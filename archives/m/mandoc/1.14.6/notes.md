@@ -39,3 +39,15 @@ make install DESTDIR=$TEST_PREFIX
 ## 注意事项
 - 无动态库，仅静态库
 - 使用 configure.local 配置，非标准 autotools
+
+---
+
+**质量修复** (2026-05-22)
+- 问题: tar.gz 未包含 libmandoc.a 静态库
+- 修复: 重新打包，添加 lib/ 目录和 libmandoc.a (1.4M)
+- 问题: manifest.yaml 字段不一致 (patches_applied/package_files)
+- 修复: 更正补丁文件名，清理缺失的 package_files 声明
+- 问题: .handoff.json 过期数据导致状态混淆
+- 修复: 备份到 reports/handoff-2026-05-21-backup.json
+- 验证: 质量门禁 PASS (G1-G4 全部通过)
+- 新包大小: 9.3M (原 8.0M + libmandoc.a 1.3M)
