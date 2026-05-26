@@ -1,0 +1,79 @@
+software: hdf5
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.13.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.13.0"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-05-27"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+  - "-DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local"
+  - "-DCMAKE_BUILD_TYPE=Release"
+  - "-DBUILD_SHARED_LIBS=ON"
+  - "-DHDF5_BUILD_EXAMPLES=OFF"
+  - "-DHDF5_BUILD_TESTING=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - zlib/system
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（仅用于 autotools，实际使用 CMake）
+patches_applied:
+- "0001-config.guess.patch"
+- "0002-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "HDF5 支持 CMake 构建，比 autotools 在鸿蒙环境更稳定"
+- "autotools 构建遇到 config.status 权限问题，改用 CMake 成功"
+- "GNU config.guess/config.sub 需要添加 HarmonyOS 和 ohos 支持"
+- "CMake 会输出平台未知警告，但不影响编译和运行"
+- "建议后续编译直接使用 CMake 构建"
