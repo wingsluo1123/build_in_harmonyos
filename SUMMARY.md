@@ -1,23 +1,23 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
 > 最后更新：2026-05-27
-> 已收录软件：420 款 / 482 个版本
+> 已收录软件：423 款 / 485 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **420** 款 |
-| 软件版本 | **482** 个 |
-| ✅ 已发布 | 23 |
-| ✅ 已编译 | 75 |
+| 收录软件 | **423** 款 |
+| 软件版本 | **485** 个 |
+| ✅ 已发布 | 24 |
+| ✅ 已编译 | 76 |
 | ❌ 编译失败 | 2 |
 
 | 构建系统 | 数量 |
 |----------|------|
-| Autotools | 170 |
+| Autotools | 171 |
 | unknown | 101 |
-| CMake | 62 |
+| CMake | 64 |
 | Makefile | 38 |
 | Meson | 13 |
 | custom | 5 |
@@ -173,7 +173,7 @@
 | **harfbuzz** | 14.2.0 | uploaded |  | Meson | 0 | - | [📄](archives/h/harfbuzz/14.2.0/) |
 | **hdrhistogram** | 0.11.9 | ✅ 已发布 |  |  | 1 | - | [📄](archives/h/hdrhistogram/0.11.9/) |
 | **help2man** | 1.49.3 | verified |  | Autotools | 0 | - | [📄](archives/h/help2man/1.49.3/) |
-| **hidapi** | 0.14.0 | ✅ 已编译 |  |  | - | - | [📄](archives/h/hidapi/0.14.0/) |
+| **hidapi** | 0.14.0 | ✅ 已编译 |  |  | 0 | - | [📄](archives/h/hidapi/0.14.0/) |
 | **hiredis** | 1.2.0 | uploaded |  | Autotools | 0 | - | [📄](archives/h/hiredis/1.2.0/) |
 | **hping** | 3.0.0-alpha-1 | ✅ 已编译 |  | Makefile | 2 | libpcap | [📄](archives/h/hping/3.0.0-alpha-1/) |
 | **htop** | 3.4.1 | verified |  | Makefile | 0 | - | [📄](archives/h/htop/3.4.1/) |
@@ -210,6 +210,7 @@
 | **libbsd** | 0.11.7、0.12.2 | ✅ 已编译 |  |  | - | - | [📄](archives/l/libbsd/0.12.2/) |
 | **libcap** | 2.69 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libcap/2.69/) |
 | **libcap-ng** | 0.9.1 | ✅ 已编译 |  | manual_makefile | 0 | linux-kernel-headers (linux/capability.h),pthread | [📄](archives/l/libcap-ng/0.9.1/) |
+| **libcbor** | 0.11.0 | ✅ 已编译 |  | CMake | 0 | - | [📄](archives/l/libcbor/0.11.0/) |
 | **libccd** | 2.1 | success |  | CMake | 3 | - | [📄](archives/l/libccd/2.1/) |
 | **libcerf** | 3.3 | success |  | CMake | - | - | [📄](archives/l/libcerf/3.3/) |
 | **libconfig** | 1.7.3 | uploaded |  | CMake | 0 | - | [📄](archives/l/libconfig/1.7.3/) |
@@ -226,8 +227,9 @@
 | **libedit** | 20240808、20240817、20251016-3.1 | partial |  | Autotools | 2 | - | [📄](archives/l/libedit/20251016-3.1/) |
 | **libepoxy** | 1.5.10 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libepoxy/1.5.10/) |
 | **libev** | 4.33 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libev/4.33/) |
-| **libevent** | 2.1.12-stable、2.1.12 | ✅ 已编译 |  | Autotools | 5 | - | [📄](archives/l/libevent/2.1.12/) |
+| **libevent** | 2.1.12-stable、2.1.12 | partial |  | Autotools | 5 | - | [📄](archives/l/libevent/2.1.12/) |
 | **libffi** | 3.4.4、3.5.2、3.4.6 | partial |  | Autotools | 3 | - | [📄](archives/l/libffi/3.4.6/) |
+| **libfido2** | 1.15.0 | ✅ 已编译 |  |  | 4 | - | [📄](archives/l/libfido2/1.15.0/) |
 | **libfontenc** | 1.1.9 | success |  | Autotools | 3 | xproto (手动安装头文件),zlib (预编译包已安装) | [📄](archives/l/libfontenc/1.1.9/) |
 | **libgcrypt** | 1.11.0 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libgcrypt/1.11.0/) |
 | **libgit2** | 1.9.4 | ✅ 已编译 |  |  | 0 | - | [📄](archives/l/libgit2/1.9.4/) |
@@ -390,6 +392,7 @@
 | **scintilla** | 5.6.1 | device_testing |  |  | 10 | - | [📄](archives/s/scintilla/5.6.1/) |
 | **scons** | 4.10.0 | uploaded |  | custom | 0 | - | [📄](archives/s/scons/4.10.0/) |
 | **screen** | 5.0.0 | uploaded |  | Makefile | 0 | - | [📄](archives/s/screen/5.0.0/) |
+| **sdl2_ttf** | 2.24.0 | ✅ 已发布 |  | CMake | 2 | - | [📄](archives/s/sdl2_ttf/2.24.0/) |
 | **sed** | 4.10、4.9 | verified |  | Autotools | 0 | - | [📄](archives/s/sed/4.9/) |
 | **sevenzip** | 26.00 | success |  | custom-makefile | 1 | - | [📄](archives/s/sevenzip/26.00/) |
 | **shorewall** | 5.2.8-r1 | success |  | shell | 1 | - | [📄](archives/s/shorewall/5.2.8-r1/) |
@@ -416,7 +419,7 @@
 | **testssl** | 3.2.3 | uploaded |  | unknown | 0 | - | [📄](archives/t/testssl/3.2.3/) |
 | **texinfo** | 7.3 | verified |  | Autotools | 0 | - | [📄](archives/t/texinfo/7.3/) |
 | **tinyssh** | 20260401 | uploaded |  | unknown | 0 | - | [📄](archives/t/tinyssh/20260401/) |
-| **tmux** | 3.4 | ✅ 已发布 |  |  | 0 | - | [📄](archives/t/tmux/3.4/) |
+| **tmux** | 3.4 | ✅ 已发布 |  | Autotools | 4 | - | [📄](archives/t/tmux/3.4/) |
 | **toml11** | 4.4.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/t/toml11/4.4.0/) |
 | **tomlplusplus** | 3.4.0 | uploaded |  | CMake | 0 | - | [📄](archives/t/tomlplusplus/3.4.0/) |
 | **traceroute** | 2.1.6 | ✅ 已编译 |  | Makefile | 1 | - | [📄](archives/t/traceroute/2.1.6/) |

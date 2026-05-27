@@ -1,0 +1,32 @@
+diff -ruN a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -246,20 +246,28 @@
+ 		set(HIDAPI_SUFFIX -hidraw)
+ 		if(NOT HAVE_CLOCK_GETTIME)
+ 			# Look for clock_gettime in librt.
+ 			check_library_exists(rt clock_gettime "time.h"
+ 			    HAVE_CLOCK_GETTIME)
+ 			if (HAVE_CLOCK_GETTIME)
+ 				add_definitions(-DHAVE_CLOCK_GETTIME)
+ 				set(BASE_LIBRARIES ${BASE_LIBRARIES} rt)
+ 			endif()
+ 		endif()
++	elseif(CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
++		# HarmonyOS lacks libudev, use hidapi instead
++		set(USE_HIDAPI ON)
++		set(NFC_LINUX OFF)
++		# pkg-config will find hidapi-libusb via PKG_CONFIG_PATH
++		set(HIDAPI_SUFFIX -libusb)
++		# Define HarmonyOS platform macro
++		add_definitions(-D__OHOS__)
+ 	else()
+ 		set(NFC_LINUX OFF)
+ 	endif()
+ 
+ 	if(MINGW)
+ 		# MinGW is stuck with a flavour of C89.
+ 		add_definitions(-DFIDO_NO_DIAGNOSTIC)
+ 		add_definitions(-DWC_ERR_INVALID_CHARS=0x80)
+ 		add_compile_options(-Wno-unused-parameter)
+ 	endif()

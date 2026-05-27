@@ -1,0 +1,55 @@
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E081
+trigger_tool:           config.status
+phase:                  configuration
+error_signature:        config\.status.*can't create.*Permission denied|mktemp.*Permission denied|csXXXXXX.*Permission denied
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               platform-environment
+match_keywords:         HMDFS, mktemp, tmpdir, umask, permission denied, config.status, temporary directory, autotools
+title:                  HMDFS mktemp 临时目录权限继承问题
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             HMDFS 文件系统创建临时目录时，umask 077 不生效。
+                        mktemp -d 创建的目录权限为 2771（继承组权限）而非预期的 700（drwx------）。
+                        导致 config.status 脚本无法在临时目录中创建 out、stdin 等文件。
+affected_scope:         所有使用 autotools 构建系统、依赖 config.status 创建临时文件的项目（如 ncurses、bash、coreutils 等）
+verification_cmd:       TMPDIR=$HOME/tmp && mkdir -p $TMPDIR && umask 077 && mktemp -d $TMPDIR/csXXXXXX | { tmp=$(cat); ls -ld "$tmp"; } && grep -q "drwx------" || echo "权限异常"
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           patch-config-status
+rec_description:        在 config.status 脚本中，mktemp -d 创建目录后，显式执行 chmod 700 确保权限正确
+rec_command:            |
+                        # 在 config.status 中找到临时目录创建代码（约第315-325行）
+                        # 在 mktemp -d 之后添加 chmod 700
+                        # 原：tmp=`(umask 077 && mktemp -d -q "$TMPDIR/csXXXXXX") 2>/dev/null`
+                        # 改：tmp=`(umask 077 && mktemp -d -q "$TMPDIR/csXXXXXX") 2>/dev/null` && chmod 700 "$tmp"
+rec_auto_fix:           false
+rec_impl:               patch-gnuconfig
+
+fallback_priority:      2
+fallback_approach:      use-alternate-tmpdir
+fallback_description:   使用非 HMDFS 挂载点的目录作为 TMPDIR（如 ~/tmp 或 /data/local/tmp）
+fallback_command:       export TMPDIR=$HOME/tmp && mkdir -p $TMPDIR
+fallback_auto_fix:      true
+fallback_impl:          env-override
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-ENV-001
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              [E002]
+similar_to:             [E002]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               draft/E081-draft-3A8B.md
+last_updated:           2026-05-27
+source_event:           ncurses 6.4 编译失败（nano 依赖）
+
+draft: true
+contributor_id: 3A8B

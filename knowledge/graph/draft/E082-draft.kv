@@ -1,0 +1,95 @@
+# E082: HarmonyOS 缺少 libudev 和 ppoll 支持
+# 状态: draft（待审核）
+# 创建日期: 2026-05-27
+# 创建者: 子任务编译 libfido2 1.15.0
+
+id: E082
+severity: 3
+category: platform_compat|system_dependency
+trigger_tool: cmake|make|clang
+stage: compilation
+
+keywords:
+  - libudev.h
+  - ppoll
+  - hid_linux.c
+  - hid_unix.c
+  - HarmonyOS
+  - systemd
+  - HID backend
+
+pattern_regex: |
+  (libudev\.h.*file not found|fatal error.*libudev\.h)
+  |(ppoll.*undeclared|call to undeclared function.*ppoll)
+
+root_cause: |
+  libfido2 在 Linux 平台上强制依赖：
+  1. libudev（systemd 组件，用于 USB HID 设备通信）
+  2. ppoll()（Linux 特有的信号安全 polling 函数）
+  
+  HarmonyOS 平台：
+  - 不使用 systemd，无 libudev
+  - 仅支持标准 poll()，不支持 ppoll()
+  
+  即使修改 CMakeLists.txt 让 HarmonyOS 使用 Linux HID 后端源码，
+  编译时仍会因为缺少 libudev 和 ppoll 而失败。
+
+affected_software:
+  - libfido2（所有版本）
+  - 其他依赖 libudev 的 HID 设备通信库
+
+solutions:
+  - priority: 1
+    type: dependency_compile
+    desc: "编译 hidapi 作为替代 HID 后端"
+    steps:
+      - 下载 hidapi 源码
+      - 编译 hidapi（使用 hidraw 后端）
+      - libfido2 配置时启用 USE_HIDAPI=ON
+    auto_fix: false
+    limitation: "需要 hidapi 预编译包或手动编译"
+    
+  - priority: 2
+    type: source_patch
+    desc: "修改 hid_unix.c 替换 ppoll"
+    steps:
+      - 将 ppoll 替换为 poll + sigprocmask 组合
+      - 或添加 #ifdef 检查 ppoll 可用性
+    auto_fix: false
+    limitation: "需要源码适配，可能影响信号处理安全性"
+    
+  - priority: 3
+    type: build_option
+    desc: "禁用 HID 后端，仅提供库 API"
+    steps:
+      - 在 CMakeLists.txt 中添加 HarmonyOS 特殊处理
+      - 定义空 HID 实现（仅编译通过，无实际功能）
+    auto_fix: false
+    limitation: "功能受限，无法与 FIDO2 设备通信"
+
+forbidden_actions:
+  - "强制安装 systemd/libudev → HarmonyOS 不支持 systemd"
+  - "忽略 libudev 缺失继续编译 → 会产生更多错误"
+
+related_errors: []
+
+principle_refs:
+  - R8: 源码"四不"准则（使用 #ifdef __OHOS__ 守卫）
+
+example_log: |
+  /path/to/hid_linux.c:16:10: fatal error: 'libudev.h' file not found
+  #include <libudev.h>
+           ^~~~~~~~~~~
+  
+  /path/to/hid_unix.c:69:11: error: call to undeclared function 'ppoll'
+  ISO C99 and later do not support implicit function declarations
+
+resolution_example: |
+  # 方案 1: 使用 hidapi
+  cmake -DUSE_HIDAPI=ON ...
+  
+  # 方案 2: 禁用 HID
+  # src/CMakeLists.txt 修改：
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+    # HarmonyOS 暂不支持 HID 设备通信
+    list(APPEND FIDO_SOURCES hid_stub.c)  # 需创建空实现
