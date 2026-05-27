@@ -1,0 +1,113 @@
+software: tmux
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/3.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.4"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 构建系统类型
+# cmake | autotools | makefile | meson | custom
+build_system: autotools
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-05-27"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--enable-static"
+    - "--disable-shared"
+    - "EVENT_CFLAGS=-I/storage/Users/currentUser/usr/local/include"
+    - "EVENT_LIBS=-L/storage/Users/currentUser/usr/local/lib -levent_core -levent_extra"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - ncurses/6.4
+    - libevent/2.1.12
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.status.patch"
+  - "0002-configure.patch"
+  - "0003-etc-config.guess.patch"
+  - "0004-etc-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "HarmonyOS HMDFS 文件系统限制：configure/config.status 无法在当前目录创建临时目录，需修改为使用绝对路径的临时目录"
+  - "静态链接配置：使用 LDFLAGS=-static 和 EVENT_LIBS=-levent_core -levent_extra 强制静态链接 libevent"
+  - "config.guess/config.sub 补丁：添加 HarmonyOS 系统识别（*:HarmonyOS:*:*）和 linux-ohos 三元组支持"
+  - "config.status 临时目录修改：将 mktemp -d './confXXXXXX' 改为 '/storage/Users/currentUser/tmp/confXXXXXX' 解决 HMDFS 权限问题"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tmux-3.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tmux-3.4.work
+  source_orig_hash: 58f4ff4a1e0b62ef
+  source_work_hash: cb3547873e742aab
+  generated_at: '2026-05-27T19:01:17'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.status.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-etc-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-etc-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
