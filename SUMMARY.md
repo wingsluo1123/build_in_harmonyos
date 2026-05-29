@@ -1,17 +1,17 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
 > 最后更新：2026-05-29
-> 已收录软件：424 款 / 488 个版本
+> 已收录软件：431 款 / 495 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **424** 款 |
-| 软件版本 | **488** 个 |
-| ✅ 已发布 | 28 |
-| ✅ 已编译 | 74 |
-| ❌ 编译失败 | 2 |
+| 收录软件 | **431** 款 |
+| 软件版本 | **495** 个 |
+| ✅ 已发布 | 26 |
+| ✅ 已编译 | 81 |
+| ❌ 编译失败 | 5 |
 
 | 构建系统 | 数量 |
 |----------|------|
@@ -19,7 +19,7 @@
 | unknown | 101 |
 | CMake | 62 |
 | Makefile | 38 |
-| Meson | 13 |
+| Meson | 14 |
 | custom | 5 |
 | openssl-perl | 1 |
 | python | 1 |
@@ -48,6 +48,7 @@
 | **aria2** | 1.37.0 | 📦 已归档 |  |  | - | - | [📄](archives/a/aria2/1.37.0/) |
 | **arp-scan** | 1.10.0 | partial |  | Autotools | - | libpcap >= 1.5.0,libpcap 1.10.6 (静态链接) | [📄](archives/a/arp-scan/1.10.0/) |
 | **asciidoc** | 10.2.1 | ✅ 已编译 |  | python | 3 | - | [📄](archives/a/asciidoc/10.2.1/) |
+| **assimp** | 6.0.5 | ✅ 已发布 |  |  | 0 | - | [📄](archives/a/assimp/6.0.5/) |
 | **autoconf** | 2.72 | uploaded |  | Autotools | 0 | - | [📄](archives/a/autoconf/2.72/) |
 | **autoconf-archive** | 2024.10.16 | uploaded |  | unknown | 0 | - | [📄](archives/a/autoconf-archive/2024.10.16/) |
 | **automake** | 1.16.5、1.17 | uploaded |  | Autotools | 0 | - | [📄](archives/a/automake/1.17/) |
@@ -132,7 +133,7 @@
 | **elinks** | 0.19.1 | success |  | Meson | - | - | [📄](archives/e/elinks/0.19.1/) |
 | **entr** | 5.8 | partial |  | Autotools | - | - | [📄](archives/e/entr/5.8/) |
 | **exiftool** | 13.50 | partial |  | perl_makemaker | - | - | [📄](archives/e/exiftool/13.50/) |
-| **expat** | 2.7.1、2.8.0、2.6.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/e/expat/2.6.0/) |
+| **expat** | 2.7.1、2.8.0、2.6.0 | ✅ 已编译 |  |  | 3 | - | [📄](archives/e/expat/2.6.0/) |
 | **faac** | 1.40 | success |  | Meson | - | - | [📄](archives/f/faac/1.40/) |
 | **faad2** | 2.11.2 | success |  | CMake | - | - | [📄](archives/f/faad2/2.11.2/) |
 | **farbfeld** | 4 | uploaded |  | unknown | 0 | - | [📄](archives/f/farbfeld/4/) |
@@ -159,7 +160,7 @@
 | **giflib** | 5.2.2 | uploaded |  | unknown | 0 | - | [📄](archives/g/giflib/5.2.2/) |
 | **git** | 2.49.0、2.45 | partial |  | Autotools | - | - | [📄](archives/g/git/2.45/) |
 | **glances** | 4.5.4 | ✅ 已编译 |  |  | 2 | - | [📄](archives/g/glances/4.5.4/) |
-| **glew** | 2.3.1 | ✅ 已发布 |  |  | 0 | - | [📄](archives/g/glew/2.3.1/) |
+| **glew** | 2.3.1 | ❌ 编译失败 |  |  | 0 | - | [📄](archives/g/glew/2.3.1/) |
 | **glib** | 2.84.0 | ✅ 已编译 |  | Meson | 3 | libffi >= 3.4.4,pcre2 >= 10.47,meson >= 1.11.1,ninja >= 1.13 | [📄](archives/g/glib/2.84.0/) |
 | **glm** | 0.9.9.8 | uploaded |  | CMake | 0 | - | [📄](archives/g/glm/0.9.9.8/) |
 | **glog** | 0.7.1 | partial |  | Autotools | 1 | - | [📄](archives/g/glog/0.7.1/) |
@@ -169,6 +170,7 @@
 | **gnupg** | 2.5.20 | ✅ 已编译 |  |  | 3 | - | [📄](archives/g/gnupg/2.5.20/) |
 | **gnutls** | 3.8.13、3.8.4 | ✅ 已发布 |  |  | 0 | - | [📄](archives/g/gnutls/3.8.4/) |
 | **gpatch** | 2.8 | partial |  | Autotools | 2 | libattr (未安装，无xattr支持) | [📄](archives/g/gpatch/2.8/) |
+| **gpgme** | 2.1.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/g/gpgme/2.1.0/) |
 | **gsm** | 1.0.22、1.0.23 | uploaded |  | unknown | 0 | - | [📄](archives/g/gsm/1.0.23/) |
 | **gzip** | 1.13 | verified |  | Autotools | 0 | - | [📄](archives/g/gzip/1.13/) |
 | **harfbuzz** | 14.2.0 | uploaded |  | Meson | 0 | - | [📄](archives/h/harfbuzz/14.2.0/) |
@@ -281,13 +283,16 @@
 | **libusb** | 1.0.27 | uploaded |  | unknown | 0 | - | [📄](archives/l/libusb/1.0.27/) |
 | **libusrsctp** | 0.9.5.0 | success |  | CMake | 5 | - | [📄](archives/l/libusrsctp/0.9.5.0/) |
 | **libuv** | 1.52.1 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libuv/1.52.1/) |
+| **libvirt** | 11.3.0 | ❌ 编译失败 |  |  | 0 | - | [📄](archives/l/libvirt/11.3.0/) |
 | **libwebp** | 1.3.2 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libwebp/1.3.2/) |
 | **libxau** | 1.0.11 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libxau/1.0.11/) |
 | **libxcb** | 1.16 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libxcb/1.16/) |
 | **libxcvt** | 0.1.3 | success |  | Meson | - | - | [📄](archives/l/libxcvt/0.1.3/) |
 | **libxdmcp** | 1.1.4 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libxdmcp/1.1.4/) |
 | **libxml2** | 2.15.3 | ✅ 已编译 |  |  | 6 | - | [📄](archives/l/libxml2/2.15.3/) |
+| **libxmlsec1** | 1.3.11 | ✅ 已发布 |  |  | 0 | - | [📄](archives/l/libxmlsec1/1.3.11/) |
 | **libxshmfence** | 1.3.3 | success |  | Autotools | 2 | - | [📄](archives/l/libxshmfence/1.3.3/) |
+| **libxslt** | 1.1.45 | ✅ 已编译 |  |  | 2 | libxml2 >= 2.9.13 | [📄](archives/l/libxslt/1.1.45/) |
 | **libzip** | 1.10.1、1.11.4 | ✅ 已编译 |  |  | - | - | [📄](archives/l/libzip/1.11.4/) |
 | **llhttp** | 9.3.1 | ✅ 已发布 |  |  | - | - | [📄](archives/l/llhttp/9.3.1/) |
 | **lm-sensors** | 3.6.0 | uploaded |  | Makefile | 0 | - | [📄](archives/l/lm-sensors/3.6.0/) |
@@ -366,6 +371,7 @@
 | **plzip** | 1.13 | uploaded |  | Makefile | 0 | lzlib | [📄](archives/p/plzip/1.13/) |
 | **polipo** | 1.1.1 | ✅ 已发布 |  | Makefile | - | - | [📄](archives/p/polipo/1.1.1/) |
 | **popt** | 1.16 | uploaded |  | unknown | 0 | - | [📄](archives/p/popt/1.16/) |
+| **proj** | 9.3.1 | ✅ 已编译 |  |  | 1 | - | [📄](archives/p/proj/9.3.1/) |
 | **protobuf** | 34.1 | uploaded |  | CMake | 0 | abseil-cpp (20260107.1) | [📄](archives/p/protobuf/34.1/) |
 | **proxychains-ng** | 4.16 | ✅ 已编译 |  | Autotools | - | - | [📄](archives/p/proxychains-ng/4.16/) |
 | **psmisc** | 23.6 | partial |  | Autotools | - | ncurses | [📄](archives/p/psmisc/23.6/) |
@@ -391,9 +397,7 @@
 | **scons** | 4.10.0 | uploaded |  | custom | 0 | - | [📄](archives/s/scons/4.10.0/) |
 | **screen** | 5.0.0 | uploaded |  | Makefile | 0 | - | [📄](archives/s/screen/5.0.0/) |
 | **sdl3-image** | 3.4.0 | ✅ 已编译 |  | CMake | 0 | - | [📄](archives/s/sdl3-image/3.4.0/) |
-| **sdl3-mixer** | 3.2.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-mixer/3.2.0/) |
-| **sdl3-shadercross** | 3.0.0-preview1 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-shadercross/3.0.0-preview1/) |
-| **sdl3-ttf** | 3.2.2 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-ttf/3.2.2/) |
+| **sdl3-mixer** | 3.2.0 | ✅ 已编译 |  |  | 1 | - | [📄](archives/s/sdl3-mixer/3.2.0/) |
 | **sed** | 4.10、4.9 | verified |  | Autotools | 0 | - | [📄](archives/s/sed/4.9/) |
 | **sevenzip** | 26.00 | success |  | custom-makefile | 1 | - | [📄](archives/s/sevenzip/26.00/) |
 | **shorewall** | 5.2.8-r1 | success |  | shell | 1 | - | [📄](archives/s/shorewall/5.2.8-r1/) |
@@ -441,9 +445,12 @@
 | **waf** | 2.1.9 | uploaded |  | custom | 0 | - | [📄](archives/w/waf/2.1.9/) |
 | **watchdog** | 5.16 | success |  | Autotools | - | - | [📄](archives/w/watchdog/5.16/) |
 | **wavpack** | 5.7.0、5.8.1 | uploaded |  | unknown | 0 | - | [📄](archives/w/wavpack/5.8.1/) |
+| **wayland** | 1.22.0 | ✅ 已编译 |  |  | 0 | - | [📄](archives/w/wayland/1.22.0/) |
+| **wayland-protocols** | 1.33 | ✅ 已编译 |  | Meson | 0 | - | [📄](archives/w/wayland-protocols/1.33/) |
 | **wget** | 1.19.1 | verified |  | Autotools | 0 | - | [📄](archives/w/wget/1.19.1/) |
 | **which** | 2.21 | partial |  | Autotools | 2 | - | [📄](archives/w/which/2.21/) |
 | **wimlib** | 1.14.5 | uploaded |  | unknown | 0 | - | [📄](archives/w/wimlib/1.14.5/) |
+| **wxwidgets** | 3.2.10 | ✅ 已编译 |  |  | 0 | - | [📄](archives/w/wxwidgets/3.2.10/) |
 | **xmlrpc-c** | 1.64.03 | ✅ 已编译 |  | Autotools | 2 | - | [📄](archives/x/xmlrpc-c/1.64.03/) |
 | **xmlstarlet** | 1.6.1 | ✅ 已编译 |  | Autotools | - | libxml2 >= 2.15.0,libxslt >= 1.1.42,clang,libxml2-dev,libxslt-dev | [📄](archives/x/xmlstarlet/1.6.1/) |
 | **xorgproto** | 2024.1 | success |  | Meson | 2 | [] | [📄](archives/x/xorgproto/2024.1/) |
