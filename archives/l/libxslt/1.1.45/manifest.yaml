@@ -1,0 +1,70 @@
+software: libxslt
+version: 1.1.45
+category: library
+description: XSLT transformation library
+website: https://gitlab.gnome.org/GNOME/libxslt
+license: MIT
+
+status: built
+
+download:
+  url: https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.45.tar.xz
+  sha256: verify_required
+
+dependencies:
+  runtime:
+    - libxml2 >= 2.9.13
+
+build:
+  system: cmake
+  configure_options:
+    - DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX
+    - DCMAKE_C_COMPILER=clang
+    - DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=bfd -Wl,-rpath,$DEFAULT_PREFIX/lib
+  make_options:
+    - -j2
+  test_result: skipped
+  test_skip_reason: HMDFS permission denied (E046)
+
+install:
+  prefix: ~/usr/local
+  destdir_test: ~/tmp/test-install-libxslt-1.1.45
+
+artifacts:
+  libraries:
+    - libxslt.so
+    - libexslt.so
+  executables:
+    - xsltproc
+  pkgconfig:
+    - libxslt.pc
+    - libexslt.pc
+
+platform_issues:
+  - HMDFS permission denied for test execution
+  - lld linker requires libxml2.so.16 (solved by using ld.bfd)
+  - config.guess/config.sub need ohos support
+
+knowledge_gained:
+  - CMake build works on OpenHarmony
+  - Need -fuse-ld=bfd due to lld libxml2 dependency
+  - RPATH must be set manually with patchelf
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libxslt-1.1.45.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libxslt-1.1.45.work
+  source_orig_hash: bbe180874e8fcc60
+  source_work_hash: 059e45dcdb6dab0f
+  generated_at: '2026-05-29T19:03:50'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
