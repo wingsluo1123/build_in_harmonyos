@@ -1,23 +1,23 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
-> 最后更新：2026-05-27
-> 已收录软件：417 款 / 479 个版本
+> 最后更新：2026-05-29
+> 已收录软件：424 款 / 488 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **417** 款 |
-| 软件版本 | **479** 个 |
-| ✅ 已发布 | 22 |
-| ✅ 已编译 | 73 |
-| ❌ 编译失败 | 1 |
+| 收录软件 | **424** 款 |
+| 软件版本 | **488** 个 |
+| ✅ 已发布 | 28 |
+| ✅ 已编译 | 74 |
+| ❌ 编译失败 | 2 |
 
 | 构建系统 | 数量 |
 |----------|------|
 | Autotools | 170 |
 | unknown | 101 |
-| CMake | 61 |
+| CMake | 62 |
 | Makefile | 38 |
 | Meson | 13 |
 | custom | 5 |
@@ -159,13 +159,15 @@
 | **giflib** | 5.2.2 | uploaded |  | unknown | 0 | - | [📄](archives/g/giflib/5.2.2/) |
 | **git** | 2.49.0、2.45 | partial |  | Autotools | - | - | [📄](archives/g/git/2.45/) |
 | **glances** | 4.5.4 | ✅ 已编译 |  |  | 2 | - | [📄](archives/g/glances/4.5.4/) |
+| **glew** | 2.3.1 | ✅ 已发布 |  |  | 0 | - | [📄](archives/g/glew/2.3.1/) |
 | **glib** | 2.84.0 | ✅ 已编译 |  | Meson | 3 | libffi >= 3.4.4,pcre2 >= 10.47,meson >= 1.11.1,ninja >= 1.13 | [📄](archives/g/glib/2.84.0/) |
 | **glm** | 0.9.9.8 | uploaded |  | CMake | 0 | - | [📄](archives/g/glm/0.9.9.8/) |
 | **glog** | 0.7.1 | partial |  | Autotools | 1 | - | [📄](archives/g/glog/0.7.1/) |
 | **glproto** | 1.4.17 | compiling |  | Autotools | - | - | [📄](archives/g/glproto/1.4.17/) |
-| **gmp** | 6.3.0 | ✅ 已编译 |  | Autotools | 3 | [] | [📄](archives/g/gmp/6.3.0/) |
+| **gmp** | 6.3.0 | pending |  | Autotools | 3 | [] | [📄](archives/g/gmp/6.3.0/) |
 | **gmssl** | 3.1.1 | uploaded |  | CMake | 0 | - | [📄](archives/g/gmssl/3.1.1/) |
 | **gnupg** | 2.5.20 | ✅ 已编译 |  |  | 3 | - | [📄](archives/g/gnupg/2.5.20/) |
+| **gnutls** | 3.8.13、3.8.4 | ✅ 已发布 |  |  | 0 | - | [📄](archives/g/gnutls/3.8.4/) |
 | **gpatch** | 2.8 | partial |  | Autotools | 2 | libattr (未安装，无xattr支持) | [📄](archives/g/gpatch/2.8/) |
 | **gsm** | 1.0.22、1.0.23 | uploaded |  | unknown | 0 | - | [📄](archives/g/gsm/1.0.23/) |
 | **gzip** | 1.13 | verified |  | Autotools | 0 | - | [📄](archives/g/gzip/1.13/) |
@@ -325,7 +327,7 @@
 | **musl-obstack** | 1.2.3 | uploaded |  | unknown | 0 | - | [📄](archives/m/musl-obstack/1.2.3/) |
 | **nano** | 9.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/n/nano/9.0/) |
 | **ncurses** | 6.4 | verified |  | Autotools | 0 | - | [📄](archives/n/ncurses/6.4/) |
-| **nettle** | 3.10.2、3.10 | partial |  | Autotools | 47 | - | [📄](archives/n/nettle/3.10/) |
+| **nettle** | 3.10.2、3.10、4.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/n/nettle/4.0/) |
 | **nghttp2** | 1.69.0 | ✅ 已编译 |  |  | 1 | - | [📄](archives/n/nghttp2/1.69.0/) |
 | **nghttp3** | 1.15.0 | success |  | CMake | 1 | [] | [📄](archives/n/nghttp3/1.15.0/) |
 | **nginx** | 1.26.2 | partial |  | Autotools | - | - | [📄](archives/n/nginx/1.26.2/) |
@@ -388,6 +390,10 @@
 | **scintilla** | 5.6.1 | device_testing |  |  | 10 | - | [📄](archives/s/scintilla/5.6.1/) |
 | **scons** | 4.10.0 | uploaded |  | custom | 0 | - | [📄](archives/s/scons/4.10.0/) |
 | **screen** | 5.0.0 | uploaded |  | Makefile | 0 | - | [📄](archives/s/screen/5.0.0/) |
+| **sdl3-image** | 3.4.0 | ✅ 已编译 |  | CMake | 0 | - | [📄](archives/s/sdl3-image/3.4.0/) |
+| **sdl3-mixer** | 3.2.0 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-mixer/3.2.0/) |
+| **sdl3-shadercross** | 3.0.0-preview1 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-shadercross/3.0.0-preview1/) |
+| **sdl3-ttf** | 3.2.2 | ✅ 已发布 |  |  | 0 | - | [📄](archives/s/sdl3-ttf/3.2.2/) |
 | **sed** | 4.10、4.9 | verified |  | Autotools | 0 | - | [📄](archives/s/sed/4.9/) |
 | **sevenzip** | 26.00 | success |  | custom-makefile | 1 | - | [📄](archives/s/sevenzip/26.00/) |
 | **shorewall** | 5.2.8-r1 | success |  | shell | 1 | - | [📄](archives/s/shorewall/5.2.8-r1/) |
@@ -430,6 +436,7 @@
 | **utf8proc** | 2.11.3、2.9.0 | uploaded |  | CMake | 0 | - | [📄](archives/u/utf8proc/2.9.0/) |
 | **uthash** | 2.3.0 | uploaded |  | CMake | 0 | - | [📄](archives/u/uthash/2.3.0/) |
 | **vala** | 0.56.18 | uploaded |  | Meson | 0 | - | [📄](archives/v/vala/0.56.18/) |
+| **vips** | 8.18.2 | ✅ 已编译 |  |  | 2 | - | [📄](archives/v/vips/8.18.2/) |
 | **vulkan-headers** | 1.3.295 | partial |  | Autotools | 1 | - | [📄](archives/v/vulkan-headers/1.3.295/) |
 | **waf** | 2.1.9 | uploaded |  | custom | 0 | - | [📄](archives/w/waf/2.1.9/) |
 | **watchdog** | 5.16 | success |  | Autotools | - | - | [📄](archives/w/watchdog/5.16/) |
