@@ -1,0 +1,93 @@
+software: sdl3-shadercross
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/3.0.0-preview1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.0.0-preview1"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-05-29"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "file:///storage/Users/currentUser/tmp/sdl3-shadercross-3.0.0-preview1.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_INSTALL_PREFIX=$HOME/usr/local"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DSDLSHADERCROSS_VENDORED=ON"
+    - "-DSDLSHADERCROSS_DXC=OFF"
+    - "-DSDLSHADERCROSS_INSTALL=ON"
+    - "-DSDLSHADERCROSS_CLI=ON"
+    - "-DSDLSHADERCROSS_SHARED=ON"
+    - "-DSDLSHADERCROSS_STATIC=OFF"
+    - "-DCMAKE_INSTALL_RPATH=$HOME/usr/local/lib"
+    - "-DCMAKE_BUILD_RPATH=$HOME/usr/local/lib"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - sdl3/3.4.8
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "SPIRV-Cross vendored 模式需要在 CMake 配置时初始化 git submodules"
+  - "生成的 libSDL3_shadercross.so 中 spirv-cross-c-shared.so 的 NEEDED 路径是相对路径，需要用 patchelf --replace-needed 修复"
+  - "shadercross CLI 需要添加 RPATH 才能找到 libSDL3_shadercross.so"
+  - "所有二进制文件都需要 ELF 签名才能在鸿蒙上执行"
+  - "__stdcall 调用约定在 ARM64 上不支持，会产生警告但不影响编译"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

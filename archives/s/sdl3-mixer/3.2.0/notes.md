@@ -69,5 +69,5 @@ make test  # exit code 0
 - 部分后端禁用（opus、gme、xmp、mpg123、fluidsynth、wavpack）因缺少对应库
 ---
 
-**编译结束**: 2026-05-29 15:53
+**编译结束**: 2026-05-29 16:05
 **最终状态**: built
