@@ -748,7 +748,7 @@ class BuildDriver:
             }
 
             def do_configure():
-                return self._run(_configure_cmd, cwd=str(vpath_dir), env_extra=_env_extra)
+                return self._run(f"umask 0 && {_configure_cmd}", cwd=str(vpath_dir), env_extra=_env_extra)
 
             def do_retry(fix_cmd):
                 self._run("make distclean 2>/dev/null || true", cwd=str(vpath_dir))
