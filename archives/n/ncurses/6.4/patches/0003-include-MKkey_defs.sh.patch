@@ -1,0 +1,40 @@
+diff -ruN a/include/MKkey_defs.sh b/include/MKkey_defs.sh
+--- a/include/MKkey_defs.sh
++++ b/include/MKkey_defs.sh
+@@ -42,32 +42,24 @@
+ data=data$$
+ pass1=pass1_$$
+ pass2=pass2_$$
+ pass3=pass3_$$
+ pass4=pass4_$$
+ trap 'rm -f $data pass[1234]_$$; exit 1' 1 2 3 15
+ trap 'rm -f $data pass[1234]_$$' 0
+ 
+ # change repeated tabs (used for readability) to single tabs (needed to make
+ # awk see the right field alignment of the corresponding columns):
+-if sort -k 6 "$@" >$data 2>/dev/null
+-then
+-	# POSIX
+-	sed -e 's/[	][	]*/	/g' "$@" |sort -n -k 6 >$data
+-elif sort -n +5 "$@" >$data 2>/dev/null
+-then
+-	# SunOS (and SVr4, marked as obsolete but still recognized)
+-	sed -e 's/[	][	]*/	/g' "$@" |sort -n +5 >$data
+-else
+-	echo "Your sort utility is broken.  Please install one that works." >&2
+-	exit 1
+-fi
++# HMDFS fix: avoid sort permissions issues, use simpler method
++sed -e 's/[	][	]*/	/g' "$@" >$data.unsorted
++LC_ALL=C sort -n -k 6 $data.unsorted >$data
++rm -f $data.unsorted
+ 
+ # add keys that we generate automatically:
+ cat >>$data <<EOF
+ key_resize	kr1	str	R1	KEY_RESIZE	+	NCURSES_EXT_FUNCS 	Terminal resize event
+ EOF
+ 
+ THIS=./`basename "$0"`
+ 
+ cat <<EOF
+ /*

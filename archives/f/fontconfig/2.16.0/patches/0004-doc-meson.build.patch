@@ -1,0 +1,59 @@
+diff -ruN a/doc/meson.build b/doc/meson.build
+--- a/doc/meson.build
++++ b/doc/meson.build
+@@ -44,29 +44,29 @@
+   'fcweight',
+ ]
+ 
+ fncs_files = []
+ foreach f : doc_funcs_fncs
+   fncs_files += files('@0@.fncs'.format(f))
+ endforeach
+ 
+ man_pages = []
+ 
+-extract_man_list = find_program('extract-man-list.py')
+-man_list = run_command(extract_man_list, fncs_files, check: true).stdout().split()
++extract_man_list = find_program('python3')
++man_list = run_command(extract_man_list, files('extract-man-list.py'), fncs_files, check: true).stdout().split()
+ 
+ foreach m : man_list
+   man_pages += ['@0@.3'.format(m)]
+ endforeach
+ 
+ # Generate sgml pages for funcs
+-edit_sgml = find_program('edit-sgml.py')
++edit_sgml = find_program('python3')
+ 
+ # copy into build directory, it includes generated files from build directory
+ fontconfig_devel_sgml = fs.copyfile('fontconfig-devel.sgml')
+ fontconfig_user_sgml = fs.copyfile('fontconfig-user.sgml')
+ 
+ version_conf = configuration_data()
+ version_conf.set('VERSION', meson.project_version())
+ 
+ configure_file(output: 'version.sgml',
+   input: 'version.sgml.in',
+@@ -78,21 +78,21 @@
+ confdir_sgml = configure_file(output: 'confdir.sgml',
+   input: 'confdir.sgml.in',
+   configuration: confdir_conf)
+ 
+ funcs_sgml = []
+ 
+ foreach f : doc_funcs_fncs
+   funcs_sgml += [custom_target('@0@.sgml'.format(f),
+     input: [files('func.sgml'), files('@0@.fncs'.format(f))],
+     output: '@0@.sgml'.format(f),
+-    command: [edit_sgml, '@INPUT0@', '@INPUT1@', '@OUTPUT@'],
++    command: [edit_sgml, files('edit-sgml.py'), '@INPUT0@', '@INPUT1@', '@OUTPUT@'],
+     install: false)]
+ endforeach
+ 
+ if docbook2man.found()
+   doc_targets += ['man']
+ 
+   custom_target('devel-man',
+     input: [fontconfig_devel_sgml, funcs_sgml],
+     output: man_pages,
+     command: [run_quiet, docbook2man, '@INPUT0@', '--output', '@OUTDIR@'],

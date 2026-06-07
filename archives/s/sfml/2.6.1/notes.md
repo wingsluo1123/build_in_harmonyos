@@ -107,4 +107,65 @@ ls -la $TEST_PREFIX/$DEFAULT_PREFIX/lib/
 ---
 
 **编译结束**: 2026-05-30 00:17
-**最终状态**: built
+**最终状态**: partial
+
+## 运行问题诊断与修复（2026-06-01）
+
+### 发现的问题
+1. **动态链接路径错误**：
+   - libsfml-network.so 的 NEEDED 依赖为 `../../../lib/libsfml-system.so`（相对路径）
+   - 这个路径是编译时CMake设置的，相对于构建目录
+   - 在运行时无法解析，导致加载失败
+
+2. **验证结果**：
+   - ✅ libsfml-system.so 可单独加载
+   - ❌ libsfml-network.so 加载失败：找不到 `../../../lib/libsfml-system.so`
+
+3. **根因分析**：
+   - SFML 使用 CMake 构建系统，设置了相对路径的库间依赖
+   - 打包时虽然设置了正确的 RUNPATH `$ORIGIN:$ORIGIN/external`
+   - 但 NEEDED 字段中的相对路径优先级更高，导致加载失败
+
+### 匹配的知识条目
+- E073: filesystem|hmdfs|runtime-linking（HMDFS对.so运行时加载支持不完整）
+- E042: packaging|rpath|linking|runtime（RPATH设置问题）
+
+### 修复方案与执行
+**方案**：使用 patchelf 修改 NEEDED 字段，将相对路径改为库名
+
+**执行步骤**：
+1. 使用 `/data/service/hnp/bin/patchelf --replace-needed` 修改NEEED依赖
+2. 移除旧签名：`llvm-objcopy --remove-section .codesign`
+3. 重新签名：`binary-sign-tool sign -selfSign 1`
+4. 重新打包：`ohc-run.py package`
+
+**修复结果**：
+```bash
+# 修复前
+NEEDED: ../../../lib/libsfml-system.so  ❌
+
+# 修复后
+NEEDED: libsfml-system.so  ✅
+```
+
+### 验证结果
+- ✅ libsfml-system.so 可正常加载
+- ✅ libsfml-network.so 可正常加载
+- ✅ Python ctypes 测试通过
+- ✅ 预编译包已重新生成（sfml-2.6.1-ohos-aarch64.tar.gz）
+
+### 质量门禁结果
+- G1-G4: PASS ✅
+- 运行时验证：PASS ✅（修复后两个模块都可正常加载）
+- 状态判定：partial → built（修复成功，System和Network模块都可运行）
+
+### 新发现的问题模式（已创建知识草稿）
+这是一个新的问题模式：**CMake库间依赖使用相对路径**，可能影响其他CMake项目。
+
+**已创建知识条目草稿**：E106 - CMake库间依赖相对路径问题
+- 文件位置：knowledge/graph/draft/E106.kv
+- 待审核：主任务审核后合并到正式图谱
+
+**触发模式**：readelf 显示 NEEDED 字段为 `../../../lib/libxxx.so`
+**根因**：CMake 设置库间依赖时使用构建目录相对路径
+**修复方案**：patchelf --replace-needed + 重签名 + 重新打包

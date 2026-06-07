@@ -1,0 +1,112 @@
+software: graphviz
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/15.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "15.0.0"
+
+# 编译状态
+# published | built | failed | archived
+status: failed
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-05-31"
+
+# 编译完成日期
+compile_date: "2026-05-31"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/15.0.0/graphviz-15.0.0.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  # R15 铁律：不使用 --build/--host/--target（native 编译）
+  # 正确做法：让 config.guess 自动识别平台
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+  # 注意：--build 参数已被删除（违反 R15），改为修改 config.guess/config.sub（E007）
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.log.patch"
+  - "0002-config.guess-ohos.patch"
+  - "0003-config.sub-ohos.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "E007: config.guess/config.sub 需要添加 OHOS 平台检测（uname -s 和目录检测）"
+  - "E008: SELinux/HMDFS 平台限制（fstat, Permission denied）"
+  - "OHOS SDK lld 依赖 libxml2，可用 -fuse-ld=bfd 绕过"
+  - "compiler-rt 运行时库：解决 __subtf3 等 soft-float 符号缺失"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/graphviz-15.0.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/graphviz-15.0.0.work
+  source_orig_hash: 99a109e01782be1e
+  source_work_hash: 0320f536afd044ad
+  generated_at: '2026-06-07T13:12:14'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.log.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.status.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

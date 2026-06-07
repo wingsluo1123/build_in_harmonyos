@@ -1,0 +1,95 @@
+diff -ruN /dev/null b/.pre-scan-report.yaml
+--- /dev/null
++++ b/.pre-scan-report.yaml
+@@ -0,0 +1,91 @@
++src_dir: /storage/Users/currentUser/tmp/builds/ncurses-6.4.work
++findings:
++- rule_id: PSCAN-HMDFS-001
++  category: hmdfs
++  severity: critical
++  description: Makefile 中的 ln -s 创建符号链接，HMDFS 不支持
++  hits:
++  - "Ada95/gen/Makefile.in:328: @USE_OLD_MAKERULES@\tln -sf ../src/*.ali ."
++  - "Ada95/gen/Makefile.in:329: @USE_GNAT_PROJECTS@\tln -sf ../static-ali/*.ali ."
++  kb_ref: P-HMDFS-001
++  solution_hint: sed 's/ln -s/cp -a/g' 或 wrapper 脚本替代
++  auto_generated: false
++- rule_id: PSCAN-FS-001
++  category: filesystem
++  severity: medium
++  description: /tmp 路径硬编码，HMDFS 上 /tmp 为只读 erofs
++  hits:
++  - 'progs/tic.c:392: _nc_STRCPY(filename, "/tmp/XXXXXX", PATH_MAX);'
++  kb_ref: null
++  solution_hint: 改用 $TMPDIR 或 /data/local/tmp
++  auto_generated: false
++- rule_id: PSCAN-PATH-001
++  category: hardcoded_path
++  severity: medium
++  description: 源码中硬编码 /etc/ 路径，可能不被 --prefix 覆盖
++  hits:
++  - 'progs/tic.c:920: source_file = "/etc/termcap";'
++  - 'progs/tset.c:582: if ((fp = fopen("/etc/ttytype", "r")) != 0'
++  - 'progs/tset.c:583: || (fp = fopen("/etc/ttys", "r")) != 0) {'
++  - 'test/picsmap.c:83: #define RGB_PATH "/etc/X11/rgb.txt"'
++  kb_ref: null
++  solution_hint: '检查是否通过 configure --sysconfdir 或 #define 配置'
++  auto_generated: false
++- rule_id: PSCAN-MUSL-001
++  category: musl_compat
++  severity: critical
++  description: pthread_cancel 在 musl/OHOS 上不可用
++  hits:
++  - 'test/ditto.c:369: pthread_cancel(ddata.ditto[j].thread);'
++  - 'test/ditto.c:373: pthread_cancel(ddata.ditto[later].thread);'
++  kb_ref: null
++  solution_hint: '#ifdef __OHOS__ 跳过 cancel，改用标志位+pthread_join'
++  auto_generated: false
++- rule_id: PSCAN-BUILD-001
++  category: build_system
++  severity: auto
++  description: 检测 config.guess/config.sub 存在，autotools 项目需打补丁
++  hits:
++  - 'config.guess: EXISTS'
++  - 'config.sub: EXISTS'
++  kb_ref: E007,E072
++  solution_hint: patch-autotools-ohos.pl 自动修复
++  auto_generated: false
++- rule_id: PSCAN-DOC-001
++  category: docs
++  severity: info
++  description: 文档中声明了 Linux/glibc 依赖，可能需要平台适配
++  hits:
++  - 'README.MinGW:51: required Windows SDK level.  Please note that some of the Linux
++    distributions'
++  - 'NEWS:9909: that checks if the function works, needed for older glibc and'
++  - 'NEWS:10154: + add configure check to define _GNU_SOURCE, needed to prop up glibc'
++  kb_ref: null
++  solution_hint: AI 读取相关文档判断具体风险
++  auto_generated: false
++- rule_id: PSCAN-MUSL-FUNC-pthread_kill
++  category: musl_compat
++  severity: medium
++  description: 源码中使用 pthread_kill()，musl/OHOS 上可能不可用
++  hits:
++  - 'ncurses/tty/lib_tstp.c:293: if ((pthread_self) && (pthread_kill) && (pthread_equal))'
++  - 'ncurses/tty/lib_tstp.c:312: pthread_kill(_nc_globals.read_thread, SIGWINCH);'
++  - 'ncurses/curses.priv.h:635: weak_symbol(pthread_kill);'
++  - 'ncurses/curses.priv.h:664: weak_symbol(pthread_kill);'
++  solution_hint: '检查 musl 是否提供该函数，必要时 #ifdef 替代'
++  auto_generated: false
++metadata:
++  build_systems:
++  - autotools
++  has_tests: true
++  doc_files:
++  - README.MinGW
++  - README.emx
++  - NEWS
++  - INSTALL
++  - README
++summary:
++  critical: 2
++  medium: 3
++  auto: 1
++  info: 1

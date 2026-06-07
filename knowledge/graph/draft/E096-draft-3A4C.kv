@@ -1,0 +1,68 @@
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E096
+trigger_tool:           clang|cc
+phase:                  compilation
+error_signature:        too many arguments provided to function-like macro invocation.*G_DEFINE_TYPE|unknown type name '_G_DEFINE_TYPE_EXTENDED_BEGIN_PRE'|_G_DEFINE_TYPE_EXTENDED_BEGIN_PRE.*defined here.*macro '_G_DEFINE_TYPE_EXTENDED_BEGIN'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               glib-compat
+match_keywords:         G_DEFINE_TYPE, glibcompat.h, _G_DEFINE_TYPE_EXTENDED_BEGIN_PRE, GLib 2.67, macro arguments mismatch
+title:                  GLib 宏兼容性问题 - libvirt 自定义宏参数数量与 GLib 2.88.0 不匹配
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             libvirt 在 glibcompat.h 中自定义 _G_DEFINE_TYPE_EXTENDED_BEGIN 宏以解决 Clang 编译器警告，该宏调用 _G_DEFINE_TYPE_EXTENDED_BEGIN_PRE(TypeName, type_name, TYPE_PARENT) 传递 3 个参数，但 GLib 2.88.0 中 _G_DEFINE_TYPE_EXTENDED_BEGIN_PRE 只接受 2 个参数（TYPE_PARENT 已被移除到 _G_DEFINE_TYPE_EXTENDED_BEGIN_REGISTER）。这是 GLib 2.67.0+ API 变化导致的兼容性问题。
+affected_scope:         使用 GLib >= 2.67.0 且定义了自定义 G_DEFINE_TYPE 宏的软件，特别是 libvirt 10.0.0 及类似版本
+verification_cmd:       grep -A5 "_G_DEFINE_TYPE_EXTENDED_BEGIN" src/util/glibcompat.h | grep "_G_DEFINE_TYPE_EXTENDED_BEGIN_PRE.*TYPE_PARENT" && pkg-config --modversion glib-2.0
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           source-modify
+rec_description:        修改 glibcompat.h 中的自定义宏定义，移除 _G_DEFINE_TYPE_EXTENDED_BEGIN_PRE 调用中的 TYPE_PARENT 参数，使其与 GLib 2.88.0 的 API 一致
+rec_command:            sed -i 's/_G_DEFINE_TYPE_EXTENDED_BEGIN_PRE(TypeName, type_name, TYPE_PARENT)/_G_DEFINE_TYPE_EXTENDED_BEGIN_PRE(TypeName, type_name)/' src/util/glibcompat.h && python3 $SKILL_ROOT/scripts/ohc-run.py track-edit add <软件名> <版本> src/util/glibcompat.h
+rec_auto_fix:           true
+rec_impl:               sed-edit
+
+fallback_priority:      2
+fallback_approach:      downgrade-glib
+fallback_description:   降级 GLib 到 2.66.x 或更早版本（不推荐，可能影响其他依赖）
+fallback_command:       curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.66.7
+fallback_auto_fix:      false
+fallback_impl:
+
+fallback_priority:      3
+fallback_approach:      version-upgrade
+fallback_description:   升级 libvirt 到 11.3.0 或更高版本（可能已修复该兼容性问题）
+fallback_command:       # 检查新版本是否修复: git log --oneline --grep="glibcompat" libvirt-11.3.0
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       undef.*G_DEFINE_TYPE|define.*G_DEFINE_TYPE.*without.*glibcompat
+forbid_1_reason:        禁止直接修改 GLib 头文件或随意重定义 G_DEFINE_TYPE，应遵循软件自身的兼容层设计
+forbid_1_consequence:   可能破坏 GLib 内部一致性，导致其他宏展开错误
+
+forbid_2_pattern:       downgrade.*glib.*without.*check.*dependencies
+forbid_2_reason:        降级 GLib 前必须检查所有依赖软件的 GLib 版本要求
+forbid_2_consequence:   可能导致其他依赖 GLib >= 2.68 的软件无法工作
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P01-source-first, P08-version-compat
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E007-config-guess]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E096.md
+last_updated:           2026-05-31
+source_event:           libvirt 10.0.0 编译，GLib 2.88.0，错误出现在 src/util/vireventthread.c 第 35 行
+fix_verified:           true
+fix_result:             修改后编译成功推进到 106/472 步（之前在 1/444 步失败），GLib 宏兼容性问题已解决
+verification_log:       ninja -j1 输出显示 vireventthread.c.o 成功编译（第 28/472 步）
+
+draft: true
+contributor_id: 3A4C

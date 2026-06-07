@@ -1,0 +1,86 @@
+#====================================================================
+# E105.kv — lld 链接器缺少 libxml2 运行时依赖
+#====================================================================
+
+# ═══ Layer 0: 错误面 ═══
+id:                     E105
+title:                  lld 链接器缺少 libxml2 运行时依赖
+trigger_tool:           cmake|clang|ld.lld
+phase:                  configuration|linking
+error_signature:        Error loading shared library libxml2.so.16|
+                        Error relocating.*lld.*xml.*symbol not found|
+                        lld.*needed by.*libxml2|
+                        xmlFreeDoc: symbol not found|
+                        xmlReadMemory: symbol not found
+
+# ═══ Layer 1: 识别层 ═══
+severity:               3
+category:               toolchain|linking|runtime-dependency
+match_keywords:         lld, libxml2.so.16, linker, symbol not found,
+                        xmlFreeDoc, xmlReadMemory, ld.lld,
+                        /data/service/hnp/ohos-sdk.org, llvm/bin/lld,
+                        unable to execute command, linker command failed
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             OHOS SDK 的 lld 链接器（ld.lld）在编译时链接了
+                        libxml2.so.16 库。当 clang++ 调用 lld 进行链接时，
+                        lld 在运行时需要加载 libxml2 来解析 XML 格式的
+                        链接脚本或配置文件。然而，libxml2.so.16 不在
+                        lld 的默认搜索路径中，导致动态链接器找不到该库。
+                        即使设置了 -L 参数或 LD_LIBRARY_PATH，问题仍然存在，
+                        因为 lld 本身启动时就失败，而不是链接参数问题。
+                        
+affected_scope:         所有使用 CMake 构建系统且需要链接的软件，
+                        特别是使用 OHOS SDK 编译的 C++ 项目。
+                        已知影响: abseil-cpp, 所有需要 CMake 配置的 C++ 库。
+                        
+verification_cmd:       find /storage/Users/currentUser/usr/local -name "libxml2.so.16";
+                        ls /data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/ld.lld;
+                        which ld.bfd
+
+# ═══ Layer 3: 方案层 ★ ═══
+rec_priority:           1
+rec_approach:           use-ld-bfd
+rec_description:        使用 GNU ld.bfd 链接器代替 lld。通过 -fuse-ld=bfd
+                        参数强制 clang++ 使用 ld.bfd，避免 lld 的 libxml2
+                        依赖问题。ld.bfd 不依赖 libxml2，可以正常工作。
+                        在 CMake 中通过 CMAKE_EXE_LINKER_FLAGS 等变量设置。
+                        
+rec_command:            cmake -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=bfd" \
+                        -DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=bfd" \
+                        -DCMAKE_MODULE_LINKER_FLAGS="-fuse-ld=bfd"
+                        
+rec_auto_fix:           true
+rec_impl:               cmake-vars-manual
+
+fallback_priority:      2
+fallback_approach:      fix-lld-library-path
+fallback_description:   将 libxml2.so.16 复制或软链接到系统库目录，
+                        或设置 LD_LIBRARY_PATH 让 lld 能找到 libxml2。
+                        这种方法不够稳健，可能影响其他软件。
+                        
+fallback_command:       export LD_LIBRARY_PATH="/storage/Users/currentUser/usr/local/lib:$LD_LIBRARY_PATH"
+                        
+fallback_auto_fix:      false
+fallback_impl:          
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       -fuse-ld=lld|use_lld=true
+forbid_1_reason:        不要强制使用 lld，它依赖 libxml2.so.16 但找不到
+forbid_1_consequence:   所有链接操作都会失败，无法编译任何可执行文件
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-TOOLCHAIN-001
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E012, E064]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E105.md
+last_updated:           2026-05-29
+source_event:           abseil-cpp 20260107.1 编译
+contributor:            DFCF

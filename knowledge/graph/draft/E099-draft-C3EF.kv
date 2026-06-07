@@ -1,0 +1,72 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E099.kv，填写各字段
+# 对应的人类文档: doc/E099.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E099
+trigger_tool:           meson|ninja|python
+phase:                  compilation
+error_signature:        HMDFS.*posix_spawn.*Permission denied|meson-python.sh.*cannot execute|keymap-gen-wrapper.*Permission denied
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               platform|hmdfs|subprocess|meson
+match_keywords:         HMDFS, subprocess, posix_spawn, meson-python.sh, Permission denied, script wrapper, build.ninja
+title:                  HMDFS 文件系统 subprocess.os.posix_spawn 权限限制
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             HMDFS 文件系统对 Python subprocess.Popen 的 os.posix_spawn 有权限限制。当 meson 构建系统使用 wrapper 脚本（如 meson-python.sh、keymap-gen-wrapper）调用 Python 生成头文件/源文件时，这些脚本在 HMDFS 上无法直接执行。原因是 HMDFS 的 UID 映射机制和 SELinux 限制，导致通过 os.posix_spawn 执行的脚本进程被拒绝。
+affected_scope:         **所有使用 meson 构建系统且依赖 wrapper 脚本生成文件的项目**在 HMDFS 上编译时均会遇到此问题（libvirt 已确认）。影响范围包括：需要生成 RPC 协议头文件的软件、需要生成键盘映射表的软件、任何使用 meson 自定义脚本生成代码的软件。
+verification_cmd:       grep "meson-python.sh" build.ninja | wc -l (大于 0 表示可能受影响)
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           edit-build-ninja
+rec_description:        修改 build.ninja 文件，将所有 wrapper 脚本调用替换为直接调用 python3 执行
+rec_command:            sed -i 's|/storage/Users/currentUser/tmp/builds/.*\.work/scripts/meson-python.sh|python3|g' build.ninja && ninja
+rec_auto_fix:           false
+rec_impl:               manual-edit
+
+fallback_priority:      2
+fallback_approach:      manual-generate-files
+fallback_description:   手动生成缺失的头文件/源文件：例如 keymap-gen、RPC 协议生成等，然后跳过脚本执行步骤继续编译
+fallback_command:       python3 scripts/keymap-gen.py ... && python3 scripts/rpc-gen.py ...
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+forbid_1_pattern:       chmod +x.*\.sh|chmod.*775
+forbid_1_reason:        HMDFS 上 chmod 对脚本执行权限可能不生效
+forbid_1_consequence:   脚本仍然无法执行，浪费时间
+forbid_2_pattern:       ln -sf.*wrapper
+forbid_2_reason:        HMDFS 软链接限制，不能 ln -sf 覆盖
+forbid_2_consequence:   软链接创建失败
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R10(临时文件用 TMPDIR)|R7(安全弹窗验证)
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E011(HMDFS umask 问题)|E002(/tmp 只读)
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E099.md
+last_updated: 2026-06-01
+source_event:           libvirt 10.0.0 编译（子任务 task_mpv4vt5a_8qhf）
+
+draft: true
+contributor_id: C3EF
+notes:                  libvirt 编译中遇到此问题，影响 30+ 个协议头文件/源文件生成。估计修复需 2-3 小时（需批量修改 build.ninja 或手动生成文件）。

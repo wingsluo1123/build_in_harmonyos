@@ -1,0 +1,42 @@
+# x264 master 版本级 manifest
+# 文件位置: archives/x/x264/master/manifest.yaml
+
+software: x264
+version: master (0.165.x)
+status: built
+build_date: "2026-05-31"
+last_updated: "2026-06-07"
+
+source:
+  url: "https://code.videolan.org/videolan/x264/-/archive/master/x264-master.tar.gz"
+  sha256: ""
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$DEFAULT_PREFIX"
+    - "--disable-asm"
+    - "--disable-opencl"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile-manual-config.patch"
+
+knowledge_gained:
+  - "x264不支持CMake，必须使用autotools"
+  - "HMDFS不支持heredoc，导致configure无法生成配置文件"
+  - "通过手动修改Makefile绕过heredoc限制"
+  - "编译产物为静态库（libx264.a）+ 可执行文件"
+  - "make install后的二进制缺少ELF签名，需要sign-elf修复（E077）"
+
+notes: |
+  x264使用autotools构建系统，在HMDFS环境下configure无法正常执行。
+  通过手动创建config.mak和config.h文件，手动修改Makefile完成编译。
+  编译成功，生成静态库和可执行文件，功能验证通过。
+  
+  2026-06-07修复：make install后的usr/local/bin/x264缺少ELF签名导致permission denied，
+  使用ohc-run.py sign-elf重新签名后可正常运行。
+  预编译包中的x264已包含签名，无需额外处理。

@@ -1,0 +1,30 @@
+diff -ruN a/conf.d/meson.build b/conf.d/meson.build
+--- a/conf.d/meson.build
++++ b/conf.d/meson.build
+@@ -76,23 +76,25 @@
+ 
+ # 35-lang-normalize.conf
+ orths = []
+ foreach o : orth_files          # orth_files is from fc-lang/meson.build
+   o = o.split('.')[0]           # strip filename suffix
+   if not o.contains('_')        # ignore those with an underscore
+     orths += [o]
+   endif
+ endforeach
+ 
++# HarmonyOS workaround: can't execute .py directly due to permission issues
++# Use python3 to run the script instead
+ custom_target('35-lang-normalize.conf',
+   output: '35-lang-normalize.conf',
+-  command: [find_program('write-35-lang-normalize-conf.py'), ','.join(orths), '@OUTPUT@'],
++  command: [find_program('python3'), files('write-35-lang-normalize-conf.py'), ','.join(orths), '@OUTPUT@'],
+   install_dir: fc_templatedir,
+   install: true)
+ 
+ # README
+ readme_cdata = configuration_data()
+ readme_cdata.set('TEMPLATEDIR', fc_templatedir)
+ configure_file(output: 'README',
+   input: 'README.in',
+   configuration: readme_cdata,
+   install_dir: fc_configdir,

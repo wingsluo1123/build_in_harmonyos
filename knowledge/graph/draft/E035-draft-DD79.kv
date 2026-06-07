@@ -1,0 +1,66 @@
+#====================================================================
+# E035: config.guess/config.sub OHOS 平台识别
+# 对应的人类文档: doc/E035.md
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E035
+trigger_tool:           configure
+phase:                  configuration
+error_signature:        cannot guess build type|OS `ohos' not recognized|Kernel `linux' not known to work with OS `ohos'|Invalid configuration `.*-unknown-linux-ohos'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               platform-detection
+match_keywords:         config.guess, config.sub, OHOS, ohos, cannot guess build type, OS not recognized
+title:                  config.guess/config.sub 不识别 OHOS 平台
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             GNU config.guess/config.sub 缺少 OHOS 平台检测逻辑，无法识别 OHOS 系统，导致 configure 失败
+affected_scope:         所有基于 autotools 的软件在 OHOS 平台上编译
+verification_cmd:       ./config/config.guess | grep -q ohos && echo PASS || echo FAIL
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           modify-config-scripts
+rec_description:        修改 config.guess 和 config.sub 添加 OHOS 平台检测
+rec_command:            sed -i '/timestamp=/a # OpenHarmony detection\nif test -d /data/service/hnp/ohos-sdk.org; then echo "aarch64-unknown-linux-ohos"; exit 0; fi' config/config.guess && sed -i '/linux-musl/s/linux-musl\* | linux-ohos\*/' config/config.sub && sed -i '/gnu\* | android/s/| ohos\*/' config/config.sub
+rec_auto_fix:           true
+rec_impl:               patch-config-guess-sub
+
+fallback_priority:      2
+fallback_approach:      specify-build-host
+fallback_description:   使用 --build 和 --host 参数绕过平台检测（不推荐，违反 R15）
+fallback_command:       ./configure --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       --build=.*-.*-.*-.*|--host=.*-.*-.*-.*|--target=.*-.*-.*-.*
+forbid_1_reason:        R15: 本平台是 native 编译，禁止使用 --build/--host/--target 绕过平台检测
+forbid_1_consequence:   可能导致编译参数错误，引入隐患，重复失败
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R15, R23
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E007
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+symptoms:               configure 失败: cannot guess build type; OS 'ohos' not recognized; Kernel 'linux' not known to work with OS 'ohos'
+solutions:              修改 config.guess: 添加 uname -s 和目录检测; 修改 config.sub: 在 OS 列表添加 ohos*, 在 kernel-os 组合添加 linux-ohos*
+patterns:               E007, E011
+scope:                  L1
+build_systems:          autotools
+software:               *
+verified:               true
+doc_file:               doc/E035.md
+last_updated:           2026-05-30
+source_event:           graphviz 15.0.0 编译
+
+draft:                  true
+contributor_id:         DD79

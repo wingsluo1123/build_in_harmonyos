@@ -1,0 +1,66 @@
+#====================================================================
+# E036: OHOS SDK lld 无法加载 libxml2.so.16
+# 对应的人类文档: doc/E036.md
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E036
+trigger_tool:           clang|ld|lld
+phase:                  linking
+error_signature:        Error loading shared library libxml2\.so\.16|Error relocating.*lld.*xmlFreeDoc.*symbol not found|clang.*error.*unable to execute command.*lld
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               linker-dependency
+match_keywords:         libxml2.so.16, lld, symbol not found, xmlFreeDoc, Error loading shared library, linker command failed
+title:                  OHOS SDK lld 无法加载 libxml2.so.16
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             OHOS SDK 的 lld 动态链接到 libxml2.so.16，但动态链接器无法加载该库（即使 LD_LIBRARY_PATH 已设置，可能受 ELF 签名或 RPATH 限制）
+affected_scope:         使用 OHOS SDK clang 编译的所有软件，默认使用 lld 作为链接器
+verification_cmd:       clang -v 2>&1 | grep -q lld && echo USES_LLD || echo USES_OTHER
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           use-gnu-ld
+rec_description:        使用 GNU ld (bfd) 代替 lld，绕过 libxml2 依赖问题
+rec_command:            export CFLAGS="-fuse-ld=bfd $CFLAGS" && export LDFLAGS="-fuse-ld=bfd $LDFLAGS"
+rec_auto_fix:           true
+rec_impl:               switch-linker-bfd
+
+fallback_priority:      2
+fallback_approach:      fix-libxml2-loading
+fallback_description:   修复 libxml2.so.16 加载问题（需要 ELF 签名或 RPATH 处理）
+fallback_command:       export LD_LIBRARY_PATH=/path/to/libxml2:$LD_LIBRARY_PATH && llvm-objcopy --remove-section .codesign libxml2.so.16 && binary-sign-tool sign -inFile libxml2.so.16 -outFile libxml2.so.16 -selfSign 1
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:
+forbid_1_reason:
+forbid_1_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R10, R20
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E002
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+symptoms:               clang 链接失败: Error loading shared library libxml2.so.16; Error relocating lld: xmlFreeDoc symbol not found
+solutions:              使用 GNU ld 代替 lld: 添加 -fuse-ld=bfd 到 CFLAGS 和 LDFLAGS
+patterns:               E002
+scope:                  L1
+build_systems:          *
+software:               *
+verified:               true
+doc_file:               doc/E036.md
+last_updated:           2026-05-30
+source_event:           graphviz 15.0.0 编译
+
+draft:                  true
+contributor_id:         5059

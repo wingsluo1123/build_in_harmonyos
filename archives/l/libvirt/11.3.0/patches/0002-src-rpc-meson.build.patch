@@ -1,0 +1,48 @@
+diff -ruN a/src/rpc/meson.build b/src/rpc/meson.build
+--- a/src/rpc/meson.build
++++ b/src/rpc/meson.build
+@@ -46,38 +46,44 @@
+ endif
+ 
+ rpc_gen_headers = []
+ rpc_gen_sources = []
+ 
+ foreach name : [ 'virnet', 'virkeepalive' ]
+   protocol_file = files('@0@protocol.x'.format(name))
+   header_file = '@0@protocol.h'.format(name)
+   source_file = '@0@protocol.c'.format(name)
+ 
++  # OHOS: HMDFS cannot directly execute Python scripts
++  # Use python3 interpreter with script path as argument
++  rpcgen_script = meson.project_source_root() / 'scripts/rpcgen/main.py'
++
+   rpc_gen_headers += custom_target(
+     header_file,
+     input: protocol_file,
+     output: header_file,
+     depend_files: rpcgen_src,
+     command: [
+       rpcgen_prog,
++      rpcgen_script,
+       '--mode=header', '@INPUT@', '@OUTPUT@',
+     ],
+   )
+ 
+   rpc_gen_sources += custom_target(
+     source_file,
+     input: protocol_file,
+     output: source_file,
+     depend_files: rpcgen_src,
+     command: [
+       rpcgen_prog,
++      rpcgen_script,
+       '--mode=source', '--header=' + header_file, '@INPUT@', '@OUTPUT@',
+     ],
+   )
+ 
+   rpc_probe_files += protocol_file
+ endforeach
+ 
+ rpc_server_sources = [
+   'virnetserverprogram.c',
+   'virnetserverservice.c',

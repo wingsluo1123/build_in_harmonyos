@@ -34,7 +34,7 @@ source:
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  tar_format: tar.xz
 
 # ============================================================
 # 构建配置
@@ -46,13 +46,27 @@ build:
   system: meson
 
   # 配置选项列表
-  configure_options: []
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "-Dfontconfig=disabled"
+    - "-Dpangocairo=disabled"
+    - "-Dpng=disabled"
+    - "-Dspng=disabled"
   # 例如:
   # - "-DCMAKE_BUILD_TYPE=Release"
   # - "-DCMAKE_SYSTEM_NAME=OHOS"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
+  dependencies:
+    - glib/2.88.0
+    - libtiff/4.7.1
+    - libjpeg/2.1.5.1
+    - zlib/1.3.1
+    - xz/5.6.2
+    - lcms2/2.19
+    - OpenEXR/3.1.5
+    - libopenjp2/2.5.2
+    - libheif/1.22.2
   # 例如:
   # - openssl/1.1.1w
   # - curl/8.19.0
@@ -78,7 +92,13 @@ patches_applied:
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+  - "meson 构建系统：使用 link_whole 合并静态库时，依赖关系可能不会正确传递到动态库，需要显式设置 RPATH 或手动添加 NEEDED 依赖"
+  - "meson 对静态库的传递依赖检测不完整，功能检测时需手动添加传递依赖（如 libtiff 需要 liblzma）"
+  - "toybox rm 在某些情况下无法执行，ninja 的 STATIC_LINKER 规则使用 'rm -f' 前置命令时需要修改 build.ninja 或使用 GNU rm wrapper"
+  - "HMDFS 不支持 ln -sf 覆盖软链接（E018），需要使用 'rm -f && ln -s' 方式创建"
+  - "meson 构建：PKG_CONFIG_PATH 需要正确设置以找到预编译包的 pkg-config 文件"
+  - "依赖链问题：freetype2.pc 需要 libpng，禁用相关功能可绕过（-Dfontconfig=disabled -Dpangocairo=disabled）"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"

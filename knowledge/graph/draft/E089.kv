@@ -1,0 +1,71 @@
+id: E089
+title: HMDFS 全面限制 autotools 脚本执行
+trigger_tool: configure|autotools|shell
+phase: configuration
+error_signature: rm.*inaccessible|ls.*inaccessible|working directory cannot be determined|
+                 config.status.*can't create.*Permission denied|
+                 timeout.*failed to run command.*Permission denied|
+                 posix_spawn.*Permission denied.*shell script
+
+severity: 3
+category: filesystem|hmdfs|autotools|shell
+match_keywords: HMDFS, autotools, configure, config.status, Permission denied,
+                 shell script, posix_spawn, timeout, rm inaccessible, ls inaccessible,
+                 working directory, temp file
+
+root_cause: HMDFS（鸿蒙分布式文件系统）对 shell 脚本执行有全面限制：
+             1. 脚本中调用的基本命令（rm、ls 等）在子进程中执行失败
+             2. config.status 无法创建临时目录（confXXX/subs.awk）
+             3. 管道操作受限（cat | sh 失败）
+             4. posix_spawn 无法执行 HMDFS 上的脚本文件
+             5. timeout 命令无法执行 HMDFS 上的脚本
+             
+             这与 E064 不同：E064 是 conftest ELF 签名问题，E089 是 HMDFS 对整个
+             autotools 流程的系统级限制。
+
+affected_scope: **所有 autotools 项目**（在 HMDFS 用户目录下编译）
+verification_cmd: |
+  # 测试 1：脚本中基本命令是否可用
+  /bin/sh -c 'rm -f /tmp/test_rm && echo "rm OK"' || echo "rm FAILED"
+  
+  # 测试 2：posix_spawn 能否执行脚本
+  python3 -c "import subprocess; subprocess.run(['/bin/sh', 'test.sh'])"
+  
+  # 测试 3：config.status 是否能创建临时目录
+  ls config.status && grep "can't create" config.log
+
+rec_priority: 0
+rec_approach: none
+rec_description: 当前无法绕过，需要系统级支持：
+                 1. 在非 HMDFS 目录（如 /data/local/tmp）编译
+                 2. 使用 cmake/meson 替代 autotools
+                 3. 等待系统放宽 HMDFS 对脚本执行的限制
+rec_command: ""
+rec_auto_fix: false
+rec_impl: none
+
+fallback_priority: 1
+fallback_approach: use-system-version
+fallback_description: 如果系统已有预编译版本，直接使用系统版本
+fallback_command: |
+  pkg-config --modversion <软件名>
+  ls ~/usr/local/lib/lib<软件名>*
+fallback_auto_fix: false
+
+forbid_1_pattern: 在 HMDFS 用户目录下编译 autotools 项目
+forbid_1_reason: HMDFS 对脚本执行的全面限制导致 configure 和 config.status 都无法正常运行
+forbid_1_consequence: 编译流程在 configure 或 config.status 阶段全面失败
+
+principles: P-AUTOTOOLS-002
+
+causes: [E050, HMDFS限制]
+caused_by: []
+similar_to: [E064]
+conflicts_with: []
+prerequisite_of: []
+
+doc_file: doc/E089.md
+last_updated: 2026-05-31
+source_event: gpgme 1.23.2 编译失败
+resolved_in: ""
+resolved_note: ""

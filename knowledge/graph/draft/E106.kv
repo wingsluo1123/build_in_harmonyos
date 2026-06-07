@@ -1,0 +1,77 @@
+# E106: CMake 库间依赖相对路径问题
+
+id: E106
+severity: 2
+category: cmake|packaging|runtime-linking
+trigger_tool: cmake|package|runtime
+phase: packaging|runtime
+
+keywords: cmake, library dependency, relative path, NEEDED, patchelf, inter-library dependency, ../../../lib, LIBRARY_OUTPUT_DIRECTORY
+
+trigger_pattern: |
+  Error loading shared library ../../../lib/libxxx.so: (needed by /path/to/libyyy.so)
+  或 readelf -d libyyy.so | grep NEEDED 显示 ../../../lib/libxxx.so
+
+root_cause: |
+  CMake 在设置库间依赖时，使用了构建目录的相对路径（如 ../../../lib/）。
+  这种路径在编译时有效（相对于 build/lib/ 目录），但打包后运行时无法解析。
+  
+  根因：CMake 的 LIBRARY_OUTPUT_DIRECTORY 或 CMAKE_LIBRARY_OUTPUT_DIRECTORY 设置
+  导致库文件间的链接依赖记录为相对路径。
+
+scope: 所有使用 CMake 构建多库项目（libA 依赖 libB）且使用共享库的软件
+
+approach_priority_1: |
+  打包后修复 NEEDED 字段（使用 patchelf）
+  
+  步骤:
+  1. 使用 readelf -d 检查 NEEDED 字段是否有相对路径
+  2. 使用 patchelf --replace-needed 修改:
+     /data/service/hnp/bin/patchelf --replace-needed ../../../lib/libxxx.so libxxx.so libyyy.so
+  3. 移除旧签名: llvm-objcopy --remove-section .codesign libyyy.so
+  4. 重新签名: binary-sign-tool sign -inFile libyyy.so -outFile libyyy.so -selfSign 1
+  5. 更新 TEST_PREFIX 中的文件并重新打包
+
+approach_priority_2: |
+  编译时配置 CMake 不使用相对路径
+  
+  CMakeLists.txt 中添加:
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  # 强制使用绝对路径
+  set_target_properties(libB PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_INSTALL_PREFIX}/lib)
+
+forbidden: |
+  ❌ 仅设置 RPATH/RUNPATH（无法解决 NEEDED 字段问题）
+  ❌ 使用 LD_LIBRARY_PATH（无法解决相对路径解析）
+  
+  原因: NEEDED 字段的相对路径优先级高于 RPATH 搜索路径
+  后果: 即使设置了正确的 RPATH，系统仍会先尝试 NEEDED 中的相对路径并失败
+
+verification: |
+  # 检查 NEEDED 字段是否使用相对路径
+  readelf -d libyyy.so | grep NEEDED | grep -E '^\.\./|^/\.\./'
+  
+  # 修复后验证
+  readelf -d libyyy.so | grep NEEDED  # 应显示 libxxx.so 而非 ../../../lib/libxxx.so
+  
+  # Python 测试加载
+  python3 -c "import ctypes; ctypes.CDLL('/path/to/libyyy.so')"
+
+principles: P-RUNTIME-002, P-PACK-001
+
+related_to: E073, E042, E019
+
+example_software: SFML 2.6.1 (libsfml-network.so 依赖 libsfml-system.so)
+
+notes: |
+  这是 CMake 构建系统的常见问题，特别是在多库项目中。
+  SFML 使用 CMake 构建多个模块（system/network/window/graphics/audio），
+  network 模块依赖 system 模块，编译时 CMake 设置了相对路径。
+  
+  打包脚本（ohc-run.py package）已自动设置 RUNPATH 为 $ORIGIN，
+  但 NEEDED 字段的相对路径仍然导致加载失败。
+  
+  解决方案：在打包阶段检测并修复 NEEDED 字段，或修改 CMakeLists.txt 避免使用相对路径。
+
+draft_created: 2026-06-01
+draft_created_by: sfml-fix-task

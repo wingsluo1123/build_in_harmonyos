@@ -1,0 +1,23 @@
+diff -ruN a/fc-lang/meson.build b/fc-lang/meson.build
+--- a/fc-lang/meson.build
++++ b/fc-lang/meson.build
+@@ -241,16 +241,18 @@
+   'lah.orth',
+   'nqo.orth',
+   'brx.orth',
+   'sat.orth',
+   'doi.orth',
+   'mni.orth',
+   'und_zsye.orth',
+   'und_zmth.orth',
+ ]
+ 
++# HarmonyOS workaround: can't execute .py directly due to permission issues
++# Use python3 to run the script instead
+ fclang_h = custom_target('fclang.h',
+   output: ['fclang.h'],
+   input: orth_files,
+-  command: [find_program('fc-lang.py'), orth_files, '--template', files('fclang.tmpl.h')[0], '--output', '@OUTPUT@', '--directory', meson.current_source_dir()],
++  command: [find_program('python3'), files('fc-lang.py'), orth_files, '--template', files('fclang.tmpl.h')[0], '--output', '@OUTPUT@', '--directory', meson.current_source_dir()],
+   build_by_default: true,
+ )

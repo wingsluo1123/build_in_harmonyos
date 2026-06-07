@@ -1,0 +1,53 @@
+diff -ruN a/doc/meson.build b/doc/meson.build
+--- a/doc/meson.build
++++ b/doc/meson.build
+@@ -1,19 +1,21 @@
+ doc_targets = []
+ 
+ docbook2man = find_program('docbook2man', required: get_option('doc-man'))
+ docbook2txt = find_program('docbook2txt', required: get_option('doc-txt'))
+ docbook2pdf = find_program('docbook2pdf', required: get_option('doc-pdf'))
+ docbook2html = find_program('docbook2html', required: get_option('doc-html'))
+ 
+ # docbook is very spammy
+-run_quiet = find_program('run-quiet.py')
++# HarmonyOS workaround: can't execute .py directly due to permission issues
++run_quiet_script = files('run-quiet.py')
++run_quiet_cmd = find_program('python3')
+ 
+ # .fncs files
+ doc_funcs_fncs = [
+   'fcatomic',
+   'fcblanks',
+   'fccache',
+   'fccharset',
+   'fcconfig',
+   'fcconstant',
+   'fcdircache',
+@@ -34,22 +36,24 @@
+   'fcweight',
+ ]
+ 
+ fncs_files = []
+ foreach f : doc_funcs_fncs
+   fncs_files += files('@0@.fncs'.format(f))
+ endforeach
+ 
+ man_pages = []
+ 
+-extract_man_list = find_program('extract-man-list.py')
+-man_list = run_command(extract_man_list, fncs_files, check: true).stdout().split()
++# HarmonyOS workaround: can't execute .py directly due to permission issues
++# Use python3 to run the script instead
++extract_man_list_cmd = find_program('python3')
++man_list = run_command(extract_man_list_cmd, files('extract-man-list.py'), fncs_files, check: true).stdout().split()
+ 
+ foreach m : man_list
+   man_pages += ['@0@.3'.format(m)]
+ endforeach
+ 
+ # Generate sgml pages for funcs
+ edit_sgml = find_program('edit-sgml.py')
+ 
+ # copy into build directory, it includes generated files from build directory
+ fontconfig_devel_sgml = configure_file(output: 'fontconfig-devel.sgml',

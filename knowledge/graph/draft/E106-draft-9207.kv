@@ -1,0 +1,15 @@
+id: E106-draft-9207
+error_signature: "Error loading shared library ../../../lib/.*\.so:.*needed by.*lib.*\.so"
+root_cause: CMake在设置库间依赖时使用构建目录相对路径（如../../../lib/），打包后运行时无法解析。根因：LIBRARY_OUTPUT_DIRECTORY或CMAKE_LIBRARY_OUTPUT_DIRECTORY导致库文件间链接依赖记录为相对路径。
+match_keywords: cmake,library dependency,relative path,NEEDED,patchelf,inter-library dependency,../../../lib,LIBRARY_OUTPUT_DIRECTORY
+rec_description: 打包后使用patchelf修改NEEDED字段，将相对路径改为库名。步骤：1.readelf检查NEEDED字段；2.patchelf --replace-needed修改；3.移除旧签名llvm-objcopy --remove-section .codesign；4.重新签名binary-sign-tool sign -selfSign 1；5.更新TEST_PREFIX文件并重新打包。
+rec_command: /data/service/hnp/bin/patchelf --replace-needed ../../../lib/libxxx.so libxxx.so libyyy.so && /data/service/hnp/bin/llvm-objcopy --remove-section .codesign libyyy.so && /data/service/hnp/bin/binary-sign-tool sign -inFile libyyy.so -outFile libyyy.so -selfSign 1
+affected_scope: 所有使用CMake构建多库项目（libA依赖libB）且使用共享库的软件，如SFML、Qt、Boost等
+verification_cmd: readelf -d libyyy.so | grep NEEDED | grep -E '^\.\./|^/\.\./' && python3 -c "import ctypes; ctypes.CDLL('/path/to/libyyy.so')"
+category: cmake|packaging|runtime-linking
+severity: 2
+phase: packaging|runtime
+example_software: SFML 2.6.1 (libsfml-network.so依赖libsfml-system.so)
+notes: CMake构建系统常见问题，特别是多库项目。SFML使用CMake构建多个模块，network模块依赖system模块，编译时CMake设置相对路径。打包脚本已设置RUNPATH为$ORIGIN，但NEEED字段相对路径仍导致加载失败。
+related_to: E073,E042,E019
+principles: P-RUNTIME-002,P-PACK-001

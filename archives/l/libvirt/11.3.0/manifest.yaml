@@ -1,0 +1,125 @@
+software: libvirt
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/11.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "11.3.0"
+
+# 编译状态
+# published | built | failed | archived
+status: failed
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-05-31"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://download.libvirt.org/libvirt-11.3.0.tar.xz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "-Ddocs=disabled"
+    - "-Ddriver_qemu=disabled"
+    - "-Ddriver_network=disabled"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib-2.0/2.88.0
+    - gnutls/3.8.4
+    - libxml-2.0/2.15.3
+    - libcurl/8.19.0
+
+  # 编译器
+  cc: /data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/clang
+  cxx: /data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/clang++
+
+  # 环境变量
+  environment:
+    PKG_CONFIG_PATH: "/storage/Users/currentUser/usr/local/lib/pkgconfig:/storage/Users/currentUser/usr/local/share/pkgconfig"
+    AR: "llvm-ar"
+    STRIP: "llvm-strip"
+    NM: "llvm-nm"
+    RANLIB: "llvm-ranlib"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "scripts/rpcgen/meson.build - 使用 python3 解释器调用脚本"
+  - "src/rpc/meson.build - 修改 command 参数传递脚本路径"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "E082: HMDFS 文件系统系统性限制 - 所有脚本文件无法直接执行（Python/Perl/Shell）"
+  - "编译器符号链接问题：需要使用真实路径而非 HMDFS 符号链接"
+  - "pkg-config 路径需要手动设置 PKG_CONFIG_PATH"
+  - "平台限制无法通过源码修改绕过，需要等待系统层面的支持"
+
+# ============================================================
+# 失败分析
+# ============================================================
+
+failure_analysis:
+  root_cause: "HMDFS 文件系统系统性限制 - 所有脚本文件无法直接执行"
+  symptoms:
+    - "Python 脚本 Permission denied（即使有执行权限）"
+    - "keymap-gen 脚本无法执行"
+    - "所有 meson 构建中的自定义命令脚本都无法执行"
+  attempted_fixes:
+    - "修改 meson.build 使用 python3 解释器调用脚本"
+    - "使用真实的编译器路径而非符号链接"
+    - "设置正确的 PKG_CONFIG_PATH"
+  remaining_blockers:
+    - "HMDFS 系统性限制无法通过源码层面修复解决"
+    - "需要平台更新或完全重写构建系统"
+  recommendation: "等待鸿蒙系统更新 HMDFS 以支持脚本执行，或考虑不编译此软件"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libvirt-11.3.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libvirt-11.3.0.work
+  source_orig_hash: 65c75e0de12df64e
+  source_work_hash: 832534ca5d72cf36
+  generated_at: '2026-05-31T16:15:47'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-scripts-rpcgen-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-rpc-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
