@@ -1,0 +1,34 @@
+software: OpenImageDenoise
+version: 2.5.0
+status: built
+build_system: cmake
+configure_options:
+  - OIDN_DEVICE_CPU=OFF
+  - OIDN_APPS=OFF
+  - OIDN_FILTER_RT=OFF
+  - OIDN_FILTER_RTLIGHTMAP=OFF
+dependencies:
+  - libc++_shared.so
+url: https://github.com/OpenImageDenoise/oidn/releases/tag/v2.5.0
+compiled_at: 2026-06-08
+compiler: clang 15.0.4
+target_arch: aarch64
+target_os: OpenHarmony
+
+patches:
+  - 0001-musl-libc-affinity.patch
+
+artifacts:
+  libraries:
+    - libOpenImageDenoise.so
+    - libOpenImageDenoise_core.so
+  headers:
+    - oidn.h
+    - oidn.hpp
+    - config.h
+
+limitations:
+  - CPU device disabled (no ISPC due to musl libc ABI incompatibility)
+  - GPU devices disabled (no CUDA/HIP/SYCL support)
+  - Filter weights disabled (OIDN_FILTER_RT=OFF, OIDN_FILTER_RTLIGHTMAP=OFF)
+  - Library provides API only, no denoising functionality available

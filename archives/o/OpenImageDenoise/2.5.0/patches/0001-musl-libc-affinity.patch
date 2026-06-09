@@ -1,0 +1,44 @@
+--- core/thread.cpp.orig	2026-06-08 20:28:52.174237188 +0800
++++ core/thread.cpp	2026-06-08 20:29:12.994236251 +0800
+@@ -193,19 +193,18 @@
+     if (threadIndex < 0 || threadIndex >= (int)affinities.size())
+       return;
+ 
+-    const pthread_t thread = pthread_self();
+-
+-    // Save the current affinity
+-    if (pthread_getaffinity_np(thread, sizeof(cpu_set_t), &oldAffinities[threadIndex]) != 0)
++    // Save the current affinity (use sched_getaffinity for musl libc compatibility)
++    // pid=0 means current thread/process
++    if (sched_getaffinity(0, sizeof(cpu_set_t), &oldAffinities[threadIndex]) != 0)
+     {
+-      printWarning("pthread_getaffinity_np failed");
++      printWarning("sched_getaffinity failed");
+       oldAffinities[threadIndex] = affinities[threadIndex];
+       return;
+     }
+ 
+-    // Set the new affinity
+-    if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &affinities[threadIndex]) != 0)
+-      printWarning("pthread_setaffinity_np failed");
++    // Set the new affinity (use sched_setaffinity for musl libc compatibility)
++    if (sched_setaffinity(0, sizeof(cpu_set_t), &affinities[threadIndex]) != 0)
++      printWarning("sched_setaffinity failed");
+   }
+ 
+   void ThreadAffinity::restore(int threadIndex)
+@@ -213,11 +212,9 @@
+     if (threadIndex < 0 || threadIndex >= (int)affinities.size())
+       return;
+ 
+-    const pthread_t thread = pthread_self();
+-
+-    // Restore the original affinity
+-    if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &oldAffinities[threadIndex]) != 0)
+-      printWarning("pthread_setaffinity_np failed");
++    // Restore the original affinity (use sched_setaffinity for musl libc compatibility)
++    if (sched_setaffinity(0, sizeof(cpu_set_t), &oldAffinities[threadIndex]) != 0)
++      printWarning("sched_setaffinity failed");
+   }
+ 
+   std::vector<int> ThreadAffinity::parseList(const std::string& filename)
