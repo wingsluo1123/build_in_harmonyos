@@ -1,0 +1,66 @@
+software: openpgl
+version: 0.7.1
+status: published
+build_date: 2026-06-08
+build_system: cmake
+
+dependencies:
+  - name: tbb
+    version: "2021.13.0"
+    type: required
+
+configure_options:
+  - -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DOPENPGL_ISA_NEON=ON
+  - -DOPENPGL_ISA_NEON2X=OFF
+  - -DOPENPGL_ISA_SSE4=OFF
+  - -DOPENPGL_ISA_AVX2=OFF
+
+patches:
+  - 0001-CMakeLists-arm-detection.patch
+  - 0002-openpgl-CMakeLists-narrowing.patch
+  - 0003-embree-sysinfo-ohos.patch
+  - 0004-embree-thread-ohos.patch
+
+products:
+  library:
+    - lib/libopenpgl.so
+  headers:
+    - include/openpgl/*.h
+  cmake:
+    - lib/cmake/openpgl-0.7.1/*.cmake
+
+issues_fixed:
+  - description: "C++11 窄化转换错误 (embree avx2neon.h)"
+    patch: "0002-openpgl-CMakeLists-narrowing.patch"
+  - description: "架构检测失败 (OPENPGL_ARM 未设置)"
+    patch: "0001-CMakeLists-arm-detection.patch"
+  - description: "pthread_getaffinity_np/pthread_setaffinity_np 不可用"
+    patch: "0003-embree-sysinfo-ohos.patch, 0004-embree-thread-ohos.patch"
+  - description: "pthread_cancel 不可用"
+    patch: "0004-embree-thread-ohos.patch"
+
+knowledge_gained:
+  - category: platform_adaptation
+    pattern: "embree 库在鸿蒙系统需要使用 sched_setaffinity 替代 pthread_setaffinity_np"
+  - category: build_options
+    pattern: "ARM 架构编译需要添加 -Wno-c++11-narrowing 和 -fsigned-char"
+  - category: runtime_limitation
+    pattern: "CPU_8 设备类型不支持，必须使用 CPU_4 设备类型"
+
+functional_test:
+  date: 2026-06-08
+  result: partial_pass
+  tests_passed: 17
+  tests_failed: 2
+  limitations:
+    - "CPU_8 设备类型不支持（invalid vectorSize parameter）"
+    - "必须使用 PGL_DEVICE_TYPE_CPU_4 作为默认设备类型"
+  verified_features:
+    - "设备创建和释放（CPU_4）"
+    - "SampleStorage 创建和操作"
+    - "数据结构（pgl_vec3f, pgl_point3f, pgl_box3f）"
+    - "类型定义和枚举"
+    - "版本信息"
+  report: reports/test-report.md

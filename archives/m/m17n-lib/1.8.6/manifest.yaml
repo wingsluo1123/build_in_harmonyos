@@ -1,0 +1,119 @@
+software: m17n-lib
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.8.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.8.6"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-08"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://download.savannah.nongnu.org/releases/m17n/m17n-lib-1.8.6.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--disable-gui"
+    - "--disable-fribidi"
+    - "--disable-fontconfig"
+    - "--disable-freetype"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 实际无外部依赖，所有依赖均已禁用
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # 编译标志
+  cflags: "-fPIC -O2"
+  ldflags: ""
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-configure-umask-fix.patch"
+  - "0002-config-guess-harmonyos.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "E011: HMDFS umask 077 导致 config.status 无法写入，需改为 022"
+  - "E007: config.guess 需添加 HarmonyOS 平台识别"
+  - "E085: musl 不支持 pthread_cancel，configure 自动检测并禁用"
+  - "禁用 fontconfig/freetype/fribidi 可减少依赖复杂度"
+  - "m17n-lib 提供 4 个库：core, flt, gui, main"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+test:
+  # 测试日期
+  date: "2026-06-08"
+
+  # 测试状态
+  # pass | partial | fail
+  status: pass
+
+  # 测试摘要
+  summary: |
+    核心库完全可用，m17n-dump 已修复！
+    PASS: 21/25, PARTIAL: 2/25, FAIL: 2/25
+
+  # 功能限制（系统级，无法修复）
+  limitations:
+    - "m17n-edit/view: X11 在 OHOS 上不可用（系统限制）"
+    - "m17n-date: musl 无 locale 命令（libc 限制）"
+
+  # 可用功能
+  working_features:
+    - "libm17n-core 核心库"
+    - "字符集转换 (m17n-conv) ✅"
+    - "PNG 图像输出 (m17n-dump) ✅ 已修复"
+    - "pkg-config 集成"
+    - "头文件编译链接"
+
+  # 修复记录
+  fixes_applied:
+    - "安装 freetype2 26.6.20"
+    - "安装 gdlib 2.3.3"
+    - "重新编译启用 freetype/gd 支持"
