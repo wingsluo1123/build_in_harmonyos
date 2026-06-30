@@ -1,0 +1,35 @@
+# manifest.yaml — perl-sereal 5.004-r1
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: perl-sereal
+version: "5.004-r1"
+status: published
+build_date: "2026-06-30"
+
+source:
+  url: "https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-5.004.tar.gz"
+  sha256: "9c25bb7ae4bd736d24b1ad1d93d77395b0c65ca8741e266bfc0cbe542261d76f"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "perl-sereal-encoder/5.004@ohpcd/stable"
+    - "perl-sereal-decoder/5.004-r3@ohpcd/stable"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Perl前端模块(Sereal)是纯Perl，依赖XS后端模块(Encoder/Decoder)才能运行"
+  - "Conan basic_layout分离source/build目录，build()需用cwd=self.source_folder"
+  - "make test因缺少Test::LongString等测试依赖失败，不影响核心编译"
+  - "Perl模块Conan配方: cpp_info.libs=[], 用runenv_info设置PERL5LIB"
+  - "conanfile.py requirements()应声明Encoder/Decoder为Conan依赖(R27 @ohpcd/stable)"
+  - "test_package应使用文件验证模式，非runtime .so加载(E046 HMDFS SELinux限制)"
+  - "参考perl-dbd-pg编译经验：纯Perl模块在鸿蒙平台无需特殊链接参数，仅需标准Makefile.PL流程"
+  - "参考perl-dbd-pg编译经验：XS模块在OHOS上.so有加载限制，前端模块通过Conan依赖链管理"
+  - "validate()方法使用ConanInvalidConfiguration实现R32 OHOS平台兼容检查"
+  - "知识图谱E053(cc1plus)对纯Perl模块为误报，无需处理"
