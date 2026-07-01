@@ -1,0 +1,96 @@
+software: nsync
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.30.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.30.0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-01"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/google/nsync/archive/5b420ef6b16532a4fad4be1fde8e483b6b7bd8f4.tar.gz"
+
+  # 源码校验和
+  sha256: "cea0b9be6039ea0b2ead2e430d0ecafa38ec54e1a918d2dcb94969cc666218ad"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+  - "-DCMAKE_SYSTEM_NAME=Linux"
+  - "-DBUILD_SHARED_LIBS=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "patches/0001-_build-Testing-Temporary-CTestCostData.txt.patch"
+- "patches/0002-_build-Testing-Temporary-LastTest.log.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "nsync 在 GitHub 上无正式 release tag，需固定到具体 commit SHA"
+- "OHOS 不区分大小写文件系统下，BUILD（Bazel）与 build/（CMake）冲突，需重命名 BUILD → BUILD.bazel"
+- "CMakeLists.txt 中 CMAKE_SYSTEM_NAME 检查需兼容 OHOS，设置 CMAKE_SYSTEM_NAME=Linux"
+- "nsync_once 是类型名（typedef），运行函数是 nsync_run_once()"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/nsync-1.30.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/nsync-1.30.0.work
+  source_orig_hash: d487ba7502ffeb55
+  source_work_hash: 6be9c9245311965a
+  generated_at: '2026-07-01T17:44:49'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-_build-Testing-Temporary-CTestCostData.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-_build-Testing-Temporary-LastTest.log.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
