@@ -1,0 +1,33 @@
+build:
+  cc: clang
+  configure_options: []
+  cxx: clang++
+  dependencies:
+  - chafa/1.18.2 (system, R18)
+  - glib/2.78.6 (system, Alpine musl)
+  - pcre2/10.42 (system, Alpine musl)
+  - libintl/0.22.3 (system, Alpine musl)
+  system: custom
+build_date: '2026-07-01'
+knowledge_gained:
+- Rust/cargo 项目需要配置镜像源 (rsproxy.cn) 因为 crates.io SSL 在 OHOS 上失败
+- chafa 预编译包缺少 glib 依赖, 需从 Alpine Linux (musl) 下载
+- rust-toolchain.toml channel 行需注释掉当系统 rustc 版本高于指定版本
+- conan-verify G2 失败当依赖未发布到 ohpcd/stable 远程仓库
+- 系统预装包(R18)应使用 system_requirements() 声明, 而非 self.requires()
+- conanfile.py generate() 应使用 Conan Environment 类, 不直接修改 os.environ
+- conandata.yml patches 必须声明所有补丁文件(R3)
+- Environment.save_script() 不能用 conanbuild 名称, 会与 Conan 聚合脚本冲突导致递归
+- cargo 项目 package() 应用 self.source_folder 而非 self.build_folder (target/ 在源码目录)
+- package_info() 应用 self.cpp_info.bindirs 而非已弃用的 env_info.PATH
+- GitHub archive SHA256 与本地 tarball 不同, 需用 GitHub 下载的实际 hash
+- test_package 在 OHOS 上应用 sh 而非 bash (系统可能未安装 bash)
+- build() 中不应残留 os.environ.setdefault (R21), 环境变量由 generate() Environment 类统一管理
+- test_package/ 目录只保留 CI 输入文件 (conanfile.py + test.sh), 不含 conan 生成脚本
+last_updated: '2026-07-01'
+patch_classification:
+- file: 0001-rust-toolchain.toml.patch
+  guard: pending
+  platform_only: true
+  type: auto
+status: published
