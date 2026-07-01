@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration file for marked 18.0.5
+# CI script (build_and_test.sh L0e) requires this file to exist
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: marked/18.0.5
+homepage: "https://github.com/markedjs/marked"
+
+# Upstream test command (npm-based)
+upstream_check_command: "npm test"
+
+# conanfile.py build() method integration of upstream tests
+upstream_test_in_build: false
+upstream_test_command: "npm run test:specs && npm run test:unit"
+
+# Upstream actual test programs
+upstream_tests:
+  - file: test/run-spec-tests.js
+    source: marked-18.0.5/test/run-spec-tests.js
+    description: "CommonMark/GFM spec conformance tests"
+    command: "node --test test/run-spec-tests.js"
+  - file: test/unit/*.test.js
+    source: marked-18.0.5/test/unit/*.test.js
+    description: "Unit tests for marked internals"
+    command: "node --test test/unit/*.test.js"
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: conanfile.py
+    description: "ESM import test — parse markdown and verify HTML output"
+    command: "node -e \"import { marked } from 'marked'; marked.parse('# Hello')\""
+
+# Approximate assertion count (for quality assessment)
+assertion_count: 50
