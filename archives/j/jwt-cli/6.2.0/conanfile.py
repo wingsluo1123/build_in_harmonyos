@@ -36,19 +36,22 @@ class JwtcliConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Build Rust project using cargo with separate target dir to avoid
-        # OHOS auto-sign "Text file busy" race condition
+        # Build Rust project using cargo with OHOS target triple
+        # --target aarch64-unknown-linux-ohos is required for OHOS cross-compilation
+        # Separate target dir avoids OHOS auto-sign "Text file busy" race condition
         target_dir = os.path.join(self.build_folder, "target")
         self.run(
-            f"cargo build --release --target-dir={target_dir}",
+            f"cargo build --release --target aarch64-unknown-linux-ohos --target-dir={target_dir}",
             cwd=self.source_folder,
         )
 
     def package(self):
         # Copy the jwt binary from separate target dir
+        # With --target aarch64-unknown-linux-ohos, binary is in target/<triple>/release/
         target_dir = os.path.join(self.build_folder, "target")
+        triple_dir = os.path.join(target_dir, "aarch64-unknown-linux-ohos")
         copy(self, "jwt",
-             src=os.path.join(target_dir, "release"),
+             src=os.path.join(triple_dir, "release"),
              dst=os.path.join(self.package_folder, "bin"))
         # Copy license
         copy(self, "LICENSE*",
