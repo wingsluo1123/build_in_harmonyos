@@ -1,0 +1,86 @@
+software: perl-net-saml2
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.83-r0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.83-r0"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-26"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/T/TI/TIMLEGGE/Net-SAML2-0.83.tar.gz"
+
+  # 源码校验和
+  sha256: "ac97c15a9318eb186c1501a8aeb590136249519a7126dfc5a946664898d5184d"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+  # perl Makefile.PL (ExtUtils::MakeMaker) — 无需额外选项
+
+  # 编译依赖列表（格式: name/version）
+  # 纯 Perl 模块本身无编译依赖，运行时依赖由 CPAN/PERL5LIB 管理
+  dependencies: []
+  # 运行时 XS 依赖 (需 HNP 安装):
+  # - Crypt::OpenSSL::Random
+  # - Crypt::OpenSSL::Verify
+  # - Crypt::OpenSSL::X509
+  # - Crypt::PK::RSA (CryptX)
+  # - XML::LibXML
+  # - XML::Sig
+  # - XML::Enc
+  # - Net::SSLeay (for LWP::Protocol::https)
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "纯 Perl 模块 (Net::SAML2) 编译无障碍，perl Makefile.PL + make 即可"
+  - "XS 依赖模块的 .so 文件受 SELinux HMDFS 限制，需 HNP 包安装到系统目录 (与 perl-dbd-pg 情况相同)"
+  - "CPAN 工具存在循环依赖：cpan 依赖 LWP，LWP 依赖 Net::SSLeay (XS)，需手动下载模块源码"
+  - "OpenSSL 1.1.1w 头文件位于 /storage/Users/currentUser/usr/local/include/openssl/，libxml2 2.15.3 头文件位于 /storage/Users/currentUser/usr/local/include/libxml2/"
+  - "XML::LibXML 2.x 依赖 Alien::Base::Wrapper，增加了编译复杂度"
+  - "conanfile.py 应使用 runenv_info 替代已废弃的 env_info (Conan 2.x)"
+  - "38 个 CPAN 依赖中 29 个为纯 Perl 可直接安装，9 个为 XS 模块需 C 编译 + HNP 安装"
