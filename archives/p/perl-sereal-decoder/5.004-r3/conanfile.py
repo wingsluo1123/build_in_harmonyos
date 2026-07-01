@@ -64,7 +64,8 @@ class PerlSerealDecoderConan(ConanFile):
         os.environ["SEREAL_USE_BUNDLED_LIBS"] = "1"
 
         self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder)
-        self.run("make -j2", cwd=self.source_folder)
+        # E074: HarmonyOS SELinux forbids FIFO, use -j1
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
         # Install to package folder directly via DESTDIR

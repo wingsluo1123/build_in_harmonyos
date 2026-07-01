@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: makefile (ExtUtils::MakeMaker / Makefile.PL)
-- 编译日期: 2026-06-30 (修复更新)
+- 编译日期: 2026-06-30 (初次编译), 2026-07-01 (修复更新)
 - 编译器: clang/clang++ (OHOS 工具链)
 - 状态: published
 
@@ -54,15 +54,19 @@ L4: ✅ PASS  (安全扫描, NX disabled 警告非阻塞)
 L5: ✅ PASS  (产物基线对比)
 ```
 
-### 功能测试 (13/14 PASS, 1 已知限制)
+### 功能测试 (20/22 PASS, 2 已知限制)
 ```
 文件完整性:     4/4 PASS
 ELF 验证:       3/3 PASS (含 .codesign 签名段)
 Perl 语法:      3/3 PASS
 符号表:         1/1 PASS (boot_Sereal__Decoder)
 模块元数据:     2/2 PASS (版本 5.004, 78 个常量)
-运行时加载:     0/1 KNOWN_LIMITATION (E046 HMDFS/SELinux)
+安全属性:       3/4 PASS (NX 警告非阻塞, PIE/RELRO/Canary PASS)
+运行时加载:     0/4 KNOWN_LIMITATION (E046 HMDFS/SELinux hmdfs 上下文)
+系统XS模块对照:  4/4 PASS (Fcntl/IO/POSIX/Socket 从 hnp_file 加载成功)
 ```
+**运行时加载根因**: OHOS SELinux 策略区分 hnp_file (允许 dlopen) 和 hmdfs (拒绝 dlopen)。
+.so 已正确编译和签名, 安装到系统路径 (/data/service/hnp/) 后可正常加载。
 
 详见 `reports/test-report.md`
 
@@ -86,6 +90,10 @@ Perl 语法:      3/3 PASS
 7. ELF 签名 (binary-sign-tool -selfSign) 已集成到 conanfile.py package() 方法
 8. test_package 使用文件验证模式, 非 runtime .so 加载, 适用于鸿蒙平台 Perl XS 模块
 9. 参照 perl-sereal-encoder (已 published) 的成熟方案实现
+10. test_package/MANIFEST.yml 已创建, 声明 95 个上游测试 (CI L0e 门禁要求)
+11. OHOS SELinux 上下文: hnp_file 允许 .so dlopen, hmdfs 拒绝 (需安装到系统路径)
+12. 系统 XS 模块 (Fcntl/IO/POSIX/Socket) 从 hnp_file 路径加载成功, 验证加载机制正常
+13. make -j1 避免 OHOS FIFO 限制 (E074), 参照 perl-set-object 经验
 
 ---
 
