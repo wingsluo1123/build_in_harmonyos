@@ -1,0 +1,76 @@
+software: perl-object-event
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/1.23-r0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.23-r0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-29"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/E/EL/ELMEX/Object-Event-1.23.tar.gz"
+
+  # 源码校验和
+  sha256: "ab6bb80508f4fddaf2d51b20ca876aab038582a86b5228e6435411348af53c82"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options:
+    - "INSTALL_BASE=/"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 运行时依赖（系统 Perl 模块，非 Conan 包）
+  runtime_dependencies:
+    - "common::sense (system Perl)"
+    - "AnyEvent >= 7.17 (system Perl)"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "纯 Perl 模块使用 Makefile.PL + INSTALL_BASE=/ + DESTDIR 模式安装，无需 C 编译"
+  - "Object::Event 运行时依赖 common::sense 和 AnyEvent，需确保系统 Perl 路径可用"
+  - "PERL5LIB 设置时需同时包含 Conan 包路径和系统 Perl lib 路径，否则依赖模块不可见"
+  - "纯 Perl 模块无 SELinux 限制问题（与 perl-dbd-pg 的 XS 模块不同）"
+  - "conan-verify 8 道门禁全部通过（G0-G4, L2, L4, L5），包括 99 个测试用例"
