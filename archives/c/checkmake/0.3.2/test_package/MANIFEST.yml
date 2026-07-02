@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: checkmake/0.3.2
+homepage: "https://github.com/checkmake/checkmake"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "go test ./..."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "go test ./..."
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: cmd/checkmake/main_test.go
+    source: checkmake-0.3.2/cmd/checkmake/main_test.go
+    description: "Command-line interface tests"
+    command: "go test ./cmd/checkmake/"
+  - file: parser/parser_test.go
+    source: checkmake-0.3.2/parser/parser_test.go
+    description: "Makefile parser tests"
+    command: "go test ./parser/"
+  - file: validator/validator_test.go
+    source: checkmake-0.3.2/validator/validator_test.go
+    description: "Rule validator tests"
+    command: "go test ./validator/"
+  - file: rules/maxbodylength/maxbodylength_test.go
+    source: checkmake-0.3.2/rules/maxbodylength/maxbodylength_test.go
+    description: "MaxBodyLength rule tests"
+    command: "go test ./rules/maxbodylength/"
+  - file: rules/minphony/minphony_test.go
+    source: checkmake-0.3.2/rules/minphony/minphony_test.go
+    description: "MinPhony rule tests"
+    command: "go test ./rules/minphony/"
+  - file: rules/phonydeclared/phonydeclared_test.go
+    source: checkmake-0.3.2/rules/phonydeclared/phonydeclared_test.go
+    description: "PhonyDeclared rule tests"
+    command: "go test ./rules/phonydeclared/"
+  - file: rules/timestampexpanded/timestampexpanded_test.go
+    source: checkmake-0.3.2/rules/timestampexpanded/timestampexpanded_test.go
+    description: "TimestampExpanded rule tests"
+    command: "go test ./rules/timestampexpanded/"
+  - file: rules/uniquetargets/uniquetargets_test.go
+    source: checkmake-0.3.2/rules/uniquetargets/uniquetargets_test.go
+    description: "UniqueTargets rule tests"
+    command: "go test ./rules/uniquetargets/"
+  - file: config/config_test.go
+    source: checkmake-0.3.2/config/config_test.go
+    description: "Configuration parser tests"
+    command: "go test ./config/"
+  - file: formatters/formatters_test.go
+    source: checkmake-0.3.2/formatters/formatters_test.go
+    description: "Output formatter tests"
+    command: "go test ./formatters/"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "Smoke test: verify checkmake --version runs"
+    command: "checkmake --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 30
