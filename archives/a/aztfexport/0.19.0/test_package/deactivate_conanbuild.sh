@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/build_in_harmonyos/build_in_harmonyos/archives/a/aztfexport/0.19.0/test_package/deactivate_conanbuildenv-release-armv8.sh"

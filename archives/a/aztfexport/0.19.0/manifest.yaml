@@ -1,0 +1,52 @@
+software: aztfexport
+
+# 版本号
+version: "0.19.0"
+
+# 编译状态
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/Azure/aztfexport/archive/refs/tags/v0.19.0.tar.gz"
+  sha256: "ccd5550dcf9a860afb6e12381cd351b44b3da58d6a3aaa78370126752ee3e3b4"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: go
+  configure_options:
+    - "GOOS=linux"
+    - "GOARCH=arm64"
+    - "CGO_ENABLED=0"
+    - "-ldflags '-X main.version=0.19.0'"
+  dependencies: []
+  # Go 依赖通过 go.mod 管理，无需外部依赖
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+# 无需补丁，Go 项目原生兼容 OHOS (GOOS=linux GOARCH=arm64)
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Go 项目使用 GOOS=linux GOARCH=arm64 进行 OHOS 交叉编译"
+  - "需要设置 GOPROXY=https://goproxy.cn 替代默认的 proxy.golang.org"
+  - "aztfexport 是纯二进制工具包，无共享库输出，package_info 中 libdirs/includedirs 置空"
+  - "conan create 环境下需要在 build() 中设置 GOPROXY 环境变量以支持 Go module 下载"
