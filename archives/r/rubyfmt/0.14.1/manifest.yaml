@@ -1,0 +1,68 @@
+software: rubyfmt
+# 版本级 manifest
+# 文件位置: archives/r/rubyfmt/0.14.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.14.1"
+status: built
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/fables-tales/rubyfmt/archive/refs/tags/v0.14.1.tar.gz"
+  sha256: "e008e4ae58680ea884c525eda0df6f70f4e8629182f0808835cb4666114e3de9"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cargo
+  configure_options:
+    - "build --release --no-default-features"
+  dependencies:
+    - "rust/1.96.1"
+    - "llvm (libclang for ruby-prism-sys bindgen)"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Cargo.toml.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "jemalloc (tikv-jemalloc-sys) 的 autoconf config.sub 不识别 OHOS 平台，需用 --no-default-features 禁用"
+  - "ruby-prism-sys 依赖 libclang 进行 FFI bindgen，需设置 LIBCLANG_PATH 环境变量"
+  - "cargo 二进制需要 LD_LIBRARY_PATH 包含 ~/.harmonybrew/lib 以找到 OpenSSL 库"
+  - "Rust edition 2024 需要 rustc >= 1.85"
+  - "cargo build 可能遇到 'Text file busy' (ETXTBSY) 错误，使用 -j1 串行编译可规避"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/rubyfmt-0.14.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/rubyfmt-0.14.1.work
+  source_orig_hash: 12ce0363b41a6fba
+  source_work_hash: 6bbf6552c633e0ef
+  generated_at: '2026-07-02T18:51:12'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
