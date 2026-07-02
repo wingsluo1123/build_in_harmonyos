@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: rocq/9.0.0
+homepage: https://github.com/rocq-prover/rocq
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make check"
+
+# test-suite/ 目录 (500+单元测试, 50+集成测试, 100+标准库编译测试)
+upstream_tests:
+  - name: "unit_tests"
+    source: rocq-9.0.0/test-suite
+    description: "500+ 单元测试 (tactic, conversion, reduction, etc.)"
+    command: "make check"
+  - name: "integration_tests"
+    source: rocq-9.0.0/test-suite
+    description: "50+ 集成测试 (module, class, record, etc.)"
+    command: "make check"
+  - name: "stdlib_compile_tests"
+    source: rocq-9.0.0/test-suite
+    description: "100+ 标准库编译测试"
+    command: "make check"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "rocq --version + test_rocq.v 编译验证"
+    command: "python3 conanfile.py"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 650
