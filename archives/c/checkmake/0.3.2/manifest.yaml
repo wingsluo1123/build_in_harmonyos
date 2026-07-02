@@ -1,0 +1,82 @@
+software: checkmake
+# 版本级 manifest
+# 文件位置: archives/c/checkmake/0.3.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.3.2"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/checkmake/checkmake/archive/refs/tags/v0.3.2.tar.gz"
+
+  # 源码校验和
+  sha256: "450412ba6500ef7c4c8a0150a5e1a3d2e76591ce9f37609bcbd5508298ad9bef"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 构建系统详情
+  build_tool: "go + make"
+
+  # 配置选项列表
+  configure_options:
+    - "VERSION=0.3.2"
+    - "BUILDER_NAME=OpenDesk"
+    - "BUILDER_EMAIL=opendesk@ohos.dev"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "go/1.26.4"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # 关键环境变量
+  env:
+    GOPROXY: "https://goproxy.cn,direct"
+    GOFLAGS: "-mod=mod"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go 项目需要设置 GOPROXY=https://goproxy.cn,direct 以在国内网络环境下载依赖"
+  - "checkmake 的 Makefile 默认目标 all 依赖 lint + require + binaries + man_targets，需用 make binaries 跳过 lint 和 pandoc 依赖"
+  - "pandoc 仅用于生成 man page，不影响二进制编译，可安全跳过"
+  - "Go 二进制为静态链接 ELF，无需额外 RPATH 配置"
