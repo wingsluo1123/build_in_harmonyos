@@ -1,0 +1,78 @@
+software: perl-set-object
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.43-r0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.43-r0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-01"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/R/RU/RURBAN/Set-Object-1.43.tar.gz"
+
+  # 源码校验和
+  sha256: "e3b3c7c7ecb91ef6d20eb06bf6bff74e41c40b75bd234e107d2ecf78d3dea9d1"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+  build_system: perl
+
+  # 配置选项列表
+  configure_options:
+    - "perl Makefile.PL INSTALL_BASE=/"
+
+  # 编译选项
+  compile_options:
+    - "make -j1 (E074: HarmonyOS SELinux 禁止 FIFO)"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Set::Object (Perl XS) 在鸿蒙平台编译无需 CRT 链接参数，因为它仅链接 libc 和 Perl 解释器符号"
+  - "与 perl-dbd-pg 不同，Set::Object 无外部 C 库依赖，Makefile.PL 无需修改"
+  - "鸿蒙 SELinux HMDFS 限制用户目录 .so 加载 (E046)，make test 在编译环境中无法通过"
+  - "Object.so 正确导出 boot_Set__Object 符号，仅依赖 libc.so，ELF 结构完整"
+  - "模块需安装到 /data/service/hnp/ 系统目录 (SELinux 标签 hnp_file) 才能被 DynaLoader 加载"
+  - "E074: HarmonyOS 必须使用 make -j1 编译（SELinux 禁止 FIFO 并行构建）"
