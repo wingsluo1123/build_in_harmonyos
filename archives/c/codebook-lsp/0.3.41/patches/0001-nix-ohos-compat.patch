@@ -1,0 +1,155 @@
+diff --git a/Cargo.toml b/Cargo.toml
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -95,6 +95,9 @@
+ [package.metadata.docs.rs]
+ rustdoc-args = ["--cfg", "docsrs"]
+ targets = [
++  "aarch64-unknown-linux-ohos",
++  "aarch64-unknown-linux-gnu",
++  "aarch64-linux-android",
+   "x86_64-unknown-linux-gnu",
+   "aarch64-linux-android",
+   "x86_64-apple-darwin",
+diff --git a/src/fcntl.rs b/src/fcntl.rs
+--- a/src/fcntl.rs
++++ b/src/fcntl.rs
+@@ -9,6 +9,7 @@
+ use std::os::unix::ffi::OsStringExt;
+ use std::os::unix::io::RawFd;
+ 
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+ #[cfg(feature = "fs")]
+ use crate::{sys::stat::Mode, NixPath, Result};
+ #[cfg(any(target_os = "android", target_os = "linux"))]
+@@ -30,7 +31,7 @@
+ use std::ptr; // For splice and copy_file_range
+ 
+ #[cfg(any(
+-    target_os = "linux",
++    target_os = "linux", target_os = "ohos",
+     target_os = "android",
+     target_os = "emscripten",
+     target_os = "fuchsia",
+@@ -400,7 +401,8 @@
+ /// `copy_file_range` had previously been enqueued for the given output file.
+ #[cfg(feature = "fs")]
+ #[cfg(any(
+-    target_os = "linux",
++    target_os = "linux",
++    target_os = "ohos",
+     target_os = "android"
+ ))]
+ pub fn copy_file_range(
+diff --git a/src/sys/signal.rs b/src/sys/signal.rs
+--- a/src/sys/signal.rs
++++ b/src/sys/signal.rs
+@@ -6,7 +6,8 @@
+ 
+ use crate::{errno::Errno, Result};
+ 
+-#[cfg(any(target_os = "android", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+ mod linux;
+ 
+ #[cfg(any(
+@@ -25,7 +26,7 @@
+   target_os = "netbsd",
+   target_os = "openbsd"
+ ))]
+-#[cfg(any(target_os = "android", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+ pub use self::linux::*;
+ 
+ #[cfg(not(any(
+diff --git a/src/sys/statfs.rs b/src/sys/statfs.rs
+--- a/src/sys/statfs.rs
++++ b/src/sys/statfs.rs
+@@ -1,4 +1,4 @@
+-#[cfg(not(any(target_os = "linux", target_os = "android")))]
++#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ohos")))]
+ use libc::{__fsword_t, fsblkcnt_t, fsfilcnt_t};
+ 
+ use libc::{c_int, c_long};
+@@ -20,7 +20,7 @@
+   target_os = "openbsd"
+ ))]
+ #[allow(dead_code)]
+-#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux", target_os = "ohos"))]
+ pub (crate) type FsType = c_long;
+ 
+ #[cfg(target_os = "freebsd")]
+@@ -34,7 +34,8 @@
+ }
+ 
+ #[allow(missing_docs)]
+-#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux",
++          target_os = "ohos"))]
+ mod consts {
+ 
+ use crate::sys::statfs::{FsType, REPARSE_REQUIRED};
+diff --git a/src/sys/statvfs.rs b/src/sys/statvfs.rs
+--- a/src/sys/statvfs.rs
++++ b/src/sys/statvfs.rs
+@@ -9,7 +9,8 @@
+ use libc::{c_ulong, statvfs};
+ 
+ // The libc crate supports statvfs on Linux, Android, iOS, macOS, FreeBSD, OpenBSD, and NetBSD.
+-#[cfg(not(target_os = "redox"))]
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "freebsd",
++          target_os = "macos", target_os = "ohos", target_os = "openbsd", target_os = "netbsd"))]
+ mod sys;
+ 
+ #[allow(missing_docs)]
+@@ -21,7 +22,7 @@
+ pub struct FsFlags {
+     /// A flag that is set when the filesystem is mounted read-only.
+     #[cfg(not(target_os = "redox"))]
+-    #[cfg(any(target_os = "android", target_os = "linux"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+     pub rdonly: bool,
+ 
+     /// A flag that is set when the filesystem is mounted with nosuid (setuid
+@@ -25,7 +26,7 @@
+     /// programs ignored).
+     #[cfg(not(target_os = "redox"))]
+     #[cfg(any(
+-        target_os = "android", target_os = "linux"
++        target_os = "android", target_os = "linux", target_os = "ohos"
+     ))]
+     pub nosuid: bool,
+@@ -37,7 +38,7 @@
+     /// A flag that is set when the filesystem is mounted with nodev (device
+     /// files ignored).
+     #[cfg(not(target_os = "redox"))]
+-    #[cfg(any(target_os = "android", target_os = "linux"))]
++    #[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+     pub nodev: bool,
+ 
+     /// A flag that is set when files can be accessed with sync semantics.
+@@ -41,7 +42,7 @@
+     /// files ignored).
+     #[cfg(not(target_os = "redox"))]
+     #[cfg(any(
+-        target_os = "linux"
++        target_os = "linux", target_os = "ohos"
+     ))]
+     pub sync: bool,
+@@ -53,7 +54,7 @@
+     /// A flag that is set when the filesystem honors the noexec flag.
+     #[cfg(not(target_os = "redox"))]
+     #[cfg(any(
+-        target_os = "android", target_os = "linux"
++        target_os = "android", target_os = "linux", target_os = "ohos"
+     ))]
+     pub noexec: bool,
+@@ -57,7 +58,7 @@
+     /// A flag that is set when the filesystem honors the noexec flag.
+     #[cfg(not(target_os = "redox"))]
+     #[cfg(any(
+-        target_os = "android", target_os = "linux"
++        target_os = "android", target_os = "linux", target_os = "ohos"
+     ))]
+     pub nosymfollow: bool,

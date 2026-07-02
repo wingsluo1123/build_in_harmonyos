@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: codebook-lsp/0.3.41
+homepage: "https://github.com/blopker/codebook"
+
+# 上游测试命令 (Rust 项目使用 cargo test)
+upstream_check_command: "cargo test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cargo test --release"
+
+# 上游实际运行的测试程序
+# codebook-lsp 使用 Rust 标准测试框架，测试在 crates/codebook/tests/ 下
+upstream_tests:
+  - file: "crates/codebook/tests/languages/test_c.rs"
+    source: "codebook-0.3.41/crates/codebook/tests/languages/test_c.rs"
+    description: "C 语言拼写检查测试"
+    command: "cargo test --release test_c"
+  - file: "crates/codebook/tests/languages/test_cpp.rs"
+    source: "codebook-0.3.41/crates/codebook/tests/languages/test_cpp.rs"
+    description: "C++ 语言拼写检查测试"
+    command: "cargo test --release test_cpp"
+  - file: "crates/codebook/tests/languages/test_python.rs"
+    source: "codebook-0.3.41/crates/codebook/tests/languages/test_python.rs"
+    description: "Python 语言拼写检查测试"
+    command: "cargo test --release test_python"
+  - file: "crates/codebook/tests/languages/test_javascript.rs"
+    source: "codebook-0.3.41/crates/codebook/tests/languages/test_javascript.rs"
+    description: "JavaScript 语言拼写检查测试"
+    command: "cargo test --release test_javascript"
+  - file: "crates/codebook/tests/languages/test_go.rs"
+    source: "codebook-0.3.41/crates/codebook/tests/languages/test_go.rs"
+    description: "Go 语言拼写检查测试"
+    command: "cargo test --release test_go"
+
+# test_package 中自带的测试 (消费者视角验证)
+# Rust 二进制无需 CMake 编译测试，直接运行 --version 验证二进制可用
+test_package_tests:
+  - file: "conanfile.py"
+    description: "验证 codebook-lsp 二进制可执行且版本正确"
+    command: "codebook-lsp --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 13 个 cargo test 通过 + 1 个 --version 验证
+assertion_count: 14

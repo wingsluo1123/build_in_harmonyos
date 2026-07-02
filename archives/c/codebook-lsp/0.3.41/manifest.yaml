@@ -1,0 +1,80 @@
+software: codebook-lsp
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/0.3.41/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.3.41"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/blopker/codebook/archive/refs/tags/v0.3.41.tar.gz"
+
+  # 源码校验和
+  sha256: "346eef8fd95bbad0dd85a20c4b461e5ed8918d245b8c4260326d8de2365c4242"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # Rust 依赖由 Cargo.lock 管理，无需 conan 级别依赖声明
+  # 关键 Rust 依赖: aws-lc-sys/0.41.0, nix/0.26.4, rustls, openssl-sys
+
+  # 编译器
+  cc: rustc
+  cxx: rustc
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - patch_file: "patches/0001-nix-ohos-compat.patch"
+    target: "cargo-registry:nix-0.26.4"
+    description: "修复 nix 0.26.4 在 OHOS 平台上的 8 个兼容性错误（fcntl/signal/statfs/statvfs/Cargo.toml）"
+  - patch_file: "patches/0002-aws-lc-sys-cmake-arch.patch"
+    target: "cargo-registry:aws-lc-sys-0.41.0"
+    description: "修补 aws-lc CMakeLists.txt 和 cmake_builder.rs，解决 CMake 无法检测 OHOS 平台处理器架构导致汇编符号未定义"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "aws-lc-sys CMake 无法检测 OHOS 平台导致汇编文件被跳过（CMAKE_SYSTEM_PROCESSOR 为空，ARCH 被设为 generic），C 代码引用 asm 符号产生 ld.lld undefined symbol 错误"
+  - "nix 0.26.4 crate 在 OHOS 上有 8 个兼容性错误，涉及 fcntl/signal/statfs/statvfs 等模块的 syscall 常量和结构体差异"
+  - "Rust target aarch64-unknown-linux-ohos 的 target_env 为 ohos，可用于 cmake_builder.rs 中区分 OHOS 平台"
+  - "OHOS 环境访问 GitHub 不稳定，SSL 连接频繁中断，conan source() 下载需要重试机制或镜像源"
+  - "cargo registry 补丁是临时的，cargo 重新下载会覆盖；conan 构建需在 build() 中通过 cargo patch 或手动应用补丁"
+  - "OpenSSL 需通过 harmonybrew 安装（/storage/Users/currentUser/.harmonybrew），设置 OPENSSL_DIR/PKG_CONFIG_PATH 环境变量"

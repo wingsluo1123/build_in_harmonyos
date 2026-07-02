@@ -1,0 +1,79 @@
+#====================================================================
+# E212-draft-CC11.kv — 知识图谱草稿条目
+# 对应的人类文档: draft/E212-draft-CC11.md (提升后: doc/E212.md)
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E212
+trigger_tool:           cargo|cmake|ld
+phase:                  linking
+error_signature:        ld.lld: error: undefined symbol: aws_lc_.*_ChaCha20_ctr32_neon|ld.lld: error: undefined symbol: aws_lc_.*_bn_mul_mont|ld.lld: error: undefined symbol: aws_lc_.*_aes_hw_encrypt|ld.lld: error: undefined symbol: aws_lc_.*_vpaes_encrypt|Unknown processor found. Using generic implementations
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               linking|rust|cmake|ohos
+match_keywords:         aws-lc, aws_lc_sys, undefined symbol, bn_mul_mont, ChaCha20_ctr32, aes_hw_encrypt, ld.lld, OHOS, CMAKE_SYSTEM_PROCESSOR, Unknown processor, generic implementations
+title:                  aws-lc-rs assembly symbols undefined on OHOS due to CMake processor detection failure
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             aws-lc-sys CMake build cannot detect CMAKE_SYSTEM_PROCESSOR on OHOS platform (reports unknown), causing ARCH to be set to generic and skipping all assembly source files. The C code still references asm symbols (ChaCha20, AES, bn_mul_mont) that are never compiled, resulting in linker errors.
+affected_scope:         Rust projects using rustls+aws-lc-rs on OHOS (e.g. codebook-lsp, any crate depending on aws-lc-sys)
+verification_cmd:      cargo build --release -p codebook-lsp 2>&1 | grep -c undefined
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:             1
+rec_approach:           patch-cmake-arch-detection
+rec_description:        Patch aws-lc CMakeLists.txt to force ARCH=aarch64 when CMAKE_SYSTEM_PROCESSOR is empty on OHOS, and add configure_open_harmony() to cmake_builder.rs to set CMAKE_SYSTEM_NAME=Linux and OHOS_ARCH=arm64-v8a
+rec_command:            cd $CARGO_REGISTRY_SRC/aws-lc-sys-0.41.0 && patch -p1 -i $ARCHIVE_DIR/patches/0002-aws-lc-sys-cmake-arch.patch && cd $BUILD_SRC_DIR && cargo build --release --locked -p codebook-lsp
+rec_auto_fix:            false
+rec_impl:               manual
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:      set-openssl-no-asm
+fallback_description:   Set OPENSSL_NO_ASM=1 environment variable or cmake define to disable all assembly code. This eliminates linker errors but causes 10-100x performance degradation in cryptographic operations. Only use as temporary workaround.
+fallback_command:       OPENSSL_NO_ASM=1 cargo build --release --locked -p codebook-lsp
+fallback_auto_fix:      false
+fallback_impl:          env
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       OPENSSL_NO_ASM.*=.*1|aws_lc_no_asm
+forbid_1_reason:        Disabling assembly code eliminates the linker errors but is not a root cause fix. It causes severe performance degradation in all cryptographic operations.
+forbid_1_consequence:   10-100x slower TLS/crypto operations; acceptable only for development/debugging, never for production builds.
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P006
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               draft/E212-draft-CC11.md
+last_updated:           2026-07-02
+source_event:           codebook-lsp/0.3.41 build on OHOS (aarch64-unknown-linux-ohos)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                huangzhe <1670616434@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-07-02
+
+draft: true
+contributor_id: CC11
