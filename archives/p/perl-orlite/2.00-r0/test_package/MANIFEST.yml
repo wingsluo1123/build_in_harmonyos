@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-orlite/2.00-r0
+homepage: "https://metacpan.org/dist/ORLite"
+
+# 上游测试命令 (Perl MakeMaker: make test)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序 (t/*.t)
+upstream_tests:
+  - file: t/01_compile.t
+    source: perl-orlite-2.00-r0/t/01_compile.t
+    description: "模块编译测试"
+    command: "perl -Iblib/lib t/01_compile.t"
+  - file: t/02_basics.t
+    source: perl-orlite-2.00-r0/t/02_basics.t
+    description: "基本功能测试"
+    command: "perl -Iblib/lib t/02_basics.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "ORLite.pm 文件存在性验证"
+    command: "perl -e 'grep { -f \"$_/ORLite.pm\" } @INC'"
+  - file: conanfile.py
+    description: "ORLite API Mock 功能验证 (版本号 + 10 个核心方法)"
+    command: "perl -e 'BEGIN { mock DBD::SQLite } use ORLite { file=>..., create=>1 }; 验证 API'"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 12
