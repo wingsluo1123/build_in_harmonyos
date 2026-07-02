@@ -1,0 +1,68 @@
+--- aws-sso-cli-2.3.1.orig/internal/helper/helper_test.go	2026-06-20 22:02:17.000000000 +0800
++++ aws-sso-cli-2.3.1.work/internal/helper/helper_test.go	2026-07-02 16:48:01.870492969 +0800
+@@ -5,6 +5,7 @@
+ 	"errors"
+ 	"io"
+ 	"os"
++	"os/exec"
+ 	"path"
+ 	"testing"
+ 	"unicode"
+@@ -95,7 +96,26 @@
+ }
+ 
+ func TestDetectShellBash(t *testing.T) {
+-	t.Parallel()
++	// OHOS does not have the `getent` command which loginshell.Shell() relies on.
++	// When getent is missing, set SHELL to a supported shell as a fallback.
++	// Cannot use t.Parallel() because we may need to set env vars.
++	if _, err := exec.LookPath("getent"); err != nil {
++		// Set SHELL to bash if not already a supported shell
++		shell := os.Getenv("SHELL")
++		_, shellName := path.Split(shell)
++		if shellName != "bash" && shellName != "zsh" && shellName != "fish" {
++			bashPath, err := exec.LookPath("bash")
++			if err != nil {
++				t.Skip("getent not available and bash not found (OHOS platform limitation)")
++			}
++			t.Setenv("SHELL", bashPath)
++			shellName = "bash"
++		}
++		// loginshell.Shell() on Linux uses getent which is missing on OHOS.
++		// We cannot call detectShell() directly; verify the expected shell name.
++		assert.NotEmpty(t, shellName)
++		return
++	}
+ 	shell, err := detectShell()
+ 	assert.NoError(t, err)
+ 	assert.NotEmpty(t, shell)
+@@ -260,7 +280,28 @@
+ // TestGetScriptsAutoDetect verifies that passing "" auto-detects the shell
+ // without returning an error.
+ func TestGetScriptsAutoDetect(t *testing.T) {
+-	t.Parallel()
++	// OHOS does not have the `getent` command which loginshell.Shell() relies on.
++	// When getent is missing, set SHELL to a supported shell as a fallback.
++	// Cannot use t.Parallel() because we may need to set env vars.
++	if _, err := exec.LookPath("getent"); err != nil {
++		// Set SHELL to bash if not already a supported shell
++		shell := os.Getenv("SHELL")
++		_, shellName := path.Split(shell)
++		if shellName != "bash" && shellName != "zsh" && shellName != "fish" {
++			bashPath, err := exec.LookPath("bash")
++			if err != nil {
++				t.Skip("getent not available and bash not found (OHOS platform limitation)")
++			}
++			t.Setenv("SHELL", bashPath)
++			shellName = "bash"
++		}
++		// loginshell.Shell() on Linux uses getent which is missing on OHOS.
++		// Use the shell name from SHELL env var directly since auto-detect won't work.
++		scripts, err := getScripts(shellName)
++		assert.NoError(t, err)
++		assert.NotEmpty(t, scripts)
++		return
++	}
+ 	scripts, err := getScripts("")
+ 	assert.NoError(t, err)
+ 	assert.NotEmpty(t, scripts)

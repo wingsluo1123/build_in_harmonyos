@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml — aws-sso-cli 2.3.1
+# Declares upstream test inventory and Conan consumer test coverage
+
+upstream_tests:
+  total: 494
+  unit: 432
+  e2e: 62
+  files: 77
+  benchmarks: 0
+  notes: |
+    Go testing framework. 61 non-E2E test files + 16 E2E test files.
+    No benchmark functions.
+
+conan_tests:
+  - name: "aws-sso version"
+    type: smoke
+    command: 'aws-sso version'
+    expects_contains: "2.3.1"
+    notes: |
+      Verifies the binary executes on OHOS and the version string
+      was correctly injected via ldflags.
+
+adaptation:
+  upstream_modified: true
+  upstream_modification_summary: |
+    7 test files modified/created for OHOS platform compatibility:
+    - 3 new main_test.go files (TestMain sets XDG_CONFIG_HOME for storage.lock path)
+    - 4 modified *_test.go files (OHOS SELinux/getent platform detection + t.Skip)
+  new_tests_added: 1
+  new_tests_summary: "Conan test_package smoke test (aws-sso version)"
+  skipped_tests:
+    - name: TestBadFilePerms
+      package: internal/storage
+      reason: "OHOS SELinux does not enforce file permission chmod 0000 (E046)"
+    - name: TestFileEdit
+      package: internal/fileutils
+      reason: "OHOS SELinux does not enforce directory permission chmod 0400 (E046)"

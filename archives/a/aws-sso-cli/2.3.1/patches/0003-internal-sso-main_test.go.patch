@@ -1,0 +1,46 @@
+--- /dev/null	2026-07-02 15:34:50.586500156 +0800
++++ aws-sso-cli-2.3.1.work/internal/sso/main_test.go	2026-07-02 16:34:38.070491562 +0800
+@@ -0,0 +1,43 @@
++package sso
++
++/*
++ * AWS SSO CLI
++ * Copyright (c) 2021-2026 Aaron Turner  <synfinatic at gmail dot com>
++ *
++ * This program is free software: you can redistribute it
++ * and/or modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation, either version 3 of the
++ * License, or with the authors permission any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++import (
++	"os"
++	"testing"
++)
++
++// TestMain sets up a temporary XDG_CONFIG_HOME so that config.ConfigDir()
++// returns a valid path for the storage lock file. On OHOS the default
++// config directory path does not exist in the sandbox, causing
++// storage.FlockFile() to fail.
++func TestMain(m *testing.M) {
++	tmpDir, err := os.MkdirTemp("", "aws-sso-test-config")
++	if err != nil {
++		panic(err)
++	}
++	defer os.RemoveAll(tmpDir)
++
++	// Create aws-sso subdirectory (ConfigDir returns {XDG_CONFIG_HOME}/aws-sso)
++	os.MkdirAll(tmpDir+"/aws-sso", 0700)
++
++	os.Setenv("XDG_CONFIG_HOME", tmpDir)
++
++	os.Exit(m.Run())
++}

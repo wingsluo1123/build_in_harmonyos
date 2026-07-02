@@ -1,0 +1,97 @@
+software: aws-sso-cli
+# 版本级 manifest
+# 文件位置: archives/a/aws-sso-cli/2.3.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.3.1"
+status: built
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/synfinatic/aws-sso-cli/archive/refs/tags/v2.3.1.tar.gz"
+  sha256: "14caf8315a715758da53819be45e6842f89383bcf9fd8abe3a68ec3591cde646"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  build_system: go
+  configure_options:
+    - "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w -X main.Version=2.3.1 -X main.Tag=v2.3.1' -o aws-sso ./cmd/aws-sso/..."
+  dependencies:
+    - go/1.26.4
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-cmd-aws-sso-main_test.go.patch"
+  - "patches/0002-internal-sso-auth-main_test.go.patch"
+  - "patches/0003-internal-sso-main_test.go.patch"
+  - "patches/0004-internal-storage-json_store_test.go.patch"
+  - "patches/0005-internal-fileutils-fileedit_test.go.patch"
+  - "patches/0006-internal-fileutils-path_test.go.patch"
+  - "patches/0007-internal-helper-helper_test.go.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Go GOROOT for harmonybrew-installed Go is at Cellar/go/<ver>/libexec, not Cellar root"
+  - "config.ConfigDir() returns OHOS sandbox path /data/storage/el2/base/haps/entry/files/aws-sso which doesn't exist; fix by setting XDG_CONFIG_HOME in TestMain"
+  - "OHOS SELinux does not enforce file/directory permission chmod (E046); tests relying on permission restrictions need t.Skip()"
+  - "OHOS lacks getent command; loginshell.Shell() fails; fix by setting SHELL env var"
+  - "ldflags -X main.Version works correctly for aws-sso-cli (unlike saml2aws which had Go build cache issue)"
+  - "Go 1.26.4 installable via harmonybrew brew install go"
+
+patch_generation:
+  method: per-file-diff
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/aws-sso-cli-2.3.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/aws-sso-cli-2.3.1.work
+  generated_at: '2026-07-02T16:54'
+  patches_count: 7
+
+patch_classification:
+  - file: 0001-cmd-aws-sso-main_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0002-internal-sso-auth-main_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0003-internal-sso-main_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0004-internal-storage-json_store_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0005-internal-fileutils-fileedit_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0006-internal-fileutils-path_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'
+  - file: 0007-internal-helper-helper_test.go.patch
+    type: portability
+    platform_only: true
+    guard: 'pending'

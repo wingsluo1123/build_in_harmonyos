@@ -1,0 +1,28 @@
+--- aws-sso-cli-2.3.1.orig/cmd/aws-sso/main_test.go	2026-06-20 22:02:17.000000000 +0800
++++ aws-sso-cli-2.3.1.work/cmd/aws-sso/main_test.go	2026-07-02 16:34:59.410497187 +0800
+@@ -15,6 +15,25 @@
+ 	"github.com/synfinatic/aws-sso-cli/internal/sso"
+ )
+ 
++// TestMain sets up a temporary XDG_CONFIG_HOME so that config.ConfigDir()
++// returns a valid path for the storage lock file. On OHOS the default
++// config directory path does not exist in the sandbox, causing
++// storage.FlockFile() to fail.
++func TestMain(m *testing.M) {
++	tmpDir, err := os.MkdirTemp("", "aws-sso-test-config")
++	if err != nil {
++		panic(err)
++	}
++	defer os.RemoveAll(tmpDir)
++
++	// Create aws-sso subdirectory (ConfigDir returns {XDG_CONFIG_HOME}/aws-sso)
++	os.MkdirAll(tmpDir+"/aws-sso", 0700)
++
++	os.Setenv("XDG_CONFIG_HOME", tmpDir)
++
++	os.Exit(m.Run())
++}
++
+ func TestAccountIDUnmarshalText(t *testing.T) {
+ 	tests := []struct {
+ 		name    string

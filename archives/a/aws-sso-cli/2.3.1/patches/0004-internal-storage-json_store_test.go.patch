@@ -1,0 +1,16 @@
+--- aws-sso-cli-2.3.1.orig/internal/storage/json_store_test.go	2026-06-20 22:02:17.000000000 +0800
++++ aws-sso-cli-2.3.1.work/internal/storage/json_store_test.go	2026-07-02 16:35:42.338493281 +0800
+@@ -48,6 +48,13 @@
+ 	err := os.WriteFile(fname, []byte{}, 0000)
+ 	assert.NoError(t, err)
+ 
++	// OHOS SELinux does not enforce file permission restrictions (E046).
++	// Verify whether chmod 0000 actually took effect; if not, skip the test.
++	_, err = os.ReadFile(fname)
++	if err == nil {
++		t.Skip("chmod 0000 not enforced on this platform (OHOS SELinux E046)")
++	}
++
+ 	_, err = OpenJsonStore(context.Background(), fname)
+ 	assert.Error(t, err)
+ }
