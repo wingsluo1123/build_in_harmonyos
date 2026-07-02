@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: dune/3.17.0
+homepage: https://github.com/ocaml/dune
+
+# 上游测试命令
+upstream_check_command: "dune runtest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "dune runtest"
+
+# Dune 自测套件 (test/ 目录)
+upstream_tests:
+  - name: "jmp"
+    source: dune-3.17.0/test/jmp
+    description: "JMP 跳转测试"
+    command: "dune runtest"
+  - name: "fib"
+    source: dune-3.17.0/test/fib
+    description: "Fibonacci 计算测试"
+    command: "dune runtest"
+  - name: "expect-tests"
+    source: dune-3.17.0/test
+    description: "Dune 期望测试套件 (ppx, cram, action, etc.)"
+    command: "dune runtest"
+  - name: "unit-tests"
+    source: dune-3.17.0/test/unit-tests
+    description: "Dune 内部单元测试"
+    command: "dune runtest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "dune --version 版本验证"
+    command: "dune --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 50
