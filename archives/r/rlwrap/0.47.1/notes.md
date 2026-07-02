@@ -1,43 +1,37 @@
-# rlwrap 0.47.1 编译笔记
+# rlwrap 0.47.1 适配笔记
 
 ## 编译环境
-- 系统: HarmonyOS (HongMeng Kernel 1.12.0)
-- 架构: aarch64
+- 构建系统: autotools
+- 编译日期: 2026-07-02
 - 编译器: clang
-- 依赖: readline 8.2, ncurses 6.4
+- 状态: success
 
-## 关键问题及解决
+## 编译步骤
+```bash
+# Conan recipe uses Autotools toolchain
+conan create . --build=missing --user=ohpcd --channel=stable
+```
 
-### 1. config.guess 不识别 HarmonyOS
-- **问题**: autotools 的 config.guess 无法识别 HarmonyOS 系统
-- **解决**: 修改 tools/config.guess，添加 HarmonyOS 检测逻辑，返回 `aarch64-unknown-linux-musl`
-- **知识图谱**: E007 平台识别问题
-
-### 2. HMDFS 文件系统权限限制
-- **问题**: config.status 无法在当前目录创建临时文件（HMDFS 特殊限制）
-- **解决**: 手动创建 config.h 和 Makefile，绕过 autotools 的临时文件机制
-- **平台限制**: HMDFS 不支持在某些位置创建临时目录
-
-### 3. 缺少 libptytty
-- **问题**: configure 报错缺少 libptytty 库
-- **解决**: 使用 `--without-libptytty` 参数，使用内置的 ptytty.c 代码
-
-### 4. 缺少宏定义
-- **问题**: 编译时缺少 DATADIR 等宏定义
-- **解决**: 在 config.h 中添加必要的宏定义
-
-## 编译参数
-- configure: `--prefix=/storage/Users/currentUser/usr/local --without-libptytty`
-- CFLAGS: `-I/storage/Users/currentUser/usr/local/include -Wall -O2`
-- LDFLAGS: `-L/storage/Users/currentUser/usr/local/lib -Wl,-rpath,/storage/Users/currentUser/usr/local/lib`
-- LIBS: `-lutil -lreadline -ltinfo`
+## 遇到的问题与解决方案
+| # | 问题 | 根因 | 解决方案 |
+|---|------|------|----------|
+| 1 | config.status 失败 | HMDFS umask 077 导致 mktemp -d 创建目录权限异常 | 补丁 0001 将 configure 中 umask 077 改为 022 |
+| 2 | bool 类型未定义 | C99+ 需要 stdbool.h | 补丁 0002 添加 #include <stdbool.h> |
+| 3 | config.guess 不识别 HarmonyOS | uname -s 返回 HarmonyOS | 补丁 0003 添加 HarmonyOS 系统识别 |
+| 4 | config.sub 不识别 ohos | ohos-linux 三元组未注册 | 补丁 0004 添加 ohos-linux 支持 |
+| 5 | CONFIG_SHELL 路径不存在 | Conan profile 设置 CONFIG_SHELL=/data/service/hnp/bin/bash | 在 build() 中替换 $CONFIG_SHELL → /bin/sh |
+| 6 | 硬编码路径不可移植 | build() 中硬编码了 /storage/Users/currentUser/.harmonybrew 路径 | 改用 AutotoolsToolchain + os.path.expanduser |
 
 ## 验证结果
-- 版本: rlwrap 0.47
-- 功能: readline wrapper，为交互式命令添加 readline 支持
-- 测试: `rlwrap --version` 正常输出
+- `rlwrap --version` ✅
+- conan-verify 8/8 gates 通过
+- 静态链接 (R26) ✅
 
+## 注意事项
+- 使用 Conan Autotools 工具链，不直接调用 ./configure
+- harmonybrew 路径通过 os.path.expanduser("~/.harmonybrew/...") 获取，CI 可移植
+- CONFIG_SHELL 修复保留在 build() 中，不绕过 Conan 工具链
 ---
-**编译开始**: 2026-05-21 23:02
-**编译结束**: 2026-05-21 23:17
-**最终状态**: built（手动绕过 autotools 限制成功）
+
+**编译结束**: 2026-07-02 11:59
+**最终状态**: built

@@ -1,18 +1,27 @@
-software: rlwrap
-version: 0.47.1
+version: "0.47.1"
 status: built
-build_system: autotools
-configure_options:
-  - --prefix=/storage/Users/currentUser/usr/local
-  - --without-libptytty
-source_url: http://deb.debian.org/debian/pool/main/r/rlwrap/rlwrap_0.47.1.orig.tar.gz
-dependencies:
-  - readline (8.2)
-  - ncurses (6.4)
-compiler: clang
-platform: HarmonyOS (aarch64)
-build_date: 2026-05-21
-build_duration: 15 minutes
-knowledge_extracted:
-  - E007: config.guess 平台识别
-  - HMDFS 权限限制（平台特定）
+build_date: "2026-07-02"
+
+source:
+  url: "https://github.com/hanslub42/rlwrap/releases/download/v0.47.1/rlwrap-0.47.1.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--without-libptytty"
+  cc: clang
+  static_linking: true
+
+patches_applied:
+  - "0001-configure.patch"
+  - "0002-src-rlwrap.h.patch"
+  - "0003-tools-config.guess.patch"
+  - "0004-tools-config.sub.patch"
+
+knowledge_gained:
+  - "E011: HarmonyOS HMDFS umask 077 导致 mktemp -d 创建目录权限异常，config.status 失败，通过 configure 补丁将 umask 改为 022 修复"
+  - "E007: config.guess/config.sub 不识别 ohos-linux 三元组，通过补丁添加 HarmonyOS 系统识别"
+  - "C99+ bool 类型需要 stdbool.h，通过 rlwrap.h 补丁修复"
+  - "CONFIG_SHELL 指向不存在的 /data/service/hnp/bin/bash，替换为 /bin/sh"
+  - "R26: 终端工具使用静态链接避免污染系统库路径"
