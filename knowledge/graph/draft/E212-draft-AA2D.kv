@@ -1,0 +1,69 @@
+#====================================================================
+# E212.kv — Bun not available on OpenHarmony (DRAFT)
+# Created during cline 4.0.5 compilation
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E212
+trigger_tool:           install|runtime
+phase:                  configuration
+error_signature:        EBADPLATFORM.*bun|Failed to download bun|curl.*bun\.sh.*Failed to connect|bun.*not found|Unknown file extension.*\.scm
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               build-system|javascript|typescript
+match_keywords:         bun, esbuild, EBADPLATFORM, workspace, npm, typescript, openharmony
+title:                  Bun runtime not available on OpenHarmony — use esbuild replacement
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             Bun runtime/package manager is not available on OpenHarmony. Bun's npm package only supports darwin/linux/android/freebsd/win32. Direct install from bun.sh also fails due to GitHub connectivity. Projects using Bun.build() API in bun.mts files cannot build without Bun.
+affected_scope:         Any TypeScript/JavaScript project using Bun as package manager or build tool (e.g. cline, and any project with bun.mts or bun.lock files)
+verification_cmd:       which bun 2>/dev/null && bun --version || echo "bun not available"
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           replace-bun-with-esbuild
+rec_description:        Replace Bun.build() calls with esbuild.build() calls. Write a Node.js build script that replicates the Bun.build() API using esbuild.
+rec_command:            node build-with-esbuild.mjs
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      install-bun-linux-arm64
+fallback_description:   Attempt to install Bun linux-arm64 binary directly (may work if OpenHarmony supports Linux ARM64 binaries)
+fallback_command:       curl -fsSL https://bun.sh/install | bash
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       npm install.*(without --force)
+forbid_1_reason:        npm install will fail with EBADPLATFORM for packages that don't list OpenHarmony as supported OS
+forbid_1_consequence:   Build fails with "Unsupported platform" error
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-TOOLCHAIN-001
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E001]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E212.md
+last_updated:           2026-07-01
+source_event:           cline 4.0.5 compilation
+
+# ═══ 知识协作 ═══
+authors:                AA2D
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-07-01
+
+draft: true
+contributor_id: AA2D

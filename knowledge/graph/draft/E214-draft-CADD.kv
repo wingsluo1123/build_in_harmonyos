@@ -1,0 +1,9 @@
+error_signature: Error loading shared library.*symbol not found|Error relocating.*symbol not found
+match_keywords: LD_LIBRARY_PATH,OHOS,musl,dynamic linker,Error loading shared library,Error relocating
+root_cause: OHOS (musl libc) 动态链接器不支持 LD_LIBRARY_PATH 环境变量，导致 Qt5 工具（qlalr, moc）和 test_package 无法在运行时加载 libQt5Core.so 等共享库。$ORIGIN RPATH 也不可靠。
+rec_description: 1. 对于构建工具：使用 make -k 继续构建，工具失败不阻塞库构建。2. 对于 test_package：使用 self.run(ignore_errors=True) 或直接运行测试可执行文件。3. 在 .qmake.conf 中设置 QT_MODULE_INCLUDE_BASE 和 QT_MODULE_LIB_BASE。
+rec_command: make -k -j1; true  # 继续构建即使工具失败
+affected_scope: 所有包含运行时工具或 test_package 的 Qt5 模块
+verification_cmd: ls lib/libQt5RemoteObjects.so.5.15.2  # 库应存在
+category: platform
+rec_priority: medium

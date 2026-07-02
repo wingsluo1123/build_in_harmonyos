@@ -1,0 +1,9 @@
+error_signature: Could not find feature (framework|c\+\+11|c\+\+1z|c99|thread)
+match_keywords: qtConfig,Could not find feature,qmodule.pri,qt_build_config
+root_cause: Qt5 的 qmodule.pri 缺少部分特性（framework, c++11, c99 等），导致 qtConfig() 调用 error()。qtConfig() 在 qt_build_config.prf 中定义，未找到特性时调用 error() 而非 return(false)。这些特性在正常的 Qt5 构建中应该由 configure 脚本检测并添加到 qmodule.pri。
+rec_description: 在 .qmake.conf 中覆盖 qtConfig() 函数，将 error() 改为 return(false)，使未知特性默认返回 false。
+rec_command: 在 .qmake.conf 末尾追加 qtConfig() 覆盖定义（return(false) 替代 error()）
+affected_scope: 所有 Qt5 模块使用不完整的 qmodule.pri 构建时
+verification_cmd: make -j1 2>&1 | grep "Could not find feature"  # 应无输出
+category: build-system
+rec_priority: high

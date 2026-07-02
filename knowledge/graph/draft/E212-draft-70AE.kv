@@ -1,0 +1,9 @@
+error_signature: Some of the required modules.*are not available|Skipped
+match_keywords: qmake,qtHaveModule,Skipped,required modules,not available
+root_cause: qmake 无法检测 Qt 模块（如 network），因为 .qmake.cache 中未包含模块 .pri 文件。qtHaveModule() 检查 QT.<module>.name 变量，该变量由 mkspecs/modules/qt_lib_<module>.pri 设置。当 qmake 属性（QT_HOST_DATA）为空时，模块 .pri 文件不会被自动加载。
+rec_description: 在 conanfile.py build() 中创建 .qmake.cache，include 所有 qt_lib_*.pri 文件，并设置 QMAKEMODULES 指向 Qt5 mkspecs/modules 目录。
+rec_command: 在 .qmake.cache 中: include($QT5_ROOT/mkspecs/modules/qt_lib_*.pri)
+affected_scope: 所有 Qt5 模块（qtremoteobjects, qtwebsockets 等）使用 conan 构建时
+verification_cmd: grep -c "Skipped" Makefile  # 应为 0
+category: build-system
+rec_priority: high

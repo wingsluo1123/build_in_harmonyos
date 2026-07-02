@@ -1,0 +1,15 @@
+# E212: Python package pip/python3 not found in Conan build environment
+# Contributor: C48A
+# Status: draft
+
+error_signature: pip: inaccessible or not found|python3: inaccessible or not found|Error 127 while executing
+match_keywords: pip,python3,inaccessible,not found,ConanException,Error 127,python package,setuptools
+root_cause: Conan build environment uses /bin/sh which does not have pip or python3 in PATH. The system python3 is installed at a non-standard path (e.g. /storage/Users/currentUser/.harmonybrew/opt/python@3.14/bin/python3.14). When conanfile.py build() or test_package test() calls self.run("pip install ...") or self.run("python3 -c ..."), /bin/sh cannot find these executables.
+category: L2
+severity: blocking
+build_system: python
+rec_description: Use sys.executable to get the full path to the Python interpreter, then use it with -m pip for pip commands. In conanfile.py build(): python_exe = sys.executable; self.run(f'{python_exe} -m pip install ...'). In test_package/conanfile.py test(): python_exe = sys.executable; self.run(f'{python_exe} -c "import mypackage"').
+rec_command: python_exe = sys.executable; self.run(f'{python_exe} -m pip install --break-system-packages ...')
+affected_scope: All pure Python packages packaged with Conan on OpenHarmony/OHOS platform (internetarchive, and any future Python packages)
+verification_cmd: python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify internetarchive 5.10.1
+rec_priority: high
