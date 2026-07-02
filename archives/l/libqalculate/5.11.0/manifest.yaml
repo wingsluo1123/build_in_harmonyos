@@ -1,0 +1,106 @@
+software: libqalculate
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/5.11.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "5.11.0"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-01"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/Qalculate/libqalculate/releases/download/v5.11.0/libqalculate-5.11.0.tar.gz"
+
+  # 源码校验和
+  sha256: "6217a634eeb9659ebb4080c265dfab47d8f8dd4c33394b48fd5a1f83ef4538c4"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--without-libcurl"
+    - "--without-icu"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "gmp/6.3.0"
+    - "mpfr/4.2.1"
+    - "readline/8.2"
+    - "libxml2/2.15.3"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-configure.patch"
+  - "0003-libqalculate-util.cc.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "HarmonyOS 的 config.guess 不包含 HarmonyOS/__OHOS__ 检测分支，需要手动添加 aarch64:HarmonyOS case 将其映射为 aarch64-unknown-linux-gnu"
+  - "HMDFS 文件系统不支持 umask 077 与 mktemp -d 组合创建安全临时目录，需要移除 umask 077 调用"
+  - "OHOS 平台不支持 pthread_cancel/pthread_setcancelstate/pthread_setcanceltype，需要用 __OHOS__ 宏守卫这些调用"
+  - "CMake 在 OHOS 平台上不识别 HarmonyOS 系统名称，test_package 需要设置 CMAKE_SYSTEM_NAME=Linux 作为变通方案 (E092)"
+  - "Autotools 构建需要设置 CONFIG_SHELL=/usr/bin/sh 和 SHELL=/usr/bin/sh 以避免 OHOS 默认 shell 兼容性问题"
+  - "系统依赖 (gmp/mpfr/readline/libxml2) 通过 pkg-config 发现，需要设置 PKG_CONFIG_PATH 指向 ~/usr/local/lib/pkgconfig"
+  - "conanfile.py 应使用 Conan Autotools helper (Autotools/AutotoolsToolchain) 而非手动 self.run() 执行 configure/make"
+  - "conandata.yml 中的源码 URL 应使用原始 GitHub URL 而非代理 URL，确保可复现性"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libqalculate-5.11.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libqalculate-5.11.0.work
+  source_orig_hash: 258828e22740ba00
+  source_work_hash: c6cd5f4fcd3ce773
+  generated_at: '2026-07-01T19:36:59'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-libqalculate-util.cc.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
