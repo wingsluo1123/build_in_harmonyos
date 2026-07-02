@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/harmony-compile-skill/archives/f/findlib/1.9.8/test_package/conanrunenv-release-armv8.sh"
