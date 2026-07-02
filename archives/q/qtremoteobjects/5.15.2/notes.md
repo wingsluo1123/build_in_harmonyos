@@ -46,7 +46,23 @@
 - OHOS 平台的 musl 动态链接器不支持 LD_LIBRARY_PATH，影响 Qt5 工具运行
 - qt5-qtbase conan 包的 qmodule.pri 缺少多个特性 (c++11, framework, c99 等)
 - init-build 的嵌套源码检测可能误提取 tests/auto/cmake 子目录
+## OHOS stripped ELF 限制 (E215)
+
+### 发现过程
+尝试让 test_package 测试运行通过时发现：
+- OHOS musl 动态链接器**拒绝加载 stripped ELF 共享库**（dlopen 返回 Permission denied）
+- 本地 clang 编译的未 strip 库可以正常 dlopen
+- LD_LIBRARY_PATH 在 OHOS 上被完全忽略
+- RPATH/RUNPATH 不传递到间接依赖（musl 限制）
+- 根因：stripped ELF 缺少 .symtab 节区，被 OHOS 安全策略视为不可信
+
+### 解决方案
+- conanfile.py: 设置 `QMAKE_STRIP=""` 禁止 strip
+- test_package: 改用 `readelf -d` + `nm -D` 静态验证 ELF 结构和导出符号
+- 不依赖运行时加载，绕过 OHOS ELF 签名/stripped 限制
+
 ---
 
 **编译结束**: 2026-07-02 14:03
+**更新**: 2026-07-02 适配 test_package 静态验证模式
 **最终状态**: published

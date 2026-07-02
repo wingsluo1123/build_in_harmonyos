@@ -141,10 +141,11 @@ class QtremoteobjectsConan(ConanFile):
                     f.write(f"include({pri_path})\n")
 
         # Run qmake
+        # QMAKE_STRIP="" prevents stripping — OHOS denies dlopen of stripped ELF (E215)
         if mkspecs_dir:
-            self.run(f'cd "{src_dir}" && QMAKEPATH="{qt5_root}" QTDIR="{qt5_root}" PATH="{qt5_bin}:$PATH" "{qmake}" -spec "{mkspecs_dir}/linux-clang" qtremoteobjects.pro')
+            self.run(f'cd "{src_dir}" && QMAKEPATH="{qt5_root}" QTDIR="{qt5_root}" PATH="{qt5_bin}:$PATH" QMAKE_STRIP="" "{qmake}" -spec "{mkspecs_dir}/linux-clang" qtremoteobjects.pro')
         else:
-            self.run(f'cd "{src_dir}" && "{qmake}" qtremoteobjects.pro')
+            self.run(f'cd "{src_dir}" && QMAKE_STRIP="" "{qmake}" qtremoteobjects.pro')
 
         # Use -j1 to avoid jobserver mkfifo issues on OHOS
         # Use -k to continue building even if tools/ fails (qlalr can't run on OHOS)
