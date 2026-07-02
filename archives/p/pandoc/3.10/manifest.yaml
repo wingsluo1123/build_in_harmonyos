@@ -1,0 +1,61 @@
+software: pandoc
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/3.10/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.10"
+status: failed
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://hackage.haskell.org/package/pandoc-3.10/pandoc-3.10.tar.gz"
+  sha256: "9c6af03b81a6f6d4669a21635ed31888759a81b999c64856601730c2ea4ad304"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - ghc/9.10.3
+    - gmp/6.3.0
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Haskell applications require GHC which is not available on OpenHarmony"
+  - "pandoc uses Cabal build system (pandoc.cabal, build-type: Simple)"
+  - "GHC not in cmd-pkgs (1248 packages checked) or Conan remote"
+  - "Build system is custom/Haskell, not autotools/cmake/meson"
+
+# ============================================================
+# 构建失败原因
+# ============================================================
+
+failure_reason: |
+  GHC (Glasgow Haskell Compiler) is not available in the OpenHarmony environment.
+  Pandoc is a Haskell application that requires GHC to compile.
+  Checked: ghc, cabal, stack, runhaskell - all not found.
+  Checked: cmd-pkgs (1248 packages, no GHC), Conan remote (no GHC).
+  pandoc.cabal specifies: tested-with GHC == 9.6.7, GHC == 9.8.4, GHC == 9.10.3, GHC == 9.12.2

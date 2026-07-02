@@ -1,0 +1,69 @@
+#====================================================================
+# E212.kv — GHC 不可用导致 Haskell 应用编译失败
+# 对应的人类文档: doc/E212.md
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E212
+trigger_tool:           conan
+phase:                  configuration
+error_signature:        Package 'ghc/.*@ohpcd/stable' not resolved.*Unable to find|ghc: command not found|cabal: command not found|runhaskell: command not found
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               dependency
+match_keywords:         ghc, haskell, cabal, pandoc, not resolved, unable to find, command not found, stack
+title:                  Haskell 编译器 GHC 不可用导致 Haskell/Cabal 应用编译失败
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             OpenHarmony 平台未提供 GHC (Glasgow Haskell Compiler) 预编译包。Haskell 应用（如 pandoc）需要 GHC 编译器才能从源码构建。cmd-pkgs（1248 个包）和 Conan 制品仓中均无 GHC。
+affected_scope:         所有 Haskell/Cabal 构建的应用程序，包括 pandoc、ShellCheck、hlint、brittany 等
+verification_cmd:       which ghc && ghc --version
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           port-ghc-to-ohos
+rec_description:        移植 GHC 到 OpenHarmony 平台（需要大量工作，包括 GHC 源码编译和平台适配）
+rec_command:            # 需要手动移植 GHC，暂无自动化命令
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      use-prebuilt-binary
+fallback_description:   使用上游提供的预编译二进制（如果有 aarch64-linux 版本可用）
+fallback_command:       # 检查上游是否提供预编译二进制: curl -sI https://github.com/jgm/pandoc/releases/download/3.10/pandoc-3.10-linux-arm64.tar.gz
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       --build=.*|--host=.*|--target=.*
+forbid_1_reason:        本平台为 native 编译，禁止 cross-compile 参数
+forbid_1_consequence:   可能导致 configure 脚本检测失败或链接错误
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P014
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E165
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E212.md
+last_updated:           2026-07-02
+source_event:           pandoc 3.10 编译失败 (GHC 不可用)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                OpenHarmony Compile Agent <agent@ohpcd>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  0
+metrics_fail_count:     1
+metrics_confidence:     0.0
+metrics_last_used:      2026-07-02
+
+draft:                  true
+contributor_id:         38FC
