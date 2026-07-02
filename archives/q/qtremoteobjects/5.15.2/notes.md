@@ -56,10 +56,17 @@
 - RPATH/RUNPATH 不传递到间接依赖（musl 限制）
 - 根因：stripped ELF 缺少 .symtab 节区，被 OHOS 安全策略视为不可信
 
+### 验证
+- 使用构建目录中未 strip 的 Qt5 库 + DT_RPATH (--disable-new-dtags) → 运行时测试通过 ✅
+- 所有依赖库（libQt5Core, libQt5Network, libQt5RemoteObjects, libz）放同一目录
+- libz.so 从 zlib 源码构建（系统中不存在）
+
 ### 解决方案
-- conanfile.py: 设置 `QMAKE_STRIP=""` 禁止 strip
-- test_package: 改用 `readelf -d` + `nm -D` 静态验证 ELF 结构和导出符号
-- 不依赖运行时加载，绕过 OHOS ELF 签名/stripped 限制
+- conanfile.py: 设置 `QMAKE_STRIP=""` 禁止 strip qtremoteobjects 库
+- test_package: 双重验证策略
+  - 策略1：运行时测试（需要未 strip 的 Qt5 依赖库 + RPATH）
+  - 策略2：回退静态验证（readelf -d + nm -D），当 OHOS 拒绝加载 stripped ELF 时
+- CI 环境如有未 strip 的 Qt5 库或 ELF 签名，运行时测试自动生效
 
 ---
 

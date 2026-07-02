@@ -1,9 +1,12 @@
 // test.cpp — qtremoteobjects test_package
-// OHOS 平台限制：无法运行时加载 stripped Qt5 库
-// 测试通过 conanfile.py 中的 readelf/nm 静态验证完成
-// 此文件仅作为 CMake 构建系统的占位符
+// 运行时测试：验证 Qt5RemoteObjects 库可正常加载和使用
+#include <QCoreApplication>
+#include <QtRemoteObjects/qremoteobjectnode.h>
 #include <cstdio>
-int main() {
-    printf("qtremoteobjects 5.15.2 test package (static verification mode)\n");
+
+int main(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
+    QRemoteObjectNode node;
+    printf("test qtremoteobjects 5.15.2: OK\n");
     return 0;
 }
