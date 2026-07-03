@@ -1,42 +1,42 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
-> 最后更新：2026-07-01
-> 已收录软件：2498 款 / 2646 个版本
+> 最后更新：2026-07-03
+> 已收录软件：2535 款 / 2687 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **2498** 款 |
-| 软件版本 | **2646** 个 |
-| ✅ 已发布 | 990 |
-| ✅ 已编译 | 1218 |
+| 收录软件 | **2535** 款 |
+| 软件版本 | **2687** 个 |
+| ✅ 已发布 | 1012 |
+| ✅ 已编译 | 1232 |
 | ❌ 编译失败 | 10 |
 
 | 构建系统 | 数量 |
 |----------|------|
-| Autotools | 522 |
-| CMake | 259 |
+| Autotools | 523 |
+| CMake | 260 |
 | Makefile | 204 |
 | unknown | 102 |
 | custom | 94 |
 | Meson | 88 |
 | go | 69 |
-| perl | 58 |
+| perl | 60 |
 | cargo | 18 |
+| perl_makefile | 15 |
 | python | 14 |
-| perl_makefile | 12 |
 | Script | 10 |
 | perl-eumm | 8 |
 | npm | 7 |
 | make | 6 |
 | manual | 5 |
+| qmake | 5 |
+| perl-makefile | 4 |
 | perl_xs | 4 |
 | shell | 4 |
-| qmake | 4 |
 | autoconf | 4 |
 | waf | 3 |
-| perl-makefile | 3 |
 | lua | 3 |
 | perl-extutils-makemaker | 3 |
 | perl-makemaker | 3 |
@@ -90,6 +90,7 @@
 | configure+make | 1 |
 | custom-makefile | 1 |
 | autosetup | 1 |
+| autotools  # 标准 conan Autotools（CI 原生 clang） | 1 |
 | prebuilt-musl | 1 |
 | simple_makefile | 1 |
 | python-zipapp | 1 |
@@ -99,33 +100,51 @@
 | 软件 | 版本 | 状态 | 兼容性 | 构建系统 | 补丁数 | 依赖 | 详情 |
 |------|------|------|--------|----------|--------|------|------|
 | **7zip** | 23.01、25.01 | uploaded |  | unknown | 0 | - | [📄](archives/7/7zip/25.01/) |
+| **B-Hooks-EndOfScope** | 0.28 | ✅ 已发布 |  |  | - | - | [📄](archives/b/B-Hooks-EndOfScope/0.28/) |
 | **CLI11** | 2.6.2 | ✅ 已发布 |  | CMake | - | - | [📄](archives/c/CLI11/2.6.2/) |
+| **Config-Any** | 0.33 | ✅ 已发布 |  |  | - | - | [📄](archives/c/Config-Any/0.33/) |
 | **Crypt-OpenSSL-Guess** | 0.15 | ✅ 已发布 |  | perl_makefile | - | perl (>= 5.006),perl | [📄](archives/c/Crypt-OpenSSL-Guess/0.15/) |
 | **Crypt-OpenSSL-RSA** | 0.33 | built   |  | perl_makefile | - | perl (>= 5.006),openssl/1.1.1w,Crypt::OpenSSL::Random/0.11,perl,openssl... | [📄](archives/c/Crypt-OpenSSL-RSA/0.33/) |
-| **Crypt-OpenSSL-Random** | 0.11 | built   |  | perl_makefile | - | perl (>= 5.006),openssl/1.1.1w,perl,openssl | [📄](archives/c/Crypt-OpenSSL-Random/0.11/) |
+| **Crypt-OpenSSL-Random** | 0.11、0.15 | built   |  | perl_makefile | - | perl (>= 5.006),openssl/1.1.1w,perl,openssl,Crypt::OpenSSL::Guess (>= 0.11) | [📄](archives/c/Crypt-OpenSSL-Random/0.15/) |
+| **DBD-CSV** | 0.62 | ✅ 已发布 |  | perl_makefile | 1 | - | [📄](archives/d/DBD-CSV/0.62/) |
 | **Data-Peek** | 0.53 | ✅ 已编译 |  |  | 1 | - | [📄](archives/d/Data-Peek/0.53/) |
 | **Data-UUID** | 1.227 | ✅ 已编译 |  | perl-xs | - | - | [📄](archives/d/Data-UUID/1.227/) |
 | **DateTime** | 1.66 | ✅ 已编译 |  | Autotools | 1 | - | [📄](archives/d/DateTime/1.66/) |
 | **Devel-Caller** | 2.07 | ✅ 已编译 |  |  | 1 | - | [📄](archives/d/Devel-Caller/2.07/) |
 | **Devel-CheckCompiler** | 0.03 | ✅ 已编译 |  | perl-build | - | - | [📄](archives/d/Devel-CheckCompiler/0.03/) |
+| **Devel-GlobalDestruction** | 0.14 | ✅ 已编译 |  | perl-makefile | 0 | name: Sub::Exporter::Progressive,name: perl,name: ExtUtils::MakeMaker | [📄](archives/d/Devel-GlobalDestruction/0.14/) |
 | **Digest-HMAC** | 1.05 | ✅ 已发布 |  | perl | - | - | [📄](archives/d/Digest-HMAC/1.05/) |
+| **Dist-CheckConflicts** | 0.11 | ✅ 已编译 |  | Autotools | - | - | [📄](archives/d/Dist-CheckConflicts/0.11/) |
 | **ElaWidgetTools** | 2.0.0 | ✅ 已发布 |  | CMake | 1 | - | [📄](archives/e/ElaWidgetTools/2.0.0/) |
 | **Email-Address-XS** | 1.05 | ✅ 已编译 |  | perl_xs | - | - | [📄](archives/e/Email-Address-XS/1.05/) |
 | **Encode** | 3.24 | 📦 已归档 |  |  | 1 | - | [📄](archives/e/Encode/3.24/) |
+| **Eval-Closure** | 0.14 | ✅ 已发布 |  |  | - | - | [📄](archives/e/Eval-Closure/0.14/) |
+| **Exception-Class** | 1.45 | ✅ 已编译 |  |  | - | - | [📄](archives/e/Exception-Class/1.45/) |
 | **ExtUtils-Builder-Compiler** | 0.032 | ✅ 已编译 |  | perl | - | - | [📄](archives/e/ExtUtils-Builder-Compiler/0.032/) |
 | **FMILibrary** | 2.0.3 | ✅ 已发布 |  |  | 3 | - | [📄](archives/f/FMILibrary/2.0.3/) |
 | **IO-Socket-IP** | 0.43 | ✅ 已发布 |  | perl | - | - | [📄](archives/i/IO-Socket-IP/0.43/) |
 | **IO-Stringy** | 2.113 | ✅ 已编译 |  | perl-makefile | - | - | [📄](archives/i/IO-Stringy/2.113/) |
 | **LWP-MediaTypes** | 6.04 | ✅ 已发布 |  |  | 1 | perl >= 5.006002,Carp,Exporter,File::Basename,Scalar::Util... | [📄](archives/l/LWP-MediaTypes/6.04/) |
 | **LWP-Protocol-https** | 6.14 | ✅ 已编译 |  |  | - | - | [📄](archives/l/LWP-Protocol-https/6.14/) |
-| **LockFile-Simple** | 0.208 | ✅ 已发布 |  |  | - | - | [📄](archives/l/LockFile-Simple/0.208/) |
+| **LockFile-Simple** | 0.208 | ✅ 已发布 |  |  | 0 | - | [📄](archives/l/LockFile-Simple/0.208/) |
+| **Log-Dispatch-FileRotate** | 1.38 | ✅ 已发布 |  | perl_makefile | - | - | [📄](archives/l/Log-Dispatch-FileRotate/1.38/) |
 | **Log-Log4perl** | 1.57 | published   |  | perl_makefile | - | perl-File-Spec (>= 0.82),perl-File-Path (>= 2.07),perl-Log-Dispatch (>= 2.00)     # ✅ published 2.71,perl-DBI (>= 1.607)              # ✅ PurePerl mode 1.637 (DBI.so 无法签名),perl-DBD-SQLite                  # ✅ published... | [📄](archives/l/Log-Log4perl/1.57/) |
-| **Memory-Process** | 0.06-r3 | ✅ 已发布 |  |  | - | - | [📄](archives/m/Memory-Process/0.06-r3/) |
+| **Memory-Process** | 0.06-r3 | ✅ 已发布 |  |  | 0 | - | [📄](archives/m/Memory-Process/0.06-r3/) |
 | **Menlo** | 1.9019 | ✅ 已发布 |  | perl_makefile | - | perl (>= 5.008),perl | [📄](archives/m/Menlo/1.9019/) |
 | **Menlo-Legacy** | 1.9022 | ✅ 已编译 |  | perl | - | - | [📄](archives/m/Menlo-Legacy/1.9022/) |
+| **Module-Implementation** | 0.09 | ✅ 已编译 |  |  | - | - | [📄](archives/m/Module-Implementation/0.09/) |
+| **Module-Runtime** | 0.016 | ✅ 已编译 |  | perl | - | - | [📄](archives/m/Module-Runtime/0.016/) |
+| **Params-ValidationCompiler** | 0.31 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/Params-ValidationCompiler/0.31/) |
 | **SDL2** | 2.30.0 | ✅ 已发布 |  | CMake | 1 | - | [📄](archives/s/SDL2/2.30.0/) |
 | **SDL2_image** | 2.6.0、2.8.0 | ✅ 已发布 |  | CMake | - | - | [📄](archives/s/SDL2_image/2.8.0/) |
 | **SDL2_ttf** | 2.22.0 | ✅ 已编译 |  | Autotools | 2 | - | [📄](archives/s/SDL2_ttf/2.22.0/) |
+| **SQL-Statement** | 1.414 | published   |  |  | - | - | [📄](archives/s/SQL-Statement/1.414/) |
+| **Specio** | 0.48、0.53 | ✅ 已编译 |  |  | - | - | [📄](archives/s/Specio/0.53/) |
+| **Sub-Exporter-Progressive** | 0.001013 | ✅ 已发布 |  |  | - | - | [📄](archives/s/Sub-Exporter-Progressive/0.001013/) |
+| **Sub-Identify** | 0.14 | ✅ 已发布 |  |  | - | - | [📄](archives/s/Sub-Identify/0.14/) |
+| **XML-DOM** | 1.46 | ✅ 已编译 |  |  | - | - | [📄](archives/x/XML-DOM/1.46/) |
+| **XML-Parser** | 2.47 | ✅ 已编译 |  |  | 2 | - | [📄](archives/x/XML-Parser/2.47/) |
+| **XML-RegExp** | 0.04 | ✅ 已发布 |  |  | - | - | [📄](archives/x/XML-RegExp/0.04/) |
 | **a2ps** | 4.15.7 | ✅ 已发布 |  |  | - | - | [📄](archives/a/a2ps/4.15.7/) |
 | **aamath** | 0.3 | ✅ 已发布 |  | Makefile | 3 | - | [📄](archives/a/aamath/0.3/) |
 | **abseil-cpp** | 20260107.1、20240116.1 | partial |  | Autotools | 1 | - | [📄](archives/a/abseil-cpp/20240116.1/) |
@@ -511,6 +530,7 @@
 | **doh** | 0.1 | ✅ 已编译 |  | custom | 1 | - | [📄](archives/d/doh/0.1/) |
 | **doppler** | 3.72.1 | ✅ 已编译 |  | go | - | - | [📄](archives/d/doppler/3.72.1/) |
 | **dos2unix** | 7.5.4 | verified |  | Makefile | 0 | - | [📄](archives/d/dos2unix/7.5.4/) |
+| **double-conversion** | 3.4.0 | ✅ 已发布 |  | CMake | - | - | [📄](archives/d/double-conversion/3.4.0/) |
 | **doxygen** | 1.17.0 | ✅ 已发布 |  | CMake | 1 | - | [📄](archives/d/doxygen/1.17.0/) |
 | **dpkg** | 1.22.6 | ✅ 已编译 |  | Autotools | 4 | - | [📄](archives/d/dpkg/1.22.6/) |
 | **dprint** | 0.54.0 | ✅ 已编译 |  |  | - | - | [📄](archives/d/dprint/0.54.0/) |
@@ -958,7 +978,7 @@
 | **lexbor** | 2.6.0 | ✅ 已发布 |  |  | - | - | [📄](archives/l/lexbor/2.6.0/) |
 | **lha** | 1.14.20211125 | uploaded |  | unknown | 0 | - | [📄](archives/l/lha/1.14.20211125/) |
 | **lib2geom** | 1.4 | ✅ 已编译 |  |  | - | - | [📄](archives/l/lib2geom/1.4/) |
-| **libHX** | 4.27 | ✅ 已发布 |  |  | 4 | - | [📄](archives/l/libHX/4.27/) |
+| **libHX** | 4.27 | ✅ 已发布 |  |  | 4 | - | [📄](archives/l/libhx/4.27/) |
 | **libOpenDRIVE** | 0.5.0 | ✅ 已编译 |  |  | - | - | [📄](archives/l/libOpenDRIVE/0.5.0/) |
 | **libSvtAv1Enc** | 3.1.2 | ✅ 已发布 |  |  | 1 | - | [📄](archives/l/libSvtAv1Enc/3.1.2/) |
 | **libXext** | 1.7.0 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libXext/1.7.0/) |
@@ -1371,7 +1391,7 @@
 | **lilv** | 0.26.5-git | ✅ 已发布 |  |  | - | - | [📄](archives/l/lilv/0.26.5-git/) |
 | **links** | 2.30 | ✅ 已编译 |  |  | - | - | [📄](archives/l/links/2.30/) |
 | **links-graphics** | 2.30 | ✅ 已编译 |  | Autotools | 3 | - | [📄](archives/l/links-graphics/2.30/) |
-| **list-someutils-xs** | 0.58 | ✅ 已编译 |  | perl | - | - | [📄](archives/l/list-someutils-xs/0.58/) |
+| **list-someutils-xs** | 0.58 | ✅ 已编译 |  | perl | 0 | - | [📄](archives/l/list-someutils-xs/0.58/) |
 | **livekit** | 1.13.1 | ✅ 已发布 |  | custom | - | - | [📄](archives/l/livekit/1.13.1/) |
 | **llhttp** | 9.3.1 | ✅ 已发布 |  |  | - | - | [📄](archives/l/llhttp/9.3.1/) |
 | **llvm** | 17.0.0 | ✅ 已编译 |  |  | - | - | [📄](archives/l/llvm/17.0.0/) |
@@ -1588,6 +1608,8 @@
 | **mypy** | 2.1.0 | ✅ 已编译 |  |  | - | - | [📄](archives/m/mypy/2.1.0/) |
 | **n** | 10.2.0 | ✅ 已编译 |  | Makefile | - | - | [📄](archives/n/n/10.2.0/) |
 | **n2n** | 3.1.1 | ✅ 已编译 |  | CMake | 3 | - | [📄](archives/n/n2n/3.1.1/) |
+| **namespace-autoclean** | 0.31 | ✅ 已发布 |  |  | - | - | [📄](archives/n/namespace-autoclean/0.31/) |
+| **namespace-clean** | 0.27 | ✅ 已发布 |  |  | - | - | [📄](archives/n/namespace-clean/0.27/) |
 | **nano** | 7.2 | ✅ 已编译 |  | Autotools | 2 | - | [📄](archives/n/nano/7.2/) |
 | **nanomsg** | 1.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/n/nanomsg/1.2/) |
 | **nasm** | 2.16.03 | ✅ 已编译 |  | Autotools | 3 | - | [📄](archives/n/nasm/2.16.03/) |
@@ -1783,7 +1805,7 @@
 | **perl-io-prompter** | 0.005004-r0 | ✅ 已编译 |  | perl | - | - | [📄](archives/p/perl-io-prompter/0.005004-r0/) |
 | **perl-io-socket-inet6** | 2.73-r2 | ✅ 已发布 |  |  | 1 | - | [📄](archives/p/perl-io-socket-inet6/2.73-r2/) |
 | **perl-io-socket-timeout** | 0.32-r2 | ✅ 已编译 |  | perl | - | - | [📄](archives/p/perl-io-socket-timeout/0.32-r2/) |
-| **perl-io-string** | 1.08 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-io-string/1.08/) |
+| **perl-io-string** | 1.08 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-io-string/1.08/) |
 | **perl-io-tee** | 0.66 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-io-tee/0.66/) |
 | **perl-io-tty** | 1.20-r2 | ✅ 已发布 |  |  | 1 | - | [📄](archives/p/perl-io-tty/1.20-r2/) |
 | **perl-ipc-run** | 20260402.0 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-ipc-run/20260402.0/) |
@@ -1823,9 +1845,9 @@
 | **perl-log-dispatch** | 2.71 | published   |  | perl_makefile | - | perl-Carp,perl-Devel-GlobalDestruction,perl-Dist-CheckConflicts (>= 0.02),perl-Encode,perl-Module-Runtime... | [📄](archives/p/perl-log-dispatch/2.71/) |
 | **perl-log-dispatch-config** | 1.04-r5 | published   |  | perl_makefile | - | perl-Log-Dispatch (>= 2.00),perl-AppConfig (optional) | [📄](archives/p/perl-log-dispatch-config/1.04-r5/) |
 | **perl-log-dispatch-configurator-any** | 1.122640-r4 | published   |  | perl_makefile | - | perl-Carp,perl-Config-Any (>= 0.15),perl-Log-Dispatch (>= 2.23),perl-Log-Dispatch-Configurator,perl-Sys-Syslog (>= 0.25)... | [📄](archives/p/perl-log-dispatch-configurator-any/1.122640-r4/) |
-| **perl-lv** | 0.006 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-lv/0.006/) |
+| **perl-lv** | 0.006 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-lv/0.006/) |
 | **perl-lwp-online** | 1.08-r0 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-lwp-online/1.08-r0/) |
-| **perl-lwp-useragent-determined** | 1.07-r4 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-lwp-useragent-determined/1.07-r4/) |
+| **perl-lwp-useragent-determined** | 1.07-r4 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-lwp-useragent-determined/1.07-r4/) |
 | **perl-mail-authenticationresults** | 2.20250709-r0 | ✅ 已发布 |  | Perl-Makefile.PL | - | Test::Exception 0.43,Sub::Uplevel 0.2800 | [📄](archives/p/perl-mail-authenticationresults/2.20250709-r0/) |
 | **perl-mail-dkim** | 1.20240923 | published   |  | perl_makefile | - | perl (>= 5.008),Crypt::OpenSSL::RSA 0.33 (签名功能必需，已编译XS模块),Crypt::OpenSSL::Random 0.11 (RSA依赖，已编译XS模块),Crypt::OpenSSL::Guess 0.15 (配置依赖，已编译可加载),Crypt::PK::Ed25519 (ed25519 签名，可选)... | [📄](archives/p/perl-mail-dkim/1.20240923/) |
 | **perl-mail-domainkeys** | 1.0 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-mail-domainkeys/1.0/) |
@@ -1842,14 +1864,14 @@
 | **perl-math-random-mt-auto** | 6.23-r10 | ✅ 已发布 |  |  | 1 | - | [📄](archives/p/perl-math-random-mt-auto/6.23-r10/) |
 | **perl-math-round** | 0.08-r1 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-math-round/0.08-r1/) |
 | **perl-meta** | 0.015-r0 | ✅ 已发布 |  | module-build | 1 | - | [📄](archives/p/perl-meta/0.015-r0/) |
-| **perl-metacpan-client** | 2.033000 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-metacpan-client/2.033000/) |
+| **perl-metacpan-client** | 2.033000 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-metacpan-client/2.033000/) |
 | **perl-metrics-any** | 0.10-r1 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-metrics-any/0.10-r1/) |
 | **perl-mime-base32** | 1.303 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-mime-base32/1.303/) |
 | **perl-mime-base64** | 3.16 | ✅ 已发布 |  | perl-xs | - | - | [📄](archives/p/perl-mime-base64/3.16/) |
 | **perl-mime-charset** | 1.013.1 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-mime-charset/1.013.1/) |
 | **perl-mime-construct** | 1.11 | ✅ 已编译 |  | perl-module | - | - | [📄](archives/p/perl-mime-construct/1.11/) |
 | **perl-mime-lite** | 3.033 | ✅ 已编译 |  | perl | - | - | [📄](archives/p/perl-mime-lite/3.033/) |
-| **perl-mime-tools** | 5.515 | ✅ 已编译 |  | perl | - | - | [📄](archives/p/perl-mime-tools/5.515/) |
+| **perl-mime-tools** | 5.515 | ✅ 已编译 |  | perl | 2 | - | [📄](archives/p/perl-mime-tools/5.515/) |
 | **perl-mime-types** | 2.29 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-mime-types/2.29/) |
 | **perl-mixin-event-dispatch** | 2.000 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-mixin-event-dispatch/2.000/) |
 | **perl-mixin-linewise** | 0.111 | ✅ 已编译 |  | perl | - | - | [📄](archives/p/perl-mixin-linewise/0.111/) |
@@ -1903,6 +1925,7 @@
 | **perl-net-dns-resolver-programmable** | 0.009-r4 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-net-dns-resolver-programmable/0.009-r4/) |
 | **perl-net-dns-sec** | 1.26-r1 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-net-dns-sec/1.26-r1/) |
 | **perl-net-domain-tld** | 1.75-r0 | ✅ 已发布 |  | Makefile | - | - | [📄](archives/p/perl-net-domain-tld/1.75-r0/) |
+| **perl-net-gemini** | 0.11-r0 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-net-gemini/0.11-r0/) |
 | **perl-net-http** | 6.24-r0 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-net-http/6.24-r0/) |
 | **perl-net-ip** | 1.26-r7 | ✅ 已发布 |  | Makefile | - | - | [📄](archives/p/perl-net-ip/1.26-r7/) |
 | **perl-net-iptrie** | 0.7-r5 | ✅ 已编译 |  |  | 2 | - | [📄](archives/p/perl-net-iptrie/0.7-r5/) |
@@ -1918,9 +1941,21 @@
 | **perl-net-openssh** | 0.84-r1 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-net-openssh/0.84-r1/) |
 | **perl-net-pcap** | 0.21-r2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/p/perl-net-pcap/0.21-r2/) |
 | **perl-net-rblclient** | 0.5-r8 | ✅ 已编译 |  |  | 1 | - | [📄](archives/p/perl-net-rblclient/0.5-r8/) |
+| **perl-net-saml2** | 0.83-r0 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-net-saml2/0.83-r0/) |
 | **perl-net-server** | 2.014-r2 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-net-server/2.014-r2/) |
 | **perl-net-sftp-foreign** | 1.93-r0 | ✅ 已编译 |  | custom | - | - | [📄](archives/p/perl-net-sftp-foreign/1.93-r0/) |
 | **perl-netaddr-ip** | 4.079 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-netaddr-ip/4.079/) |
+| **perl-number-misc** | 1.2-r5 | ✅ 已编译 |  |  | - | - | [📄](archives/p/perl-number-misc/1.2-r5/) |
+| **perl-par-packer** | 1.064-r2 | ✅ 已发布 |  |  | 5 | - | [📄](archives/p/perl-par-packer/1.064-r2/) |
+| **perl-parallel-forkmanager** | 2.04 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-parallel-forkmanager/2.04/) |
+| **perl-parallel-pipes** | 0.201 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-parallel-pipes/0.201/) |
+| **perl-parallel-prefork** | 0.18 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-parallel-prefork/0.18/) |
+| **perl-params-util** | 1.102 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-params-util/1.102/) |
+| **perl-params-validate** | 1.31 | ✅ 已发布 |  |  | 0 | - | [📄](archives/p/perl-params-validate/1.31/) |
+| **perl-params-validationcompiler** | 0.31 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-params-validationcompiler/0.31/) |
+| **perl-parse-mime** | 1.006 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-parse-mime/1.006/) |
+| **perl-parse-pmfile** | 0.47 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-parse-pmfile/0.47/) |
+| **perl-parse-recdescent** | 1.967015 | ✅ 已编译 |  |  | 0 | - | [📄](archives/p/perl-parse-recdescent/1.967015/) |
 | **perl-pdf-api2** | 2.048 | ✅ 已发布 |  | perl | - | - | [📄](archives/p/perl-pdf-api2/2.048/) |
 | **perl-perlio-utf8_strict** | 0.010 | ✅ 已编译 |  | perl-extutils | - | - | [📄](archives/p/perl-perlio-utf8_strict/0.010/) |
 | **perl-perlio-via-timeout** | 0.32 | ✅ 已编译 |  | perl-extutils-makemaker | - | - | [📄](archives/p/perl-perlio-via-timeout/0.32/) |
@@ -1959,6 +1994,7 @@
 | **perl-rt-extension-commandbymail** | 3.02 | ✅ 已发布 |  |  | 1 | - | [📄](archives/p/perl-rt-extension-commandbymail/3.02/) |
 | **perl-safe-isa** | 1.000010 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-safe-isa/1.000010/) |
 | **perl-scope-guard** | 0.21 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-scope-guard/0.21/) |
+| **perl-specio** | 0.53 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-specio/0.53/) |
 | **perl-tk** | 804.036 | ✅ 已编译 |  |  | 1 | - | [📄](archives/p/perl-tk/804.036/) |
 | **perl-xml-parser** | 2.59 | ✅ 已发布 |  |  | - | - | [📄](archives/p/perl-xml-parser/2.59/) |
 | **perltidy** | 20260204 | ✅ 已发布 |  | Custom Perl | 1 | - | [📄](archives/p/perltidy/20260204/) |
@@ -2082,6 +2118,7 @@
 | **py3-pypdf** | 6.12.2 | ✅ 已编译 |  | python3 | - | - | [📄](archives/p/py3-pypdf/6.12.2/) |
 | **pylint** | 4.0.5 | ✅ 已发布 |  |  | 1 | - | [📄](archives/p/pylint/4.0.5/) |
 | **pyright** | 1.1.410 | ✅ 已发布 |  | npm | - | node (>=14.0.0) | [📄](archives/p/pyright/1.1.410/) |
+| **pyside2** | 5.12.4 | partial_success |  |  | 0 | name: "qt5",name: "python",name: "libxml2",name: "libxslt",name: "libclang" | [📄](archives/p/pyside2/5.12.4/) |
 | **pytest** | 9.0.3 | ✅ 已编译 |  | python-pip | - | iniconfig>=1.0.1,packaging>=22,pluggy>=1.5,<2,pygments>=2.7.2,setuptools>=77... | [📄](archives/p/pytest/9.0.3/) |
 | **python** | 3.12.9、3.9.0、3.9.25 | verified |  | Autotools | 0 | - | [📄](archives/p/python/3.9.25/) |
 | **python-gssapi** | 1.8.3 | ✅ 已编译 |  | python_wheel | - | krb5 1.22.2 (MIT Kerberos),cffi 1.17.1,six 1.17.0,pyasn1 0.6.1 | [📄](archives/p/python-gssapi/1.8.3/) |
@@ -2094,6 +2131,7 @@
 | **qt-mariadb** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt-mariadb/5.15.2/) |
 | **qt-mysql** | 5.15.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/q/qt-mysql/5.15.2/) |
 | **qt-unixodbc** | 5.15.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/q/qt-unixodbc/5.15.2/) |
+| **qt5** | 5.15.2 | unknown |  | qmake | 0 | zlib 1.3.1 (system),freetype 26.6.20 (system),openssl 1.1.1w (system),fontconfig 2.16.0 (system) | [📄](archives/q/qt5/5.15.2/) |
 | **qt5-qt3d** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qt3d/5.15.2/) |
 | **qt5-qtcharts** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qtcharts/5.15.2/) |
 | **qt5-qtgraphicaleffects** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt5-qtgraphicaleffects/5.15.2/) |
@@ -2326,7 +2364,7 @@
 | **tass64** | 1.60.3243 | ✅ 已发布 |  |  | - | - | [📄](archives/t/tass64/1.60.3243/) |
 | **tbb** | 2023.0.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/t/tbb/2023.0.0/) |
 | **tcc** | 0.9.27mob | ✅ 已编译 |  | Autotools | - | - | [📄](archives/t/tcc/0.9.27mob/) |
-| **tcl** | 8.6.14 | ✅ 已编译 |  | Autotools | 1 | - | [📄](archives/t/tcl/8.6.14/) |
+| **tcl** | 8.6.14、9.0.3.1 | built             |  | autotools  # 标准 conan Autotools（CI 原生 clang） | - | - | [📄](archives/t/tcl/9.0.3.1/) |
 | **tcping** | 2.1.0 | ✅ 已编译 |  | Makefile | 1 | - | [📄](archives/t/tcping/2.1.0/) |
 | **tcpkali** | 1.1.1 | ✅ 已发布 |  | Autotools | 2 | - | [📄](archives/t/tcpkali/1.1.1/) |
 | **tcpstat** | 0.1 | ✅ 已发布 |  | Makefile | 2 | - | [📄](archives/t/tcpstat/0.1/) |
