@@ -1,0 +1,78 @@
+software: hysteria
+# Version-level manifest
+# File: archives/h/hysteria/latest/manifest.yaml
+# Follows ARCHIVE-SPEC v2.0
+
+# ============================================================
+# Required fields
+# ============================================================
+
+# Version
+version: "latest"
+
+# Build status
+# published | built | failed | archived
+status: published
+
+# Build date (YYYY-MM-DD)
+build_date: "2026-07-03"
+
+# ============================================================
+# Source information
+# ============================================================
+
+source:
+  # Source download URL (original GitHub URL, not mirror)
+  url: "https://github.com/apernet/hysteria/archive/refs/tags/app/v2.9.3.tar.gz"
+
+  # Source checksum
+  sha256: "ba7b924d348ce0209bc0a09e84068dc8f71a1f9890d9fb2f7a092fd2a6e9e669"
+
+  # Compression format
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# Build configuration
+# ============================================================
+
+build:
+  # Build system type
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # Configuration options (Go build flags)
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "GONOSUMCHECK=1"
+    - "GONOSUMDB=*"
+    - "GOFLAGS=-insecure"
+
+  # Build dependencies (Go modules handled by go.mod, no Conan deps)
+  dependencies: []
+
+  # Compiler
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# Patch information
+# ============================================================
+
+# Applied patches
+patches_applied: []
+
+# ============================================================
+# Knowledge gained
+# ============================================================
+
+# Knowledge learned during compilation
+knowledge_gained:
+  - "Hysteria is a Go workspace project (go.work) with modules in app/, core/, extras/"
+  - "Build command: CGO_ENABLED=0 go build -o hysteria -ldflags '...' -trimpath ./app"
+  - "Go proxy.golang.org is inaccessible on OHOS — must use goproxy.cn mirror"
+  - "GONOSUMDB=* and GONOSUMCHECK=1 needed to skip checksum DB verification"
+  - "Python 'cryptography' module unavailable on OHOS — cert tests fail (test infra issue, not code)"
+  - "Binary is static ELF (CGO_ENABLED=0), 20MB stripped arm64 executable"
+  - "Version 2.9.3 from GitHub release tag app/v2.9.3"

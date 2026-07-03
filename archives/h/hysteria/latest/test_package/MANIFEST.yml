@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for CI (L0e requirement)
+# Hysteria is a Go project — tests use go test and smoke tests
+
+package: hysteria/latest
+homepage: "https://github.com/apernet/hysteria"
+
+# Upstream test command (from hyperbole.py: python3 hyperbole.py test)
+upstream_check_command: "go test -v ./..."
+
+# conanfile.py build() method — upstream tests not integrated in build
+upstream_test_in_build: false
+upstream_test_command: "go test -v ./app/... ./core/... ./extras/..."
+
+# Upstream test programs
+upstream_tests:
+  - file: app/cmd/server_test.go
+    source: hysteria-app-v2.9.3/app/cmd/server_test.go
+    description: "Server configuration parsing and validation tests"
+    command: "go test -v ./app/cmd/"
+  - file: app/cmd/client_test.go
+    source: hysteria-app-v2.9.3/app/cmd/client_test.go
+    description: "Client configuration parsing and validation tests"
+    command: "go test -v ./app/cmd/"
+  - file: app/cmd/cert_test.go
+    source: hysteria-app-v2.9.3/app/cmd/cert_test.go
+    description: "Certificate handling tests"
+    command: "go test -v ./app/cmd/"
+
+# test_package tests (consumer perspective verification)
+test_package_tests:
+  - file: test.sh
+    description: "Binary smoke test — verifies hysteria binary executes and reports version"
+    command: "./test.sh"
+
+# Approximate assertion count for quality assessment
+assertion_count: 5
