@@ -1,0 +1,72 @@
+#====================================================================
+# E212.kv — Rust linker defaults to -lstdc++ on OHOS but only libc++ exists
+# Created by: Agent 80FE
+# Date: 2026-07-03
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E212
+trigger_tool:           cargo|rustc|cc|ld
+phase:                  linking
+error_signature:        ld\.lld: error: unable to find library -lstdc\+\+|clang.*linker command failed with exit code 1.*lstdc\+\+
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               build-system-compatibility|platform|rust
+match_keywords:         lstdc++, libc++, rust, cargo, ld.lld, linker, ohos, aarch64-unknown-linux-ohos
+title:                  Rust linker defaults to -lstdc++ on OHOS but system only has libc++
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             The Rust compiler for aarch64-unknown-linux-ohos target defaults to linking C++ code with -lstdc++ (GCC's C++ standard library), but OHOS uses libc++ (LLVM's C++ standard library) instead. No libstdc++ exists on the system, causing linker failure.
+affected_scope:         Any Rust project with C/C++ dependencies (e.g., -sys crates compiling C/C++ code) built on OHOS platform
+verification_cmd:       echo 'INPUT(-lc++_shared)' > $OHOS_LIB_DIR/libstdc++.so && cargo build --release
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           create-libstdcxx-linker-script
+rec_description:        Create libstdc++ linker scripts that redirect to libc++ in the OHOS SDK lib directory
+rec_command:            OHOS_LIB_DIR=$(find ~/.harmonybrew -path "*/llvm/lib/aarch64-linux-ohos" -type d | head -1) && echo 'INPUT(-lc++_shared)' > "$OHOS_LIB_DIR/libstdc++.so" && echo 'INPUT(-lc++_static -lc++abi)' > "$OHOS_LIB_DIR/libstdc++.a" && export RUSTFLAGS="-L $OHOS_LIB_DIR -C link-arg=-L$OHOS_LIB_DIR"
+rec_auto_fix:           true
+rec_impl:               batch-command
+
+# 回退方案
+fallback_priority:      2
+fallback_approach:      set-rustflags-cpp-lib
+fallback_description:   Set RUSTFLAGS to explicitly link libc++ instead of libstdc++
+fallback_command:       export RUSTFLAGS="-C link-arg=-lc++ -C link-arg=-lc++abi"
+fallback_auto_fix:      true
+fallback_impl:          env-set
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       ln -s.*libstdc\+\+|ln -sf.*libstdc\+\+
+forbid_1_reason:        HMDFS does not properly track symlinks (E050), use file copies or linker scripts instead
+forbid_1_consequence:   Linker still cannot find libstdc++ even after creating symlink
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P003
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E050]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E212.md
+last_updated:           2026-07-03
+source_event:           ouch latest compile (2026-07-03)
+
+# ═══ 知识协作 ═══
+authors:                Agent 80FE
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-07-03
+
+draft: true
+contributor_id: 80FE

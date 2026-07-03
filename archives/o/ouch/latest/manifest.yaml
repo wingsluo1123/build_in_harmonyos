@@ -1,0 +1,51 @@
+software: ouch
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/latest/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "latest"
+status: built
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/ouch-org/ouch/archive/refs/tags/0.8.0.tar.gz"
+  sha256: "72ed23c0b2aa51b1b33d3251ddae14cf2bb07a24035d1593c06fc97070e4edf0"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options:
+    - "cargo build --release"
+  dependencies:
+    - "rust/1.96.1 (harmonybrew)"
+    - "clang/15.0.4 (system)"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E212: Rust 链接器在 OHOS 上默认 -lstdc++ 但系统只有 libc++，需创建链接器脚本重定向"
+  - "E017: GitHub 源码下载慢，使用 ghfast.top 加速镜像"
+  - "E050: OHOS HMDFS 符号链接限制，影响链接器查找"
+  - "Cargo 项目 test_package 需使用 Conan 2.x API (self.dependencies 而非 deps_cpp_info)"
