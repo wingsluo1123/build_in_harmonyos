@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-crypt-openssl-bignum/0.09-r13
+homepage: "https://metacpan.org/dist/Crypt-OpenSSL-Bignum"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test.pl
+    source: Crypt-OpenSSL-Bignum-0.09/test.pl
+    description: "Crypt::OpenSSL::Bignum test suite — 67 tests for BN arithmetic"
+    command: "make test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/conanfile.py
+    description: "消费者测试 — 验证 Bignum.so/.pm 存在且为有效 ELF，可选加载模块"
+    command: "conan test"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 67

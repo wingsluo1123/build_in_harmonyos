@@ -1,0 +1,82 @@
+software: perl-crypt-openssl-bignum
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.09-r13/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.09-r13"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/K/KM/KMX/Crypt-OpenSSL-Bignum-0.09.tar.gz"
+
+  # 源码校验和
+  sha256: "234e72fb8396d45527e6fd45e43759c5c3f3a208cf8f29e6a22161a996fd42dc"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Perl XS 模块使用 ExtUtils::MakeMaker (Makefile.PL) 构建，非 autotools/cmake"
+  - "通过 OPENSSL_PREFIX 环境变量定位系统 OpenSSL，conanfile.py 使用 _resolve_openssl_prefix() 动态解析"
+  - "功能测试确认: Perl 进程 (hishell_hap:s0) 无法 dlopen HMDFS (hmdfs:s0) 上的 .so，模块不可用"
+  - "对照实验: 系统 XS 模块 (Socket/Encode 等) 在 hnp_file:s0 路径下可正常加载"
+  - "变通方案: 需 root 权限安装到 /data/service/hnp/ (hnp_file:s0 上下文)"
+  - "关联知识: E166 (HMDFS SELinux 限制), E046 (SELinux 权限限制)"
+  - "功能测试报告: reports/functional-test-report.md"
+  - "功能状态: blocked (platform-limitation)"
