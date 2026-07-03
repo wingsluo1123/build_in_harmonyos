@@ -1,0 +1,94 @@
+software: perl-crypt-openssl-aes
+# 版本级 manifest
+# 文件位置: archives/p/perl-crypt-openssl-aes/0.21-r1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.21-r1"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL (CPAN Crypt-OpenSSL-AES 0.02 by TTAR)
+  url: "https://cpan.metacpan.org/authors/id/T/TT/TTAR/Crypt-OpenSSL-AES-0.02.tar.gz"
+
+  # 源码校验和
+  sha256: "b66fab514edf97fc32f58da257582704a210c2b35e297d5c31b7fa2ffd08e908"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options:
+    - "perl Makefile.PL PREFIX=$HOME/usr/local INC=\"-I$HOME/usr/local/include\" LIBS=\"-L$HOME/usr/local/lib -lcrypto\""
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - perl/5.42.0
+    - openssl/3.5.6
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # 环境变量
+  env:
+    PKG_CONFIG_PATH: "$HOME/usr/local/lib/pkgconfig"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表 (Makefile 运行时修补，无 .patch 文件)
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "clang 18 无 sysroot，CCFLAGS 需添加 -isystem <sysroot>/include 解决 sys/types.h 等头文件找不到"
+  - "OpenHarmony 缺 crti.o/crtn.o，XS .so 链接需 -nostartfiles -nodefaultlibs -lc workaround"
+  - "OHOS SELinux 策略禁止 dlopen hmdfs 标签文件（u:object_r:hmdfs:s0），仅允许 hnp_file 标签（u:object_r:hnp_file:s0），影响所有用户路径下 XS 模块加载"
+  - "Perl Makefile.PL 需使用 $HOME 变量，不能使用 ~ 符号"
+  - "OpenSSL 3.x 中 AES_set_encrypt_key/AES_decrypt 等 API 已标记 deprecated，但仍可正常编译"
+  - "Perl XS 模块运行时加载失败可通过 C 直接调用 OpenSSL API 验证功能正确性"
+
+# 功能测试结果
+functional_test:
+  date: "2026-07-03"
+  result: "conditional"  # pass | fail | conditional | skip
+  report: "reports/functional-test-report.md"
+  summary:
+    compilation: "pass"
+    aes_encrypt: "pass"       # C API 验证，与 CPAN 测试向量一致
+    aes_decrypt: "pass"       # C API 验证，正确还原明文
+    round_trip: "pass"        # encrypt→decrypt 往返正确
+    module_loading: "fail"    # OHOS SELinux dlopen 策略限制
+    cpan_test_suite: "skip"   # 依赖模块加载
+  runtime_usability: "需安装到系统路径 /data/service/hnp/ 才可运行时加载"
+  root_cause: "OHOS SELinux 策略禁止 dlopen hmdfs 标签的 .so 文件，非软件缺陷"

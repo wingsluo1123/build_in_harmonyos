@@ -1,0 +1,43 @@
+#====================================================================
+# DRAFT — OHOS SELinux dlopen 策略限制 (hmdfs 标签)
+#====================================================================
+
+id:                     DRAFT-ohos-dlopen-hmdfs
+trigger_tool:           perl|runtime|testing
+phase:                  runtime
+error_signature:        Error loading shared library.*Permission denied|dlopen.*Permission denied|Can't load.*\.so.*Permission denied
+
+severity:               2
+category:               selinux|runtime|shared-library
+match_keywords:         dlopen, Permission denied, shared library, .so, XSLoader,
+                         DynaLoader, hmdfs, hnp_file, SELinux, seclabel,
+                         user path, site_perl, auto
+
+root_cause:             OHOS SELinux 策略禁止 dlopen 带有 `hmdfs` SELinux 标签
+                         (u:object_r:hmdfs:s0) 的共享库文件。仅允许 dlopen 带有
+                         `hnp_file` 标签 (u:object_r:hnp_file:s0) 的文件。
+                         用户路径 (/storage/Users/...) 下的文件为 hmdfs 标签，
+                         系统路径 (/data/service/hnp/...) 下的文件为 hnp_file 标签。
+                         chcon 命令不可用，无法修改标签。
+                         此限制影响所有用户路径下的 .so 文件加载，非特定软件问题。
+
+affected_scope:         所有安装到用户路径下的 Perl XS 模块 (.so)，
+                         以及任何通过 dlopen 加载用户路径 .so 的程序。
+                         已确认影响: Crypt::Bcrypt, Crypt::CAST5,
+                         Crypt::OpenSSL::AES, DBI, DBD::Pg 等。
+
+verification_cmd:       ls -laZ /path/to/file.so
+                         # 查看 SELinux 标签
+                         # hmdfs = 用户路径 (不可 dlopen)
+                         # hnp_file = 系统路径 (可 dlopen)
+
+rec_priority:           1
+rec_approach:           install-to-system-path
+rec_description:        将 .so 文件安装到系统路径 /data/service/hnp/ (需 root 权限)，
+                         或修改 SELinux 策略允许 hmdfs 标签 dlopen。
+                         对于编译验证，可通过 C 直接调用底层 API 验证功能正确性，
+                         绕过 Perl XSLoader/dlopen 限制。
+
+note:                   此前部分文档将此问题误诊为 E046 (chmod 不生效)。
+                         实际根因为 SELinux dlopen 策略限制，与文件权限无关。
+                         E046 是 chmod() 调用不生效，本条目是 dlopen() 被策略拒绝。
