@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: jsonpp/latest
+homepage: "https://github.com/jmhodges/jsonpp"
+
+# 上游测试命令
+upstream_check_command: "go test -v ./..."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "go test -v ./..."
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: jsonpp_test.go
+    source: jsonpp-latest/jsonpp_test.go
+    description: "Go unit tests for JSON pretty printing (TestMultipleObjectFiles, TestAlreadyFormattedSingleJSON)"
+    command: "go test -v ./..."
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "Smoke test: verifies jsonpp binary can pretty-print JSON, handle --help, and process multiple JSON objects"
+    command: "./test.sh <jsonpp_binary_path>"
+
+# 测试断言总数 (近似值)
+assertion_count: 5
