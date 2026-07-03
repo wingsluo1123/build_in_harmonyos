@@ -1,0 +1,29 @@
+diff -ruN a/src/archive/tar.rs b/src/archive/tar.rs
+--- a/src/archive/tar.rs
++++ b/src/archive/tar.rs
+@@ -48,21 +48,24 @@
+             }
+             tar::EntryType::Link => {
+                 let link_path = entry.path()?;
+                 let target = entry
+                     .link_name()?
+                     .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "Missing hardlink target"))?;
+ 
+                 let full_link_path = output_folder.join(&link_path);
+                 let full_target_path = output_folder.join(&target);
+ 
+-                fs::hard_link(&full_target_path, &full_link_path)?;
++                // OHOS: hard_link fails (Operation not permitted), fall back to symlink
++                if fs::hard_link(&full_target_path, &full_link_path).is_err() {
++                    std::os::unix::fs::symlink(&full_target_path, &full_link_path)?;
++                }
+             }
+             tar::EntryType::Regular | tar::EntryType::GNUSparse => {
+                 entry.unpack_in(output_folder)?;
+             }
+             tar::EntryType::Directory => {
+                 let original_mode = entry.header().mode()?;
+                 let is_writeable = (original_mode & 0o200) != 0;
+ 
+                 // this is no-op when dir already exists, errs if a file with another type is found there
+                 entry.unpack_in(output_folder)?;

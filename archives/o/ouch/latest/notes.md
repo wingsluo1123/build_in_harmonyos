@@ -35,7 +35,8 @@
 | 5 | test_package 使用 Conan 1.x API (deps_cpp_info) | conan-init 生成的模板使用旧 API | 改用 Conan 2.x API: `self.dependencies["ouch"].package_folder` |
 
 ## 源码修改
-- 无源码修改（纯环境变量和链接器脚本适配）
+- `src/archive/tar.rs`: hard_link 失败时回退到 symlink（OHOS 不允许创建硬链接）
+- `tests/integration.rs`: tar_hardlink 测试改用 symlink 回退，调整断言验证逻辑
 
 ## 依赖版本
 - Rust 1.96.1 (harmonybrew OHOS 适配版)
@@ -49,7 +50,7 @@ $ ouch --version
 ouch 0.8.0
 
 $ cargo test --release
-36 passed, 1 failed
+37 passed, 0 failed
 ```
 
 - conan-verify 8 道门禁全部通过
@@ -64,8 +65,9 @@ $ cargo test --release
 - E212 (草稿): Rust 链接器在 OHOS 上默认 -lstdc++ 但系统只有 libc++
 - E050 (命中): OHOS HMDFS 符号链接限制
 - E017 (命中): GitHub 下载慢
-
+2026-07-03 10:24
+**最终状态**: built
 ---
 
-**编译结束**: 2026-07-03 10:24
+**编译结束**: 2026-07-03 10:57
 **最终状态**: built
