@@ -1,0 +1,27 @@
+diff -ruN a/Makefile.PL b/Makefile.PL
+--- a/Makefile.PL
++++ b/Makefile.PL
+@@ -112,21 +112,23 @@
+     },
+     NAME               => 'Params::Util',
+     ABSTRACT           => 'Simple, compact and correct param-checking functions',
+     VERSION_FROM       => 'lib/Params/Util.pm',
+     AUTHOR             => ['Adam Kennedy <adamk@cpan.org>', 'Jens Rehsack <rehsack@cpan.org>'],
+     LICENSE            => 'perl',
+     CONFIGURE_REQUIRES => \%CONFIGURE_DEPS,
+     PREREQ_PM          => \%RUN_DEPS,
+     TEST_REQUIRES      => \%TEST_DEPS,
+     XS                 => {map { (my $tgt = $_) =~ s/\.xs$/\.c/; $_ => $tgt; } @XS_FILES},
++    INC                => '-I/storage/Users/currentUser/usr/local/include',
+     MAGICXS            => 1,
++    dynamic_lib        => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc' },
+     depend             => {'$(FIRST_MAKEFILE)' => '$(VERSION_FROM)'},
+     test               => {TESTS               => join(' ', 't/pp/*.t', ($loadable_xs ? 't/xs/*.t' : ()), 'xt/*.t')},
+     # Otherwise 'cxinc' isn't defined
+     ($] < 5.012 ? (DEFINE => '-DPERL_EXT') : (),),
+ );
+ 
+ sub WriteMakefile1
+ {    # originally written by Alexandr Ciornii, version 0.21. Added by eumm-upgrade.
+     my %params       = @_;
+     my $eumm_version = $ExtUtils::MakeMaker::VERSION;
