@@ -1,22 +1,22 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
-> 最后更新：2026-07-03
-> 已收录软件：2501 款 / 2649 个版本
+> 最后更新：2026-07-01
+> 已收录软件：2498 款 / 2646 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **2501** 款 |
-| 软件版本 | **2649** 个 |
-| ✅ 已发布 | 991 |
-| ✅ 已编译 | 1220 |
+| 收录软件 | **2498** 款 |
+| 软件版本 | **2646** 个 |
+| ✅ 已发布 | 990 |
+| ✅ 已编译 | 1218 |
 | ❌ 编译失败 | 10 |
 
 | 构建系统 | 数量 |
 |----------|------|
 | Autotools | 522 |
-| CMake | 260 |
+| CMake | 259 |
 | Makefile | 204 |
 | unknown | 102 |
 | custom | 94 |
@@ -511,7 +511,6 @@
 | **doh** | 0.1 | ✅ 已编译 |  | custom | 1 | - | [📄](archives/d/doh/0.1/) |
 | **doppler** | 3.72.1 | ✅ 已编译 |  | go | - | - | [📄](archives/d/doppler/3.72.1/) |
 | **dos2unix** | 7.5.4 | verified |  | Makefile | 0 | - | [📄](archives/d/dos2unix/7.5.4/) |
-| **double-conversion** | 3.4.0 | ✅ 已发布 |  | CMake | - | - | [📄](archives/d/double-conversion/3.4.0/) |
 | **doxygen** | 1.17.0 | ✅ 已发布 |  | CMake | 1 | - | [📄](archives/d/doxygen/1.17.0/) |
 | **dpkg** | 1.22.6 | ✅ 已编译 |  | Autotools | 4 | - | [📄](archives/d/dpkg/1.22.6/) |
 | **dprint** | 0.54.0 | ✅ 已编译 |  |  | - | - | [📄](archives/d/dprint/0.54.0/) |
@@ -1471,7 +1470,7 @@
 | **lzop** | 1.04 | uploaded |  | Autotools | 0 | - | [📄](archives/l/lzop/1.04/) |
 | **m17n-lib** | 1.8.6 | ✅ 已发布 |  | Autotools | 6 | - | [📄](archives/m/m17n-lib/1.8.6/) |
 | **m4** | 1.4.19 | uploaded |  | Autotools | 0 | - | [📄](archives/m/m4/1.4.19/) |
-| **mac** | 12.60 | ✅ 已发布 |  | CMake | 0 | - | [📄](archives/m/mac/12.60/) |
+| **mac** | 12.60 | ✅ 已发布 |  | CMake | - | - | [📄](archives/m/mac/12.60/) |
 | **macchanger** | 1.7.0-r3 | ✅ 已编译 |  |  | 1 | - | [📄](archives/m/macchanger/1.7.0-r3/) |
 | **mackup** | 0.10.3 | ✅ 已发布 |  |  | - | - | [📄](archives/m/mackup/0.10.3/) |
 | **magic-wormhole** | 0.24.0 | ✅ 已发布 |  |  | - | - | [📄](archives/m/magic-wormhole/0.24.0/) |
@@ -1713,7 +1712,6 @@
 | **ostree** | 2026.1 | ✅ 已编译 |  | Autotools | 2 | - | [📄](archives/o/ostree/2026.1/) |
 | **otel-cli** | 0.4.5 | ✅ 已发布 |  | go | - | - | [📄](archives/o/otel-cli/0.4.5/) |
 | **otf2bdf** | 3.1 | ✅ 已发布 |  |  | 4 | - | [📄](archives/o/otf2bdf/3.1/) |
-| **ouch** | latest | ✅ 已编译 |  |  | 0 | - | [📄](archives/o/ouch/latest/) |
 | **oxipng** | v10.1.1 | ✅ 已编译 |  |  | - | - | [📄](archives/o/oxipng/v10.1.1/) |
 | **p11-kit** | 0.25.5 | uploaded |  | Autotools | 0 | - | [📄](archives/p/p11-kit/0.25.5/) |
 | **p7zip** | 17.05 | uploaded |  | unknown | 0 | - | [📄](archives/p/p7zip/17.05/) |
@@ -2303,7 +2301,6 @@
 | **sundials** | 4.0.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/s/sundials/4.0.0/) |
 | **superfile** | 1.5.0 | ✅ 已编译 |  |  | - | - | [📄](archives/s/superfile/1.5.0/) |
 | **superlu** | 5.3.0 | ✅ 已编译 |  |  | 1 | - | [📄](archives/s/superlu/5.3.0/) |
-| **superseedr** | latest | ✅ 已编译 |  |  | 0 | - | [📄](archives/s/superseedr/latest/) |
 | **surfraw** | 2.3.0 | ✅ 已编译 |  | Autotools | 4 | - | [📄](archives/s/surfraw/2.3.0/) |
 | **svgo** | 4.0.1 | ✅ 已编译 |  | npm | 0 | node >=16,npm,rollup | [📄](archives/s/svgo/4.0.1/) |
 | **svt-av1** | 4.1.0 | ✅ 已编译 |  |  | - | - | [📄](archives/s/svt-av1/4.1.0/) |
