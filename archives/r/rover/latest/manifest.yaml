@@ -1,0 +1,93 @@
+software: rover
+# 版本级 manifest — rover 0.40.0
+# 文件位置: archives/r/rover/latest/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.40.0"
+status: published
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/apollographql/rover/archive/refs/tags/v0.40.0.tar.gz"
+  sha256: "0710306b55bcc8408835040b611f337432702b17b59460a957f6d7aef640d07d"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cargo
+  configure_options: []
+  dependencies:
+    - "rust/1.96.1"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Cargo.lock.patch"
+  - "0002-Cargo.toml.patch"
+  - "0003-crates-rover-client-Cargo.toml.patch"
+  - "0004-crates-rover-http-Cargo.toml.patch"
+  - "0005-installers-binstall-Cargo.toml.patch"
+  - "0006-xtask-Cargo.toml.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "aws-lc-sys (AWS-LC crypto) fails to build on OHOS: assembly files not compiled because DISABLE_PERL=ON prevents Perl-based assembly generation, and ARCH detection may set 'generic' for OHOS targets"
+  - "Solution: switch from aws-lc-rs to ring crypto provider by changing reqwest features from 'rustls' to 'rustls-no-provider' and adding explicit rustls/hyper-rustls/tokio-rustls deps with 'ring' feature"
+  - "reqwest 0.13+ supports 'rustls-no-provider' feature which enables rustls without aws-lc-rs, allowing ring to be used as the crypto provider"
+  - "rustls 0.23 default features include 'aws_lc_rs'; must use default-features=false with features=['ring'] to avoid pulling in aws-lc-rs"
+  - "Go linker fails with 'mapping output file failed: permission denied' on OHOS tmpfs; GOCACHE and GOTMPDIR must be set to writable directories"
+  - "Apollo Rover is a Rust/Cargo workspace project with multiple crates; all Cargo.toml files using reqwest 'rustls' feature must be updated"
+  - "Rust edition 2024 requires Rust 1.85+; harmonybrew provides Rust 1.96.1 which is compatible"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/rover-latest.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/rover-latest.work
+  source_orig_hash: 3b7d82f2765430b2
+  source_work_hash: 9720dc89c3d99d67
+  generated_at: '2026-07-03T18:49:48'
+  patches_count: 6
+
+patch_classification:
+  - file: 0001-Cargo.lock.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-crates-rover-client-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-crates-rover-http-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-installers-binstall-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-xtask-Cargo.toml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
