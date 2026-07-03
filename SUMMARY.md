@@ -1,16 +1,16 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
-> 最后更新：2026-07-01
-> 已收录软件：2498 款 / 2646 个版本
+> 最后更新：2026-07-02
+> 已收录软件：2500 款 / 2648 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **2498** 款 |
-| 软件版本 | **2646** 个 |
-| ✅ 已发布 | 990 |
-| ✅ 已编译 | 1218 |
+| 收录软件 | **2500** 款 |
+| 软件版本 | **2648** 个 |
+| ✅ 已发布 | 991 |
+| ✅ 已编译 | 1219 |
 | ❌ 编译失败 | 10 |
 
 | 构建系统 | 数量 |
@@ -1470,7 +1470,7 @@
 | **lzop** | 1.04 | uploaded |  | Autotools | 0 | - | [📄](archives/l/lzop/1.04/) |
 | **m17n-lib** | 1.8.6 | ✅ 已发布 |  | Autotools | 6 | - | [📄](archives/m/m17n-lib/1.8.6/) |
 | **m4** | 1.4.19 | uploaded |  | Autotools | 0 | - | [📄](archives/m/m4/1.4.19/) |
-| **mac** | 12.60 | ✅ 已发布 |  | CMake | - | - | [📄](archives/m/mac/12.60/) |
+| **mac** | 12.60 | ✅ 已发布 |  | CMake | 0 | - | [📄](archives/m/mac/12.60/) |
 | **macchanger** | 1.7.0-r3 | ✅ 已编译 |  |  | 1 | - | [📄](archives/m/macchanger/1.7.0-r3/) |
 | **mackup** | 0.10.3 | ✅ 已发布 |  |  | - | - | [📄](archives/m/mackup/0.10.3/) |
 | **magic-wormhole** | 0.24.0 | ✅ 已发布 |  |  | - | - | [📄](archives/m/magic-wormhole/0.24.0/) |
@@ -2100,6 +2100,7 @@
 | **qt5-qtimageformats** | 5.15.2 | ✅ 已编译 |  | qmake | - | - | [📄](archives/q/qt5-qtimageformats/5.15.2/) |
 | **qt5-qtsvg** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt5-qtsvg/5.15.2/) |
 | **qtimageformats** | 6.11.1 | ✅ 已编译 |  | CMake | - | - | [📄](archives/q/qtimageformats/6.11.1/) |
+| **qtremoteobjects** | 5.15.2 | ✅ 已发布 |  |  | 7 | - | [📄](archives/q/qtremoteobjects/5.15.2/) |
 | **qtshadertools** | 6.11.1 | ✅ 已编译 |  | CMake | 1 | - | [📄](archives/q/qtshadertools/6.11.1/) |
 | **quilt** | 0.69 | ✅ 已发布 |  | autoconf | 1 | GNU patch >= 2.5,bash,gawk,sed (GNU),diff (GNU) | [📄](archives/q/quilt/0.69/) |
 | **qxlsx** | 1.4.7 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qxlsx/1.4.7/) |
@@ -2301,6 +2302,7 @@
 | **sundials** | 4.0.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/s/sundials/4.0.0/) |
 | **superfile** | 1.5.0 | ✅ 已编译 |  |  | - | - | [📄](archives/s/superfile/1.5.0/) |
 | **superlu** | 5.3.0 | ✅ 已编译 |  |  | 1 | - | [📄](archives/s/superlu/5.3.0/) |
+| **superseedr** | latest | ✅ 已编译 |  |  | 0 | - | [📄](archives/s/superseedr/latest/) |
 | **surfraw** | 2.3.0 | ✅ 已编译 |  | Autotools | 4 | - | [📄](archives/s/surfraw/2.3.0/) |
 | **svgo** | 4.0.1 | ✅ 已编译 |  | npm | 0 | node >=16,npm,rollup | [📄](archives/s/svgo/4.0.1/) |
 | **svt-av1** | 4.1.0 | ✅ 已编译 |  |  | - | - | [📄](archives/s/svt-av1/4.1.0/) |

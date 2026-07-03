@@ -1,0 +1,52 @@
+software: superseedr
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/latest/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "latest"
+status: built
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://api.github.com/repos/Jagalite/superseedr/tarball/v1.0.11"
+  sha256: "c64569242667cbd27908118a359b5a43774db7eab651b03ceea0bc68ca2215b6"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options:
+    - "cargo build --release"
+  dependencies:
+    - "rust/1.96.1 (harmonybrew)"
+    - "openssl@3/3.6.3 (system)"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E154: Rust 工具链不识别 HarmonyOS，需通过 harmonybrew 安装 OHOS 适配版"
+  - "Cargo 项目需要配置 crates.io 镜像 (USTC sparse) 加速依赖下载"
+  - "openssl-sys crate 需要 PKG_CONFIG_PATH 和 OPENSSL_DIR 环境变量"
+  - "rust-toolchain.toml 在无 rustup 时被忽略，使用系统 Rust"
+  - "Cargo HTTP/2 multiplexing 在 OHOS 上不稳定，需关闭"
