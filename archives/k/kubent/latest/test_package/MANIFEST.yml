@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration for kubent
+# CI script (build_and_test.sh L0e) requires this file
+
+package: kubent/latest
+homepage: "https://github.com/doitintl/kube-no-trouble"
+
+# Upstream test command (from Makefile: make test)
+upstream_check_command: "go test -v ./..."
+
+# Whether upstream tests are integrated in conanfile.py build()
+upstream_test_in_build: false
+upstream_test_command: "go test -v -coverprofile fmtcoverage.html ./..."
+
+# Upstream test programs actually run
+upstream_tests:
+  - file: cmd/kubent/main_test.go
+    source: kubent-latest/cmd/kubent/main_test.go
+    description: "Main package unit tests"
+    command: "go test ./cmd/kubent/"
+  - file: pkg/rules/rego_test.go
+    source: kubent-latest/pkg/rules/rego_test.go
+    description: "Rego rules unit tests for deprecated API detection"
+    command: "go test ./pkg/rules/"
+
+# test_package self-contained tests (consumer perspective)
+test_package_tests:
+  - file: test.sh
+    description: "Smoke test: verify kubent binary runs --version and --help"
+    command: "./test.sh"
+
+# Approximate assertion count for quality assessment
+assertion_count: 50

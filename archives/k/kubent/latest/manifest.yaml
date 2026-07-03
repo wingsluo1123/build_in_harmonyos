@@ -1,0 +1,58 @@
+software: kubent
+version: "latest"
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+status: published
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/doitintl/kube-no-trouble/archive/refs/tags/0.7.3.tar.gz"
+  sha256: "4921ce9101f42a34280dd20eeae46d4f759700b8b4db8a32aace4468212d789d"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: go
+  configure_options:
+    - "CGO_ENABLED=0"
+    - 'GOPROXY=https://goproxy.cn,direct'
+    - "GONOSUMDB=*"
+    - "GOSUMDB=off"
+    - 'GOFLAGS=-mod=mod'
+    - 'ldflags=-s -w -X main.version=latest -X main.gitSha=latest'
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  go: "go1.26.4 linux/arm64"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "kubent (Kube No Trouble) is a Go project using go modules, not autotools/cmake"
+  - "Source is at github.com/doitintl/kube-no-trouble, tag 0.7.3 is the latest release"
+  - "Build uses `go build` with Makefile wrapper; CGO_ENABLED=0 for static binary"
+  - "CI environment requires GOPROXY=https://goproxy.cn,direct (proxy.golang.org unreachable)"
+  - "CI environment requires GONOSUMDB=* and GOSUMDB=off (sum.golang.org unreachable)"
+  - "Go compilation takes ~9 minutes due to heavy k8s/helm/opa dependencies"
+  - "Binary is a single static ELF executable (~40MB), placed in bin/kubent-{os}-{arch}"
+  - "Tests pass: go test ./... all Rego rule tests pass (deprecated API detection)"
+  - "validate() method checks settings.os in (Linux, OHOS) per R32"
+  - "conanfile.py build() uses shutil.which('go') with harmonybrew fallback"
