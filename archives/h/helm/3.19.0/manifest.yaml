@@ -1,0 +1,29 @@
+software: helm
+version: "3.19.0"
+
+status: published
+build_date: "2026-07-01"
+
+source:
+  url: "https://github.com/helm/helm/archive/refs/tags/v3.19.0.tar.gz"
+  sha256: "b008a47e4660109867f4ed3da12a53ad16cd650fdf0a60ad4f5c80d01a1b7493"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options:
+    - "CGO_ENABLED=0 go build -trimpath -ldflags '-w -s' -o bin/helm ./cmd/helm"
+  dependencies:
+    - "go/1.24.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "helm 3.19.0 的 go.mod 要求 go >= 1.24.0，Go 1.23.5 不够"
+  - "Go 工具链子工具 (compile, link, asm 等) 在 OHOS 上需要 elfldr wrapper 脚本"
+  - "HMDFS 不支持硬链接，shutil.copytree(copy_function=os.link) 会失败，需手动 cp -rL"
+  - "helm 源码包含无效符号链接 (invalid-symlink, windows-file-symlink)，copytree 会报错"
+  - "Conan 标准版不识别 os=OHOS，需在 settings.yml 添加 OHOS 枚举值"
+  - "Go 项目在 Conan basic_layout 下，build() 需用 self.source_folder 定位源码目录"
