@@ -12,13 +12,13 @@ version: "6.11.1"
 
 # 编译状态
 # published | built | failed | archived
-status: built
+status: published
 
 # 构建系统
 build_system: cmake
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-30"
+build_date: "2026-07-03"
 
 # ============================================================
 # 源码信息
@@ -29,11 +29,11 @@ source:
   url: "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtshadertools-everywhere-src-6.11.1.tar.xz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "2075052f9b23bcf9de045bbd180037084942f82cce870aab14a1454902c982fc"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  tar_format: tar.xz
 
 # ============================================================
 # 构建配置
@@ -62,7 +62,8 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0001-src-glslang-CMakeLists.txt.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -71,7 +72,13 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+  - "CMake 不识别 HarmonyOS 为 UNIX，需创建 Platform/HarmonyOS.cmake 或在 conanfile.py 中处理"
+  - "Qt6 缺少 harmonyos-clang mkspec，需基于 linux-clang 创建"
+  - "glslang CMakeLists.txt 不识别 HarmonyOS，需打补丁添加 HarmonyOS 到 UNIX 检查"
+  - "syncqt/moc/rcc 等工具无法从 HMDFS 执行，需创建 shell wrapper 或复制到非 HMDFS 路径"
+  - "qtbase conan cache 缺少 libexec/ 工具目录和 plugins/ 目录，需手动补充"
+  - "Conan profile 编译器路径需匹配本地 .harmonybrew 环境而非 /data/service/hnp"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"
