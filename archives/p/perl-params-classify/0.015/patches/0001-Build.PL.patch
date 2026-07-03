@@ -1,0 +1,61 @@
+diff -ruN a/Build.PL b/Build.PL
+--- a/Build.PL
++++ b/Build.PL
+@@ -1,26 +1,48 @@
+ { use 5.006; }
+ use warnings;
+ use strict;
+ 
+ use Module::Build;
+ 
+ Module::Build->subclass(code => q{
+-	unless(__PACKAGE__->can("cbuilder")) {
+-		*cbuilder = sub { $_[0]->_cbuilder or die "no C support" };
+-	}
+-	unless(__PACKAGE__->can("have_c_compiler")) {
+-		*have_c_compiler = sub {
+-			my $cb = eval { $_[0]->cbuilder };
+-			return $cb && $cb->have_compiler;
+-		};
+-	}
++	# OpenHarmony platform fix: Override cbuilder() to fix linker flags
++	# ld.lld does not support -fstack-protector-strong (a compiler flag in ldflags)
++	# and system libraries (libc, libunwind) need explicit -L paths.
++	# NOTE: Module::Build 0.33+ already has cbuilder(), so we must override directly
++	# rather than using unless(__PACKAGE__->can("cbuilder")) which skips the override.
++	*cbuilder = sub {
++		my $self = shift;
++		return $self->{properties}{_cbuilder} if $self->{properties}{_cbuilder};
++		require ExtUtils::CBuilder;
++		require Config;
++		my %config = %Config::Config;
++		# Remove -fstack-protector-strong from linker flags (ld.lld doesn't support it)
++		$config{ldflags} =~ s/-fstack-protector-strong//g;
++		$config{lddlflags} =~ s/-fstack-protector-strong//g;
++		# Add library paths for system libs and musl
++		$config{lddlflags} .= ' -L/system/lib64 -L' . ($ENV{HOME} || '/data') . '/usr/local/lib -lunwind -lc';
++		# Add musl headers include path
++		$config{ccflags} .= ' -I' . ($ENV{HOME} || '/data') . '/usr/local/include';
++		return $self->{properties}{_cbuilder} = ExtUtils::CBuilder->new(
++			config => \%config,
++			($self->quiet ? (quiet => 1) : ()),
++		);
++	};
++	*have_c_compiler = sub {
++		my $self = shift;
++		# Clear cached result so it re-evaluates with fixed config
++		delete $self->{properties}{_have_c_compiler} if exists $self->{properties}{_have_c_compiler};
++		# On OHOS, we know the compiler works (clang). Skip the have_compiler check
++		# which can fail due to platform detection issues in the Build process.
++		return 1;
++	};
+ 	if($Module::Build::VERSION < 0.33) {
+ 		# Older versions of Module::Build have a bug where if the
+ 		# cbuilder object is used at Build.PL time (which it will
+ 		# be for this distribution due to the logic in
+ 		# ->find_xs_files) then that object can be dumped to the
+ 		# build_params file, and then at Build time it will
+ 		# attempt to use the dumped blessed object without loading
+ 		# the ExtUtils::CBuilder class that is needed to make it
+ 		# work.
+ 		*write_config = sub {
