@@ -1,0 +1,26 @@
+version: "1.23"
+status: published
+build_date: "2026-04-12"
+
+source:
+  url: "https://ftp.gnu.org/gnu/gdbm/gdbm-1.23.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$TEST_PREFIX"
+    - "--enable-libgdbm-compat"
+    - "--disable-nls"
+  dependencies: []
+  cc: clang
+  cflags: "-fPIC -O2"
+
+patches_applied:
+  - "0001-config.guess-add-HarmonyOS-support.patch"
+  - "0002-config.sub-add-HarmonyOS-support.patch"
+
+knowledge_gained:
+  - "标准 autotools，打 config.guess/config.sub 补丁即可编译"
+  - "推荐 --disable-nls 避免 libintl 依赖"
+  - "gdbm_open 路径不能使用 /tmp（HMDFS），需用 $TMPDIR"

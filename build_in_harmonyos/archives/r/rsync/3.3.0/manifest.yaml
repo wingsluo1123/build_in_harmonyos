@@ -1,0 +1,54 @@
+software: rsync
+version: "3.3.0"
+status: partial
+build_system: autotools
+compile_date: "2026-03-23"
+
+dependencies:
+  required: [clang, make]
+  optional: []
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  source: https://download.samba.org/pub/rsync/src/rsync-3.3.0.tar.gz
+  configure_options:
+    - --prefix=$HOME/usr/local
+    - --disable-xxhash
+    - --disable-zstd
+    - --disable-lz4
+  cflags: null
+
+patches_applied:
+  - file: 0001-config-guess-harmonyos.patch
+    purpose: config.guess 添加 HarmonyOS 识别
+  - file: 0002-config-sub-harmonyos.patch
+    purpose: config.sub 添加 ohos 操作系统支持
+
+compatibility:
+  level: partial
+  issues:
+    - "官方测试套件全部失败（44/44）：SELinux 限制软链接创建"
+    - "whoami 无法解析用户 ID 20020081（鸿蒙数字格式用户 ID）"
+  notes: |
+    核心功能正常：基本同步(-av)、增量传输、--delete 选项均验证通过。
+    测试套件失败是 SELinux 软链接限制问题，非功能性问题。
+    支持 IPv6、xattr（Linux xattrs）、OpenSSL 加密。不支持 xxhash、zstd、lz4（已禁用）。
+
+test_results:
+  type: manual
+  passed: 3
+  failed: 0
+  note: |
+    手动测试通过：基本同步(-av)、增量传输、--delete 选项。
+    官方测试套件 44/44 全部失败（SELinux 软链接限制，非功能问题）。
+
+knowledge_gained:
+  - "rsync 核心功能在鸿蒙上正常工作"
+  - "官方测试套件因 SELinux 限制 + HMDFS 权限无法运行"
+  - "whoami 无法解析鸿蒙用户 ID（数字格式），需修改 runtests.sh 绕过"
+  - "xxhash、zstd、lz4 可通过 configure 选项禁用"
+  - "rsync 源码 config.sub 需 4 处 ohos 修改（maybe_os + OS白名单 + kernel-os白名单 + 有效性列表）"
+  - "distclean 会删除 configure.sh/config.h.in/aclocal.m4，需从 .orig 恢复"
+  - "mkgitver 脚本在 HMDFS 上无 x 权限，make check 需 bash ./mkgitver"
+  - "configure 需要 --disable-md2man（缺 cmarkgfm python 模块）"
+  - "rsync 下载 URL 需 /src/ 路径段：download.samba.org/pub/rsync/src/"

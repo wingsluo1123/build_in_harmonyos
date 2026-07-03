@@ -1,0 +1,50 @@
+# readline 8.2 编译档案
+software: readline
+version: "8.2"
+status: success
+build_system: autotools
+compile_date: 2026-04-12
+
+dependencies:
+  required:
+    - name: ncurses
+      version: "6.4"
+      note: "静态嵌入 libreadline.so（--without-shared）"
+  optional: []
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  configure_options:
+    - --prefix=$TEST_PREFIX
+    - --with-curses
+  cflags: "-fPIC -O2"
+  env:
+    CC: clang
+
+patches_applied:
+  - file: 0001-port-for-ohos.patch
+    purpose: config.guess + config.sub 添加 HarmonyOS 检测
+  - file: 0002-fix-shlib-termcap-link.patch
+    purpose: 修复 shlib/Makefile.in TERMCAP_LIB 传递问题
+
+compatibility:
+  level: high
+  issues: []
+  notes: |
+    - libreadline.so 静态嵌入 ncursesw（NEEDED 只有 libc.so）
+    - rl_library_version=8.2, rl_readline_version=0x802
+    - history API (add_history/history_list) 正常
+
+test_results:
+  type: manual
+  passed: 3
+  failed: 0
+  note: "version API + history add/list + 编译链接全部通过"
+
+knowledge_gained:
+  - "TERMCAP_LIB 需改为 -lncursesw（不是 -lncurses）"
+  - "config.sub 补丁需要 3 处修改：linux-ohos* + ohos* + linux-ohos* 白名单"
+  - "ncurses --without-shared 时自动静态嵌入 libreadline.so"
+
+references:
+  - https://ftp.gnu.org/gnu/readline/

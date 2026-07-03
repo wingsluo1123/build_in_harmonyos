@@ -1,0 +1,28 @@
+version: "1.16.5"
+status: published
+build_date: "2026-04-09"
+
+source:
+  url: "https://ftp.gnu.org/gnu/automake/automake-1.16.5.tar.xz"
+  sha256: ""
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$HOME/usr/local"
+  dependencies:
+    - perl
+    - autoconf
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - file: 0001-port-for-ohos.patch
+    purpose: "HarmonyOS 完整适配: config.guess 内核检测 + config.sub linux-ohos 识别 (3处)"
+
+knowledge_gained:
+  - "automake 是纯 Perl 项目，无需 C 编译器"
+  - "构建存在鸡生蛋问题，gen-all.pl 手动执行 @VAR@ 替换绕过标准 make"
+  - "config.guess 和 config.sub 需同时修改才能完整支持新 OS"
+  - "符号链接在某些文件系统受限，版本化副本用 cp 替代 ln -sf"

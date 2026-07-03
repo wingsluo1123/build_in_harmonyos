@@ -1,0 +1,27 @@
+version: "1.0.18"
+status: built
+build_date: "2026-04-20"
+
+source:
+  url: "https://github.com/strukturag/libde265/releases/download/v1.0.18/libde265-1.0.18.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_C_COMPILER=clang"
+    - "-DCMAKE_CXX_COMPILER=clang++"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-arm64-platform.patch"
+  - "0002-libcpp-link.patch"
+
+knowledge_gained:
+  - "ARM32汇编代码(#ifdef __arm__)在ARM64平台编译失败，需添加HAVE_ARM64检测"
+  - "cmake项目使用libc++时工具链接失败，需检测HAVE_LIBCPP并显式链接c++"
+  - "HMDFS文件系统不支持fifo，make自动降级，不影响结果"
+  - "SSL证书下载问题，使用git clone替代wget"

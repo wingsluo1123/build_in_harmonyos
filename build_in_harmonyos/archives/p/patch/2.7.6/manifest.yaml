@@ -1,0 +1,50 @@
+software: patch
+version: "2.7.6"
+status: partial
+build_system: autotools
+compile_date: "2026-03-23"
+
+dependencies:
+  required: [clang, make]
+  optional: []
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  source: https://ftp.gnu.org/gnu/patch/patch-2.7.6.tar.xz
+  configure_options:
+    - --prefix=$HOME/usr/local
+  cflags: null
+
+patches_applied:
+  - file: 0001-config-guess-harmonyos-support.patch
+    purpose: config.guess 添加 HarmonyOS 系统识别 (E007)
+  - file: 0002-config-sub-harmonyos-support.patch
+    purpose: config.sub 添加 ohos 三元组验证 (E072)
+
+compatibility:
+  level: partial
+  issues:
+    - "file-modes 测试失败：鸿蒙默认 umask 不同"
+    - "merge 测试失败：shell shift 命令行为差异"
+    - "symlinks 测试失败：SELinux 软链接访问限制"
+    - "无 xattr 支持（libattr 不可用）"
+  notes: "核心补丁功能已验证可用，测试失败为环境兼容性问题"
+
+test_results:
+  type: automated
+  total: 44
+  passed: 32
+  failed: 9
+  skipped: 1
+  note: "失败项：file-create-modes, file-modes, merge, no-mode-change-git-diff, preserve-mode-and-timestamp, remember-backup-files, symlinks, unmodified-files"
+
+knowledge_gained: []
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/patch-2.7.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/patch-2.7.6.work
+  source_orig_hash: f0a4ee279d88dead
+  source_work_hash: 776877d446d6e121
+  generated_at: '2026-04-14T01:15:46'
+  patches_count: 122

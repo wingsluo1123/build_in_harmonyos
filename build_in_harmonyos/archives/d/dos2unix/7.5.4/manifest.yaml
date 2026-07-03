@@ -1,0 +1,33 @@
+version: "7.5.4"
+status: published
+build_date: "2026-04-02"
+
+source:
+  url: "https://sourceforge.net/projects/dos2unix/files/dos2unix/7.5.4/dos2unix-7.5.4.tar.gz"
+  sha256: ""
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "ENABLE_NLS disabled (set to empty value)"
+    - "LINK changed from ln -sf to ln -s"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile-disable-nls-and-use-cp-for-link.patch"
+
+knowledge_gained:
+  - "Makefile 项目使用 'ifdef VAR' 判断时，空值才能禁用（'0' 也被视为 true）"
+  - "HarmonyOS SELinux: ln -sf 在部分目录（如 ~/tmp/builds/）失败，需用 rm -f + ln -s 替代"
+  - "dos2unix 核心功能（CRLF/LF 转换）完全正常，83/115 测试通过"
+  - "32 个失败均为软链接限制导致的 mac2unix/unix2mac 测试失败"
+
+compatibility:
+  level: high
+  issues:
+    - "NLS/i18n 支持已禁用（无 gettext/libintl）"
+    - "mac2unix/unix2mac 测试在构建目录因软链接限制失败"
+    - "symlink.t 测试因 HarmonyOS 软链接限制部分失败"

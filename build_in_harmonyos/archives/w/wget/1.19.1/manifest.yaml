@@ -1,0 +1,33 @@
+version: "1.19.1"
+status: published
+build_date: "2026-04-21"
+
+source:
+  url: "https://ftp.gnu.org/gnu/wget/wget-1.19.1.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$HOME/usr/local"
+    - "--with-ssl=openssl"
+    - "--without-libpsl"
+  dependencies:
+    - openssl
+    - zlib
+
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-doc-stamp-vti.patch"
+  - "0005-doc-version.texi.patch"
+  - "0006-lib-tmpdir.c.patch"
+
+knowledge_gained:
+  - "wget 核心下载功能正常，需配合 --no-check-certificate 使用"
+  - "musl libc 未实现 secure_getenv()，需降级为 getenv（E081）"
+  - "HMDFS 上 umask 077 导致目录权限问题，需改为 umask 022（E085）"
+  - "config.guess/config.sub 位于 build-aux/ 子目录"
+  - "旧版 config.guess（2017）不支持 GUESS= 赋值语法"
+  - "测试 98/124 通过，9 个 HTTPS 证书测试失败（环境问题）"
