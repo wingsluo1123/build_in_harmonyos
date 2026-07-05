@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/brunsli/v0.1/test_package/conanbuildenv-release-armv8.sh"

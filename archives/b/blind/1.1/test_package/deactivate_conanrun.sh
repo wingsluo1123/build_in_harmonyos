@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/blind/1.1/test_package/deactivate_conanrunenv-armv8.sh"

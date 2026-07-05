@@ -273,7 +273,7 @@ def init_archive(name: str, version: str, source_url: str = "",
     else:
         log_ok("  test_package/conanfile.py 已存在，保留")
 
-    # test_package/test.c (for CMake projects)
+    # test_package/test source files
     if build_system.lower() == "cmake":
         tp_test = tp_dir / "test.c"
         if not tp_test.exists():
@@ -291,6 +291,16 @@ def init_archive(name: str, version: str, source_url: str = "",
                 content = content.replace("{name}", name)
                 tp_cmake.write_text(content, encoding="utf-8")
                 log_ok("  test_package/CMakeLists.txt 已生成")
+    else:
+        # Autotools/Makefile: generate test.sh (smoke test)
+        tp_test = tp_dir / "test.sh"
+        if not tp_test.exists():
+            test_template = TEMPLATES_DIR / "test_package-executable" / "test.sh.tmpl"
+            if test_template.exists():
+                content = test_template.read_text(encoding="utf-8")
+                content = content.replace("{name}", name)
+                tp_test.write_text(content, encoding="utf-8")
+                log_ok("  test_package/test.sh 已生成")
 
     # test_package/MANIFEST.yml
     tp_manifest = tp_dir / "MANIFEST.yml"
