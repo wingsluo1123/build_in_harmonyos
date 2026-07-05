@@ -1,7 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
-    printf("test bear 3.1.6: OK\n");
+    printf("bear: build tool package\n");
     return 0;
 }

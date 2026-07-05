@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "basisu/transcoder/basisu_transcoder.h"
 
 int main(void) {
-    printf("test basis_universal v2.1.0: OK\n");
+    basist::basisu_transcoder_init();
+    printf("basis_universal: transcoder initialized\n");
     return 0;
 }

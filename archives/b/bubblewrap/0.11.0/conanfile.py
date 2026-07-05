@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — Meson projects.
 
-Usage: Replace Bubblewrap, bubblewrap, 0.11.0, bubblewrap 0.11.0, MIT, 
+Usage: Replace Bubblewrap, bubblewrap, 0.11.0, bubblewrap 0.11.0, MIT,
        Fill in requires() and cpp_info.libs as needed.
 
 This template enforces R26: default_library=static for terminal tools.
@@ -10,7 +10,8 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.meson import Meson, MesonToolchain, meson_layout
+from conan.tools.meson import Meson, MesonToolchain
+from conan.tools.layout import basic_layout
 
 
 class BubblewrapConan(ConanFile):
@@ -27,10 +28,10 @@ class BubblewrapConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("libcap/2.69@ohpcd/stable")
+        pass  # libcap is system library on OHOS
 
     def layout(self):
-        meson_layout(self)
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -44,12 +45,18 @@ class BubblewrapConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         meson = Meson(self)
+        hnp_bin = "/data/service/hnp/bin"
+        if hnp_bin not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = hnp_bin + ":" + os.environ.get("PATH", "")
+        os.environ["AR"] = "/data/service/hnp/bin/llvm-ar"
         meson.configure()
-        meson.compile()
+        meson.build()
 
     def package(self):
         meson = Meson(self)
         meson.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bubblewrap"]
+        # bubblewrap is a tool (executable), not a library
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

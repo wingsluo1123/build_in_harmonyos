@@ -1,7 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
-    printf("test beanstalkd 1.13: OK\n");
+    printf("beanstalkd: server package\n");
     return 0;
 }

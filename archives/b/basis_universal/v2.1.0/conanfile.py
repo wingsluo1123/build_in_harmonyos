@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Conan recipe template — CMake projects.
+"""Conan recipe — basis_universal v2.1.0 (CMake project).
 
-Usage: Replace Basisuniversal, basis_universal, v2.1.0, An LDR/HDR portable GPU supercompressed texture transcoding system, MIT, https://github.com/BinomialLLC/basis_universal
-       Fill in requires() and cpp_info.libs as needed.
-
-This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
+basis_universal is an LDR/HDR portable GPU supercompressed texture transcoding system.
+The CMake build produces basisu_encoder library but doesn't have install targets,
+so we manually copy the built files.
 """
 import os
 
@@ -19,7 +18,7 @@ class BasisuniversalConan(ConanFile):
     description = "An LDR/HDR portable GPU supercompressed texture transcoding system"
     license = "MIT"
     homepage = "https://github.com/BinomialLLC/basis_universal"
-    url = ""  # CI fills this
+    url = ""
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -37,10 +36,7 @@ class BasisuniversalConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # R26: Terminal tools must be statically linked for DevBox deployment
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.generate()
 
@@ -51,8 +47,17 @@ class BasisuniversalConan(ConanFile):
         cmake.build()
 
     def package(self):
-        cmake = CMake(self)
-        cmake.install()
+        # The CMakeLists.txt doesn't have install targets, so manually copy files
+        # Copy the built static library
+        copy(self, "*.a", self.build_folder, os.path.join(self.package_folder, "lib"))
+        # Copy headers
+        copy(self, "*.h", os.path.join(self.source_folder, "encoder"),
+             os.path.join(self.package_folder, "include", "basis_universal", "encoder"))
+        copy(self, "*.h", os.path.join(self.source_folder, "transcoder"),
+             os.path.join(self.package_folder, "include", "basis_universal", "transcoder"))
+        # Copy any root-level headers
+        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include", "basis_universal"),
+             keep_path=False)
 
     def package_info(self):
-        self.cpp_info.libs = ["basis_universal"]
+        self.cpp_info.libs = ["basisu_encoder"]

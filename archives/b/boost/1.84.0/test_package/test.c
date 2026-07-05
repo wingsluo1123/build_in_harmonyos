@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "boost/version.hpp"
 
 int main(void) {
-    printf("test boost 1.84.0: OK\n");
+    printf("boost version: %d.%d.%d\n",
+        BOOST_VERSION / 100000, BOOST_VERSION / 100 % 1000, BOOST_VERSION % 100);
     return 0;
 }

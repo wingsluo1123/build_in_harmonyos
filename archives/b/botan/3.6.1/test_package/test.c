@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "botan/system.h"
 
 int main(void) {
-    printf("test botan 3.6.1: OK\n");
+    printf("botan version: %s\n", botan_version_string());
     return 0;
 }

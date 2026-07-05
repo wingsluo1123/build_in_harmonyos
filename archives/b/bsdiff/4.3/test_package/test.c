@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "bsdiff/bsdiff.h"
 
 int main(void) {
-    printf("test bsdiff 4.3: OK\n");
+    printf("bsdiff: headers available\n");
     return 0;
 }

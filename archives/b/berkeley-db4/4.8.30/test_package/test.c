@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "db.h"
 
 int main(void) {
-    printf("test berkeley-db4 4.8.30: OK\n");
+    int major, minor, patch;
+    db_version(&major, &minor, &patch);
+    printf("berkeley-db4 version: %d.%d.%d\n", major, minor, patch);
     return 0;
 }

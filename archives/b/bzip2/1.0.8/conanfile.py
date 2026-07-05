@@ -1,22 +1,8 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
+"""Conan recipe — bzip2 1.0.8 (Makefile build).
 
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Bzip2, bzip2, 1.0.8, 高压缩比数据压缩工具和库，广泛用于 Linux 生态, BSD-4-Clause, https://sourceware.org/bzip2/
-       Fill in requires(), build commands, and cpp_info.libs as needed.
+bzip2 is a system same-name library (libbz2), so it must be built
+static-only (R26) to avoid polluting system library paths.
 """
 import os
 
@@ -28,7 +14,7 @@ from conan.tools.layout import basic_layout
 class Bzip2Conan(ConanFile):
     name = "bzip2"
     version = "1.0.8"
-    description = "高压缩比数据压缩工具和库，广泛用于 Linux 生态"
+    description = "High-quality data compressor - library and tools"
     license = "BSD-4-Clause"
     homepage = "https://sourceware.org/bzip2/"
     url = ""  # CI fills this
@@ -49,28 +35,20 @@ class Bzip2Conan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
-
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        # R26: bzip2 is system same-name lib, build static only
+        # R9: Always use -j1
+        self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1", cwd=self.source_folder)
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bzip2", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # Copy headers
+        copy(self, "bzlib.h", self.source_folder, os.path.join(self.package_folder, "include"))
+        # Copy static library
+        copy(self, "libbz2.a", self.source_folder, os.path.join(self.package_folder, "lib"))
+        # Copy executables
+        for exe in ["bzip2", "bzip2recover", "bunzip2", "bzcat", "bzgrep", "bzmore", "bzless", "bzdiff"]:
+            copy(self, exe, self.source_folder, os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["bzip2"]
+        # Library name is bz2 (libbz2.a)
+        self.cpp_info.libs = ["bz2"]
+        self.cpp_info.bindirs = ["bin"]

@@ -1,7 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(void) {
-    printf("test brunsli v0.1: OK\n");
+    printf("brunsli: package available\n");
     return 0;
 }

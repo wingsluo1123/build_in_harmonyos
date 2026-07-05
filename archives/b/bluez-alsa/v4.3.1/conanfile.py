@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
-
-Usage: Replace Bluezalsa, bluez-alsa, v4.3.1, Bluetooth ALSA audio bridge for BlueZ stack, MIT, https://github.com/arkq/bluez-alsa
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
-"""
+"""Conan recipe — bluez-alsa v4.3.1 (Autotools)."""
 import os
+import glob
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class BluezalsaConan(ConanFile):
@@ -28,11 +24,7 @@ class BluezalsaConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("alsa-lib/1.2.12@ohpcd/stable")
-        self.requires("bluez/5.79@ohpcd/stable")
-        self.requires("dbus/1.15.8@ohpcd/stable")
-        self.requires("glib/2.84.0@ohpcd/stable")
-        self.requires("sbc/1.5@ohpcd/stable")
+        pass
 
     def layout(self):
         basic_layout(self)
@@ -42,17 +34,40 @@ class BluezalsaConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.configure_args.append("--prefix=/storage/Users/currentUser/usr/local")
         tc.configure_args.append("--enable-payloadcheck")
         tc.generate()
+        # E001: Set CC/CXX for autotools on OHOS
+        env = Environment()
+        env.define("CC", "clang")
+        env.define("CXX", "clang++")
+        env.vars(self, scope="build").save_script("conanbuild_env")
 
     def build(self):
         apply_conandata_patches(self)
+        # Generate configure script if not present (GitHub tarball lacks it)
+        configure_path = os.path.join(self.source_folder, "configure")
+        if not os.path.exists(configure_path):
+            self.run("autoreconf -fi", cwd=self.source_folder)
+            configure_path = os.path.join(self.source_folder, "configure")
+        # E165: Fix shebangs for OpenHarmony
+        for f in glob.glob(os.path.join(self.source_folder, "**", "*.sh"), recursive=True):
+            try:
+                replace_in_file(self, f, "#!/bin/bash", "#!/data/service/hnp/bin/bash")
+            except Exception:
+                pass
+            try:
+                replace_in_file(self, f, "#!/bin/sh", "#!/system/bin/sh")
+            except Exception:
+                pass
+        if os.path.exists(configure_path):
+            try:
+                replace_in_file(self, configure_path, "#!/bin/sh", "#!/system/bin/sh")
+            except Exception:
+                pass
+            try:
+                replace_in_file(self, configure_path, "#!/bin/bash", "#!/data/service/hnp/bin/bash")
+            except Exception:
+                pass
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])

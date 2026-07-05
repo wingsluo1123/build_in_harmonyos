@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — CMake projects.
 
-Usage: Replace Bullet, bullet, 3.25, bullet 3.25, MIT, 
+Usage: Replace Bullet, bullet, 3.25, bullet 3.25, MIT,
        Fill in requires() and cpp_info.libs as needed.
 
 This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
@@ -37,17 +37,17 @@ class BulletConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # R26: Terminal tools must be statically linked for DevBox deployment
+        # R26: Static build for system isolation
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
-        tc.variables["CMAKE_INSTALL_PREFIX"] = "$DEFAULT_PREFIX"
         tc.variables["BUILD_CPU_DEMOS"] = "OFF"
         tc.variables["BUILD_OPENGL3_DEMOS"] = "OFF"
         tc.variables["BUILD_BULLET2_DEMOS"] = "OFF"
         tc.variables["BUILD_EXTRAS"] = "OFF"
         tc.variables["BUILD_UNIT_TESTS"] = "OFF"
         tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        # Must also be a cache variable so it's passed as -D on command line
+        # (toolchain file loads after cmake_minimum_required)
+        tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.generate()
 
     def build(self):
@@ -61,4 +61,15 @@ class BulletConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bullet"]
+        self.cpp_info.libs = [
+            "BulletDynamics",
+            "BulletCollision",
+            "LinearMath",
+            "Bullet3Common",
+            "Bullet3Collision",
+            "Bullet3Dynamics",
+            "Bullet3Geometry",
+            "Bullet2FileLoader",
+            "BulletInverseDynamics",
+            "BulletSoftBody",
+        ]

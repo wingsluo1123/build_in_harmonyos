@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe — bwfmetaedit 26.01 (Autotools, subdirectory build).
 
-Usage: Replace Bwfmetaedit, bwfmetaedit, 26.01, WAV/BWF metadata editor for Broadcast WAVE Format files, BSD-3-Clause, https://mediaarea.net/BWFMetaEdit
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
+bwfmetaedit uses autotools in Project/GNU/CLI/ subdirectory.
+Build: autoreconf → configure → make
 """
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, patch, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -38,23 +36,32 @@ class BwfmetaeditConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
         tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.configure_args.append("--prefix=$DEFAULT_PREFIX")
         tc.generate()
 
     def build(self):
+        # Apply patches from conandata.yml
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+
+        # Generate configure script using autoreconf
+        cli_dir = os.path.join(self.source_folder, "Project", "GNU", "CLI")
+        self.run("autoreconf -fi", cwd=cli_dir)
+        # Fix HMDFS umask 077 permission issue (E011)
+        self.run("sed -i 's/umask 077/umask 022/g' configure", cwd=cli_dir)
+
+        # Run configure + make in the CLI subdirectory
+        # Use --prefix=/ so DESTDIR=package_folder yields package_folder/bin/
+        self.run("./configure --prefix=/", cwd=cli_dir)
+        self.run("make -j1", cwd=cli_dir)
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        cli_dir = os.path.join(self.source_folder, "Project", "GNU", "CLI")
+        # Install: DESTDIR + --prefix=/ → package_folder/bin/bwfmetaedit
+        self.run(f"make install DESTDIR={self.package_folder}", cwd=cli_dir)
 
     def package_info(self):
-        self.cpp_info.libs = ["bwfmetaedit"]
+        # bwfmetaedit is an executable tool, not a library
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+        self.cpp_info.bindirs = ["bin"]

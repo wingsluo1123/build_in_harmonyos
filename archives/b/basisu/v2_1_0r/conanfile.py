@@ -42,7 +42,6 @@ class BasisuConan(ConanFile):
         # Add project-specific CMake variables here:
         # tc.variables["ENABLE_FOO"] = "ON"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.generate()
 
     def build(self):
@@ -54,6 +53,11 @@ class BasisuConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        # CMakeLists.txt has no install targets, manually copy artifacts
+        copy(self, "libbasisu_encoder.a", self.build_folder, os.path.join(self.package_folder, "lib"))
+        copy(self, "basisu", os.path.join(self.build_folder, "bin"), os.path.join(self.package_folder, "bin"))
+        copy(self, "*.h", os.path.join(self.source_folder, "encoder"), os.path.join(self.package_folder, "include", "basisu", "encoder"))
+        copy(self, "*.h", os.path.join(self.source_folder, "transcoder"), os.path.join(self.package_folder, "include", "basisu", "transcoder"))
 
     def package_info(self):
-        self.cpp_info.libs = ["basisu"]
+        self.cpp_info.libs = ["basisu_encoder"]

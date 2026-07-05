@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Conan recipe template — CMake projects.
+"""Conan recipe for brunsli — JPEG Brunsli compression codec (Brotli-based).
 
-Usage: Replace Brunsli, brunsli, v0.1, JPEG Brunsli compression codec (Brotli-based JPEG recompression), Apache-2.0, https://github.com/google/brunsli
-       Fill in requires() and cpp_info.libs as needed.
-
-This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
+Build system: CMake (brotli provided via Conan, googletest skipped)
+Source: https://github.com/google/brunsli
 """
 import os
 
@@ -22,32 +20,55 @@ class BrunsliConan(ConanFile):
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps"
 
     def export_sources(self):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("brotli/v1.0.7@ohpcd/stable")
+        self.requires("brotli/1.0.7")
 
     def layout(self):
         cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # Remove Bazel BUILD file that conflicts with cmake build/ dir (case-insensitive FS)
+        bazel_build = os.path.join(self.source_folder, "BUILD")
+        if os.path.isfile(bazel_build):
+            os.remove(bazel_build)
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # R26: Terminal tools must be statically linked for DevBox deployment
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
-        tc.variables["CMAKE_INSTALL_PREFIX"] = "$DEFAULT_PREFIX"
-        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
+        tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        # E092: CMake does not recognize HarmonyOS
+        tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
+        tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
+        # Patch third_party/CMakeLists.txt to use Conan-provided brotli
+        tp_cmake = os.path.join(self.source_folder, "third_party", "CMakeLists.txt")
+        if os.path.isfile(tp_cmake):
+            with open(tp_cmake, "w") as f:
+                f.write("""# Patched by Conan: brotli provided via Conan, googletest skipped
+find_package(brotli REQUIRED)
+# Create alias targets that brunsli.cmake expects
+if(NOT TARGET brotlicommon-static)
+  add_library(brotlicommon-static INTERFACE)
+  target_link_libraries(brotlicommon-static INTERFACE brotli::brotli)
+endif()
+if(NOT TARGET brotlidec-static)
+  add_library(brotlidec-static INTERFACE)
+  target_link_libraries(brotlidec-static INTERFACE brotli::brotli)
+endif()
+if(NOT TARGET brotlienc-static)
+  add_library(brotlienc-static INTERFACE)
+  target_link_libraries(brotlienc-static INTERFACE brotli::brotli)
+endif()
+""")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
@@ -57,4 +78,4 @@ class BrunsliConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["brunsli"]
+        self.cpp_info.libs = ["brunslidec-c", "brunslienc-c"]

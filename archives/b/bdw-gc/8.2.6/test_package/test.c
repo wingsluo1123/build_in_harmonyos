@@ -1,7 +1,10 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "gc.h"
 
 int main(void) {
-    printf("test bdw-gc 8.2.6: OK\n");
+    GC_INIT();
+    printf("gc version: %s\n", GC_get_version());
+    void *p = GC_MALLOC(64);
+    if (p) { printf("gc malloc: OK\n"); }
     return 0;
 }

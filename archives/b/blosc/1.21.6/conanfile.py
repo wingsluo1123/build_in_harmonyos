@@ -47,7 +47,7 @@ class BloscConan(ConanFile):
         tc.variables["BUILD_TESTS"] = "OFF"
         tc.variables["BUILD_FUZZERS"] = "OFF"
         tc.variables["BUILD_BENCHMARKS"] = "OFF"
-        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.generate()
 
     def build(self):

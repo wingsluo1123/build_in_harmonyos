@@ -28,7 +28,7 @@ class BasedpyrightConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("nodejs/24.13.0  # 系统已预装@ohpcd/stable")
+        pass  # nodejs is system pre-installed
 
     def layout(self):
         basic_layout(self)

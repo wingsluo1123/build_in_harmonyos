@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "boost/version.hpp"
 
 int main(void) {
-    printf("test boost-build 1.90.0: OK\n");
+    printf("boost-build: version=%d\n", BOOST_VERSION);
     return 0;
 }

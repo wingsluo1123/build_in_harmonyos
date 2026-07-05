@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "bearssl.h"
 
 int main(void) {
-    printf("test bearssl 0.6: OK\n");
+    printf("bearssl: BR_BEACON=0x%08x\n", BR_BEACON_VERSION);
     return 0;
 }

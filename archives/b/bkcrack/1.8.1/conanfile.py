@@ -39,10 +39,6 @@ class BkcrackConan(ConanFile):
         tc = CMakeToolchain(self)
         # R26: Terminal tools must be statically linked for DevBox deployment
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
-        tc.variables["CMAKE_INSTALL_PREFIX"] = "$DEFAULT_PREFIX"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["BKCRACK_BUILD_TESTING"] = "ON"
         tc.generate()
 
@@ -57,4 +53,5 @@ class BkcrackConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bkcrack"]
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

@@ -39,8 +39,7 @@ class Bowtie2Conan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("zlib/sysroot@ohpcd/stable")
-        self.requires("simde/submodule@ohpcd/stable")
+        self.requires("simde/0.8.0")
 
     def layout(self):
         basic_layout(self)
@@ -51,27 +50,18 @@ class Bowtie2Conan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
-
         # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        # SIMDE provides SSE2 emulation for aarch64
+        simde_pkg = self.dependencies["simde"].package_folder
+        simde_inc = os.path.join(simde_pkg, "include")
+        cxxflags = f"-std=c++11 -I{simde_inc}"
+        self.run(f"make -j1 CPP=clang++ CXX=clang++ CC=clang CXXFLAGS=\"{cxxflags}\"", cwd=self.source_folder)
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bowtie2", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # Bowtie2 builds executables
+        copy(self, "bowtie2*", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "*.py", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "*.sh", self.source_folder, os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["bowtie2"]
+        self.cpp_info.libs = []

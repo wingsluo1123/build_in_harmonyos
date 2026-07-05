@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "brotli/decode.h"
 
 int main(void) {
-    printf("test brotli 1.2.0: OK\n");
+    printf("brotli version: %u\n", BrotliDecoderVersion());
+    BrotliDecoderState *s = BrotliDecoderCreateState(NULL, NULL, NULL);
+    if (s) { printf("decoder: OK\n"); BrotliDecoderDestroyState(s); }
     return 0;
 }

@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe — bamtools 2.5.3 (CMake project).
 
-Usage: Replace Bamtools, bamtools, 2.5.3, BAM 文件处理工具库和命令行工具集, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
+bamtools is a CMake-based BAM file processing library and CLI tool.
 """
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
 class BamtoolsConan(ConanFile):
@@ -19,7 +15,7 @@ class BamtoolsConan(ConanFile):
     version = "2.5.3"
     description = "BAM 文件处理工具库和命令行工具集"
     license = "MIT"
-    homepage = ""
+    homepage = "https://github.com/pezmaster31/bamtools"
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
@@ -31,29 +27,26 @@ class BamtoolsConan(ConanFile):
         pass
 
     def layout(self):
-        basic_layout(self)
+        cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
+        tc = CMakeToolchain(self)
+        # bamtools builds a static library by default
+        tc.variables["BUILD_SHARED_LIBS"] = False
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.libs = ["bamtools"]

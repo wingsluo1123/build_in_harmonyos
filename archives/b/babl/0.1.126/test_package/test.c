@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "babl/babl.h"
 
 int main(void) {
-    printf("test babl 0.1.126: OK\n");
+    babl_init();
+    printf("babl version: %s\n", babl_get_version());
+    babl_exit();
     return 0;
 }

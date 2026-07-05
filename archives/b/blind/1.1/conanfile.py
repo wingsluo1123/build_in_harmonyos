@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
+"""Conan recipe — Makefile projects (blind from suckless.org).
 
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Blind, blind, 1.1, Collection of command line video manipulation utilities for Unix, ISC, https://tools.suckless.org/blind/
-       Fill in requires(), build commands, and cpp_info.libs as needed.
+blind is a collection of command line video manipulation utilities.
 """
 import os
 
@@ -49,28 +34,13 @@ class BlindConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
-
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        # blind uses a simple Makefile, build with clang
+        self.run(f'make -C "{self.source_folder}" CC=clang -j1', env="conanrun")
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "blind", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # blind installs to DESTDIR/PREFIX
+        self.run(f'make -C "{self.source_folder}" install DESTDIR="{self.package_folder}" PREFIX=""', env="conanrun")
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["blind"]
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

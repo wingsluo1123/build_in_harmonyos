@@ -9,7 +9,7 @@ This template enforces R26: static linking for terminal tools.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -40,13 +40,19 @@ class BbeConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # R26: Terminal tools must be statically linked
         tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
         tc.generate()
 
     def build(self):
+        import os
+        # Fix: HMDFS doesn't support temp subdirs in source dir (config.status)
+        tmpdir = os.path.join(os.path.expanduser("~"), "tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        os.environ["TMPDIR"] = tmpdir
         apply_conandata_patches(self)
+        # E011: Fix HMDFS umask 077 permission issue in configure/config.status
+        configure_path = os.path.join(self.source_folder, "configure")
+        if os.path.exists(configure_path):
+            replace_in_file(self, configure_path, "umask 077", "umask 022")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
@@ -56,4 +62,4 @@ class BbeConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bbe"]
+        self.cpp_info.libs = []

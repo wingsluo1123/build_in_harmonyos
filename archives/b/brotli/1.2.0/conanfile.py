@@ -55,4 +55,8 @@ class BrotliConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["brotli"]
+        self.cpp_info.components["brotlicommon"].libs = ["brotlicommon"]
+        self.cpp_info.components["brotlidec"].libs = ["brotlidec"]
+        self.cpp_info.components["brotlidec"].requires = ["brotlicommon"]
+        self.cpp_info.components["brotlienc"].libs = ["brotlienc"]
+        self.cpp_info.components["brotlienc"].requires = ["brotlicommon"]

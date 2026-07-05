@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
+"""Conan recipe for bossa 1.9.1 — Makefile executable package.
 
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Bossa, bossa, 1.9.1, bossa 1.9.1, MIT, 
-       Fill in requires(), build commands, and cpp_info.libs as needed.
+BOSSA (Basic Open Source SAM-BA Application) is a flash programmer for
+Atmel SAM microcontrollers. This recipe builds the CLI tool bossac only.
+bossash (interactive shell) requires readline and is not included.
+The GUI version (bossa) requires wxWidgets and is not available on OHOS.
 """
 import os
 
@@ -28,9 +16,9 @@ from conan.tools.layout import basic_layout
 class BossaConan(ConanFile):
     name = "bossa"
     version = "1.9.1"
-    description = "bossa 1.9.1"
+    description = "Flash programmer for Atmel SAM microcontrollers (CLI tool: bossac)"
     license = "MIT"
-    homepage = ""
+    homepage = "https://github.com/shumatech/BOSSA"
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
@@ -39,7 +27,7 @@ class BossaConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("readline/8.2@ohpcd/stable")
+        pass
 
     def layout(self):
         basic_layout(self)
@@ -50,27 +38,42 @@ class BossaConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
+        # Touch pre-generated WordCopyArm.cpp to prevent applet regeneration
+        # (arm-none-eabi-as not available on OHOS)
+        applet_cpp = os.path.join(self.source_folder, "src", "WordCopyArm.cpp")
+        if os.path.exists(applet_cpp):
+            os.utime(applet_cpp, None)
 
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        # bossa Makefile detects OS via uname -s | cut -c -7 = "Harmon" on OHOS,
+        # which matches no OS rule. Pass OS=Linux to get PosixSerialPort support.
+        # Build only bin/bossac (not all, which includes GUI needing wxWidgets).
+        # VERSION must be set manually (Makefile uses git describe; source is not git).
+        # Create dummy wx-config to silence parse-time $(shell wx-config) calls
+        # (only bossa GUI needs wxWidgets; we build bossac only)
+        dummy_bin = os.path.join(self.build_folder, "dummy_bin")
+        os.makedirs(dummy_bin, exist_ok=True)
+        wx_config = os.path.join(dummy_bin, "wx-config")
+        with open(wx_config, "w") as f:
+            f.write("#!/system/bin/sh\necho ''\n")
+        os.chmod(wx_config, 0o755)
+
+        # Add dummy_bin to PATH for this make invocation
+        old_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = dummy_bin + os.pathsep + old_path
+
+        # CXXFLAGS=-Wno-error overrides Makefile's -Werror (std::move unqualified call)
+        # Run from source_folder because Makefile is at root, not in build subdir.
+        self.run("make CXX=clang++ VERSION=1.9.1 OS=Linux CXXFLAGS=-Wno-error -j1 bin/bossac",
+                 cwd=self.source_folder)
+
+        # Restore PATH
+        os.environ["PATH"] = old_path
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bossa", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # Copy executable to bin/
+        copy(self, "bossac", os.path.join(self.source_folder, "bin"),
+             os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["bossa"]
+        # Executable package — no libraries to link
+        self.cpp_info.bindirs = ["bin"]

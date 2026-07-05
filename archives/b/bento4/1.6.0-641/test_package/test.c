@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "Ap4Version.h"
 
 int main(void) {
-    printf("test bento4 1.6.0-641: OK\n");
+    unsigned int r[4];
+    AP4_GetVersion(r);
+    printf("bento4 version: %d.%d.%d.%d\n", r[0], r[1], r[2], r[3]);
     return 0;
 }

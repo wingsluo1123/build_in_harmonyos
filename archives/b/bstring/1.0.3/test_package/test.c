@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "bstrlib.h"
 
 int main(void) {
-    printf("test bstring 1.0.3: OK\n");
+    bstring s = bfromcstr("hello world");
+    printf("bstring: '%s', len=%d\n", s->data, s->slen);
+    bdestroy(s);
     return 0;
 }

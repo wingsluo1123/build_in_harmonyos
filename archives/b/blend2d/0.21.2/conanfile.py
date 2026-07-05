@@ -39,10 +39,6 @@ class Blend2DConan(ConanFile):
         tc = CMakeToolchain(self)
         # R26: Terminal tools must be statically linked for DevBox deployment
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.generate()
 
     def build(self):

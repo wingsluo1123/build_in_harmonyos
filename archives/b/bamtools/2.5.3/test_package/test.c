@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "api/BamReader.h"
 
 int main(void) {
-    printf("test bamtools 2.5.3: OK\n");
+    BamTools::BamReader reader;
+    printf("bamtools: BamReader created\n");
     return 0;
 }

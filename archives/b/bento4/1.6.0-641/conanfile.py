@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — CMake projects.
 
-Usage: Replace Bento4, bento4, 1.6.0-641, C++ library and tools for reading and writing ISO-MP4 files, MIT, 
+Usage: Replace Bento4, bento4, 1.6.0-641, C++ library and tools for reading and writing ISO-MP4 files, MIT,
        Fill in requires() and cpp_info.libs as needed.
 
 This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
@@ -42,7 +42,6 @@ class Bento4Conan(ConanFile):
         # Add project-specific CMake variables here:
         # tc.variables["ENABLE_FOO"] = "ON"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
-        tc.variables["CMAKE_INSTALL_PREFIX"] = "/storage/Users/currentUser/usr/local"
         tc.generate()
 
     def build(self):
@@ -56,4 +55,4 @@ class Bento4Conan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bento4"]
+        self.cpp_info.libs = ["ap4"]

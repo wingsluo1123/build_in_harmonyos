@@ -1,7 +1,8 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include "btllib/seq.hpp"
 
 int main(void) {
-    printf("test btllib 1.7.8: OK\n");
+    btllib::Seq seq("test", "ACGTACGT");
+    printf("btllib seq: id=%s, seq=%s\n", seq.id.c_str(), seq.seq.c_str());
     return 0;
 }

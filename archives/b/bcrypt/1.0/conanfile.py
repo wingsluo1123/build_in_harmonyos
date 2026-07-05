@@ -1,45 +1,22 @@
-#!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
-
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Bcrypt, bcrypt, 1.0, bcrypt 密码哈希库和工具，支持 Blowfish 加密和自动加盐, BSD, https://github.com/rg3/libbcrypt
-       Fill in requires(), build commands, and cpp_info.libs as needed.
-"""
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.layout import basic_layout
 
 
 class BcryptConan(ConanFile):
     name = "bcrypt"
     version = "1.0"
-    description = "bcrypt 密码哈希库和工具，支持 Blowfish 加密和自动加盐"
+    description = "bcrypt password hashing library with Blowfish encryption and auto-salting"
     license = "BSD"
     homepage = "https://github.com/rg3/libbcrypt"
-    url = ""  # CI fills this
+    url = ""
 
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
-
-    def requirements(self):
-        pass
 
     def layout(self):
         basic_layout(self)
@@ -50,27 +27,20 @@ class BcryptConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
+        # Fix Makefiles: use clang instead of gcc, remove x86 assembly (not available on aarch64)
+        mk = os.path.join(self.source_folder, "Makefile")
+        replace_in_file(self, mk, "CC = gcc", "CC = clang")
 
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        cb_mk = os.path.join(self.source_folder, "crypt_blowfish", "Makefile")
+        replace_in_file(self, cb_mk, "CC = gcc", "CC = clang")
+        # Remove x86.o from BLOWFISH_OBJS (x86 assembly not available on aarch64)
+        replace_in_file(self, cb_mk, "crypt_blowfish.o x86.o", "crypt_blowfish.o")
+
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bcrypt", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "bcrypt.h", self.source_folder, os.path.join(self.package_folder, "include"))
+        copy(self, "bcrypt.a", self.source_folder, os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
         self.cpp_info.libs = ["bcrypt"]

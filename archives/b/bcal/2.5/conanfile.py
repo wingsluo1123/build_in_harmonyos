@@ -1,45 +1,22 @@
-#!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
-
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Bcal, bcal, 2.5, 存储表达式计算器，支持字节单位换算、基数转换和位运算, GPLv3, https://github.com/jarun/bcal
-       Fill in requires(), build commands, and cpp_info.libs as needed.
-"""
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, save, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
 class BcalConan(ConanFile):
     name = "bcal"
     version = "2.5"
-    description = "存储表达式计算器，支持字节单位换算、基数转换和位运算"
+    description = "Byte Calculator - storage expression calculator with byte unit conversion, base conversion, and bitwise operations"
     license = "GPLv3"
     homepage = "https://github.com/jarun/bcal"
-    url = ""  # CI fills this
+    url = ""
 
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
-
-    def requirements(self):
-        self.requires("readline/8.2@ohpcd/stable")
 
     def layout(self):
         basic_layout(self)
@@ -50,27 +27,45 @@ class BcalConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
+        # Create readline stub headers (readline not available on OHOS)
+        rl_inc_dir = os.path.join(self.source_folder, "inc", "readline")
+        os.makedirs(rl_inc_dir, exist_ok=True)
 
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        save(self, os.path.join(rl_inc_dir, "readline.h"),
+             '#ifndef _READLINE_STUB_H\n#define _READLINE_STUB_H\n'
+             '#include <stdio.h>\n'
+             'typedef int rl_command_func_t(int, int);\n'
+             'char *readline(const char *prompt);\nvoid add_history(const char *line);\n'
+             'int rl_bind_key(int key, rl_command_func_t *func);\n'
+             'int rl_insert(int count, int key);\n'
+             '#endif\n')
+        save(self, os.path.join(rl_inc_dir, "history.h"),
+             '#ifndef _HISTORY_STUB_H\n#define _HISTORY_STUB_H\n'
+             'int read_history(const char *filename);\nint write_history(const char *filename);\n'
+             '#endif\n')
+
+        # Create readline stub implementation
+        save(self, os.path.join(self.source_folder, "src", "readline_stub.c"),
+             '#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n'
+             'char *readline(const char *prompt) {\n'
+             '    if (prompt && *prompt) fprintf(stderr, "%s", prompt);\n'
+             '    char *line = NULL; size_t cap = 0;\n'
+             '    if (getline(&line, &cap, stdin) < 0) { free(line); return NULL; }\n'
+             '    size_t len = strlen(line);\n'
+             '    if (len > 0 && line[len-1] == \'\\n\') line[len-1] = \'\\0\';\n'
+             '    return line;\n}\n'
+             'void add_history(const char *line) { (void)line; }\n'
+             'int read_history(const char *f) { (void)f; return 0; }\n'
+             'int write_history(const char *f) { (void)f; return 0; }\n'
+             'int rl_bind_key(int key, int (*func)(int, int)) { (void)key; (void)func; return 0; }\n'
+             'int rl_insert(int count, int key) { (void)count; (void)key; return 0; }\n')
+
+        # Build: override LDLIBS_READLINE to empty (no -lreadline)
+        self.run("make -j1 LDLIBS_READLINE=", cwd=self.source_folder)
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bcal", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "bcal", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "bcal.1", self.source_folder, os.path.join(self.package_folder, "share", "man", "man1"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["bcal"]
+        self.cpp_info.libs = []

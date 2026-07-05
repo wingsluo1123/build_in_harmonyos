@@ -1,28 +1,25 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe for bruno-cli — npm CLI tool (Node.js).
 
-Usage: Replace Brunocli, bruno-cli, 3.4.2, bruno-cli 3.4.2, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
+Build system: npm (no C/C++ compilation)
+Package type: executable/tool (JavaScript files)
 """
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
 class BrunocliConan(ConanFile):
     name = "bruno-cli"
     version = "3.4.2"
-    description = "bruno-cli 3.4.2"
+    description = "Bruno CLI — open-source API client for testing APIs"
     license = "MIT"
-    homepage = ""
+    homepage = "https://www.usebruno.com"
     url = ""  # CI fills this
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -36,24 +33,12 @@ class BrunocliConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
-        tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.generate()
-
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        copy(self, "*", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        self.cpp_info.libs = ["bruno-cli"]
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

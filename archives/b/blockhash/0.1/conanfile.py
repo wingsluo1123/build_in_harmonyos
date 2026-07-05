@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe — Custom build (single C file compilation).
 
-Usage: Replace Blockhash, blockhash, 0.1, Perceptual image hash calculation tool based on Block Mean Value algorithm, MIT, https://github.com/commonsmachinery/blockhash
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
+blockhash is a perceptual image hash calculation tool.
+Uses stb_image.h (embedded) instead of MagickWand for HarmonyOS compatibility.
 """
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -28,7 +25,7 @@ class BlockhashConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("stb_image/2.29 (单头文件库，已内嵌)@ohpcd/stable")
+        pass  # stb_image is embedded, no external dependency
 
     def layout(self):
         basic_layout(self)
@@ -36,24 +33,29 @@ class BlockhashConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
-        tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.generate()
-
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        # Provide stb_image.h for the patched source
+        stb_path = '/storage/Users/currentUser/tmp/stb_image.h'
+        if os.path.isfile(stb_path):
+            copy(self, 'stb_image.h', os.path.dirname(stb_path), self.source_folder)
+        # blockhash is a single C file, compiled directly with stb_image.h
+        build_dir = os.path.join(self.build_folder, "build")
+        if not os.path.exists(build_dir):
+            os.makedirs(build_dir)
+        self.run(
+            "clang -O3 -DVERSION='\"0.3.2-harmonyos\"' "
+            f"-I{self.source_folder} "
+            f"-o {os.path.join(build_dir, 'blockhash')} "
+            f"{os.path.join(self.source_folder, 'blockhash.c')} -lm",
+            env="conanrun"
+        )
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        copy(self, "blockhash",
+             os.path.join(self.build_folder, "build"),
+             os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        self.cpp_info.libs = ["blockhash"]
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

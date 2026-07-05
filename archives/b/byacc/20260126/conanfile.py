@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — Autotools projects (configure + make).
 
-Usage: Replace Byacc, byacc, 20260126, byacc 20260126, MIT, 
+Usage: Replace Byacc, byacc, 20260126, byacc 20260126, MIT,
        Fill in requires(), configure_args, and cpp_info.libs as needed.
 
 This template enforces R26: static linking for terminal tools.
@@ -17,9 +17,9 @@ from conan.tools.layout import basic_layout
 class ByaccConan(ConanFile):
     name = "byacc"
     version = "20260126"
-    description = "byacc 20260126"
+    description = "Berkeley Yacc - parser generator"
     license = "MIT"
-    homepage = ""
+    homepage = "https://invisible-island.net/byacc/"
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
@@ -38,11 +38,7 @@ class ByaccConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
         tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
         tc.generate()
 
     def build(self):
@@ -56,4 +52,8 @@ class ByaccConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["byacc"]
+        # byacc is an executable tool, not a library
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+        self.cpp_info.bindirs = ["bin"]

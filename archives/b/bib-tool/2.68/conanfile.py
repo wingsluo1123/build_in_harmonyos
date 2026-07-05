@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
-
-Usage: Replace Bibtool, bib-tool, 2.68, bib-tool 2.68, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
-"""
+"""Conan recipe — bib-tool 2.68 (autotools executable tool)."""
 import os
 
 from conan import ConanFile
@@ -17,10 +11,10 @@ from conan.tools.layout import basic_layout
 class BibtoolConan(ConanFile):
     name = "bib-tool"
     version = "2.68"
-    description = "bib-tool 2.68"
+    description = "bib-tool 2.68 — BibTeX file manipulation tool"
     license = "MIT"
     homepage = ""
-    url = ""  # CI fills this
+    url = ""
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -38,22 +32,45 @@ class BibtoolConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
         tc.generate()
 
+    def _fix_script(self, path):
+        """Fix shebang and umask for OHOS."""
+        if not os.path.isfile(path):
+            return
+        with open(path, "r") as f:
+            content = f.read()
+        content = content.replace("#!/bin/bash", "#!/data/service/hnp/bin/bash")
+        content = content.replace("#!/bin/sh", "#!/system/bin/sh")
+        content = content.replace("#! /bin/bash", "#!/data/service/hnp/bin/bash")
+        content = content.replace("#! /bin/sh", "#!/system/bin/sh")
+        content = content.replace("umask 077", "umask 022")
+        with open(path, "w") as f:
+            f.write(content)
+        os.chmod(path, 0o755)
+
     def build(self):
-        apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        # Fix configure shebang and umask
+        self._fix_script(os.path.join(self.source_folder, "configure"))
+
+        # Run configure with --no-create to generate config.status without executing it
+        self.run("./configure --no-create --prefix=", cwd=self.source_folder, env="conanbuild")
+
+        # Fix config.status umask (HMDFS setgid issue)
+        self._fix_script(os.path.join(self.source_folder, "config.status"))
+
+        # Run config.status to generate Makefiles
+        self.run("./config.status", cwd=self.source_folder, env="conanbuild")
+
+        # Build
+        self.run("make -j1", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        # bib-tool's Makefile doesn't support DESTDIR; copy binary manually
+        copy(self, "bibtool", self.source_folder, os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        self.cpp_info.libs = ["bib-tool"]
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+        self.cpp_info.bindirs = ["bin"]

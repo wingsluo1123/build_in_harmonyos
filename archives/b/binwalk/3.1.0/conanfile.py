@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — Autotools projects (configure + make).
 
-Usage: Replace Binwalk, binwalk, 3.1.0, binwalk 3.1.0, MIT, 
+Usage: Replace Binwalk, binwalk, 3.1.0, binwalk 3.1.0, MIT,
        Fill in requires(), configure_args, and cpp_info.libs as needed.
 
 This template enforces R26: static linking for terminal tools.
@@ -56,4 +56,5 @@ class BinwalkConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["binwalk"]
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]

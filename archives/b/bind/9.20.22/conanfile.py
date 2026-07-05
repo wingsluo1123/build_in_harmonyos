@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — Autotools projects (configure + make).
 
-Usage: Replace Bind, bind, 9.20.22, bind 9.20.22, MIT, 
+Usage: Replace Bind, bind, 9.20.22, bind 9.20.22, MIT,
        Fill in requires(), configure_args, and cpp_info.libs as needed.
 
 This template enforces R26: static linking for terminal tools.
@@ -45,7 +45,6 @@ class BindConan(ConanFile):
         # Add project-specific configure args here:
         # tc.configure_args.append("--without-bash-malloc")
         # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.configure_args.append("--prefix=/storage/Users/currentUser/usr/local")
         tc.configure_args.append("--without-libnghttp2")
         tc.generate()
 

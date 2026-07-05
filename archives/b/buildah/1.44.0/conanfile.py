@@ -15,7 +15,7 @@ Key rules:
   - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
   -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
 
-Usage: Replace Buildah, buildah, 1.44.0, buildah 1.44.0, MIT, 
+Usage: Replace Buildah, buildah, 1.44.0, buildah 1.44.0, MIT,
        Fill in requires(), build commands, and cpp_info.libs as needed.
 """
 import os
@@ -50,27 +50,32 @@ class BuildahConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
+        # Set up Go environment for buildah (Go project using Makefile)
+        goroot = "/storage/Users/currentUser/usr/local/go1263"
+        go_bin = os.path.join(goroot, "bin", "go")
+        gopath = os.path.join(os.path.expanduser("~"), "go")
 
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        os.environ["GOROOT"] = goroot
+        os.environ["GOPATH"] = gopath
+        os.environ["GOPROXY"] = "https://goproxy.cn,direct"
+        os.environ["CGO_ENABLED"] = "0"
+        os.environ["GOOS"] = "linux"
+        os.environ["GOARCH"] = "arm64"
+        os.environ["TMPDIR"] = os.path.expanduser("~/tmp")
+        os.environ["GOCACHE"] = os.path.join(os.path.expanduser("~"), ".cache", "go-build")
+        os.environ["GOMODCACHE"] = os.path.join(gopath, "pkg", "mod")
+        os.environ["PATH"] = goroot + "/bin:/data/service/hnp/bin:" + os.environ.get("PATH", "")
+
+        # Build using Makefile (patches fix entrypoint_arm64.gz for arm64)
+        self.run("make -j1 GOCACHE=" + os.environ["GOCACHE"] + " GOMODCACHE=" + os.environ["GOMODCACHE"])
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "buildah", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # Copy the built binary
+        copy(self, "buildah", os.path.join(self.build_folder, "bin"),
+             os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["buildah"]
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+        self.cpp_info.bindirs = ["bin"]

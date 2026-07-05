@@ -1,45 +1,34 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust).
+"""Conan recipe for bsdiff — binary diff/patch tools.
 
-⚠️  This is a SCAFFOLD only. Makefile projects vary widely — each has different
-    configure scripts, build targets, output names, and install rules.
-    AI MUST review and adjust every method below before use.
-
-Typical Makefile project types:
-  1. Raw make (no configure, e.g. bzip2) — build() runs make directly
-  2. Makefile + configure (e.g. zlib) — build() runs ./configure first, then make
-
-Key rules:
-  - R9:  Use make -j1 (not -j$(nproc))
-  - R26: System-name libs (zlib, ncurses, etc.) must be static-only
-  - R5:  Use CONFIG_SHELL for configure scripts (OHOS has no /bin/sh)
-  -      Set env: os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-
-Usage: Replace Bsdiff, bsdiff, 4.3, 二进制补丁生成和应用工具, BSD-2-Clause, https://www.daemonology.net/bsdiff/
-       Fill in requires(), build commands, and cpp_info.libs as needed.
+Build system: Makefile (raw make, no configure)
+Source: https://www.daemonology.net/bsdiff/
 """
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.build import can_run
 from conan.tools.layout import basic_layout
+from conan.tools.env import VirtualBuildEnv
 
 
 class BsdiffConan(ConanFile):
     name = "bsdiff"
     version = "4.3"
-    description = "二进制补丁生成和应用工具"
+    description = "Binary diff/patch tools (bsdiff and bspatch)"
     license = "BSD-2-Clause"
     homepage = "https://www.daemonology.net/bsdiff/"
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
+    generators = "VirtualBuildEnv"
 
     def export_sources(self):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("bzip2/1.0.8@ohpcd/stable")
+        self.requires("bzip2/1.0.8")
 
     def layout(self):
         basic_layout(self)
@@ -49,28 +38,29 @@ class BsdiffConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-
-        # ⚠️ AI: Adjust the build commands below for the actual Makefile.
-        #
-        # If the project has a ./configure script (e.g. zlib):
-        #   config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        #   self.run(f"{config_shell} ./configure --prefix=${{self.package_folder}} --static")
-        #   self.run("make -j1")
-        #
-        # If raw make (no configure, e.g. bzip2):
-        #   self.run("make CC=clang AR=llvm-ar RANLIB=llvm-ranlib -j1")
-
-        # R9: Always use -j1, never -j$(nproc)
-        # R26: For system-name libs, only build static targets
-        self.run("make -j1")
+        # Get bzip2 paths from the dependency
+        bzip2 = self.dependencies["bzip2"]
+        bzip2_inc = bzip2.package_folder + "/include"
+        bzip2_lib = bzip2.package_folder + "/lib"
+        # Fix hardcoded paths in Makefile (patch uses $(HOME)/usr/local/*)
+        makefile_path = os.path.join(self.source_folder, "Makefile")
+        if os.path.isfile(makefile_path):
+            with open(makefile_path, "r") as f:
+                content = f.read()
+            content = content.replace("$(HOME)/usr/local/include", bzip2_inc)
+            content = content.replace("$(HOME)/usr/local/lib", bzip2_lib)
+            with open(makefile_path, "w") as f:
+                f.write(content)
+        # Set build environment
+        os.environ["CC"] = os.environ.get("CC", "clang")
+        self.run(f"make -C {self.source_folder} -j1")
 
     def package(self):
-        # ⚠️ AI: Adjust copy patterns for actual build outputs.
-        # Library name may differ from package name (e.g. zlib → libz.a)
-        copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
-        copy(self, "*.a", self.source_folder, os.path.join(self.package_folder, "lib"))
-        # copy(self, "bsdiff", self.source_folder, os.path.join(self.package_folder, "bin"))
+        # Binaries are built in source_folder by make
+        src = os.path.dirname(self.build_folder) if self.build_folder else self.source_folder
+        copy(self, "bsdiff", src, os.path.join(self.package_folder, "bin"))
+        copy(self, "bspatch", src, os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        # ⚠️ AI: Set the correct library name (e.g. "z" not "zlib" for zlib)
-        self.cpp_info.libs = ["bsdiff"]
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []

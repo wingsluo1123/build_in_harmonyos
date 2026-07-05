@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe — bearssl 0.6 (custom Makefile build).
 
-Usage: Replace Bearssl, bearssl, 0.6, 优化的 SSL/TLS 库，适用于嵌入式系统，纯 C 实现无外部依赖, MIT, https://www.bearssl.org/
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
+BearSSL uses a custom Makefile with CONF-based configuration files.
+No configure script. Build with: make CONF=UnixClang
 """
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -37,23 +34,28 @@ class BearsslConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = AutotoolsToolchain(self)
-        # R26: Terminal tools must be statically linked
-        tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
-        tc.generate()
+        pass  # BearSSL has no configure step
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        # BearSSL uses a custom Makefile with CONF-based configuration
+        # UnixClang uses clang as CC/LD, which is correct for OHOS
+        # Run make from source folder where the Makefile is located
+        self.run(f"make -C {self.source_folder} CONF=UnixClang -j1")
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        src = self.source_folder
+        # BearSSL with UnixClang config uses 'bclang' as BUILD directory
+        build_dir = os.path.join(src, "bclang")
+        # Copy static library
+        copy(self, "libbearssl.a", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
+        # Copy brssl tool
+        copy(self, "brssl", src=build_dir, dst=os.path.join(self.package_folder, "bin"))
+        # Copy headers
+        copy(self, "*.h", src=os.path.join(src, "inc"), dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["bearssl"]
+        self.cpp_info.includedirs = ["include"]
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.bindirs = ["bin"]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe template — CMake projects.
 
-Usage: Replace Binaryen, binaryen, 123, binaryen 123, MIT, 
+Usage: Replace Binaryen, binaryen, 123, binaryen 123, MIT,
        Fill in requires() and cpp_info.libs as needed.
 
 This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
@@ -27,7 +27,10 @@ class BinaryenConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("cmake/3.28@ohpcd/stable")
+        pass
+
+    def build_requirements(self):
+        pass  # cmake is available on the system
 
     def layout(self):
         cmake_layout(self)

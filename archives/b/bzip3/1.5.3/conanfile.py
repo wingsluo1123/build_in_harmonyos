@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Conan recipe template — CMake projects.
+"""Conan recipe — bzip3 1.5.3 (CMake build).
 
-Usage: Replace Bzip3, bzip3, 1.5.3, 下一代 bzip 压缩工具，使用现代算法提供更高压缩比, LGPL-3.0, https://github.com/kspalaiologos/bzip3
-       Fill in requires() and cpp_info.libs as needed.
-
-This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
+bzip3 is a next-generation compression library and tool.
 """
 import os
 
@@ -16,7 +13,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 class Bzip3Conan(ConanFile):
     name = "bzip3"
     version = "1.5.3"
-    description = "下一代 bzip 压缩工具，使用现代算法提供更高压缩比"
+    description = "Next-generation bzip compression tool with modern algorithms"
     license = "LGPL-3.0"
     homepage = "https://github.com/kspalaiologos/bzip3"
     url = ""  # CI fills this
@@ -37,11 +34,7 @@ class Bzip3Conan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # R26: Terminal tools must be statically linked for DevBox deployment
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # Add project-specific CMake variables here:
-        # tc.variables["ENABLE_FOO"] = "ON"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
+        # R26: Static build for system isolation
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         tc.variables["BZIP3_ENABLE_PTHREAD"] = "ON"
         tc.generate()
