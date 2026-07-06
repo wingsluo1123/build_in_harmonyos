@@ -1,0 +1,39 @@
+diff -ruN a/lib/eu-config.h b/lib/eu-config.h
+--- a/lib/eu-config.h
++++ b/lib/eu-config.h
+@@ -24,24 +24,35 @@
+ 
+    You should have received copies of the GNU General Public License and
+    the GNU Lesser General Public License along with this program.  If
+    not, see <http://www.gnu.org/licenses/>.  */
+ 
+ #ifndef EU_CONFIG_H
+ #define EU_CONFIG_H	1
+ 
+ #include "locks.h"
+ 
++#ifdef USE_NLS
+ #include <libintl.h>
+ /* gettext helper macros.  */
+ #define N_(Str) Str
+ #define _(Str) dgettext ("elfutils", Str)
++#else
++/* NLS disabled: use identity macros */
++#define N_(Str) Str
++#define _(Str) Str
++#define dgettext(domain, str) (str)
++#define gettext(str) (str)
++#define ngettext(s1, s2, n) ((n) == 1 ? (s1) : (s2))
++#define bindtextdomain(domain, dir) ((void)0)
++#define textdomain(domain) ((void)0)
++#endif
+ 
+ /* Compiler-specific definitions.  */
+ #define strong_alias(name, aliasname) \
+   extern __typeof (name) aliasname __attribute__ ((alias (#name)));
+ 
+ #ifdef __i386__
+ # define internal_function __attribute__ ((regparm (3), stdcall))
+ #else
+ # define internal_function /* nothing */
+ #endif
