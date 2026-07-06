@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Conan recipe for blake3 1.8.3 — CMake build system.
+"""Conan recipe — blake3 C library (direct compilation).
 
-BLAKE3 is a fast cryptographic hash function (C implementation).
-CMakeLists.txt is located in the c/ subdirectory of the source tree.
-Build: static-only (R26), make -j1 (R9).
+blake3 is a fast cryptographic hash function. The C implementation is a single
+file (blake3.c) with blake3.h header. We compile directly with clang instead
+of using the CMake build system, which has a complex directory structure.
 """
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.layout import basic_layout
 
 
 class Blake3Conan(ConanFile):
@@ -29,34 +29,33 @@ class Blake3Conan(ConanFile):
         pass
 
     def layout(self):
-        cmake_layout(self)
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = CMakeToolchain(self)
-        # R26: Build static only — no .so to avoid polluting system lib paths
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        # OHOS: CMake lacks a Platform/HarmonyOS module, so
-        # CMAKE_SYSTEM_PROCESSOR is detected as "unknown" instead of "aarch64".
-        # BLAKE3's CMakeLists.txt auto-detects NEON via CMAKE_SYSTEM_PROCESSOR,
-        # which fails on OHOS. Use BLAKE3_USE_NEON_INTRINSICS to explicitly
-        # enable NEON SIMD on aarch64 (CMAKE_SIZEOF_VOID_P == 8).
-        tc.variables["BLAKE3_USE_NEON_INTRINSICS"] = "ON"
-        tc.generate()
+        pass  # No CMake toolchain needed
 
     def build(self):
         apply_conandata_patches(self)
-        cmake = CMake(self)
-        # CMakeLists.txt is in the c/ subdirectory of the source tree
-        cmake.configure(build_script_folder="c")
-        # R9: Use -j1 for parallel constraint on OHOS platform
-        cmake.build(cli_args=["--parallel", "1"])
+        c_dir = os.path.join(self.source_folder, "c")
+        # Compile blake3.c - disable x86 SIMD, use NEON for aarch64
+        obj = os.path.join(self.build_folder, "blake3.o")
+        lib = os.path.join(self.build_folder, "libblake3.a")
+        self.run(
+            f"clang -c -O3 -DBLAKE3_NO_SSE2 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512 -DBLAKE3_NO_SSE41 "
+            f"-I{c_dir} "
+            f"-o {obj} "
+            f"{os.path.join(c_dir, 'blake3.c')}",
+            env="conanbuild"
+        )
+        self.run(f"ar rcs {lib} {obj}", env="conanbuild")
 
     def package(self):
-        cmake = CMake(self)
-        cmake.install()
+        c_dir = os.path.join(self.source_folder, "c")
+        copy(self, "blake3.h", c_dir, os.path.join(self.package_folder, "include"))
+        copy(self, "libblake3.a", self.build_folder, os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
         self.cpp_info.libs = ["blake3"]
