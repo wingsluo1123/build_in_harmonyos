@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Conan recipe — perl-params-validate 1.31 (Perl Module::Build).
+"""Conan recipe for perl-params-validate — Perl XS module (Module::Build).
 
-Params-Validate is a Perl XS module for validating method/function parameters.
-It uses Module::Build (Build.PL) as its build system and produces both
-pure-Perl and XS implementations.
+Build system: perl Build.PL + perl Build + perl Build install
+XS module: Validate.xs → XS.c → XS.so
+Has pure Perl fallback via Module::Implementation (auto-fallback when XS unavailable).
 
-Build system: Perl Module::Build (perl Build.PL && ./Build && ./Build install)
-
-HarmonyOS adaptation (E137): Perl 5.42.0 on OHOS has -fstack-protector-strong
-in lddlflags which ld.lld rejects. We patch inc/MyMBClass.pm to override
-the CBuilder config, removing the flag and adding proper -L/-I paths.
+On OHOS:
+  - musl C library headers at ~/usr/local/include (sys/types.h etc.)
+  - musl libc at ~/usr/local/lib
+  - E137: Perl 5.42.0 lddlflags has -fstack-protector-strong, ld.lld rejects it
+  - Fix: override inc/MyMBClass.pm cbuilder() to remove flag + add -L/-I paths
+  - XS .so may fail to load at runtime due to SELinux/HMDFS (PP fallback works)
 """
 import os
-import os.path
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, save
+from conan.tools.layout import basic_layout
 
 
 class PerlParamsValidateConan(ConanFile):
@@ -34,28 +36,47 @@ class PerlParamsValidateConan(ConanFile):
     def requirements(self):
         pass
 
+    def layout(self):
+        basic_layout(self)
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
+        # Apply conandata patches (if any)
         apply_conandata_patches(self)
 
+        # Patch inc/MyMBClass.pm for OHOS platform (E137 fix)
         if self.settings.os in ("Linux", "OHOS"):
             self._patch_for_ohos()
 
         # Step 1: Generate Build script
-        self.run("perl Build.PL")
+        self.run("perl Build.PL", cwd=self.source_folder)
 
         # Step 2: Compile XS and pure-Perl modules
-        self.run("./Build")
+        self.run("perl Build", cwd=self.source_folder)
 
     def package(self):
-        # Install to packaging directory using --destdir
-        self.run(f"./Build install --destdir={self.package_folder}")
+        # Install with --destdir to package folder
+        dest = os.path.join(self.package_folder, "")
+        self.run(f"perl Build install --destdir={dest}", cwd=self.source_folder)
+
+        # Also copy .so to standard lib/ for package integrity checks (L5)
+        site_arch_src = os.path.join(
+            dest, "data", "service", "hnp", "perl.org",
+            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
+        )
+        so_src = os.path.join(site_arch_src, "auto", "Params", "Validate", "XS", "XS.so")
+        lib_dst = os.path.join(self.package_folder, "lib")
+        os.makedirs(lib_dst, exist_ok=True)
+        if os.path.isfile(so_src):
+            shutil.copy2(so_src, os.path.join(lib_dst, "XS.so"))
 
     def package_info(self):
-        # This is a Perl module, not a C library.
-        pass
+        # Perl XS module — provides XS.so (shared library) + Perl .pm files
+        # Pure Perl fallback available via Module::Implementation auto-fallback
+        self.cpp_info.libs = ["XS"]
+        self.cpp_info.libdirs = ["lib"]
 
     def _find_musl_paths(self):
         """Detect musl C library header and library paths.
