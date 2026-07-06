@@ -1,0 +1,92 @@
+software: perl-crypt-openssl-verifyx509
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.21-r5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.21-r5"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-06"
+
+# Conan 引用
+conan_ref: "perl-crypt-openssl-verifyx509/0.21-r5@ohpcd/stable"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/T/TI/TIMLEGGE/Crypt-OpenSSL-VerifyX509-0.21.tar.gz"
+
+  # 源码校验和
+  sha256: "622d043ffb4724ca71f3c4c66b78ac52ebf4da969dc93f84f2c579fd24365c1f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options:
+    - "perl Makefile.PL INSTALL_BASE=/"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "perl-crypt-openssl-x509/2.0.1-r1@ohpcd/stable"
+    - "openssl/3.5.6 (system)"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-Makefile.PL.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Perl XS 模块需要 OPENSSL_PREFIX 环境变量指向 OpenSSL 安装路径"
+  - "INSTALL_BASE=/ 确保包布局为 lib/perl5/ (而非 data/service/hnp/)"
+  - "HMDFS SELinux (E073) 阻止 dlopen 用户目录 .so — 平台限制非编译问题"
+  - "Conan 依赖 perl-crypt-openssl-x509 需声明为 @ohpcd/stable (R27)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/perl-crypt-openssl-verifyx509-0.21-r5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/perl-crypt-openssl-verifyx509-0.21-r5.work
+  source_orig_hash: b35b56eeff23f42f
+  source_work_hash: e3846fde8ee4b35f
+  generated_at: '2026-07-06T15:29:10'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Makefile.PL.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

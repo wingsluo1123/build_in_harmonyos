@@ -1,0 +1,28 @@
+diff -ruN a/Makefile.PL b/Makefile.PL
+--- a/Makefile.PL
++++ b/Makefile.PL
+@@ -8,20 +8,24 @@
+ use 5.008;
+ use ExtUtils::MakeMaker;
+ 
+ use Config;
+ use File::Spec;
+ 
+ my %args;
+ 
+ if ($^O ne 'MSWin32' and my $prefix = `brew --prefix --installed openssl\@1.1 2>@{[File::Spec->devnull]}`) {
+   chomp $prefix;
++  $args{INC} = "-I$prefix/include";
++  $args{LIBS} = ["-L$prefix/lib -lcrypto -lssl"];
++} elsif ($ENV{OPENSSL_PREFIX}) {
++  my $prefix = $ENV{OPENSSL_PREFIX};
+   $args{INC} = "-I$prefix/include";
+   $args{LIBS} = ["-L$prefix/lib -lcrypto -lssl"];
+ } else {
+   $args{INC} = '-I/usr/local/opt/openssl/include -I/usr/local/include/openssl -I/usr/include/openssl -I/usr/local/include/ssl -I/usr/local/ssl/include';
+   $args{LIBS} = ['-L/usr/local/opt/openssl/lib -L/usr/local/lib -L/usr/lib -L/usr/local/ssl/lib -lcrypto -lssl'];
+ }
+ 
+ if ($^O eq 'MSWin32') {
+   if (my $libs = `pkg-config --libs libcrypto 2>nul`) {
+     # strawberry perl has pkg-config
