@@ -68,6 +68,9 @@ class OuchConan(ConanFile):
             os.environ["SSL_CERT_FILE"] = cert_pem
             os.environ["REQUESTS_CA_BUNDLE"] = cert_pem
 
+        # Show progress so CI doesn't timeout on no-output
+        os.environ["CARGO_TERM_PROGRESS_WHEN"] = "always"
+        os.environ["CARGO_TERM_PROGRESS_PLAIN"] = "true"
         self.run("cargo build --release", cwd=self.source_folder)
 
     def package(self):
@@ -90,9 +93,6 @@ class OuchConan(ConanFile):
         The correct approach is harmonybrew, which provides OHOS-compiled Rust
         (aarch64-unknown-linux-ohos target, musl-linked).
         """
-        if shutil.which("cargo"):
-            return
-
         home = os.path.expanduser("~")
         cert_pem = os.path.join(home, "usr", "local", "ssl", "cert.pem")
         if os.path.exists(cert_pem):
@@ -101,6 +101,12 @@ class OuchConan(ConanFile):
 
         def _add_path(p):
             os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
+
+        # Always ensure crates.io mirror is configured (fast downloads in China)
+        self._setup_cargo_mirror(home)
+
+        if shutil.which("cargo"):
+            return
 
         # 1. Check existing harmonybrew cargo
         harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
@@ -147,6 +153,29 @@ class OuchConan(ConanFile):
             return
 
         raise Exception("Rust installation failed — cargo still not found after brew install rust")
+
+    def _setup_cargo_mirror(self, home):
+        """Configure crates.io mirror for fast downloads in China."""
+        cargo_dir = os.path.join(home, ".cargo")
+        config_path = os.path.join(cargo_dir, "config.toml")
+        if os.path.isfile(config_path):
+            return  # already configured
+        os.makedirs(cargo_dir, exist_ok=True)
+        with open(config_path, "w") as f:
+            f.write(
+                '[source.crates-io]\n'
+                'replace-with = "ustc"\n'
+                '\n'
+                '[source.ustc]\n'
+                'registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"\n'
+                '\n'
+                '[net]\n'
+                'git-fetch-with-cli = true\n'
+                '\n'
+                '[http]\n'
+                'multiplexing = false\n'
+            )
+        self.output.info("Configured USTC crates.io mirror")
 
     def _find_ohos_lib_dir(self):
         """Find the OHOS SDK C++ library directory."""
