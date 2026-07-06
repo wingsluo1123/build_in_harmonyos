@@ -70,6 +70,7 @@ class OuchConan(ConanFile):
 
         # Show progress so CI doesn't timeout on no-output
         os.environ["CARGO_TERM_PROGRESS_WHEN"] = "always"
+        os.environ["CARGO_TERM_PROGRESS_WIDTH"] = "80"
         os.environ["CARGO_TERM_PROGRESS_PLAIN"] = "true"
         self.run("cargo build --release", cwd=self.source_folder)
 
