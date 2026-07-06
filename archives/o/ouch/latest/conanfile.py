@@ -159,43 +159,61 @@ class OuchConan(ConanFile):
         raise Exception("Rust installation failed — cargo still not found after brew install rust")
 
     def _ensure_cc(self, ohos_sdk_lib=None):
-        """Ensure a C compiler/linker is available (Rust build scripts need `cc`).
+        """Ensure a C compiler/linker (`cc`) is available for Rust build scripts.
 
-        On OHOS, the OHOS SDK's LLVM clang serves as the linker. If neither
-        `cc` nor `clang` is in PATH, try to infer from the OHOS SDK lib dir.
+        `rustc` itself looks for `cc` in PATH (not the `CC` env var) when
+        linking build script binaries. We either find an existing `cc`/`clang`,
+        or create a `cc` symlink → clang in a dedicated bindir.
         """
-        if shutil.which("cc") or shutil.which("clang"):
+        if shutil.which("cc"):
             return  # already available
 
-        # Try to find clang alongside the OHOS SDK lib directory
-        if ohos_sdk_lib:
+        clang_path = None
+
+        # 1. Check PATH for clang
+        clang_in_path = shutil.which("clang")
+        if clang_in_path:
+            clang_path = clang_in_path
+
+        # 2. Try OHOS SDK lib dir → ../bin/clang
+        if not clang_path and ohos_sdk_lib:
             llvm_bin = os.path.normpath(os.path.join(ohos_sdk_lib, "..", "..", "bin"))
             candidate = os.path.join(llvm_bin, "clang")
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                os.environ["CC"] = candidate
-                os.environ["CXX"] = candidate
-                self.output.info(f"Using OHOS SDK clang: {candidate}")
-                return
+                clang_path = candidate
 
-        # Fallback: try harmonybrew llvm
-        home = os.path.expanduser("~")
-        brew_clang = os.path.join(home, ".harmonybrew", "bin", "clang")
-        if os.path.isfile(brew_clang) and os.access(brew_clang, os.X_OK):
-            os.environ["CC"] = brew_clang
-            os.environ["CXX"] = brew_clang
-            self.output.info(f"Using harmonybrew clang: {brew_clang}")
-            return
+        # 3. Try harmonybrew bin
+        if not clang_path:
+            home = os.path.expanduser("~")
+            candidate = os.path.join(home, ".harmonybrew", "bin", "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                clang_path = candidate
 
-        # Last resort: install llvm via harmonybrew
-        if shutil.which("brew"):
+        # 4. Last resort: install llvm via harmonybrew
+        if not clang_path and shutil.which("brew"):
             self.output.info("Installing llvm via harmonybrew for C compiler...")
             self.run("brew install llvm")
-            brew_llvm_bin = os.path.join(home, ".harmonybrew", "opt", "llvm", "bin")
-            brew_clang = os.path.join(brew_llvm_bin, "clang")
-            if os.path.isfile(brew_clang):
-                os.environ["CC"] = brew_clang
-                os.environ["CXX"] = brew_clang
-                self.output.info(f"CC set to: {brew_clang}")
+            home = os.path.expanduser("~")
+            candidate = os.path.join(home, ".harmonybrew", "opt", "llvm", "bin", "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                clang_path = candidate
+
+        if clang_path:
+            # Set CC/CXX for the `cc` crate used by Rust build scripts
+            os.environ["CC"] = clang_path
+            os.environ["CXX"] = clang_path.replace("clang", "clang++")
+            self.output.info(f"CC={clang_path}")
+
+            # Create a `cc` symlink → clang so `rustc` can find the linker in PATH
+            cc_bindir = os.path.join(self.source_folder, "._cc_bin")
+            os.makedirs(cc_bindir, exist_ok=True)
+            cc_link = os.path.join(cc_bindir, "cc")
+            if not os.path.exists(cc_link):
+                os.symlink(clang_path, cc_link)
+            os.environ["PATH"] = cc_bindir + os.pathsep + os.environ.get("PATH", "")
+            self.output.info(f"Created cc symlink → {clang_path} in {cc_bindir}")
+        else:
+            self.output.warning("No C compiler found; build may fail if crates need cc")
 
     def _setup_cargo_mirror(self, home):
         """Configure crates.io mirror for fast downloads in China."""
