@@ -127,12 +127,10 @@ class OuchConan(ConanFile):
                 harmonybrew_repo = os.path.join(home, ".harmonybrew", "Homebrew")
                 if not os.path.isdir(harmonybrew_repo):
                     # SSL workaround for git clone on OHOS
-                    git_env = os.environ.copy()
                     if os.path.exists(cert_pem):
-                        git_env["GIT_SSL_CAINFO"] = cert_pem
+                        os.environ["GIT_SSL_CAINFO"] = cert_pem
                     self.run(
-                        f'git clone --depth=1 https://atomgit.com/Harmonybrew/brew.git {harmonybrew_repo}',
-                        env=git_env,
+                        f'git clone --depth=1 https://atomgit.com/Harmonybrew/brew.git {harmonybrew_repo}'
                     )
                 os.makedirs(harmonybrew_bin, exist_ok=True)
                 self.run(f'ln -sf {harmonybrew_repo}/bin/brew {brew_bin}')
