@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml — vacuum 0.29.9
+# 官方测试: Go 标准 go test (go test ./...)
+
+package: vacuum/0.29.9
+homepage: "https://github.com/daveshanley/vacuum"
+
+# 上游测试命令
+upstream_check_command: "go test ./..."
+
+# conanfile.py build() 中未集成上游测试（二进制构建，不跑单元测试）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游 Go 测试
+upstream_tests:
+  - file: "cmd/*_test.go"
+    source: vacuum-0.29.9/cmd/
+    description: "Command-line integration tests"
+    command: "go test ./cmd/... -tags html_report_ui -coverprofile=coverage.out"
+  - file: "functions/*_test.go"
+    source: vacuum-0.29.9/functions/
+    description: "Rule functions tests"
+    command: "go test ./functions/..."
+
+# test_package 中的消费者测试
+test_package_tests:
+  - file: "test_package/conanfile.py"
+    description: "CLI smoke test: version + --help"
+    command: "vacuum version && vacuum --help"
+
+# 测试断言数
+assertion_count: 3

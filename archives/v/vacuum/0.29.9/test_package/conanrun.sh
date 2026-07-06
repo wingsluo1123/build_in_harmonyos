@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/runner002/build_in_harmonyos/archives/v/vacuum/0.29.9/test_package/conanrunenv-release-armv8.sh"
