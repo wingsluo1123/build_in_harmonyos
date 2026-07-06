@@ -52,13 +52,10 @@ class OuchConan(ConanFile):
         apply_conandata_patches(self)
         # Ensure Rust toolchain is available (CI may not have cargo pre-installed)
         self._ensure_cargo()
-        # Set up environment for cargo build on OHOS
-        ohos_sdk_lib = self._find_ohos_lib_dir()
+        # Ensure C compiler/linker is available; also discovers OHOS SDK lib dir
+        ohos_sdk_lib = self._ensure_cc()
         if ohos_sdk_lib:
             self._setup_libstdcxx(ohos_sdk_lib)
-
-        # Ensure C compiler/linker is available (Rust build scripts need `cc`)
-        self._ensure_cc(ohos_sdk_lib)
 
         rustflags = []
         if ohos_sdk_lib:
@@ -158,29 +155,38 @@ class OuchConan(ConanFile):
 
         raise Exception("Rust installation failed — cargo still not found after brew install rust")
 
-    def _ensure_cc(self, ohos_sdk_lib=None):
+    def _ensure_cc(self):
         """Ensure a C compiler/linker (`cc`) is available for Rust build scripts.
 
         `rustc` itself looks for `cc` in PATH (not the `CC` env var) when
         linking build script binaries. We either find an existing `cc`/`clang`,
         or create a `cc` symlink → clang in a dedicated bindir.
+
+        Returns:
+            str or None: The OHOS SDK lib directory (parent of libstdc++.so
+            workaround) if found, else None.
         """
         if shutil.which("cc"):
-            return  # already available
+            # cc already in PATH — still try to discover OHOS SDK lib dir
+            return self._find_ohos_lib_dir()
 
         clang_path = None
+        ohos_sdk_lib_dir = None
 
         # 1. Check PATH for clang
         clang_in_path = shutil.which("clang")
         if clang_in_path:
             clang_path = clang_in_path
 
-        # 2. Try OHOS SDK lib dir → ../bin/clang
-        if not clang_path and ohos_sdk_lib:
-            llvm_bin = os.path.normpath(os.path.join(ohos_sdk_lib, "..", "..", "bin"))
-            candidate = os.path.join(llvm_bin, "clang")
-            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                clang_path = candidate
+        # 2. Try OHOS SDK Cellar path (known layout)
+        if not clang_path:
+            home = os.path.expanduser("~")
+            import glob
+            for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
+                candidate = os.path.join(cellar, "bin", "clang")
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    clang_path = candidate
+                    break
 
         # 3. Try harmonybrew bin
         if not clang_path:
@@ -189,7 +195,16 @@ class OuchConan(ConanFile):
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 clang_path = candidate
 
-        # 4. Last resort: install llvm via harmonybrew
+        # 4. Fallback to _find_ohos_lib_dir (rustc sysroot method)
+        if not clang_path:
+            sdk_lib = self._find_ohos_lib_dir()
+            if sdk_lib:
+                llvm_bin = os.path.normpath(os.path.join(sdk_lib, "..", "..", "bin"))
+                candidate = os.path.join(llvm_bin, "clang")
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    clang_path = candidate
+
+        # 5. Last resort: install llvm via harmonybrew
         if not clang_path and shutil.which("brew"):
             self.output.info("Installing llvm via harmonybrew for C compiler...")
             self.run("brew install llvm")
@@ -199,6 +214,13 @@ class OuchConan(ConanFile):
                 clang_path = candidate
 
         if clang_path:
+            # Derive OHOS SDK lib dir from clang path:
+            #   .../llvm/bin/clang → .../llvm/lib/aarch64-linux-ohos
+            llvm_dir = os.path.dirname(os.path.dirname(clang_path))  # .../llvm
+            candidate_lib = os.path.join(llvm_dir, "lib", "aarch64-linux-ohos")
+            if os.path.isdir(candidate_lib):
+                ohos_sdk_lib_dir = candidate_lib
+
             # Set CC/CXX for the `cc` crate used by Rust build scripts
             os.environ["CC"] = clang_path
             os.environ["CXX"] = clang_path.replace("clang", "clang++")
@@ -212,8 +234,15 @@ class OuchConan(ConanFile):
                 os.symlink(clang_path, cc_link)
             os.environ["PATH"] = cc_bindir + os.pathsep + os.environ.get("PATH", "")
             self.output.info(f"Created cc symlink → {clang_path} in {cc_bindir}")
+
+            if ohos_sdk_lib_dir:
+                self.output.info(f"OHOS SDK lib dir: {ohos_sdk_lib_dir}")
+            else:
+                self.output.warning("No OHOS SDK lib dir found alongside clang")
         else:
             self.output.warning("No C compiler found; build may fail if crates need cc")
+
+        return ohos_sdk_lib_dir
 
     def _setup_cargo_mirror(self, home):
         """Configure crates.io mirror for fast downloads in China."""
