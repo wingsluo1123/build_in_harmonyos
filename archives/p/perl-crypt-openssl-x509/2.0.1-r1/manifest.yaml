@@ -1,0 +1,80 @@
+software: perl-crypt-openssl-x509
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/2.0.1-r1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.0.1-r1"
+status: published
+build_date: "2026-07-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://cpan.metacpan.org/authors/id/J/JO/JONASBN/Crypt-OpenSSL-X509-2.0.1.tar.gz"
+  sha256: "3344824f839ea10e941a10a72c2e55f917cfef049914576540dc954d143b3fa6"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options:
+    - "perl Makefile.PL"
+  dependencies:
+    - "openssl/3.5.6 (system pre-installed)"
+    - "perl-crypt-openssl-guess/0.15 (CPAN)"
+    - "perl-convert-asn1/0.34 (CPAN)"
+    - "perl-test-pod/1.52 (CPAN)"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Perl ExtUtils::MakeMaker 模块在 OHOS 上构建需设置 PERL5LIB 指向用户安装的依赖模块路径 (E155)"
+  - "Crypt::OpenSSL::Guess 模块的 find_openssl_prefix() 需设置 OPENSSL_PREFIX 环境变量指向 OpenSSL 安装路径"
+  - "HMDFS SELinux 限制 (E073): 用户目录 .so 文件上下文为 u:object_r:hmdfs:s0，dlopen 被拒绝；系统目录 u:object_r:hnp_file:s0 可正常加载"
+  - "Conan 2.x self.run() 的 env 参数应为列表格式 ['KEY=VALUE']，不接受字典；建议直接设置 os.environ"
+  - "Perl Makefile.PL 的 INSTALL_BASE 应在 configure 阶段传递，非 make install 阶段"
+  - "OHOS dlsym(RTLD_DEFAULT) 不搜索 LD_PRELOAD 加载的库，与 Linux glibc 行为不同"
+  - "/dev/shm 的 dev_shm SELinux 上下文同样禁止 dlopen，仅 hnp_file 和 ext_cmd_lib 上下文允许"
+  - "用户 Perl 实际是符号链接到 /data/service/hnp/bin/perl（系统目录），所以可执行"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  date: "2026-07-06"
+  total_files: 9
+  passed: 2
+  skipped: 3
+  failed: 4
+  failed_subtests: 94
+  failure_reason: "E073: HMDFS SELinux dlopen Permission denied (平台限制)"
+  passed_tests:
+    - "t/00-version.t (OpenSSL 版本检测)"
+    - "t/pod.t (POD 文档验证)"
+  static_analysis:
+    elf_type: "ELF shared object, 64-bit LSB arm64"
+    file_size: 170496
+    sha256: "1cd882329a8121200dc61776ce6742edb710002de00a5135d93cf052926de3a0"
+    dependencies: ["libssl.so.3", "libcrypto.so.3", "libc.so"]
+    security_features: ["GNU_RELRO", "GNU_STACK(NX)"]
+    boot_symbol_exported: true
