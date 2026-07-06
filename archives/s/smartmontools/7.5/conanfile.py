@@ -44,6 +44,8 @@ class SmartmontoolsConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        # ── 上游官方测试 (必做) ──
+        autotools.make(target="check")
 
     def package(self):
         autotools = Autotools(self)
