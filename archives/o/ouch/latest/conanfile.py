@@ -57,6 +57,9 @@ class OuchConan(ConanFile):
         if ohos_sdk_lib:
             self._setup_libstdcxx(ohos_sdk_lib)
 
+        # Ensure C compiler/linker is available (Rust build scripts need `cc`)
+        self._ensure_cc(ohos_sdk_lib)
+
         rustflags = []
         if ohos_sdk_lib:
             rustflags.append(f"-L {ohos_sdk_lib}")
@@ -154,6 +157,45 @@ class OuchConan(ConanFile):
             return
 
         raise Exception("Rust installation failed — cargo still not found after brew install rust")
+
+    def _ensure_cc(self, ohos_sdk_lib=None):
+        """Ensure a C compiler/linker is available (Rust build scripts need `cc`).
+
+        On OHOS, the OHOS SDK's LLVM clang serves as the linker. If neither
+        `cc` nor `clang` is in PATH, try to infer from the OHOS SDK lib dir.
+        """
+        if shutil.which("cc") or shutil.which("clang"):
+            return  # already available
+
+        # Try to find clang alongside the OHOS SDK lib directory
+        if ohos_sdk_lib:
+            llvm_bin = os.path.normpath(os.path.join(ohos_sdk_lib, "..", "..", "bin"))
+            candidate = os.path.join(llvm_bin, "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                os.environ["CC"] = candidate
+                os.environ["CXX"] = candidate
+                self.output.info(f"Using OHOS SDK clang: {candidate}")
+                return
+
+        # Fallback: try harmonybrew llvm
+        home = os.path.expanduser("~")
+        brew_clang = os.path.join(home, ".harmonybrew", "bin", "clang")
+        if os.path.isfile(brew_clang) and os.access(brew_clang, os.X_OK):
+            os.environ["CC"] = brew_clang
+            os.environ["CXX"] = brew_clang
+            self.output.info(f"Using harmonybrew clang: {brew_clang}")
+            return
+
+        # Last resort: install llvm via harmonybrew
+        if shutil.which("brew"):
+            self.output.info("Installing llvm via harmonybrew for C compiler...")
+            self.run("brew install llvm")
+            brew_llvm_bin = os.path.join(home, ".harmonybrew", "opt", "llvm", "bin")
+            brew_clang = os.path.join(brew_llvm_bin, "clang")
+            if os.path.isfile(brew_clang):
+                os.environ["CC"] = brew_clang
+                os.environ["CXX"] = brew_clang
+                self.output.info(f"CC set to: {brew_clang}")
 
     def _setup_cargo_mirror(self, home):
         """Configure crates.io mirror for fast downloads in China."""
