@@ -1,0 +1,21 @@
+diff -ruN a/t/data/XSQuux/Makefile.PL b/t/data/XSQuux/Makefile.PL
+--- a/t/data/XSQuux/Makefile.PL
++++ b/t/data/XSQuux/Makefile.PL
+@@ -9,12 +9,17 @@
+ 
+ WriteMakefile(
+     NAME              => 'XSQuux',
+     VERSION           => '0.01',
+     PREREQ_PM         => {},
+     ABSTRACT          => 'simple XS module',
+     AUTHOR            => 'roderich <roderich@>',
+     FUNCLIST          => [qw( triple )],
+     DL_FUNCS          => { XSQuux => [] },
+     $pkg->get_makefile_vars(),
++    # OHOS: override to strip -fstack-protector-strong and add CRT workaround
++    LDDLFLAGS         => '--sysroot=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot -shared -nostartfiles -nodefaultlibs -lc',
++    CCFLAGS           => '--sysroot=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot -fPIC -O2 -Doff64_t=off_t',
++    LDFLAGS           => '--sysroot=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot',
++    dynamic_lib       => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -lc' },
+     clean             => { FILES => "Files.pm" },       # must come after get_makefile_vars
+ );

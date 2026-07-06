@@ -1,0 +1,82 @@
+diff -ruN a/myldr/Makefile.PL b/myldr/Makefile.PL
+--- a/myldr/Makefile.PL
++++ b/myldr/Makefile.PL
+@@ -56,27 +56,46 @@
+ 
+ my $debug = $ENV{DEBUG};
+ my $chunk_size = 32768;
+ my $exe = $Config{_exe};
+ my $link_exe = (($^O eq 'os2' and $Config{ldflags} =~ /-Zexe/) ? '' : $exe);
+ my $o = $Config{obj_ext};
+ my $gccversion = $Config{gccversion};
+ # NOTE: on some platforms, ccopts or ldopts may contain newlines
+ chomp( my $pccflags = ccopts() );
+ chomp( my $pldflags = ldopts() );
++
++# OHOS: strip -fstack-protector-strong from linker flags (ld.lld doesn't support it)
++$pccflags =~ s/-fstack-protector-strong\s*//g;
++$pldflags =~ s/-fstack-protector-strong\s*//g;
+ my $dynperl = $Config{useshrplib} && ($Config{useshrplib} ne 'false');
+ 
+ $dynperl = 1 if $pldflags =~ /\B-lperl\b/; # Gentoo lies to us!
+ 
+-my $cc = $Config{cc};
++# OHOS: ldd is not available, create a wrapper using readelf
++if ($^O =~ /linux/i && !-x "/usr/bin/ldd" && !-x "/bin/ldd") {
++    my $ldd_script = "$ENV{TMPDIR}/ldd";
++    open my $fh, '>', $ldd_script or die "Cannot create ldd wrapper: $!";
++    print $fh "#!/system/bin/sh\n";
++    print $fh 'readelf -d "$1" 2>/dev/null | grep NEEDED | while read line; do lib=$(echo "$line" | sed "s/.*\[\(.*\)\].*/\1/"); found=""; for dir in /system/lib64 /system/lib /lib64 /lib; do [ -f "$dir/$lib" ] && found="$dir/$lib" && break; done; [ -n "$found" ] && printf "\t%s => %s\n" "$lib" "$found" || printf "\t%s => not found\n" "$lib"; done', "\n";
++    close $fh;
++    chmod 0755, $ldd_script;
++    $ENV{PATH} = "$ENV{TMPDIR}:" . $ENV{PATH};
++}
++
++# OHOS: use sysroot for system headers and CRT files
++my $ohos_sysroot = '/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot';
++my $ohos_crt_dir = "$ohos_sysroot/usr/lib/aarch64-linux-ohos";
++my $cc = $Config{cc} . " --sysroot=$ohos_sysroot";
+ my $ld = $Config{ld} || (($^O eq 'MSWin32') ? 'link.exe' : $Config{cc});
+-$ld = $Config{cc} if ($^O =~ /^(?:dec_osf|aix|hpux)$/);
++$ld .= " --sysroot=$ohos_sysroot";
++$ld = $Config{cc} . " --sysroot=$ohos_sysroot" if ($^O =~ /^(?:dec_osf|aix|hpux)$/);
+ 
+ my $par_pl = catfile('..', 'script', "par.pl");
+ my $par_exe = catfile('.', "par$exe");
+ my $par_exe_link = catfile('.', "par$link_exe");
+ my $boot_exe = catfile('.', "boot$exe");
+ my $boot_exe_link = catfile('.', "boot$link_exe");
+ my $parl_exe = "parl$exe";
+ my $parldyn_exe = "parldyn$exe";
+ 
+ my( $out, $ccdebug, $lddebug, $warn, $rm, $mv, $mt_cmd );
+@@ -130,23 +149,27 @@
+     $warn = '';
+     $mt_cmd = '-$(NOOP)';
+ }
+ 
+ 
+ my $perl58lib = "";
+ if($ENV{ACTIVEPERL_MINGW} and $Config{cf_email}=~/ActiveState.com/i){
+     $perl58lib = "-l$Config{libperl}";
+     $perl58lib =~ s/\.lib$//;
+ }
+-my $cflags = "$ccdebug$warn$pccflags";
++my $cflags = "$ccdebug$warn$pccflags -Doff64_t=off_t";
+ my $optimize = $Config{optimize};
+-my $ldflags = "$lddebug$pldflags $perl58lib";
++# OHOS: add CRT files and -nostartfiles -nodefaultlibs -lc to avoid libunwind and CRT issues
++# Also add compiler-rt builtins for soft-float functions (__extenddftf2, __addtf3, etc.)
++my $ohos_crt = "$ohos_crt_dir/crti.o $ohos_crt_dir/crt1.o $ohos_crt_dir/crtn.o";
++my $ohos_compiler_rt = "/storage/Users/currentUser/usr/local/lib/clang/18/lib/aarch64-linux-ohos/libclang_rt.builtins.a";
++my $ldflags = "$lddebug -nostartfiles -nodefaultlibs $ohos_crt $pldflags -L$ohos_crt_dir $ohos_compiler_rt -lc $perl58lib";
+ my $static_ldflags = $ldflags;
+ 
+ my $libperl;
+ 
+ if ($dynperl) {
+     if ($^O eq 'os2') {
+         $libperl = OS2::DLLname();
+     }
+     else {
+         my $file = $Config{libperl};
