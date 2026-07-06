@@ -83,18 +83,32 @@ class RoverConan(ConanFile):
                 else:
                     raise
 
-    def _find_cargo(self):
-        """Find cargo binary: PATH → harmonybrew → error."""
+    def _find_or_install_cargo(self):
+        """Find cargo binary, install Rust if not found."""
         cargo = shutil.which("cargo")
         if cargo:
             return cargo
         brew_cargo = os.path.expanduser("~/.harmonybrew/bin/cargo")
         if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
             return brew_cargo
-        raise ConanInvalidConfiguration(
-            "cargo not found. Install Rust toolchain: "
-            "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust"
-        )
+        self.output.info("cargo not found, installing Rust via cmd-pkgs...")
+        import subprocess
+        try:
+            subprocess.run(
+                ["bash", "-c",
+                 "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust"],
+                check=True, timeout=600
+            )
+        except Exception as e:
+            raise ConanInvalidConfiguration(
+                f"cargo not found and Rust installation failed: {e}")
+        cargo = shutil.which("cargo")
+        if cargo:
+            return cargo
+        brew_cargo = os.path.expanduser("~/.harmonybrew/bin/cargo")
+        if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
+            return brew_cargo
+        raise ConanInvalidConfiguration("cargo not found after Rust installation")
 
     def _find_ohos_lib_dir(self):
         """Find the OHOS SDK C++ library directory (E212 fix)."""
@@ -122,7 +136,7 @@ class RoverConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        cargo = self._find_cargo()
+        cargo = self._find_or_install_cargo()
 
         # E002: OHOS /tmp is read-only, use $HOME/tmp
         tmpdir = os.path.expanduser("~/tmp")
@@ -130,6 +144,52 @@ class RoverConan(ConanFile):
 
         # E212: Rust linker defaults to -lstdc++ but OHOS only has libc++
         ohos_sdk_lib = self._find_ohos_lib_dir()
+        if ohos_sdk_lib:
+            self._setup_libstdcxx(ohos_sdk_lib)
+
+        # Set environment variables for cargo build
+        old_env = {}
+        env_vars = {
+            "CARGO_HOME": os.path.join(self.build_folder, ".cargo-home"),
+            "CARGO_NET_GIT_FETCH_WITH_CLI": "true",
+            "TMPDIR": tmpdir,
+            "TEMP": tmpdir,
+            "TMP": tmpdir,
+        }
+        # RUSTFLAGS with OHOS lib dir for linker
+        rustflags = ["-C", "link-arg=-Wl,--gc-sections"]
+        if ohos_sdk_lib:
+            rustflags.append(f"-L {ohos_sdk_lib}")
+            rustflags.append(f"-C link-arg=-L{ohos_sdk_lib}")
+        env_vars["RUSTFLAGS"] = " ".join(rustflags)
+
+        for k, v in env_vars.items():
+            old_env[k] = os.environ.get(k)
+            os.environ[k] = v
+
+        try:
+            self.run(f'"{cargo}" build --release -j2', cwd=self.source_folder)
+        finally:
+            for k, v in old_env.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def package(self):
+        bin_dir = os.path.join(self.source_folder, "target", "release")
+        copy(
+            self,
+            "rover",
+            src=bin_dir,
+            dst=os.path.join(self.package_folder, "bin"),
+        )
+
+    def package_info(self):
+        self.cpp_info.libs = []
+        self.cpp_info.builddirs = []
+        self.cpp_info.bindirs = ["bin"]
+d_ohos_lib_dir()
         if ohos_sdk_lib:
             self._setup_libstdcxx(ohos_sdk_lib)
 
