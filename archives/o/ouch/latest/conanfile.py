@@ -190,6 +190,9 @@ class OuchConan(ConanFile):
                 f'--without=rust-docs --disable-ldconfig --verbose'
             )
 
+            # Ensure binaries are executable (OHOS may not preserve tarball perms)
+            self.run(f'chmod +x {installed_bin}/*')
+
         _add_path(installed_bin)
 
         if not shutil.which("cargo"):
