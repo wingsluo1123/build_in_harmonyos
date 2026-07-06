@@ -25,6 +25,6 @@ class DashTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Test dash binary directly — must not use echo/true in self.run (L1d fake test detection)
+        # Test dash binary directly — dash has no --version flag, use -c to run a command
         dash_bin = os.path.join(self.dependencies["dash"].package_folder, "bin", "dash")
-        self.run(f'"{dash_bin}" --version')
+        self.run(f'"{dash_bin}" -c "exit 0"')
