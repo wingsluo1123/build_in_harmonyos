@@ -83,10 +83,12 @@ class OuchConan(ConanFile):
         self.cpp_info.libs = []
 
     def _ensure_cargo(self):
-        """Detect or install Rust toolchain. CI may not have cargo pre-installed.
+        """Detect or install Rust toolchain via harmonybrew.
 
-        rustup doesn't support HarmonyOS (uname -s returns 'HarmonyOS'),
-        so we use harmonybrew or download a pre-built tarball instead.
+        CI may not have cargo pre-installed. rustup doesn't support HarmonyOS,
+        and pre-built gnu tarballs need /lib/ld-linux-aarch64.so.1 (absent on OHOS).
+        The correct approach is harmonybrew, which provides OHOS-compiled Rust
+        (aarch64-unknown-linux-ohos target, musl-linked).
         """
         if shutil.which("cargo"):
             return
@@ -100,103 +102,53 @@ class OuchConan(ConanFile):
         def _add_path(p):
             os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
 
-        # 1. Check harmonybrew installation
+        # 1. Check existing harmonybrew cargo
         harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
         harmonybrew_cargo = os.path.join(harmonybrew_bin, "cargo")
         if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
             _add_path(harmonybrew_bin)
             return
 
-        # 2. Check existing ~/.cargo/bin (rustup installed but not sourced)
+        # 2. Check existing ~/.cargo/bin
         cargo_bin_dir = os.path.join(home, ".cargo", "bin")
         cargo_bin = os.path.join(cargo_bin_dir, "cargo")
         if os.path.isfile(cargo_bin) and os.access(cargo_bin, os.X_OK):
             _add_path(cargo_bin_dir)
             return
 
-        # 3. Try harmonybrew install
-        if shutil.which("brew"):
-            self.output.info("Installing Rust via harmonybrew...")
-            self.run("brew install rust")
-            if shutil.which("cargo"):
-                return
-            if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+        # 3. Ensure harmonybrew is available
+        brew_bin = os.path.join(harmonybrew_bin, "brew")
+        if not shutil.which("brew"):
+            if os.path.isfile(brew_bin):
+                self.output.info("Found harmonybrew, adding to PATH")
                 _add_path(harmonybrew_bin)
-                return
+            else:
+                self.output.info("Installing harmonybrew...")
+                harmonybrew_repo = os.path.join(home, ".harmonybrew", "Homebrew")
+                if not os.path.isdir(harmonybrew_repo):
+                    # SSL workaround for git clone on OHOS
+                    git_env = os.environ.copy()
+                    if os.path.exists(cert_pem):
+                        git_env["GIT_SSL_CAINFO"] = cert_pem
+                    self.run(
+                        f'git clone --depth=1 https://atomgit.com/Harmonybrew/brew.git {harmonybrew_repo}',
+                        env=git_env,
+                    )
+                os.makedirs(harmonybrew_bin, exist_ok=True)
+                self.run(f'ln -sf {harmonybrew_repo}/bin/brew {brew_bin}')
+                _add_path(harmonybrew_bin)
 
-        # 4. Download pre-built Rust tarball (rustup doesn't support HarmonyOS)
-        import platform
-        import tarfile
-        import urllib.request
+        # 4. Install Rust via harmonybrew
+        self.output.info("Installing Rust via harmonybrew...")
+        self.run("brew install rust")
 
-        arch = platform.machine()  # aarch64 or x86_64
-        rust_version = "1.96.1"
-        rust_target = f"{arch}-unknown-linux-gnu"
-        tarball_name = f"rust-{rust_version}-{rust_target}.tar.gz"
-        tarball_url = f"https://static.rust-lang.org/dist/{tarball_name}"
-        install_dir = os.path.join(home, ".local", "rust")
-        installed_prefix = os.path.join(install_dir, "installed")
-        installed_bin = os.path.join(installed_prefix, "bin")
+        if shutil.which("cargo"):
+            return
+        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+            _add_path(harmonybrew_bin)
+            return
 
-        if not os.path.isfile(os.path.join(installed_bin, "cargo")):
-            self.output.info(f"Downloading pre-built Rust {rust_version} for {rust_target}...")
-            os.makedirs(install_dir, exist_ok=True)
-            tmp_tarball = os.path.join(install_dir, tarball_name)
-
-            # Try mirrors first (faster in CN), fallback to official
-            mirror_urls = [
-                f"https://mirrors.ustc.edu.cn/rust-static/dist/{tarball_name}",
-                tarball_url,
-            ]
-
-            downloaded = False
-            for url in mirror_urls:
-                self.output.info(f"Trying: {url}")
-                try:
-                    if shutil.which("curl"):
-                        self.run(f'curl -SfL --progress-bar -o {tmp_tarball} {url}')
-                    elif shutil.which("wget"):
-                        self.run(f'wget --progress=bar:force -O {tmp_tarball} {url}')
-                    else:
-                        import ssl
-                        ctx = ssl.create_default_context()
-                        if os.path.exists(cert_pem):
-                            ctx.load_verify_locations(cert_pem)
-                        with urllib.request.urlopen(url, context=ctx) as resp, \
-                             open(tmp_tarball, "wb") as f:
-                            f.write(resp.read())
-                    downloaded = True
-                    break
-                except Exception as e:
-                    self.output.warn(f"Download failed from {url}: {e}")
-                    continue
-
-            if not downloaded:
-                raise Exception("Rust tarball download failed from all mirrors")
-
-            # Extract tarball
-            with tarfile.open(tmp_tarball, "r:gz") as tar:
-                tar.extractall(path=install_dir)
-            os.remove(tmp_tarball)
-
-            # Run install.sh to properly install (sets up bin/ + lib/rustlib/)
-            extracted_dir = os.path.join(install_dir, f"rust-{rust_version}-{rust_target}")
-            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-            if not os.path.isfile(bash):
-                bash = "bash"
-            self.run(
-                f'{bash} {extracted_dir}/install.sh '
-                f'--prefix={installed_prefix} '
-                f'--without=rust-docs --disable-ldconfig --verbose'
-            )
-
-            # Ensure binaries are executable (OHOS may not preserve tarball perms)
-            self.run(f'chmod +x {installed_bin}/*')
-
-        _add_path(installed_bin)
-
-        if not shutil.which("cargo"):
-            raise Exception("Rust installation failed — cargo still not found")
+        raise Exception("Rust installation failed — cargo still not found after brew install rust")
 
     def _find_ohos_lib_dir(self):
         """Find the OHOS SDK C++ library directory."""
