@@ -8,6 +8,8 @@ Build system: Cargo (cargo build --release)
 Platform: OHOS (aarch64-unknown-linux-ohos)
 """
 import os
+import shutil
+import subprocess
 from pathlib import Path
 
 from conan import ConanFile
@@ -48,6 +50,8 @@ class OuchConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Ensure Rust toolchain is available (CI may not have cargo pre-installed)
+        self._ensure_cargo()
         # Set up environment for cargo build on OHOS
         ohos_sdk_lib = self._find_ohos_lib_dir()
         if ohos_sdk_lib:
@@ -77,6 +81,54 @@ class OuchConan(ConanFile):
         # ouch is a standalone CLI binary; make bin/ available in PATH
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libs = []
+
+    def _ensure_cargo(self):
+        """Detect or install Rust toolchain. CI may not have cargo pre-installed."""
+        if shutil.which("cargo"):
+            return
+
+        home = os.path.expanduser("~")
+
+        # Check harmonybrew installation
+        harmonybrew_cargo = os.path.join(home, ".harmonybrew", "bin", "cargo")
+        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+            os.environ["PATH"] = os.path.join(home, ".harmonybrew", "bin") + os.pathsep + os.environ.get("PATH", "")
+            return
+
+        # Check existing rustup installation (installed but not sourced)
+        cargo_bin = os.path.join(home, ".cargo", "bin", "cargo")
+        if os.path.isfile(cargo_bin) and os.access(cargo_bin, os.X_OK):
+            os.environ["PATH"] = os.path.join(home, ".cargo", "bin") + os.pathsep + os.environ.get("PATH", "")
+            return
+
+        # Install via rustup — use sh (not zsh) to avoid shell dependency issues
+        cert_pem = os.path.join(home, "usr", "local", "ssl", "cert.pem")
+        if os.path.exists(cert_pem):
+            os.environ["SSL_CERT_FILE"] = cert_pem
+            os.environ["REQUESTS_CA_BUNDLE"] = cert_pem
+
+        rustup_url = "https://sh.rustup.rs"
+        if shutil.which("curl"):
+            self.run(f'curl --proto "=https" --tlsv1.2 -sSf {rustup_url} | sh -s -- -y --default-toolchain stable')
+        elif shutil.which("wget"):
+            self.run(f'wget -qO- {rustup_url} | sh -s -- -y --default-toolchain stable')
+        else:
+            # Fallback: Python urllib
+            import urllib.request
+            import ssl
+            ctx = ssl.create_default_context()
+            if os.path.exists(cert_pem):
+                ctx.load_verify_locations(cert_pem)
+            tmp_script = "/tmp/rustup-init.sh"
+            urllib.request.urlretrieve(rustup_url, tmp_script)
+            self.run(f"sh {tmp_script} -y --default-toolchain stable")
+            os.remove(tmp_script)
+
+        # Source the installed environment
+        os.environ["PATH"] = os.path.join(home, ".cargo", "bin") + os.pathsep + os.environ.get("PATH", "")
+
+        if not shutil.which("cargo"):
+            raise Exception("Rust installation failed — cargo still not found after rustup install")
 
     def _find_ohos_lib_dir(self):
         """Find the OHOS SDK C++ library directory."""
