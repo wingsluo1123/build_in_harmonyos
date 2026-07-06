@@ -143,18 +143,36 @@ class OuchConan(ConanFile):
             os.makedirs(install_dir, exist_ok=True)
             tmp_tarball = os.path.join(install_dir, tarball_name)
 
-            if shutil.which("curl"):
-                self.run(f'curl -sSf -o {tmp_tarball} {tarball_url}')
-            elif shutil.which("wget"):
-                self.run(f'wget -q -O {tmp_tarball} {tarball_url}')
-            else:
-                import ssl
-                ctx = ssl.create_default_context()
-                if os.path.exists(cert_pem):
-                    ctx.load_verify_locations(cert_pem)
-                with urllib.request.urlopen(tarball_url, context=ctx) as resp, \
-                     open(tmp_tarball, "wb") as f:
-                    f.write(resp.read())
+            # Try mirrors first (faster in CN), fallback to official
+            mirror_urls = [
+                f"https://mirrors.ustc.edu.cn/rust-static/dist/{tarball_name}",
+                tarball_url,
+            ]
+
+            downloaded = False
+            for url in mirror_urls:
+                self.output.info(f"Trying: {url}")
+                try:
+                    if shutil.which("curl"):
+                        self.run(f'curl -SfL --progress-bar -o {tmp_tarball} {url}')
+                    elif shutil.which("wget"):
+                        self.run(f'wget --progress=bar:force -O {tmp_tarball} {url}')
+                    else:
+                        import ssl
+                        ctx = ssl.create_default_context()
+                        if os.path.exists(cert_pem):
+                            ctx.load_verify_locations(cert_pem)
+                        with urllib.request.urlopen(url, context=ctx) as resp, \
+                             open(tmp_tarball, "wb") as f:
+                            f.write(resp.read())
+                    downloaded = True
+                    break
+                except Exception as e:
+                    self.output.warn(f"Download failed from {url}: {e}")
+                    continue
+
+            if not downloaded:
+                raise Exception("Rust tarball download failed from all mirrors")
 
             with tarfile.open(tmp_tarball, "r:gz") as tar:
                 tar.extractall(path=install_dir)
