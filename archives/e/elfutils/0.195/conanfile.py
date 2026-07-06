@@ -42,7 +42,7 @@ class ElfutilsConan(ConanFile):
                 "--disable-silent-rules",
                 "--disable-libdebuginfod",
                 "--disable-debuginfod",
-                "--with-bzlib",
+                "--without-bzlib",
                 "--with-lzma",
                 "--with-zlib",
                 "--with-zstd",
@@ -152,7 +152,7 @@ class ElfutilsConan(ConanFile):
             "--disable-silent-rules",
             "--disable-libdebuginfod",
             "--disable-debuginfod",
-            "--with-bzlib",
+            "--without-bzlib",
             "--with-lzma",
             "--with-zlib",
             "--with-zstd",
@@ -189,4 +189,4 @@ class ElfutilsConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["elf", "dw", "asm"]
-        self.cpp_info.system_libs = ["z", "zstd", "lzma", "bz2", "argp", "obstack"]
+        self.cpp_info.system_libs = ["z", "zstd", "lzma", "argp", "obstack"]
