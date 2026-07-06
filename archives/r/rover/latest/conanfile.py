@@ -95,8 +95,8 @@ class RoverConan(ConanFile):
         import subprocess
         try:
             subprocess.run(
-                ["bash", "-c",
-                 "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust"],
+                ["zsh", "-c",
+                 "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | zsh -s -- rust"],
                 check=True, timeout=600
             )
         except Exception as e:
