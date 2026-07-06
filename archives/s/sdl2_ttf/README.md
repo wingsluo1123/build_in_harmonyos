@@ -1,56 +1,33 @@
 # SDL2_ttf
 
-SDL2_ttf is a TrueType font rendering library for SDL2.
-
-## Description
-
-SDL2_ttf is a library that provides a simple API for loading and rendering TrueType fonts with SDL2. It wraps the FreeType and HarfBuzz libraries to provide high-quality text rendering capabilities.
-
-## Features
-
-- TrueType font loading and rendering
-- Support for UTF-8 text
-- HarfBuzz integration for complex text shaping
-- High-quality glyph rendering
+SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applications.
 
 ## Dependencies
 
-- SDL2 (>= 2.0.10)
-- FreeType2
-- HarfBuzz
-- libpng
-- zlib
+- SDL2 2.30.0 (required)
+- FreeType (bundled)
+- HarfBuzz (bundled)
 
 ## Available Versions
 
-| Version | Status | Build Date |
-|---------|--------|------------|
-| 2.24.0 | built | 2026-05-27 |
+| Version | Status | Notes |
+|---------|--------|-------|
+| 2.22.0 | built | Uses bundled FreeType and HarfBuzz |
 
-## Usage
+## Installation
 
-```c
-#include <SDL2/SDL_ttf.h>
+```bash
+# Install SDL2 first
+curl -fsSL "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh" | sh -s -- SDL2 2.30.0
 
-// Initialize SDL_ttf
-TTF_Init();
-
-// Load a font
-TTF_Font* font = TTF_OpenFont("font.ttf", 24);
-
-// Render text
-SDL_Surface* surface = TTF_RenderText_Blended(font, "Hello World", color);
-
-// Clean up
-TTF_CloseFont(font);
-TTF_Quit();
+# Build SDL2_ttf
+cd ~/builds/SDL2_ttf-2.22.0.work
+./configure --prefix=$HOME/usr/local
+make -j4
+make install
 ```
 
-## License
+## Notes
 
-MIT License
-
-## Links
-
-- Official Website: https://wiki.libsdl.org/SDL_ttf
-- Source Code: https://github.com/libsdl-org/SDL_ttf
+- Uses bundled FreeType and HarfBuzz (no external dependency needed)
+- Requires config.guess/config.sub patches for HarmonyOS support

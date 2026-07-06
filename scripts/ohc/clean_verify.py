@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -63,13 +64,16 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
         return 1
     
     # Read configure_options from manifest
-    configure_cmd = "/bin/sh ./configure"
+    # Use CONFIG_SHELL if available (OHOS has no /bin/sh)
+    config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+    configure_cmd = f"{config_shell} ./configure"
     configure_options = ""
     if manifest.exists():
         content = manifest.read_text(encoding="utf-8")
         m = re.search(r'configure_options:\s*["\']?(.*?)["\']?\n', content)
         if m:
-            configure_options = m.group(1).strip()
+            # Strip YAML list marker, quotes, and whitespace
+            configure_options = m.group(1).strip().lstrip('-').strip().strip('"\'').strip()
     
     # Get DEFAULT_PREFIX from context
     default_prefix = ctx_vars.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
@@ -130,7 +134,8 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
         
         # Step 3: Configure
         log_info("G0: 运行 configure...")
-        full_cmd = f"{configure_cmd} --prefix={default_prefix} {configure_options}"
+        # Use shlex.quote() to prevent command injection from manifest.yaml
+        full_cmd = f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))} {shlex.quote(configure_options)}" if configure_options else f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))}"
         log_file = tmpdir / "g0-configure.log"
         g0_env = os.environ.copy()
         g0_env["TMPDIR"] = str(tmpdir)
@@ -147,6 +152,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
         with open(log_file, "w") as lf:
             r = subprocess.run(
                 full_cmd, shell=True,
+                executable=config_shell,
                 cwd=str(src_dir), stdout=lf, stderr=subprocess.STDOUT,
                 env=g0_env,
                 timeout=600  # 10 minutes for configure

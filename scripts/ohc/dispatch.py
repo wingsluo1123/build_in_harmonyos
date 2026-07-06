@@ -66,14 +66,12 @@ def _get_version(software: str) -> str:
         )
         if versions:
             return versions[0]
-    
-    # Try cmd-pkgs prebuilt index
-    prebuilt_ver = get_available_version(software)
-    if prebuilt_ver:
-        return prebuilt_ver
-    
-    # Fallback to empty
-    return ""
+    # Fallback to runtime index (cmd-pkgs)
+    try:
+        ver = get_available_version(software)
+        return ver or ""
+    except Exception:
+        return ""
 
 
 # ═══════════════════════════════════════════════════════
