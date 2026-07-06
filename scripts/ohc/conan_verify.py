@@ -662,11 +662,29 @@ authors: {git_author}
         try:
             import json
             listing = json.loads(list_out)
-            pkgs = list(listing["Local Cache"][self.software][self.ref]
-                        ["revisions"].values())[0]["packages"]
+            local_cache = listing.get("Local Cache", {})
+            # Conan 2: key under "Local Cache" is the full reference string
+            ref_data = local_cache.get(self.ref)
+            if ref_data is None:
+                # Fallback: try partial match on software name + version
+                for key in local_cache:
+                    if self.software in key and self.version in key:
+                        ref_data = local_cache[key]
+                        break
+            if ref_data is None:
+                g.details.append("  ⚠️ 无法找到程序包 ID")
+                return g
+            revisions = ref_data.get("revisions", {})
+            if not revisions:
+                g.details.append("  ⚠️ 无 recipe 修订版本")
+                return g
+            pkgs = list(revisions.values())[0].get("packages", {})
+            if not pkgs:
+                g.details.append("  ⚠️ 无二进制包")
+                return g
             pkg_id = next(iter(pkgs))
-        except (KeyError, IndexError, StopIteration):
-            g.details.append("  ⚠️ 无法找到程序包 ID")
+        except (KeyError, IndexError, StopIteration, TypeError) as e:
+            g.details.append(f"  ⚠️ 无法找到程序包 ID ({e})")
             return g
 
         pkg_ref = f"{self.ref}:{pkg_id}"

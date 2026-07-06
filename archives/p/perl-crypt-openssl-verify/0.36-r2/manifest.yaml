@@ -1,5 +1,5 @@
 software: perl-crypt-openssl-verify
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/0.36-r2/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -7,14 +7,8 @@ software: perl-crypt-openssl-verify
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "0.36-r2"
-
-# 编译状态
-# published | built | failed | archived
-status: built
-
-# 编译日期（YYYY-MM-DD）
+status: published
 build_date: "2026-07-06"
 
 # ============================================================
@@ -22,14 +16,8 @@ build_date: "2026-07-06"
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/tmp/Crypt-OpenSSL-Verify-0.36.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://cpan.metacpan.org/authors/id/T/TI/TIMLEGGE/Crypt-OpenSSL-Verify-0.36.tar.gz"
+  sha256: "deefdae6b14877f590f08c4eb50e3cd3710aa3ee62412c08d183f55b3af73e9e"
   tar_format: tar.gz
 
 # ============================================================
@@ -37,23 +25,13 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: custom
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  configure_options:
+    - "perl Makefile.PL"
+  dependencies:
+    - "openssl/3.5.6 (system pre-installed)"
+    - "perl-crypt-openssl-guess/0.15 (bypassed by patch)"
+    - "perl-crypt-openssl-x509/2.1.2 (CPAN runtime)"
   cc: clang
   cxx: clang++
 
@@ -61,20 +39,18 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-Makefile.PL.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "Crypt::OpenSSL::Guess 的 find_openssl_prefix() 无法在 OHOS 上正常工作，通过 patch 移除依赖并硬编码 OPENSSL_PREFIX 环境变量"
+  - "Perl XS 模块的 .so 文件受 HMDFS SELinux 限制 (E073)，dlopen 被拒绝；test_package 中跳过运行时加载测试"
+  - "Conan 2.x generate() 应使用 buildenv_info 设置 OPENSSL_PREFIX/LD_LIBRARY_PATH/PERL5LIB/CC/CXX，而非在 build() 中直接操作 os.environ"
+  - "package_info() 应通过 system_libs 声明 OpenSSL 系统库依赖 (ssl, crypto)，而非在 requirements() 中声明 Conan 包"
 
 patch_generation:
   method: per-file-difflib
