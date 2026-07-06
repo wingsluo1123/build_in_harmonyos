@@ -135,10 +135,10 @@ class OuchConan(ConanFile):
         tarball_name = f"rust-{rust_version}-{rust_target}.tar.gz"
         tarball_url = f"https://static.rust-lang.org/dist/{tarball_name}"
         install_dir = os.path.join(home, ".local", "rust")
-        extracted_dir = os.path.join(install_dir, f"rust-{rust_version}-{rust_target}")
-        rust_bin_dir = os.path.join(extracted_dir, "bin")
+        installed_prefix = os.path.join(install_dir, "installed")
+        installed_bin = os.path.join(installed_prefix, "bin")
 
-        if not os.path.isfile(os.path.join(rust_bin_dir, "cargo")):
+        if not os.path.isfile(os.path.join(installed_bin, "cargo")):
             self.output.info(f"Downloading pre-built Rust {rust_version} for {rust_target}...")
             os.makedirs(install_dir, exist_ok=True)
             tmp_tarball = os.path.join(install_dir, tarball_name)
@@ -174,11 +174,23 @@ class OuchConan(ConanFile):
             if not downloaded:
                 raise Exception("Rust tarball download failed from all mirrors")
 
+            # Extract tarball
             with tarfile.open(tmp_tarball, "r:gz") as tar:
                 tar.extractall(path=install_dir)
             os.remove(tmp_tarball)
 
-        _add_path(rust_bin_dir)
+            # Run install.sh to properly install (sets up bin/ + lib/rustlib/)
+            extracted_dir = os.path.join(install_dir, f"rust-{rust_version}-{rust_target}")
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            if not os.path.isfile(bash):
+                bash = "bash"
+            self.run(
+                f'{bash} {extracted_dir}/install.sh '
+                f'--prefix={installed_prefix} '
+                f'--without=rust-docs --disable-ldconfig --verbose'
+            )
+
+        _add_path(installed_bin)
 
         if not shutil.which("cargo"):
             raise Exception("Rust installation failed — cargo still not found")
