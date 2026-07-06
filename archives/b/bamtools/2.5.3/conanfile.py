@@ -21,7 +21,7 @@ class BamtoolsConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     # bamtools CMake find_package(ZLIB) requires zlib
-    requires = "zlib/1.3.1"
+    requires = "zlib/1.3.1@ohpcd/stable"
 
     def export_sources(self):
         export_conandata_patches(self)

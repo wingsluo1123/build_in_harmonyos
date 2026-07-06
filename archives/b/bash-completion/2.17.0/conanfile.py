@@ -39,31 +39,20 @@ class BashcompletionConan(ConanFile):
         tmpdir = "/storage/Users/currentUser/tmp"
         os.makedirs(tmpdir, exist_ok=True)
 
-        # Step 1: Run autoreconf to generate configure script
-        # PATH must be in the command string — env="conanrun" doesn't inherit os.environ changes
-        self.run(
-            f'cd "{self.source_folder}" && '
+        env_prefix = (
             f'PATH="/storage/Users/currentUser/usr/local/bin:/data/service/hnp/bin:$PATH" '
             f'CONFIG_SHELL=/data/service/hnp/bin/bash '
             f'SHELL=/data/service/hnp/bin/bash '
             f'TMPDIR={tmpdir} '
             f'AWK=/data/service/hnp/bin/awk '
-            f'autoreconf -fi',
-            env="conanrun"
+            f'umask 022 '
         )
 
-        # Step 2: Run configure --no-create
-        self.run(
-            f'cd "{self.source_folder}" && '
-            f'umask 022 && '
-            f'PATH="/storage/Users/currentUser/usr/local/bin:/data/service/hnp/bin:$PATH" '
-            f'TMPDIR={tmpdir} '
-            f'CONFIG_SHELL=/data/service/hnp/bin/bash '
-            f'SHELL=/data/service/hnp/bin/bash '
-            f'AWK=/data/service/hnp/bin/awk '
-            f'./configure --prefix= --no-create',
-            env="conanrun"
-        )
+        # Step 1: autoreconf to generate configure
+        self.run(f'cd "{self.source_folder}" && {env_prefix} autoreconf -fi')
+
+        # Step 2: configure
+        self.run(f'cd "{self.source_folder}" && {env_prefix} ./configure --prefix= --no-create')
 
         # Step 3: Patch config.status to fix temp dir permissions
         cs = os.path.join(self.source_folder, "config.status")
@@ -78,33 +67,19 @@ class BashcompletionConan(ConanFile):
             with open(cs, "w") as f:
                 f.write(content)
 
-        # Step 4: Run config.status manually (now patched)
-        self.run(
-            f'cd "{self.source_folder}" && '
-            f'PATH="/storage/Users/currentUser/usr/local/bin:/data/service/hnp/bin:$PATH" '
-            f'TMPDIR={tmpdir} '
-            f'AWK=/data/service/hnp/bin/awk '
-            f'./config.status',
-            env="conanrun"
-        )
+        # Step 4: config.status
+        self.run(f'cd "{self.source_folder}" && {env_prefix} ./config.status')
 
-        # Step 5: Run make
-        self.run(
-            f'cd "{self.source_folder}" && '
-            f'PATH="/storage/Users/currentUser/usr/local/bin:/data/service/hnp/bin:$PATH" '
-            f'TMPDIR={tmpdir} '
-            f'AWK=/data/service/hnp/bin/awk '
-            f'make -j1',
-            env="conanrun"
-        )
+        # Step 5: make
+        self.run(f'cd "{self.source_folder}" && {env_prefix} make -j1')
 
     def package(self):
-        self.run(
-            f'cd "{self.source_folder}" && '
+        env_prefix = (
             f'PATH="/storage/Users/currentUser/usr/local/bin:/data/service/hnp/bin:$PATH" '
-            f'make install DESTDIR="{self.package_folder}"',
-            env="conanrun"
+            f'TMPDIR=/storage/Users/currentUser/tmp '
+            f'AWK=/data/service/hnp/bin/awk '
         )
+        self.run(f'cd "{self.source_folder}" && {env_prefix} make install DESTDIR="{self.package_folder}"')
 
     def package_info(self):
         self.cpp_info.libs = []
