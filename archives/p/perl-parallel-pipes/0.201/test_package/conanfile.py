@@ -2,7 +2,6 @@
 """Conan test_package — Parallel::Pipes (pure Perl module)."""
 import os
 import glob
-import tempfile
 
 from conan import ConanFile
 
@@ -22,11 +21,8 @@ class PerlparallelpipesTestConan(ConanFile):
         if not pipes_files:
             raise Exception("Parallel/Pipes.pm not found in package")
         perl_lib_dir = os.path.dirname(os.path.dirname(pipes_files[0]))
-        # Write a simple test script to avoid shell quoting issues
-        test_script = os.path.join(tempfile.gettempdir(), "test_parallel_pipes.pl")
-        with open(test_script, "w") as f:
-            f.write("use Parallel::Pipes;\n")
-            f.write("use Parallel::Pipes::App;\n")
-            f.write("my $pipes = Parallel::Pipes->new(3);\n")
-            f.write("print \"OK\\n\";\n")
-        self.run('PERL5LIB="{}" perl {}'.format(perl_lib_dir, test_script))
+
+        # Set PERL5LIB and run test.sh (CI L0c compliant)
+        os.environ["PERL5LIB"] = perl_lib_dir
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"sh {test_script}")

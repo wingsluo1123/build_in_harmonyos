@@ -3,6 +3,9 @@
 
 Tests that the installed Params::ValidationCompiler module can be loaded and used.
 """
+import os
+import glob
+
 from conan import ConanFile
 
 
@@ -13,12 +16,15 @@ class PerlparamsvalidationcompilerTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Test that the Perl module can be loaded and basic functionality works
-        test_script = (
-            'use Params::ValidationCompiler qw(validation_for); '
-            'use Params::ValidationCompiler::Exceptions; '
-            'my $validator = validation_for( params => { foo => 1 } ); '
-            'die "test failed" unless $validator; '
-            'print "Params::ValidationCompiler test OK\\n";'
-        )
-        self.run(f'perl -e \'{test_script}\'')
+        # Find the installed module path from the dependency
+        dep = self.dependencies["perl-params-validationcompiler"]
+        pkg_folder = dep.package_folder
+        pm_files = glob.glob(os.path.join(pkg_folder, "**", "Params", "ValidationCompiler.pm"), recursive=True)
+        if not pm_files:
+            raise Exception("Params/ValidationCompiler.pm not found in package")
+        perl_lib_dir = os.path.dirname(os.path.dirname(pm_files[0]))
+
+        # Set PERL5LIB and run test.sh (CI L0c compliant)
+        os.environ["PERL5LIB"] = perl_lib_dir
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"sh {test_script}")

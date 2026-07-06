@@ -43,13 +43,13 @@ class PerlparallelpipesConan(ConanFile):
         # Apply patches if any (none for this module)
         apply_conandata_patches(self)
         # Module::Build::Tiny workflow
-        self.run("perl Build.PL")
-        self.run("./Build")
+        self.run("perl Build.PL", cwd=self.source_folder)
+        self.run("perl Build", cwd=self.source_folder)
 
     def package(self):
         # Install to a temporary staging dir, then reorganize into lib/
         staging = os.path.join(self.package_folder, "_staging")
-        self.run(f"./Build install --destdir {staging}")
+        self.run(f"perl Build install --destdir {staging}", cwd=self.source_folder)
         # Find the installed .pm files and copy them to lib/ at package root
         # so that G4 (product integrity check) can find standard lib/ directory
         pm_files = glob.glob(os.path.join(staging, "**", "Parallel", "Pipes.pm"), recursive=True)
@@ -75,3 +75,4 @@ class PerlparallelpipesConan(ConanFile):
         lib_dir = os.path.join(self.package_folder, "lib")
         if os.path.isdir(lib_dir):
             self.runenv_info.define_path("PERL5LIB", lib_dir)
+th("PERL5LIB", lib_dir)

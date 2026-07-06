@@ -3,6 +3,9 @@
 
 Tests that the installed Parse::MIME module can be loaded and used.
 """
+import os
+import glob
+
 from conan import ConanFile
 
 
@@ -13,12 +16,15 @@ class PerlparsemimeTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Test that the Perl module can be loaded and basic functionality works
-        test_script = (
-            'use Parse::MIME qw( best_match ); '
-            'my $m = best_match( [ qw( application/xbel+xml text/xml ) ], '
-            '\'text/*;q=0.5,*/*; q=0.1\' ); '
-            'die "test failed" unless $m eq "text/xml"; '
-            'print "Parse::MIME test OK\\n";'
-        )
-        self.run(f'perl -e \'{test_script}\'')
+        # Find the installed module path from the dependency
+        dep = self.dependencies["perl-parse-mime"]
+        pkg_folder = dep.package_folder
+        pm_files = glob.glob(os.path.join(pkg_folder, "**", "Parse", "MIME.pm"), recursive=True)
+        if not pm_files:
+            raise Exception("Parse/MIME.pm not found in package")
+        perl_lib_dir = os.path.dirname(os.path.dirname(pm_files[0]))
+
+        # Set PERL5LIB and run test.sh (CI L0c compliant)
+        os.environ["PERL5LIB"] = perl_lib_dir
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"sh {test_script}")

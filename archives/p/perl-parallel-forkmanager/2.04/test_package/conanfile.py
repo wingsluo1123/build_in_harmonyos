@@ -18,5 +18,6 @@ class PerlParallelForkManagerTestConan(ConanFile):
         pass  # No build step needed for pure Perl module test
 
     def test(self):
-        # Test that the Perl module can be loaded
-        self.run('perl -MParallel::ForkManager -e "print qq(Parallel::ForkManager loaded OK\\n)"', env="conanrun")
+        # Run the test script (test.sh wraps perl test for CI L0c compliance)
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"sh {test_script}", env="conanrun")
