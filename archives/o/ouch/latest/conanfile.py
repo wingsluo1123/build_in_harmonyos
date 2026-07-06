@@ -83,52 +83,87 @@ class OuchConan(ConanFile):
         self.cpp_info.libs = []
 
     def _ensure_cargo(self):
-        """Detect or install Rust toolchain. CI may not have cargo pre-installed."""
+        """Detect or install Rust toolchain. CI may not have cargo pre-installed.
+
+        rustup doesn't support HarmonyOS (uname -s returns 'HarmonyOS'),
+        so we use harmonybrew or download a pre-built tarball instead.
+        """
         if shutil.which("cargo"):
             return
 
         home = os.path.expanduser("~")
-
-        # Check harmonybrew installation
-        harmonybrew_cargo = os.path.join(home, ".harmonybrew", "bin", "cargo")
-        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
-            os.environ["PATH"] = os.path.join(home, ".harmonybrew", "bin") + os.pathsep + os.environ.get("PATH", "")
-            return
-
-        # Check existing rustup installation (installed but not sourced)
-        cargo_bin = os.path.join(home, ".cargo", "bin", "cargo")
-        if os.path.isfile(cargo_bin) and os.access(cargo_bin, os.X_OK):
-            os.environ["PATH"] = os.path.join(home, ".cargo", "bin") + os.pathsep + os.environ.get("PATH", "")
-            return
-
-        # Install via rustup — use sh (not zsh) to avoid shell dependency issues
         cert_pem = os.path.join(home, "usr", "local", "ssl", "cert.pem")
         if os.path.exists(cert_pem):
             os.environ["SSL_CERT_FILE"] = cert_pem
             os.environ["REQUESTS_CA_BUNDLE"] = cert_pem
 
-        rustup_url = "https://sh.rustup.rs"
-        if shutil.which("curl"):
-            self.run(f'curl --proto "=https" --tlsv1.2 -sSf {rustup_url} | sh -s -- -y --default-toolchain stable')
-        elif shutil.which("wget"):
-            self.run(f'wget -qO- {rustup_url} | sh -s -- -y --default-toolchain stable')
-        else:
-            # Fallback: Python urllib
-            import urllib.request
-            import ssl
-            ctx = ssl.create_default_context()
-            if os.path.exists(cert_pem):
-                ctx.load_verify_locations(cert_pem)
-            tmp_script = "/tmp/rustup-init.sh"
-            urllib.request.urlretrieve(rustup_url, tmp_script)
-            self.run(f"sh {tmp_script} -y --default-toolchain stable")
-            os.remove(tmp_script)
+        def _add_path(p):
+            os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
 
-        # Source the installed environment
-        os.environ["PATH"] = os.path.join(home, ".cargo", "bin") + os.pathsep + os.environ.get("PATH", "")
+        # 1. Check harmonybrew installation
+        harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
+        harmonybrew_cargo = os.path.join(harmonybrew_bin, "cargo")
+        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+            _add_path(harmonybrew_bin)
+            return
+
+        # 2. Check existing ~/.cargo/bin (rustup installed but not sourced)
+        cargo_bin_dir = os.path.join(home, ".cargo", "bin")
+        cargo_bin = os.path.join(cargo_bin_dir, "cargo")
+        if os.path.isfile(cargo_bin) and os.access(cargo_bin, os.X_OK):
+            _add_path(cargo_bin_dir)
+            return
+
+        # 3. Try harmonybrew install
+        if shutil.which("brew"):
+            self.output.info("Installing Rust via harmonybrew...")
+            self.run("brew install rust")
+            if shutil.which("cargo"):
+                return
+            if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+                _add_path(harmonybrew_bin)
+                return
+
+        # 4. Download pre-built Rust tarball (rustup doesn't support HarmonyOS)
+        import platform
+        import tarfile
+        import urllib.request
+
+        arch = platform.machine()  # aarch64 or x86_64
+        rust_version = "1.96.1"
+        rust_target = f"{arch}-unknown-linux-gnu"
+        tarball_name = f"rust-{rust_version}-{rust_target}.tar.gz"
+        tarball_url = f"https://static.rust-lang.org/dist/{tarball_name}"
+        install_dir = os.path.join(home, ".local", "rust")
+        extracted_dir = os.path.join(install_dir, f"rust-{rust_version}-{rust_target}")
+        rust_bin_dir = os.path.join(extracted_dir, "bin")
+
+        if not os.path.isfile(os.path.join(rust_bin_dir, "cargo")):
+            self.output.info(f"Downloading pre-built Rust {rust_version} for {rust_target}...")
+            tmp_tarball = os.path.join("/tmp", tarball_name)
+
+            if shutil.which("curl"):
+                self.run(f'curl -sSf -o {tmp_tarball} {tarball_url}')
+            elif shutil.which("wget"):
+                self.run(f'wget -q -O {tmp_tarball} {tarball_url}')
+            else:
+                import ssl
+                ctx = ssl.create_default_context()
+                if os.path.exists(cert_pem):
+                    ctx.load_verify_locations(cert_pem)
+                with urllib.request.urlopen(tarball_url, context=ctx) as resp, \
+                     open(tmp_tarball, "wb") as f:
+                    f.write(resp.read())
+
+            os.makedirs(install_dir, exist_ok=True)
+            with tarfile.open(tmp_tarball, "r:gz") as tar:
+                tar.extractall(path=install_dir)
+            os.remove(tmp_tarball)
+
+        _add_path(rust_bin_dir)
 
         if not shutil.which("cargo"):
-            raise Exception("Rust installation failed — cargo still not found after rustup install")
+            raise Exception("Rust installation failed — cargo still not found")
 
     def _find_ohos_lib_dir(self):
         """Find the OHOS SDK C++ library directory."""
