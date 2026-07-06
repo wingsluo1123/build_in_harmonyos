@@ -52,16 +52,10 @@ class OuchConan(ConanFile):
         apply_conandata_patches(self)
         # Ensure Rust toolchain is available (CI may not have cargo pre-installed)
         self._ensure_cargo()
-        # Ensure C compiler/linker is available; also discovers OHOS SDK lib dir
-        ohos_sdk_lib = self._ensure_cc()
-        if ohos_sdk_lib:
-            self._setup_libstdcxx(ohos_sdk_lib)
-
-        rustflags = []
-        if ohos_sdk_lib:
-            rustflags.append(f"-L {ohos_sdk_lib}")
-            rustflags.append(f"-C link-arg=-L{ohos_sdk_lib}")
-        os.environ["RUSTFLAGS"] = " ".join(rustflags)
+        # Ensure C compiler/linker (`cc`) is available in PATH
+        self._ensure_cc()
+        # Fix -lstdc++ → -lc++_shared via linker script in rustc sysroot lib dir
+        self._setup_libstdcxx_in_sysroot()
 
         cert_pem = os.path.expanduser("~/usr/local/ssl/cert.pem")
         if os.path.exists(cert_pem):
@@ -156,32 +150,19 @@ class OuchConan(ConanFile):
         raise Exception("Rust installation failed — cargo still not found after brew install rust")
 
     def _ensure_cc(self):
-        """Ensure a C compiler/linker (`cc`) is available for Rust build scripts.
+        """Ensure a C compiler/linker (`cc`) is available in PATH.
 
-        `rustc` itself looks for `cc` in PATH (not the `CC` env var) when
-        linking build script binaries. We either find an existing `cc`/`clang`,
-        or create a `cc` symlink → clang in a dedicated bindir.
-
-        Returns:
-            str or None: The OHOS SDK lib directory (parent of libstdc++.so
-            workaround) if found, else None.
+        `rustc` looks for `cc` in PATH to link build script binaries.
         """
-        # ── Phase 1: Discover OHOS SDK lib dir ──────────────────────────
-        ohos_sdk_lib_dir = self._find_ohos_lib_dir()
-        clang_path = None
-
-        # ── Phase 2: Ensure cc is available ─────────────────────────────
-        # 2a. Already have cc → done, return whatever lib dir we found
         if shutil.which("cc"):
-            return ohos_sdk_lib_dir
+            return
 
-        # 2b. Find or install clang to create a cc symlink
+        # Find or install clang, then create a cc symlink
         clang_path = self._find_clang()
         if not clang_path and shutil.which("brew"):
             self.output.info("Installing ohos-sdk + llvm-gcc-compat via harmonybrew...")
             self.run("brew install ohos-sdk")
             self.run("brew install llvm-gcc-compat")
-            # Ensure harmonybrew bin is in PATH
             home = os.path.expanduser("~")
             harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
             if harmonybrew_bin not in os.environ.get("PATH", ""):
@@ -189,18 +170,9 @@ class OuchConan(ConanFile):
             clang_path = self._find_clang()
 
         if clang_path:
-            # Derive lib dir from clang path if _find_ohos_lib_dir missed it
-            if not ohos_sdk_lib_dir:
-                llvm_dir = os.path.dirname(os.path.dirname(clang_path))
-                candidate_lib = os.path.join(llvm_dir, "lib", "aarch64-linux-ohos")
-                if os.path.isdir(candidate_lib):
-                    ohos_sdk_lib_dir = candidate_lib
-
             os.environ["CC"] = clang_path
             os.environ["CXX"] = clang_path.replace("clang", "clang++")
             self.output.info(f"CC={clang_path}")
-
-            # Create cc symlink → clang in a dedicated bindir
             cc_bindir = os.path.join(self.source_folder, "._cc_bin")
             os.makedirs(cc_bindir, exist_ok=True)
             cc_link = os.path.join(cc_bindir, "cc")
@@ -209,11 +181,47 @@ class OuchConan(ConanFile):
             os.environ["PATH"] = cc_bindir + os.pathsep + os.environ.get("PATH", "")
             self.output.info(f"Created cc symlink → {clang_path} in {cc_bindir}")
         else:
-            self.output.warning("No C compiler found; build may fail if crates need cc")
+            self.output.warning("No C compiler found; build may fail")
 
-        if ohos_sdk_lib_dir:
-            self.output.info(f"OHOS SDK lib dir: {ohos_sdk_lib_dir}")
-        return ohos_sdk_lib_dir
+    def _setup_libstdcxx_in_sysroot(self):
+        """Create libstdc++.so → INPUT(-lc++_shared) in rustc sysroot lib dir.
+
+        rustc adds `-lstdc++` to every linker invocation. On OHOS, libstdc++
+        does not exist — the C++ standard library is libc++_shared. This method
+        places a linker script at the rustc sysroot lib path (which is always
+        in the linker's default search path) so that -lstdc++ resolves to
+        -lc++_shared automatically.
+        """
+        import subprocess
+        try:
+            result = subprocess.run(["rustc", "--print", "sysroot"],
+                                    capture_output=True, text=True, check=True)
+            sysroot = result.stdout.strip()
+        except Exception as e:
+            self.output.warning(f"Cannot determine rustc sysroot: {e}")
+            return
+
+        # The linker already has -L <sysroot>/lib/rustlib/<target>/lib
+        target = "aarch64-unknown-linux-ohos"
+        lib_dir = os.path.join(sysroot, "lib", "rustlib", target, "lib")
+        if not os.path.isdir(lib_dir):
+            self.output.warning(f"rustc target lib dir not found: {lib_dir}")
+            return
+
+        self._write_libstdcxx_redirect(lib_dir)
+
+    def _write_libstdcxx_redirect(self, lib_dir):
+        """Write libstdc++.so/.a linker scripts → libc++ in lib_dir."""
+        libstdcxx_so = os.path.join(lib_dir, "libstdc++.so")
+        if not os.path.exists(libstdcxx_so):
+            with open(libstdcxx_so, "w") as f:
+                f.write("INPUT(-lc++_shared)\n")
+            self.output.info(f"Created {libstdcxx_so}")
+        libstdcxx_a = os.path.join(lib_dir, "libstdc++.a")
+        if not os.path.exists(libstdcxx_a):
+            with open(libstdcxx_a, "w") as f:
+                f.write("INPUT(-lc++_static -lc++abi)\n")
+            self.output.info(f"Created {libstdcxx_a}")
 
     def _find_clang(self):
         """Locate clang binary on the system. Returns path or None."""
@@ -292,14 +300,3 @@ class OuchConan(ConanFile):
         except Exception:
             pass
         return None
-
-    def _setup_libstdcxx(self, lib_dir):
-        """Create libstdc++ linker scripts pointing to libc++ (E050 workaround)."""
-        libstdcxx_so = os.path.join(lib_dir, "libstdc++.so")
-        libstdcxx_a = os.path.join(lib_dir, "libstdc++.a")
-        if not os.path.exists(libstdcxx_so):
-            with open(libstdcxx_so, "w") as f:
-                f.write("INPUT(-lc++_shared)\n")
-        if not os.path.exists(libstdcxx_a):
-            with open(libstdcxx_a, "w") as f:
-                f.write("INPUT(-lc++_static -lc++abi)\n")
