@@ -1,0 +1,39 @@
+diff -ruN a/Makefile.PL b/Makefile.PL
+--- a/Makefile.PL
++++ b/Makefile.PL
+@@ -3,28 +3,30 @@
+ # Don't edit it but the dist.ini and plugins used to construct it.
+ 
+ use strict;
+ use warnings;
+ 
+ use 5.008;
+ use ExtUtils::MakeMaker;
+ 
+ use Config;
+ use File::Spec;
+-use Crypt::OpenSSL::Guess;
++# R2: Bypass Crypt::OpenSSL::Guess (not available on OHOS), hardcode OpenSSL paths
++# Known: OpenSSL 3.5.6 at /storage/Users/currentUser/usr/local
+ my %args;
+ 
+-my ($major, $minor, $patch) = openssl_version();
+-print "Installed OpenSSL: $major.$minor.$patch\n";
++my ($major, $minor, $patch) = (3, 5, 6);
++print "Installed OpenSSL: $major.$minor.$patch (hardcoded for OHOS)\n";
+ 
+-$args{INC} =  openssl_inc_paths();
+-$args{LIBS} = [openssl_lib_paths() . ' -lssl -lcrypto'];
++my $openssl_prefix = $ENV{OPENSSL_PREFIX} || '/storage/Users/currentUser/usr/local';
++$args{INC} = "-I$openssl_prefix/include";
++$args{LIBS} = ["-L$openssl_prefix/lib -lssl -lcrypto"];
+ 
+ my $cc_option_flags = $major ge 3 ? ' -DOPENSSL_API_COMPAT=30000' : ' -DOPENSSL_API_COMPAT=10100';
+ 
+ if ($Config::Config{cc} =~ /gcc/i) {
+   $cc_option_flags .= $ENV{AUTHOR_TESTING} ? ' -Wall -Werror' : ' -Wall';
+ } else {
+   $cc_option_flags .= '';
+ }
+ 
+ if ($Config{gccversion} =~ /llvm/i) {
