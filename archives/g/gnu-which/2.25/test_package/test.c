@@ -2,6 +2,6 @@
 #include <stdlib.h>
 
 int main(void) {
-    printf("test {name} {version}: OK\n");
+    printf("test gnu-which 2.25: OK\n");
     return 0;
 }
