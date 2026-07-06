@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bkcrack/1.8.1/test_package/deactivate_conanbuildenv-armv8.sh"
