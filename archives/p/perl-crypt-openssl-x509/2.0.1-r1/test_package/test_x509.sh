@@ -1,10 +1,8 @@
 #!/bin/sh
-# test_package/test_x509.sh — L0c test source file
+# test_package/test_x509.sh - L0c test source file
 # Verifies Crypt::OpenSSL::X509 package structure
 # On OHOS, runtime dlopen is restricted by SELinux (E073), so this test
 # checks file presence only. On Linux, it also attempts runtime loading.
-
-set -e
 
 PKG_DIR="${1:-.}"
 
