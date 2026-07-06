@@ -44,7 +44,6 @@ class QtshadertoolsConan(ConanFile):
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["QT_QMAKE_TARGET_MKSPEC"] = "harmonyos-clang"
         tc.variables["CMAKE_PREFIX_PATH"] = self.dependencies["qtbase"].package_folder
-        tc.variables["BUILD_TESTING"] = "ON"
         tc.generate()
 
     def build(self):
@@ -53,8 +52,7 @@ class QtshadertoolsConan(ConanFile):
         cmake.configure()
         cmake.build()
         # ── 上游官方测试 (必做) ──
-        # tst_qshaderbaker 可运行; tst_buildtimeqsb/tst_qsbdepfiles 需 Qt GUI 环境无法运行
-        self.run("ctest --output-on-failure || true", env="conanrun")
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)
