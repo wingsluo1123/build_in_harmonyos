@@ -140,7 +140,8 @@ class OuchConan(ConanFile):
 
         if not os.path.isfile(os.path.join(rust_bin_dir, "cargo")):
             self.output.info(f"Downloading pre-built Rust {rust_version} for {rust_target}...")
-            tmp_tarball = os.path.join("/tmp", tarball_name)
+            os.makedirs(install_dir, exist_ok=True)
+            tmp_tarball = os.path.join(install_dir, tarball_name)
 
             if shutil.which("curl"):
                 self.run(f'curl -sSf -o {tmp_tarball} {tarball_url}')
@@ -155,7 +156,6 @@ class OuchConan(ConanFile):
                      open(tmp_tarball, "wb") as f:
                     f.write(resp.read())
 
-            os.makedirs(install_dir, exist_ok=True)
             with tarfile.open(tmp_tarball, "r:gz") as tar:
                 tar.extractall(path=install_dir)
             os.remove(tmp_tarball)
