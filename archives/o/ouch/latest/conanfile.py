@@ -204,14 +204,23 @@ class OuchConan(ConanFile):
                 if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                     clang_path = candidate
 
-        # 5. Last resort: install llvm via harmonybrew
+        # 5. Last resort: install ohos-sdk + llvm-gcc-compat via harmonybrew
         if not clang_path and shutil.which("brew"):
-            self.output.info("Installing llvm via harmonybrew for C compiler...")
-            self.run("brew install llvm")
+            self.output.info("Installing ohos-sdk + llvm-gcc-compat via harmonybrew...")
+            self.run("brew install ohos-sdk")
+            self.run("brew install llvm-gcc-compat")
+            # Ensure harmonybrew bin is in PATH (llvm-gcc-compat puts `cc` there)
             home = os.path.expanduser("~")
-            candidate = os.path.join(home, ".harmonybrew", "opt", "llvm", "bin", "clang")
-            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                clang_path = candidate
+            harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
+            if harmonybrew_bin not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = harmonybrew_bin + os.pathsep + os.environ.get("PATH", "")
+            # After installation, clang is in Cellar/ohos-sdk/*/native/llvm/bin/
+            import glob
+            for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
+                candidate = os.path.join(cellar, "bin", "clang")
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    clang_path = candidate
+                    break
 
         if clang_path:
             # Derive OHOS SDK lib dir from clang path:
