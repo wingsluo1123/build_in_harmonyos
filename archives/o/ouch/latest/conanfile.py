@@ -166,76 +166,41 @@ class OuchConan(ConanFile):
             str or None: The OHOS SDK lib directory (parent of libstdc++.so
             workaround) if found, else None.
         """
-        if shutil.which("cc"):
-            # cc already in PATH — still try to discover OHOS SDK lib dir
-            return self._find_ohos_lib_dir()
-
+        # ── Phase 1: Discover OHOS SDK lib dir ──────────────────────────
+        ohos_sdk_lib_dir = self._find_ohos_lib_dir()
         clang_path = None
-        ohos_sdk_lib_dir = None
 
-        # 1. Check PATH for clang
-        clang_in_path = shutil.which("clang")
-        if clang_in_path:
-            clang_path = clang_in_path
+        # ── Phase 2: Ensure cc is available ─────────────────────────────
+        # 2a. Already have cc → done, return whatever lib dir we found
+        if shutil.which("cc"):
+            return ohos_sdk_lib_dir
 
-        # 2. Try OHOS SDK Cellar path (known layout)
-        if not clang_path:
-            home = os.path.expanduser("~")
-            import glob
-            for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
-                candidate = os.path.join(cellar, "bin", "clang")
-                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                    clang_path = candidate
-                    break
-
-        # 3. Try harmonybrew bin
-        if not clang_path:
-            home = os.path.expanduser("~")
-            candidate = os.path.join(home, ".harmonybrew", "bin", "clang")
-            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                clang_path = candidate
-
-        # 4. Fallback to _find_ohos_lib_dir (rustc sysroot method)
-        if not clang_path:
-            sdk_lib = self._find_ohos_lib_dir()
-            if sdk_lib:
-                llvm_bin = os.path.normpath(os.path.join(sdk_lib, "..", "..", "bin"))
-                candidate = os.path.join(llvm_bin, "clang")
-                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                    clang_path = candidate
-
-        # 5. Last resort: install ohos-sdk + llvm-gcc-compat via harmonybrew
+        # 2b. Find or install clang to create a cc symlink
+        clang_path = self._find_clang()
         if not clang_path and shutil.which("brew"):
             self.output.info("Installing ohos-sdk + llvm-gcc-compat via harmonybrew...")
             self.run("brew install ohos-sdk")
             self.run("brew install llvm-gcc-compat")
-            # Ensure harmonybrew bin is in PATH (llvm-gcc-compat puts `cc` there)
+            # Ensure harmonybrew bin is in PATH
             home = os.path.expanduser("~")
             harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
             if harmonybrew_bin not in os.environ.get("PATH", ""):
                 os.environ["PATH"] = harmonybrew_bin + os.pathsep + os.environ.get("PATH", "")
-            # After installation, clang is in Cellar/ohos-sdk/*/native/llvm/bin/
-            import glob
-            for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
-                candidate = os.path.join(cellar, "bin", "clang")
-                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                    clang_path = candidate
-                    break
+            clang_path = self._find_clang()
 
         if clang_path:
-            # Derive OHOS SDK lib dir from clang path:
-            #   .../llvm/bin/clang → .../llvm/lib/aarch64-linux-ohos
-            llvm_dir = os.path.dirname(os.path.dirname(clang_path))  # .../llvm
-            candidate_lib = os.path.join(llvm_dir, "lib", "aarch64-linux-ohos")
-            if os.path.isdir(candidate_lib):
-                ohos_sdk_lib_dir = candidate_lib
+            # Derive lib dir from clang path if _find_ohos_lib_dir missed it
+            if not ohos_sdk_lib_dir:
+                llvm_dir = os.path.dirname(os.path.dirname(clang_path))
+                candidate_lib = os.path.join(llvm_dir, "lib", "aarch64-linux-ohos")
+                if os.path.isdir(candidate_lib):
+                    ohos_sdk_lib_dir = candidate_lib
 
-            # Set CC/CXX for the `cc` crate used by Rust build scripts
             os.environ["CC"] = clang_path
             os.environ["CXX"] = clang_path.replace("clang", "clang++")
             self.output.info(f"CC={clang_path}")
 
-            # Create a `cc` symlink → clang so `rustc` can find the linker in PATH
+            # Create cc symlink → clang in a dedicated bindir
             cc_bindir = os.path.join(self.source_folder, "._cc_bin")
             os.makedirs(cc_bindir, exist_ok=True)
             cc_link = os.path.join(cc_bindir, "cc")
@@ -243,15 +208,42 @@ class OuchConan(ConanFile):
                 os.symlink(clang_path, cc_link)
             os.environ["PATH"] = cc_bindir + os.pathsep + os.environ.get("PATH", "")
             self.output.info(f"Created cc symlink → {clang_path} in {cc_bindir}")
-
-            if ohos_sdk_lib_dir:
-                self.output.info(f"OHOS SDK lib dir: {ohos_sdk_lib_dir}")
-            else:
-                self.output.warning("No OHOS SDK lib dir found alongside clang")
         else:
             self.output.warning("No C compiler found; build may fail if crates need cc")
 
+        if ohos_sdk_lib_dir:
+            self.output.info(f"OHOS SDK lib dir: {ohos_sdk_lib_dir}")
         return ohos_sdk_lib_dir
+
+    def _find_clang(self):
+        """Locate clang binary on the system. Returns path or None."""
+        # 1. Check PATH
+        clang = shutil.which("clang")
+        if clang:
+            return clang
+
+        home = os.path.expanduser("~")
+        # 2. OHOS SDK Cellar path
+        import glob
+        for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
+            candidate = os.path.join(cellar, "bin", "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+
+        # 3. harmonybrew bin
+        candidate = os.path.join(home, ".harmonybrew", "bin", "clang")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+
+        # 4. From rustc sysroot
+        sdk_lib = self._find_ohos_lib_dir()
+        if sdk_lib:
+            llvm_bin = os.path.normpath(os.path.join(sdk_lib, "..", "..", "bin"))
+            candidate = os.path.join(llvm_bin, "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+
+        return None
 
     def _setup_cargo_mirror(self, home):
         """Configure crates.io mirror for fast downloads in China."""
