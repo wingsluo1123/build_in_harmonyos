@@ -7,6 +7,7 @@
 #
 # Must complete:
 #   - Detect/install Conan (pip install conan)
+#   - Detect/install Rust toolchain (cargo/rustc for Cargo-based packages)
 #   - Verify conan remote (预部署, 不做注册/认证)
 #   - Ensure ohos-aarch64 profile exists
 #   - Set conan configuration
@@ -33,7 +34,73 @@ fi
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
 echo "[step] Conan version: $CONAN_VERSION"
 
-# ── 1b. Refresh stale settings.yml ──
+# ── 1b. Detect/install Rust toolchain (for Cargo-based packages) ──
+# CI 环境可能没有预装 cargo/rustc，需要自动安装。
+# 检测顺序: PATH → ~/.harmonybrew/bin → ~/.cargo/bin → rustup 安装
+if command -v cargo &>/dev/null; then
+    echo "[step] Cargo already in PATH"
+else
+    echo "[step] Cargo not found, checking alternative locations..."
+    _cargo_found=false
+
+    # Check harmonybrew installation
+    if [ -x "$HOME/.harmonybrew/bin/cargo" ]; then
+        echo "[step] Found cargo via harmonybrew: $HOME/.harmonybrew/bin"
+        export PATH="$HOME/.harmonybrew/bin:$PATH"
+        _cargo_found=true
+    fi
+
+    # Check existing rustup installation (installed but not sourced)
+    if [ "$_cargo_found" = false ] && [ -x "$HOME/.cargo/bin/cargo" ]; then
+        echo "[step] Found cargo in ~/.cargo/bin (not sourced)"
+        source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
+        _cargo_found=true
+    fi
+
+    # Install via rustup if still not found
+    if [ "$_cargo_found" = false ]; then
+        echo "[step] Installing Rust via rustup..."
+        # SSL cert workaround for OHOS (curl/SSL needs explicit cert path)
+        _cert_pem="$HOME/usr/local/ssl/cert.pem"
+        if [ -f "$_cert_pem" ]; then
+            export SSL_CERT_FILE="$_cert_pem"
+            export REQUESTS_CA_BUNDLE="$_cert_pem"
+        fi
+
+        # Download and run rustup-init with sh (not zsh — rustup expects sh)
+        # -y: accept defaults, --default-toolchain stable: install stable Rust
+        _rustup_url="https://sh.rustup.rs"
+        if command -v curl &>/dev/null; then
+            curl --proto '=https' --tlsv1.2 -sSf "$_rustup_url" | sh -s -- -y --default-toolchain stable
+        elif command -v wget &>/dev/null; then
+            wget -qO- "$_rustup_url" | sh -s -- -y --default-toolchain stable
+        else
+            # Fallback: use Python to download
+            python3 -c "
+import urllib.request, ssl
+ctx = ssl.create_default_context()
+ctx.load_verify_locations('$_cert_pem') if __import__('os').path.exists('$_cert_pem') else None
+urllib.request.urlretrieve('$_rustup_url', '/tmp/rustup-init.sh')
+" && sh /tmp/rustup-init.sh -y --default-toolchain stable && rm -f /tmp/rustup-init.sh
+        fi
+
+        # Source the installed environment
+        source "$HOME/.cargo/env" 2>/dev/null || export PATH="$HOME/.cargo/bin:$PATH"
+
+        if ! command -v cargo &>/dev/null; then
+            echo "[error] Rust installation failed — cargo still not found"
+            exit 1
+        fi
+        echo "[step] Rust installed via rustup ✅"
+    fi
+fi
+
+CARGO_VERSION=$(cargo --version 2>/dev/null || echo "not available")
+RUSTC_VERSION=$(rustc --version 2>/dev/null || echo "not available")
+echo "[step] Cargo: $CARGO_VERSION"
+echo "[step] Rustc: $RUSTC_VERSION"
+
+# ── 1c. Refresh stale settings.yml ──
 # conan caches settings.yml on first run; if conan was upgraded (e.g. OHOS
 # support added to default_settings.py), the cached file is stale and
 # conan will reject os=OHOS. Delete it to force regeneration.
@@ -93,3 +160,4 @@ echo "[step] Conan environment ready ✅"
 echo "[step]   remote: ${CONAN_REMOTE_NAME}"
 echo "[step]   profile: ${PROFILE_NAME}"
 echo "[step]   conan: ${CONAN_VERSION}"
+echo "[step]   cargo: ${CARGO_VERSION}"
