@@ -187,51 +187,33 @@ class OuchConan(ConanFile):
         """Redirect -lstdc++ → -lc++_shared so Rust binaries link on OHOS.
 
         rustc adds `-lstdc++` to every linker invocation, but OHOS uses libc++
-        (LLVM) instead of libstdc++ (GCC). This method:
-        1. Creates libstdc++.so → INPUT(-lc++_shared) linker scripts in the
-           rustc target lib directory (already in the linker's -L search path).
-        2. Falls back to writing into a local dir and adding it to cargo's
-           [target.<triple>.rustflags] via .cargo/config.toml.
+        (LLVM) instead of libstdc++ (GCC). This method creates a linker script
+        `libstdc++.so → INPUT(-lc++_shared)` in the rustc target lib directory,
+        which is already in the linker's default `-L` search path.
         """
-        # Step 1: try rustc sysroot (use self.run so conan's PATH is active)
-        sysroot = None
+        # Find rustc via Python PATH (NOT conan shell — conan may hide it)
+        import subprocess as _subprocess
+        rustc = shutil.which("rustc")
+        if not rustc:
+            self.output.warning("rustc not found in PATH; -lstdc++ fix skipped")
+            return
+
+        # Get sysroot
         try:
-            output = self.run("rustc --print sysroot", cwd=self.source_folder)
-            sysroot = output.strip()
-        except Exception:
-            pass
+            result = _subprocess.run([rustc, "--print", "sysroot"],
+                                     capture_output=True, text=True, check=True)
+            sysroot = result.stdout.strip()
+        except Exception as e:
+            self.output.warning(f"Cannot determine rustc sysroot: {e}")
+            return
 
         target = "aarch64-unknown-linux-ohos"
-        if sysroot:
-            lib_dir = os.path.join(sysroot, "lib", "rustlib", target, "lib")
-            if os.path.isdir(lib_dir):
-                self._write_libstdcxx_redirect(lib_dir)
-                return
+        lib_dir = os.path.join(sysroot, "lib", "rustlib", target, "lib")
+        if not os.path.isdir(lib_dir):
+            self.output.warning(f"rustc target lib dir not found: {lib_dir}")
+            return
 
-        # Step 2: fallback — write redirect into a local dir and inject via cargo config
-        self.output.info("Falling back to cargo config for -lstdc++ redirect")
-        redirect_dir = os.path.join(self.source_folder, "._libstdcxx")
-        os.makedirs(redirect_dir, exist_ok=True)
-        self._write_libstdcxx_redirect(redirect_dir)
-
-        home = os.path.expanduser("~")
-        cargo_config = os.path.join(home, ".cargo", "config.toml")
-        cargo_config_dir = os.path.dirname(cargo_config)
-        os.makedirs(cargo_config_dir, exist_ok=True)
-
-        target_rustflags = (
-            f'[target.{target}]\n'
-            f'rustflags = ["-L", "{redirect_dir}"]\n'
-        )
-        # Append; if the section already exists, prepend a newline
-        existing = ""
-        if os.path.isfile(cargo_config):
-            existing = Path(cargo_config).read_text(encoding="utf-8")
-            if target not in existing:
-                existing += "\n"
-        with open(cargo_config, "w") as f:
-            f.write(existing + target_rustflags)
-        self.output.info(f"Added [target.{target}] rustflags to {cargo_config}")
+        self._write_libstdcxx_redirect(lib_dir)
 
     def _write_libstdcxx_redirect(self, lib_dir):
         """Write libstdc++.so/.a linker scripts pointing to libc++ into lib_dir."""
