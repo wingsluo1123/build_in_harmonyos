@@ -24,7 +24,5 @@ class PerlStarletTestConan(ConanFile):
             "data", "service", "hnp", "perl.org", "perl_5.42.0",
             "lib", "site_perl", "5.42.0",
         )
-        os.environ["PERL5LIB"] = perllib
-        self.run(
-            'perl -MStarlet -e "print Starlet->VERSION . qq(\\n)"',
-        )
+        test_script = os.path.join(self.recipe_folder, "run_test.sh")
+        self.run(f'sh "{test_script}" "{perllib}"')
