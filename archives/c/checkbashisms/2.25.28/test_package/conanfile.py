@@ -31,6 +31,7 @@ class CheckbashismsTestConan(ConanFile):
         clean_script = os.path.join(self.source_folder, "clean_script.sh")
         self.run(f'"{bin_path}" "{clean_script}"', env="conanrun")
 
-        # Test 4: Check a script with bashisms (exit 1 is expected, use || true)
+        # Test 4: Check a script with bashisms (exit 1 is expected)
         bashism_script = os.path.join(self.source_folder, "bashism_script.sh")
-        self.run(f'"{bin_path}" "{bashism_script}" || true', env="conanrun")
+        rc = self.run(f'"{bin_path}" "{bashism_script}"', env="conanrun", ignore_errors=True)
+        assert rc != 0, f"Expected non-zero exit code (bashisms detected), got {rc}"
