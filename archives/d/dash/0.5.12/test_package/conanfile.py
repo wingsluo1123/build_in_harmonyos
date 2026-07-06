@@ -2,6 +2,7 @@
 """Conan test_package — dash 0.5.12
 
 Tests that the dash binary is installed and functional.
+Verifies arithmetic, variables, conditionals, and loops.
 """
 import os
 
@@ -25,6 +26,7 @@ class DashTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Test dash binary directly — dash has no --version flag, use -c to run a command
         dash_bin = os.path.join(self.dependencies["dash"].package_folder, "bin", "dash")
-        self.run(f'"{dash_bin}" -c "exit 0"')
+        # Run the compiled test program with dash binary path as argument
+        test_exe = os.path.join(self.build_folder, "test_dash")
+        self.run(f'"{test_exe}" "{dash_bin}"')
