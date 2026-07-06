@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-string-random/0.32-r2
+homepage: "https://metacpan.org/release/String-Random"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/01_use.t
+    source: String-Random-0.32/t/01_use.t
+    description: "Basic use/require test"
+    command: "perl -Iblib/lib t/01_use.t"
+  - file: t/02_new.t
+    source: String-Random-0.32/t/02_new.t
+    description: "Constructor test"
+    command: "perl -Iblib/lib t/02_new.t"
+  - file: t/03_random_string.t
+    source: String-Random-0.32/t/03_random_string.t
+    description: "Random string generation test"
+    command: "perl -Iblib/lib t/03_random_string.t"
+  - file: t/04_randpattern.t
+    source: String-Random-0.32/t/04_randpattern.t
+    description: "randpattern method test"
+    command: "perl -Iblib/lib t/04_randpattern.t"
+  - file: t/05_randregex.t
+    source: String-Random-0.32/t/05_randregex.t
+    description: "randregex method test"
+    command: "perl -Iblib/lib t/05_randregex.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "消费者测试：验证 String::Random 可加载并生成随机字符串"
+    command: "perl -e 'use String::Random; ...'"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 202
