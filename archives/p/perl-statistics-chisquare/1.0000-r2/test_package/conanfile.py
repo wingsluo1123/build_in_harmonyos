@@ -21,12 +21,5 @@ class PerlstatisticschisquareTestConan(ConanFile):
         if not pm_files:
             raise Exception("Statistics/ChiSquare.pm not found in package")
         perl_lib_dir = os.path.dirname(os.path.dirname(pm_files[0]))
-        # Write test script to the build folder (not /tmp — E002: /tmp is read-only on OHOS)
-        test_script = os.path.join(self.build_folder, "test_statistics_chisquare.pl")
-        with open(test_script, "w") as f:
-            f.write("use Statistics::ChiSquare;\n")
-            f.write("my @data = (500, 500);\n")
-            f.write("my $result = chisquare(@data);\n")
-            f.write("print $result . \"\\n\";\n")
-            f.write("print \"OK\\n\" if $result;\n")
-        self.run('PERL5LIB="{}" perl {}'.format(perl_lib_dir, test_script))
+        test_script = os.path.join(self.recipe_folder, "run_test.sh")
+        self.run(f'sh "{test_script}" "{perl_lib_dir}"')
