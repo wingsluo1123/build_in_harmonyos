@@ -3,8 +3,11 @@
 
 Build system: perl Makefile.PL + make + make install
 No compiled code — pure Perl, no XS, no C dependencies.
-Runtime dependencies: Class::Accessor::Lite, List::MoreUtils, Proc::Wait3,
-                       Scope::Guard, Signal::Mask
+Runtime dependencies (Perl modules, not Conan packages):
+  Class::Accessor::Lite, List::MoreUtils, Proc::Wait3,
+  Scope::Guard, Signal::Mask
+Note: Proc::Wait3 is an XS module whose .so cannot load from HMDFS
+on OHOS due to SELinux restrictions. See notes.md for details.
 """
 import os
 
@@ -28,6 +31,10 @@ class PerlparallelpreforkConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
+        # Runtime Perl module dependencies are not Conan packages;
+        # they are installed via perl/cpanm on the target system.
+        # Proc::Wait3 is an XS module — on OHOS its .so must be
+        # installed to /data/service/hnp to bypass SELinux HMDFS restrictions.
         pass
 
     def layout(self):
