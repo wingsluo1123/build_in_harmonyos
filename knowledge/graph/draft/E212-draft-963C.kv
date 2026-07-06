@@ -1,0 +1,18 @@
+# E212: Go 二进制项目 Conan 构建方法
+# Draft by 963C
+
+error_signature: go build|Go binary|golang project|no configure script|go: command not found
+root_cause: ohc-run.py conan-init 默认使用 Autotools 模板生成 conanfile.py（configure + make），但 Go 项目使用 go build，没有 configure 脚本和 Makefile。生成的 Autotools 配方在 Go 项目上完全不可用，必须手动重写 conanfile.py。
+match_keywords: Go, golang, go build, binary tool, no autotools, no configure
+rec_description: Go 二进制项目需要手动编写 conanfile.py：
+  1. build() 中使用 self.run("go build -trimpath -ldflags \"...\" -o <name> github.com/...") 
+  2. 去除 AutotoolsToolchain/Autotools 的 import
+  3. package() 中从 self.build_folder 复制二进制（Go 在 build-release 子目录中构建）
+  4. package_info() 中清空 cpp_info.libs/includedirs/libdirs
+  5. 设置 self.runenv_info.define("PATH", bin_path) 使 test_package 能找到二进制
+  6. test_package 中直接 self.run("<binary> --version")
+rec_command: sed -i 's/AutotoolsToolchain/AutotoolsToolchain/' # N/A, 需要完全重写 build()/package()
+affected_scope: 所有 Go 语言项目（非 C/C++ 库）
+verification_cmd: python3 ohc-run.py conan-verify <name> <version>
+category: build_system
+priority: 3
