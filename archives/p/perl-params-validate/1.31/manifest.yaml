@@ -1,0 +1,81 @@
+software: perl-params-validate
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.31/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.31"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/D/DR/DROLSKY/Params-Validate-1.31.tar.gz"
+
+  # 源码校验和
+  sha256: "1bf2518ef2c4869f91590e219f545c8ef12ed53cf313e0eb5704adf7f1b2961e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+  build_system: perl-module-build
+
+  # 配置选项列表
+  configure_options:
+    - "perl Build.PL"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - perl/5.42.0 (Module::Build)
+    - musl/1.2.x (C 标准库头文件)
+    - clang (鸿蒙编译器)
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+# conanfile.py 通过 _patch_for_ohos() 方法内联修改 inc/MyMBClass.pm
+# 不使用外部 patch 文件
+patches_applied:
+  - "inc/MyMBClass.pm: 内联覆盖 cbuilder() 方法 (E137: 移除 -fstack-protector-strong, 添加 musl 头文件/库路径, 强制 clang 链接器)"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Perl 5.42.0 on OHOS 的 lddlflags 包含 -fstack-protector-strong，ld.lld 拒绝该参数 (E137)"
+  - "Module::Build 通过 inc/MyMBClass.pm 的 cbuilder() 方法可覆盖 ExtUtils::CBuilder 配置"
+  - "musl C 库头文件不在默认搜索路径，需通过 ccflags 的 -I 参数添加"
+  - "鸿蒙系统库在 /system/lib64，需通过 lddlflags 的 -L 参数添加"
+  - "Perl XS 模块编译需要强制使用 clang 作为链接器驱动 (非 ld.lld)"
+  - "PP 模式功能测试 10/10 全部通过 (validate, validate_pos, validate_with, 正则约束, 类型检查)"
+  - "XS 模式受 SELinux HMDFS 限制，Module::Implementation 自动降级到 PP 模式"
