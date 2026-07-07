@@ -12,7 +12,7 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class PerlparallelpipesConan(ConanFile):
@@ -53,6 +53,9 @@ class PerlparallelpipesConan(ConanFile):
         # Find the installed .pm files and copy them to lib/ at package root
         # so that G4 (product integrity check) can find standard lib/ directory
         pm_files = glob.glob(os.path.join(staging, "**", "Parallel", "Pipes.pm"), recursive=True)
+        if not pm_files:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise Exception("Parallel/Pipes.pm not found in staging — package is empty, upstream install layout may have changed")
         if pm_files:
             # Determine the Perl lib root (parent of Parallel/)
             perl_lib_root = os.path.dirname(os.path.dirname(pm_files[0]))
