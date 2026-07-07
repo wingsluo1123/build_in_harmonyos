@@ -38,14 +38,14 @@ class LibqalculateConan(ConanFile):
         # (e.g., network-restricted environment), fall back to a local copy.
         try:
             get(self, **self.conan_data["sources"], strip_root=True)
-        except Exception:
+        except Exception as e:
             local = os.path.expanduser("~/libqalculate-5.11.0.tar.gz")
             if os.path.exists(local):
                 get(self, "file://" + local,
                     sha256=self.conan_data["sources"]["sha256"],
                     strip_root=True)
             else:
-                raise
+                raise e
 
     def generate(self):
         # System dependencies (gmp, mpfr, readline, libxml2) are pre-installed
@@ -68,6 +68,36 @@ class LibqalculateConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+
+        # Feature detection: check pthread_cancel availability (R8 compliance).
+        # Uses Conan build env (not bare shell vars) to compile a test program.
+        # If functions are unavailable (e.g., OHOS), generates an empty header
+        # so #ifdef HAVE_PTHREAD_* guards resolve to false.
+        test_c = (
+            '#include <pthread.h>\n'
+            'int main(){pthread_cancel(0);'
+            'pthread_setcancelstate(0,0);'
+            'pthread_setcanceltype(0,0);return 0;}\n'
+        )
+        test_file = os.path.join(self.source_folder, "_pthread_test.c")
+        header_path = os.path.join(self.source_folder, "libqalculate",
+                                   "pthread_compat.h")
+        with open(test_file, "w") as f:
+            f.write(test_c)
+
+        try:
+            self.run(f"$CC -c {test_file} -o /dev/null 2>/dev/null",
+                     env="conanbuild")
+            with open(header_path, "w") as f:
+                f.write("#pragma once\n")
+                f.write("#define HAVE_PTHREAD_CANCEL 1\n")
+                f.write("#define HAVE_PTHREAD_SETCANCELSTATE 1\n")
+                f.write("#define HAVE_PTHREAD_SETCANCELTYPE 1\n")
+        except Exception:
+            with open(header_path, "w") as f:
+                f.write("#pragma once\n")
+                f.write("/* pthread_cancel not available on this platform */\n")
+
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()

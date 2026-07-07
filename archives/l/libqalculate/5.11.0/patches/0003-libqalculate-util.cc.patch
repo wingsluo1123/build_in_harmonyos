@@ -1,8 +1,8 @@
 diff -ruN a/libqalculate/util.cc b/libqalculate/util.cc
 --- a/libqalculate/util.cc
 +++ b/libqalculate/util.cc
-@@ -1152,22 +1152,24 @@
- 
+@@ -1152,22 +1152,25 @@
+
  void Thread::doCleanup(void *data) {
  	Thread *thread = (Thread *) data;
  	thread->running = false;
@@ -10,40 +10,44 @@ diff -ruN a/libqalculate/util.cc b/libqalculate/util.cc
  	mpfr_free_cache2(MPFR_FREE_LOCAL_CACHE);
  #endif
  }
- 
+
++#include "pthread_compat.h"
++
  void Thread::enableAsynchronousCancel() {
-+#ifndef __OHOS__
+-#ifndef __OHOS__
++#ifdef HAVE_PTHREAD_SETCANCELSTATE
  	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
  	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-+#endif
+ #endif
  }
- 
+
  void *Thread::doRun(void *data) {
- 
+
  	pthread_cleanup_push(&Thread::doCleanup, data);
- 
+
  	Thread *thread = (Thread *) data;
  	thread->run();
- 
+
  	pthread_cleanup_pop(1);
-@@ -1176,16 +1178,20 @@
+@@ -1176,16 +1179,18 @@
  }
- 
+
  bool Thread::start() {
  	if(running) return true;
  	running = pthread_create(&m_thread, &m_thread_attr, &Thread::doRun, this) == 0;
  	return running;
  }
- 
+
  bool Thread::cancel() {
  	if(!running) return true;
-+#ifndef __OHOS__
+-#ifndef __OHOS__
++#ifdef HAVE_PTHREAD_CANCEL
  	running = pthread_cancel(m_thread) != 0;
-+#else
-+	running = false;
-+#endif
+-#else
+-	running = false;
+ #endif
  	return !running;
  }
- 
- 
+
+
  #endif

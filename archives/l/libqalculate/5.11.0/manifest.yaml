@@ -75,7 +75,7 @@ patches_applied:
 knowledge_gained:
   - "HarmonyOS 的 config.guess 不包含 HarmonyOS/__OHOS__ 检测分支，需要手动添加 aarch64:HarmonyOS case 将其映射为 aarch64-unknown-linux-gnu"
   - "HMDFS 文件系统不支持 umask 077 与 mktemp -d 组合创建安全临时目录，需要移除 umask 077 调用"
-  - "OHOS 平台不支持 pthread_cancel/pthread_setcancelstate/pthread_setcanceltype，需要用 __OHOS__ 宏守卫这些调用"
+  - "OHOS 平台不支持 pthread_cancel/pthread_setcancelstate/pthread_setcanceltype，使用编译期特性检测 (HAVE_PTHREAD_*) 替代平台宏守卫 (R8)"
   - "CMake 在 OHOS 平台上不识别 HarmonyOS 系统名称，test_package 需要设置 CMAKE_SYSTEM_NAME=Linux 作为变通方案 (E092)"
   - "Autotools 构建需要设置 CONFIG_SHELL=/usr/bin/sh 和 SHELL=/usr/bin/sh 以避免 OHOS 默认 shell 兼容性问题"
   - "系统依赖 (gmp/mpfr/readline/libxml2) 通过 pkg-config 发现，需要设置 PKG_CONFIG_PATH 指向 ~/usr/local/lib/pkgconfig"
@@ -95,12 +95,12 @@ patch_classification:
   - file: 0001-config.guess.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'feature_detection'
   - file: 0002-configure.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'feature_detection'
   - file: 0003-libqalculate-util.cc.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'feature_detection'

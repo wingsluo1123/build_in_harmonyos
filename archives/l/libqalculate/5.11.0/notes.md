@@ -41,7 +41,7 @@
 
 ### 补丁 0003: libqalculate-util.cc.patch
 - **文件**: libqalculate/util.cc
-- **修改**: 用 `#ifndef __OHOS__` 守卫 `pthread_setcancelstate`、`pthread_setcanceltype` 和 `pthread_cancel` 调用
+- **修改**: 用编译期特性检测 `#ifdef HAVE_PTHREAD_CANCEL` 等宏守卫 pthread 取消函数调用（R8 合规，不使用平台宏）
 
 ## 依赖版本
 
