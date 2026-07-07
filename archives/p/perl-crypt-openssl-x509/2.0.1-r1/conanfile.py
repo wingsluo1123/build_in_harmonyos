@@ -125,9 +125,24 @@ class PerlCryptOpensslX509Conan(ConanFile):
 
         self._setup_env()
 
+        # Ensure OpenSSL development headers are available.
+        # CI workers may only have the runtime .so without dev headers.
+        prefix = self._openssl_prefix
+        if not os.path.isfile(os.path.join(prefix, "include", "openssl", "asn1.h")):
+            self.output.info("OpenSSL headers not found, installing via cmd-pkgs...")
+            _home = os.path.expanduser("~")
+            _tmp = os.path.join(_home, "tmp")
+            os.makedirs(_tmp, exist_ok=True)
+            _script = os.path.join(_tmp, "cmd-pkgs-install.sh")
+            self.run(f'curl -fsSL -o "{_script}" '
+                     'https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh')
+            self.run(f'sh "{_script}" openssl 3.5.6')
+            # Re-detect prefix and re-setup env with installed OpenSSL
+            self._setup_env()
+            prefix = self._openssl_prefix
+
         # Step 1: Configure (perl Makefile.PL) — pass INC/LIBS explicitly
         # to ensure compiler finds OpenSSL headers even if Guess module fails
-        prefix = self._openssl_prefix
         inc = f"-I{prefix}/include"
         libs = f"-L{prefix}/lib -lssl -lcrypto"
         self.run(
