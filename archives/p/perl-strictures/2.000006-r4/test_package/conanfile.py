@@ -16,8 +16,7 @@ class PerlstricturesTestConan(ConanFile):
         pass
 
     def test(self):
-        # Smoke test: verify strictures module loads and import succeeds
-        # Full functional testing is done via upstream `make test` in build()
         dep = self.dependencies["perl-strictures"]
         perl_lib = os.path.join(dep.package_folder, "lib")
-        self.run(f'perl -I{perl_lib} -Mstrictures -e "strictures->import; exit 0"')
+        test_script = os.path.join(self.source_folder, "run_test.sh")
+        self.run(f'sh "{test_script}" "{perl_lib}"')
