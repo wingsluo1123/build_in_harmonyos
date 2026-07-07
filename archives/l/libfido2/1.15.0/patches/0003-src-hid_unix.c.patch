@@ -8,6 +8,7 @@ diff -ruN a/src/hid_unix.c b/src/hid_unix.c
   */
  
  #include <sys/stat.h>
+@@ -9,20 +9,34 @@
  
  #include <errno.h>
  #include <fcntl.h>
@@ -24,6 +25,18 @@ diff -ruN a/src/hid_unix.c b/src/hid_unix.c
 +/* HarmonyOS lacks ppoll, use poll + sigprocmask workaround */
 +#ifdef __OHOS__
 +#define PPOLL_WORKAROUND 1
++#ifdef __OHOS__
++/* HarmonyOS doesn't have ppoll, use poll instead */
++static inline int ohos_ppoll(struct pollfd *fds, nfds_t nfds,
++                              const struct timespec *ts, const sigset_t *mask) {
++	(void)mask;  /* sigmask not supported in poll */
++	int timeout_ms = -1;
++	if (ts != NULL) {
++		timeout_ms = (int)(ts->tv_sec * 1000 + ts->tv_nsec / 1000000);
++	}
++	return poll(fds, nfds, timeout_ms);
++}
++#define ppoll(fds, nfds, ts, mask) ohos_ppoll((fds), (nfds), (ts), (mask))
  #endif
  
  int
