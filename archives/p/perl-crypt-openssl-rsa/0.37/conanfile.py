@@ -264,3 +264,8 @@ class PerlcryptopensslrsaConan(ConanFile):
         self.buildenv_info.append_path("PERL5LIB", perl_lib)
         # rsa_helper binary (SELinux workaround for OHOS)
         self.cpp_info.bindirs = ["bin"]
+        # Explicitly set RSA_HELPER so the Perl wrapper can find the binary
+        # without relying on -x checks (OHOS SELinux may not set execute bit)
+        rsa_helper_path = os.path.join(self.package_folder, "bin", "rsa_helper")
+        self.runenv_info.define("RSA_HELPER", rsa_helper_path)
+        self.buildenv_info.define("RSA_HELPER", rsa_helper_path)

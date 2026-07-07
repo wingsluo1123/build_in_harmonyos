@@ -26,14 +26,16 @@ my %DEFAULT = (
 );
 
 # Find the rsa_helper binary
+# Uses -f instead of -x because OHOS SELinux may not report the execute
+# bit correctly (E046), even though the binary is executable at the OS level.
 sub _find_helper {
-    return $ENV{RSA_HELPER} if $ENV{RSA_HELPER} && -x $ENV{RSA_HELPER};
+    return $ENV{RSA_HELPER} if $ENV{RSA_HELPER} && -f $ENV{RSA_HELPER};
     for my $dir (split /:/, $ENV{PATH} || '') {
         my $path = File::Spec->catfile($dir, 'rsa_helper');
-        return $path if -x $path;
+        return $path if -f $path;
     }
     my $default = File::Spec->catfile($ENV{HOME} // '/storage/Users/currentUser', 'usr', 'local', 'bin', 'rsa_helper');
-    return $default if -x $default;
+    return $default if -f $default;
     die "rsa_helper binary not found. Set RSA_HELPER env var to its path.\n";
 }
 
