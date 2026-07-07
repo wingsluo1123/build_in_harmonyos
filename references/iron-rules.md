@@ -1,207 +1,426 @@
-> 本文件从 SKILL.md v4.8 提取，详细内容供按需加载。
+> 本文件从 SKILL.md 提取，详细内容供按需加载。
 
 # 铁律与 AI 执行风格规范
 
 来源: SKILL.md §1.2
 
-## 十四条铁律（违反任何一条都是 bug）
+## 铁律总表（32 条，违反=bug）
 
 | # | 规则 | 正确做法 | 禁止 |
 |---|------|---------|------|
 | R1 | **参数最少化** | `./configure --prefix=$P && make` | 加 `--build/--host`/CFLAGS hack |
-| R2 | **Phase 3 不生成 .patch** | 只改源码+记录到 notes.md | diff/sed 结果写文件 |
+| R2 | **探索阶段不生成 .patch** | 只改源码+记录到 notes.md | diff/sed 结果写文件 |
 | R3 | **补丁只用 ohc-run.py refresh-patch** | `ohc-run.py refresh-patch --auto` | 手动 diff/AI 写 patch |
-| R4 | **危险库必须静态编译** | ncurses `--without-shared` | 编译共享库导致系统崩溃 |
+| R4 | **危险库静态编译** | 在 conanfile.py `generate()` 中设置 `--without-shared` / `BUILD_SHARED_LIBS=OFF`（R26 子集） | 编译共享库导致系统崩溃 |
 | R5 | **软链接必须验证可执行 + 禁止 ln -sf** | `ls -la` 验证 + `rm -f && ln -s` | 只检查 `-L` 存在性 / `ln -sf` 覆盖 |
 | R6 | **禁止修改生成文件** | 只改 configure.ac/CMakeLists.txt/*.c/*.h（源码层） | sed 改 configure/Makefile/Makefile.in（不可复现） |
-| R7 | **安全弹窗必须先触发再测试** | make install DESTDIR 后 `find $TEST_PREFIX/$DEFAULT_PREFIX/bin -type f -exec {} --version \;` | 直接跑 make check 不触发弹窗→进程被杀→假阴性 |
+| R7 | **安全弹窗必须先触发再测试** | make install 后 `find bin -type f -exec {} --version \;` | 直接跑 make check 不触发弹窗→进程被杀→假阴性 |
 | R8 | **源码修改"四不"准则** | `#ifdef __OHOS__` 守卫 / 保持上游风格 / 追加平台分支 | 删跨平台代码 / 硬编码路径 / 改原逻辑流 / 偏离代码风格 |
-| R9 | **质量门禁 FAIL 禁止标 success** | ohc-run.py verify-build 非零 → partial 或 failed | 产物有问题仍标记成功分发 |
+| R9 | **质量门禁 FAIL 禁止标 success** | conan_verify 非零 → 降级为 built/failed | 产物有问题仍标记成功 |
 | R10 | **临时文件必须用 $TMPDIR** | 所有 tmp 文件操作使用 `$TMPDIR` 或 `$HOME/tmp` | 硬编码 `/tmp`（鸿蒙 /tmp 只读，见 E002） |
-| **R11** | **脚本步骤失败必须先查归档再动手** | 读 `archives/{pkg}/{ver}/README.md` + `manifest.yaml` 获取历史方案 | 直接手动摸索 / 忽略已有补丁和解决方案 |
-| **R12** | **遇到错误必须先匹配错误模式再修复** | 搜索 `knowledge/error-patterns.md` + 同类软件 manifest 的 known_issues | 凭直觉试错 / 重复踩已知坑 |
-| **R13** | **脚本调用必须使用完整路径** | `python3 $SKILL_ROOT/scripts/ohc-run.py <command>` | `./scripts/xxx` 相对路径（工作目录不固定时调用失败） |
-| **R14** | **脚本失败=手动模式入口，非终止** | 失败时按提示切换手动模式，完成后 `--resume-from=StepN` 继续 | 脚本 exit 后 AI 放弃/什么都不做（如 automake 会话） |
-| **R21** | **Phase 3 结束必须自检零介入** | 按 compile-guide.md §2.4.1 清单逐项检查 | 不自检就调 finish |
-| **R22** | **finish 前必须通过干净构建验证** | `ohc-run.py clean-verify` 通过 | G0 FAIL 仍标 success |
-| **R23** | **平台检测机制优先于改生成文件** | 用 hints/config.guess/cmake 检查 | 手动 sed config.sh/config.h |
+| R11 | **脚本步骤失败必须先查归档再动手** | 读 `archives/{pkg}/{ver}/README.md` + `manifest.yaml` 获取历史方案 | 直接手动摸索 / 忽略已有补丁和解决方案 |
+| R12 | **遇到错误必须先匹配错误模式再修复** | 搜索 `knowledge/error-patterns.md` + 引擎匹配 graph/index.tsv | 凭直觉试错 / 重复踩已知坑 |
+| R13 | **脚本调用必须使用完整路径** | `python3 $SKILL_ROOT/scripts/ohc-run.py <command>` | `./scripts/xxx` 相对路径 |
+| R14 | **脚本失败=手动模式入口，非终止** | 失败时按提示切换手动模式，完成后 `--resume-from=StepN` 继续 | 脚本 exit 后 AI 放弃 |
+| R15 | **历史仅供参考，不盲从** | 实际参数以本次编译为准，成功后回写 manifest + conanfile.py | 盲目复用历史错误参数 |
+| R16 | **协作不越权** | 不推送 main，走 PR 流程 | 直接推送 main 分支 |
+| R17 | **知识先草稿** | graph add --draft | 直接写正式图谱 |
+| R18 | **依赖先查预编译** | resolve-deps --install 优先于手动编译 | 直接手动编译依赖 |
+| R19 | **禁止手动打包，必须用 conan create** | `conan create` 构建 + `conan upload` 发布 | 手动 `tar czf` / 手动 install.sh |
+| R20 | **~~DESTDIR 模式~~（已废弃）** | Conan 自带构建隔离 | 手动 DESTDIR staging |
+| R21 | **探索阶段结束必须自检零介入** | 按 compile-guide.md 清单逐项检查，所有手动操作已固化为 conanfile.py | 不自检就调 finish |
+| R22 | **finish 前必须通过 conan 验证** | `conan_verify` PASS（conan create 从干净源码构建成功） | conan verify 失败仍标 success |
+| R23 | **平台检测机制优先于改生成文件** | 用 hints/config.guess/cmake 检查 | 手动 sed config.sh/config.h |
+| R24 | **归档清理：failed必删，空归档删** | 无产物无补丁的归档无价值 | 保留无用归档 |
+| R25 | **notes.md 防重复：先删后写** | finish 自动清理旧记录，只保留最后一次 | 多次 finish 产生重复记录 |
+| **R26** | **系统同名库禁止动态链接** | conanfile.py `generate()` 中对系统同名库强制 `BUILD_SHARED_LIBS=OFF` / `-static` | 构建系统同名 .so 污染 `/lib`/`/lib64` 导致其他应用崩溃 |
+| **R27** | **依赖引用必须 @ohpcd/stable** | `self.requires("name/ver@ohpcd/stable")` | 裸 `self.requires("name/ver")` |
+| **R28** | **conanfile.py 必须有 test_package/** | 生成 conanfile.py 时同时生成 test_package/ | 只有 conanfile.py 没有测试 |
+| **R29** | **conan_verify 通过后才标记 published** | `ohc-run.py conan-verify` PASS + CI upload → published；PASS 未 upload → built；FAIL → failed | conan create 失败仍标记 published |
+| **R30** | **conan-verify 失败必须查询知识图谱** | G2 失败时调用 `run_engine()` 匹配 E-entry | 只打印错误不查图谱 |
+| **R31** | **知识图谱未命中必须生成草稿** | `knowledge/drafts/DRAFT-*.kv` 自动生成 | 未命中的错误丢弃不沉淀 |
+| **R32** | **Conan recipe 平台判断兼容 OHOS** | `self.settings.os in ("Linux", "OHOS")` | `self.settings.os == "Linux"` |
+| **R33** | **build() 禁止依赖未定义 shell 环境变量** | 从 Conan Toolchain / `self.conf_info` / `AutotoolsToolchain` 获取编译器路径与标志 | 裸用 `${CC}` / `${CFLAGS}` / `${CXX}` 等 shell 变量 |
 
 ---
 
-### R21 详细说明：Phase 3 自包含性检查
+### R4 详细说明：危险库静态编译（R26 子集）
 
-Phase 3 是试错阶段，AI 可能通过手动操作绕过问题（直接改 config.sh、手动编译 .o、手动 cp 文件等）。这些操作在调试阶段是合理的，但**不能作为交付物**。
+> R4 是 R26 的特例：某些库（如 ncurses）一旦构建为共享库会直接导致系统崩溃，这些库同时是系统同名库的极端案例。
 
-Phase 3 结束时，AI 必须自检：所有手动操作是否已固化为补丁/Makefile 规则/hints 配置？
-如果还有未固化的手动操作，说明补丁不自包含，`ohc-run.py finish` 会在 G0 阶段失败。
+危险库（如 ncurses）编译为共享库会导致鸿蒙系统崩溃。这些库同时也是系统同名库（R26），在 conanfile.py 中：
 
-**perl 5.42.2 教训**：编译成功后回头整理 patch 时，才发现 Configure 中 266 处 `./script` → `sh ./script` 的修改、installperl 的可写检查删除、hints 中缺少的 `runnm=false` 等问题。如果在 Phase 3 结束时就做自检 + G0 干净验证，可以在 finish 之前一次性修复。
+```python
+# CMake 项目
+def generate(self):
+    tc = CMakeToolchain(self)
+    tc.variables["BUILD_SHARED_LIBS"] = False  # R26: 系统同名库静态
+    tc.generate()
 
-### R22 详细说明：干净构建验证（G0）
+# Autotools 项目（ncurses 特殊参数）
+def generate(self):
+    tc = AutotoolsToolchain(self)
+    tc.configure_args.append("--without-shared")  # ncurses 特殊参数
+    tc.configure_args.append("--disable-shared")   # R26 通用静态
+    tc.generate()
+```
 
-`ohc-run.py finish` 的 Step 3 (verify-build) 之前，自动执行 G0 干净构建验证：
-1. 解压原始 tarball 到临时目录
-2. 应用所有 patches/*.patch
-3. 运行 ./configure（使用 manifest 中的 configure_options）
-4. make
-5. make install
-6. 检查产物
-
-任何步骤失败 → 输出 HANDOFF 块 → AI 修复 → 重新 G0 验证。
-G0 不通过 = finish 阻塞（同 R9: 质量门禁 FAIL 禁标 success）。
-
-### R23 详细说明：平台检测机制优先
-
-许多软件构建系统提供了平台检测钩子。修改生成文件（config.h/config.sh/Makefile）是**最后手段**。
-
-优先级：
-1. 软件自带的平台检测机制（hints/config.guess/cmake 检查）
-2. 源文件（configure.ac/CMakeLists.txt/*.c）
-3. 生成文件（configure/Makefile）—— 仅作为最后手段
-
-手动 `sed -i` config.sh 是调试手段，不是交付物。交付时必须通过 Configure 参数或平台检测机制替代。
+| 危险库 | 特殊参数 | 原因 |
+|--------|---------|------|
+| ncurses | `--without-shared` | .so 与系统同名，加载导致系统崩溃 |
+| readline | `--disable-shared` | .so 与系统同名 |
+| zlib | `BUILD_SHARED_LIBS=OFF` | .so 与系统同名 |
 
 ---
 
-## R8 详细说明：源码修改"四不"准则
+### R19 详细说明：禁止手动打包（v3.0 强化）
+
+> **v3.0 变革**：手动 tar.gz + install.sh 打包完全废弃，由 Conan 体系替代。
+
+```
+❌ 禁止: ohc-run.py package → tar.gz → install.sh → curl | sh
+✅ 正确: conanfile.py → conan create → conan upload → conan install
+```
+
+**原因**：
+1. 手动 tar.gz 的 ELF 未签名（鸿蒙上不可执行）
+2. 手动打包缺少 RPATH、未 strip 符号
+3. install.sh 维护成本高，每个软件一个
+4. Conan 体系自带依赖解析、版本管理、产物隔离
+
+**废弃的模块**：
+- `package_builder.py` — 9步 tar.gz 打包管线
+- `sign_elf.py` — ELF 签名（由 ci/artifacts/sign.sh 替代）
+- `packaging/` 目录 — 不再生成
+
+---
+
+### R20 详细说明：~~DESTDIR 模式~~（已废弃）
+
+> **v3.0 废弃**：Conan 自带构建隔离，不再需要手动 DESTDIR staging。
+
+| 旧模式 (v2.x) | 新模式 (v3.0) |
+|--------------|--------------|
+| `configure --prefix=$DEFAULT_PREFIX` | conanfile.py `settings` + `layout` |
+| `make install DESTDIR=$TEST_PREFIX` | `conan create` 自动隔离 |
+| `ohc-run.py package` 从 staging 打包 | `conan create` 自动打包 |
+| 手动 G1-G4 验证 | `conan_verify` + 五级测试 |
+
+**探索阶段仍可用 DESTDIR**：AI 在探索性编译时可以用 `make install DESTDIR=...` 验证产物，
+但最终交付必须是 conanfile.py + `conan create`，不是手动 DESTDIR 产物。
+
+---
+
+### R26 详细说明：系统同名库禁止动态链接
+
+> **策略变更**：旧版要求所有终端工具一律静态链接，因为早期无 Conan 依赖管理，用户无法自动下载依赖链。
+> 现在由 Conan 管理依赖链，**默认改为动态链接**，仅系统同名库保留静态约束。
+
+**核心原因**：构建产出的 `.so` 如果与系统 `/lib`、`/lib64` 下已有 `.so` 同名，
+安装后会覆盖系统库，导致其他应用加载错误版本而崩溃。
+
+**链接策略**：
+
+| 类型 | 链接方式 | 说明 |
+|------|----------|------|
+| 系统同名库 | **必须静态** | `.so` 名与 `/lib`、`/lib64` 冲突 → 静态链接 |
+| 其他库 | **默认动态** | Conan 管理依赖链，`conan install` 自动拉取全部传递依赖 |
+
+**系统同名库判断**：
+```bash
+ls /lib*/**/lib<name>.so* /lib/**/lib<name>.so* 2>/dev/null
+# 如果有同名 → 必须静态链接
+```
+
+**依赖管理原则**：
+- 所有第三方依赖**必须在 `requirements()` 显式声明**
+- **禁止**硬编码系统路径（`-L/storage/.../usr/local/lib`）
+- 系统库仅限 libc/libm/libdl 等基础运行时
+
+**各构建系统静态配置（仅系统同名库使用）**：
+
+| 构建系统 | 静态链接配置 | 在 conanfile.py 中的位置 |
+|----------|-------------|------------------------|
+| CMake | `tc.variables["BUILD_SHARED_LIBS"] = False` | `generate()` |
+| Autotools | `--disable-shared --enable-static` | `generate()` |
+| Makefile | 只编译静态目标（不编译 shared） | `build()` |
+| Meson | `tc.project_options["default_library"] = "static"` | `generate()` |
+
+---
+
+### R27 详细说明：依赖引用必须 @ohpcd/stable
+
+所有 conanfile.py 中的依赖引用必须使用完整格式：
+
+```python
+# ✅ 正确
+def requirements(self):
+    self.requires("openssl/1.1.1w@ohpcd/stable")
+    self.requires("zlib/1.3.1@ohpcd/stable")
+
+# ❌ 错误 — 缺少 user/channel
+def requirements(self):
+    self.requires("openssl/1.1.1w")
+    self.requires("zlib/1.3.1")
+```
+
+**原因**：
+1. CI 的 `conan create` 使用 `--user=ohpcd --channel=stable` 统一注入
+2. 依赖图的自动生成靠解析 `self.requires(...)` 中的 `@ohpcd/stable`
+3. CNB Conan 制品仓的包标识格式为 `{name}/{version}@{user}/{channel}`
+
+---
+
+### R28 详细说明：conanfile.py 必须有 test_package/
+
+每个 conanfile.py 必须配套 `test_package/` 目录，作为 Conan L1 官方测试。
+
+**最低要求**：
+- `test_package/conanfile.py` — 测试配方
+- `test_package/CMakeLists.txt` 或 `test.c` — 验证程序
+
+**CI 行为**：`conan create` 在构建完成后自动执行 `test_package/`，失败则整体失败。
+
+**模板**：参见 `templates/test_package/`
+
+---
+
+### R29 详细说明：conan_verify 通过后才标记 published
+
+```
+探索性编译成功 → 生成 conanfile.py → conan_verify
+                                    ├─ PASS → status=published
+                                    └─ FAIL → status=built (需修复)
+```
+
+`conan_verify` 执行：
+1. `conan create` 从干净源码构建（验证配方自包含性）
+2. `conan test` 执行 test_package（L1 测试）
+3. `readelf -d` 检查系统同名库未输出 .so 到系统路径（R26）
+4. 产物完整性检查（bin/lib/include）
+
+只有 conan_verify PASS 才能标记 `status: published`。
+
+---
+
+### R30 详细说明：conan-verify 失败必须查询知识图谱
+
+> **核心原则**：探索阶段（Step 3-8）已有知识图谱匹配，Conan 阶段（Step 9-10）同样必须查询。
+
+当 `conan create` 在 G2 门禁失败时，`conan_verify.py` 自动调用 `engine.py` 的 `run_engine()`：
+
+```
+conan create 失败
+  ↓ 提取错误输出
+  ↓ run_engine(error_text)
+  ├─ 命中 E-entry → 展示根因 + 修复命令 + 详细文档
+  └─ 未命中 → 生成草稿（R31）
+```
+
+**已有的知识覆盖**：
+- E007: config.guess 不识别 HarmonyOS → 自动修复补丁
+- E011: mktemp -d 在 HMDFS 上权限异常 → umask 修复
+- E092: CMAKE_SYSTEM_NAME 不识别 → cmake toolchain 修复
+
+如果这些知识在 Conan 阶段被查询到，AI 可以直接应用修复而不需要重新探索。
+
+---
+
+### R31 详细说明：知识图谱未命中必须生成草稿
+
+> **核心原则**：每次编译中发现的新问题都不能丢弃，必须沉淀为知识。
+
+当 `run_engine()` 未匹配到任何 E-entry 时，`conan_verify.py` 的 `_create_draft_entry()` 自动：
+
+1. 提取错误关键词（`_extract_keywords()`）
+2. 截取错误摘录（前 1000 字符）
+3. 生成 `knowledge/drafts/DRAFT-NNN.kv` 文件
+4. 文件格式与正式 E-entry 一致，TODO 字段待填写
+
+**草稿提升流程**见 `knowledge/drafts/README.md`。
+
+**与 R17 的区别**：
+- R17: 手动新增知识也用草稿（`graph add --draft`）
+- R31: conan-verify 自动生成草稿（无需手动触发）
+
+---
+
+### R21 详细说明：探索阶段自包含性检查
+
+探索阶段是试错阶段，AI 可能通过手动操作绕过问题。结束时必须自检：所有手动操作是否已固化为 conanfile.py？
+
+**检查清单**：
+1. 所有 configure 参数 → 已写入 conanfile.py `generate()`
+2. 所有补丁 → 已在 conandata.yml 中声明
+3. 所有依赖 → 已在 conanfile.py `requirements()` 中声明
+4. 静态链接 → conanfile.py `generate()` 已设置
+5. test_package/ → 已创建且可运行
+
+---
+
+### R22 详细说明：conan 验证（替代旧 G0 干净构建）
+
+`conan create` 本身就是"干净构建"——Conan 从 tarball 下载源码、应用补丁、构建、安装到隔离目录。
+不需要单独的 G0 干净构建验证步骤。
+
+`finish` 的 Step 3 改为调用 `conan_verify`：
+1. `conan create archives/{l}/{name}/{ver}/ -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing --user=ohpcd --channel=stable`
+2. 检查退出码
+3. 检查产物完整性
+4. 检查静态链接
+
+---
+
+### R8 详细说明：源码修改"四不"准则
 
 > **核心原则：你的修改对非鸿蒙平台必须是透明的。**
-> **检验方法：去掉所有 `#ifdef __OHOS__` 块后，上游代码应与原始 tarball 一模一样。**
 
 | 不 | 含义 | 错误示例 | 正确做法 |
 |----|------|---------|---------|
 | **不破坏上游逻辑** | 不删除/反转/改变原有代码行为 | 删除某个 `if (linux)` 分支 | 用 `#elif defined(__OHOS__)` 追加新分支 |
-| **不破坏跨平台兼容性** | 不删除其他平台的已有适配 | 删掉 `#ifdef _WIN32` 块因为它"用不到" | 保留所有平台守卫，在旁边加 `__OHOS__` |
-| **不绕过鸿蒙标识机制** | 不硬编码平台特征 | `if (strstr(path, "/usr/local") != NULL)` | `#ifdef __OHOS__` + config.guess/sub 统一处理 |
-| **不偏离上游代码风格** | 缩进/命名/注释风格与项目一致 | 项目 4 空格你用 tab | 读周边 50 行代码，保持一致 |
+| **不破坏跨平台兼容性** | 不删除其他平台的已有适配 | 删掉 `#ifdef _WIN32` 块 | 保留所有平台守卫 |
+| **不绕过鸿蒙标识机制** | 不硬编码平台特征 | `if (strstr(path, "/usr/local") != NULL)` | `#ifdef __OHOS__` |
+| **不偏离上游代码风格** | 缩进/命名/注释风格与项目一致 | 项目 4 空格你用 tab | 读周边代码保持一致 |
 
-### 常见反模式（绝对禁止）
+---
 
-```bash
-# ❌ 硬编码路径 — 换设备就挂
-sed -i 's|/usr/bin|/data/local/tmp/usr/bin|g' Makefile
+### R32 详细说明：Conan recipe 平台判断兼容 OHOS
 
-# ❌ 删除跨平台检测 — 破坏 macOS/Windows 构建
-sed -i '/case.*darwin/d' config.sub
+> **核心原因**：目标平台 `os=OHOS`（见 profile `ohos-aarch64`）。如果 recipe 内部用 `self.settings.os == "Linux"` 做平台判断，OHOS 不命中，导致 Linux-like 行为（fPIC、system_libs 选择等）被错误跳过。
 
-# ❌ 条件注入 — 无法 upstream
-echo "#define OHOS_FIX 1" >> config.h
+```python
+# ❌ 禁止：OHOS 不命中
+if self.settings.os == "Linux":
+    self.cpp_info.system_libs = ["dl", "rt"]
 
-# ✅ 正确方式：平台守卫 + 可 upstream
-# 在 configure.ac 中追加:
-#   AC_CHECK_DECLS([__OHOS__], [ohos_fix=1])
-# 在 C 代码中:
-#   #if defined(__OHOS__)
-#   /* 鸿蒙特定修复 */
-#   #endif
+# ✅ 正确：OHOS 作为 Linux-like 平台同时命中
+if self.settings.os in ("Linux", "OHOS"):
+    self.cpp_info.system_libs = ["dl", "rt"]
 ```
+
+注意：绝大多数 recipe 不需要手动判断 `settings.os`——CMakeToolchain / AutotoolsToolchain 会自动处理平台差异。只有 recipe 内部确实需要按平台分支时（如选择 system_libs、条件编译选项等），才适用本规则。
+
+---
+
+### R33 详细说明：build() 禁止依赖未定义的 shell 环境变量
+
+> **核心原因**：CI/release worker 上 shell 环境变量（`$CC`、`$CFLAGS`、`$CXX` 等）可能未设置。在 `self.run()` 中裸用 `${CC}` 时，shell 展开为空字符串，导致 make 用空值编译——**编译静默失败（Error 127），但 make 继续执行**，最终 package() 打出空包，test() 找不到二进制。
+
+#### 典型反面案例（sponge/0.70 真实事故）
+
+```python
+# ❌ 禁止：$CC 和 $CFLAGS 在 release worker 上为空
+def build(self):
+    apply_conandata_patches(self)
+    self.run('make sponge -j1 CC="${CC}" CFLAGS="${CFLAGS} -Wall"')
+    # 实际执行: make sponge -j1 CC="" CFLAGS=" -Wall"
+    # make 输出: Wall sponge.c -o sponge → Wall: No such file or directory
+    # Error 127 (ignored by make) → 无 sponge 二进制 → test() 失败
+```
+
+#### 正确做法（按构建系统分类）
+
+**CMake 项目**（不需要手动传编译器，Toolchain 自动处理）：
+```python
+def build(self):
+    apply_conandata_patches(self)
+    cmake = CMake(self)
+    cmake.configure()
+    cmake.build()
+```
+
+**Autotools 项目**（AutotoolsToolchain 自动注入 CC/CFLAGS）：
+```python
+def generate(self):
+    tc = AutotoolsToolchain(self)
+    tc.generate()  # 自动写入 CC、CFLAGS、LDFLAGS 到 conanbuildenv
+
+def build(self):
+    autotools = AutotoolsToolchain(self)
+    autotools.configure()
+    autotools.make()
+```
+
+**Makefile 项目**（必须显式传入编译器，不能依赖 shell 变量）：
+```python
+def generate(self):
+    env = VirtualBuildEnv(self)
+    env.generate()
+    # 从 Conan settings 获取编译器路径
+    cc = self.conf.get("tools.build:compiler_executables:c", "clang", check_type=str)
+    cxx = self.conf.get("tools.build:compiler_executables:cpp", "clang++", check_type=str)
+    # 写入 env 确保可追溯
+    env = Environment()
+    env.define("CC", cc)
+    env.define("CXX", cxx)
+    env.vars(self).save_script("conanbuild")
+
+def build(self):
+    apply_conandata_patches(self)
+    self.run("make -j1 CC=$CC CXX=$CXX")
+    # $CC 此处来自 Conan 生成的 env 脚本，不是 shell 环境变量
+```
+
+#### 经验法则
+
+| 场景 | 正确获取方式 | 错误获取方式 |
+|------|-------------|-------------|
+| 编译器路径 (CC/CXX) | `self.conf.get("tools.build:compiler_executables:c")` | `$CC` / `${CC}` |
+| 编译标志 (CFLAGS/CXXFLAGS) | `AutotoolsToolchain` / `CMakeToolchain` 自动注入 | `$CFLAGS` / `${CFLAGS}` |
+| 链接器路径 (LDFLAGS) | `requirements()` 声明依赖，Conan 自动处理 | 手动 `-L/path -lfoo` |
+| 架构标志 (ARCH) | `self.settings.arch` | `$ARCH` / `${ARCH}` |
+
+> **L0h 门禁**：CI 在 conan create 之前会扫描 conanfile.py，检测 `self.run()` 中的 `${CC}` / `${CFLAGS}` / `${CXX}` / `${LDFLAGS}` 模式，命中则直接拦截。
 
 ---
 
 ## AI 执行风格规范
 
-> **原则：在鸿蒙 toybox ash 环境下，复杂 shell 脚本是地雷区。保持简单。**
-
 ### 测试脚本原则
 
 | ✅ 推荐 | ❌ 禁止 |
 |---------|--------|
-| 每个测试一条独立的 `[ ] && echo OK \|\| echo FAIL` | 单次 tool_call 写 >30 行复杂 shell 脚本 |
-| 变量先赋值再使用，避免管道内嵌套命令替换 | heredoc（与 `curl \| sh` 冲突，toybox ash 支持差） |
-| 用 `$TMPDIR/$HOME/tmp` 替代 `/tmp`（R10） | `for desc cmd exp in ...` 多变量循环 + 引号嵌套 |
-| `grep -F` 做固定字符串匹配（防正则元字符陷阱） | grep 不加 `-F` 匹配含 `()` `[]` `$` 的输出 |
-| `case "$var" in *pattern*)` 做 shell 原生模式匹配 | 复杂 awk/sed 管道做简单字符串判断 |
-| 逐条顺序执行，每步可独立验证 | 一次性提交大量命令，出错后难以定位 |
+| 每个测试一条独立验证 | 单次 tool_call 写 >30 行复杂 shell |
+| 变量先赋值再使用 | 管道内嵌套命令替换 |
+| 用 `$TMPDIR/$HOME/tmp` 替代 `/tmp`（R10） | 硬编码 `/tmp` |
+| `grep -F` 做固定字符串匹配 | grep 不加 `-F` 匹配含元字符的输出 |
+| 逐条顺序执行，每步可独立验证 | 一次性提交大量命令 |
 
 ### configure/make 长时间命令
 
 ```bash
 # ✅ 正确：给足够 timeout，不提前中断
-cd $BUILD_SRC_DIR && ./configure --prefix=$TEST_PREFIX 2>&1 | tail -3
-#   autotools 项目 timeout=600s, 其他 timeout=300s
-
-# ❌ 错误：频繁中断重启（浪费每次 3-10 分钟的 conftest 编译）
+cd $BUILD_SRC_DIR && ./configure --prefix=$DEFAULT_PREFIX 2>&1 | tail -3
+#   autotools timeout=600s, 其他 timeout=300s
 ```
 
 ### configure 预期耗时参考
 
-| 构建系统 | 典型软件 | 预期耗时 | 说明 |
-|----------|---------|---------|------|
-| autotools | 小工具(sed/grep) | 3-8 min | 大量 conftest 编译 |
-| autotools | 大型(gcc/bash) | 10-20 min | 更多特性检测 |
-| cmake | 一般项目 | 1-3 min | 较快 |
-| meson | 一般项目 | <1 min | 最快 |
-
-⚠️ **首次 configure 必须等完成**（用于触发安全弹窗确认）。timeout 建议：autotools ≥600s，其他 ≥300s。
+| 构建系统 | 典型软件 | 预期耗时 |
+|----------|---------|---------|
+| autotools | 小工具 | 3-8 min |
+| autotools | 大型 | 10-20 min |
+| cmake | 一般项目 | 1-3 min |
+| meson | 一般项目 | <1 min |
 
 ---
 
 ## 失败处理标准流程（R11+R12 强制执行）
 
-> **任何脚本步骤失败或编译错误触发时，必须按以下顺序执行。跳过任何一步都是 bug。**
-
 ```
 脚本/编译步骤失败
   │
   ├─ [R11] 第一步：查归档记录
-  │   │
-  │   ├─ ① 读 archives/{pkg}/{ver}/README.md
-  │   │    → 已有完整方案？（补丁/特殊构建方式/gen-all.pl 等）
-  │   │    → 有 → 直接使用历史方案重新执行
-  │   │    → 无 → 继续 ②
-  │   │
-  │   ├─ ② 读 archives/{pkg}/{ver}/manifest.yaml
-  │   │    → status in ("published", "built")？说明之前成功过，对比差异
-  │   │    → patches_applied 有补丁？确认是否已正确应用
-  │   │    → knowledge_gained 有经验？参考历史做法
-  │   │
-  │   └─ ③ 读 archives/{pkg}/README.md（软件级）
-  │        → 其他版本的通用经验（如 automake 的鸡生蛋问题）
+  │   ├─ 读 archives/{pkg}/{ver}/README.md
+  │   ├─ 读 archives/{pkg}/{ver}/manifest.yaml
+  │   └─ 读 archives/{pkg}/README.md（软件级）
   │
-  ├─ [R12] 第二步：匹配错误模式（⭐ 使用知识图谱引擎）
-  │   │
-  │   ├─ ① **引擎匹配**（推荐，v4.8+）
-  │   │    → 从错误日志提取关键词
-  │   │    → Phase A: grep 关键词于 graph/index.tsv → 候选集
-  │   │    → Phase B: 加载候选 graph/E*.kv → error_signature 精确匹配
-  │   │    → Phase C: 读取 rec_*/forbid_*/fallback_* 方案
-  │   │    → Phase D: principles 原则过滤
-  │   │    → Phase E: 输出结构化修复方案
-  │   │    → 命中？→ 直接用推荐方案修复 ✅
-  │   │
-  │   ├─ ② 快速查找（备选）
-  │   │    → grep -i "关键词" knowledge/graph/index.tsv
-  │   │    → 找到 E 编号 → 读 knowledge/doc/E{NNN}.md
-  │   │
-  │   └─ ③ 人类浏览（备选）
-  │        → 阅读 knowledge/error-patterns.md 总览表
-  │        → 按 E 编号查找对应条目
-  │
-  │   └─ ② 搜索同类软件的 manifest.yaml（同 build_system）
-  │        → autotools 项目怎么处理的？→ 参考其 configure 参数
-  │        → 同类错误别人怎么修的？→ 直接复用方案
+  ├─ [R12] 第二步：匹配错误模式
+  │   ├─ 引擎匹配: ohc-run.py engine "错误日志"
+  │   ├─ 快速查找: grep -i "关键词" knowledge/graph/index.tsv
+  │   └─ 搜索同类软件的 conanfile.py / manifest.yaml
   │
   └─ [诊断完成] 第三步：基于历史方案动手修复
-      → 如果归档和知识库都没有 → 记录为新问题（§2.5 实时知识提取）
-      → 修复后更新 notes.md + 继续执行
-```
-
-### 典型反面案例（automake 会话实录）
-
-```
-❌ build-driver Step 3 失败（unknown build system）
-   → 放弃 build-driver，手动 ls 目录找 configure
-   → 手动跑 configure → config.guess 不识别
-   → 从 GNU FTP 下载最新版 → 还是不识别
-   → 试 --build 参数 → 用户杀掉进程
-
-✅ 正确流程（遵循 R11+R12）：
-   → build-driver Step 3 失败
-   → [R11] 读 archives/a/automake/1.16.5/README.md
-      → 发现：需要 gen-all.pl 鸡生蛋绕过 + 已有补丁
-   → [R11] 读 manifest.yaml → status=published, 有 0001-port-for-ohos.patch
-   → [R12] 错误是 config.guess 不识别 → E002 标准解法：应用已有补丁
-   → 应用补丁后重新跑 build-driver → 通过
-```
-
+      → 归档和知识库都没有 → 记录为新问题
+      → 修复后更新 notes.md + conanfile.py + 继续
 ```
