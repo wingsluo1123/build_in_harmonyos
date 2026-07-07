@@ -48,22 +48,20 @@ class LibqalculateConan(ConanFile):
                 raise
 
     def generate(self):
-        # Environment variables for OHOS compatibility and system dependency lookup.
-        # CONFIG_SHELL and SHELL are also set by the conan profile [buildenv],
-        # but we set them here as well for robustness.
+        # System dependencies (gmp, mpfr, readline, libxml2) are pre-installed
+        # in ~/usr/local. Pass include/lib paths via AutotoolsToolchain (R33:
+        # compiler flags must come from Toolchain, not bare shell env vars).
         sys_prefix = os.path.expanduser("~/usr/local")
+
         env = Environment()
-        env.define("CONFIG_SHELL", "/usr/bin/sh")
-        env.define("SHELL", "/usr/bin/sh")
-        env.define("CC", "clang")
-        env.define("CXX", "clang++")
         env.define("PKG_CONFIG_PATH", f"{sys_prefix}/lib/pkgconfig")
-        env.define("LDFLAGS", f"-L{sys_prefix}/lib")
-        env.define("CPPFLAGS", f"-I{sys_prefix}/include")
         env.define("LD_LIBRARY_PATH", f"{sys_prefix}/lib")
         env.vars(self).save_script("sysdeps_env")
 
         tc = AutotoolsToolchain(self)
+        tc.extra_cflags.append(f"-I{sys_prefix}/include")
+        tc.extra_cxxflags.append(f"-I{sys_prefix}/include")
+        tc.extra_ldflags.append(f"-L{sys_prefix}/lib")
         tc.configure_args.append("--without-libcurl")
         tc.configure_args.append("--without-icu")
         tc.generate()
