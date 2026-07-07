@@ -42,7 +42,7 @@ make test
 
 ## 源码修改
 
-无源码修改。所有问题通过环境变量设置解决。
+- **patches/0001-Makefile.PL-remove-guess-dep.patch**: 移除 Makefile.PL 对 `Crypt::OpenSSL::Guess` 模块的 configure-time 依赖。CI Worker 上未安装该 Perl 模块，导致 `perl Makefile.PL` 失败 (exit code 2)。conanfile.py 已通过命令行参数 `INC` 和 `LIBS` 显式传入 OpenSSL 头文件和库路径，Guess 模块的 `openssl_lib_paths()`/`openssl_inc_paths()` 函数不再需要。
 
 ## 依赖版本
 
