@@ -68,6 +68,7 @@ ctest --output-on-failure
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
+<<<<<<< HEAD
 | 1 | CMake 配置失败：libxml2.so.16 缺失 | lld 链接器依赖 libxml2.so.16 | 设置 LD_LIBRARY_PATH 包含 `/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib` |
 | 2 | CMake 版本兼容性错误 | CMake 4.x 不支持 VERSION < 3.5 | 添加 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` |
 | 3 | FLAC::FLAC 目标未找到 | ENABLE_EXTERNAL_LIBS=ON 但缺少 FLAC 库 | 禁用外部库 `-DENABLE_EXTERNAL_LIBS=OFF` |
@@ -101,10 +102,27 @@ ls /storage/Users/currentUser/tmp/test-install-libsndfile-1.2.2/storage/Users/cu
 # include/sndfile.h, sndfile.hh - 头文件
 # lib/pkgconfig/sndfile.pc - pkg-config 文件
 # lib/cmake/SndFile/ - CMake 配置文件
+=======
+{按需添加行}
+
+## 源码修改
+
+{如有补丁，列出文件名和修改内容；无则删除此节}
+
+## 依赖版本
+
+{列出本次编译依赖的具体软件版本}
+
+## 验证结果
+
+```bash
+{验证命令和结果}
+>>>>>>> origin/main
 ```
 
 ## 交付物
 
+<<<<<<< HEAD
 待打包：libsndfile-1.2.2-ohos-aarch64.tar.gz
 
 ## 注意事项
@@ -113,3 +131,16 @@ ls /storage/Users/currentUser/tmp/test-install-libsndfile-1.2.2/storage/Users/cu
 2. **CMake 版本**: CMake 4.x 需要显式设置 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` 才能处理旧的 CMakeLists.txt
 3. **测试失败**: misc_test_* 测试失败是预期的平台限制，不影响核心音频处理功能
 4. **外部库**: 如果需要 FLAC/Vorbis/Opus 支持，需要先编译安装这些依赖库，然后启用 `-DENABLE_EXTERNAL_LIBS=ON`
+=======
+| 文件 | 大小 | 说明 |
+|------|------|------|
+{有打包产物时添加；无则删除此节}
+
+## 注意事项
+
+{需要特别注意的点；无则删除此节}
+---
+
+**编译结束**: 2026-05-20 18:38
+**最终状态**: published
+>>>>>>> origin/main
