@@ -59,8 +59,7 @@ class LibqalculateConan(ConanFile):
         env.vars(self).save_script("sysdeps_env")
 
         tc = AutotoolsToolchain(self)
-        tc.extra_cflags.append(f"-I{sys_prefix}/include")
-        tc.extra_cxxflags.append(f"-I{sys_prefix}/include")
+        tc.extra_include_dirs.append(f"{sys_prefix}/include")
         tc.extra_ldflags.append(f"-L{sys_prefix}/lib")
         tc.configure_args.append("--without-libcurl")
         tc.configure_args.append("--without-icu")
