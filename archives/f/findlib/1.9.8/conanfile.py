@@ -33,7 +33,15 @@ class FindlibConan(ConanFile):
         pass
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        sha = self.conan_data["sources"]["sha256"]
+        # CI worker shares Conan download cache with local machine.
+        # If github.com is unreachable and mirrors fail, use cached file.
+        cache_file = os.path.expanduser("~/.conan2/downloads/" + sha)
+        if os.path.isfile(cache_file):
+            shutil.copy(cache_file, "findlib-1.9.8.tar.gz")
+            get(self, "findlib-1.9.8.tar.gz", sha256=sha, strip_root=True)
+        else:
+            get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         pass
