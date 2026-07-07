@@ -47,7 +47,7 @@ class PerlparallelpreforkConan(ConanFile):
         # Pure Perl module: use Makefile.PL (ExtUtils::MakeMaker)
         apply_conandata_patches(self)
         # PREFIX ensures installation goes to the expected location
-        self.run("perl Makefile.PL PREFIX=/usr/local", cwd=self.source_folder)
+        self.run("perl -I. Makefile.PL PREFIX=/usr/local", cwd=self.source_folder)
         self.run("make", cwd=self.source_folder)
 
     def package(self):
