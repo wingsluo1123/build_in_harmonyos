@@ -1,4 +1,5 @@
 #!/bin/sh
+set -euo pipefail
 # test_package/test_x509.sh - L0c test source file
 # Verifies Crypt::OpenSSL::X509 package structure
 # On OHOS, runtime dlopen is restricted by SELinux (E073), so this test
