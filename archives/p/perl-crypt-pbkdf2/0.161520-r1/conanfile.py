@@ -9,12 +9,12 @@ import glob
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
 class PerlCryptPbkdf2Conan(ConanFile):
-    name = "perl-crypt-pdkdf2"
+    name = "perl-crypt-pbkdf2"
     version = "0.161520-r1"
     description = "The PBKDF2 password hash algorithm (pure Perl module)"
     license = "GPL-1.0-or-later OR Artistic-1.0"

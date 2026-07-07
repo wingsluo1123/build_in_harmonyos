@@ -20,7 +20,7 @@ class PerlCryptPbkdf2TestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        dep = self.dependencies["perl-crypt-pdkdf2"]
+        dep = self.dependencies["perl-crypt-pbkdf2"]
         perl_lib = os.path.join(dep.package_folder, "lib", "perl5")
 
         self.run(

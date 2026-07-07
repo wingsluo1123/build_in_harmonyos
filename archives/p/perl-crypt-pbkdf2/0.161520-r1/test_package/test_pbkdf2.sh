@@ -7,7 +7,7 @@
 # 2. 如果 Perl 运行时依赖可用，执行功能测试
 # 3. 如果依赖不可用，退化为文件结构验证
 
-set -e
+set -euo pipefail
 
 # 获取包路径（由 conanfile.py 通过环境变量传入）
 PKG_LIB="${PERL5LIB:-}"
@@ -59,7 +59,7 @@ done
 
 # --- 3. 功能测试（如果依赖可用）---
 echo "[test] Step 3: Functional test (requires Moo, Type::Tiny, etc.)"
-$PERL_BIN -e '
+if TEST_OUTPUT=$($PERL_BIN -e '
 use strict;
 use warnings;
 use Crypt::PBKDF2;
@@ -108,11 +108,19 @@ unless ($pbkdf2_256->validate($hash256, "test256")) {
 print "[pass] HMAC-SHA256 generate+validate works\n";
 
 print "[test] All functional tests passed\n";
-' 2>&1 || {
-    echo "[warn] Functional test failed (dependencies may not be available)"
-    echo "[test] Falling back to file-only validation (already passed)"
-    # 不退出非零 — 文件验证已通过，功能测试是可选的
-}
+' 2>&1); then
+    echo "$TEST_OUTPUT"
+else
+    TEST_EXIT=$?
+    if echo "$TEST_OUTPUT" | grep -q "Can't locate"; then
+        echo "[warn] Functional test skipped (Perl runtime dependencies not available)"
+        echo "[test] Falling back to file-only validation (already passed)"
+    else
+        echo "$TEST_OUTPUT"
+        echo "[fail] Functional test failed (exit code $TEST_EXIT) - not a dependency issue"
+        exit 1
+    fi
+fi
 
 echo "[test] Test package validation complete"
 exit 0

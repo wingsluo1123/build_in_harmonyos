@@ -1,4 +1,4 @@
-# perl-crypt-pdkdf2 0.161520-r1 适配笔记
+# perl-crypt-pbkdf2 0.161520-r1 适配笔记
 
 ## 编译环境
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
@@ -16,7 +16,7 @@
    - B::Hooks::EndOfScope (纯 Perl 回退: PERL_B_HOOKS_ENDOFSCOPE_BACKEND=PP)
    - namespace::clean, Sub::Name, Package::Stash, Variable::Magic
    - Test::Fatal, Module::Implementation
-4. perl Makefile PL
+4. perl Makefile.PL
 5. make
 6. make test (全部通过: t/01-raeburn.t ... t/*.t, 4050 tests)
 7. make install DESTDIR=$TEST_PREFIX

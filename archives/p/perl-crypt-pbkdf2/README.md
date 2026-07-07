@@ -55,7 +55,7 @@ perl Makefile.PL && make && make test && make install
 
 ```bash
 # 安装 Conan 包
-conan install --requires=perl-crypt-pdkdf2/0.161520-r1@ohpcd/stable
+conan install --requires=perl-crypt-pbkdf2/0.161520-r1@ohpcd/stable
 
 # 设置环境
 export PERL5LIB="<conan_package>/lib/perl5:$HOME/perl5/lib/perl5"
