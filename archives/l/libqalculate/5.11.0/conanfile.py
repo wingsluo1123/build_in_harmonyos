@@ -49,20 +49,23 @@ class LibqalculateConan(ConanFile):
 
     def generate(self):
         # System dependencies (gmp, mpfr, readline, libxml2) are pre-installed
-        # in ~/usr/local. Pass include/lib paths via AutotoolsToolchain (R33:
-        # compiler flags must come from Toolchain, not bare shell env vars).
+        # in ~/usr/local. CPPFLAGS is needed for AC_CHECK_HEADER (gmp.h),
+        # CFLAGS/CXXFLAGS for compilation, LDFLAGS for linking.
         sys_prefix = os.path.expanduser("~/usr/local")
 
         env = Environment()
         env.define("PKG_CONFIG_PATH", f"{sys_prefix}/lib/pkgconfig")
         env.define("LD_LIBRARY_PATH", f"{sys_prefix}/lib")
+        env.define("CPPFLAGS", f"-I{sys_prefix}/include")
         env.vars(self).save_script("sysdeps_env")
 
         tc = AutotoolsToolchain(self)
-        tc.extra_include_dirs.append(f"{sys_prefix}/include")
+        tc.extra_cflags.append(f"-I{sys_prefix}/include")
+        tc.extra_cxxflags.append(f"-I{sys_prefix}/include")
         tc.extra_ldflags.append(f"-L{sys_prefix}/lib")
         tc.configure_args.append("--without-libcurl")
         tc.configure_args.append("--without-icu")
+        tc.configure_args.append(f"CPPFLAGS=-I{sys_prefix}/include")
         tc.generate()
 
     def build(self):
