@@ -43,23 +43,32 @@ class PerlcryptopensslrsaTestConan(ConanFile):
         # Functional test: exercise core RSA API (R34 — must call actual API)
         # On OHOS, RSA_wrapper.pm delegates to rsa_helper (SELinux workaround).
         # On Linux, the XS .so is loaded directly.
-        perl_test = (
-            'use Crypt::OpenSSL::RSA;'
-            'my $rsa = Crypt::OpenSSL::RSA->generate_key(1024);'
-            'my $sig = $rsa->sign("hello world");'
-            'my $ok = $rsa->verify("hello world", $sig);'
-            'die "verify failed\\n" unless $ok;'
-            'my $ct = $rsa->encrypt("secret");'
-            'my $pt = $rsa->decrypt($ct);'
-            'die "decrypt mismatch: got [$pt]\\n" unless $pt eq "secret";'
-            'print "ALL RSA API TESTS PASSED\\n";'
+        # Write test script to a temp file to avoid shell quoting issues
+        # ($-variables and nested double quotes break perl -e "...").
+        import tempfile
+        perl_script = (
+            "use Crypt::OpenSSL::RSA;\n"
+            "my $rsa = Crypt::OpenSSL::RSA->generate_key(1024);\n"
+            'my $sig = $rsa->sign("hello world");\n'
+            'my $ok = $rsa->verify("hello world", $sig);\n'
+            'die "verify failed\n" unless $ok;\n'
+            'my $ct = $rsa->encrypt("secret");\n'
+            'my $pt = $rsa->decrypt($ct);\n'
+            'die "decrypt mismatch: got [$pt]\n" unless $pt eq "secret";\n'
+            'print "ALL RSA API TESTS PASSED\n";\n'
         )
-        test_cmd = f'perl -e "{perl_test}"'
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pl", delete=False
+        ) as f:
+            f.write(perl_script)
+            script_path = f.name
         try:
-            self.run(test_cmd, env="conanrun")
+            self.run(f'perl "{script_path}"', env="conanrun")
             self.output.info("RSA API functional test passed")
         except Exception as e:
             self.output.error(f"RSA API functional test failed: {e}")
             raise ConanException(
                 f"RSA API functional test failed — module is not usable. Error: {e}"
             )
+        finally:
+            os.unlink(script_path)
