@@ -6,7 +6,7 @@ A simple prefork server framework for Perl.
 
 - **官网**: https://metacpan.org/dist/Parallel-Prefork
 - **源码**: https://cpan.metacpan.org/authors/id/K/KA/KAZUHO/Parallel-Prefork-0.18.tar.gz
-- **许可证**: MIT (Perl license)
+- **许可证**: Artistic-1.0-Perl OR GPL-1.0-or-later
 - **分类**: perl-module
 
 ## 已编译版本

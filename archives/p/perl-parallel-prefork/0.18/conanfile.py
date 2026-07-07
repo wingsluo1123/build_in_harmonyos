@@ -20,7 +20,7 @@ class PerlparallelpreforkConan(ConanFile):
     name = "perl-parallel-prefork"
     version = "0.18"
     description = "A simple prefork server framework"
-    license = "MIT"
+    license = "Artistic-1.0-Perl OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/dist/Parallel-Prefork"
     url = ""  # CI fills this
 

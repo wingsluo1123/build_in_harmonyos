@@ -20,22 +20,13 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | MYMETA.json/yml 版本号为 0.17 | 源码包中的元数据文件版本与实际版本不一致 | 应用补丁更新版本号到 0.18 |
+| 1 | MYMETA.json/yml 版本号为 0.17 | 源码包中的元数据文件版本与实际版本不一致 | `perl Makefile.PL` 会自动重新生成正确的 MYMETA 文件，无需补丁 |
 | 2 | `use Parallel::Prefork` 失败 | 运行时依赖 Proc::Wait3 是 XS 模块，其 .so 在 HMDFS 上无法加载（SELinux 限制） | 需将 Proc::Wait3.so 安装到 /data/service/hnp 系统目录 |
 | 3 | conanfile.py 中 PERL5LIB 覆盖系统模块路径 | Conan 的 runenv_info 设置 PERL5LIB 后，用户安装的 Perl 模块路径被替换 | 消费者需手动追加 `~/usr/local/lib/perl5` 到 PERL5LIB |
 
 ## 源码修改
 
-### 补丁 0001-MYMETA.json.patch
-- 更新 `generated_by` 字段（Module::Install 版本）
-- 更新 `meta-spec.version` 从字符串 "2" 到数字 2
-- 更新 `version` 从 "0.17" 到 "0.18"
-- 添加 `x_serialization_backend` 字段
-
-### 补丁 0002-MYMETA.yml.patch
-- 更新 `generated_by` 字段
-- 更新 `version` 从 "0.17" 到 "0.18"
-- 添加 `x_serialization_backend` 字段
+无需补丁。`perl Makefile.PL` 执行时会从源码自动提取正确版本号并重新生成 MYMETA.json/yml，覆盖源码包中的旧版本元数据。
 
 ## 依赖版本
 
