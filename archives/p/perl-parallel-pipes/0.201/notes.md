@@ -1,7 +1,7 @@
 # perl-parallel-pipes 0.201 编译笔记
 
 ## 编译环境
-- 构建系统: Perl Module::Build::Tiny (Build.PL)
+- 构建系统: ExtUtils::MakeMaker (Makefile.PL) — Module::Build::Tiny 的回退方案
 - 编译日期: 2026-07-03
 - 编译器: 无需 C 编译器（纯 Perl 模块）
 - 状态: published
@@ -10,10 +10,10 @@
 
 1. 从 CPAN 下载 Parallel-Pipes-0.201.tar.gz
 2. 初始化编译环境：`ohc-run.py init-build perl-parallel-pipes 0.201`
-3. 运行 `perl Build.PL` 生成 Build 脚本
-4. 运行 `./Build` 构建模块
-5. 运行 `./Build install --destdir $STAGING` 安装到 staging 目录
-6. 将 .pm 文件从 staging 重新组织到 lib/ 目录
+3. 生成 Makefile.PL（ExtUtils::MakeMaker，替代 Module::Build::Tiny）
+4. 运行 `perl Makefile.PL INSTALLDIRS=site` 生成 Makefile
+5. 运行 `make` 构建模块（.pm 文件复制到 blib/lib/）
+6. 将 .pm 文件从 blib/lib/ 复制到 lib/ 目录
 7. 生成 Conan 配方并验证：`ohc-run.py conan-init` + `ohc-run.py conan-verify`
 
 ## 遇到的问题与解决方案
@@ -23,6 +23,7 @@
 | 1 | Conan basic_layout 创建 `build/` 目录与 Module::Build::Tiny 的 `Build` 脚本冲突 | 大小写不敏感文件系统上 `build/` 和 `Build` 无法区分 | conanfile.py 中 `layout()` 使用 `pass` 而非 `basic_layout`，避免创建 build/ 目录 |
 | 2 | Conan package() 默认安装无法被 G4 产物完整性检查找到 | Perl 模块安装到深层目录，非标准 bin/lib/include | 手动将 .pm 文件从 staging 重新组织到 `lib/` 目录 |
 | 3 | conanfile.py 模板默认为 autotools/CMake，不适用于纯 Perl 模块 | conan-init 生成通用模板 | 手动替换为 Perl 专用配方，使用 `perl Build.PL` + `./Build` 构建流程 |
+| 4 | CI worker 上 Module::Build::Tiny 不可用，`perl Build.PL` 失败 | CI worker 的 Perl 安装不包含 Module::Build::Tiny 模块 | 改用 ExtUtils::MakeMaker (Makefile.PL)，动态生成 Makefile.PL 并用 `make` 构建 |
 
 ## 源码修改
 

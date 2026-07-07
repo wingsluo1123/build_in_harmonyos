@@ -2,17 +2,15 @@
 """Conan recipe for perl-parallel-pipes (Parallel::Pipes) — pure Perl module.
 
 Parallel::Pipes provides parallel processing using pipe(2) for communication
-and synchronization. This is a pure Perl module using Module::Build::Tiny
-as its build system.
+and synchronization. This is a pure Perl module.
 
-Build steps: perl Build.PL → ./Build → ./Build install
+Build system: ExtUtils::MakeMaker (Makefile.PL) — fallback for Module::Build::Tiny
+which is not available on the CI worker.
 """
-import glob
 import os
-import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 
 
 class PerlparallelpipesConan(ConanFile):
@@ -42,33 +40,41 @@ class PerlparallelpipesConan(ConanFile):
     def build(self):
         # Apply patches if any (none for this module)
         apply_conandata_patches(self)
-        # Module::Build::Tiny workflow
-        self.run("perl Build.PL")
-        self.run("./Build")
+
+        # Create Makefile.PL using ExtUtils::MakeMaker (Perl core module)
+        # Source uses Module::Build::Tiny (Build.PL) which is not available on CI worker
+        makefile_pl = os.path.join(self.source_folder, "Makefile.PL")
+        if not os.path.exists(makefile_pl):
+            makefile_pl_content = """\
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+
+WriteMakefile(
+    NAME          => 'Parallel::Pipes',
+    VERSION_FROM  => 'lib/Parallel/Pipes.pm',
+    ABSTRACT_FROM => 'lib/Parallel/Pipes.pm',
+    AUTHOR        => 'Shoichi Kaji <skaji@cpan.org>',
+    LICENSE       => 'perl_5',
+    PREREQ_PM     => {
+        'perl' => '5.008001',
+    },
+    NO_MYMETA => 1,
+);
+"""
+            with open(makefile_pl, "w") as f:
+                f.write(makefile_pl_content)
+
+        # Run perl Makefile.PL && make
+        self.run("perl Makefile.PL INSTALLDIRS=site")
+        self.run("make")
 
     def package(self):
-        # Install to a temporary staging dir, then reorganize into lib/
-        staging = os.path.join(self.package_folder, "_staging")
-        self.run(f"./Build install --destdir {staging}")
-        # Find the installed .pm files and copy them to lib/ at package root
-        # so that G4 (product integrity check) can find standard lib/ directory
-        pm_files = glob.glob(os.path.join(staging, "**", "Parallel", "Pipes.pm"), recursive=True)
-        if not pm_files:
-            shutil.rmtree(staging, ignore_errors=True)
-            raise Exception("Parallel/Pipes.pm not found in staging — package is empty, upstream install layout may have changed")
-        if pm_files:
-            # Determine the Perl lib root (parent of Parallel/)
-            perl_lib_root = os.path.dirname(os.path.dirname(pm_files[0]))
-            pkg_lib = os.path.join(self.package_folder, "lib")
-            # Copy all files from perl_lib_root to pkg_lib preserving structure
-            for root, dirs, files in os.walk(perl_lib_root):
-                rel = os.path.relpath(root, perl_lib_root)
-                dst = os.path.join(pkg_lib, rel) if rel != "." else pkg_lib
-                os.makedirs(dst, exist_ok=True)
-                for f in files:
-                    shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
-        # Remove the temporary staging directory
-        shutil.rmtree(staging, ignore_errors=True)
+        # Copy .pm files from blib/lib to package lib/
+        blib_lib = os.path.join(self.build_folder, "blib", "lib")
+        if not os.path.isdir(blib_lib):
+            raise Exception("blib/lib not found — build may have failed")
+        copy(self, "*.pm", src=blib_lib, dst=os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
         # Pure Perl module — no C/C++ libraries to link
