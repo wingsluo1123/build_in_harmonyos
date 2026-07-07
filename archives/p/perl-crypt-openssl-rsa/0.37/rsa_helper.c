@@ -43,6 +43,7 @@ static char *b64_encode(const unsigned char *data, int len) {
     BUF_MEM *bptr;
     BIO_get_mem_ptr(b64, &bptr);
     char *out = malloc(bptr->length + 1);
+    if (!out) { BIO_free_all(b64); return NULL; }
     memcpy(out, bptr->data, bptr->length);
     out[bptr->length] = '\0';
     BIO_free_all(b64);
@@ -52,6 +53,7 @@ static char *b64_encode(const unsigned char *data, int len) {
 static unsigned char *b64_decode(const char *input, int *out_len) {
     int len = strlen(input);
     unsigned char *buf = malloc(len);
+    if (!buf) return NULL;
     BIO *b64 = BIO_new(BIO_f_base64());
     BIO *mem = BIO_new_mem_buf(input, len);
     b64 = BIO_push(b64, mem);
@@ -65,14 +67,18 @@ static unsigned char *b64_decode(const char *input, int *out_len) {
 static unsigned char *read_stdin(int *out_len) {
     int cap = 65536, len = 0;
     unsigned char *buf = malloc(cap);
+    if (!buf) return NULL;
     int n;
     while ((n = fread(buf + len, 1, cap - len, stdin)) > 0) {
         len += n;
         if (len >= cap) {
             cap *= 2;
-            buf = realloc(buf, cap);
+            unsigned char *tmp = realloc(buf, cap);
+            if (!tmp) { free(buf); return NULL; }
+            buf = tmp;
         }
     }
+    if (ferror(stdin)) { free(buf); return NULL; }
     *out_len = len;
     return buf;
 }
@@ -188,18 +194,20 @@ int main(int argc, char *argv[]) {
 
         /* Hash the message */
         const EVP_MD *md = EVP_get_digestbyname(hash_name);
-        if (!md) { fprintf(stderr, "Unknown hash: %s\n", hash_name); return 1; }
+        if (!md) { fprintf(stderr, "Unknown hash: %s\n", hash_name); free(msg); RSA_free(rsa); return 1; }
         unsigned char digest[EVP_MAX_MD_SIZE];
         unsigned int digest_len;
         EVP_Digest(msg, msg_len, digest, &digest_len, md, NULL);
 
         /* Sign */
         unsigned char *sig = malloc(RSA_size(rsa));
+        if (!sig) { free(msg); RSA_free(rsa); return 1; }
         unsigned int sig_len;
         if (RSA_sign(hash_to_nid(hash_name), digest, digest_len,
                      sig, &sig_len, rsa) != 1) {
             fprintf(stderr, "RSA_sign failed: %s\n",
                     ERR_error_string(ERR_get_error(), NULL));
+            free(sig); free(msg); RSA_free(rsa);
             return 1;
         }
         char *b64 = b64_encode(sig, sig_len);
@@ -223,7 +231,7 @@ int main(int argc, char *argv[]) {
         unsigned char *msg = read_stdin(&msg_len);
 
         const EVP_MD *md = EVP_get_digestbyname(hash_name);
-        if (!md) { fprintf(stderr, "Unknown hash: %s\n", hash_name); return 1; }
+        if (!md) { fprintf(stderr, "Unknown hash: %s\n", hash_name); free(sig); free(msg); RSA_free(rsa); return 1; }
         unsigned char digest[EVP_MAX_MD_SIZE];
         unsigned int digest_len;
         EVP_Digest(msg, msg_len, digest, &digest_len, md, NULL);
@@ -247,10 +255,12 @@ int main(int argc, char *argv[]) {
         unsigned char *pt = read_stdin(&pt_len);
 
         unsigned char *ct = malloc(RSA_size(rsa));
+        if (!ct) { free(pt); RSA_free(rsa); return 1; }
         int ct_len = RSA_public_encrypt(pt_len, pt, ct, rsa, padding);
         if (ct_len < 0) {
             fprintf(stderr, "RSA_public_encrypt failed: %s\n",
                     ERR_error_string(ERR_get_error(), NULL));
+            free(ct); free(pt); RSA_free(rsa);
             return 1;
         }
         char *b64 = b64_encode(ct, ct_len);
@@ -277,10 +287,12 @@ int main(int argc, char *argv[]) {
         unsigned char *ct = b64_decode((char *)b64_buf, &ct_len);
 
         unsigned char *pt = malloc(RSA_size(rsa));
+        if (!pt) { free(ct); free(b64_buf); RSA_free(rsa); return 1; }
         int pt_len = RSA_private_decrypt(ct_len, ct, pt, rsa, padding);
         if (pt_len < 0) {
             fprintf(stderr, "RSA_private_decrypt failed: %s\n",
                     ERR_error_string(ERR_get_error(), NULL));
+            free(pt); free(ct); free(b64_buf); RSA_free(rsa);
             return 1;
         }
         fwrite(pt, 1, pt_len, stdout);

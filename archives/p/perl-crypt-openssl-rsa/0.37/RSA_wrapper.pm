@@ -38,8 +38,16 @@ sub _find_helper {
 }
 
 # Run rsa_helper and capture output
+# $strip_trailing: when true (default), strip trailing whitespace from output.
+#   Must be false for decrypt, whose output is raw binary that may end with
+#   whitespace characters.
 sub _run_helper {
     my ($self, @args) = @_;
+    my $strip_trailing = 1;
+    if (@args && ref($args[-1]) eq 'HASH' && exists $args[-1]{__no_strip__}) {
+        $strip_trailing = 0;
+        pop @args;
+    }
     my $helper = _find_helper();
     my $stdin_data = '';
 
@@ -51,7 +59,13 @@ sub _run_helper {
 
     my ($stdin, $stdout, $stderr);
     $stderr = gensym();
-    my $pid = open3($stdin, $stdout, $stderr, $helper, @args);
+    my $pid;
+    eval {
+        $pid = open3($stdin, $stdout, $stderr, $helper, @args);
+    };
+    if ($@) {
+        die "rsa_helper failed to start: $@";
+    }
 
     if ($stdin_data ne '') {
         print $stdin $stdin_data;
@@ -68,8 +82,9 @@ sub _run_helper {
         die "rsa_helper error: $err" unless $rc == 0;
     }
 
-    # Remove trailing newline
-    $out =~ s/\s+$// if defined $out;
+    # Remove trailing whitespace only for non-binary output (sign/encrypt/size
+    # output base64 or numbers; decrypt outputs raw binary).
+    $out =~ s/\s+$// if defined $out && $strip_trailing;
 
     return wantarray ? ($out, $rc) : $out;
 }
@@ -155,7 +170,7 @@ sub decrypt {
     die "Private key required for decryption\n" unless $self->{private_pem};
     my $ct_b64 = encode_base64($ciphertext, '');
     my $pt = _run_helper($self, 'decrypt', $self->{padding}, $self->{private_pem},
-                         { __stdin__ => $ct_b64 });
+                         { __stdin__ => $ct_b64, __no_strip__ => 1 });
     return $pt;
 }
 
@@ -187,7 +202,7 @@ sub key_size {
 # ---- Padding mode setters ----
 sub use_pkcs1_padding       { $_[0]->{padding} = 'pkcs1'; return $_[0]; }
 sub use_pkcs1_oaep_padding  { $_[0]->{padding} = 'oaep';  return $_[0]; }
-sub use_sslv23_padding      { $_[0]->{padding} = 'pkcs1'; return $_[0]; } # SSLv23 deprecated
+sub use_sslv23_padding      { $_[0]->{padding} = 'pkcs1'; return $_[0]; } # SSLv23 padding removed in OpenSSL 3.x; fallback to PKCS#1
 sub use_no_padding          { $_[0]->{padding} = 'none';  return $_[0]; }
 
 # ---- Hash mode setters ----

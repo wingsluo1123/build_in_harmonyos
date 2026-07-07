@@ -2,9 +2,8 @@
 """Conan test_package — Crypt::OpenSSL::RSA (Perl XS module).
 
 Verifies that the packaged .so and .pm files are present in the correct
-locations. On OHOS, loading the .so via DynaLoader may be blocked by
-SELinux policy (hmdfs context); in that case we verify file existence
-and ELF validity instead.
+locations, and exercises the core RSA API (generate_key, sign, verify,
+encrypt, decrypt) to ensure the package is functional.
 """
 import os
 import glob
@@ -41,11 +40,26 @@ class PerlcryptopensslrsaTestConan(ConanFile):
         # Verify the .so is a valid ELF shared object
         self.run(f"file {so_path}")
 
-        # Try to load the module (may fail on OHOS due to SELinux)
-        perl_lib = os.path.join(pkg_folder, "lib")
-        test_cmd = f'PERL5LIB="{perl_lib}" perl -e "use Crypt::OpenSSL::RSA; print \\"module loaded OK\\n\\";"'
+        # Functional test: exercise core RSA API (R34 — must call actual API)
+        # On OHOS, RSA_wrapper.pm delegates to rsa_helper (SELinux workaround).
+        # On Linux, the XS .so is loaded directly.
+        perl_test = (
+            'use Crypt::OpenSSL::RSA;'
+            'my $rsa = Crypt::OpenSSL::RSA->generate_key(1024);'
+            'my $sig = $rsa->sign("hello world");'
+            'my $ok = $rsa->verify("hello world", $sig);'
+            'die "verify failed\\n" unless $ok;'
+            'my $ct = $rsa->encrypt("secret");'
+            'my $pt = $rsa->decrypt($ct);'
+            'die "decrypt mismatch: got [$pt]\\n" unless $pt eq "secret";'
+            'print "ALL RSA API TESTS PASSED\\n";'
+        )
+        test_cmd = f'perl -e "{perl_test}"'
         try:
             self.run(test_cmd, env="conanrun")
-            self.output.info("Module loaded successfully")
-        except Exception:
-            self.output.warning("Module loading skipped (platform limitation: SELinux blocks dlopen from HMDFS)")
+            self.output.info("RSA API functional test passed")
+        except Exception as e:
+            self.output.error(f"RSA API functional test failed: {e}")
+            raise ConanException(
+                f"RSA API functional test failed — module is not usable. Error: {e}"
+            )
