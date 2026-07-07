@@ -42,7 +42,7 @@ source:
 build:
   # 构建系统类型
   # cmake | autotools | makefile | meson | custom
-  system: autotools
+  system: perl
   build_system: perl
 
   # 配置选项列表
@@ -67,8 +67,8 @@ build:
 
 # 应用的补丁列表
 patches_applied:
-  - "Makefile.PL: 添加 INC => '-I/storage/Users/currentUser/usr/local/include' (musl C 库头文件路径)"
-  - "Makefile.PL: 添加 dynamic_lib => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc' } (CRT 文件缺失绕过)"
+  - "Makefile: 添加 -I/storage/Users/currentUser/usr/local/include 到 CCFLAGS (musl C 库头文件路径)"
+  - "Makefile: 添加 -nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc 到 LDDLFLAGS (CRT 文件缺失绕过)"
 
 # 补丁方式: conanfile.py build() 内联 regex 修改 Makefile (R3: 探索阶段不生成 .patch)
 patch_method: inline-conanfile-build
@@ -88,7 +88,7 @@ patch_classification:
     type: inline
     platform_only: True
     guard: 'none'
-    description: "Makefile.PL: 添加 INC (musl 头文件路径) 和 dynamic_lib OTHERLDFLAGS (CRT 绕过)"
+    description: "Makefile: 添加 -I (musl 头文件路径) 到 CCFLAGS 和 -nostartfiles -nodefaultlibs -lc 到 LDDLFLAGS (CRT 绕过)"
 
 # ============================================================
 # 知识沉淀
@@ -102,3 +102,4 @@ knowledge_gained:
   - "Params::Util 提供纯 Perl 回退模块 (Params::Util::PP)，通过 PERL_PARAMS_UTIL_PP=1 环境变量激活"
   - "Makefile.PL 中可通过 INC 参数添加头文件路径，通过 dynamic_lib => { OTHERLDFLAGS => ... } 添加链接参数"
   - "参考 perl-dbd-pg 3.18.0 的编译经验：相同的 CRT 绕过方案和 musl 头文件依赖"
+�：相同的 CRT 绕过方案和 musl 头文件依赖"

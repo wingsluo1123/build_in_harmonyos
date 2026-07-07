@@ -21,8 +21,8 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | 链接错误：缺少 crti.o, crtn.o, crtbeginS.o, crtendS.o | 鸿蒙系统缺少 CRT 文件 | 在 Makefile.PL 中添加 `dynamic_lib => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc' }` |
-| 2 | 编译错误：缺少 sys/types.h 等系统头文件 | 鸿蒙系统缺少标准 C 库头文件 | 在 Makefile.PL 中添加 `INC => '-I/storage/Users/currentUser/usr/local/include'` (musl 头文件路径) |
+| 1 | 链接错误：缺少 crti.o, crtn.o, crtbeginS.o, crtendS.o | 鸿蒙系统缺少 CRT 文件 | 在 Makefile 的 LDDLFLAGS 中添加 `-nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc` |
+| 2 | 编译错误：缺少 sys/types.h 等系统头文件 | 鸿蒙系统缺少标准 C 库头文件 | 在 Makefile 的 CCFLAGS 中添加 `-I/storage/Users/currentUser/usr/local/include` (musl 头文件路径) |
 | 3 | XS 模块运行时加载失败 (Permission denied) | SELinux HMDFS 限制动态库加载 | 使用纯 Perl 回退模式 `PERL_PARAMS_UTIL_PP=1`；XS .so 需安装到系统目录 |
 
 ## 与 perl-dbd-pg 编译经验对比
@@ -101,3 +101,4 @@
 **编译结束**: 2026-07-03 16:57
 **归档完善**: 2026-07-06
 **最终状态**: published (编译成功，conan-verify 全部门禁通过，CI 模拟通过，submit 自检 6/6 PASS)
+��过，submit 自检 6/6 PASS)

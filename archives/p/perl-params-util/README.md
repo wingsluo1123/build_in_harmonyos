@@ -13,7 +13,7 @@ Simple, compact and correct param-checking functions (Perl XS module with pure P
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 1.102 | built | 2026-07-03 | 首次编译成功，conan-verify 全部门禁通过 |
+| 1.102 | published | 2026-07-03 | 首次编译成功，conan-verify 全部门禁通过 |
 
 ## 运行依赖
 
