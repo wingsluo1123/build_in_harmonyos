@@ -175,8 +175,11 @@ class PerlcryptopensslrsaConan(ConanFile):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
         # Resolve OpenSSL prefix (may auto-install via cmd-pkgs if headers missing)
-        openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
-        if not os.path.isfile(os.path.join(openssl_prefix, "include", "openssl", "ssl.h")):
+        try:
+            openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
+        except ConanException:
+            openssl_prefix = ""
+        if not openssl_prefix or not os.path.isfile(os.path.join(openssl_prefix, "include", "openssl", "ssl.h")):
             self.output.info("OpenSSL headers not found, installing via cmd-pkgs...")
             _home = os.path.expanduser("~")
             _tmp = os.path.join(_home, "tmp")
