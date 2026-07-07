@@ -136,12 +136,20 @@ class PerlcryptopensslrsaConan(ConanFile):
                     site_path = os.path.join(prefix, "lib", "site_perl", ver, "aarch64-linux")
                     if os.path.isdir(site_path):
                         extra_paths.append(site_path)
-        except (subprocess.SubprocessError, IndexError):
+        except (subprocess.SubprocessError, IndexError, FileNotFoundError):
             pass
 
         return extra_paths
 
     def generate(self):
+        # Ensure system tools (perl, clang, curl, etc.) are in PATH
+        _home = os.path.expanduser("~")
+        _path = os.environ.get("PATH", "")
+        for _d in ["/data/service/hnp/bin", f"{_home}/usr/local/bin", "/usr/bin", "/bin"]:
+            if os.path.isdir(_d) and _d not in _path.split(":"):
+                _path = f"{_d}:{_path}"
+        os.environ["PATH"] = _path
+
         # Set OPENSSL_PREFIX so Makefile.PL can find OpenSSL headers and libs
         # On CI workers, OpenSSL may not be installed yet — build() will handle it
         try:
