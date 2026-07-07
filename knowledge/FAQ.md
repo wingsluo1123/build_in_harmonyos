@@ -36,6 +36,7 @@
 | python-extensions.md | Python 扩展编译 |
 | dependencies.md | 依赖关系图 |
 | harmonyos-specifics.md | 鸿蒙特异性 |
+| doc/E212.md | Rust 在 OHOS 上的 CI 构建准备 |
 
 ---
 
