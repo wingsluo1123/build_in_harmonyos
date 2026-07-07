@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Conan recipe — bazel-diff 18.0.0 (Kotlin/JVM project)
+
+bazel-diff is a CLI tool for determining affected Bazel targets between
+Git revisions. The deploy is a platform-independent fat JAR.
+
+Built on OHOS with kotlinc + JDK 21, protoc for proto compilation.
+JVM bytecode is platform-independent, runs on any JDK 21+.
+"""
+import os
+
+from conan import ConanFile
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+
+
+class BazelDiffConan(ConanFile):
+    name = "bazel-diff"
+    version = "18.0.0"
+    description = "Bazel target diffing tool — determine affected targets between Git revisions"
+    license = "Apache-2.0"
+    homepage = "https://github.com/Tinder/bazel-diff"
+    url = ""
+
+    settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        pass
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+
+    def build(self):
+        apply_conandata_patches(self)
+        # Build with kotlinc + JDK 21 (proto compiled with protoc)
+        # JVM bytecode is platform-independent
+        self.run("kotlinc -cp ... -jvm-target 21 -d build/classes cli/src/main/kotlin/ && "
+                 "jar cfm build/bazel-diff.jar MANIFEST.MF -C build/classes .")
+
+    def package(self):
+        # Copy fat JAR and launcher script
+        src_dir = self.build_folder
+        copy(self, "bazel-diff.jar", src=os.path.join(src_dir, "build"),
+             dst=os.path.join(self.package_folder, "bin"))
+        # Launcher script
+        launcher = os.path.join(self.package_folder, "bin", "bazel-diff")
+        with open(launcher, 'w') as f:
+            f.write('#!/bin/sh\nexec java -jar "$(dirname "$0")/bazel-diff.jar" "$@"\n')
+        os.chmod(launcher, 0o755)
+
+    def package_info(self):
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]
