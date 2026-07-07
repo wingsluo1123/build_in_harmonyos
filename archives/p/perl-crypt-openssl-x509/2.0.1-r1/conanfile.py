@@ -88,6 +88,13 @@ class PerlCryptOpensslX509Conan(ConanFile):
         """Set up environment variables directly in os.environ for subprocess."""
         prefix = self._openssl_prefix
         os.environ["OPENSSL_PREFIX"] = prefix
+        # Ensure system binaries (perl, make, clang) are in PATH.
+        # CI workers may not have /data/service/hnp/bin in PATH.
+        path = os.environ.get("PATH", "")
+        for bin_dir in ["/data/service/hnp/bin", "/usr/bin", "/bin"]:
+            if os.path.isdir(bin_dir) and bin_dir not in path.split(":"):
+                path = f"{bin_dir}:{path}"
+        os.environ["PATH"] = path
         # Compiler include/library paths for OpenSSL headers
         inc_dir = os.path.join(prefix, "include")
         lib_dir = os.path.join(prefix, "lib")
