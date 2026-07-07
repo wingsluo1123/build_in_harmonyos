@@ -41,7 +41,30 @@ class PerlparallelpreforkConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        import hashlib
+        from conan.tools.files import untar
+
+        sources = self.conan_data["sources"]
+        url = sources["url"]
+        expected_sha256 = sources["sha256"]
+        filename = url.split("/")[-1]
+
+        # Download using curl — Python's urllib lacks SSL on OHOS CI
+        tarball = os.path.join(self.source_folder, filename)
+        self.run(f'curl -sL "{url}" -o "{tarball}"')
+
+        # Verify SHA256
+        h = hashlib.sha256()
+        with open(tarball, "rb") as f:
+            h.update(f.read())
+        if h.hexdigest() != expected_sha256:
+            raise Exception(f"SHA256 mismatch: expected {expected_sha256}, got {h.hexdigest()}")
+
+        # Extract with strip_root
+        untar(self, tarball, self.source_folder, strip_root=True)
+
+        # Clean up tarball
+        os.remove(tarball)
 
     def build(self):
         # Pure Perl module: use Makefile.PL (ExtUtils::MakeMaker)
