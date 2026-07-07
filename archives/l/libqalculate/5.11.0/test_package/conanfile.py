@@ -39,3 +39,6 @@ class LibqalculateTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Explicit self.run() — CI L0d requires a direct call in test()
+        bin_path = os.path.join(self.build_folder, "test_libqalculate")
+        self.run(f'"{bin_path}"', env="conanrun")
