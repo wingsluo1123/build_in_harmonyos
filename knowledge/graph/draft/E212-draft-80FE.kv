@@ -8,24 +8,24 @@
 id:                     E212
 trigger_tool:           cargo|rustc|cc|ld
 phase:                  linking
-error_signature:        ld\.lld: error: unable to find library -lstdc\+\+|clang.*linker command failed with exit code 1.*lstdc\+\+
+error_signature:        ld\.lld: error: unable to find library -lstdc\+\+|linker .cc. not found|"always" progress requires a width key|Cannot determine rustc sysroot
 
 # ═══ Layer 1: 识别层 (Recognition) ═══
 severity:               3
 category:               build-system-compatibility|platform|rust
-match_keywords:         lstdc++, libc++, rust, cargo, ld.lld, linker, ohos, aarch64-unknown-linux-ohos
-title:                  Rust linker defaults to -lstdc++ on OHOS but system only has libc++
+match_keywords:         lstdc++, libc++, rust, cargo, ld.lld, linker, ohos, aarch64-unknown-linux-ohos, cc, cc not found, progress width, harmonybrew, ohos-sdk, llvm-gcc-compat
+title:                  Rust on OHOS — CI 构建环境准备
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
-root_cause:             The Rust compiler for aarch64-unknown-linux-ohos target defaults to linking C++ code with -lstdc++ (GCC's C++ standard library), but OHOS uses libc++ (LLVM's C++ standard library) instead. No libstdc++ exists on the system, causing linker failure.
-affected_scope:         Any Rust project with C/C++ dependencies (e.g., -sys crates compiling C/C++ code) built on OHOS platform
-verification_cmd:       echo 'INPUT(-lc++_shared)' > $OHOS_LIB_DIR/libstdc++.so && cargo build --release
+root_cause:             OHOS上构建Rust有三个根本差异: (1) 无cc命令但rustc需PATH中的cc (2) rustc默认-lstdc++但OHOS只有libc++ (3) Python进程与conan shell的PATH不一致
+affected_scope:         All Rust/Cargo projects built on OHOS platform (ouch, rover, etc.)
+verification_cmd:       cargo build --release 2>&1 | grep 'Finished'
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 rec_priority:           1
 rec_approach:           create-libstdcxx-linker-script
 rec_description:        Create libstdc++ linker scripts that redirect to libc++ in the OHOS SDK lib directory
-rec_command:            OHOS_LIB_DIR=$(find ~/.harmonybrew -path "*/llvm/lib/aarch64-linux-ohos" -type d | head -1) && echo 'INPUT(-lc++_shared)' > "$OHOS_LIB_DIR/libstdc++.so" && echo 'INPUT(-lc++_static -lc++abi)' > "$OHOS_LIB_DIR/libstdc++.a" && export RUSTFLAGS="-L $OHOS_LIB_DIR -C link-arg=-L$OHOS_LIB_DIR"
+rec_command:            见 conanfile.py 三段式: _ensure_cargo() -> _ensure_cc() -> _fix_libstdcxx() + CARGO_TERM_PROGRESS_WIDTH=80
 rec_auto_fix:           true
 rec_impl:               batch-command
 
@@ -38,7 +38,7 @@ fallback_auto_fix:      true
 fallback_impl:          env-set
 
 # ★ 禁止策略 ★
-forbid_1_pattern:       ln -s.*libstdc\+\+|ln -sf.*libstdc\+\+
+forbid_1_pattern:       ln -s.*libstdc\+\+|ln -sf.*libstdc\+\+|self\.run\("rustc"|仅设CC环境变量
 forbid_1_reason:        HMDFS does not properly track symlinks (E050), use file copies or linker scripts instead
 forbid_1_consequence:   Linker still cannot find libstdc++ even after creating symlink
 
@@ -53,12 +53,12 @@ conflicts_with:         []
 prerequisite_of:        []
 
 # ═══ 元数据 ═══
-doc_file:               doc/E212.md
+doc_file:               graph/draft/E212-draft-80FE.md
 last_updated:           2026-07-03
 source_event:           ouch latest compile (2026-07-03)
 
 # ═══ 知识协作 ═══
-authors:                Agent 80FE
+authors:                Agent 80FE, AtomCode
 source_pr:
 source_commit:
 
