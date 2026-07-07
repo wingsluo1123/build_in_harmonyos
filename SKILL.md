@@ -1,10 +1,45 @@
 ---
 name: openharmony-compile-agent
-description: 鸿蒙系统编译智能体——三方库预编译框架
+description: 鸿蒙PC原生应用/C/C++三方库适配编译Agent。当用户需要将开源C/C++库适配到HarmonyOS PC平台（arm64）、编写conanfile.py配方、执行conan构建发布流水线、排查CI构建失败时触发。覆盖源码获取、依赖解析、Conan配方编写、交叉编译、制品仓发布全流程。
+version: 10.3
 ---
 
 > **每次编译任务前先读本文档。** 骨架 + 要点，详解按需从 references/ 加载。
 > KNOW_YOUR_WHY.md 回答"为什么"，本文档回答"怎么做"。
+
+⭐ **回答用户问题时保持简洁。先给命令，再给解释。不要重复 SKILL.md 的原文，直接执行。**
+
+## §0.0 环境准备（Python + Conan）
+
+> 前提条件。首次使用或环境缺失时按此安装。
+
+### Python 安装
+
+```bash
+# 注意：如果已安装"Python安装器"应用，需要先卸载
+curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- python 3.12.9
+```
+
+### pip 源配置（新社区源，必须配置）
+
+```bash
+python3 -m ensurepip                          # 首次安装 pip
+pip3 config set global.index-url https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple
+pip3 config set global.trusted-host pypi.cnb.cool
+```
+
+> 鸿蒙社区 PyPI 源托管 OHOS 适配版 conan 及其他适配包，必须配置才能正确安装。
+
+### Conan 安装
+
+```bash
+pip3 install conan                            # 从配置的社区源安装 OHOS 适配版（基线 2.29.1）
+```
+
+> 此 conan 已适配 OHOS 平台（`os=OHOS` 枚举、`aarch64-linux-ohos` triplet、`CMAKE_SYSTEM_NAME` 映射等）。
+> 不要从官方 PyPI 安装，否则 `os=OHOS` 会报 `not a valid os`。
+
+---
 
 ## §0 初始化
 
@@ -17,22 +52,73 @@ SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openhar
 
 ### §0.1 协作模式（⭐ 默认生效）
 
-本 skill 默认以**协作者模式**运行，基于 Git + GitCode PR 协作。详见 `knowledge/collaboration.md` 和 `knowledge/collaboration-tutorial.md`。
-
-| 模式 | 触发方式 | 职责 |
+本 skill 默认以**协作者模式**运行，基于 Git + GitCode PR 协作。详见 `CONTRIBUTING.md`。| 模式 | 触发方式 | 职责 |
 |------|---------|------|
-| 协作者（默认） | 直接使用 | 编译软件、提取知识、创建分支并提交 PR |
+| 协作者（默认） | 直接使用 | 编译软件、提取知识、生成 conanfile.py、创建分支并提交 PR |
 | 主编 | `OHC_ROLE=editor` | 审核 PR、合并知识、重建索引 |
 
 **协作者 Git 铁律（违反=越权）**：
-- ❌ 不要直接推送到 main 分支，必须创建功能分支
-- ❌ 不要修改 `knowledge/graph/index.tsv`、`archives/_index.yaml`、`SUMMARY.md`
-- ❌ 不要修改 `SKILL.md`、`references/`、`templates/`、`scripts/`
-- ❌ 不要修改不属于自己负责的软件归档目录
-- ✅ 新增知识用 `ohc-run.py graph add E{N} --draft`（写草稿目录）
-- ✅ 完成后创建 PR：`git checkout -b feat/{软件名}-{版本}` → commit → push → GitCode PR
+- ❌ 不推 main，不走捷径：创建功能分支 `git checkout -b feat/{软件名}-{版本}` → push → GitCode PR
+- ❌ 不碰基础设施：`SKILL.md`/`references/`/`templates/`/`scripts/`/`ci/`/`index.tsv`/`SUMMARY.md` 只读
+- ❌ 不碰他人归档目录
+- ✅ 新增知识用 `ohc-run.py graph add E{N} --draft`
 
-**Agent ID**：每个 Agent 实例自动获取 4 位随机标识（如 `A7F3`），用于分支后缀和草稿归属。可通过 `OHC_AGENT_ID` 环境变量预设。
+**Agent ID**：自动获取 4 位随机标识（如 `A7F3`），用于分支后缀和草稿归属，可通过 `OHC_AGENT_ID` 预设。
+
+### §0.2 适配工作流规程（⭐ 强制执行）
+
+以下 5 条规程在每次软件适配中**强制执行**，违反=流程缺陷：
+
+**W0 — 依赖发布检查（适配前第一件事）**
+开始适配任何软件前，**必须**先检查其所有依赖是否已发布到制品仓。这是适配的第一步，**在拉代码、看源码之前就要做**：
+```bash
+# 方法一：运行本地预检脚本（推荐）
+bash ci/scripts/preflight_check.sh <软件名>/<版本>
+
+# 方法二：手动检查（R35: 禁止用 conan list 判断，必须用 conan download）
+conan download "依赖包名/版本" -r=ohpcd --only-recipe
+```
+检查结果决定下一步：
+- **所有依赖已发布** → 正常继续适配
+- **有依赖未发布** → **停止当前适配**，先适配并发布缺失的依赖（R36）
+- **多层依赖链 C→B→A** → 按拓扑序从最底层 A 开始，逐层适配→发布→再回到上层
+
+> 跳过此步=可能花数小时编译后发现依赖链断裂，浪费大量时间。先查依赖，再动手。
+
+**W1 — 同步主仓库**
+每次适配新软件前，**必须**拉取主仓库 main 最新变更，以匹配最新框架要求与知识库：
+```bash
+git checkout main
+git pull origin main
+# 仓库地址：
+#   https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos.git
+#   git@gitcode.com:OpenHarmonyPCDeveloper/build_in_harmonyos.git
+```
+> 不同步=用过期知识库+旧框架要求工作，可能重复踩已修复的坑。
+
+**W2 — PR 原子性**
+每个 PR **只允许包含一个配方软件及其知识图谱草稿**。如果对 SKILL 框架本身有修改（`scripts/`/`templates/`/`ci/`/`SKILL.md`/`references/` 等），**必须单独提交 PR**。
+> 混合提交=审核困难+回滚困难。配方 PR 和框架 PR 的审核标准不同。
+
+**W3 — 本地 CI 模拟**
+每个配方适配完成后，**必须**按照 CI 模式本地模拟验证通过后再提交 PR：
+```bash
+# 使用 CI 同款脚本验证
+bash ci/conan/setup.sh                          # 环境初始化
+bash ci/conan/build_and_test.sh <软件名>/<版本>  # conan create + L4/L5
+```
+> 本地不过=CI 必挂。不要把已知失败的配方推给 CI。
+
+**W4 — 知识图谱完整性检查**
+适配结束时**必须**检查知识图谱内容的完整性和合规性：
+```bash
+# 检查草稿/正式条目字段完整性
+python3 $SKILL_ROOT/scripts/ohc-run.py graph validate
+# 确认草稿已生成（如本次编译有新错误模式）
+ls knowledge/drafts/DRAFT-*.kv 2>/dev/null
+# 确认 doc/ 与 graph/ 配套（E###.md ↔ E###.kv）
+```
+> 每个 E###.kv 必须有配套的 doc/E###.md，关键字段（error_signature、root_cause、rec_approach）不得为空。
 
 ---
 
@@ -40,129 +126,117 @@ SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openhar
 
 ### 1.1 两套模式
 
-**模式 A：全自动（推荐，适合大多数三方库）**
+**模式 A：Conan 驱动（推荐，适合已有 conanfile.py 的软件）**
 ```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py build <软件名> [<版本>]
-# → 内含 13 步：init→patches→pre-scan→configure→make→install→staging→package→deploy→finish→...
+# → 内含 14 步：预分析→init→patches→pre-scan→configure→make→install→staging→conan-init→conan-verify→finish→...
 ```
-脚本遇到 configure/make 错误时自动输出 HANDOFF 块，AI 修复后 `--resume-from=StepN` 继续。
 
-**模式 B：AI 手动编译（适合复杂/首次编译的软件）**
+**模式 B：探索性编译（适合首次/复杂软件）**
 ```bash
 # Step 1: 初始化（自动）
 python3 $SKILL_ROOT/scripts/ohc-run.py init-build <软件名> [<版本>] [--url=URL]
 
 # Step 2: 读取上下文，手动编译（唯一需要 AI 的步骤）
-# 读取 .build-context-<name>-<ver> 获取 BUILD_SRC_DIR, TEST_PREFIX 等变量
+source .build-context-<name>-<ver>
 cd $BUILD_SRC_DIR
 ./configure --prefix=$DEFAULT_PREFIX && make -j2 && make install DESTDIR=$TEST_PREFIX
 make check  # 必须执行，超时可 Ctrl+C 跳过并记录原因
 
-# Step 2.5: 预编译包制作
-python3 $SKILL_ROOT/scripts/ohc-run.py package <软件名> <版本>
-
-# Step 2.6: 部署到本地 + 用户验证（模拟 cmd-pkgs 公共安装脚本部署后的状态）
-make install  # 不带 DESTDIR，直接安装到 $DEFAULT_PREFIX（~/usr/local）
-$DEFAULT_PREFIX/bin/<软件> --version  # 验证本地安装可用
+# Step 2.5-2.6: 生成并验证 Conan 配方（⭐ v3.0 新核心步骤）
+python3 $SKILL_ROOT/scripts/ohc-run.py conan-init <软件名> <版本>
+python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 
 # Step 3: 收尾（6 步自动）
 python3 $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|failed|archived
-
-# Step 4: 质量门禁复查（可选，finish 已自动执行）
-python3 $SKILL_ROOT/scripts/ohc-run.py verify-build <软件名> <版本>
-
-# Step 5: 预编译包制作（staging verify 后自动执行，模式 A 中为 build Step 9 内置）
-# 按 references/packaging-guide.md 9 步流程
 ```
 
-**如何选择**：已知软件/简单编译 → 模式 A；首次编译/复杂依赖/需深度调试 → 模式 B。
+**如何选择**：已有 conanfile.py / 简单编译 → 模式 A；首次编译 / 复杂依赖 / 需深度调试 → 模式 B。
 
 **特殊情况**：
 ```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py init-build libnew 1.0 --url=https://...    # 新软件
 python3 $SKILL_ROOT/scripts/ohc-run.py init-build --resume                          # 恢复中断
 python3 $SKILL_ROOT/scripts/ohc-run.py refresh-patch --auto <软件名> <版本>         # 只做补丁
-# 查看所有进行中编译状态（跨对话恢复首选）
-python3 $SKILL_ROOT/scripts/ohc-run.py status
-# 独立运行知识图谱引擎匹配
-python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"
+python3 $SKILL_ROOT/scripts/ohc-run.py status                                        # 查看所有进行中编译
+python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"                              # 独立运行知识图谱引擎
 ```
 
-### 1.2 铁律摘要（25 条，违反=bug）
+### 1.2 版本号策略（⭐ 强制执行）
 
-| # | 规则 | 一句话 | 详解 |
-|---|------|--------|------|
-| R1 | 参数最少化 | 只需 `--prefix` | references/iron-rules.md |
-| R2 | Phase 3 不生成 .patch | 只改源码+记录 notes.md | references/patch-pipeline.md |
-| R3 | 补丁只用 ohc-run.py refresh-patch | `ohc-run.py refresh-patch --auto` | references/patch-pipeline.md |
-| R4 | 危险库静态编译 | ncurses `--without-shared` | §7 Gotchas |
-| R5 | 软链接验证可执行+禁止 ln -sf | `rm -f && ln -s` | §7 Gotchas |
-| R6 | 只改源文件不改生成文件 | 用 `track-edit` 追踪，refresh-patch 只生成追踪文件的补丁 | references/iron-rules.md |
-| R7 | 安全弹窗先触发再测试 | make install 后扫一遍 --version | references/compile-guide.md |
-| R8 | 源码"四不"准则 | `#ifdef __OHOS__` 守卫 | references/iron-rules.md |
-| R9 | 门禁 FAIL 禁标 success | 降级为 partial/failed | references/iron-rules.md |
-| R10 | 临时文件用 $TMPDIR | 禁硬编码 /tmp（只读） | §7 Gotchas |
-| R11 | 失败先查归档再动手 | 读 README.md + manifest.yaml | references/failure-handling.md |
-| R12 | 先匹配错误模式再修复 | 引擎匹配 graph/index.tsv | references/failure-handling.md |
-| R13 | 脚本用完整路径 | `python3 $SKILL_ROOT/scripts/ohc-run.py <cmd>` | §0 |
-| R14 | 脚本失败=手动模式入口 | `--resume-from=StepN` 继续 | references/failure-handling.md |
-| R15 | 历史仅供参考，不盲从 | 实际参数以本次编译为准，成功后回写 manifest | §4.1 |
-| R16 | 协作不越权 | 不推送 main，走 PR 流程 | knowledge/collaboration.md |
-| R17 | 知识先草稿 | graph add --draft | knowledge/collaboration.md |
-| R18 | 依赖先查预编译 | resolve-deps --install 优先于手动编译 | §1.3 决策树 |
-| R19 | 禁止手动打包 | 必须用 ohc-run.py package 9 步管线 | §3 Step 5 |
-| R20 | **DESTDIR 模式** | `--prefix=$DEFAULT_PREFIX` + `DESTDIR=$TEST_PREFIX` | §3 Step 2 |
-| R21 | **Phase 3 结束必须自检零介入** | 按 §2.4.1 清单逐项检查，所有手动操作已固化 | 不自检就调 finish |
-| R22 | **finish 内自动触发 G0 干净构建验证** | `ohc-run.py clean-verify` G0 门禁通过 | G0 FAIL 阻塞后续门禁 |
-| R23 | **平台检测机制优先于改生成文件** | 用 hints/config.guess/cmake 检查 | 手动 sed config.sh/config.h |
-| R24 | **归档清理：failed必删，空归档删** | 无产物无补丁的归档无价值 | §6 归档清理规则 |
-| R25 | **notes.md 防重复：先删后写** | finish 自动清理旧记录，只保留最后一次 | §3 Step 3.1 |
+**版本号 = 上游版本 + 可选适配修复后缀。**
+
+| 场景 | 版本号 | 示例 |
+|------|--------|------|
+| 首次适配上游 X.Y.Z | `X.Y.Z` | `zlib/1.3.1` |
+| 同一上游版本，修复适配问题 | `X.Y.Z.N`（N 从 1 递增） | `zlib/1.3.1.1`、`zlib/1.3.1.2` |
+| 上游发布新版本 | 新版本号，后缀重置 | `zlib/1.3.2` |
+| 上游停更，我们 fork 维护 | `X.Y.Z` 不变 | conandata.yml 指向 fork 源码 |
+
+**原因**：cnb.cool 制品仓不支持同版本多 recipe revision 并存（上传新 revision 会被 409 拒绝），必须用版本号后缀区分适配修复。
+
+**CI 门禁（L0j）**：PR 阶段自动检查——如果制品仓中已存在同版本，且 conanfile.py/conandata.yml 有修改，直接 fail 并提示递增版本号。
+
+**下游引用规范**：
+```python
+self.requires("zlib/1.3.1")      # 精确引用首次版本
+self.requires("zlib/1.3.1.2")    # 精确引用第 2 次适配修复
+```
+
+### 1.3 铁律摘要（37 条，违反=bug）
+
+| # | 规则 |
+|---|------|
+| R1-R5 | **参数/补丁/链接/源码**：参数最少化(只需`--prefix`)；探索阶段不生成.patch(改源码+记notes)；补丁只用`refresh-patch --auto`；危险库静态编译；软链接`rm -f && ln -s` |
+| R6-R10 | **源码与文件**：只改源文件不改生成文件(`track-edit`)；安全弹窗先触发再测试；源码"四不"(`#ifdef __OHOS__`)；门禁FAIL禁标success；临时文件用`$TMPDIR` |
+| R11-R15 | **失败与历史**：失败先查归档再动手；先匹配错误模式再修复；脚本用完整路径；脚本失败=手动模式入口；历史仅供参考不盲从 |
+| R16-R20 | **协作与打包**：协作不越权(走PR)；知识先草稿(`graph add --draft`)；依赖先查预编译；禁止手动打包(用`conan create`+`conan upload`)；~~DESTDIR模式~~(废弃) |
+| R21-R25 | **自检与清理**：探索结束自检零介入；finish前必须通过conan验证；平台检测优先于改生成文件；归档清理failed必删；notes.md防重复(finish自动清理) |
+| R26-R31 | **Conan 配方**：系统同名库禁止动态链接(避免污染`/lib`/`/lib64`)，默认动态由Conan管理依赖链；conanfile.py必须有`test_package/`；conan_verify通过才标published；conan-verify失败必须查询知识图谱；知识图谱未命中必须生成草稿 |
+| R32 | **OHOS 平台兼容**：recipe 内 `settings.os` 判断必须 `in ("Linux", "OHOS")`，不能 `== "Linux"` |
+| R33 | **build() 禁止依赖未定义的 shell 环境变量**：编译器/标志必须从 Conan Toolchain 或 `self.conf_info` 获取，不能裸用 `${CC}`/`${CFLAGS}` 等 shell 变量（release worker 上为空→编译静默失败） |
+| R34 | **test 必须实质依赖被测包**：test_package 源文件必须调用被测包的 API / 执行被测包的二进制，禁止只打印字符串的空壳测试（CI L1e 破坏性反向验证兜底） |
+| R35 | **禁止用 conan list/search 判断 binary 是否存在**：cnb.cool 搜索 API 对 binary 返回不完整（显示 "No packages found" 但实际已上传），必须用 `conan install --requires=...` 或 `conan download` 验证预编译包 |
+| R36 | **依赖必须先发布再构建下游**：依赖包必须先通过 release 流水线发布到制品仓，再构建下游包。未发布的依赖会导致 `--build=missing` 从源码编译，耗时且易失败。依赖链 `C→B→A` 的发布顺序必须是 A→B→C |
+| R37 | **版本号 = 上游版本 + 适配修复后缀**：首次适配用上游版本 `X.Y.Z`，修复适配问题后加后缀 `X.Y.Z.N`（N 从 1 递增）。原因：cnb.cool 制品仓不支持同版本多 revision 并存，必须用版本号区分 |
+| R38 | **命令行工具必须声明 commands.json**：如果构建产物包含可执行文件，必须在**软件级别**目录下创建 `commands.json`（hicmd 格式）。库类型不需要。CI 门禁 L0k 自动校验 |
+| W0-W4 | **适配工作流**：适配前先查依赖是否已发布(W0)；每次适配前同步main(W1)；PR原子性=一配方一PR(W2)；本地CI模拟通过再提PR(W3)；适配结束检查知识图谱完整性(W4) |
+
+> 详解见 references/iron-rules.md
 
 ### 1.3 决策树
 
 ```
 新三方库？
-├─ registry 有记录 → ohc-run.py init-build <name> <ver>           （全自动）
-├─ 有 URL → ohc-run.py init-build <name> <ver> --url=URL          （自动注册）
-└─ 都没有 → ohc-run.py search-url <name> <ver>           → 从候选选 URL
+├─ registry 有记录 → ohc-run.py init-build <name> <ver>
+├─ 有 URL → ohc-run.py init-build <name> <ver> --url=URL
+└─ 都没有 → ohc-run.py search-url <name> <ver> → 从候选选 URL
 
-缺依赖？（⭐ 运行时发现优先）
-├─ 从 cmd-pkgs README 查询预编译包 → curl 远程获取最新列表
-│   ├─ 有预编译包 → curl install.sh | sh -s -- <name> <ver>（优先安装，避免重编译）
-│   └─ 无预编译包 → 查 dependencies.md 编译顺序 → 先编依赖
-└─ 依赖类型识别：
-    ├─ 构建工具缺失（automake/libtool/pkg-config等）→ 优先预编译包
-    ├─ 库依赖缺失（zlib/openssl/ncurses等）→ 优先预编译包
-    ├─ 命令差异（GNU sed vs toybox sed）→ 优先预编译包（GNU版本功能更强）
-    └─ 特殊依赖（无预编译包）→ 手动编译
+缺依赖？
+├─ 从 cmd-pkgs README 查询预编译包 → curl install.sh | sh
+├─ conan 制品仓有 → conan install --requires=name/ver
+├─ 制品仓没有 → 先适配并发布依赖包（R36：依赖发布优先级）
+│   ├─ 依赖包走完整适配流程 → conan create → CI → release → conan upload
+│   └─ 依赖发布成功后，回来继续构建当前包
+└─ 多层依赖链 C→B→A → 按拓扑序从最底层 A 开始逐层发布
 
 configure 失败？
-├─ 缺依赖 → 输出 HANDOFF → AI 查 cmd-pkgs README → 安装预编译包 → --resume-from=Step3
+├─ 缺依赖 → HANDOFF → AI 安装预编译包 → --resume-from=Step3
 ├─ 平台不识别 → 改 config.guess/sub（build-systems.md §3.1）
 ├─ conftest pipe → configure 中 `| cat` 修复
 └─ 其他 → 引擎匹配 graph/index.tsv → 按 E 编号查找
+
+编译成功 → 固化为 Conan 配方
+├─ ohc-run.py conan-init <name> <ver>     生成 conanfile.py + conandata.yml + test_package/
+├─ 检查生成的配方（requirements, package_info, 系统同名库静态配置）
+└─ ohc-run.py conan-verify <name> <ver>   验证配方可复现
 ```
 
-> **⭐ R18 强化：预编译包优先原则**
-> 
-> 编译过程中发现的任何依赖缺失，**必须先查 cmd-pkgs README**（https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/blob/main/README.md）。
-> 
-> **原因**：
-> 1. 预编译包已通过 ELF 签名，可直接执行
-> 2. 预编译包已处理平台适配（config.guess、umask等）
-> 3. 避免编译链过长浪费时间
-> 4. 本地编译可能引入新问题
+> **⭐ R18+R35+R36 强化：预编译包优先 + 查询方式 + 发布优先级**
 >
-> **只有以下情况才手动编译依赖**：
-> - cmd-pkgs 中没有该软件的预编译包
-> - 需要特定版本（预编译包版本不兼容）
-> - 需要特殊编译选项（预编译包不支持）
->
-> **software.tsv 的作用**：
-> - 已有存档的软件可预填依赖信息
-> - **但不能阻塞运行时依赖发现**
-> - 新软件的依赖在 configure/make 时动态发现
-> - 脚本捕获缺失依赖 → HANDOFF → AI 安装 → 继续
+> - **R18**：编译过程中发现的任何依赖缺失，**必须先查 cmd-pkgs README** 和 Conan 制品仓。只有两者都没有才手动编译依赖。
+> - **R35**：查制品仓时**禁止用 `conan list "*/*:*/*"` 判断 binary 是否存在**（cnb.cool 搜索 API 对 binary 返回不完整）。必须用 `conan install --requires=name/ver` 或 `conan download` 验证。
+> - **R36**：如果依赖包尚未发布到制品仓，**必须先适配并发布依赖包**（走 release 流水线 `conan upload`），再回来构建当前包。多层依赖按拓扑序逐层发布。
 
 ---
 
@@ -172,183 +246,73 @@ configure 失败？
 |---------|---------|------|
 | 技能触发 | **SKILL.md**（本文档） | 每次 |
 | 开始编译 | references/compile-guide.md | Step 2 前 |
+| 生成 Conan 配方 | templates/conanfile-*.py.tmpl + docs/ADAPTATION_GUIDE.md | conan-init 时 |
+| 验证 Conan 配方 | ci/conan/profiles/ohos-aarch64 | conan-verify 时 |
 | 预编译风险扫描 | knowledge/graph/pre-scan-rules.yaml | build Step 2.5（自动） |
 | 编译出错 | knowledge/graph/index.tsv → graph/E*.kv | 错误发生时 |
 | 缺少依赖 | ohc-run.py resolve-deps --list-available | init-build Step 7 |
 | 失败处理 | references/failure-handling.md | R11+R12 流程 |
-| 补丁生成 | references/patch-pipeline.md | Phase 3/4 |
-| Staging 验证 | references/staging-verify.md | make install 后 |
-| 打包阶段 | references/packaging-guide.md + knowledge/operations/packaging.md | Step 5 |
-| 归档收尾 | knowledge/ARCHIVE-SPEC.md | Step 5.5 |
-| 生成总览 | — | finish 内部自动 |
+| HANDOFF 交接 | references/handoff-protocol.md | 脚本→AI 交接时 |
+| 补丁生成 | references/patch-pipeline.md | finish 内部 |
+| 归档收尾 | knowledge/ARCHIVE-SPEC.md | finish 内部 |
 | 铁律详解 | references/iron-rules.md | 需要时 |
-| 人类浏览错误 | knowledge/error-patterns.md | 人类查看 |
+| 软件迁移/新适配 | references/migration-guide.md | 迁移或新软件适配时 |
 | 构建系统适配 | knowledge/operations/build-systems.md | configure 前 |
-| 环境问题 | knowledge/operations/environment.md | 平台限制 |
-| 依赖查询 | knowledge/operations/dependencies.md | 编译顺序 |
-| 上下文裁剪 | references/context-trimming-protocol.md | 问题解决后 |
+| CI 脚本契约 | ci/conan/build_and_test.sh（内联注释） | ci/ 脚本修改时 |
 
 ---
 
 ## §3 核心流程
 
-### Step 1: ohc-run.py init-build — 全自动
+### Step 1: init-build — 全自动
 
 ```bash
 $SKILL_ROOT/scripts/ohc-run.py init-build <软件名> [<版本>] [--url=URL] [--no-download] [--resume]
 ```
-
-内部 **9 步**：registry 查询 → URL 确定 → 下载 → 解压 → 历史检索 → 骨架创建 → **依赖解析** → 环境检查 → 输出 `.build-context-<name>-<ver>`。
-
-> **Step 7 依赖解析（运行时发现优先）**：
-> 
-> 依赖发现的**核心时机是 configure 执行时**，而非 init-build 静态阶段。
-> 
-> **静态阶段（init-build）**：
-> - 查 `software.tsv`（如有）→ 预填已知依赖
-> - 无记录 → 不阻塞，继续到运行时发现
-> 
-> **运行时阶段（configure/make）**：
-> 1. configure 输出 `checking for xxx... no` 或 `Package 'xxx' not found`
-> 2. 脚本捕获 → 输出 HANDOFF（EXIT_REASON: dependency_missing）
-> 3. AI 读取 HANDOFF → 查 cmd-pkgs README（远程）
-> 4. 有预编译包 → `curl install.sh | sh -s -- <name> <ver>` 安装
-> 5. 无预编译包 → 查 dependencies.md 编译顺序 → 子任务编译
-> 6. `--resume-from=Step3` 继续编译
-> 
-> **预编译包列表来源**：
-> - **远程**：https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/blob/main/README.md
-> - **命令**：`python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --list-available --refresh`
-> - **禁止本地缓存**：每次都从远程获取最新列表
-
-**关键输出变量**：`BUILD_SOFTWARE`, `BUILD_VERSION`, `BUILD_SYSTEM`, `BUILD_SRC_DIR`, `BUILD_ARCHIVE_DIR`, `DEFAULT_PREFIX`（唯一权威安装前缀）。
+内部 9 步：registry→URL→下载→解压→历史检索→骨架创建→依赖解析→环境检查→输出 `.build-context-<name>-<ver>`。
 
 ### Step 2: AI 编译 — 唯一智能步骤
 
-> **详解**: references/compile-guide.md
-> **Staging 验证**: references/staging-verify.md
-> **补丁规则**: references/patch-pipeline.md
-
 ```bash
-source .build-context-<name>-<ver>
-cd $BUILD_SRC_DIR
+source .build-context-<name>-<ver> && cd $BUILD_SRC_DIR
 ./configure --prefix=$DEFAULT_PREFIX && make -j1 && make install DESTDIR=$TEST_PREFIX
+make check  # 必须执行，超时可 Ctrl+C 跳过
 ```
+执行顺序：configure → make → make install DESTDIR（staging 隔离）→ 安全弹窗(R7) → make check → Staging 验证。
+脚本需 AI 介入时输出 HANDOFF 交接块，格式见 references/handoff-protocol.md。
 
-> **⛔ R20 铁律：DESTDIR 模式（v8.0+）**
->
-> | 变量 | 路径 | 用途 |
-> |------|------|------|
-> | `$DEFAULT_PREFIX` | `~/usr/local` | **configure --prefix 目标**（运行时路径，编译进二进制） |
-> | `$TEST_PREFIX` | `~/tmp/test-install-{name}-{ver}` | **DESTDIR staging 根**（make install DESTDIR=） |
->
-> **文件安装到**：`$TEST_PREFIX/$DEFAULT_PREFIX/bin/`, `$TEST_PREFIX/$DEFAULT_PREFIX/lib/` 等
->
-> **二进制硬编码**：`$DEFAULT_PREFIX/share/misc/magic` → 运行时路径正确 ✅
->
-> **流程**：`configure --prefix=$DEFAULT_PREFIX` → `make install DESTDIR=$TEST_PREFIX` → `package`（从 `$TEST_PREFIX/$DEFAULT_PREFIX/` 打包）→ 用户通过 cmd-pkgs 公共安装脚本部署到 `$DEFAULT_PREFIX`
+### Conan 配方（Step 2.5-2.6 合并，⭐ v3.0 新核心）
 
-**执行顺序**：
-1. `configure --prefix=$DEFAULT_PREFIX` → `make`
-2. `make install DESTDIR=$TEST_PREFIX`（staging 隔离，打包用）
-3. 安全弹窗(R7) → **make check**（必须执行，超时可 Ctrl+C 跳过）
-4. Staging 验证
-5. `ohc-run.py package`（预编译包制作）
-6. ⭐ `make install`（不带 DESTDIR，安装到 `$DEFAULT_PREFIX`，模拟用户部署）
-7. 用户验证（运行 `$DEFAULT_PREFIX/bin/*` 确认可用）
-8. `ohc-run.py finish`
-
-> **Step 6 的意义**：打包验证完成后，`make install` 将软件安装到本地 `~/usr/local`，模拟普通用户下载预编译包、通过 cmd-pkgs 公共安装脚本安装后的真实状态。这一步能发现打包遗漏（缺库、路径错误、配置文件缺失）等问题。
-
-> **make check 注意事项**：部分软件的测试套会卡住（如 coreutils cat-self、bash 多线程测试），遇到卡住可 `Ctrl+C` 跳过并在 notes.md 记录跳过原因。`make check` 的结果会写入 `reports/test-report.md`。
-
-### HANDOFF 协议（脚本 → AI 交接格式）
-
-> 脚本在需要 AI 介入时输出结构化交接块。AI 读到后按 `AI NEXT ACTIONS` 执行，完成后运行 `RESUME_CMD`。
-
-```
-╔═══ HANDOFF ══════════════════════════════════╗
-║ EXIT_REASON: configure_failed                ║
-║                | dependency_missing ⭐ 新增  ║
-║                | build_tool_missing ⭐ 新增  ║
-║ EXIT_CODE: 2 (resumable) / 1 (fatal)         ║
-║ STEP_FAILED: Step3                           ║
-║ RESUME_CMD: python3 $SKILL_ROOT/scripts/ohc-run.py build ... --resume-from=Step3
-║ KNOWLEDGE_HIT: E007 (config.guess) / none    ║
-║ KNOWLEDGE_GAP: true/false                    ║
-║ MISSING_DEPENDENCY: <软件名> ⭐ 新增字段      ║
-║ MISSING_VERSION: <所需版本> ⭐ 新增字段       ║
-║ DEPENDENCY_TYPE: library|tool|command ⭐新增 ║
-║ PRECOMPILED_AVAILABLE: yes/no ⭐ 新增字段    ║
-║ LOG_FILE: <日志路径>                          ║
-║ SRC_DIR: <源码路径>                           ║
-║ TASK_CARD: <任务卡路径>                       ║
-║ AI NEXT ACTIONS:                             ║
-║   1. 具体操作                                 ║
-║   2. 运行 RESUME_CMD 继续                     ║
-╚══════════════════════════════════════════════╝
-```
-
-**EXIT_REASON 类型说明**：
-
-| EXIT_REASON | 含义 | AI 操作 |
-|-------------|------|--------|
-| `configure_failed` | configure 脚本失败（非依赖） | 匹配知识图谱 → 修复 → resume |
-| `dependency_missing` ⭐ | 缺少库依赖（如 zlib/openssl） | 查 cmd-pkgs README → 安装预编译包 → resume |
-| `build_tool_missing` ⭐ | 缺少构建工具（如 automake/libtool） | 查 cmd-pkgs README → 安装预编译包 → resume |
-| `command_mismatch` | 命令行为差异（如 toybox sed） | 安装 GNU 版本预编译包 → resume |
-
-**dependency_missing 处理流程**：
-
-```
-收到 HANDOFF（EXIT_REASON: dependency_missing）
-  │
-  ├─ PRECOMPILED_AVAILABLE: yes
-  │   │
-  │   ├─ curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- <name> <ver>
-  │   ├─ 验证安装: pkg-config --modversion <name> 或 <name> --version
-  │   └─ 运行 RESUME_CMD 继续
-  │
-  └─ PRECOMPILED_AVAILABLE: no
-      │
-      ├─ 查 dependencies.md 编译顺序
-      ├─ 创建子任务编译依赖（createSubTask）
-      ├─ 等待子任务完成（waitSubTask）
-      └─ 运行 RESUME_CMD 继续
-```
-
-**恢复编译时的规则**：
-1. **新对话首选**：`python3 $SKILL_ROOT/scripts/ohc-run.py status` — 查看所有进行中编译，自动发现停在哪步、失败原因、HANDOFF 信息
-2. 读取 `.handoff.json`（若存在）— 获取上一轮的完整上下文（失败原因、知识图谱命中、AI 操作指引）
-3. **然后读 TASK_CARD.md**（了解之前完成了哪些步骤）
-4. 执行 `AI NEXT ACTIONS`
-5. `KNOWLEDGE_GAP: true` → 修复成功后必须沉淀到知识图谱
-6. `EXIT_CODE: 1` → 不可恢复，需手动从头处理
-
-### Step 2.5: 干净构建验证（⭐ R22 强制，脚本自动执行）
-
-> **时机**：Phase 3 编译完成 + AI 自检通过 (R21) + refresh-patch 完成之后。
-> **执行者**：`ohc-run.py clean-verify`（在 finish Step 3 内自动触发）。
+**G0 预构建评估**（init-build 内部自动执行）：基于 `knowledge/graph/pre-scan-rules.yaml` 预查询知识图谱，评估编译风险（已知平台陷阱、依赖冲突等），**非阻塞**，结果写入 `.build-context`。
 
 ```bash
-python3 $SKILL_ROOT/scripts/ohc-run.py clean-verify <软件名> <版本>
+# 生成 conanfile.py + conandata.yml + test_package/
+python3 $SKILL_ROOT/scripts/ohc-run.py conan-init <软件名> <版本>
+# 验证配方（8 道门禁）
+python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 ```
 
-脚本自动执行：
-1. 解压原始 tarball 到临时目录（不影响工作目录）
-2. 应用 `patches/*.patch`
-3. 运行 `./configure`（使用 manifest.yaml 中的 `configure_options`）
-4. `make -j1`
-5. `make install DESTDIR=...`
-6. 检查产物完整性
-7. 清理临时目录
+**conan-init 后 AI 必须检查**：`requirements()`(依赖格式 `name/version`)、`generate()`(R26 系统同名库静态)、`package_info()`(cpp_info.libs)、`conandata.yml`(sha256)。
 
-**PASS** → 继续 finish 的 G1-G4 门禁。
-**FAIL** → 输出 HANDOFF 块（见 staging-verify.md G0），AI 修复后重跑 clean-verify。
+**conan-init 后 AI 必须判断软件类型 (R38)**：
+- 如果构建产物包含**可执行文件**（命令行工具，如 `strace`、`bash`、`curl`）→ 在**软件级别**目录（`archives/{letter}/{name}/`）下创建 `commands.json`（参考 [templates/commands.json.template](templates/commands.json.template)）
+- 如果构建产物只有**库文件**（.a/.so，如 `zlib`、`openssl`）→ 不需要 commands.json
+- 判断依据：conanfile.py 的 `package_info()` 中 `cpp_info.libs` vs `cpp_info.bindirs`/构建系统 install 了可执行文件到 `bin/`
 
-**设计目的**：暴露 Phase 3 中所有"手动操作但未固化为补丁/规则"的遗漏。
+**conan-verify 8 道门禁**（G0-G4 + L2/L4/L5）：
 
-### Step 3: ohc-run.py finish — 6 步自动收尾
+| 门禁 | 名称 | 说明 |
+|------|------|------|
+| **G0** | 预构建风险评估 | 知识图谱预查询，非阻塞 |
+| **G1** | 配方完整性 | conanfile.py + conandata.yml + test_package/ 存在且字段完整 |
+| **G2** | conan create | 从干净源码构建，验证配方自包含性 |
+| **G3** | 系统同名库隔离 (R26) | readelf -d 检查系统同名库未输出 .so 到系统路径 |
+| **G4** | 产物完整性 | bin/lib/include 产物检查 |
+| **L2/L4/L5** | smoke test / 安全扫描 / 产物基线 | `--version`可执行 / NX·PIE·RELRO / SHA256 基线对比 |
+
+**知识图谱集成（R30/R31）**：G2 失败时自动调用 `run_engine()` 匹配 E-entry。命中→展示根因+修复命令；未命中→自动生成 `knowledge/drafts/DRAFT-*.kv` 草稿。G2 通过 = 可标记 `published`（R29）。
+
+### Step 3: finish — 10 步自动收尾
 
 ```bash
 $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|failed
@@ -356,62 +320,40 @@ $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|faile
 
 | 步骤 | 内容 | 失败处理 |
 |------|------|---------|
-| [1/6] refresh-patch --auto | 补丁生成 | 跳过，继续归档 |
-| [2/6] close-archive | 归档关闭 | exit 2 |
-| [3/6] verify-build | 质量门禁 G1-G4 | ❌ 阻塞（未通过则 finish 失败） |
-| [4/6] finalize-archive | 清理+校验+软件级 manifest 版本索引 | 非致命 |
-| [5/6] check-knowledge-gap | 知识完整性检查 | 非阻塞，提醒补充 |
-| [6/6] gen_summary | 重新生成 SUMMARY.md | 非致命 |
+| [1/10] refresh-patch --auto | 补丁生成 | 跳过，继续归档 |
+| [2/10] close-archive | 归档关闭 | exit 2 |
+| [2.5/10] G0 干净构建验证 | clean-verify 重建 | 非阻塞（平台限制可跳过） |
+| [3/10] conan-verify | Conan 配方验证（⭐ v3.0） | ❌ 阻塞 |
+| [3.5/10] 本地 CI 模拟 (W3) | build_and_test.sh 模拟 | 非阻塞（警告） |
+| [4/10] commands.json 检查 (R38) | 命令行工具声明验证 | 非阻塞（警告） |
+| [5/10] finalize-archive | 清理+校验+版本索引 | 非致命 |
+| [6/10] check-knowledge-gap | 知识完整性检查 (W4) | 非阻塞 |
+| [7/10] gen_summary | 重新生成 SUMMARY.md | 非致命 |
+| [8/10] PR 原子性检查 (W2) | 确认一配方一PR | 非阻塞 |
 
-**前置条件**：P1=test-report 存在, P2=Staging 验证完成, P3=预编译包已制作。
+**前置条件**：test-report 存在 + Staging 验证完成 + conanfile.py 存在。
+**状态值**：`published`(verify通过+CI upload) | `built`(verify通过未upload) | `failed`(编译或验证失败) | `archived`(旧版本归档)。
 
-**状态值**：`published`（已编译并发布）| `built`（编译成功，未发布）| `failed`（编译失败）| `archived`（旧版本归档）。verify 通过升级状态，失败降级。
-
-#### Step 3.1: close-archive 自动清理（⭐ R25）
-
-> **notes.md 防重复规则**：`close-archive` 脚本在写入编译结束记录前，**自动清理所有旧记录**。
-
-```python
-# close_archive.py 第 70-85 行
-# 先删除所有旧的编译结束块，再写入新记录
-pattern = r'\n---\n\n\*\*编译结束\*\*:.*?\n\*\*最终状态\*\*:.*?\n'
-pcontent_new = re.sub(pattern, '', pcontent, flags=re.DOTALL)
-pcontent_new = pcontent_new.rstrip() + append_text
-```
-
-**原因**：
-- 多次 finish（如修复后重跑）会产生重复记录
-- 重复记录导致 notes.md 混乱，无法判断最终状态
-- 自动清理确保每个软件只有一条最新的编译结束记录
-
-**工具约束**：脚本自动执行，无需手动干预。
-
-### Step 4: 质量门禁复查（可选）
+### Step 4-5: 质量门禁与 CI 流水线
 
 ```bash
+# Step 4: 独立复查（可选，finish 已自动调用 conan-verify）
 $SKILL_ROOT/scripts/ohc-run.py verify-build <软件名> <版本>
 ```
 
-5 道门禁：G0 干净构建验证（补丁自包含性）→ G1 二进制完整性 → G2 功能可用性 → G3 可移植性（RPATH/签名）→ G4 档案完整性。
-G0 由 `ohc-run.py clean-verify` 执行，在 finish Step 3 自动触发。G0 FAIL 阻塞后续所有门禁。
-正常流程已在 Step 3 自动执行。
+**Step 5: CI 流水线**（外部驱动，无 AI 参与。CI 纯 zsh + conan，不依赖 ohc-run.py/知识图谱/草稿机制）
 
-### Step 5: 预编译包制作
+| 流水线 | 触发 | 执行步骤 | Upload |
+|--------|------|---------|--------|
+| PR 校验 | PR 创建/更新 | setup.sh → build_and_test.sh | ❌ |
+| 正式发布 | PR 合并到 main | setup.sh → build_and_test.sh → upload.sh → sign.sh | ✅ CNB |
 
-> **详解**: references/packaging-guide.md
-> **R19: 禁止手动打包！必须用 `ohc-run.py package`。** 手动 `tar czf` 会导致 ELF 未签名（鸿蒙上不可执行）、缺少 RPATH、未 strip 符号等问题。
+**CI 脚本说明**：`ci/conan/setup.sh`(环境初始化)、`build_and_test.sh`(conan create + L4/L5)、`upload.sh`(仅 release)、`sign.sh`(GPG 签名)。
 
-verify PASS 后**必须**执行。按 packaging.md 9 步：收集 → 清理 → 链接替换 → 依赖收集 → RPATH → Strip → 签名 → 权限 → tar.gz + 安装验证。
+**Upload 安全边界**：密钥仅存 CI 执行机，PR 校验不 upload，合并 main 后才 upload。
+**CI 只读 4 文件**：`conanfile.py`/`conandata.yml`/`test_package/`/`patches/`。不读 `manifest.yaml`/`notes.md`/`reports/`。
 
-交付物：`{name}-{ver}-ohos-aarch64.tar.gz`（安装脚本由 cmd-pkgs 公共仓库提供）。
-
-### Step 5.5: 归档收口
-
-```bash
-python3 $SKILL_ROOT/scripts/ohc-run.py finalize-archive <软件名> <版本>
-```
-
-清理临时文件 + 必填校验 + 一致性检查 + 最终报告。详见 knowledge/ARCHIVE-SPEC.md。
+> 详解见 references/compile-guide.md
 
 ---
 
@@ -421,47 +363,19 @@ python3 $SKILL_ROOT/scripts/ohc-run.py finalize-archive <软件名> <版本>
 
 ```
 失败发生
-├─ [R11] 查归档：README.md → manifest.yaml → 软件级 README
+├─ [R11] 查归档：README.md → manifest.yaml → conanfile.py
 ├─ [R12] 匹配错误：引擎匹配 graph/index.tsv → E*.kv → 方案
-├─ 缺依赖？→ ohc-run.py resolve-deps --install <name>（预编译包优先）
+├─ 缺依赖？→ conan install 或 resolve-deps --install
 └─ 动手修复：归档+知识库都没有 → 记录新问题 → 修复 → 继续
 ```
 
-**知识提取决策**：平台相关 → L1 立即写 knowledge/；构建模式 → L2 写 knowledge/；仅本软件 → L3 写 manifest。
-
 ### 4.1 历史信息纠正（R15）
 
-> **核心问题**：历史编译记录可能包含错误方案（如用 `--build/--host` 绕过 config.guess），盲目复用会导致重复失败或引入隐患。
+> **核心问题**：历史编译记录可能包含错误方案。
 
-**触发条件**：以下任一情况出现时，进入纠错流程：
-1. 历史记录的 configure 参数在本次失败
-2. 历史记录包含禁用参数（`--build`, `--host`, `--target`）— 本平台是 native 编译
-3. 历史记录缺少关键参数（如 `--without-shared`）
-4. AI 在手动调试中发现历史方案有误
+**纠错 4 步**：识别差距(对比历史vs本次参数) → 手动编译(正确参数) → 回写历史(conanfile.py+manifest+notes) → 沉淀知识(写入 L1/L2)。
 
-**纠错 4 步**：
-```
-1. 识别差距 → 对比历史参数 vs 本次成功参数，定位遗漏项
-2. 手动编译 → 用正确参数完成编译（模式 B Step 2）
-3. 回写历史 → 更新 manifest.yaml 的 configure_options + notes.md
-4. 沉淀知识 → 如果是通用平台发现，写入 knowledge/ L1/L2
-```
-
-**常见平台必需参数**（R15 补充表）：
-
-| 参数 | 适用场景 | 说明 |
-|------|---------|------|
-| `--without-shared` | ncurses（R4） | 防止 .so 导致系统崩溃 |
-| `--no-asm` | OpenSSL | 无汇编支持 |
-| `--without-bash-malloc` | bash | 使用系统 malloc |
-
-**禁用参数**（native 编译，禁止使用）：
-
-| 禁用项 | 错误原因 | 正确做法 |
-|--------|---------|---------|
-| `--build=...` | 本平台是 native 编译 | 修改 config.guess/config.sub（见 E007） |
-| `--host=...` | 同上 | 同上 |
-| `--target=...` | 同上 | 同上 |
+**禁用参数**（native 编译，`--build=`/`--host=`/`--target=` → 一律改 config.guess/config.sub）。
 
 ---
 
@@ -470,13 +384,14 @@ python3 $SKILL_ROOT/scripts/ohc-run.py finalize-archive <软件名> <版本>
 ### 5.1 目录结构
 
 ```
-knowledge/graph/        # 结构化数据
-├── index.tsv           # 主索引（100+ 条目）
-├── principles.kv       # 编译原则（20 条）
-├── pre-scan-rules.yaml # 预编译风险扫描规则集（闭环：编译新发现→自动回填）
-├── E001.kv ~ E080.kv   # 错误模式条目
-knowledge/doc/          # 人类可读文档
-├── E001.md ~ E080.md
+knowledge/graph/           # 结构化数据
+├── index.tsv              # 主索引（211 条目）
+├── principles.kv          # 编译原则（20 条）
+├── pre-scan-rules.yaml    # 预编译风险扫描规则集
+├── E001.kv ~ E211.kv      # 错误模式条目
+knowledge/drafts/          # 草稿目录（conan-verify 自动生成，R31）
+├── DRAFT-001.kv ~         # 待审查的草稿条目
+knowledge/doc/             # 人类可读文档（E001.md ~ E211.md）
 knowledge/error-patterns.md  # 人类浏览入口
 ```
 
@@ -487,133 +402,86 @@ Phase A: index.tsv 粗筛 → Phase B: .kv 精排 → Phase C: 方案生成 → 
 ### 5.3 管理命令
 
 ```bash
-# 新增条目
-python3 $SKILL_ROOT/scripts/ohc-run.py graph add E{NNN}
-
-# 更新条目
-python3 $SKILL_ROOT/scripts/ohc-run.py graph update E{NNN}
-
-# 校验一致性
-python3 $SKILL_ROOT/scripts/ohc-run.py graph validate
-
-# 归档/删除
-python3 $SKILL_ROOT/scripts/ohc-run.py graph remove E{NNN} [--archive]
-
-# 独立引擎匹配
-python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"
-
-# 协作命令（协作者）
-python3 $SKILL_ROOT/scripts/ohc-run.py submit --check <软件名> <版本>  # 本地自检（提交 PR 前）
-python3 $SKILL_ROOT/scripts/ohc-run.py review <软件名> <版本>         # 主编本地辅助审核
-
-# 依赖解析（预编译包）
-python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps <软件名>           # 检查依赖
-python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --install <软件名>  # 自动安装
-python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --list-available    # 列出可用包
-python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --refresh           # 刷新远程索引
+python3 $SKILL_ROOT/scripts/ohc-run.py graph add E{NNN} [--draft]      # 新增/草稿条目
+python3 $SKILL_ROOT/scripts/ohc-run.py graph update E{NNN}              # 更新条目
+python3 $SKILL_ROOT/scripts/ohc-run.py graph validate                  # 校验一致性
+python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"               # 独立引擎匹配
+python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps <软件名> [--install] # 检查/安装依赖
 ```
 
 ### 5.4 知识分层
 
 | 层 | 归属 | 特征 | 写入时机 |
 |----|------|------|---------|
-| L1 平台真理 | knowledge/*.md | 任何软件可能遇到 | Phase 3 实时 |
-| L2 模式经验 | knowledge/*.md 章节 | 同类构建系统复现 | Phase 3 实时 |
-| L3 本版笔记 | manifest.yaml knowledge_gained | 仅本软件本版本 | Phase 3+4 |
+| L1 平台真理 | knowledge/*.md | 任何软件可能遇到 | 探索阶段实时 |
+| L2 模式经验 | knowledge/*.md 章节 | 同类构建系统复现 | 探索阶段实时 |
+| L3 本版笔记 | conanfile.py + manifest.yaml | 仅本软件本版本 | 探索阶段+固化阶段 |
 
-### 5.5 上下文裁剪协议（⭐ 控制上下文膨胀）
+### 5.5 知识生命周期（可成长性机制）
 
-问题解决后执行 4 步：沉淀知识 → 写索引行 → 裁剪遗忘 → 后续查图谱。
+知识图谱通过**草稿→审核→正式**流转自动成长：
 
-> 完整协议: references/context-trimming-protocol.md
+```
+编译失败(conan-verify G2)
+  → 引擎未命中 → 自动生成草稿 knowledge/drafts/DRAFT-###.kv
+    → 自动提取: match_keywords(从错误日志)、error_excerpt(错误行)
+    → 自动去重: 与现有草稿关键词重合>50%则跳过
+    → AI 补充: error_signature、root_cause、rec_approach
+      → graph promote DRAFT-### → 正式条目 E###.kv
+        → 自动: 生成 doc/E###.md、更新 index.tsv、填充 last_updated
+```
+
+**命令**：
+```bash
+# 查看草稿
+ls knowledge/drafts/DRAFT-*.kv
+
+# 提升草稿为正式条目（自动分配E编号+生成doc+更新index）
+python3 $SKILL_ROOT/scripts/ohc-run.py graph promote DRAFT-001
+
+# 指定目标编号提升
+python3 $SKILL_ROOT/scripts/ohc-run.py graph promote DRAFT-001 --target-id E215
+
+# 新增草稿（手动）
+python3 $SKILL_ROOT/scripts/ohc-run.py graph add E{NNN} --draft
+
+# 更新条目（自动刷新 last_updated）
+python3 $SKILL_ROOT/scripts/ohc-run.py graph update E{NNN} --field root_cause="..."
+```
+
+**自维护**：
+- `last_updated` 字段：`graph add/update` 自动填充当日日期
+- `graph validate`：一致性校验（doc↔kv 配套、字段完整、severity 合法、引用有效）
+- `principles.kv`：20 条编译原则（P001-P020），Phase D 原则过滤引用
 
 ---
 
 ## §6 归档规范摘要
 
-> **完整规范**: knowledge/ARCHIVE-SPEC.md
-
-### 目录结构
+> **完整规范**: knowledge/ARCHIVE-SPEC.md (v3.0)
 
 ```
 archives/{letter}/{name}/
   ├── manifest.yaml              # 软件级元数据 + 版本索引
   ├── README.md                  # 软件描述
+  ├── commands.json              # 命令行工具声明（软件级，仅 tool 类型，R38）
   └── {version}/
-      ├── manifest.yaml          # 版本级编译元数据
-      ├── notes.md               # 适配笔记（替代旧 PROGRESS.md）
-      ├── patches/               # 补丁（按需，有则保留）
-      ├── packaging/             # 仅 .tar.gz（按需，有产物时）
-      └── reports/               # 构建报告（按需）
+      ├── conanfile.py           # 【CI 输入】Conan 配方
+      ├── conandata.yml          # 【CI 输入】源码 + 补丁声明
+      ├── test_package/          # 【CI 输入】Conan L1 测试
+      ├── patches/               # 【CI 输入】补丁文件
+      ├── manifest.yaml          # 【AI 元数据】编译元数据 + 状态
+      ├── notes.md               # 【AI 元数据】适配笔记
+      └── reports/               # 【AI 元数据】验证报告
 ```
 
-### 必填文件
+| 分类 | 文件 | CI 读取 | AI 读取 |
+|------|------|---------|---------|
+| CI 输入 | conanfile.py / conandata.yml / test_package/ / patches/ | ✅ | ✅ |
+| CI 输入 | commands.json（软件级，仅 tool 类型） | ✅ | ✅ |
+| AI 元数据 | manifest.yaml / notes.md / reports/ | ❌ | ✅ |
 
-- **软件级（必须）**：manifest.yaml, README.md
-- **版本级（必须）**：manifest.yaml
-- **版本级（推荐）**：notes.md
-- **版本级（按需）**：patches/, packaging/, reports/
-
-### 补丁命名
-
-`NNNN-{描述}.patch`，如 `0001-config.sub.patch`。
-
-### 依赖顺序（批量编译参考）
-
-按 `software-registry.yaml` 中的 category 分阶段编译，基础顺序: pkg-config → sed/coreutils/gawk → automake/libtool → ...（详见 knowledge/operations/dependencies.md）
-
-### 归档清理规则（⭐ R24 新增）
-
-> **核心原则**：归档是知识沉淀，不是废纸堆。无价值的归档应及时清理。
-
-**状态判定标准**：
-
-| 状态 | 定义 | 产物 | 补丁 | 知识 | 处理 |
-|------|------|------|------|------|------|
-| **published** | 已编译并发布到 cmd-pkgs | ✅ 有 | 可能有 | 有 | 保留（核心资产） |
-| **built** | 编译成功，未发布 | ✅ 有 | 有 | 有 | 保留（有价值） |
-| **built** | 仅骨架，无产物 | ❌ 无 | ❌ 无 | ❌ 无 | ⚠️ 清理（空归档） |
-| **failed** | 编译失败，无产物 | ❌ 无 | ❌ 无 | ❌ 无 | ❌ 删除（无价值） |
-| **archived** | 旧版本归档 | 可能有 | 可能有 | 有 | 保留 |
-
-**清理操作**：
-
-```bash
-# 1. 删除 failed 状态的归档（无产物无知识）
-rm -rf archives/{letter}/{软件}/{版本}/
-
-# 2. 删除 built 但无产物的空归档
-#    判断：manifest.yaml status=built + 无 tar.gz + 无 .patch
-find archives -name "manifest.yaml" -exec grep -l "status: built" {} \; | while read m; do
-    dir=$(dirname "$m")
-    pkg_count=$(ls "$dir/packaging/*.tar.gz" 2>/dev/null | wc -l)
-    patch_count=$(ls "$dir/patches/*.patch" 2>/dev/null | wc -l)
-    if [ "$pkg_count" -eq 0 ] && [ "$patch_count" -eq 0 ]; then
-        rm -rf "$dir"
-    fi
-done
-
-# 3. 更新有产物的 built 为 published
-sed -i 's/^status: built$/status: published/' archives/{letter}/{软件}/{版本}/manifest.yaml
-
-# 4. 清理多版本中的无用版本（保留最新 published 版本）
-#    判断：同一软件有多版本，旧版本 built/failed 且无产物
-rm -rf archives/{letter}/{软件}/{旧版本}/
-```
-
-**多版本处理策略**：
-
-| 场景 | 处理 |
-|------|------|
-| 同软件多版本都 published | 全部保留（用户可能需要不同版本） |
-| 最新版本 published，旧版本 built | 清理旧版本（无价值） |
-| 最新版本 failed，旧版本 published | 清理最新版本，保留旧版本 |
-| 多版本都 built 无产物 | 全部清理（空归档） |
-
-**清理时机**：
-- finish 时自动检查：status=failed → 警告并建议删除
-- 定期审计（主编职责）：扫描空归档、清理废弃版本
-- PR 合并前：协作者自检，确保无 failed/built 空归档提交
+> 状态定义见 §3 Step 3。归档清理规则（R24）见 knowledge/ARCHIVE-SPEC.md。
 
 ---
 
@@ -623,22 +491,18 @@ rm -rf archives/{letter}/{软件}/{旧版本}/
 |------|------|------|
 | /tmp 只读 | E002，写入报 Read-only | 用 `$TMPDIR` 或 `$HOME/tmp` |
 | HMDFS 软链接 | 不能 ln -sf 覆盖 | `rm -f && ln -s` 或 wrapper |
-| 安全弹窗 | 首次执行二进制弹确认框 | make install 后扫一遍 bin/ ✅ **HongMeng Kernel 1.12.0 已解决：已安装二进制可直接执行，不再弹窗** |
+| 安全弹窗 | 首次执行二进制弹确认框 | make install 后扫一遍 bin/ |
 | chmod 不生效 | E046，SELinux 限制 | 记录为平台限制，不阻塞 |
 | 未实现 syscall | E051，setreuid/chroot 等 | 加入 EXCLUDE_LIST 排除 |
-| toybox sh 限制 | 缺 bash 特性，heredoc 差 | Python 化后已解决；仅限用户手动操作 shell 时注意 ✅ **HongMeng Kernel 1.12.0 已解决：GNU bash 5.3.0 已预装，heredoc 在 sh/bash 均正常** |
-| ELF 签名 | 必须签名否则不可执行 | `python3 $SKILL_ROOT/scripts/ohc-run.py sign-elf`，工具在 /data/service/hnp/bin/ |
-| ncurses 共享库 | 编译为 .so 会导致系统崩溃 | `--without-shared`（R4） ✅ **HongMeng Kernel 1.12.0 已解决：已正确编译为静态库（--without-shared）** |
+| ELF 签名 | 必须签名否则不可执行 | CI 流水线 `ci/artifacts/sign.sh` |
+| ncurses 共享库 | 编译为 .so 会导致系统崩溃 | conanfile.py `generate()` `--without-shared`（R4） |
+| 静态链接 | 系统同名库构建 .so 会污染 `/lib`、`/lib64` | conanfile.py `generate()` `BUILD_SHARED_LIBS=OFF`（R26），仅限系统同名库 |
+| 动态链接 | 非 system 同名库默认动态 | Conan 管理依赖链，用户 `conan install` 自动拉取全部依赖 |
+| RPATH 解析 | 鸿蒙 `$ORIGIN/../lib` 不稳定 | 系统同名库强制静态（R26）；其他库由 Conan RPATH 管理 |
 
 ### 流程自省
 
-发现 SKILL 自身问题时记录到 `reports/skill-feedback.md`：
-```
-### F{NNN}: {简短描述}
-- 类别: 流程缺失/矛盾/脚本问题
-- 严重: 🔴🟡🟢
-- 建议: {怎么改}
-```
+发现 SKILL 自身问题时记录到 `reports/skill-feedback.md`。
 
 ---
 
@@ -647,129 +511,69 @@ rm -rf archives/{letter}/{软件}/{旧版本}/
 ### 8.1 架构
 
 ```
-主任务（当前会话）
-├── 编排调度：依赖排序 → 分阶段派发
-├── 监控进度：dispatch status 查看各任务状态
-├── 结果审计：review 各子任务输出
-└── 最终提交：git add → commit → push → PR
-
-子任务（createSubTask，异步并行）
-└── 独立加载 skill → 完整编译流程 → 输出结果摘要
+主任务：编排调度(依赖排序→派发) → 监控进度(dispatch status) → 结果审计(review) → 提交(git push → PR)
+子任务：独立加载 skill → 完整编译流程 → 生成 conanfile.py → 输出结果摘要
 ```
 
 ### 8.2 使用方式
 
-**生成批量计划**:
 ```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py dispatch plan zlib openssl wget
-```
-输出分阶段的 createSubTask 调用指令，主任务 AI 按此执行。
-
-**查看任务状态**:
-```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py dispatch status zlib openssl wget
-```
-
-**生成子任务目标**（供 createSubTask 的 objective 参数）:
-```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py dispatch objective zlib 1.3.1
-```
-
-**生成调度脚本**（完整 createSubTask 调用序列）:
-```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 ```
-
-### 8.3 主任务 AI 操作流程
-
-```bash
-# Step 1: 生成计划
-python3 $SKILL_ROOT/scripts/ohc-run.py dispatch plan zlib bzip2 openssl wget
-
-# Step 2: 按计划创建异步子任务（Phase 0: 无依赖的软件）
-# 直接调用 createSubTask 工具，objective 使用 dispatch 生成的文本
-
-# Step 3: 等待 Phase 0 完成
-# waitSubTask 检查结果
-
-# Step 4: 创建 Phase 1 子任务（依赖 Phase 0 的软件）
-# ...
-
-# Step 5: 全部完成后审计
-python3 $SKILL_ROOT/scripts/ohc-run.py dispatch status zlib bzip2 openssl wget
-python3 $SKILL_ROOT/scripts/ohc-run.py review zlib 1.3.1
-
-# Step 6: 提交
-git add . && git commit -m "feat: batch compile ..." && git push
-```
-
-### 8.4 子任务 isolation
-
-每个子任务独立运行，互不干扰：
-- 不同的 BUILD_SRC_DIR（~/tmp/builds/{name}-{ver}.work）
-- 不同的 ARCHIVE_DIR（archives/{letter}/{name}/{ver}/）
-- 独立的 .edit-tracker.json
-- 独立的 .build-context-{name}-{ver}
-
-唯一共享的资源：
-- 项目根目录的 knowledge/（写草稿，不冲突）
-- ~/usr/local（安装前缀，package 时独立 tar.gz）
-
-**子任务知识提取职责（⭐ R17）**：
-子任务不仅是编译执行者，也是知识发现者。编译过程中遇到的每个新错误模式：
-1. 先用 `engine` 检查是否已有匹配条目
-2. 无匹配 → 用 `graph add E{N} --draft` 创建草稿到 `knowledge/graph/draft/`
-3. 草稿写入 `notes.md` 的知识提取记录
-4. 主任务从 draft/ 目录收集所有草稿，审核后合并到正式图谱
-
-`dispatch objective` 命令已内置此要求，生成的 objective 包含完整的 R17 草稿创建流程。
-
-### 8.5 子命令一览
-
-| 子命令 | 说明 |
-|--------|------|
-| `dispatch plan <sw1> <sw2> ...` | 生成分阶段执行计划 |
-| `dispatch status <sw1> <sw2> ...` | 查看各软件编译状态 |
-| `dispatch objective <sw> <ver>` | 输出子任务 objective 文本 |
-| `dispatch script <sw1> <sw2> ...` | 生成 createSubTask 调度脚本 |
 
 ---
 
 ## §9 工具一览
 
-| 脚本 | 用途 | 调用时机 |
-|------|------|---------|
-| `ohc-run.py build` | 13 步编译驱动（唯一入口） | ★ 主入口 |
-| `ohc-run.py init-build` | 下载/解压/骨架/环境 | Step 1 |
-| `pre_scan.py` | 预编译源码风险扫描（规则集 + musl 函数检测）⚠️ build 管线内部模块，非独立 CLI | build Step 2.5 |
-| `ohc-run.py finish` | 补丁+归档+verify+校验+知识+总结（6 步） | Step 3 |
-| `ohc-run.py verify-build` | G1-G4 质量门禁 | finish 内部 / 可选复查 |
-| `ohc-run.py clean-verify` | G0 干净构建验证 | finish Step 3 前置 / AI 手动 |
-| `ohc-run.py refresh-patch` | 补丁管线 | finish 内部 |
-| `ohc-run.py close-archive` | 归档关闭 | finish 内部 |
-| `ohc-run.py finalize-archive` | 清理+校验+软件级 manifest 版本索引 | finish 内部 |
-| `ohc-run.py package` | 预编译包 9 步流程 | Step 5 |
-| `ohc-run.py sign-elf` | ELF 签名 | 打包时 |
-| `ohc-run.py init-archive` | 档架骨架创建 | init 内部 |
-| `ohc-run.py check-env` | 环境检查 | init 内部 |
-| `ohc-run.py search-url` | URL 搜索 5 策略 | init fallback |
-| `ohc-run.py check-knowledge-gap` | 知识遗漏检查 | finish Step 5 |
-| `ohc-run.py graph add` | 知识图谱新增条目 | AI 手动 |
-| `ohc-run.py graph update` | 知识图谱更新条目 | AI 手动 |
-| `ohc-run.py graph remove` | 知识图谱归档/删除 | AI 手动 |
-| `ohc-run.py graph validate` | 图谱一致性校验 | add/update 内部 |
-| `ohc-run.py engine` | 独立错误匹配引擎 | AI 手动 |
-| `ohc-run.py status` | 跨对话编译状态扫描 | 恢复编译时 |
-| `ohc-run.py handoff` | HANDOFF 上下文输出 | 恢复编译时 |
-| `ohc-run.py summary` | 生成 SUMMARY.md | finish Step 6 |
-| `ohc-run.py submit` | 提交前本地自检 | 协作者 PR 前 |
-| `ohc-run.py review` | 本地审核辅助（12 项检查） | 主编 |
-| `ohc-run.py post-merge` | 合并后重建索引（5 步） | 主编 |
-| `ohc-run.py resolve-deps` | 查询/安装预编译依赖 | init-build Step 7 |
-| `ohc-run.py track-edit` | 追踪/查询源码编辑记录 | 编译中每次修改源文件时 |
-| `software-registry.yaml` | 软件元数据缓存 | init 读写 |
+### AI 工具（scripts/ohc-run.py，本地开发环境使用）
+
+| 子命令 | 用途 |
+|--------|------|
+| `build` | 14 步编译驱动（含预分析+conan 配方生成+验证）★ 主入口 |
+| `init-build` | 下载/解压/骨架/环境/依赖解析 |
+| `pre-analysis` | ⭐ 鸿蒙PC平台适配预分析（图形/音视频/系统集成/平台代码扫描） |
+| `conan-init` | 生成 conanfile.py + conandata.yml + test_package/ ⭐ |
+| `conan-verify` | conan create + G0-G4 + L2/L4/L5 + 知识图谱(R30) + 草稿(R31) ⭐ |
+| `finish` | 补丁+归档+G0+conan-verify+CI模拟+知识+PR原子性+摘要（9 步） |
+| `engine` / `graph add\|update\|validate\|promote` | 知识图谱查询/管理/草稿提升 |
+| `req add\|list\|close\|validate` | ⭐ 需求图谱管理（系统能力缺口跟踪） |
+| `resolve-deps [--install]` | 查询/安装预编译依赖 |
+| `verify-build` / `refresh-patch` | 门禁复查 / 补丁管线 |
+| `status` / `handoff` / `track-edit` | 状态恢复 / 源码追踪 |
+| `search-url` / `submit` / `review` / `post-merge` | URL 搜索 / PR 自检 / 主编审核 / 合并后索引 |
+| `init-archive` / `close-archive` / `finalize-archive` | 归档初始化 / 关闭 / 清理校验 |
+| `check-env` / `clean-verify` / `check-knowledge-gap` | 环境检查 / 干净构建验证 / 知识缺口检查 |
+| `dispatch` / `summary` / `conan-migrate` | 多任务调度 / 统计摘要 / Conan 迁移辅助 |
+
+**独立脚本**（`scripts/` 目录，不通过 ohc-run.py）：
+
+| 脚本 | 用途 |
+|------|------|
+| `scripts/gen-test-packages.py` | 批量为缺 test_package/ 的配方生成测试文件 |
+| `scripts/sync-recipes.py` | 从 conan 缓存同步配方到 archives/ |
+| `scripts/migrate_kv_to_yaml.py` | KV→YAML 渐进迁移 |
+
+### Pre-commit Hook（⭐ 建议安装）
+
+```bash
+cp ci/conan/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+提交前自动检查 L0a-L0i（conanfile 语法/sha256/test源码/test()方法/MANIFEST/patch格式/环境变量依赖/Go-Rust检测）。
+
+### CI 脚本（ci/ 目录，由 Buildbot Worker 执行，纯 shell，无 AI）
+
+| 脚本 | 用途 |
+|------|------|
+| `ci/conan/setup.sh` | Conan 环境初始化 + profile + remote |
+| `ci/conan/build_and_test.sh` | conan create + L4/L5 检查 |
+| `ci/conan/upload.sh` | conan upload 到 CNB 制品仓（仅 release） |
+| `ci/artifacts/sign.sh` | GPG 签名（非阻塞） |
+| `ci/conan/profiles/ohos-aarch64` | Conan 编译 profile |
 
 ---
 
-*SKILL.md v7.8 — 2026-04-28 — ARCHIVE-SPEC v2.0 迁移（notes.md/published/built）、删除 archive-spec.md 重复文件*
-�、删除 archive-spec.md 重复文件*
+*SKILL.md v11.0 — 2026-07-07 — 新增 R38 + commands.json (命令行工具声明, hicmd 集成)；v10.3→v11.0*
