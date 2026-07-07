@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/runner002/build_in_harmonyos/archives/g/git-who/1.3/test_package/conanrunenv-release-armv8.sh"
