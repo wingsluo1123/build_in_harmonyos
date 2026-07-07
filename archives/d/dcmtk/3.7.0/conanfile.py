@@ -6,11 +6,9 @@ large parts the DICOM standard.
 
 This template enforces R26: BUILD_SHARED_LIBS=OFF for terminal tools.
 """
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 
 
 class DcmtkConan(ConanFile):
@@ -27,21 +25,14 @@ class DcmtkConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # All dependencies should use @ohpcd/stable format (R27) once published.
-        # Currently no @ohpcd/stable packages are available in the remote yet,
-        # so all dependencies (zlib, openssl, libpng, libtiff, libjpeg-turbo,
-        # libxml2, openjpeg, libiconv) are pre-installed system libraries
-        # found via CMAKE_PREFIX_PATH and *_ROOT variables in generate().
-        # TODO: Once @ohpcd/stable packages are uploaded, migrate to:
-        # self.requires("zlib/1.3.1@ohpcd/stable")
-        # self.requires("openssl/3.5.6@ohpcd/stable")
-        # self.requires("libpng/1.6.43@ohpcd/stable")
-        # self.requires("libtiff/4.6.0@ohpcd/stable")
-        # self.requires("libjpeg-turbo/3.1.4.1@ohpcd/stable")
-        # self.requires("libxml2/2.15.3@ohpcd/stable")
-        # self.requires("openjpeg/2.5.0@ohpcd/stable")
-        # self.requires("libiconv/1.17@ohpcd/stable")
-        pass
+        self.requires("zlib/1.3.1")
+        self.requires("openssl/3.5.6")
+        self.requires("libpng/1.6.43")
+        self.requires("libtiff/4.6.0")
+        self.requires("libjpeg-turbo/3.1.4.1")
+        self.requires("libxml2/2.15.3")
+        self.requires("openjpeg/2.5.0")
+        self.requires("libiconv/1.17")
 
     def layout(self):
         cmake_layout(self)
@@ -51,10 +42,13 @@ class DcmtkConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # E092: CMAKE_SYSTEM_NAME=Linux is set via user_toolchain in the
-        # local Conan profile (ohos-aarch64-local). The user_toolchain also
-        # sets CMAKE_CROSSCOMPILING_EMULATOR so try_run() can execute
-        # test binaries natively on the DevBox.
+        # E092: CMake does not recognize OHOS as a platform.
+        # Set CMAKE_SYSTEM_NAME=Linux so CMake can configure properly.
+        # On OHOS devices, binaries run natively (no cross-compilation).
+        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+        tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+        # Allow try_run() to execute test binaries natively on OHOS
+        tc.variables["CMAKE_CROSSCOMPILING_EMULATOR"] = "env"
         # R26: Terminal tools must be statically linked for DevBox deployment
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         # DCMTK-specific CMake variables
@@ -71,37 +65,12 @@ class DcmtkConan(ConanFile):
         # use Unix domain socket IPC implementation instead
         # R32: settings.os check must use in ("Linux", "OHOS")
         if self.settings.os in ("Linux", "OHOS"):
-            # DCMTK_USE_UNIX_SOCKET_QUEUE is a preprocessor define, not a CMake option
             tc.extra_cxxflags.append("-DDCMTK_USE_UNIX_SOCKET_QUEUE")
             tc.extra_cflags.append("-DDCMTK_USE_UNIX_SOCKET_QUEUE")
             tc.variables["DCMTK_INSTALL_CMKDIR"] = "lib/cmake/dcmtk"
-            # System libraries installed to ~/usr/local (pre-compiled deps)
-            # Set find_package root variables for each library
-            home = os.environ.get("HOME", "")
-            if home:
-                prefix = os.path.join(home, "usr", "local")
-                libdir = os.path.join(prefix, "lib")
-                incdir = os.path.join(prefix, "include")
-                # Help CMake find_package() locate system-installed libraries
-                # Set individual cache variables that FindOpenSSL.cmake respects
-                tc.variables["OPENSSL_ROOT_DIR"] = prefix
-                tc.variables["OPENSSL_INCLUDE_DIR"] = incdir
-                tc.variables["OPENSSL_CRYPTO_LIBRARY"] = os.path.join(libdir, "libcrypto.so")
-                tc.variables["OPENSSL_SSL_LIBRARY"] = os.path.join(libdir, "libssl.so")
-                tc.variables["ZLIB_ROOT"] = prefix
-                tc.variables["PNG_ROOT"] = prefix
-                tc.variables["TIFF_ROOT"] = prefix
-                tc.variables["JPEG_ROOT"] = prefix
-                tc.variables["LIBXML2_ROOT_DIR"] = prefix
-                tc.variables["OPENJPEG_ROOT"] = prefix
-                tc.variables["ICONV_ROOT"] = prefix
-                # Also set CMAKE_PREFIX_PATH as fallback
-                tc.variables["CMAKE_PREFIX_PATH"] = prefix
-                tc.variables["CMAKE_LIBRARY_PATH"] = libdir
-                # Ensure linker can find shared libraries at runtime
-                tc.extra_exelinkflags.append(f"-L{libdir}")
-                tc.extra_exelinkflags.append("-lssl -lcrypto")
         tc.generate()
+        # Generate CMakeDeps for find_package() support
+        CMakeDeps(self).generate()
 
     def build(self):
         apply_conandata_patches(self)
