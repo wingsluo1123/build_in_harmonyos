@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/ADAPTATION_GUIDE.md §6
+
+package: rlwrap/0.47.1
+homepage: https://github.com/hanslub42/rlwrap
+
+# 上游测试命令 (用于 make -n check 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游 make check 需要交互式 PTY 终端，鸿蒙 HMDFS 环境下无法运行
+upstream_test_in_build: false
+upstream_test_command: "make check"
+
+# make check 实际运行的测试程序
+# rlwrap 上游测试位于 src/test/ 目录，测试 rlwrap 基本包装功能
+# 因需要交互式终端 (PTY)，鸿蒙平台无法运行，仅声明来源
+upstream_tests:
+  - file: src/test/test_rlwrap.c
+    source: rlwrap-0.47.1.tar.gz/src/test/test_rlwrap.c
+    description: "rlwrap 基本包装功能测试 (需交互式 PTY 终端，鸿蒙平台跳过)"
+    command: "make check"
+    skipped_on_ohos: true
+    skip_reason: "上游 make check 需要交互式 PTY 终端，HMDFS 环境无法提供"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "rlwrap --version smoke test (验证二进制可执行)"
+    command: "rlwrap --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 1
