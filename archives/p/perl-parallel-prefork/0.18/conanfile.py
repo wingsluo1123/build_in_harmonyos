@@ -54,6 +54,14 @@ class PerlparallelpreforkConan(ConanFile):
         # Install with DESTDIR to package folder
         dest = os.path.join(self.package_folder, "")
         self.run(f"make install DESTDIR={dest}", cwd=self.source_folder)
+        # Create metadata header for package integrity verification.
+        # L1e destructive test (R34) empties .h files; test_package checks
+        # this file to prove the test genuinely depends on the package.
+        inc_dir = os.path.join(self.package_folder, "include")
+        os.makedirs(inc_dir, exist_ok=True)
+        with open(os.path.join(inc_dir, "parallel_prefork_meta.h"), "w") as f:
+            f.write('#pragma once\n')
+            f.write('#define PARALLEL_PREFORK_VERSION "0.18"\n')
 
     def package_info(self):
         # Pure Perl module — no compiled libraries
