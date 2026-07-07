@@ -24,7 +24,9 @@
 
 ## 源码修改
 
-无源码修改
+- **patches/0001-Makefile.PL-remove-guess-dep.patch**: 移除 Makefile.PL 对 `Crypt::OpenSSL::Guess` 模块的 configure-time 依赖。CI Worker 上未安装该 Perl 模块，导致 `perl Makefile.PL` 失败。conanfile.py 已通过命令行参数 `INC` 和 `LIBS` 显式传入 OpenSSL 头文件和库路径，Guess 模块的 `openssl_inc_paths()`/`openssl_lib_paths()`/`openssl_version()` 函数不再需要。
+- **conanfile.py build() 自动安装 OpenSSL**: CI Worker 上可能只有 OpenSSL 运行库 (.so) 而无开发头文件 (.h)。build() 方法检测到头文件缺失时自动通过 cmd-pkgs 安装 OpenSSL 3.5.6 到 `$HOME/usr/local`。
+- **conanfile.py 第225行拼写错误修复**: `ildenv_info` 残留行（应为 `self.buildenv_info`）导致 `NameError: name 'ildenv_info' is not defined`，已删除。
 
 ## 依赖版本
 

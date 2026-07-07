@@ -26,6 +26,9 @@ class PerlcryptopensslrsaConan(ConanFile):
     homepage = "https://metacpan.org/dist/Crypt-OpenSSL-RSA"
     url = ""  # CI fills this
 
+    # Custom files from recipe folder needed at build/package time
+    exports = ["rsa_helper.c", "RSA_wrapper.pm"]
+
     # XS module compiles C code — needs compiler/build_type
     settings = "os", "compiler", "build_type", "arch"
 
@@ -78,8 +81,9 @@ class PerlcryptopensslrsaConan(ConanFile):
             if os.path.isfile(os.path.join(prefix, "include", "openssl", "ssl.h")):
                 return prefix
 
-        # 3. Try common system paths
-        for candidate in ("/usr", "/usr/local"):
+        # 3. Try common system paths (including user-installed via cmd-pkgs)
+        _home = os.path.expanduser("~")
+        for candidate in (os.path.join(_home, "usr", "local"), "/usr", "/usr/local"):
             if os.path.isfile(os.path.join(candidate, "include", "openssl", "ssl.h")):
                 return candidate
 
@@ -139,14 +143,17 @@ class PerlcryptopensslrsaConan(ConanFile):
 
     def generate(self):
         # Set OPENSSL_PREFIX so Makefile.PL can find OpenSSL headers and libs
-        openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
-        # Set in OS env so self.run() in build() picks it up (Makefile.PL reads env directly)
-        os.environ["OPENSSL_PREFIX"] = openssl_prefix
-        self.buildenv_info.define("OPENSSL_PREFIX", openssl_prefix)
-        self.buildenv_info.append_path("LD_LIBRARY_PATH", os.path.join(openssl_prefix, "lib"))
+        # On CI workers, OpenSSL may not be installed yet — build() will handle it
+        try:
+            openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
+        except ConanException:
+            openssl_prefix = os.environ.get("OPENSSL_PREFIX", "")
+        if openssl_prefix:
+            os.environ["OPENSSL_PREFIX"] = openssl_prefix
+            self.buildenv_info.define("OPENSSL_PREFIX", openssl_prefix)
+            self.buildenv_info.append_path("LD_LIBRARY_PATH", os.path.join(openssl_prefix, "lib"))
 
         # Set PERL5LIB to include paths where prerequisite Perl modules are installed
-        # (Crypt::OpenSSL::Guess is needed by Makefile.PL at configure time)
         perl_extra = self._resolve_perl_extra_libs()
         for p in perl_extra:
             os.environ["PERL5LIB"] = p if not os.environ.get("PERL5LIB") else os.environ["PERL5LIB"] + ":" + p
@@ -159,8 +166,25 @@ class PerlcryptopensslrsaConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
+        # Resolve OpenSSL prefix (may auto-install via cmd-pkgs if headers missing)
+        openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
+        if not os.path.isfile(os.path.join(openssl_prefix, "include", "openssl", "ssl.h")):
+            self.output.info("OpenSSL headers not found, installing via cmd-pkgs...")
+            _home = os.path.expanduser("~")
+            _tmp = os.path.join(_home, "tmp")
+            os.makedirs(_tmp, exist_ok=True)
+            _script = os.path.join(_tmp, "cmd-pkgs-install.sh")
+            self.run(f'curl -fsSL -o "{_script}" '
+                     'https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh')
+            self.run(f'sh "{_script}" openssl 3.5.6')
+            openssl_prefix = self._resolve_openssl_prefix()
+        os.environ["OPENSSL_PREFIX"] = openssl_prefix
+
         # Step 1: Generate Makefile using ExtUtils::MakeMaker
-        self.run("perl Makefile.PL", cwd=self.source_folder)
+        # Pass INC/LIBS explicitly so Makefile.PL doesn't need Crypt::OpenSSL::Guess
+        inc = f"-I{openssl_prefix}/include"
+        libs = f"-L{openssl_prefix}/lib -lssl -lcrypto"
+        self.run(f'perl Makefile.PL INC="{inc}" LIBS="{libs}"', cwd=self.source_folder)
 
         # Step 2: Build XS module (for non-OHOS platforms where dlopen works)
         self.run("make -j1", cwd=self.source_folder)
@@ -169,8 +193,8 @@ class PerlcryptopensslrsaConan(ConanFile):
         # On OHOS, dlopen() is blocked by SELinux; this C helper links
         # libssl/libcrypto at startup (bypassing dlopen) and provides
         # RSA operations via CLI for the Perl wrapper module.
-        openssl_prefix = os.environ.get("OPENSSL_PREFIX") or self._resolve_openssl_prefix()
-        self.run(f"clang -o rsa_helper rsa_helper.c"
+        rsa_helper_src = os.path.join(self.recipe_folder, "rsa_helper.c")
+        self.run(f"clang -o rsa_helper \"{rsa_helper_src}\""
                  f" -I{openssl_prefix}/include"
                  f" -L{openssl_prefix}/lib -lssl -lcrypto"
                  f" -DOPENSSL_API_COMPAT=0x30000000L"
@@ -222,4 +246,3 @@ class PerlcryptopensslrsaConan(ConanFile):
         self.buildenv_info.append_path("PERL5LIB", perl_lib)
         # rsa_helper binary (SELinux workaround for OHOS)
         self.cpp_info.bindirs = ["bin"]
-ildenv_info.append_path("PERL5LIB", perl_lib)

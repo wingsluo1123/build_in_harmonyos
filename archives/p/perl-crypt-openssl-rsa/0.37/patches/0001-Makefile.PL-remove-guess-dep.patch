@@ -1,0 +1,30 @@
+--- Makefile.PL.orig	2026-07-07 12:01:11.343457188 +0800
++++ Makefile.PL	2026-07-07 12:11:50.447457656 +0800
+@@ -4,10 +4,8 @@
+ 
+ use 5.006;
+ use ExtUtils::MakeMaker 6.48;
+-use Crypt::OpenSSL::Guess qw(openssl_inc_paths openssl_lib_paths openssl_version);
+ 
+-my ($major, $minor, $patch) = openssl_version(); 
+-print "OpenSSL version: $major.$minor $patch", "\n";
++# Crypt::OpenSSL::Guess removed — INC/LIBS passed via Makefile.PL command line
+ # See lib/ExtUtils/MakeMaker.pm for details of how to influence
+ # the contents of the Makefile that is written.
+ 
+@@ -30,12 +28,12 @@
+         'Test::More'             => 0,
+     },
+     'OBJECT' => 'RSA.o',
+-    'LIBS'   => [openssl_lib_paths() . $libs],
+-    'LDDLFLAGS' => openssl_lib_paths() . ' ' . $Config{lddlflags},
++    'LIBS'   => [$libs],
++    'LDDLFLAGS' => $Config{lddlflags},
+     'DEFINE' => '-DPERL5 -DOPENSSL_NO_KRB5',
+ 
+     # perl-5.8/gcc-3.2 needs -DPERL5, and redhat9 likes -DOPENSSL_NO_KRB5
+-    'INC' => openssl_inc_paths(),    # e.g., '-I/usr/include/other'
++    'INC' => '',    # passed via command line
+ 
+     'dist'  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
+     'clean' => { FILES    => 'Crypt-OpenSSL-RSA-*' },
