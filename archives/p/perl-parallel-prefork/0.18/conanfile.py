@@ -41,8 +41,7 @@ class PerlparallelpreforkConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        import hashlib
-        from conan.tools.files import untar
+        from conan.tools.files import unzip, check_sha256
 
         sources = self.conan_data["sources"]
         url = sources["url"]
@@ -54,14 +53,10 @@ class PerlparallelpreforkConan(ConanFile):
         self.run(f'curl -sL "{url}" -o "{tarball}"')
 
         # Verify SHA256
-        h = hashlib.sha256()
-        with open(tarball, "rb") as f:
-            h.update(f.read())
-        if h.hexdigest() != expected_sha256:
-            raise Exception(f"SHA256 mismatch: expected {expected_sha256}, got {h.hexdigest()}")
+        check_sha256(self, tarball, expected_sha256)
 
         # Extract with strip_root
-        untar(self, tarball, self.source_folder, strip_root=True)
+        unzip(self, tarball, destination=self.source_folder, strip_root=True)
 
         # Clean up tarball
         os.remove(tarball)
