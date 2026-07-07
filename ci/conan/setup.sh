@@ -103,6 +103,10 @@ fi
 # Enable revisions (Conan 2.x default, but be explicit)
 conan config set general.revisions_enabled=1 2>/dev/null || true
 
+# Clear download mirror — CI worker can access GitHub directly,
+# ghproxy.com mirror is unreachable and causes source download timeouts
+conan config set core.sources:download_mirror="" 2>/dev/null || true
+
 echo "[step] Conan environment ready ✅"
 echo "[step]   remote: ${CONAN_REMOTE_NAME} -> ${CONAN_REMOTE_URL}"
 echo "[step]   profile: ${PROFILE_NAME}"
