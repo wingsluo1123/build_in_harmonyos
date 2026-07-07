@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bruno-cli/3.4.2/test_package/conanrunenv-release-armv8.sh"
