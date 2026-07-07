@@ -28,10 +28,10 @@ else
     exit 1
 fi
 
-# Test 3: Subcommand listing
+# Test 3: Subcommand listing (use grep -E for OHOS toybox compat)
 echo -n "Test 3 - Subcommand listing: "
 SUBCMD_OUTPUT=$("$ROVER_BIN" --help 2>&1)
-if echo "$SUBCMD_OUTPUT" | grep -q "init\|graph\|subgraph\|introspect"; then
+if echo "$SUBCMD_OUTPUT" | grep -qE "init|graph|subgraph|introspect"; then
     echo "PASS"
 else
     echo "FAIL (expected subcommands in help)"
