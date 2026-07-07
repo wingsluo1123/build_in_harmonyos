@@ -1,0 +1,77 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: dcmtk/3.7.0
+homepage: https://dcmtk.org
+
+# 上游测试命令
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# DCMTK 上游测试通过 CTest 运行 (cmake.test())，但当前 conanfile.py
+# build() 中未调用 cmake.test()，测试在独立步骤中手动执行
+upstream_test_in_build: false
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游 CTest 测试套件 (DCMTK_ADD_TESTS 宏注册, 381 个测试用例)
+upstream_tests:
+  - name: "ofstd"
+    source: dcmtk-3.7.0/ofstd/tests
+    description: "OFStandard 通用工具库测试 (70 tests)"
+    command: "ctest -L ofstd"
+  - name: "oficonv"
+    source: dcmtk-3.7.0/oficonv/tests
+    description: "OFIconv 字符编码转换测试 (57 tests)"
+    command: "ctest -L oficonv"
+  - name: "dcmdata"
+    source: dcmtk-3.7.0/dcmdata/tests
+    description: "DICOM 数据编码/解码测试 (104 tests)"
+    command: "ctest -L dcmdata"
+  - name: "dcmiod"
+    source: dcmtk-3.7.0/dcmiod/tests
+    description: "IOD (Information Object Definition) 测试 (13 tests)"
+    command: "ctest -L dcmiod"
+  - name: "dcmfg"
+    source: dcmtk-3.7.0/dcmfg/tests
+    description: "Functional Groups 测试 (12 tests)"
+    command: "ctest -L dcmfg"
+  - name: "dcmseg"
+    source: dcmtk-3.7.0/dcmseg/tests
+    description: "Segmentation 测试 (11 tests)"
+    command: "ctest -L dcmseg"
+  - name: "dcmsr"
+    source: dcmtk-3.7.0/dcmsr/tests
+    description: "Structured Report 测试 (84 tests)"
+    command: "ctest -L dcmsr"
+  - name: "dcmnet"
+    source: dcmtk-3.7.0/dcmnet/tests
+    description: "DICOM 网络通信测试 (22 tests)"
+    command: "ctest -L dcmnet"
+  - name: "dcmtls"
+    source: dcmtk-3.7.0/dcmtls/tests
+    description: "DICOM TLS 安全传输测试 (2 tests)"
+    command: "ctest -L dcmtls"
+  - name: "dcmect"
+    source: dcmtk-3.7.0/dcmect/tests
+    description: "Enhanced CT 测试 (3 tests)"
+    command: "ctest -L dcmect"
+  - name: "dcmtract"
+    source: dcmtk-3.7.0/dcmtract/tests
+    description: "Tractography 测试 (1 test)"
+    command: "ctest -L dcmtract"
+  - name: "dcmrt"
+    source: dcmtk-3.7.0/dcmrt/tests
+    description: "Radiotherapy 测试 (2 tests)"
+    command: "ctest -L dcmrt"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "dcmtk 链接验证 (test_dcmtk 可执行文件编译并运行)"
+    command: "./test_dcmtk"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 381 个 CTest 测试用例, 373 通过 / 8 失败 (98%)
+assertion_count: 381
