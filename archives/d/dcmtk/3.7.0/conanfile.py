@@ -27,12 +27,13 @@ class DcmtkConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # All dependencies MUST use @ohpcd/stable format (R27)
-        # Only zlib is currently available in @ohpcd/stable remote.
-        # Other dependencies (openssl, libpng, libtiff, libjpeg-turbo,
+        # All dependencies should use @ohpcd/stable format (R27) once published.
+        # Currently no @ohpcd/stable packages are available in the remote yet,
+        # so all dependencies (zlib, openssl, libpng, libtiff, libjpeg-turbo,
         # libxml2, openjpeg, libiconv) are pre-installed system libraries
-        # found via CMAKE_PREFIX_PATH in generate().
-        # TODO: Once @ohpcd/stable packages are uploaded, add:
+        # found via CMAKE_PREFIX_PATH and *_ROOT variables in generate().
+        # TODO: Once @ohpcd/stable packages are uploaded, migrate to:
+        # self.requires("zlib/1.3.1@ohpcd/stable")
         # self.requires("openssl/3.5.6@ohpcd/stable")
         # self.requires("libpng/1.6.43@ohpcd/stable")
         # self.requires("libtiff/4.6.0@ohpcd/stable")
@@ -40,7 +41,7 @@ class DcmtkConan(ConanFile):
         # self.requires("libxml2/2.15.3@ohpcd/stable")
         # self.requires("openjpeg/2.5.0@ohpcd/stable")
         # self.requires("libiconv/1.17@ohpcd/stable")
-        self.requires("zlib/1.3.1@ohpcd/stable")
+        pass
 
     def layout(self):
         cmake_layout(self)
@@ -87,6 +88,7 @@ class DcmtkConan(ConanFile):
                 tc.variables["OPENSSL_INCLUDE_DIR"] = incdir
                 tc.variables["OPENSSL_CRYPTO_LIBRARY"] = os.path.join(libdir, "libcrypto.so")
                 tc.variables["OPENSSL_SSL_LIBRARY"] = os.path.join(libdir, "libssl.so")
+                tc.variables["ZLIB_ROOT"] = prefix
                 tc.variables["PNG_ROOT"] = prefix
                 tc.variables["TIFF_ROOT"] = prefix
                 tc.variables["JPEG_ROOT"] = prefix
