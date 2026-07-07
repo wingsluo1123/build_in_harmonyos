@@ -13,18 +13,7 @@ class RlwrapTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Use explicit binary path from the dependency package folder
-        # (VirtualRunEnv PATH may not work reliably on HarmonyOS/HMDFS)
         rlwrap_pkg = self.dependencies["rlwrap"]
         rlwrap_bin = os.path.join(rlwrap_pkg.package_folder, "bin", "rlwrap")
-        if not os.path.isfile(rlwrap_bin):
-            raise Exception(f"rlwrap binary not found at {rlwrap_bin}")
-        # HMDFS bless: re-create binary to ensure execute permission
-        import shutil
-        tmp = rlwrap_bin + ".bless"
-        shutil.copy2(rlwrap_bin, tmp)
-        os.remove(rlwrap_bin)
-        shutil.copy2(tmp, rlwrap_bin)
-        os.remove(tmp)
-        os.chmod(rlwrap_bin, 0o755)
-        self.run(f'"{rlwrap_bin}" --version')
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f'sh "{test_script}" "{rlwrap_bin}"')
