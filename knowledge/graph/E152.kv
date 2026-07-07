@@ -1,0 +1,51 @@
+id: E152
+# E152: musl libc POSIX 定时器常量未定义
+
+error_signature: undeclared identifier 'CLOCK_REALTIME'|undeclared identifier 'CLOCK_MONOTONIC'|call to undeclared function 'clock_gettime'
+severity: 2
+category: libc|compat|posix
+trigger_tool: cc|clang|cmake
+phase: compilation
+
+root_cause: musl libc 需要显式包含 time.h 头文件并可能需要 _GNU_SOURCE 宏来启用 POSIX 定时器常量（CLOCK_REALTIME=0, CLOCK_MONOTONIC=1）。glibc 会自动定义这些常量，但 musl 更严格。
+
+match_keywords: CLOCK_REALTIME,CLOCK_MONOTONIC,clock_gettime,undeclared identifier,musl,POSIX timer
+
+affected_scope: 使用 POSIX 定时器 API 的软件（glfw, sdl, 等图形库；需要高精度定时器的应用）
+
+# 推荐方案
+rec_priority: 1
+rec_approach: add-cflags
+rec_description: 添加 #include <time.h> 到源文件，并添加 -D_GNU_SOURCE 到编译器标志（CMake: -DCMAKE_C_FLAGS="-D_GNU_SOURCE"，Autotools: CFLAGS="-D_GNU_SOURCE"）
+rec_command: 在 posix_time.c 或类似文件中添加 #include <time.h>
+rec_auto_fix: false
+
+# 回退方案
+fallback_priority: 2
+fallback_description: 如果源文件中已有 time.h，检查是否需要添加 _GNU_SOURCE 或 _POSIX_C_SOURCE=200809L 特性宏
+
+# 禁止做法
+
+# 验证
+verification_cmd: grep -n "time.h" src/posix_time.c && grep "GNU_SOURCE" CMakeLists.txt || grep "GNU_SOURCE" configure.ac
+
+# 示例
+
+# 关联
+
+# 原则引用
+principles:              
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+
+doc_file:               doc/E152.md
+rec_impl:               manual
