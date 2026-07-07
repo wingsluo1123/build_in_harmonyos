@@ -69,7 +69,6 @@ $DEFAULT_PREFIX/bin/openssl version
 ### 4. 无需补丁
 - OpenSSL 3.5.6 在 OpenHarmony 上可直接编译
 - 无需修改源码或添加平台配置补丁
-
 ---
 
 **编译结束**: 2026-05-19 12:17
@@ -77,4 +76,9 @@ $DEFAULT_PREFIX/bin/openssl version
 ---
 
 **编译结束**: 2026-05-27 22:24
+**编译结束**: 2026-05-21 17:18
+**最终状态**: built
+---
+
+**编译结束**: 2026-05-21 17:18
 **最终状态**: built

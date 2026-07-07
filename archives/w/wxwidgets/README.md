@@ -1,75 +1,43 @@
 # wxWidgets
 
-## 软件简介
-wxWidgets 是一个跨平台的 C++ GUI 工具包，提供丰富的 GUI 组件和网络功能。
+## 简介
+wxWidgets 是一个成熟的开源跨平台 C++ 框架，提供 GUI 和其他开发功能。它允许开发者使用单一的代码库在 Windows、Mac OS X、Linux 和其他平台上编写应用程序。
 
-**重要限制**：在鸿蒙系统上，wxWidgets 不支持 GUI 功能（GTK/X11/Wayland 不可用），只能构建 **base toolkit**（基础库），提供：
-- 字符串处理
-- 文件系统操作
-- 网络功能（socket、HTTP、FTP）
-- 正则表达式
-- 多线程
-- 配置管理
-- 数据序列化
+## OHOS 适配
 
-## 版本信息
+### 适配要点
+1. **构建系统选择**：autotools 在 HarmonyOS 上失败（config.status 无法创建），必须使用 CMake
+2. **平台检测**：需要修改 `build/cmake/toolkit.cmake`，添加 HarmonyOS/OpenHarmony 平台检测
+3. **musl libc 兼容**：
+   - musl libc 不支持 glibc 扩展函数（`gethostbyname_r`, `getservbyname_r` 等）
+   - wxWidgets 有 fallback 机制：使用 mutex + `gethostbyname` 保证线程安全
+   - 需要在源码中添加 `HAVE_GETHOSTBYNAME`, `HAVE_INET_ATON` 等宏定义
+4. **类型定义**：`socklen_t` 在 HarmonyOS 上是 `unsigned int`，需要正确定义
 
-| 版本 | 状态 | 构建系统 | 备注 |
-|------|------|---------|------|
-| 3.2.10 | built | cmake | base toolkit（无 GUI） |
+### 已知问题
+- GUI 功能目前禁用（`wxUSE_GUI=OFF`），只编译基础库和网络库
+- xlocale 功能禁用（musl libc 不支持 locale 扩展函数）
 
-## 安装使用
+### 与 Linux 的差异
+- Linux 使用 glibc，支持所有 `_r` 版本的网络函数
+- HarmonyOS 使用 musl libc，只支持标准 POSIX 函数
 
-### 预编译包安装
+## 依赖
+wxWidgets 基础库无外部依赖，内置了：
+- zlib（压缩）
+- PCRE（正则表达式）
+
+## 功能验证
 ```bash
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- wxwidgets 3.2.10
+# 检查库文件
+ls ~/usr/local/lib/libwx*.a
+# 应输出：libwx_baseu-3.2.a, libwx_baseu_net-3.2.a, libwxregexu-3.2.a, libwxzlib-3.2.a
+
+# 验证网络库符号
+nm ~/usr/local/lib/libwx_baseu_net-3.2.a | grep gethostbyname
 ```
 
-### CMake 集成
-```cmake
-find_package(wxWidgets REQUIRED)
-target_link_libraries(your_target wx::base wx::net)
-```
-
-### wx-config 使用
-```bash
-wx-config --version    # 输出：3.2.10
-wx-config --libs       # 输出链接选项
-wx-config --cxxflags   # 输出编译选项
-```
-
-## 关键依赖
-- zlib/1.3.1
-- expat/2.6.0
-- curl/8.19.0（可选，用于 wxWebRequest）
-
-## 编译说明
-
-### CMake 配置选项
-```bash
-cmake <source_dir> \
-  -DCMAKE_SYSTEM_NAME=OHOS \
-  -DwxUSE_GUI=OFF \
-  -DwxBUILD_SHARED=OFF \
-  -DwxBUILD_SAMPLES=OFF \
-  -DwxBUILD_TESTS=OFF
-```
-
-### 关键注意事项
-1. **必须设置 `wxUSE_GUI=OFF`**：鸿蒙不支持 GTK/X11
-2. **LD_LIBRARY_PATH**：需包含 OHOS SDK 的 lib 目录
-3. **静态库推荐**：避免 ELF 签名问题
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| libwx_baseu-3.2-OHOS.a | 6.5MB | wxWidgets 基础库（静态） |
-| libwx_baseu_net-3.2-OHOS.a | 977KB | wxWidgets 网络库（静态） |
-| libwxregexu-3.2.a | 364KB | wxWidgets 正则表达式库（静态） |
-| wx-config | 47KB | 配置工具 |
-| wxWidgetsConfig.cmake | 7KB | CMake 配置文件 |
-
-## 参考资料
-- 官方网站：https://www.wxwidgets.org/
-- CMake 构建文档：https://docs.wxwidgets.org/3.2/page_cmake.html
+## 参考
+- 官网：https://www.wxwidgets.org
+- 源码：https://github.com/wxWidgets/wxWidgets
+- 文档：https://docs.wxwidgets.org/
