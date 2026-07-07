@@ -19,11 +19,4 @@ class ZarithTestConan(ConanFile):
         pass
 
     def test(self):
-        # Verify zarith is findable via ocamlfind
-        self.run('ocamlfind query zarith -format "%v"', env="conanrun")
-        # Verify big integer arithmetic: 42 + 1 = 43
-        self.run(
-            'ocamlfind ocaml -package zarith -linkpkg -e '
-            '"let () = let n = Z.add (Z.of_int 42) (Z.of_int 1) in assert (Z.to_int n = 43)"',
-            env="conanrun"
-        )
+        self.run("sh test_zarith.sh", env="conanrun")
