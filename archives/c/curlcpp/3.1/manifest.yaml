@@ -1,0 +1,92 @@
+software: curlcpp
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/3.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.1"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/JosephP91/curlcpp/archive/refs/tags/3.1.tar.gz"
+
+  # 源码校验和
+  sha256: "ba7aeed9fde9e5081936fbe08f7a584e452f9ac1199e5fabffbb3cfc95e85f4b"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCURLCPP_USE_PKGCONFIG=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "curl/8.15.0"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-include-curl_easy.h.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "CURLOPT_OBSOLETE72 在新版 libcurl 中定义为纯 int，不能用作 C++ 模板参数"
+  - "Conan 远程无 curl 包时，可通过 CMAKE_PREFIX_PATH 指向系统 libcurl 回退"
+  - "curlcpp 命名空间是 curl:: 不是 curlcpp::"
+  - "静态链接 curlcpp 需传递 zlib/openssl 静态库依赖"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/curlcpp-3.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/curlcpp-3.1.work
+  source_orig_hash: 28679e169cd2bb36
+  source_work_hash: 9d0a3c3b2be8f765
+  generated_at: '2026-07-02T17:48:26'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-include-curl_easy.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
