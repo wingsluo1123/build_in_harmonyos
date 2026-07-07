@@ -46,6 +46,13 @@ class PerlcryptopensslrsaConan(ConanFile):
         pass
 
     def source(self):
+        # Ensure Python's ssl module can find libssl for HTTPS downloads
+        _home = os.path.expanduser("~")
+        _ld = os.environ.get("LD_LIBRARY_PATH", "")
+        for _d in ["/usr/lib", f"{_home}/usr/local/lib"]:
+            if os.path.isdir(_d) and _d not in _ld.split(":"):
+                _ld = f"{_d}:{_ld}"
+        os.environ["LD_LIBRARY_PATH"] = _ld
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _resolve_openssl_prefix(self):
