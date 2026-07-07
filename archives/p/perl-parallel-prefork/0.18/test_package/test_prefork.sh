@@ -20,7 +20,8 @@ if [ -z "$PREFORK_PM" ]; then
 fi
 
 # Derive site_perl lib directory from the .pm file path
-SITE_LIB=$(dirname "$(dirname "$(dirname "$PREFORK_PM")")")
+# Prefork.pm is at <site_lib>/Parallel/Prefork.pm, so 2x dirname gives <site_lib>
+SITE_LIB=$(dirname "$(dirname "$PREFORK_PM")")
 
 # Verify SpareWorkers.pm exists
 SPAREWORKERS_PM="${SITE_LIB}/Parallel/Prefork/SpareWorkers.pm"
