@@ -12,6 +12,7 @@ Key adaptations for OHOS:
 """
 import os
 import shutil
+from pathlib import Path
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -83,92 +84,216 @@ class RoverConan(ConanFile):
                 else:
                     raise
 
-    def _find_or_install_cargo(self):
-        """Find cargo binary, install Rust if not found."""
-        cargo = shutil.which("cargo")
-        if cargo:
-            return cargo
-        brew_cargo = os.path.expanduser("~/.harmonybrew/bin/cargo")
-        if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
-            return brew_cargo
-        self.output.info("cargo not found, installing Rust via cmd-pkgs...")
-        import subprocess
-        try:
-            subprocess.run(
-                ["zsh", "-c",
-                 "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | zsh -s -- rust"],
-                check=True, timeout=600
-            )
-        except Exception as e:
-            raise ConanInvalidConfiguration(
-                f"cargo not found and Rust installation failed: {e}")
-        cargo = shutil.which("cargo")
-        if cargo:
-            return cargo
-        brew_cargo = os.path.expanduser("~/.harmonybrew/bin/cargo")
-        if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
-            return brew_cargo
-        raise ConanInvalidConfiguration("cargo not found after Rust installation")
+    def _ensure_cargo(self):
+        """Detect or install Rust toolchain via harmonybrew."""
+        home = os.path.expanduser("~")
+        cert_pem = os.path.join(home, "usr", "local", "ssl", "cert.pem")
+        if os.path.exists(cert_pem):
+            os.environ["SSL_CERT_FILE"] = cert_pem
+            os.environ["REQUESTS_CA_BUNDLE"] = cert_pem
 
-    def _find_ohos_lib_dir(self):
-        """Find the OHOS SDK C++ library directory (E212 fix)."""
+        # Configure crates.io mirror
+        self._setup_cargo_mirror(home)
+
+        if shutil.which("cargo"):
+            return
+
+        # 1. Check existing harmonybrew cargo
+        harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
+        harmonybrew_cargo = os.path.join(harmonybrew_bin, "cargo")
+        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+            self._add_path(harmonybrew_bin)
+            return
+
+        # 2. Check existing ~/.cargo/bin
+        cargo_bin_dir = os.path.join(home, ".cargo", "bin")
+        cargo_bin = os.path.join(cargo_bin_dir, "cargo")
+        if os.path.isfile(cargo_bin) and os.access(cargo_bin, os.X_OK):
+            self._add_path(cargo_bin_dir)
+            return
+
+        # 3. Ensure harmonybrew is available
+        brew_bin = os.path.join(harmonybrew_bin, "brew")
+        if not shutil.which("brew"):
+            if os.path.isfile(brew_bin):
+                self.output.info("Found harmonybrew, adding to PATH")
+                self._add_path(harmonybrew_bin)
+            else:
+                self.output.info("Installing harmonybrew...")
+                harmonybrew_repo = os.path.join(home, ".harmonybrew", "Homebrew")
+                if not os.path.isdir(harmonybrew_repo):
+                    if os.path.exists(cert_pem):
+                        os.environ["GIT_SSL_CAINFO"] = cert_pem
+                    self.run(
+                        f'git clone --depth=1 https://atomgit.com/Harmonybrew/brew.git {harmonybrew_repo}'
+                    )
+                os.makedirs(harmonybrew_bin, exist_ok=True)
+                self.run(f'ln -sf {harmonybrew_repo}/bin/brew {brew_bin}')
+                self._add_path(harmonybrew_bin)
+
+        # 4. Install Rust via harmonybrew
+        self.output.info("Installing Rust via harmonybrew...")
+        self.run("brew install rust")
+
+        if shutil.which("cargo"):
+            return
+        if os.path.isfile(harmonybrew_cargo) and os.access(harmonybrew_cargo, os.X_OK):
+            self._add_path(harmonybrew_bin)
+            return
+
+        raise Exception("Rust installation failed — cargo still not found after brew install rust")
+
+    def _add_path(self, p):
+        os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
+
+    def _setup_cargo_mirror(self, home):
+        """Configure crates.io mirror for fast downloads in China."""
+        cargo_dir = os.path.join(home, ".cargo")
+        config_path = os.path.join(cargo_dir, "config.toml")
+        if os.path.isfile(config_path):
+            return
+        os.makedirs(cargo_dir, exist_ok=True)
+        with open(config_path, "w") as f:
+            f.write(
+                '[source.crates-io]\n'
+                'replace-with = "ustc"\n'
+                '\n'
+                '[source.ustc]\n'
+                'registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"\n'
+                '\n'
+                '[net]\n'
+                'git-fetch-with-cli = true\n'
+                '\n'
+                '[http]\n'
+                'multiplexing = false\n'
+            )
+        self.output.info("Configured USTC crates.io mirror")
+
+    def _ensure_cc(self):
+        """Ensure a C compiler/linker (`cc`) is available in PATH.
+
+        rustc looks for `cc` in PATH to link build script binaries.
+        """
+        if shutil.which("cc"):
+            return
+
+        clang_path = self._find_clang()
+        if not clang_path and shutil.which("brew"):
+            self.output.info("Installing ohos-sdk + llvm-gcc-compat via harmonybrew...")
+            self.run("brew install ohos-sdk")
+            self.run("brew install llvm-gcc-compat")
+            # Ensure harmonybrew bin is in PATH
+            home = os.path.expanduser("~")
+            harmonybrew_bin = os.path.join(home, ".harmonybrew", "bin")
+            if harmonybrew_bin not in os.environ.get("PATH", ""):
+                os.environ["PATH"] = harmonybrew_bin + os.pathsep + os.environ.get("PATH", "")
+            clang_path = self._find_clang()
+
+        if clang_path:
+            os.environ["CC"] = clang_path
+            os.environ["CXX"] = clang_path.replace("clang", "clang++")
+            self.output.info(f"CC={clang_path}")
+            cc_bindir = os.path.join(self.source_folder, "._cc_bin")
+            os.makedirs(cc_bindir, exist_ok=True)
+            cc_link = os.path.join(cc_bindir, "cc")
+            if not os.path.exists(cc_link):
+                os.symlink(clang_path, cc_link)
+            os.environ["PATH"] = cc_bindir + os.pathsep + os.environ.get("PATH", "")
+            self.output.info(f"Created cc symlink → {clang_path} in {cc_bindir}")
+        else:
+            self.output.warning("No C compiler found; build may fail")
+
+    def _find_clang(self):
+        """Locate clang binary on the system. Returns path or None."""
+        clang = shutil.which("clang")
+        if clang:
+            return clang
+        home = os.path.expanduser("~")
         import glob
-        candidates = [
-            os.path.expanduser("~/.harmonybrew/Cellar/ohos-sdk/26.0.0.18_1/native/llvm/lib/aarch64-linux-ohos"),
-            os.path.expanduser("~/.harmonybrew/Cellar/ohos-sdk/*/native/llvm/lib/aarch64-linux-ohos"),
-        ]
-        for pattern in candidates:
-            for path in glob.glob(pattern):
-                if os.path.isdir(path):
-                    return path
+        for cellar in glob.glob(os.path.join(home, ".harmonybrew", "Cellar", "ohos-sdk", "*", "native", "llvm")):
+            candidate = os.path.join(cellar, "bin", "clang")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+        candidate = os.path.join(home, ".harmonybrew", "bin", "clang")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
         return None
 
-    def _setup_libstdcxx(self, lib_dir):
-        """Create libstdc++ linker scripts pointing to libc++ (E212 workaround)."""
+    def _fix_libstdcxx(self):
+        """Redirect -lstdc++ → -lc++_shared in rustc sysroot target lib dir.
+
+        rustc adds `-lstdc++` to every linker invocation, but OHOS uses libc++
+        (LLVM) instead of libstdc++ (GCC). Creates a linker script in the
+        rustc target lib directory, which is already in the linker's default -L
+        search path, so no extra RUSTFLAGS are needed.
+        """
+        import subprocess
+        rustc = shutil.which("rustc")
+        if not rustc:
+            self.output.warning("rustc not found in PATH; -lstdc++ fix skipped")
+            return
+        try:
+            result = subprocess.run([rustc, "--print", "sysroot"],
+                                    capture_output=True, text=True, check=True)
+            sysroot = result.stdout.strip()
+        except Exception as e:
+            self.output.warning(f"Cannot determine rustc sysroot: {e}")
+            return
+
+        target = "aarch64-unknown-linux-ohos"
+        lib_dir = os.path.join(sysroot, "lib", "rustlib", target, "lib")
+        if not os.path.isdir(lib_dir):
+            self.output.warning(f"rustc target lib dir not found: {lib_dir}")
+            return
+
         libstdcxx_so = os.path.join(lib_dir, "libstdc++.so")
         if not os.path.exists(libstdcxx_so):
             with open(libstdcxx_so, "w") as f:
                 f.write("INPUT(-lc++_shared)\n")
+            self.output.info(f"Created {libstdcxx_so}")
         libstdcxx_a = os.path.join(lib_dir, "libstdc++.a")
         if not os.path.exists(libstdcxx_a):
             with open(libstdcxx_a, "w") as f:
                 f.write("INPUT(-lc++_static -lc++abi)\n")
+            self.output.info(f"Created {libstdcxx_a}")
 
     def build(self):
         apply_conandata_patches(self)
-        cargo = self._find_or_install_cargo()
+        # Step 1: Ensure Rust toolchain
+        self._ensure_cargo()
+        # Step 2: Ensure C compiler (cc) is in PATH
+        self._ensure_cc()
+        # Step 3: Fix -lstdc++ → -lc++_shared
+        self._fix_libstdcxx()
 
         # E002: OHOS /tmp is read-only, use $HOME/tmp
         tmpdir = os.path.expanduser("~/tmp")
         os.makedirs(tmpdir, exist_ok=True)
 
-        # E212: Rust linker defaults to -lstdc++ but OHOS only has libc++
-        ohos_sdk_lib = self._find_ohos_lib_dir()
-        if ohos_sdk_lib:
-            self._setup_libstdcxx(ohos_sdk_lib)
+        # SSL cert for https downloads
+        cert_pem = os.path.expanduser("~/usr/local/ssl/cert.pem")
+        if os.path.exists(cert_pem):
+            os.environ["SSL_CERT_FILE"] = cert_pem
+            os.environ["REQUESTS_CA_BUNDLE"] = cert_pem
 
         # Set environment variables for cargo build
         old_env = {}
         env_vars = {
             "CARGO_HOME": os.path.join(self.build_folder, ".cargo-home"),
             "CARGO_NET_GIT_FETCH_WITH_CLI": "true",
+            "CARGO_TERM_PROGRESS_WHEN": "always",
+            "CARGO_TERM_PROGRESS_WIDTH": "80",
             "TMPDIR": tmpdir,
             "TEMP": tmpdir,
             "TMP": tmpdir,
         }
-        # RUSTFLAGS with OHOS lib dir for linker
-        rustflags = ["-C", "link-arg=-Wl,--gc-sections"]
-        if ohos_sdk_lib:
-            rustflags.append(f"-L {ohos_sdk_lib}")
-            rustflags.append(f"-C link-arg=-L{ohos_sdk_lib}")
-        env_vars["RUSTFLAGS"] = " ".join(rustflags)
 
         for k, v in env_vars.items():
             old_env[k] = os.environ.get(k)
             os.environ[k] = v
 
         try:
-            self.run(f'"{cargo}" build --release -j2', cwd=self.source_folder)
+            self.run("cargo build --release -j2", cwd=self.source_folder)
         finally:
             for k, v in old_env.items():
                 if v is None:
