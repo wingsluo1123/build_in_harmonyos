@@ -98,5 +98,5 @@ file /storage/Users/currentUser/usr/local/lib/libleptonica.a
 4. **静态库**: 生成静态库而非动态库（可能与cmake配置或平台有关）
 ---
 
-**编译结束**: 2026-05-27 12:56
+**编译结束**: 2026-07-08 11:17
 **最终状态**: built
