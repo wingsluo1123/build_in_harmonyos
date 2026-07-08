@@ -19,7 +19,6 @@ On OHOS:
 """
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -49,12 +48,22 @@ class PerlParamsValidateConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _perl_config(self, key):
-        """Get a value from Perl's Config."""
-        result = subprocess.run(
-            ["perl", "-MConfig", "-e", f"print $Config{{{key}}}"],
-            capture_output=True, text=True
+        """Get a value from Perl's Config.
+
+        Uses self.run() (not subprocess.run) because conan's self.run()
+        sources the conanbuild.sh environment file, which sets up PATH
+        to include the perl binary directory. subprocess.run() would
+        not find perl on CI workers where perl is not in the default PATH.
+        """
+        out = os.path.join(self.build_folder, f".perl_cfg_{key}")
+        self.run(
+            f"perl -MConfig -e 'print $Config{{{key}}}' > \"{out}\"",
+            cwd=self.source_folder,
         )
-        return result.stdout.strip()
+        with open(out, "r") as f:
+            val = f.read().strip()
+        os.remove(out)
+        return val
 
     def _find_musl_paths(self):
         """Detect musl C library header and library paths.
@@ -121,7 +130,8 @@ WriteMakefile(
         # perl-net-libresolv pattern.
         sys_inc, sys_lib = self._find_musl_paths()
 
-        # Get Perl build tool paths
+        # Get Perl build tool paths via self.run() (R33: no subprocess.run
+        # for perl — CI workers may not have perl in default PATH)
         scriptdir = self._perl_config("scriptdir")
         archlibexp = self._perl_config("archlibexp")
         privlibexp = self._perl_config("privlibexp")

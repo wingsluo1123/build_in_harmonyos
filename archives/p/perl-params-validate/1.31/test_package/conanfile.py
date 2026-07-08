@@ -6,7 +6,6 @@ Attempts to load Params::Validate (PP fallback via Module::Implementation).
 Runtime .so loading may fail due to SELinux/HMDFS — PP fallback is expected.
 """
 import os
-import subprocess
 
 from conan import ConanFile
 
@@ -36,24 +35,24 @@ class TestPerlParamsValidate(ConanFile):
         self.run(f'file "{so_path}"')
         self.run(f'readelf --dyn-syms --wide "{so_path}" | grep boot_Params__Validate__XS')
 
-        # --- L1: Try loading Params::Validate (PP fallback expected) ---
-        # Module::Implementation may be in user's local perl5 lib
+        # --- L1: Try loading Params::Validate via test.sh ---
+        # Set PERL5LIB so Perl can find .pm files (site_lib) and .so (site_arch).
+        # Also add user's local perl5 lib for Module::Implementation dependency.
         local_perl_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5")
-        perl5lib = f"{site_arch}:{site_lib}"
+        perl5lib_paths = [site_arch, site_lib]
         if os.path.isdir(local_perl_lib):
-            perl5lib = f"{perl5lib}:{local_perl_lib}"
+            perl5lib_paths.append(local_perl_lib)
 
-        result = subprocess.run(
-            ["perl", "-I", site_arch, "-I", site_lib,
-             "-e", "use Params::Validate; "
-                   "print \"TEST OK $Params::Validate::VERSION\\n\";"],
-            capture_output=True, text=True, timeout=10,
-            env={**os.environ, "PERL5LIB": perl5lib}
-        )
-        if result.returncode == 0 and "TEST OK" in result.stdout:
+        old_perl5lib = os.environ.get("PERL5LIB", "")
+        os.environ["PERL5LIB"] = ":".join(perl5lib_paths)
+
+        test_script = os.path.join(self.source_folder, "test.sh")
+        try:
+            self.run(f"sh {test_script}")
             self.output.info("✅ Params::Validate PP mode test passed")
-        else:
+        except Exception:
             self.output.warning(
-                f"⚠️ Runtime test failed (expected on HarmonyOS HMDFS): "
-                f"{result.stderr.strip()[:200]}"
+                "⚠️ Runtime test failed (expected on HarmonyOS HMDFS)"
             )
+        finally:
+            os.environ["PERL5LIB"] = old_perl5lib
