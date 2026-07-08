@@ -13,7 +13,7 @@ Validate method/function parameters (Perl XS module).
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 1.31 | built | 2026-07-03 | 首次编译成功，XS+PP 双实现 |
+| 1.31 | built | 2026-07-08 | XS+PP 双实现，CI 修复 Module::Build 不可用 |
 
 ## 运行依赖
 
@@ -22,7 +22,7 @@ Validate method/function parameters (Perl XS module).
 
 ## 编译依赖
 
-- perl (Module::Build >= 0.4227)
+- perl (ExtUtils::MakeMaker，随 Perl 核心提供)
 - musl (提供标准 C 库头文件: stdio.h, ctype.h 等)
 - clang (鸿蒙系统编译器)
 
@@ -40,7 +40,8 @@ XS 实现性能更高，PP 实现无需编译即可使用。
 
 ### 注意事项
 
-- 鸿蒙系统缺少 CRT 文件 (crti.o, crtn.o)，链接时需通过 MyMBClass.pm 覆盖 cbuilder() 配置
+- 源码仅提供 Build.PL (Module::Build)，CI 环境无 Module::Build，改用 Makefile.PL (ExtUtils::MakeMaker)
+- 鸿蒙系统缺少 CRT 文件 (crti.o, crtn.o)，链接时需 patch Makefile LDDLFLAGS 添加 -nostartfiles -nodefaultlibs -lc
 - Perl 5.42.0 的 lddlflags 包含 -fstack-protector-strong，ld.lld 拒绝该参数 (E137)
 - musl C 库头文件不在默认搜索路径，需通过 -I 参数添加
 - SELinux HMDFS 限制 XS 模块加载，需安装到系统目录 `/data/service/hnp`
@@ -48,4 +49,4 @@ XS 实现性能更高，PP 实现无需编译即可使用。
 - PP 模式功能完全可用 (10/10 测试通过): validate, validate_pos, validate_with, 正则约束, 类型检查
 
 ---
-*OpenHarmony 编译归档 · 2026-07-03 编译 · 2026-07-06 测试*
+*OpenHarmony 编译归档 · 2026-07-03 编译 · 2026-07-06 测试 · 2026-07-08 CI 修复*
