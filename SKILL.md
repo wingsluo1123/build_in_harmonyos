@@ -1,3 +1,9 @@
+---
+name: openharmony-compile-agent
+description: 鸿蒙PC原生应用/C/C++三方库适配编译Agent。当用户需要将开源C/C++库适配到HarmonyOS PC平台（arm64）、编写conanfile.py配方、执行conan构建发布流水线、排查CI构建失败时触发。覆盖源码获取、依赖解析、Conan配方编写、交叉编译、制品仓发布全流程。
+version: 10.3
+---
+
 > **每次编译任务前先读本文档。** 骨架 + 要点，详解按需从 references/ 加载。
 > KNOW_YOUR_WHY.md 回答"为什么"，本文档回答"怎么做"。
 
@@ -61,7 +67,23 @@ SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openhar
 
 ### §0.2 适配工作流规程（⭐ 强制执行）
 
-以下 4 条规程在每次软件适配中**强制执行**，违反=流程缺陷：
+以下 5 条规程在每次软件适配中**强制执行**，违反=流程缺陷：
+
+**W0 — 依赖发布检查（适配前第一件事）**
+开始适配任何软件前，**必须**先检查其所有依赖是否已发布到制品仓。这是适配的第一步，**在拉代码、看源码之前就要做**：
+```bash
+# 方法一：运行本地预检脚本（推荐）
+bash ci/scripts/preflight_check.sh <软件名>/<版本>
+
+# 方法二：手动检查（R35: 禁止用 conan list 判断，必须用 conan download）
+conan download "依赖包名/版本" -r=ohpcd --only-recipe
+```
+检查结果决定下一步：
+- **所有依赖已发布** → 正常继续适配
+- **有依赖未发布** → **停止当前适配**，先适配并发布缺失的依赖（R36）
+- **多层依赖链 C→B→A** → 按拓扑序从最底层 A 开始，逐层适配→发布→再回到上层
+
+> 跳过此步=可能花数小时编译后发现依赖链断裂，浪费大量时间。先查依赖，再动手。
 
 **W1 — 同步主仓库**
 每次适配新软件前，**必须**拉取主仓库 main 最新变更，以匹配最新框架要求与知识库：
@@ -107,7 +129,7 @@ ls knowledge/drafts/DRAFT-*.kv 2>/dev/null
 **模式 A：Conan 驱动（推荐，适合已有 conanfile.py 的软件）**
 ```bash
 python3 $SKILL_ROOT/scripts/ohc-run.py build <软件名> [<版本>]
-# → 内含 13 步：init→patches→pre-scan→configure→make→install→staging→conan-init→conan-verify→finish→...
+# → 内含 14 步：预分析→init→patches→pre-scan→configure→make→install→staging→conan-init→conan-verify→finish→...
 ```
 
 **模式 B：探索性编译（适合首次/复杂软件）**
@@ -140,7 +162,28 @@ python3 $SKILL_ROOT/scripts/ohc-run.py status                                   
 python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"                              # 独立运行知识图谱引擎
 ```
 
-### 1.2 铁律摘要（33 条，违反=bug）
+### 1.2 版本号策略（⭐ 强制执行）
+
+**版本号 = 上游版本 + 可选适配修复后缀。**
+
+| 场景 | 版本号 | 示例 |
+|------|--------|------|
+| 首次适配上游 X.Y.Z | `X.Y.Z` | `zlib/1.3.1` |
+| 同一上游版本，修复适配问题 | `X.Y.Z.N`（N 从 1 递增） | `zlib/1.3.1.1`、`zlib/1.3.1.2` |
+| 上游发布新版本 | 新版本号，后缀重置 | `zlib/1.3.2` |
+| 上游停更，我们 fork 维护 | `X.Y.Z` 不变 | conandata.yml 指向 fork 源码 |
+
+**原因**：cnb.cool 制品仓不支持同版本多 recipe revision 并存（上传新 revision 会被 409 拒绝），必须用版本号后缀区分适配修复。
+
+**CI 门禁（L0j）**：PR 阶段自动检查——如果制品仓中已存在同版本，且 conanfile.py/conandata.yml 有修改，直接 fail 并提示递增版本号。
+
+**下游引用规范**：
+```python
+self.requires("zlib/1.3.1")      # 精确引用首次版本
+self.requires("zlib/1.3.1.2")    # 精确引用第 2 次适配修复
+```
+
+### 1.3 铁律摘要（37 条，违反=bug）
 
 | # | 规则 |
 |---|------|
@@ -149,10 +192,15 @@ python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"                    
 | R11-R15 | **失败与历史**：失败先查归档再动手；先匹配错误模式再修复；脚本用完整路径；脚本失败=手动模式入口；历史仅供参考不盲从 |
 | R16-R20 | **协作与打包**：协作不越权(走PR)；知识先草稿(`graph add --draft`)；依赖先查预编译；禁止手动打包(用`conan create`+`conan upload`)；~~DESTDIR模式~~(废弃) |
 | R21-R25 | **自检与清理**：探索结束自检零介入；finish前必须通过conan验证；平台检测优先于改生成文件；归档清理failed必删；notes.md防重复(finish自动清理) |
-| R26-R31 | **Conan 配方**：系统同名库禁止动态链接(避免污染`/lib`/`/lib64`)，默认动态由Conan管理依赖链；依赖引用必须`@ohpcd/stable`；conanfile.py必须有`test_package/`；conan_verify通过才标published；conan-verify失败必须查询知识图谱；知识图谱未命中必须生成草稿 |
+| R26-R31 | **Conan 配方**：系统同名库禁止动态链接(避免污染`/lib`/`/lib64`)，默认动态由Conan管理依赖链；conanfile.py必须有`test_package/`；conan_verify通过才标published；conan-verify失败必须查询知识图谱；知识图谱未命中必须生成草稿 |
 | R32 | **OHOS 平台兼容**：recipe 内 `settings.os` 判断必须 `in ("Linux", "OHOS")`，不能 `== "Linux"` |
 | R33 | **build() 禁止依赖未定义的 shell 环境变量**：编译器/标志必须从 Conan Toolchain 或 `self.conf_info` 获取，不能裸用 `${CC}`/`${CFLAGS}` 等 shell 变量（release worker 上为空→编译静默失败） |
-| W1-W4 | **适配工作流**：每次适配前同步main(W1)；PR原子性=一配方一PR(W2)；本地CI模拟通过再提PR(W3)；适配结束检查知识图谱完整性(W4) |
+| R34 | **test 必须实质依赖被测包**：test_package 源文件必须调用被测包的 API / 执行被测包的二进制，禁止只打印字符串的空壳测试（CI L1e 破坏性反向验证兜底） |
+| R35 | **禁止用 conan list/search 判断 binary 是否存在**：cnb.cool 搜索 API 对 binary 返回不完整（显示 "No packages found" 但实际已上传），必须用 `conan install --requires=...` 或 `conan download` 验证预编译包 |
+| R36 | **依赖必须先发布再构建下游**：依赖包必须先通过 release 流水线发布到制品仓，再构建下游包。未发布的依赖会导致 `--build=missing` 从源码编译，耗时且易失败。依赖链 `C→B→A` 的发布顺序必须是 A→B→C |
+| R37 | **版本号 = 上游版本 + 适配修复后缀**：首次适配用上游版本 `X.Y.Z`，修复适配问题后加后缀 `X.Y.Z.N`（N 从 1 递增）。原因：cnb.cool 制品仓不支持同版本多 revision 并存，必须用版本号区分 |
+| R38 | **命令行工具必须声明 commands.json**：如果构建产物包含可执行文件，必须在**软件级别**目录下创建 `commands.json`（hicmd 格式）。库类型不需要。CI 门禁 L0k 自动校验 |
+| W0-W4 | **适配工作流**：适配前先查依赖是否已发布(W0)；每次适配前同步main(W1)；PR原子性=一配方一PR(W2)；本地CI模拟通过再提PR(W3)；适配结束检查知识图谱完整性(W4) |
 
 > 详解见 references/iron-rules.md
 
@@ -166,8 +214,11 @@ python3 $SKILL_ROOT/scripts/ohc-run.py engine "错误日志"                    
 
 缺依赖？
 ├─ 从 cmd-pkgs README 查询预编译包 → curl install.sh | sh
-├─ conan 制品仓有 → conan install --requires=name/ver@ohpcd/stable
-└─ 无预编译包 → 查 dependencies.md 编译顺序 → 先编依赖
+├─ conan 制品仓有 → conan install --requires=name/ver
+├─ 制品仓没有 → 先适配并发布依赖包（R36：依赖发布优先级）
+│   ├─ 依赖包走完整适配流程 → conan create → CI → release → conan upload
+│   └─ 依赖发布成功后，回来继续构建当前包
+└─ 多层依赖链 C→B→A → 按拓扑序从最底层 A 开始逐层发布
 
 configure 失败？
 ├─ 缺依赖 → HANDOFF → AI 安装预编译包 → --resume-from=Step3
@@ -181,9 +232,11 @@ configure 失败？
 └─ ohc-run.py conan-verify <name> <ver>   验证配方可复现
 ```
 
-> **⭐ R18 强化：预编译包优先原则**
-> 编译过程中发现的任何依赖缺失，**必须先查 cmd-pkgs README** 和 Conan 制品仓。
-> 只有两者都没有才手动编译依赖。
+> **⭐ R18+R35+R36 强化：预编译包优先 + 查询方式 + 发布优先级**
+>
+> - **R18**：编译过程中发现的任何依赖缺失，**必须先查 cmd-pkgs README** 和 Conan 制品仓。只有两者都没有才手动编译依赖。
+> - **R35**：查制品仓时**禁止用 `conan list "*/*:*/*"` 判断 binary 是否存在**（cnb.cool 搜索 API 对 binary 返回不完整）。必须用 `conan install --requires=name/ver` 或 `conan download` 验证。
+> - **R36**：如果依赖包尚未发布到制品仓，**必须先适配并发布依赖包**（走 release 流水线 `conan upload`），再回来构建当前包。多层依赖按拓扑序逐层发布。
 
 ---
 
@@ -239,7 +292,12 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-init <软件名> <版本>
 python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 ```
 
-**conan-init 后 AI 必须检查**：`requirements()`(R27 `@ohpcd/stable`)、`generate()`(R26 系统同名库静态)、`package_info()`(cpp_info.libs)、`conandata.yml`(sha256)。
+**conan-init 后 AI 必须检查**：`requirements()`(依赖格式 `name/version`)、`generate()`(R26 系统同名库静态)、`package_info()`(cpp_info.libs)、`conandata.yml`(sha256)。
+
+**conan-init 后 AI 必须判断软件类型 (R38)**：
+- 如果构建产物包含**可执行文件**（命令行工具，如 `strace`、`bash`、`curl`）→ 在**软件级别**目录（`archives/{letter}/{name}/`）下创建 `commands.json`（参考 [templates/commands.json.template](templates/commands.json.template)）
+- 如果构建产物只有**库文件**（.a/.so，如 `zlib`、`openssl`）→ 不需要 commands.json
+- 判断依据：conanfile.py 的 `package_info()` 中 `cpp_info.libs` vs `cpp_info.bindirs`/构建系统 install 了可执行文件到 `bin/`
 
 **conan-verify 8 道门禁**（G0-G4 + L2/L4/L5）：
 
@@ -254,7 +312,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 
 **知识图谱集成（R30/R31）**：G2 失败时自动调用 `run_engine()` 匹配 E-entry。命中→展示根因+修复命令；未命中→自动生成 `knowledge/drafts/DRAFT-*.kv` 草稿。G2 通过 = 可标记 `published`（R29）。
 
-### Step 3: finish — 6 步自动收尾
+### Step 3: finish — 10 步自动收尾
 
 ```bash
 $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|failed
@@ -262,12 +320,16 @@ $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|faile
 
 | 步骤 | 内容 | 失败处理 |
 |------|------|---------|
-| [1/6] refresh-patch --auto | 补丁生成 | 跳过，继续归档 |
-| [2/6] close-archive | 归档关闭 | exit 2 |
-| [3/6] conan-verify | Conan 配方验证（⭐ v3.0） | ❌ 阻塞 |
-| [4/6] finalize-archive | 清理+校验+版本索引 | 非致命 |
-| [5/6] check-knowledge-gap | 知识完整性检查 | 非阻塞 |
-| [6/6] gen_summary | 重新生成 SUMMARY.md | 非致命 |
+| [1/10] refresh-patch --auto | 补丁生成 | 跳过，继续归档 |
+| [2/10] close-archive | 归档关闭 | exit 2 |
+| [2.5/10] G0 干净构建验证 | clean-verify 重建 | 非阻塞（平台限制可跳过） |
+| [3/10] conan-verify | Conan 配方验证（⭐ v3.0） | ❌ 阻塞 |
+| [3.5/10] 本地 CI 模拟 (W3) | build_and_test.sh 模拟 | 非阻塞（警告） |
+| [4/10] commands.json 检查 (R38) | 命令行工具声明验证 | 非阻塞（警告） |
+| [5/10] finalize-archive | 清理+校验+版本索引 | 非致命 |
+| [6/10] check-knowledge-gap | 知识完整性检查 (W4) | 非阻塞 |
+| [7/10] gen_summary | 重新生成 SUMMARY.md | 非致命 |
+| [8/10] PR 原子性检查 (W2) | 确认一配方一PR | 非阻塞 |
 
 **前置条件**：test-report 存在 + Staging 验证完成 + conanfile.py 存在。
 **状态值**：`published`(verify通过+CI upload) | `built`(verify通过未upload) | `failed`(编译或验证失败) | `archived`(旧版本归档)。
@@ -402,6 +464,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py graph update E{NNN} --field root_cause=".
 archives/{letter}/{name}/
   ├── manifest.yaml              # 软件级元数据 + 版本索引
   ├── README.md                  # 软件描述
+  ├── commands.json              # 命令行工具声明（软件级，仅 tool 类型，R38）
   └── {version}/
       ├── conanfile.py           # 【CI 输入】Conan 配方
       ├── conandata.yml          # 【CI 输入】源码 + 补丁声明
@@ -415,6 +478,7 @@ archives/{letter}/{name}/
 | 分类 | 文件 | CI 读取 | AI 读取 |
 |------|------|---------|---------|
 | CI 输入 | conanfile.py / conandata.yml / test_package/ / patches/ | ✅ | ✅ |
+| CI 输入 | commands.json（软件级，仅 tool 类型） | ✅ | ✅ |
 | AI 元数据 | manifest.yaml / notes.md / reports/ | ❌ | ✅ |
 
 > 状态定义见 §3 Step 3。归档清理规则（R24）见 knowledge/ARCHIVE-SPEC.md。
@@ -473,12 +537,16 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 | `pre-analysis` | ⭐ 鸿蒙PC平台适配预分析（图形/音视频/系统集成/平台代码扫描） |
 | `conan-init` | 生成 conanfile.py + conandata.yml + test_package/ ⭐ |
 | `conan-verify` | conan create + G0-G4 + L2/L4/L5 + 知识图谱(R30) + 草稿(R31) ⭐ |
-| `finish` | 补丁+归档+conan-verify+CI模拟+知识+PR原子性+摘要（8 步） |
+| `finish` | 补丁+归档+G0+conan-verify+CI模拟+知识+PR原子性+摘要（9 步） |
 | `engine` / `graph add\|update\|validate\|promote` | 知识图谱查询/管理/草稿提升 |
 | `req add\|list\|close\|validate` | ⭐ 需求图谱管理（系统能力缺口跟踪） |
 | `resolve-deps [--install]` | 查询/安装预编译依赖 |
 | `verify-build` / `refresh-patch` | 门禁复查 / 补丁管线 |
 | `status` / `handoff` / `track-edit` | 状态恢复 / 源码追踪 |
+| `search-url` / `submit` / `review` / `post-merge` | URL 搜索 / PR 自检 / 主编审核 / 合并后索引 |
+| `init-archive` / `close-archive` / `finalize-archive` | 归档初始化 / 关闭 / 清理校验 |
+| `check-env` / `clean-verify` / `check-knowledge-gap` | 环境检查 / 干净构建验证 / 知识缺口检查 |
+| `dispatch` / `summary` / `conan-migrate` | 多任务调度 / 统计摘要 / Conan 迁移辅助 |
 
 **独立脚本**（`scripts/` 目录，不通过 ohc-run.py）：
 
@@ -494,7 +562,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 cp ci/conan/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
-提交前自动检查 L0a-L0h（conanfile 语法/sha256/test源码/test()方法/MANIFEST/patch格式/环境变量依赖）。
+提交前自动检查 L0a-L0i（conanfile 语法/sha256/test源码/test()方法/MANIFEST/patch格式/环境变量依赖/Go-Rust检测）。
 
 ### CI 脚本（ci/ 目录，由 Buildbot Worker 执行，纯 shell，无 AI）
 
@@ -508,4 +576,4 @@ cp ci/conan/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-co
 
 ---
 
-*SKILL.md v8.9 — 2026-07-06 — 模板统一(删除重复无.tmpl模板)+Step0 checkpoint+pre-commit L0h修复(R33对齐)+§9新脚本文档
+*SKILL.md v11.0 — 2026-07-07 — 新增 R38 + commands.json (命令行工具声明, hicmd 集成)；v10.3→v11.0*
