@@ -1,0 +1,85 @@
+software: libserdes
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/8.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "8.3.0"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 构建系统类型
+build_system: autotools
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://api.github.com/repos/confluentinc/libserdes/tarball/refs/tags/v8.3.0"
+
+  # 源码校验和
+  sha256: "fa70920aeca78eff337686fe26d3a3d20f1702a819833b8ee5f62e872e243a83"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "jansson/2.15.0"
+    - "curl/8.19.0"
+    - "avro-c/1.11.3"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "libserdes 使用 mklove 构建系统（非标准 autotools），configure 脚本位于源码根目录，需从源码目录运行"
+  - "avro-c 不在 cmd-pkgs 和 @ohpcd/stable 制品仓中，需从 Apache Avro 源码手动编译"
+  - "avro-c CMake 4.x 不兼容 cmake_minimum_required(3.1)，需添加 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "avro-c version.sh 在 HarmonyOS 上执行失败，需在 CMakeLists.txt 中硬编码版本变量作为 fallback"
+  - "SSL 证书路径不匹配时设置 SSL_CERT_FILE 环境变量可解决下载失败问题"
+  - "pkg-config 名称为 serdes（非 libserdes），链接使用 -lserdes"
+  - "jansson/curl/avro-c 三个依赖均不在 @ohpcd/stable 制品仓，conanfile.py 使用 requires() 声明为 @ohpcd/stable 依赖（R27），CI 需要先发布这三个依赖包"
+  - "conanfile.py 使用 VirtualBuildEnv 管理依赖路径（不硬编码 ~/usr/local），build() 方法包含 make check（CI L1c 合规）"

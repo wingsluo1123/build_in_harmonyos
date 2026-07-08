@@ -1,0 +1,28 @@
+software: libserdes
+display: "libserdes"
+description: "Confluent Schema-Registry C/C++ client library with Avro serialization"
+category: data
+homepage: "https://github.com/confluentinc/libserdes"
+license: Apache-2.0
+build_system: autotools
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "使用 mklove 构建系统（非标准 autotools），configure 脚本位于源码根目录"
+    - "avro-c 不在 cmd-pkgs 和 @ohpcd/stable 制品仓中，需从 Apache Avro 源码手动编译"
+    - "avro-c CMake 4.x 不兼容 cmake_minimum_required(3.1)，需添加 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "avro-c version.sh 在 HarmonyOS 上执行失败，需在 CMakeLists.txt 中硬编码版本变量作为 fallback"
+    - "SSL 证书路径不匹配时设置 SSL_CERT_FILE 环境变量可解决下载失败问题"
+    - "pkg-config 名称为 serdes（非 libserdes），链接使用 -lserdes"
+  common_dependencies:
+    - jansson
+    - libcurl
+    - avro-c
+
+# 版本索引（所有已归档版本，含状态）
+versions:
+  "8.3.0":
+    status: published
+    build_date: "2026-07-06"
+    conan_ref: "libserdes/8.3.0@ohpcd/stable"
