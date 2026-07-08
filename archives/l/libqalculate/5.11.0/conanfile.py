@@ -159,6 +159,44 @@ class LibqalculateConan(ConanFile):
 
         apply_conandata_patches(self)
 
+        # Fix: patch 0003 doesn't cover all pthread_cancel call sites in
+        # util.cc. Wrap remaining unguarded calls with HAVE_PTHREAD_* macros
+        # so they compile on platforms lacking these functions (e.g., OHOS).
+        util_cc = os.path.join(self.source_folder, "libqalculate", "util.cc")
+        if os.path.exists(util_cc):
+            with open(util_cc, "r") as f:
+                lines = f.readlines()
+            new_lines = []
+            in_pthread_guard = False
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("#ifdef HAVE_PTHREAD"):
+                    in_pthread_guard = True
+                if in_pthread_guard and stripped == "#endif":
+                    in_pthread_guard = False
+                    new_lines.append(line)
+                    continue
+                if not in_pthread_guard:
+                    if "pthread_setcancelstate(" in line and not stripped.startswith("#"):
+                        new_lines.append("#ifdef HAVE_PTHREAD_SETCANCELSTATE\n")
+                        new_lines.append(line)
+                        new_lines.append("#endif\n")
+                        continue
+                    if "pthread_setcanceltype(" in line and not stripped.startswith("#"):
+                        new_lines.append("#ifdef HAVE_PTHREAD_SETCANCELTYPE\n")
+                        new_lines.append(line)
+                        new_lines.append("#endif\n")
+                        continue
+                    if "pthread_cancel(" in line and not stripped.startswith("#"):
+                        new_lines.append("#ifdef HAVE_PTHREAD_CANCEL\n")
+                        new_lines.append(line)
+                        new_lines.append("#endif\n")
+                        continue
+                new_lines.append(line)
+            with open(util_cc, "w") as f:
+                f.writelines(new_lines)
+            self.output.info("Patched util.cc: guarded remaining pthread_cancel calls")
+
         # Feature detection: check pthread_cancel availability (R8 compliance).
         # Uses Conan build env (not bare shell vars) to compile a test program.
         # If functions are unavailable (e.g., OHOS), generates an empty header
