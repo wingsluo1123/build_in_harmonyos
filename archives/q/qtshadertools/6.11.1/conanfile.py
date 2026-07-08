@@ -2,7 +2,7 @@
 """Conan recipe — qtshadertools 6.11.1
 
 Qt Shader Tools - provides functionality for compiling and transforming shader code.
-Built as a Qt6 module requiring qtbase 6.11.1.
+Built as a Qt6 module using system-installed Qt6 (via CMAKE_PREFIX_PATH).
 """
 import os
 
@@ -26,7 +26,7 @@ class QtshadertoolsConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("qtbase/6.11.1@ohpcd/stable")
+        pass  # Qt6 is system-installed, found via CMAKE_PREFIX_PATH env
 
     def layout(self):
         cmake_layout(self)
@@ -43,7 +43,6 @@ class QtshadertoolsConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["QT_QMAKE_TARGET_MKSPEC"] = "harmonyos-clang"
-        tc.variables["CMAKE_PREFIX_PATH"] = self.dependencies["qtbase"].package_folder
         tc.generate()
 
     def build(self):
