@@ -1,0 +1,74 @@
+# 版本级 manifest
+# 文件位置: archives/m/mp3cat/0.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+software: mp3cat
+version: "0.5"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-30"
+
+# 构建系统类型
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/tomclegg/mp3cat/archive/refs/tags/0.5.tar.gz"
+  sha256: "b1ec915c09c7e1c0ff48f54844db273505bc0157163bed7b2940792dca8ff951"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # 链接方式
+  linking: static
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - file: "0001-Makefile.patch"
+    type: portability
+    description: "使用 $(CC)/$(CFLAGS)/$(LDFLAGS) 替代硬编码 cc；添加 DESTDIR 支持"
+  - file: "0002-mp3cat.c.patch"
+    type: feature
+    description: "添加 --version 和 --help 参数支持"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "mp3cat 使用纯手写 Makefile（非 autotools），无 configure 脚本"
+  - "原始 Makefile 硬编码 cc，需要补丁改为 $(CC) 以支持编译器覆盖"
+  - "原始 Makefile 不支持 DESTDIR，需要补丁添加以支持 staging 安装"
+  - "mp3cat 不支持 --version/--help，需补丁添加以满足 L2 smoke test"
+  - "mp3cat --tail 模式为 live stream tailing，会阻塞等待文件增长"
+  - "R33: conanfile.py build() 中编译器路径必须从 self.conf.get() 获取，不能硬编码"
