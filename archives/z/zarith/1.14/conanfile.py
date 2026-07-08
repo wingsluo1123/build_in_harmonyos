@@ -44,12 +44,12 @@ class ZarithConan(ConanFile):
         # ZArith uses a custom configure script (not standard autotools)
         # The configure script takes -installdir, not --prefix
         install_dir = os.path.join(self.package_folder, "lib", "ocaml")
-        self.run(f"./configure -installdir {install_dir}")
-        self.run("make -j1")
+        self.run(f"./configure -installdir {install_dir}", cwd=self.source_folder)
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
         # make install uses INSTALLDIR from configure
-        self.run("make install")
+        self.run("make install", cwd=self.source_folder)
 
     def package_info(self):
         self.cpp_info.libs = ["zarith"]
