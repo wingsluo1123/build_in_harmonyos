@@ -4,7 +4,7 @@
 
 来源: SKILL.md §1.2
 
-## 铁律总表（32 条，违反=bug）
+## 铁律总表（38 条，违反=bug）
 
 | # | 规则 | 正确做法 | 禁止 |
 |---|------|---------|------|
@@ -34,13 +34,20 @@
 | R24 | **归档清理：failed必删，空归档删** | 无产物无补丁的归档无价值 | 保留无用归档 |
 | R25 | **notes.md 防重复：先删后写** | finish 自动清理旧记录，只保留最后一次 | 多次 finish 产生重复记录 |
 | **R26** | **系统同名库禁止动态链接** | conanfile.py `generate()` 中对系统同名库强制 `BUILD_SHARED_LIBS=OFF` / `-static` | 构建系统同名 .so 污染 `/lib`/`/lib64` 导致其他应用崩溃 |
-| **R27** | **依赖引用必须 @ohpcd/stable** | `self.requires("name/ver@ohpcd/stable")` | 裸 `self.requires("name/ver")` |
+| **R27** | *(已废弃 — 制品仓已完成无 channel 迁移，依赖引用默认就是 `name/version` 格式)* | — | — |
 | **R28** | **conanfile.py 必须有 test_package/** | 生成 conanfile.py 时同时生成 test_package/ | 只有 conanfile.py 没有测试 |
 | **R29** | **conan_verify 通过后才标记 published** | `ohc-run.py conan-verify` PASS + CI upload → published；PASS 未 upload → built；FAIL → failed | conan create 失败仍标记 published |
 | **R30** | **conan-verify 失败必须查询知识图谱** | G2 失败时调用 `run_engine()` 匹配 E-entry | 只打印错误不查图谱 |
 | **R31** | **知识图谱未命中必须生成草稿** | `knowledge/drafts/DRAFT-*.kv` 自动生成 | 未命中的错误丢弃不沉淀 |
 | **R32** | **Conan recipe 平台判断兼容 OHOS** | `self.settings.os in ("Linux", "OHOS")` | `self.settings.os == "Linux"` |
 | **R33** | **build() 禁止依赖未定义 shell 环境变量** | 从 Conan Toolchain / `self.conf_info` / `AutotoolsToolchain` 获取编译器路径与标志 | 裸用 `${CC}` / `${CFLAGS}` / `${CXX}` 等 shell 变量 |
+| **R34** | **test 必须实质依赖被测包** | test_package 源文件调用被测包 API / 执行被测包二进制 | 只打印字符串的空壳 test（即使链接了被测库但不调用任何函数） |
+| **R35** | **禁止用 conan list/search 判断 binary 是否存在** | 用 `conan install --requires=...`（dry-run）或 `conan download` 验证预编译包 | 用 `conan list "*/*:*/*" -r=xxx` 判断（cnb.cool 服务端搜索 API 对 binary 返回不完整） |
+| **R36** | **依赖必须先发布再构建下游** | 依赖包必须先通过 release 流水线发布到制品仓（`conan upload` 完成），再适配/构建依赖它的下游包 | 在依赖包尚未发布时就构建下游包（`--build=missing` 会尝试从源码编译依赖，耗时且容易失败） |
+| **R37** | **版本号 = 上游版本 + 适配修复后缀** | 首次用 `X.Y.Z`，修复适配问题后用 `X.Y.Z.N`（N 从 1 递增） | 同一版本号重复上传不同 revision（制品仓 409 拒绝），或每次修复都改版本号 |
+| **R38** | **命令行工具必须声明 commands.json** | 构建产物包含可执行文件的包，必须在**软件级别**目录下创建 `commands.json` | 命令行工具缺少 commands.json，或库类型误加 commands.json |
+| **R39** | **源码 URL 必须为官方源** | conandata.yml 中的 URL 必须指向官方正式源（GitHub releases、官方网站）或权威镜像源，CI 自动添加镜像 fallback | 使用个人 fork、网盘、不明 CDN 作为源码下载地址 |
+| **R40** | **深度适配库需验证适配完整性** | 图形渲染/UI框架/多媒体/外设/系统底层类库，编译通过不等于适配完成，需检查实质性平台适配代码（非 stub） | 仅编译通过但无平台适配补丁，或 test_package 只调用 version() 无实际功能验证 |
 
 ---
 
@@ -145,29 +152,6 @@ ls /lib*/**/lib<name>.so* /lib/**/lib<name>.so* 2>/dev/null
 | Autotools | `--disable-shared --enable-static` | `generate()` |
 | Makefile | 只编译静态目标（不编译 shared） | `build()` |
 | Meson | `tc.project_options["default_library"] = "static"` | `generate()` |
-
----
-
-### R27 详细说明：依赖引用必须 @ohpcd/stable
-
-所有 conanfile.py 中的依赖引用必须使用完整格式：
-
-```python
-# ✅ 正确
-def requirements(self):
-    self.requires("openssl/1.1.1w@ohpcd/stable")
-    self.requires("zlib/1.3.1@ohpcd/stable")
-
-# ❌ 错误 — 缺少 user/channel
-def requirements(self):
-    self.requires("openssl/1.1.1w")
-    self.requires("zlib/1.3.1")
-```
-
-**原因**：
-1. CI 的 `conan create` 使用 `--user=ohpcd --channel=stable` 统一注入
-2. 依赖图的自动生成靠解析 `self.requires(...)` 中的 `@ohpcd/stable`
-3. CNB Conan 制品仓的包标识格式为 `{name}/{version}@{user}/{channel}`
 
 ---
 
@@ -371,6 +355,355 @@ def build(self):
 | 架构标志 (ARCH) | `self.settings.arch` | `$ARCH` / `${ARCH}` |
 
 > **L0h 门禁**：CI 在 conan create 之前会扫描 conanfile.py，检测 `self.run()` 中的 `${CC}` / `${CFLAGS}` / `${CXX}` / `${LDFLAGS}` 模式，命中则直接拦截。
+
+---
+
+### R34 详细说明：test 必须实质依赖被测包
+
+> **核心原因**：PR #1795 (bird/3.1.6) 的 test_package/test.c 只有一个 `printf("test bird 3.1.6: OK\n")`，不调用 bird 的任何 API，即使 bird 库完全损坏也能通过。这是"形式合规、实质空壳"的假测试——通过了 L0c（有源文件）、L0d（test() 调了 self.run()）、L1d（不是 echo/print/true）所有检查。
+
+#### 典型反面案例
+
+```c
+// ❌ bird/test_package/test.c — 假测试
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    printf("test bird 3.1.6: OK\n");  // 不调用 bird 的任何函数
+    return 0;
+}
+```
+
+即使 CMakeLists.txt 写了 `target_link_libraries(test bird)`，链接器发现 test.c 没有引用 bird 的符号，不会从 libbird.a 提取任何 .o，链接照样成功。
+
+#### 正确做法
+
+```c
+// ✅ 真测试 — 调用被测包 API
+#include <stdio.h>
+#include <bird/bird.h>   // 引入被测包头文件
+
+int main(void) {
+    bird_ctx *ctx = bird_init();      // 调用被测包函数
+    if (!ctx) {
+        fprintf(stderr, "FAIL: bird_init() returned NULL\n");
+        return 1;
+    }
+    bird_route *r = bird_lookup(ctx, "192.168.1.0/24");
+    printf("test bird: route lookup OK (r=%p)\n", (void*)r);
+    bird_free(ctx);
+    return 0;
+}
+```
+
+#### L1e 破坏性反向验证（CI 兜底，无法绕过）
+
+CI 在 conan create 成功后执行 L1e：
+
+1. 从 conan cache 找到被测包产物
+2. **mv 移走整个产物子目录**（bin/、lib/、include/）
+3. 重新 `conan test`（重新编译 test 源码 + 链接 + 运行）
+4. 如果仍然 PASS → 假测试（test 不依赖被测包）
+5. 如果 FAIL → 真测试（链接/运行确实依赖被测包）
+6. mv 目录回原位，恢复产物
+
+**破坏策略选择 mv 目录而非逐文件篡改的原因**：
+
+- 鸿蒙系统 MAC 策略下，`make install` 安装的文件可能只读，`cp`/`printf` 覆盖会报 `operation not permitted`
+- Conan 创建的 package 目录本身当前用户可写，mv 目录只需父目录权限
+- mv 整个目录比逐文件 find/cp/rm 更可靠，且无 zsh glob 兼容性问题
+
+**无法绕过的底层保证**：
+
+| 包类型 | 破坏方式 | 真测试的表现 | 底层保证 |
+|--------|---------|-------------|---------|
+| 静态库 .a | mv lib/ 移走 | 链接器找不到库 → cannot find -lxxx | 链接器必须找到库文件 |
+| 动态库 .so | mv lib/ 移走 | 加载器找不到库 → cannot open shared object | NEEDED 记录强制加载 |
+| 可执行包 bin | mv bin/ 移走 | test 执行 bin 找不到命令 → command not found | 进程执行不可伪造 |
+| 头文件库 | mv include/ 移走 | 编译器找不到声明 → No such file or directory | 预处理器必须解析声明 |
+
+> 提交者无论在 CMakeLists.txt、源码、conanfile.py 哪一层做手脚，都无法改变链接器/加载器/预处理器的确定行为。
+
+---
+
+### R35 详细说明：禁止用 conan list/search 判断 binary 是否存在
+
+> **核心原因**：cnb.cool 的 Conan 服务端对搜索 API（`/v2/conans/search`）的 binary package 查询支持不完整——`conan list "*/*:*/*" -r=xxx` 返回 recipe 信息但显示 "No packages found for this revision"，即使该包的预编译二进制已成功上传且可正常下载。这会导致 AI 和人工误判"制品仓没有预编译包"，进而做出错误的决策（如重新编译、修改 upload 逻辑等）。
+
+#### 三套 API 路径对比
+
+| 操作 | Conan API 路径 | cnb.cool 支持情况 |
+|------|---------------|------------------|
+| `conan list "*/*:*/*" -r=xxx` | 搜索 API (`/v2/conans/search`) | recipe ✅ binary ❌（返回空） |
+| `conan install --requires=...` | 解析 API (`/v2/conans/resolve`) | recipe ✅ binary ✅ |
+| `conan download "pkg/ver@user/ch"` | 下载 API (`/v2/conans/download`) | recipe ✅ binary ✅ |
+
+#### 正确做法
+
+```bash
+# ✅ 验证某个包是否有预编译 binary — 方法一：dry-run install
+conan install --requires="zlib/1.3.1" -pr="ohos-aarch64" --build=missing
+
+# ✅ 验证某个包是否有预编译 binary — 方法二：直接 download
+conan download "zlib/1.3.1" -r=cnb-conan
+
+# ✅ 查看制品仓有哪些 recipe（仅 recipe 列表，不含 binary 状态）
+conan list "*/*" -r=cnb-conan
+
+# ❌ 错误 — 用 list 查 binary，会得到 "No packages found" 的误判
+conan list "*/*:*/*" -r=cnb-conan
+```
+
+#### 判断规则
+
+- 需要**判断 binary 是否存在** → 用 `conan install` 或 `conan download`
+- 需要**列出制品仓有哪些包**（recipe 层面） → `conan list "*/*" -r=xxx` 可以用，但结果只反映 recipe，不代表 binary 状态
+- **绝对禁止**用 `conan list "*/*:*/*"` 的结果判断"制品仓是否有预编译包"
+
+---
+
+### R36 详细说明：依赖必须先发布再构建下游
+
+> **核心原因**：公开制品仓的核心价值是"一次发布、多方复用"。如果依赖包 A 尚未发布到制品仓，下游包 B 声明了 `self.requires("A/x.x")`，CI 构建时 `--build=missing` 会尝试从源码编译 A——这通常因为缺少 A 的构建依赖（工具链/传递依赖）而失败，或者耗时数倍于预期。更严重的是，即使侥幸成功，本地产物与制品仓中的正式版本可能不一致，破坏可复现性。
+
+#### 依赖发布优先级流程
+
+```
+适配包 B（依赖 A）
+  │
+  ├─ Step 1: 检查 A 是否已发布到制品仓
+  │   conan install --requires="A/x.x" -r=cnb-conan
+  │
+  │   ├─ 已发布 → 继续 Step 2（正常流程）
+  │   │
+  │   └─ 未发布 → 必须先适配并发布 A
+  │       ├─ 切换到 A 的适配流程
+  │       ├─ A 通过 CI + release 流水线发布到制品仓
+  │       └─ A 发布成功后，再回来构建 B
+  │
+  ├─ Step 2: 在 B 的 conanfile.py 中声明依赖
+  │   self.requires("A/x.x")
+  │
+  └─ Step 3: CI 构建 B 时，--build=missing 从制品仓拉取 A 的预编译包
+```
+
+#### 反面案例
+
+```python
+# ❌ B 的 conanfile.py 依赖了 A，但 A 还没发布
+class BConan(ConanFile):
+    requires = "A/1.0"  # A 尚未发布到制品仓
+    # CI 构建时: --build=missing 试图从源码编译 A
+    # 结果: 缺少 A 的构建依赖 → 编译失败 → 误判为 B 的适配问题
+```
+
+#### 多层依赖链
+
+当依赖链为 `C → B → A` 时：
+
+1. **先发布 A**（无外部依赖的基础库，如 zlib/openssl）
+2. **再发布 B**（声明 `requires("A/...")`，从制品仓拉取 A）
+3. **最后发布 C**（声明 `requires("B/...")`，从制品仓拉取 B）
+
+**CI 在构建 C 时，完整的依赖解析链为**：
+```
+C (本次构建)
+  → B (制品仓预编译包)
+    → A (制品仓预编译包)
+```
+
+只有每一层都先发布，下游才能通过 `--build=missing` 快速拉取预编译依赖，避免全链路从源码编译。
+
+#### 与 R18（依赖先查预编译）的关系
+
+- **R18** 是适配阶段的原则：优先查预编译包，有就用、没有再考虑编译
+- **R36** 是发布阶段的优先级原则：**没有发布的依赖，必须先走发布流程**
+- 两者结合：适配时先查预编译（R18），如果发现依赖未发布，先发布依赖（R36），再继续适配
+
+---
+
+### R37 详细说明：版本号 = 上游版本 + 适配修复后缀
+
+> **核心原因**：cnb.cool 制品仓不支持同一 `name/version` 下多个 recipe revision 并存（上传新 revision 会返回 409 Conflict）。因此，每次适配修复必须递增版本号后缀来区分。
+
+#### 版本号格式
+
+```
+X.Y.Z     ← 首次适配（= 上游版本）
+X.Y.Z.1   ← 第 1 次适配修复
+X.Y.Z.2   ← 第 2 次适配修复
+X.Y.W     ← 上游新版本（后缀重置）
+```
+
+#### 什么算"适配修复"
+
+需要递增后缀的场景：
+- conanfile.py 构建标志错误（如漏了 `-fPIC`）
+- 补丁文件缺失或不正确
+- package_info 的 libs 写错
+- test_package 修复
+- 任何 conanfile.py / conandata.yml 的修正
+
+**不需要**递增后缀的场景：
+- 上游发布新版本 → 直接用新版本号
+- 代码 review 中的文字修改（注释、README 等）→ 不影响构建产物
+
+#### 正确流程
+
+```bash
+# 首次适配
+conan create . --name=zlib --version=1.3.1
+conan upload "zlib/1.3.1" -r=ohpcd -c
+
+# 发现 CMake 标志错误，修复后重新发布
+# 修改 conanfile.py (如添加 -fPIC)
+conan create . --name=zlib --version=1.3.1.1
+conan upload "zlib/1.3.1.1" -r=ohpcd -c
+```
+
+```python
+# 下游 conanfile.py
+self.requires("zlib/1.3.1")      # 用首次版本（如果不需要修复）
+
+# 如果下游依赖了某个修复版，显式指定
+self.requires("zlib/1.3.1.1")    # 需要第 1 次适配修复
+```
+
+#### 下游引用更新规则
+
+当 zlib 从 `1.3.1` 升到 `1.3.1.1` 时：
+- **不需要**强制所有下游立即更新引用
+- 下游 `requires("zlib/1.3.1")` 仍然有效（指向首次版本）
+- 如果下游遇到 zlib/1.3.1 中的 bug 且在 1.3.1.1 中修复了，才需要更新引用
+
+#### 制品仓中的共存
+
+```
+制品仓:
+  zlib/1.3.1        ← 首次适配
+  zlib/1.3.1.1      ← 第 1 次修复
+  zlib/1.3.1.2      ← 第 2 次修复
+```
+
+所有版本独立存在，下载时精确指定：
+```bash
+conan download "zlib/1.3.1"   -r=ohpcd
+conan download "zlib/1.3.1.2" -r=ohpcd
+```
+
+#### CI 门禁 (L0j)
+
+PR 构建时，CI 自动执行版本号占用检查：
+
+1. 用 `conan download` 检查制品仓中是否已存在 `pkg_name/pkg_ver`
+2. 如果已存在，diff 比较本地 conanfile.py/conandata.yml 与制品仓中的
+3. 内容不同 → **fail**，提示递增版本号
+
+```
+[fail] L0j: zlib/1.3.1 already published with different recipe (R37)
+       制品仓中已存在 zlib/1.3.1, 且本次修改了 conanfile.py 或 conandata.yml
+       cnb.cool 制品仓不支持同版本多 revision 并存 (409 Conflict)
+[hint] 适配修复必须递增版本号后缀:
+         zlib/1.3.1 → zlib/1.3.1.1
+```
+
+本地预检也可用 preflight_check.sh 提前发现此问题。
+
+#### 追溯适配历史
+
+```bash
+# 制品仓中查看所有版本
+conan search "zlib/*" -r=ohpcd
+
+# Git log 查看适配修改历史
+git log --oneline -- "archives/z/zlib/"
+```
+
+---
+
+### R38 详细说明：命令行工具必须声明 commands.json
+
+> **核心原因**：hicmd 项目通过 commands.json 自动发现和安装命令行工具。如果工具类型包缺少此文件，hicmd 无法感知该包提供的命令行能力，用户无法通过 hicmd 安装。
+
+#### 判断标准
+
+| 类型 | 判断依据 | commands.json |
+|------|---------|---------------|
+| **tool** | 构建产物包含可执行文件（`bin/` 目录下有二进制） | **必须**创建 |
+| **library** | 构建产物只有库文件（`.a`/`.so`）和头文件 | 不需要 |
+
+**自动判断方法**（CI L0k 门禁使用）：
+- conanfile.py 中 `package_info()` 设置了 `cpp_info.bindirs`
+- conanfile.py 中有 `RUNTIME DESTINATION bin` 或类似的可执行文件安装
+- conanfile.py 中 `package_type = "application"`
+
+#### 文件位置
+
+```
+archives/{letter}/{name}/commands.json
+```
+
+**软件级别**（与 manifest.yaml、README.md 同级），一个软件一个文件，`versions` 字段聚合所有版本。新增版本时往 `versions` 中追加条目即可。
+
+#### 格式
+
+```json
+{
+  "name": "strace",
+  "description": "系统调用追踪工具，用于诊断和调试程序",
+  "homepage": "https://strace.io",
+  "type": "tool",
+  "versions": {
+    "6.19": {
+      "ref": "strace/6.19",
+      "binary": true
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| name | 包名（与 conan 包名一致） |
+| description | 中文描述（一句话说明功能） |
+| homepage | 上游官网 URL |
+| type | 固定 `"tool"` |
+| versions.{ver}.ref | Conan 引用（`name/version`） |
+| versions.{ver}.binary | 是否已发布二进制到制品仓 |
+
+#### binary 字段更新规则
+
+- `false`：尚未发布到制品仓（适配中）
+- `true`：已通过 release 流水线发布
+
+适配完成并 CI upload 成功后，由 AI 或 finish 步骤将 binary 更新为 `true`。
+
+#### 反面案例
+
+```json
+// ❌ 库类型误加 commands.json
+{
+  "name": "zlib",
+  "type": "tool",        // 错误! zlib 是库不是工具
+  ...
+}
+
+// ❌ commands.json 缺少 version 条目
+{
+  "name": "strace",
+  "type": "tool",
+  "versions": {}         // 空! 缺少当前版本
+}
+```
+
+#### CI 门禁 (L0k)
+
+PR 构建时自动检查：
+1. 扫描 conanfile.py 判断是否构建可执行文件
+2. 如果是工具类型 → 检查 commands.json 是否存在且格式有效
+3. 如果是库类型 → 检查不应有 commands.json
+4. warn 级别（不阻塞 PR，但会提示）
 
 ---
 
