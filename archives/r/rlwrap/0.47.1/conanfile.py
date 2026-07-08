@@ -74,16 +74,36 @@ class RlwrapConan(ConanFile):
                 tc.extra_ldflags.insert(0, f"-L{lib}")
         # Create symlink libtinfo.a -> libncursesw.a so AC_CHECK_LIB(tinfo, tgetent)
         # finds tgetent (OHOS ncurses is built with --enable-widec -> libncursesw.a)
-        default_prefix = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
-        ncursesw_path = os.path.join(default_prefix, "lib", "libncursesw.a")
-        if os.path.exists(ncursesw_path):
+        # Search multiple prefixes for the static ncurses library.
+        search_prefixes = []
+        for p in [os.environ.get("DEFAULT_PREFIX", ""),
+                  os.path.expanduser("~/.harmonybrew")]:
+            if p and p not in search_prefixes:
+                search_prefixes.append(p)
+        ncurses_static = None
+        for prefix in search_prefixes:
+            for lib_name in ("libncursesw.a", "libncurses.a"):
+                candidate = os.path.join(prefix, "lib", lib_name)
+                if os.path.exists(candidate):
+                    ncurses_static = candidate
+                    break
+            if ncurses_static:
+                break
+        if ncurses_static:
             compat_dir = os.path.join(self.build_folder, ".termcap_compat")
             os.makedirs(compat_dir, exist_ok=True)
             tinfo_link = os.path.join(compat_dir, "libtinfo.a")
             if not os.path.exists(tinfo_link):
-                os.symlink(ncursesw_path, tinfo_link)
+                os.symlink(ncurses_static, tinfo_link)
             tc.extra_ldflags.insert(0, f"-L{compat_dir}")
-            self.output.info(f"Created symlink libtinfo.a -> {ncursesw_path}")
+            self.output.info(f"Created symlink libtinfo.a -> {ncurses_static}")
+        else:
+            # No static ncurses/tinfo library found; remove -static so
+            # configure can find tgetent in shared libtinfo.so/libncursesw.so
+            if "-static" in tc.extra_ldflags:
+                tc.extra_ldflags.remove("-static")
+            self.output.warn("No static ncurses library found; "
+                             "using dynamic linking for tinfo/ncurses")
         tc.generate()
 
     def build(self):
