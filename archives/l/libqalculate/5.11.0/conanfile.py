@@ -89,6 +89,19 @@ class LibqalculateConan(ConanFile):
                 f.write("#pragma once\n")
                 f.write("/* pthread_cancel not available on this platform */\n")
 
+        # Diagnostic: find gmp.h location
+        sys_prefix = os.path.expanduser("~/usr/local")
+        gmp_check = os.path.join(sys_prefix, "include", "gmp.h")
+        if os.path.exists(gmp_check):
+            self.output.info("DIAG: gmp.h found at " + gmp_check)
+        else:
+            self.output.info("DIAG: gmp.h NOT at " + gmp_check)
+            for d in ["/usr/include", "/data/service/hnp/include",
+                       "/system/include", "/usr/local/include"]:
+                p = os.path.join(d, "gmp.h")
+                if os.path.exists(p):
+                    self.output.info("DIAG: gmp.h found at " + p)
+
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
