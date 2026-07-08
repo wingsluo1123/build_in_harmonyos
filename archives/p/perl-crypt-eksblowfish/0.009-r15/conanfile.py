@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Conan recipe — Crypt::Eksblowfish (Perl XS module with Module::Build).
+
+Crypt::Eksblowfish implements the Eksblowfish block cipher (used by bcrypt).
+This is a Perl XS module built with Module::Build (Build.PL), containing
+compiled C code (Eksblowfish.xs → Eksblowfish.so).
+
+Build system: Perl Module::Build (Build.PL)
+The .so is loaded by Perl's XSLoader/DynaLoader at runtime.
+
+Adaptations for OHOS:
+- CPATH/LIBRARY_PATH set to OHOS SDK sysroot for musl headers
+- PERL5LIB set to user-installed Perl module path
+- Build.PL patched to remove -fstack-protector-strong from ldflags (ld.lld unsupported)
+- R32: settings.os check uses `in ("Linux", "OHOS")`
+- R33: build environment via Conan buildenv_info, not raw os.environ
+"""
+import os
+
+from conan import ConanFile
+from conan.errors import ConanException
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.layout import basic_layout
+
+
+class PerlCryptEksblowfishConan(ConanFile):
+    name = "perl-crypt-eksblowfish"
+    version = "0.009-r15"
+    description = "Eksblowfish block cipher (Perl XS module, used by bcrypt)"
+    license = "GPL-1.0-or-later OR Artistic-1.0"
+    homepage = "https://metacpan.org/dist/Crypt-Eksblowfish"
+    url = ""  # CI fills this
+
+    # XS module compiles C code — needs compiler/build_type
+    settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def layout(self):
+        basic_layout(self)
+
+    def requirements(self):
+        # R27: dependencies must use @ohpcd/stable
+        # Perl is a system dependency, not a Conan package
+        # Required Perl modules: Class::Mix, MIME::Base64, XSLoader, parent
+        pass
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+
+    def _resolve_sysroot(self):
+        """Resolve OHOS SDK sysroot path."""
+        sysroot = os.environ.get("OHOS_SYSROOT")
+        if sysroot and os.path.isdir(sysroot):
+            return sysroot
+        candidates = [
+            "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/../../sysroot",
+            os.path.expanduser("~/ohos-sdk/sysroot"),
+        ]
+        for c in candidates:
+            if os.path.isdir(c):
+                return c
+        raise ConanException(
+            "Cannot find OHOS SDK sysroot. Set OHOS_SYSROOT environment variable."
+        )
+
+    def _resolve_perl_lib(self):
+        """Resolve Perl module library path for PERL5LIB."""
+        perl_lib = os.environ.get("PERL5LIB")
+        if perl_lib:
+            return perl_lib
+        home = os.path.expanduser("~")
+        candidates = [
+            os.path.join(home, "usr/local/lib/perl5/aarch64-linux"),
+            os.path.join(home, "usr/local/lib/perl5"),
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux",
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0",
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0/aarch64-linux",
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0",
+        ]
+        existing = [c for c in candidates if os.path.isdir(c)]
+        return ":".join(existing) if existing else ""
+
+    def generate(self):
+        sysroot = self._resolve_sysroot()
+        perl_lib = self._resolve_perl_lib()
+
+        # CPATH: OHOS SDK sysroot headers
+        cpath = os.path.join(sysroot, "usr", "include")
+        os.environ["CPATH"] = cpath
+        self.buildenv_info.define("CPATH", cpath)
+
+        # LIBRARY_PATH: sysroot libs
+        lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
+        os.environ["LIBRARY_PATH"] = lib_path
+        self.buildenv_info.define("LIBRARY_PATH", lib_path)
+
+        # PERL5LIB: Perl module path
+        if perl_lib:
+            os.environ["PERL5LIB"] = perl_lib
+            self.buildenv_info.define("PERL5LIB", perl_lib)
+
+    def _setup_build_env(self):
+        """Set build environment variables (called from build())."""
+        sysroot = self._resolve_sysroot()
+        perl_lib = self._resolve_perl_lib()
+
+        cpath = os.path.join(sysroot, "usr", "include")
+        lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
+
+        os.environ["CPATH"] = cpath
+        os.environ["LIBRARY_PATH"] = lib_path
+        if perl_lib:
+            os.environ["PERL5LIB"] = perl_lib
+
+    def build(self):
+        # Apply patches (Build.PL ldflags fix)
+        apply_conandata_patches(self)
+
+        # R32: platform check
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanException(f"Unsupported OS: {self.settings.os}")
+
+        # Ensure environment is set (may not persist from generate())
+        self._setup_build_env()
+
+        # Step 1: Generate Build script using Module::Build
+        self.run("perl Build.PL", cwd=self.source_folder)
+
+        # Step 2: Build (Build.PL patch handles ldflags cleanup)
+        self.run("perl Build", cwd=self.source_folder)
+
+    def package(self):
+        # Copy built artifacts from blib to package folder in standard layout
+        # .so goes to lib/perl5/aarch64-linux/auto/Crypt/Eksblowfish/ (Perl auto path)
+        # .pm goes to lib/perl5/aarch64-linux/Crypt/Eksblowfish/ (Perl module path)
+        src = self.source_folder
+        blib_arch = os.path.join(src, "blib", "arch")
+        blib_lib = os.path.join(src, "blib", "lib")
+
+        # Eksblowfish.so (XS extension)
+        copy(self, "Eksblowfish.so",
+             src=os.path.join(blib_arch, "auto", "Crypt", "Eksblowfish"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "auto", "Crypt", "Eksblowfish"))
+        copy(self, "Eksblowfish.bs",
+             src=os.path.join(blib_arch, "auto", "Crypt", "Eksblowfish"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "auto", "Crypt", "Eksblowfish"))
+
+        # Eksblowfish.pm (main module)
+        copy(self, "Eksblowfish.pm",
+             src=os.path.join(blib_lib, "Crypt"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "Crypt"))
+
+        # Subpackage .pm files
+        copy(self, "*.pm",
+             src=os.path.join(blib_lib, "Crypt", "Eksblowfish"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "Crypt", "Eksblowfish"))
+
+    def package_info(self):
+        # Perl XS module: .so is loaded by Perl DynaLoader, not linked by CMake
+        # R26: non-system library, default dynamic linking
+        self.cpp_info.libs = []  # No C/C++ libraries to link (Perl DynaLoader loads .so)
+        self.cpp_info.libdirs = ["lib/perl5/aarch64-linux/auto/Crypt/Eksblowfish"]
+        self.cpp_info.includedirs = []
+
+        # Set PERL5LIB to the package's perl lib directory
+        perl_lib = os.path.join(self.package_folder, "lib", "perl5")
+        perl_arch_lib = os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux")
+        self.runenv_info.append_path("PERL5LIB", perl_lib)
+        self.runenv_info.append_path("PERL5LIB", perl_arch_lib)
+        self.buildenv_info.append_path("PERL5LIB", perl_lib)
+        self.buildenv_info.append_path("PERL5LIB", perl_arch_lib)

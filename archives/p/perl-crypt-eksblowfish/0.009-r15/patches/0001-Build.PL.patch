@@ -1,0 +1,28 @@
+--- a/Build.PL
++++ b/Build.PL
+@@ -3,6 +3,17 @@
+ use strict;
+ 
+ use Module::Build;
++use Config;
++
++# OHOS: Remove -fstack-protector-strong from ldflags (ld.lld doesn't support it)
++my %clean_config;
++for my $key (qw(ldflags lddlflags)) {
++    my $val = $Config{$key} // '';
++    $val =~ s/-fstack-protector-strong//g;
++    $val =~ s/\s+/ /g;
++    $val =~ s/^\s+|\s+$//g;
++    $clean_config{$key} = $val;
++}
+ 
+ Module::Build->new(
+ 	module_name => "Crypt::Eksblowfish",
+@@ -40,6 +51,7 @@
+ 	meta_add => { distribution_type => "module" },
+ 	create_makefile_pl => "passthrough",
+ 	sign => 1,
++	config => \%clean_config,
+ )->create_build_script;
+ 
+ 1;
