@@ -61,11 +61,6 @@ class RlwrapConan(ConanFile):
         tc.extra_ldflags.append("-static")
         # libptytty is not available; rlwrap has built-in PTY handling
         tc.configure_args.append("--without-libptytty")
-        # ncurses on OHOS is built with --enable-widec → libncursesw.a
-        # rlwrap configure checks tinfo/ncurses/termcap but not ncursesw;
-        # use cache variable to bypass tgetent search without polluting LIBS
-        # (which would break the basic "C compiler works" check)
-        tc.configure_args.append("ac_cv_search_tgetent=-lncursesw")
         # Add system library paths from DEFAULT_PREFIX (CI environment)
         # and ~/.harmonybrew (developer environment)
         for prefix in [os.environ.get("DEFAULT_PREFIX", ""), os.path.expanduser("~/.harmonybrew")]:
@@ -92,6 +87,17 @@ class RlwrapConan(ConanFile):
         with open(configure_path, 'w') as f:
             f.write(content)
         self.output.info(f"Replaced {replaced} occurrences of $CONFIG_SHELL")
+
+        # Patch: rlwrap configure searches for tgetent in tinfo/ncurses/termcap
+        # but OHOS ncurses is built with --enable-widec -> libncursesw.a
+        # Add ncursesw to the search list so configure finds it
+        old_search = "-ltinfo -ltinfow -lcurses -lncurses -ltermcap"
+        new_search = "-lncursesw -ltinfo -ltinfow -lcurses -lncurses -ltermcap"
+        if old_search in content:
+            content = content.replace(old_search, new_search)
+            with open(configure_path, "w") as f:
+                f.write(content)
+            self.output.info("Patched configure: added ncursesw to tgetent search list")
 
         # Fix: Conan profile sets invalid paths for SHELL, CONFIG_SHELL, CC, CXX
         # (e.g. /data/service/hnp/bin/bash, /data/service/hnp/bin/clang).
