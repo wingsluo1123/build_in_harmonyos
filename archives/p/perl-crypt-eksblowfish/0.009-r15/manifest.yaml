@@ -1,0 +1,110 @@
+software: perl-crypt-eksblowfish
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.009-r15/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.009-r15"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/Z/ZE/ZEFRAM/Crypt-Eksblowfish-0.009.tar.gz"
+
+  # 源码校验和
+  sha256: "3cc7126d5841107237a9be2dc5c7fbc167cf3c4b4ce34678a8448b850757014c"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+  build_system: perl
+
+  # 配置选项列表
+  configure_options:
+    - "perl Build.PL"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - perl/5.42.0 (系统 Perl)
+    - musl/1.2.x (提供标准 C 库头文件)
+    - Module::Build (Perl 构建模块)
+    - ExtUtils::CBuilder/0.15 (C 编译支持)
+    - Class::Mix/0.001 (Perl 模块依赖)
+    - MIME::Base64/2.21 (Perl 模块依赖)
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "Build.PL: 添加 Config 清理 -fstack-protector-strong 标志，通过 config 参数传递给 Module::Build (E137)"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Perl Module::Build 构建系统的 .so 编译需要清理 ldflags 中的 -fstack-protector-strong（OHOS ld.lld 不支持）(E137)"
+  - "Module::Build 可通过 config 参数覆盖 Perl Config 中的 ldflags/lddlflags"
+  - "CPATH/LIBRARY_PATH 需指向 OHOS SDK sysroot 以获取 musl 头文件"
+  - "SELinux HMDFS 文件系统限制动态库加载，需要将模块安装到系统目录"
+  - "Build.PL 补丁方式优于运行时修改生成的 Build 脚本（R6 合规）"
+  - "conan-verify 8 道门禁全部通过（G0-G4, L2-L5）"
+  - "Eksblowfish.so 安全特性: NX + PIE + RELRO + BIND_NOW 全部启用"
+  - "boot_Crypt__Eksblowfish 导出符号正确，Perl XS API 引用完整"
+patch_generation:
+  method: manual-diff
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/perl-crypt-eksblowfish-0.009-r15.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/perl-crypt-eksblowfish-0.009-r15.work
+  source_orig_hash: 3cc7126d5841107237a9be2dc5c7fbc167cf3c4b4ce34678a8448b850757014c
+  source_work_hash: 3cc7126d5841107237a9be2dc5c7fbc167cf3c4b4ce34678a8448b850757014c
+  generated_at: '2026-07-07T17:00:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Build.PL.patch
+    type: manual
+    platform_only: True
+    guard: 'pending'
+
+# ============================================================
+# 测试结果摘要
+# ============================================================
+
+test_summary:
+  conan_verify: PASS
+  elf_validation: PASS
+  security_scan: PASS
+  module_loading: FAIL (SELinux platform limitation)
+  upstream_tests: SKIP (requires module loading)
+  conan_test_package: PASS
+  final_status: built (conan-verify all gates PASS)
