@@ -61,6 +61,11 @@ class RlwrapConan(ConanFile):
         tc.extra_ldflags.append("-static")
         # libptytty is not available; rlwrap has built-in PTY handling
         tc.configure_args.append("--without-libptytty")
+        # ncurses on OHOS is built with --enable-widec → libncursesw.a
+        # rlwrap configure checks tinfo/ncurses/termcap but not ncursesw;
+        # use cache variable to bypass tgetent search without polluting LIBS
+        # (which would break the basic "C compiler works" check)
+        tc.configure_args.append("ac_cv_search_tgetent=-lncursesw")
         # Add system library paths from DEFAULT_PREFIX (CI environment)
         # and ~/.harmonybrew (developer environment)
         for prefix in [os.environ.get("DEFAULT_PREFIX", ""), os.path.expanduser("~/.harmonybrew")]:
@@ -128,11 +133,6 @@ class RlwrapConan(ConanFile):
                     'export CXX="clang++"',
                     cb_content
                 )
-                modified = True
-            # Add LIBS for ncursesw (ncurses built with --enable-widec)
-            # rlwrap configure checks tinfo/ncurses/termcap but not ncursesw
-            if 'export LIBS=' not in cb_content:
-                cb_content += '\nexport LIBS="-lncursesw"\n'
                 modified = True
             if modified:
                 with open(fpath, 'w') as f:
