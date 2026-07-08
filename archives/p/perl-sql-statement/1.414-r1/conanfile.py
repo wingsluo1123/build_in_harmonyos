@@ -46,7 +46,6 @@ class PerlsqlstatementConan(ConanFile):
         self.cpp_info.libdirs = []
         # Set PERL5LIB so consumers can find the installed Perl modules
         perl_lib = os.path.join(self.package_folder, "data", "service", "hnp", "perl.org", "perl_5.42.0", "lib", "site_perl", "5.42.0")
-        self.cpp_info.includedirs.append(perl_lib)
         self.runenv_info.append_path("PERL5LIB", perl_lib)
         # HMDFS restricts .so loading from user dirs; Params::Util (XS dep) needs PP mode
         self.runenv_info.define("PERL_PARAMS_UTIL_PP", "1")
