@@ -1,0 +1,139 @@
+software: coturn
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/4.5.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.5.2"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-08"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://ghfast.top/https://github.com/coturn/coturn/archive/refs/tags/upstream/4.5.2.tar.gz"
+
+  # 源码校验和
+  sha256: "9c34be5aed9165e5c114334b63bce9f0022cc8692f9ffa27344150163a8f47be"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options:
+    - "--prefix=$DEFAULT_PREFIX"
+
+  # 编译依赖列表（格式: name/version）
+  # 所有依赖均为系统包（ohpcd remote 中尚无 Conan 包）
+  dependencies:
+    # openssl 1.1.1w/3.5.6 (cmd-pkgs system package)
+    # libevent 2.1.12 (cmd-pkgs system package)
+    # sqlite3 3.49.1 (cmd-pkgs system package)
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-configure.patch"
+  - "0002-src-client-ns_turn_msg.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "coturn 使用自定义 configure 脚本（非 autoconf），需要 self.run('sh ./configure') 而非 Autotools"
+  - "E002: 鸿蒙 /tmp 只读，configure 脚本需修改为使用 $TMPDIR 环境变量"
+  - "OpenSSL 3.x 移除了 FIPS_mode()，需要 OPENSSL_VERSION_NUMBER < 0x30000000L 版本守卫"
+  - "libevent 和 sqlite3 作为系统包（非 Conan 包），通过 system_libs 声明"
+  - "coturn configure 使用 pkg-config 查找依赖，需在 generate() 中设置 PKG_CONFIG_PATH"
+  - "E075: C_INCLUDE_PATH 会导致 pkg-config --cflags 返回空，需 unset"
+  - "OpenSSL/libevent/sqlite3 在 ohpcd remote 中尚无 Conan 包，只能作为系统包管理"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/coturn-4.5.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/coturn-4.5.2.work
+  source_orig_hash: 025a7ce402f29e0e
+  source_work_hash: 558c58fd384ca829
+  generated_at: '2026-07-08T18:27:51'
+  patches_count: 12
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-bin-turnadmin.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-bin-turnserver.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-bin-turnutils_natdiscovery.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-bin-turnutils_oauth.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-bin-turnutils_peer.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-bin-turnutils_rfc5769check.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-bin-turnutils_stunclient.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-bin-turnutils_uclient.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-sqlite-turndb.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-src-client-ns_turn_msg.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
