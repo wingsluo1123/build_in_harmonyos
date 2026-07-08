@@ -1,27 +1,98 @@
 software: tesseract
-version: 5.3.3
-category: OCR
-status: success
-compile_date: 2026-05-20
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/5.3.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
 
-configure_options:
-  - cmake build system
-  - --prefix=/storage/Users/currentUser/usr/local
+# ============================================================
+# 必须字段
+# ============================================================
 
+# 版本号
+version: "5.3.3"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-08"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.3.3.tar.gz"
+
+  # 源码校验和
+  sha256: "dc4329f85f41191b2d813b71b528ba6047745813474e583ccce8795ff2ff5681"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  build_system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_TRAINING_TOOLS=False"
+    - "-DGRAPHICS_DISABLED=True"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - leptonica/1.87.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
 patches_applied:
-  - 0001-simddetect.patch
+  - "patches/0001-simddetect.patch"
 
+# 补丁说明
 patches_description:
-  0001-simddetect.patch: "Fix SIMD detection for aarch64 platform - ensure NEON functions only enabled when HAVE_NEON is defined"
+  0001-simddetect.patch: "Fix aarch64 NEON SIMD detection: guard NEON code paths with HAVE_NEON macro to prevent link errors on OpenHarmony where HAVE_NEON is not defined at compile time"
 
-dependencies:
-  required:
-    - leptonica
+# ============================================================
+# 知识沉淀
+# ============================================================
 
+# 编译中学到的知识
 knowledge_gained:
-  - "Tesseract uses CMake build system on OpenHarmony"
-  - "SIMD detection needs HAVE_NEON check for proper NEON support"
+  - "Tesseract 使用 CMake 构建系统，源码自带 CMakeLists.txt"
+  - "aarch64 平台 SIMD 检测逻辑有误：原代码在 #if defined(__aarch64__) 时无条件启用 NEON，但 HAVE_NEON 未定义导致 NEON 函数链接错误"
+  - "修复方案：将 #if defined(__aarch64__) 改为 #if defined(HAVE_NEON) && defined(__aarch64__)，确保只在 HAVE_NEON 和 __aarch64__ 同时满足时启用 NEON"
+  - "训练工具（BUILD_TRAINING_TOOLS）依赖 pango/cairo，鸿蒙平台不可用，需禁用"
+  - "ScrollView 图形界面（GRAPHICS_DISABLED）在无头构建环境下需禁用"
+  - "tesseract 既有库（libtesseract）又有可执行文件（tesseract binary），package_info 中 cpp_info.libs 需声明 libtesseract"
 
-packaging:
-  - tesseract-5.3.3-ohos-aarch64.tar.gz
-  - tesseract-5.3.3-ohos-aarch64-debug.tar.gz
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tesseract-5.3.3.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tesseract-5.3.3.work
+  source_orig_hash: 00c4759e3a52b9f0
+  source_work_hash: b503595f804af452
+  generated_at: '2026-07-08T12:07:43'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-src-arch-simddetect.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
