@@ -121,6 +121,12 @@ class LibqalculateConan(ConanFile):
                 f.write(content)
             self.output.info("Patched configure: removed umask 077 for HMDFS")
 
+        # Ensure config.h.in exists (some tarballs ship without it)
+        config_h_in = os.path.join(src_dir, "config.h.in")
+        if not os.path.exists(config_h_in):
+            open(config_h_in, "w").close()
+            self.output.info("Created empty config.h.in")
+
         # Configure, build, install (static only to avoid polluting /lib)
         self.run(
             f'cd "{src_dir}" && '
@@ -143,6 +149,12 @@ class LibqalculateConan(ConanFile):
             "mpfr", "4.2.1",
             "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz",
             "mpfr.h",
+        )
+        self._ensure_system_dep(
+            "libxml2", "2.15.3",
+            "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+            "libxml/libxml.h",
+            "--without-python --without-lzma --without-zlib --without-icu",
         )
 
         apply_conandata_patches(self)
