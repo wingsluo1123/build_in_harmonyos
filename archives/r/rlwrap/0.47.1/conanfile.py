@@ -102,8 +102,8 @@ class RlwrapConan(ConanFile):
             # configure can find tgetent in shared libtinfo.so/libncursesw.so
             if "-static" in tc.extra_ldflags:
                 tc.extra_ldflags.remove("-static")
-            self.output.warn("No static ncurses library found; "
-                             "using dynamic linking for tinfo/ncurses")
+            self.output.warning("No static ncurses library found; "
+                                "using dynamic linking for tinfo/ncurses")
         tc.generate()
 
     def build(self):
