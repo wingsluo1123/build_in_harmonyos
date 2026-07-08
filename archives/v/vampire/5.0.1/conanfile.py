@@ -39,8 +39,10 @@ class VampireConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # E092: CMake doesn't recognize HarmonyOS, force Linux platform
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
-        tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+        # R32: settings.os 判断必须用 in ("Linux", "OHOS")
+        if self.settings.os in ("Linux", "OHOS"):
+            tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         # R26: Terminal tools must be statically linked
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
