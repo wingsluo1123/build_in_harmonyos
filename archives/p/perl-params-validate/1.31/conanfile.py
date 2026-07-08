@@ -152,9 +152,11 @@ WriteMakefile(
         )
 
         # 3b: Compile .c to .o
+        # Perl CORE headers define Off_t as off64_t, but musl/OHOS only
+        # provides off_t (already 64-bit on aarch64). Map off64_t→off_t.
         obj_file = os.path.join(self.source_folder, "lib", "Params", "Validate", "XS.o")
         self.run(
-            f'{cc} -c -I"{perl_inc}" -I"c" -I"{sys_inc}" '
+            f'{cc} -c -Doff64_t=off_t -I"{perl_inc}" -I"c" -I"{sys_inc}" '
             f'{ccflags} {optimize} {cccdlflags} -o "{obj_file}" "{c_file}"',
             cwd=self.source_folder
         )
