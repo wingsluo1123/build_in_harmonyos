@@ -43,6 +43,11 @@ class QtshadertoolsConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["QT_QMAKE_TARGET_MKSPEC"] = "harmonyos-clang"
+        # Forward system CMAKE_PREFIX_PATH for Qt6 discovery
+        # (Conan toolchain may not forward env var when no Conan deps declared)
+        tc.cache_variables["CMAKE_PREFIX_PATH"] = os.environ.get(
+            "CMAKE_PREFIX_PATH", "/storage/Users/currentUser/usr/local"
+        )
         tc.generate()
 
     def build(self):
