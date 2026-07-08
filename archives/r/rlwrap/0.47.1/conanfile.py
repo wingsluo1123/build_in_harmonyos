@@ -61,13 +61,17 @@ class RlwrapConan(ConanFile):
         tc.extra_ldflags.append("-static")
         # libptytty is not available; rlwrap has built-in PTY handling
         tc.configure_args.append("--without-libptytty")
-        # Add harmonybrew include/lib paths using expanduser (portable, not hardcoded)
-        homebrew_inc = os.path.expanduser("~/.harmonybrew/include")
-        homebrew_lib = os.path.expanduser("~/.harmonybrew/lib")
-        if os.path.exists(homebrew_inc):
-            tc.extra_cflags.append(f"-I{homebrew_inc}")
-        if os.path.exists(homebrew_lib):
-            tc.extra_ldflags.insert(0, f"-L{homebrew_lib}")
+        # Add system library paths from DEFAULT_PREFIX (CI environment)
+        # and ~/.harmonybrew (developer environment)
+        for prefix in [os.environ.get("DEFAULT_PREFIX", ""), os.path.expanduser("~/.harmonybrew")]:
+            if not prefix:
+                continue
+            inc = os.path.join(prefix, "include")
+            lib = os.path.join(prefix, "lib")
+            if os.path.exists(inc):
+                tc.extra_cflags.append(f"-I{inc}")
+            if os.path.exists(lib):
+                tc.extra_ldflags.insert(0, f"-L{lib}")
         tc.generate()
 
     def build(self):
@@ -124,6 +128,11 @@ class RlwrapConan(ConanFile):
                     'export CXX="clang++"',
                     cb_content
                 )
+                modified = True
+            # Add LIBS for ncursesw (ncurses built with --enable-widec)
+            # rlwrap configure checks tinfo/ncurses/termcap but not ncursesw
+            if 'export LIBS=' not in cb_content:
+                cb_content += '\nexport LIBS="-lncursesw"\n'
                 modified = True
             if modified:
                 with open(fpath, 'w') as f:
