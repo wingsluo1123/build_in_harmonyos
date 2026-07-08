@@ -9,7 +9,6 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.env import Environment
 from conan.tools.layout import basic_layout
 
 
@@ -37,16 +36,11 @@ class ZarithConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
-        env = Environment(self)
-        # GMP is pre-installed at system prefix
-        env.define("CFLAGS", "-I/storage/Users/currentUser/usr/local/include")
-        env.define("LDFLAGS", "-L/storage/Users/currentUser/usr/local/lib")
-        env.define("CC", "clang")
-        env.generate()
-
     def build(self):
         apply_conandata_patches(self)
+        # GMP is pre-installed at system prefix; set env vars for configure
+        os.environ["CFLAGS"] = os.environ.get("CFLAGS", "") + " -I/storage/Users/currentUser/usr/local/include"
+        os.environ["LDFLAGS"] = os.environ.get("LDFLAGS", "") + " -L/storage/Users/currentUser/usr/local/lib"
         # ZArith uses a custom configure script (not standard autotools)
         # The configure script takes -installdir, not --prefix
         install_dir = os.path.join(self.package_folder, "lib", "ocaml")
