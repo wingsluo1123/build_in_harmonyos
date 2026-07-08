@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Conan recipe for zix — Meson-based C utility library."""
+import os
+
+from conan import ConanFile
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.meson import Meson, MesonToolchain
+from conan.tools.layout import basic_layout
+
+
+class ZixConan(ConanFile):
+    name = "zix"
+    version = "0.8.1-git"
+    description = "Basic utility library - lightweight C library providing common data structures and utilities"
+    license = "ISC"
+    homepage = "https://drobilla.net/software/zix"
+    url = ""  # CI fills this
+
+    settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        pass
+
+    def layout(self):
+        basic_layout(self)
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+
+    def generate(self):
+        tc = MesonToolchain(self)
+        tc.project_options["default_library"] = "static"
+        tc.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
+        meson = Meson(self)
+        meson.configure()
+        meson.build()
+
+    def package(self):
+        meson = Meson(self)
+        meson.install()
+
+    def package_info(self):
+        self.cpp_info.set_property("pkg_config_name", "zix-0")
+        self.cpp_info.libs = ["zix-0"]
+        self.cpp_info.includedirs = ["include/zix-0"]
