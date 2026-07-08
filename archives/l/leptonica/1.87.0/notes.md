@@ -4,37 +4,37 @@
 - 构建系统: cmake（因autogen.sh失败，libtoolize脚本shebang路径问题）
 - 编译日期: 2026-05-27
 - 编译器: clang 15.0.4 / clang++
-- 状态: built
+- 状态: published
 
 ## 编译步骤
 
 1. **源码下载**: 从GitHub下载 leptonica 1.87.0
    - URL: https://github.com/DanBloomberg/leptonica/archive/refs/tags/1.87.0.tar.gz
-   
-2. **构建系统选择**: 
+
+2. **构建系统选择**:
    - autogen.sh失败（libtoolize shebang路径错误，期望bash在/storage/Users/currentUser/usr/local/bin/bash，实际在/data/service/hnp/bin/bash）
    - 改用cmake构建系统
-   
-3. **cmake配置**: 
+
+3. **cmake配置**:
    ```bash
    cmake .. -DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local -DCMAKE_BUILD_TYPE=Release
    ```
    - 找到的依赖：ZLIB 1.3.1, PNG 1.6.39, JPEG 62, TIFF 4.7.1, OpenJPEG 2.5.2
    - 未找到：GIF, WebP（可选依赖）
    - BUILD_PROG: OFF（未编译测试程序）
-   
-4. **编译**: 
+
+4. **编译**:
    ```bash
    make -j$(nproc)
    ```
    - 编译成功，生成静态库 libleptonica.a (4.8M)
-   
-5. **Staging安装**: 
+
+5. **Staging安装**:
    ```bash
    make install DESTDIR=/storage/Users/currentUser/tmp/test-install-leptonica-1.87.0
    ```
-   
-6. **本地安装**: 
+
+6. **本地安装**:
    ```bash
    make install
    ```
@@ -99,4 +99,4 @@ file /storage/Users/currentUser/usr/local/lib/libleptonica.a
 ---
 
 **编译结束**: 2026-07-08 11:17
-**最终状态**: built
+**最终状态**: published
