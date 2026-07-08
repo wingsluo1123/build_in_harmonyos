@@ -1,0 +1,59 @@
+software: libkeccak
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/1.4.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.4.3"
+status: published
+build_date: "2026-07-08"
+conan_ref: "libkeccak/1.4.3@ohpcd/stable"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://api.github.com/repos/maandree/libkeccak/tarball/refs/tags/1.4.3"
+  sha256: "199db569dbd11c635c7d8e17ba3df448b5b9431e91b60b6f10df299f57580efe"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型: plain Makefile (no configure script)
+  system: makefile
+
+  # 配置选项列表 (make 变量覆盖)
+  configure_options:
+    - "CC=clang"
+    - "CFLAGS=-fPIC -O2"
+    - "CPPFLAGS=-D_DEFAULT_SOURCE -D_BSD_SOURCE -D_XOPEN_SOURCE=700"
+
+  # 编译依赖列表
+  dependencies: []
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libkeccak 使用纯 Makefile 构建系统，非 autotools"
+  - "config.mk 中 CC=c99 需通过 make 命令行变量覆盖为 clang"
+  - "clang 不支持 __optimize__('-O0') 属性，仅产生警告不影响编译"
+  - "install target 使用 DESTDIR+PREFIX 模式，PREFIX= 空值可将文件安装到 DESTDIR 根目录"
+  - "make check 全部通过，SHA3-256/Keccak/SHAKE/cSHAKE/HMAC 测试均 OK"
