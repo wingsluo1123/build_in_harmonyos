@@ -15,7 +15,7 @@ import os
 import re
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -39,7 +39,37 @@ class PerlparamsutilConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        import hashlib
+        import tarfile
+
+        sources = self.conan_data["sources"]
+        url = sources["url"]
+        expected_sha256 = sources["sha256"]
+        filename = url.split("/")[-1]
+
+        # Download using curl — Python's urllib lacks SSL on CI
+        tarball = os.path.join(self.source_folder, filename)
+        self.run(f'curl -sL "{url}" -o "{tarball}"')
+
+        # Verify SHA256
+        h = hashlib.sha256()
+        with open(tarball, "rb") as f:
+            h.update(f.read())
+        if h.hexdigest() != expected_sha256:
+            raise Exception(f"SHA256 mismatch: expected {expected_sha256}, got {h.hexdigest()}")
+
+        # Extract with strip_root (remove top-level directory)
+        with tarfile.open(tarball, "r:*") as tar:
+            members = tar.getmembers()
+            top = members[0].name.split("/")[0]
+            for m in members:
+                if m.name == top:
+                    continue
+                m.name = m.name[len(top) + 1:]
+                tar.extract(m, self.source_folder)
+
+        # Clean up tarball
+        os.remove(tarball)
 
     def build(self):
         # Apply conandata patches (if any)
