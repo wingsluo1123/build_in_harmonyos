@@ -1,19 +1,23 @@
 from conan import ConanFile
 from conan.tools.build import can_run
-
-import os
-
-
-import shutil
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class GmpTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
         if can_run(self):
-            # Test that gmp is available by running a simple test
-            self.run("echo 'gmp test passed'", env="conanrun")
+            self.run("test_gmp", env="conanrun")
