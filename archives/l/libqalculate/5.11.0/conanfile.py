@@ -80,8 +80,34 @@ class LibqalculateConan(ConanFile):
         os.makedirs(tmpdir, exist_ok=True)
         build_dir = tempfile.mkdtemp(prefix=f"{name}-build-", dir=tmpdir)
 
-        # Download and extract
-        self.run(f'wget -O - "{url}" | tar xJ -C "{build_dir}"', env="conanbuild")
+        # Download and extract — try mirror fallback for GitHub URLs
+        # (OHOS wget may fail with "response header too large" on GitHub CDN)
+        if "github.com" in url:
+            mirrors = [
+                f"https://gh-proxy.com/{url}",
+                f"https://mirror.ghproxy.com/{url}",
+                f"https://ghproxy.com/{url}",
+                url.replace("https://github.com", "https://kkgithub.com"),
+                url,
+            ]
+        else:
+            mirrors = [url]
+
+        downloaded = False
+        for mirror_url in mirrors:
+            try:
+                self.run(
+                    f'wget -O - "{mirror_url}" | tar xJ -C "{build_dir}"',
+                    env="conanbuild",
+                )
+                downloaded = True
+                self.output.info(f"Downloaded {name} from {mirror_url}")
+                break
+            except Exception:
+                self.output.info(f"Download failed from {mirror_url}, trying next...")
+        if not downloaded:
+            raise Exception(f"Failed to download {name} from all mirrors")
+
         src_dir = os.path.join(build_dir, f"{name}-{version}")
 
         # Patch config.guess / configfsf.guess for HarmonyOS platform detection
