@@ -40,11 +40,35 @@ class PerlSqlAbstractPgConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Perl EUMM build: perl Makefile.PL && make
-        # No conan dependencies declared (perl-sql-abstract not yet published
-        # to @ohpcd/stable); SQL::Abstract must be pre-installed in system Perl.
-        subprocess.run(["perl", "Makefile.PL"], cwd=self.source_folder, check=True)
-        subprocess.run(["make", "-j1"], cwd=self.source_folder, check=True)
+
+        # Install SQL::Abstract prerequisite (not yet published to @ohpcd/stable)
+        # Download from CPAN, build and install to DEFAULT_PREFIX/lib/perl5
+        default_prefix = os.environ.get("DEFAULT_PREFIX", "/usr/local")
+        perl5_lib = os.path.join(default_prefix, "lib", "perl5")
+        env = os.environ.copy()
+        env["PERL5LIB"] = perl5_lib + (":" + env["PERL5LIB"] if env.get("PERL5LIB") else "")
+
+        deps_dir = os.path.join(self.build_folder, "sql_abstract_dep")
+        os.makedirs(deps_dir, exist_ok=True)
+        dep_tarball = os.path.join(deps_dir, "SQL-Abstract-2.000001.tar.gz")
+        subprocess.run(
+            ["curl", "-sL",
+             "https://cpan.metacpan.org/authors/id/M/MS/MSTROUT/SQL-Abstract-2.000001.tar.gz",
+             "-o", dep_tarball],
+            check=True,
+        )
+        subprocess.run(["tar", "xzf", dep_tarball], cwd=deps_dir, check=True)
+        dep_src = os.path.join(deps_dir, "SQL-Abstract-2.000001")
+        subprocess.run(
+            ["perl", "Makefile.PL", f"INSTALL_BASE={default_prefix}"],
+            cwd=dep_src, env=env, check=True,
+        )
+        subprocess.run(["make", "-j1"], cwd=dep_src, env=env, check=True)
+        subprocess.run(["make", "install"], cwd=dep_src, env=env, check=True)
+
+        # Build SQL::Abstract::Pg
+        subprocess.run(["perl", "Makefile.PL"], cwd=self.source_folder, env=env, check=True)
+        subprocess.run(["make", "-j1"], cwd=self.source_folder, env=env, check=True)
 
     def package(self):
         subprocess.run(
