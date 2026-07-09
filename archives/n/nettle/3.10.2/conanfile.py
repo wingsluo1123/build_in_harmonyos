@@ -36,8 +36,7 @@ class NettleConan(ConanFile):
         # Set CONFIG_SHELL to use correct bash for HarmonyOS
         import shutil
         bash_path = shutil.which("bash") or "/bin/bash"
-        tc.update_definitions({"CONFIG_SHELL": bash_path})
-        # Also set SHELL for configure
+        # Use environment variables for configure
         env = tc.environment()
         env.define("CONFIG_SHELL", bash_path)
         env.define("SHELL", bash_path)
