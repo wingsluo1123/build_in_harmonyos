@@ -16,7 +16,7 @@ class JiratuiConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     def source(self):
-        get(self, **self.conan_data["sources"])
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         install_prefix = os.path.join(self.build_folder, "staging")
