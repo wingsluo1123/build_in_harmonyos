@@ -178,7 +178,7 @@ class LibqalculateConan(ConanFile):
         )
         self._ensure_system_dep(
             "libxml2", "2.15.3",
-            "https://github.com/GNOME/libxml2/releases/download/v2.15.3/libxml2-2.15.3.tar.xz",
+            "https://www.xmlsoft.org/sources/libxml2-2.15.3.tar.xz",
             "libxml/libxml.h",
             "--without-python --without-lzma --without-zlib --without-icu",
         )
