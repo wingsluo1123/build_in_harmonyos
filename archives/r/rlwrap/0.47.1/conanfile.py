@@ -93,6 +93,10 @@ class RlwrapConan(ConanFile):
             )
         tc.extra_ldflags.insert(0, f"-L{stub_dir}")
         self.output.info(f"Prepared tinfo stub source at {stub_c}")
+        # Reserve paths for locally-built readline (built in build() before configure)
+        readline_prefix = os.path.join(self.build_folder, "readline_install")
+        tc.extra_cflags.append(f"-I{readline_prefix}/include")
+        tc.extra_ldflags.insert(0, f"-L{readline_prefix}/lib")
         tc.generate()
 
     def build(self):
@@ -166,6 +170,42 @@ class RlwrapConan(ConanFile):
         self.run(f'{cc} -c -fPIC -O2 -o {stub_o} {stub_c}')
         self.run(f'{ar} rcs {stub_a} {stub_o}')
         self.output.info(f"Built stub libtinfo.a at {stub_a}")
+
+        # Build readline from source (system libreadline not accessible to CI worker)
+        readline_prefix = os.path.join(self.build_folder, "readline_install")
+        readline_src = os.path.join(self.build_folder, "readline-8.2")
+        if not os.path.exists(readline_src):
+            self.output.info("Downloading readline 8.2 source...")
+            get(self, "https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz",
+                destination=self.build_folder)
+        # Copy patched config.guess/config.sub from rlwrap source
+        import shutil
+        for fn in ("config.guess", "config.sub"):
+            src_f = os.path.join(self.source_folder, "tools", fn)
+            if os.path.exists(src_f):
+                support_dir = os.path.join(readline_src, "support")
+                os.makedirs(support_dir, exist_ok=True)
+                shutil.copy2(src_f, os.path.join(support_dir, fn))
+                os.chmod(os.path.join(support_dir, fn), 0o755)
+        # Patch readline configure: umask 077 -> 022, CONFIG_SHELL fix
+        rl_conf = os.path.join(readline_src, "configure")
+        if os.path.exists(rl_conf):
+            with open(rl_conf, 'r') as f:
+                c = f.read()
+            c = c.replace('umask 077', 'umask 022')
+            c = c.replace('$CONFIG_SHELL', '/bin/sh')
+            with open(rl_conf, 'w') as f:
+                f.write(c)
+            self.output.info("Patched readline configure")
+        # Configure, build, install readline with stub tinfo
+        self.run(
+            f'./configure --prefix={readline_prefix} --disable-shared '
+            f'CC={cc} CFLAGS="-fPIC -O2" LDFLAGS="-L{stub_dir}"',
+            cwd=readline_src
+        )
+        self.run('make -j$(nproc)', cwd=readline_src)
+        self.run('make install', cwd=readline_src)
+        self.output.info(f"Installed readline to {readline_prefix}")
 
         # Use Conan Autotools toolchain (no hardcoded env overrides)
         autotools = Autotools(self)
