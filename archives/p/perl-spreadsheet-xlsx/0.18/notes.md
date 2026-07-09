@@ -131,21 +131,26 @@ CI L0e 门禁要求 `test_package/MANIFEST.yml` 存在，用于声明上游测�
 | L4 | 安全扫描 | ✅ PASS |
 | L5 | 产物基线 | ✅ PASS |
 
-### CI L0d 修复: self.run() 要求 (2026-07-03)
+### CI L0c+L0d 修复: 测试源文件 + self.run() 要求 (2026-07-09)
 
-CI 脚本 `build_and_test.sh` 的 L0d 门禁要求 test_package/conanfile.py 的 test() 方法中必须包含 `self.run()` 调用。
+CI 脚本 `build_and_test.sh` 的 L0c 门禁要求 test_package/ 下必须存在测试源文件（.c/.cpp/.cc/.cxx/.sh/.py），L0d 门禁要求 test_package/conanfile.py 的 test() 方法中必须包含 `self.run()` 调用。
 
-**问题**: 原 test_package 使用 `subprocess.run()` 直接执行 Perl 测试脚本，CI L0d 检查 `grep "self\.run"` 不匹配。
+**问题1 (L0c)**: test_package/ 下仅有 conanfile.py 和 MANIFEST.yml，无测试源文件，CI L0c 检查 `find` 不匹配。
+**问题2 (L0d)**: 原 test_package 使用 `subprocess.run()` 直接执行 Perl 测试脚本，CI L0d 检查 `grep "self\.run"` 不匹配。
+**问题3 (R33)**: 原 test_package 使用 `os.environ["PERL5LIB"] = perl5lib` 直接修改全局环境变量，违反 R33 规范。
+**问题4 (P2)**: 原 test_package 硬编码 perl 路径 `/data/service/hnp/bin/perl` 和系统 Perl 库路径。
+
 **修复**:
-1. 将 Perl 测试脚本写入临时 .pl 文件（避免 shell 转义问题）
-2. 使用 `self.run()` 执行 perl 命令
-3. 通过 `os.environ["PERL5LIB"]` 设置环境变量（`self.run()` 的 env 参数需要 list 格式，直接设 os.environ 更简洁）
-4. 测试完成后清理临时文件
+1. 创建 `test_spreadsheet_xlsx.sh` 测试脚本，包含完整的 smoke test 逻辑
+2. 脚本内通过 `command -v perl` 动态发现 Perl 解释器路径（R33 合规）
+3. 脚本内通过 `perl -e 'print join(":", @INC)'` 动态发现系统 Perl 库路径（无硬编码）
+4. PERL5LIB 在 shell 子进程中 `export` 设置，不污染 Python 全局环境（R33 合规）
+5. conanfile.py 简化为调用 `self.run(f'sh "{test_script}" "{pkg_folder}"')`，满足 L0d
 
 ### CI 模拟结果 (W3)
 
 ```
-L0_RESULT=pass: all checks passed
+L0_RESULT=pass: all checks passed (L0c: test_spreadsheet_xlsx.sh found)
 L1_RESULT=pass: test_package executed
 L2_RESULT=skip: no bin/ dir
 L4_RESULT=pass: patches clean

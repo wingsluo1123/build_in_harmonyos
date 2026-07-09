@@ -38,7 +38,7 @@ Spreadsheet::XLSX 是一个纯 Perl 模块，用于读取 Microsoft Excel 2007 (
 
 通过 Conan 安装：
 ```bash
-conan install --requires=perl-spreadsheet-xlsx/0.18@ohpcd/stable
+conan install --requires=perl-spreadsheet-xlsx/0.18
 ```
 
 安装后，设置 PERL5LIB 环境变量指向模块路径：
