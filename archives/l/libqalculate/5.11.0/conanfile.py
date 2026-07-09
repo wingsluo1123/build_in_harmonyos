@@ -58,7 +58,7 @@ class LibqalculateConan(ConanFile):
         tc.configure_args.append(f"CPPFLAGS=-I{sys_prefix}/include")
         tc.generate()
 
-    def _ensure_system_dep(self, name, version, url, header, configure_extra=""):
+    def _ensure_system_dep(self, name, version, url, header, configure_extra="", fallback_url=None):
         """Build and install a system dependency from source if not present.
 
         GMP and MPFR are not Conan packages in the ohpcd registry and may not
@@ -80,21 +80,28 @@ class LibqalculateConan(ConanFile):
         os.makedirs(tmpdir, exist_ok=True)
         build_dir = tempfile.mkdtemp(prefix=f"{name}-build-", dir=tmpdir)
 
-        # Download and extract — try mirror fallback for GitHub URLs
-        # (OHOS wget may fail with "response header too large" on GitHub CDN)
-        if "github.com" in url:
-            mirrors = [
+        # Download and extract — try multiple sources with fallback
+        # Primary URL first, then GitHub mirrors (if fallback_url is set)
+        urls_to_try = [url]
+        if fallback_url and "github.com" in fallback_url:
+            urls_to_try.extend([
+                f"https://gh-proxy.com/{fallback_url}",
+                f"https://mirror.ghproxy.com/{fallback_url}",
+                f"https://ghproxy.com/{fallback_url}",
+                fallback_url.replace("https://github.com", "https://kkgithub.com"),
+                fallback_url,
+            ])
+        elif "github.com" in url:
+            urls_to_try = [
                 f"https://gh-proxy.com/{url}",
                 f"https://mirror.ghproxy.com/{url}",
                 f"https://ghproxy.com/{url}",
                 url.replace("https://github.com", "https://kkgithub.com"),
                 url,
             ]
-        else:
-            mirrors = [url]
 
         downloaded = False
-        for mirror_url in mirrors:
+        for mirror_url in urls_to_try:
             try:
                 self.run(
                     f'wget -O - "{mirror_url}" | tar xJ -C "{build_dir}"',
@@ -106,7 +113,7 @@ class LibqalculateConan(ConanFile):
             except Exception:
                 self.output.info(f"Download failed from {mirror_url}, trying next...")
         if not downloaded:
-            raise Exception(f"Failed to download {name} from all mirrors")
+            raise Exception(f"Failed to download {name} from all sources")
 
         src_dir = os.path.join(build_dir, f"{name}-{version}")
 
@@ -178,9 +185,10 @@ class LibqalculateConan(ConanFile):
         )
         self._ensure_system_dep(
             "libxml2", "2.15.3",
-            "https://www.xmlsoft.org/sources/libxml2-2.15.3.tar.xz",
+            "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
             "libxml/libxml.h",
             "--without-python --without-lzma --without-zlib --without-icu",
+            fallback_url="https://github.com/GNOME/libxml2/releases/download/v2.15.3/libxml2-2.15.3.tar.xz",
         )
 
         apply_conandata_patches(self)
