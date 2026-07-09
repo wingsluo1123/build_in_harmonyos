@@ -13,7 +13,7 @@ Crypt::Eksblowfish — Eksblowfish block cipher and bcrypt hashing for Perl.
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 0.009-r15 | built | 2026-07-03 | 首次编译成功，2026-07-07 完善归档 |
+| 0.009-r15 | built | 2026-07-03 | 首次编译成功，2026-07-09 CI 修复 (Module::Build→ExtUtils::MakeMaker) |
 
 ## 功能模块
 

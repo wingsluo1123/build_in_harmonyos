@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Conan recipe — Crypt::Eksblowfish (Perl XS module with Module::Build).
+"""Conan recipe — Crypt::Eksblowfish (Perl XS module with ExtUtils::MakeMaker).
 
 Crypt::Eksblowfish implements the Eksblowfish block cipher (used by bcrypt).
-This is a Perl XS module built with Module::Build (Build.PL), containing
+This is a Perl XS module built with ExtUtils::MakeMaker (Makefile.PL), containing
 compiled C code (Eksblowfish.xs → Eksblowfish.so).
 
-Build system: Perl Module::Build (Build.PL)
+Build system: Perl ExtUtils::MakeMaker (Makefile.PL)
 The .so is loaded by Perl's XSLoader/DynaLoader at runtime.
 
 Adaptations for OHOS:
 - CPATH/LIBRARY_PATH set to OHOS SDK sysroot for musl headers
 - PERL5LIB set to user-installed Perl module path
-- Build.PL patched to remove -fstack-protector-strong from ldflags (ld.lld unsupported)
+- Makefile.PL patched to replace Module::Build passthrough with standalone
+  ExtUtils::MakeMaker version; cleans -fstack-protector-strong from ldflags (E137)
 - R32: settings.os check uses `in ("Linux", "OHOS")`
 - R33: build environment via Conan buildenv_info, not raw os.environ
 """
@@ -86,50 +87,32 @@ class PerlCryptEksblowfishConan(ConanFile):
         sysroot = self._resolve_sysroot()
         perl_lib = self._resolve_perl_lib()
 
+        # R33: use buildenv_info exclusively, no raw os.environ writes
         # CPATH: OHOS SDK sysroot headers
         cpath = os.path.join(sysroot, "usr", "include")
-        os.environ["CPATH"] = cpath
         self.buildenv_info.define("CPATH", cpath)
 
         # LIBRARY_PATH: sysroot libs
         lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
-        os.environ["LIBRARY_PATH"] = lib_path
         self.buildenv_info.define("LIBRARY_PATH", lib_path)
 
         # PERL5LIB: Perl module path
         if perl_lib:
-            os.environ["PERL5LIB"] = perl_lib
             self.buildenv_info.define("PERL5LIB", perl_lib)
 
-    def _setup_build_env(self):
-        """Set build environment variables (called from build())."""
-        sysroot = self._resolve_sysroot()
-        perl_lib = self._resolve_perl_lib()
-
-        cpath = os.path.join(sysroot, "usr", "include")
-        lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
-
-        os.environ["CPATH"] = cpath
-        os.environ["LIBRARY_PATH"] = lib_path
-        if perl_lib:
-            os.environ["PERL5LIB"] = perl_lib
-
     def build(self):
-        # Apply patches (Build.PL ldflags fix)
+        # Apply patches (Makefile.PL: replace Module::Build passthrough with ExtUtils::MakeMaker)
         apply_conandata_patches(self)
 
         # R32: platform check
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
-        # Ensure environment is set (may not persist from generate())
-        self._setup_build_env()
+        # Step 1: Generate Makefile using ExtUtils::MakeMaker (Makefile.PL patch handles ldflags cleanup)
+        self.run("perl Makefile.PL", cwd=self.source_folder)
 
-        # Step 1: Generate Build script using Module::Build
-        self.run("perl Build.PL", cwd=self.source_folder)
-
-        # Step 2: Build (Build.PL patch handles ldflags cleanup)
-        self.run("perl Build", cwd=self.source_folder)
+        # Step 2: Build (Makefile.PL patch cleans -fstack-protector-strong from Config)
+        self.run("make", cwd=self.source_folder)
 
     def package(self):
         # Copy built artifacts from blib to package folder in standard layout
