@@ -3,6 +3,6 @@
 #include <nettle/version.h>
 
 int main() {
-    printf("Nettle version: %s\\n", nettle_version_string());
+    printf("Nettle version: %s\n", nettle_version_string());
     return 0;
 }
