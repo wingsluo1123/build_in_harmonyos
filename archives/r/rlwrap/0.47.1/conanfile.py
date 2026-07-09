@@ -56,9 +56,8 @@ class RlwrapConan(ConanFile):
         wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
 
         tc = AutotoolsToolchain(self)
-        # R26: System same-name libraries must not dynamically link to avoid
-        # polluting /lib and /lib64. Static linking for terminal tools.
-        tc.extra_ldflags.append("-static")
+        # Static linking disabled: libc.a not accessible to CI worker
+        # (file permissions). Dynamic linking uses libreadline.so (accessible).
         # libptytty is not available; rlwrap has built-in PTY handling
         tc.configure_args.append("--without-libptytty")
         # Add system library paths from DEFAULT_PREFIX (CI environment)
