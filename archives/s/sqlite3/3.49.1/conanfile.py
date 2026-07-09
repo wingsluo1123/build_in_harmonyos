@@ -70,7 +70,7 @@ class Sqlite3Conan(ConanFile):
 
         # Build static library
         self.run(f"{cc} {' '.join(cflags)} -c sqlite3.c -o sqlite3.o")
-        self.run("llvm-ar rcs libsqlite3.a sqlite3.o")
+        self.run(f"{ar} rcs libsqlite3.a sqlite3.o")
 
         # Build CLI binary
         self.run(f"{cc} {' '.join(cflags)} -o sqlite3 shell.c sqlite3.c {' '.join(libs)}")
