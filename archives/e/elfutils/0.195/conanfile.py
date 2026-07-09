@@ -162,6 +162,9 @@ class ElfutilsConan(ConanFile):
             f'CONFIG_SHELL=/bin/sh SHELL=/bin/sh '
             f'TMPDIR={os.environ.get("TMPDIR", "$HOME/tmp")} '
             'GREP=/bin/grep EGREP="/bin/grep -E" '
+            'ac_cv_search_argp_parse="-largp -lobstack -lintl" '
+            'ac_cv_search_fts_close=-lfts '
+            'ac_cv_search__obstack_free=-lobstack '
             f'./configure {configure_args} || true'
         )
 
@@ -189,4 +192,4 @@ class ElfutilsConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["elf", "dw", "asm"]
-        self.cpp_info.system_libs = ["z", "argp", "obstack"]
+        self.cpp_info.system_libs = ["z", "argp", "obstack", "fts", "intl"]
