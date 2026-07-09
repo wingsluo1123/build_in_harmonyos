@@ -22,13 +22,11 @@ class JiratuiConan(ConanFile):
         install_prefix = os.path.join(self.build_folder, "staging")
         os.makedirs(install_prefix, exist_ok=True)
 
-        pip_cmd = [
-            sys.executable, "-m", "pip", "install",
-            "--target", install_prefix,
-            "--no-deps",
-            "."
-        ]
-        self.run(" ".join(pip_cmd), cwd=self.source_folder)
+        # jiratui 是纯 Python 包，直接安装预编译 wheel（py3-none-any）
+        # 不从 sdist 构建，避免触发 uv_build -> maturin -> rust 构建链
+        self.run(
+            f'{sys.executable} -m pip install --target {install_prefix} --no-deps jiratui==1.10.1'
+        )
 
         deps = [
             "click>=8.4.2,<9.0.0",
