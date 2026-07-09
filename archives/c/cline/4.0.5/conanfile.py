@@ -128,16 +128,19 @@ class ClineConan(ConanFile):
 
         src_dir = self.source_folder
 
+        # Find npm/node — conanrun env doesn't include system PATH on OHOS
+        npm = shutil.which("npm") or "/data/service/hnp/bin/npm"
+        node = shutil.which("node") or "/data/service/hnp/bin/node"
+
         # Step 1: Convert workspace:* protocol to * for npm compatibility
         self.run(
             f'cd "{src_dir}" && '
             f'find . -name "package.json" -not -path "*/node_modules/*" '
-            f"-exec sed -i 's/\"workspace:\\*\"/\"\\*\"/g' {{}} \\;",
-            env="conanrun",
+            f"-exec sed -i 's/\"workspace:\\*\"/\"\\*\"/g' {{}} \\;"
         )
 
         # Step 2: Install npm dependencies (force to bypass platform checks)
-        self.run(f'cd "{src_dir}" && npm install --force', env="conanrun")
+        self.run(f'cd "{src_dir}" && "{npm}" install --force')
 
         # Step 3: Write the esbuild build script (replaces Bun.build())
         build_script_path = os.path.join(src_dir, "build-with-esbuild.mjs")
@@ -145,7 +148,7 @@ class ClineConan(ConanFile):
             f.write(BUILD_SCRIPT)
 
         # Step 4: Build all packages using esbuild
-        self.run(f'cd "{src_dir}" && node build-with-esbuild.mjs', env="conanrun")
+        self.run(f'cd "{src_dir}" && "{node}" build-with-esbuild.mjs')
 
     def package(self):
         src_dir = self.source_folder
