@@ -19,15 +19,53 @@ REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 echo "[step] Conan environment setup..."
 
+# ── 0. Check Python sqlite3 module (CI environment dependency) ──
+# HNP Python environment may have broken sqlite3 (missing libsqlite3.so.0)
+# This will cause conan to fail at startup. Detect and try to fix.
+if ! python3 -c "import sqlite3" 2>/dev/null; then
+    echo "[warn] Python sqlite3 module broken (missing libsqlite3.so.0)"
+    echo "[step] Attempting to fix sqlite3 dependency..."
+    
+    # Try installing libsqlite3 using system package manager (if available)
+    # OpenHarmony/HarmonyOS may use different package managers
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y -qq libsqlite3-0 || true
+    elif command -v yum &>/dev/null; then
+        yum install -y -q sqlite-libs || true
+    elif command -v dnf &>/dev/null; then
+        dnf install -y -q sqlite-libs || true
+    elif command -v opkg &>/dev/null; then
+        opkg update && opkg install sqlite3 || true
+    elif command -v pkg &>/dev/null; then
+        pkg install -y sqlite3 || true
+    fi
+    
+    # Re-check after attempting fix
+    if ! python3 -c "import sqlite3" 2>/dev/null; then
+        echo "[error] Failed to fix sqlite3 module - environment issue"
+        echo "[error] Please contact CI maintainers to fix HNP Python environment"
+        echo "[hint] Missing: libsqlite3.so.0"
+        exit 1
+    fi
+    echo "[step] sqlite3 dependency fixed ✅"
+fi
+
 # ── 1. Detect/install Conan ──
-if ! command -v conan &>/dev/null; then
-    echo "[step] Conan not found, installing..."
+# Check both that conan exists AND is functional (conan --version succeeds)
+# If conan binary exists but is broken, force-reinstall to fix
+if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
+    echo "[step] Conan not found or broken, (re)installing..."
     # 安装 OHOS 适配版 conan（私有 PyPI 提供，基线 2.29.1，已适配 OHOS 平台）
     # 不要钉死官方旧版本号，应从配置的 PyPI 源安装最新适配版
-    pip3 install conan || {
+    # Use python3 -m pip to bypass potentially broken pip3 shebang
+    # (HNP pip3/conan binaries may have shebangs pointing to non-existent
+    #  build-machine paths with ^M line endings)
+    python3 -m pip install --user --force-reinstall conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
+    # Ensure user-installed binaries are found before any broken HNP version
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
