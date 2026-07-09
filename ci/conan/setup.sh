@@ -19,10 +19,38 @@ REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 echo "[step] Conan environment setup..."
 
-# ── 1. Detect/install Conan ──
-# pip3 可能装到 ~/.local/bin, 确保在 PATH 上
-export PATH="$HOME/.local/bin:$PATH"
+# ── 0. Check Python sqlite3 module (CI environment dependency) ──
+# HNP Python environment may have broken sqlite3 (missing libsqlite3.so.0)
+# This will cause conan to fail at startup. Detect and try to fix.
+if ! python3 -c "import sqlite3" 2>/dev/null; then
+    echo "[warn] Python sqlite3 module broken (missing libsqlite3.so.0)"
+    echo "[step] Attempting to fix sqlite3 dependency..."
+    
+    # Try installing libsqlite3 using system package manager (if available)
+    # OpenHarmony/HarmonyOS may use different package managers
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y -qq libsqlite3-0 || true
+    elif command -v yum &>/dev/null; then
+        yum install -y -q sqlite-libs || true
+    elif command -v dnf &>/dev/null; then
+        dnf install -y -q sqlite-libs || true
+    elif command -v opkg &>/dev/null; then
+        opkg update && opkg install sqlite3 || true
+    elif command -v pkg &>/dev/null; then
+        pkg install -y sqlite3 || true
+    fi
+    
+    # Re-check after attempting fix
+    if ! python3 -c "import sqlite3" 2>/dev/null; then
+        echo "[error] Failed to fix sqlite3 module - environment issue"
+        echo "[error] Please contact CI maintainers to fix HNP Python environment"
+        echo "[hint] Missing: libsqlite3.so.0"
+        exit 1
+    fi
+    echo "[step] sqlite3 dependency fixed ✅"
+fi
 
+# ── 1. Detect/install Conan ──
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
 if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
@@ -56,11 +84,10 @@ if [ -f "$SETTINGS_FILE" ]; then
     fi
 fi
 
-# ── 2. Conan remote (自动初始化, 兼容 CI 机/发布机) ──
-# CI 机 .conan.db 无 remote 定义 → 自动添加(匿名读取)
-# 发布机已有同名 remote + token → 跳过, 不影响 upload 凭证
+# ── 2. Verify conan remote (预部署校验) ──
+# Conan 配置 (remotes.json, profiles, settings.yml) 由 worker app 文件预部署到 ~/.conan2/
+# setup.sh 不做 remote 注册/认证, 仅校验 remote 已就绪
 CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-ohpcd}"
-CONAN_REMOTE_URL="${CONAN_REMOTE_URL:-https://conan.cnb.cool/OpenHarmonyPCDeveloper/Conan/-/packages/}"
 
 # Disable conancenter — these are private CI builds, no external deps needed
 if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
@@ -68,16 +95,11 @@ if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
     conan remote disable conancenter 2>/dev/null || true
 fi
 
-if conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
-    echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
-else
-    echo "[step] remote '${CONAN_REMOTE_NAME}' 不存在, 自动添加 (匿名读取)"
-    conan remote add "${CONAN_REMOTE_NAME}" "${CONAN_REMOTE_URL}" || {
-        echo "[error] 无法添加 remote '${CONAN_REMOTE_NAME}'"
-        exit 1
-    }
-    echo "[step] remote 已添加: ${CONAN_REMOTE_NAME} → ${CONAN_REMOTE_URL}"
+if ! conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
+    echo "[error] remote '${CONAN_REMOTE_NAME}' 不存在, 请检查 worker app 预部署"
+    exit 1
 fi
+echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
 
 # ── 3. Ensure ohos-aarch64 profile exists ──
 PROFILE_NAME="${CONAN_PROFILE:-ohos-aarch64}"
