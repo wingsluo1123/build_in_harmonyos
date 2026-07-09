@@ -41,22 +41,15 @@ class PerlSqlAbstractPgConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Perl EUMM build: perl Makefile.PL && make
-        env = dict(os.environ)
-        perl5lib = env.get("PERL5LIB", "")
-        # Include dependency Perl modules
-        deps_lib = os.path.join(self.generators_folder, "lib", "perl5")
-        env["PERL5LIB"] = f"{deps_lib}:{perl5lib}" if perl5lib else deps_lib
-        subprocess.run(["perl", "Makefile.PL"], cwd=self.source_folder, env=env, check=True)
-        subprocess.run(["make", "-j1"], cwd=self.source_folder, env=env, check=True)
+        # No conan dependencies declared (perl-sql-abstract not yet published
+        # to @ohpcd/stable); SQL::Abstract must be pre-installed in system Perl.
+        subprocess.run(["perl", "Makefile.PL"], cwd=self.source_folder, check=True)
+        subprocess.run(["make", "-j1"], cwd=self.source_folder, check=True)
 
     def package(self):
-        env = dict(os.environ)
-        perl5lib = env.get("PERL5LIB", "")
-        deps_lib = os.path.join(self.generators_folder, "lib", "perl5")
-        env["PERL5LIB"] = f"{deps_lib}:{perl5lib}" if perl5lib else deps_lib
         subprocess.run(
             ["make", "install", f"DESTDIR={self.package_folder}"],
-            cwd=self.source_folder, env=env, check=True
+            cwd=self.source_folder, check=True
         )
         # Copy .pm files to standard lib/ for G4 product check and downstream consumers
         copy(self, "*.pm", src=self.source_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=True)
