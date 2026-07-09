@@ -4,7 +4,6 @@
 Nettle is a low-level cryptographic library.
 """
 
-import os
 import shutil
 
 from conan import ConanFile
@@ -40,7 +39,7 @@ class NettleConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure(args=["--disable-shared", "--enable-static"])
-        bash_path = shutil.which("bash") or "/usr/bin/env bash"
+        bash_path = shutil.which("bash") or "bash"
         autotools.make(args=[f"SHELL={bash_path}"])
 
     def package(self):
