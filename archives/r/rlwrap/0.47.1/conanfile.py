@@ -60,6 +60,10 @@ class RlwrapConan(ConanFile):
         # (file permissions). Dynamic linking uses libreadline.so (accessible).
         # libptytty is not available; rlwrap has built-in PTY handling
         tc.configure_args.append("--without-libptytty")
+        # Bypass AC_CHECK_LIB(readline, readline): system libreadline.so exists
+        # but is not readable by CI worker (permissions 770). The locally-built
+        # libreadline.a in readline_install/lib is found at make time via -L.
+        tc.configure_args.append("ac_cv_lib_readline_readline=yes")
         # Add system library paths from DEFAULT_PREFIX (CI environment)
         # and ~/.harmonybrew (developer environment)
         for prefix in [os.environ.get("DEFAULT_PREFIX", ""), os.path.expanduser("~/.harmonybrew")]:
