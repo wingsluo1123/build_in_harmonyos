@@ -49,8 +49,9 @@ class Sqlite3Conan(ConanFile):
         # R33: Get compiler from Conan conf
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = compilers.get("c", "clang") if compilers else "clang"
+        ar = self.conf.get("tools.gnu:gcc:ar", default="llvm-ar", check_type=str)
 
-        # Feature defines (matching upstream autoconf defaults)
+        # Feature define (matching upstream autoconf defaults)
         defines = [
             "-DSQLITE_ENABLE_RTREE",
             "-DSQLITE_ENABLE_FTS5",
