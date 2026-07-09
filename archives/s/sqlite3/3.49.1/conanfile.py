@@ -46,10 +46,12 @@ class Sqlite3Conan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # R33: Get compiler from Conan conf
+        # R33: Get toolchain from Conan conf, not shell env vars
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = compilers.get("c", "clang") if compilers else "clang"
-        ar = self.conf.get("tools.gnu:gcc:ar", default="llvm-ar", check_type=str)
+        # Derive llvm-ar from cc's directory (same toolchain prefix)
+        cc_dir = os.path.dirname(cc)
+        ar = os.path.join(cc_dir, "llvm-ar") if cc_dir else "llvm-ar"
 
         # Feature define (matching upstream autoconf defaults)
         defines = [
