@@ -44,9 +44,19 @@ class NettleConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Set environment variables for configure
+        import os
+        bash_path = shutil.which("bash") or "/bin/bash"
+        env_vars = {
+            "CONFIG_SHELL": bash_path,
+            "SHELL": bash_path
+        }
+        # Update environment for subprocess
+        for key, value in env_vars.items():
+            os.environ[key] = value
+        
         autotools = Autotools(self)
         autotools.configure(args=["--disable-shared", "--enable-static"])
-        bash_path = shutil.which("bash") or "bash"
         autotools.make(args=[f"SHELL={bash_path}"])
 
     def package(self):
