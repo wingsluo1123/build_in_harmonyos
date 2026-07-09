@@ -1,0 +1,57 @@
+# 版本级 manifest
+# 文件位置: archives/l/libzippp/7.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+software: libzippp
+version: "7.1"
+status: published
+build_date: "2026-06-25"
+build_system: cmake
+conan_ref: "libzippp/7.1"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://codeload.github.com/ctabin/libzippp/tar.gz/refs/tags/libzippp-v7.1-1.10.1"
+  sha256: "9ded3c4b5641e65d2b3a3dd0cbc4106209ee17c17df70e5187e7171420752546"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX"
+    - "-DCMAKE_PREFIX_PATH=$DEFAULT_PREFIX"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DLIBZIPPP_INSTALL=ON"
+    - "-DLIBZIPPP_INSTALL_HEADERS=ON"
+    - "-DLIBZIPPP_BUILD_TESTS=ON"
+  dependencies:
+    - "libzip/1.10.1"
+    - "zlib/1.3.1"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libzip 预编译包缺少 libzip.so 开发符号链接，需手动创建: rm -f libzip.so && ln -s libzip.so.5.5 libzip.so"
+  - "libzippp 使用 CMake 构建，init-build 的 build_system 猜测可能不准，需根据 CMakeLists.txt 修正"
+  - "CMake find_package(LIBZIP MODULE) 依赖 FindLIBZIP.cmake，需要 libzip.so 符号链接和 libzip.pc pkgconfig 文件"
