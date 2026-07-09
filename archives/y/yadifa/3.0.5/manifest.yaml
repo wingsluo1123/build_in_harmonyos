@@ -1,0 +1,102 @@
+software: yadifa
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/3.0.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.0.5"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统类型 (top-level for G4 check)
+build_system: autotools
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-25"
+
+# Conan 引用
+conan_ref: "yadifa/3.0.5@ohpcd/stable"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（与 conandata.yml 一致）
+  url: "https://ghfast.top/https://github.com/yadifa/yadifa/archive/refs/tags/v3.0.5.tar.gz"
+
+  # 源码校验和（与 conandata.yml 一致）
+  sha256: "1b1c98c45aa4c4e72b36d8dba725675329183caab689c53c13402419e7b85f21"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+  - "--prefix=$HOME/usr/local"
+  - "--with-openssl=$HOME/usr/local"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - openssl/3.5.6
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-configure.ac.patch"
+- "0002-lib-dnscore-src-thread.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "GitHub archive tarball 不包含预生成的 configure 脚本，需要 autoreconf -fi"
+- "OpenHarmony 不支持 pthread_setaffinity_np，需用 HAS_PTHREAD_SETAFFINITY_NP 宏守护"
+- "config.status 中 ECHO 使用 ksh 语法会导致无限递归，需改为 printf"
+- "autotools Makefile 中 /usr/bin/install 硬编码需 sed 替换"
+- "cmd-pkgs 安装的 automake/libtool 需修复 shebang"
+- "E007: GNU config.guess 不识别 HarmonyOS 平台"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/yadifa-3.0.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/yadifa-3.0.5.work
+  source_orig_hash: 97c8f2908919374a
+  source_work_hash: 15ac1b22dfdbf618
+  generated_at: '2026-06-25T18:41:17'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-lib-dnscore-src-thread.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

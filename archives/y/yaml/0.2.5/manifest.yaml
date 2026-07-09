@@ -1,0 +1,112 @@
+software: yaml
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.2.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.2.5"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统类型（G4 门禁检查字段）
+build_system: cmake
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-25"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"
+
+  # 源码校验和
+  sha256: "c642ae9b75fee120b2d96c712538bd2cf283228d2337df2cf2988e3c02678ef4"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-cmake-config.h.in.patch"
+  - "0002-tests-CMakeLists.txt.patch"
+  - "0003-yamlConfig.cmake.in.patch"
+# Release tarball yaml-0.2.5.tar.gz 缺少 cmake 构建所需的模板文件:
+# cmake/config.h.in, yamlConfig.cmake.in, tests/CMakeLists.txt
+# 从上游 0.2.5 tag 下载补充
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "yaml-0.2.5 release tarball 缺少 cmake 模板文件 (cmake/config.h.in, yamlConfig.cmake.in, tests/CMakeLists.txt)，需从上游 git tag 0.2.5 补充 (ref: E081)"
+  - "CMake 4.x 移除了 <3.5 兼容性，需添加 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 (ref: E081)"
+  - "libyaml 默认构建为静态库 (libyaml.a)，无独立二进制文件 (ref: E081)"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/yaml-0.2.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/yaml-0.2.5.work
+  source_orig_hash: c92f2a2f4b6c3bf0
+  source_work_hash: 7136c58f12f1db37
+  generated_at: '2026-06-26T14:32:47'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-cmake-config.h.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-tests-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-yamlConfig.cmake.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

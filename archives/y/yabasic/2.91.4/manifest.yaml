@@ -1,0 +1,118 @@
+software: yabasic
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.91.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.91.4"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统
+build_system: autotools
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-25"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://www.yabasic.de/download/yabasic-2.91.4.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（单行字符串，clean-verify 读取）
+  configure_options: "--without-ffi CPPFLAGS=-I/storage/Users/currentUser/usr/local/include LDFLAGS=-L/storage/Users/currentUser/usr/local/lib"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - ncurses/6.4
+    - libx11/6.4.0
+    - xorgproto/2024.1
+    - libxau/6.0.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-yabasic.h.patch"
+
+# 源码修改说明:
+# - config.guess: 替换为新版本 (2022-08-01)，支持 HarmonyOS 识别 (E007)
+# - config.sub: 替换为新版本，支持 linux-ohos 三元组 (E007)
+# - yabasic.h: 移除未使用的 #include <X11/Intrinsic.h>（libXt 不可用）
+# - configure: (1) umask 077→022 修复 HarmonyOS 临时目录权限问题; (2) 禁用 print -r ECHO 检测，强制使用 printf
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "config.guess (2015版) 过旧无法打补丁，需替换为新版本 (2022-08-01)"  # ref: E007
+  - "config.sub 需要添加 linux-ohos* 到 kernel-OS 兼容性列表"  # ref: E007
+  - "ncurses 预编译包缺少头文件，需从源码生成"  # ref: E092
+  - "ncurses curses.h 由 curses.head + MKkey_defs + curses.wide + curses.tail 组装而成"  # ref: E092
+  - "config.status 的 umask 077 导致创建的临时目录不可写（平台限制），需改为 umask 022"  # ref: E082
+  - "config.status 的 ECHO='print -r --' 使用 ksh print 命令，需禁用 print 检测强制使用 printf"  # ref: E082
+  - "libX11.so 依赖 libxcb.so.1，预编译包不可用时需创建 stub 库"  # ref: E092
+  - "yabasic 包含 X11/Intrinsic.h 但实际不使用任何 Xt 类型/函数，可安全移除"  # ref: E092
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/yabasic-2.91.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/yabasic-2.91.4.work
+  source_orig_hash: a794f6a68d9cf2ba
+  source_work_hash: 77506b3d89a95ae4
+  generated_at: '2026-06-26T15:12:47'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-yabasic.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

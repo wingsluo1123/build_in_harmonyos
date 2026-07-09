@@ -1,0 +1,26 @@
+diff -ruN a/lib/dnscore/src/thread.c b/lib/dnscore/src/thread.c
+--- a/lib/dnscore/src/thread.c
++++ b/lib/dnscore/src/thread.c
+@@ -230,21 +230,21 @@
+  *
+  * @param t
+  * @param cpu_index
+  *
+  * @return an error code
+  */
+ 
+ ya_result thread_setaffinity(thread_t t, int cpu_index)
+ {
+     ya_result ret;
+-#if __linux__ || __FreeBSD__
++#if (__linux__ || __FreeBSD__) && HAS_PTHREAD_SETAFFINITY_NP
+     cpu_set_t mycpu;
+     CPU_ZERO(&mycpu);
+     CPU_SET(cpu_index, &mycpu);
+     int code = pthread_setaffinity_np(t, sizeof(cpu_set_t), &mycpu);
+     if(code == 0)
+     {
+         ret = SUCCESS;
+     }
+     else
+     {

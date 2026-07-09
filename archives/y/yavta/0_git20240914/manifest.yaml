@@ -1,0 +1,82 @@
+software: yavta
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0_git20240914/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0_git20240914"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统类型 (G4 检查字段)
+build_system: makefile
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-25"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://salsa.debian.org/debian/yavta/-/archive/upstream/0.0+git20240914.52c975e/yavta-upstream-0.0+git20240914.52c975e.tar.gz"
+
+  # 源码校验和
+  sha256: "3b32ac183f11f4f5096e45b1bc47f2a6b298f64b7fb782fcc02ad56ca9300ef7"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "yavta Makefile 使用 CC := $(CROSS_COMPILE)gcc 硬编码 gcc，需命令行 make CC=clang 覆盖"
+  - "yavta Makefile 无 install/check 目标，需手动 cp 二进制并用 --help 验证"
+  - "git.linuxtv.org 的 cgit snapshot 功能不可用，可改用 Debian Salsa upstream tag archive 下载 tarball"
+  - "鸿蒙平台 Python 缺少 CA 证书，需手动下载 Mozilla CA 证书到 $DEFAULT_PREFIX/ssl/cert.pem"
+  - "yavta 上游已标记 Makefile 为 deprecated，推荐使用 meson 构建（本版本仍可用 make）"

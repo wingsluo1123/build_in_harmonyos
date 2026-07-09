@@ -1,0 +1,49 @@
+software: zangband
+version: "2.7.5.1"
+status: built
+build_system: autotools
+build_date: "2026-06-25"
+
+source:
+  url: "https://sourceforge.net/projects/zangband/files/zangband-src/2.7.5%20preview%20I/zangband-2.7.5pre1.tar.gz/download"
+  sha256: "86871739825a292b9def28ec0dea698fb0d34949c7fab071901c231274be4c44"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$DEFAULT_PREFIX"
+  dependencies:
+    - "ncurses"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.patch"
+  - "0002-makefile.patch"
+
+knowledge_gained:
+  - E011: configure/config.status umask 077 causes HMDFS permission denied; fixed to umask 022
+  - E001: CC=clang required (no cc symlink on platform)
+  - E076: make -j1 required to avoid HMDFS FIFO jobserver issues
+  - makefile uses DESTDIR as game data path, not standard staging prefix; use prefix override for staging
+  - No make check target available; make test is informational only
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/zangband-2.7.5.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/zangband-2.7.5.1.work
+  source_orig_hash: f665edfdea0fa6f8
+  source_work_hash: c647f8c59741dee2
+  generated_at: '2026-06-26T10:07:34'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

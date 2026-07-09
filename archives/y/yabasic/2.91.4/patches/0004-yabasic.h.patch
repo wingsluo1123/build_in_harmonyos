@@ -1,0 +1,140 @@
+diff -ruN a/yabasic.h b/yabasic.h
+--- a/yabasic.h
++++ b/yabasic.h
+@@ -53,21 +53,21 @@
+ #include <string.h>
+ #elif HAS_STRINGS_HEADER
+ #include <strings.h>
+ #endif
+ #include <sys/time.h>
+ #include <sys/wait.h>
+ #include <sys/ipc.h>
+ #include <sys/ioctl.h>
+ #include <X11/Xlib.h>
+ #include <X11/Xutil.h>
+-#include <X11/Intrinsic.h>
++/* HarmonyOS: X11/Intrinsic.h (libXt) not available; yabasic does not use any Xt types/functions */
+ #define XK_LATIN1
+ #define XK_MISCELLANY
+ #include <X11/keysymdef.h>
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <term.h>
+ #ifdef HAVE_NCURSES_H
+ #include <ncurses.h>
+ #else
+ #ifdef HAVE_CURSES_H
+@@ -236,21 +236,21 @@
+ /* bison.c */
+ extern char *current_function;	/* name of currently parsed function */
+ extern int yydebug;
+ extern int missing_endif;
+ extern int missing_endif_line;
+ void report_if_missing(char *,int);
+ void report_conflicting_close(char *,int);
+ void collect_missing_clauses(char *, char);
+ void lyyerror(int, char *);
+ 
+-    
++
+ /*-------------------------- defs and undefs ------------------------*/
+ 
+ /* undef symbols */
+ #undef FATAL
+ #undef ERROR
+ #undef WARNING
+ #undef NOTE
+ #undef DEBUG
+ #undef DUMP
+ 
+@@ -295,25 +295,25 @@
+     fFIRST_FUNCTION,		/* no function, just marks start of list */
+     fRAN2, fDATE, fTIME,
+     fFRNFN_CALL, fFRNFN_CALL2, fFRNBF_ALLOC, fFRNBF_DUMP, fFRNBF_DUMP2,
+     fFRNBF_GET_NUMBER, fFRNBF_GET_STRING, fFRNBF_GET_BUFFER, fFRNFN_SIZE, fFRNBF_SIZE,
+     fZEROARGS,
+     fINKEY, fMOUSEX, fMOUSEY, fMOUSEB, fMOUSEMOD,
+     fSIN, fASIN, fCOS, fACOS, fTAN,
+     fATAN, fSYSTEM, fSYSTEM2, fPEEK, fPEEK2, fPEEK4, fTELL, fEXP, fLOG, fLEN,
+     fSTR, fSTR4,
+     fSQRT, fSQR, fFRAC, fROUND, fABS, fSIG, fRAN, fINT, fCEIL, fFLOOR, fVAL, fASC, fHEX, fBIN, fDEC,
+-    fUPPER, fLOWER, fCHOMP, 
++    fUPPER, fLOWER, fCHOMP,
+     fLTRIM, fRTRIM, fTRIM, fCHR, fBITNOT,
+     fONEARGS, fDEC2, fATAN2, fLEFT, fAND, fOR,
+     fEOR, fSHL, fSHR, fLOG2,
+-    fRIGHT, fINSTR, fRINSTR, fSTR2, fMOD, fMIN, fMAX, fPEEK3, fMID2, fSTRING, 
++    fRIGHT, fINSTR, fRINSTR, fSTR2, fMOD, fMIN, fMAX, fPEEK3, fMID2, fSTRING,
+     fTWOARGS,
+     fMID, fINSTR2, fRINSTR2, fSTR3,
+     fTHREEARGS,
+     fGETBIT, fGETCHAR,
+     fLAST_FUNCTION,		/* no function, just marks end of list */
+ };
+ 
+ enum arraymode {
+     /* type of array access */
+     CALLARRAY, ASSIGNARRAY, CALLSTRINGARRAY, ASSIGNSTRINGARRAY,
+@@ -369,21 +369,21 @@
+     cPOPSTREAM,
+     cSEEK, cSEEK2, cTESTEOF, cWAIT, cBELL, cMOVE,
+     cCLEARSCR, cCOLOUR, cCHKPROMPT, cERROR,
+ 
+     cOPENWIN, cDOT, cLINE, cCIRCLE, cTRIANGLE, cTEXT1, cTEXT2, cTEXT3, cCLOSEWIN, cCLEARWIN,	/* grafics */
+     cOPENPRN, cCLOSEPRN, cMOVEORIGIN, cRECT, cGCOLOUR, cGCOLOUR2,
+     cGBACKCOLOUR, cGBACKCOLOUR2, cPUTBIT, cPUTCHAR,
+ 
+     cFRNBF_SET_NUMBER, cFRNBF_SET_STRING, cFRNBF_FREE,    /* foreign libraries */
+     cFRNBF_SET_BUFFER,
+-    
++
+     cLAST_COMMAND			/* no command, just marks end of list */
+ };
+ 
+ enum stackentries {
+     /* different types of stackentries */
+     stGOTO, stSTRING, stSTRINGARRAYREF, stNUMBER, stNUMBERARRAYREF, stLABEL,
+     stRET_ADDR, stRET_ADDR_CALL, stFREE, stROOT,
+     stANY, stSTRING_OR_NUMBER, stSTRING_OR_NUMBER_ARRAYREF,	/* these will never appear on stack but are used to check with pop */
+     stSWITCH_STRING, stSWITCH_NUMBER	/* only used in switch statement, compares true to every string or number */
+ };
+@@ -460,37 +460,37 @@
+     int type;			/* type of command */
+     int cnt;			/* count of this command */
+     struct command *prev;		/* link to previous command */
+     struct command *next;		/* link to next command */
+     void *pointer;		/* pointer to data */
+     void *symbol;			/* pointer to symbol (or data within symbol) associated with command */
+     struct command *jump;		/* pointer to jump destination */
+     char *symname;			/* name of symbol associated with command */
+     struct command *next_symref;	/* next cmd within function referencing a symbol */
+     struct command *next_assoc;	/* next cmd within chain of associated commands; used for commands: data, docu, label */
+-    int args;			/* number of arguments for function/array call 
++    int args;			/* number of arguments for function/array call
+ 				   or stream number for open/close */
+     int tag;			/* char/int to pass some information */
+     int line;			/* line this command has been created for */
+     int first_column;           /* column, at which this command started */
+     int last_column;            /* column, at which this command ended */
+     struct library *lib;	/* associated library */
+     char *diag;                 /* optional text for diagnostics */
+     struct switch_state *switch_state;  /* state for switch statements */
+ };
+ 
+ struct switch_state {    /* records surrounding of a statement; used to check gotos into, out-of, within and between switch-statements (i.e. to err on most)  */
+     int id;           /* unique id for each switch-statment */
+     int nesting;      /* number of nested switch-statements */
+     int pop_on_qgoto; /* number of stack entries to pop on quick goto */
+ };
+-    
++
+ struct array {
+     /* data structure for arrays */
+     int bounds[10];		/* index boundaries */
+     int dimension;		/* dimension of array */
+     void *pointer;		/* contents of array */
+     char type;			/* decide between string- ('s') and double-Arrays ('d') */
+ };
+ 
+ struct buff_chain {
+     /* buffer chain for system-input */
