@@ -73,4 +73,4 @@ G0 clean build: PASS (2 patches applied, configure + make success)
 ---
 
 **编译结束**: 2026-07-08 18:27
-**最终状态**: built
+**最终状态**: published
