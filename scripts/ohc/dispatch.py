@@ -18,7 +18,7 @@ from typing import Optional
 
 import yaml
 
-from .dependency_resolver import _KNOWN_DEPS, _BUILTIN_INDEX
+from .dependency_resolver import _KNOWN_DEPS, get_available_version
 from .utils import find_project_dir, log_info, log_ok, log_warn, log_fail
 
 
@@ -65,9 +65,12 @@ def _get_version(software: str) -> str:
         )
         if versions:
             return versions[0]
-    # Fallback to BUILTIN_INDEX
-    info = _BUILTIN_INDEX.get(software, {})
-    return info.get("ver", "")
+    # Fallback to runtime index (cmd-pkgs)
+    try:
+        ver = get_available_version(software)
+        return ver or ""
+    except Exception:
+        return ""
 
 
 # ═══════════════════════════════════════════════════════
@@ -164,9 +167,53 @@ def generate_subtask_objective(
 
 调用 `LoadSkill` 加载 `openharmony-compile-agent` 技能。加载后你会获得完整的 SKILL.md，它是你执行编译的**唯一权威指南**。所有流程、铁律、命令格式、失败处理均以 SKILL.md 为准。
 
-## 第二步：按 SKILL.md 执行完整的模式 B 编译流程
+## 第二步：⭐ 前置工具检查与自动安装（动态发现）
 
-加载技能后，**严格遵循 SKILL.md §3 核心流程**，执行端到端编译：
+> **R18 扩展**：任何工具缺失，**优先从 cmd-pkgs 自动安装**。随着 cmd-pkgs 包库扩展，可用工具会动态增长。
+
+执行 init-build 后，在 configure 之前：
+
+1. **运行通用工具检查**：
+   ```bash
+   # 使用 SKILL 内置的通用检查函数（不硬编码特定工具）
+   python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --check-tools
+   
+   # 或手动检查：
+   for tool in sed gawk grep find automake libtool pkg-config make; do
+     if which $tool >/dev/null 2>&1; then
+       version=$(timeout 5 $tool --version 2>&1 | head -1)
+       echo "$tool: $version"
+     else
+       echo "$tool: ❌ 未安装"
+     fi
+   done
+   ```
+
+2. **收到 "command not found" 或工具缺失时**：
+   - 脚本会自动调用 `auto_install_missing_tools_from_log()`
+   - 从错误日志提取缺失工具名 → 查 cmd-pkgs → 自动安装 → 重试
+   - 无需人工判断具体是哪个工具
+
+3. **预编译包动态列表获取**：
+   ```bash
+   # 从远程获取最新列表（每次都刷新，不依赖本地缓存）
+   curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/raw/main/README.md | grep -E "^\\|[^|]+\\|"
+   
+   # 或使用 resolve-deps 命令
+   python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --refresh
+   python3 $SKILL_ROOT/scripts/ohc-run.py resolve-deps --list-available
+   ```
+
+**自动安装流程**（脚本自动执行，无需人工干预）：
+```
+发现工具缺失 → 查 cmd-pkgs 索引 → 有预编译包 → curl install.sh | sh → 重试 configure
+              ↓ 无预编译包
+              → HANDOFF (build_tool_missing) → AI 手动编译依赖
+```
+
+## 第三步：按 SKILL.md 执行完整的模式 B 编译流程
+
+加载技能并安装依赖后，**严格遵循 SKILL.md §3 核心流程**，执行端到端编译：
 
 1. **init-build** → 下载/解压/骨架/依赖解析
 2. **AI 编译（Step 2）** → configure → make → make install DESTDIR → staging 验证 → make check → package → make install（不带 DESTDIR）→ 用户验证
@@ -197,7 +244,8 @@ def generate_subtask_objective(
 编译结果摘要：
 1. 软件名、版本、最终状态（success/partial/failed）
 2. 遇到的关键问题及解决方式
-3. 创建的知识图谱草稿 ID（如有新发现）
+3. 安装的预编译依赖包列表（如有）
+4. 创建的知识图谱草稿 ID（如有新发现）
 """
     return objective
 
@@ -261,7 +309,7 @@ def check_task_status(software: str, version: str) -> str:
     if manifest_status == "failed":
         return "failed"
 
-    if (manifest_status == "success" and has_packaged and has_knowledge_done):
+    if (manifest_status == "published" and has_packaged and has_knowledge_done):
         return "finished"
 
     if has_knowledge_done:

@@ -1,19 +1,24 @@
-# zutils 1.16 — OpenHarmony 编译记录
+# Zutils
 
-## 基本信息
-- 软件: zutils
-- 版本: 1.16
-- 构建系统: autotools
-- 目标: ohos-aarch64
+## 简介
+透明处理 gzip、bzip2、lzip、xz 压缩文件的工具集，包含 zcat、zcmp、zdiff、zgrep、ztest、zupdate 等命令。
 
-## 编译指导
-<!-- 编译注意事项 -->
+## OHOS 适配
+- 自定义 configure 脚本，兼容 autotools 模式
+- 1.15 有 FIFO 创建限制（鸿蒙不支持 mkfifo）
+- 运行依赖 gzip, bzip2, lzip, xz
 
-## 补丁清单
-<!-- patches/ 目录中的补丁说明 -->
-
-## 已知限制
-<!-- 平台相关限制 -->
+## 依赖
+- gzip
+- bzip2
+- lzip
+- xz
 
 ## 功能验证
-<!-- 验证命令和结果 -->
+```bash
+zcat --version
+zgrep --version
+```
+
+## 参考
+- 官网: https://savannah.gnu.org/projects/zutils/

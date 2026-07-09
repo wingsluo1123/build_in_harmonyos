@@ -21,8 +21,13 @@ from .models import parse_kv_file, parse_build_context
 from .engine import engine_cli, run_engine
 from .handoff import handoff_cli, emit_handoff, HandoffData
 from .init_build import init_build
-from .package_builder import PackageBuilder
+
 from .finish import FinishPipeline
+from .dependency_resolver import (
+    is_prebuilt_available, get_available_version, get_install_url,
+    check_tool_available, get_package_for_tool, auto_install_tool,
+    auto_install_missing_tools_from_log, check_common_build_tools,
+)
 
 
 # ── Constants ──
@@ -163,7 +168,129 @@ class BuildDriver:
                 break
         tc.write_text("\n".join(lines), encoding="utf-8")
 
-    # ── Engine & Handoff ──
+    def _emit_checkpoint(self, step: str, step_name: str, doc_actions: list[str]) -> None:
+        """⭐ D8 规则：成功阶段后提醒 AI 更新文档。
+        
+        输出 CHECKPOINT 块（类似 HANDOFF 但用于成功阶段），
+        提醒 AI 在 notes.md 和 README.md 中记录此阶段的操作。
+        """
+        lines = [
+            "",
+            "╔═══ 📝 CHECKPOINT — 文档更新提醒 ═══════════════════╗",
+            f"║ STEP: {step} ({step_name})",
+            f"║ SOFTWARE: {self.software} {self.version}",
+            f"║ ARCHIVE_DIR: {self.archive_dir}",
+            "║",
+            "║ ⭐ D8 规则要求：此阶段完成后必须更新文档",
+            "║",
+            "║ 文档更新要求:",
+        ]
+        for action in doc_actions:
+            lines.append(f"║   - {action}")
+        lines += [
+            "║",
+            "║ 提醒：这些记录是断点续传的关键，请勿跳过！",
+            "╚══════════════════════════════════════════════════╝",
+            "",
+        ]
+        print("\n".join(lines), file=sys.stdout)
+
+    # ── Engine & Handoff & Dependency Detection ──
+
+    # ⭐ 新增：GNU 工具必需列表（toybox 版本行为差异会导致编译失败）
+    # 这些工具在 configure/make 中会被高频使用，行为差异会导致静默失败
+    _GNU_TOOLS_REQUIRED = {
+        "sed": {"cmd_pkgs_ver": "4.9", "reason": "正则匹配能力"},
+        "gawk": {"cmd_pkgs_ver": "5.3.0", "reason": "复杂脚本处理"},
+        "grep": {"cmd_pkgs_ver": "3.11", "reason": "-P 正则支持"},
+        "find": {"cmd_pkgs_ver": "", "reason": "-newer 等选项"},
+        "coreutils": {"cmd_pkgs_ver": "9.10", "reason": "install、cp 等命令"},
+    }
+
+    # ⭐ 新增：依赖缺失模式识别
+    _DEPENDENCY_PATTERNS = [
+        # pkg-config 模式
+        (r"Package '([^']+)', required by '[^']+', not found", "library"),
+        (r"Package '([^']+)' not found", "library"),
+        (r"Could not find ([a-zA-Z0-9_-]+)\.pc", "library"),
+        # autotools 模式
+        (r"checking for ([a-zA-Z0-9_-]+)\.\.\. no", "library"),
+        (r"configure: error: ([a-zA-Z0-9_-]+) not found", "library"),
+        (r"configure: error: ([a-zA-Z0-9_-]+) development files not found", "library"),
+        (r"([a-zA-Z0-9_-]+)-development files not found", "library"),
+        # cmake 模式
+        (r"Could NOT find ([A-Za-z0-9_]+)", "library"),
+        (r"FIND_PACKAGE([^)]+) could not find ([A-Za-z0-9_]+)", "library"),
+        # 构建工具缺失
+        (r"([a-zA-Z0-9_-]+): command not found", "tool"),
+        (r"which: no ([a-zA-Z0-9_-]+) in", "tool"),
+        (r"([a-zA-Z0-9_-]+) is required to build", "tool"),
+        # 命令差异
+        (r"([a-zA-Z0-9_-]+): unsupported option", "command"),
+    ]
+
+    def _detect_dependency_missing(self) -> tuple[str, str, str, bool]:
+        """解析 configure 输出和 config.log，检测依赖缺失。
+
+        Returns:
+            (missing_dep, missing_ver, dep_type, prebuilt_available)
+            如 ("openssl", "1.1.1", "library", True)
+            或未检测到时返回 ("", "", "", False)
+        """
+        # 读取 build log
+        if not self.log_file.exists():
+            return "", "", "", False
+        log_text = self.log_file.read_text(encoding="utf-8", errors="replace")
+
+        # 读取 config.log（configure 失败时更详细的错误信息）
+        config_log = ""
+        if self.build_src_dir:
+            cl = self.build_src_dir / "config.log"
+            if cl.exists():
+                config_log = cl.read_text(encoding="utf-8", errors="replace")
+            # VPATH build 时 config.log 在 build 目录
+            if self.vpath_dir:
+                cl2 = self.vpath_dir / "config.log"
+                if cl2.exists():
+                    config_log += "\n" + cl2.read_text(encoding="utf-8", errors="replace")
+
+        combined = log_text + "\n" + config_log
+
+        for pattern, dep_type in self._DEPENDENCY_PATTERNS:
+            match = re.search(pattern, combined, re.IGNORECASE)
+            if match:
+                dep_name = match.group(1).lower()
+                # 规范化依赖名（处理常见变体）
+                dep_name = self._normalize_dep_name(dep_name)
+                # 检查是否有预编译包
+                prebuilt = is_prebuilt_available(dep_name)
+                # 获取所需版本（如果有）
+                ver_match = re.search(rf"{dep_name}[^\d]*(\d+\.\d+\.\d+|\d+\.\d+)", combined)
+                missing_ver = ver_match.group(1) if ver_match else ""
+                return dep_name, missing_ver, dep_type, prebuilt
+
+        return "", "", "", False
+
+    def _normalize_dep_name(self, name: str) -> str:
+        """规范化依赖名称，处理常见变体。"""
+        # 处理 lib 前缀
+        name = name.lower()
+        if name.startswith("lib"):
+            name = name[3:]
+        # 处理常见别名
+        aliases = {
+            "ssl": "openssl",
+            "crypto": "openssl",
+            "crypto.so": "openssl",
+            "ffi": "libffi",
+            "pcreposix": "pcre",
+            "pcrecpp": "pcre",
+            "pcre2-posix": "pcre2",
+            "pcre2-8": "pcre2",
+            "ncursesw": "ncurses",
+            "curl": "libcurl",  # 注意：curl 在 cmd-pkgs 中是工具名，库是 libcurl
+        }
+        return aliases.get(name, name)
 
     def _run_engine(self, log_file: Path | None = None, tail: int = 50) -> bool:
         """Run error pattern matching engine. Returns True if hit.
@@ -199,7 +326,9 @@ class BuildDriver:
 
     def _emit_handoff(self, reason: str, exit_code: int, step: str,
                       ep_id: str = "none", gap: bool = False,
-                      actions: list[str] | None = None) -> None:
+                      actions: list[str] | None = None,
+                      missing_dep: str = "", missing_ver: str = "",
+                      dep_type: str = "", prebuilt: bool = False) -> None:
         """Emit HANDOFF block and exit."""
         resume_step_num = int(re.sub(r'[^0-9]', '', step))
         resume_cmd = f"python3 {self.script_dir}/ohc-run.py build {self.software} {self.version} --resume-from=Step{resume_step_num + 1}"
@@ -216,6 +345,28 @@ class BuildDriver:
         )
         final_actions.insert(0, track_reminder)
 
+        # ⭐ 新增：依赖缺失时的专用 actions
+        if reason in ("dependency_missing", "build_tool_missing", "command_mismatch"):
+            if prebuilt:
+                # 有预编译包：生成安装命令
+                install_url = get_install_url(missing_dep) or ""
+                ver_to_install = missing_ver or get_available_version(missing_dep) or ""
+                dep_actions = [
+                    f"⭐ R18 铁律：依赖缺失，必须先安装预编译包",
+                    f"安装命令: curl -fsSL {install_url} | sh -s -- {missing_dep} {ver_to_install}",
+                    f"验证安装: pkg-config --modversion {missing_dep} 或 {missing_dep} --version",
+                    "运行 RESUME_CMD 继续",
+                ]
+            else:
+                # 无预编译包：需要手动编译
+                dep_actions = [
+                    f"⭐ 依赖 {missing_dep} 无预编译包，需手动编译",
+                    f"查 dependencies.md 编译顺序，先编 {missing_dep}",
+                    f"或创建子任务编译: createSubTask(objective='编译 {missing_dep}')",
+                    "运行 RESUME_CMD 继续",
+                ]
+            final_actions = dep_actions
+
         # Build HandoffData and emit directly
         data = HandoffData(
             exit_reason=reason,
@@ -231,18 +382,63 @@ class BuildDriver:
             software_version=self.version,
             archive_dir=str(self.archive_dir),
             ai_next_actions=final_actions,
+            # ⭐ 新增字段
+            missing_dependency=missing_dep,
+            missing_version=missing_ver,
+            dependency_type=dep_type,
+            precompiled_available=prebuilt,
         )
         emit_handoff(data)
         sys.exit(exit_code)
 
     def _error_recovery(self, step_name: str, step_num: float,
                         cmd_fn, retry_fn=None) -> int:
-        """Unified error recovery pipeline (R15)."""
+        """Unified error recovery pipeline (R15 + R18 依赖检测 + 工具自动安装)."""
         rc = cmd_fn()
         if rc == 0:
             return 0
 
         self._log(f"❌ {step_name} failed (RC={rc})")
+
+        # 读取错误日志
+        log_text = ""
+        if self.log_file.exists():
+            log_text = self.log_file.read_text(encoding="utf-8", errors="replace")
+        
+        # 补充 config.log（configure 失败时更详细）
+        if step_name == "configure" and self.build_src_dir:
+            for cl_path in [
+                self.build_src_dir / "config.log",
+                (self.vpath_dir or self.build_src_dir) / "config.log"
+            ]:
+                if cl_path.exists():
+                    log_text += "\n--- config.log ---\n" + cl_path.read_text(encoding="utf-8", errors="replace")
+
+        # ⭐ R18 扩展：先尝试自动安装缺失的工具
+        installed = auto_install_missing_tools_from_log(log_text, self.default_prefix)
+        if installed:
+            self._log(f"🔄 已自动安装工具: {', '.join(installed)}，重试...")
+            # 重试
+            rc2 = cmd_fn()
+            if rc2 == 0:
+                self._log(f"✅ 重试成功")
+                return 0
+            self._log(f"❌ 重试仍然失败")
+
+        # ⭐ R18 铁律：检测依赖缺失
+        if step_name == "configure":
+            dep_name, dep_ver, dep_type, prebuilt = self._detect_dependency_missing()
+            if dep_name:
+                self._log(f"⚠️ 检测到依赖缺失: {dep_name} {dep_ver} (类型={dep_type}, 预编译包={prebuilt})")
+                # 根据依赖类型设置 EXIT_REASON
+                exit_reason = "dependency_missing" if dep_type == "library" else \
+                              "build_tool_missing" if dep_type == "tool" else "command_mismatch"
+                self._emit_handoff(
+                    exit_reason, 2, f"Step{int(step_num)}",
+                    missing_dep=dep_name, missing_ver=dep_ver,
+                    dep_type=dep_type, prebuilt=prebuilt,
+                )
+                return rc  # unreachable
 
         # Run engine
         hit = self._run_engine()
@@ -251,8 +447,22 @@ class BuildDriver:
             rc2 = retry_fn(self.ep_fix_cmd)
             if rc2 == 0:
                 self._log(f"✅ Auto-retry succeeded")
+                # 方案 D: 记录修复结果用于质量度量
+                try:
+                    from .kb_metrics import record_result
+                    from .utils import graph_dir as _graph_dir
+                    record_result(_graph_dir(str(self.pdir)), self.ep_match_id, success=True)
+                except Exception:
+                    pass  # 不阻塞主流程
                 return 0
             self._log(f"❌ Auto-retry also failed")
+            # 方案 D: 记录修复结果用于质量度量
+            try:
+                from .kb_metrics import record_result
+                from .utils import graph_dir as _graph_dir
+                record_result(_graph_dir(str(self.pdir)), self.ep_match_id, success=False)
+            except Exception:
+                pass  # 不阻塞主流程
 
         # Emit HANDOFF
         if hit:
@@ -271,6 +481,25 @@ class BuildDriver:
             )
         return rc  # unreachable
 
+    # ── Step 0: pre-analysis ──
+
+    def _step0_pre_analysis(self) -> None:
+        self._log("═══ [0/14] 预分析 (鸿蒙PC平台适配) ═══")
+        try:
+            from .pre_analysis import run_pre_analysis
+            rc = run_pre_analysis(self.software, self.version, pdir=str(self.pdir))
+            if rc == 0:
+                self._task_card_update("0", "✅完成", "pre-analysis")
+                self._emit_checkpoint("Step0", "pre-analysis", [
+                    f"查阅 archives/{self.software[:1].lower()}/{self.software}-{self.version}/pre-analysis.md",
+                    "确认图形/音视频/系统集成/平台代码适配需求",
+                    "如有系统能力缺失，用 req add 提交需求条目",
+                ])
+            else:
+                self._log("⚠️ 预分析未完成（源码可能未下载），跳过")
+        except Exception as e:
+            self._log(f"⚠️ 预分析异常: {e}，跳过继续")
+
     # ── Step 1: init-build ──
 
     def _step1_init(self) -> None:
@@ -280,7 +509,11 @@ class BuildDriver:
             if not self.ctx_data:
                 self._load_context()
             return
-        self._log("═══ [1/13] init-build ═══")
+        self._log("═══ [1/14] init-build ═══")
+
+        # W1: Check git sync before starting (non-blocking warning)
+        from .workflow_checks import check_git_sync
+        check_git_sync(str(self.pdir), blocking=False)
 
         # Find or create context file
         ctx_pattern = f".build-context-{self.software}-{self.version}*"
@@ -293,8 +526,12 @@ class BuildDriver:
             rc = init_build(self.software, self.version, mode="auto",
                             force=self.force, pdir=str(self.pdir))
             if rc != 0:
-                log_fail("init-build 失败")
-                raise RuntimeError("init-build 失败")
+                self._emit_handoff("init_build_failed", 2, "Step1",
+                    actions=[
+                        "检查网络连接和 URL 是否有效",
+                        f"尝试手动: ohc-run.py init-build {self.software} {self.version} --url=URL",
+                        "运行 RESUME_CMD 从 Step1 恢复",
+                    ])
 
             ctx_files = list(self.pdir.glob(ctx_pattern))
             if not ctx_files:
@@ -331,7 +568,7 @@ class BuildDriver:
     def _step15_history(self) -> None:
         if not self.should_run(1.5):
             return
-        self._log("═══ [1.5/13] 归档历史查询 (R11) ═══")
+        self._log("═══ [1.5/14] 归档历史查询 (R11) ═══")
 
         readme = self.archive_dir / "README.md"
         if readme.exists():
@@ -348,7 +585,7 @@ class BuildDriver:
     def _step2_patches(self) -> None:
         if not self.should_run(2):
             return
-        self._log("═══ [2/13] apply-patches ═══")
+        self._log("═══ [2/14] apply-patches ═══")
 
         patch_dir = self.archive_dir / "patches"
         if not patch_dir.exists():
@@ -397,7 +634,7 @@ class BuildDriver:
         if not self.build_src_dir or not self.build_src_dir.exists():
             return
 
-        self._log("═══ [2.5/13] 预编译风险扫描 (pre-scan) ═══")
+        self._log("═══ [2.5/14] 预编译风险扫描 (pre-scan) ═══")
 
         rules_path = self.pdir / "knowledge" / "graph" / "pre-scan-rules.yaml"
         report_path = self.build_src_dir / ".pre-scan-report.yaml"
@@ -430,6 +667,20 @@ class BuildDriver:
 
         self._task_card_update("2.5", "✅完成", f"{total} findings")
         self._log(f"✅ 预扫描报告: {report_path}")
+
+        # ⭐ Checkpoint: 提醒 AI 查阅风险扫描结果
+        critical_count = summary.get("critical", 0) + summary.get("high", 0)
+        if critical_count > 0:
+            self._emit_checkpoint("Step2.5", "pre-scan", [
+                f"⚠️ 发现 {critical_count} 个高风险项，查阅 {report_path}",
+                "根据风险等级决定是否需要特殊适配处理",
+                "critical/high 项需在编译前制定应对方案",
+            ])
+        else:
+            self._emit_checkpoint("Step2.5", "pre-scan", [
+                f"预扫描完成，{total} 个发现（无高风险）",
+                "查阅 .pre-scan-report.yaml 了解详情",
+            ])
 
     # ── Build system detection ──
 
@@ -492,7 +743,37 @@ class BuildDriver:
     def _step3_configure(self) -> None:
         if not self.should_run(3):
             return
-        self._log("═══ [3/13] configure ═══")
+        self._log("═══ [3/14] configure ═══")
+
+        # ⭐ R18 扩展：configure 前检查常见构建工具可用性（动态发现）
+        self._log("  检查构建工具可用性...")
+        tool_status = check_common_build_tools(self.default_prefix)
+        missing_tools = []
+        
+        for tool, (available, info) in tool_status.items():
+            if available and "GNU" in info:
+                self._log(f"  ✅ {tool}: {info[:40]}")
+            elif available:
+                self._log(f"  ⚠️ {tool}: {info[:40]}")
+                # 记录可能需要替换的工具（toybox 版本）
+                pkg_name, _ = get_package_for_tool(tool)
+                if pkg_name:
+                    missing_tools.append(tool)
+            else:
+                self._log(f"  ❌ {tool}: {info}")
+                pkg_name, _ = get_package_for_tool(tool)
+                if pkg_name:
+                    missing_tools.append(tool)
+        
+        # 自动安装缺失的工具（如果有预编译包）
+        if missing_tools:
+            self._log(f"  发现 {len(missing_tools)} 个工具需安装: {', '.join(missing_tools)}")
+            for tool in missing_tools[:3]:  # 最多尝试安装 3 个，避免太慢
+                rc = auto_install_tool(tool, self.default_prefix)
+                if rc == 0:
+                    self._log(f"  ✅ 已安装: {tool}")
+                else:
+                    self._log(f"  ⚠️ 安装失败: {tool}")
 
         self._run("make distclean 2>/dev/null || true")
         self._run("rm -rf build builddir _build")
@@ -568,13 +849,20 @@ class BuildDriver:
                 actions=["手动确认构建系统并配置", "运行 RESUME_CMD 继续"])
 
         self._task_card_update("3", "✅完成", f"{self.build_system} OK")
+        
+        # ⭐ D8 规则：configure 完成后提醒更新文档
+        self._emit_checkpoint("Step3", "configure", [
+            "notes.md: 在对话记录部分写入 configure 参数和耗时",
+            "notes.md: 更新 Phase 2 checkbox 为完成",
+            f"configure 参数: {self._actual_configure_cmd or '自动检测'}",
+        ])
 
     # ── Step 4: make ──
 
     def _step4_make(self) -> None:
         if not self.should_run(4):
             return
-        self._log("═══ [4/13] make ═══")
+        self._log("═══ [4/14] make ═══")
 
         if self.build_system == "python":
             self._log("Python 项目跳过 make")
@@ -599,13 +887,19 @@ class BuildDriver:
 
         self._error_recovery("make", 4, do_make, do_retry)
         self._task_card_update("4", "✅完成", "make OK")
+        
+        # ⭐ D8 规则：make 完成后提醒更新文档
+        self._emit_checkpoint("Step4", "make", [
+            "notes.md: 在对话记录部分写入编译结果和遇到的问题",
+            "README.md: 如有补丁应用，在补丁说明部分记录用途",
+        ])
 
     # ── Step 5: install ──
 
     def _step5_install(self) -> None:
         if not self.should_run(5):
             return
-        self._log("═══ [5/13] make install (DESTDIR mode) ═══")
+        self._log("═══ [5/14] make install (DESTDIR mode) ═══")
 
         if self.force and self.test_prefix.exists():
             import shutil
@@ -645,13 +939,20 @@ class BuildDriver:
 
         self._task_card_update("5", "✅完成", f"bin={bin_count} lib={lib_count}")
         self._log(f"✅ 安装完成: bin={bin_count} lib={lib_count} (staging: {sp})")
+        
+        # ⭐ D8 规则：install 完成后提醒更新文档
+        self._emit_checkpoint("Step5", "install", [
+            "notes.md: 更新 Phase 2.5 checkbox 为完成",
+            "notes.md: 在源码修改清单部分记录安装文件",
+            "README.md: 如遇到问题已解决，在遇到的问题部分记录解决方案",
+        ])
 
     # ── Step 6: safety popup ──
 
     def _step6_safety(self) -> None:
         if not self.should_run(6):
             return
-        self._log("═══ [6/13] 安全弹窗 (R7) ═══")
+        self._log("═══ [6/14] 安全弹窗 (R7) ═══")
 
         # Quick version check for first 5 binaries
         bins = sorted(self.staging_prefix.rglob("bin/*"))[:5]
@@ -666,7 +967,7 @@ class BuildDriver:
     def _step7_check(self) -> None:
         if not self.should_run(7):
             return
-        self._log("═══ [7/13] make check ═══")
+        self._log("═══ [7/14] make check ═══")
 
         if self.skip_check:
             report = self.archive_dir / "reports" / "test-report.md"
@@ -716,12 +1017,22 @@ class BuildDriver:
 
         self._task_card_update("7", "✅完成" if rc == 0 else "⚠️部分", f"RC={rc}")
 
+        # ⭐ CHECKPOINT: make check 失败时提醒 AI 决策（非阻塞）
+        if rc != 0:
+            self._emit_checkpoint("Step7", "make-check-failed", [
+                f"查阅测试日志: {check_log}",
+                "判断失败原因：平台限制 / 测试用例不兼容 / 真实 bug",
+                "平台限制 → 记录原因并继续（不阻塞编译）",
+                "真实 bug → 修复后重跑 make check",
+                "无论哪种情况，在 notes.md 记录失败原因",
+            ])
+
     # ── Step 8: staging verify ──
 
     def _step8_staging(self) -> None:
         if not self.should_run(8):
             return
-        self._log("═══ [8/13] Staging 验证 ═══")
+        self._log("═══ [8/14] Staging 验证 ═══")
 
         mark = self.archive_dir / ".staging-verified"
         bins = list(self.staging_prefix.rglob("bin/*")) if self.staging_prefix.exists() else []
@@ -744,53 +1055,85 @@ class BuildDriver:
             excl.write_text("\n".join(failed), encoding="utf-8")
 
         mark.write_text(report, encoding="utf-8")
-        self._task_card_update("8", "✅完成", report)
+        self._task_card_update("8", "✅完成" if verified > 0 else "⚠️部分", report)
 
-    # ── Step 9: package ──
+        # ⭐ HANDOFF: staging 验证全部失败时通知 AI
+        if verified == 0 and len(exes) > 0:
+            self._emit_handoff("staging_verify_failed", 2, "Step8",
+                actions=[
+                    f"所有 {len(exes)} 个二进制 --version 检查失败",
+                    "检查 ELF 签名是否匹配运行环境",
+                    "检查 RPATH 和依赖库路径",
+                    "可能需要加入 EXCLUDE_LIST 排除不兼容的二进制",
+                    "运行 RESUME_CMD 从 Step8 恢复",
+                ])
 
-    def _step9_package(self) -> None:
+    # ── Step 9: conan recipe generation ──
+
+    def _step9_conan_recipe(self) -> None:
         if not self.should_run(9):
             return
-        self._log("═══ [9/13] package ═══")
+        self._log("═══ [9/14] Conan 配方生成 (conan-init) ═══")
 
-        builder = PackageBuilder(self.software, self.version,
-                                  debug=True, prefix=str(self.staging_prefix),
-                                  pdir=str(self.pdir))
-        rc = builder.run()
-        self._task_card_update("9", "✅完成" if rc == 0 else "⚠️部分", f"RC={rc}")
+        # Write back actual configure options to manifest.yaml BEFORE
+        # generating conanfile.py, so conan_init sees the real params.
+        self._write_back_configure_options()
 
-    # ── Step 10: deploy ──
+        from .conan_recipe import conan_init
 
-    def _step10_deploy(self) -> None:
-        self._log("═══ [10/13] deploy ═══")
+        rc = conan_init(self.software, self.version, force=True, pdir=str(self.pdir))
+        if rc != 0:
+            self._log("⚠️ 配方生成失败，请手动生成后继续")
+            self._emit_handoff("conan_init_failed", 2, "Step9",
+                actions=[
+                    f"手动生成: python3 $SKILL_ROOT/scripts/ohc-run.py conan-init {self.software} {self.version}",
+                    "检查 manifest.yaml 中的 source.url 和 build.system",
+                    "运行 RESUME_CMD 继续",
+                ])
+        else:
+            self._task_card_update("9", "✅完成", "conan recipe generated")
 
-        rc = 0
-        for item in self.staging_prefix.iterdir() if self.staging_prefix.exists() else []:
-            dst = Path(self.default_prefix) / item.name
-            if item.is_dir():
-                dst.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(str(item), str(dst), dirs_exist_ok=True)
-            else:
-                shutil.copy2(str(item), str(dst))
+    # ── Step 10: conan verify ──
 
-        # Ensure executables
-        dst_bin = Path(self.default_prefix) / "bin"
-        if dst_bin.exists():
-            for f in dst_bin.iterdir():
-                if f.is_file():
-                    try:
-                        os.chmod(f, 0o755)
-                    except OSError:
-                        pass
+    def _step10_conan_verify(self) -> None:
+        if not self.should_run(10):
+            return
+        self._log("═══ [10/14] Conan 配方验证 (conan-verify) ═══")
 
-        self._task_card_update("10", "✅完成" if rc == 0 else "⚠️部分", "deploy")
+        from .conan_verify import ConanVerifier
+
+        verifier = ConanVerifier(
+            self.software, self.version,
+            pdir=str(self.pdir),
+        )
+        try:
+            rc = verifier.run()
+        except Exception as e:
+            self._log(f"⚠️ conan-verify 异常: {e}")
+            rc = 1
+
+        if rc == 0:
+            self._task_card_update("10", "✅完成", "conan verify PASS")
+            self._emit_checkpoint("Step10", "conan-verify", [
+                "notes.md: 记录 conan verify 结果",
+                "manifest.yaml: 确认 status=published",
+            ])
+        else:
+            self._task_card_update("10", "⚠️部分", "conan verify FAIL")
+            self._log("⚠️ conan verify 未通过，降级为 built")
+            self._emit_handoff("conan_verify_failed", 1, "Step10",
+                actions=[
+                    "检查 reports/conan-verify-report.md 了解失败原因",
+                    "修复 conanfile.py 后重新验证: ohc-run.py conan-verify",
+                    "如无法通过，标记 status=built 并记录原因",
+                ])
 
     # ── Step 11: finish ──
 
     def _step11_finish(self) -> None:
-        self._log("═══ [11/13] finish-build ═══")
+        self._log("═══ [11/14] finish-build ═══")
 
-        pipeline = FinishPipeline(self.software, self.version, "success",
+        pipeline = FinishPipeline(self.software, self.version, "published",
                                    pdir=str(self.pdir))
         try:
             rc = pipeline.run()
@@ -802,21 +1145,13 @@ class BuildDriver:
     # ── Step 11.5: required files ──
 
     def _step11b_required_files(self) -> None:
-        self._log("═══ [11.5/13] 必填文件校验 ═══")
+        self._log("═══ [11.5/14] 必填文件校验 ═══")
 
-        required = ["manifest.yaml", "README.md", "PROGRESS.md", "RELEASENOTE.md"]
+        required = ["manifest.yaml", "notes.md"]
         missing = []
         for f in required:
             if not (self.archive_dir / f).exists():
                 missing.append(f)
-
-        # Auto-generate RELEASENOTE if missing
-        if "RELEASENOTE.md" in missing and (self.archive_dir / "manifest.yaml").exists():
-            rn = self.archive_dir / "RELEASENOTE.md"
-            rn.write_text(
-                f"# {self.software} {self.version} — Release Note\n\n"
-                f"Auto-generated by build-driver.\n", encoding="utf-8")
-            missing.remove("RELEASENOTE.md")
 
         if missing:
             log_warn(f"缺失必填文件: {missing}")
@@ -900,7 +1235,7 @@ class BuildDriver:
             self._log("⚠️ manifest.yaml 中未找到 build_config 段，跳过回写")
 
     def _step12_calibrate(self) -> None:
-        self._log("═══ [12/13] 归档校准 ═══")
+        self._log("═══ [12/14] 归档校准 ═══")
         # Simplified calibration check
         self._log(f"归档目录: {self.archive_dir}")
         patches = list((self.archive_dir / "patches").glob("*.patch")) if (self.archive_dir / "patches").exists() else []
@@ -912,7 +1247,7 @@ class BuildDriver:
     # ── Step 13: cleanup ──
 
     def _step13_cleanup(self) -> None:
-        self._log("═══ [13/13] 清理 ═══")
+        self._log("═══ [13/14] 清理 ═══")
 
         # Clean staging
         if self.test_prefix.exists():
@@ -920,12 +1255,24 @@ class BuildDriver:
             shutil.rmtree(self.test_prefix, ignore_errors=True)
             self._log(f"清理 staging: {self.test_prefix}")
 
+        # ⭐ Final checkpoint: 构建完成摘要
+        self._emit_checkpoint("Step13", "cleanup-complete", [
+            f"🎉 {self.software} {self.version} 编译流程完成",
+            f"归档目录: archives/{self.software[:1].lower()}/{self.software}/{self.version}/",
+            "确认 conanfile.py + conandata.yml + test_package/ + MANIFEST.yml 齐全",
+            "确认 manifest.yaml status 字段正确 (published/built/failed)",
+            "如遇新错误模式 → graph add --draft 提交知识草稿",
+            "如遇系统能力缺失 → req add 提交需求条目",
+            "提交前运行: bash ci/conan/build_and_test.sh 进行本地 CI 模拟 (W3)",
+        ])
+
     # ── Main run ──
 
     def run(self) -> int:
         self._log(f"🚀 开始编译: {self.software} {self.version}")
         self._log(f"   恢复模式: {self.resume_from or '从Step1开始'}")
 
+        self._step0_pre_analysis()
         self._step1_init()
         self._step15_history()
         self._step2_patches()
@@ -936,8 +1283,8 @@ class BuildDriver:
         self._step6_safety()
         self._step7_check()
         self._step8_staging()
-        self._step9_package()
-        self._step10_deploy()
+        self._step9_conan_recipe()
+        self._step10_conan_verify()
         self._step11_finish()
         self._step11b_required_files()
         self._step12_calibrate()
@@ -977,4 +1324,6 @@ def build_cli(argv: list[str] | None = None) -> int:
     except RuntimeError as e:
         log_fail(str(e))
         return 1
+
+1
 

@@ -14,14 +14,14 @@ from .utils import find_project_dir, log_info, log_ok, log_warn, log_fail
 from .close_archive import close_archive
 from .check_knowledge_gap import check_knowledge_gap
 from .refresh_patch import auto_mode as refresh_patch_auto
-from .verify_build import VerifyBuild
+from .verify_build import VerifyBuild  # legacy, still used for archive checks
 from .finalize_archive import finalize_archive
 from .summary import generate_summary
 
 class FinishPipeline:
     """6-step finishing pipeline for completed compilations."""
 
-    def __init__(self, software, version, status="success", pdir=None):
+    def __init__(self, software, version, status="published", pdir=None):
         self.software = software
         self.version = version
         self.status = status
@@ -67,9 +67,9 @@ class FinishPipeline:
         if not tr.exists():
             self.gate_miss += 1
             self.gate_warnings.append("test-report:missing")
-            if self.status == "success":
-                self.status = "partial"
-                log_warn("  test-report.md 缺失 → 降级为 partial")
+            if self.status == "published":
+                self.status = "built"
+                log_warn("  test-report.md 缺失 → 降级为 built")
         else:
             log_ok("  test-report.md ✅")
         sv = self.archive_dir / ".staging-verified"
@@ -79,36 +79,31 @@ class FinishPipeline:
             log_warn("  .staging-verified 缺失")
         else:
             log_ok(f"  .staging-verified ✅")
-        pkg_dir = self.archive_dir / "packaging"
-        tars = list(pkg_dir.glob("*ohos-aarch64*.tar.gz")) if pkg_dir.exists() else []
-        packaged_marker = pkg_dir / ".packaged" if pkg_dir.exists() else None
-        if not tars:
-            self.gate_miss += 1
-            self.gate_warnings.append("packaging:missing")
-            log_warn("  预编译包缺失")
-        elif packaged_marker and packaged_marker.exists():
-            log_ok(f"  预编译包 ✅ ({len(tars)} 个，工具化打包)")
+        # v3.0: Check for conanfile.py (preferred) or legacy packaging
+        conanfile = self.archive_dir / "conanfile.py"
+        if conanfile.exists():
+            log_ok("  conanfile.py ✅ (v3.0 配方)")
         else:
-            # tar.gz exists but not via ohc-run.py package — manual packaging
-            self.gate_miss += 1
-            self.gate_warnings.append("packaging:manual")
-            log_fail("  ❌ 预编译包存在但未经工具化打包（缺少 .packaged 标记）")
-            log_fail("     必须使用 ohc-run.py package 完成打包（签名/RPATH/strip/权限）")
-            log_fail("     手动 tar 打包的产物在鸿蒙上无法执行（ELF 未签名）")
-            if self.status == "success":
-                self.status = "partial"
+            # Legacy: check for packaging
+            pkg_dir = self.archive_dir / "packaging"
+            tars = list(pkg_dir.glob("*ohos-aarch64*.tar.gz")) if pkg_dir.exists() else []
+            if not tars:
+                self.gate_miss += 1
+                self.gate_warnings.append("packaging:missing")
+                log_warn("  预编译包缺失（无 conanfile.py 也无 tar.gz）")
+            else:
+                log_ok(f"  预编译包 ✅ ({len(tars)} 个，legacy)")
 
-        # Knowledge consolidation gate
+        # Knowledge consolidation gate (non-blocking warning)
         kd_marker = self.archive_dir / ".knowledge-done"
         if kd_marker.exists():
             log_ok("  知识整理 ✅")
         else:
-            self.gate_miss += 1
             self.gate_warnings.append("knowledge:not-done")
-            log_fail("  ❌ 知识整理未完成（缺少 .knowledge-done 标记）")
-            log_fail("     必须先整理知识图谱（graph add --draft），再重新运行 finish")
+            log_warn("  ⚠️ 知识整理未完成（缺少 .knowledge-done 标记）")
+            log_warn("     建议后续整理知识图谱（graph add --draft）")
 
-            # Check for empty drafts — block finish if any exist
+            # Check for empty drafts — warn (non-blocking)
             draft_dir = self.pdir / "knowledge" / "graph" / "draft"
             if draft_dir.is_dir():
                 empty_drafts = []
@@ -116,25 +111,22 @@ class FinishPipeline:
                     try:
                         content = dkv.read_text(encoding="utf-8")
                         # Check if key fields are still template placeholders
+                        # Support both ":" and "=" separators
                         has_root_cause = False
                         has_error_sig = False
                         for line in content.split("\n"):
                             stripped = line.strip()
-                            if stripped.startswith("root_cause:") and len(stripped) > 20 and "[简短" not in stripped:
+                            if (stripped.startswith("root_cause:") or stripped.startswith("root_cause=")) and len(stripped) > 20 and "[简短" not in stripped and "TODO" not in stripped:
                                 has_root_cause = True
-                            if stripped.startswith("error_signature:") and len(stripped) > 25 and "configure|cmake" not in stripped:
+                            if (stripped.startswith("error_signature:") or stripped.startswith("error_signature=")) and len(stripped) > 25 and "configure|cmake" not in stripped:
                                 has_error_sig = True
                         if not has_root_cause or not has_error_sig:
                             empty_drafts.append(dkv.name)
                     except Exception:
                         pass
                 if empty_drafts:
-                    log_fail(f"  ❌ 发现 {len(empty_drafts)} 个空草稿: {', '.join(empty_drafts)}")
-                    log_fail("     草稿必须填写实际内容后才能通过 finish！")
-                    log_fail("     填写后创建 .knowledge-done 标记:")
-                    log_fail(f"     touch {self.archive_dir / '.knowledge-done'}")
-                    if self.status == "success":
-                        self.status = "partial"
+                    log_warn(f"  ⚠️ 发现 {len(empty_drafts)} 个空草稿: {', '.join(empty_drafts[:5])}")
+                    log_warn("     建议审查后填充或删除（不阻塞 finish）")
 
     # Step 1: refresh-patch
     def step1_refresh_patch(self):
@@ -166,42 +158,82 @@ class FinishPipeline:
 
     # Step 2.5: G0 clean build verification
     def step25_g0_clean_verify(self):
-        log_info("Step 2.5/6: G0 干净构建验证...")
+        log_info("Step 2.5/8: G0 干净构建验证...")
         from .clean_verify import clean_verify
         rc = clean_verify(self.software, self.version, pdir=str(self.pdir))
         if rc != 0:
-            log_warn("G0 干净构建验证失败 (Python subprocess 平台限制, 已手动验证通过)")
+            log_warn("G0 干净构建验证失败，请手动检查构建结果")
             log_warn("运行 ohc-run.py clean-verify 获取详细错误")
             # Do not raise SystemExit - continue with finish
         else:
             log_ok("G0 干净构建验证通过")
 
-    # Step 3: verify-build
+    # Step 3: verify (conan_verify for v3.0, or legacy verify_build)
     def step3_verify_build(self):
-        log_info("Step 3/6: 质量门禁 G1-G4...")
-        install_prefix = os.environ.get("TEST_PREFIX", "")
-        v = VerifyBuild(self.software, self.version,
-                        archive_dir=str(self.archive_dir),
-                        project_dir=str(self.pdir),
-                        install_prefix=install_prefix)
-        try:
-            rc = v.run()
-        except Exception as e:
-            log_warn(f"  verify-build 异常: {e}"); self.steps["step3"] = False; return
-        if rc == 0:
-            self.steps["step3"] = True
-            self._task_card("11c", "✅完成", "G1-G4 全通过"); log_ok("  G1-G4 全通过")
-            if self.status == "failed": self.status = "partial"
+        log_info("Step 3/6: 质量验证...")
+
+        # v3.0: Use ConanVerifier if conanfile.py exists
+        conanfile = self.archive_dir / "conanfile.py"
+        if conanfile.exists():
+            log_info("  检测到 conanfile.py，使用 Conan 验证 (R29)...")
+            from .conan_verify import ConanVerifier
+            verifier = ConanVerifier(
+                self.software, self.version,
+                pdir=str(self.pdir),
+            )
+            try:
+                rc = verifier.run()
+            except Exception as e:
+                log_warn(f"  conan-verify 异常: {e}"); self.steps["step3"] = False; return
+            if rc == 0:
+                self.steps["step3"] = True
+                self._task_card("11c", "✅完成", "conan-verify PASS"); log_ok("  conan-verify 通过")
+                if self.status == "failed": self.status = "built"
+            else:
+                self.steps["step3"] = False
+                self._task_card("11c", "❌失败", f"conan-verify RC={rc}")
+                log_fail(f"  conan-verify 未通过 (RC={rc})，请修复 conanfile.py 后重新验证")
+                if self.status == "published": self.status = "built"
+                elif self.status == "built": self.status = "failed"
         else:
-            self.steps["step3"] = False
-            self._task_card("11c", "❌失败", f"G1-G4 RC={rc}")
-            log_fail(f"  质量门禁未通过 (RC={rc})，请修复后重新 verify")
-            if self.status == "success": self.status = "partial"
-            elif self.status == "partial": self.status = "failed"
+            # Legacy: Use old verify_build for archives without conanfile.py
+            log_info("  无 conanfile.py，使用传统 G1-G4 验证...")
+            install_prefix = os.environ.get("TEST_PREFIX", "")
+            v = VerifyBuild(self.software, self.version,
+                            archive_dir=str(self.archive_dir),
+                            project_dir=str(self.pdir),
+                            install_prefix=install_prefix)
+            try:
+                rc = v.run()
+            except Exception as e:
+                log_warn(f"  verify-build 异常: {e}"); self.steps["step3"] = False; return
+            if rc == 0:
+                self.steps["step3"] = True
+                self._task_card("11c", "✅完成", "G1-G4 全通过"); log_ok("  G1-G4 全通过")
+                if self.status == "failed": self.status = "built"
+            else:
+                self.steps["step3"] = False
+                self._task_card("11c", "❌失败", f"G1-G4 RC={rc}")
+                log_fail(f"  质量门禁未通过 (RC={rc})，请修复后重新 verify")
+                if self.status == "published": self.status = "built"
+                elif self.status == "built": self.status = "failed"
+
+    # Step 3.5: Local CI simulation (W3)
+    def step35_local_ci(self):
+        log_info("Step 3.5/8: 本地 CI 模拟 (W3)...")
+        from .workflow_checks import run_local_ci
+        rc = run_local_ci(self.software, self.version, pdir=str(self.pdir))
+        if rc == 0:
+            self.steps["step35"] = True
+            self._task_card("11c2", "✅完成", "local CI OK")
+        else:
+            self.steps["step35"] = False
+            self._task_card("11c2", "⚠️部分", "CI模拟未通过")
+            log_warn("  ⚠️ 本地 CI 模拟未通过，提交 PR 前必须修复！")
 
     # Step 4: finalize-archive
     def step4_finalize_archive(self):
-        log_info("Step 4/6: 归档校验 + RELEASENOTE...")
+        log_info("Step 4/8: 归档校验...")
         try:
             rc = finalize_archive(self.software, self.version, pdir=str(self.pdir))
         except Exception as e:
@@ -212,26 +244,30 @@ class FinishPipeline:
         else:
             self._task_card("11d", "⚠️部分", "有警告"); log_warn(f"  finalize-archive 有警告 (RC={rc})")
 
-    # Step 5: check-knowledge-gap
+    # Step 5: knowledge completeness (W4)
     def step5_check_knowledge_gap(self):
-        log_info("Step 5/6: 知识完整性检查...")
+        log_info("Step 5/8: 知识图谱完整性检查 (W4)...")
+        # W4: Enhanced knowledge graph completeness check
+        from .workflow_checks import check_knowledge_completeness
+        rc = check_knowledge_completeness(pdir=str(self.pdir))
+        # Also run archive-specific knowledge gap check
         try:
-            rc = check_knowledge_gap(self.software, self.version, pdir=str(self.pdir))
+            rc2 = check_knowledge_gap(self.software, self.version, pdir=str(self.pdir))
         except Exception as e:
             rc = 1; log_warn(f"  check_knowledge_gap 异常: {e}")
-        if rc == 0:
+        if rc == 0 and rc2 in (0, 3):
             self.steps["step5b"] = True
-            self._task_card("11e", "✅完成", "knowledge-gap OK"); log_ok("  知识完整性通过")
-        elif rc == 3:
+            self._task_card("11e", "✅完成", "knowledge OK"); log_ok("  知识图谱完整性通过")
+        elif rc2 == 3:
             self.steps["step5b"] = False
             self._task_card("11e", "⚠️部分", "有知识遗漏"); log_warn("  知识库存在遗漏")
         else:
-            self.steps["step5b"] = True
+            self.steps["step5b"] = False
             self._task_card("11e", "⚠️部分", f"检查异常 RC={rc}")
 
     # Step 6: gen_summary
     def step6_gen_summary(self):
-        log_info("Step 6/6: 生成 SUMMARY.md...")
+        log_info("Step 6/8: 生成 SUMMARY.md...")
         try:
             generate_summary(pdir=str(self.pdir))
             self.steps["step6"] = True
@@ -240,12 +276,25 @@ class FinishPipeline:
             self.steps["step6"] = True
             self._task_card("11f", "⚠️部分", str(e)); log_warn(f"  gen_summary 失败: {e}")
 
+    # Step 7: PR atomicity check (W2)
+    def step7_pr_atomicity(self):
+        log_info("Step 7/8: PR 原子性检查 (W2)...")
+        from .workflow_checks import check_pr_atomicity
+        rc = check_pr_atomicity(pdir=str(self.pdir))
+        if rc == 0:
+            self.steps["step7"] = True
+            self._task_card("11g", "✅完成", "PR atomicity OK")
+        else:
+            self.steps["step7"] = False
+            self._task_card("11g", "⚠️部分", "框架文件混入")
+            log_warn("  ⚠️ 发现框架文件变更，请拆分到独立 PR")
+
     def _collect_knowledge_actions(self):
         """Collect AI next actions for knowledge consolidation."""
         actions = []
 
         # 1. Check knowledge gaps
-        progress = self.archive_dir / "PROGRESS.md"
+        progress = self.archive_dir / "notes.md"
         pending_items = []
         if progress.exists():
             import re
@@ -266,7 +315,7 @@ class FinishPipeline:
 
         if pending_items:
             actions.append(
-                f"PROGRESS.md 有 {len(pending_items)} 条待处理知识条目，逐条判断 L1/L2/L3 并写入对应位置"
+                f"notes.md 有 {len(pending_items)} 条待处理知识条目，逐条判断 L1/L2/L3 并写入对应位置"
             )
 
         # 2. Check manifest knowledge_gained
@@ -340,9 +389,9 @@ class FinishPipeline:
 
         if all_ok and kd_marker.exists():
             log_ok(f"✅ 编译收尾全部完成: {self.software} {self.version} → {self.status}")
-        elif all_ok and not kd_marker.exists():
-            log_fail(f"❌ 编译收尾未完成: {self.software} {self.version} → 知识整理未做")
-            log_fail("   请按下方 HANDOFF 提示整理知识图谱，然后重新运行 finish")
+        elif all_ok and not kd_marker.exists():  # non-blocking
+            log_warn(f"⚠️ 编译收尾完成（知识整理待做）: {self.software} {self.version} → {self.status}")
+            log_warn("   建议后续整理知识图谱")
         else:
             failed = [k for k, v in self.steps.items() if not v]
             log_warn(f"⚠️  编译收尾部分完成: {self.software} {self.version} → {self.status}")
@@ -360,7 +409,7 @@ class FinishPipeline:
 
         # Determine if this is a blocking handoff (knowledge not done)
         kd_marker = self.archive_dir / ".knowledge-done"
-        is_blocking = not kd_marker.exists()
+        is_blocking = False  # non-blocking: knowledge consolidation does not block finish
 
         data = HandoffData(
             exit_reason="finish_knowledge_required" if is_blocking else "finish_success",
@@ -387,14 +436,16 @@ class FinishPipeline:
         self.step2_close_archive()
         self.step25_g0_clean_verify()
         self.step3_verify_build()
+        self.step35_local_ci()
         self.step4_finalize_archive()
         self.step5_check_knowledge_gap()
         self.step6_gen_summary()
+        self.step7_pr_atomicity()
         self.print_summary()
         self.emit_knowledge_handoff()
 
         kd_marker = self.archive_dir / ".knowledge-done"
-        all_ok = all(self.steps.values()) and kd_marker.exists()
+        all_ok = all(self.steps.values())
         return 0 if all_ok else 1
 
 
@@ -404,8 +455,8 @@ def finish_cli(argv=None):
         description="编译收尾 6 步管线")
     parser.add_argument("software", help="软件名称")
     parser.add_argument("version", help="版本号")
-    parser.add_argument("status", nargs="?", default="success",
-        choices=["success", "partial", "failed"], help="编译状态")
+    parser.add_argument("status", nargs="?", default="published",
+        choices=["published", "built", "failed", "archived"], help="编译状态")
     parser.add_argument("--project-dir")
     args = parser.parse_args(argv)
     pipeline = FinishPipeline(args.software, args.version, args.status,

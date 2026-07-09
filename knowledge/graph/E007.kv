@@ -3,19 +3,20 @@
 #====================================================================
 
 id:                     E007
-title: config.guess 无法识别 HarmonyOS 系统
 trigger_tool:           configure
 phase:                  configuration
 error_signature:        cannot guess build type|unable to guess system type|
                          config.guess.*unable|cannot guess.*build type|
-                         Invalid configuration.*guess|invalid triplet.*ohos
+                         Invalid configuration.*guess|invalid triplet.*ohos|
+                         OS ohos not recognized
 
 severity:               2
 category:               autotools-config
 match_keywords:         config.guess, build type, HarmonyOS, autoconf,
                          cannot guess, unable to guess, UNAME_SYSTEM,
                          build system type, Invalid configuration,
-                         config.sub, triplet, ohos-linux, __OHOS__
+                         config.sub, triplet, ohos-linux, __OHOS__,
+                         OS not recognized, basic os list
 
 root_cause:             GNU config.guess 脚本不包含 HarmonyOS/__OHOS__ 检测分支。
                          uname -s 返回 HarmonyOS 无法匹配任何已知系统模式,
@@ -34,6 +35,7 @@ rec_approach:           patch-autotools-script
 rec_description:        用内置补丁脚本 patch-autotools-ohos.pl 一键打补丁:
                          config.guess 两处修改(§2.1 LIBC检测 + §2.2 系统识别case分支),
                          config.sub 三处修改(§3.1 ohos-linux + §3.2 OS列表 + §3.3 内核列表)。
+                         否则会报 "OS ohos not recognized" 错误。
                          输出标准三元组 aarch64-unknown-linux-ohos
 rec_command:           perl ${SKILL_ROOT}/scripts/patch-autotools-ohos.pl \
                            build-aux/config.guess build-aux/config.sub
@@ -59,14 +61,23 @@ fallback_impl:          none
                          → E005(链接错误)
                          → E040/E019(运行时崩溃)
 
-principles:             P-AUTOTOOLS-001, P-AUTOTOOLS-002
-
-causes:                 []
-caused_by:              []
-similar_to:             [E021]
-conflicts_with:         []
+principles:              P001, P003, P011
+caused_by:               
+similar_to:               
+conflicts_with:               
 prerequisite_of:        [E064]
 
 doc_file:               doc/E007.md
 last_updated:           2026-04-10
 source_event:           archives/x/xz/5.6.2/manifest.yaml (F069 确立铁律)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

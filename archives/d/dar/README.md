@@ -1,19 +1,25 @@
-# dar 2.7.14 — OpenHarmony 编译记录
+# DAR (Disk ARchive)
 
-## 基本信息
-- 软件: dar
-- 版本: 2.7.14
-- 构建系统: autotools
-- 目标: ohos-aarch64
+DAR 是一个全功能的磁盘归档工具，支持压缩（gzip、bzip2、xz、lzo、zstd）、加密、增量备份、分卷等功能。
 
-## 编译指导
-<!-- 编译注意事项 -->
+## 功能概述
+- 全量/增量/差异备份
+- 支持多种压缩算法（gzip, bzip2, xz, lzo, zstd）
+- AES 加密支持
+- 分卷归档（可跨越多个存储介质）
+- 文件排除/包含过滤
+- 网络操作（通过 dar_slave/dar_xform）
 
-## 补丁清单
-<!-- patches/ 目录中的补丁说明 -->
+## OHOS 适配
+- 需要更新 config.guess/config.sub 以识别 HarmonyOS 平台
+- po/Makefile.in 需要调整以兼容交叉编译环境
+- 多个源文件涉及平台特定 API（check-*.cpp 系列文件）需要适配
+- 实际编译使用了 15 个补丁
 
-## 已知限制
-<!-- 平台相关限制 -->
+## 依赖关系
+- **编译依赖**: zlib, bzip2, openssl, libarchive (可选)
+- **运行依赖**: zlib, bzip2, openssl
 
-## 功能验证
-<!-- 验证命令和结果 -->
+## 参考资料
+- 官网: https://dar.sourceforge.net/
+- 源码: https://sourceforge.net/projects/dar/

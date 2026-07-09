@@ -3,7 +3,6 @@
 #====================================================================
 
 id:                     E011
-title: HMDFS 文件系统 umask 077 权限问题
 trigger_tool:           configure|config.status
 phase:                  configuration
 error_signature:        Permission denied.*conf.*\.tmp|
@@ -17,7 +16,8 @@ category:               platform|hmdfs|permissions
 match_keywords:         umask 077, Permission denied, config.status,
                          mktemp, HMDFS, setgid, temp directory,
                          subs1.awk, subs1.sed, confXXXXXX,
-                         cannot create temp file
+                         cannot create temp file,
+                         chmod, drwx--S---, tmp_work
 
 root_cause:             HMDFS 文件系统的 UID 映射机制导致 umask 077 创建的
                          临时目录无法被当前进程写入。autotools 的 configure 脚本
@@ -29,7 +29,9 @@ root_cause:             HMDFS 文件系统的 UID 映射机制导致 umask 077 �
                          此外 HMDFS 可能给目录设置 setgid 位（02700），
                          进一步加剧权限问题。
 affected_scope:         **所有使用 autotools 的项目**在 HMDFS 上 configure 时
-                         均会遇到此问题（xz, tar, wget, texinfo, vala 等已确认）
+                         均会遇到此问题（xz, tar, wget, texinfo, vala,
+                         tmux, zsh, hwloc, gdb, nmap, flex, bison,
+                         sparsehash 等已确认）
 verification_cmd:       grep "umask 077" configure | head -3;
                          mktemp -d "./confXXXXXX" && ls -ld conf* 2>/dev/null;
                          id -u
@@ -54,9 +56,6 @@ fallback_command:       ./configure --no-create --prefix=$DEFAULT_PREFIX && sed 
 fallback_auto_fix:      true
 fallback_impl:          source-patch
 
-fallback2_priority:     3
-fallback2_approach:     manual-config-generation
-fallback2_description:  当 umask 修改仍无法解决时（HMDFS 极端限制：即使 umask 000
                          临时目录仍不可写），完全绕过 config.status 机制，手动生成
                          配置文件：
                          方案 A: 从 config.h.in 手动创建 config.h，将所有
@@ -67,14 +66,29 @@ fallback2_description:  当 umask 修改仍无法解决时（HMDFS 极端限制�
                          方案 C: 创建独立 Makefile.manual，硬编码所有编译
                          参数（prefix, CC, CFLAGS, LDFLAGS 等），完全
                          脱离 autotools 体系。
-fallback2_command:      # 方案 A: 手动生成 config.h
                          ./configure --no-create --prefix=$DEFAULT_PREFIX 2>&1 | tee config.log;
                          sed 's/^#undef \(.*\)/#define \1 1/' config.h.in > config.h;
                          # 方案 B: 手动生成 Makefile
                          sed 's/ = / ?= /g' Makefile.in > Makefile;
                          # 方案 C: 独立 Makefile（见 doc/E011.md 极端方案章节）
-fallback2_auto_fix:     false
-fallback2_impl:         manual
+
+                         （如 tmp_work）替代 mktemp 动态创建临时目录。
+                         HMDFS 上 mktemp 创建的目录权限为 drwx--S---
+                         （仅 owner+setgid），chmod 也无法修改 HMDFS
+                         上的目录权限。使用 mkdir -p 创建固定目录可以
+                         绕过此限制。
+                         同时，对于 configure 脚本本身也存在 umask 077
+                         的情况，需同步修改 configure 中的 umask。
+                         对于 header-only 库（如 sparsehash），可手动
+                         创建 config.h 并手动安装头文件，完全绕过
+                         config.status。
+                         mkdir -p tmp_work;
+                         sed -i 's/mktemp -d ".\/confXXXXXX"/mkdir -p "tmp_work"/g' config.status;
+                         # 同时修改 configure 中的 umask
+                         sed -i 's/umask 077/umask 000/g' configure;
+                         # header-only 库: 手动创建 config.h + 手动安装头文件
+                         # sed 's/^#undef \(.*\)/#define \1 1/' config.h.in > config.h;
+                         # cp -r src/include/* $PREFIX/include/
 
 forbid_1_pattern:       --build=|--host=|--target=
 forbid_1_reason:         禁止用交叉编译参数绕过 configure。
@@ -84,15 +98,23 @@ forbid_1_reason:         禁止用交叉编译参数绕过 configure。
 forbid_1_consequence:   configure 看似通过但 config.h 检测结果全部为默认值，
                          编译阶段出现级联错误
 
-principles:             P-PATCH-001
-
-causes:                 []
-caused_by:              []
-similar_to:             [E002]
-conflicts_with:         []
-prerequisite_of:        []
+principles:              P004, P006
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
 doc_file:               doc/E011.md
-last_updated:           2026-04-21
-source_event:           archives/x/xz/5.6.2, archives/t/tar/1.35, archives/w/wget/1.19.1
+last_updated:           2026-04-27
+source_event:           archives/x/xz/5.6.2, archives/t/tar/1.35, archives/w/wget/1.19.1, archives/i/ivykis/0.43.2
 
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
