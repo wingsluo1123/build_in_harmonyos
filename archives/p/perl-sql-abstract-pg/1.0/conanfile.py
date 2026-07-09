@@ -49,16 +49,9 @@ class PerlSqlAbstractPgConan(ConanFile):
         env["PERL5LIB"] = perl5_lib + (":" + env["PERL5LIB"] if env.get("PERL5LIB") else "")
 
         deps_dir = os.path.join(self.build_folder, "sql_abstract_dep")
-        os.makedirs(deps_dir, exist_ok=True)
-        dep_tarball = os.path.join(deps_dir, "SQL-Abstract-2.000001.tar.gz")
-        subprocess.run(
-            ["curl", "-sL",
-             "https://cpan.metacpan.org/authors/id/M/MS/MSTROUT/SQL-Abstract-2.000001.tar.gz",
-             "-o", dep_tarball],
-            check=True,
-        )
-        subprocess.run(["tar", "xzf", dep_tarball], cwd=deps_dir, check=True)
-        dep_src = os.path.join(deps_dir, "SQL-Abstract-2.000001")
+        get(self, **self.conan_data["dep_sources"]["sql_abstract"],
+            destination=deps_dir, strip_root=True)
+        dep_src = deps_dir
         subprocess.run(
             ["perl", "Makefile.PL", f"INSTALL_BASE={default_prefix}"],
             cwd=dep_src, env=env, check=True,
