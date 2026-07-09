@@ -34,7 +34,6 @@ class NettleConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         # Set CONFIG_SHELL to use correct bash for HarmonyOS
-        import shutil
         bash_path = shutil.which("bash") or "/bin/bash"
         # Use environment variables for configure
         env = tc.environment()
