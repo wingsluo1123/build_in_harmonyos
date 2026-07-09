@@ -159,6 +159,17 @@ class RlwrapConan(ConanFile):
                     cb_content
                 )
                 modified = True
+            # Strip system LDFLAGS prefix (${LDFLAGS:+$LDFLAGS }) so linker
+            # searches our -L paths first, not DEFAULT_PREFIX/lib where
+            # libreadline.so is inaccessible (permissions 770).
+            if 'export LDFLAGS=' in cb_content:
+                cb_content = re.sub(
+                    r'export\s+LDFLAGS="\$\{LDFLAGs[^}]*\}([^"]*)"',
+                    r'export LDFLAGS="\1"',
+                    cb_content,
+                    flags=re.IGNORECASE
+                )
+                modified = True
             if modified:
                 with open(fpath, 'w') as f:
                     f.write(cb_content)
