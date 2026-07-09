@@ -1,0 +1,74 @@
+software: mise
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2025.8.20/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2025.8.20"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-01"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/jdx/mise/archive/refs/tags/v2025.8.20.tar.gz"
+
+  # 源码校验和
+  sha256: "f92d22face0128612fe27039f80beae0cd30335240cb7be1aff22b429048f485"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "rustc 1.87.0 在 HarmonyOS (musl libc) 上段错误: librustc_driver 共享库加载时崩溃，dlopen 也段错误"
+  - "HarmonyOS 二进制执行需要 .note.ohos.ident 或 .codesign ELF section，预编译二进制缺少这些 section 导致 Permission denied"
+  - "clang 编译的程序自动获得 .note.ohos.ident 和 .codesign section，可直接执行"
+  - "objcopy 添加 .note.ohos.ident/.codesign 到预编译二进制仍 Permission denied，安全机制可能验证签名内容"
+  - "glibc 编译的 PIE 二进制可通过自定义 C 语言 ELF 加载器在 musl 系统上加载执行"
+  - "glibc/musl TLS 布局差异导致 Tokio 运行时线程局部变量读取垃圾数据，触发 'Cannot start a runtime from within a runtime' panic"
+  - "mise 预编译 musl 二进制实际是 glibc 链接的 (INTERP=/lib/ld-linux-aarch64.so.1)，非真正的 musl 静态二进制"
+  - "cargo 1.87.0 可正常运行但 rustc 段错误，两者使用不同的初始化路径"

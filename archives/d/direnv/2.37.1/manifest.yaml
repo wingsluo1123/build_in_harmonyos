@@ -1,0 +1,94 @@
+software: direnv
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.37.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.37.1"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/direnv/direnv/archive/refs/tags/v2.37.1.tar.gz"
+
+  # 源码校验和
+  sha256: "4142fbb661f3218913fac08d327c415e87b3e66bd0953185294ff8f3228ead24"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 构建命令
+  build_command: "CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X github.com/direnv/direnv/v2/version.Version=2.37.1' -o direnv ."
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # Go 版本
+  go_version: "1.24.4"
+
+# ============================================================
+# 产物信息
+# ============================================================
+
+artifacts:
+  # 产物二进制
+  - path: bin/direnv
+    type: executable
+    size: 7667896
+    sha256: "0d8d7e4d31e37293c4891c85150c5b6fe20d74a8fe527d1eb90a851ef2471f47"
+    elf_type: "EXEC (non-PIE, static)"
+
+  # 打包产物
+  - path: packaging/direnv-2.37.1-ohos-aarch64.tar.gz
+    type: archive
+    sha256: "44ef322f557e905bd1e516f492a4922959b9ccc4dbb22f96eb4b20056ac8761b"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "direnv 是纯 Go 项目，CGO_ENABLED=0 静态编译，无 C 依赖"
+  - "Go 工具链通过 elfldr wrapper 在 OHOS 平台运行，需要 SVC syscall patching"
+  - "init-build 自动检测构建系统为 autotools（因有 GNUmakefile），实际需手动编写 Go 构建的 conanfile.py"
+  - "GitHub 直连下载超时，使用 ghfast.top 镜像 + curl -k 下载"
+  - "conanfile.py 参考 fzf/helm 等 Go 项目模式：go build + copy binary + env_info.PATH"

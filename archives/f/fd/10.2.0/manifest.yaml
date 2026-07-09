@@ -1,0 +1,72 @@
+software: fd
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/10.2.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "10.2.0"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# 构建系统类型 (top-level for manifest validation)
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/sharkdp/fd/archive/refs/tags/v10.2.0.tar.gz"
+
+  # 源码校验和
+  sha256: "73329fe24c53f0ca47cd0939256ca5c4644742cb7c14cf4114c8c9871336d342"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "elfldr 不设置 AT_PHENT 辅助向量，对大型 TLS 段的 musl 静态二进制会导致 SIGSEGV"
+  - "fd_loader 通过设置 AT_PHENT=sizeof(Elf64_Phdr)=56 修复此问题"
+  - "TLS 段大小是判断是否需要 AT_PHENT 修复的关键指标"

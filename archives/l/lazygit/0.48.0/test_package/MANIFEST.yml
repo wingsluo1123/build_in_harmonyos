@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: lazygit/0.48.0
+homepage: "https://github.com/jesseduffield/lazygit"
+
+# 上游测试命令 (Go 项目使用 go test)
+upstream_check_command: "go test ./... -short"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# lazygit 上游有大量单元测试 (go test ./...)，但 OHOS 上不运行上游测试
+# 仅使用 L1 级别的 smoke test (--version)
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "L1 smoke test: 验证 lazygit 二进制可执行并输出正确版本号"
+    command: "elfldr lazygit --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 1

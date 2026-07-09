@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# mise is a Rust project, tests are in Rust (cargo test)
+# On HarmonyOS, cargo/rustc is not functional, so upstream tests cannot run
+
+package: mise/2025.8.20
+homepage: "https://github.com/jdx/mise"
+
+# mise uses cargo test, not make check
+upstream_check_command: "cargo test"
+
+# conanfile.py build() method - no upstream test integration (rustc unavailable)
+upstream_test_in_build: false
+upstream_test_command: "cargo test"
+
+# Upstream tests (Rust integration tests)
+upstream_tests:
+  - file: src/cli/version.rs
+    source: mise-2025.8.20/src/cli/version.rs
+    description: "Version display tests"
+    command: "cargo test version"
+
+# Consumer test
+test_package_tests:
+  - file: test.c
+    description: "mise --version smoke test"
+    command: "./test_mise --version"
+
+# Approximate assertion count
+assertion_count: 10

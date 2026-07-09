@@ -1,0 +1,81 @@
+software: zoxide
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/zoxide/0.9.8/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.9.8"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/ajeetdsouza/zoxide/archive/refs/tags/v0.9.8.tar.gz"
+
+  # 源码校验和
+  sha256: "1b276edbf328aafc86afe1ebce41f45ccba3a3125412e89c8c5d8e825b0c7407"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+  # 预编译二进制方案，无 configure 选项
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 预编译二进制信息
+# ============================================================
+
+prebuilt_binary:
+  url: "https://ghfast.top/https://github.com/ajeetdsouza/zoxide/releases/download/v0.9.8/zoxide-0.9.8-aarch64-unknown-linux-musl.tar.gz"
+  sha256: "078cc9cc8cedb6c45edb84c0f5bad53518c610859c73bdb3009a52b89652c103"
+  type: "ELF executable, 64-bit LSB arm64, static, stripped"
+  loader: "elfldr"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Rust rustc 在 OHOS 上段错误 (SIGSEGV)，需使用预编译 musl 二进制方案"
+  - "elfldr 可成功加载 zoxide musl 静态二进制（小 TLS 段，无需 fd_loader）"
+  - "参考 just 1.43.1 的 conanfile.py 预编译二进制模式：download() + tarfile.extract() + wrapper 脚本"
+  - "conanfile.py test_package 使用 self.dependencies[name].package_folder 获取二进制路径"

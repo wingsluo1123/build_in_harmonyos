@@ -1,0 +1,95 @@
+software: k9s
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.50.16/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.50.16"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/derailed/k9s/archive/refs/tags/v0.50.16.tar.gz"
+
+  # 源码校验和
+  sha256: "09451bea1ba2cf1d29d68eb10b6e8ffe43425b99dd849a58d9b3e9992848139b"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 构建系统详情
+  build_tool: "go build (Go 1.24.4)"
+  build_command: "CGO_ENABLED=0 go build -trimpath -ldflags '-s -w -X github.com/derailed/k9s/cmd.version=v0.50.16' -tags netgo -o k9s ."
+
+  # 配置选项列表
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "-trimpath"
+    - "-tags netgo"
+    - "-ldflags '-s -w -X github.com/derailed/k9s/cmd.version=v0.50.16'"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "go/1.24.4"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 产物信息
+# ============================================================
+
+artifacts:
+  # 二进制产物
+  - path: "packaging/k9s-0.50.16-ohos-aarch64.tar.gz"
+    type: tar.gz
+    sha256: "8d4d3a36775d631f00a70a46f8ce2907aa6e4bd58140ef100ba2d4efd99c39d5"
+    size: 125260477
+    description: "k9s binary for OHOS aarch64"
+
+  # 二进制 SHA256 (staging 和 conan cache 一致)
+  binary_sha256: "9bbbe594e47174f137794138d139f3ed35f2162fc7f0edb0c0ad6853d7623a8f"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go 项目 go.mod 可能要求比系统安装版本更高的 Go，需下载对应版本并创建 elfldr wrapper"
+  - "Go 工具链 (compile/link/asm 等) 在 OHOS 上需要 elfldr wrapper：将真实二进制移至 .real/ 目录，创建 bash wrapper 脚本"
+  - "GOTOOLCHAIN=local 可能被硬编码到 Go 二进制中，需修改 go wrapper 脚本设置为 auto"
+  - "k9s tcell 终端 UI 使用 syscall，CGO_ENABLED=0 即可编译，无需 C 依赖"
+  - "Go 项目 conanfile.py 模板：build() 用 self.run('go build ...')，package() 用 copy()，package_info() 设 libs=[]"

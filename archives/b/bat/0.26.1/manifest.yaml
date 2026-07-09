@@ -1,0 +1,66 @@
+software: bat
+# 版本级 manifest
+# 文件位置: archives/b/bat/0.26.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.26.1"
+status: published
+build_date: "2026-07-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/sharkdp/bat/archive/refs/tags/v0.26.1.tar.gz"
+  sha256: "4474de87e084953eefc1120cf905a79f72bbbf85091e30cf37c9214eafcaa9c9"
+  tar_format: tar.gz
+
+# ============================================================
+# 预编译二进制信息
+# ============================================================
+
+binary:
+  url: "https://github.com/sharkdp/bat/releases/download/v0.26.1/bat-v0.26.1-aarch64-unknown-linux-musl.tar.gz"
+  sha256: "6369242c584065f195fb20cb36fbd7cb63ae690605bbe89868a7596b596c2c23"
+  target: "aarch64-unknown-linux-musl"
+  packaged_sha256: "ba7c30e56a3de25fead14f9d2fa8bdde9dd974a118e367e0de6748c7322a4ae8"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  strategy: "prebuilt-musl"
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  loader: fd_loader
+
+# ============================================================
+# Conan 引用
+# ============================================================
+
+conan_ref: "bat/0.26.1@ohpcd/stable"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "fd_loader.c"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "bat (sharkdp) 必须使用 fd_loader 而非 elfldr：--version 可用 elfldr 但文件 I/O 段错误，因 TLS 初始化不完整"
+  - "elfldr 不设置 AT_PHENT 导致 musl TLS 初始化不完整，简单命令可用但复杂操作（文件读取、语法高亮）崩溃"
+  - "sharkdp 系列工具（bat、fd）均需要 fd_loader，应默认使用不做 elfldr 尝试"
