@@ -48,7 +48,8 @@ class NettleConan(ConanFile):
         bash_path = shutil.which("bash") or "/bin/bash"
         env_vars = {
             "CONFIG_SHELL": bash_path,
-            "SHELL": bash_path
+            "SHELL": bash_path,
+            "TMPDIR": os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
         }
         # Update environment for subprocess
         for key, value in env_vars.items():
