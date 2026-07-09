@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: tmux/3.4
+homepage: https://github.com/tmux/tmux
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# make check 实际运行的测试程序
+upstream_tests:
+  - name: "tmux-basic"
+    source: tmux-3.4/test/basic_test.c
+    description: "基础功能测试"
+  - name: "tmux-parse"
+    source: tmux-3.4/test/parse_test.c
+    description: "命令解析测试"
+
+# test_package 中自带的测试
+test_package_tests:
+  - file: test.sh
+    description: "tmux -V + --help smoke test"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值)
+assertion_count: 20
