@@ -5,6 +5,7 @@ This is the L1 test in the five-level test system.
 CI runs this automatically via `conan create` (which invokes test_package).
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.build import can_run
@@ -21,4 +22,5 @@ class MarkedTestConan(ConanFile):
         if can_run(self):
             marked_root = self.dependencies["marked"].package_folder
             test_script = os.path.join(os.path.dirname(__file__), "test_marked.sh")
-            self.run(f'sh "{test_script}" "{marked_root}"', env="conanrun")
+            node_bin = shutil.which("node") or "/data/service/hnp/bin/node"
+            self.run(f'sh "{test_script}" "{marked_root}" "{node_bin}"')

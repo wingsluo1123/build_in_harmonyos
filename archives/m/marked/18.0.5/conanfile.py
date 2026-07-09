@@ -45,11 +45,16 @@ class MarkedConan(ConanFile):
 
         src_dir = self.source_folder
 
+        # Find npm — conanrun env doesn't include system PATH on OHOS
+        npm = shutil.which("npm") or "/data/service/hnp/bin/npm"
+        if not os.path.isfile(npm):
+            raise Exception(f"npm not found (tried PATH and {npm})")
+
         # Step 1: Install npm dependencies
-        self.run(f'cd "{src_dir}" && npm install', env="conanrun")
+        self.run(f'cd "{src_dir}" && "{npm}" install')
 
         # Step 2: Build the library (esbuild + TypeScript + man page)
-        self.run(f'cd "{src_dir}" && npm run build', env="conanrun")
+        self.run(f'cd "{src_dir}" && "{npm}" run build')
 
     def package(self):
         src_dir = self.source_folder
