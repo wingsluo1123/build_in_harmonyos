@@ -189,8 +189,25 @@ class RlwrapConan(ConanFile):
         readline_src = os.path.join(self.build_folder, "readline-8.2")
         if not os.path.exists(readline_src):
             self.output.info("Downloading readline 8.2 source...")
-            get(self, "https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz",
-                destination=self.build_folder)
+            readline_urls = [
+                "https://github.com/bminor/readline/archive/refs/tags/readline-8.2.tar.gz",
+                "https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz",
+            ]
+            for url in readline_urls:
+                try:
+                    get(self, url, destination=self.build_folder)
+                    # GitHub archive extracts to readline-readline-8.2/
+                    github_dir = os.path.join(self.build_folder, "readline-readline-8.2")
+                    if os.path.isdir(github_dir):
+                        os.rename(github_dir, readline_src)
+                    # GitHub archive may lack pre-generated configure script
+                    if not os.path.exists(os.path.join(readline_src, "configure")):
+                        import shutil
+                        shutil.rmtree(readline_src, ignore_errors=True)
+                        continue
+                    break
+                except Exception:
+                    continue
         # Copy patched config.guess/config.sub from rlwrap source
         import shutil
         for fn in ("config.guess", "config.sub"):
