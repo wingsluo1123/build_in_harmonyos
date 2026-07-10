@@ -102,16 +102,22 @@ class LibqalculateConan(ConanFile):
 
         downloaded = False
         for mirror_url in urls_to_try:
-            try:
-                self.run(
-                    f'wget -O - "{mirror_url}" | tar xJ -C "{build_dir}"',
-                    env="conanbuild",
-                )
-                downloaded = True
-                self.output.info(f"Downloaded {name} from {mirror_url}")
+            # Try curl first (better SSL/header support on OHOS),
+            # fall back to wget if curl is unavailable
+            for cmd in (
+                f'curl -fsSL "{mirror_url}" | tar xJ -C "{build_dir}"',
+                f'wget -O - "{mirror_url}" | tar xJ -C "{build_dir}"',
+            ):
+                try:
+                    self.run(cmd, env="conanbuild")
+                    downloaded = True
+                    self.output.info(f"Downloaded {name} from {mirror_url}")
+                    break
+                except Exception:
+                    continue
+            if downloaded:
                 break
-            except Exception:
-                self.output.info(f"Download failed from {mirror_url}, trying next...")
+            self.output.info(f"Download failed from {mirror_url}, trying next...")
         if not downloaded:
             raise Exception(f"Failed to download {name} from all sources")
 
