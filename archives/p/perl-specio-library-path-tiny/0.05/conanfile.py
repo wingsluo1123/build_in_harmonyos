@@ -34,9 +34,11 @@ class PerlSpecioLibraryPathTinyConan(ConanFile):
     def layout(self):
         basic_layout(self, src_folder=".")
 
-    def requirements(self):
-        # R27: dependencies use @ohpcd/stable
-        self.requires("perl-specio/0.53@ohpcd/stable")
+    # Specio 0.53 is available as a system Perl module (installed at
+    # /storage/Users/currentUser/usr/local/lib/site_perl/5.42.0).
+    # Not declared as a Conan dependency because perl-specio has not been
+    # published to the Conan remote yet. PERL5LIB in _get_perl5lib() handles
+    # the system Perl path resolution.
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -68,14 +70,14 @@ class PerlSpecioLibraryPathTinyConan(ConanFile):
             raise Exception(f"Unsupported OS: {self.settings.os}")
 
         perl5lib = self._get_perl5lib()
-        env_vars = {"PERL5LIB": perl5lib}
+        env_vars = [f"PERL5LIB={perl5lib}", "SPECIO_IMPLEMENTATION=PP"]
 
         self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder, env=env_vars)
         self.run("make -j1", cwd=self.source_folder, env=env_vars)
 
     def package(self):
         perl5lib = self._get_perl5lib()
-        env_vars = {"PERL5LIB": perl5lib}
+        env_vars = [f"PERL5LIB={perl5lib}", "SPECIO_IMPLEMENTATION=PP"]
 
         staging = os.path.join(self.build_folder, "staging")
         self.run(f'make install DESTDIR="{staging}"', cwd=self.source_folder, env=env_vars)

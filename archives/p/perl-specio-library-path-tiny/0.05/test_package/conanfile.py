@@ -63,20 +63,16 @@ class PerlSpecioLibraryPathTinyTestConan(ConanFile):
         if "Specio" in content:
             self.output.info("Specio reference found in module")
 
-        # Set up PERL5LIB
+        # Set up PERL5LIB — use os.environ directly (env= param not reliable in test_package)
         perl5lib = self._get_perl5lib(pkg_folder)
         self.output.info(f"PERL5LIB={perl5lib}")
-
-        env = {
-            "PERL5LIB": perl5lib,
-            "SPECIO_IMPLEMENTATION": "PP",
-        }
+        os.environ["PERL5LIB"] = perl5lib
+        os.environ["SPECIO_IMPLEMENTATION"] = "PP"
 
         # Test 1: Load module
         self.run(
             'perl -MSpecio::Library::Path::Tiny -e '
             '"print qq{Specio::Library::Path::Tiny loaded OK\n}"',
-            env=env,
         )
         self.output.success("Module loaded successfully")
 
@@ -84,12 +80,11 @@ class PerlSpecioLibraryPathTinyTestConan(ConanFile):
         self.run(
             'perl -MSpecio::Library::Path::Tiny -e '
             '"print qq{VERSION=$Specio::Library::Path::Tiny::VERSION\n}"',
-            env=env,
         )
         self.output.info("Version check completed")
 
         # Test 3: Run consumer-perspective Perl test script
         test_script = os.path.join(self.source_folder, "test_specio_library_path_tiny.pl")
-        self.run(f'perl "{test_script}"', env=env)
+        self.run(f'perl "{test_script}"')
 
         self.output.info("perl-specio-library-path-tiny 0.05 package structure verified OK")
