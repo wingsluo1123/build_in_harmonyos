@@ -17,7 +17,7 @@ class ElfutilsConan(ConanFile):
     version = "0.195"
     description = "Libraries and utilities for handling ELF objects"
     license = "GPL-3.0-or-later"
-    homepage = "https://sourceware.org/elfutils/"
+    homepage = "https://github.com/sourceware-org/elfutils"
     url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
