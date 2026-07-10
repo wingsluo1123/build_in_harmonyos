@@ -6,6 +6,7 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class SerdConan(ConanFile):
@@ -34,6 +35,19 @@ class SerdConan(ConanFile):
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "static"
         tc.generate()
+
+        # OHOS: CI sets AR=llvm-ar (bare name) but the binary may not be in
+        # PATH on CI workers. Derive the full path from compiler_executables.
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c", "")
+        if cc:
+            bin_dir = os.path.dirname(cc)
+            env = Environment()
+            env.define("AR", os.path.join(bin_dir, "llvm-ar"))
+            env.define("RANLIB", os.path.join(bin_dir, "llvm-ranlib"))
+            env.define("NM", os.path.join(bin_dir, "llvm-nm"))
+            env.prepend_path("PATH", bin_dir)
+            env.vars(self).save_script("ohos_toolchain_env")
 
     def build(self):
         apply_conandata_patches(self)
