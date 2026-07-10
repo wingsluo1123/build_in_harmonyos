@@ -9,19 +9,20 @@
 
 ## 编译步骤
 
-1. 下载源码: `curl -kfsSL -o Package-Variant-1.003002.tar.gz https://cpan.metacpan.org/authors/id/M/MS/MSTROUT/Package-Variant-1.003002.tar.gz`
-2. 解压到 work 目录
-3. 运行 `perl Makefile.PL PREFIX=$DEFAULT_PREFIX` 生成 Makefile
-4. 运行 `make` 编译（纯 Perl 模块，仅复制 .pm 文件到 blib）
-5. 运行 `make install DESTDIR=$TEST_PREFIX` 安装到 staging 目录
-6. 运行 `make test` 执行测试套件
-7. 运行 `make install INSTALL_BASE=<path>` 验证 INSTALL_BASE 安装方式
+1. 下载源码: `curl -fsSL -o Package-Variant-1.003002.tar.gz https://cpan.metacpan.org/authors/id/M/MS/MSTROUT/Package-Variant-1.003002.tar.gz`
+2. 验证 SHA256: `echo "b2ed849d2f4cdd66467512daa3f143266d6df810c5fae9175b252c57bc1536dc  Package-Variant-1.003002.tar.gz" | sha256sum -c`
+3. 解压到 work 目录
+4. 运行 `perl Makefile.PL PREFIX=$DEFAULT_PREFIX` 生成 Makefile
+5. 运行 `make` 编译（纯 Perl 模块，仅复制 .pm 文件到 blib）
+6. 运行 `make install DESTDIR=$TEST_PREFIX` 安装到 staging 目录
+7. 运行 `make test` 执行测试套件
+8. 运行 `make install INSTALL_BASE=<path>` 验证 INSTALL_BASE 安装方式
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | SSL 证书验证失败 | 鸿蒙环境缺少 CA 证书 | 使用 `curl -k` 下载源码和依赖模块 |
+| 1 | SSL 证书验证失败 | 鸿蒙环境缺少 CA 证书 | 配置 CA 证书或通过 conandata.yml 的 SHA256 校验确保下载完整性；依赖模块从 CPAN 下载后手动校验 |
 | 2 | make test 失败: Can't locate strictures.pm | 缺少 Perl 运行时依赖 strictures 和 Import::Into | 从 CPAN 手动下载并安装 strictures-2.000006 和 Import-Into-1.002005 |
 | 3 | conan-verify G1 失败 | conanfile.py 缺少 export_sources() 方法和补丁应用调用 | 添加 export_conandata_patches(self) 和 apply_conandata_patches(self) |
 | 4 | conan-verify G2 失败: test_package 找不到 Package::Variant | conanfile.py 使用 PREFIX=$package_folder + DESTDIR=$package_folder 导致路径双重嵌套 | 改用 INSTALL_BASE=$package_folder 在 Makefile.PL 阶段设置，package() 直接 make install |

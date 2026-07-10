@@ -53,9 +53,9 @@ build:
   # - openssl/1.1.1w
   # - curl/8.19.0
 
-  # 编译器
-  cc: clang
-  cxx: clang++
+  # 编译器（纯 Perl 模块，未使用 C 编译器）
+  cc: none
+  cxx: none
 
 # ============================================================
 # 补丁信息
@@ -75,7 +75,7 @@ knowledge_gained:
   - "纯 Perl 模块使用 ExtUtils::MakeMaker 构建系统，编译过程仅复制 .pm 文件到 blib，无需 C 编译器"
   - "Makefile.PL 使用 INSTALL_BASE 而非 PREFIX+DESTDIR 安装，可避免 Conan 打包时路径双重嵌套"
   - "纯 Perl 模块不产生 .so 动态库，不受 SELinux HMDFS 限制，可在任意目录加载"
-  - "CPAN 源码下载需要 curl -k 绕过鸿蒙环境 SSL 证书验证问题"
+  - "CPAN 源码下载在鸿蒙环境可能遇到 SSL 证书验证失败，需配置 CA 证书或使用 conandata.yml 的 SHA256 校验替代"
   - "运行时依赖 strictures 和 Import::Into 需手动从 CPAN 下载安装"
   - "conanfile.py 对纯 Perl 模块无需设置 cpp_info.libs，应通过 runenv_info 设置 PERL5LIB 路径"
   - "conan-verify G0 clean-build 验证对 Perl 模块会失败（无 configure 脚本），记录为已知限制不阻塞"

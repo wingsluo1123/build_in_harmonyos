@@ -3,8 +3,6 @@
 
 Verifies that Package::Variant can be loaded by Perl.
 """
-import os
-
 from conan import ConanFile
 
 
@@ -18,5 +16,5 @@ class PerlPackageVariantTestConan(ConanFile):
         pass
 
     def test(self):
-        # Verify the Perl module can be loaded
-        self.run("perl -e 'use Package::Variant; print \"Package::Variant loaded OK\\n\"'", env="conanrun")
+        # Run the test script that verifies Package::Variant can be loaded
+        self.run("sh test_variant.sh", env="conanrun")
