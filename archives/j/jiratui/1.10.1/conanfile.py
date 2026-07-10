@@ -22,12 +22,18 @@ class JiratuiConan(ConanFile):
         install_prefix = os.path.join(self.build_folder, "staging")
         os.makedirs(install_prefix, exist_ok=True)
 
-        # jiratui 是纯 Python 包，直接安装预编译 wheel（py3-none-any）
-        # 不从 sdist 构建，避免触发 uv_build -> maturin -> rust 构建链
+        # jiratui 是纯 Python 包，直接安装预编译 wheel
         self.run(
             f'{sys.executable} -m pip install --target {install_prefix} --no-deps jiratui==1.10.1'
         )
 
+        # 先安装 mistune（鸿蒙 PyPI 源缺 3.x，从 pypi.org 获取）
+        self.run(
+            f'{sys.executable} -m pip install --target {install_prefix} --no-deps '
+            f'--index-url https://pypi.org/simple mistune>=3.2'
+        )
+
+        # 所有依赖用 --no-deps 安装，避免传递解析断裂
         deps = [
             "click>=8.4.2,<9.0.0",
             "gitpython>=3.1.47,<3.2.0",
@@ -42,10 +48,11 @@ class JiratuiConan(ConanFile):
             "textual[syntax]>=8.2.7,<9.0.0",
             "urllib3>=2.6.3,<2.8.0",
             "xdg-base-dirs>=6.0.2",
-            "mistune>=3.2",
         ]
         for dep in deps:
-            self.run(f'{sys.executable} -m pip install --target {install_prefix} "{dep}"')
+            self.run(
+                f'{sys.executable} -m pip install --target {install_prefix} --no-deps "{dep}"'
+            )
 
     def package(self):
         staging = os.path.join(self.build_folder, "staging")
