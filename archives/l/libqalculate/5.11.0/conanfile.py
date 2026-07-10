@@ -58,7 +58,8 @@ class LibqalculateConan(ConanFile):
         tc.configure_args.append(f"CPPFLAGS=-I{sys_prefix}/include")
         tc.generate()
 
-    def _ensure_system_dep(self, name, version, url, header, configure_extra="", fallback_url=None):
+    def _ensure_system_dep(self, name, version, url, header, configure_extra="",
+                           extra_urls=None):
         """Build and install a system dependency from source if not present.
 
         GMP and MPFR are not Conan packages in the ohpcd registry and may not
@@ -80,25 +81,25 @@ class LibqalculateConan(ConanFile):
         os.makedirs(tmpdir, exist_ok=True)
         build_dir = tempfile.mkdtemp(prefix=f"{name}-build-", dir=tmpdir)
 
-        # Download and extract — try multiple sources with fallback
-        # Primary URL first, then GitHub mirrors (if fallback_url is set)
+        # Build list of URLs to try: primary URL, then extra_urls, then
+        # GitHub mirror expansion (if any URL contains github.com)
         urls_to_try = [url]
-        if fallback_url and "github.com" in fallback_url:
-            urls_to_try.extend([
-                f"https://gh-proxy.com/{fallback_url}",
-                f"https://mirror.ghproxy.com/{fallback_url}",
-                f"https://ghproxy.com/{fallback_url}",
-                fallback_url.replace("https://github.com", "https://kkgithub.com"),
-                fallback_url,
-            ])
-        elif "github.com" in url:
-            urls_to_try = [
-                f"https://gh-proxy.com/{url}",
-                f"https://mirror.ghproxy.com/{url}",
-                f"https://ghproxy.com/{url}",
-                url.replace("https://github.com", "https://kkgithub.com"),
-                url,
-            ]
+        if extra_urls:
+            urls_to_try.extend(extra_urls)
+        # Expand GitHub URLs with mirrors
+        expanded = []
+        for u in urls_to_try:
+            if "github.com" in u:
+                expanded.extend([
+                    f"https://gh-proxy.com/{u}",
+                    f"https://mirror.ghproxy.com/{u}",
+                    f"https://ghproxy.com/{u}",
+                    u.replace("https://github.com", "https://kkgithub.com"),
+                    u,
+                ])
+            else:
+                expanded.append(u)
+        urls_to_try = expanded
 
         downloaded = False
         for mirror_url in urls_to_try:
@@ -189,12 +190,20 @@ class LibqalculateConan(ConanFile):
             "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz",
             "mpfr.h",
         )
+        # libxml2: GNOME official source + university mirrors as fallback.
+        # GitHub release URL returns 404 (GNOME/libxml2 repo has no releases).
+        # Some CI workers can't reach download.gnome.org (SSL reset), so add
+        # university GNOME mirrors with different SSL/TLS configurations.
         self._ensure_system_dep(
             "libxml2", "2.15.3",
             "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
             "libxml/libxml.h",
             "--without-python --without-lzma --without-zlib --without-icu",
-            fallback_url="https://github.com/GNOME/libxml2/releases/download/v2.15.3/libxml2-2.15.3.tar.xz",
+            extra_urls=[
+                "https://mirrors.ocf.berkeley.edu/gnome/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+                "https://ftp.acc.umu.se/mirror/gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+                "https://ftp.yz.yamagata-u.ac.jp/pub/GNOME/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+            ],
         )
 
         apply_conandata_patches(self)
