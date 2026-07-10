@@ -7,7 +7,6 @@ AbsFile, RealFile, Dir, AbsDir, RealDir).
 """
 import os
 import glob
-import subprocess
 
 from conan import ConanFile
 
@@ -68,30 +67,29 @@ class PerlSpecioLibraryPathTinyTestConan(ConanFile):
         perl5lib = self._get_perl5lib(pkg_folder)
         self.output.info(f"PERL5LIB={perl5lib}")
 
-        env = os.environ.copy()
-        env["PERL5LIB"] = perl5lib
-        env["SPECIO_IMPLEMENTATION"] = "PP"
+        env = {
+            "PERL5LIB": perl5lib,
+            "SPECIO_IMPLEMENTATION": "PP",
+        }
 
         # Test 1: Load module
-        result = subprocess.run(
-            ['perl', '-MSpecio::Library::Path::Tiny', '-e',
-             'print "Specio::Library::Path::Tiny loaded OK\n"'],
-            env=env, capture_output=True, text=True
+        self.run(
+            'perl -MSpecio::Library::Path::Tiny -e '
+            '"print qq{Specio::Library::Path::Tiny loaded OK\n}"',
+            env=env,
         )
-        if result.returncode != 0:
-            self.output.error(f"Module load test failed: {result.stderr}")
-            raise Exception(f"Module load test failed with exit code {result.returncode}")
-        self.output.success(f"Module loaded successfully: {result.stdout.strip()}")
+        self.output.success("Module loaded successfully")
 
         # Test 2: Check version
-        result2 = subprocess.run(
-            ['perl', '-MSpecio::Library::Path::Tiny', '-e',
-             'print "VERSION=", $Specio::Library::Path::Tiny::VERSION, "\n"'],
-            env=env, capture_output=True, text=True
+        self.run(
+            'perl -MSpecio::Library::Path::Tiny -e '
+            '"print qq{VERSION=$Specio::Library::Path::Tiny::VERSION\n}"',
+            env=env,
         )
-        if result2.returncode != 0:
-            self.output.error(f"Version check failed: {result2.stderr}")
-            raise Exception(f"Version check failed with exit code {result2.returncode}")
-        self.output.info(f"Version check: {result2.stdout.strip()}")
+        self.output.info("Version check completed")
+
+        # Test 3: Run consumer-perspective Perl test script
+        test_script = os.path.join(self.source_folder, "test_specio_library_path_tiny.pl")
+        self.run(f'perl "{test_script}"', env=env)
 
         self.output.info("perl-specio-library-path-tiny 0.05 package structure verified OK")

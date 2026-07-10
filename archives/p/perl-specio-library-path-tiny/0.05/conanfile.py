@@ -68,14 +68,14 @@ class PerlSpecioLibraryPathTinyConan(ConanFile):
             raise Exception(f"Unsupported OS: {self.settings.os}")
 
         perl5lib = self._get_perl5lib()
-        env_vars = [f"PERL5LIB={perl5lib}"]
+        env_vars = {"PERL5LIB": perl5lib}
 
         self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder, env=env_vars)
         self.run("make -j1", cwd=self.source_folder, env=env_vars)
 
     def package(self):
         perl5lib = self._get_perl5lib()
-        env_vars = [f"PERL5LIB={perl5lib}"]
+        env_vars = {"PERL5LIB": perl5lib}
 
         staging = os.path.join(self.build_folder, "staging")
         self.run(f'make install DESTDIR="{staging}"', cwd=self.source_folder, env=env_vars)

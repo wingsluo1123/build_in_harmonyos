@@ -275,8 +275,8 @@ ok_test(t('AbsDir')->value_is_valid($perl_path),
 
 # 7.4 Read-only filesystem path (/tmp is read-only on OHOS)
 my $ro_path = path("/tmp");
-ok_test(t('AbsDir')->value_is_valid($ro_path) || 1,
-    "Read-only /tmp path does not crash");
+ok_test(t('AbsDir')->value_is_valid($ro_path),
+    "Read-only /tmp path passes AbsDir validation");
 
 # 7.5 Deep nested path (8 levels)
 my $deep_path = $test_base->child(qw(a b c d e f g h));

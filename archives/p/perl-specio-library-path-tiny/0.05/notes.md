@@ -4,7 +4,7 @@
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
 - 编译日期: 2026-07-01 (初次) / 2026-07-02 (完善+测试)
 - 编译器: clang/clang++（纯 Perl 模块，未实际使用 C 编译器）
-- 状态: published (conan-verify 全部通过，功能测试全部通过)
+- 状态: built (conan-verify 全部通过，功能测试全部通过)
 - Conan 验证: 全部 PASS (G0-G4, L2, L4, L5) — 2026-07-02T16:45:29
 
 ## 软件简介
@@ -163,8 +163,8 @@ Specio::Library::Path::Tiny 是 Specio 类型系统的扩展库，为 Path::Tiny
 ---
 **编译结束**: 2026-07-01 10:05 (初次)
 **完善+测试**: 2026-07-02 18:36
-**最终状态**: published (编译成功，全部测试通过)
-**上库评估**: ✅ 符合上库要求 (status: published)
+**最终状态**: built (编译成功，全部测试通过)
+**上库评估**: ✅ 符合上库要求 (status: built)
   - conan-verify: G0-G4 + L2-L5 全部 PASS
   - 消费者测试: 44/44 通过
   - 功能测试: 146/146 通过
