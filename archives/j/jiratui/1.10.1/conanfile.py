@@ -49,7 +49,7 @@ class JiratuiConan(ConanFile):
             "python-json-logger>=4.1.0,<5.0.0",
             "textual-autocomplete>=4.0.6",
             "textual-image>=0.13.2,<0.14.0",
-            "textual[syntax]>=8.2.7,<9.0.0",
+            "textual>=8.2.7,<9.0.0",
             "urllib3>=2.6.3,<2.8.0",
             "xdg-base-dirs>=6.0.2",
         ]
