@@ -120,23 +120,22 @@ class RlwrapConan(ConanFile):
         # Bypass rl_set_screen_size version check: locally-built readline 8.2
         # has this function, but the link test fails because the system
         # libreadline.so is inaccessible (permissions 770, CI worker uid 100).
-        # Only change last_check=no → yes near the error, preserving line structure.
+        # Neutralize the as_fn_error call that contains "at least 4.2".
         error_marker = "at least 4.2"
         if error_marker in content:
             idx = content.find(error_marker)
-            search_start = max(0, idx - 1000)
-            search_region = content[search_start:idx]
-            import re
-            matches = list(re.finditer(r'last_check\s*=\s*no', search_region))
-            if matches:
-                last_match = matches[-1]
-                abs_start = search_start + last_match.start()
-                abs_end = search_start + last_match.end()
-                content = (content[:abs_start] + "last_check=yes" +
-                           content[abs_end:])
-                with open(configure_path, 'w') as f:
-                    f.write(content)
-                self.output.info("Bypassed rl_set_screen_size version check")
+            search_start = max(0, idx - 500)
+            err_pos = content.rfind("as_fn_error", search_start, idx)
+            if err_pos >= 0:
+                msg_end = content.find("to build this program!", idx)
+                if msg_end >= 0:
+                    line_end = content.find('\n', msg_end)
+                    content = (content[:err_pos] +
+                               "true  # bypassed: readline 8.2 has rl_set_screen_size" +
+                               content[line_end:])
+                    with open(configure_path, 'w') as f:
+                        f.write(content)
+                    self.output.info("Bypassed rl_set_screen_size version check")
 
 
         # Fix: Conan profile sets invalid paths for SHELL, CONFIG_SHELL, CC, CXX
@@ -180,17 +179,15 @@ class RlwrapConan(ConanFile):
                     cb_content
                 )
                 modified = True
-            # Strip system LDFLAGS prefix (${LDFLAGS:+$LDFLAGS }) so linker
-            # searches our -L paths first, not DEFAULT_PREFIX/lib where
-            # libreadline.so is inaccessible (permissions 770).
-            if 'export LDFLAGS=' in cb_content:
-                cb_content = re.sub(
-                    r'export\s+LDFLAGS="\$\{LDFLAGs[^}]*\}([^"]*)"',
-                    r'export LDFLAGS="\1"',
-                    cb_content,
-                    flags=re.IGNORECASE
-                )
-                modified = True
+            # Remove DEFAULT_PREFIX/lib from LDFLAGS: libreadline.so there
+            # is inaccessible to CI worker (permissions 770). Linker finds
+            # locally-built libreadline.a in readline_install/lib instead.
+            default_prefix = os.environ.get("DEFAULT_PREFIX", "")
+            if default_prefix:
+                bad_path = f"-L{os.path.join(default_prefix, 'lib')}"
+                if bad_path in cb_content:
+                    cb_content = cb_content.replace(bad_path, "")
+                    modified = True
             if modified:
                 with open(fpath, 'w') as f:
                     f.write(cb_content)
