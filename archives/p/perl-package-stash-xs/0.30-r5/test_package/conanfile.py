@@ -1,28 +1,37 @@
 #!/usr/bin/env python3
 """Conan test_package — perl-package-stash-xs 0.30-r5
 
-L1 test: verify the Perl XS module can be loaded.
-Note: On HarmonyOS, .so loading from user dirs may be blocked by SELinux HMDFS.
+L1 test: verify the Perl XS module artifacts and API.
+On HarmonyOS, .so loading from user dirs may be blocked by SELinux HMDFS.
+The test handles this by verifying ELF integrity as fallback when dlopen fails.
 """
 import os
+import glob
 
 from conan import ConanFile
-from conan.tools.layout import basic_layout
 
 
 class PerlPackageStashXsTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        basic_layout(self)
-
     def test(self):
-        # Try to load the Perl module
-        # On HarmonyOS this may fail due to SELinux HMDFS restrictions on .so loading
-        # That is a platform limitation, not a build issue
-        self.run("perl -e 'use Package::Stash::XS; print \"OK\\n\"'",
-                 env="conanrun",
-                 ignore_errors=True)
+        dep = self.dependencies["perl-package-stash-xs"]
+        pkg_folder = dep.package_folder
+
+        # Find the installed .pm file
+        pm_files = glob.glob(
+            os.path.join(pkg_folder, "**", "Package", "Stash", "XS.pm"),
+            recursive=True,
+        )
+        if not pm_files:
+            raise Exception("Package/Stash/XS.pm not found in package")
+
+        # Derive PERL5LIB: go up 3 levels from XS.pm (.../Package/Stash/XS.pm → .../)
+        perl_lib_dir = os.path.dirname(os.path.dirname(os.path.dirname(pm_files[0])))
+
+        # Run the test script with PERL5LIB set to the package's Perl lib dir
+        test_script = os.path.join(self.source_folder, "test_xs.sh")
+        self.run('PERL5LIB="{}" sh {}'.format(perl_lib_dir, test_script))
