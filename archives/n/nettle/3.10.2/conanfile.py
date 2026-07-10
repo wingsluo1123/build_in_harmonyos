@@ -5,6 +5,7 @@ Nettle is a low-level cryptographic library.
 """
 
 import shutil
+import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -33,12 +34,14 @@ class NettleConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Set CONFIG_SHELL to use correct bash for HarmonyOS
+        # Set environment variables for HarmonyOS
         bash_path = shutil.which("bash") or "/bin/bash"
+        tmpdir = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
         # Use environment variables for configure
         env = tc.environment()
         env.define("CONFIG_SHELL", bash_path)
         env.define("SHELL", bash_path)
+        env.define("TMPDIR", tmpdir)
         tc.generate()
 
     def build(self):
