@@ -27,18 +27,22 @@ class JiratuiConan(ConanFile):
             f'{sys.executable} -m pip install --target {install_prefix} --no-deps jiratui==1.10.1'
         )
 
-        # 先安装 mistune（鸿蒙 PyPI 源缺 3.x，从 pypi.org 获取）
+        # mistune: 鸿蒙 PyPI 源缺 3.x，从 pypi.org 获取（--no-deps 避免解析冲突）
         self.run(
             f'{sys.executable} -m pip install --target {install_prefix} --no-deps '
             f'--index-url https://pypi.org/simple --timeout 120 mistune>=3.2'
         )
 
-        # 所有依赖用 --no-deps 安装，避免传递解析断裂
+        # marklas: --no-deps 避免 pip 尝试从鸿蒙源解析 mistune>=3.2
+        self.run(
+            f'{sys.executable} -m pip install --target {install_prefix} --no-deps "marklas==0.8.2"'
+        )
+
+        # 其余依赖正常安装（不加 --no-deps），让 pip 自动解析传递依赖
         deps = [
             "click>=8.4.2,<9.0.0",
             "gitpython>=3.1.47,<3.2.0",
             "httpx>=0.28.1",
-            "marklas==0.8.2",
             "puremagic>=2.2.0,<3.0.0",
             "pydantic-settings[yaml]>=2.14.2,<3.0.0",
             "python-dateutil>=2.9.0.post0",
@@ -51,7 +55,7 @@ class JiratuiConan(ConanFile):
         ]
         for dep in deps:
             self.run(
-                f'{sys.executable} -m pip install --target {install_prefix} --no-deps "{dep}"'
+                f'{sys.executable} -m pip install --target {install_prefix} "{dep}"'
             )
 
     def package(self):
