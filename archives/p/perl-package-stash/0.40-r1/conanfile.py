@@ -22,7 +22,7 @@ class PerlPackageStashConan(ConanFile):
     homepage = "https://metacpan.org/dist/Package-Stash"
     url = ""  # CI fills this
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -47,6 +47,8 @@ class PerlPackageStashConan(ConanFile):
         self.run("make install PUREPERL_ONLY=1")
 
     def package_info(self):
+        # Pure Perl module — no compiled libraries
+        self.cpp_info.libs = []
         # Perl module: expose lib path for consumers
         perl5_lib = os.path.join(self.package_folder, "lib", "perl5")
         self.runenv_info.append_path("PERL5LIB", perl5_lib)
