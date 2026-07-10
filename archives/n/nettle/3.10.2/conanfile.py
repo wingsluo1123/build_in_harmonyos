@@ -49,16 +49,25 @@ class NettleConan(ConanFile):
         # Set environment variables for configure
         import os
         bash_path = shutil.which("bash") or "/bin/bash"
+        
+        # Ensure TMPDIR exists and is writable
+        tmpdir = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
+        if not os.path.exists(tmpdir):
+            os.makedirs(tmpdir, exist_ok=True)
+        
         env_vars = {
             "CONFIG_SHELL": bash_path,
             "SHELL": bash_path,
-            "TMPDIR": os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
+            "TMPDIR": tmpdir,
+            "TEMP": tmpdir,  # Windows compatibility
+            "TMP": tmpdir    # Alternative temp variable
         }
         # Update environment for subprocess
         for key, value in env_vars.items():
             os.environ[key] = value
         
         autotools = Autotools(self)
+        # Try to work around HMDFS temp file creation issues
         autotools.configure(args=["--disable-shared", "--enable-static"])
         autotools.make(args=[f"SHELL={bash_path}"])
 
