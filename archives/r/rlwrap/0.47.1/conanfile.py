@@ -120,17 +120,20 @@ class RlwrapConan(ConanFile):
         # Bypass rl_set_screen_size version check: locally-built readline 8.2
         # has this function, but the link test fails because the system
         # libreadline.so is inaccessible (permissions 770, CI worker uid 100).
+        # Only change last_check=no → yes near the error, preserving line structure.
         error_marker = "at least 4.2"
         if error_marker in content:
             idx = content.find(error_marker)
-            search_start = max(0, idx - 500)
-            check_pos = content.rfind("last_check", search_start, idx)
-            if check_pos >= 0:
-                line_start = content.rfind('\n', 0, check_pos) + 1
-                line_end = content.find('\n', check_pos)
-                content = (content[:line_start] +
-                           "true  # bypassed: readline 8.2 has rl_set_screen_size" +
-                           content[line_end:])
+            search_start = max(0, idx - 1000)
+            search_region = content[search_start:idx]
+            import re
+            matches = list(re.finditer(r'last_check\s*=\s*no', search_region))
+            if matches:
+                last_match = matches[-1]
+                abs_start = search_start + last_match.start()
+                abs_end = search_start + last_match.end()
+                content = (content[:abs_start] + "last_check=yes" +
+                           content[abs_end:])
                 with open(configure_path, 'w') as f:
                     f.write(content)
                 self.output.info("Bypassed rl_set_screen_size version check")
