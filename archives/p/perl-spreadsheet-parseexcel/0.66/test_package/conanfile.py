@@ -20,7 +20,7 @@ class PerlSpreadsheetParseexcelTestConan(ConanFile):
         pass  # No C compilation needed for pure Perl module
 
     def test(self):
-        pkg = self.deps_user_info["perl-spreadsheet-parseexcel"].rootpath
+        pkg = self.dependencies["perl-spreadsheet-parseexcel"].package_folder
 
         # Locate Perl lib directory inside the package
         perl_lib = os.path.join(
@@ -33,12 +33,8 @@ class PerlSpreadsheetParseexcelTestConan(ConanFile):
         pm_files += glob.glob(os.path.join(perl_lib, "Spreadsheet", "ParseExcel.pm"))
         assert len(pm_files) >= 15, f"Expected >=15 .pm files, found {len(pm_files)}"
 
-        # 2. Try loading the module with perl
-        self.run(
-            f'perl -I "{perl_lib}" -MSpreadsheet::ParseExcel -e '
-            f'"print Spreadsheet::ParseExcel->VERSION . qq(\\n)"',
-            env="conanrun"
-        )
+        # 2. Run the test script that loads and exercises the module
+        self.run(f'bash "{self.source_folder}/test.sh" "{perl_lib}"', env="conanrun")
 
         print(f"Perl smoke test passed: found {len(pm_files)} .pm files in package")
         print(f"  Package folder: {pkg}")

@@ -53,10 +53,4 @@ class PerlSpreadsheetParseexcelConan(ConanFile):
     def package_info(self):
         # Pure Perl module — no C libraries to link
         self.cpp_info.libs = []
-        # Expose the Perl lib path as a system property for consumers
-        perl_lib = os.path.join(
-            self.package_folder,
-            "data", "service", "hnp", "perl.org", "perl_5.42.0",
-            "lib", "site_perl", "5.42.0"
-        )
         self.cpp_info.resdirs = ["data"]
