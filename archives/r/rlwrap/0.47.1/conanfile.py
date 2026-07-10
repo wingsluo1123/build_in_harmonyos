@@ -117,26 +117,6 @@ class RlwrapConan(ConanFile):
             f.write(content)
         self.output.info(f"Replaced {replaced} occurrences of $CONFIG_SHELL")
 
-        # Bypass rl_set_screen_size version check: locally-built readline 8.2
-        # has this function, but the link test fails because the system
-        # libreadline.so is inaccessible (permissions 770, CI worker uid 100).
-        # Neutralize the as_fn_error call that contains "at least 4.2".
-        error_marker = "at least 4.2"
-        if error_marker in content:
-            idx = content.find(error_marker)
-            search_start = max(0, idx - 500)
-            err_pos = content.rfind("as_fn_error", search_start, idx)
-            if err_pos >= 0:
-                msg_end = content.find("to build this program!", idx)
-                if msg_end >= 0:
-                    line_end = content.find('\n', msg_end)
-                    content = (content[:err_pos] +
-                               "true  # bypassed: readline 8.2 has rl_set_screen_size" +
-                               content[line_end:])
-                    with open(configure_path, 'w') as f:
-                        f.write(content)
-                    self.output.info("Bypassed rl_set_screen_size version check")
-
 
         # Fix: Conan profile sets invalid paths for SHELL, CONFIG_SHELL, CC, CXX
         # (e.g. /data/service/hnp/bin/bash, /data/service/hnp/bin/clang).
@@ -239,6 +219,14 @@ class RlwrapConan(ConanFile):
         self.run('make -j$(nproc)', cwd=readline_src)
         self.run('make install', cwd=readline_src)
         self.output.info(f"Installed readline to {readline_prefix}")
+
+        # Create libreadline.so linker script that redirects to libreadline.a.
+        # The linker finds this .so first (readline_install/lib is at -L pos 0)
+        # and follows the script to libreadline.a. This avoids the inaccessible
+        # system libreadline.so in DEFAULT_PREFIX/lib (permissions 770).
+        with open(os.path.join(readline_prefix, "lib", "libreadline.so"), "w") as f:
+            f.write("GROUP ( libreadline.a )\n")
+        self.output.info("Created libreadline.so linker script -> libreadline.a")
 
         # Clear system LDFLAGS: env script uses ${LDFLAGS:+$LDFLAGS } which
         # prepends -LDEFAULT_PREFIX/lib where libreadline.so is inaccessible
