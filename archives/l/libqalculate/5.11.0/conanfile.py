@@ -86,21 +86,30 @@ class LibqalculateConan(ConanFile):
 
         downloaded = False
         for mirror_url in urls_to_try:
-            # Use tar xf (auto-detect compression) instead of tar xJ
-            for cmd in (
-                f'curl -fsSL "{mirror_url}" | tar xf - -C "{build_dir}"',
-                f'wget -O - "{mirror_url}" | tar xf - -C "{build_dir}"',
+            # Download to file first, then extract — avoids pipe issues
+            # where curl fails mid-stream but tar partially succeeds
+            archive_file = os.path.join(build_dir, f"{name}-{version}.archive")
+            for dl_cmd in (
+                f'curl -fsSL "{mirror_url}" -o "{archive_file}"',
+                f'wget -O "{archive_file}" "{mirror_url}"',
             ):
                 try:
-                    self.run(cmd, env="conanbuild")
-                    downloaded = True
-                    self.output.info(f"Downloaded {name} from {mirror_url}")
+                    self.run(dl_cmd, env="conanbuild")
                     break
                 except Exception:
                     continue
-            if downloaded:
+            else:
+                self.output.info(f"Download failed from {mirror_url}, trying next...")
+                continue
+            # Extract with integrity check — tar must succeed fully
+            try:
+                self.run(f'tar xf "{archive_file}" -C "{build_dir}"', env="conanbuild")
+                downloaded = True
+                self.output.info(f"Downloaded {name} from {mirror_url}")
                 break
-            self.output.info(f"Download failed from {mirror_url}, trying next...")
+            except Exception:
+                self.output.info(f"Extraction failed from {mirror_url}, trying next...")
+                continue
         if not downloaded:
             raise Exception(f"Failed to download {name} from all sources")
 
@@ -145,9 +154,18 @@ class LibqalculateConan(ConanFile):
                 f.write(content)
             self.output.info("Patched configure: removed umask 077 for HMDFS")
         else:
-            # GitHub archive doesn't include configure; generate it
-            self.output.info("configure not found, running autoreconf -fi...")
-            self.run(f'cd "{src_dir}" && autoreconf -fi', env="conanbuild")
+            # Only run autoreconf if configure.ac exists (GitHub archive
+            # without release configure). If neither exists, the download
+            # was likely corrupted.
+            configure_ac = os.path.join(src_dir, "configure.ac")
+            if os.path.exists(configure_ac):
+                self.output.info("configure not found, running autoreconf -fi...")
+                self.run(f'cd "{src_dir}" && autoreconf -fi', env="conanbuild")
+            else:
+                raise Exception(
+                    f"Neither configure nor configure.ac found in {src_dir} "
+                    f"— download may be corrupted"
+                )
 
         # Ensure config.h.in exists
         config_h_in = os.path.join(src_dir, "config.h.in")
@@ -184,11 +202,6 @@ class LibqalculateConan(ConanFile):
             "https://github.com/GNOME/libxml2/archive/refs/tags/v2.15.3.tar.gz",
             "libxml/libxml.h",
             "--without-python --without-lzma --without-zlib --without-icu",
-            extra_urls=[
-                "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
-                "https://mirrors.ocf.berkeley.edu/gnome/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
-                "https://ftp.acc.umu.se/mirror/gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
-            ],
         )
 
         apply_conandata_patches(self)
