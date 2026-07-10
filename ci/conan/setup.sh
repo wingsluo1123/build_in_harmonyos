@@ -26,18 +26,39 @@ if ! python3 -c "import sqlite3" 2>/dev/null; then
     echo "[warn] Python sqlite3 module broken (missing libsqlite3.so.0)"
     echo "[step] Attempting to fix sqlite3 dependency..."
     
-    # Try installing libsqlite3 using system package manager (if available)
-    # OpenHarmony/HarmonyOS may use different package managers
-    if command -v apt-get &>/dev/null; then
-        apt-get update -qq && apt-get install -y -qq libsqlite3-0 || true
-    elif command -v yum &>/dev/null; then
-        yum install -y -q sqlite-libs || true
-    elif command -v dnf &>/dev/null; then
-        dnf install -y -q sqlite-libs || true
-    elif command -v opkg &>/dev/null; then
-        opkg update && opkg install sqlite3 || true
-    elif command -v pkg &>/dev/null; then
-        pkg install -y sqlite3 || true
+    # Find libsqlite3.so.0 in system and add to LD_LIBRARY_PATH
+    SQLITE3_LIB=""
+    for lib_path in \
+        "/usr/lib/libsqlite3.so.0" \
+        "/usr/lib64/libsqlite3.so.0" \
+        "/lib/libsqlite3.so.0" \
+        "/lib64/libsqlite3.so.0" \
+        "/data/service/hnp/lib/libsqlite3.so.0" \
+        "/system/lib/libsqlite3.so.0" \
+        "/system/lib64/libsqlite3.so.0"; do
+        if [ -f "$lib_path" ]; then
+            SQLITE3_LIB="$lib_path"
+            lib_dir=$(dirname "$lib_path")
+            echo "[step] Found libsqlite3.so.0 at: $lib_path"
+            export LD_LIBRARY_PATH="$lib_dir:$LD_LIBRARY_PATH"
+            break
+        fi
+    done
+    
+    # If still not found, try installing via package manager
+    if [ -z "$SQLITE3_LIB" ]; then
+        echo "[step] libsqlite3.so.0 not found, trying package manager..."
+        if command -v apt-get &>/dev/null; then
+            apt-get update -qq && apt-get install -y -qq libsqlite3-0 || true
+        elif command -v yum &>/dev/null; then
+            yum install -y -q sqlite-libs || true
+        elif command -v dnf &>/dev/null; then
+            dnf install -y -q sqlite-libs || true
+        elif command -v opkg &>/dev/null; then
+            opkg update && opkg install sqlite3 || true
+        elif command -v pkg &>/dev/null; then
+            pkg install -y sqlite3 || true
+        fi
     fi
     
     # Re-check after attempting fix
