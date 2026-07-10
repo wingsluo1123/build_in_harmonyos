@@ -5,6 +5,7 @@ A multi-purpose desktop calculator library.
 Provides arbitrary precision arithmetic, symbolic calculation,
 unit conversion, and plotting support.
 """
+import glob
 import os
 import tempfile
 
@@ -25,9 +26,6 @@ class LibqalculateConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
-    # System dependencies: gmp 6.3.0, mpfr 4.2.1, readline 8.2, libxml2 2.15.3
-    # These are not Conan packages — built from source if missing on the worker.
-
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -39,13 +37,11 @@ class LibqalculateConan(ConanFile):
 
     def generate(self):
         sys_prefix = os.path.expanduser("~/usr/local")
-
         env = Environment()
         env.define("PKG_CONFIG_PATH", f"{sys_prefix}/lib/pkgconfig")
         env.define("LD_LIBRARY_PATH", f"{sys_prefix}/lib")
         env.define("CPPFLAGS", f"-I{sys_prefix}/include")
         env.vars(self).save_script("sysdeps_env")
-
         tc = AutotoolsToolchain(self)
         tc.extra_cflags.append(f"-I{sys_prefix}/include")
         tc.extra_cxxflags.append(f"-I{sys_prefix}/include")
@@ -60,13 +56,11 @@ class LibqalculateConan(ConanFile):
         """Build and install a system dependency from source if not present."""
         sys_prefix = os.path.expanduser("~/usr/local")
         header_path = os.path.join(sys_prefix, "include", header)
-
         if os.path.exists(header_path):
             self.output.info(f"{name} already installed at {sys_prefix}")
             return
 
         self.output.info(f"{name} not found, building {name} {version} from source...")
-
         tmpdir = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
         os.makedirs(tmpdir, exist_ok=True)
         build_dir = tempfile.mkdtemp(prefix=f"{name}-build-", dir=tmpdir)
@@ -92,9 +86,10 @@ class LibqalculateConan(ConanFile):
 
         downloaded = False
         for mirror_url in urls_to_try:
+            # Use tar xf (auto-detect compression) instead of tar xJ
             for cmd in (
-                f'curl -fsSL "{mirror_url}" | tar xJ -C "{build_dir}"',
-                f'wget -O - "{mirror_url}" | tar xJ -C "{build_dir}"',
+                f'curl -fsSL "{mirror_url}" | tar xf - -C "{build_dir}"',
+                f'wget -O - "{mirror_url}" | tar xf - -C "{build_dir}"',
             ):
                 try:
                     self.run(cmd, env="conanbuild")
@@ -109,7 +104,11 @@ class LibqalculateConan(ConanFile):
         if not downloaded:
             raise Exception(f"Failed to download {name} from all sources")
 
-        src_dir = os.path.join(build_dir, f"{name}-{version}")
+        # Auto-detect source directory (GitHub archive uses name-vX.Y.Z,
+        # release tarball uses name-X.Y.Z)
+        src_dirs = sorted(glob.glob(os.path.join(build_dir, f"{name}-*")))
+        src_dir = src_dirs[0] if src_dirs else os.path.join(build_dir, f"{name}-{version}")
+        self.output.info(f"Source directory: {src_dir}")
 
         # Patch config.guess / configfsf.guess for HarmonyOS
         for guess_name in ("configfsf.guess", "config.guess"):
@@ -145,6 +144,10 @@ class LibqalculateConan(ConanFile):
             with open(configure_path, "w") as f:
                 f.write(content)
             self.output.info("Patched configure: removed umask 077 for HMDFS")
+        else:
+            # GitHub archive doesn't include configure; generate it
+            self.output.info("configure not found, running autoreconf -fi...")
+            self.run(f'cd "{src_dir}" && autoreconf -fi', env="conanbuild")
 
         # Ensure config.h.in exists
         config_h_in = os.path.join(src_dir, "config.h.in")
@@ -173,15 +176,18 @@ class LibqalculateConan(ConanFile):
             "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.1.tar.xz",
             "mpfr.h",
         )
+        # libxml2: GitHub tag archive as primary (gh-proxy mirror works on
+        # all CI workers), GNOME mirrors as fallback. GitHub archive doesn't
+        # include configure, so autoreconf -fi is run automatically.
         self._ensure_system_dep(
             "libxml2", "2.15.3",
-            "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
+            "https://github.com/GNOME/libxml2/archive/refs/tags/v2.15.3.tar.gz",
             "libxml/libxml.h",
             "--without-python --without-lzma --without-zlib --without-icu",
             extra_urls=[
+                "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
                 "https://mirrors.ocf.berkeley.edu/gnome/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
                 "https://ftp.acc.umu.se/mirror/gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
-                "https://ftp.yz.yamagata-u.ac.jp/pub/GNOME/sources/libxml2/2.15/libxml2-2.15.3.tar.xz",
             ],
         )
 
@@ -189,8 +195,7 @@ class LibqalculateConan(ConanFile):
 
         # Fix: patch 0003 doesn't cover all pthread_cancel call sites.
         # Write a temp Python script and run it to wrap remaining unguarded
-        # calls with HAVE_PTHREAD_* macros. Using self.run() with a script
-        # is more reliable than Python file I/O via self.source_folder.
+        # calls with HAVE_PTHREAD_* macros.
         tmpdir = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
         patch_script = os.path.join(tmpdir, "_patch_pthread.py")
         with open(patch_script, "w") as f:
