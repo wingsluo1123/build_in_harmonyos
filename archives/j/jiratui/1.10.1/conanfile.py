@@ -30,7 +30,7 @@ class JiratuiConan(ConanFile):
         # 先安装 mistune（鸿蒙 PyPI 源缺 3.x，从 pypi.org 获取）
         self.run(
             f'{sys.executable} -m pip install --target {install_prefix} --no-deps '
-            f'--index-url https://pypi.org/simple mistune>=3.2'
+            f'--index-url https://pypi.org/simple --timeout 120 mistune>=3.2'
         )
 
         # 所有依赖用 --no-deps 安装，避免传递解析断裂
