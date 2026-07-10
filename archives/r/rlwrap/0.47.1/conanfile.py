@@ -225,7 +225,7 @@ class RlwrapConan(ConanFile):
         # and follows the script to libreadline.a. This avoids the inaccessible
         # system libreadline.so in DEFAULT_PREFIX/lib (permissions 770).
         with open(os.path.join(readline_prefix, "lib", "libreadline.so"), "w") as f:
-            f.write("GROUP ( libreadline.a )\n")
+            f.write(f"GROUP ( {readline_prefix}/lib/libreadline.a )\n")
         self.output.info("Created libreadline.so linker script -> libreadline.a")
 
         # Clear system LDFLAGS: env script uses ${LDFLAGS:+$LDFLAGS } which
