@@ -64,7 +64,5 @@ class JiratuiConan(ConanFile):
         self.cpp_info.libdirs = []
         self.cpp_info.includedirs = []
 
-        self.runenv_info.define("PYTHONPATH", [
-            os.path.join(self.package_folder, "lib"),
-            self.package_folder,
-        ])
+        # Python 包安装在 package_folder 根目录，需加入 PYTHONPATH
+        self.runenv_info.prepend("PYTHONPATH", self.package_folder)
