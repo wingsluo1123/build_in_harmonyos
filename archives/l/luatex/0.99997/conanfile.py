@@ -30,11 +30,7 @@ class LuatexConan(ConanFile):
     def requirements(self):
         self.requires("freetype/2.14.3")
         self.requires("zlib/1.3.1.1")
-        self.requires("fontconfig/2.16.0")
         self.requires("expat/2.8.2")
-        self.requires("lua/5.2.4")
-        self.requires("gmp/6.3.0")
-        self.requires("mpfr/4.2.1")
 
     def layout(self):
         basic_layout(self)
@@ -46,9 +42,11 @@ class LuatexConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # R26: Terminal tools must be statically linked
         tc.extra_ldflags.append("-static")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
-        # ncurses: tc.configure_args.append("--without-shared")  # R4
+        # Use bundled versions for dependencies not yet in the registry
+        tc.configure_args.append("--without-system-lua")
+        tc.configure_args.append("--without-system-gmp")
+        tc.configure_args.append("--without-system-mpfr")
+        tc.configure_args.append("--without-system-fontconfig")
         tc.generate()
 
     def build(self):
