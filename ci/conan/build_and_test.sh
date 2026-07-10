@@ -75,6 +75,14 @@ fi
 
 echo "[step] Found ${#PACKAGES[@]} package(s) to build"
 
+# ── 1.5 Pre-export all package recipes to local cache ──
+# This ensures cross-package dependencies within the same PR can be
+# resolved via --build=missing (conan needs the recipe in the cache
+# to build a missing dependency from source).
+for pkg_dir in "${PACKAGES[@]}"; do
+    conan export "$pkg_dir" >/dev/null 2>&1 || true
+done
+
 # ── 2. Build + test each package ──
 SUCCESS=0
 FAILED=0
