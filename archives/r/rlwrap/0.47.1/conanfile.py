@@ -222,6 +222,12 @@ class RlwrapConan(ConanFile):
         self.run('make install', cwd=readline_src)
         self.output.info(f"Installed readline to {readline_prefix}")
 
+        # Clear system LDFLAGS: env script uses ${LDFLAGS:+$LDFLAGS } which
+        # prepends -LDEFAULT_PREFIX/lib where libreadline.so is inaccessible
+        # (permissions 770, CI worker uid 100). Clearing it makes the linker
+        # use only tc.extra_ldflags paths (readline_install/lib comes first).
+        os.environ["LDFLAGS"] = ""
+
         # Use Conan Autotools toolchain (no hardcoded env overrides)
         autotools = Autotools(self)
         autotools.configure()
