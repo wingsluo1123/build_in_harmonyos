@@ -38,8 +38,7 @@ class PopplerConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # R27: Use @ohpcd/stable for all dependencies
-        self.requires("freetype/2.14.3@ohpcd/stable")
+        self.requires("freetype/2.14.3")
 
     def layout(self):
         cmake_layout(self)
