@@ -1,0 +1,60 @@
+--- /dev/null
++++ b/configure
+@@ -0,0 +1,53 @@
++#!/data/service/hnp/bin/bash
++# Minimal configure script for raft 0.18.1
++
++set -e
++
++PREFIX=/usr/local
++while [ $# -gt 0 ]; do
++    case "$1" in
++        --prefix=*) PREFIX="${1#*=}" ;;
++        --help) echo "Usage: ./configure --prefix=PREFIX"; exit 0 ;;
++        *) echo "Unknown option: $1"; exit 1 ;;
++    esac
++    shift
++done
++
++echo "configure: using prefix $PREFIX"
++
++cat > Makefile << 'MAKEFILE_EOF'
++CC = clang
++CFLAGS = -std=c11 -g -fvisibility=hidden -D_GNU_SOURCE -DRAFT_REVISION=\"0.18.1\" -I. -Iinclude
++LDFLAGS = -shared -fPIC
++AR = ar
++ARFLAGS = rcs
++
++LIB_SRC = $(wildcard src/*.c)
++LIB_OBJ = $(LIB_SRC:.c=.o)
++LIB = libraft.so
++LIB_STATIC = libraft.a
++
++.PHONY: all install clean
++
++all: $(LIB) $(LIB_STATIC)
++
++%.o: %.c
++	$(CC) $(CFLAGS) -c -o $@ $<
++
++$(LIB): $(LIB_OBJ)
++	$(CC) $(LDFLAGS) -o $@ $(LIB_OBJ) -lm
++
++$(LIB_STATIC): $(LIB_OBJ)
++	$(AR) $(ARFLAGS) $@ $(LIB_OBJ)
++
++install: all
++	mkdir -p $(DESTDIR)$(PREFIX)/lib
++	mkdir -p $(DESTDIR)$(PREFIX)/include/raft
++	cp $(LIB) $(DESTDIR)$(PREFIX)/lib/
++	cp $(LIB_STATIC) $(DESTDIR)$(PREFIX)/lib/
++	cp include/raft.h $(DESTDIR)$(PREFIX)/include/
++	cp include/raft/*.h $(DESTDIR)$(PREFIX)/include/raft/
++
++clean:
++	rm -f $(LIB_OBJ) $(LIB) $(LIB_STATIC)
++MAKEFILE_EOF
++
++echo "configure: done"
++PATCHEOF
++echo "patch created" && ls -la archives/r/raft/0.18.1/patches/
