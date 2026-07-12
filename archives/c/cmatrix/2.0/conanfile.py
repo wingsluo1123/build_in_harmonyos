@@ -10,7 +10,7 @@ class CmatrixConan(ConanFile):
     version = "2.0"
     description = "CMatrix — a scrolling Matrix like screen (OHOS aarch64)"
     license = "MIT"
-    homepage = "https://github.com/abishekvashok/cmatrix"
+    homepage = "https://github.com/bisqwit/cmatrix"
 
     package_type = "application"
 
@@ -19,6 +19,9 @@ class CmatrixConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def requirements(self):
+        self.requires("ncurses/6.6")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -29,15 +32,18 @@ class CmatrixConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # 交叉编译工具链
-        toolchain = "/home/chensiqi/公共/prebuilts_gcc_linux-x86_aarch64_aarch64-linaro-7-master"
-        ncurses = "/home/chensiqi/公共/ncurses-6.6/output"
-        sysroot = f"{toolchain}/aarch64-linux-gnu/libc"
-
-        cc = f"{toolchain}/bin/aarch64-linux-gnu-gcc"
+        # 交叉编译工具链路径（从 profile [buildenv] PATH 获取）
+        toolchain_bin = "/home/chensiqi/公共/prebuilts_gcc_linux-x86_aarch64_aarch64-linaro-7-master/bin"
+        cc = os.path.join(toolchain_bin, "aarch64-linux-gnu-gcc")
+        # 推导工具链 sysroot
+        toolchain_root = os.path.normpath(os.path.join(toolchain_bin, ".."))
+        sysroot = f"{toolchain_root}/aarch64-linux-gnu/libc"
+        # 从 Conan 依赖链获取 ncurses 路径
+        ncurses = self.dependencies["ncurses"]
+        ncurses_dir = ncurses.package_folder
         cflags = (f"-Wall -O2 --sysroot={sysroot} "
-                  f"-I{ncurses}/include -I{ncurses}/include/ncursesw")
-        ldflags = f"--sysroot={sysroot} -L{ncurses}/lib -static"
+                  f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
+        ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
 
         # 生成最小 config.h（模拟 autotools 检测结果）
         save(self, "config.h", """
