@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — cmatrix 2.0 (custom Makefile, cross-compile to OHOS aarch64)"""
 from conan import ConanFile
 from conan.tools.files import get, copy, save, apply_conandata_patches, export_conandata_patches
 from conan.tools.env import VirtualBuildEnv
