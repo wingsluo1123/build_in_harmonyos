@@ -22,6 +22,7 @@ echo "[step] Conan environment setup..."
 # ── 1. Detect/install Conan ──
 # pip3 可能装到 ~/.local/bin, 确保在 PATH 上
 export PATH="$HOME/.local/bin:$PATH"
+export LD_LIBRARY_PATH="/system/lib64:/system/lib:$LD_LIBRARY_PATH"
 
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
