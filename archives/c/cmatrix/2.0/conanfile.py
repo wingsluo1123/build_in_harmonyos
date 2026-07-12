@@ -19,9 +19,9 @@ class CmatrixConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        cc = "/data/service/hnp/bin/clang"
-        cflags = "-Wall -O2 -fPIC"
-        ldflags = "-static -L/storage/Users/currentUser/usr/local/lib"
+        cc = "/home/chensiqi/文档/openharmony/prebuilts/clang/ohos/linux-x86_64/llvm/bin/clang"
+        cflags = "-Wall -O2 -fPIC --sysroot=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc --gcc-toolchain=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu"
+        ldflags = "--sysroot=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc --gcc-toolchain=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu -static"
         # 生成 config.h（模拟 autotools ./configure 输出）
         config_h_path = os.path.join(self.source_folder, "config.h")
         with open(config_h_path, "w") as f:
