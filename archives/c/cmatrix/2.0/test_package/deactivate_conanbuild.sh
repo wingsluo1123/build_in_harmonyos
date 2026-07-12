@@ -1,1 +1,0 @@
-. "/home/chensiqi/ohos_workspace/build_in_harmonyos/archives/c/cmatrix/2.0/test_package/deactivate_conanbuildenv-release-armv8.sh"
