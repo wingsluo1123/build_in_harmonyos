@@ -1,131 +1,68 @@
-# fast_float 7.0.0 适配笔记
+# fast_float 7.0.0 HarmonyOS PC 适配笔记
 
 ## 编译环境
-- 构建系统: cmake
-- 编译日期: 2026-06-04
-- 编译器: clang/clang++ 15.0.4
-- 状态: published
 
-## 编译步骤
+- 构建系统：CMake
+- 编译日期：2026-07-12
+- 编译器：Clang 15.0.4
+- 目标平台：HarmonyOS PC arm64
+- 状态：built（已通过本地验证，尚未上传制品仓）
 
-1. **初始化编译环境**
-   ```bash
-   python3 $SKILL_ROOT/scripts/ohc-run.py init-build fast_float 7.0.0
-   ```
+## 适配内容
 
-2. **配置 CMake**
-   ```bash
-   cd /storage/Users/currentUser/builds/fast_float-7.0.0.work
-   cmake -DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local \
-         -DCMAKE_BUILD_TYPE=Release \
-         -DCMAKE_CXX_STANDARD=11 \
-         -B build
-   ```
+fast_float 上游是 header-only C++ 浮点解析库。本次在保留头文件和 CMake 配置交付的基础上，新增 `fast_float` 命令行工具：
 
-3. **编译**
-   ```bash
-   cmake --build build
-   ```
+```bash
+fast_float --version
+fast_float 3.1416
+fast_float 1.5 2.75
+```
 
-   由于 fast_float 是 header-only INTERFACE library，编译步骤仅生成 CMake 配置文件，无实际二进制文件生成。
+适配通过 `0001-CMakeLists.txt.patch` 增加可选的 `FASTFLOAT_TOOLS` 构建目标。命令行源码由 Conan 配方通过 `export_sources()` 导出到源码树的 `tools/` 目录，不修改上游测试源码。
 
-4. **安装到 staging 目录**
-   ```bash
-   DESTDIR=/storage/Users/currentUser/test-install-fast_float-7.0.0 \
-   cmake --install build
-   ```
+## Conan 配方
 
-5. **预编译包制作**
-   ```bash
-   python3 $SKILL_ROOT/scripts/ohc-run.py package fast_float 7.0.0
-   ```
+```bash
+python3 scripts/ohc-run.py conan-verify fast_float 7.0.0
+python3 scripts/ohc-run.py finish fast_float 7.0.0 built
+```
 
-6. **安装到本地**
-   ```bash
-   cmake --install build
-   ```
+配方配置：
 
-## 遇到的问题与解决方案
+- `FASTFLOAT_TEST=OFF`：Conan 消费者测试由 `test_package` 独立执行
+- `FASTFLOAT_BENCHMARKS=OFF`
+- `FASTFLOAT_INSTALL=ON`
+- `FASTFLOAT_TOOLS=ON`
 
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-| 1 | G0 验证失败（无实际编译步骤） | CMake 项目是 header-only INTERFACE library，无二进制产物 | 记录为平台特性，G0 验证不适用 header-only 库 |
-| 2 | manifest.yaml 构建系统错误标记为 autotools | init-build 自动检测失败 | 手动修正为 cmake |
+## 依赖
 
-### 特殊说明：Header-Only 库的验证
-
-fast_float 是一个 header-only INTERFACE library，其特点：
-- 无 `.so` 或 `.a` 二进制文件
-- 仅包含头文件和 CMake 配置文件
-- G0 干净构建验证不适用（无编译步骤）
-- G1-G3 质量门禁适用但检查项为空（无二进制）
-
-## 源码修改
-
-无补丁。源码无需修改即可在鸿蒙平台编译。
-
-## 依赖版本
-
-- 无外部依赖
-- CMake >= 3.9
-- C++11 标准
+无外部 Conan 依赖。构建要求 CMake >= 3.9 和支持 C++11 的编译器。
 
 ## 验证结果
 
-```bash
-# 检查安装的头文件
-ls -la /storage/Users/currentUser/usr/local/include/fast_float/
-# Output: fast_float.h 等头文件存在
+| 检查项 | 结果 |
+|---|---|
+| `conan create` | PASS |
+| Conan G0-G4 | PASS |
+| Conan L2/L4/L5 | PASS |
+| W3 本地 CI 模拟 | PASS |
+| `fast_float::from_chars` 消费者 API 测试 | PASS |
+| `fast_float --version` | PASS |
+| `fast_float 3.1416` | PASS |
 
-# 检查 CMake 配置文件
-ls -la /storage/Users/currentUser/usr/local/share/cmake/FastFloat/
-# Output: FastFloatConfig.cmake, FastFloatConfigVersion.cmake 存在
+`test_package` 实质调用 `fast_float::from_chars`，校验错误码、输入完整消费和解析精度；同时执行命令行工具验证版本输出与数值解析。
 
-# 验证预编译包
-ls -lh archives/f/fast_float/7.0.0/packaging/fast_float-7.0.0-ohos-aarch64.tar.gz
-# Output: 161KB，包含头文件和 CMake 配置
+## 源码与补丁
 
-# 简单编译测试
-cat > test_fast_float.cpp << 'EOF'
-#include "fast_float/fast_float.h"
-#include <iostream>
-int main() {
-    const std::string input = "3.1416";
-    double result;
-    auto answer = fast_float::from_chars(input.data(), input.data() + input.size(), result);
-    if (answer.ec != std::errc()) {
-        std::cerr << "parsing failure\n";
-        return 1;
-    }
-    std::cout << "parsed: " << result << std::endl;
-    return 0;
-}
-EOF
-clang++ -std=c++11 -I/storage/Users/currentUser/usr/local/include test_fast_float.cpp -o test_fast_float
-./test_fast_float
-# Output: parsed: 3.1416
-```
+- 官方源码：`https://github.com/fastfloat/fast_float/archive/refs/tags/v7.0.0.tar.gz`
+- SHA256：`d2a08e722f461fe699ba61392cd29e6b23be013d0f56e50c7786d0954bffcb17`
+- 补丁：`patches/0001-CMakeLists.txt.patch`，增加命令行构建和安装目标
+- 新增源码：`fast_float_cli.cpp`，由配方导出到 `tools/fast_float_cli.cpp`
 
-## 交付物
+## 已知说明
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| fast_float-7.0.0-ohos-aarch64.tar.gz | 161KB | 预编译包（头文件 + CMake 配置） |
-| include/fast_float/*.h | - | 头文件（header-only） |
-| share/cmake/FastFloat/*.cmake | - | CMake 配置文件 |
-
-## 注意事项
-
-1. **Header-Only 特性**：fast_float 是 header-only 库，使用时只需包含头文件，无需链接库文件。
-2. **C++11 标准**：最低要求 C++11，支持 C++17/C++20 constexpr 特性。
-3. **无依赖**：不依赖任何外部库，可直接集成到项目中。
-4. **性能优势**：比标准库 strtod 快 4-5 倍，适合高性能数值解析场景。
-5. **广泛应用**：被 GCC、Chromium、WebKit、Redis、Apache Arrow 等项目使用。
-
----
-**编译结束**: 2026-06-04 11:37
-**最终状态**: published
+`clean-verify` 的旧式自动检测会误判该 CMake 项目为 configure 流程并报告 exit 127；阻塞门禁使用的 Conan 干净构建及 W3 本地 CI 均已通过。软件无系统同名库冲突，交付物包括头文件、CMake 配置和命令行可执行文件。
 ---
 
-**编译结束**: 2026-06-04 11:41
+**编译结束**: 2026-07-12 12:45
 **最终状态**: built

@@ -1,0 +1,34 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,20 +23,31 @@
+ endif()
+ 
+ option(FASTFLOAT_INSTALL "Enable install" ON)
+ 
+ if(FASTFLOAT_INSTALL)
+   include(GNUInstallDirs)
+ endif()
+ 
+ add_library(fast_float INTERFACE)
+ add_library(FastFloat::fast_float ALIAS fast_float)
++
++option(FASTFLOAT_TOOLS "Build the fast_float command-line tool" OFF)
++if(FASTFLOAT_TOOLS)
++  add_executable(fast_float_cli tools/fast_float_cli.cpp)
++  set_target_properties(fast_float_cli PROPERTIES OUTPUT_NAME fast_float)
++  target_link_libraries(fast_float_cli PRIVATE FastFloat::fast_float)
++  if(FASTFLOAT_INSTALL)
++    install(TARGETS fast_float_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
++  endif()
++endif()
++
+ target_include_directories(
+   fast_float
+   INTERFACE
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+ )
+ target_compile_features(fast_float INTERFACE cxx_std_11)
+ if(FASTFLOAT_SANITIZE)
+   target_compile_options(fast_float INTERFACE -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all)
+   target_link_libraries(fast_float INTERFACE -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=all)

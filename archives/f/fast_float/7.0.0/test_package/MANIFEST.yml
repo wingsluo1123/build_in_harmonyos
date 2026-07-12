@@ -1,0 +1,22 @@
+package: fast_float/7.0.0
+homepage: "https://github.com/fastfloat/fast_float"
+
+upstream_check_command: "cmake -S . -B build -DFASTFLOAT_TEST=ON && cmake --build build && ctest --test-dir build --output-on-failure"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: tests/example_test.cpp
+    source: fast_float-7.0.0/tests/example_test.cpp
+    description: "上游浮点解析 API 功能测试"
+    command: "./example_test"
+
+test_package_tests:
+  - file: test_package.cpp
+    description: "消费者视角验证 from_chars API、完整输入消费和解析精度"
+    command: "./test_package"
+  - file: conanfile.py
+    description: "验证 fast_float CLI 的 --version 与数值解析"
+    command: "fast_float --version && fast_float 3.1416"
+
+assertion_count: 5
