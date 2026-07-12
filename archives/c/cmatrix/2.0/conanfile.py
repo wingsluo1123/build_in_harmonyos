@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — cmatrix 2.0 (native OHOS compile)"""
+"""Conan recipe — cmatrix 2.0"""
 from conan import ConanFile
 from conan.tools.files import get, copy
 import os
@@ -10,19 +10,16 @@ class CmatrixConan(ConanFile):
     description = "CMatrix — a scrolling Matrix like screen"
     license = "MIT"
     homepage = "https://github.com/bisqwit/cmatrix"
-
     package_type = "application"
-
     settings = "os", "arch", "compiler", "build_type"
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        cc = "/home/chensiqi/文档/openharmony/prebuilts/clang/ohos/linux-x86_64/llvm/bin/clang"
-        cflags = "-Wall -O2 -fPIC --sysroot=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc --gcc-toolchain=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu"
-        ldflags = "--sysroot=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc --gcc-toolchain=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu -static"
-        # 生成 config.h（模拟 autotools ./configure 输出）
+        cc = "clang"
+        cflags = os.environ.get("CFLAGS", "-Wall -O2 -fPIC")
+        ldflags = os.environ.get("LDFLAGS", "-static")
         config_h_path = os.path.join(self.source_folder, "config.h")
         with open(config_h_path, "w") as f:
             f.write("""
