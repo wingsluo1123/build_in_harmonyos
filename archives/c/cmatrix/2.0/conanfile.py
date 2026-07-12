@@ -48,7 +48,7 @@ class CmatrixConan(ConanFile):
                   f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
         ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
 
-        # 生成最小 config.h（模拟 autotools 检测结果）
+        # 生成 config.h（模拟 autotools ./configure 的输出，非源码补丁）
         save(self, "config.h", """
 #define PACKAGE_NAME "cmatrix"
 #define PACKAGE_TARNAME "cmatrix"
