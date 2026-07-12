@@ -1,10 +1,17 @@
 # cmatrix 2.0 适配笔记
 
 ## 编译环境
-- 构建系统: custom（Makefile 模板交叉编译）
+- 构建系统: custom（直接编译源码）
 - 编译日期: 2026-07-12
-- 编译器: aarch64-linux-gnu-gcc (GCC Linaro 7.5.0)
+- 编译器: aarch64-linux-gnu-gcc (GCC Linaro 7.5.0, Linux 交叉编译器)
+- sysroot: Linux aarch64 glibc sysroot（来自 GCC Linaro 工具链）
+- 链接方式: 静态链接（产物不依赖运行时动态库）
 - 状态: built
+
+## 工具链说明
+当前在 x86_64 Linux 主机上交叉编译。使用的 GCC Linaro 工具链是 Linux aarch64 交叉编译器，其 sysroot 基于 glibc。产物通过 `-static` 静态链接，不依赖运行时动态库，可在 OHOS 上执行。
+
+如需使用 OHOS 原生 LLVM 工具链（clang 15.0.4 + musl libc），需在 OHOS 设备上原生编译，或下载 OHOS SDK for Linux x86_64 后切换 profile 中的 `tools.build:compiler_executables`。
 
 ## 编译步骤
 - 交叉编译：x86_64 Linux → OHOS aarch64
