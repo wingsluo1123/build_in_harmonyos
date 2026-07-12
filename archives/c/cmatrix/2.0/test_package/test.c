@@ -1,8 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-
-int main(void) {
-    /* cmatrix 是命令行工具，验证 find_package + 链接通过即可 */
-    printf("cmatrix test_package: link OK\n");
-    return 0;
-}
+/* cmatrix 2.0 test_package
+   cmatrix 是 CLI 工具（application 类型），测试通过 test() 方法
+   直接执行 cmatrix -V 验证功能，无需编译测试程序。 */
