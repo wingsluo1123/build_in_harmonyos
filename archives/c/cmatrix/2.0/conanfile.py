@@ -17,9 +17,14 @@ class CmatrixConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        cc = "clang"
-        cflags = os.environ.get("CFLAGS", "-Wall -O2 -fPIC")
-        ldflags = os.environ.get("LDFLAGS", "-static")
+        llvm_bin = "/home/chensiqi/文档/openharmony/prebuilts/clang/ohos/linux-x86_64/llvm/bin"
+        cc = f"{llvm_bin}/clang"
+        target = "--target=aarch64-linux-ohos"
+        sysroot = "--sysroot=/home/chensiqi/文档/openharmony/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-7.5.0-2019.12-x86_64_aarch64-linux-gnu/aarch64-linux-gnu/libc"
+        ncurses = "/home/chensiqi/公共/ncurses-6.6/output"
+        linker = f"--ld-path={llvm_bin}/ld.lld"
+        cflags = f"-Wall -O2 -fPIC {target} {sysroot} {linker} -I{ncurses}/include -I{ncurses}/include/ncursesw"
+        ldflags = f"{target} {sysroot} {linker} -L{ncurses}/lib"
         config_h_path = os.path.join(self.source_folder, "config.h")
         with open(config_h_path, "w") as f:
             f.write("""
@@ -40,13 +45,10 @@ class CmatrixConan(ConanFile):
 """)
         self.run(f"{cc} {cflags} {ldflags} -o cmatrix cmatrix.c -lncursesw",
                  cwd=self.source_folder)
-
     def package(self):
         mkdir = lambda p: os.makedirs(p, exist_ok=True)
         mkdir(os.path.join(self.package_folder, "bin"))
-        copy(self, "cmatrix", src=self.source_folder,
-             dst=os.path.join(self.package_folder, "bin"))
-
+        copy(self, "cmatrix", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libdirs = []
