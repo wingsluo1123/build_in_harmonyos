@@ -47,12 +47,6 @@ class CmatrixConan(ConanFile):
         cflags = (f"-Wall -O2 --sysroot={sysroot} "
                   f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
         ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
-        # 从 Conan 依赖链获取 ncurses 路径
-        ncurses = self.dependencies["ncurses"]
-        ncurses_dir = ncurses.package_folder
-        cflags = (f"-Wall -O2 --sysroot={sysroot} "
-                  f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
-        ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
 
         # 生成最小 config.h（模拟 autotools 检测结果）
         save(self, "config.h", """
