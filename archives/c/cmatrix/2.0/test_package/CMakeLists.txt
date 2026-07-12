@@ -1,3 +1,8 @@
-# cmatrix 2.0 — test_package
-# cmatrix 是 CLI 工具（application 类型），无需 CMake 编译测试。
-# 测试在 test_package/conanfile.py 的 test() 方法中直接执行 cmatrix -V。
+cmake_minimum_required(VERSION 3.15)
+project(test_cmatrix C)
+
+add_executable(test_cmatrix test.c)
+target_link_libraries(test_cmatrix PRIVATE)
+
+enable_testing()
+add_test(NAME test_cmatrix COMMAND test_cmatrix)
