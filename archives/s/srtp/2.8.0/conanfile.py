@@ -55,7 +55,7 @@ class SrtpConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Fix shebang for HarmonyOS: /bin/bash -> /data/service/hnp/bin/bash
-        import glob as g, os as _os
+        import glob as g
         src = self.source_folder
         for f in [f"{src}/configure"] + g.glob(f"{src}/**/*.sh", recursive=True):
             try:
@@ -85,4 +85,7 @@ class SrtpConan(ConanFile):
         autotools.install()
 
     def package_info(self):
+        self.cpp_info.libs = ["srtp2"]
+p2"]
+ def package_info(self):
         self.cpp_info.libs = ["srtp2"]

@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
+"""Conan test_package for srtp 2.8.0.
 
-This is the L1 test in the five-level test system.
 CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/srtp/{version}/test_package/conanfile.py
 """
-import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
