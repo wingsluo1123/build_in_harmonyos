@@ -32,12 +32,21 @@ class CmatrixConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # 交叉编译工具链路径（从 profile [buildenv] PATH 获取）
-        toolchain_bin = "/home/chensiqi/公共/prebuilts_gcc_linux-x86_aarch64_aarch64-linaro-7-master/bin"
-        cc = os.path.join(toolchain_bin, "aarch64-linux-gnu-gcc")
-        # 推导工具链 sysroot
-        toolchain_root = os.path.normpath(os.path.join(toolchain_bin, ".."))
-        sysroot = f"{toolchain_root}/aarch64-linux-gnu/libc"
+        # 交叉编译器（由 profile [buildenv] PATH 提供）
+        cc = "aarch64-linux-gnu-gcc"
+        # 获取编译器 sysroot
+        self.run(f"{cc} --print-sysroot > sysroot.txt", cwd=self.build_folder)
+        sysroot = ""
+        sysroot_file = os.path.join(self.build_folder, "sysroot.txt")
+        if os.path.exists(sysroot_file):
+            with open(sysroot_file) as f:
+                sysroot = f.read().strip()
+        # 从 Conan 依赖链获取 ncurses 路径
+        ncurses = self.dependencies["ncurses"]
+        ncurses_dir = ncurses.package_folder
+        cflags = (f"-Wall -O2 --sysroot={sysroot} "
+                  f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
+        ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
         # 从 Conan 依赖链获取 ncurses 路径
         ncurses = self.dependencies["ncurses"]
         ncurses_dir = ncurses.package_folder

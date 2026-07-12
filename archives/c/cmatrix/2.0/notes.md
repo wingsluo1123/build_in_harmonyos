@@ -8,9 +8,10 @@
 
 ## 编译步骤
 - 交叉编译：x86_64 Linux → OHOS aarch64
-- 工具链：prebuilts_gcc_linux-x86_aarch64_aarch64-linaro-7-master
-- ncurses：预编译静态库（~/公共/ncurses-6.6/output）
-- 编译命令：`aarch64-linux-gnu-gcc -static -o cmatrix cmatrix.c -lncursesw`
+- 工具链：由 profile [buildenv] PATH 提供（`aarch64-linux-gnu-gcc`）
+- ncurses：通过 `self.requires("ncurses/6.6")` 从 Conan 依赖链获取
+- sysroot：由 `aarch64-linux-gnu-gcc --print-sysroot` 动态获取
+- 编译方式：`conan create` 自动完成，无硬编码路径
 
 ## 遇到的问题与解决方案
 
@@ -27,7 +28,7 @@
 - 生成最小 config.h 模拟 autotools 检测结果
 
 ## 依赖版本
-- ncurses 6.6（静态库，预编译）
+- ncurses 6.6（通过 `self.requires("ncurses/6.6")` 由 Conan 解析）
 
 ## 验证结果
 ```bash
