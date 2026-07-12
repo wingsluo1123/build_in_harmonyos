@@ -19,7 +19,7 @@ class CmatrixConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        cc = "clang"
+        cc = "/data/service/hnp/bin/clang"
         cflags = "-Wall -O2 -fPIC"
         ldflags = "-static"
         # 生成 config.h（模拟 autotools ./configure 输出）
