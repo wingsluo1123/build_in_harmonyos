@@ -1,55 +1,28 @@
 #!/usr/bin/env python3
-"""Conan recipe — cmatrix 2.0 (custom Makefile, cross-compile to OHOS aarch64)"""
+"""Conan recipe — cmatrix 2.0 (native OHOS compile)"""
 from conan import ConanFile
-from conan.tools.files import get, copy, save, apply_conandata_patches, export_conandata_patches
-from conan.tools.env import VirtualBuildEnv
+from conan.tools.files import get, copy
 import os
 
 class CmatrixConan(ConanFile):
     name = "cmatrix"
     version = "2.0"
-    description = "CMatrix — a scrolling Matrix like screen (OHOS aarch64)"
+    description = "CMatrix — a scrolling Matrix like screen"
     license = "MIT"
     homepage = "https://github.com/bisqwit/cmatrix"
 
     package_type = "application"
 
     settings = "os", "arch", "compiler", "build_type"
-    exports_sources = "conandata.yml"
-
-    def export_sources(self):
-        export_conandata_patches(self)
-
-    def requirements(self):
-        self.requires("ncurses/6.6")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        vb = VirtualBuildEnv(self)
-        vb.generate()
-
-    def build(self):
-        apply_conandata_patches(self)
-        # 交叉编译器（由 profile [buildenv] PATH 提供）
-        cc = "aarch64-linux-gnu-gcc"
-        # 获取编译器 sysroot
-        self.run(f"{cc} --print-sysroot > sysroot.txt", cwd=self.build_folder)
-        sysroot = ""
-        sysroot_file = os.path.join(self.build_folder, "sysroot.txt")
-        if os.path.exists(sysroot_file):
-            with open(sysroot_file) as f:
-                sysroot = f.read().strip()
-        # 从 Conan 依赖链获取 ncurses 路径
-        ncurses = self.dependencies["ncurses"]
-        ncurses_dir = ncurses.package_folder
-        cflags = (f"-Wall -O2 --sysroot={sysroot} "
-                  f"-I{ncurses_dir}/include -I{ncurses_dir}/include/ncursesw")
-        ldflags = f"--sysroot={sysroot} -L{ncurses_dir}/lib -static"
-
-        # 生成 config.h（模拟 autotools ./configure 的输出，非源码补丁）
-        save(self, "config.h", """
+        # 生成 config.h（模拟 autotools ./configure 输出）
+        config_h_path = os.path.join(self.source_folder, "config.h")
+        with open(config_h_path, "w") as f:
+            f.write("""
 #define PACKAGE_NAME "cmatrix"
 #define PACKAGE_TARNAME "cmatrix"
 #define PACKAGE_VERSION "2.0"
@@ -66,7 +39,12 @@ class CmatrixConan(ConanFile):
 #define HAVE_PUTENV 1
 """)
 
-        self.run(f"{cc} {cflags} {ldflags} -o cmatrix cmatrix.c -lncursesw")
+    def build(self):
+        cc = "clang"
+        cflags = "-Wall -O2 -fPIC"
+        ldflags = "-static"
+        self.run(f"{cc} {cflags} {ldflags} -o cmatrix cmatrix.c -lncursesw",
+                 cwd=self.source_folder)
 
     def package(self):
         mkdir = lambda p: os.makedirs(p, exist_ok=True)
