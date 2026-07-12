@@ -26,7 +26,7 @@
 |---|------|------|----------|
 | 1 | E001: C compiler cannot create executables | `--host=aarch64-linux-ohos` 触发交叉编译但 clang sysroot 不存在 | 改用 GCC Linaro 工具链直接编译，不走 configure |
 | 2 | conan create: settings.yml 坏链接 | `~/.conan2/settings.yml` 指向不存在的 `ci/conan/config/settings.yml` | 删除坏链接，用默认 settings.yml 添加 OHOS 和 GCC 16 支持 |
-| 3 | conan create: SHA256 不匹配 | 原始 URL `xs4all.nl` 已重定向，缓存了错误文件 | 改用 GitHub release URL，更新 SHA256 |
+| 3 | conan create: SHA256 不匹配 | 原始 URL `xs4all.nl` 已重定向 | 改用 `abishekvashok/cmatrix`（上游 `bisqwit/cmatrix` 仓库已不存在，返回 404） |
 | 4 | conan create: 缺少 config.h | GitHub 源码不含 autotools 生成的 config.h | 手动生成最小 config.h |
 | 5 | test_package: 交叉编译二进制无法在 x86_64 运行 | 测试二进制是 aarch64 格式 | 使用 `can_run(self)` 跳过运行时测试 |
 
