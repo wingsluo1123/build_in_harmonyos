@@ -71,6 +71,14 @@ if ! python3 -c "import sqlite3" 2>/dev/null; then
     echo "[step] sqlite3 dependency fixed ✅"
 fi
 
+# ── 0.5. Fix HNP lld linker libxml2 dependency ──
+# HNP lld needs libxml2.so.16, add OHOS SDK lib path to LD_LIBRARY_PATH
+OHOS_SDK_LIB="/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib"
+if [ -d "$OHOS_SDK_LIB" ]; then
+    echo "[step] Adding OHOS SDK lib to LD_LIBRARY_PATH (lld needs libxml2.so.16)"
+    export LD_LIBRARY_PATH="$OHOS_SDK_LIB:$LD_LIBRARY_PATH"
+fi
+
 # ── 1. Detect/install Conan ──
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
