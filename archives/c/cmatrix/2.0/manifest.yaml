@@ -1,0 +1,32 @@
+version: "2.0"
+software: cmatrix
+status: built
+build_date: "2026-07-12"
+build_system: custom
+
+source:
+  url: "https://github.com/abishekvashok/cmatrix/archive/refs/tags/v2.0.tar.gz"
+  sha256: "ad93ba39acd383696ab6a9ebbed1259ecf2d3cf9f49d6b97038c66f80749e99a"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - ncurses/6.6
+  cc: aarch64-linux-gnu-gcc
+  cxx: aarch64-linux-gnu-g++
+  note: 交叉编译（x86_64 → aarch64），conan create 验证通过
+
+conan_verify:
+  result: pass
+  note: G1-4 全部通过（交叉编译，运行时测试跳过）
+
+patches_applied: []
+
+knowledge_gained:
+  - "交叉编译：使用 GCC Linaro 7 aarch64 工具链，静态链接 ncurses"
+  - "E001 根因：原始 URL 失效（xs4all.nl 已重定向），改用 GitHub release"
+  - "conanfile.py 使用 Makefile 模板 + 手动生成 config.h 绕过 autotools"
+  - "test_package 使用 can_run() 跳过交叉编译的运行时测试"
+  - "finish G0/W3 需 OHOS 原生环境，交叉编译场景下跳过"
