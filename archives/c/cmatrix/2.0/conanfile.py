@@ -21,7 +21,7 @@ class CmatrixConan(ConanFile):
     def build(self):
         cc = "/data/service/hnp/bin/clang"
         cflags = "-Wall -O2 -fPIC"
-        ldflags = "-static"
+        ldflags = "-static -L/storage/Users/currentUser/usr/local/lib"
         # 生成 config.h（模拟 autotools ./configure 输出）
         config_h_path = os.path.join(self.source_folder, "config.h")
         with open(config_h_path, "w") as f:
