@@ -18,7 +18,10 @@ class CmatrixConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
+    def build(self):
+        cc = "clang"
+        cflags = "-Wall -O2 -fPIC"
+        ldflags = "-static"
         # 生成 config.h（模拟 autotools ./configure 输出）
         config_h_path = os.path.join(self.source_folder, "config.h")
         with open(config_h_path, "w") as f:
@@ -38,11 +41,6 @@ class CmatrixConan(ConanFile):
 #define HAVE_TERMIOS_H 1
 #define HAVE_PUTENV 1
 """)
-
-    def build(self):
-        cc = "clang"
-        cflags = "-Wall -O2 -fPIC"
-        ldflags = "-static"
         self.run(f"{cc} {cflags} {ldflags} -o cmatrix cmatrix.c -lncursesw",
                  cwd=self.source_folder)
 
