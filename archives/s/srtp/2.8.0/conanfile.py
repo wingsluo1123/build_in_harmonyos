@@ -5,7 +5,7 @@ Cisco libsrtp — Secure Real-time Transport Protocol (SRTP) library.
 """
 
 from conan import ConanFile
-from conan.tools.files import copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -65,8 +65,8 @@ class SrtpConan(ConanFile):
                 content = content.replace("#!/bin/sh", "#!/system/bin/sh")
                 with open(f, "w") as fh:
                     fh.write(content)
-            except Exception:
-                pass
+            except Exception as e:
+                self.output.warning(f"Failed to fix shebang in {f}: {e}")
         # Fix mktemp compatibility: HarmonyOS mktemp doesn't support XXXXXX template
         cfg = f"{src}/configure"
         with open(cfg, "r") as fh:
