@@ -18,7 +18,12 @@ int main(void) {
     fprintf(stderr, "uuid_create OK\n");
 
     /* Make a UUID v1 (time-based) with default */
-    uuid_make(u, UUID_MAKE_V1);
+    rc = uuid_make(u, UUID_MAKE_V1);
+    if (rc != UUID_RC_OK) {
+        fprintf(stderr, "FAIL: uuid_make returned %d\n", (int)rc);
+        uuid_destroy(u);
+        return 1;
+    }
     fprintf(stderr, "uuid_make OK\n");
 
     /* Export to string */
