@@ -6,9 +6,11 @@ System dependencies (glib, pcre2, libffi, libjpeg, libwebp, lcms2, expat, zlib)
 are pre-installed via cmd-pkgs on OHOS.
 """
 import os
+import hashlib
+import tarfile
 
-from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan import ConanFile, ConanException
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
 
@@ -29,18 +31,78 @@ class VipsConan(ConanFile):
     def requirements(self):
         # System dependencies via cmd-pkgs (not in conan remotes):
         # glib-2.0, pcre2, libffi, libjpeg-turbo, libwebp, lcms2
-        # Conan-available: expat/2.8.2, zlib/1.3.1
         pass
 
     def layout(self):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Use curl instead of conan's get() to bypass Python ssl module issues
+        # on CI workers where the ssl module is not available (R39).
+        src = self.conan_data["sources"]
+        url = src["url"]
+        expected_sha256 = src.get("sha256", "")
+        filename = url.split("/")[-1]
+        download_path = os.path.join(self.source_folder, filename)
+
+        need_download = True
+        if os.path.exists(download_path):
+            if self._verify_sha256(download_path, expected_sha256):
+                self.output.info("Source already cached, skipping download")
+                need_download = False
+            else:
+                os.remove(download_path)
+
+        if need_download:
+            urls = [
+                url,
+                url.replace("https://github.com", "https://gitcode.com"),
+            ]
+            downloaded = False
+            for try_url in urls:
+                self.output.info(f"Downloading via curl: {try_url}")
+                try:
+                    self.run(f'curl -fSL -o "{download_path}" "{try_url}"')
+                    if os.path.exists(download_path) and self._verify_sha256(download_path, expected_sha256):
+                        self.output.info("Download OK")
+                        downloaded = True
+                        break
+                except Exception:
+                    self.output.warn(f"Download failed: {try_url}")
+                    if os.path.exists(download_path):
+                        os.remove(download_path)
+            if not downloaded:
+                raise ConanException("Failed to download source from all URLs")
+
+        self.output.info(f"Extracting {filename} ...")
+        with tarfile.open(download_path, "r:*") as tar:
+            tar.extractall(self.source_folder)
+
+        extract_dir = filename.replace(".tar.xz", "").replace(".tar.gz", "").replace(".tar.bz2", "")
+        extracted_path = os.path.join(self.source_folder, extract_dir)
+        if os.path.isdir(extracted_path):
+            for item in os.listdir(extracted_path):
+                os.rename(
+                    os.path.join(extracted_path, item),
+                    os.path.join(self.source_folder, item),
+                )
+            os.rmdir(extracted_path)
+
+    @staticmethod
+    def _verify_sha256(filepath, expected):
+        if not expected:
+            return True
+        h = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest() == expected
 
     def generate(self):
         tc = MesonToolchain(self)
-        # Disable features not available on OHOS
         tc.project_options.update({
             "fontconfig": "disabled",
             "pangocairo": "disabled",
@@ -70,11 +132,9 @@ class VipsConan(ConanFile):
                 lines = f.readlines()
             out = []
             for line in lines:
-                # Add ar after cpp line in [binaries] section
                 if line.strip().startswith("cpp ="):
                     out.append(line)
                     out.append("ar = '{}'\n".format(ar_path))
-                # Fix pkg_config_path to include system dependencies
                 elif "pkg_config_path = '" in line:
                     out.append(line.replace(
                         "pkg_config_path = '",
