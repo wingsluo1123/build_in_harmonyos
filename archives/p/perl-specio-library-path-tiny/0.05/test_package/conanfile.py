@@ -68,7 +68,10 @@ class PerlSpecioLibraryPathTinyTestConan(ConanFile):
             self.output.warning(f"Perl dep install failed: {result.stderr[-500:]}")
             return []
 
-        paths = result.stdout.strip().split(":") if result.stdout.strip() else []
+        # Script outputs ONLY the PERL5LIB paths on the last stdout line
+        lines = result.stdout.strip().splitlines()
+        last_line = lines[-1] if lines else ""
+        paths = last_line.split(":") if last_line else []
         if paths:
             self.output.info(f"Perl deps installed to {paths[0]}")
         return paths

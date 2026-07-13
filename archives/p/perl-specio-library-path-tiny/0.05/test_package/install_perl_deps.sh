@@ -6,7 +6,8 @@
 # installs them (and their dependencies) to a local lib directory.
 #
 # Usage: bash install_perl_deps.sh <perl_lib_dir>
-# Output: Prints the PERL5LIB paths (colon-separated) to stdout on success.
+# Output: Prints ONLY the PERL5LIB paths (colon-separated) to stdout.
+#         All build output goes to stderr.
 
 set -euo pipefail
 
@@ -46,19 +47,22 @@ for entry in "${MODULES[@]}"; do
     tarball="${WORK_DIR}/${dirname}.tar.gz"
     src_dir="${WORK_DIR}/${dirname}"
 
-    # Skip if already extracted and installed
+    # Skip if already extracted
     if [ -f "${src_dir}/Makefile" ]; then
         cd "${src_dir}"
     else
-        wget -O "${tarball}" "${url}" 2>/dev/null
+        echo "Downloading ${dirname}..." >&2
+        wget -O "${tarball}" "${url}" >&2 2>&1
         cd "${WORK_DIR}"
         tar xzf "${tarball}"
         cd "${src_dir}"
     fi
 
-    PERL5LIB="${LOCAL_PERL5}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" 2>&1 | tail -1
-    make -j1 2>&1 | tail -1
-    make install 2>&1 | tail -1
+    echo "Building ${dirname}..." >&2
+    PERL5LIB="${LOCAL_PERL5}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" >&2 2>&1
+    make -j1 >&2 2>&1
+    make install >&2 2>&1
 done
 
+# ONLY this line goes to stdout — the PERL5LIB paths
 echo "${LOCAL_PERL5}:${LOCAL_ARCH}"
