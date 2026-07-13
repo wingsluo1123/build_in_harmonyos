@@ -1,0 +1,44 @@
+--- a/main.c
++++ b/main.c
+@@ -1,14 +1,16 @@
+ /* Released under AGPL v3 with exception for the OpenSSL library. See license.txt */
+ 
+ #include "config.h"
++#if INTL_FOUND
+ #include <libintl.h>
++#endif
+ #define _GNU_SOURCE
+ #define __USE_XOPEN
+ #include <time.h>
+ #include <sys/ioctl.h>
+ #include <stdio.h>
+ #include <locale.h>
+ #include "gen.h"
+ #include <stdlib.h>
+ #include <errno.h>
+ #include <math.h>
+@@ -1058,22 +1060,24 @@
+ 		{"version",	0, NULL, 'V' },
+ 		{"help",	0, NULL, 22 },
+ 		{NULL,		0, NULL, 0   }
+ 	};
+ 
+ 	bps.Bps_min = 1 << 30;
+ 	bps.Bps_max = -bps.Bps_min;
+ 	bps.Bps_avg = 0;
+ 
+ 	setlocale(LC_ALL, "");
++#if INTL_FOUND
+ 	bindtextdomain("httping", LOCALEDIR);
+ 	textdomain("httping");
++#endif
+ 
+ 	determine_terminal_size(&max_y, &max_x);
+ 
+ 	signal(SIGPIPE, SIG_IGN);
+ 
+ 	while((c = getopt_long(argc, argv, "2DKEA5MvYWT:ZQ6Sy:XL:bBg:h:p:c:i:Gx:t:o:e:falqsmV?I:R:rn:N:zP:U:C:Fk", long_options, NULL)) != -1)
+ 	{
+ 		switch(c)
+ 		{
+ 			case '2':

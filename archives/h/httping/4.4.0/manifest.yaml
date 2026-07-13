@@ -1,0 +1,88 @@
+# 版本级 manifest — httping 4.4.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.4.0"
+
+# 软件名
+software: "httping"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-13"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/folkertvanheusden/HTTPing/archive/refs/tags/v4.4.0.tar.gz"
+
+  # 源码校验和
+  sha256: "87fa2da5ac83c4a0edf4086161815a632df38e1cc230e1e8a24a8114c09da8fd"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DUSE_SSL=ON"
+    - "-DUSE_TUI=OFF"
+    - "-DUSE_GETTEXT=OFF"
+    - "-DUSE_FFTW3=OFF"
+
+  # 编译依赖列表
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-main.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "httping CMakeLists.txt 中 USE_GETTEXT=OFF 时 source 仍无条件调用 bindtextdomain/textdomain，需打补丁用 #if INTL_FOUND 包裹"
+  - "httping 可选依赖: openssl(SSL)、ncurses(TUI)、fftw3(FFT可视化)、gettext(国际化)"
+  - "首次适配：最小构建 (仅核心功能)，SSL/TUI/FFTW3/GETTEXT 均为 OFF"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/httping-4.4.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/httping-4.4.0.work
+  source_orig_hash: 343be71fd44b59cc
+  source_work_hash: 879224de59d14e48
+  generated_at: '2026-07-13T21:51:04'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-main.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
