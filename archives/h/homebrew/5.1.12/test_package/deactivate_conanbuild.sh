@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/h/homebrew/5.1.12/test_package/deactivate_conanbuildenv-release-armv8.sh"
