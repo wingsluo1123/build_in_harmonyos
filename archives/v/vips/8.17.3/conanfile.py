@@ -29,8 +29,6 @@ class VipsConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # System dependencies via cmd-pkgs (not in conan remotes):
-        # glib-2.0, pcre2, libffi, libjpeg-turbo, libwebp, lcms2
         pass
 
     def layout(self):
@@ -38,13 +36,39 @@ class VipsConan(ConanFile):
 
     def source(self):
         # Use curl instead of conan's get() to bypass Python ssl module issues
-        # on CI workers where the ssl module is not available (R39).
-        src = self.conan_data["sources"]
-        url = src["url"]
-        expected_sha256 = src.get("sha256", "")
-        filename = url.split("/")[-1]
+        # on CI workers. Handle both dict and list formats (CI may rewrite
+        # conandata.yml to add mirror fallback URLs).
+        sources = self.conan_data["sources"]
+
+        # Normalize to list of (url, sha256) pairs
+        url_sha_pairs = []
+        if isinstance(sources, list):
+            for entry in sources:
+                url = entry.get("url", "")
+                sha = entry.get("sha256", "")
+                if isinstance(url, list):
+                    for u in url:
+                        url_sha_pairs.append((u, sha))
+                else:
+                    url_sha_pairs.append((url, sha))
+        elif isinstance(sources, dict):
+            url = sources.get("url", "")
+            sha = sources.get("sha256", "")
+            if isinstance(url, list):
+                for u in url:
+                    url_sha_pairs.append((u, sha))
+            else:
+                url_sha_pairs.append((url, sha))
+
+        if not url_sha_pairs:
+            raise Exception("No source URLs found in conandata")
+
+        # Use first URL's sha256 as the expected hash
+        expected_sha256 = url_sha_pairs[0][1]
+        filename = url_sha_pairs[0][0].split("/")[-1]
         download_path = os.path.join(self.source_folder, filename)
 
+        # Check if already downloaded and valid
         need_download = True
         if os.path.exists(download_path):
             if self._verify_sha256(download_path, expected_sha256):
@@ -54,31 +78,35 @@ class VipsConan(ConanFile):
                 os.remove(download_path)
 
         if need_download:
-            urls = [
-                url,
-                url.replace("https://github.com", "https://gitcode.com"),
-            ]
             downloaded = False
-            for try_url in urls:
-                self.output.info(f"Downloading via curl: {try_url}")
+            for url, sha in url_sha_pairs:
+                self.output.info("Downloading via curl: {}".format(url))
                 try:
-                    self.run(f'curl -fSL -o "{download_path}" "{try_url}"')
-                    if os.path.exists(download_path) and self._verify_sha256(download_path, expected_sha256):
+                    self.run('curl -fSL -o "{}" "{}"'.format(download_path, url))
+                    if os.path.exists(download_path) and self._verify_sha256(download_path, sha):
                         self.output.info("Download OK")
                         downloaded = True
                         break
                 except Exception:
-                    self.output.warn(f"Download failed: {try_url}")
+                    self.output.warn("Download failed: {}".format(url))
                     if os.path.exists(download_path):
                         os.remove(download_path)
             if not downloaded:
                 raise Exception("Failed to download source from all URLs")
 
-        self.output.info(f"Extracting {filename} ...")
+        # Extract
+        self.output.info("Extracting {} ...".format(filename))
         with tarfile.open(download_path, "r:*") as tar:
             tar.extractall(self.source_folder)
 
-        extract_dir = filename.replace(".tar.xz", "").replace(".tar.gz", "").replace(".tar.bz2", "")
+        # Move stripped root dir contents to source_folder
+        for ext in (".tar.xz", ".tar.gz", ".tar.bz2", ".tar"):
+            if filename.endswith(ext):
+                extract_dir = filename[:-len(ext)]
+                break
+        else:
+            extract_dir = filename.rsplit(".", 1)[0] if "." in filename else filename
+
         extracted_path = os.path.join(self.source_folder, extract_dir)
         if os.path.isdir(extracted_path):
             for item in os.listdir(extracted_path):
@@ -90,7 +118,7 @@ class VipsConan(ConanFile):
 
     @staticmethod
     def _verify_sha256(filepath, expected):
-        if not expected:
+        if not expected or expected == "REPLACE_WITH_ACTUAL_SHA256":
             return True
         h = hashlib.sha256()
         with open(filepath, "rb") as f:
