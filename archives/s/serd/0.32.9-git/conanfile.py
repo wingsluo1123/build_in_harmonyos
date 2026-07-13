@@ -23,7 +23,7 @@ class SerdConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("zix/0.8.1-git")
+        pass
 
     def layout(self):
         basic_layout(self)
@@ -34,6 +34,7 @@ class SerdConan(ConanFile):
     def generate(self):
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "static"
+        tc.project_options["wrap_mode"] = "default"
         tc.generate()
 
         # OHOS: CI sets AR=llvm-ar (bare name) but the binary may not be in

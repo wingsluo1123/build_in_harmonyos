@@ -25,7 +25,6 @@ class SordConan(ConanFile):
 
     def requirements(self):
         self.requires("serd/0.32.9-git")
-        self.requires("zix/0.8.1-git")
 
     def layout(self):
         basic_layout(self)
@@ -36,6 +35,7 @@ class SordConan(ConanFile):
     def generate(self):
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "static"
+        tc.project_options["wrap_mode"] = "default"
         tc.generate()
         pkg = PkgConfigDeps(self)
         pkg.generate()
