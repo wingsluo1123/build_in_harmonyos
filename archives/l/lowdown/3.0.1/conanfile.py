@@ -92,7 +92,10 @@ class LowdownConan(ConanFile):
         pkg_dir = self.package_folder
         src_dir = self.source_folder
 
-        self.run(f"/system/bin/sh ./configure CC={cc} PREFIX={pkg_dir}", cwd=src_dir)
+        cfg_opts = f"CC={cc} PREFIX={pkg_dir}"
+        if self.options.shared:
+            cfg_opts += " LINK_METHOD=shared"
+        self.run(f"/system/bin/sh ./configure {cfg_opts}", cwd=src_dir)
         self.run("make -f GNUmakefile -j1", cwd=src_dir)
 
     def package(self):
@@ -115,8 +118,14 @@ class LowdownConan(ConanFile):
             copy(self, "lowdown", src=src,
                  dst=os.path.join(pkg, "bin"), keep_path=False)
 
-        # Library (static only)
-        copy(self, "liblowdown.a", src=src, dst=os.path.join(pkg, "lib"), keep_path=False)
+        # Library (static, or shared if requested)
+        if self.options.shared:
+            for sofile in ["liblowdown.so", "liblowdown.so.3"]:
+                p = os.path.join(src, sofile)
+                if os.path.exists(p):
+                    copy(self, sofile, src=src, dst=os.path.join(pkg, "lib"), keep_path=False)
+        else:
+            copy(self, "liblowdown.a", src=src, dst=os.path.join(pkg, "lib"), keep_path=False)
 
         # Header
         copy(self, "lowdown.h", src=src, dst=os.path.join(pkg, "include"), keep_path=False)

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/queue.h>
 #include <lowdown.h>
 
@@ -18,6 +19,7 @@ int main(void) {
     ret = lowdown_buf(&opts, md, strlen(md), &out, &outsz, NULL);
     if (ret == 0 || out == NULL) {
         printf("FAIL: lowdown_buf returned %d, out=%p\n", ret, (void*)out);
+        free(out);
         return 1;
     }
 
@@ -25,14 +27,17 @@ int main(void) {
     if (strstr(out, "<h1") == NULL) {
         printf("FAIL: no <h1> tag found in output\n");
         printf("Output: %s\n", out);
+        free(out);
         return 1;
     }
     if (strstr(out, "Hello HarmonyOS") == NULL) {
         printf("FAIL: expected text not found in output\n");
         printf("Output: %s\n", out);
+        free(out);
         return 1;
     }
 
     printf("PASS: lowdown HTML round-trip OK (%zu bytes output)\n", outsz);
+    free(out);
     return 0;
 }
