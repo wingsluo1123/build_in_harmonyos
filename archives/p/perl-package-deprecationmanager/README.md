@@ -19,7 +19,7 @@ Manage deprecation warnings for your Perl distribution (Package::DeprecationMana
 ## 运行依赖
 
 - perl (5.42.0+)
-- perl-package-stash (Conan: perl-package-stash/0.40-r1@ohpcd/stable)
+- perl-package-stash (Conan: perl-package-stash/0.40-r1)
 - Module::Implementation (系统 Perl)
 - Params::Util (系统 Perl)
 - Sub::Install (系统 Perl)

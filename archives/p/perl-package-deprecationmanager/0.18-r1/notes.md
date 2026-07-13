@@ -36,7 +36,7 @@
 
 | 依赖 | 版本 | 来源 |
 |------|------|------|
-| Package::Stash | 0.40 | perl-package-stash 0.40-r1 @ohpcd/stable |
+| Package::Stash | 0.40 | perl-package-stash 0.40-r1 |
 | Params::Util | 1.07 | 系统Perl |
 | Sub::Install | 0.926 | 系统Perl |
 | Sub::Util | 1.68_01 | 系统Perl (Scalar-List-Utils) |
@@ -111,3 +111,4 @@ $ conan-verify: ALL GATES PASSED
 **功能测试**: 2026-07-02 (51/51 ALL PASS)
 **最终状态**: built (conan-verify 通过，功能测试全部通过，满足上库要求)
 onan-verify 通过，功能测试全部通过，满足上库要求)
+

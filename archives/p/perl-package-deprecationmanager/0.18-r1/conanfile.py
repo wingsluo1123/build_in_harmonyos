@@ -26,8 +26,7 @@ class PerlPackageDeprecationManagerConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # R27: dependencies must reference @ohpcd/stable
-        self.requires("perl-package-stash/0.40-r1@ohpcd/stable")
+        self.requires("perl-package-stash/0.40-r1")
 
     def layout(self):
         self.folders.build = "."
