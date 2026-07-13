@@ -81,24 +81,27 @@ class IceConan(ConanFile):
             with open(datastorm_mk, "w") as f:
                 f.write("# DataStorm disabled on OHOS: requires C++20 structured binding capture.\n")
 
+        def _abs_paths(dep, paths):
+            return [path if os.path.isabs(path) else os.path.join(dep.package_folder, path) for path in paths]
+
         dep_homes = {
-            "bz2_home": self.dependencies["bzip2"].package_folder,
-            "expat_home": self.dependencies["expat"].package_folder,
-            "lmdb_home": self.dependencies["lmdb"].package_folder,
-            "mcpp_home": self.dependencies["mcpp"].package_folder,
+            "BZ2_HOME": self.dependencies["bzip2"].package_folder,
+            "EXPAT_HOME": self.dependencies["expat"].package_folder,
+            "LMDB_HOME": self.dependencies["lmdb"].package_folder,
+            "MCPP_HOME": self.dependencies["mcpp"].package_folder,
         }
         include_flags = []
         lib_flags = []
         for dep_name in ("bzip2", "expat", "libedit", "lmdb", "mcpp", "openssl", "zlib"):
             dep = self.dependencies[dep_name]
-            include_flags.extend(
-                f"-I{path if os.path.isabs(path) else os.path.join(dep.package_folder, path)}"
-                for path in dep.cpp_info.includedirs
-            )
-            lib_flags.extend(
-                f"-L{path if os.path.isabs(path) else os.path.join(dep.package_folder, path)}"
-                for path in dep.cpp_info.libdirs
-            )
+            include_flags.extend(f"-I{path}" for path in _abs_paths(dep, dep.cpp_info.includedirs))
+            lib_flags.extend(f"-L{path}" for path in _abs_paths(dep, dep.cpp_info.libdirs))
+
+        mcpp_dep = self.dependencies["mcpp"]
+        mcpp_includedirs = _abs_paths(mcpp_dep, mcpp_dep.cpp_info.includedirs) or [os.path.join(mcpp_dep.package_folder, "include")]
+        mcpp_libdirs = _abs_paths(mcpp_dep, mcpp_dep.cpp_info.libdirs) or [os.path.join(mcpp_dep.package_folder, "lib")]
+        mcpp_libs = mcpp_dep.cpp_info.libs or ["mcpp"]
+        mcpp_ldflags = [f"-L{path}" for path in mcpp_libdirs] + [f"-l{lib}" for lib in mcpp_libs]
 
         make_vars = {
             "CC": cc,
@@ -106,6 +109,9 @@ class IceConan(ConanFile):
             "AR": ar,
             "CPPFLAGS": " ".join(include_flags),
             "LDFLAGS": " ".join(lib_flags),
+            "mcpp_includedir": mcpp_includedirs[0],
+            "mcpp_libdir": mcpp_libdirs[0],
+            "mcpp_ldflags": " ".join(mcpp_ldflags),
             "SHELL": "/data/service/hnp/bin/bash",
             **dep_homes,
         }
@@ -146,15 +152,4 @@ class IceConan(ConanFile):
         self.cpp_info.includedirs = ["include", "include/generated"]
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.cxxflags = ["-std=c++17", "-pthread"]
-        self.cpp_info.system_libs = [
-            "dl",
-            "pthread",
-            "rt",
-            "ssl",
-            "crypto",
-            "bz2",
-            "mcpp",
-            "expat",
-            "edit",
-            "lmdb",
-        ]
+        self.cpp_info.system_libs = ["dl", "pthread", "rt"]

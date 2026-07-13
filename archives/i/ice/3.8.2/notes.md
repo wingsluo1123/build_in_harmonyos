@@ -30,7 +30,7 @@ make -C cpp Slice IceUtil slice2cpp Ice IceBox icebox iceboxadmin Glacier2 IceSt
 | 3 | `install(1)` 不可用 | OHOS 环境没有 GNU install | recipe 的 package 阶段使用 Conan `copy()` 打包 |
 | 4 | 消费端找不到 `Ice/Version.h` | 生成的 Slice 头在 `include/generated` | 同时安装 generated 头到 `include/` 和 `include/generated/` |
 | 5 | test_package 编译聚合头触发 OpenSSL 头问题 | `Ice/Ice.h` 会间接包含 SSL 相关头 | test_package 改为运行时 smoke：`icebox --version` 与 `slice2cpp` 代码生成 |
-| 6 | CI 隔离构建链接 `slice2cpp` 时找不到 `-lmcpp` | 原 recipe 未显式声明 Conan 依赖，依赖了本地环境中的 mcpp 库 | 在 `requirements()` 声明 mcpp 等依赖，并向 Ice Makefile 传入 Conan 依赖路径 |
+| 6 | CI 隔离构建链接 `slice2cpp` 时找不到 `-lmcpp` | Ice 上游 Makefile 的 `Slice_libs := mcpp` 最终依赖 `mcpp_ldflags`，仅传 `mcpp_home`/全局 `LDFLAGS` 在 CI 中未生成有效 `-L` | 在 `requirements()` 声明 mcpp 等依赖，并显式向 Ice Makefile 传入 `MCPP_HOME`、`mcpp_libdir`、`mcpp_includedir`、`mcpp_ldflags` |
 
 ## 源码修改
 无持久补丁。所有 HarmonyOS 适配都在 Conan recipe 的 build/package 阶段完成。
