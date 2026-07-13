@@ -1,0 +1,51 @@
+software: ittapi
+# 版本级 manifest
+# 文件位置: archives/i/ittapi/3.26.7/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.26.7"
+status: published
+build_date: "2026-06-26"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/intel/ittapi/archive/refs/tags/v3.26.7.tar.gz"
+  sha256: "29aa0dd50cdf0f0a0a21563eafc5b7ce79052c19594a64017a51f09304a4a39f"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "ittapi 源码 rust/ittapi-sys/c-library 符号链接循环导致 copytree 失败，需移除该符号链接"
+  - "conan-init 误检测构建系统为 autotools，需手动重写 conanfile.py 为 CMake 工具链"
+  - "ittapi 上游 CMakeLists.txt 仅安装 ittnotify 目标，jitprofiling 库未安装"
+  - "CMake 在 HarmonyOS 上输出 System is unknown 警告但不影响编译"
+  - "__itt_init_ittlib 是内部函数非公开 API，test.c 不应直接调用"

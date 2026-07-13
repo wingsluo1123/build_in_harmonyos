@@ -1,0 +1,108 @@
+diff -ruN a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -275,21 +275,21 @@
+             else
+                 ac_param="$ac_param,$ac_from:$ac_what"
+             fi
+             ;;
+     esac
+ done
+ if test ".$ac_param" != .; then
+     # echo "loading parameters"
+     OIFS="$IFS"
+     IFS=","
+-    pconf="/tmp/autoconf.$$"
++    pconf="${TMPDIR:-/tmp}/autoconf.$$"
+     echo "ac_options=''" >$pconf
+     ac_from="config.param"
+     for ac_section in $ac_param; do
+ 
+         case $ac_section in
+             *:* )
+                 ac_from=`echo "$ac_section" | sed -e 's/:.*//'`
+                 ac_section=`echo "$ac_section" | sed -e 's/.*://'`
+                 ;;
+         esac
+@@ -22503,35 +22503,37 @@
+ rm -f core *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+ fi
+ CFLAGS="$OCFLAGS"
+ if test ".$rc" = .ok; then
+     ac_cv_check_sjlj=$testtype
+     break
+ fi
+ done
+ case $PLATFORM in
+     *-*-linux* )
+-        braindead=no
+-        case "x`uname -r`" in
+-            x2.[23456789]* ) ;;
+-
+-            * ) braindead=yes ;;
+-        esac
+-        case `grep __GLIBC_MINOR /usr/include/features.h | grep '#define' |\
+-              awk '{ printf("%s", $3 >= 1 ? "yes" : "no"); }'` in
+-            yes ) ;;
+-            * ) braindead=yes ;;
+-        esac
+-        case $braindead in
+-            yes ) ac_cv_check_sjlj=sjljlx ;;
+-            no  ) ac_cv_check_sjlj=ssjlj  ;;
+-        esac
++        if test -f /usr/include/features.h; then
++            braindead=no
++            case "x`uname -r`" in
++                x2.[23456789]* ) ;;
++
++                * ) braindead=yes ;;
++            esac
++            case `grep __GLIBC_MINOR /usr/include/features.h | grep '#define' |\
++                  awk '{ printf("%s", $3 >= 1 ? "yes" : "no"); }'` in
++                yes ) ;;
++                * ) braindead=yes ;;
++            esac
++            case $braindead in
++                yes ) ac_cv_check_sjlj=sjljlx ;;
++                no  ) ac_cv_check_sjlj=ssjlj  ;;
++            esac
++        fi
+         ;;
+     *86-*-gnu0* )
+         #   GNU/Hurd is similar to linux 2.0 in that it has
+         #   non-functional stubs for sigstack and sigaltstack.
+         ac_cv_check_sjlj=sjljlx
+         ;;
+     *-*-isc* )
+         ac_cv_check_sjlj=sjljisc
+         ;;
+     *-*-interix )
+@@ -26438,26 +26440,26 @@
+ # Create a temporary directory, and hook for its removal unless debugging.
+ $debug ||
+ {
+   trap 'exit_status=$?; rm -rf $tmp && exit $exit_status' 0
+   trap '{ (exit 1); exit 1; }' 1 2 13 15
+ }
+ 
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d -q "./confstatXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d -q "./confstatXXXXXX") 2>/dev/null` &&
+   test -n "$tmp" && test -d "$tmp"
+ }  ||
+ {
+   tmp=./confstat$$-$RANDOM
+-  (umask 077 && mkdir $tmp)
++  (umask 022 && mkdir $tmp)
+ } ||
+ {
+    echo "$me: cannot create a temporary directory in ." >&2
+    { (exit 1); exit 1; }
+ }
+ 
+ _ACEOF
+ 
+ cat >>$CONFIG_STATUS <<_ACEOF
+ 

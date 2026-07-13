@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/a/automysqlbackup/3.0-rc6/test_package/conanbuildenv-armv8.sh"

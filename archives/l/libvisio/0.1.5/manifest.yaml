@@ -1,0 +1,56 @@
+software: libvisio
+version: "0.1.5"
+status: built
+build_date: "2026-06-25"
+
+source:
+  url: "https://dev-www.libreoffice.org/src/libvisio/libvisio-0.1.5.tar.xz"
+  sha256: "430a067903660bb1b97daf4b045e408a1bb75ca45e615cf05fb1a4da65fc5a8c"
+  tar_format: tar.xz
+
+build_system: autotools
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--disable-tests"
+    - "--host=aarch64-unknown-linux-ohos"
+  dependencies:
+    - librevenge/0.0.5
+    - libxml2/2.9.8
+    - zlib/1.3.1
+    - icu4c/77
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+
+knowledge_gained:
+  - "autoreconf -fi 会导致 autoconf 2.72 与旧版 configure.ac 的 ICU 检测宏不兼容，应直接打补丁而非重新生成"
+  - "configure 和 config.status 中的 umask 077 在 HMDFS 上导致临时目录不可写，需改为 umask 022 并将 ./confXXXXXX 改为 $TMPDIR/confXXXXXX"
+  - "libvisio 0.1.5 的 Makefile 硬编码 -Werror，clang 的 -Wdeprecated-copy-with-user-provided-copy 会阻止编译，需移除 -Werror"
+  - "为避免 autotools maintainer 规则触发 missing 脚本调用，需将源文件(.am/.ac)时间戳设旧、生成文件时间戳设新"
+  - "config.guess 2014 版需手动添加 HarmonyOS 识别：__OHOS__ 宏检测 + LIBC case + GUESS→echo/exit"
+  - "config.sub 2014 版需添加 linux-ohos* 到 maybe_os 列表、OS 列表，并在 -linux*) 兜底分支前添加 -linux-ohos*) 专用 case"
+
+patch_generation:
+  method: manual-diff
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libvisio-0.1.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libvisio-0.1.5.work
+  source_orig_hash: d6264f24095fdc54
+  source_work_hash: c05944123408a798
+  generated_at: '2026-06-25T21:59:00'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: platform
+    platform_only: true
+    guard: 'config.guess timestamp < 2020'
+  - file: 0002-config.sub.patch
+    type: platform
+    platform_only: true
+    guard: 'config.sub timestamp < 2020'
