@@ -9,7 +9,7 @@ import os
 import hashlib
 import tarfile
 
-from conan import ConanFile, ConanException
+from conan import ConanFile
 from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
@@ -72,7 +72,7 @@ class VipsConan(ConanFile):
                     if os.path.exists(download_path):
                         os.remove(download_path)
             if not downloaded:
-                raise ConanException("Failed to download source from all URLs")
+                raise Exception("Failed to download source from all URLs")
 
         self.output.info(f"Extracting {filename} ...")
         with tarfile.open(download_path, "r:*") as tar:
