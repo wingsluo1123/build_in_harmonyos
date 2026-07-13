@@ -29,7 +29,7 @@ class RaftConan(ConanFile):
 
     def requirements(self):
         self.requires("libuv/1.52.1")
-        self.requires("liblz4/1.10.0")
+        self.requires("lz4/1.10.0")
 
     def layout(self):
         basic_layout(self)
