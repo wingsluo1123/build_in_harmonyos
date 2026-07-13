@@ -2,9 +2,9 @@
 """Conan test_package for perl-package-deprecationmanager — L1 smoke test.
 
 Verifies that Package::DeprecationManager can be loaded and used after installation.
+Tests real API: import with -deprecations, deprecated(), custom message,
+feature-based deprecation, warning capture.
 """
-import os
-
 from conan import ConanFile
 
 
@@ -19,11 +19,7 @@ class PerlPackageDeprecationManagerTestConan(ConanFile):
         pass
 
     def test(self):
-        # Smoke test: load Package::DeprecationManager with -deprecations parameter
+        # Smoke test: run test_deprecationmanager.sh which tests real API
         # The VirtualRunEnv generator sets PERL5LIB from the recipe's runenv_info
-        self.run(
-            'perl -e "use Package::DeprecationManager -deprecations => {'
-            " 'TestModule' => '0.01' }; "
-            'print \\"Package::DeprecationManager OK\\n\\";"',
-            env="conanrun",
-        )
+        test_script = "test_deprecationmanager.sh"
+        self.run(f'sh "{test_script}"', env="conanrun")

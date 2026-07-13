@@ -9,7 +9,7 @@
 
 ## 编译步骤
 
-1. 下载源码: `curl -k -L -o Package-DeprecationManager-0.18.tar.gz https://cpan.metacpan.org/authors/id/D/DR/DROLSKY/Package-DeprecationManager-0.18.tar.gz`
+1. 下载源码: `curl -L -o Package-DeprecationManager-0.18.tar.gz https://cpan.metacpan.org/authors/id/D/DR/DROLSKY/Package-DeprecationManager-0.18.tar.gz`
 2. 解压到工作目录
 3. `perl Makefile.PL` (生成 Makefile)
 4. `make` (纯Perl模块，仅复制 .pm 文件到 blib)
@@ -110,3 +110,4 @@ $ conan-verify: ALL GATES PASSED
 **编译结束**: 2026-07-02 15:14
 **功能测试**: 2026-07-02 (51/51 ALL PASS)
 **最终状态**: built (conan-verify 通过，功能测试全部通过，满足上库要求)
+onan-verify 通过，功能测试全部通过，满足上库要求)

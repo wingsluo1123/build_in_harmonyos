@@ -55,7 +55,7 @@ sub old_method {
 
 通过 Conan 安装：
 ```bash
-conan install --requires=perl-package-deprecationmanager/0.18-r1@ohpcd/stable
+conan install --requires=perl-package-deprecationmanager/0.18-r1
 ```
 
 安装后通过 `PERL5LIB` 环境变量加载模块。
