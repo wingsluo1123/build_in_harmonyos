@@ -31,6 +31,8 @@ class WasmMicroRuntimeConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        simde_dir = os.path.join(self.source_folder, "simde_src")
+        get(self, **self.conan_data["simde"], strip_root=True, destination=simde_dir)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -38,9 +40,8 @@ class WasmMicroRuntimeConan(ConanFile):
         tc.variables["WAMR_BUILD_PLATFORM"] = "linux"
         tc.variables["WAMR_BUILD_TARGET"] = "AARCH64"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
-        simde_dir = os.environ.get("SIMDE_SOURCE_DIR", "")
-        if simde_dir and os.path.isdir(simde_dir):
-            tc.variables["FETCHCONTENT_SOURCE_DIR_SIMDE"] = simde_dir
+        simde_dir = os.path.join(self.source_folder, "simde_src")
+        tc.variables["FETCHCONTENT_SOURCE_DIR_SIMDE"] = simde_dir
         tc.generate()
 
     def build(self):
