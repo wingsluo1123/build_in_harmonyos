@@ -2,7 +2,6 @@
 """Conan recipe for Boost.Build b2 from Boost 1.85.0."""
 import hashlib
 import os
-import shutil
 import tarfile
 
 from conan import ConanFile
@@ -74,4 +73,3 @@ class BoostConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = []
         self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.builddirs = ["bin"]
