@@ -54,6 +54,17 @@ class SordConan(ConanFile):
             env.vars(self).save_script("ohos_toolchain_env")
 
     def build(self):
+        # Create zix.wrap for Meson subproject fallback (sord source lacks it)
+        subprojects_dir = os.path.join(self.source_folder, "subprojects")
+        os.makedirs(subprojects_dir, exist_ok=True)
+        with open(os.path.join(subprojects_dir, "zix.wrap"), "w") as f:
+            f.write(
+                "[wrap-file]\n"
+                "directory = zix-a4fab09\n"
+                "source_url = https://gitlab.com/drobilla/zix/-/archive/a4fab09/zix-a4fab09.tar.gz\n"
+                "source_filename = zix-a4fab09.tar.gz\n"
+                "source_hash = 858b93002977e9b4d5dd95cccb4732f6c2a8afbd94f38374fcb311e751d8296d\n"
+            )
         apply_conandata_patches(self)
         meson = Meson(self)
         meson.configure()
