@@ -30,5 +30,5 @@ class OsspuuidTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_ossp-uuid')}", env="conanrun")
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} -c './test_ossp-uuid'", env="conanrun")
