@@ -58,11 +58,11 @@ class RaftConan(ConanFile):
         self.run("cd {} && make -j1".format(build_dir))
 
     def package(self):
-        copy(self, "libraft.so*", self.source_folder, _os.path.join(self.package_folder, "lib"))
-        copy(self, "libraft.a", self.source_folder, _os.path.join(self.package_folder, "lib"))
-        copy(self, "raft.h", _os.path.join(self.source_folder, "include"), _os.path.join(self.package_folder, "include"))
-        if _os.path.isdir(_os.path.join(self.source_folder, "include", "raft")):
-            copy(self, "*.h", _os.path.join(self.source_folder, "include", "raft"), _os.path.join(self.package_folder, "include", "raft"))
+        copy(self, "libraft.so*", self.source_folder, os.path.join(self.package_folder, "lib"))
+        copy(self, "libraft.a", self.source_folder, os.path.join(self.package_folder, "lib"))
+        copy(self, "raft.h", os.path.join(self.source_folder, "include"), os.path.join(self.package_folder, "include"))
+        if os.path.isdir(os.path.join(self.source_folder, "include", "raft")):
+            copy(self, "*.h", os.path.join(self.source_folder, "include", "raft"), os.path.join(self.package_folder, "include", "raft"))
 
     def package_info(self):
         self.cpp_info.libs = ["raft"]
