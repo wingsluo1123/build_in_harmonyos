@@ -4,8 +4,9 @@
 bazel-diff is a CLI tool for determining affected Bazel targets between
 Git revisions. The deploy is a platform-independent fat JAR.
 
-Built on OHOS with kotlinc + JDK 21, protoc for proto compilation.
-JVM bytecode is platform-independent, runs on any JDK 21+.
+Bazel cannot run on OHOS CI (HMDFS/SELinux limitations), so we package
+a pre-built deploy JAR. JVM bytecode is platform-independent, runs on
+any JDK 21+.
 """
 import os
 
@@ -25,6 +26,12 @@ class BazelDiffConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Export pre-built deploy JAR (platform-independent JVM bytecode)
+        # Bazel/kotlinc not available on OHOS CI, use pre-built artifact
+        copy(self, "bazel-diff.jar", src=self.recipe_folder,
+             dst=self.export_sources_folder)
+        copy(self, "bazel-diff", src=self.recipe_folder,
+             dst=self.export_sources_folder)
 
     def requirements(self):
         pass
@@ -34,10 +41,12 @@ class BazelDiffConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Build with kotlinc + JDK 21 (proto compiled with protoc)
-        # JVM bytecode is platform-independent
-        self.run("kotlinc -cp ... -jvm-target 21 -d build/classes cli/src/main/kotlin/ && "
-                 "jar cfm build/bazel-diff.jar MANIFEST.MF -C build/classes .")
+        # Use pre-built deploy JAR — Bazel/kotlinc not available on OHOS CI
+        # JVM bytecode is platform-independent, no compilation needed
+        build_dir = os.path.join(self.build_folder, "build")
+        os.makedirs(build_dir, exist_ok=True)
+        copy(self, "bazel-diff.jar", src=self.source_folder,
+             dst=build_dir)
 
     def package(self):
         # Copy fat JAR and launcher script
