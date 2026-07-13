@@ -54,7 +54,8 @@ class RaftConan(ConanFile):
         if _os.path.exists(_cfg):
             _os.chmod(_cfg, 0o755)
         # Run configure and make in source folder
-        self.run("cd {} && ./configure --prefix=/".format(build_dir))
+        # --disable-uv: OHOS lacks Linux AIO syscalls (io_setup etc.)
+        self.run("cd {} && ./configure --prefix=/ --disable-uv".format(build_dir))
         self.run("cd {} && make -j1".format(build_dir))
 
     def package(self):

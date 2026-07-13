@@ -4,38 +4,32 @@
 #include <raft.h>
 
 int main(void) {
-    raft_configuration config;
-    unsigned id;
-    char *address;
+    struct raft_configuration config;
+    struct raft_buffer buf;
     int rv;
 
     /* Test: raft_configuration_init + raft_configuration_add */
     raft_configuration_init(&config);
     rv = raft_configuration_add(&config, 1, "127.0.0.1:9090", RAFT_STANDBY);
     if (rv != 0) {
-        fprintf(stderr, "raft_configuration_add failed: %s\n", raft_errmsg(rv));
-        return 1;
-    }
-
-    /* Test: raft_configuration_get */
-    rv = raft_configuration_get(&config, 1, &id, &address);
-    if (rv != 0 || id != 1 || strcmp(address, "127.0.0.1:9090") != 0) {
-        fprintf(stderr, "raft_configuration_get failed or returned wrong values\n");
+        fprintf(stderr, "raft_configuration_add failed: %s\n", raft_strerror(rv));
         return 1;
     }
 
     /* Test: raft_configuration_encode */
-    raft_buffer buf;
-    raft_configuration_encode(&config, &buf);
+    rv = raft_configuration_encode(&config, &buf);
+    if (rv != 0) {
+        fprintf(stderr, "raft_configuration_encode failed: %s\n", raft_strerror(rv));
+        raft_configuration_close(&config);
+        return 1;
+    }
     if (buf.len == 0) {
         fprintf(stderr, "raft_configuration_encode produced empty buffer\n");
+        raft_free(buf.base);
+        raft_configuration_close(&config);
         return 1;
     }
     raft_free(buf.base);
-
-    /* Test: raft_vsnprintf (internal error handling) */
-    char msg[256];
-    raft_errmsg_print(msg, sizeof msg, "raft test: %s", "OK");
 
     raft_configuration_close(&config);
 
