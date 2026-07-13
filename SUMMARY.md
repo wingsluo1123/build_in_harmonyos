@@ -1,23 +1,23 @@
 # 鸿蒙平台开源软件编译兼容性总览
 
-> 最后更新：2026-07-11
-> 已收录软件：2515 款 / 2670 个版本
+> 最后更新：2026-07-13
+> 已收录软件：2526 款 / 2686 个版本
 
 ## 📊 总体统计
 
 | 指标 | 数量 |
 |------|------|
-| 收录软件 | **2515** 款 |
-| 软件版本 | **2670** 个 |
-| ✅ 已发布 | 998 |
-| ✅ 已编译 | 1232 |
+| 收录软件 | **2526** 款 |
+| 软件版本 | **2686** 个 |
+| ✅ 已发布 | 1006 |
+| ✅ 已编译 | 1235 |
 | ❌ 编译失败 | 10 |
 
 | 构建系统 | 数量 |
 |----------|------|
-| Autotools | 523 |
-| CMake | 261 |
-| Makefile | 204 |
+| Autotools | 524 |
+| CMake | 265 |
+| Makefile | 205 |
 | unknown | 102 |
 | custom | 95 |
 | Meson | 87 |
@@ -51,6 +51,7 @@
 | perl-build | 2 |
 | perl_makemaker | 2 |
 | pip | 2 |
+| {BUILD_SYSTEM} | 2 |
 | rust | 2 |
 | Makefile | 2 |
 | perl-module | 2 |
@@ -223,6 +224,7 @@
 | **avfs** | 1.2.0 | ✅ 已编译 |  |  | 3 | - | [📄](archives/a/avfs/1.2.0/) |
 | **avrdude** | 8.1-r0 | ✅ 已编译 |  |  | - | [] | [📄](archives/a/avrdude/8.1-r0/) |
 | **avro-c** | 1.12.0 | ✅ 已发布 |  |  | 2 | - | [📄](archives/a/avro-c/1.12.0/) |
+| **avro-tools** | 1.12.1 | ✅ 已发布 |  |  | - | - | [📄](archives/a/avro-tools/1.12.1/) |
 | **awk** | 20251225 | success |  | Makefile | - | - | [📄](archives/a/awk/20251225/) |
 | **aws-c-auth** | 0.10.1 | ✅ 已发布 |  |  | - | - | [📄](archives/a/aws-c-auth/0.10.1/) |
 | **aws-c-cal** | 0.9.13 | uploaded |  | unknown | 0 | - | [📄](archives/a/aws-c-cal/0.9.13/) |
@@ -243,6 +245,7 @@
 | **b2sum** | 20190724 | ✅ 已发布 |  | Makefile | 1 | - | [📄](archives/b/b2sum/20190724/) |
 | **b3sum** | 1.8.4 | uploaded |  | CMake | 0 | - | [📄](archives/b/b3sum/1.8.4/) |
 | **babl** | 0.1.126 | ✅ 已发布 |  |  | - | - | [📄](archives/b/babl/0.1.126/) |
+| **bam** | 0.5.1 | ✅ 已发布 |  |  | - | - | [📄](archives/b/bam/0.5.1/) |
 | **bamtools** | 2.5.3 | ✅ 已编译 |  |  | 1 | - | [📄](archives/b/bamtools/2.5.3/) |
 | **bandwhich** | 0.23.0 | ✅ 已发布 |  | cargo | - | - | [📄](archives/b/bandwhich/0.23.0/) |
 | **base64** | 1.5 | ✅ 已发布 |  | Autotools | 2 | - | [📄](archives/b/base64/1.5/) |
@@ -272,8 +275,11 @@
 | **bind** | 9.20.22 | ✅ 已编译 |  | Autotools | - | - | [📄](archives/b/bind/9.20.22/) |
 | **binutils** | 2.46.0 | ✅ 已编译 |  |  | 2 | - | [📄](archives/b/binutils/2.46.0/) |
 | **binwalk** | 2.3.4、3.1.0 | ✅ 已发布 |  |  | - | - | [📄](archives/b/binwalk/3.1.0/) |
+| **bird** | 3.1.6 | ✅ 已编译 |  |  | 1 | - | [📄](archives/b/bird/3.1.6/) |
+| **bird2** | 2.17.4 | unknown |  |  | - | - | [📄](archives/b/bird2/2.17.4/) |
 | **bison** | 2.7、3.8.2 | ✅ 已编译 |  |  | 5 | - | [📄](archives/b/bison/3.8.2/) |
 | **bitrise** | 2.40.5 | ✅ 已发布 |  | go | - | [] | [📄](archives/b/bitrise/2.40.5/) |
+| **bitwise** | 0.50 | ✅ 已发布 |  | Autotools | 5 | - | [📄](archives/b/bitwise/0.50/) |
 | **bkcrack** | 1.8.1 | ✅ 已发布 |  | CMake | 2 | - | [📄](archives/b/bkcrack/1.8.1/) |
 | **black** | 26.5.1 | ✅ 已编译 |  |  | 1 | - | [📄](archives/b/black/26.5.1/) |
 | **blake3** | 1.8.3 | ✅ 已编译 |  | CMake | - | - | [📄](archives/b/blake3/1.8.3/) |
@@ -473,6 +479,7 @@
 | **ddrescue** | 1.30 | partial |  | simple-configure | - | [] | [📄](archives/d/ddrescue/1.30/) |
 | **deark** | 1.7.2 | ✅ 已编译 |  | Makefile | - | - | [📄](archives/d/deark/1.7.2/) |
 | **debianutils** | 5.23.2 | ✅ 已发布 |  |  | 1 | - | [📄](archives/d/debianutils/5.23.2/) |
+| **defaultbrowser** | 1.1 | ✅ 已编译 |  | Makefile | 0 | - | [📄](archives/d/defaultbrowser/1.1/) |
 | **dejagnu** | 1.6.3 | ✅ 已编译 |  | Autotools | 4 | - | [📄](archives/d/dejagnu/1.6.3/) |
 | **devcontainer** | 0.87.0 | ✅ 已发布 |  |  | - | - | [📄](archives/d/devcontainer/0.87.0/) |
 | **deviceinfo** | 0.2.4 | ✅ 已编译 |  |  | 3 | - | [📄](archives/d/deviceinfo/0.2.4/) |
@@ -613,11 +620,12 @@
 | **ffmpegthumbs** | 26.04.1 | ✅ 已编译 |  |  | 6 | - | [📄](archives/f/ffmpegthumbs/26.04.1/) |
 | **ffms2** | 5.0 | ✅ 已编译 |  | Autotools | - | ffmpeg (libavformat >= 60.16.0, libavcodec >= 60.31.0, libswscale >= 7.5.0, libavutil >= 58.29.0, libswresample >= 4.12.0),zlib | [📄](archives/f/ffms2/5.0/) |
 | **ffnvcodec-headers** | 13.0.19.0 | ✅ 已编译 |  |  | - | - | [📄](archives/f/ffnvcodec-headers/13.0.19.0/) |
+| **ffprobe** | 8.1.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/f/ffprobe/8.1.2/) |
 | **fftw** | 3.3.10 | uploaded |  | unknown | 0 | - | [📄](archives/f/fftw/3.3.10/) |
 | **ffuf** | 2.1.0-r21 | ✅ 已发布 |  | custom | 1 | - | [📄](archives/f/ffuf/2.1.0-r21/) |
 | **fig2dev** | 3.2.9a | ✅ 已编译 |  | Autotools | 1 | - | [📄](archives/f/fig2dev/3.2.9a/) |
 | **figlet** | 2.2.5 | success |  | Makefile | 1 | - | [📄](archives/f/figlet/2.2.5/) |
-| **file** | 5.45、5.46 | ✅ 已编译 |  | Autotools | 3 | - | [📄](archives/f/file/5.46/) |
+| **file** | 5.45、5.46、5.48 | ✅ 已发布 |  |  | 3 | - | [📄](archives/f/file/5.48/) |
 | **findent** | 4.3.6 | ✅ 已编译 |  | Autotools | 3 | - | [📄](archives/f/findent/4.3.6/) |
 | **findutils** | 4.10.0 | ✅ 已编译 |  | Autotools | 2 | [] | [📄](archives/f/findutils/4.10.0/) |
 | **fio** | 3.41 | partial |  | Autotools | 1 | - | [📄](archives/f/fio/3.41/) |
@@ -929,6 +937,7 @@
 | **kquickimageeditor** | 0.3.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/k/kquickimageeditor/0.3.0/) |
 | **kquickimageeditor5** | 0.2.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/k/kquickimageeditor5/0.2.0/) |
 | **krb5** | 1.22.1、1.22.2 | ✅ 已编译 |  |  | 4 | - | [📄](archives/k/krb5/1.22.2/) |
+| **ktfmt** | 0.64 | ✅ 已发布 |  |  | - | - | [📄](archives/k/ktfmt/0.64/) |
 | **kube-ps1** | 1.0.0 | ✅ 已发布 |  | shell | - | - | [📄](archives/k/kube-ps1/1.0.0/) |
 | **kubebuilder** | 4.14.0 | ✅ 已发布 |  | custom | - | - | [📄](archives/k/kubebuilder/4.14.0/) |
 | **kubecolor** | 0.0.25 | ✅ 已编译 |  | go | - | - | [📄](archives/k/kubecolor/0.0.25/) |
@@ -960,7 +969,7 @@
 | **lemon** | 3.53.0 | uploaded |  | unknown | 0 | - | [📄](archives/l/lemon/3.53.0/) |
 | **lensfun** | 0.3.4 | ✅ 已编译 |  |  | - | - | [📄](archives/l/lensfun/0.3.4/) |
 | **leptonica** | 1.84.1、1.87.0 | ✅ 已编译 |  |  | - | - | [📄](archives/l/leptonica/1.87.0/) |
-| **lerc** | 2.2、4.0.0 | uploaded |  | unknown | 0 | - | [📄](archives/l/lerc/4.0.0/) |
+| **lerc** | 2.2、4.0.0、4.1.1 | built             |  | CMake | - | - | [📄](archives/l/lerc/4.1.1/) |
 | **less** | 661 | partial |  | Autotools | 2 | - | [📄](archives/l/less/661/) |
 | **leveldb** | 1.23 | uploaded |  | CMake | 0 | - | [📄](archives/l/leveldb/1.23/) |
 | **lexbor** | 2.6.0 | ✅ 已发布 |  |  | - | - | [📄](archives/l/lexbor/2.6.0/) |
@@ -1128,7 +1137,7 @@
 | **libjcat** | 0.2.6 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libjcat/0.2.6/) |
 | **libjodycode** | 4.1.2 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libjodycode/4.1.2/) |
 | **libjpeg** | 10 | ✅ 已发布 |  |  | 3 | - | [📄](archives/l/libjpeg/10/) |
-| **libjpeg-turbo** | 3.1.4.1、2.1.5.1 | partial |  | Autotools | - | - | [📄](archives/l/libjpeg-turbo/2.1.5.1/) |
+| **libjpeg-turbo** | 3.1.4.1、2.1.5.1、3.2.0 | built             |  | CMake | - | - | [📄](archives/l/libjpeg-turbo/3.2.0/) |
 | **libjwt** | 3.3.3 | ✅ 已编译 |  |  | - | - | [📄](archives/l/libjwt/3.3.3/) |
 | **libjxl** | 0.11.2 | ✅ 已发布 |  | CMake | - | - | [📄](archives/l/libjxl/0.11.2/) |
 | **libkcapi** | 1.4.0、1.5.0、1.5.0-r1 | ✅ 已编译 |  | Autotools | - | - | [📄](archives/l/libkcapi/1.5.0-r1/) |
@@ -1342,7 +1351,7 @@
 | **libvpx** | 1.14.1 | ✅ 已编译 |  |  | 2 | - | [📄](archives/l/libvpx/1.14.1/) |
 | **libvterm** | 0.3.3 | ✅ 已发布 |  |  | - | - | [📄](archives/l/libvterm/0.3.3/) |
 | **libwapcaplet** | 0.4.3 | ✅ 已发布 |  | Makefile | 1 | - | [📄](archives/l/libwapcaplet/0.4.3/) |
-| **libwebp** | 1.3.2 | uploaded |  | Autotools | 0 | - | [📄](archives/l/libwebp/1.3.2/) |
+| **libwebp** | 1.3.2、1.6.0 | built             |  | CMake | - | - | [📄](archives/l/libwebp/1.6.0/) |
 | **libwebsockets** | 4.3.5 | ✅ 已发布 |  |  | 2 | - | [📄](archives/l/libwebsockets/4.3.5/) |
 | **libwmf** | 0.2.15 | ✅ 已编译 |  |  | - | - | [📄](archives/l/libwmf/0.2.15/) |
 | **libwpe** | 1.16.0 | ✅ 已编译 |  | Meson | 2 | - | [📄](archives/l/libwpe/1.16.0/) |
@@ -1465,6 +1474,7 @@
 | **lv2** | 1.18.11-git | ✅ 已发布 |  |  | - | - | [📄](archives/l/lv2/1.18.11-git/) |
 | **lxc-templates-legacy** | 3.0.4 | ✅ 已编译 |  | Autotools | 11 | - | [📄](archives/l/lxc-templates-legacy/3.0.4/) |
 | **lyaml** | 6.2.8 | ✅ 已编译 |  |  | - | - | [📄](archives/l/lyaml/6.2.8/) |
+| **lynis** | 3.1.7 | ✅ 已发布 |  |  | 3 | - | [📄](archives/l/lynis/3.1.7/) |
 | **lynx** | 2.9.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/l/lynx/2.9.2/) |
 | **lz4** | 1.10.0 | uploaded |  | unknown | 0 | - | [📄](archives/l/lz4/1.10.0/) |
 | **lz4jsoncat** | v2 | uploaded |  | Makefile | 0 | - | [📄](archives/l/lz4jsoncat/v2/) |
@@ -2037,7 +2047,7 @@
 | **podman-tui** | 1.9.0 | ✅ 已编译 |  |  | - | - | [📄](archives/p/podman-tui/1.9.0/) |
 | **podofo** | 0.9.5 | ✅ 已编译 |  | CMake | - | - | [📄](archives/p/podofo/0.9.5/) |
 | **polipo** | 1.1.1 | ✅ 已发布 |  | Makefile | - | - | [📄](archives/p/polipo/1.1.1/) |
-| **poppler** | 25.12.0 | ✅ 已编译 |  | CMake | - | - | [📄](archives/p/poppler/25.12.0/) |
+| **poppler** | 25.12.0 | ✅ 已发布 |  | CMake | 39 | - | [📄](archives/p/poppler/25.12.0/) |
 | **popt** | 1.16 | uploaded |  | unknown | 0 | [] | [📄](archives/p/popt/1.16/) |
 | **portable-libyaml** | 0.2.5 | ✅ 已发布 |  |  | - | - | [📄](archives/p/portable-libyaml/0.2.5/) |
 | **portable-ruby** | 4.0.2 | ✅ 已发布 |  | Autotools | 3 | - | [📄](archives/p/portable-ruby/4.0.2/) |
@@ -2188,6 +2198,7 @@
 | **saml2aws** | homebrew | ✅ 已发布 |  |  | 1 | - | [📄](archives/s/saml2aws/homebrew/) |
 | **samtools** | 1.21 | ✅ 已发布 |  | Autotools | - | - | [📄](archives/s/samtools/1.21/) |
 | **samurai** | 1.2 | uploaded |  | unknown | 0 | - | [📄](archives/s/samurai/1.2/) |
+| **scala** | 2.12.21 | ✅ 已编译 |  |  | - | - | [📄](archives/s/scala/2.12.21/) |
 | **scapy** | 2.6.1-r0 | ✅ 已编译 |  |  | - | - | [📄](archives/s/scapy/2.6.1-r0/) |
 | **scc** | 3.6.0-r5 | ✅ 已发布 |  | custom | 1 | - | [📄](archives/s/scc/3.6.0-r5/) |
 | **scdoc** | 1.11.0、1.11.3 | partial |  | Autotools | - | - | [📄](archives/s/scdoc/1.11.3/) |
@@ -2609,11 +2620,12 @@
 | **zsh-autocomplete** | 25.03.19、main | ✅ 已发布 |  | Script | - | zsh >= 5.8 (with zsh/param/private and zsh/system modules) | [📄](archives/z/zsh-autocomplete/main/) |
 | **zsh-git-prompt** | 0.1.0.0 | ✅ 已编译 |  | none | - | - | [📄](archives/z/zsh-git-prompt/0.1.0.0/) |
 | **zsh-history-substring-search** | 1.1.0 | ✅ 已编译 |  |  | - | - | [📄](archives/z/zsh-history-substring-search/1.1.0/) |
-| **zstd** | 1.5.6、1.5.7 | ✅ 已发布 |  |  | - | - | [📄](archives/z/zstd/1.5.7/) |
+| **zstd** | 1.5.6、1.5.7 | built             |  | CMake | - | - | [📄](archives/z/zstd/1.5.7/) |
 | **zstd-jni** | 1.5.6-5 | uploaded |  | unknown | 0 | - | [📄](archives/z/zstd-jni/1.5.6-5/) |
 | **zutils** | 1.15、1.16 | uploaded |  | unknown | 0 | - | [📄](archives/z/zutils/1.16/) |
 | **zxc** | 0.9.1 | ✅ 已发布 |  |  | 2 | - | [📄](archives/z/zxc/0.9.1/) |
 | **zziplib** | 0.13.78 | uploaded |  | unknown | 0 | - | [📄](archives/z/zziplib/0.13.78/) |
+| **{software}** | homebrew、1.24 | ✅ 已发布 |  | {BUILD_SYSTEM} | - | - | [📄](archives/h/htslib/1.24/) |
 
 ---
 
