@@ -1,22 +1,33 @@
 --- /dev/null
 +++ b/configure
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,66 @@
 +#!/data/service/hnp/bin/bash
-+# Minimal configure script for raft 0.18.1
++# Minimal configure script for raft 0.18.1 (OHOS compat)
 +
 +set -e
 +
 +PREFIX=/usr/local
++BINDIR='${prefix}/bin'
++SBINDIR='${prefix}/bin'
++LIBDIR='${prefix}/lib'
++INCLUDEDIR='${prefix}/include'
++OLDINCLUDEDIR='${prefix}/include'
++
 +while [ $# -gt 0 ]; do
 +    case "$1" in
 +        --prefix=*) PREFIX="${1#*=}" ;;
-+        --help) echo "Usage: ./configure --prefix=PREFIX"; exit 0 ;;
++        --bindir=*) BINDIR="${1#*=}" ;;
++        --sbindir=*) SBINDIR="${1#*=}" ;;
++        --libdir=*) LIBDIR="${1#*=}" ;;
++        --includedir=*) INCLUDEDIR="${1#*=}" ;;
++        --oldincludedir=*) OLDINCLUDEDIR="${1#*=}" ;;
++        --help) echo "Usage: ./configure [OPTIONS]"; exit 0 ;;
 +        *) echo "Unknown option: $1"; exit 1 ;;
 +    esac
 +    shift
 +done
 +
-+echo "configure: using prefix $PREFIX"
++echo "configure: prefix=$PREFIX libdir=$LIBDIR includedir=$INCLUDEDIR"
 +
 +cat > Makefile << 'MAKEFILE_EOF'
 +CC = clang
@@ -56,5 +67,3 @@
 +MAKEFILE_EOF
 +
 +echo "configure: done"
-+PATCHEOF
-+echo "patch created" && ls -la archives/r/raft/0.18.1/patches/
