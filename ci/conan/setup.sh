@@ -32,7 +32,17 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    python3 -m pip install --user --force-reinstall conan || {
+
+    # Community PyPI source lacks several conan dependencies (requests,
+    # urllib3, PyYAML, python-dateutil). Install ALL deps from official
+    # PyPI first, then install conan itself from community source with
+    # --no-deps to avoid pulling the non-OHOS conan from official PyPI.
+    python3 -m pip install --user \
+        --index-url https://pypi.org/simple \
+        requests PyYAML python-dateutil colorama patch-ng fasteners distro Jinja2 \
+        2>/dev/null || true
+
+    python3 -m pip install --user --force-reinstall --no-deps conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
