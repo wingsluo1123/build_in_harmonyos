@@ -423,9 +423,9 @@ except Exception:
     # ── Mirror fallback (通用镜像映射) ──
     # 将 conandata.yml 中已知域名的 url 从单值改为列表, 自动加上镜像源 fallback
     # Conan 2.x 的 get() 支持 url 列表, 会逐个尝试直到成功
-    # 支持: github.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
+    # 支持: github.com, gitlab.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
     if [ -f "$CONANDATA" ]; then
-        if grep -qE 'url:.*https://(github\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org)/' "$CONANDATA" 2>/dev/null; then
+        if grep -qE 'url:.*https://(github\.com|gitlab\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org)/' "$CONANDATA" 2>/dev/null; then
             echo "[step] Mirror fallback: rewriting source URLs in conandata.yml..."
             cp "$CONANDATA" "${CONANDATA}.orig" 2>/dev/null
 
@@ -449,6 +449,16 @@ def get_mirrors(url):
             'https://gitclone.com/' + url[len('https://'):],
             'https://moeyy.cn/gh-proxy/' + url,
             url.replace('https://github.com', 'https://kkgithub.com'),
+            url,
+        ]
+    # ── GitLab ──
+    if re.match(r'^https?://gitlab\.com/', url):
+        return [
+            'https://gh-proxy.com/' + url,
+            'https://mirror.ghproxy.com/' + url,
+            'https://ghproxy.com/' + url,
+            'https://gitclone.com/' + url[len('https://'):],
+            'https://moeyy.cn/gh-proxy/' + url,
             url,
         ]
     # ── GNU (ftpmirror.gnu.org) ──
