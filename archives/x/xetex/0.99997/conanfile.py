@@ -78,9 +78,53 @@ class XetexConan(ConanFile):
         # 4. Fix AC_CONFIG_AUX_DIR paths in subdirectories
         self._fix_aux_dirs(src)
 
-        # 5. Generate configure scripts (requires automake/libtool)
-        self._run("cd source && aclocal --force && autoheader --force && "
-                  "automake --add-missing --copy --force-missing && autoconf --force", cwd=src)
+        # 5. Generate configure script (automake not available on OHOS)
+        #    Create aclocal.m4 with automake macro stubs, then run autoconf directly.
+        source_dir = os.path.join(src, "source")
+        aclocal_m4 = os.path.join(source_dir, "aclocal.m4")
+        with open(aclocal_m4, "w") as f:
+            f.write(
+                "m4_pattern_allow([m4_sinclude])\n"
+                "AC_DEFUN([AM_INIT_AUTOMAKE], [])\n"
+                "AC_DEFUN([AM_MAINTAINER_MODE], [])\n"
+                "AC_DEFUN([AM_AUTOMAKE_VERSION], [])\n"
+                "AC_DEFUN([AM_CONDITIONAL], [])\n"
+                "AC_DEFUN([AM_COND_IF], [])\n"
+                "AC_DEFUN([AM_COND_ELSE], [])\n"
+                "AC_DEFUN([AM_COND_ENDIF], [])\n"
+                "AC_DEFUN([AM_SILENT_RULES], [])\n"
+                "AC_DEFUN([AM_PROG_AR], [])\n"
+                "AC_DEFUN([AM_PROG_CC_C_O], [])\n"
+                "AC_DEFUN([AM_PROG_CXX_C_O], [])\n"
+                "AC_DEFUN([AM_MISSING_PROG], [])\n"
+                "AC_DEFUN([AM_PROG_INSTALL], [])\n"
+                "AC_DEFUN([AM_PROG_MKDIR_P], [])\n"
+                "AC_DEFUN([AM_SUBST_NOTMAKE], [])\n"
+                "AC_DEFUN([AM_MAKEFILE_INCLUDE], [])\n"
+                "AC_DEFUN([AM_PROG_LIBTOOL], [])\n"
+                "AC_DEFUN([AM_DISABLE_SHARED], [])\n"
+                "AC_DEFUN([AM_DISABLE_STATIC], [])\n"
+                "AC_DEFUN([AM_ENABLE_SHARED], [])\n"
+                "AC_DEFUN([AM_ENABLE_STATIC], [])\n"
+                "AC_DEFUN([AM_PROG_LD], [])\n"
+                "AC_DEFUN([AM_PROG_NM], [])\n"
+                "AC_DEFUN([AM_PROG_AS], [])\n"
+                "AC_DEFUN([AM_PROG_FC_C_O], [])\n"
+                "AC_DEFUN([AM_PROG_MOC], [])\n"
+                "AC_DEFUN([AM_GNU_GETTEXT], [])\n"
+                "AC_DEFUN([AM_GNU_GETTEXT_INTL_SUBDIR], [])\n"
+                "AC_DEFUN([AM_ICONV], [])\n"
+                "AC_DEFUN([AM_NLS], [])\n"
+                "AC_DEFUN([AM_DEFAULT_VERBOSITY], [])\n"
+                "AC_DEFUN([AM_DISTCHECK_CONFIGURE_FLAGS], [])\n"
+                "AC_DEFUN([AM_EXTRA_RECURSIVE_TARGETS], [])\n"
+            )
+        # Create Makefile.in from Makefile.am (automake not available)
+        for dirpath, _, filenames in os.walk(source_dir):
+            if "Makefile.am" in filenames and "Makefile.in" not in filenames:
+                shutil.copy(os.path.join(dirpath, "Makefile.am"),
+                            os.path.join(dirpath, "Makefile.in"))
+        self._run("cd source && autoconf --force", cwd=src)
 
         # 6. Configure and build
         conf_opts = " ".join([
