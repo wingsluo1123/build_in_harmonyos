@@ -52,13 +52,3 @@ class PerlPackageStashConan(ConanFile):
         # Perl module: expose lib path for consumers
         perl5_lib = os.path.join(self.package_folder, "lib", "perl5")
         self.runenv_info.append_path("PERL5LIB", perl5_lib)
-        # Package::Stash requires Module::Implementation at runtime,
-        # which is a system-installed Perl module not in the default @INC
-        # on CI workers. Add system Perl lib paths so consumers can find it.
-        for sys_path in [
-            "/storage/Users/currentUser/usr/local/lib/perl5",
-            "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0",
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0",
-        ]:
-            if os.path.isdir(sys_path):
-                self.runenv_info.append_path("PERL5LIB", sys_path)
