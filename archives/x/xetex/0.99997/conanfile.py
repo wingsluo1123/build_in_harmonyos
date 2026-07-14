@@ -34,7 +34,7 @@ class XetexConan(ConanFile):
 
     def requirements(self):
         self.requires("freetype/2.14.3")
-        self.requires("zlib/1.3.1.1")
+        self.requires("zlib/1.3.1")
         self.requires("expat/2.8.2")
 
     def layout(self):
