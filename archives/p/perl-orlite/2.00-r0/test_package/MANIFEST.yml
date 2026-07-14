@@ -26,12 +26,12 @@ upstream_tests:
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
-  - file: conanfile.py
+  - file: test_orlite.sh
     description: "ORLite.pm 文件存在性验证"
-    command: "perl -e 'grep { -f \"$_/ORLite.pm\" } @INC'"
-  - file: conanfile.py
-    description: "ORLite API Mock 功能验证 (版本号 + 10 个核心方法)"
-    command: "perl -e 'BEGIN { mock DBD::SQLite } use ORLite { file=>..., create=>1 }; 验证 API'"
+    command: "perl -e 'my @f = grep { -f \"$_/ORLite.pm\" } @INC; die unless @f'"
+  - file: test_orlite.sh
+    description: "ORLite API Mock 功能验证 (版本号 + 9 个核心方法)"
+    command: "perl -e 'BEGIN { $INC{\"DBD/SQLite.pm\"}=\"mock\"; ... } use ORLite {...}; 验证 9 个方法'"
 
 # 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 12
+assertion_count: 11

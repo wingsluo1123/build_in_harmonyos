@@ -50,7 +50,7 @@ ORLite 不是传统的 ORM——它是一个代码生成器。使用时通过 `u
 
 ```bash
 # 通过 Conan 安装
-conan install --requires=perl-orlite/2.00-r0@ohpcd/stable
+conan install --requires=perl-orlite/2.00-r0
 
 # 或手动安装
 perl Makefile.PL && make && make install

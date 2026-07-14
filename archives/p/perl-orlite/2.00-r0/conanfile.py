@@ -45,6 +45,7 @@ class PerlorliteConan(ConanFile):
         # Pure Perl module — no C libraries
         self.cpp_info.libdirs = []
         self.cpp_info.libs = []
-        # Expose Perl lib path via runenv
+        # Expose Perl lib path via runenv (append_path so multiple
+        # Perl module packages don't overwrite each other's PERL5LIB)
         perl_lib = os.path.join(self.package_folder, "lib", "perl5")
-        self.runenv_info.define("PERL5LIB", perl_lib)
+        self.runenv_info.append_path("PERL5LIB", perl_lib)
