@@ -14,7 +14,7 @@ import os
 import subprocess
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, chmod
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, chmod
 from conan.tools.layout import basic_layout
 
 
@@ -72,13 +72,10 @@ class PerlSocket6Conan(ConanFile):
             self.output.info("Creating config.pl and config.h manually (HMDFS workaround)")
             self._create_config_files(src_dir)
 
-        # Step 2: Patch Makefile.PL to add XS linker flags and skip configure
-        self._patch_makefile_pl(src_dir)
-
-        # Step 3: Run Makefile.PL
+        # Step 2: Run Makefile.PL (patch already applied via apply_conandata_patches)
         self.run("perl Makefile.PL", cwd=src_dir)
 
-        # Step 4: Build
+        # Step 3: Build
         self.run("make -j1", cwd=src_dir)
 
     def _create_config_files(self, src_dir):
@@ -103,30 +100,6 @@ class PerlSocket6Conan(ConanFile):
 /* #undef HAVE_SOCKADDR_SA_LEN */
 #define HAVE_SOCKLEN_T 1
 """)
-
-    def _patch_makefile_pl(self, src_dir):
-        """Patch Makefile.PL to add XS linker flags and skip configure step."""
-        makefile_pl_path = os.path.join(src_dir, "Makefile.PL")
-        with open(makefile_pl_path, "r") as f:
-            content = f.read()
-
-        # Skip the configure call (already done manually)
-        old_configure = """    $cmd .= " ./configure";
-    $cmd .= " --with-perl=$path_perl" if ($path_perl);
-    system($cmd);"""
-        new_configure = """    # OHOS: configure step already completed manually (config.status HMDFS issue)"""
-        if old_configure in content:
-            content = content.replace(old_configure, new_configure)
-
-        # Add dynamic_lib with XS linker flags
-        if "dynamic_lib" not in content:
-            content = content.replace(
-                "    LIBS\t => [\"${libs}\"],",
-                "    LIBS\t => [\"${libs}\"],\n    dynamic_lib => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -lc' },"
-            )
-
-        with open(makefile_pl_path, "w") as f:
-            f.write(content)
 
     def package(self):
         src_dir = self.source_folder
