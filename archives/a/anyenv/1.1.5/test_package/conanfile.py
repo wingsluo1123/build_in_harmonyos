@@ -34,4 +34,4 @@ class AnyenvTestConan(ConanFile):
 
         with TemporaryDirectory(prefix="anyenv-root-") as anyenv_root:
             env_prefix = f'ANYENV_ROOT="{anyenv_root}" PATH="{":".join(path_parts)}"'
-            self.run(f'{env_prefix} "{test_script}"', env="conanrun")
+            self.run(f'{env_prefix} "{bash_path}" "{test_script}"', env="conanrun")
