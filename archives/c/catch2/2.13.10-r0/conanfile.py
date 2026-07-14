@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Conan recipe for catch2 2.13.10-r0 (header-only CMake)."""
 
-import os
 from conan import ConanFile
 from conan.tools.files import get
-from conan.tools.cmake import CMake, CMakeToolchain
+from conan.tools.cmake import CMakeToolchain
 
 
 class Catch2Recipe(ConanFile):
@@ -36,12 +35,15 @@ class Catch2Recipe(ConanFile):
         tc.generate()
 
     def build(self):
-        cmake = CMake(self)
-        cmake.configure()
+        self.run(
+            f'cmake -S "{self.source_folder}" -B "{self.build_folder}" '
+            f'-DCMAKE_TOOLCHAIN_FILE="generators/conan_toolchain.cmake" '
+            f'-DBUILD_TESTING=OFF -DCATCH_BUILD_TESTING=OFF '
+            f'-DCATCH_BUILD_EXAMPLES=OFF -DCATCH_INSTALL_DOCS=OFF'
+        )
 
     def package(self):
-        cmake = CMake(self)
-        cmake.install()
+        self.run(f'cmake --install "{self.build_folder}" --prefix "{self.package_folder}"')
 
     def package_info(self):
         self.cpp_info.includedirs = ["include"]
