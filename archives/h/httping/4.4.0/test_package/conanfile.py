@@ -3,8 +3,6 @@
 
 Verifies httping binary is installed and runs --version successfully.
 """
-import os
-
 from conan import ConanFile
 
 

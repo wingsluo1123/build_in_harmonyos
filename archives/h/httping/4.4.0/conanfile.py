@@ -5,10 +5,8 @@ httping is a CLI tool for measuring HTTP request latency.
 Uses CMake build system; SSL, TUI, FFTW3, gettext are optional features.
 """
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.build import cross_building
-import os
 
 
 class HttpingConan(ConanFile):

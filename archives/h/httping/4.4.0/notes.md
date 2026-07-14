@@ -14,7 +14,7 @@ CMake (最小版本 3.12)
 - USE_FFTW3=OFF (FFT 可视化可选，需 USE_TUI)
 
 ## 补丁
-1. `0001-guard-gettext-calls-with-HAVE_INTL.patch`
+1. `0001-main.c.patch`
    - 问题: CMakeLists.txt 中 USE_GETTEXT=OFF 时，main.c 仍无条件调用 bindtextdomain()/textdomain()
    - 修复: 用 #if INTL_FOUND 包裹 libintl.h 包含和 bindtextdomain/textdomain 调用
    - gen.h 已有正确的 #if INTL_FOUND 守卫，仅需修改 main.c
