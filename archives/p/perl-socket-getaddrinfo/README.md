@@ -46,4 +46,4 @@ die "Cannot resolve name - $err" if $err;
 - 原始源码使用 Module::Build 构建，鸿蒙系统不支持，已在 conanfile.py 中重写为 ExtUtils::MakeMaker
 
 ---
-*OpenHarmony 编译归档 · 2026-07-01*
+*OpenHarmony 编译归档 · 2026-07-02*

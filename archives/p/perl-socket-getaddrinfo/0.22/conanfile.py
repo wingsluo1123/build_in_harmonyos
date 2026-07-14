@@ -16,7 +16,7 @@ import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -152,6 +152,6 @@ WriteMakefile(
                 shutil.rmtree(empty_root)
 
     def package_info(self):
-        # Perl XS module - expose the .so library
-        self.cpp_info.libs = ["GetAddrInfo"]
-        self.cpp_info.libdirs = ["lib/site_perl/5.42.0/aarch64-linux/auto/Socket/GetAddrInfo"]
+        # Perl XS module — no C/C++ linkable libraries
+        self.cpp_info.libs = []
+        self.cpp_info.libdirs = []
