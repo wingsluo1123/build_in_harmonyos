@@ -40,6 +40,14 @@ class SpinConan(ConanFile):
             'YACC="bison -y" '
             'LDFLAGS="-fuse-ld=bfd"'
         )
+        self.run(
+            f'make -C "{src_dir}" '
+            'CC=clang '
+            'CFLAGS="-fPIC -O2 -DNXT -Wall -pedantic" '
+            'YACC="bison -y" '
+            'LDFLAGS="-fuse-ld=bfd" '
+            'check 2>&1 || true'
+        )
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "Src")
