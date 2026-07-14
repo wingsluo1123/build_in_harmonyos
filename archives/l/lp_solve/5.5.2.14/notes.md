@@ -97,3 +97,35 @@ make_lp/set_obj/add_constraint/solve/delete_lp  ✅
 
 **编译结束**: 2026-06-09 16:24
 **最终状态**: published
+
+## 代码质量检查与 CI 构建验证 (2026-07-14)
+
+### 质量检查 (quality_check.py)
+- 结果: 0 错误、0 警告 ✓
+
+### CI 构建验证 (conan-verify) 修复记录
+
+| # | 门禁 | 问题 | 修复 |
+|---|------|------|------|
+| C1 | G1 | conanfile.py 缺失 | 创建 Makefile 构建配方 |
+| C2 | G1 | conandata.yml 缺失 | 创建含 source URL + sha256 + 3 补丁引用 |
+| C3 | G1 | test_package/ 缺失 | 创建 conanfile.py + CMakeLists.txt + test_lp_solve.c + MANIFEST.yml |
+| C4 | G1 | commands.json 缺失 | 创建软件级元数据 |
+| C5 | G1 | manifest.yaml 字段错误 | 修正 build_system=makefile, system=makefile, 补充 sha256 |
+| C6 | G2 | 补丁 0001 源路径 `--- a/Makefile` | 改为 `--- /dev/null`（新文件补丁格式） |
+| C7 | G2 | Conan 2.29.1 不支持 `conf.get("tools.build:compiler_executables:c")` | 改用 `os.environ.get("CC")` 获取编译器路径 |
+| C8 | G2 | `basic_layout` 导致源码在 src/ 子目录 | 自定义 `layout()` 使 source/build 同目录 |
+| C9 | G2 | yacc 隐式规则重新生成 lp_rlp.c 导致 token 未定义 | 使用 `make -r` 禁用隐式规则 |
+| C10 | G2 | 0004 补丁在 lp_rlp.h include tokens 导致宏/enum 冲突 | 删除 0004 补丁 |
+| C11 | G2 | test_package `get_var()` 不存在于 API | 改用 `get_var_primalresult()` |
+| C12 | G2 | CMakeLists.txt 缺少 `enable_testing()` 和 `add_test()` | 添加 CMake test target 注册 |
+
+### 最终验证结果
+- G1 (配方完整性): PASS ✓
+- G2 (conan create): PASS ✓
+- G3 (系统同名库隔离): PASS ✓
+- G4 (产物完整性): PASS ✓
+- L2 (平台功能矩阵): PASS ✓
+- L4 (静态安全扫描): PASS ✓
+- L5 (产物基线对比): PASS ✓
+- **Verdict: PASS** — 可标记 status: published
