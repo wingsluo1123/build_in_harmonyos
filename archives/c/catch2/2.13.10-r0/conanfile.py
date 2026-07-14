@@ -1,32 +1,33 @@
 #!/usr/bin/env python3
-"""Conan recipe — catch2 2.13.10-r0 (CMake)"""
-from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+"""Conan recipe for catch2 2.13.10-r0 (header-only CMake)."""
 
-# CI 重跑标记: 2026-07-14
+import os
+from conan import ConanFile
+from conan.tools.files import get
+from conan.tools.cmake import CMake, CMakeToolchain
+
 
 class Catch2Recipe(ConanFile):
     name = "catch2"
     version = "2.13.10-r0"
     package_type = "header-library"
-    settings = "os", "arch", "compiler", "build_type"
-    exports_sources = ()
-    generators = ()
-    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
-    license = "BSL-1.0"
+
     description = "A modern, C++-native, header-only, test framework for unit-tests"
+    license = "BSL-1.0"
+    homepage = "https://github.com/catchorg/Catch2"
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
     topics = ("testing", "unit-testing", "header-only")
 
+    settings = "os", "arch", "compiler", "build_type"
+
     def layout(self):
-        cmake_layout(self, src_folder=".")
+        self.folders.source = "."
+        self.folders.build = "."
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version])
 
     def generate(self):
-        deps = CMakeDeps(self)
-        deps.generate()
         tc = CMakeToolchain(self)
         tc.variables["BUILD_TESTING"] = False
         tc.variables["CATCH_BUILD_TESTING"] = False
@@ -39,7 +40,8 @@ class Catch2Recipe(ConanFile):
         cmake.configure()
 
     def package(self):
-        CMake(self).install()
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.includedirs = ["include"]
