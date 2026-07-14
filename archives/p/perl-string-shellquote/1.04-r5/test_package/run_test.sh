@@ -4,7 +4,7 @@
 #
 # Sets PERL5LIB and runs the Perl test suite, then optionally tests
 # the shell-quote CLI tool.
-set -e
+set -euo pipefail
 
 PERL_LIB="$1"
 SHELL_QUOTE_BIN="$2"

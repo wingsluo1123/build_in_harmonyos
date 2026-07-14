@@ -19,21 +19,13 @@ class PerlStringShellQuoteTestConan(ConanFile):
     def _find_perl_lib(self):
         """Find the Perl library path containing String/ShellQuote.pm."""
         dep = self.dependencies["perl-string-shellquote"]
-        pkg_folder = dep.package_folder
-        for root, dirs, files in os.walk(pkg_folder):
-            if "ShellQuote.pm" in files:
-                # Go up to the lib root (parent of String/)
-                return os.path.dirname(os.path.dirname(root))
-        raise Exception("Could not find ShellQuote.pm in package")
+        return os.path.join(dep.package_folder, "lib", "perl5")
 
     def _find_shell_quote_bin(self):
         """Find the shell-quote executable in the installed package."""
         dep = self.dependencies["perl-string-shellquote"]
-        pkg_folder = dep.package_folder
-        for root, dirs, files in os.walk(pkg_folder):
-            if "shell-quote" in files:
-                return os.path.join(root, "shell-quote")
-        return None  # CLI tool is optional on some platforms
+        bin_path = os.path.join(dep.package_folder, "bin", "shell-quote")
+        return bin_path if os.path.isfile(bin_path) else None
 
     def test(self):
         perl_lib = self._find_perl_lib()

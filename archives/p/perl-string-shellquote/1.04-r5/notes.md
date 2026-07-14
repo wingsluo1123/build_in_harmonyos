@@ -98,15 +98,3 @@ L2: PASS  L4: PASS  L5: PASS
 
 **编译结束**: 2026-07-06 14:44
 **最终状态**: published (编译成功，conan-verify + CI 模拟全部通过)
-建系统在鸿蒙平台兼容性良好
-- 上游 test.t 中 fork 子进程测试需要设置 PERL5LIB 环境变量
-
-### 编译建议
-- 纯 Perl 模块编译流程：`perl Makefile.PL && make && make install DESTDIR=...`
-- 无需补丁、无需特殊链接参数
-- test_package 测试应避免复杂的 shell 转义，使用临时脚本文件更可靠
-
----
-
-**编译结束**: 2026-07-03 10:03
-**最终状态**: built (编译成功，conan-verify 全部通过)

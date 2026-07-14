@@ -43,9 +43,19 @@ check('comment_quote(newlines)', shell_comment_quote("foo\nbar"), "foo\n#bar");
 
 # null byte handling
 eval { shell_quote("t\x00") };
-$pass++ if $@;
+if ($@) {
+    $pass++;
+} else {
+    print "FAIL: shell_quote should croak on null byte\n";
+    $fail++;
+}
 my $r = shell_quote_best_effort("foo*", "as\x00df");
-$pass++ if $r =~ /foo\*/;
+if ($r =~ /foo\*/) {
+    $pass++;
+} else {
+    print "FAIL: shell_quote_best_effort should include foo* in output\n";
+    $fail++;
+}
 
 print "$pass tests passed, $fail failed\n";
 exit($fail > 0 ? 1 : 0);
