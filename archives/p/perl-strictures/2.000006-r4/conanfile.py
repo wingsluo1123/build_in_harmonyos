@@ -46,7 +46,7 @@ class PerlstricturesConan(ConanFile):
     def package(self):
         # Install to a staging dir
         dest = os.path.join(self.build_folder, "staging")
-        self.run(f"make install DESTDIR={dest}", cwd=self.source_folder, env="conanbuild")
+        self.run(f'make install DESTDIR="{dest}"', cwd=self.source_folder, env="conanbuild")
         # Find the site_perl directory where .pm files were installed
         # and copy them flat into lib/
         pm_files = glob.glob(os.path.join(dest, "**", "*.pm"), recursive=True)
