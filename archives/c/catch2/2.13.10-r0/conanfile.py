@@ -4,6 +4,7 @@ from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import get
 
+# CI 重跑标记: 2026-07-14
 
 class Catch2Recipe(ConanFile):
     name = "catch2"
