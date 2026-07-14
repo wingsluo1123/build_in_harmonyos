@@ -102,4 +102,5 @@ MyApp::Plugin, MyApp::Mixin, MyApp::Addon, Corporate::Thinger
 ---
 
 **编译结束**: 2026-07-06
-**最终状态**: published
+**最终状态**: built
+ed

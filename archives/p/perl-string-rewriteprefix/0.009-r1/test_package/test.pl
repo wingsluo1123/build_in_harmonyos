@@ -5,40 +5,8 @@ use strict;
 use warnings;
 
 # Set pure-Perl mode for Params::Util (bypasses XS .so SELinux restriction)
+# PERL5LIB is set by test_package/conanfile.py to include all dependency paths
 $ENV{PERL_PARAMS_UTIL_PP} = 1;
-
-# Add the package's Perl lib path
-# Conan installs to DESTDIR/data/service/hnp/.../site_perl/.../String/RewritePrefix.pm
-# We need to find it from the conan package folder
-my @candidates = (
-    $ENV{CONAN_PERL_LIB},                           # set by conanfile
-    glob("/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0"),
-    glob("/storage/Users/currentUser/usr/local/perl5/lib/perl5"),
-);
-
-# Also search the conan package folder
-if ($ENV{CONAN_PACKAGE_FOLDER}) {
-    push @candidates, "$ENV{CONAN_PACKAGE_FOLDER}/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0";
-}
-
-# Add Sub::Exporter dependency paths
-unshift @candidates, (
-    "/storage/Users/currentUser/usr/local/perl5/lib/perl5",
-    "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0/aarch64-linux",
-    "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0",
-);
-
-my $found_perl_lib = 0;
-for my $dir (@candidates) {
-    next unless $dir && -d $dir;
-    if (-f "$dir/String/RewritePrefix.pm") {
-        $found_perl_lib = 1;
-    }
-    # Add to Perl search path if not already there
-    unless (grep { $_ eq $dir } @INC) {
-        unshift @INC, $dir;
-    }
-}
 
 use String::RewritePrefix;
 

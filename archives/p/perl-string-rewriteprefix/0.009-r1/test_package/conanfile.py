@@ -42,8 +42,8 @@ class PerlStringRewriteprefixTestConan(ConanFile):
             )
             if os.path.isdir(pkg_perl_lib):
                 perl5lib = pkg_perl_lib + ":" + perl5lib
-        except Exception:
-            pass
+        except (KeyError, AttributeError):
+            pass  # Package not yet resolved — fall back to system Perl paths
 
         # Use shell inline env vars (Conan 2 env=list doesn't always work)
         cmd = (
