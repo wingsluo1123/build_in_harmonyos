@@ -15,8 +15,6 @@ class FatsortTestConan(ConanFile):
 
     def test(self):
         bin_path = os.path.join(self.dependencies["fatsort"].package_folder, "bin", "fatsort")
-        if not os.path.isfile(bin_path):
-            raise Exception(f"fatsort binary not found: {bin_path}")
+        test_script = os.path.join(self.source_folder, "test.sh")
         if can_run(self):
-            self.run(f"{bin_path} -v", env="conanrun")
-            self.run(f"{bin_path} -h", env="conanrun")
+            self.run(f"bash \"{test_script}\" \"{bin_path}\"", env="conanrun")
