@@ -30,6 +30,17 @@ class PerlSqlTranslatorConan(ConanFile):
     _perl_base = "/data/service/hnp/perl.org/perl_5.42.0"
     _perl_locallib = "/storage/Users/currentUser/usr/local/perl5"
 
+    @property
+    def _perl_arch_dir(self):
+        """Map Conan arch setting to Perl platform directory name."""
+        arch_map = {
+            "armv8": "aarch64-linux",
+            "aarch64": "aarch64-linux",
+            "x86_64": "x86_64-linux",
+            "x86": "i686-linux",
+        }
+        return arch_map.get(str(self.settings.arch), "aarch64-linux")
+
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -52,7 +63,7 @@ class PerlSqlTranslatorConan(ConanFile):
         apply_conandata_patches(self)
         # Set up Perl environment with local::lib for dependencies
         perl5lib = os.path.join(self._perl_locallib, "lib", "perl5")
-        perl5lib_arch = os.path.join(perl5lib, "aarch64-linux")
+        perl5lib_arch = os.path.join(perl5lib, self._perl_arch_dir)
         env = {
             "PERL5LIB": f"{perl5lib_arch}:{perl5lib}",
             "PERL_MM_OPT": f"INSTALL_BASE={self._perl_locallib}",
@@ -68,16 +79,19 @@ class PerlSqlTranslatorConan(ConanFile):
         # make install to local::lib path
         perl5lib = os.path.join(self._perl_locallib, "lib", "perl5")
         os.environ["PERL_MM_OPT"] = f"INSTALL_BASE={self._perl_locallib}"
-        os.environ["PERL5LIB"] = f"{os.path.join(perl5lib, 'aarch64-linux')}:{perl5lib}"
+        os.environ["PERL5LIB"] = f"{os.path.join(perl5lib, self._perl_arch_dir)}:{perl5lib}"
         self.run("make install", cwd=self.source_folder)
-        # Copy installed files to package folder
+        # Copy installed Perl modules to package folder
         copy(self, "*", src=os.path.join(self._perl_locallib, "lib", "perl5"),
              dst=os.path.join(self.package_folder, "lib", "perl5"))
+        # Copy installed scripts (sqlt etc.) to package folder
+        copy(self, "*", src=os.path.join(self._perl_locallib, "bin"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "bin"))
 
     def package_info(self):
         # Pure Perl module — no C/C++ libraries
         self.cpp_info.libs = []
         perl5lib = os.path.join(self.package_folder, "lib", "perl5")
-        perl5lib_arch = os.path.join(perl5lib, "aarch64-linux")
+        perl5lib_arch = os.path.join(perl5lib, self._perl_arch_dir)
         self.runenv_info.append_path("PERL5LIB", perl5lib)
         self.runenv_info.append_path("PERL5LIB", perl5lib_arch)
