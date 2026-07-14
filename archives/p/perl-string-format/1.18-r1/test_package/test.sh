@@ -1,7 +1,7 @@
 #!/bin/sh
 # test_package/test.sh — L1 consumer test wrapper for perl-string-format
 # Runs Perl functional tests against the installed String::Format module
-set -e
+set -euo pipefail
 
 # L2 smoke test: verify module loads
 perl -MString::Format -e 'print "OK\n"'

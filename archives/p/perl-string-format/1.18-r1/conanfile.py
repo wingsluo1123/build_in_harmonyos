@@ -5,8 +5,6 @@ String::Format: sprintf-like string formatting with arbitrary format definitions
 Build system: Perl ExtUtils::MakeMaker (perl Makefile.PL && make && make install).
 """
 import os
-import shutil
-import glob
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches

@@ -4,9 +4,6 @@
 Tests that String::Format Perl module is installed and functional.
 Runs upstream test suite (t/*.t) plus a functional smoke test.
 """
-import os
-import glob
-
 from conan import ConanFile
 from conan.tools.layout import basic_layout
 
