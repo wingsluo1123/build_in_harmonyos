@@ -89,6 +89,13 @@ class SparkConan(ConanFile):
                 "cmd-pkgs or set JAVA_HOME before running Spark commands."
             )
 
+    def _remove_archive(self, archive: str) -> None:
+        if os.path.exists(archive):
+            try:
+                os.remove(archive)
+            except OSError as exc:
+                self.output.warning(f"Failed to remove incomplete archive {archive}: {exc}")
+
     def _download(self, url: str, archive: str) -> None:
         env = os.environ.copy()
         ssl_cert = "/storage/Users/currentUser/usr/local/ssl/cert.pem"
@@ -99,12 +106,41 @@ class SparkConan(ConanFile):
         wget = shutil.which("wget")
         if curl:
             subprocess.check_call(
-                [curl, "-L", "--fail", "--connect-timeout", "30", "-o", archive, url],
+                [
+                    curl,
+                    "-L",
+                    "--fail",
+                    "--connect-timeout",
+                    "20",
+                    "--retry",
+                    "2",
+                    "--retry-delay",
+                    "3",
+                    "--retry-connrefused",
+                    "--max-time",
+                    "600",
+                    "-o",
+                    archive,
+                    url,
+                ],
                 env=env,
-                timeout=1800,
+                timeout=660,
             )
         elif wget:
-            subprocess.check_call([wget, "-O", archive, url], env=env, timeout=1800)
+            subprocess.check_call(
+                [
+                    wget,
+                    "--tries=3",
+                    "--connect-timeout=20",
+                    "--read-timeout=120",
+                    "--timeout=120",
+                    "-O",
+                    archive,
+                    url,
+                ],
+                env=env,
+                timeout=660,
+            )
         else:
             raise ConanException("Neither curl nor wget is available for source download")
 
@@ -122,19 +158,33 @@ class SparkConan(ConanFile):
 
     def source(self):
         sources = self.conan_data["sources"]
-        url = sources["url"]
-        filename = os.path.basename(url)
+        urls = sources.get("urls") or [sources["url"]]
+        filename = os.path.basename(urls[0])
         archive = os.path.join(self.source_folder, filename)
+        errors = []
 
-        self._download(url, archive)
-        self._verify_hash(archive, "sha256", sources["sha256"])
-        self._verify_hash(archive, "sha512", sources["sha512"])
+        for index, url in enumerate(urls, 1):
+            self._remove_archive(archive)
+            self.output.info(f"Downloading Spark archive from mirror {index}/{len(urls)}: {url}")
+            try:
+                self._download(url, archive)
+                self._verify_hash(archive, "sha256", sources["sha256"])
+                self._verify_hash(archive, "sha512", sources["sha512"])
+                break
+            except Exception as exc:
+                self._remove_archive(archive)
+                errors.append(f"{url}: {exc}")
+                self.output.warning(f"Spark archive download failed from {url}: {exc}")
+        else:
+            raise ConanException(
+                "All Spark archive download URLs failed:\n" + "\n".join(f"- {error}" for error in errors)
+            )
 
         subprocess.check_call(
             ["tar", "xzf", archive, "--strip-components=1"],
             cwd=self.source_folder,
         )
-        os.remove(archive)
+        self._remove_archive(archive)
 
     def build(self):
         apply_conandata_patches(self)
