@@ -17,7 +17,7 @@ class FatsortConan(ConanFile):
     url = "https://sourceforge.net/projects/fatsort/"
     package_type = "application"
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
