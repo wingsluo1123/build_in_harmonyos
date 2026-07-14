@@ -9,7 +9,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -19,7 +19,7 @@ class AamathConan(ConanFile):
     description = "Render mathematical expressions as ASCII art text"
     license = "GPL-2.0-or-later"
     homepage = "https://cdn.netbsd.org/pub/pkgsrc/distfiles/"
-    url = ""
+    url = ""  # CI fills this
 
     package_type = "application"
 

@@ -2,7 +2,7 @@
 # test_package/test.sh — smoke test for aamath executable
 # aamath renders math expressions as ASCII art text.
 # Runs in conanrun env (PATH includes installed bin/)
-set -eu
+set -euo pipefail
 
 echo "[test] aamath -h (version/help check)"
 aamath -h > /dev/null 2>&1 && echo "PASS: aamath -h OK" || {
