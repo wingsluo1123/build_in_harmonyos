@@ -71,6 +71,9 @@ class PerlSqlTranslatorConan(ConanFile):
         }
         for k, v in env.items():
             os.environ[k] = v
+        # Install configure-time dependency: File::ShareDir::Install
+        # (required by Makefile.PL but may be missing on CI workers)
+        self.run("cpan -T -i File::ShareDir::Install", cwd=self.source_folder)
         # Pure Perl module: perl Makefile.PL && make
         self.run("perl Makefile.PL", cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
