@@ -10,7 +10,8 @@ from conan import ConanFile
 
 
 class PerlStringRandomTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -23,19 +24,15 @@ class PerlStringRandomTestConan(ConanFile):
         perl_lib = os.path.join(pkg_folder, "data", "service", "hnp",
                                 "perl.org", "perl_5.42.0", "lib",
                                 "site_perl", "5.42.0")
-        # Write test script to temp file
-        test_script = r'''use strict;
-use warnings;
-use String::Random;
 
-my $sr = String::Random->new();
-my $s = $sr->randpattern("Ccnc");
-die "too short" unless length($s) == 4;
-print "OK: String::Random version $String::Random::VERSION works\n";
-'''
-        test_file = os.path.join(self.build_folder, "test_string_random.pl")
-        with open(test_file, "w") as f:
-            f.write(test_script)
+        # Verify String::Random.pm exists
+        random_pm = os.path.join(perl_lib, "String", "Random.pm")
+        if not os.path.exists(random_pm):
+            # Search in versioned subdirectories
+            for root, _, files in os.walk(pkg_folder):
+                if "Random.pm" in files and "String" in root:
+                    perl_lib = root.rsplit("/String", 1)[0]
+                    break
 
-        # Run with PERL5LIB set
-        self.run('PERL5LIB="{}" perl {}'.format(perl_lib, test_file))
+        # Run the test script with PERL5LIB set
+        self.run('PERL5LIB="{}" sh test_string_random.sh'.format(perl_lib))

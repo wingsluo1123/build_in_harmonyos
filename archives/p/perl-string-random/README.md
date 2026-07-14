@@ -34,7 +34,7 @@ String::Random 提供基于模式生成随机字符串的功能，支持两种�
 
 通过 Conan 安装：
 ```bash
-conan install --requires=perl-string-random/0.32-r2@ohpcd/stable
+conan install --requires=perl-string-random/0.32-r2
 ```
 
 模块安装路径：`data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/String/Random.pm`

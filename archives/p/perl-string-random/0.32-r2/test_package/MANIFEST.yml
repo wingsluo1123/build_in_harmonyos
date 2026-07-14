@@ -15,6 +15,10 @@ upstream_test_command: "make test"
 
 # 上游实际运行的测试程序
 upstream_tests:
+  - file: t/00-compile.t
+    source: String-Random-0.32/t/00-compile.t
+    description: "Compile check test"
+    command: "perl -Iblib/lib t/00-compile.t"
   - file: t/01_use.t
     source: String-Random-0.32/t/01_use.t
     description: "Basic use/require test"
@@ -35,12 +39,27 @@ upstream_tests:
     source: String-Random-0.32/t/05_randregex.t
     description: "randregex method test"
     command: "perl -Iblib/lib t/05_randregex.t"
+  - file: t/06_random_regex.t
+    source: String-Random-0.32/t/06_random_regex.t
+    description: "Random regex generation test"
+    command: "perl -Iblib/lib t/06_random_regex.t"
+  - file: t/07_rand_gen.t
+    source: String-Random-0.32/t/07_rand_gen.t
+    description: "Random generator test"
+    command: "perl -Iblib/lib t/07_rand_gen.t"
+  - file: t/08_get_set.t
+    source: String-Random-0.32/t/08_get_set.t
+    description: "Get/set accessor test"
+    command: "perl -Iblib/lib t/08_get_set.t"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
+  - file: test_string_random.sh
+    description: "Shell 脚本: 4 项 Perl 测试 (load+version, randpattern, randregex, random_string)"
+    command: "sh test_string_random.sh"
   - file: conanfile.py
-    description: "消费者测试：验证 String::Random 可加载并生成随机字符串"
-    command: "perl -e 'use String::Random; ...'"
+    description: "Conan L1 测试: 查找 String::Random.pm，设置 PERL5LIB，通过 self.run() 调用 test_string_random.sh"
+    command: "conan test test_package/conanfile.py"
 
 # 测试断言总数 (近似值, 用于质量评估)
 assertion_count: 202

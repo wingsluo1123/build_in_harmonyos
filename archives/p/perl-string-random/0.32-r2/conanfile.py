@@ -4,10 +4,8 @@
 String::Random — generate random strings based on a pattern.
 Uses ExtUtils::MakeMaker (Makefile.PL) build system.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class PerlStringRandomConan(ConanFile):

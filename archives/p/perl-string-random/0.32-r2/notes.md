@@ -66,8 +66,8 @@ Result: PASS
 
 ### Conan 消费者测试 (test_package)
 ```
-RUN: PERL5LIB="..." perl test_string_random.pl
-OK: String::Random version 0.32 works
+RUN: PERL5LIB="..." sh test_string_random.sh
+OK: String::Random v0.32 loaded (4/4 tests passed)
 ```
 
 ### Conan 验证门禁 (conan-verify)
