@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """Conan recipe for libyaml 0.2.4 — Autotools (configure + make).
-
-Patches:
-  - config-guess-harmonyos.patch: Add HarmonyOS recognition to config.guess
-
-Platform workarounds (in build method):
-  - Fix configure/config.status umask 077 mktemp issue on HMDFS
-  - Fix libtool wrapper script bash shebang for OHOS
+Source: GitHub archive (needs autoreconf to generate configure).
+Platform workarounds: HMDFS umask fix, HarmonyOS config.guess, bash shebang.
 """
 import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -23,19 +18,11 @@ class LibyamlConan(ConanFile):
     description = "YAML parser/emitter library"
     license = "MIT"
     homepage = "https://pyyaml.org/wiki/LibYAML"
-    url = ""  # CI fills this
-
+    url = ""
     package_type = "library"
-
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = {"shared": False}
-
-    def export_sources(self):
-        export_conandata_patches(self)
-
-    def requirements(self):
-        pass
 
     def layout(self):
         basic_layout(self)
@@ -51,14 +38,28 @@ class LibyamlConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
-
-        # Fix HMDFS umask 077 issue: mktemp -d with umask 077 creates
-        # directories that cannot be written to on HarmonyOS HMDFS.
-        # Remove umask 077 from configure script before running it.
+        # Generate configure from configure.ac (GitHub archive lacks pre-generated files)
         configure_path = os.path.join(self.source_folder, "configure")
-        if os.path.isfile(configure_path):
-            with open(configure_path, "r") as f:
+        if not os.path.isfile(configure_path):
+            self.run("autoreconf -fi", cwd=self.source_folder)
+
+        # Fix config.guess: add HarmonyOS recognition
+        cg = os.path.join(self.source_folder, "config", "config.guess")
+        if os.path.isfile(cg):
+            with open(cg, "r") as f:
+                content = f.read()
+            if "HarmonyOS" not in content:
+                content = content.replace(
+                    'case "$UNAME_SYSTEM" in\nLinux|GNU|GNU/*)',
+                    'case "$UNAME_SYSTEM" in\nHarmonyOS|HongMeng)\n\tUNAME_SYSTEM=Linux\n\tLIBC=musl\n\t;;\nLinux|GNU|GNU/*)'
+                )
+                with open(cg, "w") as f:
+                    f.write(content)
+
+        # Fix HMDFS umask 077 mktemp issue in configure script
+        cp = os.path.join(self.source_folder, "configure")
+        if os.path.isfile(cp):
+            with open(cp, "r") as f:
                 content = f.read()
             content = content.replace(
                 '(umask 077 && mktemp -d "./confXXXXXX")',
@@ -68,13 +69,8 @@ class LibyamlConan(ConanFile):
                 '(umask 077 && mkdir "$tmp")',
                 '(mkdir "$tmp")'
             )
-            with open(configure_path, "w") as f:
+            with open(cp, "w") as f:
                 f.write(content)
-
-        # GitHub archive lacks pre-generated configure; generate if needed
-        configure_path = os.path.join(self.source_folder, "configure")
-        if not os.path.isfile(configure_path):
-            self.run("autoreconf -fi", cwd=self.source_folder)
 
         autotools = Autotools(self)
         autotools.configure()
@@ -91,7 +87,7 @@ class LibyamlConan(ConanFile):
                         with open(fpath, "r") as f:
                             first_line = f.readline()
                         if first_line.startswith("#! bash"):
-                            self.run(f'sed -i "1s|#! bash|#! {bash_path}|" "{fpath}"')
+                            self.run('sed -i "1s|#! bash|#! {}|" "{}"'.format(bash_path, fpath))
                     except Exception:
                         pass
 
