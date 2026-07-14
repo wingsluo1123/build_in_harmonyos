@@ -18,7 +18,7 @@ class Catch2Recipe(ConanFile):
     topics = ("testing", "unit-testing", "header-only")
 
     def layout(self):
-        cmake_layout(self)
+        cmake_layout(self, src_folder=".")
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version])
