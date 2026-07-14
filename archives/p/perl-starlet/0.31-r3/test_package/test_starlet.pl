@@ -8,22 +8,19 @@ my $pass = 0;
 my $fail = 0;
 my $skip = 0;
 
-# Test 1: Module loads
-eval { require Starlet };
+# Test 1+2: Module loads and version check (combined to avoid die on missing namespace)
+eval {
+    require Starlet;
+    my $version = Starlet->VERSION;
+    if (defined $version && $version eq '0.31') {
+        $pass += 2;
+    } else {
+        die "Version mismatch: got '" . ($version // 'undef') . "', expected '0.31'\n";
+    }
+};
 if ($@) {
-    print "FAIL: Cannot load Starlet: $@\n";
-    $fail++;
-} else {
-    $pass++;
-}
-
-# Test 2: Version check
-my $version = Starlet->VERSION;
-if (defined $version && $version eq '0.31') {
-    $pass++;
-} else {
-    print "FAIL: Version mismatch: got '" . ($version // 'undef') . "', expected '0.31'\n";
-    $fail++;
+    print "FAIL: $@\n";
+    $fail += 2;
 }
 
 # Test 3: Starlet::Server loads (requires Plack, Parallel::Prefork etc.)

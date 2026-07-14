@@ -5,10 +5,8 @@ Starlet is a high-performance PSGI/Plack HTTP server.
 This is a pure Perl module using Module::Install (Makefile.PL).
 No C compiler needed.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -16,7 +14,7 @@ class PerlStarletConan(ConanFile):
     name = "perl-starlet"
     version = "0.31-r3"
     description = "Starlet - a simple, high-performance PSGI/Plack HTTP server"
-    license = "MIT"
+    license = "Artistic-1.0 OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/dist/Starlet"
     url = ""  # CI fills this
 
