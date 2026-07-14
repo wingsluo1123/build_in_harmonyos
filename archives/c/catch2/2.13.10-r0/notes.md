@@ -15,3 +15,4 @@
 ## 已知结论
 - catch2 是 header-only C++ 测试框架，不需要编译生成库文件
 - 适合 CI 的关键是结构完整性与 `test_package` smoke test
+- CI 复跑记录：本次因 worker 侧 git clone 传输中断，需要重新触发校验
