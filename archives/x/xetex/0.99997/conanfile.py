@@ -189,6 +189,8 @@ class XetexConan(ConanFile):
                 content = open(ac_file).read()
                 if "AC_CONFIG_AUX_DIR" in content:
                     local_aux = os.path.join(dirpath, "build-aux")
+                    if os.path.normpath(local_aux) == os.path.normpath(build_aux):
+                        continue
                     os.makedirs(local_aux, exist_ok=True)
                     for f in os.listdir(build_aux):
                         shutil.copy(os.path.join(build_aux, f), local_aux)
