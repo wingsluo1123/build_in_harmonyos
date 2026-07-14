@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — catch2 2.13.10-r0 (CMake)"""
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import get
