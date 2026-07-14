@@ -17,9 +17,15 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
-# OHOS SDK paths
-SYSROOT = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot"
-LLVM_LIB = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib/aarch64-linux-ohos"
+# OHOS SDK paths — use env vars with fallback for portability
+SYSROOT = os.environ.get(
+    "OHOS_SYSROOT",
+    "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot",
+)
+LLVM_LIB = os.environ.get(
+    "OHOS_LLVM_LIB",
+    "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib/aarch64-linux-ohos",
+)
 SYSROOT_INC = f"{SYSROOT}/usr/include"
 SYSROOT_ARCH_INC = f"{SYSROOT}/usr/include/aarch64-linux-ohos"
 SYSROOT_ARCH_LIB = f"{SYSROOT}/usr/lib/aarch64-linux-ohos"
