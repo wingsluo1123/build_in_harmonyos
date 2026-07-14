@@ -33,12 +33,11 @@ python3 scripts/ohc-run.py conan-verify anyenv 1.1.5
 
 ## 验证结果
 
-消费者测试覆盖：
+消费者测试覆盖 4 个 smoke 命令：
 - `anyenv -v`
 - `anyenv commands`
 - `anyenv help version`
 - `anyenv root`
-- test_package PATH 注入当前 Bash 目录
 
 ## 交付物
 

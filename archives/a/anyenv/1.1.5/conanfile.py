@@ -20,7 +20,7 @@ class AnyenvConan(ConanFile):
     description = "All-in-one wrapper for rbenv-style environment managers"
     license = "MIT"
     homepage = "https://github.com/anyenv/anyenv"
-    url = ""
+    url = "https://github.com/anyenv/anyenv"
 
     settings = "os", "arch"
 

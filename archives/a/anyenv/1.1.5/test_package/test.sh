@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
+
 anyenv -v
 anyenv commands | grep '^version$'
 anyenv help version | grep 'Usage: anyenv version'
-anyenv root
+anyenv root | grep -Fx "$ANYENV_ROOT"
