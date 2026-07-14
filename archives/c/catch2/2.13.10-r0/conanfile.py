@@ -3,7 +3,7 @@
 
 from conan import ConanFile
 from conan.tools.files import get
-from conan.tools.cmake import CMakeToolchain
+from conan.tools.cmake import CMakeToolchain, cmake_layout
 
 
 class Catch2Recipe(ConanFile):
@@ -20,8 +20,7 @@ class Catch2Recipe(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     def layout(self):
-        self.folders.source = "."
-        self.folders.build = "."
+        cmake_layout(self, src_folder=".")
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version])
@@ -37,7 +36,7 @@ class Catch2Recipe(ConanFile):
     def build(self):
         self.run(
             f'cmake -S "{self.source_folder}" -B "{self.build_folder}" '
-            f'-DCMAKE_TOOLCHAIN_FILE="generators/conan_toolchain.cmake" '
+            f'-DCMAKE_TOOLCHAIN_FILE="{self.build_folder}/generators/conan_toolchain.cmake" '
             f'-DBUILD_TESTING=OFF -DCATCH_BUILD_TESTING=OFF '
             f'-DCATCH_BUILD_EXAMPLES=OFF -DCATCH_INSTALL_DOCS=OFF'
         )
