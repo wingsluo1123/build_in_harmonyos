@@ -33,6 +33,10 @@ class Catch2Recipe(ConanFile):
         tc.variables["CATCH_INSTALL_DOCS"] = False
         tc.generate()
 
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+
     def package(self):
         CMake(self).install()
 
