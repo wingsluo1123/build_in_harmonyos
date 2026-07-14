@@ -38,7 +38,9 @@
 
 ## 源码修改
 
-无补丁，源码未修改。
+- 补丁: `0001-CMakeLists-txt.patch`
+  - 修改 `CMakeLists.txt`：平台检测添加 HarmonyOS 匹配（原仅匹配 Linux，导致 modulefinder/stb_sprintf 未编译）
+  - 修改 `vendor/libunwind/CMakeLists.txt`：架构检测添加 `unknown + 64-bit → aarch64` 回退（CMake project() 将 CMAKE_SYSTEM_PROCESSOR 重置为 unknown）
 
 ## 依赖版本
 
@@ -74,9 +76,5 @@ ls ~/usr/local/include/sentry.h → 存在
 - G0 clean-verify 脚本不支持 cmake 构建系统，需手动验证
 - CMAKE_SYSTEM_PROCESSOR 必须明确设置为 aarch64
 ---
-**编译结束**: 2026-06-09 12:15
-**最终状态**: published
----
-
 **编译结束**: 2026-06-09 16:28
 **最终状态**: published
