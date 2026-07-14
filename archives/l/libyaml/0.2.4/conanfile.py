@@ -71,6 +71,11 @@ class LibyamlConan(ConanFile):
             with open(configure_path, "w") as f:
                 f.write(content)
 
+        # GitHub archive lacks pre-generated configure; generate if needed
+        configure_path = os.path.join(self.source_folder, "configure")
+        if not os.path.isfile(configure_path):
+            self.run("autoreconf -fi", cwd=self.source_folder)
+
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
