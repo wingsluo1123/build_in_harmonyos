@@ -71,12 +71,18 @@ class PerlSqlTranslatorConan(ConanFile):
         }
         for k, v in env.items():
             os.environ[k] = v
-        # Install configure-time dependency: File::ShareDir::Install
-        # (required by Makefile.PL but may be missing on CI workers)
-        self.run("cpan -T -i File::ShareDir::Install", cwd=self.source_folder)
+        # Remove File::ShareDir::Install configure-time dependency
+        # (not available on CI workers — share files handled manually below)
+        self.run("sed -i '/^use File::ShareDir::Install;$/d' Makefile.PL", cwd=self.source_folder)
+        self.run("sed -i '/^install_share .share.;$/d' Makefile.PL", cwd=self.source_folder)
+        self.run("sed -i '/^package MY;$/d' Makefile.PL", cwd=self.source_folder)
+        self.run("sed -i '/^use File::ShareDir::Install qw(postamble);$/d' Makefile.PL", cwd=self.source_folder)
         # Pure Perl module: perl Makefile.PL && make
         self.run("perl Makefile.PL", cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
+        # Manually copy share files (replaces File::ShareDir::Install's install_share)
+        self.run("mkdir -p blib/lib/auto/share/dist/SQL-Translator", cwd=self.source_folder)
+        self.run("cp -r share/* blib/lib/auto/share/dist/SQL-Translator/", cwd=self.source_folder)
 
     def package(self):
         # make install to local::lib path
