@@ -62,10 +62,20 @@ class XetexConan(ConanFile):
         bld = self.build_folder
         os.makedirs(os.path.join(bld, "tmp"), exist_ok=True)
 
-        # 1. Copy build-aux files
+        # 1. Copy build-aux files from autoconf installation
+        #    Upstream tarball doesn't ship build-aux/; normally automake --add-missing
+        #    provides these, but automake is not available on OHOS.
         build_aux = os.path.join(src, "source", "build-aux")
         os.makedirs(build_aux, exist_ok=True)
-        # build-aux files are expected to exist; in CI they come from automake
+        autoconf_aux = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(
+                shutil.which("autoconf") or "/data/service/hnp/bin/autoconf"))),
+            "share", "autoconf", "build-aux")
+        for fname in ("install-sh", "config.guess", "config.sub"):
+            src_file = os.path.join(autoconf_aux, fname)
+            if os.path.isfile(src_file):
+                shutil.copy2(src_file, os.path.join(build_aux, fname))
+                os.chmod(os.path.join(build_aux, fname), 0o755)
 
         # 2. Fix config.guess for HarmonyOS
         config_guess = os.path.join(build_aux, "config.guess")
