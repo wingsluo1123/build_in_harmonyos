@@ -15,7 +15,7 @@ version: "2.4.0"
 status: published
 
 # 构建系统类型 (G4 门禁要求)
-build_system: autotools
+build_system: cmake
 
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-06-06"
@@ -42,11 +42,11 @@ source:
 build:
   # 构建系统类型
   # cmake | autotools | makefile | meson | custom
-  system: autotools
+  system: cmake
 
-  # 配置选项列表
+  # CMake 选项
   configure_options:
-    - "--disable-neon-optimizations"
+    - "-DNEON=OFF"
 
   # 编译依赖列表（格式: name/version）
   dependencies: []
@@ -55,19 +55,16 @@ build:
   cc: clang
   cxx: clang++
 
-  # 预配置步骤（G0 干净构建需要）
-  # SoundTouch 源码包不含 configure，需先 bootstrap
-  pre_configure: "./bootstrap && sed -i 's/umask 077/umask 022/g' configure"
+  # 链接器标志
+  ldflags:
+    - "-lclang_rt.builtins"
 
 # ============================================================
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied:
-  - "0001-include-soundtouch_config.h.patch"
-  - "0002-source-SoundStretch-Makefile.am.patch"
-  - "0003-source-SoundTouch-Makefile.am.patch"
+# CMake 构建不需要补丁，平台适配通过 CMake 选项和链接器标志处理
+patches_applied: []
 
 # ============================================================
 # 知识沉淀

@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""Conan recipe — SoundTouch 2.4.0 (Autotools project).
+"""Conan recipe — SoundTouch 2.4.0 (CMake project).
 
 SoundTouch is an open-source audio processing library for changing
 the tempo, pitch, and playback rate of audio streams independently.
 
 Source: https://www.surina.net/soundtouch/
 """
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
+from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
 class SoundTouchConan(ConanFile):
@@ -35,32 +32,29 @@ class SoundTouchConan(ConanFile):
         pass
 
     def layout(self):
-        basic_layout(self)
+        cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--disable-neon-optimizations")
+        tc = CMakeToolchain(self)
+        # Disable NEON optimizations (ref: E099)
+        tc.cache_variables["NEON"] = "OFF"
+        # Add clang_rt.builtins for __powidf2 symbol (ref: E098)
+        tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = "-lclang_rt.builtins"
+        tc.cache_variables["CMAKE_SHARED_LINKER_FLAGS"] = "-lclang_rt.builtins"
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
-        # SoundTouch source tarball doesn't include configure script
-        # OHOS: bootstrap not executable via shebang, use CONFIG_SHELL
-        shell = os.environ.get("CONFIG_SHELL") or "bash"
-        src = self.source_folder
-        self.run(f"cd {src} && {shell} ./bootstrap")
-        # Fix HMDFS umask 077 issue (ref: E100)
-        self.run(f"cd {src} && sed -i 's/umask 077/umask 022/g' configure")
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make()
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.libs = ["SoundTouch"]
