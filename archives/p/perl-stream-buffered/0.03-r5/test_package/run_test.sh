@@ -1,7 +1,7 @@
 #!/bin/sh
 # test_package/run_test.sh — Test runner for perl-stream-buffered
 # Usage: run_test.sh <perl_lib_path>
-set -e
+set -eu
 
 PERL_LIB="$1"
 

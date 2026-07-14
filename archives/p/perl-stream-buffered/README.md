@@ -58,7 +58,7 @@ my $fh   = $buf->rewind;
 
 通过 Conan 安装：
 ```bash
-conan install --requires=perl-stream-buffered/0.03-r5@ohpcd/stable
+conan install --requires=perl-stream-buffered/0.03-r5
 ```
 
 安装产物路径：

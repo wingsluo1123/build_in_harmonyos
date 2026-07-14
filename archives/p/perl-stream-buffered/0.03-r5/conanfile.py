@@ -4,7 +4,6 @@ perl-stream-buffered 0.03-r5 — Stream::Buffered: temporary buffer to save byte
 Pure Perl module, no C/C++ compilation.
 """
 import os
-import glob
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -50,3 +49,5 @@ class PerlStreamBufferedConan(ConanFile):
         # Pure Perl module - no C/C++ libraries
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.libs = []
+        # Set PERL5LIB for consumers
+        self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib"))
