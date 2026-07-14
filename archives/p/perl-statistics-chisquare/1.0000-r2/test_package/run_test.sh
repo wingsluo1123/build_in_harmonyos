@@ -1,7 +1,7 @@
 #!/bin/sh
 # test_package/run_test.sh — Test runner for perl-statistics-chisquare
 # Usage: run_test.sh <perl_lib_path>
-set -e
+set -euo pipefail
 
 PERL_LIB="$1"
 

@@ -54,6 +54,8 @@ class PerlstatisticschisquareConan(ConanFile):
             target_dir = os.path.join(self.package_folder, "lib", "perl5", "Statistics")
             os.makedirs(target_dir, exist_ok=True)
             shutil.copy2(pm_files[0], target_dir)
+        else:
+            raise Exception("Statistics/ChiSquare.pm not found in DESTDIR after make install")
 
     def package_info(self):
         # Pure Perl module — no compiled libraries
