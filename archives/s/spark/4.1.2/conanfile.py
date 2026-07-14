@@ -112,24 +112,22 @@ class SparkConan(ConanFile):
                     "--fail",
                     "--connect-timeout",
                     "20",
-                    "--retry",
-                    "2",
-                    "--retry-delay",
-                    "3",
-                    "--retry-connrefused",
+                    "-C",
+                    "-",
                     "--max-time",
-                    "600",
+                    "1800",
                     "-o",
                     archive,
                     url,
                 ],
                 env=env,
-                timeout=660,
+                timeout=1860,
             )
         elif wget:
             subprocess.check_call(
                 [
                     wget,
+                    "-c",
                     "--tries=3",
                     "--connect-timeout=20",
                     "--read-timeout=120",
@@ -139,7 +137,7 @@ class SparkConan(ConanFile):
                     url,
                 ],
                 env=env,
-                timeout=660,
+                timeout=1860,
             )
         else:
             raise ConanException("Neither curl nor wget is available for source download")
@@ -151,7 +149,7 @@ class SparkConan(ConanFile):
                 h.update(chunk)
         actual = h.hexdigest()
         if actual != expected:
-            os.remove(path)
+            self._remove_archive(path)
             raise ConanException(
                 f"{algo} mismatch for Spark archive: expected {expected}, got {actual}"
             )
@@ -162,29 +160,37 @@ class SparkConan(ConanFile):
         filename = os.path.basename(urls[0])
         archive = os.path.join(self.source_folder, filename)
         errors = []
+        downloaded = False
 
         for index, url in enumerate(urls, 1):
-            self._remove_archive(archive)
-            self.output.info(f"Downloading Spark archive from mirror {index}/{len(urls)}: {url}")
+            existing_size = os.path.getsize(archive) if os.path.exists(archive) else 0
+            if existing_size:
+                self.output.info(
+                    f"Resuming Spark archive download at {existing_size} bytes from mirror {index}/{len(urls)}: {url}"
+                )
+            else:
+                self.output.info(f"Downloading Spark archive from mirror {index}/{len(urls)}: {url}")
             try:
                 self._download(url, archive)
-                self._verify_hash(archive, "sha256", sources["sha256"])
-                self._verify_hash(archive, "sha512", sources["sha512"])
+                downloaded = True
                 break
             except Exception as exc:
-                self._remove_archive(archive)
                 errors.append(f"{url}: {exc}")
                 self.output.warning(f"Spark archive download failed from {url}: {exc}")
-        else:
+
+        if not downloaded:
             raise ConanException(
-                "All Spark archive download URLs failed:\n" + "\n".join(f"- {error}" for error in errors)
+                "All Spark archive download URLs failed; partial archive was kept for resume:\n"
+                + "\n".join(f"- {error}" for error in errors)
             )
+
+        self._verify_hash(archive, "sha256", sources["sha256"])
+        self._verify_hash(archive, "sha512", sources["sha512"])
 
         subprocess.check_call(
             ["tar", "xzf", archive, "--strip-components=1"],
             cwd=self.source_folder,
         )
-        self._remove_archive(archive)
 
     def build(self):
         apply_conandata_patches(self)
