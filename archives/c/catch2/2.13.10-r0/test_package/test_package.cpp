@@ -1,6 +1,6 @@
+#define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
 
-int main() {
+TEST_CASE("smoke") {
     REQUIRE(1 == 1);
-    return 0;
 }
