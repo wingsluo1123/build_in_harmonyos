@@ -1,0 +1,94 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R5-CS5",
+      "file": "archives/l/libyaml/0.2.4/conanfile.py",
+      "line": 26,
+      "description": "残留模板占位符: `url = \"\"  # CI fills this`。代码规范性标准第5条明确禁止 `url = \"\"  # CI fills this` 出现在合入的代码中，应由适配者填写实际 recipe URL。",
+      "fix_suggestion": "将 url 设置为实际 recipe 仓库地址，例如 `url = \"https://cnb.cool/your-org/your-repo/-/tree/main/archives/l/libyaml/0.2.4\"`，或如果项目约定 CI 填充，至少改为 `url = None` 并移除占位注释。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R6",
+      "file": "archives/l/libyaml/0.2.4/conanfile.py",
+      "line": 59,
+      "description": "在 build() 方法中直接修改生成产物 `configure` 脚本（通过字符串替换移除 umask 077）。review-memory R6 明确规定「禁止修改 config.h、configure、Makefile.in、CMakeCache.txt 等生成产物。应通过 generate() 或 patches/ 处理。」虽然此修改在构建时执行而非提交到仓库，但仍违反了通过 patches/ 或 generate() 处理的规范要求。",
+      "fix_suggestion": "将 configure 脚本的 umask 077 修复提取为 patches/0003-configure-umask-fix.patch 补丁文件，并在 conandata.yml 中声明。或者在 generate() 方法中通过 AutotoolsToolchain 的 configure_args 处理。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS10",
+      "file": "archives/l/libyaml/0.2.4/conanfile.py",
+      "line": 90,
+      "description": "`except Exception: pass` 静默吞掉所有异常，且无注释说明为何忽略。代码规范性标准第10条禁止 `|| true` 吞掉错误（除非有明确注释说明为何忽略）。此处 Python 的 `except Exception: pass` 等价于 shell 的 `|| true` 无注释版本。",
+      "fix_suggestion": "添加注释说明为何忽略异常，例如 `except Exception:  # 非关键测试脚本，失败时跳过不影响主构建`。或者改为只捕获预期的 IOError/PermissionError，并打印 warning 日志。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/l/libyaml/0.2.4/notes.md",
+      "line": 4,
+      "description": "notes.md 包含大量未填充的模板占位符: `{cmake|autotools|makefile|meson|custom}`(行4)、`{published|built|failed}`(行7)、`{用文字描述实际编译步骤...}`(行11)、`{按需添加行}`(行17)、`{如有补丁...}`(行21)、`{列出本次编译依赖...}`(行25)、`{验证命令和结果}`(行30)、`{有打包产物时...}`(行37)、`{需要特别注意的点...}`(行41)。代码规范性标准第5条规定这些占位符出现在合入代码中=未完成。",
+      "fix_suggestion": "逐项填充 notes.md 模板: 构建系统填 autotools，状态填 built，编写实际编译步骤描述，记录遇到的问题与解决方案，列出补丁文件，列出验证命令和结果。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/l/libyaml/0.2.4/manifest.yaml",
+      "line": 2,
+      "description": "manifest.yaml 使用 `software: \"libyaml\"` 字段名，但代码规范性标准第14条规定的字段名为 `name`（示例: `name: zlib`）。",
+      "fix_suggestion": "将 `software: \"libyaml\"` 改为 `name: \"libyaml\"` 以符合规范。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R3",
+      "file": "archives/l/libyaml/0.2.4/manifest.yaml",
+      "line": 31,
+      "description": "manifest.yaml 的 `patches_applied` 字段列出的补丁路径 `patches/config-guess-harmonyos.patch` 不匹配任何实际存在的补丁文件（实际文件为 `patches/0001-CMakeLists.txt.patch` 和 `patches/0002-config-config.guess.patch`）。且仅列出了1个补丁，实际有2个。补丁信息与实际文件不一致。",
+      "fix_suggestion": "更新 patches_applied 为实际补丁文件列表:\n```yaml\npatches_applied:\n  - \"patches/0001-CMakeLists.txt.patch\"\n  - \"patches/0002-config-config.guess.patch\"\n```"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS12",
+      "file": "archives/l/libyaml/0.2.4/conandata.yml",
+      "line": 11,
+      "description": "patch_description 格式不符合规范。代码规范性标准第12条规定 patch_description 应以补丁编号开头并用空格分隔（如 `\"0001 build aux config.guess\"`），但实际值为 `\"Add HarmonyOS recognition to config.guess\"` 和 `\"Fix CMakeLists.txt config.h.in path for cmake build\"`，均未以补丁编号开头。",
+      "fix_suggestion": "将 patch_description 改为以补丁编号开头的格式，例如 `\"0002 config config.guess HarmonyOS recognition\"` 和 `\"0001 CMakeLists.txt config.h.in path fix\"`。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS13",
+      "file": "archives/l/libyaml/0.2.4/conandata.yml",
+      "line": 9,
+      "description": "conandata.yml 中补丁声明顺序为逆序: 0002 在 0001 之前。虽然两个补丁修改不同文件（config.guess 和 CMakeLists.txt），应用顺序不影响正确性，但逆序声明不符合编号递增的惯例。",
+      "fix_suggestion": "将补丁声明调整为编号递增顺序: 先 0001-CMakeLists.txt.patch，再 0002-config-config.guess.patch。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS16",
+      "file": "archives/l/libyaml/0.2.4/test_package/conanfile.py",
+      "line": 9,
+      "description": "`import os` 未被实际使用。该 import 仅在注释掉的代码行中使用 (`# self.run(f\"{os.path.join(...)}\")`)，活跃代码中无引用。未使用的 import 属于代码规范问题。",
+      "fix_suggestion": "移除 `import os`，或者在需要时再添加。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS1",
+      "file": "archives/l/libyaml/0.2.4/conanfile.py",
+      "line": 5,
+      "description": "docstring 中提到的补丁文件名 `config-guess-harmonyos.patch` 与实际补丁文件名 `0002-config-config.guess.patch` 不一致。docstring 只提到了1个补丁，但实际有2个（缺少对 CMakeLists.txt 补丁的描述）。",
+      "fix_suggestion": "更新 docstring 中的补丁列表为:\n```\nPatches:\n  - 0001-CMakeLists.txt.patch: Fix CMakeLists.txt config.h.in path\n  - 0002-config-config.guess.patch: Add HarmonyOS recognition to config.guess\n```"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/l/libyaml/0.2.4/patches/0001-CMakeLists.txt.patch",
+      "line": 1,
+      "description": "CMakeLists.txt 补丁被声明在 conandata.yml 中，但 conanfile.py 使用 Autotools 构建系统（AutotoolsToolchain + Autotools），CMake 构建路径不会被触发。该补丁被 apply_conandata_patches() 应用但无实际效果，属于冗余补丁。",
+      "fix_suggestion": "评估是否需要保留 CMakeLists.txt 补丁。如果仅使用 Autotools 构建，可移除该补丁及其在 conandata.yml 中的声明。如果是为了支持 CMake 构建路径的备选方案，在 notes.md 中说明。"
+    }
+  ],
+  "summary": "对 libyaml 0.2.4 Conan 配方 PR 进行了全面审计，共检查 11 个变更文件。\n\n【欺骗性行为检测 (P0) — 全部通过】\n- R34 空壳测试: PASS — test_package/test.c 实际调用了 libyaml API (yaml_parser_initialize, yaml_parser_set_input_string, yaml_parser_parse, yaml_event_delete, yaml_parser_delete)，解析 YAML 文档并验证事件计数，非空壳测试。\n- R9 跳过测试: PASS — test_package/conanfile.py 的 test() 方法调用了 cmake.test()，未跳过。\n- 伪造状态标记: PASS — .build-closed 标记为 built，manifest.yaml status 也为 built，一致。\n- 伪造 sha256: PASS — sha256 为 64 位十六进制字符串 (d80aeda...)，非全零/全f/过短/删除。URL 指向官方 pyyaml.org。因网络限制无法独立下载验证，但符合所有非伪造特征。\n- R8 #ifdef __OHOS__ 空壳: N/A — 代码中无 #ifdef __OHOS__ 守卫。config.guess 补丁通过 case 语句映射 HarmonyOS→Linux，属实质性适配逻辑。\n- R19 预编译二进制: PASS — PR 中无 .so/.a/.o 文件。\n- R40 深度适配验证: N/A — libyaml 是纯解析库，不属于图形/UI/多媒体/硬件/系统底层等需深度适配的类别。\n\n【配方正确性 (P1) — 全部通过】\n- R37 版本号策略: PASS — 0.2.4 为上游版本，首次适配。\n- R26 系统同名库静态链接: N/A — libyaml 非系统库同名。\n- R32 OHOS 平台兼容: PASS — 使用 Autotools + config.guess 补丁处理平台检测。\n- R33 裸用 shell 环境变量: PASS — 使用 AutotoolsToolchain，无 os.environ 赋值 CC/CXX。\n- R39 源码 URL 官方源: PASS — https://pyyaml.org/download/libyaml/yaml-0.2.4.tar.gz 为官方源。\n- Conan 2.x API: PASS — from conan import ConanFile, conan.tools.* 全部为 2.x API。\n- R38 commands.json: N/A — libyaml 为库类型 (package_type=\"library\")，无需 commands.json。\n- R6 生成文件修改: 见 P2 问题 — build() 中修改 configure 脚本，建议改用 patches。\n\n【代码规范 (P2) — 7 项警告】\n1. conanfile.py: url=\"\" # CI fills this — 模板占位符未填充 (CS5)\n2. conanfile.py: build() 中直接修改 configure 生成产物 (R6)\n3. conanfile.py: except Exception: pass 无注释吞异常 (CS10)\n4. notes.md: 大量未填充模板占位符 (CS5)\n5. manifest.yaml: software 字段应为 name (CS14)\n6. manifest.yaml: patches_applied 列出不存在的补丁名且不完整 (R3)\n7. conandata.yml: patch_description 格式不符合编号开头规范 (CS12)\n\n【建议性改进 (P3) — 4 项提示】\n1. conandata.yml: 补丁声明逆序 (0002 在 0001 前)\n2. test_package/conanfile.py: import os 未使用\n3. conanfile.py: docstring 补丁名与实际不符\n4. CMakeLists.txt.patch: 对 Autotools 构建冗余\n\n【结论】verdict=pass。未发现 P0 欺骗性行为或 P1 配方正确性问题。7 项 P2 代码规范警告需在合入前修复，4 项 P3 建议可酌情处理。"
+}
