@@ -92,7 +92,13 @@ class XetexConan(ConanFile):
         #    Create aclocal.m4 with automake macro stubs, then run autoconf directly.
         source_dir = os.path.join(src, "source")
         aclocal_m4 = os.path.join(source_dir, "aclocal.m4")
+        m4_dir = os.path.join(source_dir, "m4")
         with open(aclocal_m4, "w") as f:
+            # Include project's own m4 macros (normally done by aclocal)
+            if os.path.isdir(m4_dir):
+                for fname in sorted(os.listdir(m4_dir)):
+                    if fname.endswith(".m4"):
+                        f.write(f"m4_include([m4/{fname}])\n")
             f.write(
                 "m4_pattern_allow([m4_sinclude])\n"
                 "AC_DEFUN([AM_INIT_AUTOMAKE], [])\n"
