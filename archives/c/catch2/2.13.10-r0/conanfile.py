@@ -1,6 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import get, copy
+from conan.tools.files import get
 
 
 class Catch2Recipe(ConanFile):
@@ -31,14 +31,8 @@ class Catch2Recipe(ConanFile):
         tc.variables["CATCH_INSTALL_DOCS"] = False
         tc.generate()
 
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def package(self):
-        cmake = CMake(self)
-        cmake.install()
+        CMake(self).install()
 
     def package_info(self):
         self.cpp_info.includedirs = ["include"]
