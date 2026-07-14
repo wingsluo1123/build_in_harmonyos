@@ -5,7 +5,7 @@ Starlet — a simple, high-performance PSGI/Plack HTTP server.
 ## 软件信息
 
 - **官网**: https://metacpan.org/dist/Starlet
-- **源码**: https://backpan.perl.org/authors/id/K/KA/KAZUHO/Starlet-0.31.tar.gz
+- **源码**: http://cpan.metacpan.org/authors/id/K/KA/KAZUHO/Starlet-0.31.tar.gz
 - **许可证**: Perl (Artistic-1.0 或 GPL-1.0+)
 - **分类**: web-server
 - **构建系统**: Perl Module::Install (Makefile.PL)
