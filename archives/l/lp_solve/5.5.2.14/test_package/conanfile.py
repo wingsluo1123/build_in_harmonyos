@@ -22,5 +22,5 @@ class LpSolveTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_lp_solve")
+        self.run(test_bin, env="conanrun")
