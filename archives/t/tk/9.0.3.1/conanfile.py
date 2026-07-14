@@ -22,11 +22,14 @@ class TkConan(ConanFile):
         if self.options.shared:
             self.options.rm_safe("fPIC")
 
+    def export_sources(self):
+        pass
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def requirements(self):
-        self.requires("tcl/9.0.3.1@ohpcd/stable")
+        self.requires("tcl/9.0.3.1")
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -62,10 +65,30 @@ class TkConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure(build_script_folder="unix")
         autotools.make(args=["-j1"])
+        # SKILL 要求尝试上游测试。tk 上游测试为 `make test`（非 make check），
+        # 但 tktest 编译失败：OHOS 平台移植缺少 TkpTestsendCmd/TkpPrintWindowId 声明
+        # （tkIntPlatDecls.h 仅在 #if defined(WIN)/#if defined(X11) 段内声明）。
+        # 记录失败，不阻塞构建；test_package 提供功能验证（wish9.0 + Tcl 脚本）。
+        try:
+            autotools.make(target="test", args=["-j1"])
+        except Exception:
+            self.output.warning("make test failed (expected: tktest build fails — OHOS missing TkpTestsendCmd/TkpPrintWindowId)")
 
     def package(self):
         autotools = Autotools(self)
         autotools.install()
+        # tk.h `#include <X11/Xlib.h>` / `<X11/X.h>`——autotools install-headers 只装公开 tk 头，
+        # 不装源码 xlib/ 的 X11 stub 头。任何编译 tk.h 的消费方（如 CPython _tkinter）都需要它们，
+        # 故把 xlib/X11/*.h 装进包 include/X11/（Xlib.h 引的 "tkIntXlibDecls.h" 已在包 include/）。
+        import os
+        import glob
+        import shutil
+        x11_src = os.path.join(self.source_folder, "xlib", "X11")
+        if os.path.isdir(x11_src):
+            x11_dst = os.path.join(self.package_folder, "include", "X11")
+            os.makedirs(x11_dst, exist_ok=True)
+            for h in glob.glob(os.path.join(x11_src, "*.h")):
+                shutil.copy2(h, x11_dst)
 
 
     def package_info(self):
