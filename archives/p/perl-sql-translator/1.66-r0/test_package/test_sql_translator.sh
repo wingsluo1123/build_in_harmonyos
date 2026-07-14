@@ -20,8 +20,7 @@ echo "PASS: Found SQL/Translator.pm"
 
 # L2: Functional test — MySQL to PostgreSQL DDL conversion
 # Check if runtime dependencies are available before running
-perl -e 'use Moo; use Parse::RecDescent; use Try::Tiny;' 2>/dev/null
-if [ $? -ne 0 ]; then
+if ! perl -e 'use Moo; use Parse::RecDescent; use Try::Tiny;' 2>/dev/null; then
     echo "SKIP: Runtime dependencies (Moo, Parse::RecDescent, etc.) not available on this worker"
     echo "SKIP: Functional test (MySQL -> PostgreSQL) skipped — L1 file checks passed"
     exit 0
