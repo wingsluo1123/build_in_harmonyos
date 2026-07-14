@@ -39,7 +39,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify fatsort 1.7.1.683
 |---|------|------|----------|
 | 1 | `make install` 调用 `install` 失败 | HarmonyOS 当前 PATH 没有 GNU install；且上游顶层 install 依赖已存在的 `man/fatsort.1` | Conan package() 直接复制 `src/fatsort` 和上游 manpage，避免依赖系统 install 工具 |
 | 2 | Conan G2 初次构建失败: `make: *** src: No such file or directory` | basic_layout 下 Conan build() 当前目录是 build-release，不是 source root | build() 中使用 `os.path.join(self.source_folder, "src")` 作为 make 工作目录 |
-| 3 | SourceForge 下载超时 | `downloads.sourceforge.net` 被重定向到慢镜像，conan source() 下载超时 | conandata.yml 增加 Gentoo distfiles 权威镜像作为首选 URL，保留 SourceForge fallback |
+| 3 | SourceForge 下载超时 | `downloads.sourceforge.net` 可能被重定向到慢镜像或限流 | conandata.yml 保持 SourceForge 官方源为首选，并保留 MIT Gentoo distfiles 权威镜像作为 fallback |
 | 4 | 上游 tests 大量失败 | 测试套件依赖 `/bin/bash`、bbe、valgrind、可写 `/tmp`、镜像解压/挂载等能力，当前 HarmonyOS 环境不完整 | 记录 `reports/upstream-tests.log`，阻塞质量验证改用 conan test_package 运行 `fatsort -v` 和 `fatsort -h` |
 
 ## 源码修改

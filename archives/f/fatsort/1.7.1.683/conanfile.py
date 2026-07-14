@@ -6,7 +6,6 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import apply_conandata_patches, copy, get, export_conandata_patches
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
 
 
 class FatsortConan(ConanFile):
@@ -31,16 +30,6 @@ class FatsortConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"])
-
-    def generate(self):
-        env = Environment()
-        env.define("CC", "clang")
-        env.define("LD", "clang")
-        env.define("BUILD_SHARED_LIBS", "OFF")
-        env.define("CFLAGS", "-fPIC -O2 -D__LINUX__")
-        env.define("LDFLAGS", "")
-        envvars = env.vars(self)
-        envvars.save_script("conan_fatsort_env")
 
     def build(self):
         if str(self.settings.os) not in ("Linux", "OHOS"):
