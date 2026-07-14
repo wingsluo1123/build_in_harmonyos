@@ -3,7 +3,6 @@
 
 from conan import ConanFile
 from conan.tools.files import get
-from conan.tools.cmake import CMakeToolchain, cmake_layout
 
 
 class Catch2Recipe(ConanFile):
@@ -20,29 +19,25 @@ class Catch2Recipe(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
 
     def layout(self):
-        cmake_layout(self, src_folder=".")
+        self.folders.source = "."
+        self.folders.build = "."
 
     def source(self):
-        get(self, **self.conan_data["sources"][self.version])
-
-    def generate(self):
-        tc = CMakeToolchain(self)
-        tc.variables["BUILD_TESTING"] = False
-        tc.variables["CATCH_BUILD_TESTING"] = False
-        tc.variables["CATCH_BUILD_EXAMPLES"] = False
-        tc.variables["CATCH_INSTALL_DOCS"] = False
-        tc.generate()
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def build(self):
         self.run(
-            f'cmake -S "{self.source_folder}" -B "{self.build_folder}" '
-            f'-DCMAKE_TOOLCHAIN_FILE="{self.build_folder}/generators/conan_toolchain.cmake" '
-            f'-DBUILD_TESTING=OFF -DCATCH_BUILD_TESTING=OFF '
-            f'-DCATCH_BUILD_EXAMPLES=OFF -DCATCH_INSTALL_DOCS=OFF'
+            "cmake -S . -B builddir "
+            "-DBUILD_TESTING=OFF -DCATCH_BUILD_TESTING=OFF "
+            "-DCATCH_BUILD_EXAMPLES=OFF -DCATCH_INSTALL_DOCS=OFF",
+            cwd=self.source_folder
         )
 
     def package(self):
-        self.run(f'cmake --install "{self.build_folder}" --prefix "{self.package_folder}"')
+        self.run(
+            "cmake --install builddir --prefix=" + self.package_folder,
+            cwd=self.source_folder
+        )
 
     def package_info(self):
         self.cpp_info.includedirs = ["include"]
