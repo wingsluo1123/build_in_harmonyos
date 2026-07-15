@@ -1,0 +1,83 @@
+--- a/src/postgres/src_port_pg_popcount_aarch64.c
++++ b/src/postgres/src_port_pg_popcount_aarch64.c
+@@ -129,25 +129,78 @@
+ 	 * instructions.  The line below should compile to the same code on those
+ 	 * systems.
+ 	 */
+ 	return vaddv_u8(vcnt_u8(vld1_u8((const uint8 *) &word)));
+ }
+ 
+ /*
+  * pg_popcount_neon
+  *		Returns number of 1 bits in buf
+  */
+-
++static uint64
++pg_popcount_neon(const char *buf, int bytes)
++{
++	uint64		cnt = 0;
++	uint8_t		tmp[16];
++
++	while (bytes >= 16)
++	{
++		uint8x16_t		v8 = vld1q_u8((const uint8 *) buf);
++		uint8x16_t		cnt8 = vcntq_u8(v8);
++		cnt += (uint64) vaddv_u8(vget_low_u8(cnt8)) + (uint64) vaddv_u8(vget_high_u8(cnt8));
++		bytes -= 16;
++		buf += 16;
++	}
++
++	/* Handle remaining bytes */
++	if (bytes > 0)
++	{
++		memset(tmp, 0, sizeof(tmp));
++		memcpy(tmp, buf, bytes);
++		uint8x16_t		v8 = vld1q_u8(tmp);
++		uint8x16_t		cnt8 = vcntq_u8(v8);
++		cnt += (uint64) vaddv_u8(vget_low_u8(cnt8)) + (uint64) vaddv_u8(vget_high_u8(cnt8));
++	}
++
++	return cnt;
++}
+ 
+ /*
+  * pg_popcount_masked_neon
+  *		Returns number of 1 bits in buf after applying the mask to each byte
+  */
+-
++static uint64
++pg_popcount_masked_neon(const char *buf, int bytes, bits8 mask)
++{
++	uint64		cnt = 0;
++	uint8_t		tmp[16];
++	uint8x16_t	mask_vec = vdupq_n_u8(mask);
++
++	while (bytes >= 16)
++	{
++		uint8x16_t		v8 = vld1q_u8((const uint8 *) buf);
++		uint8x16_t		cnt8 = vcntq_u8(vandq_u8(v8, mask_vec));
++		cnt += (uint64) vaddv_u8(vget_low_u8(cnt8)) + (uint64) vaddv_u8(vget_high_u8(cnt8));
++		bytes -= 16;
++		buf += 16;
++	}
++
++	/* Handle remaining bytes */
++	if (bytes > 0)
++	{
++		memset(tmp, 0, sizeof(tmp));
++		memcpy(tmp, buf, bytes);
++		uint8x16_t		v8 = vld1q_u8(tmp);
++		uint8x16_t		cnt8 = vcntq_u8(vandq_u8(v8, mask_vec));
++		cnt += (uint64) vaddv_u8(vget_low_u8(cnt8)) + (uint64) vaddv_u8(vget_high_u8(cnt8));
++	}
++
++	return cnt;
++}
+ 
+ #else							/* POPCNT_AARCH64 */
+ 
+ /* prevent linker complaints about empty module */
+ extern int	pg_popcount_aarch64_dummy_variable;
+ int			pg_popcount_aarch64_dummy_variable = 0;
+ 
+ #endif							/* ! POPCNT_AARCH64 */

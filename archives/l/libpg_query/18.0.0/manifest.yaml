@@ -1,0 +1,47 @@
+version: "18.0.0"
+software: "libpg_query"
+status: built
+build_date: "2026-07-15"
+build_system: "makefile"
+
+source:
+  url: "https://github.com/pganalyze/libpg_query/releases/download/18.0.0/libpg_query-18.0.0.tar.gz"
+  sha256: "6ad7783f272acfd116455c66a03298a0cac9a9168281df547969219112f0260f"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make build"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-postgres-include-pg_config.h.patch"
+  - "0002-src-postgres-src_port_pg_popcount_aarch64.c.patch"
+
+knowledge_gained:
+  - "PG18 pg_popcount_aarch64.c has SVE code guarded by USE_SVE_POPCNT_WITH_RUNTIME_CHECK; clang 15.0.4 on OHOS lacks SVE support"
+  - "libpg_query strips Neon popcount function bodies from PostgreSQL source; need to reimplement pg_popcount_neon and pg_popcount_masked_neon"
+  - "make build target only builds static library (libpg_query.a), avoiding lld linker issues with examples/tests"
+  - "make test concurrency test crashes due to HMDFS memory management limitations with large process memory"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libpg_query-18.0.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libpg_query-18.0.0.work
+  source_orig_hash: 731f8f504a91c50c
+  source_work_hash: d951a1be3a083b00
+  generated_at: '2026-07-15T16:29:16'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-src-postgres-include-pg_config.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-postgres-src_port_pg_popcount_aarch64.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
