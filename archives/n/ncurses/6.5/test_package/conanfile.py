@@ -1,7 +1,10 @@
+import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import cross_building
 
-class NcursesTestConan(ConanFile):
+
+class TestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
 
@@ -17,5 +20,5 @@ class NcursesTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        if not cross_building(self):
+            self.run(os.path.join(self.cpp.build.bindirs[0], "test_ncurses"), env="conanrun")
