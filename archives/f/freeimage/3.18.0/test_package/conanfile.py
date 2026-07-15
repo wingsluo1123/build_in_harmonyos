@@ -20,6 +20,5 @@ class FreeimageTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run the test binary directly to get better error output
-        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_freeimage")
-        self.run(test_bin, env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
