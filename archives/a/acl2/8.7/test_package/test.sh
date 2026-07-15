@@ -1,6 +1,6 @@
 #!/bin/sh
 # test_package/test.sh — smoke test for ACL2 saved_acl2 executable
-set -eu
+set -euo pipefail
 
 ACL2_BIN="$1"
 
@@ -26,12 +26,16 @@ else
 fi
 
 echo "[test] 4. Run simple ACL2 proof"
-# Run a minimal ACL2 session: prove that 1+1=2
-RESULT=$(echo '(thm (equal (+ 1 1) 2))' | timeout 120 "$ACL2_BIN" 2>&1 || true)
+RESULT=$(echo '(thm (equal (+ 1 1) 2))' | timeout 120 "$ACL2_BIN" 2>&1)
+EXIT_CODE=${PIPESTATUS[1]}
 if echo "$RESULT" | grep -qi "Q.E.D\|proved"; then
     echo "PASS: ACL2 proof engine works"
+elif [ "$EXIT_CODE" -eq 124 ]; then
+    echo "WARN: proof timed out (may be normal for first run)"
 else
-    echo "WARN: proof did not complete in time (may be normal for first run)"
+    echo "FAIL: ACL2 proof engine failed with exit code $EXIT_CODE"
+    echo "$RESULT"
+    exit 1
 fi
 
 echo ""

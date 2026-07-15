@@ -12,11 +12,10 @@ License: ACL2 License (BSD-like)
 """
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -97,15 +96,8 @@ class Acl2Conan(ConanFile):
         )
 
     def package(self):
-        # Copy the saved_acl2 executable and associated scripts
         copy(self, "saved_acl2*", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))
 
-        # Copy documentation and books (community libraries)
-        books_dir = os.path.join(self.source_folder, "books")
-        if os.path.isdir(books_dir):
-            copy(self, "*.lisp", src=books_dir, dst=os.path.join(self.package_folder, "share", "acl2", "books"))
-
-        # Ensure executable permission
         saved_acl2 = os.path.join(self.package_folder, "bin", "saved_acl2")
         if os.path.exists(saved_acl2):
             os.chmod(saved_acl2, 0o755)

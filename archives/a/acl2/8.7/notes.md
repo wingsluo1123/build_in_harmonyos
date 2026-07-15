@@ -34,7 +34,7 @@ ACL2 环境由两部分组成：
 ### 1. 源码下载
 
 ```bash
-curl -kfsSL -o acl2-8.7.tar.gz \
+curl -fsSL -o acl2-8.7.tar.gz \
   https://github.com/acl2-devel/acl2-devel/releases/download/8.7/acl2-8.7.tar.gz
 ```
 
@@ -47,7 +47,13 @@ ACL2 的构建过程需要在构建系统上安装 Common Lisp 编译器：
 
 ```bash
 # 安装 SBCL (Steel Bank Common Lisp)
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- sbcl
+# 注意：请在执行前检查脚本内容，确保来源可信
+INSTALL_SH=$(mktemp)
+curl -fsSL -o "$INSTALL_SH" https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh
+# 可选：检查脚本内容后再执行
+# cat "$INSTALL_SH"
+sh "$INSTALL_SH" sbcl
+rm -f "$INSTALL_SH"
 
 # 构建 ACL2
 cd acl2-8.7
