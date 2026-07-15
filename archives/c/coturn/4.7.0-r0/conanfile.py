@@ -41,12 +41,14 @@ class CoturnConan(ConanFile):
             "--disable-shared",
             "--enable-static",
         ])
+        tc.extra_env_info["TMPDIR"] = os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
+        self.run('export TMPDIR="${TMPDIR:-/storage/Users/currentUser/tmp}" && mkdir -p "$TMPDIR"', shell=True)
         autotools = Autotools(self)
-        autotools.configure()
+        autotools.configure(args=[f'TMPDIR={os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")}'])
         autotools.make("-j$(nproc)")
 
     def package(self):
