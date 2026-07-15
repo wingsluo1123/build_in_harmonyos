@@ -33,6 +33,8 @@ class LibbsdConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        # OHOS aarch64 的 config.guess/sub 不识别 linux-ohos 三元组，显式指定
+        tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.generate()
 
     def build(self):
