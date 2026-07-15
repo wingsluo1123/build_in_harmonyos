@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Conan recipe — kissfft 131.2.0 (Makefile)"""
 
 from conan import ConanFile
