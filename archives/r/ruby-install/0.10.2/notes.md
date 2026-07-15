@@ -64,5 +64,5 @@ $ file ~/test-install-ruby-install-0.10.2/storage/Users/currentUser/usr/local/bi
 4. 安装 Ruby 时需要编译器（gcc/clang），但 ruby-install 本身不需要
 ---
 
-**编译结束**: 2026-05-19 22:08
-**最终状态**: built
+**编译结束**: 2026-07-15 16:46
+**最终状态**: published
