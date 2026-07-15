@@ -34,9 +34,11 @@ class CurlppConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
-        # curl 通过系统 cmd-pkgs 安装，告知 CMake 其安装路径
-        curl_prefix = os.path.join(os.path.expanduser("~"), "usr", "local")
-        if os.path.isdir(curl_prefix):
+        # curl 通过系统 cmd-pkgs 安装，路径通过 Conan conf 配置:
+        #   conan profile update -c user.curl:prefix=/path/to/curl ohos-aarch64
+        # CI 环境已在 profile 中预设此 conf
+        curl_prefix = self.conf.get("user.curl:prefix", default="", check_type=str)
+        if curl_prefix:
             tc.variables["CMAKE_PREFIX_PATH"] = curl_prefix
         tc.generate()
 

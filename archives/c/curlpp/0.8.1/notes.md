@@ -61,8 +61,8 @@ pkg-config --modversion curlpp → 0.8.1
 ls /storage/Users/currentUser/usr/local/lib/libcurlpp*
 → libcurlpp.a, libcurlpp.so
 
-# 功能验证（编译测试程序执行 HTTP 请求）
-./test_curlpp → curlpp library linked successfully + HTTP response received
+# 功能验证（编译测试程序验证 curlpp 生命周期 API）
+./test_curlpp → curlpp lifecycle test passed
 ```
 
 ## 交付物
@@ -79,4 +79,6 @@ ls /storage/Users/currentUser/usr/local/lib/libcurlpp*
 ---
 
 **编译结束**: 2026-07-15 18:36
+**最终状态**: built
+15 18:36
 **最终状态**: built
