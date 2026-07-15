@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""Conan recipe for kissfft — A mixed-radix Fast Fourier Transform library."""
-import os
+"""Conan recipe — kissfft 131.2.0 (Makefile)"""
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -13,13 +11,15 @@ class KissfftConan(ConanFile):
     description = "A mixed-radix Fast Fourier Transform library - Keep It Simple, Stupid"
     license = "BSD-3-Clause"
     homepage = "https://github.com/mborgerding/kissfft"
-    url = ""  # CI fills this
+    url = "https://cnb.cool/ohpcd/conan-recipes"
 
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = {"shared": False}
+
+    generators = "VirtualBuildEnv"
 
     def export_sources(self):
         export_conandata_patches(self)
