@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.5)
+project(test_libbsd)
+find_package(libbsd REQUIRED)
+add_executable(test_libbsd test.c)
+target_link_libraries(test_libbsd libbsd::libbsd)
