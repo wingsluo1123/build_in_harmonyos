@@ -10,7 +10,6 @@ from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
 
 
 class LhasaConan(ConanFile):
@@ -58,13 +57,10 @@ class LhasaConan(ConanFile):
 
         tmpdir = os.path.expanduser("~/tmp")
         os.makedirs(tmpdir, exist_ok=True)
-        env = Environment()
-        env.define("TMPDIR", tmpdir)
-        env.vars(self).save_script("env_tmpdir")
+        tc.environment().define("TMPDIR", tmpdir)
 
     def build(self):
         apply_conandata_patches(self)
-        self._fix_umask()
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
@@ -78,13 +74,3 @@ class LhasaConan(ConanFile):
         self.cpp_info.includedirs = ["include/liblhasa-0.6.0"]
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("pkg_config_name", "liblhasa")
-
-    def _fix_umask(self):
-        for rel in ("configure", "config.status"):
-            path = os.path.join(self.source_folder, rel)
-            if os.path.isfile(path):
-                with open(path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                content = content.replace("umask 077", "umask 022")
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(content)

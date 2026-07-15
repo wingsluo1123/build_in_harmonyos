@@ -65,7 +65,7 @@ python3 scripts/ohc-run.py conan-verify lhasa 0.6.0
 | conanfile.py | Conan 2 Autotools 配方，包含 OHOS 平台校验与 umask 修复 |
 | conandata.yml | 官方 GitHub release 源码 URL 与 sha256 |
 | test_package/test.c | 消费者视角链接 liblhasa 并调用公开 API |
-| test_package/conanfile.py | 执行 CMake 消费者测试并运行 `lha --help` |
+| test_package/conanfile.py | 执行 CMake 消费者测试并运行 `lha`（无参数，验证退出码 255） |
 | commands.json | 命令行工具 `lha` 的 hicmd 声明 |
 
 ## 注意事项
