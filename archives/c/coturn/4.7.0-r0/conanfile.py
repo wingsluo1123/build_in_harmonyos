@@ -23,9 +23,9 @@ class CoturnConan(ConanFile):
         self.folders.build = "."
 
     def requirements(self):
-        self.requires("openssl/3.5.6@ohpcd/stable")
-        self.requires("libevent/2.1.12@ohpcd/stable")
-        self.requires("sqlite3/3.49.1@ohpcd/stable")
+        self.requires("openssl/3.5.6")
+        self.requires("libevent/2.1.12")
+        self.requires("sqlite3/3.49.1")
 
     def export_sources(self):
         export_conandata_patches(self)
