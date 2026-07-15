@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/opt/ai-worker/repo/archives/v/vmtouch/1.3.1/test_package/conanrunenv-release-armv8.sh"
