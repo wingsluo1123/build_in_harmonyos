@@ -80,8 +80,11 @@ make install PREFIX=$DEFAULT_PREFIX DESTDIR=$TEST_PREFIX CC=clang
 - 预编译包: `cweb-4.12.2-ohos-aarch64.tar.gz` (286KB)
 - 预编译包内容: bin/cweave, bin/ctangle, lib/cweb/ 下的 2 个 .w 文件, share/ 下的 4 个文件
 - 无外部依赖库
-
 ---
 
-**编译结束**: 2026-06-09
-**最终状态**: published
+**编译结束**: 2026-07-15 22:20
+**最终状态**: built
+---
+
+**编译结束**: 2026-07-15 22:21
+**最终状态**: built
