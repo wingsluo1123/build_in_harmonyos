@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/m/microsocks/1.0.5/test_package/build-release/conan/deactivate_conanrunenv-release-armv8.sh"
