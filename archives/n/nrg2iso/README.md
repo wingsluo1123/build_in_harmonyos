@@ -1,19 +1,14 @@
 # nrg2iso
 
-Nero nrg 映像文件转 ISO9660 转换工具。
+nrg2iso is a command-line tool that converts NERO image files (.nrg) to ISO format (.iso).
 
-nrg2iso 将 Nero Burning ROM 的专有 .nrg 光盘映像文件转换为标准的 ISO9660 格式。
+## 上游
 
-## 可用版本
+- 项目地址: https://github.com/basrach/nrg2iso
+- 许可证: GPL-3.0-or-later
 
-| 版本 | 状态 | 构建系统 | 日期 |
-|------|------|---------|------|
-| 0.4.1 | 已发布 | makefile | 2026-06-11 |
+## 版本
 
-## 功能说明
-
-nrg2iso 是一个简单的命令行工具，通过剥离 Nero .nrg 映像文件前缀的 307200 字节 Nero 头部数据，提取其中的 ISO9660 数据。支持版本查询（--version）和帮助信息（--help）选项。
-
-## 依赖
-
-无 — nrg2iso 是独立的 C 程序，无任何外部库依赖。
+| 版本 | 状态 | 构建系统 | 说明 |
+|------|------|----------|------|
+| 0.4.1 | published | makefile | 首次适配 |
