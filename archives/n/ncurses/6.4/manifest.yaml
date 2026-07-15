@@ -1,29 +1,28 @@
 # ncurses 6.4 编译档案
 software: ncurses
 version: 6.4
-status: partial
-build_system: autotools
-compile_date: 2026-04-12
+status: built
+build_date: "2026-07-16"
 
-dependencies:
-  required: []
-  optional: []
+source:
+  url: "https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.4.tar.gz"
+  sha256: "6931283d9ac87c5073f30b6290c4c75f21632bb4fc3603ac8100812bed248159"
+  tar_format: tar.gz
 
-build_config:
-  target: aarch64-unknown-linux-ohos
+build:
+  system: autotools
   configure_options:
-    - --prefix=$TEST_PREFIX
-    - --without-shared
-    - --without-debug
-    - --without-ada
-    - --without-manpages
-    - --without-tests
-    - --without-cxx-binding
-    - --enable-widec
-    - --enable-overwrite
-  cflags: "-fPIC -O2"
-  env:
-    CC: clang
+    - "--without-shared"
+    - "--without-debug"
+    - "--without-ada"
+    - "--without-manpages"
+    - "--without-tests"
+    - "--without-cxx-binding"
+    - "--enable-widec"
+    - "--enable-overwrite"
+  dependencies: []
+  cc: clang
+  cxx: clang++
 
 patches_applied:
   - file: 0001-port-for-ohos.patch
@@ -41,16 +40,7 @@ compatibility:
     - 2851个terminfo条目
     - 11个工具：clear tput tic infocmp toe captoinfo infotocap reset tabs tset ncursesw6-config
 
-test_results:
-  type: manual
-  passed: 3
-  failed: 0
-  note: "tput cols/colors/tic功能验证通过，零共享库确认安全"
-
 knowledge_gained:
   - "ncurses 必须静态编译（--without-shared），否则LD_LIBRARY_PATH会劫持系统libncursesw.so.6导致zsh崩溃"
   - "--enable-widec 编译libncursesw（宽字符版本），readline依赖它"
   - "--enable-overwrite 让头文件安装到顶层include/而非include/ncursesw/"
-
-references:
-  - https://invisible-island.net/ncurses/
