@@ -113,9 +113,22 @@ Package install verification OK
 - -DM64BITS 宏必须保留（64-bit 类型定义）
 - -D__OHOS__ 宏启用 OpenHarmony 平台守卫代码
 - musl libc 不暴露 FILE 内部结构，所有 `_fileno`/`_file` 直接访问需改为 `fileno()`
+<<<<<<< HEAD
 - make check 不可用（picat 无标准测试套件）
-
 ---
 
-**编译结束**: 2026-06-11 01:22
-**最终状态**: published
+**编译结束**: 2026-07-15 20:01
+**最终状态**: built
+---
+
+**编译结束**: 2026-07-15 20:04
+=======
+- make check 不可用（picat 无标准测试套件）---
+
+**编译结束**: 2026-07-16 00:17
+**最终状态**: built
+---
+
+**编译结束**: 2026-07-16 00:40
+>>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
+**最终状态**: built

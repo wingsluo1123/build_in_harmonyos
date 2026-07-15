@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/data/service/hnp/bin/bash
 # Picat configure wrapper for OpenHarmony clean-verify
 # Picat uses custom Makefile (not autotools), so configure is a no-op
 # The actual build is done by: cd emu && make -f Makefile.ohos
