@@ -10,16 +10,16 @@ Dependencies (system packages, installed via cmd-pkgs to ~/usr/local):
   - libexif (optional, enabled)
   - libXext (indirect, via imlib2)
 
-Source: The source tarball is included with the recipe (export_sources)
+Source: The source tarball is included with the recipe (exports)
 to ensure CI workers with restricted network access can build without
 downloading from GitHub. The official URL is recorded in conandata.yml.
 """
 import os
 import tarfile
-from pathlib import Path
+import glob
 
 from conan import ConanFile
-from conan.tools.files import copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -33,13 +33,12 @@ class NsxivConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
+    # Include the source tarball with the recipe for CI workers
+    # that cannot access GitHub directly
+    exports = "nsxiv-34-src.tar.gz"
+
     def export_sources(self):
         export_conandata_patches(self)
-        # Include the source tarball with the recipe for CI workers
-        # that cannot access GitHub directly
-        src_tarball = Path(self.recipe_folder) / "nsxiv-34-src.tar.gz"
-        if src_tarball.exists():
-            copy(self, "nsxiv-34-src.tar.gz", self.recipe_folder, self.export_folder)
 
     def requirements(self):
         pass
@@ -50,9 +49,13 @@ class NsxivConan(ConanFile):
 
     def source(self):
         # Extract source from included tarball (avoids GitHub download issues)
-        src_tarball = os.path.join(self.source_folder, "nsxiv-34-src.tar.gz")
-        if os.path.exists(src_tarball):
-            with tarfile.open(src_tarball, "r:gz") as tar:
+        # The tarball was exported via the `exports` attribute
+        tarballs = glob.glob(os.path.join(self.source_folder, "nsxiv-34-src.tar.gz"))
+        if not tarballs:
+            # Also check in recipe folder (conan 2.x exports location)
+            tarballs = glob.glob(os.path.join(self.recipe_folder, "nsxiv-34-src.tar.gz"))
+        if tarballs:
+            with tarfile.open(tarballs[0], "r:gz") as tar:
                 tar.extractall(path=self.source_folder)
         else:
             # Fallback: download from official URL
