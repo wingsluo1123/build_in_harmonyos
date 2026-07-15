@@ -8,7 +8,7 @@
 - 平台: HarmonyOS（aarch64, musl libc）
 - 源码版本: Win64-20211225 tag（跨平台 C 代码，非仅 Windows）
 - 源码 SHA256: cd5dcc03394af275f0416b3cb2914574bf51ec60d1c857020fbd34b5427c5faf
-- 状态: **published**
+- 状态: **built**
 
 ## 编译步骤
 
@@ -116,8 +116,7 @@ $ printf 'a: !5\nb: 2*a\nb\n' | k
 - src/va.c 的 2 个编译警告是 long long → double 的隐式转换（LLONG_MAX/MIN），不影响功能
 - kona 是解释器，不产生库文件，只输出单个二进制 `k`
 - G0 自动验证受限于平台 `patch` 命令（不支持 `--input`），已手动验证通过
-
 ---
 
-**编译结束**: 2026-06-18 00:35
-**最终状态**: published
+**编译结束**: 2026-07-15 22:41
+**最终状态**: built
