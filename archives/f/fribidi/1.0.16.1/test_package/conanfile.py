@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package for fribidi 1.0.16 — Conan L1 official test.
+"""Conan test_package for fribidi 1.0.16.1 — Conan L1 official test.
 
 Uses CMake (CMakeDeps + CMakeToolchain) so the compiler is handled
 by Conan toolchain, not raw shell env vars (R33).

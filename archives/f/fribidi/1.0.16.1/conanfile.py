@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for fribidi 1.0.16 — Unicode Bidirectional Algorithm library.
+"""Conan recipe for fribidi 1.0.16.1 — Unicode Bidirectional Algorithm library.
 
 Build system: autotools (configure + make).
 Patches: config.guess/config.sub OHOS detection.
