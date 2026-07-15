@@ -2,11 +2,13 @@
 """Conan recipe — cdo 2.4.0 (Climate Data Operators, autotools).
 
 CDO is a command-line tool for processing climate and forecast data.
-Uses autotools build system. Requires config.guess/config.sub patches
-for HarmonyOS platform recognition.
+Uses autotools build system. config.guess/config.sub are patched
+with patch-ohos.sh for HarmonyOS platform recognition (E007).
 """
+import os
+
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -46,7 +48,14 @@ class CdoConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
+        # R33: Get compiler from Conan conf, not shell env
+        cc = self.conf.get("tools.build:compiler_executables:c", "clang", check_type=str)
+        cxx = self.conf.get("tools.build:compiler_executables:cpp", "clang++", check_type=str)
+        # E007: Patch config.guess/config.sub for HarmonyOS via helper script
+        script = os.path.join(self.source_folder, "patches", "patch-ohos.sh")
+        if os.path.exists(script):
+            self.run(f"bash {script} {self.source_folder}")
+        # Build with autotools
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
