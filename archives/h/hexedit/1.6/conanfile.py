@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Conan recipe for hexedit 1.6 (console hex file editor)."""
 
-import os
 from conan import ConanFile
 from conan.tools.files import get, copy, replace_in_file
+from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps
 
 
 class HexeditConan(ConanFile):
@@ -21,28 +21,35 @@ class HexeditConan(ConanFile):
         self.folders.source = "."
         self.folders.build = "."
 
+    def requirements(self):
+        self.requires("ncurses/6.4")
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        deps = AutotoolsDeps(self)
+        deps.generate()
+        tc = AutotoolsToolchain(self)
+        tc.configure_args.extend([
+            "HELP2MAN=/bin/true",
+            "LIBS=-lncursesw",
+        ])
+        tc.generate()
+
     def build(self):
-        p = os.environ.get("DEFAULT_PREFIX", "/storage/Users/currentUser/usr/local")
-        # Generate configure script from configure.ac (CI has autoconf but not automake)
+        # Generate configure script from configure.ac
         self.run("autoconf", cwd=self.source_folder)
         # Apply platform patches for HMDFS
         replace_in_file(self, self.source_folder + "/configure", "cross_compiling=no", "cross_compiling=maybe")
         replace_in_file(self, self.source_folder + "/configure", "umask 077", "umask 022")
-        self.run(
-            "bash ./configure --prefix=%s" % p
-            + " HELP2MAN=/bin/true"
-            + " CFLAGS='-fPIC -O2 -I%s/include'" % p
-            + " LDFLAGS='-L%s/lib'" % p
-            + " LIBS='-lncursesw'",
-            cwd=self.source_folder
-        )
-        self.run("make -j$(nproc)", cwd=self.source_folder)
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make("-j1")
 
     def package(self):
-        copy(self, "hexedit", self.source_folder, os.path.join(self.package_folder, "bin"))
+        autotools = Autotools(self)
+        autotools.install()
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
