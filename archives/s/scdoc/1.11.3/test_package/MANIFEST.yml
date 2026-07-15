@@ -1,0 +1,54 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: scdoc/1.11.3
+homepage: "https://git.sr.ht/~sircmpwn/scdoc"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/comments
+    source: scdoc-1.11.3/test/comments
+    description: "Test comment handling in scdoc"
+    command: "make check (comments)"
+  - file: test/heading
+    source: scdoc-1.11.3/test/heading
+    description: "Test heading parsing in scdoc"
+    command: "make check (heading)"
+  - file: test/indent
+    source: scdoc-1.11.3/test/indent
+    description: "Test indentation handling in scdoc"
+    command: "make check (indent)"
+  - file: test/inline-formatting
+    source: scdoc-1.11.3/test/inline-formatting
+    description: "Test inline formatting (bold, underline) in scdoc"
+    command: "make check (inline-formatting)"
+  - file: test/line-breaks
+    source: scdoc-1.11.3/test/line-breaks
+    description: "Test line break parsing in scdoc"
+    command: "make check (line-breaks)"
+  - file: test/preamble
+    source: scdoc-1.11.3/test/preamble
+    description: "Test preamble validation in scdoc"
+    command: "make check (preamble)"
+  - file: test/tables
+    source: scdoc-1.11.3/test/tables
+    description: "Test table parsing in scdoc"
+    command: "make check (tables)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者 smoke test: scdoc 生成 man page 并验证 roff 输出内容"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10

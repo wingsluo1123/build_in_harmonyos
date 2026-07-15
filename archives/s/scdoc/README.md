@@ -38,6 +38,7 @@ scdoc myprogram.scd.1.in > myprogram.1
 | 版本 | 状态 | 备注 |
 |------|------|------|
 | 1.11.0 | built | 首次适配 |
+| 1.11.3 | published | 无补丁，1.11.0 已知问题已在上游修复 |
 
 ## 许可证
 MIT License
