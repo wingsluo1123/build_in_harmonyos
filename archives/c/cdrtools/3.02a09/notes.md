@@ -62,3 +62,7 @@ ls ~/test-install-cdrtools-3.02a09/$HOME/usr/local/bin/
 3. HMDFS 不支持某些软链接操作，tar 解压可能有警告但不影响编译
 4. 生成的 avoffset.h 可能不完整，需要手动修复
 ---
+---
+
+**编译结束**: 2026-07-15 22:36
+**最终状态**: built
