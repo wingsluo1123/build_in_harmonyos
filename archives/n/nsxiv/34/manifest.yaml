@@ -1,24 +1,46 @@
 software: nsxiv
 version: "34"
-status: built
-build_date: "2026-06-01"
+status: published
+build_date: "2026-07-15"
 
 source:
   url: "https://github.com/nsxiv/nsxiv/archive/refs/tags/v34.tar.gz"
-  sha256: ""
+  sha256: "19684cafeb06671e0332d8953eb53199cbd6dd1a0d49bf3294af507abc6efc3b"
   tar_format: tar.gz
 
 build:
   system: makefile
-  configure_options: []
-  dependencies: []
+  configure_options:
+    - "HAVE_INOTIFY=0"
+    - "HAVE_LIBFONTS=0"
+    - "HAVE_LIBEXIF=1"
+  dependencies:
+    - "imlib2 (system, with X11 support)"
+    - "libX11 (system)"
+    - "libexif (system)"
+    - "libXext (system, indirect via imlib2)"
   cc: clang
   cxx: clang++
 
-patches_applied:
-  - "0001-config.mk.patch"
-  - "0002-configure.patch"
+patches_applied: []
 
 knowledge_gained:
-  - "inotify 不可用 — 需禁用 HAVE_INOTIFY=0"
-  - "PREFIX 需通过 config.mk 传入 $DEFAULT_PREFIX 路径"
+  - "inotify not available on OHOS — disable with HAVE_INOTIFY=0"
+  - "libXft not available as pre-compiled package — disable with HAVE_LIBFONTS=0"
+  - "imlib2 must be built WITH X11 support (not --without-x) for nsxiv"
+  - "Makefile projects: pass HAVE_* flags as make arguments, no patches needed"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/nsxiv-src-orig
+  source_work_dir: /storage/Users/currentUser/tmp/nsxiv-src
+  source_orig_hash: bb91bf9f156bbed2
+  source_work_hash: 412c8074eca14580
+  generated_at: '2026-07-16T00:52:12'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-version.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
