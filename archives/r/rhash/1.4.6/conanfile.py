@@ -17,7 +17,7 @@ class RhashConan(ConanFile):
     description = "Recursive hash computation tool supporting multiple hash algorithms"
     license = "MIT"
     homepage = "http://rhash.sourceforge.net/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
