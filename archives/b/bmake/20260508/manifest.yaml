@@ -1,0 +1,46 @@
+# 版本级 manifest — bmake 20260508
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "20260508"
+software: "bmake"
+status: built
+build_date: "2026-07-15"
+build_system: "autotools"
+
+source:
+  url: "https://www.crufty.net/ftp/pub/sjg/bmake-20260508.tar.gz"
+  sha256: "7b1eea90abc767430cd1a612529d5f301c47fd6a35bee7585778c951e891a82c"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--without-makefile"
+    - "--without-meta"
+    - "--without-filemon"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.patch"
+
+knowledge_gained:
+  - "HarmonyOS 文件系统上 mktemp -d 配合 umask 077 创建的目录权限异常（SGID 位导致 Permission denied），需将 umask 改为 022"
+  - "bmake 的 Makefile 使用 BSD make 语法，GNU make 无法解析，需要使用 make-bootstrap.sh 构建"
+  - "bmake 是命令行工具（package_type=application），需设置 runenv_info 使下游能找到 bmake 在 PATH 中"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/bmake-20260508.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/bmake-20260508.work
+  source_orig_hash: 79acb2e0f706d50d
+  source_work_hash: 0d1bc918c171eb76
+  generated_at: '2026-07-15T16:44:28'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
