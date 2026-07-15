@@ -1,29 +1,28 @@
-diff -ruN a/Make.rules b/Make.rules
 --- a/Make.rules
 +++ b/Make.rules
-@@ -29,21 +29,21 @@
- else
- override MAKE := $(1)="$($(strip $(1)))" $(MAKE)
- endif)
- endef
- else
- set = $(eval $(1) = $(2))
- endif
+@@ -71,21 +71,21 @@
+ datadir = $(prefix)/share
+ mandir = $(datadir)/man
+ infodir = $(datadir)/info
+ localstatedir = $(prefix)/var
+ sharedstatedir = $(prefix)/com
+ 
+ DESTDIR =
  
  
- $(call set, CROSS, )
--$(call set, CC, $$(CROSS)gcc)
-+$(call set, CC, $$(CROSS)clang)
- $(call set, AS, $$(CROSS)as)
- $(call set, LD, $$(CROSS)ld)
- $(call set, DEPEND, $$(CROSS)gcc -MM -MG)
- $(call set, AR, $$(CROSS)ar)
- $(call set, RANLIB, $$(CROSS)ranlib)
- $(call set, INSTALL, cp)
- $(call set, INDENT, true)
+ #  layout stuff
+-SKIPDIRS = tmp%
++SKIPDIRS = tmp% build% patches%
+ INCLUDEDIRS = include%
+ LIBDIRS = lib%
+ MODDIRS = mod%
+ SKIPINSTALL = test%
  
- gcc = $(findstring gcc,$(CC))
- $(call set, CFLAGS, $(if $(gcc), -O2 -Wall, -O))
+ 
+ include $(srcdir)/Make.defines
+ 
+ 
+ ifndef NAME
 @@ -141,21 +141,21 @@
  
  override LIBS := $(_libs) -lm $(LIBS)

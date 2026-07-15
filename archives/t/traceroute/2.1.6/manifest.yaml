@@ -7,32 +7,18 @@ software: traceroute
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "2.1.6"
-
-# 编译状态
-# published | built | failed | archived
-status: built
-
-# 构建系统类型（简化字段，供 verify-build 检查）
+status: published
 build_system: makefile
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-14"
+build_date: "2026-07-16"
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "http://deb.debian.org/debian/pool/main/t/traceroute/traceroute_2.1.6.orig.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://deb.debian.org/debian/pool/main/t/traceroute/traceroute_2.1.6.orig.tar.gz"
+  sha256: "9ccef9cdb9d7a98ff7fbf93f79ebd0e48881664b525c4b232a0fcec7dcb9db5e"
   tar_format: tar.gz
 
 # ============================================================
@@ -40,23 +26,10 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: makefile
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
+  configure_options:
+    - "env=yes"
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
   cc: clang
   cxx: clang++
 
@@ -64,28 +37,25 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-Make.rules.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "Make.rules LIBDEPS must filter -l% flags alongside -L% to avoid treating -lm as a file dependency"
+  - "Default CC must be changed from gcc to clang for OHOS platform"
+  - "env=yes flag is needed to inherit environment variables in the custom Makefile build system"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/traceroute-2.1.6.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/traceroute-2.1.6.work
   source_orig_hash: 917da0260c8f2991
-  source_work_hash: 11b12dec27e128fd
-  generated_at: '2026-05-14T15:31:14'
+  source_work_hash: 5d0c95bb116d6c47
+  generated_at: '2026-07-16T01:19:49'
   patches_count: 1
 
 patch_classification:
