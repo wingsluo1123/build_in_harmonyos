@@ -36,9 +36,6 @@ class TrioConan(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             self.options.rm_safe("fPIC")
-        # OHOS 平台只支持静态库，删除 shared 选项
-        if self.settings.os == "OHOS":
-            self.options.rm_safe("shared")
 
     def configure(self):
         if self.options.get_safe("shared"):
