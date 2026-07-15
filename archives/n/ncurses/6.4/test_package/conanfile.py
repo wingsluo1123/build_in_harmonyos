@@ -1,12 +1,24 @@
+import os
+
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
-class NcursesTestPackage(ConanFile):
+class NcursesTestConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
-        # ncurses is a library — verify headers are available
-        self.run("echo 'ncurses/6.4 library package'", env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
