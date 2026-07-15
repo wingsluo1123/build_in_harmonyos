@@ -48,9 +48,6 @@ class CdoConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # R33: Get compiler from Conan conf, not shell env
-        cc = self.conf.get("tools.build:compiler_executables:c", "clang", check_type=str)
-        cxx = self.conf.get("tools.build:compiler_executables:cpp", "clang++", check_type=str)
         # E007: Patch config.guess/config.sub for HarmonyOS via helper script
         script = os.path.join(self.source_folder, "patches", "patch-ohos.sh")
         if os.path.exists(script):
