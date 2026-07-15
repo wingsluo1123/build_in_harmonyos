@@ -89,3 +89,7 @@ PKG_CONFIG_PATH=/storage/Users/currentUser/usr/local/lib/pkgconfig pkg-config --
 - libmpack 使用简单的 Makefile 构建，无 configure 脚本
 - DESTDIR 模式需要同时设置 PREFIX 和 DESTDIR
 - libtool 的 ldconfig 警告可忽略（鸿蒙平台限制）
+---
+
+**编译结束**: 2026-07-15 17:01
+**最终状态**: built
