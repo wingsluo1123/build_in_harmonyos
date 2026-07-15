@@ -684,7 +684,7 @@ def cmd_submit(software: str, version: str,
        Phase 1: Wait for "变更摘要" (poll 5min, 30min timeout)
        Phase 2: AI evaluates summary → HANDOFF (mandatory fix check)
        Phase 3: Wait for review opinions (poll 5min, 30min timeout)
-       Phase 4: AI evaluates opinions → HANDOFF (strict reasonability check)
+       Phase 4: AI evaluates opinions → HANDOFF (accept: fix+resolve, reject: reply only)
        Phase 5: Review complete → proceed to CI
     6. Monitor CI via gitcode_pr.py ci-status (poll 30s, 40min timeout)
     """
@@ -1217,8 +1217,8 @@ def _monitor_ci(gitcode_pr: str, repo: str, pr_number: int,
 #   → 超时无新意见 → 直接进入 CI 监控
 # Phase 4: AI 处理检视意见（HANDOFF）
 #   → ⚠️ 检视意见不一定正确，需严格判断合理性
-#   → 每条意见必须回复（接纳: 修改+说明 / 拒绝: 说明原因）
-#   → 每条意见回复后用 resolve-comment 标记为已解决
+#   → 接纳的意见：修改代码 + 回复 + AI 标记已解决
+#   → 拒绝的意见：回复说明原因 + 请审核人员评估，AI 不标记已解决
 #   → CI 状态通知（ohpcd-robot）不是检视意见，不需要回复
 #   → 所有意见处理完毕后 --resume
 # Phase 5: AI Review 完成，进入 CI 监控
@@ -1472,9 +1472,9 @@ def _monitor_ai_review(gitcode_pr: str, repo: str, pr_number: int,
                     "",
                     opinions_text,
                     "━━━ 处理要求 ━━━",
-                    "每条检视意见必须完成以下操作（缺一不可）：",
-                    "  a) 回复评论 — 接纳或拒绝，说明原因",
-                    "  b) 标记为已解决 — 无论接纳还是拒绝",
+                    "每条检视意见必须完成回复（接纳或拒绝），说明原因：",
+                    "  · 接纳的意见：修改代码 + 回复 + AI 标记已解决",
+                    "  · 拒绝的意见：仅回复说明原因 + 请审核人员评估，AI 不标记已解决",
                     "",
                     "━━━ 操作命令 ━━━",
                     "",
@@ -1487,13 +1487,14 @@ def _monitor_ai_review(gitcode_pr: str, repo: str, pr_number: int,
                     "",
                     "【拒绝意见（不修改）】",
                     f"  1. 回复: python3 scripts/gitcode_pr.py reply-comment --repo {repo} "
-                    f"--number {pr_number} --discussion-id <id> --body '不接纳: <拒绝原因>'",
-                    f"  2. 标记已解决: python3 scripts/gitcode_pr.py resolve-comment --repo {repo} "
-                    f"--number {pr_number} --discussion-id <id>",
+                    f"--number {pr_number} --discussion-id <id> --body '不接纳: <拒绝原因>。请审核人员评估是否无需解决，如无需解决，由审核人员标记已解决。'",
+                    f"  2. ⚠️ 不要执行 resolve-comment — 拒绝的意见由审核人员决定是否标记已解决",
                     "",
                     "━━━ 完成条件 ━━━",
-                    f"  所有 {len(opinions)} 条检视意见都已回复并标记为已解决后，继续:",
+                    f"  所有 {len(opinions)} 条检视意见都已回复后，继续:",
                     f"  python3 scripts/ohc-run.py submit {software} {version} --resume",
+                    "",
+                    "  其中：接纳的意见已由 AI 标记已解决；拒绝的意见已请审核人员评估。",
                     "",
                     "⚠️ 非 CI 状态通知评论（如 ohpcd-robot 的 CI 排队/构建/失败）不需要回复和标记。",
                 ],
