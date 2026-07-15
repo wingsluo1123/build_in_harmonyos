@@ -78,5 +78,5 @@ ls /storage/Users/currentUser/usr/local/lib/libcurlpp*
 - 无 make check 测试套件
 ---
 
-**编译结束**: 2026-06-17 16:58
-**最终状态**: published
+**编译结束**: 2026-07-15 18:36
+**最终状态**: built
