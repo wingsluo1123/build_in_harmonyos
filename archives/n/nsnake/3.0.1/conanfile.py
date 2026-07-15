@@ -20,7 +20,7 @@ class NsnakeConan(ConanFile):
     description = "nsnake - classic snake game on the terminal using ncurses"
     license = "GPL-3.0"
     homepage = "https://github.com/alexdantas/nSnake"
-    url = ""  # CI fills this
+    url = "https://github.com/alexdantas/nSnake"
 
     settings = "os", "compiler", "build_type", "arch"
 
