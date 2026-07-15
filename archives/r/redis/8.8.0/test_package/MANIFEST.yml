@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Redis has upstream tests (make test) but they require a running server
+# The test_package runs the binary directly (R34: test must depend on tested package)
+
+package: redis/8.8.0
+homepage: "https://redis.io/"
+
+# Redis Makefile has a 'test' target but requires a running server
+upstream_check_command: "make test"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# No upstream test programs for L1
+upstream_tests: []
+
+# test_package tests (consumer-side verification)
+test_package_tests:
+  - file: conanfile.py
+    description: "Run redis-server --version and redis-cli --version to verify binaries"
+    command: "conan test"
+
+# Approximate assertion count
+assertion_count: 2

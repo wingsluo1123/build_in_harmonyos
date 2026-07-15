@@ -1,0 +1,25 @@
+--- a/src/threads_mngr.c
++++ b/src/threads_mngr.c
+@@ -17,21 +17,21 @@
+ 
+ #include <signal.h>
+ #include <time.h>
+ #include <sys/syscall.h>
+ 
+ #define IN_PROGRESS 1
+ static const clock_t RUN_ON_THREADS_TIMEOUT = 2;
+ 
+ /*================================= Globals ================================= */
+ 
+-static redisAtomic run_on_thread_cb g_callback = NULL;
++static redisAtomic run_on_thread_cb g_callback;
+ static redisAtomic size_t g_tids_len = 0;
+ static redisAtomic size_t g_num_threads_done = 0;
+ 
+ /* This flag is set while ThreadsManager_runOnThreads is running */
+ static redisAtomic int g_in_progress = 0;
+ 
+ /*============================ Internal prototypes ========================== */
+ 
+ static void invoke_callback(int sig);
+ /* returns 0 if it is safe to start, IN_PROGRESS otherwise. */
