@@ -66,5 +66,5 @@ PASS: lwc_intern_substring('hello',1,3) = 'ell' (len=3)
 - 测试需使用 GNU ld 替代 OHOS SDK 的 lld（lld 有 libxml2 依赖问题）
 ---
 
-**编译结束**: 2026-06-06 17:16
-**最终状态**: published
+**编译结束**: 2026-07-15 16:24
+**最终状态**: built
