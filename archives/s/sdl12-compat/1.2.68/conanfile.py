@@ -15,10 +15,6 @@ class Sdl12_CompatConan(ConanFile):
     default_options = {"shared": False, "fPIC": True}
     exports_sources = "patches/*"
 
-    def config_options(self):
-        if self.settings.os == "OHOS":
-            self.options.rm_safe("shared")
-
     def configure(self):
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
