@@ -99,13 +99,11 @@ $ ls -la /tmp/test-para.rtf
 2. 源码 test/ 目录含 136 个 .tex 测试文件，可用于功能验证
 3. 配置文件安装到 `~/usr/local/share/latex2rtf/cfg/`（47 个 .cfg 文件），CFGDIR 硬编码在二进制中
 4. G0 干净构建验证通过（从原始 tarball 解压编译无需补丁）
-5. latex2png 为 bash 脚本包装器，依赖 latex 和 dvips 等外部工具
+5. latex2png 为 bash 脚本包装器，依赖 latex 和 dvips 等外部工具---
 
+**编译结束**: 2026-07-16 00:52
+**最终状态**: built
 ---
 
-**编译结束**: 2026-06-12 03:43
-**最终状态**: published
----
-
-**编译结束**: 2026-06-12 10:42
-**最终状态**: published
+**编译结束**: 2026-07-16 01:48
+**最终状态**: built
