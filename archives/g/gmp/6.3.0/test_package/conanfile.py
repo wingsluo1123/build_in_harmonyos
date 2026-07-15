@@ -24,3 +24,6 @@ class GmpTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # L0d: explicit self.run() to satisfy CI gate
+        bin_path = os.path.join(self.cpp.build.bindir, "test_gmp")
+        self.run(bin_path, env="conanrun")
