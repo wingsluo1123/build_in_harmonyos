@@ -48,12 +48,6 @@ class CoturnConan(ConanFile):
         apply_conandata_patches(self)
         tmpdir = os.path.join(os.environ.get("HOME", "/storage/Users/currentUser"), ".ci_logs", "coturn-tmp")
         self.run(f'mkdir -p "{tmpdir}"', env="conanrun")
-        configure = os.path.join(self.source_folder, "configure")
-        if os.path.isfile(configure):
-            from conan.tools.files import replace_in_file
-            replace_in_file(self, configure, "TMP=/tmp", f'TMP={tmpdir}')
-            replace_in_file(self, configure, "TMPDIR=/tmp", f'TMPDIR={tmpdir}')
-            replace_in_file(self, configure, "/tmp", tmpdir)
         self.run(
             f'CONFIG_SHELL="${{CONFIG_SHELL:-/bin/sh}}" TMPDIR="{tmpdir}" TMP="{tmpdir}" '
             f'./configure --prefix=/ --bindir=${{prefix}}/bin --sbindir=${{prefix}}/bin '
