@@ -55,5 +55,5 @@ $ /storage/Users/currentUser/usr/local/bin/shellspec --version
 - G0 clean-verify 需要配置 configure wrapper 和 no-op all 目标才能通过
 ---
 
-**编译结束**: 2026-06-17 02:51
-**最终状态**: published
+**编译结束**: 2026-07-15 22:19
+**最终状态**: built
