@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-import os
-
-from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-=======
 #!/usr/bin/env python3
 """Conan recipe for picat 3.9.7 — Makefile-based CLI tool.
 
@@ -26,8 +20,7 @@ import os
 import stat
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, save
->>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -40,22 +33,14 @@ class PicatConan(ConanFile):
     url = ""  # CI fills this
 
     package_type = "application"
-<<<<<<< HEAD
-
-    settings = "os", "compiler", "build_type", "arch"
-=======
     settings = "os", "arch"
->>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
 
     def export_sources(self):
         export_conandata_patches(self)
 
-<<<<<<< HEAD
-=======
     def requirements(self):
         pass
 
->>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
     def layout(self):
         basic_layout(self)
 
@@ -64,11 +49,6 @@ class PicatConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-<<<<<<< HEAD
-        # Picat uses a custom Makefile (Makefile.ohos) for OpenHarmony
-        # The Makefile sets CC/CPP to clang/clang++ with -D__OHOS__ and other flags
-        # Build happens in the emu/ subdirectory
-=======
 
         # Create Makefile.ohos for OpenHarmony (based on Makefile.linux64)
         makefile_ohos = os.path.join(self.source_folder, "emu", "Makefile.ohos")
@@ -84,27 +64,14 @@ class PicatConan(ConanFile):
             "\n"
             "include common.mak\n"
         )
-        save(self, makefile_ohos, content)
+        with open(makefile_ohos, "w") as f:
+            f.write(content)
 
         # R9: Always use -j1
->>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
         self.run("make -f Makefile.ohos -j1", cwd=os.path.join(self.source_folder, "emu"))
 
     def package(self):
         # Copy the picat binary
-<<<<<<< HEAD
-        copy(self, "picat", os.path.join(self.source_folder, "emu"),
-             os.path.join(self.package_folder, "bin"))
-        # Copy the picat library modules (.pi files)
-        copy(self, "*.pi", os.path.join(self.source_folder, "lib"),
-             os.path.join(self.package_folder, "share", "picat", "lib"))
-
-    def package_info(self):
-        self.cpp_info.bindirs = ["bin"]
-        # Picat needs PICATPATH to find non-preloaded library modules
-        libdir = os.path.join(self.package_folder, "share", "picat", "lib")
-        self.runenv_info.append_path("PICATPATH", libdir)
-=======
         emu_dir = os.path.join(self.source_folder, "emu")
         copy(self, "picat", src=emu_dir,
              dst=os.path.join(self.package_folder, "bin"), keep_path=False)
@@ -121,4 +88,3 @@ class PicatConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libdirs = []
         self.cpp_info.libs = []
->>>>>>> d7c41276 (feat(picat): 3.9.7 适配完成)
