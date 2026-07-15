@@ -6,6 +6,16 @@ set -eu
 
 TMPDIR="${TMPDIR:-/tmp}"
 
+# Find cfg directory relative to the latex2rtf binary
+L2R_BIN=$(command -v latex2rtf 2>/dev/null || echo "")
+if [ -n "$L2R_BIN" ]; then
+    L2R_DIR=$(dirname "$L2R_BIN")
+    CFG_DIR="${L2R_DIR}/../share/latex2rtf/cfg"
+    if [ -d "$CFG_DIR" ]; then
+        export RTFPATH="$CFG_DIR"
+    fi
+fi
+
 # Create a minimal LaTeX document
 TEX_FILE="$TMPDIR/l2r_test_input.tex"
 cat > "$TEX_FILE" << 'TEXEOF'
