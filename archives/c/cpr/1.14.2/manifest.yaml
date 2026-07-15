@@ -1,0 +1,32 @@
+software: cpr
+version: "1.14.2"
+status: built
+build_date: "2026-07-15"
+build_system: cmake
+
+source:
+  url: "https://github.com/libcpr/cpr/archive/refs/tags/1.14.2.tar.gz"
+  sha256: ""
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCPR_USE_SYSTEM_CURL=ON"
+    - "-DCPR_ENABLE_SSL=OFF"
+    - "-DCPR_CURL_USE_LIBPSL=OFF"
+    - "-DCPR_BUILD_TESTS=OFF"
+  dependencies:
+    - curl/8.13.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "libcpr 使用 CMake 构建系统，需要 C++17 标准"
+  - "默认行为会通过 FetchContent 下载 curl 和 zlib-ng，但在无 GitHub 网络环境中不可用"
+  - "使用 CPR_USE_SYSTEM_CURL=ON 可复用预先构建的 curl 库"
+  - "OHOS sysroot 中 <linux/socket.h> 和 <sys/socket.h> 同时定义 sockaddr_storage，编译 curl 时需要定义 _UAPI_LINUX_SOCKET_H 并禁用 HAVE_LINUX_TCP_H"
+  - "SSL 支持需要预先构建 OpenSSL for OHOS，当前环境暂缺，编译时用 CPR_ENABLE_SSL=OFF 跳过"
