@@ -3,7 +3,7 @@
 
 import os
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, replace_in_file
 
 
 class HexeditConan(ConanFile):
@@ -21,15 +21,16 @@ class HexeditConan(ConanFile):
         self.folders.source = "."
         self.folders.build = "."
 
-    def export_sources(self):
-        export_conandata_patches(self)
-
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        apply_conandata_patches(self)
         p = os.environ.get("DEFAULT_PREFIX", "/storage/Users/currentUser/usr/local")
+        # Generate configure script from configure.ac
+        self.run("autoreconf -i", cwd=self.source_folder)
+        # Apply platform patches for HMDFS
+        replace_in_file(self, self.source_folder + "/configure", "cross_compiling=no", "cross_compiling=maybe")
+        replace_in_file(self, self.source_folder + "/configure", "umask 077", "umask 022")
         self.run(
             "bash ./configure --prefix=%s" % p
             + " HELP2MAN=/bin/true"
