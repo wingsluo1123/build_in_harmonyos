@@ -60,10 +60,11 @@ Usage: python3 ohc-run.py <command> [options]
 Commands: {' | '.join(sorted(_MODULES.keys()))}
 
 协作流程 (Git + GitCode PR):
+  promote <software> <version>      平台统一入口，推进到提交/PR/CI 流程
   submit <software> <version>       编译自检，不生成提交单
-  review <software> <version>        本地审核辅助，直接扫描目录
-  post-merge <software> <version>    PR 合并后重建索引与知识库
-  feedback <software> <version>      SKILL_FEEDBACK 流程终态反馈报告
+  review <software> <version>       本地审核辅助，直接扫描目录
+  post-merge <software> <version>   PR 合并后重建索引与知识库
+  feedback <software> <version>     SKILL_FEEDBACK 流程终态反馈报告
 
 Run 'python3 ohc-run.py <command> --help' for details.""")
 

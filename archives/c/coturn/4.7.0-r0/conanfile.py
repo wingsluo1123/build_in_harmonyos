@@ -46,10 +46,10 @@ class CoturnConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        tmpdir = os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")
-        self.run(f'mkdir -p "{tmpdir}"')
+        tmpdir = os.path.join(os.environ.get("HOME", "/storage/Users/currentUser"), ".ci_logs", "coturn-tmp")
+        self.run(f'mkdir -p "{tmpdir}"', env="conanrun")
         self.run(
-            f'CONFIG_SHELL="${{CONFIG_SHELL:-/bin/sh}}" TMPDIR="{tmpdir}" '
+            f'TMPDIR="{tmpdir}" TMP="{tmpdir}" '
             f'./configure --prefix=/ --bindir=${{prefix}}/bin --sbindir=${{prefix}}/bin '
             f'--libdir=${{prefix}}/lib --includedir=${{prefix}}/include --oldincludedir=${{prefix}}/include '
             f'--disable-shared --enable-static',

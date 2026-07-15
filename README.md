@@ -138,6 +138,13 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 python3 $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|failed
 ```
 
+### 平台统一入口
+
+```bash
+python3 $SKILL_ROOT/scripts/ohc-run.py promote <软件名> <版本>
+# → submit 的平台级别别名，适合外部系统/CI 调用
+```
+
 ### 依赖管理
 
 ```bash

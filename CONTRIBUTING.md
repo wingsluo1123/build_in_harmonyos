@@ -61,6 +61,13 @@ python3 $SKILL_ROOT/scripts/ohc-run.py build <软件名> <版本>
 # → 13 步全自动（含 Conan 配方生成+验证+收尾）
 ```
 
+### 平台统一入口
+
+```bash
+python3 $SKILL_ROOT/scripts/ohc-run.py promote <软件名> <版本>
+# → submit 的平台级别别名，适合外部系统/CI 调用
+```
+
 ### Conan 配方检查清单
 
 `conan-init` 后 AI 必须检查：
