@@ -1,10 +1,24 @@
 version: "0.9.35"
-status: built
-build_date: "2026-04-27"
+software: "lmdb"
+status: published
+build_date: "2026-07-15"
+build_system: makefile
 
 source:
   url: "https://api.github.com/repos/LMDB/lmdb/tarball/refs/tags/LMDB_0.9.35"
+  sha256: "8d4b1584e7b6d4adaa983ac3f93215a67485e8fec04a32598508995d49f6a41d"
   tar_format: tar.gz
 
 build:
   system: makefile
+  configure_options:
+    - "XCFLAGS=-DMDB_USE_ROBUST=0"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "OpenHarmony musl libc lacks robust mutex support (pthread_mutexattr_setrobust, pthread_mutex_consistent)"
+  - "MDB_USE_ROBUST=0 disables robust mutex, required for HarmonyOS compatibility"
