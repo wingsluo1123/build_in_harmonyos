@@ -1,0 +1,28 @@
+version: "1.0.20260223"
+software: "wireguard-tools"
+status: published
+build_date: "2026-07-15"
+build_system: makefile
+
+source:
+  url: "https://git.zx2c4.com/wireguard-tools/snapshot/wireguard-tools-1.0.20260223.tar.xz"
+  sha256: "af459827b80bfd31b83b08077f4b5843acb7d18ad9a33a2ef532d3090f291fbf"
+  tar_format: tar.xz
+
+build:
+  system: makefile
+  configure_options:
+    - "PLATFORM=linux"
+    - "WITH_WGQUICK=yes"
+    - "WITH_BASHCOMPLETION=no"
+    - "WITH_SYSTEMDUNITS=no"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "OHOS sys/socket.h 用 #ifndef __MUSL__ 保护 sockaddr_storage，linux/socket.h 无保护，需定义 _UAPI_LINUX_SOCKET_H 跳过"
+  - "Makefile 的 PLATFORM 通过 uname 检测为 harmonyos，uapi/harmonyos 目录不存在，需创建符号链接或传 PLATFORM=linux"
+  - "AutotoolsToolchain 的 extra_cflags 可用于添加 -include ohos_compat.h，Makefile 的 CFLAGS ?= 会拾取环境变量"

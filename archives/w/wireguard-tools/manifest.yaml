@@ -1,0 +1,23 @@
+software: wireguard-tools
+display: "wireguard-tools"
+description: "WireGuard userspace tools — wg and wg-quick"
+category: network
+homepage: "https://www.wireguard.com/"
+license: GPL-2.0
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "sockaddr_storage 重复定义: sys/socket.h 与 linux/socket.h 冲突，通过生成 ohos_compat.h 定义 _UAPI_LINUX_SOCKET_H 跳过"
+    - "uapi/harmonyos 目录不存在: 创建 uapi/harmonyos -> uapi/linux 符号链接，使 Makefile 找到 wireguard.h"
+    - "PLATFORM 检测: uname 返回 harmonyos 而非 linux，需传 PLATFORM=linux 给 make"
+    - "无 configure 脚本，纯 Makefile 构建，不属于 autotools 项目"
+    - "wg-quick 为 bash 脚本，需设置 WITH_WGQUICK=yes 显式安装"
+  common_dependencies: []
+
+versions:
+  "1.0.20260223":
+    status: published
+    build_date: "2026-07-15"
+    conan_ref: "wireguard-tools/1.0.20260223"
+    sha256: "af459827b80bfd31b83b08077f4b5843acb7d18ad9a33a2ef532d3090f291fbf"

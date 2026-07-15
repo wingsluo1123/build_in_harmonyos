@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: wireguard-tools/1.0.20260223
+homepage: "https://www.wireguard.com/"
+
+# 上游测试命令
+# wireguard-tools 的 check 目标使用 scan-build (Clang 静态分析)，非标准测试
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "运行 wg --help 验证二进制可执行且显示使用说明"
+    command: "wg --help"
+  - file: conanfile.py
+    description: "运行 wg genkey 验证 curve25519 加密核心功能正常"
+    command: "wg genkey"
+
+# 测试断言总数
+assertion_count: 2
