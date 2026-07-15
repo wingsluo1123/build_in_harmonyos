@@ -18,7 +18,7 @@ astroterm 依赖以下库：
 - `ncurses` (>= 6.0) — 终端 UI
 - `math` — 标准 C 数学库（libc 的一部分）
 
-Conan 配方中声明了 `argtable3/3.3.1` 和 `ncurses/6.5` 依赖。如果制品仓中不存在这些 Conan 包，则需要在构建环境中预先安装（例如通过系统包管理器或手动编译静态库）。
+Conan 配方将 argtable3 和 ncurses 声明为 system_libs（不通过 Conan 依赖解析），构建环境中必须已安装这两个库的开发包。
 
 ### 2. 构建步骤
 
@@ -28,7 +28,7 @@ conan create . --profile:host <OHOS-profile> --profile:build <native-profile>
 
 Meson 构建流程：
 1. `source()`: 下载 `v1.0.9.tar.gz`
-2. `generate()`: 生成 MesonToolchain 和 pkg-config 文件
+2. `generate()`: 生成 MesonToolchain（注入 ar/ranlib 路径）
 3. `build()`: 应用补丁，执行 `meson setup` + `meson compile`
 4. `package()`: `meson install`，并清理 `.so`/`.la` 文件（R26）
 
@@ -48,7 +48,7 @@ astroterm 是终端工具，通过 `MesonToolchain` 默认关闭共享库构建�
 
 ### 5. 已知问题与待办
 
-- **缺少 Conan 制品**: argtable3 与 ncurses 在当前制品仓中可能缺少完整的 Conan 配方。若 CI 构建失败，需确认这两个依赖是否已发布到制品仓，或是否在 CI worker 上预装了系统开发包。
+- **系统依赖**: argtable3 与 ncurses 作为系统库使用，CI worker 上需预装开发包。
 - **ncurses 宽字符**: 确保 ncurses 启用了 wide-char 支持（`ncursesw`），否则中文字符或特殊符号可能显示异常。
 - **上游测试缺失**: astroterm 上游未提供自动化单元测试，test_package 仅做二进制烟雾测试（`--version` / `--help`）。
 
