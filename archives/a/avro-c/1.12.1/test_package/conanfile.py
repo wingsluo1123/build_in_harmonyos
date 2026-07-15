@@ -26,5 +26,4 @@ class AvroCTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        self.run(os.path.join(self.test_build_folder, "test_avro"), env="conanrun")
