@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/a/aamath/0.3/test_package/conanrunenv-release-armv8.sh"
