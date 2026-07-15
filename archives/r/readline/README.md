@@ -238,7 +238,7 @@ export LD_LIBRARY_PATH=$HOME/usr/local/lib:$LD_LIBRARY_PATH
 重新编译 readline，确保设置 `CFLAGS="-fPIC -O2"`：
 
 ```bash
-cd readline-8.3
+cd readline-8.2
 make clean
 CFLAGS="-fPIC -O2" ./configure --prefix=$HOME/usr/local --with-curses
 make -j$(nproc)

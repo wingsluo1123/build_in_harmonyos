@@ -1,56 +1,35 @@
-# ncurses 6.4 编译档案
+version: "6.4"
 software: ncurses
-version: 6.4
-status: partial
+status: built
+build_date: "2026-07-15"
 build_system: autotools
-compile_date: 2026-04-12
 
-dependencies:
-  required: []
-  optional: []
+source:
+  url: "https://ftp.gnu.org/gnu/ncurses/ncurses-6.4.tar.gz"
+  sha256: "6931283d9ac87c5073f30b6290c4c75f21632bb4fc3603ac8100812bed248159"
+  tar_format: tar.gz
 
-build_config:
-  target: aarch64-unknown-linux-ohos
+build:
+  system: autotools
   configure_options:
-    - --prefix=$TEST_PREFIX
-    - --without-shared
-    - --without-debug
-    - --without-ada
-    - --without-manpages
-    - --without-tests
-    - --without-cxx-binding
-    - --enable-widec
-    - --enable-overwrite
-  cflags: "-fPIC -O2"
-  env:
-    CC: clang
+    - "--without-shared"
+    - "--enable-static"
+    - "--without-debug"
+    - "--without-ada"
+    - "--without-manpages"
+    - "--without-tests"
+    - "--without-cxx-binding"
+    - "--enable-widec"
+    - "--enable-overwrite"
+  dependencies: []
+  cc: clang
+  cxx: clang++
 
 patches_applied:
-  - file: 0001-port-for-ohos.patch
-    purpose: config.guess + config.sub 添加 HarmonyOS 检测
-
-compatibility:
-  level: high
-  issues: []
-  notes: |
-    - 🔴 必须使用 --without-shared 静态编译
-    - 系统zsh依赖libncursesw.so.6，共享库会导致Shell崩溃
-    - --enable-widec 宽字符支持（readline/bash需要）
-    - --enable-overwrite 头文件安装到顶层
-    - 4个静态库：libncursesw.a libpanelw.a libmenuw.a libformw.a
-    - 2851个terminfo条目
-    - 11个工具：clear tput tic infocmp toe captoinfo infotocap reset tabs tset ncursesw6-config
-
-test_results:
-  type: manual
-  passed: 3
-  failed: 0
-  note: "tput cols/colors/tic功能验证通过，零共享库确认安全"
+  - "0001-port-for-ohos.patch"
 
 knowledge_gained:
-  - "ncurses 必须静态编译（--without-shared），否则LD_LIBRARY_PATH会劫持系统libncursesw.so.6导致zsh崩溃"
-  - "--enable-widec 编译libncursesw（宽字符版本），readline依赖它"
-  - "--enable-overwrite 让头文件安装到顶层include/而非include/ncursesw/"
-
-references:
-  - https://invisible-island.net/ncurses/
+  - "ncurses MUST be static (--without-shared): shared lib hijacks system libncursesw.so.6 causing zsh crash"
+  - "--enable-widec builds libncursesw (wide character version), readline/bash need it"
+  - "--enable-overwrite installs headers to top-level include/ not include/ncursesw/"
+  - "-fPIC required for static lib to be linkable into shared libs on OHOS"
