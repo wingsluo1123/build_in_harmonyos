@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/opt/ai-worker/repo/archives/m/mkinitfs/3.4.5/test_package/conanbuildenv-armv8.sh"
