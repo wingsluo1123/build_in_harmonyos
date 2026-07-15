@@ -42,7 +42,7 @@ class CdkConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def requirements(self):
-        self.requires("ncurses/6.4")
+        self.requires("ncurses/6.5")
 
     def layout(self):
         basic_layout(self)
