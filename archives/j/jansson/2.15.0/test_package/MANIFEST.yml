@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jansson/2.15.0
+homepage: "https://github.com/akheron/jansson"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/contexts
+    source: jansson-2.15.0/test/contexts
+    description: "JSON encode/decode context tests"
+    command: "./contexts"
+  - file: test/suites/api
+    source: jansson-2.15.0/test/suites/api
+    description: "API function tests"
+    command: "json_dump_callback"
+  - file: test/suites/valid
+    source: jansson-2.15.0/test/suites/valid
+    description: "Valid JSON parsing tests"
+    command: "json_load_file"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 创建JSON对象, 序列化, 反序列化, 验证值"
+    command: "./test_jansson"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
