@@ -446,6 +446,52 @@ def cmd_resolve_comment(args):
     return result
 
 
+def cmd_handle_review_opinion(args):
+    """处理单条检视意见：回复 + （接纳时）标记已解决。
+
+    封装检视意见处理流程，确保规则一致性：
+    - accept: 回复"已修复: {reason}" + 标记已解决
+    - reject: 回复"不接纳: {reason}。请审核人员评估..."（不标记已解决）
+
+    AI 只需传入 action 和 reason，脚本保证流程正确。
+    """
+    if args.action == "accept":
+        reply_body = f"✅ 已修复: {args.reason}"
+    else:
+        reply_body = (f"❌ 不接纳: {args.reason}\n\n"
+                       "请审核人员评估是否无需解决，"
+                       "如无需解决，由审核人员标记已解决。")
+
+    # Step 1: 回复评论
+    reply_data = {"body": reply_body, "in_reply_to": args.discussion_id}
+    reply_path = f"/repos/{args.repo}/pulls/{args.number}/comments"
+    reply_result = api_request("POST", reply_path, body=reply_data)
+
+    print(f"✅ 已回复检视意见 ({args.action})")
+    print(f"   discussion_id: {args.discussion_id}")
+    print(f"   回复内容: {reply_body[:100]}")
+
+    # Step 2: 标记已解决（仅接纳时）
+    if args.action == "accept":
+        resolve_data = {"resolved": True}
+        resolve_path = f"/repos/{args.repo}/pulls/{args.number}/comments/{args.discussion_id}"
+        resolve_result = api_request("PUT", resolve_path, body=resolve_data)
+        print(f"✅ 已标记为已解决")
+    else:
+        print(f"⏸️  未标记已解决（拒绝意见，留待审核人员评估）")
+
+    if args.json:
+        output = {
+            "action": args.action,
+            "discussion_id": args.discussion_id,
+            "reply_body": reply_body,
+            "resolved": args.action == "accept",
+        }
+        print("\n--- JSON ---")
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+    return {"action": args.action, "resolved": args.action == "accept"}
+
+
 def cmd_update_pr(args):
     """更新 PR 信息（标题/描述/状态）。"""
     body = {}
@@ -845,6 +891,16 @@ def main():
     p.add_argument("--discussion-id", required=True, help="讨论 ID")
     p.add_argument("--unresolved", action="store_true", help="标记为未解决 (默认标记为已解决)")
     p.set_defaults(func=cmd_resolve_comment)
+
+    # handle-review-opinion
+    p = sub.add_parser("handle-review-opinion", help="处理单条检视意见 (回复+标记已解决)")
+    p.add_argument("--repo", required=True)
+    p.add_argument("--number", type=int, required=True)
+    p.add_argument("--discussion-id", required=True, help="检视意见讨论 ID")
+    p.add_argument("--action", required=True, choices=["accept", "reject"],
+                   help="accept=接纳并修复(回复+标记已解决), reject=拒绝(仅回复)")
+    p.add_argument("--reason", required=True, help="修复说明或拒绝原因")
+    p.set_defaults(func=cmd_handle_review_opinion)
 
     # update-pr
     p = sub.add_parser("update-pr", help="更新 PR 信息")
