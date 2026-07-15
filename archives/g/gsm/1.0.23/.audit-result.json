@@ -1,0 +1,110 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-R5",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 37,
+      "description": "Template placeholder residue: 'url = \"\"  # CI fills this' — explicitly prohibited by code style rule R5 (禁止残留模板占位符). The url field should be filled by the adapter, not left empty for CI.",
+      "fix_suggestion": "Set url to the recipe repository URL (e.g. url = \"https://cnb.cool/your-org/opendesk-packages\") or remove the 'CI fills this' comment."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R1",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 2,
+      "description": "Docstring still contains SCAFFOLD/template markers: 'Conan recipe template — Makefile projects (SCAFFOLD, AI must adjust)' and 'AI MUST review and adjust every method below before use'. Code style R1 requires docstring to state software name and build system (e.g. 'Conan recipe — gsm 1.0.23 (Makefile)'). This is also a R5 template placeholder residue.",
+      "fix_suggestion": "Replace the entire template docstring with: \"\"\"Conan recipe — gsm 1.0.23 (Makefile)\"\"\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R14",
+      "file": "archives/g/gsm/1.0.23/manifest.yaml",
+      "line": 1,
+      "description": "Missing 'name' field — code style R14 requires manifest.yaml to have name, version, build_system, and status as top-level fields. The 'name' field is absent.",
+      "fix_suggestion": "Add 'name: gsm' as the first field in manifest.yaml."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R14",
+      "file": "archives/g/gsm/1.0.23/manifest.yaml",
+      "line": 10,
+      "description": "build_system is nested as 'build.system: makefile' instead of a top-level 'build_system: makefile' field as required by code style R14 format. The standard format uses a flat 'build_system' key, not a nested 'build:' object.",
+      "fix_suggestion": "Use top-level 'build_system: makefile' instead of nested 'build: system: makefile'. Other build details (cc, configure_options) can remain nested if the project uses an extended manifest format."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R5",
+      "file": "archives/g/gsm/1.0.23/test_package/conanfile.py",
+      "line": 7,
+      "description": "Docstring contains unreplaced template placeholders: '{letter}' and '{version}' in 'File location: archives/{letter}/gsm/{version}/test_package/conanfile.py'. These are template variables that should have been replaced with actual values.",
+      "fix_suggestion": "Replace with actual values: 'File location: archives/g/gsm/1.0.23/test_package/conanfile.py' or remove the path line entirely."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R5",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 60,
+      "description": "Build command 'make CC=clang -j1' omits CCFLAGS and LN parameters that are documented in notes.md and manifest.yaml. The in-code comment says the patch handles them, but the documentation is inconsistent — notes.md step 3 shows 'make CC=clang CCFLAGS=... LN=...' as the build command.",
+      "fix_suggestion": "Either update notes.md/manifest.yaml to note that the patch sets CCFLAGS and LN values (so only 'make -j1' is needed), or pass all parameters explicitly in the conanfile.py build command for consistency."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R4",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 77,
+      "description": "package_info() does not set cpp_info.bindirs despite the package() method copying tools (toast, tcat, untoast) to the bin/ directory. While package_type is 'library' (not strictly requiring bindirs), consumers cannot discover the tools without it.",
+      "fix_suggestion": "Add 'self.cpp_info.bindirs = [\"bin\"]' to package_info() so consumers can locate the command-line tools."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R5",
+      "file": "archives/g/gsm/1.0.23/notes.md",
+      "line": 5,
+      "description": "Date inconsistency: notes.md states '编译日期: 2026-04-24' but the same file's footer says '编译结束: 2026-07-15 21:27' and manifest.yaml has 'build_date: 2026-07-15'. The build date appears to be stale.",
+      "fix_suggestion": "Update '编译日期' to '2026-07-15' to match the actual build date."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R16",
+      "file": "archives/g/gsm/1.0.23/test_package/conanfile.py",
+      "line": 9,
+      "description": "Unused import: 'import os' is only referenced in a commented-out line (line 31: '# self.run(f\"{os.path.join(...)}\")'), not in any active code path.",
+      "fix_suggestion": "Remove 'import os' since it is not used by any active code, or uncomment the alternative test execution line if intended."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R11",
+      "file": "archives/g/gsm/1.0.23/test_package/MANIFEST.yml",
+      "line": 29,
+      "description": "assertion_count is 3, but test.c contains 4 explicit assertions: (1) gsm_create() for encoder succeeds, (2) gsm_create() for decoder succeeds, (3) gsm_decode() returns 0, (4) decoded max amplitude <= 100.",
+      "fix_suggestion": "Update assertion_count from 3 to 4 to match the actual number of assertions in test.c."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R11",
+      "file": "archives/g/gsm/1.0.23/test_package/test.c",
+      "line": 2,
+      "description": "Unused include: '#include <string.h>' — no string functions (strlen, memcpy, strcmp, etc.) are called in the test. The test uses fprintf (requires stdio.h) and gsm API (requires gsm.h) only.",
+      "fix_suggestion": "Remove the unused '#include <string.h>' line."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RM-R33",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 60,
+      "description": "Build uses hardcoded 'CC=clang' passed as a make variable override instead of obtaining the compiler from Conan configuration. The conanfile.py docstring itself recommends: self.conf.get('tools.build:compiler_executables:c', 'clang'). While not a bare environment variable (not a P1), hardcoding limits flexibility.",
+      "fix_suggestion": "Consider using: cc = self.conf.get('tools.build:compiler_executables:c', 'clang'); self.run(f'make CC={cc} -j1', cwd=self.source_folder)"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R5",
+      "file": "archives/g/gsm/1.0.23/conanfile.py",
+      "line": 78,
+      "description": "Template comment residue: '# ⚠️ AI: Set the correct library name (e.g. \"z\" not \"zlib\" for zlib)' in package_info() — this is a scaffold instruction comment that was not cleaned up after the library name was set correctly.",
+      "fix_suggestion": "Remove the template comment '# ⚠️ AI: Set the correct library name...' since the library name 'gsm' is correct."
+    }
+  ],
+  "summary": "Audit of gsm 1.0.23 (branch feat/gsm-1.0.23, 9 changed files, 234 insertions). VERDICT: PASS (with warnings). No P0 (deception) or P1 (recipe correctness) issues found. Deception checks all pass: test.c calls real gsm API (gsm_create/gsm_encode/gsm_decode/gsm_destroy) with 4 assertions — not an empty shell test (R34); cmake.test() is invoked — test not skipped (R9); sha256 is a valid 64-char hex string — not faked; manifest status 'built' is truthful per notes.md; source URL https://www.quut.com/gsm/ is the official gsm homepage (R39); no pre-compiled binaries in PR (R19); R40 deep-adaptation check: gsm is a pure software codec, patch handles build-system settings (CC/fPIC/symlinks), test covers encode/decode roundtrip — adaptation appears complete. Recipe correctness checks pass: version 1.0.23 uses upstream version for first adaptation (R37); no OHOS-incompatible platform checks (R32); no bare environment variables (R33); commands.json present for tool-producing package (R38). 5 P2 code-style issues: template placeholder residue in conanfile.py (url='' and SCAFFOLD docstring) and test_package/conanfile.py ({letter}/{version} placeholders); manifest.yaml missing 'name' field and non-standard build_system nesting. 8 P3 suggestions for documentation consistency, unused imports/includes, assertion count mismatch, and minor improvements. All P2/P3 issues are non-blocking — recommend fixing before merge but do not block."
+}
