@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/f/farbfeld/4.0.0/test_package/conanbuildenv-release-armv8.sh"

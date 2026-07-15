@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R34",
+      "file": "archives/f/farbfeld/4.0.0/test_package/conanfile.py",
+      "line": 38,
+      "description": "Test coverage gap: only ff2ppm and ff2pam (tools without external dependencies) are tested. The libpng-dependent tools (png2ff, ff2png) and libjpeg-dependent tools (jpg2ff, ff2jpg) are not exercised by the test_package. While the tested tools provide genuine verification of the farbfeld format conversion, the dependency integration (libpng/libjpeg linking) is not validated by tests.",
+      "fix_suggestion": "Add a test case that uses png2ff or ff2png to verify libpng integration, e.g. generate a small PNG and convert it to farbfeld, or convert the farbfeld image to PNG and verify the PNG header. Similarly, optionally test jpg2ff/ff2jpg for libjpeg integration."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_2",
+      "file": "archives/f/farbfeld/4.0.0/conanfile.py",
+      "line": 18,
+      "description": "The 'url' class attribute is set to the source tarball download URL (https://dl.suckless.org/farbfeld/farbfeld-4.tar.gz) instead of the recipe hosting URL. In Conan 2.x, 'url' should point to where the conanfile.py recipe is hosted (e.g., a git repository URL), not the upstream source download. The source URL is already correctly specified in conandata.yml.",
+      "fix_suggestion": "Set the 'url' attribute to the recipe repository URL, or remove it entirely if no specific recipe hosting URL applies. The source download URL belongs only in conandata.yml."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_11",
+      "file": "archives/f/farbfeld/4.0.0/test_package/CMakeLists.txt",
+      "line": 1,
+      "description": "CMakeLists.txt and test.c in test_package appear to be dead code. The test_package conanfile.py uses 'generators = \"VirtualRunEnv\"' (not CMake) and generates the farbfeld test image in Python via struct.pack, then runs the installed ff2ppm/ff2pam binaries. The CMakeLists.txt builds a test_farbfeld executable from test.c that is never invoked by the test() method.",
+      "fix_suggestion": "Either remove CMakeLists.txt and test.c since they are unused, or refactor the test to use the CMake-built helper (test_farbfeld) to generate the farbfeld input image instead of generating it in Python."
+    }
+  ],
+  "summary": "Audit PASS for farbfeld 4.0.0. Previous P1 issue (hardcoded paths in archives/f/farbfeld/4/patches/0001-config.mk.patch) has been RESOLVED — the patch file was deleted and no patches are needed (all build config passed via make arguments). No P0 deception issues found: (1) sha256 verified by downloading the actual tarball from dl.suckless.org — hash c7df5921edd121ca5d5b1cf6fb01e430aff9b31242262e4f690d3af72ccbe72a matches exactly; (2) test_package is NOT a stub — it runs installed ff2ppm and ff2pam binaries and verifies output with 8 assertions (PPM P6 header, dimensions, maxval, pixel data; PAM P7 header, WIDTH, HEIGHT, DEPTH); (3) manifest status='built' is consistent with notes.md verification results. No P1 issues: R33 satisfied (compiler from self.conf.get, no os.environ), R39 satisfied (official suckless source URL https://dl.suckless.org/farbfeld/farbfeld-4.tar.gz), R38 satisfied (commands.json present at software level with type='tool'), no hardcoded paths anywhere. 3 non-blocking warnings (P2/P3): test coverage gap (only non-dependency tools tested), conanfile.py url attribute semantics, and unused CMakeLists.txt/test.c in test_package."
+}
