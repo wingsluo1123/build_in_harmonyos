@@ -39,6 +39,23 @@ class CdoConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _resolve_shell(self):
+        for candidate in [
+            os.environ.get("CONFIG_SHELL"),
+            os.environ.get("SHELL"),
+            shutil.which("bash"),
+            shutil.which("sh"),
+            "/system/bin/sh",
+            "/bin/sh",
+        ]:
+            if candidate and os.path.isabs(candidate) and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+            if candidate and not os.path.isabs(candidate):
+                resolved = shutil.which(candidate)
+                if resolved:
+                    return resolved
+        return "/bin/sh"
+
     def generate(self):
         tc = AutotoolsToolchain(self)
         # R26: Static build for system-name libraries
@@ -51,16 +68,29 @@ class CdoConan(ConanFile):
         tc.generate()
 
         env = Environment()
-        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
-        env.define("CONFIG_SHELL", bash)
+        shell_path = self._resolve_shell()
+        env.define("CONFIG_SHELL", shell_path)
+        env.define("SHELL", shell_path)
         env.vars(self).save_script("ohos_env")
 
     def build(self):
+        shell_path = self._resolve_shell()
+        conanbuild_sh = os.path.join(self.generators_folder, "conanbuild.sh")
+        if os.path.exists(conanbuild_sh):
+            with open(conanbuild_sh, "r", encoding="utf-8") as f:
+                content = f.read()
+            fix = (
+                "\n# Override invalid CONFIG_SHELL/SHELL from Conan profile\n"
+                f'export CONFIG_SHELL="{shell_path}"\n'
+                f'export SHELL="{shell_path}"\n'
+            )
+            if fix not in content:
+                with open(conanbuild_sh, "w", encoding="utf-8") as f:
+                    f.write(content + fix)
         # E007: Patch config.guess/config.sub for HarmonyOS via helper script
         script = os.path.join(self.export_sources_folder, "patches", "patch-ohos.sh")
         if os.path.exists(script):
-            bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
-            self.run(f'"{bash}" "{script}" "{self.source_folder}"', env="conanbuild")
+            self.run(f'"{shell_path}" "{script}" "{self.source_folder}"', env="conanbuild")
         # Build with autotools
         autotools = Autotools(self)
         autotools.configure()
