@@ -1,0 +1,64 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.0"
+software: "libbcrypt"
+status: built
+build_date: "2026-07-15"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/rg3/libbcrypt/archive/refs/heads/master.tar.gz"
+  sha256: "0bc7b63303aa741ea5f48a4e4079822f3c862e8fc92588c9a6def48935f3d32b"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-crypt_blowfish-Makefile.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "x86 assembly (x86.S) not compatible with ARM64; removed from BLOWFISH_OBJS"
+  - "CC ?= gcc allows Conan toolchain to override compiler"
+  - "Library renamed to libbcrypt.a in package() for find_library compatibility on HarmonyOS"
+
+patch_generation:
+  method: per-file-difflib
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: portability
+    platform_only: True
+    guard: 'CC ?= gcc'
+  - file: 0002-crypt_blowfish-Makefile.patch
+    type: portability
+    platform_only: True
+    guard: 'ARM64 non-x86'

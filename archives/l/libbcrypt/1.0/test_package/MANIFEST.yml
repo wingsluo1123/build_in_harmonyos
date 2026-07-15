@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libbcrypt/1.0
+homepage: "https://github.com/rg3/libbcrypt"
+
+# 上游测试命令
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: bcrypt.c
+    source: libbcrypt-1.0/bcrypt.c
+    description: "bcrypt library self-test (TEST_BCRYPT mode): generates salt, hashes password, verifies with bcrypt_checkpw"
+    command: "./bcrypt_test"
+  - file: crypt_blowfish/crypt_test.c
+    source: libbcrypt-1.0/crypt_blowfish/wrapper.c
+    description: "crypt_blowfish test suite: validates bcrypt/crypt implementation against known test vectors"
+    command: "./crypt_blowfish/crypt_test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 生成 salt, hash 密码, 验证正确/错误密码"
+    command: "./test_libbcrypt"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
