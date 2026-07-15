@@ -1,6 +1,7 @@
 from conan import ConanFile
-from conan.tools.make import Make
+from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.files import get, copy
+from conan.tools.layout import basic_layout
 import os
 
 
@@ -15,15 +16,24 @@ class HydraConan(ConanFile):
     exports_sources = "patches/*"
 
     def layout(self):
-        pass
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        tc = AutotoolsToolchain(self)
+        tc.generate()
+
     def build(self):
-        make = Make(self)
-        make.make()
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make()
 
     def package(self):
-        copy(self, "*", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"),
-             keep_path=False)
+        autotools = Autotools(self)
+        autotools.install()
+
+    def package_info(self):
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]
