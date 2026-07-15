@@ -65,7 +65,7 @@
  * For reentrant code, we map the various global variables into SCREEN by
  * using functions to access them.
  */
-#define NCURSES_PUBLIC_VAR(name) @NCURSES_WRAP_PREFIX@##name
+#define NCURSES_PUBLIC_VAR(name) name
 
 #if defined(BUILDING_NCURSES)
 # define NCURSES_IMPEXP NCURSES_EXPORT_GENERAL_EXPORT

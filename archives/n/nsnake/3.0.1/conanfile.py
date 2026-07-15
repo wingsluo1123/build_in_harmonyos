@@ -47,7 +47,7 @@ class NsnakeConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
         # Copy bundled ncurses headers/lib from the export folder into the
         # source folder so build() can reach them.
-        export_dir = os.path.join(os.path.dirname(self.source_folder), "e")
+        export_dir = self.export_folder
         res_src = os.path.join(export_dir, "res")
         if os.path.isdir(res_src):
             res_dst = os.path.join(self.source_folder, "res")
@@ -65,7 +65,6 @@ class NsnakeConan(ConanFile):
         cxx = ce.get("cpp", "clang++")
 
         src = self.source_folder
-        out = self.build_folder
 
         # Bundled ncurses (CI workers lack dev headers). Create a symlink
         # ncurses.h -> curses.h since nsnake uses <ncurses.h>.
@@ -93,7 +92,7 @@ class NsnakeConan(ConanFile):
             f"make -C {src} -j1 V=1 CC={cc} CXX={cxx} "
             f"CXXFLAGS='{cxxflags}' "
             f"CFLAGS_PLATFORM='-I{bundled_inc}' "
-            f"LDFLAGS_PLATFORM='-L{bundled_lib} -lncurses' "
+            f"LDFLAGS_PLATFORM='{ldflags}' "
             f"PREFIX=/usr"
         )
 
