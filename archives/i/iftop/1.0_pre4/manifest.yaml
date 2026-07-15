@@ -1,0 +1,84 @@
+software: iftop
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0_pre4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0_pre4"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期 (YYYY-MM-DD)
+build_date: "2026-07-15"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL (官方 ex-parrot 发布包)
+  # 注: GitHub 镜像 sqs/iftop 不存在 (404), 使用官方源
+  url: "https://www.ex-parrot.com/pdw/iftop/download/iftop-1.0pre4.tar.gz"
+
+  # 源码校验和 (留空, 后续填充)
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+  build_system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+  # 例如:
+  # - "--prefix=/storage/Users/currentUser/usr/local"
+
+  # 编译依赖列表 (格式: name/version)
+  dependencies:
+    - "libpcap/1.10.6"
+    - "ncurses/6.5"
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+# 本 Conan 配方为基础配方 (无内嵌补丁); OHOS 适配补丁见 1.0_pre4-r0/patches/
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "iftop 为终端可执行工具, package_info.cpp_info.libs=[] (无可链接库)"
+  - "OHOS 平台 config_options 删除 shared (强制静态可执行)"
+  - "依赖 libpcap (cmake 配方 1.10.6) 与 ncurses (6.5)"
+  - "OHOS 适配需 config.guess/config.sub 识别 linux-ohos, 详见 1.0_pre4-r0/"
+  - "pthread_cancel 在 musl/OHOS 不可用, 需改用标志位+pthread_join (见 1.0_pre4-r0/)"
