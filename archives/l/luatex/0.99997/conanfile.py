@@ -44,6 +44,10 @@ class LuatexConan(ConanFile):
         tc.extra_ldflags.append("-static")
         # OHOS not recognized by config.guess; bypass with explicit triplet
         tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        tc.configure_args.append("--without-x")  # OHOS has no X11
+        tc.configure_args.append("--disable-all-pkgs")
+        tc.configure_args.append("--enable-web2c")
+        tc.configure_args.append("--disable-xetex")  # xetex needs fontconfig
         # Use bundled versions for dependencies not yet in the registry
         tc.configure_args.append("--without-system-lua")
         tc.configure_args.append("--without-system-gmp")
