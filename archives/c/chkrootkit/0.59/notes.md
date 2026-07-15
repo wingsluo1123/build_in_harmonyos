@@ -111,3 +111,7 @@ chkrootkit -V → chkrootkit version 0.59  ✅
 
 **编译结束**: 2026-06-02
 **最终状态**: published
+---
+
+**编译结束**: 2026-07-15 15:20
+**最终状态**: built
