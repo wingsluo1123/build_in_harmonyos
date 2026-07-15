@@ -42,6 +42,8 @@ class LuatexConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # R26: Terminal tools must be statically linked
         tc.extra_ldflags.append("-static")
+        # OHOS not recognized by config.guess; bypass with explicit triplet
+        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
         # Use bundled versions for dependencies not yet in the registry
         tc.configure_args.append("--without-system-lua")
         tc.configure_args.append("--without-system-gmp")
@@ -50,6 +52,7 @@ class LuatexConan(ConanFile):
         tc.generate()
 
     def build(self):
+        os.umask(0o022)  # HMDFS: 077 prevents writing to 700 dirs
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
