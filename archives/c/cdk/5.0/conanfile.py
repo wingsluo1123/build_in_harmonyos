@@ -35,6 +35,8 @@ class CdkConan(ConanFile):
 
     def config_options(self):
 
+        pass
+
     def configure(self):
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
