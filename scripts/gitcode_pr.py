@@ -622,15 +622,20 @@ def cmd_get_review_comments(args):
 SUMMARY_GENERATING_MARKERS = ["正在生成合并请求摘要", "正在生成合并请求摘要，请稍候"]
 REVIEW_IN_PROGRESS_MARKERS = ["AI 代码检视正在进行中", "AI 代码检视正在进行中，请稍候"]
 SUMMARY_READY_MARKERS = ["变更摘要"]
+# CI 状态评论关键词（ohpcd-robot 等，非检视意见，不需要回复）
+CI_STATUS_MARKERS = ["CI 校验", "CI 构建", "CI 检验", "CI 自动", "CI流水线",
+                     "校验排队", "校验通过", "校验失败",
+                     "构建已启动", "构建成功", "构建失败"]
 
 
 def classify_comment(body: str) -> str:
-    """将 atomgit-bot 评论内容分类。
+    """将 bot 评论内容分类。
 
     Returns:
         "summary_generating" — 正在生成摘要
         "review_in_progress" — AI 检视进行中
         "summary_ready"      — 变更摘要已生成
+        "ci_status"          — CI 状态通知（非检视意见，不需要回复）
         "review_opinion"     — 检视意见（需处理）
         "unknown"            — 未知类型
     """
@@ -645,6 +650,10 @@ def classify_comment(body: str) -> str:
     for marker in SUMMARY_READY_MARKERS:
         if marker in body:
             return "summary_ready"
+    # CI 状态通知（非检视意见）
+    for marker in CI_STATUS_MARKERS:
+        if marker in body:
+            return "ci_status"
     return "review_opinion"
 
 

@@ -1217,7 +1217,9 @@ def _monitor_ci(gitcode_pr: str, repo: str, pr_number: int,
 #   → 超时无新意见 → 直接进入 CI 监控
 # Phase 4: AI 处理检视意见（HANDOFF）
 #   → ⚠️ 检视意见不一定正确，需严格判断合理性
-#   → 合理的修改并 push，不合理的回复说明原因
+#   → 每条意见必须回复（接纳: 修改+说明 / 拒绝: 说明原因）
+#   → 每条意见回复后用 resolve-comment 标记为已解决
+#   → CI 状态通知（ohpcd-robot）不是检视意见，不需要回复
 #   → 所有意见处理完毕后 --resume
 # Phase 5: AI Review 完成，进入 CI 监控
 
@@ -1327,7 +1329,7 @@ def _monitor_ai_review(gitcode_pr: str, repo: str, pr_number: int,
             _emit_submit_handoff(software, version, ver_dir, project_dir,
                 "ai_review_summary_timeout",
                 [f"变更摘要未在 {POLL_TIMEOUT//60} 分钟内生成，请稍后手动检查 PR #{pr_number}",
-                 f"检查: python3 scripts/gitcode_pr.py monitor-review --repo {repo} --number {pr_number} --json",
+                 f"检查: python3 scripts/gitcode_pr.py --json monitor-review --repo {repo} --number {pr_number}",
                  f"摘要出现后: python3 scripts/ohc-run.py submit {software} {version} --resume"],
                 resume_with_flag=True)
             return "timeout"
@@ -1464,22 +1466,36 @@ def _monitor_ai_review(gitcode_pr: str, repo: str, pr_number: int,
             _emit_submit_handoff(software, version, ver_dir, project_dir,
                 "ai_review_opinions",
                 [
-                    f"atomgit-bot 已发布 {len(opinions)} 条检视意见，请逐条评估：",
+                    f"atomgit-bot 已发布 {len(opinions)} 条检视意见，请逐条评估并处理：",
                     "",
                     "⚠️ 注意：检视意见不一定正确，需严格判断是否合理后再修改！",
                     "",
                     opinions_text,
-                    "操作步骤：",
-                    "1. 逐条阅读检视意见",
-                    "2. 评估每条意见是否合理",
-                    f"3. 合理的意见 → 修改代码并: git push origin {branch_name}",
-                    f"4. 不合理的意见 → 在 PR #{pr_number} 上回复说明原因",
-                    "5. 所有意见处理完毕后:",
-                    f"   python3 scripts/ohc-run.py submit {software} {version} --resume",
+                    "━━━ 处理要求 ━━━",
+                    "每条检视意见必须完成以下操作（缺一不可）：",
+                    "  a) 回复评论 — 接纳或拒绝，说明原因",
+                    "  b) 标记为已解决 — 无论接纳还是拒绝",
                     "",
-                    "回复检视评论命令:",
-                    f"   python3 scripts/gitcode_pr.py reply-comment --repo {repo} "
-                    f"--number {pr_number} --discussion-id <id> --body '回复内容'",
+                    "━━━ 操作命令 ━━━",
+                    "",
+                    "【接纳意见并修复】",
+                    f"  1. 修改代码并: git push origin {branch_name}",
+                    f"  2. 回复: python3 scripts/gitcode_pr.py reply-comment --repo {repo} "
+                    f"--number {pr_number} --discussion-id <id> --body '已修复: <修改说明>'",
+                    f"  3. 标记已解决: python3 scripts/gitcode_pr.py resolve-comment --repo {repo} "
+                    f"--number {pr_number} --discussion-id <id>",
+                    "",
+                    "【拒绝意见（不修改）】",
+                    f"  1. 回复: python3 scripts/gitcode_pr.py reply-comment --repo {repo} "
+                    f"--number {pr_number} --discussion-id <id> --body '不接纳: <拒绝原因>'",
+                    f"  2. 标记已解决: python3 scripts/gitcode_pr.py resolve-comment --repo {repo} "
+                    f"--number {pr_number} --discussion-id <id>",
+                    "",
+                    "━━━ 完成条件 ━━━",
+                    f"  所有 {len(opinions)} 条检视意见都已回复并标记为已解决后，继续:",
+                    f"  python3 scripts/ohc-run.py submit {software} {version} --resume",
+                    "",
+                    "⚠️ 非 CI 状态通知评论（如 ohpcd-robot 的 CI 排队/构建/失败）不需要回复和标记。",
                 ],
                 resume_with_flag=True)
             # Advance state to Phase 5 so resume proceeds to CI
