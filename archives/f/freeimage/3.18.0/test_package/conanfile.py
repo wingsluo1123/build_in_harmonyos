@@ -20,5 +20,6 @@ class FreeimageTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # R34: Run the test binary directly to verify FreeImage API
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_freeimage")
+        self.run(test_bin, env="conanrun")
