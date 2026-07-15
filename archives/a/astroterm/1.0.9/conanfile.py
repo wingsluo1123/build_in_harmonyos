@@ -5,15 +5,14 @@ astroterm is a terminal-based star map written in C, displaying real-time
 positions of stars, planets, and constellations. Upstream uses the Meson build
 system and depends on argtable3, ncurses, and the math library.
 
-R26: Terminal tools must be statically linked for DevBox deployment; we enforce
-BUILD_SHARED_LIBS=OFF via MesonToolchain defaults and avoid packaging .so files.
+R26: Terminal tools must be statically linked for DevBox deployment.
+R27: argtable3 and ncurses are system libraries (no Conan recipe in repo).
 """
 import os
 
 from conan import ConanFile
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
 from conan.errors import ConanInvalidConfiguration
 
@@ -41,11 +40,9 @@ class AstrotermConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # argtable3 and ncurses are required dependencies.
-        # If they are unavailable in the Conan remote they must be present in
-        # the build environment (system packages or manually compiled).
-        self.requires("argtable3/3.3.1")
-        self.requires("ncurses/6.5")
+        # R27: argtable3 and ncurses are system runtime libraries (no Conan recipe).
+        # They are assumed to be available in the build environment.
+        pass
 
     def layout(self):
         basic_layout(self)
@@ -55,9 +52,27 @@ class AstrotermConan(ConanFile):
 
     def generate(self):
         tc = MesonToolchain(self)
+        # Inject ar/ranlib paths (CI profile may not provide them)
+        ce = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        ar = ce.get("ar")
+        ranlib = ce.get("ranlib")
+        if not ar:
+            cc = ce.get("c") or ""
+            bindir = os.path.dirname(cc) if os.path.sep in cc else ""
+            if bindir:
+                cand = os.path.join(bindir, "llvm-ar")
+                if os.path.isfile(cand):
+                    ar = cand
+                    rlc = os.path.join(bindir, "llvm-ranlib")
+                    if os.path.isfile(rlc):
+                        ranlib = rlc
+        if ar:
+            tc.project_options["ar"] = ar
+        if ranlib:
+            tc.project_options["ranlib"] = ranlib
         tc.generate()
-        pkg = PkgConfigDeps(self)
-        pkg.generate()
 
     def build(self):
         apply_conandata_patches(self)
@@ -79,3 +94,5 @@ class AstrotermConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["astroterm"]
         self.cpp_info.bindirs = ["bin"]
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["m", "ncurses", "argtable3"]
