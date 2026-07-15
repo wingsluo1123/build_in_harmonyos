@@ -26,8 +26,8 @@ class HexeditConan(ConanFile):
 
     def build(self):
         p = os.environ.get("DEFAULT_PREFIX", "/storage/Users/currentUser/usr/local")
-        # Generate configure script from configure.ac
-        self.run("autoreconf -i", cwd=self.source_folder)
+        # Generate configure script from configure.ac (CI has autoconf but not automake)
+        self.run("autoconf", cwd=self.source_folder)
         # Apply platform patches for HMDFS
         replace_in_file(self, self.source_folder + "/configure", "cross_compiling=no", "cross_compiling=maybe")
         replace_in_file(self, self.source_folder + "/configure", "umask 077", "umask 022")
