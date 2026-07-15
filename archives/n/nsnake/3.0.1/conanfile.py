@@ -47,7 +47,7 @@ class NsnakeConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
         # Copy bundled ncurses headers/lib from the export folder into the
         # source folder so build() can reach them.
-        export_dir = os.path.join(os.path.dirname(self.source_folder), "e")
+        export_dir = getattr(self, "export_folder", None) or os.path.join(os.path.dirname(self.source_folder), "e")
         res_src = os.path.join(export_dir, "res")
         if os.path.isdir(res_src):
             res_dst = os.path.join(self.source_folder, "res")
