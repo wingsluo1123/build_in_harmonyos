@@ -33,7 +33,7 @@ conan install --requires=libwebp/1.6.0.1 -pr ohos-native
 ## 消费 B：裸程序（设备 ~/usr/local + dlopen）
 
 ```bash
-conan install --requires=libwebp/1.6.0 -pr ohos-native \
+conan install --requires=libwebp/1.6.0.1 -pr ohos-native \
     --deployer=usr_local --deployer-folder=$HOME/usr/local
 ```
 

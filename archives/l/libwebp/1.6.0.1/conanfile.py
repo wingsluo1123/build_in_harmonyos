@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — libwebp 1.6.0 (cmake)"""
+"""Conan recipe — libwebp 1.6.0.1 (cmake)"""
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import collect_libs, get
