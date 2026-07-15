@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/opt/ai-worker/repo/archives/s/stuntman/1.2.17/test_package/conanbuildenv-release-armv8.sh"
