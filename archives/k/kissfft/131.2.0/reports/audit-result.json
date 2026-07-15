@@ -1,0 +1,69 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule": "CS-1",
+      "file": "archives/k/kissfft/131.2.0/conanfile.py",
+      "description": "Missing shebang '#!/usr/bin/env python3'. CS-1 requires both shebang and docstring. The docstring was fixed (now includes build system 'Makefile'), but the shebang line is still absent.",
+      "blocking": false,
+      "recommendation": "Add '#!/usr/bin/env python3' as the first line of conanfile.py for full CS-1 compliance. Non-blocking — does not affect recipe functionality."
+    }
+  ],
+  "summary": "W4 Pre-PR Audit (Round 2) for kissfft 131.2.0 — PASS. All 5 previously identified issues have been correctly fixed: (1) R39 — conandata.yml now has single official GitHub URL with no mirror prefixes; (2) R33 — conanfile.py now has generators='VirtualBuildEnv' for proper toolchain setup; (3) P2 CS-5 — url field now contains actual URL 'https://cnb.cool/ohpcd/conan-recipes' instead of empty string; (4) P3 CS-1 — docstring now includes build system '(Makefile)'; (5) P3 CS-16 — unused 'import os' removed. P0 deception detection: all clear — test.c calls real kissfft API (kiss_fft_alloc, kiss_fft, kiss_fft_free) with forward+inverse FFT and reconstruction verification (R34 pass); no skipped tests (R9 pass); sha256 is valid 64-hex-char hash (not fake); status 'published' is consistent with conan-verify-report G2 PASS and test-report SUCCESS; no pre-compiled binaries in PR (R19 pass); no #ifdef __OHOS__ stubs (R8 pass); kissfft is pure math library, no deep adaptation needed (R40 pass). P1 recipe correctness: all clear — no hardcoded paths (uses self.source_folder/self.package_folder); platform compatibility OK (no Linux-only checks, make is platform-agnostic, CMakeLists uses if(UNIX)); R33 env var dependency resolved; R39 official GitHub URL; R37 first adaptation version; R26 not a system-named library; R38 library type, no commands.json needed; Conan 2.x API correct. One minor non-blocking P3 CS-1 issue: shebang line still missing from conanfile.py (docstring fix was done, shebang was not). Overall verdict: PASS — no P0 or P1 issues, all previous fixes verified correct, recipe is ready for PR.",
+  "fix_verification": {
+    "R39_mirror_urls": {
+      "status": "fixed",
+      "details": "conandata.yml has single official GitHub URL: https://github.com/mborgerding/kissfft/archive/refs/tags/131.2.0.tar.gz — no mirror URL prefixes."
+    },
+    "R33_virtual_build_env": {
+      "status": "fixed",
+      "details": "conanfile.py has 'generators = \"VirtualBuildEnv\"' class attribute for proper build environment setup from Conan profile."
+    },
+    "P2_CS5_empty_url": {
+      "status": "fixed",
+      "details": "conanfile.py url field is 'https://cnb.cool/ohpcd/conan-recipes' — actual URL, not empty string."
+    },
+    "P3_CS1_docstring_build_system": {
+      "status": "fixed",
+      "details": "conanfile.py docstring is '\"\"\"Conan recipe — kissfft 131.2.0 (Makefile)\"\"\"' — includes build system 'Makefile'."
+    },
+    "P3_CS16_unused_import_os": {
+      "status": "fixed",
+      "details": "conanfile.py imports are: from conan import ConanFile, from conan.tools.files import get/apply_conandata_patches/export_conandata_patches, from conan.tools.layout import basic_layout — no 'import os'."
+    }
+  },
+  "p0_checks": {
+    "R34_empty_test": "PASS — test.c calls kiss_fft_alloc(), kiss_fft(), kiss_fft_free() with forward FFT, frequency detection (bin 1 > bin 0), inverse FFT, and reconstruction error < 1e-5 verification.",
+    "R9_skip_test": "PASS — test_package/conanfile.py def test(self) calls cmake.test(), not skipped.",
+    "fake_sha256": "PASS — sha256 '205a8f6a448ef12b091f8ac6a514b5091bb5f6b0b543431ed75f673116cf5cbf' is 64 hex chars, not all zeros/f's, reasonable length.",
+    "fake_status": "PASS — status 'published' consistent across notes.md, conan-verify-report.md (G2 PASS), and test-report.md (SUCCESS).",
+    "R8_ohos_stub": "PASS — no #ifdef __OHOS__ in any file.",
+    "R19_manual_packaging": "PASS — no .so/.a/binary files in PR. All artifacts built from source via conan create.",
+    "R40_deep_adaptation": "PASS — kissfft is a pure math/FFT library, no graphics/UI/multimedia/hardware/system adaptation needed."
+  },
+  "p1_checks": {
+    "R37_version": "PASS — version 131.2.0, first adaptation using upstream version.",
+    "R26_system_named_lib": "PASS — kissfft is not a system-named library, no static linking requirement.",
+    "R32_ohos_compat": "PASS — no self.settings.os == 'Linux' checks. Build uses make (platform-agnostic). CMakeLists uses if(UNIX) which matches OHOS.",
+    "R33_env_var_dependency": "PASS — generators='VirtualBuildEnv' provides toolchain from Conan profile. No bare os.environ usage.",
+    "R39_official_url": "PASS — URL is official GitHub archive for mborgerding/kissfft, not a fork or unknown mirror.",
+    "R6_generated_files": "PASS — no config.h, configure, Makefile.in, or CMakeCache.txt modifications.",
+    "R38_commands_json": "PASS — kissfft is library type with KISSFFT_TOOLS=0, no commands.json needed.",
+    "conan_2x_api": "PASS — uses 'from conan import ConanFile' (not conans), conan.tools.files, conan.tools.layout, conan.tools.cmake.",
+    "hardcoded_paths": "PASS — build uses cwd=self.source_folder, package uses PREFIX={self.package_folder}, both Conan variables."
+  },
+  "p2_p3_checks": {
+    "CS1_file_header": "WARN — docstring present with build system (fixed), but shebang '#!/usr/bin/env python3' still missing. Non-blocking.",
+    "CS2_class_name": "PASS — KissfftConan and KissfftTestConan, both PascalCase.",
+    "CS3_package_type": "PASS — package_type = 'library'.",
+    "CS4_method_order": "PASS — export_sources → requirements → layout → source → build → package → package_info.",
+    "CS5_package_info_libs": "PASS — self.cpp_info.libs = ['kissfft-float'].",
+    "CS6_no_placeholders": "PASS — no TODO/FIXME/XXX/empty url.",
+    "CS11_test_source": "PASS — test.c lowercase, int main(void), includes kiss_fft.h matching cpp_info.libs.",
+    "CS13_conandata_yml": "PASS — HTTPS URL, quoted strings, 2-space indent, sha256 present.",
+    "CS16_import_order": "PASS — all conan.* imports properly grouped, no unused import os.",
+    "R17_file_structure": "PASS — conanfile.py, conandata.yml, test_package/ all present.",
+    "R19_forbidden_files": "PASS — no .build-context-*, *.log, .DS_Store, __pycache__/, or binary files."
+  }
+}
