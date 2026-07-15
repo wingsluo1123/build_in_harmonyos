@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: nkf/2.1.5
+homepage: "https://gitlab.com/nkf-developers/nkf"
+
+# 上游测试命令
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test.pl
+    source: nkf-2.1.5/test.pl
+    description: "Perl-based encoding conversion test suite covering JIS/SJIS/EUC/UTF-8/UTF-16/UTF-32"
+    command: "perl test.pl"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "Verify nkf binary is executable and can perform encoding conversion"
+    command: "nkf --version"
+
+# 测试断言总数
+assertion_count: 120
