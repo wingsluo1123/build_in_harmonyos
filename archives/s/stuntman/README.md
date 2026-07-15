@@ -15,10 +15,12 @@ stuntman 是一个开源的 STUN（Session Traversal Utilities for NAT）协议�
 | 版本 | 编译状态 | 编译日期 |
 |------|---------|---------|
 | 1.2.16 | published | 2026-06-05 |
+| 1.2.17 | built | 2026-07-15 |
 
 ## 依赖
 
 - openssl（提供 libcrypto，用于 STUN 消息完整性验证）
+- boost 1.72.0（header-only，提供 shared_ptr、property_tree、crc 等组件）
 
 ## 编译说明
 
@@ -60,4 +62,5 @@ Apache License 2.0（详见源码包中的 LICENSE 文件）
 ## 参考链接
 
 - 官方网站：https://www.stunprotocol.org/
-- 源码下载：https://www.stunprotocol.org/stunserver-1.2.16.tgz
+- 源码下载 (1.2.16): https://www.stunprotocol.org/stunserver-1.2.16.tgz
+- 源码下载 (1.2.17): https://github.com/jselbie/stunserver

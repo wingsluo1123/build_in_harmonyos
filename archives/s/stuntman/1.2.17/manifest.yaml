@@ -1,0 +1,65 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.2.17/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.2.17"
+software: "stuntman"
+status: built
+build_date: "2026-07-15"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/jselbie/stunserver/archive/2049da33990b66d71a0f42f32d70b75fe4911374.tar.gz"
+  sha256: "b4d7fc5121a1e718f67083cf5d1eea7784f784dc9d4a319bcd2175e7ae197c7d"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: ["openssl/3.5.6"]
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "lld linker requires libxml2.so.16 unavailable on OHOS; use GNU ld via -fuse-ld=/data/service/hnp/bin/ld"
+  - "Custom Makefile project has no install target; manual install of binaries"
+  - "Boost headers needed (boost::shared_ptr, property_tree, crc); not in ohpcd remote, downloaded from sourceforge"
+  - "Boost 1.83+ uses pthread_setcancelstate unavailable on OHOS; use Boost 1.72.0"
+  - "OpenSSL 3.x deprecation warnings for MD5/HMAC APIs but compilation succeeds"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/stuntman-1.2.17.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/stuntman-1.2.17.work
+  source_orig_hash: 3628c208c99848ec
+  source_work_hash: 237a54a98eeb5937
+  generated_at: '2026-07-15T18:09:20'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-common.inc.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
