@@ -22,3 +22,5 @@ class NcursesTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Direct binary execution for L0d gate check
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_ncurses"), env="conanrun")
