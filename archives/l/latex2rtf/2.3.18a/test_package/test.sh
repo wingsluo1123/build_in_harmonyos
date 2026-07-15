@@ -1,19 +1,15 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for latex2rtf executable
-# Runs in conanrun env (PATH includes installed bin/)
-# latex2rtf doesn't support --version, so we test actual conversion
+# Args: $1 = path to latex2rtf binary, $2 = path to cfg directory
 set -eu
 
+LATEX2RTF_BIN="${1:?Usage: test.sh <latex2rtf_path> <cfg_dir>}"
+CFG_DIR="${2:-}"
 TMPDIR="${TMPDIR:-/tmp}"
 
-# Find cfg directory relative to the latex2rtf binary
-L2R_BIN=$(command -v latex2rtf 2>/dev/null || echo "")
-if [ -n "$L2R_BIN" ]; then
-    L2R_DIR=$(dirname "$L2R_BIN")
-    CFG_DIR="${L2R_DIR}/../share/latex2rtf/cfg"
-    if [ -d "$CFG_DIR" ]; then
-        export RTFPATH="$CFG_DIR"
-    fi
+# Set RTFPATH so the binary can find its configuration files
+if [ -n "$CFG_DIR" ] && [ -d "$CFG_DIR" ]; then
+    export RTFPATH="$CFG_DIR"
 fi
 
 # Create a minimal LaTeX document
@@ -26,8 +22,8 @@ Hello World
 TEXEOF
 
 # Run latex2rtf to convert .tex to .rtf
-echo "[test] latex2rtf $TEX_FILE"
-latex2rtf "$TEX_FILE" || {
+echo "[test] $LATEX2RTF_BIN $TEX_FILE"
+"$LATEX2RTF_BIN" "$TEX_FILE" || {
     echo "❌ latex2rtf conversion failed"
     exit 1
 }
