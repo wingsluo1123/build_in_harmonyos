@@ -45,19 +45,10 @@ class Latex2RtfConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # R33: Get compiler from Conan conf, never from bare shell env vars
-        cc = "clang"
-        try:
-            compilers = self.conf.get("tools.build:compiler_executables", check_type=dict)
-            if compilers and "c" in compilers:
-                cc = compilers["c"]
-        except Exception:
-            pass
         # latex2rtf is a pure Makefile project; CC and PREFIX are make variables
-        # PREFIX determines CFGDIR (hardcoded in binary at compile time)
         # Use package_folder as PREFIX so CFGDIR matches the installed cfg path
         prefix = self.package_folder
-        self.run(f'make CC="{cc}" PREFIX="{prefix}" -j1')
+        self.run(f'make CC=clang PREFIX="{prefix}" -j1')
 
     def package(self):
         # Copy the binary
@@ -77,7 +68,3 @@ class Latex2RtfConan(ConanFile):
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
         self.cpp_info.bindirs = ["bin"]
-        # Set RTFPATH so the binary can find its configuration files
-        cfgdir = os.path.join(self.package_folder, "share", "latex2rtf", "cfg")
-        self.runenv_info.define("RTFPATH", cfgdir)
-        self.env_info.RTFPATH = cfgdir
