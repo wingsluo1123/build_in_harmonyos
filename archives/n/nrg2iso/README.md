@@ -11,4 +11,4 @@ nrg2iso is a command-line tool that converts NERO image files (.nrg) to ISO form
 
 | 版本 | 状态 | 构建系统 | 说明 |
 |------|------|----------|------|
-| 0.4.1 | published | makefile | 首次适配 |
+| 0.4.1 | built | makefile | 首次适配 |

@@ -4,7 +4,7 @@
 - 构建系统: makefile（原始 Makefile 为简单手写版，非 autotools）
 - 编译日期: 2026-07-15
 - 编译器: clang 15.0.4
-- 状态: published
+- 状态: built
 - 目标平台: OpenHarmony / aarch64 (musl libc)
 
 ## 编译步骤

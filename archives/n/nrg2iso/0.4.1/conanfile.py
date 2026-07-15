@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — nrg2iso 0.4.1 (Makefile)"""
 import os
 import shutil
 import glob
