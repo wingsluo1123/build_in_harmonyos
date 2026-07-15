@@ -5,7 +5,7 @@
 - 编译日期: 2026-06-11
 - 编译器: clang 15.0.4 / clang++ 15.0.4
 - 平台: OpenHarmony (aarch64, musl libc, ld-musl-aarch64.so.1)
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -181,5 +181,5 @@ $ llvm-readelf -d fairymax | grep RUNPATH
 **最终状态**: published
 ---
 
-**编译结束**: 2026-06-12 15:15
-**最终状态**: published
+**编译结束**: 2026-07-15 21:16
+**最终状态**: built

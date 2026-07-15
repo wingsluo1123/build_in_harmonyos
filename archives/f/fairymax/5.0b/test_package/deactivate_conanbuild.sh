@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/f/fairymax/5.0b/test_package/deactivate_conanbuildenv-release-armv8.sh"
