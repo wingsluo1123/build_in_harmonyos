@@ -1243,10 +1243,10 @@ def _save_submit_state(ver_dir: Path, state: dict) -> None:
 
 
 def _call_monitor_review(gitcode_pr: str, repo: str, pr_number: int) -> dict | None:
-    """Call gitcode_pr.py monitor-review --json and parse result."""
+    """Call gitcode_pr.py --json monitor-review and parse result."""
     result = subprocess.run(
-        [sys.executable, gitcode_pr, "monitor-review",
-         "--repo", repo, "--number", str(pr_number), "--json"],
+        [sys.executable, gitcode_pr, "--json", "monitor-review",
+         "--repo", repo, "--number", str(pr_number)],
         capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
         return None

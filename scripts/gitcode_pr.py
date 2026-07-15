@@ -405,14 +405,40 @@ def cmd_ci_status(args):
 
 
 def cmd_reply_comment(args):
-    """回复 PR 评论。"""
-    body = {"body": args.body}
-    path = f"/repos/{args.repo}/pulls/{args.number}/discussions/{args.discussion_id}/comments"
+    """回复 PR 评论。
+
+    使用简单评论 API (POST /repos/{repo}/pulls/{number}/comments) 配合
+    in_reply_to 参数回复指定讨论。discussions API 需要额外权限，
+    简单评论 API 兼容性更好。
+    """
+    body = {"body": args.body, "in_reply_to": args.discussion_id}
+    path = f"/repos/{args.repo}/pulls/{args.number}/comments"
     result = api_request("POST", path, body=body)
 
     print("✅ 回复成功")
-    print(f"   comment_id: {result.get('id', 'N/A')}")
-    print(f"   URL: {result.get('html_url', 'N/A')}")
+    print(f"   note_id: {result.get('note_id', 'N/A')}")
+    print(f"   discussion_id: {args.discussion_id}")
+
+    if args.json:
+        print("\n--- JSON ---")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    return result
+
+
+def cmd_resolve_comment(args):
+    """修改检视意见解决状态（标记为已解决/未解决）。
+
+    API: PUT /repos/{owner}/{repo}/pulls/{number}/comments/{discussion_id}
+    Body: {"resolved": true/false}
+    """
+    resolved = not args.unresolved if args.unresolved else True
+    body = {"resolved": resolved}
+    path = f"/repos/{args.repo}/pulls/{args.number}/comments/{args.discussion_id}"
+    result = api_request("PUT", path, body=body)
+
+    status_text = "已解决" if resolved else "未解决"
+    print(f"✅ 检视意见标记为{status_text}")
+    print(f"   discussion_id: {args.discussion_id}")
 
     if args.json:
         print("\n--- JSON ---")
@@ -802,6 +828,14 @@ def main():
     p.add_argument("--discussion-id", required=True, help="讨论 ID")
     p.add_argument("--body", required=True, help="回复内容")
     p.set_defaults(func=cmd_reply_comment)
+
+    # resolve-comment
+    p = sub.add_parser("resolve-comment", help="修改检视意见解决状态 (标记为已解决/未解决)")
+    p.add_argument("--repo", required=True)
+    p.add_argument("--number", type=int, required=True)
+    p.add_argument("--discussion-id", required=True, help="讨论 ID")
+    p.add_argument("--unresolved", action="store_true", help="标记为未解决 (默认标记为已解决)")
+    p.set_defaults(func=cmd_resolve_comment)
 
     # update-pr
     p = sub.add_parser("update-pr", help="更新 PR 信息")
