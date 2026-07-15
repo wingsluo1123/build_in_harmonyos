@@ -14,7 +14,9 @@ class KonaConan(ConanFile):
     description = "K programming language interpreter (Arthur Whitney's array language)"
     license = "ISC"
     homepage = "https://github.com/kevinlawler/kona"
-    url = ""  # CI fills this
+    url = "https://github.com/kevinlawler/kona"
+
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
 

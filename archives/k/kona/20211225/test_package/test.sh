@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for kona interpreter
 # Usage: test.sh <path_to_k_binary>
-set -eu
+set -euo pipefail
 
 K_BIN="$1"
 
