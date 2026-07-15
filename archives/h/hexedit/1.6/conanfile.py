@@ -2,8 +2,8 @@
 """Conan recipe for hexedit 1.6 (console hex file editor)."""
 
 from conan import ConanFile
-from conan.tools.files import get, copy, replace_in_file
-from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps
+from conan.tools.files import get, replace_in_file
+from conan.tools.gnu import Autotools, AutotoolsToolchain
 
 
 class HexeditConan(ConanFile):
@@ -21,15 +21,10 @@ class HexeditConan(ConanFile):
         self.folders.source = "."
         self.folders.build = "."
 
-    def requirements(self):
-        self.requires("ncurses/6.4")
-
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        deps = AutotoolsDeps(self)
-        deps.generate()
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend([
             "HELP2MAN=/bin/true",
