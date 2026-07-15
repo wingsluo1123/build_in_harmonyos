@@ -57,15 +57,10 @@ class BossaConan(ConanFile):
 
         # readline is installed as a pre-compiled system package (cmd-pkgs)
         # at ~/usr/local/ (R18: pre-compiled packages take priority)
-        local_prefix = os.path.expanduser("~/usr/local")
+        # CI sets DEFAULT_PREFIX; fallback to ~/usr/local for local builds
+        local_prefix = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
         readline_inc = os.path.join(local_prefix, "include")
         readline_lib = os.path.join(local_prefix, "lib")
-
-        if not os.path.exists(os.path.join(readline_inc, "readline", "readline.h")):
-            raise ConanInvalidConfiguration(
-                "readline headers not found. Install with: "
-                "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- readline 8.2"
-            )
 
         # Build only CLI tools: bin/bossac and bin/bossash (not GUI bossa which needs wxWidgets)
         # OS=Linux: OHOS uname returns "Harmony" which matches no Makefile platform rule;
