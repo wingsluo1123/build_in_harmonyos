@@ -69,4 +69,4 @@ class FreeimageConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["freeimage"]
         if self.settings.os in ("Linux", "OHOS"):
-            self.cpp_info.system_libs = ["stdc++"]
+            self.cpp_info.system_libs = ["c++"]
