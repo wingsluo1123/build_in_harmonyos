@@ -18,7 +18,6 @@ R38: commands.json declared (command-line tool).
 """
 import os
 import stat
-import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -32,8 +31,9 @@ class ColordiffConan(ConanFile):
     description = "A wrapper/replacement for 'diff' producing colourful output (pure Perl script)"
     license = "GPL-2.0-or-later"
     homepage = "https://www.colordiff.org/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
+    package_type = "application"
     settings = "os", "arch"
 
     def validate(self):
@@ -42,9 +42,6 @@ class ColordiffConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-
-    def requirements(self):
-        pass
 
     def layout(self):
         basic_layout(self)

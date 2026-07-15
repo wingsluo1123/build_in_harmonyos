@@ -17,9 +17,6 @@ class ColordiffTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def build(self):
-        pass  # No build step needed for a script tool
-
     def test(self):
         # Get the bin path from the dependency's package
         bin_dir = self.dependencies["colordiff"].cpp_info.bindirs[0]
