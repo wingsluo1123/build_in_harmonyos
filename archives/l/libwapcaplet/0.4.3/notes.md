@@ -27,7 +27,7 @@
 
 | 文件 | 原因 | 方式 | 补丁状态 |
 |------|------|------|----------|
-| Makefile | NetSurf 构建系统不可用 | 完全替换为独立 Makefile | 待 refresh-patch 生成 |
+| Makefile | NetSurf 构建系统不可用 | 完全替换为独立 Makefile | 已生成 (0001-Makefile.patch) |
 
 ## 依赖版本
 
@@ -37,17 +37,8 @@
 ## 验证结果
 
 ```bash
-$ ./test_lwc
-PASS: Created string 'hello' (len=5, data='hello')
-PASS: Interning same string returns same pointer (str1==str2)
-PASS: Interning different string returns different pointer (str1!=str3)
-PASS: lwc_string_isequal(str1,str2) = true
-PASS: lwc_string_isequal(str1,str3) = false
-PASS: lwc_string_caseless_isequal('hello','HELLO') = true
-PASS: lwc_string_hash_value('hello') = 3069866343
-PASS: lwc_intern_substring('hello',1,3) = 'ell' (len=3)
-
-=== All tests passed ===
+$ ./test_libwapcaplet
+All 7 tests passed
 ```
 
 ## 交付物

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Conan recipe for libwapcaplet — NetSurf string internment library."""
+"""Conan recipe — libwapcaplet 0.4.3 (Makefile)"""
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -18,7 +18,7 @@ class LibwapcapletConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False]}
+    options = {"shared": [False]}
     default_options = {"shared": False}
 
     def export_sources(self):

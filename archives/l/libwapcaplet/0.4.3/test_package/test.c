@@ -1,9 +1,8 @@
 #include <stdio.h>
-#include <string.h>
 #include <libwapcaplet/libwapcaplet.h>
 
 int main(void) {
-    lwc_string *str1, *str2, *str3, *sub, *upper;
+    lwc_string *str1 = NULL, *str2 = NULL, *str3 = NULL, *sub = NULL, *upper = NULL;
     bool result;
     int pass = 0, fail = 0;
 
@@ -65,6 +64,13 @@ int main(void) {
     } else {
         fail++;
     }
+
+    /* Cleanup: release all interned strings */
+    if (sub) lwc_string_unref(sub);
+    if (upper) lwc_string_unref(upper);
+    if (str3) lwc_string_unref(str3);
+    if (str2) lwc_string_unref(str2);
+    if (str1) lwc_string_unref(str1);
 
     if (fail > 0) {
         printf("FAIL: %d tests failed\n", fail);

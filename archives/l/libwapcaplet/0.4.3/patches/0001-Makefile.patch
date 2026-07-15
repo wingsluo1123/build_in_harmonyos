@@ -10,22 +10,22 @@
 +# netsurf-buildsystem package is not available on this platform.
  #
  # Copyright 2009-2015 John-Mark Bell <jmb@netsurf-browser.org>
- 
+
  # Component settings
  COMPONENT := wapcaplet
  COMPONENT_VERSION := 0.4.3
 -# Default to a static library
  COMPONENT_TYPE ?= lib-static
- 
+
 -# Setup the tooling
 -PREFIX ?= /opt/netsurf
 -NSSHARED ?= $(PREFIX)/share/netsurf-buildsystem
 -include $(NSSHARED)/makefiles/Makefile.tools
 +# Installation paths
-+PREFIX ?= /storage/Users/currentUser/usr/local
++PREFIX ?= /usr/local
 +LIBDIR ?= lib
 +INCLUDEDIR ?= include
- 
+
 -# Reevaluate when used, as BUILDDIR won't be defined yet
 -TESTRUNNER = $(BUILDDIR)/test_testrunner$(EXEEXT)
 +# Source files
@@ -36,7 +36,7 @@
 +LIB := lib$(COMPONENT).a
 +PC_IN := libwapcaplet.pc.in
 +PC := lib$(COMPONENT).pc
- 
+
 -# Toolchain flags
 +# Compiler settings
 +CC ?= clang
@@ -55,7 +55,7 @@
 -  WARNFLAGS := $(WARNFLAGS) -Werror
 -endif
 +	-Wmissing-declarations -Wnested-externs -Wno-error
- 
+
 -CFLAGS := -D_BSD_SOURCE -D_DEFAULT_SOURCE \
 +COMPILE_CFLAGS := -D_BSD_SOURCE -D_DEFAULT_SOURCE -std=c99 \
  	-I$(CURDIR)/include/ -I$(CURDIR)/src \
@@ -66,11 +66,11 @@
 -  # __inline__ is a GCCism
 -  CFLAGS := $(CFLAGS) -Dinline="__inline__"
 -endif
- 
+
 -include $(NSBUILD)/Makefile.top
 +# Targets
 +.PHONY: all clean install uninstall
- 
+
 -ifeq ($(WANT_TEST),yes)
 -  ifneq ($(PKGCONFIG),)
 -    TESTCFLAGS := $(TESTCFLAGS) $(shell $(PKGCONFIG) --cflags check)
@@ -80,7 +80,7 @@
 -  endif
 -endif
 +all: $(LIB) $(PC)
- 
+
 -# Extra installation rules
 -I := /$(INCLUDEDIR)/libwapcaplet
 -INSTALL_ITEMS := $(INSTALL_ITEMS) $(I):include/libwapcaplet/libwapcaplet.h
