@@ -2,7 +2,7 @@
 """Conan test_package for massdns — verifies the installed binary works.
 
 R34: test must substantially depend on the tested package.
-We run `massdns --version` to verify the binary is functional.
+We run test.sh which executes `massdns --version` to verify the binary.
 """
 import os
 
@@ -26,8 +26,5 @@ class MassdnsTestConan(ConanFile):
             self.dependencies["massdns"].package_folder, "bin", "massdns"
         )
 
-        # Verify binary exists
-        assert os.path.isfile(massdns_bin), f"massdns binary not found at {massdns_bin}"
-
-        # Run smoke test — massdns --version outputs "massdns" and exits 0
-        self.run(f'"{massdns_bin}" --version', env="conanrun")
+        # Run smoke test script
+        self.run(f'MASSDNS_BIN="{massdns_bin}" sh test.sh', env="conanrun")
