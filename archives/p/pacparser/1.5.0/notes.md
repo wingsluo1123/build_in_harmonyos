@@ -96,8 +96,11 @@ G0 clean-verify: PASS
 - Internet测试需设NO_INTERNET=1
 - GNU install命令在OpenHarmony不可用，Makefile中已用mkdir+cp+chmod替代
 - pactester --version不支持，需使用 -v 参数
-
 ---
 
-**编译结束**: 2026-06-11
+**编译结束**: 2026-07-15 20:12
+**最终状态**: built
+---
+
+**编译结束**: 2026-07-15 20:16
 **最终状态**: built
