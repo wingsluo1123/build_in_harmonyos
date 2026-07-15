@@ -55,3 +55,7 @@ htpdate version 1.3.7
 1. htpdate 可选择编译 HTTPS 支持版本（make https），需要 libssl
 2. 编译时必须使用 `-D__OHOS__` 定义以启用 adjtimex 兼容性补丁
 3. 运行时需要 root 权限才能调整系统时间
+
+---
+**编译结束**: 2026-07-15
+**最终状态**: built
