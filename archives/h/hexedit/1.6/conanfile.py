@@ -1,48 +1,45 @@
-from conan import ConanFile
-from conan.tools.files import copy, get, replace_in_file
-from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain
+#!/usr/bin/env python3
+"""Conan recipe for hexedit 1.6 (console hex file editor)."""
 
-import os
+from conan import ConanFile
+from conan.tools.files import get, copy, replace_in_file
 
 
 class HexeditRecipe(ConanFile):
     name = "hexedit"
     version = "1.6"
     package_type = "application"
-    settings = "os", "arch", "compiler", "build_type"
-    exports_sources = "patches/*"
-    generators = ()
-    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
-    license = "GPL-2.0-or-later"
+
     description = "View and edit files in hex"
+    license = "GPL-2.0-or-later"
+    homepage = "https://github.com/pixel/hexedit"
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
     topics = ("hex", "editor", "terminal")
 
-    def source(self):
-        get(self, **self.conan_data["sources"][self.version])
+    settings = "os", "arch", "compiler", "build_type"
 
-    def generate(self):
-        deps = AutotoolsDeps(self)
-        deps.generate()
-        tc = AutotoolsToolchain(self)
-        tc.configure_args.extend([
-            'HELP2MAN=/bin/true',
-            'CFLAGS=-fPIC -O2 -I$DEFAULT_PREFIX/include',
-            'LDFLAGS=-L$DEFAULT_PREFIX/lib',
-            'LIBS=-lncursesw',
-        ])
-        tc.generate()
+    def layout(self):
+        self.folders.source = "."
+        self.folders.build = "."
+
+    def source(self):
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def build(self):
-        replace_in_file(self, os.path.join(self.source_folder, "configure"), "cross_compiling=no", "cross_compiling=maybe")
-        replace_in_file(self, os.path.join(self.source_folder, "configure"), "umask 077", "umask 022")
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make("-j1")
+        # Apply platform patches for HMDFS
+        configure = self.source_folder + "/configure"
+        replace_in_file(self, configure, "cross_compiling=no", "cross_compiling=maybe")
+        replace_in_file(self, configure, "umask 077", "umask 022")
+        self.run(
+            "./configure --prefix=" + self.package_folder
+            + " HELP2MAN=/bin/true"
+            + " LIBS='-lncursesw'",
+            cwd=self.source_folder
+        )
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
-        copy(self, "COPYING", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
+        self.run("make install", cwd=self.source_folder)
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
