@@ -3,7 +3,7 @@
 **Verdict**: PASS
 **Reference**: `kissfft/131.2.0@ohpcd/stable`
 **Profile**: ohos-aarch64
-**Date**: 2026-07-15T18:00:53.949882
+**Date**: 2026-07-15T18:26:49.404281
 
 ## G0: ✅ PASS
   📦 构建系统: unknown
