@@ -61,6 +61,14 @@ class TrioConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        os.chmod(self.source_folder, 0o755)
+        for root, dirs, files in os.walk(self.source_folder):
+            for d in dirs:
+                try: os.chmod(os.path.join(root, d), 0o755)
+                except: pass
+            for f in files:
+                try: os.chmod(os.path.join(root, f), 0o755)
+                except: pass
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
