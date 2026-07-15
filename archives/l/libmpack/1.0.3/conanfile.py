@@ -6,7 +6,7 @@ since it's not available on OHOS).
 """
 import os
 
-from conan import ConanFile
+from conan import ConanFile, ConanInvalidConfiguration
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -30,7 +30,7 @@ class LibmpackConan(ConanFile):
 
     def configure(self):
         if self.options.shared:
-            self.options.rm_safe("shared")
+            raise ConanInvalidConfiguration("libmpack only supports static linking")
 
     def requirements(self):
         pass
@@ -71,7 +71,15 @@ class LibmpackConan(ConanFile):
                             f.write(line)
 
         # Compile each source file
-        cflags = f"-fPIC -O2 -Wall -Wextra -std=c99 -I{build_dir}"
+        # Adjust optimization flags based on build_type
+        build_type = str(self.settings.build_type) if self.settings.build_type else "Release"
+        if build_type == "Debug":
+            opt_flags = "-O0 -g"
+        elif build_type == "RelWithDebInfo":
+            opt_flags = "-O2 -g"
+        else:
+            opt_flags = "-O2"
+        cflags = f"-fPIC {opt_flags} -Wall -Wextra -std=c99 -I{build_dir}"
         sources = ["core.c", "conv.c", "object.c", "rpc.c"]
         objects = []
         for s in sources:
