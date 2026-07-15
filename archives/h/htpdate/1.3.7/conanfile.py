@@ -17,7 +17,7 @@ class HtpdateConan(ConanFile):
     description = "HTTP Time Protocol synchronization tool"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/twekkel/htpdate"
-    url = ""  # CI fills this
+    url = "https://github.com/twekkel/htpdate"
 
     package_type = "application"
 
