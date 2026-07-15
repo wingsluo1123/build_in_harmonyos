@@ -27,5 +27,6 @@ class SpimTestConan(ConanFile):
 
     def test(self):
         # Run the test executable directly via self.run() (L0d requirement)
-        test_bin = os.path.join(self.test_build_folder, "test_spim")
+        cmake = CMake(self)
+        test_bin = os.path.join(cmake.build_folder, "test_spim")
         self.run(f'"{test_bin}"', env="conanrun")
