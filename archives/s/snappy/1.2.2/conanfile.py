@@ -15,7 +15,7 @@ class SnappyConan(ConanFile):
     description = "Fast compression/decompression library by Google"
     license = "BSD-3-Clause"
     homepage = "https://google.github.io/snappy/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
