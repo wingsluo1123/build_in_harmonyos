@@ -30,3 +30,7 @@ bzip2 -z test.txt && bzip2 -d test.txt.bz2  # ✅
 ## 注意事项
 - 鸿蒙 ln -sf bug 影响符号链接创建
 - -fPIC 对 Python _bz2 模块编译是必要的
+---
+
+**编译结束**: 2026-07-16 00:24
+**最终状态**: built
