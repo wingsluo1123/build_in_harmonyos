@@ -1,0 +1,59 @@
+diff -ruN a/build/config.guess b/build/config.guess
+--- a/build/config.guess
++++ b/build/config.guess
+@@ -153,21 +153,23 @@
+ Linux|GNU|GNU/*)
+ 	LIBC=unknown
+ 
+ 	set_cc_for_build
+ 	cat <<-EOF > "$dummy.c"
+ 	#include <features.h>
+ 	#if defined(__UCLIBC__)
+ 	LIBC=uclibc
+ 	#elif defined(__dietlibc__)
+ 	LIBC=dietlibc
+-	#elif defined(__GLIBC__)
++	#elif defined(__OHOS__)
++	LIBC=ohos
++#elif defined(__GLIBC__)
+ 	LIBC=gnu
+ 	#else
+ 	#include <stdarg.h>
+ 	/* First heuristic to detect musl libc.  */
+ 	#ifdef __DEFINED_va_list
+ 	LIBC=musl
+ 	#endif
+ 	#endif
+ 	EOF
+ 	cc_set_libc=`$CC_FOR_BUILD -E "$dummy.c" 2>/dev/null | grep '^LIBC' | sed 's, ,,g'`
+@@ -184,20 +186,30 @@
+ 	# We could probably try harder.
+ 	if [ "$LIBC" = unknown ]; then
+ 		LIBC=gnu
+ 	fi
+ 	;;
+ esac
+ 
+ # Note: order is significant - the case branches are not exclusive.
+ 
+ case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in
++    *:HarmonyOS:*:*)
++	case "$UNAME_MACHINE" in
++	    aarch64|arm64) MACHINE=aarch64 ;;
++	    armv7*|armv8*) MACHINE=arm ;;
++	    x86_64|amd64)  MACHINE=x86_64 ;;
++	    i?86)          MACHINE=i686 ;;
++	    *)             MACHINE="$UNAME_MACHINE" ;;
++	esac
++	GUESS=${MACHINE}-unknown-linux-ohos
++	;;
+     *:NetBSD:*:*)
+ 	# NetBSD (nbsd) targets should (where applicable) match one or
+ 	# more of the tuples: *-*-netbsdelf*, *-*-netbsdaout*,
+ 	# *-*-netbsdecoff* and *-*-netbsd*.  For targets that recently
+ 	# switched to ELF, *-*-netbsd* would select the old
+ 	# object file format.  This provides both forward
+ 	# compatibility and a consistent mechanism for selecting the
+ 	# object file format.
+ 	#
+ 	# Note: NetBSD doesn't particularly care about the vendor
