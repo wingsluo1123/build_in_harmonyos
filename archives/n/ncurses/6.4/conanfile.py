@@ -4,7 +4,6 @@
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
 
 
 class NcursesConan(ConanFile):
@@ -24,7 +23,10 @@ class NcursesConan(ConanFile):
         export_conandata_patches(self)
 
     def layout(self):
-        basic_layout(self)
+        # In-source build: ncurses configure generates Makefiles in subdirs
+        # (form/, panel/, menu/, progs/, ncurses/) that must exist in build dir.
+        self.folders.source = "."
+        self.folders.build = "."
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
