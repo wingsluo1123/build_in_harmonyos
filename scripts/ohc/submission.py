@@ -7,6 +7,9 @@ Usage:
     python3 ohc-run.py promote <software> <version>
     python3 ohc-run.py review <software> <version>
     python3 ohc-run.py post-merge <software> <version>
+
+Notes:
+    promote is the platform-facing alias for submit.
 """
 from __future__ import annotations
 
@@ -1937,17 +1940,50 @@ def promote_cli(argv: list[str] | None = None) -> int:
     """CLI entry point: ohc promote <software> <version>"""
     parser = argparse.ArgumentParser(
         prog="ohc promote",
-        description="submit 的别名，用于平台统一调用 AI 推进/晋级流程",
+        description="平台入口：自动执行自检、PR 创建、AI Review 监控与 CI 监控",
     )
     parser.add_argument("software", help="软件名称")
     parser.add_argument("version", help="版本号")
     parser.add_argument("--project-dir", "-p", default=None)
     parser.add_argument("--resume", action="store_true",
                          help="从上次 HANDOFF 处恢复（跳过已完成阶段，从状态文件继续）")
+    parser.add_argument("--dry-run", action="store_true",
+                         help="仅生成/检查流程，不执行 git push/PR 创建")
     args = parser.parse_args(argv)
-    return cmd_submit(args.software, args.version,
-                      pdir=getattr(args, "project_dir", None),
-                      resume=getattr(args, "resume", False))
+    return cmd_promote(
+        args.software,
+        args.version,
+        pdir=getattr(args, "project_dir", None),
+        resume=getattr(args, "resume", False),
+        dry_run=getattr(args, "dry_run", False),
+    )
+
+
+def cmd_promote(software: str, version: str,
+                pdir: str | None = None,
+                resume: bool = False,
+                dry_run: bool = False) -> int:
+    """Platform-facing promotion flow based on project docs.
+
+    Compared to submit, promote emphasizes:
+    - deterministic platform entrypoint
+    - dry-run support for orchestration/preview
+    - same gates and review/CI flow when not dry-running
+    """
+    if dry_run:
+        project_dir = pdir or find_project_dir()
+        letter = software[0].lower()
+        ver_dir = _archive_dir(letter, software, version, project_dir)
+        print(
+            f"promote dry-run\n"
+            f"software: {software}\n"
+            f"version: {version}\n"
+            f"project_dir: {project_dir}\n"
+            f"archive_dir: {ver_dir}\n"
+            f"resume: {resume}"
+        )
+        return 0
+    return cmd_submit(software, version, pdir=pdir, resume=resume)
 
 
 def review_cli(argv: list[str] | None = None) -> int:
