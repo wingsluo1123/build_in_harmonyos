@@ -1,0 +1,110 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/k/kona/20211225/conandata.yml",
+      "line": 5,
+      "description": "URL field is a list containing 6 manually added mirror proxy URLs (gh-proxy.com, mirror.ghproxy.com, ghproxy.com, gitclone.com, moeyy.cn, kkgithub.com) plus the official GitHub URL. R39/Rule 13 explicitly states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The mirror URLs are redundant and should be removed. Additionally, the code style rule shows url as a single string, not a list.",
+      "fix_suggestion": "Replace the url list with a single string: url: \"https://github.com/kevinlawler/kona/archive/refs/tags/Win64-20211225.tar.gz\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R5",
+      "file": "archives/k/kona/20211225/conanfile.py",
+      "line": 17,
+      "description": "url = \"\"  # CI fills this — prohibited template placeholder. Code style rule 5 explicitly lists 'url = \"\"  # CI fills this' as a prohibited placeholder that indicates incomplete work ('出现在合入的代码中 = 未完成'). The recipe url attribute should be filled with the recipe repository URL.",
+      "fix_suggestion": "Set the recipe URL, e.g., url = \"https://github.com/kevinlawler/kona\" or the Conan recipe repository URL."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R2",
+      "file": "archives/k/kona/20211225/conanfile.py",
+      "line": 19,
+      "description": "Missing package_type attribute. Code style rule 2 states '禁止 package_type 留空或写错（库=\"library\"，工具=\"application\"）'. kona is a tool/interpreter that produces a binary 'k', so package_type should be 'application'. Without it, Conan defaults to 'library', which is incorrect for a CLI tool and could cause issues in dependency resolution.",
+      "fix_suggestion": "Add package_type = \"application\" after the settings line."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R7",
+      "file": "archives/k/kona/20211225/test_package/test.sh",
+      "line": 4,
+      "description": "set -eu missing -o pipefail. Code style rule 7 requires all scripts to start with 'set -euo pipefail'. The test script uses pipes (e.g., echo '2+2' | \"${K_BIN}\"), so without pipefail, a failure of the k binary could be masked by the successful echo command.",
+      "fix_suggestion": "Change 'set -eu' to 'set -euo pipefail'."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-R3",
+      "file": "archives/k/kona/20211225/conanfile.py",
+      "line": 35,
+      "description": "AutotoolsToolchain used for a pure Makefile build. kona uses a plain Makefile (build_system: makefile), not autotools. AutotoolsToolchain is designed for autotools projects (configure scripts). The generated toolchain files are not used by build() which directly calls 'make CC=... k'. This is misleading and generates unnecessary files.",
+      "fix_suggestion": "Either remove the generate() method entirely (since build() doesn't rely on the toolchain output), use a no-op generate(), or switch to an appropriate approach for Makefile builds."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R37",
+      "file": "archives/k/kona/20211225/conanfile.py",
+      "line": 48,
+      "description": "build() method only passes CC to make but omits CFLAGS and PRODFLAGS as documented in manifest.yaml line 49 (make CC=clang CFLAGS='-fPIC -O2' PRODFLAGS='-O3 -fPIC'). The recipe produces a binary without optimization (-O2/-O3) or position-independent code (-fPIC), which does not match the intended build configuration.",
+      "fix_suggestion": "Pass CFLAGS and PRODFLAGS in the self.run() call, e.g.: self.run(f'make CC=\"{cc}\" CFLAGS=\"-fPIC -O2\" PRODFLAGS=\"-O3 -fPIC\" -j1 k')"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/k/kona/20211225/test_package/test.sh",
+      "line": 9,
+      "description": "Test assertions are weak — only checking for non-empty output (if [ -z \"$result\" ]), not expected values. For example, '2+2' should return '4', but the test only verifies output is non-empty. A broken k binary that outputs garbage would still pass all tests. R34 requires test_package to 'substantially test the package' — the tests do exercise real K expressions (passing R34), but assertions could be stronger.",
+      "fix_suggestion": "Add expected value checks, e.g.: if [ \"$result\" != \"4\" ]; then echo \"FAIL: expected 4, got $result\"; exit 1; fi"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/k/kona/20211225/test_package/conanfile.py",
+      "line": 18,
+      "description": "Hardcoded default bash path '/data/service/hnp/bin/bash'. While CONFIG_SHELL env var provides a fallback mechanism, this default is HarmonyOS-specific and won't work on non-HarmonyOS CI runners. Consider using 'bash' as default to rely on PATH resolution.",
+      "fix_suggestion": "Change default to 'bash': bash = os.environ.get(\"CONFIG_SHELL\", \"bash\")"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R38",
+      "file": "archives/k/kona/commands.json",
+      "line": 9,
+      "description": "\"binary\": true but version-level manifest status is \"built\" (not \"published\"). The binary field indicates a pre-compiled binary package exists in the Conan artifact repo. If the binary hasn't been published via CI upload yet, binary should be false. If a previous binary exists from a prior publication, verify it matches the updated recipe.",
+      "fix_suggestion": "Consider setting \"binary\": false until CI confirms the binary is published with the new recipe."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R1",
+      "file": "archives/k/kona/20211225/conanfile.py",
+      "line": 2,
+      "description": "Docstring does not follow the recommended format 'Conan recipe — {name} {version} ({build_system})'. Current: 'Conan recipe for kona — K programming language interpreter.' Missing version and build system information.",
+      "fix_suggestion": "Change to: \"\"\"Conan recipe — kona 20211225 (Makefile)\"\"\""
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-R6",
+      "file": "archives/k/kona/20211225/test_package/test.sh",
+      "line": 1,
+      "description": "Shebang '#!/data/service/hnp/bin/bash' is a hardcoded HarmonyOS-specific path. While the script is invoked via 'bash test.sh' (not executed directly), so the shebang is not used in practice, it is still a hardcoded path that could cause confusion.",
+      "fix_suggestion": "Change shebang to '#!/usr/bin/env bash' for portability."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "INFO",
+      "file": "archives/k/kona/20211225/manifest.yaml",
+      "line": 95,
+      "description": "patch_classification has guard: 'pending', suggesting the patch guard status is not yet verified. This may indicate incomplete patch validation workflow.",
+      "fix_suggestion": "Verify and update the guard status to 'verified' or 'not_required' as appropriate."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "INFO",
+      "file": "archives/k/kona/manifest.yaml",
+      "line": 12,
+      "description": "Software-level manifest (not in this PR's changed_files) has status: 'published' for version 20211225, but the version-level manifest in this PR has status: 'built' (changed from 'published' to 'built' in this PR). This inconsistency should be resolved — the software-level manifest should be updated to match.",
+      "fix_suggestion": "Update the software-level manifest status to 'built' to match the version-level manifest, or ensure CI will re-publish and set both to 'published'."
+    }
+  ],
+  "summary": "Audit of kona 20211225 Conan recipe PR (feat/kona-20211225, 9 changed files, +179/-5 lines). VERDICT: PASS with warnings.\n\n=== Deception Detection (P0) — No issues found ===\n- R34 (Empty shell test): PASS — test.sh executes the k binary with real K language expressions (2+2, 7*8, !5, +/!5), not just printing strings.\n- R9 (Skip test/fake pass): PASS — test() method runs test.sh, no 'pass' stubs or forced exits.\n- Fake status: PASS — manifest status 'built' matches .build-closed. Status was downgraded from 'published' to 'built' (correcting premature status, not deception).\n- Fake sha256: PASS — sha256 'cd5dcc03394af275f0416b3cb2914574bf51ec60d1c857020fbd34b5427c5faf' is a valid 64-char hex string (not all zeros/f's, not truncated).\n- R8 (#ifdef __OHOS__ stub): PASS — no __OHOS__ ifdef in code.\n- R19 (Manual packaging bypass): PASS — no pre-compiled .so/.a/binary files in PR.\n- R40 (Deep adaptation): N/A — kona is a standalone interpreter, not in special categories (graphics/UI/multimedia/hardware/system-level).\n\n=== Recipe Correctness (P1) — No issues found ===\n- R33 (No bare env vars): PASS — uses self.conf.get('tools.build:compiler_executables') for compiler, not os.environ['CC'].\n- R32 (settings.os 'in' not '=='): N/A — no settings.os check in conanfile.py (OS detection handled in Makefile patch via ifeq).\n- R39 (Official source URL): PASS — official GitHub URL present (https://github.com/kevinlawler/kona/...), though 6 redundant mirror URLs should be removed (P2).\n- R26 (System-name static): N/A — kona is not a system-named library.\n- R37 (Version suffix): PASS — first-time adaptation (conanfile.py/conandata.yml are new files, not modifications of published recipe).\n- R38 (commands.json): PASS — correct format, type='tool', name matches, no trailing commas.\n- Conan 2.x API: PASS — uses 'from conan import ConanFile', 'conan.tools.files', 'conan.tools.gnu'.\n- Patch file: PASS — patches/0001-Makefile.patch exists and contains substantive platform adaptation (harmonyos OS detection, DESTDIR install support, dependency rules).\n\n=== Code Style (P2) — 6 warnings ===\n1. R39: conandata.yml has 6 manually added mirror proxy URLs (should only have official URL)\n2. CS-R5: conanfile.py url='' placeholder ('# CI fills this')\n3. CS-R2: conanfile.py missing package_type='application' for tool\n4. CS-R7: test.sh missing 'set -o pipefail' (pipes present in tests)\n5. CS-R3: conanfile.py uses AutotoolsToolchain for Makefile build (wrong toolchain)\n6. R37: conanfile.py build() omits CFLAGS/PRODFLAGS documented in manifest.yaml\n\n=== Suggestions (P3) — 7 hints ===\n1. R34: test assertions only check non-empty output, not expected values\n2. R33: hardcoded default bash path in test_package/conanfile.py\n3. R38: commands.json binary=true but manifest status is 'built'\n4. CS-R1: docstring missing version and build system\n5. CS-R6: test.sh shebang hardcoded to HarmonyOS-specific path\n6. INFO: manifest.yaml patch_classification guard='pending'\n7. INFO: software-level manifest status inconsistency (published vs built)\n\nAll P2 issues are fixable before merge but do not block the PR. No deceptive behavior detected."
+}
