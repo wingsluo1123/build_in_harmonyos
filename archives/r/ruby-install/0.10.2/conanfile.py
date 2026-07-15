@@ -29,7 +29,7 @@ class RubyInstallConan(ConanFile):
     description = "Installs Ruby, JRuby, TruffleRuby, or mruby (pure Bash scripts)"
     license = "MIT"
     homepage = "https://github.com/postmodern/ruby-install"
-    url = ""  # CI fills this
+    url = "https://github.com/postmodern/ruby-install"
 
     package_type = "application"
 
@@ -75,8 +75,9 @@ class RubyInstallConan(ConanFile):
             copy(self, "*", src=share_src, dst=os.path.join(self.package_folder, "share"), keep_path=True)
 
         # Copy doc files
-        copy(self, "*.md", src=src_dir, dst=os.path.join(self.package_folder, "share", "doc", "ruby-install-0.10.2"), keep_path=False)
-        copy(self, "*.txt", src=src_dir, dst=os.path.join(self.package_folder, "share", "doc", "ruby-install-0.10.2"), keep_path=False)
+        doc_dir = os.path.join(self.package_folder, "share", "doc", f"ruby-install-{self.version}")
+        copy(self, "*.md", src=src_dir, dst=doc_dir, keep_path=False)
+        copy(self, "*.txt", src=src_dir, dst=doc_dir, keep_path=False)
 
     def package_info(self):
         # Pure script project: no libraries, just executables in bin/
