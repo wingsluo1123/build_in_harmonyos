@@ -16,7 +16,7 @@ development and debugging.
 - File upload/download capabilities
 - Escape character control
 
-## Compiled-in Options (2024.07)
+## Compiled-in Options (3.1)
 
 - TTY_Q_SZ: 0 (unlimited output queue)
 - HIGH_BAUD: enabled
@@ -28,3 +28,4 @@ development and debugging.
 | Version | Status | Date |
 |---------|--------|------|
 | 2024.07 | published | 2026-05-25 |
+| 3.1 | built | 2026-07-15 |
