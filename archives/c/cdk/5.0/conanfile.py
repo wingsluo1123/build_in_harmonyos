@@ -34,9 +34,6 @@ class CdkConan(ConanFile):
         export_conandata_patches(self)
 
     def config_options(self):
-        # OHOS platform: force static, remove shared option (R26)
-        if self.settings.os == "OHOS":
-            self.options.rm_safe("shared")
 
     def configure(self):
         if self.options.get_safe("shared"):
