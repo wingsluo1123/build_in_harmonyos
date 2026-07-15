@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe for minimap2 2.30 — a versatile pairwise aligner for genomic sequences.
+
+minimap2 is a C library + CLI tool for nucleotide sequence alignment.
+Build: make arm_neon=1 aarch64=1 (NEON via sse2neon on aarch64)
+Products: minimap2 binary + libminimap2.a static library
+"""
 import os
 
 from conan import ConanFile
