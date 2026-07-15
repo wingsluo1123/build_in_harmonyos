@@ -4,6 +4,7 @@
 
 Usage:
     python3 ohc-run.py submit <software> <version>
+    python3 ohc-run.py promote <software> <version>
     python3 ohc-run.py review <software> <version>
     python3 ohc-run.py post-merge <software> <version>
 """
@@ -1920,6 +1921,23 @@ def submit_cli(argv: list[str] | None = None) -> int:
         prog="ohc submit",
         description="门禁检查(完成/W3/W4) + 自检 + git push + 自动创建PR + "
                     "AI Review 监控(5阶段,HANDOFF) + CI 监控（阻塞式，失败 emit HANDOFF）",
+    )
+    parser.add_argument("software", help="软件名称")
+    parser.add_argument("version", help="版本号")
+    parser.add_argument("--project-dir", "-p", default=None)
+    parser.add_argument("--resume", action="store_true",
+                         help="从上次 HANDOFF 处恢复（跳过已完成阶段，从状态文件继续）")
+    args = parser.parse_args(argv)
+    return cmd_submit(args.software, args.version,
+                      pdir=getattr(args, "project_dir", None),
+                      resume=getattr(args, "resume", False))
+
+
+def promote_cli(argv: list[str] | None = None) -> int:
+    """CLI entry point: ohc promote <software> <version>"""
+    parser = argparse.ArgumentParser(
+        prog="ohc promote",
+        description="submit 的别名，用于平台统一调用 AI 推进/晋级流程",
     )
     parser.add_argument("software", help="软件名称")
     parser.add_argument("version", help="版本号")

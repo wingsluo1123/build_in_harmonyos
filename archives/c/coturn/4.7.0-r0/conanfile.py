@@ -21,6 +21,7 @@ class CoturnConan(ConanFile):
     def layout(self):
         self.folders.source = "."
         self.folders.build = "."
+        self.folders.generators = "gen"
 
     def requirements(self):
         self.requires("openssl/3.5.6")
@@ -45,10 +46,16 @@ class CoturnConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        os.environ["TMPDIR"] = os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make("-j$(nproc)")
+        tmpdir = os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")
+        self.run(f'mkdir -p "{tmpdir}"')
+        self.run(
+            f'CONFIG_SHELL="${{CONFIG_SHELL:-/bin/sh}}" TMPDIR="{tmpdir}" '
+            f'./configure --prefix=/ --bindir=${{prefix}}/bin --sbindir=${{prefix}}/bin '
+            f'--libdir=${{prefix}}/lib --includedir=${{prefix}}/include --oldincludedir=${{prefix}}/include '
+            f'--disable-shared --enable-static',
+            env="conanrun",
+        )
+        self.run("make -j$(nproc)", env="conanrun")
 
     def package(self):
         autotools = Autotools(self)

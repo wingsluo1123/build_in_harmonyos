@@ -13,6 +13,7 @@ _MODULES = {
     "verify-build": "verify_build",
     "summary": "summary",
     "submit": "submission",
+    "promote": "submission",
     "review": "submission",
     "post-merge": "submission",
     "feedback": "feedback",
