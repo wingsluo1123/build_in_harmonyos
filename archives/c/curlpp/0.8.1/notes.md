@@ -4,7 +4,7 @@
 - 构建系统: cmake
 - 编译日期: 2026-06-17
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -79,6 +79,4 @@ ls /storage/Users/currentUser/usr/local/lib/libcurlpp*
 ---
 
 **编译结束**: 2026-07-15 18:36
-**最终状态**: built
-15 18:36
 **最终状态**: built
