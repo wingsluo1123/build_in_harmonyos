@@ -73,7 +73,8 @@
 - hexedit 无 make check 目标
 - 交互模式需设置 `TERMINFO` 和 `TERM` 环境变量（HarmonyOS 默认 terminfo 不完整）
 - 打包签名版二进制可在 HarmonyOS 上正常执行
+
 ---
 
-**编译结束**：2026-05-27 01:31
-**最终状态**：published
+**编译结束**: 2026-07-16
+**最终状态**: built
