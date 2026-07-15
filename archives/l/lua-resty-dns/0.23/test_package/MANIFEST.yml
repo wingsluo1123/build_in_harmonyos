@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: lua-resty-dns/0.23
+homepage: "https://github.com/openresty/lua-resty-dns"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "PATH=$(OPENRESTY_PREFIX)/nginx/sbin:$$PATH prove -I../test-nginx/lib -r t"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "prove -I../test-nginx/lib -r t"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/mock.t
+    source: lua-resty-dns-0.23/t/mock.t
+    description: "Mock DNS server test (requires nginx + test-nginx + Perl)"
+    command: "prove t/mock.t"
+  - file: t/sanity.t
+    source: lua-resty-dns-0.23/t/sanity.t
+    description: "Sanity test (requires nginx + test-nginx + Perl)"
+    command: "prove t/sanity.t"
+
+# 上游测试无法在 OHOS 上运行的原因:
+#   lua-resty-dns 是 ngx_lua 模块库，测试依赖 OpenResty/Nginx 运行环境
+#   测试框架 test-nginx 需要 Perl + Nginx + LuaJIT，OHOS 环境不具备
+#   替代方案: 使用 test_package 验证 .lua 文件打包正确性和内容完整性
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/test_package.py
+    description: "Verifies resolver.lua is correctly packaged with all key API symbols"
+    command: "python3 test_package.py <package_lib>/resty/dns/resolver.lua"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 9
