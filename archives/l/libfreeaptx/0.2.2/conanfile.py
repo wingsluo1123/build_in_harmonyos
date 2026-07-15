@@ -21,7 +21,7 @@ class LibfreeaptxConan(ConanFile):
     description = "Free implementation of Audio Processing Technology codec (aptX)"
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/regularhunter/libfreeaptx"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
