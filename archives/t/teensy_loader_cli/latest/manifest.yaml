@@ -1,0 +1,74 @@
+software: teensy_loader_cli
+# 版本线 manifest 模板
+# 文件位置: archives/{letter}/{name}/latest/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "latest"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统
+build_system: makefile
+
+# 编译日期 (YYYY-MM-DD)
+build_date: "2026-07-15"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/PaulStoffregen/teensy_loader_cli/archive/refs/tags/2.3.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项 (平面字符串格式)
+  configure_options: ""
+
+  # 编译依赖列表 (格式: name/version)
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "纯 Makefile 项目，无 autotools/configure，直接调用编译器构建"
+  - "上游 Linux 分支硬编码 -DUSE_LIBUSB -lusb (libusb-0.1 compat API)"
+  - "无 Conan libusb 包可用，使用 stub USB 后端实现无依赖编译"
+  - "源码 USB 访问函数声明: teensy_open/teensy_write/teensy_close/hard_reboot/soft_reboot"
+  - "MakeToolchain 生成 CC/CFLAGS/LDFLAGS 环境变量，用于直接编译"
