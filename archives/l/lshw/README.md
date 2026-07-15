@@ -1,100 +1,52 @@
-# lshw B.02.20 for HarmonyOS
+# lshw for HarmonyOS
 
 ## 概述
 
-lshw 在 HarmonyOS/OpenHarmony (aarch64) 上的编译指南和测试记录。
+lshw (Hardware Lister) 在 HarmonyOS/OpenHarmony (aarch64) 上的适配。
 
 ## 软件信息
 
 | 项目 | 值 |
 |------|-----|
 | 名称 | lshw |
-| 版本 | B.02.20 |
+| 版本 | b.02.20 (上游 B.02.20) |
 | 下载地址 | https://github.com/lyonel/lshw/archive/refs/tags/B.02.20.tar.gz |
-| 官方文档 | {文档链接} |
-
-## 鸿蒙环境
-
-| 项目 | 值 |
-|------|-----|
-| 系统版本 | HarmonyOS HongMeng Kernel 1.11.0 |
-| 架构 | aarch64 |
-| 编译器 | clang (LLVM) |
-| 构建系统 | autotools |
+| 官方文档 | https://github.com/lyonel/lshw |
+| 许可证 | GPL-2.0 |
+| 构建系统 | makefile |
+| 类型 | 命令行工具 |
 
 ## 编译步骤
 
 ```bash
-# 1. 下载源码
-wget https://github.com/lyonel/lshw/archive/refs/tags/B.02.20.tar.gz
-tar -xzf {源码包}
-cd {源码目录}
+# 1. 应用补丁
+patch -p1 < patches/0001-src-Makefile.patch
+patch -p1 < patches/0002-src-core-pnp.cc.patch
 
-# 2. 应用补丁（如有）
-patch -p1 < patches/0001-xxx.patch
+# 2. 编译
+make -C src VERSION=b.02.20 PREFIX=/usr/local -j1
 
-# 3. 配置
-./configure --prefix=$HOME/usr/local {其他选项}
-
-# 4. 编译
-make -j$(nproc)
-
-# 5. 安装
-make install
+# 3. 安装
+make -C src install SBINDIR=/bin MANDIR=/share/man DATADIR=/share/lshw DESTDIR=<prefix>
 ```
 
 ## 补丁说明
 
-### 0001-xxx.patch
+### 0001-src-Makefile.patch
+- 在 DEFINES 中添加 -DNONLS，禁用 NLS/gettext 支持
+- 原因: OpenHarmony 平台缺少 gettext 库
 
-**目的**: {补丁用途说明}
-
-**修改文件**:
-- `config.guess`: 添加 HarmonyOS 系统检测
-- `config.sub`: 添加 ohos 操作系统支持
-
-**关键修改详解**:
-
-```diff
-# 关键代码片段
-```
+### 0002-src-core-pnp.cc.patch
+- 在 pnp.cc 中添加 #include "config.h"
+- 原因: 修复缺失的 include 导致的编译错误
 
 ## 遇到的问题
 
-### 问题1: {问题描述}
-
-**现象**: {错误信息}
-
-**原因**: {根因分析}
-
-**解决**: {解决方案}
+### Conan 版本必须全小写
+- 上游版本 `B.02.20` 包含大写字母，Conan 2.x 要求全小写
+- 使用 `b.02.20` 作为 Conan 版本号
 
 ## 测试结果
 
-详见 [test-report.md](./reports/test-report.md)
-
-| 测试项 | 结果 |
-|--------|------|
-| {功能1} | ✅ |
-| {功能2} | ✅ |
-| {功能3} | ⚠️ 部分功能受限 |
-
-## 验证安装
-
-```bash
-# 检查安装
-ls -la $HOME/usr/local/lib/libxxx*
-
-# 检查功能
-{验证命令}
-```
-
-## 经验总结
-
-1. {经验1}
-2. {经验2}
-
-## 参考资料
-
-- {参考链接1}
-- {参考链接2}
+- `lshw -version` 输出 `B.02.20` ✅
+- conan create + test_package 通过 ✅
