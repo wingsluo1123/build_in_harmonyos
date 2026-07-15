@@ -1,35 +1,32 @@
-diff -ruN a/Makefile b/Makefile
---- a/Makefile
-+++ b/Makefile
-@@ -1,28 +1,27 @@
--FILES=README cli.c tcping.h tcping.c Makefile LICENSE
-+FILES=README.md cli.c tcping.h tcping.c Makefile
+--- a/Makefile	2026-07-15 17:55:28.997329219 +0800
++++ b/Makefile	2026-07-15 17:55:41.209329844 +0800
+@@ -2,27 +2,26 @@
  VERNUM=$$(grep TCPING_VERSION tcping.h | cut -d" " -f3 | sed -e 's/"//g')
  VER=tcping-$(VERNUM)
  
 -CCFLAGS=-Wall
 -CC=gcc
 +PREFIX?=/usr/local
-+CCFLAGS=-Wall -fPIC -O2
-+CC=clang
++CCFLAGS?=-Wall
++CC?=gcc
  
 -tcping.linux: tcping.c
-+all: tcping
-+
-+tcping: cli.c tcping.c tcping.h
- 	$(CC) -o tcping $(CCFLAGS) cli.c tcping.c
- 
+-	$(CC) -o tcping $(CCFLAGS) cli.c tcping.c
+-
 -tcping.macos: tcping.linux
++all: tcping
+ 
+-tcping.openbsd: tcping.linux
++tcping: cli.c tcping.c tcping.h
++	$(CC) -o tcping $(CCFLAGS) cli.c tcping.c
+ 
+-readme: man/tcping.1
+-	groff -man -Tascii man/tcping.1 | col -bx > README
 +install: tcping
 +	mkdir -p $(DESTDIR)$(PREFIX)/bin
 +	cp tcping $(DESTDIR)$(PREFIX)/bin/tcping
 +	chmod 755 $(DESTDIR)$(PREFIX)/bin/tcping
  
--tcping.openbsd: tcping.linux
--
--readme: man/tcping.1
--	groff -man -Tascii man/tcping.1 | col -bx > README
--
 -.PHONY: clean dist
 +.PHONY: all clean install dist
  clean:
