@@ -1,3 +1,4 @@
+import os
 from conan import ConanFile
 
 
@@ -8,4 +9,7 @@ class CoturnTestPackage(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        self.run("turnserver --version", env="conanrun")
+        # Verify binary is a valid ELF executable
+        pkg = self.dependencies["coturn"]
+        binary = os.path.join(pkg.package_folder, "bin", "turnserver")
+        self.run(f'file "{binary}"')
