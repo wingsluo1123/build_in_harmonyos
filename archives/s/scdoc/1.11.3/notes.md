@@ -4,7 +4,7 @@
 - 构建系统: makefile（无 configure）
 - 编译日期: 2026-07-15
 - 编译器: clang 15.0.4
-- 状态: published
+- 状态: built
 
 ## 软件简介
 scdoc 是一个简单的 man page 生成工具，使用自定义的标记语言编写，可以生成标准的 roff 格式 man pages。
@@ -65,8 +65,4 @@ make install DESTDIR=$PREFIX PREFIX=
 
 ---
 **编译结束**: 2026-07-15
-**最终状态**: built
----
-
-**编译结束**: 2026-07-15 20:13
 **最终状态**: built
