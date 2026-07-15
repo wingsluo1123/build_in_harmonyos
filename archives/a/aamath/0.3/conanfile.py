@@ -46,7 +46,7 @@ class AamathConan(ConanFile):
         comp = self.conf.get("tools.build:compiler_executables", check_type=dict, default={})
         cxx = comp.get("cpp", "clang++") if comp else "clang++"
 
-        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        sysroot = self._find_sysroot()
         src = self.source_folder
 
         self.run(
@@ -59,6 +59,23 @@ class AamathConan(ConanFile):
             env="conanbuild",
             cwd=src,
         )
+
+    def _find_sysroot(self):
+        """Find prefix containing readline/ncurses headers and libs."""
+        candidates = [
+            os.environ.get("DEFAULT_PREFIX"),
+            os.path.expanduser("~/usr/local"),
+            "/data/service/hnp",
+            "/usr/local",
+            "/usr",
+        ]
+        for path in candidates:
+            if not path:
+                continue
+            if os.path.isfile(os.path.join(path, "include", "readline", "readline.h")):
+                return path
+        # Fallback: use DEFAULT_PREFIX or ~/usr/local (will fail with clear error if missing)
+        return os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
 
     def package(self):
         src = self.source_folder
