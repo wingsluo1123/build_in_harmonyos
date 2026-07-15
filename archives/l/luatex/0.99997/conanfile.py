@@ -54,6 +54,15 @@ class LuatexConan(ConanFile):
     def build(self):
         os.umask(0o022)  # HMDFS: 077 prevents writing to 700 dirs
         apply_conandata_patches(self)
+        # Fix umask 077 → 022 in all configure scripts (HMDFS workaround)
+        # config.status inherits umask 077 from configure, causing Permission denied
+        for dirpath, _, filenames in os.walk(self.source_folder):
+            for f in filenames:
+                if f == "configure":
+                    filepath = os.path.join(dirpath, f)
+                    content = open(filepath).read()
+                    if "umask 077" in content:
+                        open(filepath, "w").write(content.replace("umask 077", "umask 022"))
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
