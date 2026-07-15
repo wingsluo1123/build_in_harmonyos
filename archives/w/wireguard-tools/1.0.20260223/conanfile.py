@@ -10,6 +10,7 @@ License: GPL-2.0
 import os
 import shutil
 import subprocess
+import time
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
@@ -23,8 +24,8 @@ class WireguardToolsConan(ConanFile):
     description = "WireGuard userspace tools — wg and wg-quick"
     license = "GPL-2.0"
     homepage = "https://www.wireguard.com/"
-    url = ""  # CI fills this
 
+    package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
@@ -127,7 +128,7 @@ class WireguardToolsConan(ConanFile):
                 if r.returncode == 0 and os.path.exists(tmp):
                     shutil.move(tmp, bin_path)
                     break
-                import time; time.sleep(1)
+                time.sleep(1)
             else:
                 if os.path.exists(tmp):
                     os.remove(tmp)

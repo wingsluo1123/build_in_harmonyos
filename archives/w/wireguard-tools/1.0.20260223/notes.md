@@ -4,7 +4,7 @@
 - 构建系统: makefile (纯 Makefile，无 configure 脚本)
 - 编译日期: 2026-07-15
 - 编译器: clang/clang++ (clang 15.0.4)
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
