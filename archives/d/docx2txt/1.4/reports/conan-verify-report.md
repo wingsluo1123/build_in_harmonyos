@@ -3,7 +3,7 @@
 **Verdict**: PASS
 **Reference**: `docx2txt/1.4@ohpcd/stable`
 **Profile**: ohos-aarch64
-**Date**: 2026-07-15T23:16:34.017632
+**Date**: 2026-07-15T23:26:15.717517
 
 ## G0: ✅ PASS
   📦 构建系统: unknown
