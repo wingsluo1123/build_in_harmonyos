@@ -15,7 +15,7 @@ class HydraConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "patches/*"
 
-    def layout(self):
+    build(self): layout(self):
         basic_layout(self)
 
     def source(self):
