@@ -3,14 +3,14 @@
 
 CDO is a command-line tool for processing climate and forecast data.
 Uses autotools build system. config.guess/config.sub are patched
-with patch-ohos.sh for HarmonyOS platform recognition (E007).
+via conandata patches for HarmonyOS platform recognition (E007).
 """
 import os
 import shutil
 
 from conan import ConanFile
 from conan.tools.env import Environment
-from conan.tools.files import copy, get, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, get, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -28,7 +28,6 @@ class CdoConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        copy(self, "patches/*", src=self.recipe_folder, dst=self.export_sources_folder)
 
     def requirements(self):
         pass
@@ -75,6 +74,7 @@ class CdoConan(ConanFile):
 
     def build(self):
         shell_path = self._resolve_shell()
+        apply_conandata_patches(self)
         conanbuild_sh = os.path.join(self.generators_folder, "conanbuild.sh")
         if os.path.exists(conanbuild_sh):
             with open(conanbuild_sh, "r", encoding="utf-8") as f:
@@ -87,10 +87,6 @@ class CdoConan(ConanFile):
             if fix not in content:
                 with open(conanbuild_sh, "w", encoding="utf-8") as f:
                     f.write(content + fix)
-        # E007: Patch config.guess/config.sub for HarmonyOS via helper script
-        script = os.path.join(self.export_sources_folder, "patches", "patch-ohos.sh")
-        if os.path.exists(script):
-            self.run(f'"{shell_path}" "{script}" "{self.source_folder}"', env="conanbuild")
         # Build with autotools
         autotools = Autotools(self)
         autotools.configure()
