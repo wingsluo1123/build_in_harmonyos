@@ -24,3 +24,5 @@ class BerkeleyDb4TestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Run the test executable directly to verify functionality
+        self.run(os.path.join(self.cpp.build.bindir, "test_db"))
