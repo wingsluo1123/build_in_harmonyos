@@ -1,0 +1,22 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "CS-1",
+      "file": "archives/d/dynamips/0.2.23/test_package/conanfile.py",
+      "line": 1,
+      "description": "test_package/conanfile.py 缺少文件级 shebang 行 (#!/usr/bin/env python3)。code-style 规则1 要求 conanfile.py 必须有 shebang + docstring。该文件虽有类级 docstring 但无 shebang 和文件级 docstring。",
+      "fix_suggestion": "在文件首行添加 #!/usr/bin/env python3，并在 import 前添加文件级 docstring 说明测试包用途。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/d/dynamips/0.2.23/test_package/MANIFEST.yml",
+      "line": 25,
+      "description": "assertion_count 仅为 1。对于 CLI 工具 smoke test 虽已满足最低要求（执行二进制并验证版本输出），但可考虑增加更多断言以提升测试覆盖度。",
+      "fix_suggestion": "可在 test.sh 中增加 file 命令验证二进制为 ELF 格式、ldd 验证关键依赖库存在等额外断言，并相应更新 assertion_count。"
+    }
+  ],
+  "summary": "dynamips/0.2.23 (修复后) Pre-PR 审计通过（PASS）。所有 P0/P1 检查项均清零。\n\n【P0 欺骗性行为检测 - 全部通过】\n- R34 空壳测试: test_package/conanfile.py 的 test() 方法通过 self.run() 执行 test.sh，test.sh 实际调用 dynamips --version 和 --help 二进制并 grep 验证输出，非空壳测试。✅\n- R9 跳过测试/伪造通过: test() 非 pass、无注释掉 cmake.test()、无 os.system('exit 0')。✅\n- 伪造状态标记: 版本级 manifest.yaml status=built，软件级 manifest.yaml status=built，notes.md 状态=built，三处一致。built 表示验证通过未 upload，notes.md 有详细验证记录佐证。✅\n- 伪造 sha256: conandata.yml 和 manifest.yaml 的 sha256 均为 503bbb52c03f91900ea8dbe8bd0b804b76e2e28d0b7242624e0d3c52dda441a1（64位 hex），非全零/全f/过短。✅\n- R8 #ifdef __OHOS__ 空壳stub: 补丁和源码中无 #ifdef __OHOS__。N/A。✅\n- R19 预编译二进制: changed_files 中无 .so/.a/二进制文件。✅\n- R40 深度适配验证: dynamips 为网络仿真工具，不在图形/UI/多媒体/外设/系统底层类别中。N/A。✅\n\n【P1 配方正确性 - 全部通过】\n- conanfile.py: package_type=application（CLI工具正确）；无 self.settings.os 判断（R32 N/A，无OS分支不需in判断）；无 os.environ 裸用（R33 通过，使用 CMakeToolchain）；无硬编码 remote；url 非空（cnb.cool 制品仓路径）；Conan 2.x API 正确（from conan import ConanFile，conan.tools.cmake/files）；方法顺序正确（export_sources→requirements→layout→source→generate→build→package→package_info）；package_info 设置 bindirs=[bin]（application 正确）。✅\n- conandata.yml: URL 为 HTTPS 官方源 https://github.com/GNS3/dynamips/archive/refs/tags/v0.2.23.tar.gz（GNS3 为 dynamips 官方维护组织）；无镜像 URL 前缀（无 gh-proxy/ghproxy/gitclone 等）；sha256 非空非伪造；patches 格式正确（patch_file + patch_description 空格分隔 + patch_type=portability）。✅\n- test_package: conanfile.py 有 test() 且有 self.run()；测试源文件 test.sh 存在；MANIFEST.yml 存在；测试非空壳（实际执行 dynamips 二进制）。✅\n- commands.json: type=tool ✅；name=dynamips 匹配包名 ✅；version 0.2.23 存在 ✅；路径在软件级目录（archives/d/dynamips/commands.json）✅。\n- manifest.yaml (版本级): status=built 真实 ✅；sha256 非空 ✅。\n- manifest.yaml (软件级): versions.0.2.23.status=built 与版本级一致 ✅。\n- notes.md: 状态 built 与 manifest.yaml 一致 ✅。\n\n【P2/P3 规范性建议 - 不影响通过】\n- P3: test_package/conanfile.py 缺少文件级 shebang（code-style 规则1 适用于主 conanfile.py，test_package 为建议项）。\n- P3: assertion_count=1 虽满足 CLI 工具 smoke test 最低要求，可考虑增加 ELF 完整性、依赖库验证等断言。\n\n判定: P0/P1 清零 → PASS。"
+}

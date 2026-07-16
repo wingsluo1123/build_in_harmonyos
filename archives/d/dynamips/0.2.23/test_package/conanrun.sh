@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/d/dynamips/0.2.23/test_package/conanrunenv-release-armv8.sh"
