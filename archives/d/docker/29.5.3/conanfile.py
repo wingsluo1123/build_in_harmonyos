@@ -153,6 +153,9 @@ class DockerCliConan(ConanFile):
         os.environ["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = "1"
         os.environ["TMPDIR"] = writable_tmp
         os.environ["GOTMPDIR"] = writable_tmp
+        # Reduce memory usage to avoid OOM kills on CI workers
+        os.environ["GOGC"] = "50"
+        os.environ["GOMEMLIMIT"] = "2GiB"
 
         ldflags = (
             "-X github.com/docker/cli/cli/version.GitCommit=29.5.3"
@@ -160,7 +163,7 @@ class DockerCliConan(ConanFile):
             " -X github.com/docker/cli/cli/version.Version=29.5.3"
         )
         cmd = (
-            f'go build -mod=vendor -o "{output_path}"'
+            f'go build -mod=vendor -p 1 -o "{output_path}"'
             f" -tags grpcnotrace"
             f' -ldflags "{ldflags}"'
             f" github.com/docker/cli/cmd/docker"
