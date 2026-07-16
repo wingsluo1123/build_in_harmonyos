@@ -6,7 +6,6 @@ L1 test: verify the vmtouch binary is installed and can inspect a file's cache s
 import os
 
 from conan import ConanFile
-from conan.tools.build import can_run
 
 
 class VmtouchTestConan(ConanFile):
@@ -18,7 +17,6 @@ class VmtouchTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        if can_run(self):
-            pkg_folder = self.dependencies["vmtouch"].package_folder
-            bin_path = os.path.join(pkg_folder, "bin", "vmtouch")
-            self.run(f'sh test.sh "{bin_path}"', env="conanrun")
+        pkg_folder = self.dependencies["vmtouch"].package_folder
+        bin_path = os.path.join(pkg_folder, "bin", "vmtouch")
+        self.run(f'sh test.sh "{bin_path}"', env="conanrun")
