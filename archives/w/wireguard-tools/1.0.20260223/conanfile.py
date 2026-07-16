@@ -114,10 +114,19 @@ class WireguardToolsConan(ConanFile):
         bin_path = os.path.join(self.package_folder, "bin", "wg")
         sign_tool = "/data/service/hnp/bin/binary-sign-tool"
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
+
+        # Ensure execution permissions regardless of signing tool availability
+        os.chmod(bin_path, 0o755)
+        os.chmod(os.path.join(self.package_folder, "bin", "wg-quick"), 0o755)
+
         if os.path.exists(sign_tool) and os.path.exists(objcopy):
             # Remove old signature if present
-            subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
-                           capture_output=True, timeout=10)
+            r = subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
+                               capture_output=True, timeout=10)
+            if r.returncode != 0:
+                raise ConanException(
+                    f"objcopy --remove-section .codesign failed: {r.stderr.decode().strip()}"
+                )
             # Sign with self-signed certificate
             tmp = bin_path + ".signed.tmp"
             for _attempt in range(3):
@@ -137,9 +146,6 @@ class WireguardToolsConan(ConanFile):
                     f"Binary will not be executable on HarmonyOS."
                 )
             os.chmod(bin_path, 0o755)
-
-            # Also sign wg-quick (it's a script, just ensure executable)
-            os.chmod(os.path.join(self.package_folder, "bin", "wg-quick"), 0o755)
 
     def package_info(self):
         # wireguard-tools is a command-line tool, not a library

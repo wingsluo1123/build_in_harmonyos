@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/opt/ai-worker/repo/archives/w/wireguard-tools/1.0.20260223/test_package/conanrunenv-release-armv8.sh"
