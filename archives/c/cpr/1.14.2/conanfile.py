@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Conan recipe for cpr 1.14.2 — C++ Requests: Curl for People.
+
+Build system: CMake, C++17.
+Dependencies: curl/8.13.0 (system curl, not the built-in FetchContent one).
+"""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -14,8 +20,6 @@ class CprConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False]}
-    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -31,7 +35,7 @@ class CprConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.get_safe("shared") else "OFF"
         tc.variables["CPR_USE_SYSTEM_CURL"] = "ON"
         tc.variables["CPR_ENABLE_SSL"] = "OFF"
         tc.variables["CPR_CURL_USE_LIBPSL"] = "OFF"

@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Conan test_package for cpr 1.14.2 — verifies the library compiles and links correctly.
+
+Builds test_cpr.cpp and runs the resulting binary to confirm cpr headers
+and the static library are usable from a consumer project.
+"""
 import os
 
 from conan import ConanFile
@@ -20,4 +26,5 @@ class CprTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run(os.path.join(self.test_build_folder, "test_cpr"), env="conanrun")
+        bin_path = os.path.join(self.cpp.build.bindir, "test_cpr")
+        self.run(bin_path, env="conanrun")
