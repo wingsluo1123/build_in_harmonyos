@@ -5,8 +5,14 @@ set -e
 
 VMTOUCH_BIN="${1:-vmtouch}"
 
+# Verify the binary exists and is executable
+if [ ! -x "$VMTOUCH_BIN" ]; then
+    echo "FAIL: vmtouch binary not found or not executable: $VMTOUCH_BIN"
+    exit 1
+fi
+
 # L2 smoke test: verify binary runs and shows version
-output=$("$VMTOUCH_BIN" -h 2>&1 || true)
+output=$("$VMTOUCH_BIN" -h 2>&1)
 case "$output" in
     *vmtouch*)
         echo "PASS: vmtouch binary works correctly"
