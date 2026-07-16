@@ -41,7 +41,7 @@ class VmtouchConan(ConanFile):
         apply_conandata_patches(self)
         # R33: Get compiler from Conan conf, NEVER from shell env vars
         # tools.build:compiler_executables is a dict {c, cpp}, not a sub-conf
-        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = compilers.get("c", "clang")
         # Only build the vmtouch binary (not vmtouch.8 which requires pod2man)
         self.run(f"make vmtouch CC={cc} CFLAGS='-Wall -O2 -g -std=c99 -fPIC' -j1",
