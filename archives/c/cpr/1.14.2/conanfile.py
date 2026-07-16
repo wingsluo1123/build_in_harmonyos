@@ -20,6 +20,8 @@ class CprConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
