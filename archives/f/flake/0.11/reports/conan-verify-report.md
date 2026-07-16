@@ -3,7 +3,7 @@
 **Verdict**: PASS
 **Reference**: `flake/0.11@ohpcd/stable`
 **Profile**: ohos-aarch64
-**Date**: 2026-07-16T16:48:40.207759
+**Date**: 2026-07-16T21:29:44.887051
 
 ## G0: ✅ PASS
   📦 构建系统: unknown
