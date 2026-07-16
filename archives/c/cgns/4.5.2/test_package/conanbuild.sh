@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/c/cgns/4.5.2/test_package/conanbuildenv-release-armv8.sh"
