@@ -30,4 +30,4 @@ class Bento4Conan(ConanFile):
         copy(self, "*.hpp", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
-        self.cpp_info.libs = ["bento4"]
+        self.cpp_info.libs = ["ap4"]
