@@ -7,11 +7,10 @@ from conan.errors import ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import (
     apply_conandata_patches,
-    check_sha256,
     copy,
     export_conandata_patches,
+    get,
 )
-from conan.tools.scm import Git
 
 
 class LibldacConan(ConanFile):
@@ -43,27 +42,13 @@ class LibldacConan(ConanFile):
 
     def source(self):
         source = self.conan_data["sources"]
-        git = Git(self)
-        git.clone(
+        get(
+            self,
             url=source["url"],
-            target="upstream",
-            args=["--filter=blob:none", "--no-checkout"],
+            sha256=source["sha256"],
+            destination=os.path.join(self.source_folder, "upstream"),
+            strip_root=True,
         )
-        upstream_git = Git(self, folder="upstream")
-        upstream_git.checkout(commit=source["revision"])
-
-        actual_tree = upstream_git.run("rev-parse HEAD^{tree}").strip()
-        if actual_tree != source["tree"]:
-            raise ConanInvalidConfiguration(
-                f"unexpected source tree {actual_tree}; expected {source['tree']}"
-            )
-
-        source_archive = os.path.join(self.source_folder, "libldac-source.tar")
-        upstream_git.run(
-            f'archive --format=tar --output="{source_archive}" "{source["revision"]}"'
-        )
-        check_sha256(self, source_archive, source["sha256"])
-        os.remove(source_archive)
 
     def generate(self):
         toolchain = CMakeToolchain(self)
