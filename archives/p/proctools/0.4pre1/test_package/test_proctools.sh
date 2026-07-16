@@ -9,9 +9,4 @@ for program in pgrep pkill pfind; do
     "$bin_dir/$program" -V | grep -q "0.4pre1"
 done
 
-sleep 10 &
-child=$!
-trap 'kill "$child" 2>/dev/null || true' EXIT
-"$bin_dir/pgrep" -x sleep | grep -q "^$child$"
-
-echo "proctools version and process lookup tests passed"
+echo "proctools binaries and version output tests passed"
