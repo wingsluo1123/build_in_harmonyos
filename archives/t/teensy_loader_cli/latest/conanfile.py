@@ -41,6 +41,7 @@ class TeensyLoaderCliConan(ConanFile):
             "${CC:-cc} ${CFLAGS:-} -o teensy_loader_cli "
             "teensy_loader_cli.c stub_usb.c ${LDFLAGS:-}",
             env="conanbuild",
+            cwd=self.source_folder,
         )
 
     def package(self):
