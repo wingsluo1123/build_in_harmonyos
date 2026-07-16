@@ -8,8 +8,8 @@
 
 ## 编译步骤
 1. 下载源码（abishekvashok/cmatrix v2.0，官方上游 bisqwit/cmatrix 无 release tag）
-2. 应用补丁：cmake_minimum_required 2.8 → 3.5（CMake 4.x 兼容性）
-3. 创建 ncurses.h 包装器（OHOS 系统 ncurses 只有 curses.h）
+2. 应用补丁：更新 CMake 最低版本，并改为独立发现 ncurses 库
+3. 创建可适配多种系统头布局的 ncurses.h 包装器；系统未安装头文件时使用随配方导出的 ncurses 6.4 生成头
 4. cmake configure + cmake build
 5. 手动打包 bin/cmatrix
 
@@ -19,7 +19,7 @@
 - R39 例外: 已获主编批准，追溯记录见 PR #1953
 
 ## 依赖
-- ncurses（系统库，/root/sysnc，非 Conan 包）
+- ncurses（CI/目标环境系统库，非 Conan 包；头文件缺失时使用随配方导出的兼容头）
 
 ## 验证结果
 ```bash
@@ -36,7 +36,7 @@ Web: https://github.com/abishekvashok/cmatrix
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | CMake 4.x 不兼容 cmake_minimum_required(VERSION 2.8) | CMake 4.x 移除了 3.5 以下版本兼容 | 补丁修改为 3.5 |
-| 2 | ncurses.h 找不到 | OHOS 系统 ncurses 只有 curses.h 无 ncurses.h | source() 中创建 ncurses.h → #include <curses.h> |
+| 2 | CI 编译找不到 curses.h | Worker 已安装 ncurses 静态库，但未安装对应开发头文件 | 导出 ncurses 6.4 生成头作为 fallback，并补丁分离库与头文件发现 |
 | 3 | CMake install 找不到 CMakeRelink.dir | CMake 4.x 生成新式 install 路径 | 手动 copy 二进制到 package bin/ |
 
 ## 注意事项
