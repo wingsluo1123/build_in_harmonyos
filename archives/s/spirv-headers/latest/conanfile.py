@@ -48,6 +48,7 @@ class SpirvHeadersConan(ConanFile):
             dst=os.path.join(self.package_folder, "include"),
         )
 
+        copy(self, "*.hpp11", src=os.path.join(self.source_folder, "include"), dst=os.path.join(self.package_folder, "include"))
     def package_info(self):
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include"]
