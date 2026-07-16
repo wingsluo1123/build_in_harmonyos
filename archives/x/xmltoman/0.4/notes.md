@@ -12,7 +12,7 @@
 
 1. 初始化编译环境：`python3 $SKILL_ROOT/scripts/ohc-run.py init-build xmltoman 0.4 --url=...`
 2. 安装运行时依赖 XML::Parser Perl 模块（通过 CPAN 安装，依赖 expat 库）
-3. 修复 shebang 路径：将 `#!/usr/bin/perl -w` 改为 `#!/storage/Users/currentUser/usr/local/bin/perl -w`
+3. 修复 shebang 路径：将 `#!/usr/bin/perl -w` 改为 `#!/usr/bin/env perl`
 4. 构建 man 页面：`make PREFIX=$DEFAULT_PREFIX`
 5. DESTDIR 安装：`make install PREFIX=$DEFAULT_PREFIX DESTDIR=$TEST_PREFIX`
 6. 预编译包制作：`python3 $SKILL_ROOT/scripts/ohc-run.py package xmltoman 0.4`
@@ -24,7 +24,7 @@
 
 | # | 问题 | 根因 | 解决方案 | 知识图谱关联 |
 |---|------|------|----------|------------|
-| 1 | xmltoman/xmlmantohtml 脚本无法执行 | shebang `#!/usr/bin/perl` 指向不存在的路径 | 修改为 `#!/storage/Users/currentUser/usr/local/bin/perl -w` | E049, E105(draft) |
+| 1 | xmltoman/xmlmantohtml 脚本无法执行 | shebang `#!/usr/bin/perl` 指向不存在的路径 | 修改为 `#!/usr/bin/env perl`（可移植，避免硬编码路径） | E049, E105(draft) |
 | 2 | XML::Parser Perl 模块缺失 | xmltoman 运行需要 XML::Parser 模块 | 通过 CPAN 安装 XML::Parser 2.59（需先有 expat 库） | 本版特有 |
 | 3 | Python3 无法启动（libintl.so.8 缺失） | musl 系统不自动加载 python.org lib 目录 | 设置 LD_LIBRARY_PATH 包含 `/data/service/hnp/python.org/python_3.12/lib` | 环境问题 |
 | 4 | G4 门禁首次失败 | manifest 缺少 `build_system` 字段 | 添加 `build_system: makefile` 字段 | 流程问题 |
@@ -32,8 +32,8 @@
 
 # 源码修改
 
-- **0001-xmlmantohtml.patch**: 修复 xmlmantohtml 的 Perl shebang 路径（`#!/usr/bin/perl` → `#!/storage/Users/currentUser/usr/local/bin/perl -w`）
-- **0002-xmltoman.patch**: 修复 xmltoman 的 Perl shebang 路径（`#!/usr/bin/perl -w` → `#!/storage/Users/currentUser/usr/local/bin/perl -w`）
+- **0001-xmlmantohtml.patch**: 修复 xmlmantohtml 的 Perl shebang 路径（`#!/usr/bin/perl` → `#!/usr/bin/env perl`）
+- **0002-xmltoman.patch**: 修复 xmltoman 的 Perl shebang 路径（`#!/usr/bin/perl -w` → `#!/usr/bin/env perl`）
 
 # 依赖版本
 

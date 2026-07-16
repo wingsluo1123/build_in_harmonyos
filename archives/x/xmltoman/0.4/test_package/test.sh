@@ -35,7 +35,7 @@ echo "[test] xmltoman execution (requires Perl + XML::Parser)"
 output=$(xmltoman 2>&1) || true
 if echo "$output" | grep -q "You need to specify a file to parse"; then
     echo "✅ xmltoman executed successfully with usage message"
-elif echo "$output" | grep -qi "XML/Parser\|Can't locate"; then
+elif echo "$output" | grep -qi -e "XML/Parser" -e "Can't locate"; then
     echo "⚠️ XML::Parser Perl module not available (runtime dependency)"
     echo "⚠️ xmltoman package requires Perl XML::Parser module at runtime"
     # Don't fail — XML::Parser is a system runtime dependency, not a packaging issue.
@@ -49,10 +49,12 @@ echo "[test] xmlmantohtml execution"
 output=$(xmlmantohtml 2>&1) || true
 if echo "$output" | grep -q "You need to specify a file to parse"; then
     echo "✅ xmlmantohtml executed successfully with usage message"
-elif echo "$output" | grep -qi "XML/Parser\|Can't locate"; then
+elif echo "$output" | grep -qi -e "XML/Parser" -e "Can't locate"; then
     echo "⚠️ XML::Parser Perl module not available (runtime dependency)"
+    echo "⚠️ xmlmantohtml package requires Perl XML::Parser module at runtime"
 else
-    echo "⚠️ xmlmantohtml output: $output (acceptable)"
+    echo "❌ unexpected output from xmlmantohtml: $output"
+    exit 1
 fi
 
 echo "[test] data files installed"

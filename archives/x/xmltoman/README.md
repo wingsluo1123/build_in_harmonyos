@@ -26,7 +26,7 @@ xmltoman 是一个轻量级实用工具，将遵循其自有 DTD 格式的 XML �
 
 ## OpenHarmony/HarmonyOS 平台适配要点
 
-- Perl shebang 需从 `#!/usr/bin/perl` 修改为平台实际 Perl 路径 `#!/storage/Users/currentUser/usr/local/bin/perl -w`
+- Perl shebang 需从 `#!/usr/bin/perl` 修改为 `#!/usr/bin/env perl`（可移植，避免硬编码路径）
 - 需预先安装 XML::Parser Perl 模块（依赖 expat 库）
 - 无编译步骤——纯 Perl 脚本工具，仅需修复 shebang 和 `make install`
 
