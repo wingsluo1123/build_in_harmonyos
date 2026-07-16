@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+"""Conan recipe for txt2man 1.7.1 — convert flat ASCII text to man page format.
+
+txt2man is a shell script tool that converts plain text to man page format.
+It also includes src2man and bookman utilities.
+
+R28: test_package/ exists.
+R32: settings.os supports OHOS.
+R38: commands.json declared (command-line tool).
+"""
 import os
 
 from conan import ConanFile
@@ -42,4 +52,3 @@ class Txt2ManConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libdirs = []
         self.cpp_info.resdirs = ["share"]
-   self.cpp_info.resdirs = ["share"]
