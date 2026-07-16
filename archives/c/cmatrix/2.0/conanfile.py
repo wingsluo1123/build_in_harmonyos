@@ -34,25 +34,24 @@ class CmatrixConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        # Create ncurses.h wrapper if system ncurses only has curses.h
-        curses_prefix = "/root/sysnc"
-        if os.path.isdir(curses_prefix) and not os.path.isfile(os.path.join(curses_prefix, "include", "ncurses.h")):
-            ncurses_h = os.path.join(self.source_folder, "ncurses.h")
+        # Create ncurses.h wrapper pointing to curses.h
+        # OHOS sysroot provides curses.h but not ncurses.h
+        ncurses_h = os.path.join(self.source_folder, "ncurses.h")
+        if not os.path.isfile(ncurses_h):
             with open(ncurses_h, "w") as f:
                 f.write('#include <curses.h>\n')
             self.output.info("Created ncurses.h wrapper in source folder")
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Use system ncurses
-        curses_prefix = "/root/sysnc"
-        if os.path.isdir(curses_prefix):
-            tc.variables["CMAKE_INCLUDE_PATH"] = f"{curses_prefix}/include"
-            tc.variables["CMAKE_LIBRARY_PATH"] = f"{curses_prefix}/lib"
         # CMake >= 3.5 removed compatibility with cmake_minimum_required(VERSION 2.8)
         tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         # Add source dir to include path for ncurses.h wrapper
-        tc.variables["CMAKE_C_STANDARD_INCLUDE_DIRECTORIES"] = "${CMAKE_CURRENT_SOURCE_DIR}"
+        # Use absolute path to avoid CMake 4.x relative path error
+        tc.variables["CMAKE_C_STANDARD_INCLUDE_DIRECTORIES"] = self.source_folder
+        # Allow finding ncurses in toolchain sysroot
+        tc.variables["CMAKE_FIND_ROOT_PATH_MODE_INCLUDE"] = "BOTH"
+        tc.variables["CMAKE_FIND_ROOT_PATH_MODE_LIBRARY"] = "BOTH"
         tc.generate()
 
     def build(self):
