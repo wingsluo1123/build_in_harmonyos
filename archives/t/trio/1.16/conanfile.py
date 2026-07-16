@@ -79,3 +79,6 @@ class TrioConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.set_property("cmake_file_name", "trio")
         self.cpp_info.set_property("cmake_target_name", "trio::trio")
+
+    def _recursive_chmod(self):
+        def _recursive_chmod(self, path, mode):
