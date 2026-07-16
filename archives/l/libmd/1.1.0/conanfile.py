@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Conan recipe for libmd 1.1.0."""
+"""Conan recipe for libmd 1.1.0.
+OHOS 上 HMDFS 禁止执行用户文件 (E046)，config.status 创建临时 awk 脚本会失败。
+解决：configure 后在 config.status 中用 $AWK -f 替换直接执行。
+"""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -30,7 +33,6 @@ class LibmdConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # OHOS aarch64 的 config.guess/sub 不识别 linux-ohos 三元组，显式指定
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.generate()
 
@@ -38,6 +40,10 @@ class LibmdConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
+        # OHOS HMDFS noexec (E046): config.status 中临时 awk 脚本无法直接执行,
+        # 用 $AWK -f 方式运行
+        self.run(r"sed -i 's|\./conftmp[^ ]*/subs1\.awk|$AWK -f &|g' config.status",
+                 cwd=self.source_folder, ignore_errors=True)
         autotools.make(args=["-j1"])
 
     def package(self):
