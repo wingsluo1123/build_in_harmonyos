@@ -44,6 +44,9 @@ class NcursesConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
+        # OHOS HMDFS noexec (E046): config.status 中临时 awk 脚本无法直接执行
+        self.run(r"sed -i 's|\./conf[^/]*/subs1\.awk|$AWK -f &|g' config.status",
+                 cwd=self.source_folder, ignore_errors=True)
         autotools.make(args=["-j1"])
 
     def package(self):
