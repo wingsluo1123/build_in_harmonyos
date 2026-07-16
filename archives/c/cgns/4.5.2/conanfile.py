@@ -40,6 +40,9 @@ class CgnsConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        # Run upstream tests (make check). CTest will skip if no test targets
+        # are configured (HDF5 disabled, so CGNS test suite is empty).
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)
