@@ -1,45 +1,19 @@
-# highs 1.13.1 适配笔记
+# HiGHS 1.13.1 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-07-15}
-- 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 系统：Windows 10 (Git Bash) / MSYS2 Clang64
+- 编译器：clang 22.1.7
+- CMake：4.4.0
+- Conan：2.29.1
 
 ## 编译步骤
-
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+1. `conan create archives/h/highs/1.13.1/ --build=missing --user=ohpcd --channel=stable`
 
 ## 遇到的问题与解决方案
-
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-{按需添加行}
-
-## 源码修改
-
-{如有补丁，列出文件名和修改内容；无则删除此节}
-
-## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
+1. **CMakeLists.txt 禁止在源码目录构建**
+   - 问题：CMakeLists.txt 第 36 行检查 `if(EXISTS "${LOC_PATH}")` 强制要求 out-of-source 构建
+   - 解决：在 conanfile.py 的 build() 方法中通过字符串替换将 `if(EXISTS "${LOC_PATH}")` 改为 `if(FALSE)`
 
 ## 验证结果
-
-```bash
-{验证命令和结果}
-```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
-
-## 注意事项
-
-{需要特别注意的点；无则删除此节}
----
-
-**编译结束**: 2026-07-15 17:05
-**最终状态**: built
+- conan create 编译通过
+- test_package 单测 1/1 通过
