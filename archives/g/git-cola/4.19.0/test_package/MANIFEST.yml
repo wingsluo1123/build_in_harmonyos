@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: git-cola/4.19.0
+homepage: "https://github.com/git-cola/git-cola"
+
+# 上游测试命令 (git-cola 使用 garden test 或 make test)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/
+    source: git-cola-4.19.0/test/
+    description: "git-cola 上游 Python 测试套件 (需要 garden 工具运行)"
+    command: "garden test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_git_cola.py
+    description: "验证 cola Python 模块可导入且版本号正确"
+    command: "python3 test_git_cola.py"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2
