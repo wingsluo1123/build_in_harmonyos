@@ -42,7 +42,8 @@ class TreeSitterConan(ConanFile):
         internal = os.path.join(self.source_folder, "src")
 
         self.run(
-            '"{}" -O2 -fPIC -std=c11 -I"{}" -I"{}" -c "{}" -o "{}"'.format(
+            '"{}" -O2 -fPIC -std=c11 -D_POSIX_C_SOURCE=200809L '
+            '-I"{}" -I"{}" -c "{}" -o "{}"'.format(
                 cc, include, internal, source, obj
             )
         )
