@@ -5,7 +5,7 @@
 - 编译日期: 2026-06-17
 - 编译器: clang 15.0.4 / clang++
 - 平台: HarmonyOS aarch64
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -81,3 +81,7 @@ $ flake -q test-sine.wav -o test-sine.flac
 - flake 无 --version 选项，验证方式为运行无参数或 `flake -h` 查看版本信息
 - flake 无 `make check` 测试套件，需通过手动编码测试验证功能
 - 鸿蒙平台需要 ELF 签名才能执行二进制文件
+---
+
+**编译结束**: 2026-07-16 16:48
+**最终状态**: built

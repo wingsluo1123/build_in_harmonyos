@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code-style §2",
+      "file": "archives/f/flake/0.11/conanfile.py",
+      "line": 15,
+      "description": "package_type 分类不一致：conanfile.py 声明 package_type = \"library\"，但 commands.json 声明 type = \"tool\"。flake 的主要产物是 FLAC 编码器二进制（flake 命令行工具），description 也描述为 encoder（工具），commands.json 归类为 tool。按 code-style §2 规范，工具应使用 package_type = \"application\"。虽然该包同时提供 libflake.a 库且 test_package 以库方式链接测试，但主要用途为工具时建议使用 \"application\"。",
+      "fix_suggestion": "将 package_type 改为 \"application\"；若确需保留 \"library\"（如其他包以库方式依赖 flake），建议在 conanfile.py 中添加注释说明选择理由，并确保 commands.json 的 type 与之协调。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/f/flake/0.11/conanfile.py",
+      "line": 42,
+      "description": "R40 深度适配验证：flake 是多媒体/编解码类库（FLAC 音频编码器），属于 R40 规则覆盖范围。当前平台适配仅通过 configure 参数（--cc=clang --ar=llvm-ar --ranlib=llvm-ranlib）和 shebang 替换（/bin/sh → /system/bin/sh）完成，无 patches/ 适配补丁。test_package 调用了 flake_set_defaults() API 验证参数初始化，但未覆盖实际音频编码功能（WAV→FLAC 转换）。按 R40 规则需标注「需人工确认适配完整性」。",
+      "fix_suggestion": "建议在 test_package 中增加实际编码功能测试（如构造简短 WAV 数据调用 flake 编码 API 生成 FLAC 输出并验证输出有效性），或在 notes.md 中补充人工编码验证的详细记录（已有手动验证记录，建议标准化为测试用例）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/f/flake/0.11/conandata.yml",
+      "line": 5,
+      "description": "源码 URL 外部验证受限：URL 指向 SourceForge (https://downloads.sourceforge.net/project/flake-enc/flake/0.11/flake-0.11.tar.bz2)，URL 格式符合 SourceForge 官方下载规范，sha256 (8dd2498...) 为 64 位十六进制且非全零/全f。但通过搜索引擎无法独立验证 flake-enc 项目的存在性（SourceForge 返回 HTTP 403，搜索引擎无有效索引）。flake 是 Justin Ruggles 开发的 FLAC 编码器（2006-2007），属于较冷门项目，搜索引擎未索引属正常现象。建议 CI 构建时验证下载文件的实际 sha256 与 conandata.yml 声明值一致。",
+      "fix_suggestion": "确保 CI 在 conan create 时自动校验 sha256；如条件允许，在 notes.md 中补充上游项目验证来源（如 SourceForge 项目页面截图或 archive.org 快照链接）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style §14",
+      "file": "archives/f/flake/0.11/manifest.yaml",
+      "line": 28,
+      "description": "manifest.yaml 中 build_system: custom 不在 code-style.md §14 标准列表 (cmake | autotools | makefile | meson) 中。flake 使用 ffmpeg-style 自定义 configure 脚本，不属于任何标准构建系统类别，custom 是合理的描述。但 code-style.md 未列出 custom 作为合法选项，可能导致自动化工具无法识别。",
+      "fix_suggestion": "在 code-style.md §14 的 build_system 注释中增加 \"custom\" 选项；或在 manifest.yaml 中将 build_system 设为最接近的标准类型（如 makefile，因 flake 最终使用 make 构建）并添加注释说明使用自定义 configure。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "文档一致性",
+      "file": "archives/f/flake/0.11/manifest.yaml",
+      "line": 33,
+      "description": "conanfile.py build() 使用 --prefix=\"\" （Conan DESTDIR 模式，空 prefix + make install DESTDIR=package_folder），而 manifest.yaml 的 configure_options 记录 --prefix=/storage/Users/currentUser/usr/local（手动构建路径）。二者用途不同（Conan 配方 vs 手动构建记录），但可能引起混淆。",
+      "fix_suggestion": "在 manifest.yaml 的 configure_options 部分增加注释，说明 Conan 配方使用 DESTDIR 模式（空 prefix），手动构建使用绝对路径 prefix；或统一使用 Conan 配方的方式。"
+    }
+  ],
+  "summary": "flake 0.11 Conan 配方独立审计完成。共审计 11 个变更文件，逐条对照 code-style.md（24条）和 review-memory.md（30条）规则进行检查。\n\n【P0 欺骗性行为检测 — 全部通过】\n- R34 空壳测试：test_package/test.c 实际调用 flake_set_defaults() 函数和 FLAKE_IDENT 宏，验证返回值和参数初始化，非空壳测试。test_package/conanfile.py 的 test() 调用 cmake.test() 并额外 self.run() 执行测试二进制，无 pass/skip 行为。\n- R9 跳过测试：无 def test(self): pass，无注释掉 cmake.test()，无 os.system(\"exit 0\")。\n- 伪造状态：manifest.yaml status=built，与 notes.md「最终状态: built」、conan-verify-report「Verdict: PASS」一致，未将 failed 标为 published。\n- 伪造 sha256：conandata.yml sha256 为 64 位十六进制（8dd2498...），非全零/全f/过短。conandata.yml 与 manifest.yaml 的 sha256 一致。\n- R19 手动打包：PR 变更文件中无 .so/.a/二进制文件，notes.md 中预编译包描述仅为文档记录。\n- R8 #ifdef __OHOS__：代码中未使用 #ifdef __OHOS__ 空壳 stub。\n\n【P1 配方正确性 — 全部通过】\n- R37 版本号：version=\"0.11\" 为上游版本，首次适配，符合 R37 首次适配规则。\n- R32 平台兼容：validate() 使用 if self.settings.os not in (\"Linux\", \"OHOS\")，正确。build() 中 == \"OHOS\" 三元表达式用于选择平台特定工具链（llvm-ar/llvm-ranlib），非 Linux-only 门禁，不违反 R32。\n- R33 环境变量：使用 str(self.settings.compiler) 获取编译器，未使用 os.environ 裸环境变量。\n- R26 静态编译：flake 非系统同名库，default_options={\"shared\": False} 设置静态为默认。\n- R39 官方源码：SourceForge 为 flake-enc 官方托管平台，URL 格式合规（详见 P3 建议）。\n- R38 commands.json：archives/f/flake/commands.json 存在且格式正确，type=\"tool\"，路径为软件级目录。\n- Conan 2.x API：全部使用 from conan import ConanFile，无旧版 from conans。\n- R6 生成文件：replace_in_file 在 build() 中运行时修改 configure 脚本的 shebang，非提交修改后的生成文件。\n\n【P2 代码规范 — 1 项警告】\n- package_type 分类不一致（conanfile.py=\"library\" vs commands.json=\"tool\"）。\n\n【P3 建议性改进 — 4 项提示】\n- R40 深度适配验证（多媒体/编解码类，需人工确认适配完整性）。\n- R39 源码 URL 外部验证受限（SourceForge 返回 403）。\n- manifest.yaml build_system=custom 非标准类型。\n- conanfile.py 与 manifest.yaml 的 --prefix 不一致（DESTDIR 模式 vs 手动路径）。\n\n【其他合规项】\n- code-style §1 shebang+docstring：conanfile.py 和 test_package/conanfile.py 均有 ✅\n- code-style §3 方法顺序：export_sources→requirements→layout→source→generate→validate→build→package→package_info，标准方法顺序正确（validate 为 Conan 标准生命周期方法，插入 generate 和 build 之间为惯例）✅\n- code-style §4 package_info：cpp_info.libs=[\"flake\"] ✅，cpp_info.bindirs=[\"bin\"] ✅\n- code-style §5 模板占位符：无 TODO/FIXME/XXX/CI fills this/(请填写) ✅\n- code-style §11 测试源码：test.c 小写命名，main(void) 返回 int，#include <flake.h> 对应 cpp_info.libs ✅\n- code-style §13 conandata.yml：HTTPS URL，带引号，2空格缩进，sha256 存在 ✅\n- code-style §15 commands.json：2空格缩进，带引号，type=\"tool\"，无尾逗号 ✅\n- code-style §16 import 顺序：标准库(os) → 第三方(conan)，组间空行 ✅\n\n结论：无 P0 欺骗性行为，无 P1 配方正确性问题。1 项 P2 警告（package_type 分类不一致）和 4 项 P3 建议性改进。配方核心功能正确，测试实质调用 API，版本号合规，平台兼容性处理得当。verdict: pass。"
+}
