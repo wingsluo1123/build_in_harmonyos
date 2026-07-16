@@ -1,5 +1,5 @@
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 from conan.tools.files import get
 
 
@@ -19,6 +19,9 @@ class Sdl12_CompatConan(ConanFile):
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
 
+    def requirements(self):
+        self.requires("sdl2/2.30.10")
+
     def layout(self):
         cmake_layout(self)
 
@@ -28,6 +31,8 @@ class Sdl12_CompatConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.generate()
+        deps = CMakeDeps(self)
+        deps.generate()
 
     def build(self):
         cmake = CMake(self)
