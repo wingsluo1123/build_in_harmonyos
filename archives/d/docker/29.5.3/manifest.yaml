@@ -12,10 +12,10 @@ version: "29.5.3"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-17"
+build_date: "2026-07-16"
 
 # ============================================================
 # 源码信息
@@ -26,7 +26,7 @@ source:
   url: "https://github.com/docker/cli/archive/refs/tags/v29.5.3.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "7608d82f33ce0ebbbed5bf8f6997319375c30a46d325496f3e8974c9a0c8ce6b"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -43,24 +43,22 @@ build:
 
   # 配置选项列表
   configure_options:
-    - "CGO_ENABLED=0"
+    - "CGO_ENABLED=1"
     - "GOOS=linux"
     - "GOARCH=arm64"
     - "GOTOOLCHAIN=local"
     - "DISABLE_WARN_OUTSIDE_CONTAINER=1"
     - "GIT_DISCOVERY_ACROSS_FILESYSTEM=1"
-    - "TMPDIR=/data/storage/el2/base/haps/entry/temp"
 
   # 编译依赖列表（格式: name/version）
-  dependencies:
-    - "golang/1.25.0"
+  dependencies: []
 
   # 编译器
-  cc: ""
-  cxx: ""
+  cc: "clang"
+  cxx: "clang++"
 
   # Go 编译命令
-  go_build_cmd: "go build -mod=vendor -o build/docker -tags 'grpcnotrace' -ldflags '-X github.com/docker/cli/cli/version.GitCommit=29.5.3 -X github.com/docker/cli/cli/version.BuildTime=2026-06-17T04:00:00Z -X github.com/docker/cli/cli/version.Version=29.5.3' github.com/docker/cli/cmd/docker"
+  go_build_cmd: "go build -mod=vendor -o build/docker -tags grpcnotrace -ldflags '-X github.com/docker/cli/cli/version.GitCommit=29.5.3 -X github.com/docker/cli/cli/version.BuildTime=2026-07-16T04:00:00Z -X github.com/docker/cli/cli/version.Version=29.5.3' github.com/docker/cli/cmd/docker"
   go_version: "1.25.0"
 
 # ============================================================
@@ -68,9 +66,7 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied:
-  - "0001-go.mod.patch"
-  - "0002-go.sum.patch"
+patches_applied: []
 
 # ============================================================
 # 知识沉淀
@@ -81,24 +77,6 @@ knowledge_gained:
   - "docker/cli 使用 vendor.mod 而非 go.mod，需手动复制为 go.mod"
   - "Go >= 1.23 要求满足 vendor 依赖版本要求"
   - "HarmonyOS 上需要签名 Go 工具链所有 ELF 才能执行"
-  - "TMPDIR 必须设置为可写目录，/tmp 在 HarmonyOS 上只读"
-  - "CGO_ENABLED=0 静态编译适合 HarmonyOS musl libc 环境"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/docker-29.5.3.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/docker-29.5.3.work
-  source_orig_hash: e0bd20f0b86a1c6d
-  source_work_hash: 4618a8bc940252cb
-  generated_at: '2026-06-17T12:16:34'
-  patches_count: 2
-
-patch_classification:
-  - file: 0001-go.mod.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-go.sum.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+  - "E124: Go linker mmap 在 HMDFS 上失败，输出需写到 /data 分区"
+  - "CGO_ENABLED=1 使用系统链接器替代 Go 内部链接器"
+  - "vendor.mod 中 tool 指令需移除"

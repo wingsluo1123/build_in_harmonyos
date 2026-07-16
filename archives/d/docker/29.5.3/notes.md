@@ -62,3 +62,7 @@ cp build/docker $TEST_PREFIX/$DEFAULT_PREFIX/bin/docker-cli
 2. 需要下载 Go 1.25.0 并签名后才能使用
 3. TMPDIR 必须设置为可写目录（/tmp 在 HarmonyOS 上只读）
 4. go.mod 和 go.sum 需从 vendor.mod 和 vendor.sum 复制创建
+---
+
+**编译结束**: 2026-07-16 17:35
+**最终状态**: built
