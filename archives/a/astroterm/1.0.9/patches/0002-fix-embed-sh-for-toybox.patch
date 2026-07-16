@@ -15,7 +15,7 @@ diff -ruN a/scripts/embed.sh b/scripts/embed.sh
 @@ -41,6 +37,14 @@
      usage
  fi
- 
+
 +# Fallback to Python embed.py if xxd does not support -i (e.g. toybox xxd)
 +if ! command -v xxd > /dev/null 2>&1 || ! xxd -i /dev/null > /dev/null 2>&1; then
 +    python3 "$(dirname "$0")/embed.py" --source "$SOURCE" --header "$HEADER" --array-name "$ARRAY_NAME"
@@ -25,3 +25,4 @@ diff -ruN a/scripts/embed.sh b/scripts/embed.sh
  # Generate the header file
  xxd -i "$SOURCE" | \
      sed "s/unsigned char [^ ]*/unsigned char ${ARRAY_NAME}[]/" | \
+     sed "s/unsigned int [^ ]*/unsigned int ${ARRAY_NAME}_len/" > "$HEADER"
