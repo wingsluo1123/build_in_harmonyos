@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/ydnhaha/build_in_harmonyos/.pr-worktree-pidcat/archives/p/pidcat/2.1.0/test_package/deactivate_conanbuildenv-release-armv8.sh"

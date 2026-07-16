@@ -6,7 +6,7 @@ filtering by application package name. It is a pure Python tool (no C/C++).
 """
 import os
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, save
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -20,7 +20,7 @@ class PidcatConan(ConanFile):
 
     package_type = "application"
 
-    settings = "os", "compiler", "build_type", "arch"
+    # Pure Python script — no C/C++ compiler settings needed
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -34,7 +34,7 @@ class PidcatConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # pidcat is a pure Python script — no compilation needed.
-        # The shebang is already patched in 0001-fix-shebang-for-ohos.patch.
+        # The shebang is already patched in 0001-pidcat.py.patch.
         pass
 
     def package(self):

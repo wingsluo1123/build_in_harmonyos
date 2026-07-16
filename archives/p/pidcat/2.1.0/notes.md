@@ -23,7 +23,7 @@ pidcat 是纯 Python 脚本，无需 configure/make 编译步骤：
 
 ## 源码修改
 
-- 补丁: `patches/0001-fix-shebang-for-ohos.patch`
+- 补丁: `patches/0001-pidcat.py.patch`
   - 修改 pidcat.py shebang: `#!/usr/bin/python -u` → `#!/usr/bin/env python3`
 
 ## 依赖版本
