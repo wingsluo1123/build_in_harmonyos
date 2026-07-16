@@ -42,28 +42,72 @@ class Berkeleydb5Conan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Berkeley DB needs to be configured from build_unix/ directory
-        # using ../dist/configure
+        # Berkeley DB needs to run configure from build_unix/, not from source root.
+        # The autotools.configure() helper runs ./configure at source root, which
+        # doesn't work for this project. We pass args via configure_args for
+        # consistency, then run configure manually in build().
         tc.configure_args.append("--enable-static")
         tc.configure_args.append("--enable-shared")
         tc.configure_args.append("--with-repmgr-ssl=no")
-        # HMDFS compatibility: avoid umask 077 temp dir issue
-        tc.extra_defines.append("TMPDIR=${TMPDIR:-/tmp}")
         tc.generate()
+        # Also generate the config.sub/config.guess update script
+        self._patch_config_guess()
+
+    def _patch_config_guess(self):
+        """Patch config.guess/config.sub if a newer version is bundled with
+        the build environment (e.g. automake-1.16+ includes OHOS support)."""
+        import shutil, stat
+        src_dir = self.source_folder
+        dist_dir = os.path.join(src_dir, "dist")
+        for f in ("config.guess", "config.sub"):
+            target = os.path.join(dist_dir, f)
+            if os.path.isfile(target):
+                os.chmod(target, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        # Berkeley DB requires configure to be run from build_unix/
         src_dir = self.source_folder
         build_dir = os.path.join(src_dir, "build_unix")
         os.makedirs(build_dir, exist_ok=True)
-        self.run(f"cd {build_dir} && ../dist/configure --prefix={self.prefix} "
-                 f"--enable-static --enable-shared --with-repmgr-ssl=no",
-                 env="conanbuild")
+
+        # Configure from build_unix/ using ../dist/configure
+        # Conan's AutotoolsToolchain sets --prefix=/ for library packages,
+        # and DESTDIR handles the actual install path.
+        self.run(
+            f"cd {build_dir} && ../dist/configure "
+            f"--prefix=/ "
+            f"--enable-static --enable-shared --with-repmgr-ssl=no",
+            env="conanbuild"
+        )
+        # Patch config.status to use $TMPDIR instead of ./confXXXXXX for HMDFS compat
+        config_status = os.path.join(build_dir, "config.status")
+        if os.path.isfile(config_status):
+            with open(config_status) as f:
+                content = f.read()
+            old = (
+                '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&\n'
+                '  test -d "$tmp"\n'
+                '}  ||\n'
+                '{\n'
+                '  tmp=./conf$$-$RANDOM\n'
+                '  (umask 077 && mkdir "$tmp")\n'
+                '} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5'
+            )
+            new = (
+                '  tmp="${TMPDIR:-/tmp}"/conf$$-$RANDOM\n'
+                '  (umask 022 && mkdir -p "$tmp")\n'
+                '} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5'
+            )
+            if old in content:
+                content = content.replace(old, new)
+                with open(config_status, "w") as f:
+                    f.write(content)
+
         self.run(f"cd {build_dir} && make -j1", env="conanbuild")
-        self.run(f"cd {build_dir} && make install DESTDIR={self.package_folder}",
-                 env="conanbuild")
+        self.run(
+            f"cd {build_dir} && make install DESTDIR={self.package_folder}",
+            env="conanbuild"
+        )
 
     def package(self):
         # build() already handles install via DESTDIR
