@@ -21,7 +21,7 @@ esac
 # Functional test: run vmtouch on a temp file to verify cache inspection
 _tmpdir="${TMPDIR:-$HOME/tmp}"
 mkdir -p "$_tmpdir" 2>/dev/null || true
-tmpfile=$(mktemp "$_tmpdir/vmtouch_test_XXXXXX.txt")
+tmpfile="$_tmpdir/vmtouch_test_$$.txt"
 echo "vmtouch test content" > "$tmpfile"
 output=$("$VMTOUCH_BIN" "$tmpfile" 2>&1)
 rm -f "$tmpfile"
