@@ -1,7 +1,7 @@
 #!/bin/sh
 # R34: Test must actually exercise the tested package's binary
 # vmtouch is a CLI tool — test by running vmtouch -h and on a temp file
-set -e
+# Note: vmtouch -h returns non-zero exit code (common for help flags)
 
 VMTOUCH_BIN="${1:-vmtouch}"
 
@@ -12,6 +12,7 @@ if [ ! -x "$VMTOUCH_BIN" ]; then
 fi
 
 # L2 smoke test: verify binary runs and shows version
+# vmtouch -h returns non-zero, so capture output without set -e
 output=$("$VMTOUCH_BIN" -h 2>&1)
 case "$output" in
     *vmtouch*)
