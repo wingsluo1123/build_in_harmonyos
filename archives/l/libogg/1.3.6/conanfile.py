@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-"""Conan recipe — libogg 1.3.6 (Autotools).
+"""Conan recipe — libogg 1.3.6 (CMake).
 
 R26: libogg is a system-name-colliding library — build static only
      to avoid polluting /lib, /lib64 with a shared libogg.so.
-E165: HarmonyOS shebang fix — /bin/sh not accessible, use /data/app/bin/bash
+     Uses CMake to avoid E165 shebang issues with autotools configure.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, replace_in_file
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.cmake import CMake, CMakeToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -36,25 +34,20 @@ class LiboggConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = AutotoolsToolchain(self)
-        # R26: System-name-colliding library — static only
-        tc.configure_args.append("--enable-static")
-        tc.configure_args.append("--disable-shared")
+        tc = CMakeToolchain(self)
+        # R26: System-name-colliding library — BUILD_SHARED_LIBS=OFF
+        tc.variables["BUILD_SHARED_LIBS"] = False
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
-        # E165: Fix shebang for HarmonyOS — /bin/sh not accessible
-        _configure = os.path.join(self.source_folder, "configure")
-        if os.path.exists(_configure):
-            replace_in_file(self, _configure, "#! /bin/sh", "#! /data/app/bin/bash")
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        cmake = CMake(self)
+        cmake.install()
 
     def package_info(self):
         self.cpp_info.libs = ["ogg"]
