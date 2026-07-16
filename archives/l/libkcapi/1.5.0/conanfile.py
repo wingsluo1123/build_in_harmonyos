@@ -31,6 +31,8 @@ class LibkcapiConan(ConanFile):
         tc.generate()
 
     def build(self):
+        import subprocess
+        subprocess.run(["autoreconf", "-fi"], cwd=self.source_folder, check=False)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
