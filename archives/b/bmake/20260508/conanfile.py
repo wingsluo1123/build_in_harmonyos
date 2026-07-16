@@ -33,8 +33,7 @@ class BmakeConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R33: don't rely on shell env vars; pass CXX explicitly
-        tc.configure_args.append("CXX=clang++")
+        # AutotoolsToolchain automatically sets CC/CXX from Conan profile
         # --without-makefile: prevent generated makefile (GNU make can't parse BSD makefiles)
         tc.configure_args.append("--without-makefile")
         # --without-meta: disable meta mode (needs filemon(9) not available on OHOS)
