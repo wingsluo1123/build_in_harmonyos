@@ -16,7 +16,9 @@ class SipsakTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            executable = os.path.join(
-                self.dependencies["sipsak"].package_folder, "bin", "sipsak"
+            script = os.path.join(self.source_folder, "test_sipsak.sh")
+            package_folder = self.dependencies["sipsak"].package_folder
+            self.run(
+                'sh "{}" "{}"'.format(script, package_folder),
+                env="conanrun",
             )
-            self.run('"{}" --version'.format(executable), env="conanrun")
