@@ -4,7 +4,7 @@
 import os
 
 from conan import ConanFile
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
+from conan.tools.files import copy, get
 from conan.tools.layout import basic_layout
 
 
@@ -18,9 +18,6 @@ class SipsakConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
-    def export_sources(self):
-        export_conandata_patches(self)
-
     def layout(self):
         basic_layout(self)
 
@@ -28,7 +25,6 @@ class SipsakConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        apply_conandata_patches(self)
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         ) or {}
@@ -42,7 +38,7 @@ class SipsakConan(ConanFile):
             for item in sources.split()
         )
         flags = (
-            "-O2 -D_GNU_SOURCE -DPACKAGE_VERSION=\\\"0.9.7\\\" "
+            "-O2 -fcommon -D_GNU_SOURCE -DPACKAGE_VERSION=\\\"0.9.7\\\" "
             "-DHAVE_STDIO_H -DHAVE_STDLIB_H -DHAVE_STDARG_H "
             "-DHAVE_STDINT_H -DHAVE_STRING_H -DHAVE_STRINGS_H "
             "-DHAVE_CTYPE_H -DHAVE_ERRNO_H -DHAVE_UNISTD_H "
