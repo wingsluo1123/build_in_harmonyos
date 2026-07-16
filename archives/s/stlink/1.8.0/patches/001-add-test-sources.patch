@@ -1,0 +1,60 @@
+diff --git a/test_package/CMakeLists.txt b/test_package/CMakeLists.txt
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/test_package/CMakeLists.txt
+@@ -0,0 +1,7 @@
++cmake_minimum_required(VERSION 3.1)
++project(test_package C)
++find_package(stlink REQUIRED)
++add_executable(${PROJECT_NAME} test.c)
++target_link_libraries(${PROJECT_NAME} stlink::stlink)
++set_target_properties(${PROJECT_NAME} PROPERTIES
++    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+diff --git a/test_package/conanfile.py b/test_package/conanfile.py
+index 4b3c2c1..a1b2c3d 100644
+--- a/test_package/conanfile.py
++++ b/test_package/conanfile.py
+@@ -1,12 +1,20 @@
+ from conan import ConanFile
+ from conan.tools.build import can_run
++from conan.tools.cmake import CMake
+ 
+ 
+ class TestConan(ConanFile):
+     settings = "os", "compiler", "build_type", "arch"
+-    generators = "VirtualRunEnv"
++    generators = "VirtualRunEnv", "CMakeToolchain", "CMakeDeps"
+ 
+-    def requirements(self):
+-        self.requires(self.tested_reference_str)
++    def build(self):
++        cmake = CMake(self)
++        cmake.configure()
++        cmake.build()
+ 
+     def test(self):
+         if can_run(self):
++            self.run("./test_package", env="conanrun")
+             self.run("st-info --version", env="conanrun")
+diff --git a/test_package/test.c b/test_package/test.c
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/test_package/test.c
+@@ -0,0 +1,16 @@
++#include <stlink.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++int main() {
++    stlink_t *sl = NULL;
++    sl = stlink_open_usb(0, 0, NULL, 0);
++    if (sl) {
++        printf("Successfully opened ST-LINK device.\n");
++        stlink_close(sl);
++    } else {
++        printf("No ST-LINK device found, but library loaded correctly.\n");
++    }
++    return 0;
++}
