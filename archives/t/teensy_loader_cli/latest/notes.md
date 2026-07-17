@@ -39,7 +39,7 @@ Teensy 开发板 (使用 HalfKay bootloader)。本项目为 HarmonyOS PC (aarch6
 因此采用 stub USB 后端方案:
 
 - 创建 stub_usb.c，提供 5 个 USB 访问函数的空实现:
-  - `teensy_open()` - 打印错误信息，返回 0
+  - `teensy_open()` - 返回 0，表示没有可用的 USB 设备
   - `teensy_write()` - 返回 0
   - `teensy_close()` - 空操作
   - `hard_reboot()` - 返回 0
@@ -70,6 +70,11 @@ latest 版本采用无依赖的 stub 方案，便于快速打包和 CI 验证。
 | 4 | 无 install target | 上游 Makefile 仅有 clean target | 在 conanfile.py package() 中直接 copy 可执行文件 |
 
 ## 验证结果
+
+Conan `test_package` 直接定位软件包 `bin/teensy_loader_cli`，先验证文件
+存在且可执行，再运行硬件无关的 `--list-mcus`。上游 2.3 在输出 MCU 列表后
+固定返回状态码 1，因此测试只接受“状态码恰为 1 且包含预期 MCU 标记”。缺少
+产物、加载失败、崩溃、空输出或其他退出码都会使 CI 失败。
 
 ```bash
 $ teensy_loader_cli --list-mcus

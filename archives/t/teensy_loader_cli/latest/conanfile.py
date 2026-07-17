@@ -3,7 +3,14 @@
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, save, copy
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    save,
+)
+from conan.tools.gnu import GnuToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -20,8 +27,15 @@ class TeensyLoaderCliConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
+
+    def generate(self):
+        GnuToolchain(self).generate()
 
     def build(self):
         # The upstream Makefile hardcodes -DUSE_LIBUSB -lusb (libusb-0.1).
@@ -36,9 +50,13 @@ class TeensyLoaderCliConan(ConanFile):
             "int soft_reboot(void) { return 0; }\n"
         )
         save(self, os.path.join(self.source_folder, "stub_usb.c"), stub_usb_c)
-        # Compile directly with CC
+        # Compile directly with the profile-selected cross compiler.  Keep the
+        # artifact in build_folder so package() cannot silently create an
+        # empty package.
+        os.makedirs(self.build_folder, exist_ok=True)
+        output = os.path.join(self.build_folder, "teensy_loader_cli")
         self.run(
-            "${CC:-cc} ${CFLAGS:-} -o teensy_loader_cli "
+            f'${{CC:-cc}} ${{CFLAGS:-}} -o "{output}" '
             "teensy_loader_cli.c stub_usb.c ${LDFLAGS:-}",
             env="conanbuild",
             cwd=self.source_folder,
@@ -51,4 +69,6 @@ class TeensyLoaderCliConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = []
-        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+        self.cpp_info.bindirs = ["bin"]
+        self.runenv_info.append_path(
+            "PATH", os.path.join(self.package_folder, "bin"))
