@@ -62,9 +62,6 @@ class TrioConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        import subprocess
-        subprocess.run(["chmod", "-R", "u+rwx", self.source_folder], check=False)
-        subprocess.run(["chmod", "-R", "u+rwx", self.build_folder], check=False)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
