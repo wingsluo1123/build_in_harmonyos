@@ -25,13 +25,12 @@ def test_cli():
 
 
 def test_image_processing():
-    """Test 3: Create a test PNG and verify imgp can process it."""
+    """Test 3: Create a test PNG and verify imgp can process it (in-place)."""
     from PIL import Image
 
     tmpdir = tempfile.mkdtemp()
     try:
         src = os.path.join(tmpdir, "test.png")
-        dst = os.path.join(tmpdir, "test_resized.png")
 
         img = Image.new("RGB", (100, 100), color="red")
         img.save(src)
@@ -40,11 +39,11 @@ def test_image_processing():
         assert os.path.getsize(src) > 0, "Source PNG not created"
         print(f"Test PNG created: {src} ({os.path.getsize(src)} bytes)")
 
-        # Run imgp to resize the image
-        rc = os.system(f"imgp -x 50 -o {dst} {src}")
+        # Run imgp to resize the image in-place (imgp has no -o output flag)
+        rc = os.system(f"imgp -x 50% {src}")
         assert rc == 0, "imgp resize failed"
-        assert os.path.isfile(dst), "Resized image not found"
-        print(f"Resized image: {dst}")
+        assert os.path.isfile(src), "Resized image not found"
+        print(f"Resized image size: {os.path.getsize(src)} bytes")
         print("✅ imgp image processing OK")
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)

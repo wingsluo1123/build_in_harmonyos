@@ -42,21 +42,15 @@ class ImgpConan(ConanFile):
         # Change to the source directory since pip needs to find setup.py
         src_dir = self.source_folder
 
-        # Install pillow (pre-built wheel for OHOS)
+        # Install pillow (pre-built wheel for OHOS) separately
         self.run(f"{python} -m pip install pillow", env="conanrun")
 
-        # Ensure setuptools is available for PEP 517 build backend.
-        # The pip index may not have it, so use ensurepip (stdlib) as fallback.
-        self.run(f"{python} -c 'import setuptools' 2>/dev/null || "
-                 f"{python} -m ensurepip --upgrade 2>/dev/null || "
-                 f"{python} -m pip install setuptools --index-url https://pypi.org/simple/ --break-system-packages 2>/dev/null || true",
-                 env="conanrun")
-
-        # Install imgp from source directory
-        # Use --no-build-isolation to reuse the already-installed setuptools
-        # (pip install . creates a fresh isolated build env by default, which
-        #  cannot find setuptools on OHOS due to pip index limitations)
-        self.run(f"cd {src_dir} && {python} -m pip install --no-build-isolation .", env="conanrun")
+        # Install imgp from source directory via pip.
+        # pip creates an isolated build env by default and needs setuptools
+        # as a PEP 517 build backend. The CI's internal pip index may not
+        # have setuptools, so add the official PyPI as an extra index URL
+        # so pip can find and download the setuptools wheel automatically.
+        self.run(f"cd {src_dir} && {python} -m pip install --extra-index-url https://pypi.org/simple/ .", env="conanrun")
 
     def package(self):
         # Find the installed files from the system Python
