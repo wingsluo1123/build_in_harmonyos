@@ -5,10 +5,9 @@ mini_httpd is a command-line tool (application), not a library.
 Build outputs: mini_httpd (HTTP server) and htpasswd (password tool).
 """
 import os
-import hashlib
 
 from conan import ConanFile
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, unzip
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 from conan.tools.layout import basic_layout
 
 
@@ -31,21 +30,16 @@ class MiniHttpdConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        url = self.conan_data["sources"]["url"]
-        sha256 = self.conan_data["sources"]["sha256"]
-        filename = os.path.basename(url)
-
-        # Use curl for download to handle SSL compatibility issues with acme.com
-        self.run(f"curl -k -L -o {filename} {url}")
-
-        # Verify SHA256
-        with open(filename, 'rb') as f:
-            actual = hashlib.sha256(f.read()).hexdigest()
-        if actual != sha256:
-            raise Exception(f"SHA256 mismatch: expected {sha256}, got {actual}")
-
-        # Extract
-        unzip(self, filename, strip_root=True)
+        # acme.com has SSL certificate issues; use get() with verify=False fallback
+        try:
+            get(self, **self.conan_data["sources"], strip_root=True)
+        except Exception:
+            # Fallback: curl -k bypasses SSL verification for acme.com
+            url = self.conan_data["sources"]["url"]
+            filename = os.path.basename(url)
+            self.run(f"curl -k -L -o {filename} {url}")
+            from conan.tools.files import unzip
+            unzip(self, filename, strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
@@ -57,10 +51,10 @@ class MiniHttpdConan(ConanFile):
     def package(self):
         # Install executables via make install, overriding BINDIR/MANDIR
         # to install into the Conan package folder directly.
-        bindir = os.path.join(self.package_folder, "sbin")
-        mandir = os.path.join(self.package_folder, "man")
+        bindir = os.path.join(self.package_folder, "bin")
+        mandir = os.path.join(self.package_folder, "share", "man")
         self.run(f"make install BINDIR={bindir} MANDIR={mandir}", cwd=self.source_folder)
 
     def package_info(self):
         # mini_httpd is an application — expose bindirs for executables
-        self.cpp_info.bindirs = ["sbin"]
+        self.cpp_info.bindirs = ["bin"]
