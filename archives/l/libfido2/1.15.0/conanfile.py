@@ -115,6 +115,21 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
                 with open(src_cmake, "w") as f:
                     f.write(content)
 
+        # Set PKG_CONFIG_PATH for pkg-config based dependency detection
+        pkg_paths = []
+        for dep_name in ["libcbor", "openssl", "zlib"]:
+            try:
+                dep = self.dependencies[dep_name]
+            except Exception:
+                continue
+            pkg_root = str(getattr(dep, "package_folder", "") or "")
+            for libdir in dep.cpp_info.libdirs:
+                pkg_dir = os.path.join(pkg_root, str(libdir), "pkgconfig")
+                if os.path.isdir(pkg_dir):
+                    pkg_paths.append(pkg_dir)
+        if pkg_paths:
+            os.environ["PKG_CONFIG_PATH"] = ":".join(pkg_paths) + ":" + os.environ.get("PKG_CONFIG_PATH", "")
+
         cmake = CMake(self)
         cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
         cmake.build()
