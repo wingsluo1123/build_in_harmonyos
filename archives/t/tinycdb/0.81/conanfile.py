@@ -45,8 +45,11 @@ class TinycdbConan(ConanFile):
 
         args = f"CC={cc} AR={ar} RANLIB={ranlib} CFLAGS=\"-fPIC -O2\""
         # R33: On OHOS, must use GNU ld (ld.bfd) instead of lld
+        # Linker selectable via Conan conf (name like "bfd" or absolute path);
+        # default "bfd" lets clang resolve ld.bfd via PATH
         if self.settings.os == "OHOS":
-            args += ' LDFLAGS="-fuse-ld=/data/service/hnp/bin/ld.bfd"'
+            ld = self.conf.get("user.tinycdb:ld", default="bfd")
+            args += f' LDFLAGS="-fuse-ld={ld}"'
         return args
 
     def build(self):

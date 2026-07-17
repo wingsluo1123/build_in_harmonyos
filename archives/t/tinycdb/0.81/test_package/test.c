@@ -28,15 +28,26 @@ int main(void) {
 
     const char *key = "hello";
     const char *val = "world";
-    cdb_make_add(&cdbm, key, strlen(key), val, strlen(val));
+    if (cdb_make_add(&cdbm, key, strlen(key), val, strlen(val)) != 0) {
+        fprintf(stderr, "FAIL: cdb_make_add failed for key '%s'\n", key);
+        close(fd);
+        unlink(path);
+        return 1;
+    }
 
     const char *key2 = "foo";
     const char *val2 = "bar";
-    cdb_make_add(&cdbm, key2, strlen(key2), val2, strlen(val2));
+    if (cdb_make_add(&cdbm, key2, strlen(key2), val2, strlen(val2)) != 0) {
+        fprintf(stderr, "FAIL: cdb_make_add failed for key '%s'\n", key2);
+        close(fd);
+        unlink(path);
+        return 1;
+    }
 
     if (cdb_make_finish(&cdbm) != 0) {
         perror("cdb_make_finish");
         close(fd);
+        unlink(path);
         return 1;
     }
     close(fd);
