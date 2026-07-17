@@ -66,29 +66,28 @@ class Berkeleydb5Conan(ConanFile):
             f"--enable-static --enable-shared --with-repmgr-ssl=no",
             env="conanbuild"
         )
-        # Patch config.status to use $TMPDIR instead of ./confXXXXXX for HMDFS compat
+        # Patch config.status for OHOS/HarmonyOS compatibility
         config_status = os.path.join(build_dir, "config.status")
         if os.path.isfile(config_status):
             with open(config_status) as f:
                 content = f.read()
-            old = (
-                '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&\n'
-                '  test -d "$tmp"\n'
-                '}  ||\n'
-                '{\n'
-                '  tmp=./conf$$-$RANDOM\n'
-                '  (umask 077 && mkdir "$tmp")\n'
-                '} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5'
+            # Fix 1: Replace `print` with `printf` (bashism, not available in /bin/sh)
+            content = content.replace('\tprint -r --', '\tprintf "%s\\n"')
+            content = content.replace('\tprint -r ', '\tprintf "%s\\n" ')
+            content = content.replace('print -r --', 'printf "%s\\n"')
+            # Fix 2: Replace mktemp temp dir with a simple mkdir approach
+            # The old format uses: mktemp -d "./confXXXXXX" || mkdir ./conf$$-$RANDOM
+            # We replace it with a simple mkdir approach using TMPDIR
+            content = content.replace(
+                '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&',
+                '  tmp="./conf$$"'
             )
-            new = (
-                '  tmp="${TMPDIR:-/tmp}"/conf$$-$RANDOM\n'
-                '  (umask 022 && mkdir -p "$tmp")\n'
-                '} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5'
+            content = content.replace(
+                '  tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")',
+                '  (umask 022 && mkdir -p "$tmp")'
             )
-            if old in content:
-                content = content.replace(old, new)
-                with open(config_status, "w") as f:
-                    f.write(content)
+            with open(config_status, "w") as f:
+                f.write(content)
 
         self.run(f"cd {build_dir} && make -j1", env="conanbuild")
         self.run(
