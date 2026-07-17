@@ -102,7 +102,7 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
         with open(os.path.join(stub_dir, "stub-udev.c"), "w") as f:
             f.write(stub_c)
 
-        # Add stub-udev.c to CMake build by patching src/CMakeLists.txt
+        # Add stub-udev.c to CMake build
         src_cmake = os.path.join(self.source_folder, "src", "CMakeLists.txt")
         if os.path.isfile(src_cmake):
             with open(src_cmake, "r") as f:
@@ -114,18 +114,6 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
                 )
                 with open(src_cmake, "w") as f:
                     f.write(content)
-
-        # Set PKG_CONFIG_PATH for pkg-config based dependency detection
-        pkg_paths = []
-        for dep_name in ["libcbor", "openssl", "zlib"]:
-            dep = self.dependencies[dep_name]
-            pkg_root = str(getattr(dep, "package_folder", "") or "")
-            for libdir in dep.cpp_info.libdirs:
-                pkg_dir = os.path.join(pkg_root, str(libdir), "pkgconfig")
-                if os.path.isdir(pkg_dir):
-                    pkg_paths.append(pkg_dir)
-        if pkg_paths:
-            os.environ["PKG_CONFIG_PATH"] = ":".join(pkg_paths) + ":" + os.environ.get("PKG_CONFIG_PATH", "")
 
         cmake = CMake(self)
         cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
