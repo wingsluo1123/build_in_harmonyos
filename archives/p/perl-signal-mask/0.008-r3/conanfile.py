@@ -13,6 +13,46 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 from conan.tools.layout import basic_layout
 
 
+def _find_ipc_signal_paths():
+    """Dynamically find Perl lib paths containing IPC/Signal.pm.
+
+    Searches system Perl site_perl, $HOME/usr/local/lib, and /usr/local/lib
+    using glob — no subprocess or perl binary call required.
+    """
+    paths = []
+    seen = set()
+
+    # 1. System Perl site_perl (HNP-managed Perl installation)
+    for p in glob.glob("/data/service/hnp/perl.org/perl_*/lib/site_perl/*/"):
+        ap = os.path.abspath(p)
+        if ap not in seen and os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
+            paths.append(ap)
+            seen.add(ap)
+
+    # 2. $HOME/usr/local/lib paths (user-installed Perl modules)
+    home = os.environ.get("HOME", "")
+    if home:
+        for sub in ["usr/local/lib/perl5", "usr/local/lib/site_perl",
+                     "usr/local/lib/perl5/site_perl/*"]:
+            for p in glob.glob(os.path.join(home, sub)):
+                ap = os.path.abspath(p)
+                if os.path.isdir(ap) and ap not in seen:
+                    if os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
+                        paths.append(ap)
+                        seen.add(ap)
+
+    # 3. /usr/local/lib paths
+    for sub in ["perl5", "site_perl", "perl5/site_perl/*"]:
+        for p in glob.glob(os.path.join("/usr/local/lib", sub)):
+            ap = os.path.abspath(p)
+            if os.path.isdir(ap) and ap not in seen:
+                if os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
+                    paths.append(ap)
+                    seen.add(ap)
+
+    return paths
+
+
 class PerlSignalMaskConan(ConanFile):
     name = "perl-signal-mask"
     version = "0.008-r3"
@@ -30,75 +70,44 @@ class PerlSignalMaskConan(ConanFile):
         basic_layout(self, src_folder=".")
 
     def requirements(self):
-        # IPC::Signal is a runtime dependency; if available as Conan pkg use @ohpcd/stable
-        # self.requires("perl-ipc-signal/1.00@ohpcd/stable")
         pass
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # Pure Perl module, no C/XS code — no toolchain needed
         pass
-
-    def _get_perl5lib(self):
-        """Build PERL5LIB from system Perl paths (for IPC::Signal dependency)."""
-        parts = []
-
-        # Add system Perl site_perl paths for runtime deps (IPC::Signal)
-        for sys_path in [
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0",
-            "/storage/Users/currentUser/usr/local/lib/perl5",
-            "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0",
-        ]:
-            if os.path.isdir(sys_path):
-                parts.append(sys_path)
-
-        existing = os.environ.get("PERL5LIB", "")
-        if existing:
-            parts.append(existing)
-
-        return ":".join(parts)
 
     def build(self):
         apply_conandata_patches(self)
 
-        perl5lib = self._get_perl5lib()
-        env_vars = [f"PERL5LIB={perl5lib}"]
-
-        # R32: Platform check
         if self.settings.os not in ("Linux", "OHOS"):
             raise Exception(f"Unsupported OS: {self.settings.os}")
 
-        self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder, env=env_vars)
-        self.run("make -j1", cwd=self.source_folder, env=env_vars)
+        self.run("perl Makefile.PL INSTALL_BASE=/", cwd=self.source_folder)
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
-        perl5lib = self._get_perl5lib()
-        env_vars = [f"PERL5LIB={perl5lib}"]
-
         staging = os.path.join(self.build_folder, "staging")
-        self.run(f'make install DESTDIR="{staging}"', cwd=self.source_folder, env=env_vars)
+        self.run(f'make install DESTDIR="{staging}"', cwd=self.source_folder)
 
-        # Copy Perl .pm files to lib/perl5 at package root
-        for pm_file in glob.glob(os.path.join(staging, "**", "*.pm"), recursive=True):
-            rel = os.path.relpath(pm_file, staging)
-            parts = rel.split(os.sep)
-            if 'site_perl' in parts:
-                idx = parts.index('site_perl')
-                target_rel = os.path.join('lib', 'perl5', *parts[idx:])
-            else:
-                target_rel = os.path.join('lib', 'perl5', rel)
-            target = os.path.join(self.package_folder, target_rel)
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            copy(self, os.path.basename(pm_file), src=os.path.dirname(pm_file), dst=os.path.dirname(target))
+        src_lib = os.path.join(staging, "lib")
+        if not os.path.exists(src_lib):
+            raise Exception(f"Package staging lib directory not found: {src_lib}")
+        copy(self, "*", src_lib, os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
-        # Pure Perl module — libraries are .pm files in lib/perl5
         self.cpp_info.libdirs = ["lib/perl5"]
         self.cpp_info.libs = []
-        # Set PERL5LIB for consumers — use glob to find the actual site_perl path
-        for site_lib in glob.glob(os.path.join(self.package_folder, "lib", "perl5", "site_perl", "*")):
-            if os.path.isdir(site_lib):
-                self.runenv_info.append_path("PERL5LIB", site_lib)
-                break
+        perl_dirs = glob.glob(
+            os.path.join(self.package_folder, "lib", "perl5", "*")
+        )
+        for perl_dir in perl_dirs:
+            if os.path.isdir(perl_dir):
+                self.runenv_info.append_path("PERL5LIB", perl_dir)
+        base_perl = os.path.join(self.package_folder, "lib", "perl5")
+        if os.path.isdir(base_perl):
+            self.runenv_info.append_path("PERL5LIB", base_perl)
+
+        for ipc_path in _find_ipc_signal_paths():
+            self.runenv_info.append_path("PERL5LIB", ipc_path)

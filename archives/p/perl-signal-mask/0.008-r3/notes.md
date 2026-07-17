@@ -18,6 +18,8 @@
 8. 验证 Conan 配方：ohc-run.py conan-verify perl-signal-mask 0.008-r3
 9. 收尾归档：ohc-run.py finish perl-signal-mask 0.008-r3 built
 
+> 注：PR 合并并 CI upload 成功后，状态从 `built` 更新为 `published`
+
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
