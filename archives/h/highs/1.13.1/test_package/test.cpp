@@ -5,7 +5,7 @@
 int main(void) {
     Highs highs;
     HighsStatus status = highs.run();
-    if (status == HighsStatus::kHighsStatusError) {
+    if (status == HighsStatus::kError) {
         printf("test highs 1.13.1: FAILED\n");
         return 1;
     }

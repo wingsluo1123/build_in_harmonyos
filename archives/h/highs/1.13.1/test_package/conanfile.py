@@ -21,5 +21,5 @@ class HighsTestConan(ConanFile):
 
     def test(self):
         # Run the compiled test binary to verify HiGHS API works
-        bin_path = os.path.join(self.test_build_folder, "test_highs")
+        bin_path = os.path.join(self.build_folder, "test_highs")
         self.run(bin_path, env="conanrun")
