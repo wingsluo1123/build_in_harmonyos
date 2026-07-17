@@ -7,7 +7,6 @@ This is the front-end module that wraps Sereal::Encoder and Sereal::Decoder.
 Build system: Perl ExtUtils::MakeMaker (Makefile.PL)
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration

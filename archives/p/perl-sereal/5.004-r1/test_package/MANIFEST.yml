@@ -1,0 +1,77 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-sereal/5.004-r1
+homepage: https://github.com/Sereal/Sereal
+
+# 上游测试命令
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# make test 需要 .so runtime 加载，OHOS HMDFS/SELinux 限制 (E046) 阻止 dlopen
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序 (Perl .t 文件)
+# 所有测试依赖 use Sereal 触发 XS .so 加载，因 E046 无法在 conan 缓存中运行
+upstream_tests:
+  - file: t/001_load.t
+    source: Sereal-5.004/t/001_load.t
+    description: "模块加载测试 (use Sereal)"
+  - file: t/002_basic.t
+    source: Sereal-5.004/t/002_basic.t
+    description: "基本编码/解码功能测试"
+  - file: t/003_threshold.t
+    source: Sereal-5.004/t/003_threshold.t
+    description: "编码阈值选项测试"
+  - file: t/004_nesting.t
+    source: Sereal-5.004/t/004_nesting.t
+    description: "嵌套数据结构测试"
+  - file: t/005_options.t
+    source: Sereal-5.004/t/005_options.t
+    description: "编码器/解码器选项测试"
+  - file: t/006_freeze.t
+    source: Sereal-5.004/t/006_freeze.t
+    description: "FREEZE/THAW 钩子测试"
+  - file: t/007_aliases.t
+    source: Sereal-5.004/t/007_aliases.t
+    description: "别名引用测试"
+  - file: t/009_tied.t
+    source: Sereal-5.004/t/009_tied.t
+    description: "tied 变量测试"
+  - file: t/010_objects.t
+    source: Sereal-5.004/t/010_objects.t
+    description: "Perl 对象序列化测试"
+  - file: t/012_constructors.t
+    source: Sereal-5.004/t/012_constructors.t
+    description: "构造函数测试"
+  - file: t/013_compressing.t
+    source: Sereal-5.004/t/013_compressing.t
+    description: "压缩选项测试"
+  - file: t/014_no_bless.t
+    source: Sereal-5.004/t/014_no_bless.t
+    description: "nobless 选项测试"
+  - file: t/015_unicode.t
+    source: Sereal-5.004/t/015_unicode.t
+    description: "Unicode 数据序列化测试"
+  - file: t/016_roundtrip.t
+    source: Sereal-5.004/t/016_roundtrip.t
+    description: "编码-解码往返测试"
+  - file: t/017_bulk.t
+    source: Sereal-5.004/t/017_bulk.t
+    description: "批量编码/解码测试"
+
+# test_package 中自带的测试 (消费者视角验证)
+# 使用文件验证模式：.pm 存在性 + 内容验证 + ELF 格式检查 + 依赖完整性
+# .so runtime 加载因 E046 SELinux 限制无法执行
+test_package_tests:
+  - file: test.sh
+    description: "文件验证: Sereal.pm 存在性 + 内容验证 + Encoder/Decoder 依赖完整性 + ELF 格式检查"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值)
+# test_package: 6 项断言 (文件存在 + 内容验证 + 依赖 .pm/.so + ELF 格式)
+# 上游测试: ~50 项 (因 E046 无法运行，仅声明)
+assertion_count: 6

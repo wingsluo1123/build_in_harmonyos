@@ -15,7 +15,7 @@
 
 ## 编译步骤
 
-1. 下载源码: `curl -kL https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-5.004.tar.gz`
+1. 下载源码: `curl -L https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-5.004.tar.gz`
 2. 解压到工作目录
 3. 生成Makefile: `perl Makefile.PL`
 4. 编译: `make` (纯Perl模块，只需cp Sereal.pm到blib/lib/)
