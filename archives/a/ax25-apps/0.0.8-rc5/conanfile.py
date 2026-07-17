@@ -73,8 +73,9 @@ class Ax25AppsConan(ConanFile):
         # E129: Fix umask 077 -> umask 022 in generated configure (HMDFS setgid issue)
         replace_in_file(self, "configure", "umask 077", "umask 022")
 
-        # E165: Fix shebang in generated configure for OHOS
-        replace_in_file(self, "configure", "#! /bin/sh", "#!/system/bin/sh")
+        # E165: Fix shebang in generated configure for OHOS only
+        if self.settings.os == "OHOS":
+            replace_in_file(self, "configure", "#! /bin/sh", "#!/system/bin/sh")
 
         autotools = Autotools(self)
         autotools.configure()
