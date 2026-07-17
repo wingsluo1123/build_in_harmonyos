@@ -50,19 +50,6 @@ class Berkeleydb5Conan(ConanFile):
         tc.configure_args.append("--enable-shared")
         tc.configure_args.append("--with-repmgr-ssl=no")
         tc.generate()
-        # Also generate the config.sub/config.guess update script
-        self._patch_config_guess()
-
-    def _patch_config_guess(self):
-        """Patch config.guess/config.sub if a newer version is bundled with
-        the build environment (e.g. automake-1.16+ includes OHOS support)."""
-        import shutil, stat
-        src_dir = self.source_folder
-        dist_dir = os.path.join(src_dir, "dist")
-        for f in ("config.guess", "config.sub"):
-            target = os.path.join(dist_dir, f)
-            if os.path.isfile(target):
-                os.chmod(target, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
 
     def build(self):
         apply_conandata_patches(self)
