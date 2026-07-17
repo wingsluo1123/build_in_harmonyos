@@ -19,7 +19,7 @@ class TrioConan(ConanFile):
     description = "Portable, extensible printf/sprintf/scanf replacement library"
     license = "MIT"
     homepage = "https://sourceforge.net/projects/ctrio/"
-    url = ""  # CI fills this
+    url = "https://sourceforge.net/projects/ctrio/"
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
@@ -79,6 +79,3 @@ class TrioConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.set_property("cmake_file_name", "trio")
         self.cpp_info.set_property("cmake_target_name", "trio::trio")
-
-    def _recursive_chmod(self):
-        def _recursive_chmod(self, path, mode):
