@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.atomcode/skills/openharmony-compile-agent/archives/g/graphqlite/0.6.0/test_package/conanbuildenv-release-armv8.sh"
