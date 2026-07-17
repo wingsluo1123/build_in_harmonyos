@@ -57,6 +57,46 @@ class Berkeleydb5Conan(ConanFile):
         build_dir = os.path.join(src_dir, "build_unix")
         os.makedirs(build_dir, exist_ok=True)
 
+        # Pre-patch dist/configure BEFORE running it.
+        # Two problems force us to intercept configure BEFORE it runs:
+        #
+        # (A) configure probes `print -r --` as an echo mechanism. On HMDFS the
+        #     probe succeeds (ksh-style `print` builtin exists in the probe shell),
+        #     but config.status later runs in a context where `print` is unavailable
+        #     → "print: command not found" spam and failure.
+        #     Fix: rewrite configure so it never picks `print -r --`, forcing the
+        #     POSIX `printf %s\n` fallback for both as_echo and ECHO.
+        #
+        # (B) configure's LAST step is `$SHELL $CONFIG_STATUS ...` — it execs the
+        #     freshly-written config.status immediately. config.status creates temp
+        #     awk scripts in ./confXXXX/ then executes them directly (`./subs1.awk`),
+        #     but HMDFS denies execute permission on newly-created scripts and also
+        #     blocks writes under umask 077 + setgid. We need to patch config.status
+        #     BEFORE it runs, so we neuter the auto-exec in configure and re-run
+        #     config.status ourselves after patching it below.
+        configure = os.path.join(src_dir, "dist", "configure")
+        if os.path.isfile(configure):
+            with open(configure) as f:
+                cfg = f.read()
+            # (A) Force printf fallback — drop every `print -r --` probe branch.
+            cfg = cfg.replace("as_echo='print -r --'", "as_echo='printf %s\\n'")
+            cfg = cfg.replace("as_echo_n='print -rn --'", "as_echo_n='printf %s'")
+            cfg = cfg.replace("ECHO='print -r --'", "ECHO='printf %s\\n'")
+            cfg = cfg.replace("print -r --", "printf %s\\n")
+            cfg = cfg.replace("print -rn --", "printf %s")
+            # (B) Stop configure from auto-execing config.status. We re-run it
+            #     manually after patching. The auto-exec line looks like:
+            #       $SHELL $CONFIG_STATUS $ac_config_status_args || ac_cs_success
+            #     Replace it with a no-op so configure exits cleanly first.
+            import re as _re
+            cfg = _re.sub(
+                r'\$SHELL \$CONFIG_STATUS \$ac_config_status_args \|\| ac_cs_success',
+                'echo "config.status deferred (HMDFS patch pending)"',
+                cfg,
+            )
+            with open(configure, "w") as f:
+                f.write(cfg)
+
         # Configure from build_unix/ using ../dist/configure
         # Conan's AutotoolsToolchain sets --prefix=/ for library packages,
         # and DESTDIR handles the actual install path.
@@ -66,50 +106,49 @@ class Berkeleydb5Conan(ConanFile):
             f"--enable-static --enable-shared --with-repmgr-ssl=no",
             env="conanbuild"
         )
-        # Patch config.status for OHOS/HarmonyOS (HMDFS) compatibility.
-        # Two issues:
-        #   (1) `print -r` is a ksh/zsh builtin not available in HMDFS /bin/sh
-        #       → replace with POSIX `printf '%s\n'`.
-        #   (2) config.status creates temp awk scripts in ./confXXXX/ then
-        #       executes them directly (`./subs1.awk`). HMDFS denies execute
-        #       permission on newly-created scripts → Permission denied.
-        #       → rewrite the invocation to `awk -f <script>` so the script
-        #         only needs read permission, not execute.
+
+        # Patch config.status for HMDFS temp dir perms, THEN run it manually
+        # (configure's auto-exec was neutered above).
+        # Root cause of "subs1.awk: Permission denied": config.status creates temp
+        # awk scripts in ./confXXXX/ (mktemp + umask 077). HMDFS setgid blocks
+        # writes under 2700 perms → the `echo > "$ac_tmp/subs1.awk"` write fails.
+        # Fix: redirect tmp to $TMPDIR and use umask 022 so writes succeed.
+        # NOTE: do NOT rewrite awk script invocation to `awk -f` — every
+        # `subs*.awk` occurrence in config.status is a redirection target
+        # (">", ">>", "<"), not a direct execution. Patching those breaks
+        # filenames. Once temp dir is writable, awk scripts run fine.
         config_status = os.path.join(build_dir, "config.status")
         if os.path.isfile(config_status):
             with open(config_status) as f:
                 content = f.read()
-            # (1) print -r -- "..."  →  printf '%s\n' "..."
-            content = content.replace('print -r --', "printf '%s\\n'")
-            # (1b) any bare `print -r ` fallback
-            content = content.replace('print -r ', "printf '%s\\n' ")
-            # (2) Direct awk script execution:  "$ac_tmp/subs1.awk"  →  awk -f "$ac_tmp/subs1.awk"
-            #     config.status invokes awk scripts via:  . "$tmp/subs1.awk"  OR  "$tmp/subs1.awk"
-            #     We wrap every `subs*.awk` direct invocation with `awk -f`.
             import re
-            # Match:  "$ac_tmp/subsN.awk"   or   $ac_tmp/subsN.awk   (no leading awk -f)
+            # mktemp temp dir: umask 077 → umask 022, use $TMPDIR (HMDFS setgid
+            # blocks writes under 2700 perms). Use regex — literal replace
+            # fails because of nested backticks/quotes in the real config.status.
             content = re.sub(
-                r'(?<!awk -f )(\$ac_tmp/subs\d+\.awk)',
-                r'awk -f \1',
+                r'tmp=`\(umask 077 && mktemp -d "\./confXXXXXX"\) 2>/dev/null` &&',
+                'tmp="${TMPDIR:-/tmp}"/conf$$-$RANDOM  &&',
                 content,
             )
-            # Also handle the "./confXXX/subsN.awk" form used by older autotools
             content = re.sub(
-                r'(?<!awk -f )(\./conf\S+/subs\d+\.awk)',
-                r'awk -f \1',
+                r'tmp=\./conf\$\$-\$RANDOM\n  \(umask 077 && mkdir "\$tmp"\)',
+                'tmp="${TMPDIR:-/tmp}"/conf$$-$RANDOM\n  (umask 022 && mkdir -p "$tmp")',
                 content,
             )
-            # (3) mktemp temp dir: umask 077 → umask 022, use $TMPDIR
-            content = content.replace(
-                '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&',
-                '  tmp="${TMPDIR:-/tmp}"/conf$$  &&',
+            # Fallback: any remaining `umask 077 && mkdir "$tmp"` → umask 022
+            content = re.sub(
+                r'umask 077 && mkdir "\$tmp"',
+                'umask 022 && mkdir -p "$tmp"',
+                content,
             )
-            content = content.replace(
-                '  (umask 077 && mkdir "$tmp")',
-                '  (umask 022 && mkdir -p "$tmp")',
-            )
+            # Defensive: if configure still emitted `print -r --`, swap it.
+            content = content.replace("print -r --", "printf %s\\n")
+            content = content.replace("print -rn --", "printf %s")
             with open(config_status, "w") as f:
                 f.write(content)
+
+            # Now manually run the patched config.status.
+            self.run(f"cd {build_dir} && $SHELL ./config.status", env="conanbuild")
 
         self.run(f"cd {build_dir} && make -j1", env="conanbuild")
         self.run(
