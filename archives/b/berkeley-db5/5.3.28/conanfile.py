@@ -66,25 +66,47 @@ class Berkeleydb5Conan(ConanFile):
             f"--enable-static --enable-shared --with-repmgr-ssl=no",
             env="conanbuild"
         )
-        # Patch config.status for OHOS/HarmonyOS compatibility
+        # Patch config.status for OHOS/HarmonyOS (HMDFS) compatibility.
+        # Two issues:
+        #   (1) `print -r` is a ksh/zsh builtin not available in HMDFS /bin/sh
+        #       → replace with POSIX `printf '%s\n'`.
+        #   (2) config.status creates temp awk scripts in ./confXXXX/ then
+        #       executes them directly (`./subs1.awk`). HMDFS denies execute
+        #       permission on newly-created scripts → Permission denied.
+        #       → rewrite the invocation to `awk -f <script>` so the script
+        #         only needs read permission, not execute.
         config_status = os.path.join(build_dir, "config.status")
         if os.path.isfile(config_status):
             with open(config_status) as f:
                 content = f.read()
-            # Fix 1: Replace `print` with `printf` (bashism, not available in /bin/sh)
-            content = content.replace('\tprint -r --', '\tprintf "%s\\n"')
-            content = content.replace('\tprint -r ', '\tprintf "%s\\n" ')
-            content = content.replace('print -r --', 'printf "%s\\n"')
-            # Fix 2: Replace mktemp temp dir with a simple mkdir approach
-            # The old format uses: mktemp -d "./confXXXXXX" || mkdir ./conf$$-$RANDOM
-            # We replace it with a simple mkdir approach using TMPDIR
+            # (1) print -r -- "..."  →  printf '%s\n' "..."
+            content = content.replace('print -r --', "printf '%s\\n'")
+            # (1b) any bare `print -r ` fallback
+            content = content.replace('print -r ', "printf '%s\\n' ")
+            # (2) Direct awk script execution:  "$ac_tmp/subs1.awk"  →  awk -f "$ac_tmp/subs1.awk"
+            #     config.status invokes awk scripts via:  . "$tmp/subs1.awk"  OR  "$tmp/subs1.awk"
+            #     We wrap every `subs*.awk` direct invocation with `awk -f`.
+            import re
+            # Match:  "$ac_tmp/subsN.awk"   or   $ac_tmp/subsN.awk   (no leading awk -f)
+            content = re.sub(
+                r'(?<!awk -f )(\$ac_tmp/subs\d+\.awk)',
+                r'awk -f \1',
+                content,
+            )
+            # Also handle the "./confXXX/subsN.awk" form used by older autotools
+            content = re.sub(
+                r'(?<!awk -f )(\./conf\S+/subs\d+\.awk)',
+                r'awk -f \1',
+                content,
+            )
+            # (3) mktemp temp dir: umask 077 → umask 022, use $TMPDIR
             content = content.replace(
                 '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&',
-                '  tmp="./conf$$"'
+                '  tmp="${TMPDIR:-/tmp}"/conf$$  &&',
             )
             content = content.replace(
-                '  tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")',
-                '  (umask 022 && mkdir -p "$tmp")'
+                '  (umask 077 && mkdir "$tmp")',
+                '  (umask 022 && mkdir -p "$tmp")',
             )
             with open(config_status, "w") as f:
                 f.write(content)
