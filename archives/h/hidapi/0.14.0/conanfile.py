@@ -127,8 +127,15 @@ Cflags: -I${{includedir}}
                 'set(HIDAPI_WITH_LIBUSB ON)',
                 'set(HIDAPI_WITH_LIBUSB OFF)')
 
+        # Add compile options to bypass stub libudev implicit declaration errors
+        top_cmake = os.path.join(self.source_folder, "CMakeLists.txt")
+        if os.path.isfile(top_cmake):
+            replace_in_file(self, top_cmake,
+                "project(hidapi LANGUAGES C)",
+                'project(hidapi LANGUAGES C)\nadd_compile_options(-Wno-error=implicit-function-declaration -Wno-error=int-conversion)')
+
         cmake = CMake(self)
-        cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5", "-DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration -Wno-error=int-conversion"])
+        cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
         cmake.build()
 
     def package(self):
