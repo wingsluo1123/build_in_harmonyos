@@ -32,9 +32,6 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    # 先配置 OHOS 社区 PyPI 源（requests 等依赖仅在此源可用）
-    python3 -m pip config set global.index-url https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple 2>/dev/null || true
-    python3 -m pip config set global.trusted-host pypi.cnb.cool 2>/dev/null || true
     python3 -m pip install --user --force-reinstall conan || {
         echo "[error] Failed to install conan"
         exit 1
