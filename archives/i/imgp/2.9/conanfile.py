@@ -44,6 +44,14 @@ class ImgpConan(ConanFile):
 
         # Install pillow (pre-built wheel for OHOS) separately
         self.run(f"{python} -m pip install pillow", env="conanrun")
+        # Fix permissions on .so files installed by pillow (CI may have
+        # restrictive umask that makes shared libraries unreadable)
+        self.run(f"{python} -c \"import site; "
+                 f"sp = site.getusersitepackages(); "
+                 f"import os, glob; "
+                 f"for f in glob.glob(os.path.join(sp, 'PIL', '*.so')): "
+                 f"  os.chmod(f, 0o644); "
+                 f"  print('fix ' + f)\" 2>/dev/null || true", env="conanrun")
 
         # Download and install setuptools from files.pythonhosted.org.
         # The CI's internal pip index (pypi.cnb.cool) does not have setuptools,
@@ -105,6 +113,7 @@ print('Download complete: ' + str(downloaded) + ' bytes')
         for site_dir in [
             f"/usr/local/lib/{py_ver}/site-packages",
             f"/usr/lib/{py_ver}/site-packages",
+            os.path.expanduser(f"~/.local/lib/{py_ver}/site-packages"),
             os.path.expanduser(f"~/usr/local/lib/{py_ver}/site-packages"),
         ]:
             if os.path.isdir(site_dir):
