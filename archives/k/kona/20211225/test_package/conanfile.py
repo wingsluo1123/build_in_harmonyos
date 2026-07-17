@@ -15,5 +15,5 @@ class KonaTestConan(ConanFile):
 
     def test(self):
         bin_path = os.path.join(self.dependencies["kona"].package_folder, "bin", "k")
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL", "bash")
         self.run(f'{bash} test.sh "{bin_path}"', env="conanrun")

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe for kona — K programming language interpreter."""
+"""Conan recipe — kona 20211225 (Makefile)."""
 import json
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import AutotoolsToolchain
 
 
 class KonaConan(ConanFile):
@@ -33,10 +32,6 @@ class KonaConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
-        tc = AutotoolsToolchain(self)
-        tc.generate()
-
     def build(self):
         apply_conandata_patches(self)
         # R33: Get compiler from Conan conf, not shell env vars
@@ -47,7 +42,7 @@ class KonaConan(ConanFile):
             except Exception:
                 compilers = {}
         cc = compilers.get("c", "clang") if isinstance(compilers, dict) else "clang"
-        self.run(f'make CC="{cc}" -j1 k')
+        self.run(f'make CC="{cc}" CFLAGS="-fPIC -O2" PRODFLAGS="-O3 -fPIC" -j1 k')
 
     def package(self):
         copy(self, "k", self.build_folder, os.path.join(self.package_folder, "bin"))
