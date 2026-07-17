@@ -29,11 +29,15 @@ class HiGHSConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        # HiGHS CMake install may not copy all headers on OHOS, manually ensure they're included
+        # HiGHS 的 CMake install 会把头文件装到 include/highs/ 子目录下，
+        # 但 cmake config 把 include path 设为 include/。
+        # 从 src/ 按 keep_path=True 复制确保头文件结构与内部 #include 匹配。
         copy(self, "*.h", src=os.path.join(self.source_folder, "src"),
-             dst=os.path.join(self.package_folder, "include"), keep_path=False)
+             dst=os.path.join(self.package_folder, "include"), keep_path=True)
+        copy(self, "*.hpp", src=os.path.join(self.source_folder, "src"),
+             dst=os.path.join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.hh", src=os.path.join(self.source_folder, "src"),
-             dst=os.path.join(self.package_folder, "include"), keep_path=False)
+             dst=os.path.join(self.package_folder, "include"), keep_path=True)
 
     def package_info(self):
         self.cpp_info.libs = ["highs"]
