@@ -40,3 +40,6 @@ class LibdjinteropConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["djinterop"]
+
+    def requirements(self):
+        self.requires("zlib/1.2.13")
