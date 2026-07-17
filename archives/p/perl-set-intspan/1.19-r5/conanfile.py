@@ -57,9 +57,6 @@ class PerlSetIntSpanConan(ConanFile):
         )
         for src_dir in src_dirs:
             if os.path.isdir(src_dir):
-                rel = os.path.relpath(src_dir, self.package_folder)
-                # Find the site_perl parent
-                parts = rel.split(os.sep)
                 # Copy to lib/perl5/Set/
                 dst = os.path.join(self.package_folder, "lib", "perl5", "Set")
                 os.makedirs(dst, exist_ok=True)
