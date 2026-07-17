@@ -25,7 +25,7 @@ Perl ExtUtils::MakeMaker (Makefile.PL) — pure Perl module, no C/XS code.
 
 ```bash
 # Install via Conan
-conan install --requires=perl-sereal/5.004-r1@ohpcd/stable
+conan install --requires=perl-sereal/5.004-r1
 
 # Use in Perl
 perl -e 'use Sereal qw(encode_sereal decode_sereal); my $enc = encode_sereal({key => "value"}); my $dec = decode_sereal($enc);'

@@ -38,8 +38,8 @@
 ## 依赖版本
 
 ### 运行时依赖（Conan包）
-- perl-sereal-encoder/5.004@ohpcd/stable (XS模块，已发布)
-- perl-sereal-decoder/5.004-r3@ohpcd/stable (XS模块，已编译)
+- perl-sereal-encoder/5.004 (XS模块)
+- perl-sereal-decoder/5.004-r3 (XS模块)
 
 ### 测试依赖（未安装，不影响核心功能）
 - Test::LongString

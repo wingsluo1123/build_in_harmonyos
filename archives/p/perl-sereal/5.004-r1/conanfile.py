@@ -29,9 +29,8 @@ class PerlSerealConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # R27: dependencies must use @ohpcd/stable
-        self.requires("perl-sereal-encoder/5.004@ohpcd/stable")
-        self.requires("perl-sereal-decoder/5.004-r3@ohpcd/stable")
+        self.requires("perl-sereal-encoder/5.004")
+        self.requires("perl-sereal-decoder/5.004-r3")
 
     def validate(self):
         # R32: settings.os judgment must use in ("Linux", "OHOS")
