@@ -127,6 +127,16 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
                 pkg_dir = os.path.join(pkg_root, str(libdir), "pkgconfig")
                 if os.path.isdir(pkg_dir):
                     pkg_paths.append(pkg_dir)
+                    # Fix broken .pc files (zlib/openssl may have prefix=/)
+                    for pc_file in os.listdir(pkg_dir):
+                        pc_path = os.path.join(pkg_dir, pc_file)
+                        if os.path.isfile(pc_path):
+                            with open(pc_path, "r") as f:
+                                pc_content = f.read()
+                            if "prefix=/" in pc_content or "prefix=\n" in pc_content:
+                                pc_content = pc_content.replace("prefix=/", f"prefix={pkg_root}").replace("prefix=\n", f"prefix={pkg_root}\n")
+                                with open(pc_path, "w") as f:
+                                    f.write(pc_content)
         if pkg_paths:
             os.environ["PKG_CONFIG_PATH"] = ":".join(pkg_paths) + ":" + os.environ.get("PKG_CONFIG_PATH", "")
 
