@@ -45,12 +45,23 @@ class ImgpConan(ConanFile):
         # Install pillow (pre-built wheel for OHOS) separately
         self.run(f"{python} -m pip install pillow", env="conanrun")
 
-        # Install imgp from source directory via pip.
-        # pip creates an isolated build env by default and needs setuptools
-        # as a PEP 517 build backend. The CI's internal pip index may not
-        # have setuptools, so add the official PyPI as an extra index URL
-        # so pip can find and download the setuptools wheel automatically.
-        self.run(f"cd {src_dir} && {python} -m pip install --extra-index-url https://pypi.org/simple/ .", env="conanrun")
+        # Download and install setuptools from files.pythonhosted.org.
+        # The CI's internal pip index (pypi.cnb.cool) does not have setuptools,
+        # and the official PyPI (pypi.org) is not reachable from the CI network.
+        # However, files.pythonhosted.org (the CDN) IS reachable.
+        # The source tarball URL format is predictable:
+        #   https://files.pythonhosted.org/packages/source/{first_letter}/{name}/{name}-{version}.tar.gz
+        # Download to the build folder (which is always writable).
+        st_tarball = os.path.join(self.build_folder, "setuptools-75.8.0.tar.gz")
+        self.run(f"{python} -c \"import urllib.request; "
+                 f"urllib.request.urlretrieve("
+                 f"'https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-75.8.0.tar.gz', "
+                 f"'{st_tarball}')\"", env="conanrun")
+        self.run(f"{python} -m pip install '{st_tarball}' --no-build-isolation", env="conanrun")
+
+        # Install imgp from source directory using --no-build-isolation
+        # (setuptools is now available in the system Python)
+        self.run(f"cd {src_dir} && {python} -m pip install --no-build-isolation .", env="conanrun")
 
     def package(self):
         # Find the installed files from the system Python
