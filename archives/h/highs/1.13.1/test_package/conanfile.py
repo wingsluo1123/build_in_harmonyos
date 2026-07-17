@@ -1,6 +1,7 @@
 """Conan test_package — 验证 highs 库可正常使用"""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+import os
 
 
 class HighsTestConan(ConanFile):
@@ -19,5 +20,6 @@ class HighsTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the compiled test binary to verify HiGHS API works
+        bin_path = os.path.join(self.test_build_folder, "test_highs")
+        self.run(bin_path, env="conanrun")
