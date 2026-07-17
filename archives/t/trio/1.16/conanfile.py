@@ -62,9 +62,13 @@ class TrioConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make()
+        previous_umask = os.umask(0o022)
+        try:
+            autotools = Autotools(self)
+            autotools.configure()
+            autotools.make()
+        finally:
+            os.umask(previous_umask)
 
     def package(self):
         autotools = Autotools(self)
