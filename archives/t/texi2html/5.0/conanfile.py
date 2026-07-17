@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe for texi2html 5.0 — Autotools (configure + make).
 
-Usage: Replace Texi2Html, texi2html, 5.0, texi2html 5.0, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for system-name libraries.
+HarmonyOS PC adaptation:
+- install-sh: fix permissions (upstream tarball 0644 → 0755)
+- configure: fix /bin/sh shebang, PACKAGE_DATE, umask
+- package: fix pkgdatadir, Perl module paths, dgettext, shebangs
 """
 import os
 import shutil
@@ -18,9 +18,9 @@ from conan.tools.layout import basic_layout
 class Texi2HtmlConan(ConanFile):
     name = "texi2html"
     version = "5.0"
-    description = "texi2html 5.0"
+    description = "Texinfo 文档格式转换工具，将 .texi 文件转换为 HTML"
     license = "MIT"
-    homepage = ""
+    homepage = "https://www.nongnu.org/texi2html/"
     url = ""  # CI fills this
 
     package_type = "application"
@@ -52,6 +52,9 @@ class Texi2HtmlConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Fix install-sh permissions (upstream tarball ships 0644, needs 0755 for execution)
+        install_sh = os.path.join(self.source_folder, "install-sh")
+        os.chmod(install_sh, 0o755)
         configure = os.path.join(self.source_folder, "configure")
         # E165: fix /bin/sh shebang for HarmonyOS
         replace_in_file(self, configure, "#! /bin/sh", "#!/system/bin/sh")
