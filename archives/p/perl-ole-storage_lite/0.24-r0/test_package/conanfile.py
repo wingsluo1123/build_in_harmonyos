@@ -3,6 +3,8 @@
 
 Verifies that OLE::Storage_Lite Perl module can be loaded and reports version.
 """
+import os
+
 from conan import ConanFile
 
 
@@ -13,5 +15,6 @@ class PerlolestorageliteTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # L1: verify Perl module loads and prints version
-        self.run('perl -e "use OLE::Storage_Lite; print OLE::Storage_Lite->VERSION, qq(\\n)"', env="conanrun")
+        # L1: verify Perl module loads and prints version via test script
+        test_script = os.path.join(self.source_folder, "test_ole_storage_lite.sh")
+        self.run(f"sh {test_script}", env="conanrun")

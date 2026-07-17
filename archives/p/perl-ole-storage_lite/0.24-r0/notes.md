@@ -12,6 +12,9 @@
 # 1. 下载源码
 curl -kL -o $HOME/tmp/OLE-Storage_Lite-0.24.tar.gz https://cpan.metacpan.org/authors/id/J/JM/JMCNAMARA/OLE-Storage_Lite-0.24.tar.gz
 
+# 1.1 校验源码完整性
+echo "71c3b6ef082176c9585e620dd48f0f4782c282be73f2a653ea4b618f757bb3fd  $HOME/tmp/OLE-Storage_Lite-0.24.tar.gz" | sha256sum -c
+
 # 2. 初始化编译环境
 python3 $SKILL_ROOT/scripts/ohc-run.py init-build perl-ole-storage_lite 0.24-r0 --url=file://$HOME/tmp/OLE-Storage_Lite-0.24.tar.gz
 
