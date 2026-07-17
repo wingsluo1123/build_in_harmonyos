@@ -23,21 +23,25 @@
 | 1 | make test 全部失败 (Permission denied) | 鸿蒙 SELinux HMDFS 限制用户目录 .so 加载 (E046) | 平台限制，非编译缺陷。模块需安装到 `/data/service/hnp/` 系统目录运行 |
 | 2 | conanfile.py 缺少 make test 步骤 | 初始 conanfile 未包含测试步骤 | 在 build() 中添加 `make test` (ignore_errors=True)，记录 SELinux 限制 |
 | 3 | test_package 仅检查文件结构 | 初始 test_package 无功能测试 | 增强 test_package：添加 ELF 静态分析 + 运行时功能测试（best-effort） |
+| 4 | sys/types.h 找不到 | Perl MakeMaker 不使用 Conan Toolchain，clang 找不到 OHOS SDK sysroot 头文件 | Makefile CCFLAGS patch: -isystem 添加 sysroot/usr/include + aarch64-linux-ohos 子目录 |
+| 5 | libunwind.a 链接失败 | -fstack-protector-strong ldflags 导致链接器需要 libunwind.a | Makefile LDDLFLAGS patch: -nostartfiles -nodefaultlibs -lc (E137 CRT workaround) |
 
 ## 与 perl-dbd-pg 编译经验对比
 
 | 项目 | perl-dbd-pg | perl-set-object |
 |------|-------------|-----------------|
 | 构建系统 | ExtUtils::MakeMaker | ExtUtils::MakeMaker |
-| CRT 链接参数 | 需要 `-nostartfiles -nodefaultlibs -lc` | 不需要（仅链接 libc 和 Perl 符号） |
+| CRT 链接参数 | 需要 `-nostartfiles -nodefaultlibs -lc` | 需要（E137: 解决 libunwind.a 链接失败） |
 | 外部 C 依赖 | libpq (PostgreSQL) | 无 |
 | SELinux 限制 | 相同（HMDFS 限制 .so 加载） | 相同 |
 | make -j1 | 是 (E074) | 是 (E074) |
-| 补丁 | 需要（Makefile.PL 修改） | 不需要 |
+| 补丁 | 需要（Makefile.PL 修改） | 需要（Makefile CCFLAGS/LDDLFLAGS patch，E137） |
 
 ## 源码修改
 
-无补丁。Set::Object 的 Makefile.PL 在鸿蒙平台上无需修改即可编译。
+无 conandata 补丁。在 conanfile.py build() 中对生成的 Makefile 进行运行时 patch（E137）：
+- CCFLAGS 添加 `-isystem {sysroot}/usr/include -isystem {sysroot}/usr/include/aarch64-linux-ohos`（解决 sys/types.h、bits/alltypes.h 找不到）
+- LDDLFLAGS 添加 `-nostartfiles -nodefaultlibs -L{sysroot_lib} -lc`（解决 libunwind.a 链接失败）
 
 ## 依赖版本
 
@@ -85,7 +89,7 @@
 ## 注意事项
 
 1. **SELinux 限制**: 鸿蒙系统 SELinux HMDFS 限制用户目录的 .so 加载。模块必须安装到 `/data/service/hnp/` 系统目录（SELinux 标签 `hnp_file`）才能被 Perl DynaLoader 加载。
-2. **无需 CRT 参数**: 与 perl-dbd-pg 不同，Set::Object 不需要 `-nostartfiles -nodefaultlibs -lc` 链接参数，因为它不依赖外部 C 库。
+2. **Makefile patch (E137)**: 在 build() 中对生成的 Makefile 进行运行时 patch，添加 `-isystem` 指定 OHOS SDK sysroot 头文件路径，`-nostartfiles -nodefaultlibs -lc` 解决 libunwind.a 链接问题。
 3. **make -j1**: 必须使用 `-j1` 编译（E074: HarmonyOS SELinux 禁止 FIFO 并行构建）。
 4. **功能测试受限**: 由于 SELinux 限制，make test 在编译环境中无法通过。功能测试需在模块安装到系统目录后进行。
 

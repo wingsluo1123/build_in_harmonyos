@@ -41,8 +41,9 @@ conan install --requires=perl-set-object/1.43-r0@ohpcd/stable
 ### 注意事项
 
 - 鸿蒙系统 SELinux HMDFS 限制用户目录的 .so 加载，XS 模块需安装到 `/data/service/hnp/` 系统目录才能正常运行
-- 与 perl-dbd-pg 不同，Set::Object 不需要 CRT 链接参数（`-nostartfiles -nodefaultlibs -lc`），因为它仅链接 libc 和 Perl 解释器符号
+- 编译使用 `-isystem` 指定 OHOS SDK sysroot 头文件路径，`-nostartfiles -nodefaultlibs -lc` CRT workaround 解决 libunwind.a 链接问题
 - 编译使用 `make -j1`（E074: HarmonyOS SELinux 禁止 FIFO）
 
 ---
-*OpenHarmony 编译归档 · 2026-06-29*
+*OpenHarmony 编译归档 · 2026-07-01*
+06-29*
