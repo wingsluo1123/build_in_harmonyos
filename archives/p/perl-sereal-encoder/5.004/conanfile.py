@@ -25,7 +25,7 @@ class PerlSerealEncoderConan(ConanFile):
     description = "Sereal::Encoder - XS-based Sereal binary serialization encoder for Perl"
     license = "perl_5"
     homepage = "https://metacpan.org/dist/Sereal-Encoder"
-    url = ""  # CI fills this
+    url = "https://metacpan.org/dist/Sereal-Encoder"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -97,7 +97,7 @@ class PerlSerealEncoderConan(ConanFile):
 
     def package_info(self):
         # XS module: .so is loaded by Perl's XSLoader/DynaLoader
-        self.cpp_info.libs = []
+        self.cpp_info.libs = ["Encoder"]
         perl_arch = "aarch64-linux" if str(self.settings.arch) in ("armv8", "aarch64") else "x86_64-linux"
         perl_ver = "5.42.0"
         lib_base = os.path.join(
