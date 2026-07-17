@@ -1,0 +1,74 @@
+diff --git a/conandata.yml b/conandata.yml
+index a1b2c3d..e4f5g6h 100644
+--- a/conandata.yml
++++ b/conandata.yml
+@@ -1,10 +1,5 @@
+ sources:
+   url: "https://github.com/stlink-org/stlink/archive/refs/tags/v1.8.0.tar.gz"
+   sha256: "cff760b5c212c2cc480f705b9ca7f3828d6b9c267950c6a547002cd0a1f5f6ac"  # CI 校验
+-patches: []
+-
+-patches:
+-  "1.8.0":
+-    - patch_file: patches/001-add-test-sources.patch
+-      patch_description: test_package/ 仅提供了运行 st-info 的命令，缺少调用库 API 的测试源文件，导致 L0 质量门检查失败。stlink 提供了 libst
++
++# Patches are no longer needed as test_package sources are now included in the recipe.
+@@ -0,0 +1,7 @@
+diff --git a/test_package/CMakeLists.txt b/test_package/CMakeLists.txt
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/test_package/CMakeLists.txt
+@@ -0,0 +1,7 @@
++cmake_minimum_required(VERSION 3.1)
++project(test_package C)
++find_package(stlink REQUIRED)
++add_executable(${PROJECT_NAME} test.c)
++target_link_libraries(${PROJECT_NAME} stlink::stlink)
++set_target_properties(${PROJECT_NAME} PROPERTIES
++    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+@@ -0,0 +1,8 @@
+diff --git a/test_package/test.c b/test_package/test.c
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/test_package/test.c
+@@ -0,0 +1,8 @@
++#include <stlink.h>
++
++int main(void) {
++    stlink_init();
++    stlink_exit();
++    return 0;
++}
++
+diff --git a/test_package/conanfile.py b/test_package/conanfile.py
+index 4b3c2c1..a1b2c3d 100644
+--- a/test_package/conanfile.py
++++ b/test_package/conanfile.py
+@@ -1,13 +1,20 @@
+ from conan import ConanFile
+ from conan.tools.build import can_run
++import os
++from conan.tools.cmake import CMake
+ 
+ 
+ class TestConan(ConanFile):
+     settings = "os", "compiler", "build_type", "arch"
+-    generators = "VirtualRunEnv"
++    generators = "VirtualRunEnv", "CMakeToolchain", "CMakeDeps"
+ 
++    def requirements(self):
++        self.requires(self.tested_reference_str)
++
++    def build(self):
++        cmake = CMake(self)
++        cmake.configure()
++        cmake.build()
++
+     def test(self):
+         if can_run(self):
+             self.run("st-info --version", env="conanrun")
++            bin_path = os.path.join(self.cpp.build.bindir, "test_package")
++            self.run(bin_path, env="conanrun")
