@@ -5,7 +5,7 @@ Perl SNMP Session 模块，提供 SNMP 协议访问功能。
 ## 软件信息
 
 - **官网**: https://github.com/sleinen/snmp-session
-- **源码**: https://deb.debian.org/debian/pool/main/libs/libsnmp-session-perl/
+- **源码**: https://github.com/sleinen/snmp-session
 - **许可证**: Artistic-2.0
 - **分类**: network
 
@@ -46,7 +46,7 @@ SNMP::Session 是纯 Perl 实现的 SNMP 协议访问模块，支持 SNMPv1 和 
 
 通过 Conan 安装：
 ```bash
-conan install --requires=perl-snmp-session/1.16-r2@ohpcd/stable
+conan install --requires=perl-snmp-session/1.16-r2
 ```
 
 模块安装路径：`lib/perl5/`（Conan 包）或 `site_perl/5.42.0/`（系统安装）。

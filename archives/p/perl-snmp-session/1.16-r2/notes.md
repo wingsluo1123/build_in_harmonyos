@@ -12,12 +12,12 @@
 
 ```bash
 # 下载源码
-curl -kL -o libsnmp-session-perl_1.16.orig.tar.gz \
-  "https://deb.debian.org/debian/pool/main/libs/libsnmp-session-perl/libsnmp-session-perl_1.16.orig.tar.gz"
+curl -L -o snmp-session-1.16.tar.gz \
+  "https://github.com/sleinen/snmp-session/archive/refs/tags/v1.16.tar.gz"
 
 # 解压并进入源码目录
-tar xzf libsnmp-session-perl_1.16.orig.tar.gz
-cd sleinen-snmp-session-c6dfacd
+tar xzf snmp-session-1.16.tar.gz
+cd snmp-session-1.16
 
 # 构建和安装
 perl Makefile.PL

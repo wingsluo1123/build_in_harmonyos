@@ -57,8 +57,6 @@ class PerlSnmpSessionConan(ConanFile):
         )
         for pm_file in pm_files:
             rel = os.path.relpath(pm_file, self.package_folder)
-            # Extract the filename (e.g., SNMP_Session.pm)
-            parts = rel.split(os.sep)
             # Find site_perl subdirectory; copy .pm files to lib/perl5/
             dst_dir = os.path.join(self.package_folder, "lib", "perl5")
             os.makedirs(dst_dir, exist_ok=True)
