@@ -67,3 +67,4 @@ class Bzip2Conan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["bz2"]
+        self.cpp_info.bindirs = ["bin"]

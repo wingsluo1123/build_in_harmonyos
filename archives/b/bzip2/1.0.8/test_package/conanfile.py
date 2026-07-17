@@ -30,5 +30,4 @@ class Bzip2TestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_bzip2')}", env="conanrun")
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_bzip2"), env="conanrun")
