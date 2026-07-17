@@ -65,3 +65,6 @@ class AllegroConan(ConanFile):
             f"allegro_memfile{suffix}",
             f"allegro_primitives{suffix}",
         ]
+        # System libraries required by allegro on Unix-like platforms
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["m", "pthread", "dl", "rt"]

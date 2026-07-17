@@ -9,7 +9,7 @@
 - 无 X11/OpenGL 依赖 (WANT_X11=OFF)
 - 示例程序包含 X11 头文件导致编译失败，禁用示例 (WANT_EXAMPLES=OFF)
 - CMake function sanitize_cmake_link_flags 使用 ... 变参语法，移除后修复 (patch)
-- 构建产物为动态库 (.so)，包含 allegro 主库和 8 个附加库
+- 构建产物为静态库 (.a)，默认配置 shared=False，包含 allegro 主库和 8 个附加库
 
 ## 构建配置
 - WANT_X11=OFF: 无 X11 依赖
