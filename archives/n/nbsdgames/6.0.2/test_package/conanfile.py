@@ -18,4 +18,8 @@ class NbsdgamesTestConan(ConanFile):
             dep = self.dependencies["nbsdgames"]
             bin_path = os.path.join(dep.cpp_info.bindirs[0], "sudoku")
             self.run(f'test -x "{bin_path}"', env="conanrun")
-            self.run(f'"{bin_path}" -h >/dev/null 2>&1 || true', env="conanrun")
+            self.run(
+                f'output=$("{bin_path}" -h 2>&1); status=$?; '
+                f'test "$status" -eq 1 && printf "%s\\n" "$output" | grep -q "^Usage:"',
+                env="conanrun",
+            )

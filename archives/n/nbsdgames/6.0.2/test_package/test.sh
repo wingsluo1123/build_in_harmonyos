@@ -3,7 +3,13 @@
 set -euo pipefail
 
 if command -v sudoku >/dev/null 2>&1; then
-    sudoku -h >/dev/null 2>&1 || true
+    if output=$(sudoku -h 2>&1); then
+        status=0
+    else
+        status=$?
+    fi
+    test "$status" -eq 1
+    printf '%s\n' "$output" | grep -q '^Usage:'
     echo "nbsdgames (sudoku) is available and working"
     exit 0
 fi

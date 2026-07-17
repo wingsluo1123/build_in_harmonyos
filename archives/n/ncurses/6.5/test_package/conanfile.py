@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Conan test_package — ncurses 6.5."""
 
+import os
+
 from conan import ConanFile
+from conan.tools.build import can_run
 
 
 class NcursesTestConan(ConanFile):
@@ -30,4 +33,8 @@ class NcursesTestConan(ConanFile):
         )
 
     def test(self):
-        self.run("./test_ncurses", env="conanrun")
+        if can_run(self):
+            self.run(
+                os.path.join(self.build_folder, "test_ncurses"),
+                env="conanrun",
+            )
