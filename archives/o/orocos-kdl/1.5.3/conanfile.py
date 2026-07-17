@@ -5,7 +5,7 @@ Builds the orocos_kdl subdirectory from the monorepo.
 Requires Eigen3 (header-only, downloaded directly).
 """
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, save, download
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 import os
 
@@ -31,12 +31,13 @@ class OrocoskdlConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        # Download orocos-kdl source
+        # Download orocos-kdl source (sha256 verified via conandata)
         get(self, **self.conan_data["sources"], strip_root=True)
-        # Download Eigen3 (header-only) into the build environment
-        eigen_url = "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz"
+        # Download Eigen3 (header-only) — URL + sha256 集中管理于 conandata.yml，防供应链投毒
+        eigen = self.conan_data["eigen3"]
         eigen_dir = os.path.join(self.source_folder, "_eigen")
-        get(self, eigen_url, destination=eigen_dir, strip_root=True)
+        get(self, eigen["url"], sha256=eigen["sha256"],
+            destination=eigen_dir, strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -56,7 +57,6 @@ class OrocoskdlConan(ConanFile):
 
     def package(self):
         cmake = CMake(self)
-        cmake.configure(build_script_folder="orocos_kdl")
         cmake.install()
         # Copy Eigen3 headers into the package (KDL headers depend on Eigen3)
         eigen_src = os.path.join(self.source_folder, "_eigen", "Eigen")

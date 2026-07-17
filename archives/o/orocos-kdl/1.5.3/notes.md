@@ -10,8 +10,10 @@
 
 ```bash
 # 1. 安装依赖 Eigen3
-# Eigen3 为 header-only 库，从 GitLab 下载安装到 ~/usr/local/include/eigen3
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- eigen 3.4.0
+# Eigen3 为 header-only 库，从 cmd-pkgs 下载并校验 sha256 后解压到 $DEFAULT_PREFIX/include/eigen3
+curl -fsSL -o /tmp/eigen-3.4.0.tar.gz https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/eigen-3.4.0.tar.gz
+echo "8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72  /tmp/eigen-3.4.0.tar.gz" | sha256sum -c -
+tar -xzf /tmp/eigen-3.4.0.tar.gz -C $DEFAULT_PREFIX/include
 
 # 2. CMake 配置
 cmake -B build -S . \
