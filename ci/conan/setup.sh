@@ -32,7 +32,8 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    python3 -m pip install --user --force-reinstall conan || {
+    # 社区 PyPI 源可能缺少 conan 的依赖包（如 requests），添加官方 PyPI 作为后备
+    python3 -m pip install --user --force-reinstall --extra-index-url https://pypi.org/simple conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
