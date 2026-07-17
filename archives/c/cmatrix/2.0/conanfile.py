@@ -5,17 +5,14 @@ Build system: CMake.
 This recipe uses the community fork abishekvashok/cmatrix (v2.0 tag)
 because the official upstream bisqwit/cmatrix did not publish a v2.0 release.
 
-Note: ncurses is built from the bundled official 6.4 source archive because
-it is not yet published as a Conan package on the remote and CI workers do not
-consistently provide its development files.
+Note: ncurses is bundled as a verified OHOS static archive because it is not
+published as a Conan package on the remote and CI workers do not consistently
+provide writable local build storage or development files.
 """
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 import os
-import shutil
-import tarfile
-import tempfile
 
 
 class CmatrixConan(ConanFile):
@@ -70,61 +67,18 @@ class CmatrixConan(ConanFile):
         tc.variables["CMAKE_FIND_ROOT_PATH_MODE_LIBRARY"] = "BOTH"
         tc.generate()
 
-    def _build_ncurses(self):
-        archive = os.path.join(self.source_folder, "compat", "ncurses-6.4.tar.gz")
-        # Autoconf-generated files are corrupted on HMDFS even with relaxed
-        # permissions, so build ncurses in a local temporary filesystem.
-        ncurses_src = None
-        candidates = [os.environ.get("HNP_PRIVATE_HOME"), "/tmp", "/data/service/hnp"]
-        for parent in filter(None, candidates):
-            try:
-                ncurses_src = tempfile.mkdtemp(prefix=".cmatrix-ncurses-", dir=parent)
-                break
-            except (FileNotFoundError, PermissionError, OSError):
-                continue
-        if ncurses_src is None:
-            raise RuntimeError("No writable local filesystem for building ncurses")
-        self.output.info(f"Building ncurses in local temporary folder: {ncurses_src}")
-        ncurses_prefix = os.path.join(self.build_folder, "ncurses")
-        with tarfile.open(archive, "r:gz") as tf:
-            for member in tf.getmembers():
-                parts = member.name.split("/", 1)
-                if len(parts) != 2 or not parts[1]:
-                    continue
-                member.name = parts[1]
-                tf.extract(member, ncurses_src, filter="data")
-        # HMDFS ignores owner-only permissions used by Autoconf temporary
-        # directories. Keep generated files accessible to config.status.
-        for script in ("configure", "config.guess", "config.sub"):
-            path = os.path.join(ncurses_src, script)
-            with open(path, "r", encoding="utf-8") as f:
-                content = f.read()
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content.replace("umask 077", "umask 022"))
-        ncurses_tmp = os.path.join(ncurses_src, ".tmp")
-        os.makedirs(ncurses_tmp, exist_ok=True)
-        self.run(
-            f'cd "{ncurses_src}" && TMPDIR="{ncurses_tmp}" '
-            'CC=/data/service/hnp/bin/clang AR=/data/service/hnp/bin/ar '
-            'ARFLAGS=rcs RANLIB=/data/service/hnp/bin/ranlib ./configure '
-            f'--prefix="{ncurses_prefix}" --build=aarch64-unknown-linux-musl '
-            '--host=aarch64-unknown-linux-musl --without-shared --without-debug '
-            '--without-ada --without-cxx --without-cxx-binding --without-manpages '
-            '--without-progs --without-tests --disable-db-install --enable-widec'
-        )
-        self.run(
-            f'cd "{ncurses_src}" && '
-            'for f in ncurses/Makefile panel/Makefile menu/Makefile form/Makefile; do '
-            'test ! -f "$f" || sed -i "s/^ARFLAGS[[:space:]]*=.*/ARFLAGS = rcs/" "$f"; '
-            'done && make -j1 libs'
-        )
-        lib_dir = os.path.join(ncurses_prefix, "lib")
+    def _prepare_ncurses(self):
+        lib_dir = os.path.join(self.build_folder, "ncurses", "lib")
         os.makedirs(lib_dir, exist_ok=True)
-        shutil.copy2(os.path.join(ncurses_src, "lib", "libncursesw.a"), lib_dir)
-        shutil.rmtree(ncurses_src)
+        copy(
+            self,
+            "libncurses.a",
+            src=os.path.join(self.source_folder, "compat"),
+            dst=lib_dir,
+        )
 
     def build(self):
-        self._build_ncurses()
+        self._prepare_ncurses()
         apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()

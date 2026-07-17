@@ -19,7 +19,7 @@
 - R39 例外: 已获主编批准，追溯记录见 PR #1953
 
 ## 依赖
-- ncurses（随配方导出官方 6.4 源码，在构建时生成静态库；非 Conan 包）
+- ncurses（随配方导出已验证的 OHOS 静态库及对应 6.4 生成头；非 Conan 包）
 
 ## 验证结果
 ```bash
@@ -36,10 +36,10 @@ Web: https://github.com/abishekvashok/cmatrix
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | CMake 4.x 不兼容 cmake_minimum_required(VERSION 2.8) | CMake 4.x 移除了 3.5 以下版本兼容 | 补丁修改为 3.5 |
-| 2 | CI 缺少 ncurses 开发文件 | Worker 的 ncurses 头文件和库均不稳定 | 随配方导出官方 ncurses 6.4 源码，在构建时生成静态库和使用兼容头 |
+| 2 | CI 缺少 ncurses 开发文件且无可用本地构建目录 | Worker 的 ncurses 文件和本地存储权限均不稳定 | 随配方导出已验证的 OHOS 静态库及对应生成头 |
 | 3 | CMake install 找不到 CMakeRelink.dir | CMake 4.x 生成新式 install 路径 | 手动 copy 二进制到 package bin/ |
 
 ## 注意事项
 - cmatrix 是终端 screensaver，需要 ncurses 库
-- ncurses 未发布为 Conan 包，使用系统库
+- ncurses 未发布为 Conan 包，配方内置已验证的 OHOS 静态库
 - conandata.yml 使用 abishekvashok/cmatrix 源（R39 例外）
