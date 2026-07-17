@@ -32,13 +32,20 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    python3 -m pip install --user requests setuptools wheel || {
-        echo "[error] Failed to install conan dependencies"
-        exit 1
+    # 使用公共 PyPI 安装依赖，私有 PyPI 安装 conan
+    python3 -m pip install --break-system-packages requests setuptools wheel --index-url https://pypi.org/simple || {
+        echo "[warn] Failed with --break-system-packages, trying --user..."
+        python3 -m pip install --user requests setuptools wheel --index-url https://pypi.org/simple || {
+            echo "[error] Failed to install conan dependencies"
+            exit 1
+        }
     }
-    python3 -m pip install --user --force-reinstall conan || {
-        echo "[error] Failed to install conan"
-        exit 1
+    python3 -m pip install --break-system-packages --force-reinstall conan || {
+        echo "[warn] Failed with --break-system-packages, trying --user..."
+        python3 -m pip install --user --force-reinstall conan || {
+            echo "[error] Failed to install conan"
+            exit 1
+        }
     }
     # Ensure user-installed binaries are found before any broken HNP version
     export PATH="$HOME/.local/bin:$PATH"
