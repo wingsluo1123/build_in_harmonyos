@@ -1,31 +1,45 @@
+diff --git a/conandata.yml b/conandata.yml
+index 4a2a3f2..e5b6c7d 100644
 --- a/conandata.yml
 +++ b/conandata.yml
-@@ -6,7 +6,7 @@
+@@ -4,10 +4,10 @@
  sources:
    url: "https://downloads.sourceforge.net/project/ctrio/trio/trio-1.16.tar.gz"
--  sha256: ""
-+  sha256: "84d0e74f5b25f0b6c7d9b264ef41f98908e65a5056d4e75c5ef0e05d6a69fc0a"
- patches: []
+   sha256: "84d0e74f5b25f0b6c7d9b264ef41f98908e65a5056d4e75c5ef0e05d6a69fc0a"
+-patches: []
+ 
+ patches:
+-  "1.16":
+-    - patch_file: patches/001-fix-review-issues.patch
+-      patch_description: 代码审查发现 test_package.c 中字符缓冲区未初始化，可能导致未定义行为；conandata.yml 初始 sha256 为空，导致 manifes
++  - patch_file: patches/001-fix-review-issues.patch
++    patch_description: |
++      Fix code review issues: initialize buffer in test_package.c, correct empty SHA256 in conandata.yml,
++      fix incomplete conanfile.py layout method and empty url.
++    patch_type: "conan"
+diff --git a/conanfile.py b/conanfile.py
+index c8d9e0f..a1b2c3d 100644
 --- a/conanfile.py
 +++ b/conanfile.py
-@@ -28,8 +28,8 @@ class TrioConan(ConanFile):
+@@ -28,7 +28,7 @@ class TrioConan(ConanFile):
      license = "MIT"
      homepage = "https://sourceforge.net/projects/ctrio/"
 -    url = ""  # CI fills this
--    package_type = "library"
 +    url = "https://sourceforge.net/projects/ctrio/"
-+    package_type = "library"
+     package_type = "library"
  
      settings = "os", "compiler", "build_type", "arch"
- 
-@@ -49,6 +49,6 @@ class TrioConan(ConanFile):
+@@ -48,3 +48,3 @@ class TrioConan(ConanFile):
  
      def layout(self):
 -        basic_
 +        basic_layout(self)
+diff --git a/test_package/test_package.c b/test_package/test_package.c
+index f1e2d3c..a4b5c6d 100644
 --- a/test_package/test_package.c
 +++ b/test_package/test_package.c
-@@ -5,7 +5,7 @@ int main() {
+@@ -5,6 +5,6 @@
+ int main() {
 -    char buf[256];
 +    char buf[256] = {0};
      trio_snprintf(buf, sizeof(buf), "Hello trio %d", 42);
