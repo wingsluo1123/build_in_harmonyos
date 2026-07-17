@@ -27,7 +27,7 @@ fi
 
 echo "[test] 4. Run simple ACL2 proof"
 RESULT=$(echo '(thm (equal (+ 1 1) 2))' | timeout 120 "$ACL2_BIN" 2>&1)
-EXIT_CODE=${PIPESTATUS[1]}
+EXIT_CODE=$?
 if echo "$RESULT" | grep -qi "Q.E.D\|proved"; then
     echo "PASS: ACL2 proof engine works"
 elif [ "$EXIT_CODE" -eq 124 ]; then
