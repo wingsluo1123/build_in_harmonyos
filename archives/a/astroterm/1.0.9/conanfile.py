@@ -49,6 +49,8 @@ class AstrotermConan(ConanFile):
 
     def generate(self):
         tc = MesonToolchain(self)
+        # R26: Terminal tools must be statically linked
+        tc.project_options["default_library"] = "static"
         # Inject ar/ranlib paths (CI profile may not provide them)
         ce = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
