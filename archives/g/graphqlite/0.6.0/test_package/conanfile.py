@@ -27,4 +27,5 @@ class GraphqliteTestConan(ConanFile):
         test_bin = os.path.join(self.build_folder, "test_graphqlite")
         cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "clang")
         self.run(f"{cc} -o {test_bin} {test_src} -ldl", env="conanrun")
-        self.run(test_bin, env="conanrun")
+        # Run with LD_LIBRARY_PATH set to find the .so
+        self.run(f"LD_LIBRARY_PATH={lib_dir}:$LD_LIBRARY_PATH {test_bin}", env="conanrun")
