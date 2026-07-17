@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "highs/Highs.h"
+#include "Highs.h"
 
 int main(void) {
     Highs highs;
