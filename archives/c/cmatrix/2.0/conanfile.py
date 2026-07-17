@@ -81,6 +81,14 @@ class CmatrixConan(ConanFile):
                     continue
                 member.name = parts[1]
                 tf.extract(member, ncurses_src, filter="data")
+        # HMDFS ignores owner-only permissions used by Autoconf temporary
+        # directories. Keep generated files accessible to config.status.
+        for script in ("configure", "config.guess", "config.sub"):
+            path = os.path.join(ncurses_src, script)
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content.replace("umask 077", "umask 022"))
         ncurses_tmp = os.path.join(ncurses_src, ".tmp")
         os.makedirs(ncurses_tmp, exist_ok=True)
         self.run(
