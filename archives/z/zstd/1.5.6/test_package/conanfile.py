@@ -20,11 +20,5 @@ class TestPkg(ConanFile):
         self.run(f"{cc} test.c -o test_probe {inc} -DTARGET_SO='\"{so}\"' -ldl")
 
     def test(self):
-        if cross_building(self):
-            self.output.info("cross-building：只验编译+链接")
-            return
-        if False:
-            self.output.info("skip_test_run：GUI/app 库只验编译+链接")
-            return
         bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         self.run(f"{bash} -c './test_probe'", env="conanrun")
