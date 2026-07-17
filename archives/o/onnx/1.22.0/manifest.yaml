@@ -1,0 +1,33 @@
+version: "1.22.0"
+status: built
+build_date: "2026-07-16"
+
+source:
+  url: "https://github.com/onnx/onnx/archive/refs/tags/v1.22.0.tar.gz"
+  sha256: "70bb8b25cf31ea9b1d9f94baacfdc8c4fa27a760f9a10f5d93881bc9eede5fbc"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DONNX_BUILD_CUSTOM_PROTOBUF=OFF"
+    - "-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF"
+    - "-DONNX_USE_LITE_PROTO=OFF"
+    - "-DONNX_BUILD_TESTS=OFF"
+    - "-DONNX_ML=ON"
+    - "-DONNX_VERIFY_PROTOBUF=ON"
+  dependencies:
+    - "abseil-cpp/20260107.1"
+    - "protobuf/34.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+knowledge_gained:
+  - "ONNX 1.22.0 使用 CMake 构建系统，依赖 protobuf 和 abseil-cpp"
+  - "通过 CMAKE_PREFIX_PATH 让 ONNX find_package 找到已安装的 protobuf"
+  - "产物: 2 个静态库 (onnx, onnx_proto) + CMake 配置文件"
+  - "ONNX_ML=ON 时安装的 protobuf 头文件名为 onnx-ml.pb.h，package_info 需声明 ONNX_ML=1 define"
+  - "onnx_pb.h 根据是否定义 ONNX_ML 宏选择包含 onnx-ml.pb.h 或 onnx.pb.h"
+  - "test_package 需使用 onnx::ModelProto 等 protobuf 命名空间下的类型，不能直接用 schema.h（内部类型无命名空间前缀）"
