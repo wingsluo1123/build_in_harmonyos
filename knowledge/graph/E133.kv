@@ -1,65 +1,45 @@
-# Layer 0: 错误面
-id:                     E133
-title:                  install 命令缺失
-trigger_tool:          make|install
-phase:                  installation
-error_signature:        make: install: No such file or directory|install: command not found|make\[\d+\]: install: No such file or directory
+#====================================================================
+# E082 — musl libc headers in ~/usr/local/include conflict with OHOS SDK sysroot
+#====================================================================
 
-# Layer 1: 识别层
-severity:               2
-category:              tool-missing|platform-limitation
-match_keywords:         install, No such file or directory, make, coreutils, installation failed
+id: E133
+trigger_tool:           clang|cmake|make
+phase:                  compilation
+error_signature:        no member named 'nullptr_t' in the global namespace|pthread_cond_clockwait|target of using declaration conflicts|unable to find library -lc\+\+
 
-# Layer 2: 诊断层
-root_cause:             OpenHarmony 缺少 GNU coreutils 的 install 命令。
-                        install 命令是 GNU coreutils 的一部分，用于安装文件到指定位置并设置权限。
-                        OpenHarmony 的工具集不包含完整的 GNU coreutils，导致 make install 失败。
-                        需要使用 cp + chmod 手动安装，或制作 Makefile 补丁。
-affected_scope:         使用 Makefile install 目标的项目，依赖 install 命令的安装脚本
-verification_cmd:       which install || echo "install command missing"
+severity:               3
+category:               platform-musl-header-conflict
+match_keywords:         musl, stddef.h, stdlib.h, pthread.h, sysroot conflict, isystem, nullptr_t
 
-# Layer 3: 方案层 ★
+root_cause:             cmake adds -isystem ~/usr/local/include for dependency headers, which causes musl libc headers (stddef.h, stdlib.h, pthread.h etc.) to shadow compiler built-in headers and OHOS SDK sysroot headers
+affected_scope:         any C++ project using cmake with dependencies installed in ~/usr/local on OpenHarmony
+verification_cmd:       echo '#include <string>' | clang++ -x c++ -std=c++17 -fno-rtti -isystem ~/usr/local/include - -o /dev/null
+
 rec_priority:           1
-rec_approach:           manual-install
-rec_description:        手动使用 cp + chmod 替代 install 命令进行文件安装
-rec_command:            # 示例：手动安装二进制文件
-                        cp binary ~/usr/local/bin/
-                        chmod 0755 ~/usr/local/bin/binary
+rec_approach:           temp-move-musl-headers
+rec_description:        Temporarily move conflicting musl headers from ~/usr/local/include/ during compilation, restore after build
+rec_command:            mkdir -p ~/tmp/musl_backup && for h in stddef.h stdint.h stdlib.h string.h stdio.h pthread.h time.h unistd.h wchar.h wctype.h ctype.h errno.h fcntl.h signal.h limits.h float.h locale.h setjmp.h math.h stdarg.h stdbool.h; do mv ~/usr/local/include/$h ~/tmp/musl_backup/ 2>/dev/null; done && for d in bits sys netinet net linux arpa; do mv ~/usr/local/include/$d ~/tmp/musl_backup/ 2>/dev/null; done
+rec_auto_fix:           false
+rec_impl:               manual-edit
 
-                        # 示例：创建目录并安装
-                        mkdir -p ~/usr/local/share/man/man1
-                        cp doc/manpage.1 ~/usr/local/share/man/man1/
-                        chmod 0644 ~/usr/local/share/man/man1/manpage.1
-rec_auto_fix:          false
-rec_impl:               manual-copy
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-fallback_priority:      2
-fallback_approach:      makefile-patch
-fallback_description:   修改 Makefile，将 install 命令替换为 cp + chmod 组合
-fallback_command:       # 在 Makefile 中查找 install 命令并替换
-                        sed -i 's/install -m \([0-9]*\) \([^ ]*\) \([^ ]*\)/cp \2 \3 \&\& chmod \1 \3/g' Makefile
-fallback_auto_fix:      false
-fallback_impl:          makefile-modify
+doc_file:               doc/E133.md
+last_updated:           2026-06-23
+source_event:           rocksdb 6.4.6 compile
 
-# 禁止策略
-forbid_1_pattern:       apt-get install.*coreutils|yum install.*coreutils
-forbid_1_reason:        OpenHarmony 不是标准 Linux 发行版，不支持 apt/yum 包管理器
-forbid_1_consequence:   命令执行失败，无法解决问题
 
-# Layer 4: 原则引用
-principles:             P-PLATFORM-001
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
 
-# 关系图
-causes:                 []
-caused_by:              []
-similar_to:             [E001, E080]
-conflicts_with:         []
-prerequisite_of:        []
-
-# 元数据
-doc_file:               doc/E105.md
-last_updated:           2026-05-27
-source_event:           incron 0.5.12 安装（2026-05-26）
-
-draft: false
-contributor_id: F840
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

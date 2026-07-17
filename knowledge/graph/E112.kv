@@ -1,77 +1,58 @@
-#====================================================================
-# E112.kv — 知识图谱条目 (草稿)
-# HMDFS 大小写不敏感文件系统导致测试用例失败
-#====================================================================
+# Layer 0: 错误面
+id: E112
+trigger_tool:           config.status
+phase:                  configuration
+error_signature:        can't create ./confXXXXXX/subs1.awk: Permission denied|config\.status: error: could not setup config files machinery
 
-id:                     E112
-trigger_tool:           test|make check
-phase:                  testing
-error_signature:        case.insensitive.*FAIL|case_sensitive.*FAIL|3d2.*/boo|BOO.*boo.*same inode|case.insensitive.filesystem
+# Layer 1: 识别层
+severity:               3
+category:               platform-hmdfs
+match_keywords:         mktemp, Permission denied, subs1.awk, config.status, HMDFS, temporary directory, autotools
 
-severity:               2
-category:               platform|hmdfs|filesystem|testing
-match_keywords:         case-insensitive, HMDFS, filesystem, BOO, boo,
-                        case_sensitive, exclusion list, macOS, Darwin,
-                        inode, HarmonyOS, HongMeng Kernel
+# Layer 2: 诊断层
+root_cause:             HMDFS 文件系统上，mktemp -d 创建的临时目录权限为 drwx--S--- (2700 + setgid)，
+                        导致即使目录 owner 是当前用户，也无法在其中创建文件。这是 HMDFS 的安全限制，
+                        chmod 也无法修改权限（参见 E046）。
+affected_scope:         所有使用 autotools 构建系统且依赖 mktemp 创建临时目录的软件
+verification_cmd:       ls -ld $TMPDIR/conf* 2>/dev/null | grep "drwx--S---"
 
-root_cause:             HMDFS (鸿蒙分布式文件系统) 是大小写不敏感的。 
-                        创建不同大小写的文件名（如 BOO 和 boo）时，
-                        它们指向同一个 inode（共享相同 inode 编号）。
-                        这与 macOS 的 APFS/HFS+ 行为一致，但与 Linux 
-                        标准 ext4/xfs 不同。
-                        许多开源测试套件会创建不同大小写的文件来测试
-                        大小写区分能力，在 HMDFS 上这些测试会失败。
-                        
-affected_scope:         所有在 HMDFS 上运行 make check 的软件，
-                        特别是那些创建不同大小写文件名来验证
-                        文件系统行为的测试用例。
-                        
-verification_cmd:       touch BOO && touch boo && stat -c '%i' BOO boo | sort -u | wc -l
-                        # 如果输出为 1，说明文件系统是大小写不敏感的
-
-rec_priority:           2
-rec_approach:           skip-case-sensitive-tests
-rec_description:        检测到 HarmonyOS 系统时，跳过大小写敏感测试用例。
-                        参考 macOS (Darwin) 上的相同处理策略。
-rec_command:            '
-                        # 在测试脚本中添加 HarmonyOS 检测：
-                        case_insensitive_fs=false
-                        if uname -a | grep -qi "HarmonyOS"; then
-                            case_insensitive_fs=true
-                        fi
-                        for t_file in ...; do
-                            if $case_insensitive_fs && [[ $t_file == */case_*sensitive ]]; then
-                                continue   # 跳过大小写敏感测试
-                            fi
-                            ...
-                        done
-                        '
-rec_auto_fix:           true
+# Layer 3: 方案层 ★
+rec_priority:           1
+rec_approach:           bypass-mktemp
+rec_description:        在 configure/config.status 运行前，预先创建临时目录（不使用 mktemp），并修改脚本中的 tmp/ac_tmp 变量指向该目录
+rec_command:            export TMPDIR=/storage/Users/currentUser/tmp && TEMP_DIR=$TMPDIR/fixed-temp-$$ && mkdir -p $TEMP_DIR && sed -i "s|ac_tmp=\$tmp|ac_tmp=$TEMP_DIR|g" configure config.status
+rec_auto_fix:          false
 rec_impl:               manual-patch
 
-principles:             R9
+fallback_priority:      2
+fallback_approach:      copy-to-tmpfs
+fallback_description:   将整个工作目录复制到 $TMPDIR，在其中运行 configure（绕过 HMDFS 限制）
+fallback_command:       cp -r ~/tmp/builds/sw-X.Y.work $TMPDIR/sw-build && cd $TMPDIR/sw-build && ./configure --prefix=$DEFAULT_PREFIX
+fallback_auto_fix:     false
+fallback_impl:          directory-copy
 
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+# Layer 4: 原则引用
+principles:               
 
-content:                HMDFS (HarmonyOS Distributed File System) 是大小写不敏感的，
-                        与 macOS APFS/HFS+ 行为一致，但与其他 Linux 文件系统不同。
-                        在 HMDFS 上 touch BOO 和 touch boo 会创建同一个文件
-                        （相同 inode）。这会导致涉及大小写文件名区分的测试用例失败。
-                        解决方案是像 macOS 一样，在测试脚本中检测 HarmonyOS 系统，
-                        跳过 case_*sensitive 测试用例。
-                        具体案例：wimlib test-imagex-capture_and_apply 的
-                        exclusion list test 中 case_insensitive/case_sensitive 测试
-                        在 HMDFS 上因 BOO 和 boo 共享 inode 而失败。
+# 关系图
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-software:               wimlib
-version:                1.14.5
+# 元数据
 doc_file:               doc/E112.md
-last_updated:           2026-06-26
-source_event:           wimlib-1.14.5-compile
+last_updated:           2026-04-29
+source_event:           libtool 2.4.7 编译（2026-04-29）
 
-draft: false
-contributor_id:         A7F3
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

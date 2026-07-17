@@ -1,59 +1,72 @@
-#====================================================================
-# E081: OHOS 平台 clang/lld 动态链接器路径问题
-# 对应的人类文档: doc/E081.md
-#====================================================================
+# Layer 0: 错误面
+id: E058
+trigger_tool:           configure
+phase:                  configuration
 
-# ═══ Layer 0: 错误面 (Error Surface) ═══
-id:                     E058
-trigger_tool:           ld|clang|cmake|make
-phase:                  linking
-error_signature:        error while loading shared libraries: libxml2\.so\.16|cannot open shared object file: libxml2\.so\.16|lld: error:.*libxml2
-
-# ═══ Layer 1: 识别层 (Recognition) ═══
+# Layer 1: 识别层
 severity:               3
-category:               environment|linking|ohos-sdk
-match_keywords:         libxml2.so.16, lld, shared libraries, LD_LIBRARY_PATH, OHOS SDK
-title:                  OHOS SDK clang/lld 找不到动态链接库 libxml2.so.16
+category:               autotools-config
+error_signature:        configure: No such file or directory|autoconf: possibly undefined macro|autogen.sh.*failed
+match_keywords:         configure, missing, autoconf, autogen, autotools, bootstrap, development snapshot
 
-# ═══ Layer 2: 诊断层 (Diagnosis) ═══
-root_cause:             OHOS SDK 的 lld 动态链接到 libxml2.so.16，但系统库路径未包含该路径
-affected_scope:         使用 OHOS SDK 26.0.0+ 的所有编译，尤其是链接阶段
-verification_cmd:       ldd /data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/lld | grep libxml2
+# Layer 2: 诊断层
+root_cause:             源码包是开发版本或打包不完整，缺少预生成的 configure、aclocal.m4、Makefile.in 等构建系统文件。
+                        对比稳定版（configure ~500KB）vs 开发版（configure ~150KB 或不存在）可判断。
+affected_scope:         所有使用 Autotools 但打包不完整的 C/C++ 项目
+verification_cmd:       ls -l configure && wc -l configure.ac && test -f aclocal.m4 && test -f Makefile.in
 
-# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# Layer 3: 方案层
 rec_priority:           1
-rec_approach:           env-library-path
-rec_description:        设置 LD_LIBRARY_PATH 包含 OHOS SDK 的 lib 目录
-rec_command:            export LD_LIBRARY_PATH=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib:$LD_LIBRARY_PATH
-rec_auto_fix:           true
-rec_impl:               set-env
+rec_approach:           use-stable-release
+rec_description:        使用稳定版本的源码包（如 libfm-1.3.2），而非开发版本（libfm-1.4.0）。
+                        稳定版通常包含完整的构建系统文件（configure ~500KB、Makefile.in、aclocal.m4）。
+rec_command:            |
+  # 检查当前源码包是否完整
+  ls -l configure configure.ac aclocal.m4 Makefile.in
+  # 对比稳定版本
+  curl -LO https://download.savannah.nongnu.org/releases/libfm/libfm-1.3.2.tar.gz
+  tar xzf libfm-1.3.2.tar.gz
+  cd libfm-1.3.2
+  ./configure --prefix=$DEFAULT_PREFIX --disable-old-actions --disable-nls
 
 fallback_priority:      2
-fallback_approach:      static-link
-fallback_description:   使用静态链接的 lld 版本（如果可用）
-fallback_command:        
-fallback_auto_fix:      false
-fallback_impl:
+fallback_approach:      git-clone-bootstrap
+fallback_description:   从 git 克隆源码并运行完整的 bootstrap 流程（需要 automake、autoconf、libtool、pkg-config 全套工具）。
+fallback_command:       |
+  git clone https://github.com/lxde/libfm.git
+  cd libfm
+  ./autogen.sh
+  ./configure --prefix=$DEFAULT_PREFIX --disable-old-actions --disable-nls
+fallback_impl:          bootstrap-from-git
 
-# ★ 禁止策略 ★
-forbid_1_pattern:       LD_LIBRARY_PATH=.*libxml2
-forbid_1_reason:         不应直接指向 libxml2 库目录，应指向 OHOS SDK 的 lib 目录
-forbid_1_consequence:   可能导致其他库加载问题
+forbid_1_pattern:       手动编写 configure 文件
+forbid_1_reason:        configure 由 autoconf 生成，手动编写会导致宏缺失、逻辑错误
+forbid_1_consequence:   configure 看似正常但实际缺少关键检查，导致后续编译失败
 
-# ═══ Layer 4: 原则引用 ═══
-principles:             P005,P006
+# Layer 4: 原则引用
+principles:               
 
-# ═══ 关系图 (Relations) ═══
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+# 关系图
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-# ═══ 元数据 ═══
-doc_file:               doc/E081.md
-last_updated: 2026-05-29
-source_event:           raylib 6.0 编译失败 - 链接阶段 lld 找不到 libxml2.so.16
+# 元数据
+doc_file:               doc/E058.md
+last_updated:           2026-06-05
+source_event:           libfm-1.4.0 编译失败（缺少 configure/aclocal.m4）
 
-draft: false
-contributor_id: 41A7
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+rec_auto_fix:               false
+rec_impl:               manual

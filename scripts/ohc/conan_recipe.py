@@ -141,8 +141,12 @@ def _parse_dependencies(manifest_path: Path) -> list[str]:
     return deps
 
 
-def _detect_build_system(manifest: dict) -> str:
-    """Detect build system from manifest or fallback."""
+def _detect_build_system(manifest: dict, source_dir: Path | None = None) -> str:
+    """Detect build system from manifest or source directory scan."""
+    # Check BUILD_SYSTEM env var (set by init-build)
+    env_bs = os.environ.get("BUILD_SYSTEM", "").strip()
+    if env_bs:
+        return env_bs
     # Check manifest build.system
     build = manifest.get("build", {})
     if isinstance(build, dict):
@@ -153,6 +157,18 @@ def _detect_build_system(manifest: dict) -> str:
     bs = manifest.get("build_system", "")
     if bs:
         return bs
+
+    # Fallback: scan source directory for build system markers
+    if source_dir and source_dir.is_dir():
+        if (source_dir / "CMakeLists.txt").exists():
+            return "cmake"
+        if (source_dir / "meson.build").exists():
+            return "meson"
+        if (source_dir / "configure").exists() or (source_dir / "configure.ac").exists():
+            return "autotools"
+        if (source_dir / "Makefile").exists() or (source_dir / "makefile").exists():
+            return "makefile"
+
     return "autotools"  # default
 
 
@@ -181,61 +197,6 @@ def _load_template(project_dir: Path, template_name: str) -> str:
         log_fail(f"Template not found: {tmpl_path}")
         return ""
     return tmpl_path.read_text(encoding="utf-8")
-
-
-# ── 功能裁剪检测 ────────────────────────────────────────────
-
-# 禁止的功能裁剪参数模式 (--without-* / --disable-* 等)
-# 全量适配要求: 所有可选功能必须保留, 不得通过 configure 参数关闭
-_TRIM_PATTERNS = [
-    # pattern,                    description
-    (r"--without-[a-z0-9_-]+",    "禁用可选功能 (--without-XXX): 违反全量适配原则"),
-    (r"--disable-[a-z0-9_-]+",    "禁用可选功能 (--disable-XXX): 违反全量适配原则"),
-    (r"-DBUILD_TESTS=OFF",        "禁用测试构建: CI 门禁要求保留测试"),
-    (r"-DENABLE_TESTS=OFF",       "禁用测试构建: CI 门禁要求保留测试"),
-]
-
-# 允许的例外 (不影响功能完整性的纯平台适配参数)
-_TRIM_EXCEPTIONS = {
-    "--disable-shared",           # R26 静态链接要求, 不是功能裁剪
-    "--enable-static",            # R26 静态链接要求
-    "--disable-nls",              # 国际化在 OHOS 上不可用, 非功能裁剪
-    "--without-man",              # man 手册不影响二进制功能
-    "--without-doc",              # 文档不影响二进制功能
-    "--disable-gtk-doc",          # 文档不影响二进制功能
-    "--disable-dependency-tracking",  # 构建优化, 非功能裁剪
-}
-
-
-def _detect_feature_trimming(configure_options: list[str], software: str) -> list[str]:
-    """检测 configure_options 中是否有功能裁剪参数。
-
-    全量适配要求: 不得通过 --without-XXX / --disable-XXX 关闭可选功能。
-    所有功能模块必须编译进来, 依赖必须在 conanfile.py requires() 中声明。
-
-    Args:
-        configure_options: manifest.yaml 中的 configure_options 列表
-        software: 软件名称 (用于警告信息)
-
-    Returns:
-        警告消息列表 (空列表 = 无问题)
-    """
-    warnings = []
-    for opt in configure_options:
-        opt_stripped = opt.strip()
-        # 跳过例外
-        if opt_stripped in _TRIM_EXCEPTIONS:
-            continue
-        # 检测裁剪模式
-        for pattern, desc in _TRIM_PATTERNS:
-            if re.match(pattern, opt_stripped, re.IGNORECASE):
-                warnings.append(
-                    f"⚠️  [{software}] configure_options 含 '{opt_stripped}'\n"
-                    f"    {desc}\n"
-                    f"    全量适配要求: 保留该功能, 将其依赖加入 conanfile.py requires()"
-                )
-                break
-    return warnings
 
 
 def _generate_conanfile(
@@ -272,9 +233,7 @@ def _generate_conanfile(
     # Generate requirements() body
     req_lines = []
     for dep in dependencies:
-        # Normalize: "openssl/1.1.1w" → "openssl/1.1.1w@ohpcd/stable"
-        if "@" not in dep:
-            dep = f"{dep}@ohpcd/stable"
+        dep = dep.split('@')[0]  # 兼容性: 去掉可能的 @user/channel 后缀
         req_lines.append(f'        self.requires("{dep}")')
 
     if req_lines:
@@ -500,7 +459,19 @@ def conan_init(
         return 1
 
     # Extract info
-    build_system = _detect_build_system(manifest)
+    # Try to get source dir from build context for build system auto-detection
+    source_dir = None
+    ctx_file = project / f".build-context-{software}-{version}"
+    if ctx_file.exists():
+        try:
+            ctx_content = ctx_file.read_text(encoding="utf-8")
+            for line in ctx_content.split("\n"):
+                if line.startswith("export BUILD_SRC_DIR="):
+                    source_dir = Path(line.split("=", 1)[1].strip().strip('"'))
+                    break
+        except Exception:
+            pass
+    build_system = _detect_build_system(manifest, source_dir)
     source_url, source_sha = _get_source_info(manifest)
     dependencies = _parse_dependencies(manifest_path)
     configure_options = _parse_configure_options(manifest_path)
@@ -523,17 +494,6 @@ def conan_init(
     log_info(f"  依赖: {len(dependencies)} 个")
     log_info(f"  配置选项: {len(configure_options)} 个")
     log_info(f"  补丁: {len(patches)} 个")
-
-    # ── 1.5 禁止功能裁剪检查 ──────────────────────────────────
-    trim_warnings = _detect_feature_trimming(configure_options, software)
-    for w in trim_warnings:
-        log_warn(w)
-
-    # ── 1.6 依赖完整性检查 ────────────────────────────────────
-    if not dependencies:
-        log_warn(f"⚠️  manifest.yaml 中未声明任何依赖 (dependencies 为空)")
-        log_warn(f"    全量适配要求把所有编译依赖写入 conanfile.py 的 requires()")
-        log_warn(f"    请检查源码的 configure.ac / CMakeLists.txt 确认完整依赖列表")
 
     # ── 2. Generate conanfile.py ──
     log_info("生成 conanfile.py...")

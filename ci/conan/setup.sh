@@ -27,12 +27,6 @@ export PATH="$HOME/.local/bin:$PATH"
 # If conan binary exists but is broken, force-reinstall to fix
 if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     echo "[step] Conan not found or broken, (re)installing..."
-
-    # 配置 OHOS 社区 PyPI 源 (必须先配置, 否则 pip 找不到 requests 等依赖)
-    # 某些 CI Worker 可能未预配置 pip 源, 导致 conan 安装失败
-    python3 -m pip config set global.index-url https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple 2>/dev/null || true
-    python3 -m pip config set global.trusted-host pypi.cnb.cool 2>/dev/null || true
-
     # 安装 OHOS 适配版 conan（私有 PyPI 提供，基线 2.29.1，已适配 OHOS 平台）
     # 不要钉死官方旧版本号，应从配置的 PyPI 源安装最新适配版
     # Use python3 -m pip to bypass potentially broken pip3 shebang

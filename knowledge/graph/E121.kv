@@ -1,60 +1,67 @@
 #====================================================================
-# E082: OHOS 平台 POSIX clock_gettime 兼容性问题
-# 对应的人类文档: doc/E082.md
+# E081.kv — OHOS 缺少 utmpx API
+# 对应的人类文档: doc/E081.md
 #====================================================================
 
 # ═══ Layer 0: 错误面 (Error Surface) ═══
-id:                     E121
-trigger_tool:           gcc|clang|make|cmake
-phase:                  compilation
-error_signature:        error: 'CLOCK_REALTIME' undeclared|error: 'CLOCK_MONOTONIC' undeclared|error: implicit declaration of function 'clock_gettime'|error: storage size of 'ts' isn't known|undeclared identifier 'CLOCK_REALTIME'|undeclared identifier 'CLOCK_MONOTONIC'|call to undeclared function 'clock_gettime'
+id: E121
+trigger_tool:           ld|clang
+phase:                  linking
+error_signature:        undefined symbol: setutxent|undefined symbol: pututxline|undefined symbol: endutxent|did you mean: setutent|did you mean: pututline|did you mean: endutent
 
 # ═══ Layer 1: 识别层 (Recognition) ═══
 severity:               3
-category:               posix-compatibility|ohos-porting|time-functions
-match_keywords:         CLOCK_REALTIME, CLOCK_MONOTONIC, clock_gettime, timespec, time.h, POSIX timer
-title:                  OHOS 平台 POSIX clock_gettime/CLOCK_* 常量未定义
+category:               api-missing|platform-limitation
+match_keywords:         setutxent,pututxline,endutxline,utmpx,OMIT_UTMP
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
-root_cause:             OHOS SDK 的 sysroot 中 time.h 定义了 clock_gettime，但 CLOCK_REALTIME/CLOCK_MONOTONIC 等常量需要特定的宏定义或头文件包含顺序
-affected_scope:         使用 POSIX timer 的跨平台库（如 raylib、SDL 等）
-verification_cmd:       echo '#include <time.h>\nint main() { return CLOCK_REALTIME; }' | clang -E -dM - | grep CLOCK
+root_cause:             OHOS 系统只提供 utmp API（setutent/pututline/endutent），不提供 utmpx API（setutxent/pututxline/endutxent），导致链接失败
+affected_scope:         使用 utmpx.h 和 utmp 记录功能的程序（如 SSH 服务器、终端工具）
+verification_cmd:       grep -r "setutxent|pututxline|endutxent" *.c
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 rec_priority:           1
-rec_approach:           disable-posix-timer
-rec_description:        禁用 POSIX timer 功能，使用替代计时方案（如 gettimeofday）
-rec_command:            cmake .. -DSUPPORT_POSIX_TIMERS=OFF -DUSE_POSIX_TIMERS=OFF
-                        # Alt: add #include <time.h> to posix_time.c (from E094-8D7D)
+rec_approach:           add_compile_definition
+rec_description:        添加 OMIT_UTMP 编译定义，禁用 utmp 记录功能（对非桌面终端程序核心功能非必需）
+rec_command:            target_compile_definitions(target PRIVATE OMIT_UTMP)
 rec_auto_fix:           false
-rec_impl:
+rec_impl:               none
 
 fallback_priority:      2
-fallback_approach:      sdl-backend
-fallback_description:   使用 SDL backend 替代原生平台后端（SDL 已处理平台兼容性）
-fallback_command:       cmake .. -DPLATFORM=SDL
+fallback_approach:      replace-api
+fallback_description:   将 utmpx API 替换为 utmp API（setutxent → setutent，pututxline → pututline，endutxent → endutent）
+fallback_command:       sed -i 's/setutxent/setutent/;s/pututxline/pututline/;s/endutxent/endutent/' pty.c
 fallback_auto_fix:      false
-fallback_impl:
+fallback_impl:          none
 
 # ★ 禁止策略 ★
-forbid_1_pattern:       -D_TIME_H|undef.*clock_gettime
-forbid_1_reason:        不应通过禁用系统头文件来绕过问题
-forbid_1_consequence:   可能导致其他时间相关函数失效
+forbid_1_pattern:       utmpx\.h
+forbid_1_reason:        OHOS 不提供 utmpx.h，必须禁用或替换
+forbid_1_consequence:   链接失败：undefined symbol
 
 # ═══ Layer 4: 原则引用 ═══
-principles:             P003,P008
+principles:               
 
 # ═══ 关系图 (Relations) ═══
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
 # ═══ 元数据 ═══
-doc_file:               doc/E082.md
-last_updated: 2026-05-29
-source_event:           raylib 6.0 编译失败 - CLOCK_REALTIME/CLOCK_MONOTONIC 未定义
+doc_file:               doc/E121.md
+last_updated:           2026-05-28
+source_event:           putty 0.84 编译
 
-draft: false
-contributor_id: AC04
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

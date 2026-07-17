@@ -158,11 +158,11 @@ class FinishPipeline:
 
     # Step 2.5: G0 clean build verification
     def step25_g0_clean_verify(self):
-        log_info("Step 2.5/6: G0 干净构建验证...")
+        log_info("Step 2.5/8: G0 干净构建验证...")
         from .clean_verify import clean_verify
         rc = clean_verify(self.software, self.version, pdir=str(self.pdir))
         if rc != 0:
-            log_warn("G0 干净构建验证失败 (Python subprocess 平台限制, 已手动验证通过)")
+            log_warn("G0 干净构建验证失败，请手动检查构建结果")
             log_warn("运行 ohc-run.py clean-verify 获取详细错误")
             # Do not raise SystemExit - continue with finish
         else:
@@ -218,9 +218,73 @@ class FinishPipeline:
                 if self.status == "published": self.status = "built"
                 elif self.status == "built": self.status = "failed"
 
+    # Step 3.5: Local CI simulation (W3) — BLOCKING with HANDOFF
+    def step35_local_ci(self):
+        log_info("Step 3.5/8: 本地 CI 模拟 (W3) [阻塞门禁]...")
+        from .workflow_checks import run_local_ci
+        rc = run_local_ci(self.software, self.version, pdir=str(self.pdir))
+        if rc == 0:
+            self.steps["step35"] = True
+            self._task_card("11c2", "✅完成", "local CI OK")
+            self._write_ci_result(passed=True)
+            log_ok("  ✅ W3 本地 CI 模拟通过")
+        else:
+            self.steps["step35"] = False
+            self._task_card("11c2", "❌失败", "CI模拟失败")
+            log_fail("  ❌ W3 本地 CI 模拟失败 — 阻塞！不可继续 finish")
+            self._emit_w3_handoff()
+            sys.exit(1)
+
+    def _write_ci_result(self, passed: bool):
+        """Write .ci-result.json with integrity info (防伪造)."""
+        import json
+        import hashlib
+        ts = datetime.now().isoformat()
+        # Integrity hash: prevents AI from forging this file manually
+        raw = f"{ts}:{self.software}:{self.version}:{0 if passed else 1}"
+        integrity_hash = hashlib.sha256(raw.encode()).hexdigest()[:16]
+        ci_result = {
+            "timestamp": ts,
+            "exit_code": 0 if passed else 1,
+            "software": self.software,
+            "version": self.version,
+            "step": "W3_local_ci",
+            "archive_dir": str(self.archive_dir),
+            "integrity_hash": integrity_hash,
+        }
+        ci_path = self.archive_dir / ".ci-result.json"
+        ci_path.write_text(
+            json.dumps(ci_result, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+
+    def _emit_w3_handoff(self):
+        """Emit HANDOFF block for W3 local CI failure (blocking)."""
+        from .handoff import HandoffData, emit_handoff
+        data = HandoffData(
+            exit_reason="w3_local_ci_failed",
+            exit_code=2,
+            step_failed="Step3.5",
+            resume_cmd=f"python3 scripts/ohc-run.py finish {self.software} {self.version} {self.status}",
+            knowledge_hit="none",
+            knowledge_gap=False,
+            log_file="",
+            src_dir="",
+            task_card=str(self.archive_dir / "TASK_CARD.md"),
+            software_name=self.software,
+            software_version=self.version,
+            archive_dir=str(self.archive_dir),
+            ai_next_actions=[
+                "W3 本地 CI 模拟失败，必须修复后重新 finish",
+                "查看上方错误输出，定位 setup.sh 或 build_and_test.sh 失败原因",
+                f"修复后重新运行: python3 scripts/ohc-run.py finish {self.software} {self.version} {self.status}",
+            ],
+        )
+        emit_handoff(data, project_dir=str(self.pdir))
+
     # Step 4: finalize-archive
     def step4_finalize_archive(self):
-        log_info("Step 4/6: 归档校验...")
+        log_info("Step 4/8: 归档校验...")
         try:
             rc = finalize_archive(self.software, self.version, pdir=str(self.pdir))
         except Exception as e:
@@ -231,17 +295,21 @@ class FinishPipeline:
         else:
             self._task_card("11d", "⚠️部分", "有警告"); log_warn(f"  finalize-archive 有警告 (RC={rc})")
 
-    # Step 5: check-knowledge-gap
+    # Step 5: knowledge completeness (W4)
     def step5_check_knowledge_gap(self):
-        log_info("Step 5/6: 知识完整性检查...")
+        log_info("Step 5/8: 知识图谱完整性检查 (W4)...")
+        # W4: Enhanced knowledge graph completeness check
+        from .workflow_checks import check_knowledge_completeness
+        rc = check_knowledge_completeness(pdir=str(self.pdir))
+        # Also run archive-specific knowledge gap check
         try:
-            rc = check_knowledge_gap(self.software, self.version, pdir=str(self.pdir))
+            rc2 = check_knowledge_gap(self.software, self.version, pdir=str(self.pdir))
         except Exception as e:
             rc = 1; log_warn(f"  check_knowledge_gap 异常: {e}")
-        if rc == 0:
+        if rc == 0 and rc2 in (0, 3):
             self.steps["step5b"] = True
-            self._task_card("11e", "✅完成", "knowledge-gap OK"); log_ok("  知识完整性通过")
-        elif rc == 3:
+            self._task_card("11e", "✅完成", "knowledge OK"); log_ok("  知识图谱完整性通过")
+        elif rc2 == 3:
             self.steps["step5b"] = False
             self._task_card("11e", "⚠️部分", "有知识遗漏"); log_warn("  知识库存在遗漏")
         else:
@@ -250,7 +318,7 @@ class FinishPipeline:
 
     # Step 6: gen_summary
     def step6_gen_summary(self):
-        log_info("Step 6/6: 生成 SUMMARY.md...")
+        log_info("Step 6/8: 生成 SUMMARY.md...")
         try:
             generate_summary(pdir=str(self.pdir))
             self.steps["step6"] = True
@@ -258,6 +326,69 @@ class FinishPipeline:
         except Exception as e:
             self.steps["step6"] = True
             self._task_card("11f", "⚠️部分", str(e)); log_warn(f"  gen_summary 失败: {e}")
+
+    # Step 7: PR atomicity check (W2)
+    def step7_pr_atomicity(self):
+        log_info("Step 7/8: PR 原子性检查 (W2)...")
+        from .workflow_checks import check_pr_atomicity
+        rc = check_pr_atomicity(pdir=str(self.pdir))
+        if rc == 0:
+            self.steps["step7"] = True
+            self._task_card("11g", "✅完成", "PR atomicity OK")
+        else:
+            self.steps["step7"] = False
+            self._task_card("11g", "⚠️部分", "框架文件混入")
+            log_warn("  ⚠️ 发现框架文件变更，请拆分到独立 PR")
+
+    def step8_submit_readiness(self):
+        """Step 8/8: Submit readiness pre-check."""
+        log_info("Step 8/8: submit 就绪预检...")
+        checks = []
+
+        # Check test-report.md
+        test_report = self.archive_dir / "reports" / "test-report.md"
+        if test_report.exists():
+            checks.append(("✅", "test-report.md", ""))
+        else:
+            checks.append(("❌", "test-report.md", "需创建 reports/test-report.md"))
+
+        # Check packaging directory
+        packaging_dir = self.archive_dir / "packaging"
+        if packaging_dir.exists() and any(packaging_dir.iterdir()):
+            checks.append(("✅", "packaging/", ""))
+        else:
+            checks.append(("❌", "packaging/", "需创建 packaging/ 目录并打包"))
+
+        # Check .staging-verified
+        staging = self.archive_dir / ".staging-verified"
+        if staging.exists():
+            checks.append(("✅", ".staging-verified", ""))
+        else:
+            checks.append(("❌", ".staging-verified", "需创建 .staging-verified 空文件"))
+
+        # Check .build-closed or 编译结束 marker in notes.md
+        build_closed = self.archive_dir / ".build-closed"
+        notes = self.archive_dir / "notes.md"
+        has_marker = build_closed.exists()
+        if not has_marker and notes.exists():
+            has_marker = "编译结束" in notes.read_text(encoding="utf-8", errors="replace")
+        if has_marker:
+            checks.append(("✅", "build-closed marker", ""))
+        else:
+            checks.append(("❌", "build-closed marker", "需运行 close-archive 或手动添加标记"))
+
+        failed = [c for c in checks if c[0] == "❌"]
+        for icon, name, hint in checks:
+            log_info(f"  {icon} {name}" + (f" — {hint}" if hint else ""))
+
+        if failed:
+            log_warn(f"  ⚠️ {len(failed)} 项未就绪，submit 前需修复")
+            self._task_card("12", "⚠️部分", f"submit readiness: {len(failed)} 项未就绪")
+        else:
+            log_ok("  ✅ submit 就绪")
+            self._task_card("12", "✅完成", "submit readiness OK")
+
+        self.steps["step8"] = len(failed) == 0
 
     def _collect_knowledge_actions(self):
         """Collect AI next actions for knowledge consolidation."""
@@ -406,9 +537,12 @@ class FinishPipeline:
         self.step2_close_archive()
         self.step25_g0_clean_verify()
         self.step3_verify_build()
+        self.step35_local_ci()
         self.step4_finalize_archive()
         self.step5_check_knowledge_gap()
         self.step6_gen_summary()
+        self.step7_pr_atomicity()
+        self.step8_submit_readiness()
         self.print_summary()
         self.emit_knowledge_handoff()
 

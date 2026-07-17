@@ -1,37 +1,53 @@
-#====================================================================
-# E082 — musl libc headers in ~/usr/local/include conflict with OHOS SDK sysroot
-#====================================================================
+id: E118
+trigger_tool: configure
+phase: configuration
+rec_approach: patch-script
+# E118: HMDFS mktemp 权限限制
 
-id:                     E118
-trigger_tool:           clang|cmake|make
-phase:                  compilation
-error_signature:        no member named 'nullptr_t' in the global namespace|pthread_cond_clockwait|target of using declaration conflicts|unable to find library -lc\+\+
+## 错误签名
+error_signature: mktemp.*Permission denied|can't create.*conf.*Permission denied|config\.status.*could not setup config files machinery
 
+## 根因分析
+root_cause: HMDFS 文件系统对通过 `mktemp -d` 创建的临时目录施加特殊权限限制（setgid 标志），导致即使是目录创建者也无法在其中写入文件。这是 HMDFS 的安全机制，防止临时文件被恶意篡改。
+
+## 匹配关键词
+match_keywords: HMDFS, mktemp, config.status, autotools, Permission denied, 临时目录, configure
+
+## 推荐解决方案
+rec_description: 修改 config.status 脚本的临时目录创建逻辑，使用预创建的固定目录替代 mktemp。具体做法是创建 `./config-tmp-fixed` 目录，并修改 config.status 第 588-595 行，将 `mktemp -d "./confXXXXXX"` 替换为直接使用固定目录。
+
+## 推荐命令
+rec_command: mkdir -p ./config-tmp-fixed && chmod 777 ./config-tmp-fixed && # 手动修改 config.status: tmp=./config-tmp-fixed; ac_tmp=$tmp
+
+## 受影响范围
+affected_scope: 所有使用 autotools 构建系统的软件，包括但不限于：autoconf 生成的 configure 脚本、任何调用 mktemp 创建临时目录的构建过程
+
+## 验证命令
+verification_cmd: ./config.status 2>&1 | grep -E "creating|error" && echo "✅ HMDFS workaround successful"
+
+## 分类标签
+category: platform_restriction
+
+## 平台信息
+
+## 严重等级
 severity:               3
-category:               platform-musl-header-conflict
-match_keywords:         musl, stddef.h, stdlib.h, pthread.h, sysroot conflict, isystem, nullptr_t
-title:                  musl libc headers in ~/usr/local/include conflict with OHOS SDK sysroot when used as -isystem
 
-root_cause:             cmake adds -isystem ~/usr/local/include for dependency headers, which causes musl libc headers (stddef.h, stdlib.h, pthread.h etc.) to shadow compiler built-in headers and OHOS SDK sysroot headers
-affected_scope:         any C++ project using cmake with dependencies installed in ~/usr/local on OpenHarmony
-verification_cmd:       echo '#include <string>' | clang++ -x c++ -std=c++17 -fno-rtti -isystem ~/usr/local/include - -o /dev/null
 
-rec_priority:           1
-rec_approach:           temp-move-musl-headers
-rec_description:        Temporarily move conflicting musl headers from ~/usr/local/include/ during compilation, restore after build
-rec_command:            mkdir -p ~/tmp/musl_backup && for h in stddef.h stdint.h stdlib.h string.h stdio.h pthread.h time.h unistd.h wchar.h wctype.h ctype.h errno.h fcntl.h signal.h limits.h float.h locale.h setjmp.h math.h stdarg.h stdbool.h; do mv ~/usr/local/include/$h ~/tmp/musl_backup/ 2>/dev/null; done && for d in bits sys netinet net linux arpa; do mv ~/usr/local/include/$d ~/tmp/musl_backup/ 2>/dev/null; done
-rec_auto_fix:           false
-rec_impl:               manual-edit
+## 注意事项
 
-causes:                 [E081]
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
 
-doc_file:               doc/E082.md
-last_updated:           2026-06-23
-source_event:           rocksdb 6.4.6 compile
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
 
-draft: false
-contributor_id: EFAD
+doc_file:               doc/E118.md
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1

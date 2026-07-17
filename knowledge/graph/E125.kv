@@ -1,48 +1,71 @@
-id:                     E125
-title: libbytesize.so 需要 g_libintl_dgettext 符号，运行时必须链接 libintl_glib.so
-trigger_tool:           ld|runtime
-phase:                  runtime
-error_signature:        g_libintl_dgettext: symbol not found|
-                         Error relocating.*g_libintl_dgettext|
-                         undefined reference.*g_libintl_dgettext
+#====================================================================
+# E081-draft-B0E1.kv — HMDFS 文件系统限制导致 autotools config.status 无法创建临时子目录
+#====================================================================
+
+id: E125
+trigger_tool:           configure
+phase:                  configuration
+error_signature:        can't create .* subs1\.awk.*Permission denied|
+                         config\.status.*could not setup config files machinery|
+                         \.\/conf[a-zA-Z0-9]+\/.*Permission denied
 
 severity:               3
-category:               platform-runtime
-match_keywords:         g_libintl_dgettext, libintl_glib, gettext,
-                         NLS, gnulib, dgettext, ENABLE_NLS
+category:               environment
+match_keywords:         HMDFS, hmdfs, config.status, Permission denied, 
+                         subs1.awk, confdir, temporary directory,
+                         config files machinery, distributed filesystem
 
-root_cause:             libbytesize.so 编译时启用 NLS（-DENABLE_NLS），gnulib gettext 重命名规则将标准 dgettext 重命名为 g_libintl_dgettext。该符号不在标准 libintl.so.8 中，而是在 libintl_glib.so（GLib 的 gettext 包装器）中提供
-affected_scope:         所有启用 NLS 且使用 gnulib gettext 重命名的软件（libbytesize, libbd_utils, libostree 等）
-verification_cmd:       nm -D /path/to/libintl_glib.so | grep g_libintl_dgettext
+root_cause:             HMDFS（鸿蒙分布式文件系统）在创建临时子目录时存在权限限制。
+                         autotools 的 config.status 使用 mktemp 创建随机命名的临时子目录
+                         （如 conf[a-zA-Z0-9]+/），并在其中写入 subs1.awk 等文件。
+                         但 HMDFS 的安全策略限制了某些目录下的子目录创建操作，
+                         导致即使父目录权限正确，子目录创建仍然失败。
+                         这与 E002（/tmp 只读）不同，E002 是挂载点只读问题，
+                         而 E081 是 HMDFS 特定的文件系统安全限制。
+affected_scope:         所有使用 autotools 构建系统的软件，在 HMDFS 挂载目录下编译时
+verification_cmd:       mount | grep hmdfs; 
+                         cd $HOME && mkdir -p test-tmp && cd test-tmp && 
+                         mktemp -d ./confXXXXXX && ls -la || echo "HMDFS restriction detected"
 
-rec_priority:           1
-rec_approach:           link-libintl_glib
-rec_description:        运行使用 libbytesize.so 的程序时，必须链接 libintl_glib.so（-lintl_glib）以满足 g_libintl_dgettext 符号依赖
-rec_command:            clang ... -lbytesize -lintl_glib -lintl -lgmp -lmpfr
-rec_auto_fix:           false
-rec_impl:               manual
+rec_priority:           2
+rec_approach:           relocate-build-dir
+rec_description:        将源码目录移动到 HMDFS 外的可写目录（如 /data/local/tmp，如果可写）
+                         或使用 tmpfs 挂载点（如 /dev/shm，如果空间足够）。
+                         如果以上都不可行，则此问题为平台硬限制，需等待系统更新或使用
+                         非HMDFS环境的构建服务器。
+                         注意：即使设置 TMPDIR，config.status 仍会在源码目录下创建临时子目录，
+                         因此仅设置 TMPDIR 无法解决此问题。
+rec_command:            # 方案 A：尝试使用 /dev/shm（tmpfs）
+                         if mountpoint -q /dev/shm && df -h /dev/shm | grep -q "G"; then
+                           cd /dev/shm && cp -r $BUILD_SRC_DIR . && cd libsigrok-* && ./configure ...
+                         fi
+                         # 方案 B：标记为平台限制，无法编译
+                         echo "E081: HMDFS restriction blocks autotools config.status" >> $BUILD_ARCHIVE_DIR/notes.md
+rec_auto_fix:          false
+rec_impl:               manual-intervention
 
-fallback_priority:      2
-fallback_approach:      LD_PRELOAD
-fallback_description:   使用 LD_PRELOAD=libintl_glib.so 运行时注入符号（临时方案）
-fallback_command:       LD_PRELOAD=$PREFIX/lib/libintl_glib.so ./program
-fallback_auto_fix:      false
+forbid_1_pattern:      --build=|--host=
+forbid_1_reason:        不能用 --build/--host 绕过，这会导致其他问题（见 E007）
+forbid_1_consequence:   级联错误：config.h 不匹配 → 运行时崩溃
 
-forbid_1_pattern:       -lintl.*without.*-lintl_glib
-forbid_1_reason:        仅链接 -lintl 不能提供 g_libintl_dgettext 符号
-forbid_1_consequence:   运行时 symbol not found 导致程序崩溃
+principles:               
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-principles:             []
+doc_file:               doc/E125.md
+last_updated:           2026-05-26
+source_event:           libsigrok 0.5.2 编译失败（config.status Permission denied）
 
-causes:                 []
-caused_by:              []
-similar_to:             [E082]
-conflicts_with:         []
-prerequisite_of:        []
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
 
-doc_file:               doc/E085.md
-last_updated: 2026-06-02
-source_event:           libbytesize-2.11-functional-test
-
-draft: false
-contributor_id: A74D
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

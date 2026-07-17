@@ -1,56 +1,67 @@
 #====================================================================
-# E104-draft-5FC0.kv — verify_build.py 检查 build_system 字段不一致
+# E081 — LD env var interferes with dlopen/.so loading on OpenHarmony
 #====================================================================
 
-id:                     E131
-title: verify_build.py 检查 build_system 字段不一致
-trigger_tool:           verify_build
-phase:                  verify
-error_signature:        manifest 缺少 build_system|
-                        G4 Archive FAIL.*manifest|
-                        verify_build.*build_system
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id: E131
+trigger_tool:           runtime|test|perl
+phase:                  runtime
+error_signature:        Error loading shared library.*\.so.*Permission denied|Can't load.*\.so.*Permission denied
 
-severity:               1
-category:               tool
-match_keywords:         verify_build, manifest, build_system, G4, archive, 
-                        field, yaml, verify
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity: 2
+category: environment
+match_keywords:         Permission denied, loading shared library, LD environment variable, dlopen, Perl XS, DynaLoader
 
-root_cause:             verify_build.py 在 G4 检查中查找 build_system: 字段（顶级），
-                        但版本级 manifest.yaml 规范使用 build.system:（嵌套结构），
-                        导致检查失败
-affected_scope:         所有使用版本级 manifest.yaml 的软件
-verification_cmd:       grep -n "build_system:" archives/*/manifest.yaml; grep -n "build:" archives/*/manifest.yaml
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: Setting LD=<value> as environment variable causes musl's dynamic linker to fail loading .so files via dlopen() with "Permission denied". The LD variable is interpreted by the linker subsystem and interferes with normal .so resolution. This particularly affects Perl XS modules where CC=cc LD=cc are set during compilation (to override Perl's default clang 18 without sysroot) but must be unset at runtime.
+affected_scope: Perl XS modules and any software using dlopen when LD env var is set
+verification_cmd: env | grep "^LD=" → if set, try: env -u LD <command>
 
-rec_priority:           1
-rec_approach:           add-compat-field
-rec_description:        在版本级 manifest.yaml 中添加顶级 build_system: 字段作为兼容性方案
-rec_command:            sed -i '/^status:/a build_system: cmake' archives/{letter}/{name}/{version}/manifest.yaml
-rec_auto_fix:           true
-rec_impl:               yaml-edit
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: unset-env-var
+rec_description: Unset LD (and CC) environment variables before runtime/test operations
+rec_command: env -u CC -u LD perl -Mmodule -e '...'
+rec_auto_fix: false
+rec_impl: manual-hint
 
-fallback_priority:      2
-fallback_approach:       fix-verify-script
-fallback_description:   修改 verify_build.py，检查 build.system 字段或软件级 manifest
-fallback_command:       修改 verify_build.py gate4_archive 中的字段检查逻辑
-fallback_auto_fix:      false
-fallback_impl:           script-edit
+# 回退方案
+fallback_priority: 2
+fallback_approach: wrapper-script
+fallback_description: Create a wrapper script that unsets LD before exec
+fallback_command: sh -c 'unset LD; exec "$@"' -- perl ...
+fallback_auto_fix: false
+fallback_impl:
 
-forbid_1_pattern:       none
-forbid_1_reason:        none
-forbid_1_consequence:   none
+# ★ 禁止策略 ★
+forbid_1_pattern: export LD=
+forbid_1_reason: Do not set LD as persistent env var - it will break all .so loading
+forbid_1_consequence: All Perl XS modules and dlopen-based software fail with Permission denied
 
-principles:
-  - ARCHIVE-SPEC v2.0 软件级 manifest.yaml 使用 build_system（顶级）
-  - ARCHIVE-SPEC v2.0 版本级 manifest.yaml 使用 build.system（嵌套）
-  - verify_build.py 应检查两者之一，不应硬编码查找顶级字段
+# ═══ Layer 4: 原则引用 ═══
+principles:              
 
-causes:                 []
-caused_by:              [ARCHIVE-SPEC 规范与 verify_build.py 实现不一致]
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+# ═══ 关系图 (Relations) ═══
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-doc_file:               draft/E104-draft-5FC0.md
-last_updated:           2026-05-20
-source_event:           fmt 11.0.2 编译失败于 verify-build G4
-draft: false
+# ═══ 元数据 ═══
+doc_file:               doc/E131.md
+last_updated: 2026-06-17
+source_event: perl-meta 0.015-r0 compilation
+
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

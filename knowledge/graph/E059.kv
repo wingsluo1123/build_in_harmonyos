@@ -1,59 +1,74 @@
-#====================================================================
-# E081.kv — OHOS 缺少 utmpx API
-# 对应的人类文档: doc/E081.md
-#====================================================================
+# Layer 0: 错误面
+id: E059
+trigger_tool:           aclocal/autogen.sh
+phase:                  configuration
 
-# ═══ Layer 0: 错误面 (Error Surface) ═══
-id:                     E059
-trigger_tool:           ld|clang
-phase:                  linking
-error_signature:        undefined symbol: setutxent|undefined symbol: pututxline|undefined symbol: endutxent|did you mean: setutent|did you mean: pututline|did you mean: endutent
-
-# ═══ Layer 1: 识别层 (Recognition) ═══
+# Layer 1: 识别层
 severity:               3
-category:               api-missing|platform-limitation
-match_keywords:         setutxent,pututxline,endutxline,utmpx,OMIT_UTMP
-title:                  OHOS 不支持 utmpx API（只有 utmp API）
+category:               autotools-bootstrap
+error_signature:        @am_AUTOM4TE@.*inaccessible|sh: @am_AUTOM4TE@.*not found|aclocal.*error.*@am_AUTOM4TE@
+match_keywords:         AUTOM4TE, aclocal.m4, placeholder, automake, bootstrap, configure.ac
 
-# ═══ Layer 2: 诊断层 (Diagnosis) ═══
-root_cause:             OHOS 系统只提供 utmp API（setutent/pututline/endutent），不提供 utmpx API（setutxent/pututxline/endutxent），导致链接失败
-affected_scope:         使用 utmpx.h 和 utmp 记录功能的程序（如 SSH 服务器、终端工具）
-verification_cmd:       grep -r "setutxent|pututxline|endutxent" *.c
+# Layer 2: 诊断层
+root_cause:             aclocal.m4 文件在打包时未正确处理 automake 宏变量，导致 @am_AUTOM4TE@ 占位符未被替换为实际路径。
+                        这是打包脚本或 autotools 配置文件的问题，而非源码本身的问题。
+affected_scope:         所有包含不完整 aclocal.m4 的 Autotools 项目
+verification_cmd:       grep "@am_AUTOM4TE@" aclocal.m4 || grep "@am_" aclocal.m4
 
-# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# Layer 3: 方案层
 rec_priority:           1
-rec_approach:           add_compile_definition
-rec_description:        添加 OMIT_UTMP 编译定义，禁用 utmp 记录功能（对非桌面终端程序核心功能非必需）
-rec_command:            target_compile_definitions(target PRIVATE OMIT_UTMP)
-rec_auto_fix:           false
-rec_impl:               none
+rec_approach:           use-stable-release
+rec_description:        使用稳定版本的源码包（包含完整的 aclocal.m4），避免开发版本打包不完整的问题。
+rec_command:            |
+  # 检查 aclocal.m4 是否包含占位符
+  grep "@am_" aclocal.m4
+  # 如果有占位符，说明源码包不完整，应使用稳定版本
+  cd ..
+  curl -LO <stable-version-url>
+  tar xf <stable-version.tar>
+  cd <stable-version>
+  ./configure --prefix=$DEFAULT_PREFIX
 
 fallback_priority:      2
-fallback_approach:      replace-api
-fallback_description:   将 utmpx API 替换为 utmp API（setutxent → setutent，pututxline → pututline，endutxent → endutent）
-fallback_command:       sed -i 's/setutxent/setutent/;s/pututxline/pututline/;s/endutxent/endutent/' pty.c
-fallback_auto_fix:      false
-fallback_impl:          none
+fallback_approach:      regenerate-aclocal
+fallback_description:   使用系统的 automake/aclocal 重新生成 aclocal.m4 文件（需要完整的 automake 安装）。
+fallback_command:       |
+  # 删除有问题的 aclocal.m4
+  rm aclocal.m4
+  # 使用系统 automake 重新生成
+  aclocal -I /usr/share/aclocal
+  automake --add-missing
+  autoconf
+fallback_impl:          regenerate-autotools
 
-# ★ 禁止策略 ★
-forbid_1_pattern:       utmpx\.h
-forbid_1_reason:        OHOS 不提供 utmpx.h，必须禁用或替换
-forbid_1_consequence:   链接失败：undefined symbol
+forbid_1_pattern:       手动替换 @am_AUTOM4TE@ 为具体路径
+forbid_1_reason:        占位符表明 aclocal.m4 不完整，手动替换可能遗漏其他问题
+forbid_1_consequence:   编译看似通过但生成文件不完整，后续步骤可能失败
 
-# ═══ Layer 4: 原则引用 ═══
-principles:             R6-minimal-change,R1-minimal-options
+# Layer 4: 原则引用
+principles:               
 
-# ═══ 关系图 (Relations) ═══
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+# 关系图
+causes:               
+caused_by:               
+similar_to:               
+conflicts_with:               
+prerequisite_of:        
 
-# ═══ 元数据 ═══
-doc_file:               doc/E081.md
-last_updated:           2026-05-28
-source_event:           putty 0.84 编译
+# 元数据
+doc_file:               doc/E059.md
+last_updated:           2026-06-05
+source_event:           libfm-1.4.0 autogen.sh 失败（@am_AUTOM4TE@ 占位符）
 
-draft: false
-contributor_id:         42FF
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+rec_auto_fix:               false
+rec_impl:               manual

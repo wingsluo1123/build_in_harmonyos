@@ -1,52 +1,29 @@
-# Layer 0: 错误面
-id:                     E128
-title: 纯 Perl 模块编译模式 (ExtUtils::MakeMaker)
-trigger_tool:           perl|make|test
-phase:                  configuration|installation|testing
-error_signature:        Can't locate.*\.pm in @INC|perl Makefile.PL|No such file.*Makefile.PL
+id: E128
+severity:               3
+category: platform_limitation
+trigger_tool: go
+phase: init
+rec_approach: use-prebuilt-package
+error_signature: permission denied.*go.*|sign.*elf.*failed.*go|zsh.*permission denied.*go/bin/go
+root_cause: Go 编译器二进制文件需要 ELF 签名才能在鸿蒙上执行，但 binary-sign-tool 签名 Go 失败
+match_keywords: go,golang,permission denied,elf签名,Go编译器,Go项目
+affected_scope: 所有 Go 语言项目
+rec_description: 使用预编译的 Go 编译器（已签名），或使用交叉编译在其他平台为鸿蒙编译 Go 项目
+rec_command: curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- go <version>
+verification_cmd: go version
+rec_priority: P0
 
-# Layer 1: 识别层
-severity:               1
-category:               build-system|perl
-match_keywords:         Makefile.PL, ExtUtils::MakeMaker, PERL5LIB, pure Perl, CPAN, backpan, PREFIX, INSTALL_BASE, Pod::Coverage, Devel::Symdump, Pod::Parser
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
 
-# Layer 2: 诊断层
-root_cause:             纯 Perl 模块使用 ExtUtils::MakeMaker (Makefile.PL) 构建，不涉及 C 编译器。
-                        Perl 安装在 /data/service/hnp，@INC 不包含用户安装路径 ~/usr/local。
-                        需通过 PERL5LIB 环境变量提供依赖模块路径。
-                        部分模块源码 URL 可能 404（如 savannah.nongnu.org），需使用 CPAN backpan 替代。
-affected_scope:         所有纯 Perl 模块（Pod::Coverage, PHP::Serialization, PDF::API2 等）
-verification_cmd:       perl -MPod::Coverage -e 'print $Pod::Coverage::VERSION, "\n"'
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
 
-# Layer 3: 方案层 ★
-rec_priority:           1
-rec_approach:           perl-pure-module-build
-rec_description:        使用 PERL5LIB 指定依赖路径，PREFIX/INSTALL_BASE=$DEFAULT_PREFIX 控制安装路径，DESTDIR 模式 staging
-rec_command:            export PERL5LIB=$HOME/usr/local/lib/site_perl/5.42.0:$HOME/usr/local/lib/5.42.0 && perl Makefile.PL PREFIX=$DEFAULT_PREFIX && make && make install DESTDIR=$TEST_PREFIX && make test
-rec_auto_fix:           true
-rec_impl:               set-env-var
-
-fallback_priority:      2
-fallback_approach:      install-base-mode
-fallback_description:   使用 INSTALL_BASE 替代 PREFIX（部分模块 INSTALL_BASE 更可靠地控制安装路径到 $DEFAULT_PREFIX/lib/perl5/）
-fallback_command:       perl Makefile.PL INSTALL_BASE=$DEFAULT_PREFIX && make && make install DESTDIR=$TEST_PREFIX
-fallback_auto_fix:      true
-fallback_impl:          set-env-var
-
-# Layer 4: 原则引用
-principles:             R20-DESTDIR, R1-minimal-args
-
-# 关系图
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
-
-# 元数据
-doc_file:               doc/E097.md
-last_updated:           2026-06-24
-source_event:           perl-pod-coverage 0.23 编译（2026-06-24），参考 perl-pdf-api2、perl-php-serialization 编译经验
-
-draft: false
-contributor_id: 04E5
+doc_file:               doc/E128.md
+rec_auto_fix:               false
+rec_impl:               manual

@@ -1,37 +1,58 @@
-#====================================================================
-# E081 — OHOS SDK libc++ headers require C++17 minimum
-#====================================================================
+id: E109
+trigger_tool: make
+phase: compilation
+severity: 3
+rec_approach: use-prebuilt-package
+# E109: Fortran Compiler Missing
 
-id:                     E109
-trigger_tool:           clang|cmake|make
-phase:                  compilation
-error_signature:        no member named 'nullptr_t' in the global namespace|unknown type name 'nullptr_t'|'__abi_tag__' attribute only applies to
+## Error Signature
+error_signature: gfortran: No such file or directory|make\[.*\]: gfortran: No such file or directory|FC=gfortran|\.f\.o:\s+Error\s+127|\.f\s+compilation failed
 
-severity:               3
-category:               platform-libcxx-stdlib
-match_keywords:         nullptr_t, __abi_tag__, libcxx-ohos, c++17, c++11, OHOS SDK
-title:                  OHOS SDK libc++ headers require C++17 minimum standard
+## Root Cause
+root_cause: OpenHarmony系统未预装Fortran编译器（gfortran），且预编译包仓库中无Fortran编译器预编译包。Fortran项目无法在OpenHarmony平台直接编译，需要交叉编译或等待官方提供编译器支持。
 
-root_cause:             OHOS SDK (ohos-sdk_26.0.0.18) ships custom libc++ headers at libcxx-ohos/include/c++/v1/ designed for C++17+, projects using -std=c++11 fail with nullptr_t, __abi_tag__, and constexpr errors
-affected_scope:         any C++ project compiled with -std=c++11 or lower on OpenHarmony
-verification_cmd:       echo '#include <string>' | clang++ -x c++ -std=c++11 -fno-rtti -isystem ~/usr/local/include - -o /dev/null
+## Match Keywords
+match_keywords: fortran,gfortran,\.f文件,fortran编译器缺失,F77,F90,F95
 
-rec_priority:           1
-rec_approach:           change-cxx-standard
-rec_description:        Change -std=c++11 to -std=c++17 in CMakeLists.txt or build config, also disable -Werror
-rec_command:            sed -i 's/-std=c++11/-std=c++17/' CMakeLists.txt && cmake .. -DFAIL_ON_WARNINGS=OFF
-rec_auto_fix:           false
-rec_impl:               manual-edit
+## Recommended Solution
+rec_description: 1. 交叉编译：在其他支持Fortran的平台编译后移植到OpenHarmony\n2. 等待OpenHarmony官方提供gfortran预编译包\n3. 使用功能替代库（如LAPACK/Eigen提供类似功能）
+rec_command: 无法通过本地命令解决。建议标记为failed，记录到归档notes.md等待官方支持。
 
-causes:                 []
-caused_by:              []
-similar_to:             []
-conflicts_with:         []
-prerequisite_of:        []
+## Affected Scope
+affected_scope: 所有Fortran项目（源码为.f/.f90/.f95文件），包括qrupdate、BLAS/LAPACK等科学计算库
 
-doc_file:               doc/E081.md
-last_updated:           2026-06-23
-source_event:           rocksdb 6.4.6 compile
+## Verification Command
+verification_cmd: gfortran --version && which f77 f90 f95
 
-draft: false
-contributor_id: EFAD
+## Category
+category: build_tool_missing
+trigger_tool: make
+phase: compilation
+severity: 2
+rec_approach: skip-or-cross-compile
+
+## Priority
+rec_priority: P1（阻塞编译，无法通过本地操作解决）
+
+## Software Examples
+
+## Platform Impact
+
+## Date Added
+
+## Contributor
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+
+doc_file:               doc/E109.md
+rec_auto_fix:               false
+rec_impl:               manual
