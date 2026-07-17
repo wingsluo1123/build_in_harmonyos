@@ -23,7 +23,7 @@ The canonical source tarball is the official SourceForge release:
 - Conan 2.x autotools recipe (`conan.tools.gnu.Autotools` / `AutotoolsToolchain`).
 - `config_options`: on OHOS the `shared` option is removed (asymptote is a
   standalone executable, never a shared library).
-- `generate`: `--build=aarch64-unknown-linux-gnu` is appended for OHOS
+- `generate`: `--build=aarch64-unknown-linux-gnu` is appended only for OHOS
   config.guess detection (autotools 项目惯例).
 - Optional dependencies (`ffmpeg`/`gsl`/`opengl`) are disabled via
   `--disable-*` to avoid OHOS platform missing-library build failures.
@@ -47,10 +47,11 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 - Optional (disabled on OHOS): ffmpeg, gsl, opengl/freeglut
 
 ## Verification
-The test_package is a Conan L1 smoke test verifying the `asymptote` package is
-consumable. Because `asy --version` requires a working TeX installation at
-runtime, the test uses a minimal consumer program that links against the
-package's environment to verify the install layout.
+The test_package is a Conan L1 smoke test for the packaged `asy` executable.
+It checks that the real artifact exists and is executable, runs `asy --version`,
+accepts only the upstream exit statuses 0 or 1, and requires output identifying
+Asymptote 3.12. Missing artifacts, loader failures, crashes, or unrelated output
+fail the test.
 
 ---
 

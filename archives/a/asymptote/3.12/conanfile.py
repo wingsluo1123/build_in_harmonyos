@@ -10,7 +10,11 @@ Product: `asy` executable (vector graphics compiler — no linkable library)
 Build system: autotools (configure + make)
 """
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import (
+    apply_conandata_patches,
+    export_conandata_patches,
+    get,
+)
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -44,13 +48,18 @@ class AsymptoteConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
         # OHOS 平台需显式指定 build 类型, 避免 config.guess 识别失败
-        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        if self.settings.os == "OHOS":
+            tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
         # 关闭可选依赖, 减少鸿蒙平台缺失库的编译阻碍
         tc.configure_args.append("--disable-ffmpeg")
         tc.configure_args.append("--disable-gsl")
