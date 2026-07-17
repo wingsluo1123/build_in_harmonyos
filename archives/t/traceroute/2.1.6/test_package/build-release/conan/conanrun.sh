@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/t/traceroute/2.1.6/test_package/build-release/conan/conanrunenv-release-armv8.sh"

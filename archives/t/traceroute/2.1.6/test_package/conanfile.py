@@ -12,6 +12,7 @@ from conan.tools.layout import basic_layout
 class TracerouteTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "VirtualRunEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -21,5 +22,6 @@ class TracerouteTestConan(ConanFile):
 
     def test(self):
         # R34: Test must actually use the tested package
-        # Run traceroute --version to verify the binary works
-        self.run("traceroute --version", env="conanrun")
+        # Run test.sh which invokes traceroute --version
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"bash {test_script}", env="conanrun")
