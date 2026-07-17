@@ -10,11 +10,11 @@ References:
   - R32: settings.os check uses in ("Linux", "OHOS")
   - E074: use make -j1 (HarmonyOS FIFO restriction)
   - E046: SELinux HMDFS restricts .so loading from user space
-  - perl-dbd-pg experience: CRT workaround (-nostartfiles) not needed
-    for Set::Object because it only links against libc and Perl
-    interpreter symbols (no external C library dependencies).
+  - E137: Makefile patch for OHOS sysroot + CRT workaround
+    (-isystem for sys/types.h, -nostartfiles -nodefaultlibs -lc for linking)
 """
 import os
+import re
 import glob
 
 from conan import ConanFile
@@ -45,83 +45,50 @@ class PerlSetObjectConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def _resolve_sysroot(self):
-        """Resolve OHOS SDK sysroot path for musl headers (sys/types.h etc.)."""
-        sysroot = os.environ.get("OHOS_SYSROOT")
-        if sysroot and os.path.isdir(sysroot):
-            return sysroot
-        candidates = [
-            "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/../../sysroot",
-            os.path.expanduser("~/ohos-sdk/sysroot"),
-        ]
-        for c in candidates:
-            if os.path.isdir(c):
-                return c
-        raise ConanException(
-            "Cannot find OHOS SDK sysroot. Set OHOS_SYSROOT environment variable."
-        )
-
-    def _resolve_perl_lib(self):
-        """Resolve Perl module library path for PERL5LIB."""
-        perl_lib = os.environ.get("PERL5LIB")
-        if perl_lib:
-            return perl_lib
-        home = os.path.expanduser("~")
-        candidates = [
-            os.path.join(home, "usr/local/lib/perl5/aarch64-linux"),
-            os.path.join(home, "usr/local/lib/perl5"),
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux",
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0",
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0/aarch64-linux",
-            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0",
-        ]
-        existing = [c for c in candidates if os.path.isdir(c)]
-        return ":".join(existing) if existing else ""
-
-    def generate(self):
-        sysroot = self._resolve_sysroot()
-        perl_lib = self._resolve_perl_lib()
-
-        # R33: use buildenv_info, not raw os.environ
-        # CPATH: OHOS SDK sysroot headers (sys/types.h etc.)
-        cpath = os.path.join(sysroot, "usr", "include")
-        self.buildenv_info.define("CPATH", cpath)
-
-        # LIBRARY_PATH: sysroot libs
-        lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
-        self.buildenv_info.define("LIBRARY_PATH", lib_path)
-
-        # PERL5LIB: Perl module path
-        if perl_lib:
-            self.buildenv_info.define("PERL5LIB", perl_lib)
-
     def build(self):
         apply_conandata_patches(self)
         # R32: platform check
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
-        # Set CPATH for clang to find sys/types.h etc. from OHOS SDK sysroot
-        # Perl MakeMaker doesn't use Conan Toolchain, so we set CPATH directly
-        sysroot = self._resolve_sysroot()
-        inc = os.path.join(sysroot, "usr", "include")
-        arch_inc = os.path.join(inc, "aarch64-linux-ohos")
-        lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
-        local_lib = os.path.join(os.path.expanduser("~"), "usr/local", "lib")
-        os.environ["CPATH"] = f"{inc}:{arch_inc}"
-        os.environ["LIBRARY_PATH"] = f"{lib_path}:{local_lib}"
-
-        # Perl XS module: use ExtUtils::MakeMaker
+        # Step 1: Generate Makefile via Makefile.PL
         # INSTALL_BASE=/ makes files install to $DESTDIR/lib/perl5/<arch>/
         self.run("perl Makefile.PL INSTALL_BASE=/", cwd=self.source_folder)
-        # E074: HarmonyOS SELinux forbids FIFO, use -j1
+
+        # Step 2: Patch Makefile for OHOS platform (E137)
+        #   a) Add -isystem for OHOS SDK sysroot headers (sys/types.h etc.)
+        #   b) Add CRT workaround: -nostartfiles -nodefaultlibs -lc
+        #      Avoids libunwind.a dependency from -fstack-protector-strong
+        sysroot_inc = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr/include"
+        arch_inc = sysroot_inc + "/aarch64-linux-ohos"
+        sysroot_lib = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr/lib/aarch64-linux-ohos"
+        makefile_path = os.path.join(self.source_folder, "Makefile")
+        with open(makefile_path, "r") as f:
+            content = f.read()
+
+        content = re.sub(
+            r"^(CCFLAGS = -D_GNU_SOURCE)",
+            rf"CCFLAGS = -isystem {sysroot_inc} -isystem {arch_inc} -D_GNU_SOURCE",
+            content,
+            flags=re.MULTILINE,
+        )
+        content = re.sub(
+            r"^LDDLFLAGS = -shared -O2 -fstack-protector-strong$",
+            f"LDDLFLAGS = -shared -nostartfiles -nodefaultlibs -L{sysroot_lib} -lc -O2 -fstack-protector-strong",
+            content,
+            flags=re.MULTILINE,
+        )
+
+        with open(makefile_path, "w") as f:
+            f.write(content)
+
+        # Step 3: Build (E074: HarmonyOS SELinux forbids FIFO, use -j1)
         self.run("make -j1", cwd=self.source_folder)
 
         # Run test suite (required by build skill Step 2)
         # On HarmonyOS, SELinux HMDFS restricts .so loading from user space,
         # so make test will fail with "Permission denied" at DynaLoader.
         # This is a known platform limitation (E046), not a build defect.
-        # The test is run to document the limitation; failure is non-fatal.
         self.run("make test", cwd=self.source_folder, ignore_errors=True)
         self.output.warning(
             "make test: expected failure on HarmonyOS (SELinux HMDFS "
