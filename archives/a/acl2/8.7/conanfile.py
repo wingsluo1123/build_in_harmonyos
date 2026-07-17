@@ -51,7 +51,17 @@ class Acl2Conan(ConanFile):
         pass
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        sources = self.conan_data["sources"]
+        urls = [sources["url"]] + list(sources.get("backup_urls", []))
+        last_error = None
+        for url in urls:
+            try:
+                get(self, url=url, sha256=sources["sha256"], strip_root=True)
+                return
+            except Exception as e:
+                last_error = e
+                self.output.warning(f"Download failed from {url}, trying next mirror...")
+        raise ConanException(f"All download URLs failed. Last error: {last_error}")
 
     def build(self):
         # Locate the host Lisp compiler.
