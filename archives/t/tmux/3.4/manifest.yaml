@@ -19,7 +19,7 @@ status: published
 build_system: autotools
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-27"
+compile_date: "2026-05-27"
 
 # ============================================================
 # 源码信息
@@ -30,7 +30,7 @@ source:
   url: "https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "551ab8dea0bf505c0ad6b7bb35ef567cdde0ccb84357df142c254f35a23e19aa"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -47,17 +47,17 @@ build:
 
   # 配置选项列表
   configure_options:
-    - "--build=aarch64-unknown-linux-ohos"
     - "--prefix=/storage/Users/currentUser/usr/local"
     - "--enable-static"
     - "--disable-shared"
     - "EVENT_CFLAGS=-I/storage/Users/currentUser/usr/local/include"
     - "EVENT_LIBS=-L/storage/Users/currentUser/usr/local/lib -levent_core -levent_extra"
 
-  # 编译依赖列表（格式: name/version）
-  dependencies:
-    - ncurses/6.4
-    - libevent/2.1.12
+  # 系统库依赖（这些库由 HarmonyOS 系统提供，不在 Conan 远程仓库中）
+  system_libs:
+    - libncurses.so
+    - libevent_core.so
+    - libevent_extra.so
 
   # 编译器
   cc: clang
@@ -69,10 +69,12 @@ build:
 
 # 应用的补丁列表
 patches_applied:
-  - "0001-config.status.patch"
-  - "0002-configure.patch"
-  - "0003-etc-config.guess.patch"
-  - "0004-etc-config.sub.patch"
+  - "0001-cmd-parse.c.patch"
+  - "0002-compat.h.patch"
+  - "0003-compat-forkpty-linux.c.patch"
+  - "0004-configure.patch"
+  - "0005-etc-config.guess.patch"
+  - "0006-etc-config.sub.patch"
 
 # ============================================================
 # 知识沉淀
@@ -95,23 +97,27 @@ patch_generation:
   patches_count: 6
 
 patch_classification:
-  - file: 0001-config.status.patch
+  - file: 0001-cmd-parse.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0002-configure.patch
+  - file: 0002-compat.h.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0003-etc-config.guess.patch
+  - file: 0003-compat-forkpty-linux.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0004-etc-config.sub.patch
+  - file: 0004-configure.patch
     type: auto
     platform_only: True
     guard: 'pending'
-tch
+  - file: 0005-etc-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-etc-config.sub.patch
     type: auto
     platform_only: True
     guard: 'pending'

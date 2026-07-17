@@ -5,29 +5,32 @@ SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applicati
 ## Dependencies
 
 - SDL2 2.30.0 (required)
-- FreeType (bundled)
-- HarfBuzz (bundled)
+- FreeType 26.6.20 (external)
+- HarfBuzz 14.2.0 (external)
+- libpng 16.39.0
+- zlib 1.3.1
 
 ## Available Versions
 
-| Version | Status | Notes |
-|---------|--------|-------|
-| 2.22.0 | built | Uses bundled FreeType and HarfBuzz |
+| Version | Status | Build System | Notes |
+|---------|--------|--------------|-------|
+| 2.24.0 | published | cmake | External FreeType + HarfBuzz; autotools fails on HMDFS |
 
 ## Installation
 
 ```bash
-# Install SDL2 first
+# Install dependencies first
 curl -fsSL "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh" | sh -s -- SDL2 2.30.0
 
-# Build SDL2_ttf
-cd ~/builds/SDL2_ttf-2.22.0.work
-./configure --prefix=$HOME/usr/local
-make -j4
-make install
+# Build SDL2_ttf (cmake required, autotools fails on HMDFS)
+cd ~/builds/SDL2_ttf-2.24.0.work
+cmake -B build -DCMAKE_INSTALL_PREFIX=$HOME/usr/local -DSDL2TTF_HARFBUZZ=ON -DSDL2TTF_FREETYPE=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j4
+cmake --install build --prefix $HOME/usr/local
 ```
 
 ## Notes
 
-- Uses bundled FreeType and HarfBuzz (no external dependency needed)
-- Requires config.guess/config.sub patches for HarmonyOS support
+- Uses external FreeType and HarfBuzz (not bundled)
+- CMake is required — autotools configure fails on HMDFS (config.status cannot create temp files)
+- Requires config.guess patch for HarmonyOS platform recognition

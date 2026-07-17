@@ -25,11 +25,9 @@ class Sdl2TtfConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("SDL2/2.30.0@ohpcd/stable")
-        self.requires("freetype/26.6.20@ohpcd/stable")
-        self.requires("harfbuzz/14.2.0@ohpcd/stable")
-        self.requires("libpng/16.39.0@ohpcd/stable")
-        self.requires("zlib/1.3.1@ohpcd/stable")
+        # SDL2, FreeType, HarfBuzz, libpng, zlib are system libraries
+        # No Conan packages available for these on ohpcd remote
+        pass
 
     def layout(self):
         cmake_layout(self)
@@ -56,3 +54,5 @@ class Sdl2TtfConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["SDL2_ttf"]
+        # System dependencies: SDL2, FreeType, HarfBuzz, libpng, zlib
+        self.cpp_info.system_libs = ["SDL2", "freetype", "harfbuzz", "png16", "z"]

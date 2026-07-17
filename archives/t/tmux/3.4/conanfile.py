@@ -28,8 +28,10 @@ class TmuxConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("ncurses/6.4@ohpcd/stable")
+        # libevent is available on ohpcd remote
         self.requires("libevent/2.1.12@ohpcd/stable")
+        # ncurses is installed as a system library (no Conan package on ohpcd)
+        pass
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -57,3 +59,5 @@ class TmuxConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["tmux"]
+        # System dependency: ncurses (installed via cmd-pkgs, no Conan package)
+        self.cpp_info.system_libs = ["ncurses", "tinfo"]
