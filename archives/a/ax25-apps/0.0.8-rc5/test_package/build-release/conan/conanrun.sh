@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/a/ax25-apps/0.0.8-rc5/test_package/build-release/conan/conanrunenv-release-armv8.sh"
