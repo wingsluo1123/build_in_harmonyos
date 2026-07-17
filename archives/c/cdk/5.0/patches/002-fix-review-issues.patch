@@ -1,0 +1,96 @@
+diff --git a/conanfile.py b/conanfile.py
+index 12d3a4b..e5f6c7d 100644
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -5,7 +5,6 @@
+ CDK is a library of predefined curses widgets for terminal applications.
+ This recipe builds the static libcdk.
+ """
+-import glob
+ 
+ from conan import ConanFile
+ from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+@@ -33,7 +32,8 @@ class CdkConan(ConanFile):
+         basic_layout(self)
+ 
+     def generate(self):
+-        tc = 
++        tc = AutotoolsToolchain(self)
++        tc.generate()
+ 
+     def source(self):
+         get(self, **self.conan_data["sources"], strip_root=True)
+diff --git a/conandata.yml b/conandata.yml
+index fa7b1c2..8d9e0f1 100644
+--- a/conandata.yml
++++ b/conandata.yml
+@@ -7,8 +7,6 @@ sources:
+   url: "https://github.com/ThomasDickey/cdk-snapshots/archive/refs/tags/t20260119.tar.gz"
+   sha256: "0f3095d7983227c06d1d326a6c95e0255e944be8a0f9748174840bfb3edd0cb5"
+ 
+-patches: []
+-
+ patches:
+   "5.0":
+     - patch_file: patches/001-fix-code-review.patch
+diff --git a/test_package/conanfile.py b/test_package/conanfile.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/test_package/conanfile.py
++++ b/test_package/conanfile.py
+@@ -1,10 +1,10 @@
+ #!/usr/bin/env python3
+-"""Conan test_package - cdk 5.0 (L1 official test).
++"""Conan test_package - cdk 5.0 (L1 official test with real API call).
+ 
+-Verifies the CDK header (cdk.h) is available and the package can be consumed.
+-CI runs this automatically via `conan create` (which invokes test_package).
++Verifies the CDK library can be initialized and used from C code.
+ """
+ import os
+ 
+@@ -17,16 +17,22 @@ class CdkTestConan(ConanFile):
+ 
+     def requirements(self):
+         self.requires(self.tested_reference_str)
++        self.requires("ncurses/6.5")
+ 
+     def build(self):
+         src = os.path.join(self.source_folder, "test_package.c")
+-        inc = [f"-I{p}" for p in self.deps_cpp_info.include_paths]
+-        libdirs = [f"-L{p}" for p in self.deps_cpp_info.lib_paths]
+-        libs = [f"-l{l}" for l in self.deps_cpp_info.libs]
++        cdk = self.dependencies["cdk"].cpp_info
++        ncu = self.dependencies["ncurses"].cpp_info
++        inc = [f"-I{p}" for p in cdk.include_paths] + [f"-I{p}" for p in ncu.include_paths]
++        libdirs = [f"-L{p}" for p in cdk.lib_paths] + [f"-L{p}" for p in ncu.lib_paths]
++        libs = [f"-l{l}" for l in cdk.libs] + [f"-l{l}" for l in ncu.libs]
+         self.run(f"cc {' '.join(inc)} {src} {' '.join(libdirs)} {' '.join(libs)} -o test_package")
+ 
+     def test(self):
+         if can_run(self):
+             cmd = os.path.join(self.build_folder, "test_package")
+             self.run(cmd, env="conanrun")
+diff --git a/test_package/test_package.c b/test_package/test_package.c
+index 1234567..89abcdef 100644
+--- a/test_package/test_package.c
++++ b/test_package/test_package.c
+@@ -1,3 +1,14 @@
+-int main() {
+-    return 0;
+-}
++#include <cdk.h>
++#include <ncurses.h>
++#include <stdio.h>
++
++int main() {
++    initscr();
++    CDKSCREEN *screen = initCDKScreen(stdscr);
++    if (screen) {
++        printf("CDK test passed\n");
++        endCDK(screen);
++    } else {
++        printf("CDK init failed\n");
++    }
++    endwin();
++    return screen ? 0 : 1;
++}
