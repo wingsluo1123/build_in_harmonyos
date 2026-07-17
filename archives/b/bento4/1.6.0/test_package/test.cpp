@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "Ap4.h"
+#include "bento4/Ap4.h"
 
 int main(void) {
     // Verify bento4 library is usable by creating a minimal MP4 output stream
