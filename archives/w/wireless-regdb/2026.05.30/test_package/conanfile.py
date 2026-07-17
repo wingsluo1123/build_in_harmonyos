@@ -23,8 +23,17 @@ class WirelessRegdbTestConan(ConanFile):
 
         if not pkg_root:
             # Fallback: search conan cache for the regulatory.db file
+            import subprocess
             home = os.path.expanduser("~")
-            self.run(f'find {home}/.conan2/p -name regulatory.db -path "*/lib/firmware/*" 2>/dev/null | head -1 | xargs -I@ test -f @', env="conanrun")
+            result = subprocess.run(
+                ["find", f"{home}/.conan2/p", "-name", "regulatory.db",
+                 "-path", "*/lib/firmware/*", "-print", "-quit"],
+                capture_output=True, text=True
+            )
+            found = result.stdout.strip()
+            assert found, "regulatory.db not found in conan cache (package_folder unavailable)"
+            assert os.path.isfile(found), f"regulatory.db path not a file: {found}"
+            self.output.info(f"regulatory.db found via cache search ({os.path.getsize(found)} bytes)")
             return
 
         # Check regulatory database files

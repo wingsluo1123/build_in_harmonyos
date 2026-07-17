@@ -3,7 +3,7 @@
 ## 编译环境
 - 构建系统: makefile (无 configure)
 - 编译日期: 2026-07-15
-- 状态: published
+- 状态: built
 - 平台: HarmonyOS PC (aarch64)
 
 ## 编译步骤

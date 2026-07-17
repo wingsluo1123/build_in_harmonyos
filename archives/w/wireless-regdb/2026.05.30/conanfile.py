@@ -47,4 +47,4 @@ class WirelessRegdbConan(ConanFile):
     def package_info(self):
         # Data package: no libraries to link.
         # Expose resdirs for consumers to find regulatory database files.
-        self.cpp_info.resdirs = ["lib/firmware", "lib/crda"]
+        self.cpp_info.resdirs = ["lib/firmware", "usr/lib/crda"]
