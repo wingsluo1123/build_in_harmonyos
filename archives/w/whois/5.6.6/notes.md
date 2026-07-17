@@ -52,4 +52,4 @@ conan create + conan-verify 全部通过：
 ---
 
 **编译结束**: 2026-07-15 18:04
-**最终状态**: built
+**最终状态**: published
