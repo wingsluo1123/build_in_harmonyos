@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
-
-Usage: Replace Spek, spek, 0.8.5, spek 0.8.5, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for system-name libraries.
-"""
+"""Conan recipe — spek 0.8.5 (Autotools, headless CLI build)."""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -18,7 +12,7 @@ class SpekConan(ConanFile):
     description = "Spek - Acoustic spectrum analyser (headless CLI build)"
     license = "GPL-3.0"
     homepage = "https://www.spek.cc/"
-    url = "https://github.com/alexkay/spek"  # CI fills this
+    url = "https://github.com/alexkay/spek"
 
     package_type = "application"
 
@@ -59,5 +53,4 @@ class SpekConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["spek"]
-
+        self.cpp_info.bindirs = ["bin"]
