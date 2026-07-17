@@ -74,9 +74,16 @@ class CmatrixConan(ConanFile):
         archive = os.path.join(self.source_folder, "compat", "ncurses-6.4.tar.gz")
         # Autoconf-generated files are corrupted on HMDFS even with relaxed
         # permissions, so build ncurses in a local temporary filesystem.
-        ncurses_src = tempfile.mkdtemp(
-            prefix=".cmatrix-ncurses-", dir="/data/service/hnp"
-        )
+        ncurses_src = None
+        candidates = [os.environ.get("HNP_PRIVATE_HOME"), "/tmp", "/data/service/hnp"]
+        for parent in filter(None, candidates):
+            try:
+                ncurses_src = tempfile.mkdtemp(prefix=".cmatrix-ncurses-", dir=parent)
+                break
+            except (FileNotFoundError, PermissionError, OSError):
+                continue
+        if ncurses_src is None:
+            raise RuntimeError("No writable local filesystem for building ncurses")
         self.output.info(f"Building ncurses in local temporary folder: {ncurses_src}")
         ncurses_prefix = os.path.join(self.build_folder, "ncurses")
         with tarfile.open(archive, "r:gz") as tf:
