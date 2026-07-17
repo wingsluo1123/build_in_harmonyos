@@ -34,14 +34,16 @@ class LibeditConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # HarmonyOS: use system libtinfo for termcap
         # Create symlink libtinfo.so -> libtinfo.so.6 in build lib dir
-        lib_dir = os.path.join(self.build_folder, "lib")
-        os.makedirs(lib_dir, exist_ok=True)
-        tinfo_link = os.path.join(lib_dir, "libtinfo.so")
-        if not os.path.exists(tinfo_link):
-            os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
-        tc.extra_cflags.append("-I" + self.source_folder)
-        # HarmonyOS: wchar_t stores ISO 10646 but __STDC_ISO_10646__ not defined
-        tc.extra_cflags.append("-D__STDC_ISO_10646__=201206L")
+        if self.settings.os in ("Linux", "OHOS"):
+            lib_dir = os.path.join(self.build_folder, "lib")
+            os.makedirs(lib_dir, exist_ok=True)
+            tinfo_link = os.path.join(lib_dir, "libtinfo.so")
+            if not os.path.exists(tinfo_link):
+                os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
+            tc.extra_ldflags.append("-L" + lib_dir)
+            tc.extra_cflags.append("-I" + self.source_folder)
+            # HarmonyOS: wchar_t stores ISO 10646 but __STDC_ISO_10646__ not defined
+            tc.extra_cflags.append("-D__STDC_ISO_10646__=201206L")
         tc.extra_ldflags.append("-L" + lib_dir)
         tc.generate()
 
