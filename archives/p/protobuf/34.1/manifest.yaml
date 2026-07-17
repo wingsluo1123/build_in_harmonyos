@@ -1,19 +1,30 @@
-software: protobuf
-version: 34.1
-status: success
-build_system: cmake
-created_at: 2026-04-22
-knowledge_gained:
-  - protobuf 使用 CMake 构建系统，需要依赖 abseil-cpp
-  - CMake 配置参数: -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX -Dprotobuf_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
-  - abseil-cpp 通过 absl_DIR cmake 变量自动找到（$DEFAULT_PREFIX/lib/cmake/absl）
-  - 编译有 deprecated 警告（abseil MutexLock/Lock/Unlock API），不影响功能
+version: "34.1"
+status: built
+build_date: "2026-07-16"
+
+source:
+  url: "https://github.com/protocolbuffers/protobuf/archive/refs/tags/v34.1.tar.gz"
+  sha256: "a83103b7ed3afaeedee9a212c8f65825444f58144f5e075b73c83f2b4ff27b62"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-Dprotobuf_BUILD_TESTS=OFF"
+    - "-Dprotobuf_BUILD_CONFORMANCE=OFF"
+    - "-Dprotobuf_BUILD_EXAMPLES=OFF"
+    - "-Dprotobuf_BUILD_SHARED_LIBS=OFF"
+    - "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=OFF"
+  dependencies:
+    - "abseil-cpp/20260107.1"
+  cc: clang
+  cxx: clang++
+
 patches_applied: []
-build_log: logs/build.log
-source_url: https://github.com/protocolbuffers/protobuf/releases/download/v34.1/protobuf-34.1.tar.gz
-configure_options:
-  - "-DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX"
-  - "-Dprotobuf_BUILD_TESTS=OFF"
-  - "-DCMAKE_BUILD_TYPE=Release"
-dependencies:
-  - abseil-cpp (20260107.1)
+knowledge_gained:
+  - "protobuf 34.1 使用 CMake 构建系统，依赖 abseil-cpp"
+  - "通过 CMAKE_PREFIX_PATH 让 protobuf find_package(absl CONFIG) 找到已安装的 abseil-cpp"
+  - "产物: 6 个静态库 (protobuf, protobuf-lite, protoc, upb, utf8_validity, utf8_range) + protoc 可执行文件"
+  - "Conan 配方需要 transitive_headers=True 和 cpp_info.requires 传递 abseil-cpp 依赖给消费者"
+  - "protobuf 34.1 的 Descriptor::name() 返回 string_view 而非 string"
