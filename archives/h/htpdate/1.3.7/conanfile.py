@@ -5,6 +5,8 @@ htpdate synchronizes system time via HTTP headers from web servers.
 Build system: raw Makefile (no configure).
 """
 import os
+import subprocess
+import tempfile
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -39,13 +41,23 @@ class HtpdateConan(ConanFile):
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = compilers.get("c", "clang")
 
-        # R9: Use -j1
-        # -D__OHOS__ enables adjtimex compatibility for OpenHarmony
-        # -C to run make in the source directory (Makefile is there)
-        self.run(
-            f"make -C {self.source_folder} CC={cc} "
-            f"CFLAGS=\"-Wall -std=c11 -pedantic -O2 -D__OHOS__\" -j1"
-        )
+        # R8: Feature detection instead of platform macro (#ifdef __OHOS__)
+        # Check if adjtime() is available; if not, define ADJTIME_MISSING
+        cflags = "-Wall -std=c11 -pedantic -O2"
+        test_code = '#include <sys/time.h>\nint main(void){struct timeval t={0};return adjtime(&t,0);}\n'
+        tmpdir = os.environ.get("TMPDIR", "/tmp")
+        with tempfile.NamedTemporaryFile(suffix=".c", mode="w", dir=tmpdir, delete=False) as f:
+            f.write(test_code)
+            test_path = f.name
+        out_path = test_path + ".out"
+        result = subprocess.run([cc, test_path, "-o", out_path], capture_output=True, timeout=10)
+        if os.path.exists(out_path):
+            os.unlink(out_path)
+        os.unlink(test_path)
+        if result.returncode != 0:
+            cflags += " -DADJTIME_MISSING"
+
+        self.run(f'make -C {self.source_folder} CC={cc} CFLAGS="{cflags}" -j1')
 
     def package(self):
         copy(self, "htpdate", self.source_folder, os.path.join(self.package_folder, "bin"))
