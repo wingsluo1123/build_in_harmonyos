@@ -8,7 +8,8 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.errors import ConanException
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -45,14 +46,16 @@ class PerlsocketConan(ConanFile):
         so_src = os.path.join(src, "blib", "arch", "auto", "Socket", "Socket.so")
         so_dst = os.path.join(self.package_folder, "lib", "auto", "Socket")
         os.makedirs(so_dst, exist_ok=True)
-        if os.path.exists(so_src):
-            shutil.copy2(so_src, os.path.join(so_dst, "Socket.so"))
+        if not os.path.exists(so_src):
+            raise ConanException(f"Socket.so not found at {so_src} — build may have failed")
+        shutil.copy2(so_src, os.path.join(so_dst, "Socket.so"))
         # Socket.pm (Perl module) -> lib/
         pm_src = os.path.join(src, "blib", "lib", "Socket.pm")
         pm_dst = os.path.join(self.package_folder, "lib")
         os.makedirs(pm_dst, exist_ok=True)
-        if os.path.exists(pm_src):
-            shutil.copy2(pm_src, os.path.join(pm_dst, "Socket.pm"))
+        if not os.path.exists(pm_src):
+            raise ConanException(f"Socket.pm not found at {pm_src} — build may have failed")
+        shutil.copy2(pm_src, os.path.join(pm_dst, "Socket.pm"))
 
     def package_info(self):
         # Perl XS module: no C library to link against

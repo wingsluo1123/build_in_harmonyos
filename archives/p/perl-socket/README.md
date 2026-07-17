@@ -35,7 +35,7 @@ Socket 模块提供网络编程所需的常量和函数，包括：
 
 ```bash
 # 通过 Conan 安装
-conan install --requires=perl-socket/2.040-r0@ohpcd/stable
+conan install --requires=perl-socket/2.040-r0
 
 # 或手动安装到系统目录
 cp lib/Socket.pm /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/
