@@ -4,6 +4,8 @@
 HIDAPI is a multi-platform library for communicating with USB and Bluetooth HID devices.
 Uses hidraw backend only (libusb not available on HarmonyOS).
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -34,6 +36,19 @@ class HidapiConan(ConanFile):
         tc.generate()
 
     def build(self):
+        # Disable libusb backend (libusb not available on HarmonyOS)
+        cmake_file = os.path.join(self.source_folder, "CMakeLists.txt")
+        if os.path.isfile(cmake_file):
+            with open(cmake_file, "r") as f:
+                content = f.read()
+            if "add_subdirectory(libusb)" in content:
+                content = content.replace(
+                    "add_subdirectory(libusb)",
+                    "# add_subdirectory(libusb)  # disabled: libusb not available on HarmonyOS"
+                )
+                with open(cmake_file, "w") as f:
+                    f.write(content)
+
         apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
