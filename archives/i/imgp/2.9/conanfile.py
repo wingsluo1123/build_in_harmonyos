@@ -52,11 +52,30 @@ class ImgpConan(ConanFile):
         # The source tarball URL format is predictable:
         #   https://files.pythonhosted.org/packages/source/{first_letter}/{name}/{name}-{version}.tar.gz
         # Download to the build folder (which is always writable).
+        # Use urlopen with a 120s timeout and chunked read with progress output
+        # to prevent CI from killing the process due to no output.
         st_tarball = os.path.join(self.build_folder, "setuptools-75.8.0.tar.gz")
-        self.run(f"{python} -c \"import urllib.request; "
-                 f"urllib.request.urlretrieve("
-                 f"'https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-75.8.0.tar.gz', "
-                 f"'{st_tarball}')\"", env="conanrun")
+        st_url = "https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-75.8.0.tar.gz"
+        st_script = os.path.join(self.build_folder, "download_setuptools.py")
+        with open(st_script, "w") as f:
+            f.write(f"""import urllib.request, sys
+resp = urllib.request.urlopen('{st_url}', timeout=120)
+total = int(resp.headers.get('Content-Length', 0))
+downloaded = 0
+with open('{st_tarball}', 'wb') as f:
+    while True:
+        chunk = resp.read(65536)
+        if not chunk:
+            break
+        f.write(chunk)
+        downloaded += len(chunk)
+        if total:
+            sys.stdout.write('\\rDownloading setuptools... ' + str(downloaded * 100 // total) + '%')
+            sys.stdout.flush()
+sys.stdout.write('\\n')
+print('Download complete: ' + str(downloaded) + ' bytes')
+""")
+        self.run(f"{python} '{st_script}'", env="conanrun")
         self.run(f"{python} -m pip install '{st_tarball}' --no-build-isolation", env="conanrun")
 
         # Install imgp from source directory using --no-build-isolation
