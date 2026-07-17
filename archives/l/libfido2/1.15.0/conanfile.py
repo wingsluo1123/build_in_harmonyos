@@ -127,7 +127,7 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
                 pkg_dir = os.path.join(pkg_root, str(libdir), "pkgconfig")
                 if os.path.isdir(pkg_dir):
                     pkg_paths.append(pkg_dir)
-                    # Fix broken .pc files (zlib may have prefix=/ meaning root)
+                    # Fix broken .pc files (prefix may be / or point to build dir)
                     for pc_file in os.listdir(pkg_dir):
                         pc_path = os.path.join(pkg_dir, pc_file)
                         if os.path.isfile(pc_path):
@@ -135,7 +135,13 @@ struct udev_device *udev_device_unref(struct udev_device *dev) { (void)dev; retu
                                 lines = f.readlines()
                             changed = False
                             for i, line in enumerate(lines):
-                                if line.strip() == "prefix=/":
+                                stripped = line.strip()
+                                # Fix prefix=/ (root, broken zlib)
+                                if stripped == "prefix=/":
+                                    lines[i] = f"prefix={pkg_root}\n"
+                                    changed = True
+                                # Fix prefix pointing to build dir (p/b/) instead of package dir
+                                elif stripped.startswith("prefix=") and "/p/b/" in stripped:
                                     lines[i] = f"prefix={pkg_root}\n"
                                     changed = True
                             if changed:
