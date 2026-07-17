@@ -1,6 +1,7 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain
-from conan.tools.files import apply_conandata_patches, get
+from conan.tools.files import apply_conandata_patches, copy, get
+import os
 
 class HiGHSConan(ConanFile):
     name = "highs"
@@ -28,6 +29,11 @@ class HiGHSConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        # HiGHS CMake install may not copy all headers on OHOS, manually ensure they're included
+        copy(self, "*.h", src=os.path.join(self.source_folder, "src"),
+             dst=os.path.join(self.package_folder, "include"), keep_path=False)
+        copy(self, "*.hh", src=os.path.join(self.source_folder, "src"),
+             dst=os.path.join(self.package_folder, "include"), keep_path=False)
 
     def package_info(self):
         self.cpp_info.libs = ["highs"]
