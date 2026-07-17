@@ -23,13 +23,15 @@ The canonical source tarball is the official SourceForge release:
 - Conan 2.x autotools recipe (`conan.tools.gnu.Autotools` / `AutotoolsToolchain`).
 - `config_options`: on OHOS the `shared` option is removed (asymptote is a
   standalone executable, never a shared library).
-- `generate`: `--build=aarch64-unknown-linux-gnu` is appended only for OHOS
+- `generate`: `--build=aarch64-unknown-linux-gnu` is appended for OHOS
   config.guess detection (autotools 项目惯例).
 - Optional dependencies (`ffmpeg`/`gsl`/`opengl`) are disabled via
   `--disable-*` to avoid OHOS platform missing-library build failures.
 - `package_info`: `cpp_info.libs = []` (executable, not a linkable library);
   `bindirs = ["bin"]` exposes the installed `asy` binary.
-- No patches are bundled in this base recipe (`patches: {}`).
+- `001-config-status-readable-temp.patch` changes Autoconf's temporary
+  directory umask from `077` to `022`, matching the repository's established
+  HMDFS workaround so `config.status` can consume its generated files.
 
 ## OHOS Adaptation
 A full HarmonyOS (aarch64) build of asymptote relies on platform availability
@@ -41,6 +43,8 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 2. `--disable-ffmpeg` / `--disable-gsl` / `--disable-opengl`: 关闭鸿蒙平台
    缺失的可选依赖, 仅保留核心 asy 编译器功能.
 3. `config_options`: OHOS 平台删除 `shared` 选项 (asymptote 为可执行工具).
+4. `config.status`: create its temporary directory with HMDFS-compatible mode;
+   `umask 077` causes `subs1.awk: Permission denied` on the OHOS worker.
 
 ## Dependencies
 - Core runtime: libc, libstdc++ (clang/clang++)
@@ -48,10 +52,10 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 
 ## Verification
 The test_package is a Conan L1 smoke test for the packaged `asy` executable.
-It checks that the real artifact exists and is executable, runs `asy --version`,
-accepts only the upstream exit statuses 0 or 1, and requires output identifying
-Asymptote 3.12. Missing artifacts, loader failures, crashes, or unrelated output
-fail the test.
+It builds and runs a consumer that executes `asy --version` through Conan's
+run environment, accepts only the upstream exit statuses 0 or 1, and requires
+output identifying Asymptote 3.12. Missing artifacts, loader failures, crashes,
+or unrelated output fail the test.
 
 ---
 
