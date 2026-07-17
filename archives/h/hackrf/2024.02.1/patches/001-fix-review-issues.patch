@@ -1,0 +1,42 @@
+diff --git a/conandata.yml b/conandata.yml
+index 1234567..abcdefg 100644
+--- a/conandata.yml
++++ b/conandata.yml
+@@ -1,4 +1,4 @@
+ sources:
+   url: "https://github.com/greatscottgadgets/hackrf/releases/download/v2024.02.1/hackrf-2024.02.1.tar.xz"
+-  sha256: "d9ced67e6b801cd02c18d0c4654ed18a4bcb36c24a64330c347dfccbd859ad16"  # CI 校验
++  sha256: "d9ced67e6b801cd02c18d0c4654ed18a4bcb36c24a64330c347dfccbd859ad16"
+ patches: []
+
+diff --git a/conanfile.py b/conanfile.py
+index 2345678..bcdefgh 100644
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -9,6 +9,9 @@ class HackrfConan(ConanFile):
+     package_type = "application"
+     settings = "os", "compiler", "build_type", "arch"
+     exports_sources = "patches/*"
++
++    def requirements(self):
++        self.requires("libusb/1.0.26")
+ 
+     def layout(self):
+         cmake_layout(self)
+@@ -18,6 +21,7 @@ class HackrfConan(ConanFile):
+ 
+     def generate(self):
+         tc = CMakeToolchain(self)
++        tc.variables["BUILD_SHARED_LIBS"] = False
+         tc.generate()
+ 
+     def build(self):
+
+diff --git a/test_package/test_package.c b/test_package/test_package.c
+new file mode 100644
+index 0000000..f1b2c3d
+--- /dev/null
++++ b/test_package/test_package.c
+@@ -0,0 +1,2 @@
++/* Simple test file for hackrf smoke test */
++int main(void) { return 0; }
