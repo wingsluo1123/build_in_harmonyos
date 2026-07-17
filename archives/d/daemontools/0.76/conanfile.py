@@ -73,15 +73,21 @@ class DaemontoolsConan(ConanFile):
         # ELF signing for HarmonyOS (E082)
         import subprocess
         bin_dir = os.path.join(self.package_folder, "bin")
-        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
+        sign_tool = os.environ.get("SIGN_TOOL") or shutil.which("binary-sign-tool")
+        objcopy = os.environ.get("LLVM_OBJCOPY") or shutil.which("llvm-objcopy")
+        if not sign_tool or not objcopy:
+            self.output.warning("SIGN_TOOL or LLVM_OBJCOPY not found, skipping ELF signing")
+            return
         for bin_name in bins:
             bin_path = os.path.join(bin_dir, bin_name)
             if os.path.exists(bin_path):
                 tmp_signed = bin_path + ".signed"
                 # Remove existing .codesign section if present (non-fatal if absent)
-                subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
-                               capture_output=True)
+                result_objcopy = subprocess.run(
+                    [objcopy, "--remove-section", ".codesign", bin_path],
+                    capture_output=True)
+                if result_objcopy.returncode != 0:
+                    self.output.warning(f"objcopy --remove-section failed for {bin_name}: {result_objcopy.stderr}")
                 # Sign the binary for HarmonyOS execution
                 result = subprocess.run(
                     [sign_tool, "sign", "-inFile", bin_path,

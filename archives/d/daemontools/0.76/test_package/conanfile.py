@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """test_package for daemontools — runs test.sh which exercises the tai64n/tai64nlocal/svstat binaries."""
 import os
+import shutil
 
 from conan import ConanFile
 
@@ -15,5 +16,5 @@ class DaemontoolsTestConan(ConanFile):
 
     def test(self):
         # conanrun env puts the package's bin/ on PATH, so binaries resolve.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "bash"
         self.run(f"{bash} test.sh", env="conanrun")

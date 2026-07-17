@@ -4,7 +4,7 @@
 - 构建系统: makefile（DJB 风格，非标准 autotools）
 - 编译日期: 2026-06-11
 - 编译器: clang / clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -13,12 +13,12 @@ daemontools 使用 DJB 风格构建系统，没有标准的 configure/Makefile.a
 1. **init-build**: `ohc-run.py init-build daemontools 0.76 --url=https://cr.yp.to/daemontools/daemontools-0.76.tar.gz` 下载并解压源码
 2. **配置编译器**: 修改 `conf-cc`，将 `gcc` 替换为 `clang -fPIC -O2 -Wimplicit -Wunused -Wcomment -Wchar-subscripts -Wuninitialized -Wshadow -Wcast-qual -Wcast-align -Wwrite-strings`
 3. **配置链接器**: 修改 `conf-ld`，将 `gcc -s` 替换为 `clang`
-4. **配置安装路径**: 创建 `home` 文件，内容为 `/storage/Users/currentUser/usr/local`
+4. **配置安装路径**: 在 conanfile.py 的 build() 方法中动态创建 `home` 文件，内容为 package_folder
 5. **修复 find-systype.sh**: 将脚本中的 `gcc` 替换为 `clang`，使 systype 检测正确
 6. **修复 errno 冲突**: 修改 `error.h`，将 `extern int errno;` 替换为 `#include <errno.h>`
 7. **跳过测试套**: 修改 `Makefile` 的 `rts` 目标，跳过 FIFO/supervise 测试（OpenHarmony 平台限制）
 8. **执行构建**: `make clean && make` — 全部 17 个可执行文件编译成功
-9. **手动安装**: DJB 不支持 `make install DESTDIR=`，使用 `cp` 手动安装到 staging 目录
+9. **手动安装**: DJB 不支持 `make install DESTDIR=`，在 conanfile.py 的 package() 中手动复制二进制到 bin/
 
 ## 遇到的问题与解决方案
 
@@ -27,13 +27,13 @@ daemontools 使用 DJB 风格构建系统，没有标准的 configure/Makefile.a
 | 1 | 链接错误 `undefined symbol: errno` | DJB 代码 `extern int errno;` 与 musl libc errno 宏冲突 | 替换 error.h 中 `extern int errno;` 为 `#include <errno.h>` (补丁 0004) |
 | 2 | 编译器检测失败 | find-systype.sh 中硬编码 `gcc` | 替换脚本中 `gcc` 为 `clang` (补丁 0005) |
 | 3 | 编译器配置不匹配 | conf-cc/conf-ld 中硬编码 `gcc` | 替换为 `clang` 及 clang 选项 (补丁 0002/0003) |
-| 4 | 安装路径未指定 | DJB 通过 `home` 文件读取安装路径 | 创建 home 文件 (补丁 0006) |
+| 4 | 安装路径未指定 | DJB 通过 `home` 文件读取安装路径 | conanfile.py build() 中动态创建 home 文件 |
 | 5 | 测试套挂住 | supervise/svscan 的 FIFO 测试在 OpenHarmony 上无法完成 | 修改 Makefile rts 目标跳过测试 (补丁 0001) |
-| 6 | `make install DESTDIR=` 失败 | DJB 构建系统不支持标准 DESTDIR 安装 | 手动 cp 二进制到 staging 目录 |
+| 6 | `make install DESTDIR=` 失败 | DJB 构建系统不支持标准 DESTDIR 安装 | conanfile.py package() 中手动 cp 二进制到 bin/ |
 
 ## 源码修改
 
-共 6 个补丁文件：
+共 5 个补丁文件（home 文件在 conanfile.py build() 中动态创建，不再使用补丁）：
 
 | 补丁 | 修改文件 | 修改内容 |
 |------|----------|----------|
@@ -42,7 +42,6 @@ daemontools 使用 DJB 风格构建系统，没有标准的 configure/Makefile.a
 | 0003-conf-ld.patch | conf-ld | `gcc -s` → `clang` |
 | 0004-error.h.patch | error.h | `extern int errno;` → `#include <errno.h>` |
 | 0005-find-systype.sh.patch | find-systype.sh | 脚本内 `gcc` → `clang` |
-| 0006-home.patch | home | 新建文件，内容为安装路径 prefix |
 
 ## 依赖版本
 
@@ -85,7 +84,6 @@ $ svstat /nonexistent
 | 0003-conf-ld.patch | ~0.1 | 链接器配置 |
 | 0004-error.h.patch | ~0.3 | errno 修复 |
 | 0005-find-systype.sh.patch | ~1 | systype 检测 |
-| 0006-home.patch | ~0.1 | 安装路径 |
 
 ## 注意事项
 
@@ -96,9 +94,6 @@ $ svstat /nonexistent
 5. 知识图谱条目 E999 记录了 DJB errno 修复模式，适用于所有 DJB 软件（qmail、djbdns、ucspi-tcp 等）
 
 ---
-**编译结束**: 2026-06-11 23:50
-**最终状态**: published
----
-
 **编译结束**: 2026-07-15 16:05
 **最终状态**: built
+---

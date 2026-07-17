@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/opt/ai-worker/repo/archives/d/daemontools/0.76/test_package/deactivate_conanrunenv-release-armv8.sh"
