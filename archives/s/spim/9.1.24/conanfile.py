@@ -62,7 +62,7 @@ class SpimConan(ConanFile):
         # The Makefile references ../CPU/ for core source files.
         # After patching, CXX=clang++ and LDFLAGS include -fuse-ld for GNU ld.
         build_dir = os.path.join(self.source_folder, "spim")
-        self.run(f"make -C {build_dir} -j1 spim")
+        self.run(f"make -C {build_dir} -j1 spim CXX=clang++")
 
         # Sign the ELF binary for HarmonyOS (required for execution)
         spim_bin = os.path.join(build_dir, "spim")
