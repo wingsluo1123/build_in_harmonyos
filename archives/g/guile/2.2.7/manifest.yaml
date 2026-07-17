@@ -1,5 +1,5 @@
 software: guile
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/2.2.7/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -7,7 +7,6 @@ software: guile
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "2.2.7"
 
 # 编译状态
@@ -15,7 +14,7 @@ version: "2.2.7"
 status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
+build_date: "2026-07-17"
 
 # 构建系统类型
 build_system: autotools
@@ -25,43 +24,34 @@ build_system: autotools
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "http://mirrors.tuna.tsinghua.edu.cn/gnu/guile/guile-2.2.7.tar.xz"
+  url: "https://ftp.gnu.org/gnu/guile/guile-2.2.7.tar.xz"
 
-  # 源码校验和
-  sha256: ""
+  sha256: "cdf776ea5f29430b1258209630555beea6d2be5481f9da4d64986b077ff37504"
 
   # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  tar_format: tar.xz
 
 # ============================================================
 # 构建配置
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
 
-  # 配置选项列表
   configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
 
-  # 编译依赖列表（格式: name/version）
+  # Conan 依赖
   dependencies:
     - "gc/8.2.12"
-    - "libunistring/1.4.2"
-    - "gmp/6.3.0"
-    - "libffi/3.4.6"
-    - "libtool/2.4.7"
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
+    - "gmp/6.3.0@ohpcd/stable"
+    - "libffi/3.4.8"
+  # 非 Conan 依赖（已安装到 /usr/local）
+  system_dependencies:
+    - "libunistring/1.4.2 (/usr/local)"
+    - "libltdl/2.4.7 (/usr/local)"
+    - "readline/8.2 (system)"
+    - "gettext/libintl (system)"
 
-  # 编译器
   cc: clang
   cxx: clang++
 
@@ -69,23 +59,26 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied:
   - "0001-build-aux-config.guess.patch"
   - "0002-build-aux-config.sub.patch"
   - "0003-configure.patch"
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+
+# 注意: 0004/0005 补丁是构建过程中自动生成的文档时间戳补丁，
+# 包含环境变量转储，不应作为正式补丁应用。
+# 文档时间戳问题通过 conanfile.py 中的 touch 操作处理。
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "Guile 2.2.x 依赖 libltdl（libtool 的库部分），需确保 /usr/local 在搜索路径中"
+  - "HMDFS 文件系统需修改 umask 077 为 022（configure 和 guile-snarf 两处）"
+  - "Signal 5 (SIGTRAP) 在 .go 编译后崩溃不影响产物，用 make -k 容忍"
+  - "doc/ref/stamp-vti 和 version.texi 需 touch 防止 texinfo 工具重新生成"
+  - "Guile 2.2.7 的库名为 libguile-2.2（非 libguile），pkg-config 名为 guile-2.2"
+  - "头文件无 libguile.h 总头文件，需直接 include libguile/__scm.h 等"
 
 patch_generation:
   method: per-file-difflib
@@ -99,21 +92,23 @@ patch_generation:
 patch_classification:
   - file: 0001-build-aux-config.guess.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: 'applied'
   - file: 0002-build-aux-config.sub.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: 'applied'
   - file: 0003-configure.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: 'applied'
   - file: 0004-doc-ref-stamp-vti.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: 'skipped'
+    note: 'Contains environment dump; handled via touch in conanfile.py'
   - file: 0005-doc-ref-version.texi.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: 'skipped'
+    note: 'Contains environment dump; handled via touch in conanfile.py'
