@@ -4,11 +4,15 @@
 CDO is a command-line tool for processing climate and forecast data.
 Uses autotools build system. config.guess/config.sub are patched
 via conandata patches for HarmonyOS platform recognition (E007).
+
+Upstream 2.4.0 switched to C++20, so the recipe forces a C++20
+compiler mode even when the global CI profile defaults to C++17.
 """
 import os
 import shutil
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.env import Environment
 from conan.tools.files import apply_conandata_patches, get, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -57,6 +61,10 @@ class CdoConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        # Upstream 2.4.0 requires C++20 (see NEWS/configure checks).
+        # CI's shared OHOS profile still defaults to compiler.cppstd=17,
+        # so force the required dialect here to avoid configure failing.
+        tc.extra_cxxflags.append("-std=c++20")
         # R26: Static build for system-name libraries
         tc.configure_args.append("--enable-static")
         tc.configure_args.append("--disable-shared")
@@ -91,6 +99,10 @@ class CdoConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        if can_run(self):
+            autotools.make(target="check")
+        else:
+            self.output.info("Skipping upstream 'make check' while cross-building")
 
     def package(self):
         autotools = Autotools(self)

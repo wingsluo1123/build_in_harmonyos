@@ -22,10 +22,17 @@ build:
   dependencies: []
   cc: clang
   cxx: clang++
+  cxxflags:
+    - "-std=c++20"
 
 patches_applied:
-  - "patch-ohos.sh (inline HarmonyOS patching)"
+  - "patches/0001-config-config.guess.patch"
+  - "patches/0002-config-config.sub.patch"
+  - "patches/0003-libcdi-config-config.guess.patch"
+  - "patches/0004-libcdi-config-config.sub.patch"
 
 knowledge_gained:
   - "E007: config.guess/config.sub 需要打 HarmonyOS 识别补丁"
   - "CDO 使用 autotools 构建，需要 CONFIG_SHELL=/data/service/hnp/bin/bash"
+  - "CDO 2.4.0 上游已切换到 C++20，CI 共享 profile 为 C++17 时需在配方中显式覆盖"
+  - "CI 可运行目标程序时应在 build() 阶段执行 make check，以满足 L1 上游测试验证"
