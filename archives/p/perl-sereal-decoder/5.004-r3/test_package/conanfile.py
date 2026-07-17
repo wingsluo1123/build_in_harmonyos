@@ -8,6 +8,7 @@ the standard approach for Perl XS modules on OHOS.
 """
 import glob
 import os
+import subprocess
 
 from conan import ConanFile
 
@@ -22,44 +23,36 @@ class PerlSerealDecoderTestConan(ConanFile):
         pkg = self.dependencies["perl-sereal-decoder"]
         pkg_folder = pkg.package_folder
 
-        # 1. Verify Decoder.pm exists in package
+        # Run shell test script with package folder as argument
+        # test.sh verifies: Decoder.pm/Constants.pm/Decoder.so existence +
+        # ELF format + .codesign section + module declaration
+        test_script = os.path.join(self.recipe_folder, "test.sh")
+        self.run(f'bash "{test_script}" "{pkg_folder}"', env="conanrun")
+
+        # Additional Python-level verification for critical assertions
         pm_files = glob.glob(os.path.join(pkg_folder, "**", "Decoder.pm"), recursive=True)
         if not pm_files:
-            raise Exception("Decoder.pm not found in package")
+            raise AssertionError("Decoder.pm not found in package")
         self.output.info(f"Decoder.pm found at {pm_files[0]}")
 
-        # 2. Verify Constants.pm exists
         const_files = glob.glob(os.path.join(pkg_folder, "**", "Constants.pm"), recursive=True)
         if not const_files:
-            raise Exception("Constants.pm not found in package")
+            raise AssertionError("Constants.pm not found in package")
         self.output.info(f"Constants.pm found at {const_files[0]}")
 
-        # 3. Verify Decoder.so exists (XS compilation verification)
         so_files = glob.glob(os.path.join(pkg_folder, "**", "Decoder.so"), recursive=True)
         if not so_files:
-            raise Exception("Decoder.so not found in package (XS compilation may have failed)")
+            raise AssertionError("Decoder.so not found in package (XS compilation may have failed)")
         self.output.info(f"Decoder.so found at {so_files[0]}")
 
-        # 4. Verify .so is signed (has .codesign section)
-        # On OHOS, unsigned ELF .so cannot be loaded by musl dynamic linker
-        import subprocess
-        result = subprocess.run(
-            ["llvm-readelf", "-S", so_files[0]],
-            capture_output=True, text=True
-        )
-        if ".codesign" in result.stdout:
-            self.output.info("Decoder.so has .codesign section (ELF signed)")
-        else:
-            self.output.warning("Decoder.so missing .codesign section (may not load on OHOS)")
-
-        # 5. Perl syntax check (does not trigger .so dlopen)
+        # Perl syntax check (does not trigger .so dlopen)
         self.run(f'perl -c "{pm_files[0]}"', env="conanrun")
         self.output.info("Decoder.pm syntax check passed")
 
         self.run(f'perl -c "{const_files[0]}"', env="conanrun")
         self.output.info("Constants.pm syntax check passed")
 
-        # 6. Check file sizes
+        # Check file sizes
         pm_size = os.path.getsize(pm_files[0])
         so_size = os.path.getsize(so_files[0])
         self.output.info(f"Decoder.pm: {pm_size} bytes")

@@ -13,10 +13,11 @@ OHOS adaptations:
 import glob
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class PerlSerealDecoderConan(ConanFile):
@@ -83,12 +84,20 @@ class PerlSerealDecoderConan(ConanFile):
         # Sign ELF .so files for HarmonyOS (P-SIGN-001)
         # musl dynamic linker checks .codesign section; unsigned .so = Permission denied
         for so_file in so_files:
-            # Remove old .codesign section if present (non-fatal if absent)
+            self.output.info(f"Processing ELF signing for {os.path.basename(so_file)}")
+            # Remove old .codesign section if present (non-fatal if section doesn't exist)
+            has_codesign = False
             try:
+                result = subprocess.run(
+                    ["llvm-readelf", "-S", so_file],
+                    capture_output=True, text=True
+                )
+                has_codesign = ".codesign" in result.stdout
+            except (FileNotFoundError, subprocess.CalledProcessError):
+                self.output.warning(f"llvm-readelf failed for {so_file}, skipping codesign check")
+            if has_codesign:
                 self.run(f'llvm-objcopy --remove-section .codesign "{so_file}"',
                          cwd=self.source_folder)
-            except Exception:
-                pass
             # Self-sign the .so for HarmonyOS
             self.run(f'binary-sign-tool sign -inFile "{so_file}" '
                      f'-outFile "{so_file}" -selfSign 1',

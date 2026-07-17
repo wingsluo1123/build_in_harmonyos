@@ -58,12 +58,4 @@ perl -e 'use Sereal::Decoder; my $dec = Sereal::Decoder->new(); my $data = $dec-
 - 详见 `5.004-r3/notes.md` for detailed adaptation notes
 
 ---
-*OpenHarmony 编译归档 · 2026-07-01*
-已集成到 conanfile.py package() 方法
-- test_package 使用文件验证 + 语法检查模式，不做 runtime .so 加载
-- test_package/MANIFEST.yml 已创建, 声明 95 个上游测试 (CI L0e 门禁要求)
-- make -j1 避免 OHOS FIFO 限制 (E074)
-- 详见 `5.004-r3/notes.md` for detailed adaptation notes
-
----
-*OpenHarmony 编译归档 · 2026-06-30*
+*OpenHarmony 编译归档 · 初次编译: 2026-06-30, 更新: 2026-07-01*
