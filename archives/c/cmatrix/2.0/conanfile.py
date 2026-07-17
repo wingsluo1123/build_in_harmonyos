@@ -81,8 +81,10 @@ class CmatrixConan(ConanFile):
                     continue
                 member.name = parts[1]
                 tf.extract(member, ncurses_src, filter="data")
+        ncurses_tmp = os.path.join(ncurses_src, ".tmp")
+        os.makedirs(ncurses_tmp, exist_ok=True)
         self.run(
-            f'cd "{ncurses_src}" && '
+            f'cd "{ncurses_src}" && TMPDIR="{ncurses_tmp}" '
             'CC=/data/service/hnp/bin/clang AR=/data/service/hnp/bin/ar '
             'ARFLAGS=rcs RANLIB=/data/service/hnp/bin/ranlib ./configure '
             f'--prefix="{ncurses_prefix}" --build=aarch64-unknown-linux-musl '
