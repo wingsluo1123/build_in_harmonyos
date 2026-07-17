@@ -48,9 +48,7 @@ Usage: gofumpt [flags] [path ...]
 - 无补丁，Go 项目直接编译
 - CGO_ENABLED=0 确保纯静态编译
 - gofumpt 是纯 Go CLI 工具，无 configure/make
----
-**编译结束**: 2026-07-13 20:49
-**最终状态**: built
+
 ---
 
 **编译结束**: 2026-07-13 20:56

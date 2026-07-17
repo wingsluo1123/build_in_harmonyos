@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/g/gofumpt/0.10.0-r0/test_package/conanrunenv-release-armv8.sh"
