@@ -13,7 +13,7 @@ Classic snake game on the terminal; made with C++ and ncurses.
 - Makefile
 
 ## Dependencies
-- ncurses (bundled in res/ due to CI worker limitations)
+- ncurses/6.4 (Conan dependency, built from source by ncurses recipe)
 
 ## Test Report
 See [3.0.1/reports/test-report.md](3.0.1/reports/test-report.md) for detailed test results.

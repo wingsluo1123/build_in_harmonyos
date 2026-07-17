@@ -2,12 +2,9 @@
 """Conan recipe — nsnake 3.0.1 (ncurses snake game).
 
 nsnake is a classic snake game on the terminal using ncurses. Upstream uses
-a plain Makefile (not autotools). OHOS CI workers ship the ncurses runtime
-library but NOT the development headers, so the ncurses headers and a matching
-static libncurses.a are bundled under res/ (same approach as nudoku / bitwise).
+a plain Makefile (not autotools). ncurses is provided as a Conan dependency.
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -26,34 +23,15 @@ class NsnakeConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Bundle ncurses headers + static lib (res/) — CI workers ship the
-        # ncurses runtime but lack the dev headers/static archive.
-        res_src = os.path.join(self.recipe_folder, "res")
-        if os.path.isdir(res_src):
-            res_dst = os.path.join(self.export_folder, "res")
-            if os.path.exists(res_dst):
-                shutil.rmtree(res_dst)
-            shutil.copytree(res_src, res_dst)
 
     def requirements(self):
-        # ncurses is a system runtime library; headers/lib are bundled
-        # because CI workers lack the dev package.
-        pass
+        self.requires("ncurses/6.4")
 
     def layout(self):
         basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        # Copy bundled ncurses headers/lib from the export folder into the
-        # source folder so build() can reach them.
-        export_dir = getattr(self, "export_folder", None) or os.path.join(os.path.dirname(self.source_folder), "e")
-        res_src = os.path.join(export_dir, "res")
-        if os.path.isdir(res_src):
-            res_dst = os.path.join(self.source_folder, "res")
-            if os.path.exists(res_dst):
-                shutil.rmtree(res_dst)
-            shutil.copytree(res_src, res_dst)
 
     def build(self):
         apply_conandata_patches(self)
@@ -66,23 +44,17 @@ class NsnakeConan(ConanFile):
 
         src = self.source_folder
 
-        # Bundled ncurses (CI workers lack dev headers). Create a symlink
-        # ncurses.h -> curses.h since nsnake uses <ncurses.h>.
-        bundled_inc = os.path.join(src, "res", "headers")
-        bundled_lib = os.path.join(src, "res", "libs")
-        if not os.path.isdir(bundled_inc):
-            raise RuntimeError(f"bundled ncurses headers missing: {bundled_inc}")
+        # Get ncurses dependency info from the Conan dependency
+        dep = self.dependencies["ncurses"]
+        cpp_info = dep.cpp_info
+        ncurses_inc = ":".join(cpp_info.includedirs) if cpp_info.includedirs else os.path.join(dep.package_folder, "include")
+        ncurses_lib = ":".join(cpp_info.libdirs) if cpp_info.libdirs else os.path.join(dep.package_folder, "lib")
+        ncurses_libs = " ".join(f"-l{lib}" for lib in cpp_info.libs)
 
-        ncurses_h = os.path.join(bundled_inc, "ncurses.h")
-        if not os.path.exists(ncurses_h):
-            curses_h = os.path.join(bundled_inc, "curses.h")
-            if os.path.exists(curses_h):
-                # Create a redirect header if ncurses.h doesn't exist
-                with open(ncurses_h, "w") as f:
-                    f.write('#include <curses.h>\n')
-
-        cxxflags = f"-O2 -Wall -Wextra -I{bundled_inc}"
-        ldflags = f"-L{bundled_lib} -lncurses"
+        cxxflags = f"-O2 -Wall -Wextra -I{ncurses_inc}"
+        # Override LDFLAGS entirely (the Makefile's default LDFLAGS has
+        # -lncurses, but the wide-character build produces libncursesw.a).
+        ldflags = f"-L{ncurses_lib} {ncurses_libs}"
 
         # Build with the Makefile
         self.run(
@@ -91,8 +63,8 @@ class NsnakeConan(ConanFile):
         self.run(
             f"make -C {src} -j1 V=1 CC={cc} CXX={cxx} "
             f"CXXFLAGS='{cxxflags}' "
-            f"CFLAGS_PLATFORM='-I{bundled_inc}' "
-            f"LDFLAGS_PLATFORM='{ldflags}' "
+            f"CFLAGS_PLATFORM='-I{ncurses_inc}' "
+            f"LDFLAGS='{ldflags}' "
             f"PREFIX=/usr"
         )
 
