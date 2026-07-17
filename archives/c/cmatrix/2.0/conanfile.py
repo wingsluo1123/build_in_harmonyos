@@ -85,7 +85,8 @@ class CmatrixConan(ConanFile):
             f'cd "{ncurses_src}" && '
             'CC=/data/service/hnp/bin/clang AR=/data/service/hnp/bin/ar '
             'ARFLAGS=rcs RANLIB=/data/service/hnp/bin/ranlib ./configure '
-            f'--prefix="{ncurses_prefix}" --without-shared --without-debug '
+            f'--prefix="{ncurses_prefix}" --build=aarch64-unknown-linux-musl '
+            '--host=aarch64-unknown-linux-musl --without-shared --without-debug '
             '--without-ada --without-cxx --without-cxx-binding --without-manpages '
             '--without-progs --without-tests --disable-db-install --enable-widec'
         )
