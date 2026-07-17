@@ -10,7 +10,7 @@
 
 1. 源码下载: `get()` 从 CPAN 下载 Server-Starter-0.35.tar.gz
 2. 生成 Makefile.PL: 源码仅含 Build.PL (Module::Build)，生成 Makefile.PL 用于 ExtUtils::MakeMaker
-3. 构建: `perl Makefile PL` + `make -j2`
+3. 构建: `perl Makefile.PL` + `make -j2`
 4. 安装: `make install DESTDIR={package_folder}`
 5. 打包: 使用 os.walk + shutil.copy2 将 .pm 文件复制到 lib/perl5/，脚本复制到 bin/
 6. 清理: 删除原始 Perl 安装树 data/ 目录
