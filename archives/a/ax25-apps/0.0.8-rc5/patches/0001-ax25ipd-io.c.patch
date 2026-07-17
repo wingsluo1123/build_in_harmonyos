@@ -1,0 +1,85 @@
+--- a/ax25ipd/io.c
++++ b/ax25ipd/io.c
+@@ -12,34 +12,34 @@
+ #define _XOPEN_SOURCE_EXTENDED
+ 
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <memory.h>
+ #include <netdb.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <syslog.h>
+-#include <termio.h>
++#include <termios.h>
+ #include <time.h>
+ #include <unistd.h>
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+ #include <netinet/in_systm.h>
+ #include <netinet/ip.h>
+ #include <sys/types.h>
+ #include <sys/time.h>
+ #include <sys/socket.h>
+ 
+ #include "ax25ipd.h"
+ 
+-static struct termio nterm;
++static struct termios nterm;
+ 
+ int ttyfd = -1;
+ static int udpsock = -1;
+ static int sock = -1;
+ static struct sockaddr_in udpbind;
+ static struct sockaddr_in to;
+ static struct sockaddr_in from;
+ static socklen_t fromlen;
+ 
+ static time_t last_bc_time;
+@@ -332,21 +332,21 @@
+ 		if (unlockpt(ttyfd) == -1) {
+ 			perror("Cannot unlock pts-device.");
+ 			exit(1);
+ 		}
+ 	}
+ 
+ 	if (ttyfd_bpq) {
+ 		set_bpq_dev_call_and_up(ttydevice);
+ 		goto behind_normal_tty;
+ 	}
+-	if (ioctl(ttyfd, TCGETA, &nterm) < 0) {
++	if (tcgetattr(ttyfd, &nterm) < 0) {
+ 		perror("fetching tty device parameters");
+ 		exit(1);
+ 	}
+ 
+ 	if (ttyspeed == 50)
+ 		baudrate = B50;
+ 	else if (ttyspeed == 50)
+ 		baudrate = B50;
+ 	else if (ttyspeed == 75)
+ 		baudrate = B75;
+@@ -469,21 +469,21 @@
+ 	else
+ 		baudrate = B9600;
+ 
+ 	nterm.c_iflag = 0;
+ 	nterm.c_oflag = 0;
+ 	nterm.c_cflag = baudrate | CS8 | CREAD | CLOCAL;
+ 	nterm.c_lflag = 0;
+ 	nterm.c_cc[VMIN] = 0;
+ 	nterm.c_cc[VTIME] = 0;
+ 
+-	if (ioctl(ttyfd, TCSETA, &nterm) < 0) {
++	if (tcsetattr(ttyfd, TCSANOW, &nterm) < 0) {
+ 		perror("setting tty device parameters");
+ 		exit(1);
+ 	}
+ 
+ 	if (digi)
+ 		send_params();
+ 
+ 	if (i_am_unix98_pty_master) {
+ 		/* Users await the slave pty to be referenced in the last line */
+ 		printf("Awaiting client connects on\n%s\n", namepts);
