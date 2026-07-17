@@ -26,6 +26,8 @@ class Libax25Conan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Copy prebuilt autotools files (CI worker may lack automake/libtoolize)
+        copy(self, "prebuilt.tar.gz", self.recipe_folder, self.export_sources_folder)
 
     def requirements(self):
         self.requires("zlib/1.3.1")
@@ -51,13 +53,28 @@ class Libax25Conan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        # Fix: AutotoolsToolchain may generate invalid "harmonyos" triplet for OHOS
+        # Override with explicit --build and --host to avoid configure error
+        if self.settings.os == "OHOS":
+            arch_map = {"armv8": "aarch64", "x86_64": "x86_64"}
+            arch = arch_map.get(str(self.settings.arch), str(self.settings.arch))
+            triplet = f"{arch}-unknown-linux-ohos"
+            tc.configure_args.append(f"--build={triplet}")
+            tc.configure_args.append(f"--host={triplet}")
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
 
-        # Source tarball has no configure script — generate via autoreconf
-        self.run("autoreconf --install --force", env="conanbuild")
+        # Extract pre-generated autotools files instead of running autoreconf
+        # (CI workers may lack automake/libtoolize)
+        import os
+        prebuilt = os.path.join(self.source_folder, "prebuilt.tar.gz")
+        if os.path.isfile(prebuilt):
+            self.run(f"tar xzf {prebuilt}", env="conanbuild")
+        else:
+            # Fallback: generate configure via autoreconf
+            self.run("autoreconf --install --force", env="conanbuild")
 
         # E165: Fix shebangs for OHOS (no /bin/sh or /bin/bash on OHOS)
         for script in ["configure", "config.status", "libtool",
