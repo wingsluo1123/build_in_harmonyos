@@ -17,6 +17,16 @@ class Gtkspell3Conan(ConanFile):
     url = ""
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": True, "fPIC": True}
+
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
 
     def export_sources(self):
         pass
@@ -38,6 +48,10 @@ class Gtkspell3Conan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+        if self.options.shared:
+            tc.configure_args.append("--disable-static")
+        else:
+            tc.configure_args.append("--disable-shared")
         tc.generate()
 
     def build(self):
