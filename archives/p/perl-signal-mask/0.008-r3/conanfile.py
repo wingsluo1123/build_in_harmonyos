@@ -3,7 +3,7 @@
 
 Pure Perl module — provides easy access to signal masks.
 Build system: ExtUtils::MakeMaker (Makefile.PL).
-Requires: IPC::Signal (installed at system Perl path).
+Bundles IPC::Signal (runtime dependency) for self-contained operation.
 """
 import os
 import glob
@@ -11,46 +11,6 @@ import glob
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
-
-
-def _find_ipc_signal_paths():
-    """Dynamically find Perl lib paths containing IPC/Signal.pm.
-
-    Searches system Perl site_perl, $HOME/usr/local/lib, and /usr/local/lib
-    using glob — no subprocess or perl binary call required.
-    """
-    paths = []
-    seen = set()
-
-    # 1. System Perl site_perl (HNP-managed Perl installation)
-    for p in glob.glob("/data/service/hnp/perl.org/perl_*/lib/site_perl/*/"):
-        ap = os.path.abspath(p)
-        if ap not in seen and os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
-            paths.append(ap)
-            seen.add(ap)
-
-    # 2. $HOME/usr/local/lib paths (user-installed Perl modules)
-    home = os.environ.get("HOME", "")
-    if home:
-        for sub in ["usr/local/lib/perl5", "usr/local/lib/site_perl",
-                     "usr/local/lib/perl5/site_perl/*"]:
-            for p in glob.glob(os.path.join(home, sub)):
-                ap = os.path.abspath(p)
-                if os.path.isdir(ap) and ap not in seen:
-                    if os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
-                        paths.append(ap)
-                        seen.add(ap)
-
-    # 3. /usr/local/lib paths
-    for sub in ["perl5", "site_perl", "perl5/site_perl/*"]:
-        for p in glob.glob(os.path.join("/usr/local/lib", sub)):
-            ap = os.path.abspath(p)
-            if os.path.isdir(ap) and ap not in seen:
-                if os.path.exists(os.path.join(ap, "IPC", "Signal.pm")):
-                    paths.append(ap)
-                    seen.add(ap)
-
-    return paths
 
 
 class PerlSignalMaskConan(ConanFile):
@@ -73,7 +33,13 @@ class PerlSignalMaskConan(ConanFile):
         pass
 
     def source(self):
+        # Download Signal::Mask source
         get(self, **self.conan_data["sources"], strip_root=True)
+
+        # Download IPC::Signal (runtime dependency) to a subdirectory
+        ipc_dir = os.path.join(self.source_folder, "_deps", "ipc-signal")
+        get(self, **self.conan_data["ipc_signal"], strip_root=True,
+            destination=ipc_dir)
 
     def generate(self):
         pass
@@ -96,6 +62,18 @@ class PerlSignalMaskConan(ConanFile):
             raise Exception(f"Package staging lib directory not found: {src_lib}")
         copy(self, "*", src_lib, os.path.join(self.package_folder, "lib"))
 
+        # Bundle IPC::Signal (runtime dependency) into the package
+        ipc_signal_pm = os.path.join(
+            self.source_folder, "_deps", "ipc-signal", "Signal.pm"
+        )
+        if os.path.exists(ipc_signal_pm):
+            ipc_dest = os.path.join(self.package_folder, "lib", "perl5", "IPC")
+            os.makedirs(ipc_dest, exist_ok=True)
+            copy(self, "Signal.pm", src=os.path.dirname(ipc_signal_pm),
+                 dst=ipc_dest)
+        else:
+            raise Exception("IPC::Signal Signal.pm not found in downloaded source")
+
     def package_info(self):
         self.cpp_info.libdirs = ["lib/perl5"]
         self.cpp_info.libs = []
@@ -108,6 +86,3 @@ class PerlSignalMaskConan(ConanFile):
         base_perl = os.path.join(self.package_folder, "lib", "perl5")
         if os.path.isdir(base_perl):
             self.runenv_info.append_path("PERL5LIB", base_perl)
-
-        for ipc_path in _find_ipc_signal_paths():
-            self.runenv_info.append_path("PERL5LIB", ipc_path)
