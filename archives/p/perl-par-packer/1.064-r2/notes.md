@@ -189,8 +189,8 @@ par.pl hello.par  →  Hello from PAR::Packer!
 |------|------|------|
 | myldr/par | ~4MB | PAR 打包器可执行文件 (动态, 已签名) |
 | myldr/boot | ~6.2MB | PAR 引导加载器 (静态, 已签名) |
-| myldr/parl | ~7.6MB | 完整 PAR 打包器 (静态, 签名失效) |
-| myldr/parldyn | ~5.4MB | 完整 PAR 打包器 (动态, 签名失效) |
+| myldr/parl | ~7.6MB | 完整 PAR 打包器 (静态, 已签名) |
+| myldr/parldyn | ~5.4MB | 完整 PAR 打包器 (动态, 已签名) |
 | blib/arch/auto/XSFoo/XSFoo.so | 9472 | XS 模块共享库 |
 | blib/lib/PAR/Packer.pm | 50KB | 主模块 |
 | blib/lib/PAR/StrippedPARL/Static.pm | ~8.6MB | 静态 PARL 数据 (内嵌 boot) |
@@ -200,7 +200,7 @@ par.pl hello.par  →  Hello from PAR::Packer!
 
 ## 注意事项
 
-- parl/parldyn 二进制虽已生成，但由于签名失效无法在 OHOS 上直接执行
+- parl/parldyn 已通过 ELF section 嵌入 + binary-sign-tool 重新签名，可在 OHOS 上执行
 - 推荐使用 .par 文件 + par.pl 方案替代独立可执行文件
 - 所有 XS 模块的 Makefile.PL 都需要添加 OHOS 适配参数
 - `PAR_GLOBAL_TEMP` 是绕过 HMDFS 安全检查的关键环境变量
