@@ -21,8 +21,8 @@
 - 4 个已知问题已通过补丁解决
 
 ## 补丁
-1. **0001-version.sh.patch**: bash 路径修复（#!/bin/bash → #!/usr/bin/env bash）
-2. **0002-src-CMakeLists.txt.patch**: CMake SOVERSION 空值处理（设置默认值 "22"）
+1. **0001-CMakeLists.txt.patch**: CMake UNIX 检测（为 HarmonyOS 设置 UNIX 标志，使 version.sh 正常执行获取 SOVERSION）
+2. **0002-version.sh.patch**: bash 路径修复（#!/bin/bash → #!/usr/bin/env bash）
 
 ## Conan 配方要点
 - 依赖: jansson/2.15.0, snappy/1.2.2, xz/5.6.2, zlib/1.3.1

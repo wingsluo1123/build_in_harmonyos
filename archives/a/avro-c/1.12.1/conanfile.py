@@ -5,8 +5,6 @@ Apache Avro C library — data serialization system with codec support
 (deflate, snappy, lzma). Produces libavro + command-line tools
 (avroappend, avrocat, avromod, avropipe).
 """
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -40,7 +38,7 @@ class AvroCConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # snappy is a C++ library; linking to C project needs -lc++
-        tc.variables["CMAKE_EXE_LINKER_FLAGS"] = "-lc++"
+        tc.variables["CMAKE_EXE_LINKER_FLAGS"] = (tc.variables.get("CMAKE_EXE_LINKER_FLAGS", "") + " -lc++").strip()
         tc.generate()
 
     def build(self):

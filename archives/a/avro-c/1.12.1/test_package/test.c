@@ -42,7 +42,6 @@ int main(void) {
     }
 
     /* 3. Set field values */
-    avro_value_t field;
     avro_value_t name_val;
 
     if (avro_value_get_by_name(&record, "name", &name_val, NULL) != 0) {
@@ -53,12 +52,29 @@ int main(void) {
         return 1;
     }
 
-    avro_wrapped_buffer_t buf = avro_wrapped_buffer_new("jansson-test", strlen("jansson-test") + 1);
-    avro_value_set_bytes(&name_val, &buf);
+    if (avro_value_set_string(&name_val, "jansson-test") != 0) {
+        fprintf(stderr, "FAIL: set field 'name': %s\n", avro_strerror());
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        return 1;
+    }
 
     avro_value_t age_val;
-    avro_value_get_by_name(&record, "age", &age_val, NULL);
-    avro_value_set_int(&age_val, 42);
+    if (avro_value_get_by_name(&record, "age", &age_val, NULL) != 0) {
+        fprintf(stderr, "FAIL: get field 'age': %s\n", avro_strerror());
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        return 1;
+    }
+    if (avro_value_set_int(&age_val, 42) != 0) {
+        fprintf(stderr, "FAIL: set field 'age': %s\n", avro_strerror());
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        return 1;
+    }
 
     /* 4. Serialize to memory */
     avro_writer_t writer = avro_memory_writer(NULL, 0);
@@ -81,13 +97,29 @@ int main(void) {
 
     /* 5. Read back and verify */
     void *data;
-        int64_t data_len;
+    int64_t data_len;
     avro_memory_writer_get_buf(writer, &data, &data_len);
 
     avro_reader_t reader = avro_memory_reader(data, data_len);
+    if (!reader) {
+        fprintf(stderr, "FAIL: avro_memory_reader: %s\n", avro_strerror());
+        avro_writer_free(writer);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        return 1;
+    }
 
     avro_value_t record2;
-    avro_generic_value_new(iface, &record2);
+    if (avro_generic_value_new(iface, &record2) != 0) {
+        fprintf(stderr, "FAIL: avro_generic_value_new (record2): %s\n", avro_strerror());
+        avro_reader_free(reader);
+        avro_writer_free(writer);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        return 1;
+    }
     if (avro_value_read(reader, &record2) != 0) {
         fprintf(stderr, "FAIL: avro_value_read: %s\n", avro_strerror());
         avro_reader_free(reader);
@@ -99,12 +131,65 @@ int main(void) {
         return 1;
     }
 
-    int32_t age_out;
-    avro_value_get_by_name(&record2, "age", &age_val, NULL);
-    avro_value_get_int(&age_val, &age_out);
+    /* 6. Verify field values */
+    int32_t age_out = 0;
+    if (avro_value_get_by_name(&record2, "age", &age_val, NULL) != 0) {
+        fprintf(stderr, "FAIL: get field 'age' from record2: %s\n", avro_strerror());
+        avro_reader_free(reader);
+        avro_generic_value_free(iface, &record2);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        avro_writer_free(writer);
+        return 1;
+    }
+    if (avro_value_get_int(&age_val, &age_out) != 0) {
+        fprintf(stderr, "FAIL: get int from age_val: %s\n", avro_strerror());
+        avro_reader_free(reader);
+        avro_generic_value_free(iface, &record2);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        avro_writer_free(writer);
+        return 1;
+    }
+
+    const char *name_out = NULL;
+    size_t name_len = 0;
+    if (avro_value_get_by_name(&record2, "name", &name_val, NULL) != 0) {
+        fprintf(stderr, "FAIL: get field 'name' from record2: %s\n", avro_strerror());
+        avro_reader_free(reader);
+        avro_generic_value_free(iface, &record2);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        avro_writer_free(writer);
+        return 1;
+    }
+    if (avro_value_get_string(&name_val, &name_out, &name_len) != 0) {
+        fprintf(stderr, "FAIL: get string from name_val: %s\n", avro_strerror());
+        avro_reader_free(reader);
+        avro_generic_value_free(iface, &record2);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        avro_writer_free(writer);
+        return 1;
+    }
 
     if (age_out != 42) {
         fprintf(stderr, "FAIL: age mismatch (got %d, expected 42)\n", age_out);
+        avro_reader_free(reader);
+        avro_generic_value_free(iface, &record2);
+        avro_generic_value_free(iface, &record);
+        avro_value_iface_decref(iface);
+        avro_schema_decref(schema);
+        avro_writer_free(writer);
+        return 1;
+    }
+
+    if (strncmp(name_out, "jansson-test", 12) != 0) {
+        fprintf(stderr, "FAIL: name mismatch (got %.*s, expected 'jansson-test')\n", (int)name_len, name_out);
         avro_reader_free(reader);
         avro_generic_value_free(iface, &record2);
         avro_generic_value_free(iface, &record);
