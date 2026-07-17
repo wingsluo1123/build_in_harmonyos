@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Conan recipe — curlpp 0.8.1 (CMake)"""
+"""Conan recipe — curlpp 0.8.1 (CMake)
+
+Uses system curl (pre-installed via cmd-pkgs). The curl installation path
+is passed via DEFAULT_PREFIX environment variable or user.curl:prefix conf.
+"""
 
 import os
 
@@ -22,8 +26,6 @@ class CurlppConan(ConanFile):
     options = {"shared": [True, False]}
     default_options = {"shared": False}
 
-    exports = "sources/curlpp-0.8.1.tar.gz"
-
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -31,29 +33,12 @@ class CurlppConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        # CI Worker 网络受限，优先使用配方内嵌源码
-        from conan.tools.files import unzip, check_sha256
-        sha = self.conan_data["sources"]["sha256"]
-        local_tarball = os.path.join(self.recipe_folder, "sources", "curlpp-0.8.1.tar.gz")
-        if os.path.isfile(local_tarball):
-            check_sha256(self, local_tarball, sha)
-            unzip(self, local_tarball, strip_root=True)
-            return
-        # 回退: 检查 DOWNLOAD_CACHE 预缓存
-        cache_dir = os.environ.get("DOWNLOAD_CACHE", "")
-        if cache_dir:
-            staged = os.path.join(cache_dir, "curlpp-0.8.1.tar.gz")
-            if os.path.isfile(staged):
-                check_sha256(self, staged, sha)
-                unzip(self, staged, strip_root=True)
-                return
-        # 最终回退: 在线下载
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
-        # curl 通过系统 cmd-pkgs 安装，通过 Conan conf 或 DEFAULT_PREFIX 环境变量定位
+        # curl is system-preinstalled; locate via Conan conf or DEFAULT_PREFIX env
         curl_prefix = self.conf.get("user.curl:prefix", default="", check_type=str)
         if not curl_prefix:
             curl_prefix = os.environ.get("DEFAULT_PREFIX", "")
