@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: AtomCode <noreply@atomgit.com>
+Date: 2026-07-15 16:00:00 +0000
+Subject: [PATCH] fix setup.py: remove pkg_resources dependency, hardcode pillow
+
+pkg_resources is not available in the pip build environment on OHOS.
+Hardcode pillow as the dependency instead of dynamically checking for
+pillow-simd.
+
+diff --git a/setup.py b/setup.py
+index 6d92b58..e3a0b47 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1,21 +1,10 @@
+ #!/usr/bin/env python3
+ 
+ import re
+-import os.path
+-import shutil
+-import sys
+ 
+ from setuptools import setup, find_packages
+-from pkg_resources import get_distribution, DistributionNotFound
+ 
+-def get_dist(pkgname):
+-    try:
+-        return get_distribution(pkgname)
+-    except DistributionNotFound:
+-        return None
+ 
+-if os.path.isfile('imgp'):
+-    shutil.copyfile('imgp', 'imgp.py')
+ 
+ with open('imgp.py', encoding='utf-8') as f:
+     version = re.search('_VERSION_ = \'([^\']+)\'', f.read()).group(1)
+@@ -23,7 +12,7 @@ with open('imgp.py', encoding='utf-8') as f:
+ with open('README.md', encoding='utf-8') as f:
+     long_description = f.read()
+ 
+-requirements = ['pillow-simd' if get_dist('pillow-simd') is not None else 'pillow']
++requirements = ['pillow']
+ 
+ setup(
+     name='imgp',
+-- 
+2.30.0
