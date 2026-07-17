@@ -29,6 +29,7 @@ class IgraphConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.variables["IGRAPH_VERSION"] = "1.0.0"
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         tc.variables["IGRAPH_USE_INTERNAL_ARPACK"] = "ON"
         tc.variables["IGRAPH_USE_INTERNAL_BLAS"] = "ON"
