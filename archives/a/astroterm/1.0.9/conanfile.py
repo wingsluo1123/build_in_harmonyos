@@ -51,26 +51,6 @@ class AstrotermConan(ConanFile):
         tc = MesonToolchain(self)
         # R26: Terminal tools must be statically linked
         tc.project_options["default_library"] = "static"
-        # Inject ar/ranlib paths (CI profile may not provide them)
-        ce = self.conf.get(
-            "tools.build:compiler_executables", default={}, check_type=dict
-        ) or {}
-        ar = ce.get("ar")
-        ranlib = ce.get("ranlib")
-        if not ar:
-            cc = ce.get("c") or ""
-            bindir = os.path.dirname(cc) if os.path.sep in cc else ""
-            if bindir:
-                cand = os.path.join(bindir, "llvm-ar")
-                if os.path.isfile(cand):
-                    ar = cand
-                    rlc = os.path.join(bindir, "llvm-ranlib")
-                    if os.path.isfile(rlc):
-                        ranlib = rlc
-        if ar:
-            tc.project_options["ar"] = ar
-        if ranlib:
-            tc.project_options["ranlib"] = ranlib
         tc.generate()
 
     def build(self):
