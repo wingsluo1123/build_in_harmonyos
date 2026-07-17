@@ -128,7 +128,7 @@ Cflags: -I${{includedir}}
                 'set(HIDAPI_WITH_LIBUSB OFF)')
 
         cmake = CMake(self)
-        cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
+        cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5", "-DCMAKE_C_FLAGS=-Wno-error=implicit-function-declaration -Wno-error=int-conversion"])
         cmake.build()
 
     def package(self):
