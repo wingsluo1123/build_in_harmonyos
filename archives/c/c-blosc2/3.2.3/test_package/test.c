@@ -33,17 +33,17 @@ int main(void) {
     }
 
     dsize = blosc1_decompress(data_out, data_dest, sizeof(data_dest));
-    if (dsize < 0) {
-        printf("Decompression error. Error code: %d\n", dsize);
+    if (dsize != isize) {
+        printf("Decompression size mismatch. Expected: %d, actual: %d\n", isize, dsize);
         blosc2_destroy();
-        return dsize;
+        return 1;
     }
 
     for (i = 0; i < SIZE; i++) {
         if (data[i] != data_dest[i]) {
             printf("Decompressed data differs from original!\n");
             blosc2_destroy();
-            return -1;
+            return 1;
         }
     }
 

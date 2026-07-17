@@ -39,6 +39,8 @@ class CBlosc2Conan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
+        tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(self.options.get_safe("fPIC", True))
         tc.variables["BUILD_TESTS"] = False
         tc.variables["BUILD_FUZZERS"] = False
         tc.variables["BUILD_BENCHMARKS"] = False
@@ -47,7 +49,7 @@ class CBlosc2Conan(ConanFile):
         tc.variables["PREFER_EXTERNAL_LZ4"] = True
         tc.variables["PREFER_EXTERNAL_ZLIB"] = True
         tc.variables["PREFER_EXTERNAL_ZSTD"] = True
-        if self.settings.os in ("Linux", "OHOS"):
+        if self.settings.os == "OHOS":
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 

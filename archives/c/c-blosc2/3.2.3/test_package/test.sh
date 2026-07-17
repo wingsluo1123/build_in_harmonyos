@@ -13,4 +13,7 @@ test -f "$TEST_BIN"
 if [ -x "$TEST_BIN" ]; then
     output=$("$TEST_BIN")
     echo "$output" | grep -q "Successful roundtrip!"
+else
+    echo "ERROR: $TEST_BIN is not executable" >&2
+    exit 1
 fi
