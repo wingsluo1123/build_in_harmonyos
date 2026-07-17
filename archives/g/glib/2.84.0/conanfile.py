@@ -32,9 +32,8 @@ class GlibConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # R27: Dependencies must reference @ohpcd/stable
-        self.requires("libffi/3.4.4@ohpcd/stable")
-        self.requires("pcre2/10.40@ohpcd/stable")
+        self.requires("libffi/3.4.4")
+        self.requires("pcre2/10.40")
         # zlib is system pre-installed
         # gettext (intl) is provided by musl libc on OHOS
 
