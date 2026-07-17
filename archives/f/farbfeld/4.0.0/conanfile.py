@@ -19,7 +19,6 @@ class FarbfeldConan(ConanFile):
     description = "Suckless lossless image format with 16-bit RGBA pixel data and conversion tools"
     license = "ISC"
     homepage = "https://tools.suckless.org/farbfeld/"
-    url = "https://dl.suckless.org/farbfeld/farbfeld-4.tar.gz"
 
     package_type = "application"
 

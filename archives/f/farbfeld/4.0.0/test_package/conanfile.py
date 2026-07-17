@@ -2,38 +2,39 @@
 """Conan test_package for farbfeld — verifies the command-line tools work.
 
 Tests:
-  1. Generate a minimal 1x1 farbfeld image
+  1. Build test_farbfeld helper (CMake) to generate a minimal 1x1 farbfeld image
   2. Pipe it to ff2ppm (farbfeld → PPM conversion)
   3. Verify the PPM output has correct header and pixel data
   4. Also test ff2pam (farbfeld → PAM, no external deps)
 """
 import os
-import struct
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class FarbfeldTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeToolchain", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
-        # Generate a minimal 1x1 farbfeld image:
-        # magic "farbfeld" (8 bytes) + width (4B BE) + height (4B BE) + pixel (8B RGBA 16-bit)
-        farbfeld_data = b"farbfeld"
-        farbfeld_data += struct.pack(">II", 1, 1)  # width=1, height=1
-        # Pixel: R=0, G=0, B=0, A=65535 (each 2 bytes big-endian)
-        farbfeld_data += struct.pack(">HHHH", 0, 0, 0, 65535)
-
-        # Write to temp file
+        # Use the compiled test_farbfeld helper to generate a farbfeld image
+        test_farbfeld = os.path.join(self.build_folder, "test_farbfeld")
         ff_input = os.path.join(self.build_folder, "test.ff")
-        with open(ff_input, "wb") as f:
-            f.write(farbfeld_data)
+        self.run(f"{test_farbfeld} > {ff_input}")
 
-        # Run ff2ppm to convert farbfeld → PPM (uses conanrun env for PATH/LD_LIBRARY_PATH)
+        # Run ff2ppm to convert farbfeld → PPM
         ppm_output = os.path.join(self.build_folder, "test.ppm")
         self.run(f"ff2ppm < {ff_input} > {ppm_output}", env="conanrun")
 
@@ -45,7 +46,6 @@ class FarbfeldTestConan(ConanFile):
         assert ppm_data[:3] == b"P6\n", f"Expected PPM magic 'P6\\n', got {ppm_data[:3]}"
         assert b"1 1\n" in ppm_data[:15], "Expected dimensions '1 1' in PPM header"
         assert b"255\n" in ppm_data[:20], "Expected max value '255' in PPM header"
-        # Pixel data should be 3 bytes (RGB for P6 format)
         pixel_start = ppm_data.rfind(b"255\n") + 4
         pixel_data = ppm_data[pixel_start:]
         assert len(pixel_data) == 3, f"Expected 3 bytes of pixel data, got {len(pixel_data)}"
