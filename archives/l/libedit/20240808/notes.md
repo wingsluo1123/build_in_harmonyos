@@ -67,3 +67,7 @@ ls $HOME/usr/local/include/histedit.h
 - libedit 不是系统同名库，默认动态链接，不需要 R26 静态隔离
 - 补丁 0001-aclocal.m4.patch 较大（9132行），为整体替换 aclocal.m4 生成文件
 ---
+---
+
+**编译结束**: 2026-07-17 18:59
+**最终状态**: built
