@@ -1,7 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain
-from conan.tools.files import apply_conandata_patches, copy, get
-import os
+from conan.tools.files import apply_conandata_patches, get
 
 class HiGHSConan(ConanFile):
     name = "highs"
@@ -15,6 +14,7 @@ class HiGHSConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
     generators = "CMakeToolchain"
+    exports_sources = "patches/*"
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -28,10 +28,6 @@ class HiGHSConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        include_dir = os.path.join(self.source_folder, "src")
-        if os.path.exists(include_dir):
-            copy(self, "*.h", src=include_dir, dst=os.path.join(self.package_folder, "include"))
-            copy(self, "*.hpp", src=include_dir, dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["highs"]
