@@ -52,6 +52,37 @@ class AstrotermConan(ConanFile):
         # R26: Terminal tools must be statically linked
         tc.project_options["default_library"] = "static"
         tc.generate()
+        self._inject_meson_archiver()
+
+    def _inject_meson_archiver(self):
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        ar = executables.get("ar")
+        ranlib = executables.get("ranlib")
+        if not ar:
+            compiler = executables.get("cpp") or executables.get("c") or ""
+            bindir = os.path.dirname(compiler)
+            candidate = os.path.join(bindir, "llvm-ar") if bindir else ""
+            if candidate and os.path.isfile(candidate):
+                ar = candidate
+                candidate_ranlib = os.path.join(bindir, "llvm-ranlib")
+                if os.path.isfile(candidate_ranlib):
+                    ranlib = candidate_ranlib
+        native_file = os.path.join(
+            self.generators_folder, "conan_meson_native.ini"
+        )
+        if not ar or not os.path.isfile(native_file):
+            return
+        with open(native_file, encoding="utf-8") as handle:
+            content = handle.read()
+        if "\nar =" in content or "[binaries]" not in content:
+            return
+        binaries = "[binaries]\nar = '%s'\n" % ar
+        if ranlib:
+            binaries += "ranlib = '%s'\n" % ranlib
+        with open(native_file, "w", encoding="utf-8") as handle:
+            handle.write(content.replace("[binaries]\n", binaries, 1))
 
     def build(self):
         # Patch 1: Add stddef.h before string.h to fix size_t not found on OHOS
