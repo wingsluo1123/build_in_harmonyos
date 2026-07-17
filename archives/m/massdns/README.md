@@ -26,4 +26,3 @@ massdns -r resolvers.txt domains.txt -o S -w results.txt
 ## Links
 
 - GitHub: https://github.com/blechschmidt/massdns
-- Savannah: https://download.savannah.nongnu.org/releases/massdns/

@@ -55,6 +55,15 @@ Usage: ./bin/massdns [options] [domainlist]
 - src/main.c:987: warning: incompatible pointer types (sockaddr_in6 vs sockaddr)
 - src/main.c:1616: warning: variable 'rec_index' set but not used
 
+## 二次校准 (2026-07-17)
+
+| # | 问题 | 根因 | 解决方案 |
+|---|------|------|----------|
+| 5 | R33: build() 依赖裸 $(CC) | Makefile 用 $(CC) 但未从 Conan profile 传入 | 添加 _compiler_c() + generate() + 显式传 CC |
+| 6 | R32: 缺少 validate() | 未检查平台兼容性 | 添加 validate() 检查 Linux/OHOS |
+| 7 | test.sh set -eu 命令替换缺陷 | `OUTPUT=$(cmd)` 失败时 set -e 直接退出 | 改用 `|| true` + grep 检查 |
+| 8 | README 无效 Savannah 链接 | massdns 不在 Savannah | 移除无效链接 |
+
 ## 注意事项
 
 1. massdns 是高性能 DNS stub resolver，用于批量域名解析

@@ -8,6 +8,8 @@ built with a plain Makefile (no configure script).
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import Environment
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -30,18 +32,38 @@ class MassdnsConan(ConanFile):
     def requirements(self):
         pass
 
+    def validate(self):
+        # R32: OHOS must be matched alongside Linux
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(
+                f"massdns supports Linux/OHOS only, got {self.settings.os}"
+            )
+
     def layout(self):
         basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _compiler_c(self):
+        # R33: take the compiler from the Conan profile, never from ${CC}.
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        )
+        return executables.get("c") or "clang"
+
+    def generate(self):
+        env = Environment()
+        env.define("CC", self._compiler_c())
+        env.vars(self).save_script("conanbuild_cc")
+
     def build(self):
         apply_conandata_patches(self)
-        # The Makefile uses $(CC), $(CFLAGS) etc. from the environment.
-        # Conan's profile sets these via generated env files (conanbuild.sh).
-        # R9: Always use -j1
-        self.run(f"make -C {self.source_folder} -j1")
+        # R33: pass CC explicitly from Conan profile to avoid relying on
+        # bare shell variables that may be empty on release workers.
+        cc = self._compiler_c()
+        # R9: Always use -j1 (HMDFS does not support mkfifo)
+        self.run(f'make -C {self.source_folder} CC="{cc}" -j1')
 
     def package(self):
         # massdns produces a single binary in {source_folder}/bin/

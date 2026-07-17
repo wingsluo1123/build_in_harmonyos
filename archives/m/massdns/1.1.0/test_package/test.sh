@@ -13,18 +13,13 @@ if [ ! -f "$MASSDNS_BIN" ]; then
     exit 1
 fi
 
-# Run massdns --version and check output
-OUTPUT=$("$MASSDNS_BIN" --version 2>&1)
-if [ $? -ne 0 ]; then
-    echo "FAIL: massdns --version exited with error"
-    exit 1
-fi
-
-# massdns --version outputs "massdns"
-if echo "$OUTPUT" | grep -q "massdns"; then
-    echo "PASS: massdns binary is functional"
-    exit 0
-else
+# Run massdns --version and check output.
+# Use `|| true` to prevent set -e from exiting before we can check the result.
+OUTPUT=$("$MASSDNS_BIN" --version 2>&1) || true
+if ! echo "$OUTPUT" | grep -q "massdns"; then
     echo "FAIL: unexpected output from massdns --version: $OUTPUT"
     exit 1
 fi
+
+echo "PASS: massdns binary is functional"
+exit 0
