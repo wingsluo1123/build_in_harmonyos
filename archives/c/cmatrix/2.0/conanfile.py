@@ -5,13 +5,16 @@ Build system: CMake.
 This recipe uses the community fork abishekvashok/cmatrix (v2.0 tag)
 because the official upstream bisqwit/cmatrix did not publish a v2.0 release.
 
-Note: ncurses is used via system library (not a Conan dependency),
-because ncurses is not yet published as a Conan package on the remote.
+Note: ncurses is built from the bundled official 6.4 source archive because
+it is not yet published as a Conan package on the remote and CI workers do not
+consistently provide its development files.
 """
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 import os
+import shutil
+import tarfile
 
 
 class CmatrixConan(ConanFile):
@@ -57,27 +60,47 @@ class CmatrixConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # CMake >= 3.5 removed compatibility with cmake_minimum_required(VERSION 2.8)
         tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
-        # Add source dir for the ncurses.h wrapper. CI publishes system
-        # dependencies under /storage/.../usr/local; the local builder keeps
-        # its ncurses staging tree under /root/sysnc.
-        include_dirs = [self.source_folder, os.path.join(self.source_folder, "compat")]
-        library_dirs = []
-        for prefix in ("/storage/Users/currentUser/usr/local", "/root/sysnc"):
-            include_dir = os.path.join(prefix, "include")
-            library_dir = os.path.join(prefix, "lib")
-            if os.path.isdir(include_dir):
-                include_dirs.append(include_dir)
-            if os.path.isdir(library_dir):
-                library_dirs.append(library_dir)
-        tc.variables["CMAKE_C_STANDARD_INCLUDE_DIRECTORIES"] = ";".join(include_dirs)
-        tc.variables["CMAKE_LIBRARY_PATH"] = ";".join(library_dirs)
+        tc.variables["CMAKE_C_STANDARD_INCLUDE_DIRECTORIES"] = ";".join(
+            [self.source_folder, os.path.join(self.source_folder, "compat")]
+        )
+        tc.variables["CMAKE_LIBRARY_PATH"] = os.path.join(self.build_folder, "ncurses", "lib")
         tc.variables["CMAKE_FIND_ROOT_PATH_MODE_INCLUDE"] = "BOTH"
         tc.variables["CMAKE_FIND_ROOT_PATH_MODE_LIBRARY"] = "BOTH"
         tc.generate()
 
+    def _build_ncurses(self):
+        archive = os.path.join(self.source_folder, "compat", "ncurses-6.4.tar.gz")
+        ncurses_src = os.path.join(self.build_folder, "ncurses-src")
+        ncurses_prefix = os.path.join(self.build_folder, "ncurses")
+        os.makedirs(ncurses_src, exist_ok=True)
+        with tarfile.open(archive, "r:gz") as tf:
+            for member in tf.getmembers():
+                parts = member.name.split("/", 1)
+                if len(parts) != 2 or not parts[1]:
+                    continue
+                member.name = parts[1]
+                tf.extract(member, ncurses_src, filter="data")
+        self.run(
+            f'cd "{ncurses_src}" && '
+            'CC=/data/service/hnp/bin/clang AR=/data/service/hnp/bin/ar '
+            'ARFLAGS=rcs RANLIB=/data/service/hnp/bin/ranlib ./configure '
+            f'--prefix="{ncurses_prefix}" --without-shared --without-debug '
+            '--without-ada --without-cxx --without-cxx-binding --without-manpages '
+            '--without-progs --without-tests --disable-db-install --enable-widec'
+        )
+        self.run(
+            f'cd "{ncurses_src}" && '
+            'for f in ncurses/Makefile panel/Makefile menu/Makefile form/Makefile; do '
+            'test ! -f "$f" || sed -i "s/^ARFLAGS[[:space:]]*=.*/ARFLAGS = rcs/" "$f"; '
+            'done && make -j1 libs'
+        )
+        lib_dir = os.path.join(ncurses_prefix, "lib")
+        os.makedirs(lib_dir, exist_ok=True)
+        shutil.copy2(os.path.join(ncurses_src, "lib", "libncursesw.a"), lib_dir)
+
     def build(self):
+        self._build_ncurses()
         apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
