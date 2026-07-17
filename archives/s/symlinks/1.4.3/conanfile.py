@@ -40,10 +40,9 @@ class SymlinksConan(ConanFile):
         cc = cc_info.get("c", "clang") if cc_info else "clang"
 
         # Run the dummy configure script (created by patch)
-        config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         configure_path = os.path.join(self.source_folder, "configure")
         if os.path.exists(configure_path):
-            self.run(f"{config_shell} {configure_path} --prefix={self.package_folder}")
+            self.run(f"sh {configure_path} --prefix={self.package_folder}")
 
         # R9: Always use -j1
         self.run(f"make CC={cc} -j1", cwd=self.source_folder)
