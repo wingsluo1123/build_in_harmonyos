@@ -27,6 +27,7 @@ class HydraConan(ConanFile):
         tc.generate()
 
     def build(self):
+        self.run("autoreconf -fi", env="conanbuild")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
