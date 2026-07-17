@@ -42,8 +42,11 @@ class ImgpConan(ConanFile):
         # Change to the source directory since pip needs to find setup.py
         src_dir = self.source_folder
 
-        # Install setuptools (needed by setup.py) and pillow (pre-built wheel for OHOS)
-        self.run(f"{python} -m pip install setuptools pillow", env="conanrun")
+        # Install pillow (pre-built wheel for OHOS) and ensure setuptools
+        # Try to install setuptools first; if the pip index doesn't have it,
+        # it may already be available in the system Python environment
+        self.run(f"{python} -m pip install setuptools pillow 2>/dev/null || "
+                 f"{python} -m pip install pillow", env="conanrun")
         # Install imgp from source directory (pillow already installed)
         # Use --no-build-isolation to reuse the already-installed setuptools
         # (pip install . creates a fresh isolated build env by default, which
