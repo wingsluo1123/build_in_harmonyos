@@ -43,13 +43,10 @@ class FairymaxConan(ConanFile):
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
         cc = compilers.get("c", "clang")
 
-        # FAIRYDIR is compiled into the binary — set prefix to package_folder
-        # so the binary knows where to find its data files at runtime.
-        prefix = self.package_folder
         cflags = "-fPIC -O2"
 
         self.run(
-            f'make CC="{cc}" CFLAGS="{cflags}" prefix="{prefix}" '
+            f'make CC="{cc}" CFLAGS="{cflags}" '
             f'-j1 fairymax shamax maxqi fairymax.6.gz',
             cwd=self.source_folder,
             env=["conanbuild"],
@@ -76,3 +73,7 @@ class FairymaxConan(ConanFile):
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.resdirs = ["share"]
+        # Set FAIRYDIR at runtime so the binary can locate its data files
+        # within the Conan package folder (avoids hardcoding path at compile time).
+        self.runenv_info.define("FAIRYDIR",
+                                os.path.join(self.package_folder, "share/games/fairymax"))

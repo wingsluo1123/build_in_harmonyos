@@ -1,4 +1,4 @@
-script_folder="/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/f/fairymax/5.0b/test_package"
+script_folder="/storage/Users/currentUser/opt/ai-worker/repo/archives/f/fairymax/5.0b/test_package"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanbuildenv-release-armv8.sh"
 for v in SHELL CONFIG_SHELL
 do

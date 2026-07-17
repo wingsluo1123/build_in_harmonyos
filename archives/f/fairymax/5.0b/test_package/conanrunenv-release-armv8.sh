@@ -1,6 +1,6 @@
-script_folder="/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/f/fairymax/5.0b/test_package"
+script_folder="/storage/Users/currentUser/opt/ai-worker/repo/archives/f/fairymax/5.0b/test_package"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanrunenv-release-armv8.sh"
-for v in PATH
+for v in FAIRYDIR PATH
 do
    is_defined="true"
    value=$(printenv $v) || is_defined="" || true
@@ -12,4 +12,5 @@ do
    fi
 done
 
-export PATH="/storage/Users/currentUser/.conan2/p/b/fairy6299626dc3ee2/p/bin${PATH:+:$PATH}"
+export FAIRYDIR="/storage/Users/currentUser/.conan2/p/b/fairyd8314bfcd0e2c/p/share/games/fairymax"
+export PATH="/storage/Users/currentUser/.conan2/p/b/fairyd8314bfcd0e2c/p/bin${PATH:+:$PATH}"

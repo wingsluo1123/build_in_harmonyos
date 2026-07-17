@@ -49,5 +49,3 @@ case "$output" in
 esac
 
 exit $fail
-
-l

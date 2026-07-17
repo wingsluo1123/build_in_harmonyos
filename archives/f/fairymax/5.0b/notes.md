@@ -175,11 +175,7 @@ $ llvm-readelf -d fairymax | grep RUNPATH
 - fairymax 是 XBoard 协议的棋类引擎，不支持常规 --help/--version CLI 参数
 - 验证时通过 `printf "xboard\nquit\n" | fairymax` 测试，引擎会进入交互模式
 - 项目 Makefile 默认 CFLAGS 含 `-s`（strip），编译时必须移除，由 packaging 管线统一处理
-- maxqi 版本号显示为 "MaxQi 4.8 (G)" 而非 5.0b，这是上游代码行为（maxqi.c 有独立版本）---
-
-**编译结束**: 2026-06-12 15:11
-**最终状态**: published
----
+- maxqi 版本号显示为 "MaxQi 4.8 (G)" 而非 5.0b，这是上游代码行为（maxqi.c 有独立版本）
 
 **编译结束**: 2026-07-15 21:16
 **最终状态**: built

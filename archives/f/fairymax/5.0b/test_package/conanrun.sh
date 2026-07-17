@@ -1,1 +1,1 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/f/fairymax/5.0b/test_package/conanrunenv-release-armv8.sh"
+. "/storage/Users/currentUser/opt/ai-worker/repo/archives/f/fairymax/5.0b/test_package/conanrunenv-release-armv8.sh"
