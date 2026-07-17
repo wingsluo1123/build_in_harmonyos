@@ -112,6 +112,8 @@ class Libax25Conan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        # Run upstream test suite (CI gate: make check must be called)
+        autotools.make(target="check")
 
     def _patch_config_for_ohos(self):
         """Patch config.guess/config.sub for HarmonyOS/OHOS platform detection."""
