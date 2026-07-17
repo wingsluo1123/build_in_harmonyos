@@ -1,0 +1,66 @@
+diff --git a/conanfile.py b/conanfile.py
+index abcdef1..1234567 100644
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -1,7 +1,6 @@
+ #!/usr/bin/env python3
+ """Conan recipe - cdk 5.0 (Curses Development Kit, Autotools).
+ """
+ import os
+-import glob
+ 
+ from conan import ConanFile
+ from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+diff --git a/conandata.yml b/conandata.yml
+--- a/conandata.yml
++++ b/conandata.yml
+@@ -8,4 +8,5 @@
+   url: "https://github.com/ThomasDickey/cdk-snapshots/archive/refs/tags/t20260119.tar.gz"
+   sha256: "0f3095d7983227c06d1d326a6c95e0255e944be8a0f9748174840bfb3edd0cb5"
+ 
+-patches: []
++patches:
++  - "001-fix-code-review.patch"
+diff --git a/test_package/conanfile.py b/test_package/conanfile.py
+--- a/test_package/conanfile.py
++++ b/test_package/conanfile.py
+@@ -13,11 +13,15 @@ class CdkTestConan(ConanFile):
+         self.requires(self.tested_reference_str)
+ 
+     def build(self):
++        c_info = self.dependencies["cdk"].cpp_info
++        n_info = self.dependencies["ncurses"].cpp_info
++        inc = [f"-I{p}" for p in set(c_info.includedirs + n_info.includedirs)]
++        libdirs = [f"-L{p}" for p in set(c_info.libdirs + n_info.libdirs)]
++        libs = [f"-l{l}" for l in (c_info.libs + n_info.libs)]
+         src = os.path.join(self.source_folder, "test_package.c")
+-        inc = [f"-I{p}" for p in self.deps_cpp_info.include_paths]
+-        libdirs = [f"-L{p}" for p in self.deps_cpp_info.lib_paths]
+-        libs = [f"-l{l}" for l in self.deps_cpp_info.libs]
+         self.run(f"cc {' '.join(inc)} {src} {' '.join(libdirs)} {' '.join(libs)} -o test_package")
+ 
+     def test(self):
+         if can_run(self):
+             cmd = os.path.join(self.build_folder, "test_package")
+             self.run(cmd, env="conanrun")
+diff --git a/test_package/test_package.c b/test_package/test_package.c
+--- a/test_package/test_package.c
++++ b/test_package/test_package.c
+@@ -1,3 +1,14 @@
+-#include <stdio.h>
+-int main() { return 0; }
++/*
++ * CDK test program: initializes screen and exits.
++ * Verifies that libcdk and its headers are usable.
++ */
++#include <cdk.h>
++#include <stdlib.h>
+ 
++int main(void) {
++    CDKSCREEN *cdkscreen = initCDKScreen(NULL);
++    if (cdkscreen == NULL) return 1;
++    refreshCDKScreen(cdkscreen);
++    destroyCDKScreen(cdkscreen);
++    endCDK();
++    return 0;
++}
