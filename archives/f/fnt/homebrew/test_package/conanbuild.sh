@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/PCCPC/build_in_harmonyos/archives/f/fnt/homebrew/test_package/conanbuildenv-release-armv8.sh"
