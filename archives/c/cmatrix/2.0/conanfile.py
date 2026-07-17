@@ -15,6 +15,7 @@ from conan.tools.files import get, apply_conandata_patches, export_conandata_pat
 import os
 import shutil
 import tarfile
+import tempfile
 
 
 class CmatrixConan(ConanFile):
@@ -71,9 +72,13 @@ class CmatrixConan(ConanFile):
 
     def _build_ncurses(self):
         archive = os.path.join(self.source_folder, "compat", "ncurses-6.4.tar.gz")
-        ncurses_src = os.path.join(self.build_folder, "ncurses-src")
+        # Autoconf-generated files are corrupted on HMDFS even with relaxed
+        # permissions, so build ncurses in a local temporary filesystem.
+        ncurses_src = tempfile.mkdtemp(
+            prefix=".cmatrix-ncurses-", dir="/data/service/hnp"
+        )
+        self.output.info(f"Building ncurses in local temporary folder: {ncurses_src}")
         ncurses_prefix = os.path.join(self.build_folder, "ncurses")
-        os.makedirs(ncurses_src, exist_ok=True)
         with tarfile.open(archive, "r:gz") as tf:
             for member in tf.getmembers():
                 parts = member.name.split("/", 1)
@@ -109,6 +114,7 @@ class CmatrixConan(ConanFile):
         lib_dir = os.path.join(ncurses_prefix, "lib")
         os.makedirs(lib_dir, exist_ok=True)
         shutil.copy2(os.path.join(ncurses_src, "lib", "libncursesw.a"), lib_dir)
+        shutil.rmtree(ncurses_src)
 
     def build(self):
         self._build_ncurses()
