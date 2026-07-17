@@ -80,6 +80,8 @@ class Ax25AppsConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        # Run upstream test suite (CI gate: make check must be called)
+        autotools.make(target="check")
 
     def package(self):
         autotools = Autotools(self)
