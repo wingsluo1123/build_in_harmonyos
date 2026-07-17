@@ -1,0 +1,43 @@
+diff --git a/conanfile.py b/conanfile.py
+index 1111111..2222222 100644
+--- a/conanfile.py
++++ b/conanfile.py
+@@ -1,3 +1,5 @@
++#!/usr/bin/env python3
++"""Conan recipe for stlink - STM32 MCU programmer toolkit."""
+ from conan import ConanFile
+ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+ from conan.tools.files import get
+@@ -28,3 +30,7 @@
+     def package(self):
+         cmake = CMake(self)
+         cmake.install()
++
++    def package_info(self):
++        self.cpp_info.bindirs = ["bin"]
++        self.cpp_info.executables = ["st-flash", "st-util", "st-info"]
+diff --git a/conandata.yml b/conandata.yml
+index aabbccd..ddccbba 100644
+--- a/conandata.yml
++++ b/conandata.yml
+@@ -1,8 +1,5 @@
+ sources:
+   url: "https://github.com/stlink-org/stlink/archive/refs/tags/v1.8.0.tar.gz"
+   sha256: "cff760b5c212c2cc480f705b9ca7f3828d6b9c267950c6a547002cd0a1f5f6ac"  # CI 校验
+-patches: []
+-
+ patches:
+   "1.8.0":
+     - patch_file: patches/001-add-test-sources.patch
+@@ -10,4 +7,4 @@ patches:
+     - patch_file: patches/001-fix-test-package.patch
+       patch_description: L0 质量门检查失败，原因是 test_package 目录下缺少实际的 C 测试源文件（test.c）和 CMakeLists.txt，无法满足 Conan 
+     - patch_file: patches/002-fix-code-review.patch
+-      patch_description: 代码审查发现了 4 类问题：conanfile.py 缺少 shebang/docstring、缺少 commands.json；conandata.yml 与
++      patch_description: 代码审查发现了 4 类问题：conanfile.py 缺少 shebang/docstring、缺少 commands.json；conandata.yml 与
+\ No newline at end of file
+--- /dev/null
++++ b/notes.md
+@@ -0,0 +1,2 @@
++# stlink 1.8.0 Conan recipe
++This recipe packages stlink as an application. No custom options are required.
