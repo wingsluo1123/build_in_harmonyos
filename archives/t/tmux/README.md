@@ -26,10 +26,12 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 ### 补丁文件
 
-- `0001-config.status.patch` - 修改临时目录路径
-- `0002-configure.patch` - 修改临时目录路径
-- `0003-etc-config.guess.patch` - HarmonyOS 系统识别
-- `0004-etc-config.sub.patch` - linux-ohos 三元组支持
+- `0001-cmd-parse.c.patch` - Bison 3.8.2 生成的解析器（替换 cmd-parse.c）
+- `0002-compat.h.patch` - 添加 `__OHOS__` 守卫，使用系统 forkpty
+- `0003-compat-forkpty-linux.c.patch` - 空实现（OHOS 系统提供 forkpty）
+- `0004-configure.patch` - 修改临时目录路径为 $TMPDIR（解决 HMDFS 权限问题）
+- `0005-etc-config.guess.patch` - HarmonyOS 系统识别
+- `0006-etc-config.sub.patch` - linux-ohos 三元组支持
 
 ## 功能验证
 

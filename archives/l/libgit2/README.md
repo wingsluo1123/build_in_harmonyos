@@ -33,7 +33,11 @@ cmake --install build --prefix /storage/Users/currentUser/usr/local
 ## 验证
 
 ```bash
-/storage/Users/currentUser/usr/local/bin/git2 --version
+# libgit2 installs as a library, not a standalone binary.
+# Verify via pkg-config:
+pkg-config --modversion libgit2
+# Or check the library file:
+ls ~/usr/local/lib/libgit2.so*
 ```
 
 ## 许可证
