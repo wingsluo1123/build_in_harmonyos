@@ -9,7 +9,7 @@
 |------|-----|
 | 软件 | zziplib |
 | 版本 | 0.13.78 |
-| 状态 | ⚠️ partial |
+| 状态 | ✅ uploaded |
 | 构建系统 | cmake |
 | 源码路径 | 待补充 |
 
@@ -62,5 +62,6 @@
 | zziplib-0.13.78-ohos-aarch64.tar.gz | 待补充 | 主包 |
 
 ## 六、结束记录
-- **最终状态**: partial
+- **最终状态**: uploaded
+- **Conan 配方**: 已创建完整配方（conanfile.py + conandata.yml + test_package/）
 - **结束时间**: 2026-04-24
