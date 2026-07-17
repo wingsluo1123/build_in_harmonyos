@@ -13,7 +13,7 @@ class NymphcastConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "patches/*"
 
-    def layout(self):
+    generate(self): layout(self):
         cmake_layout(self)
 
     def source(self):
