@@ -88,9 +88,15 @@ class CdoConan(ConanFile):
             with open(conanbuild_sh, "r", encoding="utf-8") as f:
                 content = f.read()
             fix = (
-                "\n# Override invalid CONFIG_SHELL/SHELL from Conan profile\n"
+                "\n# Override invalid shell/preprocessor values from Conan profile\n"
                 f'export CONFIG_SHELL="{shell_path}"\n'
                 f'export SHELL="{shell_path}"\n'
+                'if [ -z "${CPP:-}" ] || [ "${CPP}" = ":" ]; then\n'
+                '    if [ -n "${CC:-}" ]; then export CPP="${CC} -E"; fi\n'
+                "fi\n"
+                'if [ -z "${CXXCPP:-}" ] || [ "${CXXCPP}" = ":" ]; then\n'
+                '    if [ -n "${CXX:-}" ]; then export CXXCPP="${CXX} -E"; fi\n'
+                "fi\n"
             )
             if fix not in content:
                 with open(conanbuild_sh, "w", encoding="utf-8") as f:
