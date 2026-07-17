@@ -22,6 +22,33 @@ echo "[step] Conan environment setup..."
 # ── 1. Detect/install Conan ──
 # pip3 可能装到 ~/.local/bin, 确保在 PATH 上
 export PATH="$HOME/.local/bin:$PATH"
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+
+PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
+PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-pypi.cnb.cool}"
+PIP_EXTRA_INDEX_URL="${PIP_EXTRA_INDEX_URL:-https://pypi.org/simple}"
+
+install_conan() {
+    local -a pip_args
+    pip_args=(
+        install
+        --user
+        --force-reinstall
+        --index-url "$PIP_INDEX_URL"
+        --trusted-host "$PIP_TRUSTED_HOST"
+        --extra-index-url "$PIP_EXTRA_INDEX_URL"
+        "requests>=2.25,<3.0.0"
+        conan
+    )
+
+    echo "[step] Installing Conan from community index with PyPI fallback..."
+    if python3 -m pip "${pip_args[@]}"; then
+        return 0
+    fi
+
+    echo "[warn] Conan install with mixed indexes failed, retrying with configured pip defaults..."
+    python3 -m pip install --user --force-reinstall "requests>=2.25,<3.0.0" conan
+}
 
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
@@ -32,7 +59,7 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    python3 -m pip install --user --force-reinstall conan || {
+    install_conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
