@@ -20,14 +20,30 @@ REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 echo "[step] Conan environment setup..."
 
 # ── 1. Detect/install Conan ──
-if ! command -v conan &>/dev/null; then
-    echo "[step] Conan not found, installing..."
+# pip3 可能装到 ~/.local/bin, 确保在 PATH 上
+export PATH="$HOME/.local/bin:$PATH"
+
+# Check both that conan exists AND is functional (conan --version succeeds)
+# If conan binary exists but is broken, force-reinstall to fix
+if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
+    echo "[step] Conan not found or broken, (re)installing..."
+
+    # 配置 OHOS 社区 PyPI 源 (必须先配置, 否则 pip 找不到 requests 等依赖)
+    # 某些 CI Worker 可能未预配置 pip 源, 导致 conan 安装失败
+    python3 -m pip config set global.index-url https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple 2>/dev/null || true
+    python3 -m pip config set global.trusted-host pypi.cnb.cool 2>/dev/null || true
+
     # 安装 OHOS 适配版 conan（私有 PyPI 提供，基线 2.29.1，已适配 OHOS 平台）
     # 不要钉死官方旧版本号，应从配置的 PyPI 源安装最新适配版
-    pip3 install conan || {
+    # Use python3 -m pip to bypass potentially broken pip3 shebang
+    # (HNP pip3/conan binaries may have shebangs pointing to non-existent
+    #  build-machine paths with ^M line endings)
+    python3 -m pip install --user --force-reinstall conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
+    # Ensure user-installed binaries are found before any broken HNP version
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
@@ -46,10 +62,11 @@ if [ -f "$SETTINGS_FILE" ]; then
     fi
 fi
 
-# ── 2. Verify conan remote (预部署校验) ──
-# Conan 配置 (remotes.json, profiles, settings.yml) 由 worker app 文件预部署到 ~/.conan2/
-# setup.sh 不做 remote 注册/认证, 仅校验 remote 已就绪
+# ── 2. Conan remote (自动初始化, 兼容 CI 机/发布机) ──
+# CI 机 .conan.db 无 remote 定义 → 自动添加(匿名读取)
+# 发布机已有同名 remote + token → 跳过, 不影响 upload 凭证
 CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-ohpcd}"
+CONAN_REMOTE_URL="${CONAN_REMOTE_URL:-https://conan.cnb.cool/OpenHarmonyPCDeveloper/Conan/-/packages/}"
 
 # Disable conancenter — these are private CI builds, no external deps needed
 if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
@@ -57,11 +74,16 @@ if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
     conan remote disable conancenter 2>/dev/null || true
 fi
 
-if ! conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
-    echo "[error] remote '${CONAN_REMOTE_NAME}' 不存在, 请检查 worker app 预部署"
-    exit 1
+if conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
+    echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
+else
+    echo "[step] remote '${CONAN_REMOTE_NAME}' 不存在, 自动添加 (匿名读取)"
+    conan remote add "${CONAN_REMOTE_NAME}" "${CONAN_REMOTE_URL}" || {
+        echo "[error] 无法添加 remote '${CONAN_REMOTE_NAME}'"
+        exit 1
+    }
+    echo "[step] remote 已添加: ${CONAN_REMOTE_NAME} → ${CONAN_REMOTE_URL}"
 fi
-echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
 
 # ── 3. Ensure ohos-aarch64 profile exists ──
 PROFILE_NAME="${CONAN_PROFILE:-ohos-aarch64}"
