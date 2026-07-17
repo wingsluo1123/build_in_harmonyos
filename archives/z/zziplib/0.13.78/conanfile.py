@@ -27,7 +27,7 @@ class ZziplibConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("zlib/1.3.1@ohpcd/stable")
+        self.requires("zlib/1.3.1")
 
     def layout(self):
         cmake_layout(self)
