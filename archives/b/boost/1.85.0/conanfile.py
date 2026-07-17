@@ -29,7 +29,22 @@ class BoostConan(ConanFile):
     def source(self):
         source = self.conan_data["sources"]
         archive = os.path.join(self.source_folder, source["filename"])
-        self.run(f'curl -L -sS --fail -o "{archive}" "{source["url"]}"')
+        # CI 镜像 fallback 会把 conandata.yml 的 url 改写为列表（与
+        # conan.tools.files.get 行为一致），此处逐个尝试直到成功。
+        urls = source["url"]
+        if isinstance(urls, str):
+            urls = [urls]
+        last_error = None
+        for url in urls:
+            try:
+                self.run(f'curl -L -sS --fail -o "{archive}" "{url}"')
+                last_error = None
+                break
+            except Exception as exc:
+                last_error = exc
+                self.output.warn(f'下载失败，尝试下一个镜像: {url} ({exc})')
+        if last_error is not None:
+            raise RuntimeError(f"所有源 URL 下载均失败: {urls}") from last_error
         digest = hashlib.sha256()
         with open(archive, "rb") as stream:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
