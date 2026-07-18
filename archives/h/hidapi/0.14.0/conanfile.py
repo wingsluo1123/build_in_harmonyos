@@ -150,4 +150,4 @@ Cflags: -I${{includedir}}
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["hidapi", "hidapi-hidraw"]
+        self.cpp_info.libs = ["hidapi-hidraw"]
