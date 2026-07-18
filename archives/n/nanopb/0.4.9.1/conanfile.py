@@ -43,17 +43,6 @@ class NanopbConan(ConanFile):
             sha256=source_data["sha256"],
             strip_root=True,
         )
-        if self._is_ohos():
-            protoc_source = source_data.get("protoc")
-            if not protoc_source:
-                raise RuntimeError("nanopb requires a protobuf source for OHOS protoc")
-            get(
-                self,
-                url=protoc_source["url"],
-                sha256=protoc_source["sha256"],
-                destination=os.path.join(self.source_folder, ".nanopb-protoc-source"),
-                strip_root=True,
-            )
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -242,11 +231,7 @@ class NanopbConan(ConanFile):
 
     def _build_ohos_protoc(self, cc, cxx):
         """Build and sign standalone protoc for the OHOS upstream tests."""
-        source_data = self.conan_data["sources"].get("protoc")
-        if not source_data:
-            raise RuntimeError("nanopb requires a protobuf source for OHOS protoc")
-
-        protoc_source = os.path.join(self.source_folder, ".nanopb-protoc-source")
+        protoc_source = self._prepare_ohos_protoc_source()
         protoc_build = os.path.join(self.build_folder, "nanopb-protoc-build")
         cmake = shutil.which("cmake") or "cmake"
         cmake_args = [
@@ -289,6 +274,23 @@ class NanopbConan(ConanFile):
             raise RuntimeError(f"protobuf build did not produce protoc: {protoc}")
         self._sign_ohos_elf(protoc)
         return protoc
+
+    def _prepare_ohos_protoc_source(self):
+        """Download protobuf only when the OHOS build actually needs protoc."""
+        source_data = self.conan_data["sources"].get("protoc")
+        if not source_data:
+            raise RuntimeError("nanopb requires a protobuf source for OHOS protoc")
+
+        protoc_source = os.path.join(self.source_folder, ".nanopb-protoc-source")
+        if not os.path.isfile(os.path.join(protoc_source, "CMakeLists.txt")):
+            get(
+                self,
+                url=source_data["url"],
+                sha256=source_data["sha256"],
+                destination=protoc_source,
+                strip_root=True,
+            )
+        return protoc_source
 
     def _make_ohos_compiler_wrapper(self, compiler, name):
         """Sign each SCons test executable immediately after linking."""
