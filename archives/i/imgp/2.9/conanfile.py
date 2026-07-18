@@ -48,6 +48,8 @@ class ImgpConan(ConanFile):
         # restrictive umask that makes shared libraries unreadable).
         # Use os.walk to recursively find all .so files in the user
         # site-packages — glob.glob may miss files in subdirectories.
+        # NOTE: .so files need execute (0o755) not just read (0o644),
+        # because the Linux dynamic linker requires +x to load them.
         chmod_script = os.path.join(self.build_folder, "fix_so_perms.py")
         with open(chmod_script, "w") as f:
             f.write("""import os
@@ -56,7 +58,7 @@ for root, dirs, files in os.walk(sp):
     for f in files:
         if f.endswith('.so'):
             fp = os.path.join(root, f)
-            os.chmod(fp, 0o644)
+            os.chmod(fp, 0o755)
             print('fix', fp)
 """)
         self.run(f"{python} '{chmod_script}'", env="conanrun")
