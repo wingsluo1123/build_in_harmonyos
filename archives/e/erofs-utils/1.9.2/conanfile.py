@@ -13,6 +13,7 @@ class ErofsUtilsConan(ConanFile):
     description = "Userspace tools for the EROFS filesystem"
     license = "GPL-2.0-or-later AND MIT"
     homepage = "https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git"
+    package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):

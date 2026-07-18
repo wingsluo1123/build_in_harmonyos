@@ -15,4 +15,8 @@ class ErofsUtilsTestConan(ConanFile):
     def test(self):
         if can_run(self):
             script = os.path.join(self.source_folder, "test_erofs_utils.sh")
-            self.run(f'bash "{script}"', env="conanrun")
+            package_folder = self.dependencies["erofs-utils"].package_folder
+            self.run(
+                f'bash "{script}" "{package_folder}"',
+                env="conanrun",
+            )
