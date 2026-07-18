@@ -47,8 +47,10 @@ class ImgpConan(ConanFile):
         # default user site-packages (~/.local/). The OHOS filesystem
         # at ~/.local/ is mounted with noexec, preventing .so loading.
         # $HOME/usr/local/ is on an executable filesystem.
+        # Use --force-reinstall because pip may skip if pillow is
+        # already cached in the noexec user site-packages.
         prefix = os.path.expanduser("~/usr/local")
-        self.run(f"{python} -m pip install --prefix='{prefix}' pillow", env="conanrun")
+        self.run(f"{python} -m pip install --force-reinstall --prefix='{prefix}' pillow", env="conanrun")
 
         # Download and install setuptools from files.pythonhosted.org.
         # The CI's internal pip index (pypi.cnb.cool) does not have setuptools,
