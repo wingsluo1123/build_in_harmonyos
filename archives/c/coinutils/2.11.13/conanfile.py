@@ -50,19 +50,21 @@ class CoinutilsConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Override compiler/shell paths: profile may point to paths that
-        # don't exist on all machines. Append overrides to conanbuild.sh
-        # so they take effect when sourced.
+        # don't exist on all machines. Only override CC/CXX if profile
+        # path is invalid; always override SHELL/TMPDIR for OHOS.
+        profile_clang = '/data/service/hnp/bin/clang'
         bash_path = shutil.which("bash") or "/bin/sh"
-        clang = shutil.which("clang") or "clang"
-        clangxx = shutil.which("clang++") or "clang++"
         tmpdir = os.environ.get("TMPDIR") or os.path.join(
             os.path.expanduser("~"), "tmp"
         )
         conanbuild = os.path.join(self.generators_folder, "conanbuild.sh")
         if os.path.exists(conanbuild):
             with open(conanbuild, "a") as f:
-                f.write(f'\nexport CC="{clang}"\n')
-                f.write(f'\nexport CXX="{clangxx}"\n')
+                if not os.path.exists(profile_clang):
+                    clang = shutil.which("clang") or "clang"
+                    clangxx = shutil.which("clang++") or "clang++"
+                    f.write(f'\nexport CC="{clang}"\n')
+                    f.write(f'\nexport CXX="{clangxx}"\n')
                 f.write(f'\nexport SHELL="{bash_path}"\n')
                 f.write(f'\nexport CONFIG_SHELL="{bash_path}"\n')
                 f.write(f'\nexport TMPDIR="{tmpdir}"\n')

@@ -23,11 +23,12 @@ class CoinutilsTestConan(ConanFile):
 
     def build(self):
         # Override compiler paths: profile may point to paths that don't
-        # exist on all machines. Append overrides to conan_toolchain.cmake.
-        clang = shutil.which("clang") or "clang"
-        clangxx = shutil.which("clang++") or "clang++"
+        # exist on all machines. Only override if profile path is invalid.
+        profile_clang = '/data/service/hnp/bin/clang'
         conan_toolchain = os.path.join(self.generators_folder, "conan_toolchain.cmake")
-        if os.path.exists(conan_toolchain):
+        if os.path.exists(conan_toolchain) and not os.path.exists(profile_clang):
+            clang = shutil.which("clang") or "clang"
+            clangxx = shutil.which("clang++") or "clang++"
             with open(conan_toolchain, "a") as f:
                 f.write(f'\nset(CMAKE_C_COMPILER "{clang}")\n')
                 f.write(f'\nset(CMAKE_CXX_COMPILER "{clangxx}")\n')
