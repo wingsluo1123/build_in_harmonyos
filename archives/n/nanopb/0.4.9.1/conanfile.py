@@ -163,7 +163,7 @@ class NanopbConan(ConanFile):
             self.run(
                 f"{python} -m pip install --target {target} --upgrade "
                 "--disable-pip-version-check --no-deps protobuf==7.35.1 "
-                "grpcio-tools==1.82.1"
+                "grpcio-tools==1.81.0"
             )
             if local_tools not in tool_dirs:
                 tool_dirs.insert(0, local_tools)

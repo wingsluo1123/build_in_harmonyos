@@ -153,8 +153,8 @@ if [ "$PROTOC_USABLE" -eq 0 ]; then
             }
         fi
         "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-            --disable-pip-version-check --no-deps "grpcio-tools==1.82.1" || {
-            echo "[error] Failed to install grpcio-tools 1.82.1"
+            --disable-pip-version-check --no-deps "grpcio-tools==1.81.0" || {
+            echo "[error] Failed to install grpcio-tools 1.81.0"
             exit 1
         }
     fi
