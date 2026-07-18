@@ -26,7 +26,7 @@ class BoostTestConan(ConanFile):
         boost_pkg = self.dependencies["boost"].package_folder
         include_dir = os.path.join(boost_pkg, "include")
         
-        cppstd = self.settings.compiler.cppstd
+        cppstd = self.settings.compiler.cppstd or "14"
         test_src = os.path.join(self.source_folder, "test.cpp")
         test_bin = os.path.join(self.build_folder, "test_boost")
         

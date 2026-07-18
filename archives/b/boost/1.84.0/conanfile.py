@@ -18,7 +18,7 @@ R26: boost is NOT a system-name library, so dynamic linking is OK (N/A for heade
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, copy
 
 
 class BoostConan(ConanFile):
@@ -39,9 +39,6 @@ class BoostConan(ConanFile):
         "shared": False,
     }
 
-    def export_sources(self):
-        export_conandata_patches(self)
-
     def requirements(self):
         self.requires("zlib/1.3.1")
 
@@ -52,7 +49,7 @@ class BoostConan(ConanFile):
         # E035/E068: b2 build system fails on OHOS (SHELL execution + arch detection)
         # Header-only installation: no compilation needed
         # Headers are copied in package() directly from source
-        apply_conandata_patches(self)
+        pass
 
     def package(self):
         # Copy boost headers from source to package folder
