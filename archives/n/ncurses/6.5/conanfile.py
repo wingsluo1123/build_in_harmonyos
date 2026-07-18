@@ -46,10 +46,11 @@ class NcursesConan(ConanFile):
         self.run("sed -i 's/ironclad\*)/ironclad* | ohos*)/' config.sub", cwd=self.source_folder)
         self.run("sed -i 's/uclibc\*- )/uclibc*- | linux-ohos*- )/' config.sub", cwd=self.source_folder)
         autotools = Autotools(self)
-        autotools.configure()
-        # OHOS HMDFS noexec (E046): config.status 中临时 awk 脚本无法直接执行
-        self.run(r"sed -i 's|\./conf[^/]*/subs1\.awk|$AWK -f &|g' config.status",
-                 cwd=self.source_folder, ignore_errors=True)
+        # HMDFS noexec: set TMPDIR to writable dir and use shell for configure
+        import tempfile
+        exec_tmp = tempfile.mkdtemp(dir='/storage/Users/currentUser', prefix='.tmp-')
+        configure_cmd = f"TMPDIR={exec_tmp} /system/bin/sh ./configure " + " ".join(autotools.configure_args)
+        self.run(configure_cmd, cwd=self.build_folder)
         autotools.make(args=["-j1"])
 
     def package(self):
