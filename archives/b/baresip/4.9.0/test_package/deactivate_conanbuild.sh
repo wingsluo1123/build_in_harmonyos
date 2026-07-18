@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/b/baresip/4.9.0/test_package/deactivate_conanbuildenv-release-armv8.sh"
