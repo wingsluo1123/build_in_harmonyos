@@ -65,4 +65,4 @@ class I686elfbinutilsConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["i686-elf-binutils"]
+        self.cpp_info.libs = []
