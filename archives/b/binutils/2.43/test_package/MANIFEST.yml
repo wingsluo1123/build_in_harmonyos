@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: binutils/2.43
+homepage: "https://www.gnu.org/software/binutils/"
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: ld/ldgram.y
+    source: binutils-2.43/ld/testsuite
+    description: "链接器测试套件"
+    command: "make check -C ld"
+  - file: gas/testsuite
+    source: binutils-2.43/gas/testsuite
+    description: "汇编器测试套件"
+    command: "make check -C gas"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "交叉工具链二进制验证测试"
+    command: "conan create 后自动运行 test_package"
+
+# 测试断言总数
+assertion_count: 16
