@@ -59,29 +59,6 @@ class ChezschemeConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         src = self.source_folder
-        # Fallback: ensure HMDFS patch applied (ln -f/ln -s → cp)
-        from conan.tools.files import replace_in_file
-        install_zuo = os.path.join(src, "makefiles", "install.zuo")
-        if os.path.exists(install_zuo):
-            try:
-                replace_in_file(self, install_zuo,
-                    '(shell/wait* "ln" "-f" from to)',
-                    '(shell/wait* "cp" from to)')
-            except Exception:
-                pass
-            try:
-                replace_in_file(self, install_zuo,
-                    '(shell/wait* "ln" "-s" from to)',
-                    '(shell/wait* "cp" from to)')
-            except Exception:
-                pass
-            # Fix ln-s/rel: use absolute path instead of relative
-            try:
-                replace_in_file(self, install_zuo,
-                    '(find-relative-path to-dir from)',
-                    'from')
-            except Exception:
-                pass
         # Chez Scheme custom configure: --pbarch for portable bytecode
         self.run(
             f'./configure --pbarch --disable-curses --disable-x11 --disable-iconv --as-is '

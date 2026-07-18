@@ -1,8 +1,9 @@
-#!/system/bin/sh
+#!/data/service/hnp/bin/bash
 # test_package/test.sh — Test wrapper for chezscheme
 # R34: test substantively depends on the chezscheme package binary
 # Called by conanfile.py test() method
-#
+set -euo pipefail
+
 # Usage: test.sh <scheme_binary_path>
 # Exit: 0 = pass, non-0 = fail
 

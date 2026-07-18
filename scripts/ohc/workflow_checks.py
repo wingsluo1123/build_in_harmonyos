@@ -185,7 +185,7 @@ def run_local_ci(software: str, version: str, pdir: str | None = None) -> int:
         ["zsh", str(build_sh), pkg_spec],
         cwd=str(project),
         env_extra={"CI_PACKAGES": pkg_spec, "CI_REPO_ROOT": str(project)},
-        timeout=3600,
+        timeout=600,
     )
     if rc != 0:
         log_fail(f"  ❌ build_and_test.sh 失败 (RC={rc})")

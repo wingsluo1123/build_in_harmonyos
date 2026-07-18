@@ -9,10 +9,14 @@ homepage: "https://github.com/cisco/ChezScheme"
 upstream_check_command: "make check"
 
 # conanfile.py build() 方法中是否已集成上游测试
+# Chez Scheme has make check but it requires a workingScheme runtime first (bootstrap)
+# Skipped due to: 1) bootstrap dependency 2) test suite time (~30min) 3) platform syscall gaps
 upstream_test_in_build: false
 upstream_test_command: ""
 
 # 上游实际运行的测试程序 (Chez Scheme 自带测试套件)
+# Note: These tests exist upstream but were not run during conan build
+# due to bootstrap complexity and platform limitations (E051 syscalls)
 upstream_tests:
   - file: s/compile.ss
     source: chezscheme-10.4.1/s/compile.ss
@@ -21,9 +25,9 @@ upstream_tests:
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
-  - file: conanfile.py
+  - file: test.sh
     description: "运行 scheme 二进制验证版本和算术"
-    command: "scheme --version && scheme -q -e \"(display (+ 1 2))\""
+    command: "scheme --version && scheme --script test.ss"
 
 # 测试断言总数 (近似值)
 assertion_count: 5
