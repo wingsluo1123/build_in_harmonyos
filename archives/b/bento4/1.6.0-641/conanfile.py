@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+"""Conan recipe — bento4 1.6.0-641 (CMake)"""
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain
 from conan.tools.files import copy, get
 import os
+
 
 class Bento4Conan(ConanFile):
     name = "bento4"
@@ -9,7 +13,8 @@ class Bento4Conan(ConanFile):
     license = "MIT"
     author = "axiomatic-systems"
     url = "https://github.com/axiomatic-systems/Bento4"
-    description = "MP4 library and tools"
+    homepage = "http://www.bento4.com"
+    description = "C++ library and tools for reading and writing ISO-MP4 files"
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
@@ -28,9 +33,6 @@ class Bento4Conan(ConanFile):
         cmake.install()
         copy(self, "*.h", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
         copy(self, "*.hpp", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
-
-    def package_info(self):
-        self.cpp_info.libs = ["ap4"]      copy(self, "*.hpp", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["ap4"]
