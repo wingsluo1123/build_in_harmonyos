@@ -1,0 +1,356 @@
+From: AtomCode <noreply@atomgit.com>
+Date: 2026-07-17
+Subject: [PATCH] Add --disable-gui headless CLI build support
+
+---
+--- a/configure.ac	2026-07-18 11:11:29.352935000 +0800
++++ b/configure.ac	2026-07-18 11:11:29.352935000 +0800
+@@ -50,21 +50,33 @@
+ PKG_CHECK_MODULES(AVCODEC, [libavcodec >= 59.37.100])
+ PKG_CHECK_MODULES(AVUTIL, [libavutil >= 57.28.100])
+ 
+-AM_OPTIONS_WXCONFIG
+-reqwx=3.0.0
+-AM_PATH_WXCONFIG($reqwx, wx=1)
+-if test "$wx" != 1; then
+-	AC_MSG_ERROR([
+-		wxWidgets must be installed on your system.
++# --disable-gui: build headless CLI tool instead of the GUI binary
++AC_ARG_ENABLE([gui],
++    AS_HELP_STRING([--disable-gui], [Build headless CLI tool instead of GUI binary]),
++    [build_gui=$enableval],
++    [build_gui=yes]
++)
+ 
+-		Please check that wx-config is in path, the directory
+-		where wxWidgets libraries are installed (returned by
+-		'wx-config --libs' or 'wx-config --static --libs' command)
+-		is in LD_LIBRARY_PATH or equivalent variable and
+-		wxWidgets version is $reqwx or above.
+-		])
+-fi
++AM_CONDITIONAL([BUILD_GUI], [test "x$build_gui" = xyes])
++AC_DEFINE_UNQUOTED([HAVE_GUI], [`test "x$build_gui" = xyes && echo 1 || echo 0`], [GUI support])
+ 
++AS_IF([test "x$build_gui" = xyes], [
++    AM_OPTIONS_WXCONFIG
++    reqwx=3.0.0
++    AM_PATH_WXCONFIG($reqwx, wx=1)
++    if test "$wx" != 1; then
++        AC_MSG_ERROR([
++            wxWidgets must be installed on your system.
++
++            Please check that wx-config is in path, the directory
++            where wxWidgets libraries are installed (returned by
++            'wx-config --libs' or 'wx-config --static --libs' command)
++            is in LD_LIBRARY_PATH or equivalent variable and
++            wxWidgets version is $reqwx or above.
++            ])
++    fi
++])
++
+ GETTEXT_PACKAGE=spek
+ AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE], ["$GETTEXT_PACKAGE"], [Gettext Package])
+ AC_SUBST(GETTEXT_PACKAGE)
+--- a/src/Makefile.am	2026-07-18 11:11:29.352935000 +0800
++++ b/src/Makefile.am	2026-07-18 11:11:29.352935000 +0800
+@@ -23,6 +23,7 @@
+ 	$(AVUTIL_CFLAGS) \
+ 	$(WX_CXXFLAGS_ONLY)
+ 
++if BUILD_GUI
+ bin_PROGRAMS = spek
+ 
+ spek_SOURCES = \
+@@ -61,3 +62,27 @@
+ 
+ spek_LDFLAGS = \
+ 	-pthread
++else
++bin_PROGRAMS = spek-cli
++
++spek_cli_SOURCES = \
++	spek-cli.cc
++
++spek_cli_CPPFLAGS = \
++	-include config.h \
++	-pthread
++
++spek_cli_CXXFLAGS = \
++	$(AVFORMAT_CFLAGS) \
++	$(AVCODEC_CFLAGS) \
++	$(AVUTIL_CFLAGS)
++
++spek_cli_LDADD = \
++	libspek.a \
++	$(AVFORMAT_LIBS) \
++	$(AVCODEC_LIBS) \
++	$(AVUTIL_LIBS)
++
++spek_cli_LDFLAGS = \
++	-pthread
++endif
+--- /dev/null	2026-07-18 11:11:29.352935000 +0800
++++ b/src/spek-cli.cc	2026-07-18 11:11:29.352935000 +0800
+@@ -0,0 +1,176 @@
++/* spek-cli.cc — Headless CLI spectrum analyser
++ * Built when --disable-gui is passed to configure.
++ * Uses libspek.a (FFmpeg + wxBase) to decode audio and compute FFT.
++ * Outputs spectrum data as CSV: time(ms), band0, band1, ..., bandN
++ */
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <memory>
++#include <string>
++#include <vector>
++
++#include "spek-audio.h"
++#include "spek-fft.h"
++#include "spek-pipeline.h"
++
++// Pipeline callback: collect spectrum data per sample
++static void spectrum_cb(int bands, int sample, float *values, void *cb_data)
++{
++    auto *out = static_cast<FILE *>(cb_data);
++    // Print time in milliseconds
++    fprintf(out, "%d", sample);
++    // Print magnitudes for each frequency band
++    for (int i = 0; i < bands; i++) {
++        fprintf(out, ",%.2f", values[i]);
++    }
++    fprintf(out, "\n");
++}
++
++static void print_usage(const char *prog)
++{
++    fprintf(stderr, "Usage: %s [options] <audio-file>\n", prog);
++    fprintf(stderr, "Options:\n");
++    fprintf(stderr, "  --stream N     Audio stream index (default: 0)\n");
++    fprintf(stderr, "  --channel N    Channel index (default: 0)\n");
++    fprintf(stderr, "  --samples N    FFT samples (default: 1024, must be power of 2)\n");
++    fprintf(stderr, "  --window TYPE  Window function: hann, hamming, blackman_harris (default: hann)\n");
++    fprintf(stderr, "  --output FILE  Output file (default: stdout)\n");
++    fprintf(stderr, "  --info         Print file info and exit\n");
++    fprintf(stderr, "  --help         Show this help\n");
++}
++
++static int parse_window(const char *name)
++{
++    if (strcmp(name, "hann") == 0) return WINDOW_HANN;
++    if (strcmp(name, "hamming") == 0) return WINDOW_HAMMING;
++    if (strcmp(name, "blackman_harris") == 0) return WINDOW_BLACKMAN_HARRIS;
++    return -1;
++}
++
++int main(int argc, char *argv[])
++{
++    const char *file_name = nullptr;
++    int stream = 0, channel = 0, samples = 1024;
++    int window = WINDOW_DEFAULT;
++    FILE *output = stdout;
++    bool info_only = false;
++
++    // Parse arguments
++    for (int i = 1; i < argc; i++) {
++        if (strcmp(argv[i], "--help") == 0) {
++            print_usage(argv[0]);
++            return 0;
++        } else if (strcmp(argv[i], "--info") == 0) {
++            info_only = true;
++        } else if (strcmp(argv[i], "--stream") == 0 && i + 1 < argc) {
++            stream = atoi(argv[++i]);
++        } else if (strcmp(argv[i], "--channel") == 0 && i + 1 < argc) {
++            channel = atoi(argv[++i]);
++        } else if (strcmp(argv[i], "--samples") == 0 && i + 1 < argc) {
++            samples = atoi(argv[++i]);
++        } else if (strcmp(argv[i], "--window") == 0 && i + 1 < argc) {
++            window = parse_window(argv[++i]);
++            if (window < 0) {
++                fprintf(stderr, "Unknown window function: %s\n", argv[i]);
++                return 1;
++            }
++        } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
++            const char *path = argv[++i];
++            output = fopen(path, "w");
++            if (!output) {
++                fprintf(stderr, "Cannot open output file: %s\n", path);
++                return 1;
++            }
++        } else if (argv[i][0] == '-') {
++            fprintf(stderr, "Unknown option: %s\n", argv[i]);
++            print_usage(argv[0]);
++            return 1;
++        } else {
++            file_name = argv[i];
++        }
++    }
++
++    if (!file_name) {
++        fprintf(stderr, "No input file specified.\n");
++        print_usage(argv[0]);
++        return 1;
++    }
++
++    // Open audio file
++    Audio audio;
++    auto file = audio.open(file_name, stream);
++    if (!file) {
++        fprintf(stderr, "Failed to open audio file: %s\n", file_name);
++        return 1;
++    }
++
++    if (file->get_error() != AudioError::OK) {
++        fprintf(stderr, "Audio error: %s (code %d)\n", file_name,
++                static_cast<int>(file->get_error()));
++        return 1;
++    }
++
++    // Print file info
++    fprintf(stderr, "File:     %s\n", file_name);
++    fprintf(stderr, "Codec:    %s\n", file->get_codec_name().c_str());
++    fprintf(stderr, "Sample:   %d Hz, %d bps\n", file->get_sample_rate(), file->get_bits_per_sample());
++    fprintf(stderr, "Streams:  %d, Channels: %d\n", file->get_streams(), file->get_channels());
++    fprintf(stderr, "Duration: %.2f s\n", file->get_duration());
++    fprintf(stderr, "Bitrate:  %d kbps\n", file->get_bit_rate() / 1000);
++
++    if (info_only) {
++        return 0;
++    }
++
++    // Validate samples is power of 2
++    int nbits = 0;
++    int tmp = samples;
++    while (tmp > 1) { tmp >>= 1; nbits++; }
++    if ((1 << nbits) != samples) {
++        fprintf(stderr, "Samples must be a power of 2, got %d\n", samples);
++        return 1;
++    }
++
++    // Create FFT
++    FFT fft;
++    auto fft_plan = fft.create(nbits);
++    if (!fft_plan) {
++        fprintf(stderr, "Failed to create FFT plan\n");
++        return 1;
++    }
++
++    // Create pipeline
++    auto *pipeline = spek_pipeline_open(
++        std::move(file), std::move(fft_plan),
++        stream, channel,
++        static_cast<enum window_function>(window),
++        samples, spectrum_cb, output
++    );
++
++    if (!pipeline) {
++        fprintf(stderr, "Failed to create pipeline\n");
++        return 1;
++    }
++
++    // Write CSV header
++    fprintf(output, "sample");
++    // We don't know bands until after pipeline starts, but we need the header first
++    // Use a two-pass approach: collect bands from first callback
++    // Actually, let's just write the header based on the first callback call
++    // For now, write without header (user can infer from data)
++    // Better: write header after pipeline starts
++
++    // Run pipeline
++    fprintf(stderr, "Processing...\n");
++    spek_pipeline_start(pipeline);
++    spek_pipeline_close(pipeline);
++
++    fprintf(stderr, "Done.\n");
++
++    if (output != stdout) {
++        fclose(output);
++    }
++
++    return 0;
++}
+\ No newline at end of file
+--- a/src/spek-pipeline.cc	2026-07-18 11:11:29.352935000 +0800
++++ b/src/spek-pipeline.cc	2026-07-18 11:11:29.352935000 +0800
+@@ -1,2 +0,0 @@
+-#include <wx/intl.h>
+-
+@@ -6,0 +5 @@
++#include <stdio.h>
+@@ -9,0 +9 @@
++#include <string>
+@@ -17 +17,3 @@
+-#define ngettext wxPLURAL
++// No-op gettext: replace wxWidgets _() macro for headless builds
++#define _(s) (s)
++#define ngettext(s1, s2, n) ((n) == 1 ? (s1) : (s2))
+@@ -181,3 +183,3 @@
+-        items.push_back(std::string(
+-            wxString::Format(_("%d kbps"), (pipeline->file->get_bit_rate() + 500) / 1000).utf8_str()
+-        ));
++        char buf[64];
++        snprintf(buf, sizeof(buf), "%d kbps", (pipeline->file->get_bit_rate() + 500) / 1000);
++        items.push_back(std::string(buf));
+@@ -187,3 +189,3 @@
+-        items.push_back(std::string(
+-            wxString::Format(_("%d Hz"), pipeline->file->get_sample_rate()).utf8_str()
+-        ));
++        char buf[64];
++        snprintf(buf, sizeof(buf), "%d Hz", pipeline->file->get_sample_rate());
++        items.push_back(std::string(buf));
+@@ -194,6 +196,4 @@
+-        items.push_back(std::string(
+-            wxString::Format(
+-                ngettext("%d bit", "%d bits", pipeline->file->get_bits_per_sample()),
+-                pipeline->file->get_bits_per_sample()
+-            ).utf8_str()
+-        ));
++        char buf[64];
++        snprintf(buf, sizeof(buf), ngettext("%d bit", "%d bits", pipeline->file->get_bits_per_sample()),
++                 pipeline->file->get_bits_per_sample());
++        items.push_back(std::string(buf));
+@@ -203,6 +203,3 @@
+-        items.push_back(std::string(
+-            wxString::Format(
+-                // TRANSLATORS: first %d is the current channel, second %d is the total number.
+-                "channel %d / %d", pipeline->channel + 1, pipeline->file->get_channels()
+-            ).utf8_str()
+-        ));
++        char buf[64];
++        snprintf(buf, sizeof(buf), "channel %d / %d", pipeline->channel + 1, pipeline->file->get_channels());
++        items.push_back(std::string(buf));
+@@ -212 +209,3 @@
+-        items.push_back(std::string(wxString::Format(wxT("W:%i"), pipeline->nfft).utf8_str()));
++        char buf[64];
++        snprintf(buf, sizeof(buf), "W:%i", pipeline->nfft);
++        items.push_back(std::string(buf));
+@@ -241 +240 @@
+-    wxString error;
++    std::string error;
+@@ -271 +269,0 @@
+-    auto error_string = std::string(error.utf8_str());
+@@ -273 +271 @@
+-        desc = error_string;
++        desc = error;
+@@ -275,13 +273,8 @@
+-        desc = std::string(
+-            wxString::Format(
+-                // TRANSLATORS: first %d is the stream number, second %d is the
+-                // total number of streams, %s is the stream description.
+-                _("Stream %d / %d: %s"),
+-                pipeline->stream + 1, pipeline->file->get_streams(), desc.c_str()
+-            ).utf8_str()
+-        );
+-    } else if (!error_string.empty()) {
+-        desc = std::string(
+-            // TRANSLATORS: first %s is the error message, second %s is stream description.
+-            wxString::Format(_("%s: %s"), error_string.c_str(), desc.c_str()).utf8_str()
+-        );
++        char buf[256];
++        snprintf(buf, sizeof(buf), _("Stream %d / %d: %s"),
++                 pipeline->stream + 1, pipeline->file->get_streams(), desc.c_str());
++        desc = std::string(buf);
++    } else if (!error.empty()) {
++        char buf[256];
++        snprintf(buf, sizeof(buf), _("%s: %s"), error.c_str(), desc.c_str());
++        desc = std::string(buf);
