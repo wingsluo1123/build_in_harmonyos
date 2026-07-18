@@ -182,12 +182,11 @@ class NanopbConan(ConanFile):
             if local_tools not in tool_dirs:
                 tool_dirs.insert(0, local_tools)
 
-        # HMDFS can preserve pip's non-executable mode for native extension
-        # modules. The dynamic loader then rejects grpcio-tools' OHOS .so
-        # even though Python can read the package. Restore the executable bit
-        # for native test-tool modules before they are imported by protoc.
+        # HarmonyOS validates ELF signatures when loading native Python
+        # extensions. Prepare pip-installed OHOS modules before protoc imports
+        # grpc_tools' _protoc_compiler extension.
         for tool_dir in tool_dirs:
-            self._make_shared_objects_executable(tool_dir)
+            self._prepare_native_test_tools(tool_dir)
 
         pythonpath = [path for path in tool_dirs if os.path.isdir(path)]
         existing_pythonpath = os.environ.get("PYTHONPATH")
@@ -212,14 +211,31 @@ class NanopbConan(ConanFile):
             "cmake_target_name", "nanopb::protobuf-nanopb-static"
         )
 
-    def _make_shared_objects_executable(self, tool_dir):
+    def _prepare_native_test_tools(self, tool_dir):
         if not os.path.isdir(tool_dir):
             return
+        objcopy = "/data/service/hnp/bin/llvm-objcopy"
+        signer = "/data/service/hnp/bin/binary-sign-tool"
         for root, _, filenames in os.walk(tool_dir):
             for filename in filenames:
                 if not (filename.endswith(".so") or ".so." in filename):
                     continue
                 path = os.path.join(root, filename)
+                if str(self.settings.os) == "OHOS":
+                    if not os.path.isfile(objcopy) or not os.path.isfile(signer):
+                        raise RuntimeError(
+                            "OHOS native test tools require llvm-objcopy and "
+                            "binary-sign-tool"
+                        )
+                    quoted_path = shlex.quote(path)
+                    self.run(
+                        f"{shlex.quote(objcopy)} --remove-section .codesign "
+                        f"{quoted_path} 2>/dev/null || true"
+                    )
+                    self.run(
+                        f"{shlex.quote(signer)} sign -inFile {quoted_path} "
+                        f"-outFile {quoted_path} -selfSign 1"
+                    )
                 try:
                     mode = os.stat(path).st_mode
                     os.chmod(

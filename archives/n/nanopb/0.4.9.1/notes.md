@@ -26,6 +26,7 @@
 - nanopb 是库类型，未新增 `commands.json`。
 - 未修改上游源文件，也未新增补丁。
 - CMake 上游工程在关闭 generator 时仍会探测 `protoc`，因此构建环境必须提供 `protoc`；CI worker 缺少独立二进制时由固定版本的 `grpcio-tools` 提供 Python 回退。generator Python 模块不作为本 Conan 库产物安装。
+- OHOS CI 的 `grpcio-tools` 回退包含原生 `.so`；在 HMDFS 上导入前移除旧 `.codesign`、使用 worker 的 `binary-sign-tool -selfSign 1` 重签，并恢复执行权限，确保动态加载器接受该扩展。
 
 ## 验证结果
 
