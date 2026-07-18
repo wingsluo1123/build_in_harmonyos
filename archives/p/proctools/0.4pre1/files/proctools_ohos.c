@@ -60,6 +60,31 @@ static int process_text(pid_t pid, int full, char *buffer, size_t size) {
     return read_text(path, buffer, size);
 }
 
+static int process_start_time(pid_t pid, unsigned long long *start_time) {
+    char path[64];
+    char stat_line[4096];
+    char *field;
+    char *saveptr = NULL;
+    char *end;
+    int field_number;
+
+    snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+    if (read_text(path, stat_line, sizeof(stat_line)) != 0) return -1;
+
+    /* The command name is parenthesized and may contain spaces. */
+    field = strrchr(stat_line, ')');
+    if (!field) return -1;
+    field = strtok_r(field + 1, " ", &saveptr);
+    for (field_number = 3; field && field_number < 22; ++field_number)
+        field = strtok_r(NULL, " ", &saveptr);
+    if (!field) return -1;
+
+    errno = 0;
+    *start_time = strtoull(field, &end, 10);
+    if (errno == ERANGE || end == field || *end != '\0') return -1;
+    return 0;
+}
+
 static void usage(void) {
     fprintf(stderr, "Usage: %s [-flnvxV] [-d delimiter] [-s signal] pattern\n", PROCTOOLS_NAME);
     exit(64);
@@ -91,6 +116,7 @@ int main(int argc, char **argv) {
     struct dirent *entry;
     regex_t regex;
     pid_t newest_pid = -1;
+    unsigned long long newest_start_time = 0;
     char newest_text[4096] = {0};
 
     while ((option = getopt(argc, argv, "d:flnvs:xV")) != -1) {
@@ -137,8 +163,12 @@ int main(int argc, char **argv) {
         if (invert) matched = !matched;
         if (!matched) continue;
         if (newest) {
-            if (pid > newest_pid) {
+            unsigned long long start_time;
+            if (process_start_time(pid, &start_time) != 0) continue;
+            if (newest_pid < 0 || start_time > newest_start_time ||
+                (start_time == newest_start_time && pid > newest_pid)) {
                 newest_pid = pid;
+                newest_start_time = start_time;
                 snprintf(newest_text, sizeof(newest_text), "%s", text);
             }
             continue;
