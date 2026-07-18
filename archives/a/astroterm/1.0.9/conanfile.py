@@ -27,6 +27,7 @@ class AstrotermConan(ConanFile):
     license = "MIT"
     homepage = "https://github.com/da-luce/astroterm"
     url = ""  # CI fills this
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -135,11 +136,8 @@ class AstrotermConan(ConanFile):
         if os.path.isdir(lib_dir):
             for root, _dirs, files in os.walk(lib_dir):
                 for f in files:
-                    if f.endswith(".so") or f.endswith(".so.1") or f.endswith(".la"):
+                    if f.endswith((".so", ".la")) or ".so." in f:
                         os.remove(os.path.join(root, f))
 
     def package_info(self):
-        self.cpp_info.libs = ["astroterm"]
         self.cpp_info.bindirs = ["bin"]
-        if self.settings.os in ("Linux", "OHOS"):
-            self.cpp_info.system_libs = ["m", "ncurses"]

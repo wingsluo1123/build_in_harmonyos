@@ -7,6 +7,7 @@ the binary is installed and can execute.
 import os
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, cmake_layout
 
 
@@ -26,9 +27,8 @@ class AstrotermTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Get the astroterm binary from the installed package
-        dep = self.dependencies["astroterm"]
-        astroterm_bin = os.path.join(dep.package_folder, "bin", "astroterm")
-        test_bin = os.path.join(self.build_folder, "test_astroterm")
-        # Pass the astroterm binary path as argument to the test
-        self.run(f'{test_bin} "{astroterm_bin}"', env="conanrun")
+        if can_run(self):
+            dep = self.dependencies["astroterm"]
+            astroterm_bin = os.path.join(dep.package_folder, "bin", "astroterm")
+            test_bin = os.path.join(self.build_folder, "test_astroterm")
+            self.run(f'{test_bin} "{astroterm_bin}"', env="conanrun")
