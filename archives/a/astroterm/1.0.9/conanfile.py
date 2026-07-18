@@ -6,7 +6,7 @@ positions of stars, planets, and constellations. Upstream uses the Meson build
 system and depends on argtable3, ncurses, and the math library.
 
 R26: Terminal tools must be statically linked for DevBox deployment.
-R27: argtable3 and ncurses are system libraries (no Conan recipe in repo).
+R27: ncurses is provided by the system toolchain.
 """
 import os
 
@@ -36,16 +36,17 @@ class AstrotermConan(ConanFile):
                 f"os={self.settings.os} not supported"
             )
 
-    def requirements(self):
-        # R27: argtable3 and ncurses are system runtime libraries (no Conan recipe).
-        # They are assumed to be available in the build environment.
-        pass
-
     def layout(self):
         basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        get(
+            self,
+            **self.conan_data["argtable3_source"],
+            destination=os.path.join(self.source_folder, "deps", "argtable3"),
+            strip_root=True,
+        )
 
     def generate(self):
         tc = MesonToolchain(self)
@@ -85,6 +86,26 @@ class AstrotermConan(ConanFile):
             handle.write(content.replace("[binaries]\n", binaries, 1))
 
     def build(self):
+        meson_file = os.path.join(self.source_folder, "meson.build")
+        replace_in_file(
+            self,
+            meson_file,
+            "argtable = dependency('argtable3', required: false)\n"
+            "    if not argtable.found()\n"
+            "        argtable = cc.find_library('argtable3', required: false)\n"
+            "    endif\n"
+            "    if argtable.found()\n"
+            "        have_argtable3 = true\n"
+            "    else\n"
+            "        argtable = dependency('argtable2', required: true)\n"
+            "        have_argtable2 = true\n"
+            "    endif",
+            "argtable = declare_dependency(\n"
+            "        sources: files('deps/argtable3/src/argtable3.c'),\n"
+            "        include_directories: include_directories('deps/argtable3/src'),\n"
+            "    )\n"
+            "    have_argtable3 = true",
+        )
         # Patch 1: Add stddef.h before string.h to fix size_t not found on OHOS
         replace_in_file(
             self,
@@ -131,4 +152,4 @@ class AstrotermConan(ConanFile):
         self.cpp_info.libs = ["astroterm"]
         self.cpp_info.bindirs = ["bin"]
         if self.settings.os in ("Linux", "OHOS"):
-            self.cpp_info.system_libs = ["m", "ncurses", "argtable3"]
+            self.cpp_info.system_libs = ["m", "ncurses"]
