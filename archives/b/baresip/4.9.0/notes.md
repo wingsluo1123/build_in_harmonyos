@@ -13,7 +13,6 @@ cmake -B build \
   -DCMAKE_C_COMPILER=/data/service/hnp/bin/clang \
   -DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local \
   -DCMAKE_PREFIX_PATH=/storage/Users/currentUser/usr/local \
-  -DCMAKE_SYSTEM_NAME=Linux \
   -DSTATIC=OFF
 cmake --build build -j1
 cmake --install build
