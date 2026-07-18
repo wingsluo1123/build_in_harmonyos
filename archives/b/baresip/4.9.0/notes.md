@@ -59,5 +59,5 @@ ls /storage/Users/currentUser/usr/local/lib/baresip/modules/
 - re/4.9.0 尚未发布到 Conan 远程（ohpcd），需先发布 re 或使用本地安装的 re
 ---
 
-**编译结束**: 2026-07-18 19:36
+**编译结束**: 2026-07-18 20:09
 **最终状态**: built
