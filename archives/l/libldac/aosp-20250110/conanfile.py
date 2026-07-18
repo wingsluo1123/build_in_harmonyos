@@ -3,7 +3,7 @@
 import os
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanException, ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import (
     apply_conandata_patches,
@@ -42,13 +42,25 @@ class LibldacConan(ConanFile):
 
     def source(self):
         source = self.conan_data["sources"]
-        get(
-            self,
-            url=source["url"],
-            sha256=source["sha256"],
-            destination=os.path.join(self.source_folder, "upstream"),
-            strip_root=False,
-        )
+        destination = os.path.join(self.source_folder, "upstream")
+        try:
+            get(
+                self,
+                url=source["url"],
+                sha256=source["sha256"],
+                destination=destination,
+                strip_root=False,
+                retry=0,
+            )
+        except ConanException:
+            self.output.warning("Official AOSP archive unavailable; using the pinned read-only mirror")
+            get(
+                self,
+                url=source["mirror_url"],
+                sha256=source["mirror_sha256"],
+                destination=destination,
+                strip_root=True,
+            )
 
     def generate(self):
         toolchain = CMakeToolchain(self)
