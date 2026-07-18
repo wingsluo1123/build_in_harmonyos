@@ -1,6 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 
 
 class LibdiscidConan(ConanFile):
@@ -11,11 +11,15 @@ class LibdiscidConan(ConanFile):
     homepage = "https://musicbrainz.org/doc/libdiscid"
     settings = "os", "compiler", "build_type", "arch"
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def layout(self):
         cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = CMakeToolchain(self)
