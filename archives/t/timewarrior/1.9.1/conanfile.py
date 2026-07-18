@@ -23,6 +23,12 @@ class TimewarriorConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "cmake", "CXXSniffer.cmake"),
+            '${CMAKE_SYSTEM_NAME} MATCHES "Linux"',
+            '${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS"',
+        )
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -37,12 +43,6 @@ class TimewarriorConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        replace_in_file(
-            self,
-            os.path.join(self.source_folder, "cmake", "CXXSniffer.cmake"),
-            '${CMAKE_SYSTEM_NAME} MATCHES "Linux"',
-            '${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS"',
-        )
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
