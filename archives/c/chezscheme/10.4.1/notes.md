@@ -4,7 +4,7 @@
 - 构建系统: custom (zuo - Chez Scheme 自带构建系统)
 - 编译日期: 2026-07-17
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
