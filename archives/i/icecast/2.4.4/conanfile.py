@@ -8,7 +8,14 @@ import stat
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, save
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+    save,
+)
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -64,6 +71,13 @@ class IcecastConan(ConanFile):
         os.chmod(xslt_config, os.stat(xslt_config).st_mode | stat.S_IEXEC)
 
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend(
+                [
+                    "--build=aarch64-unknown-linux-gnu",
+                    "--host=aarch64-unknown-linux-ohos",
+                ]
+            )
         tc.configure_args.extend(
             [
                 "--disable-shared",
@@ -78,6 +92,13 @@ class IcecastConan(ConanFile):
         tc.generate()
 
     def build(self):
+        if self.settings.os == "OHOS":
+            replace_in_file(
+                self,
+                os.path.join(self.source_folder, "configure"),
+                "umask 077",
+                "umask 022",
+            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])

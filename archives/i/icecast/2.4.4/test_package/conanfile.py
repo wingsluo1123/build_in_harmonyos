@@ -20,4 +20,5 @@ class IcecastTestConan(ConanFile):
                 "icecast",
             )
             script = os.path.join(self.source_folder, "test.sh")
-            self.run(f'sh "{script}" "{binary}"', env="conanrun")
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            self.run(f'"{bash}" "{script}" "{binary}"', env="conanrun")
