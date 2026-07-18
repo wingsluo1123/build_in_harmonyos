@@ -62,8 +62,8 @@ cp ../libpkgconf/*.h $TEST_PREFIX/$DEFAULT_PREFIX/include/pkgconf/
 
 ## 源码修改
 
-无补丁文件，但应用了：
-- **E007 补丁**：config.guess + config.sub（HarmonyOS 平台识别）
+补丁文件：
+- **0004-meson-force-bsd-funcs.patch**：强制设置 HAVE_DECL_STRLCPY/STRLCAT/STRNDUP=1（OHOS musl 提供这些 BSD 函数，但 meson 交叉编译检测失败）
 
 ## 依赖版本
 
@@ -103,4 +103,4 @@ $TEST_PREFIX/$DEFAULT_PREFIX/bin/bomtool --version
 ---
 
 **编译结束**: 2026-07-16 12:56
-**最终状态**: built
+**最终状态**: published

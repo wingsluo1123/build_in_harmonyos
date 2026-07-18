@@ -83,12 +83,14 @@ class PkgconfConan(ConanFile):
                 content = content.replace("ar = 'llvm-ar'", f"ar = '{ar}'")
                 content = content.replace("ar = 'ar'", f"ar = '{ar}'")
             if 'ar =' not in content and ar:
+                extra_lines = f"\nar = '{ar}'"
+                if ranlib:
+                    extra_lines += f"\nranlib = '{ranlib}'"
+                if strip:
+                    extra_lines += f"\nstrip = '{strip}'"
                 content = content.replace(
                     f"cpp = '{clangxx or profile_clangxx}'",
-                    f"cpp = '{clangxx or profile_clangxx}'\n"
-                    f"ar = '{ar}'\n"
-                    f"ranlib = '{ranlib}'\n"
-                    f"strip = '{strip}'"
+                    f"cpp = '{clangxx or profile_clangxx}'{extra_lines}"
                 )
             with open(native_file, 'w') as f:
                 f.write(content)
@@ -96,19 +98,6 @@ class PkgconfConan(ConanFile):
         apply_conandata_patches(self)
         meson = Meson(self)
         meson.configure()
-
-        # Fix config.h: meson's has_header_symbol check fails for strlcpy/strlcat/strndup
-        # on OHOS musl, causing bsdstubs.c to redefine them as static (conflict)
-        config_h = os.path.join(self.build_folder, "libpkgconf", "config.h")
-        if os.path.exists(config_h):
-            with open(config_h, 'r') as f:
-                content = f.read()
-            content = content.replace("#define HAVE_DECL_STRLCPY 0", "#define HAVE_DECL_STRLCPY 1")
-            content = content.replace("#define HAVE_DECL_STRLCAT 0", "#define HAVE_DECL_STRLCAT 1")
-            content = content.replace("#define HAVE_DECL_STRNDUP 0", "#define HAVE_DECL_STRNDUP 1")
-            with open(config_h, 'w') as f:
-                f.write(content)
-
         meson.build()
 
     def package(self):

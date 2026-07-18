@@ -26,6 +26,10 @@ int main(void) {
     /* Test path splitting (core pkg-config path handling) */
     size_t count = pkgconf_path_split("/usr/lib/pkgconfig:/usr/share/pkgconfig", &list, true);
     printf("path_split returned %zu entries\n", count);
+    if (count != 2) {
+        fprintf(stderr, "FAIL: path_split returned %zu entries, expected 2\n", count);
+        return 1;
+    }
     pkgconf_path_free(&list);
 
     printf("PASS: libpkgconf API test OK\n");

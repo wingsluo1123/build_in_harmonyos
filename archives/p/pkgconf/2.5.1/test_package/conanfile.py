@@ -31,12 +31,8 @@ class PkgconfTestConan(ConanFile):
         if not os.path.exists(profile_clang):
             clang = shutil.which('clang')
             clangxx = shutil.which('clang++')
-            if clang:
-                os.environ["CC"] = clang
-            if clangxx:
-                os.environ["CXX"] = clangxx
 
-            # Also fix the CMake toolchain file if it has the wrong path
+            # Fix the CMake toolchain file if it has the wrong path
             gen_folder = self.generators_folder
             toolchain_file = os.path.join(gen_folder, "conan_toolchain.cmake")
             if os.path.exists(toolchain_file):

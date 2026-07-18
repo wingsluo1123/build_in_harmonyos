@@ -15,10 +15,10 @@ build_system: meson
 
 # 编译状态
 # published | built | failed | archived
-status: built
+status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
+build_date: "2026-07-18"
 
 # ============================================================
 # 源码信息
@@ -29,7 +29,7 @@ source:
   url: "https://github.com/pkgconf/pkgconf/archive/refs/tags/pkgconf-2.5.1.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "79721badcad1987dead9c3609eb4877ab9b58821c06bdacb824f2c8897c11f2a"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -65,7 +65,8 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0004-meson-force-bsd-funcs.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -74,10 +75,10 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "meson has_header_symbol 在交叉编译时对 strlcpy/strlcat/strndup 检测失败，需通过 patch 强制设置 HAVE_DECL 宏"
+  - "CI profile 编译器路径可能指向开发环境不存在的路径，需在 build() 中动态修复"
+  - "kyua/atf 测试框架在 OHOS 不可用，需通过 Conan test_package 补充测试"
 
 patch_generation:
   method: per-file-difflib
@@ -86,18 +87,10 @@ patch_generation:
   source_orig_hash: c5d4d30eae3a0b87
   source_work_hash: 393670693ac7a3c1
   generated_at: '2026-05-26T16:33:58'
-  patches_count: 3
+  patches_count: 1
 
 patch_classification:
-  - file: 0001-aclocal.m4.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-config.sub.patch
-    type: auto
+  - file: 0004-meson-force-bsd-funcs.patch
+    type: manual
     platform_only: True
     guard: 'pending'
