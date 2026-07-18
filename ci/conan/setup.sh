@@ -75,6 +75,23 @@ if [ "$CONAN_VERSION" = "unknown" ]; then
     fi
 fi
 
+# Some upstream libraries use SCons for their official test suites.  Keep the
+# test tool available on clean workers instead of relying on a preinstalled
+# command that may be absent from PATH.
+if ! command -v scons &>/dev/null; then
+    echo "[step] SCons not found, installing the pinned test tool..."
+    python3 -m pip install --user --disable-pip-version-check "SCons==4.10.0" || {
+        echo "[error] Failed to install SCons 4.10.0"
+        exit 1
+    }
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+if ! command -v scons &>/dev/null; then
+    echo "[error] SCons is still unavailable after installation"
+    exit 1
+fi
+echo "[step] SCons: $(scons --version 2>/dev/null | head -1)"
+
 # ── 1b. Refresh stale settings.yml ──
 # conan caches settings.yml on first run; if conan was upgraded (e.g. OHOS
 # support added to default_settings.py), the cached file is stale and
