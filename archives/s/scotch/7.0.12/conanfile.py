@@ -82,4 +82,4 @@ class ScotchConan(ConanFile):
         self.cpp_info.libs = ["scotch", "scotcherr"]
         self.cpp_info.set_property("cmake_file_name", "scotch")
         self.cpp_info.set_property("cmake_target_name", "scotch::scotch")
-        self.cpp_info.system_libs = ["m", "pthread"]
+        self.cpp_info.system_libs = ["m"] if self.settings.os == "OHOS" else ["m", "pthread"]
