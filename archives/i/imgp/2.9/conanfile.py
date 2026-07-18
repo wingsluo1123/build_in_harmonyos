@@ -42,36 +42,13 @@ class ImgpConan(ConanFile):
         # Change to the source directory since pip needs to find setup.py
         src_dir = self.source_folder
 
-        # Install pillow (pre-built wheel for OHOS) separately
-        self.run(f"{python} -m pip install pillow", env="conanrun")
-        # Copy .so files from user site-packages to a writable location,
-        # then replace originals with symlinks. The OHOS filesystem at
-        # ~/.local/ may be mounted with noexec, preventing .so loading.
-        # Also fix parent directory permissions (missing +x on PIL/
-        # prevents accessing files inside it).
-        chmod_script = os.path.join(self.build_folder, "fix_so_perms.py")
-        with open(chmod_script, "w") as f:
-            f.write("""import os, shutil
-sp = os.path.expanduser('~/.local/lib/python3.12/site-packages')
-libdir = os.path.expanduser('~/.local/lib/python3.12/site-packages/.so_fix')
-os.makedirs(libdir, exist_ok=True)
-for root, dirs, files in os.walk(sp):
-    # Fix parent directory permissions
-    os.chmod(root, 0o755)
-    for f in files:
-        if f.endswith('.so'):
-            src = os.path.join(root, f)
-            dst = os.path.join(libdir, f)
-            try:
-                shutil.copy2(src, dst)
-                os.chmod(dst, 0o755)
-                os.remove(src)
-                os.symlink(dst, src)
-                print('fix', src, '->', dst)
-            except Exception as e:
-                print('fail', src, e)
-""")
-        self.run(f"{python} '{chmod_script}'", env="conanrun")
+        # Install pillow (pre-built wheel for OHOS) separately.
+        # Use --prefix to install to $HOME/usr/local instead of the
+        # default user site-packages (~/.local/). The OHOS filesystem
+        # at ~/.local/ is mounted with noexec, preventing .so loading.
+        # $HOME/usr/local/ is on an executable filesystem.
+        prefix = os.path.expanduser("~/usr/local")
+        self.run(f"{python} -m pip install --prefix='{prefix}' pillow", env="conanrun")
 
         # Download and install setuptools from files.pythonhosted.org.
         # The CI's internal pip index (pypi.cnb.cool) does not have setuptools,
