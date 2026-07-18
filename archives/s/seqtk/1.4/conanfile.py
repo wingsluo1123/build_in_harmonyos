@@ -76,7 +76,11 @@ class SeqtkConan(ConanFile):
         library_flags = [
             f"-L{path}" for path in self._dependency_paths(zlib, "libdirs")
         ]
-        cflags = "-O2 -Wall -Wextra -Wno-unused-function " + " ".join(include_flags)
+        cflags = "-Wall -Wextra -Wno-unused-function " + " ".join(include_flags)
+        if self.settings.build_type == "Debug":
+            cflags = "-g " + cflags
+        else:
+            cflags = "-O2 " + cflags
         compiler = self._compiler()
         if library_flags:
             compiler = f"{compiler} {' '.join(library_flags)}"
