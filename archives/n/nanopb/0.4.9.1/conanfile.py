@@ -86,6 +86,7 @@ class NanopbConan(ConanFile):
             # nanopb_pb2.py generation uses the same OHOS-safe protoc.
             protoc_dir = os.path.dirname(protoc)
             os.environ["PROTOC"] = protoc
+            os.environ["NANOPB_PB2_NO_REBUILD"] = "1"
             os.environ["PATH"] = os.pathsep.join(
                 path for path in (protoc_dir, os.environ.get("PATH", "")) if path
             )
@@ -282,6 +283,7 @@ class NanopbConan(ConanFile):
         if not os.path.isfile(protoc):
             raise RuntimeError(f"protobuf build did not produce protoc: {protoc}")
         self._sign_ohos_elf(protoc)
+        self._generate_ohos_nanopb_pb2(protoc, protoc_source)
         return protoc
 
     def _prepare_ohos_protoc_source(self):
@@ -300,6 +302,24 @@ class NanopbConan(ConanFile):
                 strip_root=True,
             )
         return protoc_source
+
+    def _generate_ohos_nanopb_pb2(self, protoc, protobuf_source):
+        """Pre-generate nanopb's Python bindings with the signed protoc."""
+        proto_dir = os.path.join(self.source_folder, "generator", "proto")
+        proto_file = os.path.join(proto_dir, "nanopb.proto")
+        protobuf_include = os.path.join(protobuf_source, "src")
+        generated = os.path.join(proto_dir, "nanopb_pb2.py")
+        command = [
+            protoc,
+            f"--python_out={proto_dir}",
+            proto_file,
+            f"-I{proto_dir}",
+            f"-I{protobuf_include}",
+        ]
+        self.output.info("Generating nanopb Python bindings with signed OHOS protoc")
+        self.run(" ".join(shlex.quote(str(arg)) for arg in command))
+        if not os.path.isfile(generated):
+            raise RuntimeError(f"protoc did not generate nanopb Python bindings: {generated}")
 
     def _make_ohos_compiler_wrapper(self, compiler, name):
         """Sign each SCons test executable immediately after linking."""
