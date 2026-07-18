@@ -33,7 +33,25 @@ class ErofsUtilsConan(ConanFile):
             self.export_sources_folder, "files", "autotools-generated"
         )
         copy(self, "*", generated, self.source_folder, keep_path=True)
+        self._set_autotools_executable_bits()
         self._refresh_autotools_timestamps()
+
+    def _set_autotools_executable_bits(self):
+        executable_files = (
+            "configure",
+            os.path.join("config", "ar-lib"),
+            os.path.join("config", "compile"),
+            os.path.join("config", "config.guess"),
+            os.path.join("config", "config.sub"),
+            os.path.join("config", "depcomp"),
+            os.path.join("config", "install-sh"),
+            os.path.join("config", "ltmain.sh"),
+            os.path.join("config", "missing"),
+        )
+        for relative_path in executable_files:
+            path = os.path.join(self.source_folder, relative_path)
+            if os.path.exists(path):
+                os.chmod(path, os.stat(path).st_mode | 0o111)
 
     def _refresh_autotools_timestamps(self):
         base = time.time() - 3600
