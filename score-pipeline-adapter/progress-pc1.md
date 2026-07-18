@@ -43,10 +43,19 @@
 
 | 阶段 | 状态 | 备注 |
 |------|------|------|
-| recipe 创建 | ⏳ | 等待 re 完成 |
-| 本地 finish | ⏳ | |
-| submit / PR | ⏳ | |
+| recipe 创建 | ✅ | conanfile.py + conandata.yml + test_package + patches |
+| 本地 finish | ❌ | 阻塞：CMake FindPkgConfig 兼容性 bug + 链接 OpenSSL 符号问题 |
+| submit / PR | ⏳ | 等待 finish 通过 |
 | 远端 CI | ⏳ | |
 | AI Review | ⏳ | |
 | 评审闭环 | ⏳ | |
 | 等待人工审核 | ⏳ | |
+
+#### 阻塞证据
+
+baresip 4.9.0 在 OHOS 上 `conan create` 失败，根因：
+1. **CMake FindPkgConfig 兼容性 bug**：`FindSNDFILE.cmake` 调用 `pkg_check_modules` 时触发 CMake 4.1.2 的 `if` 参数解析错误
+2. **链接 OpenSSL 符号问题**：`libbaresip.so` 通过 re 库间接依赖 OpenSSL，链接器 `--no-allow-shlib-undefined` 阻止未定义符号通过
+3. **CMake OHOS 平台检测不完整**：`CMAKE_SYSTEM_NAME=Linux` 绕过检测但引入 Linux 专用源文件冲突
+
+修复方向：需等待 CMake 工具链更新或手动 patch CMake FindPkgConfig 模块。当前标记为 `阻塞`。|
