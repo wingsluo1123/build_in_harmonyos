@@ -142,17 +142,16 @@ Cflags: -I${{includedir}}
                 "project(hidapi LANGUAGES C)",
                 'project(hidapi LANGUAGES C)\nadd_compile_options(-Wno-error=implicit-function-declaration -Wno-error=int-conversion)')
 
+        # Add stub-udev.c to the hidraw target so it's compiled into the library
+        src_cmake = os.path.join(self.source_folder, "src", "CMakeLists.txt")
+        if os.path.isfile(src_cmake):
+            replace_in_file(self, src_cmake,
+                'add_subdirectory("${PROJECT_ROOT}/linux" linux)',
+                'add_subdirectory("${PROJECT_ROOT}/linux" linux)\nif(TARGET hidapi_hidraw)\n    target_sources(hidapi_hidraw PRIVATE ${PROJECT_ROOT}/stub-udev/stub-udev.c)\n    target_include_directories(hidapi_hidraw PRIVATE ${PROJECT_ROOT}/stub-udev)\nendif()')
+
         cmake = CMake(self)
         cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
         cmake.build()
-
-        # Merge stub-udev.o into libhidapi-hidraw.a to resolve libudev symbols
-        import glob
-        stub_obj = os.path.join(stub_dir, "stub-udev.o")
-        hidraw_libs = glob.glob(os.path.join(self.build_folder, "**", "libhidapi-hidraw.a"), recursive=True)
-        if os.path.isfile(stub_obj) and hidraw_libs:
-            ar = os.environ.get("AR", "llvm-ar")
-            self.run(f"{ar} rcs {hidraw_libs[0]} {stub_obj}")
 
     def package(self):
         cmake = CMake(self)
