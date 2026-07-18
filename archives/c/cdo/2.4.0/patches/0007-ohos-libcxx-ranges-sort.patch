@@ -1,0 +1,48 @@
+diff -ruN -U0 a/src/dcw_reader.cc b/src/dcw_reader.cc
+--- a/src/dcw_reader.cc	2026-07-19 00:10:20
++++ b/src/dcw_reader.cc	2026-07-19 00:10:21
+@@ -546 +546 @@
+-  std::ranges::sort(dcw_lists.countries, compare_code);
++  std::sort(dcw_lists.countries.begin(), dcw_lists.countries.end(), compare_code);
+diff -ruN -U0 a/src/factory.cc b/src/factory.cc
+--- a/src/factory.cc	2026-07-19 00:10:20
++++ b/src/factory.cc	2026-07-19 00:10:21
+@@ -179 +179 @@
+-  std::ranges::sort(names);
++  std::sort(names.begin(), names.end());
+diff -ruN -U0 a/src/varray.h b/src/varray.h
+--- a/src/varray.h	2026-07-19 00:10:20
++++ b/src/varray.h	2026-07-19 00:10:21
+@@ -15,0 +16 @@
++#include <functional>
+@@ -17,0 +19,28 @@
++#ifdef __OHOS__
++namespace ranges
++{
++using std::ranges::count_if;
++using std::ranges::fill;
++using std::ranges::fill_n;
++using std::ranges::greater;
++using std::ranges::less;
++using std::ranges::minmax_element;
++using std::ranges::transform;
++
++template <typename Range, typename Compare = std::less<>, typename Projection = std::identity>
++void
++sort(Range &range, Compare compare = {}, Projection projection = {})
++{
++  std::sort(range.begin(), range.end(),
++            [&](const auto &left, const auto &right) { return std::invoke(compare, std::invoke(projection, left), std::invoke(projection, right)); });
++}
++
++template <typename Range, typename Compare = std::less<>, typename Projection = std::identity>
++void
++stable_sort(Range &range, Compare compare = {}, Projection projection = {})
++{
++  std::stable_sort(range.begin(), range.end(),
++                   [&](const auto &left, const auto &right) { return std::invoke(compare, std::invoke(projection, left), std::invoke(projection, right)); });
++}
++}
++#else
+@@ -18,0 +48 @@
++#endif
