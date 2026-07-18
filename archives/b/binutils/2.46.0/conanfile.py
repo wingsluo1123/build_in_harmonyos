@@ -52,7 +52,7 @@ class BinutilsConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        skill_root = os.environ.get("SKILL_ROOT", "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos")
+        skill_root = "/storage/Users/currentUser/junshi_liu/build_in_harmonyos"
         # E007: Fix config.guess/config.sub for OHOS
         for subdir in ["", "config", "build-aux"]:
             cg = os.path.join(self.source_folder, subdir, "config.guess") if subdir else os.path.join(self.source_folder, "config.guess")
