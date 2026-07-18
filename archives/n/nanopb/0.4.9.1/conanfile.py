@@ -55,6 +55,25 @@ class NanopbConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
+        # The CI setup step and the Conan build step are separate processes.
+        # Keep the shared test-tool directory visible to the Python process
+        # that runs SCons and the grpcio-tools protoc fallback.
+        test_tools_dir = os.environ.get(
+            "CONAN_TEST_TOOLS_DIR",
+            os.path.join(
+                os.path.expanduser("~"),
+                ".cache",
+                "build_in_harmonyos",
+                "test-tools",
+            ),
+        )
+        if os.path.isdir(test_tools_dir):
+            pythonpath = [test_tools_dir]
+            existing_pythonpath = os.environ.get("PYTHONPATH")
+            if existing_pythonpath:
+                pythonpath.append(existing_pythonpath)
+            os.environ["PYTHONPATH"] = os.pathsep.join(pythonpath)
+
         cmake = CMake(self)
         cmake.configure()
         cmake.build()

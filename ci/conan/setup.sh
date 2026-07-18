@@ -16,6 +16,7 @@ set -euo pipefail
 # ── Path resolution ──
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+TEST_TOOLS_DIR="${CONAN_TEST_TOOLS_DIR:-$HOME/.cache/build_in_harmonyos/test-tools}"
 
 echo "[step] Conan environment setup..."
 
@@ -54,8 +55,21 @@ echo "[step] Conan version: $CONAN_VERSION"
 CONAN_PYTHON="$PYTHON3_BIN"
 CONAN_BIN="$(command -v conan 2>/dev/null || true)"
 if [ -n "$CONAN_BIN" ]; then
-    CONAN_SHEBANG="$(head -n 1 "$CONAN_BIN" 2>/dev/null || true)"
-    CONAN_CANDIDATE="$(printf '%s\n' "$CONAN_SHEBANG" | sed 's/^#!//' | awk '{print $1}')"
+    # HNP launchers may use either a direct interpreter path or
+    # #!/usr/bin/env python3.  Strip CR from generated launchers before
+    # parsing, because a trailing CR makes an otherwise valid path unusable.
+    CONAN_SHEBANG="$(head -n 1 "$CONAN_BIN" 2>/dev/null | tr -d '\r' || true)"
+    CONAN_CANDIDATE=""
+    case "$CONAN_SHEBANG" in
+        '#!'*'/env '* )
+            CONAN_NAME="${CONAN_SHEBANG#*'/env ' }"
+            CONAN_NAME="${CONAN_NAME%% *}"
+            CONAN_CANDIDATE="$(command -v "$CONAN_NAME" 2>/dev/null || true)"
+            ;;
+        '#!'* )
+            CONAN_CANDIDATE="${CONAN_SHEBANG#\#!}"
+            ;;
+    esac
     if [ -x "$CONAN_CANDIDATE" ]; then
         CONAN_PYTHON="$CONAN_CANDIDATE"
     fi
@@ -93,22 +107,28 @@ if [ "$CONAN_VERSION" = "unknown" ]; then
     fi
 fi
 
+mkdir -p "$TEST_TOOLS_DIR"
+echo "[step] Conan test tools: $TEST_TOOLS_DIR"
+
 # Some upstream libraries use SCons for their official test suites. Install
 # it for Conan's interpreter because recipes invoke it as 'python -m SCons'.
-if ! "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
+if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
     echo "[step] SCons not found for Conan Python, installing the pinned test tool..."
-    "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check "SCons==4.10.0" || {
+    "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
+        --disable-pip-version-check --no-warn-script-location "SCons==4.10.0" || {
         echo "[error] Failed to install SCons 4.10.0"
         exit 1
     }
-    export PATH="$HOME/.local/bin:$PATH"
 fi
-if ! "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
+if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
     echo "[error] SCons is still unavailable for Conan Python after installation"
     exit 1
 fi
 echo "[step] SCons interpreter: $CONAN_PYTHON"
-"$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
+PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    "$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
 
 # Nanopb's upstream tests also require protoc. The setup step runs in a
 # separate process from Conan, so a protoc found only in ~/.local/bin would
@@ -121,20 +141,25 @@ case "$PROTOC_PATH" in
     *) PROTOC_USABLE=1;;
 esac
 if [ "$PROTOC_USABLE" -eq 0 ]; then
-    if ! "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null; then
+    if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+        "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null; then
         echo "[step] protoc not found, installing grpcio-tools fallback..."
-        if ! "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
-            "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
+        if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+            "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
+            "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
+                --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
                 echo "[error] Failed to install protobuf runtime 5.29.6"
                 exit 1
             }
         fi
-        "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
+        "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
+            --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
             echo "[error] Failed to install grpcio-tools 1.67.1"
             exit 1
         }
     fi
-    "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null || {
+    PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+        "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null || {
         echo "[error] grpcio-tools protoc fallback is unavailable"
         exit 1
     }
