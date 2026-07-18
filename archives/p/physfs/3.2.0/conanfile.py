@@ -1,15 +1,28 @@
+#!/usr/bin/env python3
+"""Conan recipe — physfs 3.2.0 (CMake project).
+
+PhysicsFS: filesystem abstraction library for game archive access (ZIP, 7z, etc.)
+"""
 from conan import ConanFile
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get
 
 
 class PhysfsConan(ConanFile):
     name = "physfs"
     version = "3.2.0"
-    description = "Portable virtual filesystem library for archives"
+    description = "Filesystem abstraction library for game archive access (ZIP, 7z, etc.)"
     license = "Zlib"
     homepage = "https://icculus.org/physfs/"
+    url = ""  # CI fills this
+
     settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        pass
 
     def layout(self):
         cmake_layout(self)
@@ -19,22 +32,14 @@ class PhysfsConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables.update(
-            {
-                "PHYSFS_BUILD_STATIC": True,
-                "PHYSFS_BUILD_SHARED": False,
-                "PHYSFS_BUILD_TEST": False,
-                "PHYSFS_BUILD_DOCS": False,
-                "PHYSFS_DISABLE_INSTALL": False,
-                "CMAKE_POSITION_INDEPENDENT_CODE": True,
-                "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
-            }
-        )
+        # CMake 4.x removed compatibility with < 3.5; physfs requires 3.0.0
+        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.generate()
 
     def build(self):
+        apply_conandata_patches(self)
         cmake = CMake(self)
-        cmake.configure()
+        cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
 
     def package(self):
@@ -43,6 +48,3 @@ class PhysfsConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["physfs"]
-        self.cpp_info.set_property("cmake_file_name", "PhysFS")
-        self.cpp_info.set_property("cmake_target_name", "PhysFS::PhysFS")
-        self.cpp_info.set_property("pkg_config_name", "physfs")
