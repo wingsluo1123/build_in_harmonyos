@@ -110,10 +110,17 @@ fi
 echo "[step] SCons interpreter: $CONAN_PYTHON"
 "$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
 
-# Nanopb's upstream tests also require protoc.  Some clean workers do not
-# provide the standalone binary, so install the Python protoc implementation
-# as a portable fallback for recipes that invoke it through their interpreter.
-if ! command -v protoc &>/dev/null; then
+# Nanopb's upstream tests also require protoc. The setup step runs in a
+# separate process from Conan, so a protoc found only in ~/.local/bin would
+# not be visible to the recipe later. Treat that location as non-persistent
+# and prepare the Python fallback for Conan's interpreter instead.
+PROTOC_PATH="$(command -v protoc 2>/dev/null || true)"
+PROTOC_USABLE=0
+case "$PROTOC_PATH" in
+    ""|"$HOME/.local/bin/"*) ;;
+    *) PROTOC_USABLE=1;;
+esac
+if [ "$PROTOC_USABLE" -eq 0 ]; then
     if ! "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null; then
         echo "[step] protoc not found, installing grpcio-tools fallback..."
         if ! "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
@@ -132,8 +139,8 @@ if ! command -v protoc &>/dev/null; then
         exit 1
     }
 fi
-if command -v protoc &>/dev/null; then
-    echo "[step] protoc: $(protoc --version 2>/dev/null)"
+if [ "$PROTOC_USABLE" -eq 1 ]; then
+    echo "[step] protoc: $PROTOC_PATH"
 else
     echo "[step] protoc: python grpc_tools.protoc fallback"
 fi
