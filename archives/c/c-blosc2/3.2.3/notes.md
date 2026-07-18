@@ -8,7 +8,7 @@
 
 ## 编译步骤
 
-1. 源码获取：从 GitHub 下载 v3.2.3 tag 的 tar.gz 压缩包
+1. 源码获取：从 GitCode 镜像浅克隆 v3.2.3 tag
 2. CMake 配置（参考 homebrew formula 的构建选项）：
    ```
    cmake -S . -B build \
@@ -30,6 +30,7 @@
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | OHOS aarch64 交叉编译需指定处理器架构 | CMake 默认检测宿主机架构 | 在 generate() 中设置 CMAKE_SYSTEM_PROCESSOR=aarch64 |
+| 2 | CI 无法下载 GitHub 源码归档 | Worker 网络受限，无法直连 github.com | 从 GitCode 镜像浅克隆 v3.2.3 tag |
 
 ## 依赖版本
 

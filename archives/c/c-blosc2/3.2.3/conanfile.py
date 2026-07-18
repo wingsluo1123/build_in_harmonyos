@@ -1,6 +1,7 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get, copy
+from conan.tools.files import copy
+from conan.tools.scm import Git
 import os
 
 
@@ -35,7 +36,13 @@ class CBlosc2Conan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        source = self.conan_data["sources"][self.version]
+        git = Git(self)
+        git.clone(
+            url=source["git_url"],
+            target=".",
+            args=["--depth", "1", "--branch", source["git_tag"]],
+        )
 
     def generate(self):
         tc = CMakeToolchain(self)
