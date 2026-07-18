@@ -87,8 +87,11 @@ print('Download complete: ' + str(downloaded) + ' bytes')
         self.run(f"{python} -m pip install '{st_tarball}' --no-build-isolation", env="conanrun")
 
         # Install imgp from source directory using --no-build-isolation
-        # (setuptools is now available in the system Python)
-        self.run(f"cd {src_dir} && {python} -m pip install --no-build-isolation .", env="conanrun")
+        # (setuptools is now available in the system Python).
+        # Use --no-deps to prevent pip from re-installing pillow to the
+        # noexec user site-packages (~/.local/). Pillow is already
+        # installed to $HOME/usr/local/ via --prefix --force-reinstall.
+        self.run(f"cd {src_dir} && {python} -m pip install --no-build-isolation --no-deps .", env="conanrun")
 
     def package(self):
         # Find the installed files from the system Python
