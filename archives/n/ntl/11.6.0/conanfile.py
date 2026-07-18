@@ -50,7 +50,9 @@ class NtlConan(ConanFile):
         AutotoolsToolchain(self).generate()
 
     def build(self):
-        executables = self.conf.get("tools.build:compiler_executables", default={})
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        )
         ar = executables.get("ar", "llvm-ar")
         ranlib = executables.get("ranlib", "llvm-ranlib")
         configure_args = [
