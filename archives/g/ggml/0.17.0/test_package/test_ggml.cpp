@@ -34,7 +34,19 @@ int main() {
     std::memcpy(rhs->data, rhs_values, sizeof(rhs_values));
 
     ggml_tensor *sum = ggml_add(context, lhs, rhs);
+    if (!sum) {
+        std::fprintf(stderr, "ggml_add failed\n");
+        ggml_free(context);
+        return 1;
+    }
+
     ggml_cgraph *graph = ggml_new_graph(context);
+    if (!graph) {
+        std::fprintf(stderr, "ggml_new_graph failed\n");
+        ggml_free(context);
+        return 1;
+    }
+
     ggml_build_forward_expand(graph, sum);
     if (ggml_graph_compute_with_ctx(context, graph, 1) != GGML_STATUS_SUCCESS) {
         std::fprintf(stderr, "ggml_graph_compute_with_ctx failed\n");
