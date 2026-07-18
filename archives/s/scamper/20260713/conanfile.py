@@ -44,6 +44,13 @@ class ScamperConan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend(
+                [
+                    "--build=aarch64-unknown-linux-gnu",
+                    "--host=aarch64-unknown-linux-ohos",
+                ]
+            )
         tc.configure_args.extend(
             [
                 "--disable-shared",
