@@ -44,17 +44,20 @@ class ImgpConan(ConanFile):
 
         # Install pillow (pre-built wheel for OHOS) separately
         self.run(f"{python} -m pip install pillow", env="conanrun")
-        # Copy .so files from user site-packages to LD_LIBRARY_PATH.
-        # The OHOS filesystem at ~/.local/ is mounted with noexec, so
-        # shared libraries (.so) cannot be loaded from there even with
-        # correct permissions. Copy them to /usr/local/lib/ which is
-        # both writable and in LD_LIBRARY_PATH (and is executable).
+        # Copy .so files from user site-packages to a writable location,
+        # then replace originals with symlinks. The OHOS filesystem at
+        # ~/.local/ may be mounted with noexec, preventing .so loading.
+        # Also fix parent directory permissions (missing +x on PIL/
+        # prevents accessing files inside it).
         chmod_script = os.path.join(self.build_folder, "fix_so_perms.py")
         with open(chmod_script, "w") as f:
-            f.write("""import os, shutil, glob
+            f.write("""import os, shutil
 sp = os.path.expanduser('~/.local/lib/python3.12/site-packages')
-libdir = '/storage/Users/currentUser/usr/local/lib'
+libdir = os.path.expanduser('~/.local/lib/python3.12/site-packages/.so_fix')
+os.makedirs(libdir, exist_ok=True)
 for root, dirs, files in os.walk(sp):
+    # Fix parent directory permissions
+    os.chmod(root, 0o755)
     for f in files:
         if f.endswith('.so'):
             src = os.path.join(root, f)
@@ -62,7 +65,9 @@ for root, dirs, files in os.walk(sp):
             try:
                 shutil.copy2(src, dst)
                 os.chmod(dst, 0o755)
-                print('copy', src, '->', dst)
+                os.remove(src)
+                os.symlink(dst, src)
+                print('fix', src, '->', dst)
             except Exception as e:
                 print('fail', src, e)
 """)
