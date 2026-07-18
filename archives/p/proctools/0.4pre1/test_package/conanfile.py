@@ -18,7 +18,7 @@ class ProctoolsTestConan(ConanFile):
         if can_run(self):
             script = os.path.join(self.source_folder, "test_proctools.sh")
             self.run(
-                'sh "{}" "{}"'.format(
+                'bash "{}" "{}"'.format(
                     script, self.dependencies["proctools"].package_folder
                 ),
                 env="conanrun",

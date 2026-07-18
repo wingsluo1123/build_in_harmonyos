@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
 #include <regex.h>
 #include <signal.h>
 #include <stdio.h>
@@ -56,6 +57,23 @@ static void usage(void) {
     exit(64);
 }
 
+static int parse_signal_number(const char *argument, int *signal_number) {
+    char *end = NULL;
+    long value;
+
+    errno = 0;
+    value = strtol(argument, &end, 10);
+    if (errno == ERANGE || end == argument || *end != '\0' || value < 0 ||
+        value >= NSIG || value > INT_MAX) {
+        fprintf(stderr, "%s: invalid signal number: %s\n", PROCTOOLS_NAME,
+                argument);
+        return -1;
+    }
+
+    *signal_number = (int)value;
+    return 0;
+}
+
 int main(int argc, char **argv) {
     int full = 0, long_output = 0, newest = 0, invert = 0, exact = 0;
     int signal_number = SIGTERM, option, found = 0;
@@ -74,7 +92,9 @@ int main(int argc, char **argv) {
         case 'l': long_output = 1; break;
         case 'n': newest = 1; break;
         case 'v': invert = 1; break;
-        case 's': signal_number = atoi(optarg); break;
+        case 's':
+            if (parse_signal_number(optarg, &signal_number) != 0) return 64;
+            break;
         case 'x': exact = 1; break;
         case 'V':
             printf("%s (proctools %s) %s\n", PROCTOOLS_NAME, VERSION,
