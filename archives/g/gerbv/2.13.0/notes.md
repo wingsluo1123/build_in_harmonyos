@@ -10,7 +10,7 @@
 1. init-build: python3 scripts/ohc-run.py init-build gerbv 2.13.0
 2. 源码获取: git clone --depth 1 --branch v2.13.0 https://github.com/gerbv/gerbv.git
 3. CMake 构建: cmake -B build -DCMAKE_BUILD_TYPE=Release
-4. 依赖安装: curl install.sh 安装 glib 2.88.0, cairo 1.18.2, gtk4 4.22.4, libxml2 2.15.3, gettext 0.22.5
+4. 依赖安装: 使用 ohc-run.py resolve-deps 或 Conan 包管理安装 glib 2.88.0, cairo 1.18.2, gtk4 4.22.4, libxml2 2.15.3, gettext 0.22.5
 
 ## 遇到的问题与解决方案
 

@@ -16,7 +16,7 @@ class GerbvConan(ConanFile):
     description = "gerbv - A Free/Open Source Gerber RS-274X file viewer"
     license = "GPL-2.0"
     homepage = "https://gerbv.github.io/"
-    url = ""
+    url = "https://gerbv.github.io/"
 
     package_type = "application"
 
