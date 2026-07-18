@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """Conan recipe for xmlsec1 1.3.11."""
+import os
+
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, collect_libs, export_conandata_patches, get
+from conan.tools.files import (
+    apply_conandata_patches,
+    collect_libs,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+)
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -63,6 +71,13 @@ class Xmlsec1Conan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        if self.settings.os == "OHOS":
+            replace_in_file(
+                self,
+                os.path.join(self.source_folder, "configure"),
+                "umask 077",
+                "umask 022",
+            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
