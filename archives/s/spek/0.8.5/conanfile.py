@@ -40,10 +40,10 @@ class SpekConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        tc.generate()
         # Use system-installed FFmpeg libraries (pre-built packages, not conan packages)
         if self.settings.os in ("Linux", "OHOS"):
-            tc.extra_env["PKG_CONFIG_PATH"] = "/storage/Users/currentUser/usr/local/lib/pkgconfig"
-        tc.generate()
+            self.buildenv_info().append_path("PKG_CONFIG_PATH", "/storage/Users/currentUser/usr/local/lib/pkgconfig")
 
     def build(self):
         apply_conandata_patches(self)
