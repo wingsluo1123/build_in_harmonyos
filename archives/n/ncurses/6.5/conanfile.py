@@ -12,7 +12,7 @@ class NcursesConan(ConanFile):
     description = "The ncurses (new curses) library"
     license = "X11"
     homepage = "https://www.gnu.org/software/ncurses"
-    url = ""
+    url = "https://github.com/mirror/ncurses"
 
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
@@ -41,7 +41,10 @@ class NcursesConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
+        # E160: Fix config.guess/sub for HarmonyOS detection
+        self.run("sed -i '/case \$UNAME_SYSTEM in/a HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl ;;' config.guess", cwd=self.source_folder)
+        self.run("sed -i 's/ironclad\*)/ironclad* | ohos*)/' config.sub", cwd=self.source_folder)
+        self.run("sed -i 's/uclibc\*- )/uclibc*- | linux-ohos*- )/' config.sub", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         # OHOS HMDFS noexec (E046): config.status 中临时 awk 脚本无法直接执行
