@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: apache-arrow-glib/homebrew
+homepage: "https://arrow.apache.org/"
+
+# 上游测试命令 (meson test 运行 Ruby 测试套件)
+upstream_check_command: "meson test -C build"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试为 Ruby 脚本 (test-*.rb)，鸿蒙平台没有 Ruby 运行时，不在 build() 中运行
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 上游测试套件: 180+ 个 Ruby 测试文件 (run-test.rb 驱动)
+# 因 Ruby 运行时在 OHOS 平台不可用，上游测试不在 CI 中运行
+upstream_tests:
+  - file: test/run-test.rb
+    source: c_glib/test/run-test.rb
+    description: "上游 Ruby 测试驱动 (180+ 测试文件)，鸿蒙平台无可用的 Ruby 运行时"
+    command: "ruby run-test.rb"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_arrow_glib.c
+    description: "编译时版本宏检查 + 运行时 API 调用，验证 libarrow-glib 可链接"
+    command: "./test_arrow_glib"
+
+# 测试断言总数 (近似值)
+# 上游: 180+ Ruby 测试文件, ~1000+ 断言
+# test_package: 1 编译时宏检查 + 2 个 API 断言
+assertion_count: 3
