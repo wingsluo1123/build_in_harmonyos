@@ -75,8 +75,7 @@ ci/conan/build_and_test.sh archives/i/ice/3.8.2
 ## 注意事项
 - 本次首次适配不包含 DataStorm。
 - `finish` 的通用 G0 clean-build-verify 会尝试 `configure`，但 Ice 没有 autotools configure；真实质量门禁以 Conan 验证和 W3 本地 CI 模拟为准。
-
 ---
 
-**编译结束**: 2026-07-14 00:53
+**编译结束**: 2026-07-18 10:41
 **最终状态**: built
