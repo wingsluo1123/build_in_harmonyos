@@ -2,6 +2,7 @@
 """Conan recipe — nanopb 0.4.9.1 (CMake static runtime library)."""
 
 import shlex
+import sys
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -65,9 +66,10 @@ class NanopbConan(ConanFile):
             + "/generator/protoc-gen-nanopb "
         )
         command = (
-            "scons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
+            "{python} -m SCons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
             "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1"
         ).format(
+            python=shlex.quote(sys.executable),
             tests=tests_dir,
             cc=shlex.quote(str(cc)),
             cxx=shlex.quote(str(cxx)),
