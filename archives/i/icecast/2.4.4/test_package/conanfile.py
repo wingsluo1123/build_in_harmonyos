@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.build import can_run
@@ -20,5 +21,9 @@ class IcecastTestConan(ConanFile):
                 "icecast",
             )
             script = os.path.join(self.source_folder, "test.sh")
-            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            bash = (
+                os.environ.get("CONFIG_SHELL")
+                or shutil.which("bash")
+                or "/data/service/hnp/bin/bash"
+            )
             self.run(f'"{bash}" "{script}" "{binary}"', env="conanrun")
