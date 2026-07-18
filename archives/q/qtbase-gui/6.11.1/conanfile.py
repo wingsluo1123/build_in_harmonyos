@@ -126,7 +126,8 @@ class QtbaseGuiConan(ConanFile):
         # Append target-specific options instead of assigning
         # CMAKE_CXX_FLAGS, which would discard flags supplied by the
         # Conan profile, environment and compiler wrapper.
-        tc.extra_cxxflags.append("-march=armv8-a+crypto")
+        if str(self.settings.arch) == "armv8":
+            tc.extra_cxxflags.append("-march=armv8-a+crypto")
         if not self._has_pthread_cancel():
             tc.extra_cxxflags.append("-DQT_NO_PTHREAD_CANCEL")
             self.output.info(

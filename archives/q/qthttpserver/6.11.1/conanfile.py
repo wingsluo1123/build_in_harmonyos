@@ -33,7 +33,7 @@ class QtHttpServerConan(ConanFile):
         # an incomplete replacement config with CMakeDeps.
         qtbase_gui_prefix = self.dependencies["qtbase-gui"].package_folder
         tc.cache_variables["CMAKE_PREFIX_PATH"] = qtbase_gui_prefix
-        tc.variables.update(
+        tc.cache_variables.update(
             {
                 "QT_BUILD_TESTS": False,
                 "QT_BUILD_EXAMPLES": False,
