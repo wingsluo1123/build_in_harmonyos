@@ -90,7 +90,7 @@ class AstrotermConan(ConanFile):
         replace_in_file(
             self,
             meson_file,
-            "argtable = dependency('argtable3', required: false)\n"
+            "    argtable = dependency('argtable3', required: false)\n"
             "    if not argtable.found()\n"
             "        argtable = cc.find_library('argtable3', required: false)\n"
             "    endif\n"
@@ -100,7 +100,7 @@ class AstrotermConan(ConanFile):
             "        argtable = dependency('argtable2', required: true)\n"
             "        have_argtable2 = true\n"
             "    endif",
-            "argtable = declare_dependency(\n"
+            "    argtable = declare_dependency(\n"
             "        sources: files('deps/argtable3/src/argtable3.c'),\n"
             "        include_directories: include_directories('deps/argtable3/src'),\n"
             "    )\n"
