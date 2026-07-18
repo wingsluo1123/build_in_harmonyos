@@ -20,7 +20,7 @@ class PhysfsConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables.update(
+        tc.cache_variables.update(
             {
                 "PHYSFS_BUILD_STATIC": True,
                 "PHYSFS_BUILD_SHARED": False,
@@ -35,7 +35,9 @@ class PhysfsConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        # Pass this on the CMake command line so it is available before the
+        # upstream cmake_minimum_required(VERSION 3.0.0) is evaluated.
+        cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
 
     def package(self):

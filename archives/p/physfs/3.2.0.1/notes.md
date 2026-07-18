@@ -24,7 +24,8 @@ depend on GitHub downloads.
 
 - Build the static library.
 - Disable the shared library, upstream interactive utility, and Doxygen docs.
-- Set `CMAKE_POLICY_VERSION_MINIMUM=3.5` for CMake 4 compatibility.
+- Set `CMAKE_POLICY_VERSION_MINIMUM=3.5` as a cache/command-line variable so
+  it is available before CMake evaluates the upstream 3.0.0 minimum version.
 - No source patches are required.
 
 ## Test coverage
