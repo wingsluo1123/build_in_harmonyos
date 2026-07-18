@@ -146,16 +146,17 @@ Cflags: -I${{includedir}}
         cmake.configure(cli_args=["-DCMAKE_POLICY_VERSION_MINIMUM=3.5"])
         cmake.build()
 
+        # Merge stub-udev.o into libhidapi-hidraw.a to resolve libudev symbols
+        import glob
+        stub_obj = os.path.join(stub_dir, "stub-udev.o")
+        hidraw_libs = glob.glob(os.path.join(self.build_folder, "**", "libhidapi-hidraw.a"), recursive=True)
+        if os.path.isfile(stub_obj) and hidraw_libs:
+            ar = os.environ.get("AR", "llvm-ar")
+            self.run(f"{ar} rcs {hidraw_libs[0]} {stub_obj}")
+
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        # Install stub libudev library
-        import shutil
-        stub_lib = os.path.join(self.source_folder, "stub-udev", "libudev_stub.a")
-        if os.path.isfile(stub_lib):
-            lib_dir = os.path.join(self.package_folder, "lib")
-            os.makedirs(lib_dir, exist_ok=True)
-            shutil.copy2(stub_lib, lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = ["hidapi-hidraw", "udev_stub"]
+        self.cpp_info.libs = ["hidapi-hidraw"]
