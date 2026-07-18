@@ -99,9 +99,21 @@ class NanopbConan(ConanFile):
             + self.source_folder
             + "/generator/protoc-gen-nanopb "
         )
+        shell_arg = ""
+        if str(self.settings.os) == "OHOS":
+            # SCons' POSIX platform defaults its construction SHELL variable
+            # to the literal "sh" and invokes every action through it. The
+            # OHOS worker provides bash at this path but does not provide a
+            # /bin/sh-compatible command named "sh".
+            shell = (
+                os.environ.get("SHELL")
+                or os.environ.get("CONFIG_SHELL")
+                or "/data/service/hnp/bin/bash"
+            )
+            shell_arg = " SHELL=" + shlex.quote(shell)
         command = (
             "{python} -m SCons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
-            "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1"
+            "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1{shell_arg}"
         ).format(
             python=shlex.quote(sys.executable),
             tests=tests_dir,
@@ -109,6 +121,7 @@ class NanopbConan(ConanFile):
             cxx=shlex.quote(str(cxx)),
             protoc=shlex.quote(protoc),
             plugin=plugin,
+            shell_arg=shell_arg,
         )
         self.run(command)
 
