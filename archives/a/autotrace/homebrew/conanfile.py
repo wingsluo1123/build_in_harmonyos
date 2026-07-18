@@ -4,7 +4,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -45,6 +45,8 @@ class AutotraceConan(ConanFile):
 
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend([
+            "--build=aarch64-unknown-linux-gnu",
+            "--host=aarch64-unknown-linux-gnu",
             "--without-magick",
             "--without-pstoedit",
             "--without-png",
@@ -57,7 +59,25 @@ class AutotraceConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        self.run("chmod +x autogen.sh && ./autogen.sh", cwd=self.source_folder)
+        configure_ac = os.path.join(self.source_folder, "configure.ac")
+        makefile_am = os.path.join(self.source_folder, "Makefile.am")
+        for macro in (
+            "IT_PROG_INTLTOOL([0.50.1])",
+            "AM_GNU_GETTEXT_VERSION([0.19.3])",
+            "AM_GNU_GETTEXT([external])",
+            "ALL_LINGUAS=\"ja de\"",
+            "AM_GLIB_GNU_GETTEXT",
+        ):
+            replace_in_file(self, configure_ac, macro, "")
+        replace_in_file(
+            self,
+            configure_ac,
+            "AC_CONFIG_FILES([po/Makefile.in Makefile autotrace.pc])",
+            "AC_CONFIG_FILES([Makefile autotrace.pc])",
+        )
+        replace_in_file(self, makefile_am, "SUBDIRS = po", "SUBDIRS =")
+        replace_in_file(self, makefile_am, "$(INTLLIBS)", "")
+        self.run("autoreconf --force --install --verbose", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
@@ -73,5 +93,5 @@ class AutotraceConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.system_libs = ["intl"]
+        self.cpp_info.system_libs = []
         self.cpp_info.set_property("pkg_config_name", "autotrace")
