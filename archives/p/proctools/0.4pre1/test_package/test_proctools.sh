@@ -29,4 +29,20 @@ assert_invalid_signal "9junk"
 assert_invalid_signal "-1"
 assert_invalid_signal "999999999999999999999999"
 
-echo "proctools binaries, version output, and signal validation tests passed"
+probe_name="sleep"
+probe_pid=""
+cleanup() {
+    if test -n "$probe_pid"; then
+        kill "$probe_pid" 2>/dev/null || true
+        wait "$probe_pid" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+sleep 30 &
+probe_pid=$!
+
+"$bin_dir/pgrep" "^${probe_name}$" | grep -qx "$probe_pid"
+test "$("$bin_dir/pgrep" -n -x "$probe_name")" = "$probe_pid"
+
+echo "proctools version, signal validation, /proc matching, and newest tests passed"
