@@ -28,7 +28,5 @@ class LvTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_lv')}", env="conanrun")
+        self.run("which lv", env="conanrun")
+        self.run("lv /dev/null", env="conanrun")

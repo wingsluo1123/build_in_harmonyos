@@ -46,21 +46,38 @@ class LvConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Source is in src/ subdirectory
+        autotools = Autotools(self)
+        # Configure script is in src/ subdirectory
         src_dir = os.path.join(self.source_folder, "src")
-        self.run(f"cd {src_dir} && chmod +x configure && ./configure --prefix=/ --enable-static --disable-shared")
-        self.run(f"cd {src_dir} && make -j$(nproc)")
+        autotools.configure(build_script_folder=src_dir)
+        autotools.make()
 
     def package(self):
-        src_dir = os.path.join(self.source_folder, "src")
+        # Use manual install because make install fails on HMDFS (hardlink)
+        # After autotools.build(), binary is in the build-release subfolder
+        build_dir = os.path.join(self.build_folder, "build-release") if hasattr(self, 'build_folder') else self.source_folder
+        # Try multiple locations for the lv binary
+        lv_bin = None
+        for candidate in [os.path.join(build_dir, "lv"), os.path.join(self.source_folder, "src", "lv"),
+                          os.path.join(self.source_folder, "lv"), os.path.join(self.build_folder, "lv")]:
+            if os.path.exists(candidate):
+                lv_bin = candidate
+                break
+        if not lv_bin:
+            # Search in build folder
+            import glob
+            found = glob.glob(os.path.join(self.build_folder, "**", "lv"), recursive=True)
+            if found:
+                lv_bin = found[0]
+        
         root_dir = self.source_folder
         bin_dir = os.path.join(self.package_folder, "bin")
         lib_dir = os.path.join(self.package_folder, "lib", "lv")
         os.makedirs(bin_dir, exist_ok=True)
         os.makedirs(lib_dir, exist_ok=True)
-        self.run(f"cp {src_dir}/lv {bin_dir}/")
+        if lv_bin:
+            self.run(f"cp {lv_bin} {bin_dir}/")
         self.run(f"cd {bin_dir} && ln -sf lv lgrep")
-        # lv.hlp is at root of source folder, not in src/
         if os.path.exists(os.path.join(root_dir, "lv.hlp")):
             self.run(f"cp {root_dir}/lv.hlp {lib_dir}/")
 
