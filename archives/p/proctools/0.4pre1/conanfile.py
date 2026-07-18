@@ -50,7 +50,7 @@ class ProctoolsConan(ConanFile):
             "Release": "-O2 -DNDEBUG",
             "MinSizeRel": "-Os -DNDEBUG",
             "RelWithDebInfo": "-O2 -g -DNDEBUG",
-        }[str(self.settings.build_type)]
+        }.get(str(self.settings.build_type), "-O2 -DNDEBUG")
         for program in ("pgrep", "pkill", "pfind"):
             output = os.path.join(self.build_folder, program)
             self.run(
