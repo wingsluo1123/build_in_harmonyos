@@ -4,6 +4,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import cross_building
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -11,7 +12,7 @@ from conan.tools.files import (
     get,
     replace_in_file,
 )
-from conan.tools.gnu import AutotoolsDeps, AutotoolsToolchain
+from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -28,14 +29,11 @@ class NtlConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration("NTL supports Linux and OHOS")
 
-    def requirements(self):
-        self.requires("gmp/6.3.0")
-
     def export_sources(self):
         export_conandata_patches(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         do_config = os.path.join(self.source_folder, "src", "DoConfig")
         replace_in_file(
             self,
@@ -49,20 +47,18 @@ class NtlConan(ConanFile):
         basic_layout(self, src_folder=".")
 
     def generate(self):
-        AutotoolsDeps(self).generate()
         AutotoolsToolchain(self).generate()
 
     def build(self):
-        gmp = self.dependencies["gmp"].package_folder
         executables = self.conf.get("tools.build:compiler_executables", default={})
         ar = executables.get("ar", "llvm-ar")
         ranlib = executables.get("ranlib", "llvm-ranlib")
         configure_args = [
             f'PREFIX="{self.package_folder}"',
-            f'GMP_PREFIX="{gmp}"',
             "SHARED=off",
             "NATIVE=off",
             "TUNE=generic",
+            "NTL_GMP_LIP=off",
             "NTL_GF2X_LIB=off",
             "NTL_THREADS=on",
             "NTL_SAFE_VECTORS=on",
@@ -76,8 +72,9 @@ class NtlConan(ConanFile):
             f'RANLIB="{ranlib}"',
         ]
         source_dir = os.path.join(self.source_folder, "src")
+        cross_prefix = "CONAN_CROSS_BUILDING=1 " if cross_building(self) else ""
         self.run(
-            "CONAN_CROSS_BUILDING=1 ./configure " + " ".join(configure_args),
+            cross_prefix + "./configure " + " ".join(configure_args),
             cwd=source_dir,
             env="conanbuild",
         )
