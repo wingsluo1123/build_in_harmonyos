@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Conan recipe for the EROFS userspace utilities."""
+
 import os
 import shutil
 import time
