@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Conan recipe for the MusicBrainz libdiscid library."""
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get

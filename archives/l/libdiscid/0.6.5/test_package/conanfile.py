@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Conan test package for the libdiscid recipe."""
+
 import os
 
 from conan import ConanFile
