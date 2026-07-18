@@ -20,7 +20,7 @@ class ChezschemeConan(ConanFile):
     description = "Chez Scheme is a compiler and runtime for the Scheme programming language"
     license = "Apache-2.0"
     homepage = "https://github.com/cisco/ChezScheme"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
