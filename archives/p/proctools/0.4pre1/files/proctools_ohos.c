@@ -121,11 +121,17 @@ int main(int argc, char **argv) {
     }
 
     while ((entry = readdir(proc)) != NULL) {
+        char *pid_end = NULL;
+        long pid_value;
         pid_t pid;
         char text[4096];
         int matched;
         if (!numeric_name(entry->d_name)) continue;
-        pid = (pid_t)strtol(entry->d_name, NULL, 10);
+        errno = 0;
+        pid_value = strtol(entry->d_name, &pid_end, 10);
+        if (errno == ERANGE || pid_end == entry->d_name || *pid_end != '\0' ||
+            pid_value <= 0 || pid_value > INT_MAX) continue;
+        pid = (pid_t)pid_value;
         if (pid == getpid() || process_text(pid, full, text, sizeof(text)) != 0) continue;
         matched = exact ? strcmp(text, pattern) == 0 : regexec(&regex, text, 0, NULL, 0) == 0;
         if (invert) matched = !matched;

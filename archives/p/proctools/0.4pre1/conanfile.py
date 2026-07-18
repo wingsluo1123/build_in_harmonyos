@@ -57,7 +57,8 @@ class ProctoolsConan(ConanFile):
                 '"{}" {} -std=c11 -D_GNU_SOURCE -DPROCTOOLS_NAME=\\\"{}\\\" '
                 '"{}" -o "{}"'.format(
                     cc, build_type_flags, program, source, output
-                )
+                ),
+                env="conanbuild",
             )
 
     def package(self):
