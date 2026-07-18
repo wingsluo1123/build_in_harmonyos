@@ -36,7 +36,24 @@ class NanopbConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        source_data = self.conan_data["sources"]
+        get(
+            self,
+            url=source_data["url"],
+            sha256=source_data["sha256"],
+            strip_root=True,
+        )
+        if self._is_ohos():
+            protoc_source = source_data.get("protoc")
+            if not protoc_source:
+                raise RuntimeError("nanopb requires a protobuf source for OHOS protoc")
+            get(
+                self,
+                url=protoc_source["url"],
+                sha256=protoc_source["sha256"],
+                destination=os.path.join(self.source_folder, ".nanopb-protoc-source"),
+                strip_root=True,
+            )
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -47,9 +64,9 @@ class NanopbConan(ConanFile):
 
         # CMake does not recognize OHOS as a target platform. The Conan
         # profile still supplies the actual OHOS compiler and architecture.
-        if self.settings.os in ("Linux", "OHOS"):
+        if str(self.settings.os) in ("Linux", "OHOS"):
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
-            if self.settings.os == "OHOS":
+            if str(self.settings.os) == "OHOS":
                 tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 
@@ -67,32 +84,39 @@ class NanopbConan(ConanFile):
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         )
-        cc = compilers.get("c", "cc") if compilers else "cc"
-        cxx = compilers.get("cpp", "c++") if compilers else "c++"
-        protoc_path = shutil.which("protoc")
-        if protoc_path:
-            protoc = protoc_path
+        real_cc = compilers.get("c", "cc") if compilers else "cc"
+        real_cxx = compilers.get("cpp", "c++") if compilers else "c++"
+        if self._is_ohos():
+            # User-path .so files carry an HMDFS security label which rejects
+            # Python dlopen even after ELF signing. Use native protoc and
+            # sign the test executables produced by SCons instead.
+            protoc = self._build_ohos_protoc(real_cc, real_cxx)
+            cc = self._make_ohos_compiler_wrapper(real_cc, "cc")
+            cxx = self._make_ohos_compiler_wrapper(real_cxx, "cxx")
+            os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
         else:
-            # SCons treats PROTOC as the path to one executable. Passing
-            # "python -m grpc_tools.protoc" directly works in a shell, but
-            # SCons then tries to execute the whole string as a file and
-            # fails on clean OHOS workers. Create a tiny executable wrapper
-            # in the Conan build folder so SCons gets a real path.
-            protoc = os.path.join(self.build_folder, "nanopb-protoc")
-            save(
-                self,
-                protoc,
-                "#!" + sys.executable + "\n"
-                "import runpy\n"
-                'runpy.run_module("grpc_tools.protoc", run_name="__main__")\n',
-            )
-            os.chmod(
-                protoc,
-                os.stat(protoc).st_mode
-                | stat.S_IXUSR
-                | stat.S_IXGRP
-                | stat.S_IXOTH,
-            )
+            cc = real_cc
+            cxx = real_cxx
+            protoc_path = shutil.which("protoc")
+            if protoc_path:
+                protoc = protoc_path
+            else:
+                # SCons needs a real executable path, not "python -m ...".
+                protoc = os.path.join(self.build_folder, "nanopb-protoc")
+                save(
+                    self,
+                    protoc,
+                    "#!" + sys.executable + "\n"
+                    "import runpy\n"
+                    'runpy.run_module("grpc_tools.protoc", run_name="__main__")\n',
+                )
+                os.chmod(
+                    protoc,
+                    os.stat(protoc).st_mode
+                    | stat.S_IXUSR
+                    | stat.S_IXGRP
+                    | stat.S_IXOTH,
+                )
         tests_dir = shlex.quote(self.source_folder + "/tests")
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="
@@ -106,8 +130,8 @@ class NanopbConan(ConanFile):
             # OHOS worker provides bash at this path but does not provide a
             # /bin/sh-compatible command named "sh".
             shell = (
-                os.environ.get("SHELL")
-                or os.environ.get("CONFIG_SHELL")
+                os.environ.get("CONFIG_SHELL")
+                or os.environ.get("SHELL")
                 or "/data/service/hnp/bin/bash"
             )
             shell_arg = " SHELL=" + shlex.quote(shell)
@@ -172,21 +196,35 @@ class NanopbConan(ConanFile):
             )
             tool_dirs.insert(0, local_tools)
 
-        if not shutil.which("protoc") and not has_module("grpc_tools") and not has_module_in_dirs("grpc_tools"):
+        if self._is_ohos():
+            if not has_module("google.protobuf") and not has_module_in_dirs("google"):
+                self.output.info(
+                    "Python protobuf not found; installing the pinned pure-Python runtime"
+                )
+                self.run(
+                    f"{python} -m pip install --target {target} --upgrade "
+                    "--disable-pip-version-check --no-warn-script-location "
+                    "--no-deps protobuf==7.35.1"
+                )
+                if local_tools not in tool_dirs:
+                    tool_dirs.insert(0, local_tools)
+        elif (
+            not shutil.which("protoc")
+            and not has_module("grpc_tools")
+            and not has_module_in_dirs("grpc_tools")
+        ):
             self.output.info("protoc not found; installing the pinned Python fallback")
             self.run(
                 f"{python} -m pip install --target {target} --upgrade "
-                "--disable-pip-version-check --no-deps protobuf==7.35.1 "
-                "grpcio-tools==1.81.0"
+                "--disable-pip-version-check --no-warn-script-location "
+                "--no-deps protobuf==7.35.1 grpcio-tools==1.81.0"
             )
             if local_tools not in tool_dirs:
                 tool_dirs.insert(0, local_tools)
 
-        # HarmonyOS validates ELF signatures when loading native Python
-        # extensions. Prepare pip-installed OHOS modules before protoc imports
-        # grpc_tools' _protoc_compiler extension.
-        for tool_dir in tool_dirs:
-            self._prepare_native_test_tools(tool_dir)
+        # OHOS deliberately avoids importing native Python extensions from
+        # user-writable paths. Its protoc is native and its generator uses
+        # the pure-Python protobuf runtime.
 
         pythonpath = [path for path in tool_dirs if os.path.isdir(path)]
         existing_pythonpath = os.environ.get("PYTHONPATH")
@@ -199,6 +237,147 @@ class NanopbConan(ConanFile):
                 + os.environ["PYTHONPATH"]
             )
 
+    def _is_ohos(self):
+        return str(self.settings.os).lower() == "ohos"
+
+    def _build_ohos_protoc(self, cc, cxx):
+        """Build and sign standalone protoc for the OHOS upstream tests."""
+        source_data = self.conan_data["sources"].get("protoc")
+        if not source_data:
+            raise RuntimeError("nanopb requires a protobuf source for OHOS protoc")
+
+        protoc_source = os.path.join(self.source_folder, ".nanopb-protoc-source")
+        protoc_build = os.path.join(self.build_folder, "nanopb-protoc-build")
+        cmake = shutil.which("cmake") or "cmake"
+        cmake_args = [
+            cmake,
+            "-S",
+            protoc_source,
+            "-B",
+            protoc_build,
+            "-G",
+            "Unix Makefiles",
+            "-DCMAKE_BUILD_TYPE=Release",
+            f"-DCMAKE_C_COMPILER={cc}",
+            f"-DCMAKE_CXX_COMPILER={cxx}",
+            "-DCMAKE_SYSTEM_NAME=Linux",
+            "-DCMAKE_SYSTEM_PROCESSOR=aarch64",
+            "-Dprotobuf_BUILD_TESTS=OFF",
+            "-Dprotobuf_BUILD_SHARED_LIBS=OFF",
+            "-Dprotobuf_BUILD_PROTOC_BINARIES=ON",
+            "-Dprotobuf_WITH_ZLIB=OFF",
+            "-DCMAKE_CXX_FLAGS=-stdlib=libc++",
+        ]
+        self.output.info("Building standalone OHOS protoc from protobuf source")
+        self.run(" ".join(shlex.quote(str(arg)) for arg in cmake_args))
+        self.run(
+            " ".join(
+                [
+                    shlex.quote(cmake),
+                    "--build",
+                    shlex.quote(protoc_build),
+                    "--target",
+                    "protoc",
+                    "--",
+                    "-j1",
+                ]
+            )
+        )
+
+        protoc = os.path.join(protoc_build, "protoc")
+        if not os.path.isfile(protoc):
+            raise RuntimeError(f"protobuf build did not produce protoc: {protoc}")
+        self._sign_ohos_elf(protoc)
+        return protoc
+
+    def _make_ohos_compiler_wrapper(self, compiler, name):
+        """Sign each SCons test executable immediately after linking."""
+        wrapper = os.path.join(self.build_folder, f"nanopb-{name}-signed")
+        save(
+            self,
+            wrapper,
+            "#!" + sys.executable + "\n"
+            "import os\n"
+            "import shutil\n"
+            "import stat\n"
+            "import subprocess\n"
+            "import sys\n"
+            f"REAL_COMPILER = {compiler!r}\n"
+            "OBJCOPY = '/data/service/hnp/bin/llvm-objcopy'\n"
+            "SIGNER = '/data/service/hnp/bin/binary-sign-tool'\n"
+            "\n"
+            "def output_path(args):\n"
+            "    for index, arg in enumerate(args):\n"
+            "        if arg == '-o' and index + 1 < len(args):\n"
+            "            return args[index + 1]\n"
+            "        if arg.startswith('-o') and len(arg) > 2:\n"
+            "            return arg[2:]\n"
+            "    return None\n"
+            "\n"
+            "def sign(path):\n"
+            "    if not os.path.isfile(path):\n"
+            "        return\n"
+            "    with open(path, 'rb') as stream:\n"
+            "        if stream.read(4) != b'\\x7fELF':\n"
+            "            return\n"
+            "    mode = os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH\n"
+            "    os.chmod(path, mode)\n"
+            "    subprocess.run([OBJCOPY, '--remove-section', '.codesign', path], check=False)\n"
+            "    signed = path + '.nanopb-signed'\n"
+            "    try:\n"
+            "        subprocess.run([SIGNER, 'sign', '-inFile', path, '-outFile', signed, '-selfSign', '1'], check=True)\n"
+            "        with open(signed, 'rb') as source, open(path, 'wb') as target:\n"
+            "            shutil.copyfileobj(source, target)\n"
+            "    finally:\n"
+            "        if os.path.exists(signed):\n"
+            "            os.unlink(signed)\n"
+            "    if not (os.stat(path).st_mode & stat.S_IXUSR):\n"
+            "        raise RuntimeError('signed OHOS test executable lost execute permission: ' + path)\n"
+            "\n"
+            "args = sys.argv[1:]\n"
+            "result = subprocess.run([REAL_COMPILER] + args)\n"
+            "if result.returncode == 0 and not any(flag in args for flag in ('-c', '-E', '-S')):\n"
+            "    output = output_path(args)\n"
+            "    if output:\n"
+            "        sign(output)\n"
+            "sys.exit(result.returncode)\n",
+        )
+        os.chmod(
+            wrapper,
+            os.stat(wrapper).st_mode
+            | stat.S_IXUSR
+            | stat.S_IXGRP
+            | stat.S_IXOTH,
+        )
+        return wrapper
+
+    def _sign_ohos_elf(self, path):
+        """Sign an OHOS ELF while preserving its executable inode and mode."""
+        objcopy = shutil.which("llvm-objcopy") or "/data/service/hnp/bin/llvm-objcopy"
+        signer = shutil.which("binary-sign-tool") or "/data/service/hnp/bin/binary-sign-tool"
+        if not os.path.isfile(objcopy) or not os.path.isfile(signer):
+            raise RuntimeError("OHOS ELF signing requires llvm-objcopy and binary-sign-tool")
+
+        mode = os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        os.chmod(path, mode)
+        self.run(
+            f"{shlex.quote(objcopy)} --remove-section .codesign "
+            f"{shlex.quote(path)} 2>/dev/null || true"
+        )
+        signed = path + ".nanopb-signed"
+        try:
+            self.run(
+                f"{shlex.quote(signer)} sign -inFile {shlex.quote(path)} "
+                f"-outFile {shlex.quote(signed)} -selfSign 1"
+            )
+            with open(signed, "rb") as source, open(path, "wb") as target:
+                shutil.copyfileobj(source, target)
+        finally:
+            if os.path.exists(signed):
+                os.unlink(signed)
+        if not (os.stat(path).st_mode & stat.S_IXUSR):
+            raise RuntimeError(f"signed OHOS ELF is not executable: {path}")
+
     def package(self):
         cmake = CMake(self)
         cmake.install()
@@ -210,77 +389,3 @@ class NanopbConan(ConanFile):
         self.cpp_info.set_property(
             "cmake_target_name", "nanopb::protobuf-nanopb-static"
         )
-
-    def _prepare_native_test_tools(self, tool_dir):
-        if not os.path.isdir(tool_dir):
-            return
-        is_ohos = str(self.settings.os).lower() == "ohos"
-        objcopy = shutil.which("llvm-objcopy") or (
-            "/data/service/hnp/bin/llvm-objcopy"
-        )
-        signer = shutil.which("binary-sign-tool") or (
-            "/data/service/hnp/bin/binary-sign-tool"
-        )
-        for root, _, filenames in os.walk(tool_dir):
-            for filename in filenames:
-                if not (filename.endswith(".so") or ".so." in filename):
-                    continue
-                path = os.path.join(root, filename)
-                if is_ohos:
-                    if not os.path.isfile(objcopy) or not os.path.isfile(signer):
-                        raise RuntimeError(
-                            "OHOS native test tools require llvm-objcopy and "
-                            "binary-sign-tool"
-                        )
-                    quoted_path = shlex.quote(path)
-                    signed_path = path + ".nanopb-signed"
-                    quoted_signed_path = shlex.quote(signed_path)
-                    executable_mode = (
-                        os.stat(path).st_mode
-                        | stat.S_IXUSR
-                        | stat.S_IXGRP
-                        | stat.S_IXOTH
-                    )
-                    # HMDFS may reject chmod after an ELF already contains a
-                    # .codesign section. Set the executable mode while the
-                    # input is still unsigned, then preserve this inode when
-                    # installing the signed bytes below.
-                    os.chmod(path, executable_mode)
-                    self.output.info(
-                        "Signing OHOS native test tool: " + path
-                    )
-                    self.run(
-                        f"{shlex.quote(objcopy)} --remove-section .codesign "
-                        f"{quoted_path} 2>/dev/null || true"
-                    )
-                    try:
-                        # Use a separate output file. Some worker versions of
-                        # binary-sign-tool reject an in-place input/output
-                        # pair even though the command is otherwise valid.
-                        self.run(
-                            f"{shlex.quote(signer)} sign -inFile {quoted_path} "
-                            f"-outFile {quoted_signed_path} -selfSign 1"
-                        )
-                        with open(signed_path, "rb") as signed_file, open(
-                            path, "wb"
-                        ) as native_file:
-                            shutil.copyfileobj(signed_file, native_file)
-                    finally:
-                        if os.path.exists(signed_path):
-                            os.unlink(signed_path)
-                    if not (os.stat(path).st_mode & stat.S_IXUSR):
-                        raise RuntimeError(
-                            "OHOS native test tool is not executable after "
-                            f"signing: {path}"
-                        )
-                try:
-                    mode = os.stat(path).st_mode
-                    os.chmod(
-                        path,
-                        mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
-                    )
-                except OSError as exc:
-                    self.output.warning(
-                        "Unable to make native test tool executable: "
-                        f"{path} ({exc})"
-                    )

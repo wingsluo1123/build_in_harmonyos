@@ -5,15 +5,15 @@
 - 构建系统：CMake
 - 运行时产物：静态库 `protobuf-nanopb`
 - 目标平台：HarmonyOS PC aarch64
-- Conan 依赖：无
-- 构建工具：CMake、SCons、protoc（缺失时通过构建目录中的可执行 wrapper 回退到 Python grpcio-tools）、Python protobuf
+- Conan 依赖：无（OHOS 下额外从 protobuf 21.12 源码构建测试用 protoc）
+- 构建工具：CMake、SCons、原生 protoc、纯 Python protobuf
 
 ## 编译步骤
 
 1. 从官方 GitHub tag `0.4.9.1` 下载源码并校验 SHA256。
 2. 使用 CMakeToolchain 设置 `BUILD_SHARED_LIBS=OFF`、`BUILD_STATIC_LIBS=ON`，只构建 nanopb runtime。
 3. 使用 CMake 编译并安装静态库和头文件。
-4. 使用上游 `tests/SConstruct` 执行官方 SCons 测试套件；当 worker 没有独立 `protoc` 时，在 Conan 构建目录生成单路径可执行 wrapper，转调当前 Conan Python 的 `grpc_tools.protoc`，避免把 `python -m ...` 作为 SCons 的可执行文件路径。
+4. 使用上游 `tests/SConstruct` 执行官方 SCons 测试套件；OHOS worker 没有可用的独立 `protoc` 时，从 protobuf 21.12 源码构建并签名原生 `protoc`。
 5. 使用 `test_package` 从消费者视角链接并运行 nanopb 编码/解码测试。
 
 ## 测试范围
@@ -25,17 +25,14 @@
 
 - nanopb 是库类型，未新增 `commands.json`。
 - 未修改上游源文件，也未新增补丁。
-- CMake 上游工程在关闭 generator 时仍会探测 `protoc`，因此构建环境必须提供 `protoc`；CI worker 缺少独立二进制时由固定版本的 `grpcio-tools` 提供 Python 回退。generator Python 模块不作为本 Conan 库产物安装。
-- OHOS CI 的 `grpcio-tools` 回退包含原生 `.so`；在 HMDFS 上导入前先为未签名原文件设置执行位，移除旧 `.codesign`，使用 worker 的 `binary-sign-tool -selfSign 1` 写入临时文件，再把签名字节写回原执行文件 inode，避免签名工具重置执行权限导致动态加载器报 `Permission denied`。
+- CMake 上游工程在关闭 generator 时仍会探测 `protoc`，因此构建环境必须提供 `protoc`；OHOS 不使用 `grpcio-tools`，因为其 `_protoc_compiler.so` 位于 HMDFS 用户路径时会被 hmmac 拒绝 `dlopen`，即使签名和执行位都正确。
+- OHOS 的 Python 生成器只使用 `protobuf` 纯 Python 实现；独立 `protoc`、SCons 生成的测试 ELF 和 `test_package` 消费者测试程序均通过 `binary-sign-tool -selfSign 1` 签名，测试编译器包装器在链接后自动完成签名。
+- 该失败的根因是路径安全标签（知识库 E212/E179），不是 chmod、旧 `.codesign` 或签名输出 inode 问题。
 
 ## 验证结果
 
-- `conan create .../0.4.9.1 --build=missing -pr:h=default -pr:b=default`：通过。
-- 上游官方 SCons 测试：143/143 通过；测试在 Conan `build()` 阶段执行。
-- `test_package`：1/1 CTest 通过。
-- `ci/conan/build_and_test.sh`（Linux profile 的隔离 CI 模拟）：L0/L1/L4/L5 通过，L2 按库无命令行程序规则跳过。
-- `ci/scripts/preflight_check.sh nanopb/0.4.9.1`：通过，无依赖需要检查。
-- `git diff --check` 和 Conanfile Python 编译检查：通过。
+- Windows 本地：Conanfile Python 语法、W3 审计、`git diff --check` 通过。
+- OHOS CI #8227：失败，根因是 HMDFS 用户路径上的 `grpcio-tools/_protoc_compiler.so` 无法 `dlopen`；本次提交改为原生 `protoc` 和签名测试 ELF，等待 CI 重新验证。
 
 ## 编译结束
 

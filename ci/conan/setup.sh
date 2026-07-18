@@ -130,10 +130,10 @@ echo "[step] SCons interpreter: $CONAN_PYTHON"
 PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
     "$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
 
-# Nanopb's upstream tests also require protoc. The setup step runs in a
-# separate process from Conan, so a protoc found only in ~/.local/bin would
-# not be visible to the recipe later. Treat that location as non-persistent
-# and prepare the Python fallback for Conan's interpreter instead.
+# Nanopb's upstream tests require protoc. On OHOS the Conan recipe builds a
+# native, signed protoc because grpcio-tools contains a Python C extension;
+# importing that extension from HMDFS is rejected by the hmmac security label.
+# Keep this setup step limited to the pure-Python protobuf runtime.
 PROTOC_PATH="$(command -v protoc 2>/dev/null || true)"
 PROTOC_USABLE=0
 case "$PROTOC_PATH" in
@@ -142,32 +142,19 @@ case "$PROTOC_PATH" in
 esac
 if [ "$PROTOC_USABLE" -eq 0 ]; then
     if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-        "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null; then
-        echo "[step] protoc not found, installing grpcio-tools fallback..."
-        if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-            "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
-            "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-                --disable-pip-version-check --no-deps "protobuf==7.35.1" || {
-                echo "[error] Failed to install protobuf runtime 7.35.1"
-                exit 1
-            }
-        fi
+        "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
+        echo "[step] protoc not found, installing pure-Python protobuf runtime..."
         "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-            --disable-pip-version-check --no-deps "grpcio-tools==1.81.0" || {
-            echo "[error] Failed to install grpcio-tools 1.81.0"
+            --disable-pip-version-check --no-deps "protobuf==7.35.1" || {
+            echo "[error] Failed to install protobuf runtime 7.35.1"
             exit 1
         }
     fi
-    PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-        "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null || {
-        echo "[error] grpcio-tools protoc fallback is unavailable"
-        exit 1
-    }
 fi
 if [ "$PROTOC_USABLE" -eq 1 ]; then
     echo "[step] protoc: $PROTOC_PATH"
 else
-    echo "[step] protoc: python grpc_tools.protoc fallback"
+    echo "[step] protoc: built and signed by the nanopb Conan recipe"
 fi
 
 # ── 1b. Refresh stale settings.yml ──
