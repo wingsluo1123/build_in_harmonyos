@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+"""Consumer test for the qthttpserver Conan package."""
+
 import os
 
 from conan import ConanFile
 from conan.tools.build import can_run
-from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
 class QtHttpServerTestConan(ConanFile):
@@ -16,8 +19,16 @@ class QtHttpServerTestConan(ConanFile):
         cmake_layout(self)
 
     def generate(self):
-        CMakeDeps(self).generate()
-        CMakeToolchain(self).generate()
+        tc = CMakeToolchain(self)
+        # Both qtbase and qthttpserver install native Qt CMake package files.
+        # List every host dependency prefix so find_package(Qt6 COMPONENTS ...)
+        # can locate the base modules and HttpServer module together.
+        prefixes = [
+            dependency.package_folder
+            for dependency in self.dependencies.host.values()
+        ]
+        tc.cache_variables["CMAKE_PREFIX_PATH"] = ";".join(prefixes)
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)
