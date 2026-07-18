@@ -22,4 +22,5 @@ class Acl2TestConan(ConanFile):
         pkg = self.dependencies["acl2"].package_folder
         bin_path = os.path.join(pkg, "bin", "saved_acl2")
         if can_run(self):
-            self.run(f'bash {self.source_folder}/test.sh "{bin_path}"', env="conanrun")
+            test_script = os.path.join(self.source_folder, "test.sh")
+            self.run(f'bash "{test_script}" "{bin_path}"', env="conanrun")
