@@ -35,14 +35,6 @@ class ErofsUtilsConan(ConanFile):
         copy(self, "*", generated, self.source_folder, keep_path=True)
         self._refresh_autotools_timestamps()
 
-        if str(self.settings.os) == "OHOS":
-            replace_in_file(
-                self,
-                os.path.join(self.source_folder, "configure"),
-                "umask 077",
-                "umask 022",
-            )
-
     def _refresh_autotools_timestamps(self):
         base = time.time() - 3600
         groups = (
@@ -64,6 +56,14 @@ class ErofsUtilsConan(ConanFile):
                     os.utime(path, (newest, newest))
 
     def generate(self):
+        if str(self.settings.os) == "OHOS":
+            replace_in_file(
+                self,
+                os.path.join(self.source_folder, "configure"),
+                "umask 077",
+                "umask 022",
+            )
+
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
