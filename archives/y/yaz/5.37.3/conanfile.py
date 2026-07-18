@@ -41,6 +41,13 @@ class YazConan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend(
+                [
+                    "--build=aarch64-unknown-linux-gnu",
+                    "--host=aarch64-unknown-linux-ohos",
+                ]
+            )
         tc.configure_args.extend(
             [
                 "--disable-shared",
@@ -73,4 +80,4 @@ class YazConan(ConanFile):
         self.cpp_info.libs = collect_libs(self) or ["yaz", "yaz_server"]
         self.cpp_info.set_property("cmake_file_name", "yaz")
         self.cpp_info.set_property("cmake_target_name", "yaz::yaz")
-        self.cpp_info.system_libs = ["m", "pthread", "dl"]
+        self.cpp_info.system_libs = ["m"] if self.settings.os == "OHOS" else ["m", "pthread", "dl"]
