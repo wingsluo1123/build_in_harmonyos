@@ -24,7 +24,9 @@ class SpekConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        pass
+        self.requires("libavformat/62.12.101")
+        self.requires("libavcodec/62.28.101")
+        self.requires("libavutil/60.26.101")
 
     def layout(self):
         basic_layout(self)
