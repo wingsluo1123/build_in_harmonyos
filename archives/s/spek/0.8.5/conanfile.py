@@ -41,9 +41,6 @@ class SpekConan(ConanFile):
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         tc.generate()
-        # Use system-installed FFmpeg libraries (pre-built packages, not conan packages)
-        if self.settings.os in ("Linux", "OHOS"):
-            self.buildenv_info.append_path("PKG_CONFIG_PATH", "/storage/Users/currentUser/usr/local/lib/pkgconfig")
 
     def build(self):
         apply_conandata_patches(self)
@@ -51,7 +48,10 @@ class SpekConan(ConanFile):
         # Use autoconf instead of autoreconf -fi (autopoint not available on CI worker)
         self.run("autoconf", cwd=self.source_folder)
         autotools = Autotools(self)
-        autotools.configure()
+        # Set PKG_CONFIG_PATH for system-installed FFmpeg (pre-built packages, not conan)
+        configure_cmd = "PKG_CONFIG_PATH=/storage/Users/currentUser/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH " + \
+                        "./configure " + " ".join(autotools.configure_args)
+        self.run(configure_cmd, cwd=self.build_folder)
         autotools.make(args=["-j1"])
 
     def package(self):
