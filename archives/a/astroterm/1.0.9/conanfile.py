@@ -90,21 +90,11 @@ class AstrotermConan(ConanFile):
         replace_in_file(
             self,
             meson_file,
-            "    argtable = dependency('argtable3', required: false)\n"
-            "    if not argtable.found()\n"
-            "        argtable = cc.find_library('argtable3', required: false)\n"
-            "    endif\n"
-            "    if argtable.found()\n"
-            "        have_argtable3 = true\n"
-            "    else\n"
-            "        argtable = dependency('argtable2', required: true)\n"
-            "        have_argtable2 = true\n"
-            "    endif",
-            "    argtable = declare_dependency(\n"
+            "argtable = dependency('argtable3', required: false)",
+            "argtable = declare_dependency(\n"
             "        sources: files('deps/argtable3/src/argtable3.c'),\n"
             "        include_directories: include_directories('deps/argtable3/src'),\n"
-            "    )\n"
-            "    have_argtable3 = true",
+            "    )",
         )
         # Patch 1: Add stddef.h before string.h to fix size_t not found on OHOS
         replace_in_file(
