@@ -5,7 +5,7 @@ import os
 
 class Bento4Conan(ConanFile):
     name = "bento4"
-    version = "1.6.0"
+    version = "1.6.0-641"
     license = "MIT"
     author = "axiomatic-systems"
     url = "https://github.com/axiomatic-systems/Bento4"
@@ -28,6 +28,9 @@ class Bento4Conan(ConanFile):
         cmake.install()
         copy(self, "*.h", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
         copy(self, "*.hpp", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
+
+    def package_info(self):
+        self.cpp_info.libs = ["ap4"]      copy(self, "*.hpp", src=os.path.join(self.source_folder, "Source"), dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["ap4"]
