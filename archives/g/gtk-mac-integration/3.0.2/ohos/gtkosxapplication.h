@@ -21,7 +21,7 @@ typedef struct _GtkosxApplicationClass GtkosxApplicationClass;
 
 typedef enum {
     GTKOSX_APPLICATION_ATTENTION_TYPE_CRITICAL_REQUEST = 0,
-    GTKOSX_APPLICATION_ATTENTION_TYPE_INFO_REQUEST = 10
+    GTKOSX_APPLICATION_ATTENTION_TYPE_INFO_REQUEST = 1
 } GtkosxApplicationAttentionType;
 
 GType gtkosx_application_get_type(void);
