@@ -92,6 +92,34 @@ if ! command -v scons &>/dev/null; then
 fi
 echo "[step] SCons: $(scons --version 2>/dev/null | head -1)"
 
+# Nanopb's upstream tests also require protoc.  Some clean workers do not
+# provide the standalone binary, so install the Python protoc implementation
+# as a portable fallback for recipes that invoke it through their interpreter.
+if ! command -v protoc &>/dev/null; then
+    if ! python3 -c "import grpc_tools.protoc" &>/dev/null; then
+        echo "[step] protoc not found, installing grpcio-tools fallback..."
+        if ! python3 -c "import google.protobuf" &>/dev/null; then
+            python3 -m pip install --user --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
+                echo "[error] Failed to install protobuf runtime 5.29.6"
+                exit 1
+            }
+        fi
+        python3 -m pip install --user --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
+            echo "[error] Failed to install grpcio-tools 1.67.1"
+            exit 1
+        }
+    fi
+    python3 -c "import grpc_tools.protoc" &>/dev/null || {
+        echo "[error] grpcio-tools protoc fallback is unavailable"
+        exit 1
+    }
+fi
+if command -v protoc &>/dev/null; then
+    echo "[step] protoc: $(protoc --version 2>/dev/null)"
+else
+    echo "[step] protoc: python grpc_tools.protoc fallback"
+fi
+
 # ── 1b. Refresh stale settings.yml ──
 # conan caches settings.yml on first run; if conan was upgraded (e.g. OHOS
 # support added to default_settings.py), the cached file is stale and

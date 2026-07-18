@@ -2,6 +2,7 @@
 """Conan recipe — nanopb 0.4.9.1 (CMake static runtime library)."""
 
 import shlex
+import shutil
 import sys
 
 from conan import ConanFile
@@ -58,7 +59,8 @@ class NanopbConan(ConanFile):
         )
         cc = compilers.get("c", "cc") if compilers else "cc"
         cxx = compilers.get("cpp", "c++") if compilers else "c++"
-        protoc = "protoc"
+        protoc_path = shutil.which("protoc")
+        protoc = protoc_path or f"{shlex.quote(sys.executable)} -m grpc_tools.protoc"
         tests_dir = shlex.quote(self.source_folder + "/tests")
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="
