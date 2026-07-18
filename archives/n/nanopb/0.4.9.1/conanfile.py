@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Conan recipe — nanopb 0.4.9.1 (CMake static runtime library)."""
 
+import os
 import shlex
+import stat
 import shutil
 import sys
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
+from conan.tools.files import (
+    apply_conandata_patches,
+    export_conandata_patches,
+    get,
+    save,
+)
 
 
 class NanopbConan(ConanFile):
@@ -60,7 +67,28 @@ class NanopbConan(ConanFile):
         cc = compilers.get("c", "cc") if compilers else "cc"
         cxx = compilers.get("cpp", "c++") if compilers else "c++"
         protoc_path = shutil.which("protoc")
-        protoc = protoc_path or f"{shlex.quote(sys.executable)} -m grpc_tools.protoc"
+        if protoc_path:
+            protoc = protoc_path
+        else:
+            # SCons treats PROTOC as the path to one executable. Passing
+            # "python -m grpc_tools.protoc" directly works in a shell, but
+            # SCons then tries to execute the whole string as a file and
+            # fails on clean OHOS workers. Create a tiny executable wrapper
+            # in the Conan build folder so SCons gets a real path.
+            protoc = os.path.join(self.build_folder, "nanopb-protoc")
+            save(
+                self,
+                protoc,
+                "#!/bin/sh\n"
+                f"exec {shlex.quote(sys.executable)} -m grpc_tools.protoc \"$@\"\n",
+            )
+            os.chmod(
+                protoc,
+                os.stat(protoc).st_mode
+                | stat.S_IXUSR
+                | stat.S_IXGRP
+                | stat.S_IXOTH,
+            )
         tests_dir = shlex.quote(self.source_folder + "/tests")
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="

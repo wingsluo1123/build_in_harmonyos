@@ -6,14 +6,14 @@
 - 运行时产物：静态库 `protobuf-nanopb`
 - 目标平台：HarmonyOS PC aarch64
 - Conan 依赖：无
-- 构建工具：CMake、SCons、protoc（缺失时回退到 Python grpcio-tools）、Python protobuf
+- 构建工具：CMake、SCons、protoc（缺失时通过构建目录中的可执行 wrapper 回退到 Python grpcio-tools）、Python protobuf
 
 ## 编译步骤
 
 1. 从官方 GitHub tag `0.4.9.1` 下载源码并校验 SHA256。
 2. 使用 CMakeToolchain 设置 `BUILD_SHARED_LIBS=OFF`、`BUILD_STATIC_LIBS=ON`，只构建 nanopb runtime。
 3. 使用 CMake 编译并安装静态库和头文件。
-4. 使用上游 `tests/SConstruct` 执行官方 SCons 测试套件；为兼容上游 SCons 命令拼接，向 `PROTOCFLAGS` 提供尾随空格。
+4. 使用上游 `tests/SConstruct` 执行官方 SCons 测试套件；当 worker 没有独立 `protoc` 时，在 Conan 构建目录生成单路径可执行 wrapper，转调当前 Conan Python 的 `grpc_tools.protoc`，避免把 `python -m ...` 作为 SCons 的可执行文件路径。
 5. 使用 `test_package` 从消费者视角链接并运行 nanopb 编码/解码测试。
 
 ## 测试范围
