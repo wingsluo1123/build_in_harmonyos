@@ -107,7 +107,10 @@ int main(int argc, char **argv) {
     pattern = argv[optind];
     if (!exact && regcomp(&regex, pattern, REG_EXTENDED | REG_NOSUB) != 0) return 2;
     proc = opendir("/proc");
-    if (!proc) return 2;
+    if (!proc) {
+        if (!exact) regfree(&regex);
+        return 2;
+    }
 
     while ((entry = readdir(proc)) != NULL) {
         pid_t pid;

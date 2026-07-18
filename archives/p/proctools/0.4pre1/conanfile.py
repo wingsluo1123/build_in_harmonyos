@@ -11,6 +11,7 @@ from conan.tools.layout import basic_layout
 class ProctoolsConan(ConanFile):
     name = "proctools"
     version = "0.4pre1"
+    package_type = "application"
     description = "Process lookup and signaling tools: pgrep, pkill and pfind"
     license = "BSD-3-Clause AND BSD-4-Clause-UC"
     homepage = "https://proctools.sourceforge.net"
