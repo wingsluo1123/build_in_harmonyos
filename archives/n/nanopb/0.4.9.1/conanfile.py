@@ -82,8 +82,9 @@ class NanopbConan(ConanFile):
             save(
                 self,
                 protoc,
-                "#!/bin/sh\n"
-                f"exec {shlex.quote(sys.executable)} -m grpc_tools.protoc \"$@\"\n",
+                "#!" + sys.executable + "\n"
+                "import runpy\n"
+                'runpy.run_module("grpc_tools.protoc", run_name="__main__")\n',
             )
             os.chmod(
                 protoc,
