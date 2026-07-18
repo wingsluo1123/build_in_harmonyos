@@ -64,15 +64,12 @@ int main(void) {
         return 1;
     }
 
-    printf("test jansson 2.15.0: OK\n");
-    printf("JSON dump:\n%s\n", dump);
-
-    free(dump);
-    json_decref(parsed);
-    json_decref(root);
-    return 0;
-}
-    free(dump);
+    /* 5. Verify nested object */
+    json_t *nest = json_object_get(parsed, "nested");
+    json_t *nest_key = nest ? json_object_get(nest, "key") : NULL;
+    if (!nest_key || !json_is_string(nest_key) || strcmp(json_string_value(nest_key), "value") != 0) {
+        fprintf(stderr, "FAIL: nested object mismatch\n");
+        free(dump);
         json_decref(parsed);
         json_decref(root);
         return 1;
