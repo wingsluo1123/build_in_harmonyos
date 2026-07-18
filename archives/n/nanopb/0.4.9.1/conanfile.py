@@ -235,6 +235,17 @@ class NanopbConan(ConanFile):
                     quoted_path = shlex.quote(path)
                     signed_path = path + ".nanopb-signed"
                     quoted_signed_path = shlex.quote(signed_path)
+                    executable_mode = (
+                        os.stat(path).st_mode
+                        | stat.S_IXUSR
+                        | stat.S_IXGRP
+                        | stat.S_IXOTH
+                    )
+                    # HMDFS may reject chmod after an ELF already contains a
+                    # .codesign section. Set the executable mode while the
+                    # input is still unsigned, then preserve this inode when
+                    # installing the signed bytes below.
+                    os.chmod(path, executable_mode)
                     self.output.info(
                         "Signing OHOS native test tool: " + path
                     )
@@ -250,10 +261,18 @@ class NanopbConan(ConanFile):
                             f"{shlex.quote(signer)} sign -inFile {quoted_path} "
                             f"-outFile {quoted_signed_path} -selfSign 1"
                         )
-                        os.replace(signed_path, path)
+                        with open(signed_path, "rb") as signed_file, open(
+                            path, "wb"
+                        ) as native_file:
+                            shutil.copyfileobj(signed_file, native_file)
                     finally:
                         if os.path.exists(signed_path):
                             os.unlink(signed_path)
+                    if not (os.stat(path).st_mode & stat.S_IXUSR):
+                        raise RuntimeError(
+                            "OHOS native test tool is not executable after "
+                            f"signing: {path}"
+                        )
                 try:
                     mode = os.stat(path).st_mode
                     os.chmod(
