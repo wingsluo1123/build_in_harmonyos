@@ -98,9 +98,13 @@ class SparkConan(ConanFile):
 
     def _download(self, url: str, archive: str) -> None:
         env = os.environ.copy()
-        ssl_cert = "/storage/Users/currentUser/usr/local/ssl/cert.pem"
-        if os.path.exists(ssl_cert):
-            env["SSL_CERT_FILE"] = ssl_cert
+        # Use SSL_CERT_FILE from env if set, otherwise try system standard paths
+        if "SSL_CERT_FILE" not in env:
+            for cert_path in ("/etc/ssl/certs/cacert.pem", "/etc/ssl/cert.pem",
+                              "/usr/local/ssl/cert.pem"):
+                if os.path.exists(cert_path):
+                    env["SSL_CERT_FILE"] = cert_path
+                    break
 
         curl = shutil.which("curl")
         wget = shutil.which("wget")
