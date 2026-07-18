@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for ggml 0.17.0."""
+"""Conan recipe for ggml 0.17.0, built with CMake."""
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
