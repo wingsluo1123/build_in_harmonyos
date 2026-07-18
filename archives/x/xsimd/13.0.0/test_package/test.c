@@ -1,7 +1,9 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <xsimd/xsimd.hpp>
 
-int main(void) {
-    printf("test xsimd 13.0.0: OK\n");
+int main() {
+    xsimd::batch<float, xsimd::sse> v(1.0f, 2.0f, 3.0f, 4.0f);
+    v = v + v;
+    printf("test xsimd 13.0.0: OK (batch add: %f)\n", (float)xsimd::hadd(v));
     return 0;
 }
