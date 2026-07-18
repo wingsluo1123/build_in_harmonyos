@@ -86,7 +86,6 @@ class NanopbConan(ConanFile):
             # nanopb_pb2.py generation uses the same OHOS-safe protoc.
             protoc_dir = os.path.dirname(protoc)
             os.environ["PROTOC"] = protoc
-            os.environ["NANOPB_PB2_NO_REBUILD"] = "1"
             os.environ["PATH"] = os.pathsep.join(
                 path for path in (protoc_dir, os.environ.get("PATH", "")) if path
             )
