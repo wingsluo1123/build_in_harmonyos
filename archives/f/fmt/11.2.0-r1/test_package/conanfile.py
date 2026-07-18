@@ -35,11 +35,12 @@ class FmtTestConan(ConanFile):
             replaced = False
             clang_path = shutil.which("clang")
             clangxx_path = shutil.which("clang++")
-            if clang_path and "/data/service/hnp/bin/clang" in content:
-                content = content.replace("/data/service/hnp/bin/clang", clang_path)
-                replaced = True
+            # Replace clang++ first (longer string) to avoid partial match
             if clangxx_path and "/data/service/hnp/bin/clang++" in content:
                 content = content.replace("/data/service/hnp/bin/clang++", clangxx_path)
+                replaced = True
+            if clang_path and "/data/service/hnp/bin/clang" in content:
+                content = content.replace("/data/service/hnp/bin/clang", clang_path)
                 replaced = True
             if replaced:
                 with open(toolchain_file, "w") as f:

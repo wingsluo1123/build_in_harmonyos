@@ -1,7 +1,6 @@
 // test_package/test.cpp — R34 compliant test for fmt/11.2.0-r1
 // Substantially depends on the tested package by calling fmt API.
 #include <fmt/format.h>
-#include <fmt/ostream.h>
 
 #include <cassert>
 #include <string>
