@@ -20,8 +20,6 @@ typedef struct _GtkosxApplicationClass GtkosxApplicationClass;
     (G_TYPE_CHECK_INSTANCE_TYPE((obj), GTKOSX_TYPE_APPLICATION))
 
 typedef enum {
-    CRITICAL_REQUEST = 0,
-    INFO_REQUEST = 10,
     GTKOSX_APPLICATION_ATTENTION_TYPE_CRITICAL_REQUEST = 0,
     GTKOSX_APPLICATION_ATTENTION_TYPE_INFO_REQUEST = 10
 } GtkosxApplicationAttentionType;
