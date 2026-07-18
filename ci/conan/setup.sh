@@ -147,14 +147,14 @@ if [ "$PROTOC_USABLE" -eq 0 ]; then
         if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
             "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
             "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-                --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
-                echo "[error] Failed to install protobuf runtime 5.29.6"
+                --disable-pip-version-check --no-deps "protobuf==7.35.1" || {
+                echo "[error] Failed to install protobuf runtime 7.35.1"
                 exit 1
             }
         fi
         "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-            --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
-            echo "[error] Failed to install grpcio-tools 1.67.1"
+            --disable-pip-version-check --no-deps "grpcio-tools==1.82.1" || {
+            echo "[error] Failed to install grpcio-tools 1.82.1"
             exit 1
         }
     fi
