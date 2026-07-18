@@ -13,7 +13,6 @@ from conan.tools.files import (
     copy,
     export_conandata_patches,
     get,
-    replace_in_file,
     save,
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
@@ -92,13 +91,6 @@ class IcecastConan(ConanFile):
         tc.generate()
 
     def build(self):
-        if self.settings.os == "OHOS":
-            replace_in_file(
-                self,
-                os.path.join(self.source_folder, "configure"),
-                "umask 077",
-                "umask 022",
-            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
