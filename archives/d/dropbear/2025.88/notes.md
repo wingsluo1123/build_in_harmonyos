@@ -10,7 +10,7 @@
 
 The recipe uses the upstream Autotools build and the bundled libtomcrypt/libtommath implementations. Linux keeps the available zlib, openpty and accounting features; OHOS disables the APIs which are unavailable there.
 
-The recipe generates `localoptions.h` with `DROPBEAR_SVR_PASSWORD_AUTH=0`. The OHOS C library does not provide `crypt()`, while Dropbear requires it when server password authentication is enabled. Public-key authentication remains enabled.
+For OHOS builds, the recipe generates `localoptions.h` with `DROPBEAR_SVR_PASSWORD_AUTH=0`. The OHOS C library does not provide `crypt()`, while Dropbear requires it when server password authentication is enabled. Linux builds do not generate this override and retain the upstream password-authentication default. Public-key authentication remains enabled on both platforms.
 
 The two existing portability patches guard `getpass()` and `getspnam()` for OHOS environments where headers may be present without the corresponding functions.
 

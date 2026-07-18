@@ -96,12 +96,13 @@ class DropbearConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        save(
-            self,
-            "localoptions.h",
-            "#define DROPBEAR_SVR_PASSWORD_AUTH 0\n"
-            "/* Use public-key authentication where crypt() is unavailable. */\n",
-        )
+        if str(self.settings.os) == "OHOS":
+            save(
+                self,
+                "localoptions.h",
+                "#define DROPBEAR_SVR_PASSWORD_AUTH 0\n"
+                "/* Use public-key authentication where crypt() is unavailable. */\n",
+            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
