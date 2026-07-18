@@ -8,11 +8,10 @@
 int main() {
     const size_t context_size =
         3 * ggml_tensor_overhead() + ggml_graph_overhead() + 1024;
-    ggml_init_params params = {
-        .mem_size = context_size,
-        .mem_buffer = nullptr,
-        .no_alloc = false,
-    };
+    ggml_init_params params{};
+    params.mem_size = context_size;
+    params.mem_buffer = nullptr;
+    params.no_alloc = false;
 
     ggml_context *context = ggml_init(params);
     if (!context) {
