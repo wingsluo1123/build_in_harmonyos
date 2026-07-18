@@ -53,7 +53,8 @@ class ExtraCMakeModulesConan(ConanFile):
 
     def package(self):
         # ECM 产物是 share/ECM/ 下的 .cmake/.py/.in 脚本，无 bin/lib/include
-        copy(self, "*", os.path.join(self.source_folder, "build"),
+        # 注意：cmake_layout(self) 将构建产物分到 self.build_folder，不在 source_folder/build/
+        copy(self, "*", self.build_folder,
              os.path.join(self.package_folder, "share/ECM"), excludes=["*.log", "CMakeCache.txt"])
         # 直接从源码树拷贝（cmake install 的标准产物布局）
         copy(self, "*.cmake", os.path.join(self.source_folder, "modules"),
@@ -66,8 +67,8 @@ class ExtraCMakeModulesConan(ConanFile):
              os.path.join(self.package_folder, "share/ECM/toolchain"))
         copy(self, "*", os.path.join(self.source_folder, "cmake"),
              os.path.join(self.package_folder, "share/ECM/cmake"))
-        # ECMConfig.cmake.in 需替换为实际安装路径——CI build() 内 cmake.configure 会处理
-        copy(self, "ECMConfig.cmake", os.path.join(self.source_folder, "build"),
+        # ECMConfig.cmake 由 cmake.configure() 生成在 self.build_folder（cmake_layout 分离）
+        copy(self, "ECMConfig.cmake", self.build_folder,
              os.path.join(self.package_folder, "share/ECM/cmake"))
 
     def package_info(self):
