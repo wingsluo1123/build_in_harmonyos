@@ -66,7 +66,8 @@ class ImgpConan(ConanFile):
         st_url = "https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-75.8.0.tar.gz"
         st_script = os.path.join(self.build_folder, "download_setuptools.py")
         with open(st_script, "w") as f:
-            f.write(f"""import urllib.request, sys
+            f.write(f"""import urllib.request, sys, socket
+socket.setdefaulttimeout(30)
 resp = urllib.request.urlopen('{st_url}', timeout=120)
 total = int(resp.headers.get('Content-Length', 0))
 downloaded = 0
