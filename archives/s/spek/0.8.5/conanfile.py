@@ -45,7 +45,8 @@ class SpekConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Regenerate configure from patched configure.ac (patch adds --disable-gui)
-        self.run("autoreconf -fi", cwd=self.source_folder)
+        # Use autoconf instead of autoreconf -fi (autopoint not available on CI worker)
+        self.run("autoconf", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
