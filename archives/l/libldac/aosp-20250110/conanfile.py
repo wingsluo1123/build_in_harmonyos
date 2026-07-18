@@ -47,7 +47,7 @@ class LibldacConan(ConanFile):
             url=source["url"],
             sha256=source["sha256"],
             destination=os.path.join(self.source_folder, "upstream"),
-            strip_root=True,
+            strip_root=False,
         )
 
     def generate(self):
