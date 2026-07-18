@@ -1,0 +1,25 @@
+diff -ruN a/test/test_dropbear.py b/test/test_dropbear.py
+--- a/test/test_dropbear.py
++++ b/test/test_dropbear.py
+@@ -49,4 +49,7 @@
+ 	base_args = opt.dbclient.split() + ["-y", host, "-p", opt.port]
++	identity_file = os.environ.get("DROPBEAR_TEST_IDENTITY_FILE")
++	if identity_file and "-i" not in args:
++		base_args.extend(["-i", identity_file])
+ 	if opt.user:
+ 		base_args.extend(['-l', opt.user])
+ 	full_args = base_args + list(args)
+diff -ruN a/test/test_concurrent.py b/test/test_concurrent.py
+--- a/test/test_concurrent.py
++++ b/test/test_concurrent.py
+@@ -6,1 +6,2 @@
++import os
+ import asyncssh
+@@ -10,2 +11,6 @@
+ async def run(addr, port):
+-    async with asyncssh.connect(addr, port = port) as conn:
++    connect_options = {"known_hosts": None}
++    identity_file = os.environ.get("DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE")
++    if identity_file:
++        connect_options["client_keys"] = [identity_file]
++    async with asyncssh.connect(addr, port=port, **connect_options) as conn:
