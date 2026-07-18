@@ -43,6 +43,9 @@ class SipsakConan(ConanFile):
             for item in sources.split()
         )
         flags = (
+            "-DPACKAGE_NAME=\\\"sipsak\\\" "
+            "-DPACKAGE_BUGREPORT=\\\"nils@sipsak.org\\\" "
+            "-DDEFAULT_TIMEOUT=500 "
             "-fcommon -D_GNU_SOURCE -DPACKAGE_VERSION=\\\"0.9.7\\\" "
             "-DHAVE_STDIO_H -DHAVE_STDLIB_H -DHAVE_STDARG_H "
             "-DHAVE_STDINT_H -DHAVE_STRING_H -DHAVE_STRINGS_H "
@@ -51,6 +54,7 @@ class SipsakConan(ConanFile):
             "-DHAVE_SYS_SOCKET_H -DHAVE_SYS_UTSNAME_H -DHAVE_SYS_POLL_H "
             "-DHAVE_NETDB_H -DHAVE_NETINET_IN_H -DHAVE_ARPA_INET_H "
             "-DHAVE_REGEX_H -DHAVE_SIGNAL_H -DHAVE_LIMITS_H "
+            "-DHAVE_SYSLOG_H -DHAVE_SYS_WAIT_H "
             "-DHAVE_GETOPT_H -DHAVE_GETOPT_LONG -DHAVE_INET_NTOP "
             "-DHAVE_STRNCASECMP -DHAVE_STRCASESTR -DHAVE_CALLOC "
             "-DHAVE_GETDOMAINNAME -DTIME_WITH_SYS_TIME"
