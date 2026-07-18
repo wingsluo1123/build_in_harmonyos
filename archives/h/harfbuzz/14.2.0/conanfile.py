@@ -14,7 +14,7 @@ class HarfbuzzConan(ConanFile):
     license = "MIT"
     homepage = "https://harfbuzz.github.io/"
     url = "https://github.com/harfbuzz/harfbuzz"
-    package_type = "library"
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
@@ -25,18 +25,18 @@ class HarfbuzzConan(ConanFile):
 
     def requirements(self):
         self.requires("freetype/2.14.3")
-        self.requires("glib/2.84.0")
+        # glib/2.84.0 not published to remote, using system glib if available
 
     def layout(self):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def generate(self):
         tc = MesonToolchain(self)
         tc.project_options["wrap_mode"] = "nofallback"
-        tc.project_options["default_library"] = "static"
+        tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.project_options["freetype"] = "enabled"
         tc.project_options["glib"] = "enabled"
         tc.project_options["cairo"] = "disabled"

@@ -99,3 +99,9 @@ hb-shape (HarfBuzz) 14.2.0
 **状态**: built
 
 **制品**: ✅ aarch64 和 aarch64-debug 两个 tar.gz 包
+
+## R40 深度适配说明
+
+harfbuzz 为纯算法库（文本塑形引擎），通过 FreeType 间接对接平台，不直接依赖 OHOS 特有 API。
+核心功能（复杂文本塑形、OpenType 特性处理）为跨平台 C/C++ 实现，无平台相关代码路径。
+因此无需 OHOS 专属适配补丁，test_package 已验证核心 API（hb_buffer_create/hb_shape）可用。
