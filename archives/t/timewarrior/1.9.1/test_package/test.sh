@@ -1,4 +1,8 @@
-#!/bin/sh
-set -eu
-output=$("$1" --version 2>&1)
+#!/usr/bin/env bash
+set -euo pipefail
+output=$("$1" --version 2>&1) || {
+    status=$?
+    printf '%s\n' "$output" >&2
+    exit "$status"
+}
 printf '%s\n' "$output" | grep -E "1\.9\.1|timew|Timewarrior"
