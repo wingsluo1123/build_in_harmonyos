@@ -2,6 +2,7 @@
 """Conan recipe — nanopb 0.4.9.1 (CMake static runtime library)."""
 
 import os
+import importlib.util
 import shlex
 import stat
 import shutil
@@ -55,24 +56,7 @@ class NanopbConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # The CI setup step and the Conan build step are separate processes.
-        # Keep the shared test-tool directory visible to the Python process
-        # that runs SCons and the grpcio-tools protoc fallback.
-        test_tools_dir = os.environ.get(
-            "CONAN_TEST_TOOLS_DIR",
-            os.path.join(
-                os.path.expanduser("~"),
-                ".cache",
-                "build_in_harmonyos",
-                "test-tools",
-            ),
-        )
-        if os.path.isdir(test_tools_dir):
-            pythonpath = [test_tools_dir]
-            existing_pythonpath = os.environ.get("PYTHONPATH")
-            if existing_pythonpath:
-                pythonpath.append(existing_pythonpath)
-            os.environ["PYTHONPATH"] = os.pathsep.join(pythonpath)
+        self._prepare_test_tools()
 
         cmake = CMake(self)
         cmake.configure()
@@ -126,6 +110,74 @@ class NanopbConan(ConanFile):
             plugin=plugin,
         )
         self.run(command)
+
+    def _prepare_test_tools(self):
+        """Make SCons and the Python protoc fallback visible to test commands."""
+
+        configured_dir = os.environ.get("CONAN_TEST_TOOLS_DIR")
+        repo_root = os.environ.get("CI_REPO_ROOT")
+        tool_dirs = [
+            path
+            for path in (
+                configured_dir,
+                os.path.join(repo_root, ".ci-test-tools") if repo_root else None,
+                os.path.join(
+                    os.path.expanduser("~"),
+                    ".cache",
+                    "build_in_harmonyos",
+                    "test-tools",
+                ),
+            )
+            if path
+        ]
+        tool_dirs = list(dict.fromkeys(tool_dirs))
+
+        def has_module(module_name):
+            try:
+                return importlib.util.find_spec(module_name) is not None
+            except (ImportError, ModuleNotFoundError):
+                return False
+
+        def has_module_in_dirs(module_name):
+            return any(
+                os.path.isdir(os.path.join(path, module_name))
+                for path in tool_dirs
+            )
+
+        local_tools = os.path.join(self.build_folder, "test-tools")
+        os.makedirs(local_tools, exist_ok=True)
+        python = shlex.quote(sys.executable)
+        target = shlex.quote(local_tools)
+
+        if not has_module("SCons") and not has_module_in_dirs("SCons"):
+            self.output.info("SCons not found; installing the pinned test tool")
+            self.run(
+                f"{python} -m pip install --target {target} --upgrade "
+                "--disable-pip-version-check --no-warn-script-location "
+                "SCons==4.10.0"
+            )
+            tool_dirs.insert(0, local_tools)
+
+        if not shutil.which("protoc") and not has_module("grpc_tools") and not has_module_in_dirs("grpc_tools"):
+            self.output.info("protoc not found; installing the pinned Python fallback")
+            self.run(
+                f"{python} -m pip install --target {target} --upgrade "
+                "--disable-pip-version-check --no-deps protobuf==5.29.6 "
+                "grpcio-tools==1.67.1"
+            )
+            if local_tools not in tool_dirs:
+                tool_dirs.insert(0, local_tools)
+
+        pythonpath = [path for path in tool_dirs if os.path.isdir(path)]
+        existing_pythonpath = os.environ.get("PYTHONPATH")
+        if existing_pythonpath:
+            pythonpath.append(existing_pythonpath)
+        if pythonpath:
+            os.environ["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(pythonpath))
+            self.output.info(
+                "Nanopb test-tool PYTHONPATH: "
+                + os.environ["PYTHONPATH"]
+            )
 
     def package(self):
         cmake = CMake(self)

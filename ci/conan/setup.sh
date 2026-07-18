@@ -16,7 +16,7 @@ set -euo pipefail
 # ── Path resolution ──
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
-TEST_TOOLS_DIR="${CONAN_TEST_TOOLS_DIR:-$HOME/.cache/build_in_harmonyos/test-tools}"
+TEST_TOOLS_DIR="${CONAN_TEST_TOOLS_DIR:-$REPO_ROOT/.ci-test-tools}"
 
 echo "[step] Conan environment setup..."
 
