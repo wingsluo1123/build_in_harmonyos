@@ -133,10 +133,24 @@ class NanopbConan(ConanFile):
                 or "/data/service/hnp/bin/bash"
             )
             shell_arg = " SHELL=" + shlex.quote(shell)
+        path_arg = ""
+        if self._is_ohos():
+            # Conan's self.run() may rebuild the child environment from its
+            # generated env files, so changing os.environ above is not enough
+            # for nanopb's relative-path tests. Those tests invoke `protoc`
+            # directly instead of using SCons' absolute PROTOC value.
+            test_path = os.pathsep.join(
+                path
+                for path in (os.path.dirname(protoc), os.environ.get("PATH", ""))
+                if path
+            )
+            path_arg = "PATH=" + shlex.quote(test_path) + " "
+            self.output.info("Nanopb SCons PATH: " + test_path)
         command = (
-            "{python} -m SCons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
+            "{path_arg}{python} -m SCons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
             "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1{shell_arg}"
         ).format(
+            path_arg=path_arg,
             python=shlex.quote(sys.executable),
             tests=tests_dir,
             cc=shlex.quote(str(cc)),
