@@ -24,9 +24,7 @@ class SpekConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("libavformat/62.12.101")
-        self.requires("libavcodec/62.28.101")
-        self.requires("libavutil/60.26.101")
+        pass
 
     def layout(self):
         basic_layout(self)
@@ -42,6 +40,9 @@ class SpekConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        # Use system-installed FFmpeg libraries (pre-built packages, not conan packages)
+        if self.settings.os in ("Linux", "OHOS"):
+            tc.extra_env["PKG_CONFIG_PATH"] = "/storage/Users/currentUser/usr/local/lib/pkgconfig"
         tc.generate()
 
     def build(self):
