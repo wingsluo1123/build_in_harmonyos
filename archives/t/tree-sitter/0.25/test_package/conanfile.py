@@ -10,6 +10,7 @@ from conan.tools.build import can_run
 class TreeSitterTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     test_type = "explicit"
+    generators = "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
