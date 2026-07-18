@@ -182,6 +182,13 @@ class NanopbConan(ConanFile):
             if local_tools not in tool_dirs:
                 tool_dirs.insert(0, local_tools)
 
+        # HMDFS can preserve pip's non-executable mode for native extension
+        # modules. The dynamic loader then rejects grpcio-tools' OHOS .so
+        # even though Python can read the package. Restore the executable bit
+        # for native test-tool modules before they are imported by protoc.
+        for tool_dir in tool_dirs:
+            self._make_shared_objects_executable(tool_dir)
+
         pythonpath = [path for path in tool_dirs if os.path.isdir(path)]
         existing_pythonpath = os.environ.get("PYTHONPATH")
         if existing_pythonpath:
@@ -204,3 +211,23 @@ class NanopbConan(ConanFile):
         self.cpp_info.set_property(
             "cmake_target_name", "nanopb::protobuf-nanopb-static"
         )
+
+    def _make_shared_objects_executable(self, tool_dir):
+        if not os.path.isdir(tool_dir):
+            return
+        for root, _, filenames in os.walk(tool_dir):
+            for filename in filenames:
+                if not (filename.endswith(".so") or ".so." in filename):
+                    continue
+                path = os.path.join(root, filename)
+                try:
+                    mode = os.stat(path).st_mode
+                    os.chmod(
+                        path,
+                        mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+                    )
+                except OSError as exc:
+                    self.output.warning(
+                        "Unable to make native test tool executable: "
+                        f"{path} ({exc})"
+                    )
