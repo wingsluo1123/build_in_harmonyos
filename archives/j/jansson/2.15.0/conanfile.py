@@ -4,10 +4,8 @@
 Jansson is a C library for encoding, decoding and manipulating JSON data.
 It uses a straightforward API and supports UTF-8 encoded JSON.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 

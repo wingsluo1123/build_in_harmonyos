@@ -43,9 +43,10 @@
 位于 /storage/Users/currentUser/usr/local/bin/，该路径为 HMDFS（分布式文件系统），
 SELinux 上下文为 u:object_r:hmdfs:s0，不允许执行 ELF 二进制文件。
 仅 /data/app/bin/ 路径（private_hnp_file 上下文）的工具可执行。
-CI 环境（/data/service/hnp/bin/）的工具可用，配方将在 CI 流水线中验证。
+CI 环境（/data/service/hnp/bin/）的工具可用，配方已通过 CI 验证（build #7864）。
 
 ---
 
 **编译结束**: 2026-07-15 11:04
-**最终状态**: built（配方已就绪，待 CI 验证发布）
+**最终状态**: built（CI 验证通过，配方已就绪）
+就绪，待 CI 验证发布）

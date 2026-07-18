@@ -21,7 +21,13 @@ int main(void) {
     /* 2. Add members */
     json_object_set_new(root, "name", json_string("jansson-test"));
     json_object_set_new(root, "version", json_integer(215));
-    json_object_set_new(root, "nested", json_pack("{s:s}", "key", "value"));
+    json_t *nested = json_pack("{s:s}", "key", "value");
+    if (!nested) {
+        fprintf(stderr, "FAIL: json_pack() returned NULL\n");
+        json_decref(root);
+        return 1;
+    }
+    json_object_set_new(root, "nested", nested);
 
     /* 3. Serialize */
     char *dump = json_dumps(root, JSON_INDENT(2));
@@ -53,6 +59,20 @@ int main(void) {
     if (!json_is_integer(ver) || json_integer_value(ver) != 215) {
         fprintf(stderr, "FAIL: version mismatch\n");
         free(dump);
+        json_decref(parsed);
+        json_decref(root);
+        return 1;
+    }
+
+    printf("test jansson 2.15.0: OK\n");
+    printf("JSON dump:\n%s\n", dump);
+
+    free(dump);
+    json_decref(parsed);
+    json_decref(root);
+    return 0;
+}
+    free(dump);
         json_decref(parsed);
         json_decref(root);
         return 1;
