@@ -115,6 +115,7 @@ class ErofsUtilsConan(ConanFile):
                     "--build=aarch64-linux-ohos",
                     "--host=aarch64-linux-ohos",
                     "--target=aarch64-linux-ohos",
+                    "--program-prefix=",
                 ]
             )
         tc.generate()
