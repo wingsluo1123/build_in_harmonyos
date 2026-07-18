@@ -123,14 +123,16 @@ class QtbaseGuiConan(ConanFile):
             }
         )
 
-        cxx_flags = "-march=armv8-a+crypto"
+        # Append target-specific options instead of assigning
+        # CMAKE_CXX_FLAGS, which would discard flags supplied by the
+        # Conan profile, environment and compiler wrapper.
+        tc.extra_cxxflags.append("-march=armv8-a+crypto")
         if not self._has_pthread_cancel():
-            cxx_flags += " -DQT_NO_PTHREAD_CANCEL"
+            tc.extra_cxxflags.append("-DQT_NO_PTHREAD_CANCEL")
             self.output.info(
                 "pthread cancellation APIs unavailable; "
                 "defining QT_NO_PTHREAD_CANCEL"
             )
-        tc.cache_variables["CMAKE_CXX_FLAGS"] = cxx_flags
         tc.generate()
 
     def build(self):
