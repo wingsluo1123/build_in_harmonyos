@@ -23,8 +23,6 @@ class YazConan(ConanFile):
             raise ConanInvalidConfiguration("YAZ supports Linux and OHOS")
 
     def requirements(self):
-        self.requires("gnutls/3.8.10")
-        self.requires("icu4c/78")
         self.requires("libxml2/2.15.3")
         self.requires("libxslt/1.1.45")
 
@@ -45,13 +43,12 @@ class YazConan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
-                "--host=aarch64-unknown-linux-gnu",
                 "--disable-shared",
                 "--enable-static",
                 "--enable-threads",
                 "--disable-tcpd",
-                "--with-gnutls=yes",
-                "--with-icu=yes",
+                "--with-gnutls=no",
+                "--with-icu=no",
                 "--with-xml2=yes",
                 "--with-xslt=yes",
                 "--with-memcached=no",
@@ -73,7 +70,7 @@ class YazConan(ConanFile):
         copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
-        self.cpp_info.libs = collect_libs(self) or ["yaz", "yaz_server", "yaz_icu"]
+        self.cpp_info.libs = collect_libs(self) or ["yaz", "yaz_server"]
         self.cpp_info.set_property("cmake_file_name", "yaz")
         self.cpp_info.set_property("cmake_target_name", "yaz::yaz")
         self.cpp_info.system_libs = ["m", "pthread", "dl"]

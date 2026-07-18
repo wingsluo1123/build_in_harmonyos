@@ -2,7 +2,8 @@
 
 ## Configuration
 
-- Build static YAZ client/server libraries with GnuTLS, ICU, XML, and XSLT support.
+- Build static YAZ client/server libraries with XML and XSLT support.
+- Disable optional GnuTLS and ICU integrations until those dependencies are published for HarmonyOS PC.
 - Disable TCP wrappers, Redis, memcached, and documentation toolchain discovery.
 - Use Autotools dependency metadata generated from Conan packages.
 
