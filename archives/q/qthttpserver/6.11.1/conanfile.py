@@ -18,7 +18,7 @@ class QtHttpServerConan(ConanFile):
     default_options = {"shared": True}
 
     def requirements(self):
-        self.requires("qtbase/6.11.1")
+        self.requires("qtbase-gui/6.11.1")
 
     def layout(self):
         cmake_layout(self)
@@ -28,11 +28,11 @@ class QtHttpServerConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Qt modules use qtbase's native Qt6Config.cmake and BuildInternals
+        # Qt modules use qtbase-gui's native Qt6Config.cmake and BuildInternals
         # files.  Point CMake at the dependency package instead of generating
         # an incomplete replacement config with CMakeDeps.
-        qtbase_prefix = self.dependencies["qtbase"].package_folder
-        tc.cache_variables["CMAKE_PREFIX_PATH"] = qtbase_prefix
+        qtbase_gui_prefix = self.dependencies["qtbase-gui"].package_folder
+        tc.cache_variables["CMAKE_PREFIX_PATH"] = qtbase_gui_prefix
         tc.variables.update(
             {
                 "QT_BUILD_TESTS": False,
@@ -57,6 +57,10 @@ class QtHttpServerConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["Qt6HttpServer"]
         # The package installs Qt's own Qt6HttpServerConfig.cmake.  Consumers
-        # should use that native config together with qtbase's Qt6Config.cmake.
+        # should use it together with qtbase-gui's native Qt6Config.cmake.
         self.cpp_info.set_property("cmake_find_mode", "none")
+        self.cpp_info.requires = [
+            "qtbase-gui::core",
+            "qtbase-gui::network",
+        ]
         self.cpp_info.set_property("cmake_target_name", "Qt6::HttpServer")

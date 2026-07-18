@@ -20,7 +20,7 @@ class QtHttpServerTestConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Both qtbase and qthttpserver install native Qt CMake package files.
+        # Both qtbase-gui and qthttpserver install native Qt CMake files.
         # List every host dependency prefix so find_package(Qt6 COMPONENTS ...)
         # can locate the base modules and HttpServer module together.
         prefixes = [
