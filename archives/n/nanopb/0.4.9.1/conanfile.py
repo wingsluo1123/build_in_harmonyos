@@ -238,6 +238,19 @@ class NanopbConan(ConanFile):
             self.run(
                 f"{python} -m pip install --target {target} --upgrade "
                 "--disable-pip-version-check --no-warn-script-location "
+                    "--no-deps protobuf==4.21.12"
+                )
+                if local_tools not in tool_dirs:
+                    tool_dirs.insert(0, local_tools)
+        elif (
+            not shutil.which("protoc")
+            and not has_module("grpc_tools")
+            and not has_module_in_dirs("grpc_tools")
+        ):
+            self.output.info("protoc not found; installing the pinned Python fallback")
+            self.run(
+                f"{python} -m pip install --target {target} --upgrade "
+                "--disable-pip-version-check --no-warn-script-location "
                 "--no-deps protobuf==4.21.12 grpcio-tools==1.81.0"
             )
             if local_tools not in tool_dirs:
