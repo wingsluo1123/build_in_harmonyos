@@ -56,15 +56,16 @@ class PkgconfConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # Fix compiler/tool paths in generated meson native file
+        # Fix compiler/tool paths in generated meson native file.
         # CI profile points to /data/service/hnp/bin/clang which may not exist
-        # on dev machines — only replace if the profile path is invalid
+        # on dev machines — replace with resolved path if invalid.
+        # Always resolve ar/ranlib/strip to full paths: bare 'llvm-ar' from the
+        # AR env var may not be in PATH on CI workers, causing meson to fail.
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         profile_clang = '/data/service/hnp/bin/clang'
         profile_clangxx = '/data/service/hnp/bin/clang++'
 
-        need_fix = not os.path.exists(profile_clang)
-        if need_fix and os.path.exists(native_file):
+        if os.path.exists(native_file):
             clang = shutil.which('clang') or ''
             clangxx = shutil.which('clang++') or ''
             ar = shutil.which('llvm-ar') or shutil.which('ar') or ''
@@ -72,11 +73,15 @@ class PkgconfConan(ConanFile):
             strip = shutil.which('llvm-strip') or shutil.which('strip') or ''
             with open(native_file, 'r') as f:
                 content = f.read()
-            if clang:
+            # Fix compiler paths only if profile path is invalid
+            if not os.path.exists(profile_clang) and clang:
                 content = content.replace(profile_clang, clang)
-            if clangxx:
+            if not os.path.exists(profile_clangxx) and clangxx:
                 content = content.replace(profile_clangxx, clangxx)
-            # Add ar/ranlib/strip to the [binaries] section if not present
+            # Always ensure ar/ranlib/strip use full paths
+            if ar:
+                content = content.replace("ar = 'llvm-ar'", f"ar = '{ar}'")
+                content = content.replace("ar = 'ar'", f"ar = '{ar}'")
             if 'ar =' not in content and ar:
                 content = content.replace(
                     f"cpp = '{clangxx or profile_clangxx}'",
