@@ -51,7 +51,6 @@ class ScotchConan(ConanFile):
         xz = self.dependencies["xz"].package_folder
         zlib = self.dependencies["zlib"].package_folder
         tc = CMakeToolchain(self)
-        tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.cache_variables["BZIP2_INCLUDE_DIR"] = os.path.join(bzip2, "include")
         tc.cache_variables["BZIP2_LIBRARIES"] = self._library(bzip2, ["libbz2.a", "libbz2.so"])
         tc.cache_variables["LIBLZMA_INCLUDE_DIR"] = os.path.join(xz, "include")

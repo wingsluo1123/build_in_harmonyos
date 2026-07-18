@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Consumer test package for SCOTCH 7.0.12."""
+
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
