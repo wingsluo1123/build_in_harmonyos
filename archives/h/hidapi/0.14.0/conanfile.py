@@ -149,6 +149,13 @@ Cflags: -I${{includedir}}
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        # Install stub libudev library
+        import shutil
+        stub_lib = os.path.join(self.source_folder, "stub-udev", "libudev_stub.a")
+        if os.path.isfile(stub_lib):
+            lib_dir = os.path.join(self.package_folder, "lib")
+            os.makedirs(lib_dir, exist_ok=True)
+            shutil.copy2(stub_lib, lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = ["hidapi-hidraw"]
+        self.cpp_info.libs = ["hidapi-hidraw", "udev_stub"]
