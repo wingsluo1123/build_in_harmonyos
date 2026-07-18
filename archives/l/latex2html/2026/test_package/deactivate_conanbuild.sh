@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/l/latex2html/2026/test_package/deactivate_conanbuildenv-release-armv8.sh"
