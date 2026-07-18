@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(test_source-highlight C)
+project(test_source-highlight CXX)
 
 # Find the package via Conan-generated CMakeDeps
 find_package(source-highlight REQUIRED)
