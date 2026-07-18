@@ -145,7 +145,7 @@ if [ "$PROTOC_USABLE" -eq 0 ]; then
         "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
         echo "[step] protoc not found, installing pure-Python protobuf runtime..."
         "$CONAN_PYTHON" -m pip install --target "$TEST_TOOLS_DIR" --upgrade \
-            --disable-pip-version-check --no-deps "protobuf==7.35.1" || {
+            --disable-pip-version-check --no-deps "protobuf==4.21.12" || {
             echo "[error] Failed to install protobuf runtime 7.35.1"
             exit 1
         }
