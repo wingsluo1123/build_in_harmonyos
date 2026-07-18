@@ -12,4 +12,4 @@ seqtk size "$input" > "$sizes"
 
 grep -Fqx '>read1' "$fasta"
 grep -Fqx 'ACGT' "$fasta"
-grep -Eq '^1[[:space:]]+4$' "$sizes"
+grep -Fqx 'read1	4' "$sizes"
