@@ -4,6 +4,7 @@
 import os
 
 from conan import ConanFile
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import copy, get
 from conan.tools.layout import basic_layout
 
@@ -15,6 +16,7 @@ class SipsakConan(ConanFile):
     license = "GPL-2.0-or-later"
     homepage = "https://sipsak.org"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -23,6 +25,9 @@ class SipsakConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+
+    def generate(self):
+        VirtualBuildEnv(self).generate()
 
     def build(self):
         compilers = self.conf.get(
@@ -38,7 +43,7 @@ class SipsakConan(ConanFile):
             for item in sources.split()
         )
         flags = (
-            "-O2 -fcommon -D_GNU_SOURCE -DPACKAGE_VERSION=\\\"0.9.7\\\" "
+            "-fcommon -D_GNU_SOURCE -DPACKAGE_VERSION=\\\"0.9.7\\\" "
             "-DHAVE_STDIO_H -DHAVE_STDLIB_H -DHAVE_STDARG_H "
             "-DHAVE_STDINT_H -DHAVE_STRING_H -DHAVE_STRINGS_H "
             "-DHAVE_CTYPE_H -DHAVE_ERRNO_H -DHAVE_UNISTD_H "
@@ -54,7 +59,8 @@ class SipsakConan(ConanFile):
         self.run(
             '"{}" {} -I"{}" {} -o "{}"'.format(
                 cc, flags, os.path.join(self.source_folder, "src"), source_args, output
-            )
+            ),
+            env="conanbuild",
         )
 
     def package(self):
