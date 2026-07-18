@@ -1,0 +1,69 @@
+# 版本级 manifest
+# 文件位置: archives/c/chezscheme/10.4.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "10.4.1"
+software: "chezscheme"
+status: built
+build_date: "2026-07-17"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/cisco/ChezScheme/releases/download/v10.4.1/csv10.4.1.tar.gz"
+  sha256: "2e74952db7bc177f0c3602e2217a341ba677d733eec4cd7726418c3a4e1ef308"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options:
+    - "--pbarch"
+    - "--disable-curses"
+    - "--disable-x11"
+    - "--disable-iconv"
+    - "--as-is"
+    - "--installprefix=/storage/Users/currentUser/usr/local"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  cflags: "-fPIC -O2 -DDISABLE_CURSES -DDISABLE_X11 -DDISABLE_ICONV"
+  ldflags: "-fPIC"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-makefiles-install.zuo.patch"
+
+knowledge_gained:
+  - "HMDFS does not support hard links (ln -f), replace with cp in install.zuo"
+  - "HMDFS does not support relative symlinks (ln -s), replace with cp"
+  - "Chez Scheme uses custom zuo build system, not autotools"
+  - "--pbarch builds portable bytecode version avoiding platform-specific assembly"
+  - "Machine type: tpb64l (threaded pb 64-bit LE on unknown OS)"
+  - "Self-contained: bundles zlib, lz4, zuo, nanopass, stex - no external deps"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/chezscheme-10.4.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/chezscheme-10.4.1.work
+  generated_at: '2026-07-17T16:05:57'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-makefiles-install.zuo.patch
+    type: auto
+    platform_only: true
+    guard: 'HMDFS_no_hard_links'
