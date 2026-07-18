@@ -45,6 +45,7 @@ class HidapiConan(ConanFile):
 
         libudev_h = """#ifndef LIBUDEV_H
 #define LIBUDEV_H
+#include <sys/types.h>
 struct udev;
 struct udev_device;
 struct udev_enumerate;
