@@ -90,13 +90,14 @@ class SeqtkConan(ConanFile):
         if library_flags:
             compiler = f"{compiler} {' '.join(library_flags)}"
         self.run(
-            f'make -j1 CC="{compiler}" CFLAGS="{cflags}"'
+            f'make -j1 CC="{compiler}" CFLAGS="{cflags}"',
+            cwd=self.source_folder,
         )
 
     def package(self):
         bin_dir = os.path.join(self.package_folder, "bin")
         license_dir = os.path.join(self.package_folder, "licenses")
-        copy(self, "seqtk", src=self.build_folder, dst=bin_dir, keep_path=False)
+        copy(self, "seqtk", src=self.source_folder, dst=bin_dir, keep_path=False)
         copy(self, "LICENSE", src=self.source_folder, dst=license_dir, keep_path=False)
 
         binary = os.path.join(bin_dir, "seqtk")

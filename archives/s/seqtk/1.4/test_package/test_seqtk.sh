@@ -1,5 +1,8 @@
 #!/bin/sh
 set -eu
+if (set -o pipefail) 2>/dev/null; then
+    set -o pipefail
+fi
 
 input="$(mktemp "${TMPDIR:-.}/seqtk-test.XXXXXX")"
 fasta="$(mktemp "${TMPDIR:-.}/seqtk-test.XXXXXX")"
