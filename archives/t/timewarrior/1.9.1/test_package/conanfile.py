@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.build import can_run
@@ -16,4 +17,9 @@ class TimewarriorTestConan(ConanFile):
         if can_run(self):
             binary = os.path.join(self.dependencies["timewarrior"].package_folder, "bin", "timew")
             script = os.path.join(self.source_folder, "test.sh")
-            self.run(f'sh "{script}" "{binary}"', env="conanrun")
+            bash = (
+                os.environ.get("CONFIG_SHELL")
+                or shutil.which("bash")
+                or "/data/service/hnp/bin/bash"
+            )
+            self.run(f'"{bash}" "{script}" "{binary}"', env="conanrun")
