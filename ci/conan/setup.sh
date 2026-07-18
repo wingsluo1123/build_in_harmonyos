@@ -22,6 +22,11 @@ echo "[step] Conan environment setup..."
 # ── 1. Detect/install Conan ──
 # pip3 可能装到 ~/.local/bin, 确保在 PATH 上
 export PATH="$HOME/.local/bin:$PATH"
+PYTHON3_BIN="$(command -v python3 2>/dev/null || true)"
+if [ -z "$PYTHON3_BIN" ]; then
+    echo "[error] python3 not found"
+    exit 1
+fi
 
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
@@ -32,7 +37,7 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    python3 -m pip install --user --force-reinstall conan || {
+    "$PYTHON3_BIN" -m pip install --user --force-reinstall conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
@@ -42,6 +47,20 @@ fi
 
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
 echo "[step] Conan version: $CONAN_VERSION"
+
+# Conan may be launched by a Python interpreter different from the first
+# python3 on PATH (the OHOS HNP worker is one example). Python packages used
+# by recipes must be installed for the interpreter that actually runs Conan.
+CONAN_PYTHON="$PYTHON3_BIN"
+CONAN_BIN="$(command -v conan 2>/dev/null || true)"
+if [ -n "$CONAN_BIN" ]; then
+    CONAN_SHEBANG="$(head -n 1 "$CONAN_BIN" 2>/dev/null || true)"
+    CONAN_CANDIDATE="$(printf '%s\n' "$CONAN_SHEBANG" | sed 's/^#!//' | awk '{print $1}')"
+    if [ -x "$CONAN_CANDIDATE" ]; then
+        CONAN_PYTHON="$CONAN_CANDIDATE"
+    fi
+fi
+echo "[step] Conan Python: $CONAN_PYTHON"
 
 # If conan still can't run after install/reinstall, diagnose the root cause
 if [ "$CONAN_VERSION" = "unknown" ]; then
@@ -62,7 +81,6 @@ if [ "$CONAN_VERSION" = "unknown" ]; then
     }
     python3 -c "import ssl" 2>&1 || echo "[error] Python ssl 模块损坏 — libssl.so 缺失"
     # Check for other missing shared libraries
-    PYTHON3_BIN=$(which python3 2>/dev/null)
     if [ -n "$PYTHON3_BIN" ]; then
         ldd "$PYTHON3_BIN" 2>/dev/null | grep "not found" | while read -r line; do
             echo "[error] 缺失动态库: $line"
@@ -75,41 +93,41 @@ if [ "$CONAN_VERSION" = "unknown" ]; then
     fi
 fi
 
-# Some upstream libraries use SCons for their official test suites.  Keep the
-# test tool available on clean workers instead of relying on a preinstalled
-# command that may be absent from PATH.
-if ! command -v scons &>/dev/null; then
-    echo "[step] SCons not found, installing the pinned test tool..."
-    python3 -m pip install --user --disable-pip-version-check "SCons==4.10.0" || {
+# Some upstream libraries use SCons for their official test suites. Install
+# it for Conan's interpreter because recipes invoke it as 'python -m SCons'.
+if ! "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
+    echo "[step] SCons not found for Conan Python, installing the pinned test tool..."
+    "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check "SCons==4.10.0" || {
         echo "[error] Failed to install SCons 4.10.0"
         exit 1
     }
     export PATH="$HOME/.local/bin:$PATH"
 fi
-if ! command -v scons &>/dev/null; then
-    echo "[error] SCons is still unavailable after installation"
+if ! "$CONAN_PYTHON" -c "import SCons" &>/dev/null; then
+    echo "[error] SCons is still unavailable for Conan Python after installation"
     exit 1
 fi
-echo "[step] SCons: $(scons --version 2>/dev/null | head -1)"
+echo "[step] SCons interpreter: $CONAN_PYTHON"
+"$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
 
 # Nanopb's upstream tests also require protoc.  Some clean workers do not
 # provide the standalone binary, so install the Python protoc implementation
 # as a portable fallback for recipes that invoke it through their interpreter.
 if ! command -v protoc &>/dev/null; then
-    if ! python3 -c "import grpc_tools.protoc" &>/dev/null; then
+    if ! "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null; then
         echo "[step] protoc not found, installing grpcio-tools fallback..."
-        if ! python3 -c "import google.protobuf" &>/dev/null; then
-            python3 -m pip install --user --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
+        if ! "$CONAN_PYTHON" -c "import google.protobuf" &>/dev/null; then
+            "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check --no-deps "protobuf==5.29.6" || {
                 echo "[error] Failed to install protobuf runtime 5.29.6"
                 exit 1
             }
         fi
-        python3 -m pip install --user --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
+        "$CONAN_PYTHON" -m pip install --user --disable-pip-version-check --no-deps "grpcio-tools==1.67.1" || {
             echo "[error] Failed to install grpcio-tools 1.67.1"
             exit 1
         }
     fi
-    python3 -c "import grpc_tools.protoc" &>/dev/null || {
+    "$CONAN_PYTHON" -c "import grpc_tools.protoc" &>/dev/null || {
         echo "[error] grpcio-tools protoc fallback is unavailable"
         exit 1
     }
