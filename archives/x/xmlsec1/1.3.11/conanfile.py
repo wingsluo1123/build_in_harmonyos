@@ -40,8 +40,12 @@ class Xmlsec1Conan(ConanFile):
         libxml2 = self.dependencies["libxml2"].package_folder
         openssl = self.dependencies["openssl"].package_folder
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend([
+                "--build=aarch64-unknown-linux-gnu",
+                "--host=aarch64-unknown-linux-ohos",
+            ])
         tc.configure_args.extend([
-            "--host=aarch64-unknown-linux-gnu",
             "--disable-shared",
             "--enable-static",
             "--enable-static-linking",
@@ -73,4 +77,4 @@ class Xmlsec1Conan(ConanFile):
         self.cpp_info.includedirs = ["include/xmlsec1"]
         self.cpp_info.set_property("cmake_file_name", "xmlsec1")
         self.cpp_info.set_property("cmake_target_name", "xmlsec1::xmlsec1")
-        self.cpp_info.system_libs = ["dl", "m", "pthread"]
+        self.cpp_info.system_libs = ["m"] if self.settings.os == "OHOS" else ["dl", "m", "pthread"]
