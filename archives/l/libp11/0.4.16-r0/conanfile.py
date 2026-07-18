@@ -4,7 +4,13 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+)
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -30,6 +36,7 @@ class Libp11Conan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -39,8 +46,12 @@ class Libp11Conan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend([
+                "--build=aarch64-unknown-linux-gnu",
+                "--host=aarch64-unknown-linux-ohos",
+            ])
         tc.configure_args.extend([
-            "--host=aarch64-unknown-linux-gnu",
             "--disable-shared",
             "--enable-static",
             "--disable-static-engine",
@@ -51,8 +62,13 @@ class Libp11Conan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
-        self.run("./bootstrap", cwd=self.source_folder)
+        if self.settings.os == "OHOS":
+            replace_in_file(
+                self,
+                os.path.join(self.source_folder, "configure"),
+                "umask 077",
+                "umask 022",
+            )
         autotools = Autotools(self)
         autotools.configure()
         self.run("make -C src -j1 libp11.la", cwd=self.source_folder)
@@ -68,4 +84,4 @@ class Libp11Conan(ConanFile):
         self.cpp_info.libs = ["p11"]
         self.cpp_info.set_property("cmake_file_name", "libp11")
         self.cpp_info.set_property("cmake_target_name", "libp11::libp11")
-        self.cpp_info.system_libs = ["dl", "pthread"]
+        self.cpp_info.system_libs = ["m"] if self.settings.os == "OHOS" else ["dl", "pthread"]
