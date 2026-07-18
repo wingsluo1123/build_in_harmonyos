@@ -124,7 +124,7 @@ class NanopbConan(ConanFile):
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="
             + self.source_folder
-            + "/generator/protoc-gen-nanopb "
+            + "/generator/protoc-gen-nanopb"
         )
         shell_arg = ""
         if str(self.settings.os) == "OHOS":
@@ -363,8 +363,8 @@ class NanopbConan(ConanFile):
             "    for index, arg in enumerate(args):\n"
             "        if arg == '-o' and index + 1 < len(args):\n"
             "            return args[index + 1]\n"
-            "        if arg.startswith('-o') and len(arg) > 2:\n"
-            "            return arg[2:]\n"
+            "        if arg.startswith('-o=') and len(arg) > 3:\n"
+            "            return arg[3:]\n"
             "    return None\n"
             "\n"
             "def sign(path):\n"

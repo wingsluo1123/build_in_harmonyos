@@ -31,12 +31,8 @@ class NanopbTestConan(ConanFile):
         self.run("ctest --output-on-failure", env="conanrun")
 
     def _sign_test_binary(self):
-        binary = None
-        for root, _, filenames in os.walk(self.build_folder):
-            if "test_nanopb" in filenames:
-                binary = os.path.join(root, "test_nanopb")
-                break
-        if not binary:
+        binary = os.path.join(self.build_folder, "test_nanopb")
+        if not os.path.isfile(binary):
             raise RuntimeError("test_package did not produce test_nanopb")
 
         objcopy = shutil.which("llvm-objcopy") or "/data/service/hnp/bin/llvm-objcopy"
