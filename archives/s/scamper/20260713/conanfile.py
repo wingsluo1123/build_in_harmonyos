@@ -46,7 +46,6 @@ class ScamperConan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
-                "--host=aarch64-unknown-linux-gnu",
                 "--disable-shared",
                 "--enable-static",
                 "--disable-debug",
