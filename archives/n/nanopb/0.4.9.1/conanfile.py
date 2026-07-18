@@ -238,7 +238,7 @@ class NanopbConan(ConanFile):
             self.run(
                 f"{python} -m pip install --target {target} --upgrade "
                 "--disable-pip-version-check --no-warn-script-location "
-                "--no-deps protobuf==7.35.1 grpcio-tools==1.81.0"
+                "--no-deps protobuf==4.21.12 grpcio-tools==1.81.0"
             )
             if local_tools not in tool_dirs:
                 tool_dirs.insert(0, local_tools)
