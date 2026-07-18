@@ -92,6 +92,10 @@ class NanopbConan(ConanFile):
             cc = self._make_ohos_compiler_wrapper(real_cc, "cc")
             cxx = self._make_ohos_compiler_wrapper(real_cxx, "cxx")
             os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+            scons_command = "{} {}".format(
+                shlex.quote(sys.executable),
+                shlex.quote(self._make_ohos_scons_runner(protoc)),
+            )
         else:
             cc = real_cc
             cxx = real_cxx
@@ -115,6 +119,7 @@ class NanopbConan(ConanFile):
                     | stat.S_IXGRP
                     | stat.S_IXOTH,
                 )
+            scons_command = shlex.quote(sys.executable) + " -m SCons"
         tests_dir = shlex.quote(self.source_folder + "/tests")
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="
@@ -133,25 +138,11 @@ class NanopbConan(ConanFile):
                 or "/data/service/hnp/bin/bash"
             )
             shell_arg = " SHELL=" + shlex.quote(shell)
-        path_arg = ""
-        if self._is_ohos():
-            # Conan's self.run() may rebuild the child environment from its
-            # generated env files, so changing os.environ above is not enough
-            # for nanopb's relative-path tests. Those tests invoke `protoc`
-            # directly instead of using SCons' absolute PROTOC value.
-            test_path = os.pathsep.join(
-                path
-                for path in (os.path.dirname(protoc), os.environ.get("PATH", ""))
-                if path
-            )
-            path_arg = "PATH=" + shlex.quote(test_path) + " "
-            self.output.info("Nanopb SCons PATH: " + test_path)
         command = (
-            "{path_arg}{python} -m SCons -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
+            "{scons} -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
             "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1{shell_arg}"
         ).format(
-            path_arg=path_arg,
-            python=shlex.quote(sys.executable),
+            scons=scons_command,
             tests=tests_dir,
             cc=shlex.quote(str(cc)),
             cxx=shlex.quote(str(cxx)),
@@ -160,6 +151,24 @@ class NanopbConan(ConanFile):
             shell_arg=shell_arg,
         )
         self.run(command)
+
+    def _make_ohos_scons_runner(self, protoc):
+        """Inject protoc into PATH after Conan has prepared the run env."""
+        runner = os.path.join(self.build_folder, "nanopb-scons-runner.py")
+        protoc_dir = os.path.dirname(os.path.abspath(protoc))
+        save(
+            self,
+            runner,
+            "import os\n"
+            "import runpy\n"
+            f"PROTOC_DIR = {protoc_dir!r}\n"
+            "os.environ['PATH'] = os.pathsep.join(\n"
+            "    path for path in (PROTOC_DIR, os.environ.get('PATH', '')) if path\n"
+            ")\n"
+            "print('Nanopb SCons effective PATH: ' + os.environ['PATH'])\n"
+            "runpy.run_module('SCons', run_name='__main__')\n",
+        )
+        return runner
 
     def _prepare_test_tools(self):
         """Make SCons and the Python protoc fallback visible to test commands."""
