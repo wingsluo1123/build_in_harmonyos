@@ -116,17 +116,13 @@ class GuileConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
 
-        # Build with -k (keep going) to tolerate Signal 5 (SIGTRAP) crashes during
-        # .go file compilation on HarmonyOS. The .go files are written before the
-        # crash occurs, so the build output is complete.
-        try:
-            autotools.make(args=["-k", "-j1"])
-        except ConanException as e:
-            self._verify_build()
-            self.output.warn(
-                "make reported errors (Signal 5 during .go compilation "
-                "is expected on OHOS): {}".format(e)
-            )
+        # Build only libguile (library + binary) and meta (config files).
+        # Skip bootstrap/module .go compilation — it takes 10+ hours on HMDFS
+        # due to Signal 5 (SIGTRAP) crashes during guile execution.
+        # Pre-compiled .go files are copied from previous builds instead.
+        autotools.make(args=["-C", "libguile", "-k", "-j1"])
+        autotools.make(args=["-C", "meta", "-k", "-j1"])
+        self._copy_prebuilt_go_files()
 
     def package(self):
         # HMDFS: set umask 022 for install step
@@ -184,6 +180,43 @@ class GuileConan(ConanFile):
             path = os.path.join(self.source_folder, doc_file)
             if os.path.isfile(path):
                 os.utime(path, None)
+
+    def _copy_prebuilt_go_files(self):
+        """Copy pre-compiled .go files from /usr/local installation.
+
+        On HarmonyOS, guile's .go (Scheme bytecode) compilation triggers
+        Signal 5 (SIGTRAP) on every file, making full builds take 10+ hours.
+        This method reuses .go files from the system-installed guile to skip
+        recompilation entirely.
+        """
+        import shutil
+
+        # /usr/local guile installation has .go files in lib/guile/2.2/ccache/
+        src_base = "/usr/local/lib/guile/2.2/ccache"
+        if not os.path.isdir(src_base):
+            self.output.warn("No pre-compiled .go files in /usr/local")
+            return
+
+        # Copy to both bootstrap/ and module/ build dirs so make install finds them
+        for subdir in ("bootstrap", "module"):
+            dst = os.path.join(self.build_folder, subdir)
+            if not os.path.exists(dst):
+                os.makedirs(dst, exist_ok=True)
+            for root, dirs, files in os.walk(src_base):
+                rel = os.path.relpath(root, src_base)
+                dst_root = os.path.join(dst, rel) if rel != "." else dst
+                os.makedirs(dst_root, exist_ok=True)
+                for f in files:
+                    if f.endswith(".go"):
+                        shutil.copy2(
+                            os.path.join(root, f),
+                            os.path.join(dst_root, f),
+                        )
+        eval_go = os.path.join(self.build_folder, "bootstrap", "ice-9", "eval.go")
+        if os.path.exists(eval_go):
+            self.output.info("Copied pre-compiled .go files from /usr/local")
+        else:
+            self.output.warn("Failed to copy .go files; guile runtime may be limited")
 
     def _verify_build(self):
         """Verify the library was built despite possible Signal 5 crashes."""
