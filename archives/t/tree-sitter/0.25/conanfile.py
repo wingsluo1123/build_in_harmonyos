@@ -4,6 +4,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import copy, get
 from conan.tools.layout import basic_layout
 
@@ -23,6 +24,24 @@ class TreeSitterConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # crates.io contains one top-level tree-sitter-0.25.0 directory.
+        # After strip_root, the C runtime and public header are directly under
+        # src/ and include/; the archive does not contain an extra lib/ layer.
+        required_paths = (
+            os.path.join("src", "lib.c"),
+            os.path.join("include", "tree_sitter", "api.h"),
+        )
+        missing = [
+            path
+            for path in required_paths
+            if not os.path.isfile(os.path.join(self.source_folder, path))
+        ]
+        if missing:
+            raise ConanInvalidConfiguration(
+                "Unexpected tree-sitter crate layout; missing: {}".format(
+                    ", ".join(missing)
+                )
+            )
 
     def build(self):
         compilers = self.conf.get(
