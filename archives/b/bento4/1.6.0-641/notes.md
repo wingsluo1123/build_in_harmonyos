@@ -11,7 +11,7 @@
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
-cmake --install build --prefix $DEFAULT_PREFIX
+cmake --install build --prefix /storage/Users/currentUser/usr/local
 ```
 
 ## 遇到的问题与解决方案

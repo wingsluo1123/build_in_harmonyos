@@ -10,7 +10,7 @@ import os
 class Bento4Conan(ConanFile):
     name = "bento4"
     version = "1.6.0-641"
-    license = "MIT"
+    license = "GPL-2.0-only"
     author = "axiomatic-systems"
     url = "https://github.com/axiomatic-systems/Bento4"
     homepage = "http://www.bento4.com"
