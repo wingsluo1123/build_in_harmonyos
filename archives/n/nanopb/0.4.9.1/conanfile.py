@@ -80,6 +80,15 @@ class NanopbConan(ConanFile):
             # Python dlopen even after ELF signing. Use native protoc and
             # sign the test executables produced by SCons instead.
             protoc = self._build_ohos_protoc(real_cc, real_cxx)
+            # The upstream Python generator invokes a fallback subprocess as
+            # ['protoc', ...] and does not inherit SCons' PROTOC construction
+            # variable. Export the signed binary through PATH as well so that
+            # nanopb_pb2.py generation uses the same OHOS-safe protoc.
+            protoc_dir = os.path.dirname(protoc)
+            os.environ["PROTOC"] = protoc
+            os.environ["PATH"] = os.pathsep.join(
+                path for path in (protoc_dir, os.environ.get("PATH", "")) if path
+            )
             cc = self._make_ohos_compiler_wrapper(real_cc, "cc")
             cxx = self._make_ohos_compiler_wrapper(real_cxx, "cxx")
             os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
