@@ -42,7 +42,14 @@ class SipsakConan(ConanFile):
             '"{}"'.format(os.path.join(self.source_folder, "src", item))
             for item in sources.split()
         )
+        build_type_flags = {
+            "Debug": "-g -O0",
+            "Release": "-O2 -DNDEBUG",
+            "MinSizeRel": "-Os -DNDEBUG",
+            "RelWithDebInfo": "-O2 -g -DNDEBUG",
+        }[str(self.settings.build_type)]
         flags = (
+            build_type_flags + " "
             "-DPACKAGE_NAME=\\\"sipsak\\\" "
             "-DPACKAGE_BUGREPORT=\\\"nils@sipsak.org\\\" "
             "-DDEFAULT_TIMEOUT=500 "
