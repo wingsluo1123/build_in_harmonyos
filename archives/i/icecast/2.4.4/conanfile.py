@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Conan recipe for Icecast 2.4.4-r14."""
+"""Conan recipe for Icecast 2.4.4.
+
+Builds the static streaming server for Linux and OHOS targets.
+"""
 import os
 import stat
 
@@ -12,7 +15,7 @@ from conan.tools.layout import basic_layout
 
 class IcecastConan(ConanFile):
     name = "icecast"
-    version = "2.4.4-r14"
+    version = "2.4.4"
     description = "Streaming media server for Ogg and other formats"
     license = "GPL-2.0-only"
     homepage = "https://icecast.org"
@@ -24,8 +27,7 @@ class IcecastConan(ConanFile):
             raise ConanInvalidConfiguration("Icecast requires POSIX sockets and threads")
 
     def requirements(self):
-        self.requires("curl/8.15.0")
-        self.requires("libogg/1.3.6")
+        self.requires("libogg/1.3.5")
         self.requires("libvorbis/1.3.7")
         self.requires("libxml2/2.15.3")
         self.requires("libxslt/1.1.45")
@@ -64,10 +66,10 @@ class IcecastConan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
-                "--host=aarch64-unknown-linux-gnu",
                 "--disable-shared",
                 "--enable-static",
                 "--disable-yp",
+                "--with-curl=no",
                 "--without-theora",
                 "--without-speex",
                 f"--with-xslt-config={xslt_config}",
