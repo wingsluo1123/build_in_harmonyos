@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for ncmpcpp 0.10.1-r2."""
+"""Conan recipe for ncmpcpp 0.10.1."""
 import os
 
 from conan import ConanFile
@@ -11,7 +11,7 @@ from conan.tools.layout import basic_layout
 
 class NcmpcppConan(ConanFile):
     name = "ncmpcpp"
-    version = "0.10.1-r2"
+    version = "0.10.1"
     description = "Feature-rich ncurses client for Music Player Daemon"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/ncmpcpp/ncmpcpp"
@@ -48,7 +48,6 @@ class NcmpcppConan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
-                "--host=aarch64-unknown-linux-gnu",
                 "--disable-shared",
                 "--enable-static",
                 "--enable-clock",

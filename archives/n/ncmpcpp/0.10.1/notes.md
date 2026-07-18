@@ -1,4 +1,4 @@
-# ncmpcpp 0.10.1-r2 adaptation notes
+# ncmpcpp 0.10.1 adaptation notes
 
 ## Configuration
 
