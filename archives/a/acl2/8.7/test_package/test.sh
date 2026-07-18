@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # test_package/test.sh — smoke test for ACL2 saved_acl2 executable
 set -euo pipefail
 

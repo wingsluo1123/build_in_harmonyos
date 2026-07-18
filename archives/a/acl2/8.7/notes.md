@@ -3,7 +3,7 @@
 **软件名称**: acl2 (A Computational Logic for Applicative Common Lisp)
 **版本**: 8.7
 **编译日期**: 2026-07-18
-**编译状态**: pending CI verification
+**编译状态**: failed (CI #6701 缺少宿主 Lisp；修复后待重跑)
 
 ---
 
@@ -100,9 +100,9 @@ ACL2 → GCL 2.7.1 → C 编译器 (clang)
 
 ## 验证结果
 
-- **编译状态**: pending CI verification
+- **编译状态**: failed (CI #6701 未找到 Common Lisp 实现)
 - **静态检查**: 配方语法、YAML、补丁适用性和 Conan inspect 已验证
-- **OHOS 真机构建**: 待 PR CI 验证 GCL 引导与 ACL2 完整构建
+- **OHOS 真机构建**: 已增加 GCL 引导修复，待 PR CI 重跑验证完整构建
 
 > 当前 Windows 环境无法执行 OHOS aarch64 真机构建。配方不再依赖 CI 预装 SBCL/CCL，并通过固定版本和 SHA256 的 GCL 2.7.1 完成宿主 Lisp 引导。
 
@@ -124,4 +124,4 @@ ACL2 → GCL 2.7.1 → C 编译器 (clang)
 ---
 
 **编译结束**: 2026-07-18
-**最终状态**: pending CI verification
+**最终状态**: failed (已修复宿主 Lisp 缺失问题，待 CI 重跑)
