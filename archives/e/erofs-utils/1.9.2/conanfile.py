@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 
 from conan import ConanFile
@@ -30,10 +31,12 @@ class ErofsUtilsConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
-        generated = os.path.join(
-            self.export_sources_folder, "files", "autotools-generated"
+        generated_archive = os.path.join(
+            self.export_sources_folder,
+            "files",
+            "autotools-generated.tar.gz",
         )
-        copy(self, "*", generated, self.source_folder, keep_path=True)
+        shutil.unpack_archive(generated_archive, self.source_folder)
         self._set_autotools_executable_bits()
         self._refresh_autotools_timestamps()
 
