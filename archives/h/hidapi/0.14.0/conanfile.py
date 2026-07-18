@@ -112,6 +112,12 @@ Cflags: -I${{includedir}}
         with open(os.path.join(pc_dir, "libudev.pc"), "w") as f:
             f.write(libudev_pc)
 
+        # Compile stub-udev.c into libudev_stub.a
+        cc = os.environ.get("CC", "clang")
+        ar = os.environ.get("AR", "llvm-ar")
+        self.run(f"{cc} -c -fPIC -I{stub_dir} -o {stub_dir}/stub-udev.o {stub_dir}/stub-udev.c")
+        self.run(f"{ar} rcs {stub_dir}/libudev_stub.a {stub_dir}/stub-udev.o")
+
         # Set PKG_CONFIG_PATH to find stub libudev
         old_pc = os.environ.get("PKG_CONFIG_PATH", "")
         os.environ["PKG_CONFIG_PATH"] = pc_dir + (":" + old_pc if old_pc else "")
