@@ -34,6 +34,7 @@ class HidapiConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["HIDAPI_NO_ICONV"] = "ON"
         tc.variables["HIDAPI_WITH_LIBUSB"] = "OFF"
+        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         tc.generate()
 
     def build(self):
