@@ -45,11 +45,19 @@ class ProctoolsConan(ConanFile):
         ) or {}
         cc = compilers.get("c", "clang")
         source = os.path.join(self.source_folder, "proctools_ohos.c")
+        build_type_flags = {
+            "Debug": "-O0 -g",
+            "Release": "-O2 -DNDEBUG",
+            "MinSizeRel": "-Os -DNDEBUG",
+            "RelWithDebInfo": "-O2 -g -DNDEBUG",
+        }[str(self.settings.build_type)]
         for program in ("pgrep", "pkill", "pfind"):
             output = os.path.join(self.build_folder, program)
             self.run(
-                '"{}" -O2 -std=c11 -D_GNU_SOURCE -DPROCTOOLS_NAME=\\\"{}\\\" '
-                '"{}" -o "{}"'.format(cc, program, source, output)
+                '"{}" {} -std=c11 -D_GNU_SOURCE -DPROCTOOLS_NAME=\\\"{}\\\" '
+                '"{}" -o "{}"'.format(
+                    cc, build_type_flags, program, source, output
+                )
             )
 
     def package(self):

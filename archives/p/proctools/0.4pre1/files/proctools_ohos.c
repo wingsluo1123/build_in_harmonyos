@@ -26,6 +26,10 @@ static int read_text(const char *path, char *buffer, size_t size) {
     size_t used;
     if (!file) return -1;
     used = fread(buffer, 1, size - 1, file);
+    if (ferror(file)) {
+        fclose(file);
+        return -1;
+    }
     fclose(file);
     buffer[used] = '\0';
     while (used && (buffer[used - 1] == '\n' || buffer[used - 1] == '\r'))
@@ -42,6 +46,10 @@ static int process_text(pid_t pid, int full, char *buffer, size_t size) {
         file = fopen(path, "r");
         if (!file) return -1;
         used = fread(buffer, 1, size - 1, file);
+        if (ferror(file)) {
+            fclose(file);
+            return -1;
+        }
         fclose(file);
         buffer[used] = '\0';
         for (size_t i = 0; i < used; ++i) if (buffer[i] == '\0') buffer[i] = ' ';
