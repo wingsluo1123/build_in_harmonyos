@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/i/i686-elf-binutils/2.46.1/test_package/deactivate_conanbuildenv-release-armv8.sh"
