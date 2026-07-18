@@ -214,28 +214,46 @@ class NanopbConan(ConanFile):
     def _prepare_native_test_tools(self, tool_dir):
         if not os.path.isdir(tool_dir):
             return
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        is_ohos = str(self.settings.os).lower() == "ohos"
+        objcopy = shutil.which("llvm-objcopy") or (
+            "/data/service/hnp/bin/llvm-objcopy"
+        )
+        signer = shutil.which("binary-sign-tool") or (
+            "/data/service/hnp/bin/binary-sign-tool"
+        )
         for root, _, filenames in os.walk(tool_dir):
             for filename in filenames:
                 if not (filename.endswith(".so") or ".so." in filename):
                     continue
                 path = os.path.join(root, filename)
-                if str(self.settings.os) == "OHOS":
+                if is_ohos:
                     if not os.path.isfile(objcopy) or not os.path.isfile(signer):
                         raise RuntimeError(
                             "OHOS native test tools require llvm-objcopy and "
                             "binary-sign-tool"
                         )
                     quoted_path = shlex.quote(path)
+                    signed_path = path + ".nanopb-signed"
+                    quoted_signed_path = shlex.quote(signed_path)
+                    self.output.info(
+                        "Signing OHOS native test tool: " + path
+                    )
                     self.run(
                         f"{shlex.quote(objcopy)} --remove-section .codesign "
                         f"{quoted_path} 2>/dev/null || true"
                     )
-                    self.run(
-                        f"{shlex.quote(signer)} sign -inFile {quoted_path} "
-                        f"-outFile {quoted_path} -selfSign 1"
-                    )
+                    try:
+                        # Use a separate output file. Some worker versions of
+                        # binary-sign-tool reject an in-place input/output
+                        # pair even though the command is otherwise valid.
+                        self.run(
+                            f"{shlex.quote(signer)} sign -inFile {quoted_path} "
+                            f"-outFile {quoted_signed_path} -selfSign 1"
+                        )
+                        os.replace(signed_path, path)
+                    finally:
+                        if os.path.exists(signed_path):
+                            os.unlink(signed_path)
                 try:
                     mode = os.stat(path).st_mode
                     os.chmod(
