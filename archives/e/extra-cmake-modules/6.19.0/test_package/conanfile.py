@@ -27,5 +27,6 @@ class ExtraCMakeModulesTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # R-CI L0d: test() 必须含 self.run() 直跑测试程序，cmake.test() 不被门禁识别
+        test_bin = os.path.join(self.test_build_folder, "test_ecm")
+        self.run(test_bin, env="conanrun")
