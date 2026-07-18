@@ -26,12 +26,13 @@ else
 fi
 
 echo "[test] 4. Run simple ACL2 proof"
-RESULT=$(echo '(thm (equal (+ 1 1) 2))' | timeout 120 "$ACL2_BIN" 2>&1)
-EXIT_CODE=$?
-if echo "$RESULT" | grep -qi "Q.E.D\|proved"; then
+EXIT_CODE=0
+RESULT=$(printf '%s\n' '(thm (equal (+ 1 1) 2))' ':q' | timeout 120 "$ACL2_BIN" 2>&1) || EXIT_CODE=$?
+if [ "$EXIT_CODE" -eq 0 ] && echo "$RESULT" | grep -qi "Q.E.D\|proved"; then
     echo "PASS: ACL2 proof engine works"
 elif [ "$EXIT_CODE" -eq 124 ]; then
-    echo "WARN: proof timed out (may be normal for first run)"
+    echo "FAIL: ACL2 proof timed out"
+    exit 1
 else
     echo "FAIL: ACL2 proof engine failed with exit code $EXIT_CODE"
     echo "$RESULT"

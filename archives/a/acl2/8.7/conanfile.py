@@ -14,8 +14,8 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration, ConanException
-from conan.tools.files import get, copy, export_conandata_patches
+from conan.errors import ConanException, ConanInvalidConfiguration
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
 from conan.tools.layout import basic_layout
 
 
@@ -30,6 +30,7 @@ class Acl2Conan(ConanFile):
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
+    exports_sources = "gcl-sign-elf.sh"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -43,12 +44,6 @@ class Acl2Conan(ConanFile):
             raise ConanInvalidConfiguration(
                 f"os={self.settings.os} not supported, requires Linux or OHOS"
             )
-
-    def requirements(self):
-        # ACL2 requires a host Common Lisp implementation to build.
-        # SBCL is the most commonly used; it should be available on the
-        # build system (e.g. installed via cmd-pkgs or system package manager).
-        pass
 
     def source(self):
         sources = self.conan_data["sources"]
@@ -67,11 +62,14 @@ class Acl2Conan(ConanFile):
         # Locate the host Lisp compiler.
         lisp = self._find_lisp()
 
+        if not lisp:
+            lisp = self._build_gcl()
+
         # Build ACL2 using the host Lisp implementation.
         # 'make large' builds saved_acl2 from scratch.
         self.output.info(f"Building ACL2 with LISP={lisp}")
         self.run(
-            f"make large LISP={lisp}",
+            f'MAKEFLAGS=-j1 make -j1 large LISP="{lisp}"',
             cwd=self.source_folder,
             env=["conanbuild"],
         )
@@ -82,7 +80,57 @@ class Acl2Conan(ConanFile):
             raise ConanException(
                 f"saved_acl2 not found after build at {saved_acl2}"
             )
+        self._sign_elf(saved_acl2)
         self.output.info("ACL2 build complete: saved_acl2 created")
+
+    def _build_gcl(self):
+        gcl = self.conan_data["build_sources"]["gcl"]
+        gcl_folder = os.path.join(self.build_folder, "gcl")
+        self._download(gcl, gcl_folder)
+        apply_conandata_patches(self, base_path=gcl_folder)
+        sign_command = "true"
+        if self.settings.os == "OHOS":
+            sign_script = os.path.join(self.export_sources_folder, "gcl-sign-elf.sh")
+            sign_command = f"/data/service/hnp/bin/bash {sign_script}"
+        self.run(
+            "./configure --enable-ansi=yes --enable-xgcl=no --enable-readline=no "
+            "--enable-dynsysgmp=no --enable-locbfd=yes --disable-statsysbfd",
+            cwd=gcl_folder,
+            env=["conanbuild"],
+        )
+        self.run(
+            f'MAKEFLAGS=-j1 make -j1 SIGN_ELF="{sign_command}"',
+            cwd=gcl_folder,
+            env=["conanbuild"],
+        )
+        gcl_binary = os.path.join(gcl_folder, "unixport", "saved_gcl")
+        if not os.path.exists(gcl_binary):
+            raise ConanException(f"GCL bootstrap failed: {gcl_binary} was not created")
+        return gcl_binary
+
+    def _download(self, source, destination):
+        urls = [source["url"]] + list(source.get("backup_urls", []))
+        last_error = None
+        for url in urls:
+            try:
+                get(
+                    self,
+                    url=url,
+                    sha256=source["sha256"],
+                    destination=destination,
+                    strip_root=True,
+                )
+                return
+            except Exception as e:
+                last_error = e
+                self.output.warning(f"Download failed from {url}, trying next mirror...")
+        raise ConanException(f"All download URLs failed. Last error: {last_error}")
+
+    def _sign_elf(self, path):
+        if self.settings.os != "OHOS":
+            return
+        script = os.path.join(self.export_sources_folder, "gcl-sign-elf.sh")
+        self.run(f'/data/service/hnp/bin/bash "{script}" "{path}"')
 
     def _find_lisp(self):
         """Locate a Common Lisp implementation on the system."""
@@ -98,12 +146,7 @@ class Acl2Conan(ConanFile):
             if os.path.exists(p):
                 self.output.info(f"Found Lisp compiler: {candidate} at {p}")
                 return p
-        raise ConanInvalidConfiguration(
-            "No Common Lisp implementation found. "
-            "Install SBCL or CCL before building ACL2. "
-            "Try: curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/"
-            "releases/download/pkgs/install.sh | sh -s -- sbcl"
-        )
+        return None
 
     def package(self):
         copy(self, "saved_acl2*", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))

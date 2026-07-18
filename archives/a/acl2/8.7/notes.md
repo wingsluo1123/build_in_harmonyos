@@ -2,8 +2,8 @@
 
 **软件名称**: acl2 (A Computational Logic for Applicative Common Lisp)
 **版本**: 8.7
-**编译日期**: 2026-07-15
-**编译状态**: failed (缺少宿主 Lisp 编译器)
+**编译日期**: 2026-07-18
+**编译状态**: pending CI verification
 
 ---
 
@@ -23,7 +23,7 @@ ACL2 环境由两部分组成：
 ## 构建系统
 
 - **类型**: GNU Makefile (GNUmakefile)
-- **构建命令**: `make large LISP=sbcl`
+- **构建命令**: `MAKEFLAGS=-j1 make -j1 large LISP=<host-lisp>`
 - **输出**: `saved_acl2` 可执行文件（Lisp 镜像）
 - **默认 Lisp**: CCL (Clozure Common Lisp)，可通过 `LISP=` 变量指定
 
@@ -43,24 +43,24 @@ curl -fsSL -o acl2-8.7.tar.gz \
 
 ### 2. 构建步骤
 
-ACL2 的构建过程需要在构建系统上安装 Common Lisp 编译器：
+ACL2 的构建过程需要可在构建机上运行的 Common Lisp。配方优先使用已有的 SBCL 或 CCL；CI 未提供时，从 GNU 官方源码构建 GCL 2.7.1：
 
 ```bash
-# 安装 SBCL (Steel Bank Common Lisp)
-# 注意：请在执行前检查脚本内容，确保来源可信
-INSTALL_SH=$(mktemp)
-curl -fsSL -o "$INSTALL_SH" https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh
-# 可选：检查脚本内容后再执行
-# cat "$INSTALL_SH"
-sh "$INSTALL_SH" sbcl
-rm -f "$INSTALL_SH"
+curl -fsSL -o gcl-2.7.1.tar.gz https://ftpmirror.gnu.org/gcl/gcl-2.7.1.tar.gz
+printf '%s  %s\n' \
+  79d0bb65b82df81c078bc55c4cda3fe4d766d87e3bfe10fde0b2f728204e1015 \
+  gcl-2.7.1.tar.gz | sha256sum -c -
+tar -xzf gcl-2.7.1.tar.gz
+cd gcl-2.7.1
+./configure --enable-ansi=yes --enable-xgcl=no --enable-readline=no \
+  --enable-dynsysgmp=no --enable-locbfd=yes --disable-statsysbfd
+MAKEFLAGS=-j1 make -j1
 
-# 构建 ACL2
-cd acl2-8.7
-make large LISP=sbcl
+cd ../acl2-8.7
+MAKEFLAGS=-j1 make -j1 large LISP=../gcl-2.7.1/unixport/saved_gcl
 ```
 
-构建完成后生成 `saved_acl2` 可执行文件。
+OHOS 构建中，GCL 各引导阶段生成的 ELF 镜像以及最终 `saved_acl2` 必须在首次运行前移除旧 `.codesign`、重新自签并恢复执行权限。该流程已由配方和补丁自动执行。
 
 ### 3. 测试
 
@@ -78,9 +78,10 @@ test_package 中的烟雾测试验证：
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | 缺少 Common Lisp 编译器 | OHOS 平台无预装 SBCL/CCL | 需先为 OHOS aarch64 交叉编译 SBCL |
+| 1 | 缺少 Common Lisp 编译器 | OHOS CI 无预装 SBCL/CCL | 配方从 GNU 官方源码引导 GCL 2.7.1 |
 | 2 | 源码包体积大 | 包含 community books (~237MB) | CI 构建可能需要较长下载时间 |
 | 3 | 构建耗时长 | ACL2 需要编译大量 Lisp 源文件 | 预期首次构建 30-60 分钟 |
+| 4 | 引导生成的 ELF 无法执行 | OHOS 要求新生成 ELF 具有有效代码签名 | 在 GCL 各引导阶段和 ACL2 打包前执行自签名 |
 
 ---
 
@@ -88,33 +89,28 @@ test_package 中的烟雾测试验证：
 
 | 依赖 | 类型 | 说明 |
 |------|------|------|
-| SBCL | 构建依赖 | Steel Bank Common Lisp，ACL2 的宿主 Lisp 编译器 |
+| GCL 2.7.1 | 构建依赖 | CI 缺少 SBCL/CCL 时从源码引导的宿主 Lisp |
 | GNU Make | 构建工具 | 需要 GNU make (gmake) |
 
-### SBCL 依赖链
+### GCL 引导链
 
-ACL2 → SBCL → C 编译器 (clang)
-
-SBCL 本身是一个 C+Lisp 项目，需要先在 OHOS 上编译 SBCL，然后才能构建 ACL2。
+ACL2 → GCL 2.7.1 → C 编译器 (clang)
 
 ---
 
 ## 验证结果
 
-- **编译状态**: failed (缺少 SBCL)
-- **submit --check**: 未执行（缺少构建环境）
-- **conan-verify**: 未执行（缺少构建环境）
-- **本地 CI 模拟**: 未执行（缺少构建环境）
+- **编译状态**: pending CI verification
+- **静态检查**: 配方语法、YAML、补丁适用性和 Conan inspect 已验证
+- **OHOS 真机构建**: 待 PR CI 验证 GCL 引导与 ACL2 完整构建
 
-> 当前环境缺少 OHOS aarch64 构建环境和 SBCL 编译器，无法完成实际编译。
-> Conan 配方已按仓库规范编写，待 SBCL 在 OHOS 上可用后即可执行构建。
+> 当前 Windows 环境无法执行 OHOS aarch64 真机构建。配方不再依赖 CI 预装 SBCL/CCL，并通过固定版本和 SHA256 的 GCL 2.7.1 完成宿主 Lisp 引导。
 
 ---
 
 ## 补丁说明
 
-本次适配无需补丁。ACL2 的 GNUmakefile 构建系统具有良好的可移植性，
-通过 `LISP=` 变量即可指定宿主 Lisp 编译器路径。
+本次增加 GCL bootstrap 补丁，在每个新生成 Lisp ELF 镜像首次执行前完成 OHOS 自签名。ACL2 本身无需源码补丁，通过 `LISP=` 指定 GCL 路径。
 
 ---
 
@@ -127,5 +123,5 @@ SBCL 本身是一个 C+Lisp 项目，需要先在 OHOS 上编译 SBCL，然后�
 
 ---
 
-**编译结束**: 2026-07-15
-**最终状态**: failed (等待 SBCL 可用后重试)
+**编译结束**: 2026-07-18
+**最终状态**: pending CI verification

@@ -1,0 +1,47 @@
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -4551,7 +4551,8 @@ unixport/saved_%: | unixport/raw_% unixport/gcl_cmpnopt_%.lsp \
+ 		GCL_LSPSYSDIR=../$(srcdir)/unixport/ \
+ 			../unixport/raw_$* $$(dirname $$(pwd))/unixport/ -libdir $$(dirname $$(pwd))/ \
+ 			    < <(cat ../unixport/init_raw.lsp <(echo "(system:save-system \"../$@\")")) && \
+-		rm -f ../unixport/gcl_cmpnopt.lsp
++		$(SIGN_ELF) ../$@ && \
++		rm -f ../unixport/gcl_cmpnopt.lsp
+ 	rm -rf sb_$*
+ 
+ unixport/raw_%: unixport/lib%.a
+@@ -4559,4 +4560,5 @@ unixport/raw_%: unixport/lib%.a
+ 	$(CC) $(AM_LDFLAGS) -rdynamic -Wl,-z,relro $(LDFLAGS) -o $@ $< $(LIBS) #FIXME relro
++	$(SIGN_ELF) $@
+ 
+ unixport/gcl_cmpnopt_gcl_gprof.lsp unixport/gcl_cmpnopt_ansi_gcl_gprof.lsp:\
+ unixport/gcl_cmpnopt_%_gprof.lsp: unixport/gcl_cmpnopt_%.lsp
+@@ -4609,5 +4611,6 @@ unixport/ansi_gcl:  | unixport/saved_pcl_gcl
+ $(addprefix unixport/,gcl0 gcl1): unixport/% : unixport/cinit.lisp | %
+ 	$(word 2,$|) < <(cat $< <(echo "(system:save-system \"$@\")"))
++	$(SIGN_ELF) $@
+ $(addprefix unixport/,gcl2 gcl3 gcl mod_gcl): unixport/% : | %
+ 	ln -snf $$(basename $(word 2,$|)) $@
+ 
+@@ -4618,5 +4621,6 @@ unixport/mod_gcl0: xgcl-2/sysdef.lisp | mod_gcl0
+ 	echo "(compiler::cdebug)(si::save-system \"$@\")" >>$(@D)/in
+ 	$(word 2,$|) <$(@D)/in
++	$(SIGN_ELF) $@
+ 	rm $(@D)/in
+ 	cp gcl/all.hsh $(word 1,$|) #FIXME
+ 
+@@ -4630,5 +4634,6 @@ unixport/pcl_gcl: clcs/package.lisp cmpnew/gcl_collectfn.lsp pcl/defsys.lisp  | pcl_gcl
+ 	      "(setq pcl::*pathname-extensions* (cons \"lisp\" \"o\"))" \
+ 	      "(si::save-system \"$@\")" | $(word 2,$|)
++	$(SIGN_ELF) $@
+ 
+ unixport/ansi_gcl: clcs/package.lisp clcs/gcl_clcs_precom.lisp \
+ 		   clcs/gcl_clcs_conditions.lisp clcs/gcl_clcs_condition_definitions.lisp \
+@@ -4637,6 +4642,7 @@ unixport/ansi_gcl: clcs/package.lisp clcs/gcl_clcs_precom.lisp \
+ 	echo "(mapc (quote load) (list $(patsubst %,\"%\",$^)))" \
+              "(compiler::cdebug)" \
+              "(si::save-system \"$@\")" | $(word 2,$|)
++	$(SIGN_ELF) $@
+ 	cp pcl_gcl/all.hsh $(word 1,$|) #FIXME
+ 
+ $(addprefix gcl0/,$(LL_OBJS)): gcl0/%.o : lsp/%.lsp
