@@ -16,6 +16,8 @@ class StkConan(ConanFile):
     exports_sources = "patches/*"
 
     def configure(self):
+        if self.settings.os == "OHOS":
+            self.options.shared = False
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
 
@@ -27,6 +29,12 @@ class StkConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        shared = bool(self.options.shared)
+        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        tc.variables["BUILD_SHARED"] = shared
+        tc.variables["BUILD_STATIC"] = not shared
+        tc.variables["REALTIME"] = False
+        tc.variables["COMPILE_PROJECTS"] = False
         tc.generate()
 
     def build(self):
@@ -40,3 +48,4 @@ class StkConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["stk"]
+        self.cpp_info.includedirs = ["include/stk"]

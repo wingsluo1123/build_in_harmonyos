@@ -23,9 +23,9 @@
 
 - `conanfile.py`: CMAKE 构建配方
   - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
+  - OHOS 平台强制 `shared=False`（HarmonyOS 仅构建静态库）
   - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
+- `conandata.yml`: 源码 URL + 已验证的 SHA-256
 - `test_package/`: 测试包，编译链接测试程序验证库核心功能
 
 ## 编译步骤
@@ -40,8 +40,9 @@
 
 | # | 问题 | 原因 | 解决方案 |
 |---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
+| 1 | OHOS 平台不支持实时音频后端 | 上游对未知平台会中止配置 | 禁用 `REALTIME` 和示例工程，仅构建静态核心库 |
+| 2 | CMake 4 移除旧策略兼容 | 上游最低版本仍为 3.1 | 设置 `CMAKE_POLICY_VERSION_MINIMUM=3.5` |
+| 3 | 源码完整性校验 | master 归档需要固定校验值 | 使用实测 SHA-256 `c5d1fa6ca903b5f0571a2ba036b35cac2aee552f45c7a273e0df793cfefbace7` |
 
 ## 验证结果
 
