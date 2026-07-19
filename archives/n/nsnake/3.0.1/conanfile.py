@@ -37,7 +37,7 @@ class NsnakeConan(ConanFile):
     def source(self):
         # Try the local source tarball first (exported via export_sources)
         # This allows CI workers without GitHub access to build
-        src_dir = self.source_folder
+        src_dir = self.source_folder if self.source_folder else os.getcwd()
         local_tarball = os.path.join(src_dir, "source", "nsnake-3.0.1.tar.gz")
         if os.path.exists(local_tarball):
             self.output.info(f"Using local source tarball: {local_tarball}")
