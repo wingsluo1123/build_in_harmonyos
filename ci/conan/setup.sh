@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 echo "[step] Conan environment setup..."
+echo "[step] setup.sh revision: 2026-07-19-cdo-wheel-first"
 
 # ── 1. Detect/install Conan ──
 # pip3 可能装到 ~/.local/bin, 确保在 PATH 上
@@ -61,12 +62,24 @@ install_conan() {
             --user \
             --force-reinstall \
             --index-url "$index_url" \
+            --extra-index-url "$PYPI_FALLBACK_INDEX_URL" \
             "$wheel_file"; then
             rm -rf "$wheel_dir"
             return 0
         fi
         echo "[warn] Dependency installation failed from $index_url"
     done
+
+    echo "[step] Final fallback: installing conan directly from mirrored indexes..."
+    if python3 -m pip install \
+        --user \
+        --force-reinstall \
+        --index-url "$PYPI_INDEX_URL" \
+        --extra-index-url "$PYPI_FALLBACK_INDEX_URL" \
+        conan; then
+        rm -rf "$wheel_dir"
+        return 0
+    fi
 
     rm -rf "$wheel_dir"
     return 1
