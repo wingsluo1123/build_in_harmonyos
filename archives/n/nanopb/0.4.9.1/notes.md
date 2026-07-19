@@ -34,10 +34,12 @@
 ## 验证结果
 
 - Windows 本地：Conanfile Python 语法、W3 审计、`git diff --check` 通过。
-- OHOS CI #8227：失败，根因是 HMDFS 用户路径上的 `grpcio-tools/_protoc_compiler.so` 无法 `dlopen`；本次提交改为原生 `protoc` 和签名测试 ELF，等待 CI 重新验证。
+- WSL Ubuntu Linux：`conan create` 已通过，CMake、上游 143 个 SCons 测试和 1 个 `test_package` CTest 均通过；这不能替代 OHOS CI 验证。
+- OHOS CI #8227：失败，根因是 HMDFS 用户路径上的 `grpcio-tools/_protoc_compiler.so` 无法 `dlopen`；后续已改为原生 `protoc` 和签名测试 ELF，最新 OHOS CI 仍待验证。
+- Python 测试 runtime 固定为 `protobuf==7.35.1`：该版本在 CI 使用的 Python 包索引中可用；`protobuf-all-21.12` 是独立的源码 `protoc` 构建版本，两者版本号不直接对应。
 
 ## 编译结束
 
 - 编译结束：2026-07-17
-- 最终状态：built
+- 最终状态：OHOS CI pending
 - COMPLETED
