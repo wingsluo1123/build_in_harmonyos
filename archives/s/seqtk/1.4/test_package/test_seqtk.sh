@@ -4,15 +4,48 @@ if (set -o pipefail) 2>/dev/null; then
     set -o pipefail
 fi
 
+binary=${1:?seqtk binary path is required}
+if [ ! -f "$binary" ] || [ ! -x "$binary" ]; then
+    printf 'seqtk binary is not executable: %s\n' "$binary" >&2
+    exit 1
+fi
+
 input="$(mktemp "${TMPDIR:-.}/seqtk-test.XXXXXX")"
 fasta="$(mktemp "${TMPDIR:-.}/seqtk-test.XXXXXX")"
 sizes="$(mktemp "${TMPDIR:-.}/seqtk-test.XXXXXX")"
 trap 'rm -f "$input" "$fasta" "$sizes"' EXIT HUP INT TERM
 
-printf '%s\n' '@read1' 'ACGT' '+' 'IIII' > "$input"
-seqtk seq -a "$input" > "$fasta"
-seqtk size "$input" > "$sizes"
+run_and_report() {
+    label=$1
+    output=$2
+    shift 2
+    set +e
+    "$@" >"$output" 2>&1
+    status=$?
+    set -e
+    if [ "$status" -ne 0 ]; then
+        printf '%s failed with exit code %s\n' "$label" "$status" >&2
+        printf '%s output:\n' "$label" >&2
+        cat "$output" >&2
+        return "$status"
+    fi
+}
 
-grep -Fqx '>read1' "$fasta"
-grep -Fqx 'ACGT' "$fasta"
-grep -Fqx 'read1	4' "$sizes"
+assert_line() {
+    expected=$1
+    output=$2
+    if ! grep -Fqx "$expected" "$output"; then
+        printf 'assertion failed: expected line %s\n' "$expected" >&2
+        printf 'actual output:\n' >&2
+        cat "$output" >&2
+        return 1
+    fi
+}
+
+printf '%s\n' '@read1' 'ACGT' '+' 'IIII' > "$input"
+run_and_report 'seqtk seq' "$fasta" "$binary" seq -a "$input"
+run_and_report 'seqtk size' "$sizes" "$binary" size "$input"
+
+assert_line '>read1' "$fasta"
+assert_line 'ACGT' "$fasta"
+assert_line 'read1	4' "$sizes"
