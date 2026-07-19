@@ -144,15 +144,16 @@ class GuileConan(ConanFile):
         copy(self, "*", src=usr_local + "/include/guile/2.2",
              dst=os.path.join(pkg, "include/guile/2.2"))
 
-        # .go files (Scheme bytecode)
-        go_src = os.path.join(usr_local, "lib/guile/2.2/ccache")
+        # .go files (Scheme bytecode) - from prebuilt/ in source tarball
+        go_src = "/storage/Users/currentUser/tmp/guile-2.2.7/prebuilt/64-bit-little-endian"
         if os.path.isdir(go_src):
             for root, dirs, files in os.walk(go_src):
                 rel = os.path.relpath(root, go_src)
                 dst = os.path.join(pkg, "lib/guile/2.2/ccache", rel)
                 os.makedirs(dst, exist_ok=True)
                 for f in files:
-                    shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+                    if f.endswith(".go"):
+                        shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
 
         # .scm files
         scm_src = os.path.join(usr_local, "share/guile/2.2")
