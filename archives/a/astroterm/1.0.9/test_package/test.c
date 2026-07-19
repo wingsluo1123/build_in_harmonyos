@@ -13,6 +13,10 @@ int main(int argc, char *argv[]) {
     /* Test 1: --version */
     snprintf(cmd, sizeof(cmd), "\"%s\" --version 2>&1", astroterm_bin);
     ret = system(cmd);
+    if (ret == -1) {
+        perror("system");
+        return 1;
+    }
     if (!WIFEXITED(ret) || WEXITSTATUS(ret) != 0) {
         fprintf(stderr, "FAIL: astroterm --version returned %d\n", ret);
         return 1;
@@ -22,6 +26,10 @@ int main(int argc, char *argv[]) {
     /* Test 2: --help */
     snprintf(cmd, sizeof(cmd), "\"%s\" --help 2>&1", astroterm_bin);
     ret = system(cmd);
+    if (ret == -1) {
+        perror("system");
+        return 1;
+    }
     if (!WIFEXITED(ret) || WEXITSTATUS(ret) != 0) {
         fprintf(stderr, "FAIL: astroterm --help returned %d\n", ret);
         return 1;

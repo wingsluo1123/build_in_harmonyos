@@ -18,7 +18,7 @@ astroterm 依赖以下库：
 - `ncurses` (>= 6.0) — 终端 UI
 - `math` — 标准 C 数学库（libc 的一部分）
 
-Conan 配方将 argtable3 和 ncurses 声明为 system_libs（不通过 Conan 依赖解析），构建环境中必须已安装这两个库的开发包。
+Conan 配方下载并静态编译 argtable3 3.3.1 源码，ncurses 由 OHOS 构建环境提供。
 
 ### 2. 构建步骤
 
@@ -48,9 +48,9 @@ astroterm 是终端工具，通过 `MesonToolchain` 默认关闭共享库构建�
 
 ### 5. 已知问题与待办
 
-- **系统依赖**: argtable3 与 ncurses 作为系统库使用，CI worker 上需预装开发包。
+- **系统依赖**: ncurses 由 OHOS 构建环境提供；argtable3 3.3.1 随配方下载并静态编译。
 - **ncurses 宽字符**: 确保 ncurses 启用了 wide-char 支持（`ncursesw`），否则中文字符或特殊符号可能显示异常。
-- **上游测试缺失**: astroterm 上游未提供自动化单元测试，test_package 仅做二进制烟雾测试（`--version` / `--help`）。
+- **上游测试**: 上游包含 7 个 Unity 测试程序，当前配方未在 CI 中执行；test_package 执行二进制烟雾测试（`--version` / `--help`）。
 
 ### 6. 文件清单
 
