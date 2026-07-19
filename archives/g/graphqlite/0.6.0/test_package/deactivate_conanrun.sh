@@ -1,1 +1,1 @@
-. "/storage/Users/currentUser/.atomcode/skills/openharmony-compile-agent/archives/g/graphqlite/0.6.0/test_package/deactivate_conanrunenv-release-armv8.sh"
+. "/storage/Users/currentUser/PCCPC/build_in_harmonyos/archives/g/graphqlite/0.6.0/test_package/deactivate_conanrunenv-release-armv8.sh"

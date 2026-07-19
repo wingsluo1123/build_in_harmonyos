@@ -1,4 +1,4 @@
-script_folder="/storage/Users/currentUser/.atomcode/skills/openharmony-compile-agent/archives/g/graphqlite/0.6.0/test_package"
+script_folder="/storage/Users/currentUser/PCCPC/build_in_harmonyos/archives/g/graphqlite/0.6.0/test_package"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanrunenv-release-armv8.sh"
 for v in 
 do

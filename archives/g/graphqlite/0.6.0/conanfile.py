@@ -48,7 +48,8 @@ class GraphqliteConan(ConanFile):
         try:
             execs = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
             cc = execs.get("c", "clang")
-        except Exception:
+        except (TypeError, ValueError):
+            # Fall back to default clang if conf is malformed
             pass
 
         # Build the SQLite extension (.so) — uses vendored SQLite headers
