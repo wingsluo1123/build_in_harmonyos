@@ -32,7 +32,7 @@ class PerconaServerConan(ConanFile):
     exports_sources = "conandata.yml"
 
     def requirements(self):
-        self.requires("openssl/1.1.1w")
+        self.requires("openssl/3.5.6")
         self.requires("zlib/1.3.1")
         self.requires("boost/1.90.0")
 
