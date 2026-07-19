@@ -4,7 +4,7 @@ project(test_xsimd CXX)
 # Find the package via Conan-generated CMakeDeps
 find_package(xsimd REQUIRED)
 
-add_executable(test_xsimd test.c)
+add_executable(test_xsimd test.cpp)
 target_link_libraries(test_xsimd xsimd::xsimd)
 
 enable_testing()
