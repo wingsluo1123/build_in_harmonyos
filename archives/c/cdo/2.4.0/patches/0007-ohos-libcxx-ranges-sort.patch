@@ -1,31 +1,77 @@
+diff -ruN -U0 a/src/cdo_getopt.cc b/src/cdo_getopt.cc
+--- a/src/cdo_getopt.cc	2026-07-19 15:44:13
++++ b/src/cdo_getopt.cc	2026-07-19 15:44:14
+@@ -291 +291 @@
+-  std::ranges::transform(optionName, optionName.begin(), ::tolower);
++  std::transform(optionName.begin(), optionName.end(), optionName.begin(), ::tolower);
 diff -ruN -U0 a/src/dcw_reader.cc b/src/dcw_reader.cc
---- a/src/dcw_reader.cc	2026-07-19 00:10:20
-+++ b/src/dcw_reader.cc	2026-07-19 00:10:21
+--- a/src/dcw_reader.cc	2026-07-19 15:44:13
++++ b/src/dcw_reader.cc	2026-07-19 15:44:14
 @@ -546 +546 @@
 -  std::ranges::sort(dcw_lists.countries, compare_code);
 +  std::sort(dcw_lists.countries.begin(), dcw_lists.countries.end(), compare_code);
 diff -ruN -U0 a/src/factory.cc b/src/factory.cc
---- a/src/factory.cc	2026-07-19 00:10:20
-+++ b/src/factory.cc	2026-07-19 00:10:21
+--- a/src/factory.cc	2026-07-19 15:44:13
++++ b/src/factory.cc	2026-07-19 15:44:14
 @@ -179 +179 @@
 -  std::ranges::sort(names);
 +  std::sort(names.begin(), names.end());
+diff -ruN -U0 a/src/util_string.cc b/src/util_string.cc
+--- a/src/util_string.cc	2026-07-19 15:44:13
++++ b/src/util_string.cc	2026-07-19 15:44:14
+@@ -39 +39 @@
+-  std::ranges::transform(str, str.begin(), ::toupper);
++  std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+@@ -46 +46 @@
+-  std::ranges::transform(str, str.begin(), ::tolower);
++  std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 diff -ruN -U0 a/src/varray.h b/src/varray.h
---- a/src/varray.h	2026-07-19 00:10:20
-+++ b/src/varray.h	2026-07-19 00:10:21
+--- a/src/varray.h	2026-07-19 15:44:13
++++ b/src/varray.h	2026-07-19 15:44:14
 @@ -15,0 +16 @@
 +#include <functional>
-@@ -17,0 +19,28 @@
+@@ -18 +19,63 @@
+-namespace ranges = std::ranges;
 +#ifdef __OHOS__
 +namespace ranges
 +{
-+using std::ranges::count_if;
-+using std::ranges::fill;
-+using std::ranges::fill_n;
-+using std::ranges::greater;
-+using std::ranges::less;
-+using std::ranges::minmax_element;
-+using std::ranges::transform;
++using greater = std::greater<>;
++using less = std::less<>;
++
++template <typename Range, typename Predicate>
++auto
++count_if(const Range &range, Predicate predicate)
++{
++  return std::count_if(range.begin(), range.end(), predicate);
++}
++
++template <typename Range, typename Value>
++void
++fill(Range &range, const Value &value)
++{
++  std::fill(range.begin(), range.end(), value);
++}
++
++template <typename Iterator, typename Size, typename Value>
++void
++fill_n(Iterator first, Size count, const Value &value)
++{
++  std::fill_n(first, count, value);
++}
++
++template <typename Range>
++auto
++minmax_element(Range &range)
++{
++  return std::minmax_element(range.begin(), range.end());
++}
++
++template <typename Range, typename OutputIterator, typename Operation>
++void
++transform(Range &range, OutputIterator output, Operation operation)
++{
++  std::transform(range.begin(), range.end(), output, operation);
++}
 +
 +template <typename Range, typename Compare = std::less<>, typename Projection = std::identity>
 +void
@@ -44,5 +90,8 @@ diff -ruN -U0 a/src/varray.h b/src/varray.h
 +}
 +}
 +#else
-@@ -18,0 +48 @@
++namespace ranges
++{
++using namespace std::ranges;
++}
 +#endif
