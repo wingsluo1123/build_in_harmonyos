@@ -1,0 +1,19 @@
+# test_package/MANIFEST.yml - upstream test declaration
+package: usbredir/0.15.0
+homepage: https://gitlab.freedesktop.org/spice/usbredir
+
+# Upstream has Meson tests under tests/, but this first OHOS package disables
+# them because they depend on the parser test harness and runtime behavior that
+# is covered by remote CI separately. The consumer test below validates headers,
+# transitive libusb includes, parser init/destroy, and host open/close linkage.
+upstream_test_in_build: false
+upstream_tests:
+  - tests/filter.c
+  - tests/serializer.c
+
+test_package_tests:
+  - file: test_usbredir.c
+    description: "Compile and run parser create/init/destroy plus host open/close callbacks"
+    command: "./test_usbredir"
+
+assertion_count: 3

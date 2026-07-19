@@ -1,5 +1,13 @@
 # usbredir 0.15.0 适配笔记
 
+## Conan recipe update (2026-07-19)
+
+- Added Conan package inputs for the Meson build: `conanfile.py`, `conandata.yml`, and `test_package/`.
+- The recipe builds the two library targets, `libusbredirparser` and `libusbredirhost`.
+- `tools`, `tests`, and `fuzzing` are disabled for the first OHOS package because `usbredirect` pulls in `glib-2.0`/`gio-unix-2.0`, while `spice-gtk` currently needs the library dependency closure first.
+- The consumer test includes parser and host public headers, initializes/destroys `usbredirparser`, and opens/closes a host instance with dummy callbacks.
+- Local workstation limitation: Conan is not installed here, so full `conan create usbredir/0.15.0` is pending remote OHOS CI.
+
 ## 编译环境
 - 构建系统: meson
 - 编译日期: 2026-06-12
