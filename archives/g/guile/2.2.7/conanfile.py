@@ -120,15 +120,23 @@ class GuileConan(ConanFile):
         # (SNARF runs guile → Signal 5 crash → .x files corrupted → compile fails)
         self._touch_snarf_outputs()
 
-        # Build only libguile library target (skip SNARF/docs which trigger Signal 5).
-        # Using specific target avoids 'all' which depends on SNARF .doc generation.
+        # Step 1: Run full make -k to compile .lo files (SNARF will fail with
+        # Signal 5, but -k ensures .lo compilation continues past SNARF errors).
+        try:
+            autotools.make(args=["-C", "libguile", "-k", "-j1"])
+        except ConanException as e:
+            self.output.warn(
+                "libguile make (pass 1) had SNARF errors (expected on OHOS): {}".format(e)
+            )
+
+        # Step 2: Link the library. .lo files are already compiled from pass 1,
+        # so this make should only run CCLD (linking), skipping SNARF entirely.
         try:
             autotools.make(target="libguile-2.2.la", args=["-C", "libguile", "-k", "-j1"])
         except ConanException as e:
             self._verify_build()
             self.output.warn(
-                "libguile make reported errors (Signal 5 during SNARF "
-                "is expected on OHOS): {}".format(e)
+                "libguile make (pass 2 - link) error: {}".format(e)
             )
         try:
             autotools.make(args=["-C", "meta", "-k", "-j1"])
