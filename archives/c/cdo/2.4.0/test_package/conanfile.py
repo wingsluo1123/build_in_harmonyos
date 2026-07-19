@@ -4,6 +4,7 @@
 R34: Test actually executes cdo binary to verify it works.
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.build import can_run
@@ -19,6 +20,7 @@ class CdoTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-            self.run(f"{bash} test.sh", env="conanrun")
+            bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
+            script = os.path.join(self.source_folder, "test.sh")
+            self.run(f'"{bash}" "{script}"', env="conanrun")
             self.output.success("Conan test_package: success")
