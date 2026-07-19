@@ -191,10 +191,10 @@ class GuileConan(ConanFile):
         """
         import shutil
 
-        # /usr/local guile installation has .go files in lib/guile/2.2/ccache/
-        src_base = "/usr/local/lib/guile/2.2/ccache"
+        # Pre-compiled .go files from the source tarball (prebuilt/)
+        src_base = "/storage/Users/currentUser/tmp/guile-2.2.7/prebuilt/64-bit-little-endian"
         if not os.path.isdir(src_base):
-            self.output.warn("No pre-compiled .go files in /usr/local")
+            self.output.warn("No pre-compiled .go files found")
             return
 
         # Copy to both bootstrap/ and module/ build dirs so make install finds them
