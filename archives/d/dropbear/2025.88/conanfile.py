@@ -161,4 +161,5 @@ class DropbearConan(ConanFile):
         self.cpp_info.libs = []
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
+        # Dropbear's Autotools build maps both bindir and sbindir to bin.
         self.cpp_info.bindirs = ["bin"]

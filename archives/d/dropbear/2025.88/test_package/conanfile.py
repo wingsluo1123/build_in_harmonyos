@@ -16,14 +16,11 @@ class DropbearTestConan(ConanFile):
 
     def test(self):
         dependency = self.dependencies["dropbear"]
-        expected = {
-            "dropbear": "bin",
-            "dbclient": "bin",
-            "dropbearkey": "bin",
-            "dropbearconvert": "bin",
-        }
-        for program, directory in expected.items():
-            path = os.path.join(dependency.package_folder, directory, program)
+        binary_dir = os.path.join(dependency.package_folder, "bin")
+        if not os.path.isdir(binary_dir):
+            raise RuntimeError(f"missing packaged binary directory: {binary_dir}")
+        for program in ("dropbear", "dbclient", "dropbearkey", "dropbearconvert"):
+            path = os.path.join(binary_dir, program)
             if not os.path.isfile(path):
                 raise RuntimeError(f"missing packaged executable: {path}")
 
