@@ -25,7 +25,7 @@
   - settings = "os", "compiler", "build_type", "arch"
   - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
   - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
+- `conandata.yml`: 源码 URL + 已验证的 SHA-256
 - `test_package/`: 测试包，编译链接测试程序验证库核心功能
 
 ## 编译步骤
@@ -40,8 +40,8 @@
 
 | # | 问题 | 原因 | 解决方案 |
 |---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
+| 1 | 上游 CMake 强制构建共享库 | `ADD_LIBRARY` 硬编码 `SHARED` | 补丁移除硬编码类型，并在 OHOS 上显式设置 `BUILD_SHARED_LIBS=OFF` |
+| 2 | 源码完整性校验 | 下载归档需要固定校验值 | 使用实测 SHA-256 `72dbb493e07336418fe2056f0ebc7ce544eedb500bb896cc1cc04bd078c2d530` |
 
 ## 验证结果
 
