@@ -19,7 +19,6 @@ class CdoTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            bin_dir = self.dependencies["cdo"].cpp_info.bindirs[0]
-            bin_path = os.path.join(bin_dir, "cdo")
-            self.run(f'CDO_BIN="{bin_path}" /bin/sh test.sh', env="conanrun")
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            self.run(f"{bash} test.sh", env="conanrun")
             self.output.success("Conan test_package: success")

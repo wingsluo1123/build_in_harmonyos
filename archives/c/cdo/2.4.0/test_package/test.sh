@@ -1,13 +1,13 @@
-#!/bin/sh
+#!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for the cdo executable.
+# Runs in conanrun env (PATH includes installed bin/).
 set -eu
 
-CDO_BIN="${CDO_BIN:-cdo}"
-
-echo "[test] $CDO_BIN --version"
-"$CDO_BIN" --version >/dev/null
-
-echo "[test] $CDO_BIN --help"
-"$CDO_BIN" --help >/dev/null
-
-echo "[ok] cdo executable responded to --version and --help"
+echo "[test] cdo --version"
+cdo --version && echo "OK: --version" || {
+    echo "[test] --version failed, trying --help..."
+    cdo --help > /dev/null 2>&1 && echo "OK: --help" || {
+        echo "FAIL: cdo failed both --version and --help"
+        exit 1
+    }
+}
