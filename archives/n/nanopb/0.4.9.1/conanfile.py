@@ -343,6 +343,7 @@ class NanopbConan(ConanFile):
     def _make_ohos_compiler_wrapper(self, compiler, name):
         """Sign each SCons test executable immediately after linking."""
         wrapper = os.path.join(self.build_folder, f"nanopb-{name}-signed")
+        objcopy, signer = self._ohos_signing_tools()
         save(
             self,
             wrapper,
@@ -353,8 +354,8 @@ class NanopbConan(ConanFile):
             "import subprocess\n"
             "import sys\n"
             f"REAL_COMPILER = {compiler!r}\n"
-            "OBJCOPY = '/data/service/hnp/bin/llvm-objcopy'\n"
-            "SIGNER = '/data/service/hnp/bin/binary-sign-tool'\n"
+            f"OBJCOPY = {objcopy!r}\n"
+            f"SIGNER = {signer!r}\n"
             "\n"
             "def output_path(args):\n"
             "    for index, arg in enumerate(args):\n"
@@ -401,10 +402,16 @@ class NanopbConan(ConanFile):
         )
         return wrapper
 
+    def _ohos_signing_tools(self):
+        """Resolve the same signing tools for wrappers and recipe actions."""
+        return (
+            shutil.which("llvm-objcopy") or "/data/service/hnp/bin/llvm-objcopy",
+            shutil.which("binary-sign-tool") or "/data/service/hnp/bin/binary-sign-tool",
+        )
+
     def _sign_ohos_elf(self, path):
         """Sign an OHOS ELF while preserving its executable inode and mode."""
-        objcopy = shutil.which("llvm-objcopy") or "/data/service/hnp/bin/llvm-objcopy"
-        signer = shutil.which("binary-sign-tool") or "/data/service/hnp/bin/binary-sign-tool"
+        objcopy, signer = self._ohos_signing_tools()
         if not os.path.isfile(objcopy) or not os.path.isfile(signer):
             raise RuntimeError("OHOS ELF signing requires llvm-objcopy and binary-sign-tool")
 
