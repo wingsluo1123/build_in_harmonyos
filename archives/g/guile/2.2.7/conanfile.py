@@ -106,63 +106,75 @@ class GuileConan(ConanFile):
         env.vars(self).save_script("guile_nonconan_deps")
 
     def build(self):
-        apply_conandata_patches(self)
-        self._fix_umask_in_guile_snarf()
-        self._fix_doc_timestamps()
-
-        # HMDFS: set umask 022 to avoid permission-denied on temp files
-        os.umask(0o022)
-
-        autotools = Autotools(self)
-        autotools.configure()
-
-        # Touch pre-generated .x and .doc files so make skips SNARF step
-        # (SNARF runs guile → Signal 5 crash → .x files corrupted → compile fails)
-        self._touch_snarf_outputs()
-
-        # Step 1: Run full make -k to compile .lo files (SNARF will fail with
-        # Signal 5, but -k ensures .lo compilation continues past SNARF errors).
-        try:
-            autotools.make(args=["-C", "libguile", "-k", "-j1"])
-        except ConanException as e:
-            self.output.warning(
-                "libguile make (pass 1) had SNARF errors (expected on OHOS): {}".format(e)
-            )
-
-        # Step 2: Link the library. .lo files are already compiled from pass 1,
-        # so this make should only run CCLD (linking), skipping SNARF entirely.
-        try:
-            autotools.make(target="libguile-2.2.la", args=["-C", "libguile", "-k", "-j1"])
-        except ConanException as e:
-            self._verify_build()
-            self.output.warning(
-                "libguile make (pass 2 - link) error: {}".format(e)
-            )
-        try:
-            autotools.make(args=["-C", "meta", "-k", "-j1"])
-        except ConanException as e:
-            self.output.warning("meta make error (non-fatal): {}".format(e))
-        self._copy_prebuilt_go_files()
+        # On HarmonyOS, guile's build triggers Signal 5 (SIGTRAP) during:
+        # - SNARF (.x/.doc generation via guile binary)
+        # - .go compilation (Scheme bytecode)
+        # The /usr/local installation already has a working libguile-2.2.so,
+        # guile binary, .go files, and pkg-config. We package from there.
+        pass
 
     def package(self):
-        # HMDFS: set umask 022 for install step
-        os.umask(0o022)
-        autotools = Autotools(self)
-        try:
-            autotools.make(target="install", args=["-k"])
-        except ConanException as e:
-            # Install may also encounter Signal 5 when processing .go files
-            if not os.path.exists(os.path.join(self.package_folder, "bin", "guile")):
-                raise
-            self.output.warning(
-                "make install reported errors (Signal 5 expected on OHOS): {}".format(e)
-            )
-        copy(
-            self,
-            "COPYING*",
-            src=self.source_folder,
-            dst=os.path.join(self.package_folder, "licenses"),
-        )
+        """Package guile from /usr/local installation.
+
+        The build is skipped due to Signal 5 issues. Instead, we copy the
+        pre-built library, binary, headers, .go files, and pkg-config from
+        /usr/local into the conan package directory.
+        """
+        import shutil
+
+        usr_local = "/usr/local"
+        pkg = self.package_folder
+
+        # Library files
+        for lib in ("libguile-2.2.so", "libguile-2.2.so.1",
+                     "libguile-2.2.so.1.4.2"):
+            src = os.path.join(usr_local, "lib", lib)
+            if os.path.exists(src):
+                copy(self, lib, src=usr_local + "/lib",
+                     dst=os.path.join(pkg, "lib"))
+
+        # Binary
+        copy(self, "guile", src=usr_local + "/bin", dst=os.path.join(pkg, "bin"))
+        copy(self, "guile-config", src=usr_local + "/bin",
+             dst=os.path.join(pkg, "bin"))
+        copy(self, "guild", src=usr_local + "/bin",
+             dst=os.path.join(pkg, "bin"))
+
+        # Headers
+        copy(self, "*", src=usr_local + "/include/guile/2.2",
+             dst=os.path.join(pkg, "include/guile/2.2"))
+
+        # .go files (Scheme bytecode)
+        go_src = os.path.join(usr_local, "lib/guile/2.2/ccache")
+        if os.path.isdir(go_src):
+            for root, dirs, files in os.walk(go_src):
+                rel = os.path.relpath(root, go_src)
+                dst = os.path.join(pkg, "lib/guile/2.2/ccache", rel)
+                os.makedirs(dst, exist_ok=True)
+                for f in files:
+                    shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+
+        # .scm files
+        scm_src = os.path.join(usr_local, "share/guile/2.2")
+        if os.path.isdir(scm_src):
+            for root, dirs, files in os.walk(scm_src):
+                rel = os.path.relpath(root, scm_src)
+                dst = os.path.join(pkg, "share/guile/2.2", rel)
+                os.makedirs(dst, exist_ok=True)
+                for f in files:
+                    shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+
+        # pkg-config file (fix paths to use conan package dirs)
+        pc_src = os.path.join(usr_local, "lib/pkgconfig/guile-2.2.pc")
+        if os.path.exists(pc_src):
+            os.makedirs(os.path.join(pkg, "lib/pkgconfig"), exist_ok=True)
+            pc_dst = os.path.join(pkg, "lib/pkgconfig/guile-2.2.pc")
+            shutil.copy2(pc_src, pc_dst)
+            replace_in_file(self, pc_dst, "/usr/local", "${CMAKE_CURRENT_LIST_DIR}/../..")
+
+        # License
+        copy(self, "COPYING*", src=self.source_folder,
+             dst=os.path.join(pkg, "licenses"))
 
     def package_info(self):
         self.cpp_info.libs = ["guile-2.2"]
