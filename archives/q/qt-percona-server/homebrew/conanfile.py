@@ -1,7 +1,18 @@
+"""Conan recipe for qt-percona-server homebrew - Qt6 Percona Server SQL driver plugin.
+
+Builds the QMYSQL driver plugin from qtbase 6.11.1 source (src/plugins/sqldrivers/mysql),
+linking against percona-server 8.0.36 client library (libperconaserverclient).
+
+Build system: CMake + Ninja
+Produces: libqsqlmysql.so (QMYSQL driver key, loaded via dlopen by Qt at runtime)
+
+Conflicts with qt-mysql and qt-mariadb (all install the same libqsqlmysql.so).
+"""
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
-import os
+from conan.tools.files import get, apply_conandata_patches
 
 
 class QtPerconaServerConan(ConanFile):
@@ -10,11 +21,11 @@ class QtPerconaServerConan(ConanFile):
     description = "Qt6 SQL driver plugin for Percona Server (QMYSQLDriver)"
     license = "LGPL-3.0-only"
     homepage = "https://www.qt.io/"
-    url = ""
+    url = ""  # CI fills this
 
     package_type = "shared-library"
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch", "compiler", "build_type"
 
     exports_sources = "conandata.yml"
 
@@ -55,5 +66,7 @@ class QtPerconaServerConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = []
         self.cpp_info.bindirs = []
-        # Plugin is loaded via dlopen by Qt at runtime
         self.cpp_info.includedirs = []
+        # Plugin is loaded via dlopen by Qt at runtime
+        # Propagate qtbase as transitive dependency for consumers (e.g. test_package)
+        self.cpp_info.requires = ["qtbase::qtbase", "percona-server::percona-server"]
