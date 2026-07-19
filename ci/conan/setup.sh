@@ -18,88 +18,73 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 echo "[step] Conan environment setup..."
-echo "[step] setup.sh revision: 2026-07-19-cdo-wheel-first"
+echo "[step] setup.sh revision: 2026-07-19-cdo-runtime-preinstall"
 
 # ── 1. Detect/install Conan ──
-# pip3 可能装到 ~/.local/bin, 确保在 PATH 上
-export PATH="$HOME/.local/bin:$PATH"
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 
-CONAN_PYPI_INDEX_URL="${CONAN_PYPI_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
-CONAN_PYPI_TRUSTED_HOST="${CONAN_PYPI_TRUSTED_HOST:-pypi.cnb.cool}"
-PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.org/simple}"
-PYPI_FALLBACK_INDEX_URL="${PYPI_FALLBACK_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+CONAN_INDEX_URL="${CONAN_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
+CONAN_TRUSTED_HOST="${CONAN_TRUSTED_HOST:-pypi.cnb.cool}"
+PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+PYPI_FALLBACK_INDEX_URL="${PYPI_FALLBACK_INDEX_URL:-https://pypi.org/simple}"
+PYTHON_USER_BIN="$(python3 -m site --user-base)/bin"
+
+# pip --user 的脚本目录由 Python 决定，不一定是 ~/.local/bin。
+export PATH="$PYTHON_USER_BIN:$HOME/.local/bin:$PATH"
+
+CONAN_RUNTIME_REQUIREMENTS=(
+    'requests>=2.25,<3.0.0'
+    'urllib3>=1.26.6,<3.0'
+    'colorama>=0.4.3,<0.5.0'
+    'PyYAML>=6.0,<7.0'
+    'patch-ng>=1.18.0,<1.20'
+    'fasteners>=0.15'
+    'Jinja2>=3.0,<4.0.0'
+    'python-dateutil>=2.8.0,<3'
+    'distro>=1.4.0,<2.0.0'
+)
+
+conan_runtime_ok() {
+    python3 -c "import requests" >/dev/null 2>&1 && conan --version >/dev/null 2>&1
+}
 
 install_conan() {
-    local temp_root wheel_dir wheel_file index_url
-    local -a wheel_files
-    temp_root="${TMPDIR:-$HOME/tmp}"
-    mkdir -p "$temp_root" || return 1
-    wheel_dir="$(mktemp -d "$temp_root/conan-wheel.XXXXXX")" || return 1
-
-    echo "[step] Downloading OHOS Conan wheel from community index..."
-    if ! python3 -m pip download \
-        --no-deps \
-        --dest "$wheel_dir" \
-        --index-url "$CONAN_PYPI_INDEX_URL" \
-        --trusted-host "$CONAN_PYPI_TRUSTED_HOST" \
-        conan; then
-        rm -rf "$wheel_dir"
-        return 1
-    fi
-
-    wheel_files=("$wheel_dir"/conan-*.whl(N))
-    if [ ${#wheel_files[@]} -ne 1 ]; then
-        echo "[error] Expected one Conan wheel from community index, found ${#wheel_files[@]}"
-        rm -rf "$wheel_dir"
-        return 1
-    fi
-    wheel_file="${wheel_files[1]}"
-
-    for index_url in "$PYPI_INDEX_URL" "$PYPI_FALLBACK_INDEX_URL"; do
-        echo "[step] Installing OHOS Conan wheel with dependencies from $index_url..."
-        if python3 -m pip install \
-            --user \
-            --force-reinstall \
-            --index-url "$index_url" \
-            --extra-index-url "$PYPI_FALLBACK_INDEX_URL" \
-            "$wheel_file"; then
-            rm -rf "$wheel_dir"
-            return 0
-        fi
-        echo "[warn] Dependency installation failed from $index_url"
-    done
-
-    echo "[step] Final fallback: installing conan directly from mirrored indexes..."
-    if python3 -m pip install \
+    # 社区源只托管 OHOS 适配的 Conan wheel，不保证包含通用运行依赖。
+    # 先从普通 PyPI 镜像安装完整依赖，再用 --no-deps 安装适配版。
+    python3 -m pip install \
         --user \
         --force-reinstall \
         --index-url "$PYPI_INDEX_URL" \
-        --extra-index-url "$PYPI_FALLBACK_INDEX_URL" \
-        conan; then
-        rm -rf "$wheel_dir"
-        return 0
-    fi
+        "${CONAN_RUNTIME_REQUIREMENTS[@]}" || \
+    python3 -m pip install \
+        --user \
+        --force-reinstall \
+        --index-url "$PYPI_FALLBACK_INDEX_URL" \
+        "${CONAN_RUNTIME_REQUIREMENTS[@]}" || return 1
 
-    rm -rf "$wheel_dir"
-    return 1
+    python3 -m pip install \
+        --user \
+        --force-reinstall \
+        --no-deps \
+        --index-url "$CONAN_INDEX_URL" \
+        --trusted-host "$CONAN_TRUSTED_HOST" \
+        conan
 }
 
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
-if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
+if ! command -v conan &>/dev/null || ! conan_runtime_ok; then
     echo "[step] Conan not found or broken, (re)installing..."
-    # 安装 OHOS 适配版 conan（私有 PyPI 提供，基线 2.29.1，已适配 OHOS 平台）
-    # 不要钉死官方旧版本号，应从配置的 PyPI 源安装最新适配版
-    # Use python3 -m pip to bypass potentially broken pip3 shebang
-    # (HNP pip3/conan binaries may have shebangs pointing to non-existent
-    #  build-machine paths with ^M line endings)
     install_conan || {
         echo "[error] Failed to install conan"
         exit 1
     }
-    # Ensure user-installed binaries are found before any broken HNP version
-    export PATH="$HOME/.local/bin:$PATH"
+    export PATH="$PYTHON_USER_BIN:$HOME/.local/bin:$PATH"
+fi
+
+if ! conan_runtime_ok; then
+    echo "[error] Conan installation is incomplete"
+    exit 1
 fi
 
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
