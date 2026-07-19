@@ -35,13 +35,13 @@ class NsnakeConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # Try official GitHub URL first, fall back to local source tarball
-        ext = "tar.gz"
-        src_url = self.conan_data["sources"]["url"]
-        # Use the local source tarball (exported via export_sources)
-        src_path = os.path.join(self.source_folder, "..", "source", f"nsnake-3.0.1.{ext}")
-        if os.path.exists(src_path):
-            get(self, src_path, strip_root=True)
+        # Try the local source tarball first (exported via export_sources)
+        # This allows CI workers without GitHub access to build
+        src_dir = self.source_folder
+        local_tarball = os.path.join(src_dir, "source", "nsnake-3.0.1.tar.gz")
+        if os.path.exists(local_tarball):
+            self.output.info(f"Using local source tarball: {local_tarball}")
+            get(self, local_tarball, strip_root=True)
         else:
             get(self, **self.conan_data["sources"], strip_root=True)
 
