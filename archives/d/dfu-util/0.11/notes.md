@@ -17,8 +17,8 @@
 - 状态: archived (配方已创建，待目标环境实际构建验证)
 
 ## 构建步骤
-1. 源码获取: GitHub archive (Stefan-Schmidt/dfu-util)
-2. 重新生成 autotools: `autoreconf -fi` (GitHub 归档未含预生成 configure)
+1. 源码获取: SourceForge 官方 `dfu-util-0.11.tar.gz`
+2. 使用发布包自带的预生成 `configure`
 3. Configure: `./configure --prefix=/usr/local` (通过 pkg-config 检测 libusb-1.0)
 4. Make: `make -j$(nproc)`
 5. Install: `make install`
@@ -29,11 +29,9 @@
   - 参考 dfu-programmer 的 pre-configure 处理方式
 
 ## 关键说明
-- dfu-util 0.11 在 GitHub 仓库未打 tag (最新 tag 为 v0.7)，0.11 release 官方发布于 SourceForge。
-  - conandata.yml 中 URL 暂用 GitHub archive 格式 (refs/tags/v0.11)，sha256 留空待实际构建时校验填充。
-  - 若 GitHub 归档不可用，可改用 SourceForge 官方 release: https://sourceforge.net/projects/dfu-util/files/dfu-util-0.11.tar.gz
+- dfu-util 0.11 官方发布于 SourceForge，SHA-256 为 `b4b53ba21a82ef7e3d4c47df2952adf5fa494f499b6b0b57c58c5d04ae8ff19e`。
 - 产物为终端工具 (dfu-util/dfu-suffix/dfu-prefix)，无可链接库，故 cpp_info.libs = []。
-- 测试配方 test_package 编译占位 C 程序并运行 `dfu-util --version` 验证可执行文件可用。
+- `test_package/test.sh` 执行 dfu-util、dfu-prefix 和 dfu-suffix，并核对版本输出。
 
 ## 质量门禁
 G1-G4 待目标环境构建验证。

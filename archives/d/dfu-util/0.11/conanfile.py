@@ -11,7 +11,7 @@ Dependency: libusb
 """
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -22,16 +22,9 @@ class DfuUtilConan(ConanFile):
     description = "USB DFU (Device Firmware Upgrade) host utilities"
     license = "GPL-2.0-or-later"
     homepage = "http://dfu-util.sourceforge.net/"
-    url = "https://github.com/Stefan-Schmidt/dfu-util"
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
-
-    def export_sources(self):
-        export_conandata_patches(self)
-
-    def requirements(self):
-        # libusb 1.0 provides USB device access
-        self.requires("libusb/1.0.27")
 
     def layout(self):
         basic_layout(self)
@@ -45,9 +38,6 @@ class DfuUtilConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
-        # GitHub archive ships no pre-generated configure; regenerate autotools files
-        self.run("autoreconf -fi", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
@@ -58,6 +48,5 @@ class DfuUtilConan(ConanFile):
 
     def package_info(self):
         # Terminal tool: no linkable library, only executables
-        self.cpp_info.libs = []
         self.cpp_info.includedirs = []
         self.cpp_info.bindirs = ["bin"]
