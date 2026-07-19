@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe for THC Hydra 9.6."""
+
 from conan import ConanFile
-from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.files import get, copy
+from conan.tools.files import get
+from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-import os
 
 
 class HydraConan(ConanFile):
@@ -13,21 +15,24 @@ class HydraConan(ConanFile):
     homepage = "https://github.com/vanhauser-thc/thc-hydra"
     package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "patches/*"
 
-    build(self): layout(self):
+    def requirements(self):
+        self.requires("openssl/1.1.1w")
+        self.requires("zlib/1.3.1")
+
+    def layout(self):
         basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        AutotoolsDeps(self).generate()
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        tc.configure_args.extend(["--disable-xhydra", "--nostrip"])
         tc.generate()
 
     def build(self):
-        self.run("autoreconf -fi", env="conanbuild")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
@@ -37,5 +42,4 @@ class HydraConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = []
         self.cpp_info.bindirs = ["bin"]

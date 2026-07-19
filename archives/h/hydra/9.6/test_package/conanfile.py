@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Conan test_package - hydra 9.6 smoke test."""
+"""Conan consumer test for THC Hydra 9.6."""
+
 import os
 
 from conan import ConanFile
@@ -8,13 +9,12 @@ from conan.tools.build import can_run
 
 class HydraTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualBuildEnv"
+    generators = "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
     def test(self):
         if can_run(self):
-            # 运行主程序检查是否可执行
-            for exe in ['hydra']:
-                self.run(f"{exe} --help || true", env="conanrun")
+            script = os.path.join(self.source_folder, "test.sh")
+            self.run(f'sh "{script}"', env="conanrun")

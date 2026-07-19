@@ -1,51 +1,27 @@
 # hydra 9.6 适配笔记
 
-## 编译环境
-- 构建系统: makefile
+## 构建环境
+
+- 构建系统: Autotools
 - 编译日期: 2026-07-15
 - 编译器: clang / clang++
-- 状态: built
 - 平台: HarmonyOS PC (aarch64)
-- 源码来源: https://github.com/vanhauser-thc/thc-hydra/archive/refs/tags/v9.6.tar.gz
+- 状态: built
 
-## 软件信息
-- 名称: hydra
-- 版本: 9.6
-- 上游仓库: vanhauser-thc/thc-hydra
-- 许可证: GPL-3.0-or-later
-- 描述: THC Hydra - fast network logon cracker supporting many protocols
-- 产物: hydra (可执行文件) + pw-inspector (工具)
-- 依赖: libssh, libidn, libpcre（可选编译时依赖）
+## 源码与依赖
 
-## Conan 配方说明
+- 源码: https://github.com/vanhauser-thc/thc-hydra/archive/refs/tags/v9.6.tar.gz
+- SHA-256: `c839e5c64ef60185c69a07a9a59831bd2cfe9ac2eac0c4d9e87fdf38dbf04c40`
+- 依赖: `openssl/1.1.1w`、`zlib/1.3.1`
 
-本归档采用 Conan 2.x MAKEFILE 配方：
+## Conan 配方
 
-- `conanfile.py`: MAKEFILE 构建配方
-  - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
-  - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
-- `test_package/`: 测试包，运行 `hydra -h`
+配方通过 `AutotoolsToolchain` 传递 OHOS 交叉编译环境，先执行
+`configure --disable-xhydra --nostrip`，再执行 `make` 和 `make install`。图形界面被禁用，
+安装阶段不调用上游硬编码的宿主 `strip`。
+缺少 libssh、libidn、ncurses 等可选库时，上游配置脚本会禁用对应模块。
 
-## 编译步骤
+## 验证
 
-1. Conan 下载源码：`get(self, **self.conan_data["sources"], strip_root=True)`
-2. 构建：`make.make()`
-3. 安装：复制可执行文件到 bin 目录
-
-## 遇到的问题与解决方案
-
-| # | 问题 | 原因 | 解决方案 |
-|---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
-
-## 验证结果
-
-test_package 验证 hydra 核心功能，运行 `hydra -h`。
-
-## 注意事项
-
-- hydra 为积分赛范畴
-- 默认静态构建（shared=False），符合系统库规则
+`test_package/test.sh` 运行 `hydra -h` 与 `pw-inspector -h`，并检查两个工具的
+版本输出。软件仅应用于合法、已授权的安全测试。
