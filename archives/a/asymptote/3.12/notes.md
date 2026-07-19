@@ -32,7 +32,8 @@ The canonical source tarball is the official SourceForge release:
 - The recipe builds in the copied source directory because Asymptote's main
   Makefile is not safe for an out-of-source build (`Makefile.in` is expected
   beside the generated Makefile).
-- `make -j1` avoids GNU make's FIFO jobserver, which is unavailable on OHOS.
+- `make --jobserver-style=pipe -j4` keeps the build within the CI timeout
+  without using the FIFO jobserver, which is unavailable on OHOS.
 - `001-config-status-readable-temp.patch` changes Autoconf's temporary
   directory umask from `077` to `022`, matching the repository's established
   HMDFS workaround so `config.status` can consume its generated files.
@@ -49,8 +50,8 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 3. `config_options`: OHOS 平台删除 `shared` 选项 (asymptote 为可执行工具).
 4. `config.status`: create its temporary directory with HMDFS-compatible mode;
    `umask 077` causes `subs1.awk: Permission denied` on the OHOS worker.
-5. Build in-source and serially: out-of-source make cannot find `Makefile.in`,
-   and parallel make cannot create its jobserver FIFO on OHOS.
+5. Build in-source and use make's pipe jobserver: out-of-source make cannot
+   find `Makefile.in`, while the default FIFO jobserver is unavailable on OHOS.
 
 ## Dependencies
 - Core runtime: libc, libstdc++ (clang/clang++)
