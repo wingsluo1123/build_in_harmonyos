@@ -58,6 +58,7 @@ class AsymptoteConan(ConanFile):
             tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
         # 关闭可选依赖, 减少鸿蒙平台缺失库的编译阻碍
         tc.configure_args.append("--disable-ffmpeg")
+        tc.configure_args.append("--disable-gc")
         tc.configure_args.append("--disable-gsl")
         tc.configure_args.append("--disable-opengl")
         tc.generate()
