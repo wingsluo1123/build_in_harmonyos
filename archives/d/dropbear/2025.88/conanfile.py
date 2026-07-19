@@ -103,55 +103,70 @@ class DropbearConan(ConanFile):
                 "#define DROPBEAR_SVR_PASSWORD_AUTH 0\n"
                 "/* Use public-key authentication where crypt() is unavailable. */\n",
             )
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        previous_tmpdir = None
+        if str(self.settings.os) == "OHOS":
+            # config.guess compiles a probe in TMPDIR; OHOS CI's global path is not writable.
+            tmpdir = os.path.join(self.build_folder, ".tmp")
+            os.makedirs(tmpdir, exist_ok=True)
+            previous_tmpdir = os.environ.get("TMPDIR")
+            os.environ["TMPDIR"] = tmpdir
 
-        if can_run(self):
-            test_home = self._prepare_upstream_test_auth()
-            previous_home = os.environ.get("HOME")
-            previous_dbtest = os.environ.get("DBTEST_IN_ACTION")
-            previous_auth_dir = os.environ.get("DROPBEAR_TEST_AUTHORIZED_KEYS_DIR")
-            previous_identity = os.environ.get("DROPBEAR_TEST_IDENTITY_FILE")
-            previous_asyncssh_identity = os.environ.get(
-                "DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"
-            )
-            os.environ["HOME"] = test_home
-            os.environ["DBTEST_IN_ACTION"] = "1"
-            os.environ["DROPBEAR_TEST_AUTHORIZED_KEYS_DIR"] = os.path.join(test_home, ".ssh")
-            os.environ["DROPBEAR_TEST_IDENTITY_FILE"] = os.path.join(
-                test_home, ".ssh", "id_dropbear"
-            )
-            os.environ["DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"] = os.path.join(
-                test_home, ".ssh", "id_dropbear_openssh"
-            )
-            try:
-                autotools.make(target="check")
-            finally:
-                if previous_home is None:
-                    os.environ.pop("HOME", None)
+        try:
+            autotools = Autotools(self)
+            autotools.configure()
+            autotools.make(args=["-j1"])
+
+            if can_run(self):
+                test_home = self._prepare_upstream_test_auth()
+                previous_home = os.environ.get("HOME")
+                previous_dbtest = os.environ.get("DBTEST_IN_ACTION")
+                previous_auth_dir = os.environ.get("DROPBEAR_TEST_AUTHORIZED_KEYS_DIR")
+                previous_identity = os.environ.get("DROPBEAR_TEST_IDENTITY_FILE")
+                previous_asyncssh_identity = os.environ.get(
+                    "DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"
+                )
+                os.environ["HOME"] = test_home
+                os.environ["DBTEST_IN_ACTION"] = "1"
+                os.environ["DROPBEAR_TEST_AUTHORIZED_KEYS_DIR"] = os.path.join(test_home, ".ssh")
+                os.environ["DROPBEAR_TEST_IDENTITY_FILE"] = os.path.join(
+                    test_home, ".ssh", "id_dropbear"
+                )
+                os.environ["DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"] = os.path.join(
+                    test_home, ".ssh", "id_dropbear_openssh"
+                )
+                try:
+                    autotools.make(target="check")
+                finally:
+                    if previous_home is None:
+                        os.environ.pop("HOME", None)
+                    else:
+                        os.environ["HOME"] = previous_home
+                    if previous_dbtest is None:
+                        os.environ.pop("DBTEST_IN_ACTION", None)
+                    else:
+                        os.environ["DBTEST_IN_ACTION"] = previous_dbtest
+                    if previous_auth_dir is None:
+                        os.environ.pop("DROPBEAR_TEST_AUTHORIZED_KEYS_DIR", None)
+                    else:
+                        os.environ["DROPBEAR_TEST_AUTHORIZED_KEYS_DIR"] = previous_auth_dir
+                    if previous_identity is None:
+                        os.environ.pop("DROPBEAR_TEST_IDENTITY_FILE", None)
+                    else:
+                        os.environ["DROPBEAR_TEST_IDENTITY_FILE"] = previous_identity
+                    if previous_asyncssh_identity is None:
+                        os.environ.pop("DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE", None)
+                    else:
+                        os.environ["DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"] = (
+                            previous_asyncssh_identity
+                        )
+            else:
+                self.output.info("cross-building: upstream make check requires a runnable target")
+        finally:
+            if str(self.settings.os) == "OHOS":
+                if previous_tmpdir is None:
+                    os.environ.pop("TMPDIR", None)
                 else:
-                    os.environ["HOME"] = previous_home
-                if previous_dbtest is None:
-                    os.environ.pop("DBTEST_IN_ACTION", None)
-                else:
-                    os.environ["DBTEST_IN_ACTION"] = previous_dbtest
-                if previous_auth_dir is None:
-                    os.environ.pop("DROPBEAR_TEST_AUTHORIZED_KEYS_DIR", None)
-                else:
-                    os.environ["DROPBEAR_TEST_AUTHORIZED_KEYS_DIR"] = previous_auth_dir
-                if previous_identity is None:
-                    os.environ.pop("DROPBEAR_TEST_IDENTITY_FILE", None)
-                else:
-                    os.environ["DROPBEAR_TEST_IDENTITY_FILE"] = previous_identity
-                if previous_asyncssh_identity is None:
-                    os.environ.pop("DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE", None)
-                else:
-                    os.environ["DROPBEAR_TEST_ASYNCSSH_IDENTITY_FILE"] = (
-                        previous_asyncssh_identity
-                    )
-        else:
-            self.output.info("cross-building: upstream make check requires a runnable target")
+                    os.environ["TMPDIR"] = previous_tmpdir
 
     def package(self):
         autotools = Autotools(self)

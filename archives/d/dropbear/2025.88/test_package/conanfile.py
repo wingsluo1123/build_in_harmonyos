@@ -3,6 +3,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import cross_building
 
 
@@ -10,6 +11,12 @@ class DropbearTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "VirtualRunEnv"
     test_type = "explicit"
+
+    def validate(self):
+        if str(self.settings.os) not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(
+                f"Dropbear test supports Linux and OHOS only, got {self.settings.os}"
+            )
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -19,14 +26,24 @@ class DropbearTestConan(ConanFile):
         binary_dir = os.path.join(dependency.package_folder, "bin")
         if not os.path.isdir(binary_dir):
             raise RuntimeError(f"missing packaged binary directory: {binary_dir}")
+        binaries = {}
         for program in ("dropbear", "dbclient", "dropbearkey", "dropbearconvert"):
             path = os.path.join(binary_dir, program)
-            if not os.path.isfile(path):
-                raise RuntimeError(f"missing packaged executable: {path}")
+            if not os.path.isfile(path) or not os.access(path, os.X_OK):
+                raise ConanInvalidConfiguration(
+                    f"missing executable packaged binary: {path}"
+                )
+            binaries[program] = path
 
         if cross_building(self):
             self.output.info("cross-building: executable presence checks passed")
             return
 
         shell = os.environ.get("CONFIG_SHELL", "bash")
-        self.run(f'{shell} test_dropbear.sh', env="conanrun")
+        script = os.path.join(self.recipe_folder, "test_dropbear.sh")
+        command = '"{}" "{}" {}'.format(
+            shell,
+            script,
+            " ".join('"{}"'.format(binaries[name]) for name in binaries),
+        )
+        self.run(command, env="conanrun")
