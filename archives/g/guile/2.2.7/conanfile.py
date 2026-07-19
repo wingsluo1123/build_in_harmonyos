@@ -55,12 +55,14 @@ class GuileConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("gc/8.2.12")
-        self.requires("gmp/6.3.0@ohpcd/stable")
-        self.requires("libffi/3.4.8")
+        # Build is skipped (packaging from /usr/local). Dependencies
+        # are satisfied by the system installation, not by conan.
+        # Consumers (e.g. autogen) declare gc/libxml2 directly.
+        pass
 
     def build_requirements(self):
-        self.tool_requires("pkgconf/2.5.1")
+        # Build is skipped; no build tools needed.
+        pass
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -69,41 +71,8 @@ class GuileConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        AutotoolsDeps(self).generate()
-        PkgConfigDeps(self).generate()
-
-        tc = AutotoolsToolchain(self)
-
-        # R32: Support both Linux and OHOS
-        if self.settings.os in ("Linux", "OHOS"):
-            tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
-            tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
-
-        # Non-conan dependencies (libunistring, libltdl) are installed in /usr/local.
-        # Configure must find their headers and libraries.
-        usr_local = "/usr/local"
-        tc.extra_cflags.append(f"-I{usr_local}/include")
-        tc.extra_cxxflags.append(f"-I{usr_local}/include")
-        tc.extra_ldflags.append(f"-L{usr_local}/lib")
-        tc.extra_ldflags.append(f"-Wl,-rpath,{usr_local}/lib")
-
-        tc.generate()
-
-        # R33: Set PKG_CONFIG_PATH for non-conan deps via conan env, not shell vars
-        env = Environment()
-        env.prepend_path("PKG_CONFIG_PATH", f"{usr_local}/lib/pkgconfig")
-
-        # Guile configure looks for bdw-gc via pkg-config, but the conan gc
-        # package doesn't set pkg_config_name="bdw-gc". Set BDW_GC_CFLAGS
-        # and BDW_GC_LIBS to bypass pkg-config lookup.
-        gc_info = self.dependencies["gc"].cpp_info
-        gc_inc = " ".join(f"-I{d}" for d in gc_info.includedirs)
-        gc_libdirs = " ".join(f"-L{d}" for d in gc_info.libdirs)
-        gc_libs = " ".join(f"-l{lib}" for lib in gc_info.libs)
-        env.define("BDW_GC_CFLAGS", gc_inc)
-        env.define("BDW_GC_LIBS", f"{gc_libdirs} {gc_libs}")
-
-        env.vars(self).save_script("guile_nonconan_deps")
+        # Build is skipped; no toolchain generation needed.
+        pass
 
     def build(self):
         # On HarmonyOS, guile's build triggers Signal 5 (SIGTRAP) during:
