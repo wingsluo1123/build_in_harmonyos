@@ -1,53 +1,38 @@
 # hackrf 2024.02.1 适配笔记
 
-## 编译环境
-- 构建系统: cmake
+## 构建环境
+
+- 构建系统: CMake
 - 编译日期: 2026-07-15
 - 编译器: clang / clang++
-- 状态: built
 - 平台: HarmonyOS PC (aarch64)
-- 源码来源: https://github.com/greatscottgadgets/hackrf/releases/download/v2024.02.1/hackrf-2024.02.1.tar.xz
+- 状态: built
 
-## 软件信息
-- 名称: hackrf
-- 版本: 2024.02.1
-- 上游仓库: greatscottgadgets/hackrf
-- 许可证: GPL-2.0-or-later
-- 描述: HackRF Software Defined Radio tools (hackrf_info, hackrf_transfer)
-- 产物: hackrf_info, hackrf_transfer (可执行文件) + libhackrf.a (静态库)
-- 依赖: libusb, libfftw（编译时依赖）
+## 源码与依赖
 
-## Conan 配方说明
+- 源码: https://github.com/greatscottgadgets/hackrf/releases/download/v2024.02.1/hackrf-2024.02.1.tar.xz
+- SHA-256: `d9ced67e6b801cd02c18d0c4654ed18a4bcb36c24a64330c347dfccbd859ad16`
+- Conan 依赖: `libusb/1.0.27`
+- FFTW: 可选；缺失时不构建 `hackrf_sweep`
 
-本归档采用 Conan 2.x CMAKE 配方：
+## Conan 配方
 
-- `conanfile.py`: CMAKE 构建配方
-  - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
-  - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
-- `test_package/`: 测试包，运行 `hackrf_info --help`
+配方使用 Conan 2.x CMake 工具：
 
-## 编译步骤
+- 从源码树的 `host/` 子目录配置 CMake。
+- 设置 `BUILD_SHARED_LIBS=OFF`，生成静态 `libhackrf`。
+- 设置 `CMAKE_POLICY_VERSION_MINIMUM=3.5`，兼容上游旧版 CMake 配置。
+- 应用 `0001-host-hackrf-tools-src-CMakeLists.txt.patch`，使 FFTW 可选。
+- 应用 `0002-host-respect-build-shared-libs.patch`，让上游遵循静态库选项并在 OHOS 上安装库和头文件。
+- 生成并安装 HackRF 命令行工具及 `libhackrf`。
 
-1. Conan 下载源码：`get(self, **self.conan_data["sources"], strip_root=True)`
-2. 生成工具链：`CMakeToolchain`
-3. 配置：`cmake.configure()`
-4. 构建：`cmake.build()`
-5. 安装：`cmake.install()`
+## 验证
 
-## 遇到的问题与解决方案
-
-| # | 问题 | 原因 | 解决方案 |
-|---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
-
-## 验证结果
-
-test_package 验证 hackrf 核心功能，运行 `hackrf_info --help`。
+`test_package` 通过 `hackrf::hackrf` 链接 `libhackrf`，并调用
+`hackrf_init()` 和 `hackrf_exit()`。在未连接 HackRF 设备或 USB 后端不可用时，
+测试接受 `HACKRF_ERROR_LIBUSB`；其他未预期错误会使测试失败。
 
 ## 注意事项
 
-- hackrf 为积分赛范畴
-- 默认静态构建（shared=False），符合系统库规则
+- `hackrf_sweep` 需要 FFTW；当前配方未声明 FFTW，因此该工具不会构建。
+- 其他工具运行时可能需要 HackRF 硬件设备。

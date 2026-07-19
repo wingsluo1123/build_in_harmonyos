@@ -1,0 +1,35 @@
+diff -ruN a/host/hackrf-tools/src/CMakeLists.txt b/host/hackrf-tools/src/CMakeLists.txt
+--- a/host/hackrf-tools/src/CMakeLists.txt
++++ b/host/hackrf-tools/src/CMakeLists.txt
+@@ -26,4 +26,6 @@
+-find_package(FFTW REQUIRED)
+-include_directories(${FFTW_INCLUDES})
+-get_filename_component(FFTW_LIBRARY_DIRS ${FFTW_LIBRARIES} DIRECTORY)
+-link_directories(${FFTW_LIBRARY_DIRS})
++find_package(FFTW QUIET)
++if(FFTW_FOUND)
++	include_directories(${FFTW_INCLUDES})
++	get_filename_component(FFTW_LIBRARY_DIRS ${FFTW_LIBRARIES} DIRECTORY)
++	link_directories(${FFTW_LIBRARY_DIRS})
++endif()
+@@ -38 +40,0 @@
+-	hackrf_sweep
+@@ -41,0 +43,7 @@
++
++# hackrf_sweep requires FFTW
++if(FFTW_FOUND)
++	LIST(APPEND TOOLS hackrf_sweep)
++else()
++	message(STATUS "FFTW not found, skipping hackrf_sweep")
++endif()
+@@ -47 +55,3 @@
+-	LIST(APPEND TOOLS_LINK_LIBS ${FFTW_LIBRARIES})
++	if(FFTW_FOUND)
++		LIST(APPEND TOOLS_LINK_LIBS ${FFTW_LIBRARIES})
++	endif()
+@@ -49 +59,4 @@
+-    LIST(APPEND TOOLS_LINK_LIBS m fftw3f)
++    LIST(APPEND TOOLS_LINK_LIBS m)
++	if(FFTW_FOUND)
++		LIST(APPEND TOOLS_LINK_LIBS fftw3f)
++	endif()
