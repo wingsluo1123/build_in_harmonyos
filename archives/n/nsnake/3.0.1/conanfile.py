@@ -23,10 +23,10 @@ class NsnakeConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Export source tarball for CI workers that cannot reach GitHub
+        # Export source tarball at root level for easy access in source()
         copy(self, "source/nsnake-3.0.1.tar.gz",
              src=self.recipe_folder,
-             dst=os.path.join(self.export_sources_folder, "source"))
+             dst=self.export_sources_folder)
 
     def requirements(self):
         self.requires("ncurses/6.4")
@@ -35,15 +35,9 @@ class NsnakeConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # Try the local source tarball first (exported via export_sources)
-        # This allows CI workers without GitHub access to build
-        src_dir = self.source_folder if self.source_folder else os.getcwd()
-        local_tarball = os.path.join(src_dir, "source", "nsnake-3.0.1.tar.gz")
-        if os.path.exists(local_tarball):
-            self.output.info(f"Using local source tarball: {local_tarball}")
-            get(self, local_tarball, strip_root=True)
-        else:
-            get(self, **self.conan_data["sources"], strip_root=True)
+        # Use the local source tarball exported via export_sources
+        # This avoids GitHub download issues on CI workers without GitHub access
+        get(self, "nsnake-3.0.1.tar.gz", strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
