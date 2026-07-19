@@ -1,0 +1,32 @@
+version: "8.0.36"
+status: built
+build_date: "2026-07-19"
+
+source:
+  url: "https://github.com/percona/percona-server/archive/refs/tags/Percona-Server-8.0.36-28.tar.gz"
+  sha256: "a2e456912eb5650947122e2902704110c8a1bf9523550d0e1ef148e39ad00db9"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DWITHOUT_SERVER=ON"
+    - "-DWITH_SSL=system"
+    - "-DWITH_ZLIB=system"
+    - "-DDOWNLOAD_BOOST=1"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+  dependencies:
+    - "openssl/1.1.1w"
+    - "zlib/1.3.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Percona Server 源码包约 455MB，仅构建客户端库大幅减少编译时间"
+  - "WITHOUT_SERVER=ON 仍需要 Boost 头文件（DOWNLOAD_BOOST=1 自动下载）"
+  - "客户端库产物名为 libperconaserverclient（不是 libmysqlclient）"
+  - "ARM64 平台需确保 -fPIC 编译（CMAKE_POSITION_INDEPENDENT_CODE=ON）"
+  - "被 qt-percona-server 作为 QMYSQL 驱动后端依赖"
+
