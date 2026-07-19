@@ -4,8 +4,9 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, replace_in_file
 
 
 class TimewarriorConan(ConanFile):
@@ -38,7 +39,7 @@ class TimewarriorConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["BUILD_TESTING"] = False
+        tc.variables["BUILD_TESTING"] = True
         tc.generate()
 
     def build(self):
@@ -46,6 +47,22 @@ class TimewarriorConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        if can_run(self):
+            test_source = os.path.join(self.source_folder, "test")
+            test_build = os.path.join(self.build_folder, "test")
+            copy(self, "*.t", src=test_source, dst=test_build)
+            for directory in ("basetest", "simpletap", "test_extensions"):
+                copy(
+                    self,
+                    "*",
+                    src=os.path.join(test_source, directory),
+                    dst=os.path.join(test_build, directory),
+                )
+            for helper in ("bash_tap.sh", "bash_tap_ti.sh", "timemachine"):
+                copy(self, helper, src=test_source, dst=test_build)
+            self.run("chmod +x *.t run_all problems", cwd=test_build)
+            cmake.build(target="test")
+            self.run("./AtomicFileTest", cwd=test_build)
 
     def package(self):
         CMake(self).install()
