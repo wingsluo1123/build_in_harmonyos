@@ -33,6 +33,7 @@ class LvConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+        self.folders.build = "."
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -47,39 +48,27 @@ class LvConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         autotools = Autotools(self)
-        # Configure script is in src/ subdirectory
         src_dir = os.path.join(self.source_folder, "src")
         autotools.configure(build_script_folder=src_dir)
         autotools.make()
 
     def package(self):
-        # Use manual install because make install fails on HMDFS (hardlink)
-        # After autotools.build(), binary is in the build-release subfolder
-        build_dir = os.path.join(self.build_folder, "build-release") if hasattr(self, 'build_folder') else self.source_folder
-        # Try multiple locations for the lv binary
-        lv_bin = None
-        for candidate in [os.path.join(build_dir, "lv"), os.path.join(self.source_folder, "src", "lv"),
-                          os.path.join(self.source_folder, "lv"), os.path.join(self.build_folder, "lv")]:
-            if os.path.exists(candidate):
-                lv_bin = candidate
-                break
-        if not lv_bin:
-            # Search in build folder
-            import glob
-            found = glob.glob(os.path.join(self.build_folder, "**", "lv"), recursive=True)
-            if found:
-                lv_bin = found[0]
-        
+        src_dir = os.path.join(self.source_folder, "src")
         root_dir = self.source_folder
         bin_dir = os.path.join(self.package_folder, "bin")
         lib_dir = os.path.join(self.package_folder, "lib", "lv")
         os.makedirs(bin_dir, exist_ok=True)
         os.makedirs(lib_dir, exist_ok=True)
-        if lv_bin:
-            self.run(f"cp '{lv_bin}' '{bin_dir}/'")
-        self.run(f"cd '{bin_dir}' && ln -sf lv lgrep")
-        if os.path.exists(os.path.join(root_dir, "lv.hlp")):
-            self.run(f"cp '{root_dir}/lv.hlp' '{lib_dir}/'")
+        # Find lv binary in build folder
+        lv_path = os.path.join(self.build_folder, "lv")
+        if not os.path.exists(lv_path):
+            lv_path = os.path.join(src_dir, "lv")
+        if os.path.exists(lv_path):
+            self.run(f"cp {lv_path} {bin_dir}/lv")
+        self.run(f"cd {bin_dir} && ln -sf lv lgrep")
+        hlp_src = os.path.join(root_dir, "lv.hlp")
+        if os.path.exists(hlp_src):
+            self.run(f"cp {hlp_src} {lib_dir}/")
 
     def package_info(self):
         self.cpp_info.libs = []
