@@ -1,53 +1,32 @@
-# stlink 1.8.0 适配笔记
+# stlink 1.8.0 adaptation notes
 
-## 编译环境
-- 构建系统: cmake
-- 编译日期: 2026-07-15
-- 编译器: clang / clang++
-- 状态: built
-- 平台: HarmonyOS PC (aarch64)
-- 源码来源: https://github.com/stlink-org/stlink/archive/refs/tags/v1.8.0.tar.gz
+## Source
 
-## 软件信息
-- 名称: stlink
-- 版本: 1.8.0
-- 上游仓库: stlink-org/stlink
-- 许可证: BSD-3-Clause
-- 描述: STM32 MCU programmer toolkit (st-flash, st-info, st-util)
-- 产物: st-flash, st-info, st-util (可执行文件) + libstlink.a (静态库)
-- 依赖: libusb（编译时依赖）
+- URL: `https://github.com/stlink-org/stlink/archive/refs/tags/v1.8.0.tar.gz`
+- SHA-256: `cff760b5c212c2cc480f705b9ca7f3828d6b9c267950c6a547002cd0a1f5f6ac`
 
-## Conan 配方说明
+## Package
 
-本归档采用 Conan 2.x CMAKE 配方：
+- Build system: CMake through Conan 2
+- Package type: application with a static `libstlink`
+- Executables: `st-flash`, `st-info`, and `st-util`
+- Dependency: `libusb/1.0.27`
 
-- `conanfile.py`: CMAKE 构建配方
-  - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
-  - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
-- `test_package/`: 测试包，运行 `st-info --version`
+The software-level `commands.json` declares `stlink/1.8.0` as a tool package.
+`package_info()` exports the three executables, the `bin` directory, the
+`stlink::stlink` CMake target, and the transitive libusb dependency.
 
-## 编译步骤
+## HarmonyOS adaptation
 
-1. Conan 下载源码：`get(self, **self.conan_data["sources"], strip_root=True)`
-2. 生成工具链：`CMakeToolchain`
-3. 配置：`cmake.configure()`
-4. 构建：`cmake.build()`
-5. 安装：`cmake.install()`
+The recipe reuses the seven upstream-source patches already validated by the
+`1.8.0-r1` archive. They address portable headers and integer-width warnings in
+the CMake flags, gdb server, chip database, flash loader, mapped files, and USB
+backend. No patch modifies recipe metadata or test_package files.
 
-## 遇到的问题与解决方案
+## Consumer test
 
-| # | 问题 | 原因 | 解决方案 |
-|---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
+The test package keeps `self.requires(self.tested_reference_str)`, compiles a C
+consumer against `stlink::stlink`, calls `stlink_open_usb()` and closes an
+optional device, then runs `st-info --version`. No physical probe is required.
 
-## 验证结果
-
-test_package 验证 stlink 核心功能，运行 `st-info --version`。
-
-## 注意事项
-
-- stlink 为积分赛范畴
-- 默认静态构建（shared=False），符合系统库规则
+<!-- ARCHIVE-CLOSED -->
