@@ -73,6 +73,67 @@ if [ ${#PACKAGES[@]} -eq 0 ]; then
     exit 1
 fi
 
+SORTED_PACKAGE_OUTPUT=$(python3 - "${PACKAGES[@]}" <<'PYEOF'
+import ast
+import os
+import sys
+
+packages = sys.argv[1:]
+by_ref = {
+    f"{os.path.basename(os.path.dirname(path))}/{os.path.basename(path)}": path
+    for path in packages
+}
+dependencies = {path: [] for path in packages}
+
+for path in packages:
+    with open(os.path.join(path, "conanfile.py"), encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr not in {"requires", "tool_requires"} or not node.args:
+            continue
+        value = node.args[0]
+        if not isinstance(value, ast.Constant) or not isinstance(value.value, str):
+            continue
+        ref = value.value.split("@", 1)[0]
+        dependency = by_ref.get(ref)
+        if dependency and dependency not in dependencies[path]:
+            dependencies[path].append(dependency)
+
+state = {}
+ordered = []
+
+
+def visit(path):
+    if state.get(path) == 1:
+        raise RuntimeError(path)
+    if state.get(path) == 2:
+        return
+    state[path] = 1
+    for dependency in dependencies[path]:
+        visit(dependency)
+    state[path] = 2
+    ordered.append(path)
+
+
+try:
+    for package in packages:
+        visit(package)
+except RuntimeError as error:
+    print(f"[error] Dependency cycle detected at: {error.args[0]}", file=sys.stderr)
+    sys.exit(1)
+
+print("\n".join(ordered))
+PYEOF
+) || exit 1
+PACKAGES=("${(@f)SORTED_PACKAGE_OUTPUT}")
+for pkg_dir in "${PACKAGES[@]}"; do
+    if [ -f "$pkg_dir/conanfile.py" ]; then
+        conan export "$pkg_dir" >/dev/null
+    fi
+done
+
 echo "[step] Found ${#PACKAGES[@]} package(s) to build"
 
 # ── 2. Build + test each package ──
