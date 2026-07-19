@@ -15,7 +15,7 @@ class LibmdConan(ConanFile):
     description = "Message Digest functions from BSD systems"
     license = "BSD-3-Clause"
     homepage = "https://libbsd.freedesktop.org"
-    url = ""
+    url = "https://libbsd.freedesktop.org/releases/libmd-1.1.0.tar.xz"
 
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
@@ -33,22 +33,35 @@ class LibmdConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+        arch_map = {"armv8": "aarch64", "armv8_32": "aarch64", "x86_64": "x86_64", "x86": "i386"}
+        build_arch = arch_map.get(str(self.settings.arch), str(self.settings.arch))
+        tc.configure_args.append(f"--build={build_arch}-unknown-linux-ohos")
         tc.generate()
+        self._configure_args = tc.configure_args
 
     def build(self):
         apply_conandata_patches(self)
         autotools = Autotools(self)
-        autotools.configure()
-        # OHOS HMDFS noexec (E046): config.status 中临时 awk 脚本无法直接执行,
-        # 用 $AWK -f 方式运行 (ac_tmp 模板为 ./confXXXXXX)
-        self.run(r"sed -i 's|\./conf[^/]*/subs1\.awk|$AWK -f &|g' config.status",
-                 cwd=self.source_folder, ignore_errors=True)
-        autotools.make(args=["-j1"])
+        # HMDFS noexec: use /system/bin/sh to run configure, with --no-create
+        configure_cmd = "/system/bin/sh ./configure --no-create " + " ".join(self._configure_args)
+        self.run(configure_cmd, cwd=self.source_folder)
+        # HMDFS noexec: patch config.status to use writable temp dir
+        import tempfile, re, os
+        conf_tmp = tempfile.mkdtemp(dir='/storage/Users/currentUser', prefix='.libmd-conf-')
+        os.chmod(conf_tmp, 0o755)
+        cs_path = os.path.join(self.source_folder, "config.status")
+        if os.path.isfile(cs_path):
+            with open(cs_path, 'r') as f:
+                cs_content = f.read()
+            cs_content = re.sub(r'tmp=`\(umask 077 && mktemp -d[^`]+`', f'tmp="{conf_tmp}"', cs_content)
+            cs_content = re.sub(r'tmp=\./conf\$\$-\$RANDOM', f'tmp={conf_tmp}', cs_content)
+            with open(cs_path, 'w') as f:
+                f.write(cs_content)
+        self.run("/system/bin/sh ./config.status", cwd=self.source_folder)
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        self.run("make install DESTDIR={} -j1".format(self.package_folder), cwd=self.source_folder)
 
     def package_info(self):
         self.cpp_info.libs = ["md"]
