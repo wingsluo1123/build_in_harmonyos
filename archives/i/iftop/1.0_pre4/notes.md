@@ -22,10 +22,10 @@ Note: the GitHub mirror `sqs/iftop` referenced in some docs does not exist
 - Conan 2.x autotools recipe (`conan.tools.gnu.Autotools` / `AutotoolsToolchain`).
 - `config_options`: on OHOS the `shared` option is removed (iftop is a
   standalone executable, never a shared library).
-- `requirements`: declares `libpcap/1.10.6` and `ncurses/6.5`.
+- `requirements`: declares `libpcap/1.10.6`; ncurses is supplied by the OHOS system prefix.
 - `package_info`: `cpp_info.libs = []` (executable, not a linkable library);
   `bindirs = ["bin"]` exposes the installed `iftop` binary.
-- No patches are bundled in this base recipe (`patches/.gitkeep`).
+- The six previously verified r0 OHOS portability patches are applied by Conan.
 
 ## OHOS Adaptation
 A full HarmonyOS (aarch64) build of iftop requires platform adaptation patches
@@ -43,7 +43,7 @@ These patches have been verified to produce a working `iftop` binary on OHOS.
 
 ## Dependencies
 - libpcap (packet capture) — Conan recipe `libpcap/1.10.6`.
-- ncurses (terminal UI, wide-char `ncursesw`) — `ncurses/6.5`.
+- ncurses (terminal UI, wide-char `ncursesw`) — system prebuilt 6.5.
 
 ## Verification
 The existing OHOS build (1.0_pre4-r0) confirmed a working binary:
