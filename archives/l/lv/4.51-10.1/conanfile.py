@@ -6,6 +6,7 @@ lv is a powerful multi-lingual file viewer/grep tool.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -63,8 +64,9 @@ class LvConan(ConanFile):
         lv_path = os.path.join(self.build_folder, "lv")
         if not os.path.exists(lv_path):
             lv_path = os.path.join(src_dir, "lv")
-        if os.path.exists(lv_path):
-            self.run(f"cp {lv_path} {bin_dir}/lv")
+        if not os.path.exists(lv_path):
+            raise ConanInvalidConfiguration("lv binary not found in build output")
+        self.run(f"cp {lv_path} {bin_dir}/lv")
         self.run(f"cd {bin_dir} && ln -sf lv lgrep")
         hlp_src = os.path.join(root_dir, "lv.hlp")
         if os.path.exists(hlp_src):
