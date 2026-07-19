@@ -24,30 +24,52 @@ echo "[step] Conan environment setup..."
 export PATH="$HOME/.local/bin:$PATH"
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 
-PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
-PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-pypi.cnb.cool}"
-PIP_EXTRA_INDEX_URL="${PIP_EXTRA_INDEX_URL:-https://pypi.org/simple}"
+CONAN_PYPI_INDEX_URL="${CONAN_PYPI_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
+CONAN_PYPI_TRUSTED_HOST="${CONAN_PYPI_TRUSTED_HOST:-pypi.cnb.cool}"
+PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.org/simple}"
+PYPI_FALLBACK_INDEX_URL="${PYPI_FALLBACK_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 
 install_conan() {
-    local -a pip_args
-    pip_args=(
-        install
-        --user
-        --force-reinstall
-        --index-url "$PIP_INDEX_URL"
-        --trusted-host "$PIP_TRUSTED_HOST"
-        --extra-index-url "$PIP_EXTRA_INDEX_URL"
-        "requests>=2.25,<3.0.0"
-        conan
-    )
+    local temp_root wheel_dir wheel_file index_url
+    local -a wheel_files
+    temp_root="${TMPDIR:-$HOME/tmp}"
+    mkdir -p "$temp_root" || return 1
+    wheel_dir="$(mktemp -d "$temp_root/conan-wheel.XXXXXX")" || return 1
 
-    echo "[step] Installing Conan from community index with PyPI fallback..."
-    if python3 -m pip "${pip_args[@]}"; then
-        return 0
+    echo "[step] Downloading OHOS Conan wheel from community index..."
+    if ! python3 -m pip download \
+        --no-deps \
+        --dest "$wheel_dir" \
+        --index-url "$CONAN_PYPI_INDEX_URL" \
+        --trusted-host "$CONAN_PYPI_TRUSTED_HOST" \
+        conan; then
+        rm -rf "$wheel_dir"
+        return 1
     fi
 
-    echo "[warn] Conan install with mixed indexes failed, retrying with configured pip defaults..."
-    python3 -m pip install --user --force-reinstall "requests>=2.25,<3.0.0" conan
+    wheel_files=("$wheel_dir"/conan-*.whl(N))
+    if [ ${#wheel_files[@]} -ne 1 ]; then
+        echo "[error] Expected one Conan wheel from community index, found ${#wheel_files[@]}"
+        rm -rf "$wheel_dir"
+        return 1
+    fi
+    wheel_file="${wheel_files[1]}"
+
+    for index_url in "$PYPI_INDEX_URL" "$PYPI_FALLBACK_INDEX_URL"; do
+        echo "[step] Installing OHOS Conan wheel with dependencies from $index_url..."
+        if python3 -m pip install \
+            --user \
+            --force-reinstall \
+            --index-url "$index_url" \
+            "$wheel_file"; then
+            rm -rf "$wheel_dir"
+            return 0
+        fi
+        echo "[warn] Dependency installation failed from $index_url"
+    done
+
+    rm -rf "$wheel_dir"
+    return 1
 }
 
 # Check both that conan exists AND is functional (conan --version succeeds)
