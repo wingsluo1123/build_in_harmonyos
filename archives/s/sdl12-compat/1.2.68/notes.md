@@ -6,7 +6,7 @@
 - 编译器: clang / clang++
 - 状态: built
 - 平台: HarmonyOS PC (aarch64)
-- 源码来源: https://github.com/libsdl-org/sdl12-compat/archive/refs/tags/v1.2.68.tar.gz
+- 源码来源: https://github.com/libsdl-org/sdl12-compat/archive/refs/tags/release-1.2.68.tar.gz
 
 ## 软件信息
 - 名称: sdl12-compat
@@ -15,7 +15,7 @@
 - 许可证: Zlib
 - 描述: SDL 1.2 compatibility layer on top of SDL2
 - 产物: libSDL.a (静态库) + SDL.h (头文件)
-- 依赖: SDL2（运行时依赖）
+- 依赖: SDL2/2.30.0（构建和运行时依赖）
 
 ## Conan 配方说明
 
@@ -23,9 +23,9 @@
 
 - `conanfile.py`: CMAKE 构建配方
   - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
-  - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
+  - 通过 Conan 声明并传播 `SDL2/2.30.0`
+  - CMake 使用 `SDL2::SDL2` 获取依赖头文件
+- `conandata.yml`: 源码 URL、已验证的 SHA-256 和依赖补丁
 - `test_package/`: 测试包，编译链接测试程序验证库核心功能
 
 ## 编译步骤
@@ -40,12 +40,15 @@
 
 | # | 问题 | 原因 | 解决方案 |
 |---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
+| 1 | SDL2 依赖无法解析 | 原配方引用未发布的 `sdl2/2.30.10` | 改用已发布的 `SDL2/2.30.0` 和 Conan CMake target |
+| 2 | 源码完整性校验 | 下载归档需要固定校验值 | 使用实测 SHA-256 `63c6e4dcc1154299e6f363c872900be7f3dcb3e42b9f8f57e05442ec3d89d02d` |
 
 ## 验证结果
 
-test_package 验证 sdl12-compat 核心功能，编译链接测试程序验证库核心功能。
+test_package 使用 SDL dummy video 后端创建 64x64 surface，执行像素填充、
+buffer flip，并验证 SDL 事件队列。该测试覆盖视频 surface 和事件兼容层，
+但不覆盖真实显示输出、GPU 加速、音频设备或输入设备；这些能力仍需在
+具有 HarmonyOS 图形和音频环境的设备上人工确认。
 
 ## 注意事项
 
