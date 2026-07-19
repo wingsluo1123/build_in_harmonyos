@@ -1,45 +1,40 @@
 # fnt homebrew 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-07-17}
-- 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 构建系统: custom（shell 脚本，无需编译）
+- 编译日期: 2026-07-17
+- 编译器: 无（shell 脚本项目）
+- 状态: built
 
 ## 编译步骤
-
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+```bash
+# 无需编译，直接复制 shell 脚本
+# 1. 修复 shebang
+# 2. 添加 HarmonyOS 平台检测
+# 3. 复制到 bin/ 目录
+```
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | /usr/bin/env bash 不存在 | E165: OHOS 无 /usr/bin/env | 改 shebang 为 /data/service/hnp/bin/bash |
+| 2 | HMDFS chmod 失败 | HMDFS 安全策略 | 使用 os.system 作为 fallback |
+| 3 | GitHub 源码下载超时 | Worker 网络受限 | 使用 ghfast.top 镜像 |
 
 ## 源码修改
-
-{如有补丁，列出文件名和修改内容；无则删除此节}
+- `0001-shebang-fix.patch` — 修复 shebang + 添加 HarmonyOS 平台检测
 
 ## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
+- 无外部依赖
 
 ## 验证结果
-
 ```bash
-{验证命令和结果}
+$ fnt help
+Apt for fonts, the missing font manager for macOS/linux
 ```
 
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
-
 ## 注意事项
-
-{需要特别注意的点；无则删除此节}
----
-
-**编译结束**: 2026-07-17 14:57
-**最终状态**: built
+1. fnt 是 shell 脚本项目，无需编译，直接复制脚本文件
+2. shebang 已改为 `/data/service/hnp/bin/bash`
+3. 添加了 HarmonyOS 平台检测支持
