@@ -39,6 +39,7 @@ class NcursesConan(ConanFile):
         tc.configure_args.append("--enable-widec")
         tc.configure_args.append("--enable-overwrite")
         tc.generate()
+        self._configure_args = tc.configure_args
 
     def build(self):
         # E160: Fix config.guess/sub for HarmonyOS detection
@@ -46,11 +47,22 @@ class NcursesConan(ConanFile):
         self.run("sed -i 's/ironclad\*)/ironclad* | ohos*)/' config.sub", cwd=self.source_folder)
         self.run("sed -i 's/uclibc\*- )/uclibc*- | linux-ohos*- )/' config.sub", cwd=self.source_folder)
         autotools = Autotools(self)
-        # HMDFS noexec: set TMPDIR to writable dir and use shell for configure
-        import tempfile
-        exec_tmp = tempfile.mkdtemp(dir='/storage/Users/currentUser', prefix='.tmp-')
-        configure_cmd = f"TMPDIR={exec_tmp} /system/bin/sh ./configure " + " ".join(autotools.configure_args)
-        self.run(configure_cmd, cwd=self.build_folder)
+        # HMDFS noexec: use /system/bin/sh to run configure, with --no-create
+        configure_cmd = "/system/bin/sh ./configure --no-create " + " ".join(self._configure_args)
+        self.run(configure_cmd, cwd=self.source_folder)
+        # HMDFS noexec: patch config.status to use writable temp dir
+        import tempfile, re, os as _os
+        conf_tmp = tempfile.mkdtemp(dir='/storage/Users/currentUser', prefix='.ncurses-conf-')
+        _os.chmod(conf_tmp, 0o755)
+        cs_path = _os.path.join(self.source_folder, "config.status")
+        if _os.path.isfile(cs_path):
+            with open(cs_path, 'r') as f:
+                cs_content = f.read()
+            cs_content = re.sub(r'tmp=`\(umask 077 && mktemp -d[^`]+`', f'tmp="{conf_tmp}"', cs_content)
+            cs_content = re.sub(r'tmp=\./conf\$\$-\$RANDOM', f'tmp={conf_tmp}', cs_content)
+            with open(cs_path, 'w') as f:
+                f.write(cs_content)
+        self.run("/system/bin/sh ./config.status", cwd=self.source_folder)
         autotools.make(args=["-j1"])
 
     def package(self):

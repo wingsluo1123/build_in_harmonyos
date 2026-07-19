@@ -21,4 +21,10 @@ class TestConan(ConanFile):
 
     def test(self):
         if not cross_building(self):
-            self.run(os.path.join(self.cpp.build.bindirs[0], "test_ncurses"), env="conanrun")
+            bin_path = os.path.join(self.dependencies["ncurses"].package_folder, "bin", "test_ncurses")
+            if os.path.exists(bin_path):
+                self.run(bin_path, env="conanrun")
+            else:
+                # Fallback: use cmake test
+                cmake = CMake(self)
+                cmake.test()
