@@ -34,18 +34,23 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     #  build-machine paths with ^M line endings)
     # Pre-install requests to satisfy conan's dependency requests<3.0.0,>=2.25
     # (pip dependency resolution may fail on some CI workers)
-    # Try multiple pip indices to find requests
-    for pip_idx in "" "https://pypi.org/simple/" "https://mirrors.aliyun.com/pypi/simple/"; do
-        if [ -z "$pip_idx" ]; then
-            python3 -m pip install --user 'requests>=2.25,<3.0.0' 2>&1 && break || continue
-        else
-            python3 -m pip install --user --index-url "$pip_idx" \
-                --trusted-host pypi.org --trusted-host mirrors.aliyun.com \
-                'requests>=2.25,<3.0.0' 2>&1 && break || continue
-        fi
-    done
-    # Try to install conan with --no-deps first (skip dependency resolution)
-    if python3 -m pip install --user --no-deps conan 2>&1; then
+    # Use multiple indices simultaneously with --extra-index-url so pip
+    # can find packages across all indices in one pass
+    PYPI_DEFAULT="https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple/"
+    if python3 -m pip install --user \
+        --index-url "$PYPI_DEFAULT" \
+        --extra-index-url "https://pypi.org/simple/" \
+        --extra-index-url "https://mirrors.aliyun.com/pypi/simple/" \
+        --trusted-host pypi.cnb.cool \
+        --trusted-host pypi.org \
+        --trusted-host mirrors.aliyun.com \
+        'requests>=2.25,<3.0.0' 2>&1; then
+        echo "[step] requests pre-installed"
+    else
+        echo "[step] requests pre-install skipped (not critical, conan may have it)"
+    fi
+    # Install conan with --no-deps to skip dependency resolution
+    if python3 -m pip install --user --no-deps --force-reinstall conan 2>&1; then
         echo "[step] Conan installed (no-deps mode)"
     else
         echo "[step] --no-deps failed, trying normal install..."
