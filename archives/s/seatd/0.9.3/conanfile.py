@@ -8,7 +8,8 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.meson import Meson, MesonToolchain, meson_layout
+from conan.tools.layout import basic_layout
+from conan.tools.meson import Meson, MesonToolchain
 
 
 class SeatdConan(ConanFile):
@@ -51,7 +52,7 @@ class SeatdConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def layout(self):
-        meson_layout(self)
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
