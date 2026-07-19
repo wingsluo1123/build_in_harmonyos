@@ -28,6 +28,7 @@
 - CMake 上游工程在关闭 generator 时仍会探测 `protoc`，因此构建环境必须提供 `protoc`；OHOS 不使用 `grpcio-tools`，因为其 `_protoc_compiler.so` 位于 HMDFS 用户路径时会被 hmmac 拒绝 `dlopen`，即使签名和执行位都正确。
 - OHOS 的 Python 生成器只使用 `protobuf` 纯 Python 实现；独立 `protoc`、SCons 生成的测试 ELF 和 `test_package` 消费者测试程序均通过 `binary-sign-tool -selfSign 1` 签名，测试编译器包装器在链接后自动完成签名。
 - OHOS 将已签名的独立 `protoc` 绝对路径通过 `PROTOC` 环境变量传给生成器，并在构建阶段为上游 `generator/proto/_utils.py` 的系统回退分支做最小适配，确保 `generator_relative_paths` 测试不会依赖 HMDFS 上不可靠的裸命令查找。
+- `PROTOCFLAGS` 的 plugin 参数值保留末尾参数分隔符，因为上游 `proto3_optional` 测试通过 SCons `Append` 追加 protoc 参数；没有分隔符时，追加参数会错误地粘到插件路径上。
 - 该失败的根因是路径安全标签（知识库 E212/E179），不是 chmod、旧 `.codesign` 或签名输出 inode 问题。
 
 ## 验证结果

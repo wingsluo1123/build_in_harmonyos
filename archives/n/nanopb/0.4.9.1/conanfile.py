@@ -123,7 +123,7 @@ class NanopbConan(ConanFile):
         plugin = shlex.quote(
             "--plugin=protoc-gen-nanopb="
             + self.source_folder
-            + "/generator/protoc-gen-nanopb"
+            + "/generator/protoc-gen-nanopb "
         )
         shell_arg = ""
         if str(self.settings.os) == "OHOS":
