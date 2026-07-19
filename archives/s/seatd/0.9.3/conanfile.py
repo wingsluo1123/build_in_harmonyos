@@ -43,11 +43,10 @@ class SeatdConan(ConanFile):
     def config_options(self):
         if self.settings.os == "Windows":
             self.options.rm_safe("fPIC")
-        # OHOS 平台：无动态库使用场景，删除 shared，强制静态
-        if self.settings.os == "OHOS":
-            self.options.rm_safe("shared")
 
     def configure(self):
+        if self.settings.os == "OHOS":
+            self.options.shared = False
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
 
