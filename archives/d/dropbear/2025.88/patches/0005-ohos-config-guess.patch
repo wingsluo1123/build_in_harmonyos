@@ -1,7 +1,10 @@
 diff -ruN a/src/config.guess b/src/config.guess
 --- a/src/config.guess
 +++ b/src/config.guess
-@@ -197,0 +198,10 @@
+@@ -195,6 +195,16 @@
+ # Note: order is significant - the case branches are not exclusive.
+ 
+ case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in
 +    *:HarmonyOS:*:*|*:OHOS:*:*)
 +    case "$UNAME_MACHINE" in
 +        aarch64|arm64) MACHINE=aarch64 ;;
@@ -12,10 +15,15 @@ diff -ruN a/src/config.guess b/src/config.guess
 +    esac
 +    GUESS=${MACHINE}-unknown-linux-ohos
 +    ;;
+     *:NetBSD:*:*)
+ 	# NetBSD (nbsd) targets should (where applicable) match one or
+ 	# more of the tuples: *-*-netbsdelf*, *-*-netbsdaout*,
 diff -ruN a/src/config.sub b/src/config.sub
 --- a/src/config.sub
 +++ b/src/config.sub
-@@ -122,9 +122,33 @@
+@@ -120,12 +120,37 @@
+ esac
+ 
  # Split fields of configuration type
 -# shellcheck disable=SC2162
 -saved_IFS=$IFS
@@ -54,40 +62,69 @@ diff -ruN a/src/config.sub b/src/config.sub
 +		field4=
 +		;;
 +esac
--
+ 
  # Separate into logical components for further validation
-@@ -156,0 +157,4 @@
-+            ohos-linux)
-+                basic_machine=$field1-unknown
-+                basic_os=linux-ohos
-+                ;;
-@@ -968,8 +968,4 @@
-	*-*)
+ case $1 in
+@@ -150,7 +175,11 @@
+ 				basic_machine=$field1
+ 				basic_os=$maybe_os
+ 				;;
+-			android-linux)
++			ohos-linux)
++				basic_machine=$field1-unknown
++				basic_os=linux-ohos
++				;;
++			android-linux)
+ 				basic_machine=$field1-unknown
+ 				basic_os=linux-android
+ 				;;
+@@ -937,12 +966,9 @@
+ 		;;
+ 
+ 	*-*)
 -		# shellcheck disable=SC2162
 -		saved_IFS=$IFS
 -		IFS="-" read cpu vendor <<EOF
 -$basic_machine
 -EOF
 -		IFS=$saved_IFS
++		# Avoid a here-document for portability to HMDFS shells.
 +		cpu=${basic_machine%%-*}
 +		vendor=${basic_machine#*-}
-		;;
-@@ -1336,8 +1336,4 @@
-	*-*)
+ 		;;
+ 	# We use 'pc' rather than 'unknown'
+ 	# because (1) that's what they normally are, and
+@@ -1305,12 +1331,9 @@
+ 		os=`echo "$basic_os" | sed -e 's|nto-qnx|qnx|'`
+ 		;;
+ 	*-*)
 -		# shellcheck disable=SC2162
 -		saved_IFS=$IFS
 -		IFS="-" read kernel os <<EOF
 -$basic_os
 -EOF
 -		IFS=$saved_IFS
++		# Avoid a here-document for portability to HMDFS shells.
 +		kernel=${basic_os%%-*}
 +		os=${basic_os#*-}
-		;;
-@@ -1738,1 +1738,1 @@
+ 		;;
+ 	# Default OS when just kernel was specified
+ 	nto*)
+@@ -1735,7 +1758,7 @@
+ 	# Now accept the basic system types.
+ 	# The portable systems comes first.
+ 	# Each alternative MUST end in a * to match a version number.
 -	gnu* | android* | bsd* | mach* | minix* | genix* | ultrix* | irix* \
-+        gnu* | android* | ohos* | bsd* | mach* | minix* | genix* | ultrix* | irix* \
-@@ -1821,2 +1821,2 @@
--	linux-gnu*- | linux-dietlibc*- | linux-android*- | linux-newlib*- \
++	gnu* | android* | ohos* | bsd* | mach* | minix* | genix* | ultrix* | irix* \
+ 	     | *vms* | esix* | aix* | cnk* | sunos | sunos[34]* \
+ 	     | hpux* | unos* | osf* | luna* | dgux* | auroraux* | solaris* \
+ 	     | sym* |  plan9* | psp* | sim* | xray* | os68k* | v88r* \
+@@ -1819,7 +1842,7 @@
+ # (given a valid OS), if there is a kernel.
+ case $kernel-$os-$obj in
+ 	linux-gnu*- | linux-dietlibc*- | linux-android*- | linux-newlib*- \
 -		   | linux-musl*- | linux-relibc*- | linux-uclibc*- | linux-mlibc*- )
-+        linux-gnu*- | linux-dietlibc*- | linux-android*- | linux-newlib*- \
-+           | linux-musl*- | linux-relibc*- | linux-ohos*- | linux-uclibc*- | linux-mlibc*- )
++		   | linux-musl*- | linux-relibc*- | linux-ohos*- | linux-uclibc*- | linux-mlibc*- )
+ 		;;
+ 	uclinux-uclibc*- )
+ 		;;
