@@ -76,10 +76,10 @@ class LvConan(ConanFile):
         os.makedirs(bin_dir, exist_ok=True)
         os.makedirs(lib_dir, exist_ok=True)
         if lv_bin:
-            self.run(f"cp {lv_bin} {bin_dir}/")
-        self.run(f"cd {bin_dir} && ln -sf lv lgrep")
+            self.run(f"cp '{lv_bin}' '{bin_dir}/'")
+        self.run(f"cd '{bin_dir}' && ln -sf lv lgrep")
         if os.path.exists(os.path.join(root_dir, "lv.hlp")):
-            self.run(f"cp {root_dir}/lv.hlp {lib_dir}/")
+            self.run(f"cp '{root_dir}/lv.hlp' '{lib_dir}/'")
 
     def package_info(self):
         self.cpp_info.libs = []
