@@ -37,7 +37,7 @@ class BrogueConan(ConanFile):
         # Use terminal mode instead of SDL graphics (no SDL2 available on OHOS)
         self.run(f"cd {self.source_folder} && sed -i 's/TERMINAL := NO/TERMINAL := YES/' config.mk")
         self.run(f"cd {self.source_folder} && sed -i 's/GRAPHICS := YES/GRAPHICS := NO/' config.mk")
-        self.run(f"cd {self.source_folder} && make CC=clang CFLAGS='-fPIC -O2 -I/storage/Users/currentUser/usr/local/include/ncurses -I/storage/Users/currentUser/usr/local/include' LDFLAGS='-L/storage/Users/currentUser/usr/local/lib'")
+        self.run(f"cd {self.source_folder} && make CC=clang CFLAGS='-fPIC -O2'")
 
     def package(self):
         self.run(f"mkdir -p {self.package_folder}/bin")
