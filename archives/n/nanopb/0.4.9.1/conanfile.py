@@ -92,6 +92,9 @@ class NanopbConan(ConanFile):
             cc = self._make_ohos_compiler_wrapper(real_cc, "cc")
             cxx = self._make_ohos_compiler_wrapper(real_cxx, "cxx")
             os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+            python_arg = " PYTHON=" + shlex.quote(
+                self._make_ohos_python_runner(protoc)
+            )
             scons_command = "{} {}".format(
                 shlex.quote(sys.executable),
                 shlex.quote(self._make_ohos_scons_runner(protoc)),
@@ -99,6 +102,7 @@ class NanopbConan(ConanFile):
         else:
             cc = real_cc
             cxx = real_cxx
+            python_arg = ""
             protoc_path = shutil.which("protoc")
             if protoc_path:
                 protoc = protoc_path
@@ -140,7 +144,8 @@ class NanopbConan(ConanFile):
             shell_arg = " SHELL=" + shlex.quote(shell)
         command = (
             "{scons} -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
-            "PROTOCFLAGS={plugin} NOVALGRIND=1 NODEFARGS=1{shell_arg}"
+            "PROTOCFLAGS={plugin}{python_arg} "
+            "NOVALGRIND=1 NODEFARGS=1{shell_arg}"
         ).format(
             scons=scons_command,
             tests=tests_dir,
@@ -148,6 +153,7 @@ class NanopbConan(ConanFile):
             cxx=shlex.quote(str(cxx)),
             protoc=shlex.quote(protoc),
             plugin=plugin,
+            python_arg=python_arg,
             shell_arg=shell_arg,
         )
         self.run(command)
@@ -167,6 +173,32 @@ class NanopbConan(ConanFile):
             ")\n"
             "print('Nanopb SCons effective PATH: ' + os.environ['PATH'])\n"
             "runpy.run_module('SCons', run_name='__main__')\n",
+        )
+        return runner
+
+    def _make_ohos_python_runner(self, protoc):
+        """Run generator Python with the signed protoc directory in PATH."""
+        runner = os.path.join(self.build_folder, "nanopb-python-runner")
+        protoc_dir = os.path.dirname(os.path.abspath(protoc))
+        save(
+            self,
+            runner,
+            "#!" + sys.executable + "\n"
+            "import os\n"
+            "import sys\n"
+            f"PROTOC_DIR = {protoc_dir!r}\n"
+            f"REAL_PYTHON = {sys.executable!r}\n"
+            "os.environ['PATH'] = os.pathsep.join(\n"
+            "    path for path in (PROTOC_DIR, os.environ.get('PATH', '')) if path\n"
+            ")\n"
+            "os.execv(REAL_PYTHON, [REAL_PYTHON] + sys.argv[1:])\n",
+        )
+        os.chmod(
+            runner,
+            os.stat(runner).st_mode
+            | stat.S_IXUSR
+            | stat.S_IXGRP
+            | stat.S_IXOTH,
         )
         return runner
 
