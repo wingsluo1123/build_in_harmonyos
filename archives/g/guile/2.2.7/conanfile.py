@@ -123,7 +123,7 @@ class GuileConan(ConanFile):
         # Build only libguile library target (skip SNARF/docs which trigger Signal 5).
         # Using specific target avoids 'all' which depends on SNARF .doc generation.
         try:
-            autotools.make(target="libguile_2.2.la", args=["-C", "libguile", "-k", "-j1"])
+            autotools.make(target="libguile-2.2.la", args=["-C", "libguile", "-k", "-j1"])
         except ConanException as e:
             self._verify_build()
             self.output.warn(
