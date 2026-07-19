@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Conan recipe template — CMake projects.
+"""Conan recipe — xsimd 13.0.0 (CMake, header-only).
 
-Usage: Replace Xsimd, xsimd, 13.0.0, C++ wrappers for SIMD intrinsics - header-only library, BSD-3-Clause, https://github.com/xtensor-stack/xsimd
-       Fill in requires() and cpp_info.libs as needed.
-
-This template enforces R26: BUILD_SHARED_LIBS=OFF for system-name libraries.
+xsimd is a C++ header-only library providing SIMD intrinsics wrappers.
 """
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
