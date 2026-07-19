@@ -25,7 +25,7 @@ The canonical source tarball is the official SourceForge release:
   standalone executable, never a shared library).
 - `generate`: `--build=aarch64-unknown-linux-gnu` is appended for OHOS
   config.guess detection (autotools 项目惯例).
-- Optional dependencies (`ffmpeg`/`gsl`/`opengl`) are disabled via
+- Optional components (`ffmpeg`/`gc`/`gsl`/`opengl`) are disabled via
   `--disable-*` to avoid OHOS platform missing-library build failures.
 - `package_info`: `cpp_info.libs = []` (executable, not a linkable library);
   `bindirs = ["bin"]` exposes the installed `asy` binary.
@@ -45,8 +45,10 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 1. `config.guess` / `config.sub`: pass `--build=aarch64-unknown-linux-gnu`
    explicitly to bypass OHOS system type detection failures (autotools
    projects 惯例).
-2. `--disable-ffmpeg` / `--disable-gsl` / `--disable-opengl`: 关闭鸿蒙平台
-   缺失的可选依赖, 仅保留核心 asy 编译器功能.
+2. `--disable-ffmpeg` / `--disable-gc` / `--disable-gsl` /
+   `--disable-opengl`: 关闭鸿蒙平台缺失或不兼容的可选组件, 仅保留核心 asy
+   编译器功能. In particular, the bundled Boehm GC starts a nested Autotools
+   configure that cannot create its probe files on the OHOS worker.
 3. `config_options`: OHOS 平台删除 `shared` 选项 (asymptote 为可执行工具).
 4. `config.status`: create its temporary directory with HMDFS-compatible mode;
    `umask 077` causes `subs1.awk: Permission denied` on the OHOS worker.
@@ -55,7 +57,7 @@ of its core C++ runtime and the Boehm GC. Key adaptations:
 
 ## Dependencies
 - Core runtime: libc, libstdc++ (clang/clang++)
-- Optional (disabled on OHOS): ffmpeg, gsl, opengl/freeglut
+- Optional (disabled on OHOS): Boehm GC, ffmpeg, gsl, opengl/freeglut
 
 ## Verification
 The test_package is a Conan L1 smoke test for the packaged `asy` executable.
