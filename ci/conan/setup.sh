@@ -37,25 +37,20 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use multiple indices simultaneously with --extra-index-url so pip
     # can find packages across all indices in one pass
     PYPI_DEFAULT="https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple/"
-    if python3 -m pip install --user \
+    python3 -m pip install --user \
         --index-url "$PYPI_DEFAULT" \
         --extra-index-url "https://pypi.org/simple/" \
         --extra-index-url "https://mirrors.aliyun.com/pypi/simple/" \
         --trusted-host pypi.cnb.cool \
         --trusted-host pypi.org \
         --trusted-host mirrors.aliyun.com \
-        'requests>=2.25,<3.0.0' 2>&1; then
-        echo "[step] requests pre-installed"
-    else
-        echo "[step] requests pre-install skipped (not critical, conan may have it)"
-    fi
+        'requests>=2.25,<3.0.0' 2>&1 || \
+        echo "[step] requests pre-install skipped (not critical)"
     # Install conan with --no-deps to skip dependency resolution
-    if python3 -m pip install --user --no-deps --force-reinstall conan 2>&1; then
-        echo "[step] Conan installed (no-deps mode)"
-    else
+    python3 -m pip install --user --no-deps --force-reinstall conan 2>&1 || {
         echo "[step] --no-deps failed, trying normal install..."
         # Try normal install (may fail on some CI workers due to requests dep)
-        python3 -m pip install --user --force-reinstall conan || {
+        python3 -m pip install --user --force-reinstall conan 2>&1 || {
             # Fallback: try specific conan version that works
             echo "[step] Normal install failed, trying conan-2.29.1..."
             python3 -m pip install --user --force-reinstall 'conan==2.29.1' 2>&1 || {
@@ -63,7 +58,7 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
                 exit 1
             }
         }
-    fi
+    }
     # Ensure user-installed binaries are found before any broken HNP version
     export PATH="$HOME/.local/bin:$PATH"
 fi
