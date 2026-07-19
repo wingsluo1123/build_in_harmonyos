@@ -7,6 +7,13 @@ for program in dropbear dbclient dropbearkey dropbearconvert; do
     printf '%s\n' "$output" | grep -qi 'usage'
 done
 
+dropbear_help="$(dropbear -h 2>&1 || true)"
+if ! printf '%s\n' "$dropbear_help" \
+    | grep -Eq '(^|[[:space:]])-D[[:space:]]+.*authorized_keys'; then
+    printf '%s\n' "dropbear was built without the -D authorized_keys option" >&2
+    exit 1
+fi
+
 tmpdir="$(mktemp -d "${HOME:-/root}/dropbear-test.XXXXXX")"
 server_pid=""
 
@@ -35,6 +42,7 @@ test -s "$authorized_keys"
 
 port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
 log="$tmpdir/dropbear.log"
+# Use a private authorized_keys directory instead of the test runner's home.
 HOME="$home" dropbear -F -E -D "$ssh_dir" \
     -p "127.0.0.1:$port" -r "$hostkey" > "$log" 2>&1 &
 server_pid=$!
