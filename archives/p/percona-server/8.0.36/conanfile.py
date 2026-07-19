@@ -27,7 +27,6 @@ class PerconaServerConan(ConanFile):
     options = {"shared": [True, False]}
     default_options = {"shared": True}
 
-
     settings = "os", "arch", "compiler", "build_type"
 
     exports_sources = "conandata.yml"
@@ -64,11 +63,13 @@ class PerconaServerConan(ConanFile):
         cmake.build(target="mysqlclient")
 
     def package(self):
-        # Install client library and headers
+        # Install source headers (top-level include/)
         copy(self, "*.h", dst=os.path.join(self.package_folder, "include"),
              src=os.path.join(self.source_folder, "include"))
-        copy(self, "*.h", dst=os.path.join(self.package_folder, "include", "mysql"),
+        # Install build-generated headers (my_config.h, mysql_version.h etc.)
+        copy(self, "*.h", dst=os.path.join(self.package_folder, "include"),
              src=os.path.join(self.build_folder, "include"))
+        # Install client library (MySQL builds into libmysql/ subdirectory)
         copy(self, "*perconaserverclient*", dst=os.path.join(self.package_folder, "lib"),
              src=self.build_folder, keep_path=False)
         copy(self, "*mysqlclient*", dst=os.path.join(self.package_folder, "lib"),
@@ -81,3 +82,5 @@ class PerconaServerConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["perconaserverclient"]
         self.cpp_info.includedirs = ["include"]
+        # Propagate dependencies to consumers (e.g. qt-percona-server)
+        self.cpp_info.requires = ["openssl::openssl", "zlib::zlib"]
