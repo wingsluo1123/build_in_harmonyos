@@ -24,6 +24,9 @@ class PerconaServerConan(ConanFile):
     url = ""  # CI fills this
 
     package_type = "library"
+    options = {"shared": [True, False]}
+    default_options = {"shared": True}
+
 
     settings = "os", "arch", "compiler", "build_type"
 
