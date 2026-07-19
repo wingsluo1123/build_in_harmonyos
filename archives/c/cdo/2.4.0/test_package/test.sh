@@ -3,10 +3,17 @@
 # Runs in conanrun env (PATH includes installed bin/).
 set -eu
 
+CDO_BIN="${CDO_BIN:-cdo}"
+
+if [ ! -x "$CDO_BIN" ] && ! command -v "$CDO_BIN" >/dev/null 2>&1; then
+    echo "FAIL: cdo binary not found: $CDO_BIN"
+    exit 1
+fi
+
 echo "[test] cdo --version"
-cdo --version && echo "OK: --version" || {
+"$CDO_BIN" --version && echo "OK: --version" || {
     echo "[test] --version failed, trying --help..."
-    cdo --help > /dev/null 2>&1 && echo "OK: --help" || {
+    "$CDO_BIN" --help > /dev/null 2>&1 && echo "OK: --help" || {
         echo "FAIL: cdo failed both --version and --help"
         exit 1
     }
