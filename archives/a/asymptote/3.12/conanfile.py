@@ -65,8 +65,8 @@ class AsymptoteConan(ConanFile):
     def build(self):
         autotools = Autotools(self)
         autotools.configure()
-        # GNU make's parallel jobserver uses mkfifo, which OHOS disallows.
-        autotools.make(args=["-j1"])
+        # GNU make 4.4 defaults to a FIFO jobserver, which OHOS disallows.
+        autotools.make(args=["--jobserver-style=pipe", "-j4"])
 
     def package(self):
         autotools = Autotools(self)
