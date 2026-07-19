@@ -23,6 +23,10 @@ class NsnakeConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Export source tarball for CI workers that cannot reach GitHub
+        copy(self, "source/nsnake-3.0.1.tar.gz",
+             src=self.recipe_folder,
+             dst=os.path.join(self.export_sources_folder, "source"))
 
     def requirements(self):
         self.requires("ncurses/6.4")
@@ -31,7 +35,15 @@ class NsnakeConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Try official GitHub URL first, fall back to local source tarball
+        ext = "tar.gz"
+        src_url = self.conan_data["sources"]["url"]
+        # Use the local source tarball (exported via export_sources)
+        src_path = os.path.join(self.source_folder, "..", "source", f"nsnake-3.0.1.{ext}")
+        if os.path.exists(src_path):
+            get(self, src_path, strip_root=True)
+        else:
+            get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
