@@ -49,13 +49,11 @@ class NcursesConan(ConanFile):
         autotools = Autotools(self)
         # HMDFS noexec: patch configure to skip 'make preinstall' test (no Makefile yet)
         self.run("sed -i 's#\\${MAKE:-make} preinstall#true #' configure", cwd=self.source_folder)
-        # HMDFS noexec: config.status creates temp dir in a subshell with umask 077 (700 perms)
-        # HMDFS hmmac=use_task prevents writing to 700-perm dirs created by subshells.
-        # Fix: change umask to 022 (755 perms) which HMDFS allows.
-        self.run("sed -i '/mktemp -d \\.\\/conf/s/umask 077/umask 022/' configure", cwd=self.source_folder)
-        self.run("sed -i '/mkdir \"\\$tmp\"/s/umask 077/umask 022/' configure", cwd=self.source_folder)
-        # Run configure normally (without --no-create) — config.status will create Makefile
-        configure_cmd = "/system/bin/sh ./configure " + " ".join(self._configure_args)
+        # Use sandbox directory as TMPDIR (HMDFS tmpfs with hmmac=use_task blocks temp file creation)
+        # The sandbox at /data/storage/el2/base/haps/entry/files is on HMFS (hmmac=inherit_parent)
+        # and allows temp file creation across subshell boundaries.
+        self.run("mkdir -p /data/storage/el2/base/haps/entry/files/.ncurses-tmp && chmod 755 /data/storage/el2/base/haps/entry/files/.ncurses-tmp", cwd=self.source_folder, ignore_errors=True)
+        configure_cmd = "TMPDIR=/data/storage/el2/base/haps/entry/files/.ncurses-tmp /system/bin/sh ./configure " + " ".join(self._configure_args)
         self.run(configure_cmd, cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
 
