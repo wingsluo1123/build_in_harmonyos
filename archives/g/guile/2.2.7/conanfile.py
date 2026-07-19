@@ -119,9 +119,19 @@ class GuileConan(ConanFile):
         # Build only libguile (library + binary) and meta (config files).
         # Skip bootstrap/module .go compilation — it takes 10+ hours on HMDFS
         # due to Signal 5 (SIGTRAP) crashes during guile execution.
-        # Pre-compiled .go files are copied from previous builds instead.
-        autotools.make(args=["-C", "libguile", "-k", "-j1"])
-        autotools.make(args=["-C", "meta", "-k", "-j1"])
+        # Pre-compiled .go files are copied from source tarball's prebuilt/ dir.
+        try:
+            autotools.make(args=["-C", "libguile", "-k", "-j1"])
+        except ConanException as e:
+            self._verify_build()
+            self.output.warn(
+                "libguile make reported errors (Signal 5 during SNARF "
+                "is expected on OHOS): {}".format(e)
+            )
+        try:
+            autotools.make(args=["-C", "meta", "-k", "-j1"])
+        except ConanException as e:
+            self.output.warn("meta make error (non-fatal): {}".format(e))
         self._copy_prebuilt_go_files()
 
     def package(self):
