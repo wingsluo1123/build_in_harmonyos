@@ -125,7 +125,7 @@ class GuileConan(ConanFile):
         try:
             autotools.make(args=["-C", "libguile", "-k", "-j1"])
         except ConanException as e:
-            self.output.warn(
+            self.output.warning(
                 "libguile make (pass 1) had SNARF errors (expected on OHOS): {}".format(e)
             )
 
@@ -135,13 +135,13 @@ class GuileConan(ConanFile):
             autotools.make(target="libguile-2.2.la", args=["-C", "libguile", "-k", "-j1"])
         except ConanException as e:
             self._verify_build()
-            self.output.warn(
+            self.output.warning(
                 "libguile make (pass 2 - link) error: {}".format(e)
             )
         try:
             autotools.make(args=["-C", "meta", "-k", "-j1"])
         except ConanException as e:
-            self.output.warn("meta make error (non-fatal): {}".format(e))
+            self.output.warning("meta make error (non-fatal): {}".format(e))
         self._copy_prebuilt_go_files()
 
     def package(self):
@@ -154,7 +154,7 @@ class GuileConan(ConanFile):
             # Install may also encounter Signal 5 when processing .go files
             if not os.path.exists(os.path.join(self.package_folder, "bin", "guile")):
                 raise
-            self.output.warn(
+            self.output.warning(
                 "make install reported errors (Signal 5 expected on OHOS): {}".format(e)
             )
         copy(
@@ -233,7 +233,7 @@ class GuileConan(ConanFile):
                 "Copied {} .x files from {} to build dir".format(len(x_files), src)
             )
             return
-        self.output.warn("No .x files found in source or tmp directories")
+        self.output.warning("No .x files found in source or tmp directories")
 
     def _copy_prebuilt_go_files(self):
         """Copy pre-compiled .go files from /usr/local installation.
@@ -248,7 +248,7 @@ class GuileConan(ConanFile):
         # Pre-compiled .go files from the source tarball (prebuilt/)
         src_base = "/storage/Users/currentUser/tmp/guile-2.2.7/prebuilt/64-bit-little-endian"
         if not os.path.isdir(src_base):
-            self.output.warn("No pre-compiled .go files found")
+            self.output.warning("No pre-compiled .go files found")
             return
 
         # Copy to both bootstrap/ and module/ build dirs so make install finds them
@@ -270,7 +270,7 @@ class GuileConan(ConanFile):
         if os.path.exists(eval_go):
             self.output.info("Copied pre-compiled .go files from /usr/local")
         else:
-            self.output.warn("Failed to copy .go files; guile runtime may be limited")
+            self.output.warning("Failed to copy .go files; guile runtime may be limited")
 
     def _verify_build(self):
         """Verify the library was built despite possible Signal 5 crashes."""
