@@ -1,53 +1,43 @@
-# libdjinterop 0.24.3 适配笔记
+# libdjinterop 0.24.3 adaptation notes
 
-## 编译环境
-- 构建系统: cmake
-- 编译日期: 2026-07-15
-- 编译器: clang / clang++
-- 状态: built
-- 平台: HarmonyOS PC (aarch64)
-- 源码来源: https://github.com/xsco/libdjinterop/archive/refs/tags/v0.24.3.tar.gz
+## Build configuration
 
-## 软件信息
-- 名称: libdjinterop
-- 版本: 0.24.3
-- 上游仓库: xsco/libdjinterop
-- 许可证: LGPL-3.0-or-later
-- 描述: C++ library for accessing DJ database formats (Engine Prime, Rekordbox, Serato)
-- 产物: libdjinterop.a (静态库) + djinterop/djinterop.hpp (头文件)
-- 依赖: SQLite3（编译时依赖）
+- Build system: CMake through Conan 2
+- Target: HarmonyOS PC (aarch64)
+- Library type: static (`BUILD_SHARED_LIBS=OFF`)
+- Source: official `0.24.3` GitHub tag archive
+- Source SHA-256: `df41fe39bed9d16d27a3649d237b68edd2cdb6fc71a82cae5cd746d4e4ef6578`
 
-## Conan 配方说明
+## Dependencies
 
-本归档采用 Conan 2.x CMAKE 配方：
+- `zlib/1.3.1`
+- `sqlite3/3.49.1`
 
-- `conanfile.py`: CMAKE 构建配方
-  - settings = "os", "compiler", "build_type", "arch"
-  - OHOS 平台删除 shared 选项（HarmonyOS 仅支持静态库）
-  - exports_sources = "patches/*"
-- `conandata.yml`: 源码 URL + sha256（留空，CI 校验）
-- `test_package/`: 测试包，编译链接测试程序验证库核心功能
+`CMakeDeps` exposes the dependency package and target names expected by
+upstream CMake: `ZLIB` / `ZLIB::ZLIB` and `SQLite3` /
+`SQLite::SQLite3`.
 
-## 编译步骤
+## HarmonyOS adaptation
 
-1. Conan 下载源码：`get(self, **self.conan_data["sources"], strip_root=True)`
-2. 生成工具链：`CMakeToolchain`
-3. 配置：`cmake.configure()`
-4. 构建：`cmake.build()`
-5. 安装：`cmake.install()`
+`patches/0001-CMakeLists.txt.patch` applies the established adaptation from
+the published `0.24.3-r1` archive:
 
-## 遇到的问题与解决方案
+- removes `-Werror`, which turns harmless platform warnings into failures;
+- enables pkg-config generation when `CMAKE_SYSTEM_NAME` is `HarmonyOS`;
+- guards Boost-based upstream tests with `BUILD_TESTING`.
 
-| # | 问题 | 原因 | 解决方案 |
-|---|------|------|----------|
-| 1 | OHOS 平台不支持动态库 | HarmonyOS PC 当前仅支持静态链接 | config_options 中 OHOS 平台 rm_safe("shared") |
-| 2 | sha256 暂未填入 | CI 环境校验 | conandata.yml 中 sha256 留空，由 CI 下载校验后回填 |
+The recipe sets `SYSTEM_SQLITE=ON`, `BUILD_TESTING=OFF`, and `BUILD_DOC=OFF`.
 
-## 验证结果
+## Consumer test
 
-test_package 验证 libdjinterop 核心功能，编译链接测试程序验证库核心功能。
+The test package discovers `DjInterop`, links `DjInterop::DjInterop`, creates a
+temporary Engine database with schema 2.20.2, and verifies that its initial
+track collection is empty and its version name is non-empty.
 
-## 注意事项
+## Status
 
-- libdjinterop 为依赖项范畴
-- 默认静态构建（shared=False），符合系统库规则
+Recipe metadata and the source patch were validated locally. The full Conan
+cross-build is delegated to the HarmonyOS CI environment because Conan and the
+OHOS profile are not installed in this Windows workspace.
+
+<!-- ARCHIVE-CLOSED -->

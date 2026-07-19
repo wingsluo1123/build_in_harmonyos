@@ -1,6 +1,6 @@
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.files import apply_conandata_patches, get
 
 
 class LibdjinteropConan(ConanFile):
@@ -16,8 +16,7 @@ class LibdjinteropConan(ConanFile):
     exports_sources = "patches/*"
 
     def configure(self):
-        if self.options.get_safe("shared"):
-            self.options.rm_safe("fPIC")
+        self.options.shared = False
 
     def layout(self):
         cmake_layout(self)
@@ -26,10 +25,22 @@ class LibdjinteropConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        deps = CMakeDeps(self)
+        deps.set_property("zlib", "cmake_file_name", "ZLIB")
+        deps.set_property("zlib", "cmake_target_name", "ZLIB::ZLIB")
+        deps.set_property("sqlite3", "cmake_file_name", "SQLite3")
+        deps.set_property("sqlite3", "cmake_target_name", "SQLite::SQLite3")
+        deps.generate()
+
         tc = CMakeToolchain(self)
+        tc.variables["BUILD_SHARED_LIBS"] = False
+        tc.variables["SYSTEM_SQLITE"] = True
+        tc.variables["BUILD_TESTING"] = False
+        tc.variables["BUILD_DOC"] = False
         tc.generate()
 
     def build(self):
+        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
@@ -40,6 +51,10 @@ class LibdjinteropConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["djinterop"]
+        self.cpp_info.set_property("cmake_file_name", "DjInterop")
+        self.cpp_info.set_property("cmake_target_name", "DjInterop::DjInterop")
+        self.cpp_info.requires = ["zlib::zlib", "sqlite3::sqlite3"]
 
     def requirements(self):
-        self.requires("zlib/1.2.13")
+        self.requires("zlib/1.3.1")
+        self.requires("sqlite3/3.49.1")
