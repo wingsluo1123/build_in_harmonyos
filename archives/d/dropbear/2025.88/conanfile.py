@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for the Dropbear SSH server and client suite."""
 import os
+import stat
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -103,6 +104,11 @@ class DropbearConan(ConanFile):
                 "#define DROPBEAR_SVR_PASSWORD_AUTH 0\n"
                 "/* Use public-key authentication where crypt() is unavailable. */\n",
             )
+            for config_script in ("config.guess", "config.sub"):
+                path = os.path.join(self.source_folder, "src", config_script)
+                if os.path.isfile(path):
+                    mode = os.stat(path).st_mode
+                    os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         previous_tmpdir = None
         if str(self.settings.os) == "OHOS":
             # config.guess compiles a probe in TMPDIR; OHOS CI's global path is not writable.
