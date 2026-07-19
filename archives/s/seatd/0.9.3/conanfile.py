@@ -75,6 +75,27 @@ class SeatdConan(ConanFile):
         tc.project_options["examples"] = "disabled"
         tc.generate()
 
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler = executables.get("c", "")
+        bindir = os.path.dirname(compiler) if os.path.sep in compiler else ""
+        ar = executables.get("ar") or (os.path.join(bindir, "llvm-ar") if bindir else "")
+        ranlib = executables.get("ranlib") or (
+            os.path.join(bindir, "llvm-ranlib") if bindir else ""
+        )
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if ar and os.path.isfile(ar) and os.path.isfile(native_file):
+            with open(native_file, encoding="utf-8") as stream:
+                content = stream.read()
+            if "\nar =" not in content and "[binaries]\n" in content:
+                tools = f"[binaries]\nar = '{ar}'\n"
+                if ranlib and os.path.isfile(ranlib):
+                    tools += f"ranlib = '{ranlib}'\n"
+                content = content.replace("[binaries]\n", tools, 1)
+                with open(native_file, "w", encoding="utf-8") as stream:
+                    stream.write(content)
+
     def build(self):
         apply_conandata_patches(self)
         meson = Meson(self)
