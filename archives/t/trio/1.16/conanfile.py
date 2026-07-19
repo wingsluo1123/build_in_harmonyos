@@ -8,7 +8,13 @@ trio 是可移植、可扩展的 printf/sprintf/scanf 替换库 (SourceForge: ct
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+)
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -62,6 +68,36 @@ class TrioConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        configure = os.path.join(self.source_folder, "configure")
+        makefile_in = os.path.join(self.source_folder, "Makefile.in")
+
+        replace_in_file(
+            self,
+            configure,
+            "ac_tmp=$tmp\n",
+            'chmod 755 "$tmp"\nac_tmp=$tmp\n',
+        )
+        replace_in_file(self, makefile_in, "AR\t= ar", "AR\t?= ar")
+        if not self.options.shared:
+            replace_in_file(
+                self,
+                makefile_in,
+                "all: $(TARGETLIB) $(TARGETSHLIB) $(TARGET)",
+                "all: $(TARGETLIB) $(TARGET)",
+            )
+            replace_in_file(
+                self,
+                makefile_in,
+                "install:\t$(TARGETLIB) $(TARGETSHLIB)",
+                "install:\t$(TARGETLIB)",
+            )
+            replace_in_file(
+                self,
+                makefile_in,
+                "$(INSTALL_DATA) $(TARGETLIB) $(TARGETSHLIB) $(libdir)/",
+                "$(INSTALL_DATA) $(TARGETLIB) $(libdir)/",
+            )
+
         previous_umask = os.umask(0o022)
         try:
             autotools = Autotools(self)

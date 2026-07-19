@@ -12,7 +12,7 @@
 - 源码下载 URL（已验证可下载，HTTP 200，真实 gzip tarball）：
   `https://sourceforge.net/projects/ctrio/files/trio/trio-1.16.tar.gz/download`
   实测 sha256: `84d0e74f5b25f0b6c7d9b264ef41f98908e65a5056d4e75c5ef0e05d6a69fc0a`
-  （按任务要求 conandata.yml 中 sha256 留空。）
+  该值已同步写入 `conandata.yml` 和 `manifest.yaml`，下载时强制校验。
 
 ## 构建系统
 - **autotools**：源码包自带预生成的 `configure` 脚本（无需 autoconf）。
@@ -24,7 +24,8 @@
   - `install` 同时安装 `libtrio.a`、`libtrio.so.2.0.0` 及 5 个头文件到 `libdir`/`includedir`。
 
 ## OHOS 适配要点
-- **config_options**：OHOS 平台删除 `shared` 选项（仅静态库）。
+- **静态构建**：`shared=False` 时从上游 Makefile 的构建和安装目标移除共享库。
+- **config.status 权限**：显式将临时目录设为 0755，兼容 HMDFS 权限模型。
 - **AR 硬编码**：`Makefile.in` 中 `AR = ar`（字面量，非 `@AR@`，configure 未探测）。OHOS 交叉编译若 PATH 中无 `ar`，需替换为工具链的 `llvm-ar`（参考 jbigkit 配方做法）。
 - **config.guess/config.sub**：configure 由 2014 年 autoconf 生成，可能不识别 OHOS/aarch64 目标，真机构建时或需补丁替换 config.guess/config.sub。
 - 头文件 `triop.h`（私有头）会被 install，test_package 显式包含它以验证导出符号。
