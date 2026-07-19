@@ -34,7 +34,15 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     #  build-machine paths with ^M line endings)
     # Pre-install requests to satisfy conan's dependency requests<3.0.0,>=2.25
     # (pip dependency resolution may fail on some CI workers)
-    python3 -m pip install --user 'requests>=2.25,<3.0.0' 2>/dev/null || true
+    # Try multiple pip indices to find requests
+    for pip_idx in "" "https://pypi.org/simple/" "https://mirrors.aliyun.com/pypi/simple/"; do
+        if [ -z "$pip_idx" ]; then
+            python3 -m pip install --user 'requests>=2.25,<3.0.0' 2>&1 || continue
+        else
+            python3 -m pip install --user --index-url "$pip_idx" 'requests>=2.25,<3.0.0' 2>&1 || continue
+        fi
+        break
+    done
     python3 -m pip install --user --force-reinstall conan || {
         echo "[error] Failed to install conan"
         exit 1
