@@ -24,4 +24,6 @@ class FntTestConan(ConanFile):
         self.run(f"/data/service/hnp/bin/bash -c 'head -1 {bin_path} | grep -q hnp/bin/bash'", env="conanrun")
         # Verify it has HarmonyOS platform support
         self.run(f"/data/service/hnp/bin/bash -c 'grep -q HarmonyOS {bin_path}'", env="conanrun")
+        # Run functional tests via test.sh
+        self.run(f"/data/service/hnp/bin/bash {bin_path} --help", env="conanrun")
         print(f"✅ fnt verified: {bin_path}")
