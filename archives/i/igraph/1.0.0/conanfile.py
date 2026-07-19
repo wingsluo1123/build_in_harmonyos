@@ -2,7 +2,8 @@
 """Conan recipe for igraph 1.0.0 — CMake-based network analysis library."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, save
+import os
 
 
 class IgraphConan(ConanFile):
@@ -20,6 +21,7 @@ class IgraphConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        copy(self, "patches/arith.h", src=self.recipe_folder, dst=self.export_sources_folder)
 
     def layout(self):
         cmake_layout(self)
@@ -30,6 +32,7 @@ class IgraphConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["IGRAPH_VERSION"] = "1.0.0"
+        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         tc.variables["IGRAPH_USE_INTERNAL_ARPACK"] = "ON"
         tc.variables["IGRAPH_USE_INTERNAL_BLAS"] = "ON"
@@ -37,6 +40,7 @@ class IgraphConan(ConanFile):
         tc.variables["IGRAPH_USE_INTERNAL_GLPK"] = "ON"
         tc.variables["IGRAPH_USE_INTERNAL_GMP"] = "ON"
         tc.variables["BUILD_TESTING"] = "OFF"
+        tc.variables["F2C_EXTERNAL_ARITH_HEADER"] = os.path.join(self.source_folder, "patches", "arith.h")
         tc.generate()
 
     def build(self):
