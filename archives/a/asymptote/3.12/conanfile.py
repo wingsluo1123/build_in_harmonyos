@@ -16,7 +16,6 @@ from conan.tools.files import (
     get,
 )
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
 
 
 class AsymptoteConan(ConanFile):
@@ -45,9 +44,6 @@ class AsymptoteConan(ConanFile):
         if self.options.get_safe("shared"):
             self.options.rm_safe("fPIC")
 
-    def layout(self):
-        basic_layout(self)
-
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -69,7 +65,8 @@ class AsymptoteConan(ConanFile):
     def build(self):
         autotools = Autotools(self)
         autotools.configure()
-        autotools.make()
+        # GNU make's parallel jobserver uses mkfifo, which OHOS disallows.
+        autotools.make(args=["-j1"])
 
     def package(self):
         autotools = Autotools(self)
