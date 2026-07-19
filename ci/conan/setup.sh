@@ -37,16 +37,28 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Try multiple pip indices to find requests
     for pip_idx in "" "https://pypi.org/simple/" "https://mirrors.aliyun.com/pypi/simple/"; do
         if [ -z "$pip_idx" ]; then
-            python3 -m pip install --user 'requests>=2.25,<3.0.0' 2>&1 || continue
+            python3 -m pip install --user 'requests>=2.25,<3.0.0' 2>&1 && break || continue
         else
-            python3 -m pip install --user --index-url "$pip_idx" 'requests>=2.25,<3.0.0' 2>&1 || continue
+            python3 -m pip install --user --index-url "$pip_idx" \
+                --trusted-host pypi.org --trusted-host mirrors.aliyun.com \
+                'requests>=2.25,<3.0.0' 2>&1 && break || continue
         fi
-        break
     done
-    python3 -m pip install --user --force-reinstall conan || {
-        echo "[error] Failed to install conan"
-        exit 1
-    }
+    # Try to install conan with --no-deps first (skip dependency resolution)
+    if python3 -m pip install --user --no-deps conan 2>&1; then
+        echo "[step] Conan installed (no-deps mode)"
+    else
+        echo "[step] --no-deps failed, trying normal install..."
+        # Try normal install (may fail on some CI workers due to requests dep)
+        python3 -m pip install --user --force-reinstall conan || {
+            # Fallback: try specific conan version that works
+            echo "[step] Normal install failed, trying conan-2.29.1..."
+            python3 -m pip install --user --force-reinstall 'conan==2.29.1' 2>&1 || {
+                echo "[error] Failed to install conan after all attempts"
+                exit 1
+            }
+        }
+    fi
     # Ensure user-installed binaries are found before any broken HNP version
     export PATH="$HOME/.local/bin:$PATH"
 fi
