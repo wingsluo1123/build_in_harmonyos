@@ -1,0 +1,88 @@
+software: i686-elf-gcc
+# 版本级 manifest
+# 文件位置: archives/i/i686-elf-gcc/13.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "13.3.0"
+status: built
+build_date: "2026-07-18"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://ftp.gnu.org/gnu/gcc/gcc-13.3.0/gcc-13.3.0.tar.xz"
+  sha256: "0845e9621c9543a13f484e94584a49ffc0129970e9914624235fc1d061a0c083"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  build_system: autotools
+  system: autotools
+  configure_options:
+    - "--target=i686-elf"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--prefix=/ "
+    - "--without-headers"
+    - "--enable-languages=c,c++"
+    - "--disable-nls"
+    - "--disable-werror"
+    - "--disable-multilib"
+    - "--disable-libssp"
+    - "--disable-libquadmath"
+    - "--disable-libgomp"
+    - "--disable-plugin"
+    - "--disable-libstdc++-v3"
+    - "--with-gnu-as"
+    - "--with-gnu-ld"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 前置依赖（in-tree，由 conandata.yml 声明）
+# ============================================================
+
+prerequisites:
+  - name: gmp
+    version: "6.2.1"
+    source: "https://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.2.1.tar.bz2"
+  - name: mpfr
+    version: "4.1.0"
+    source: "https://gcc.gnu.org/pub/gcc/infrastructure/mpfr-4.1.0.tar.bz2"
+  - name: mpc
+    version: "1.2.1"
+    source: "https://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.2.1.tar.gz"
+  - name: isl
+    version: "0.24"
+    source: "https://gcc.gnu.org/pub/gcc/infrastructure/isl-0.24.tar.bz2"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "configure: umask 077→022 (HMDFS, all configure scripts)"
+  - "libiberty/config.in: fix missing HAVE_LIMITS_H, HAVE_SPAWN_H, etc."
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "HMDFS 不支持 mkfifo（make -j2 jobserver 失败），用 make -j1"
+  - "HarmonyOS dlfcn.h 不定义 RTLD_NOW/RTLD_GLOBAL，需 --disable-plugin"
+  - "裸机目标 i686-elf 无法运行 configure 测试程序，需 --disable-libstdc++-v3"
+  - "contrib/download_prerequisites 下载 GMP/MPFR/MPC/ISL 到源码树，configure 自动发现符号链接"
+  - "MPC 未预安装，需单独编译安装或使用 in-tree prerequisites 方式"
+  - "config.guess 不识别 OHOS，需使用 --build=aarch64-unknown-linux-gnu 绕过"
+  - "R33: 使用 conandata.yml 声明 prerequisites 下载到源码树，避免硬编码 --with-gmp 路径"
