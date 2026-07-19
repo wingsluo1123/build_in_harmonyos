@@ -12,7 +12,6 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.layout import basic_layout
 from conan.tools.cmake import CMake, cmake_layout
 
 
@@ -27,6 +26,10 @@ class ExtraCMakeModulesConan(ConanFile):
     # R32: settings.os 判断必须 in ("Linux", "OHOS")，但 ECM 无编译产物，
     # settings 仅用于 conan create 验证可移植性
     settings = "os", "compiler", "build_type", "arch"
+
+    # R-CI2/R-CI4: generators 必须显式声明，CMakeToolchain 生成 CMakePresets.json 让 CMake(self) 能 configure
+    # 注意：VirtualLayout 不是 generator（属 layout 范畴），误塞会被 Conan 2.x 拒绝 (Invalid generator)
+    generators = "CMakeToolchain", "CMakeDeps"
 
     # 无编译产物 → 不声明 cpp_info.libs（R26 系统同名库隔离不适用）
     # 无运行时依赖 → requirements() 为空
@@ -54,8 +57,9 @@ class ExtraCMakeModulesConan(ConanFile):
     def package(self):
         # ECM 产物是 share/ECM/ 下的 .cmake/.py/.in 脚本，无 bin/lib/include
         # 注意：cmake_layout(self) 将构建产物分到 self.build_folder，不在 source_folder/build/
-        copy(self, "*", self.build_folder,
-             os.path.join(self.package_folder, "share/ECM"), excludes=["*.log", "CMakeCache.txt"])
+        # R-CI8: 删 copy(self, "*", self.build_folder, ...) 通配复制——它会把 CMakeFiles/、
+        # CTestTestfile.cmake、测试二进制等构建垃圾全复制到 share/ECM/ 下，污染包产物（违 R19）。
+        # 改为精确复制 cmake.configure() 生成的 ECMConfig*.cmake 到 share/ECM/cmake/。
         # 直接从源码树拷贝（cmake install 的标准产物布局）
         copy(self, "*.cmake", os.path.join(self.source_folder, "modules"),
              os.path.join(self.package_folder, "share/ECM/modules"))
@@ -67,8 +71,11 @@ class ExtraCMakeModulesConan(ConanFile):
              os.path.join(self.package_folder, "share/ECM/toolchain"))
         copy(self, "*", os.path.join(self.source_folder, "cmake"),
              os.path.join(self.package_folder, "share/ECM/cmake"))
-        # ECMConfig.cmake 由 cmake.configure() 生成在 self.build_folder（cmake_layout 分离）
+        # R-CI8: ECMConfig.cmake + ECMConfigVersion.cmake 由 cmake.configure() 生成在 self.build_folder，
+        # 精确复制到 share/ECM/cmake/（同目录，让 find_package(ECM <version> CONFIG) 版本校验能找到 ECMConfigVersion.cmake）
         copy(self, "ECMConfig.cmake", self.build_folder,
+             os.path.join(self.package_folder, "share/ECM/cmake"))
+        copy(self, "ECMConfigVersion.cmake", self.build_folder,
              os.path.join(self.package_folder, "share/ECM/cmake"))
 
     def package_info(self):
@@ -84,3 +91,12 @@ class ExtraCMakeModulesConan(ConanFile):
         self.cpp_info.builddirs.append(os.path.join(ecm_share, "kde-modules"))
         self.cpp_info.builddirs.append(os.path.join(ecm_share, "find-modules"))
         self.cpp_info.builddirs.append(os.path.join(ecm_share, "toolchain"))
+        # R-CI5: cmake_build_modules 声明 ECM 的 .cmake 模块路径，
+        # Conan 2.x CMakeDeps 会生成 ECM_DIR 变量注入 CMAKE_MODULE_PATH，
+        # 让下游 include(ECMQmLoader)/include(ECMSetupVersion) 能找到文件
+        self.cpp_info.set_property("cmake_build_modules", [
+            os.path.join(ecm_share, "modules"),
+            os.path.join(ecm_share, "kde-modules"),
+            os.path.join(ecm_share, "find-modules"),
+            os.path.join(ecm_share, "toolchain"),
+        ])
