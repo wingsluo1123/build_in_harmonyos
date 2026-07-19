@@ -17,7 +17,7 @@ The two existing portability patches guard `getpass()` and `getspnam()` for OHOS
 ## Validation
 
 - Conan export succeeds with the source and patch metadata.
-- OHOS builds redirect `TMPDIR` to a writable directory under Conan's build folder while running Autotools and its tests; this avoids the CI global temporary directory permission failure in `config.guess`.
+- OHOS builds recognize `HarmonyOS` directly in Autotools `config.guess` and accept the canonical `linux-ohos` triplet in `config.sub`, avoiding compiler probes whose `mktemp -d` directories are not writable on HMDFS. The recipe also redirects `TMPDIR` to a Conan-local directory for the remaining Autotools and test steps.
 - The Conan L1 test verifies `dropbear`, `dbclient`, `dropbearkey`, and `dropbearconvert` are packaged.
 - Autotools maps both `bindir` and `sbindir` to the package `bin` directory; the L1 test verifies that directory and all four executables.
 - On a native runnable target, the test invokes `-h` for all four binaries and checks their usage output, then performs a real public-key SSH client/server round trip.
