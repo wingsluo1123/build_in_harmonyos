@@ -48,4 +48,4 @@ run_and_report 'seqtk size' "$sizes" "$binary" size "$input"
 
 assert_line '>read1' "$fasta"
 assert_line 'ACGT' "$fasta"
-assert_line 'read1	4' "$sizes"
+assert_line '1	4' "$sizes"
