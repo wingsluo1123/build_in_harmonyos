@@ -120,12 +120,10 @@ class GuileConan(ConanFile):
         # (SNARF runs guile → Signal 5 crash → .x files corrupted → compile fails)
         self._touch_snarf_outputs()
 
-        # Build only libguile (library + binary) and meta (config files).
-        # Skip bootstrap/module .go compilation — it takes 10+ hours on HMDFS
-        # due to Signal 5 (SIGTRAP) crashes during guile execution.
-        # Pre-compiled .go files are copied from source tarball's prebuilt/ dir.
+        # Build only libguile library target (skip SNARF/docs which trigger Signal 5).
+        # Using specific target avoids 'all' which depends on SNARF .doc generation.
         try:
-            autotools.make(args=["-C", "libguile", "-k", "-j1"])
+            autotools.make(target="libguile_2.2.la", args=["-C", "libguile", "-k", "-j1"])
         except ConanException as e:
             self._verify_build()
             self.output.warn(
@@ -196,17 +194,38 @@ class GuileConan(ConanFile):
                 os.utime(path, None)
 
     def _touch_snarf_outputs(self):
-        """Touch .x and .doc files to prevent make from re-running SNARF.
+        """Copy and touch .x files to prevent make from re-running SNARF.
 
         SNARF uses guile to extract Scheme documentation from C source.
         On OHOS, guile crashes (Signal 5) during SNARF, corrupting .x files.
-        The source tarball ships pre-generated .x/.doc files — touching them
-        makes make consider them up-to-date and skip SNARF entirely.
+        The source tarball ships pre-generated .x files — we copy them to the
+        build directory and touch them to skip SNARF entirely.
         """
         import glob
-        for pattern in ("*.x", "*.doc"):
-            for f in glob.glob(os.path.join(self.source_folder, "libguile", pattern)):
-                os.utime(f, None)
+        import shutil
+
+        # Source .x files are in the source tarball's libguile/ directory
+        src_dir = os.path.join(self.source_folder, "libguile")
+        # Build directory where make looks for .x files
+        build_libguile = os.path.join(self.build_folder, "build-release", "libguile")
+
+        # Also check tmp/guile-2.2.7 as fallback
+        tmp_src = "/storage/Users/currentUser/tmp/guile-2.2.7/libguile"
+
+        for src in (src_dir, tmp_src):
+            x_files = glob.glob(os.path.join(src, "*.x"))
+            if not x_files:
+                continue
+            os.makedirs(build_libguile, exist_ok=True)
+            for xf in x_files:
+                dst = os.path.join(build_libguile, os.path.basename(xf))
+                shutil.copy2(xf, dst)
+                os.utime(dst, None)
+            self.output.info(
+                "Copied {} .x files from {} to build dir".format(len(x_files), src)
+            )
+            return
+        self.output.warn("No .x files found in source or tmp directories")
 
     def _copy_prebuilt_go_files(self):
         """Copy pre-compiled .go files from /usr/local installation.
@@ -248,7 +267,11 @@ class GuileConan(ConanFile):
     def _verify_build(self):
         """Verify the library was built despite possible Signal 5 crashes."""
         for lib_name in ["libguile-2.2.so", "libguile-2.2.a"]:
-            for subdir in [os.path.join("libguile", ".libs"), "libguile"]:
+            for subdir in [
+                os.path.join("build-release", "libguile", ".libs"),
+                os.path.join("libguile", ".libs"),
+                "libguile",
+            ]:
                 lib_path = os.path.join(self.build_folder, subdir, lib_name)
                 if os.path.exists(lib_path):
                     return
