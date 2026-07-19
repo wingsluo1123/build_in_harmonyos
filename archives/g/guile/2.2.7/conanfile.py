@@ -116,6 +116,10 @@ class GuileConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
 
+        # Touch pre-generated .x and .doc files so make skips SNARF step
+        # (SNARF runs guile → Signal 5 crash → .x files corrupted → compile fails)
+        self._touch_snarf_outputs()
+
         # Build only libguile (library + binary) and meta (config files).
         # Skip bootstrap/module .go compilation — it takes 10+ hours on HMDFS
         # due to Signal 5 (SIGTRAP) crashes during guile execution.
@@ -190,6 +194,19 @@ class GuileConan(ConanFile):
             path = os.path.join(self.source_folder, doc_file)
             if os.path.isfile(path):
                 os.utime(path, None)
+
+    def _touch_snarf_outputs(self):
+        """Touch .x and .doc files to prevent make from re-running SNARF.
+
+        SNARF uses guile to extract Scheme documentation from C source.
+        On OHOS, guile crashes (Signal 5) during SNARF, corrupting .x files.
+        The source tarball ships pre-generated .x/.doc files — touching them
+        makes make consider them up-to-date and skip SNARF entirely.
+        """
+        import glob
+        for pattern in ("*.x", "*.doc"):
+            for f in glob.glob(os.path.join(self.source_folder, "libguile", pattern)):
+                os.utime(f, None)
 
     def _copy_prebuilt_go_files(self):
         """Copy pre-compiled .go files from /usr/local installation.
