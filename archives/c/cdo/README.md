@@ -27,4 +27,4 @@ $HOME/usr/local/bin/cdo --help
 
 ## 参考
 - 主页：https://code.mpimet.mpg.de/projects/cdo
-- 源码：https://github.com/ClimateDataOps/CDO
+- 源码：https://code.mpimet.mpg.de/projects/cdo
