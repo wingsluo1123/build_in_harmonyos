@@ -24,10 +24,10 @@
 ## 适配说明
 
 - nanopb 是库类型，未新增 `commands.json`。
-- 未修改上游源文件，也未新增补丁。
+- 未修改上游源文件；OHOS 构建阶段仅对源码树中的生成器回退调用做临时适配，不改变打包产物中的上游源码。
 - CMake 上游工程在关闭 generator 时仍会探测 `protoc`，因此构建环境必须提供 `protoc`；OHOS 不使用 `grpcio-tools`，因为其 `_protoc_compiler.so` 位于 HMDFS 用户路径时会被 hmmac 拒绝 `dlopen`，即使签名和执行位都正确。
 - OHOS 的 Python 生成器只使用 `protobuf` 纯 Python 实现；独立 `protoc`、SCons 生成的测试 ELF 和 `test_package` 消费者测试程序均通过 `binary-sign-tool -selfSign 1` 签名，测试编译器包装器在链接后自动完成签名。
-- OHOS 使用 Python SCons 启动器在 Conan 完成运行环境组装后，将独立 `protoc` 所在目录前置到进程内 `PATH`；generator 专用 Python 启动器也会重复注入该路径，确保上游 `generator_relative_paths` 测试直接调用裸命令 `protoc` 时仍能找到同一个已签名工具。
+- OHOS 将已签名的独立 `protoc` 绝对路径通过 `PROTOC` 环境变量传给生成器，并在构建阶段为上游 `generator/proto/_utils.py` 的系统回退分支做最小适配，确保 `generator_relative_paths` 测试不会依赖 HMDFS 上不可靠的裸命令查找。
 - 该失败的根因是路径安全标签（知识库 E212/E179），不是 chmod、旧 `.codesign` 或签名输出 inode 问题。
 
 ## 验证结果

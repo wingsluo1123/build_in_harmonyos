@@ -14,6 +14,7 @@ from conan.tools.files import (
     apply_conandata_patches,
     export_conandata_patches,
     get,
+    replace_in_file,
     save,
 )
 
@@ -82,27 +83,21 @@ class NanopbConan(ConanFile):
             protoc = self._build_ohos_protoc(real_cc, real_cxx)
             # The upstream Python generator invokes a fallback subprocess as
             # ['protoc', ...] and does not inherit SCons' PROTOC construction
-            # variable. Export the signed binary through PATH as well so that
-            # nanopb_pb2.py generation uses the same OHOS-safe protoc.
+            # variable. Keep the signed binary in PATH for subprocesses, while
+            # _patch_ohos_generator_protoc supplies its absolute path.
             protoc_dir = os.path.dirname(protoc)
             os.environ["PROTOC"] = protoc
             os.environ["PATH"] = os.pathsep.join(
                 path for path in (protoc_dir, os.environ.get("PATH", "")) if path
             )
+            self._patch_ohos_generator_protoc()
             cc = self._make_ohos_compiler_wrapper(real_cc, "cc")
             cxx = self._make_ohos_compiler_wrapper(real_cxx, "cxx")
             os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
-            python_arg = " PYTHON=" + shlex.quote(
-                self._make_ohos_python_runner(protoc)
-            )
-            scons_command = "{} {}".format(
-                shlex.quote(sys.executable),
-                shlex.quote(self._make_ohos_scons_runner(protoc)),
-            )
+            scons_command = shlex.quote(sys.executable) + " -m SCons"
         else:
             cc = real_cc
             cxx = real_cxx
-            python_arg = ""
             protoc_path = shutil.which("protoc")
             if protoc_path:
                 protoc = protoc_path
@@ -144,7 +139,7 @@ class NanopbConan(ConanFile):
             shell_arg = " SHELL=" + shlex.quote(shell)
         command = (
             "{scons} -C {tests} CC={cc} CXX={cxx} PROTOC={protoc} "
-            "PROTOCFLAGS={plugin}{python_arg} "
+            "PROTOCFLAGS={plugin} "
             "NOVALGRIND=1 NODEFARGS=1{shell_arg}"
         ).format(
             scons=scons_command,
@@ -153,54 +148,24 @@ class NanopbConan(ConanFile):
             cxx=shlex.quote(str(cxx)),
             protoc=shlex.quote(protoc),
             plugin=plugin,
-            python_arg=python_arg,
             shell_arg=shell_arg,
         )
         self.run(command)
 
-    def _make_ohos_scons_runner(self, protoc):
-        """Inject protoc into PATH after Conan has prepared the run env."""
-        runner = os.path.join(self.build_folder, "nanopb-scons-runner.py")
-        protoc_dir = os.path.dirname(os.path.abspath(protoc))
-        save(
+    def _patch_ohos_generator_protoc(self):
+        """Use the signed absolute protoc path in nanopb's fallback branch."""
+        generator_utils = os.path.join(
+            self.source_folder,
+            "generator",
+            "proto",
+            "_utils.py",
+        )
+        replace_in_file(
             self,
-            runner,
-            "import os\n"
-            "import runpy\n"
-            f"PROTOC_DIR = {protoc_dir!r}\n"
-            "os.environ['PATH'] = os.pathsep.join(\n"
-            "    path for path in (PROTOC_DIR, os.environ.get('PATH', '')) if path\n"
-            ")\n"
-            "print('Nanopb SCons effective PATH: ' + os.environ['PATH'])\n"
-            "runpy.run_module('SCons', run_name='__main__')\n",
+            generator_utils,
+            "return subprocess.call(argv)",
+            "return subprocess.call([os.environ.get('PROTOC', argv[0])] + argv[1:])",
         )
-        return runner
-
-    def _make_ohos_python_runner(self, protoc):
-        """Run generator Python with the signed protoc directory in PATH."""
-        runner = os.path.join(self.build_folder, "nanopb-python-runner")
-        protoc_dir = os.path.dirname(os.path.abspath(protoc))
-        save(
-            self,
-            runner,
-            "#!" + sys.executable + "\n"
-            "import os\n"
-            "import sys\n"
-            f"PROTOC_DIR = {protoc_dir!r}\n"
-            f"REAL_PYTHON = {sys.executable!r}\n"
-            "os.environ['PATH'] = os.pathsep.join(\n"
-            "    path for path in (PROTOC_DIR, os.environ.get('PATH', '')) if path\n"
-            ")\n"
-            "os.execv(REAL_PYTHON, [REAL_PYTHON] + sys.argv[1:])\n",
-        )
-        os.chmod(
-            runner,
-            os.stat(runner).st_mode
-            | stat.S_IXUSR
-            | stat.S_IXGRP
-            | stat.S_IXOTH,
-        )
-        return runner
 
     def _prepare_test_tools(self):
         """Make SCons and the Python protoc fallback visible to test commands."""
