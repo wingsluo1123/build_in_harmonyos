@@ -3,6 +3,8 @@
 #include <string.h>
 
 int main(void) {
+    /* libdiscid requires offsets[0] to be the lead-out sector; track
+       offsets occupy indexes first_track through last_track. */
     int offsets[] = {30000, 150, 15000};
     DiscId *disc = discid_new();
     const char *id;
