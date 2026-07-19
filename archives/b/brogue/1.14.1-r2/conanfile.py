@@ -34,7 +34,8 @@ class BrogueConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        self.run(f"cd {self.source_folder} && make CC=clang CFLAGS='-fPIC -O2'")
+        # Makefile is in src/ subdirectory
+        self.run(f"cd {self.source_folder}/src && make CC=clang CFLAGS='-fPIC -O2'")
 
     def package(self):
         self.run(f"mkdir -p {self.package_folder}/bin")
