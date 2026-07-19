@@ -48,4 +48,6 @@ run_and_report 'seqtk size' "$sizes" "$binary" size "$input"
 
 assert_line '>read1' "$fasta"
 assert_line 'ACGT' "$fasta"
-assert_line '1	4' "$sizes"
+# seqtk size reports the record count and total sequence length.
+expected_size=$(awk 'NR % 4 == 2 { count++; total += length($0) } END { printf "%d\t%d\n", count, total }' "$input")
+assert_line "$expected_size" "$sizes"
