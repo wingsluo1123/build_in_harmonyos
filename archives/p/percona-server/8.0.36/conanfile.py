@@ -6,7 +6,7 @@ Used by qt-percona-server as the MySQL protocol backend.
 Build system: CMake
 Produces: libperconaserverclient.so (and .a)
 
-Dependencies: openssl, zlib (both must be published in Conan repo before this builds)
+Dependencies: boost (header-only), openssl, zlib
 """
 import os
 
@@ -34,6 +34,7 @@ class PerconaServerConan(ConanFile):
     def requirements(self):
         self.requires("openssl/1.1.1w")
         self.requires("zlib/1.3.1")
+        self.requires("boost/1.90.0")
 
     def layout(self):
         cmake_layout(self, src_folder="src")
@@ -45,12 +46,13 @@ class PerconaServerConan(ConanFile):
         tc = CMakeToolchain(self)
         # Build client library only, not the full server
         tc.variables["WITHOUT_SERVER"] = "ON"
-        # Use system OpenSSL and zlib from Conan dependencies
+        # Use Conan-provided OpenSSL and zlib, set explicit paths
         tc.variables["WITH_SSL"] = "system"
+        tc.variables["OPENSSL_ROOT_DIR"] = self.dependencies["openssl"].package_folder
         tc.variables["WITH_ZLIB"] = "system"
-        # Auto-download Boost headers (needed even for client-only build)
-        tc.variables["DOWNLOAD_BOOST"] = "1"
-        tc.variables["DOWNLOAD_BOOST_TIMEOUT"] = "28800"
+        tc.variables["ZLIB_ROOT"] = self.dependencies["zlib"].package_folder
+        # Use Conan boost package instead of CMake DOWNLOAD_BOOST (more reliable)
+        tc.variables["WITH_BOOST"] = self.dependencies["boost"].package_folder
         # ARM64 specific: use -fPIC for shared library compatibility
         tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON"
         tc.generate()

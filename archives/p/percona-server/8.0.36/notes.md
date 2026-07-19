@@ -19,8 +19,9 @@ cmake -S src -B build \
   -DWITHOUT_SERVER=ON \
   -DWITH_SSL=system \
   -DWITH_ZLIB=system \
-  -DDOWNLOAD_BOOST=1 \
-  -DDOWNLOAD_BOOST_TIMEOUT=28800 \
+  -DWITH_BOOST=<boost-package>/ \
+  -DOPENSSL_ROOT_DIR=<openssl-package>/ \
+  -DZLIB_ROOT=<zlib-package>/ \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON
 ```
 
@@ -29,31 +30,24 @@ cmake -S src -B build \
 cmake --build build --target mysqlclient
 ```
 
-### 安装产物
-```bash
-# 手动复制到 Conan package folder
-cp build/libmysqlclient/libperconaserverclient.* <package>/lib/
-cp -r include/* <package>/include/
-cp build/include/*.h <package>/include/mysql/
-```
-
 ## 与同类配方对比
 | 项目 | mariadb-connector-c | percona-server |
 |------|---------------------|----------------|
 | 源码大小 | ~8 MB | ~455 MB |
 | 构建范围 | 完整客户端库 | 仅客户端库 (WITHOUT_SERVER=ON) |
 | 产物 | libmariadb.so | libperconaserverclient.so |
-| 协议兼容 | MySQL 协议 | MySQL 协议 |
-| 额外依赖 | 无 | Boost 头文件(自动下载) |
+| Boost 依赖 | 无 | boost/1.90.0 (Conan header-only) |
+| OpenSSL | openssl/3.0.13 | openssl/1.1.1w |
 
 ## 依赖版本
-- OpenSSL: 1.1.1w
-- zlib: 1.3.1
-- Boost: 自动下载 (CMake DOWNLOAD_BOOST=1)
+- OpenSSL: 1.1.1w (Conan)
+- zlib: 1.3.1 (Conan)
+- Boost: 1.90.0 (Conan header-only, 替代 CMake DOWNLOAD_BOOST)
 
 ## 注意事项
 - percona-server 源码包很大 (~455MB)，CI 下载需要较长时间
-- Boost 头文件由 CMake 自动下载，超时设为 8 小时 (28800 秒)
+- 使用 Conan boost head-only 包替代 CMake DOWNLOAD_BOOST，避免构建时网络下载
+- 通过 OPENSSL_ROOT_DIR / ZLIB_ROOT 显式指定依赖路径，避免 CMake find 失败
 - 仅构建 mysqlclient 目标，不会触发完整的 MySQL 测试套件
 - 被 qt-percona-server 作为 QMYSQL 驱动后端依赖使用
 - 产物库名为 libperconaserverclient（区别于 MySQL 的 libmysqlclient 和 MariaDB 的 libmariadb）
