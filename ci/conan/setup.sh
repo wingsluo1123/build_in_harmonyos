@@ -20,29 +20,46 @@ REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 echo "[step] Conan environment setup..."
 
 # ── 1. Detect/install Conan ──
-# pip3 可能装到 ~/.local/bin, 确保在 PATH 上
-export PATH="$HOME/.local/bin:$PATH"
-
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 
 CONAN_INDEX_URL="${CONAN_INDEX_URL:-https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple}"
 CONAN_TRUSTED_HOST="${CONAN_TRUSTED_HOST:-pypi.cnb.cool}"
 PYPI_INDEX_URL="${PYPI_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+PYPI_FALLBACK_INDEX_URL="${PYPI_FALLBACK_INDEX_URL:-https://pypi.org/simple}"
+PYTHON_USER_BIN="$(python3 -m site --user-base)/bin"
+
+# pip --user 的脚本目录由 Python 决定，不一定是 ~/.local/bin。
+export PATH="$PYTHON_USER_BIN:$HOME/.local/bin:$PATH"
+
+CONAN_RUNTIME_REQUIREMENTS=(
+    'requests>=2.25,<3.0.0'
+    'urllib3>=1.26.6,<3.0'
+    'colorama>=0.4.3,<0.5.0'
+    'PyYAML>=6.0,<7.0'
+    'patch-ng>=1.18.0,<1.20'
+    'fasteners>=0.15'
+    'Jinja2>=3.0,<4.0.0'
+    'python-dateutil>=2.8.0,<3'
+    'distro>=1.4.0,<2.0.0'
+)
 
 conan_runtime_ok() {
     python3 -c "import requests" >/dev/null 2>&1 && conan --version >/dev/null 2>&1
 }
 
 install_conan() {
+    # 社区源只托管 OHOS 适配的 Conan wheel，不保证包含通用运行依赖。
+    # 先从普通 PyPI 镜像安装完整依赖，再用 --no-deps 安装适配版。
     python3 -m pip install \
         --user \
         --force-reinstall \
         --index-url "$PYPI_INDEX_URL" \
-        "requests>=2.25,<3.0.0" \
-        "urllib3>=1.26,<3.0.0" \
-        certifi \
-        charset-normalizer \
-        idna || return 1
+        "${CONAN_RUNTIME_REQUIREMENTS[@]}" || \
+    python3 -m pip install \
+        --user \
+        --force-reinstall \
+        --index-url "$PYPI_FALLBACK_INDEX_URL" \
+        "${CONAN_RUNTIME_REQUIREMENTS[@]}" || return 1
 
     python3 -m pip install \
         --user \
@@ -61,7 +78,7 @@ if ! command -v conan &>/dev/null || ! conan_runtime_ok; then
         echo "[error] Failed to install conan"
         exit 1
     }
-    export PATH="$HOME/.local/bin:$PATH"
+    export PATH="$PYTHON_USER_BIN:$HOME/.local/bin:$PATH"
 fi
 
 if ! conan_runtime_ok; then
