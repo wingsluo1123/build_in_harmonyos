@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Conan recipe — bcal 2.5 (Makefile)
+
+Byte CALculator — storage expression calculator supporting byte unit
+conversion, radix conversion, and bitwise operations.
+
+Build system: plain Makefile (no configure script).
+The Makefile uses CC, CPPFLAGS, CFLAGS, LDFLAGS, PREFIX, DESTDIR variables.
+Links against system prebuilt readline (headers + .a bundled in res/).
+License: GPLv3
+"""
+import os
+import shutil
+
+from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+
+
+class BcalConan(ConanFile):
+    name = "bcal"
+    version = "2.5"
+    description = "Byte CALculator — storage expression calculator with byte unit conversion, radix conversion, and bitwise operations"
+    license = "GPL-3.0"
+    homepage = "https://github.com/jarun/bcal"
+    url = "https://github.com/jarun/bcal"
+
+    package_type = "application"
+
+    settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+        # Export bundled readline headers + .a library for CI workers
+        res_src = os.path.join(self.recipe_folder, "res")
+        if os.path.isdir(res_src):
+            res_dst = os.path.join(self.export_folder, "res")
+            if os.path.exists(res_dst):
+                shutil.rmtree(res_dst)
+            shutil.copytree(res_src, res_dst)
+
+    # R26/R27: System prebuilt readline is NOT in requires().
+    # Headers and .a library are bundled in res/ for CI workers.
+
+    def validate(self):
+        # R32: Use `in ("Linux", "OHOS")` for settings.os check
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(
+                f"bcal supports Linux/OHOS only, got {self.settings.os}"
+            )
+
+    def layout(self):
+        self.folders.build = "."
+        self.folders.generators = "."
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+        # Copy bundled readline headers from export folder to source folder
+        export_dir = os.path.join(os.path.dirname(self.source_folder), "e")
+        res_src = os.path.join(export_dir, "res")
+        if os.path.isdir(res_src):
+            res_dst = os.path.join(self.source_folder, "res")
+            if os.path.exists(res_dst):
+                shutil.rmtree(res_dst)
+            shutil.copytree(res_src, res_dst)
+
+    def build(self):
+        apply_conandata_patches(self)
+        # R33: Get compiler from Conan conf, NEVER from shell env vars.
+        comp_execs = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = comp_execs.get("c") or "clang"
+
+        # Set up readline include and lib paths.
+        # Try system readline first (DEFAULT_PREFIX), then bundled res/.
+        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        sys_inc = os.path.join(sysroot, "include")
+
+        cppflags = []
+        ldflags = []
+
+        # LDLIBS_READLINE: Makefile uses ?= so command-line override works.
+        # Static libreadline.a needs -lncurses for terminfo symbols (tputs etc.)
+        readline_libs = "-lreadline -lncurses"
+
+        if os.path.exists(os.path.join(sys_inc, "readline", "readline.h")):
+            # System readline headers available
+            cppflags.append(f"-I{sys_inc}")
+            ldflags.append(f"-L{sysroot}/lib")
+            # System readline may be dynamic, no ncurses needed
+            readline_libs = "-lreadline"
+        else:
+            # Use bundled readline headers and .a library
+            bundled_inc = os.path.join(self.source_folder, "res", "headers")
+            bundled_libs = os.path.join(self.source_folder, "res", "libs")
+            if os.path.isdir(bundled_inc):
+                cppflags.append(f"-I{bundled_inc}")
+            if os.path.isdir(bundled_libs):
+                ldflags.append(f"-L{bundled_libs}")
+
+        # R9: Always use -j1, never -j$(nproc)
+        cppflags_str = " ".join(cppflags) if cppflags else ""
+        ldflags_str = " ".join(ldflags) if ldflags else ""
+        self.run(
+            f'make CC="{cc}" CPPFLAGS="{cppflags_str}" LDFLAGS="{ldflags_str}" '
+            f'LDLIBS_READLINE="{readline_libs}" -j1'
+        )
+
+    def package(self):
+        # Copy the binary to bin/
+        copy(self, "bcal", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"))
+        # Copy man page
+        copy(self, "bcal.1", src=self.source_folder, dst=os.path.join(self.package_folder, "share", "man", "man1"))
+
+    def package_info(self):
+        # bcal is a command-line tool, not a library
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
+        self.cpp_info.bindirs = ["bin"]
