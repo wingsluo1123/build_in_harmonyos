@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/runner002/build_in_harmonyos/archives/a/advancescan/1.18/test_package/conanrunenv-release-armv8.sh"
