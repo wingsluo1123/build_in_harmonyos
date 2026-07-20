@@ -33,6 +33,13 @@ class FalcoSecurityLibsConan(ConanFile):
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
             tc.cache_variables["CMAKE_C_COMPILER_TARGET"] = "aarch64-linux-ohos"
             tc.cache_variables["CMAKE_CXX_COMPILER_TARGET"] = "aarch64-linux-ohos"
+            # OHOS Clang defines __linux__; avoid pulling in Linux platform
+            # stubs via a project-level macro rather than __OHOS__ guards.
+            tc.cache_variables["HAS_LINUX_PLATFORM"] = False
+            tc.preprocessor_definitions["HAS_LINUX_PLATFORM"] = "0"
+        else:
+            tc.cache_variables["HAS_LINUX_PLATFORM"] = True
+            tc.preprocessor_definitions["HAS_LINUX_PLATFORM"] = "1"
         tc.cache_variables["USE_BUNDLED_DEPS"] = True
         tc.cache_variables["USE_BUNDLED_DRIVER"] = False
         tc.cache_variables["MUSL_OPTIMIZED_BUILD"] = self.settings.os == "OHOS"
