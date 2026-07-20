@@ -46,8 +46,8 @@ class IconConan(ConanFile):
                     raw = json.loads(raw)
                 if isinstance(raw, dict) and "c" in raw:
                     cc = raw["c"]
-        except Exception:
-            pass
+        except (json.JSONDecodeError, TypeError, KeyError):
+            pass  # Fall back to PATH lookup
 
         # Step 1: Configure for linux platform (NoGraphics)
         self.run("make Configure name=linux", cwd=self.source_folder)
@@ -80,15 +80,22 @@ class IconConan(ConanFile):
         sign_tool = "/data/service/hnp/bin/binary-sign-tool"
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
 
-        # Remove old signature section
-        subprocess.run([objcopy, "--remove-section", ".codesign", elf_path],
-                       capture_output=True, timeout=10)
+        # Remove old signature section (non-zero exit is normal on first signing)
+        r = subprocess.run([objcopy, "--remove-section", ".codesign", elf_path],
+                            capture_output=True, text=True, timeout=10)
+        if r.returncode != 0 and r.stderr:
+            self.output.info(f"  objcopy note: {r.stderr.strip()}")
 
         # Sign with self-sign
         tmp = elf_path + ".signed.tmp"
-        subprocess.run([sign_tool, "sign", "-inFile", elf_path,
-                        "-outFile", tmp, "-selfSign", "1"],
-                       capture_output=True, timeout=30)
+        r = subprocess.run([sign_tool, "sign", "-inFile", elf_path,
+                            "-outFile", tmp, "-selfSign", "1"],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            os.unlink(tmp) if os.path.exists(tmp) else None
+            raise RuntimeError(
+                f"ELF signing failed for {elf_path}: {r.stderr or r.stdout}"
+            )
 
         if os.path.exists(tmp):
             os.replace(tmp, elf_path)
