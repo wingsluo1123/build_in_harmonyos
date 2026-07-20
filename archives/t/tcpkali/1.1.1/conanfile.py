@@ -12,6 +12,7 @@ OHOS adaptation notes:
 """
 
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, save
@@ -55,12 +56,15 @@ class TcpkaliConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # OHOS: umask 000 needed for config.status temp dir creation
-        os.umask(0)
+        # OHOS: config.status uses umask 077 for temp dirs which fails on OHOS.
+        # Use umask 007 (group-writable, consistent with notes.md E109).
+        # Save and restore to avoid affecting other operations.
+        old_umask = os.umask(0o007)
         apply_conandata_patches(self)
         # Ensure autotools (automake, aclocal, libtoolize) are in PATH.
         # CI worker has them in system PATH; local dev machines may have them
         # installed via cmd-pkgs in ~/usr/local/bin.
+        old_path = os.environ.get("PATH", "")
         for prefix in (
             os.path.join(os.path.expanduser("~"), "usr", "local", "bin"),
             "/data/service/hnp/bin",
@@ -68,15 +72,15 @@ class TcpkaliConan(ConanFile):
             if os.path.isdir(prefix) and prefix not in os.environ.get("PATH", ""):
                 os.environ["PATH"] = prefix + os.pathsep + os.environ.get("PATH", "")
         # Ensure aclocal can find autoconf-archive m4 macros
+        old_aclocal = os.environ.get("ACLOCAL_PATH", "")
         for aclocal_dir in (
             os.path.join(os.path.expanduser("~"), "usr", "local", "share", "aclocal"),
             "/data/service/hnp/autoconf.org/autoconf_2.72/share/aclocal",
         ):
             if os.path.isdir(aclocal_dir):
-                existing = os.environ.get("ACLOCAL_PATH", "")
-                if aclocal_dir not in existing:
+                if aclocal_dir not in old_aclocal:
                     os.environ["ACLOCAL_PATH"] = (
-                        aclocal_dir + os.pathsep + existing if existing else aclocal_dir
+                        aclocal_dir + os.pathsep + old_aclocal if old_aclocal else aclocal_dir
                     )
                 break
         # GitHub archive tarball is missing m4/ directory (exists in repo but
@@ -90,7 +94,6 @@ class TcpkaliConan(ConanFile):
         ]:
             src = os.path.join(search_dir, "ax_check_compile_flag.m4")
             if os.path.isfile(src):
-                import shutil
                 shutil.copy2(src, os.path.join(m4_dir, "ax_check_compile_flag.m4"))
                 break
         # ax_pthread.m4: from autoconf-archive
@@ -100,7 +103,6 @@ class TcpkaliConan(ConanFile):
         ]:
             src = os.path.join(search_dir, "ax_pthread.m4")
             if os.path.isfile(src):
-                import shutil
                 shutil.copy2(src, os.path.join(m4_dir, "ax_pthread.m4"))
                 break
         # ax_make_optional_include.m4: custom tcpkali macro (not in autoconf-archive,
@@ -156,10 +158,18 @@ class TcpkaliConan(ConanFile):
         # Generate configure script (GitHub archive has no pre-generated configure)
         self.run("autoreconf -fi", cwd=self.source_folder)
         # OHOS: config.status uses umask 077 for temp dirs which fails on OHOS
-        self.run("sed -i 's/umask 077/umask 000/g' configure", cwd=self.source_folder)
+        self.run("sed -i 's/umask 077/umask 007/g' configure", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make()
+        # Restore environment variables modified for autotools
+        os.environ["PATH"] = old_path
+        if old_aclocal:
+            os.environ["ACLOCAL_PATH"] = old_aclocal
+        elif "ACLOCAL_PATH" in os.environ:
+            del os.environ["ACLOCAL_PATH"]
+        # Restore umask
+        os.umask(old_umask)
 
     def package(self):
         autotools = Autotools(self)
