@@ -19,7 +19,6 @@ class PerlcryptopensslguessConan(ConanFile):
     description = "Guess OpenSSL include path (pure Perl module)"
     license = "GPL-1.0-or-later OR Artistic-1.0"
     homepage = "https://github.com/akiym/Crypt-OpenSSL-Guess"
-    url = ""  # CI fills this
 
     # Pure Perl module — no compiler/build_type needed
     settings = "os", "arch"
@@ -29,9 +28,6 @@ class PerlcryptopensslguessConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
-
-    def requirements(self):
-        pass
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
