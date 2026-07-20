@@ -51,9 +51,11 @@ class Ipv6toolkitConan(ConanFile):
         pcap_inc = " ".join(f"-I{d}" for d in pcap_info.includedirs)
         pcap_lib = " ".join(f"-L{d}" for d in pcap_info.libdirs)
 
-        # CFLAGS: -D__OHOS__ activates the platform guard in libipv6.c.
-        cflags = ("-Wall -Wno-address-of-packed-member -Wno-missing-braces "
-                  "-fPIC -O2 -D__OHOS__")
+        # CFLAGS: -D__OHOS__ activates the platform guard in libipv6.c
+        # (patch 0001: avoids sockaddr_storage redefinition conflict).
+        cflags = "-Wall -Wno-address-of-packed-member -Wno-missing-braces -fPIC -O2"
+        if self.settings.os == "OHOS":
+            cflags += " -D__OHOS__"
         ldflags = f"{pcap_lib} -lpcap -lm"
 
         # R9: always -j1.
