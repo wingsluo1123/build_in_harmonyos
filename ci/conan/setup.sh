@@ -85,7 +85,7 @@ if [ "$CONAN_VERSION" = "unknown" ]; then
         echo "[error] 这不是 conan 问题, 需要在 Worker 上安装/链接 libsqlite3.so.0"
         echo "[error] 修复: 找到 HNP 目录下的 libsqlite3.so.0 或从 OHOS 系统链接"
         # Try to find and link it
-        SQLITE_LIB=$(find /data/service/hnp /system/lib* /usr/lib* -name 'libsqlite3.so*' 2>/dev/null | head -1)
+        SQLITE_LIB=$(find /data/service/hnp /system/lib* /usr/lib* -name 'libsqlite3.so*' -print -quit 2>/dev/null)
         if [ -n "$SQLITE_LIB" ]; then
             echo "[step] 尝试设置 LD_LIBRARY_PATH: $(dirname "$SQLITE_LIB")"
             export LD_LIBRARY_PATH="$(dirname "$SQLITE_LIB"):${LD_LIBRARY_PATH:-}"
@@ -127,8 +127,9 @@ if ! PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
     exit 1
 fi
 echo "[step] SCons interpreter: $CONAN_PYTHON"
-PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
-    "$CONAN_PYTHON" -m SCons --version 2>/dev/null | head -1
+SCONS_VERSION_OUTPUT=$(PYTHONPATH="$TEST_TOOLS_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    "$CONAN_PYTHON" -m SCons --version 2>/dev/null)
+printf '%s\n' "${SCONS_VERSION_OUTPUT%%$'\n'*}"
 
 # Nanopb's upstream tests require protoc. On OHOS the Conan recipe builds a
 # native, signed protoc because grpcio-tools contains a Python C extension;
