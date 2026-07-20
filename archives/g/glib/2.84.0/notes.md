@@ -29,6 +29,14 @@
 - **问题**: meson 无法下载 pcre2 子项目
 - **解决**: 使用系统预装的 pcre2 10.47
 
+### 问题6: Conan libintl 探测失败
+- **问题**: Meson 的内建 `intl` 探测只传递 `-lintl`，无法找到 Conan 私有缓存中的静态 libintl
+- **解决**: 依赖 gettext 0.22.5，并将其 include 和 lib 搜索路径注入 Conan 生成的 Meson native file
+
+### 问题7: Conan 消费者缺少 GLib 头文件路径
+- **问题**: `glib.h` 和 `glibconfig.h` 分别安装在 `include/glib-2.0` 和 `lib/glib-2.0/include`
+- **解决**: 在 `package_info()` 中导出两项 include 路径，并传播 gettext、libffi、pcre2 和 zlib 依赖
+
 ## 补丁文件
 
 1. **0001-disable-netlink-for-harmonyos.patch**
@@ -67,6 +75,8 @@ ninja -C build install
 - libgio-2.0.a ✅
 - gio 二进制 ✅
 - glib-compile-schemas ✅
+- Conan test_package ✅（输出 `glib consumer passed`）
+- Conan G0/G1/G2/G3/G4/L2/L4/L5 门禁 ✅
 
 ---
 *编译者: OpenDesk Compile Agent*
