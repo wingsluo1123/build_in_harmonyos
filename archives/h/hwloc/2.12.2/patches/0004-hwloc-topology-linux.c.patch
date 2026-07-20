@@ -1,0 +1,147 @@
+--- a/hwloc/topology-linux.c
++++ b/hwloc/topology-linux.c
+@@ -289,21 +289,27 @@
+ # elif defined(__mips__) && _MIPS_SIM == _ABIN32
+ #  define __NR_set_mempolicy 6233
+ # elif defined(__mips__) && _MIPS_SIM == _ABIO32
+ #  define __NR_set_mempolicy 4270
+ # endif
+ #endif
+ static __hwloc_inline long hwloc_set_mempolicy(int mode __hwloc_attribute_unused,
+ 					       const unsigned long *nodemask __hwloc_attribute_unused,
+ 					       unsigned long maxnode __hwloc_attribute_unused)
+ {
+-#if (defined __NR_set_mempolicy) && (defined HWLOC_HAVE_SYSCALL)
++#ifdef __OHOS__
++  /* OpenHarmony sandboxes these NUMA mempolicy syscalls with SIGSYS
++   * instead of returning ENOSYS. Short-circuit to ENOSYS so hwloc
++   * gracefully disables memory binding support. */
++  errno = ENOSYS;
++  return -1;
++#elif (defined __NR_set_mempolicy) && (defined HWLOC_HAVE_SYSCALL)
+   return syscall(__NR_set_mempolicy, mode, nodemask, maxnode);
+ #else
+ #warning Couldn't find __NR_set_mempolicy syscall number, memory binding won't be supported
+   errno = ENOSYS;
+   return -1;
+ #endif
+ }
+ 
+ #ifndef __NR_get_mempolicy
+ # ifdef __i386__
+@@ -341,21 +347,27 @@
+ # elif defined(__mips__) && _MIPS_SIM == _ABIO32
+ #  define __NR_get_mempolicy 4269
+ # endif
+ #endif
+ static __hwloc_inline long hwloc_get_mempolicy(int *mode __hwloc_attribute_unused,
+ 					       unsigned long *nodemask __hwloc_attribute_unused,
+ 					       unsigned long maxnode __hwloc_attribute_unused,
+ 					       void *addr __hwloc_attribute_unused,
+ 					       int flags __hwloc_attribute_unused)
+ {
+-#if (defined __NR_get_mempolicy) && (defined HWLOC_HAVE_SYSCALL)
++#ifdef __OHOS__
++  /* OpenHarmony sandboxes these NUMA mempolicy syscalls with SIGSYS
++   * instead of returning ENOSYS. Short-circuit to ENOSYS so hwloc
++   * gracefully disables memory binding support. */
++  errno = ENOSYS;
++  return -1;
++#elif (defined __NR_get_mempolicy) && (defined HWLOC_HAVE_SYSCALL)
+   return syscall(__NR_get_mempolicy, mode, nodemask, maxnode, addr, flags);
+ #else
+ #warning Couldn't find __NR_get_mempolicy syscall number, memory binding won't be supported
+   errno = ENOSYS;
+   return -1;
+ #endif
+ }
+ 
+ #ifndef __NR_migrate_pages
+ # ifdef __i386__
+@@ -392,21 +404,27 @@
+ #  define __NR_migrate_pages 6250
+ # elif defined(__mips__) && _MIPS_SIM == _ABIO32
+ #  define __NR_migrate_pages 4287
+ # endif
+ #endif
+ static __hwloc_inline long hwloc_migrate_pages(int pid __hwloc_attribute_unused,
+ 					       unsigned long maxnode __hwloc_attribute_unused,
+ 					       const unsigned long *oldnodes __hwloc_attribute_unused,
+ 					       const unsigned long *newnodes __hwloc_attribute_unused)
+ {
+-#if (defined __NR_migrate_pages) && (defined HWLOC_HAVE_SYSCALL)
++#ifdef __OHOS__
++  /* OpenHarmony sandboxes these NUMA mempolicy syscalls with SIGSYS
++   * instead of returning ENOSYS. Short-circuit to ENOSYS so hwloc
++   * gracefully disables memory migration support. */
++  errno = ENOSYS;
++  return -1;
++#elif (defined __NR_migrate_pages) && (defined HWLOC_HAVE_SYSCALL)
+   return syscall(__NR_migrate_pages, pid, maxnode, oldnodes, newnodes);
+ #else
+ #warning Couldn't find __NR_migrate_pages syscall number, memory migration won't be supported
+   errno = ENOSYS;
+   return -1;
+ #endif
+ }
+ 
+ #ifndef __NR_move_pages
+ # ifdef __i386__
+@@ -445,21 +463,27 @@
+ #  define __NR_move_pages 4308
+ # endif
+ #endif
+ static __hwloc_inline long hwloc_move_pages(int pid __hwloc_attribute_unused,
+ 					    unsigned long count __hwloc_attribute_unused,
+ 					    void **pages __hwloc_attribute_unused,
+ 					    const int *nodes __hwloc_attribute_unused,
+ 					    int *status __hwloc_attribute_unused,
+ 					    int flags __hwloc_attribute_unused)
+ {
+-#if (defined __NR_move_pages) && (defined HWLOC_HAVE_SYSCALL)
++#ifdef __OHOS__
++  /* OpenHarmony sandboxes these NUMA mempolicy syscalls with SIGSYS
++   * instead of returning ENOSYS. Short-circuit to ENOSYS so hwloc
++   * gracefully disables page migration support. */
++  errno = ENOSYS;
++  return -1;
++#elif (defined __NR_move_pages) && (defined HWLOC_HAVE_SYSCALL)
+   return syscall(__NR_move_pages, pid, count, pages, nodes, status, flags);
+ #else
+ #warning Couldn't find __NR_move_pages syscall number, getting memory location won't be supported
+   errno = ENOSYS;
+   return -1;
+ #endif
+ }
+ 
+ 
+ /* Added for ntohl() */
+@@ -962,21 +986,27 @@
+ 
+ /*****************************
+  ******* CpuBind Hooks *******
+  *****************************/
+ 
+ int
+ hwloc_linux_set_tid_cpubind(hwloc_topology_t topology __hwloc_attribute_unused, pid_t tid __hwloc_attribute_unused, hwloc_const_bitmap_t hwloc_set __hwloc_attribute_unused)
+ {
+   /* The resulting binding is always strict */
+ 
+-#if defined(HWLOC_HAVE_CPU_SET_S) && !defined(HWLOC_HAVE_OLD_SCHED_SETAFFINITY)
++#ifdef __OHOS__
++  /* OpenHarmony sched_setaffinity() silently succeeds without actually
++   * binding (sched_getaffinity() returns all CPUs afterwards). Surface
++   * this as ENOSYS so callers don't rely on the fake success. */
++  errno = ENOSYS;
++  return -1;
++#elif defined(HWLOC_HAVE_CPU_SET_S) && !defined(HWLOC_HAVE_OLD_SCHED_SETAFFINITY)
+   cpu_set_t *plinux_set;
+   unsigned cpu;
+   int last;
+   size_t setsize;
+   int err;
+ 
+   last = hwloc_bitmap_last(hwloc_set);
+   if (last == -1) {
+     errno = EINVAL;
+     return -1;

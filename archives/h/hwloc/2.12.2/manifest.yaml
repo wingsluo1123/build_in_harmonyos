@@ -1,0 +1,117 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.12.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.12.2"
+
+# 软件名
+software: "hwloc"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-20"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://download.open-mpi.org/release/hwloc/v2.12/hwloc-2.12.2.tar.gz"
+
+  # 源码校验和
+  sha256: "ff7d309fdff7ceddfe15c1e79eaff25f3126a134f29f44d4e85571f187a6bab8"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--enable-static"
+    - "--disable-shared"
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config-config.guess.patch"
+  - "0002-config-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-hwloc-topology-linux.c.patch"
+  - "0005-tests-hwloc-glibc-sched.c.patch"
+  - "0006-tests-hwloc-ports-include-freebsd-sys-user.h.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "E002+E073: HMDFS 对 umask 077 + mktemp -d + 重定向写入必拒（autotools 全源文件需改 umask 022）"
+  - "鸿蒙沙箱对 4 个 NUMA mempolicy syscall 发 SIGSYS 而非 ENOSYS: set_mempolicy/get_mempolicy/migrate_pages/move_pages"
+  - "鸿蒙 sched_setaffinity 静默成功不绑定（rc=0 但 sched_getaffinity 返回全 CPU），需 OHOS 守卫返回 ENOSYS"
+  - "autotools config.guess/sub 需加 __OHOS__ 检测分支 + linux-ohos kernel-os 组合"
+  - "freebsd ports 测试代码 __int32_t 鸿蒙 sysroot 不提供，需改 int32_t"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/hwloc-2.12.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/hwloc-2.12.2.work
+  source_orig_hash: 330c1f8763660155
+  source_work_hash: ec82ca3a355f1461
+  generated_at: '2026-07-21T00:39:29'
+  patches_count: 6
+
+patch_classification:
+  - file: 0001-config-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-hwloc-topology-linux.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-tests-hwloc-glibc-sched.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-tests-hwloc-ports-include-freebsd-sys-user.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
