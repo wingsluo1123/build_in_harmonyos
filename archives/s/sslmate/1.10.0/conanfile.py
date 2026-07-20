@@ -21,7 +21,6 @@ class SslmateConan(ConanFile):
     description = "Command-line tool for purchasing and managing SSL certificates via SSLMate service"
     license = "MIT"
     homepage = "https://sslmate.com"
-    url = ""  # CI fills this
 
     package_type = "application"
 
@@ -30,14 +29,14 @@ class SslmateConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def requirements(self):
+        pass  # No external Conan deps: Perl is pre-installed on OHOS
+
     def layout(self):
         # sslmate builds in-source (Makefile is in source root), so
         # build and source share the same directory.
         basic_layout(self, src_folder=".")
         self.folders.build = "."
-
-    def requirements(self):
-        pass  # No external Conan deps: Perl is pre-installed on OHOS
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
