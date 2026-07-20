@@ -12,4 +12,4 @@ do
    fi
 done
 
-export PATH="/storage/Users/currentUser/.conan2/p/b/fnt2275e050e73f7/p/bin${PATH:+:$PATH}"
+export PATH="/storage/Users/currentUser/.conan2/p/b/fnt452b1750e0d14/p/bin${PATH:+:$PATH}"
