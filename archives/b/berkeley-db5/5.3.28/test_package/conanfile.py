@@ -29,6 +29,6 @@ class Berkeleydb5TestConan(ConanFile):
 
     def test(self):
         cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_berkeley-db5')}", env="conanrun")
+        # Pass env="conanrun" so LD_LIBRARY_PATH includes the installed libdb-5.3.so
+        # (HMDFS does not use ld.so runpath for newly-built libs without explicit env)
+        cmake.test(env="conanrun")
