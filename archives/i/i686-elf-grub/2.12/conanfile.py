@@ -60,19 +60,24 @@ class I686ElfGrubConan(ConanFile):
         _bash = shutil.which("bash") or "bash"
         _cc = shutil.which("clang") or "clang"
         _cxx = shutil.which("clang++") or "clang++"
-        env_prefix = (
-            f"CONFIG_SHELL={_bash} SHELL={_bash} "
-            f"CC={_cc} CXX={_cxx} "
-            f"AR=llvm-ar RANLIB=llvm-ranlib NM=llvm-nm STRIP=llvm-strip "
-            f"CPPFLAGS='' "
-            f"CFLAGS='-O2' CXXFLAGS='-O2' "
-        )
 
         src = self.source_folder or "."
 
         # R32: Support both Linux and OHOS
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"OS {self.settings.os} not supported")
+
+        # Create i686-elf cross-compiler wrapper scripts (CI env has no i686-elf-gcc)
+        cross_bindir = self._setup_cross_tools(src)
+
+        env_prefix = (
+            f"CONFIG_SHELL={_bash} SHELL={_bash} "
+            f"PATH={cross_bindir}:$PATH "
+            f"CC={_cc} CXX={_cxx} "
+            f"AR=llvm-ar RANLIB=llvm-ranlib NM=llvm-nm STRIP=llvm-strip "
+            f"CPPFLAGS='' "
+            f"CFLAGS='-O2' CXXFLAGS='-O2' "
+        )
 
         # Fix umask 077→022 in configure script (HMDFS permission issue)
         self._fix_configure_umask()
@@ -98,10 +103,44 @@ class I686ElfGrubConan(ConanFile):
         self._fix_genmoddep_awk()
 
         # Create empty extra_deps.lst (missing from release tarball)
-        open(os.path.join(src, "grub-core", "extra_deps.lst"), "w").close()
+        with open(os.path.join(src, "grub-core", "extra_deps.lst"), "w"):
+            pass
 
         # Build with -j1 (HMDFS doesn't support mkfifo)
         self.run(f"umask 022; {env_prefix} make -j1", cwd=src)
+
+    def _setup_cross_tools(self, src):
+        """Create i686-elf cross-compiler wrapper scripts using clang --target=i686-elf.
+
+        GRUB's configure looks for i686-elf-gcc in PATH. The CI environment only has
+        host clang (aarch64), so we create wrapper scripts that add --target=i686-elf.
+        """
+        import stat
+        bindir = os.path.join(src, ".cross-tools")
+        os.makedirs(bindir, exist_ok=True)
+        _clang = shutil.which("clang") or "clang"
+        _clangxx = shutil.which("clang++") or "clang++"
+
+        # Compiler wrappers: add --target=i686-elf to host clang
+        for name, real in [("i686-elf-gcc", _clang), ("i686-elf-cc", _clang),
+                           ("i686-elf-c++", _clangxx), ("i686-elf-cpp", _clang)]:
+            wrapper = os.path.join(bindir, name)
+            with open(wrapper, "w") as f:
+                f.write(f"#!/bin/sh\nexec {real} --target=i686-elf \"$@\"\n")
+            os.chmod(wrapper, os.stat(wrapper).st_mode | stat.S_IEXEC)
+
+        # LLVM binutils wrappers (LLVM tools are target-agnostic, no --target needed)
+        for name, real in [("i686-elf-ar", "llvm-ar"), ("i686-elf-ranlib", "llvm-ranlib"),
+                           ("i686-elf-nm", "llvm-nm"), ("i686-elf-strip", "llvm-strip"),
+                           ("i686-elf-objcopy", "llvm-objcopy"), ("i686-elf-as", "llvm-as"),
+                           ("i686-elf-ld", "ld.lld")]:
+            real_path = shutil.which(real) or real
+            wrapper = os.path.join(bindir, name)
+            with open(wrapper, "w") as f:
+                f.write(f"#!/bin/sh\nexec {real_path} \"$@\"\n")
+            os.chmod(wrapper, os.stat(wrapper).st_mode | stat.S_IEXEC)
+
+        return bindir
 
     def _fix_umask(self):
         """Fix umask 077→022 in config.status (HMDFS permission issue)."""
@@ -175,14 +214,16 @@ class I686ElfGrubConan(ConanFile):
         _bash = shutil.which("bash") or "bash"
         _cc = shutil.which("clang") or "clang"
         _cxx = shutil.which("clang++") or "clang++"
+        src = self.source_folder or "."
+        cross_bindir = os.path.join(src, ".cross-tools")
         env_prefix = (
             f"CONFIG_SHELL={_bash} SHELL={_bash} "
+            f"PATH={cross_bindir}:$PATH "
             f"CC={_cc} CXX={_cxx} "
             f"AR=llvm-ar RANLIB=llvm-ranlib NM=llvm-nm STRIP=llvm-strip "
             f"CPPFLAGS='' "
             f"CFLAGS='-O2' CXXFLAGS='-O2' "
         )
-        src = self.source_folder or "."
         # Install to package folder (DESTDIR), prefix=/
         self.run(f"umask 022; {env_prefix} make install DESTDIR={self.package_folder}",
                  cwd=src)

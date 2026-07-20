@@ -6,7 +6,6 @@ Runs grub-mkimage --version to verify the GRUB tools work.
 """
 import os
 from conan import ConanFile
-from conan.tools.build import can_run
 
 class I686ElfGrubTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"

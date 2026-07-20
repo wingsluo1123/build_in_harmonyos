@@ -53,18 +53,17 @@ GNU GRUB bootloader cross-compiled for i686-elf target on aarch64-ohos.
 - **lib/grub/**: GRUB modules (.mod), kernel images, boot images
 
 ## Dependencies
-- i686-elf-gcc 13.3.0 (cross-compiler)
-- i686-elf-binutils 2.42 (cross-assembler/linker)
+- clang (host compiler, used via wrapper as i686-elf cross-compiler)
+- LLVM toolchain: llvm-ar, llvm-ranlib, llvm-nm, llvm-strip, llvm-objcopy, llvm-as, ld.lld
 - bison 3.8.2 (parser generator)
 - flex 2.6.4 (lexer generator)
 - liblzma (for XZ compression support)
-### 9. conan create: fork: Out of memory
-- **Issue**: The conan create (conan-verify G2) fails because the configure script cannot fork child processes due to `fork: Out of memory` errors. The system has only ~0.75GB free memory, which is insufficient for the conan sandbox to run the configure script's many fork-based compiler tests.
-- **Impact**: The conan create and conan-verify (G2) fail. The W3 local CI simulation also fails.
-- **Root Cause**: System memory pressure - the OHOS platform has limited free memory, and the conan sandbox adds overhead that pushes the system past its fork limits.
-- **Note**: The manual build succeeded because it ran directly in the interactive shell without the conan sandbox overhead. The conanfile.py is correct and contains all necessary platform fixes.
-- **Resolution**: This is a platform resource issue, not a recipe issue. The conan create should pass on a system with more free memory.
+
+### 9. CI: configure assembly compilation failure
+- **Issue**: CI build failed at configure step with `configure: error: could not compile assembly`. GRUB's configure looks for `i686-elf-gcc` in PATH (not found in CI env), falls back to `cc` (host clang without `--target` flag), which cannot compile i686 assembly.
+- **Root Cause**: CI environment lacks `i686-elf-gcc` cross-compiler that was available during manual build.
+- **Fix**: Added `_setup_cross_tools()` method in conanfile.py that creates wrapper scripts (`i686-elf-gcc`, `i686-elf-cc`, etc.) calling `clang --target=i686-elf`, plus LLVM binutils wrappers (`i686-elf-ar`, `i686-elf-objcopy`, etc.). The wrapper directory is prepended to PATH in build env.
 ---
 
 **编译结束**: 2026-07-19 13:01
-**最终状态**: built
+**最终状态**: adapting
