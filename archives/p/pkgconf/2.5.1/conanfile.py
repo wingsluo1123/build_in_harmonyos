@@ -8,6 +8,8 @@ R26: Static build by default (system-name library — avoids polluting /lib).
 R38: Command-line tool — commands.json declared at software-level directory.
 """
 import os
+import shutil
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
@@ -19,7 +21,7 @@ class PkgconfConan(ConanFile):
     description = "pkgconf is a package compiler and configuration tool (pkg-config replacement)"
     license = "ISC"
     homepage = "https://github.com/pkgconf/pkgconf"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -58,7 +60,8 @@ class PkgconfConan(ConanFile):
         # Fix compiler/tool paths in generated meson native file
         # CI profile points to /data/service/hnp/bin/clang which doesn't exist
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
-        tool_prefix = "/storage/Users/currentUser/usr/local/bin"
+        tool_prefix = shutil.which("clang") or "/storage/Users/currentUser/usr/local/bin"
+        tool_prefix = os.path.dirname(tool_prefix)
         if os.path.exists(native_file):
             with open(native_file, 'r') as f:
                 content = f.read()
@@ -74,7 +77,7 @@ class PkgconfConan(ConanFile):
             # Add ar and ranlib to the [binaries] section if not present
             if 'ar =' not in content:
                 content = content.replace(
-                    "cpp = '/storage/Users/currentUser/usr/local/bin/clang++'",
+                    f"cpp = '{tool_prefix}/clang++'",
                     f"cpp = '{tool_prefix}/clang++'\n"
                     f"ar = '{tool_prefix}/llvm-ar'\n"
                     f"ranlib = '{tool_prefix}/llvm-ranlib'\n"
@@ -82,10 +85,6 @@ class PkgconfConan(ConanFile):
                 )
             with open(native_file, 'w') as f:
                 f.write(content)
-
-        # Also ensure PATH includes the toolchain directory
-        old_path = os.environ.get("PATH", "")
-        os.environ["PATH"] = f"{tool_prefix}:{old_path}"
 
         apply_conandata_patches(self)
         meson = Meson(self)

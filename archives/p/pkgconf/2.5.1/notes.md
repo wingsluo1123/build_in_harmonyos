@@ -4,7 +4,7 @@
 - 构建系统: meson（绕过 autotools/sh 权限问题）
 - 编译日期: 2026-05-26
 - 编译器: OHOS SDK clang 15.0.4
-- 状态: published（静态链接版本）
+- 状态: built（静态链接版本）
 
 ## 编译步骤
 
@@ -102,5 +102,5 @@ $TEST_PREFIX/$DEFAULT_PREFIX/bin/bomtool --version
 3. **手动链接步骤**：如果 ninja 失败，需手动创建静态库和链接可执行文件
 ---
 
-**编译结束**: 2026-07-16 12:56
+**编译结束**: 2026-07-20 11:27
 **最终状态**: built
