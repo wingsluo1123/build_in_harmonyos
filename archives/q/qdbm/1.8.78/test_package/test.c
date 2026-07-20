@@ -60,11 +60,14 @@ int main(void) {
     /* Close the database */
     if (!dpclose(depot)) {
         fprintf(stderr, "dpclose failed\n");
+        remove(dbname);
         return 1;
     }
 
     /* Clean up */
-    remove(dbname);
+    if (remove(dbname) != 0) {
+        fprintf(stderr, "warning: failed to remove %s\n", dbname);
+    }
 
     printf("qdbm test: ALL PASSED\n");
     return 0;

@@ -35,7 +35,9 @@ class QdbmConan(ConanFile):
         apply_conandata_patches(self)
         # qdbm's configure does not support out-of-source builds
         conf_args = ["--prefix=/"]
-        if not self.options.shared:
+        if self.options.shared:
+            conf_args.append("--enable-shared")
+        else:
             conf_args.append("--enable-static")
             conf_args.append("--disable-shared")
         self.run("./configure {}".format(" ".join(conf_args)))
