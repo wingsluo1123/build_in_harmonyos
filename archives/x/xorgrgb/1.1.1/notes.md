@@ -2,9 +2,9 @@
 
 ## 编译环境
 - 构建系统: autotools
-- 编译日期: 2026-06-17
+- 编译日期: 2026-07-20
 - 编译器: clang 15.0.4 / clang++ (LLVM 15.0.4)
-- 状态: published
+- 状态: built
 
 - 主机: aarch64-unknown-linux-ohos (鸿蒙)
 
@@ -125,8 +125,7 @@ ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1), not st
 - 源码URL: https://gitlab.freedesktop.org/xorg/app/rgb/-/archive/rgb-1.1.1/rgb-rgb-1.1.1.tar.gz
 - 上游仓库: https://gitlab.freedesktop.org/xorg/app/rgb
 - 知识图谱: E011（HMDFS umask 077）
-
 ---
 
-**编译结束**: 2026-06-17
-**最终状态**: published
+**编译结束**: 2026-07-20 12:39
+**最终状态**: built
