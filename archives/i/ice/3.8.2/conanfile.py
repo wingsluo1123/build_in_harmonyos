@@ -35,7 +35,7 @@ class IceConan(ConanFile):
 
     def requirements(self):
         self.requires("bzip2/1.0.8")
-        self.requires("expat/2.8.0")
+        self.requires("expat/2.8.2")
         self.requires("libedit/20240817")
         self.requires("lmdb/0.9.35")
         self.requires("mcpp/2.7.2")
