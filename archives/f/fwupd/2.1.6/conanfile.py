@@ -53,16 +53,16 @@ class FwupdConan(ConanFile):
         # R32: OHOS platform compatibility
         is_ohos = self.settings.os == "OHOS"
 
-        # All dependencies come from OHOS system via pkg-config
-        # Add system pkg-config paths for glib, libusb, libcurl etc.
-        pc_paths = [
-            "/storage/Users/currentUser/usr/local/lib/pkgconfig",
-            "/storage/Users/currentUser/usr/local/libusb-package/lib/pkgconfig",
-            "/data/service/hnp/xz.org/xz_v5.8.2/lib/pkgconfig",
-        ]
-        valid_paths = [p for p in pc_paths if os.path.isdir(p)]
-        if valid_paths:
-            tc.pkg_config_path = ":".join(valid_paths)
+        # OHOS: system libs from SDK sysroot via pkg-config
+        if is_ohos:
+            _pc = [
+                "/storage/Users/currentUser/usr/local/lib/pkgconfig",
+                "/storage/Users/currentUser/usr/local/libusb-package/lib/pkgconfig",
+                "/data/service/hnp/xz.org/xz_v5.8.2/lib/pkgconfig",
+            ]
+            _existing = [p for p in _pc if os.path.isdir(p)]
+            if _existing:
+                os.environ["PKG_CONFIG_PATH"] = ":".join(_existing)
 
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.project_options["build"] = "standalone"
@@ -101,11 +101,23 @@ class FwupdConan(ConanFile):
 
         if is_ohos:
             tc.project_options["vendor_ids_dir"] = "/storage/Users/currentUser/share/hwdata"
-            # R33: Inject AR/RANLIB via MesonToolchain [binaries], not os.environ
-            tc.toolchain["AR"] = "/data/service/hnp/bin/llvm-ar"
-            tc.toolchain["RANLIB"] = "/data/service/hnp/bin/llvm-ranlib"
 
         tc.generate()
+
+        # cairo/pixman 模式: tc.generate() 后手动编辑 native file 注入 AR/RANLIB
+        # MesonToolchain 无 toolchain/pkg_config_path 属性，tc.generate() 不读取它们
+        _nf = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if is_ohos and os.path.isfile(_nf):
+            _ar = "/data/service/hnp/bin/llvm-ar"
+            _rl = "/data/service/hnp/bin/llvm-ranlib"
+            if os.path.isfile(_ar) and os.path.isfile(_rl):
+                with open(_nf) as _f:
+                    _c = _f.read()
+                if "[binaries]" in _c and "\nar =" not in _c:
+                    _ins = "[binaries]\nar = '%s'\nranlib = '%s'\n" % (_ar, _rl)
+                    _c = _c.replace("[binaries]\n", _ins, 1)
+                    with open(_nf, "w") as _f:
+                        _f.write(_c)
 
     def build(self):
         apply_conandata_patches(self)
