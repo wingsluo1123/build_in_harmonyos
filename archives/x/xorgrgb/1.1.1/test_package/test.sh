@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for xorgrgb (showrgb) executable
 # Runs in conanrun env (PATH includes installed bin/)
-set -eu
+set -euo pipefail
 
 echo "[test] showrgb --version"
 showrgb --version && echo "✅ --version OK" || {
