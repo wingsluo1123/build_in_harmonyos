@@ -1,22 +1,23 @@
-#!/usr/bin/env bash
+#!/data/service/hnp/bin/bash
 # Test fnt — verify the binary runs and shows help
 set -e
+FNT="/system/bin/sh $(which fnt)"
 
 echo "=== fnt test suite ==="
 
 # Test 1: fnt --help shows usage
 echo "Test 1: fnt --help"
-fnt --help 2>&1 | head -10
+$FNT --help 2>&1 | head -10
 echo "PASS: fnt --help"
 
 # Test 2: fnt list (lists installed fonts, should not crash)
 echo "Test 2: fnt list"
-fnt list 2>&1 | head -5 || echo "NOTE: fnt list may show no fonts (expected on OHOS)"
+$FNT list 2>&1 | head -5 || echo "NOTE: fnt list may show no fonts (expected on OHOS)"
 echo "PASS: fnt list"
 
 # Test 3: fnt home (shows font directory)
 echo "Test 3: fnt home"
-fnt home 2>&1
+$FNT home 2>&1
 echo "PASS: fnt home"
 
 # Test 4: Verify shebang is correct
