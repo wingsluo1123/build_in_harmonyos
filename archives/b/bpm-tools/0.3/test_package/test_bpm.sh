@@ -5,7 +5,9 @@
 
 set -euo pipefail
 
-TEST_TMPDIR="${TMPDIR:-/tmp}"
+# E002: OHOS /tmp is read-only — use $HOME/tmp as fallback
+TEST_TMPDIR="${TMPDIR:-${HOME}/tmp}"
+mkdir -p "$TEST_TMPDIR"
 AUDIO_FILE="$TEST_TMPDIR/test_audio_120bpm.bin"
 OUTPUT_FILE="$TEST_TMPDIR/bpm_output.txt"
 
@@ -29,8 +31,9 @@ DETECTED=$(cat "$OUTPUT_FILE")
 echo "Detected BPM: $DETECTED (expected ~120)"
 
 # Verify the result is within 5 BPM of 120
-python3 -c "
-detected = float('$DETECTED')
+DETECTED="$DETECTED" python3 -c "
+import os
+detected = float(os.environ['DETECTED'])
 assert abs(detected - 120.0) < 5.0, f'BPM detection failed: got {detected}, expected ~120'
 print('PASS: BPM detection within tolerance')
 "
