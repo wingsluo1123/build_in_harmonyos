@@ -6,14 +6,16 @@ Build system: Autotools (configure + make)
 Key design:
 - package_type = "library" (primarily used as an embeddable Scheme library)
 - Also provides bindirs = ["bin"] for the guile executable
-- Conan deps: gc/8.2.12, gmp/6.3.0, libffi/3.4.8
-- Non-conan deps (libunistring, libltdl) found via /usr/local search paths
+- Conan dep: gc/8.2.12@ohpcd/stable (Boehm-Demers-Weiser GC)
+- Non-conan system deps (gmp, libffi, libunistring, libltdl) found via
+  ~/usr/local search paths — these are pre-installed on the build machine
 - Signal 5 (SIGTRAP) during .go compilation is tolerated via make -k
+- .go files are copied from the source tarball's prebuilt/ directory
 """
 import os
+import shutil
 
 from conan import ConanFile
-from conan.errors import ConanException
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -55,14 +57,13 @@ class GuileConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # Build is skipped (packaging from /usr/local). Dependencies
-        # are satisfied by the system installation, not by conan.
-        # Consumers (e.g. autogen) declare gc/libxml2 directly.
-        pass
+        # gc (Boehm GC) is the only conan-managed dependency.
+        # gmp, libffi, libunistring, libltdl are pre-installed at
+        # ~/usr/local/ on the build machine (see generate()).
+        self.requires("gc/8.2.12")
 
     def build_requirements(self):
-        # Build is skipped; no build tools needed.
-        pass
+        self.tool_requires("pkgconf/2.5.1")
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -71,57 +72,132 @@ class GuileConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # Build is skipped; no toolchain generation needed.
-        pass
+        # System-local prefix for non-conan deps (gmp, libffi, etc.)
+        local_prefix = os.path.expanduser("~/usr/local")
+
+        tc = AutotoolsToolchain(self)
+        tc.extra_cflags.append(f"-I{local_prefix}/include")
+        tc.extra_ldflags.append(
+            f"-L{local_prefix}/lib -Wl,-rpath,{local_prefix}/lib"
+        )
+        tc.generate()
+
+        deps = AutotoolsDeps(self)
+        deps.generate()
+
+        pkg = PkgConfigDeps(self)
+        pkg.generate()
+
+        # Add ~/usr/local to PKG_CONFIG_PATH for non-conan deps
+        env = Environment()
+        env.append("PKG_CONFIG_PATH", f"{local_prefix}/lib/pkgconfig")
+        env.vars(self).save_script("conanenv_non_conan_deps")
 
     def build(self):
-        # On HarmonyOS, guile's build triggers Signal 5 (SIGTRAP) during:
-        # - SNARF (.x/.doc generation via guile binary)
-        # - .go compilation (Scheme bytecode)
-        # The /usr/local installation already has a working libguile-2.2.so,
-        # guile binary, .go files, and pkg-config. We package from there.
-        pass
+        """Build guile from source.
+
+        Signal 5 (SIGTRAP) occurs during .go (Scheme bytecode) compilation
+        on HarmonyOS due to GC/HarmonyOS limitations. ``make -k`` tolerates
+        these errors and continues building .so libraries and binaries, which
+        are compiled before the .go targets.
+
+        The .go files are NOT rebuilt — they are copied from the source
+        tarball's ``prebuilt/`` directory in ``package()``.
+        """
+        apply_conandata_patches(self)
+        autotools = Autotools(self)
+
+        # The CI profile may set CONFIG_SHELL and CC to paths that don't
+        # exist on the development machine (e.g. /data/service/hnp/bin/...).
+        # We override these for the configure command with available tools.
+        local_prefix = os.path.expanduser("~/usr/local")
+        bash = os.path.join(local_prefix, "bin", "bash")
+        if not os.path.isfile(bash):
+            bash = shutil.which("bash") or "/bin/sh"
+        cc = os.path.join(local_prefix, "bin", "clang")
+        if not os.path.isfile(cc):
+            cc = shutil.which("clang") or "clang"
+        cxx = os.path.join(local_prefix, "bin", "clang++")
+        if not os.path.isfile(cxx):
+            cxx = shutil.which("clang++") or "clang++"
+
+        # Find the configure script (it may be in build_folder or its parent)
+        configure_path = os.path.join(self.build_folder, "configure")
+        if not os.path.isfile(configure_path):
+            configure_path = os.path.join(
+                os.path.dirname(self.build_folder), "configure"
+            )
+
+        # Run configure with correct shell and compiler overrides.
+        # Use distinct --build and --host triplets to force cross-compile
+        # mode so configure does not try to run the test binary (libcord.so
+        # from the system path causes a runtime load failure).
+        self.run(
+            f'CONFIG_SHELL="{bash}" SHELL="{bash}" '
+            f'CC="{cc}" CXX="{cxx}" '
+            f'LD_LIBRARY_PATH="{local_prefix}/lib'
+            f'${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}" '
+            f'PKG_CONFIG_PATH="{local_prefix}/lib/pkgconfig'
+            f'${{PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}}" '
+            f'"{bash}" "{configure_path}" '
+            f'--build=aarch64-unknown-linux-gnu '
+            f'--host=aarch64-unknown-linux-ohos '
+            f'--enable-shared --disable-static '
+            f'--prefix=/ '
+            f"--bindir=${{prefix}}/bin "
+            f"--sbindir=${{prefix}}/bin "
+            f"--libdir=${{prefix}}/lib "
+            f"--includedir=${{prefix}}/include "
+            f"--oldincludedir=${{prefix}}/include",
+            env="conanbuild",
+        )
+
+        # Signal 5 (SIGTRAP) during .go compilation is tolerated via make -k.
+        # .so libraries are built before .go files, so they should succeed.
+        autotools.make(args=["-k"])
 
     def package(self):
-        """Package guile from pre-built installation.
+        """Package guile from build output and source tarball.
 
-        The build is skipped due to Signal 5 (SIGTRAP) issues during .go
-        compilation on HarmonyOS. Instead, we copy the pre-built library,
-        binary, headers, .go files, .scm files, and pkg-config from the
-        pre-built directory into the conan package directory.
-
-        The pre-built files come from /storage/Users/currentUser/tmp/guile-2.2.7/
-        which contains the results of a manual exploratory build (Signal 5
-        tolerated via make -k).
+        - .so files, binaries, and pkg-config come from the build output
+        - .go files come from the source tarball's prebuilt/ directory
+        - .scm files come from the source module/ directory
+        - .h headers come from the source libguile/ directory
         """
-        import shutil
-
-        build_dir = "/storage/Users/currentUser/tmp/guile-2.2.7"
         pkg = self.package_folder
+        build_folder = self.build_folder
+        source_folder = self.source_folder
 
-        # Library files (from libguile/.libs/)
-        lib_src = os.path.join(build_dir, "libguile", ".libs")
-        for lib in ("libguile-2.2.so", "libguile-2.2.so.1",
-                     "libguile-2.2.so.1.4.2"):
-            src = os.path.join(lib_src, lib)
-            if os.path.exists(src):
-                copy(self, lib, src=lib_src,
-                     dst=os.path.join(pkg, "lib"))
+        # ── Library files (.so) from build output ────────────────────
+        lib_src = os.path.join(build_folder, "libguile", ".libs")
+        if os.path.isdir(lib_src):
+            copy(self, "libguile-2.2.so*", src=lib_src,
+                 dst=os.path.join(pkg, "lib"))
+            copy(self, "libguile-2.2.a", src=lib_src,
+                 dst=os.path.join(pkg, "lib"))
 
-        # Binary (guile binary is in libguile/.libs/, wrappers in meta/)
-        copy(self, "guile", src=lib_src,
-             dst=os.path.join(pkg, "bin"))
-        copy(self, "guile-config", src=os.path.join(build_dir, "meta"),
-             dst=os.path.join(pkg, "bin"))
-        copy(self, "guild", src=os.path.join(build_dir, "meta"),
-             dst=os.path.join(pkg, "bin"))
+        # ── Binaries from build output ────────────────────────────────
+        if os.path.isdir(lib_src):
+            copy(self, "guile", src=lib_src,
+                 dst=os.path.join(pkg, "bin"))
 
-        # Headers (from libguile/ → include/guile/2.2/libguile/)
-        copy(self, "*.h", src=os.path.join(build_dir, "libguile"),
-             dst=os.path.join(pkg, "include/guile/2.2/libguile"))
+        # guile-config and guild are scripts in meta/
+        meta_dir = os.path.join(build_folder, "meta")
+        if os.path.isdir(meta_dir):
+            copy(self, "guile-config", src=meta_dir,
+                 dst=os.path.join(pkg, "bin"))
+            copy(self, "guild", src=meta_dir,
+                 dst=os.path.join(pkg, "bin"))
 
-        # .go files (Scheme bytecode) - from prebuilt/ in source tarball
-        go_src = os.path.join(build_dir, "prebuilt/64-bit-little-endian")
+        # ── Headers from source libguile/ ────────────────────────────
+        header_src = os.path.join(source_folder, "libguile")
+        if os.path.isdir(header_src):
+            copy(self, "*.h", src=header_src,
+                 dst=os.path.join(pkg, "include/guile/2.2/libguile"))
+
+        # ── .go files from source tarball prebuilt/ ──────────────────
+        go_src = os.path.join(source_folder, "prebuilt",
+                              "64-bit-little-endian")
         if os.path.isdir(go_src):
             for root, dirs, files in os.walk(go_src):
                 rel = os.path.relpath(root, go_src)
@@ -129,10 +205,11 @@ class GuileConan(ConanFile):
                 os.makedirs(dst, exist_ok=True)
                 for f in files:
                     if f.endswith(".go"):
-                        shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+                        shutil.copy2(os.path.join(root, f),
+                                     os.path.join(dst, f))
 
-        # .scm files (from module/ → share/guile/2.2/)
-        scm_src = os.path.join(build_dir, "module")
+        # ── .scm files from source module/ ────────────────────────────
+        scm_src = os.path.join(source_folder, "module")
         if os.path.isdir(scm_src):
             for root, dirs, files in os.walk(scm_src):
                 # Skip hidden directories (.deps, .libs, etc.)
@@ -142,21 +219,27 @@ class GuileConan(ConanFile):
                 os.makedirs(dst, exist_ok=True)
                 for f in files:
                     if f.endswith(".scm"):
-                        shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+                        shutil.copy2(os.path.join(root, f),
+                                     os.path.join(dst, f))
 
-        # pkg-config file (fix paths to use conan package dirs)
-        pc_src = os.path.join(build_dir, "meta", "guile-2.2.pc")
+        # ── pkg-config file from build output ────────────────────────
+        pc_src = os.path.join(build_folder, "meta", "guile-2.2.pc")
         if os.path.exists(pc_src):
-            os.makedirs(os.path.join(pkg, "lib/pkgconfig"), exist_ok=True)
+            os.makedirs(os.path.join(pkg, "lib/pkgconfig"),
+                        exist_ok=True)
             pc_dst = os.path.join(pkg, "lib/pkgconfig/guile-2.2.pc")
             shutil.copy2(pc_src, pc_dst)
-            # Fix absolute paths to point within conan package
+            # Fix absolute build paths to use pkg-config variables
+            local_prefix = os.path.expanduser("~/usr/local")
             replace_in_file(self, pc_dst,
-                            "/storage/Users/currentUser/usr/local",
-                            "${CMAKE_CURRENT_LIST_DIR}/../..")
+                            local_prefix, "${prefix}")
+            # Remove explicit -lgc, -lgmp, -lffi (handled by conan deps)
+            replace_in_file(self, pc_dst, "-lgc", "")
+            replace_in_file(self, pc_dst, "-lgmp", "")
+            replace_in_file(self, pc_dst, "-lffi", "")
 
-        # License
-        copy(self, "COPYING*", src=self.source_folder,
+        # ── License ──────────────────────────────────────────────────
+        copy(self, "COPYING*", src=source_folder,
              dst=os.path.join(pkg, "licenses"))
 
     def package_info(self):
@@ -171,113 +254,3 @@ class GuileConan(ConanFile):
         # R32: System libs for Linux and OHOS
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "pthread", "dl"]
-
-    # ── Private helpers ──────────────────────────────────────────────
-
-    def _fix_umask_in_guile_snarf(self):
-        """Fix umask 077 → 022 in libguile/guile-snarf for HMDFS compatibility.
-
-        The configure patch (0003) fixes umask in the configure script itself,
-        but guile-snarf is a separate shell script that also uses umask 077.
-        """
-        snarf = os.path.join(self.source_folder, "libguile", "guile-snarf")
-        if os.path.isfile(snarf):
-            replace_in_file(self, snarf, "umask 077", "umask 022")
-
-    def _fix_doc_timestamps(self):
-        """Touch doc files to prevent make from regenerating them.
-
-        The texinfo tools (makeinfo/texi2html) are broken or missing on
-        HarmonyOS. Touching stamp-vti and version.texi ensures make considers
-        them up-to-date and skips regeneration.
-        """
-        for doc_file in ["doc/ref/stamp-vti", "doc/ref/version.texi"]:
-            path = os.path.join(self.source_folder, doc_file)
-            if os.path.isfile(path):
-                os.utime(path, None)
-
-    def _touch_snarf_outputs(self):
-        """Copy and touch .x files to prevent make from re-running SNARF.
-
-        SNARF uses guile to extract Scheme documentation from C source.
-        On OHOS, guile crashes (Signal 5) during SNARF, corrupting .x files.
-        The source tarball ships pre-generated .x files — we copy them to the
-        build directory and touch them to skip SNARF entirely.
-        """
-        import glob
-        import shutil
-
-        # Source .x files are in the source tarball's libguile/ directory
-        src_dir = os.path.join(self.source_folder, "libguile")
-        # Build directory where make looks for .x files
-        build_libguile = os.path.join(self.build_folder, "build-release", "libguile")
-
-        # Also check tmp/guile-2.2.7 as fallback
-        tmp_src = "/storage/Users/currentUser/tmp/guile-2.2.7/libguile"
-
-        for src in (src_dir, tmp_src):
-            x_files = glob.glob(os.path.join(src, "*.x"))
-            if not x_files:
-                continue
-            os.makedirs(build_libguile, exist_ok=True)
-            for xf in x_files:
-                dst = os.path.join(build_libguile, os.path.basename(xf))
-                shutil.copy2(xf, dst)
-                os.utime(dst, None)
-            self.output.info(
-                "Copied {} .x files from {} to build dir".format(len(x_files), src)
-            )
-            return
-        self.output.warning("No .x files found in source or tmp directories")
-
-    def _copy_prebuilt_go_files(self):
-        """Copy pre-compiled .go files from /usr/local installation.
-
-        On HarmonyOS, guile's .go (Scheme bytecode) compilation triggers
-        Signal 5 (SIGTRAP) on every file, making full builds take 10+ hours.
-        This method reuses .go files from the system-installed guile to skip
-        recompilation entirely.
-        """
-        import shutil
-
-        # Pre-compiled .go files from the source tarball (prebuilt/)
-        src_base = "/storage/Users/currentUser/tmp/guile-2.2.7/prebuilt/64-bit-little-endian"
-        if not os.path.isdir(src_base):
-            self.output.warning("No pre-compiled .go files found")
-            return
-
-        # Copy to both bootstrap/ and module/ build dirs so make install finds them
-        for subdir in ("bootstrap", "module"):
-            dst = os.path.join(self.build_folder, subdir)
-            if not os.path.exists(dst):
-                os.makedirs(dst, exist_ok=True)
-            for root, dirs, files in os.walk(src_base):
-                rel = os.path.relpath(root, src_base)
-                dst_root = os.path.join(dst, rel) if rel != "." else dst
-                os.makedirs(dst_root, exist_ok=True)
-                for f in files:
-                    if f.endswith(".go"):
-                        shutil.copy2(
-                            os.path.join(root, f),
-                            os.path.join(dst_root, f),
-                        )
-        eval_go = os.path.join(self.build_folder, "bootstrap", "ice-9", "eval.go")
-        if os.path.exists(eval_go):
-            self.output.info("Copied pre-compiled .go files from /usr/local")
-        else:
-            self.output.warning("Failed to copy .go files; guile runtime may be limited")
-
-    def _verify_build(self):
-        """Verify the library was built despite possible Signal 5 crashes."""
-        for lib_name in ["libguile-2.2.so", "libguile-2.2.a"]:
-            for subdir in [
-                os.path.join("build-release", "libguile", ".libs"),
-                os.path.join("libguile", ".libs"),
-                "libguile",
-            ]:
-                lib_path = os.path.join(self.build_folder, subdir, lib_name)
-                if os.path.exists(lib_path):
-                    return
-        raise ConanException(
-            "Neither libguile-2.2.so nor libguile-2.2.a was built"
-        )

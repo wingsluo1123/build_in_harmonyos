@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/.opendesk/worktrees/guile-2.2.7/archives/g/guile/2.2.7/test_package/conanrunenv-release-armv8.sh"
