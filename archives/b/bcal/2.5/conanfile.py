@@ -6,7 +6,7 @@ conversion, radix conversion, and bitwise operations.
 
 Build system: plain Makefile (no configure script).
 The Makefile uses CC, CPPFLAGS, CFLAGS, LDFLAGS, PREFIX, DESTDIR variables.
-Links against system prebuilt readline (headers + .a bundled in res/).
+Links against system prebuilt readline (headers bundled in res/, dynamic .so).
 License: GPLv3
 """
 import os
@@ -31,7 +31,7 @@ class BcalConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Export bundled readline headers + .a library for CI workers
+        # Export bundled readline headers for CI workers without system readline-devel
         res_src = os.path.join(self.recipe_folder, "res")
         if os.path.isdir(res_src):
             res_dst = os.path.join(self.export_folder, "res")
@@ -39,8 +39,9 @@ class BcalConan(ConanFile):
                 shutil.rmtree(res_dst)
             shutil.copytree(res_src, res_dst)
 
-    # R26/R27: System prebuilt readline is NOT in requires().
-    # Headers and .a library are bundled in res/ for CI workers.
+    # System prebuilt readline is NOT in requires() (not a conan package).
+    # Headers are bundled in res/headers/ for CI workers.
+    # Dynamic libreadline.so.8 is available via DEFAULT_PREFIX on OHOS.
 
     def validate(self):
         # R32: Use `in ("Linux", "OHOS")` for settings.os check
@@ -70,32 +71,49 @@ class BcalConan(ConanFile):
         comp_execs = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = comp_execs.get("c") or "clang"
 
-        # Set up readline include and lib paths.
-        # Try system readline first (DEFAULT_PREFIX), then bundled res/.
+        # Set up readline include path.
+        # Use system headers if available, otherwise bundled res/headers/.
         sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
         sys_inc = os.path.join(sysroot, "include")
 
         cppflags = []
         ldflags = []
 
-        # LDLIBS_READLINE: Makefile uses ?= so command-line override works.
-        # Static libreadline.a needs -lncurses for terminfo symbols (tputs etc.)
-        readline_libs = "-lreadline -lncurses"
-
         if os.path.exists(os.path.join(sys_inc, "readline", "readline.h")):
-            # System readline headers available
             cppflags.append(f"-I{sys_inc}")
-            ldflags.append(f"-L{sysroot}/lib")
-            # System readline may be dynamic, no ncurses needed
-            readline_libs = "-lreadline"
         else:
-            # Use bundled readline headers and .a library
             bundled_inc = os.path.join(self.source_folder, "res", "headers")
-            bundled_libs = os.path.join(self.source_folder, "res", "libs")
             if os.path.isdir(bundled_inc):
                 cppflags.append(f"-I{bundled_inc}")
-            if os.path.isdir(bundled_libs):
-                ldflags.append(f"-L{bundled_libs}")
+
+        # Find system libreadline for dynamic linking.
+        # OHOS cmd-pkgs installs to ~/usr/local/lib/external/libreadline.so.8
+        # Create libreadline.so symlink so -lreadline can find it.
+        lib_search_dirs = [
+            os.path.join(sysroot, "lib"),
+            os.path.join(sysroot, "lib", "external"),
+            "/lib",
+            "/usr/lib",
+        ]
+        readline_so = None
+        for lib_dir in lib_search_dirs:
+            for name in ("libreadline.so", "libreadline.so.8"):
+                path = os.path.join(lib_dir, name)
+                if os.path.exists(path):
+                    readline_so = path
+                    ldflags.append(f"-L{lib_dir}")
+                    break
+            if readline_so:
+                break
+
+        # Determine readline link flag
+        if readline_so and readline_so.endswith(".so.8") and not os.path.exists(
+            os.path.join(os.path.dirname(readline_so), "libreadline.so")
+        ):
+            # No libreadline.so symlink, use -l: to link exact filename
+            readline_libs = "-l:libreadline.so.8"
+        else:
+            readline_libs = "-lreadline"
 
         # R9: Always use -j1, never -j$(nproc)
         cppflags_str = " ".join(cppflags) if cppflags else ""
@@ -117,3 +135,9 @@ class BcalConan(ConanFile):
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
         self.cpp_info.bindirs = ["bin"]
+        # Add system readline library path to runtime environment
+        # libreadline.so.8 is installed by cmd-pkgs to ~/usr/local/lib/external/
+        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        lib_external = os.path.join(sysroot, "lib", "external")
+        if os.path.isdir(lib_external):
+            self.runenv_info.append_path("LD_LIBRARY_PATH", lib_external)
