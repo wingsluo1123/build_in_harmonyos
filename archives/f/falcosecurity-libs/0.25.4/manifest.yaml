@@ -1,0 +1,31 @@
+software: falcosecurity-libs
+version: "0.25.4"
+status: built
+build_date: "2026-07-20"
+build_system: cmake
+
+source:
+  url: "https://codeload.github.com/falcosecurity/libs/tar.gz/refs/tags/0.25.4"
+  sha256: "272a5a0c05e7c10a658ed9649023e6179061a4ab29e012602893586ac64b5938"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DUSE_BUNDLED_DEPS=ON"
+    - "-DUSE_BUNDLED_DRIVER=OFF"
+    - "-DMUSL_OPTIMIZED_BUILD=ON"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DCREATE_TEST_TARGETS=OFF"
+    - "-DBUILD_LIBSCAP_EXAMPLES=OFF"
+    - "-DBUILD_LIBSINSP_EXAMPLES=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-use-non-linux-platform-stubs.patch"
+  - "0002-musl-shared-build-without-static-flag.patch"
+knowledge_gained:
+  - "HarmonyOS 必须保持非 Linux 的 CMake 平台标识，避免启用 kmod/BPF 引擎"
+  - "OHOS 使用 musl libc，需要启用 MUSL_OPTIMIZED_BUILD"
