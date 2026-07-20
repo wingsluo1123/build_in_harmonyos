@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/x/xorgrgb/1.1.1/test_package/conanbuildenv-release-armv8.sh"
