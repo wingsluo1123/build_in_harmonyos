@@ -17,7 +17,7 @@ from .edit_tracker import get_tracked_files, has_tracker, scan as tracker_scan
 EXCLUDE_DIRS = {"build", ".git", "autom4te.cache", "CMakeFiles",
                 "__pycache__", ".libs", ".deps"}
 EXCLUDE_SUFFIXES = (".o", ".lo", ".la", ".so", ".a")
-EXCLUDE_FILES = {"config.status", "config.log"}
+EXCLUDE_FILES = {"config.status", "config.log", ".patch-ai-review.txt"}
 
 # Known build-system generated file names (only used for NEW files in right_only)
 _GENERATED_NAMES = frozenset({
@@ -263,9 +263,10 @@ def _validate_patch_format(patch_file: Path) -> tuple[int, list[str]]:
         first_plus = next(i for i, l in enumerate(lines) if l.startswith("+++ "))
         orig_path = lines[first_minus][4:].split("\t")[0]
         mod_path = lines[first_plus][4:].split("\t")[0]
-        header = f"diff -ruN {orig_path} {mod_path}\n"
-        patch_file.write_text(header + content, encoding="utf-8")
-        warnings.append("E058-3: missing diff header (auto-fixed)")
+        # Do NOT add 'diff -ruN' header — pre-commit hooks reject it.
+        # Unified diff format only requires --- and +++ lines.
+        patch_file.write_text(content, encoding="utf-8")
+        warnings.append("E058-3: missing diff header (auto-fixed, no diff command line)")
         return 1, warnings
 
     if diff_count == 0 and not has_header:
@@ -285,11 +286,12 @@ def _patch_stats(patch_file: Path) -> dict:
 def _dry_run(patch_file: Path, orig_dir: Path) -> bool:
     """Verify patch with dry-run (requires external patch command)."""
     try:
-        r = subprocess.run(
-            ["patch", "--dry-run", "-p1"],
-            stdin=open(patch_file), cwd=str(orig_dir),
-            capture_output=True, timeout=30,
-        )
+        with open(patch_file) as f:
+            r = subprocess.run(
+                ["patch", "--dry-run", "-p1"],
+                stdin=f, cwd=str(orig_dir),
+                capture_output=True, timeout=30,
+            )
         return r.returncode == 0
     except Exception:
         return False
