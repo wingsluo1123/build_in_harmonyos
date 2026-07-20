@@ -83,38 +83,45 @@ class GuileConan(ConanFile):
         pass
 
     def package(self):
-        """Package guile from /usr/local installation.
+        """Package guile from pre-built installation.
 
-        The build is skipped due to Signal 5 issues. Instead, we copy the
-        pre-built library, binary, headers, .go files, and pkg-config from
-        /usr/local into the conan package directory.
+        The build is skipped due to Signal 5 (SIGTRAP) issues during .go
+        compilation on HarmonyOS. Instead, we copy the pre-built library,
+        binary, headers, .go files, .scm files, and pkg-config from the
+        pre-built directory into the conan package directory.
+
+        The pre-built files come from /storage/Users/currentUser/tmp/guile-2.2.7/
+        which contains the results of a manual exploratory build (Signal 5
+        tolerated via make -k).
         """
         import shutil
 
-        usr_local = "/usr/local"
+        build_dir = "/storage/Users/currentUser/tmp/guile-2.2.7"
         pkg = self.package_folder
 
-        # Library files
+        # Library files (from libguile/.libs/)
+        lib_src = os.path.join(build_dir, "libguile", ".libs")
         for lib in ("libguile-2.2.so", "libguile-2.2.so.1",
                      "libguile-2.2.so.1.4.2"):
-            src = os.path.join(usr_local, "lib", lib)
+            src = os.path.join(lib_src, lib)
             if os.path.exists(src):
-                copy(self, lib, src=usr_local + "/lib",
+                copy(self, lib, src=lib_src,
                      dst=os.path.join(pkg, "lib"))
 
-        # Binary
-        copy(self, "guile", src=usr_local + "/bin", dst=os.path.join(pkg, "bin"))
-        copy(self, "guile-config", src=usr_local + "/bin",
+        # Binary (guile binary is in libguile/.libs/, wrappers in meta/)
+        copy(self, "guile", src=lib_src,
              dst=os.path.join(pkg, "bin"))
-        copy(self, "guild", src=usr_local + "/bin",
+        copy(self, "guile-config", src=os.path.join(build_dir, "meta"),
+             dst=os.path.join(pkg, "bin"))
+        copy(self, "guild", src=os.path.join(build_dir, "meta"),
              dst=os.path.join(pkg, "bin"))
 
-        # Headers
-        copy(self, "*", src=usr_local + "/include/guile/2.2",
-             dst=os.path.join(pkg, "include/guile/2.2"))
+        # Headers (from libguile/ → include/guile/2.2/libguile/)
+        copy(self, "*.h", src=os.path.join(build_dir, "libguile"),
+             dst=os.path.join(pkg, "include/guile/2.2/libguile"))
 
         # .go files (Scheme bytecode) - from prebuilt/ in source tarball
-        go_src = "/storage/Users/currentUser/tmp/guile-2.2.7/prebuilt/64-bit-little-endian"
+        go_src = os.path.join(build_dir, "prebuilt/64-bit-little-endian")
         if os.path.isdir(go_src):
             for root, dirs, files in os.walk(go_src):
                 rel = os.path.relpath(root, go_src)
@@ -124,23 +131,29 @@ class GuileConan(ConanFile):
                     if f.endswith(".go"):
                         shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
 
-        # .scm files
-        scm_src = os.path.join(usr_local, "share/guile/2.2")
+        # .scm files (from module/ → share/guile/2.2/)
+        scm_src = os.path.join(build_dir, "module")
         if os.path.isdir(scm_src):
             for root, dirs, files in os.walk(scm_src):
+                # Skip hidden directories (.deps, .libs, etc.)
+                dirs[:] = [d for d in dirs if not d.startswith(".")]
                 rel = os.path.relpath(root, scm_src)
                 dst = os.path.join(pkg, "share/guile/2.2", rel)
                 os.makedirs(dst, exist_ok=True)
                 for f in files:
-                    shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
+                    if f.endswith(".scm"):
+                        shutil.copy2(os.path.join(root, f), os.path.join(dst, f))
 
         # pkg-config file (fix paths to use conan package dirs)
-        pc_src = os.path.join(usr_local, "lib/pkgconfig/guile-2.2.pc")
+        pc_src = os.path.join(build_dir, "meta", "guile-2.2.pc")
         if os.path.exists(pc_src):
             os.makedirs(os.path.join(pkg, "lib/pkgconfig"), exist_ok=True)
             pc_dst = os.path.join(pkg, "lib/pkgconfig/guile-2.2.pc")
             shutil.copy2(pc_src, pc_dst)
-            replace_in_file(self, pc_dst, "/usr/local", "${CMAKE_CURRENT_LIST_DIR}/../..")
+            # Fix absolute paths to point within conan package
+            replace_in_file(self, pc_dst,
+                            "/storage/Users/currentUser/usr/local",
+                            "${CMAKE_CURRENT_LIST_DIR}/../..")
 
         # License
         copy(self, "COPYING*", src=self.source_folder,

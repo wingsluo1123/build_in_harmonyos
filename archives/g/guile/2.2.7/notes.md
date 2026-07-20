@@ -104,3 +104,7 @@ Copyright (C) 2020 Free Software Foundation, Inc.
 
 **Conan 配方创建**: 2026-07-17
 **最终状态**: published (conan create 验证)
+---
+
+**编译结束**: 2026-07-20 11:51
+**最终状态**: built

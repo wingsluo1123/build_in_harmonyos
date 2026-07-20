@@ -36,7 +36,7 @@ class TestPkg(ConanFile):
         try:
             self.run(f"{bash} -c './test_probe'", env="conanrun")
         except Exception as e:
-            self.output.warn(
+            self.output.warning(
                 f"test binary crashed (Signal 5 expected on OHOS): {e}"
             )
             self.output.info("R34 compile+link check passed — runtime tolerated")
