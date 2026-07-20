@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for perl-ntlm 1.09-r6 (Authen::NTLM).
+"""Conan recipe for perl-ntlm 1.09.6 (Authen::NTLM).
 
 Pure Perl module using ExtUtils::MakeMaker (perl Makefile.PL + make).
 Build: perl Makefile.PL && make && make install DESTDIR=...
@@ -12,7 +12,7 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 
 class PerlntlmConan(ConanFile):
     name = "perl-ntlm"
-    version = "1.09-r6"
+    version = "1.09.6"
     description = "Perl module for NTLM authentication (Authen::NTLM)"
     license = "Artistic-1.0 OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/dist/NTLM"

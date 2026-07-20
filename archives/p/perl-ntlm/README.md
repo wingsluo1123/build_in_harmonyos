@@ -24,7 +24,7 @@ Perl 模块，实现 NTLM (NT LAN Manager) 认证协议，用于 Windows 网络�
 | 问题 | 根因 | 解决方案 |
 |------|------|----------|
 | `/tmp` 只读 | 鸿蒙平台限制 | 使用 `$TMPDIR` 或 `$HOME/tmp` |
-| curl SSL 证书验证失败 | 鸿蒙平台证书链 | 使用 `curl -kL` 绕过 |
+| curl SSL 证书验证失败 | 鸿蒙平台证书链不完整 | 更新 CA 证书或使用 Conan `get()` 内置下载（自动校验 sha256） |
 | Conan 2 `deps_cpp_info` 废弃 | Conan API 变更 | 使用 `self.dependencies[name].package_folder` |
 
 ### 与 Linux 的差异

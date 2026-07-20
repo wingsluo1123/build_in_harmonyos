@@ -1,10 +1,10 @@
-# perl-ntlm 1.09-r6 适配笔记
+# perl-ntlm 1.09.6 适配笔记
 
 ## 编译环境
 - 构建系统: Perl ExtUtils::MakeMaker (perl Makefile.PL + make)
 - 编译日期: 2026-06-29 (初次), 2026-07-01 (修复完善)
 - 编译器: 不需要（纯 Perl 模块）
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -36,7 +36,7 @@
 | 6 | test_package 输出错误 | Perl -e 命令使用 shell 双引号，`$Authen::NTLM::VERSION` 被 shell 展开为空 | 改用 shell 单引号 + 字符串拼接，避免 shell 变量展开和 Python f-string 花括号冲突 |
 | 7 | 缺少软件级 manifest.yaml | 原始编译未生成软件级文件 | 新建，含版本索引和 OHOS 适配知识 |
 | 8 | 缺少软件级 README.md | 原始编译未生成 | 新建，含功能概述和 OHOS 适配说明 |
-| 9 | 版本级 manifest 缺少 conan_ref | 字段缺失 | 添加 conan_ref: perl-ntlm/1.09-r6@ohpcd/stable |
+| 9 | 版本级 manifest 缺少 conan_ref | 字段缺失 | 添加 conan_ref: perl-ntlm/1.09.6@ohpcd/stable |
 | 10 | 缺少 test_package/MANIFEST.yml | CI L0e 门禁要求 | 新建，含上游测试声明 (5 个测试文件) |
 | 11 | build.system 值不正确 | 原值为 "custom" | 修正为 "perl" |
 
@@ -147,4 +147,5 @@ Result: PASS
 
 **编译结束**: 2026-06-29 20:01 (初次)
 **修复完善**: 2026-07-01 15:55
-**最终状态**: published
+**最终状态**: built
+d
