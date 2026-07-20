@@ -60,6 +60,11 @@ struct udev_device *udev_device_unref(struct udev_device *udev_device);
 const char *udev_device_get_devnode(struct udev_device *udev_device);
 struct udev_device *udev_device_get_parent(struct udev_device *udev_device);
 const char *udev_device_get_sysattr_value(struct udev_device *udev_device, const char *sysattr);
+const char *udev_device_get_syspath(struct udev_device *udev_device);
+const char *udev_device_get_action(struct udev_device *udev_device);
+const char *udev_device_get_subsystem(struct udev_device *udev_device);
+const char *udev_device_get_sysname(struct udev_device *udev_device);
+const char *udev_device_get_driver(struct udev_device *udev_device);
 struct udev_list_entry *udev_device_get_devlinks_list_entry(struct udev_device *udev_device);
 struct udev_enumerate *udev_enumerate_new(struct udev *udev);
 int udev_enumerate_add_match_subsystem(struct udev_enumerate *udev_enumerate, const char *subsystem);
@@ -86,6 +91,11 @@ struct udev_device *udev_device_unref(struct udev_device *d) { (void)d; return N
 const char *udev_device_get_devnode(struct udev_device *d) { (void)d; return NULL; }
 struct udev_device *udev_device_get_parent(struct udev_device *d) { (void)d; return NULL; }
 const char *udev_device_get_sysattr_value(struct udev_device *d, const char *a) { (void)d; (void)a; return NULL; }
+const char *udev_device_get_syspath(struct udev_device *d) { (void)d; return NULL; }
+const char *udev_device_get_action(struct udev_device *d) { (void)d; return NULL; }
+const char *udev_device_get_subsystem(struct udev_device *d) { (void)d; return NULL; }
+const char *udev_device_get_sysname(struct udev_device *d) { (void)d; return NULL; }
+const char *udev_device_get_driver(struct udev_device *d) { (void)d; return NULL; }
 struct udev_list_entry *udev_device_get_devlinks_list_entry(struct udev_device *d) { (void)d; return NULL; }
 struct udev_enumerate *udev_enumerate_new(struct udev *udev) { (void)udev; return NULL; }
 int udev_enumerate_add_match_subsystem(struct udev_enumerate *e, const char *s) { (void)e; (void)s; return 0; }
