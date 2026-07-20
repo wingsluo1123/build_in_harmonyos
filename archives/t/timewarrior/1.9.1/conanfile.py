@@ -6,7 +6,14 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, replace_in_file
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+    save,
+)
 
 
 class TimewarriorConan(ConanFile):
@@ -60,6 +67,34 @@ class TimewarriorConan(ConanFile):
                 )
             for helper in ("bash_tap.sh", "bash_tap_ti.sh", "timemachine"):
                 copy(self, helper, src=test_source, dst=test_build)
+            copy(
+                self,
+                "totals.py",
+                src=os.path.join(self.source_folder, "ext"),
+                dst=os.path.join(self.build_folder, "ext"),
+            )
+            shim_dir = os.path.join(test_build, "test-bin")
+            os.makedirs(shim_dir, exist_ok=True)
+            man_shim = os.path.join(shim_dir, "man")
+            save(
+                self,
+                man_shim,
+                "#!/bin/sh\n"
+                "name=\"$1\"\n"
+                "old_ifs=$IFS\n"
+                "IFS=:\n"
+                "for directory in ${MANPATH:-}; do\n"
+                "  for section in 1 5 7; do\n"
+                "    page=\"$directory/$name.$section\"\n"
+                "    if [ -f \"$page\" ]; then cat \"$page\"; exit 0; fi\n"
+                "  done\n"
+                "done\n"
+                "IFS=$old_ifs\n"
+                "echo \"No manual entry for $name\" >&2\n"
+                "exit 1\n",
+            )
+            os.chmod(man_shim, 0o755)
+            os.environ["PATH"] = shim_dir + os.pathsep + os.environ.get("PATH", "")
             self.run("chmod +x *.t run_all problems", cwd=test_build)
             cmake.build(target="test")
             self.run("./AtomicFileTest", cwd=test_build)
