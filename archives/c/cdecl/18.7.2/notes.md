@@ -25,6 +25,7 @@
 | 3 | 缺少 curses 库 | 终端尺寸功能依赖 curses，批处理功能不需要 | 添加 `--disable-term-size` |
 | 4 | config.status 写入 `subs1.awk` 权限失败 | HMDFS 下 `umask 077` 创建的临时目录不可写 | 补丁改为 `umask 022` |
 | 5 | GNU make jobserver mkfifo 警告 | HMDFS 不支持 mkfifo | Conan 构建使用 `make -j1` |
+| 6 | 上游测试是否依赖 readline | 评审人关注 `make check` 是否需要 readline | 经分析：所有 `.test` 文件通过管道传 stdin 比对 stdout 运行，不依赖 readline；自动补全测试 (`.exp`) 依赖 `expect(1)` 而非 readline，由 `--with-expect` 门控。Conan 配方已添加 `make check` 到 `build()` |
 
 ## 源码修改
 

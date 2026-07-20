@@ -4,6 +4,7 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -60,6 +61,14 @@ class CdeclConan(ConanFile):
         if os.path.exists(stale_config):
             os.remove(stale_config)
         autotools.make(args=["-j1"])
+        # Run upstream test suite: all tests use batch mode (piping input
+        # to cdecl and comparing output).  Readline is NOT required — the
+        # test runner (test/run_test.sh) feeds .test files via stdin and
+        # checks stdout against expected output.  Auto-completion tests
+        # (.exp) use expect(1), not readline, and are gated by
+        # --with-expect (not enabled here).
+        if can_run(self):
+            autotools.make(target="check")
 
     def package(self):
         bindir = os.path.join(self.package_folder, "bin")
