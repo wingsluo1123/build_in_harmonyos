@@ -1,5 +1,23 @@
 # proj 9.3.1 适配笔记
 
+## Conan 固化记录（2026-07-20）
+
+- 新增 `conanfile.py`、`conandata.yml` 和 `test_package/`，使用官方 OSGeo
+  源码包 `https://download.osgeo.org/proj/proj-9.3.1.tar.gz`。
+- 源码 SHA256：
+  `b0f919cb9e1f42f803a3e616c2b63a78e4d81ecfaed80978d570d3a5e29d10bc`。
+- PROJ 构建期必须运行 sqlite3 生成 `proj.db`，recipe 同时声明
+  `self.requires("sqlite3/3.49.1")` 和 `self.tool_requires("sqlite3/3.49.1")`。
+- 首版 Conan 包关闭 `ENABLE_TIFF`、`ENABLE_CURL` 和 `BUILD_PROJSYNC`，避免在
+  MapServer 依赖前置阶段引入未固化的 CURL/TIFF 全链；保留核心库和
+  `proj`、`cs2cs`、`cct`、`geod`、`gie`、`projinfo` 等常用命令。
+- `test_package/test_proj.cpp` 覆盖版本查询、context 生命周期、pipeline 坐标变换、
+  非法 projection 拒绝和 geodesic inverse 计算。
+- 本地 Windows 原生验证使用 CMake 4.2.1 + MinGW g++ 8.1.0 + Anaconda sqlite3：
+  configure、单线程 build、install、安装树消费测试和 `ctest` 均通过；`proj --version`
+  与 `projinfo EPSG:4326` smoke 通过。
+- 本机未安装 OpenHarmony Conan，因此 `conan create proj/9.3.1` 需等待远端 OHOS CI。
+
 ## 编译环境
 - 构建系统: cmake
 - 编译日期: 2026-05-29
