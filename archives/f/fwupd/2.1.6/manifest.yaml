@@ -1,0 +1,70 @@
+# 版本级 manifest
+version: "2.1.6"
+software: "fwupd"
+status: built
+build_date: "2026-07-20"
+build_system: meson
+
+source:
+  url: "https://github.com/fwupd/fwupd/archive/refs/tags/2.1.6.tar.gz"
+  sha256: "03f45f637a7178839f9f4894f86f4cb0ff4e2fc8d04a9a4da5af3157404ac369"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dbuild=standalone"
+    - "-Dpolkit=disabled"
+    - "-Dsystemd=disabled"
+    - "-Dplugin_modem_manager=disabled"
+    - "-Dplugin_uefi_capsule_splash=false"
+    - "-Ddocs=disabled"
+    - "-Dman=false"
+    - "-Dtests=false"
+    - "-Dintrospection=disabled"
+    - "-Dlvfs=disabled"
+    - "-Dblkid=disabled"
+    - "-Dbluez=disabled"
+    - "-Dgnutls=disabled"
+    - "-Dopenssl=disabled"
+    - "-Dhsi=disabled"
+    - "-Dpassim=disabled"
+    - "-Dlogind=disabled"
+    - "-Dreadline=disabled"
+    - "-Dbash_completion=false"
+    - "-Dfish_completion=false"
+    - "-Dmetainfo=false"
+    - "-Dfirmware-packager=false"
+    - "-Dudev_hotplug=false"
+    - "-Dlibdrm=disabled"
+    - "-Dlibmnl=disabled"
+    - "-Dqubes=false"
+    - "-Dvendor_metadata=false"
+    - "-Dumockdev_tests=disabled"
+    - "-Dvalgrind=disabled"
+    - "-Dsupported_build=disabled"
+    - "-Dstatic_analysis=false"
+    - "--default-library=both"
+
+  dependencies:
+    - glib/2.84.0
+    - libcurl/8.12.0
+    - libxmlb/0.3.19
+    - libusb/1.0.27
+    - sqlite3/3.49.1
+    - zlib/1.3.1
+    - lzma/5.6.2
+
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-fix-libusb-get-parent-redefinition.patch"
+  - "0002-add-ohos-platform-support.patch"
+  - "0003-fix-ohos-sockaddr-storage-redefinition.patch"
+  - "0004-force-include-libusb-h.patch"
+
+knowledge_gained:
+  - "host_machine.system() on OHOS returns 'harmonyos' (lowercase)"
+  - "OHOS sys/socket.h uses #ifndef __MUSL__ around sockaddr_storage, needs predefinition"
+  - "libusb 1.0.27 has libusb_get_parent but meson has_symbol() check fails; use LIBUSB_API_VERSION guard instead"
