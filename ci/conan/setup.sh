@@ -32,32 +32,9 @@ if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
     # Use python3 -m pip to bypass potentially broken pip3 shebang
     # (HNP pip3/conan binaries may have shebangs pointing to non-existent
     #  build-machine paths with ^M line endings)
-    # Pre-install requests to satisfy conan's dependency requests<3.0.0,>=2.25
-    # (pip dependency resolution may fail on some CI workers)
-    # Use multiple indices simultaneously with --extra-index-url so pip
-    # can find packages across all indices in one pass
-    PYPI_DEFAULT="https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple/"
-    python3 -m pip install --user \
-        --index-url "$PYPI_DEFAULT" \
-        --extra-index-url "https://pypi.org/simple/" \
-        --extra-index-url "https://mirrors.aliyun.com/pypi/simple/" \
-        --trusted-host pypi.cnb.cool \
-        --trusted-host pypi.org \
-        --trusted-host mirrors.aliyun.com \
-        'requests>=2.25,<3.0.0' 2>&1 || \
-        echo "[step] requests pre-install skipped (not critical)"
-    # Install conan with --no-deps to skip dependency resolution
-    python3 -m pip install --user --no-deps --force-reinstall conan 2>&1 || {
-        echo "[step] --no-deps failed, trying normal install..."
-        # Try normal install (may fail on some CI workers due to requests dep)
-        python3 -m pip install --user --force-reinstall conan 2>&1 || {
-            # Fallback: try specific conan version that works
-            echo "[step] Normal install failed, trying conan-2.29.1..."
-            python3 -m pip install --user --force-reinstall 'conan==2.29.1' 2>&1 || {
-                echo "[error] Failed to install conan after all attempts"
-                exit 1
-            }
-        }
+    python3 -m pip install --user --force-reinstall conan || {
+        echo "[error] Failed to install conan"
+        exit 1
     }
     # Ensure user-installed binaries are found before any broken HNP version
     export PATH="$HOME/.local/bin:$PATH"
@@ -65,6 +42,38 @@ fi
 
 CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
 echo "[step] Conan version: $CONAN_VERSION"
+
+# If conan still can't run after install/reinstall, diagnose the root cause
+if [ "$CONAN_VERSION" = "unknown" ]; then
+    echo "[error] conan 仍然无法运行, 诊断系统环境..."
+    # Check for common system-level issues
+    python3 -c "import sqlite3" 2>&1 || {
+        echo "[error] Python sqlite3 模块损坏 — libsqlite3.so.0 缺失"
+        echo "[error] 这不是 conan 问题, 需要在 Worker 上安装/链接 libsqlite3.so.0"
+        echo "[error] 修复: 找到 HNP 目录下的 libsqlite3.so.0 或从 OHOS 系统链接"
+        # Try to find and link it
+        SQLITE_LIB=$(find /data/service/hnp /system/lib* /usr/lib* -name 'libsqlite3.so*' 2>/dev/null | head -1)
+        if [ -n "$SQLITE_LIB" ]; then
+            echo "[step] 尝试设置 LD_LIBRARY_PATH: $(dirname "$SQLITE_LIB")"
+            export LD_LIBRARY_PATH="$(dirname "$SQLITE_LIB"):${LD_LIBRARY_PATH:-}"
+            CONAN_VERSION=$(conan --version 2>/dev/null || echo "unknown")
+            echo "[step] Retry conan version: $CONAN_VERSION"
+        fi
+    }
+    python3 -c "import ssl" 2>&1 || echo "[error] Python ssl 模块损坏 — libssl.so 缺失"
+    # Check for other missing shared libraries
+    PYTHON3_BIN=$(which python3 2>/dev/null)
+    if [ -n "$PYTHON3_BIN" ]; then
+        ldd "$PYTHON3_BIN" 2>/dev/null | grep "not found" | while read -r line; do
+            echo "[error] 缺失动态库: $line"
+        done
+    fi
+    # Final check — if still broken, exit with clear message
+    if [ "$CONAN_VERSION" = "unknown" ]; then
+        echo "[error] Conan 无法启动, Worker 环境需要修复 (非 CI 脚本问题)"
+        exit 1
+    fi
+fi
 
 # ── 1b. Refresh stale settings.yml ──
 # conan caches settings.yml on first run; if conan was upgraded (e.g. OHOS
