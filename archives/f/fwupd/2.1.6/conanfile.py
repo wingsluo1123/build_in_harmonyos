@@ -44,15 +44,6 @@ class FwupdConan(ConanFile):
             build_dir = os.path.join(self.source_folder, 'build')
             if os.path.isdir(build_dir):
                 shutil.rmtree(build_dir)
-            # OHOS: copy libusb.h into source root for force-include
-            libusb_src = "/storage/Users/currentUser/usr/local/include/libusb-1.0/libusb.h"
-            libusb_dst = os.path.join(self.source_folder, "libusb.h")
-            if os.path.isfile(libusb_src):
-                try:
-                    shutil.copy2(libusb_src, libusb_dst)
-                    self.output.info(f"Copied libusb.h to source root")
-                except Exception as _e:
-                    self.output.warning(f"Could not copy libusb.h: {_e}")
         else:
             get(self, **self.conan_data["sources"], strip_root=True)
 
@@ -110,58 +101,17 @@ class FwupdConan(ConanFile):
 
         if is_ohos:
             tc.project_options["vendor_ids_dir"] = "/storage/Users/currentUser/share/hwdata"
+            # R33: Inject AR/RANLIB via MesonToolchain [binaries], not os.environ
+            tc.toolchain["AR"] = "/data/service/hnp/bin/llvm-ar"
+            tc.toolchain["RANLIB"] = "/data/service/hnp/bin/llvm-ranlib"
 
         tc.generate()
 
     def build(self):
-        # R32: OHOS builds need special include handling
-        is_ohos = self.settings.os == "OHOS"
-
-        # OHOS: expose AR/RANLIB for meson to find static archiver
-        old_ar = os.environ.get("AR")
-        old_ranlib = os.environ.get("RANLIB")
-        os.environ["AR"] = "/data/service/hnp/bin/llvm-ar"
-        os.environ["RANLIB"] = "/data/service/hnp/bin/llvm-ranlib"
-        try:
-            apply_conandata_patches(self)
-
-            # OHOS: copy libusb.h into source tree for -include
-            try:
-                libusb_src = "/storage/Users/currentUser/usr/local/include/libusb-1.0/libusb.h"
-                libusb_dst = os.path.join(self.source_folder, "libusb.h")
-                with open(libusb_src) as _fr:
-                    _content = _fr.read()
-                with open(libusb_dst, 'w') as _fw:
-                    _fw.write(_content)
-            except Exception as _e:
-                self.output.warning(f"Could not copy libusb.h: {_e}")
-
-            # OHOS: add -include libusb.h to top-level meson.build
-            top_build = os.path.join(self.source_folder, "meson.build")
-            if os.path.isfile(top_build):
-                with open(top_build) as _f:
-                    _content = _f.read()
-                if "force_include_libusb" not in _content:
-                    marker = "add_project_arguments(\n  '-DFWUPD_COMPILATION',"
-                    replacement = ("# OHOS force_include_libusb\n"
-                                   "add_project_arguments('-include', 'libusb.h', language: 'c')\n\n"
-                                   "add_project_arguments(\n  '-DFWUPD_COMPILATION',")
-                    _content = _content.replace(marker, replacement)
-                    with open(top_build, 'w') as _f:
-                        _f.write(_content)
-
-            meson = Meson(self)
-            meson.configure()
-            meson.build()
-        finally:
-            if old_ar:
-                os.environ["AR"] = old_ar
-            else:
-                os.environ.pop("AR", None)
-            if old_ranlib:
-                os.environ["RANLIB"] = old_ranlib
-            else:
-                os.environ.pop("RANLIB", None)
+        apply_conandata_patches(self)
+        meson = Meson(self)
+        meson.configure()
+        meson.build()
 
     def package(self):
         meson = Meson(self)
