@@ -24,7 +24,7 @@
 
 ## 源码修改
 
-应用 `0001-ohos-use-non-linux-platform-stubs.patch`。OHOS Clang 同时定义 `__linux__`，而 CMake 平台名是 `HarmonyOS`；补丁让 libscap 在该组合下使用非 Linux 用户态平台桩，避免引用未参与构建的 Linux platform 实现。
+应用 `0001-ohos-use-non-linux-platform-stubs.patch`。OHOS Clang 同时定义 `__linux__`，而 CMake 平台名是 `HarmonyOS`；补丁让 libscap 在 `__linux__` 且未定义项目级宏 `HAS_LINUX_PLATFORM` 时使用非 Linux 用户态平台桩，避免引用未参与构建的 Linux platform 实现。`HAS_LINUX_PLATFORM` 由 conanfile.py `generate()` 根据 `CMAKE_SYSTEM_NAME` 推导：HarmonyOS 下置 OFF，其他平台置 ON。补丁不引入 `__OHOS__` 等平台条件编译宏（符合 R8）。
 
 应用 `0002-musl-shared-build-without-static-flag.patch`。上游 musl 优化默认全局加入 `-static`，会导致共享引擎链接动态 `scap_event_schema` 失败；共享构建保留 musl 兼容源码，但不再加入静态链接参数。
 
