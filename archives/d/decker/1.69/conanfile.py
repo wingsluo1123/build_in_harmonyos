@@ -9,7 +9,7 @@ Build uses PkgConfigDeps to provide SDL2/SDL2_image flags via pkg-config
 when SDL2 dependencies are available.
 """
 import os
-from conan import ConanFile
+from conan import ConanFile, ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -63,7 +63,12 @@ class DeckerConan(ConanFile):
         self.run("chmod +x scripts/resources.sh")
         self.run("./scripts/resources.sh examples/decks/tour.deck")
 
-        # Common flags
+        # Ensure c/build/ exists before writing lilt/decker binaries into it.
+        # git does not track empty dirs, so the source tarball has no c/build/.
+        os.makedirs(os.path.join(self.source_folder, "c", "build"), exist_ok=True)
+
+        # Common flags. -O2 is fixed upstream; build_type is a Makefile project
+        # so we don't remap Debug/Release here.
         flags = "-std=c99 -Wall -Wextra -O2 -Wno-misleading-indentation"
         flags += " -Wno-unknown-warning-option -Wno-overlength-strings -lm"
 
@@ -75,14 +80,22 @@ class DeckerConan(ConanFile):
 
         # Build decker (GUI app, needs SDL2 + SDL2_image)
         if self.options.with_sdl:
-            sdl2_cflags = os.popen("pkg-config --cflags sdl2 SDL2_image 2>/dev/null").read().strip()
-            sdl2_libs = os.popen("pkg-config --libs sdl2 SDL2_image 2>/dev/null").read().strip()
-            if sdl2_cflags and sdl2_libs:
-                self.run(
-                    f"{cc} ./c/decker.c -o ./c/build/decker "
-                    f"{sdl2_cflags} {sdl2_libs} "
-                    f"{flags} -DVERSION='\"{version}\"'"
+            # Use with-statements so popen() pipes are always closed, even
+            # when pkg-config fails. Surface stderr instead of swallowing it.
+            with os.popen("pkg-config --cflags sdl2 SDL2_image") as cf:
+                sdl2_cflags = cf.read().strip()
+            with os.popen("pkg-config --libs sdl2 SDL2_image") as lf:
+                sdl2_libs = lf.read().strip()
+            if not sdl2_cflags or not sdl2_libs:
+                raise ConanException(
+                    "with_sdl=True but pkg-config could not resolve "
+                    "sdl2/SDL2_image flags (PKG_CONFIG_PATH / deps missing?)"
                 )
+            self.run(
+                f"{cc} ./c/decker.c -o ./c/build/decker "
+                f"{sdl2_cflags} {sdl2_libs} "
+                f"{flags} -DVERSION='\"{version}\"'"
+            )
 
     def package(self):
         # Install lilt binary
