@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Conan recipe — xz 5.6.2.1 (Autotools static liblzma build)."""
 
-import os
 import stat
 from pathlib import Path
 
 from conan import ConanFile
+from conan.tools.env import Environment
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -46,7 +46,9 @@ class XzConan(ConanFile):
         ])
         toolchain.generate()
 
-        os.environ["PATH"] = f"{wrapper_dir}{os.pathsep}{os.environ['PATH']}"
+        build_env = Environment()
+        build_env.prepend_path("PATH", str(wrapper_dir))
+        build_env.vars(self).save_script("ohos_build_env")
 
     def build(self):
         apply_conandata_patches(self)

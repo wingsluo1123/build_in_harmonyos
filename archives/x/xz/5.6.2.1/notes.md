@@ -18,7 +18,7 @@
 - `conan create`：通过。
 - 上游 `make check`：18/18 通过。
 - `test_package`：CMake 消费者程序静态链接 `xz::xz`，调用 `lzma_easy_buffer_encode` 和 `lzma_stream_buffer_decode` 完成编解码往返验证；未设置 `LD_LIBRARY_PATH`。
-- 本地 CI：L0、L1、L2、L5 通过；L4 仅对 config.guess 补丁中的 `case` 关键字给出非阻塞告警。
+- 本地 CI：`conan create`、上游测试、消费者测试和 ELF 检查实际通过；`conan-verify` 报告中的 G4、L2、L4、L5 因未找到 cache 路径而跳过，不记作实际执行通过。
 
 ## 下游用法
 
