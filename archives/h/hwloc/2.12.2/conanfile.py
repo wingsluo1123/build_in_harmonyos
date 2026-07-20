@@ -17,8 +17,8 @@ class HwlocConan(ConanFile):
     version = "2.12.2"
     description = "hwloc 2.12.2"
     license = "MIT"
-    homepage = ""
-    url = ""  # CI fills this
+    homepage = "https://www.open-mpi.org/projects/hwloc/"
+    url = "https://download.open-mpi.org/release/hwloc/v2.12/hwloc-2.12.2.tar.gz"
 
     package_type = "library"
 
