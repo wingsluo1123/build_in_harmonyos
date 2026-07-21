@@ -11,25 +11,36 @@
 package: glib/2.84.0
 homepage: ""
 
-# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
-upstream_check_command: "make check"
+# 上游测试命令 (meson 项目用 meson test)
+upstream_check_command: "meson test"
 
 # conanfile.py build() 方法中是否已集成上游测试
+# glib 上游测试套件庞大且依赖 DBus/桌面环境，OHOS 上无法运行
 upstream_test_in_build: false
 upstream_test_command: ""
 
-# 上游实际运行的测试程序
+# 上游测试套件 (meson test --list 分析结果)
+# glib 上游有数百个测试，OHOS 上因 tests=false 未构建
+# 以下列出代表性测试模块
 upstream_tests:
-  - file: <TODO: 测试源文件>
-    source: glib-2.84.0/<TODO: 测试源文件>
-    description: "<TODO: 测试描述>"
-    command: "./<TODO: 测试程序>"
+  - file: glib/tests/
+    source: glib-2.84.0/glib/tests/
+    description: "glib 核心工具库测试 (string, hash, list, etc.)"
+    command: "meson test glib"
+  - file: gobject/tests/
+    source: glib-2.84.0/gobject/tests/
+    description: "gobject 类型系统测试 (GType, signals, properties)"
+    command: "meson test gobject"
+  - file: gio/tests/
+    source: glib-2.84.0/gio/tests/
+    description: "gio I/O 测试 (file, socket, dbus, etc.)"
+    command: "meson test gio"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.c
-    description: "消费者测试"
+    description: "glib+gobject 消费者测试 (g_strdup, g_free, GType 类型系统)"
     command: "./test_glib"
 
 # 测试断言总数 (近似值, 用于质量评估)
-assertion_count: <TODO: 断言数>
+assertion_count: 5

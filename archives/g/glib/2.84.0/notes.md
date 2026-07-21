@@ -31,13 +31,18 @@
 
 ## 补丁文件
 
-1. **0001-disable-netlink-for-harmonyos.patch**
-   - 注释掉 gnetworkmonitornetlink.c 的编译
-   - 禁用 HAVE_NETLINK 定义
+1. **0001-gio-meson.build.patch**
+   - 修改 gio/meson.build，将 `host_system == 'linux'` 改为 `host_system in ['linux', 'harmonyos']`
+   - 影响 gjournal-private.c 的条件编译
 
-2. **0002-add-harmonyos-host-support.patch**
-   - 修改 glib/meson.build 和 gio/meson.build
-   - 添加 HarmonyOS 到 host_system 条件
+2. **0002-glib-meson.build.patch**
+   - 修改 glib/meson.build，将 `host_system == 'linux'` 改为 `host_system in ['linux', 'harmonyos']`
+   - 影响 gjournal-private.c 的条件编译
+
+3. **0003-meson.build.patch**
+   - 修改顶层 meson.build，多处 `host_system == 'linux'` 改为 `host_system in ['linux', 'harmonyos']`
+   - 添加 HAVE_NETLINK 平台条件守卫：`if host_system != 'harmonyos' and ...`
+   - 影响 musl libc 检测、mkostemp 检测、libmount/selinux 依赖、summary 输出
 
 ## 编译命令总结
 

@@ -38,10 +38,10 @@ diff -ruN a/meson.build b/meson.build
 -if glib_conf.has('HAVE_LINUX_NETLINK_H') or glib_conf.has('HAVE_NETLINK_NETLINK_H')
 -  glib_conf.set('HAVE_NETLINK', 1)
 -endif
-+# disabled for HarmonyOS - sockaddr_storage duplicate definition
-+# if glib_conf.has('HAVE_LINUX_NETLINK_H') or glib_conf.has('HAVE_NETLINK_NETLINK_H')
-+#   glib_conf.set('HAVE_NETLINK', 1)
-+# endif
++# HarmonyOS: sockaddr_storage duplicate definition between linux/socket.h and sys/socket.h
++if host_system != 'harmonyos' and (glib_conf.has('HAVE_LINUX_NETLINK_H') or glib_conf.has('HAVE_NETLINK_NETLINK_H'))
++  glib_conf.set('HAVE_NETLINK', 1)
++endif
  
  # Is statx() supported? Android systems don’t reliably support it as of August 2020.
  statx_code = '''
