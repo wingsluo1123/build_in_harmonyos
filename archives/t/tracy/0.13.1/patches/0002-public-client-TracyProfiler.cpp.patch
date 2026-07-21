@@ -1,6 +1,6 @@
 --- a/public/client/TracyProfiler.cpp
 +++ b/public/client/TracyProfiler.cpp
-@@ -431,38 +431,67 @@
+@@ -431,38 +431,70 @@
      const char* ptr = buf;
      while( *ptr != '\0' ) ptr++;
      while( ptr > buf && *ptr != '\\' && *ptr != '/' ) ptr--;
@@ -25,8 +25,11 @@
 +        {
 +            cmdlineBuf[len] = '\0';
 +            // Strip leading path components to mirror program_invocation_short_name.
++            // Stop at the first NUL byte: cmdline entries are separated by '\0',
++            // and scanning past argv[0] could land on a '/' inside a later arg
++            // (e.g. `--config=/etc/foo`).
 +            const char* base = cmdlineBuf;
-+            for( int i = 0; i < len; ++i )
++            for( int i = 0; i < len && cmdlineBuf[i] != '\0'; ++i )
 +            {
 +                if( cmdlineBuf[i] == '/' ) base = cmdlineBuf + i + 1;
 +            }

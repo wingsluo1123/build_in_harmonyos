@@ -54,8 +54,10 @@ class TracyConan(ConanFile):
         tc = CMakeToolchain(self)
         # R26: System-name library → static default
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
-        # tracy CMake options
-        tc.variables["TRACY_STATIC"] = "ON"
+        # tracy CMake options. TRACY_STATIC controls add_library(... STATIC) and
+        # would override BUILD_SHARED_LIBS, so bind it to the shared option to
+        # keep both switches consistent.
+        tc.variables["TRACY_STATIC"] = "OFF" if self.options.shared else "ON"
         tc.variables["TRACY_ENABLE"] = "ON"
         tc.variables["TRACY_NO_BROADCAST"] = "ON"        # don't broadcast on LAN
         tc.variables["TRACY_ONLY_LOCALHOST"] = "ON"      # listen on 127.0.0.1

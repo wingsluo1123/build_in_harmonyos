@@ -1,6 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -50,20 +50,23 @@
+@@ -50,20 +50,31 @@
  set_target_properties(TracyClient PROPERTIES INTERPROCEDURAL_OPTIMIZATION ${LTO_SUPPORTED})
  target_include_directories(TracyClient SYSTEM PUBLIC
      $<BUILD_INTERFACE:${TRACY_PUBLIC_DIR}>
@@ -14,6 +14,14 @@
 +# OHOS/OHOS_PC bionic libc 不默认定义 _GNU_SOURCE，导致 pthread_setcancelstate /
 +# program_invocation_short_name 等 GNU 扩展未声明，必须显式开启。
 +target_compile_definitions(TracyClient PUBLIC _GNU_SOURCE=1)
++# POSIX feature detection (per R8: no platform conditionals in patches). Probes
++# whether pthread_setcancelstate exists; result is exposed to TracySystem.cpp
++# via the HAS_PTHREAD_SETCANCELSTATE preprocessor macro.
++include(CheckSymbolExists)
++check_symbol_exists(pthread_setcancelstate "pthread.h" HAS_PTHREAD_SETCANCELSTATE)
++if(HAS_PTHREAD_SETCANCELSTATE)
++    target_compile_definitions(TracyClient PUBLIC HAS_PTHREAD_SETCANCELSTATE=1)
++endif()
  if(rocprofiler-sdk_FOUND)
      target_compile_definitions(TracyClient PUBLIC TRACY_ROCPROF)
      target_link_libraries(TracyClient PUBLIC rocprofiler-sdk::rocprofiler-sdk)
