@@ -43,7 +43,7 @@ class PerlPackageStashXsConan(ConanFile):
         # Perl XS module build: perl Makefile.PL && make
         # Patch already modifies Makefile.PL with HarmonyOS-specific INC and dynamic_lib flags
         home = os.environ.get("HOME", "/storage/Users/currentUser")
-        perl_lib = f"{home}/usr/local/lib/site_perl/5.42.0:{home}/usr/local/lib/5.42.0"
+        perl_lib = f"{home}/usr/local/lib/site_perl/5.42.2:{home}/usr/local/lib/5.42.2"
         # Set PERL5LIB in the environment
         os.environ["PERL5LIB"] = perl_lib
         self.run(f"perl Makefile.PL PREFIX={home}/usr/local", cwd=self.source_folder)
