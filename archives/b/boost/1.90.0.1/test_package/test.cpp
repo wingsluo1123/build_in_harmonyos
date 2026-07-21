@@ -1,4 +1,6 @@
+#include <boost/atomic.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
 #include <boost/thread.hpp>
@@ -34,7 +36,10 @@ int main(int argc, char** argv) {
         throw std::runtime_error("serialization produced no output");
     }
 
-    int value = 0;
+    boost::atomic<int> value(0);
+    const boost::chrono::steady_clock::time_point start =
+        boost::chrono::steady_clock::now();
+
     boost::thread worker([&value, count]() {
         for (int i = 0; i < count; ++i) {
             ++value;
@@ -42,8 +47,15 @@ int main(int argc, char** argv) {
     });
     worker.join();
 
-    if (value != count) {
+    const boost::chrono::steady_clock::time_point finish =
+        boost::chrono::steady_clock::now();
+    const boost::chrono::steady_clock::duration elapsed = finish - start;
+
+    if (value.load() != count) {
         throw std::runtime_error("thread did not update value");
+    }
+    if (elapsed < boost::chrono::steady_clock::duration::zero()) {
+        throw std::runtime_error("chrono steady clock moved backwards");
     }
 
     return 0;
