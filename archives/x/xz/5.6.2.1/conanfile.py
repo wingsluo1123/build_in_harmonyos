@@ -48,7 +48,7 @@ class XzConan(ConanFile):
 
         build_env = Environment()
         build_env.prepend_path("PATH", str(wrapper_dir))
-        build_env.vars(self).save_script("ohos_build_env")
+        build_env.vars(self).save_script("conanbuild")
 
     def build(self):
         apply_conandata_patches(self)
