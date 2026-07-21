@@ -28,5 +28,6 @@ class HwlocTestConan(ConanFile):
 
     def test(self):
         # Run the test binary directly to verify hwloc API works
-        bin_dir = os.path.join(self.cpp.build.bindirs[0]) if self.cpp.build.bindirs else self.build_folder
-        self.run(f"{os.path.join(bin_dir, 'test_hwloc')}", env="conanrun")
+        bindirs = self.cpp.build.bindirs or []
+        bin_dir = bindirs[0] if len(bindirs) > 0 else self.build_folder
+        self.run(os.path.join(bin_dir, "test_hwloc"), env="conanrun")

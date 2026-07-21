@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe for hwloc/2.12.2 (Autotools project: configure + make).
 
-Usage: Replace Hwloc, hwloc, 2.12.2, hwloc 2.12.2, MIT, 
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for system-name libraries.
+hwloc is the Hardware Locality library from OpenMPI — discovers and binds
+the hardware topology of the running system. This recipe builds the static
+library and the 13 command-line tools (hwloc-info/lstopo/hwloc-bind ...).
 """
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -16,7 +15,7 @@ class HwlocConan(ConanFile):
     name = "hwloc"
     version = "2.12.2"
     description = "hwloc 2.12.2"
-    license = "MIT"
+    license = "BSD-3-Clause"
     homepage = "https://www.open-mpi.org/projects/hwloc/"
     url = "https://download.open-mpi.org/release/hwloc/v2.12/hwloc-2.12.2.tar.gz"
 
