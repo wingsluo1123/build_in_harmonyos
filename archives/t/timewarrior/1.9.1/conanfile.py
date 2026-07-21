@@ -6,6 +6,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -71,7 +72,7 @@ class TimewarriorConan(ConanFile):
                 self,
                 "totals.py",
                 src=os.path.join(self.source_folder, "ext"),
-                dst=os.path.join(self.build_folder, "ext"),
+                dst=test_build,
             )
             shim_dir = os.path.join(test_build, "test-bin")
             os.makedirs(shim_dir, exist_ok=True)
@@ -85,8 +86,9 @@ class TimewarriorConan(ConanFile):
                 "IFS=:\n"
                 "for directory in ${MANPATH:-}; do\n"
                 "  for section in 1 5 7; do\n"
-                "    page=\"$directory/$name.$section\"\n"
-                "    if [ -f \"$page\" ]; then cat \"$page\"; exit 0; fi\n"
+                "    for page in \"$directory/$name.$section\" \"$directory/man$section/$name.$section\"; do\n"
+                "      if [ -f \"$page\" ]; then cat \"$page\"; exit 0; fi\n"
+                "    done\n"
                 "  done\n"
                 "done\n"
                 "IFS=$old_ifs\n"
@@ -94,10 +96,12 @@ class TimewarriorConan(ConanFile):
                 "exit 1\n",
             )
             os.chmod(man_shim, 0o755)
-            os.environ["PATH"] = shim_dir + os.pathsep + os.environ.get("PATH", "")
-            self.run("chmod +x *.t run_all problems", cwd=test_build)
-            cmake.build(target="test")
-            self.run("./AtomicFileTest", cwd=test_build)
+            test_env = Environment()
+            test_env.prepend_path("PATH", shim_dir)
+            with test_env.vars(self).apply():
+                self.run("chmod +x *.t run_all problems", cwd=test_build)
+                cmake.build(target="test")
+                self.run("./AtomicFileTest", cwd=test_build)
 
     def package(self):
         CMake(self).install()
