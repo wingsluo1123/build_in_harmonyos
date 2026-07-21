@@ -1,6 +1,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import cross_building
 
 
@@ -20,7 +21,10 @@ class TestPackageConan(ConanFile):
                 library_flags.append("-L" + libdir)
             libs += ["-l" + lib for lib in dep.cpp_info.libs if lib != "mapserver"]
             libs += ["-l" + lib for lib in dep.cpp_info.system_libs]
-        cc = os.environ.get("CC", "clang")
+        executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
+        cc = executables.get("c") or os.environ.get("CC")
+        if not cc:
+            raise ConanException("C compiler not found in tools.build:compiler_executables or CC")
         command = "{} test_mapserver.c -o test_mapserver {} {} {}".format(
             cc,
             " ".join(include_flags),
@@ -33,6 +37,5 @@ class TestPackageConan(ConanFile):
         if cross_building(self):
             self.output.info("cross-building: compile/link validation completed")
             return
-        shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{shell} -c './test_mapserver'", env="conanrun")
-        self.run(f"{shell} -c 'mapserv -v'", env="conanrun")
+        self.run("./test_mapserver", env="conanrun")
+        self.run("mapserv -v", env="conanrun")
