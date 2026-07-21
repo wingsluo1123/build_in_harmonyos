@@ -101,12 +101,15 @@ class SpiceGtkConan(ConanFile):
         copy(self, "COPYING*", self.source_folder, os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
-        self.cpp_info.libs = ["spice-client-gtk-3.0", "spice-client-glib-2.0"]
+        self.cpp_info.libs = ["spice-client-glib-2.0"]
         self.cpp_info.set_property("cmake_file_name", "spice-gtk")
         self.cpp_info.set_property("cmake_target_name", "spice-gtk::spice-gtk")
-        self.cpp_info.set_property("pkg_config_name", "spice-client-gtk-3.0")
+        self.cpp_info.set_property("pkg_config_name", "spice-client-glib-2.0")
         self.cpp_info.components["glib"].libs = ["spice-client-glib-2.0"]
         self.cpp_info.components["glib"].set_property("pkg_config_name", "spice-client-glib-2.0")
-        self.cpp_info.components["gtk"].libs = ["spice-client-gtk-3.0"]
-        self.cpp_info.components["gtk"].requires = ["glib"]
-        self.cpp_info.components["gtk"].set_property("pkg_config_name", "spice-client-gtk-3.0")
+        if self.options.gtk:
+            self.cpp_info.libs.insert(0, "spice-client-gtk-3.0")
+            self.cpp_info.set_property("pkg_config_name", "spice-client-gtk-3.0")
+            self.cpp_info.components["gtk"].libs = ["spice-client-gtk-3.0"]
+            self.cpp_info.components["gtk"].requires = ["glib"]
+            self.cpp_info.components["gtk"].set_property("pkg_config_name", "spice-client-gtk-3.0")
