@@ -13,7 +13,7 @@ file (ExtUtils::MakeMaker doesn't auto-detect .xs files for sub-modules).
 On OHOS:
   - musl C library headers at ~/usr/local/include (sys/types.h etc.)
   - musl libc at ~/usr/local/lib
-  - E137: Perl 5.42.0 lddlflags has -fstack-protector-strong, ld.lld rejects it
+  - E137: Perl 5.42.2 lddlflags has -fstack-protector-strong, ld.lld rejects it
   - Fix: use clang -shared with -nostartfiles -nodefaultlibs -lc for XS linking
   - XS .so may fail to load at runtime due to SELinux/HMDFS (PP fallback works)
 """
@@ -183,7 +183,7 @@ WriteMakefile(
         # Manually install XS.so to Perl's auto directory
         site_arch = os.path.join(
             dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
+            "perl_5.42.2", "lib", "site_perl", "5.42.2", "aarch64-linux"
         )
         so_src = os.path.join(
             self.source_folder, "blib", "arch", "auto", "Params", "Validate", "XS", "XS.so"
