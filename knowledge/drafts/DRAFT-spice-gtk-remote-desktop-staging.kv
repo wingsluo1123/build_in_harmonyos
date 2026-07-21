@@ -1,0 +1,47 @@
+#====================================================================
+# DRAFT-spice-gtk-remote-desktop-staging.kv
+#====================================================================
+id:                     DRAFT-spice-gtk-remote-desktop-staging
+title:                  Stage remote desktop GUI clients by separating display core from device side channels
+trigger_tool:           meson|pkg-config|conan|cc
+phase:                  configuration|compilation|testing
+error_signature:        spice-protocol|gtk+-3.0|gstreamer|usbredir|phodav|libsoup|wayland|cacard
+severity:               3
+category:               gui|video|audio|usb|dependency-closure
+match_keywords:         spice-gtk, SPICE, GTK, GDK, GStreamer, usbredir, WebDAV, SASL, smartcard
+root_cause:             Remote desktop GUI clients combine protocol code generation, display/input
+                        widgets, video/audio pipelines, authentication, USB redirection, file transfer,
+                        and optional native window-system handles. Enabling all side channels in the
+                        first OHOS package pass makes dependency and runtime validation too broad.
+affected_scope:         SPICE-like remote display clients, GTK multimedia clients, and device-forwarding GUI packages.
+verification_cmd:       conan create archives/s/spice-gtk/0.42
+
+rec_priority:           1
+rec_approach:           core-display-first-feature-staging
+rec_description:        Keep the GLib/GTK client libraries and essential display/audio pipeline first,
+                        then disable USB redirection, WebDAV/phodav, SASL, smartcard, Wayland protocol
+                        generation, EGL, introspection, VAPI, documentation, and build-tree tests until
+                        the corresponding OHOS dependency packages and runtime devices are available.
+rec_command:            -Dusbredir=disabled -Dwebdav=disabled -Dsasl=disabled -Dsmartcard=disabled
+rec_auto_fix:           false
+rec_impl:               meson-options-and-dependency-staging
+
+forbid_1_pattern:       claim full remote desktop support without real SPICE server/display/audio/USB validation
+principles:             R34,R40
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:
+last_updated:           2026-07-21
+
+authors:                asp1r1n1
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/3134
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.6
+metrics_last_used:
