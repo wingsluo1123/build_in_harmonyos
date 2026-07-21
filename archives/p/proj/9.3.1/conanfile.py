@@ -8,6 +8,7 @@ so the recipe wires sqlite3 as both a host dependency and a build tool.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 
@@ -55,7 +56,7 @@ class ProjConan(ConanFile):
         sqlite_host = self.dependencies.host["sqlite3"].package_folder
         sqlite_build = self.dependencies.build["sqlite3"].package_folder
         sqlite_exe = self._sqlite3_executable(sqlite_build)
-        sqlite_lib = os.path.join(sqlite_host, "lib", "libsqlite3.a")
+        sqlite_lib = self._sqlite3_library(sqlite_host)
 
         tc = CMakeToolchain(self)
         if self.settings.os == "OHOS":
@@ -105,4 +106,18 @@ class ProjConan(ConanFile):
         for candidate in candidates:
             if os.path.exists(candidate):
                 return candidate
-        return candidates[0]
+        checked = ", ".join(candidates)
+        raise ConanException(f"sqlite3 executable not found; checked: {checked}")
+
+    @staticmethod
+    def _sqlite3_library(package_folder):
+        lib_dir = os.path.join(package_folder, "lib")
+        candidates = [
+            os.path.join(lib_dir, "libsqlite3.a"),
+            os.path.join(lib_dir, "sqlite3.lib"),
+        ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+        checked = ", ".join(candidates)
+        raise ConanException(f"static sqlite3 library not found; checked: {checked}")
