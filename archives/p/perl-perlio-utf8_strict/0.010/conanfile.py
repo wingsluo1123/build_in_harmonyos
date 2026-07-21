@@ -44,4 +44,8 @@ class PerlPerlioUtf8_strict(ConanFile):
                     shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = []
+        # The shared library is utf8_strict.so (Perl XS extension)
+        self.cpp_info.libs = ["utf8_strict"]
+        self.cpp_info.libdirs = ["lib/auto/PerlIO/utf8_strict"]
+        # Perl module path for consumers
+        self.cpp_info.includedirs = []

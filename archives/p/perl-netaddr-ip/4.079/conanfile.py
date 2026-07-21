@@ -51,4 +51,8 @@ class PerlNetaddrIp(ConanFile):
                     shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = []
+        # The shared library is Util.so (Perl XS extension)
+        self.cpp_info.libs = ["Util"]
+        self.cpp_info.libdirs = ["lib/auto/NetAddr/IP/Util"]
+        # Perl module path for consumers
+        self.cpp_info.includedirs = []

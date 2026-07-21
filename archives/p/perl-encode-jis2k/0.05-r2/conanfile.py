@@ -44,4 +44,8 @@ class PerlEncodeJis2k(ConanFile):
                     shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = []
+        # The shared library is JIS2K.so (Perl XS extension)
+        self.cpp_info.libs = ["JIS2K"]
+        self.cpp_info.libdirs = ["lib/auto/Encode/JIS2K"]
+        # Perl module path for consumers
+        self.cpp_info.includedirs = []

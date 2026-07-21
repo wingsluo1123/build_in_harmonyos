@@ -44,4 +44,8 @@ class PerlMimeBase64(ConanFile):
                     shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = []
+        # The shared library is Base64.so (Perl XS extension)
+        self.cpp_info.libs = ["Base64"]
+        self.cpp_info.libdirs = ["lib/auto/MIME/Base64"]
+        # Perl module path for consumers
+        self.cpp_info.includedirs = []
