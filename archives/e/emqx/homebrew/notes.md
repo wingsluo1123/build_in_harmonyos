@@ -2,8 +2,8 @@
 
 ## Build scope
 
-- Homebrew formula version: `homebrew`
-- Upstream version used by the formula: `5.8.8`
+- Recipe directory: `homebrew`, documenting the Homebrew formula build entry point
+- Upstream version: `5.8.8`
 - Source URL: `https://github.com/emqx/emqx/archive/refs/tags/v5.8.8.tar.gz`
 - SHA256: `5861d8d32c4934175ca3d01c691ea679ac1a7903a1faee72027f6484d3085c89`
 
@@ -43,4 +43,4 @@ binary can run locally, it also runs `emqx help` as a command smoke test.
 
 The official source tarball hash was verified locally. The workstation used for
 this PR does not have an OHOS Conan environment or Erlang/OTP 26 release toolchain,
-so full `conan create emqx/homebrew` is pending remote OHOS CI.
+so full `conan create emqx/5.8.8` is pending remote OHOS CI.

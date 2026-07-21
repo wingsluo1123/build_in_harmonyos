@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for emqx homebrew (upstream 5.8.8).
+"""Conan recipe for EMQX 5.8.8.
 
 Homebrew formula source:
 https://github.com/Homebrew/homebrew-core/blob/master/Formula/e/emqx.rb
@@ -19,7 +19,7 @@ from conan.tools.layout import basic_layout
 
 class EmqxConan(ConanFile):
     name = "emqx"
-    version = "homebrew"
+    version = "5.8.8"
     description = "Distributed MQTT broker for IoT messaging"
     license = "Apache-2.0"
     homepage = "https://www.emqx.io/"
