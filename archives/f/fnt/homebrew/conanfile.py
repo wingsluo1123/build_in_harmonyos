@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Conan recipe for fnt — a font manager shell script (no compilation needed)."""
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, save
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 import os
 
 
 class FntConan(ConanFile):
     name = "fnt"
-    version = "homebrew"
+    version = "1.9.1"
     description = "Apt for fonts, the missing font manager for macOS/linux"
     license = "MIT"
     homepage = "https://github.com/alexmyczko/fnt"
@@ -51,8 +51,11 @@ class FntConan(ConanFile):
         src_fnt = os.path.join(self.source_folder, "fnt")
         dst_fnt = os.path.join(dst_bin, "fnt")
         shutil.copyfile(src_fnt, dst_fnt)
-        # Try system chmod as fallback for HMDFS
-        os.system("chmod 755 " + dst_fnt)
+        # Fix permissions: use os.chmod with try/except, fallback to os.system
+        try:
+            os.chmod(dst_fnt, 0o755)
+        except (PermissionError, OSError):
+            os.system("chmod 755 \"" + dst_fnt + "\" 2>/dev/null")
         copy(self, "fnt.1", src=self.source_folder, dst=os.path.join(self.package_folder, "man", "man1"))
         copy(self, "completions/_fnt", src=self.source_folder, dst=os.path.join(self.package_folder, "zsh", "site-functions"))
 
