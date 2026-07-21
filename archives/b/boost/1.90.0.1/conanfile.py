@@ -29,10 +29,12 @@ class BoostCompiledConan(ConanFile):
     _components = (
         "atomic",
         "chrono",
+        "filesystem",
         "program_options",
         "regex",
         "serialization",
         "thread",
+        "timer",
     )
 
     def layout(self):
@@ -78,6 +80,7 @@ class BoostCompiledConan(ConanFile):
 
         self.cpp_info.components["chrono"].requires = ["atomic"]
         self.cpp_info.components["thread"].requires = ["chrono", "atomic"]
+        self.cpp_info.components["timer"].requires = ["chrono"]
 
         if self.settings.os in ("Linux", "OHOS", "FreeBSD"):
             self.cpp_info.components["thread"].system_libs.append("pthread")

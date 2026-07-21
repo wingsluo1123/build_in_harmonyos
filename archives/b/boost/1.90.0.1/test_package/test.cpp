@@ -1,8 +1,10 @@
 #include <boost/atomic.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/chrono.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
+#include <boost/timer/timer.hpp>
 #include <boost/thread.hpp>
 
 #include <sstream>
@@ -24,8 +26,14 @@ int main(int argc, char** argv) {
     const std::string name = vm["name"].as<std::string>();
     const int count = vm["count"].as<int>();
 
+    boost::timer::cpu_timer timer;
+
     if (!boost::regex_match(name, boost::regex("[A-Za-z0-9_]+"))) {
         throw std::runtime_error("regex validation failed");
+    }
+    const boost::filesystem::path composed = boost::filesystem::path("boost") / name;
+    if (composed.generic_string() != "boost/" + name) {
+        throw std::runtime_error("filesystem path composition failed");
     }
 
     std::ostringstream buffer;
@@ -56,6 +64,9 @@ int main(int argc, char** argv) {
     }
     if (elapsed < boost::chrono::steady_clock::duration::zero()) {
         throw std::runtime_error("chrono steady clock moved backwards");
+    }
+    if (timer.elapsed().wall < 0) {
+        throw std::runtime_error("timer wall clock moved backwards");
     }
 
     return 0;
