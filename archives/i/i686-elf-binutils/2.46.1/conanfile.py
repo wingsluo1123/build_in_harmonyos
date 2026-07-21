@@ -19,8 +19,6 @@ class I686elfbinutilsConan(ConanFile):
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False]}
-    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -36,9 +34,9 @@ class I686elfbinutilsConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        if not self.options.shared:
-            tc.configure_args.append("--enable-static")
-            tc.configure_args.append("--disable-shared")
+        # Static build: cross-toolchain binaries are self-contained, no shared libs needed
+        tc.configure_args.append("--enable-static")
+        tc.configure_args.append("--disable-shared")
         tc.configure_args.append("--target=i686-elf")
         tc.configure_args.append("--disable-nls")
         tc.configure_args.append("--disable-werror")
@@ -49,6 +47,11 @@ class I686elfbinutilsConan(ConanFile):
         tc.configure_args.append("--disable-sim")
         # Bypass config.guess detection on OHOS
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+        # Set LLVM toolchain for HarmonyOS (E012: use llvm-ar/ranlib/nm/strip instead of GNU)
+        tc.make_args.append("AR=llvm-ar")
+        tc.make_args.append("RANLIB=llvm-ranlib")
+        tc.make_args.append("NM=llvm-nm")
+        tc.make_args.append("STRIP=llvm-strip")
         tc.generate()
 
     def build(self):

@@ -12,3 +12,7 @@ conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos
 ```
 
 ## 编译结束
+---
+
+**编译结束**: 2026-07-21 08:13
+**最终状态**: built
