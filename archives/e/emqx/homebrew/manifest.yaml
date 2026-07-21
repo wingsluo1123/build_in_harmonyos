@@ -1,0 +1,29 @@
+software: emqx
+version: "homebrew"
+status: built
+build_system: makefile
+build_date: "2026-07-21"
+
+source:
+  url: "https://github.com/emqx/emqx/archive/refs/tags/v5.8.8.tar.gz"
+  sha256: "5861d8d32c4934175ca3d01c691ea679ac1a7903a1faee72027f6484d3085c89"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "PKG_VSN=5.8.8"
+    - "BUILD_WITHOUT_QUIC=1"
+    - "PROFILE=emqx"
+    - "make emqx-rel"
+  dependencies:
+    - "openssl/3.5.6"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Homebrew EMQX homebrew version maps to upstream 5.8.8 and is built through make emqx-rel."
+  - "The first OHOS recipe disables QUIC with BUILD_WITHOUT_QUIC=1 to avoid the quicer/native QUIC dependency closure."
+  - "Full validation requires Erlang/OTP 26 and rebar3/relx release generation; runtime smoke tests may be limited in cross builds."
