@@ -121,7 +121,7 @@ class PerlparamsutilConan(ConanFile):
         import shutil
         site_arch_src = os.path.join(
             dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
+            "perl_5.42.2", "lib", "site_perl", "5.42.2", "aarch64-linux"
         )
         so_src = os.path.join(site_arch_src, "auto", "Params", "Util", "Util.so")
         lib_dst = os.path.join(self.package_folder, "lib")
