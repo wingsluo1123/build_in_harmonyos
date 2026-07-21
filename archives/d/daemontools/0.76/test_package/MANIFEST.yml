@@ -1,24 +1,21 @@
 # test_package/MANIFEST.yml
-# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
-
+# daemontools has a DJB test suite (rts target) but it hangs on OHOS (FIFO/supervise)
 package: daemontools/0.76
 homepage: "https://cr.yp.to/daemontools.html"
 
-# 上游测试命令（DJB 测试套 rts.tests 在 OpenHarmony 上 FIFO/supervise 测试挂住，已跳过）
-upstream_check_command: "make rts"
-
-# conanfile.py build() 中是否已集成上游测试
+# Upstream test suite exists but cannot run on OHOS (FIFO/supervise tests hang)
+upstream_check_command: "make rts (skipped — FIFO/supervise tests hang on OHOS)"
 upstream_test_in_build: false
-upstream_test_command: ""
+upstream_test_command: "N/A (skipped on OHOS, patch 0001)"
 
-# 上游实际运行的测试程序（FIFO/supervise 测试在 OHOS 上不可用，未集成）
+# No upstream test programs included in test_package
 upstream_tests: []
 
-# test_package 自带的测试（消费者视角验证：执行 tai64n/tai64nlocal/svstat）
+# test_package smoke tests (consumer-side verification)
 test_package_tests:
   - file: test.sh
-    description: "tai64n 时间戳 + tai64nlocal 转换 + svstat 错误处理"
+    description: "Smoke test: verifies tai64n/tai64nlocal timestamp conversion and envdir environment variable handling"
     command: "bash test.sh"
 
-# 测试断言总数
-assertion_count: 3
+# Approximate assertion count
+assertion_count: 5

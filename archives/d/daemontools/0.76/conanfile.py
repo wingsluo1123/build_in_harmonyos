@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Conan recipe for daemontools 0.76 — DJB service management tools.
+"""Conan recipe — daemontools 0.76 (DJB Makefile)
 
-daemontools is a collection of tools by D.J. Bernstein for managing UNIX
-services (supervise, svscan, svc, multilog, tai64n, etc.).
+daemontools is a UNIX service management toolset by Daniel J. Bernstein.
+Build system: DJB-style Makefile (no configure script; configuration via
+conf-cc/conf-ld/home files). Output: 17 command-line tools.
 
-Build system: DJB custom Makefile (no configure, no autotools).
-Compiler configured via conf-cc/conf-ld files (patches set to clang).
-Install prefix configured via 'home' file (created in build()).
-No 'make install' target — binaries copied manually.
+Key adaptation:
+- conf-cc/conf-ld/home generated dynamically (replaces patches 0002/0003/0006)
+- errno fix: extern int errno -> #include <errno.h> (musl libc compat)
+- find-systype.sh: gcc -> clang (patch 0005)
+- rts test suite skipped (FIFO/supervise tests hang on OHOS)
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -23,7 +24,7 @@ class DaemontoolsConan(ConanFile):
     description = "Collection of tools for managing UNIX services"
     license = "LicenseRef-Homebrew-public-domain"
     homepage = "https://cr.yp.to/daemontools.html"
-    url = ""  # CI fills this
+
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
@@ -32,73 +33,90 @@ class DaemontoolsConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
+        # daemontools is pure C, no external dependencies
         pass
 
     def layout(self):
-        basic_layout(self, src_folder=".")
+        basic_layout(self)
 
     def source(self):
-        # DJB tarball has nested structure: admin/daemontools-0.76/src/
-        get(self, **self.conan_data["sources"], strip_root=False)
-
-        # Promote src/ contents to source folder root
-        src_dir = os.path.join(self.source_folder, "admin", "daemontools-0.76", "src")
-        for item in os.listdir(src_dir):
-            shutil.move(os.path.join(src_dir, item), os.path.join(self.source_folder, item))
-        shutil.rmtree(os.path.join(self.source_folder, "admin"), ignore_errors=True)
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
 
-        # DJB build system: create 'home' file with install prefix
-        # (choose/svscanboot scripts embed this path at build time)
-        with open(os.path.join(self.source_folder, "home"), "w") as f:
-            f.write(self.package_folder)
+        # DJB source is nested: strip_root removes 'admin/', leaving daemontools-0.76/src/
+        src_dir = os.path.join(self.source_folder, "daemontools-0.76", "src")
 
-        # DJB uses conf-cc/conf-ld (patches set to clang), no configure script
-        self.run("make -j1", cwd=self.source_folder)
+        # R33: Get compiler from Conan conf, never from shell env vars
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        cc = compilers.get("c", "clang")
+
+        # Write DJB configuration files dynamically (replaces patches 0002/0003/0006)
+        # conf-cc: compiler and flags for compiling .c files
+        conf_cc = (
+            f"{cc} -fPIC -O2"
+            " -Wimplicit -Wunused -Wcomment -Wchar-subscripts"
+            " -Wuninitialized -Wshadow -Wcast-qual -Wcast-align"
+            " -Wwrite-strings"
+        )
+        with open(os.path.join(src_dir, "conf-cc"), "w") as f:
+            f.write(conf_cc + "\n")
+
+        # conf-ld: linker for linking .o into executables
+        with open(os.path.join(src_dir, "conf-ld"), "w") as f:
+            f.write(f"{cc}\n")
+
+        # home: installation prefix (DJB reads this for path substitution in svscanboot)
+        with open(os.path.join(src_dir, "home"), "w") as f:
+            f.write(self.package_folder + "\n")
+
+        # R9: Always use -j1
+        self.run(f"make -C {src_dir} -j1")
 
     def package(self):
-        # DJB produces executables, copy all built binaries to bin/
-        bins = [
-            "envdir", "envuidgid", "fghack", "multilog", "pgrphack",
-            "readproctitle", "setlock", "setuidgid", "softlimit",
-            "supervise", "svc", "svok", "svscan", "svscanboot",
-            "svstat", "tai64n", "tai64nlocal",
-        ]
-        for bin_name in bins:
-            copy(self, bin_name, src=self.source_folder,
-                 dst=os.path.join(self.package_folder, "bin"), keep_path=False)
+        src_dir = os.path.join(self.source_folder, "daemontools-0.76", "src")
+        bin_dst = os.path.join(self.package_folder, "bin")
 
-        # ELF signing for HarmonyOS (E082)
-        import subprocess
-        bin_dir = os.path.join(self.package_folder, "bin")
-        sign_tool = os.environ.get("SIGN_TOOL") or shutil.which("binary-sign-tool")
-        objcopy = os.environ.get("LLVM_OBJCOPY") or shutil.which("llvm-objcopy")
-        if not sign_tool or not objcopy:
-            self.output.warning("SIGN_TOOL or LLVM_OBJCOPY not found, skipping ELF signing")
-            return
-        for bin_name in bins:
-            bin_path = os.path.join(bin_dir, bin_name)
-            if os.path.exists(bin_path):
-                tmp_signed = bin_path + ".signed"
-                # Remove existing .codesign section if present (non-fatal if absent)
-                result_objcopy = subprocess.run(
-                    [objcopy, "--remove-section", ".codesign", bin_path],
-                    capture_output=True)
-                if result_objcopy.returncode != 0:
-                    self.output.warning(f"objcopy --remove-section failed for {bin_name}: {result_objcopy.stderr}")
-                # Sign the binary for HarmonyOS execution
-                result = subprocess.run(
-                    [sign_tool, "sign", "-inFile", bin_path,
-                     "-outFile", tmp_signed, "-selfSign", "1"],
-                    capture_output=True, text=True)
-                if result.returncode == 0 and os.path.exists(tmp_signed):
-                    os.replace(tmp_signed, bin_path)
-                    os.chmod(bin_path, 0o755)
-                else:
-                    self.output.warning(f"ELF signing failed for {bin_name}: {result.stderr}")
+        # DJB has no make install; manually copy all built executables
+        daemontools_bins = [
+            "envdir", "envuidgid", "fghack", "multilog",
+            "pgrphack", "readproctitle", "setlock", "setuidgid", "softlimit",
+            "supervise", "svc", "svok", "svscan", "svscanboot", "svstat",
+            "tai64n", "tai64nlocal",
+        ]
+        for binary in daemontools_bins:
+            binary_path = os.path.join(src_dir, binary)
+            if os.path.isfile(binary_path):
+                copy(self, binary, src=src_dir, dst=bin_dst)
+
+        # R7: Self-sign ELF binary on OHOS for local execution
+        # OHOS requires ELF signatures; unsigned binaries get "Permission denied"
+        if self.settings.os == "OHOS":
+            sign_tool = "/data/service/hnp/bin/binary-sign-tool"
+            if os.path.isfile(sign_tool):
+                for binary in daemontools_bins:
+                    binary_path = os.path.join(bin_dst, binary)
+                    if not os.path.isfile(binary_path):
+                        continue
+                    # Skip non-ELF files (svscanboot is a shell script)
+                    with open(binary_path, "rb") as f:
+                        if f.read(4) != b"\x7fELF":
+                            continue
+                    signed_path = f"{binary_path}.signed"
+                    self.run(
+                        f'{sign_tool} sign -inFile "{binary_path}"'
+                        f' -outFile "{signed_path}"'
+                        f' -selfSign 1 -signAlg SHA256withECDSA',
+                        quiet=True
+                    )
+                    if os.path.isfile(signed_path):
+                        os.replace(signed_path, binary_path)
+                        os.chmod(binary_path, 0o755)
 
     def package_info(self):
+        # daemontools is a command-line toolset, not a library
         self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
         self.cpp_info.bindirs = ["bin"]

@@ -12,7 +12,7 @@ version: "0.76"
 
 # 编译状态
 # published | built | failed | archived
-status: built
+status: published
 
 # 构建系统 (makefile for DJB - no configure script, use Makefile directly)
 build_system: makefile
@@ -60,10 +60,9 @@ build:
 # ============================================================
 
 # 应用的补丁列表
+# 0002-conf-cc, 0003-conf-ld, 0006-home 已由 conanfile.py build() 动态生成
 patches_applied:
   - "0001-Makefile.patch"
-  - "0002-conf-cc.patch"
-  - "0003-conf-ld.patch"
   - "0004-error.h.patch"
   - "0005-find-systype.sh.patch"
 
@@ -74,7 +73,8 @@ patches_applied:
 # 编译中学到的知识
 knowledge_gained:
   - "DJB errno fix: extern int errno -> #include <errno.h> (musl libc compat) ref:E999"
-  - "DJB build: replace gcc with clang in conf-cc, conf-ld, find-systype.sh ref:E999"
+  - "DJB build: conf-cc/conf-ld/home generated dynamically by conanfile.py build(), not patches ref:E999"
+  - "DJB build: replace gcc with clang in find-systype.sh (source patch) ref:E999"
   - "DJB install: no DESTDIR support, manual cp of binaries to staging dir ref:E999"
   - "DJB test suite: FIFO/supervise tests hang on OpenHarmony, skip rts target in Makefile ref:E999"
 
@@ -83,28 +83,24 @@ patch_generation:
   source_orig_dir: /storage/Users/currentUser/tmp/builds/daemontools-0.76.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/daemontools-0.76.work
   source_orig_hash: 359e2442846e939a
-  source_work_hash: 403c48899c9ef695
-  generated_at: '2026-07-15T16:05:47'
-  patches_count: 5
+  source_work_hash: 43e10d23858acb33
+  generated_at: '2026-06-11T23:50:18'
+  patches_count: 3
+  note: "Reduced from 6 to 3 patches — conf-cc/conf-ld/home now generated dynamically by conanfile.py build()"
 
 patch_classification:
   - file: 0001-Makefile.patch
     type: auto
     platform_only: True
-    guard: 'pending'
-  - file: 0002-conf-cc.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-conf-ld.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    guard: 'none'
+    description: "Skip DJB test suite (rts target) — FIFO/supervise tests hang on OHOS"
   - file: 0004-error.h.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'none'
+    description: "Fix extern int errno -> #include <errno.h> for musl libc compat"
   - file: 0005-find-systype.sh.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'none'
+    description: "Replace gcc with clang in systype detection script"
