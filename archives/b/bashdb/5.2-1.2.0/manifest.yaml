@@ -1,0 +1,27 @@
+version: "5.2-1.2.0"
+status: built
+build_date: "2026-07-22"
+
+source:
+  url:
+    - "https://downloads.sourceforge.net/project/bashdb/bashdb/5.2-1.2.0/bashdb-5.2-1.2.0.tar.bz2"
+    - "https://distfiles.macports.org/bashdb/bashdb-5.2-1.2.0.tar.bz2"
+  sha256: "96fe0c8ffc12bc478c9dc41bb349ae85135da71b692069b8b7f62b27967ce534"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$TEST_PREFIX"
+    - "--with-bash=$BASH_PREFIX/bin/bash"
+    - "--build=aarch64-unknown-linux-gnu"
+  cc: clang
+
+patches_applied:
+  - "0001-support-bash-5.3.patch"
+
+knowledge_gained:
+  - "configure 脚本仅支持 bash 5.0/5.1/5.2，需补丁添加 5.3 case 分支"
+  - "使用 --with-bash 选项指定 bash 5.3 可执行文件路径，避免 PATH 中找到旧版 bash"
+  - "纯 bash 脚本包，无需编译，仅运行 configure + make install"
+  - "SourceForge 在中国地区不可达，使用 MacPorts distfiles 镜像作为 fallback"

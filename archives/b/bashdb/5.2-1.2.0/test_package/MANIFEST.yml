@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: bashdb/5.2-1.2.0
+homepage: https://bashdb.sourceforge.net/
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# bashdb 的 make check 需要交互式终端，不适合 CI 环境
+# 上游测试套件位于 test/ 目录，包含单元测试和集成测试
+upstream_tests:
+  - name: "test-unit"
+    source: bashdb-5.2-1.2.0/test/unit
+    description: "单元测试"
+  - name: "test-integration"
+    source: bashdb-5.2-1.2.0/test/integration
+    description: "集成测试"
+
+# test_package 中自带的测试
+test_package_tests:
+  - file: conanfile.py
+    description: "bashdb --version 版本验证"
+    command: "bashdb --version"
+
+# 测试断言总数 (近似值)
+assertion_count: 1
