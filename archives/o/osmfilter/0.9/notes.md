@@ -1,7 +1,7 @@
 # osmfilter 0.9 适配笔记
 
 ## 编译环境
-- 构建系统: autotools
+- 构建系统: makefile
 - 编译日期: 2026-06-16
 - 编译器: clang/clang++
 - 状态: built
