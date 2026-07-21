@@ -42,7 +42,7 @@ class PerlnetdnssecConan(ConanFile):
 
         # Step 0: Remove any previously installed version to prevent
         # Makefile.PL's custom install() from detecting occlusion
-        site_arch = "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0/aarch64-linux"
+        site_arch = "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.2/aarch64-linux"
         import shutil
         for path in [
             os.path.join(site_arch, "Net", "DNS", "SEC.pm"),
@@ -93,7 +93,7 @@ class PerlnetdnssecConan(ConanFile):
         import shutil
         site_arch_src = os.path.join(
             dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
+            "perl_5.42.2", "lib", "site_perl", "5.42.2", "aarch64-linux"
         )
         so_src = os.path.join(site_arch_src, "auto", "Net", "DNS", "SEC", "SEC.so")
         lib_dst = os.path.join(self.package_folder, "lib")
