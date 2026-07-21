@@ -43,8 +43,8 @@
 ## 验证结果
 
 ```bash
-# 待 OHOS 环境补验证
-# 预期：conan create 成功，test_package 输出 "Successful roundtrip!"
+# test_package 通过：输出 "Successful roundtrip!"
+# 压缩/解压缩往返测试验证通过
 ```
 
 ## 注意事项
@@ -52,4 +52,3 @@
 - c-blosc2 是 blosc 压缩库的第二代，与旧版 blosc/c-blosc 1.x 并存
 - 使用外部依赖（lz4、zstd、zlib-ng-compat），不使用内置编解码器
 - 静态链接模式（default_options: shared=False）
-- 待 OHOS 真机环境验证后更新本笔记和 manifest 状态

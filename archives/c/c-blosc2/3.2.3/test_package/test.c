@@ -2,18 +2,23 @@
  * c-blosc2 test_package
  * Based on upstream examples/simple.c (BSD-3-Clause)
  * Compresses data, decompresses, and verifies roundtrip correctness.
+ *
+ * Output buffer sized to isize + BLOSC_MAX_OVERHEAD to handle worst-case
+ * incompressible input per blosc1 API requirement.
  */
 #include <stdio.h>
 #include "blosc2.h"
 
 #define SIZE 1000
+/* BLOSC_MAX_OVERHEAD = 16 (defined in blosc.h) */
+#define OUT_SIZE (SIZE + (BLOSC_MAX_OVERHEAD / sizeof(int)) + 1)
 
 int main(void) {
     int data[SIZE];
-    int data_out[SIZE];
+    int data_out[OUT_SIZE];
     int data_dest[SIZE];
-    int isize = sizeof(data);
-    int osize = sizeof(data_out);
+    size_t isize = sizeof(data);
+    size_t osize = sizeof(data_out);
     int csize, dsize;
     int i;
 
@@ -33,8 +38,8 @@ int main(void) {
     }
 
     dsize = blosc1_decompress(data_out, data_dest, sizeof(data_dest));
-    if (dsize != isize) {
-        printf("Decompression size mismatch. Expected: %d, actual: %d\n", isize, dsize);
+    if (dsize < 0 || (size_t)dsize != isize) {
+        printf("Decompression size mismatch. Expected: %zu, actual: %d\n", isize, dsize);
         blosc2_destroy();
         return 1;
     }

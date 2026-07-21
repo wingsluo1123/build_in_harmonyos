@@ -7,7 +7,10 @@ set -euo pipefail
 TEST_BIN="${1:-test_package}"
 
 # Verify the test binary exists
-test -f "$TEST_BIN"
+if [ ! -f "$TEST_BIN" ]; then
+    echo "ERROR: $TEST_BIN does not exist" >&2
+    exit 1
+fi
 
 # If the binary is executable, run it and verify output
 if [ -x "$TEST_BIN" ]; then

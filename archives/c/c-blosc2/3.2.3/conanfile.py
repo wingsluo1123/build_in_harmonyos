@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""Conan recipe — c-blosc2 3.2.3.
+
+c-blosc2 是高性能压缩二进制数据存储库，blosc 的第二代实现。
+构建系统: CMake
+依赖: lz4 + zstd + zlib-ng-compat (Conan 管理)
+"""
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import copy
