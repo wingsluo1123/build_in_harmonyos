@@ -44,6 +44,8 @@ class LvConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        # OHOS 需要显式链接 termcap (ncurses 的 termcap 适配层)
+        tc.configure_args.append("LIBS=-ltermcap")
         tc.generate()
 
     def build(self):
