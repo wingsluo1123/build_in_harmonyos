@@ -1,6 +1,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import cross_building
 
 
@@ -41,7 +42,10 @@ class TestPackageConan(ConanFile):
         lib_flags = " ".join(
             f"-l{name}" for name in unique(tested_libs + dependency_libs + system_libs)
         )
-        cc = os.environ.get("CC", "clang")
+        executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
+        cc = executables.get("c") or os.environ.get("CC")
+        if not cc:
+            raise ConanException("C compiler not found in tools.build:compiler_executables or CC")
         self.run(
             f"{cc} test_usbredir.c -o test_usbredir "
             f"{include_flags} {libdir_flags} {lib_flags}"
@@ -51,5 +55,4 @@ class TestPackageConan(ConanFile):
         if cross_building(self):
             self.output.info("cross-building: compile and link test completed")
             return
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_usbredir'", env="conanrun")
+        self.run("./test_usbredir", env="conanrun")
