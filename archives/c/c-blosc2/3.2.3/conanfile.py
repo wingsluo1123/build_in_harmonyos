@@ -8,8 +8,7 @@ c-blosc2 是高性能压缩二进制数据存储库，blosc 的第二代实现�
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import copy
-from conan.tools.scm import Git
+from conan.tools.files import get, copy
 import os
 
 
@@ -44,13 +43,7 @@ class CBlosc2Conan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        source = self.conan_data["sources"][self.version]
-        git = Git(self)
-        git.clone(
-            url=source["git_url"],
-            target=".",
-            args=["--depth", "1", "--branch", source["git_tag"]],
-        )
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)

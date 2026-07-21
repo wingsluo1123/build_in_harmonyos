@@ -14,7 +14,16 @@ fi
 
 # If the binary is executable, run it and verify output
 if [ -x "$TEST_BIN" ]; then
-    output=$("$TEST_BIN")
+    set +e
+    output=$("$TEST_BIN" 2>&1)
+    rc=$?
+    set -e
+    if [ $rc -ne 0 ]; then
+        echo "ERROR: $TEST_BIN exited with code $rc" >&2
+        echo "Output was:" >&2
+        echo "$output" >&2
+        exit 1
+    fi
     if ! echo "$output" | grep -q "Successful roundtrip!"; then
         echo "ERROR: test_package did not output 'Successful roundtrip!'" >&2
         echo "Output was:" >&2
