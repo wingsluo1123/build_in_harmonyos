@@ -1,0 +1,80 @@
+# tracy 0.13.1 OHOS PC 适配 manifest
+
+version: "0.13.1"
+software: "tracy"
+status: built
+build_date: "2026-07-22"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/wolfpld/tracy/archive/refs/tags/v0.13.1.tar.gz"
+  sha256: "d4efc50ebcb0bfcfdbba148995aeb75044c0d80f5d91223aebfaa8fa9e563d2b"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DTRACY_STATIC=ON"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DTRACY_ENABLE=ON"
+    - "-DTRACY_NO_BROADCAST=ON"
+    - "-DTRACY_ONLY_LOCALHOST=ON"
+    - "-DTRACY_NO_SYSTEM_TRACING=ON"
+    - "-DTRACY_NO_CRASH_HANDLER=ON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用 3 个源码 patch（探索阶段直接改源码后固化）：
+#   0001: 根 CMakeLists 加 _GNU_SOURCE=1 + target_compile_definitions
+#   0002: TracySystem.cpp OHOS 排除 pthread_setcancelstate（bionic 不存在）
+#   0003: TracyProfiler.cpp 用 /proc/self/cmdline 替代 program_invocation_short_name
+patches_applied:
+  - "0001-ohos-gnu-source.patch"
+  - "0002-ohos-pthread-setcancelstate-guard.patch"
+  - "0003-ohos-proc-cmdline-replace-program-invocation.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OpenHarmony bionic libc 不默认定义 _GNU_SOURCE，且 pthread_setcancelstate 等 GNU 扩展根本不存在（与 Android bionic 同样缺）"
+  - "program_invocation_short_name / program_invocation_name 是 glibc 独有的 errno.h 扩展，bionic（Android + OHOS）都无；OHOS 分支用 /proc/self/cmdline + readlink /proc/self/exe 替代"
+  - "OHOS bionic 不暴露 __NR_perf_event_open syscall，必须 -DTRACY_NO_SYSTEM_TRACING=ON 关闭 system tracing"
+  - "libTracyClient.a 仅依赖 pthread + dl，不依赖其他系统库，0 个外部 Conan 依赖"
+  - "上游 install 把 headers 装到 include/tracy/tracy/（双层），使用方 include 路径为 <tracy/tracy/Tracy.hpp>"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tracy-0.13.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tracy-0.13.1.work
+  source_orig_hash: 13309a33fc45ee36
+  source_work_hash: 569c78a97c15c51d
+  generated_at: '2026-07-22T02:35:26'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-public-client-TracyProfiler.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-public-common-TracySystem.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

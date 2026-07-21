@@ -1,0 +1,70 @@
+--- a/public/client/TracyProfiler.cpp
++++ b/public/client/TracyProfiler.cpp
+@@ -431,38 +431,67 @@
+     const char* ptr = buf;
+     while( *ptr != '\0' ) ptr++;
+     while( ptr > buf && *ptr != '\\' && *ptr != '/' ) ptr--;
+     if( ptr > buf ) ptr++;
+     processName = ptr;
+ #elif defined __ANDROID__
+ #  if __ANDROID_API__ >= 21
+     auto buf = getprogname();
+     if( buf ) processName = buf;
+ #  endif
++#elif defined __OHOS__
++    // OHOS bionic does not expose program_invocation_short_name; fall back to
++    // /proc/self/cmdline which contains argv[0] (the executable basename) as
++    // the first null-terminated token.
++    static char cmdlineBuf[1024];
++    int fd = open( "/proc/self/cmdline", O_RDONLY );
++    if( fd >= 0 )
++    {
++        int len = read( fd, cmdlineBuf, sizeof( cmdlineBuf ) - 1 );
++        close( fd );
++        if( len > 0 )
++        {
++            cmdlineBuf[len] = '\0';
++            // Strip leading path components to mirror program_invocation_short_name.
++            const char* base = cmdlineBuf;
++            for( int i = 0; i < len; ++i )
++            {
++                if( cmdlineBuf[i] == '/' ) base = cmdlineBuf + i + 1;
++            }
++            processName = base;
++        }
++    }
+ #elif defined __linux__ && defined _GNU_SOURCE
+     if( program_invocation_short_name ) processName = program_invocation_short_name;
+ #elif defined __APPLE__ || defined BSD
+     auto buf = getprogname();
+     if( buf ) processName = buf;
+ #elif defined __QNX__
+     processName = __progname;
+ #endif
+     return processName;
+ }
+ 
+ static const char* GetProcessExecutablePath()
+ {
+ #ifdef _WIN32
+     static char buf[_MAX_PATH];
+     GetModuleFileNameA( nullptr, buf, _MAX_PATH );
+     return buf;
+ #elif defined __ANDROID__
++    return nullptr;
++#elif defined __OHOS__
++    // OHOS bionic does not expose program_invocation_name; readlink /proc/self/exe
++    // to recover the full executable path (Linux kernel procfs).
++    static char exeBuf[1024];
++    ssize_t n = readlink( "/proc/self/exe", exeBuf, sizeof( exeBuf ) - 1 );
++    if( n > 0 ) { exeBuf[n] = '\0'; return exeBuf; }
+     return nullptr;
+ #elif defined __linux__ && defined _GNU_SOURCE
+     return program_invocation_name;
+ #elif defined __APPLE__
+     static char buf[1024];
+     uint32_t size = 1024;
+     _NSGetExecutablePath( buf, &size );
+     return buf;
+ #elif defined __DragonFly__
+     static char buf[1024];

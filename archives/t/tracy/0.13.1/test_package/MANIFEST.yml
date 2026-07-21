@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml — tracy/0.13.1
+package: tracy/0.13.1
+homepage: "https://github.com/wolfpld/tracy"
+
+# Upstream test entry-point: tracy ships a single demo / smoke program at
+# test/test.cpp which exercises zones, frame marks, signal handling, and
+# the embedded allocator. We use a smaller but equivalent consumer-side
+# test in test_package/test.cpp.
+upstream_check_command: "ctest -N"
+upstream_test_in_build: false
+upstream_test_command: "./test/test-tracy"
+
+# Upstream-shipped tests (one demo binary; no formal test framework).
+# The upstream demo is an infinite-loop visual verification program requiring
+# the capture GUI + image.jpg + signal triggers — not CI-able. We port its
+# API coverage into test_package/test.cpp (see below).
+upstream_tests:
+  - file: test/test.cpp
+    source: tracy-0.13.1/test/test.cpp
+    description: "Upstream demo (23-thread infinite-loop): ZoneScoped / FrameMark / Lockable / Plot / Message / Depth / CallstackTime / OnlyMemory / SharedMutex — visual verification only, not CI-able"
+    command: "./test-tracy"
+
+# test_package consumer-side tests (substantive API calls per R34).
+# 9 worker threads + main thread cover 22 Tracy APIs + 3 runtime asserts.
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer-side coverage of upstream demo API surface: 9 workers (zones-frames / clock-sanity / nested-scopes / mutex-locks / plot / messages / depth / callstack / memory) + main thread exercise 22 Tracy APIs (ZoneScoped/ZoneName/ZoneScopedN/ZoneScopedC/ZoneText/FrameMark/FrameMarkNamed/FrameMarkStart/FrameMarkEnd/TracyPlot/TracyPlotConfig/TracyMessage/TracyMessageL/TracyMessageC/TracyMessageLC/TracyAllocN/TracyFreeN/TracyLockableN/std::lock_guard<TracyLockable>/TracyAppInfo/tracy::SetThreadName/TracyLockable) with 3 runtime asserts (steady_clock monotonicity, payload non-empty, payload length)"
+    command: "./test_tracy"
+
+assertion_count: 22
