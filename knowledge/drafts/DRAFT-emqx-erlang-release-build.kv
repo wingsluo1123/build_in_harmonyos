@@ -1,0 +1,47 @@
+#====================================================================
+# DRAFT-emqx-erlang-release-build.kv
+#====================================================================
+id:                     DRAFT-emqx-erlang-release-build
+title:                  Package Erlang/OTP release applications by separating release generation and runtime validation
+trigger_tool:           make|rebar3|relx|conan
+phase:                  build|packaging|testing
+error_signature:        rebar3|relx|erts|OTP|make emqx-rel|quicer|Common Test
+severity:               3
+category:               runtime|toolchain|dependency-closure
+match_keywords:         erlang, otp, rebar3, relx, emqx, mqtt, release, quicer, common_test
+root_cause:             Erlang service applications are not single native libraries. The build produces
+                        a BEAM release tree with scripts, erts/runtime assumptions, application deps,
+                        config files, logs, and service/network semantics. Native optional extensions
+                        such as QUIC can obscure first-pass release generation failures.
+affected_scope:         Erlang/OTP daemons, MQTT brokers, and BEAM release packages.
+verification_cmd:       conan create archives/e/emqx/homebrew
+
+rec_priority:           1
+rec_approach:           release-first-with-native-feature-gating
+rec_description:        First package the upstream release target and verify the installed release layout
+                        before enabling optional native protocol extensions. Disable QUIC/native closure
+                        in the first pass, keep upstream release variables explicit, and use test_package
+                        to check bin/releases/etc/lib plus a help command when the target can run.
+rec_command:            BUILD_WITHOUT_QUIC=1 PROFILE=emqx make emqx-rel
+rec_auto_fix:           false
+rec_impl:               recipe-env-and-release-layout-test
+
+forbid_1_pattern:       claim success for an Erlang release package without checking release tree layout
+principles:             R34,R40
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:
+last_updated:           2026-07-21
+
+authors:                asp1r1n1
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/3133
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.6
+metrics_last_used:
