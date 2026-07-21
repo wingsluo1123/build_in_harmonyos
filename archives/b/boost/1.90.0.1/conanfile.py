@@ -70,6 +70,13 @@ class BoostCompiledConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
 
+        header_info = self.cpp_info.components["boost"]
+        header_info.set_property("cmake_target_name", "Boost::boost")
+        header_info.set_property("cmake_file_name", "Boost")
+        header_info.includedirs = ["include"]
+        header_info.libdirs = []
+        header_info.libs = []
+
         for component in self._components:
             info = self.cpp_info.components[component]
             info.set_property("cmake_target_name", f"Boost::{component}")

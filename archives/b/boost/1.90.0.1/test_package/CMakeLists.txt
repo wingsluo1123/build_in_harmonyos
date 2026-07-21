@@ -7,6 +7,7 @@ add_executable(test_boost_compiled test.cpp)
 target_link_libraries(
     test_boost_compiled
     PRIVATE
+        Boost::boost
         Boost::program_options
         Boost::regex
         Boost::serialization
