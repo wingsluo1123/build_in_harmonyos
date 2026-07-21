@@ -19,13 +19,13 @@ class SlangConan(ConanFile):
     description = "S-Lang is a multi-platform programmer's library designed to allow a developer to create robust multi-platform software."
     license = "GPL-2.0-or-later"
     homepage = "https://www.jedsoft.org/slang/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
-    package_type = "library"
+    package_type = "shared-library"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
-    default_options = {"shared": False}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -41,10 +41,6 @@ class SlangConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: System-name libraries default to static
-        if not self.options.shared:
-            tc.configure_args.append("--enable-static")
-            tc.configure_args.append("--disable-shared")
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         tc.generate()

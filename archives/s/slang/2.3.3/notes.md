@@ -38,11 +38,10 @@ S-Lang 2.3.3 successfully compiled and verified on HarmonyOS PC (aarch64-unknown
 ## Conan Recipe
 - 8-gate verification: ALL PASS (G0, G1, G2, G3, G4, L2, L4, L5)
 - W3 local CI simulation: PASS
-- Build type: shared+static library + executable (slsh)
+- Build type: shared library + executable (slsh)
 
 ## Artifacts
 - `lib/libslang.so.2.3.3` (4.9 MB shared library)
-- `lib/libslang.a` (6.6 MB static library)
 - `bin/slsh` (88 KB S-Lang shell interpreter)
 - `include/slang.h`, `include/slcurses.h`
 - 19 dynamically loadable modules (.so files)
