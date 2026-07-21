@@ -52,7 +52,7 @@ class Clipper2Conan(ConanFile):
         if self.settings.os in ("Linux", "OHOS"):
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
-        # R26: static library by default
+        # Default to static library
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         # Disable tests/examples/utils (tests require googletest git clone)
         tc.variables["CLIPPER2_TESTS"] = "OFF"
