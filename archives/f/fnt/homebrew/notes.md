@@ -20,7 +20,7 @@
 |---|------|------|----------|
 | 1 | /usr/bin/env bash 不存在 | E165: OHOS 无 /usr/bin/env | 改 shebang 为 /data/service/hnp/bin/bash |
 | 2 | HMDFS chmod 失败 | HMDFS 安全策略 | 使用 os.system 作为 fallback |
-| 3 | GitHub 源码下载超时 | Worker 网络受限 | 使用 ghfast.top 镜像 |
+| 3 | GitHub 源码下载超时 | Worker 网络受限 | 使用 CI 镜像 fallback（R39） |
 
 ## 源码修改
 - `0001-shebang-fix.patch` — 修复 shebang + 添加 HarmonyOS 平台检测

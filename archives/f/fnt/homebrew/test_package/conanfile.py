@@ -25,5 +25,7 @@ class FntTestConan(ConanFile):
         # Verify it has HarmonyOS platform support
         self.run(f"/data/service/hnp/bin/bash -c 'grep -q HarmonyOS {bin_path}'", env="conanrun")
         # Run functional tests via /system/bin/sh (HMDFS noexec can't execute shebang directly)
-        self.run(f"/system/bin/sh {bin_path} --help", env="conanrun", ignore_errors=True)
+        # Note: fnt --help requires external tools (otfinfo, etc.) that may not be installed
+        # Use bash syntax check instead to verify the script is valid
+        self.run(f"/data/service/hnp/bin/bash -n {bin_path}", env="conanrun")
         print(f"✅ fnt verified: {bin_path}")

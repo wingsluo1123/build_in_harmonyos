@@ -1,6 +1,6 @@
 #!/data/service/hnp/bin/bash
 # Test fnt — verify the binary runs and shows help
-set -e
+set -e -o pipefail
 FNT="/system/bin/sh $(which fnt)"
 
 echo "=== fnt test suite ==="
@@ -12,7 +12,8 @@ echo "PASS: fnt --help"
 
 # Test 2: fnt list (lists installed fonts, should not crash)
 echo "Test 2: fnt list"
-$FNT list 2>&1 | head -5 || echo "NOTE: fnt list may show no fonts (expected on OHOS)"
+$FNT list 2>&1 | head -5
+echo "NOTE: fnt list may show no fonts (expected on OHOS)"
 echo "PASS: fnt list"
 
 # Test 3: fnt home (shows font directory)
