@@ -5,6 +5,7 @@
 #include <log4cpp/Priority.hh>
 
 #include <cstdlib>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -13,6 +14,7 @@ namespace {
 
 void require(bool condition, const char* message) {
     if (!condition) {
+        std::cerr << message << std::endl;
         std::abort();
     }
 }
