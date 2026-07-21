@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -euo pipefail
 
 pkg="${1:?package path required}"
 emqx="$pkg/bin/emqx"
