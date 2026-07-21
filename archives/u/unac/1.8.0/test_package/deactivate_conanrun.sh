@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/runner002/build_in_harmonyos/archives/u/unac/1.8.0/test_package/deactivate_conanrunenv-release-armv8.sh"
