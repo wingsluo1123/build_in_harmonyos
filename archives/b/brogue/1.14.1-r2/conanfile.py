@@ -4,7 +4,7 @@
 Brogue is a roguelike game.
 """
 from conan import ConanFile
-from conan.tools.files import get, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -33,6 +33,7 @@ class BrogueConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
+        apply_conandata_patches(self)
         # Use terminal mode instead of SDL graphics (no SDL2 available on OHOS)
         self.run(f"cd {self.source_folder}/src && sed -i 's/TERMINAL := NO/TERMINAL := YES/' config.mk")
         self.run(f"cd {self.source_folder}/src && sed -i 's/GRAPHICS := YES/GRAPHICS := NO/' config.mk")
