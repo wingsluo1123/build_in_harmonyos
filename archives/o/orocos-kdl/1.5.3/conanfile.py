@@ -3,11 +3,102 @@
 
 Builds the orocos_kdl subdirectory from the monorepo.
 Requires Eigen3 (header-only, downloaded directly).
+Builds cppunit from source to enable upstream tests (ohpcd remote has no cppunit recipe).
 """
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, save
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 import os
+
+
+# Minimal config-auto.h for cppunit static build on OHOS (bypass autotools).
+# Key: CPPUNIT_HAVE_NAMESPACES must be defined, otherwise Portability.h
+# #defines `std` to nothing, breaking libc++ and triggering sort.h
+# extern template errors. CPPUNIT_HAVE_SSTREAM routes OStringStream to
+# std::ostringstream (libc++ provides it).
+_CPPUNIT_CONFIG_AUTO_H = """\
+/* Minimal config-auto.h for HarmonyOS static build (bypass autotools) */
+#ifndef CPPUNIT_CONFIG_AUTO_H
+#define CPPUNIT_CONFIG_AUTO_H
+
+/* C++11 supported (clang 15) */
+#define HAVE_CXX11 1
+
+/* std::sstream available (libc++ provides it) */
+#define CPPUNIT_HAVE_SSTREAM 1
+
+/* Compiler supports namespaces — MUST define, otherwise Portability.h
+   #defines std to nothing, breaking libc++ internals */
+#define CPPUNIT_HAVE_NAMESPACES 1
+#define CPPUNIT_HAVE_CPP_CAST 1
+#define CPPUNIT_HAVE_CPP_SOURCE_ANNOTATION 1
+
+/* Standard headers available on OHOS */
+#define HAVE_CMATH 1
+#define HAVE_DLFCN_H 1
+#define HAVE_INTTYPES_H 1
+#define HAVE_MEMORY_H 1
+#define HAVE_STDINT_H 1
+#define HAVE_STDLIB_H 1
+#define HAVE_STRINGS_H 1
+#define HAVE_STRING_H 1
+#define HAVE_SYS_STAT_H 1
+#define HAVE_SYS_TYPES_H 1
+#define HAVE_UNISTD_H 1
+
+/* Functions available */
+#define HAVE_DLERROR 1
+#define HAVE_DLOPEN 1
+#define HAVE_LIBDL 1
+
+/* Compiler supports GCC ABI demangling */
+#define HAVE_GCC_ABI_DEMANGLE 1
+
+/* Package info */
+#define PACKAGE "cppunit"
+#define PACKAGE_NAME "cppunit"
+#define PACKAGE_VERSION "1.15.1"
+#define VERSION "1.15.1"
+
+#endif /* CPPUNIT_CONFIG_AUTO_H */
+"""
+
+# Minimal CMakeLists.txt to build cppunit as a static library.
+# cppunit's own build system is autotools, whose config.status fails on
+# HarmonyOS (cannot create temp awk dirs). This CMake wrapper compiles
+# the sources directly with the Conan toolchain.
+_CPPUNIT_CMAKELISTS = """\
+cmake_minimum_required(VERSION 3.15)
+project(cppunit CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include_directories(include)
+
+file(GLOB CPPUNIT_SOURCES "src/cppunit/*.cpp")
+list(FILTER CPPUNIT_SOURCES EXCLUDE REGEX "DllMain\\\\.cpp$")
+list(FILTER CPPUNIT_SOURCES EXCLUDE REGEX "ShlDynamicLibraryManager\\\\.cpp$")
+
+add_library(cppunit STATIC ${CPPUNIT_SOURCES})
+target_include_directories(cppunit PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cppunit
+)
+
+find_library(DL_LIB dl)
+if(DL_LIB)
+    target_link_libraries(cppunit ${DL_LIB})
+endif()
+
+include(GNUInstallDirs)
+install(TARGETS cppunit
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+install(DIRECTORY include/cppunit DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+"""
 
 
 class OrocoskdlConan(ConanFile):
@@ -33,11 +124,47 @@ class OrocoskdlConan(ConanFile):
     def source(self):
         # Download orocos-kdl source (sha256 verified via conandata)
         get(self, **self.conan_data["sources"], strip_root=True)
-        # Download Eigen3 (header-only) — URL + sha256 集中管理于 conandata.yml，防供应链投毒
+        # Download Eigen3 (header-only) — URL + sha256 centralized in conandata.yml
         eigen = self.conan_data["eigen3"]
         eigen_dir = os.path.join(self.source_folder, "_eigen")
         get(self, eigen["url"], sha256=eigen["sha256"],
             destination=eigen_dir, strip_root=True)
+        # Download cppunit (upstream test framework, built from source)
+        cpp = self.conan_data["cppunit"]
+        cpp_dir = os.path.join(self.source_folder, "_cppunit")
+        get(self, cpp["url"], sha256=cpp["sha256"],
+            destination=cpp_dir, strip_root=True)
+        # Drop our config-auto.h + CMakeLists.txt into cppunit sources
+        save(self, os.path.join(cpp_dir, "include", "cppunit", "config-auto.h"),
+             _CPPUNIT_CONFIG_AUTO_H)
+        save(self, os.path.join(cpp_dir, "CMakeLists.txt"), _CPPUNIT_CMAKELISTS)
+
+    def _build_cppunit(self):
+        """Build cppunit as a static library via our CMake wrapper.
+
+        Returns (lib_path, include_path) for the KDL build to consume.
+        """
+        cpp_src = os.path.join(self.source_folder, "_cppunit")
+        cpp_build = os.path.join(self.build_folder, "_cppunit_build")
+        cpp_prefix = os.path.join(self.build_folder, "_cppunit_prefix")
+        os.makedirs(cpp_build, exist_ok=True)
+
+        cmake = CMake(self)
+        cmake.configure(
+            source_folder=cpp_src,
+            build_folder=cpp_build,
+            cli_args=[
+                "-DBUILD_SHARED_LIBS=OFF",
+                "-DCMAKE_INSTALL_PREFIX=" + cpp_prefix,
+            ],
+        )
+        cmake.build(build_folder=cpp_build)
+        cmake.install(build_folder=cpp_build)
+
+        lib_path = os.path.join(cpp_prefix, "lib", "libcppunit.a")
+        include_path = os.path.join(cpp_prefix, "include")
+        self.output.info(f"cppunit built: lib={lib_path}, include={include_path}")
+        return lib_path, include_path
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -50,10 +177,22 @@ class OrocoskdlConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Source is in the orocos_kdl subdirectory of the monorepo
+        # 1. Build cppunit from source (upstream test framework)
+        cpp_lib, cpp_inc = self._build_cppunit()
+
+        # 2. Configure orocos-kdl with ENABLE_TESTS=ON and point to cppunit
         cmake = CMake(self)
-        cmake.configure(build_script_folder="orocos_kdl")
+        cmake.configure(
+            build_script_folder="orocos_kdl",
+            cli_args=[
+                "-DENABLE_TESTS=ON",
+                "-DCPPUNIT=" + cpp_lib,
+                "-DCPPUNIT_HEADERS=" + cpp_inc,
+            ],
+        )
         cmake.build()
+        # Run upstream cppunit tests via ctest
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)
