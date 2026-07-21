@@ -19,7 +19,6 @@ class OsmfilterConan(ConanFile):
     description = "OpenStreetMap data filtering, conversion and update tools"
     license = "AGPL-3.0"
     homepage = "https://gitlab.com/osm-c-tools/osmctools"
-    url = ""  # CI fills this
 
     package_type = "application"
 

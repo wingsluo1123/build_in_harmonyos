@@ -1,6 +1,6 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for osmfilter executable
-set -eu
+set -euo pipefail
 
 # Conan's VirtualRunEnv puts binaries in PATH via env="conanrun"
 OSMFILTER_BIN="osmfilter"
@@ -8,7 +8,7 @@ OSMCONVERT_BIN="osmconvert"
 
 # --- Test 1: osmfilter --help (version check) ---
 echo "[test] osmfilter --help"
-if ${OSMFILTER_BIN} --help 2>&1 | grep -q "osmfilter"; then
+if "${OSMFILTER_BIN}" --help 2>&1 | grep -q "osmfilter"; then
     echo "  PASS: osmfilter --help OK"
 else
     echo "  FAIL: osmfilter --help failed"
@@ -46,9 +46,9 @@ else
 fi
 
 # --- Test 3: osmconvert format conversion (if available) ---
-if command -v ${OSMCONVERT_BIN} >/dev/null 2>&1; then
+if command -v "${OSMCONVERT_BIN}" >/dev/null 2>&1; then
     echo "[test] osmconvert OSM to o5m"
-    ${OSMCONVERT_BIN} "$TMPDIR_TEST/test.osm" -o="$TMPDIR_TEST/test.o5m" 2>&1
+    "${OSMCONVERT_BIN}" "$TMPDIR_TEST/test.osm" -o="$TMPDIR_TEST/test.o5m" 2>&1
     if [ -f "$TMPDIR_TEST/test.o5m" ] && [ -s "$TMPDIR_TEST/test.o5m" ]; then
         echo "  PASS: osmconvert OSM->o5m OK"
     else
