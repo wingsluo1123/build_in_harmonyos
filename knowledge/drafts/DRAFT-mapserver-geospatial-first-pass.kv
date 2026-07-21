@@ -1,0 +1,46 @@
+#====================================================================
+# DRAFT-mapserver-geospatial-first-pass.kv
+#====================================================================
+id:                     DRAFT-mapserver-geospatial-first-pass
+title:                  Geospatial server first-pass OHOS packaging with real mapfile smoke tests
+trigger_tool:           cmake|conan|ctest
+phase:                  configuration|testing
+error_signature:        FindGDAL|FindPROJ|FindFreetype|FindPNG|FindJPEG|mapfile smoke test
+severity:               2
+category:               dependency-closure|testing|geospatial
+match_keywords:         mapserver, gdal, proj, freetype, png, jpeg, mapfile, WMS, test_package
+root_cause:             Geospatial server libraries combine mandatory raster/vector/projection/rendering
+                        dependencies with optional CGI, OGC, database, text layout, and rendering
+                        stacks. A version-only consumer test is not enough to prove the package can
+                        parse real map configuration on OHOS.
+affected_scope:         MapServer-like GIS engines and geospatial command/server packages.
+verification_cmd:       conan create archives/m/mapserver/8.6.5
+
+rec_priority:           1
+rec_approach:           staged-dependency-closure-with-mapfile-test
+rec_description:        Keep mandatory core dependencies in the first pass, disable heavyweight optional
+                        OGC/database/rendering/language-binding closures, and add a consumer test that
+                        writes and loads a minimal mapfile in addition to version/API checks.
+rec_command:            BUILD_TESTING=OFF WITH_WMS=ON WITH_WFS=OFF WITH_WCS=OFF WITH_OGCAPI=OFF
+rec_auto_fix:           false
+rec_impl:               cmake-options-and-test-package
+
+forbid_1_pattern:       test_package only calls version APIs for a rendering/geospatial engine
+principles:             R34,R40
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:
+last_updated:           2026-07-21
+
+authors:                asp1r1n1
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/3121
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.6
+metrics_last_used:
