@@ -46,6 +46,6 @@ class PerlIoTty(ConanFile):
     def package_info(self):
         # The shared library is Tty.so (Perl XS extension)
         self.cpp_info.libs = ["Tty"]
-        self.cpp_info.libdirs = ["lib/auto/IO/Tty"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

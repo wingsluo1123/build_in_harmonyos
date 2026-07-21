@@ -46,6 +46,6 @@ class PerlCryptOpensslDsa(ConanFile):
     def package_info(self):
         # The shared library is DSA.so (Perl XS extension)
         self.cpp_info.libs = ["DSA"]
-        self.cpp_info.libdirs = ["lib/auto/Crypt/OpenSSL/DSA"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

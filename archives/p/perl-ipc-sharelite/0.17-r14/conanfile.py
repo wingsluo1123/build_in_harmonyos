@@ -46,6 +46,6 @@ class PerlIpcSharelite(ConanFile):
     def package_info(self):
         # The shared library is ShareLite.so (Perl XS extension)
         self.cpp_info.libs = ["ShareLite"]
-        self.cpp_info.libdirs = ["lib/auto/IPC/ShareLite"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

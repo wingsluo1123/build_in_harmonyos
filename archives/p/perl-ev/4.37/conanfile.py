@@ -46,6 +46,6 @@ class PerlEv(ConanFile):
     def package_info(self):
         # The shared library is EV.so (Perl XS extension)
         self.cpp_info.libs = ["EV"]
-        self.cpp_info.libdirs = ["lib/auto/EV"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

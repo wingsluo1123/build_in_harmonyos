@@ -46,6 +46,6 @@ class PerlMathRandomMtAuto(ConanFile):
     def package_info(self):
         # The shared library is Auto.so (Perl XS extension)
         self.cpp_info.libs = ["Auto"]
-        self.cpp_info.libdirs = ["lib/auto/Math/Random/MT/Auto"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

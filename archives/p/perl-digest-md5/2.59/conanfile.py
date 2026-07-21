@@ -46,6 +46,6 @@ class PerlDigestMd5(ConanFile):
     def package_info(self):
         # The shared library is MD5.so (Perl XS extension)
         self.cpp_info.libs = ["MD5"]
-        self.cpp_info.libdirs = ["lib/auto/Digest/MD5"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

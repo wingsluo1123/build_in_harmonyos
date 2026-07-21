@@ -46,6 +46,6 @@ class PerlDbi(ConanFile):
     def package_info(self):
         # The shared library is DBI.so (Perl XS extension)
         self.cpp_info.libs = ["DBI"]
-        self.cpp_info.libdirs = ["lib/auto/DBI"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

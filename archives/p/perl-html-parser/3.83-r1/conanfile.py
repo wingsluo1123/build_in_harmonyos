@@ -46,6 +46,6 @@ class PerlHtmlParser(ConanFile):
     def package_info(self):
         # The shared library is Parser.so (Perl XS extension)
         self.cpp_info.libs = ["Parser"]
-        self.cpp_info.libdirs = ["lib/auto/HTML/Parser"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

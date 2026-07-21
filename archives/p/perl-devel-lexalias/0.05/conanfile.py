@@ -46,6 +46,6 @@ class PerlDevelLexalias(ConanFile):
     def package_info(self):
         # The shared library is LexAlias.so (Perl XS extension)
         self.cpp_info.libs = ["LexAlias"]
-        self.cpp_info.libdirs = ["lib/auto/Devel/LexAlias"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

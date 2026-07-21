@@ -46,6 +46,6 @@ class PerlMatchSimpleXs(ConanFile):
     def package_info(self):
         # The shared library is XS.so (Perl XS extension)
         self.cpp_info.libs = ["XS"]
-        self.cpp_info.libdirs = ["lib/auto/match/simple/XS"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

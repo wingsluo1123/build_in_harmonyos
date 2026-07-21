@@ -46,6 +46,6 @@ class PerlDigestSha3(ConanFile):
     def package_info(self):
         # The shared library is SHA3.so (Perl XS extension)
         self.cpp_info.libs = ["SHA3"]
-        self.cpp_info.libdirs = ["lib/auto/Digest/SHA3"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

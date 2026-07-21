@@ -26,7 +26,7 @@ class PerlNetaddrIp(ConanFile):
             for h in ["config.h", "localconf.h", "localperl.h"]:
                 hp = os.path.join(lite_util, h)
                 if not os.path.exists(hp):
-                    open(hp, "w").close()
+                    pass  # skip empty file creation
         # HarmonyOS: patch Makefile for CRT linker flags
         makefile = os.path.join(src, "Makefile")
         if os.path.exists(makefile):
@@ -53,6 +53,6 @@ class PerlNetaddrIp(ConanFile):
     def package_info(self):
         # The shared library is Util.so (Perl XS extension)
         self.cpp_info.libs = ["Util"]
-        self.cpp_info.libdirs = ["lib/auto/NetAddr/IP/Util"]
+        self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []
