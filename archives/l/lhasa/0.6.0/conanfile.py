@@ -53,11 +53,11 @@ class LhasaConan(ConanFile):
             tc.configure_args.append("--enable-static")
             tc.extra_ldflags.append("-static")
         tc.configure_args.append("--prefix=/")
-        tc.generate()
 
         tmpdir = os.path.expanduser("~/tmp")
         os.makedirs(tmpdir, exist_ok=True)
         tc.environment().define("TMPDIR", tmpdir)
+        tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
