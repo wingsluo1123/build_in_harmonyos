@@ -4,7 +4,7 @@
 - 构建系统: autotools (automake-1.11, 需 touch 时间戳防止重新生成)
 - 编译日期: 2026-06-15
 - 编译器: clang / clang++
-- 状态: published
+- 状态: built
 - 构建三联式: aarch64-unknown-linux-ohos
 - 动态链接器: /lib/ld-musl-aarch64.so.1
 
@@ -97,3 +97,7 @@ $ readelf -d dns2tcpc | grep NEEDED
 ---
 **编译结束**: 2026-06-15 11:56
 **最终状态**: published
+---
+
+**编译结束**: 2026-07-21 18:55
+**最终状态**: built
