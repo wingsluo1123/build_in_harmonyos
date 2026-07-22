@@ -1,0 +1,116 @@
+# 版本级 manifest
+# 文件位置: archives/h/hashlink/1.15/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.15"
+
+# 软件名
+software: "hashlink"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-22"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（HaxeFoundation hashlink 1.15 官方 tag）
+  url: "https://github.com/HaxeFoundation/hashlink/archive/refs/tags/1.15.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项（路径 A：只打包 libhl，关闭所有 WITH_* hdll 模块）
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DBUILD_TESTING=OFF"
+    - "-DWITH_VM=OFF"
+    - "-DWITH_FMT=OFF"
+    - "-DWITH_OPENAL=OFF"
+    - "-DWITH_SDL=OFF"
+    - "-DWITH_SQLITE=OFF"
+    - "-DWITH_SSL=OFF"
+    - "-DWITH_UI=OFF"
+    - "-DWITH_UV=OFF"
+    - "-DWITH_VIDEO=OFF"
+    - "-DWITH_HEAPS=OFF"
+
+  # 编译依赖列表（路径 A：无 conan 依赖；PCRE2 内置）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-src-hl.h.patch"
+
+patches_count: 1
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "hashlink 1.15 是 CMake 项目，但仓库顶层有 Makefile，init-build 的 _guess_build_system 仅看 URL，误判为 autotools，需手动改 BUILD_SYSTEM=cmake"
+  - "libhl 在 CMakeLists.txt 默认是 SHARED（含 PCRE2 内置）；libs/ 下 .hdll 模块需逐个 WITH_*=OFF"
+  - "WITH_VM 在 aarch64 默认 OFF（顶层 CMakeLists.txt 第 22-24 行）"
+  - "PCRE2 已 vendor 在 include/pcre/，不依赖系统库"
+  - "stdlib (src/std/*.c) 全部静态编进 libhl；不存在独立 libhlstd"
+  - "hashlink 1.15 tarball 内 src/*.c src/*.h 是 CRLF 行尾（^M$），refrespatch 用 Python difflib 时丢失 \\r 导致 dry-run FAILED；用 diff -u 命令生成 patch 可保留"
+  - "顶层 CMakeLists.txt 第 1 行 cmake_minimum_required(VERSION 3.1) 与本地 cmake 4.1.2 不兼容，需加 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "/tmp 只读（E002），必须用 $HOME/tmp（/storage/Users/currentUser/tmp）"
+
+# ============================================================
+# OHOS 适配关键点
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "路径 A：只打包 libhl（核心 VM 库 + PCRE2 + std 全部静态聚合），关闭所有 .hdll 插件"
+    - "libhl 默认 SHARED 构建（hashlink 生态要求 .hdll 插件动态链接），保持共享库形式"
+    - "libhl.so 不是系统同名库，R26 不限制"
+    - "license = MIT（hashlink 是 MIT，比 ola GPL-2.0 宽松）"
+    - "WITH_VM=OFF：不打包 hl VM 可执行（aarch64 默认即 OFF）"
+    - "system_libs: m dl pthread（顶层 CMakeLists.txt 第 199 行 target_link_libraries）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/hashlink-1.15.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/hashlink-1.15.work
+  generated_at: '2026-07-22T18:14:00'
+  patches_count: 1
+  notes: "refresh_patch.py auto-mode 失败，原因是 hashlink 1.15 tarball 解压后 src/hl.h 是 CRLF 行尾（^M$），而 difflib.unified_diff 经 Python read_text() 后丢失 \\r，生成的 patch context 与 orig 文件不匹配 → dry-run FAILED。手工用 'diff -u' 命令生成（diff 内部保留 CRLF），再 sed 替换绝对路径为 a/ b/，dry-run 通过。已记录为工具 bug 待修。"
+
+patch_classification:
+  - file: 0001-src-hl.h.patch
+    type: auto
+    platform_only: True
+    guard: '#if defined(__aarch64__) || defined(__OHOS__)'

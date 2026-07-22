@@ -1,0 +1,28 @@
+--- a/src/hl.h	2025-03-23 20:02:14.000000000 +0800
++++ b/src/hl.h	2026-07-22 18:10:11.262855625 +0800
+@@ -285,12 +285,19 @@
+ C_FUNCTION_END
+ #elif defined(HL_LINUX)
+ #	ifdef HL_64
+-#	define hl_debug_break() \
+-		if( hl_detect_debugger() ) \
+-			__asm__("0: int3;" \
+-			    ".pushsection embed-breakpoints;" \
+-			    ".quad 0b;" \
+-			    ".popsection")
++#	if defined(__aarch64__) || defined(__OHOS__)
++		/* aarch64 has no 'int3' — use 'brk #0' (a software breakpoint). */
++#		define hl_debug_break() \
++			if( hl_detect_debugger() ) \
++				__asm__ __volatile__("brk #0")
++#	else
++#		define hl_debug_break() \
++			if( hl_detect_debugger() ) \
++				__asm__("0: int3;" \
++				    ".pushsection embed-breakpoints;" \
++				    ".quad 0b;" \
++				    ".popsection")
++#	endif
+ #	else
+ #	define hl_debug_break() \
+ 		if( hl_detect_debugger() ) \
