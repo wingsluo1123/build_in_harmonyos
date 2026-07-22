@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/PCCPC/build_in_harmonyos/archives/g/graphqlite/0.6.0/test_package/conanbuildenv-release-armv8.sh"
