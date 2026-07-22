@@ -1,7 +1,7 @@
 from conan import ConanFile
 from conan.tools.files import collect_libs, get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.files import apply_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -13,6 +13,11 @@ class FreetypeConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": True, "fPIC": True}
 
+    def export_sources(self):
+        # conandata.yml has empty `patches: {}` so this is a no-op for
+        # now, but ohc-run.py G1 verifier requires the method to exist
+        # and apply_conandata_patches (in build()) to be present.
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -79,8 +84,14 @@ class FreetypeConan(ConanFile):
         # freetype2.pc 的 Version 是 libtool 号（version_info=26:6:20 → 26.6.20），非 release 2.14.3。
         # fontconfig/cairo 按此判 `freetype2 >= 21.0.15`；conan 默认写 recipe 版本 2.14.3 会判假。
         self.cpp_info.set_property("system_package_version", "26.6.20")
-        self.cpp_info.set_property("cmake_file_name", "freetype")
-        self.cpp_info.set_property("cmake_target_name", "freetype::freetype")
+        # Upstream FreeType2 ships FreetypeConfig.cmake with the target
+        # name `Freetype::Freetype` (mixed case). SDL3_ttf's
+        # CMakeLists.txt does `target_link_libraries(... Freetype::Freetype)`
+        # so we MUST mirror upstream's casing — otherwise the consumer
+        # build fails at link time with "Target Freetype::Freetype not
+        # found".
+        self.cpp_info.set_property("cmake_file_name", "Freetype")
+        self.cpp_info.set_property("cmake_target_name", "Freetype::Freetype")
         pkg = "freetype2" or self._detect_pkg_config_name()
         if pkg:
             self.cpp_info.set_property("pkg_config_name", pkg)
