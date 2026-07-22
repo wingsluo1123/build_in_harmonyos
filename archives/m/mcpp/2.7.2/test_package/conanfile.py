@@ -5,7 +5,6 @@ L1 test: verify the mcpp binary can preprocess C source files.
 """
 import os
 from conan import ConanFile
-from conan.tools.build import can_run
 
 
 class McppTestConan(ConanFile):
