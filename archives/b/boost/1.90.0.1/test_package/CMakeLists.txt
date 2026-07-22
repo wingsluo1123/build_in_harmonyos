@@ -4,6 +4,9 @@ project(test_boost_compiled CXX)
 find_package(Boost REQUIRED COMPONENTS atomic chrono filesystem program_options regex serialization thread timer)
 
 add_executable(test_boost_compiled test.cpp)
+if(WIN32)
+    target_compile_definitions(test_boost_compiled PRIVATE _WIN32_WINNT=0x0602)
+endif()
 target_link_libraries(
     test_boost_compiled
     PRIVATE
