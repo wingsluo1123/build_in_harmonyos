@@ -18,12 +18,12 @@
 | **合计** | **~33** | 全部依赖 Haxe 编译器 + 完整 VM 链 |
 
 ### 是否存在对上游测试用例的修改？
-是（**构建层关闭**而非源码删除）：`BUILD_TESTING=OFF` 主动关闭上游 ctest 套件；下游 test_package 改用 R34 consumer-side 真实 API 调用覆盖 libhl 六大核心 API（12 个 `HL_ASSERT` 断言）。
+是（**构建层关闭**而非源码删除）：`BUILD_TESTING=OFF` 主动关闭上游 ctest 套件；下游 test_package 改用 R34 consumer-side 真实 API 调用覆盖 libhl 六大核心 API（22 个 `HL_ASSERT` 断言）。
 
 ### 适配后测试用例统计
 | 测试类型 | 适配后用例数 | 与上游对比 | 说明 |
 |----------|-------------|-----------|------|
-| 单元测试 | 1 | **-29**（上游 ~30 → 1） | `test_package/test.c` 1 个 test binary，6 个测试函数 / 12 个 `HL_ASSERT` 断言覆盖 `hl_global_init` / `hl_alloc_init` / `hl_buffer_*` / `hl_to_utf8`+`hl_from_utf8` / `hl_alloc_bytes` / `hlt_*` 类型 singletons |
+| 单元测试 | 1 | **-29**（上游 ~30 → 1） | `test_package/test.c` 1 个 test binary，6 个测试函数 / 22 个 `HL_ASSERT` 断言覆盖 `hl_global_init` / `hl_alloc_init` / `hl_buffer_*` / `hl_to_utf8`+`hl_from_utf8` / `hl_alloc_bytes` / `hlt_*` 类型 singletons |
 | 集成测试 | 0 | -3 | 全部为 `.hl` 字节码集成，依赖 `haxe` 编译器（不在 OHOS hnp）+ 完整 VM 链 |
 | 鸿蒙特有测试 | 0 | 新增（0） | `hl_debug_break` 已切换到 `brk #0`（aarch64 软件断点），但单测覆盖即可验证 |
 | **合计** | **1** | **-32** | Haxe 编译器不在 OHOS hnp；改用真实 API 等价覆盖 |
@@ -85,7 +85,7 @@
 
 ### 测试结论
 - **总体评价**：✅ 适配成功
-- **测试覆盖**：12 个 `HL_ASSERT` 断言覆盖 libhl 核心 API（GC init / 自定义 allocator / 动态 buffer / UTF-8 round-trip / 原始字节分配 / 类型系统 singletons）；运行无崩溃无内存错误
+- **测试覆盖**：22 个 `HL_ASSERT` 断言覆盖 libhl 核心 API（GC init / 自定义 allocator / 动态 buffer / UTF-8 round-trip / 原始字节分配 / 类型系统 singletons）；运行无崩溃无内存错误
 - **已知限制**：
   1. 不打包 `hl` VM 可执行（`WITH_VM=OFF`，aarch64 上游默认即 OFF）；下游若要运行 Haxe 编译产物需自备 VM 或扩展路径 B
   2. 不打包任何 `.hdll` 插件模块（`uv.hdll` / `sdl.hdll` / `ssl.hdll` 等）；这些是 dlopen 加载的动态库，需要对应外部依赖（libuv / SDL2 / mbedtls）而 OHOS hnp 未提供

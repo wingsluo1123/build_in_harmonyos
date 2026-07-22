@@ -19,7 +19,7 @@
 ### 2. 唯一 patch（0001-src-hl.h.patch）
 - 上游 `src/hl.h` 在 `#elif defined(HL_LINUX)` + `HL_64` 分支硬编码 x86 `int3` 指令作为软件断点
 - aarch64 没有 `int3`，改用 `brk #0`
-- 守护宏：`#if defined(__aarch64__) || defined(__OHOS__)`（不破坏 x86_64 路径）
+- 守护宏：`#if defined(__aarch64__)`（不破坏 x86_64 路径；OHOS aarch64 clang 必然预定义 `__aarch64__`）
 - 影响 1 个源文件，+7/-6 行
 
 ### 3. 关键适配技巧
@@ -34,11 +34,10 @@
 - 手动改 `.build-context-hashlink-1.15` 的 `BUILD_SYSTEM="cmake"` + manifest.yaml 的 `build_system: cmake`
 - 工具 bug，建议在 init_build.py 中加 `if src/CMakeLists.txt exists and not src/configure: return "cmake"` 兜底（driver.py:687 已有这逻辑，init_build.py:78 缺）
 
-### 5. refresh_patch.py CRLF 问题（工具 bug）
-- hashlink 1.15 tarball 内 `src/*.c` `src/*.h` 是 CRLF 行尾（^M$）
-- Python `read_text()` 剥掉 \r 后 difflib 生成的 patch context 与 orig 文件失配 → dry-run FAILED
-- 手工 `diff -u` 命令可保留 CRLF，再 `sed` 替换绝对路径为 `a/` `b/`
-- 工具 bug，建议 refresh_patch.py 在 read_text 后加 `.replace('\r\n', '\n')` 标准化行尾后生成 patch，apply 时由 patch 工具自动处理 CRLF
+### 5. refresh_patch.py CRLF 问题（工具 bug — 待修复 + 临时应急）
+- **现象**：hashlink 1.15 tarball 内 `src/*.c` `src/*.h` 是 CRLF 行尾（^M$），Python `read_text()` 剥掉 \r 后 difflib 生成的 patch context 与 orig 文件失配 → `refresh_patch.py --auto` dry-run FAILED
+- **工具 bug 待修**：`refresh_patch.py` 应该在 `read_text` 后加 `.replace('\r\n', '\n')` 标准化行尾后再生成 patch；apply 时由 conan 内部 patch 工具自动处理 CRLF。这是上游工具 bug，非适配者责任
+- **临时应急**（仅本次会话使用，不应成为标准做法）：手工 `diff -u` 命令生成 patch（diff 内部保留 CRLF），再 `sed` 替换绝对路径为 `a/` `b/`。修复工具后必须用 `refresh_patch.py --auto` 重新生成所有 patch
 
 ## 二、踩坑清单（已知问题）
 
@@ -53,7 +52,7 @@
 
 ## 三、test_package 真实 API 覆盖
 
-6 个测试函数 / 12 个 `HL_ASSERT` 断言：
+6 个测试函数 / 22 个 `HL_ASSERT` 断言：
 
 | 测试 | API | 断言数 |
 |------|-----|--------|
