@@ -1,24 +1,30 @@
----
 software: sdl3
-version: 3.4.8
-compile_date: "2026-05-20"
-status: built
-compiler: clang
-platform: ohos-aarch64
+version: "3.4.8"
+status: published
+build_system: cmake
+build_date: "2026-07-22"
+
+source:
+  url: "https://ghfast.top/https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.8.tar.gz"
+  sha256: "429a9f38483f834da5727a63dd7b5127a7c9d06a16439d7c6de4b7ebbfdb6374"
+  tar_format: tar.gz
 
 build:
   system: cmake
   configure_options:
-    - "-DCMAKE_BUILD_TYPE=Release"
-    - "-DSDL_PTHREADS=ON"
-    - "-DSDL_TRAY=OFF"
+    - "-DSDL_SHARED=OFF"
+    - "-DSDL_STATIC=ON"
+    - "-DSDL_X11=OFF"
+    - "-DSDL_WAYLAND=OFF"
+    - "-DSDL_KMSDRM=OFF"
+    - "-DSDL_DIRECTFB=OFF"
+    - "-DSDL_PULSEAUDIO=OFF"
+    - "-DSDL_ALSA=OFF"
+    - "-DSDL_OPENGL=OFF"
+    - "-DSDL_OPENGLES=OFF"
   dependencies: []
   cc: clang
   cxx: clang++
-
-archive:
-  source_url: https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.8.tar.gz
-  source_hash: d9d5536
 
 patches_applied:
   - "0001-CMakeLists.txt.patch"
@@ -26,33 +32,9 @@ patches_applied:
   - "0003-src-SDL.c.patch"
   - "0004-src-thread-pthread-SDL_systhread.c.patch"
 
-patch_classification:
-  - file: 0001-CMakeLists.txt.patch
-    type: platform_detection
-    platform_only: true
-    guard: '__OHOS__'
-  - file: 0002-include-SDL3-SDL_platform_defines.h.patch
-    type: platform_detection
-    platform_only: true
-    guard: '__OHOS__'
-  - file: 0003-src-SDL.c.patch
-    type: platform_exclusion
-    platform_only: true
-    guard: '__OHOS__'
-  - file: 0004-src-thread-pthread-SDL_systhread.c.patch
-    type: platform_exclusion
-    platform_only: true
-    guard: '__OHOS__'
-
 knowledge_gained:
-  - "HarmonyOS 需要 cmake 检测 OHOS 平台：set(OHOS true) + add_definitions(-D__OHOS__)"
-  - "SDL3 需要定义 SDL_PLATFORM_OHOS 并取消 SDL_PLATFORM_LINUX（避免错误识别为 Linux）"
-  - "HarmonyOS pthread 实现不完整：禁用 pthread_setcanceltype（线程取消功能）"
-  - "HarmonyOS 无 Gtk 支持：禁用 SDL_TRAY 并排除 SDL_Gtk_Quit 调用"
-
-quality:
-  g0_clean_build: pass
-  g1_binary_integrity: pass
-  g2_functional: pass
-  g3_portability: pass
-  g4_archive_complete: pass
+  - "OHOS maps to CMAKE_SYSTEM_NAME=HarmonyOS via conan — patch detects via MATCHES HarmonyOS|OpenHarmony"
+  - "All audio/video backends must be explicitly disabled (X11/Wayland/ALSA/etc.) — none are available on OHOS"
+  - "Dummy and offscreen video drivers are opt-in via SDL_HINT_VIDEO_DRIVER — must set hint before SDL_Init"
+  - "SDL3's SDL_platform_defines.h defines SDL_PLATFORM_OHOS when __OHOS__ is set; consumers must define __OHOS__ themselves"
+  - "test_package must clear cmake build cache after editing CMakeLists.txt or conan uses stale config"

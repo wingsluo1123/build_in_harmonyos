@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml — R34 compliance statement for SDL3 3.4.8
+
+package: sdl3/3.4.8
+homepage: "https://libsdl.org/"
+
+# SDL3 upstream's test/ tree contains hundreds of platform-specific tests
+# (audio, video, render, events). They link against the very backends
+# we disable for OHOS (X11, Wayland, ALSA, PulseAudio), so we exercise
+# the public API in test_package/test.c instead.
+upstream_check_command: "ctest --test-dir build -N"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test.c
+    description: |
+      R34 consumer smoke test — exercises the SDL3 API surface downstream
+      users (INSTEAD, sdl3_image, sdl3_ttf, sdl3_mixer) actually rely on:
+      SDL_Init, SDL_GetPlatform, SDL_GetNumVideoDrivers, SDL_CreateWindow,
+      SDL_PollEvent, SDL_GetCurrentVideoDriver, SDL_DestroyWindow,
+      SDL_Quit. No display required — works with the always-built
+      "dummy"/"offscreen" drivers.
+    command: "./test_sdl3"
+
+assertion_count: 6
