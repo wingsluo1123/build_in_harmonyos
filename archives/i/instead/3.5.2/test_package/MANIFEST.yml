@@ -1,0 +1,25 @@
+# test_package/MANIFEST.yml — R34 compliance statement for INSTEAD Engine
+
+assertion_count: 3
+upstream_tests:
+  # INSTEAD 上游仅做手工集成测试（手动启 SDL 窗口加载 .game 验收），
+  # 未提供可独立跑的 C / Lua 测试套件。所以上方 assertion_count
+  # 指本 test_package 的断言数。
+  []
+test_package_tests:
+  # 断言 1：sdl-instead 二进制在 OHOS hnp 中存在且 +x
+  - name: "sdl-instead binary exists and is executable"
+    runner: "test.sh"
+    expected_exit_code: 0
+    reason: "R34 实测执行被测包二进制，确认 conan 包完整性"
+  # 断言 2：sdl-instead --version 返回非空 version 字符串（含 INSTEAD_VERSION="3.5.2"）
+  - name: "sdl-instead --version reports INSTEAD_VERSION"
+    runner: "test.sh"
+    expected_exit_code: 0
+    expected_stderr_substring: "3.5.2"
+    reason: "校验上游 INSTEAD_VERSION 宏被正确编入 sdl-instead 主函数"
+  # 断言 3：sdl-instead --help 列出命令行用法（--version / --help / --game 等）
+  - name: "sdl-instead --help reports usage"
+    runner: "test.sh"
+    expected_exit_code: 0
+    reason: "校验 main.c 的帮助分支未被 OHOS 配置误关"
