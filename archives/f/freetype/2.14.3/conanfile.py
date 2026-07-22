@@ -1,7 +1,7 @@
 from conan import ConanFile
 from conan.tools.files import collect_libs, get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.files import apply_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -13,6 +13,8 @@ class FreetypeConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": True, "fPIC": True}
 
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
