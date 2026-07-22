@@ -4,6 +4,8 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
+import os
 
 
 class SpekConan(ConanFile):
@@ -42,16 +44,37 @@ class SpekConan(ConanFile):
             tc.configure_args.append("--disable-shared")
         tc.generate()
 
+        # R33: PKG_CONFIG_PATH 必须从环境读取, 不能硬编码本机绝对路径.
+        # 系统 FFmpeg 装在 $DEFAULT_PREFIX (CI profile 注入), 其 .pc 文件在
+        # $DEFAULT_PREFIX/lib/pkgconfig. 把该路径前置注入 PKG_CONFIG_PATH,
+        # 让 configure 能找到 ffmpeg/fftw 等系统预装依赖.
+        default_prefix = os.environ.get("DEFAULT_PREFIX", "")
+        env = Environment()
+        if default_prefix:
+            pc_dir = os.path.join(default_prefix, "lib", "pkgconfig")
+            env.prepend_path("PKG_CONFIG_PATH", pc_dir)
+        env.vars(self).save_script("spek_pkgconfig")
+
     def build(self):
         apply_conandata_patches(self)
         # Regenerate configure from patched configure.ac (patch adds --disable-gui)
         # Use autoconf instead of autoreconf -fi (autopoint not available on CI worker)
         self.run("autoconf", cwd=self.source_folder)
+        # E046: HMDFS does not preserve +x on autoconf-generated configure,
+        # causing "Permission denied" (exit 126) when Autotools.exec() runs it.
+        # chmod every configure we can find in source/build folders.
+        import glob
+        for pattern in (
+            os.path.join(self.source_folder, "configure"),
+            os.path.join(self.build_folder, "configure"),
+            os.path.join(os.path.dirname(self.build_folder), "configure"),
+        ):
+            if os.path.exists(pattern):
+                os.chmod(pattern, 0o755)
         autotools = Autotools(self)
-        # Set PKG_CONFIG_PATH for system-installed FFmpeg (pre-built packages, not conan)
-        configure_cmd = "PKG_CONFIG_PATH=/storage/Users/currentUser/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH " + \
-                        "./configure " + " ".join(autotools.configure_args)
-        self.run(configure_cmd, cwd=self.build_folder)
+        # PKG_CONFIG_PATH 已在 generate() 通过 Environment 注入 (R33),
+        # 这里只需调用 configure, 不再硬编码本机路径.
+        autotools.configure()
         autotools.make(args=["-j1"])
 
     def package(self):
