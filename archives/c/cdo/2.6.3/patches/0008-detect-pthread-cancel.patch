@@ -1,8 +1,11 @@
 --- a/configure.ac
 +++ b/configure.ac
-@@ -86,1 +86,2 @@
- AC_CHECK_FUNCS(getrlimit)
+@@ -74,4 +74,5 @@
+ AC_CHECK_FUNCS(backtrace)
+ #  ----------------------------------------------------------------------
+ # Checks for the availability of ANSI-C99 functions
 +AC_CHECK_FUNCS(pthread_cancel)
+ AC_CHECK_FUNCS(getrlimit)
 --- a/configure
 +++ b/configure
 @@ -27812,3 +27812,11 @@
@@ -27,13 +30,17 @@
  #undef HAVE_PROJ_H
 --- a/src/processManager.cc
 +++ b/src/processManager.cc
-@@ -192,7 +192,9 @@ ProcessManager::kill_processes()
+@@ -192,8 +192,12 @@ ProcessManager::kill_processes()
    {
      if (threadID != pthread_self())
      {
 +#ifdef HAVE_PTHREAD_CANCEL
        pthread_cancel(threadID);
+-      Debug(PROCESS_MANAGER, "process killed: %ld", threadID);
++      Debug(PROCESS_MANAGER, "process cancel requested: %ld", threadID);
++#else
++      Debug(PROCESS_MANAGER, "process cancel skipped (pthread_cancel unavailable): %ld", threadID);
 +#endif
-       Debug(PROCESS_MANAGER, "process killed: %ld", threadID);
      }
    }
+ }
