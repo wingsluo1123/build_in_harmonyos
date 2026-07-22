@@ -1,0 +1,72 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ola/0.10.9
+homepage: "https://github.com/OpenLightingProject/ola"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# OLA 0.10.9 upstream ships ~120 C++ unit tests under common/, libs/,
+# plugins/, tools/ — most are guarded by --enable-unittests at configure
+# time. We disable those in path A scope (configure --disable-unittests)
+# and instead provide our own consumer-facing smoke test here.
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（被本配方路径 A 禁用，下面只列出代表性样本）
+upstream_tests:
+  - file: common/network/NetworkUtilsTest.cpp
+    source: ola-0.10.9/common/network/NetworkUtilsTest.cpp
+    description: "NetworkUtils (FQDN / Hostname / DefaultRoute) — disabled in path A"
+    command: "./common/network/NetworkUtilsTest"
+    status: "disabled"
+  - file: common/rdm/UIDTest.cpp
+    source: ola-0.10.9/common/rdm/UIDTest.cpp
+    description: "RDM UID equality / DirectedToUID / Vendorcast — disabled in path A"
+    command: "./common/rdm/UIDTest"
+    status: "disabled"
+  - file: common/utils/DmxBufferTest.cpp
+    source: ola-0.10.9/common/utils/DmxBufferTest.cpp
+    description: "DmxBuffer SetChannel/Get/Blackout — disabled in path A"
+    command: "./common/utils/DmxBufferTest"
+    status: "disabled"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_ola.cpp
+    source: archives/o/ola/0.10.9/test_package/test_ola.cpp
+    description: >-
+      Real-API smoke test of libolacommon:
+      IPV4Address default + uint32 ctor + AsInt + copy + assignment + equality;
+      MACAddress uint8_t ctor + ToString ostringstream formatter + copy + equality;
+      RDM UID ManufacturerId / DeviceId / DirectedToUID semantics;
+      DmxBuffer SetChannel/Get/Blackout across 512 channels;
+      ola::StringTrim + ola::strings::IntToString.
+      The string-based FromStringOrDie paths are skipped because inet_pton,
+      inet_ntop, strtoul and ether_aton are no-op stubs in
+      aarch64-linux-ohos libc.so.
+    command: "./test_ola"
+
+# 测试断言总数 (R34 audit metric)
+# NOTE: 22 assertions — IPV4Address and MACAddress are exercised via their
+# low-level byte constructors (uint32 / const uint8_t*) instead of the
+# string-based FromStringOrDie. inet_pton, inet_ntop, strtoul, ether_aton
+# — every libc inet/hex parser — is a no-op stub in aarch64-linux-ohos
+# libc.so (all share address 0x11d80, single `ret` instruction). With
+# NDEBUG the asserts in FromStringOrDie are no-ops, so reading the
+# parsed result would read uninitialized stack memory. The bit-level
+# surface we test is what downstream callers actually rely on for
+# sending/receiving IP frames in DMX-over-IP protocols. The format/parse
+# logic is left to upstream's own NetworkUtilsTest, which we disable
+# per path A.
+assertion_count: 22
+assertion_breakdown:
+  - IPV4Address: 6
+  - MACAddress: 4
+  - UID: 4
+  - DmxBuffer: 6
+  - StringUtils: 2

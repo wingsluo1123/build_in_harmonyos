@@ -1,0 +1,135 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.10.9/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.10.9"
+
+# 软件名
+software: "ola"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-22"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（Debian .orig tarball，含预生成 autotools artifacts）
+  url: "https://deb.debian.org/debian/pool/main/o/ola/ola_0.10.9.nojsmin.orig.tar.gz"
+
+  # 源码校验和
+  sha256: "44073698c147fe641507398253c2e52ff8dc7eac8606cbf286c29f37939a4ebf"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（路径 A：只打包核心 + 禁用 HTTP server / tests / examples）
+  configure_options:
+    - "--disable-http"
+    - "--disable-unittests"
+    - "--disable-examples"
+    - "--disable-osc"
+    - "--disable-fatal-warnings"
+
+  # 编译依赖列表（路径 A：protobuf 通过 system_libs 透传，不进 conan 制品）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+# 路径 A 严格遵循 R6 原则——不修改 protobuf/bison/flex 等生成文件
+#      (.pb.cc/.pb.h/.tab.cpp/.tab.h/lex.yy.cpp 等)。patches/ 目录
+#      只保留真正的可重现源码变更，共 3 份：
+#        0001 — NetworkUtils.cpp: /proc/net/route + bionic resolver 修复
+#        0002 — config/config.guess: 添加 HarmonyOS uname 识别分支
+#        0003 — config/config.sub: 添加 linux-ohos 内核识别
+#      config.guess/sub 是 OLA tarball 自带的 2015 版本，patch 直接
+#      在该版本上写回上游 GNU autoconf-archive 的 case 表，可重现且
+#      不依赖 conanfile.py 运行时注入。
+
+patches_applied:
+  - "0001-common-network-NetworkUtils.cpp.patch"
+  - "0002-config-config.guess.patch"
+  - "0003-config-config.sub.patch"
+
+patches_count: 3
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "E007: config.guess/sub 需添加 HarmonyOS → linux-ohos 映射"
+  - "E011: HMDFS 上 umask 077 创建 0700 目录不可写（uid 0 不绕过 DAC）"
+  - "OLA 配置 detect libprotoc.a 时需要 LIBS=-lprotobuf 透传"
+  - "OHOS bionic libresolv.a 是 8 字节空 stub；_res 不导出；res_ninit 不存在"
+  - "OLA bionic 不支持 netlink（linux/socket.h 重定义 sockaddr_storage）和 sysctl（缺头文件）"
+  - "/proc/net/route 在 OHOS 可读，可替代 netlink 作为 default-route 探测"
+  - "路径 A 策略：conanfile 列出 olacommon/ola/olaserver 三个 core lib"
+  - "R6 约束：finish 时 refresh-patch 会把所有 changed 文件当 patch 输出，包含 .pb.cc/.tab.cpp/.lex.yy.cpp/.h 等生成文件，需在 conanfile 内以运行时注入替代 patch"
+
+# ============================================================
+# OHOS 适配关键点
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "路径 A：只打包 libolacommon / libola / libolaserver / olad 主进程"
+    - "HTTP UI / Python bindings / 具体 DMX 设备驱动 plugin 不进 PR"
+    - "配置编译选项收敛：--disable-http --disable-unittests --disable-examples --disable-osc --disable-fatal-warnings"
+    - "licenses = ['GPL-2.0-or-later', 'LGPL-2.1-or-later'] —— 比 tracy 严"
+    - "name_servers 在 OHOS 不可用（bionic resolver opaque），返回空"
+    - "default_route 通过 /proc/net/route 解析（替代 netlink/sysctl）"
+    - "system_libs: protobuf（系统 3.21.12） + pthread + dl + m"
+    - "FATAL_WARNINGS 关闭：libolacommon 有未用参数警告，避免触发 -Werror"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/ola-0.10.9.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/ola-0.10.9.work
+  source_orig_hash: 55e4038542fbb940
+  source_work_hash: 701cbaf91f72d5ce
+  generated_at: '2026-07-22T14:44:16'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-common-network-NetworkUtils.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-config-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
