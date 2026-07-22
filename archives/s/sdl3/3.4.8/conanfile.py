@@ -131,8 +131,11 @@ class Sdl3Conan(ConanFile):
         # it via its installed SDL3headersTargets.cmake. We include that
         # file as a build module so the upstream-defined SDL3::Headers
         # target is added to every consumer's CMake project.
+        # The path must be ABSOLUTE inside the package folder; conan
+        # copies it into the consumer's generators dir verbatim.
         self.cpp_info.build_modules["cmake"].append(
-            os.path.join("lib", "cmake", "SDL3", "SDL3headersTargets.cmake"))
+            os.path.join(self.package_folder, "lib", "cmake", "SDL3",
+                         "SDL3headersTargets.cmake"))
 
     def package_id(self):
         # Bionic libc++ ABI is consistent across OHOS profiles; no need
