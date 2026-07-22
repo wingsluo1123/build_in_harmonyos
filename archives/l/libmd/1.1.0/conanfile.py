@@ -41,24 +41,29 @@ class LibmdConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
+        # P2: autotools = Autotools(self) was dead code — all build steps
+        # use manual self.run() and AutotoolsToolchain.generate() already
+        # injected the conanbuild env. Removed.
         # HMDFS noexec: use /system/bin/sh to run configure, with --no-create
         configure_cmd = "/system/bin/sh ./configure --no-create " + " ".join(self._configure_args)
         self.run(configure_cmd, cwd=self.source_folder)
-        # HMDFS noexec: patch config.status to use writable temp dir
+        # HMDFS noexec: patch config.status to use writable temp dir.
+        # P1+P2: use TemporaryDirectory (auto-cleanup, no disk leak) and
+        # omit dir= (defaults to $TMPDIR or /tmp) — never hardcode
+        # /storage/Users/currentUser which only exists on dev machine.
         import tempfile, re, os
-        conf_tmp = tempfile.mkdtemp(dir='/storage/Users/currentUser', prefix='.libmd-conf-')
-        os.chmod(conf_tmp, 0o755)
-        cs_path = os.path.join(self.source_folder, "config.status")
-        if os.path.isfile(cs_path):
-            with open(cs_path, 'r') as f:
-                cs_content = f.read()
-            cs_content = re.sub(r'tmp=`\(umask 077 && mktemp -d[^`]+`', f'tmp="{conf_tmp}"', cs_content)
-            cs_content = re.sub(r'tmp=\./conf\$\$-\$RANDOM', f'tmp={conf_tmp}', cs_content)
-            with open(cs_path, 'w') as f:
-                f.write(cs_content)
-        self.run("/system/bin/sh ./config.status", cwd=self.source_folder)
-        self.run("make -j1", cwd=self.source_folder)
+        with tempfile.TemporaryDirectory(prefix='.libmd-conf-') as conf_tmp:
+            os.chmod(conf_tmp, 0o755)
+            cs_path = os.path.join(self.source_folder, "config.status")
+            if os.path.isfile(cs_path):
+                with open(cs_path, 'r') as f:
+                    cs_content = f.read()
+                cs_content = re.sub(r'tmp=`\(umask 077 && mktemp -d[^`]+`', f'tmp="{conf_tmp}"', cs_content)
+                cs_content = re.sub(r'tmp=\./conf\$\$-\$RANDOM', f'tmp={conf_tmp}', cs_content)
+                with open(cs_path, 'w') as f:
+                    f.write(cs_content)
+            self.run("/system/bin/sh ./config.status", cwd=self.source_folder)
+            self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
         self.run("make install DESTDIR={} -j1".format(self.package_folder), cwd=self.source_folder)
