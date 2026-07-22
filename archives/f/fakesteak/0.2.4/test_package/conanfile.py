@@ -12,6 +12,7 @@ from conan import ConanFile
 
 class FakesteakTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "VirtualRunEnv"
     test_type = "explicit"
 
     def requirements(self):

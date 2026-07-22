@@ -12,6 +12,7 @@ import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.env import VirtualBuildEnv
 
 
 class FakesteakConan(ConanFile):
@@ -20,7 +21,6 @@ class FakesteakConan(ConanFile):
     description = "Matrix digital rain for your terminal (no ncurses dependency)"
     license = "CC0-1.0"
     homepage = "https://github.com/domsson/fakesteak"
-    url = ""  # CI fills this
 
     package_type = "application"
 
@@ -29,8 +29,10 @@ class FakesteakConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def requirements(self):
+        pass
+
     def layout(self):
-        # Build in source directory — Makefile is in the source root
         self.folders.build = "."
         self.folders.generators = "."
 
@@ -44,11 +46,16 @@ class FakesteakConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        VirtualBuildEnv(self).generate()
+
     def build(self):
         apply_conandata_patches(self)
-        # OHOS profile always uses clang; R33: don't use shell env vars
-        # R9: Always use -j1
-        self.run('make CC=clang CFLAGS="-Wall -O3 -fPIC" LDLIBS="-lm" -j1')
+        # R33: Get compiler from Conan conf, never hardcode or use shell env vars
+        comp = self.conf.get("tools.build:compiler_executables", check_type=dict, default={})
+        cc = comp.get("c", "clang") if comp else "clang"
+        # Use -j1 to avoid race conditions; CFLAGS/LDLIBS handled by Makefile after patch
+        self.run(f"make CC='{cc}' -j1", env="conanbuild")
 
     def package(self):
         # Copy the fakesteak executable to bin/
