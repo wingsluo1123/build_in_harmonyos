@@ -5,10 +5,10 @@ libedit is a line editing library for interactive command-line programs.
 It provides the BSD-licensed editline and readline compatible API.
 
 Fixes for OHOS/HMDFS:
-- TMPDIR: set to writable location (/tmp is erofs read-only)
+- TMPDIR: set to build_folder/tmp (/tmp is erofs read-only)
 - config.status: umask 077 creates mode 0700 dirs that HMDFS can't write to;
   the build() method patches configure to use umask 022 before running it.
-- ncurses: use system libncursesw.a (conan ncurses/6.4 configure fails on /tmp erofs)
+- ncurses: use system libncursesw.a via NCURSES_ROOT/NCURSES_PREFIX env vars.
 """
 import os
 
@@ -47,28 +47,38 @@ class LibeditConan(ConanFile):
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         tc.configure_args.append("--disable-examples")
-        # System ncurses include path
-        ncurses_inc = os.environ.get("NCURSES_INCLUDE",
-            "/storage/Users/currentUser/tmp/test-install-ncurses-6.4/include")
-        ncurses_lib = os.environ.get("NCURSES_PREFIX",
-            "/storage/Users/currentUser/usr/local")
-        tc.extra_cflags.append(f"-I{ncurses_inc}")
-        tc.extra_ldflags.append(f"-L{ncurses_lib}/lib")
+
+        # System ncurses: must be provided via NCURSES_ROOT or NCURSES_PREFIX
+        ncurses_root = os.environ.get("NCURSES_ROOT") or os.environ.get("NCURSES_PREFIX")
+        ncurses_include = os.environ.get("NCURSES_INCLUDE")
+        if ncurses_root:
+            inc_dir = os.path.join(ncurses_root, "include")
+            lib_dir = os.path.join(ncurses_root, "lib")
+            if os.path.isdir(inc_dir):
+                tc.extra_cflags.append(f"-I{inc_dir}")
+            if os.path.isdir(lib_dir):
+                tc.extra_ldflags.append(f"-L{lib_dir}")
+        if ncurses_include and os.path.isdir(ncurses_include):
+            tc.extra_cflags.append(f"-I{ncurses_include}")
+        # Also add ncursesw link flag (always needed for libedit on OHOS)
+        tc.extra_ldflags.append("-lncursesw")
         tc.generate()
 
     def build(self):
         # ── Fix 1: ncurses symlink ──
-        ncurses_lib = os.environ.get("NCURSES_PREFIX",
-            "/storage/Users/currentUser/usr/local")
-        libncurses = os.path.join(ncurses_lib, "lib", "libncurses.a")
-        libncursesw = os.path.join(ncurses_lib, "lib", "libncursesw.a")
-        if not os.path.exists(libncurses) and os.path.exists(libncursesw):
-            os.symlink("libncursesw.a", libncurses)
-            self.output.info(f"Created symlink: libncurses.a -> libncursesw.a")
+        ncurses_root = os.environ.get("NCURSES_ROOT") or os.environ.get("NCURSES_PREFIX")
+        if ncurses_root:
+            lib_dir = os.path.join(ncurses_root, "lib")
+            libncurses = os.path.join(lib_dir, "libncurses.a")
+            libncursesw = os.path.join(lib_dir, "libncursesw.a")
+            if not os.path.exists(libncurses) and os.path.exists(libncursesw):
+                os.symlink("libncursesw.a", libncurses)
+                self.output.info(f"Created symlink: libncurses.a -> libncursesw.a")
 
-        # ── Fix 2: TMPDIR for /tmp erofs ──
+        # ── Fix 2: TMPDIR for /tmp erofs — use build_folder/tmp ──
         old_tmpdir = os.environ.get("TMPDIR")
-        writable_tmp = "/storage/Users/currentUser/.conan2/tmp"
+        writable_tmp = os.path.join(self.build_folder, "tmp")
+        os.makedirs(writable_tmp, exist_ok=True)
         os.environ["TMPDIR"] = writable_tmp
 
         # ── Fix 3: patch configure to use umask 022 instead of 077 ──
@@ -77,7 +87,6 @@ class LibeditConan(ConanFile):
         if os.path.exists(configure_path):
             with open(configure_path) as f:
                 content = f.read()
-            # Change umask 077 to umask 022 in the temp dir creation section
             original = 'umask 077 && mktemp -d "./confXXXXXX"'
             replacement = 'umask 022 && mktemp -d "./confXXXXXX"'
             if original in content:
@@ -88,31 +97,24 @@ class LibeditConan(ConanFile):
             else:
                 self.output.warning("umask 077 pattern not found in configure")
 
-        # ── Fix 4: termcap function declarations for OHOS ncurses ──
+        # ── Fix 4: termcap function declarations for ncurses without termcap.h ──
         # terminal.c declares tgetent/tgoto/tgetflag/tgetnum/tgetstr/tputs
-        # only for __sun; OHOS ncurses has them in the library but not declared
-        # in the headers. We add __OHOS__ to the same guard.
+        # only for __sun; OHOS has them in the ncurses library but not declared
+        # in the headers (no termcap.h). We use feature-based detection:
+        # HAVE_NCURSES_H && !HAVE_TERMCAP_H instead of platform macro __OHOS__.
         terminal_c = os.path.join(self.source_folder, "src", "terminal.c")
         if os.path.exists(terminal_c):
             with open(terminal_c) as f:
                 content = f.read()
             old_guard = '#if defined(__sun)'
-            new_guard = '#if defined(__sun) || defined(__OHOS__)'
+            new_guard = '#if defined(__sun) || (defined(HAVE_NCURSES_H) && !defined(HAVE_TERMCAP_H))'
             if old_guard in content:
                 content = content.replace(old_guard, new_guard)
                 with open(terminal_c, "w") as f:
                     f.write(content)
-                self.output.info("Patched terminal.c: added __OHOS__ to termcap decl guard")
+                self.output.info("Patched terminal.c: added feature-based termcap decl guard (HAVE_NCURSES_H && !HAVE_TERMCAP_H)")
             else:
-                self.output.warning("__sun guard not found in terminal.c, checking content...")
-                # Check if the guard is already there
-                if '__OHOS__' in content:
-                    self.output.info("__OHOS__ guard already present in terminal.c")
-                else:
-                    # Try to find the actual guard pattern
-                    for line in content.split('\n'):
-                        if 'tgetent' in line and 'extern' in line:
-                            self.output.info(f"Found tgetent decl: {line.strip()}")
+                self.output.warning("__sun guard not found in terminal.c")
 
         try:
             apply_conandata_patches(self)

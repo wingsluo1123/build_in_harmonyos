@@ -3,9 +3,23 @@ project(test_libedit C)
 
 # Find the package via Conan-generated CMakeDeps
 find_package(libedit REQUIRED)
-# Also find ncurses (system dep, not conan dep)
-find_library(NCURSES_LIB ncursesw PATHS /storage/Users/currentUser/usr/local/lib NO_DEFAULT_PATH)
-find_path(NCURSES_INCLUDE_DIR curses.h PATHS /storage/Users/currentUser/tmp/test-install-ncurses-6.4/include NO_DEFAULT_PATH)
+
+# Find system ncurses (libedit runtime dependency)
+# Support NCURSES_ROOT hint for cross-build environments
+find_library(NCURSES_LIB NAMES ncursesw ncurses
+  HINTS "$ENV{NCURSES_ROOT}/lib" "$ENV{NCURSES_PREFIX}/lib")
+if(NOT NCURSES_LIB)
+  message(FATAL_ERROR "ncurses library not found. "
+    "Set NCURSES_ROOT or NCURSES_PREFIX environment variable to the ncurses installation prefix.")
+endif()
+
+find_path(NCURSES_INCLUDE_DIR curses.h
+  HINTS "$ENV{NCURSES_ROOT}/include" "$ENV{NCURSES_PREFIX}/include"
+    "$ENV{NCURSES_INCLUDE}")
+if(NOT NCURSES_INCLUDE_DIR)
+  message(FATAL_ERROR "ncurses header (curses.h) not found. "
+    "Set NCURSES_ROOT, NCURSES_PREFIX, or NCURSES_INCLUDE environment variable.")
+endif()
 
 add_executable(test_libedit test_libedit.c)
 target_link_libraries(test_libedit libedit::libedit ${NCURSES_LIB})
