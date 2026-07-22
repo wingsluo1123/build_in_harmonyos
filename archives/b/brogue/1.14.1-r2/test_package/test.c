@@ -19,7 +19,7 @@ int main() {
         printf("test brogue 1.14.1-r2: OK\n");
         return 0;
     }
-    // Binary exists but execution failed (may need terminal in CI)
-    printf("test brogue 1.14.1-r2: OK (binary found, execution skipped - may need terminal)\n");
-    return 0;
+    // Binary exists but execution failed - likely broken or missing deps
+    printf("FAIL: brogue binary found but execution failed\n");
+    return 1;
 }
