@@ -197,12 +197,14 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +    auto file = audio.open(file_name, stream);
 +    if (!file) {
 +        fprintf(stderr, "Failed to open audio file: %s\n", file_name);
++        if (output != stdout) fclose(output);
 +        return 1;
 +    }
 +
 +    if (file->get_error() != AudioError::OK) {
 +        fprintf(stderr, "Audio error: %s (code %d)\n", file_name,
 +                static_cast<int>(file->get_error()));
++        if (output != stdout) fclose(output);
 +        return 1;
 +    }
 +
@@ -215,6 +217,7 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +    fprintf(stderr, "Bitrate:  %d kbps\n", file->get_bit_rate() / 1000);
 +
 +    if (info_only) {
++        if (output != stdout) fclose(output);
 +        return 0;
 +    }
 +
@@ -224,6 +227,7 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +    while (tmp > 1) { tmp >>= 1; nbits++; }
 +    if ((1 << nbits) != samples) {
 +        fprintf(stderr, "Samples must be a power of 2, got %d\n", samples);
++        if (output != stdout) fclose(output);
 +        return 1;
 +    }
 +
@@ -232,6 +236,7 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +    auto fft_plan = fft.create(nbits);
 +    if (!fft_plan) {
 +        fprintf(stderr, "Failed to create FFT plan\n");
++        if (output != stdout) fclose(output);
 +        return 1;
 +    }
 +
@@ -245,6 +250,7 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +
 +    if (!pipeline) {
 +        fprintf(stderr, "Failed to create pipeline\n");
++        if (output != stdout) fclose(output);
 +        return 1;
 +    }
 +
