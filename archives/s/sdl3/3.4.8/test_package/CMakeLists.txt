@@ -3,7 +3,7 @@ project(test_sdl3 C)
 
 # R34: a real consumer exercising the public SDL3 API on OHOS.
 
-find_package(sdl3 REQUIRED CONFIG)
+find_package(SDL3 REQUIRED CONFIG)
 
 add_executable(test_sdl3 test.c)
 # SDL3's SDL_platform_defines.h defines SDL_PLATFORM_OHOS only when
@@ -12,7 +12,7 @@ add_executable(test_sdl3 test.c)
 if(CMAKE_SYSTEM_NAME MATCHES "HarmonyOS|OpenHarmony")
     target_compile_definitions(test_sdl3 PRIVATE __OHOS__=1)
 endif()
-target_link_libraries(test_sdl3 PRIVATE sdl3::sdl3)
+target_link_libraries(test_sdl3 PRIVATE SDL3::SDL3)
 
 # SDL3 uses the C math library (sin/cos in SDL_sqrt.c etc.) — link
 # explicitly so the test binary doesn't fail at link time on bionic.

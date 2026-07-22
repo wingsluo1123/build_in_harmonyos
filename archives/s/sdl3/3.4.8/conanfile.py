@@ -108,11 +108,6 @@ class Sdl3Conan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        # Strip non-portable CMake package config from the install tree;
-        # we want downstream to use our package_info() only.
-        # (SDL's installed SDL3Config.cmake assumes a system install layout
-        # and points at /usr/lib etc. which OHOS doesn't have.)
-        # Keep headers, libSDL3.a, and license.
 
     def package_info(self):
         self.cpp_info.libs = ["SDL3"]
@@ -130,6 +125,14 @@ class Sdl3Conan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "SDL3")
         self.cpp_info.set_property("cmake_target_name", "SDL3::SDL3")
         self.cpp_info.set_property("cmake_find_mode", "config")
+        # SDL3_image / SDL3_ttf / SDL3_mixer each call
+        # `target_link_libraries(... SDL3::Headers)` — a separate INTERFACE
+        # target for the public headers. Upstream SDL3Config.cmake provides
+        # it via its installed SDL3headersTargets.cmake. We include that
+        # file as a build module so the upstream-defined SDL3::Headers
+        # target is added to every consumer's CMake project.
+        self.cpp_info.build_modules["cmake"].append(
+            os.path.join("lib", "cmake", "SDL3", "SDL3headersTargets.cmake"))
 
     def package_id(self):
         # Bionic libc++ ABI is consistent across OHOS profiles; no need
