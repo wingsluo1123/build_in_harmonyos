@@ -27,4 +27,5 @@ class CprTestConan(ConanFile):
 
     def test(self):
         bin_path = os.path.join(self.cpp.build.bindir, "test_cpr")
-        self.run(bin_path, env="conanrun")
+        ret = self.run(bin_path, env="conanrun")
+        assert ret == 0, f"test_cpr exited with code {ret}"
