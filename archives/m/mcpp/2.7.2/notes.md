@@ -73,8 +73,7 @@ End of include path list.
 - ohos-sdk 的 lld 链接器依赖 libxml2.so.16，当前环境存在动态链接问题，需使用 ld.bfd 替代
 - clang-wrapper 是本地构建辅助脚本，自动处理 `-fuse-ld=bfd` 和 conftest ELF 签名，不属于上游代码
 - mcpp 无标准 `make check` 测试套件，仅通过 `mcpp -v` 手动验证功能可用性
-
 ---
 
-**编译结束**: 2026-06-02 22:20
+**编译结束**: 2026-07-22 20:49
 **最终状态**: built
