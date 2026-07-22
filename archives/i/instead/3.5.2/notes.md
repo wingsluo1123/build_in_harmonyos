@@ -80,15 +80,32 @@ KeyError: 'OHOS'
 **根因**：conancenter 上的 `sdl` / `lua` / `sdl_image` / `sdl_ttf` / `sdl_mixer` 配方目前不支持 `settings.os=OHOS`（它们的源码字典是按 Linux/Windows/Mac 枚举键索引），因此 cross-compile OHOS 时报 KeyError。`zlib` 同理。
 
 **R36 正确路径**（拓扑序先行）：
-1. 在 `archives/z/zlib/<ver>/` 先迁移 zlib（含 OHOS cross-compile 适配）
-2. 然后 `archives/l/lua/<ver>/` 迁移 lua
-3. 然后 `archives/s/sdl/<ver>/`、`s/sdl_image/<ver>/`、`s/sdl_ttf/<ver>/`、`s/sdl_mixer/<ver>/`
-4. 最后再来 build INSTEAD
+1. 在 `archives/z/zlib/<ver>/` 先迁移 zlib（含 OHOS cross-compile 适配）  ✅ feat/zlib-1.3.1（本地）
+2. 然后 `archives/l/lua/<ver>/` 迁移 lua  ✅ feat/lua-5.4.7（本地）
+3. 然后 `archives/s/sdl/<ver>/`、`s/sdl_image/<ver>/`、`s/sdl_ttf/<ver>/`、`s/sdl_mixer/<ver>` — SDL2 链路未迁移；本轮迁移走的是 **SDL3 链路**：
+   - feat/sdl3-3.4.8
+   - feat/sdl3_image-3.4.4
+   - feat/sdl3_ttf-3.2.2（额外依赖 freetype/2.14.3）
+   - feat/sdl3_mixer-3.2.4
+4. INSTEAD 本体需 SDL2→SDL3 的源码层适配（`src/sdl-instead.c` 等多处 API 改名）才能消费这批 SDL3 配方。该 PR 范围外。
+
+**@ohpcd/stable 推送状态**：
+- 已迁移的 6 个配方（lua/5.4.7、sdl3/3.4.8、sdl3_image/3.4.4、sdl3_ttf/3.2.2、sdl3_mixer/3.2.4、freetype/2.14.3）目前**只在本地 conan cache**，未推送到 ohpcd 远端制品仓（远端要求鉴权）。
+- @ohpcd 远端目前只携带 zlib/1.3.1 一个 OHOS 适配配方。
+- 故本仓库 `self.requires(...)` 的 deps 仍按 `conancenter` 解析；待 ohpcd 制品仓补齐后，可批量加 `@ohpcd/stable` 后缀让 conan 优先解析本地 OHOS-friendly 制品。
+
+**G2 重跑结果（2026-07-22 22:53）**：
+- 状态：FAIL（同 W0，原因未变）
+- 失败位置：`cmake/3.31.12` 拉取时 `KeyError: 'OHOS'`
+- 阻断层：transitive 依赖 cmake 自身的 conandata.yml 不识别 `settings.os=OHOS`
+- 根因：conancenter 全链路配方（cmake、sdl、lua、zlib、sdl_*）默认按 `Linux/Windows/Mac` 枚举键索引源码，跨编译 OHOS 即报 KeyError
+- 本 PR 不解决：阻塞点在 transitive 依赖侧的 os 枚举缺失，需要上游 PR 补 `OHOS` 分支，或在 ohpcd 制品仓批量补齐替代品
 
 **本适配阶段的妥协**：
 - 配方骨架（conanfile.py + conandata.yml + test_package/ + manifests）已落地
 - 8 门禁只在 G0 / G1 通过，G2 受 R36 阻塞
-- 给接手人：本目录的 conanfile.py 在 zlib/lua/SDL 系列迁移到 ohpcd 制品仓后**立即生效**，只需把 `self.requires(...)` 中的 `lua/5.4.7` → `@ohpcd/stable` 后缀，无需重写
+- 给接手人：本目录的 conanfile.py 在 zlib/lua/SDL 系列迁移到 ohpcd 制品仓后**立即生效**，只需把 `self.requires(...)` 中的依赖加 `@ohpcd/stable` 后缀（每个依赖版本若 ohpcd 已发布对应版本），无需重写 conanfile.py 框架
+- INSTEAD 源码目前还是 SDL2 API，跟我们已经迁好的 SDL3 链路**不兼容**。要让 INSTEAD 在 OHOS 上跑通，必须再做一次 SDL2→SDL3 的源码迁移（PR 范围外，建议单独立项）
 
 **可选绕路**（仅 demo 用，不入正式 PR）：
 - 临时在 conan-center PR 一个 OHOS-aware fork 并 upstream 接受
