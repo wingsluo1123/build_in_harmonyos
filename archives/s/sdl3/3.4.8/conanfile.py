@@ -128,14 +128,22 @@ class Sdl3Conan(ConanFile):
         # SDL3_image / SDL3_ttf / SDL3_mixer each call
         # `target_link_libraries(... SDL3::Headers)` — a separate INTERFACE
         # target for the public headers. Upstream SDL3Config.cmake provides
-        # it via its installed SDL3headersTargets.cmake. We include that
-        # file as a build module so the upstream-defined SDL3::Headers
-        # target is added to every consumer's CMake project.
-        # The path must be ABSOLUTE inside the package folder; conan
-        # copies it into the consumer's generators dir verbatim.
-        self.cpp_info.build_modules["cmake"].append(
-            os.path.join(self.package_folder, "lib", "cmake", "SDL3",
-                         "SDL3headersTargets.cmake"))
+        # it via its installed SDL3headersTargets.cmake. We expose that
+        # file as a `cmake_build_modules` property so the conan-generated
+        # SDL3Config.cmake in the consumer's generators dir will `include`
+        # it and register the SDL3::Headers target.
+        #
+        # In conan 2.x the canonical API is the `cmake_build_modules`
+        # property (read by CMakeDeps.target_data). The old
+        # `cpp_info.build_modules["cmake"].append(...)` is the conan 1.x
+        # idiom and is silently ignored by CMakeDeps, which is why
+        # `sdl3_BUILD_MODULES_PATHS_RELEASE` was coming out empty.
+        #
+        # The path is relative to the package folder; conan resolves it
+        # against `self.package_folder` at consumer-config time.
+        self.cpp_info.set_property(
+            "cmake_build_modules",
+            ["lib/cmake/SDL3/SDL3headersTargets.cmake"])
 
     def package_id(self):
         # Bionic libc++ ABI is consistent across OHOS profiles; no need
