@@ -18,7 +18,7 @@ class McppConan(ConanFile):
     homepage = "https://mcpp.sourceforge.net/"
     url = ""  # CI fills this
 
-    package_type = "library"
+    package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "enable_mcpp_lib": [True, False]}
@@ -59,9 +59,11 @@ class McppConan(ConanFile):
         autotools.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["mcpp"]
         self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.includedirs = ["include"]
-        self.cpp_info.set_property("cmake_find_mode", "both")
-        self.cpp_info.set_property("pkg_config_name", "mcpp")
+        # mcpp 默认构建为 standalone 二进制；仅当 --enable-mcpp-lib 时构建 libmcpp
+        if self.options.enable_mcpp_lib:
+            self.cpp_info.libs = ["mcpp"]
+            self.cpp_info.libdirs = ["lib"]
+            self.cpp_info.includedirs = ["include"]
+            self.cpp_info.set_property("cmake_find_mode", "both")
+            self.cpp_info.set_property("pkg_config_name", "mcpp")
