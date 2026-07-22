@@ -22,11 +22,13 @@ class TestPackageConan(ConanFile):
             libs += ["-l" + lib for lib in dep.cpp_info.libs if lib != "mapserver"]
             libs += ["-l" + lib for lib in dep.cpp_info.system_libs]
         executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
-        cc = executables.get("c") or os.environ.get("CC")
+        cc = executables.get("c")
         if not cc:
-            raise ConanException("C compiler not found in tools.build:compiler_executables or CC")
-        command = "{} test_mapserver.c -o test_mapserver {} {} {}".format(
+            raise ConanException("C compiler not found in tools.build:compiler_executables")
+        test_source = os.path.join(self.source_folder, "test_mapserver.c")
+        command = '{} "{}" -o test_mapserver {} {} {}'.format(
             cc,
+            test_source,
             " ".join(include_flags),
             " ".join(library_flags),
             " ".join(libs),

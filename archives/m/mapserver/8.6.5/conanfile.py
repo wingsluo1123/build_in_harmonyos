@@ -143,7 +143,7 @@ class MapserverConan(ConanFile):
             "-DWITH_THREAD_SAFETY=OFF",
             "-DWITH_PCRE2=OFF",
             "-DWITH_PYTHON=OFF",
-            "-DWITH_PHPNG=OFF",
+            "-DWITH_PHP=OFF",
             "-DWITH_PERL=OFF",
             "-DWITH_RUBY=OFF",
             "-DWITH_JAVA=OFF",
@@ -155,7 +155,8 @@ class MapserverConan(ConanFile):
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")
         self.run('cmake --install "{}" --prefix "{}"'.format(build_dir, self.package_folder))
-        self._sign_shared_libs()
+        if self.options.shared and self.settings.os == "OHOS":
+            self._sign_shared_libs()
 
     def _sign_shared_libs(self):
         libdir = os.path.join(self.package_folder, "lib")
@@ -165,10 +166,13 @@ class MapserverConan(ConanFile):
             return
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
         signer = "/data/service/hnp/bin/binary-sign-tool"
+        for tool in (objcopy, signer):
+            if not os.path.isfile(tool):
+                raise FileNotFoundError(f"Required OHOS signing tool is missing: {tool}")
         for shared_lib in shared_libs:
             if os.path.islink(shared_lib):
                 continue
-            self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=shared_lib))
+            self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=shared_lib))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=shared_lib))
 
     def package_info(self):
