@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package — cdo 2.4.0.
+"""Conan test_package — cdo 2.6.3.
 
 R34: Test actually executes cdo binary to verify it works.
 """

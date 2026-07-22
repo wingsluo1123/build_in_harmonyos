@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Conan recipe — cdo 2.4.0 (Climate Data Operators, autotools).
+"""Conan recipe — cdo 2.6.3 (Climate Data Operators, autotools).
 
 CDO is a command-line tool for processing climate and forecast data.
 Uses autotools build system. config.guess/config.sub are patched
 via conandata patches for HarmonyOS platform recognition (E007).
 
-Upstream 2.4.0 switched to C++20, so the recipe forces a C++20
+Upstream CDO requires C++20, so the recipe forces a C++20
 compiler mode even when the global CI profile defaults to C++17.
 """
 import os
@@ -21,7 +21,7 @@ from conan.tools.layout import basic_layout
 
 class CdoConan(ConanFile):
     name = "cdo"
-    version = "2.4.0"
+    version = "2.6.3"
     description = "Climate Data Operators — command-line tools for processing climate and forecast data"
     license = "GPL-2.0-only"
     homepage = "https://code.mpimet.mpg.de/projects/cdo"
@@ -61,7 +61,7 @@ class CdoConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Upstream 2.4.0 requires C++20 (see NEWS/configure checks).
+        # Upstream CDO requires C++20 (see NEWS/configure checks).
         # CI's shared OHOS profile still defaults to compiler.cppstd=17,
         # so force the required dialect here to avoid configure failing.
         tc.extra_cxxflags.append("-std=c++20")

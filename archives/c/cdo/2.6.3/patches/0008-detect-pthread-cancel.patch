@@ -1,0 +1,39 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -86,1 +86,2 @@
+ AC_CHECK_FUNCS(getrlimit)
++AC_CHECK_FUNCS(pthread_cancel)
+--- a/configure
++++ b/configure
+@@ -27812,3 +27812,11 @@
++ac_fn_c_check_func "$LINENO" "pthread_cancel" "ac_cv_func_pthread_cancel"
++if test "x$ac_cv_func_pthread_cancel" = xyes
++then :
++  printf '%s\n' "#define HAVE_PTHREAD_CANCEL 1" >>confdefs.h
++
++fi
++
++
+ ac_fn_c_check_func "$LINENO" "getrlimit" "ac_cv_func_getrlimit"
+ if test "x$ac_cv_func_getrlimit" = xyes
+ then :
+--- a/src/config.h.in
++++ b/src/config.h.in
+@@ -171,2 +171,5 @@
++/* Define to 1 if you have the 'pthread_cancel' function. */
++#undef HAVE_PTHREAD_CANCEL
++
+ /* Define to 1 if you have the <proj.h> header file. */
+ #undef HAVE_PROJ_H
+--- a/src/processManager.cc
++++ b/src/processManager.cc
+@@ -192,7 +192,9 @@ ProcessManager::kill_processes()
+   {
+     if (threadID != pthread_self())
+     {
++#ifdef HAVE_PTHREAD_CANCEL
+       pthread_cancel(threadID);
++#endif
+       Debug(PROCESS_MANAGER, "process killed: %ld", threadID);
+     }
+   }

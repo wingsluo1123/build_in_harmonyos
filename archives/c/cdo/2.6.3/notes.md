@@ -1,4 +1,4 @@
-# cdo 2.4.0 编译进度
+# cdo 2.6.3 编译进度
 
 **日期**: 2026-07-15
 **状态**: ✅ 编译成功
@@ -19,10 +19,9 @@
 1. **config.guess/config.sub 补丁**: CDO 使用 autotools 构建，需要更新 config.guess/config.sub 以支持 HarmonyOS 平台识别，否则 configure 无法识别 aarch64-linux-ohos 目标。
 2. **CONFIG_SHELL**: 需要设置 CONFIG_SHELL=/data/service/hnp/bin/bash 以解决 HMDFS 兼容问题。
 3. **静态编译**: 使用 --enable-static --disable-shared 避免动态库依赖问题。
-4. **C++20 要求**: 上游 CDO 2.4.0 已切换到 C++20，Conan 配方需显式追加 `-std=c++20`，否则在 CI 共享 profile 的 `compiler.cppstd=17` 基线下会在 `configure` 阶段失败。
-5. **ranges 回退**: libc++ 不完整实现 `std::ranges` 算法时，需要基于 `_LIBCPP_HAS_NO_INCOMPLETE_RANGES` 回退到经典迭代器算法，而不是使用平台宏。
-6. **pthread_cancel 检测**: 通过 `AC_CHECK_FUNCS([pthread_cancel])` 生成 `HAVE_PTHREAD_CANCEL`，再在源码里按函数可用性决定是否调用，避免平台特判。
-7. **上游测试执行**: 在目标程序可运行的场景下，Conan `build()` 阶段执行 `make check`，让 CI 的 L1 能看到上游官方测试痕迹；纯交叉构建场景则跳过并保留 `test_package` 验证。
+4. **C++20 要求**: 上游 CDO 2.6.3 需要 C++20，Conan 配方需显式追加 `-std=c++20`，否则在 CI 共享 profile 的 `compiler.cppstd=17` 基线下会在 `configure` 阶段失败。
+5. **pthread_cancel 检测**: 通过 `AC_CHECK_FUNCS([pthread_cancel])` 生成 `HAVE_PTHREAD_CANCEL`，再在源码里按函数可用性决定是否调用，避免平台特判。
+6. **上游测试执行**: 在目标程序可运行的场景下，Conan `build()` 阶段执行 `make check`，让 CI 的 L1 能看到上游官方测试痕迹；纯交叉构建场景则跳过并保留 `test_package` 验证。
 
 ---
 
