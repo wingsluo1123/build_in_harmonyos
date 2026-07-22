@@ -158,49 +158,43 @@ ola 0.10.9 libolacommon API smoke test: ALL PASS
 
 ### 补丁说明
 
-**补丁共 3 份**（与 `conandata.yml` `patches` 列表严格一致）：
+**补丁共 4 份**（与 `conandata.yml` `patches` 列表严格一致）：
 
 #### Patch #1 — `patches/0001-common-network-NetworkUtils.cpp.patch`
 
 OLA 0.10.9 的 `common/network/NetworkUtils.cpp` 有三条 OHOS bionic 不支持的代码路径：
 
-1. `#include <linux/netlink.h>` + `<linux/rtnetlink.h>` —— bionic `<linux/socket.h>` 会重复定义 `sockaddr_storage`，与 `<sys/socket.h>` 冲突
+1. `<linux/netlink.h>` + `<linux/rtnetlink.h>` —— bionic `<linux/socket.h>` 会重复定义 `sockaddr_storage`，与 `<sys/socket.h>` 冲突
 2. `NameServers()` 调 `_res`（glibc 全局 resolver state）+ `res_ninit` —— bionic 只导出 `struct __res_state` 类型，**不导出全局 `_res` 符号**，`libresolv.a` 是 8 字节空 stub，`res_ninit` 未声明
-3. `DefaultRoute()` 走 netlink 或 sysctl —— 两条路径 OHOS 都不可用，`#error` 死分支
+3. `DefaultRoute()` 走 netlink 或 sysctl —— 两条路径 OHOS 都不可用
 
-补丁通过 `#elif defined(__OHOS__)` 守护添加三个分支：
+补丁采用 **feature-detection 而非平台宏**（避免违反 R8）：
+- 顶部 `#include <linux/netlink.h>` 守护保持上游 `HAVE_LINUX_NETLINK_H && HAVE_LINUX_RTNETLINK_H` 不变（OHOS 上 configure 不会定义这俩宏，自动跳过）
+- `NameServers()` 走 `#elif !defined(HAVE_DECL__RES)` —— `HAVE_DECL__RES` 由 Patch #4 的 `AC_LINK_IFELSE` 探针设置；OHOS bionic 不导出 `_res`，`HAVE_DECL__RES` 未定义，走 fallback 返回空列表
+- `DefaultRoute()` 走 `#elif !defined(_WIN32)` —— 通用 POSIX fallback，解析 `/proc/net/route`；OHOS 走此分支；gateway 经 `__builtin_bswap32` 转换后再传给 `IPV4Address`（`/proc/net/route` 输出的 `gateway` 字段是 host int 字节序，IPV4Address 存 BE uint32_t；用 `__builtin_bswap32` 是 clang builtin，不依赖 libc 的 `ntohl` —— 后者在 OHOS bionic 是 no-op stub）
 
 ```diff
-@@ -74,7 +74,9 @@
- #ifdef HAVE_LINUX_NETLINK_H
- #include <linux/netlink.h>
- #include <linux/rtnetlink.h>
-+#elif defined(__OHOS__)
-+// OHOS bionic: <linux/socket.h> re-defines sockaddr_storage; netlink
-+// headers unavailable. Skip them and fall through to /proc fallback.
- #endif
-
-@@ -315,6 +317,12 @@ void NameServers(...) {
- #ifdef HAVE_RESINIT
-   res_init();
-+#elif defined(__OHOS__)
-+  OLA_INFO << "NameServers() on OHOS: bionic libresolv is a stub, "
-+              "no DNS servers available";
-+  return;
-+#else
-   struct __res_state state;
+@@ -333,6 +333,17 @@
+   }
+   delete[] fixed_info;
++#elif !defined(HAVE_DECL__RES)
++  (void)name_servers;
++  OLA_INFO << "NameServers() not supported: _res symbol unavailable; "
++              "returning empty list";
++  return true;
+ #else
    res_ninit(&state);
 
-@@ -340,6 +348,18 @@ bool DefaultRoute(...) {
- #ifdef HAVE_LINUX_NETLINK_H
-   ...
-+#elif defined(__OHOS__)
-+  // OHOS bionic: no netlink, no sysctl. Fall back to /proc/net/route
-+  // parsing — first line with Destination=00000000 + RTF_GATEWAY flag set.
+@@ -619,6 +630,58 @@
+   return GetDefaultRouteWithNetlink(if_index, default_gateway);
++#elif !defined(_WIN32)
++  FILE *route_file = fopen("/proc/net/route", "r");
 +  ...
-   return false;
- #endif
- }
++    if ((flags & 0x2) == 0) continue;  // RTF_GATEWAY
++    *default_gateway = IPV4Address(
++        static_cast<in_addr_t>(__builtin_bswap32(gateway)));
+   ...
+ #elif defined(_WIN32)
 ```
 
 #### Patch #2 — `patches/0002-config-config.guess.patch`
@@ -211,12 +205,21 @@ OLA 0.10.9 的 `config/config.guess` 是上游 GNU autoconf-archive 的 2015 版
 
 同上，`config/config.sub` 是 2015 版本，不识别 `linux-ohos` 作为 `linux-*` 系列内核。在两处 case 表添加 `linux-ohos*` 匹配项，让 `config.sub` 把 `aarch64-unknown-linux-ohos` 当作合法三元组。
 
+#### Patch #4 — `patches/0004-configure-ac-res-symbol.patch`
+
+为 `configure.ac` 添加 `AC_LINK_IFELSE` 探针：探测全局 `_res` 符号是否能成功链接；能则定义 `HAVE_DECL__RES=1`，否则留空。OHOS bionic 不导出 `_res`，`HAVE_DECL__RES` 留空，Patch #1 的 `NameServers()` 走 fallback 路径。该探针对任何缺 `_res` 的 libc 都生效（不限于 OHOS），非平台特定。
+
+```diff
++AC_LINK_IFELSE([extern struct __res_state _res; int main(){return _res.options;}],
++               [AC_DEFINE([HAVE_DECL__RES], 1,
++                 [Define if libc exports the global _res resolver state])])
+```
+
 #### In-recipe host/toolchain-specific fixes（**不进 patches/**）
 
 下列 fix 属于 host/toolchain 运行环境问题而非源码改动，按 §14 提交纪律写在 `conanfile.py` 里：
 
-- `_patch_configure_for_hmdfs()` —— `sed -i 's/umask 077/umask 022/g' configure`（E011：HMDFS + uid0 不绕过 DAC，`umask 077` 创建 0700 临时目录不可写）
-- 早期版本的 `_materialize_config_scripts()` / `_patch_config_scripts_for_hmos()` 已由 Patch #2/#3 取代（idempotent 防御性 fallback 保留）
+- `_patch_configure_for_hmdfs()` —— 锚定到具体几行 `sed -i 's/umask 077/umask 022/g' configure`（E011：HMDFS + uid0 不绕过 DAC，`umask 077` 创建 0700 临时目录不可写；非全局替换以避免误伤 install 规则）
 
 ### 依赖
 
@@ -256,8 +259,8 @@ OLA 0.10.9 的 `config/config.guess` 是上游 GNU autoconf-archive 的 2015 版
 | 1 | `configure: error: cannot guess build type` | `config.guess` 不知道 `HarmonyOS` uname 系统名 | Patch #2 在 OLA 自带 2015 config.guess 的 case 表里加 `*:HarmonyOS:*:* → aarch64-unknown-linux-ohos` 分支（E007） |
 | 2 | `configure: error: cannot find libprotoc`（链接期） | `protoc --plugin=protoc-gen-ola` 用的是 `libprotoc.a` 静态库，导出但未内联 `libprotobuf` 符号 | `env.append("LIBS", ["-lprotobuf"])` 让 link 行追加 `-lprotobuf`（R6：写入 conanfile.py，不改 configure 模板） |
 | 3 | `config.status: Permission denied` 创建 `./confXXXX/subs1.awk` | HMDFS 文件系统 + uid 0 不绕过 DAC；`umask 077` 创建的 `0700` 临时目录不可写 | `_patch_configure_for_hmdfs()` `sed` 改 `umask 077 → umask 022`（E011，写入 conanfile.py 不进 patches/） |
-| 4 | `common/network/NetworkUtils.cpp:344: error: use of undeclared identifier '_res'` | OHOS bionic `<resolv.h>` 只声明类型 `__res_state`，**不导出** 全局 `_res`；且 `libresolv.a` 是 8 字节空 stub；`res_ninit` 未声明 | Patch #1 添加 `#elif defined(__OHOS__)` 分支：`NameServers()` 直接返回空列表 + `OLA_INFO` 提示；`DefaultRoute()` 用 `/proc/net/route` 解析（替代缺失的 netlink/sysctl） |
-| 5 | `<linux/socket.h> error: redefinition of 'sockaddr_storage'` | bionic `<linux/socket.h>` 缺 `__kernel_sa_family_t` 之前就 re-define `sockaddr_storage`（与 `<sys/socket.h>` 冲突） | Patch #1 `#elif defined(__OHOS__)` 直接跳过 `<linux/netlink.h>` / `<linux/rtnetlink.h>` 的 include（两条上游后端在 bionic 都不可用） |
+| 4 | `common/network/NetworkUtils.cpp:344: error: use of undeclared identifier '_res'` | OHOS bionic `<resolv.h>` 只声明类型 `__res_state`，**不导出** 全局 `_res`；且 `libresolv.a` 是 8 字节空 stub；`res_ninit` 未声明 | Patch #1 添加 `#elif !defined(HAVE_DECL__RES)` 分支：`NameServers()` 返回空列表 + `OLA_INFO` 提示（`HAVE_DECL__RES` 由 Patch #4 的 `AC_LINK_IFELSE` 探针定义）；`DefaultRoute()` 用 `/proc/net/route` 解析（替代缺失的 netlink/sysctl） |
+| 5 | `<linux/socket.h> error: redefinition of 'sockaddr_storage'` | bionic `<linux/socket.h>` 缺 `__kernel_sa_family_t` 之前就 re-define `sockaddr_storage`（与 `<sys/socket.h>` 冲突） | 配置阶段不定义 `HAVE_LINUX_NETLINK_H` / `HAVE_LINUX_RTNETLINK_H`（bionic 上 netlink 头不可用），Patch #1 顶部 `#include` 守护自动跳过；两条上游后端在 bionic 都不可用 |
 | 6 | `Missing the uuid library` | OLA autotools 默认查找 libuuid，但默认搜索路径不含 `/storage/Users/currentUser/usr/local/lib` | `env.append("LIBS", ["-luuid"])` 显式加 link 行（PKG_CONFIG_PATH 已含 prefix 但 autotools 链接顺序对 libuuid 不友好） |
 | 7 | `STLUtils.h:362:25: error: unused parameter 'container' [-Werror,-Wunused-parameter]` | OLA 的 `Makefile.am` 在 `FATAL_WARNINGS` 宏下加 `-Werror`，OHOS bionic libc++ 头文件展开后对 assert() 内部参数的 unused-param 报 -Werror | conanfile.py `tc.configure_args.append("--disable-fatal-warnings")`（OLA 自带该 configure 开关，无需 patch） |
 | 8 | `Library 'olaacn' not found in package` | `cpp_info.libs` 列出 `olaacn`，但 OLA 默认 `libolaacn.la` 是 `noinst_LTLIBRARIES`（仅编译不安装），CMakeDeps 生成 `ola-Target.cmake` 时找不到 `libolaacn.a` 报错 | 从 `cpp_info.libs` 移除 `olaacn`（CID helpers 已通过 `libolae131core.a` 静态 archive 间接包含在 `olae131` 中；`olaacn` 不是 path A 公开接口） |
@@ -297,13 +300,14 @@ python3 scripts/ohc-run.py submit ola 0.10.9
 ```
 archives/o/ola/0.10.9/
 ├── conanfile.py                            # autotools recipe, system_libs=[protobuf,pthread,dl,m], 28 .a libs
-├── conandata.yml                           # Debian .orig tarball, sha256=4407...4ebf, 3 patches
+├── conandata.yml                           # Debian .orig tarball, sha256=4407...4ebf, 4 patches
 ├── manifest.yaml                           # build_system=autotools, status=built
 ├── notes.md                                # 编译步骤 + 13 个问题表 + 依赖表
 ├── patches/
-│   ├── 0001-common-network-NetworkUtils.cpp.patch   # __OHOS__ 跳过 netlink + /proc/net/route 解析
+│   ├── 0001-common-network-NetworkUtils.cpp.patch   # HAVE_DECL__RES / !_WIN32 feature-detection 守护 + /proc/net/route 解析 + __builtin_bswap32
 │   ├── 0002-config-config.guess.patch               # OLA 2015 config.guess 加 HarmonyOS uname 识别
-│   └── 0003-config-config.sub.patch                 # OLA 2015 config.sub 加 linux-ohos 内核识别
+│   ├── 0003-config-config.sub.patch                 # OLA 2015 config.sub 加 linux-ohos 内核识别
+│   └── 0004-configure-ac-res-symbol.patch           # AC_LINK_IFELSE _res 符号探测 → HAVE_DECL__RES
 ├── test_package/
 │   ├── CMakeLists.txt                      # CXX project + find_package(ola)
 │   ├── conanfile.py                        # CMakeDeps + test()

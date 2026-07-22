@@ -41,23 +41,24 @@ make install DESTDIR=$DESTDIR
 | 1 | `configure: error: cannot guess build type` | `config.guess` 不知道 `HarmonyOS` uname 系统名 | 在 `config.guess` 加 `*:HarmonyOS:*:*` 分支回退到 `aarch64-unknown-linux-ohos`；`config.sub` 在 `maybe_os` 列表加 `linux-ohos*`（E007） |
 | 2 | `configure: error: cannot find libprotoc` (链接期) | `protoc --plugin=protoc-gen-ola` 用的是 `libprotoc.a` 静态库，导出但未内联 `libprotobuf` 符号 | `export LIBS="-lprotobuf"` 让 link 行追加 `-lprotobuf`（R6：写入 conanfile.py，不改 configure 模板） |
 | 3 | `config.status: Permission denied` 创建 `./confXXXX/subs1.awk` | HMDFS 文件系统 + uid 0 不绕过 DAC；`umask 077` 创建的 `0700` 临时目录不可写 | `sed -i 's/umask 077/umask 022/g' configure`（E011） |
-| 4 | `common/network/NetworkUtils.cpp:344: error: use of undeclared identifier '_res'` | OHOS bionic `<resolv.h>` 只声明类型 `__res_state`，**不导出** 全局 `_res`；且 `libresolv.a` 是 8 字节空 stub；`res_ninit` 未声明 | 添加 `#elif defined(__OHOS__)` 分支：`NameServers()` 直接返回空列表 + OLA_INFO 提示；`DefaultRoute()` 用 `/proc/net/route` 解析（替代缺失的 netlink/sysctl） |
-| 5 | `<linux/socket.h> error: redefinition of 'sockaddr_storage'` | bionic `<linux/socket.h>` 缺 `__kernel_sa_family_t` 之前就 re-define `sockaddr_storage`（与 `<sys/socket.h>` 冲突） | `#if defined(__OHOS__)` 直接跳过 `<linux/netlink.h>` / `<linux/rtnetlink.h>` 的 include（两条上游后端在 bionic 都不可用） |
+| 4 | `common/network/NetworkUtils.cpp:344: error: use of undeclared identifier '_res'` | OHOS bionic `<resolv.h>` 只声明类型 `__res_state`，**不导出** 全局 `_res`；且 `libresolv.a` 是 8 字节空 stub；`res_ninit` 未声明 | Patch #1 添加 `#elif !defined(HAVE_DECL__RES)` 分支：`NameServers()` 返回空列表 + OLA_INFO 提示（`HAVE_DECL__RES` 由 Patch #4 的 `AC_LINK_IFELSE` 探针定义）；`DefaultRoute()` 用 `/proc/net/route` 解析（替代缺失的 netlink/sysctl） |
+| 5 | `<linux/socket.h> error: redefinition of 'sockaddr_storage'` | bionic `<linux/socket.h>` 缺 `__kernel_sa_family_t` 之前就 re-define `sockaddr_storage`（与 `<sys/socket.h>` 冲突） | 配置阶段不定义 `HAVE_LINUX_NETLINK_H` / `HAVE_LINUX_RTNETLINK_H`（bionic 上 netlink 头不可用），Patch #1 顶部 `#include` 守护自动跳过；两条上游后端在 bionic 都不可用 |
 
 ## 源码修改
 
-OLA 0.10.9 在 OHOS 上需要 1 个源码 patch（conan recipe 应用）：
+OLA 0.10.9 在 OHOS 上需要 4 个源码 patch（conan recipe 通过 conandata.yml `patches` 列表应用）：
 
 - `0001-common-network-NetworkUtils.cpp.patch` —— 修改 `common/network/NetworkUtils.cpp`：
-  - `#if defined(__OHOS__) ... #elif defined(HAVE_LINUX_NETLINK_H) ...` 跳过 netlink 头（bionic `linux/socket.h` 与 `sys/socket.h` 冲突）
-  - `DefaultRoute()` 增 `__OHOS__` 分支：用 `/proc/net/route` 解析默认路由（Hex 编码 `Destination=00000000 + Flags&RTF_GATEWAY`）
-  - `NameServers()` 增 `__OHOS__` 分支：返回空列表 + OLA_INFO 提示（R8 实质行为，不写空 stub）
-
-`config.guess` / `config.sub` 的 HarmonyOS 识别（E007）由 `conanfile.py` 的 `_patch_config_scripts_for_hmos()` 在 build 时注入到 material 出的副本中，避免补丁文件对 autoconf 版本漂移敏感。
-
-> 注：`configure` 中 `umask 077 → 022` 是探索阶段为绕过 HMDFS + uid 0 DAC 而做的临时修改。最终方案改为：在 `conanfile.py` 的 `_patch_configure_for_hmdfs()` 中 `os.environ['TMPDIR']=/<build>/ola-tmp`（默认 0755），让 `mktemp -d "./confXXXXXX"` 落入正常权限目录。configure 不进 patch。
+  - 顶部 `#include <linux/netlink.h>` 守护保持上游 `HAVE_LINUX_NETLINK_H && HAVE_LINUX_RTNETLINK_H` 不变（OHOS 上 configure 不会定义这俩宏，自动跳过；R8：避免平台宏）
+  - `DefaultRoute()` 增 `#elif !defined(_WIN32)` 通用 POSIX fallback：用 `/proc/net/route` 解析默认路由（Hex 编码 `Destination=00000000 + Flags&RTF_GATEWAY`，gateway 经 `__builtin_bswap32` 转换后再传给 `IPV4Address` —— `/proc/net/route` 输出的 gateway 字段是 host int 字节序，IPV4Address 存 BE uint32_t；`__builtin_bswap32` 是 clang builtin 不依赖 libc 的 `ntohl` —— 后者在 OHOS bionic 是 no-op stub）
+  - `NameServers()` 增 `#elif !defined(HAVE_DECL__RES)` 分支：返回空列表 + OLA_INFO 提示（R8 feature-detection 而非平台宏）
+- `0002-config-config.guess.patch` —— `config/config.guess` 2015 版本加 `*:HarmonyOS:*:*` 分支
+- `0003-config-config.sub.patch` —— `config/config.sub` 2015 版本加 `linux-ohos*` 匹配项
+- `0004-configure-ac-res-symbol.patch` —— `configure.ac` 加 `AC_LINK_IFELSE` 探针：探测全局 `_res` 符号是否能链接；能则定义 `HAVE_DECL__RES=1`，否则留空。OHOS bionic 不导出 `_res`，`HAVE_DECL__RES` 留空，Patch #1 走 fallback。该探针对任何缺 `_res` 的 libc 都生效，非平台特定
 
 > 源码选型：使用 Debian .orig tarball（`ola_0.10.9.nojsmin.orig.tar.gz`），sha256 44073698...4ebf，bit-identical to upstream release plus pre-bootstrapped autotools artifacts（configure / aclocal.m4 / Makefile.in）。这样 conan 配方不需要 `aclocal`/`automake`（OHOS hnp 未打包），只需标准 autoconf + libtool + 编译器。
+
+> 注：`configure` 中 `umask 077 → 022` 是探索阶段为绕过 HMDFS + uid 0 DAC 而做的修改，锚定到具体几行（非全局替换以避免误伤 install 规则）。由 `conanfile.py` 的 `_patch_configure_for_hmdfs()` 在 build 阶段做。
 
 ## 依赖版本
 

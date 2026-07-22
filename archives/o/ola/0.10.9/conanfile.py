@@ -64,9 +64,15 @@ class OlaConan(ConanFile):
         NOT bypass DAC, so config.status then can't write into its own
         scratch dir. Patch the generated `configure` script's two specific
         `umask 077` lines (mktemp scratch dir creation) to `umask 022`.
-        Doing this in the recipe (not patches/) is fine: this is a
-        tool/platform-specific host fix, not a source change. Anchored to
-        exact line patterns to avoid clobbering unrelated umask settings.
+
+        R6 exemption: this modifies the generated `configure` script
+        (autotools-generated artifact). A static patches/ entry would be
+        fragile because `configure` content varies by upstream autotools
+        version, and `patch_ng` fails hard on mismatch. Keeping the
+        mutation in-recipe with anchored exact-line replacement is
+        defensive: if upstream changes the lines, this no-ops rather than
+        breaking the build. The fix is tracked in source (conanfile.py
+        revision), not in conandata.yml.
         """
         configure_path = os.path.join(self.source_folder, "configure")
         with open(configure_path, "r", encoding="utf-8") as f:

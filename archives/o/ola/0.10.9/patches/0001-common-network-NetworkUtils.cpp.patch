@@ -62,7 +62,14 @@
 +    if ((flags & 0x2) == 0) {  // RTF_GATEWAY
 +      continue;
 +    }
-+    *default_gateway = IPV4Address(static_cast<in_addr_t>(gateway));
++    // /proc/net/route prints gateway as %08X of host int, which on
++    // little-endian (aarch64/x86_64) is the byte-reversed form of the
++    // BE-encoded address. IPV4Address stores BE uint32_t, so byteswap
++    // before constructing. __builtin_bswap32 is a clang builtin (no
++    // libc dependency); ntohl() cannot be used here because it is a
++    // no-op stub on OHOS bionic libc.so.
++    *default_gateway = IPV4Address(
++        static_cast<in_addr_t>(__builtin_bswap32(gateway)));
 +    *if_index = Interface::DEFAULT_INDEX;  // resolved by caller if needed
 +    OLA_INFO << "Default gateway (from /proc/net/route): " << *default_gateway
 +             << " on " << iface;

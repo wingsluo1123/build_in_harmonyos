@@ -25,17 +25,16 @@ _GENERATED_NAMES = frozenset({
     "config.cache", "config.h.in~", "configure.lineno",
 })
 # Filename patterns that are always build-system generated
-import re as _re
 _GENERATED_NAME_PATTERNS = (
-    _re.compile(r"\.pb\.cc$"),          # protobuf-generated C++ sources
-    _re.compile(r"\.pb\.cpp$"),         # protobuf-generated C++ sources (alt ext)
-    _re.compile(r"\.pb\.h$"),           # protobuf-generated headers
-    _re.compile(r"\+pb\.cc$"),          # g++-style .proto.pb.cc
-    _re.compile(r"\.tab\.c$"),          # bison .tab.c
-    _re.compile(r"\.tab\.h$"),          # bison .tab.h
-    _re.compile(r"\.tab\.cpp$"),        # bison C++
-    _re.compile(r"^lex\.yy\.c$"),       # flex .yy.c
-    _re.compile(r"^lex\.yy\.cpp$"),     # flex .yy.cpp
+    re.compile(r"\.pb\.cc$"),          # protobuf-generated C++ sources
+    re.compile(r"\.pb\.cpp$"),         # protobuf-generated C++ sources (alt ext)
+    re.compile(r"\.pb\.h$"),           # protobuf-generated headers
+    re.compile(r"\+pb\.cc$"),          # g++-style .proto.pb.cc
+    re.compile(r"\.tab\.c$"),          # bison .tab.c
+    re.compile(r"\.tab\.h$"),          # bison .tab.h
+    re.compile(r"\.tab\.cpp$"),        # bison C++
+    re.compile(r"^lex\.yy\.c$"),       # flex .yy.c
+    re.compile(r"^lex\.yy\.cpp$"),     # flex .yy.cpp
 )
 # Hand-curated header files that are generated at build time
 _GENERATED_HEADER_NAMES = frozenset({
