@@ -42,18 +42,18 @@ class SpekConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
-        tc.generate()
 
         # R33: PKG_CONFIG_PATH 必须从环境读取, 不能硬编码本机绝对路径.
         # 系统 FFmpeg 装在 $DEFAULT_PREFIX (CI profile 注入), 其 .pc 文件在
-        # $DEFAULT_PREFIX/lib/pkgconfig. 把该路径前置注入 PKG_CONFIG_PATH,
-        # 让 configure 能找到 ffmpeg/fftw 等系统预装依赖.
+        # $DEFAULT_PREFIX/lib/pkgconfig. 通过 AutotoolsToolchain 的 env 注入,
+        # 这样 configure 调用时自动生效 (Conan 2.x 会 source tc.generate()
+        # 产生的 conanbuild 脚本).
         default_prefix = os.environ.get("DEFAULT_PREFIX", "")
-        env = Environment()
         if default_prefix:
             pc_dir = os.path.join(default_prefix, "lib", "pkgconfig")
-            env.prepend_path("PKG_CONFIG_PATH", pc_dir)
-        env.vars(self).save_script("spek_pkgconfig")
+            tc.environment.prepend_path("PKG_CONFIG_PATH", pc_dir)
+
+        tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
