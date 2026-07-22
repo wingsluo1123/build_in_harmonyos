@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/build_in_harmonyos/archives/l/lua/5.4.7/test_package/deactivate_conanrunenv-release-armv8.sh"

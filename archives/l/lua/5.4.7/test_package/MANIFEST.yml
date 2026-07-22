@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml — R34 compliance statement for Lua 5.4.7
+
+assertion_count: 6
+upstream_tests:
+  # Lua 上游通过 `make test` 跑一组 Lua 端测试套件（约 80 个 .lua 脚本），
+  # 以及 C 端 luaL_* API 验证；这些都在 `src/Makefile` 内的 "test" 目标里。
+  # OHOS hnp 不带 Lua 的测试套件运行 lib（需要 cd src/lua test/...），
+  # 但本配方通过 R34 consumer-side 真实 API 调用复现：
+  []
+test_package_tests:
+  - name: "lua -v reports Lua 5.4"
+    runner: "test.sh"
+    expected_exit_code: 0
+    expected_stdout_substring: "Lua 5.4"
+    reason: "校验 lua.c 内部 Lua 5.4.7 的 LUA_VERSION_MAJOR/LUA_VERSION_MINOR 在 OHOS 下被正确输出"
+
+  - name: "luac -v reports Lua 5.4"
+    runner: "test.sh"
+    expected_exit_code: 0
+    expected_stdout_substring: "Lua 5.4"
+    reason: "luac 与 lua 共用 LUA_VERSION_* 宏，必须同号对齐"
+
+  - name: "liblua.a exists"
+    runner: "test.sh"
+    expected_exit_code: 0
+    expected_file_exists: "lib/liblua.a"
+    reason: "R26：静态 archive 存在且可被下游 archive 工具链读取"
+
+  - name: "C API: luaL_newstate returns non-NULL"
+    runner: "test.sh"
+    expected_exit_code: 0
+    reason: "Lua 5.4 改用 lua_State GC，验证 OHOS bionic 上 malloc/free 路径无误"
+
+  - name: "C API: lua_pushinteger(42) round-trips"
+    runner: "test.sh"
+    expected_exit_code: 0
+    reason: "测试 lua_pushinteger + lua_isinteger + lua_tointeger 三步闭环，不触发任何 libc stub"
+
+  - name: "C API: luaL_dostring 'return 6*7' = 42"
+    runner: "test.sh"
+    expected_exit_code: 0
+    reason: "完整 VM 执行循环，验证 Lua 5.4 解释器（编译器 + VM）在 OHOS 上正常"
