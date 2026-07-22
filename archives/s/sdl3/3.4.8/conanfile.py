@@ -120,6 +120,16 @@ class Sdl3Conan(ConanFile):
         # consumer bring it in (matches upstream behavior).
         # system_libs: pthread is required for SDL_CreateThread etc.
         self.cpp_info.system_libs = ["pthread"]
+        # SDL3 upstream's installed CMake config (`SDL3Config.cmake`)
+        # defines a target named `SDL3::SDL3` (uppercase, mixed case).
+        # Without these properties, conan 2.x's CMakeDeps generator
+        # creates a `sdl3::sdl3` (lowercase) target, breaking any consumer
+        # that does `find_package(SDL3)` (e.g. SDL3_image, SDL3_ttf,
+        # SDL3_mixer). Force the right names so `find_package(SDL3)` in
+        # downstream consumers picks up the right target.
+        self.cpp_info.set_property("cmake_file_name", "SDL3")
+        self.cpp_info.set_property("cmake_target_name", "SDL3::SDL3")
+        self.cpp_info.set_property("cmake_find_mode", "config")
 
     def package_id(self):
         # Bionic libc++ ABI is consistent across OHOS profiles; no need
