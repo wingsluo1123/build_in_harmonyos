@@ -139,8 +139,7 @@ install_command: "PYTHONHOME=/data/service/hnp/python.org/python_3.12 DESTDIR=__
 ### 3. DESTDIR install 环境修复
 **问题**：ninja install 调用 meson 内部命令时使用 python3-fixed（无 PYTHONHOME）。
 **方案**：运行 DESTDIR install 时需设置 `PYTHONHOME=/data/service/hnp/python.org/python_3.12`。
-
 ---
 
-**编译结束**: 2026-06-13
+**编译结束**: 2026-07-22 16:56
 **最终状态**: published
