@@ -60,6 +60,8 @@ class LibeditConan(ConanFile):
                 tc.extra_ldflags.append(f"-L{lib_dir}")
         if ncurses_include and os.path.isdir(ncurses_include):
             tc.extra_cflags.append(f"-I{ncurses_include}")
+        # Define __STDC_ISO_10646__ to avoid chartype.h #error (replaces removed 0010 patch)
+        tc.extra_cflags.append("-D__STDC_ISO_10646__")
         # Also add ncursesw link flag (always needed for libedit on OHOS)
         tc.extra_ldflags.append("-lncursesw")
         tc.generate()
@@ -76,47 +78,48 @@ class LibeditConan(ConanFile):
                 self.output.info(f"Created symlink: libncurses.a -> libncursesw.a")
 
         # ── Fix 2: TMPDIR for /tmp erofs — use build_folder/tmp ──
+        # Capture old TMPDIR inside try so recovery is always paired
         old_tmpdir = os.environ.get("TMPDIR")
-        writable_tmp = os.path.join(self.build_folder, "tmp")
-        os.makedirs(writable_tmp, exist_ok=True)
-        os.environ["TMPDIR"] = writable_tmp
-
-        # ── Fix 3: patch configure to use umask 022 instead of 077 ──
-        # On HMDFS, umask 077 creates mode 0700 dirs that can't be written to.
-        configure_path = os.path.join(self.source_folder, "configure")
-        if os.path.exists(configure_path):
-            with open(configure_path) as f:
-                content = f.read()
-            original = 'umask 077 && mktemp -d "./confXXXXXX"'
-            replacement = 'umask 022 && mktemp -d "./confXXXXXX"'
-            if original in content:
-                content = content.replace(original, replacement)
-                with open(configure_path, "w") as f:
-                    f.write(content)
-                self.output.info("Patched configure: umask 077 -> 022 for temp dir")
-            else:
-                self.output.warning("umask 077 pattern not found in configure")
-
-        # ── Fix 4: termcap function declarations for ncurses without termcap.h ──
-        # terminal.c declares tgetent/tgoto/tgetflag/tgetnum/tgetstr/tputs
-        # only for __sun; OHOS has them in the ncurses library but not declared
-        # in the headers (no termcap.h). We use feature-based detection:
-        # HAVE_NCURSES_H && !HAVE_TERMCAP_H instead of platform macro __OHOS__.
-        terminal_c = os.path.join(self.source_folder, "src", "terminal.c")
-        if os.path.exists(terminal_c):
-            with open(terminal_c) as f:
-                content = f.read()
-            old_guard = '#if defined(__sun)'
-            new_guard = '#if defined(__sun) || (defined(HAVE_NCURSES_H) && !defined(HAVE_TERMCAP_H))'
-            if old_guard in content:
-                content = content.replace(old_guard, new_guard)
-                with open(terminal_c, "w") as f:
-                    f.write(content)
-                self.output.info("Patched terminal.c: added feature-based termcap decl guard (HAVE_NCURSES_H && !HAVE_TERMCAP_H)")
-            else:
-                self.output.warning("__sun guard not found in terminal.c")
-
         try:
+            writable_tmp = os.path.join(self.build_folder, "tmp")
+            os.makedirs(writable_tmp, exist_ok=True)
+            os.environ["TMPDIR"] = writable_tmp
+
+            # ── Fix 3: patch configure to use umask 022 instead of 077 ──
+            # On HMDFS, umask 077 creates mode 0700 dirs that can't be written to.
+            configure_path = os.path.join(self.source_folder, "configure")
+            if os.path.exists(configure_path):
+                with open(configure_path) as f:
+                    content = f.read()
+                original = 'umask 077 && mktemp -d "./confXXXXXX"'
+                replacement = 'umask 022 && mktemp -d "./confXXXXXX"'
+                if original in content:
+                    content = content.replace(original, replacement)
+                    with open(configure_path, "w") as f:
+                        f.write(content)
+                    self.output.info("Patched configure: umask 077 -> 022 for temp dir")
+                else:
+                    self.output.warning("umask 077 pattern not found in configure")
+
+            # ── Fix 4: termcap function declarations for ncurses without termcap.h ──
+            # terminal.c declares tgetent/tgoto/tgetflag/tgetnum/tgetstr/tputs
+            # only for __sun; OHOS has them in the ncurses library but not declared
+            # in the headers (no termcap.h). We use feature-based detection:
+            # HAVE_NCURSES_H && !HAVE_TERMCAP_H instead of platform macro __OHOS__.
+            terminal_c = os.path.join(self.source_folder, "src", "terminal.c")
+            if os.path.exists(terminal_c):
+                with open(terminal_c) as f:
+                    content = f.read()
+                old_guard = '#if defined(__sun)'
+                new_guard = '#if defined(__sun) || (defined(HAVE_NCURSES_H) && !defined(HAVE_TERMCAP_H))'
+                if old_guard in content:
+                    content = content.replace(old_guard, new_guard)
+                    with open(terminal_c, "w") as f:
+                        f.write(content)
+                    self.output.info("Patched terminal.c: added feature-based termcap decl guard (HAVE_NCURSES_H && !HAVE_TERMCAP_H)")
+                else:
+                    self.output.warning("__sun guard not found in terminal.c")
+
             apply_conandata_patches(self)
             autotools = Autotools(self)
             autotools.configure()
