@@ -15,17 +15,12 @@ class FntTestConan(ConanFile):
     def test(self):
         if cross_building(self):
             return
-        # Get the package folder where fnt was installed
+        # Delegate to test.sh which owns the 5 functional assertions.
+        # Expose fnt on PATH so test.sh's `which fnt` resolves to our pkg.
         pkg = self.dependencies["fnt"]
-        bin_path = os.path.join(pkg.package_folder, "bin", "fnt")
-        # Verify the file exists and has correct content
-        self.run(f"test -f {bin_path}", env="conanrun")
-        # Verify shebang is correct (patched for OHOS)
-        self.run(f"/data/service/hnp/bin/bash -c 'head -1 {bin_path} | grep -q hnp/bin/bash'", env="conanrun")
-        # Verify it has HarmonyOS platform support
-        self.run(f"/data/service/hnp/bin/bash -c 'grep -q HarmonyOS {bin_path}'", env="conanrun")
-        # Run functional tests via /system/bin/sh (HMDFS noexec can't execute shebang directly)
-        # Note: fnt --help requires external tools (otfinfo, etc.) that may not be installed
-        # Use bash syntax check instead to verify the script is valid
-        self.run(f"/data/service/hnp/bin/bash -n {bin_path}", env="conanrun")
-        print(f"✅ fnt verified: {bin_path}")
+        bin_dir = os.path.join(pkg.package_folder, "bin")
+        test_sh = os.path.join(self.source_folder, "test.sh")
+        # test.sh uses /data/service/hnp/bin/bash shebang (HMDFS noexec-safe
+        # via explicit interpreter invocation). Pass PATH so `which fnt` works.
+        self.run(f'PATH="{bin_dir}:$PATH" /data/service/hnp/bin/bash "{test_sh}"',
+                 env="conanrun")
