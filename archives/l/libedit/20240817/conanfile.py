@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for libedit 20240817 — Autotools project.
+"""Conan recipe for libedit 20240808-3.1 — Autotools project.
 
 libedit is a line editing library for interactive command-line programs.
 It provides the BSD-licensed editline and readline compatible API.
@@ -20,7 +20,7 @@ from conan.tools.layout import basic_layout
 
 class LibeditConan(ConanFile):
     name = "libedit"
-    version = "20240817"
+    version = "20240808-3.1"
     description = "BSD-licensed line editing library (editline/readline replacement)"
     license = "BSD-3-Clause"
     homepage = "https://thrysoee.dk/editline/"
