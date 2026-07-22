@@ -17,7 +17,8 @@ class TestPackageConan(ConanFile):
         tested_libs = []
         dependency_libs = []
         system_libs = []
-        tested_ref = self.dependencies["spice-gtk"].ref
+        tested_dep = self.dependencies["spice-gtk"]
+        tested_ref = tested_dep.ref
         for _ref, dependency in self.dependencies.items():
             info = dependency.cpp_info
             includes.extend(info.includedirs)
@@ -43,13 +44,16 @@ class TestPackageConan(ConanFile):
             f"-l{name}" for name in unique(tested_libs + dependency_libs + system_libs)
         )
         executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
-        cc = executables.get("c") or os.environ.get("CC")
+        cc = executables.get("c")
         if not cc:
-            raise ConanException("C compiler not found in tools.build:compiler_executables or CC")
+            raise ConanException("C compiler not found in tools.build:compiler_executables")
         test_source = os.path.join(self.source_folder, "test_spice_gtk.c")
+        defines = ""
+        if "spice-client-gtk-3.0" in tested_dep.cpp_info.libs:
+            defines = "-DSPICE_GTK_TEST_WITH_GTK=1"
         self.run(
             f'{cc} "{test_source}" -o test_spice_gtk '
-            f"{include_flags} {libdir_flags} {lib_flags}"
+            f"{defines} {include_flags} {libdir_flags} {lib_flags}"
         )
 
     def test(self):

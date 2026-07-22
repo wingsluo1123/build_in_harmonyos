@@ -1,7 +1,9 @@
 #include <string.h>
 
 #include <spice-client.h>
+#ifdef SPICE_GTK_TEST_WITH_GTK
 #include <spice-client-gtk.h>
+#endif
 
 int main(void)
 {
@@ -21,10 +23,12 @@ int main(void)
         return 3;
     }
 
+#ifdef SPICE_GTK_TEST_WITH_GTK
     if (spice_display_get_type() == 0) {
         g_object_unref(session);
         return 4;
     }
+#endif
 
     g_object_unref(session);
     return 0;
