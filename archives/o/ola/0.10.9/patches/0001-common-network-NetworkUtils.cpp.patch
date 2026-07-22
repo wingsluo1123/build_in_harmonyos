@@ -1,96 +1,37 @@
---- a/common/network/NetworkUtils.cpp
-+++ b/common/network/NetworkUtils.cpp
-@@ -35,35 +35,42 @@
- #include <winerror.h>
- #endif  // HAVE_WINERROR_H
- #else
- #include <netinet/in.h>
- #endif  // _WIN32
- 
- #ifdef HAVE_RESOLV_H
- #include <resolv.h>
- #endif  // HAVE_RESOLV_H
- 
--#if defined(HAVE_LINUX_NETLINK_H) && defined(HAVE_LINUX_RTNETLINK_H)
-+// OHOS bionic: <linux/netlink.h> includes <linux/socket.h> which redefines
-+// struct sockaddr_storage already declared by <sys/socket.h>. bionic also
-+// lacks <sys/sysctl.h>, so the sysctl fallback is unavailable. Skip both
-+// upstream default-route backends on OHOS; GetDefaultRouteIfName() simply
-+// returns false (acceptable: not all platforms can expose a default route).
-+#if defined(__OHOS__)
-+// No default-route backend on OHOS.
-+#elif defined(HAVE_LINUX_NETLINK_H) && defined(HAVE_LINUX_RTNETLINK_H)
- #define USE_NETLINK_FOR_DEFAULT_ROUTE 1
- #include <linux/netlink.h>
- #include <linux/rtnetlink.h>
- #elif defined(HAVE_SYS_SYSCTL_H) && defined(HAVE_NET_ROUTE_H) && \
-       defined(HAVE_DECL_PF_ROUTE) && defined(HAVE_DECL_NET_RT_DUMP)
- #define USE_SYSCTL_FOR_DEFAULT_ROUTE 1
- #include <net/route.h>
- #ifdef HAVE_SYS_PARAM_H
- #include <sys/param.h>
- #endif  // HAVE_SYS_PARAM_H
- #include <sys/sysctl.h>
- #else
- // TODO(Peter): Do something else if we don't have Netlink/on Windows
--#endif  // defined(HAVE_LINUX_NETLINK_H) && defined(HAVE_LINUX_RTNETLINK_H)
-+#endif  // __OHOS__
- 
- #ifdef HAVE_ENDIAN_H
- #include <endian.h>
- #endif  // HAVE_ENDIAN_H
- #include <errno.h>
- #include <limits.h>
- #include <stdlib.h>
- #include <string.h>
- #include <unistd.h>
- #include <iomanip>
-@@ -326,20 +333,28 @@
-   }
- 
-   IP_ADDR_STRING* addr = &(fixed_info->DnsServerList);
-   for (; addr; addr = addr->Next) {
-     IPV4Address ipv4addr = IPV4Address(inet_addr(addr->IpAddress.String));
-     OLA_DEBUG << "Found nameserver: " << ipv4addr;
-     name_servers->push_back(ipv4addr);
+--- a/common/network/NetworkUtils.cpp	2023-02-26 09:30:48.000000000 +0800
++++ b/common/network/NetworkUtils.cpp	2026-07-22 21:17:00.636488906 +0800
+@@ -333,6 +333,17 @@
    }
  
    delete[] fixed_info;
-+#elif defined(__OHOS__)
-+  // OHOS bionic does not export the global `_res` symbol and does not
-+  // provide `res_ninit()`; the resolver state is opaque inside libc.so.
-+  // There is no portable way to enumerate DNS nameservers at user level.
-+  // Return success with an empty list; OLA's RDM responders tolerate this
-+  // (RDM nameserver discovery degrades gracefully to "no DNS advertised").
++#elif !defined(HAVE_DECL__RES)
++  // The global `_res` resolver-state symbol is not exported by this libc
++  // (true on OHOS bionic, possibly true on other embedded libcs in the future).
++  // Without `_res` we cannot enumerate DNS nameservers at user level. Return
++  // success with an empty list — OLA's RDM responders tolerate this gracefully
++  // (RDM nameserver discovery degrades to "no DNS advertised"). HAVE_DECL__RES
++  // is set by configure.ac via AC_LINK_IFELSE on the resolver state object.
 +  (void)name_servers;
-+  OLA_INFO << "NameServers() not supported on OHOS; returning empty list";
++  OLA_INFO << "NameServers() not supported: _res symbol unavailable; "
++              "returning empty list";
++  return true;
  #else
    // Init the resolver info each time so it's always current for the RDM
    // responders in case we've set it via RDM too
-   if (res_init() != 0) {
-     OLA_WARN << "Error getting nameservers via res_init";
-     return false;
-   }
- 
-   for (int32_t i = 0; i < _res.nscount; i++) {
-     IPV4Address addr = IPV4Address(_res.nsaddr_list[i].sin_addr.s_addr);
-@@ -601,20 +616,68 @@
- }
- #endif  // USE_SYSCTL_FOR_DEFAULT_ROUTE
- 
- bool DefaultRoute(int32_t *if_index, IPV4Address *default_gateway) {
-   *default_gateway = IPV4Address();
-   *if_index = Interface::DEFAULT_INDEX;
- #ifdef USE_SYSCTL_FOR_DEFAULT_ROUTE
+@@ -608,6 +619,58 @@
    return GetDefaultRouteWithSysctl(if_index, default_gateway);
  #elif defined(USE_NETLINK_FOR_DEFAULT_ROUTE)
    return GetDefaultRouteWithNetlink(if_index, default_gateway);
-+#elif defined(__OHOS__)
-+  // OHOS bionic ships neither <linux/netlink.h> usable headers nor
-+  // <sys/sysctl.h>. Fall back to the kernel-provided /proc/net/route, which
-+  // every Linux system (including Android/bionic) exposes with the same
-+  // hex-encoded ASCII columns. The default route is the row whose
-+  // Destination field is 00000000 and whose Flags include RTF_GATEWAY (0x2).
++#elif !defined(_WIN32)
++  // Generic POSIX fallback: parse /proc/net/route. Used on systems where
++  // neither netlink (HAVE_LINUX_NETLINK_H / HAVE_LINUX_RTNETLINK_H) nor
++  // sysctl (HAVE_SYS_SYSCTL_H / HAVE_NET_ROUTE_H / HAVE_DECL_PF_ROUTE /
++  // HAVE_DECL_NET_RT_DUMP) was detected at configure time — e.g. OHOS bionic
++  // (headers absent or conflicting with <sys/socket.h>) and other embedded
++  // Linux systems. /proc/net/route is a kernel-provided file present on every
++  // Linux system with the same hex-encoded ASCII columns. The default route
++  // is the row whose Destination field is 00000000 and whose Flags include
++  // RTF_GATEWAY (0x2).
 +  FILE *route_file = fopen("/proc/net/route", "r");
 +  if (!route_file) {
 +    OLA_WARN << "Could not open /proc/net/route: " << strerror(errno);
@@ -136,10 +77,3 @@
  #elif defined(_WIN32)
    ULONG size = 4096;
    PMIB_IPFORWARDTABLE forward_table =
-       reinterpret_cast<PMIB_IPFORWARDTABLE>(malloc(size));
-   DWORD result = GetIpForwardTable(forward_table, &size, TRUE);
-   if (result == NO_ERROR) {
-     for (unsigned int i = 0; i < forward_table->dwNumEntries; ++i) {
-       if (forward_table->table[i].dwForwardDest == 0) {
-         *default_gateway =
-             IPV4Address(forward_table->table[i].dwForwardNextHop);

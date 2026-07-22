@@ -11,7 +11,6 @@ are linked statically inside the package.
 import os
 
 from conan import ConanFile
-from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -63,19 +62,34 @@ class OlaConan(ConanFile):
         """E011: HMDFS + uid 0 DAC quirk — autotools creates
         ./confXXXXXX/ with `umask 077` → mode 0700; uid 0 on HMDFS does
         NOT bypass DAC, so config.status then can't write into its own
-        scratch dir. Patch the generated `configure` script's `umask 077`
-        lines to `umask 022`. Doing this in the recipe (not patches/) is
-        fine: this is a tool/platform-specific host fix, not a source change.
+        scratch dir. Patch the generated `configure` script's two specific
+        `umask 077` lines (mktemp scratch dir creation) to `umask 022`.
+        Doing this in the recipe (not patches/) is fine: this is a
+        tool/platform-specific host fix, not a source change. Anchored to
+        exact line patterns to avoid clobbering unrelated umask settings.
         """
         configure_path = os.path.join(self.source_folder, "configure")
         with open(configure_path, "r", encoding="utf-8") as f:
             data = f.read()
-        if "umask 077" not in data:
-            return  # already patched or upstream changed it
-        data = data.replace("umask 077", "umask 022")
+        # Anchored replacement: only the two autotools scratch-dir umasks
+        # in `configure`. Other `umask` lines (e.g. test scripts, install
+        # rules) must keep their original semantics.
+        anchored_pairs = (
+            ("(umask 077 && mktemp -d \"./confXXXXXX\") 2>/dev/null",
+             "(umask 022 && mktemp -d \"./confXXXXXX\") 2>/dev/null"),
+            ("(umask 077 && mkdir \"$tmp\")",
+             "(umask 022 && mkdir \"$tmp\")"),
+        )
+        patched = False
+        for old, new in anchored_pairs:
+            if old in data:
+                data = data.replace(old, new, 1)
+                patched = True
+        if not patched:
+            return  # already patched or upstream changed the lines
         with open(configure_path, "w", encoding="utf-8") as f:
             f.write(data)
-        self.output.info("E011: patched configure `umask 077` → `umask 022`")
+        self.output.info("E011: patched configure scratch-dir umask 077 → 022")
 
     def generate(self):
         tc = AutotoolsToolchain(self)
@@ -128,113 +142,6 @@ class OlaConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j%d" % os.cpu_count()])
-
-    def _materialize_config_scripts(self):
-        """Copy config.guess / config.sub from autoconf install dir into
-        source's config/ so autoreconf can see them. Looks in common
-        autoconf install locations; bails out if not found.
-        """
-        import shutil
-        candidates = [
-            "/data/service/hnp/autoconf.org/autoconf_2.72/share/autoconf/build-aux",
-            "/data/service/hnp/share/automake-1.16",
-            "/data/service/hnp/share/autoconf",
-            "/usr/share/automake-1.16",
-            "/usr/share/autoconf",
-            "/usr/share/libtool/build-aux",
-        ]
-        config_dir = os.path.join(self.source_folder, "config")
-        os.makedirs(config_dir, exist_ok=True)
-        for name in ("config.guess", "config.sub"):
-            target = os.path.join(config_dir, name)
-            if os.path.exists(target):
-                continue  # already there from a prior extraction
-            for d in candidates:
-                src = os.path.join(d, name)
-                if os.path.exists(src):
-                    shutil.copy2(src, target)
-                    self.output.info(f"copied {src} -> {target}")
-                    break
-            else:
-                raise ConanException(
-                    f"Cannot find {name} in any of {candidates}; "
-                    f"install automake/autoconf or set AUTOMAKE_DATA / "
-                    f"AUTOCONF_DATA env vars")
-
-    def _patch_config_scripts_for_hmos(self):
-        """Idempotent defensive injection of HarmonyOS recognition into
-        config.guess / config.sub. The primary mechanism is now the
-        patches in conandata.yml (0002 / 0003), which apply at source()
-        time. This method remains as a fallback in case the patches
-        fail to apply on a future autoconf version where config.guess
-        has shifted. Safe to call repeatedly — it no-ops if the
-        HarmonyOS branch is already present.
-        """
-        config_guess = os.path.join(self.source_folder, "config", "config.guess")
-        with open(config_guess, "r", encoding="utf-8") as f:
-            guess = f.read()
-        if "HarmonyOS" in guess and "linux-ohos" in guess:
-            return  # already patched
-        # Two known marker variants:
-        #   autoconf-2.72:     case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in
-        #   autoconf-archive:  case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
-        marker_quoted = 'case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in'
-        marker_unquoted = "case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in"
-        marker = None
-        echo_line = None
-        if marker_quoted in guess:
-            marker = marker_quoted
-            echo_line = "echo \"${UNAME_MACHINE}\"-unknown-linux-ohos"
-        elif marker_unquoted in guess:
-            marker = marker_unquoted
-            echo_line = "echo $UNAME_MACHINE-unknown-linux-ohos"
-        else:
-            self.output.warning(
-                "Could not locate config.guess case marker; "
-                "skipping HarmonyOS injection"
-            )
-            return
-        injection = (
-            marker + "\n"
-            "    *:HarmonyOS:*:*)\n"
-            "        # OpenHarmony / HarmonyOS (bionic libc);\n"
-            "        # clang triple <arch>-unknown-linux-ohos\n"
-            f"        {echo_line}\n"
-            "        exit ;;\n"
-        )
-        guess = guess.replace(marker, injection, 1)
-        with open(config_guess, "w", encoding="utf-8") as f:
-            f.write(guess)
-
-        config_sub = os.path.join(self.source_folder, "config", "config.sub")
-        with open(config_sub, "r", encoding="utf-8") as f:
-            sub = f.read()
-        if "linux-ohos*" in sub:
-            return  # already patched
-        # Pattern 1: in `case $maybe_os in ... esac` — add after linux-gnu*.
-        old_maybe = (
-            "  nto-qnx* | linux-gnu* | linux-android* | linux-dietlibc | "
-            "linux-newlib* | \\"
-        )
-        new_maybe = (
-            "  nto-qnx* | linux-gnu* | linux-ohos* | linux-android* | "
-            "linux-dietlibc | linux-newlib* | \\"
-        )
-        if old_maybe in sub:
-            sub = sub.replace(old_maybe, new_maybe, 1)
-        # Pattern 2: in the basic_os list — add `-linux-ohos*`.
-        old_basic = (
-            "	      | -mingw32* | -mingw64* | -linux-gnu* | -linux-android* \\"
-        )
-        new_basic = (
-            "	      | -mingw32* | -mingw64* | -linux-gnu* | -linux-ohos* | "
-            "-linux-android* \\"
-        )
-        if old_basic in sub:
-            sub = sub.replace(old_basic, new_basic, 1)
-        with open(config_sub, "w", encoding="utf-8") as f:
-            f.write(sub)
-        self.output.info("injected HarmonyOS recognition into config.guess/config.sub")
 
     def package(self):
         autotools = Autotools(self)

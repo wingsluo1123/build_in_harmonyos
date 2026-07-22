@@ -7,7 +7,9 @@ DmxBuffer channel ops, StringUtils) — see test_ola.cpp. It is not a printf
 stub; CI's P0 audit grep would catch that.
 
 Build: CMake + test_ola.cpp (no in-tree unit tests required).
-Test:  ctest runs the binary; non-zero exit fails the package.
+Test:  test() invokes the binary directly (self.run(cmd, env="conanrun"))
+       rather than going through ctest, so exit codes map 1:1 to pass/fail
+       without ctest's discovery indirection.
 """
 import os
 

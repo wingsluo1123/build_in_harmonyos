@@ -20,7 +20,17 @@ patches:
   - patch_file: "patches/0003-config-config.sub.patch"
     patch_description: "0003 config.sub — recognize linux-ohos kernel"
     patch_type: "portability"
+  - patch_file: "patches/0004-configure-ac-res-symbol.patch"
+    patch_description: "0004 configure.ac — AC_LINK_IFELSE probe for `_res` symbol"
+    patch_type: "portability"
 # config.guess / config.sub are bundled in OLA's own tarball (2015-08-20
 # timestamp). We patch them in conandata.yml rather than in-recipe so
 # the hunks are visible and reproducible; the in-recipe runtime injection
 # is now removed (see conanfile.py).
+#
+# Patch 0004 adds a configure-time probe (AC_LINK_IFELSE) for the global
+# `_res` resolver-state symbol, defining HAVE_DECL__RES=1 when it links
+# and leaving it undefined otherwise. OHOS bionic libc does not export
+# `_res`, so HAVE_DECL__RES is left undefined there; downstream code
+# (see patch 0001) takes a graceful "no nameservers" fallback instead of
+# producing a link error.

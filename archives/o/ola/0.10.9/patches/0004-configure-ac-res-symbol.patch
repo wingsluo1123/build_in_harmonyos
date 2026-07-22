@@ -1,0 +1,24 @@
+--- a/configure.ac	2023-02-26 09:30:48.000000000 +0800
++++ b/configure.ac	2026-07-22 21:20:34.032488593 +0800
+@@ -203,6 +203,21 @@
+                    #endif
+                   ]])
+ 
++# Check whether the global `_res` resolver-state symbol is linkable.
++# OHOS bionic libc does not export `_res`; downstream users of NameServers()
++# (i.e. common/network/NetworkUtils.cpp) need this signal to take a graceful
++# "no nameservers" fallback instead of producing a link error. AC_CHECK_DECLS
++# cannot be used here because `_res` is a definition (extern struct __res_state),
++# not a declaration; AC_LINK_IFELSE catches the missing-symbol case at configure
++# time and propagates it via the standard HAVE_DECL__RES preprocessor define.
++AC_LINK_IFELSE([AC_LANG_PROGRAM([[
++#include <resolv.h>
++]], [[
++extern struct __res_state _res;
++return _res.nscount;
++]])], [AC_DEFINE([HAVE_DECL__RES], [1],
++                  [Define to 1 if the global `_res` resolver-state symbol is available for linking])], [])
++
+ # Checks for typedefs, structures, and compiler characteristics.
+ AC_HEADER_STDBOOL
+ AC_TYPE_UID_T
