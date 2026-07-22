@@ -10,7 +10,7 @@
 
 libedit 使用 autotools 构建系统，通过 conanfile.py 自动执行：
 1. 下载源码: `http://thrysoee.dk/editline/libedit-20240808-3.1.tar.gz`
-2. 应用 4 个有效补丁（config.guess、config.sub、chartype.h、sys.h）
+2. 应用 3 个有效补丁（config.guess、config.sub、sys.h）; chartype.h 改用 -D__STDC_ISO_10646__ CFLAGS
 3. 运行时 patch：configure umask 077→022、terminal.c feature-based termcap decl (HAVE_NCURSES_H && !HAVE_TERMCAP_H)
 4. `./configure --enable-static --disable-shared --disable-examples`
 5. `make -j1`
@@ -25,15 +25,14 @@ libedit 使用 autotools 构建系统，通过 conanfile.py 自动执行：
 | 3 | 系统 ncurses 找不到 | AC_CHECK_LIB(ncurses) 需 libncurses.a，系统只有 libncursesw.a | 创建 libncurses.a → libncursesw.a 符号链接 | — |
 | 4 | termcap 函数未声明 | OHOS ncurses 头文件无 tgetent/tgoto/tputs 声明 | patch terminal.c: feature-based decl (HAVE_NCURSES_H && !HAVE_TERMCAP_H) | — |
 | 5 | test_package 链接失败 | 未传递 ncurses 链接库 | CMakeLists.txt 添加 find_library(ncursesw) | — |
-| 6 | chartype.h wchar_t 检查失败 | OHOS 未定义 __STDC_ISO_10646__ | 补丁添加 __OHOS__ 守卫（补丁文件，非运行时引入） | — |
+| 6 | chartype.h wchar_t 检查失败 | OHOS 未定义 __STDC_ISO_10646__ | -D__STDC_ISO_10646__ CFLAGS（替代移除的 0010 补丁，避免 R8 违规） | — |
 | 7 | configure 无法识别 OHOS | config.guess/sub 未包含 OHOS 条目 | 补丁添加 aarch64-unknown-linux-ohos 支持 | — |
 
 ## 源码修改
 
-### 有效补丁（4 个，直接应用到源码包）
+### 有效补丁（3 个，直接应用到源码包）
 - `0002-config.guess.patch` — 添加 OHOS 系统检测
 - `0003-config.sub.patch` — 添加 ohos 操作系统支持
-- `0010-src-chartype.h.patch` — 添加 __OHOS__ 守卫跳过 wchar_t 检查（补丁文件，非 conanfile.py 运行时引入）
 - `0016-src-sys.h.patch` — OHOS 兼容
 
 ### 运行时 patch（conanfile.py build() 中执行）
