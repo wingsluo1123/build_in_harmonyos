@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Conan recipe for whois 5.6.6 — command-line WHOIS client.
+"""Conan recipe — whois 5.6.6 (command-line WHOIS client).
 
-whois is a client for the WHOIS protocol, used to query domain registration
-information. It uses a simple Makefile build system.
+whois uses a plain Makefile (no configure). The build requires:
+1. perl to generate version.h from debian/changelog
+2. make to compile whois binary
+
+Platform adaptation: config.h needs HAVE_GETOPT_LONG defined for OHOS
+(musl libc supports getopt_long but the upstream config.h doesn't detect it).
 """
 import os
 
@@ -26,6 +30,9 @@ class WhoisConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def requirements(self):
+        pass
+
     def layout(self):
         basic_layout(self)
 
@@ -35,28 +42,22 @@ class WhoisConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # R33: Get compiler from Conan conf, never from shell env vars
-        compiler_executables = self.conf.get("tools.build:compiler_executables", {}, check_type=dict)
-        cc = compiler_executables.get("c", "clang")
-        ar = compiler_executables.get("ar", "llvm-ar")
-        ranlib = compiler_executables.get("ranlib", "llvm-ranlib")
+        # R33: Get compiler from Conan conf, NEVER from shell env vars.
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c", "clang")
 
-        src = self.source_folder
+        # Generate version.h from debian/changelog using perl
         perl = os.environ.get("PERL", "perl")
+        self.run(f"{perl} make_version_h.pl debian/changelog > version.h", cwd=self.source_folder)
 
-        # Generate version.h from debian/changelog
-        self.run(f"{perl} {src}/make_version_h.pl {src}/debian/changelog > {src}/version.h")
-
-        # Build whois target only (mkpasswd fails on OHOS due to getpass)
-        # R9: Always use -j1
-        self.run(f"make -C {src} CC={cc} AR={ar} RANLIB={ranlib} whois -j1")
+        # Build whois binary (R9: use -j1)
+        self.run(f"make whois CC={cc} -j1", cwd=self.source_folder)
 
     def package(self):
-        src = self.source_folder
-        # Install the whois binary and man pages
-        copy(self, "whois", src, os.path.join(self.package_folder, "bin"))
-        copy(self, "*.1", src, os.path.join(self.package_folder, "share", "man", "man1"))
-        copy(self, "*.5", src, os.path.join(self.package_folder, "share", "man", "man5"))
+        # Install whois binary and man pages
+        copy(self, "whois", self.source_folder, os.path.join(self.package_folder, "bin"))
+        copy(self, "whois.1", self.source_folder, os.path.join(self.package_folder, "share", "man", "man1"))
+        copy(self, "whois.conf.5", self.source_folder, os.path.join(self.package_folder, "share", "man", "man5"))
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]

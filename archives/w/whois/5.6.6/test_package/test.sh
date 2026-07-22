@@ -1,14 +1,17 @@
 #!/data/service/hnp/bin/bash
-# test_package/test.sh — smoke test for whois executable
-# Runs in conanrun env (PATH includes installed bin/)
-set -eu
+# test.sh — whois 5.6.6 smoke test
+# R34: Exercise the actual whois binary
+set -e
 
-echo "[test] whois --help"
-# whois --help exits with code 1 (non-standard), so check output content
-output=$(whois --help 2>&1 || true)
-if echo "$output" | grep -q "Usage:"; then
-    echo "✅ --help shows usage OK"
+WHOIS_BIN="${WHOIS_BIN:-whois}"
+
+output=$("$WHOIS_BIN" --version 2>&1)
+echo "$output"
+
+if echo "$output" | grep -q "Version 5.6.6"; then
+    echo "PASS: whois --version output verified"
+    exit 0
 else
-    echo "❌ whois --help did not show usage"
+    echo "FAIL: expected 'Version 5.6.6' in output"
     exit 1
 fi
