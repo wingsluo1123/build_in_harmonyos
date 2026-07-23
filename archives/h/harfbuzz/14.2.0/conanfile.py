@@ -41,8 +41,10 @@ class HarfbuzzConan(ConanFile):
 
     def requirements(self):
         # R36: dependencies must be published before building downstream
-        self.requires("graphite2/1.3.14")
-        self.requires("freetype/2.14.3")
+        if self.options.with_graphite2:
+            self.requires("graphite2/1.3.14")
+        if self.options.with_freetype:
+            self.requires("freetype/2.14.3")
 
     def layout(self):
         cmake_layout(self)

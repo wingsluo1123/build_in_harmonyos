@@ -105,5 +105,6 @@ class Icu4cConan(ConanFile):
         # ICU static libraries in dependency order for static linking:
         # icui18n → icuuc → icudata
         self.cpp_info.libs = ["icui18n", "icuuc", "icudata"]
-        # ICU requires system libraries for static linking
-        self.cpp_info.system_libs = ["pthread", "dl", "m"]
+        # R32: system_libs must be guarded by os check
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["pthread", "dl", "m"]

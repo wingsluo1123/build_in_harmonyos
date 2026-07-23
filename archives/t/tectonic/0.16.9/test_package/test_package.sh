@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/system/bin/sh
 # test_package.sh — tectonic 0.16.9 test script
 # Runs tectonic --version to verify the binary is functional.
-set -e
+set -euo pipefail
 
 # The tectonic binary path is provided by Conan
 TECTONIC_BIN="${TECTONIC_BIN:-tectonic}"
