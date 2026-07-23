@@ -37,7 +37,7 @@ class XsimdConan(ConanFile):
         if self.settings.os == "OHOS":
             tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        tc.variables["BUILD_TESTS"] = "OFF"
+        tc.variables["BUILD_TESTS"] = "ON"
         tc.variables["BUILD_BENCHMARKS"] = "OFF"
         tc.variables["BUILD_EXAMPLES"] = "OFF"
         tc.generate()
@@ -47,6 +47,7 @@ class XsimdConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)
