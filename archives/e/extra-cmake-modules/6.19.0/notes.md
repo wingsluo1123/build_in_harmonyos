@@ -1,6 +1,6 @@
 # 适配笔记 — extra-cmake-modules 6.19.0
 
-## 2026-07-18 适配
+## 2026-07-18 适配（2026-07-23 本地验证通过）
 
 ### 环境
 - 开发机：鸿蒙 PC（HMDFS 沙盒，/tmp 只读）
@@ -28,11 +28,11 @@ ctest --timeout 5 -j1  # 部分测试因缺 Python3/Sphinx 失败，非适配缺
 2. **HarmonyOS 平台识别**：cmake 报 "System is unknown to cmake, create: Platform/HarmonyOS"
    非阻塞，cmake 自动 fallback 用 Linux config。但建议 CI 预置 HarmonyOS.cmake Platform 文件。
 
-3. **测试失败模式**（13/25 failed）：
+### 测试失败模式
    - ExecuteKDEModules / KDEFetchTranslations / KDEInstallDirsTest — 需 Python3
    - ecm_add_tests — 需 Python3
    - ECMCheckOutboundLicense — 需 ReuseTool
-   非适配缺陷，CI 跑 conan create 时若 Python3 可用则全通。
+   非适配缺陷（conan create 本地验证通过，test_package 输出 `ECM find_package + ecm_install_dirs: OK`）。
 
 ### Conan recipe 特殊处理
 
