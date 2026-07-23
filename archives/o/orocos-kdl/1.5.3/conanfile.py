@@ -201,7 +201,7 @@ class OrocoskdlConan(ConanFile):
         eigen_src = os.path.join(self.source_folder, "_eigen", "Eigen")
         eigen_dst = os.path.join(self.package_folder, "include", "Eigen")
         if os.path.isdir(eigen_src) and not os.path.isdir(eigen_dst):
-            copy(self, "*", src=os.path.dirname(eigen_src), dst=os.path.join(self.package_folder, "include"))
+            copy(self, "*", src=eigen_src, dst=eigen_dst)
         # Copy license file
         for lic in ["COPYING", "LICENSE", "LICENSE.txt"]:
             src = os.path.join(self.source_folder, lic)
