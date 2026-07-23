@@ -5,7 +5,7 @@ Builds the torchvision C++ extension library against libtorch.
 """
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
 class TorchvisionConan(ConanFile):
@@ -60,6 +60,7 @@ class TorchvisionConan(ConanFile):
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
             tc.variables["CMAKE_LINK_WHAT_YOU_USE"] = "OFF"
         tc.generate()
+        CMakeDeps(self).generate()
 
     def build(self):
         apply_conandata_patches(self)
