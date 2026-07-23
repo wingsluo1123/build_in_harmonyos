@@ -37,6 +37,7 @@ class TorchvisionConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
+        self.requires("libtorch/2.9.0")
         raise ConanInvalidConfiguration(
             "torchvision/0.28.0 requires libtorch/2.9.0, which is not yet "
             "available in the Conan artifact registry"
