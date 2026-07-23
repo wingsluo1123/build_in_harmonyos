@@ -57,7 +57,7 @@ class TorchvisionConan(ConanFile):
             tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
             tc.variables["CMAKE_CROSSCOMPILING"] = "OFF"
-        tc.variables["CMAKE_LINK_WHAT_YOU_USE"] = "OFF"
+            tc.variables["CMAKE_LINK_WHAT_YOU_USE"] = "OFF"
         tc.generate()
 
     def build(self):
