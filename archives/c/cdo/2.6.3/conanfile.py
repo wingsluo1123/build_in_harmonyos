@@ -108,7 +108,12 @@ class CdoConan(ConanFile):
         if can_run(self):
             autotools.make(target="check")
         else:
-            self.output.info("Skipping upstream 'make check' while cross-building")
+            # Cross-building: target binary cannot run on the build host,
+            # so upstream 'make check' is skipped. The test_package still
+            # exercises real cdo operators (field creation, fldmean,
+            # format conversion) when the package runs on-target.
+            self.output.info("Skipping upstream 'make check' while cross-building "
+                             "(test_package covers functional verification on-target)")
 
     def package(self):
         autotools = Autotools(self)

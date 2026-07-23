@@ -15,9 +15,20 @@ upstream_tests:
     description: "CDO 内置测试套件（格式转换、统计计算、网格操作等）"
     command: "make check"
 
+cross_build_handling:
+  skip_upstream_check: true
+  reason: "交叉编译时目标二进制无法在构建机运行，make check 被跳过"
+  fallback: "test_package 在目标平台运行，覆盖真实气候数据处理功能"
+
 test_package_tests:
   - file: test.sh
-    description: "消费者测试: 通过 test.sh 执行 cdo --version 与 cdo --help"
+    description: "功能测试: 创建 SERVICE 格式字段、fldmean 统计计算、SERVICE→EXTRA 格式转换"
     command: "bash test.sh"
+    operators_exercised:
+      - "expr (字段创建)"
+      - "fldmean (空间均值统计)"
+      - "output (数值读回)"
+      - "f srv/ext (内置格式转换)"
+      - "--version (版本烟测)"
 
-assertion_count: 2
+assertion_count: 8
