@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for latex2rtf executable
 # Args: $1 = path to latex2rtf binary, $2 = path to cfg directory
-set -eu
+set -euo pipefail
 
 LATEX2RTF_BIN="${1:?Usage: test.sh <latex2rtf_path> <cfg_dir>}"
 CFG_DIR="${2:-}"
@@ -22,22 +22,29 @@ Hello World
 TEXEOF
 
 # Run latex2rtf to convert .tex to .rtf
-echo "[test] $LATEX2RTF_BIN $TEX_FILE"
-"$LATEX2RTF_BIN" "$TEX_FILE" || {
-    echo "❌ latex2rtf conversion failed"
+echo "[step] latex2rtf functional test"
+if ! "$LATEX2RTF_BIN" "$TEX_FILE"; then
+    echo "        [fail] latex2rtf conversion failed"
     exit 1
-}
+fi
 
-# Verify RTF output exists and has valid header
+# Verify RTF output exists
 RTF_FILE="$TMPDIR/l2r_test_input.rtf"
 if [ ! -f "$RTF_FILE" ]; then
-    echo "❌ RTF output file not created"
+    echo "        [fail] RTF output file not created"
     exit 1
 fi
 
-if ! head -1 "$RTF_FILE" | grep -q '{\\rtf'; then
-    echo "❌ Invalid RTF header"
-    exit 1
-fi
+# Verify RTF header is valid
+RTF_HEADER=$(head -1 "$RTF_FILE")
+case "$RTF_HEADER" in
+    *"{\\rtf"*)
+        echo "        [ok] valid RTF output detected"
+        ;;
+    *)
+        echo "        [fail] invalid RTF header: $RTF_HEADER"
+        exit 1
+        ;;
+esac
 
-echo "✅ latex2rtf conversion test passed"
+echo "        [ok] latex2rtf smoke test passed"
