@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+"""Conan 2.x recipe — tectonic 0.16.9
+
+A modernized, complete, embeddable TeX/LaTeX engine.
+Build system: cargo (Rust). Uses pkg-config to find C/C++ dependencies.
+
+Fixes applied:
+- R33: Dynamic tool path lookup (no hardcoded paths)
+- Static linking: .pc files patched to use .a absolute paths
+- SSL: SSL_CERT_FILE set for reqwest (LaTeX bundle download)
+- crates.io mirror: rsproxy.cn configured in .cargo/config.toml
+"""
+import os
+import re
+import shutil
+
+from conan import ConanFile
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.layout import basic_layout
+from conan.tools.env import VirtualBuildEnv
+from conan.tools.gnu import PkgConfigDeps
+
+
+class TectonicConan(ConanFile):
+    name = "tectonic"
+    version = "0.16.9"
+    description = "A modernized, complete, embeddable TeX/LaTeX engine"
+    license = "MIT"
+    homepage = "https://tectonic-typesetting.github.io/"
+    url = ""
+
+    settings = "os", "compiler", "build_type", "arch"
+
+    # Force ALL C/C++ dependencies to static linking so the tectonic binary
+    # is self-contained (no runtime .so dependency on conan cache paths).
+    default_options = {
+        "*:shared": False,
+    }
+
+    def requirements(self):
+        self.requires("freetype/2.14.3")
+        self.requires("fontconfig/2.18.1")
+        self.requires("harfbuzz/14.2.0")
+        self.requires("graphite2/1.3.14")
+        self.requires("icu4c/78")
+        self.requires("libpng/1.6.58")
+        self.requires("zlib/1.3.1.1")
+        self.requires("openssl/3.5.6")
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def layout(self):
+        basic_layout(self)
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+
+    def generate(self):
+        pkg = PkgConfigDeps(self)
+        pkg.generate()
+        env = VirtualBuildEnv(self)
+        env.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
+
+        gen_folder = self.generators_folder
+
+        # ── 1. Tool path setup (R33: dynamic lookup, no hardcoded paths) ──
+        # Find tools by checking common locations + environment variables
+        toolchain_paths = []
+        for candidate in [
+            os.environ.get("HNP_BIN", "/data/service/hnp/bin"),
+            os.path.expanduser("~/.harmonybrew/bin"),
+            os.path.expanduser("~/usr/local/bin"),
+        ]:
+            if os.path.isdir(candidate) and candidate not in toolchain_paths:
+                toolchain_paths.append(candidate)
+
+        current_path = os.environ.get("PATH", "")
+        for p in toolchain_paths:
+            if p not in current_path:
+                current_path = p + ":" + current_path
+        os.environ["PATH"] = current_path
+
+        # Rust environment (R33: use env or known path, not shell vars)
+        home = os.path.expanduser("~")
+        cargo_home = os.environ.get("CARGO_HOME", os.path.join(home, ".cargo"))
+        if os.path.isdir(cargo_home):
+            os.environ["CARGO_HOME"] = cargo_home
+        rustup_home = os.environ.get("RUSTUP_HOME", os.path.join(home, ".rustup"))
+        if os.path.isdir(rustup_home):
+            os.environ["RUSTUP_HOME"] = rustup_home
+
+        # Shell (R33: find bash dynamically)
+        bash_path = shutil.which("bash") or "/data/service/hnp/bin/bash"
+        os.environ["CONFIG_SHELL"] = bash_path
+        os.environ["SHELL"] = bash_path
+
+        # ── 2. Pkg-config setup ──
+        os.environ["PKG_CONFIG_PATH"] = gen_folder + ":" + os.environ.get("PKG_CONFIG_PATH", "")
+        os.environ["PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"] = "1"
+        # R26: Don't allow system lib paths to leak in
+        os.environ["PKG_CONFIG_ALLOW_SYSTEM_LIBS"] = "0"
+
+        # ── 3. Static linking: patch .pc files to use .a absolute paths ──
+        # The .pc files from Conan have -L/path -l<name>. The linker finds
+        # .so (shared) and prefers it over .a (static). We replace -l<name>
+        # with the absolute path to the .a file to force static linking.
+        self._patch_pc_files_for_static(gen_folder)
+
+        # ── 4. SSL certificates for reqwest (LaTeX bundle download) ──
+        for cert_file in ["/etc/ssl/certs/cacert.pem", "/etc/pki/tls/cacert.pem"]:
+            if os.path.exists(cert_file):
+                os.environ["SSL_CERT_FILE"] = cert_file
+                break
+        if os.path.isdir("/etc/ssl/certs"):
+            os.environ["SSL_CERT_DIR"] = "/etc/ssl/certs"
+
+        # ── 5. DEP_FONTCONFIG_INCLUDE_PATH ──
+        # engine_xetex needs fontconfig headers but doesn't directly depend
+        # on bridge_fontconfig crate, so Cargo doesn't set this env var.
+        fc_pc = os.path.join(gen_folder, "fontconfig.pc")
+        if os.path.exists(fc_pc):
+            content = open(fc_pc).read()
+            prefix_match = re.search(r'^prefix=(.+)$', content, re.MULTILINE)
+            prefix = prefix_match.group(1).strip() if prefix_match else ""
+            inc_match = re.search(r'^includedir=(.+)$', content, re.MULTILINE)
+            if inc_match:
+                includedir = inc_match.group(1).strip()
+                if "${prefix}" in includedir and prefix:
+                    includedir = includedir.replace("${prefix}", prefix)
+                os.environ["DEP_FONTCONFIG_INCLUDE_PATH"] = includedir
+
+        # ── 6. Create icu-uc.pc (tectonic expects "icu-uc", Conan generates "icu4c") ──
+        icu_uc_pc = os.path.join(gen_folder, "icu-uc.pc")
+        icu4c_pc = os.path.join(gen_folder, "icu4c.pc")
+        if os.path.exists(icu4c_pc) and not os.path.exists(icu_uc_pc):
+            shutil.copy2(icu4c_pc, icu_uc_pc)
+
+        # ── 7. Create .cargo/config.toml ──
+        cargo_dir = os.path.join(self.source_folder, ".cargo")
+        os.makedirs(cargo_dir, exist_ok=True)
+        cargo_config = (
+            '[target.aarch64-unknown-linux-ohos]\n'
+            'linker = "clang"\n'
+            'rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib"]\n\n'
+            '[env]\n'
+            'CC = "clang"\n'
+            'CXX = "clang++"\n\n'
+            # crates.io mirror (network optimization for OHOS)
+            '[source.crates-io]\n'
+            'replace-with = "rsproxy-sparse"\n\n'
+            '[source.rsproxy-sparse]\n'
+            'url = "sparse+https://rsproxy.cn/index/"\n'
+        )
+        with open(os.path.join(cargo_dir, "config.toml"), "w") as f:
+            f.write(cargo_config)
+
+        # ── 8. Build with cargo ──
+        # external-harfbuzz: use system harfbuzz instead of git submodule
+        self.run("cargo build --release --features external-harfbuzz")
+
+    def _patch_pc_files_for_static(self, gen_folder):
+        """Patch .pc files to use .a absolute paths instead of -l flags.
+
+        This forces the linker to use static libraries (.a) instead of
+        shared libraries (.so), making the resulting binary self-contained.
+        """
+        for pc_name in os.listdir(gen_folder):
+            if not pc_name.endswith(".pc"):
+                continue
+            pc_path = os.path.join(gen_folder, pc_name)
+            try:
+                with open(pc_path, "r") as f:
+                    content = f.read()
+            except (OSError, IOError):
+                continue
+
+            # Find all -L paths in the Libs: line
+            libs_match = re.search(r'^Libs:\s*(.*)$', content, re.MULTILINE)
+            if not libs_match:
+                continue
+
+            libs_line = libs_match.group(1)
+            lib_paths = re.findall(r'-L(\S+)', libs_line)
+
+            # Replace -l<name> with absolute path to .a file
+            def replace_lib(match):
+                lib_name = match.group(1)
+                for path in lib_paths:
+                    static_lib = os.path.join(path, f"lib{lib_name}.a")
+                    if os.path.exists(static_lib):
+                        return static_lib
+                return match.group(0)
+
+            new_libs = re.sub(r'-l(\S+)', replace_lib, libs_line)
+            content = content.replace(libs_line, new_libs)
+
+            try:
+                with open(pc_path, "w") as f:
+                    f.write(content)
+            except (OSError, IOError):
+                pass
+
+    def package(self):
+        import glob
+        # Search multiple candidate paths for the binary
+        candidates = [
+            os.path.join(self.build_folder, "target", "release"),
+            os.path.join(self.source_folder, "target", "release"),
+        ]
+        for base in [self.build_folder, self.source_folder]:
+            candidates.append(os.path.join(os.path.dirname(base), "target", "release"))
+            candidates.append(os.path.join(os.path.dirname(os.path.dirname(base)), "b", "target", "release"))
+
+        target_dir = None
+        for c in candidates:
+            tectonic_path = os.path.join(c, "tectonic")
+            if os.path.isfile(tectonic_path):
+                target_dir = c
+                break
+
+        if target_dir:
+            # Copy the actual binary as tectonic.real (Conan post-processing
+            # corrupts $ORIGIN in RUNPATH, so we use a wrapper script)
+            src_bin = os.path.join(target_dir, "tectonic")
+            dst_real = os.path.join(self.package_folder, "bin", "tectonic.real")
+            os.makedirs(os.path.dirname(dst_real), exist_ok=True)
+            shutil.copy2(src_bin, dst_real)
+
+            # Create wrapper script that sets LD_LIBRARY_PATH for libexpat.so
+            wrapper = os.path.join(self.package_folder, "bin", "tectonic")
+            with open(wrapper, "w") as f:
+                f.write(
+                    '#!/system/bin/sh\n'
+                    'DIR="$(cd "$(dirname "$0")" && pwd)"\n'
+                    'export LD_LIBRARY_PATH="$DIR/../lib:$LD_LIBRARY_PATH"\n'
+                    'exec "$DIR/tectonic.real" "$@"\n'
+                )
+            os.chmod(wrapper, 0o755)
+        else:
+            for pattern in [
+                os.path.join(self.build_folder, "**", "tectonic"),
+                os.path.join(str(self.build_folder), "**", "target", "release", "tectonic"),
+            ]:
+                matches = glob.glob(pattern, recursive=True)
+                for m in matches:
+                    if os.path.isfile(m) and os.access(m, os.X_OK | os.R_OK):
+                        copy(self, "tectonic", os.path.dirname(m), os.path.join(self.package_folder, "bin"))
+                        return
+
+        # ── Package shared C/C++ deps alongside the binary ──
+        # expat's conanfile hardcodes EXPAT_SHARED_LIBS=ON (upstream bug),
+        # so libexpat.so is always shared. Copy it to lib/ and set RPATH
+        # so the binary finds it relative to its own location ($ORIGIN/../lib).
+        lib_dir = os.path.join(self.package_folder, "lib")
+        os.makedirs(lib_dir, exist_ok=True)
+
+        for dep_name in ["expat"]:
+            dep = self.dependencies.get(dep_name)
+            if dep is None:
+                continue
+            dep_lib_dir = os.path.join(dep.package_folder, "lib")
+            if not os.path.isdir(dep_lib_dir):
+                continue
+            for so_file in os.listdir(dep_lib_dir):
+                if so_file.endswith(".so") or ".so." in so_file:
+                    copy(self, so_file, dep_lib_dir, lib_dir)
+
+        # Set RPATH on the tectonic binary so it finds lib/ relative to itself
+        tectonic_bin = os.path.join(self.package_folder, "bin", "tectonic")
+        if os.path.isfile(tectonic_bin):
+            patchelf = shutil.which("patchelf") or "/data/service/hnp/bin/patchelf"
+            if os.path.isfile(patchelf):
+                try:
+                    self.run(f'{patchelf} --set-rpath "$ORIGIN/../lib" {tectonic_bin}')
+                except Exception:
+                    pass  # Non-fatal if patchelf fails
+
+    def package_info(self):
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+
+    def package_id(self):
+        del self.info.settings.compiler

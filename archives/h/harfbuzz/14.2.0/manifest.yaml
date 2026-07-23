@@ -1,28 +1,33 @@
 software: "harfbuzz"
 version: "14.2.0"
-status: built
-build_date: "2026-05-22"
-build_system: meson
+status: "built"
+build_date: "2026-07-22"
+build_system: "cmake"
 
 source:
   url: "https://github.com/harfbuzz/harfbuzz/releases/download/14.2.0/harfbuzz-14.2.0.tar.xz"
+  sha256: "94017020f96d025bb66ae91574e4cf334bcad23e8175a8a40565b3721bc2eaff"
   tar_format: tar.xz
 
 configure_options: ""
 
 build:
-  system: meson
+  system: cmake
   dependencies:
-    - freetype
-    - glib-2.0
+    - graphite2/1.3.14
+    - freetype/2.14.3
   cc: clang
   cxx: clang++
+  features:
+    - graphite2 support enabled (HB_HAVE_GRAPHITE2=ON)
+    - freetype support enabled (HB_HAVE_FREETYPE=ON)
+    - static library (BUILD_SHARED_LIBS=OFF)
 
-patches_applied:
-  - "hb-features.h configuration patch"
+patches_applied: []
 
 knowledge_gained:
-  - "harfbuzz 依赖 freetype 影成循环依赖，需要先编译不带 harfbuzz 的 freetype"
-  - "meson 构建支持较好，但在 HMDFS 上 subprocess 有问题"
-  - "使用 amalgamated 源码编译可绕过 meson subprocess 问题"
-  - "需要手动创建 hb-features.h 配置文件"
+  - "harfbuzz 14.2.0 CMake build supports graphite2 via HB_HAVE_GRAPHITE2 option"
+  - "meson build fails on HMDFS due to subprocess execution restrictions"
+  - "CMake build is the recommended approach for OHOS cross-compilation"
+  - "graphite2/1.3.14 provides libgraphite2.a for static linking"
+  - "freetype/2.14.3 from conan cache provides shared library for compile-time linking"
