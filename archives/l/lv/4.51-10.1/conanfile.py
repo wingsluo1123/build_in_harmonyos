@@ -46,6 +46,7 @@ class LvConan(ConanFile):
             tc.configure_args.append("--disable-shared")
         # OHOS 需要显式链接 termcap (ncurses 的 termcap 适配层)
         tc.configure_args.append("LIBS=-ltermcap")
+        tc.extra_ldflags.append("-ltermcap")
         tc.generate()
 
     def build(self):
@@ -53,7 +54,7 @@ class LvConan(ConanFile):
         autotools = Autotools(self)
         src_dir = os.path.join(self.source_folder, "src")
         autotools.configure(build_script_folder=src_dir)
-        autotools.make()
+        autotools.make(vars={"LDFLAGS": "-ltermcap"})
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
