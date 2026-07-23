@@ -7,7 +7,6 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.layout import basic_layout
 
 
 class TorchvisionConan(ConanFile):
@@ -73,4 +72,4 @@ class TorchvisionConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["torchvision"]
-        self.cpp_info.requires = []
+        self.cpp_info.requires = ["torch::torch"]
