@@ -5,7 +5,7 @@
 
 int main(void)
 {
-    const char *json_str = "{\"name\":\"cjson\",\"version\":1.7.19}";
+    const char *json_str = "{\"name\":\"cjson\",\"version\":\"1.7.19\"}";
     cJSON *json = cJSON_Parse(json_str);
     if (!json) {
         fprintf(stderr, "cJSON_Parse failed\n");

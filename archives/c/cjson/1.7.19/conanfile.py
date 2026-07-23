@@ -38,9 +38,8 @@ class CjsonConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
-        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.variables["ENABLE_CJSON_TEST"] = "OFF"
-        tc.variables["ENABLE_CJSON_UTILS"] = "OFF"
+        tc.variables["ENABLE_CJSON_UTILS"] = "OFF"  # upstream utils not needed for OHOS
         tc.generate()
 
     def build(self):
