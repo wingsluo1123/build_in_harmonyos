@@ -4,7 +4,7 @@
 - 构建系统: makefile（原始 Makefile，非 autotools）
 - 编译日期: 2026-06-12
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 - 源码URL: https://github.com/danihek/hellwal/archive/refs/tags/v1.0.7.tar.gz
 
 ## 对话记录
