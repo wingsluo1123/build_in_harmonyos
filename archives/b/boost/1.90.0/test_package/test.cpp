@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 
 /* Verify that key Boost headers are includable */
 #include <boost/version.hpp>
@@ -12,6 +13,9 @@
 #include <boost/tuple/tuple.hpp>
 #include <boost/function.hpp>
 #include <boost/bind/bind.hpp>
+
+/* Boost.Regex — requires the compiled library */
+#include <boost/regex.hpp>
 
 int main(void) {
     printf("Boost version: %d\n", BOOST_VERSION);
@@ -30,6 +34,20 @@ int main(void) {
     } catch (...) {
         printf("boost::lexical_cast test: FAILED\n");
         return 1;
+    }
+
+    /* Boost.Regex — requires actual library linking */
+    {
+        std::string line = "Subject: Hello World";
+        boost::regex pat("Subject: (.*)");
+        boost::smatch matches;
+        if (boost::regex_search(line, matches, pat)) {
+            printf("boost::regex_search test: PASSED (matched=%s)\n",
+                   matches[1].str().c_str());
+        } else {
+            printf("boost::regex_search test: FAILED (no match)\n");
+            return 1;
+        }
     }
 
     return 0;
