@@ -26,9 +26,9 @@ make -j1 TracyClient
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | `pthread_setcancelstate` 未声明（TracySystem.cpp:278, 293） | bionic libc 不默认定义 `_GNU_SOURCE`，pthread 的 GNU 扩展（setcancelstate）需宏开启 | `target_compile_definitions(TracyClient PUBLIC _GNU_SOURCE=1)` 加到根 CMakeLists.txt（**但仍不够**，见 #4） |
-| 2 | `program_invocation_short_name` / `program_invocation_name` 未声明（TracyProfiler.cpp:442, 461） | 这俩是 **glibc 独有的 `errno.h` GNU 扩展**，bionic **根本没有**这两个符号，加 `_GNU_SOURCE` 也无效 | **Patch #3**：在 OHOS 分支用 `/proc/self/cmdline` 读 argv[0] 替代 `program_invocation_short_name`；用 `readlink /proc/self/exe` 替代 `program_invocation_name` |
+| 2 | `program_invocation_short_name` / `program_invocation_name` 未声明（TracyProfiler.cpp:442, 461） | 这俩是 **glibc 独有的 `errno.h` GNU 扩展**，bionic **根本没有**这两个符号，加 `_GNU_SOURCE` 也无效 | **Patch #2**：在 `#elif !defined(HAS_PROGRAM_INVOCATION_SHORT_NAME)` 分支用 `/proc/self/cmdline` 读 argv[0] 替代 `program_invocation_short_name`；用 `readlink /proc/self/exe` 替代 `program_invocation_name`（特性宏由 patch 0001 中 CMake `check_symbol_exists` 探测） |
 | 3 | `__NR_perf_event_open` 未声明（如果启用 TRACY_HAS_SYSTEM_TRACING） | bionic 不暴露 perf_event syscall 号 | 通过 `-DTRACY_NO_SYSTEM_TRACING=ON` 关闭 |
-| 4 | #1 的 patch 不够：`pthread_setcancelstate` 即使 `_GNU_SOURCE` 也不存在 | bionic **根本没有**这个 GNU 扩展函数（Android bionic 也缺） | **Patch #2**：把 `#ifndef __ANDROID__` 扩成 `#if !defined(__ANDROID__) && !defined(__OHOS__)` |
+| 4 | #1 的 patch 不够：`pthread_setcancelstate` 即使 `_GNU_SOURCE` 也不存在 | bionic **根本没有**这个 GNU 扩展函数（Android bionic 也缺） | **Patch #3**：把 `#ifndef __ANDROID__` 改为 `#ifdef HAS_PTHREAD_SETCANCELSTATE`（特性检测，由 patch 0001 中 CMake `check_symbol_exists` 探测） |
 | 5 | init-build 误识别 build_system=autotools | tracy 同时提供 CMakeLists.txt 和 meson.build，init-build heuristic 误判 | manifest.yaml 手动指定 `build_system: cmake` |
 | 6 | conandata.yml 7 个 mirror 网络层全挂（403/超时/SSL/500/sha mismatch） | 国内 GitHub 镜像生态不稳定 + Python urllib3 拒弱 SSL 证书 | 手动下载 source tarball 到 conan cache（sha256 校验通过），并预填 conandata.yml 多个 mirror 兜底 |
 
@@ -49,7 +49,7 @@ make -j1 TracyClient
 100% tests passed, 0 tests failed out of 1
 ```
 
-22 个 Tracy API + 3 处运行时 assert 通过（详见 `reports/test-report.md`）。
+22 个 Tracy API + 2 处运行时 assert 通过（详见 `reports/test-report.md`）。
 
 ## 关键编译选项（CMake flags）
 
@@ -66,9 +66,9 @@ make -j1 TracyClient
 
 ## 源码修改（3 个 patch 固化在 patches/）
 
-- `patches/0001-CMakeLists.txt.patch` — 加 `target_compile_definitions(TracyClient PUBLIC _GNU_SOURCE=1)`
-- `patches/0002-public-client-TracyProfiler.cpp.patch` — OHOS 分支用 `/proc/self/cmdline` + `readlink /proc/self/exe` 替代 glibc 独有 `program_invocation_*`
-- `patches/0003-public-common-TracySystem.cpp.patch` — `#ifndef __ANDROID__` 扩成 `#if !defined(__ANDROID__) && !defined(__OHOS__)` 跳过 `pthread_setcancelstate`
+- `patches/0001-CMakeLists.txt.patch` — 加 `target_compile_definitions(TracyClient PUBLIC _GNU_SOURCE=1)` + CMake `check_symbol_exists` 特性检测（`HAS_PTHREAD_SETCANCELSTATE`、`HAS_PROGRAM_INVOCATION_SHORT_NAME`）
+- `patches/0002-public-client-TracyProfiler.cpp.patch` — `#elif !defined(HAS_PROGRAM_INVOCATION_SHORT_NAME)` 分支用 `/proc/self/cmdline` + `readlink /proc/self/exe` 替代 glibc 独有 `program_invocation_*`
+- `patches/0003-public-common-TracySystem.cpp.patch` — `#ifndef __ANDROID__` 改为 `#ifdef HAS_PTHREAD_SETCANCELSTATE` 守护 `pthread_setcancelstate` 调用
 
 ## 依赖版本
 

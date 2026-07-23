@@ -11,10 +11,12 @@
      auto buf = getprogname();
      if( buf ) processName = buf;
  #  endif
-+#elif defined __OHOS__
-+    // OHOS bionic does not expose program_invocation_short_name; fall back to
++#elif !defined( HAS_PROGRAM_INVOCATION_SHORT_NAME )
++    // Bionic libc (Android + OHOS + others) does not expose
++    // program_invocation_short_name even with _GNU_SOURCE; fall back to
 +    // /proc/self/cmdline which contains argv[0] (the executable basename) as
-+    // the first null-terminated token.
++    // the first null-terminated token. Feature detection is wired in
++    // patches/0001-CMakeLists.txt.patch (check_symbol_exists).
 +    static char cmdlineBuf[1024];
 +    int fd = open( "/proc/self/cmdline", O_RDONLY );
 +    if( fd >= 0 )
@@ -55,9 +57,10 @@
      return buf;
  #elif defined __ANDROID__
 +    return nullptr;
-+#elif defined __OHOS__
-+    // OHOS bionic does not expose program_invocation_name; readlink /proc/self/exe
-+    // to recover the full executable path (Linux kernel procfs).
++#elif !defined( HAS_PROGRAM_INVOCATION_SHORT_NAME )
++    // Bionic libc does not expose program_invocation_name; readlink
++    // /proc/self/exe to recover the full executable path (Linux kernel
++    // procfs). Reuses the same feature macro as the cmdline branch above.
 +    static char exeBuf[1024];
 +    ssize_t n = readlink( "/proc/self/exe", exeBuf, sizeof( exeBuf ) - 1 );
 +    if( n > 0 ) { exeBuf[n] = '\0'; return exeBuf; }

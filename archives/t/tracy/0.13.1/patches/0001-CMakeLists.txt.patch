@@ -1,6 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -50,20 +50,31 @@
+@@ -50,20 +50,32 @@
  set_target_properties(TracyClient PROPERTIES INTERPROCEDURAL_OPTIMIZATION ${LTO_SUPPORTED})
  target_include_directories(TracyClient SYSTEM PUBLIC
      $<BUILD_INTERFACE:${TRACY_PUBLIC_DIR}>
@@ -22,6 +22,10 @@
 +if(HAS_PTHREAD_SETCANCELSTATE)
 +    target_compile_definitions(TracyClient PUBLIC HAS_PTHREAD_SETCANCELSTATE=1)
 +endif()
++# Also probe program_invocation_short_name so patch 0002 can use feature
++# detection (#elif !defined(HAS_PROGRAM_INVOCATION_SHORT_NAME)) instead of
++# #elif defined __OHOS__ on bionic libc.
++check_symbol_exists(program_invocation_short_name "errno.h" HAS_PROGRAM_INVOCATION_SHORT_NAME)
  if(rocprofiler-sdk_FOUND)
      target_compile_definitions(TracyClient PUBLIC TRACY_ROCPROF)
      target_link_libraries(TracyClient PUBLIC rocprofiler-sdk::rocprofiler-sdk)
