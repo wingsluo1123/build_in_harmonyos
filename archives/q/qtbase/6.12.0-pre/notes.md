@@ -92,14 +92,14 @@ kdoctools 6.19.0-r0 (配方已入库占位，最终目标)
 
 **真根因实测**：Qt 6.11.1 官方 release tarball **零 OHOS/HarmonyOS 平台支持**——`mkspecs/` 零 ohos/harmony 目录，`grep -rniE "OHOS|harmonyos|harmony" cmake/` 零命中。
 
-**Qt6 开发分支 6.12 实测真含 OHOS 支持**（Qt 官方 git 镜像 `git://code.qt.io/qt/qtbase.git` 6.12 分支单仓实测）：
+**Qt6 开发分支 6.12 实测真含 OHOS 支持**（Qt 官方 git 镜像 `https://code.qt.io/qt/qtbase.git` 6.12 分支单仓实测）：
 - `mkspecs/ohos-clang` ✅
 - `mkspecs/features/ohos/ohos.prf` ✅
 - `cmake/QtAutoDetectHelpers.cmake qt_auto_detect_ohos()` 含 `OHOS_SDK_ROOT`/`OHOS_NDK_ROOT`/`OHOS_ARCH`/`OHOS_NATIVE_ABI_LEVEL` 自动检测 ✅
 
 Qt 官方 wiki https://wiki.qt.io/Building_Qt6_for_HarmonyOS 指南的 `-ohos-sdk` 变量是给 **Qt6 开发分支 6.12 + commit 746950** 用的，非 6.11.1 release。
 
-**配方真可行性决断**：qtbase 6.11.1 配方需切到 Qt6 开发分支 6.12（`git://code.qt.io/qt/qtbase.git` 6.12 分支，R39 合规 Qt 官方 git 镜像），或保留 6.11.1 赛事预构建引用模式（commit `b7cf19695` 已示范）。需你决断真下一步——这是 R39（官方源 URL）与 Qt6 开发分支 OHOS 支持的真冲突。
+**配方真可行性决断**：qtbase 6.11.1 配方需切到 Qt6 开发分支 6.12（`https://code.qt.io/qt/qtbase.git` 6.12 分支，R39 合规 Qt 官方 git 镜像），或保留 6.11.1 赛事预构建引用模式（commit `b7cf19695` 已示范）。需你决断真下一步——这是 R39（官方源 URL）与 Qt6 开发分支 OHOS 支持的真冲突。
 
 ### 6.12 切版实测（2026-07-20，决断 A 后）
 
@@ -107,9 +107,9 @@ Qt 官方 wiki https://wiki.qt.io/Building_Qt6_for_HarmonyOS 指南的 `-ohos-sd
 
 | 改动 | 真状态 |
 |------|--------|
-| conanfile.py source() | ✅ 改用 `git clone --depth 1 --branch 6.12 git://code.qt.io/qt/qtbase.git`（conan 2.x `get()` 不支持 git 源）+ `shutil.which("git")` 全路径 + `env=os.environ` 继承 PATH |
+| conanfile.py source() | ✅ 改用 `git clone --depth 1 --branch 6.12 https://code.qt.io/qt/qtbase.git`（conan 2.x `get()` 不支持 git 源）+ `shutil.which("git")` 全路径 + `env=os.environ` 继承 PATH |
 | conanfile.py build() variables | ✅ 切 Qt6 6.12 `cmake/QtAutoDetectHelpers.cmake qt_auto_detect_ohos()` 真变量名：`OHOS_SDK_ROOT` + `OHOS_ARCH=aarch64` + `OHOS_NATIVE_ABI_LEVEL=23` + `CMAKE_FIND_ROOT_PATH`（删 `INPUT_ohos_sdk`/`CMAKE_SYSTEM_NAME`）|
-| conandata.yml URL | ✅ 切 `git://code.qt.io/qt/qtbase.git` 6.12 分支（R39 合规 Qt 官方 git 镜像，download.qt.io 6.12 release 404）|
+| conandata.yml URL | ✅ 切 `https://code.qt.io/qt/qtbase.git` 6.12 分支（R39 合规 Qt 官方 git 镜像，download.qt.io 6.12 release 404）|
 
 **`conan create qtbase/6.11.1` 6.12 切版后实测真进展**：
 
@@ -156,12 +156,26 @@ ohos-additional-packages Google Drive 直链你交互 shell `curl` 撞 `Couldn't
 | conandata.yml 格式 | ✅ 正确 |
 | manifest.yaml 格式 | ✅ 正确 |
 | test_package 结构 | ✅ CMakeLists.txt + conanfile.py + MANIFEST.yml + test() + self.run() |
-| `Qt4Gui` 拼写错误 | ✅ **修复**：`components["Gui"]["libs"]` 从 `["Qt4Gui"]` 改为 `["Qt6Gui"]` |
 | conan export | ✅ 导出成功 |
 | conan create | ⏳ 超时（git clone 50MB+ qtbase 源码耗时过长）+ 缺 DevEco SDK（CI 预置） |
 
-**结论**：配方逻辑正确，唯一 bug（`Qt4Gui`→`Qt6Gui`）已修复。完整编译验证需在 CI worker（预置 DevEco SDK + ohos-additional-packages）上执行。
+### AI Review 修复汇总（2026-07-23）
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | `archives/q/qtbase/manifest.yaml` homepage 指向 Qt5 | 改为 `https://code.qt.io/qt/qtbase.git` |
+| 2 | 两个 manifest.yaml 中 state/status 误标 `built` | 改为 `pending`（待 CI 验证） |
+| 3 | `test_package/conanfile.py` 使用不存在的 `self.test_build_folder` | 改为 `self.cpp.build.bindirs[0]`（Conan 2.x 标准写法） |
+| 4 | 版本号 `6.11.1` 与 6.12 分支源码不匹配（R37） | **方案 A**：改版本号为 `6.12.0-pre`，目录从 `6.11.1/` 迁移至 `6.12.0-pre/` |
+| 5 | `ShaderTools` 不属于 qtbase（独立 qtshadertools 仓库） | 从 components 中移除 |
+| 6 | `EglFSDeviceIntegration` 硬声明致链接失败 | 改为可选，与 `with_opengl` option 关联 |
+| 7 | `ohos_sdk` fallback 硬编码 macOS 路径 | 删除 fallback，缺失时抛 `ConanInvalidConfiguration` |
+| 8 | `git://` 协议无加密（MITM 风险） | conandata.yml + notes.md 中全部改为 `https://` |
+| 9 | conandata.yml 未锁定 commit（不可重现构建） | 添加 `commit: 4cd34f389333c9a69815980cf4c00c205d89adaa`，`source()` 中执行 git checkout |
+| 10 | `Qt4Gui` 拼写错误 | 改为 `Qt6Gui`（上一轮已修复） |
+
+**结论**：所有代码级问题已修复。完整 `conan create` 编译验证需在 CI worker（预置 DevEco SDK + ohos-additional-packages）上执行。
 
 ### 版本号策略（R37）
 
-引用赛事预构建 6.11.1 → 版本号 6.11.1。若后续赛事升级 prebuilt 到 6.11.2/6.12.x，新增版本子目录。
+使用实际源码版本 `6.12.0-pre`（来自 Qt 6.12 开发分支）。若后续 CI 验证后推送正式 6.12.0 release，版本号改为 `6.12.0` 并锁定对应 tag。

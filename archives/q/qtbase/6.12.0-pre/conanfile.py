@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe — qtbase 6.11.1 (Qt6 qtbase，鸿蒙 aarch64 源码编译).
+"""Conan recipe — qtbase 6.12.0-pre (Qt6 qtbase，鸿蒙 aarch64 源码编译).
 
 R39 合规：源码指 Qt 官方 git 镜像 code.qt.io/qt/qtbase.git 6.12 分支。
   Qt 6.11.1 官方 release tarball 零 OHOS/HarmonyOS 平台支持（实测），
   Qt6 开发分支 6.12 真含 mkspecs/ohos-clang + cmake/QtAutoDetectHelpers.cmake qt_auto_detect_ohos()，
-  故切 6.12 分支源（R39 合规：Qt 官方 git 镜像）。
+  故切 6.12 分支源（R39 合规：Qt 官方 git 镜像）。版本号 6.12.0-pre 标明此预发布特性。
 构建系统：Qt6 CMake（qt-cmake / qt-configure-module）
 平台：OHOS aarch64（API Level 23+, HarmonyOS 6.1.0+）
 依赖：DevEco Studio SDK + ohos-additional-packages（CI 提供，详见 Qt 官方 wiki
@@ -18,13 +18,14 @@ import os
 import subprocess
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, cmake_layout
 
 
 class QtBaseConan(ConanFile):
     name = "qtbase"
-    version = "6.11.1"
+    version = "6.12.0-pre"
     description = "Qt6 qtbase 鸿蒙 aarch64 源码编译（Core/Gui/Widgets/Network/OpenGL/Xml/Concurrent/Sql/Test 等）"
     license = "LGPL-3.0-only OR GPL-3.0-only OR Qt-Commercial-3.1"
     homepage = "https://code.qt.io/qt/qtbase.git"
@@ -82,6 +83,13 @@ class QtBaseConan(ConanFile):
             check=True,
             env=os.environ,
         )
+        # 锁定 commit hash 保证可重现构建（R38 可重现性要求）
+        if "commit" in scm:
+            subprocess.run(
+                [git_bin, "-C", self.source_folder, "checkout", scm["commit"]],
+                check=True,
+                env=os.environ,
+            )
 
     def build(self):
         apply_conandata_patches(self)
@@ -97,9 +105,14 @@ class QtBaseConan(ConanFile):
         # Qt 官方 wiki 明令 -ohos-sdk + -DCMAKE_FIND_ROOT_PATH 两变量：
         #   -ohos-sdk /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/
         #   -DCMAKE_FIND_ROOT_PATH=~/.local/opt/ohos/additional-packages
-        # CI worker 预置 DEV_ECO_SDK_DIR + OHOS_ADDITIONAL_PACKAGES_DIR 环境变量（鸿蒙赛事标准）
-        ohos_sdk = os.environ.get("DEV_ECO_SDK_DIR", "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/")
-        additional_pkgs = os.environ.get("OHOS_ADDITIONAL_PACKAGES_DIR", os.path.expanduser("~/.local/opt/ohos/additional-packages"))
+        # CI worker 必须预置 DEV_ECO_SDK_DIR + OHOS_ADDITIONAL_PACKAGES_DIR 环境变量
+        ohos_sdk = os.environ.get("DEV_ECO_SDK_DIR")
+        additional_pkgs = os.environ.get("OHOS_ADDITIONAL_PACKAGES_DIR")
+        if not ohos_sdk or not additional_pkgs:
+            raise ConanInvalidConfiguration(
+                "qtbase OHOS build requires DEV_ECO_SDK_DIR and OHOS_ADDITIONAL_PACKAGES_DIR "
+                "environment variables. See https://wiki.qt.io/Building_Qt6_for_HarmonyOS"
+            )
         cmake.configure(variables={
             "QT_WITH_GUI": "ON" if self.options.with_gui else "OFF",
             "QT_WITH_WIDGETS": "ON" if self.options.with_widgets else "OFF",
@@ -145,6 +158,7 @@ class QtBaseConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
 
         # 各组件声明（按 Qt6 qtbase 上游模块边界）
+        # ShaderTools 属于独立的 qtshadertools 仓库，不由 qtbase 提供
         components = {
             "Core":            {"libs": ["Qt6Core"]},
             "Gui":             {"libs": ["Qt6Gui"]},
@@ -157,9 +171,13 @@ class QtBaseConan(ConanFile):
             "Sql":             {"libs": ["Qt6Sql"]},
             "Test":            {"libs": ["Qt6Test"]},
             "Core5Compat":     {"libs": ["Qt6Core5Compat"]},
-            "ShaderTools":     {"libs": ["Qt6ShaderTools"]},
-            "EglFSDeviceIntegration": {"libs": ["Qt6EglFSDeviceIntegration"]},
         }
+        # EglFSDeviceIntegration 仅在 eglfs 平台配置下构建，设为可选
+        if self.options.get_safe("with_opengl"):
+            comp = self.cpp_info.components["EglFSDeviceIntegration"]
+            comp.libs = ["Qt6EglFSDeviceIntegration"]
+            comp.set_property("cmake_file", "lib/cmake/Qt6EglFSDeviceIntegration/Qt6EglFSDeviceIntegrationConfig.cmake")
+            comp.set_property("cmake_target_name", "Qt6::EglFSDeviceIntegration")
         for comp_name, comp_info in components.items():
             comp = self.cpp_info.components[comp_name]
             comp.libs = comp_info["libs"]
