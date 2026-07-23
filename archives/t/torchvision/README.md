@@ -16,4 +16,4 @@ This archive provides the torchvision C++ extension library (`libtorchvision.so`
 
 ## Versions
 
-- [0.28.0](0.28.0/) — Built against PyTorch 2.9.0 (CPU-only)
+- [0.28.0](0.28.0/) — Failed pending libtorch 2.9.0 Conan dependency availability

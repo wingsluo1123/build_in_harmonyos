@@ -86,10 +86,10 @@ cmake .. \
 - CMake config: share/cmake/TorchVision/
 
 ## 状态
-- 编译: partial, only completed in manual validation after preparing libtorch 2.9.0
+- 编译: failed, libtorch 2.9.0 is not yet available as a Conan dependency for validation
 - 验证: waiting for full Conan recipe validation after libtorch 2.9.0 is available in the Conan artifact registry
-- Current limitation: libtorch 2.9.0 is not available as a Conan dependency yet, so this recipe must not be marked built or published
+- Current limitation: libtorch 2.9.0 is not available as a Conan dependency yet, so this recipe remains failed until the dependency is available and validation succeeds
 ---
 
 **编译结束**: 2026-07-16 15:26
-**最终状态**: partial
+**最终状态**: failed
