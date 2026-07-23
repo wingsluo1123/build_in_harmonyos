@@ -70,7 +70,7 @@ afl-fuzz++5.02c
 
 ## 测试
 - AFL++ 上游测试框架 (test/test-all.sh) 需要 Docker 环境，不适用于 CI L1
-- test_package 验证: afl-fuzz --version, afl-showmap --help, afl-cc 存在性
+- test_package 验证: afl-fuzz --version, afl-cc --version (含存在性检查)
 ---
 
 **编译结束**: 2026-07-22 18:52

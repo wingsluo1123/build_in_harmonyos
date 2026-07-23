@@ -5,12 +5,11 @@ This is the L1 test in the five-level test system.
 CI runs this automatically via `conan create` (which invokes test_package).
 
 R34: The test must substantively depend on the tested package.
-We verify afl-fuzz --version and afl-showmap functionality.
+We verify afl-fuzz --version and afl-cc --version.
 """
 import os
 
 from conan import ConanFile
-from conan.tools.build import can_run
 
 
 class AflplusplusTestConan(ConanFile):
