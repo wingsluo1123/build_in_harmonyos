@@ -39,6 +39,7 @@ class CjsonConan(ConanFile):
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.variables["ENABLE_CJSON_TEST"] = "OFF"
+        tc.variables["ENABLE_CJSON_UTILS"] = "OFF"
         tc.generate()
 
     def build(self):

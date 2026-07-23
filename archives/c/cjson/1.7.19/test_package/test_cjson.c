@@ -26,8 +26,8 @@ int main(void)
         return 1;
     }
 
-    cJSON_Delete(json);
     printf("cJSON test PASSED: parsed '%s' successfully, name='%s'\n",
            json_str, name->valuestring);
+    cJSON_Delete(json);
     return 0;
 }
