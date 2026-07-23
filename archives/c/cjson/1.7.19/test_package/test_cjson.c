@@ -19,7 +19,15 @@ int main(void)
         return 1;
     }
 
+    if (strcmp(name->valuestring, "cjson") != 0) {
+        fprintf(stderr, "Unexpected value for 'name': expected 'cjson', got '%s'\n",
+                name->valuestring);
+        cJSON_Delete(json);
+        return 1;
+    }
+
     cJSON_Delete(json);
-    printf("cJSON test PASSED: parsed '%s' successfully\n", json_str);
+    printf("cJSON test PASSED: parsed '%s' successfully, name='%s'\n",
+           json_str, name->valuestring);
     return 0;
 }

@@ -1,3 +1,8 @@
+"""
+Conan recipe for cJSON v1.7.19 — OHOS (OpenHarmony) aarch64 adaptation.
+
+Portability patches: cmake_minimum_required 3.0→3.5, C standard c89→c99.
+"""
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -9,7 +14,7 @@ class CjsonConan(ConanFile):
     description = "Ultralightweight JSON parser in ANSI C"
     license = "MIT"
     homepage = "https://github.com/DaveGamble/cJSON"
-    url = ""
+    url = "https://github.com/DaveGamble/cJSON"
 
     package_type = "library"
 
