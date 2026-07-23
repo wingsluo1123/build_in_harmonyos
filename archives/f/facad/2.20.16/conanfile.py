@@ -9,6 +9,7 @@ Pure C implementation with no external dependencies (only libc and libm).
 Builds an executable binary via meson + ninja.
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -43,13 +44,16 @@ class FacadConan(ConanFile):
         tc = MesonToolchain(self)
         tc.generate()
         # Inject ar into meson native file (profile doesn't set tools.build:archiver)
+        ar_path = shutil.which("ar")
+        if not ar_path:
+            raise RuntimeError("ar not found in PATH")
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         with open(native_file) as f:
             content = f.read()
         old_content = content
         content = content.replace(
             "[binaries]\nc =",
-            "[binaries]\nar = '/data/service/hnp/bin/ar'\nc ="
+            f"[binaries]\nar = '{ar_path}'\nc ="
         )
         if content == old_content:
             raise RuntimeError("Failed to inject ar into meson native file "

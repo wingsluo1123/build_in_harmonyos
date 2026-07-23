@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: meson
-- 编译日期: 2026-06-13
+- 编译日期: 2026-07-22
 - 编译器: clang 15.0.4 / clang++
 - 目标平台: OpenHarmony aarch64 (musl libc)
 - 状态: published

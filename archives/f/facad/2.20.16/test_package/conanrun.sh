@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/workspace/build_in_harmonyos/archives/f/facad/2.20.16/test_package/conanrunenv-release-armv8.sh"
