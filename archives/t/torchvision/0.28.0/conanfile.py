@@ -55,7 +55,7 @@ class TorchvisionConan(ConanFile):
         tc.variables["WITH_WEBP"] = self.options.with_webp
         if str(self.settings.os) == "OHOS":
             tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
-            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = str(self.settings.arch)
+            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
             tc.variables["CMAKE_CROSSCOMPILING"] = "OFF"
         tc.variables["CMAKE_LINK_WHAT_YOU_USE"] = "OFF"
         tc.generate()
