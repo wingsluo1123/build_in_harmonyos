@@ -27,10 +27,6 @@ class McppConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
-    def requirements(self):
-        # mcpp has no external dependencies
-        pass
-
     def layout(self):
         basic_layout(self)
 

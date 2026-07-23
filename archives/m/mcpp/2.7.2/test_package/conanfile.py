@@ -5,6 +5,7 @@ L1 test: verify the mcpp binary can preprocess C source files.
 """
 import os
 from conan import ConanFile
+from conan.tools.build import can_run
 
 
 class McppTestConan(ConanFile):
@@ -15,6 +16,8 @@ class McppTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
+        if not can_run(self):
+            return
         # Get the dependency's bindir
         dep = self.dependencies["mcpp"]
         bin_path = os.path.join(dep.package_folder, "bin", "mcpp")
