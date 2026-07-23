@@ -2,7 +2,7 @@
  * Minimal BLAS/LAPACK stub for FAISS on HarmonyOS.
  * BLAS: sgemm_, dgemm_, sgemv_ (functional implementations)
  * LAPACK: sgeqrf_, sorgqr_, sgetrf_, sgetri_, sgesvd_, sgelsd_,
- *         dgetrf_, dgetri_, dgesvd_ (stubs that set info=0)
+ *         dgetrf_, dgetri_, dgesvd_ (stubs that set info=-1 = not implemented)
  */
 #include <string.h>
 #include <stddef.h>
@@ -125,45 +125,46 @@ void sgemv_(const char *trans, const int *pm, const int *pn,
     }
 }
 
-/* ===== LAPACK stubs (no-op, set info=0) ===== */
+/* ===== LAPACK stubs (no-op, set info=-1 to signal not implemented) ===== */
 /* These are used by FAISS matrix_qr/matrix_inverse which are not
-   called in the IndexFlat test path. They exist for link resolution. */
+   called in the IndexFlat test path. They exist for link resolution.
+   info=-1 signals "argument error / not available" per LAPACK convention. */
 
 void sgeqrf_(const int *m, const int *n, float *a, const int *lda,
              float *tau, float *work, const int *lwork, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void sorgqr_(const int *m, const int *n, const int *k, float *a,
              const int *lda, const float *tau, float *work,
              const int *lwork, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void sgetrf_(const int *m, const int *n, float *a, const int *lda,
              int *ipiv, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void sgetri_(const int *n, float *a, const int *lda, const int *ipiv,
              float *work, const int *lwork, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void dgetrf_(const int *m, const int *n, double *a, const int *lda,
              int *ipiv, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void dgetri_(const int *n, double *a, const int *lda, const int *ipiv,
              double *work, const int *lwork, int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void sgesvd_(const char *jobu, const char *jobvt, const int *m, const int *n,
@@ -171,7 +172,7 @@ void sgesvd_(const char *jobu, const char *jobvt, const int *m, const int *n,
              float *vt, const int *ldvt, float *work, const int *lwork,
              int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void dgesvd_(const char *jobu, const char *jobvt, const int *m, const int *n,
@@ -179,7 +180,7 @@ void dgesvd_(const char *jobu, const char *jobvt, const int *m, const int *n,
              double *vt, const int *ldvt, double *work, const int *lwork,
              int *info)
 {
-    *info = 0;
+    *info = -1;
 }
 
 void sgelsd_(const int *m, const int *n, const int *nrhs, float *a,
@@ -187,5 +188,5 @@ void sgelsd_(const int *m, const int *n, const int *nrhs, float *a,
              const float *rcond, int *rank, float *work, const int *lwork,
              int *iwork, int *info)
 {
-    *info = 0;
+    *info = -1;
 }

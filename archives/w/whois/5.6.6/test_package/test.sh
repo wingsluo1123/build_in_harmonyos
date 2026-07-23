@@ -1,7 +1,7 @@
-#!/data/service/hnp/bin/bash
+#!/usr/bin/env bash
 # test.sh — whois 5.6.6 smoke test
 # R34: Exercise the actual whois binary
-set -e
+set -euo pipefail
 
 WHOIS_BIN="${WHOIS_BIN:-whois}"
 

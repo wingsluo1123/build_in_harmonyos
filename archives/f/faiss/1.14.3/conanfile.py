@@ -44,13 +44,30 @@ class FaissConan(ConanFile):
         tc.variables["LAPACK_LIBRARIES"] = stub_lib
         tc.generate()
 
+    def _get_toolchain_tools(self):
+        """R33: Get compiler/archiver from Conan conf, not hardcoded paths."""
+        comp_execs = self.conf.get("tools.build:compiler_executables",
+                                   default={}, check_type=dict) or {}
+        cc = comp_execs.get("c", "clang")
+        ar = comp_execs.get("ar")
+        if not ar:
+            cc_dir = os.path.dirname(cc)
+            if cc_dir:
+                ar_cand = os.path.join(cc_dir, "llvm-ar")
+                if os.path.isfile(ar_cand):
+                    ar = ar_cand
+        if not ar:
+            ar = "llvm-ar"
+        return cc, ar
+
     def build(self):
         # Build BLAS stub (OpenBLAS not available on OHOS)
         stub_src = os.path.join(self.source_folder, "blas_stub.c")
         if not os.path.exists(stub_src):
             stub_src = os.path.join(self.recipe_folder, "patches", "blas_stub.c")
-        self.run(f"clang -c -O2 {stub_src} -o {self.build_folder}/blas_stub.o")
-        self.run(f"llvm-ar rcs {self.build_folder}/libblas_stub.a {self.build_folder}/blas_stub.o")
+        cc, ar = self._get_toolchain_tools()
+        self.run(f'"{cc}" -c -O2 "{stub_src}" -o "{self.build_folder}/blas_stub.o"')
+        self.run(f'"{ar}" rcs "{self.build_folder}/libblas_stub.a" "{self.build_folder}/blas_stub.o"')
 
         cmake = CMake(self)
         cmake.configure()
@@ -59,7 +76,7 @@ class FaissConan(ConanFile):
         # Merge BLAS stub into libfaiss.a so all symbols are in one library
         libfaiss = os.path.join(self.build_folder, "faiss", "libfaiss.a")
         if os.path.exists(libfaiss):
-            self.run(f"llvm-ar rs {libfaiss} {self.build_folder}/blas_stub.o")
+            self.run(f'"{ar}" rs "{libfaiss}" "{self.build_folder}/blas_stub.o"')
 
     def package(self):
         cmake = CMake(self)
@@ -75,8 +92,13 @@ class FaissConan(ConanFile):
         self.cpp_info.system_libs = ["omp"]
         self.cpp_info.set_property("cmake_file_name", "faiss")
         self.cpp_info.set_property("cmake_target_name", "faiss::faiss")
-        # OpenMP runtime library path
-        import glob
-        omp_dirs = glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/llvm/lib/aarch64-linux-ohos")
-        if omp_dirs:
-            self.runenv_info.append_path("LD_LIBRARY_PATH", omp_dirs[0])
+        # OpenMP runtime: derive libomp.so path from Conan conf compiler path
+        comp_execs = self.conf.get("tools.build:compiler_executables",
+                                   default={}, check_type=dict) or {}
+        cc = comp_execs.get("c", "")
+        if cc:
+            cc_bindir = os.path.dirname(os.path.realpath(cc))
+            omp_dir = os.path.normpath(
+                os.path.join(cc_bindir, "..", "lib", "aarch64-linux-ohos"))
+            if os.path.isdir(omp_dir):
+                self.runenv_info.append_path("LD_LIBRARY_PATH", omp_dir)

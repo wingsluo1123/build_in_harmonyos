@@ -23,5 +23,5 @@ class WhoisTestConan(ConanFile):
     def test(self):
         whois_bin = os.path.join(self.dependencies["whois"].package_folder, "bin", "whois")
         test_script = os.path.join(self.source_folder, "test.sh")
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL", "bash")
         self.run(f'WHOIS_BIN="{whois_bin}" {bash} "{test_script}"', env="conanrun")
