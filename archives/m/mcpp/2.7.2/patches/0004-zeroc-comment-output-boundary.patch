@@ -1,0 +1,71 @@
+--- a/src/main.c	2008-11-05 16:34:46.000000000 +0800
++++ b/src/main.c	2026-07-23 14:13:22.582862812 +0800
+@@ -326,6 +326,8 @@
+             = FALSE;
+     option_flags.trig = TRIGRAPHS_INIT;
+     option_flags.dig = DIGRAPHS_INIT;
++    sh_file = NULL;
++    sh_line = 0;
+ }
+ 
+ int     mcpp_lib_main
+--- a/src/support.c	2008-06-10 16:32:33.000000000 +0800
++++ b/src/support.c	2026-07-23 14:13:22.642861718 +0800
+@@ -188,7 +188,7 @@
+     size_t      length
+ )
+ {
+-    if (mem_buf_p->bytes_avail < length) {  /* Need to allocate more memory */
++    if (mem_buf_p->bytes_avail < length + 1) {  /* Need to allocate more memory */
+         size_t size = MAX( BUF_INCR_SIZE, length);
+ 
+         if (mem_buf_p->buffer == NULL) {            /* 1st append   */
+@@ -1722,6 +1722,8 @@
+                     sp -= 2;
+                     while (*sp != '\n')     /* Until end of line    */
+                         mcpp_fputc( *sp++, OUT);
++                    mcpp_fputc( '\n', OUT);
++                    wrong_line = TRUE;
+                 }
+                 goto  end_line;
+             default:                        /* Not a comment        */
+--- a/src/internal.H	2008-08-27 21:01:16.000000000 +0800
++++ b/src/internal.H	2026-07-23 14:13:22.666860155 +0800
+@@ -390,6 +390,8 @@
+ extern char     identifier[];       /* Lastly scanned name          */
+ extern IFINFO   ifstack[];          /* Information of #if nesting   */
+ extern char     work_buf[];
++extern FILEINFO * sh_file;
++extern int      sh_line;
+         /* Temporary buffer for directive line and macro expansion  */
+ 
+ /* main.c   */
+@@ -557,6 +559,6 @@
+ #endif
+ #endif
+ 
+-#if HOST_HAVE_STPCPY
++#if HOST_HAVE_STPCPY && !defined(stpcpy)
+ extern char *   stpcpy( char * dest, const char * src);
+ #endif
+--- a/src/system.c	2008-11-26 17:53:51.000000000 +0800
++++ b/src/system.c	2026-07-23 14:13:22.774860312 +0800
+@@ -3858,6 +3858,9 @@
+ }
+ #endif
+ 
++FILEINFO*       sh_file;
++int             sh_line;
++
+ void    sharp(
+     FILEINFO *  sharp_file,
+     int         flag        /* Flag to append to the line for GCC   */
+@@ -3868,8 +3871,6 @@
+  * else (i.e. 'sharp_file' is NULL) 'infile'.
+  */
+ {
+-    static FILEINFO *   sh_file;
+-    static int  sh_line;
+     FILEINFO *  file;
+     int         line;
+ 
