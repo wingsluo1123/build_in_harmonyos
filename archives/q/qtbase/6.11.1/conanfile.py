@@ -147,7 +147,7 @@ class QtBaseConan(ConanFile):
         # 各组件声明（按 Qt6 qtbase 上游模块边界）
         components = {
             "Core":            {"libs": ["Qt6Core"]},
-            "Gui":             {"libs": ["Qt4Gui"]},
+            "Gui":             {"libs": ["Qt6Gui"]},
             "Widgets":         {"libs": ["Qt6Widgets"]},
             "Network":         {"libs": ["Qt6Network"]},
             "OpenGL":          {"libs": ["Qt6OpenGL"]},

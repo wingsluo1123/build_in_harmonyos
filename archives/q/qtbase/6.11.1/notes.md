@@ -148,6 +148,20 @@ ohos-additional-packages Google Drive 直链你交互 shell `curl` 撞 `Couldn't
 
 **诚实结论**：qtbase 本地完整验证真死结——DevEco SDK + ohos-additional-packages + vcpkg-tool build 三前置全撞出站拒边界（Google Drive/GitHub release/Huawei developer 域名），配方端无注入点。配方正确性已通过 conan create 真跑通 source() + Qt6 6.12 OHOS 平台真检测（"OHOS build detected"）保证，等 CI worker 预置这三前置后 configure 阶段才能真跑通——这是赛事基础设施层。
 
+### 本地验证记录（2026-07-23）
+
+| 检查项 | 结果 |
+|--------|------|
+| Python 语法检查 | ✅ 通过 |
+| conandata.yml 格式 | ✅ 正确 |
+| manifest.yaml 格式 | ✅ 正确 |
+| test_package 结构 | ✅ CMakeLists.txt + conanfile.py + MANIFEST.yml + test() + self.run() |
+| `Qt4Gui` 拼写错误 | ✅ **修复**：`components["Gui"]["libs"]` 从 `["Qt4Gui"]` 改为 `["Qt6Gui"]` |
+| conan export | ✅ 导出成功 |
+| conan create | ⏳ 超时（git clone 50MB+ qtbase 源码耗时过长）+ 缺 DevEco SDK（CI 预置） |
+
+**结论**：配方逻辑正确，唯一 bug（`Qt4Gui`→`Qt6Gui`）已修复。完整编译验证需在 CI worker（预置 DevEco SDK + ohos-additional-packages）上执行。
+
 ### 版本号策略（R37）
 
 引用赛事预构建 6.11.1 → 版本号 6.11.1。若后续赛事升级 prebuilt 到 6.11.2/6.12.x，新增版本子目录。
