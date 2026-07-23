@@ -4,6 +4,7 @@
 Builds the torchvision C++ extension library against libtorch.
 """
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.layout import basic_layout
@@ -37,9 +38,10 @@ class TorchvisionConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # libtorch must be published to ohpcd first (R36)
-        # self.requires("libtorch/2.9.0")
-        pass
+        raise ConanInvalidConfiguration(
+            "torchvision/0.28.0 requires libtorch/2.9.0, which is not yet "
+            "available in the Conan artifact registry"
+        )
 
     def layout(self):
         cmake_layout(self)
@@ -70,4 +72,4 @@ class TorchvisionConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["torchvision"]
-        self.cpp_info.requires = ["torch::torch"]  # depends on libtorch
+        self.cpp_info.requires = []
