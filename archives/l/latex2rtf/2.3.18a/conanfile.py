@@ -18,9 +18,8 @@ class Latex2RtfConan(ConanFile):
     description = "Converts LaTeX documents to RTF format"
     license = "GPL-2.0-or-later"
     homepage = "https://latex2rtf.sourceforge.net/"
-    url = ""  # CI fills this
-
     settings = "os", "compiler", "build_type", "arch"
+    package_type = "application"
 
     def validate(self):
         # R32: OHOS platform compatibility

@@ -2,10 +2,10 @@
 
 ## 编译环境
 - 构建系统: makefile（注意：源码包无 configure 脚本，为纯 Makefile 项目，非 autotools）
-- 编译日期: 2026-06-12
+- 编译日期: 2026-07-16
 - 编译器: clang 15.0.4 / clang++
 - 目标平台: OpenHarmony aarch64 (musl libc)
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -99,10 +99,8 @@ $ ls -la /tmp/test-para.rtf
 2. 源码 test/ 目录含 136 个 .tex 测试文件，可用于功能验证
 3. 配置文件安装到 `~/usr/local/share/latex2rtf/cfg/`（47 个 .cfg 文件），CFGDIR 硬编码在二进制中
 4. G0 干净构建验证通过（从原始 tarball 解压编译无需补丁）
-5. latex2png 为 bash 脚本包装器，依赖 latex 和 dvips 等外部工具---
+5. latex2png 为 bash 脚本包装器，依赖 latex 和 dvips 等外部工具
 
-**编译结束**: 2026-07-16 00:52
-**最终状态**: built
 ---
 
 **编译结束**: 2026-07-16 01:48
