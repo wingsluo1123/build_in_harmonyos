@@ -21,7 +21,6 @@
 - OHOS 平台 cmake 报 "System is unknown"
 - Set `CMAKE_SYSTEM_NAME=Linux` only when `settings.os == "OHOS"`
 - Set `CMAKE_SYSTEM_PROCESSOR=aarch64` for the OHOS armv8 target; this override is guarded to OHOS only
-- 必须同时设置 `CMAKE_CROSSCOMPILING=OFF` (否则 sleef 的 add_host_executable 走 IMPORTED 分支)
 
 ### 2. CMAKE_LINK_WHAT_YOU_USE 禁用
 - PyTorch CMakeLists.txt 第79行硬编码 `CMAKE_LINK_WHAT_YOU_USE TRUE`
