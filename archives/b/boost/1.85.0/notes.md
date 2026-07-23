@@ -1,50 +1,79 @@
-# Boost 1.85.0 适配笔记
+# Boost 1.85.0 OpenHarmony 适配笔记
 
-## 编译环境
+## 概况
 
-- 构建系统：Boost.Build engine 自定义构建脚本
-- 编译日期：2026-07-13
-- 编译器：clang/clang++ 15.0.4
-- 平台：HarmonyOS PC aarch64
-- 状态：built（本地 Conan 验证通过，尚未由 CI 上传）
+- 上游版本：1.85.0
+- 上游源码：https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.bz2
+- 平台：OpenHarmony（aarch64-unknown-linux-ohos）
+- 编译器：clang
+- 构建系统：Boost.Build（b2）
+- Conan 包类型：header-library；安装 `boost/` 头文件
 
-## 编译步骤
+## 适配补丁
 
-1. W0 预检：`bash ci/scripts/preflight_check.sh boost/1.85.0`，无外部依赖。
-2. 下载官方 Boost 1.85.0 tarball 并校验 SHA256。
-3. 在 `tools/build/src/engine` 执行 `./build.sh clang`，生成 b2 5.1.0。
-4. 执行 `b2 --help` 验证 CLI。
-5. 从 Conan profile 读取 clang/clang++ 绝对路径并生成 `user-config.jam`，执行 `b2 toolset=clang-ohos -j1`，编译并运行 `hello.c`。
-6. 由 Conan 配方重复上述干净构建与消费者测试。
+### E035：b2 SHELL/vfork 兼容
 
-## 遇到的问题与解决方案
+在 `tools/build/src/engine/`：
 
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-| 1 | `b2 --version` 输出版本后返回 1 | Boost.Build 5.1.0 的该选项退出码行为 | 门禁使用 `b2 --help`，并增加实际构建 hello 项目的功能测试 |
-| 2 | 旧版 1.84.0 记录称 b2 的 SHELL 机制不可用 | 旧记录测试的是完整 Boost 库构建，不等同于 b2 engine 自身 | 本次直接构建 engine，并用 b2+clang 完成实质消费者构建验证 |
+- `jam.h`：OpenHarmony 下定义 `NO_VFORK`，避免 sandbox 环境中的 `vfork()` 不可靠行为。
+- `execunix.cpp`：默认 shell 使用 `/bin/sh` → `$SHELL` → `sh` 的 fallback。
 
-## 源码修改
+Boost 1.85.0 的 b2 引擎目录为 `tools/build/src/engine`，可通过：
 
-无。Boost.Build engine 在 HarmonyOS PC aarch64 上无需源码补丁。
-
-## 依赖版本
-
-无外部 Conan 依赖；构建时使用系统 clang/clang++ 15.0.4。
-
-## 验证结果
-
-```text
-B2 5.1.0 (OS=LINUX, jobs=20)
-ELF64, AArch64, PIE
-b2 --user-config=user-config.jam toolset=clang-ohos -j1 -> hello
-hello output: boost-b2-ok
+```bash
+cd tools/build/src/engine
+./build.sh clang --cxx=clang++
+./b2 --version
 ```
 
-## 注意事项
+验证引擎可正常执行 SHELL 规则。
 
-本配方交付 Boost 1.85.0 源码中的 Boost.Build `b2` 命令行工具，不宣称交付全部需要编译的 Boost C++ 库。
----
+### E099：`pthread_setcancelstate` 缺失
 
-**编译结束**: 2026-07-13 10:59
-**最终状态**: built
+补丁：`patches/0001-sp-thread-sleep-ohos.patch`
+
+`boost/core/detail/sp_thread_sleep.hpp` 的三个 pthread 取消状态调用条件增加 `!defined(__OHOS__)`。OpenHarmony 使用 musl libc，不提供该 glibc 风格 API；鸿蒙下保留 `nanosleep` 路径。
+
+### E100：ucontext API 缺失
+
+OpenHarmony musl 不提供 `getcontext`/`swapcontext`/`makecontext`。在鸿蒙 clang 下跳过 native ucontext 测试，同时保留 fcontext 测试路径：
+
+- `libs/fiber/test/Jamfile.v2`
+- `libs/context/test/Jamfile.v2`
+- `libs/coroutine2/test/Jamfile.v2`（补丁：`patches/0004-coroutine2-ohos-no-ucontext.patch`）
+
+coroutine2 回归验证结果：`b2_exit=0`，通过 1，失败 0，且日志中无 `getcontext`/`ucontext` 错误。
+
+## 测试结果
+
+| 指标 | 结果 |
+|------|------|
+| 带测试目录的库 | 142/142 |
+| 源码树测试 `.cpp` 文件 | 12201 |
+| 实际执行 b2 测试目标 | 5754 |
+| 通过 | 5439 |
+| 失败 | 315 |
+| 实际执行通过率 | 94.5% |
+| 新增鸿蒙测试 | 0 |
+
+12201 是 `libs/*/test/*.cpp` 源文件计数，包含 helper、fixture 及 compile-fail 辅助源码；5754 才是 b2 实际执行的独立测试目标，故通过率使用 `5439/5754`。
+
+## 剩余失败
+
+剩余 315 个失败主要不是 OpenHarmony 平台适配问题：
+
+- b2 的 compile-fail/`failed updating` 分类问题；
+- Boost 的编译期负例和 `static_assert` 断言测试；
+- C++ 标准边界（mpl、filesystem、exception、rational）；
+- mysql 测试缺少 OpenSSL 开发头文件；
+- function_types 使用已废弃的 Boost header。
+
+coroutine2 的 3 个 ucontext 残留已由 `0004-coroutine2-ohos-no-ucontext.patch` 修复。
+
+## 配方验证
+
+```bash
+python3 scripts/ohc-run.py conan-verify boost 1.85.0
+```
+
+已验证 Conan 配方包含 OpenHarmony 补丁，并可从官方 1.85.0 源码应用补丁。

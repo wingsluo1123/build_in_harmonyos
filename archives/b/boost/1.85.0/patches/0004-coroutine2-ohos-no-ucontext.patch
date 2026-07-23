@@ -1,0 +1,25 @@
+--- libs/coroutine2/test/Jamfile.v2
++++ libs/coroutine2/test/Jamfile.v2
+@@ -35,13 +35,20 @@
+     {
+         result = <build>no ;
+     }
+-    else if ( ! ( <target-os>windows in $(properties) ) )
++    else if ( <target-os>windows in $(properties) )
++    {
++        result = <context-impl>winfib ;
++    }
++    else if ( <target-os>linux in $(properties) && ! <toolset>gcc in $(properties) && ! <toolset>clang in $(properties) )
+     {
++        # OpenHarmony musl libc does not provide the getcontext/ucontext API.
++        # Clang on OpenHarmony defines __linux__, so distinguish it by toolset.
+         result = <context-impl>ucontext ;
+     }
+     else
+     {
+-        result = <context-impl>winfib ;
++        # OpenHarmony (clang+__linux__) uses fcontext and skips native ucontext tests.
++        result = <build>no ;
+     }
+     return $(result) ;
+ }

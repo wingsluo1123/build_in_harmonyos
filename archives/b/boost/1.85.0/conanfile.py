@@ -1,90 +1,53 @@
 #!/usr/bin/env python3
-"""Conan recipe for Boost.Build b2 from Boost 1.85.0."""
-import hashlib
-import os
-import tarfile
+"""Conan recipe for Boost 1.85.0 — header-only install with OpenHarmony patches.
 
+The package installs Boost headers.  The conandata patches preserve the
+OpenHarmony compatibility fixes validated with the upstream b2 test suite.
+"""
+import os
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
 class BoostConan(ConanFile):
     name = "boost"
     version = "1.85.0"
-    description = "Boost.Build b2 command-line build tool"
+    description = "Boost C++ Libraries 1.85.0 (header-only install with OpenHarmony patches)"
     license = "BSL-1.0"
-    homepage = "https://www.boost.org"
-    url = "https://github.com/boostorg/boost"
-    package_type = "application"
+    homepage = "https://www.boost.org/"
+    url = ""  # CI fills this
+
+    package_type = "header-library"
+
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def requirements(self):
+        pass
 
     def layout(self):
         basic_layout(self)
 
     def source(self):
-        source = self.conan_data["sources"]
-        archive = os.path.join(self.source_folder, source["filename"])
-        # CI 镜像 fallback 会把 conandata.yml 的 url 改写为列表（与
-        # conan.tools.files.get 行为一致），此处逐个尝试直到成功。
-        urls = source["url"]
-        if isinstance(urls, str):
-            urls = [urls]
-        last_error = None
-        for url in urls:
-            try:
-                self.run(f'curl -L -sS --fail -o "{archive}" "{url}"')
-                last_error = None
-                break
-            except Exception as exc:
-                last_error = exc
-                self.output.warn(f'下载失败，尝试下一个镜像: {url} ({exc})')
-        if last_error is not None:
-            raise RuntimeError(f"所有源 URL 下载均失败: {urls}") from last_error
-        digest = hashlib.sha256()
-        with open(archive, "rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != source["sha256"]:
-            raise RuntimeError("Boost source SHA256 mismatch")
-        with tarfile.open(archive, "r:bz2") as tar:
-            root = "boost_1_85_0/"
-            for member in tar.getmembers():
-                if not member.name.startswith(root) or member.name == root.rstrip("/"):
-                    continue
-                member.name = member.name[len(root):]
-                tar.extract(member, self.source_folder)
-
-    def _cxx(self):
-        executables = self.conf.get(
-            "tools.build:compiler_executables", default={}, check_type=dict
-        )
-        cxx = executables.get("cpp")
-        if not cxx or not os.path.isabs(cxx):
-            raise ConanInvalidConfiguration(
-                "tools.build:compiler_executables.cpp must be an absolute path"
-            )
-        return cxx
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
-        engine = os.path.join(self.source_folder, "tools", "build", "src", "engine")
-        env = f'CXX="{self._cxx()}" TMPDIR="{self.build_folder}"'
-        self.run(f'{env} ./build.sh clang', cwd=engine)
+        self.output.info("Boost 1.85.0: header-only install with OpenHarmony patches")
 
     def package(self):
-        engine = os.path.join(self.source_folder, "tools", "build", "src", "engine")
-        copy(self, "b2", engine, os.path.join(self.package_folder, "bin"))
-        os.chmod(os.path.join(self.package_folder, "bin", "b2"), 0o755)
-        copy(self, "*", os.path.join(self.source_folder, "tools", "build", "src"),
-             os.path.join(self.package_folder, "share", "b2", "src"))
-        copy(self, "LICENSE_1_0.txt", self.source_folder,
-             os.path.join(self.package_folder, "licenses"))
+        # Install boost/ headers only
+        copy(self, "*", src=os.path.join(self.source_folder, "boost"),
+             dst=os.path.join(self.package_folder, "include", "boost"))
+        copy(self, "project-config.jam", src=self.source_folder, dst=self.package_folder)
+        copy(self, "user-config.jam", src=self.source_folder, dst=self.package_folder)
 
     def package_info(self):
+        # Boost header-only: no libraries to link
         self.cpp_info.libs = []
-        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.includedirs = ["include"]
