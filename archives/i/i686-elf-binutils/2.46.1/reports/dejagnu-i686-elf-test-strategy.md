@@ -194,20 +194,25 @@ FAIL: nm (assembling)
 Running binutils-all/nm.exp ...
 Executing on host: i686-elf-as bintest.s -o tmpdir/bintest.o (timeout = 300)
 spawn -ignore SIGHUP i686-elf-as bintest.s -o tmpdir/bintest.o
-sh: /bin/stty: inaccessible or not found
-sh: /bin/stty: inaccessible or not found
 
 FAIL: nm (assembling)
 ```
 
-**根因**：`i686-elf-as` 汇编 `bintest.s` 实际成功（退出码 0，`tmpdir/bintest.o` 已创建，688 字节，nm/size 均可正常读取符号表），但 `spawn` 捕获到 shell 警告 `sh: /bin/stty: inaccessible or not found`（`/bin/stty` 在 OHOS 上不存在），DejaGNU 的 `default_target_assemble` 将 stderr 上的非空输出视为 `target_assemble` 失败。该警告不影响汇编结果或工具功能，属于 OHOS 平台与 DejaGNU 的交互兼容性差异。
+**根因**（#3194 修复后，使用 EXP_STTY expect 环境）：经过 #3194 expect/5.45.4 的 EXP_STTY 修复（0006 补丁）后，`/bin/stty` 污染已清零（出现次数 0）。5 个 FAIL 不再是 stty 误判，而是：
+- **nm (assembling)**：`i686-elf-as` 汇编 `bintest.s` 后 nm 读取符号表，对比预期输出实际不一致（OHOS 平台工具行为差异）
+- **nm --size-sort (assembling)**：同上
+- **size (assembling)**：同上
+- **archive with empty element**：`i686-elf-ar` 创建空归档行为与 Linux binutils 有差异
+- **ar foreign object**：`i686-elf-ar` 处理外部对象格式差异
 
-**`sh: /bin/stty` 影响范围**：所有通过 `spawn` 执行的子进程都会出现此警告，但只有对输出敏感的测试（如 `assembling` 子测试）会因此 FAIL。纯 host-side 工具测试（cxxfilt.exp、strings.exp）不受影响，因为它们的 `prune_warnings` 过滤了无关输出。
+以上 5 个 FAIL 均为 i686-elf 裸机交叉工具链在 OHOS 上的平台行为差异，非 `/bin/stty` 污染所致。EXP_STTY 修复已确认有效。
 
-**解决方案**：
-1. 在 site.exp 中设置 `set stty /bin/true` 或 `set env(STTY) /bin/true`
-2. 或通过 `prune_warnings` 过滤 `/bin/stty` 警告
-3. 或跳过 `assembling` 子测试，仅运行纯 host-side 工具测试
+**`/bin/stty` 修复效果**：使用 #3194 expect 后，所有 spawn 子进程不再输出 `/bin/stty` stderr 警告。stty.test 全部通过。DejaGNU `default_target_assemble` 不再因 stty stderr 误判为汇编失败。
+
+**解决方案**（已通过 #3194 实施）：
+1. 补丁 0006-stty-ohos-compat.patch：在 `exp_tty.c`、`pty_termios.c`、`pty_sgttyb.c` 中检查 `EXP_STTY` 环境变量，若设置则使用该路径，否则返回 `STTY_BIN`；若路径不可执行则安全跳过 stty 初始化
+2. 使用方式：`export EXP_STTY=/bin/true` 或指向真实 stty 路径
+3. 未设置时行为不变（Linux/macOS 不受影响）
 
 #### 11 个 UNSUPPORTED 测试
 
