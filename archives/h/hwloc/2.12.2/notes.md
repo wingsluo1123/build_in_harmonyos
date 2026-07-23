@@ -84,19 +84,19 @@ L5 产物基线: PASS
 | 文件 | 大小 | 说明 |
 |------|------|------|
 | conanfile.py | 1.4KB | Conan 配方 (autotools, 静态库) |
-| conandata.yml | 1.2KB | 源码 + 6 个补丁声明 |
+| conandata.yml | 3.5KB | 源码 + 21 个补丁声明 |
 | test_package/test.c | 1.4KB | L1 测试 (调用 hwloc_topology_init/load/get_depth 验证 API) |
 | test_package/conanfile.py | 0.8KB | L1 测试配方 (CMake) |
 | test_package/CMakeLists.txt | 0.3KB | CMake 配置 |
 | test_package/MANIFEST.yml | 3.0KB | 上游 44 个测试声明 |
 | commands.json | 0.3KB | 命令行工具声明 (R38, 13 个 bin) |
-| patches/0001-*.patch ~ 0006-*.patch | 共 11KB | 6 个适配补丁 |
+| patches/0001-*.patch ~ 0021-*.patch | 共 27KB | 21 个适配补丁 |
 
 ## 注意事项
 
 1. **HMDFS umask 077 陷阱**：鸿蒙 HMDFS 对 `umask 077` + `mktemp -d` 创建的目录内重定向写入必拒（非间歇性 race，是必现）。所有 autotools 生成文件（configure/Makefile.in/config.guess/所有测试脚本）含 `umask 077` 都需改 `umask 022`。
-2. **鸿蒙沙箱 SIGSYS 行为**：4 个 NUMA mempolicy syscall (`set_mempolicy`/`get_mempolicy`/`migrate_pages`/`move_pages`) 在鸿蒙沙箱里直接发 SIGSYS 而非返回 ENOSYS。hwloc 需加 `#ifdef __OHOS__` 守卫提前返回 ENOSYS。
-3. **鸿蒙 sched_setaffinity 静默成功 bug**：`sched_setaffinity()` 返回 rc=0 声称成功但不实际绑定，`sched_getaffinity()` 仍返回全部 CPU。hwloc 需加 `#ifdef __OHOS__` 守卫返回 ENOSYS 避免下游误解绑定状态。
+2. **鸿蒙沙箱 SIGSYS 行为**：4 个 NUMA mempolicy syscall (`set_mempolicy`/`get_mempolicy`/`migrate_pages`/`move_pages`) 在鸿蒙沙箱里直接发 SIGSYS 而非返回 ENOSYS。应在 configure 阶段通过独立测试进程探测 syscall 能力，并用 `HWLOC_HAVE_WORKING_LINUX_MEMPOLICY` 功能宏控制调用；探测子进程收到 SIGSYS 不会终止 configure 主进程。
+3. **鸿蒙 sched_setaffinity 静默成功 bug**：`sched_setaffinity()` 返回 rc=0 声称成功但不实际绑定，`sched_getaffinity()` 仍返回全部 CPU。应在设置后立即回读并比较实际 affinity，不一致时返回 ENOSYS；相关测试通过运行时检测返回 Automake SKIP 77。
 4. **conan 必须用 OHOS 适配版**：官方 conan 2.30 不接受 `os=OHOS`。社区源提供 conan 2.29.1 适配版（需 `--no-deps` 装，依赖用官方 PyPI 装），settings.yml 需手动加 OHOS 枚举。
 5. **下游可硬依赖 hwloc/2.12.2**：libhwloc.so 库本身完全正常（`-i synthetic` 拓扑生成成功），CPU 亲和性绑定是鸿蒙沙箱限制非 hwloc 缺陷。下游 `self.requires("hwloc/2.12.2")` 能拿到完整库 + 13 个命令行工具。
 ---
