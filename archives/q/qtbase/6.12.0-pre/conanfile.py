@@ -78,12 +78,14 @@ class QtBaseConan(ConanFile):
         git_bin = shutil.which("git") or "git"
         scm = self.conan_data["sources"]
         subprocess.run(
-            [git_bin, "clone", "--depth", "1", "--branch",
+            [git_bin, "clone", "--single-branch", "--branch",
              scm["branch"], scm["url"], self.source_folder],
             check=True,
             env=os.environ,
         )
         # 锁定 commit hash 保证可重现构建（R38 可重现性要求）
+        # 注意：不能同时用 --depth 1，否则 6.12 分支推进后旧 commit 不在浅克隆中，
+        # git checkout 会报 "reference is not a tree"
         if "commit" in scm:
             subprocess.run(
                 [git_bin, "-C", self.source_folder, "checkout", scm["commit"]],
