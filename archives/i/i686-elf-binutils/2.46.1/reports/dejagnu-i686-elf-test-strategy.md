@@ -235,7 +235,7 @@ runtest --tool binutils --target i686-elf \
 
 | 测试类别 | 文件/驱动规模 | 通过率 | 说明 |
 |----------|-------------|--------|------|
-| 全量 binutils 上游 testsuite（binutils + gas + ld） | 约 25,959 文件 / 386 .exp 驱动 | **未执行（0/25959）** | 依赖 DejaGNU + QEMU/target simulator，当前 OHOS 环境未补齐 |
+| 全量 binutils 上游 testsuite（binutils + gas + ld） | 约 25,959 文件 / 386 .exp 驱动 | **未执行（N/A）** | 规模 25,959 为 testsuite 文件总量，不作为已执行用例分母；完整运行依赖 DejaGNU + QEMU/target simulator，当前 OHOS 环境未补齐 |
 | binutils 工具子目录 testsuite | 617 文件 / 37 .exp 驱动 | **未执行（0/617）** | 同上 |
 | 本轮 DejaGNU host-side 子集（5 .exp） | 5 .exp / 20 测试项 | **4 PASS / 5 FAIL / 11 UNSUPPORTED** | 退出码 1；4 PASS 来自纯 host-side 工具（cxxfilt、strings）；5 FAIL 为 i686-elf 裸机 target 汇编/`/bin/stty` 兼容性限制；11 UNSUPPORTED 为 target/simulator 不可用相关跳过 |
 | Smoke test | 8 个工具 --version | **8/8（100%）** | test_package conanfile.py 验证 |
