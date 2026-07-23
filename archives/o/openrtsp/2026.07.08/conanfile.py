@@ -43,12 +43,12 @@ class OpenrtspConan(ConanFile):
     def generate(self):
         # Get openssl dependency info for include/link paths
         openssl = self.dependencies["openssl"]
-        openssl_inc = (openssl.cpp_info.includedirs[0]
-                       if openssl.cpp_info.includedirs
-                       else os.path.join(openssl.package_folder, "include"))
-        openssl_lib = (openssl.cpp_info.libdirs[0]
-                       if openssl.cpp_info.libdirs
-                       else os.path.join(openssl.package_folder, "lib"))
+        openssl_inc = os.path.join(openssl.package_folder, openssl.cpp_info.includedirs[0]
+                                   if openssl.cpp_info.includedirs
+                                   else "include")
+        openssl_lib = os.path.join(openssl.package_folder, openssl.cpp_info.libdirs[0]
+                                   if openssl.cpp_info.libdirs
+                                   else "lib")
 
         # Generate a custom config for the live555 build system that uses
         # the conan toolchain environment variables (CC, CXX, CFLAGS, etc.)
