@@ -7,7 +7,9 @@ import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import copy, get, save
+from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
 
 
@@ -29,6 +31,13 @@ class AutotraceConan(ConanFile):
             raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
         if self.options.shared:
             raise ConanInvalidConfiguration("autotrace is packaged as a static library for OHOS")
+
+    def requirements(self):
+        self.requires("glib/2.84.0")
+
+    def generate(self):
+        PkgConfigDeps(self).generate()
+        VirtualBuildEnv(self).generate()
 
     def layout(self):
         basic_layout(self)
@@ -65,6 +74,11 @@ class AutotraceConan(ConanFile):
 
     def _pkg_config(self, args):
         pkg_config = os.environ.get("PKG_CONFIG") or shutil.which("pkg-config") or "pkg-config"
+        env = os.environ.copy()
+        pkg_config_paths = [self.generators_folder]
+        if env.get("PKG_CONFIG_PATH"):
+            pkg_config_paths.append(env["PKG_CONFIG_PATH"])
+        env["PKG_CONFIG_PATH"] = os.pathsep.join(pkg_config_paths)
         try:
             result = subprocess.run(
                 [pkg_config, *args],
@@ -72,6 +86,7 @@ class AutotraceConan(ConanFile):
                 stderr=subprocess.PIPE,
                 text=True,
                 check=False,
+                env=env,
             )
         except FileNotFoundError as exc:
             raise ConanInvalidConfiguration("pkg-config is required to build autotrace") from exc
