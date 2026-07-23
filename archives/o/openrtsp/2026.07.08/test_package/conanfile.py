@@ -22,9 +22,20 @@ class OpenrtspTestConan(ConanFile):
         # Run the binary to verify it executes (openRTSP without args exits 1
         # with usage text, which is expected behavior, so ignore_errors is used).
         self.run(f"{bin_path} 2>&1", ignore_errors=True, env="conanrun")
+<<<<<<< Updated upstream
         # Verify the binary produced actual output (usage text)
         import subprocess
         result = subprocess.run([bin_path], capture_output=True, text=True)
+=======
+
+        # Verify the binary produced actual output (usage text) using Conan
+        # run environment so openssl shared libraries are found.
+        from conan.tools.env import RunEnvironment
+        run_env = RunEnvironment(self).vars(self, scope="run")
+        import subprocess
+        result = subprocess.run([bin_path], capture_output=True, text=True,
+                                env=run_env)
+>>>>>>> Stashed changes
         output = (result.stdout + result.stderr).strip()
         if not output:
             raise Exception(f"openRTSP binary at {bin_path} produced no output (expected usage text)")
