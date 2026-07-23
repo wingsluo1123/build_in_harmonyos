@@ -103,5 +103,5 @@ make install DESTDIR=$TEST_PREFIX
 - CMake 配置: `$DEFAULT_PREFIX/ElaWidgetTools/lib/cmake/`（4 个文件）
 ---
 
-**编译结束**: 2026-06-24 19:11
-**最终状态**: published
+**编译结束**: 2026-07-23 16:37
+**最终状态**: built
