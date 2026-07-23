@@ -40,11 +40,10 @@ class HwlocConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         # R26: System-name libraries default to static
-        if not self.options.shared:
-            tc.configure_args.append("--enable-static")
-            tc.configure_args.append("--disable-shared")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
+        if self.options.shared:
+            tc.configure_args.extend(["--disable-static", "--enable-shared"])
+        else:
+            tc.configure_args.extend(["--enable-static", "--disable-shared"])
         tc.generate()
 
     def build(self):
@@ -69,3 +68,4 @@ class HwlocConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["hwloc"]
+        self.cpp_info.bindirs = ["bin"]
