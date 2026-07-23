@@ -72,4 +72,4 @@ class TorchvisionConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["torchvision"]
-        self.cpp_info.requires = ["torch::torch"]
+        self.cpp_info.requires = ["libtorch::libtorch"]
