@@ -18,6 +18,7 @@
 
 - Added a `test_package` layout check for the CLI, public header, static library, and pkg-config file.
 - Compiles and links a C API consumer against `libautotrace.a` and GLib.
+- Executes the linked API consumer, as well as the CLI version check, when target binaries are runnable.
 - The test does not require image conversion fixtures.
 
 ## Local Validation

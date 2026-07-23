@@ -33,7 +33,7 @@ def pkg_config_flags(args):
     return result.stdout.split()
 
 
-def compile_and_link_api_probe(pkg, cc):
+def compile_and_link_api_probe(pkg, cc, run_binary):
     include_dir = os.path.join(pkg, "include")
     lib_dir = os.path.join(pkg, "lib")
     glib_modules = ["glib-2.0", "gmodule-2.0", "gthread-2.0", "gobject-2.0"]
@@ -95,6 +95,8 @@ def compile_and_link_api_probe(pkg, cc):
             check=True,
         )
         require_path("linked API probe", output)
+        if run_binary == "1":
+            subprocess.run([output], check=True)
 
 
 def run_cli_version(exe):
@@ -128,7 +130,7 @@ def main():
         require_path(name, path)
 
     require_text(pc, "Name: autotrace", "Version: 0.31.10", "-lautotrace")
-    compile_and_link_api_probe(pkg, cc)
+    compile_and_link_api_probe(pkg, cc, run_binary)
     if run_binary == "1":
         run_cli_version(exe)
 
