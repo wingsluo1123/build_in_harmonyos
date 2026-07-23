@@ -21,8 +21,8 @@ class SwigConan(ConanFile):
     version = "4.4.1"
     description = "Simplified Wrapper and Interface Generator for connecting C/C++ to scripting languages"
     license = "GPL-3.0"
-    homepage = "http://www.swig.org/"
-    url = ""  # CI fills this
+    homepage = "https://www.swig.org/"
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
