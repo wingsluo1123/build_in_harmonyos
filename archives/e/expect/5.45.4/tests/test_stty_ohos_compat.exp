@@ -1,0 +1,69 @@
+#!/usr/bin/expect -f
+# Regression test: verify spawn works correctly on OHOS without /bin/stty
+# Part of expect/5.45.4 OHOS stty compatibility fix (0006-stty-ohos-compat.patch)
+set timeout 30
+set passed 0
+set failed 0
+
+proc pass {msg} { global passed; incr passed; puts "PASS: $msg" }
+proc fail {msg} { global failed; incr failed; puts "FAIL: $msg" }
+
+puts "=== Expect stty OHOS compat test ==="
+puts "EXP_STTY=[if {[info exists ::env(EXP_STTY)]} {set ::env(EXP_STTY)} else {set \"(unset)\"}]"
+
+# Test 1: spawn echo
+puts "--- Test 1: spawn echo ---"
+set seen_stty 0
+spawn -noecho echo "hello world"
+expect {
+    -re {inaccessible or not found} { set seen_stty 1; exp_continue }
+    -re {hello world} { pass "echo produced expected output" }
+    timeout { fail "echo timed out"; set failed [expr {$failed + 1}] }
+}
+expect eof
+catch wait result
+set exit_code [lindex $result 3]
+if {$exit_code == 0} {
+    pass "echo exit code 0"
+} else {
+    fail "echo exit code $exit_code (expected 0)"
+}
+if {$seen_stty == 0} {
+    pass "no /bin/stty warning on stderr"
+} else {
+    fail "/bin/stty warning still present on stderr"
+}
+
+# Test 2: spawn i686-elf-objdump --version
+puts "--- Test 2: spawn objdump --version ---"
+set seen_stty 0
+spawn -noecho i686-elf-objdump --version
+expect {
+    -re {inaccessible or not found} { set seen_stty 1; exp_continue }
+    -re {GNU objdump} { pass "objdump produced expected output" }
+    timeout { fail "objdump timed out" }
+}
+expect eof
+catch wait result
+set exit_code [lindex $result 3]
+if {$exit_code == 0} {
+    pass "objdump exit code 0"
+} else {
+    fail "objdump exit code $exit_code"
+}
+if {$seen_stty == 0} {
+    pass "no /bin/stty warning on stderr"
+} else {
+    fail "/bin/stty warning still present on stderr"
+}
+
+puts ""
+puts "=== Summary ==="
+puts "Passed: $passed / Failed: $failed"
+if {$failed > 0} {
+    puts "Verdict: SOME TESTS FAILED"
+    exit 1
+} else {
+    puts "Verdict: ALL PASS"
+    exit 0
+}
