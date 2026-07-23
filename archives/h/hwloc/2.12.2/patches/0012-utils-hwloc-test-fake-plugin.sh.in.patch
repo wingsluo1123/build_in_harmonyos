@@ -1,0 +1,31 @@
+--- a/utils/hwloc/test-fake-plugin.sh.in
++++ b/utils/hwloc/test-fake-plugin.sh.in
+@@ -15,26 +15,26 @@
+ 
+ HWLOC_PLUGINS_PATH=${HWLOC_top_builddir}/hwloc/.libs
+ export HWLOC_PLUGINS_PATH
+ 
+ HWLOC_DEBUG_CHECK=1
+ export HWLOC_DEBUG_CHECK
+ 
+ : ${TMPDIR=/tmp}
+ {
+   tmp=`
+-    (umask 077 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
++    (umask 022 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
+   ` &&
+   test -n "$tmp" && test -d "$tmp"
+ } || {
+   tmp=$TMPDIR/foo$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || exit $?
+ file="$tmp/test-fake-plugin.output"
+ 
+ set -e
+ 
+ echo "Checking that the tweak phase restricts to a single PU and single NUMA"
+ HWLOC_DEBUG_FAKE_COMPONENT_TWEAK=1
+ export HWLOC_DEBUG_FAKE_COMPONENT_TWEAK
+ 
+ test `$hcalc -N pu root` = 1

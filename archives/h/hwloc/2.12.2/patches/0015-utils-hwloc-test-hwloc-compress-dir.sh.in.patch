@@ -1,0 +1,31 @@
+--- a/utils/hwloc/test-hwloc-compress-dir.sh.in
++++ b/utils/hwloc/test-hwloc-compress-dir.sh.in
+@@ -25,26 +25,26 @@
+ if test x@HWLOC_XML_LOCALIZED@ = x1; then
+   # make sure we use default numeric formats
+   LANG=C
+   LC_ALL=C
+   export LANG LC_ALL
+ fi
+ 
+ : ${TMPDIR=/tmp}
+ {
+   tmp=`
+-    (umask 077 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
++    (umask 022 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
+   ` &&
+   test -n "$tmp" && test -d "$tmp"
+ } || {
+   tmp=$TMPDIR/foo$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || exit $?
+ 
+ set -e
+ 
+ (cd "$tmp" && gunzip -c $srcdir/test-hwloc-compress-dir.input.tar.gz | tar xf -)
+ (cd "$tmp" && gunzip -c $srcdir/test-hwloc-compress-dir.output.tar.gz | tar xf -)
+ (cd "$tmp" && mkdir test-hwloc-compress-dir.newoutput)
+ (cd "$tmp" && mkdir test-hwloc-compress-dir.newoutput2)
+ 
+ $compress "$tmp/test-hwloc-compress-dir.input" "$tmp/test-hwloc-compress-dir.newoutput"

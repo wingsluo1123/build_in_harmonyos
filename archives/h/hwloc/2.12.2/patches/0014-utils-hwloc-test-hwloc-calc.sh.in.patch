@@ -1,0 +1,31 @@
+--- a/utils/hwloc/test-hwloc-calc.sh.in
++++ b/utils/hwloc/test-hwloc-calc.sh.in
+@@ -19,26 +19,26 @@
+ 
+ HWLOC_PLUGINS_PATH=${HWLOC_top_builddir}/hwloc/.libs
+ export HWLOC_PLUGINS_PATH
+ 
+ HWLOC_DEBUG_CHECK=1
+ export HWLOC_DEBUG_CHECK
+ 
+ : ${TMPDIR=/tmp}
+ {
+   tmp=`
+-    (umask 077 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
++    (umask 022 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
+   ` &&
+   test -n "$tmp" && test -d "$tmp"
+ } || {
+   tmp=$TMPDIR/foo$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || exit $?
+ file="$tmp/test-hwloc-calc.output"
+ 
+ set -e
+ (
+   echo "# root --cpuset-output-format hwloc"
+   $calc --if synthetic --input "node:4 core:4 pu:4" root --cpuset-output-format hwloc
+   echo
+   echo "# all --cof list"
+   $calc --if synthetic --input "node:4 core:4 pu:4" all --cof list

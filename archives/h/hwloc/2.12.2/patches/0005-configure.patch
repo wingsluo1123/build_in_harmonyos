@@ -1,0 +1,104 @@
+--- a/configure
++++ b/configure
+@@ -27230,20 +27230,72 @@
+          { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+ printf "%s\n" "yes" >&6; }
+ else case e in #(
+   e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+ printf "%s\n" "no" >&6; } ;;
+ esac
+ fi
+ rm -f core conftest.err conftest.$ac_objext conftest.beam \
+     conftest$ac_exeext conftest.$ac_ext
+ 
++      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether Linux NUMA mempolicy syscalls are usable" >&5
++printf %s "checking whether Linux NUMA mempolicy syscalls are usable... " >&6; }
++      if test "$cross_compiling" = yes
++then :
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: unknown while cross-compiling; disabled" >&5
++printf "%s\n" "unknown while cross-compiling; disabled" >&6; }
++else case e in #(
++  e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++
++          #include <errno.h>
++          #include <unistd.h>
++          #include <sys/syscall.h>
++
++int
++main (void)
++{
++
++#if defined(SYS_get_mempolicy)
++          int mode = 0;
++          errno = 0;
++          if (syscall(SYS_get_mempolicy, &mode, NULL, 0UL, NULL, 0UL) < 0
++              && errno == ENOSYS)
++            return 1;
++          return 0;
++#else
++          return 1;
++#endif
++
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_run "$LINENO"
++then :
++
++printf "%s\n" "#define HWLOC_HAVE_WORKING_LINUX_MEMPOLICY 1" >>confdefs.h
++
++         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
++printf "%s\n" "yes" >&6; }
++else case e in #(
++  e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
++printf "%s\n" "no" >&6; } ;;
++esac
++fi
++rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
++  conftest.$ac_objext conftest.beam conftest.$ac_ext ;;
++esac
++fi
++
++
+       # Linux libudev support
+       if test "x$enable_libudev" != xno; then
+                for ac_header in libudev.h
+ do :
+   ac_fn_c_check_header_compile "$LINENO" "libudev.h" "ac_cv_header_libudev_h" "$ac_includes_default"
+ if test "x$ac_cv_header_libudev_h" = xyes
+ then :
+   printf "%s\n" "#define HAVE_LIBUDEV_H 1" >>confdefs.h
+ 
+           { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for udev_device_new_from_subsystem_sysname in -ludev" >&5
+@@ -37105,26 +37157,26 @@
+   tmp= ac_tmp=
+   trap 'exit_status=$?
+   : "${ac_tmp:=$tmp}"
+   { test ! -d "$ac_tmp" || rm -fr "$ac_tmp"; } && exit $exit_status
+ ' 0
+   trap 'as_fn_exit 1' 1 2 13 15
+ }
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+ # Set up the scripts for CONFIG_FILES section.
+ # No need to generate them if there are no CONFIG_FILES.
+ # This happens for instance with './config.status config.h'.
+ if test -n "$CONFIG_FILES"; then
+ 
+ 
+ ac_cr=`echo X | tr X '\015'`

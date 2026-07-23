@@ -1,6 +1,6 @@
 --- a/tests/hwloc/glibc-sched.c
 +++ b/tests/hwloc/glibc-sched.c
-@@ -72,18 +72,25 @@
+@@ -72,18 +72,26 @@
    hwloc_bitmap_free(hwlocset);
  
  #ifdef HWLOC_HAVE_OLD_SCHED_SETAFFINITY
@@ -11,14 +11,15 @@
    assert(!err);
    hwlocset = hwloc_bitmap_alloc();
    hwloc_cpuset_from_glibc_sched_affinity(topology, hwlocset, &schedset, sizeof(schedset));
-+#ifdef __OHOS__
-+  /* OpenHarmony sched_setaffinity() silently succeeds without actually
-+   * binding (sched_getaffinity() returns all CPUs afterwards), so the
-+   * retrieved affinity won't match obj->cpuset. Skip the equality check. */
-+  (void)hwlocset;
-+#else
++  if (!hwloc_bitmap_isequal(hwlocset, obj->cpuset)) {
++    /* Some sandboxes report success from sched_setaffinity() without
++     * changing the effective affinity. Treat this as an unsupported
++     * runtime capability instead of hiding it behind a platform macro. */
++    hwloc_bitmap_free(hwlocset);
++    hwloc_topology_destroy(topology);
++    return 77;
++  }
    assert(hwloc_bitmap_isequal(hwlocset, obj->cpuset));
-+#endif
    hwloc_bitmap_free(hwlocset);
  
  #endif /* HWLOC_HAVE_CPU_SET */

@@ -51,11 +51,21 @@ class HwlocConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
-        autotools.make(args=["-j1"])
+        autotools.make(args=[
+            "-j1",
+            "ACLOCAL=/bin/true",
+            "AUTOMAKE=/bin/true",
+            "AUTOHEADER=/bin/true",
+        ])
 
     def package(self):
         autotools = Autotools(self)
-        autotools.install()
+        autotools.install(args=[
+            "-j1",
+            "ACLOCAL=/bin/true",
+            "AUTOMAKE=/bin/true",
+            "AUTOHEADER=/bin/true",
+        ])
 
     def package_info(self):
         self.cpp_info.libs = ["hwloc"]

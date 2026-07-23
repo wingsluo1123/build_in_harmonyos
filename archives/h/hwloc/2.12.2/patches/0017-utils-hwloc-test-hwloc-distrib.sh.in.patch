@@ -1,0 +1,31 @@
+--- a/utils/hwloc/test-hwloc-distrib.sh.in
++++ b/utils/hwloc/test-hwloc-distrib.sh.in
+@@ -17,26 +17,26 @@
+ 
+ HWLOC_PLUGINS_PATH=${HWLOC_top_builddir}/hwloc/.libs
+ export HWLOC_PLUGINS_PATH
+ 
+ HWLOC_DEBUG_CHECK=1
+ export HWLOC_DEBUG_CHECK
+ 
+ : ${TMPDIR=/tmp}
+ {
+   tmp=`
+-    (umask 077 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
++    (umask 022 && mktemp -d "$TMPDIR/fooXXXXXX") 2>/dev/null
+   ` &&
+   test -n "$tmp" && test -d "$tmp"
+ } || {
+   tmp=$TMPDIR/foo$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || exit $?
+ file="$tmp/test-hwloc-distrib.output"
+ 
+ set -e
+ (
+   echo "# 2 sets out of 2 2 2"
+   $distrib --if synthetic --input "2 2 2" 2
+   echo
+   echo "# 4 sets out of 2 2 2, as lists"
+   $distrib --if synthetic --input "2 2 2" --cof list 4

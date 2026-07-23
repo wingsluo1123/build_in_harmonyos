@@ -18,7 +18,7 @@
 6. `make -j2` 通过
 7. `make install DESTDIR=$TEST_PREFIX` 通过
 8. `hwloc-info --version` 输出 `2.12.2`，13 个 bin + libhwloc.so.15.10.1 产物完整
-9. `make check` 44 个测试 43 PASS / 1 SKIP (shmem: HMDFS 共享内存限制) / 0 FAIL
+9. `make check` 44 个测试 42 PASS / 2 SKIP (shmem: HMDFS 共享内存限制) / 0 FAIL
 
 ## 遇到的问题与解决方案
 
@@ -26,21 +26,19 @@
 |---|------|------|----------|
 | 1 | configure 不识别鸿蒙平台 | GNU config.guess 无 OHOS 检测分支 | patch-autotools-ohos.pl + config.sub 加 linux-ohos kernel-os |
 | 2 | HMDFS umask 077 + mktemp + 重定向写入被拒 | HMDFS 对 umask 077 创建的临时目录内重定向写入必拒 | 全源文件 sed umask 077→022（configure/Makefile.in/config.guess/all test scripts） |
-| 3 | lstopo 探测真实硬件时 SIGSYS (Signal 31) | 鸿蒙沙箱对 4 个 NUMA mempolicy syscall 发 SIGSYS 而非 ENOSYS | topology-linux.c 4 函数加 #ifdef __OHOS__ 守卫返回 ENOSYS |
-| 4 | hwloc_get_last_cpu_location + glibc-sched 测试 assert 失败 | 鸿蒙 sched_setaffinity 静默成功不绑定 (rc=0 但 sched_getaffinity 返回全 CPU) | hwloc_linux_set_tid_cpubind 加 #ifdef __OHOS__ 返回 ENOSYS；glibc-sched.c 测试加 #ifdef __OHOS__ 跳过 isequal assert |
+| 3 | lstopo 探测真实硬件时 SIGSYS (Signal 31) | 鸿蒙沙箱对 4 个 NUMA mempolicy syscall 发 SIGSYS 而非 ENOSYS | configure 运行能力探测；仅定义 `HWLOC_HAVE_WORKING_LINUX_MEMPOLICY` 时调用 syscall，否则返回 ENOSYS |
+| 4 | hwloc_get_last_cpu_location + glibc-sched 测试 assert 失败 | 鸿蒙 sched_setaffinity 静默成功不绑定 (rc=0 但 sched_getaffinity 返回全 CPU) | 运行时用 sched_getaffinity 回读验证；不一致时库返回 ENOSYS、测试返回 automake SKIP(77) |
 | 5 | freebsd ports 测试编译错误 `__int32_t` 未定义 | 鸿蒙 sysroot 不提供 `__int32_t` (双下划线 BSD 内部类型) | freebsd/sys/user.h `__int32_t` → `int32_t` (标准 POSIX 类型) |
 | 6 | conan create 失败 `config.status: ./confggFmPm/subs1.awk: Permission denied` | config.status 固有 umask 077 + mktemp -d + 重定向写入 awk 脚本，HMDFS 必拒 | 同 #2，全局 umask 077→022 补丁覆盖 configure 内嵌的 config.status 生成器 |
 | 7 | conan 2.30 官方版不接受 os=OHOS | 需 OHOS 适配版 conan 2.29.1 + settings.yml 加 OHOS 枚举 | 装社区源 conan 2.29.1 (--no-deps)，依赖用官方 PyPI 装；手动往 ~/.conan2/settings.yml 的 os: 节加 OHOS 枚举 |
 
 ## 源码修改
 
-6 个补丁（refresh-patch --auto 按内部路径命名）：
-- `0001-config-config.guess.patch` — config.guess 加 __OHOS__/HarmonyOS 检测
-- `0002-config-config.sub.patch` — config.sub 加 ohos-linux triplet + linux-ohos* kernel-os 组合
-- `0003-configure.patch` — configure + 所有 autotools 生成文件 umask 077→022 (HMDFS 兼容)
-- `0004-hwloc-topology-linux.c.patch` — topology-linux.c 加 #ifdef __OHOS__ 守卫: 4 个 NUMA mempolicy syscall (SIGSYS) + sched_setaffinity 静默成功
-- `0005-tests-hwloc-glibc-sched.c.patch` — glibc-sched 测试加 #ifdef __OHOS__ 跳过 isequal assert (sched_setaffinity 静默成功)
-- `0006-tests-hwloc-ports-include-freebsd-sys-user.h.patch` — freebsd ports user.h `__int32_t` → `int32_t` (鸿蒙 sysroot 兼容)
+21 个 per-file 补丁由 `refresh-patch --auto` 生成：
+- `0001`–`0005`：Makefile/config.guess/config.sub/Autoconf NUMA 能力探测及预生成 configure
+- `0006`–`0008`：topology-linux 功能宏与 affinity 回读验证、config 宏模板、glibc-sched 运行时 SKIP
+- `0009`：freebsd ports user.h `__int32_t` → `int32_t`
+- `0010`–`0021`：测试脚本模板的 HMDFS `umask 077` → `umask 022` 兼容修改
 
 ## 依赖版本
 
@@ -57,8 +55,8 @@ lstopo 2.12.2
 
 # make check 结果
 # TOTAL: 44
-# PASS:  43
-# SKIP:  1 (shmem: HMDFS 共享内存限制)
+# PASS:  42
+# SKIP:  2 (shmem: HMDFS 共享内存限制；glibc-sched: affinity 运行时能力不可用)
 # FAIL:  0
 
 # conan-verify (8 道门禁全 PASS)
