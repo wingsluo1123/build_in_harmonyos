@@ -73,4 +73,11 @@ class TorchvisionConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["torchvision"]
-        self.cpp_info.requires = ["libtorch::libtorch"]
+        requires = ["libtorch::libtorch"]
+        if self.options.with_png:
+            requires.append("libpng::libpng")
+        if self.options.with_jpeg:
+            requires.append("libjpeg::libjpeg")
+        if self.options.with_webp:
+            requires.append("WebP::webp")
+        self.cpp_info.requires = requires
