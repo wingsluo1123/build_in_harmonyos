@@ -1,4 +1,4 @@
-# 适配笔记 — qtbase 6.11.1 (Qt6 qtbase 鸿蒙预构建引用)
+# 适配笔记 — qtbase 6.12.0-pre (Qt6 qtbase 鸿蒙源码编译)
 
 ## 2026-07-18 适配
 
@@ -38,8 +38,6 @@ lib/libQt6OpenGLWidgets.so.6.11.1 ← OpenGLWidgets
 lib/libQt6Xml.so.6.11.1            ← Xml
 lib/libQt6Concurrent.so.6.11.1     ← Concurrent
 lib/libQt6Core5Compat.so.6.11.1    ← Core5Compat
-lib/libQt6ShaderTools.so.6.11.1    ← ShaderTools
-lib/libQt6EglFSDeviceIntegration.so.6.11.1 ← EglFSDeviceIntegration
 
 bin/qmake / qmake6 / qt-cmake / qt-cmake-create / qt-configure-module / qtpaths / qtpaths6
 ```
@@ -48,7 +46,7 @@ bin/qmake / qmake6 / qt-cmake / qt-cmake-create / qt-configure-module / qtpaths 
 
 本 PR 入库后，kdoctools 链可解锁真验证（CI 有 DevEco SDK + additional-packages）：
 ```
-qtbase 6.11.1 (本 PR) ← 零依赖预构建引用
+qtbase 6.12.0-pre (本 PR) ← 零依赖源码编译
 extra-cmake-modules 6.19.0 (MR !2983 已就位)
 ki18n 6.19.0 + karchive 6.19.0 (配方已入库占位，待 CI conan create)
 kdoctools 6.19.0-r0 (配方已入库占位，最终目标)
