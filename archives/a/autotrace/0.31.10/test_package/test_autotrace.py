@@ -99,7 +99,7 @@ def compile_and_link_api_probe(pkg, cc):
 
 def run_cli_version(exe):
     result = subprocess.run(
-        [exe, "-version"],
+        [exe, "--version"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
