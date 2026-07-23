@@ -17,9 +17,10 @@
 
 ## 平台适配 (OHOS)
 
-### 1. CMAKE_SYSTEM_NAME 设置
+### 1. OHOS CMake platform settings
 - OHOS 平台 cmake 报 "System is unknown"
-- 设置 `CMAKE_SYSTEM_NAME=Linux` + `CMAKE_SYSTEM_PROCESSOR=aarch64`
+- Set `CMAKE_SYSTEM_NAME=Linux` only when `settings.os == "OHOS"`
+- Use Conan `settings.arch` for `CMAKE_SYSTEM_PROCESSOR` to avoid forcing non-OHOS or non-aarch64 builds
 - 必须同时设置 `CMAKE_CROSSCOMPILING=OFF` (否则 sleef 的 add_host_executable 走 IMPORTED 分支)
 
 ### 2. CMAKE_LINK_WHAT_YOU_USE 禁用
@@ -66,9 +67,8 @@ cmake .. \
 ## PyTorch CMake 配置参数 (libtorch 构建)
 ```
 cmake .. \
-  -DCMAKE_SYSTEM_NAME=Linux \
-  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-  -DCMAKE_CROSSCOMPILING=OFF \
+  # OHOS only: CMAKE_SYSTEM_NAME=Linux, CMAKE_SYSTEM_PROCESSOR=<settings.arch> \
+  # OHOS only: CMAKE_CROSSCOMPILING=OFF \
   -DBUILD_PYTHON=OFF \
   -DUSE_CUDA=OFF -DUSE_ROCM=OFF -DUSE_MPS=OFF \
   -DUSE_FBGEMM=OFF -DUSE_KINETO=OFF \
