@@ -98,7 +98,12 @@ class HarfbuzzConan(ConanFile):
         # Transitive dependencies: harfbuzz public headers include
         # graphite2 and freetype headers (e.g., hb-graphite2.h includes
         # <graphite2/Font.h>, hb-ft.h includes <ft2build.h>)
-        self.cpp_info.requires = ["graphite2::graphite2", "freetype::freetype"]
+        _requires = []
+        if self.options.with_graphite2:
+            _requires.append("graphite2::graphite2")
+        if self.options.with_freetype:
+            _requires.append("freetype::freetype")
+        self.cpp_info.requires = _requires
         # R32: settings.os check must use in ("Linux", "OHOS")
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread"]
