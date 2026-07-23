@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Conan recipe for cJSON v1.7.19 — OHOS (OpenHarmony) aarch64 adaptation.
 
