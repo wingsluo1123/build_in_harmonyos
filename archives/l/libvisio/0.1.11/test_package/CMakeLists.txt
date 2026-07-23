@@ -14,10 +14,13 @@ target_link_libraries(test_libvisio libvisio::libvisio librevenge::librevenge)
 
 # Workaround: librevenge package doesn't expose includedirs in cpp_info
 # Add the include path manually using the package folder variable
-if(DEFINED librevenge_PACKAGE_FOLDER_RELEASE)
-    target_include_directories(test_libvisio PRIVATE
-        ${librevenge_PACKAGE_FOLDER_RELEASE}/include/librevenge-0.0)
-endif()
+# Support all build types (Release, Debug, RelWithDebInfo, MinSizeRel)
+foreach(_config RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
+    if(DEFINED librevenge_PACKAGE_FOLDER_${_config})
+        target_include_directories(test_libvisio PRIVATE
+            ${librevenge_PACKAGE_FOLDER_${_config}}/include/librevenge-0.0)
+    endif()
+endforeach()
 
 enable_testing()
 add_test(NAME test_libvisio COMMAND test_libvisio)

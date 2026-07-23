@@ -146,7 +146,9 @@ fi
                             content = content.replace("//lib/", f"{libdir}/")
                             with open(la_file, "w") as f:
                                 f.write(content)
-                    except Exception:
+                    except (IOError, OSError) as e:
+                        # .la files may be read-only or missing; skip silently
+                        # as this is a best-effort fix for conan cache packaging issue
                         pass
 
     def build(self):
