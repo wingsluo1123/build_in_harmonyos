@@ -9,25 +9,32 @@
 ## 编译步骤
 
 ```bash
+# 执行前显式设置路径；鸿蒙环境请使用可写的 TMPDIR，不要使用 /tmp。
+: "${DEFAULT_PREFIX:?请设置 DEFAULT_PREFIX，例如 /storage/Users/currentUser/usr/local}"
+: "${TEST_PREFIX:?请设置 TEST_PREFIX，例如 /storage/Users/currentUser/tmp/test-prefix}"
+: "${TMPDIR:?请设置可写的 TMPDIR}"
+
 # 1. 安装依赖 Eigen3
-# Eigen3 为 header-only 库，从 cmd-pkgs 下载并校验 sha256 后解压到 $DEFAULT_PREFIX/include/eigen3
-curl -fsSL -o /tmp/eigen-3.4.0.tar.gz https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/eigen-3.4.0.tar.gz
-echo "8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72  /tmp/eigen-3.4.0.tar.gz" | sha256sum -c -
-tar -xzf /tmp/eigen-3.4.0.tar.gz -C $DEFAULT_PREFIX/include
+# Eigen3 为 header-only 库，从与 conandata.yml 一致的官方 GitLab 源下载并校验 sha256。
+EIGEN_ARCHIVE="$TMPDIR/eigen-3.4.0.tar.gz"
+curl -fsSL -o "$EIGEN_ARCHIVE" https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+echo "8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72  $EIGEN_ARCHIVE" | sha256sum -c -
+mkdir -p "$DEFAULT_PREFIX/include/eigen3"
+tar -xzf "$EIGEN_ARCHIVE" --strip-components=1 -C "$DEFAULT_PREFIX/include/eigen3"
 
 # 2. CMake 配置
 cmake -B build -S . \
-  -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX \
+  -DCMAKE_INSTALL_PREFIX="$DEFAULT_PREFIX" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
-  -DEIGEN3_INCLUDE_DIR=$DEFAULT_PREFIX/include/eigen3
+  -DEIGEN3_INCLUDE_DIR="$DEFAULT_PREFIX/include/eigen3"
 
 # 3. 编译
 cmake --build build -j2
 
 # 4. 安装
-cmake --install build --prefix $TEST_PREFIX/$DEFAULT_PREFIX
+cmake --install build --prefix "$TEST_PREFIX$DEFAULT_PREFIX"
 ```
 
 ## 遇到的问题与解决方案
@@ -35,7 +42,7 @@ cmake --install build --prefix $TEST_PREFIX/$DEFAULT_PREFIX
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | monorepo 结构，源码在 orocos_kdl 子目录 | GitHub 仓库包含多个子项目（orocos_kdl、kdl_parser 等） | init-build 自动检测嵌套源码并提升到顶层；conan recipe 中 configure 使用 build_script_folder="orocos_kdl" |
-| 2 | 依赖 Eigen3 未安装 | header-only 线性代数库，非系统默认包含 | 从 cmd-pkgs 安装 eigen/3.4.0 预编译包 |
+| 2 | 依赖 Eigen3 未安装 | header-only 线性代数库，非系统默认包含 | 从官方 GitLab 源下载 Eigen3 3.4.0，并以 conandata.yml 中的 sha256 校验 |
 | 3 | /tmp 只读文件系统 | 鸿蒙平台限制 | 使用 $TMPDIR 环境变量路径 |
 
 ## 源码修改
@@ -44,7 +51,8 @@ cmake --install build --prefix $TEST_PREFIX/$DEFAULT_PREFIX
 
 ## 依赖版本
 
-- Eigen3: 3.4.0 (header-only, 通过 cmd-pkgs 安装)
+- Eigen3: 3.4.0 (header-only, 从官方 GitLab 源下载并通过 sha256 校验)
+- cppunit: 1.15.1（仅构建阶段的上游测试依赖，从源码临时构建，不随最终包发布）
 
 ## 验证结果
 
@@ -71,7 +79,8 @@ $ cmake --install build --prefix $TEST_PREFIX/$DEFAULT_PREFIX
 
 - orocos-kdl 是 C++ 库，需要 C++17 编译
 - Eigen3 为 header-only 依赖，无需编译
-- 上游测试需要 cppunit 依赖，本次未启用 (ENABLE_TESTS=OFF)
+- 上游测试在 conanfile.py 的 build() 阶段启用（`ENABLE_TESTS=ON`）；cppunit 从源码临时构建后，通过 `ctest --output-on-failure` 执行全部 8 项上游测试
+- cppunit 仅用于构建阶段测试，不随最终 orocos-kdl 包发布
 - 属于库类型产物，无需 commands.json
 ---
 
