@@ -1,8 +1,8 @@
-# autotrace homebrew adaptation notes
+# autotrace 0.31.10 adaptation notes
 
 ## Scope
 
-- Package: autotrace/homebrew
+- Package: autotrace/0.31.10
 - Upstream version: 0.31.10
 - Issue: #809
 - Source: https://github.com/autotrace/autotrace/archive/refs/tags/0.31.10.tar.gz

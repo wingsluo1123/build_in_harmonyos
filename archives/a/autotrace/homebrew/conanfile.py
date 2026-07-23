@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Conan recipe for autotrace homebrew (upstream 0.31.10)."""
+"""Conan recipe for autotrace 0.31.10."""
 import os
+import shlex
+import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import copy, export_conandata_patches, get, save
+from conan.tools.files import copy, get, save
 from conan.tools.layout import basic_layout
 
 
 class AutotraceConan(ConanFile):
     name = "autotrace"
-    version = "homebrew"
+    version = "0.31.10"
     description = "Bitmap to vector graphics converter and library"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/autotrace/autotrace"
@@ -24,9 +27,8 @@ class AutotraceConan(ConanFile):
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
-
-    def export_sources(self):
-        export_conandata_patches(self)
+        if self.options.shared:
+            raise ConanInvalidConfiguration("autotrace is packaged as a static library for OHOS")
 
     def layout(self):
         basic_layout(self)
@@ -38,50 +40,156 @@ class AutotraceConan(ConanFile):
     def _out_dir(self):
         return os.path.join(self.build_folder, "ohos-direct")
 
+    @property
+    def _obj_dir(self):
+        return os.path.join(self._out_dir, "obj")
+
+    def _compiler_executables(self):
+        return self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+
+    def _cc(self):
+        return self._compiler_executables().get("c") or os.environ.get("CC") or "clang"
+
     def _tool(self, name, fallback):
-        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        compilers = self._compiler_executables()
         cc = compilers.get("c", "")
         bindir = os.path.dirname(cc) if os.path.isabs(cc) else ""
         candidate = os.path.join(bindir, name) if bindir else ""
         return candidate if candidate and os.path.exists(candidate) else fallback
 
-    def build(self):
-        os.makedirs(self._out_dir, exist_ok=True)
-        cc = self._tool("clang", "clang")
-        ar = self._tool("llvm-ar", "llvm-ar")
-        ranlib = self._tool("llvm-ranlib", "llvm-ranlib")
-        cflags = "-O2"
-        if self.options.fPIC:
-            cflags += " -fPIC"
+    def _run_checked(self, args, **kwargs):
+        command = " ".join(shlex.quote(str(arg)) for arg in args)
+        retcode = self.run(command, ignore_errors=True, **kwargs)
+        if retcode not in (None, 0):
+            raise RuntimeError(f"Command failed with exit code {retcode}: {command}")
 
-        lib_src = os.path.join(self._out_dir, "autotrace_stub.c")
-        lib_obj = os.path.join(self._out_dir, "autotrace_stub.o")
-        lib_path = os.path.join(self._out_dir, "libautotrace.a")
-        cli_src = os.path.join(self._out_dir, "autotrace_cli.c")
-        cli_path = os.path.join(self._out_dir, "autotrace")
+    def _pkg_config(self, args):
+        pkg_config = os.environ.get("PKG_CONFIG") or shutil.which("pkg-config") or "pkg-config"
+        try:
+            result = subprocess.run(
+                [pkg_config, *args],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise ConanInvalidConfiguration("pkg-config is required to build autotrace") from exc
+        if result.returncode != 0:
+            raise ConanInvalidConfiguration(
+                f"pkg-config {' '.join(args)} failed: {result.stderr.strip()}"
+            )
+        return shlex.split(result.stdout.strip())
 
-        save(self, lib_src, 'int autotrace_ohos_package_marker(void) { return 0; }\n')
+    def _write_config_header(self):
         save(
             self,
-            cli_src,
-            r'''#include <stdio.h>
-#include <string.h>
-
-int main(int argc, char **argv)
-{
-    if (argc > 1 && strcmp(argv[1], "--version") == 0) {
-        puts("autotrace 0.31.10");
-        return 0;
-    }
-    puts("autotrace 0.31.10 packaged for OHOS");
-    return 0;
-}
-''',
+            os.path.join(self.build_folder, "config.h"),
+            """#pragma once
+#define PACKAGE "autotrace"
+#define PACKAGE_NAME "autotrace"
+#define PACKAGE_VERSION "0.31.10"
+#define AUTOTRACE_VERSION "0.31.10"
+#define AUTOTRACE_WEB "https://github.com/autotrace/autotrace"
+#define HAVE_LOCALTIME_R 1
+#define HAVE_STDINT_H 1
+#define HAVE_STRING_H 1
+#define HAVE_STRINGS_H 1
+#define STDC_HEADERS 1
+""",
         )
-        self.run(f'"{cc}" {cflags} -c "{lib_src}" -o "{lib_obj}"')
-        self.run(f'"{ar}" rcs "{lib_path}" "{lib_obj}"')
-        self.run(f'"{ranlib}" "{lib_path}"')
-        self.run(f'"{cc}" -O2 "{cli_src}" -o "{cli_path}"')
+
+    def _build_type_flags(self):
+        return {
+            "Debug": ["-O0", "-g"],
+            "Release": ["-O2", "-DNDEBUG"],
+            "RelWithDebInfo": ["-O2", "-g", "-DNDEBUG"],
+            "MinSizeRel": ["-Os", "-DNDEBUG"],
+        }.get(str(self.settings.build_type), ["-O2", "-DNDEBUG"])
+
+    def _compile(self, cc, source, cflags):
+        rel = source.replace("/", "_").replace("\\", "_")
+        obj = os.path.join(self._obj_dir, rel + ".o")
+        self._run_checked([cc, *cflags, "-c", os.path.join(self.source_folder, source), "-o", obj])
+        return obj
+
+    def build(self):
+        os.makedirs(self._out_dir, exist_ok=True)
+        os.makedirs(self._obj_dir, exist_ok=True)
+        self._write_config_header()
+
+        cc = self._cc()
+        ar = self._tool("llvm-ar", os.environ.get("AR") or "llvm-ar")
+        ranlib = self._tool("llvm-ranlib", os.environ.get("RANLIB") or "llvm-ranlib")
+        glib_modules = ["glib-2.0", "gmodule-2.0", "gthread-2.0", "gobject-2.0"]
+        glib_cflags = self._pkg_config(["--cflags", *glib_modules])
+        glib_libs = self._pkg_config(["--libs", *glib_modules])
+
+        cflags = [
+            *self._build_type_flags(),
+            "-DHAVE_CONFIG_H",
+            "-DLOCALEDIR=\"share/locale\"",
+            "-I" + self.build_folder,
+            "-I" + os.path.join(self.source_folder, "src"),
+            "-I" + self.source_folder,
+        ]
+        if self.options.fPIC:
+            cflags.append("-fPIC")
+
+        lib_sources = [
+            "src/input-gf.c",
+            "src/input-bmp.c",
+            "src/input-pnm.c",
+            "src/input-tga.c",
+            "src/output-eps.c",
+            "src/output-er.c",
+            "src/output-fig.c",
+            "src/output-sk.c",
+            "src/output-svg.c",
+            "src/output-ugs.c",
+            "src/output-p2e.c",
+            "src/output-emf.c",
+            "src/output-dxf.c",
+            "src/output-epd.c",
+            "src/output-pdf.c",
+            "src/output-mif.c",
+            "src/output-cgm.c",
+            "src/output-dr2d.c",
+            "src/output-pov.c",
+            "src/output-plt.c",
+            "src/output-ild.c",
+            "src/fit.c",
+            "src/bitmap.c",
+            "src/spline.c",
+            "src/curve.c",
+            "src/epsilon-equal.c",
+            "src/vector.c",
+            "src/color.c",
+            "src/datetime.c",
+            "src/autotrace.c",
+            "src/output.c",
+            "src/input.c",
+            "src/pxl-outline.c",
+            "src/median.c",
+            "src/thin-image.c",
+            "src/logreport.c",
+            "src/filename.c",
+            "src/despeckle.c",
+            "src/exception.c",
+            "src/image-proc.c",
+            "src/module.c",
+        ]
+        objects = [self._compile(cc, source, [*cflags, *glib_cflags]) for source in lib_sources]
+        lib_path = os.path.join(self._out_dir, "libautotrace.a")
+        self._run_checked([ar, "rcs", lib_path, *objects])
+        self._run_checked([ranlib, lib_path])
+
+        cli_objects = [
+            self._compile(cc, "src/main.c", [*cflags, *glib_cflags]),
+            self._compile(cc, "src/atou.c", [*cflags, *glib_cflags]),
+        ]
+        cli_path = os.path.join(self._out_dir, "autotrace")
+        self._run_checked([cc, "-o", cli_path, *cli_objects, lib_path, *glib_libs, "-lm"])
         os.chmod(cli_path, 0o755)
 
     def package(self):
@@ -96,7 +204,8 @@ int main(int argc, char **argv)
 
         copy(self, "autotrace", src=self._out_dir, dst=bindir, keep_path=False)
         copy(self, "libautotrace.a", src=self._out_dir, dst=libdir, keep_path=False)
-        copy(self, "*.h", src=os.path.join(self.source_folder, "src"), dst=incdir, keep_path=False)
+        for header in ("types.h", "autotrace.h", "input.h", "output.h", "spline.h", "exception.h", "color.h"):
+            copy(self, header, src=os.path.join(self.source_folder, "src"), dst=incdir, keep_path=False)
         copy(self, "COPYING", src=self.source_folder,
              dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
         copy(self, "COPYING.LIB", src=self.source_folder,
@@ -113,7 +222,8 @@ includedir=${prefix}/include
 Name: autotrace
 Description: Bitmap to vector graphics converter and library
 Version: 0.31.10
-Libs: -L${libdir} -lautotrace
+Requires: glib-2.0 gmodule-2.0 gthread-2.0 gobject-2.0
+Libs: -L${libdir} -lautotrace -lm
 Cflags: -I${includedir}
 """,
         )
@@ -121,19 +231,35 @@ Cflags: -I${includedir}
         bin_path = os.path.join(bindir, "autotrace")
         if os.path.exists(bin_path):
             os.chmod(bin_path, 0o755)
-        if os.path.exists(bin_path) and self.settings.os == "OHOS":
-            sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-            objcopy = "/data/service/hnp/bin/llvm-objcopy"
-            tmp_signed = bin_path + ".signed"
-            self.run(f"{objcopy} --remove-section .codesign {bin_path} 2>/dev/null || true")
-            self.run(f"{sign_tool} sign -inFile {bin_path} -outFile {tmp_signed} -selfSign 1", quiet=True)
-            os.replace(tmp_signed, bin_path)
-            os.chmod(bin_path, 0o755)
+            self._sign_binary_if_available(bin_path)
+
+    def _find_external_tool(self, env_name, tool_name):
+        configured = os.environ.get(env_name)
+        if configured:
+            return configured if os.path.exists(configured) else ""
+        return shutil.which(tool_name) or ""
+
+    def _sign_binary_if_available(self, bin_path):
+        if self.settings.os != "OHOS":
+            return
+        objcopy = self._find_external_tool("LLVM_OBJCOPY", "llvm-objcopy")
+        sign_tool = self._find_external_tool("BINARY_SIGN_TOOL", "binary-sign-tool")
+        if not objcopy or not sign_tool:
+            self.output.warning("Skipping OHOS binary signing because signing tools are not configured")
+            return
+
+        tmp_signed = bin_path + ".signed"
+        self._run_checked([objcopy, "--remove-section", ".codesign", bin_path])
+        self._run_checked([sign_tool, "sign", "-inFile", bin_path, "-outFile", tmp_signed, "-selfSign", "1"])
+        if not os.path.exists(tmp_signed):
+            raise RuntimeError(f"Signing did not create output file: {tmp_signed}")
+        os.replace(tmp_signed, bin_path)
+        os.chmod(bin_path, 0o755)
 
     def package_info(self):
         self.cpp_info.libs = ["autotrace"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.system_libs = []
+        self.cpp_info.system_libs = ["m", "pthread"]
         self.cpp_info.set_property("pkg_config_name", "autotrace")

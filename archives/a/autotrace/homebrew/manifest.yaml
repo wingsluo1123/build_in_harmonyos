@@ -1,8 +1,8 @@
 software: "autotrace"
-version: "homebrew"
+version: "0.31.10"
 status: built
 build_date: "2026-07-18"
-build_system: autotools
+build_system: custom
 
 source:
   url: "https://github.com/autotrace/autotrace/archive/refs/tags/0.31.10.tar.gz"
@@ -10,18 +10,13 @@ source:
   tar_format: tar.gz
 
 build:
-  system: autotools
+  system: custom
   configure_options:
-    - "./autogen.sh"
-    - "--without-magick"
-    - "--without-pstoedit"
-    - "--without-png"
-    - "--enable-static"
-    - "--disable-shared"
+    - "direct compile upstream C sources"
+    - "disable optional GraphicsMagick/ImageMagick, libpng, libming, and pstoedit backends"
+    - "build static libautotrace.a and autotrace CLI"
   dependencies:
-    - glib/2.88.0
-    - gettext/0.22.5
-    - intltool/0.51.0
+    - glib/2.84.0
   cc: clang
   cxx: clang++
 
@@ -29,4 +24,5 @@ patches_applied: []
 
 knowledge_gained:
   - "autotrace tag archives do not include a generated configure script."
-  - "Optional image backends can be disabled for a core library and CLI build."
+  - "Optional image backends can be disabled while keeping native BMP/PNM/TGA readers and vector writers."
+  - "NLS/gettext bootstrap is not required when building directly with ENABLE_NLS disabled."
