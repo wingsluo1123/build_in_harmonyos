@@ -28,15 +28,11 @@
 - OHOS 无 ldd 命令，LWYU 检查失败
 - 修改为 `CMAKE_LINK_WHAT_YOU_USE FALSE`
 
-### 3. __assert_fail 声明冲突
-- 文件: torch/headeronly/macros/Macros.h:434
-- OHOS 系统 __assert_fail 用 `int` 非 `unsigned int`，无 __noreturn__ 属性
-- 修改声明匹配系统: `int line` + 移除 `__attribute__((__noreturn__))`
-
-### 4. ssize_t 未定义
-- 文件: c10/util/Enumerate.h
-- OHOS 不默认定义 ssize_t
-- 添加 `#include <sys/types.h>` (非 Windows 平台)
+### 3. libtorch dependency-side patches
+- `torch/headeronly/macros/Macros.h` `__assert_fail` declaration compatibility is a libtorch source adaptation item.
+- `c10/util/Enumerate.h` `ssize_t` compatibility is also a libtorch source adaptation item.
+- This torchvision recipe does not patch libtorch sources directly; those changes belong in the future `libtorch/2.9.0` recipe.
+- Because the libtorch Conan dependency is not available yet, this PR remains `status: failed`.
 
 ### 5. ldd wrapper
 - 创建 /storage/Users/currentUser/usr/local/bin/ldd
