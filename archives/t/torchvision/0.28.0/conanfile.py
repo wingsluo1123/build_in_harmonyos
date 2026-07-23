@@ -37,6 +37,12 @@ class TorchvisionConan(ConanFile):
 
     def requirements(self):
         self.requires("libtorch/2.9.0")
+        if self.options.with_png:
+            self.requires("libpng/1.6.58")
+        if self.options.with_jpeg:
+            self.requires("libjpeg/10")
+        if self.options.with_webp:
+            self.requires("libwebp/1.6.0")
 
     def layout(self):
         cmake_layout(self)
@@ -52,7 +58,6 @@ class TorchvisionConan(ConanFile):
         if str(self.settings.os) == "OHOS":
             tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
-            tc.variables["CMAKE_CROSSCOMPILING"] = "OFF"
             tc.variables["CMAKE_LINK_WHAT_YOU_USE"] = "OFF"
         tc.generate()
 
