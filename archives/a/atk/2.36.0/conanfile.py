@@ -1,5 +1,5 @@
 from conan import ConanFile
-from conan.tools.meson import Meson, MesonToolchain
+from conan.tools.meson import Meson, MesonToolchain, meson_layout
 from conan.tools.files import get, copy
 import os
 
@@ -8,7 +8,7 @@ class AtkConan(ConanFile):
     version = "2.36.0"
     license = "LGPL-2.1-or-later"
     homepage = "https://wiki.gnome.org/Projects/ATK"
-    url = "https://github.com/conan-io/conan-center-index"
+    url = "https://wiki.gnome.org/Projects/ATK"
     description = "ATK is a toolkit for developing accessibility support."
     topics = ("accessibility", "gnome")
 
@@ -25,7 +25,7 @@ class AtkConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def layout(self):
-        pass
+        meson_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
