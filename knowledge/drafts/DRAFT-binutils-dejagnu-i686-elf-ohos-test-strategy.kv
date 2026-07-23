@@ -1,0 +1,95 @@
+#====================================================================
+# DRAFT-binutils-dejagnu-i686-elf-ohos-test-strategy — GNU binutils 交叉工具链 DejaGNU testsuite 测试策略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-binutils-dejagnu-i686-elf-ohos-test-strategy
+trigger_tool:           finish|conan-verify|test_package
+phase:                  test|verify
+error_signature:        DejaGNU|runtest|testsuite.*not run|DejaGNU.*missing|site\.exp|target_board.*unavailable|simulator.*missing|QEMU.*not found
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               test|dejagnu|binutils|*-elf|cross-toolchain|platform-limitation
+match_keywords:         DejaGNU, runtest, Tcl, Expect, site.exp, target_board, i686-elf, binutils, testsuite, simulator, QEMU, compile-only, host-side, cross-toolchain, HarmonyOS, OHOS, *-elf, bare-metal
+title:                  GNU binutils 交叉工具链 DejaGNU testsuite 测试策略 — 针对 *-elf 裸机目标在 OHOS 上的适配方案
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: GNU binutils 上游 testsuite 依赖 DejaGNU / Tcl / Expect 运行框架，且 i686-elf 裸机交叉目标需要 target simulator（如 QEMU）或硬件环境才能执行目标代码。当前 HarmonyOS PC 构建环境满足 DejaGNU 框架条件（runtest 1.6.3、expect 5.45.4、Tcl 8.6 均可用），但缺少 i686 target simulator（qemu-system-i386 不可用）和 tclsh，且 i686-elf 裸机 ELF 无法直接在 OHOS aarch64 host 上执行。因此上游全量 testsuite 无法运行，需通过 compile-only/host-side 子集方案替代。
+affected_scope: 所有 *-elf 格式的 GNU binutils 交叉工具链（i686-elf、arm-none-eabi、x86_64-elf 等），在 OHOS 或类似无 target simulator 的交叉构建环境中。
+verification_cmd: runtest --tool binutils --target i686-elf --target_board=i686-elf-compile-only ar.exp nm.exp objcopy.exp size.exp strings.exp cxxfilt.exp 2>&1 | grep -E '^(# of expected|# of unexpected|FAIL|PASS)'
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           compile-only-host-side-subset
+rec_description:        compile-only/host-side 子集方案：选择不要求执行目标代码的 .exp 驱动（如 ar.exp、nm.exp、objcopy.exp、size.exp、strings.exp、cxxfilt.exp、readelf.exp、elfedit.exp），在 host 上直接运行。这些工具操作 ELF 文件格式，不执行目标代码，可在交叉构建环境中使用。通过 site.exp 配置 target_triplet 和 target_alias，设置 target_board 为 compile-only 模式，跳过需要 target simulator 的执行类测试。
+rec_command: |
+  # 1. 设置工具路径
+  export PATH=/path/to/i686-elf-binutils/bin:$PATH
+
+  # 2. 配置 site.exp
+  mkdir -p tmp-dejagnu
+  cat > tmp-dejagnu/site.exp << 'EOF'
+  set target_triplet i686-elf
+  set target_alias i686-elf
+  EOF
+
+  # 3. 运行 compile-only 子集
+  runtest --tool binutils \
+    --srcdir /path/to/binutils-2.46.1/binutils/testsuite \
+    --target_board=i686-elf-compile-only \
+    --target i686-elf \
+    --site-file tmp-dejagnu/site.exp \
+    ar.exp nm.exp objcopy.exp size.exp strings.exp cxxfilt.exp readelf.exp elfedit.exp
+
+  # 4. 统计通过率
+  grep -E '^# of (expected|unexpected)' runtest.log
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      smoke-test-fallback
+fallback_description:   当 DejaGNU 子集也无法执行时，回退到 test_package smoke test：验证 8 个核心工具（i686-elf-objdump、objcopy、ld、as、ar、nm、strip、size）的 --version 输出，共 8 个 assertion。这是最低可用性验证。
+fallback_command:       for tool in i686-elf-objdump i686-elf-objcopy i686-elf-ld i686-elf-as i686-elf-ar i686-elf-nm i686-elf-strip i686-elf-size; do $tool --version; done
+fallback_auto_fix:      false
+fallback_impl:          conanfile.py
+
+forbid_1_pattern:       upstream_tests:.*\[\]|0/0.*N/A
+forbid_1_reason:        不能把上游 testsuite 写为 0/0 或"无测试用例"。上游 testsuite 存在，只是当前环境无法执行。应写真实原因和执行状态。
+forbid_1_consequence:   审核不通过，PR 正文需修正
+
+forbid_2_pattern:       smoke.*8/8.*100%.*upstream.*0/0
+forbid_2_reason:        不能用 smoke test 的 100% 通过率覆盖上游 testsuite 未执行的事实。上游测试和新测试应分开统计。
+forbid_2_consequence:   审核不通过，测试统计口径需分开
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P001|P003|P012
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+software:               i686-elf-binutils/2.46.1
+symptom:                上游 DejaGNU testsuite 无法运行，缺少 target simulator，需 compile-only 子集方案
+solution:               compile-only/host-side 子集 + smoke test 回退，提供可复用的测试策略
+pattern:                *-elf cross binutils → DejaGNU compile-only 子集 + smoke fallback
+doc_file:               archives/i/i686-elf-binutils/2.46.1/reports/dejagnu-i686-elf-test-strategy.md
+last_updated:           2026-07-23
+source_event:           i686-elf-binutils 2.46.1 适配 — PR !2992
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                AtomCode <noreply@atomgit.com>
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/pull/2992
+source_commit:          7fa33ab1e11b5c500d6cb4187d231eeb32c5601b
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  4
+metrics_fail_count:     5
+metrics_confidence:     0.6
+metrics_last_used:      2026-07-23
+metrics_log:            ~/dejagnu-i686-binutils/runtest-i686-binutils-subset.log
+metrics_summary:        Run 5 .exp on 2026-07-23 using #3194-fixed expect (EXP_STTY). No /bin/stty pollution (0 occurrences). 4 expected passes, 5 unexpected failures, 11 unsupported, 0 unresolved. 全量上游 testsuite 25959 文件/386 .exp 驱动未执行；binutils 子目录 617 文件/37 .exp 驱动未执行；smoke 8/8 通过。W3 passed. Full analysis in report §5.4.
