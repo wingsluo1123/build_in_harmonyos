@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/build_in_harmonyos/archives/m/mutt/2.2.16/test_package/conanbuildenv-release-armv8.sh"
