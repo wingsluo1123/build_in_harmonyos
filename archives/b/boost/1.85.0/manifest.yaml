@@ -1,72 +1,44 @@
 software: boost
 version: 1.85.0
 status: built
-build_system: header-only
+build_system: boost-build
 upstream_url: https://www.boost.org/
 configure_options: []
-build_options: []
+build_options:
+  - ./build.sh clang --cxx=<OHOS clang++> --cxxflags=-DNO_VFORK
 dependencies: []
 knowledge_gained:
-  - Boost.Build SHELL 执行机制在鸿蒙不兼容（E035）
-  - b2 引擎可通过重编译修复：jam.h 加 __ohos__ 检测定义 NO_VFORK
-  - boost/core/detail/sp_thread_sleep.hpp 用 pthread_setcancelstate 鸿蒙缺失（E099）
-  - boost/fiber+context 的 native-impl 规则显式用 ucontext，鸿蒙 musl 缺 getcontext（E100）
-  - 29 个 compiled 库可通过 b2 直接编译（atomic~wave），供测试链接
-  - b2 引擎编译规则存在 phantom fail bug：编译成功（exit 0）但标记 failed updating N targets，无 error 行
-  - Boost CMake 支持是实验性的，不支持独立构建
-  - Boost 大部分库是 header-only，可直接安装使用
+  - Boost.Build SHELL 执行机制在 /bin/sh 不可用环境中需要 shell fallback（E035）
+  - b2 引擎可通过 build.sh 使用 Conan 提供的 OHOS clang++ 构建
+  - b2 在 OpenHarmony sandbox 下以 -DNO_VFORK 构建，避免 vfork 兼容性风险
 knowledge_ref:
   - E035 (Boost.Build SHELL 执行机制在鸿蒙不兼容)
-  - E099 (boost sp_thread_sleep.hpp pthread_setcancelstate 鸿蒙缺失)
-  - E100 (boost fiber/context ucontext API 鸿蒙 musl 缺失)
 issues:
-  - b2 构建系统失败：clang++ --version SHELL 执行错误（已通过重编译 b2 引擎修复 E035）
-  - sp_thread_sleep.hpp 调用 pthread_setcancelstate 鸿蒙 musl 缺失（已加 __OHOS__ 排除 E099）
-  - fiber/context 的 native-impl 规则显式用 ucontext，鸿蒙 musl 缺 getcontext（已改 Jamfile 跳过 native E100）
-  - system/filesystem/date_time/locale/thread 等测试依赖 compiled 库（已用 b2 编译 29 个 compiled 库）
-  - b2 phantom fail bug：编译成功但标记 failed updating，无 error 行（51 个虚假失败，不计入真实通过率）
-  - CMake 构建系统不支持独立构建（需要 superproject 模式）
-compilation_date: 2026-05-19
+  - /bin/sh 不可用时 b2 的 SHELL 规则无法执行（已由 0005-b2-shell-fallback.patch 修复）
+  - vfork 在 OpenHarmony sandbox 环境存在兼容性风险（已在 b2 编译参数中定义 NO_VFORK）
+compilation_date: 2026-07-24
 compiler: clang
 platform: OpenHarmony
-notes: header-only 安装 + b2 引擎重编译（E035）+ sp_thread_sleep.hpp 鸿蒙补丁（E099）+ fiber/context ucontext 跳过（E100）+ 29 个 compiled 库编译
-test_passed: 5439
-test_failed: 315
-test_total: 5754
+notes: b2 application 包；交付 bin/b2 和 share/b2/src 构建模块
 
 test_results:
-  type: b2-runtime
-  passed: 5439
-  failed: 315
-  total: 5754
-  upstream_source_files: 12201
-  libs_tested: 142
-  libs_total: 142
-  pass_rate: 94.5
+  type: conan-test-package
+  passed: 4
+  failed: 0
+  total: 4
+  pass_rate: 100.0
   note: |
-    Boost 1.85.0 源码树有 12201 个 libs/*/test/*.cpp 测试源文件；其中 helper、fixture
-    和 compile-fail 辅助源码不是独立 b2 测试目标。使用修复后的 b2 引擎、E099 pthread
-    兼容补丁、E100 ucontext 跳过补丁和 29 个已编译 compiled 库，已跑完 142/142 个带测试库。
-    实际执行目标：通过 5439、失败 315、合计 5754，实际执行通过率 94.5%。
-    coroutine2 的 3 个 native-ucontext 目标已按 E100 同类规则跳过；鸿蒙 musl 不提供
-    getcontext/ucontext API，保留 fcontext 测试路径。
-    剩余失败主要归属 b2 compile-fail/failed-updating 分类、Boost 编译期负例、C++ 标准边界
-    及 mysql 的 OpenSSL 外部依赖缺失，详见 reports/pr-body.md。
+    test_package 验证 b2 --help、使用 Conan OHOS clang 工具链构建 hello.c、
+    发现 hello 可执行文件以及执行 hello，共 4 项检查。
 
 new_tests_total: 0
 new_tests_passed: 0
 new_tests_failed: 0
 
 verification: |
-  # 1. b2 引擎重编译（E035；Boost 1.85.0 引擎路径）
-  cd tools/build/src/engine && ./build.sh clang --cxx=clang++
-  # 2. 验证 b2 可执行和 SHELL 执行器修复
+  # b2 引擎构建并启用 OpenHarmony vfork 规避
+  cd tools/build/src/engine
+  ./build.sh clang --cxx=/absolute/path/to/clang++ --cxxflags=-DNO_VFORK
   ./b2 --version
-  # 3. E099：sp_thread_sleep.hpp 的 3 个 pthread_setcancelstate 条件
-  # 加 && !defined(__OHOS__)
-  # 4. E100：fiber/context/coroutine2 的 native-impl 规则
-  # 鸿蒙 clang 下返回 <build>no，跳过 native ucontext 测试并保留 fcontext 测试
-  # 5. 编译并测试（29 个 compiled 库按需构建）
-  ./b2 --user-config=user-config.jam toolset=clang libs/coroutine2/test
-  # 6. Conan 配方验证
+  # Conan 配方验证
   python3 scripts/ohc-run.py conan-verify boost 1.85.0

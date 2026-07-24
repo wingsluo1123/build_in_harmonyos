@@ -1,0 +1,36 @@
+--- tools/build/src/engine/execunix.cpp
++++ tools/build/src/engine/execunix.cpp
+@@ -19,6 +19,7 @@
+ #include <errno.h>
+ #include <signal.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <time.h>
+ #include <unistd.h>  /* vfork(), _exit(), STDOUT_FILENO and such */
+ #include <sys/resource.h>
+@@ -191,9 +192,22 @@
+     /* Initialize default shell. */
+     static LIST * default_shell;
+     if ( !default_shell )
+-        default_shell = list_push_back( list_new(
+-            object_new( "/bin/sh" ) ),
+-            object_new( "-c" ) );
++    {
++        char const * shell_path = getenv( "SHELL" );
++        if ( !shell_path || !*shell_path )
++        {
++            FILE * shell_file = fopen( "/bin/sh", "r" );
++            if ( shell_file )
++            {
++                fclose( shell_file );
++                shell_path = "/bin/sh";
++            }
++            else
++                shell_path = "sh";
++        }
++        default_shell = list_push_back( list_new(
++            object_new( shell_path ) ), object_new( "-c" ) );
++    }
+ 
+     if ( list_empty( shell ) )
+         shell = default_shell;

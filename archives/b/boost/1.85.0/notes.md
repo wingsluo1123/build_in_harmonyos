@@ -1,79 +1,48 @@
 # Boost 1.85.0 OpenHarmony 适配笔记
 
-## 概况
+## 交付内容
 
 - 上游版本：1.85.0
 - 上游源码：https://archives.boost.io/release/1.85.0/source/boost_1_85_0.tar.bz2
 - 平台：OpenHarmony（aarch64-unknown-linux-ohos）
 - 编译器：clang
 - 构建系统：Boost.Build（b2）
-- Conan 包类型：header-library；安装 `boost/` 头文件
+- Conan 包类型：`application`
+- 安装内容：`bin/b2` 及 `share/b2/src` 的 Boost.Build 模块
 
-## 适配补丁
+该配方只支持 `os=OHOS`，避免 OpenHarmony 专用构建参数和兼容补丁影响其他平台。
 
-### E035：b2 SHELL/vfork 兼容
+## E035：b2 SHELL/vfork 兼容
 
-在 `tools/build/src/engine/`：
+补丁：`patches/0005-b2-shell-fallback.patch`
 
-- `jam.h`：OpenHarmony 下定义 `NO_VFORK`，避免 sandbox 环境中的 `vfork()` 不可靠行为。
-- `execunix.cpp`：默认 shell 使用 `/bin/sh` → `$SHELL` → `sh` 的 fallback。
+b2 原本硬编码 `/bin/sh -c`。补丁按以下顺序选择 shell：
 
-Boost 1.85.0 的 b2 引擎目录为 `tools/build/src/engine`，可通过：
+1. 环境变量 `$SHELL`；
+2. 存在时使用 `/bin/sh`；
+3. 否则从 `PATH` 中解析 `sh`。
+
+这使 SHELL 规则可在 `/bin/sh` 不可用的 OpenHarmony 环境运行。b2 构建时传入 `-DNO_VFORK`，以避免 sandbox 环境的 `vfork()` 兼容性风险；该宏是构建参数，不写入上游源码补丁。
 
 ```bash
 cd tools/build/src/engine
-./build.sh clang --cxx=clang++
+./build.sh clang --cxx=/absolute/path/to/clang++ --cxxflags=-DNO_VFORK
 ./b2 --version
 ```
 
-验证引擎可正常执行 SHELL 规则。
+## 包验证
 
-### E099：`pthread_setcancelstate` 缺失
+`test_package` 以 Conan profile 中的绝对 clang 路径生成 `user-config.jam`，并执行四项检查：
 
-补丁：`patches/0001-sp-thread-sleep-ohos.patch`
-
-`boost/core/detail/sp_thread_sleep.hpp` 的三个 pthread 取消状态调用条件增加 `!defined(__OHOS__)`。OpenHarmony 使用 musl libc，不提供该 glibc 风格 API；鸿蒙下保留 `nanosleep` 路径。
-
-### E100：ucontext API 缺失
-
-OpenHarmony musl 不提供 `getcontext`/`swapcontext`/`makecontext`。在鸿蒙 clang 下跳过 native ucontext 测试，同时保留 fcontext 测试路径：
-
-- `libs/fiber/test/Jamfile.v2`
-- `libs/context/test/Jamfile.v2`
-- `libs/coroutine2/test/Jamfile.v2`（补丁：`patches/0004-coroutine2-ohos-no-ucontext.patch`）
-
-coroutine2 回归验证结果：`b2_exit=0`，通过 1，失败 0，且日志中无 `getcontext`/`ucontext` 错误。
-
-## 测试结果
-
-| 指标 | 结果 |
-|------|------|
-| 带测试目录的库 | 142/142 |
-| 源码树测试 `.cpp` 文件 | 12201 |
-| 实际执行 b2 测试目标 | 5754 |
-| 通过 | 5439 |
-| 失败 | 315 |
-| 实际执行通过率 | 94.5% |
-| 新增鸿蒙测试 | 0 |
-
-12201 是 `libs/*/test/*.cpp` 源文件计数，包含 helper、fixture 及 compile-fail 辅助源码；5754 才是 b2 实际执行的独立测试目标，故通过率使用 `5439/5754`。
-
-## 剩余失败
-
-剩余 315 个失败主要不是 OpenHarmony 平台适配问题：
-
-- b2 的 compile-fail/`failed updating` 分类问题；
-- Boost 的编译期负例和 `static_assert` 断言测试；
-- C++ 标准边界（mpl、filesystem、exception、rational）；
-- mysql 测试缺少 OpenSSL 开发头文件；
-- function_types 使用已废弃的 Boost header。
-
-coroutine2 的 3 个 ucontext 残留已由 `0004-coroutine2-ohos-no-ucontext.patch` 修复。
-
-## 配方验证
+1. `b2 --help` 成功；
+2. b2 使用 OHOS clang 编译 `hello.c`；
+3. 找到 b2 生成的 `hello` 可执行文件；
+4. 运行 `hello` 成功。
 
 ```bash
 python3 scripts/ohc-run.py conan-verify boost 1.85.0
 ```
 
-已验证 Conan 配方包含 OpenHarmony 补丁，并可从官方 1.85.0 源码应用补丁。
+## 不包含的全库测试补丁
+
+E099（`pthread_setcancelstate`）与 E100（ucontext）是对 Boost 库全量单元测试的适配经验，不是本 Conan application 包构建或交付 `b2` 所需的补丁，因此未加入该配方的 `conandata.yml`。它们应在后续交付完整 Boost 库测试/运行时组件的独立配方中处理。
