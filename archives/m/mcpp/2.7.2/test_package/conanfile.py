@@ -23,8 +23,9 @@ class McppTestConan(ConanFile):
         bin_path = os.path.join(dep.package_folder, "bin", "mcpp")
 
         # Test 1: mcpp -v shows version string and include directories
-        self.run(f"{bin_path} -v", env="conanrun")
+        # 注意：必须关闭 stdin（</dev/null），否则 mcpp 会等待 stdin 输入导致 CI 挂死
+        self.run(f"{bin_path} -v </dev/null", env="conanrun")
 
         # Test 2: mcpp can preprocess a simple C source (macro expansion)
         test_input = os.path.join(self.source_folder, "test_input.c")
-        self.run(f"{bin_path} {test_input}", env="conanrun")
+        self.run(f"{bin_path} {test_input} </dev/null", env="conanrun")
