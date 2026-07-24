@@ -1,0 +1,52 @@
+software: pdal
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/{version}/manifest.yaml
+
+version: "2.10.2"
+status: built
+build_date: "2026-07-24"
+
+source:
+  url: "https://github.com/PDAL/PDAL/releases/download/2.10.2/PDAL-2.10.2-src.tar.gz"
+  sha256: "1fa8156b0394136e891462507466fb8ee9f6fac98d3fe07f17e1fcdb53dbefd1"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DWITH_TESTS=OFF"
+    - "-DWITH_BACKTRACE=OFF"
+    - "-DWITH_GCS=OFF"
+    - "-DWITH_COMPLETION=OFF"
+    - "-DBUILD_TOOLS_LASDUMP=OFF"
+  dependencies:
+    - "gdal/3.9.2"
+    - "proj/9.3.1"
+    - "nlohmann-json/3.11.2"
+    - "curl/8.19.0"
+    - "zlib/1.3.1"
+    - "libxml2/2.15.3"
+    - "libtiff/4.6.0"
+    - "libgeotiff/1.7.4"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "HarmonyOS SELinux prevents executing locally-built binaries (dimbuilder) - use Python script as replacement"
+  - "CMake doesn't recognize HarmonyOS platform - use CMAKE_CROSSCOMPILING=ON workaround"
+  - "musl dynamic linker can't find shared libraries from conan cache at runtime (E088)"
+  - "libgdal.so has unresolved transitive dependencies - use --allow-shlib-undefined linker flag"
+  - "GDAL pre-compiled package lacks development headers and cmake config - need to extract from source"
+  - "PROJ and GeoTIFF cmake configs reference TIFF::TIFF target - need find_package(TIFF CONFIG) before loading"
+
+patch_generation:
+  method: direct-modification
+  source_orig_dir: /storage/Users/currentUser/builds/pdal-2.10.2.orig
+  source_work_dir: /storage/Users/currentUser/builds/pdal-2.10.2.work
+  generated_at: '2026-07-24T12:00:00'
+  patches_count: 0
+
+patch_classification: []
