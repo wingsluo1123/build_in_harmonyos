@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: makefile（plain Makefile，非 autotools）
-- 编译日期: 2026-06-12
+- 编译日期: 2026-07-24
 - 编译器: clang 15.0.4 / clang++ 15.0.4
 - 目标平台: OpenHarmony aarch64 (HongMeng Kernel 1.12.0, musl libc)
 - 状态: built
