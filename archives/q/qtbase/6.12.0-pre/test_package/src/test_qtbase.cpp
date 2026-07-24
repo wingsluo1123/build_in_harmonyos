@@ -89,8 +89,8 @@ int main(int argc, char *argv[]) {
 
         // argc/argv 必须透传给 QGuiApplication 以避免 Qt 运行时警告
         QGuiApplication app(argc, argv);
-        // 验证 QGuiApplication 构造成功 — qApp 不依赖平台默认属性值
-        CHECK(qApp != nullptr, "Gui QGuiApplication created");
+        CHECK(app.testAttribute(Qt::AA_ShareOpenGLContexts) == false,
+              "Gui QGuiApplication created");
 
         QWindow window;
         window.setTitle("qtbase test");

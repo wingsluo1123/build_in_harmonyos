@@ -164,34 +164,31 @@ class QtBaseConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
 
         # 各组件声明（按 Qt6 qtbase 上游模块边界）
-        # 每个组件对应一个 with_* option，仅在该 option 为 True 时声明
         # ShaderTools 属于独立的 qtshadertools 仓库，不由 qtbase 提供
-        component_options = {
-            "Core":            {"option": None,     "libs": ["Qt6Core"]},           # Core 始终可用
-            "Gui":             {"option": "with_gui",   "libs": ["Qt6Gui"]},
-            "Widgets":         {"option": "with_widgets","libs": ["Qt6Widgets"]},
-            "Network":         {"option": "with_network","libs": ["Qt6Network"]},
-            "OpenGL":          {"option": "with_opengl", "libs": ["Qt6OpenGL"]},
-            "OpenGLWidgets":   {"option": "with_opengl", "libs": ["Qt6OpenGLWidgets"]},
-            "Xml":             {"option": "with_xml",    "libs": ["Qt6Xml"]},
-            "Concurrent":      {"option": "with_concurrent","libs": ["Qt6Concurrent"]},
-            "Sql":             {"option": "with_sql",    "libs": ["Qt6Sql"]},
-            "Test":            {"option": "with_test",   "libs": ["Qt6Test"]},
-            "Core5Compat":     {"option": None,     "libs": ["Qt6Core5Compat"]},    # Core5Compat 始终可用
+        components = {
+            "Core":            {"libs": ["Qt6Core"]},
+            "Gui":             {"libs": ["Qt6Gui"]},
+            "Widgets":         {"libs": ["Qt6Widgets"]},
+            "Network":         {"libs": ["Qt6Network"]},
+            "OpenGL":          {"libs": ["Qt6OpenGL"]},
+            "OpenGLWidgets":   {"libs": ["Qt6OpenGLWidgets"]},
+            "Xml":             {"libs": ["Qt6Xml"]},
+            "Concurrent":      {"libs": ["Qt6Concurrent"]},
+            "Sql":             {"libs": ["Qt6Sql"]},
+            "Test":            {"libs": ["Qt6Test"]},
+            "Core5Compat":     {"libs": ["Qt6Core5Compat"]},
         }
-        for comp_name, comp_info in component_options.items():
-            opt = comp_info["option"]
-            if opt is None or self.options.get_safe(opt, False):
-                comp = self.cpp_info.components[comp_name]
-                comp.libs = comp_info["libs"]
-                comp.set_property("cmake_file", f"lib/cmake/Qt6{comp_name}/Qt6{comp_name}Config.cmake")
-                comp.set_property("cmake_target_name", f"Qt6::{comp_name}")
         # EglFSDeviceIntegration 仅在 eglfs 平台配置下构建，设为可选
         if self.options.get_safe("with_opengl"):
             comp = self.cpp_info.components["EglFSDeviceIntegration"]
             comp.libs = ["Qt6EglFSDeviceIntegration"]
             comp.set_property("cmake_file", "lib/cmake/Qt6EglFSDeviceIntegration/Qt6EglFSDeviceIntegrationConfig.cmake")
             comp.set_property("cmake_target_name", "Qt6::EglFSDeviceIntegration")
+        for comp_name, comp_info in components.items():
+            comp = self.cpp_info.components[comp_name]
+            comp.libs = comp_info["libs"]
+            comp.set_property("cmake_file", f"lib/cmake/Qt6{comp_name}/Qt6{comp_name}Config.cmake")
+            comp.set_property("cmake_target_name", f"Qt6::{comp_name}")
 
         # CMake config 根文件（find_package(Qt6) 入口）
         self.cpp_info.set_property("cmake_file", "lib/cmake/Qt6/Qt6Config.cmake")
