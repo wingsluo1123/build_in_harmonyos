@@ -58,7 +58,9 @@ class CBlosc2Conan(ConanFile):
         tc.variables["PREFER_EXTERNAL_ZLIB"] = True
         tc.variables["PREFER_EXTERNAL_ZSTD"] = True
         if self.settings.os == "OHOS":
-            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+            arch_map = {"armv8": "aarch64", "armv8.3": "aarch64", "armv8.5": "aarch64"}
+            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = arch_map.get(
+                str(self.settings.arch), str(self.settings.arch))
         tc.generate()
 
     def build(self):

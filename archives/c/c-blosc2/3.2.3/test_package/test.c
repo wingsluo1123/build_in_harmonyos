@@ -23,7 +23,11 @@ int main(void) {
     int i;
 
     blosc2_init();
-    blosc2_set_nthreads(2);
+    if (blosc2_set_nthreads(2) < 0) {
+        printf("blosc2_set_nthreads() failed\n");
+        blosc2_destroy();
+        return 1;
+    }
 
     for (i = 0; i < SIZE; i++) {
         data[i] = i;
