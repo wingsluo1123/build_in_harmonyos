@@ -192,12 +192,7 @@ class QtBaseConan(ConanFile):
             comp.libs = ["Qt6EglFSDeviceIntegration"]
             comp.set_property("cmake_file", "lib/cmake/Qt6EglFSDeviceIntegration/Qt6EglFSDeviceIntegrationConfig.cmake")
             comp.set_property("cmake_target_name", "Qt6::EglFSDeviceIntegration")
-        for comp_name, comp_info in components.items():
-            comp = self.cpp_info.components[comp_name]
-            comp.libs = comp_info["libs"]
-            comp.set_property("cmake_file", f"lib/cmake/Qt6{comp_name}/Qt6{comp_name}Config.cmake")
-            comp.set_property("cmake_target_name", f"Qt6::{comp_name}")
-
+ 
         # CMake config 根文件（find_package(Qt6) 入口）
         self.cpp_info.set_property("cmake_file", "lib/cmake/Qt6/Qt6Config.cmake")
         self.cpp_info.set_property("cmake_target_name", "Qt6")
