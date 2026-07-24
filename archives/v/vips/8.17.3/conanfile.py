@@ -183,6 +183,39 @@ class VipsConan(ConanFile):
         meson = Meson(self)
         meson.install()
 
+        # Fix absolute paths in DT_NEEDED entries (E050 workaround).
+        # pkg-config .pc files embed absolute libdir paths, causing meson to
+        # emit DT_NEEDED with absolute paths like /storage/.../libexpat.so.
+        # Replace them with bare library names for portability.
+        lib_dir = os.path.join(self.package_folder, "lib")
+        if os.path.isdir(lib_dir):
+            for fname in os.listdir(lib_dir):
+                if not fname.startswith("libvips") or not ".so" in fname:
+                    continue
+                lib_path = os.path.join(lib_dir, fname)
+                if os.path.islink(lib_path):
+                    continue
+                # Read current NEEDED entries and fix absolute paths
+                try:
+                    result = self.run(
+                        'patchelf --print-needed "{}"'.format(lib_path),
+                        capture=True,
+                    )
+                    for needed in result.stdout.strip().splitlines():
+                        needed = needed.strip()
+                        if needed.startswith("/"):
+                            bare = os.path.basename(needed)
+                            self.output.info(
+                                "Fixing NEEDED: {} -> {}".format(needed, bare)
+                            )
+                            self.run(
+                                'patchelf --replace-needed "{}" "{}" "{}"'.format(
+                                    needed, bare, lib_path
+                                )
+                            )
+                except Exception as e:
+                    self.output.warn("patchelf on {}: {}".format(fname, e))
+
     def package_info(self):
         self.cpp_info.libs = ["vips"]
         self.cpp_info.set_property("pkg_config_name", "vips")
