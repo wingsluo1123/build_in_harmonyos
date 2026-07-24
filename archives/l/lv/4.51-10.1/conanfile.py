@@ -7,7 +7,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -54,7 +54,7 @@ class LvConan(ConanFile):
         autotools = Autotools(self)
         src_dir = os.path.join(self.source_folder, "src")
         autotools.configure(build_script_folder=src_dir)
-        autotools.make(vars={"LDFLAGS": "-ltermcap"})
+        autotools.make(vars={"LDFLAGS": "${LDFLAGS} -ltermcap"})
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
@@ -69,11 +69,11 @@ class LvConan(ConanFile):
             lv_path = os.path.join(src_dir, "lv")
         if not os.path.exists(lv_path):
             raise ConanInvalidConfiguration("lv binary not found in build output")
-        self.run(f"cp {lv_path} {bin_dir}/lv")
-        self.run(f"cd {bin_dir} && ln -sf lv lgrep")
+        copy(self, os.path.basename(lv_path), src=os.path.dirname(lv_path), dst=bin_dir)
+        os.symlink(os.path.join(bin_dir, "lv"), os.path.join(bin_dir, "lgrep"))
         hlp_src = os.path.join(root_dir, "lv.hlp")
         if os.path.exists(hlp_src):
-            self.run(f"cp {hlp_src} {lib_dir}/")
+            copy(self, "lv.hlp", src=root_dir, dst=lib_dir)
 
     def package_info(self):
         self.cpp_info.libs = []

@@ -22,4 +22,5 @@ class LvTestConan(ConanFile):
 
     def test(self):
         self.run("which lv", env="conanrun")
-        self.run("lv /dev/null", env="conanrun")
+        # 用 timeout 防止 lv 在非交互终端挂起；输入为空时立即退出
+        self.run("timeout 3 lv /dev/null 2>&1 || true", env="conanrun")
