@@ -34,8 +34,12 @@ class GmpConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: System-name libraries default to static
-        if not self.options.shared:
+        # R26: System-name libraries default to static.
+        # GMP configure 默认只构建静态库，shared=True 时必须显式传
+        # --enable-shared，否则产物只有 libgmp.a，与选项语义矛盾。
+        if self.options.shared:
+            tc.configure_args.append("--enable-shared")
+        else:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         tc.configure_args.append("ABI=64")
