@@ -72,14 +72,9 @@ class TimewarriorConan(ConanFile):
                 "timemachine",
             ):
                 copy(self, helper, src=test_source, dst=test_build)
-            # Both are executable files in 1.9.1; upstream CMake copies them
-            # with configure_file(), and this explicit copy documents the layout.
-            for runner in ("run_all", "problems"):
-                copy(self, runner, src=test_source, dst=test_build)
-                if not os.path.isfile(os.path.join(test_build, runner)):
-                    raise ConanInvalidConfiguration(
-                        f"Missing upstream test runner: {runner}"
-                    )
+            copy(self, "run_all", src=test_source, dst=test_build)
+            if not os.path.isfile(os.path.join(test_build, "run_all")):
+                raise ConanInvalidConfiguration("Missing upstream test runner: run_all")
             copy(
                 self,
                 "totals.py",
@@ -111,7 +106,7 @@ class TimewarriorConan(ConanFile):
             test_env = Environment()
             test_env.prepend_path("PATH", shim_dir)
             with test_env.vars(self).apply():
-                self.run("chmod +x *.t run_all problems", cwd=test_build)
+                self.run("chmod +x *.t run_all", cwd=test_build)
                 cmake.build(target="test")
                 self.run("./AtomicFileTest", cwd=test_build)
 
