@@ -114,7 +114,8 @@ class DropbearConan(ConanFile):
             # HMDFS rejects config.status files created with umask 077. Use the
             # device-local tmpfs path instead of the package build directory.
             tmpdir = "/data/local/tmp"
-            os.makedirs(tmpdir, exist_ok=True)
+            if not os.path.isdir(tmpdir):
+                raise RuntimeError(f"OHOS temporary directory is unavailable: {tmpdir}")
             previous_tmpdir = os.environ.get("TMPDIR")
             os.environ["TMPDIR"] = tmpdir
 
