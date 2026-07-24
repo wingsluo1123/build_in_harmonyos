@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Conan recipe for ATK — Accessibility Toolkit for GNOME.
+
+HarmonyOS PC (aarch64) adaptation. Uses Meson build system.
+"""
+
 from conan import ConanFile
 from conan.tools.meson import Meson, MesonToolchain, meson_layout
 from conan.tools.files import get, copy

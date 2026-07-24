@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Test package for ATK — validates library linkage via atk_get_version() API call."""
+
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, cmake_layout
