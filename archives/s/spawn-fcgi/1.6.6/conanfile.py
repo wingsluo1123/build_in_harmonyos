@@ -17,7 +17,6 @@ class SpawnFcgiConan(ConanFile):
     description = "Simple program to spawn FastCGI processes"
     license = "BSD-3-Clause"
     homepage = "https://www.lighttpd.net/"
-    url = ""
 
     package_type = "application"
 

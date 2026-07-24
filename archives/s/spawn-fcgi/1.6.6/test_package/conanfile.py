@@ -8,6 +8,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.env import VirtualRunEnv
+from conan.tools.layout import basic_layout
 
 
 class SpawnFcgiTestConan(ConanFile):
@@ -18,7 +19,6 @@ class SpawnFcgiTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def layout(self):
-        from conan.tools.layout import basic_layout
         basic_layout(self)
 
     def test(self):

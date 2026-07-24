@@ -80,4 +80,4 @@ spawn-fcgi v1.6.6 (ipv6) - spawns FastCGI processes
 ---
 
 **编译结束**: 2026-06-13 16:05
-**最终状态**: published
+**最终状态**: built
