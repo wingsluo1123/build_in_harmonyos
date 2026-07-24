@@ -18,7 +18,7 @@
 
 R39 明令 conandata.yml URL 必须指 Qt 官方源 `download.qt.io/official_releases/`，禁 gitcode.com 非官方源（供应链安全风险）。原预构建引用模式违规，改源码编译范式：
 
-- `source()`: get() 拉 Qt 官方源 tar.xz
+- `source()`: git clone Qt 官方 git 镜像 6.12 分支源码（conan 2.x get() 不支持 git 源）
 - `build()`: cmake.configure() + cmake.build()（CI 跑，本地豁免）
 - `package()`: 从 build_folder 拷构建产物
 - `package_info()`: cpp_info.components 声明多子包
@@ -54,7 +54,7 @@ kdoctools 6.19.0-r0 (配方已入库占位，最终目标)
 
 ### Conan recipe 特殊处理
 
-- **预构建引用模式**：`no_copy_sources = True`，`build() = pass`，仅 `source()` + `package()`
+- **源码编译模式**：`source()` git clone Qt 官方 6.12 分支源，`build()` cmake.configure() + cmake.build()（CI 跑），`package()` 从 build_folder 拷构建产物
 - **多组件包**：`cpp_info.components[Core/Gui/Widgets/...]` 各声明 cmake_file + cmake_target_name
 - **CMake config 根**：`lib/cmake/Qt6/Qt6Config.cmake` 作为 find_package(Qt6) 入口
 - **环境变量**：QTDIR + QTPATHS + PATH 让下游能找到 qmake/qt-cmake

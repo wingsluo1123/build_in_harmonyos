@@ -9,6 +9,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class QtBaseTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
