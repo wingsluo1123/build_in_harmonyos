@@ -30,7 +30,7 @@ class DropbearTestConan(ConanFile):
         for program in ("dropbear", "dbclient", "dropbearkey", "dropbearconvert"):
             path = os.path.join(binary_dir, program)
             if not os.path.isfile(path) or not os.access(path, os.X_OK):
-                raise ConanInvalidConfiguration(
+                raise RuntimeError(
                     f"missing executable packaged binary: {path}"
                 )
             binaries[program] = path
