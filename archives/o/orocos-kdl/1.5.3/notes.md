@@ -47,7 +47,11 @@ cmake --install build --prefix "$TEST_PREFIX$DEFAULT_PREFIX"
 
 ## 源码修改
 
-无补丁，源码无需修改即可编译。
+- `patches/0001-kinfamtest-define-uint-for-libcxx.patch`
+  - 修改 `orocos_kdl/tests/kinfamtest.cpp`，加入 `#include <cstdint>` 和
+    `using uint = unsigned int;`。
+  - 原因：上游测试使用 BSD `uint` 类型；HarmonyOS 的 C++17 libc++ 不默认声明该类型。
+  - 该补丁仅作用于上游 cppunit 测试编译，不改变 orocos-kdl 库的对外 API 或运行时产物。
 
 ## 依赖版本
 

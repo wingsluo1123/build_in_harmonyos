@@ -9,6 +9,7 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, save
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 import os
+import shutil
 
 
 # Minimal config-auto.h for cppunit static build on OHOS (bypass autotools).
@@ -200,8 +201,8 @@ class OrocoskdlConan(ConanFile):
         # Copy Eigen3 headers into the package (KDL headers depend on Eigen3)
         eigen_src = os.path.join(self.source_folder, "_eigen", "Eigen")
         eigen_dst = os.path.join(self.package_folder, "include", "Eigen")
-        if os.path.isdir(eigen_src) and not os.path.isdir(eigen_dst):
-            copy(self, "*", src=eigen_src, dst=eigen_dst)
+        if os.path.isdir(eigen_src):
+            shutil.copytree(eigen_src, eigen_dst, dirs_exist_ok=True)
         # Copy license file
         for lic in ["COPYING", "LICENSE", "LICENSE.txt"]:
             src = os.path.join(self.source_folder, lic)
