@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/p/pdf2json/0.71/test_package/conanbuildenv-release-armv8.sh"
