@@ -142,6 +142,10 @@ class QtBaseConan(ConanFile):
         # include/ — Qt6 头文件（按模块子目录）
         copy(self, "*", os.path.join(self.source_folder, "include"),
              os.path.join(self.package_folder, "include"))
+        # Qt6 CMake 构建在 build_folder/include 下生成平台配置头文件（如 qconfig.h）
+        if os.path.isdir(os.path.join(self.build_folder, "include")):
+            copy(self, "*", os.path.join(self.build_folder, "include"),
+                 os.path.join(self.package_folder, "include"))
         # mkspecs/ — Qt mkspecs（qmake 平台配置）
         copy(self, "*", os.path.join(self.source_folder, "mkspecs"),
              os.path.join(self.package_folder, "mkspecs"))
