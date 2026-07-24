@@ -6,7 +6,7 @@
 - 编译日期: 2026-06-13
 - 编译器: clang 15.0.4 / clang++ 15.0.4
 - 平台: OpenHarmony aarch64 (native编译)
-- 状态: published
+- 状态: built
 - 特殊环境变量: PYTHONHOME=/data/service/hnp/python.org/python_3.12
 
 ## 编译步骤
