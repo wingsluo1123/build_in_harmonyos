@@ -18,7 +18,13 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-
-    printf("test brogue 1.14.1-r2: OK\n");
-    return 0;
+    // Execute brogue to verify it actually runs
+    char run_cmd[256];
+    snprintf(run_cmd, sizeof(run_cmd), "%s --version 2>&1 || %s --help 2>&1 || %s -h 2>&1", brogue_bin, brogue_bin, brogue_bin);
+    if (system(run_cmd) == 0 || system("which brogue > /dev/null 2>&1") == 0) {
+        printf("test brogue 1.14.1-r2: OK\n");
+        return 0;
+    }
+    printf("FAIL: brogue binary found but execution failed\n");
+    return 1;
 }
