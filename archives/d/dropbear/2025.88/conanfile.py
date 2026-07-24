@@ -111,8 +111,9 @@ class DropbearConan(ConanFile):
                     os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         previous_tmpdir = None
         if str(self.settings.os) == "OHOS":
-            # config.guess compiles a probe in TMPDIR; OHOS CI's global path is not writable.
-            tmpdir = os.path.join(self.build_folder, ".tmp")
+            # HMDFS rejects config.status files created with umask 077. Use the
+            # device-local tmpfs path instead of the package build directory.
+            tmpdir = "/data/local/tmp"
             os.makedirs(tmpdir, exist_ok=True)
             previous_tmpdir = os.environ.get("TMPDIR")
             os.environ["TMPDIR"] = tmpdir
