@@ -1,6 +1,6 @@
-# harfbuzz 14.2.0 编译记录
+# HarfBuzz 14.2.0 adaptation notes
 
-## 编译环境
+## Build
 
 - **软件**: harfbuzz
 - **版本**: 14.2.0
@@ -17,9 +17,9 @@
 - ✅ conanfile.py requirements() 包含 graphite2/1.3.14
 - ✅ conanfile.py package_info() 设置传递依赖 graphite2::graphite2
 
-## 编译过程
+The dependency recipe builds FreeType without HarfBuzz, so the Conan graph has no cycle. `PkgConfigDeps` generates `freetype2.pc`; Meson receives its path from the generated native file. Conan's standard `shared` option supplies `default_library`, while the recipe enables FreeType, subset, vector, and tests and disables unrelated optional integrations and utilities.
 
-### 1. 源码获取
+The recipe resolves LLVM tools from Conan's configured C compiler through one shared resolver. On Linux/OHOS it injects absolute `ar` and `ranlib` paths into Meson's native file, and supplies absolute `NM` and `OBJDUMP` paths while running the upstream test suite; other platforms keep Meson's native behavior. Versioned compilers retain their suffix consistently, for example `clang-15` selects `llvm-ar-15`, `llvm-ranlib-15`, `llvm-nm-15`, and `llvm-objdump-15`. This keeps HarfBuzz's symbol and static-initializer checks active even when OHOS Python does not resolve bare commands through `posix_spawn`, without forcing Windows/MSVC to provide Unix tools. On OHOS shared builds, installed libraries are re-signed after Meson rewrites ELF metadata; both `llvm-objcopy` and `binary-sign-tool` are resolved to absolute paths from the toolchain directory or `PATH`, and every dynamic command argument is POSIX-shell quoted before execution. Static consumers receive the upstream `-pthread -lm` private link requirements through the core component.
 
 - 源码下载成功（通过 ghfast.top 镜像）：https://github.com/harfbuzz/harfbuzz/releases/download/14.2.0/harfbuzz-14.2.0.tar.xz
 - sha256: 94017020f96d025bb66ae91574e4cf334bcad23e8175a8a40565b3721bc2eaff
