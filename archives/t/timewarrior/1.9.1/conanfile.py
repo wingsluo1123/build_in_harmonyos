@@ -36,7 +36,7 @@ class TimewarriorConan(ConanFile):
             self,
             os.path.join(self.source_folder, "cmake", "CXXSniffer.cmake"),
             '${CMAKE_SYSTEM_NAME} MATCHES "Linux"',
-            '${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS"',
+            '${CMAKE_SYSTEM_NAME} MATCHES "Linux|OHOS|HarmonyOS"',
         )
 
     def export_sources(self):
@@ -66,7 +66,13 @@ class TimewarriorConan(ConanFile):
                     src=os.path.join(test_source, directory),
                     dst=os.path.join(test_build, directory),
                 )
-            for helper in ("bash_tap.sh", "bash_tap_ti.sh", "timemachine"):
+            for helper in (
+                "bash_tap.sh",
+                "bash_tap_ti.sh",
+                "timemachine",
+                "run_all",
+                "problems",
+            ):
                 copy(self, helper, src=test_source, dst=test_build)
             copy(
                 self,
