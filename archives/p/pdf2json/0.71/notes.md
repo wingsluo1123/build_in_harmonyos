@@ -110,8 +110,11 @@ lib/external/    (空目录)
 - JSON 输出编码为 latin-1, UTF-8 解析可能失败, 需指定 encoding='latin-1'
 - Makefile 补丁为完整生成文件, 包含平台特定路径, 不可移植到其他环境
 - configure.ac 中 AC_CHECK_LIB 检查的 Goo/Xpdf/fofi/splash 为内部库, 不需预安装
-
 ---
 
-**编译结束**: 2026-06-12 04:45
-**最终状态**: published
+**编译结束**: 2026-07-24 10:50
+**最终状态**: built
+---
+
+**编译结束**: 2026-07-24 11:40
+**最终状态**: built
