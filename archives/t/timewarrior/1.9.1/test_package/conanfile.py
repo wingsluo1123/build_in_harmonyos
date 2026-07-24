@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Consumer test for Timewarrior 1.9.1."""
+
 import os
 import shutil
 
@@ -15,7 +18,11 @@ class TimewarriorTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            binary = os.path.join(self.dependencies["timewarrior"].package_folder, "bin", "timew")
+            binary = os.path.join(
+                self.dependencies["timewarrior"].package_folder,
+                "bin",
+                "timew",
+            )
             script = os.path.join(self.source_folder, "test.sh")
             bash = (
                 os.environ.get("CONFIG_SHELL")
