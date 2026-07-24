@@ -39,19 +39,21 @@ class SpawnFcgiConan(ConanFile):
     def generate(self):
         tc = MesonToolchain(self)
         tc.generate()
-        # Inject ar into meson native file (profile doesn't set tools.build:archiver)
+        # Inject ar into meson native file if not set by profile
+        # (OHOS HNP profile doesn't set tools.build:archiver)
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         with open(native_file) as f:
             content = f.read()
-        old_content = content
-        content = content.replace(
-            "[binaries]\nc =",
-            "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\nc =",
-        )
-        if content == old_content:
-            raise RuntimeError("Failed to inject ar into meson native file")
-        with open(native_file, "w") as f:
-            f.write(content)
+        if "ar =" not in content:
+            old_content = content
+            content = content.replace(
+                "[binaries]\nc =",
+                "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\nc =",
+            )
+            if content == old_content:
+                raise RuntimeError("Failed to inject ar into meson native file")
+            with open(native_file, "w") as f:
+                f.write(content)
 
     def build(self):
         apply_conandata_patches(self)

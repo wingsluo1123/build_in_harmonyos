@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/temp/build_in_harmonyos/archives/s/spawn-fcgi/1.6.6/test_package/build-release/conan/conanbuildenv-release-armv8.sh"

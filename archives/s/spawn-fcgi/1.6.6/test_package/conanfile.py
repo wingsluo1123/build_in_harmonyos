@@ -7,7 +7,6 @@ Verifies that the spawn-fcgi binary is functional by running
 import os
 
 from conan import ConanFile
-from conan.tools.env import VirtualRunEnv
 from conan.tools.layout import basic_layout
 
 
