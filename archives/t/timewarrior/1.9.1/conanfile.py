@@ -70,10 +70,16 @@ class TimewarriorConan(ConanFile):
                 "bash_tap.sh",
                 "bash_tap_ti.sh",
                 "timemachine",
-                "run_all",
-                "problems",
             ):
                 copy(self, helper, src=test_source, dst=test_build)
+            # Both are executable files in 1.9.1; upstream CMake copies them
+            # with configure_file(), and this explicit copy documents the layout.
+            for runner in ("run_all", "problems"):
+                copy(self, runner, src=test_source, dst=test_build)
+                if not os.path.isfile(os.path.join(test_build, runner)):
+                    raise ConanInvalidConfiguration(
+                        f"Missing upstream test runner: {runner}"
+                    )
             copy(
                 self,
                 "totals.py",
