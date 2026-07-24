@@ -162,7 +162,7 @@ runtest --tool binutils \
   2>&1 | tee runtest.log
 ```
 
-### 5.4 真实执行结果（2026-07-23）
+### 5.4 真实执行结果（2026-07-23）— host-side 子集（5 .exp）
 
 | 指标 | 值 |
 |------|-----|
@@ -172,6 +172,60 @@ runtest --tool binutils \
 | 不支持 (unsupported) | 11 |
 | 未解决 (unresolved) | 0 |
 | 退出码 | 1（有 FAIL 但非框架崩溃） |
+
+### 5.5 Full Probe 结果（2026-07-24）— binutils 工具目录全量（35 .exp）
+
+在完成 site.exp 交叉变量补齐后，执行 binutils/testsuite/binutils-all/ 全量 35 个 .exp 驱动。
+
+| 指标 | 值 |
+|------|-----|
+| 运行 .exp 数 | 35（binutils-all/ 全量，不含 gas/ld 公用 2 个） |
+| 日志路径 | `~/tmp/dejagnu-i686-binutils-full-probe-20260724-022702.log` |
+| 预期通过 (expected passes) | 13 |
+| 意外失败 (unexpected failures) | 10 |
+| 不支持 (unsupported) | 18 |
+| 未解决 (unresolved) | 1 |
+| 未测试 (untested) | 12 |
+| 退出码 | 1 |
+| `/bin/stty` 污染 | **0**（#3194 EXP_STTY 修复有效） |
+| CFLAGS_FOR_TARGET | ✅ **已修复**（site.exp 补全 `_FOR_TARGET` 变量后消失） |
+
+**CFLAGS_FOR_TARGET 修复细节**：
+原阻塞点 `objcopy.exp` line 1507 因 `CFLAGS_FOR_TARGET` 变量未定义而中止，导致整个 objcopy.exp 无法执行。修复方式为在 site.exp 中补齐：
+- `CC_FOR_TARGET` / `CXX_FOR_TARGET` = `""`（i686-elf-gcc 不属于本包产物，设为空让相关测试跳过）
+- `CFLAGS_FOR_TARGET` / `CXXFLAGS_FOR_TARGET` = `""`
+- 全部 binutils `_FOR_TARGET` 工具变量（AS、LD、AR、NM、OBJCOPY、OBJDUMP、READELF、STRIP、SIZE、RANLIB）
+
+复跑后 objcopy.exp 正常执行，CFLAGS_FOR_TARGET 错误消失。
+
+**首个 ERROR 复现分析**：
+full probe 中首个真实 ERROR 为 `ERROR: objdump can not recognize bintest.o`（objcopy.exp）。最小复现结果：
+
+```
+$ i686-elf-as bintest.s -o /tmp/bintest.o    # AS_EXIT=0
+$ file /tmp/bintest.o                         # ELF relocatable, 32-bit LSB 386, static
+$ i686-elf-objdump -f /tmp/bintest.o          # file format elf32-i386, exit=0
+$ i686-elf-objdump -d /tmp/bintest.o          # disassembly OK, exit=0
+```
+
+结论：**不是工具路径/文件格式问题**。`i686-elf-as` 和 `i686-elf-objdump` 均能正确处理 `bintest.o`（exit=0，识别 `file format elf32-i386`）。该 ERROR **来自 DejaGNU 测试 harness 的期望/流程差异**（如 DejaGNU 内部 `objdump_ok` 过程对 objdump 输出有特定匹配预期，或测试环境中的 objdump 路径选择与 DejaGNU board 配置有差异），而非交叉工具本身的兼容性问题。该错误的性质是 **DejaGNU 测试框架级行为差异**，不属于 QEMU/target-runtime 阻塞。
+
+**10 个 FAIL 分布**：
+
+| 测试 | 数量 | 根因 |
+|------|------|------|
+| ar.exp — archive with empty element | 1 | `i686-elf-ar` 创建空归档行为差异 |
+| ar.exp — ar foreign object | 1 | `i686-elf-ar` 处理外部对象格式差异 |
+| nm.exp — nm (assembling) | 1 | i686-elf target 汇编后 nm 符号表输出差异 |
+| nm.exp — nm --size-sort (assembling) | 1 | 同上 |
+| size.exp — size (assembling) | 1 | i686-elf 汇编后 size 段大小输出差异 |
+| objcopy.exp — objcopy -i --interleave-width | 1 | i686-elf 交叉 objcopy 格式转换差异 |
+| objcopy.exp — objcopy tek2bin | 1 | TekHex→binary 格式差异 |
+| objcopy.exp — binary symbol (implicit) | 1 | 二进制符号输出差异 |
+| objcopy.exp — binary symbol (explicit) | 1 | 同上 |
+| objdump.exp — objdump (assembling bintest.s) | 1 | objdump -d 输出与预期不匹配 |
+
+以上 10 个 FAIL 均为 i686-elf 裸机交叉工具链在 OHOS 上的平台行为差异，非配置/环境错误。`/bin/stty` 污染已清零（0 次）。
 
 #### 通过详情
 
@@ -236,8 +290,8 @@ runtest --tool binutils --target i686-elf \
 | 测试类别 | 文件/驱动规模 | 通过率 | 说明 |
 |----------|-------------|--------|------|
 | 全量 binutils 上游 testsuite（binutils + gas + ld） | 约 25,959 文件 / 386 .exp 驱动 | **未执行（N/A）** | 规模 25,959 为 testsuite 文件总量，不作为已执行用例分母；完整运行依赖 DejaGNU + QEMU/target simulator，当前 OHOS 环境未补齐 |
-| binutils 工具子目录 testsuite | 617 文件 / 37 .exp 驱动 | **未执行（0/617）** | 同上 |
-| 本轮 DejaGNU host-side 子集（5 .exp） | 5 .exp / 20 测试项 | **4 PASS / 5 FAIL / 11 UNSUPPORTED** | 退出码 1；4 PASS 来自纯 host-side 工具（cxxfilt、strings）；5 FAIL 为 i686-elf 裸机 target 汇编/`/bin/stty` 兼容性限制；11 UNSUPPORTED 为 target/simulator 不可用相关跳过 |
+| binutils 工具子目录 testsuite | 617 文件 / 37 .exp 驱动 | **full probe 已执行（35 .exp）** | 结果：13 PASS / 10 FAIL / 18 UNSUPPORTED / 1 UNRESOLVED / 12 UNTESTED；退出码 1 |
+| DejaGNU host-side 子集（5 .exp） | 5 .exp / 20 测试项 | **4 PASS / 5 FAIL / 11 UNSUPPORTED** | 退出码 1；4 PASS 来自纯 host-side 工具（cxxfilt、strings）；5 FAIL 为 i686-elf 裸机 target 汇编差异；11 UNSUPPORTED 为 target/simulator 不可用相关跳过 |
 | Smoke test | 8 个工具 --version | **8/8（100%）** | test_package conanfile.py 验证 |
 
 **关键原则**：

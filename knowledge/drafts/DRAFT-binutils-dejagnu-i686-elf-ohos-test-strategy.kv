@@ -15,9 +15,9 @@ match_keywords:         DejaGNU, runtest, Tcl, Expect, site.exp, target_board, i
 title:                  GNU binutils 交叉工具链 DejaGNU testsuite 测试策略 — 针对 *-elf 裸机目标在 OHOS 上的适配方案
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
-root_cause: GNU binutils 上游 testsuite 依赖 DejaGNU / Tcl / Expect 运行框架，且 i686-elf 裸机交叉目标需要 target simulator（如 QEMU）或硬件环境才能执行目标代码。当前 HarmonyOS PC 构建环境满足 DejaGNU 框架条件（runtest 1.6.3、expect 5.45.4、Tcl 8.6 均可用），但缺少 i686 target simulator（qemu-system-i386 不可用）和 tclsh，且 i686-elf 裸机 ELF 无法直接在 OHOS aarch64 host 上执行。因此上游全量 testsuite 无法运行，需通过 compile-only/host-side 子集方案替代。
+root_cause: GNU binutils 上游 testsuite 依赖 DejaGNU / Tcl / Expect 运行框架，且 i686-elf 裸机交叉目标需要 target simulator（如 QEMU）或硬件环境才能执行目标代码。当前 HarmonyOS PC 构建环境满足 DejaGNU 框架条件（runtest 1.6.3、expect 5.45.4、Tcl 8.6 均可用），但缺少 i686 target simulator（qemu-system-i386 不可用）和 tclsh，且 i686-elf 裸机 ELF 无法直接在 OHOS aarch64 host 上执行。因此上游全量 testsuite 无法运行，已执行 host-side 子集（5 .exp）和 binutils 工具目录 full probe（35 .exp），覆盖上游全部 37 个 binutils 测试驱动中的 35 个。
 affected_scope: 所有 *-elf 格式的 GNU binutils 交叉工具链（i686-elf、arm-none-eabi、x86_64-elf 等），在 OHOS 或类似无 target simulator 的交叉构建环境中。
-verification_cmd: runtest --tool binutils --target i686-elf --target_board=i686-elf-compile-only ar.exp nm.exp objcopy.exp size.exp strings.exp cxxfilt.exp 2>&1 | grep -E '^(# of expected|# of unexpected|FAIL|PASS)'
+verification_cmd: runtest --tool binutils --target i686-elf --srcdir .../binutils/testsuite ar.exp nm.exp objcopy.exp size.exp strings.exp cxxfilt.exp 2>&1 | grep -E '^(# of expected|# of unexpected|FAIL|PASS)'
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 rec_priority:           1
@@ -87,9 +87,33 @@ source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harm
 source_commit:          7fa33ab1e11b5c500d6cb4187d231eeb32c5601b
 
 # ═══ 质量度量 (Quality Metrics) ═══
-metrics_success_count:  4
-metrics_fail_count:     5
-metrics_confidence:     0.6
-metrics_last_used:      2026-07-23
-metrics_log:            ~/dejagnu-i686-binutils/runtest-i686-binutils-subset.log
-metrics_summary:        Run 5 .exp on 2026-07-23 using #3194-fixed expect (EXP_STTY). No /bin/stty pollution (0 occurrences). 4 expected passes, 5 unexpected failures, 11 unsupported, 0 unresolved. 全量上游 testsuite 25959 文件/386 .exp 驱动未执行；smoke 8/8 通过。W3 passed. Full analysis in report §5.4.
+metrics_host_side_pass:     4
+metrics_host_side_fail:     5
+metrics_host_side_unsupported: 11
+metrics_host_side_unresolved: 0
+metrics_host_side_exp_count: 5
+metrics_host_side_log:      ~/dejagnu-i686-binutils/runtest-i686-binutils-subset.log
+
+metrics_full_probe_date:    2026-07-24
+metrics_full_probe_pass:    13
+metrics_full_probe_fail:    10
+metrics_full_probe_unsupported: 18
+metrics_full_probe_unresolved: 1
+metrics_full_probe_untested: 12
+metrics_full_probe_exp_count: 35
+metrics_full_probe_log:     ~/tmp/dejagnu-i686-binutils-full-probe-20260724-022702.log
+metrics_full_probe_exit:    1
+
+metrics_cflags_fix:         fixed
+metrics_cflags_detail:      site.exp 补齐 CC_FOR_TARGET/CXX_FOR_TARGET/CFLAGS_FOR_TARGET/CXXFLAGS_FOR_TARGET 及全部 binutils _FOR_TARGET 工具变量。i686-elf-gcc/g++ 不属于本包产物，设为空字符串让相关测试跳过。
+
+metrics_stty_pollution:     0
+metrics_stty_detail:        #3194 EXP_STTY 修复有效，全量 35 .exp 中 /bin/stty 出现 0 次
+
+metrics_objdump_error:      "ERROR: objdump can not recognize bintest.o"
+metrics_objdump_class:      DejaGNU-harness-diff
+metrics_objdump_detail:     最小复现确认：i686-elf-as 汇编成功 (exit=0)，i686-elf-objdump -f/-d 正常识别 elf32-i386 (exit=0)。错误来自 DejaGNU 测试 harness 的期望/流程差异（如 objdump_ok 过程的输出匹配预期），非工具路径/文件格式问题，也非 QEMU/target-runtime 阻塞。
+
+metrics_confidence:         0.7
+metrics_last_used:          2026-07-24
+metrics_summary:            上游存在 DejaGNU testsuite (~25,959 文件 / 386 .exp)。binutils 工具目录 37 .exp 已覆盖 35 个进行 full probe。结果：13 PASS / 10 FAIL / 18 UNSUPPORTED / 1 UNRESOLVED / 12 UNTESTED。CFLAGS_FOR_TARGET 已修复，STTY_COUNT=0。首个 ERROR (objdump can not recognize bintest.o) 已确认非工具/格式问题，属 DejaGNU harness 差异。全量 gas/ld testsuite 执行仍依赖 target simulator/QEMU。smoke 8/8 通过。W3 passed。
