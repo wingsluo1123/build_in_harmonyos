@@ -1,11 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_brogue C)
 
-# Find the package via Conan-generated CMakeDeps
-find_package(brogue REQUIRED)
-
-add_executable(test_brogue test.c)
-target_link_libraries(test_brogue brogue::brogue)
+# brogue is a CLI tool (application), not a library — do NOT link against it.
+# See bitwise/0.50/test_package/CMakeLists.txt for the project pattern.
 
 enable_testing()
 add_test(NAME test_brogue COMMAND test_brogue)
