@@ -5,6 +5,8 @@ spawn-fcgi is a simple program to spawn FastCGI processes.
 It supports IPv4/IPv6 TCP sockets and Unix domain sockets.
 No external dependencies — only uses libc functions.
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
@@ -38,13 +40,16 @@ class SpawnFcgiConan(ConanFile):
         tc = MesonToolchain(self)
         tc.generate()
         # Inject ar into meson native file (profile doesn't set tools.build:archiver)
-        native_file = self.generators_folder + "/conan_meson_native.ini"
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         with open(native_file) as f:
             content = f.read()
+        old_content = content
         content = content.replace(
             "[binaries]\nc =",
             "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\nc =",
         )
+        if content == old_content:
+            raise RuntimeError("Failed to inject ar into meson native file")
         with open(native_file, "w") as f:
             f.write(content)
 
