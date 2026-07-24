@@ -22,6 +22,7 @@ The two existing portability patches guard `getpass()` and `getspnam()` for OHOS
 - Autotools maps both `bindir` and `sbindir` to the package `bin` directory; the L1 test verifies that directory and all four executables.
 - On a native runnable target, the test invokes `-h` for all four binaries and checks their usage output, then performs a real public-key SSH client/server round trip.
 - The L1 test passes absolute package paths to the shell script and prints captured command output when a help or SSH check fails.
+- The ASLR test uses the Linux-compatible `/proc` interface directly instead of building `psutil`, which has no usable OHOS wheel in the CI environment.
 - Cross builds perform executable presence checks and leave execution to the target CI worker.
 
 The upstream `make check` target now passes with `51 passed, 1 xfailed`. The test setup supplies an isolated authorized-keys directory and Dropbear-format client keys, converts one key to OpenSSH format for AsyncSSH, uses stderr logging for server readiness, explicitly calls the inherited `socketserver.TCPServer.server_close()` after joining each server thread, and closes parameterized TCP listeners before the next case. The Conan build also completes the packaged-binary consumer test successfully.
