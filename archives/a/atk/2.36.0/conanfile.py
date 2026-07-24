@@ -6,8 +6,9 @@ HarmonyOS PC (aarch64) adaptation. Uses Meson build system.
 """
 
 from conan import ConanFile
-from conan.tools.meson import Meson, MesonToolchain, meson_layout
+from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.files import get, copy
+from conan.tools.layout import basic_layout
 import os
 
 class AtkConan(ConanFile):
@@ -32,7 +33,7 @@ class AtkConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def layout(self):
-        meson_layout(self)
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
