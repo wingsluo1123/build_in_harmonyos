@@ -147,27 +147,39 @@ class VipsConan(ConanFile):
             "magick": "disabled",
             "introspection": "disabled",
             "vapi": "false",
+            # Use $ORIGIN-relative RPATH for portability
+            "build.rpath": "$ORIGIN/../lib",
         })
         tc.generate()
 
-        # Patch meson native file: add ar binary and fix pkg_config_path
+        # Patch meson native file: add ar binary, fix pkg_config_path,
+        # and add -Wl,-rpath for clean install RUNPATH
         native_ini = os.path.join(self.generators_folder, "conan_meson_native.ini")
         if os.path.isfile(native_ini):
             sdk_bin = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin"
             ar_path = os.path.join(sdk_bin, "llvm-ar")
             sys_pc = "/storage/Users/currentUser/usr/local/lib/pkgconfig"
+            rpath_flag = "-Wl,-rpath,$ORIGIN/../lib"
             with open(native_ini, "r") as f:
                 lines = f.readlines()
             out = []
             for line in lines:
+                # Add ar after cpp line in [binaries] section
                 if line.strip().startswith("cpp ="):
                     out.append(line)
                     out.append("ar = '{}'\n".format(ar_path))
+                # Fix pkg_config_path to include system dependencies
                 elif "pkg_config_path = '" in line:
                     out.append(line.replace(
                         "pkg_config_path = '",
                         "pkg_config_path = '{}:".format(sys_pc),
                     ))
+                # Add rpath to C link args
+                elif line.strip().startswith("c_link_args ="):
+                    out.append(line.rstrip().rstrip("]") + ", '{}']\n".format(rpath_flag))
+                # Add rpath to C++ link args
+                elif line.strip().startswith("cpp_link_args ="):
+                    out.append(line.rstrip().rstrip("]") + ", '{}']\n".format(rpath_flag))
                 else:
                     out.append(line)
             with open(native_ini, "w") as f:
