@@ -48,7 +48,58 @@ class LibeditConan(ConanFile):
             tc.configure_args.append("--disable-shared")
         tc.configure_args.append("--disable-examples")
 
-        # System ncurses: must be provided via NCURSES_ROOT or NCURSES_PREFIX
+        # ── ncurses header stub for OHOS ──
+        # OHOS CI lacks ncurses-devel headers. We generate a minimal stub
+        # curses.h that provides the termcap function declarations libedit
+        # needs at configure-time and compile-time. Linking uses the system's
+        # libncursesw.so.6 at /usr/lib/libncursesw.so.6.
+        ncurses_stub_dir = os.path.join(self.build_folder, "ncurses_stub")
+        ncurses_stub_include = os.path.join(ncurses_stub_dir, "include")
+        os.makedirs(ncurses_stub_include, exist_ok=True)
+        stub_header = os.path.join(ncurses_stub_include, "curses.h")
+        if not os.path.exists(stub_header):
+            with open(stub_header, "w") as f:
+                f.write("""/* Minimal curses.h stub for OHOS — provides termcap
+ * declarations that libedit needs. Real curses types are
+ * not needed; libedit only calls termcap functions. */
+#ifndef __CURSES_STUB_H
+#define __CURSES_STUB_H
+
+#define HAVE_NCURSES_H 1
+
+typedef unsigned int bool;
+#define TRUE 1
+#define FALSE 0
+
+/* Termcap entry functions */
+extern int tgetent(char *, const char *);
+extern int tgetflag(char *);
+extern int tgetnum(char *);
+extern char *tgetstr(char *, char **);
+extern char *tgoto(const char *, int, int);
+extern int tputs(const char *, int, int (*)(int));
+
+/* Standard curses types */
+typedef int WINDOW;
+typedef unsigned int chtype;
+
+extern WINDOW *initscr(void);
+extern int endwin(void);
+extern int refresh(void);
+extern int clearok(WINDOW *, bool);
+extern int clear(void);
+extern int move(int, int);
+extern int addch(const chtype);
+extern int addstr(const char *);
+extern int printw(const char *, ...);
+extern int getch(void);
+
+#endif /* __CURSES_STUB_H */
+""")
+        tc.extra_cflags.append(f"-I{ncurses_stub_include}")
+        tc.extra_cflags.append("-DHAVE_NCURSES_H=1")
+
+        # Also try NCURSES_ROOT / NCURSES_PREFIX (for local developer setups)
         ncurses_root = os.environ.get("NCURSES_ROOT") or os.environ.get("NCURSES_PREFIX")
         ncurses_include = os.environ.get("NCURSES_INCLUDE")
         if ncurses_root:
@@ -62,7 +113,7 @@ class LibeditConan(ConanFile):
             tc.extra_cflags.append(f"-I{ncurses_include}")
         # Define __STDC_ISO_10646__ to avoid chartype.h #error (replaces removed 0010 patch)
         tc.extra_cflags.append("-D__STDC_ISO_10646__")
-        # Also add ncursesw link flag (always needed for libedit on OHOS)
+        # Link against ncursesw (system library at /usr/lib/libncursesw.so.6)
         tc.extra_ldflags.append("-lncursesw")
         tc.generate()
 
