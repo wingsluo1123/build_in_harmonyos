@@ -14,6 +14,7 @@ import os
 class AtkConan(ConanFile):
     name = "atk"
     version = "2.36.0"
+    package_type = "library"
     license = "LGPL-2.1-or-later"
     homepage = "https://wiki.gnome.org/Projects/ATK"
     url = "https://wiki.gnome.org/Projects/ATK"
@@ -23,6 +24,9 @@ class AtkConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
+
+    def requirements(self):
+        self.requires("glib/2.88.0")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -40,6 +44,10 @@ class AtkConan(ConanFile):
 
     def generate(self):
         tc = MesonToolchain(self)
+        # OHOS: disable introspection and docs to avoid build failures
+        tc.project_options["introspection"] = "disabled"
+        tc.project_options["docs"] = "false"
+        tc.project_options["enable_docs"] = "false"
         tc.generate()
 
     def build(self):
