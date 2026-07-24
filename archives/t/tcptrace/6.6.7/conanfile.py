@@ -40,6 +40,9 @@ class TcptraceConan(ConanFile):
         # E002: /tmp is read-only on OHOS, redirect TMPDIR to build folder
         env = Environment()
         env.define("TMPDIR", os.path.join(self.build_folder, "tmp"))
+        # Regenerate bison/flex output with modern tools (replaces patches 0005-0007)
+        env.define("YACC", "bison -y")
+        env.define("LEX", "flex")
         envvars = env.vars(self)
         envvars.save_script("tcptrace_env")
 
