@@ -23,5 +23,6 @@ class QtBaseTestConan(ConanFile):
 
     def test(self):
         # R-CI L0d: test() 必须含 self.run() 直跑测试程序，cmake.test() 不被门禁识别
-        test_bin = os.path.join(self.build_folder, "test_qtbase")
+        # 使用 self.cpp.build.bindirs[0] 兼容单配置和多配置生成器（Unix Makefiles/Xcode/VS）
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_qtbase")
         self.run(test_bin, env="conanrun")
