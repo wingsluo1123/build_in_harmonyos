@@ -6,7 +6,7 @@
 - 编译器: clang 15.0.4 / clang++ 15.0.4 (HarmonyOS SDK)
 - C++ 标准库: libc++ (非 libstdc++)
 - 系统: HarmonyOS aarch64, HongMeng Kernel 1.12.0
-- 状态: 成功 (published)
+- 状态: 成功 (built)
 
 ## 依赖版本
 - Qt5 qtbase 5.15.2（从源码编译，安装路径: $HOME/usr/local/Qt5）
@@ -105,3 +105,7 @@ make install DESTDIR=$TEST_PREFIX
 
 **编译结束**: 2026-07-23 16:37
 **最终状态**: built
+
+## 源码版本说明
+- 上游仓库无版本 tag，使用 main 分支 commit 快照: `aa1856b8f8589ba0a82e50c0ac01e289eb3ff2c4` (2026-06-15)
+- conandata.yml 中 URL 指向该 commit 的 archive，确保构建可复现

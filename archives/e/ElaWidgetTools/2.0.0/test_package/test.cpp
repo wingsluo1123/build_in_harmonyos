@@ -1,6 +1,5 @@
 #include <ElaWidget.h>
 #include <QApplication>
-#include <QCoreApplication>
 
 int main(int argc, char *argv[]) {
     // Use offscreen platform to avoid display server dependency

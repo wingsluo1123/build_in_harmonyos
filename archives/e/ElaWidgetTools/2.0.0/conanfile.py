@@ -46,8 +46,11 @@ class ElaWidgetToolsConan(ConanFile):
         tc.variables["CMAKE_CXX_FLAGS"] = "-stdlib=libc++"
         tc.variables["CMAKE_EXE_LINKER_FLAGS"] = "-stdlib=libc++"
         tc.variables["CMAKE_SHARED_LINKER_FLAGS"] = "-stdlib=libc++"
-        # Build static library
-        tc.variables["ELAWIDGETTOOLS_BUILD_STATIC_LIB"] = "ON"
+        # Build static or shared library based on the shared option
+        if self.options.shared:
+            tc.variables["ELAWIDGETTOOLS_BUILD_STATIC_LIB"] = "OFF"
+        else:
+            tc.variables["ELAWIDGETTOOLS_BUILD_STATIC_LIB"] = "ON"
         tc.generate()
 
     def build(self):
