@@ -4,6 +4,7 @@
 lv is a powerful multi-lingual file viewer/grep tool.
 """
 import os
+import tempfile
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -51,10 +52,17 @@ class LvConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
         src_dir = os.path.join(self.source_folder, "src")
-        autotools.configure(build_script_folder=src_dir)
-        autotools.make(vars={"LDFLAGS": "${LDFLAGS} -ltermcap"})
+        # HMDFS: ./configure 无法获得执行权限，用 bash 运行 + TMPDIR 解决临时文件问题
+        tmpdir = tempfile.mkdtemp()
+        configure = os.path.join(src_dir, "configure")
+        cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
+        sysroot = self.conf.get("tools.build:sysroot", default="")
+        cflags = f"-O3 --sysroot={sysroot}" if sysroot else "-O3"
+        ldflags = f"--sysroot={sysroot} -ltermcap" if sysroot else "-ltermcap"
+        args = f"--enable-static --disable-shared LIBS=-ltermcap --build=aarch64-unknown-linux-gnu"
+        self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}' /data/service/hnp/bin/bash {configure} {args}", cwd=src_dir, shell=True)
+        self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}'", cwd=src_dir)
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
