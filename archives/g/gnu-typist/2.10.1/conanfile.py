@@ -53,11 +53,12 @@ class GnutypistConan(ConanFile):
 
     def build(self):
         import os as _os
-        # [R33] 以下 PATH 操作为 OHOS 平台限制所需，无法通过 toolchain 替代：
-        #   - /bin 前置：HMDFS 上 GNU cat (9.10) stdout 权限受限, /bin/cat (toybox) 正常（E106）
-        #   - _tools/ 路径：help2man wrapper（E079）+ gettext stub 需要在 PATH 中可见
-        # Disable documentation generation via makeinfo wrapper (missing on OHOS)
-        _os.environ["PATH"] = "/bin:" + _os.environ.get("PATH", "")
+        # R33: Save PATH to restore after build (prevent parent process pollution)
+        _saved_path = _os.environ.get("PATH", "")
+        # [R33] PATH adjustments for OHOS platform limitations (E106/E079):
+        #   - Prefix /bin: HMDFS GNU cat stdout permission issue (E106)
+        #   - _tools/: help2man not available on OHOS (E079)
+        _os.environ["PATH"] = "/bin:" + _saved_path
         # Create wrapper scripts for missing tools
         _os.makedirs("_tools", exist_ok=True)
         with open("_tools/help2man", "w") as f:
@@ -66,7 +67,6 @@ class GnutypistConan(ConanFile):
         with open("_tools/makeinfo", "w") as f:
             f.write("#!/bin/sh\nexit 0\n")
         _os.chmod("_tools/makeinfo", 0o755)
-        # Create gettext stub for NLS-disabled builds (included via -include)
         with open("_tools/gettext_stub.h", "w") as f:
             f.write("/* gettext stub for NLS-disabled builds */\n")
             f.write("#define gettext(x) (x)\n")
