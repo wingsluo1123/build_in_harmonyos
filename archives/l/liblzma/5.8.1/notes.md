@@ -1,44 +1,61 @@
 # liblzma 5.8.1 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-07-24}
+- 构建系统: autotools
+- 编译日期: 2026-07-24
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: built
 
 ## 编译步骤
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+1. `conan source` 获取 xz-5.8.1 源码
+2. 应用补丁：`config.guess` 添加 OHOS 平台识别
+3. `./configure --disable-scripts`（禁用依赖 /bin/sh 的脚本）
+4. `make` 构建 liblzma.so/liblzma.a 及工具
+5. `make check` 运行上游测试套件（13 个测试程序，18 个断言）
+6. `make install` 安装产物
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | config.status 失败：临时目录权限 drwx--S--- | HarmonyOS 上 mktemp -d 创建目录组权限异常 | 创建 mktemp wrapper（exit 1）迫使 autoconf AS_TMPDIR 回退到 mkdir |
+| 2 | xzdiff/xzgrep 脚本安装失败 | 脚本依赖 /bin/sh，HarmonyOS 无此路径 | `--disable-scripts` 跳过脚本安装 |
+| 3 | xz 工具运行时找不到 liblzma.so | 动态链接库不在默认搜索路径 | extra_ldflags 添加 `-static`，工具静态链接 liblzma.a |
 
 ## 源码修改
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
+- `patches/0001-build-aux-config.guess.patch`: 为 config.guess 添加 HarmonyOS（ohos）系统分支
 
 ## 依赖版本
 
-{列出本次编译依赖的具体软件版本}
+无外部依赖。liblzma 是 XZ Utils 中的自包含压缩库。
 
 ## 验证结果
 
 ```bash
-{验证命令和结果}
+# L1: make check（上游测试套件）
+make check
+# 结果: 全部 13 个测试程序通过，18 个断言通过
+
+# L2: ELF 格式与运行验证
+file src/liblzma/.libs/liblzma.so.5  # ELF 64-bit aarch64
+./src/xz/xz --version                 # xz (XZ Utils) 5.8.1
 ```
 
 ## 交付物
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
+| 文件 | 说明 |
+|------|------|
+| liblzma.so.5.8.1 | 动态库（供消费者使用） |
+| liblzma.a | 静态库（工具静态链接用） |
+| lzma.h, lzma_detector.h | 公共头文件 |
+| xz, lzmadec, lzmainfo | 命令行工具（静态链接） |
 
 ## 注意事项
 
-{需要特别注意的点；无则删除此节}
+- mktemp wrapper 仅在 `self.settings.os == "OHOS"` 时创建，不影响其他平台构建
+- `--disable-scripts` 为全局配置，跳过 xzdiff/xzgrep 等脚本（HarmonyOS 无 /bin/sh）
 ---
 
 **编译结束**: 2026-07-24 15:52

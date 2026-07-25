@@ -45,16 +45,18 @@ class LiblzmaConan(ConanFile):
     def generate(self):
         # HarmonyOS: mktemp -d creates dirs with drwx--S--- (broken group perms),
         # causing config.status to fail. Create a mktemp wrapper that fixes perms.
-        wrapper_dir = Path(self.build_folder) / ".hmos_fix"
-        wrapper_dir.mkdir(exist_ok=True, parents=True)
-        wrapper = wrapper_dir / "mktemp"
-        wrapper.write_text(
-            '#!/bin/sh\n'
-            '# HarmonyOS: mktemp -d creates dirs with broken perms (hmmac MAC).\n'
-            '# Return failure to force autoconf AS_TMPDIR to use mkdir fallback.\n'
-            'exit 1\n'
-        )
-        wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
+        wrapper_dir = None
+        if self.settings.os == "OHOS":
+            wrapper_dir = Path(self.build_folder) / ".hmos_fix"
+            wrapper_dir.mkdir(exist_ok=True, parents=True)
+            wrapper = wrapper_dir / "mktemp"
+            wrapper.write_text(
+                '#!/bin/sh\n'
+                '# HarmonyOS: mktemp -d creates dirs with broken perms (hmmac MAC).\n'
+                '# Return failure to force autoconf AS_TMPDIR to use mkdir fallback.\n'
+                'exit 1\n'
+            )
+            wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)
 
         tc = AutotoolsToolchain(self)
         # OHOS: scripts (xzdiff, xzgrep, etc.) use /bin/sh which doesn't exist.
@@ -71,7 +73,8 @@ class LiblzmaConan(ConanFile):
         config_shell = os.environ.get("CONFIG_SHELL")
         if config_shell:
             env.define("CONFIG_SHELL", config_shell)
-        env.prepend_path("PATH", str(wrapper_dir))
+        if wrapper_dir:
+            env.prepend_path("PATH", str(wrapper_dir))
         # Set LD_LIBRARY_PATH for make check (test programs need liblzma.so
         # from build tree, but rpath points to install prefix /lib)
         lib_build_dir = os.path.join(self.build_folder, "src", "liblzma", ".libs")
