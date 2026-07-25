@@ -20,7 +20,7 @@ class Texi2HtmlConan(ConanFile):
     name = "texi2html"
     version = "5.0"
     description = "Texinfo 文档格式转换工具，将 .texi 文件转换为 HTML"
-    license = "MIT"
+    license = "GPL-3.0-or-later"
     homepage = "https://www.nongnu.org/texi2html/"
     url = ""
     package_type = "application"
@@ -47,61 +47,53 @@ class Texi2HtmlConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # Apply conandata patches (no-op: patches section removed, kept for G1)
         apply_conandata_patches(self)
         install_sh = os.path.join(self.source_folder, "install-sh")
         os.chmod(install_sh, 0o755)
-
-        # Fix config.sub: add aarch64 CPU + OHOS triplet support inline
+        # Fix config.sub: add aarch64 CPU + OHOS triplet support inline (fail-fast)
         # The upstream 2006 config.sub doesn't know aarch64 CPU or OHOS at all
         csub = os.path.join(self.source_folder, "config.sub")
-        if os.path.exists(csub):
-            with open(csub, "r") as f:
-                text = f.read()
-            # 1. Add aarch64 CPU patterns to the basic CPU list
-            text = text.replace(
-                "| arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \",
-                "| aarch64 | aarch64_be | aarch64c | arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \",
-            )
-            # 2. Add aarch64le to the next CPU list line
-            text = text.replace(
-                "| spu | strongarm \",
-                "| aarch64le | spu | strongarm \",
-            )
-            # 3. Add aarch64*-* to the CPU-arch list
-            text = text.replace(
-                "| arm-*  | armbe-* | armle-* | armeb-* | armv*-* \",
-                "| aarch64*-* | arm-*  | armbe-* | armle-* | armeb-* | armv*-* \",
-            )
-            # 4. Add linux-ohos* to kernel-OS detection list
-            text = text.replace(
-                "linux-newlib* | linux-uclibc* | \",
-                "linux-newlib* | linux-uclibc* | linux-ohos* | \",
-            )
-            # 5. Add -linux-ohos* to OS name validation list
-            text = text.replace(
-                "| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* \",
-                "| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* | -linux-ohos* \",
-            )
-            with open(csub, "w") as f:
-                f.write(text)
-            self.output.info("config.sub: added aarch64 + OHOS support inline")
-        else:
-            # Fallback: try inline fix on upstream 2006 config.sub
-            if os.path.exists(dst_csub):
-                with open(dst_csub, "r") as f:
-                    text = f.read()
-                text = text.replace(
-                    "linux-newlib* | linux-uclibc* | \\",
-                    "linux-newlib* | linux-uclibc* | linux-ohos* | \\",
+        if not os.path.exists(csub):
+            raise RuntimeError("config.sub not found at {}".format(csub))
+        with open(csub, "r") as f:
+            text = f.read()
+        old_new_pairs = [
+            (
+                '| arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \\',
+                '| aarch64 | aarch64_be | aarch64c | arc | arm | arm[bl]e | arme[lb] | armv[2345] | armv[345][lb] | avr | avr32 \\',
+            ),
+            (
+                '| spu | strongarm \\',
+                '| aarch64le | spu | strongarm \\',
+            ),
+            (
+                '| arm-*  | armbe-* | armle-* | armeb-* | armv*-* \\',
+                '| aarch64*-* | arm-*  | armbe-* | armle-* | armeb-* | armv*-* \\',
+            ),
+            (
+                'linux-newlib* | linux-uclibc* | \\',
+                'linux-newlib* | linux-uclibc* | linux-ohos* | \\',
+            ),
+            (
+                '| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* \\',
+                '| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* | -linux-ohos* \\',
+            ),
+        ]
+        for old, new in old_new_pairs:
+            if old not in text:
+                raise RuntimeError(
+                    "config.sub: expected pattern not found - cannot add OHOS support.\n"
+                    "Missing: {}\n"
+                    "The upstream config.sub may differ from expected version.".format(repr(old))
                 )
-                text = text.replace(
-                    "| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* \\",
-                    "| -mingw32* | -linux-gnu* | -linux-newlib* | -linux-uclibc* | -linux-ohos* \\",
-                )
-                with open(dst_csub, "w") as f:
-                    f.write(text)
-                self.output.info("config.sub: inline fix attempted")
+            text = text.replace(old, new, 1)
+        if "aarch64" not in text or "linux-ohos" not in text:
+            raise RuntimeError(
+                "config.sub: inline OHOS fix did not apply - 'aarch64' or 'linux-ohos' missing after patch"
+            )
+        with open(csub, "w") as f:
+            f.write(text)
+        self.output.info("config.sub: added aarch64 + OHOS support inline (fail-fast)")
         configure = os.path.join(self.source_folder, "configure")
         replace_in_file(self, configure, "#! /bin/sh", "#!/system/bin/sh")
         replace_in_file(
@@ -130,17 +122,17 @@ class Texi2HtmlConan(ConanFile):
             replace_in_file(
                 self, texi2html_script,
                 '"/usr/local/share/texi2html"',
-                f'"{pkgdatadir_path}"',
+                '"{}"'.format(pkgdatadir_path),
             )
             libintl_path = os.path.join(pkgdatadir_path, "lib", "libintl-perl", "lib")
             eastasian_path = os.path.join(pkgdatadir_path, "lib", "Unicode-EastAsianWidth", "lib")
             with open(texi2html_script, "r") as f:
                 content = f.read()
-            use_lib_line = f'use lib "{libintl_path}";\nuse lib "{eastasian_path}";\n'
+            use_lib_line = 'use lib "{}";\nuse lib "{}";\n'.format(libintl_path, eastasian_path)
             if use_lib_line not in content:
                 content = content.replace(
                     "# texi2html: generated by addformats.sh",
-                    f"{use_lib_line}# texi2html: generated by addformats.sh", 1)
+                    "{}{}".format(use_lib_line, "# texi2html: generated by addformats.sh"), 1)
                 with open(texi2html_script, "w") as f:
                     f.write(content)
             with open(texi2html_script, "r") as f:
