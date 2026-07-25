@@ -1,0 +1,32 @@
+version: '1.5.2'
+status: built
+build_date: '2026-07-25'
+
+source:
+  url: 'https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz'
+  sha256: '65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1'
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - '--build=aarch64-unknown-linux-musl'
+    - '--host=aarch64-unknown-linux-musl'
+    - '--disable-doc'
+    - '--disable-extra-programs'
+    - '--disable-dependency-tracking'
+  dependencies: []
+  cc: clang
+
+patches_applied: []
+
+verification:
+  device: 'HarmonyOS PC (3QC0124C11000718)'
+  result: 'conan create rc=0, 115s, 733K'
+  soname: 'libopus.so.0'
+  test: 'opus_encoder_create -> opus_encode(362 bytes) -> opus_decoder_create -> opus_decode(960 samples/ch)'
+
+knowledge_gained:
+  - '标准 autotools，无平台特异性坑；显式 --build/--host 用 musl 三元组跳过 config.guess（HMDFS 上 mktemp 建 .c 被拒）'
+  - 'build == host 让 configure 走原生路径而非 cross 模式'
+  - 'FFmpeg 内建有 Opus 解码器，外接 libopus 是为了编码能力'
