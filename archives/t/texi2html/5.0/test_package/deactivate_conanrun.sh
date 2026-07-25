@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/t/texi2html/5.0/test_package/deactivate_conanrunenv-release-armv8.sh"
