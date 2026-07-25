@@ -1,0 +1,49 @@
+software: riscv64-elf-binutils
+version: "2.46.0"
+status: built
+build_date: "2026-07-25"
+
+source:
+  url: "https://ftp.gnu.org/gnu/binutils/binutils-2.46.0.tar.gz"
+  sha256: "8608fe44ab7de645f6ad0a898313b75338842490d609adb85c9fb2827c376af2"
+  tar_format: tar.gz
+
+build:
+  build_system: autotools
+  system: autotools
+  configure_options:
+    - "--target=riscv64-elf"
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--host=aarch64-linux-ohos"
+    - "--build=aarch64-linux-ohos"
+    - "--disable-gprofng"
+    - "--disable-nls"
+    - "--disable-shared"
+    - "--enable-static"
+  dependencies: {}
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-bfd-configure-umask.patch"
+  - "0002-binutils-configure-umask.patch"
+  - "0003-config.guess-ohos.patch"
+  - "0004-config.sub-ohos.patch"
+  - "0005-configure-umask.patch"
+  - "0006-etc-configure-umask.patch"
+  - "0007-gas-configure-umask.patch"
+  - "0008-gprof-configure-umask.patch"
+  - "0009-gprofng-configure-umask.patch"
+  - "0010-gprofng-libcollector-configure-umask.patch"
+  - "0011-ld-configure-umask.patch"
+  - "0012-libctf-configure-umask.patch"
+  - "0013-libiberty-configure-umask.patch"
+  - "0014-libsframe-configure-umask.patch"
+  - "0015-opcodes-configure-umask.patch"
+  - "0016-zlib-configure-umask.patch"
+
+knowledge_gained:
+  - "riscv64-elf 交叉 binutils 使用 binutils 同源，配置参数 --target=riscv64-elf"
+  - "HarmonyOS 需要 config.guess/config.sub 补丁添加系统识别（E007）"
+  - "HMDFS 文件系统需修改所有 configure 脚本 umask 077→022（E011）"
+  - "gprofng 使用 Linux 特有 SIGEV_THREAD_ID，OHOS 不可用，需 --disable-gprofng"
