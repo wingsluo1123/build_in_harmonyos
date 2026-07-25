@@ -46,6 +46,13 @@ class PoptConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # E097: Fix HMDFS setgid — autoconf umask 077 strips group perms
+        source_dir = self.source_folder
+        self.run(
+            "sed -i 's/umask 077/umask 022/g' configure"
+            " && sed -i 's|mktemp -d \"./confXXXXXX\"|mktemp -d \"$TMPDIR/confXXXXXX\"|g' configure",
+            cwd=source_dir
+        )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
