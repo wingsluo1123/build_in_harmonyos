@@ -27,7 +27,7 @@ class PdalTestConan(ConanFile):
         cmake.build()
         # Copy PDAL shared library next to test binary (HarmonyOS musl workaround)
         for dep in self.dependencies.values():
-            if dep.name == "pdal":
+            if dep.ref.name == "pdal":
                 libdir = dep.cpp_info.libdir
                 copy(self, "*.so*", libdir, self.cpp.build.bindirs[0])
 

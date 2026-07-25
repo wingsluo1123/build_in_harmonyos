@@ -2,7 +2,6 @@
 """Conan recipe for PDAL 2.10.2 — CMake build system.
 Point Data Abstraction Library for point cloud processing.
 """
-import json
 import os
 
 from conan import ConanFile
@@ -51,164 +50,6 @@ class PdalConan(ConanFile):
         scripts_dir = os.path.join(self.source_folder, "scripts")
         os.makedirs(scripts_dir, exist_ok=True)
         save(self, os.path.join(scripts_dir, "gen_dimension.py"), self._gen_dimension_script())
-
-    def _generate_dimension_hpp(self, src_dir, build_dir):
-        """Generate Dimension.hpp from Dimension.json using Python (HarmonyOS SELinux workaround).
-
-        On HarmonyOS, locally-built binaries (like dimbuilder) cannot execute due to
-        SELinux restrictions. This method replaces dimbuilder with a Python equivalent.
-        """
-        infile = os.path.join(src_dir, "pdal", "Dimension.json")
-        outfile = os.path.join(build_dir, "include", "pdal", "Dimension.hpp")
-        os.makedirs(os.path.dirname(outfile), exist_ok=True)
-
-        TYPE_MAP = {
-            "double": "Double", "float": "Float",
-            "uint8": "Unsigned8", "int8": "Signed8",
-            "uint16": "Unsigned16", "int16": "Signed16",
-            "uint32": "Unsigned32", "int32": "Signed32",
-            "uint64": "Unsigned64", "int64": "Signed64",
-        }
-
-        with open(infile) as f:
-            data = json.load(f)
-
-        dims = data.get("dimensions", [])
-        specs = []
-        for dim in dims:
-            name = dim["name"]
-            desc = dim["description"]
-            dtype = TYPE_MAP.get(dim["type"], "None")
-            alt_names = dim.get("alt_names", [])
-            if isinstance(alt_names, str):
-                alt_names = [s.strip() for s in alt_names.split(",")]
-            deprecated = dim.get("deprecated", False)
-            specs.append({"name": name, "description": desc, "type": dtype,
-                          "alt_names": alt_names, "deprecated": deprecated})
-
-        out = []
-        out.append(f"// This file was programatically generated from 'pdal/Dimension.json'.")
-        out.append("// Do not edit directly.")
-        out.append("")
-        out.append("#pragma once")
-        out.append("")
-        out.append("#include <string>")
-        out.append("#include <vector>")
-        out.append("")
-        out.append("#include <pdal/DimUtil.hpp>")
-        out.append("#include <pdal/pdal_types.hpp>")
-        out.append("#include <pdal/util/Utils.hpp>")
-        out.append("")
-        out.append("namespace pdal")
-        out.append("{")
-        out.append("namespace Dimension")
-        out.append("{")
-        out.append("")
-        out.append("enum class Id")
-        out.append("{")
-        out.append("    Unknown,")
-        for i, d in enumerate(specs):
-            comma = "," if i < len(specs) - 1 else ""
-            out.append(f"    {d['name']}{comma} ///< \\brief {d['description']}")
-            out.append(f"    {'':<{len(d['name'])+5}}///< \\default {d['type']}")
-        out.append("};")
-        out.append("typedef std::vector<Id> IdList;")
-        out.append("")
-
-        # description()
-        out.append("/// Get a description of a predefined dimension.")
-        out.append("/// \\param[in] id  Dimension ID.")
-        out.append("/// \\return  Dimension description.")
-        out.append("inline std::string description(Id id)")
-        out.append("{")
-        out.append("    switch (id)")
-        out.append("    {")
-        for d in specs:
-            out.append(f"    case Id::{d['name']}:")
-            out.append(f'        return "{d["description"]}";')
-        out.append("    case Id::Unknown:")
-        out.append('        return "";')
-        out.append("    }")
-        out.append('    return "";')
-        out.append("}")
-        out.append("")
-
-        # id()
-        out.append('/// Get a predefined dimension ID given a dimension name.')
-        out.append('/// \\param[in] s  Name of dimension.')
-        out.append('/// \\return  Dimension ID.')
-        out.append("inline Id id(std::string s)")
-        out.append("{")
-        out.append("    s = Utils::toupper(s);")
-        out.append("")
-        for d in specs:
-            all_names = [d["name"]] + d["alt_names"]
-            for nm in all_names:
-                out.append(f'    if (s == "{nm.upper()}")')
-                out.append(f'        return Id::{d["name"]};')
-        out.append("    return Id::Unknown;")
-        out.append("}")
-        out.append("")
-
-        # name()
-        out.append("/// Get the name of a predefined dimension.")
-        out.append("/// \\param[in] id  Dimension ID")
-        out.append("/// \\return  Dimension name.")
-        out.append("inline std::string name(Id id)")
-        out.append("{")
-        out.append("    switch (id)")
-        out.append("    {")
-        for d in specs:
-            out.append(f"    case Id::{d['name']}:")
-            out.append(f'        return "{d["name"]}";')
-        out.append("    case Id::Unknown:")
-        out.append('        return "";')
-        out.append("    }")
-        out.append('    return "";')
-        out.append("}")
-        out.append("")
-
-        # defaultType()
-        out.append("/// Get the default storage type of a predefined dimension.")
-        out.append("/// \\param id  ID of the predefined dimension.")
-        out.append("/// \\return  The dimension's default storage type.")
-        out.append("inline Type defaultType(Id id)")
-        out.append("{")
-        out.append("    switch (id)")
-        out.append("    {")
-        for d in specs:
-            out.append(f"    case Id::{d['name']}:")
-            out.append(f"        return Type::{d['type']};")
-        out.append('    case Id::Unknown:')
-        out.append('        throw pdal_error("No type found for undefined dimension.");')
-        out.append("    }")
-        out.append('    throw pdal_error("No type found for undefined dimension.");')
-        out.append("}")
-        out.append("")
-
-        # isDeprecated()
-        out.append("/// Check whether a predefined dimension is deprecated.")
-        out.append("/// \\param[in] id  Dimension ID.")
-        out.append("/// \\return  True if deprecated, otherwise false.")
-        out.append("inline bool isDeprecated(Id id)")
-        out.append("{")
-        out.append("    switch (id)")
-        out.append("    {")
-        for d in specs:
-            if d["deprecated"]:
-                out.append(f"    case Id::{d['name']}:")
-        out.append("        return true;")
-        out.append("    default:")
-        out.append("        return false;")
-        out.append("    }")
-        out.append("}")
-        out.append("")
-        out.append("} // namespace Dimension")
-        out.append("} // namespace pdal")
-        out.append("")
-
-        with open(outfile, "w") as f:
-            f.write("\n".join(out))
 
     def _gen_dimension_script(self):
         """Return Python script content for gen_dimension.py (HarmonyOS workaround)."""
@@ -295,7 +136,7 @@ with open(sys.argv[2],"w") as f:f.write("\n".join(o))
     def generate(self):
         tc = CMakeToolchain(self)
         # Point to system-installed dependencies (via cmd-pkgs)
-        tc.cache_variables["CMAKE_PREFIX_PATH"] = "/storage/Users/currentUser/usr/local"
+        tc.cache_variables["CMAKE_PREFIX_PATH"] = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
         # Disable features not needed for HarmonyOS
         tc.cache_variables["BUILD_SHARED_LIBS"] = self.options.shared
         tc.cache_variables["WITH_TESTS"] = False
@@ -315,7 +156,6 @@ with open(sys.argv[2],"w") as f:f.write("\n".join(o))
         tc.cache_variables["CMAKE_SHARED_LINKER_FLAGS"] = "-fuse-ld=bfd -Wl,--allow-shlib-undefined"
         # Use Python script instead of dimbuilder binary (HarmonyOS SELinux workaround)
         # CMAKE_CROSSCOMPILING=ON prevents make from building/running dimbuilder target
-        # Use Python script instead of dimbuilder binary (HarmonyOS SELinux workaround)
         dimbuilder_path = os.path.join(self.source_folder, "scripts", "gen_dimension.py")
         tc.cache_variables["DIMBUILDER_EXECUTABLE"] = f"python3 {dimbuilder_path}"
         tc.cache_variables["CMAKE_CROSSCOMPILING"] = "ON"
@@ -323,39 +163,8 @@ with open(sys.argv[2],"w") as f:f.write("\n".join(o))
 
     def build(self):
         apply_conandata_patches(self)
-        # Directly modify source files (patches had context matching issues)
-        # 1. Add find_package(TIFF CONFIG) before PROJ include in CMakeLists.txt
-        cmakefile = os.path.join(self.source_folder, "CMakeLists.txt")
-        with open(cmakefile) as f:
-            c = f.read()
-        if "find_package(TIFF CONFIG)" not in c:
-            c = c.replace("include(${PDAL_CMAKE_DIR}/proj.cmake",
-                          "find_package(TIFF CONFIG)\ninclude(${PDAL_CMAKE_DIR}/proj.cmake")
-            with open(cmakefile, "w") as f:
-                f.write(c)
-
-        # 2. Replace dimbuilder command with Python script in dimension.cmake
-        dimcmake = os.path.join(self.source_folder, "cmake", "dimension.cmake")
-        with open(dimcmake) as f:
-            d = f.read()
-        dimbuilder_path = os.path.join(self.source_folder, "scripts", "gen_dimension.py")
-        d = d.replace(
-            "COMMAND ${DIMBUILDER_EXECUTABLE} ${DIMENSION_INFILE} ${DIMENSION_OUTFILE}\n        DEPENDS ${DIMENSION_INFILE} ${DIMBUILDER}",
-            f"COMMAND python3 {dimbuilder_path} ${{DIMENSION_INFILE}} ${{DIMENSION_OUTFILE}}\n        DEPENDS ${{DIMENSION_INFILE}}"
-        )
-        with open(dimcmake, "w") as f:
-            f.write(d)
-
         cmake = CMake(self)
         cmake.configure()
-
-        # Generate Dimension.hpp using Python (HarmonyOS SELinux workaround)
-        build_dir = str(self.build_folder)
-        src_dir = str(self.source_folder)
-        self._generate_dimension_hpp(src_dir, build_dir)
-        dim_hpp = os.path.join(build_dir, "include", "pdal", "Dimension.hpp")
-        os.utime(dim_hpp, None)
-
         cmake.build()
 
     def package(self):
