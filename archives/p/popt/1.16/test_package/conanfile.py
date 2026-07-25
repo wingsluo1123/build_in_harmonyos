@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -22,3 +23,6 @@ class PoptTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Explicit self.run() for CI L0d — verifies test binary is executable
+        test_bin = os.path.join(self.build_folder, "test_popt")
+        self.run(test_bin, env="conanrun")
