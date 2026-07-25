@@ -1,11 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-int main(void) {
-    /* Run gtypist binary to verify the package was installed correctly */
-    FILE *fp = popen("gtypist --version 2>&1", "r");
+int main(int argc, char *argv[]) {
+    /* Accept binary path from command line or default to "gtypist" */
+    const char *gtypist_path = (argc > 1) ? argv[1] : "gtypist";
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "%s --version 2>&1", gtypist_path);
+
+    FILE *fp = popen(cmd, "r");
     if (fp == NULL) {
-        fprintf(stderr, "FAIL: could not run gtypist\n");
+        fprintf(stderr, "FAIL: could not run %s\n", cmd);
         return 1;
     }
     char buf[256];
@@ -16,7 +21,8 @@ int main(void) {
     }
     int status = pclose(fp);
     if (status != 0 || !found) {
-        fprintf(stderr, "FAIL: gtypist not working (exit=%d)\n", status);
+        fprintf(stderr, "FAIL: gtypist not working (exit=%d, path=%s)\n",
+                status, gtypist_path);
         return 1;
     }
     printf("test_gnu-typist: PASS\n");

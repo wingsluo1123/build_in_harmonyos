@@ -39,6 +39,12 @@ class GnutypistConan(ConanFile):
         if self.settings.os == "OHOS":
             tc.configure_args.append("--build=aarch64-linux-gnu")
             tc.configure_args.append("--host=aarch64-linux-gnu")
+        # Suppress int-conversion error from bundled getopt.c (uses 0 as NULL)
+        tc.extra_cflags.append("-Wno-int-conversion")
+        # Define gettext stubs for NLS-disabled builds (via -include to avoid
+        # shell quoting issues with parentheses in -D flags)
+        tc.extra_cflags.append("-include")
+        tc.extra_cflags.append("_tools/gettext_stub.h")
         tc.configure_args.append("--disable-nls")
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
@@ -50,13 +56,18 @@ class GnutypistConan(ConanFile):
         # Fix HMDFS mktemp issue (E106): configure's config.status uses
         # mktemp -d which fails on HMDFS; use mktemp -p + rm + mkdir instead.
         _os.environ["PATH"] = "/bin:" + _os.environ.get("PATH", "")
-        # Disable documentation generation via MAKEINFO (missing makeinfo on OHOS)
+        # Disable documentation generation via make arg (missing makeinfo on OHOS)
         _os.environ["MAKEINFO"] = ":"
         # Create wrapper scripts for missing tools
         _os.makedirs("_tools", exist_ok=True)
         with open("_tools/help2man", "w") as f:
             f.write("#!/bin/sh\nexit 0\n")
         _os.chmod("_tools/help2man", 0o755)
+        # Create gettext stub for NLS-disabled builds (included via -include)
+        with open("_tools/gettext_stub.h", "w") as f:
+            f.write("/* gettext stub for NLS-disabled builds */\n")
+            f.write("#define gettext(x) (x)\n")
+            f.write("#define _(x) (x)\n")
         _os.environ["PATH"] = _os.path.abspath("_tools") + ":" + _os.environ.get("PATH", "")
         # Patch configure's mktemp to work around HMDFS limitation (E106):
         # mktemp -d creates files not writable on HMDFS; replace with
@@ -71,13 +82,6 @@ class GnutypistConan(ConanFile):
                 content = content.replace(old, new)
                 with open(configure_path, "w") as f:
                     f.write(content)
-        # Patch config.h to define gettext() stub (NLS disabled)
-        config_h_path = _os.path.join(self.source_folder, "config.h.in")
-        if _os.path.exists(config_h_path):
-            with open(config_h_path, "a") as f:
-                f.write('\n/* gettext stub for NLS-disabled builds */\n')
-                f.write('#define gettext(x) (x)\n')
-                f.write('#define _(x) (x)\n')
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
