@@ -150,14 +150,21 @@ class Texi2HtmlConan(ConanFile):
                 with open(texi2html_script, "w") as f:
                     f.write(content)
         import subprocess
-        # Resolve env/perl/en paths on OHOS for shebang fixes
+        # Resolve env/perl paths on OHOS for shebang fixes — each is independent
         env_path = None
         perl_path = None
         try:
-            env_path = subprocess.check_output(["command", "-v", "env"], timeout=10).decode().strip()
-            perl_path = subprocess.check_output(["command", "-v", "perl"], timeout=10).decode().strip()
-        except Exception:
-            pass  # non-critical — paths may not exist
+            env_path = subprocess.check_output(
+                ["command", "-v", "env"], timeout=10
+            ).decode().strip()
+        except Exception as e:
+            self.output.warning("failed to resolve env path: {}".format(e))
+        try:
+            perl_path = subprocess.check_output(
+                ["command", "-v", "perl"], timeout=10
+            ).decode().strip()
+        except Exception as e:
+            self.output.warning("failed to resolve perl path: {}".format(e))
         for root, dirs, files in os.walk(self.package_folder):
             for fname in files:
                 fpath = os.path.join(root, fname)
