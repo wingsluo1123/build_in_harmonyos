@@ -25,9 +25,6 @@ class OpenrtspTestConan(ConanFile):
         if not os.path.exists(bin_path):
             raise Exception(f"openRTSP binary not found at {bin_path}")
         self.output.info(f"openRTSP binary found at {bin_path}")
-        # Run the binary with conanrun environment (VirtualRunEnv sets
-        # LD_LIBRARY_PATH for openssl). openRTSP without args exits 1
-        # with usage text, which is expected — use ignore_errors to
-        # allow non-zero exit. The "Usage:" output appears in the CI log
-        # and is verified by the CI pipeline's L1 test execution check.
-        self.run(f"{bin_path} 2>&1", ignore_errors=True, env="conanrun")
+        # Run test_openrtsp.sh with conanrun environment (sets LD_LIBRARY_PATH for openssl)
+        script_path = os.path.join(self.source_folder, "test_openrtsp.sh")
+        self.run(f"/system/bin/sh {script_path} {bin_path}", env="conanrun")

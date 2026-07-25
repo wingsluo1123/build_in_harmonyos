@@ -15,11 +15,12 @@
 
 ## 验证结果
 ```bash
-openRTSP -h  # 显示 usage 信息即验证通过
+openRTSP  # 无参数运行，输出 usage 信息即验证通过
 ```
 
 ## 已知问题
-- 无
+- `openRTSP -h` 在该平台触发 Signal 11，不能用于验证；当前 smoke test 使用无参数运行。
+- upstream 无官方测试套件（live555 项目上游无 make check 或等效测试框架）。
 
 ---
 

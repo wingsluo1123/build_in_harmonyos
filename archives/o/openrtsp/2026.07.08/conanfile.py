@@ -11,8 +11,7 @@ R38: This is a command-line tool — commands.json is created.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, save
-from conan.tools.build import cross_building
+from conan.tools.files import get, copy, save
 
 
 class OpenrtspConan(ConanFile):
@@ -28,8 +27,7 @@ class OpenrtspConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
-        export_conandata_patches(self)
-
+        pass
     def requirements(self):
         self.requires("openssl/3.5.6")
 
@@ -95,7 +93,6 @@ class OpenrtspConan(ConanFile):
             f.write("\ncheck:\n\t@echo \"openrtsp smoke test: verify binary exists\"\n\ttest -f testProgs/openRTSP\n")
 
     def build(self):
-        apply_conandata_patches(self)
         self.run("make -j1", cwd=self.source_folder)
         self.run("make check", cwd=self.source_folder)
 
