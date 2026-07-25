@@ -1,11 +1,20 @@
-name: glib-test-package
-version: "2.84.0"
-sources:
-  - test_glib.c
-  - CMakeLists.txt
-  - conanfile.py
-test_commands:
-  - conan create .. --build=missing
-assertions:
-  count: 2
-  description: "Validate GLib string conversion and hash table operations"
+package: glib/2.84.0
+upstream_test_in_build: false
+upstream_tests:
+  - suite: glib/tests
+    count: 90+
+    note: "上游 glib/tests 含 strfuncs/hash/atomic 等纯算法测试及部分 IO 测试，本次以 -Dtests=false 关闭未执行"
+  - suite: gio/tests
+    count: 200+
+    note: "上游 gio/tests 含数百个 GIO 功能测试，本次以 -Dtests=false 关闭未执行"
+test_package_tests:
+  - file: test_glib.c
+    description: "GObject 类型系统初始化 + GIO 文件操作 + GNetworkMonitor 创建（验证 netlink 关闭补丁无副作用）"
+    command: "./test_glib"
+    assertions:
+      - "g_ascii_strup(\"harmonyos\") == \"HARMONYOS\""
+      - "GHashTable insert+lookup succeeds"
+      - "g_type_from_name(\"GObject\") != 0 && g_object_new(G_TYPE_OBJECT) != NULL"
+      - "g_file_new_for_path != NULL"
+      - "g_network_monitor_get_default != NULL && G_IS_NETWORK_MONITOR(monitor) == TRUE"
+assertion_count: 5

@@ -73,10 +73,34 @@ ninja -C build install
 ## 功能验证
 - libglib-2.0.a ✅
 - libgio-2.0.a ✅
+- libgobject-2.0.a ✅
+- libgmodule-2.0.a ✅
+- libgthread-2.0.a ✅
 - gio 二进制 ✅
 - glib-compile-schemas ✅
-- Conan test_package ✅（输出 `glib consumer passed`）
+- Conan test_package ✅（5 项断言全部通过）
 - Conan G0/G1/G2/G3/G4/L2/L4/L5 门禁 ✅
+
+## 上游测试情况
+
+### 上游测试套件
+- **glib/tests**: 90+ 用例，含 strfuncs、hash、atomic 等纯算法测试及部分 IO 测试
+- **gio/tests**: 200+ 用例，含数百个 GIO 功能测试
+- **上游用例合计**: 290+
+
+### 本次适配测试策略
+本次基础适配以 `-Dtests=false` 关闭上游测试构建，**未执行上游测试**。
+
+### 冒烟测试（test_package）
+新增 test_package 冒烟用例（5 项断言），覆盖：
+1. **g_ascii_strup**: 字符串转换 — 验证 libglib-2.0.a 核心功能
+2. **GHashTable 插入/查询**: 数据结构 — 验证 libglib-2.0.a 核心功能
+3. **g_object_new / g_type_from_name**: GObject 类型系统 — 验证 libgobject-2.0.a 链接与类型系统初始化
+4. **g_file_new_for_path**: GIO 文件操作 — 验证 libgio-2.0.a 链接与 GFile 创建
+5. **g_network_monitor_get_default**: GNetworkMonitor 创建 — 验证 netlink 关闭补丁（0001-disable-netlink-for-harmonyos.patch）无副作用
+
+### 上游测试运行计划
+上游测试运行计划延后。条件允许时，可考虑在鸿蒙上跑上游 strfuncs、hash、atomic 等纯算法测试，作为"适配未破坏功能"的更强证据。
 
 ---
 *编译者: OpenDesk Compile Agent*
