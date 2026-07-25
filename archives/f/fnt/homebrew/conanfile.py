@@ -41,17 +41,26 @@ class FntConan(ConanFile):
             )
 
     def package(self):
-        import shutil
+        import shutil, subprocess, sys
         dst_bin = os.path.join(self.package_folder, "bin")
         os.makedirs(dst_bin, exist_ok=True)
         src_fnt = os.path.join(self.source_folder, "fnt")
         dst_fnt = os.path.join(dst_bin, "fnt")
         shutil.copyfile(src_fnt, dst_fnt)
-        # Fix permissions: use os.chmod with try/except, fallback to os.system
+        # Fix permissions. HMDFS may reject os.chmod with PermissionError;
+        # fall back to the chmod binary, but DO inspect its return code and
+        # surface failures — silent 2>/dev/null + unchecked os.system ships
+        # a non-executable fnt that fails downstream with "Permission denied".
         try:
             os.chmod(dst_fnt, 0o755)
-        except (PermissionError, OSError):
-            os.system("chmod 755 \"" + dst_fnt + "\" 2>/dev/null")
+        except (PermissionError, OSError) as e:
+            self.output.warn(f"os.chmod failed ({e}); trying chmod binary")
+            r = subprocess.run(["chmod", "755", dst_fnt], capture_output=True)
+            if r.returncode != 0:
+                self.output.warn(
+                    f"chmod binary failed rc={r.returncode}: "
+                    f"{r.stderr.decode(errors='replace').strip()}"
+                )
         copy(self, "fnt.1", src=self.source_folder, dst=os.path.join(self.package_folder, "man", "man1"))
         copy(self, "completions/_fnt", src=self.source_folder, dst=os.path.join(self.package_folder, "zsh", "site-functions"))
 
