@@ -59,9 +59,9 @@ class LvConan(ConanFile):
         cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
         sysroot = self.conf.get("tools.build:sysroot", default="")
         cflags = f"-O3 --sysroot={sysroot}" if sysroot else "-O3"
-        ldflags = f"--sysroot={sysroot} -ltermcap" if sysroot else "-ltermcap"
-        args = f"--enable-static --disable-shared LIBS=-ltermcap --build=aarch64-unknown-linux-gnu"
-        self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}' /data/service/hnp/bin/bash {configure} {args}", cwd=src_dir, shell=True)
+        ldflags = "-ltermcap"
+        args = "--enable-static --disable-shared --build=aarch64-unknown-linux-gnu"
+        self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}' LIBS=-ltermcap /data/service/hnp/bin/bash {configure} {args}", cwd=src_dir, shell=True)
         self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}'", cwd=src_dir)
 
     def package(self):
