@@ -1,6 +1,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -72,21 +73,37 @@ class GlibConan(ConanFile):
             native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
             with open(native_file, encoding="utf-8") as stream:
                 content = stream.read()
-            content = content.replace(
+            # gettext 路径注入依赖 native file 中固定子串；MesonToolchain 升级若改格式，
+            # replace 会静默不替换导致 gettext 找不到。逐次断言匹配成功。
+            def _inject(haystack, needle, replacement, what):
+                if needle not in haystack:
+                    raise ConanException(
+                        f"{what}: native file 缺少预期片段，请检查 MesonToolchain 输出格式"
+                    )
+                return haystack.replace(needle, replacement, 1)
+            content = _inject(
+                content,
                 "c_args = [] + preprocessor_definitions",
                 f"c_args = {include_args!r} + preprocessor_definitions",
+                "c_args",
             )
-            content = content.replace(
+            content = _inject(
+                content,
                 "c_link_args = []",
                 f"c_link_args = {link_args!r}",
+                "c_link_args",
             )
-            content = content.replace(
+            content = _inject(
+                content,
                 "cpp_args = ['-stdlib=libc++'] + preprocessor_definitions",
                 f"cpp_args = ['-stdlib=libc++'] + {include_args!r} + preprocessor_definitions",
+                "cpp_args",
             )
-            content = content.replace(
+            content = _inject(
+                content,
                 "cpp_link_args = ['-stdlib=libc++']",
                 f"cpp_link_args = ['-stdlib=libc++'] + {link_args!r}",
+                "cpp_link_args",
             )
             with open(native_file, "w", encoding="utf-8") as stream:
                 stream.write(content)
