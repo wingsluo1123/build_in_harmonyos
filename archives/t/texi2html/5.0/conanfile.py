@@ -149,16 +149,57 @@ class Texi2HtmlConan(ConanFile):
                 content = content.replace(old_dpgettext, new_dpgettext, 1)
                 with open(texi2html_script, "w") as f:
                     f.write(content)
+        import subprocess
+        # Resolve env/perl/en paths on OHOS for shebang fixes
+        env_path = None
+        perl_path = None
+        try:
+            env_path = subprocess.check_output(["command", "-v", "env"], timeout=10).decode().strip()
+            perl_path = subprocess.check_output(["command", "-v", "perl"], timeout=10).decode().strip()
+        except Exception:
+            pass  # non-critical — paths may not exist
         for root, dirs, files in os.walk(self.package_folder):
             for fname in files:
                 fpath = os.path.join(root, fname)
                 try:
-                    with open(fpath, "r") as f:
+                    with open(fpath, "r", errors="replace") as f:
                         first_line = f.readline()
+                    if not first_line.startswith("#!"):
+                        continue
+                    # Only fix #!/usr/bin/env scripts (the upstream tarball may have hardcoded paths)
                     if first_line.startswith("#!/usr/bin/env"):
-                        replace_in_file(self, fpath, first_line.rstrip(), "#!/" + first_line.split("/")[-1].rstrip())
-                except Exception:
-                    pass
+                        if env_path is not None:
+                            # env is available — keep original shebang (it works)
+                            continue
+                        # env is not available — try to resolve the interpreter
+                        parts = first_line.strip().split()
+                        interpreter = parts[-1] if len(parts) > 1 else None
+                        if interpreter:
+                            try:
+                                resolved = subprocess.check_output(
+                                    ["command", "-v", interpreter], timeout=10
+                                ).decode().strip()
+                                if resolved:
+                                    replace_in_file(self, fpath, first_line.rstrip(), "#!{}".format(resolved))
+                                    self.output.info("shebang fix: {} → #!{}".format(fpath, resolved))
+                            except Exception as e:
+                                self.output.warning(
+                                    "cannot resolve interpreter '{}' for {}: {}".format(interpreter, fpath, e)
+                                )
+                except (UnicodeDecodeError, OSError, IOError) as e:
+                    self.output.warning("cannot read shebang from {}: {}".format(fpath, e))
+        # Verify texi2html main script has a valid shebang
+        texi2html_script = os.path.join(self.package_folder, "bin", "texi2html")
+        if os.path.exists(texi2html_script):
+            with open(texi2html_script, "r") as f:
+                shebang = f.readline().strip()
+            bad_shebangs = ["#!/env", "#!/perl", "#!/python3", "#!/python"]
+            if any(shebang == b or shebang.startswith(b + " ") for b in bad_shebangs):
+                raise RuntimeError(
+                    "texi2html main script has invalid shebang: '{}'. "
+                    "The shebang fix must produce a valid absolute path.".format(shebang)
+                )
+            self.output.info("texi2html shebang verified: {}".format(shebang))
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
