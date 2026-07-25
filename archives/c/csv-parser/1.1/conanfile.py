@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Conan recipe for csv-parser 1.1 — header-only C++17 CSV parsing library.
+
+csv-parser is a modern C++ header-only library (MIT) requiring C++17.
+No build step needed; package() copies *.hpp headers to include/.
+"""
 from conan import ConanFile
 from conan.tools.build import check_min_cppstd
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
