@@ -5,7 +5,6 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -18,8 +17,8 @@ class NcursesConan(ConanFile):
     url = "https://invisible-island.net/ncurses/"
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": False, "fPIC": True}
+    options = {"fPIC": [True, False]}
+    default_options = {"fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -31,36 +30,12 @@ class NcursesConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _compiler(self, name):
-        candidates = sorted(
-            glob.glob(f"/storage/Users/currentUser/ohpc-ci-shadow/runs/*/tools/{name}"),
-            key=os.path.getmtime,
-            reverse=True,
-        )
-        for candidate in candidates:
-            if os.access(candidate, os.X_OK):
-                return candidate
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        if name == "clang":
+            return compilers.get("c", name)
+        if name == "clang++":
+            return compilers.get("cpp", name)
         return name
-
-    def generate(self):
-        tc = AutotoolsToolchain(self)
-        if self.options.shared:
-            tc.configure_args.extend(["--with-shared", "--without-normal"])
-        else:
-            tc.configure_args.extend(["--without-shared", "--with-normal"])
-        tc.configure_args.extend([
-            "--enable-widec",
-            "--enable-overwrite",
-            "--without-debug",
-            "--without-ada",
-            "--without-cxx",
-            "--without-cxx-binding",
-            "--without-manpages",
-            "--without-tests",
-            "--disable-stripping",
-            "--disable-db-install",
-            "--with-fallbacks=xterm-256color,vt100",
-        ])
-        tc.generate()
 
     def _patch_config_scripts(self):
         replacements = {
