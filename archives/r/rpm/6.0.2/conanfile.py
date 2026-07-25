@@ -6,6 +6,7 @@ libarchive, lua) are installed as system packages via cmd-pkgs.
 """
 import os
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
@@ -34,15 +35,18 @@ class RpmConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        sys_prefix = os.environ.get("HNP_PREFIX", "/storage/Users/currentUser/usr/local")
+        sys_prefix = os.environ.get("HNP_PREFIX")
+        if not sys_prefix:
+            raise ConanInvalidConfiguration("HNP_PREFIX environment variable is not set. Please set it to the system prefix path (e.g. /usr/local).")
         pkg_config_path = sys_prefix + "/lib/pkgconfig"
         if os.path.exists(pkg_config_path):
             old = os.environ.get("PKG_CONFIG_PATH", "")
             os.environ["PKG_CONFIG_PATH"] = pkg_config_path + (":" + old if old else "")
 
         tc = CMakeToolchain(self)
-        tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
-        tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+        if self.settings.os in ("Linux", "OHOS"):
+            tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
+            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.cache_variables["CMAKE_PREFIX_PATH"] = sys_prefix
         tc.variables["ENABLE_PYTHON"] = False
         tc.variables["ENABLE_PLUGINS"] = True

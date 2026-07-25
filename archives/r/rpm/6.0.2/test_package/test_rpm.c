@@ -4,7 +4,11 @@
 
 int main(void) {
     /* Verify the library is linkable and the API is callable */
-    rpmReadConfigFiles(NULL, NULL);
+    int rc = rpmReadConfigFiles(NULL, NULL);
+    if (rc != 0) {
+        fprintf(stderr, "rpmReadConfigFiles failed: %d\n", rc);
+        return 1;
+    }
     /* Print version constant to verify linkage */
     printf("rpm version: %s\n", RPMVERSION);
     return 0;

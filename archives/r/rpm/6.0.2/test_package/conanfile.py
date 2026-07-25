@@ -22,7 +22,8 @@ class RpmTestConan(ConanFile):
 
     def test(self):
         # System packages are installed via cmd-pkgs, ensure their lib path is on LD_LIBRARY_PATH
-        sys_prefix = os.environ.get("HNP_PREFIX", "/storage/Users/currentUser/usr/local")
+        sys_prefix = os.environ.get("HNP_PREFIX")
         old_ld = os.environ.get("LD_LIBRARY_PATH", "")
-        os.environ["LD_LIBRARY_PATH"] = sys_prefix + "/lib" + (":" + old_ld if old_ld else "")
+        if sys_prefix:
+            os.environ["LD_LIBRARY_PATH"] = sys_prefix + "/lib" + (":" + old_ld if old_ld else "")
         self.run(os.path.join(self.cpp.build.bindirs[0], "test_rpm"), env="conanrun")
