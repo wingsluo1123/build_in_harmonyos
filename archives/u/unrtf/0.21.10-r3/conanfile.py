@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Conan recipe for GNU UnRTF 0.21.10-r3."""
+import configparser
+import hashlib
 import os
 
 from conan import ConanFile
-from conan.errors import ConanException
-from conan.tools.files import chdir, copy, get, apply_conandata_patches, export_conandata_patches, replace_in_file
+from conan.tools.files import apply_conandata_patches, chdir, export_conandata_patches, get, save
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-from conan.tools.microsoft import unix_path
 
 
 class UnrtfConan(ConanFile):
@@ -34,81 +34,68 @@ class UnrtfConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         tc.configure_args.append("--datarootdir=${prefix}/share")
+        tc.configure_args.append("--disable-maintainer-mode")
+        tc.configure_args.append("--disable-dependency-tracking")
         tc.generate()
 
-    def _patch_configure_umask(self):
-        configure_path = f"{self.source_folder}/configure"
-        replacements = {
-            '(umask 077 && mktemp -d "./confXXXXXX")': '(umask 022 && mktemp -d "./confXXXXXX")',
-            '(umask 077 && mkdir "$tmp")': '(umask 022 && mkdir "$tmp")',
-        }
-        with open(configure_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        changed = False
-        for old, new in replacements.items():
-            if old in content:
-                content = content.replace(old, new)
-                changed = True
-        if not changed:
-            raise ConanException("Expected configure umask patterns not found")
-        with open(configure_path, "w", encoding="utf-8") as f:
-            f.write(content)
+    def build_directory(self):
+        build_tag = hashlib.sha1(os.path.normpath(self.build_folder).encode("utf-8")).hexdigest()[:12]
+        base_dir = os.environ.get("TMPDIR") or self.build_folder
+        return os.path.join(base_dir, f"{self.name}-{self.version}-{build_tag}")
 
-    def _patch_windows_makefile_quoting(self):
-        src_makefile = f"{self.source_folder}/src/Makefile"
-        copy(self, "unrtf_w.c", src=f"{self.source_folder}/Windows", dst=f"{self.source_folder}/src")
-        replace_in_file(
+    def configure_arguments(self):
+        config = configparser.ConfigParser()
+        config.read(os.path.join(self.generators_folder, "conanbuild.conf"))
+        return config.get("toolchain", "configure_args")
+
+    def write_mktemp_wrapper(self, build_dir):
+        tools_dir = os.path.join(build_dir, "conan-tools")
+        os.makedirs(tools_dir, exist_ok=True)
+        wrapper = os.path.join(tools_dir, "mktemp")
+        save(
             self,
-            src_makefile,
-            'AM_CPPFLAGS = -DPKGDATADIR=\\"$(pkgdatadir)\\"',
-            'AM_CPPFLAGS = "-DPKGDATADIR=\\"$(pkgdatadir)\\""',
+            wrapper,
+            """#!/usr/bin/env bash
+set -e
+for candidate in /storage/Users/currentUser/usr/local/bin/mktemp /system/bin/mktemp /bin/mktemp; do
+  if [[ -x "$candidate" && "$candidate" != "$0" ]]; then
+    umask 022
+    exec "$candidate" "$@"
+  fi
+done
+echo "mktemp: no real mktemp found" >&2
+exit 127
+""",
         )
-        replace_in_file(
-            self,
-            src_makefile,
-            "word.$(OBJEXT)",
-            "word.$(OBJEXT) unrtf_w.$(OBJEXT)",
-        )
-        replace_in_file(
-            self,
-            src_makefile,
-            "LIBS = ",
-            "LIBS = -liconv -lshlwapi -lkernel32",
-        )
+        os.chmod(wrapper, 0o755)
+        return tools_dir
 
     def build(self):
         apply_conandata_patches(self)
-        # Build-time HMDFS config.status temp-dir permission fix; keep generated configure out of persistent patches.
-        self._patch_configure_umask()
         autotools = Autotools(self)
-        configure_args = " ".join([
-            autotools._configure_args,
-            "--disable-maintainer-mode",
-            "--disable-dependency-tracking",
-        ])
-        with chdir(self, self.source_folder):
+        build_dir = self.build_directory()
+        os.makedirs(build_dir, exist_ok=True)
+        with chdir(self, build_dir):
             if self.settings_build.get_safe("os") == "Windows":
-                self.run(f"./configure {configure_args}")
+                autotools.configure(build_script_folder=self.source_folder)
             else:
                 configure_shell = os.environ.get("CONFIG_SHELL") or "bash"
                 if os.path.isabs(configure_shell) and not os.path.exists(configure_shell):
                     configure_shell = "bash"
                 os.environ["CONFIG_SHELL"] = configure_shell
                 os.environ["SHELL"] = configure_shell
-                self.run(f"CONFIG_SHELL={configure_shell} SHELL={configure_shell} {configure_shell} ./configure {configure_args}")
-            if self.settings_build.get_safe("os") == "Windows":
-                self._patch_windows_makefile_quoting()
-                self.run("MSYS2_ARG_CONV_EXCL='*' mingw32-make -j1")
-            else:
-                autotools.make(args=["-j1"])
+                os.environ["PATH"] = f"{self.write_mktemp_wrapper(build_dir)}:{os.environ.get('PATH', '')}"
+                configure_script = os.path.join(self.source_folder, "configure")
+                self.run(
+                    f'CONFIG_SHELL="{configure_shell}" SHELL="{configure_shell}" '
+                    f'"{configure_shell}" "{configure_script}" {self.configure_arguments()}'
+                )
+            autotools.make(args=["-j1"])
 
     def package(self):
         autotools = Autotools(self)
-        with chdir(self, self.build_folder):
-            if self.settings_build.get_safe("os") == "Windows":
-                self.run(f'mingw32-make install -j1 DESTDIR="{unix_path(self, self.package_folder)}"')
-            else:
-                autotools.install(args=["-j1"])
+        with chdir(self, self.build_directory()):
+            autotools.install(args=["-j1"])
 
     def package_info(self):
         self.cpp_info.libs = []
