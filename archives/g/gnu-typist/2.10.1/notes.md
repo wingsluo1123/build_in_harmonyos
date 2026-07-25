@@ -53,5 +53,5 @@ There is NO WARRANTY, to the extent permitted by law.
 - 本适配为路径 A（基础适配），无需知识库新增
 ---
 
-**编译结束**: 2026-07-25 19:09
+**编译结束**: 2026-07-25 21:56
 **最终状态**: built

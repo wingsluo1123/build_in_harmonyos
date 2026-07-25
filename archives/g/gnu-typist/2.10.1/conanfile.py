@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for gnu-typist 2.10.1 — Autotools project with system ncurses."""
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 import os
@@ -22,7 +22,7 @@ class GnutypistConan(ConanFile):
     default_options = {"shared": False}
 
     def export_sources(self):
-        pass
+        export_conandata_patches(self)
 
     def requirements(self):
         pass
@@ -53,45 +53,47 @@ class GnutypistConan(ConanFile):
 
     def build(self):
         import os as _os
-        # R33: Save PATH to restore after build (prevent parent process pollution)
-        _saved_path = _os.environ.get("PATH", "")
-        # [R33] PATH adjustments for OHOS platform limitations (E106/E079):
-        #   - Prefix /bin: HMDFS GNU cat stdout permission issue (E106)
-        #   - _tools/: help2man not available on OHOS (E079)
-        _os.environ["PATH"] = "/bin:" + _saved_path
-        # Create wrapper scripts for missing tools
-        _os.makedirs("_tools", exist_ok=True)
-        with open("_tools/help2man", "w") as f:
-            f.write("#!/bin/sh\nexit 0\n")
-        _os.chmod("_tools/help2man", 0o755)
-        with open("_tools/makeinfo", "w") as f:
-            f.write("#!/bin/sh\nexit 0\n")
-        _os.chmod("_tools/makeinfo", 0o755)
-        with open("_tools/gettext_stub.h", "w") as f:
-            f.write("/* gettext stub for NLS-disabled builds */\n")
-            f.write("#define gettext(x) (x)\n")
-            f.write("#define _(x) (x)\n")
-        _os.environ["PATH"] = _os.path.abspath("_tools") + ":" + _os.environ.get("PATH", "")
-        # Patch configure's mktemp to work around HMDFS limitation (E106):
-        # mktemp -d creates files not writable on HMDFS; replace with
-        # mktemp -p + rm + mkdir approach using local variable 't'.
-        configure_path = _os.path.join(self.source_folder, "configure")
-        if _os.path.exists(configure_path):
-            with open(configure_path, "r") as f:
-                content = f.read()
-            old = 'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`'
-            new = 'tmp=`(umask 077 && t=$(mktemp -p . confXXXXXX.tmp) && rm -f "$t" && mkdir -p "$t" && echo "$t") 2>/dev/null`'
-            if old in content:
-                content = content.replace(old, new)
-                with open(configure_path, "w") as f:
-                    f.write(content)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        # Save full environment to restore after build (R33)
+        _saved_environ = dict(_os.environ)
+        try:
+            apply_conandata_patches(self)
+            # [R33] PATH adjustments for OHOS platform limitations (E106/E079):
+            #   - Prefix /bin: HMDFS GNU cat stdout permission issue (E106)
+            #   - _tools/: help2man/makeinfo not available on OHOS (E079)
+            _os.environ["PATH"] = "/bin:" + _saved_environ.get("PATH", "")
+            # Create wrapper scripts for missing tools
+            _os.makedirs("_tools", exist_ok=True)
+            with open("_tools/help2man", "w") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            _os.chmod("_tools/help2man", 0o755)
+            with open("_tools/makeinfo", "w") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            _os.chmod("_tools/makeinfo", 0o755)
+            with open("_tools/gettext_stub.h", "w") as f:
+                f.write("/* gettext stub for NLS-disabled builds */\n")
+                f.write("#define gettext(x) (x)\n")
+                f.write("#define _(x) (x)\n")
+            _os.environ["PATH"] = _os.path.abspath("_tools") + ":" + _os.environ.get("PATH", "")
+            autotools = Autotools(self)
+            autotools.configure()
+            autotools.make(args=["-j1"])
+        finally:
+            # R33: restore original environment after build
+            _os.environ.clear()
+            _os.environ.update(_saved_environ)
 
     def package(self):
-        autotools = Autotools(self)
-        autotools.install()
+        import os as _os
+        _saved_path = _os.environ.get("PATH", "")
+        try:
+            # _tools/ created in build() — still on disk; add to PATH for install
+            _tools_dir = _os.path.join(self.build_folder, "_tools")
+            if _os.path.isdir(_tools_dir):
+                _os.environ["PATH"] = _tools_dir + ":" + _saved_path
+            autotools = Autotools(self)
+            autotools.install()
+        finally:
+            _os.environ["PATH"] = _saved_path
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
