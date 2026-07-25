@@ -24,7 +24,7 @@
      -DCMAKE_C_COMPILER=/data/service/hnp/bin/clang \
      -DCMAKE_CXX_COMPILER=/data/service/hnp/bin/clang++ \
      -DCMAKE_BUILD_TYPE=Release \
-     -CMAKE_SYSTEM_NAME=Linux \
+     -DCMAKE_SYSTEM_NAME=Linux \
      -DLLVM_DIR=$LLVM_PKG_DIR/lib/cmake/llvm \
      -DLLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR=/path/to/spirv-headers \
      -DLLVM_SPIRV_INCLUDE_TESTS=OFF \

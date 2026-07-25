@@ -6,6 +6,7 @@ LLVM IR <-> SPIR-V 翻译器，依赖 llvm/20.1.0。
 """
 import os
 import glob
+import shlex
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -19,7 +20,7 @@ class SpirvLlvmTranslatorConan(ConanFile):
     description = "LLVM-based translator for SPIR-V (LLVM IR <-> SPIR-V)"
     license = "Apache-2.0 WITH LLVM-exception"
     homepage = "https://github.com/KhronosGroup/SPIRV-LLVM-Translator"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
@@ -42,8 +43,9 @@ class SpirvLlvmTranslatorConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
         # Download SPIRV-Headers at the specific commit required by this version
         # (spirv-headers-tag.conf specifies commit 2b2e05e088841c63c0b6fd4c9fb380d8688738d3)
-        get(self, "https://github.com/KhronosGroup/SPIRV-Headers/archive/2b2e05e088841c63c0b6fd4c9fb380d8688738d3.tar.gz",
-            strip_root=True, destination=os.path.join(self.source_folder, "external", "SPIRV-Headers"))
+        spirv_headers = self.conan_data["spirv_headers"]
+        get(self, **spirv_headers, strip_root=True,
+            destination=os.path.join(self.source_folder, "external", "SPIRV-Headers"))
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -85,13 +87,15 @@ class SpirvLlvmTranslatorConan(ConanFile):
                 p = os.path.join(bindir, name)
                 if os.path.isfile(p) and not os.path.islink(p) and self._is_elf(p):
                     targets.append(p)
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        objcopy = os.environ.get("LLVM_OBJCOPY", "llvm-objcopy")
+        signer = os.environ.get("BINARY_SIGN_TOOL", "binary-sign-tool")
         for f in targets:
             if os.path.islink(f):
                 continue
-            self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
-            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
+            # Remove existing .codesign section (may not exist, ignore errors)
+            self.run(f"{shlex.quote(objcopy)} --remove-section .codesign {shlex.quote(f)}", ignore_errors=True)
+            # Sign the binary; failure here means the binary won't run on OHOS
+            self.run(f"{shlex.quote(signer)} sign -inFile {shlex.quote(f)} -outFile {shlex.quote(f)} -selfSign 1")
 
     def package(self):
         cmake = CMake(self)
