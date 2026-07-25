@@ -22,5 +22,8 @@ class LvTestConan(ConanFile):
 
     def test(self):
         self.run("which lv", env="conanrun")
-        # 用 timeout 防止 lv 在非交互终端挂起；输入为空时立即退出
-        self.run("timeout 3 lv /dev/null 2>&1 || true", env="conanrun")
+        # 用 lv --help 验证二进制可执行（非交互式，不会挂起）
+        self.run("lv --help", env="conanrun")
+        # 运行 CTest 执行 test.c 的编译验证
+        cmake = CMake(self)
+        cmake.test()
