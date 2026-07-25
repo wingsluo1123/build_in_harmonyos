@@ -1,8 +1,18 @@
 # popt 1.16 — 编译进度
 
 > 档案创建时间: 2026-04-25
-> 最后更新: 2026-06-04 (当前会话)
-> 当前会话 ID: 手动编译 → 正式configure编译
+> 最后更新: 2026-07-26 (v8.7 Conan 迁移)
+> 当前状态: conan create ✅ | test_package 1/1 ✅
+
+## v8.7 Conan 迁移 (2026-07-26)
+
+- conanfile.py: Autotools + E007 补丁 + E097 umask 修复
+- conandata.yml: http://ftp.rpm.org/mirror/popt/popt-1.16.tar.gz
+- test_package: CMake + test_popt.c (popt API 命令行解析)
+- conan create 验证通过: configure → make → install → test_package 1/1 ✅
+- E097 新增: autoconf umask 077 在 HMDFS setgid 下导致 config.status 权限错误
+
+## 旧版记录 (v7.8, 2026-04-25 ~ 2026-06-04)
 
 ## 一、基本信息
 
