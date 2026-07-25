@@ -53,16 +53,19 @@ class GnutypistConan(ConanFile):
 
     def build(self):
         import os as _os
-        # Fix HMDFS mktemp issue (E106): configure's config.status uses
-        # mktemp -d which fails on HMDFS; use mktemp -p + rm + mkdir instead.
+        # [R33] 以下 PATH 操作为 OHOS 平台限制所需，无法通过 toolchain 替代：
+        #   - /bin 前置：HMDFS 上 GNU cat (9.10) stdout 权限受限, /bin/cat (toybox) 正常（E106）
+        #   - _tools/ 路径：help2man wrapper（E079）+ gettext stub 需要在 PATH 中可见
+        # Disable documentation generation via makeinfo wrapper (missing on OHOS)
         _os.environ["PATH"] = "/bin:" + _os.environ.get("PATH", "")
-        # Disable documentation generation via make arg (missing makeinfo on OHOS)
-        _os.environ["MAKEINFO"] = ":"
         # Create wrapper scripts for missing tools
         _os.makedirs("_tools", exist_ok=True)
         with open("_tools/help2man", "w") as f:
             f.write("#!/bin/sh\nexit 0\n")
         _os.chmod("_tools/help2man", 0o755)
+        with open("_tools/makeinfo", "w") as f:
+            f.write("#!/bin/sh\nexit 0\n")
+        _os.chmod("_tools/makeinfo", 0o755)
         # Create gettext stub for NLS-disabled builds (included via -include)
         with open("_tools/gettext_stub.h", "w") as f:
             f.write("/* gettext stub for NLS-disabled builds */\n")
