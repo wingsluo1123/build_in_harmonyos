@@ -39,3 +39,13 @@
 ## 注意事项
 
 {需要特别注意的点；无则删除此节}
+
+## 2026-07-25 Conan adaptation
+- Added Conan 2 recipe for `ncurses/6.5` using Autotools.
+- Source URL and sha256 were recorded from invisible-mirror upstream tarball.
+- Recipe builds static wide-character ncurses by default and disables terminal database installation.
+- Added consumer `test_package` covering `curses_version()`.
+- Dependency issue: #1437.
+- Updated recipe to run configure through `CONFIG_SHELL ./configure` to avoid direct execute permission issues on HMDFS.
+- Updated recipe to use `/system/bin/sh ./configure` because profile `CONFIG_SHELL=/data/service/hnp/bin/bash` is inaccessible in the CI shell.
+- Recipe now overrides `SHELL` and `CONFIG_SHELL` to `/system/bin/sh` during build so configure does not use inaccessible profile bash.
