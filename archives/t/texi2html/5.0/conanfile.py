@@ -111,7 +111,7 @@ class Texi2HtmlConan(ConanFile):
             dirs_exist_ok=True,
         )
         autotools.make(args=["-j1"])
-        self.run("make check || true", cwd=self.build_folder)
+        self.run("make check > make-check.log 2>&1; rc=$?; cat make-check.log; if [ $rc -ne 0 ]; then grep -qE 'check-local|\.mo|texi2html_document\.mo|Locale::Messages|locale' make-check.log && echo 'OHOS: make check failure is known NLS/locale limitation, continuing' && exit 0 || exit $rc; fi", cwd=self.build_folder)
 
     def package(self):
         autotools = Autotools(self)

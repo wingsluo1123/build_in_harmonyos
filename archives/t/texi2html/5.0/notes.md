@@ -36,5 +36,5 @@ texi2html --no-validate sample.texi
 - make check || true 在 build() 中执行，check-local 因缺少 .mo 文件失败
 ---
 
-**编译结束**: 2026-07-25
-**最终状态**: built (no patches, inline fixes only)
+**编译结束**: 2026-07-25 13:19
+**最终状态**: built
