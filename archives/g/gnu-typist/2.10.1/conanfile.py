@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for gnu-typist 2.10.1 — Autotools project with system ncurses."""
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 import os
@@ -22,7 +22,7 @@ class GnutypistConan(ConanFile):
     default_options = {"shared": False}
 
     def export_sources(self):
-        export_conandata_patches(self)
+        pass
 
     def requirements(self):
         pass
@@ -35,8 +35,10 @@ class GnutypistConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--build=aarch64-linux-gnu")
-        tc.configure_args.append("--host=aarch64-linux-gnu")
+        # Cross-compilation: only add --build/--host for OHOS builds
+        if self.settings.os == "OHOS":
+            tc.configure_args.append("--build=aarch64-linux-gnu")
+            tc.configure_args.append("--host=aarch64-linux-gnu")
         tc.configure_args.append("--disable-nls")
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
@@ -44,13 +46,11 @@ class GnutypistConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         import os as _os
-        # Fix HMDFS /tmp issue: replace mktemp -d with flat file approach
-        # in the configure script's config.status generation
+        # Fix HMDFS mktemp issue (E106): configure's config.status uses
+        # mktemp -d which fails on HMDFS; use mktemp -p + rm + mkdir instead.
         _os.environ["PATH"] = "/bin:" + _os.environ.get("PATH", "")
-        _os.environ["CC"] = "clang"
-        _os.environ["CXX"] = "clang++"
+        # Disable documentation generation via MAKEINFO (missing makeinfo on OHOS)
         _os.environ["MAKEINFO"] = ":"
         # Create wrapper scripts for missing tools
         _os.makedirs("_tools", exist_ok=True)
@@ -58,28 +58,19 @@ class GnutypistConan(ConanFile):
             f.write("#!/bin/sh\nexit 0\n")
         _os.chmod("_tools/help2man", 0o755)
         _os.environ["PATH"] = _os.path.abspath("_tools") + ":" + _os.environ.get("PATH", "")
-        # Patch configure script to fix HMDFS mktemp issue (E106)
-        # HMDFS doesn't allow creating files inside mktemp -d subdirs
-        # configure is in the source folder, not the build folder
+        # Patch configure's mktemp to work around HMDFS limitation (E106):
+        # mktemp -d creates files not writable on HMDFS; replace with
+        # mktemp -p + rm + mkdir approach using local variable 't'.
         configure_path = _os.path.join(self.source_folder, "configure")
-        with open(configure_path, "r") as f:
-            content = f.read()
-        content = content.replace(
-            'mktemp -d "./confXXXXXX"',
-            'mktemp -p . confXXXXXX.tmp'
-        )
-        content = content.replace(
-            'test -d "$tmp"',
-            'test -d "$tmp2"'
-        )
-        # Fix the missing reference: tmp2 is set from the mktemp result
-        # The mktemp -p creates a flat file, so we need to rm it and mkdir -p
-        content = content.replace(
-            'mktemp -p . confXXXXXX.tmp',
-            'mktemp -p . confXXXXXX.tmp && tmp2="$tmp" && rm -f "$tmp" && mkdir -p "$tmp2"'
-        )
-        with open(configure_path, "w") as f:
-            f.write(content)
+        if _os.path.exists(configure_path):
+            with open(configure_path, "r") as f:
+                content = f.read()
+            old = 'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`'
+            new = 'tmp=`(umask 077 && t=$(mktemp -p . confXXXXXX.tmp) && rm -f "$t" && mkdir -p "$t" && echo "$t") 2>/dev/null`'
+            if old in content:
+                content = content.replace(old, new)
+                with open(configure_path, "w") as f:
+                    f.write(content)
         # Patch config.h to define gettext() stub (NLS disabled)
         config_h_path = _os.path.join(self.source_folder, "config.h.in")
         if _os.path.exists(config_h_path):
