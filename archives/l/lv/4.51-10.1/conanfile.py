@@ -46,34 +46,28 @@ class LvConan(ConanFile):
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         # OHOS 需要显式链接 termcap (ncurses 的 termcap 适配层)
-        tc.configure_args.append("LIBS=-ltermcap")
         tc.extra_ldflags.append("-ltermcap")
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
         src_dir = os.path.join(self.source_folder, "src")
-        # HMDFS: ./configure 无法获得执行权限，用 bash 运行 + TMPDIR 解决临时文件问题
+        # HMDFS: ./configure 无法获得执行权限，用 bash 运行
+        # 不 source toolchain 文件以避免 --sysroot 重复，
+        # 手动设置跨编译标志，仅编译阶段加 -ltermcap（不在 configure 测试中）
         with tempfile.TemporaryDirectory() as tmpdir:
             configure = os.path.join(src_dir, "configure")
             shared_args = "--disable-shared --enable-static" if not self.options.shared else "--enable-shared --disable-static"
             args = f"{shared_args} --build=aarch64-unknown-linux-gnu"
             bash = os.environ.get("CONFIG_SHELL", "bash")
-            # Source the AutotoolsToolchain-generated env for cross-compilation flags
-            tc_script = os.path.join(self.generators_folder, "conanautotoolstoolchain.sh")
-            if os.path.exists(tc_script):
-                # Source toolchain for cross-compilation vars but override LDFLAGS 
-                # to avoid --sysroot duplication (toolchain adds it to both CFLAGS and LDFLAGS)
-                self.run(f". {tc_script} && LDFLAGS='-ltermcap' TMPDIR={tmpdir} LIBS=-ltermcap {bash} {configure} {args}", cwd=src_dir, shell=True)
-                self.run(f". {tc_script} && LDFLAGS='-ltermcap' make -j$(nproc) LIBS=-ltermcap", cwd=src_dir)
-            else:
-                # Fallback: manual flags if toolchain file not generated
-                cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
-                sysroot = self.conf.get("tools.build:sysroot", default="")
-                opt = {"Debug": "-O0 -g", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
-                cflags = f"{opt} --sysroot={sysroot}" if sysroot else opt
-                self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap {bash} {configure} {args}", cwd=src_dir, shell=True)
-                self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap'", cwd=src_dir)
+            cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
+            sysroot = self.conf.get("tools.build:sysroot", default="")
+            opt = {"Debug": "-O0 -g", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
+            cflags = f"{opt} --sysroot={sysroot}" if sysroot else opt
+            # configure 测试编译器时不加 -ltermcap（链接器标志导致测试失败）
+            self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' {bash} {configure} {args}", cwd=src_dir, shell=True)
+            # make 阶段才加 LIBS=-ltermcap（链接目标需要）
+            self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
