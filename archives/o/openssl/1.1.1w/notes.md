@@ -1,29 +1,20 @@
-# openssl 1.1.1w 编译进度
+# OpenSSL 1.1.1w OHOS adaptation
 
-**日期**: 2026-04-12
-**状态**: 🔄 编译中
+## Build
 
-## 步骤记录
+- Target: `openharmony-aarch64`
+- Build system: Perl `Configure` and Make
+- Configuration: `no-asm`, static libraries by default, `-fPIC -O2 -D__OHOS__`
+- Source checksum: `cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8`
 
-| 步骤 | 状态 | 备注 |
-|------|------|------|
-| Step 1 init | ⏳ | |
-| Step 2 patches | ⏳ | |
-| Step 3 configure | ⏳ | |
-| Step 4 make | ⏳ | |
-| Step 5 install | ⏳ | |
-| Step 6 safety | ⏳ | |
-| Step 7 check | ⏳ | |
-| Step 8 staging | ⏳ | |
-| Step 9 package | ⏳ | |
-| Step 10 deploy | ⏳ | |
-| Step 11 finish | ⏳ | |
+## Adaptation
 
-## 发现与知识
+- Added the OpenHarmony aarch64 Configure target through a source patch.
+- Kept the Configure compatibility patch required by the OHOS toolchain.
+- Resolves compiler and archiver paths from Conan configuration when provided.
+- The package disables assembly by default because the OHOS target requires the portable implementation.
 
-<!-- 编译过程中发现的问题和解决方案 -->
+## Tests
 
----
-
-**编译结束**: 2026-04-12 20:08
-**最终状态**: partial
+- The Conan consumer test checks the packaged version, SHA-256, SSL context creation, and AES-256-CBC round-trip.
+- Remote OHOS CI verification is required before publication.
