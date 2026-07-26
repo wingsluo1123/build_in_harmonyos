@@ -1,55 +1,17 @@
-diff --git a/Configurations/15-openharmony.conf b/Configurations/15-openharmony.conf
-new file mode 100644
-index 0000000..1111111
---- /dev/null
-+++ b/Configurations/15-openharmony.conf
-@@ -0,0 +1,49 @@
-+# -*- mode: perl; -*-
-+## OpenHarmony (HarmonyOS/OpenHarmony) Configuration
-+# OpenHarmony is a HarmonyOS/OpenHarmony distribution based on OpenHarmony with LLVM toolchain
-+
-+{
-+    use File::Spec::Functions;
-+
-+    my %targets = (
-+        "openharmony" => {
-+            inherit_from     => [ "linux-generic32.0" ],
-+            template         => 1,
-+            cflags           => add("-D__OHOS__"),
-+            cppflags         => add("-D__OHOS__"),
-+            cxxflags         => add("-D__OHOS__"),
-+            bn_ops           => "BN_LLONG RC4_CHAR",
-+            thread_scheme    => "pthreads",
-+            dso_scheme       => "dlfcn",
-+            shared_target    => "linux-shared",
-+            shared_cflag     => "-fPIC",
-+            shared_ldflag    => sub { $disabled{pinshared} ? () : "-Wl,-znodelete" },
-+            shared_extension => ".so.\$(SHLIB_VERSION_NUMBER)",
-+            enable           => [ "afalgeng" ],
-+        },
-+        "openharmony-aarch64" => {
-+            inherit_from     => [ "openharmony", asm("aarch64_asm") ],
-+            bn_ops           => add("RC4_CHAR"),
-+            perlasm_scheme   => "linux64",
-+        },
-+        "openharmony-arm" => {
-+            inherit_from     => [ "openharmony", asm("armv4_asm") ],
-+            bn_ops           => add("RC4_CHAR"),
-+        },
-+        "openharmony-x86_64" => {
-+            inherit_from     => [ "openharmony", asm("x86_64_asm") ],
-+            bn_ops           => "SIXTY_FOUR_BIT_LONG RC4_CHAR",
-+            perlasm_scheme   => "elf",
-+        },
-+        "openharmony-x86" => {
-+            inherit_from     => [ "openharmony", asm("x86_asm") ],
-+            bn_ops           => "BN_LLONG RC4_CHAR",
-+            perlasm_scheme   => "elf",
-+        },
-+        "openharmony-riscv64" => {
-+            inherit_from     => [ "openharmony" ],
-+            bn_ops           => "SIXTY_FOUR_BIT_LONG RC4_CHAR",
-+            perlasm_scheme   => "linux64",
-+        },
-+    );
-+}
+diff -ruN a/Configurations/10-main.conf b/Configurations/10-main.conf
+--- a/Configurations/10-main.conf	2023-09-11 22:08:11.000000000 +0800
++++ b/Configurations/10-main.conf	2026-07-26 00:00:00.000000000 +0800
+@@ -1838,6 +1838,15 @@
+         pointer_size     => "64",
+     },
+
++    "openharmony-aarch64" => {
++        inherit_from     => [ "linux-aarch64" ],
++        cflags           => add("-D__OHOS__"),
++        cppflags         => add("-D__OHOS__"),
++        cxxflags         => add("-D__OHOS__"),
++        thread_scheme    => "pthreads",
++        dso_scheme       => "dlfcn",
++    },
+
+);
