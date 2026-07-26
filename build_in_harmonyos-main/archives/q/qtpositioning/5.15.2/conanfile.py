@@ -60,7 +60,12 @@ class QtpositioningConan(ConanFile):
         qt_root = self.dependencies["qt"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
-        self.run(f"{qmake_bin} {pro_file}")
+        # Pass shared/static config to qmake based on Conan options
+        config_flag = ""
+        if not self.options.shared:
+            config_flag = "CONFIG+=static"
+            self.run_env.define("QT_STATIC_BUILD", "1")
+        self.run(f"{qmake_bin} {pro_file} {config_flag}")
         self.run("make -j1")
 
     def package(self):
