@@ -96,6 +96,9 @@ class BoostConan(ConanFile):
             f"--sysroot={sysroot}",
             "-nostdinc++",
             "-stdlib=libc++",
+            "-D__OHOS_FAMILY__=1",
+            "-D_LIBCPP_HAS_NO_C_LOCALE",
+            "-DBOOST_DISABLE_THREADS",
         ]
         if self.options.fPIC:
             cxxflags.append("-fPIC")

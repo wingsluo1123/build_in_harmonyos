@@ -30,6 +30,16 @@ target library directory. The same flags are exported through `cpp_info` so
 the test_package and downstream CMake consumers use the identical OHOS
 standard library configuration.
 
+## CI fix: OHOS libc and Boost thread surface
+
+The remote smoke matrix showed that the SDK libc++ rune table requires its
+expected `__OHOS_FAMILY__=1` macro. OHOS libc does not provide
+`strtoll_l`/`strtoull_l` or `pthread_setcancelstate`, so the recipe also uses
+`-D_LIBCPP_HAS_NO_C_LOCALE` and `-DBOOST_DISABLE_THREADS`. These flags are in
+the b2 compile configuration and are exported through `cpp_info` for the
+consumer test and downstream CMake targets. `_LIBCPP_HAS_NO_LOCALIZATION` is
+intentionally not used because it disables the required `<locale>` surface.
+
 The Windows worktree has no OHOS clang/llvm toolchain, so full b2 and
 test_package execution is blocked locally. Remote validation must run after
 the branch is pushed, using:
