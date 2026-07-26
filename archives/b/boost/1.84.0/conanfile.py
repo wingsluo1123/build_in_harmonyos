@@ -50,7 +50,7 @@ class BoostConan(ConanFile):
             raise ConanInvalidConfiguration("OHOS compiler paths must be absolute")
         return cc, cxx
 
-    def _ohos_flags(self, target):
+    def _ohos_flags(self, target, compat_header=None):
         """Return explicit OHOS sysroot and libc++ flags for HNP clang."""
         sysroot = self.conf.get("tools.build:sysroot", default="", check_type=str)
         if not sysroot:
@@ -80,6 +80,44 @@ class BoostConan(ConanFile):
                 f"OHOS libc++ __config_site not found below: {llvm}/include"
             )
 
+        if compat_header is None:
+            compat_header = os.path.join(
+                self.build_folder, "boost_ohos_locale_compat.h"
+            )
+            save(
+                self,
+                compat_header,
+                """#ifndef BOOST_OHOS_LOCALE_COMPAT_H
+#define BOOST_OHOS_LOCALE_COMPAT_H
+
+#if defined(__OHOS__) || defined(__OHOS_FAMILY__)
+#include <stdlib.h>
+
+/* OHOS libc omits the locale_t variants used by libc++ <locale>. */
+static inline long long boost_ohos_strtoll_l(
+    const char *value, char **end, int base, ...)
+{
+    return strtoll(value, end, base);
+}
+
+static inline unsigned long long boost_ohos_strtoull_l(
+    const char *value, char **end, int base, ...)
+{
+    return strtoull(value, end, base);
+}
+
+#ifndef strtoll_l
+#define strtoll_l boost_ohos_strtoll_l
+#endif
+#ifndef strtoull_l
+#define strtoull_l boost_ohos_strtoull_l
+#endif
+#endif
+
+#endif
+""",
+            )
+
         include_dirs = [
             libcxx_v1,
             *[os.path.dirname(path) for path in sorted(config_sites)],
@@ -99,6 +137,7 @@ class BoostConan(ConanFile):
             "-D__OHOS_FAMILY__=1",
             "-D_LIBCPP_HAS_NO_C_LOCALE",
             "-DBOOST_DISABLE_THREADS",
+            f"-include {compat_header}",
         ]
         if self.options.fPIC:
             cxxflags.append("-fPIC")
@@ -166,6 +205,12 @@ class BoostConan(ConanFile):
     def package(self):
         stage = os.path.join(self.build_folder, "stage")
         copy(self, "boost/*", src=os.path.join(stage, "include"), dst=os.path.join(self.package_folder, "include"))
+        copy(
+            self,
+            "boost_ohos_locale_compat.h",
+            src=self.build_folder,
+            dst=os.path.join(self.package_folder, "include"),
+        )
         for component in ("program_options", "date_time"):
             copy(self, f"libboost_{component}*.a", src=os.path.join(stage, "lib"), dst=os.path.join(self.package_folder, "lib"))
             copy(self, f"libboost_{component}*.so*", src=os.path.join(stage, "lib"), dst=os.path.join(self.package_folder, "lib"))
@@ -175,7 +220,12 @@ class BoostConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "Boost")
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        _, cxxflags, linkflags = self._ohos_flags("aarch64-linux-ohos")
+        compat_header = os.path.join(
+            self.package_folder, "include", "boost_ohos_locale_compat.h"
+        )
+        _, cxxflags, linkflags = self._ohos_flags(
+            "aarch64-linux-ohos", compat_header
+        )
         self.cpp_info.cxxflags = shlex.split(cxxflags)
         self.cpp_info.exelinkflags = shlex.split(linkflags)
         self.cpp_info.sharedlinkflags = shlex.split(linkflags)

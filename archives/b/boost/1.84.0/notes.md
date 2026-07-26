@@ -40,6 +40,16 @@ the b2 compile configuration and are exported through `cpp_info` for the
 consumer test and downstream CMake targets. `_LIBCPP_HAS_NO_LOCALIZATION` is
 intentionally not used because it disables the required `<locale>` surface.
 
+## CI fix: missing locale `_l` APIs
+
+The next remote build showed that this SDK's `<locale>` does not honor
+`_LIBCPP_HAS_NO_C_LOCALE`; it still references `strtoll_l` and `strtoull_l`,
+which OHOS libc does not declare. The recipe now generates
+`boost_ohos_locale_compat.h` and force-includes it for b2 and consumers. The
+header is OHOS-guarded and maps those calls to `strtoll`/`strtoull`, ignoring
+the locale argument. It is packaged under `include/` so consumer flags never
+point back into a transient build directory.
+
 The Windows worktree has no OHOS clang/llvm toolchain, so full b2 and
 test_package execution is blocked locally. Remote validation must run after
 the branch is pushed, using:
