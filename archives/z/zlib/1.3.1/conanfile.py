@@ -19,6 +19,7 @@ class ZlibConan(ConanFile):
     license = "Zlib"
     homepage = "https://zlib.net/"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/tree/main/archives/z/zlib/1.3.1"
+    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
 
