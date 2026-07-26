@@ -4,7 +4,7 @@
 
 - Target: `openharmony-aarch64`
 - Build system: Perl `Configure` and Make
-- Configuration: `no-asm`, static libraries by default, `-fPIC -O2 -D__OHOS__`
+- Configuration: `no-asm`, static libraries only, `-fPIC -O2 -D__OHOS__`
 - Source checksum: `cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8`
 
 ## Adaptation

@@ -19,12 +19,6 @@ class OpensslConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {
-        "shared": [True, False],
-    }
-    default_options = {
-        "shared": False,
-    }
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -43,11 +37,17 @@ class OpensslConan(ConanFile):
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         )
+        cc = compilers.get("c", os.environ.get("CC", "clang"))
+        tool_dir = os.path.dirname(cc) if os.path.isabs(cc) else ""
+        ar = compilers.get("ar") or (os.path.join(tool_dir, "llvm-ar") if tool_dir else "llvm-ar")
+        ranlib = compilers.get("ranlib") or (
+            os.path.join(tool_dir, "llvm-ranlib") if tool_dir else "llvm-ranlib"
+        )
         return (
-            compilers.get("c", os.environ.get("CC", "clang")),
+            cc,
             compilers.get("cpp", os.environ.get("CXX", "clang++")),
-            os.environ.get("AR", "llvm-ar"),
-            os.environ.get("RANLIB", "llvm-ranlib"),
+            ar,
+            ranlib,
         )
 
     def build(self):
@@ -62,13 +62,12 @@ class OpensslConan(ConanFile):
         perl = os.environ.get("PERL", "perl")
         prefix = self.package_folder
         openssldir = os.path.join(prefix, "ssl")
-        shared_flag = "" if self.options.shared else "no-shared"
         configure = (
             f'CC="{cc}" CXX="{cxx}" AR="{ar}" RANLIB="{ranlib}" '
             'CFLAGS="-fPIC -O2 -D__OHOS__" '
             f'{perl} ./Configure openharmony-aarch64 '
             f'--prefix="{prefix}" --openssldir="{openssldir}" '
-            f"no-asm {shared_flag}"
+            "no-asm no-shared"
         )
         self.run(configure, cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
