@@ -32,8 +32,10 @@ class IgraphConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.variables["IGRAPH_VERSION"] = "1.0.0"
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
+        # Respect the user's `shared` option instead of hardcoding OFF.
+        # CMakeToolchain already sets CMAKE_SYSTEM_NAME from Conan settings.os,
+        # so OHOS platform modules load correctly — do not override to "Linux".
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["IGRAPH_USE_INTERNAL_ARPACK"] = "ON"
         tc.variables["IGRAPH_USE_INTERNAL_BLAS"] = "ON"
         tc.variables["IGRAPH_USE_INTERNAL_LAPACK"] = "ON"
@@ -45,6 +47,18 @@ class IgraphConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # arith.h is a direct header replacement (not a unified-diff patch),
+        # so apply_conandata_patches won't copy it. Inject it into the source
+        # tree so F2C_EXTERNAL_ARITH_HEADER resolves. export_sources() placed
+        # it under export_sources_folder/patches/; copy from there to the
+        # source_folder so the build-time path is correct.
+        os.makedirs(os.path.join(self.source_folder, "patches"), exist_ok=True)
+        copy(
+            self,
+            "arith.h",
+            src=os.path.join(self.export_sources_folder, "patches"),
+            dst=os.path.join(self.source_folder, "patches"),
+        )
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
