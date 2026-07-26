@@ -26,9 +26,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (rc < -1) {
+        const char *bad = poptBadOption(ctx, POPT_BADOPTION_NOALIAS);
+        const char *err = poptStrerror(rc);
         fprintf(stderr, "popt error: %s: %s\n",
-                poptBadOption(ctx, POPT_BADOPTION_NOALIAS),
-                poptStrerror(rc));
+                bad ? bad : "(unknown option)",
+                err ? err : "(unknown error)");
         poptFreeContext(ctx);
         return 1;
     }
