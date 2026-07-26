@@ -54,15 +54,25 @@ class LvConan(ConanFile):
         apply_conandata_patches(self)
         src_dir = os.path.join(self.source_folder, "src")
         # HMDFS: ./configure 无法获得执行权限，用 bash 运行 + TMPDIR 解决临时文件问题
-        tmpdir = tempfile.mkdtemp()
-        configure = os.path.join(src_dir, "configure")
-        cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
-        sysroot = self.conf.get("tools.build:sysroot", default="")
-        cflags = f"-O3 --sysroot={sysroot}" if sysroot else "-O3"
-        ldflags = "-ltermcap"
-        args = "--enable-static --disable-shared --build=aarch64-unknown-linux-gnu"
-        self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}' LIBS=-ltermcap /data/service/hnp/bin/bash {configure} {args}", cwd=src_dir, shell=True)
-        self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='{ldflags}'", cwd=src_dir)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            configure = os.path.join(src_dir, "configure")
+            args = "--enable-static --disable-shared --build=aarch64-unknown-linux-gnu"
+            bash = os.environ.get("CONFIG_SHELL", "bash")
+            # Source the AutotoolsToolchain-generated env for cross-compilation flags
+            tc_script = os.path.join(self.generators_folder, "conanautotoolstoolchain.sh")
+            if os.path.exists(tc_script):
+                # Source toolchain for cross-compilation vars but override LDFLAGS 
+                # to avoid --sysroot duplication (toolchain adds it to both CFLAGS and LDFLAGS)
+                self.run(f". {tc_script} && LDFLAGS='-ltermcap' TMPDIR={tmpdir} LIBS=-ltermcap {bash} {configure} {args}", cwd=src_dir, shell=True)
+                self.run(f". {tc_script} && LDFLAGS='-ltermcap' make -j$(nproc) LIBS=-ltermcap", cwd=src_dir)
+            else:
+                # Fallback: manual flags if toolchain file not generated
+                cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
+                sysroot = self.conf.get("tools.build:sysroot", default="")
+                opt = {"Debug": "-O0 -g", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
+                cflags = f"{opt} --sysroot={sysroot}" if sysroot else opt
+                self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap {bash} {configure} {args}", cwd=src_dir, shell=True)
+                self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap'", cwd=src_dir)
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
