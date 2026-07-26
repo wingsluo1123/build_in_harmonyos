@@ -7,6 +7,7 @@ Platform: aarch64-linux-ohos (HarmonyOS PC)
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
+from conan.tools.env import VirtualBuildEnv
 import os
 
 
@@ -40,14 +41,17 @@ class QtpositioningConan(ConanFile):
         # R32: OHOS platform support — pass mkspec via env for cross-compilation
         if self.settings.os == "OHOS":
             # qmake reads QMAKESPEC to determine target platform
-            # The ohos-aarch64 mkspec is provided by the Qt5 package
             qt_root = self.dependencies["qt"].package_folder
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
-            if os.path.isdir(os.path.join(qt_mkspecs, "ohos-aarch64-clang")):
-                self.run_env.define("QMAKESPEC", os.path.join(qt_mkspecs, "ohos-aarch64-clang"))
+            ohos_mkspec = os.path.join(qt_mkspecs, "ohos-aarch64-clang")
+            if os.path.isdir(ohos_mkspec):
+                # Set QMAKESPEC via VirtualBuildEnv for the build context
+                build_env = VirtualBuildEnv(self)
+                build_env.define("QMAKESPEC", ohos_mkspec)
+                build_env.generate()
             else:
-                # Fallback: use default mkspecs path from Qt installation
-                self.run_env.define("QMAKESPEC", qt_mkspecs)
+                # Fallback: qmake will use its default mkspecs
+                pass
 
     def build(self):
         apply_conandata_patches(self)
