@@ -17,4 +17,6 @@
 ## Tests
 
 - The Conan consumer test checks the packaged version, SHA-256, SSL context creation, and AES-256-CBC round-trip.
-- Remote OHOS CI verification is required before publication.
+- Remote OHOS CI passed on job `20260727-023111-2a31de-openssl-111w-final-test` at commit `3c59deb48`.
+- Conan create completed successfully on OHOS/aarch64; upstream tests and the consumer test passed (`4/4`).
+- L0, L1, L4, and L5 passed. L2 was non-blocking because the packaged command smoke probes could not run on OHOS.
