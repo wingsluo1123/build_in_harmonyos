@@ -15,6 +15,11 @@ int main(int argc, char *argv[]) {
 
     poptContext ctx = poptGetContext("test_popt", argc, (const char **)argv,
                                      options, 0);
+    if (!ctx) {
+        fprintf(stderr, "popt error: failed to create context\n");
+        return 1;
+    }
+
     int rc;
     while ((rc = poptGetNextOpt(ctx)) > 0) {
         /* parse options */
