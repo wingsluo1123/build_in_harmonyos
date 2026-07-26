@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for fnt — a font manager shell script (no compilation needed)."""
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 import os
@@ -57,10 +58,17 @@ class FntConan(ConanFile):
             self.output.warn(f"os.chmod failed ({e}); trying chmod binary")
             r = subprocess.run(["chmod", "755", dst_fnt], capture_output=True)
             if r.returncode != 0:
-                self.output.warn(
+                msg = (
                     f"chmod binary failed rc={r.returncode}: "
                     f"{r.stderr.decode(errors='replace').strip()}"
                 )
+                self.output.warn(msg)
+                # CHMOD also failed: surface the failure instead of shipping a
+                # non-executable fnt that fails downstream with "Permission
+                # denied" — the exact silent-failure mode the comment above
+                # warns against. Raise so Conan marks the build failed and no
+                # incomplete package is produced.
+                raise ConanException(msg)
         copy(self, "fnt.1", src=self.source_folder, dst=os.path.join(self.package_folder, "man", "man1"))
         copy(self, "completions/_fnt", src=self.source_folder, dst=os.path.join(self.package_folder, "zsh", "site-functions"))
 
