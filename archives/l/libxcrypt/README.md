@@ -17,16 +17,16 @@ libxcrypt 是一个现代的扩展 crypt 库，支持多种密码哈希算法，
 ### 已知问题与解决方案
 
 1. **HMDFS 权限限制**：
-   - **问题**：autotools 的 configure 脚本在 HMDFS 文件系统上无法创建临时文件（umask 077）
-   - **解决方案**：修改 configure 中的 `umask 077` 为 `umask 022`（见补丁 0003-configure.patch）
+   - **问题**：autotools 的 configure 脚本在 HMDFS 文件系统上使用受限的临时目录权限
+   - **解决方案**：配方验证可写目录并在 configure 子进程中使用 `umask 022`，不修改生成的 `configure`
 
 2. **平台识别**：
    - **问题**：config.guess/config.sub 无法识别 HarmonyOS 平台
    - **解决方案**：添加 HarmonyOS 平台识别和三元组支持（见补丁 0001、0002）
 
 3. **编译器警告**：
-   - **问题**：clang 对 GNU inline asm 扩展发出警告（lib/util-xbzero.c）
-   - **解决方案**：添加 `-Wno-language-extension-token` 编译标志
+   - **问题**：clang 对 GNU inline asm 扩展和 VLA memory constraint 发出警告（lib/util-xbzero.c）
+   - **解决方案**：补丁 0004 在 Clang 分支使用 `__asm__`、指针输入和 memory clobber
 
 ### 与 Linux 的差异
 
@@ -40,8 +40,7 @@ libxcrypt 是一个现代的扩展 crypt 库，支持多种密码哈希算法，
 - 无外部依赖（可独立编译）
 
 ### 运行依赖
-- 无外部依赖（静态链接时）
-- 动态链接时需要 libc
+- 无外部依赖；默认构建为静态库以避免与系统 `libcrypt` 冲突
 
 ## 参考资料
 

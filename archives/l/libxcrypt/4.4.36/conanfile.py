@@ -18,11 +18,11 @@ class LibxcryptConan(ConanFile):
     description = "Extended crypt library with support for modern password hashing schemes"
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/besser82/libxcrypt"
-    url = ""
+    url = "https://github.com/besser82/libxcrypt"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": True, "fPIC": True}
+    default_options = {"shared": False, "fPIC": True}
 
     def config_options(self):
         if str(self.settings.os) == "Windows":
@@ -85,7 +85,11 @@ class LibxcryptConan(ConanFile):
 
         apply_conandata_patches(self)
         autotools = Autotools(self)
-        autotools.configure()
+        previous_umask = os.umask(0o022)
+        try:
+            autotools.configure()
+        finally:
+            os.umask(previous_umask)
         autotools.make(args=["-j1"])
 
     def package(self):

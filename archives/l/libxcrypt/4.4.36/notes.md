@@ -1,15 +1,17 @@
 # libxcrypt 4.4.36 编译笔记
 
-## 编译状态
+## 历史失败记录
 
-**当前状态**: 编译失败（HMDFS SELinux 权限限制）
+**初次尝试状态（2026-05-25）**: 编译失败（HMDFS SELinux 权限限制）
 
 **失败原因**:
 - libxcrypt 是纯 autotools 项目，没有 CMakeLists.txt，不支持 cmake 编译方式
 - autotools 的 config.status 在 HMDFS 文件系统上无法创建临时文件（SELinux 权限限制）
 - 错误：`./config.status[1115]: can't create ./confCIanaH/subs1.awk: Permission denied`
 
-## 问题分析
+以下内容记录初次尝试，最终配方已通过后续 OHOS CI 验证。
+
+## 历史问题分析
 
 ### 1. cmake 支持检查
 
@@ -126,13 +128,15 @@ config.status: error: could not setup config files machinery
 
 ---
 
-## 质量门禁状态
+## 初次尝试质量门禁状态
 
 - G0（干净构建验证）：❌ 未执行（configure 失败）
 - G1（二进制完整性）：❌ 未执行
 - G2（功能可用性）：❌ 未执行
 - G3（可移植性）：❌ 未执行
 - G4（档案完整性）：❌ 未执行
+
+以上是初次失败尝试的状态，不代表最终配方验证结果。
 ---
 
 **编译结束**: 2026-05-25 21:28
