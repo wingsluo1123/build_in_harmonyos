@@ -38,6 +38,8 @@ class QtpositioningConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # Always create VirtualBuildEnv for env="conanbuild" support in build()
+        build_env = VirtualBuildEnv(self)
         # R32: OHOS platform support — pass mkspec via env for cross-compilation
         if self.settings.os == "OHOS":
             # qmake reads QMAKESPEC to determine target platform
@@ -46,12 +48,9 @@ class QtpositioningConan(ConanFile):
             ohos_mkspec = os.path.join(qt_mkspecs, "ohos-aarch64-clang")
             if os.path.isdir(ohos_mkspec):
                 # Set QMAKESPEC via VirtualBuildEnv for the build context
-                build_env = VirtualBuildEnv(self)
                 build_env.define("QMAKESPEC", ohos_mkspec)
-                build_env.generate()
-            else:
-                # Fallback: qmake will use its default mkspecs
-                pass
+        # Generate the conanbuild environment file for all platforms
+        build_env.generate()
 
     def build(self):
         apply_conandata_patches(self)
