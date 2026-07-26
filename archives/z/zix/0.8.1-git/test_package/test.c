@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <zix/zix.h>
 #include <zix/allocator.h>
 
