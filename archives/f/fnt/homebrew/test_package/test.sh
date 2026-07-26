@@ -29,8 +29,7 @@ run_fnt_and_judge() {
     local label="$1"
     shift
     local out rc
-    out="$("$@" 2>&1)" || true
-    rc=$?
+    out="$("$@" 2>&1)" && rc=0 || rc=$?
     if [ "$rc" -ge 128 ]; then
         echo "FAIL: $label crashed (rc=$rc)" >&2
         return 1

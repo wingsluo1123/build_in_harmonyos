@@ -27,7 +27,7 @@ class FntConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        # Apply patches declared in conandata.yml (0001-shebang-fix.patch)
+        # Apply patches declared in conandata.yml (0001-fnt.patch)
         # The patch handles both shebang fix and HarmonyOS platform detection.
         # No inline string-replacement code — patches are the single source.
         apply_conandata_patches(self)
@@ -37,7 +37,7 @@ class FntConan(ConanFile):
         if not os.path.exists(fnt_path):
             raise FileNotFoundError(
                 f"fnt source not found at {fnt_path} after applying patches — "
-                "expected from 0001-shebang-fix.patch"
+                "expected from 0001-fnt.patch"
             )
 
     def package(self):
