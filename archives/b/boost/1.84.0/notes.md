@@ -16,6 +16,20 @@ The new recipe uses the OHOS profile's real `/data/service/hnp/bin/clang` and
 `clang++`, target `aarch64-linux-ohos`, libc++, and b2 `-j1`. It fails if b2
 does not install either required library.
 
+## CI fix: libc++ `__config_site`
+
+The first remote build failed because HNP clang found `libc++/v1/__config` but
+could not find its generated `__config_site`. The recipe now discovers the
+latest `/data/service/hnp/ohos-sdk.org/ohos-sdk_*/ohos/native/sysroot`, locates
+`native/llvm/include/libcxx-ohos/include/c++/v1` and every `__config_site`
+parent directory, and passes them explicitly to b2.
+
+Compile flags now include `--sysroot`, `-nostdinc++`, libc++ v1 and config-site
+`-isystem` directories, while link flags include the target sysroot and LLVM
+target library directory. The same flags are exported through `cpp_info` so
+the test_package and downstream CMake consumers use the identical OHOS
+standard library configuration.
+
 The Windows worktree has no OHOS clang/llvm toolchain, so full b2 and
 test_package execution is blocked locally. Remote validation must run after
 the branch is pushed, using:

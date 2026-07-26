@@ -50,25 +50,83 @@ class BoostConan(ConanFile):
             raise ConanInvalidConfiguration("OHOS compiler paths must be absolute")
         return cc, cxx
 
+    def _ohos_flags(self, target):
+        """Return explicit OHOS sysroot and libc++ flags for HNP clang."""
+        sysroot = self.conf.get("tools.build:sysroot", default="", check_type=str)
+        if not sysroot:
+            sysroot = os.environ.get("OHOS_SYSROOT", "")
+        if not sysroot:
+            candidates = glob.glob(
+                "/data/service/hnp/ohos-sdk.org/ohos-sdk_*/ohos/native/sysroot"
+            )
+            if candidates:
+                sysroot = sorted(candidates)[-1]
+        if not sysroot or not os.path.isdir(sysroot):
+            raise ConanInvalidConfiguration(
+                "OHOS SDK sysroot not found; set tools.build:sysroot or OHOS_SYSROOT"
+            )
+
+        llvm = os.path.join(os.path.dirname(sysroot), "llvm")
+        libcxx_v1 = os.path.join(llvm, "include", "libcxx-ohos", "include", "c++", "v1")
+        config_sites = glob.glob(
+            os.path.join(llvm, "include", "**", "__config_site"), recursive=True
+        )
+        if not os.path.isdir(libcxx_v1):
+            raise ConanInvalidConfiguration(
+                f"OHOS libc++ headers not found: {libcxx_v1}"
+            )
+        if not config_sites:
+            raise ConanInvalidConfiguration(
+                f"OHOS libc++ __config_site not found below: {llvm}/include"
+            )
+
+        include_dirs = [
+            libcxx_v1,
+            *[os.path.dirname(path) for path in sorted(config_sites)],
+            os.path.join(sysroot, "usr", "include"),
+            os.path.join(sysroot, "usr", "include", target),
+        ]
+        include_flags = []
+        for include_dir in include_dirs:
+            if include_dir not in include_flags and os.path.isdir(include_dir):
+                include_flags.append(include_dir)
+
+        cxxflags = [
+            f"-target {target}",
+            f"--sysroot={sysroot}",
+            "-nostdinc++",
+            "-stdlib=libc++",
+        ]
+        if self.options.fPIC:
+            cxxflags.append("-fPIC")
+        cxxflags.extend(f"-isystem {path}" for path in include_flags)
+        linkflags = [
+            f"-target {target}",
+            f"--sysroot={sysroot}",
+            "-stdlib=libc++",
+            f"-L{os.path.join(llvm, 'lib', target)}",
+            f"-L{os.path.join(sysroot, 'usr', 'lib', target)}",
+        ]
+        return sysroot, " ".join(cxxflags), " ".join(linkflags)
+
     def build(self):
         cc, cxx = self._toolchain()
-        shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         target = "aarch64-linux-ohos"
+        _, cxxflags, linkflags = self._ohos_flags(target)
+        shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         user_config = os.path.join(self.source_folder, "user-config-ohos.jam")
-        cxxflags = f"-target {target} -stdlib=libc++"
-        if self.options.fPIC:
-            cxxflags += " -fPIC"
         save(
             self,
             user_config,
-            "using clang : ohos : \"{}\" : <cxxflags>\"{}\" <linkflags>\"{} -stdlib=libc++\" ;\n".format(
-                cxx, cxxflags, f"-target {target}"
+            "using clang : ohos : \"{}\" : <cxxflags>\"{}\" <linkflags>\"{}\" ;\n".format(
+                cxx, cxxflags, linkflags
             ),
         )
         stage = os.path.join(self.build_folder, "stage")
         os.makedirs(stage, exist_ok=True)
 
         with chdir(self, self.source_folder):
+            os.environ["PATH"] = os.path.dirname(cc) + os.pathsep + os.environ.get("PATH", "")
             self.run(
                 "CC={} CXX={} {} bootstrap.sh --with-toolset=clang".format(
                     shlex.quote(cc), shlex.quote(cxx), shlex.quote(shell)
@@ -114,6 +172,10 @@ class BoostConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "Boost")
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
+        _, cxxflags, linkflags = self._ohos_flags("aarch64-linux-ohos")
+        self.cpp_info.cxxflags = shlex.split(cxxflags)
+        self.cpp_info.exelinkflags = shlex.split(linkflags)
+        self.cpp_info.sharedlinkflags = shlex.split(linkflags)
         self.cpp_info.components["headers"].libs = []
         self.cpp_info.components["headers"].set_property("cmake_target_name", "Boost::headers")
         for component in ("program_options", "date_time"):
