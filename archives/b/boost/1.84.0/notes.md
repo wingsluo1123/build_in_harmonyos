@@ -57,7 +57,7 @@ compatibility cxxflags and link flags are now explicitly assigned to the
 package metadata.
 
 The Windows worktree has no OHOS clang/llvm toolchain, so full b2 and
-test_package execution is blocked locally. Remote validation must run after
-the branch is pushed, using:
-
-`conan create archives/b/boost/1.84.0 --user=ohpcd --channel=stable -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing`
+test_package execution runs through OpenDesk. Job
+`20260726-233739-d9f7f5-boost-r5-error-tail` completed the Conan create and
+consumer test successfully. The complete CI wrapper is being rerun separately
+to distinguish package results from its L5 shell-pipeline exit status.
