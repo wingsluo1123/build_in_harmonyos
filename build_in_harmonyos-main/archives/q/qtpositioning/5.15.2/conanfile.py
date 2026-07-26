@@ -64,8 +64,8 @@ class QtpositioningConan(ConanFile):
         config_flag = ""
         if not self.options.shared:
             config_flag = "CONFIG+=static"
-        self.run(f"{qmake_bin} {pro_file} {config_flag}")
-        self.run("make -j1")
+        self.run(f"{qmake_bin} {pro_file} {config_flag}", env="conanbuild")
+        self.run("make -j1", env="conanbuild")
 
     def package(self):
         self.run("make install INSTALL_ROOT={}".format(self.package_folder))
