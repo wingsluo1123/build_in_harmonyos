@@ -64,7 +64,6 @@ class QtpositioningConan(ConanFile):
         config_flag = ""
         if not self.options.shared:
             config_flag = "CONFIG+=static"
-            self.run_env.define("QT_STATIC_BUILD", "1")
         self.run(f"{qmake_bin} {pro_file} {config_flag}")
         self.run("make -j1")
 
