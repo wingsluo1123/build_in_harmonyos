@@ -1,0 +1,13 @@
+diff -ruN a/lib/util-xbzero.c b/lib/util-xbzero.c
+--- a/lib/util-xbzero.c
++++ b/lib/util-xbzero.c
+@@ -44,2 +44,6 @@
+-# define OBSERVE_MEM(s, len) \
+-  asm volatile ("" : : "m" (*(const char (*)[len]) s))
++# if defined __clang__
++#  define OBSERVE_MEM(s, len) \
++  __asm__ volatile ("" : : "m" (*(const char (*)[len]) s))
++# else
++# define OBSERVE_MEM(s, len) \
++  asm volatile ("" : : "m" (*(const char (*)[len]) s))
++# endif

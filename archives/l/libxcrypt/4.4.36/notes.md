@@ -136,4 +136,14 @@ config.status: error: could not setup config files machinery
 ---
 
 **编译结束**: 2026-05-25 21:28
-**最终状态**: built
+**最终状态**: Conan adaptation complete; OpenDesk configure passed, Clang compile fix pending validation
+
+## Clang compatibility follow-up (2026-07-26)
+
+OpenDesk reached configure successfully. The remaining OHOS failure was in
+`lib/util-xbzero.c`: Clang treated the GNU `asm` token in `OBSERVE_MEM` as
+`-Wlanguage-extension-token`, and the build promoted that warning to an error.
+
+Patch `0004-lib-util-xbzero-clang-asm.patch` uses `__asm__` only when
+`__clang__` is defined. GCC and other GNU-compatible compilers keep the
+original `asm volatile` spelling. The real `crypt()` consumer test is unchanged.
