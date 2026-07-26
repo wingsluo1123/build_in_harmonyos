@@ -22,7 +22,10 @@ int main(void) {
     int csize, dsize;
     int i;
 
-    blosc2_init();
+    if (blosc2_init() < 0) {
+        printf("blosc2_init() failed\n");
+        return 1;
+    }
     if (blosc2_set_nthreads(2) < 0) {
         printf("blosc2_set_nthreads() failed\n");
         blosc2_destroy();

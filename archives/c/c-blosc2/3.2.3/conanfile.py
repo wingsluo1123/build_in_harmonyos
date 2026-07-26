@@ -58,7 +58,18 @@ class CBlosc2Conan(ConanFile):
         tc.variables["PREFER_EXTERNAL_ZLIB"] = True
         tc.variables["PREFER_EXTERNAL_ZSTD"] = True
         if self.settings.os == "OHOS":
-            arch_map = {"armv8": "aarch64", "armv8.3": "aarch64", "armv8.5": "aarch64"}
+            arch_map = {
+                "armv8": "aarch64",
+                "armv8.1": "aarch64",
+                "armv8.2": "aarch64",
+                "armv8.3": "aarch64",
+                "armv8.4": "aarch64",
+                "armv8.5": "aarch64",
+                "armv8.6": "aarch64",
+                "armv8.7": "aarch64",
+                "armv8.8": "aarch64",
+                "armv8.9": "aarch64",
+            }
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = arch_map.get(
                 str(self.settings.arch), str(self.settings.arch))
         tc.generate()
