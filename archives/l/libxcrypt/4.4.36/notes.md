@@ -144,6 +144,9 @@ OpenDesk reached configure successfully. The remaining OHOS failure was in
 `lib/util-xbzero.c`: Clang treated the GNU `asm` token in `OBSERVE_MEM` as
 `-Wlanguage-extension-token`, and the build promoted that warning to an error.
 
-Patch `0004-lib-util-xbzero-clang-asm.patch` uses `__asm__` only when
-`__clang__` is defined. GCC and other GNU-compatible compilers keep the
-original `asm volatile` spelling. The real `crypt()` consumer test is unchanged.
+Patch `0004-lib-util-xbzero-clang-asm.patch` uses `__asm__` with a pointer
+input and a `memory` clobber only when `__clang__` is defined. This avoids both
+`-Wlanguage-extension-token` and the VLA constraint under `-Werror`. GCC and
+other GNU-compatible compilers keep the original `asm volatile` VLA spelling;
+the outer compiler conditional is unchanged. The real `crypt()` consumer test
+is unchanged.
