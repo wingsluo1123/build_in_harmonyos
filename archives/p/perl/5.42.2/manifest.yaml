@@ -1,22 +1,69 @@
-# 编译档案 manifest
-# 由 init-archive.sh 自动生成 / 恢复
-# 生成时间: 2026-04-09 17:34:03
-
 software: perl
-version: 5.42.2
-status: partial
+version: "5.42.2"
+status: validated
+build_date: "2026-07-26"
+issue: "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/issues/1478"
 
-build_system: unknown
-source_url: https://www.cpan.org/src/5.0/perl-5.42.2.tar.gz
+source:
+  url: "https://www.cpan.org/src/5.0/perl-5.42.2.tar.gz"
+  mirrors:
+    - "https://mirrors.tuna.tsinghua.edu.cn/CPAN/src/5.0/perl-5.42.2.tar.gz"
+    - "https://mirrors.ustc.edu.cn/CPAN/src/5.0/perl-5.42.2.tar.gz"
+    - "https://mirrors.aliyun.com/CPAN/src/5.0/perl-5.42.2.tar.gz"
+  sha256: "9384e8deb75b7b1695e5637971b752281aaecd025a3d5d4734d33c1d0adfee47"
+  analysis_tar_xz_sha256: "0a585eeb9e363c0f80482ddb3571625250c2c86aeb408853e8ea50805cfb14bb"
 
-# 编译环境信息
-created_at: 2026-04-09 17:34:03
+build:
+  system: "perl Configure"
+  target: "OHOS/aarch64 native"
+  dependencies: []
+  configuration:
+    - "-des"
+    - "-Dprefix=/"
+    - "-Dsiteprefix=/"
+    - "-Dvendorprefix=/"
+    - "-Uuseshrplib"
+    - "-Dusethreads"
+    - "-Dusemymalloc=n"
+    - "-Dlibswanted=pthread dl m c"
+    - "-Dnoextensions=GDBM_File NDBM_File ODBM_File DB_File"
+    - "-Dosname=linux"
+    - "-Darchname=aarch64-linux"
+    - "-Dlns=<build-folder>/ohos-ln-copy.sh"
+  patches:
+    - "patches/0001-miniperl-touch-noop.patch"
+    - "patches/0002-extutils-install-write-probe.patch"
+    - "patches/0003-installperl-write-probe.patch"
 
-# 知识积累
-knowledge_gained: []
+test_package:
+  type: "tool smoke"
+  requires_runtime: true
+  commands:
+    - "perl version check"
+    - "perl -MConfig -MFile::Spec"
+    - "small strict/warnings script execution"
 
-# 补丁列表
-patches_applied: []
+validation:
+  true_device:
+    run: "/storage/Users/currentUser/ohos-test-runs/codex-perl-5.42.2-perl-5.42.2-F72D-20260726-142000-conan-20260727-002653-59772"
+    result: "pass"
+    package_reference: "perl/5.42.2#66357f3a7814ffa244bdfbe8bf1c2b86:6b129b068851896169fae42d399fa922d239ce8a#68082b6e1498fa256e37f3922e155302"
+    command: "CI_PACKAGES=\"archives/p/perl/5.42.2\" zsh ci/conan/build_and_test.sh"
+  upstream_test:
+    run: "/storage/Users/currentUser/ohos-test-runs/codex-perl-5.42.2-upstream-test_harness_notty-20260727-012804"
+    result: "fail"
+    command: "make test_harness_notty"
+    cwd: "/storage/Users/currentUser/ohos-users/codex-perl/perl-5.42.2-F72D-20260726-142000/conan-home/p/b/perl901852186ce53/b"
+    wrapper_exit_code: 0
+    harness_summary: "Files=2908, Tests=1348696, 2912 wallclock secs; Result: FAIL"
+    manual_terminations:
+      - "PID 60602/60601: lib/warnings.t generated tmp_CIWS_C hung after '$0' prctl failure."
+      - "PID 2021: op/leaky-magic.t hung after '$0' prctl failure."
+      - "PID 3285: op/magic.t generated process [haha...] hung after '$0' prctl failure."
 
-# 编译日志
-build_log: logs/build.log
+consumers:
+  - "open-mpi/5.0.10: configure requires perl"
+  - "mpich/4.0.3: build/configure flow needs perl available as a build tool"
+
+known_limits:
+  - "Full upstream Perl make test_harness_notty was run on true device and ended Result: FAIL. Failures are concentrated in OHOS filesystem/POSIX semantic gaps such as symlink/hardlink, chmod/-w/access, SysV IPC, termios/signal behavior, Unix socket path length, locale/timezone checks, direct shell-script execution, and '$0' prctl process-name handling. Conan build/test_package validation passed for the build-tool use case."
