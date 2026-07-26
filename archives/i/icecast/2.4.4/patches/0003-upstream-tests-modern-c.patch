@@ -1,0 +1,87 @@
+diff --git a/src/avl/test.c b/src/avl/test.c
+index 747a301..75ff0f5 100644
+--- a/src/avl/test.c
++++ b/src/avl/test.c
+@@ -1,4 +1,6 @@
+ #include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
+ #include "avl.h"
+ 
+ #ifdef _WIN32
+@@ -29,7 +31,7 @@ int main(int argc, char **argv)
+ 
+     printf("Filling tree...\n");
+     for (i = 0; i < max_nodes; i++) {
+-        avl_insert(tree, (void *)rand());
++        avl_insert(tree, (void *)(intptr_t)rand());
+     }
+     
+     printf("Traversing tree...\n");
+@@ -37,6 +39,6 @@ int main(int argc, char **argv)
+     node = avl_get_first(tree);
+     while (node) {
+-        i = (int)node->key;
++        i = (int)(intptr_t)node->key;
+ 
+         printf("...%5d\n", i);
+ 
+@@ -47,7 +49,7 @@ int main(int argc, char **argv)
+     printf("Trying to go backwards...\n");
+     node = tree->root->right;
+     while (node) {
+-        i = (int)node->key;
++        i = (int)(intptr_t)node->key;
+         printf("...%5d\n", i);
+         node = avl_get_prev(node);
+     }
+@@ -62,10 +64,10 @@ int main(int argc, char **argv)
+ 
+ int _compare(void *compare_arg, void *a, void *b)
+ {
+-    int i, j;
++    intptr_t i, j;
+ 
+-    i = (int)a;
+-    j = (int)b;
++    i = (intptr_t)a;
++    j = (intptr_t)b;
+ 
+     if (i > j)
+         return 1;
+@@ -77,10 +79,11 @@ int _compare(void *compare_arg, void *a, void *b)
+ 
+ int _free(void *key) 
+ {
++    (void)key;
+     return 1;
+ }
+ 
+ int _printer(char *buff, void *key)
+ {
+-    return snprintf(buff, 25, "%d", (int)key);
++    return snprintf(buff, 25, "%ld", (long)(intptr_t)key);
+ }
+diff --git a/src/log/test.c b/src/log/test.c
+index fe90aad..90fa15a 100644
+--- a/src/log/test.c
++++ b/src/log/test.c
+@@ -2,7 +2,7 @@
+ 
+ #define CATMODULE "test"
+ 
+-#define LOG_ERR(x, y, z...) log_write(x, 1, CATMODULE "/" __FUNCTION__, y, ##z)
++#define LOG_ERR(x, y, z...) log_write(x, 1, CATMODULE, __func__, y, ##z)
+ 
+ 
+ int main(void)
+@@ -12,6 +12,9 @@ int main(void)
+     log_initialize();
+ 
+     lid = log_open("test.log");
++    if (lid < 0)
++        return 1;
++
+ 
+     LOG_ERR(lid, "The log id is %d, damnit...", lid);
+ 

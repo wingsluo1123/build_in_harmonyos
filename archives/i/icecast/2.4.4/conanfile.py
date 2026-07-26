@@ -4,10 +4,12 @@
 Builds the static streaming server for Linux and OHOS targets.
 """
 import os
+import shlex
 import stat
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -94,6 +96,37 @@ class IcecastConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        self._build_upstream_tests()
+
+    def _build_upstream_tests(self):
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = shlex.quote(compilers.get("c", "cc"))
+        source = self.source_folder
+        build = self.build_folder
+        avl_test = os.path.join(build, "upstream-avl-test")
+        log_test = os.path.join(build, "upstream-log-test")
+
+        self.run(
+            f"{cc} -std=gnu11 -DNO_THREAD "
+            f"-I{shlex.quote(os.path.join(source, 'src'))} "
+            f"{shlex.quote(os.path.join(source, 'src', 'avl', 'test.c'))} "
+            f"{shlex.quote(os.path.join(source, 'src', 'avl', 'avl.c'))} "
+            f"-o {shlex.quote(avl_test)}"
+        )
+        self.run(
+            f"{cc} -std=gnu11 -DHAVE_CONFIG_H "
+            f"-I{shlex.quote(build)} "
+            f"-I{shlex.quote(os.path.join(source, 'src', 'log'))} "
+            f"{shlex.quote(os.path.join(source, 'src', 'log', 'test.c'))} "
+            f"{shlex.quote(os.path.join(source, 'src', 'log', 'log.c'))} "
+            f"-pthread -o {shlex.quote(log_test)}"
+        )
+
+        if can_run(self):
+            self.run(f"{shlex.quote(avl_test)} 25")
+            self.run(shlex.quote(log_test))
 
     def package(self):
         Autotools(self).install()
