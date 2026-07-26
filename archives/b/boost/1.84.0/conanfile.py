@@ -226,13 +226,23 @@ static inline unsigned long long boost_ohos_strtoull_l(
         _, cxxflags, linkflags = self._ohos_flags(
             "aarch64-linux-ohos", compat_header
         )
-        self.cpp_info.cxxflags = shlex.split(cxxflags)
-        self.cpp_info.exelinkflags = shlex.split(linkflags)
-        self.cpp_info.sharedlinkflags = shlex.split(linkflags)
-        self.cpp_info.components["headers"].libs = []
-        self.cpp_info.components["headers"].set_property("cmake_target_name", "Boost::headers")
+        component_cxxflags = shlex.split(cxxflags)
+        component_linkflags = shlex.split(linkflags)
+        self.cpp_info.cxxflags = list(component_cxxflags)
+        self.cpp_info.exelinkflags = list(component_linkflags)
+        self.cpp_info.sharedlinkflags = list(component_linkflags)
+
+        headers = self.cpp_info.components["headers"]
+        headers.libs = []
+        headers.cxxflags = list(component_cxxflags)
+        headers.exelinkflags = list(component_linkflags)
+        headers.sharedlinkflags = list(component_linkflags)
+        headers.set_property("cmake_target_name", "Boost::headers")
         for component in ("program_options", "date_time"):
             cpp = self.cpp_info.components[component]
             cpp.libs = [f"boost_{component}"]
             cpp.requires = ["headers"]
+            cpp.cxxflags = list(component_cxxflags)
+            cpp.exelinkflags = list(component_linkflags)
+            cpp.sharedlinkflags = list(component_linkflags)
             cpp.set_property("cmake_target_name", f"Boost::{component}")

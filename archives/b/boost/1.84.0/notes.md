@@ -50,6 +50,12 @@ header is OHOS-guarded and maps those calls to `strtoll`/`strtoull`, ignoring
 the locale argument. It is packaged under `include/` so consumer flags never
 point back into a transient build directory.
 
+The fourth remote run built both Boost libraries successfully, but the
+test_package CMake targets did not inherit root `cpp_info.cxxflags`. The
+compatibility cxxflags and link flags are now explicitly assigned to the
+`headers`, `program_options`, and `date_time` components as well as the root
+package metadata.
+
 The Windows worktree has no OHOS clang/llvm toolchain, so full b2 and
 test_package execution is blocked locally. Remote validation must run after
 the branch is pushed, using:
