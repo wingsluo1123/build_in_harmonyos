@@ -136,7 +136,7 @@ config.status: error: could not setup config files machinery
 ---
 
 **编译结束**: 2026-05-25 21:28
-**最终状态**: Conan adaptation complete; OpenDesk configure passed, Clang compile fix pending validation
+**最终状态**: Conan adaptation complete; OpenDesk OHOS CI verified
 
 ## Clang compatibility follow-up (2026-07-26)
 
@@ -150,3 +150,11 @@ input and a `memory` clobber only when `__clang__` is defined. This avoids both
 other GNU-compatible compilers keep the original `asm volatile` VLA spelling;
 the outer compiler conditional is unchanged. The real `crypt()` consumer test
 is unchanged.
+
+## Final OpenDesk validation (2026-07-27)
+
+Job `20260727-000636-b9cebe-libxcrypt-4436-ohos-r5-test` returned
+`exit_code: 0`. Autotools configure, Clang compilation, shared-library
+packaging, the real `crypt()` consumer test, L0/L1/L5, and the destructive
+dependency test all passed. L4 reported a non-blocking warning for the
+upstream `config.guess` patch because it contains a legacy string function.
