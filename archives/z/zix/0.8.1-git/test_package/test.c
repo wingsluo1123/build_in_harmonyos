@@ -4,7 +4,7 @@
 #include <zix/allocator.h>
 
 int main(void) {
-    const ZixAllocator* allocator = zix_default_allocator();
+    ZixAllocator* allocator = zix_default_allocator();
     if (!allocator) {
         fprintf(stderr, "zix_default_allocator returned NULL\n");
         return 1;
