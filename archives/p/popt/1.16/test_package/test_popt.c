@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
         /* parse options */
     }
 
-    if (rc < -1) {
+    if (rc < 0) {
         const char *bad = poptBadOption(ctx, POPT_BADOPTION_NOALIAS);
         const char *err = poptStrerror(rc);
         fprintf(stderr, "popt error: %s: %s\n",

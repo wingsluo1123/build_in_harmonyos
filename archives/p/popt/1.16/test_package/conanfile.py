@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Test package for popt — CMake-based."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
