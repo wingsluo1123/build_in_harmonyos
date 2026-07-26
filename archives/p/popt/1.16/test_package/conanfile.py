@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test package for popt — CMake-based."""
+import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -23,3 +24,5 @@ class PoptTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # CI L0d: explicit self.run() required (cmake.test() doesn't count)
+        self.run(os.path.join(self.build_folder, "test_popt"), env="conanrun")
