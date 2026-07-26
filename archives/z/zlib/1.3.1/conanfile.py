@@ -18,16 +18,9 @@ class ZlibConan(ConanFile):
     description = "Massively-used data compression library (DEFLATE/inflate)."
     license = "Zlib"
     homepage = "https://zlib.net/"
-    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/tree/main/archives/z/zlib/1.3.1"
-    package_type = "library"
+    url = ""  # CI fills this
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {
-        "shared": [False],
-    }
-    default_options = {
-        "shared": False,
-    }
 
     def export_sources(self):
         export_conandata_patches(self)
