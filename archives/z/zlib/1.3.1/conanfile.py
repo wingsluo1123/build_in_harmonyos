@@ -18,7 +18,7 @@ class ZlibConan(ConanFile):
     description = "Massively-used data compression library (DEFLATE/inflate)."
     license = "Zlib"
     homepage = "https://zlib.net/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/tree/main/archives/z/zlib/1.3.1"
 
     settings = "os", "compiler", "build_type", "arch"
 

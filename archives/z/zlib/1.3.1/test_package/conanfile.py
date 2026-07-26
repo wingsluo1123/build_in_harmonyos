@@ -13,7 +13,7 @@ from conan.tools.cmake import CMake, cmake_layout
 
 class ZlibTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -30,4 +30,4 @@ class ZlibTestConan(ConanFile):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
         bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_zlib'", env="conanrun")
+        self.run(f"{bash} -c './test_zlib'", env="conanrun", cwd=self.build_folder)
