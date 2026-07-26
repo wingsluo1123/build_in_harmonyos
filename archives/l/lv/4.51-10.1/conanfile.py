@@ -19,7 +19,7 @@ class LvConan(ConanFile):
     description = "Powerful multi-lingual file viewer/grep tool"
     license = "GPL-2.0-or-later"
     homepage = "http://www.ff.iij4u.or.jp/~nrt/lv/"
-    url = ""  # CI fills this
+    url = "http://www.ff.iij4u.or.jp/~nrt/lv/"
 
     package_type = "application"
 
@@ -56,7 +56,8 @@ class LvConan(ConanFile):
         # HMDFS: ./configure 无法获得执行权限，用 bash 运行 + TMPDIR 解决临时文件问题
         with tempfile.TemporaryDirectory() as tmpdir:
             configure = os.path.join(src_dir, "configure")
-            args = "--enable-static --disable-shared --build=aarch64-unknown-linux-gnu"
+            shared_args = "--disable-shared --enable-static" if not self.options.shared else "--enable-shared --disable-static"
+            args = f"{shared_args} --build=aarch64-unknown-linux-gnu"
             bash = os.environ.get("CONFIG_SHELL", "bash")
             # Source the AutotoolsToolchain-generated env for cross-compilation flags
             tc_script = os.path.join(self.generators_folder, "conanautotoolstoolchain.sh")
@@ -87,8 +88,10 @@ class LvConan(ConanFile):
             lv_path = os.path.join(src_dir, "lv")
         if not os.path.exists(lv_path):
             raise ConanInvalidConfiguration("lv binary not found in build output")
-        copy(self, os.path.basename(lv_path), src=os.path.dirname(lv_path), dst=bin_dir)
-        os.symlink(os.path.join(bin_dir, "lv"), os.path.join(bin_dir, "lgrep"))
+        # Copy lv binary and create lgrep symlink
+        copy(self, "lv", src=os.path.dirname(lv_path), dst=bin_dir, keep_path=False)
+        if not os.path.exists(os.path.join(bin_dir, "lgrep")):
+            os.symlink("lv", os.path.join(bin_dir, "lgrep"))
         hlp_src = os.path.join(root_dir, "lv.hlp")
         if os.path.exists(hlp_src):
             copy(self, "lv.hlp", src=root_dir, dst=lib_dir)
