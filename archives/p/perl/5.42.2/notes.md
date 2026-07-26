@@ -84,6 +84,7 @@ Existing project knowledge that applies to this adaptation:
 - `knowledge/doc/E018.md` and `knowledge/doc/E050.md`: OHOS/HMDFS link behavior can reject or fail to resolve symbolic-link style paths; the recipe replaces Perl's `lns` flow with a copy wrapper.
 - `docs/ADAPTATION_GUIDE.md`: configure scripts should be run through an explicit shell on OHOS; the recipe detects `CONFIG_SHELL`/`SHELL` and invokes `Configure` through that shell.
 - `knowledge/operations/dependencies.md`: Perl is a build-tool dependency for OpenSSL/autotools-style projects and is already identified as part of the lower toolchain layer.
+- `archives/p/perl-mojolicious/9.42/notes.md`: prior Perl-module adaptation hit the same OpenHarmony `prctl(PR_SET_NAME)`/`$0` limitation and worked around module-level `$0` assignment with guarded save/restore logic. That prior art supports treating the Perl core harness `$0` failures as a known platform-sensitive area rather than an isolated package regression.
 
 ## Local verification
 
@@ -239,6 +240,16 @@ Package reference:
 perl/5.42.2#66357f3a7814ffa244bdfbe8bf1c2b86:6b129b068851896169fae42d399fa922d239ce8a#68082b6e1498fa256e37f3922e155302
 ```
 
+Post-review clean rerun `codex-perl-5.42.2-conan-rerun-20260727-024352` was started after adding `archives/p/perl/commands.json` and correcting `patches/0002-extutils-install-write-probe.patch` to treat `POSIX::access(W_OK)` return value `0` as success. It exited nonzero because the repository CI wrapper killed `conan create` at its 2700 second timeout:
+
+```text
+end_utc=2026-07-26T19:41:37.920977+00:00
+elapsed_seconds=2703.7
+exit_code=1
+```
+
+This rerun completed source/SHA256, patch application, `Configure`, `make depend`, hardlink replacement through `ohos-ln-copy.sh`, `miniperl`, generated `perl`, `pm_to_blib` for many core modules, and passed the earlier `ExtUtils::Install` write-probe failure point. It was interrupted during the dynamic XS build stage, around `Compress::Raw::Zlib`, before `package()` and `test_package`; stderr was empty and no new functional error was observed before timeout. Per user instruction, no further true-device build was launched after this failed rerun.
+
 ## Upstream test_harness_notty validation
 
 Full upstream Perl test harness was run on the true device from the successful Conan build directory to provide audit evidence beyond the package smoke test.
@@ -266,7 +277,7 @@ Finished test run at Mon Jul 27 02:17:39 2026.
 
 The wrapper `exit-code.txt` is `0`, but the upstream harness summary is authoritative here and reports `Result: FAIL`. The test run is therefore recorded as upstream test failure, not as a pass.
 
-The summary contains 44 failing test-file entries. Representative failure groups:
+The summary contains 44 failing test-file entries, so the file-level upstream pass rate is `2864/2908` test programs (`98.49%`). The harness reports `Tests=1348696` actual subtests executed, but several failing test programs aborted early or produced TAP parse errors, so no reliable global passed-subtest count is claimed. Representative failure groups:
 
 - Link and filesystem semantics: `cpan/Archive-Tar`, `ext/File-Find`, `op/stat.t`, `op/taint.t`, and `io/fs.t` fail around symbolic links, hard links, link counts, and symlink traversal on OHOS storage.
 - Writable/permission-bit semantics: `cpan/ExtUtils-Install`, `cpan/File-Path`, `cpan/File-Temp`, `op/filetest.t`, `AnyDBM_File`, and `SDBM_File` expose the same `-w`/chmod/access mismatch that the recipe works around with actual create/unlink probes for build and install.
@@ -277,6 +288,8 @@ The summary contains 44 failing test-file entries. Representative failure groups
   - PID `2021` from `op/leaky-magic.t`
   - PID `3285` from `op/magic.t`, shown as `[haha...]`
 - Other platform-sensitive checks: `Time-Piece` timezone expectations, `run/locale.t` fallback message, `porting/globvar.t`, and selected ExtUtils::MakeMaker dynamic/static XS subtests fail, while the large regex, Unicode, thread, JSON, core language, and many XS API sections continue to execute successfully.
+
+Low-risk follow-up considered but not applied in this PR revision: disabling Perl's `HAS_PRCTL_SET_NAME` on OHOS with `-Ud_prctl_set_name`. Source inspection shows `Configure` only probes `prctl(PR_SET_NAME, "Test")`, which succeeds with a short name, while runtime `$0` assignments with longer process names can still fail with `EINVAL` and croak in `mg.c`. This matches the earlier `perl-mojolicious/9.42` platform note. Applying the configure change would alter core interpreter behavior and requires a fresh clean Conan validation; the post-review clean rerun instead hit the 2700 second CI timeout, and the user had instructed that a new failed build should pause further true-device builds.
 
 No upstream test files were modified for this run. The failures are not treated as accepted upstream compatibility; they are documented as known limitations for a Path A build-tool adaptation. The Conan validation remains the acceptance gate for the immediate open-mpi/mpich use case because those consumers require `perl` as a configure/build tool available through Conan `tool_requires`, not full CPAN/runtime compatibility.
 
