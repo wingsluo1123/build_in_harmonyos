@@ -49,9 +49,11 @@ class QtpositioningConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Qt5 addon module build: qmake → make
+        # Note: positioning.pro is in src/positioning/ under source_folder
         qt_root = self.dependencies["qt"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
-        self.run(f"{qmake_bin} positioning.pro")
+        pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
+        self.run(f"{qmake_bin} {pro_file}")
         self.run("make -j1")
 
     def package(self):
