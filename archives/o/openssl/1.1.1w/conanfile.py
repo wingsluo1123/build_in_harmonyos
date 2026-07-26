@@ -42,19 +42,19 @@ class OpensslConan(ConanFile):
     def _compiler_executables(self):
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
-        )
-        cc = compilers.get("c", os.environ.get("CC", "clang"))
+        ) or {}
+        cc = compilers.get("c")
+        cxx = compilers.get("cpp")
+        if not cc or not cxx:
+            raise ConanInvalidConfiguration(
+                "OpenSSL requires tools.build:compiler_executables c and cpp"
+            )
         tool_dir = os.path.dirname(cc) if os.path.isabs(cc) else ""
         ar = compilers.get("ar") or (os.path.join(tool_dir, "llvm-ar") if tool_dir else "llvm-ar")
         ranlib = compilers.get("ranlib") or (
             os.path.join(tool_dir, "llvm-ranlib") if tool_dir else "llvm-ranlib"
         )
-        return (
-            cc,
-            compilers.get("cpp", os.environ.get("CXX", "clang++")),
-            ar,
-            ranlib,
-        )
+        return cc, cxx, ar, ranlib
 
     def build(self):
         apply_conandata_patches(self)
@@ -65,7 +65,7 @@ class OpensslConan(ConanFile):
             )
 
         cc, cxx, ar, ranlib = self._compiler_executables()
-        perl = os.environ.get("PERL", "perl")
+        perl = "perl"
         prefix = self.package_folder
         openssldir = os.path.join(prefix, "ssl")
         configure = (

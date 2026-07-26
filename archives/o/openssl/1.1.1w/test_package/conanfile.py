@@ -4,6 +4,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 
 
 class OpensslTestConan(ConanFile):
@@ -22,7 +23,11 @@ class OpensslTestConan(ConanFile):
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         )
-        cc = compilers.get("c", os.environ.get("CC", "clang"))
+        cc = compilers.get("c")
+        if not cc:
+            raise ConanInvalidConfiguration(
+                "OpenSSL consumer test requires tools.build:compiler_executables c"
+            )
         self.run(
             f'"{cc}" test_openssl.c -o test_openssl '
             f"{include_flags} {library_flags} {link_flags} {system_flags}"
@@ -30,7 +35,7 @@ class OpensslTestConan(ConanFile):
 
     def test(self):
         # /system/bin/sh on OHOS cannot execute a user ELF directly.
-        shell = os.environ.get("CONFIG_SHELL", "")
+        shell = ""
         if not shell or not os.path.exists(shell):
             for candidate in (
                 "/data/service/hnp/bin/bash",
