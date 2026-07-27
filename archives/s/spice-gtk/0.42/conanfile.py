@@ -74,6 +74,14 @@ class SpiceGtkConan(ConanFile):
         )
         replace_in_file(
             self,
+            os.path.join(
+                self.source_folder, "subprojects", "spice-common", "meson_options.txt"
+            ),
+            "option('tests',\n    type : 'boolean',\n    value : true,",
+            "option('tests',\n    type : 'boolean',\n    value : false,",
+        )
+        replace_in_file(
+            self,
             os.path.join(self.source_folder, "meson.build"),
             "subdir('tests')",
             "# Tests are run through Conan test_package in the OHOS recipe.\n# subdir('tests')",
