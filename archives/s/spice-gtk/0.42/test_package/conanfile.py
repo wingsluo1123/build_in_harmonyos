@@ -34,8 +34,7 @@ class TestPackageConan(ConanFile):
         tested_dep = self.dependencies["spice-gtk"]
         tested_ref = tested_dep.ref
         for _ref, dependency in self.dependencies.items():
-            infos = [dependency.cpp_info] + list(dependency.cpp_info.components.values())
-            for info in infos:
+            for info in self._dependency_infos(dependency):
                 includes.extend(info.includedirs)
                 libdirs.extend(info.libdirs)
                 system_libs.extend(info.system_libs)
@@ -46,21 +45,12 @@ class TestPackageConan(ConanFile):
                 else:
                     dependency_libs.extend(info.libs)
 
-        def unique(items):
-            seen = set()
-            result = []
-            for item in items:
-                if item and item not in seen:
-                    seen.add(item)
-                    result.append(item)
-            return result
-
-        include_flags = " ".join(f'-I"{path}"' for path in unique(includes))
-        libdir_flags = " ".join(f'-L"{path}"' for path in unique(libdirs))
+        include_flags = " ".join(f'-I"{path}"' for path in self._unique(includes))
+        libdir_flags = " ".join(f'-L"{path}"' for path in self._unique(libdirs))
         lib_flags = " ".join(
-            f"-l{name}" for name in unique(tested_libs + dependency_libs + system_libs)
+            f"-l{name}" for name in self._unique(tested_libs + dependency_libs + system_libs)
         )
-        extra_link_flags = " ".join(unique(link_flags))
+        extra_link_flags = " ".join(self._unique(link_flags))
         executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
         cc = executables.get("c")
         if not cc:
@@ -78,4 +68,27 @@ class TestPackageConan(ConanFile):
         if cross_building(self):
             self.output.info("cross-building: compile and link test completed")
             return
+        libdirs = []
+        for _ref, dependency in self.dependencies.items():
+            for info in self._dependency_infos(dependency):
+                libdirs.extend(info.libdirs)
+        existing = os.environ.get("LD_LIBRARY_PATH")
+        runtime_paths = self._unique(libdirs)
+        if existing:
+            runtime_paths.append(existing)
+        os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(runtime_paths)
         self.run("./test_spice_gtk", env="conanrun")
+
+    @staticmethod
+    def _dependency_infos(dependency):
+        return [dependency.cpp_info] + list(dependency.cpp_info.components.values())
+
+    @staticmethod
+    def _unique(items):
+        seen = set()
+        result = []
+        for item in items:
+            if item and item not in seen:
+                seen.add(item)
+                result.append(item)
+        return result

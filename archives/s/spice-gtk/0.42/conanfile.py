@@ -173,6 +173,10 @@ class SpiceGtkConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "spice-gtk")
         self.cpp_info.set_property("cmake_target_name", "spice-gtk::spice-gtk")
         self.cpp_info.set_property("pkg_config_name", "spice-client-glib-2.0")
+        self.runenv_info.prepend_path(
+            "LD_LIBRARY_PATH", os.path.join(self.package_folder, "lib")
+        )
+        self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
         self.cpp_info.components["glib"].libs = [glib_lib]
         self.cpp_info.components["glib"].includedirs = [
             "include/spice-client-glib-2.0",
