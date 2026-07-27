@@ -37,7 +37,7 @@ class Libsmb2Conan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # libsmb2 is NOT a system same-name library -> shared build (R26 N/A)
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
+        tc.variables["CMAKE_BUILD_TYPE"] = str(self.settings.build_type)
         # Build shared library
         tc.variables["BUILD_SHARED_LIBS"] = True
         tc.generate()
