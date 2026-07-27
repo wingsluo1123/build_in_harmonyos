@@ -34,7 +34,9 @@ ace-link 是一个纯 Emacs Lisp 包，类似 cask。它不需要 C/C++ 编译�
 
 ### 依赖
 - 运行时依赖: `emacs` (Emacs 编辑器), `avy` (Emacs Lisp 包)
-- 在 `requirements()` 中声明: `emacs/29.4`, `avy/0.5.0`
+- `requirements()` 中暂未声明（emacs/avy 为运行时依赖，非 Conan 构建依赖）
+- emacs 本身尚未完成 OHOS 适配，现仅通过 manifest.yaml 文档记录依赖关系
+- 待 emacs 完成 OHOS 适配后，可在 `requirements()` 中补充: `emacs/29.4`, `avy/0.5.0`
 
 ### 测试
 - test_package: 验证 ace-link.el 文件存在于安装目录
