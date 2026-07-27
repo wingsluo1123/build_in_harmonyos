@@ -15,7 +15,7 @@ class CephConan(ConanFile):
     description = "Standalone CRUSH data-placement component from Ceph"
     license = "LGPL-2.1-or-later"
     homepage = "https://ceph.com/"
-    package_type = "library"
+    package_type = "static-library"
 
     settings = "os", "arch", "compiler", "build_type"
     options = {"fPIC": [True, False]}
