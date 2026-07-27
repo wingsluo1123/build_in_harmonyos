@@ -21,7 +21,6 @@ class CdoTestConan(ConanFile):
     def _resolve_bash(self):
         for candidate in [
             os.environ.get("CONFIG_SHELL"),
-            os.environ.get("SHELL"),
             shutil.which("bash"),
             "/data/service/hnp/bin/bash",
             "/storage/Users/currentUser/usr/local/bin/bash",
