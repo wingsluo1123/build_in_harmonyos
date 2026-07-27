@@ -33,6 +33,9 @@ class TREConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        # Explicit build/host triplet (config.guess fails on OHOS)
+        tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+        tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
