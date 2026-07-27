@@ -41,7 +41,7 @@ class QtpositioningConan(ConanFile):
         # Always create VirtualBuildEnv for env="conanbuild" support in build()
         build_env = VirtualBuildEnv(self)
         # R32: OHOS platform support — pass mkspec via env for cross-compilation
-        if self.settings.os == "OHOS":
+        if self.settings.os in ("Linux", "OHOS"):
             # qmake reads QMAKESPEC to determine target platform
             qt_root = self.dependencies["qt"].package_folder
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
