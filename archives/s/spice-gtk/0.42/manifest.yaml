@@ -1,7 +1,7 @@
 software: spice-gtk
 version: "0.42"
-status: pending
-build_date: "2026-07-21"
+status: adapted
+build_date: "2026-07-28"
 
 source:
   url: "https://www.spice-space.org/download/gtk/spice-gtk-0.42.tar.xz"
@@ -11,7 +11,7 @@ source:
 build:
   system: meson
   configure_options:
-    - "-Dgtk=enabled"
+    - "-Dgtk=disabled"
     - "-Dwayland-protocols=disabled"
     - "-Dwebdav=disabled"
     - "-Dusbredir=disabled"
@@ -36,21 +36,23 @@ build:
     - json-glib/1.6.6
     - gstreamer/1.28.3
     - gst-plugins-base/1.28.3
-    - gtk+/3.24.38
 
 patches_applied: []
 
 knowledge_gained:
   - "spice-gtk 0.42 has no upstream Meson option to disable tests/man/po; the Conan recipe removes those subdir entries and keeps runtime libraries/tools plus test_package coverage."
   - "GStreamer is a direct source-level dependency through channel-display-gst.c, spice-gstaudio.c, channel-display-priv.h, and spice-widget.c; disabling it requires code stubs and is not used in the first PR."
+  - "The first validated OHOS package defaults to gtk=False because gtk+/3.24.38 is not yet available in the dependency set; GTK UI support remains an explicit follow-up option."
 
 ci:
-  status: local-precheck-blocked
+  status: local-precheck-passed
   local_validation:
     - "Source SHA256 verified"
     - "Python syntax check passed for conanfile.py and test_package/conanfile.py"
     - "git diff --check passed"
     - "Sensitive-token and PR-template placeholder scan passed"
-    - "OHOS Conan 2.29.1 local conan create precheck exported the recipe and reached dependency graph resolution"
+    - "OHOS Conan 2.29.1 local conan create precheck passed on commit ca8873096 with -o spice-gtk/*:gtk=False"
     - "Fixed Conan 2.29.1 compatibility by using basic_layout instead of unavailable meson_layout"
-    - "Current local CI blocker: json-glib/1.6.6 is not resolved from the ohpcd Conan remote, so build/test_package stages were not reached"
+    - "Dependency graph resolved through json-glib/1.6.6, gstreamer/1.28.3, and gst-plugins-base/1.28.3 from the remote Conan cache"
+    - "Meson configure/build completed 69/69 build steps and packaged libspice-client-glib-2.0 plus spicy-screenshot/spicy-stats"
+    - "test_package compiled and linked 1 C consumer test on OHOS; runtime execution is skipped on OHOS because the dynamic loader cannot reliably load shared libraries from Conan cache/test paths"
