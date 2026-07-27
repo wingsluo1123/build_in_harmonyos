@@ -53,6 +53,12 @@ class SpiceGtkConan(ConanFile):
         replace_in_file(
             self,
             os.path.join(self.source_folder, "meson.build"),
+            "run_command('build-aux/git-version-gen',",
+            "run_command('sh', 'build-aux/git-version-gen',",
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "meson.build"),
             "subdir('tests')",
             "# Tests are run through Conan test_package in the OHOS recipe.\n# subdir('tests')",
         )
