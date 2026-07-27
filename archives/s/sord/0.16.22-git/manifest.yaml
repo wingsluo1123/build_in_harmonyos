@@ -1,45 +1,48 @@
 version: "0.16.22-git"
 status: published
-build_date: "2026-05-25"
+build_date: "2026-07-27"
 
 packaging:
   directory: "packaging/"
   tarball: "sord-0.16.22-git-ohos-aarch64.tar.gz"
-  size: "94KB"
 
 source:
-  url: "https://gitlab.com/drobilla/sord.git"
+  url: "https://gitlab.com/drobilla/sord/-/archive/c9b049b/sord-c9b049b.tar.gz"
+  sha256: "560bfd76aa87d248e6ea21c2d5100da4354aa0abbf3a0824af3163407a31eb1c"
   git_commit: "c9b049b"
-  tar_format: git
+  size_bytes: 286929
 
 build:
   system: meson
-  configure_options:
-    - "--prefix=$HOME/usr/local"
-  dependencies:
-    - serd/0.32.9-git
-    - zix/0.8.1-git
+  default_library: static
   cc: clang
   cxx: clang++
+  configure_options:
+    - "default_library=static"
+    - "wrap_mode=default"
+  dependencies:
+    - "zix/0.8.1-git"
+    - "serd/0.32.9-git"
 
 test_results:
+  type: official
+  upstream_test_command: "meson test"
+  upstream_test_in_build: true
   total: 3
   passed: 3
   failed: 0
-  pass_rate: 100%
+  note: "上游 meson test 在 build() 阶段运行 (test_sord)"
 
 artifacts:
-  shared_library:
-    - "libsord-0.so.0.16.22"
-    - "libsord-0.so.0"
-    - "libsord-0.so"
+  static_library:
+    - "libsord-0.a"
   executables:
     - "sordi"
   pkg_config: "sord-0.pc"
   headers:
-    - "sord-0/sord/sord.h"
-    - "sord-0/sord/sordmm.hpp"
+    - "include/sord-0/sord/sord.h"
 
 knowledge_gained:
-  - "sord 测试简单但覆盖关键功能"
-  - "依赖库需要先安装才能编译"
+  - "sord 是 drobilla LV2 生态的 RDF 存储库"
+  - "依赖 zix-0 (>= 0.4.0) 和 serd-0 (>= 0.30.10)"
+  - "提供 sordi 命令行工具进行 RDF 查询"

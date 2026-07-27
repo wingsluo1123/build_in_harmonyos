@@ -1,30 +1,29 @@
 # Sord
 
 ## 简介
-Sord 是一个 SPARQL 库，用于存储和查询 RDF 数据，是 LV2 生态的重要组成部分。
+Sord 是 David Robillard 开发的轻量级 RDF 内存存储库，提供快速 RDF 数据存储和查询功能。
 
 ## 功能概述
-- RDF 数据存储
-- SPARQL 查询支持
-- 提供 sordi 命令行工具
-- C++ API (sordmm.hpp)
+- RDF 内存存储
+- 快速 RDF 查询
+- 提供 sordi 命令行工具进行 RDF 查询
+- 基于 serd 的 RDF 序列化
 
 ## OHOS 适配
-- 构建系统: meson 1.11.1
-- 依赖 serd-0 和 zix-0
-- ELF 签名必需
-- 测试全部通过（3/3）
+- 构建系统：meson (default_library=static)
+- 上游 `meson test` 在 `build()` 阶段运行
+- 静态库方式打包，作为 lilv 的前置依赖
 
 ## 依赖
-- serd >= 0.30.10 (RDF 序列化库)
-- zix >= 0.6.0 (基础工具库)
+- zix/0.8.1-git (基础工具库)
+- serd/0.32.9-git (RDF 序列化库)
 
 ## 功能验证
 ```bash
 export LD_LIBRARY_PATH=$HOME/usr/local/lib
-sordi -v  # 输出: sordi 0.16.22
+sordi --version  # 输出: sordi 0.16.22
 ```
 
 ## 参考
-- 官网: https://drobilla.net/software/sord
-- 源码: https://gitlab.com/drobilla/sord
+- 官网：https://drobilla.net/software/sord
+- 源码：https://gitlab.com/drobilla/sord

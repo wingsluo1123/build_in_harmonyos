@@ -1,67 +1,45 @@
 # 编译记录: sord 0.16.22-git
 
-**编译开始**: 2026-05-25 17:23
-**编译结束**: 2026-05-25 17:23
-**最终状态**: built (100% 测试通过)
+**编译开始**: 2026-07-27
+**最终状态**: built (上游 meson test 运行)
 
 ---
 
 ## 编译环境
 
-- 构建系统: meson 1.11.1 + ninja 1.13.1
-- 编译器: clang 15.0.4
+- 构建系统: meson + ninja
+- 编译器: clang (aarch64-linux-ohos)
 - 目标平台: aarch64 (OpenHarmony)
-- 安装前缀: ~/usr/local
-- 源码位置: ~/tmp/builds/sord-git (git c9b049b)
+- 源码: sord-c9b049b.tar.gz (git c9b049b)
 
-## 依赖状态
+## 源码完整性
 
-| 依赖 | 版本 | 状态 |
-|------|------|------|
-| serd-0 | 0.32.9 | ✓ 已安装 |
-| zix-0 | 0.8.1 | ✓ 已安装 |
+| 项 | 值 |
+|----|----|
+| URL | https://gitlab.com/drobilla/sord/-/archive/c9b049b/sord-c9b049b.tar.gz |
+| SHA-256 | 560bfd76aa87d248e6ea21c2d5100da4354aa0abbf3a0824af3163407a31eb1c |
+| 大小 | 286929 bytes |
+
+## 许可证
+
+ISC (Copyright 2011-2025 David Robillard <d@drobilla.net>)
 
 ## 编译步骤
 
-### 1. 环境配置
-```bash
-export PKG_CONFIG_PATH=$HOME/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
-export LD_LIBRARY_PATH=$HOME/usr/local/lib:$LD_LIBRARY_PATH
-```
+1. `meson.configure()` + `meson.build()` — 编译 libsord-0.a 和 sordi
+2. `meson.test()` — 运行上游测试套件 (test_sord)
+3. `meson.install()` — 安装 libsord-0.a、sordi、sord-0.pc、include/sord-0/sord/*.h
 
-### 2. Meson 配置
-```bash
-cd ~/tmp/builds/sord-git
-meson setup build --prefix=$HOME/usr/local
-```
+## 依赖
 
-### 3. 编译与测试
-```bash
-cd build && ninja
-ninja test
-```
-- 测试全部通过 ✓ (3/3)
-
-### 4. 安装与签名
-```bash
-ninja install
-SKILL_ROOT="/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent"
-python3 $SKILL_ROOT/scripts/ohc-run.py sign-elf ~/usr/local/bin/sordi
-python3 $SKILL_ROOT/scripts/ohc-run.py sign-elf ~/usr/local/lib/libsord-0.so.0.16.22
-```
-
-## 安装产物
-
-- libsord-0.so.0.16.22 (42KB)
-- sordi (26KB)
-- sord-0.pc
-- sord-0/sord/*.h
+- zix/0.8.1-git (基础工具库)
+- serd/0.32.9-git (RDF 序列化库)
 
 ## 验证结果
 
 ```bash
-$ sordi -v
-sordi 0.16.22
+$ pkg-config --modversion sord-0
+0.16.22
 ```
 
 ---
