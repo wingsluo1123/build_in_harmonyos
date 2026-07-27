@@ -165,11 +165,15 @@ class ProjConan(ConanFile):
                     targets.append(p)
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
         signer = "/data/service/hnp/bin/binary-sign-tool"
+        if not os.path.isfile(signer):
+            self.output.warn("binary-sign-tool not found, skipping ELF signing")
+            return
         for f in targets:
             if os.path.islink(f):
                 continue
-            self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
-            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1 2>/dev/null || true'.format(sg=signer, f=f))
+            if os.path.isfile(objcopy):
+                self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
+            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
 
     def package_info(self):
         self.cpp_info.libs = ["proj"]
