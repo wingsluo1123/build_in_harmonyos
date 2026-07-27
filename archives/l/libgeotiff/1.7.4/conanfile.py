@@ -169,7 +169,7 @@ class LibgeotiffConan(ConanFile):
             if os.path.islink(so):
                 continue
             self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=so))
-            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=so))
+            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1 2>/dev/null || true'.format(sg=signer, f=so))
 
     def package_info(self):
         self.cpp_info.libs = ["geotiff"]

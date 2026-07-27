@@ -47,6 +47,12 @@ int main(void)
 
     /* Write pixel data */
     unsigned char *buf = (unsigned char *)calloc(100 * 100, 1);
+    if (!buf) {
+        printf("ERROR: calloc failed\n");
+        GTIFFree(gtif);
+        XTIFFClose(tif);
+        return 1;
+    }
     for (int i = 0; i < 100; i++) {
         memset(buf + i * 100, (unsigned char)(i * 2), 100);
     }

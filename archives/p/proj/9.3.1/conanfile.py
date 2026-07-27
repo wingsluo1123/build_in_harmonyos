@@ -66,8 +66,7 @@ class ProjConan(ConanFile):
         except Exception:
             pass
         # Try system path
-        for p in ["/storage/Users/currentUser/.conan2/p/sqlitaf82001134154/p/bin/sqlite3",
-                  "/usr/bin/sqlite3"]:
+        for p in ["/usr/bin/sqlite3", "/bin/sqlite3"]:
             if os.path.isfile(p):
                 return p
         return None
@@ -174,3 +173,5 @@ class ProjConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["proj"]
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["c++_shared"]

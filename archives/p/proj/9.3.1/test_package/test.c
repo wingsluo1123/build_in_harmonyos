@@ -1,8 +1,69 @@
+/*
+ * proj functional test — creates a coordinate transformation and verifies output.
+ * Tests: proj_info, proj_context_create, proj_create_crs_to_crs,
+ *        proj_normalize_for_visualization, proj_trans, proj_destroy, proj_context_destroy
+ */
+#include <proj.h>
 #include <stdio.h>
-#include <stdlib.h>
 
-/* Test that we can link against libproj.a */
-int main(void) {
-    printf("test proj 9.3.1: OK (linked successfully)\n");
+int main(void)
+{
+    /* --- Get PROJ version info --- */
+    PJ_INFO info = proj_info();
+    printf("PROJ version: %d.%d.%d\n", info.major, info.minor, info.patch);
+    if (info.major != 9) {
+        printf("ERROR: unexpected major version %d\n", info.major);
+        return 1;
+    }
+    printf("proj_info: OK (v%d.%d.%d)\n", info.major, info.minor, info.patch);
+
+    /* --- Create a coordinate transformation: WGS84 -> Web Mercator --- */
+    PJ_CONTEXT *ctx = proj_context_create();
+    if (!ctx) {
+        printf("ERROR: proj_context_create failed\n");
+        return 1;
+    }
+    printf("proj_context_create: OK\n");
+
+    PJ *pj = proj_create_crs_to_crs(ctx, "EPSG:4326", "EPSG:3857", NULL);
+    if (!pj) {
+        printf("ERROR: proj_create_crs_to_crs failed\n");
+        proj_context_destroy(ctx);
+        return 1;
+    }
+    printf("proj_create_crs_to_crs(EPSG:4326 -> EPSG:3857): OK\n");
+
+    /* Normalize for visualization (handles axis ordering) */
+    PJ *pj_norm = proj_normalize_for_visualization(ctx, pj);
+    if (!pj_norm) {
+        printf("ERROR: proj_normalize_for_visualization failed\n");
+        proj_destroy(pj);
+        proj_context_destroy(ctx);
+        return 1;
+    }
+    proj_destroy(pj);
+    printf("proj_normalize_for_visualization: OK\n");
+
+    /* --- Transform origin (lat=0, lon=0) -> should be (0, 0) --- */
+    PJ_COORD c;
+    c.lp.lam = 0.0;  /* longitude */
+    c.lp.phi = 0.0;  /* latitude */
+    PJ_COORD result = proj_trans(pj_norm, PJ_FWD, c);
+    printf("proj_trans(0,0) -> (%.4f, %.4f)\n", result.xy.x, result.xy.y);
+
+    /* Web Mercator origin maps to (0, 0) */
+    if (result.xy.x == 0.0 && result.xy.y == 0.0) {
+        printf("VERIFY: origin transform correct\n");
+        printf("\n=== PROJ FUNCTIONAL TEST: PASSED ===\n");
+    } else {
+        printf("VERIFY: origin transform incorrect\n");
+        printf("\n=== PROJ FUNCTIONAL TEST: FAILED ===\n");
+        proj_destroy(pj_norm);
+        proj_context_destroy(ctx);
+        return 1;
+    }
+
+    proj_destroy(pj_norm);
+    proj_context_destroy(ctx);
     return 0;
 }
