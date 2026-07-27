@@ -4,7 +4,7 @@
 - 构建系统: autotools
 - 编译日期: 2026-06-11
 - 编译器: clang 15.0.4 / clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -65,8 +65,7 @@ $ make check
 - 在 HMDFS 上运行时需设置 `TMPDIR` 环境变量（否则 tmpfile() 会失败）
 - config.status 的 umask 077 问题是 HMDFS 平台限制，每次重新 configure 都需手动修复
 - G0 干净构建验证失败是预期行为（HMDFS 平台限制导致 config.status 在 subprocess 中失败），手动编译验证已通过
-
 ---
 
-**编译结束**: 2026-06-11
-**最终状态**: published
+**编译结束**: 2026-07-27 12:54
+**最终状态**: built
