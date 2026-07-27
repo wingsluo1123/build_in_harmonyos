@@ -49,6 +49,7 @@ class SpiceGtkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        os.chmod(os.path.join(self.source_folder, "build-aux", "git-version-gen"), 0o755)
         replace_in_file(
             self,
             os.path.join(self.source_folder, "meson.build"),
