@@ -3,6 +3,7 @@
 
 import os
 import re
+import sys
 
 from conan import ConanFile
 from conan.tools.files import copy, get, replace_in_file
@@ -87,6 +88,10 @@ class SpiceGtkConan(ConanFile):
     def generate(self):
         self._ensure_tmpdir()
         PkgConfigDeps(self).generate()
+        mkenums = self._write_glib_tool_wrapper("glib-mkenums")
+        genmarshal = self._write_glib_tool_wrapper("glib-genmarshal")
+        self._set_glib_pkg_config_variable("glib_mkenums", mkenums)
+        self._set_glib_pkg_config_variable("glib_genmarshal", genmarshal)
         self._create_glib_pkg_config_aliases()
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
@@ -190,3 +195,35 @@ class SpiceGtkConan(ConanFile):
             alias = re.sub(r"^Name:.*$", f"Name: {name}", content, flags=re.M)
             with open(alias_path, "w", encoding="utf-8") as target:
                 target.write(alias)
+
+    def _set_glib_pkg_config_variable(self, variable, value):
+        glib_pc = os.path.join(self.generators_folder, "glib-2.0.pc")
+        if not os.path.isfile(glib_pc):
+            return
+        with open(glib_pc, encoding="utf-8") as source:
+            content = source.read()
+        replacement = f"{variable}={value}"
+        if re.search(rf"^{re.escape(variable)}=.*$", content, flags=re.M):
+            content = re.sub(
+                rf"^{re.escape(variable)}=.*$", replacement, content, flags=re.M
+            )
+        else:
+            content = content.rstrip() + "\n" + replacement + "\n"
+        with open(glib_pc, "w", encoding="utf-8") as target:
+            target.write(content)
+
+    def _write_glib_tool_wrapper(self, tool_name):
+        glib = self.dependencies["glib"]
+        original = os.path.join(glib.package_folder, "bin", tool_name)
+        wrapper = os.path.join(self.generators_folder, tool_name)
+        script = f"""#!{sys.executable}
+import runpy
+import sys
+
+sys.argv[0] = {original!r}
+runpy.run_path({original!r}, run_name="__main__")
+"""
+        with open(wrapper, "w", encoding="utf-8", newline="\n") as target:
+            target.write(script)
+        os.chmod(wrapper, 0o755)
+        return wrapper
