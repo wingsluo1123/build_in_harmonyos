@@ -14,6 +14,8 @@ if(NOT EXISTS "${CEPH_CRUSH_DIR}/builder.c")
 endif()
 
 set(CEPH_GENERATED_ROOT "${CMAKE_CURRENT_BINARY_DIR}/generated")
+# Ceph 20.2.2 CRUSH headers include "include/int_types.h" verbatim.
+# Keep the generated root as the search path and preserve that subpath.
 file(MAKE_DIRECTORY "${CEPH_GENERATED_ROOT}/include")
 configure_file(
   "${CMAKE_CURRENT_LIST_DIR}/int_types.h.in"
@@ -53,6 +55,8 @@ install(
     "${CEPH_CRUSH_DIR}/mapper.h"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/crush"
 )
+# Consumers search from <prefix>/include, so the upstream include spelling
+# resolves to <prefix>/include/include/int_types.h.
 install(
   FILES
     "${CEPH_GENERATED_ROOT}/include/int_types.h"

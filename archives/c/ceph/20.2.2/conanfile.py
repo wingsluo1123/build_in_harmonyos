@@ -39,8 +39,6 @@ class CephConan(ConanFile):
         # Cross builds cannot execute target binaries, but compiling the
         # adapted upstream tests still validates their OHOS compatibility.
         tc.variables["BUILD_TESTING"] = True
-        if self.options.get_safe("fPIC") is not None:
-            tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(self.options.fPIC)
         tc.generate()
 
     def build(self):
