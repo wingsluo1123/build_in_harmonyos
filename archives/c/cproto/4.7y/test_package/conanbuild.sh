@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/c/cproto/4.7y/test_package/conanbuildenv-release-armv8.sh"
