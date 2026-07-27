@@ -43,8 +43,10 @@ class LiblzmaConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # HarmonyOS: mktemp -d creates dirs with drwx--S--- (broken group perms),
-        # causing config.status to fail. Create a mktemp wrapper that fixes perms.
+        # HarmonyOS: mktemp -d under umask 077 (autoconf AS_TMPDIR) creates
+        # drwx--S--- dirs — setgid inherited + no group execute = MAC blocks writes.
+        # The mkdir fallback has the same problem. chmod is ineffective (E046).
+        # Fix: wrapper creates dirs with mkdir -m 775 (drwxrws--x) at creation time.
         wrapper_dir = None
         if self.settings.os == "OHOS":
             wrapper_dir = Path(self.build_folder) / ".hmos_fix"
@@ -52,8 +54,15 @@ class LiblzmaConan(ConanFile):
             wrapper = wrapper_dir / "mktemp"
             wrapper.write_text(
                 '#!/bin/sh\n'
-                '# HarmonyOS: mktemp -d creates dirs with broken perms (hmmac MAC).\n'
-                '# Return failure to force autoconf AS_TMPDIR to use mkdir fallback.\n'
+                '# HarmonyOS: mktemp -d under umask 077 creates drwx--S--- dirs.\n'
+                '# Use mkdir -m 775 (drwxrws--x) so MAC allows writes.\n'
+                'if [ "$1" = "-d" ]; then\n'
+                '    dir="./conf$$-$RANDOM"\n'
+                '    if mkdir -m 775 "$dir" 2>/dev/null; then\n'
+                '        echo "$dir"\n'
+                '        exit 0\n'
+                '    fi\n'
+                'fi\n'
                 'exit 1\n'
             )
             wrapper.chmod(wrapper.stat().st_mode | stat.S_IEXEC)

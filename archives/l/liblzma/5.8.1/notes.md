@@ -19,7 +19,7 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | config.status 失败：临时目录权限 drwx--S--- | HarmonyOS 上 mktemp -d 创建目录组权限异常 | 创建 mktemp wrapper（exit 1）迫使 autoconf AS_TMPDIR 回退到 mkdir |
+| 1 | config.status 失败：临时目录权限 drwx--S--- | autoconf AS_TMPDIR 在 `umask 077` 下调用 `mktemp -d`/`mkdir`，setgid 继承 + 无组执行位 = MAC 阻止写入 | 创建 mktemp wrapper，用 `mkdir -m 775` 创建 `drwxrws--x` 目录（chmod 在 OHOS 不生效，须用 `-m` 在创建时设置） |
 | 2 | xzdiff/xzgrep 脚本安装失败 | 脚本依赖 /bin/sh，HarmonyOS 无此路径 | `--disable-scripts` 跳过脚本安装 |
 | 3 | xz 工具运行时找不到 liblzma.so | 动态链接库不在默认搜索路径 | extra_ldflags 添加 `-static`，工具静态链接 liblzma.a |
 
@@ -55,6 +55,7 @@ file src/liblzma/.libs/liblzma.so.5  # ELF 64-bit aarch64
 ## 注意事项
 
 - mktemp wrapper 仅在 `self.settings.os == "OHOS"` 时创建，不影响其他平台构建
+- wrapper 用 `mkdir -m 775` 创建临时目录（`drwxrws--x`），绕过 `umask 077` 造成的 `drwx--S---` 权限问题
 - `--disable-scripts` 为全局配置，跳过 xzdiff/xzgrep 等脚本（HarmonyOS 无 /bin/sh）
 ---
 
