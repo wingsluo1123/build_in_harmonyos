@@ -69,13 +69,22 @@ class TimewarriorConan(ConanFile):
             for helper in (
                 "bash_tap.sh",
                 "bash_tap_ti.sh",
-                "problems",
                 "timemachine",
             ):
                 copy(self, helper, src=test_source, dst=test_build)
+            # Upstream test/problems is an executable Python file, not a directory.
+            problems_helper = os.path.join(test_source, "problems")
+            if not os.path.isfile(problems_helper):
+                raise ConanInvalidConfiguration(
+                    "Missing upstream test helper file: problems"
+                )
+            copy(self, "problems", src=test_source, dst=test_build)
             copy(self, "run_all", src=test_source, dst=test_build)
-            if not os.path.isfile(os.path.join(test_build, "run_all")):
-                raise ConanInvalidConfiguration("Missing upstream test runner: run_all")
+            for required_helper in ("problems", "run_all"):
+                if not os.path.isfile(os.path.join(test_build, required_helper)):
+                    raise ConanInvalidConfiguration(
+                        f"Missing staged upstream test helper: {required_helper}"
+                    )
             copy(
                 self,
                 "totals.py",
@@ -107,7 +116,7 @@ class TimewarriorConan(ConanFile):
             test_env = Environment()
             test_env.prepend_path("PATH", shim_dir)
             with test_env.vars(self).apply():
-                self.run("chmod +x *.t run_all", cwd=test_build)
+                self.run("chmod +x *.t problems run_all", cwd=test_build)
                 cmake.build(target="test")
                 self.run("./AtomicFileTest", cwd=test_build)
 
