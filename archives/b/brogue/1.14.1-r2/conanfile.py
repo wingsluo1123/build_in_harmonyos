@@ -39,7 +39,8 @@ class BrogueConan(ConanFile):
         self.run(f"cd {self.source_folder} && sed -i 's/TERMINAL := NO/TERMINAL := YES/' config.mk")
         self.run(f"cd {self.source_folder} && sed -i 's/GRAPHICS := YES/GRAPHICS := NO/' config.mk")
         opt_flag = {"Debug": "-g -O0", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
-        self.run(f"cd {self.source_folder}/src && make CC='{self.conf.get('tools.build:compiler_executables', default={}, check_type=dict).get('c','cc')}' CFLAGS='{opt_flag}'")
+        # 上游 Makefile 在源根目录（非 src/），修正 make 路径
+        self.run(f"cd {self.source_folder} && make CC='{self.conf.get('tools.build:compiler_executables', default={}, check_type=dict).get('c','cc')}' CFLAGS='{opt_flag}'")
         # Run upstream regression tests
         self.run(f"cd {self.source_folder}/test && python3 run_regression_tests.py 2>&1", cwd=self.source_folder)
 
