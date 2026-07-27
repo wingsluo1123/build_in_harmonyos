@@ -5,6 +5,7 @@ Build system: qmake (Qt5 addon module)
 Platform: aarch64-linux-ohos (HarmonyOS PC)
 """
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
@@ -49,6 +50,12 @@ class QtpositioningConan(ConanFile):
             if os.path.isdir(ohos_mkspec):
                 # Set QMAKESPEC via VirtualBuildEnv for the build context
                 build_env.define("QMAKESPEC", ohos_mkspec)
+            else:
+                raise ConanException(
+                    f"OHOS mkspec not found at {ohos_mkspec}. "
+                    "The qt/5.15.13 package must include the ohos-aarch64-clang mkspec "
+                    "for OHOS cross-compilation."
+                )
         # Generate the conanbuild environment file for all platforms
         build_env.generate()
 
