@@ -69,6 +69,7 @@ class TimewarriorConan(ConanFile):
             for helper in (
                 "bash_tap.sh",
                 "bash_tap_ti.sh",
+                "problems",
                 "timemachine",
             ):
                 copy(self, helper, src=test_source, dst=test_build)
