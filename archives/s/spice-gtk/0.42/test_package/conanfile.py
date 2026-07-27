@@ -10,6 +10,15 @@ class TestPackageConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        self.requires("spice-protocol/0.14.5")
+        self.requires("glib/2.84.0")
+        self.requires("pixman/0.46.4.1")
+        self.requires("openssl/3.5.6")
+        self.requires("libjpeg-turbo/3.2.0")
+        self.requires("zlib/1.3.1")
+        self.requires("json-glib/1.6.6")
+        self.requires("gstreamer/1.28.3")
+        self.requires("gst-plugins-base/1.28.3")
 
     def build(self):
         includes = []
@@ -17,17 +26,21 @@ class TestPackageConan(ConanFile):
         tested_libs = []
         dependency_libs = []
         system_libs = []
+        link_flags = []
         tested_dep = self.dependencies["spice-gtk"]
         tested_ref = tested_dep.ref
         for _ref, dependency in self.dependencies.items():
-            info = dependency.cpp_info
-            includes.extend(info.includedirs)
-            libdirs.extend(info.libdirs)
-            if dependency.ref == tested_ref:
-                tested_libs.extend(info.libs)
-            else:
-                dependency_libs.extend(info.libs)
-            system_libs.extend(info.system_libs)
+            infos = [dependency.cpp_info] + list(dependency.cpp_info.components.values())
+            for info in infos:
+                includes.extend(info.includedirs)
+                libdirs.extend(info.libdirs)
+                system_libs.extend(info.system_libs)
+                link_flags.extend(info.sharedlinkflags)
+                link_flags.extend(info.exelinkflags)
+                if dependency.ref == tested_ref:
+                    tested_libs.extend(info.libs)
+                else:
+                    dependency_libs.extend(info.libs)
 
         def unique(items):
             seen = set()
@@ -43,6 +56,7 @@ class TestPackageConan(ConanFile):
         lib_flags = " ".join(
             f"-l{name}" for name in unique(tested_libs + dependency_libs + system_libs)
         )
+        extra_link_flags = " ".join(unique(link_flags))
         executables = self.conf.get("tools.build:compiler_executables", default={}) or {}
         cc = executables.get("c")
         if not cc:
@@ -53,7 +67,7 @@ class TestPackageConan(ConanFile):
             defines = "-DSPICE_GTK_TEST_WITH_GTK=1"
         self.run(
             f'{cc} "{test_source}" -o test_spice_gtk '
-            f"{defines} {include_flags} {libdir_flags} {lib_flags}"
+            f"{defines} {include_flags} {libdir_flags} {lib_flags} {extra_link_flags}"
         )
 
     def test(self):
