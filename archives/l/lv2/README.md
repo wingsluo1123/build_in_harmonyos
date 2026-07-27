@@ -10,12 +10,12 @@ LV2 是一个开放标准的音频插件规范，提供头文件和规范定义�
 - lv2_validate 插件验证工具
 
 ## OHOS 适配
-- 构建系统: meson 1.11.1
-- 纯头文件库，无共享库生成
-- 测试全部通过（5/5）
+- 构建系统：meson (default_library=static)
+- 纯头文件规范库，无共享库生成
+- 上游 `meson test` 在 `build()` 阶段运行
 
 ## 依赖
-- 无外部依赖
+- 无编译依赖 (纯头文件规范库)
 
 ## 功能验证
 ```bash
@@ -23,5 +23,5 @@ pkg-config --modversion lv2  # 输出: 1.18.11
 ```
 
 ## 参考
-- 官网: https://lv2plug.in
-- 源码: https://gitlab.com/lv2/lv2
+- 官网：https://lv2plug.in
+- 源码：https://gitlab.com/lv2/lv2
