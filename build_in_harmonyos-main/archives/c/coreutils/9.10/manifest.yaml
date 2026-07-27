@@ -1,0 +1,60 @@
+version: "9.10"
+status: published
+build_date: "2026-04-09"
+
+source:
+  url: "https://ftp.gnu.org/gnu/coreutils/coreutils-9.10.tar.xz"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$TEST_PREFIX"
+    - "CFLAGS=-fPIC -O2 -g"
+  dependencies: []
+  cc: "Clang 15.0.4 (HarmonyOS NDK)"
+  cxx: clang++
+
+patches_applied:
+  - "0001-add-harmonyos-support.patch"
+  - "0002-fix-fstat-for-harmonyos.patch"
+  - "0003-fix-od-fstat-for-harmonyos.patch"
+
+knowledge_gained:
+  - "fstat()/lseek() 对管道返回 EACCES，需要 __OHOS__ 守卫降级处理"
+  - "SELinux 上下文 hmdfs:s0 限制软链接操作，toybox_exec:s0 不受限"
+  - "make check 约50分钟，334P/128F/573S/82E（1117测试）"
+  - "86个二进制正常工作，14个因平台限制排除"
+  - "package.sh 在 zsh 下需注意 pipefail 兼容性"
+
+# 编译产物信息
+binary_count: 86
+man_page_count: 100
+excluded_count: 14
+excluded_commands:
+  selinux_link:
+    - ls
+    - rm
+    - cp
+    - mv
+    - stat
+    - chmod
+    - chown
+    - chgrp
+    - ln
+    - link
+    - unlink
+    - readlink
+    - realpath
+  system_compat:
+    - chroot
+    - tac
+
+test_results:
+  method: "make check (~50min)"
+  total: 1117
+  pass: 334
+  fail: 128
+  skip: 573
+  error: 82
+  staging_verification: "82/83 --version PASS (99%)"

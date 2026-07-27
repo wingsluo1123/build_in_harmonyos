@@ -1,0 +1,34 @@
+version: "7.3"
+status: published
+build_date: "2026-04-20"
+
+source:
+  url: "https://ftp.gnu.org/gnu/texinfo/texinfo-7.3.tar.xz"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$TEST_PREFIX"
+    - "--disable-nls"
+    - "CC=clang"
+  cc: clang
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-Pod-Simple-Texinfo-Makefile.patch"
+  - "0003-Pod-Simple-Texinfo-pod2texi.patch"
+  - "0004-build-aux-config.guess.patch"
+  - "0005-build-aux-config.sub.patch"
+  - "0006-tta-build-aux-config.guess.patch"
+  - "0007-tta-build-aux-config.sub.patch"
+  - "0008-tta-perl-CheckXS-build-aux-config.guess.patch"
+  - "0009-tta-perl-CheckXS-build-aux-config.sub.patch"
+
+knowledge_gained:
+  - "texinfo 7.3 在 HarmonyOS 上使用 autotools 编译成功"
+  - "使用 --disable-nls 禁用 NLS 支持（缺少相关库）"
+  - "3 处独立的 config.guess/config.sub 需修补：主目录、tta/、tta/perl/CheckXS/"
+  - "文档目录 doc 需从 SUBDIRS 中移除以跳过文档构建"
+  - "TTA C 扩展代码默认不编译（需 --enable-xs）"
+  - "官方测试套件 138 个测试中 92 通过、46 跳过（缺外部工具），无失败"

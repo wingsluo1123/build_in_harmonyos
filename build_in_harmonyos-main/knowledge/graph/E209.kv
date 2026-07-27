@@ -1,0 +1,29 @@
+id: E209
+trigger_tool: autogen.sh|libtoolize
+phase: configuration
+severity: 2
+rec_approach: manual-workaround
+error_signature: autogen\.sh.*required file.*ltmain\.sh.*not found|libtoolize.*ltmain\.sh
+root_cause: autogen.sh 运行时 libtoolize 无法正确复制 ltmain.sh 到源码目录，可能是因为目录结构不匹配或 libtool 版本问题
+match_keywords: ltmain.sh,autogen.sh,libtool,autotools,configure.ac
+rec_description: 手动复制 libtool 的 ltmain.sh 文件到源码目录根目录，然后重新运行 autogen.sh
+rec_command: cp $HOME/usr/local/share/libtool/build-aux/ltmain.sh . && ./autogen.sh
+affected_scope: autotools 项目，尤其是使用 AC_PROG_LIBTOOL 的旧版本 configure.ac
+verification_cmd: ls -la ltmain.sh && test -x configure
+category: build_tools
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+
+doc_file:               doc/E209.md
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1

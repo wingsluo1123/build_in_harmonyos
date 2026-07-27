@@ -1,0 +1,23 @@
+version: "5.3"
+status: published
+build_date: "2026-04-13"
+
+source:
+  url: "https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$TEST_PREFIX"
+    - "--without-bash-malloc"
+  cc: clang
+
+patches_applied:
+  - "0001-support-config.guess.patch"
+  - "0002-support-config.sub.patch"
+
+knowledge_gained:
+  - "bash 5.3 bundled readline >= 8.3，含 rl_completion_rewrite_hook 等新符号，不能链接 readline 8.2"
+  - "使用 bundled readline 时自动静态链接 libncursesw.a，无需 --with-installed-readline"
+  - "去掉 --with-installed-readline 后，NEEDED 仅 libc.so，彻底解决 ncurses 动态依赖问题"

@@ -1,0 +1,42 @@
+version: "5.45"
+status: built
+build_date: "2026-03-23"
+
+source:
+  url: "https://astron.com/pub/file/file-5.45.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$HOME/usr/local"
+    - "--disable-libseccomp"
+    - "--enable-static"
+    - "--disable-shared"
+    - "LDFLAGS=-static"
+  dependencies:
+    - zlib
+    - bzip2
+    - xz
+  cc: clang
+
+patches_applied:
+  - "0001-config.sub.patch"
+  - "0002-doc-file.1.patch"
+  - "0003-doc-libmagic.3.patch"
+  - "0004-doc-magic.4.patch"
+  - "0005-src-file.patch"
+  - "0006-src-magic.h.patch"
+  - "0007-tests-test.patch"
+
+knowledge_gained:
+  - "config.sub 需要添加 linux-ohos* kernel-os 白名单"
+  - "鸿蒙 SELinux 限制导致动态链接的 .so 软链接无法被加载"
+  - "使用 --enable-static --disable-shared LDFLAGS=-static 可解决软链接加载问题"
+  - "file 命令支持 elf、zlib、bzlib、xzlib 格式识别"
+
+test_results:
+  type: automated
+  total: 72
+  passed: 72
+  failed: 0

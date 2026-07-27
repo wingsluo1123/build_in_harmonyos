@@ -13,7 +13,7 @@ find_package(qtpositioning REQUIRED)
 add_executable(test_qtpositioning test.cpp)
 target_link_libraries(test_qtpositioning PRIVATE
     Qt5::Positioning
-    Qt${QT_VERSION_MAJOR}::Core
+    Qt5::Core
 )
 
 enable_testing()
