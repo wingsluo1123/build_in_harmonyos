@@ -16,6 +16,7 @@ release/6.1，Ubuntu 24.04 LTS / RHEL 9 衍生所用。与本仓其它 ffmpeg �
 ### 本版 drawtext 需要 harfbuzz
 
 `drawtext_filter_deps="libfreetype libharfbuzz"` —— 除 freetype（字形光栅化）外还硬依赖 harfbuzz
+（实测 6.0.1 尚无、6.1.6 起才有；5.1/4.4 连 `libharfbuzz` 选项都没有）
 （文本整形），**缺任一个 configure 不报错、只是静默不生成该滤镜**。
 
 ## 外部编解码器与功能库

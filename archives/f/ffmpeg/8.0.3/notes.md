@@ -16,6 +16,7 @@ release/8.0（8.1 的前一条功能线）。与本仓其它 ffmpeg 版本**并�
 ### 本版 drawtext 需要 harfbuzz
 
 `drawtext_filter_deps="libfreetype libharfbuzz"` —— 除 freetype（字形光栅化）外还硬依赖 harfbuzz
+（实测 6.0.1 尚无、6.1.6 起才有；5.1/4.4 连 `libharfbuzz` 选项都没有）
 （文本整形），**缺任一个 configure 不报错、只是静默不生成该滤镜**。
 
 ## 外部编解码器与功能库
