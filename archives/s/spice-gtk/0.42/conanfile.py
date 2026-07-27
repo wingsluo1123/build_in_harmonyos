@@ -76,6 +76,7 @@ class SpiceGtkConan(ConanFile):
         )
 
     def generate(self):
+        self._ensure_tmpdir()
         PkgConfigDeps(self).generate()
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
@@ -99,6 +100,7 @@ class SpiceGtkConan(ConanFile):
         tc.generate()
 
     def build(self):
+        self._ensure_tmpdir()
         self._make_version_helper_executable()
         meson = Meson(self)
         meson.configure()
@@ -131,3 +133,8 @@ class SpiceGtkConan(ConanFile):
             helper = os.path.join(root, "build-aux", "git-version-gen")
             if os.path.isfile(helper):
                 os.chmod(helper, 0o755)
+
+    def _ensure_tmpdir(self):
+        tmpdir = os.path.join(self.build_folder, ".tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        os.environ["TMPDIR"] = tmpdir
