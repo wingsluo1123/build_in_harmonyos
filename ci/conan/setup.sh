@@ -19,67 +19,10 @@ REPO_ROOT="${CI_REPO_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
 echo "[step] Conan environment setup..."
 
-# ── 0. Check Python sqlite3 module (CI environment dependency) ──
-# HNP Python environment may have broken sqlite3 (missing libsqlite3.so.0)
-# This will cause conan to fail at startup. Detect and try to fix.
-if ! python3 -c "import sqlite3" 2>/dev/null; then
-    echo "[warn] Python sqlite3 module broken (missing libsqlite3.so.0)"
-    echo "[step] Attempting to fix sqlite3 dependency..."
-    
-    # Find libsqlite3.so.0 in system and add to LD_LIBRARY_PATH
-    SQLITE3_LIB=""
-    for lib_path in \
-        "/usr/lib/libsqlite3.so.0" \
-        "/usr/lib64/libsqlite3.so.0" \
-        "/lib/libsqlite3.so.0" \
-        "/lib64/libsqlite3.so.0" \
-        "/data/service/hnp/lib/libsqlite3.so.0" \
-        "/system/lib/libsqlite3.so.0" \
-        "/system/lib64/libsqlite3.so.0"; do
-        if [ -f "$lib_path" ]; then
-            SQLITE3_LIB="$lib_path"
-            lib_dir=$(dirname "$lib_path")
-            echo "[step] Found libsqlite3.so.0 at: $lib_path"
-            export LD_LIBRARY_PATH="$lib_dir:$LD_LIBRARY_PATH"
-            break
-        fi
-    done
-    
-    # If still not found, try installing via package manager
-    if [ -z "$SQLITE3_LIB" ]; then
-        echo "[step] libsqlite3.so.0 not found, trying package manager..."
-        if command -v apt-get &>/dev/null; then
-            apt-get update -qq && apt-get install -y -qq libsqlite3-0 || true
-        elif command -v yum &>/dev/null; then
-            yum install -y -q sqlite-libs || true
-        elif command -v dnf &>/dev/null; then
-            dnf install -y -q sqlite-libs || true
-        elif command -v opkg &>/dev/null; then
-            opkg update && opkg install sqlite3 || true
-        elif command -v pkg &>/dev/null; then
-            pkg install -y sqlite3 || true
-        fi
-    fi
-    
-    # Re-check after attempting fix
-    if ! python3 -c "import sqlite3" 2>/dev/null; then
-        echo "[error] Failed to fix sqlite3 module - environment issue"
-        echo "[error] Please contact CI maintainers to fix HNP Python environment"
-        echo "[hint] Missing: libsqlite3.so.0"
-        exit 1
-    fi
-    echo "[step] sqlite3 dependency fixed ✅"
-fi
-
-# ── 0.5. Fix HNP lld linker libxml2 dependency ──
-# HNP lld needs libxml2.so.16, add OHOS SDK lib path to LD_LIBRARY_PATH
-OHOS_SDK_LIB="/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib"
-if [ -d "$OHOS_SDK_LIB" ]; then
-    echo "[step] Adding OHOS SDK lib to LD_LIBRARY_PATH (lld needs libxml2.so.16)"
-    export LD_LIBRARY_PATH="$OHOS_SDK_LIB:$LD_LIBRARY_PATH"
-fi
-
 # ── 1. Detect/install Conan ──
+# pip3 可能装到 ~/.local/bin, 确保在 PATH 上
+export PATH="$HOME/.local/bin:$PATH"
+
 # Check both that conan exists AND is functional (conan --version succeeds)
 # If conan binary exists but is broken, force-reinstall to fix
 if ! command -v conan &>/dev/null || ! conan --version &>/dev/null; then
@@ -113,10 +56,11 @@ if [ -f "$SETTINGS_FILE" ]; then
     fi
 fi
 
-# ── 2. Verify conan remote (预部署校验) ──
-# Conan 配置 (remotes.json, profiles, settings.yml) 由 worker app 文件预部署到 ~/.conan2/
-# setup.sh 不做 remote 注册/认证, 仅校验 remote 已就绪
+# ── 2. Conan remote (自动初始化, 兼容 CI 机/发布机) ──
+# CI 机 .conan.db 无 remote 定义 → 自动添加(匿名读取)
+# 发布机已有同名 remote + token → 跳过, 不影响 upload 凭证
 CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-ohpcd}"
+CONAN_REMOTE_URL="${CONAN_REMOTE_URL:-https://conan.cnb.cool/OpenHarmonyPCDeveloper/Conan/-/packages/}"
 
 # Disable conancenter — these are private CI builds, no external deps needed
 if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
@@ -124,11 +68,16 @@ if conan remote list 2>/dev/null | grep -q "^conancenter:"; then
     conan remote disable conancenter 2>/dev/null || true
 fi
 
-if ! conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
-    echo "[error] remote '${CONAN_REMOTE_NAME}' 不存在, 请检查 worker app 预部署"
-    exit 1
+if conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
+    echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
+else
+    echo "[step] remote '${CONAN_REMOTE_NAME}' 不存在, 自动添加 (匿名读取)"
+    conan remote add "${CONAN_REMOTE_NAME}" "${CONAN_REMOTE_URL}" || {
+        echo "[error] 无法添加 remote '${CONAN_REMOTE_NAME}'"
+        exit 1
+    }
+    echo "[step] remote 已添加: ${CONAN_REMOTE_NAME} → ${CONAN_REMOTE_URL}"
 fi
-echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
 
 # ── 3. Ensure ohos-aarch64 profile exists ──
 PROFILE_NAME="${CONAN_PROFILE:-ohos-aarch64}"
