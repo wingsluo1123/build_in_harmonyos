@@ -46,6 +46,32 @@ class GnutypistConan(ConanFile):
         tc.extra_cflags.append("-include")
         tc.extra_cflags.append("_tools/gettext_stub.h")
         tc.configure_args.append("--disable-nls")
+        # Detect system ncursesw via its config tool (portable, no hardcoded paths)
+        import subprocess as _sp
+        import shutil as _su
+        _ncursesw6 = _su.which("ncursesw6-config") or \
+                     _su.which("ncursesw6-config", path=os.environ.get("PATH","") + ":" +
+                               "/usr/local/bin:/usr/bin:" +
+                               os.environ.get("HOME","") + "/usr/local/bin")
+        if _ncursesw6:
+            try:
+                _ncurses_cflags = _sp.check_output(
+                    [_ncursesw6, "--cflags"], text=True
+                ).strip()
+                _ncurses_libs = _sp.check_output(
+                    [_ncursesw6, "--libs"], text=True
+                ).strip()
+                # CPPFLAGS for configure header checks (AC_CHECK_HEADERS uses CPPFLAGS)
+                tc.configure_args.append("CPPFLAGS=" + _ncurses_cflags)
+                # CFLAGS for compilation
+                tc.extra_cflags.append(_ncurses_cflags)
+                # LDFLAGS for linking
+                tc.extra_ldflags.append(_ncurses_libs)
+            except (_sp.CalledProcessError, FileNotFoundError):
+                self.output.warning("ncursesw6-config found but failed to run")
+        else:
+            self.output.warning("ncursesw6-config not found in PATH. "
+                                "ncursesw headers may be missing from compiler search path.")
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
