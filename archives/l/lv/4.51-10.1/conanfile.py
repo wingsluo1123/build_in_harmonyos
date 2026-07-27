@@ -40,6 +40,11 @@ class LvConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def validate(self):
+        # R32 平台兼容性检查：lv 上游 curses/termcap 依赖在 OHOS aarch64 需适配 patch
+        if self.settings.os == "OHOS" and self.settings.arch != "armv8":
+            raise ConanInvalidConfiguration(f"lv {self.version} only supports OHOS armv8, got arch={self.settings.arch}")
+
     def generate(self):
         tc = AutotoolsToolchain(self)
         if not self.options.shared:
@@ -85,7 +90,7 @@ class LvConan(ConanFile):
         if not os.path.exists(lv_path):
             lv_path = os.path.join(src_dir, "lv")
         if not os.path.exists(lv_path):
-            raise ConanInvalidConfiguration("lv binary not found in build output")
+            raise ConanException("lv binary not found in build output")
         # Copy lv binary and create lgrep symlink
         copy(self, "lv", src=os.path.dirname(lv_path), dst=bin_dir, keep_path=False)
         if not os.path.exists(os.path.join(bin_dir, "lgrep")):
