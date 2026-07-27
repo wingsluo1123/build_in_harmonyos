@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for gnu-typist 2.10.1 — Autotools project with system ncurses."""
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 import os
@@ -11,7 +11,7 @@ class GnutypistConan(ConanFile):
     name = "gnu-typist"
     version = "2.10.1"
     description = "GNU Typist — a typing tutor"
-    license = "GPL-2.0-or-later"
+    license = "GPL-3.0-or-later"
     homepage = "https://www.gnu.org/software/gtypist/"
     url = ""
 
