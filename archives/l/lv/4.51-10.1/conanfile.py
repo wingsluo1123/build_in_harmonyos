@@ -66,8 +66,10 @@ class LvConan(ConanFile):
             ret = self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' {bash} {configure} {args}", cwd=src_dir, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")
+            # lv 上游用 #include <boolean.h> 非标准 angled include，加 -iquote=. 让 clang 在 angled include 时也搜索本地 src 目录
+            dep_cflags = f"{cflags} -iquote=. -iquote=../src"
             # make 阶段加 LIBS=-ltermcap（链接目标需要 termcap）
-            ret = self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
+            ret = self.run(f"make -j$(nproc) CC={cc} CFLAGS='{dep_cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
             if ret != 0:
                 raise ConanException(f"make failed with exit code {ret}")
 
