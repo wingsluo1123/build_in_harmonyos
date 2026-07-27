@@ -51,6 +51,12 @@ class SpiceGtkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        get(
+            self,
+            **self.conan_data["build_tools"]["pyparsing"],
+            strip_root=True,
+            destination=os.path.join(self.source_folder, "_pyparsing"),
+        )
         self._make_version_helper_executable()
         replace_in_file(
             self,
@@ -87,6 +93,7 @@ class SpiceGtkConan(ConanFile):
 
     def generate(self):
         self._ensure_tmpdir()
+        self._add_pyparsing_to_pythonpath()
         PkgConfigDeps(self).generate()
         mkenums = self._write_glib_tool_wrapper("glib-mkenums")
         genmarshal = self._write_glib_tool_wrapper("glib-genmarshal")
@@ -117,6 +124,7 @@ class SpiceGtkConan(ConanFile):
 
     def build(self):
         self._ensure_tmpdir()
+        self._add_pyparsing_to_pythonpath()
         self._make_version_helper_executable()
         meson = Meson(self)
         meson.configure()
@@ -227,3 +235,15 @@ runpy.run_path({original!r}, run_name="__main__")
             target.write(script)
         os.chmod(wrapper, 0o755)
         return wrapper
+
+    def _add_pyparsing_to_pythonpath(self):
+        roots = [
+            os.path.join(self.source_folder, "_pyparsing"),
+            os.path.join(os.path.dirname(self.build_folder), "_pyparsing"),
+        ]
+        paths = [path for path in roots if os.path.isdir(os.path.join(path, "pyparsing"))]
+        current = os.environ.get("PYTHONPATH")
+        if current:
+            paths.append(current)
+        if paths:
+            os.environ["PYTHONPATH"] = os.pathsep.join(paths)
