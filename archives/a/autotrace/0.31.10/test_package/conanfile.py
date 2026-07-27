@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan test package for autotrace 0.31.10."""
 import os
+import shlex
 import sys
 
 from conan import ConanFile
@@ -25,7 +26,8 @@ class AutotraceTestConan(ConanFile):
         VirtualBuildEnv(self).generate()
         VirtualRunEnv(self).generate()
 
-    def _run_checked(self, command, **kwargs):
+    def _run_checked(self, args, **kwargs):
+        command = " ".join(shlex.quote(str(arg)) for arg in args)
         retcode = self.run(command, ignore_errors=True, **kwargs)
         if retcode not in (None, 0):
             raise RuntimeError(f"Command failed with exit code {retcode}: {command}")
@@ -46,7 +48,7 @@ class AutotraceTestConan(ConanFile):
         os.environ["PKG_CONFIG_PATH"] = os.pathsep.join(pkg_config_paths)
         try:
             self._run_checked(
-                f'"{sys.executable}" "{script}" "{pkg}" "{cc}" "{run_binary}"',
+                [sys.executable, script, pkg, cc, run_binary],
                 env="conanrun",
             )
         finally:

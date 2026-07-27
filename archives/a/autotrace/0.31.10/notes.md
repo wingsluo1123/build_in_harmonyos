@@ -10,8 +10,8 @@
 ## Adaptation
 
 - Added a Conan custom recipe that compiles the upstream C sources directly.
-- Declares `glib/2.84.0` as a Conan requirement and resolves GLib flags through `PkgConfigDeps`.
-- Disables optional ImageMagick, pstoedit, png, libming, and other optional image backends to keep the package focused on the core library and CLI.
+- Declares `glib/2.84.0` and `libpng/1.6.58` as Conan requirements and resolves their flags through `PkgConfigDeps`.
+- Retains the native PNG input backend through libpng while disabling optional ImageMagick, pstoedit, libming, and other optional image backends.
 - Defaults to static library packaging.
 
 ## Tests
