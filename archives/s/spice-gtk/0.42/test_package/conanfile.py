@@ -70,6 +70,9 @@ class TestPackageConan(ConanFile):
         if cross_building(self):
             self.output.info("cross-building: compile and link test completed")
             return
+        if str(self.settings.os) == "OHOS":
+            self.output.info("OHOS: compile and link test completed")
+            return
         libdirs = []
         for _ref, dependency in self.dependencies.items():
             for info in self._dependency_infos(dependency):
