@@ -7,7 +7,7 @@ import os
 import tempfile
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanInvalidConfiguration, ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -45,16 +45,14 @@ class LvConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
-        # OHOS 需要显式链接 termcap (ncurses 的 termcap 适配层)
-        tc.extra_ldflags.append("-ltermcap")
+        # 注意：不在 extra_ldflags 注入 -ltermcap，否则 configure 测试编译器时
+        # 会带 -ltermcap，HMDFS 上符号找不到导致 "C compiler cannot create executables"。
+        # -ltermcap 仅在 build() 的 make 阶段通过 LIBS/LDFLAGS 显式传入。
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
         src_dir = os.path.join(self.source_folder, "src")
-        # HMDFS: ./configure 无法获得执行权限，用 bash 运行
-        # 不 source toolchain 文件以避免 --sysroot 重复，
-        # 手动设置跨编译标志，仅编译阶段加 -ltermcap（不在 configure 测试中）
         with tempfile.TemporaryDirectory() as tmpdir:
             configure = os.path.join(src_dir, "configure")
             shared_args = "--disable-shared --enable-static" if not self.options.shared else "--enable-shared --disable-static"
@@ -64,10 +62,14 @@ class LvConan(ConanFile):
             sysroot = self.conf.get("tools.build:sysroot", default="")
             opt = {"Debug": "-O0 -g", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
             cflags = f"{opt} --sysroot={sysroot}" if sysroot else opt
-            # configure 测试编译器时不加 -ltermcap（链接器标志导致测试失败）
-            self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' {bash} {configure} {args}", cwd=src_dir, shell=True)
-            # make 阶段才加 LIBS=-ltermcap（链接目标需要）
-            self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
+            # configure 阶段不加 -ltermcap，避免 C compiler cannot create executables
+            ret = self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' {bash} {configure} {args}", cwd=src_dir, shell=True)
+            if ret != 0:
+                raise ConanException(f"configure failed with exit code {ret}")
+            # make 阶段加 LIBS=-ltermcap（链接目标需要 termcap）
+            ret = self.run(f"make -j$(nproc) CC={cc} CFLAGS='{cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
+            if ret != 0:
+                raise ConanException(f"make failed with exit code {ret}")
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
