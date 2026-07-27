@@ -22,7 +22,7 @@ class GnutypistConan(ConanFile):
     default_options = {"shared": False}
 
     def export_sources(self):
-        export_conandata_patches(self)
+        pass
 
     def requirements(self):
         pass
@@ -82,7 +82,16 @@ class GnutypistConan(ConanFile):
         # Save full environment to restore after build (R33)
         _saved_environ = dict(_os.environ)
         try:
-            apply_conandata_patches(self)
+            # Inline mktemp fix for HMDFS: upstream configure uses mktemp -d
+            # which fails on HMDFS (t=$(mktemp -p . confXXXXXX.tmp) fallback)
+            from pathlib import Path as _Path
+            _cf = _Path(self.source_folder) / "configure"
+            if _cf.is_file():
+                _txt = _cf.read_text(encoding="utf-8")
+                _old = '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&'
+                _new = '  tmp=`(umask 077 && t=$(mktemp -p . confXXXXXX.tmp) && rm -f "$t" && mkdir -p "$t" && echo "$t") 2>/dev/null` &&'
+                if _old in _txt:
+                    _cf.write_text(_txt.replace(_old, _new), encoding="utf-8")
             # [R33] PATH adjustments for OHOS platform limitations (E106/E079):
             #   - Prefix /bin: HMDFS GNU cat stdout permission issue (E106)
             #   - _tools/: help2man/makeinfo not available on OHOS (E079)
