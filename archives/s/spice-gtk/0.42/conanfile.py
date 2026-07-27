@@ -3,6 +3,7 @@
 
 import os
 import re
+import shutil
 import sys
 
 from conan import ConanFile
@@ -141,6 +142,7 @@ class SpiceGtkConan(ConanFile):
     def package(self):
         meson = Meson(self)
         meson.install()
+        self._copy_shared_sonames()
         copy(self, "COPYING*", self.source_folder, os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
@@ -289,3 +291,18 @@ runpy.run_path({original!r}, run_name="__main__")
             paths.append(current)
         if paths:
             os.environ["PYTHONPATH"] = os.pathsep.join(paths)
+
+    def _copy_shared_sonames(self):
+        libdir = os.path.join(self.package_folder, "lib")
+        libraries = [
+            ("libspice-client-glib-2.0.so.8.8.2", ["libspice-client-glib-2.0.so.8"]),
+            ("libspice-client-gtk-3.0.so.5.1.1", ["libspice-client-gtk-3.0.so.5"]),
+        ]
+        for real_name, sonames in libraries:
+            real_path = os.path.join(libdir, real_name)
+            if not os.path.isfile(real_path):
+                continue
+            for soname in sonames:
+                soname_path = os.path.join(libdir, soname)
+                if not os.path.exists(soname_path):
+                    shutil.copy2(real_path, soname_path)
