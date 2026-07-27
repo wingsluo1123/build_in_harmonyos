@@ -10,7 +10,7 @@
 #include "blosc2.h"
 
 #define SIZE 1000
-/* BLOSC_MAX_OVERHEAD = 16 (defined in blosc.h) */
+/* BLOSC_MAX_OVERHEAD = 32 (defined in blosc2.h) */
 #define OUT_SIZE (SIZE + (BLOSC_MAX_OVERHEAD / sizeof(int)) + 1)
 
 int main(void) {
