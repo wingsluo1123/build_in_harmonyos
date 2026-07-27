@@ -9,7 +9,7 @@
 ## 编译步骤
 
 ```bash
-cd src
+# config.mk 和 Makefile 都在源根目录（非 src/），configure 阶段 cwd=源根
 sed -i 's/TERMINAL := NO/TERMINAL := YES/' config.mk
 sed -i 's/GRAPHICS := YES/GRAPHICS := NO/' config.mk
 make CC=clang CFLAGS='-fPIC -O2'
