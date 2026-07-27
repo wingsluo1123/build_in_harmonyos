@@ -45,9 +45,11 @@ Results:
 - Python syntax check passed for `conanfile.py` and
   `test_package/conanfile.py`.
 - `git diff --check` passed.
-- `conan create archives/s/spice-gtk/0.42 -pr:h=ci/conan/profiles/ohos-aarch64
-  -pr:b=ci/conan/profiles/ohos-aarch64 -o spice-gtk/*:gtk=False
-  --build=missing --build=spice-gtk/*` completed on commit `ca8873096`.
+- Default `conan create archives/s/spice-gtk/0.42
+  -pr:h=ci/conan/profiles/ohos-aarch64
+  -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+  --build=spice-gtk/*` completed on commit `e5559b12e`; no package option
+  override is required for the validated `gtk=False` scope.
 - Fixed during precheck: replaced unavailable `conan.tools.meson.meson_layout`
   with `conan.tools.layout.basic_layout`, matching other Meson recipes in this
   repository and Conan 2.29.1.
