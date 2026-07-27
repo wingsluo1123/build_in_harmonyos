@@ -21,6 +21,10 @@ class TestPackageConan(ConanFile):
         self.requires("gst-plugins-base/1.28.3")
 
     def build(self):
+        tmpdir = os.path.join(self.build_folder, ".tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        os.environ["TMPDIR"] = tmpdir
+
         includes = []
         libdirs = []
         tested_libs = []
