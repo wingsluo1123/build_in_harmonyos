@@ -143,6 +143,7 @@ class SpiceGtkConan(ConanFile):
         meson = Meson(self)
         meson.install()
         self._copy_shared_sonames()
+        self._fix_package_permissions()
         copy(self, "COPYING*", self.source_folder, os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
@@ -310,3 +311,13 @@ runpy.run_path({original!r}, run_name="__main__")
                 soname_path = os.path.join(libdir, soname)
                 if not os.path.exists(soname_path):
                     shutil.copy2(real_path, soname_path)
+
+    def _fix_package_permissions(self):
+        for folder in ["bin", "lib"]:
+            root = os.path.join(self.package_folder, folder)
+            if not os.path.isdir(root):
+                continue
+            for name in os.listdir(root):
+                path = os.path.join(root, name)
+                if os.path.isfile(path):
+                    os.chmod(path, 0o755)
