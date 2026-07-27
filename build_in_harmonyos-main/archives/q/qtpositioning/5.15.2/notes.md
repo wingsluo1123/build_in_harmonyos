@@ -57,3 +57,18 @@ make install
 - 本配方需要 Qt5 环境，由 conan 的 `qt/5.15.13` 包提供
 - 本地已完成：配方结构验证 ✅、CI 模拟测试 (18/18) ✅、AI review 审查 ✅
 - 完整 conan create 编译验证需在 CI 环境中 Qt5 就绪后自动执行
+
+## R40 深度适配验证
+
+### 检查结果
+- **patches/**: conandata.yml 中 `patches: {}` 为空，无鸿蒙平台适配补丁
+- **test_package**: test.cpp 仅测试几何数据类（QGeoCoordinate/QGeoCircle/QGeoRectangle），未测试 QGeoPositionInfoSource 实际定位源
+- **系统依赖**: 仅依赖 `qt/5.15.13`，未声明鸿蒙位置服务（hilog/geolocation）等系统依赖
+
+### 当前阶段说明
+QtPositioning 5.15.2 当前为**基础适配阶段**（路径 A），重点在于提供 Conan 配方使库可被正确构建和链接。定位功能在鸿蒙上的底层实现（如通过 geoclue、鸿蒙原生 Location API 或位置传感器 HAL）需要单独评估和适配，属于后续迭代范围。
+
+### 后续计划
+1. 鸿蒙定位后端适配：调研鸿蒙 Location Kit API，在后续版本中补丁接入
+2. test_package 增强：补充 QGeoPositionInfoSource 实际定位源测试
+3. 系统依赖补充：根据适配方案声明鸿蒙定位服务依赖
