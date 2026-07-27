@@ -1,43 +1,47 @@
 version: "0.32.9-git"
 status: published
-build_date: "2026-05-25"
+build_date: "2026-07-27"
 
 packaging:
   directory: "packaging/"
   tarball: "serd-0.32.9-git-ohos-aarch64.tar.gz"
-  size: "145KB"
 
 source:
-  url: "https://gitlab.com/drobilla/serd.git"
+  url: "https://gitlab.com/drobilla/serd/-/archive/0317806/serd-0317806.tar.gz"
+  sha256: "4cec57d40ff913a4530043ffc6e37f80b758f08fb807ac8d73b832d31f336a78"
   git_commit: "0317806"
-  tar_format: git
+  size_bytes: 380829
 
 build:
   system: meson
-  configure_options:
-    - "--prefix=$HOME/usr/local"
-  dependencies:
-    - zix/0.8.1-git
+  default_library: static
   cc: clang
   cxx: clang++
+  configure_options:
+    - "default_library=static"
+    - "wrap_mode=default"
+  dependencies:
+    - "zix/0.8.1-git"
 
 test_results:
+  type: official
+  upstream_test_command: "meson test"
+  upstream_test_in_build: true
   total: 41
   passed: 41
   failed: 0
-  pass_rate: 100%
+  note: "上游 meson test 在 build() 阶段运行，覆盖 node/reader/writer/env/string/uri"
 
 artifacts:
-  shared_library:
-    - "libserd-0.so.0.32.9"
-    - "libserd-0.so.0"
-    - "libserd-0.so"
+  static_library:
+    - "libserd-0.a"
   executables:
     - "serdi"
   pkg_config: "serd-0.pc"
   headers:
-    - "serd-0/serd/serd.h"
+    - "include/serd-0/serd/serd.h"
 
 knowledge_gained:
-  - "serd 测试套件设计良好，所有测试通过"
-  - "需要设置 LD_LIBRARY_PATH 才能运行 serdi"
+  - "serd 是 drobilla LV2 生态的 RDF 序列化库"
+  - "依赖 zix-0 (>= 0.4.0)"
+  - "提供 serdi 命令行工具，需要 LD_LIBRARY_PATH 才能运行"
