@@ -2,6 +2,7 @@
 """Conan recipe for spice-gtk 0.42 remote desktop client libraries."""
 
 import os
+import re
 
 from conan import ConanFile
 from conan.tools.files import copy, get, replace_in_file
@@ -78,6 +79,7 @@ class SpiceGtkConan(ConanFile):
     def generate(self):
         self._ensure_tmpdir()
         PkgConfigDeps(self).generate()
+        self._create_glib_pkg_config_aliases()
         tc = MesonToolchain(self)
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.project_options["gtk"] = "enabled" if self.options.gtk else "disabled"
@@ -160,3 +162,23 @@ class SpiceGtkConan(ConanFile):
             tools += f"ranlib = '{ranlib}'\n"
         with open(native_file, "w", encoding="utf-8") as native:
             native.write(content.replace("[binaries]\n", tools, 1))
+
+    def _create_glib_pkg_config_aliases(self):
+        glib_pc = os.path.join(self.generators_folder, "glib-2.0.pc")
+        if not os.path.isfile(glib_pc):
+            return
+        with open(glib_pc, encoding="utf-8") as source:
+            content = source.read()
+        aliases = {
+            "gobject-2.0.pc": "gobject-2.0",
+            "gmodule-2.0.pc": "gmodule-2.0",
+            "gmodule-no-export-2.0.pc": "gmodule-no-export-2.0",
+            "gthread-2.0.pc": "gthread-2.0",
+            "gio-2.0.pc": "gio-2.0",
+            "gio-unix-2.0.pc": "gio-unix-2.0",
+        }
+        for filename, name in aliases.items():
+            alias_path = os.path.join(self.generators_folder, filename)
+            alias = re.sub(r"^Name:.*$", f"Name: {name}", content, flags=re.M)
+            with open(alias_path, "w", encoding="utf-8") as target:
+                target.write(alias)
