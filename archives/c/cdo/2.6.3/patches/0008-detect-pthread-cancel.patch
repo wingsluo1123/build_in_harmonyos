@@ -1,14 +1,20 @@
 --- a/configure.ac
 +++ b/configure.ac
-@@ -74,4 +74,5 @@
+@@ -73,6 +73,7 @@
+ AC_CHECK_FUNCS(mallinfo)
  AC_CHECK_FUNCS(backtrace)
  #  ----------------------------------------------------------------------
  # Checks for the availability of ANSI-C99 functions
 +AC_CHECK_FUNCS(pthread_cancel)
  AC_CHECK_FUNCS(getrlimit)
+ 
+ # Check compiler version
 --- a/configure
 +++ b/configure
-@@ -27812,3 +27812,11 @@
+@@ -27809,6 +27809,14 @@ fi
+ 
+ #  ----------------------------------------------------------------------
+ # Checks for the availability of ANSI-C99 functions
 +ac_fn_c_check_func "$LINENO" "pthread_cancel" "ac_cv_func_pthread_cancel"
 +if test "x$ac_cv_func_pthread_cancel" = xyes
 +then :
@@ -22,12 +28,17 @@
  then :
 --- a/src/config.h.in
 +++ b/src/config.h.in
-@@ -171,2 +171,5 @@
+@@ -169,6 +169,10 @@
+ #undef HAVE_NETCDF_META_H
+ 
+ /* Define to 1 if you have the <proj.h> header file. */
 +/* Define to 1 if you have the 'pthread_cancel' function. */
 +#undef HAVE_PTHREAD_CANCEL
 +
- /* Define to 1 if you have the <proj.h> header file. */
++
  #undef HAVE_PROJ_H
+ 
+ /* Define to 1 if you have the <pthread.h> header file. */
 --- a/src/processManager.cc
 +++ b/src/processManager.cc
 @@ -192,8 +192,12 @@ ProcessManager::kill_processes()
