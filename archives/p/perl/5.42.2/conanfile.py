@@ -3,6 +3,7 @@
 
 import os
 import shutil
+import subprocess
 from shlex import quote
 
 from conan import ConanFile
@@ -262,6 +263,7 @@ exec "$cp_cmd" "$@"
         if not (os.path.exists(sign_tool) and os.path.exists(objcopy)):
             return
 
+        failures = []
         for root, _, files in os.walk(self.package_folder):
             for filename in files:
                 path = os.path.join(root, filename)
@@ -272,14 +274,48 @@ exec "$cp_cmd" "$@"
                 except OSError:
                     continue
                 tmp_signed = path + ".signed"
-                self.run(f"{quote(objcopy)} --remove-section .codesign {quote(path)}", quiet=True)
-                self.run(
-                    f"{quote(sign_tool)} sign -inFile {quote(path)} "
-                    f"-outFile {quote(tmp_signed)} -selfSign 1",
-                    quiet=True,
-                )
-                os.replace(tmp_signed, path)
-                os.chmod(path, 0o755)
+                try:
+                    if os.path.exists(tmp_signed):
+                        os.remove(tmp_signed)
+                    remove_result = subprocess.run(
+                        [objcopy, "--remove-section", ".codesign", path],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    remove_output = "\n".join(
+                        part for part in (remove_result.stdout, remove_result.stderr) if part
+                    ).strip()
+                    missing_codesign = (
+                        ".codesign" in remove_output and "not found" in remove_output.lower()
+                    )
+                    if remove_result.returncode != 0 and not missing_codesign:
+                        detail = remove_output or f"exit code {remove_result.returncode}"
+                        failures.append(f"{path}: objcopy failed: {detail}")
+                        continue
+
+                    sign_result = subprocess.run(
+                        [sign_tool, "sign", "-inFile", path, "-outFile", tmp_signed, "-selfSign", "1"],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if sign_result.returncode != 0 or not os.path.exists(tmp_signed):
+                        sign_output = "\n".join(
+                            part for part in (sign_result.stdout, sign_result.stderr) if part
+                        ).strip()
+                        detail = sign_output or f"exit code {sign_result.returncode}"
+                        failures.append(f"{path}: signing failed: {detail}")
+                        continue
+
+                    os.replace(tmp_signed, path)
+                    os.chmod(path, 0o755)
+                finally:
+                    if os.path.exists(tmp_signed):
+                        os.remove(tmp_signed)
+
+        if failures:
+            raise RuntimeError("ELF signing failed:\n" + "\n".join(failures))
 
     def _perl5lib_dirs(self):
         root = os.path.join(self.package_folder, "lib", "perl5")
