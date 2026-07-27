@@ -1,9 +1,11 @@
 --- a/installperl
 +++ b/installperl
 @@ -217,10 +217,29 @@
- 
+-
++
  # Do some quick sanity checks.
- 
+-
++
 +sub _probe_write_access {
 +    my ($dir) = @_;
 +    return 0 unless defined $dir && -d $dir;
@@ -28,6 +30,8 @@
 --w $installbin		|| $opts{notify} || die "$installbin is not writable by you\n"
 +(-w $installbin || _probe_write_access($installbin))
 +			|| $opts{notify} || die "$installbin is not writable by you\n"
- 	unless $installbin =~ m#^/afs/# || $opts{notify};
- 
+-	unless $installbin =~ m#^/afs/# || $opts{notify};
++	unless $installbin =~ m#^/afs/# || $opts{notify};
+-
++
  if (!$Is_VMS) {
