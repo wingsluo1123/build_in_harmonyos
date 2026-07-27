@@ -1,0 +1,31 @@
+version: "2.69"
+software: libcap
+status: built
+build_date: "2026-07-15"
+build_system: makefile
+
+source:
+  url: "https://mirrors.edge.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.69.tar.xz"
+  sha256: "f311f8f3dad84699d0566d1d6f7ec943a9298b28f714cae3c931dfd57492d7eb"
+  tar_format: tar.xz
+
+build:
+  system: makefile
+  configure_options:
+    - "GOLANG=no"
+    - "PAM_CAP=no"
+    - "SHARED=no"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Make.Rules-clang.patch"
+  - "0002-bash-path.patch"
+
+knowledge_gained:
+  - "libcap使用自定义Makefile系统，不是autotools"
+  - "需要修改Make.Rules将gcc改为clang"
+  - "需要修改脚本shebang从/bin/bash到/data/service/hnp/bin/bash"
+  - "conan build时需要使用make -C libcap只构建库子目录"
+  - "psx_syscall.h是符号链接，package时需从psx/目录直接复制"

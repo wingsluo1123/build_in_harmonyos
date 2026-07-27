@@ -1,0 +1,27 @@
+version: "1.7.1"
+status: partial
+build_date: "2026-04-13"
+
+source:
+  url: "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-1.7.1.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=$HOME/usr/local"
+  env:
+    CC: clang
+    CFLAGS: "-fPIC -O2"
+  dependencies:
+    - oniguruma/bundled
+  cc: clang
+
+patches_applied:
+  - "0001-config-guess-harmonyos-support.patch"
+  - "0002-config-sub-harmonyos-support.patch"
+
+knowledge_gained:
+  - "含 autotools 子模块的项目需单独修复子模块 config.guess"
+  - "子模块 config.guess 中的 HarmonyOS 补丁可能包含重复条目需清理"
+  - "BusyBox script 不支持 -e 选项，导致 shtest 失败（平台限制）"

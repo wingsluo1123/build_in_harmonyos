@@ -1,0 +1,51 @@
+software: massdns
+# 版本级 manifest 模板
+# 文件位置: archives/m/massdns/1.1.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.1.0"
+status: built
+build_date: "2026-07-16"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/blechschmidt/massdns/archive/refs/tags/v1.1.0.tar.gz"
+  sha256: "93b14431496b358ee9f3a5b71bd9618fe4ff1af8c420267392164f7b2d949559"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build_system: makefile
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "massdns 使用纯 Makefile 构建，无 configure 脚本，无 make install 目标"
+  - "Makefile 中 PROJECT_FLAGS 使用 git describe 获取版本号，tarball 中需手动传递 MASSDNS_REVISION"
+  - "massdns 自 v0.3 起使用自定义 DNS 实现，不再依赖 ldns"
+  - "使用 -DHAVE_EPOLL -DHAVE_SYSINFO Linux 特定选项，HarmonyOS 基于 Linux 内核支持"
+  - "构建产物为单一二进制 bin/massdns，需手动 copy 到 package/bin 并进行 ELF 签名"

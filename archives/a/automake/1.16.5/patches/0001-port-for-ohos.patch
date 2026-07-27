@@ -1,0 +1,168 @@
+From: OpenHarmony PC Developer <community@example.com>
+Date: Sat, 09 Apr 2026 00:00:00 +0800
+Subject: [PATCH] port automake 1.16.5 for HarmonyOS (OpenHarmony)
+
+Add HarmonyOS / OpenHarmony (ohos) support to config.guess and config.sub:
+- config.guess: detect HarmonyOS kernel, report as aarch64-unknown-linux-ohos
+- config.sub: recognize linux-ohos and ohos as valid OS variants
+
+--- a/lib/config.guess
++++ b/lib/config.guess
+@@ -2,3 +2,3 @@
+ # Attempt to guess a canonical system name.
+-#   Copyright 1992-2021 Free Software Foundation, Inc.
++#   Copyright 1992-2023 Free Software Foundation, Inc.
+ 
+@@ -6,3 +6,3 @@
+ 
+-timestamp='2021-06-03'
++timestamp='2023-06-23'
+ 
+@@ -10,3 +10,3 @@ timestamp='2021-06-03'
+ # under the terms of the GNU General Public License as published by
+-# the Free Software Foundation; either version 3 of the License, or
++# the Free Software Foundation, either version 3 of the License, or
+ # (at your option) any later version.
+@@ -49,3 +49,3 @@ Usage: $0 [OPTION]
+ 
+-Output the configuration name of the system \`$me' is run on.
++Output the configuration name of the system '$me' is run on.
+ 
+@@ -62,3 +62,3 @@ GNU config.guess ($timestamp)
+ Originally written by Per Bothner.
+-Copyright 1992-2021 Free Software Foundation, Inc.
++Copyright 1992-2023 Free Software Foundation, Inc.
+ 
+@@ -68,3 +68,3 @@ warranty; not even for MERCHANTABILITY o
+ help="
+-Try \`$me --help' for more information."
++Try '$me --help' for more information."
+ 
+@@ -104,4 +104,4 @@ GUESS=
+ 
+-# Historically, `CC_FOR_BUILD' used to be named `HOST_CC'. We still
+-# use `HOST_CC' if defined, but it is deprecated.
++# Historically, 'CC_FOR_BUILD' used to be named 'HOST_CC'. We still
++# use 'HOST_CC' if defined, but it is deprecated.
+ 
+@@ -152,2 +152,6 @@ UNAME_VERSION=`(uname -v) 2>/dev/null` |
+ case $UNAME_SYSTEM in
++HarmonyOS)
++	# OpenHarmony/HarmonyOS uses musl libc
++	LIBC=musl
++	;;
+ Linux|GNU|GNU/*)
+@@ -439,3 +443,3 @@ case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME
+ 	    if (echo '#ifdef __amd64'; echo IS_64BIT_ARCH; echo '#endif') | \
+-		(CCOPTS="" $CC_FOR_BUILD -E - 2>/dev/null) | \
++		(CCOPTS="" $CC_FOR_BUILD -m64 -E - 2>/dev/null) | \
+ 		grep IS_64BIT_ARCH >/dev/null
+@@ -461,3 +465,3 @@ case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME
+ 	esac
+-	# Japanese Language versions have a version number like `4.1.3-JL'.
++	# Japanese Language versions have a version number like '4.1.3-JL'.
+ 	SUN_REL=`echo "$UNAME_RELEASE" | sed -e 's/-/_/'`
+@@ -931,2 +935,5 @@ EOF
+ 	;;
++    *:SerenityOS:*:*)
++        GUESS=$UNAME_MACHINE-pc-serenity
++        ;;
+     *:Interix*:*)
+@@ -965,2 +972,8 @@ EOF
+ 	;;
++    x86_64:[Mm]anagarm:*:*|i?86:[Mm]anagarm:*:*)
++	GUESS="$UNAME_MACHINE-pc-managarm-mlibc"
++	;;
++    *:[Mm]anagarm:*:*)
++	GUESS="$UNAME_MACHINE-unknown-managarm-mlibc"
++	;;
+     *:Minix:*:*)
+@@ -968,2 +981,5 @@ EOF
+ 	;;
++    aarch64:HarmonyOS:*:*)
++	GUESS=$UNAME_MACHINE-unknown-linux-ohos
++	;;
+     aarch64:Linux:*:*)
+@@ -1035,3 +1051,3 @@ EOF
+ 	;;
+-    loongarch32:Linux:*:* | loongarch64:Linux:*:* | loongarchx32:Linux:*:*)
++    loongarch32:Linux:*:* | loongarch64:Linux:*:*)
+ 	GUESS=$UNAME_MACHINE-unknown-linux-$LIBC
+@@ -1150,12 +1166,23 @@ EOF
+ 	set_cc_for_build
++	CPU=$UNAME_MACHINE
+ 	LIBCABI=$LIBC
+ 	if test "$CC_FOR_BUILD" != no_compiler_found; then
+-	    if (echo '#ifdef __ILP32__'; echo IS_X32; echo '#endif') | \
+-		(CCOPTS="" $CC_FOR_BUILD -E - 2>/dev/null) | \
+-		grep IS_X32 >/dev/null
+-	    then
+-		LIBCABI=${LIBC}x32
+-	    fi
++	    ABI=64
++	    sed 's/^	    //' << EOF > "$dummy.c"
++	    #ifdef __i386__
++	    ABI=x86
++	    #else
++	    #ifdef __ILP32__
++	    ABI=x32
++	    #endif
++	    #endif
++EOF
++	    cc_set_abi=`$CC_FOR_BUILD -E "$dummy.c" 2>/dev/null | grep '^ABI' | sed 's, ,,g'`
++	    eval "$cc_set_abi"
++	    case $ABI in
++		x86) CPU=i686 ;;
++		x32) LIBCABI=${LIBC}x32 ;;
++	    esac
+ 	fi
+-	GUESS=$UNAME_MACHINE-pc-linux-$LIBCABI
++	GUESS=$CPU-pc-linux-$LIBCABI
+ 	;;
+@@ -1179,3 +1206,3 @@ EOF
+     i*86:OS/2:*:*)
+-	# If we were able to find `uname', then EMX Unix compatibility
++	# If we were able to find 'uname', then EMX Unix compatibility
+ 	# is probably installed.
+@@ -1320,3 +1347,3 @@ EOF
+ 	;;
+-    PENTIUM:*:4.0*:*)	# Unisys `ClearPath HMP IX 4000' SVR4/MP effort
++    PENTIUM:*:4.0*:*)	# Unisys 'ClearPath HMP IX 4000' SVR4/MP effort
+ 			# says <Richard.M.Bartel@ccMail.Census.GOV>
+@@ -1366,4 +1393,7 @@ EOF
+ 	;;
+-    x86_64:Haiku:*:*)
+-	GUESS=x86_64-unknown-haiku
++    ppc:Haiku:*:*)	# Haiku running on Apple PowerPC
++	GUESS=powerpc-apple-haiku
++	;;
++    *:Haiku:*:*)	# Haiku modern gcc (not bound by BeOS compat)
++	GUESS=$UNAME_MACHINE-unknown-haiku
+ 	;;
+@@ -1524,2 +1554,5 @@ EOF
+ 	;;
++    i*86:Fiwix:*:*)
++	GUESS=$UNAME_MACHINE-pc-fiwix
++	;;
+     *:AROS:*:*)
+
+--- a/lib/config.sub
++++ b/lib/config.sub
+@@ -1321,2 +1321,6 @@ case $basic_os in
+ 		;;
++	linux-ohos*)
++		kernel=linux
++		os=ohos
++		;;
+ 	*-*)
+@@ -1750,3 +1754,4 @@ case $os in
+ 	     | midnightbsd* | amdhsa* | unleashed* | emscripten* | wasi* \
+-	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr*)
++	     | nsk* | powerunix* | genode* | zvmoe* | qnx* | emx* | zephyr* \
++	     | linux-ohos* | ohos*)
+ 		;;
+@@ -1768,3 +1773,3 @@ case $kernel-$os in
+ 	linux-gnu* | linux-dietlibc* | linux-android* | linux-newlib* \
+-		   | linux-musl* | linux-relibc* | linux-uclibc* )
++		   | linux-musl* | linux-relibc* | linux-uclibc* | linux-ohos*)
+ 		;;
