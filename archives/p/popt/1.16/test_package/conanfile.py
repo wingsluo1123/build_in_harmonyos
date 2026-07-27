@@ -22,7 +22,4 @@ class PoptTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # CI L0d: explicit self.run() required (cmake.test() doesn't count)
         self.run(os.path.join(self.build_folder, "test_popt"), env="conanrun")
