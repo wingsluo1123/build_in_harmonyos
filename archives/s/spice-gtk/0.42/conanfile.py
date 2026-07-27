@@ -144,16 +144,49 @@ class SpiceGtkConan(ConanFile):
         copy(self, "COPYING*", self.source_folder, os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
-        self.cpp_info.libs = ["spice-client-glib-2.0"]
+        glib_lib = "spice-client-glib-2.0"
+        gtk_lib = "spice-client-gtk-3.0"
+        if self.options.shared and self.settings.os == "OHOS":
+            glib_lib = ":libspice-client-glib-2.0.so.8.8.2"
+            gtk_lib = ":libspice-client-gtk-3.0.so.5.1.1"
+
+        glib_requires = [
+            "glib::glib",
+            "pixman::pixman",
+            "openssl::openssl",
+            "libjpeg-turbo::libjpeg-turbo",
+            "zlib::zlib",
+            "json-glib::json-glib",
+            "gstreamer::gstreamer",
+            "gstreamer::base",
+            "gst-plugins-base::app",
+            "gst-plugins-base::audio",
+            "gst-plugins-base::video",
+        ]
+
+        self.cpp_info.libs = [glib_lib]
+        self.cpp_info.includedirs = ["include/spice-client-glib-2.0", "include"]
+        self.cpp_info.requires = glib_requires
         self.cpp_info.set_property("cmake_file_name", "spice-gtk")
         self.cpp_info.set_property("cmake_target_name", "spice-gtk::spice-gtk")
         self.cpp_info.set_property("pkg_config_name", "spice-client-glib-2.0")
-        self.cpp_info.components["glib"].libs = ["spice-client-glib-2.0"]
+        self.cpp_info.components["glib"].libs = [glib_lib]
+        self.cpp_info.components["glib"].includedirs = [
+            "include/spice-client-glib-2.0",
+            "include",
+        ]
+        self.cpp_info.components["glib"].requires = glib_requires
         self.cpp_info.components["glib"].set_property("pkg_config_name", "spice-client-glib-2.0")
         if self.options.gtk:
-            self.cpp_info.libs.insert(0, "spice-client-gtk-3.0")
+            self.cpp_info.libs.insert(0, gtk_lib)
+            self.cpp_info.includedirs.insert(0, "include/spice-client-gtk-3.0")
             self.cpp_info.set_property("pkg_config_name", "spice-client-gtk-3.0")
-            self.cpp_info.components["gtk"].libs = ["spice-client-gtk-3.0"]
+            self.cpp_info.components["gtk"].libs = [gtk_lib]
+            self.cpp_info.components["gtk"].includedirs = [
+                "include/spice-client-gtk-3.0",
+                "include/spice-client-glib-2.0",
+                "include",
+            ]
             self.cpp_info.components["gtk"].requires = ["glib"]
             self.cpp_info.components["gtk"].set_property("pkg_config_name", "spice-client-gtk-3.0")
 
