@@ -9,7 +9,7 @@ import tempfile
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -41,9 +41,11 @@ class LvConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def validate(self):
-        # R32 平台兼容性检查：lv 上游 curses/termcap 依赖在 OHOS aarch64 需适配 patch
-        if self.settings.os == "OHOS" and self.settings.arch != "armv8":
-            raise ConanInvalidConfiguration(f"lv {self.version} only supports OHOS armv8, got arch={self.settings.arch}")
+        # R32 平台兼容性检查（统模式：先 OS 后 arch）
+        if self.settings.os != "OHOS":
+            raise ConanInvalidConfiguration(f"lv {self.version} only supports OHOS, got os={self.settings.os}")
+        if self.settings.arch != "armv8":
+            raise ConanInvalidConfiguration(f"lv {self.version} only supports armv8, got arch={self.settings.arch}")
 
     def generate(self):
         tc = AutotoolsToolchain(self)
