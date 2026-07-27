@@ -93,6 +93,7 @@ class SpiceGtkConan(ConanFile):
         tc.generate()
 
     def build(self):
+        os.chmod(os.path.join(self.build_folder, "build-aux", "git-version-gen"), 0o755)
         meson = Meson(self)
         meson.configure()
         meson.build()
