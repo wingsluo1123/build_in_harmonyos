@@ -1,0 +1,33 @@
+name: ohos-build-ci
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  setup:
+    runs-on: ohos-aarch64-runner
+    steps:
+      - uses: checkout-action@0.0.1
+      - name: Conan environment setup
+        run: bash ci/conan/setup.sh
+
+  build-and-test:
+    needs: setup
+    runs-on: ohos-aarch64-runner
+    steps:
+      - uses: checkout-action@0.0.1
+      - name: Conan build and test
+        run: bash ci/conan/build_and_test.sh $CI_PACKAGES
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ohos-aarch64-runner
+    steps:
+      - uses: checkout-action@0.0.1
+      - name: Upload to CNB registry
+        run: |
+          bash ci/conan/upload.sh
+          bash ci/artifacts/sign.sh

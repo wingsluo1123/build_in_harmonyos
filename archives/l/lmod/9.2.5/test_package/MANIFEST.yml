@@ -1,0 +1,36 @@
+package: lmod/9.2.5
+homepage: https://github.com/TACC/Lmod
+upstream_check_command: module --version
+upstream_test_in_build: false
+test_package_tests:
+  - type: version
+    command: module --version
+    expected: exit 0, contains version string
+  - type: help
+    command: module --help
+    expected: exit 0, contains usage info
+  - type: avail
+    command: module avail
+    expected: exit 0, lists available modules
+  - type: list
+    command: module list
+    expected: exit 0
+  - type: load_unload
+    command: module load/unload test_app/1.0
+    expected: exit 0, environment variable set/cleared
+  - type: purge
+    command: module purge
+    expected: exit 0
+  - type: spider
+    command: module spider
+    expected: exit 0
+  - type: env_vars
+    command: check LMOD_VERSION/LMOD_DIR/LMOD_PKG
+    expected: all variables set
+assertion_count: 20
+upstream_tests:
+  name: Lmod Test Suite
+  repo: https://github.com/rtmclay/Lmod_test_suite
+  framework: busted (Lua)
+  adapted_count: 20
+  adapted_coverage: [version, help, avail, list, load, unload, purge, spider, env_vars]
