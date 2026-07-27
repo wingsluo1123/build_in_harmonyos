@@ -14,5 +14,5 @@ class CprotoTestConan(ConanFile):
 
     def test(self):
         # R34: test must actually execute the tested package's binary
-        # cproto processes a C file and outputs function prototypes
-        self.run("cproto test.c", env="conanrun")
+        # and verify output contains expected prototypes
+        self.run("cproto test.c | grep -q 'int add(int a, int b)'", env="conanrun")
