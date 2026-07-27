@@ -151,6 +151,7 @@ class SpiceGtkConan(ConanFile):
             gtk_lib = ":libspice-client-gtk-3.0.so.5.1.1"
 
         glib_requires = [
+            "spice-protocol::spice-protocol",
             "glib::glib",
             "pixman::pixman",
             "openssl::openssl",
