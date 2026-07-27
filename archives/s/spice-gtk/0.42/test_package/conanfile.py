@@ -76,8 +76,8 @@ class TestPackageConan(ConanFile):
         runtime_paths = self._unique(libdirs)
         if existing:
             runtime_paths.append(existing)
-        os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(runtime_paths)
-        self.run("./test_spice_gtk", env="conanrun")
+        ld_library_path = os.pathsep.join(runtime_paths)
+        self.run(f'LD_LIBRARY_PATH="{ld_library_path}" ./test_spice_gtk')
 
     @staticmethod
     def _dependency_infos(dependency):
