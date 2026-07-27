@@ -48,8 +48,9 @@ class QtpositioningConan(ConanFile):
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
             ohos_mkspec = os.path.join(qt_mkspecs, "ohos-aarch64-clang")
             if os.path.isdir(ohos_mkspec):
-                # Set QMAKESPEC via VirtualBuildEnv for the build context
-                build_env.define("QMAKESPEC", ohos_mkspec)
+                # Set QMAKESPEC via VirtualBuildEnv.environment() for the build context
+                env_vars = build_env.environment()
+                env_vars.define("QMAKESPEC", ohos_mkspec)
             else:
                 raise ConanException(
                     f"OHOS mkspec not found at {ohos_mkspec}. "
