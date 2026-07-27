@@ -47,6 +47,7 @@ class TestPackageConan(ConanFile):
 
         include_flags = " ".join(f'-I"{path}"' for path in self._unique(includes))
         libdir_flags = " ".join(f'-L"{path}"' for path in self._unique(libdirs))
+        rpath_flags = " ".join(f"-Wl,-rpath,{path}" for path in self._unique(libdirs))
         lib_flags = " ".join(
             f"-l{name}" for name in self._unique(tested_libs + dependency_libs + system_libs)
         )
@@ -61,7 +62,8 @@ class TestPackageConan(ConanFile):
             defines = "-DSPICE_GTK_TEST_WITH_GTK=1"
         self.run(
             f'{cc} "{test_source}" -o test_spice_gtk '
-            f"{defines} {include_flags} {libdir_flags} {lib_flags} {extra_link_flags}"
+            f"{defines} {include_flags} {libdir_flags} {rpath_flags} "
+            f"{lib_flags} {extra_link_flags}"
         )
 
     def test(self):
