@@ -13,4 +13,4 @@ It can compress data faster than a memory-to-memory copy.
 
 | Version | Status |
 |---------|--------|
-| 3.2.3 | built |
+| 2.23.1 | built |

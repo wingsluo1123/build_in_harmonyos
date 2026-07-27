@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — c-blosc2 3.2.3.
+"""Conan recipe — c-blosc2 2.23.1.
 
 c-blosc2 是高性能压缩二进制数据存储库，blosc 的第二代实现。
 构建系统: CMake
@@ -14,7 +14,7 @@ import os
 
 class CBlosc2Conan(ConanFile):
     name = "c-blosc2"
-    version = "3.2.3"
+    version = "2.23.1"
     description = "Fast, compressed, persistent binary data store library for C"
     license = "BSD-3-Clause"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
