@@ -49,7 +49,7 @@ class SpiceGtkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
-        os.chmod(os.path.join(self.source_folder, "build-aux", "git-version-gen"), 0o755)
+        self._make_version_helper_executable()
         replace_in_file(
             self,
             os.path.join(self.source_folder, "meson.build"),
@@ -93,7 +93,7 @@ class SpiceGtkConan(ConanFile):
         tc.generate()
 
     def build(self):
-        os.chmod(os.path.join(self.build_folder, "build-aux", "git-version-gen"), 0o755)
+        self._make_version_helper_executable()
         meson = Meson(self)
         meson.configure()
         meson.build()
@@ -116,3 +116,12 @@ class SpiceGtkConan(ConanFile):
             self.cpp_info.components["gtk"].libs = ["spice-client-gtk-3.0"]
             self.cpp_info.components["gtk"].requires = ["glib"]
             self.cpp_info.components["gtk"].set_property("pkg_config_name", "spice-client-gtk-3.0")
+
+    def _make_version_helper_executable(self):
+        roots = [self.source_folder]
+        if self.build_folder:
+            roots.extend([self.build_folder, os.path.dirname(self.build_folder)])
+        for root in roots:
+            helper = os.path.join(root, "build-aux", "git-version-gen")
+            if os.path.isfile(helper):
+                os.chmod(helper, 0o755)
