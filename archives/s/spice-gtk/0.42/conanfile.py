@@ -98,6 +98,7 @@ class SpiceGtkConan(ConanFile):
         tc.project_options["recorder"] = False
         tc.project_options["valgrind"] = False
         tc.generate()
+        self._inject_meson_archive_tools()
 
     def build(self):
         self._ensure_tmpdir()
@@ -138,3 +139,24 @@ class SpiceGtkConan(ConanFile):
         tmpdir = os.path.join(self.build_folder, ".tmp")
         os.makedirs(tmpdir, exist_ok=True)
         os.environ["TMPDIR"] = tmpdir
+
+    def _inject_meson_archive_tools(self):
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler = executables.get("c", "")
+        bindir = os.path.dirname(compiler) if os.path.sep in compiler else ""
+        ar = executables.get("ar") or os.path.join(bindir, "llvm-ar")
+        ranlib = executables.get("ranlib") or os.path.join(bindir, "llvm-ranlib")
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if not bindir or not os.path.isfile(ar) or not os.path.isfile(native_file):
+            return
+        with open(native_file, encoding="utf-8") as native:
+            content = native.read()
+        if "\nar =" in content or "[binaries]" not in content:
+            return
+        tools = f"[binaries]\nar = '{ar}'\n"
+        if os.path.isfile(ranlib):
+            tools += f"ranlib = '{ranlib}'\n"
+        with open(native_file, "w", encoding="utf-8") as native:
+            native.write(content.replace("[binaries]\n", tools, 1))
