@@ -67,6 +67,8 @@ The recipe is a native OHOS/Linux build tool package:
 - Uses Conan `tools.build:compiler_executables` to select the C compiler.
 - Uses Linux hints for OHOS via `-Dosname=linux` and `-Darchname=aarch64-linux`.
 - Avoids external DBM libraries by trimming `libswanted` and disabling `GDBM_File`, `NDBM_File`, `ODBM_File`, and `DB_File`.
+- Excludes `IPC/SysV` on OHOS because the true-device upstream harness caught `SIGSYS` from SysV IPC runtime paths even though headers and symbols are detectable during configuration.
+- Disables `HAS_PRCTL_SET_NAME` on OHOS with `-Ud_prctl_set_name`; the Configure probe uses a short process name that succeeds, while real `$0` assignments in the upstream suite fail with `EINVAL` and can hang child processes.
 - Uses CPAN mirror fallback in `conandata.yml`; the first clean true-device run spent much of the 2700 second CI `conan create` timeout downloading from `www.cpan.org`.
 - Forces `lns`/`LNS` to a build-local `ohos-ln-copy.sh` wrapper on OHOS because the true-device storage rejects hard links used by Perl's `GNUmakefile` for `opmini.c`, `perlmini.c`, and similar generated copies. The wrapper copies files and also resolves symlink-style relative sources such as `perldelta.pod -> pod/perl5422delta.pod` through the destination directory.
 - Applies `patches/0001-miniperl-touch-noop.patch` so the generated `GNUmakefile` does not run `touch miniperl` after linking; the true-device storage permits executing the linked `miniperl` but rejects updating its timestamp.
@@ -99,6 +101,7 @@ Performed in `D:\harmonyos\worktrees\perl` without starting real-device CI:
 - Prepared `conanfile.py`, `conandata.yml`, and non-empty `test_package/`.
 - `ast.parse` passed for `conanfile.py` and `test_package/conanfile.py`.
 - YAML parsing passed for `conandata.yml`, `manifest.yaml`, and `test_package/MANIFEST.yml`.
+- `archives/p/perl/commands.json` is present at the required software-level path and validates as `type=tool`, `name=perl`, `versions["5.42.2"].ref=perl/5.42.2`.
 - `conan inspect` loaded `perl/5.42.2` metadata successfully.
 - `conan export ... --user=ohpcd --channel=stable` exported the recipe successfully.
 - `conan graph info` with the repository OHOS aarch64 profile parsed with no dependencies and `info_invalid: None`.
@@ -248,7 +251,43 @@ elapsed_seconds=2703.7
 exit_code=1
 ```
 
-This rerun completed source/SHA256, patch application, `Configure`, `make depend`, hardlink replacement through `ohos-ln-copy.sh`, `miniperl`, generated `perl`, `pm_to_blib` for many core modules, and passed the earlier `ExtUtils::Install` write-probe failure point. It was interrupted during the dynamic XS build stage, around `Compress::Raw::Zlib`, before `package()` and `test_package`; stderr was empty and no new functional error was observed before timeout. Per user instruction, no further true-device build was launched after this failed rerun.
+This rerun completed source/SHA256, patch application, `Configure`, `make depend`, hardlink replacement through `ohos-ln-copy.sh`, `miniperl`, generated `perl`, `pm_to_blib` for many core modules, and passed the earlier `ExtUtils::Install` write-probe failure point. It was interrupted during the dynamic XS build stage, around `Compress::Raw::Zlib`, before `package()` and `test_package`; stderr was empty and no new functional error was observed before timeout.
+
+Follow-up true-device rerun `codex-perl-5.42.2-conan-after-fixes-20260727-081120` was launched with a writable `TMPDIR` for CI L0 heredocs and `PATH` including the device Conan entry points:
+
+```text
+TMPDIR=/storage/Users/currentUser/ohos-test-runs/codex-perl-5.42.2-conan-after-fixes-20260727-081120/tmp
+PATH=$HOME/.local/bin:$HOME/ohpc-ci-shadow/python-user/bin:$PATH
+CI_PACKAGES="archives/p/perl/5.42.2" zsh ci/conan/build_and_test.sh
+```
+
+This run proved the latest recipe changes through package creation:
+
+```text
+[ok] L0: All quality gate checks passed
+[step] L0k: Checking commands.json for CLI tools (R38)...
+        [ok] commands.json valid (type=tool)
+Created package revision d8f9b5d50161ac009ed647586fab2d9a
+Full package reference: perl/5.42.2#de213e597a9818c21c2a608c25de92b0:6b129b068851896169fae42d399fa922d239ce8a#d8f9b5d50161ac009ed647586fab2d9a
+```
+
+It then failed in `test_package` because the true-device work copy had CRLF line endings in `test_package/test_perl.sh`:
+
+```text
+test_perl.sh[2]: set: -\r: unknown option
+```
+
+After syncing the LF-normalized `test_perl.sh` to that same true-device test package directory, a lightweight smoke using the generated `conanbuild.sh` and already-created package passed without triggering another full build:
+
+```text
+no_cr_bytes
+sh_n_ok
+perl 5.042002 ok
+os=linux; arch=aarch64-linux-thread-multi; sep=a/b
+script ok
+```
+
+Per the user's instruction to pause after a failed full build, no further complete true-device `conan create` rerun was launched after this CRLF failure. The remaining verification gap is a fresh full Conan rerun proving the LF-normalized `test_package` through the CI wrapper end to end.
 
 ## Upstream test_harness_notty validation
 
@@ -281,15 +320,17 @@ The summary contains 44 failing test-file entries, so the file-level upstream pa
 
 - Link and filesystem semantics: `cpan/Archive-Tar`, `ext/File-Find`, `op/stat.t`, `op/taint.t`, and `io/fs.t` fail around symbolic links, hard links, link counts, and symlink traversal on OHOS storage.
 - Writable/permission-bit semantics: `cpan/ExtUtils-Install`, `cpan/File-Path`, `cpan/File-Temp`, `op/filetest.t`, `AnyDBM_File`, and `SDBM_File` expose the same `-w`/chmod/access mismatch that the recipe works around with actual create/unlink probes for build and install.
-- POSIX/kernel feature gaps: `IPC-SysV`, `io/sem.t`, `POSIX::termios`, `POSIX::sigaction`, `Time::HiRes::itimer`, and `dist/IO/t/io_unix.t` fail around SysV IPC, errno differences, signal handling, virtual timers, and Unix-domain socket limits.
+- POSIX/kernel feature gaps: `IPC-SysV`, `io/sem.t`, `POSIX::termios`, `POSIX::sigaction`, `Time::HiRes::itimer`, and `dist/IO/t/io_unix.t` fail around SysV IPC, errno differences, signal handling, virtual timers, and Unix-domain socket limits. `IPC/SysV` is now excluded for OHOS so the SysV IPC files should skip on a fresh rerun.
 - Direct execution and script handling: `cpan/Test-Harness/t/source_handler.t` cannot directly execute `.sh` test scripts on the device (`Permission denied`), matching the recipe choice to run configure/tool scripts through an explicit shell.
-- Process-name and `$0` handling: `lib/warnings.t`, `op/leaky-magic.t`, `op/lex.t`, and `op/magic.t` show `Can't set $0 with prctl(): Invalid argument`; three child processes hung and were manually terminated so the harness could continue:
+- Process-name and `$0` handling: the original run showed `Can't set $0 with prctl(): Invalid argument` in `lib/warnings.t`, `op/leaky-magic.t`, `op/lex.t`, and `op/magic.t`; three child processes hung and were manually terminated so the harness could continue:
   - PID `60602`/`60601` from `lib/warnings.t` generated `tmp_CIWS_C`
   - PID `2021` from `op/leaky-magic.t`
   - PID `3285` from `op/magic.t`, shown as `[haha...]`
 - Other platform-sensitive checks: `Time-Piece` timezone expectations, `run/locale.t` fallback message, `porting/globvar.t`, and selected ExtUtils::MakeMaker dynamic/static XS subtests fail, while the large regex, Unicode, thread, JSON, core language, and many XS API sections continue to execute successfully.
 
-Low-risk follow-up considered but not applied in this PR revision: disabling Perl's `HAS_PRCTL_SET_NAME` on OHOS with `-Ud_prctl_set_name`. Source inspection shows `Configure` only probes `prctl(PR_SET_NAME, "Test")`, which succeeds with a short name, while runtime `$0` assignments with longer process names can still fail with `EINVAL` and croak in `mg.c`. This matches the earlier `perl-mojolicious/9.42` platform note. Applying the configure change would alter core interpreter behavior and requires a fresh clean Conan validation; the post-review clean rerun instead hit the 2700 second CI timeout, and the user had instructed that a new failed build should pause further true-device builds.
+Follow-up fixes applied after this upstream analysis: the recipe now passes `-Ud_prctl_set_name` for OHOS and excludes `IPC/SysV` from OHOS extension builds. Source inspection shows `Configure` only probes `prctl(PR_SET_NAME, "Test")`, which succeeds with a short name, while runtime `$0` assignments with longer or empty values can fail with `EINVAL` in `mg.c`. This matches the earlier `perl-mojolicious/9.42` platform note. SysV IPC is likewise detectable but raises `SIGSYS` during upstream runtime tests. These changes need a fresh clean true-device Conan rerun for new package revision evidence.
+
+All 44 failing upstream test-file entries have been closed in `upstream-failure-analysis.md` with per-file evidence, root cause, fixability judgment, and action or non-fix rationale.
 
 No upstream test files were modified for this run. The failures are not treated as accepted upstream compatibility; they are documented as known limitations for a Path A build-tool adaptation. The Conan validation remains the acceptance gate for the immediate open-mpi/mpich use case because those consumers require `perl` as a configure/build tool available through Conan `tool_requires`, not full CPAN/runtime compatibility.
 

@@ -160,6 +160,10 @@ exec "$cp_cmd" "$@"
         return candidate
 
     def _configure_args(self):
+        no_extensions = ["GDBM_File", "NDBM_File", "ODBM_File", "DB_File"]
+        if self.settings.os == "OHOS":
+            no_extensions.append("IPC/SysV")
+
         args = [
             "-des",
             "-Dprefix=/",
@@ -179,7 +183,7 @@ exec "$cp_cmd" "$@"
             "-Dinstallman1dir=none",
             "-Dinstallman3dir=none",
             "-Dlibswanted=pthread dl m c",
-            "-Dnoextensions=GDBM_File NDBM_File ODBM_File DB_File",
+            f"-Dnoextensions={' '.join(no_extensions)}",
             "-Dcf_by=conan",
         ]
         if self.settings.os == "OHOS":
@@ -193,6 +197,7 @@ exec "$cp_cmd" "$@"
                 "-Ui_langinfo",
                 "-Ud_nl_langinfo",
                 "-Ud_nl_langinfo_l",
+                "-Ud_prctl_set_name",
             ])
         return args
 
