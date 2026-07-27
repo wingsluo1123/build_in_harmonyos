@@ -6,7 +6,8 @@ import os
 from conan import ConanFile
 from conan.tools.files import copy, get, replace_in_file
 from conan.tools.gnu import PkgConfigDeps
-from conan.tools.meson import Meson, MesonToolchain, meson_layout
+from conan.tools.layout import basic_layout
+from conan.tools.meson import Meson, MesonToolchain
 
 
 class SpiceGtkConan(ConanFile):
@@ -44,7 +45,7 @@ class SpiceGtkConan(ConanFile):
             self.requires("gtk+/3.24.38")
 
     def layout(self):
-        meson_layout(self)
+        basic_layout(self, src_folder=".")
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
