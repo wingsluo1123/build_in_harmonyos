@@ -21,6 +21,9 @@
 #   - Print build summary
 
 set -euo pipefail
+# 忽略 SIGPIPE：防止 grep|tail/head 等管道中读端提前关闭导致写端 exit 141
+# （zsh + pipefail 下 SIGPIPE 会令整个脚本崩溃）
+trap '' PIPE
 
 # ── Path resolution ──
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -39,7 +42,13 @@ echo "[step]   profile: $PROFILE"
 echo "[step]   channel: (no channel — plain name/version)"
 
 # ── 1. Discover packages (BUG-9: respect CI_PACKAGES) ──
+# CI_PACKAGES 可通过环境变量或位置参数传入（位置参数在部分鸿蒙 worker
+# 上比 env 更可靠，buildbot command= 也用位置参数传递）
+if [ -z "${CI_PACKAGES:-}" ] && [ $# -gt 0 ]; then
+    CI_PACKAGES="$*"
+fi
 PACKAGES=()
+MISSING_CONANFILE=()
 if [ -n "${CI_PACKAGES:-}" ]; then
     # CI 传入了定向包列表（空格分隔的相对路径，如 "archives/b/bash/5.3"）
     echo "[step] CI_PACKAGES received: $CI_PACKAGES"
@@ -54,6 +63,7 @@ if [ -n "${CI_PACKAGES:-}" ]; then
             PACKAGES+=("$pkg_dir")
         else
             echo "[warn] Path in CI_PACKAGES has no conanfile.py: $pkg_path"
+            MISSING_CONANFILE+=("$pkg_path")
         fi
     done
 else
@@ -70,6 +80,25 @@ fi
 
 if [ ${#PACKAGES[@]} -eq 0 ]; then
     echo "[error] No packages to build"
+    echo ""
+    echo "─── 修复建议 ───"
+    if [ -n "${CI_PACKAGES:-}" ] && [ ${#MISSING_CONANFILE[@]} -gt 0 ]; then
+        # CI_PACKAGES 指定的路径都没找到 conanfile.py
+        echo "[hint] CI_PACKAGES 指定的路径中没有 conanfile.py"
+        echo "       CI_PACKAGES = $CI_PACKAGES"
+        echo ""
+        echo "       这通常意味着 PR 只改了 conandata.yml（源码下载元数据）"
+        echo "       但没有包含 conanfile.py（构建脚本）"
+        echo ""
+        echo "       请在以下目录创建 conanfile.py（参考 templates/ 目录模板）:"
+        for missing_path in "${MISSING_CONANFILE[@]}"; do
+            echo "         - $missing_path/conanfile.py"
+        done
+    else
+        echo "[hint] 在 $SCAN_ROOT/ 下没有找到任何 conanfile.py"
+        echo "       请确保 archives/字母/包名/版本/conanfile.py 文件存在"
+    fi
+    echo "─── end 修复建议 ───"
     exit 1
 fi
 
@@ -144,7 +173,7 @@ for pkg_dir in "${PACKAGES[@]}"; do
     # L0c: test_package/ 下必须有测试源文件 (.c/.cpp/.cc/.cxx/.sh/.py)
     TEST_SOURCES=""
     for ext in c cpp cc cxx sh py; do
-        found=$(find "$TEST_PKG_DIR" -maxdepth 2 -name "*.$ext" -not -name "conanfile.py" 2>/dev/null | head -1)
+        found=$(find "$TEST_PKG_DIR" -maxdepth 2 -name "*.$ext" -not -name "conanfile.py" -print -quit 2>/dev/null)
         if [ -n "$found" ]; then
             TEST_SOURCES="$found"
             break
@@ -209,7 +238,7 @@ for pkg_dir in "${PACKAGES[@]}"; do
         # 检测 self.run() 或 self.run(...) 中的 ${CC}, ${CXX}, ${CFLAGS}, ${LDFLAGS}
         SHELL_ENV_VARS=$(grep -nE 'self\.run\(.*\$\{(CC|CXX|CFLAGS|CXXFLAGS|LDFLAGS|AR|RANLIB)\}' "$CONANFILE" 2>/dev/null || true)
         if [ -n "$SHELL_ENV_VARS" ]; then
-            BAD_VAR=$(echo "$SHELL_ENV_VARS" | head -1 | grep -oE '\$\{[A-Z]+\}' | head -1)
+            BAD_VAR=$(awk 'NR==1{line=$0} END{if(match(line,/\$\{[A-Z]+\}/)) print substr(line,RSTART,RLENGTH)}' <<< "$SHELL_ENV_VARS")
             echo "[fail] L0h: conanfile.py 在 self.run() 中依赖未定义 shell 变量 ${BAD_VAR} — 用 self.conf.get() 代替 (R33)"
             L0_FAILED=true
             L0_ERRORS="${L0_ERRORS} shell_env_var_in_run"
@@ -221,7 +250,7 @@ for pkg_dir in "${PACKAGES[@]}"; do
         REMOTE_HARDCODE=$(grep -nE 'conan\s+(install|download|create|upload|export).*\s-r[= ]' "$CONANFILE" 2>/dev/null || true)
         if [ -n "$REMOTE_HARDCODE" ]; then
             echo "[fail] L0g: conanfile.py 禁止硬编码 remote 名称 (-r=), remote 属于 CI 环境配置"
-            echo "       $(echo "$REMOTE_HARDCODE" | head -1)"
+            echo "       ${REMOTE_HARDCODE%%$'\n'*}"
             L0_FAILED=true
             L0_ERRORS="${L0_ERRORS} hardcoded_remote"
         fi
@@ -294,7 +323,7 @@ PYEOF
         for dep_ref in $UNPUBLISHED_DEPS; do
             dep_name=$(echo "$dep_ref" | cut -d'/' -f1)
             dep_ver=$(echo "$dep_ref" | cut -d'/' -f2)
-            local_recipe=$(find "$REPO_ROOT/archives" -path "*/${dep_name}/${dep_ver}/conanfile.py" -not -path "*/test_package/*" 2>/dev/null | head -1)
+            local_recipe=$(find "$REPO_ROOT/archives" -path "*/${dep_name}/${dep_ver}/conanfile.py" -not -path "*/test_package/*" -print -quit 2>/dev/null)
             if [ -n "$local_recipe" ]; then
                 echo "[step] Exporting local recipe for missing dependency: $dep_ref"
                 conan export "$(dirname "$local_recipe")" 2>/dev/null && \
@@ -686,11 +715,14 @@ PYEOF
         # Conan 2.x: `conan cache path "name/version"` returns the recipe cache
         # (only conanfile.py + conandata.yml), not the package cache (lib/, include/).
         # Parse the Package folder path from the conan create build log instead.
-        PKG_CACHE=$(grep "Package folder" "$BUILD_LOG" 2>/dev/null | tail -1 | sed 's/.*Package folder //')
+        # NOTE: 用 awk 单进程替代 grep|tail|sed 管道，彻底消除 SIGPIPE (exit 141) 风险
+        #   （zsh + pipefail + set -e 下，grep 写入 tail 管道被提前关闭 → SIGPIPE → exit 141，
+        #    trap '' PIPE 和 || true 在 $(...) 子 shell 中不可靠）
+        PKG_CACHE=$(awk '/Package folder/{line=$0} END{sub(/.*Package folder /,"",line); print line}' "$BUILD_LOG" 2>/dev/null || true)
         if [ -n "$PKG_CACHE" ] && [ -d "$PKG_CACHE" ]; then
-            BINS=$(find "$PKG_CACHE" -name "bin" -type d 2>/dev/null | head -1)
-            LIBS=$(find "$PKG_CACHE" -name "lib" -type d 2>/dev/null | head -1)
-            INCS=$(find "$PKG_CACHE" -name "include" -type d 2>/dev/null | head -1)
+            BINS=$(find "$PKG_CACHE" -name "bin" -type d -print -quit 2>/dev/null)
+            LIBS=$(find "$PKG_CACHE" -name "lib" -type d -print -quit 2>/dev/null)
+            INCS=$(find "$PKG_CACHE" -name "include" -type d -print -quit 2>/dev/null)
 
             if [ -n "$BINS" ] && [ -n "$(ls -A "$BINS" 2>/dev/null)" ]; then
                 echo "[ok] L5: bin/ has content"
@@ -816,7 +848,7 @@ PYEOF
                 [ -x "$bin_file" ] || continue
                 _found_exec=true
                 bin_name="${bin_file##*/}"
-                if "$bin_file" --version >/dev/null 2>&1; then
+                if timeout 15 "$bin_file" --version </dev/null >/dev/null 2>&1; then
                     echo "[ok] L2: $bin_name --version OK"
                     L2_RESULT="pass"
                     if [ -z "$L2_DETAIL" ] || [ "$L2_DETAIL" = "not_run" ]; then
@@ -824,7 +856,7 @@ PYEOF
                     else
                         L2_DETAIL="${L2_DETAIL}, $bin_name --version OK"
                     fi
-                elif "$bin_file" --help >/dev/null 2>&1; then
+                elif timeout 15 "$bin_file" --help </dev/null >/dev/null 2>&1; then
                     echo "[ok] L2: $bin_name --help OK"
                     L2_RESULT="pass"
                     if [ -z "$L2_DETAIL" ] || [ "$L2_DETAIL" = "not_run" ]; then
@@ -869,8 +901,8 @@ PYEOF
         SOURCE_URL=""
         SOURCE_SHA256=""
         if [ -f "$CONANDATA_FILE" ]; then
-            SOURCE_URL=$(grep -E '^\s*url:' "$CONANDATA_FILE" 2>/dev/null | head -1 | sed 's/^\s*url:\s*//' | tr -d '"' || echo "")
-            SOURCE_SHA256=$(grep -E '^\s*sha256:' "$CONANDATA_FILE" 2>/dev/null | head -1 | sed 's/^\s*sha256:\s*//' | tr -d '"' || echo "")
+            SOURCE_URL=$(awk -F'"' '/^\s*url:/{gsub(/^[ \t]*url:[ \t]*/,""); gsub(/"/,""); print; exit}' "$CONANDATA_FILE" 2>/dev/null || echo "")
+            SOURCE_SHA256=$(awk -F'"' '/^\s*sha256:/{gsub(/^[ \t]*sha256:[ \t]*/,""); gsub(/"/,""); print; exit}' "$CONANDATA_FILE" 2>/dev/null || echo "")
         fi
 
         # Build trace info from environment / profile
