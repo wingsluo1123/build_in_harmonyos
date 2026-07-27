@@ -47,9 +47,8 @@ class FfmpegConan(ConanFile):
         self.requires("xz/5.6.2")            # lzma：tiff/matroska 等
         self.requires("openssl/3.5.6")       # https/tls 协议（LGPL 下无需 --enable-version3）
         self.requires("freetype/2.14.3")     # drawtext 滤镜（字形光栅化）
-        self.requires("harfbuzz/14.2.0")     # drawtext 滤镜（文本整形）：FFmpeg **6.1 起**
+        self.requires("harfbuzz/14.2.0")     # drawtext 滤镜（文本整形）：FFmpeg 7.0 起
                                              # drawtext_filter_deps="libfreetype libharfbuzz"，缺它滤镜不会被编进去
-                                             # （实测 6.0.1 无此依赖、6.1.6 起有；5.1/4.4 连 libharfbuzz 选项都没有）
         self.requires("fontconfig/2.18.1.1")   # drawtext 的字体选择
         self.requires("libxml2/2.15.3")      # dash 解封装
         self.requires("openh264/2.6.0")      # H.264 编码（BSD；x264/x265 会强制 --enable-gpl）
@@ -142,7 +141,7 @@ class FfmpegConan(ConanFile):
             "--enable-libmp3lame",      # MP3 编码
             "--enable-openssl",         # https / tls 协议
             "--enable-libfreetype",     # drawtext：字形光栅化
-            "--enable-libharfbuzz",     # drawtext：文本整形（6.1 起为 drawtext 的硬依赖）
+            "--enable-libharfbuzz",     # drawtext：文本整形（7.0 起为 drawtext 的硬依赖）
             "--enable-libfontconfig",   # drawtext 的字体选择
             "--enable-libxml2",         # dash 解封装
             "--enable-bzlib",
