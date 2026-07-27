@@ -34,11 +34,8 @@ def pkg_config_flags(args):
 
 
 def compile_and_link_api_probe(pkg, cc, run_binary):
-    include_dir = os.path.join(pkg, "include")
-    lib_dir = os.path.join(pkg, "lib")
-    glib_modules = ["glib-2.0", "gmodule-2.0", "gthread-2.0", "gobject-2.0"]
-    glib_cflags = pkg_config_flags(["--cflags", *glib_modules])
-    glib_libs = pkg_config_flags(["--libs", *glib_modules])
+    autotrace_cflags = pkg_config_flags(["--cflags", "autotrace"])
+    autotrace_libs = pkg_config_flags(["--static", "--libs", "autotrace"])
 
     with tempfile.TemporaryDirectory() as tmpdir:
         source = os.path.join(tmpdir, "autotrace_api_probe.c")
@@ -80,15 +77,9 @@ def compile_and_link_api_probe(pkg, cc, run_binary):
         subprocess.run(
             [
                 cc,
-                "-I",
-                include_dir,
-                *glib_cflags,
+                *autotrace_cflags,
                 source,
-                "-L",
-                lib_dir,
-                "-lautotrace",
-                *glib_libs,
-                "-lm",
+                *autotrace_libs,
                 "-o",
                 output,
             ],

@@ -8,7 +8,13 @@ import subprocess
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.env import VirtualBuildEnv
-from conan.tools.files import copy, get, save
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    save,
+)
 from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -34,6 +40,10 @@ class AutotraceConan(ConanFile):
 
     def requirements(self):
         self.requires("glib/2.84.0")
+        self.requires("libpng/1.6.58")
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def generate(self):
         PkgConfigDeps(self).generate()
@@ -57,7 +67,13 @@ class AutotraceConan(ConanFile):
         return self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
 
     def _cc(self):
-        return self._compiler_executables().get("c") or os.environ.get("CC") or "clang"
+        return (
+            self._compiler_executables().get("c")
+            or os.environ.get("CC")
+            or shutil.which("clang")
+            or shutil.which("cc")
+            or "cc"
+        )
 
     def _tool(self, name, fallback):
         compilers = self._compiler_executables()
@@ -107,6 +123,7 @@ class AutotraceConan(ConanFile):
 #define AUTOTRACE_VERSION "0.31.10"
 #define AUTOTRACE_WEB "https://github.com/autotrace/autotrace"
 #define HAVE_LOCALTIME_R 1
+#define HAVE_LIBPNG 1
 #define HAVE_STDINT_H 1
 #define HAVE_STRING_H 1
 #define HAVE_STRINGS_H 1
@@ -129,16 +146,25 @@ class AutotraceConan(ConanFile):
         return obj
 
     def build(self):
+        apply_conandata_patches(self)
         os.makedirs(self._out_dir, exist_ok=True)
         os.makedirs(self._obj_dir, exist_ok=True)
         self._write_config_header()
 
         cc = self._cc()
-        ar = self._tool("llvm-ar", os.environ.get("AR") or "llvm-ar")
-        ranlib = self._tool("llvm-ranlib", os.environ.get("RANLIB") or "llvm-ranlib")
+        ar = self._tool(
+            "llvm-ar",
+            os.environ.get("AR") or shutil.which("llvm-ar") or shutil.which("ar") or "ar",
+        )
+        ranlib = self._tool(
+            "llvm-ranlib",
+            os.environ.get("RANLIB") or shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib",
+        )
         glib_modules = ["glib-2.0", "gmodule-2.0", "gthread-2.0", "gobject-2.0"]
         glib_cflags = self._pkg_config(["--cflags", *glib_modules])
         glib_libs = self._pkg_config(["--libs", *glib_modules])
+        png_cflags = self._pkg_config(["--cflags", "libpng"])
+        png_libs = self._pkg_config(["--libs", "libpng"])
 
         cflags = [
             *self._build_type_flags(),
@@ -156,6 +182,7 @@ class AutotraceConan(ConanFile):
             "src/input-bmp.c",
             "src/input-pnm.c",
             "src/input-tga.c",
+            "src/input-png.c",
             "src/output-eps.c",
             "src/output-er.c",
             "src/output-fig.c",
@@ -194,7 +221,10 @@ class AutotraceConan(ConanFile):
             "src/image-proc.c",
             "src/module.c",
         ]
-        objects = [self._compile(cc, source, [*cflags, *glib_cflags]) for source in lib_sources]
+        objects = [
+            self._compile(cc, source, [*cflags, *glib_cflags, *png_cflags])
+            for source in lib_sources
+        ]
         lib_path = os.path.join(self._out_dir, "libautotrace.a")
         self._run_checked([ar, "rcs", lib_path, *objects])
         self._run_checked([ranlib, lib_path])
@@ -204,7 +234,9 @@ class AutotraceConan(ConanFile):
             self._compile(cc, "src/atou.c", [*cflags, *glib_cflags]),
         ]
         cli_path = os.path.join(self._out_dir, "autotrace")
-        self._run_checked([cc, "-o", cli_path, *cli_objects, lib_path, *glib_libs, "-lm"])
+        self._run_checked(
+            [cc, "-o", cli_path, *cli_objects, lib_path, *glib_libs, *png_libs, "-lm"]
+        )
         os.chmod(cli_path, 0o755)
 
     def package(self):
@@ -237,7 +269,7 @@ includedir=${prefix}/include
 Name: autotrace
 Description: Bitmap to vector graphics converter and library
 Version: 0.31.10
-Requires: glib-2.0 gmodule-2.0 gthread-2.0 gobject-2.0
+Requires: glib-2.0 gmodule-2.0 gthread-2.0 gobject-2.0 libpng
 Libs: -L${libdir} -lautotrace -lm
 Cflags: -I${includedir}
 """,
@@ -255,7 +287,7 @@ Cflags: -I${includedir}
         return shutil.which(tool_name) or ""
 
     def _sign_binary_if_available(self, bin_path):
-        if self.settings.os != "OHOS":
+        if str(self.settings.os) != "OHOS":
             return
         objcopy = self._find_external_tool("LLVM_OBJCOPY", "llvm-objcopy")
         sign_tool = self._find_external_tool("BINARY_SIGN_TOOL", "binary-sign-tool")
