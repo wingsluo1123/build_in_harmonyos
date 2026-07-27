@@ -59,6 +59,14 @@ class SpiceGtkConan(ConanFile):
         )
         replace_in_file(
             self,
+            os.path.join(
+                self.source_folder, "subprojects", "spice-common", "meson_options.txt"
+            ),
+            "option('python-checks',\n    type : 'boolean',\n    value : true,",
+            "option('python-checks',\n    type : 'boolean',\n    value : false,",
+        )
+        replace_in_file(
+            self,
             os.path.join(self.source_folder, "meson.build"),
             "subdir('tests')",
             "# Tests are run through Conan test_package in the OHOS recipe.\n# subdir('tests')",
@@ -99,7 +107,6 @@ class SpiceGtkConan(ConanFile):
         tc.project_options["gtk_doc"] = "disabled"
         tc.project_options["recorder"] = False
         tc.project_options["valgrind"] = False
-        tc.project_options["spice-common:python-checks"] = False
         tc.generate()
         self._inject_meson_archive_tools()
 
