@@ -99,6 +99,7 @@ class SpiceGtkConan(ConanFile):
         tc.project_options["gtk_doc"] = "disabled"
         tc.project_options["recorder"] = False
         tc.project_options["valgrind"] = False
+        tc.project_options["spice-common:python-checks"] = False
         tc.generate()
         self._inject_meson_archive_tools()
 
