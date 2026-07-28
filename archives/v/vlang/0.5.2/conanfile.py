@@ -71,13 +71,13 @@ class VConan(ConanFile):
         self._replace_required_once(
             makefile,
             "./v run ./cmd/tools/detect_tcc.v;",
-            "./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v;",
+            "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v; fi;",
         )
         self._replace_required_once(makefile, "./v version;", "./v$(EXE_EXT) version;")
         self._replace_required_once(
             makefile,
             "./v run .github/problem-matchers/register_all.vsh",
-            "./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh",
+            "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh; fi",
         )
         self._replace_required_once(
             makefile,

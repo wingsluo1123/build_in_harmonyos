@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Conan test package for vlang/0.5.2."""
 import os
+from pathlib import Path
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.files import copy
@@ -30,6 +32,8 @@ class VTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
+            if str(self.settings.os) == "OHOS":
+                self._sign_ohos_binary(Path(self.build_folder) / "test_v_metadata")
             self.run("ctest --output-on-failure", cwd=self.build_folder)
 
         if not can_run(self):
@@ -48,4 +52,20 @@ class VTestConan(ConanFile):
 
         self.run(f'"{v_exe}" version', env="conanrun")
         self.run(f'"{v_exe}" -gc none -o "{test_bin}" "{test_src}"', env="conanrun")
+        if str(self.settings.os) == "OHOS":
+            self._sign_ohos_binary(Path(test_cmd))
         self.run(f'"{test_cmd}"', env="conanrun")
+
+    def _sign_ohos_binary(self, binary_path):
+        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
+        binary_path = Path(binary_path)
+        if not binary_path.is_file():
+            raise ConanException(f"OHOS test binary not found: {binary_path}")
+        signed_path = binary_path.with_name(f"{binary_path.name}.signed")
+        self.run(
+            f'{sign_tool} sign -inFile "{binary_path}" '
+            f'-outFile "{signed_path}" -selfSign 1 -signAlg SHA256withECDSA',
+            quiet=True,
+        )
+        os.replace(signed_path, binary_path)
+        os.chmod(binary_path, 0o755)
