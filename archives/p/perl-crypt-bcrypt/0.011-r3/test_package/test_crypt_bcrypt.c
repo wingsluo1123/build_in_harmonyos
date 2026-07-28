@@ -22,9 +22,9 @@ static int chk(const char *name, int ok) {
 
 int main(void) {
     int fail = 0;
-    char hash[64];
-    char verify[64];
-    char salt[64];
+    char hash[64] = {0};
+    char verify[64] = {0};
+    char salt[64] = {0};
     char *result;
 
     printf("=== Crypt::Bcrypt C library test (OpenHarmony/aarch64) ===\n");
