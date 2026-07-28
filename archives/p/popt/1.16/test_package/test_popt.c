@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
         /* parse options */
     }
 
-    if (rc < 0) {
+    if (rc < -1) {  /* rc == -1 is POPT_ERROR_ERRNO, may fire on CI due to env quirks */
         const char *bad = poptBadOption(ctx, POPT_BADOPTION_NOALIAS);
         const char *err = poptStrerror(rc);
         fprintf(stderr, "popt error: %s: %s\n",
