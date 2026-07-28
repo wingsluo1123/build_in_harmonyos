@@ -47,5 +47,5 @@ class VTestConan(ConanFile):
         test_cmd = f"{test_bin}.exe" if is_windows else test_bin
 
         self.run(f'"{v_exe}" version', env="conanrun")
-        self.run(f'"{v_exe}" -o "{test_bin}" "{test_src}"', env="conanrun")
+        self.run(f'"{v_exe}" -gc none -o "{test_bin}" "{test_src}"', env="conanrun")
         self.run(f'"{test_cmd}"', env="conanrun")
