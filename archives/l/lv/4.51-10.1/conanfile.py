@@ -31,7 +31,9 @@ class LvConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        pass
+        # lv 上游用 curses/termcap，OHOS 无独立 termcap 库，用 ncurses Conan 配方兼容
+        # （ncurses/6.4@ohpcd/stable 提供 libncursesw.a + 头文件）
+        self.requires("ncurses/6.4")
 
     def layout(self):
         basic_layout(self)
@@ -69,14 +71,18 @@ class LvConan(ConanFile):
             sysroot = self.conf.get("tools.build:sysroot", default="")
             opt = {"Debug": "-O0 -g", "Release": "-O2", "RelWithDebInfo": "-O2 -g", "MinSizeRel": "-Os"}.get(str(self.settings.build_type), "-O2")
             cflags = f"{opt} --sysroot={sysroot}" if sysroot else opt
+            # ncurses Conan 配方路径（依赖后 cpp_info.libdirs/includedirs 自动注入）
+            ncurses_inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
+            ncurses_lib = os.path.join(self.dependencies["ncurses"].package_folder, "lib")
             # configure 阶段不加 -ltermcap，避免 C compiler cannot create executables
-            ret = self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' {bash} {configure} {args}", cwd=src_dir, shell=True)
+            # 加 CPPFLAGS=-I.../include + LDFLAGS=-L.../lib 让 AC_CHECK_LIB(ncurses) 找到 libncursesw.a
+            ret = self.run(f"TMPDIR={tmpdir} CC={cc} CFLAGS='{cflags}' CPPFLAGS='-I{ncurses_inc}' LDFLAGS='-L{ncurses_lib}' {bash} {configure} {args}", cwd=src_dir, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")
             # lv 上游用 #include <boolean.h> 非标准 angled include，加 -I. -I../src 让 clang angled include 也能找到本地头文件
-            dep_cflags = f"{cflags} -I. -I../src"
-            # make 阶段加 LIBS=-ltermcap（链接目标需要 termcap）
-            ret = self.run(f"make -j$(nproc) CC={cc} CFLAGS='{dep_cflags}' LDFLAGS='-ltermcap' LIBS=-ltermcap", cwd=src_dir)
+            dep_cflags = f"{cflags} -I. -I../src -I{ncurses_inc}"
+            # make 阶段用 -lncursesw 替 -ltermcap（ncurses 提供 termcap 兼容功能）
+            ret = self.run(f"make -j$(nproc) CC={cc} CFLAGS='{dep_cflags}' LDFLAGS='-L{ncurses_lib}' LIBS=-lncursesw", cwd=src_dir)
             if ret != 0:
                 raise ConanException(f"make failed with exit code {ret}")
 
