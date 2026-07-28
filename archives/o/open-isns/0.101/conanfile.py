@@ -98,6 +98,22 @@ class OpenIsnsConan(ConanFile):
                 "\t-linux-ohos*)\n\t\t;;\n"
                 "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
             )
+            if not cross_building(self):
+                # Native OHOS workers expose a writable TMPDIR, while the
+                # Conan build tree can reject Autoconf's temporary awk files.
+                configure = os.path.join(self.source_folder, "configure")
+                replace_in_file(
+                    self,
+                    configure,
+                    'mktemp -d "./confXXXXXX"',
+                    'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
+                )
+                replace_in_file(
+                    self,
+                    configure,
+                    "tmp=./conf$$-$RANDOM",
+                    'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+                )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(target="libisns.a", args=["-j1"])
