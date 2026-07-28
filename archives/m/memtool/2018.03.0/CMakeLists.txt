@@ -13,7 +13,7 @@ add_executable(memtool
 target_include_directories(memtool PRIVATE "${MEMTOOL_SOURCE_DIR}")
 target_compile_definitions(memtool PRIVATE
   _GNU_SOURCE
-  PACKAGE_STRING="memtool ${PROJECT_VERSION}"
+  "PACKAGE_STRING=\"memtool ${PROJECT_VERSION}\""
 )
 set_target_properties(memtool PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES)
 
