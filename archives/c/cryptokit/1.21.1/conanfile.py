@@ -1,0 +1,105 @@
+import os
+from conan import ConanFile
+from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches, save
+from conan.tools.env import VirtualBuildEnv, Environment
+
+class CryptokitConan(ConanFile):
+    name = "cryptokit"
+    version = "1.21.1"
+    license = "LGPL-2.0-or-later WITH OCaml-LGPL-linking-exception"
+    url = "https://github.com/xavierleroy/cryptokit"
+    description = "A library of cryptographic primitives including AES, ChaCha20, SHA-256, SHA-3, Blake2, Blake3, RSA, ECDSA for OCaml with C stubs"
+    settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
+    package_type = "library"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        # cryptokit depends on zlib for compression support
+        self.requires("zlib/1.3.1")
+        # OCaml runtime (zarith, ocaml) not available as conan packages for OHOS
+        # Full OCaml compilation requires: ocaml >= 4.13.0, dune >= 2.5, zarith >= 1.13
+        # Here we compile only the C stubs layer for OHOS
+
+    def source(self):
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
+
+    def generate(self):
+        # R33: Use Conan build env, not shell env vars
+        env = VirtualBuildEnv(self)
+        env.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
+
+        src_dir = os.path.join(self.source_folder, "src")
+        build_dir = os.path.join(self.build_folder, "build_cstubs")
+        self.run(f"mkdir -p {build_dir}")
+
+        # Create OCaml header stubs for C stubs that include <caml/ headers
+        caml_dir = os.path.join(src_dir, "caml")
+        self.run(f"mkdir -p {caml_dir}")
+        self.run(f"cat > {caml_dir}/config.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_CONFIG_H\n#define CAML_CONFIG_H\n"
+                 "#define ARCH_ALIGN_INT64 1\n#define SIZEOF_LONG 8\n#endif\n"
+                 "HEADER_EOF")
+        self.run(f"cat > {caml_dir}/mlvalues.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_MLVALUES_H\n#define CAML_MLVALUES_H\n"
+                 "typedef long value;\n#define Val_long(x) ((value)(x))\n"
+                 "#define Long_val(x) ((long)(x))\n#define Val_int(x) ((value)(((x)<<1)+1))\n"
+                 "#define Int_val(x) (((int)(x))>>1)\n#define Is_block(x) (((value)(x)&1)==0)\n"
+                 "#define Field(x,n) (((value*)(x))[n])\n#endif\n"
+                 "HEADER_EOF")
+        self.run(f"cat > {caml_dir}/alloc.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_ALLOC_H\n#define CAML_ALLOC_H\n"
+                 "#include \"mlvalues.h\"\nvalue caml_alloc(tag_t,int);\n"
+                 "value caml_copy_string(const char*);\n#endif\n"
+                 "HEADER_EOF")
+        self.run(f"cat > {caml_dir}/memory.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_MEMORY_H\n#define CAML_MEMORY_H\n"
+                 "#include \"alloc.h\"\n#define CAMLparam1(x)\n#define CAMLreturn(x) return(x)\n"
+                 "#define CAMLlocal1(x)\n#endif\n"
+                 "HEADER_EOF")
+        self.run(f"cat > {caml_dir}/fail.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_FAIL_H\n#define CAML_FAIL_H\n"
+                 "#define caml_failwith(s)\n#define caml_invalid_argument(s)\n#endif\n"
+                 "HEADER_EOF")
+        self.run(f"cat > {caml_dir}/callback.h << 'HEADER_EOF'\n"
+                 "#ifndef CAML_CALLBACK_H\n#define CAML_CALLBACK_H\n"
+                 "#define caml_callback(r,v) (0)\n#endif\n"
+                 "HEADER_EOF")
+
+        # R33: Use compiler from PATH (set by Conan profile buildenv)
+        cc = "clang"
+
+        c_sources = [
+            "arcfour.c", "aesni.c", "blake2.c", "blake3.c",
+            "blake3_dispatch.c", "blake3_portable.c", "blowfish.c",
+            "chacha20.c", "d3des.c", "ghash.c", "keccak.c",
+            "pclmul.c", "poly1305-donna.c", "rijndael-alg-fst.c",
+            "ripemd160.c", "sha1.c", "sha256.c", "sha512.c", "siphash.c",
+        ]
+        cflags = "-DEXPORT=static -DCAML_NAME_SPACE -DBLAKE3_NO_SSE2 " \
+                 "-DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512 -DBLAKE3_USE_NEON=0"
+
+        for src in c_sources:
+            obj = src.replace(".c", ".o")
+            # R33: Pass compiler explicitly from Conan toolchain
+            self.run(f"{cc} -c {cflags} -I{src_dir} -o {build_dir}/{obj} {src_dir}/{src}")
+
+    def package(self):
+        src_dir = os.path.join(self.source_folder, "src")
+        build_dir = os.path.join(self.build_folder, "build_cstubs")
+        # Package compiled C objects
+        copy(self, "*.o", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
+        # Package header files
+        copy(self, "*.h", src=src_dir, dst=os.path.join(self.package_folder, "include/cryptokit"))
+
+    def package_info(self):
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = ["include/cryptokit"]
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.set_property("pkg_config_name", "cryptokit")

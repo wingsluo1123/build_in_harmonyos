@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/Documents/build_in_harmonyos-main/build_in_harmonyos-main/archives/c/cryptokit/1.21.1/test_package/conanrunenv-release-armv8.sh"
