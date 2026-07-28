@@ -77,6 +77,11 @@ class EmqxConan(ConanFile):
         )
         self._replace_if_present(makefile, "\t@$(BUILD) ", "\t@bash $(BUILD) ")
         self._replace_if_present(
+            os.path.join(self.source_folder, "build"),
+            'SYSTEM="$(./scripts/get-distro.sh)"',
+            'SYSTEM="${SYSTEM:-$(bash ./scripts/get-distro.sh)}"',
+        )
+        self._replace_if_present(
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
