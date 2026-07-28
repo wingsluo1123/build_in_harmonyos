@@ -1,0 +1,100 @@
+diff --git a/source/modules/ysfx/sources/ysfx_utils_fts.cpp b/source/modules/ysfx/sources/ysfx_utils_fts.cpp
+--- a/source/modules/ysfx/sources/ysfx_utils_fts.cpp
++++ b/source/modules/ysfx/sources/ysfx_utils_fts.cpp
+@@ -12,56 +12,61 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ //
+-// SPDX-License-Identifier: Apache-2.0
+-//
+ 
+ #if !defined(_WIN32)
+ 
+-// fts lacks large file support in glibc < 2.23
+-#if defined(YSFX_FTS_LACKS_LFS_SUPPORT)
+-#   undef _FILE_OFFSET_BITS
+-#endif
+-
+ #include "ysfx_utils.hpp"
+ #ifndef __EMSCRIPTEN__
+-#include <fts.h>
++// HarmonyOS/musl does not provide <fts.h>; use POSIX nftw instead.
++#define _XOPEN_SOURCE 700
++#include <ftw.h>
+ #endif
+ #include <string>
+ #include <cstring>
+ 
+ namespace ysfx {
+ 
+-void visit_directories(const char *rootpath, bool (*visit)(const std::string &, void *), void *data)
+-{
+ #ifndef __EMSCRIPTEN__
+-    char *argv[] = {(char *)rootpath, nullptr};
++namespace {
++// nftw callback has no user-data parameter, so thread-local globals carry
++// the visitor and stop flag. carla's ysfx only walks directories from a
++// single thread at a time, so this is safe.
++struct walk_state {
++    bool (*visit)(const std::string &, void *);
++    void *data;
++    bool stop;
++};
+ 
+-#if !defined(__FreeBSD__)
+-    using compar_arg_t = const FTSENT **;
+-#else
+-    using compar_arg_t = const FTSENT *const *;
+-#endif
++thread_local walk_state g_state{nullptr, nullptr, false};
+ 
+-    auto compar = [](compar_arg_t a, compar_arg_t b) -> int {
+-        return strcmp((*a)->fts_name, (*b)->fts_name);
+-    };
+-
+-    FTS *fts = fts_open(argv, FTS_NOCHDIR|FTS_PHYSICAL, +compar);
+-    if (!fts)
+-        return;
+-    auto fts_cleanup = defer([fts]() { fts_close(fts); });
+-
+-    std::string pathbuf;
+-    pathbuf.reserve(1024);
+-
+-    while (FTSENT *ent = fts_read(fts)) {
+-        if (ent->fts_info == FTS_D) {
+-            pathbuf.assign(ent->fts_path);
+-            pathbuf.push_back('/');
+-            if (!visit(pathbuf, data))
+-                return;
+-        }
++int nftw_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
++{
++    (void)sb; (void)ftwbuf;
++    if (typeflag != FTW_D)
++        return 0;
++    if (g_state.stop)
++        return 1;
++    std::string p(fpath);
++    p.push_back('/');
++    if (!g_state.visit(p, g_state.data)) {
++        g_state.stop = true;
++        return 1;
+     }
++    return 0;
++}
++} // namespace
++#endif
++
++void visit_directories(const char *rootpath, bool (*visit)(const std::string &, void *), void *data)
++{
++#ifndef __EMSCRIPTEN__
++    g_state.visit = visit;
++    g_state.data = data;
++    g_state.stop = false;
++    nftw(rootpath, nftw_cb, 32, FTW_PHYS);
++    g_state.visit = nullptr;
++    g_state.data = nullptr;
++    g_state.stop = false;
+ #endif
+ }
+ 
