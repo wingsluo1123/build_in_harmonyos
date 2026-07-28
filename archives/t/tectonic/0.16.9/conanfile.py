@@ -123,7 +123,8 @@ class TectonicConan(ConanFile):
         # on bridge_fontconfig crate, so Cargo doesn't set this env var.
         fc_pc = os.path.join(gen_folder, "fontconfig.pc")
         if os.path.exists(fc_pc):
-            content = open(fc_pc).read()
+            with open(fc_pc, "r") as f:
+                content = f.read()
             prefix_match = re.search(r'^prefix=(.+)$', content, re.MULTILINE)
             prefix = prefix_match.group(1).strip() if prefix_match else ""
             inc_match = re.search(r'^includedir=(.+)$', content, re.MULTILINE)
