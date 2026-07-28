@@ -1,4 +1,4 @@
-# perl-number-misc 1.2-r5 适配笔记
+# perl-number-misc 1.2 适配笔记
 
 ## 编译环境
 - 构建系统: perl (ExtUtils::MakeMaker)
@@ -117,7 +117,7 @@ L5: PASS (产物基线对比, 5个文件一致)
 - `packaging/lib/Number/Misc.pm` (9407B)
 - `packaging/lib/Number/Misc.pod` (4164B)
 - `packaging/lib/aarch64-linux/perllocal.pod` (284B)
-- `packaging/perl-number-misc-1.2-r5-ohos-aarch64.tar.gz` (18967B)
+- `packaging/perl-number-misc-1.2-ohos-aarch64.tar.gz` (18967B)
 
 ---
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — perl-number-misc (Number::Misc) 1.2-r5
+"""Conan recipe — perl-number-misc (Number::Misc) 1.2
 
 Pure Perl module: handy utilities for numbers.
 Build system: perl Makefile.PL + make + make install
@@ -13,7 +13,7 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 
 class PerlnumbermiscConan(ConanFile):
     name = "perl-number-misc"
-    version = "1.2-r5"
+    version = "1.2"
     description = "Number::Misc - handy utilities for numbers"
     license = "perl_5"
     homepage = "https://metacpan.org/dist/Number-Misc"

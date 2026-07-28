@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package — perl-number-misc (Number::Misc) 1.2-r5
+"""Conan test_package — perl-number-misc (Number::Misc) 1.2
 
 L1 test: verify the Perl module can be loaded and its core API works.
 """
