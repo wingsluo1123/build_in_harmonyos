@@ -47,6 +47,23 @@ class PerlParamsValidateConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _find_perl(self):
+        """Find perl binary path.
+
+        Probes known OHOS locations before falling back to PATH.
+        Some CI workers don't have perl in the default PATH.
+        """
+        candidates = [
+            "/data/service/hnp/bin/perl",
+            os.path.join(os.path.expanduser("~"), "usr", "local", "bin", "perl"),
+            "/usr/bin/perl",
+            "/usr/local/bin/perl",
+        ]
+        for p in candidates:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
+        return "perl"
+
     def _perl_config(self, key):
         """Get a value from Perl's Config.
 
@@ -55,9 +72,10 @@ class PerlParamsValidateConan(ConanFile):
         to include the perl binary directory. subprocess.run() would
         not find perl on CI workers where perl is not in the default PATH.
         """
+        perl = self._find_perl()
         out = os.path.join(self.build_folder, f".perl_cfg_{key}")
         self.run(
-            f"perl -MConfig -e 'print $Config{{{key}}}' > \"{out}\"",
+            f'"{perl}" -MConfig -e \'print $Config{{{key}}}\' > "{out}"',
             cwd=self.source_folder,
         )
         with open(out, "r") as f:
@@ -120,7 +138,8 @@ WriteMakefile(
             f.write(makefile_pl_content)
 
         # --- Step 2: Build .pm files via Makefile.PL + make ---
-        self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder)
+        perl_bin = self._find_perl()
+        self.run(f'"{perl_bin}" Makefile.PL INSTALLDIRS=site', cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
 
         # --- Step 3: Manually compile XS module ---
@@ -147,7 +166,7 @@ WriteMakefile(
         xs_file = os.path.join(self.source_folder, "lib", "Params", "Validate", "XS.xs")
         c_file = os.path.join(self.source_folder, "lib", "Params", "Validate", "XS.c")
         self.run(
-            f'perl "{xsubpp}" -typemap "{typemap}" "{xs_file}" > "{c_file}"',
+            f'"{perl_bin}" "{xsubpp}" -typemap "{typemap}" "{xs_file}" > "{c_file}"',
             cwd=self.source_folder
         )
 
