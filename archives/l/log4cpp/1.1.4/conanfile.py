@@ -7,7 +7,7 @@ POSIX/OHOS config header before configuring.
 """
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import copy, get, save
+from conan.tools.files import copy, get, load, save
 import os
 
 
@@ -80,8 +80,15 @@ class Log4cppConan(ConanFile):
 """
         save(self, os.path.join(self.source_folder, "log4cpp", "include", "log4cpp", "config.h"), config)
 
+    def _patch_cmake_minimum(self):
+        cmake_lists = os.path.join(self.source_folder, "log4cpp", "CMakeLists.txt")
+        content = load(self, cmake_lists)
+        if "cmake_minimum_required" not in content:
+            save(self, cmake_lists, "cmake_minimum_required(VERSION 3.5)\n" + content)
+
     def build(self):
         self._write_config_header()
+        self._patch_cmake_minimum()
         cmake = CMake(self)
         cmake.configure(build_script_folder="log4cpp")
         cmake.build()
