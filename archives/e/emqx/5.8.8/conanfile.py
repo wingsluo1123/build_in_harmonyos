@@ -70,6 +70,11 @@ class EmqxConan(ConanFile):
             "@bash $(SCRIPTS)/ensure-rebar3.sh",
             strict=False,
         )
+        self._replace_if_present(
+            makefile,
+            "\t@$(SCRIPTS)/ensure-rebar3.sh",
+            "\t@bash $(SCRIPTS)/ensure-rebar3.sh",
+        )
         build_vars = (
             "CMAKE_POLICY_VERSION_MINIMUM=3.5 "
             "PKG_VSN=5.8.8 "
@@ -92,3 +97,12 @@ class EmqxConan(ConanFile):
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
         self.cpp_info.bindirs = ["bin"]
+
+    def _replace_if_present(self, path, search, replacement):
+        with open(path, "r", encoding="utf-8") as handle:
+            content = handle.read()
+        if search not in content:
+            self.output.info(f"Skipping absent source rewrite in {path}: {search!r}")
+            return
+        with open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content.replace(search, replacement))
