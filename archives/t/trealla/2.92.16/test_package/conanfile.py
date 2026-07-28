@@ -28,7 +28,7 @@ class TreallaTestConan(ConanFile):
         bash = (
             os.environ.get("CONFIG_SHELL")
             or shutil.which("bash")
-            or "/data/service/hnp/bin/bash"
+            or shutil.which("bash", path="/data/service/hnp/bin")
         )
         if not bash:
             raise RuntimeError("bash is required by Trealla's upstream test suite")
