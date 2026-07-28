@@ -90,7 +90,7 @@ L5: PASS (产物基线对比 - 18个文件)
 
 ### test_package 测试
 ```
-perl -I{perl_lib} test_oio.pl
+sh test_oio.sh
 Object::InsideOut version: 4.05
 Test OK
 ```
