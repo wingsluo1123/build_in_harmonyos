@@ -47,7 +47,7 @@ class EmqxConan(ConanFile):
 
     def build(self):
         save(self, os.path.join(self.source_folder, ".prepare"), "")
-        self.run("chmod +x scripts/*.sh", cwd=self.source_folder)
+        self.run("chmod +x build scripts/*.sh", cwd=self.source_folder)
         makefile = os.path.join(self.source_folder, "Makefile")
         replace_in_file(
             self,
