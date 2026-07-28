@@ -6,7 +6,10 @@
 
 int main(void) {
     struct aws_allocator *allocator = aws_default_allocator();
-    aws_http_library_init(allocator);
+    if (aws_http_library_init(allocator) != 0) {
+        fprintf(stderr, "FAIL: aws_http_library_init failed\n");
+        return 1;
+    }
 
     /* Verify API: aws_http_status_text returns correct string for HTTP 200 */
     const char *ok_text = aws_http_status_text(AWS_HTTP_STATUS_CODE_200_OK);
