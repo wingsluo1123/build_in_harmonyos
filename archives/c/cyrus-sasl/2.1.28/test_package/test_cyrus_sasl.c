@@ -36,7 +36,7 @@ int main(void)
     failures += check(result == SASL_OK && client != NULL, "sasl_client_new creates a connection");
 
     const char *mechanisms = NULL;
-    unsigned int mechanism_count = 0;
+    int mechanism_count = 0;
     result = sasl_listmech(client, NULL, "", " ", "", &mechanisms, NULL, &mechanism_count);
     failures += check(result == SASL_OK, "sasl_listmech succeeds");
     failures += check(mechanisms != NULL || mechanism_count == 0, "mechanism list output is consistent");
