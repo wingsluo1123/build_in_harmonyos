@@ -116,27 +116,30 @@ class VConan(ConanFile):
             "\trm -rf v1$(EXE_EXT) v2$(EXE_EXT); \\",
         )
         for vc_file in ["v.c", "v_win.c"]:
-            self._replace_required_once(
+            self._replace_required_alternative(
                 os.path.join(vc_dir, vc_file),
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
-                "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);",
-                "#if !((defined(__MINGW32__) || defined(__MINGW64__)) && defined(__V_GCC__))\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
-                "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\n"
-                "#endif",
-            )
-            self._replace_required_once(
-                os.path.join(vc_dir, vc_file),
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\\n"
-                "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);",
-                "#if !((defined(__MINGW32__) || defined(__MINGW64__)) && defined(__V_GCC__))\\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\\n"
-                "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\\n"
-                "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\\n"
-                "#endif",
+                [
+                    (
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
+                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);",
+                        "#if !((defined(__MINGW32__) || defined(__MINGW64__)) && defined(__V_GCC__))\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
+                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\n"
+                        "#endif",
+                    ),
+                    (
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\\n"
+                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);",
+                        "#if !((defined(__MINGW32__) || defined(__MINGW64__)) && defined(__V_GCC__))\\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\\n"
+                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\\n"
+                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\\n"
+                        "#endif",
+                    ),
+                ],
             )
         self._replace_required_once(
             os.path.join(self.source_folder, "vlib", "v", "gen", "c", "cheaders.v"),
