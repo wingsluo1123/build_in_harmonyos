@@ -18,6 +18,8 @@ CMAKE_POLICY_VERSION_MINIMUM=3.5 PKG_VSN=5.8.8 BUILD_WITHOUT_QUIC=1 SYSTEM=Linux
 OHOS CI shell enables unset-variable checks, and `scripts/get-distro.sh` reads
 `SYSTEM` before assigning a default; using the Linux/Unix release path avoids
 that early script abort while keeping the Homebrew-compatible build flow.
+The recipe also restores execute bits on upstream shell helpers after Conan
+unpacks the source archive so `make emqx-rel` can invoke `ensure-rebar3.sh`.
 
 ## High-difficulty reasons
 

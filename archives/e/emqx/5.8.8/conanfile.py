@@ -44,6 +44,7 @@ class EmqxConan(ConanFile):
 
     def build(self):
         save(self, os.path.join(self.source_folder, ".prepare"), "")
+        self.run("chmod +x scripts/*.sh", cwd=self.source_folder)
         build_vars = (
             "CMAKE_POLICY_VERSION_MINIMUM=3.5 "
             "PKG_VSN=5.8.8 "
