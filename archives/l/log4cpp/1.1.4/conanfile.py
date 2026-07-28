@@ -80,6 +80,7 @@ class Log4cppConan(ConanFile):
 #define LOG4CPP_HAVE_STDINT_H 1
 #define LOG4CPP_HAVE_THREADING 1
 #define LOG4CPP_HAVE_UNISTD_H 1
+#define LOG4CPP_USE_PTHREADS 1
 #define PACKAGE "log4cpp"
 #define PACKAGE_NAME "log4cpp"
 #define PACKAGE_STRING "log4cpp 1.1.4"
