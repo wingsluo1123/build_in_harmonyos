@@ -5,7 +5,11 @@
 #include <curl/curl.h>
 
 int main(void) {
-    curl_global_init(CURL_GLOBAL_ALL);
+    CURLcode ginit_rc = curl_global_init(CURL_GLOBAL_ALL);
+    if (ginit_rc != CURLE_OK) {
+        fprintf(stderr, "curl_global_init failed: %s\n", curl_easy_strerror(ginit_rc));
+        return 1;
+    }
 
     CURL *handle = curl_easy_init();
     if (!handle) {
