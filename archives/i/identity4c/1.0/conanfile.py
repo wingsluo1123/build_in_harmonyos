@@ -79,7 +79,7 @@ LIBS={libs}
 all: libufpidentity.a
 
 libufpidentity.a: {objs}
-\t$($AR) $($ARFLAGS) $@ $^
+\t$(AR) $(ARFLAGS) $@ $^
 
 {objs}: %.o: %.c
 \t$(CC) $(CFLAGS) -c $< -o $@
