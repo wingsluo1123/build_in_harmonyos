@@ -4,25 +4,34 @@ import os
 
 from conan import ConanFile
 from conan.tools.build import can_run
+from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.files import copy
-from conan.tools.layout import basic_layout
 
 
 class VTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeToolchain", "VirtualRunEnv"
     test_type = "explicit"
 
     def layout(self):
-        basic_layout(self)
+        cmake_layout(self)
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
     def export_sources(self):
         copy(self, "test_v_language.v", src=self.recipe_folder, dst=self.export_sources_folder)
+        copy(self, "test_v_metadata.cpp", src=self.recipe_folder, dst=self.export_sources_folder)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def test(self):
+        if can_run(self):
+            self.run("ctest --output-on-failure", cwd=self.build_folder)
+
         if not can_run(self):
             self.output.info("Skipping runtime test because target binaries cannot run here")
             return
