@@ -18,7 +18,8 @@ class PerlNumberCompareConan(ConanFile):
     homepage = "https://metacpan.org/dist/Number-Compare"
     url = "https://metacpan.org/dist/Number-Compare"
 
-    settings = "os", "compiler", "build_type", "arch"
+    # Pure Perl module — no compiler/build_type needed
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -47,9 +48,12 @@ class PerlNumberCompareConan(ConanFile):
 
     def package_info(self):
         # Pure Perl module — no C libraries, headers, or binaries
-        # Use lib/ as the product directory (contains .pm files)
-        perl_lib = os.path.join(self.package_folder, "lib")
+        self.cpp_info.libs = []
+        self.cpp_info.libdirs = []
         self.cpp_info.includedirs = []
-        self.cpp_info.libdirs = [perl_lib]
         self.cpp_info.bindirs = []
         self.cpp_info.resdirs = []
+        # Expose Perl module path via PERL5LIB for downstream consumers
+        perl_lib = os.path.join(self.package_folder, "lib")
+        self.runenv_info.append_path("PERL5LIB", perl_lib)
+        self.buildenv_info.append_path("PERL5LIB", perl_lib)

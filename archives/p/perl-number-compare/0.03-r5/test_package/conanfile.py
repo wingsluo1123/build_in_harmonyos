@@ -10,7 +10,7 @@ from conan import ConanFile
 
 
 class PerlNumberCompareTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
     test_type = "explicit"
 
     def requirements(self):
