@@ -104,8 +104,13 @@ class CryptokitConan(ConanFile):
             # Create shared library (.so)
             self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {objs_str}")
         else:
-            # Create static library (.a)
-            ar = self.conf.get("tools.build:compiler_executables:ar", default="llvm-ar", check_type=str)
+            # Create static library (.a) — get ar from same dict as cc
+            ar = compilers.get("ar")
+            if not ar and cc:
+                # Derive llvm-ar from cc's directory (OHOS CI only gives c/cpp)
+                ar = os.path.join(os.path.dirname(cc), "llvm-ar")
+            if not ar or not os.path.isabs(ar):
+                ar = "llvm-ar"
             self.run(f"{ar} rcs {build_dir}/libcryptokit.a {objs_str}")
 
     def package(self):
