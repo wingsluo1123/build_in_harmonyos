@@ -24,6 +24,7 @@ class OpenIsnsConan(ConanFile):
     homepage = "https://github.com/open-iscsi/open-isns"
     package_type = "static-library"
     settings = "os", "arch", "compiler", "build_type"
+    win_bash = True
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -34,27 +35,6 @@ class OpenIsnsConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        if self.settings.os == "OHOS":
-            config_sub = os.path.join(self.source_folder, "aclocal", "config.sub")
-            replace_in_file(
-                self,
-                config_sub,
-                "linux-gnu* | linux-dietlibc | linux-uclibc*",
-                "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "-mingw32* | -linux-gnu* | -linux-uclibc*",
-                "-mingw32* | -linux-gnu* | -linux-ohos* | -linux-uclibc*",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
-                "\t-linux-ohos*)\n\t\t;;\n"
-                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
-            )
 
     def layout(self):
         basic_layout(self)
@@ -74,6 +54,39 @@ class OpenIsnsConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        if self.settings.os == "OHOS":
+            config_sub = os.path.join(self.source_folder, "aclocal", "config.sub")
+            replace_in_file(
+                self,
+                config_sub,
+                "| arc | arm | arm[bl]e",
+                "| aarch64 | arc | arm | arm[bl]e",
+            )
+            replace_in_file(
+                self,
+                config_sub,
+                "| alphapca5[67]-* | alpha64pca5[67]-* | arc-*",
+                "| alphapca5[67]-* | alpha64pca5[67]-* | aarch64-* | arc-*",
+            )
+            replace_in_file(
+                self,
+                config_sub,
+                "linux-gnu* | linux-dietlibc | linux-uclibc*",
+                "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
+            )
+            replace_in_file(
+                self,
+                config_sub,
+                "-mingw32* | -linux-gnu* | -linux-uclibc*",
+                "-mingw32* | -linux-gnu* | -linux-ohos* | -linux-uclibc*",
+            )
+            replace_in_file(
+                self,
+                config_sub,
+                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
+                "\t-linux-ohos*)\n\t\t;;\n"
+                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
+            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(target="libisns.a", args=["-j1"])

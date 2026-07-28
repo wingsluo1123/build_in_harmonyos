@@ -1,4 +1,5 @@
 #include <libisns/isns.h>
+#include <libisns/attrs.h>
 #include <string.h>
 
 int main(void)
