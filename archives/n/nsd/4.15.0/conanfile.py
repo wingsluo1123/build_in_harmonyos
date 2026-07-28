@@ -112,6 +112,22 @@ class NsdConan(ConanFile):
             self._patch_config_sub(
                 os.path.join(self.source_folder, "simdzone", "config.sub")
             )
+            if not cross_building(self):
+                # Native OHOS workers expose a writable TMPDIR, while the
+                # Conan build tree can reject Autoconf's temporary awk files.
+                configure = os.path.join(self.source_folder, "configure")
+                replace_in_file(
+                    self,
+                    configure,
+                    'mktemp -d "./confXXXXXX"',
+                    'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
+                )
+                replace_in_file(
+                    self,
+                    configure,
+                    "tmp=./conf$$-$RANDOM",
+                    'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+                )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
