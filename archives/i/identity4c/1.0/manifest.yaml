@@ -1,0 +1,47 @@
+# identity4c 1.0 编译档案
+software: identity4c
+version: "1.0"
+status: built
+build_system: autotools
+build_date: "2026-07-28"
+
+dependencies:
+  required:
+    - openssl/3.5.6
+    - libxml2/2.15.3
+
+build_config:
+  configure_options:
+    - --enable-shared=no
+    - --enable-static=yes
+  env:
+    CC: clang
+    CXX: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.ac.patch"
+
+compatibility:
+  level: medium
+  issues: []
+  notes: |
+    - UFP Identity C library, provides SSL/TLS identity verification
+    - Uses OpenSSL for TLS/crypto and libxml2 for XML parsing
+    - Bundles strmap (LGPL-3) and picohttpparser (MIT) as source
+    - Build system: autotools (autogen.sh → configure → make)
+    - Test package verifies library linking and basic strmap API
+
+test_results:
+  type: manual
+  note: |
+    - conan-verify pending (requires openssl/libxml2 built first)
+
+knowledge_gained:
+  - "identity4c uses AC_SEARCH_LIBS for openssl detection, links -lssl -lcrypto"
+  - "Uses PKG_PROG_PKG_CONFIG to find libxml2 via pkg-config libxml-2.0"
+  - "AX_CHECK_OPENSSL macro requires autoconf-archive"
+
+references:
+  - https://github.com/ufpidentity/identity4c
