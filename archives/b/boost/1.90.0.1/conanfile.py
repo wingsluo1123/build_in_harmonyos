@@ -45,6 +45,16 @@ class BoostCompiledConan(ConanFile):
     def _b2_executable(self):
         return "b2.exe" if self.settings.os == "Windows" else "./b2"
 
+    def _b2_variant(self):
+        build_type = str(self.settings.build_type)
+        variants = {
+            "Debug": "debug",
+            "Release": "release",
+            "RelWithDebInfo": "release",
+            "MinSizeRel": "release",
+        }
+        return variants[build_type]
+
     def _bootstrap_command(self):
         if self.settings.os == "Windows":
             compiler = str(self.settings.compiler)
@@ -54,14 +64,13 @@ class BoostCompiledConan(ConanFile):
         return f"sh bootstrap.sh --with-libraries={libraries}"
 
     def _b2_common_args(self):
-        build_type = str(self.settings.build_type).lower()
         link = "shared" if self.options.shared else "static"
         jobs = min(os.cpu_count() or 2, 8)
         address_model = "64" if str(self.settings.arch) in ("x86_64", "armv8", "armv8.3") else "32"
         args = [
             f"-j{jobs}",
             "--layout=system",
-            f"variant={build_type}",
+            f"variant={self._b2_variant()}",
             f"link={link}",
             f"address-model={address_model}",
             "threading=multi",
