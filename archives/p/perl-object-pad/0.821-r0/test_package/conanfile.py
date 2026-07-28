@@ -3,8 +3,8 @@
 
 L1 test: verify Pad.so is a valid Perl XS shared library.
 Compiles a C test that reads the ELF header to verify the .so is a
-valid ELF64 AArch64 shared library, and checks for the boot_Object__Pad
-symbol via nm.
+valid ELF64 AArch64 shared library, checks for the boot_Object__Pad
+symbol via nm, and loads Object::Pad via Perl to call its API.
 """
 import os
 import glob
@@ -61,3 +61,15 @@ class PerlobjectpadTestConan(ConanFile):
         self.output.info(
             f"PASS: object_pad.h found ({os.path.getsize(header)} bytes)"
         )
+
+        # Load Object::Pad and call its API via Perl
+        perl_lib = os.path.join(pkg_folder, "lib", "perl5", "aarch64-linux")
+        test_script = (
+            'use Object::Pad; '
+            'class MyTest { field $x :param = 0; method get { return $x } } '
+            'my $obj = MyTest->new(x => 42); '
+            'die "test failed" unless $obj->get == 42; '
+            'print "Object::Pad test OK\\n";'
+        )
+        self.run(f"perl -I {perl_lib} -e '{test_script}'")
+        self.output.info("PASS: Object::Pad API loaded and called successfully")

@@ -7,6 +7,7 @@ Produces: Pad.so (ELF64 AArch64 shared library) + .pm modules
 """
 import json
 import os
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -50,9 +51,20 @@ class PerlobjectpadConan(ConanFile):
             cc_info = json.loads(cc_info)
         cc = cc_info.get("c", "clang") if cc_info else "clang"
 
+        # Resolve compiler path: if bare filename, search PATH
+        if os.sep not in cc and "/" not in cc:
+            cc_resolved = shutil.which(cc)
+            if not cc_resolved:
+                raise ConanInvalidConfiguration(
+                    f"Compiler '{cc}' not found in PATH. "
+                    "Configure tools.build:compiler_executables in your Conan profile."
+                )
+        else:
+            cc_resolved = cc
+
         # Resolve compiler symlink and derive sysroot:
         # clang at {sdk}/llvm/bin/clang -> sysroot at {sdk}/sysroot
-        cc_real = os.path.realpath(cc)
+        cc_real = os.path.realpath(cc_resolved)
         cc_bin_dir = os.path.dirname(cc_real)          # .../llvm/bin
         sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))  # .../native
         sysroot = os.path.join(sdk_native, "sysroot")
@@ -81,6 +93,10 @@ class PerlobjectpadConan(ConanFile):
         copy(self, "Pad.so",
              src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"),
              dst=os.path.join(self.package_folder, "lib"))
+        # Copy .so to Perl auto directory for DynaLoader
+        copy(self, "Pad.so",
+             src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"))
         # Copy header to include/
         copy(self, "object_pad.h",
              src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "share", "module", "Object-Pad", "include"),
