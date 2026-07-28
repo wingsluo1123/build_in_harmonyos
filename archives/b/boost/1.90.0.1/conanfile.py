@@ -121,7 +121,7 @@ class BoostCompiledConan(ConanFile):
             info.libdirs = ["lib"]
             info.libs = [f"boost_{component}"]
 
-        self.cpp_info.components["chrono"].requires = ["atomic"]
+        self.cpp_info.components["chrono"].requires = ["atomic", "system"]
         self.cpp_info.components["filesystem"].requires = ["atomic", "system"]
         self.cpp_info.components["program_options"].requires = ["regex"]
         self.cpp_info.components["thread"].requires = ["chrono", "atomic", "system"]
