@@ -84,7 +84,8 @@ class CyrusSaslConan(ConanFile):
         tc.generate()
 
     def build(self):
-        self._patch_configure_for_ohos()
+        if self.settings.os == "OHOS":
+            self._patch_configure_for_ohos()
         autotools = Autotools(self)
         if self.settings.os == "OHOS":
             configure = os.path.join(self.source_folder, "configure")
