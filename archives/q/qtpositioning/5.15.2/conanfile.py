@@ -75,7 +75,7 @@ class QtpositioningConan(ConanFile):
         self.run("make -j1", env="conanbuild")
 
     def package(self):
-        self.run("make install INSTALL_ROOT={}".format(self.package_folder))
+        self.run("make install INSTALL_ROOT=\"{}\"".format(self.package_folder))
         # Also copy any .prl, .la, .pc files
         for pattern in ["*.prl", "*.la", "*.pc"]:
             copy(self, pattern, src=self.build_folder, dst=os.path.join(self.package_folder, "lib"))
