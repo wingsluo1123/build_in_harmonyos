@@ -1,0 +1,54 @@
+FCHECK FOR DEBIAN
+=================
+
+Installation
+------------
+
+Debian package should perform all installation that is required. You should
+only need to edit the configuration file and re-run fcheck additionally
+including the -c option to rebuild the database.
+
+Original README and INSTALL docs included that came with the source.
+
+Configuration
+-------------
+
+Additional features included in the debian package include:
+
+a) Default /etc/fcheck/fcheck.cfg config file to do some basic checking.
+
+   This file will need editing to suit your personal requirements, please
+   see the INSTALL file regarding syntax and options;
+
+b) Automatic addition of a crontab entry to run fcheck regularly.
+
+   Edit /etc/cron.d/fcheck and amend as required.
+
+c) Addition of basic man page;
+
+d) Basic fcheck md5sum database created when the package is installed;
+
+   Database is created according to the ruleset defined in the configuration
+   file, /etc/fcheck/fcheck.cfg. If you wish to change the database, then
+   edit the configuration file and re-run fcheck with the -c option.
+
+   See INSTALL file for further details.
+
+ -- Graham Simpson <gsimpson@copernicusgbs.com>, Wed, 29 Nov 2000 07:44:36 +0000
+
+Power Management
+----------------
+
+If you are using fcheck on a laptop and would like to avoid running the check
+when you are running off of battery power, install the "powermgmt-base" package
+and change the cronjob (/etc/cron.d/fcheck) like this:
+
+from:
+
+  30 */2	* * *	root	test -x /usr/sbin/fcheck && if ! nice ionice -c3 /usr/sbin/fcheck -asxrf ...
+
+to:
+
+  30 */2	* * *	root	test -x /usr/sbin/fcheck && /usr/bin/on_ac_power && if ! nice ionice -c3 /usr/sbin/fcheck -asxrf ...
+
+ -- Francois Marier <francois@debian.org>  Thu, 01 Oct 2009 21:45:48 +1300

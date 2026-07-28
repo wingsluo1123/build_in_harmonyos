@@ -1,0 +1,121 @@
+=head1 NAME
+
+fcheck - IDS filesystem baseline integrity checker
+
+=head1 SYNOPSIS
+
+fcheck [OPTIONS]
+
+=head1 OPTIONS
+
+The options to fcheck are defined below:
+
+=over
+
+=item B<-a>
+
+Automatic mode, do all directories in configuration file.
+
+=item B<-c>
+
+Create a new base line database for the given directory.
+
+=item B<-d>
+
+Directory names are to be monitored for changes also.
+
+=item B<-f filename>
+
+Use alternate 'filename' as the configuration file.
+
+=item B<-i>
+
+Ignore creation times, check permissions, adds, deletes only.
+
+=item B<-h>
+
+Append the $HOSTNAME to the configuration filename.
+
+=item B<-l>
+
+Log information to logger rather than stdout messages.
+
+=item B<-r>
+
+Report mode, great for emailed status reports.
+
+=item B<-s>
+
+Sign each file with a CRC/hash signature.
+
+=item B<-v>
+
+Verbose mode, not used for report generation.
+
+=item B<-x>
+
+eXtended unix checks, # of links, UID, GID, Major/Minor checks.
+
+=back
+
+=head1 DESCRIPTION
+
+=head2 Overview
+
+The fcheck utility is an IDS (Intrusion Detection System)
+which can be used to monitor changes to any given filesystem.
+
+Essentially, fcheck has the ability to monitor directories, files
+or complete filesystems for any additions, deletions, and modifications.
+It is configurable to exclude active log files, and can be ran as often
+as needed from the command line or cron making it extremely difficult to
+circumvent.
+
+=head2 Operation and Getting Started
+
+Flag passing is a fairly simple process. Primarily you will be using two
+commands. One builds (or rebuilds) your baseline database files (system
+snapshots). The second runs in a scanning comparison mode.
+
+C<"fcheck -ac">
+
+Builds the baseline database.
+
+C<"fcheck -a">
+
+Comparison scans the system against the baseline database.
+
+For normal operation: Initially you will run fcheck by issuing the command
+"fcheck -ac" to create the initial baseline file used for comparison. Any
+runs after the creation of the basline will normally be with the following
+flags "fcheck C<-a>" to scan for any system modifications.
+
+After a scan is completed, you will probably want to have fcheck re-create its
+baseline database for the next comparison cycle. Otherwise you will be seeing
+every system modification since the last baseline re-build. In other words, run
+the C<"fcheck -ac"> command again.
+
+(Advanced Note:)
+A more intensive system check would be accomplished by building your database
+to include GID/UID checks, directories, and CRC checks by using the following
+sample syntax:
+
+  "fcheck -cadsxlf /etc/fcheck/fcheck.cfg"
+
+And provide periodic integrity scans from cron by using the following sample
+syntax:
+
+  "fcheck -adsxlf /etc/fcheck/fcheck.cfg"
+
+=head1 AUTHOR
+
+Author: Copyright (C) 1996 Michael A. Gumienny <gumienny@hotmail.com>
+
+Debianized by: Graham Simpson <gsi@eggconnect.net>
+
+=head1 SEE ALSO
+
+Please also refer to the excellent README and INSTALL instructions provided with
+the package F</usr/share/doc/fcheck>.
+
+=cut

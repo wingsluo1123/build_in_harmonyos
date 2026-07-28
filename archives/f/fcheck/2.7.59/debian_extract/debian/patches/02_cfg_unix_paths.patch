@@ -1,0 +1,110 @@
+Description: Use UNIX and Debian paths in config file
+Forwarded: not needed
+Author: Francois Marier <francois@debian.org>
+Last-Update: 2011-10-12
+
+--- a/fcheck.cfg
++++ b/fcheck.cfg
+@@ -22,9 +22,20 @@
+ #     recursively under it, (I.E. /usr/bin..., /usr/local/..., etc.)
+ # 
+ 
+-Directory	= /usr/local/admtools/
+-Directory	= /tmp/
+-#Directory	= C:/WINNT/
++Directory       = /
++Directory       = /etc/
++Directory       = /bin/
++Directory       = /sbin/
++Directory       = /lib/
++Directory       = /usr/bin/
++Directory       = /usr/sbin/
++Directory       = /usr/lib/
++
++# Optionally may want to add the following:
++#Directory      = /usr/
++#Directory      = /usr/X11R6/bin
++#Directory      = /usr/X11R6/lib
++#Directory      = /var/
+ 
+ 
+ 
+@@ -41,28 +52,45 @@ Directory	= /tmp/
+ # section.
+ #
+ 
+-#Exclusion      = /tmp/dir/afile
+-Exclusion       = /usr/local/admtools/data/
+-#Exclusion       = /usr/local/admtools/logs/
+-#Exclusion       = C:/WINNT/TEMP/
+-
+-
++Exclusion      = /tmp/
++Exclusion      = /var/
++Exclusion      = /lib/udev/devices/
++Exclusion      = /run/
++
++# Other common paths you may need to exclude
++#Exclusion      = /etc/mtab
++#Exclusion      = /etc/resolv.conf
++#Exclusion      = /etc/cups/cupsd.conf
++#Exclusion      = /etc/cups/cupsd.conf.O
++#Exclusion      = /etc/cups/printers.conf
++#Exclusion      = /etc/cups/printers.conf.O
++#Exclusion      = /etc/ld.so.cache
++#Exclusion      = /etc/network/run/ifstate
++#Exclusion      = /etc/adjtime
++#Exclusion      = /etc/motd
++#Exclusion      = /etc/default/ntpdate.dhcp
++#Exclusion      = /etc/ntp.conf.dhcp
++#Exclusion      = /etc/logcheck/
++#Exclusion      = /etc/.bzr/
++#Exclusion      = /etc/.git/
++#Exclusion      = /etc/.hg/
++#Exclusion      = /etc/.etckeeper
++#Exclusion      = /etc/.gitignore
+ 
+ 
+ # Miscellaneous settings are passed to fcheck from here.
+ #
+-# The baseline database files are to be kept under the "DataBase" directory
+-# that is defined next.
++# The "DataBase" keyword points to the absolute path/filename of the baseline
++# database file, and is defined next.
+ #
+-DataBase        = /usr/local/admtools/logs/sol.dbf
+-#DataBase       = C:/FCHECK/LOCALHOST.DBF
++DataBase        = /var/lib/fcheck/fcheck.dbf
+ 
+ 
+ 
+ # If you are using a read-only location. You can write the database files to
+ # one location, and read from an alternate read-only (CD-ROM?) location.
+-#ReadDB          = /usr/local/data
+-#WriteDB         = /usr/local/data
++#ReadDB          = /usr/local/data/fcheck.dbf
++#WriteDB         = /usr/local/data/fcheck.dbf
+ 
+ 
+ 
+@@ -88,8 +116,8 @@ Logger          = /usr/bin/logger -tfcheck
+ # This is the system command to determine a files type. Used to determine
+ # pipes, major/minor numbers.
+ #
+-# Only useful on Unix platforms, not portable to Windows (yet).
+-FileTyper        = /bin/file
++# Only useful on Unix platforms, not portable to Windows (yet?!?!).
++FileTyper        = /usr/bin/file
+ 
+ 
+ 
+@@ -130,8 +158,7 @@ $Signature      = /bin/cksum
+ #CFInclude
+ 
+ # Used for individual file checking (I.E. FCheck databases!)
+-#
+-File	= /usr/local/admtools/logs/sol.dbf
++File	= /var/lib/fcheck/fcheck.dbf
+ 
+ #
+ # End of FCheck.cfg file
