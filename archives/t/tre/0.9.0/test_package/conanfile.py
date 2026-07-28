@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
-from conan.tools.build import cross_building
 
 
-class CjsonTestConan(ConanFile):
+class TRETestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
     test_type = "explicit"
@@ -22,5 +20,5 @@ class CjsonTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if not cross_building(self):
-            self.run(os.path.join(self.cpp.build.bindir, "test_cjson"), env="conanrun")
+        cmake = CMake(self)
+        cmake.test()

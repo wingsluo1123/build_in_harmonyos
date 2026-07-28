@@ -1,5 +1,38 @@
 # chmlib 0.40 适配笔记
 
+## Conan 配方 (2026-07-29)
+
+### 配方设计
+- **构建系统**: autotools (configure + make)，无需 autoreconf
+- **源码**: Slackware 权威镜像（官方发行版 tarball，含预生成 configure）
+- **补丁**: 4 个已验证 OHOS aarch64 平台补丁（复用 2026-06-03 适配）
+- **编译**: `--enable-static --disable-shared --enable-examples=no`
+- **测试**: test_package 集成测试（API 安全性 + 最小 ITSF 文件解析）
+
+### 关键设计决策
+- **不用 autoreconf**: Slackware tarball 含预生成 configure，避免 CI 缺少 autoconf 的风险
+- **复用旧补丁**: 4 个补丁在 2026-06-03 已通过 OHOS aarch64 实机验证，不要推倒重来
+- **静态编译**: chmlib 是系统同名库（libchm），默认静态避免动态链接污染 (R26)
+- **禁用 examples**: `--enable-examples=no` 避免编译 chm_http/extract_chmLib 等示例程序
+
+### 文件清单
+| 文件 | 说明 |
+|------|------|
+| conanfile.py | Autotools Conan 配方 |
+| conandata.yml | 源码 URL + SHA256 + 4 补丁声明 |
+| test_package/ | CMake 集成测试，4 个断言 |
+| patches/0001-0004 | OHOS aarch64 平台适配补丁 |
+| commands.json | CLI 工具声明 (R38) |
+
+### 待验证
+- [ ] 鸿蒙 PC `conan create` 编译通过
+- [ ] test_package 4/4 通过
+- [ ] CI 流水线通过
+
+---
+
+## 历史适配记录 (2026-06-03, Mode B 探索性编译)
+
 ## 编译环境
 - 构建系统: autotools
 - 编译日期: 2026-06-03
