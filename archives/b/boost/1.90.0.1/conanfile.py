@@ -32,6 +32,7 @@ class BoostCompiledConan(ConanFile):
         "program_options",
         "regex",
         "serialization",
+        "system",
         "thread",
         "timer",
     )
@@ -121,8 +122,9 @@ class BoostCompiledConan(ConanFile):
             info.libs = [f"boost_{component}"]
 
         self.cpp_info.components["chrono"].requires = ["atomic"]
-        self.cpp_info.components["filesystem"].requires = ["atomic"]
-        self.cpp_info.components["thread"].requires = ["chrono", "atomic"]
+        self.cpp_info.components["filesystem"].requires = ["atomic", "system"]
+        self.cpp_info.components["program_options"].requires = ["regex"]
+        self.cpp_info.components["thread"].requires = ["chrono", "atomic", "system"]
         self.cpp_info.components["timer"].requires = ["chrono"]
 
         if str(self.settings.os) in ("Linux", "OHOS", "FreeBSD"):

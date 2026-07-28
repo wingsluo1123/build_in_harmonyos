@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(test_boost_compiled CXX)
 
-find_package(Boost REQUIRED COMPONENTS atomic chrono filesystem program_options regex serialization thread timer)
+find_package(Boost REQUIRED COMPONENTS atomic chrono filesystem program_options regex serialization system thread timer)
 
 add_executable(test_boost_compiled test.cpp)
 if(WIN32)
@@ -15,6 +15,7 @@ target_link_libraries(
         Boost::regex
         Boost::serialization
         Boost::filesystem
+        Boost::system
         Boost::thread
         Boost::timer
         Boost::chrono

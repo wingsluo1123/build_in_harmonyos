@@ -6,6 +6,7 @@
 #include <boost/regex.hpp>
 #include <boost/timer/timer.hpp>
 #include <boost/thread.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <sstream>
 #include <stdexcept>
@@ -34,6 +35,10 @@ int main(int argc, char** argv) {
     const boost::filesystem::path composed = boost::filesystem::path("boost") / name;
     if (composed.generic_string() != "boost/" + name) {
         throw std::runtime_error("filesystem path composition failed");
+    }
+    const boost::system::error_code ok;
+    if (ok) {
+        throw std::runtime_error("default system error code is not clear");
     }
 
     std::ostringstream buffer;
