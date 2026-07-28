@@ -20,10 +20,6 @@ from conan.tools.files import (
 )
 from conan.tools.layout import basic_layout
 
-
-DEFAULT_OHOS_TOOL_DIR = "/data/service/hnp/bin"
-
-
 class VConan(ConanFile):
     name = "vlang"
     version = "0.5.2"
@@ -263,8 +259,22 @@ class VConan(ConanFile):
         return sign_tool
 
     def _ohos_tool_path(self, filename):
-        tool_dir = str(self.conf.get("user.ohos:tool_dir", default=DEFAULT_OHOS_TOOL_DIR))
-        return os.path.join(tool_dir, filename)
+        tool_dir = self.conf.get("user.ohos:tool_dir", default=None)
+        if tool_dir:
+            return os.path.join(str(tool_dir), filename)
+
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = compilers.get("c")
+        if cc and os.path.isabs(str(cc)):
+            tool_dir = os.path.dirname(str(cc))
+            return os.path.join(tool_dir, filename)
+
+        raise ConanException(
+            "OHOS tool directory not configured; set user.ohos:tool_dir or "
+            "tools.build:compiler_executables['c'] to an absolute OHOS compiler path"
+        )
 
     def _find_built_v(self):
         for filename in ["v.exe", "v"]:

@@ -9,10 +9,6 @@ from conan.tools.build import can_run
 from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.files import copy
 
-
-DEFAULT_OHOS_TOOL_DIR = "/data/service/hnp/bin"
-
-
 class VTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeToolchain", "VirtualRunEnv"
@@ -91,5 +87,18 @@ class VTestConan(ConanFile):
         return sign_tool
 
     def _ohos_tool_path(self, filename):
-        tool_dir = str(self.conf.get("user.ohos:tool_dir", default=DEFAULT_OHOS_TOOL_DIR))
-        return os.path.join(tool_dir, filename)
+        tool_dir = self.conf.get("user.ohos:tool_dir", default=None)
+        if tool_dir:
+            return os.path.join(str(tool_dir), filename)
+
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = compilers.get("c")
+        if cc and os.path.isabs(str(cc)):
+            return os.path.join(os.path.dirname(str(cc)), filename)
+
+        raise ConanException(
+            "OHOS tool directory not configured; set user.ohos:tool_dir or "
+            "tools.build:compiler_executables['c'] to an absolute OHOS compiler path"
+        )
