@@ -111,6 +111,8 @@ class Log4cppConan(ConanFile):
         copy(self, "config.h", src=f"{self.source_folder}/log4cpp/include/log4cpp", dst=f"{self.package_folder}/include/log4cpp")
 
     def package_info(self):
+        self.cpp_info.set_property("cmake_file_name", "log4cpp")
+        self.cpp_info.set_property("cmake_target_name", "log4cpp::log4cpp")
         self.cpp_info.libs = ["log4cpp"]
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread"]
