@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Conan recipe — librhash 1.4.4 (configure + make)"""
-import os, glob, shutil
+import os, glob, re, shutil
+from io import StringIO
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 
 class LibrhashConan(ConanFile):
     name = "librhash"
     version = "1.4.4"
-    description = "LibRHash shared library for computing hash sums"
+    description = "LibRHash shared library for computing hash sums（哈希计算库，configure+make 构建，鸿蒙 PC 适配）"
     license = "0BSD"
     homepage = "https://github.com/rhash/RHash"
     url = ""
@@ -46,11 +48,14 @@ class LibrhashConan(ConanFile):
         cc = compilers.get("c", "clang")
         ar = "llvm-ar"
 
-        cflags = "-fPIC -O2"
-        if self.options.shared:
-            pass  # already included
+        # cflags driven by fPIC option (not hardcoded); -O2 for Release-like build.
+        # Note: configure() removes the fPIC option when shared=True, so we must
+        # also force -fPIC for shared builds (shared objects always need PIC).
+        cflags = "-O2"
+        if self.options.shared or self.options.get_safe("fPIC", False):
+            cflags += " -fPIC"
 
-        # Configure: build only the librhash library
+        # Configure: build only the librhash library; target depends on shared/static.
         args = [
             "./configure",
             f"--cc={cc}",
@@ -58,10 +63,16 @@ class LibrhashConan(ConanFile):
             f"--prefix={self.package_folder}",
             f"--libdir={os.path.join(self.package_folder, 'lib')}",
             f"--extra-cflags='{cflags}'",
-            "--enable-lib-shared",
-            "--disable-static",
-            "--disable-openssl",
         ]
+        if self.options.shared:
+            args += ["--enable-lib-shared", "--disable-static"]
+        else:
+            # librhash configure controls the librhash library via --enable-lib-static
+            # (not --enable-static, which flips the rhash binary link mode).
+            # --disable-lib-shared suppresses the shared lib; --disable-shared is NOT
+            # a recognized configure option (configure exits 1 on it).
+            args += ["--enable-lib-static", "--disable-lib-shared"]
+        args.append("--disable-openssl")
         self.run(" ".join(args))
 
         # Fix Makefile: remove SOLINK_TARGET dependency that fails when
@@ -69,19 +80,43 @@ class LibrhashConan(ConanFile):
         # and breaks the build before the .so is actually compiled).
         self.run("sed -i 's/$(SOLINK_TARGET)//' librhash/Makefile")
 
-        # Build librhash only (not the rhash command-line tool)
-        self.run("make -C librhash -j1 lib-shared")
+        # Build librhash only (not the rhash command-line tool); target bound to shared.
+        make_target = "lib-shared" if self.options.shared else "lib-static"
+        self.run(f"make -C librhash -j1 {make_target}")
 
-        # Sign shared lib for OHOS
+        # Sign shared lib for OHOS (static libs don't need signing)
         if self.settings.os == "OHOS" and self.options.shared:
             libdir = os.path.join(self.source_folder, "librhash")
             sos = glob.glob(os.path.join(libdir, "*.so*"))
-            objcopy = "/data/service/hnp/bin/llvm-objcopy"
-            signer = "/data/service/hnp/bin/binary-sign-tool"
+            # Tool paths read from environment with sensible defaults so the
+            # recipe works across CI workers and local dev setups. Missing tools
+            # are reported rather than silently swallowed.
+            objcopy = os.environ.get("LLVM_OBJCOPY", "llvm-objcopy")
+            signer = os.environ.get("BINARY_SIGN_TOOL", "binary-sign-tool")
+            readelf = os.environ.get("LLVM_READELF", "llvm-readelf")
+            # If no .so was produced by `make lib-shared`, signing is moot —
+            # surface the real defect rather than a misleading "tool not found".
+            if not sos:
+                return
+            # Validate objcopy is executable once up front (loud fail on missing tool).
+            if not shutil.which(objcopy):
+                raise ConanException(f"objcopy not found: {objcopy}")
+            if not shutil.which(signer):
+                raise ConanException(f"signer not found: {signer}")
+            if not shutil.which(readelf):
+                raise ConanException(f"readelf not found: {readelf}")
             for so in sos:
                 if os.path.islink(so):
                     continue
-                self.run(f'{objcopy} --remove-section .codesign "{so}" 2>/dev/null || true')
+                # Strip .codesign only when the exact section is present: llvm-objcopy
+                # exits non-zero if the section is absent. Anchor the readelf probe to
+                # a whitespace boundary so `.codesign_backup` etc. don't false-positive.
+                buf = StringIO()
+                self.run(f'{readelf} -S "{so}"', stdout=buf, stderr=StringIO(), ignore_errors=True)
+                if re.search(r'\.codesign(?=\s)', buf.getvalue()):
+                    # ignore_errors: tolerate a stale probe result (e.g. a section named
+                    # `.codesign_v2` that the regex accepted but objcopy strips narrowly).
+                    self.run(f'{objcopy} --remove-section .codesign "{so}"', ignore_errors=True)
                 self.run(f'{signer} sign -inFile "{so}" -outFile "{so}" -selfSign 1')
 
     def package(self):

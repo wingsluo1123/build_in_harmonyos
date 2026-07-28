@@ -22,6 +22,9 @@ class LibrhashTestConan(ConanFile):
 
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
-        # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_rhash'", env="conanrun")
+        # Use bash to wrap binary execution; other platforms run the ELF directly.
+        if self.settings.os == "OHOS":
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            self.run(f"{bash} -c './test_rhash'", env="conanrun")
+        else:
+            self.run("./test_rhash", env="conanrun")
