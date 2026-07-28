@@ -64,12 +64,15 @@ class TidyHtml5Conan(ConanFile):
         if self.settings.os == "OHOS" and self.options.shared:
             libdir = os.path.join(self.package_folder, "lib")
             sos = glob.glob(os.path.join(libdir, "**", "*.so*"), recursive=True)
-            objcopy = "/data/service/hnp/bin/llvm-objcopy"
-            signer = "/data/service/hnp/bin/binary-sign-tool"
+            # Tool paths are read from environment with sensible defaults so the
+            # recipe works across CI workers and local dev setups. Missing tools
+            # are reported rather than silently swallowed.
+            objcopy = os.environ.get("LLVM_OBJCOPY", "llvm-objcopy")
+            signer = os.environ.get("BINARY_SIGN_TOOL", "binary-sign-tool")
             for so in sos:
                 if os.path.islink(so):
                     continue
-                self.run(f'{objcopy} --remove-section .codesign "{so}" 2>/dev/null || true')
+                self.run(f'{objcopy} --remove-section .codesign "{so}"')
                 self.run(f'{signer} sign -inFile "{so}" -outFile "{so}" -selfSign 1')
 
     def package_info(self):

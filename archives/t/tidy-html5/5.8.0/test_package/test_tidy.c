@@ -7,6 +7,10 @@
 
 int main(void) {
     TidyDoc tdoc = tidyCreate();
+    if (!tdoc) {
+        fprintf(stderr, "tidyCreate() returned NULL\n");
+        return 1;
+    }
     TidyBuffer errbuf = {0};
     int rc = -1;
 
