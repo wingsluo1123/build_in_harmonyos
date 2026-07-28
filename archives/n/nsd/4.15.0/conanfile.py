@@ -8,6 +8,7 @@ from conan.tools.files import (
     apply_conandata_patches,
     export_conandata_patches,
     get,
+    load,
     replace_in_file,
 )
 from conan.tools.gnu import (
@@ -45,18 +46,21 @@ class NsdConan(ConanFile):
         )
 
     def _patch_config_sub(self, path):
-        replace_in_file(
-            self,
-            path,
-            "gnu* | android* | bsd*",
-            "gnu* | android* | ohos* | bsd*",
-        )
-        replace_in_file(
-            self,
-            path,
-            "linux-gnu* | linux-dietlibc* | linux-android*",
-            "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-android*",
-        )
+        contents = load(self, path)
+        if "ohos* | bsd*" not in contents:
+            replace_in_file(
+                self,
+                path,
+                "gnu* | android* | bsd*",
+                "gnu* | android* | ohos* | bsd*",
+            )
+        if "linux-ohos*" not in contents:
+            replace_in_file(
+                self,
+                path,
+                "linux-gnu* | linux-dietlibc* | linux-android*",
+                "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-android*",
+            )
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
