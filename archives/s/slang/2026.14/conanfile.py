@@ -234,6 +234,17 @@ class SlangConan(ConanFile):
         max_retries = 50  # Safety limit
         build_dir = self.build_folder
 
+        # Pre-check signing tools to avoid infinite retry loop
+        sign_tool = self._find_tool("binary-sign-tool")
+        objcopy = self._find_tool("llvm-objcopy")
+        if not sign_tool or not objcopy:
+            raise ConanException(
+                f"Signing tools missing on OHOS: "
+                f"binary-sign-tool={'found' if sign_tool else 'MISSING'}, "
+                f"llvm-objcopy={'found' if objcopy else 'MISSING'}. "
+                f"Build requires these tools for ELF binary signing."
+            )
+
         for attempt in range(max_retries):
             try:
                 result = subprocess.run(
