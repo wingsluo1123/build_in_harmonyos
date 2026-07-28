@@ -11,7 +11,7 @@
 1. 从 CPAN 下载 Params-Util-1.102.tar.gz
 2. 初始化编译环境：ohc-run.py init-build perl-params-util 1.102
 3. 运行 perl Makefile.PL 配置
-4. 修改 Makefile.PL 添加 musl 头文件路径和 CRT 链接参数
+4. 修改 Makefile 添加 musl 头文件路径和 CRT 链接参数
 5. 运行 make 编译
 6. 运行 make install DESTDIR=$TEST_PREFIX 安装到 staging
 7. 生成 Conan 配方 (conan-init)
@@ -62,8 +62,8 @@
 
 ### 编译建议
 - Perl XS 模块编译需要完整的 C 库头文件支持
-- Makefile.PL 中可通过 `INC` 参数添加头文件路径
-- Makefile.PL 中可通过 `dynamic_lib` 参数添加链接选项
+- 修改生成的 Makefile（非 Makefile.PL）的 CCFLAGS 添加 musl 头文件路径
+- 修改生成的 Makefile 的 LDDLFLAGS 添加 CRT 绕过链接参数
 - 参考 perl-dbd-pg 编译经验可直接复用 CRT 绕过方案
 
 ## 后续修复与完善 (2026-07-06)
@@ -101,4 +101,4 @@
 **编译结束**: 2026-07-03 16:57
 **归档完善**: 2026-07-06
 **最终状态**: published (编译成功，conan-verify 全部门禁通过，CI 模拟通过，submit 自检 6/6 PASS)
-��过，submit 自检 6/6 PASS)
+��过，submit 自检 6/6 PASS)
