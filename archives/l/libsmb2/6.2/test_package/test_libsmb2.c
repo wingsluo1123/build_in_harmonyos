@@ -7,6 +7,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* Include smb2.h first — it defines struct smb2_timeval, SMB2_GUID_SIZE */
 #include <smb2/smb2.h>
@@ -18,12 +19,12 @@ int main(void) {
     struct smb2_libversion ver;
     memset(&ver, 0, sizeof(ver));
     smb2_get_libsmb2Version(&ver);
-    if (ver.version == 0 && ver.version_string[0] == '\0') {
+    if (ver.major_version == 0 && ver.minor_version == 0 && ver.patch_version == 0) {
         fprintf(stderr, "FAIL: smb2_get_libsmb2Version returned empty\n");
         return 1;
     }
-    printf("libsmb2 version: %d.%d (string: %s)\n",
-           ver.version, ver.version_major, ver.version_string);
+    printf("libsmb2 version: %d.%d.%d\n",
+           ver.major_version, ver.minor_version, ver.patch_version);
 
     /* Test context creation (core API) */
     struct smb2_context *smb2 = smb2_init_context();
