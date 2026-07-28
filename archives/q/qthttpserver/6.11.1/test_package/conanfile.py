@@ -4,6 +4,7 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
@@ -37,5 +38,10 @@ class QtHttpServerTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            executable = os.path.join(self.cpp.build.bindir, "test_qthttpserver")
-            self.run(executable, env="conanrun")
+            bindirs = self.cpp.build.bindirs
+            if not bindirs:
+                raise ConanInvalidConfiguration(
+                    "qthttpserver test package has no build bindir"
+                )
+            executable = os.path.join(bindirs[0], "test_qthttpserver")
+            self.run(executable, env="conanrun", ignore_errors=False)
