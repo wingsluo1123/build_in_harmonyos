@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: numen/0.7
+homepage: "https://git.sr.ht/~geb/numen"
+
+# 上游测试命令 (源码 test/test.sh)
+upstream_check_command: "test/test.sh"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游 test.sh 需要完整 numen 二进制 + dotool dummy + test.wav 音频文件，
+# 属于运行时集成测试，不适合在 Conan test_package 阶段执行
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/test.sh
+    source: numen-0.7/test/test.sh
+    description: "上游集成测试：使用 test.wav 音频 + dummy dotool 验证 numen 端到端语音识别流程"
+    command: "test/test.sh"
+  - file: test/test.phrases
+    source: numen-0.7/test/test.phrases
+    description: "测试用短语配置文件，输入 'n u m e n' 五个字母"
+    command: ""
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "numen --version 冒烟测试，验证二进制可执行且版本号正确"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 1) numen 二进制存在于 PATH
+# 2) numen --version 退出码为 0
+# 3) --version 输出包含数字版本号
+assertion_count: 3
