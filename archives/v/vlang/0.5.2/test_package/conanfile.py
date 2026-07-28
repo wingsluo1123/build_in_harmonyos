@@ -26,8 +26,14 @@ class VTestConan(ConanFile):
         copy(self, "test_v_metadata.cpp", src=self.recipe_folder, dst=self.export_sources_folder)
 
     def build(self):
+        package_folder = self.dependencies["vlang"].package_folder
+        is_windows = str(self.settings.os) == "Windows"
+        v_exe = os.path.join(package_folder, "bin", "v.bat" if is_windows else "v")
         cmake = CMake(self)
-        cmake.configure()
+        variables = {"VLANG_EXECUTABLE": v_exe}
+        if str(self.settings.os) == "OHOS":
+            variables["VLANG_LAUNCHER"] = "/system/bin/sh"
+        cmake.configure(variables=variables)
         cmake.build()
 
     def test(self):
