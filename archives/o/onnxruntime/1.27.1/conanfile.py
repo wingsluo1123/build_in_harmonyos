@@ -18,7 +18,8 @@ Source modifications applied via conandata patches:
 """
 import os
 import shutil
-import hashlib
+import subprocess
+import zipfile
 from pathlib import Path
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -125,7 +126,6 @@ class OnnxruntimeConan(ConanFile):
 
     def _find_tool(self, name):
         """Find a tool in PATH."""
-        import shutil
         path = shutil.which(name)
         if path:
             return path
@@ -138,7 +138,6 @@ class OnnxruntimeConan(ConanFile):
 
     def _download_deps(self):
         """Pre-download FetchContent dependencies to local mirror directory."""
-        import subprocess
         mirror = self._get_mirror_dir()
         deps_file = self._get_source_dir() / "cmake" / "deps.txt"
 
@@ -180,32 +179,32 @@ class OnnxruntimeConan(ConanFile):
 
                 local_path.parent.mkdir(parents=True, exist_ok=True)
                 self.output.info(f"Downloading {name} from {url}...")
-                # Use curl (faster than urllib on OHOS)
+                tmp_path = local_path.with_suffix(".tmp")
+                # Use curl (faster than urllib on OHOS), download to temp file first
                 result = subprocess.run(
                     ["curl", "-fsSL", "--retry", "3", "--max-time", "120",
-                     "-o", str(local_path), url],
+                     "-o", str(tmp_path), url],
                     capture_output=True, text=True
                 )
                 if result.returncode != 0:
                     self.output.warn(f"  curl failed for {name}, trying urllib...")
+                    tmp_path.unlink(missing_ok=True)
                     # Fallback to urllib
                     import urllib.request
                     req = urllib.request.Request(url, headers={"User-Agent": "conan/ohc"})
                     with urllib.request.urlopen(req, timeout=120) as resp:
-                        with open(local_path, 'wb') as f_out:
+                        with open(tmp_path, 'wb') as f_out:
                             while True:
                                 chunk = resp.read(65536)
                                 if not chunk:
                                     break
                                 f_out.write(chunk)
+                # Atomic move: only replace target if download succeeded
+                shutil.move(str(tmp_path), str(local_path))
                 self.output.info(f"  Downloaded {name}: {local_path.stat().st_size} bytes")
 
     def _build_protoc(self):
         """Build protoc from protobuf source for host platform."""
-        import urllib.request
-        import subprocess
-        import tempfile
-
         mirror = self._get_mirror_dir()
         proto_zip = mirror / "github.com" / "protocolbuffers" / "protobuf" / "archive" / "refs" / "tags" / "v21.12.zip"
 
@@ -214,21 +213,23 @@ class OnnxruntimeConan(ConanFile):
             self.output.info("Protobuf not in mirror, downloading directly...")
             proto_zip.parent.mkdir(parents=True, exist_ok=True)
             url = "https://github.com/protocolbuffers/protobuf/archive/refs/tags/v21.12.zip"
+            tmp_path = proto_zip.with_suffix(".tmp")
+            import urllib.request
             req = urllib.request.Request(url, headers={"User-Agent": "conan/ohc"})
             with urllib.request.urlopen(req, timeout=300) as resp:
-                with open(proto_zip, 'wb') as f:
+                with open(tmp_path, 'wb') as f:
                     while True:
                         chunk = resp.read(65536)
                         if not chunk:
                             break
                         f.write(chunk)
+            shutil.move(str(tmp_path), str(proto_zip))
             self.output.info(f"Downloaded protobuf: {proto_zip.stat().st_size} bytes")
 
         # Extract protobuf
         proto_build_dir = Path(self.build_folder) / "protobuf-protoc"
         proto_build_dir.mkdir(parents=True, exist_ok=True)
 
-        import zipfile
         with zipfile.ZipFile(proto_zip) as zf:
             zf.extractall(proto_build_dir)
 

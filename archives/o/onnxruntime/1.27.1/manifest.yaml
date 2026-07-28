@@ -1,38 +1,24 @@
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.27.1/manifest.yaml
+# 版本级 manifest
+# 文件位置: archives/o/onnxruntime/1.27.1/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
 # ============================================================
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "1.27.1"
-
-# 软件名
-software: "{software}"
-
-# 编译状态
-# published | built | failed | archived
-status: failed
-
-# 编译日期（YYYY-MM-DD）
+software: "onnxruntime"
+status: built
 build_date: "2026-07-24"
-build_system: "{BUILD_SYSTEM}"
+build_system: "cmake"
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://github.com/microsoft/onnxruntime/archive/refs/tags/v1.27.1.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "e53b06ccd454f56088fde374d1af6660ef111ca7ce7a98d62b274ff9094d3005"
   tar_format: tar.gz
 
 # ============================================================
@@ -40,23 +26,16 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
+  system: cmake
+  configure_options:
+    - "-DCMAKE_TOOLCHAIN_FILE=ohos.toolchain.cmake"
+    - "-DOHOS_ARCH=arm64-v8a"
+    - "-Donnxruntime_BUILD_SHARED_LIB=ON"
+    - "-Donnxruntime_MINIMAL_BUILD=ON"
+    - "-Donnxruntime_BUILD_UNIT_TESTS=OFF"
+    - "-Donnxruntime_ENABLE_PYTHON=OFF"
+    - "-DONNX_CUSTOM_PROTOC_EXECUTABLE=<protoc_path>"
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
   cc: clang
   cxx: clang++
 
@@ -64,20 +43,27 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-cmake-adjust_global_compile_flags.cmake.patch"
+  - "0002-cmake-onnxruntime_mlas.cmake.patch"
+  - "0003-cmake-external-abseil-cpp.cmake.patch"
+  - "0004-cmake-external-eigen.cmake.patch"
+  - "0005-cmake-external-onnxruntime_external_deps.cmake.patch"
+  - "0006-cmake-external-xnnpack.cmake.patch"
+  - "0007-onnxruntime-core-platform-posix-env.cc.patch"
+  - "0008-onnxruntime-core-mlas-lib-mlasi.h.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "OHOS toybox patch 不支持 --binary 和 --ignore-whitespace，需用 -l 替代"
+  - "OHOS 工具链清空 CMAKE_CXX_FLAGS 缓存，需用 add_compile_options 替代 -D 传参"
+  - "bfloat16_t 类型需 __ARM_FEATURE_BF16 守卫，因自定义 -march 的文件不包含 bf16 扩展"
+  - "musl libc 不支持 pthread_setaffinity_np，需 __MUSL__ 守卫"
+  - "cpuinfo 库不认识 OHOS 平台，需在 CMake configure 后 patch 为 Linux"
+  - "ONNX Runtime 的 CMakeLists.txt 在 cmake/ 子目录，需 build_script_folder=cmake"
 
 patch_generation:
   method: per-file-difflib
@@ -90,34 +76,34 @@ patch_generation:
 
 patch_classification:
   - file: 0001-cmake-adjust_global_compile_flags.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: platform
+    platform_only: true
+    guard: 'CMAKE_SYSTEM_NAME STREQUAL "OHOS"'
   - file: 0002-cmake-onnxruntime_mlas.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: platform
+    platform_only: true
+    guard: 'aarch64'
   - file: 0003-cmake-external-abseil-cpp.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: compat
+    platform_only: true
+    guard: 'toybox patch'
   - file: 0004-cmake-external-eigen.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: compat
+    platform_only: true
+    guard: 'toybox patch'
   - file: 0005-cmake-external-onnxruntime_external_deps.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: compat
+    platform_only: true
+    guard: 'toybox patch + OHOS'
   - file: 0006-cmake-external-xnnpack.cmake.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: compat
+    platform_only: true
+    guard: 'toybox patch'
   - file: 0007-onnxruntime-core-platform-posix-env.cc.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: platform
+    platform_only: true
+    guard: '__MUSL__'
   - file: 0008-onnxruntime-core-mlas-lib-mlasi.h.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: platform
+    platform_only: true
+    guard: '__ARM_FEATURE_BF16'
