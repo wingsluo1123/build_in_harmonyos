@@ -10,15 +10,15 @@ class CryptokitTestConan(ConanFile):
 
     def test(self):
         # R34: Test must actually verify the package contents
-        # Verify that the compiled C stubs exist in the package
+        # Verify that the compiled library exists in the package
         lib_dir = os.path.join(self.dependencies[self.tested_reference_str].package_folder, "lib")
         header_dir = os.path.join(self.dependencies[self.tested_reference_str].package_folder, "include", "cryptokit")
 
-        # Check lib directory has compiled objects
+        # Check lib directory has compiled library (.a for static or .so for shared)
         if os.path.isdir(lib_dir):
-            objects = [f for f in os.listdir(lib_dir) if f.endswith('.o')]
-            assert len(objects) > 0, f"No compiled .o files found in {lib_dir}"
-            print(f"cryptokit test: {len(objects)} compiled objects verified OK")
+            libs = [f for f in os.listdir(lib_dir) if f.endswith(('.a', '.so'))]
+            assert len(libs) > 0, f"No library files (.a/.so) found in {lib_dir}"
+            print(f"cryptokit test: {len(libs)} library files verified OK: {libs}")
         else:
             raise Exception(f"Lib directory not found: {lib_dir}")
 

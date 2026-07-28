@@ -97,14 +97,15 @@ class CryptokitConan(ConanFile):
             self.run(f"{cc} -c {cflags} -I{src_dir} -o {build_dir}/{obj} {src_dir}/{src}")
 
         # Create library archive based on shared option
-        obj_files = " ".join([s.replace(".c", ".o") for s in c_sources])
+        obj_files = [os.path.join(build_dir, s.replace(".c", ".o")) for s in c_sources]
+        objs_str = " ".join(obj_files)
         if self.options.shared:
             # Create shared library (.so)
-            self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {build_dir}/{' '.join(obj_files.split())}")
+            self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {objs_str}")
         else:
             # Create static library (.a)
             ar = self.conf.get("tools.build:compiler_executables:ar", default="llvm-ar", check_type=str)
-            self.run(f"{ar} rcs {build_dir}/libcryptokit.a {' '.join(obj_files.split())}")
+            self.run(f"{ar} rcs {build_dir}/libcryptokit.a {objs_str}")
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
