@@ -46,23 +46,6 @@ class SpeexConan(ConanFile):
         # ── Fix 0: Repair new-file patch format before applying ──
         # refresh-patch generates `--- a/filename` for new files, but
         # Conan's patch_ng requires `--- /dev/null`. Fix in-place.
-        export_sources = self.export_sources_folder
-        if export_sources:
-            for p in self.conan_data.get("patches", []):
-                patch_file = p.get("patch_file", "")
-                patch_path = os.path.join(export_sources, patch_file)
-                if not os.path.isfile(patch_path):
-                    continue
-                with open(patch_path, "r") as f:
-                    content = f.read()
-                if "--- a/" in content and "@@ -0,0" in content:
-                    lines = content.split("\n")
-                    for i, line in enumerate(lines):
-                        if line.startswith("--- a/"):
-                            lines[i] = "--- /dev/null"
-                    with open(patch_path, "w") as f:
-                        f.write("\n".join(lines))
-
         apply_conandata_patches(self)
 
         # ── Fix 1: Patch ALL generated env scripts for local dev ──
