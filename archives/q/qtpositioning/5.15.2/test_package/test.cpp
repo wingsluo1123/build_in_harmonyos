@@ -1,6 +1,5 @@
 #include <QCoreApplication>
 #include <QGeoCoordinate>
-#include <QGeoPositionInfo>
 #include <QGeoPositionInfoSource>
 #include <QGeoCircle>
 #include <QGeoRectangle>
@@ -21,6 +20,10 @@ int main(int argc, char *argv[])
     // Test GeoRectangle
     QGeoRectangle rect(coord, 0.5, 1.0);
     qDebug() << "Rectangle:" << rect.toString();
+
+    // Test QGeoPositionInfoSource symbol availability
+    QStringList sources = QGeoPositionInfoSource::availableSources();
+    qDebug() << "Available position sources:" << sources;
 
     qDebug() << "QtPositioning test PASSED!";
     return 0;
