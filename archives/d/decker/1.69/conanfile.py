@@ -13,6 +13,7 @@ from conan import ConanFile
 from conan.errors import ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import PkgConfigDeps
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.layout import basic_layout
 
 
@@ -43,8 +44,8 @@ class DeckerConan(ConanFile):
 
     def generate(self):
         if self.options.with_sdl:
-            pkg_deps = PkgConfigDeps(self)
-            pkg_deps.generate()
+            VirtualBuildEnv(self).generate()
+            PkgConfigDeps(self).generate()
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
