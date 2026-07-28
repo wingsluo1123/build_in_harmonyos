@@ -34,4 +34,4 @@ class Identity4cTestConan(ConanFile):
 
     def test(self):
         bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_probe'", env="conanrun")
+        self.run('./test_probe', env="conanrun")
