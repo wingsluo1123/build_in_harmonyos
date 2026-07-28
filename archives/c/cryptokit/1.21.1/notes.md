@@ -22,7 +22,7 @@
 ## 已修正的质量缺陷
 
 1. **R33**: conanfile.py build() 从 Conan conf 获取编译器路径，不硬编码
-2. **R34**: test_package 实际验证编译产物（.o 文件 + .h 文件）
+2. **R34**: test_package 通过 CMake 编译 test.c 调用 SHA-256 API（SHA256_init/add_data/finish），验证加密算法功能正确
 3. **requirements()**: 正确声明 zlib 依赖
 4. **build 系统**: 使用 MakeToolchain 而非错误的 AutotoolsToolchain
 
