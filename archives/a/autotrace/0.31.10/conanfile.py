@@ -7,6 +7,7 @@ import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import (
     apply_conandata_patches,
@@ -145,6 +146,21 @@ class AutotraceConan(ConanFile):
         self._run_checked([cc, *cflags, "-c", os.path.join(self.source_folder, source), "-o", obj])
         return obj
 
+    def _run_upstream_tests(self, cli_path):
+        if not can_run(self):
+            self.output.warning(
+                "Skipping upstream runtime tests because the target binary cannot run "
+                "in the current build context"
+            )
+            return
+
+        test_script = os.path.join(self.source_folder, "tests", "runtests.sh")
+        command = (
+            f"AUTOTRACE={shlex.quote(cli_path)} "
+            f"sh {shlex.quote(test_script)}"
+        )
+        self.run(command, cwd=self.source_folder)
+
     def build(self):
         apply_conandata_patches(self)
         os.makedirs(self._out_dir, exist_ok=True)
@@ -238,6 +254,7 @@ class AutotraceConan(ConanFile):
             [cc, "-o", cli_path, *cli_objects, lib_path, *glib_libs, *png_libs, "-lm"]
         )
         os.chmod(cli_path, 0o755)
+        self._run_upstream_tests(cli_path)
 
     def package(self):
         bindir = os.path.join(self.package_folder, "bin")

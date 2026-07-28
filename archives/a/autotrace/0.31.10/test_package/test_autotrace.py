@@ -102,6 +102,54 @@ def run_cli_version(exe):
         raise AssertionError(f"unexpected autotrace version output: {result.stdout}")
 
 
+def run_png_to_svg(exe):
+    fixture = os.path.join(os.path.dirname(__file__), "fixtures", "watch.png")
+    require_path("upstream PNG fixture", fixture)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        output = os.path.join(tmpdir, "watch.svg")
+        subprocess.run(
+            [
+                exe,
+                "-report-progress",
+                "--centerline",
+                "--background-color",
+                "ffffff",
+                "--color-count",
+                "2",
+                "--preserve-width",
+                "-input-format",
+                "PNG",
+                fixture,
+                "-output-format",
+                "svg",
+                "-output-file",
+                output,
+            ],
+            check=True,
+            timeout=30,
+        )
+        require_path("PNG to SVG output", output)
+        if os.path.getsize(output) == 0:
+            raise AssertionError("PNG to SVG output is empty")
+        require_text(output, "<svg")
+
+
+def run_missing_input_failure(exe):
+    result = subprocess.run(
+        [exe, "-input-format", "PNG", "missing-input.png", "-output-format", "svg"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    if result.returncode == 0:
+        raise AssertionError(
+            "autotrace unexpectedly accepted a missing PNG input: "
+            f"{result.stdout}"
+        )
+
+
 def main():
     if len(sys.argv) != 4:
         raise SystemExit("usage: test_autotrace.py <package-folder> <c-compiler> <run-binary-flag>")
@@ -124,8 +172,13 @@ def main():
     compile_and_link_api_probe(pkg, cc, run_binary)
     if run_binary == "1":
         run_cli_version(exe)
+        run_png_to_svg(exe)
+        run_missing_input_failure(exe)
 
-    print("PASS: autotrace CLI metadata and linked C API consumer are valid")
+    print(
+        "PASS: autotrace package, linked C API, PNG-to-SVG conversion, "
+        "and missing-input failure behavior are valid"
+    )
 
 
 if __name__ == "__main__":

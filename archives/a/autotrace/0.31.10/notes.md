@@ -18,11 +18,18 @@
 
 - Added a `test_package` layout check for the CLI, public header, static library, and pkg-config file.
 - Compiles and links a C API consumer against `libautotrace.a` and GLib.
-- Executes the linked API consumer, as well as the CLI version check, when target binaries are runnable.
-- The test does not require image conversion fixtures.
+- Runs the complete upstream `tests/runtests.sh` regression driver against the
+  newly built CLI whenever the target binary is runnable.
+- Executes the linked API consumer and CLI version check when target binaries are runnable.
+- Reuses upstream `tests/github-#34/watch.png` for a real PNG-to-SVG conversion
+  and verifies that a missing PNG input fails with a non-zero exit status.
+- Upstream 0.31.10 reports 7 successful scenarios, 2 expected-failure
+  scenarios, and 1 conditionally skipped stdin scenario without Magick support.
 
 ## Local Validation
 
 - `python -m py_compile` was run for recipe/test files.
 - `git diff --check` passed.
-- Full OHOS `conan create` requires the remote CI environment.
+- Native Linux Release and Debug `conan create` runs execute the upstream
+  regression driver and the complete `test_package`.
+- Full OHOS validation still requires the supported OHOS environment.
