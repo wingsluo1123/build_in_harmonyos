@@ -17,4 +17,4 @@ class DfuUtilTestConan(ConanFile):
     def test(self):
         if can_run(self):
             script = os.path.join(self.source_folder, "test.sh")
-            self.run(f'sh "{script}"', env="conanrun")
+            self.run(f'bash "{script}"', env="conanrun")
