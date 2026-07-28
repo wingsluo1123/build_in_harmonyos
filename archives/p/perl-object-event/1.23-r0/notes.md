@@ -11,7 +11,7 @@
 1. 下载源码包 `Object-Event-1.23.tar.gz` (CPAN)
 2. 执行 `perl Makefile.PL INSTALL_BASE=/`（使用 INSTALL_BASE=/ 使文件安装到 lib/perl5/ 下）
 3. 执行 `make -j1` 编译
-4. 执行 `make test` 运行测试套件
+4. ~~执行 `make test` 运行测试套件~~ (已移除: CI worker 缺少 common::sense/AnyEvent 运行时依赖)
 5. 执行 `make install DESTDIR=$PACKAGE_FOLDER` 安装到 Conan 包目录
 
 ### Conan 配方生成
