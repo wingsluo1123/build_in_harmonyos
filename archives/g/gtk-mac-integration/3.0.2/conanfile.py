@@ -79,3 +79,4 @@ class GtkMacIntegrationConan(ConanFile):
         )
         self.cpp_info.set_property("pkg_config_name", "gtk-mac-integration-gtk3")
         self.cpp_info.defines = ["GTKOSX_HARMONYOS_COMPAT=1"]
+        self.cpp_info.requires = ["glib::gobject-2.0"]
