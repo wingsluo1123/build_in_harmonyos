@@ -75,6 +75,15 @@ class EmqxConan(ConanFile):
             "\t@$(SCRIPTS)/ensure-rebar3.sh",
             "\t@bash $(SCRIPTS)/ensure-rebar3.sh",
         )
+        self._replace_if_present(
+            os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
+            'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
+            (
+                "python3 -c 'import sys, urllib.request; "
+                "urllib.request.urlretrieve(sys.argv[1], sys.argv[2])' "
+                '"${DOWNLOAD_URL}/${VERSION}/rebar3" ./rebar3'
+            ),
+        )
         build_vars = (
             "CMAKE_POLICY_VERSION_MINIMUM=3.5 "
             "PKG_VSN=5.8.8 "
