@@ -48,6 +48,7 @@ class EmqxConan(ConanFile):
             "CMAKE_POLICY_VERSION_MINIMUM=3.5 "
             "PKG_VSN=5.8.8 "
             "BUILD_WITHOUT_QUIC=1 "
+            "SYSTEM=Linux "
             "PROFILE=emqx"
         )
         self.run(f"{build_vars} make emqx-rel", cwd=self.source_folder, env=["conanbuild"])

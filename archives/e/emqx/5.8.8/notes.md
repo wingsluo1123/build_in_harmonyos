@@ -11,8 +11,13 @@
 The recipe follows the Homebrew formula build path:
 
 ```bash
-CMAKE_POLICY_VERSION_MINIMUM=3.5 PKG_VSN=5.8.8 BUILD_WITHOUT_QUIC=1 PROFILE=emqx make emqx-rel
+CMAKE_POLICY_VERSION_MINIMUM=3.5 PKG_VSN=5.8.8 BUILD_WITHOUT_QUIC=1 SYSTEM=Linux PROFILE=emqx make emqx-rel
 ```
+
+`SYSTEM=Linux` is set explicitly for the upstream distro detection script. The
+OHOS CI shell enables unset-variable checks, and `scripts/get-distro.sh` reads
+`SYSTEM` before assigning a default; using the Linux/Unix release path avoids
+that early script abort while keeping the Homebrew-compatible build flow.
 
 ## High-difficulty reasons
 
