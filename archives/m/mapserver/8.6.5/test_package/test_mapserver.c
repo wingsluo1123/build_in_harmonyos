@@ -51,5 +51,6 @@ int main(void)
     require_true(map->width == 64 && map->height == 64, "map size parsed");
     require_true(map->numlayers == 1, "layer count parsed");
     msFreeMap(map);
+    require_true(remove(map_path) == 0, "remove smoke mapfile");
     return 0;
 }

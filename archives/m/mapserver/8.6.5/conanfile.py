@@ -10,7 +10,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, collect_libs, get
+from conan.tools.files import apply_conandata_patches, get
 from conan.tools.cmake import cmake_layout
 
 
@@ -187,8 +187,7 @@ class MapserverConan(ConanFile):
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=shared_lib))
 
     def package_info(self):
-        explicit_libs = ["mapserver"]
-        self.cpp_info.libs = explicit_libs or collect_libs(self)
+        self.cpp_info.libs = ["mapserver"]
         self.cpp_info.set_property("cmake_file_name", "mapserver")
         self.cpp_info.set_property("cmake_target_name", "mapserver::mapserver")
         if self.settings.os in ("Linux", "OHOS"):
