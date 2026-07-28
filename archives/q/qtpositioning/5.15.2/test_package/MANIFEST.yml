@@ -1,0 +1,42 @@
+# test_package MANIFEST — qtpositioning 5.15.2
+# 上游测试声明
+
+# 测试文件
+test_source:
+  - test.cpp
+
+# 构建系统
+build_system: cmake
+
+# 测试类型：L1 (smoke test) — 验证包可被正确链接和加载
+test_type: L1
+
+# 测试内容：
+# - 创建 QGeoCoordinate 对象
+# - 创建 QGeoCircle 对象
+# - 创建 QGeoRectangle 对象
+# - 验证 QtPositioning 模块可正常链接
+
+# 上游测试用例（来自 qtlocation 仓库 tests/auto/ 目录）
+# 编译验证结果：头文件编译通过，完整运行需要 qmake + moc 元对象系统
+# CI 环境中 Qt5 就绪后可通过 `qmake tests/auto/auto.pro && make && make check` 运行
+upstream_test_verification:
+  status: "partial_compile"
+  details:
+    - "预编译Qt5头文件已提取并配置（43.8MB: qtbase 5.15.2 gcc_64）"
+    - "QtPositioning公共头文件（40个）与私有头文件已同步到Qt5 include目录"
+    - "上游测试tst_qgeocoordinate.cpp继承QObject使用Q_SLOTS/private slots，需moc处理"
+    - "完整测试需要qmake（预编译的x86_64版本与当前aarch64不兼容）"
+  ci_instructions: "在标准Linux x86_64 CI机器上使用aqtinstall安装Qt5.15.2，运行qmake tests/auto/auto.pro && make && make check"
+
+upstream_tests:
+  - tests/auto/qgeocoordinate/ — 坐标 API 测试（tst_qgeocoordinate.cpp, 952行）
+  - tests/auto/qgeocircle/ — 圆形区域测试（tst_qgeocircle.cpp）
+  - tests/auto/qgeopath/ — 路径测试（tst_qgeopath.cpp）
+  - tests/auto/qgeopolygon/ — 多边形测试（tst_qgeopolygon.cpp）
+  - tests/auto/qgeorectangle/ — 矩形区域测试（tst_qgeorectangle.cpp）
+  - tests/auto/qgeopositioninfo/ — 位置信息测试（tst_qgeopositioninfo.cpp）
+  - tests/auto/qnmeapositioninfosource/ — NMEA 位置源测试（6个测试变体）
+  - tests/auto/positionplugin/ — 位置插件测试（tst_positionplugin.cpp）
+  - tests/auto/positionplugintest/ — 位置插件集成测试
+  - tests/auto/declarative_geoshape/ — QML 几何形状测试
