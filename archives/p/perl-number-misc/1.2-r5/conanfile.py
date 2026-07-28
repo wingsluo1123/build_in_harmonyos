@@ -19,7 +19,7 @@ class PerlnumbermiscConan(ConanFile):
     homepage = "https://metacpan.org/dist/Number-Misc"
     url = ""  # CI fills this
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)

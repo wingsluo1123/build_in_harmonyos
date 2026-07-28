@@ -9,7 +9,7 @@
 ## 编译步骤
 
 1. 通过MetaCPAN API查找正确的下载URL（CPAN模块名为Number-Misc，作者MIKO）
-2. 使用curl -kL手动下载源码包到$TMPDIR/builds/（绕过SSL证书验证问题）
+2. 使用curl -L手动下载源码包到$TMPDIR/builds/（如遇SSL证书问题，先安装ca-certificates或仅在开发环境临时使用--insecure，正式CI构建通过conandata.yml的sha256校验保障完整性）
 3. ohc-run.py init-build（检测到已有tarball，跳过下载，执行解压和归档初始化）
 4. cd $BUILD_SRC_DIR
 5. perl Makefile.PL INSTALL_BASE=$DEFAULT_PREFIX
@@ -24,7 +24,7 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | ohc-run.py下载SSL证书验证失败 | HarmonyOS环境缺少CA证书 | 使用curl -kL手动下载源码包到$TMPDIR/builds/目录 |
+| 1 | ohc-run.py下载SSL证书验证失败 | HarmonyOS环境缺少CA证书 | 手动下载源码包到$TMPDIR/builds/目录（建议安装ca-certificates解决根因，下载后须通过sha256校验确认文件完整性） |
 | 2 | init-build初始搜索的URL返回404 | search_url找到的savannah URL不正确 | 通过MetaCPAN API查找正确的CPAN URL |
 | 3 | conan-init生成的conanfile.py使用Autotools模板 | 自动检测误判构建系统 | 手动改写为Perl专用配方，参考perl-net-server的conanfile.py |
 | 4 | conan-init生成的test_package使用CMake+C | 模板默认为C/C++项目 | 改写为Perl模块验证脚本 |

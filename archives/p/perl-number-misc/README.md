@@ -22,7 +22,7 @@ Perl 模块，提供数字处理的便捷工具函数，包括数字判断、字
 - **纯 Perl 模块**：无 C/XS 代码，不需要编译器参与实际编译，原始源码无需任何修改即可在 OHOS 上编译运行
 - **SELinux 兼容**：纯文本 .pm 文件不受 HMDFS SELinux 限制，可直接从用户目录加载（与 perl-dbd-pg 等 XS 模块不同，后者需要管理员安装到系统目录）
 - **Conan 集成**：通过 `package_info()` 设置 `PERL5LIB` 环境变量，消费者 `conan install` 后 `source conanrun.sh` 即可使用
-- **SSL 证书**：CPAN 下载可能遇到 SSL 证书验证失败，使用 `curl -kL` 手动下载绕过
+- **SSL 证书**：CPAN 下载可能遇到 SSL 证书验证失败，建议安装 `ca-certificates` 解决根因；如需临时绕过可使用 `curl --insecure` 仅限开发环境，下载后务必通过 sha256 校验确认文件完整性
 
 ### 已知问题
 
