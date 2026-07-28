@@ -68,7 +68,7 @@ class BoostCompiledConan(ConanFile):
         build_type = str(self.settings.build_type)
         link = "shared" if self.options.shared else "static"
         jobs = min(os.cpu_count() or 2, 8)
-        address_model = "64" if str(self.settings.arch) in ("x86_64", "armv8", "armv8.3") else "32"
+        address_model = "64" if str(self.settings.arch) in ("x86_64", "aarch64") or str(self.settings.arch).startswith(("armv8", "armv9")) else "32"
         args = [
             f"-j{jobs}",
             "--layout=system",
