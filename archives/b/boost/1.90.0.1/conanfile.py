@@ -107,6 +107,7 @@ class BoostCompiledConan(ConanFile):
             info.libs = [f"boost_{component}"]
 
         self.cpp_info.components["chrono"].requires = ["atomic"]
+        self.cpp_info.components["filesystem"].requires = ["atomic"]
         self.cpp_info.components["thread"].requires = ["chrono", "atomic"]
         self.cpp_info.components["timer"].requires = ["chrono"]
 

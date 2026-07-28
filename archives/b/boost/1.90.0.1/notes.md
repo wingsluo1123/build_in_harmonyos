@@ -8,18 +8,19 @@ subset is aimed at downstream FastNetMon 1.2.9 and includes:
 
 - `atomic`
 - `chrono`
+- `filesystem`
 - `program_options`
 - `regex`
 - `serialization`
 - `thread`
+- `timer`
 
 ## Adaptation Strategy
 
-Boost.Build/b2 is avoided because prior OpenHarmony attempts hit the known
-OHOS b2 failures in E099/E153. Boost 1.90.0 includes CMake support, so the
-recipe configures CMake with `BOOST_INCLUDE_LIBRARIES` for the required
-compiled components and leaves the rest of Boost header-only through the
-installed include tree.
+This recipe uses Boost.Build/b2 directly because the compiled components need
+Boost's native build metadata. The recipe limits b2 to the component subset
+above, sets a deterministic `--layout=system`, and preserves the rest of Boost
+as headers through the installed include tree.
 
 ## Validation
 
