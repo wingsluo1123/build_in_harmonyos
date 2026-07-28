@@ -78,18 +78,18 @@ class Log4cppConan(ConanFile):
 #define USE_PTHREADS 1
 #define VERSION "1.1.4"
 """
-        save(self, os.path.join(self.source_folder, "include", "log4cpp", "config.h"), config)
+        save(self, os.path.join(self.source_folder, "log4cpp", "include", "log4cpp", "config.h"), config)
 
     def build(self):
         self._write_config_header()
         cmake = CMake(self)
-        cmake.configure()
+        cmake.configure(build_script_folder="log4cpp")
         cmake.build()
 
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        copy(self, "config.h", src=f"{self.source_folder}/include/log4cpp", dst=f"{self.package_folder}/include/log4cpp")
+        copy(self, "config.h", src=f"{self.source_folder}/log4cpp/include/log4cpp", dst=f"{self.package_folder}/include/log4cpp")
 
     def package_info(self):
         self.cpp_info.libs = ["log4cpp"]
