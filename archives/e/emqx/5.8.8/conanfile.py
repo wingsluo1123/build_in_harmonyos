@@ -82,6 +82,11 @@ class EmqxConan(ConanFile):
             'SYSTEM="${SYSTEM:-$(bash ./scripts/get-distro.sh)}"',
         )
         self._replace_if_present(
+            os.path.join(self.source_folder, "build"),
+            '    ./scripts/pre-compile.sh "$PROFILE"',
+            '    bash ./scripts/pre-compile.sh "$PROFILE"',
+        )
+        self._replace_if_present(
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
