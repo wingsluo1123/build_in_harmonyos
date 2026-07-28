@@ -54,7 +54,7 @@ class BoostCompiledConan(ConanFile):
             "RelWithDebInfo": "release",
             "MinSizeRel": "release",
         }
-        return variants[build_type]
+        return variants.get(build_type, "release")
 
     def _bootstrap_command(self):
         if self.settings.os == "Windows":
@@ -68,7 +68,8 @@ class BoostCompiledConan(ConanFile):
         build_type = str(self.settings.build_type)
         link = "shared" if self.options.shared else "static"
         jobs = min(os.cpu_count() or 2, 8)
-        address_model = "64" if str(self.settings.arch) in ("x86_64", "aarch64") or str(self.settings.arch).startswith(("armv8", "armv9")) else "32"
+        arch = str(self.settings.arch)
+        address_model = "64" if arch in ("x86_64", "aarch64", "arm64") or arch.startswith(("armv8", "armv9")) else "32"
         args = [
             f"-j{jobs}",
             "--layout=system",

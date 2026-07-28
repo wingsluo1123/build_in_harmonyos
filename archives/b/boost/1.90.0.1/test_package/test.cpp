@@ -4,6 +4,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
 #include <boost/regex.hpp>
+#include <boost/serialization/string.hpp>
 #include <boost/timer/timer.hpp>
 #include <boost/thread.hpp>
 #include <boost/system/error_code.hpp>
