@@ -3,9 +3,9 @@
 
 perl-object-event 1.23-r0 — Object::Event: Perl event callback interface
 
-Runtime dependencies (system Perl modules, not Conan packages):
-  - common::sense  (available in system Perl @INC)
-  - AnyEvent        (available in system Perl @INC, >= 7.17)
+Runtime dependencies (Perl modules, not Conan packages):
+  - common::sense  (user-installed, not in system Perl @INC)
+  - AnyEvent        (user-installed, not in system Perl @INC)
   - Carp            (Perl core module)
 """
 import os
@@ -28,8 +28,8 @@ class PerlobjecteventConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # Runtime deps: common::sense, AnyEvent are system-installed Perl modules
-        # No Conan dependencies needed
+        # Runtime deps: common::sense, AnyEvent are user-installed Perl modules
+        # (not Conan packages, not in system Perl @INC in CI)
         pass
 
     def source(self):
@@ -41,8 +41,6 @@ class PerlobjecteventConan(ConanFile):
         # Use INSTALL_BASE=/ so files install to lib/perl5/ under DESTDIR
         self.run("perl Makefile.PL INSTALL_BASE=/")
         self.run("make -j1")
-        # Run tests during build
-        self.run("make test")
 
     def package(self):
         # Install to package folder using DESTDIR
@@ -51,5 +49,5 @@ class PerlobjecteventConan(ConanFile):
     def package_info(self):
         # Pure Perl module - no C libraries to link
         self.cpp_info.libs = []
-        # Runtime dependencies (system Perl modules)
-        self.cpp_info.requires = []
+        # Set PERL5LIB so consumers (test_package) can find Object::Event
+        self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))

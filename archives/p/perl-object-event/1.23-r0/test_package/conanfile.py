@@ -8,6 +8,7 @@ from conan import ConanFile
 
 class PerlobjecteventTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -16,4 +17,4 @@ class PerlobjecteventTestConan(ConanFile):
         pass
 
     def test(self):
-        self.run("bash test_object_event.sh")
+        self.run("bash test_object_event.sh", env="conanrun")

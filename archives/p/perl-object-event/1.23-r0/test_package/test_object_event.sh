@@ -3,8 +3,9 @@
 # Verifies that Object::Event can be loaded and its API works correctly
 set -euo pipefail
 
-# Ensure Conan-installed Perl modules are visible
-export PERL5LIB="${PERL5LIB:-}${PERL5LIB:+:}$(perl -e 'print join(":", @INC)')"
+# Add user-installed Perl modules (common::sense, AnyEvent) to PERL5LIB
+# These are not in the system Perl @INC in CI environment
+export PERL5LIB="/storage/Users/currentUser/usr/local/lib/perl5/aarch64-linux:/storage/Users/currentUser/usr/local/lib/perl5${PERL5LIB:+:}${PERL5LIB:-}"
 
 # Test 1: Module loads successfully
 perl -MObject::Event -e 'exit 0' 2>/dev/null
