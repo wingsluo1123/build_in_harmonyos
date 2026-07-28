@@ -305,10 +305,12 @@ gint gtkosx_application_attention_request(
         0
     );
 
-    id = self->next_attention_id++;
     if (self->next_attention_id <= 0) {
         self->next_attention_id = 1;
     }
+    id = self->next_attention_id;
+    self->next_attention_id =
+        id == G_MAXINT ? 1 : id + 1;
     g_hash_table_insert(
         self->attention_requests,
         GINT_TO_POINTER(id),
@@ -334,7 +336,7 @@ gchar *gtkosx_application_get_bundle_path(void)
 
     if (executable_path == NULL || *executable_path == '\0') {
         g_free(executable_path);
-        return g_get_current_dir();
+        return g_canonicalize_filename(".", NULL);
     }
     bundle_path = g_path_get_dirname(executable_path);
     g_free(executable_path);
