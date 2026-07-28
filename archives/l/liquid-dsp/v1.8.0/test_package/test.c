@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <liquid.h>
+#include <liquid/liquid.h>
 
 int main(void) {
     const char *version = liquid_libversion();
