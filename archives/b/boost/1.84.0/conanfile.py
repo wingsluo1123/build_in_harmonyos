@@ -14,12 +14,17 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 class BoostConan(ConanFile):
     name = "boost"
     version = "1.84.0"
-    description = "Boost C++ Libraries 1.84.0"
+    description = "Boost C++ Libraries 1.84.0（手动编译 4 个库：filesystem/regex/program_options/system，鸿蒙 PC 适配）"
     license = "BSL-1.0"
     homepage = "https://www.boost.org/"
     url = ""
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
+    # Conan 2 requires `shared` to be declared for package_type="library".
+    # Boost b2 build system is incompatible with OHOS, so we manually compile
+    # select non-header-only libraries into static archives. Dynamic library
+    # building would require b2 (which fails on OHOS), so `shared` is fixed to
+    # False — see notes.md for the rationale.
     options = {"shared": [True, False]}
     default_options = {"shared": False}
 
@@ -60,10 +65,15 @@ class BoostConan(ConanFile):
         cxx = compilers.get("cpp", "clang++")
 
         boost_root = self.source_folder
+        # Optimization flags driven by build_type (R8: no hardcoded build profile).
+        if self.settings.build_type == "Debug":
+            opt_flags = ["-O0", "-g"]
+        else:
+            opt_flags = ["-O2", "-DNDEBUG"]
         cxxflags = " ".join([
             "-std=c++17",
             "-stdlib=libc++",
-            "-O2",
+            *opt_flags,
             "-fPIC",
             f"-I{boost_root}",
             "-DBOOST_ALL_NO_LIB",
@@ -71,6 +81,10 @@ class BoostConan(ConanFile):
             "-DBOOST_FILESYSTEM_NO_CXX20_CHAR8_T",
             "-DBOOST_FILESYSTEM_NO_CXX20_ATOMIC_REF",
             "-DBOOST_IOSTREAMS_NO_LIB",
+            # R8 compliance: skip pthread_setcancelstate (not available on OHOS musl)
+            # via a feature-detection macro instead of a platform macro (__OHOS__).
+            # The patch consumes BOOST_SP_NO_PTHREAD_SETCANCELSTATE, see patches/0001.
+            "-DBOOST_SP_NO_PTHREAD_SETCANCELSTATE",
             f"-I{os.path.join(self.dependencies['zlib'].package_folder, 'include')}",
         ])
 
@@ -119,6 +133,12 @@ class BoostConan(ConanFile):
 
         # Main "headers" component (always needed)
         self.cpp_info.components["boost_headers"].includedirs = ["include"]
+        # R8 compliance: expose BOOST_SP_NO_PTHREAD_SETCANCELSTATE to all
+        # consumers so the patched sp_thread_sleep.hpp skips the
+        # pthread_setcancelstate path (not available on OHOS musl) without
+        # relying on a platform macro. Every downstream that includes boost
+        # headers gets this define via Conan's CMakeDeps/Toolchain propagation.
+        self.cpp_info.components["boost_headers"].defines = ["BOOST_SP_NO_PTHREAD_SETCANCELSTATE"]
         self.cpp_info.components["boost_headers"].set_property("cmake_target_name", "Boost::headers")
 
         # Filesystem
