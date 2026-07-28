@@ -58,8 +58,8 @@
 ## 四、源码修改清单
 | 文件 | 原因 | 方式 | 补丁 |
 |------|------|------|------|
-| libusb/os/linux_netlink.c | E091: sockaddr_storage 重定义 | include-time sockaddr_storage rename around linux/netlink.h | 0003-libusb-os-linux_netlink.c.patch |
-| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | 检测 HongMeng/OHOS 内核格式 | 0004-libusb-os-linux_usbfs.c.patch |
+| libusb/os/linux_netlink.c | E091: sockaddr_storage 重定义 | include-time sockaddr_storage rename around linux/netlink.h | 0002-libusb-os-linux_netlink.c.patch |
+| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | 检测 HongMeng/OHOS 内核格式 | 0003-libusb-os-linux_usbfs.c.patch |
 | configure | HMDFS umask 077 目录权限问题 | sed umask 077→022 | 0001-configure.patch |
 
 ## 五、预编译包交付物
