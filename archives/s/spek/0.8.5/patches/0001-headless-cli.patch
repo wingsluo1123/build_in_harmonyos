@@ -113,6 +113,19 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +static void spectrum_cb(int bands, int sample, float *values, void *cb_data)
 +{
 +    auto *out = static_cast<FILE *>(cb_data);
++    // Write CSV header on the first callback, once we know the band count.
++    // Replaces the old fprintf(output, "sample") at pipeline creation time
++    // which lacked a newline and concatenated with the first data row
++    // ("sample0,val0,..."). Header is sample + band0..bandN.
++    static bool header_written = false;
++    if (!header_written) {
++        fprintf(out, "sample");
++        for (int i = 0; i < bands; i++) {
++            fprintf(out, ",band%d", i);
++        }
++        fprintf(out, "\n");
++        header_written = true;
++    }
 +    // Print time in milliseconds
 +    fprintf(out, "%d", sample);
 +    // Print magnitudes for each frequency band
@@ -149,9 +162,15 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +    int stream = 0, channel = 0, samples = 1024;
 +    int window = WINDOW_DEFAULT;
 +    FILE *output = stdout;
++    const char *output_path = nullptr;  // deferred fopen — parse first, open later
 +    bool info_only = false;
 +
-+    // Parse arguments
++    // Parse arguments. --output only records the path here; the actual
++    // fopen is deferred until after parsing completes (see "Open output
++    // file" below). This eliminates the file-handle leak on every early
++    // return in this loop (--help / unknown --window / unknown option /
++    // missing input file) — none of them can leak because output is still
++    // stdout at this point.
 +    for (int i = 1; i < argc; i++) {
 +        if (strcmp(argv[i], "--help") == 0) {
 +            print_usage(argv[0]);
@@ -171,12 +190,7 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +                return 1;
 +            }
 +        } else if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-+            const char *path = argv[++i];
-+            output = fopen(path, "w");
-+            if (!output) {
-+                fprintf(stderr, "Cannot open output file: %s\n", path);
-+                return 1;
-+            }
++            output_path = argv[++i];
 +        } else if (argv[i][0] == '-') {
 +            fprintf(stderr, "Unknown option: %s\n", argv[i]);
 +            print_usage(argv[0]);
@@ -190,6 +204,16 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +        fprintf(stderr, "No input file specified.\n");
 +        print_usage(argv[0]);
 +        return 1;
++    }
++
++    // Open output file — deferred to here so every parse-phase early return
++    // above is guaranteed not to leak a handle (output was still stdout).
++    if (output_path) {
++        output = fopen(output_path, "w");
++        if (!output) {
++            fprintf(stderr, "Cannot open output file: %s\n", output_path);
++            return 1;
++        }
 +    }
 +
 +    // Open audio file
@@ -254,13 +278,10 @@ Subject: [PATCH] Add --disable-gui headless CLI build support
 +        return 1;
 +    }
 +
-+    // Write CSV header
-+    fprintf(output, "sample");
-+    // We don't know bands until after pipeline starts, but we need the header first
-+    // Use a two-pass approach: collect bands from first callback
-+    // Actually, let's just write the header based on the first callback call
-+    // For now, write without header (user can infer from data)
-+    // Better: write header after pipeline starts
++    // CSV header is written by spectrum_cb on its first callback, once
++    // the band count is known (sample,band0,band1,...,bandN\n). This
++    // replaces the prior fprintf(output, "sample") here which lacked a
++    // newline and concatenated with the first data row.
 +
 +    // Run pipeline
 +    fprintf(stderr, "Processing...\n");
