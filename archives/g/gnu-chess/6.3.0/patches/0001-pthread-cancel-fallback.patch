@@ -1,0 +1,36 @@
+--- a/src/components.cc
++++ b/src/components.cc
+@@ -30,1 +30,3 @@
+ #include <pthread.h>
++extern "C" int pthread_cancel(pthread_t) __attribute__((weak));
++
+@@ -162,9 +164,13 @@ int SendToEngine( char msg[] );
+ void TerminateAdapterEngine()
+ {
+-  pthread_cancel( engine_thread );
++  if ( pthread_cancel ) {
++    pthread_cancel( engine_thread );
++  }
+   pthread_join( engine_thread, NULL );
+   if ( ! (flags & UCI ) ) {
+-    pthread_cancel( adapter_thread );
++    if ( pthread_cancel ) {
++      pthread_cancel( adapter_thread );
++    }
+     pthread_join( adapter_thread, NULL );
+   }
+ }
+@@ -172,7 +178,11 @@
+ void TerminateInput()
+ {
+   if ( ! (flags & UCI ) ) {
+-    pthread_cancel( input_thread );
+-    pthread_join( input_thread, NULL );
++    if ( pthread_cancel ) {
++      pthread_cancel( input_thread );
++      pthread_join( input_thread, NULL );
++    } else {
++      pthread_detach( input_thread );
++    }
+   }
+ }

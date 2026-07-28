@@ -2,9 +2,9 @@
 
 - Builds the command-line engine without optional readline and gettext
   integrations.
-- During OHOS shutdown, completed engine and adapter workers are joined; only
-  the potentially blocked input reader is detached because the platform does
-  not provide `pthread_cancel`.
+- A weak-symbol feature check preserves `pthread_cancel` where the POSIX
+  implementation provides it. Otherwise, completed engine and adapter workers
+  are joined and only the potentially blocked input reader is detached.
 - The release contains no automated upstream test suite.
 - The consumer checks version/help output and completes the UCI `uci`,
   `isready`, and `quit` protocol handshake.
