@@ -7,4 +7,8 @@
 - The official 4.15.0 release tarball omits `tpkg`, and its `make test` target
   is intentionally empty. The consumer checks the version, parses a minimal
   configuration, and validates a real zone file.
+- Local OHOS arm64 `conan create` completed successfully: OpenSSL, NSD, and
+  five packaged NSD tools were built for AArch64. The three consumer checks
+  were prepared by the test package; runtime execution is not applicable
+  locally because no OHOS arm64 HDC target is connected.
 - Official OHOS test and CI results remain pending.

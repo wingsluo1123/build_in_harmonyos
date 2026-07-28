@@ -17,6 +17,7 @@ from conan.tools.gnu import (
     PkgConfigDeps,
 )
 from conan.tools.layout import basic_layout
+from conan.tools.microsoft import unix_path
 
 
 class NsdConan(ConanFile):
@@ -27,6 +28,7 @@ class NsdConan(ConanFile):
     homepage = "https://www.nlnetlabs.nl/projects/nsd/"
     package_type = "application"
     settings = "os", "arch", "compiler", "build_type"
+    win_bash = True
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -37,7 +39,7 @@ class NsdConan(ConanFile):
 
     def requirements(self):
         self.requires(
-            "openssl/3.5.6@ohpcd/stable",
+            "openssl/3.5.6",
             transitive_headers=True,
             transitive_libs=True,
         )
@@ -58,11 +60,6 @@ class NsdConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        if self.settings.os == "OHOS":
-            self._patch_config_sub(os.path.join(self.source_folder, "config.sub"))
-            self._patch_config_sub(
-                os.path.join(self.source_folder, "simdzone", "config.sub")
-            )
 
     def layout(self):
         basic_layout(self)
@@ -70,7 +67,9 @@ class NsdConan(ConanFile):
     def generate(self):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
-        openssl = self.dependencies["openssl"].package_folder
+        openssl = unix_path(
+            self, self.dependencies["openssl"].package_folder
+        )
         toolchain = AutotoolsToolchain(self)
         toolchain.configure_args.extend(
             [
@@ -93,6 +92,11 @@ class NsdConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        if self.settings.os == "OHOS":
+            self._patch_config_sub(os.path.join(self.source_folder, "config.sub"))
+            self._patch_config_sub(
+                os.path.join(self.source_folder, "simdzone", "config.sub")
+            )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
