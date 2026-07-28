@@ -10,7 +10,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 class Tinyxml2Conan(ConanFile):
     name = "tinyxml2"
     version = "10.0.0"
-    description = "A simple, small, efficient C++ XML parser"
+    description = "A simple, small, efficient C++ XML parser（轻量 XML 解析库，CMake 构建，鸿蒙 PC 适配）"
     license = "Zlib"
     homepage = "https://github.com/leethomason/tinyxml2"
     url = ""
