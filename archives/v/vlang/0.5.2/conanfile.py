@@ -21,6 +21,11 @@ from conan.tools.files import (
 from conan.tools.layout import basic_layout
 
 
+OHOS_TOOL_DIR = "/data/service/hnp/bin"
+OHOS_LINKER = os.path.join(OHOS_TOOL_DIR, "ld.bfd")
+OHOS_SIGN_TOOL = os.path.join(OHOS_TOOL_DIR, "binary-sign-tool")
+
+
 class VConan(ConanFile):
     name = "vlang"
     version = "0.5.2"
@@ -180,8 +185,8 @@ class VConan(ConanFile):
         ldflags = ""
         sign_tool_arg = ""
         if str(self.settings.os) == "OHOS":
-            ldflags = "-fuse-ld=/data/service/hnp/bin/ld.bfd"
-            sign_tool_arg = ' OHOS_SIGN_TOOL="/data/service/hnp/bin/binary-sign-tool"'
+            ldflags = f"-fuse-ld={OHOS_LINKER}"
+            sign_tool_arg = f' OHOS_SIGN_TOOL="{self._ohos_sign_tool()}"'
 
         # Run only the local bootstrap target. The default target tries to clone
         # or pull vlang/vc; source() has already supplied vc/v.c deterministically.
@@ -242,9 +247,7 @@ class VConan(ConanFile):
             os.chmod(real_v, 0o755)
 
     def _sign_ohos_binary(self, binary_path):
-        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-        if not os.path.isfile(sign_tool):
-            raise ConanException(f"OHOS binary sign tool not found: {sign_tool}")
+        sign_tool = self._ohos_sign_tool()
         signed_path = f"{binary_path}.signed"
         self.run(
             f'{sign_tool} sign -inFile "{binary_path}" '
@@ -254,6 +257,12 @@ class VConan(ConanFile):
         if not os.path.isfile(signed_path):
             raise ConanException(f"OHOS binary signing did not create {signed_path}")
         os.replace(signed_path, binary_path)
+
+    def _ohos_sign_tool(self):
+        sign_tool = OHOS_SIGN_TOOL
+        if not os.path.isfile(sign_tool):
+            raise ConanException(f"OHOS binary sign tool not found: {sign_tool}")
+        return sign_tool
 
     def _find_built_v(self):
         for filename in ["v.exe", "v"]:

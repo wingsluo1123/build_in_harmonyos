@@ -10,6 +10,10 @@ from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.files import copy
 
 
+OHOS_TOOL_DIR = "/data/service/hnp/bin"
+OHOS_SIGN_TOOL = os.path.join(OHOS_TOOL_DIR, "binary-sign-tool")
+
+
 class VTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeToolchain", "VirtualRunEnv"
@@ -68,7 +72,7 @@ class VTestConan(ConanFile):
         self.run(f'"{test_cmd}"', env="conanrun")
 
     def _sign_ohos_binary(self, binary_path):
-        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
+        sign_tool = self._ohos_sign_tool()
         binary_path = Path(binary_path)
         if not binary_path.is_file():
             raise ConanException(f"OHOS test binary not found: {binary_path}")
@@ -80,3 +84,9 @@ class VTestConan(ConanFile):
         )
         os.replace(signed_path, binary_path)
         os.chmod(binary_path, 0o755)
+
+    def _ohos_sign_tool(self):
+        sign_tool = OHOS_SIGN_TOOL
+        if not os.path.isfile(sign_tool):
+            raise ConanException(f"OHOS binary sign tool not found: {sign_tool}")
+        return sign_tool
