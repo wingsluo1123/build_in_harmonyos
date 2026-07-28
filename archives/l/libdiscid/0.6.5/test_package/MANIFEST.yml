@@ -3,9 +3,28 @@ homepage: https://musicbrainz.org/doc/libdiscid
 upstream_check_command: "cmake --build build --target check"
 upstream_test_in_build: false
 upstream_test_command: ""
+
+excluded_upstream_tests:
+  - command: "cmake --build build --target check"
+    reason: "The recipe cross-compiles the library and does not execute build-tree test binaries; the separate test_package validates the packaged target with a synthetic TOC."
+
 upstream_tests:
+  - file: test/test_core.c
+    source: libdiscid-0.6.5/test/test_core.c
+    description: "Upstream core DiscId calculation tests"
+    command: "./test_core"
   - file: test/test_put.c
+    source: libdiscid-0.6.5/test/test_put.c
     description: "Upstream DiscId TOC calculation tests"
+    command: "./test_put"
+  - file: test/test_read.c
+    source: libdiscid-0.6.5/test/test_read.c
+    description: "Upstream device TOC read tests"
+    command: "./test_read"
+  - file: test/test_read_full.c
+    source: libdiscid-0.6.5/test/test_read_full.c
+    description: "Upstream full device TOC read tests"
+    command: "./test_read_full"
 test_package_tests:
   - file: test_libdiscid.c
     description: "Create a DiscId from a synthetic two-track TOC"
