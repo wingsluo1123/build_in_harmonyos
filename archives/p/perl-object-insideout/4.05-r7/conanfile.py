@@ -44,11 +44,13 @@ class PerlobjectinsideoutConan(ConanFile):
         os.environ["PERL_CANARY_STABILITY_NOPROMPT"] = "1"
         # Install directly to the temporary prefix (no DESTDIR)
         self.run("make install", cwd=self.source_folder)
-        # Copy Perl module files from prefix/lib/perl5/ to package/lib/
+        # Copy Perl module files from prefix/lib/perl5/ to package/lib/perl5/
         perl_lib = os.path.join(self._prefix, "lib", "perl5")
-        copy(self, "*.pm", perl_lib, os.path.join(self.package_folder, "lib"))
-        copy(self, "*.pod", perl_lib, os.path.join(self.package_folder, "lib"))
+        copy(self, "*.pm", perl_lib, os.path.join(self.package_folder, "lib", "perl5"))
+        copy(self, "*.pod", perl_lib, os.path.join(self.package_folder, "lib", "perl5"))
 
     def package_info(self):
         # Pure Perl module — no C/C++ libraries
         self.cpp_info.libs = []
+        self.cpp_info.libdirs = ["lib/perl5"]
+        self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))

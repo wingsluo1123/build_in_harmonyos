@@ -17,7 +17,7 @@ Object::InsideOut 是一个全面的 Perl 面向对象编程模块，提供 insi
 ### Conan 安装
 
 ```bash
-conan install --requires=perl-object-insideout/4.05-r7@ohpcd/stable
+conan install --requires=perl-object-insideout/4.05-r7
 ```
 
 ### Perl 代码示例
