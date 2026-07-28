@@ -21,4 +21,4 @@ class NumenTestConan(ConanFile):
             return
         # Use bash wrapper to execute test.sh (Windows compatibility + OHOS requirement)
         bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "bash"
-        self.run(f'{bash} test.sh', env="conanrun")
+        self.run(f'{bash} test.sh', env=["conanrun"])

@@ -49,19 +49,19 @@ class NumenConan(ConanFile):
         # CGO is required because vosk-api Go binding links libvosk C++.
         version = str(self.version)
         ldflags = f"-X main.Version={version}"
-        env = os.environ.copy()
         # Go environment (based on yamlfmt lessons learned E081/E082):
         # - CGO_ENABLED=1: vosk-api Go binding requires CGO
         # - GOTOOLCHAIN=local: prevent auto-download of unsigned Go toolchain
         # - GOPROXY: use China mirror for module downloads
-        env.setdefault("CGO_ENABLED", "1")
-        env.setdefault("GO111MODULE", "on")
-        env.setdefault("GOTOOLCHAIN", "local")
-        env.setdefault("GOPROXY", "https://goproxy.cn,direct")
+        # Note: Conan 2.x run() env param must be a list of env-file names,
+        # not a dict; set Go vars directly on os.environ instead.
+        os.environ.setdefault("CGO_ENABLED", "1")
+        os.environ.setdefault("GO111MODULE", "on")
+        os.environ.setdefault("GOTOOLCHAIN", "local")
+        os.environ.setdefault("GOPROXY", "https://goproxy.cn,direct")
         self.run(
             f'go build -ldflags "{ldflags}" -o numen .',
             cwd=self.source_folder,
-            env=env,
         )
 
     def package(self):
