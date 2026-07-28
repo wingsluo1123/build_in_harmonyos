@@ -42,6 +42,12 @@ Meson 构建流程：
 
 OHOS 使用 toybox 工具链，其 `xxd` 不支持 `-i` 选项。补丁在 `scripts/embed.sh` 中检测 `xxd -i` 是否可用，不可用时自动回退到项目自带的 `scripts/embed.py`（CLI 接口一致），确保 `meson.build` 中的 `custom_target('bsc5_embed')` 能正常生成 `bsc5_embed.h`。
 
+#### 补丁 3: `0003-fix-curses-for-ohos.patch`
+
+OHOS CI worker 在 `/storage/Users/currentUser/usr/local/{include,lib}` 预装了 ncurses 静态库（`libncursesw.a`）和头文件，但未安装 `curses.pc` pkg-config 文件。meson 的 `dependency('curses')` 走 pkg-config 查找必然失败。
+
+补丁将 `meson.build` 中的 `dependency('curses')` 替换为 `cc.find_library('ncursesw')` + `include_directories()`，绕过 pkg-config 直接定位系统库。与 hexcurse、fdclone 等配方的 `-I/-L` 注入思路一致，但适配了 meson 的 `find_library` API。
+
 ### 4. 静态链接（R26）
 
 astroterm 是终端工具，通过 `MesonToolchain` 默认关闭共享库构建，并在 `package()` 阶段删除任何意外生成的 `.so` / `.la` 文件，确保 DevBox 部署兼容性。
@@ -61,3 +67,4 @@ astroterm 是终端工具，通过 `MesonToolchain` 默认关闭共享库构建�
 - `test_package/MANIFEST.yml` — 测试清单
 - `patches/0001-*.patch` — stddef.h 修复
 - `patches/0002-*.patch` — embed.sh toybox 兼容
+- `patches/0003-*.patch` — curses pkg-config 绕过（OHOS 专用）
