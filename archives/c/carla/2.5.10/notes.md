@@ -23,7 +23,7 @@ carla 是 Makefile 范式的 C++ 音频插件宿主项目，上游用 `make` 直
 | 3 | `cc: No such file or directory`，make 找不到编译器 | `source/Makefile.deps.mk` 默认 `CC?=gcc` / `CXX?=g++`，鸿蒙工具链是 clang，无 gcc/g++ | conanfile.py `build()` 用 `make -j1 CC=clang CXX=clang++` 命令行参数覆盖（命令行参数优先级高于环境变量和 `?=` 赋值） |
 | 4 | Conan `self.run(env=...)` 要求 list 非 dict | Conan 2.x 的 `run()` env 参数语义是 list of "KEY=VALUE" 字符串，且会替换而非追加环境 | 早期尝试用 dict 报 AssertionError；改用 make 命令行参数传 CC/CXX，绕开 env 注入问题 |
 | 5 | `carla-discovery-native --version` 退出 1 | 上游 CLI 无 `--version` 标志，`--version` 被当未知 `<type>` 参数，打印 usage 后退出 1 | test_package 改用无参数调用，断言 stdout 含 `usage:`（二进制存活的真实信号），不依赖 returncode（退出码在不同构建间不稳定，0 或 1） |
-| 6 | 本地 `conan create` 卡在下载源码（github.com 不可达） | 本地网络无法访问 github.com，conan `get()` 下载超时 | conanfile.py `source()` 加本地 fallback：读 `CARLA_LOCAL_TARBALL` 环境变量指向的 tarball，用 `unzip()` 解压；sha256 仍由 conandata.yml 校验 |
+| 6 | 本地 `conan create` 卡在下载源码（github.com 不可达） | 本地网络无法访问 github.com，conan `get()` 下载超时 | conanfile.py `source()` 加本地 fallback：读 `CARLA_LOCAL_TARBALL` 环境变量指向的 tarball；**显式调用 `check_sha256(self, local_tar, src_meta["sha256"])` 后再 `unzip()`**，sha256 取自 conandata.yml，与在线 `get()` 走同一条校验路径 |
 
 ## 源码修改
 

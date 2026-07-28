@@ -43,12 +43,15 @@ class CarlaConan(ConanFile):
     def source(self):
         # Offline-friendly: if the upstream URL cannot be reached (CI sandboxes
         # that proxy via a mirror, or local no-network runs), fall back to a
-        # tarball supplied through the CARLA_LOCAL_TARBALL env var. The sha256
-        # in conandata.yml still gate integrity.
+        # tarball supplied through the CARLA_LOCAL_TARBALL env var. The local
+        # tarball path performs an explicit check_sha256() against
+        # conandata.yml before unzipping, so an upstream or network mirror
+        # serving a tampered tarball still fails the recipe.
         src_meta = self.conan_data["sources"]
         local_tar = os.environ.get("CARLA_LOCAL_TARBALL")
         if local_tar and os.path.isfile(local_tar):
-            from conan.tools.files import unzip
+            from conan.tools.files import unzip, check_sha256
+            check_sha256(self, local_tar, src_meta["sha256"])
             unzip(self, local_tar, destination=self.source_folder, strip_root=True)
             self.output.info(f"Used local tarball {local_tar} for {src_meta['url']}")
         else:
