@@ -73,28 +73,34 @@ class HarfbuzzConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         cmake = CMake(self)
-        cmake.configure(variables={
-            "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
-        })
+        cmake.configure()
         cmake.build()
 
     def package(self):
         cmake = CMake(self)
         cmake.install()
 
-        # If CMake install didn't copy the library, do it manually
+        # If CMake install didn't copy libraries, do it manually
         lib_dir = os.path.join(self.package_folder, "lib")
         if not os.path.exists(lib_dir):
             os.makedirs(lib_dir, exist_ok=True)
-        build_lib = os.path.join(self.build_folder, "libharfbuzz.a")
-        if os.path.exists(build_lib) and not os.path.exists(os.path.join(lib_dir, "libharfbuzz.a")):
-            shutil.copy2(build_lib, lib_dir)
+        for lib_name in ("libharfbuzz.a", "libharfbuzz-subset.a",
+                         "libharfbuzz-vector.a", "libharfbuzz-raster.a",
+                         "libharfbuzz-gpu.a"):
+            build_lib = os.path.join(self.build_folder, lib_name)
+            if os.path.exists(build_lib) and not os.path.exists(os.path.join(lib_dir, lib_name)):
+                shutil.copy2(build_lib, lib_dir)
 
     def package_info(self):
         # Headers are installed to include/harfbuzz/, so consumers can
         # use #include <hb.h> directly
         self.cpp_info.includedirs = ["include/harfbuzz"]
-        self.cpp_info.libs = ["harfbuzz"]
+
+        # Components: harfbuzz produces multiple independent libraries
+        self.cpp_info.components["harfbuzz"].libs = ["harfbuzz"]
+        self.cpp_info.components["subset"].libs = ["harfbuzz-subset"]
+        self.cpp_info.components["vector"].libs = ["harfbuzz-vector"]
+
         # Transitive dependencies: harfbuzz public headers include
         # graphite2 and freetype headers (e.g., hb-graphite2.h includes
         # <graphite2/Font.h>, hb-ft.h includes <ft2build.h>)
@@ -103,7 +109,7 @@ class HarfbuzzConan(ConanFile):
             _requires.append("graphite2::graphite2")
         if self.options.with_freetype:
             _requires.append("freetype::freetype")
-        self.cpp_info.requires = _requires
+        self.cpp_info.components["harfbuzz"].requires = _requires
         # R32: settings.os check must use in ("Linux", "OHOS")
         if self.settings.os in ("Linux", "OHOS"):
-            self.cpp_info.system_libs = ["pthread"]
+            self.cpp_info.components["harfbuzz"].system_libs = ["pthread", "m"]

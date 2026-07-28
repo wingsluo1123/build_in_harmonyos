@@ -8,6 +8,7 @@ CI runs this automatically via `conan create` (which invokes test_package).
 R34: test calls real ICU APIs (u_init, u_getUnicodeVersion, u_errorName, u_isalpha).
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
@@ -31,5 +32,6 @@ class Icu4cTestConan(ConanFile):
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        # R33: find bash dynamically, avoid hardcoding paths
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
         self.run(f"{bash} -c './test_icu4c'", env="conanrun")
