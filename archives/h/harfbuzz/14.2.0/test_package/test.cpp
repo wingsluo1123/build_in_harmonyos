@@ -25,6 +25,7 @@ int main(void)
     hb_buffer_t *buf = hb_buffer_create();
     if (buf == hb_buffer_get_empty()) {
         fprintf(stderr, "FAIL: Buffer creation returned empty buffer\n");
+        hb_buffer_destroy(buf);
         return 1;
     }
 
@@ -35,12 +36,14 @@ int main(void)
     printf("Buffer length: %u glyphs\n", len);
     if (len == 0) {
         fprintf(stderr, "FAIL: Buffer is empty after adding text\n");
+        hb_buffer_destroy(buf);
         return 1;
     }
 
     hb_glyph_info_t *info = hb_buffer_get_glyph_infos(buf, NULL);
     if (info == NULL) {
         fprintf(stderr, "FAIL: Got NULL glyph info from non-empty buffer\n");
+        hb_buffer_destroy(buf);
         return 1;
     }
 

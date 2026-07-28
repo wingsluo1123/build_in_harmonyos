@@ -270,16 +270,6 @@ class TectonicConan(ConanFile):
                 if so_file.endswith(".so") or ".so." in so_file:
                     copy(self, so_file, dep_lib_dir, lib_dir)
 
-        # Set RPATH on the tectonic binary so it finds lib/ relative to itself
-        tectonic_bin = os.path.join(self.package_folder, "bin", "tectonic")
-        if os.path.isfile(tectonic_bin):
-            patchelf = shutil.which("patchelf") or "/data/service/hnp/bin/patchelf"
-            if os.path.isfile(patchelf):
-                try:
-                    self.run(f'{patchelf} --set-rpath "$ORIGIN/../lib" {tectonic_bin}')
-                except Exception:
-                    pass  # Non-fatal if patchelf fails
-
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libs = []
