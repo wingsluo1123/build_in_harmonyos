@@ -1,0 +1,25 @@
+package: liquid-dsp/v1.8.0
+homepage: "https://liquidsdr.org"
+
+# 上游测试命令 (liquid-dsp 使用 cmake CTest)
+upstream_check_command: "ctest"
+
+# conanfile.py 中未集成上游测试 (仅 test_package 消费者测试)
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (autotests 已关闭)
+upstream_tests:
+  - file: autotest/src/autotest.c
+    source: liquid-dsp-v1.8.0/autotest/
+    description: "Autotest suite (disabled in conan build, BUILD_AUTOTESTS=OFF)"
+    command: "./autotest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "验证 liquid_libversion() 返回版本字符串和版本号"
+    command: "./test_liquid-dsp"
+
+# 测试断言数 (API 版本号校验: header vs library)
+assertion_count: 1
