@@ -13,7 +13,6 @@ Key OHOS adaptations:
 """
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -49,6 +48,12 @@ class OsvScannerConan(ConanFile):
             raise ConanInvalidConfiguration(
                 f"{self.settings.os} not supported. Only Linux and OHOS are supported."
             )
+        # Validate architecture — GOARCH is derived from settings.arch
+        arch = str(self.settings.arch)
+        if arch not in ("armv8", "x86_64"):
+            raise ConanInvalidConfiguration(
+                f"Unsupported architecture: {arch}. Only armv8 and x86_64 are supported."
+            )
 
     def generate(self):
         # Go project — no CMake/Autotools toolchain needed
@@ -59,8 +64,13 @@ class OsvScannerConan(ConanFile):
         apply_conandata_patches(self)
 
         # Set up Go environment as list of KEY=VALUE strings (Conan 2.x API)
-        goroot = os.environ.get("GOROOT", "/storage/Users/currentUser/usr/local/go")
-        go_bin = os.environ.get("GO_BIN_PATH", "/storage/Users/currentUser/tmp/go_bin")
+        goroot = os.environ.get("GOROOT", "")
+        go_bin = os.environ.get("GO_BIN_PATH", "")
+        if not goroot or not go_bin:
+            raise ConanInvalidConfiguration(
+                "GOROOT and GO_BIN_PATH environment variables must be set. "
+                "Please configure the Go toolchain path."
+            )
         gopath = os.environ.get("GOPATH", os.path.join(os.path.expanduser("~"), "go"))
         goproxy = os.environ.get("GOPROXY", "https://goproxy.cn,direct")
         tmpdir = os.environ.get("TMPDIR", os.path.join(os.path.expanduser("~"), "tmp"))
@@ -76,7 +86,7 @@ class OsvScannerConan(ConanFile):
             f"GOCACHE={gocache}",
             f"GOTMPDIR={gotmpdir}",
             "GOOS=linux",
-            "GOARCH=arm64",
+            f"GOARCH={'arm64' if str(self.settings.arch) == 'armv8' else 'amd64'}",
             "CGO_ENABLED=0",
         ]
 
@@ -89,10 +99,19 @@ class OsvScannerConan(ConanFile):
         # Download dependencies
         self.run('go mod download', env=env_list, cwd=build_dir)
 
-        # Check if toolexec wrapper is needed (OHOS fallocate workaround)
+        # toolexec wrapper is required on OHOS (fallocate workaround)
         toolexec_arg = ""
-        toolexec_script = os.path.join(os.path.expanduser("~"), "tmp", "toolexec_wrapper.sh")
-        if str(self.settings.os) == "OHOS" and os.path.exists(toolexec_script):
+        if str(self.settings.os) == "OHOS":
+            toolexec_script = os.environ.get(
+                "TOOLEXEC_WRAPPER",
+                os.path.join(os.path.expanduser("~"), "tmp", "toolexec_wrapper.sh")
+            )
+            if not os.path.exists(toolexec_script):
+                raise ConanInvalidConfiguration(
+                    f"toolexec wrapper not found at {toolexec_script}. "
+                    f"It is required on OHOS for Go compilation. "
+                    f"Set TOOLEXEC_WRAPPER env var to specify its path."
+                )
             toolexec_arg = f"-toolexec {toolexec_script}"
 
         # Build osv-scanner
@@ -103,22 +122,29 @@ class OsvScannerConan(ConanFile):
 
         # Sign binaries on OHOS (ELF signature requirement)
         if str(self.settings.os) == "OHOS":
-            sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-            if os.path.exists(sign_tool):
-                for binary in ["osv-scanner", "osv-reporter"]:
-                    signed = f"{binary}-signed"
-                    self.run(
-                        f'{sign_tool} sign -inFile {binary} -outFile {signed} '
-                        f'-selfSign 1 -signAlg SHA256withECDSA',
-                        env=env_list, cwd=build_dir
-                    )
-                    # Replace unsigned with signed
-                    os.remove(os.path.join(build_dir, binary))
-                    shutil.move(
-                        os.path.join(build_dir, signed),
-                        os.path.join(build_dir, binary)
-                    )
-                    os.chmod(os.path.join(build_dir, binary), 0o755)
+            sign_tool = os.environ.get(
+                "SIGN_TOOL_PATH", "/data/service/hnp/bin/binary-sign-tool"
+            )
+            if not os.path.exists(sign_tool):
+                raise ConanInvalidConfiguration(
+                    f"binary-sign-tool not found at {sign_tool}. "
+                    f"ELF signature is required on OHOS. "
+                    f"Set SIGN_TOOL_PATH env var to specify its path."
+                )
+            for binary in ["osv-scanner", "osv-reporter"]:
+                signed = f"{binary}-signed"
+                self.run(
+                    f'{sign_tool} sign -inFile {binary} -outFile {signed} '
+                    f'-selfSign 1 -signAlg SHA256withECDSA',
+                    env=env_list, cwd=build_dir
+                )
+                # Replace unsigned with signed
+                os.remove(os.path.join(build_dir, binary))
+                shutil.move(
+                    os.path.join(build_dir, signed),
+                    os.path.join(build_dir, binary)
+                )
+                os.chmod(os.path.join(build_dir, binary), 0o755)
 
     def package(self):
         # Copy both binaries to bin/ (binaries are built in source_folder)
