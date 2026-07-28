@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 package_folder="$1"
 executable="$package_folder/bin/sipsak"
