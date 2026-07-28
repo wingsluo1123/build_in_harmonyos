@@ -115,6 +115,15 @@ class EmqxConan(ConanFile):
             ),
         )
         self._replace_if_present(
+            os.path.join(self.source_folder, "scripts", "get-dashboard.sh"),
+            'unzip -o -q "$RELEASE_ASSET_FILE" -d "$DASHBOARD_PATH"',
+            (
+                "python3 -c 'import sys, zipfile; "
+                "zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' "
+                '"$RELEASE_ASSET_FILE" "$DASHBOARD_PATH"'
+            ),
+        )
+        self._replace_if_present(
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
