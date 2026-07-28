@@ -9,7 +9,7 @@
 
 ## 编译步骤
 
-1. 下载源码: curl -kL 下载 Crypt-Bcrypt-0.011.tar.gz (CPAN URL, SSL 证书需 -k)
+1. 下载源码: curl -L 下载 Crypt-Bcrypt-0.011.tar.gz (CPAN URL，如遇 SSL 验证失败请配置 CA 证书)
 2. perl Makefile.PL PREFIX=$DEFAULT_PREFIX
 3. make -j2 (编译 crypt_blowfish.c + Bcrypt.xs → Bcrypt.so)
 4. make install DESTDIR=$TEST_PREFIX (staging 隔离安装)
@@ -19,7 +19,7 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | init-build 下载失败 (SSL CERTIFICATE_VERIFY_FAILED) | 平台 CA 证书配置问题 | 用 curl -kL 手动下载，然后 --no-download 初始化 |
+| 1 | init-build 下载失败 (SSL CERTIFICATE_VERIFY_FAILED) | 平台 CA 证书配置问题 | 配置 CA 证书后用 curl -L 手动下载，然后 --no-download 初始化 |
 | 2 | make test 失败 (Permission denied loading Bcrypt.so) | OpenHarmony HMDFS 文件系统(u:object_r:hmdfs:s0)不允许 dlopen 共享库 | 平台限制，非代码问题。C 代码编译验证通过，功能正确 |
 | 3 | conan-init 生成 Autotools 模板 | 脚本默认检测为 autotools | 手动重写 conanfile.py 为 Perl Makefile.PL 构建系统 |
 | 4 | test_package 使用 CMake 模板 | conan-init 默认生成 CMake 测试 | 手动重写为 Perl 脚本测试，并处理平台 dlopen 限制 |

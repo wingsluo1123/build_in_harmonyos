@@ -42,9 +42,29 @@ class PerlCryptBcryptConan(ConanFile):
     def build(self):
         # Apply patches if any
         apply_conandata_patches(self)
+        # Override PERL5LIB to prioritize HNP module paths over HMDFS,
+        # avoiding dlopen restriction on XS shared libraries (Cwd.so, etc.)
+        os.environ["PERL5LIB"] = (
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0/aarch64-linux:"
+            "/data/service/hnp/perl.org/perl_5.42.0/lib/5.42.0:"
+            "/storage/Users/currentUser/usr/local/lib/perl5"
+        )
+        # Add OHOS SDK sysroot paths for system headers (sys/types.h, etc.)
+        sysroot = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr"
+        llvm_lib = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib/aarch64-linux-ohos"
+        os.environ["C_INCLUDE_PATH"] = (
+            sysroot + "/include:" + sysroot + "/include/aarch64-linux-ohos:"
+            + os.environ.get("C_INCLUDE_PATH", "")
+        )
+        os.environ["LIBRARY_PATH"] = (
+            sysroot + "/lib/aarch64-linux-ohos:" + llvm_lib + ":"
+            + os.environ.get("LIBRARY_PATH", "")
+        )
         # Perl XS module: use Makefile.PL (ExtUtils::MakeMaker)
         self.run("perl Makefile.PL", cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
+        # Create static library from pure C object (no Perl XS dependencies)
+        self.run("ar rcs libcrypt_blowfish.a crypt_blowfish.o", cwd=self.source_folder)
 
     def package(self):
         # Install to a temporary DESTDIR
@@ -54,9 +74,17 @@ class PerlCryptBcryptConan(ConanFile):
         # Find and copy the compiled .so (XS shared library)
         so_files = glob.glob(os.path.join(dest_dir, "**", "auto", "Crypt", "Bcrypt", "Bcrypt.so"), recursive=True)
         if so_files:
-            target_dir = os.path.join(self.package_folder, "lib", "perl5", "auto", "Crypt", "Bcrypt")
-            os.makedirs(target_dir, exist_ok=True)
-            shutil.copy2(so_files[0], target_dir)
+            # Copy to Perl autoload path for Perl DynaLoader
+            perl_target = os.path.join(self.package_folder, "lib", "perl5", "auto", "Crypt", "Bcrypt")
+            os.makedirs(perl_target, exist_ok=True)
+            shutil.copy2(so_files[0], perl_target)
+
+        # Copy static C library for C consumers (pure C, no Perl XS deps)
+        static_lib = os.path.join(self.source_folder, "libcrypt_blowfish.a")
+        if os.path.exists(static_lib):
+            lib_dir = os.path.join(self.package_folder, "lib")
+            os.makedirs(lib_dir, exist_ok=True)
+            shutil.copy2(static_lib, lib_dir)
 
         # Find and copy the .pm (Perl module file)
         pm_files = glob.glob(os.path.join(dest_dir, "**", "Crypt", "Bcrypt.pm"), recursive=True)
@@ -73,8 +101,11 @@ class PerlCryptBcryptConan(ConanFile):
             shutil.copy2(header_src, inc_dir)
 
     def package_info(self):
-        # XS module produces Bcrypt.so for Perl DynaLoader
-        self.cpp_info.libs = ["Bcrypt"]
+        # C library interface (crypt_blowfish functions in libcrypt_blowfish.a)
+        self.cpp_info.set_property("cmake_file_name", "CryptBcrypt")
+        self.cpp_info.set_property("cmake_target_name", "CryptBcrypt::CryptBcrypt")
+        self.cpp_info.libs = ["crypt_blowfish"]
+        self.cpp_info.libdirs = ["lib"]
         # Set PERL5LIB to the package's perl lib directory
         perl_lib = os.path.join(self.package_folder, "lib", "perl5")
         self.runenv_info.append_path("PERL5LIB", perl_lib)
