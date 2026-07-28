@@ -14,7 +14,7 @@ class PerlNumberCompareConan(ConanFile):
     name = "perl-number-compare"
     version = "0.03-r5"
     description = "Perl module for numeric comparisons"
-    license = "MIT"
+    license = "perl_5"
     homepage = "https://metacpan.org/dist/Number-Compare"
     url = "https://metacpan.org/dist/Number-Compare"
 

@@ -79,7 +79,6 @@ PASS
 | `conanfile.py` | 1.5KB | Conan 配方 |
 | `conandata.yml` | 0.3KB | 源码 URL + sha256 |
 | `test_package/conanfile.py` | 1.2KB | Conan 测试配方 |
-| `test_package/test_compare.pl` | 0.2KB | Perl 测试脚本 |
 | `reports/conan-verify-report.md` | 1.2KB | Conan 验证报告 |
 | `reports/test-report.md` | 4.5KB | 功能测试报告 |
 | `reports/quality-report.md` | 0.8KB | 质量报告 |

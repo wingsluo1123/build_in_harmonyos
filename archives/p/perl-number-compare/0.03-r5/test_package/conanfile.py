@@ -21,13 +21,6 @@ class PerlNumberCompareTestConan(ConanFile):
         pkg_folder = dep.package_folder
         pm_files = glob.glob(os.path.join(pkg_folder, "**", "Compare.pm"), recursive=True)
         if not pm_files:
-            try:
-                resdirs = dep.cpp_info.resdirs
-                if resdirs:
-                    pm_files = glob.glob(os.path.join(resdirs[0], "**", "Compare.pm"), recursive=True)
-            except Exception:
-                pass
-        if not pm_files:
             raise Exception("Number::Compare.pm not found in package")
         perl_lib = os.path.dirname(os.path.dirname(pm_files[0]))
 
