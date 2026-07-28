@@ -3,6 +3,8 @@
 
 import glob
 import os
+import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.tools.env import VirtualRunEnv
@@ -68,6 +70,8 @@ class VapoursynthConan(ConanFile):
         tc.project_options["build_wheel"] = False
         tc.generate()
         self._inject_meson_archiver()
+        self._inject_meson_pkg_config()
+        self._wrap_nonexecutable_meson_compilers()
 
     def build(self):
         apply_conandata_patches(self)
@@ -78,6 +82,7 @@ class VapoursynthConan(ConanFile):
     def package(self):
         copy(self, "COPYING.LESSER", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
         Meson(self).install()
+        self._ensure_unversioned_shared_libraries()
         self._sign_shared_libraries()
 
     def package_info(self):
@@ -121,6 +126,84 @@ class VapoursynthConan(ConanFile):
             insertion += "ranlib = '{}'\n".format(ranlib.replace("\\", "/"))
         with open(native_file, "w", encoding="utf-8") as handle:
             handle.write(content.replace("[binaries]\n", insertion, 1))
+
+    def _inject_meson_pkg_config(self):
+        pkg_config = self.conf.get("tools.gnu:pkg_config", default=None)
+        if not pkg_config or not os.path.isfile(str(pkg_config)):
+            pkg_config = shutil.which("pkg-config") or shutil.which("pkgconf")
+        if not pkg_config:
+            return
+
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if not os.path.isfile(native_file):
+            return
+        with open(native_file, encoding="utf-8") as handle:
+            content = handle.read()
+        if "[binaries]" not in content:
+            return
+        if "\npkg-config =" not in content and "\npkgconfig =" not in content:
+            insertion = "[binaries]\npkg-config = '{}'\n".format(str(pkg_config).replace("\\", "/"))
+            content = content.replace("[binaries]\n", insertion, 1)
+        if "pkg_config_path =" not in content and "[built-in options]" in content:
+            pc_path = self.generators_folder.replace("\\", "/")
+            content = content.replace(
+                "[built-in options]\n",
+                "[built-in options]\npkg_config_path = ['{}']\n".format(pc_path),
+                1,
+            )
+        with open(native_file, "w", encoding="utf-8") as handle:
+            handle.write(content)
+
+    def _wrap_nonexecutable_meson_compilers(self):
+        if self.settings.os != "OHOS":
+            return
+        shell = "/system/bin/sh"
+        if not os.path.exists(shell):
+            return
+
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if not os.path.isfile(native_file):
+            return
+        with open(native_file, encoding="utf-8") as handle:
+            lines = handle.readlines()
+
+        changed = False
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            for key in ("c", "cpp"):
+                prefix = "{} = '".format(key)
+                if not stripped.startswith(prefix) or not stripped.endswith("'"):
+                    continue
+                compiler = stripped[len(prefix):-1]
+                if os.path.exists(compiler) and not self._can_execute(compiler):
+                    lines[idx] = "{} = ['{}', '{}']\n".format(key, shell, compiler)
+                    changed = True
+
+        if changed:
+            with open(native_file, "w", encoding="utf-8") as handle:
+                handle.writelines(lines)
+
+    @staticmethod
+    def _can_execute(path):
+        try:
+            subprocess.run(
+                [path, "--version"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            return True
+        except OSError:
+            return False
+
+    def _ensure_unversioned_shared_libraries(self):
+        if not self.options.shared:
+            return
+        libdir = os.path.join(self.package_folder, "lib")
+        unversioned = os.path.join(libdir, "libvapoursynth.so")
+        versioned = os.path.join(libdir, "libvapoursynth.so.4")
+        if os.path.exists(versioned) and not os.path.exists(unversioned):
+            shutil.copy2(versioned, unversioned)
 
     def _sign_shared_libraries(self):
         if self.settings.os != "OHOS":

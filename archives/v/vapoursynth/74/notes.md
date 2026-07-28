@@ -72,5 +72,13 @@ Shadow CI runner form:
 
 ## Current blocking points
 
-- `zimg/3.0.6` recipe is merged, but ohpcd binary availability could not be confirmed from this workstation.
+- `zimg/3.0.6` recipe is merged, but ohpcd binary availability could not be confirmed from this workstation. The true-device isolated validation exported the merged local zimg recipe and reused the locally built OHOS package.
 - Python module is intentionally disabled in this first precheck recipe. If downstream tests require `import vapoursynth`, plan a follow-up within the VapourSynth PR after Python/Cython dependencies are confirmed, not in the `mvtools` PR.
+
+## True-device validation
+
+- Device job: `/storage/Users/currentUser/ohos-users/codex-vapoursynth/vapoursynth-74-20260728-r1`
+- Latest passed run: `/storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20260728-233538-34842`
+- Command: `sh "$HOME/ohos-users/codex-vapoursynth/vapoursynth-74-20260728-r1/run-conan-heavy.sh"`
+- Result: pass. `vapoursynth/74` built, packaged `libvapoursynth.so.4`, copied `libvapoursynth.so` for consumers on non-symlink platforms, executed the direct C smoke test, and passed the destructive negative test.
+- Summary: `L0_RESULT=pass`, `L1_RESULT=pass`, `L2_RESULT=skip` (no `bin/`), `L4_RESULT=pass`, `L5_RESULT=pass`, `Success: 1`, `Failed: 0`.
