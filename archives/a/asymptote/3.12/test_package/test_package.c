@@ -19,8 +19,7 @@ int main(void)
     }
 
     int status = pclose(pipe);
-    if (!WIFEXITED(status) ||
-        (WEXITSTATUS(status) != 0 && WEXITSTATUS(status) != 1)) {
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         fprintf(stderr, "asy --version exited unexpectedly: %d\n", status);
         return 1;
     }
