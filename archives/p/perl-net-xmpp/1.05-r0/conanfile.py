@@ -8,7 +8,7 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class PerlNetXmppConan(ConanFile):
@@ -34,7 +34,7 @@ class PerlNetXmppConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Pure Perl module: perl Makefile.PL + make
-        # Makefile.PL is a Module::Build::Compat wrapper around Build.PL
+        # Makefile.PL patched to use ExtUtils::MakeMaker (Module::Build removed from Perl 5.42+)
         self.run("perl Makefile.PL", env="conanbuild")
         self.run("make", env="conanbuild")
 

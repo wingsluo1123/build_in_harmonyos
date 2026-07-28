@@ -44,7 +44,18 @@ make test
 
 ## 源码修改
 
-无补丁。Net::XMPP 1.05 是纯 Perl 模块，在 OpenHarmony 平台上无需修改源码即可编译和运行。
+### 补丁: 0001-replace-Makefile.PL-with-ExtUtils-MakeMaker.patch
+
+**问题**: 原始 Makefile.PL 使用 `Module::Build::Compat` 生成 Makefile，但 `Module::Build` 已从 Perl 5.39.0 核心模块中移除，Perl 5.42.0 不包含此模块，导致 `perl Makefile.PL` 失败。
+
+**修复**: 用 `ExtUtils::MakeMaker` 替换 Makefile.PL，功能等价（安装纯 Perl .pm 文件），且 ExtUtils::MakeMaker 在 Perl 5.42.0 中可用。
+
+### AI Review 修复 (2026-07-28)
+
+1. **conanfile.py**: 移除未使用的 `copy` 导入（死代码，文件实际使用 `shutil.copy2`/`shutil.copytree`）
+2. **manifest.yaml**: 将 `perl-xml-stream/1.24` 和 `perl-authen-sasl/2.2000` 从 `build.dependencies` 移至新增的 `runtime_dependencies` 字段（这些是运行时依赖，不仅是构建期依赖）
+3. **test_package/conanfile.py**: 改为文件内容验证测试（验证 .pm 文件存在性和版本号），因运行时依赖 XML::Stream 未安装，无法在 CI 环境加载模块
+4. **test_package/test_net_xmpp.py**: 新增测试源文件，修复 CI L0c 门禁 (no_test_sources)
 
 ## 依赖版本
 

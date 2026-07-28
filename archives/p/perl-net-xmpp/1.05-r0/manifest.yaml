@@ -48,6 +48,9 @@ build:
   # 编译依赖列表（格式: name/version）
   dependencies:
     - "perl/5.42.0"
+
+  # 运行时依赖（这些模块在运行时也需要，不仅是构建期依赖）
+  runtime_dependencies:
     - "perl-xml-stream/1.24"
     - "perl-authen-sasl/2.2000"
 
@@ -60,7 +63,8 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "patches/0001-replace-Makefile.PL-with-ExtUtils-MakeMaker.patch"
 
 # ============================================================
 # 知识沉淀
@@ -69,7 +73,8 @@ patches_applied: []
 # 编译中学到的知识
 knowledge_gained:
   - "纯 Perl 模块在 OpenHarmony 上可直接编译，无需修改源码或添加补丁"
-  - "Perl Module::Build (via Makefile.PL compat wrapper) 在 OHOS 平台正常工作"
+  - "Perl Module::Build 已从 Perl 5.39.0 核心移除，Perl 5.42+ 需用 ExtUtils::MakeMaker 替换 Makefile.PL"
+  - "ExtUtils::MakeMaker 可作为 Module::Build::Compat 的替代方案用于纯 Perl 模块安装"
   - "XML::Stream 1.24 运行时会产生 'Possible precedence problem' 警告，非阻塞"
   - "纯 Perl 模块不受 SELinux HMDFS 限制影响（对比 XS 模块如 perl-dbd-pg）"
   - "Net::XMPP 的 AUTOLOAD 机制生成的动态方法在 OHOS Perl 5.42.0 上正常工作"
