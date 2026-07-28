@@ -75,8 +75,9 @@ class CryptokitConan(ConanFile):
                  "#define caml_callback(r,v) (0)\n#endif\n"
                  "HEADER_EOF")
 
-        # R33: Use compiler from PATH (set by Conan profile buildenv)
-        cc = "clang"
+        # R33: Get compiler from Conan conf (not hardcoded)
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c", "clang")
 
         c_sources = [
             "arcfour.c", "aesni.c", "blake2.c", "blake3.c",

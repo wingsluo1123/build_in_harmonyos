@@ -13,6 +13,6 @@ elif [ -f "${TEST_DIR}/test_cryptokit" ]; then
     "${TEST_DIR}/test_cryptokit"
     echo "=== cryptokit API test PASSED ==="
 else
-    echo "WARN: test_cryptokit binary not found (test runs via CMake)"
-    echo "This script is a fallback; the actual test is CMake-based"
+    echo "ERROR: test_cryptokit binary not found — test cannot run!" >&2
+    exit 1
 fi

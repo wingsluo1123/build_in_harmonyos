@@ -1,33 +1,27 @@
 import os
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import can_run
 
 class CryptokitTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualBuildEnv"
+    generators = "CMakeToolchain", "CMakeDeps", "VirtualRunEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        # R34: Actually compile test.c that calls SHA-256 API
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
-        # R34: Test must actually verify the package contents
-        # Verify that the compiled library exists in the package
-        lib_dir = os.path.join(self.dependencies[self.tested_reference_str].package_folder, "lib")
-        header_dir = os.path.join(self.dependencies[self.tested_reference_str].package_folder, "include", "cryptokit")
-
-        # Check lib directory has compiled library (.a for static or .so for shared)
-        if os.path.isdir(lib_dir):
-            libs = [f for f in os.listdir(lib_dir) if f.endswith(('.a', '.so'))]
-            assert len(libs) > 0, f"No library files (.a/.so) found in {lib_dir}"
-            print(f"cryptokit test: {len(libs)} library files verified OK: {libs}")
-        else:
-            raise Exception(f"Lib directory not found: {lib_dir}")
-
-        # Check header files exist
-        if os.path.isdir(header_dir):
-            headers = [f for f in os.listdir(header_dir) if f.endswith('.h')]
-            assert len(headers) > 0, f"No header files found in {header_dir}"
-            print(f"cryptokit test: {len(headers)} header files verified OK")
-        else:
-            raise Exception(f"Header directory not found: {header_dir}")
-
-        print("cryptokit/1.21.1: C stubs package verification PASSED")
+        # R34: Actually run the compiled test binary
+        if can_run(self):
+            bin_path = os.path.join(self.cpp.build.bindir, "test_cryptokit")
+            self.run(bin_path, env="conanrun")
