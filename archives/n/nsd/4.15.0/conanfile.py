@@ -4,6 +4,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import cross_building
 from conan.tools.files import (
     apply_conandata_patches,
     export_conandata_patches,
@@ -75,6 +76,16 @@ class NsdConan(ConanFile):
             self, self.dependencies["openssl"].package_folder
         )
         toolchain = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS" and not cross_building(self):
+            # Native OHOS workers cannot always execute config.guess because
+            # its temporary directory may be read-only.  Supplying the
+            # canonical tuple avoids that probe while preserving native mode.
+            toolchain.configure_args.extend(
+                [
+                    "--build=aarch64-unknown-linux-ohos",
+                    "--host=aarch64-unknown-linux-ohos",
+                ]
+            )
         toolchain.configure_args.extend(
             [
                 f"--with-ssl={openssl}",
