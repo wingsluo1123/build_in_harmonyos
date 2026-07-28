@@ -9,8 +9,8 @@
 ## 编译步骤
 
 ```bash
-# 1. 下载源码（通过 ghfast.top 代理，GitHub 直连超时）
-curl -L -o xdelta-3.2.0.tar.gz "https://ghfast.top/https://github.com/jmacd/xdelta/archive/refs/tags/v3.2.0.tar.gz"
+# 1. 下载源码（使用官方 GitHub URL，CI 环境通过 conan 缓存获取）
+curl -L -o xdelta-3.2.0.tar.gz "https://github.com/jmacd/xdelta/archive/refs/tags/v3.2.0.tar.gz"
 
 # 2. 解压后源码在 xdelta3/ 子目录中（tarball 结构: xdelta-3.2.0/xdelta3/）
 
@@ -38,7 +38,7 @@ cmake --install . --prefix $TEST_PREFIX
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | GitHub 直连超时 | 环境无法访问 github.com | 使用 ghfast.top 代理下载 |
+| 1 | GitHub 直连超时 | 环境无法访问 github.com | 使用 conan 缓存源码包或配置官方镜像 |
 | 2 | BLAKE3 FetchContent 失败 | XD3_ARMOR=ON 需要 FetchContent 从 GitHub 获取 BLAKE3 | 设置 XD3_ARMOR=OFF 禁用 armor 模式 |
 | 3 | builtin_test no_output 子测试失败 | OHOS 平台文件系统行为差异，命令预期失败但实际成功 | 平台限制，不影响核心功能 |
 | 4 | conan-init 检测为 autotools | URL 模式匹配错误 | 手动重写 conanfile.py 为 CMake 构建 |
