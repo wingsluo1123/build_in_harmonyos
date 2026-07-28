@@ -64,6 +64,7 @@ class BoostCompiledConan(ConanFile):
         return f"sh bootstrap.sh --with-libraries={libraries}"
 
     def _b2_common_args(self):
+        build_type = str(self.settings.build_type)
         link = "shared" if self.options.shared else "static"
         jobs = min(os.cpu_count() or 2, 8)
         address_model = "64" if str(self.settings.arch) in ("x86_64", "armv8", "armv8.3") else "32"
@@ -77,6 +78,10 @@ class BoostCompiledConan(ConanFile):
             "runtime-link=shared",
             "cxxstd=14",
         ]
+        if build_type == "RelWithDebInfo":
+            args.append("debug-symbols=on")
+        elif build_type == "MinSizeRel":
+            args.append("optimization=space")
         if self.settings.os != "Windows" and not self.options.shared and self.options.fPIC:
             args.append("cxxflags=-fPIC")
         for component in self._components:
