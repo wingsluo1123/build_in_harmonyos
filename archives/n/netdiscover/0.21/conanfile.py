@@ -4,7 +4,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import apply_conandata_patches, copy, get, save
 
 
@@ -24,7 +24,7 @@ class NetdiscoverConan(ConanFile):
 
     def requirements(self):
         self.requires(
-            "libpcap/1.10.6@ohpcd/stable",
+            "libpcap/1.10.6",
             transitive_headers=True,
             transitive_libs=True,
         )
@@ -41,6 +41,7 @@ class NetdiscoverConan(ConanFile):
         cmake_layout(self)
 
     def generate(self):
+        CMakeDeps(self).generate()
         toolchain = CMakeToolchain(self)
         toolchain.variables["NETDISCOVER_SOURCE_DIR"] = self.source_folder.replace(
             "\\", "/"
