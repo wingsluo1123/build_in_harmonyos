@@ -24,12 +24,14 @@ All dependencies found via CMAKE_PREFIX_PATH:
 - aws-c-compression/0.3.2 ✅ (transitive through aws-c-http)
 
 ## Patches
-No patches required. aws-c-auth compiled cleanly on HarmonyOS without modifications.
+1 patch applied: `0001-CMakeLists.txt.patch`
+- Adds `find_package(Threads REQUIRED)` after `find_package(aws-c-common REQUIRED)` to resolve missing `Threads::Threads` target on HarmonyOS (CMake does not recognize OHOS as UNIX).
 
 ## TLS Notes
 aws-c-auth references TLS functions (aws_tls_connection_options_*, aws_tls_ctx_*)
-from aws-c-io. These are available in aws-c-io (built with BYO_CRYPTO=ON)
-which provides full TLS function implementations. No stub.c needed.
+from aws-c-io. aws-c-io is built with BYO_CRYPTO=ON, which does not export
+`aws_tls_handler_protocol`. However, aws-c-http references this symbol, causing
+a link error. `stub.c` provides a safe fallback that returns an empty `aws_byte_buf`.
 
 ## Test
 L1 smoke test: initializes and cleans up aws-c-auth library.

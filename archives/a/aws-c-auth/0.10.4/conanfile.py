@@ -20,8 +20,6 @@ CMAKE_PREFIX_PATH so find_package can locate their cmake config files.
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-import os
-
 
 class AwsCauthConan(ConanFile):
     name = "aws-c-auth"

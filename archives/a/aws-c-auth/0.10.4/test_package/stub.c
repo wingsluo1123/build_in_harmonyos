@@ -9,8 +9,8 @@
 /* aws_byte_buf is a struct with { size_t len, size_t capacity, uint8_t *buffer, struct aws_allocator *allocator }.
  * On aarch64, returning a zero-initialized struct is safe. */
 typedef struct {
-    unsigned long len;
-    unsigned long capacity;
+    size_t len;
+    size_t capacity;
     unsigned char *buffer;
     void *allocator;
 } aws_byte_buf_stub;
