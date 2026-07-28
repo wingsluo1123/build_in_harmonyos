@@ -19,7 +19,7 @@
 
 ## Validation
 
-- Source tarball downloaded from the official SourceForge legacy download URL.
+- Source tarball downloaded from the official SourceForge project download URL.
 - SHA256 verified locally:
   `696113659e426540625274a8b251052cc04306d8ee5c42a0c7639f39ca90c9d6`.
 - `test_package` compiles and runs a real C++ consumer covering:
