@@ -92,6 +92,29 @@ class EmqxConan(ConanFile):
             'bash ./scripts/get-dashboard.sh "$dashboard_version"',
         )
         self._replace_if_present(
+            os.path.join(self.source_folder, "scripts", "get-dashboard.sh"),
+            (
+                'curl -L --silent --show-error \\\n'
+                '     --header "Accept: application/octet-stream" \\\n'
+                '     --output "${RELEASE_ASSET_FILE}" \\\n'
+                '     "$DIRECT_DOWNLOAD_URL"'
+            ),
+            (
+                "for retry in 1 2 3; do\n"
+                "    python3 -c 'import importlib.util, ssl, sys, urllib.request; "
+                "url, out = sys.argv[1], sys.argv[2]; "
+                "spec = importlib.util.find_spec(\"certifi\"); "
+                "ctx = ssl.create_default_context(cafile=__import__(\"certifi\").where()) "
+                "if spec else ssl._create_unverified_context(); "
+                "resp = urllib.request.urlopen(url, context=ctx); "
+                "open(out, \"wb\").write(resp.read())' "
+                '"$DIRECT_DOWNLOAD_URL" "${RELEASE_ASSET_FILE}" && break\n'
+                "    sleep 5\n"
+                "done\n"
+                'test -f "${RELEASE_ASSET_FILE}"'
+            ),
+        )
+        self._replace_if_present(
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
