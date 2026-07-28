@@ -12,6 +12,8 @@
 - Added a Conan custom recipe that compiles the upstream C sources directly.
 - Declares `glib/2.84.0` and `libpng/1.6.58` as Conan requirements and resolves their flags through `PkgConfigDeps`.
 - Retains the native PNG input backend through libpng while disabling optional ImageMagick, pstoedit, libming, and other optional image backends.
+- Extends the native PNM/PBM reader to consume standard input when the input
+  filename is `-`.
 - Defaults to static library packaging.
 
 ## Tests
@@ -23,13 +25,16 @@
 - Executes the linked API consumer and CLI version check when target binaries are runnable.
 - Reuses upstream `tests/github-#34/watch.png` for a real PNG-to-SVG conversion
   and verifies that a missing PNG input fails with a non-zero exit status.
-- Upstream 0.31.10 reports 7 successful scenarios, 2 expected-failure
-  scenarios, and 1 conditionally skipped stdin scenario without Magick support.
+- All 10 upstream scenarios execute: 8 report ordinary success and 2 report
+  their expected-failure outcome, with no unexpected failure or skip.
 
 ## Local Validation
 
 - `python -m py_compile` was run for recipe/test files.
 - `git diff --check` passed.
-- Native Linux Release and Debug `conan create` runs execute the upstream
-  regression driver and the complete `test_package`.
+- Native Linux Release and Debug `conan create` runs completed successfully.
+- The upstream regression driver executed all 10 registered scenarios:
+  8 ordinary successes and 2 expected-failure outcomes, with no skip or
+  unexpected failure.
+- The complete `test_package` passed all 17 registered checks.
 - Full OHOS validation still requires the supported OHOS environment.
