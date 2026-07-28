@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/data/service/hnp/bin/bash
 set -euo pipefail
 
 check_version() {
