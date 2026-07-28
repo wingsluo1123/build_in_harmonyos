@@ -136,7 +136,7 @@ class LibusbConan(ConanFile):
             self._make(
                 self._ohos_build_folder(),
                 target="install",
-                args=[f'DESTDIR="{self.package_folder}"'],
+                args=[f'DESTDIR="{self.package_folder}"', "prefix="],
             )
         else:
             Autotools(self).install()
