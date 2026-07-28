@@ -9,6 +9,7 @@ int main(void) {
     // Create a temporary CSV file
     const char* tmpdir = getenv("TMPDIR");
     if (!tmpdir) tmpdir = getenv("HOME");
+    if (!tmpdir) tmpdir = "/tmp";
     std::string tmpfile = std::string(tmpdir) + "/test_csv_parser_input.csv";
 
     {
