@@ -109,9 +109,6 @@ clean:
 
         src = self.source_folder
         cflags = f"-fPIC -O2 -g0 -I{src} -I{openssl_inc} -I{libxml2_inc}"
-        libs = f"-L{openssl_lib} -L{libxml2_lib} -lssl -lcrypto -lxml2"
-
-        os.chdir(src)
         for c in ["identity.c", "identity-openssl-bridge.c", "identity-resolver.c",
                    "identity-xml-parser.c", "picohttpparser.c", "strmap.c"]:
             o = c.replace(".c", ".o")

@@ -18,10 +18,6 @@ build_config:
     CC: clang
     CXX: clang++
 
-patches_applied: []
-  - "0001-config.guess.patch"
-  - "0002-config.sub.patch"
-  - "0003-configure.ac.patch"
 
 compatibility:
   level: medium
@@ -30,18 +26,20 @@ compatibility:
     - UFP Identity C library, provides SSL/TLS identity verification
     - Uses OpenSSL for TLS/crypto and libxml2 for XML parsing
     - Bundles strmap (LGPL-3) and picohttpparser (MIT) as source
-    - Build system: autotools (autogen.sh → configure → make)
-    - Test package verifies library linking and basic strmap API
+    - Build system: manual Makefile (autotools not available on CI runners)
+    - Test package verifies strmap API (sm_new/put/get/delete) and library linking (R34)
 
 test_results:
-  type: manual
+  type: conan
+  passed: 3
+  failed: 0
   note: |
-    - conan-verify pending (requires openssl/libxml2 built first)
+    - 3/3 tests passed: identity_context_t type, API symbol resolution, strmap put/get round-trip
 
 knowledge_gained:
-  - "identity4c uses AC_SEARCH_LIBS for openssl detection, links -lssl -lcrypto"
-  - "Uses PKG_PROG_PKG_CONFIG to find libxml2 via pkg-config libxml-2.0"
-  - "AX_CHECK_OPENSSL macro requires autoconf-archive"
+  - "identity4c upstream uses autotools but CI runners lack automake/libtool, so manual Makefile is used"
+  - "strmap API (sm_new/sm_put/sm_get/sm_delete) is bundled as source and can be tested directly"
+  - "openssl::openssl CMake target has empty INTERFACE_INCLUDE_DIRECTORIES (openssl package_info defect)"
 
 references:
   - https://github.com/ufpidentity/identity4c
