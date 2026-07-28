@@ -53,9 +53,8 @@ class OpenobexConan(ConanFile):
         replace_in_file(
             self,
             cmake_file,
-            "add_custom_target ( openobex-apps )\nadd_subdirectory ( apps )",
+            "add_subdirectory ( apps )",
             "if ( BUILD_APPLICATIONS )\n"
-            "  add_custom_target ( openobex-apps )\n"
             "  add_subdirectory ( apps )\n"
             "endif ( BUILD_APPLICATIONS )",
         )
