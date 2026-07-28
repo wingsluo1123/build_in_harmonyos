@@ -85,6 +85,7 @@ class EmqxConan(ConanFile):
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
+                "for retry in 1 2 3; do "
                 "python3 -c 'import importlib.util, ssl, sys, urllib.request; "
                 "url, out = sys.argv[1], sys.argv[2]; "
                 "spec = importlib.util.find_spec(\"certifi\"); "
@@ -92,7 +93,10 @@ class EmqxConan(ConanFile):
                 "if spec else ssl._create_unverified_context(); "
                 "resp = urllib.request.urlopen(url, context=ctx); "
                 "open(out, \"wb\").write(resp.read())' "
-                '"${DOWNLOAD_URL}/${VERSION}/rebar3" ./rebar3'
+                '"${DOWNLOAD_URL}/${VERSION}/rebar3" ./rebar3 && return 0; '
+                "sleep 5; "
+                "done; "
+                "return 1"
             ),
         )
         build_vars = (
