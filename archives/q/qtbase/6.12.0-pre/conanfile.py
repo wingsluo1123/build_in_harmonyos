@@ -132,6 +132,13 @@ class QtBaseConan(ConanFile):
         })
         cmake.build()
 
+        # 上游 make check：仅在 with_test=True 时执行 Qt6 官方测试套件
+        # Qt6 测试套件需 DevEco Studio SDK + ohos-additional-packages 环境，
+        # 开发机通常不预置，故默认关闭（with_test=False）。
+        # CI worker 预置上述环境后可启用 -o with_test=True 执行全量上游测试。
+        if self.options.with_test:
+            cmake.test()
+
     def package(self):
         # bin/ — qmake / qt-cmake / qtpaths 等工具链
         copy(self, "*", os.path.join(self.build_folder, "bin"),
