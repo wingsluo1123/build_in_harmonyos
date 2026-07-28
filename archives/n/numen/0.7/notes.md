@@ -16,7 +16,7 @@ numen 是一个语音控制工具，允许用户通过语音命令操作计算�
 2. 应用补丁：无（numen 0.7 源码无需补丁即可在 HarmonyOS 上编译）
 3. Go 构建：
    ```bash
-   CGO_ENABLED=1 go build -ldflags "-X 'main.Version=0.7'" -o numen .
+   CGO_ENABLED=1 go build -ldflags "-X main.Version=0.7" -o numen .
    ```
 4. 安装：
    - `numen` 二进制 → bin/
@@ -72,4 +72,4 @@ numen --version
 ---
 
 **编译结束**: 2026-07-28 11:53
-**最终状态**: failed
+**最终状态**: published

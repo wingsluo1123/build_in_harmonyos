@@ -6,7 +6,7 @@ from conan.tools.build import cross_building
 
 
 class NumenTestConan(ConanFile):
-    """test_package for numen executable — runs test.sh which invokes numen --help."""
+    """test_package for numen executable — runs test.sh which invokes numen --version."""
     settings = "os", "arch", "compiler", "build_type"
     generators = "VirtualRunEnv"
     test_type = "explicit"

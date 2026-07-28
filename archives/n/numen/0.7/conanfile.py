@@ -48,7 +48,7 @@ class NumenConan(ConanFile):
         # Mirror install-numen.sh: go build with version ldflag.
         # CGO is required because vosk-api Go binding links libvosk C++.
         version = str(self.version)
-        ldflags = f"-X 'main.Version={version}'"
+        ldflags = f"-X main.Version={version}"
         env = os.environ.copy()
         # Go environment (based on yamlfmt lessons learned E081/E082):
         # - CGO_ENABLED=1: vosk-api Go binding requires CGO
