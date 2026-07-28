@@ -1,7 +1,7 @@
 import os
 from conan import ConanFile
-from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches, save
-from conan.tools.env import VirtualBuildEnv, Environment
+from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
+from conan.tools.env import VirtualBuildEnv
 
 class CryptokitConan(ConanFile):
     name = "cryptokit"
@@ -82,7 +82,7 @@ class CryptokitConan(ConanFile):
             "pclmul.c", "poly1305-donna.c", "rijndael-alg-fst.c",
             "ripemd160.c", "sha1.c", "sha256.c", "sha512.c", "siphash.c",
         ]
-        cflags = "-DEXPORT=static -DCAML_NAME_SPACE -DBLAKE3_NO_SSE2 " \
+        cflags = "-DEXPORT= -DCAML_NAME_SPACE -DBLAKE3_NO_SSE2 " \
                  "-DBLAKE3_NO_SSE41 -DBLAKE3_NO_AVX2 -DBLAKE3_NO_AVX512 -DBLAKE3_USE_NEON=0"
 
         for src in c_sources:
