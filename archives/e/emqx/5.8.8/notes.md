@@ -1,8 +1,9 @@
-# emqx homebrew adaptation notes
+# EMQX 5.8.8 adaptation notes
 
 ## Build scope
 
-- Recipe directory: `homebrew`, documenting the Homebrew formula build entry point
+- Recipe directory: `5.8.8`, matching the upstream package version
+- Build entry point: Homebrew formula `make emqx-rel` flow
 - Upstream version: `5.8.8`
 - Source URL: `https://github.com/emqx/emqx/archive/refs/tags/v5.8.8.tar.gz`
 - SHA256: `5861d8d32c4934175ca3d01c691ea679ac1a7903a1faee72027f6484d3085c89`

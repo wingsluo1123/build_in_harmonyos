@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package for emqx homebrew.
+"""Conan test_package for EMQX 5.8.8.
 
 The test validates the installed EMQX release layout and runs the actual
 launcher help command when the target binary can execute on the build host.
