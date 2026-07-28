@@ -4,7 +4,7 @@ set -euo pipefail
 # c-blosc2 test_package verification script
 # Usage: test.sh [path/to/test_package_binary]
 
-TEST_BIN="${1:-test_package}"
+TEST_BIN="${1:-./test_package}"
 
 # Verify the test binary exists
 if [ ! -f "$TEST_BIN" ]; then
