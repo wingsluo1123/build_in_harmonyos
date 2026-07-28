@@ -19,8 +19,22 @@ int main(void)
     }
 
     int status = pclose(pipe);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "asy --version exited unexpectedly: %d\n", status);
+    if (status == -1) {
+        fprintf(stderr, "failed to close asy --version process\n");
+        return 1;
+    }
+    if (WIFSIGNALED(status)) {
+        fprintf(stderr, "asy --version terminated by signal: %d\n",
+                WTERMSIG(status));
+        return 1;
+    }
+    if (!WIFEXITED(status)) {
+        fprintf(stderr, "asy --version did not report a normal exit\n");
+        return 1;
+    }
+    if (WEXITSTATUS(status) != 0) {
+        fprintf(stderr, "asy --version exited with code: %d\n",
+                WEXITSTATUS(status));
         return 1;
     }
     if (strstr(output, "Asymptote") == NULL || strstr(output, "3.12") == NULL) {

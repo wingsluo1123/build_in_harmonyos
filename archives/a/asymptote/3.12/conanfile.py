@@ -61,7 +61,9 @@ class AsymptoteConan(ConanFile):
             tc.configure_args.append("--disable-ffmpeg")
             tc.configure_args.append("--disable-gc")
             tc.configure_args.append("--disable-gsl")
-            tc.configure_args.append("--disable-opengl")
+            tc.configure_args.append("--disable-gl")
+            tc.configure_args.append("--disable-vulkan")
+            tc.configure_args.append("--disable-lsp")
         tc.generate()
 
     def build(self):
