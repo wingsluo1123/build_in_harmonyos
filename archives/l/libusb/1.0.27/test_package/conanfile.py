@@ -45,7 +45,12 @@ class LibusbTestConan(ConanFile):
         include_flags = " ".join(f'-I"{path}"' for path in unique(includes))
         libdir_flags = " ".join(f'-L"{path}"' for path in unique(libdirs))
         lib_flags = " ".join(f"-l{name}" for name in unique(libs))
-        self.run(f'{cc} test_libusb.c -o test_libusb {include_flags} {libdir_flags} {lib_flags}')
+        tmpdir = os.path.join(self.build_folder, "tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        self.run(
+            f'TMPDIR="{tmpdir}" {cc} test_libusb.c -o test_libusb '
+            f"{include_flags} {libdir_flags} {lib_flags}"
+        )
 
     def test(self):
         if not can_run(self):
