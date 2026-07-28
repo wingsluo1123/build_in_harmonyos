@@ -51,7 +51,7 @@ class CryptokitConan(ConanFile):
                  "HEADER_EOF")
         self.run(f"cat > {caml_dir}/mlvalues.h << 'HEADER_EOF'\n"
                  "#ifndef CAML_MLVALUES_H\n#define CAML_MLVALUES_H\n"
-                 "typedef long value;\n#define Val_long(x) ((value)(x))\n"
+                 "typedef long value;\ntypedef unsigned char tag_t;\n#define Val_long(x) ((value)(x))\n"
                  "#define Long_val(x) ((long)(x))\n#define Val_int(x) ((value)(((x)<<1)+1))\n"
                  "#define Int_val(x) (((int)(x))>>1)\n#define Is_block(x) (((value)(x)&1)==0)\n"
                  "#define Field(x,n) (((value*)(x))[n])\n#endif\n"
@@ -96,16 +96,29 @@ class CryptokitConan(ConanFile):
             # R33: Pass compiler explicitly from Conan toolchain
             self.run(f"{cc} -c {cflags} -I{src_dir} -o {build_dir}/{obj} {src_dir}/{src}")
 
+        # Create library archive based on shared option
+        obj_files = " ".join([s.replace(".c", ".o") for s in c_sources])
+        if self.options.shared:
+            # Create shared library (.so)
+            self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {build_dir}/{' '.join(obj_files.split())}")
+        else:
+            # Create static library (.a)
+            ar = self.conf.get("tools.build:compiler_executables:ar", default="llvm-ar", check_type=str)
+            self.run(f"{ar} rcs {build_dir}/libcryptokit.a {' '.join(obj_files.split())}")
+
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
         build_dir = os.path.join(self.build_folder, "build_cstubs")
-        # Package compiled C objects
-        copy(self, "*.o", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
+        # Package library archive
+        if self.options.shared:
+            copy(self, "*.so", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
+        else:
+            copy(self, "*.a", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
         # Package header files
         copy(self, "*.h", src=src_dir, dst=os.path.join(self.package_folder, "include/cryptokit"))
 
     def package_info(self):
-        self.cpp_info.libs = []
+        self.cpp_info.libs = ["cryptokit"]
         self.cpp_info.includedirs = ["include/cryptokit"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.set_property("pkg_config_name", "cryptokit")
