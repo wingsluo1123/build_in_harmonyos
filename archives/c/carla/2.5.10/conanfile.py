@@ -113,7 +113,7 @@ class CarlaConan(ConanFile):
         if os.path.isfile(single):
             with open(single, "r", encoding="utf-8") as f:
                 content = f.read()
-            content = content.replace("X-PREFIX-X", os.path.join(pkg, "bin"))
+            content = content.replace("X-PREFIX-X", pkg)
             with open(single, "w", encoding="utf-8") as f:
                 f.write(content)
 
