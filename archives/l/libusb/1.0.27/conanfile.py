@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for libusb 1.0.27."""
 import os
+import shlex
 import shutil
 import subprocess
 
@@ -47,18 +48,23 @@ class LibusbConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        tc.configure_args.extend(self._configure_args())
+        tc.generate()
+
+    def _configure_args(self):
+        args = []
         if str(self.settings.os) == "OHOS":
-            tc.configure_args.extend([
+            args.extend([
                 "--build=aarch64-unknown-linux-musl",
                 "--host=aarch64-unknown-linux-musl",
             ])
-        tc.configure_args.extend([
+        args.extend([
             "--disable-dependency-tracking",
             "--disable-udev",
             "--enable-shared" if self.options.shared else "--disable-shared",
             "--disable-static" if self.options.shared else "--enable-static",
         ])
-        tc.generate()
+        return args
 
     def build(self):
         apply_conandata_patches(self)
@@ -71,7 +77,7 @@ class LibusbConan(ConanFile):
         autotools = Autotools(self)
         if str(self.settings.os) == "OHOS":
             ohos_build_folder = self._prepare_ohos_build_folder()
-            self._configure(autotools, ohos_build_folder)
+            self._configure(ohos_build_folder)
             self._use_system_install_helper(ohos_build_folder)
             self._make(ohos_build_folder, args=["-j1"])
         else:
@@ -89,10 +95,10 @@ class LibusbConan(ConanFile):
         root = os.path.join(os.path.expanduser("~"), ".conan-ohos-build")
         return os.path.join(root, f"{self.name}-{self.version}-{token}")
 
-    def _configure(self, autotools, build_folder):
+    def _configure(self, build_folder):
         shell = self._ohos_shell()
         configure = os.path.join(self.source_folder, "configure")
-        args = getattr(autotools, "_configure_args", "") or ""
+        args = " ".join(shlex.quote(arg) for arg in self._configure_args())
         command = (
             f'TMPDIR="{build_folder}" CONFIG_SHELL="{shell}" SHELL="{shell}" '
             f'"{shell}" "{configure}" {args}'

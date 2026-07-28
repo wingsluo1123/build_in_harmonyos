@@ -58,8 +58,8 @@
 ## 四、源码修改清单
 | 文件 | 原因 | 方式 | 补丁 |
 |------|------|------|------|
-| libusb/os/linux_netlink.c | E091: sockaddr_storage 重定义 | #ifdef __OHOS__ define-guard | 0003-libusb-os-linux_netlink.c.patch |
-| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | #ifdef __OHOS__ 检测 HongMeng 内核格式 | 0004-libusb-os-linux_usbfs.c.patch |
+| libusb/os/linux_netlink.c | E091: sockaddr_storage 重定义 | include-time sockaddr_storage rename around linux/netlink.h | 0003-libusb-os-linux_netlink.c.patch |
+| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | 检测 HongMeng/OHOS 内核格式 | 0004-libusb-os-linux_usbfs.c.patch |
 | configure | HMDFS umask 077 目录权限问题 | sed umask 077→022 | 0001-configure.patch |
 
 ## 五、预编译包交付物
@@ -90,7 +90,7 @@
 
 **P1: 鸿蒙内核版本解析失败（已修复）** 🔴
 - 问题: `get_kernel_version()` 无法解析 `HongMeng Kernel 1.12.0` 格式
-- 修复: 在 `linux_usbfs.c` 中增加 `__OHOS__` 守卫，检测到 HongMeng 内核时报告现代 Linux 版本
+- 修复: 在 `linux_usbfs.c` 中检测 HongMeng/OHOS release 字符串并报告现代 Linux 版本
 - 状态: ✅ 已修复
 
 **P2: sysfs USB 设备访问被拒绝（平台限制）** 🟡
