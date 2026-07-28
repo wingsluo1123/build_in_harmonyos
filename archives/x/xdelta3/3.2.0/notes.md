@@ -4,7 +4,7 @@
 - 构建系统: cmake
 - 编译日期: 2026-07-27
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -91,7 +91,7 @@ $ diff new.txt reconstructed.txt && echo "PASS"
 
 - XD3_ARMOR=OFF: armor 模式需要 BLAKE3，通过 FetchContent 从 GitHub 获取，CI 环境无法访问。如需 armor 模式，需预下载 BLAKE3 或使用 Conan blake3 包。
 - XD3_LZMA_MODE: 在 Conan 构建中使用 "auto" 模式，通过 CMakeDeps 从 xz/5.6.2 依赖获取 liblzma。手动编译时使用 "off" 因为系统 liblzma 版本不匹配。
-- 源码在 xdelta3/ 子目录中，conanfile.py build() 使用 source_folder="xdelta3"。
+- 源码在 xdelta3/ 子目录中，conanfile.py source() 将 xdelta3/ 子目录内容移动到源码根目录。
 ---
 
 **编译结束**: 2026-07-27 11:40

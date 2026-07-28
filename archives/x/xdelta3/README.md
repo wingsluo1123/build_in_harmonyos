@@ -25,4 +25,4 @@ VCDIFF (RFC 3284) delta compression library and tool.
 
 | Version | Status |
 |---------|--------|
-| 3.2.0 | published |
+| 3.2.0 | built |

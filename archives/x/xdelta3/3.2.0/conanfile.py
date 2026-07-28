@@ -143,11 +143,22 @@ class Xdelta3Conan(ConanFile):
         # the xdelta3lib target, but Conan CMakeDeps does not propagate
         # them from the installed CMake config.  Without these, xdelta3.h
         # fails to typedef usize_t/xoff_t (SIZEOF_* all evaluate to 0).
-        self.cpp_info.defines = [
-            "SIZEOF_SIZE_T=8",
+        arch = str(self.settings.arch)
+        is_64bit = arch in ("x86_64", "armv8", "aarch64", "armv8.3", "armv8.4")
+        if is_64bit:
+            self.cpp_info.defines = [
+                "SIZEOF_SIZE_T=8",
+                "SIZEOF_UNSIGNED_LONG=8",
+                "XD3_USE_LARGESIZET=1",
+            ]
+        else:
+            self.cpp_info.defines = [
+                "SIZEOF_SIZE_T=4",
+                "SIZEOF_UNSIGNED_LONG=4",
+                "XD3_USE_LARGESIZET=0",
+            ]
+        self.cpp_info.defines.extend([
             "SIZEOF_UNSIGNED_INT=4",
-            "SIZEOF_UNSIGNED_LONG=8",
             "SIZEOF_UNSIGNED_LONG_LONG=8",
-            "XD3_USE_LARGESIZET=1",
             "XD3_USE_LARGEFILE64=1",
-        ]
+        ])

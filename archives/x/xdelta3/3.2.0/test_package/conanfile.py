@@ -26,9 +26,8 @@ class Xdelta3TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # R34: Explicitly run the test binary that calls xd3_encode_memory
+        # R34: Run the test binary that calls xd3_encode_memory
         # and xd3_decode_memory for a real encode/decode round-trip.
-        self.run(os.path.join(self.cpp.build.bindirs[0], "test_xdelta3"),
-                 env="conanrun")
+        bindirs = self.cpp.build.bindirs
+        assert bindirs, "No binary output directory found"
+        self.run(os.path.join(bindirs[0], "test_xdelta3"), env="conanrun")
