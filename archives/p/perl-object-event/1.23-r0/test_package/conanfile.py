@@ -16,4 +16,4 @@ class PerlobjecteventTestConan(ConanFile):
         pass
 
     def test(self):
-        self.run('perl -MObject::Event -e "print Object::Event->VERSION, qq{\\n}"')
+        self.run("bash test_object_event.sh")
