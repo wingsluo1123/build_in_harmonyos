@@ -22,6 +22,7 @@ class GnuChessConan(ConanFile):
     homepage = "https://www.gnu.org/software/chess/"
     package_type = "application"
     settings = "os", "arch", "compiler", "build_type"
+    win_bash = True
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -32,6 +33,24 @@ class GnuChessConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+
+    def layout(self):
+        basic_layout(self)
+
+    def generate(self):
+        toolchain = AutotoolsToolchain(self)
+        toolchain.configure_args.extend(
+            [
+                "--without-readline",
+                "--disable-nls",
+                "ac_cv_func_malloc_0_nonnull=yes",
+                "ac_cv_func_realloc_0_nonnull=yes",
+            ]
+        )
+        toolchain.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
         if self.settings.os == "OHOS":
             config_sub = os.path.join(self.source_folder, "config.sub")
             replace_in_file(
@@ -46,22 +65,6 @@ class GnuChessConan(ConanFile):
                 "linux-gnu* | linux-dietlibc* | linux-android*",
                 "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-android*",
             )
-
-    def layout(self):
-        basic_layout(self)
-
-    def generate(self):
-        toolchain = AutotoolsToolchain(self)
-        toolchain.configure_args.extend(
-            [
-                "--without-readline",
-                "--disable-nls",
-            ]
-        )
-        toolchain.generate()
-
-    def build(self):
-        apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
