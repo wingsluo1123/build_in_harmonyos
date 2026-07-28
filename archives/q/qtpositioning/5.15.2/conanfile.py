@@ -30,7 +30,7 @@ class QtpositioningConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("qt/5.15.13")
+        self.requires("qt5-qtbase/5.15.2")
 
     def layout(self):
         basic_layout(self)
@@ -44,7 +44,7 @@ class QtpositioningConan(ConanFile):
         # R32: OHOS platform support — pass mkspec via env for cross-compilation
         if self.settings.os == "OHOS":
             # qmake reads QMAKESPEC to determine target platform for OHOS cross-compilation
-            qt_root = self.dependencies["qt"].package_folder
+            qt_root = self.dependencies["qt5-qtbase"].package_folder
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
             ohos_mkspec = os.path.join(qt_mkspecs, "ohos-aarch64-clang")
             if os.path.isdir(ohos_mkspec):
@@ -54,7 +54,7 @@ class QtpositioningConan(ConanFile):
             else:
                 raise ConanException(
                     f"OHOS mkspec not found at {ohos_mkspec}. "
-                    "The qt/5.15.13 package must include the ohos-aarch64-clang mkspec "
+                    "The qt5-qtbase/5.15.2 package must include the ohos-aarch64-clang mkspec "
                     "for OHOS cross-compilation."
                 )
         # Generate the conanbuild environment file for all platforms
@@ -64,7 +64,7 @@ class QtpositioningConan(ConanFile):
         apply_conandata_patches(self)
         # Qt5 addon module build: qmake → make
         # Note: positioning.pro is in src/positioning/ under source_folder
-        qt_root = self.dependencies["qt"].package_folder
+        qt_root = self.dependencies["qt5-qtbase"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
         # Pass shared/static config to qmake based on Conan options
