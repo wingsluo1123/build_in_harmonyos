@@ -1,29 +1,20 @@
 diff -ruN a/scripts/embed.sh b/scripts/embed.sh
 --- a/scripts/embed.sh
 +++ b/scripts/embed.sh
-@@ -8,10 +8,6 @@
- }
- 
+@@ -10,5 +10,1 @@
  # Ensure xxd is available
 -if ! command -v xxd > /dev/null 2>&1; then
 -    echo "Error: xxd is not installed or not found in PATH."
 -    exit 1
 -fi
- 
- # Parse arguments
- SOURCE=""
-@@ -44,9 +40,15 @@
-     echo "Error: Missing required arguments."
-     usage
- fi
- 
+@@ -48,4 +44,10 @@
+ # Generate the header file
 +# Fallback to Python embed.py if xxd does not support -i (e.g. toybox xxd)
 +if ! command -v xxd > /dev/null 2>&1 || ! xxd -i /dev/null > /dev/null 2>&1; then
 +    python3 "$(dirname "$0")/embed.py" --source "$SOURCE" --header "$HEADER" --array-name "$ARRAY_NAME"
 +    exit $?
 +fi
 +
- # Generate the header file
  xxd -i "$SOURCE" | \
      sed "s/unsigned char [^ ]*/unsigned char ${ARRAY_NAME}[]/" | \
      sed "s/unsigned int [^ ]*/unsigned int ${ARRAY_NAME}_len/" > "$HEADER"
