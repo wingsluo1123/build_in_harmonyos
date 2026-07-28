@@ -173,7 +173,6 @@ class LibgeotiffConan(ConanFile):
                 continue
             if os.path.isfile(objcopy):
                 self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=so), ignore_errors=True)
-                self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=so))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=so))
 
     def package_info(self):

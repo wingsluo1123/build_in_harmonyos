@@ -173,7 +173,6 @@ class ProjConan(ConanFile):
                 continue
             if os.path.isfile(objcopy):
                 self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=f), ignore_errors=True)
-                self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
 
     def package_info(self):

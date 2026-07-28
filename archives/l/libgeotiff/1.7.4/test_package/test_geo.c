@@ -104,7 +104,6 @@ int main(void)
 
     /* Read the GeoTIFF key back */
     unsigned short pcs = 0;
-    int count = 0;
     int ret = GTIFKeyGet(gtif, ProjectedCSTypeGeoKey, &pcs, 0, 1);
     printf("GTIFKeyGet ProjectedCSTypeGeoKey: ret=%d, PCS=%d\n", ret, (int)pcs);
 
