@@ -21,6 +21,16 @@ class Log4cppConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
+
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
 
     def layout(self):
         cmake_layout(self)
@@ -30,8 +40,9 @@ class Log4cppConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
-        tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON"
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
+        if not self.options.shared:
+            tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON" if self.options.fPIC else "OFF"
         tc.generate()
 
     def _write_config_header(self):
