@@ -98,11 +98,16 @@ class NsdConan(ConanFile):
                 "--disable-recvmmsg",
                 "--disable-tcp-fastopen",
                 "--with-configdir=/etc/nsd",
-                "--with-dbdir=/data/local/tmp/nsd/db",
-                "--with-pidfile=/data/local/tmp/nsd/nsd.pid",
-                "--with-xfrdir=/data/local/tmp/nsd/xfr",
             ]
         )
+        if self.settings.os == "OHOS":
+            toolchain.configure_args.extend(
+                [
+                    "--with-dbdir=/data/local/tmp/nsd/db",
+                    "--with-pidfile=/data/local/tmp/nsd/nsd.pid",
+                    "--with-xfrdir=/data/local/tmp/nsd/xfr",
+                ]
+            )
         toolchain.generate()
 
     def build(self):
