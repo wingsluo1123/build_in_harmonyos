@@ -37,11 +37,21 @@ class TestPerlParamsValidate(ConanFile):
 
         # --- L1: Try loading Params::Validate via test.sh ---
         # Set PERL5LIB so Perl can find .pm files (site_lib) and .so (site_arch).
-        # Also add user's local perl5 lib for Module::Implementation dependency.
-        local_perl_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5")
+        # Also add user's local perl5 lib for runtime dependencies
+        # (Module::Implementation, Try::Tiny, etc.).
+        home = os.path.expanduser("~")
+        local_perl5_candidates = [
+            os.path.join(home, "usr", "local", "lib", "perl5",
+                         "site_perl", "5.42.0", "aarch64-linux"),
+            os.path.join(home, "usr", "local", "lib", "perl5",
+                         "site_perl", "5.42.0"),
+            os.path.join(home, "usr", "local", "lib", "site_perl",
+                         "5.42.0", "aarch64-linux"),
+            os.path.join(home, "usr", "local", "lib", "site_perl", "5.42.0"),
+        ]
         perl5lib_paths = [site_arch, site_lib]
-        if os.path.isdir(local_perl_lib):
-            perl5lib_paths.append(local_perl_lib)
+        perl5lib_paths.extend(p for p in local_perl5_candidates
+                              if os.path.isdir(p))
 
         old_perl5lib = os.environ.get("PERL5LIB", "")
         os.environ["PERL5LIB"] = ":".join(perl5lib_paths)
@@ -50,9 +60,13 @@ class TestPerlParamsValidate(ConanFile):
         try:
             self.run(f"sh {test_script}")
             self.output.info("✅ Params::Validate PP mode test passed")
-        except Exception:
-            self.output.warning(
-                "⚠️ Runtime test failed (expected on HarmonyOS HMDFS)"
-            )
+        except Exception as e:
+            err_str = str(e).lower()
+            if any(kw in err_str for kw in ("permission denied", "hmdfs", "selinux")):
+                self.output.warning(
+                    "⚠️ Runtime test failed (expected on HarmonyOS HMDFS/SELinux)"
+                )
+            else:
+                raise
         finally:
             os.environ["PERL5LIB"] = old_perl5lib

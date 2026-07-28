@@ -183,7 +183,7 @@ WriteMakefile(
         # Manually install XS.so to Perl's auto directory
         site_arch = os.path.join(
             dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.2", "lib", "site_perl", "5.42.2", "aarch64-linux"
+            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
         )
         so_src = os.path.join(
             self.source_folder, "blib", "arch", "auto", "Params", "Validate", "XS", "XS.so"
