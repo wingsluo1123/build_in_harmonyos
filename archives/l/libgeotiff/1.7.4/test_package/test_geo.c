@@ -64,6 +64,14 @@ int main(void)
         memset(buf + i * 100, (unsigned char)(i * 2), 100);
     }
     for (int row = 0; row < 100; row++) {
+        if (TIFFWriteScanline(tif, buf + row * 100, row, 0) < 0) {
+            printf("ERROR: TIFFWriteScanline failed at row %d\n", row);
+            free(buf);
+            GTIFFree(gtif);
+            XTIFFClose(tif);
+            return 1;
+        }
+    }
         TIFFWriteScanline(tif, buf + row * 100, row, 0);
     }
     free(buf);
