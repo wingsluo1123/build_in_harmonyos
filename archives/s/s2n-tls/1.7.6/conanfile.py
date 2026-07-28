@@ -18,7 +18,7 @@ class S2nTlsConan(ConanFile):
     description = "AWS implementation of the TLS/SSL protocol, designed for simplicity and security"
     license = "Apache-2.0"
     homepage = "https://github.com/aws/s2n-tls"
-    url = "https://github.com/awslabs/s2n-tls"  # CI this
+    url = "https://github.com/aws/s2n-tls"  # CI this
 
     package_type = "library"
 
