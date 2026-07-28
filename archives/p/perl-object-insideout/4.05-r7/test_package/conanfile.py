@@ -38,30 +38,8 @@ class PerlObjectInsideOutTestConan(ConanFile):
                 perl5lib_paths.append(pkg_lib)
         perl5lib = ":".join(perl5lib_paths)
 
-        # Write a test script that verifies module files and attempts to load
-        test_pl = os.path.join(self.build_folder, "test_oio.pl")
-        with open(test_pl, "w") as f:
-            f.write(
-                "use strict;\n"
-                "use warnings;\n"
-                f"my $pm_file = '{oio_pm}';\n"
-                'die "Module file not found: $pm_file" unless -f $pm_file;\n'
-                'open my $fh, "<", $pm_file or die "Cannot open: $!";\n'
-                'my $content = do { local $/; <$fh> };\n'
-                "close $fh;\n"
-                r'my ($ver) = $content =~ /\$VERSION\s*=\s*[\x27"]([\d.]+)[\x27"]/;'
-                '\ndie "VERSION not found" unless $ver;\n'
-                'die "VERSION mismatch: $ver" unless $ver eq "4.05";\n'
-                "\n"
-                "eval { require Object::InsideOut; };\n"
-                r'if ($@ && $@ =~ /Exception[\/:]Class/) {'
-                '\n    exit 0;\n'
-                "}\n"
-                'elsif ($@) {\n'
-                '    die "Unexpected error: $@";\n'
-                "}\n"
-                'die "Version mismatch" unless $Object::InsideOut::VERSION eq "4.05";\n'
-            )
-
-        cmd = f'PERL5LIB="{perl5lib}" perl {test_pl}'
-        self.run(cmd)
+        # Run the static test script
+        test_script = os.path.join(os.path.dirname(__file__), "test_oio.sh")
+        self.run(
+            f'PERL5LIB="{perl5lib}" OIO_PM_PATH="{oio_pm}" sh "{test_script}"'
+        )
