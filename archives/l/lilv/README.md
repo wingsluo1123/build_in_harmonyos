@@ -30,6 +30,13 @@ lv2info --version  # 输出: lv2info (lilv) 0.26.5
 lv2ls --version    # 输出: lv2ls (lilv) 0.26.5
 ```
 
+## Conan package
+
+The versioned Conan recipe is in `0.26.5-git/`. It pins the upstream
+`5318c9e` source archive and its SHA-256, builds the Meson tests and tools,
+and disables the optional Python binding because OHOS requires ELF signing
+before Python can load the shared library.
+
 ## 参考
 - 官网: https://drobilla.net/software/lilv
 - 源码: https://gitlab.com/lv2/lilv
