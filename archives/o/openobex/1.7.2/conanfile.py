@@ -6,9 +6,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import (
-    apply_conandata_patches,
     copy,
-    export_conandata_patches,
     get,
     replace_in_file,
 )
@@ -26,9 +24,6 @@ class OpenobexConan(ConanFile):
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration("openobex supports POSIX platforms")
-
-    def export_sources(self):
-        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -81,7 +76,6 @@ class OpenobexConan(ConanFile):
         toolchain.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
