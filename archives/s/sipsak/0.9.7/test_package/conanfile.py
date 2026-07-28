@@ -19,6 +19,6 @@ class SipsakTestConan(ConanFile):
             script = os.path.join(self.source_folder, "test_sipsak.sh")
             package_folder = self.dependencies["sipsak"].package_folder
             self.run(
-                'sh "{}" "{}"'.format(script, package_folder),
+                'bash "{}" "{}"'.format(script, package_folder),
                 env="conanrun",
             )

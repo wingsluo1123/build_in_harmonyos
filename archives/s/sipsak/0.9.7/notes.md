@@ -30,5 +30,5 @@
 - `tests/check_md5.c`
 
 OHOS 交叉构建环境没有可用的 Check 依赖，因此配方不运行 `make check`。
-`test_package/test_sipsak.sh` 使用 POSIX `sh` 验证安装后的可执行文件存在，并确认
+`test_package/test_sipsak.sh` 使用 Bash 严格模式验证安装后的可执行文件存在，并确认
 `sipsak --version` 输出版本 0.9.7。
