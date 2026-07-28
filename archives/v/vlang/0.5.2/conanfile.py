@@ -68,16 +68,32 @@ class VConan(ConanFile):
         )
         self._replace_required_once(makefile, "set -- ./v2 -o v", "set -- ./v2$(EXE_EXT) -o v$(EXE_EXT)")
         self._replace_required_once(makefile, "rm -rf v1 v2;", "rm -rf v1$(EXE_EXT) v2$(EXE_EXT);")
-        self._replace_required_once(
+        self._replace_required_alternative(
             makefile,
-            "./v run ./cmd/tools/detect_tcc.v;",
-            "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v; fi;",
+            [
+                (
+                    "./v run ./cmd/tools/detect_tcc.v;",
+                    "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v; fi;",
+                ),
+                (
+                    "./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v;",
+                    "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run ./cmd/tools/detect_tcc.v; fi;",
+                ),
+            ],
         )
         self._replace_required_once(makefile, "./v version;", "./v$(EXE_EXT) version;")
-        self._replace_required_once(
+        self._replace_required_alternative(
             makefile,
-            "./v run .github/problem-matchers/register_all.vsh",
-            "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh; fi",
+            [
+                (
+                    "./v run .github/problem-matchers/register_all.vsh",
+                    "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh; fi",
+                ),
+                (
+                    "./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh",
+                    "if [ -z \"$(OHOS_SIGN_TOOL)\" ]; then ./v$(EXE_EXT) $$bootstrap_gcflags run .github/problem-matchers/register_all.vsh; fi",
+                ),
+            ],
         )
         self._replace_required_once(
             makefile,
@@ -262,6 +278,27 @@ class VConan(ConanFile):
         count = content.count(old)
         if count != 1:
             raise ConanException(f"Expected one occurrence of {old!r} in {path}, found {count}")
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content.replace(old, new))
+
+    def _replace_required_alternative(self, path, replacements):
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        matched = []
+        for old, new in replacements:
+            count = content.count(old)
+            if count > 1:
+                raise ConanException(
+                    f"Expected at most one occurrence of {old!r} in {path}, found {count}"
+                )
+            if count == 1:
+                matched.append((old, new))
+        if len(matched) != 1:
+            candidates = ", ".join(repr(old) for old, _ in replacements)
+            raise ConanException(
+                f"Expected exactly one replacement candidate in {path}; candidates: {candidates}"
+            )
+        old, new = matched[0]
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(content.replace(old, new))
 
