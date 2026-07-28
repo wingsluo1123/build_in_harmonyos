@@ -12,6 +12,7 @@ from conan.tools.layout import basic_layout
 class TreeSitterConan(ConanFile):
     name = "tree-sitter"
     version = "0.25"
+    package_type = "static-library"
     description = "Incremental parsing library for programming tools"
     license = "MIT"
     homepage = "https://tree-sitter.github.io/tree-sitter"
@@ -22,26 +23,29 @@ class TreeSitterConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def _runtime_root(self):
+        """Return the C runtime root for either published crate layout."""
+        candidates = (
+            self.source_folder,
+            os.path.join(self.source_folder, "lib"),
+        )
+        for candidate in candidates:
+            if all(
+                os.path.isfile(os.path.join(candidate, relative_path))
+                for relative_path in (
+                    os.path.join("src", "lib.c"),
+                    os.path.join("include", "tree_sitter", "api.h"),
+                )
+            ):
+                return candidate
+        raise ConanInvalidConfiguration(
+            "Unexpected tree-sitter crate layout: neither src/include nor "
+            "lib/src + lib/include contains the C runtime"
+        )
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        # crates.io contains one top-level tree-sitter-0.25.0 directory.
-        # After strip_root, the C runtime and public header are directly under
-        # src/ and include/; the archive does not contain an extra lib/ layer.
-        required_paths = (
-            os.path.join("src", "lib.c"),
-            os.path.join("include", "tree_sitter", "api.h"),
-        )
-        missing = [
-            path
-            for path in required_paths
-            if not os.path.isfile(os.path.join(self.source_folder, path))
-        ]
-        if missing:
-            raise ConanInvalidConfiguration(
-                "Unexpected tree-sitter crate layout; missing: {}".format(
-                    ", ".join(missing)
-                )
-            )
+        self._runtime_root()
 
     def build(self):
         compilers = self.conf.get(
@@ -54,11 +58,12 @@ class TreeSitterConan(ConanFile):
             candidate = os.path.join(compiler_dir, "llvm-ar") if compiler_dir else ""
             ar = candidate if candidate and os.path.isfile(candidate) else "llvm-ar"
 
-        source = os.path.join(self.source_folder, "src", "lib.c")
+        runtime_root = self._runtime_root()
+        source = os.path.join(runtime_root, "src", "lib.c")
         obj = os.path.join(self.build_folder, "libtree-sitter.o")
         archive = os.path.join(self.build_folder, "libtree-sitter.a")
-        include = os.path.join(self.source_folder, "include")
-        internal = os.path.join(self.source_folder, "src")
+        include = os.path.join(runtime_root, "include")
+        internal = os.path.join(runtime_root, "src")
 
         self.run(
             '"{}" -O2 -fPIC -std=c11 -D_POSIX_C_SOURCE=200809L '
@@ -69,10 +74,11 @@ class TreeSitterConan(ConanFile):
         self.run('"{}" rcs "{}" "{}"'.format(ar, archive, obj))
 
     def package(self):
+        runtime_root = self._runtime_root()
         copy(
             self,
             "api.h",
-            src=os.path.join(self.source_folder, "include", "tree_sitter"),
+            src=os.path.join(runtime_root, "include", "tree_sitter"),
             dst=os.path.join(self.package_folder, "include", "tree_sitter"),
         )
         copy(
