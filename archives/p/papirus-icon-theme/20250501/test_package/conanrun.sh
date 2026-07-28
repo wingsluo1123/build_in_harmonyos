@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/p/papirus-icon-theme/20250501/test_package/conanrunenv-armv8.sh"
