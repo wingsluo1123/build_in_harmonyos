@@ -37,7 +37,7 @@ int main(void)
         return 1;
     }
 
-    char val[64];
+    char val[64] = {0};
     rc = sm_get(sm, "test_key", val, sizeof(val));
     if (rc != 1 || strcmp(val, "test_value") != 0) {
         fprintf(stderr, "FAIL: sm_get returned %d, val='%s' (expected 'test_value')\n", rc, val);
