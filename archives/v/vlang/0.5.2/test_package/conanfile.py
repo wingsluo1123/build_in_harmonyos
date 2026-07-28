@@ -50,9 +50,13 @@ class VTestConan(ConanFile):
         test_bin = os.path.join(self.build_folder, "test_v_language")
         test_cmd = f"{test_bin}.exe" if is_windows else test_bin
         v_cmd = f'"/system/bin/sh" "{v_exe}"' if str(self.settings.os) == "OHOS" else f'"{v_exe}"'
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = compilers.get("c", "cc")
 
         self.run(f"{v_cmd} version", env="conanrun")
-        self.run(f'{v_cmd} -gc none -o "{test_bin}" "{test_src}"', env="conanrun")
+        self.run(f'{v_cmd} -gc none -cc "{cc}" -o "{test_bin}" "{test_src}"', env="conanrun")
         if str(self.settings.os) == "OHOS":
             self._sign_ohos_binary(Path(test_cmd))
         self.run(f'"{test_cmd}"', env="conanrun")
