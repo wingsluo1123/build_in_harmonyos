@@ -43,6 +43,13 @@ int main(void)
 
     /* Set a GeoTIFF key — PCS WGS84 UTM zone 33N */
     GTIFKeySet(gtif, ProjectedCSTypeGeoKey, TYPE_SHORT, 1, PCS_WGS84_UTM_zone_33N);
+    if (!GTIFKeySet(gtif, ProjectedCSTypeGeoKey, TYPE_SHORT, 1, PCS_WGS84_UTM_zone_33N)) {
+        printf("ERROR: GTIFKeySet failed\n");
+        free(buf);
+        GTIFFree(gtif);
+        XTIFFClose(tif);
+        return 1;
+    }
     printf("GTIFKeySet ProjectedCSTypeGeoKey=PCS_WGS84_UTM_zone_33N: OK\n");
 
     /* Write pixel data */
