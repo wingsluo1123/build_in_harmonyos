@@ -20,6 +20,9 @@ OHOS CI shell enables unset-variable checks, and `scripts/get-distro.sh` reads
 that early script abort while keeping the Homebrew-compatible build flow.
 The recipe also restores execute bits on upstream shell helpers after Conan
 unpacks the source archive so `make emqx-rel` can invoke `ensure-rebar3.sh`.
+On OHOS the release helper still cannot be executed directly from the Conan
+build directory, so the recipe patches the Makefile to invoke
+`ensure-rebar3.sh` through `bash` instead of relying on direct script exec.
 
 ## High-difficulty reasons
 

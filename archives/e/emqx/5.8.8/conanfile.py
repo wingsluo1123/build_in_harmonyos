@@ -13,7 +13,7 @@ import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.env import VirtualBuildEnv
-from conan.tools.files import copy, get, rm, save
+from conan.tools.files import copy, get, replace_in_file, rm, save
 from conan.tools.layout import basic_layout
 
 
@@ -45,6 +45,21 @@ class EmqxConan(ConanFile):
     def build(self):
         save(self, os.path.join(self.source_folder, ".prepare"), "")
         self.run("chmod +x scripts/*.sh", cwd=self.source_folder)
+        makefile = os.path.join(self.source_folder, "Makefile")
+        replace_in_file(
+            self,
+            makefile,
+            "$(CURDIR)/scripts/ensure-rebar3.sh",
+            "bash $(CURDIR)/scripts/ensure-rebar3.sh",
+            strict=False,
+        )
+        replace_in_file(
+            self,
+            makefile,
+            "./scripts/ensure-rebar3.sh",
+            "bash ./scripts/ensure-rebar3.sh",
+            strict=False,
+        )
         build_vars = (
             "CMAKE_POLICY_VERSION_MINIMUM=3.5 "
             "PKG_VSN=5.8.8 "
