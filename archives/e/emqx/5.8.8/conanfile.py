@@ -87,6 +87,11 @@ class EmqxConan(ConanFile):
             '    bash ./scripts/pre-compile.sh "$PROFILE"',
         )
         self._replace_if_present(
+            os.path.join(self.source_folder, "scripts", "pre-compile.sh"),
+            './scripts/get-dashboard.sh "$dashboard_version"',
+            'bash ./scripts/get-dashboard.sh "$dashboard_version"',
+        )
+        self._replace_if_present(
             os.path.join(self.source_folder, "scripts", "ensure-rebar3.sh"),
             'curl -f -L "${DOWNLOAD_URL}/${VERSION}/rebar3" -o ./rebar3',
             (
