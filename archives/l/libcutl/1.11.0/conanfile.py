@@ -26,7 +26,8 @@ class LibcutlConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False]}
+    # Only static library is supported (build2 source has no shared lib target)
+    options = {"shared": [False]}
     default_options = {"shared": False}
 
     def export_sources(self):
@@ -68,16 +69,23 @@ class LibcutlConan(ConanFile):
         obj_dir = os.path.join(self.build_folder, "obj")
         os.makedirs(obj_dir, exist_ok=True)
 
-        cxxflags = [
-            "-O2",
-            "-fPIC",
-            "-I.",
-            "-DLIBCUTL_STATIC_BUILD",
-        ]
+        # Build type-aware optimization flags
+        cxxflags = ["-fPIC", "-I.", "-DLIBCUTL_STATIC_BUILD"]
+        build_type = str(self.settings.build_type) if self.settings.build_type else "Release"
+        if build_type == "Debug":
+            cxxflags.extend(["-g", "-O0"])
+        elif build_type == "Release":
+            cxxflags.extend(["-O2", "-DNDEBUG"])
+        elif build_type == "RelWithDebInfo":
+            cxxflags.extend(["-g", "-O2", "-DNDEBUG"])
+        elif build_type == "MinSizeRel":
+            cxxflags.extend(["-Os", "-DNDEBUG"])
+        else:
+            cxxflags.append("-O2")
 
-        # Add C++ standard from Conan settings
-        if self.settings.compiler.cppstd:
-            cxxflags.append(f"-std=c++{self.settings.compiler.cppstd}")
+        # C++ standard: default to C++14 if profile doesn't specify
+        cppstd = self.settings.compiler.cppstd or "14"
+        cxxflags.append(f"-std=c++{cppstd}")
 
         for src in sources:
             # Use path-based naming to avoid collisions (exception.cxx exists
@@ -85,7 +93,7 @@ class LibcutlConan(ConanFile):
             rel = os.path.relpath(src, "libcutl")
             obj_name = os.path.splitext(rel)[0].replace("/", "-") + ".o"
             obj = os.path.join(obj_dir, obj_name)
-            self.run(f'"{cxx}" -c {" ".join(cxxflags)} {src} -o "{obj}"',
+            self.run(f'"{cxx}" -c {" ".join(cxxflags)} "{src}" -o "{obj}"',
                      cwd=src_dir)
 
         # Archive into static library
