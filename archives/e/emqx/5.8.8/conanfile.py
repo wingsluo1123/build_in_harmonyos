@@ -33,6 +33,9 @@ class EmqxConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"os={self.settings.os} not supported")
 
+    def requirements(self):
+        self.requires("openssl/3.5.6")
+
     def layout(self):
         basic_layout(self)
 
@@ -58,6 +61,13 @@ class EmqxConan(ConanFile):
             makefile,
             "./scripts/ensure-rebar3.sh",
             "bash ./scripts/ensure-rebar3.sh",
+            strict=False,
+        )
+        replace_in_file(
+            self,
+            makefile,
+            "@$(SCRIPTS)/ensure-rebar3.sh",
+            "@bash $(SCRIPTS)/ensure-rebar3.sh",
             strict=False,
         )
         build_vars = (
