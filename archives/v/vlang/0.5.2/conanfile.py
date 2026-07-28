@@ -58,7 +58,7 @@ class VConan(ConanFile):
         self._replace_required_once(
             makefile,
             "LDFLAGS ?=\n\nall:",
-            "LDFLAGS ?=\nVCFILE ?= v.c\nEXE_EXT ?=\n\nall:",
+            "LDFLAGS ?=\nOHOS_SIGN_TOOL ?=\nVCFILE ?= v.c\nEXE_EXT ?=\n\nall:",
         )
         self._replace_required_once(
             makefile, "-o v1 vc/v.c", "-o v1$(EXE_EXT) vc/$(VCFILE)"
@@ -78,6 +78,26 @@ class VConan(ConanFile):
             makefile,
             "./v run .github/problem-matchers/register_all.vsh",
             "./v$(EXE_EXT) run .github/problem-matchers/register_all.vsh",
+        )
+        self._replace_required_once(
+            makefile,
+            "$(CC) $$bootstrap_ccflags -std=gnu11 -w -o v1$(EXE_EXT) vc/$(VCFILE) -lm -lpthread $$ldflags || cmd/tools/cc_compilation_failed_non_windows.sh; \\",
+            "$(CC) $$bootstrap_ccflags -std=gnu11 -w -o v1$(EXE_EXT) vc/$(VCFILE) -lm -lpthread $$ldflags || cmd/tools/cc_compilation_failed_non_windows.sh; \\\n"
+            "\tif [ -n \"$(OHOS_SIGN_TOOL)\" ]; then $(OHOS_SIGN_TOOL) sign -inFile v1$(EXE_EXT) -outFile v1$(EXE_EXT).signed -selfSign 1 -signAlg SHA256withECDSA; mv v1$(EXE_EXT).signed v1$(EXE_EXT); chmod +x v1$(EXE_EXT); fi; \\",
+        )
+        self._replace_required_once(
+            makefile,
+            "\t\"$$@\"; \\\n\tset -- ./v2$(EXE_EXT) -o v$(EXE_EXT) $$bootstrap_gcflags $(VFLAGS); \\",
+            "\t\"$$@\"; \\\n"
+            "\tif [ -n \"$(OHOS_SIGN_TOOL)\" ]; then $(OHOS_SIGN_TOOL) sign -inFile v2$(EXE_EXT) -outFile v2$(EXE_EXT).signed -selfSign 1 -signAlg SHA256withECDSA; mv v2$(EXE_EXT).signed v2$(EXE_EXT); chmod +x v2$(EXE_EXT); fi; \\\n"
+            "\tset -- ./v2$(EXE_EXT) -o v$(EXE_EXT) $$bootstrap_gcflags $(VFLAGS); \\",
+        )
+        self._replace_required_once(
+            makefile,
+            "\t\"$$@\"; \\\n\trm -rf v1$(EXE_EXT) v2$(EXE_EXT); \\",
+            "\t\"$$@\"; \\\n"
+            "\tif [ -n \"$(OHOS_SIGN_TOOL)\" ]; then $(OHOS_SIGN_TOOL) sign -inFile v$(EXE_EXT) -outFile v$(EXE_EXT).signed -selfSign 1 -signAlg SHA256withECDSA; mv v$(EXE_EXT).signed v$(EXE_EXT); chmod +x v$(EXE_EXT); fi; \\\n"
+            "\trm -rf v1$(EXE_EXT) v2$(EXE_EXT); \\",
         )
         for vc_file in ["v.c", "v_win.c"]:
             self._replace_required_once(
@@ -139,8 +159,10 @@ class VConan(ConanFile):
 
         cflags = "-O1 -municode" if is_windows else "-O1"
         ldflags = ""
+        sign_tool_arg = ""
         if str(self.settings.os) == "OHOS":
             ldflags = "-fuse-ld=/data/service/hnp/bin/ld.bfd"
+            sign_tool_arg = ' OHOS_SIGN_TOOL="/data/service/hnp/bin/binary-sign-tool"'
 
         # Run only the local bootstrap target. The default target tries to clone
         # or pull vlang/vc; source() has already supplied vc/v.c deterministically.
@@ -153,7 +175,8 @@ class VConan(ConanFile):
             self.run(
                 f'{make_program} -f Makefile -j1 v{shell_arg} VCFILE="{vc_file}" '
                 f'EXE_EXT="{exe_ext}" CC="{cc}" '
-                f'CFLAGS="{cflags}" LDFLAGS="{ldflags}" VFLAGS="-cc {cc}"',
+                f'CFLAGS="{cflags}" LDFLAGS="{ldflags}" VFLAGS="-cc {cc}"'
+                f"{sign_tool_arg}",
                 cwd=self.source_folder,
             )
 
