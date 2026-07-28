@@ -58,7 +58,7 @@ class TestPackageConan(ConanFile):
             raise ConanException("C compiler not found in tools.build:compiler_executables")
         test_source = os.path.join(self.source_folder, "test_spice_gtk.c")
         defines = ""
-        if "spice-client-gtk-3.0" in tested_dep.cpp_info.libs:
+        if any("spice-client-gtk-3.0" in lib for lib in tested_libs):
             defines = "-DSPICE_GTK_TEST_WITH_GTK=1"
         self.run(
             f'{cc} "{test_source}" -o test_spice_gtk '
