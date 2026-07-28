@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-object-pad/0.821-r0
+homepage: https://metacpan.org/dist/Object-Pad
+
+# Object::Pad 上游使用 ./Build test 运行测试套件 (440 tests)
+# 但测试需要完整 Perl 运行时 + XS 依赖链, 在 Conan test_package 中不可直接运行
+upstream_check_command: "./Build test"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: main.c
+    description: "验证 Pad.so 是有效的 ELF64 AArch64 共享库 + boot_Object__Pad 符号检查"
+    command: "./test_pad"
+
+# 测试断言总数 (ELF magic + shared library type + AArch64 arch + symbol check + header check)
+assertion_count: 5

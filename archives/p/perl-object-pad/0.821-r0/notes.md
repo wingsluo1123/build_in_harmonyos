@@ -8,7 +8,7 @@
 - 测试日期: 2026-07-02
 
 ## 编译步骤
-1. 下载源码: curl -kL from CPAN (SSL证书问题, 使用curl -kL)
+1. 下载源码: from CPAN (SSL证书需正确配置, conandata.yml已包含官方URL)
 2. 安装XS依赖: cpan install XS::Parse::Keyword, XS::Parse::Sublike
 3. 补丁Builder模块: 跳过.so加载, 硬编码include路径
 4. perl Build.PL --install_base=$DEFAULT_PREFIX

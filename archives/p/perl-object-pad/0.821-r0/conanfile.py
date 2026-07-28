@@ -5,9 +5,11 @@ Object::Pad - simple syntax for lexical field-based objects
 Build system: perl Build.PL + ./Build (Module::Build with XS)
 Produces: Pad.so (ELF64 AArch64 shared library) + .pm modules
 """
+import json
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 
 
@@ -25,6 +27,13 @@ class PerlobjectpadConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def configure(self):
+        # R32: OHOS platform compatibility
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(
+                f"perl-object-pad does not support os={self.settings.os}"
+            )
+
     def requirements(self):
         # XS dependencies (managed by Conan or pre-installed)
         pass
@@ -34,21 +43,36 @@ class PerlobjectpadConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Set up HarmonyOS-specific environment for XS module compilation
-        import os
-        cpath = "/storage/Users/currentUser/usr/local/include"
-        libpath = "/storage/Users/currentUser/usr/local/lib"
-        os.environ["CPATH"] = cpath
-        os.environ["LIBRARY_PATH"] = libpath
+        # R33: Derive sysroot paths from Conan config, no hardcoded user paths
+        # Get compiler path from Conan profile configuration
+        cc_info = self.conf.get("tools.build:compiler_executables", default={})
+        if isinstance(cc_info, str):
+            cc_info = json.loads(cc_info)
+        cc = cc_info.get("c", "clang") if cc_info else "clang"
+
+        # Resolve compiler symlink and derive sysroot:
+        # clang at {sdk}/llvm/bin/clang -> sysroot at {sdk}/sysroot
+        cc_real = os.path.realpath(cc)
+        cc_bin_dir = os.path.dirname(cc_real)          # .../llvm/bin
+        sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))  # .../native
+        sysroot = os.path.join(sdk_native, "sysroot")
+
+        if os.path.isdir(sysroot):
+            os.environ["CPATH"] = os.path.join(sysroot, "usr", "include")
+            os.environ["LIBRARY_PATH"] = os.path.join(
+                sysroot, "usr", "lib", "aarch64-linux-ohos"
+            )
+
         os.environ["PERL_CANARY_STABILITY_NOPROMPT"] = "1"
-        os.environ["TMPDIR"] = "/storage/Users/currentUser/tmp"
+        # Use system TMPDIR, fallback to /tmp (R33: no hardcoded user paths)
+        os.environ.setdefault("TMPDIR", "/tmp")
+
         # Perl Module::Build: configure with install_base pointing to build dir
         prefix = os.path.join(self.build_folder, "perl_prefix")
         self.run(f"perl Build.PL --install_base={prefix}", env="conanbuild")
         self.run("./Build", env="conanbuild")
 
     def package(self):
-        import os
         # Install to a staging directory
         stage = os.path.join(self.build_folder, "stage")
         self.run(f"./Build install --install_base={stage}", env="conanbuild")
@@ -71,6 +95,7 @@ class PerlobjectpadConan(ConanFile):
              dst=os.path.join(self.package_folder, "lib", "perl5"))
 
     def package_info(self):
-        # XS module .so file
-        self.cpp_info.libs = ["Pad"]
+        # Pad.so is a Perl XS module loaded by Perl runtime via DynaLoader,
+        # not linked by C/C++ consumers. No cpp_info.libs declaration needed
+        # since the .so uses Perl naming (Pad.so, not libPad.so).
         self.cpp_info.libdirs = ["lib"]
