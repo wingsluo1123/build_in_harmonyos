@@ -63,6 +63,17 @@ class MapserverConan(ConanFile):
             "tools.cmake.cmaketoolchain:user_toolchain."
         )
 
+    def _ohos_arch(self):
+        arch = str(self.settings.arch)
+        arch_map = {
+            "armv8": "arm64-v8a",
+            "armv7": "armeabi-v7a",
+            "x86_64": "x86_64",
+        }
+        if arch not in arch_map:
+            raise ConanInvalidConfiguration(f"Unsupported OHOS architecture: {arch}")
+        return arch_map[arch]
+
     def _library(self, dep_name, names):
         libdir = os.path.join(self.dependencies[dep_name].package_folder, "lib")
         for name in names:
@@ -95,7 +106,7 @@ class MapserverConan(ConanFile):
 
         defs = [
             '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH=arm64-v8a",
+            "-DOHOS_ARCH={}".format(self._ohos_arch()),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
             "-DBUILD_DYNAMIC={}".format("ON" if self.options.shared else "OFF"),
