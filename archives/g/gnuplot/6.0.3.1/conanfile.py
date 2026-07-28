@@ -39,6 +39,9 @@ class GnuplotConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # Force cross-compile mode: build != host → configure skips run-test
         # (conftest links to Conan .so files not in default LD_LIBRARY_PATH)
+        # --build is intentionally set to a different arch than --host to trigger
+        # cross-compile mode; the actual CI build machine arch doesn't matter here
+        # since configure only uses build!=host to decide whether to run conftest.
         tc.configure_args.append("--build=x86_64-pc-linux-gnu")
         tc.configure_args.append("--host=aarch64-unknown-linux-gnu")
         # gnuplot-specific configure options
