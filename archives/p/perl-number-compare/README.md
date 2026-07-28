@@ -16,7 +16,7 @@ Number::Compare 将简单的比较表达式编译为匿名子程序，支持千�
 
 ```bash
 # 通过 Conan 安装
-conan install --requires=perl-number-compare/0.03-r5@ohpcd/stable
+conan install --requires=perl-number-compare/0.03-r5
 
 # Perl 代码中使用
 use Number::Compare;

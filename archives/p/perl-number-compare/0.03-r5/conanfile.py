@@ -40,9 +40,10 @@ class PerlNumberCompareConan(ConanFile):
         self.run(f'make install DESTDIR="{self.package_folder}"', env="conanbuild")
         # Also copy .pm files to a standard lib/ directory for package structure
         pm_files = glob.glob(os.path.join(self.package_folder, "**", "Compare.pm"), recursive=True)
-        if pm_files:
-            src_dir = os.path.dirname(pm_files[0])
-            copy(self, "*.pm", src=src_dir, dst=os.path.join(self.package_folder, "lib", "Number"))
+        if not pm_files:
+            raise Exception("Compare.pm not found after make install — package is incomplete")
+        src_dir = os.path.dirname(pm_files[0])
+        copy(self, "*.pm", src=src_dir, dst=os.path.join(self.package_folder, "lib", "Number"))
 
     def package_info(self):
         # Pure Perl module — no C libraries, headers, or binaries

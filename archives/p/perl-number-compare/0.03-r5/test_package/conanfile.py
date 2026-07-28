@@ -11,6 +11,7 @@ from conan import ConanFile
 
 class PerlNumberCompareTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
