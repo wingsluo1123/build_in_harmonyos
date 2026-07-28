@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/a/arm-none-eabi-binutils/2.46.1/test_package/conanrunenv-release-armv8.sh"

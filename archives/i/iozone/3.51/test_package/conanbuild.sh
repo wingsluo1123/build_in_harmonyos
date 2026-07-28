@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/i/iozone/3.51/test_package/conanbuildenv-armv8.sh"
