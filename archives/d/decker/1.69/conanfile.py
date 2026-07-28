@@ -9,7 +9,8 @@ Build uses PkgConfigDeps to provide SDL2/SDL2_image flags via pkg-config
 when SDL2 dependencies are available.
 """
 import os
-from conan import ConanFile, ConanException
+from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -59,22 +60,41 @@ class DeckerConan(ConanFile):
 
         version = self.version
 
-        # Generate resources.h
-        self.run("chmod +x scripts/resources.sh")
-        self.run("./scripts/resources.sh examples/decks/tour.deck")
+        # All source-relative paths must be absolute. basic_layout() makes
+        # self.build_folder distinct from self.source_folder, and self.run()
+        # executes in self.build_folder by default — so './c/lilt.c' would
+        # resolve to <build_folder>/c/lilt.c, which does not exist. Use
+        # self.source_folder explicitly and run with cwd=source so the
+        # upstream './scripts/resources.sh' relative commands also work.
+        src = self.source_folder
+        c_dir = os.path.join(src, "c")
+        build_dir = os.path.join(c_dir, "build")
 
         # Ensure c/build/ exists before writing lilt/decker binaries into it.
         # git does not track empty dirs, so the source tarball has no c/build/.
-        os.makedirs(os.path.join(self.source_folder, "c", "build"), exist_ok=True)
+        os.makedirs(build_dir, exist_ok=True)
+
+        # Generate resources.h (upstream script uses relative paths).
+        self.run("chmod +x scripts/resources.sh", cwd=src)
+        self.run("./scripts/resources.sh examples/decks/tour.deck", cwd=src)
 
         # Common flags. -O2 is fixed upstream; build_type is a Makefile project
         # so we don't remap Debug/Release here.
+        # _POSIX_C_SOURCE=200809L: upstream c/lib/bestline.c and lil.h use
+        # fileno()/strdup()/realpath() without a feature-test macro, so on
+        # HarmonyOS musl they are implicit declarations (C99 forbids this).
+        # Defining _POSIX_C_SOURCE exposes the prototypes in <unistd.h>/
+        # <string.h>/<stdlib.h>.
         flags = "-std=c99 -Wall -Wextra -O2 -Wno-misleading-indentation"
         flags += " -Wno-unknown-warning-option -Wno-overlength-strings -lm"
+        flags += " -D_POSIX_C_SOURCE=200809L"
+
+        lilt_src = os.path.join(c_dir, "lilt.c")
+        lilt_out = os.path.join(build_dir, "lilt")
 
         # Build lilt (standalone interpreter, no SDL needed)
         self.run(
-            f"{cc} ./c/lilt.c -o ./c/build/lilt "
+            f"{cc} \"{lilt_src}\" -o \"{lilt_out}\" "
             f"{flags} -DVERSION='\"{version}\"'"
         )
 
@@ -91,13 +111,16 @@ class DeckerConan(ConanFile):
                     "with_sdl=True but pkg-config could not resolve "
                     "sdl2/SDL2_image flags (PKG_CONFIG_PATH / deps missing?)"
                 )
+            decker_src = os.path.join(c_dir, "decker.c")
+            decker_out = os.path.join(build_dir, "decker")
             self.run(
-                f"{cc} ./c/decker.c -o ./c/build/decker "
+                f"{cc} \"{decker_src}\" -o \"{decker_out}\" "
                 f"{sdl2_cflags} {sdl2_libs} "
                 f"{flags} -DVERSION='\"{version}\"'"
             )
 
     def package(self):
+        # Binaries are built into <source_folder>/c/build/ (see build()).
         # Install lilt binary
         copy(self, "c/build/lilt", self.source_folder, os.path.join(self.package_folder, "bin"))
         # Install decker binary if built
