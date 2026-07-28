@@ -44,7 +44,7 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
 """)
         output_file = os.path.join(self.source_folder, "test_output.spirv")
         self.output.info("Compiling test shader...")
-        self.run(f'"{slang_bin}" {shader_file} -o {output_file} -target spirv',
+        self.run(f'"{slang_bin}" "{shader_file}" -o "{output_file}" -target spirv',
                  env="conanrun")
 
         if os.path.exists(output_file):

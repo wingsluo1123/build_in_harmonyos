@@ -130,31 +130,44 @@ class SlangConan(ConanFile):
                 self._download_submodule_tarball(path, repo, commit)
 
     def _download_submodule_tarball(self, path, repo, commit):
-        """Fallback: download submodule as tarball using urllib."""
+        """Fallback: download submodule as tarball.
+
+        Uses Conan's built-in get() which handles SSL verification properly.
+        Falls back to urllib with SSL verification enabled (not disabled).
+        """
+        archive_url = f"https://ghfast.top/https://github.com/{repo}/archive/{commit}.tar.gz"
+
+        src_folder = self.source_folder
+        full_path = os.path.join(src_folder, path)
+        os.makedirs(full_path, exist_ok=True)
+
+        # Preferred: use Conan's built-in download (handles SSL verification internally)
+        try:
+            get(self, archive_url, destination=full_path, strip_root=True)
+            return
+        except Exception as e:
+            self.output.warning(f"Conan get() failed for {path}: {e}, trying urllib fallback")
+
+        # Fallback: urllib with SSL verification enabled
         import ssl
         import urllib.request
         import tarfile
         import io
 
-        # Construct GitHub archive URL via ghfast.top proxy to avoid timeout
-        archive_url = f"https://ghfast.top/https://github.com/{repo}/archive/{commit}.tar.gz"
-
-        src_folder = self.source_folder
-        full_path = os.path.join(src_folder, path)
-
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-
         req = urllib.request.Request(archive_url, headers={"User-Agent": "conan/2"})
         with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
             data = resp.read()
 
-        # Extract tarball
+        # Extract tarball with path traversal protection
         extract_dir = full_path + "_extract"
         os.makedirs(extract_dir, exist_ok=True)
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-            tar.extractall(extract_dir)
+            safe_members = [
+                m for m in tar.getmembers()
+                if not (m.name.startswith("/") or ".." in m.name)
+            ]
+            tar.extractall(extract_dir, members=safe_members)
 
         # Move contents from the top-level directory to the target path
         extracted = os.listdir(extract_dir)
@@ -218,7 +231,6 @@ class SlangConan(ConanFile):
         This method catches 'Operation not permitted' errors, signs
         the affected binary, and retries the build.
         """
-        import subprocess
         max_retries = 50  # Safety limit
         build_dir = self.build_folder
 
@@ -322,8 +334,8 @@ class SlangConan(ConanFile):
                                        "-outFile", fpath, "-selfSign", "1"],
                                       capture_output=True, timeout=10)
                         os.chmod(fpath, 0o755)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.output.warning(f"Failed to sign {fpath}: {e}")
 
     def _find_tool(self, name):
         """Find a tool in common paths."""
@@ -338,13 +350,19 @@ class SlangConan(ConanFile):
         cmake.install()
         # Copy additional static libraries needed for linking
         # (libslang-compiler.a references symbols from these)
-        import shutil
-        build_lib = os.path.join(self.build_folder, "Release", "lib")
         pkg_lib = os.path.join(self.package_folder, "lib")
+        # CMake may place libraries under a build_type subdirectory
+        build_type = str(self.settings.build_type) if self.settings.build_type else "Release"
+        candidate_dirs = [
+            os.path.join(self.build_folder, build_type, "lib"),
+            os.path.join(self.build_folder, "lib"),
+        ]
         for lib in ["libcore.a", "libcompiler-core.a", "libslang-cpp-parser.a"]:
-            src = os.path.join(build_lib, lib)
-            if os.path.exists(src):
-                shutil.copy2(src, os.path.join(pkg_lib, lib))
+            for build_lib in candidate_dirs:
+                src = os.path.join(build_lib, lib)
+                if os.path.exists(src):
+                    shutil.copy2(src, os.path.join(pkg_lib, lib))
+                    break
 
     def package_info(self):
         self.cpp_info.libs = ["slang-compiler", "slang-cpp-parser", "compiler-core", "core", "slang-rt"]
