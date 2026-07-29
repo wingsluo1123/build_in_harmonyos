@@ -1,4 +1,4 @@
-#!/data/service/hnp/bin/bash
+#!/usr/bin/env bash
 # test_package/test.sh - smoke test for the packaged tmux executable
 set -euo pipefail
 
