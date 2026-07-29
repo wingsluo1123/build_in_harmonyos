@@ -53,7 +53,7 @@ make install
 | notes.md | 本文件 |
 
 ## 注意事项
-- Qt 5.15.x 系列 API/ABI 兼容，使用 5.15.13 作为依赖版本
+- Qt 5.15.x 系列 API/ABI 兼容，使用 5.15.2 作为依赖版本
 - 本配方需要 Qt5 环境，由 conan 的 `qt5-qtbase/5.15.2` 包提供
 - 本地已完成：配方结构验证 ✅、CI 模拟测试 (18/18) ✅、AI review 审查 ✅
 - 完整 conan create 编译验证需在 CI 环境中 Qt5 就绪后自动执行
