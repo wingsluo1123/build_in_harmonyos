@@ -3,7 +3,7 @@
 import os
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanException, ConanInvalidConfiguration
 from conan.tools.build import cross_building
 from conan.tools.files import (
     apply_conandata_patches,
@@ -72,6 +72,45 @@ class OpenIsnsConan(ConanFile):
                 '(umask 022 && mkdir "$tmp")',
             )
 
+    def _patch_config_sub(self, path):
+        replacements = (
+            (
+                "| arc | arm | arm[bl]e",
+                "| aarch64 | arc | arm | arm[bl]e",
+            ),
+            (
+                "| alphapca5[67]-* | alpha64pca5[67]-* | arc-*",
+                "| alphapca5[67]-* | alpha64pca5[67]-* | aarch64-* | arc-*",
+            ),
+            (
+                "linux-gnu* | linux-dietlibc | linux-uclibc*",
+                "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
+            ),
+            (
+                "-mingw32* | -linux-gnu* | -linux-uclibc*",
+                "-mingw32* | -linux-gnu* | -linux-ohos* | -linux-uclibc*",
+            ),
+            (
+                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
+                "\t-linux-ohos*)\n\t\t;;\n"
+                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
+            ),
+        )
+
+        contents = load(self, path)
+        for original, replacement in replacements:
+            if replacement in contents:
+                continue
+            if original not in contents:
+                raise ConanException(
+                    f"Cannot add OHOS support to unexpected config.sub: {path}"
+                )
+            replace_in_file(self, path, original, replacement)
+            contents = load(self, path)
+
+        if any(replacement not in contents for _, replacement in replacements):
+            raise ConanException(f"Failed to add OHOS support to config.sub: {path}")
+
     def generate(self):
         toolchain = AutotoolsToolchain(self)
         if self.settings.os == "OHOS" and not cross_building(self):
@@ -99,37 +138,7 @@ class OpenIsnsConan(ConanFile):
         apply_conandata_patches(self)
         if self.settings.os == "OHOS":
             config_sub = os.path.join(self.source_folder, "aclocal", "config.sub")
-            replace_in_file(
-                self,
-                config_sub,
-                "| arc | arm | arm[bl]e",
-                "| aarch64 | arc | arm | arm[bl]e",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "| alphapca5[67]-* | alpha64pca5[67]-* | arc-*",
-                "| alphapca5[67]-* | alpha64pca5[67]-* | aarch64-* | arc-*",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "linux-gnu* | linux-dietlibc | linux-uclibc*",
-                "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "-mingw32* | -linux-gnu* | -linux-uclibc*",
-                "-mingw32* | -linux-gnu* | -linux-ohos* | -linux-uclibc*",
-            )
-            replace_in_file(
-                self,
-                config_sub,
-                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
-                "\t-linux-ohos*)\n\t\t;;\n"
-                "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
-            )
+            self._patch_config_sub(config_sub)
             if not cross_building(self):
                 # HMDFS cannot use Autoconf's 077 temporary mode reliably.
                 # Apply the repository's E011-compatible 022 mode.
