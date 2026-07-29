@@ -6,8 +6,6 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import cross_building
 from conan.tools.files import (
-    apply_conandata_patches,
-    export_conandata_patches,
     get,
     load,
     replace_in_file,
@@ -35,9 +33,6 @@ class NsdConan(ConanFile):
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration("nsd supports POSIX platforms")
-
-    def export_sources(self):
-        export_conandata_patches(self)
 
     def requirements(self):
         self.requires(
@@ -142,7 +137,6 @@ class NsdConan(ConanFile):
         toolchain.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         if self.settings.os == "OHOS":
             self._patch_config_sub(os.path.join(self.source_folder, "config.sub"))
             self._patch_config_sub(
