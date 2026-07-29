@@ -97,6 +97,15 @@ class CryptokitConan(ConanFile):
         # Respect fPIC option (P2: fPIC=True must add -fPIC flag)
         if self.options.fPIC:
             cflags += " -fPIC"
+        # Respect build_type setting (P2: Release/Debug optimization flags)
+        if self.settings.build_type == "Release":
+            cflags += " -O2 -DNDEBUG"
+        elif self.settings.build_type == "Debug":
+            cflags += " -O0 -g"
+        elif self.settings.build_type == "RelWithDebInfo":
+            cflags += " -O2 -g"
+        elif self.settings.build_type == "MinSizeRel":
+            cflags += " -Os -DNDEBUG"
 
         for src in c_sources:
             obj = src.replace(".c", ".o")

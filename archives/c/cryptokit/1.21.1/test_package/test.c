@@ -13,7 +13,7 @@ int main(void) {
     /* Initialize SHA-256 */
     SHA256_init(&ctx, 256);
     /* Feed data */
-    SHA256_add_data(&ctx, (unsigned char *)test_input, test_len);
+    SHA256_add_data(&ctx, (const unsigned char *)test_input, test_len);
     /* Finalize */
     SHA256_finish(&ctx, 256, hash);
 
