@@ -42,10 +42,8 @@ int main(void)
     printf("GTIFNew: OK\n");
 
     /* Set a GeoTIFF key — PCS WGS84 UTM zone 33N */
-    GTIFKeySet(gtif, ProjectedCSTypeGeoKey, TYPE_SHORT, 1, PCS_WGS84_UTM_zone_33N);
     if (!GTIFKeySet(gtif, ProjectedCSTypeGeoKey, TYPE_SHORT, 1, PCS_WGS84_UTM_zone_33N)) {
         printf("ERROR: GTIFKeySet failed\n");
-        free(buf);
         GTIFFree(gtif);
         XTIFFClose(tif);
         return 1;
@@ -72,12 +70,15 @@ int main(void)
             return 1;
         }
     }
-        TIFFWriteScanline(tif, buf + row * 100, row, 0);
-    }
     free(buf);
 
     /* Write GeoTIFF keys to the TIFF file */
-    GTIFWriteKeys(gtif);
+    if (!GTIFWriteKeys(gtif)) {
+        printf("ERROR: GTIFWriteKeys failed\n");
+        GTIFFree(gtif);
+        XTIFFClose(tif);
+        return 1;
+    }
     printf("GTIFWriteKeys: OK\n");
 
     /* Free resources */

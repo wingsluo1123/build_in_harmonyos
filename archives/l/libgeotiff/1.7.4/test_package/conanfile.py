@@ -4,8 +4,6 @@
 Tests that libgeotiff's core API (GTIFNew, GTIFKeySet, GTIFWriteKeys,
 GTIFKeyGet, GTIFFree) works correctly by creating and reading a GeoTIFF file.
 """
-import os
-
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.build import cross_building
