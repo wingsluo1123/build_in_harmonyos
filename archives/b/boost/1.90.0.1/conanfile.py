@@ -189,6 +189,12 @@ class BoostCompiledConan(ConanFile):
             info.libdirs = ["lib"]
             info.libs = [f"boost_{component}"]
 
+        # Boost.System is header-only in this upstream release; keeping a
+        # Boost::system component lets downstream component dependencies resolve
+        # without making CMakeDeps search for a non-existent libboost_system.
+        self.cpp_info.components["system"].libdirs = []
+        self.cpp_info.components["system"].libs = []
+
         self.cpp_info.components["chrono"].requires = ["atomic", "system"]
         self.cpp_info.components["filesystem"].requires = ["atomic", "system"]
         self.cpp_info.components["program_options"].requires = ["regex"]
