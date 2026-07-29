@@ -10,15 +10,15 @@ GMP 是 GNU 高精度数学运算库，提供任意精度的整数、分数和�
 - 构建系统: autotools
 
 ## 已编译版本
-- 6.3.0 (2026-05-18)
+- 6.3.0 (2026-07-15, built，尚未发布)
 
 ## 依赖
 无外部依赖（纯 C 实现）
 
 ## 使用方式
 ```bash
-# 安装预编译包
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- gmp 6.3.0
+# 合入并由正式发布流水线上传后安装 Conan 包
+conan install --requires=gmp/6.3.0 -r=ohpcd
 
 # 编译链接
 clang -fuse-ld=bfd your_program.c -I$HOME/usr/local/include -L$HOME/usr/local/lib -lgmp
