@@ -10,8 +10,8 @@
   and consumer both compiled and linked. The 11 upstream daemon/network cases
   require root, live services, and an OHOS device, so they are not runnable in
   the local unprivileged cross-build environment.
-- Native OHOS builds place Autoconf's temporary awk files under the worker's
-  writable `TMPDIR`, restore mode `0700`, and set `umask 022` so
-  `config.status` can read them while generated build files retain normal
-  permissions.
+- Native OHOS builds place Autoconf's temporary directories and files under
+  the worker's writable `TMPDIR` and use the repository's E011 `umask 022`
+  workaround so `config.status` can create and read its generated awk programs
+  on HMDFS.
 - Official OHOS test and CI results remain pending.
