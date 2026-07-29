@@ -17,6 +17,10 @@ class CryptokitConan(ConanFile):
     default_options = {"shared": False, "fPIC": True}
     package_type = "library"
 
+    def validate(self):
+        if self.options.shared and not self.options.fPIC:
+            raise ConanException("shared=True requires fPIC=True (arm64 link failure otherwise)")
+
     def export_sources(self):
         export_conandata_patches(self)
 
