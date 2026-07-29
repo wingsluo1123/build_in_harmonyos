@@ -27,14 +27,15 @@ class DeckerTestConan(ConanFile):
         cmake_layout(self)
 
     def generate(self):
+        # CMakeToolchain must always be generated so cmake.configure() works.
+        tc = CMakeToolchain(self)
         # Hand the decker bindir to CMake as a plain variable so CMakeLists.txt
         # can turn it into the LILT_DEFAULT_BIN compile-time macro.
         decker = self.dependencies["decker"]
         bin_dirs = decker.cpp_info.aggregated_components().bindirs
         if bin_dirs:
-            tc = CMakeToolchain(self)
             tc.variables["DECKER_BIN_DIRS"] = bin_dirs[0]
-            tc.generate()
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)
@@ -49,7 +50,7 @@ class DeckerTestConan(ConanFile):
         lilt_path = os.path.join(bin_dirs[0], "lilt") if bin_dirs else "lilt"
 
         # R34: run the compiled test binary directly with self.run().
-        # Use the full path to the built test binary (cmake_layout places it
-        # in the build folder for the current configuration).
+        # Pass LILT_BIN via env dict for cross-platform safety (avoids
+        # shell-specific VAR=value syntax).
         test_bin = os.path.join(self.cpp.build.bindir, "test_decker")
-        self.run(f"LILT_BIN={lilt_path} {test_bin}", env="conanrun")
+        self.run(f'"{test_bin}"', env={"LILT_BIN": lilt_path, **self.build_env.vars()})
