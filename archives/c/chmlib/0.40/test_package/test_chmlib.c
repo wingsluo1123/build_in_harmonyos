@@ -31,8 +31,14 @@ int main(void)
             buf[4]  = 3;       /* version LE = 3 */
             buf[8]  = 0x60;    /* header length LE = 96 */
             buf[12] = 1;       /* unknown, always 1 */
-            fwrite(buf, 1, sizeof(buf), f);
+            size_t written = fwrite(buf, 1, sizeof(buf), f);
             fclose(f);
+            if (written != sizeof(buf)) {
+                printf("SKIP 2: failed to write test file (wrote %zu/%zu)\n",
+                       written, sizeof(buf));
+                remove(testfile);
+                goto done;
+            }
 
             h = chm_open(testfile);
             if (h != NULL) {
@@ -44,6 +50,7 @@ int main(void)
             remove(testfile);
         }
     }
+done:
 
     if (failures > 0) {
         fprintf(stderr, "\nchmlib test FAILED: %d check(s) failed\n", failures);
