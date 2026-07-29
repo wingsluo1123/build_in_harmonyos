@@ -29,7 +29,7 @@ class LibmaxminddbConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def layout(self):
-        cmake_layout(self, src_folder="src")
+        cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
