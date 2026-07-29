@@ -221,7 +221,8 @@ WriteMakefile(
             shutil.copy2(so_src, os.path.join(lib_dst, "XS.so"))
 
     def package_info(self):
-        # Perl XS module — provides XS.so (shared library) + Perl .pm files
-        # Pure Perl fallback available via Module::Implementation auto-fallback
-        self.cpp_info.libs = ["XS"]
+        # Perl XS module — .so is loaded dynamically by Perl, not linked by
+        # other Conan packages. Declare empty libs (consistent with other
+        # Perl XS recipes like perl-net-libresolv).
+        self.cpp_info.libs = []
         self.cpp_info.libdirs = ["lib"]
