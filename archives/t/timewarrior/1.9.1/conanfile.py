@@ -91,6 +91,12 @@ class TimewarriorConan(ConanFile):
                 src=os.path.join(self.source_folder, "ext"),
                 dst=test_build,
             )
+            copy(
+                self,
+                "*",
+                src=os.path.join(self.source_folder, "doc"),
+                dst=os.path.join(self.build_folder, "doc"),
+            )
             shim_dir = os.path.join(test_build, "test-bin")
             os.makedirs(shim_dir, exist_ok=True)
             man_shim = os.path.join(shim_dir, "man")
@@ -115,6 +121,7 @@ class TimewarriorConan(ConanFile):
             os.chmod(man_shim, 0o755)
             test_env = Environment()
             test_env.prepend_path("PATH", shim_dir)
+            test_env.define("MANPATH", os.path.join(self.build_folder, "doc"))
             with test_env.vars(self).apply():
                 self.run("chmod +x *.t problems run_all", cwd=test_build)
                 cmake.build(target="test")
