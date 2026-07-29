@@ -26,8 +26,9 @@ class CryptokitConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # cryptokit depends on zlib for compression support
-        self.requires("zlib/1.3.1")
+        # zlib/1.3.1 是 cryptokit OCaml 完整构建的依赖（conf-zlib）
+        # C stubs 层不需要 zlib，留注释供后续 OCaml 构建参考
+        pass
         # OCaml runtime (zarith, ocaml) not available as conan packages for OHOS
         # Full OCaml compilation requires: ocaml >= 4.13.0, dune >= 2.5, zarith >= 1.13
         # Here we compile only the C stubs layer for OHOS
