@@ -9,6 +9,7 @@ Runtime dependencies (Perl modules, not Conan packages):
   - Carp            (Perl core module)
 """
 import os
+import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -51,17 +52,17 @@ class PerlobjecteventConan(ConanFile):
         self.cpp_info.libs = []
         # Set PERL5LIB so consumers (test_package) can find Object::Event
         self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))
-        # Inject system Perl module paths for runtime deps (common::sense, AnyEvent)
-        # These are user-installed Perl modules not managed by Conan.
-        # CI workers can set SYSTEM_PERL5LIB; auto-detect common install locations as fallback.
-        system_perl5lib = os.environ.get("SYSTEM_PERL5LIB", "")
-        if not system_perl5lib:
-            candidates = [
-                os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5", "aarch64-linux"),
-                os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5"),
-            ]
-            system_perl5lib = ":".join(p for p in candidates if os.path.isdir(p))
-        if system_perl5lib:
-            for p in system_perl5lib.split(":"):
-                if p:
-                    self.runenv_info.append_path("PERL5LIB", p)
+        # Dynamically add system Perl @INC paths for runtime dependencies
+        # (common::sense, AnyEvent are user-installed, not in default @INC in CI)
+        try:
+            result = subprocess.run(
+                ["perl", "-e", "print join(chr(58), grep { $_ ne q{.} && -d } @INC)"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                for inc_path in result.stdout.strip().split(":"):
+                    inc_path = inc_path.strip()
+                    if inc_path:
+                        self.runenv_info.append_path("PERL5LIB", inc_path)
+        except Exception:
+            pass

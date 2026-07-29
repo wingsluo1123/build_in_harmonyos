@@ -3,8 +3,10 @@
 # Verifies that Object::Event can be loaded and its API works correctly
 set -euo pipefail
 
-# System Perl modules (common::sense, AnyEvent) are injected via conanrun env
-# by the conanfile.py package_info() runenv_info, so PERL5LIB is already set.
+# PERL5LIB is set by Conan's conanrun environment, which includes:
+#   1. Package's lib/perl5 path (Object::Event itself)
+#   2. System Perl @INC paths (common::sense, AnyEvent)
+# No hardcoded paths needed — portability handled by conanfile.py package_info().
 
 # Test 1: Module loads successfully
 perl -MObject::Event -e 'exit 0'
