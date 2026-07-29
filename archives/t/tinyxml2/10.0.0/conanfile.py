@@ -3,6 +3,8 @@
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import cross_building
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
@@ -62,15 +64,21 @@ class Tinyxml2Conan(ConanFile):
         cmake = CMake(self)
         cmake.install()
         if self.settings.os == "OHOS" and self.options.shared:
-            import glob, shutil
+            import glob
             libdir = os.path.join(self.package_folder, "lib")
             sos = glob.glob(os.path.join(libdir, "**", "*.so*"), recursive=True)
             objcopy = "/data/service/hnp/bin/llvm-objcopy"
             signer = "/data/service/hnp/bin/binary-sign-tool"
+            if not os.path.isfile(objcopy) or not os.path.isfile(signer):
+                if cross_building(self):
+                    self.output.info("cross-building: target-only shared-library signing skipped")
+                    return
+                raise ConanInvalidConfiguration("OHOS objcopy/signing tools not found on native host")
             for so in sos:
                 if os.path.islink(so):
                     continue
-                self.run(f'{objcopy} --remove-section .codesign "{so}" 2>/dev/null || true')
+                # llvm-objcopy accepts a missing .codesign section; real errors must fail.
+                self.run(f'{objcopy} --remove-section .codesign "{so}"')
                 self.run(f'{signer} sign -inFile "{so}" -outFile "{so}" -selfSign 1')
 
     def package_info(self):
