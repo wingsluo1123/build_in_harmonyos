@@ -259,10 +259,14 @@ class OsvScannerConan(ConanFile):
                 os.remove(tool_path)
                 shutil.move(signed_path, tool_path)
                 os.chmod(tool_path, 0o755)
-            except Exception:
-                # Signing may fail if already signed or tool not needed
+            except Exception as e:
                 if os.path.exists(signed_path):
                     os.remove(signed_path)
+                raise ConanInvalidConfiguration(
+                    f"Failed to sign Go tool '{tool_name}' at {tool_path}: {e}. "
+                    f"Unsigned ELF binaries cannot execute on OHOS. "
+                    f"Check binary-sign-tool availability and permissions."
+                )
 
     def _is_elf_signed(self, path):
         """Check if an ELF binary has a .codesign section (OHOS signature)."""
