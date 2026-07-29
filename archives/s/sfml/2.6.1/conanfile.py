@@ -53,7 +53,7 @@ class SfmlConan(ConanFile):
             config_path,
             'elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")',
             'elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR '
-            '${CMAKE_SYSTEM_NAME} STREQUAL "OHOS")',
+            '${CMAKE_SYSTEM_NAME} STREQUAL "HarmonyOS")',
         )
 
         thread_path = os.path.join(
