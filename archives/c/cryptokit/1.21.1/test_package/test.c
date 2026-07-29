@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <cryptokit/sha256.h>
+#include <sha256.h>
 
 int main(void) {
     struct SHA256Context ctx;

@@ -121,11 +121,11 @@ class CryptokitConan(ConanFile):
             copy(self, "*.so", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
         else:
             copy(self, "*.a", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
-        # Package header files
-        copy(self, "*.h", src=src_dir, dst=os.path.join(self.package_folder, "include/cryptokit"))
+        # Package header files directly to include/ (CMakeDeps compatibility)
+        copy(self, "*.h", src=src_dir, dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["cryptokit"]
-        self.cpp_info.includedirs = ["include/cryptokit"]
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.set_property("pkg_config_name", "cryptokit")
