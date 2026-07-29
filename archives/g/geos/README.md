@@ -1,21 +1,23 @@
-# GEOS (Geometry Engine Open Source)
+# GEOS
 
-## 简介
-GEOS 是一个 C++ 几何库，是 JTS (Java Topology Suite) 的 C++ 移植版本。
-用于地理空间数据处理，支持各种几何操作。
+GEOS is a C++ library for performing operations on two-dimensional vector geometries. It provides the geometry engine used by projects such as PostGIS, QGIS, and Shapely.
 
-## 官方网站
-https://libgeos.org/
+## Features
 
-## 源码下载
-https://download.osgeo.org/geos/
+- OGC Simple Features geometry model and predicates
+- Spatial operations such as intersection, union, buffer, and distance
+- Stable C API and an advanced C++ API
+- `geosop` command-line utility for inspecting and processing geometries
 
-## 已编译版本
-- 3.13.0 (静态库版本)
+## OpenHarmony adaptation
 
-## 依赖关系
-无外部依赖
+GEOS 3.12.1 uses its upstream CMake build without source patches. The Conan recipe builds static libraries by default, exports the upstream CMake target names, runs the registered upstream CTest suite, and packages `geosop` and `geos-config`.
 
-## 注意事项
-- 建议编译为静态库（BUILD_SHARED_LIBS=OFF）
-- 动态库版本存在 RPATH 相对路径问题
+## Dependencies
+
+GEOS has no required third-party library dependencies. Consumers of the static C API also link the packaged C++ library and the platform C++ runtime.
+
+## References
+
+- https://libgeos.org/
+- https://github.com/libgeos/geos

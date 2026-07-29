@@ -1,75 +1,30 @@
-software: geos
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/3.12.1/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "3.12.1"
-
-# 编译状态
-# published | built | failed | archived
 status: built
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-29"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_date: "2026-07-29"
+conan_ref: "geos/3.12.1"
 
 source:
-  # 源码下载 URL
   url: "https://download.osgeo.org/geos/geos-3.12.1.tar.bz2"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "d6ea7e492224b51193e8244fe3ec17c4d44d0777f3c32ca4fb171140549a0d03"
   tar_format: tar.bz2
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: cmake
-
-  # 配置选项列表
   configure_options:
-    - "-DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local"
-    - "-DCMAKE_C_COMPILER=/storage/Users/currentUser/tmp/build-wrappers/clang-ohos"
-    - "-DCMAKE_CXX_COMPILER=/storage/Users/currentUser/tmp/build-wrappers/clang++-ohos"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DBUILD_TESTING=ON"
+    - "-DGEOS_BUILD_DEVELOPER=OFF"
+    - "-DBUILD_BENCHMARKS=OFF"
+    - "-DBUILD_GEOSOP=ON"
     - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-
-  # 编译依赖列表（格式: name/version）
   dependencies: []
-
-  # 编译器
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
-
-# 应用的补丁列表
 patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
 
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
 knowledge_gained:
-  - "OHOS SDK的lld链接器依赖libxml2.so.16，运行时需要设置LD_LIBRARY_PATH=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib"
-  - "解决方案：创建clang wrapper脚本设置正确的LD_LIBRARY_PATH"
-  - "geos使用cmake构建系统（不是autotools），configure脚本实际是cmake wrapper"
+  - "GEOS 3.12.1 requires C++14 and builds on OHOS through the standard Conan CMake toolchain"
+  - "The static geos_c archive must be linked before geos, which is represented by the Conan component dependency"
+  - "The upstream source registers 466 CTest entries: 298 unit tests and 168 XML regression tests"
+  - "CMake 4 requires CMAKE_POLICY_VERSION_MINIMUM=3.5 for GEOS 3.12.1's bundled Ccache module"
