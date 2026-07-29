@@ -13,7 +13,7 @@ file (ExtUtils::MakeMaker doesn't auto-detect .xs files for sub-modules).
 On OHOS:
   - musl C library headers at ~/usr/local/include (sys/types.h etc.)
   - musl libc at ~/usr/local/lib
-  - E137: Perl 5.42.2 lddlflags has -fstack-protector-strong, ld.lld rejects it
+  - E137: Perl 5.42.0 lddlflags has -fstack-protector-strong, ld.lld rejects it
   - Fix: use clang -shared with -nostartfiles -nodefaultlibs -lc for XS linking
   - XS .so may fail to load at runtime due to SELinux/HMDFS (PP fallback works)
 """
@@ -148,6 +148,8 @@ WriteMakefile(
         # NAME (Params::Validate). We compile it manually following the
         # perl-net-libresolv pattern.
         sys_inc, sys_lib = self._find_musl_paths()
+        inc_flags = f' -I"{sys_inc}"' if sys_inc else ""
+        lib_flags = f' -L"{sys_lib}"' if sys_lib else ""
 
         # Get Perl build tool paths via self.run() (R33: no subprocess.run
         # for perl — CI workers may not have perl in default PATH)
@@ -175,7 +177,7 @@ WriteMakefile(
         # provides off_t (already 64-bit on aarch64). Map off64_t→off_t.
         obj_file = os.path.join(self.source_folder, "lib", "Params", "Validate", "XS.o")
         self.run(
-            f'{cc} -c -Doff64_t=off_t -I"{perl_inc}" -I"c" -I"{sys_inc}" '
+            f'{cc} -c -Doff64_t=off_t -I"{perl_inc}" -I"c"{inc_flags} '
             f'{ccflags} {optimize} {cccdlflags} -o "{obj_file}" "{c_file}"',
             cwd=self.source_folder
         )
@@ -190,7 +192,7 @@ WriteMakefile(
         so_file = os.path.join(blib_dir, "XS.so")
         self.run(
             f'{cc} -shared -nostartfiles -nodefaultlibs -lc '
-            f'-L"{sys_lib}" -L/system/lib64 -o "{so_file}" "{obj_file}"',
+            f'{lib_flags} -L/system/lib64 -o "{so_file}" "{obj_file}"',
             cwd=self.source_folder
         )
 
