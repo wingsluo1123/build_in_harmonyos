@@ -17,9 +17,8 @@
 - **错误**: `undefined symbol: inflateInit2_`, `undefined symbol: png_create_read_struct`
 - **解决方案**: 手动修改 link.txt 添加 `-lpng16 -lz -lm`
 
-### 3. config.guess 平台识别
-- **问题**: 默认 config.guess 不支持 HarmonyOS
-- **解决方案**: 手动添加 HarmonyOS 识别规则（参考 SDL2_image 补丁）
+### 3. 平台识别
+- CMake 构建不读取 autotools 的 config.guess，因此不需要平台识别补丁。
 
 ## 编译流程
 1. 源码下载: 从 GitHub releases 下载（网络需要长超时）
@@ -45,4 +44,4 @@
 
 **编译开始**: 2026-05-27 18:33
 **编译结束**: 2026-05-27 18:49
-**最终状态**: published
+**最终状态**: built

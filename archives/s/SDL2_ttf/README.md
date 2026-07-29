@@ -34,5 +34,5 @@ cmake --install build --prefix $HOME/usr/local
 
 - Uses external FreeType and HarfBuzz (not bundled)
 - CMake is required — autotools configure fails on HMDFS (config.status cannot create temp files)
-- Requires config.guess patch for HarmonyOS platform recognition
-- Adaptation completeness requires manual validation with a known TTF asset for `TTF_OpenFont` and `TTF_RenderUTF8_Solid`; the automated smoke test covers library initialization and shutdown without relying on a Worker-specific font path
+- CMake does not consume autotools config.guess, so no platform-recognition patch is applied
+- Set `SDL_TTF_TEST_FONT` to a known TTF asset to enable the consumer test's font-open and glyph-render checks
