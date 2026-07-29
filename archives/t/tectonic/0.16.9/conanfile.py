@@ -223,32 +223,8 @@ class TectonicConan(ConanFile):
                 target_dir = c
                 break
 
-        if target_dir:
-            # Copy the actual binary as tectonic.real (Conan post-processing
-            # corrupts $ORIGIN in RUNPATH, so we use a wrapper script)
-            src_bin = os.path.join(target_dir, "tectonic")
-            dst_real = os.path.join(self.package_folder, "bin", "tectonic.real")
-            os.makedirs(os.path.dirname(dst_real), exist_ok=True)
-            shutil.copy2(src_bin, dst_real)
-
-            # Create wrapper script that sets LD_LIBRARY_PATH for libexpat.so
-            # and SSL_CERT_FILE/SSL_CERT_DIR for HTTPS TeX bundle downloads
-            wrapper = os.path.join(self.package_folder, "bin", "tectonic")
-            with open(wrapper, "w") as f:
-                f.write(
-                    '#!/system/bin/sh\n'
-                    'DIR="$(cd "$(dirname "$0")" && pwd)"\n'
-                    'export LD_LIBRARY_PATH="$DIR/../lib:$LD_LIBRARY_PATH"\n'
-                    'if [ -f /etc/ssl/certs/cacert.pem ]; then\n'
-                    '    export SSL_CERT_FILE="/etc/ssl/certs/cacert.pem"\n'
-                    'fi\n'
-                    'if [ -d /etc/ssl/certs ]; then\n'
-                    '    export SSL_CERT_DIR="/etc/ssl/certs"\n'
-                    'fi\n'
-                    'exec "$DIR/tectonic.real" "$@"\n'
-                )
-            os.chmod(wrapper, 0o755)
-        else:
+        # Fallback: glob search if not found in candidate paths
+        if target_dir is None:
             for pattern in [
                 os.path.join(self.build_folder, "**", "tectonic"),
                 os.path.join(str(self.build_folder), "**", "target", "release", "tectonic"),
@@ -256,8 +232,39 @@ class TectonicConan(ConanFile):
                 matches = glob.glob(pattern, recursive=True)
                 for m in matches:
                     if os.path.isfile(m) and os.access(m, os.X_OK | os.R_OK):
-                        copy(self, "tectonic", os.path.dirname(m), os.path.join(self.package_folder, "bin"))
-                        return
+                        target_dir = os.path.dirname(m)
+                        break
+                if target_dir:
+                    break
+
+        # Guard: binary must be found before packaging shared deps
+        if target_dir is None:
+            raise FileNotFoundError("tectonic binary not found in build output")
+
+        # Copy the actual binary as tectonic.real (Conan post-processing
+        # corrupts $ORIGIN in RUNPATH, so we use a wrapper script)
+        src_bin = os.path.join(target_dir, "tectonic")
+        dst_real = os.path.join(self.package_folder, "bin", "tectonic.real")
+        os.makedirs(os.path.dirname(dst_real), exist_ok=True)
+        shutil.copy2(src_bin, dst_real)
+
+        # Create wrapper script that sets LD_LIBRARY_PATH for libexpat.so
+        # and SSL_CERT_FILE/SSL_CERT_DIR for HTTPS TeX bundle downloads
+        wrapper = os.path.join(self.package_folder, "bin", "tectonic")
+        with open(wrapper, "w") as f:
+            f.write(
+                '#!/system/bin/sh\n'
+                'DIR="$(cd "$(dirname "$0")" && pwd)"\n'
+                'export LD_LIBRARY_PATH="$DIR/../lib:$LD_LIBRARY_PATH"\n'
+                'if [ -f /etc/ssl/certs/cacert.pem ]; then\n'
+                '    export SSL_CERT_FILE="/etc/ssl/certs/cacert.pem"\n'
+                'fi\n'
+                'if [ -d /etc/ssl/certs ]; then\n'
+                '    export SSL_CERT_DIR="/etc/ssl/certs"\n'
+                'fi\n'
+                'exec "$DIR/tectonic.real" "$@"\n'
+            )
+        os.chmod(wrapper, 0o755)
 
         # ── Package shared C/C++ deps alongside the binary ──
         # expat's conanfile hardcodes EXPAT_SHARED_LIBS=ON (upstream bug),

@@ -98,10 +98,13 @@ class HarfbuzzConan(ConanFile):
 
         # Components: harfbuzz produces multiple independent libraries
         self.cpp_info.components["harfbuzz"].libs = ["harfbuzz"]
+        self.cpp_info.components["harfbuzz"].set_property("pkg_config_name", "harfbuzz")
         self.cpp_info.components["subset"].libs = ["harfbuzz-subset"]
         self.cpp_info.components["subset"].requires = ["harfbuzz"]
+        self.cpp_info.components["subset"].set_property("pkg_config_name", "harfbuzz-subset")
         self.cpp_info.components["vector"].libs = ["harfbuzz-vector"]
         self.cpp_info.components["vector"].requires = ["harfbuzz"]
+        self.cpp_info.components["vector"].set_property("pkg_config_name", "harfbuzz-vector")
 
         # Transitive dependencies: harfbuzz public headers include
         # graphite2 and freetype headers (e.g., hb-graphite2.h includes

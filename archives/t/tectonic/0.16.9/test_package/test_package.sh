@@ -2,6 +2,8 @@
 # test_package.sh — tectonic 0.16.9 test script
 # Runs tectonic --version to verify the binary is functional.
 set -eu
+# pipefail may not be available in all shells (e.g., mksh on OHOS)
+set -o pipefail 2>/dev/null || true
 
 # The tectonic binary path is provided by Conan
 TECTONIC_BIN="${TECTONIC_BIN:-tectonic}"
