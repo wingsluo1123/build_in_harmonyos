@@ -11,6 +11,7 @@ import stat
 import sys
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import copy, get
 
 
@@ -108,7 +109,12 @@ class BoostCompiledConan(ConanFile):
         if str(self.settings.os) != "OHOS":
             return
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
-        cxx = compilers.get("cpp") or compilers.get("cxx") or "clang++"
+        cxx = compilers.get("cpp") or compilers.get("cxx")
+        if not cxx:
+            raise ConanInvalidConfiguration(
+                "OHOS cross-compilation requires tools.build:compiler_executables "
+                "to define cpp or cxx in [conf]"
+            )
         cxx = str(cxx).replace("\\", "/")
         target = self._ohos_target_triple()
         wrapper = self._ohos_compiler_wrapper_path()
