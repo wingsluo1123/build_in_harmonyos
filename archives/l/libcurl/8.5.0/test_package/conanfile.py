@@ -21,5 +21,10 @@ class LibcurlTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
+        # Use bash to wrap binary execution; other platforms run the ELF directly.
+        if self.settings.os == "OHOS":
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            self.run(f"{bash} -c './test_libcurl'", env="conanrun")
+        else:
+            self.run("./test_libcurl", env="conanrun")

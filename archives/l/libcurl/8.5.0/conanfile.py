@@ -10,7 +10,7 @@ from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 class LibcurlConan(ConanFile):
     name = "libcurl"
     version = "8.5.0"
-    description = "Multiprotocol file transfer library"
+    description = "Multiprotocol file transfer library（多协议传输库，鸿蒙 PC 适配，依赖 zlib）"
     license = "curl"
     homepage = "https://curl.se"
     url = ""
