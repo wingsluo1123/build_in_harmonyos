@@ -5,7 +5,13 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, rm
+from conan.tools.files import (
+    apply_conandata_patches,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+    rm,
+)
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -60,6 +66,11 @@ class NettleConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        configure_path = os.path.join(self.source_folder, "configure")
+        with open(configure_path, encoding="utf-8") as configure_file:
+            if configure_file.read().count("umask 077") != 2:
+                raise RuntimeError("unexpected Autoconf temporary-directory guards")
+        replace_in_file(self, configure_path, "umask 077", "umask 022")
         self._prepare_autotools_environment()
         autotools = Autotools(self)
         autotools.configure()
