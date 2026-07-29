@@ -279,6 +279,7 @@ class OnnxruntimeConan(ConanFile):
             return
 
         # Add OHOS to Linux matches
+        original = content
         content = content.replace(
             'STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android"',
             'STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS"'
@@ -288,5 +289,8 @@ class OnnxruntimeConan(ConanFile):
             '^(Windows|WindowsStore|CYGWIN|MSYS|Darwin|Linux|Android|FreeBSD|Emscripten|OHOS)$'
         )
 
-        cpuinfo_cmake.write_text(content)
-        self.output.info("Patched cpuinfo CMakeLists.txt for OHOS")
+        if content == original:
+            self.output.warn("cpuinfo patch had no effect (patterns not found)")
+        else:
+            cpuinfo_cmake.write_text(content)
+            self.output.info("Patched cpuinfo CMakeLists.txt for OHOS")
