@@ -47,7 +47,7 @@ class GnuTLSConan(ConanFile):
             "--with-included-libtasn1",
             "--disable-gost"
         ])
-        bash_path = shutil.which("bash") or "/usr/bin/env bash"
+        bash_path = shutil.which("bash") or "bash"
         autotools.make(args=[f"SHELL={bash_path}"])
 
     def package(self):
