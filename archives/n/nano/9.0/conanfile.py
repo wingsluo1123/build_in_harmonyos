@@ -74,9 +74,13 @@ class NanoConan(ConanFile):
     def _prepare_autotools_scripts(self):
         configure_path = os.path.join(self.source_folder, "configure")
         with open(configure_path, encoding="utf-8") as configure_file:
-            if configure_file.read().count("umask 077") != 2:
-                raise RuntimeError("unexpected Autoconf temporary-directory guards")
-        replace_in_file(self, configure_path, "umask 077", "umask 022")
+            configure_content = configure_file.read()
+        umask_077_count = configure_content.count("umask 077")
+        umask_022_count = configure_content.count("umask 022")
+        if umask_077_count == 2:
+            replace_in_file(self, configure_path, "umask 077", "umask 022")
+        elif umask_077_count != 0 or umask_022_count < 2:
+            raise RuntimeError("unexpected Autoconf temporary-directory guards")
 
         guess_path = os.path.join(self.source_folder, "config.guess")
         guess_anchor = (
@@ -92,4 +96,13 @@ class NanoConan(ConanFile):
             + "\techo $UNAME_MACHINE-unknown-linux-ohos\n"
             + "\texit ;;\n"
         )
-        replace_in_file(self, guess_path, guess_anchor, harmony_case)
+        with open(guess_path, encoding="utf-8") as guess_file:
+            guess_content = guess_file.read()
+        if "arm64:HarmonyOS:*:*)" not in guess_content:
+            if guess_content.count(guess_anchor) != 1:
+                raise RuntimeError("unexpected config.guess platform dispatch")
+            replace_in_file(self, guess_path, guess_anchor, harmony_case)
+
+        with open(guess_path, encoding="utf-8") as guess_file:
+            if "arm64:HarmonyOS:*:*)" not in guess_file.read():
+                raise RuntimeError("HarmonyOS config.guess case was not installed")
