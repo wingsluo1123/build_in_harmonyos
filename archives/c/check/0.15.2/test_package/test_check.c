@@ -4,8 +4,8 @@
 
 START_TEST(test_check_version)
 {
-    ck_assert_str_eq(CHECK_MAJOR_VERSION, "0");
-    ck_assert_str_eq(CHECK_MINOR_VERSION, "15");
+    ck_assert_int_eq(CHECK_MAJOR_VERSION, 0);
+    ck_assert_int_eq(CHECK_MINOR_VERSION, 15);
 }
 END_TEST
 
