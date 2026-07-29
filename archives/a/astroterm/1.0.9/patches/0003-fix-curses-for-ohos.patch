@@ -6,17 +6,29 @@ Subject: [PATCH] fix: bypass pkg-config for curses on OHOS
 OHOS CI workers ship the ncurses static library (libncursesw.a) and
 headers under /storage/Users/currentUser/usr/local/{include,lib} but
 do NOT install a curses.pc / ncurses.pc pkg-config file. As a result
-meson's dependency('curses') fails at the pkg-config stage with:
+meson's dependency('curses') fails at the pkg-config stage:
 
   Run-time dependency curses found: NO
-  (tried pkg-config, pkg-config, pkg-config, pkg-config,
-   config-tool and system)
 
-Replace dependency('curses') with cc.find_library('ncursesw') plus an
-explicit include_directories() pointing at the OHOS system include
-path. This mirrors the approach used by the hexcurse and fdclone
-recipes (autotools, -I/-L injection) but adapted for meson's
-find_library API.
+A first attempt used cc.find_library('ncursesw', dirs: [...]) to
+bypass pkg-config. However, meson 1.11.1's compiler.find_library
+compiles and links a minimal test program to verify the library, and
+under Conan's isolated MesonToolchain environment the OHOS clang
+default search paths do not include /storage/Users/currentUser/usr/local
+(either -I or -L), so the probe fails even though libncursesw.a exists
+on disk:
+
+  ../meson.build:150:21: ERROR: C shared or static library 'ncursesw' not found
+
+Replace dependency('curses') with a plain declare_dependency() that
+injects -I and -L/-l directly into link_args / include_directories.
+This mirrors the approach used by the hexcurse / fdclone / frotz /
+aamath recipes (autotools -I/-L injection) but adapted for meson's
+declare_dependency API. declare_dependency() returns found() == true,
+so the downstream `if curses.found()` header-detection block keeps
+running. Source files do not reference HAVE_NCURSES* / HAVE_CURSES*
+macros, so missed cc.has_header() probes only emit warnings, not
+errors.
 
 No source code logic changes — only the dependency discovery method.
 
@@ -26,18 +38,14 @@ Signed-off-by: OHOS PC Developer <ohpcd@example.com>
 diff --git a/meson.build b/meson.build
 --- a/meson.build
 +++ b/meson.build
-@@ -142,7 +142,15 @@ if is_windows
+@@ -142,7 +142,11 @@ if is_windows
          link_args: ['-L' + deps_lib_path, '-lpdcurses']
      )
  else
 -    curses = dependency('curses', required : true)
-+    # OHOS: system provides libncursesw.a + headers at /storage/Users/currentUser/usr/local
-+    # but no curses.pc pkg-config file. Use cc.find_library() to bypass pkg-config.
-+    ncurses_lib = cc.find_library('ncursesw',
-+        dirs: ['/storage/Users/currentUser/usr/local/lib'],
-+        required: true)
++    # OHOS: libncursesw.a + headers at /storage/Users/currentUser/usr/local/{lib,include}, no curses.pc
 +    curses = declare_dependency(
-+        dependencies: [ncurses_lib],
++        link_args: ['-L/storage/Users/currentUser/usr/local/lib', '-lncursesw'],
 +        include_directories: include_directories('/storage/Users/currentUser/usr/local/include')
 +    )
  endif

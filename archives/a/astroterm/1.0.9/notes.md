@@ -46,7 +46,18 @@ OHOS 使用 toybox 工具链，其 `xxd` 不支持 `-i` 选项。补丁在 `scri
 
 OHOS CI worker 在 `/storage/Users/currentUser/usr/local/{include,lib}` 预装了 ncurses 静态库（`libncursesw.a`）和头文件，但未安装 `curses.pc` pkg-config 文件。meson 的 `dependency('curses')` 走 pkg-config 查找必然失败。
 
-补丁将 `meson.build` 中的 `dependency('curses')` 替换为 `cc.find_library('ncursesw')` + `include_directories()`，绕过 pkg-config 直接定位系统库。与 hexcurse、fdclone 等配方的 `-I/-L` 注入思路一致，但适配了 meson 的 `find_library` API。
+**第一版方案（已废弃）**：用 `cc.find_library('ncursesw', dirs: [...])` 替代。但 meson 1.11.1 的 `compiler.find_library` 会编译链接测试程序验证库可用，而 Conan MesonToolchain 隔离环境下 OHOS clang 默认搜索路径不含 `/storage/Users/currentUser/usr/local/{include,lib}`，导致 probe 失败（`-I`/`-L` 均缺失），报错：
+
+```
+../meson.build:150:21: ERROR: C shared or static library 'ncursesw' not found
+```
+
+**最终方案**：用 `declare_dependency(link_args: ['-L...', '-lncursesw'], include_directories: include_directories('...'))` 完全跳过 meson 的库查找逻辑，直接注入 `-I`/`-L`/`-l`。等价于 hexcurse / fdclone / frotz / aamath 等配方的 autotools `-I/-L` 注入方式。
+
+- `declare_dependency()` 返回 `found() == true`，后续 `if curses.found()` 头文件检测块继续执行。
+- `cc.has_header()` 不带 args 时无法找到 ncurses 头文件，所有 `HAVE_NCURSES*` 宏不定义。
+- 但源代码（`src/*.c`、`include/*.h`）不引用任何 `HAVE_NCURSES*` / `HAVE_CURSES*` 宏，仅 meson.build 内部 `if` 块用，缺失仅触发 warning，不阻塞 configure/compile。
+- 实际编译时 `static_library(..., dependencies: [curses, math])` 会自动应用 `curses` 的 include_directories，`#include <curses.h>` 能找到。
 
 ### 4. 静态链接（R26）
 
