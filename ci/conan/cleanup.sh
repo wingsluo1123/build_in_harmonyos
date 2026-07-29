@@ -152,8 +152,7 @@ HOME_KEEP=(
     # ── 基础配置/工具 ──
     ".config" ".local"
     ".ohpcd" ".hnp"
-    # ── 用户安装 ──
-    "usr" "npm"
+    # NOTE: ~/usr/ 不再保护 — make install 可能写入未签名的 .so 污染环境
 )
 
 # 扫描 $HOME 下的顶层条目, 清理不在保护清单内的
@@ -206,7 +205,7 @@ fi
 for tmpdir in "/tmp" "/var/tmp" "$HOME_DIR/.tmp"; do
     if [ -d "$tmpdir" ] && [ -w "$tmpdir" ]; then
         # 只清理 conan 相关的临时文件
-        conan_tmp=$(find "$tmpdir" -maxdepth 1 -name "conan*" -o -name "tmp*" 2>/dev/null | head -20)
+        conan_tmp=$(find "$tmpdir" -maxdepth 1 \( -name "conan*" -o -name "tmp*" \) 2>/dev/null | head -20 || true)
         if [ -n "$conan_tmp" ]; then
             echo "$conan_tmp" | while IFS= read -r f; do
                 [ -n "$f" ] && rm -rf "$f" 2>/dev/null
