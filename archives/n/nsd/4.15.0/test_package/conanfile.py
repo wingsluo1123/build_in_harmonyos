@@ -19,9 +19,6 @@ class NsdTestConan(ConanFile):
             return
 
         bindir = os.path.join(self.dependencies["nsd"].package_folder, "sbin")
-        nsd = os.path.join(bindir, "nsd")
-        checkconf = os.path.join(bindir, "nsd-checkconf")
-        checkzone = os.path.join(bindir, "nsd-checkzone")
         zone = os.path.join(self.source_folder, "example.test.zone")
         config = os.path.join(self.build_folder, "nsd.conf")
 
@@ -36,6 +33,8 @@ class NsdTestConan(ConanFile):
                 f'  zonefile: "{zone}"\n'
             )
 
-        self.run(f'"{nsd}" -v', env="conanrun")
-        self.run(f'"{checkconf}" "{config}"', env="conanrun")
-        self.run(f'"{checkzone}" example.test "{zone}"', env="conanrun")
+        script = os.path.join(self.source_folder, "test_nsd.sh")
+        self.run(
+            f'sh "{script}" "{bindir}" "{config}" "{zone}"',
+            env="conanrun",
+        )
