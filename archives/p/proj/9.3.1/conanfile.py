@@ -61,7 +61,9 @@ class ProjConan(ConanFile):
         tc = CMakeToolchain(self)
         if self.settings.os == "OHOS":
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
-            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = self._cmake_system_processor(
+                str(self.settings.arch)
+            )
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
         tc.variables["BUILD_EXAMPLES"] = "OFF"
@@ -97,6 +99,18 @@ class ProjConan(ConanFile):
         self.cpp_info.set_property("pkg_config_name", "proj")
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "dl", "pthread"]
+
+    @staticmethod
+    def _cmake_system_processor(settings_arch):
+        return {
+            "armv8": "aarch64",
+            "armv8.3": "aarch64",
+            "armv8.4": "aarch64",
+            "armv8.5": "aarch64",
+            "armv8.6": "aarch64",
+            "armv8.7": "aarch64",
+            "armv8.8": "aarch64",
+        }.get(settings_arch, settings_arch)
 
     @staticmethod
     def _sqlite3_executable(package_folder):
