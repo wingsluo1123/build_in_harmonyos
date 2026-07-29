@@ -19,6 +19,8 @@ class Sdl2TtfConan(ConanFile):
     homepage = "https://github.com/libsdl-org/SDL_ttf"
     url = ""  # CI fills this
 
+    package_type = "library"
+
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
@@ -37,9 +39,8 @@ class Sdl2TtfConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["SDL2TTF_HARFBUZZ"] = "ON"
-        tc.variables["SDL2TTF_FREETYPE"] = "ON"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
+        tc.variables["SDL2TTF_HARFBUZZ"] = True
+        tc.variables["SDL2TTF_FREETYPE"] = True
         tc.generate()
 
     def build(self):
