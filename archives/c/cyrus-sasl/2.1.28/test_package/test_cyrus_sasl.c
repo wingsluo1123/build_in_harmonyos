@@ -30,6 +30,9 @@ int main(void)
 
     int result = sasl_client_init(NULL);
     failures += check(result == SASL_OK, "sasl_client_init succeeds");
+    if (result != SASL_OK) {
+        return 1;
+    }
 
     sasl_conn_t *client = NULL;
     result = sasl_client_new("imap", "localhost", NULL, NULL, NULL, 0, &client);
