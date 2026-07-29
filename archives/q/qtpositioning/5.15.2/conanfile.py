@@ -76,9 +76,6 @@ class QtpositioningConan(ConanFile):
 
     def package(self):
         self.run(f"make install INSTALL_ROOT=\"{self.package_folder}\"")
-        # Also copy any .prl, .la, .pc files from subdirectories
-        for pattern in ["**/*.prl", "**/*.la", "**/*.pc"]:
-            copy(self, pattern, src=self.build_folder, dst=os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
         self.cpp_info.libs = ["Qt5Positioning"]
