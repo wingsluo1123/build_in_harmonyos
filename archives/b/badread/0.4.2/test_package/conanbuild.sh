@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/Desktop/pc2hao/build_in_harmonyos/archives/b/badread/0.4.2/test_package/conanbuildenv-x86_64.sh"
