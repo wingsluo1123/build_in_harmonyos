@@ -42,7 +42,7 @@ def read_elf_needed(path):
                 p_type = struct.unpack(endian + "I", f.read(4))[0]
                 if p_type == 2:  # PT_DYNAMIC
                     if is_64:
-                        f.seek(8, 1)
+                        f.seek(4, 1)  # skip p_flags (4 bytes) to reach p_offset
                         p_offset = struct.unpack(endian + "Q", f.read(8))[0]
                     else:
                         f.seek(4, 1)
@@ -86,10 +86,10 @@ def read_elf_needed(path):
                 p_type = struct.unpack(endian + "I", f.read(4))[0]
                 if p_type == 1:  # PT_LOAD
                     if is_64:
-                        f.seek(8, 1)
+                        f.seek(4, 1)  # skip p_flags (4 bytes) to reach p_offset
                         p_offset = struct.unpack(endian + "Q", f.read(8))[0]
                         p_vaddr = struct.unpack(endian + "Q", f.read(8))[0]
-                        f.seek(8, 1)
+                        f.seek(8, 1)  # skip p_paddr (8 bytes) to reach p_filesz
                         p_filesz = struct.unpack(endian + "Q", f.read(8))[0]
                     else:
                         p_offset = struct.unpack(endian + "I", f.read(4))[0]
@@ -154,6 +154,9 @@ def main() -> int:
         elif "Invalid arguments" in combined:
             print("PASS: pacvim binary executed (usage output detected)")
         else:
+            if result.returncode < 0:
+                print(f"FAIL: binary crashed (signal {-result.returncode})", file=sys.stderr)
+                return 1
             print(f"PASS: pacvim binary executed (exit={result.returncode})")
     except subprocess.TimeoutExpired:
         print("PASS: pacvim binary executed (timed out)")
