@@ -3,17 +3,15 @@
 # Verifies that Object::Event can be loaded and its API works correctly
 set -euo pipefail
 
-# Add user-installed Perl modules (common::sense, AnyEvent) to PERL5LIB
-# These are not in the system Perl @INC in CI environment
-SYSTEM_PERL5="${SYSTEM_PERL5LIB:-/storage/Users/currentUser/usr/local/lib/perl5/aarch64-linux:/storage/Users/currentUser/usr/local/lib/perl5}"
-export PERL5LIB="${SYSTEM_PERL5}${PERL5LIB:+:}${PERL5LIB:-}"
+# System Perl modules (common::sense, AnyEvent) are injected via conanrun env
+# by the conanfile.py package_info() runenv_info, so PERL5LIB is already set.
 
 # Test 1: Module loads successfully
-perl -MObject::Event -e 'exit 0' 2>/dev/null
+perl -MObject::Event -e 'exit 0'
 echo "[PASS] Object::Event module loads"
 
 # Test 2: Version is accessible
-VERSION=$(perl -MObject::Event -e 'print Object::Event->VERSION' 2>/dev/null)
+VERSION=$(perl -MObject::Event -e 'print Object::Event->VERSION')
 if [ -n "$VERSION" ]; then
     echo "[PASS] Object::Event version: $VERSION"
 else

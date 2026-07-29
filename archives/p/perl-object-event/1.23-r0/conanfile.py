@@ -51,3 +51,17 @@ class PerlobjecteventConan(ConanFile):
         self.cpp_info.libs = []
         # Set PERL5LIB so consumers (test_package) can find Object::Event
         self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))
+        # Inject system Perl module paths for runtime deps (common::sense, AnyEvent)
+        # These are user-installed Perl modules not managed by Conan.
+        # CI workers can set SYSTEM_PERL5LIB; auto-detect common install locations as fallback.
+        system_perl5lib = os.environ.get("SYSTEM_PERL5LIB", "")
+        if not system_perl5lib:
+            candidates = [
+                os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5", "aarch64-linux"),
+                os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "perl5"),
+            ]
+            system_perl5lib = ":".join(p for p in candidates if os.path.isdir(p))
+        if system_perl5lib:
+            for p in system_perl5lib.split(":"):
+                if p:
+                    self.runenv_info.append_path("PERL5LIB", p)
