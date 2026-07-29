@@ -259,7 +259,10 @@ class OnnxruntimeConan(ConanFile):
 
         protoc_path = build_dir / "protoc"
         if not protoc_path.exists():
-            protoc_path = list(build_dir.glob("protoc-*"))[0]
+            candidates = list(build_dir.glob("protoc-*"))
+            if not candidates:
+                raise RuntimeError(f"protoc binary not found in {build_dir}")
+            protoc_path = candidates[0]
 
         self.output.info(f"Built protoc at {protoc_path}")
         return str(protoc_path)
