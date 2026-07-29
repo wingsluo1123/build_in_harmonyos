@@ -8,7 +8,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
 class Sdl2TtfConan(ConanFile):
@@ -29,9 +29,9 @@ class Sdl2TtfConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # SDL2, FreeType, HarfBuzz, libpng, zlib are system libraries
-        # No Conan packages available for these on ohpcd remote
-        pass
+        self.requires("sdl2/2.30.10")
+        self.requires("freetype/2.14.3")
+        self.requires("harfbuzz/14.2.0")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -48,12 +48,25 @@ class Sdl2TtfConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        sdl2 = self.dependencies["sdl2"].cpp_info
+        sdl2.set_property("cmake_file_name", "SDL2")
+        sdl2.set_property(
+            "cmake_target_name",
+            "SDL2::SDL2" if self.options.shared else "SDL2::SDL2-static",
+        )
+
+        freetype = self.dependencies["freetype"].cpp_info
+        freetype.set_property("cmake_file_name", "Freetype")
+        freetype.set_property("cmake_target_name", "Freetype::Freetype")
+
+        CMakeDeps(self).generate()
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
         if self.options.get_safe("fPIC") is not None:
             tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(self.options.fPIC)
         tc.variables["SDL2TTF_HARFBUZZ"] = True
         tc.variables["SDL2TTF_FREETYPE"] = True
+        tc.variables["CMAKE_FIND_PACKAGE_PREFER_CONFIG"] = True
         tc.generate()
 
     def build(self):
@@ -68,5 +81,12 @@ class Sdl2TtfConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["SDL2_ttf"]
-        # System dependencies: SDL2, FreeType, HarfBuzz, libpng, zlib
-        self.cpp_info.system_libs = ["SDL2", "freetype", "harfbuzz", "png16", "z"]
+        self.cpp_info.requires = [
+            "sdl2::sdl2",
+            "freetype::freetype",
+            "harfbuzz::harfbuzz",
+        ]
+        self.cpp_info.set_property("cmake_file_name", "SDL2_ttf")
+        self.cpp_info.set_property(
+            "cmake_target_name", "SDL2_ttf::SDL2_ttf-static"
+        )
