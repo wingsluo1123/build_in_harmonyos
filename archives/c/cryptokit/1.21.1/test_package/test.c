@@ -23,19 +23,23 @@ int main(void) {
     }
     printf("\n");
 
-    /* Verify against known-good digest (computed independently) */
-    /* SHA256("The Cryptokit library - SHA-256 test") should match */
-    /* Known correct: first 4 bytes should be non-zero if algorithm works */
-    int valid = 0;
-    for (i = 0; i < 32; i++) {
-        if (hash[i] != 0) valid++;
-    }
+    /* Verify against known-good SHA-256 digest */
+    /* Pre-computed: SHA-256("The Cryptokit library - SHA-256 test") */
+    const unsigned char expected[32] = {
+        0x52, 0xa3, 0x99, 0x63, 0x08, 0x9a, 0xe9, 0xe2,
+        0xa6, 0x9e, 0x00, 0x3f, 0x0d, 0x37, 0xe6, 0x9b,
+        0xc0, 0xd8, 0x38, 0x1d, 0x71, 0x46, 0x0b, 0xcc,
+        0xcd, 0xff, 0x66, 0x90, 0x59, 0x26, 0xed, 0x36
+    };
 
-    if (valid > 0) {
-        printf("cryptokit SHA-256: algorithm produced non-zero digest ✅\n");
+    if (memcmp(hash, expected, 32) == 0) {
+        printf("cryptokit SHA-256: digest MATCHES expected value ✅\n");
         return 0;
     } else {
-        printf("cryptokit SHA-256: FAILED - all zeros!\n");
+        printf("cryptokit SHA-256: FAILED - digest mismatch!\n");
+        printf("  Expected: ");
+        for (i = 0; i < 32; i++) printf("%02x", expected[i]);
+        printf("\n");
         return 1;
     }
 }
