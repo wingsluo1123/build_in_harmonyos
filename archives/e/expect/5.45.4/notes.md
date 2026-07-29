@@ -26,7 +26,13 @@
 - [x] make install 完成
 
 ### Phase 3: 测试
-- [x] make test 跳过（静态 Tcl 不支持动态加载）
+- [x] 上游测试核验：确认存在测试入口
+  - 入口：`make test` → `$(TCLSH) tests/all.tcl $(TESTFLAGS)`
+  - 测试 runner：tests/all.tcl
+  - tests/ 下共 7 个 .test 文件：cat.test、expect.test、logfile.test、pid.test、send.test、spawn.test、stty.test
+  - 按 `^test ` 定义统计约 29 个 tcltest 用例
+- [x] make test 未执行（静态 Tcl 不支持动态加载 Expect 扩展 .so）
+- [x] 新增 smoke test：test_package/test_expect.sh — 4/4（100%）通过
 - [x] 手动功能测试通过
 
 ### Phase 4: 预编译包
@@ -87,5 +93,5 @@
 - **最终状态**: ✅ 编译成功
 ---
 
-**编译结束**: 2026-05-27 17:37
-**最终状态**: built
+**编译结束**: 2026-07-29 15:14
+**最终状态**: published
