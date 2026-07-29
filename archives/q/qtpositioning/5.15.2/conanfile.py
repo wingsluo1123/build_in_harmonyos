@@ -75,7 +75,7 @@ class QtpositioningConan(ConanFile):
         self.run("make -j1", env="conanbuild")
 
     def package(self):
-        self.run("make install INSTALL_ROOT=\"{}\"".format(self.package_folder))
+        self.run(f"make install INSTALL_ROOT=\"{self.package_folder}\"")
         # Also copy any .prl, .la, .pc files
         for pattern in ["*.prl", "*.la", "*.pc"]:
             copy(self, pattern, src=self.build_folder, dst=os.path.join(self.package_folder, "lib"))
@@ -84,6 +84,5 @@ class QtpositioningConan(ConanFile):
         self.cpp_info.libs = ["Qt5Positioning"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("cmake_target_name", "Qt5::Positioning")
         self.cpp_info.set_property("pkg_config_name", "Qt5Positioning")
