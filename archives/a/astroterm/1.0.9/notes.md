@@ -52,10 +52,11 @@ OHOS CI worker 在 `/storage/Users/currentUser/usr/local/{include,lib}` 预装�
 ../meson.build:150:21: ERROR: C shared or static library 'ncursesw' not found
 ```
 
-**最终方案**：用 `declare_dependency(link_args: ['-L...', '-lncursesw'], include_directories: include_directories('...'))` 完全跳过 meson 的库查找逻辑，直接注入 `-I`/`-L`/`-l`。等价于 hexcurse / fdclone / frotz / aamath 等配方的 autotools `-I/-L` 注入方式。
+**最终方案（fallback 模式）**：保留 `dependency('curses', required: false)` 作为主路径（Linux/macOS 通过 pkg-config 成功），仅当 pkg-config 失败（OHOS 无 curses.pc）时 fallback 到 `declare_dependency(link_args: ['-L...', '-lncursesw'], include_directories: include_directories('...'))` 直接注入 `-I`/`-L`/`-l`。
 
-- `declare_dependency()` 返回 `found() == true`，后续 `if curses.found()` 头文件检测块继续执行。
-- `cc.has_header()` 不带 args 时无法找到 ncurses 头文件，所有 `HAVE_NCURSES*` 宏不定义。
+- 这与 `conanfile.py` 的 `validate()` 允许 `os in ("Linux", "OHOS")` 契约一致：Linux 走 pkg-config 原可移植路径，OHOS 走硬编码路径。
+- `declare_dependency()` 返回 `found() == true`，后续 `if curses.found()` 头文件检测块在两个平台都继续执行。
+- `cc.has_header()` 不带 args 时在 OHOS 上找不到 ncurses 头文件，所有 `HAVE_NCURSES*` 宏不定义。
 - 但源代码（`src/*.c`、`include/*.h`）不引用任何 `HAVE_NCURSES*` / `HAVE_CURSES*` 宏，仅 meson.build 内部 `if` 块用，缺失仅触发 warning，不阻塞 configure/compile。
 - 实际编译时 `static_library(..., dependencies: [curses, math])` 会自动应用 `curses` 的 include_directories，`#include <curses.h>` 能找到。
 
