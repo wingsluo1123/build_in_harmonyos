@@ -22,6 +22,8 @@ class Sdl2TtfConan(ConanFile):
     package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -31,6 +33,14 @@ class Sdl2TtfConan(ConanFile):
         # No Conan packages available for these on ohpcd remote
         pass
 
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
+
     def layout(self):
         cmake_layout(self)
 
@@ -39,6 +49,9 @@ class Sdl2TtfConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
+        if self.options.get_safe("fPIC") is not None:
+            tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(self.options.fPIC)
         tc.variables["SDL2TTF_HARFBUZZ"] = True
         tc.variables["SDL2TTF_FREETYPE"] = True
         tc.generate()
