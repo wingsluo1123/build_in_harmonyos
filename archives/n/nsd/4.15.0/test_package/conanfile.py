@@ -18,7 +18,7 @@ class NsdTestConan(ConanFile):
         if not can_run(self):
             return
 
-        bindir = os.path.join(self.dependencies["nsd"].package_folder, "sbin")
+        bindir = os.path.join(self.dependencies["nsd"].package_folder, "bin")
         zone = os.path.join(self.source_folder, "example.test.zone")
         config = os.path.join(self.build_folder, "nsd.conf")
 
