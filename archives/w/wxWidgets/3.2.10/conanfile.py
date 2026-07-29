@@ -113,13 +113,12 @@ class WxwidgetsConan(ConanFile):
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin"]
 
-        # Cross-compiled wxWidgets base/net libraries include the target OS in
-        # their filenames. Keep dependent static libraries before providers so
-        # consumers link correctly without relying on linker groups.
-        target_suffix = "-OHOS" if self.settings.os == "OHOS" else ""
+        # Keep dependent static libraries before providers so consumers link
+        # correctly without relying on linker groups. The CMake build installs
+        # the same archive names on OHOS and Linux.
         self.cpp_info.libs = [
-            f"wx_baseu_net-3.2{target_suffix}",
-            f"wx_baseu-3.2{target_suffix}",
+            "wx_baseu_net-3.2",
+            "wx_baseu-3.2",
             "wxregexu-3.2",
             "wxexpat-3.2",
             "wxzlib-3.2",

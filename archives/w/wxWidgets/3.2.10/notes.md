@@ -63,8 +63,8 @@ cmake --install . --DESTDIR=$TEST_PREFIX
 **最终状态**: built
 
 **产物**:
-- libwx_baseu-3.2-OHOS.a (核心库)
-- libwx_baseu_net-3.2-OHOS.a (网络库)
+- libwx_baseu-3.2.a (核心库)
+- libwx_baseu_net-3.2.a (网络库)
 - libwxregexu-3.2.a (正则库)
 - libwxexpat-3.2.a (XML 解析库)
 - libwxzlib-3.2.a (压缩库)
