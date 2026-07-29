@@ -88,8 +88,6 @@ L5: ✅ PASS (产物基线, 跳过-无 cache)
 | conandata.yml | 源码 URL + SHA256 |
 | test_package/conanfile.py | 打包验证测试 (文件存在性 + 功能测试) |
 | test_package/MANIFEST.yml | 上游测试声明 |
-| reports/conan-verify-report.md | 验证报告 |
-| reports/conan-create.log | conan create 日志 |
 
 ## 功能测试结果 (2026-07-02)
 
@@ -111,7 +109,6 @@ L5: ✅ PASS (产物基线, 跳过-无 cache)
 ### Perl XS 模块加载: ❌ 不可用
 
 根因: OpenHarmony musl libc 的 `dlopen_config_abs_path_policy` 路径策略阻止从 HNP 启动的 Perl 加载 HMDFS 上的 .so。
-详细分析见 `reports/functional-test-report.md`。
 
 ### 综合结论
 
@@ -128,7 +125,7 @@ L5: ✅ PASS (产物基线, 跳过-无 cache)
 5. **R26 不适用**: Bcrypt.so 是 Perl XS 模块，不是系统同名库。
 6. **R27 合规**: 无外部依赖，requirements() 为空。
 7. **R32 合规**: 无 settings.os 条件判断。
-8. **与 perl-dbd-pg 交叉对比**: 同为 Perl XS 模块，均受 dlopen 限制影响。但 crypt-bcrypt 未遇到 CRT 文件缺失问题 (crypt_blowfish.c 是纯 C 库，不依赖 CRT 启动代码)，而 dbd-pg 需要 `-nostartfiles -nodefaultlibs -lc` 参数。详见 `reports/functional-test-report.md` §3.4。
+8. **与 perl-dbd-pg 交叉对比**: 同为 Perl XS 模块，均受 dlopen 限制影响。但 crypt-bcrypt 未遇到 CRT 文件缺失问题 (crypt_blowfish.c 是纯 C 库，不依赖 CRT 启动代码)，而 dbd-pg 需要 `-nostartfiles -nodefaultlibs -lc` 参数。
 
 ---
 

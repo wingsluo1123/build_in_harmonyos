@@ -34,7 +34,7 @@ Crypt::Bcrypt 是 Perl 的现代 bcrypt 密码哈希实现，包含 C XS 扩展 
 
 **建议使用方式**: 作为 C 库使用，通过 Conan 依赖引用，直接调用 `_crypt_blowfish_rn` 和 `_crypt_gensalt_blowfish_rn` 函数。C 库功能测试 16/16 全部通过。
 
-详见: `0.011-r3/notes.md` 和 `0.011-r3/reports/functional-test-report.md`
+详见: `0.011-r3/notes.md`
 
 ---
 *OpenHarmony 编译归档 · 2026-07-02*
