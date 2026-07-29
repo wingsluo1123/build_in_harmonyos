@@ -106,9 +106,10 @@ class ProjConan(ConanFile):
         # Build directory
         bdir = os.path.join(self.build_folder, "build-ohos")
         pkgdir = self.package_folder
+        _ohos_arch = "arm64-v8a" if str(self.settings.arch).startswith("armv8") else str(self.settings.arch)
         defs = " ".join([
             '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH=arm64-v8a",
+            "-DOHOS_ARCH={}".format(_ohos_arch),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
             "-DBUILD_SHARED_LIBS=OFF",
@@ -154,7 +155,6 @@ class ProjConan(ConanFile):
 
     def _sign_binaries(self):
         """Sign ELF binaries for OpenHarmony."""
-        import glob
         targets = glob.glob(os.path.join(self.package_folder, "lib", "**", "*.so"), recursive=True)
         targets += glob.glob(os.path.join(self.package_folder, "lib", "**", "*.so.*"), recursive=True)
         bindir = os.path.join(self.package_folder, "bin")

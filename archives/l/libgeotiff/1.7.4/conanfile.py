@@ -66,12 +66,13 @@ class LibgeotiffConan(ConanFile):
         toolchain = self._ohos_toolchain()
         src = self.source_folder
         bdir = os.path.join(self.build_folder, "build-ohos")
+        _ohos_arch = "arm64-v8a" if str(self.settings.arch).startswith("armv8") else str(self.settings.arch)
         defs = [
             '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH=arm64-v8a",
+            "-DOHOS_ARCH={}".format(_ohos_arch),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
-            "-DBUILD_SHARED_LIBS=ON",
+            "-DBUILD_SHARED_LIBS={}".format("ON" if self.options.shared else "OFF"),
             "-DWITH_TIFF=ON",
             "-DWITH_UTILITIES=OFF",
             "-DBUILD_MAN=OFF",

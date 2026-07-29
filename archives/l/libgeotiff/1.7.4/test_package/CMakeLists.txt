@@ -3,7 +3,7 @@ project(test_geotiff C)
 
 # Find packages via Conan-generated CMakeDeps
 find_package(GeoTIFF REQUIRED)
-find_package(TIFF REQUIRED)
+find_package(libtiff REQUIRED)
 
 add_executable(test_geotiff test_geo.c)
 target_link_libraries(test_geotiff GeoTIFF::geotiff)
