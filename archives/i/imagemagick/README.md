@@ -7,4 +7,11 @@ ImageMagick 是一个免费的开源软件套件，用于编辑和操作数字�
 - Modern (v7): https://imagemagick.org/
 
 ## 源码仓库
-- GitHub: https://github.com/ImageMagick/ImageMagick6
+- GitHub: https://github.com/ImageMagick/ImageMagick
+
+## 可用版本
+
+| 版本 | 状态 | 构建系统 |
+|------|------|----------|
+| 7.1.2-23 | built | autotools |
+| 7.1.2-24 | built | autotools |
