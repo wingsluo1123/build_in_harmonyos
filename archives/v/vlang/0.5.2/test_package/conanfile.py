@@ -77,6 +77,8 @@ class VTestConan(ConanFile):
             f'-outFile "{signed_path}" -selfSign 1 -signAlg SHA256withECDSA',
             quiet=True,
         )
+        if not signed_path.is_file():
+            raise ConanException(f"OHOS binary signing did not create {signed_path}")
         os.replace(signed_path, binary_path)
         os.chmod(binary_path, 0o755)
 
