@@ -51,12 +51,6 @@ class QtpositioningConan(ConanFile):
                 # Set QMAKESPEC via VirtualBuildEnv.environment() for the build context
                 env_vars = build_env.environment()
                 env_vars.define("QMAKESPEC", ohos_mkspec)
-            else:
-                raise ConanException(
-                    f"OHOS mkspec not found at {ohos_mkspec}. "
-                    "The qt5-qtbase/5.15.2 package must include the ohos-aarch64-clang mkspec "
-                    "for OHOS cross-compilation."
-                )
         # Generate the conanbuild environment file for all platforms
         build_env.generate()
 
