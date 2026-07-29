@@ -13,9 +13,9 @@ import os
 from conan import ConanFile
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.files import (
-    apply_conandata_patches,
     export_conandata_patches,
     get,
+    patch,
     replace_in_file,
 )
 from conan.tools.layout import basic_layout
@@ -95,7 +95,18 @@ class AstrotermConan(ConanFile):
             handle.write(content.replace("[binaries]\n", binaries, 1))
 
     def build(self):
-        apply_conandata_patches(self)
+        # Apply patches conditionally: 0003 (curses OHOS fallback) is
+        # OHOS-only. On Linux/macOS the original dependency('curses')
+        # via pkg-config is preserved, keeping the recipe portable.
+        for p in self.conan_data.get("patches", []):
+            patch_file = p["patch_file"]
+            if "0003" in patch_file and self.settings.os != "OHOS":
+                continue
+            patch(
+                self,
+                base_path=self.source_folder,
+                patch_file=os.path.join(self.export_sources_folder, patch_file),
+            )
         meson_file = os.path.join(self.source_folder, "meson.build")
         replace_in_file(
             self,

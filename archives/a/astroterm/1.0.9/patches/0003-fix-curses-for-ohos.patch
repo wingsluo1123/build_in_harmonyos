@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: OHOS PC Developer <ohpcd@example.com>
 Date: Wed, 28 Jul 2026 10:00:00 +0800
-Subject: [PATCH] fix: add OHOS fallback for curses dependency discovery
+Subject: [PATCH] fix: bypass pkg-config for curses on OHOS
 
 OHOS CI workers ship the ncurses static library (libncursesw.a) and
 headers under /storage/Users/currentUser/usr/local/{include,lib} but
@@ -11,41 +11,35 @@ stage on OHOS:
 
   Run-time dependency curses found: NO
 
-Earlier attempts:
-  1. dependency('curses', required: true) → fails on OHOS (no .pc)
-  2. cc.find_library('ncursesw', dirs: [...]) → meson 1.11.1 probes
-     by compiling+linking a test program; under Conan's isolated
-     MesonToolchain the OHOS clang default search paths miss both -I
-     and -L for /storage/Users/currentUser/usr/local, so the probe
-     fails with:
-       ../meson.build:150:21: ERROR: C shared or static library
-       'ncursesw' not found
+This patch replaces dependency('curses') with a declare_dependency()
+that injects -I and -L/-l directly, bypassing pkg-config entirely.
 
-Final approach (this patch):
-  Keep dependency('curses', required: false) as the primary,
-  portable discovery path (works on Linux/macOS via pkg-config).
-  Only when pkg-config fails (i.e. on OHOS, where curses.pc is
-  absent) fall back to declare_dependency() with explicit -I/-L/-l
-  pointing at the OHOS system install path.
+Conditional application:
+  This patch is OHOS-specific. conanfile.py applies it conditionally
+  (only when self.settings.os == "OHOS") by iterating over
+  conan_data["patches"] and skipping "0003" on non-OHOS platforms.
+  On Linux/macOS the original dependency('curses', required: true)
+  is preserved, so pkg-config discovery works normally and no
+  hardcoded OHOS path is ever referenced.
 
-This contract-aligns with conanfile.py's validate() which permits
-os in ("Linux", "OHOS"):
-  - Linux: dependency('curses') succeeds via pkg-config → fallback
-           not entered, original portable behaviour preserved.
-  - OHOS:  dependency('curses') fails (no .pc) → fallback
-          declare_dependency() injects -L/storage/.../lib
-          -lncursesw and -I/storage/.../include. No probe is
-          performed by meson (declare_dependency does not compile
-          a test program), so the missing default search paths do
-          not matter.
+Why declare_dependency (not cc.find_library):
+  An earlier attempt used cc.find_library('ncursesw', dirs: [...]).
+  However, meson 1.11.1's compiler.find_library probes by compiling
+  and linking a test program, and under Conan's isolated MesonToolchain
+  the OHOS clang default search paths miss both -I and -L for
+  /storage/Users/currentUser/usr/local, so the probe fails with:
+    ../meson.build:150:21: ERROR: C shared or static library
+    'ncursesw' not found
+  declare_dependency() performs no such probe, so the missing default
+  search paths do not matter.
 
 declare_dependency() returns found() == true, so the downstream
-`if curses.found()` header-detection block continues to run on both
-platforms. Source files (src/*.c, include/*.h) do not reference any
-HAVE_NCURSES* / HAVE_CURSES* macros, so missed cc.has_header() probes
-on OHOS only emit meson warnings, not errors. At compile time,
-static_library(..., dependencies: [curses, math]) applies the
-curses include_directories, so #include <curses.h> resolves.
+`if curses.found()` header-detection block continues to run. Source
+files (src/*.c, include/*.h) do not reference any HAVE_NCURSES* /
+HAVE_CURSES* macros, so missed cc.has_header() probes only emit
+meson warnings, not errors. At compile time, static_library(...,
+dependencies: [curses, math]) applies the curses include_directories,
+so #include <curses.h> resolves.
 
 No source code logic changes — only the dependency discovery method.
 
@@ -55,22 +49,18 @@ Signed-off-by: OHOS PC Developer <ohpcd@example.com>
 diff --git a/meson.build b/meson.build
 --- a/meson.build
 +++ b/meson.build
-@@ -142,7 +142,17 @@ if is_windows
+@@ -142,7 +142,13 @@ if is_windows
          link_args: ['-L' + deps_lib_path, '-lpdcurses']
      )
  else
 -    curses = dependency('curses', required : true)
-+    curses = dependency('curses', required : false)
-+    # OHOS fallback: system provides libncursesw.a + headers at
++    # OHOS: system provides libncursesw.a + headers at
 +    # /storage/Users/currentUser/usr/local/{lib,include} but no curses.pc.
-+    # On Linux/macOS dependency('curses') succeeds via pkg-config and
-+    # this branch is skipped, preserving portability.
-+    if not curses.found()
-+        curses = declare_dependency(
-+            link_args: ['-L/storage/Users/currentUser/usr/local/lib', '-lncursesw'],
-+            include_directories: include_directories('/storage/Users/currentUser/usr/local/include')
-+        )
-+    endif
++    # This patch is applied only on OHOS (see conanfile.py build()).
++    curses = declare_dependency(
++        link_args: ['-L/storage/Users/currentUser/usr/local/lib', '-lncursesw'],
++        include_directories: include_directories('/storage/Users/currentUser/usr/local/include')
++    )
  endif
 
  # Define some curses preprocessor symbols
