@@ -5,6 +5,7 @@ Build system: qmake (Qt5 addon module)
 Platform: aarch64-linux-ohos (HarmonyOS PC)
 """
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
@@ -51,10 +52,10 @@ class QtpositioningConan(ConanFile):
                 env_vars = build_env.environment()
                 env_vars.define("QMAKESPEC", ohos_mkspec)
             else:
-                self.output.warn(
+                raise ConanInvalidConfiguration(
                     f"OHOS mkspec (harmonyos-clang) not found in qt5-qtbase package. "
-                    "qmake will use default mkspec. ⚠️ 产物架构可能为 host (x86_64) 而非 target (aarch64), "
-                    "CI 层面应做产物架构校验确认。"
+                    "qmake would use default mkspec and produce host-arch binary. "
+                    "The qt5-qtbase/5.15.2 must include harmonyos-clang mkspec for OHOS cross-compilation."
                 )
         # Generate the conanbuild environment file for all platforms
         build_env.generate()
