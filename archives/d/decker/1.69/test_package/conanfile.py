@@ -42,11 +42,14 @@ class DeckerTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Resolve the installed lilt binary and pass it to CTest via LILT_BIN.
+        # Resolve the installed lilt binary and pass it to the test binary
+        # via LILT_BIN environment variable.
         decker = self.dependencies["decker"]
         bin_dirs = decker.cpp_info.aggregated_components().bindirs
         lilt_path = os.path.join(bin_dirs[0], "lilt") if bin_dirs else "lilt"
 
-        env_vars = {"LILT_BIN": lilt_path}
-        cmake = CMake(self)
-        cmake.test(env=env_vars)
+        # R34: run the compiled test binary directly with self.run().
+        # Use the full path to the built test binary (cmake_layout places it
+        # in the build folder for the current configuration).
+        test_bin = os.path.join(self.cpp.build.bindir, "test_decker")
+        self.run(f"LILT_BIN={lilt_path} {test_bin}", env="conanrun")
