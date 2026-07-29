@@ -163,6 +163,13 @@ class AutotraceConan(ConanFile):
             )
         return shlex.split(result.stdout.strip())
 
+    def _dependency_pkg_config_name(self, dependency):
+        dependency_info = self.dependencies[dependency]
+        return (
+            dependency_info.cpp_info.get_property("pkg_config_name")
+            or dependency_info.ref.name
+        )
+
     def _write_config_header(self):
         save(
             self,
@@ -226,11 +233,12 @@ class AutotraceConan(ConanFile):
             "llvm-ranlib",
             os.environ.get("RANLIB") or shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib",
         )
-        glib_modules = ["glib-2.0", "gmodule-2.0", "gthread-2.0", "gobject-2.0"]
-        glib_cflags = self._pkg_config(["--cflags", *glib_modules])
-        glib_libs = self._pkg_config(["--libs", *glib_modules])
-        png_cflags = self._pkg_config(["--cflags", "libpng"])
-        png_libs = self._pkg_config(["--libs", "libpng"])
+        glib_pc = self._dependency_pkg_config_name("glib")
+        png_pc = self._dependency_pkg_config_name("libpng")
+        glib_cflags = self._pkg_config(["--cflags", glib_pc])
+        glib_libs = self._pkg_config(["--libs", glib_pc])
+        png_cflags = self._pkg_config(["--cflags", png_pc])
+        png_libs = self._pkg_config(["--libs", png_pc])
 
         cflags = [
             *self._build_type_flags(),
@@ -325,20 +333,22 @@ class AutotraceConan(ConanFile):
         copy(self, "COPYING.LIB", src=self.source_folder,
              dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
 
+        glib_pc = self._dependency_pkg_config_name("glib")
+        png_pc = self._dependency_pkg_config_name("libpng")
         save(
             self,
             os.path.join(pcdir, "autotrace.pc"),
-            """prefix=${pcfiledir}/../..
-exec_prefix=${prefix}
-libdir=${prefix}/lib
-includedir=${prefix}/include
+            f"""prefix=${{pcfiledir}}/../..
+exec_prefix=${{prefix}}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include
 
 Name: autotrace
 Description: Bitmap to vector graphics converter and library
 Version: 0.31.10
-Requires: glib-2.0 gmodule-2.0 gthread-2.0 gobject-2.0 libpng
-Libs: -L${libdir} -lautotrace -lm
-Cflags: -I${includedir}
+Requires: {glib_pc} {png_pc}
+Libs: -L${{libdir}} -lautotrace -lm
+Cflags: -I${{includedir}}
 """,
         )
 
