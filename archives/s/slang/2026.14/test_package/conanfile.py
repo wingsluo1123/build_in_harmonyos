@@ -1,20 +1,37 @@
 #!/usr/bin/env python3
-"""Conan test_package for slang — functional test via slangc binary (R34).
+"""Conan test_package for slang — functional test via slangc binary and C API (R34).
 
-Tests the slang compiler by running slangc on a simple shader file.
-This validates that the built slangc binary works correctly on HarmonyOS.
+Tests the slang compiler by:
+1. Compiling and running test.cpp (C API link test via CMake)
+2. Running slangc --version (smoke test)
+3. Compiling a simple shader to SPIR-V
 """
 import os
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout, CMakeDeps, CMakeToolchain
 
 
 class SlangTestConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     test_type = "explicit"
 
+    def layout(self):
+        cmake_layout(self)
+
     def requirements(self):
         self.requires(self.tested_reference_str)
+
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.generate()
+        deps = CMakeDeps(self)
+        deps.generate()
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def test(self):
         # Get slangc binary path from the package
@@ -56,7 +73,18 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
         else:
             raise AssertionError("FAIL: SPIR-V output file not created")
 
-        # Test 3: Check the build tag matches expected version
+        # Test 3: Run the C API test binary (compiled in build())
+        self.output.info("Running slang C API test...")
+        test_bin = os.path.join(self.build_folder, "test_slang")
+        if os.path.exists(test_bin):
+            exit_code = self.run(f'"{test_bin}"', env="conanrun")
+            if exit_code != 0:
+                raise AssertionError(f"C API test failed (exit code: {exit_code})")
+            self.output.info("PASS: C API test passed")
+        else:
+            raise AssertionError("C API test binary not found — build() may have failed silently")
+
+        # Test 4: Check slangc help
         self.output.info("Checking slang version tag...")
         exit_code = self.run(f'"{slang_bin}" -h', env="conanrun")
         if exit_code != 0:

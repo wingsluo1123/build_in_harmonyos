@@ -214,13 +214,13 @@ class SlangConan(ConanFile):
         # On HarmonyOS, newly built binaries need ELF signing before execution.
         # The build process generates and executes build-time tools (generators),
         # so we need to sign binaries during the build, not just after.
-        if self.settings.os in ("Linux", "OHOS"):
+        if self.settings.os == "OHOS":
             self._build_with_signing(cmake)
         else:
             cmake.build()
 
-        # Sign all final binaries
-        if self.settings.os in ("Linux", "OHOS"):
+        # Sign all final binaries (OHOS only)
+        if self.settings.os == "OHOS":
             self._sign_binaries()
 
     def _build_with_signing(self, cmake):
@@ -233,6 +233,7 @@ class SlangConan(ConanFile):
         """
         max_retries = 50  # Safety limit
         build_dir = self.build_folder
+        failed_sign_bins = set()  # Track binaries that failed to sign
 
         # Pre-check signing tools to avoid infinite retry loop
         sign_tool = self._find_tool("binary-sign-tool")
@@ -296,8 +297,16 @@ class SlangConan(ConanFile):
                                         break
 
                 if unsigned_bins:
-                    for bin_path in unsigned_bins:
-                        self._sign_single_binary(bin_path)
+                    # Skip binaries that already failed to sign
+                    new_unsigned = unsigned_bins - failed_sign_bins
+                    if not new_unsigned:
+                        raise ConanException(
+                            f"Cannot sign binaries (all failed): {failed_sign_bins}. "
+                            f"Aborting to prevent infinite retry loop."
+                        )
+                    for bin_path in new_unsigned:
+                        if not self._sign_single_binary(bin_path):
+                            failed_sign_bins.add(bin_path)
                     continue  # Retry the build
 
             # Different error - report it
@@ -308,11 +317,11 @@ class SlangConan(ConanFile):
         raise ConanException(f"Build failed after {max_retries} retries (binary signing loop)")
 
     def _sign_single_binary(self, bin_path):
-        """Sign a single ELF binary on HarmonyOS."""
+        """Sign a single ELF binary on HarmonyOS. Returns True on success, False on failure."""
         sign_tool = self._find_tool("binary-sign-tool")
         objcopy = self._find_tool("llvm-objcopy")
         if not sign_tool or not objcopy:
-            return
+            return False
         try:
             subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
                           capture_output=True, timeout=10, check=True)
@@ -321,10 +330,13 @@ class SlangConan(ConanFile):
                           capture_output=True, timeout=10, check=True)
             os.chmod(bin_path, 0o755)
             self.output.info(f"Signed: {os.path.basename(bin_path)}")
+            return True
         except subprocess.CalledProcessError as e:
             self.output.warning(f"Signing tool failed for {bin_path}: {e.stderr.decode() if e.stderr else e}")
+            return False
         except Exception as e:
             self.output.warning(f"Failed to sign {bin_path}: {e}")
+            return False
 
     def _sign_binaries(self):
         """Sign ELF binaries on HarmonyOS to allow execution."""
