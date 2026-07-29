@@ -4,6 +4,7 @@
 L1 test: verify the package can be found and linked.
 Uses direct compilation to keep test simple.
 """
+import os
 import shlex
 
 from conan import ConanFile
@@ -33,8 +34,9 @@ class Sdl2TtfTestConan(ConanFile):
             raise ConanInvalidConfiguration(
                 "tools.build:compiler_executables.c is required to build the consumer"
             )
+        source = os.path.join(self.source_folder, "test_sdl2_ttf.c")
         self.run(
-            f"{shlex.quote(cc)} test_sdl2_ttf.c -o test_sdl2_ttf "
+            f"{shlex.quote(cc)} {shlex.quote(source)} -o test_sdl2_ttf "
             f"{inc_flags} {lib_flags} {link_flags} {system_flags}"
         )
 
