@@ -75,14 +75,15 @@ class SfmlConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "SFML")
+        library_suffix = "" if self.options.shared else "-s"
 
         system = self.cpp_info.components["system"]
-        system.libs = ["sfml-system"]
+        system.libs = [f"sfml-system{library_suffix}"]
         system.set_property("cmake_target_name", "SFML::System")
         if self.settings.os in ("Linux", "OHOS"):
             system.system_libs = ["pthread"]
 
         network = self.cpp_info.components["network"]
-        network.libs = ["sfml-network"]
+        network.libs = [f"sfml-network{library_suffix}"]
         network.requires = ["system"]
         network.set_property("cmake_target_name", "SFML::Network")
