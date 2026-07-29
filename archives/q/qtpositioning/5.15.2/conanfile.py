@@ -84,5 +84,6 @@ class QtpositioningConan(ConanFile):
         self.cpp_info.libs = ["Qt5Positioning"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.requires = ["qt5-qtbase::qt5-qtbase"]
         self.cpp_info.set_property("cmake_target_name", "Qt5::Positioning")
         self.cpp_info.set_property("pkg_config_name", "Qt5Positioning")
