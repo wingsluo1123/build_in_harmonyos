@@ -46,9 +46,10 @@ class NettleTestConan(ConanFile):
     def test(self):
         if can_run(self):
             name = "test_nettle.exe" if self.settings.os == "Windows" else "test_nettle"
-            cmd = os.path.join(self.cpp.build.bindir, name)
             if self.settings.os == "Windows":
-                cmd = self._unix_path(cmd)
+                cmd = self._unix_path(os.path.join(self.build_folder, name))
+            else:
+                cmd = os.path.join(self.cpp.build.bindir, name)
             self.run(cmd, env="conanrun")
 
     def _unix_path(self, path):
