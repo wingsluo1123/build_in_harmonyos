@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # cryptokit 1.21.1 API smoke test - SHA-256 functional verification
 set -euo pipefail
 
