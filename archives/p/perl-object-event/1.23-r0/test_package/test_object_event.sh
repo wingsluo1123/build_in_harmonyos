@@ -5,7 +5,8 @@ set -euo pipefail
 
 # Add user-installed Perl modules (common::sense, AnyEvent) to PERL5LIB
 # These are not in the system Perl @INC in CI environment
-export PERL5LIB="/storage/Users/currentUser/usr/local/lib/perl5/aarch64-linux:/storage/Users/currentUser/usr/local/lib/perl5${PERL5LIB:+:}${PERL5LIB:-}"
+SYSTEM_PERL5="${SYSTEM_PERL5LIB:-/storage/Users/currentUser/usr/local/lib/perl5/aarch64-linux:/storage/Users/currentUser/usr/local/lib/perl5}"
+export PERL5LIB="${SYSTEM_PERL5}${PERL5LIB:+:}${PERL5LIB:-}"
 
 # Test 1: Module loads successfully
 perl -MObject::Event -e 'exit 0' 2>/dev/null
