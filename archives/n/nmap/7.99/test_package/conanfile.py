@@ -33,7 +33,7 @@ class NmapTestConan(ConanFile):
         self.output.info(f"PASS: nmap binary exists ({os.path.getsize(nmap_bin)} bytes)")
 
         # Test 2: Verify it's a valid ELF binary
-        self.run(f'file "{nmap_bin}"', env="conanrun")
+        self.run(f'file "{nmap_bin}" | grep "ELF"', env="conanrun")
 
         # Test 3: Verify version string is embedded in binary
         self.run(f'strings "{nmap_bin}" | grep "7.99"', env="conanrun")
