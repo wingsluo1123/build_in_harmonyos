@@ -8,12 +8,12 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 | 版本 | 状态 | 编译日期 | 补丁数 | 预编译包 |
 |------|------|---------|--------|---------|
-| 3.4 | published | 2026-05-27 | 3 | 否 |
+| 3.4 | built | 2026-05-27 | 3 | 否 |
 
 ## 编译特性
 
 - **静态链接**：无动态库依赖，解决 HarmonyOS 动态库加载限制
-- **依赖**：ncurses 6.4, libevent 2.1.12
+- **依赖**：Worker 系统 ncurses、Conan libevent 2.1.12
 
 ## HarmonyOS 平台适配
 

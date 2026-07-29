@@ -2,6 +2,7 @@
 """Conan recipe for tmux 3.4."""
 
 import os
+from pathlib import Path
 
 from conan import ConanFile
 from conan.tools.files import (
@@ -29,7 +30,6 @@ class TmuxConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("ncurses/6.4")
         self.requires("libevent/2.1.12")
 
     def layout(self):
@@ -42,6 +42,9 @@ class TmuxConan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
+        system_prefix = Path.home() / "usr" / "local"
+        tc.extra_cflags.append(f"-I{system_prefix / 'include'}")
+        tc.extra_ldflags.append(f"-L{system_prefix / 'lib'}")
         tc.configure_args.append("--enable-static")
         tc.extra_ldflags.append("-static")
         tc.generate()
