@@ -60,9 +60,9 @@ class NmapConan(ConanFile):
         conanbuild = os.path.join(self.generators_folder, "conanbuild.sh")
         env_prefix = f'source "{conanbuild}" && '
 
-        # Configure with OpenSSL path
+        # Configure with OpenSSL path and static linking (R26)
         self.run(
-            'cd {} && {} ./configure --prefix=/ --with-openssl={}'.format(
+            'cd {} && {} ./configure --prefix=/ --enable-static --disable-shared --with-openssl={}'.format(
                 src, env_prefix, openssl_prefix
             )
         )

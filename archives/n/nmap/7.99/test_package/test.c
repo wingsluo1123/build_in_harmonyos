@@ -16,6 +16,17 @@ int main(void) {
         return 1;
     }
 
+    /* Validate nmap_bin to prevent command injection */
+    for (const char *p = nmap_bin; *p; p++) {
+        if (*p == ';' || *p == '|' || *p == '&' || *p == '`' ||
+            *p == '$' || *p == '(' || *p == ')' || *p == '<' ||
+            *p == '>' || *p == '\n' || *p == '\r' ||
+            *p == '"' || *p == '\'') {
+            fprintf(stderr, "FAIL: NMAP_PATH contains invalid characters\n");
+            return 1;
+        }
+    }
+
     char cmd[512];
     FILE *fp;
     char buf[256];
@@ -24,7 +35,11 @@ int main(void) {
     int ret;
 
     /* Test 1: nmap --version */
-    snprintf(cmd, sizeof(cmd), "%s --version 2>&1", nmap_bin);
+    ret = snprintf(cmd, sizeof(cmd), "%s --version 2>&1", nmap_bin);
+    if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
+        fprintf(stderr, "FAIL: command too long\n");
+        return 1;
+    }
     fp = popen(cmd, "r");
     if (!fp) {
         fprintf(stderr, "FAIL: cannot run nmap --version\n");
@@ -45,7 +60,11 @@ int main(void) {
     printf("PASS: nmap --version outputs version 7.99\n");
 
     /* Test 2: nmap -sL 127.0.0.1 (list scan) */
-    snprintf(cmd, sizeof(cmd), "%s -sL 127.0.0.1 2>&1", nmap_bin);
+    ret = snprintf(cmd, sizeof(cmd), "%s -sL 127.0.0.1 2>&1", nmap_bin);
+    if (ret < 0 || (size_t)ret >= sizeof(cmd)) {
+        fprintf(stderr, "FAIL: command too long\n");
+        return 1;
+    }
     fp = popen(cmd, "r");
     if (!fp) {
         fprintf(stderr, "FAIL: cannot run nmap -sL\n");
