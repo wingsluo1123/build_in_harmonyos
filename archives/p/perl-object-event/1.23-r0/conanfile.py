@@ -63,6 +63,15 @@ class PerlobjecteventConan(ConanFile):
                 for inc_path in result.stdout.strip().split(":"):
                     inc_path = inc_path.strip()
                     if inc_path:
+            if result.returncode == 0 and result.stdout.strip():
+                for inc_path in result.stdout.strip().split(":"):
+                    inc_path = inc_path.strip()
+                    if inc_path:
                         self.runenv_info.append_path("PERL5LIB", inc_path)
+            elif result.returncode != 0:
+                self.output.warning(
+                    f"perl @INC query exited with code {result.returncode}: "
+                    f"{result.stderr.strip()}"
+                )
         except Exception as e:
             self.output.warning(f"Failed to query system Perl @INC: {e}")
