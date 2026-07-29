@@ -1,12 +1,8 @@
 #!/data/service/hnp/bin/bash
-# test_package/test.sh — smoke test for tmux executable
-set -eu
+# test_package/test.sh - smoke test for the packaged tmux executable
+set -euo pipefail
 
 echo "[test] tmux -V"
-tmux -V && echo "OK --version OK" || {
-    echo "[test] --version failed, trying --help..."
-    tmux --help > /dev/null 2>&1 && echo "OK --help OK" || {
-        echo "FAIL tmux failed both -V and --help"
-        exit 1
-    }
-}
+actual="$(tmux -V)"
+test "$actual" = "tmux 3.4"
+echo "[ok] tmux version matched: $actual"

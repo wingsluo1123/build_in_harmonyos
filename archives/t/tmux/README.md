@@ -8,7 +8,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 | 版本 | 状态 | 编译日期 | 补丁数 | 预编译包 |
 |------|------|---------|--------|---------|
-| 3.4 | published | 2026-05-27 | 4 | ✅ tmux-3.4-ohos-aarch64.tar.gz |
+| 3.4 | published | 2026-05-27 | 3 | 否 |
 
 ## 编译特性
 
@@ -19,17 +19,16 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 ### 已解决的问题
 
-1. **HMDFS 临时文件限制**：configure/config.status 无法在当前目录创建临时目录，修改为使用绝对路径 `/storage/Users/currentUser/tmp/confXXXXXX`
+1. **HMDFS 临时文件限制**：configure 无法在当前目录创建临时目录时，改用 `${TMPDIR:-/tmp}`
 2. **系统识别**：config.guess 不识别 HarmonyOS，添加 `*:HarmonyOS:*:*` 分支
 3. **三元组支持**：config.sub 不接受 `linux-ohos` 组合，添加 `linux-ohos*` 支持
 4. **静态链接**：强制静态链接 libevent 和 ncurses，避免动态库加载问题
 
 ### 补丁文件
 
-- `0001-config.status.patch` - 修改临时目录路径
-- `0002-configure.patch` - 修改临时目录路径
-- `0003-etc-config.guess.patch` - HarmonyOS 系统识别
-- `0004-etc-config.sub.patch` - linux-ohos 三元组支持
+- `0004-configure.patch` - 使用 TMPDIR 创建临时目录
+- `0005-etc-config.guess.patch` - HarmonyOS 系统识别
+- `0006-etc-config.sub.patch` - linux-ohos 三元组支持
 
 ## 功能验证
 
