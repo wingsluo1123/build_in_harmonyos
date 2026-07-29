@@ -26,4 +26,15 @@ class FalcoSecurityLibsTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run("./test_falcosecurity_libs", env="conanrun")
+        # DT_NEEDED in libsinsp.so/libscap.so uses build-relative paths
+        # (e.g. ../jsoncpp-prefix/src/lib/libjsoncpp.so) which don't resolve
+        # at runtime. Set LD_LIBRARY_PATH to find installed bundled deps and
+        # engine shared libraries.
+        dep = self.dependencies["falcosecurity-libs"]
+        lib_dir = os.path.join(dep.package_folder, "lib")
+        bundled_dir = os.path.join(lib_dir, "falcosecurity")
+        ld_path = f"{lib_dir}:{bundled_dir}"
+        self.run(
+            f"LD_LIBRARY_PATH={ld_path} ./test_falcosecurity_libs",
+            env="conanrun",
+        )
