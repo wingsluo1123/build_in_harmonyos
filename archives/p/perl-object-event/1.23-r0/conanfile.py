@@ -65,4 +65,5 @@ class PerlobjecteventConan(ConanFile):
                     if inc_path:
                         self.runenv_info.append_path("PERL5LIB", inc_path)
         except Exception:
-            pass
+        except Exception as e:
+            self.output.warning(f"Failed to query system Perl @INC: {e}")
