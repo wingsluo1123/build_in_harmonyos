@@ -15,7 +15,7 @@ python3 ohc-run.py init-build nmap 7.99 --url=https://nmap.org/dist/nmap-7.99.ta
 
 # 2. 配置（需要设置 TMPDIR）
 export TMPDIR=~/.tmp
-./configure --prefix=/usr/local --with-openssl=$OPENSSL_PREFIX
+./configure --prefix=/ --with-openssl=$OPENSSL_PREFIX
 
 # 3. 编译（跳过 zenmap）
 make nmap
