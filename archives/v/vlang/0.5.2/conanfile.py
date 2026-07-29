@@ -128,16 +128,6 @@ class VConan(ConanFile):
                         "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\n"
                         "#endif",
                     ),
-                    (
-                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
-                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
-                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);",
-                        "#if !((defined(__MINGW32__) || defined(__MINGW64__)) && defined(__V_GCC__))\n"
-                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_malloc(size_t size, size_t alignment);\n"
-                        "V_CRT_LINKAGE void * V_CRT_CALL _aligned_realloc(void *memory, size_t size, size_t alignment);\n"
-                        "V_CRT_LINKAGE void V_CRT_CALL _aligned_free(void *memory);\n"
-                        "#endif",
-                    ),
                 ],
             )
         self._replace_required_once(
