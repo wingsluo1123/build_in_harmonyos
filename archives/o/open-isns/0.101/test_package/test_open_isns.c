@@ -16,6 +16,7 @@ int main(void)
     }
 
     isns_attr_list_init(&attrs);
+    /* This API returns void; the lookup below verifies that insertion worked. */
     isns_attr_list_append_string(
         &attrs, ISNS_TAG_ENTITY_IDENTIFIER, "ohos.test.entity");
     if (!isns_attr_list_get_string(
