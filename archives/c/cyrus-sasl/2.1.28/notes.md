@@ -16,6 +16,21 @@
 - Static SASL support is enabled for the default package so validation does not
   depend on OHOS runtime plugin directory discovery.
 
+## OHOS build adjustments
+
+- `0001-configure-ohos-tempdir.patch` changes the autoconf temporary directory
+  creation umask from `077` to `022`, matching the OHOS/HMDFS build-directory
+  permission workaround while keeping the change tracked in `patches/`.
+- `0002-lib-Makefile.in-copy-linksrcs.patch` replaces the generated static
+  archive symlink step with a copy operation so package creation does not depend
+  on symlink support.
+- The recipe passes `MKDIR_P`, `INSTALL`, `INSTALL_PROGRAM`, and `INSTALL_DATA`
+  to `make`/`make install` for OHOS instead of rewriting generated Makefiles in
+  the build tree.
+- `CC_FOR_BUILD` is derived from `tools.build:compiler_executables` when
+  available and otherwise falls back to the PATH-visible `clang` name; no
+  absolute build-machine compiler path is hard-coded.
+
 ## Upstream tests
 
 The release includes upstream test and sample sources such as:

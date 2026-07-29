@@ -50,6 +50,10 @@ int main(void)
         return 1;
     }
 
-    printf("cyrus-sasl consumer checks passed: %s %s\n", implementation, version);
+    printf(
+        "cyrus-sasl consumer checks passed: %s %s\n",
+        implementation != NULL ? implementation : "(null)",
+        version != NULL ? version : "(null)"
+    );
     return 0;
 }

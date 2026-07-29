@@ -5,8 +5,7 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get
+from conan.tools.files import apply_conandata_patches, get
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -38,6 +37,7 @@ class CyrusSaslConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
@@ -84,14 +84,12 @@ class CyrusSaslConan(ConanFile):
         tc.generate()
 
     def build(self):
-        if self.settings.os == "OHOS":
-            self._patch_configure_for_ohos()
         autotools = Autotools(self)
         if self.settings.os == "OHOS":
             configure = os.path.join(self.source_folder, "configure")
             tmpdir = os.path.join(self.source_folder, "tmp")
             os.makedirs(tmpdir, exist_ok=True)
-            build_cc = "/data/service/hnp/bin/clang"
+            build_cc = self._build_cc_for_ohos()
             self.run(
                 f'TMPDIR="{tmpdir}" CONFIG_SHELL=/system/bin/sh SHELL=/system/bin/sh '
                 f'CC_FOR_BUILD="{build_cc}" CPP_FOR_BUILD="{build_cc} -E" '
@@ -101,8 +99,7 @@ class CyrusSaslConan(ConanFile):
             autotools.configure()
         if self.settings.os == "OHOS":
             self._copy_linksrcs_for_ohos()
-            self._patch_makefile_for_ohos()
-            self.run(f'TMPDIR="{tmpdir}" make -j1')
+            self.run(f'TMPDIR="{tmpdir}" {self._ohos_make_vars()} make -j1')
         else:
             autotools.make(args=["-j1"])
 
@@ -111,9 +108,8 @@ class CyrusSaslConan(ConanFile):
         if self.settings.os == "OHOS":
             tmpdir = os.path.join(self.source_folder, "tmp")
             os.makedirs(tmpdir, exist_ok=True)
-            self._patch_makefile_for_ohos()
             self.run(
-                f'TMPDIR="{tmpdir}" make install '
+                f'TMPDIR="{tmpdir}" {self._ohos_make_vars()} make install '
                 f'DESTDIR="{self.package_folder}" -j1'
             )
         else:
@@ -131,40 +127,18 @@ class CyrusSaslConan(ConanFile):
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread"]
 
-    def _patch_configure_for_ohos(self):
-        folders = {
-            self.source_folder,
-            self.build_folder,
-            os.getcwd(),
-            os.path.dirname(self.build_folder),
-        }
-        for folder in folders:
-            configure = os.path.join(folder, "configure")
-            if not os.path.isfile(configure):
-                continue
-            with open(configure, encoding="utf-8", errors="ignore") as source:
-                content = source.read()
-            replacements = {
-                "${TMPDIR-/tmp}": "${TMPDIR:-${HOME}/tmp}",
-                "${TMPDIR:-/tmp}": "${TMPDIR:-${HOME}/tmp}",
-            }
-            if "umask 077" in content:
-                content = content.replace("umask 077", "umask 022")
-            elif "umask 022" not in content:
-                raise ConanInvalidConfiguration(
-                    "Expected configure pattern not found: umask 077"
-                )
-            for needle, replacement in replacements.items():
-                if needle in content:
-                    content = content.replace(needle, replacement)
-            with open(configure, "w", encoding="utf-8") as target:
-                target.write(content)
-            os.chmod(configure, 0o755)
-            config_dir = os.path.join(folder, "config")
-            for script in ("install-sh", "missing"):
-                script_path = os.path.join(config_dir, script)
-                if os.path.isfile(script_path):
-                    os.chmod(script_path, 0o755)
+    def _build_cc_for_ohos(self):
+        executables = self.conf.get("tools.build:compiler_executables", default={})
+        return executables.get("c") or executables.get("cc") or "clang"
+
+    def _ohos_make_vars(self):
+        install_sh = os.path.join(self.source_folder, "config", "install-sh")
+        return (
+            f'MKDIR_P="/system/bin/sh {install_sh} -c -d" '
+            f'INSTALL="/system/bin/sh {install_sh} -c" '
+            f'INSTALL_PROGRAM="/system/bin/sh {install_sh} -c" '
+            f'INSTALL_DATA="/system/bin/sh {install_sh} -c -m 644"'
+        )
 
     def _copy_linksrcs_for_ohos(self):
         links = {
@@ -179,30 +153,3 @@ class CyrusSaslConan(ConanFile):
                 os.path.join(self.source_folder, source),
                 os.path.join(self.source_folder, target),
             )
-
-    def _patch_makefile_for_ohos(self):
-        for root, _, files in os.walk(self.source_folder):
-            if "Makefile" not in files:
-                continue
-            makefile = os.path.join(root, "Makefile")
-            with open(makefile, encoding="utf-8", errors="ignore") as source:
-                content = source.read()
-            content = content.replace("ln -s .libs/$@ $@", "cp -pR .libs/$@ $@")
-            content = content.replace(
-                "MKDIR_P = config/install-sh -c -d",
-                "MKDIR_P = /system/bin/sh config/install-sh -c -d",
-            )
-            content = content.replace(
-                "MKDIR_P = ../config/install-sh -c -d",
-                "MKDIR_P = /system/bin/sh ../config/install-sh -c -d",
-            )
-            content = content.replace(
-                "\n\t../config/install-sh",
-                "\n\t/system/bin/sh ../config/install-sh",
-            )
-            content = content.replace(
-                "\n\tconfig/install-sh",
-                "\n\t/system/bin/sh config/install-sh",
-            )
-            with open(makefile, "w", encoding="utf-8") as target:
-                target.write(content)
