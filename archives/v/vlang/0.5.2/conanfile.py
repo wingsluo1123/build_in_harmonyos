@@ -115,7 +115,7 @@ class VConan(ConanFile):
             "\trm -rf v1$(EXE_EXT) v2$(EXE_EXT); \\",
         )
         for vc_file in ["v.c", "v_win.c"]:
-            self._replace_required_alternative(
+            self._replace_optional_alternative(
                 os.path.join(vc_dir, vc_file),
                 [
                     (
@@ -322,6 +322,29 @@ class VConan(ConanFile):
             raise ConanException(
                 f"Expected exactly one replacement candidate in {path}; candidates: {candidates}"
             )
+        old, new = matched[0]
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content.replace(old, new))
+
+    def _replace_optional_alternative(self, path, replacements):
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        matched = []
+        for old, new in replacements:
+            count = content.count(old)
+            if count > 1:
+                raise ConanException(
+                    f"Expected at most one occurrence of {old!r} in {path}, found {count}"
+                )
+            if count == 1:
+                matched.append((old, new))
+        if len(matched) > 1:
+            candidates = ", ".join(repr(old) for old, _ in replacements)
+            raise ConanException(
+                f"Expected at most one replacement candidate in {path}; candidates: {candidates}"
+            )
+        if not matched:
+            return
         old, new = matched[0]
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(content.replace(old, new))
