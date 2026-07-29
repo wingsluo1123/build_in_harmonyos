@@ -79,26 +79,19 @@ class NsdConan(ConanFile):
                 "tmp=./conf$$-$RANDOM",
                 'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
             )
-        if 'test -d "$tmp" && chmod 700 "$tmp"' not in contents:
+        if "(umask 022 && mktemp -d" not in contents:
             replace_in_file(
                 self,
                 path,
-                '  test -d "$tmp"\n}  ||',
-                '  test -d "$tmp" && chmod 700 "$tmp"\n}  ||',
+                "(umask 077 && mktemp -d",
+                "(umask 022 && mktemp -d",
             )
-        if '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")' not in contents:
+        if '(umask 022 && mkdir "$tmp")' not in contents:
             replace_in_file(
                 self,
                 path,
                 '(umask 077 && mkdir "$tmp")',
-                '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")',
-            )
-        if "\numask 022\nac_tmp=$tmp\n" not in contents:
-            replace_in_file(
-                self,
-                path,
-                "\nac_tmp=$tmp\n",
-                "\numask 022\nac_tmp=$tmp\n",
+                '(umask 022 && mkdir "$tmp")',
             )
 
     def source(self):
@@ -156,9 +149,8 @@ class NsdConan(ConanFile):
                 os.path.join(self.source_folder, "simdzone", "config.sub")
             )
             if not cross_building(self):
-                # Native OHOS may create Autoconf temp directories without
-                # usable owner permissions. Restore the secure mode before
-                # config.status writes its generated awk files.
+                # HMDFS cannot use Autoconf's 077 temporary mode reliably.
+                # Apply the repository's E011-compatible 022 mode.
                 self._patch_config_status_tempdir(
                     os.path.join(self.source_folder, "configure")
                 )

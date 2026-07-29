@@ -11,7 +11,7 @@
   five packaged NSD tools were built for AArch64. The three consumer checks
   were prepared by the test package; runtime execution is not applicable
   locally because no OHOS arm64 HDC target is connected.
-- Native OHOS builds use the worker `TMPDIR`, restore its generated directory
-  to mode `0700`, and set `umask 022` so `config.status` can read temporary awk
-  files while generated build files retain normal permissions.
+- Native OHOS builds use the worker `TMPDIR` and the repository's E011
+  `umask 022` workaround for Autoconf temporary directories and files, so
+  `config.status` can create and read its generated awk programs on HMDFS.
 - Official OHOS test and CI results remain pending.
