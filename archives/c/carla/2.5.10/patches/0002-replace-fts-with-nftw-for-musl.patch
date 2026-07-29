@@ -1,12 +1,8 @@
 diff --git a/source/modules/ysfx/sources/ysfx_utils_fts.cpp b/source/modules/ysfx/sources/ysfx_utils_fts.cpp
+index 2226a35..51eb9ef 100644
 --- a/source/modules/ysfx/sources/ysfx_utils_fts.cpp
 +++ b/source/modules/ysfx/sources/ysfx_utils_fts.cpp
-@@ -12,54 +12,63 @@
- // See the License for the specific language governing permissions and
- // limitations under the License.
- //
-+// SPDX-License-Identifier: Apache-2.0
-+//
+@@ -17,51 +17,58 @@
  
  #if !defined(_WIN32)
  
@@ -31,6 +27,21 @@ diff --git a/source/modules/ysfx/sources/ysfx_utils_fts.cpp b/source/modules/ysf
 -{
  #ifndef __EMSCRIPTEN__
 -    char *argv[] = {(char *)rootpath, nullptr};
+-
+-#if !defined(__FreeBSD__)
+-    using compar_arg_t = const FTSENT **;
+-#else
+-    using compar_arg_t = const FTSENT *const *;
+-#endif
+-
+-    auto compar = [](compar_arg_t a, compar_arg_t b) -> int {
+-        return strcmp((*a)->fts_name, (*b)->fts_name);
+-    };
+-
+-    FTS *fts = fts_open(argv, FTS_NOCHDIR|FTS_PHYSICAL, +compar);
+-    if (!fts)
+-        return;
+-    auto fts_cleanup = defer([fts]() { fts_close(fts); });
 +namespace {
 +// nftw callback has no user-data parameter, so thread-local globals carry
 +// the visitor and stop flag. carla's ysfx only walks directories from a
@@ -41,25 +52,10 @@ diff --git a/source/modules/ysfx/sources/ysfx_utils_fts.cpp b/source/modules/ysf
 +    bool stop;
 +};
  
--#if !defined(__FreeBSD__)
--    using compar_arg_t = const FTSENT **;
--#else
--    using compar_arg_t = const FTSENT *const *;
--#endif
-+thread_local walk_state g_state{nullptr, nullptr, false};
- 
--    auto compar = [](compar_arg_t a, compar_arg_t b) -> int {
--        return strcmp((*a)->fts_name, (*b)->fts_name);
--    };
--
--    FTS *fts = fts_open(argv, FTS_NOCHDIR|FTS_PHYSICAL, +compar);
--    if (!fts)
--        return;
--    auto fts_cleanup = defer([fts]() { fts_close(fts); });
--
 -    std::string pathbuf;
 -    pathbuf.reserve(1024);
--
++thread_local walk_state g_state{nullptr, nullptr, false};
+ 
 -    while (FTSENT *ent = fts_read(fts)) {
 -        if (ent->fts_info == FTS_D) {
 -            pathbuf.assign(ent->fts_path);
