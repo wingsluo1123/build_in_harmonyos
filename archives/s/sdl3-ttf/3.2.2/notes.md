@@ -10,7 +10,7 @@
 
 1. **下载源码**: 从 GitHub 下载 SDL3_ttf-3.2.2.tar.gz
 2. **解压源码**: 解压到 ~/tmp/builds/sdl3-ttf-3.2.2.work
-3. **配置 CMake**: 
+3. **配置 CMake**:
    ```bash
    cmake -B build -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
      -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX -DSDLTTF_SAMPLES=OFF \
