@@ -53,7 +53,8 @@ class QtpositioningConan(ConanFile):
             else:
                 self.output.warn(
                     f"OHOS mkspec (ohos-aarch64-clang) not found in qt5-qtbase package. "
-                    "qmake will use default mkspec; verify output architecture."
+                    "qmake will use default mkspec. ⚠️ 产物架构可能为 host (x86_64) 而非 target (aarch64), "
+                    "CI 层面应做产物架构校验确认。"
                 )
         # Generate the conanbuild environment file for all platforms
         build_env.generate()
