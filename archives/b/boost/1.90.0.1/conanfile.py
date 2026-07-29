@@ -144,7 +144,7 @@ class BoostCompiledConan(ConanFile):
                 "    if arg in ('-m32', '-m64'):\n"
                 "        continue\n"
                 "    filtered.append(arg)\n"
-                "os.execv(real_cxx, [real_cxx, f'--target={target}', *filtered])\n"
+                "os.execvp(real_cxx, [real_cxx, f'--target={target}', *filtered])\n"
             )
         current_mode = os.stat(wrapper).st_mode
         os.chmod(wrapper, current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
