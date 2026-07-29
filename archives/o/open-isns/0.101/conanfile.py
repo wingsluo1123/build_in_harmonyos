@@ -11,6 +11,7 @@ from conan.tools.files import (
     copy,
     export_conandata_patches,
     get,
+    load,
     replace_in_file,
 )
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -39,6 +40,37 @@ class OpenIsnsConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+
+    def _patch_config_status_tempdir(self, path):
+        contents = load(self, path)
+        if 'mktemp -d "${TMPDIR:-.}/confXXXXXX"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                'mktemp -d "./confXXXXXX"',
+                'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
+            )
+        if 'tmp="${TMPDIR:-.}/conf$$-$RANDOM"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                "tmp=./conf$$-$RANDOM",
+                'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+            )
+        if 'test -d "$tmp" && chmod 700 "$tmp"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                '  test -d "$tmp"\n}  ||',
+                '  test -d "$tmp" && chmod 700 "$tmp"\n}  ||',
+            )
+        if '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")' not in contents:
+            replace_in_file(
+                self,
+                path,
+                '(umask 077 && mkdir "$tmp")',
+                '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")',
+            )
 
     def generate(self):
         toolchain = AutotoolsToolchain(self)
@@ -99,20 +131,10 @@ class OpenIsnsConan(ConanFile):
                 "\t-linux*)\n\t\tos=`echo $os | sed -e 's|linux|linux-gnu|'`",
             )
             if not cross_building(self):
-                # Native OHOS workers expose a writable TMPDIR, while the
-                # Conan build tree can reject Autoconf's temporary awk files.
-                configure = os.path.join(self.source_folder, "configure")
-                replace_in_file(
-                    self,
-                    configure,
-                    'mktemp -d "./confXXXXXX"',
-                    'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
-                )
-                replace_in_file(
-                    self,
-                    configure,
-                    "tmp=./conf$$-$RANDOM",
-                    'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+                # Native OHOS workers need a writable, executable Autoconf
+                # temp directory for config.status helper scripts.
+                self._patch_config_status_tempdir(
+                    os.path.join(self.source_folder, "configure")
                 )
         autotools = Autotools(self)
         autotools.configure()
