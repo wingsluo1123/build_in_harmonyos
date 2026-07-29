@@ -35,8 +35,12 @@ class FalcoSecurityLibsConan(ConanFile):
             tc.cache_variables["CMAKE_CXX_COMPILER_TARGET"] = "aarch64-linux-ohos"
             # OHOS Clang defines __linux__; avoid pulling in Linux platform
             # stubs via a project-level macro rather than __OHOS__ guards.
+            # NOTE: Only set cmake cache variable, NOT preprocessor definition.
+            #   defined(HAS_LINUX_PLATFORM) in C++ is true when macro is defined
+            #   to ANY value (including "0"), which defeats the guard in 0001 patch.
+            #   The 0001 patch uses `#if defined(__linux__) && HAS_LINUX_PLATFORM`
+            #   (value check), which is false when HAS_LINUX_PLATFORM is undefined.
             tc.cache_variables["HAS_LINUX_PLATFORM"] = False
-            tc.preprocessor_definitions["HAS_LINUX_PLATFORM"] = "0"
         else:
             tc.cache_variables["HAS_LINUX_PLATFORM"] = True
             tc.preprocessor_definitions["HAS_LINUX_PLATFORM"] = "1"
