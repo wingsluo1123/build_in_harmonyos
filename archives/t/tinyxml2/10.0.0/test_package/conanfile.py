@@ -22,7 +22,10 @@ class Tinyxml2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
-        # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_tinyxml2'", env="conanrun")
+        if self.settings.os == "OHOS":
+            # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
+            # Use bash to wrap binary execution.
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            self.run(f"{bash} -c './test_tinyxml2'", env="conanrun")
+        else:
+            self.run("./test_tinyxml2", env="conanrun")
