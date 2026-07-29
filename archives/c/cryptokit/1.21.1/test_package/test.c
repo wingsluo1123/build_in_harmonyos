@@ -18,9 +18,9 @@ int main(void) {
     SHA256_finish(&ctx, 256, hash);
 
     /* Print hash */
-    printf("SHA-256(\"%s\") = ", test_input);
+    printf("SHA-256(\"%s\") = ", (const char *)test_input);
     for (i = 0; i < 32; i++) {
-        printf("%02x", hash[i]);
+        printf("%02hhx", hash[i]);
     }
     printf("\n");
 
@@ -39,7 +39,7 @@ int main(void) {
     } else {
         printf("cryptokit SHA-256: FAILED - digest mismatch!\n");
         printf("  Expected: ");
-        for (i = 0; i < 32; i++) printf("%02x", expected[i]);
+        for (i = 0; i < 32; i++) printf("%02hhx", expected[i]);
         printf("\n");
         return 1;
     }
