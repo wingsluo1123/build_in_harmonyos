@@ -3,10 +3,8 @@
 
 All codecs disabled; provides HEIF container support only.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
@@ -16,15 +14,13 @@ class LibheifConan(ConanFile):
     description = "HEIF file format library (codec-free build)"
     license = "LGPL-3.0-or-later"
     homepage = "https://github.com/strukturag/libheif"
-    url = ""
+    url = "https://github.com/strukturag/libheif"
 
+    package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
-
-    def requirements(self):
-        pass
 
     def layout(self):
         cmake_layout(self)
@@ -34,18 +30,18 @@ class LibheifConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["BUILD_SHARED_LIBS"] = "ON"
-        tc.variables["WITH_EXAMPLES"] = "OFF"
-        tc.variables["WITH_GDK_PIXBUF"] = "OFF"
-        tc.variables["BUILD_TESTING"] = "OFF"
-        tc.variables["WITH_LIBDE265"] = "OFF"
-        tc.variables["WITH_X265"] = "OFF"
-        tc.variables["WITH_AOM_DECODER"] = "OFF"
-        tc.variables["WITH_AOM_ENCODER"] = "OFF"
-        tc.variables["WITH_X264"] = "OFF"
-        tc.variables["WITH_DAV1D"] = "OFF"
-        tc.variables["ENABLE_PLUGIN_LOADING"] = "OFF"
-        tc.variables["WITH_LIBSHARPYUV"] = "OFF"
+        tc.variables["BUILD_SHARED_LIBS"] = True
+        tc.variables["WITH_EXAMPLES"] = False
+        tc.variables["WITH_GDK_PIXBUF"] = False
+        tc.variables["BUILD_TESTING"] = False
+        tc.variables["WITH_LIBDE265"] = False
+        tc.variables["WITH_X265"] = False
+        tc.variables["WITH_AOM_DECODER"] = False
+        tc.variables["WITH_AOM_ENCODER"] = False
+        tc.variables["WITH_X264"] = False
+        tc.variables["WITH_DAV1D"] = False
+        tc.variables["ENABLE_PLUGIN_LOADING"] = False
+        tc.variables["WITH_LIBSHARPYUV"] = False
         tc.generate()
 
     def build(self):
