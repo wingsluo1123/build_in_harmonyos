@@ -20,6 +20,7 @@
 archives/{letter}/{name}/
   ├── manifest.yaml              # 软件级元数据 + 版本索引（人读，CI 不依赖）
   ├── README.md                  # 软件描述（是什么、依赖、OHOS 适配要点）
+  ├── commands.json              # 命令行工具声明（仅 tool 类型，R38）
   └── {version}/
       ├── conanfile.py           # 【必填·CI唯一输入】可执行 Conan 配方
       ├── conandata.yml          # 【必填】源码URL + SHA256 + 补丁声明
@@ -60,11 +61,13 @@ versions:
   "3.30.0":
     status: published             # published | built | failed | archived
     build_date: "2026-04-15"
-    conan_ref: "cmake/3.30.0@ohpcd/stable"  # Conan 引用格式
+    conan_ref: "cmake/3.30.0"  # Conan 引用格式
   "3.28.3":
     status: archived
     build_date: "2026-03-20"
 ```
+
+**模板**：参见 `templates/manifest-software.yaml`
 
 #### README.md（必须）
 
@@ -78,6 +81,45 @@ versions:
 不包含：
 - 版本特定的编译配置（→ 版本级 conanfile.py）
 - 编译过程记录（→ 版本级 notes.md）
+
+#### commands.json（条件必填·仅 tool 类型，R38）
+
+命令行工具声明文件。当构建产物包含可执行文件（`bin/` 目录下有二进制）时，**必须**在软件级别目录下创建此文件。库类型（只有 `.a`/`.so`）不需要。
+
+**文件位置**：`archives/{letter}/{name}/commands.json`（与 manifest.yaml、README.md 同级）
+
+**格式**：
+
+```json
+{
+  "name": "strace",
+  "description": "系统调用追踪工具，用于诊断和调试程序",
+  "homepage": "https://strace.io",
+  "type": "tool",
+  "versions": {
+    "6.19": {
+      "ref": "strace/6.19",
+      "binary": true
+    }
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| name | 包名（与 Conan 包名一致） |
+| description | 中文描述（一句话说明功能） |
+| homepage | 上游官网 URL |
+| type | 固定 `"tool"` |
+| versions.{ver}.ref | Conan 引用（`name/version`） |
+| versions.{ver}.binary | 是否已发布二进制到制品仓（适配中为 `false`，发布后改为 `true`） |
+
+**判断标准**：
+- conanfile.py 中 `package_info()` 设置了 `cpp_info.bindirs`
+- conanfile.py 中有 `RUNTIME DESTINATION bin` 或类似可执行文件安装
+- conanfile.py 中 `package_type = "application"`
+
+> CI 门禁 L0k 自动校验：工具类型必须有 commands.json，库类型不应有（warn 级别）。
 
 ### 2.2 版本级文件
 
@@ -96,7 +138,7 @@ versions:
 
 **强制规则**：
 - 终端工具：`generate()` 中必须设置 `BUILD_SHARED_LIBS=OFF`（CMake）或 `-static`（Autotools）或 `default_library=static`（Meson）（R26）
-- 依赖引用：`self.requires("name/version@ohpcd/stable")`（R27）
+- 依赖引用：`self.requires("name/version")`（R27）
 - 补丁应用：`apply_conandata_patches(self)`（从 conandata.yml 读取）
 - 禁止 `--build`/`--host`/`--target` 三元组（native 编译，R1）
 
@@ -131,7 +173,7 @@ patches:
 version: "3.30.0"
 status: published                 # published | built | failed | archived
 build_date: "2026-04-15"
-conan_ref: "cmake/3.30.0@ohpcd/stable"  # Conan 引用
+conan_ref: "cmake/3.30.0"  # Conan 引用
 
 source:
   url: "https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0.tar.gz"
@@ -191,6 +233,7 @@ test_package/
 
 - 构建报告、测试报告等
 - conan_verify 的验证报告存放在此
+- 兼容性评估报告模板：参见 `templates/compatibility.md`
 
 ### 2.3 废弃的文件/目录
 
@@ -229,7 +272,7 @@ test_package/
 | build_system | 推荐 | string | 常用构建系统 |
 | ohos_adaptation | 推荐 | object | 跨版本适配知识 |
 | versions | ✅ | map | 版本索引 |
-| versions.{ver}.conan_ref | 推荐 | string | Conan 引用格式 name/ver@ohpcd/stable |
+| versions.{ver}.conan_ref | 推荐 | string | Conan 引用格式 name/ver |
 
 ### 4.2 版本级 manifest.yaml 字段
 
@@ -238,7 +281,7 @@ test_package/
 | version | ✅ | string | 版本号 |
 | status | ✅ | string | published / built / failed / archived |
 | build_date | ✅ | string | 编译日期 (YYYY-MM-DD) |
-| conan_ref | 推荐 | string | Conan 引用 (name/ver@ohpcd/stable) |
+| conan_ref | 推荐 | string | Conan 引用 (name/ver) |
 | source.url | ✅ | string | 源码下载 URL（与 conandata.yml 一致） |
 | source.sha256 | 推荐 | string | 源码校验和 |
 | source.tar_format | 推荐 | string | 压缩格式 |
@@ -267,19 +310,21 @@ test_package/
 
 ### 文件名
 - 补丁：`{4位序号}-{简短描述}.patch`
-- Conan 包引用：`{name}/{version}@ohpcd/stable`
+- Conan 包引用：`{name}/{version}`
 
 ## 6. 与 CI 的关系
 
 ```
-archives/{l}/{name}/{ver}/
-  ├── conanfile.py     ← CI: conan create 读取此文件构建
-  ├── conandata.yml    ← CI: conan create 读取源码地址和补丁
-  ├── test_package/    ← CI: conan create 自动执行 L1 测试
-  ├── manifest.yaml    ← CI: 不读取（仅人类交叉校验）
-  ├── notes.md         ← CI: 不读取（仅人类参考）
-  ├── patches/         ← CI: conandata.yml 引用，apply_conandata_patches 应用
-  └── reports/         ← CI: conan_verify 写入验证报告
+archives/{l}/{name}/
+  ├── commands.json    ← CI: 工具类型包必须有（L0k 校验）
+  └── {ver}/
+    ├── conanfile.py     ← CI: conan create 读取此文件构建
+    ├── conandata.yml    ← CI: conan create 读取源码地址和补丁
+    ├── test_package/    ← CI: conan create 自动执行 L1 测试
+    ├── manifest.yaml    ← CI: 不读取（仅人类交叉校验）
+    ├── notes.md         ← CI: 不读取（仅人类参考）
+    ├── patches/         ← CI: conandata.yml 引用，apply_conandata_patches 应用
+    └── reports/         ← CI: conan_verify 写入验证报告
 ```
 
 CI 流水线（ci/ 目录脚本）：
