@@ -315,12 +315,14 @@ class SlangConan(ConanFile):
             return
         try:
             subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
-                          capture_output=True, timeout=10)
+                          capture_output=True, timeout=10, check=True)
             subprocess.run([sign_tool, "sign", "-inFile", bin_path,
                            "-outFile", bin_path, "-selfSign", "1"],
-                          capture_output=True, timeout=10)
+                          capture_output=True, timeout=10, check=True)
             os.chmod(bin_path, 0o755)
             self.output.info(f"Signed: {os.path.basename(bin_path)}")
+        except subprocess.CalledProcessError as e:
+            self.output.warning(f"Signing tool failed for {bin_path}: {e.stderr.decode() if e.stderr else e}")
         except Exception as e:
             self.output.warning(f"Failed to sign {bin_path}: {e}")
 
@@ -340,11 +342,13 @@ class SlangConan(ConanFile):
                 if os.access(fpath, os.X_OK):
                     try:
                         subprocess.run([objcopy, "--remove-section", ".codesign", fpath],
-                                      capture_output=True, timeout=10)
+                                      capture_output=True, timeout=10, check=True)
                         subprocess.run([sign_tool, "sign", "-inFile", fpath,
                                        "-outFile", fpath, "-selfSign", "1"],
-                                      capture_output=True, timeout=10)
+                                      capture_output=True, timeout=10, check=True)
                         os.chmod(fpath, 0o755)
+                    except subprocess.CalledProcessError as e:
+                        self.output.warning(f"Signing tool failed for {fpath}: {e.stderr.decode() if e.stderr else e}")
                     except Exception as e:
                         self.output.warning(f"Failed to sign {fpath}: {e}")
 
@@ -369,11 +373,16 @@ class SlangConan(ConanFile):
             os.path.join(self.build_folder, "lib"),
         ]
         for lib in ["libcore.a", "libcompiler-core.a", "libslang-cpp-parser.a"]:
+            found = False
             for build_lib in candidate_dirs:
                 src = os.path.join(build_lib, lib)
                 if os.path.exists(src):
                     shutil.copy2(src, os.path.join(pkg_lib, lib))
+                    found = True
                     break
+            if not found:
+                self.output.warning(f"Required library {lib} not found in candidate dirs; "
+                                    f"downstream linking may fail")
 
     def package_info(self):
         self.cpp_info.libs = ["slang-compiler", "slang-cpp-parser", "compiler-core", "core", "slang-rt"]
