@@ -3,6 +3,7 @@
 
 import glob
 import os
+import subprocess
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
