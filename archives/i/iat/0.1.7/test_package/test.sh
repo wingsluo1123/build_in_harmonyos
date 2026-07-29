@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # test_package/test.sh — 验证 iat 二进制功能正常
 set -euo pipefail
 

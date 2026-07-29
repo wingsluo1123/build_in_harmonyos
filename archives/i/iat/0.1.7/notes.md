@@ -31,9 +31,7 @@
 
 ## 源码修改
 
-本次编译未修改任何源码文件，仅修改了 `config.status`（编译生成文件，不属于源码）以解决 HMDFS 临时目录限制。
-
-无需应用补丁。
+本次编译通过 `patches/0001-configure.patch` 修改 `configure` 脚本中的 `mktemp -d` 调用，替换为 `mkdir` 方式以兼容 HMDFS 文件系统（E060 知识图谱条目）。
 
 ## 依赖版本
 
