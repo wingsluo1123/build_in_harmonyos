@@ -28,7 +28,13 @@ class FalcoSecurityLibsConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         tc.cache_variables["FALCOSECURITY_LIBS_VERSION"] = str(self.version)
+        # Bundled deps (jsoncpp/zlib/re2/tbb) are installed to lib/falcosecurity/
+        # Engine libs (nodriver/source_plugin) go to lib/ alongside main libs.
+        # DT_NEEDED uses build-relative paths; set RPATH via linker flags since
+        # CMAKE_INSTALL_RPATH is overridden by upstream CMakeLists.txt.
         if self.settings.os == "OHOS":
+            rpath = "\\$ORIGIN:\\$ORIGIN/falcosecurity"
+            tc.cache_variables["CMAKE_SHARED_LINKER_FLAGS"] = f"-Wl,-rpath,{rpath}"
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "HarmonyOS"
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
             tc.cache_variables["CMAKE_C_COMPILER_TARGET"] = "aarch64-linux-ohos"
