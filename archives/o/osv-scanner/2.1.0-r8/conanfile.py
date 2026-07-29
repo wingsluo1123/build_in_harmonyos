@@ -59,6 +59,15 @@ fi
 """
 
 
+# ── Go toolchain auto-download constants ──
+# CI workers don't have Go pre-installed; the recipe downloads it on demand.
+GO_VERSION = "1.24.4"
+GO_TARBALL = f"go{GO_VERSION}.linux-arm64.tar.gz"
+# Google's official Chinese mirror — accessible from CI workers
+GO_DOWNLOAD_URL = f"https://golang.google.cn/dl/{GO_TARBALL}"
+GO_SHA256 = "d5501ee5aca0f258d5fe9bfaed401958445014495dc115f202d43d5210b45241"
+
+
 class OsvScannerConan(ConanFile):
     name = "osv-scanner"
     version = "2.1.0-r8"
@@ -192,19 +201,22 @@ class OsvScannerConan(ConanFile):
                 os.chmod(os.path.join(build_dir, binary), 0o755)
 
     def _find_go_toolchain(self):
-        """Auto-detect Go toolchain from PATH or common installation paths.
+        """Auto-detect Go toolchain from PATH, common paths, or download it.
 
         Search order:
         1. go in PATH (shutil.which)
-        2. $HOME/usr/local/go/bin/go (user install — most common on OHOS CI workers)
+        2. $HOME/usr/local/go/bin/go (user install)
         3. $HNP_PUBLIC_HOME/go/bin/go (HNP-managed Go)
         4. /usr/local/go/bin/go (standard Linux install path)
+        5. Download from official mirror (CI workers don't have Go pre-installed)
         """
         # 1. Try PATH
         go_bin = shutil.which("go")
         if go_bin:
             goroot = os.path.dirname(os.path.dirname(go_bin))
-            return goroot, go_bin
+            # Verify GOROOT has expected directory structure (pkg/ must exist)
+            if os.path.isdir(os.path.join(goroot, "pkg")):
+                return goroot, go_bin
 
         # 2. Try common installation paths
         home = os.path.expanduser("~")
@@ -217,21 +229,125 @@ class OsvScannerConan(ConanFile):
         for candidate in candidates:
             if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                 goroot = os.path.dirname(os.path.dirname(candidate))
-                return goroot, candidate
+                # Verify GOROOT has expected directory structure
+                if os.path.isdir(os.path.join(goroot, "pkg")):
+                    return goroot, candidate
 
-        raise ConanInvalidConfiguration(
-            "Go toolchain not found. Searched: PATH, $HOME/usr/local/go, "
-            "$HNP_PUBLIC_HOME/go, /usr/local/go. "
-            "Please install Go or set GOROOT/GO_BIN_PATH environment variables."
-        )
+        # 3. Download Go toolchain (CI workers don't have Go pre-installed)
+        return self._download_go_toolchain()
+
+    def _download_go_toolchain(self):
+        """Download and extract Go toolchain for CI environments.
+
+        CI workers don't have Go pre-installed. This method downloads the
+        official Go tarball from Google's mirror, verifies its SHA256,
+        and extracts it to a cache directory.
+        """
+        import hashlib
+        import tarfile
+        import urllib.request
+
+        # Determine cache directory — prefer DOWNLOAD_CACHE (CI), fallback to TMPDIR
+        cache_dir = os.environ.get("DOWNLOAD_CACHE", "")
+        if not cache_dir:
+            tmpdir = os.environ.get("TMPDIR", os.path.join(os.path.expanduser("~"), "tmp"))
+            cache_dir = os.path.join(tmpdir, "go-toolchain")
+
+        goroot = os.path.join(cache_dir, "go")
+        go_bin = os.path.join(goroot, "bin", "go")
+
+        # Check if already downloaded and extracted
+        if os.path.isfile(go_bin) and os.access(go_bin, os.X_OK):
+            self.output.info(f"Using cached Go {GO_VERSION} toolchain at {goroot}")
+            return goroot, go_bin
+
+        os.makedirs(cache_dir, exist_ok=True)
+        tarball_path = os.path.join(cache_dir, GO_TARBALL)
+
+        # Download if not cached
+        if not os.path.isfile(tarball_path):
+            self.output.info(f"Downloading Go {GO_VERSION} toolchain from {GO_DOWNLOAD_URL}...")
+            try:
+                urllib.request.urlretrieve(GO_DOWNLOAD_URL, tarball_path)
+            except Exception as e:
+                raise ConanInvalidConfiguration(
+                    f"Failed to download Go toolchain from {GO_DOWNLOAD_URL}: {e}. "
+                    f"Please install Go manually or set GOROOT/GO_BIN_PATH environment variables."
+                )
+
+        # Verify SHA256
+        sha256_hash = hashlib.sha256()
+        with open(tarball_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256_hash.update(chunk)
+        actual_sha256 = sha256_hash.hexdigest()
+        if actual_sha256 != GO_SHA256:
+            os.remove(tarball_path)
+            raise ConanInvalidConfiguration(
+                f"Go toolchain SHA256 mismatch: expected {GO_SHA256}, got {actual_sha256}. "
+                f"The download may be corrupted."
+            )
+
+        # Extract
+        self.output.info(f"Extracting Go toolchain to {cache_dir}...")
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            tar.extractall(cache_dir)
+
+        if not os.path.isfile(go_bin):
+            raise ConanInvalidConfiguration(
+                f"Go binary not found after extraction at {go_bin}. "
+                f"Please check the tarball contents."
+            )
+
+        self.output.info(f"Go {GO_VERSION} toolchain ready at {goroot}")
+        return goroot, go_bin
+
+    def _sign_elf_binary(self, binary_path, sign_tool, binary_name=None):
+        """Sign an ELF binary with binary-sign-tool if not already signed.
+
+        On OHOS, unsigned ELF binaries cannot be executed. This method
+        checks if the binary has a .codesign section and signs it if not.
+        """
+        if not os.path.isfile(binary_path):
+            return
+        # Skip if already signed (has .codesign ELF section)
+        if self._is_elf_signed(binary_path):
+            return
+        name = binary_name or os.path.basename(binary_path)
+        signed_path = f"{binary_path}-signed"
+        try:
+            self.run(
+                f'{sign_tool} sign -inFile "{binary_path}" -outFile "{signed_path}" '
+                f'-selfSign 1 -signAlg SHA256withECDSA',
+                env=None
+            )
+            os.remove(binary_path)
+            shutil.move(signed_path, binary_path)
+            os.chmod(binary_path, 0o755)
+        except Exception as e:
+            if os.path.exists(signed_path):
+                os.remove(signed_path)
+            raise ConanInvalidConfiguration(
+                f"Failed to sign Go binary '{name}' at {binary_path}: {e}. "
+                f"Unsigned ELF binaries cannot execute on OHOS. "
+                f"Check binary-sign-tool availability and permissions."
+            )
 
     def _ensure_go_tools_signed(self, goroot, sign_tool):
-        """Ensure Go's internal tools are signed for OHOS execution.
+        """Ensure Go's binaries are signed for OHOS execution.
 
-        Go's internal tools (compile, link, asm, etc.) are ELF binaries
-        located in GOROOT/pkg/tool/linux_arm64/. On OHOS, unsigned ELF
-        binaries cannot be executed. This method signs any unsigned tools.
+        Signs two categories of ELF binaries:
+        1. GOROOT/bin/go and GOROOT/bin/gofmt — the main entry points
+        2. GOROOT/pkg/tool/linux_arm64/* — internal tools (compile, link, asm, etc.)
+
+        On OHOS, unsigned ELF binaries cannot be executed.
         """
+        # 1. Sign main go and gofmt binaries
+        for binary_name in ["go", "gofmt"]:
+            binary_path = os.path.join(goroot, "bin", binary_name)
+            self._sign_elf_binary(binary_path, sign_tool, binary_name)
+
+        # 2. Sign internal tools
         tooldir = os.path.join(goroot, "pkg", "tool", "linux_arm64")
         if not os.path.isdir(tooldir):
             return
@@ -243,30 +359,7 @@ class OsvScannerConan(ConanFile):
         ]
         for tool_name in tools:
             tool_path = os.path.join(tooldir, tool_name)
-            if not os.path.isfile(tool_path):
-                continue
-            # Skip if already signed (has .codesign ELF section)
-            if self._is_elf_signed(tool_path):
-                continue
-            # Sign the tool
-            signed_path = f"{tool_path}-signed"
-            try:
-                self.run(
-                    f'{sign_tool} sign -inFile "{tool_path}" -outFile "{signed_path}" '
-                    f'-selfSign 1 -signAlg SHA256withECDSA',
-                    env=None
-                )
-                os.remove(tool_path)
-                shutil.move(signed_path, tool_path)
-                os.chmod(tool_path, 0o755)
-            except Exception as e:
-                if os.path.exists(signed_path):
-                    os.remove(signed_path)
-                raise ConanInvalidConfiguration(
-                    f"Failed to sign Go tool '{tool_name}' at {tool_path}: {e}. "
-                    f"Unsigned ELF binaries cannot execute on OHOS. "
-                    f"Check binary-sign-tool availability and permissions."
-                )
+            self._sign_elf_binary(tool_path, sign_tool, tool_name)
 
     def _is_elf_signed(self, path):
         """Check if an ELF binary has a .codesign section (OHOS signature)."""
