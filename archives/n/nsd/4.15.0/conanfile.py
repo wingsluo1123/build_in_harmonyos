@@ -93,6 +93,13 @@ class NsdConan(ConanFile):
                 '(umask 077 && mkdir "$tmp")',
                 '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")',
             )
+        if "\numask 022\nac_tmp=$tmp\n" not in contents:
+            replace_in_file(
+                self,
+                path,
+                "\nac_tmp=$tmp\n",
+                "\numask 022\nac_tmp=$tmp\n",
+            )
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
