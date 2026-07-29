@@ -10,7 +10,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 class TidyHtml5Conan(ConanFile):
     name = "tidy-html5"
     version = "5.8.0"
-    description = "HTML Tidy, an HTML checker and reformatter"
+    description = "HTML Tidy, an HTML checker and reformatter（HTML 检查格式化库，CMake 构建，鸿蒙 PC 适配）"
     license = "HTML-TIDY"
     homepage = "https://github.com/htacg/tidy-html5"
     url = ""
