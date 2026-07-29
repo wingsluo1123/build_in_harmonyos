@@ -6,7 +6,7 @@ from conan.tools.layout import basic_layout
 
 class TclConan(ConanFile):
     name = "tcl"
-    version = "9.0.2"
+    version = "8.6.16"
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": True, "fPIC": True}

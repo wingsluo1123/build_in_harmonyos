@@ -1,4 +1,4 @@
-# tcl 9.0.2 适配笔记
+# tcl 8.6.16 适配笔记
 
 ## 编译环境
 - 构建系统: makefile（unix/Makefile.in）
