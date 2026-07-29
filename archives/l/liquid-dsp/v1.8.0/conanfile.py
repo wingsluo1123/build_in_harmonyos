@@ -11,7 +11,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 class LiquiddspConan(ConanFile):
     name = "liquid-dsp"
-    version = "v1.8.0"
+    version = "1.8.0"
     description = "liquid-dsp is a free and open-source signal processing library for software-defined radios"
     license = "MIT"
     homepage = "https://liquidsdr.org"
