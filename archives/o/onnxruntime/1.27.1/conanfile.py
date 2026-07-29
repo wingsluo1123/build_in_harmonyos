@@ -23,7 +23,7 @@ import zipfile
 from pathlib import Path
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class OnnxruntimeConan(ConanFile):

@@ -73,4 +73,4 @@ ONNX Runtime 使用 CMake FetchContent 自管理依赖，conanfile.py 不需要 
 ---
 
 **编译结束**: 2026-07-27 09:48
-**最终状态**: failed
+**最终状态**: built
