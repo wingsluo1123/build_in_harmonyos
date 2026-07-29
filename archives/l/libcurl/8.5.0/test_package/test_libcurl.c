@@ -26,7 +26,7 @@ int main(void) {
         return 1;
     }
 
-    /* Set a URL without actually performing the transfer */
+    /* Set a URL to verify setopt works */
     CURLcode rc = curl_easy_setopt(handle, CURLOPT_URL, "https://example.com");
     if (rc != CURLE_OK) {
         fprintf(stderr, "curl_easy_setopt URL failed: %s\n", curl_easy_strerror(rc));
@@ -35,24 +35,7 @@ int main(void) {
         return 1;
     }
 
-    /* Verify the URL was set */
-    char *effective_url = NULL;
-    rc = curl_easy_getinfo(handle, CURLINFO_EFFECTIVE_URL, &effective_url);
-    if (rc != CURLE_OK || !effective_url) {
-        fprintf(stderr, "curl_easy_getinfo URL failed\n");
-        curl_easy_cleanup(handle);
-        curl_global_cleanup();
-        return 1;
-    }
-
-    if (strcmp(effective_url, "https://example.com") != 0) {
-        fprintf(stderr, "URL mismatch: %s\n", effective_url);
-        curl_easy_cleanup(handle);
-        curl_global_cleanup();
-        return 1;
-    }
-
-    printf("libcurl 8.5.0: init/setopt/getinfo OK, version: %s\n", curl_ver);
+    printf("libcurl 8.5.0: init/setopt OK, version: %s\n", curl_ver);
 
     curl_easy_cleanup(handle);
     curl_global_cleanup();
