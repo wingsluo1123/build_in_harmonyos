@@ -26,8 +26,6 @@ int main(int argc, char *argv[]) {
         /* parse options */
     }
 
-    /* DEBUG: print exact rc and errno to diagnose CI-only failure */
-    fprintf(stderr, "DEBUG: poptGetNextOpt returned rc=%d, errno=%d\n", rc, errno);
 
     if (rc < -1) {
         const char *bad = poptBadOption(ctx, POPT_BADOPTION_NOALIAS);
