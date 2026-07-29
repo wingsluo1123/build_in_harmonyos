@@ -87,34 +87,42 @@ class FalcoSecurityLibsConan(ConanFile):
         # RUNPATH so the dynamic linker finds them by SONAME.
         lib_dir = os.path.join(self.package_folder, "lib")
         bundled_dir = os.path.join(lib_dir, "falcosecurity")
-        # Build a map of known SONAMEs for quick lookup
         known_sos = set()
-        for so in glob.glob(os.path.join(lib_dir, "*.so")):
+        for so in glob.glob(os.path.join(lib_dir, "*.so")) + glob.glob(os.path.join(lib_dir, "*.so.*")):
             known_sos.add(os.path.basename(so))
-        for so in glob.glob(os.path.join(bundled_dir, "*.so")):
+        for so in glob.glob(os.path.join(bundled_dir, "*.so")) + glob.glob(os.path.join(bundled_dir, "*.so.*")):
             known_sos.add(os.path.basename(so))
-        # Fix each .so in lib/
-        for so_file in glob.glob(os.path.join(lib_dir, "*.so")):
-            # Get current DT_NEEDED entries
-            needed_str = self.run(
-                f"patchelf --print-needed {so_file}",
-                stdout=True,
-            ) or ""
+        for so_file in glob.glob(os.path.join(lib_dir, "*.so")) + glob.glob(os.path.join(lib_dir, "*.so.*")):
+            if os.path.islink(so_file):
+                continue
+            try:
+                needed_str = subprocess.check_output("patchelf --print-needed " + so_file, shell=True, text=True)
+            except subprocess.CalledProcessError:
+                needed_str = ""
             for dep in needed_str.strip().split("\n"):
                 dep = dep.strip()
                 if not dep:
                     continue
                 dep_basename = os.path.basename(dep)
-                # Convert path-based refs to SONAME-only (e.g.
-                # ../jsoncpp-prefix/src/lib/libjsoncpp.so -> libjsoncpp.so)
                 if dep != dep_basename and dep_basename in known_sos:
-                    self.run(f"patchelf --remove-needed '{dep}' {so_file}")
-                    self.run(f"patchelf --add-needed '{dep_basename}' {so_file}")
-            # Set RUNPATH for install-time resolution
-            self.run(f"patchelf --set-rpath '$ORIGIN:$ORIGIN/falcosecurity' {so_file}")
-        # Set RUNPATH on bundled deps too (for completeness)
-        for so_file in glob.glob(os.path.join(bundled_dir, "*.so")):
-            self.run(f"patchelf --set-rpath '$ORIGIN' {so_file}")
+                    self.run("patchelf --remove-needed '" + dep + "' " + so_file)
+                    self.run("patchelf --add-needed '" + dep_basename + "' " + so_file)
+            self.run("patchelf --set-rpath '$ORIGIN:$ORIGIN/falcosecurity' " + so_file)
+        for so_file in glob.glob(os.path.join(bundled_dir, "*.so")) + glob.glob(os.path.join(bundled_dir, "*.so.*")):
+            if os.path.islink(so_file):
+                continue
+            self.run("patchelf --set-rpath '$ORIGIN' " + so_file)
+        scap_error_a = os.path.join(self.build_folder, "build", "Release", "libscap", "libscap_error.a")
+        scap_event = os.path.join(lib_dir, "libscap_event_schema.so")
+        if os.path.exists(scap_error_a) and os.path.exists(scap_event):
+            fix_so = os.path.join(lib_dir, "libscap_error_fix.so")
+            if not os.path.exists(fix_so):
+                self.run("ar x " + scap_error_a + " strerror.c.obj", cwd=lib_dir)
+                cc = os.environ.get("CC", "clang")
+                self.run(cc + " -shared -fPIC -o libscap_error_fix.so strerror.c.obj", cwd=lib_dir)
+                os.unlink(os.path.join(lib_dir, "strerror.c.obj"))
+            self.run("patchelf --set-rpath '$ORIGIN' " + fix_so)
+            self.run("patchelf --add-needed 'libscap_error_fix.so' " + scap_event)
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "falcosecurity-libs")
