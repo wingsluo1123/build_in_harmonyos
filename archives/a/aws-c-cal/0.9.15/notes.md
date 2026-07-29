@@ -4,7 +4,7 @@
 - 构建系统: cmake
 - 编译日期: 2026-07-27
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -54,7 +54,7 @@ readelf -d $TEST_PREFIX/lib/libaws-c-cal.so | grep NEEDED
 ---
 
 **编译结束**: 2026-07-27 12:57
-**最终状态**: published
+**最终状态**: built
 
 ## 最终状态
 
