@@ -55,14 +55,14 @@ quality_gates:
   L0e_test_uses_api: PASS  # R34: test.cpp calls wxString/wxVersion/wxThread API
 
 libraries:
-  - name: libwx_baseu-3.2.a
+  - name: libwx_baseu-3.2-OHOS.a
     type: static
-    conan_lib_name: wx_baseu-3.2
+    conan_lib_name: wx_baseu-3.2-OHOS
     size: "5.4MB"
     description: "wxWidgets 核心基础库（字符串、数据结构、线程、文件系统等）"
-  - name: libwx_baseu_net-3.2.a
+  - name: libwx_baseu_net-3.2-OHOS.a
     type: static
-    conan_lib_name: wx_baseu_net-3.2
+    conan_lib_name: wx_baseu_net-3.2-OHOS
     size: "648KB"
     description: "网络库（socket、TCP/IP、HTTP/FTP 协议）"
   - name: libwxregexu-3.2.a
@@ -70,6 +70,10 @@ libraries:
     conan_lib_name: wxregexu-3.2
     size: "372KB"
     description: "正则表达式库（PCRE 引擎）"
+  - name: libwxexpat-3.2.a
+    type: static
+    conan_lib_name: wxexpat-3.2
+    description: "XML 解析库（内置 Expat）"
   - name: libwxzlib-3.2.a
     type: static
     conan_lib_name: wxzlib-3.2
@@ -78,11 +82,11 @@ libraries:
 
 knowledge_gained:
   - category: platform
-    content: "HarmonyOS 使用 musl libc，不支持 glibc 扩展函数如 gethostbyname_r"
+    content: "Socket 类型和 resolver 函数必须由 CMake 针对目标 sysroot 做能力检测，不能按平台名硬编码"
   - category: build_system
     content: "autotools 在 HarmonyOS 上失败，必须使用 CMake"
   - category: type
-    content: "socklen_t 在 HarmonyOS 上是 unsigned int，而非 int"
+    content: "wxWidgets 的 wx_get_socket_param_type() 可探测 socklen_t、size_t 或 int 的正确类型"
   - category: conan_recipe
     content: "R26: wxWidgets 是系统同名库，必须静态编译 BUILD_SHARED_LIBS=OFF"
   - category: conan_recipe

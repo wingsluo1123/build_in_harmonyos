@@ -1,8 +1,8 @@
 diff --git a/build/cmake/toolkit.cmake b/build/cmake/toolkit.cmake
-index c5febca..2c5269a 100644
+index c5febca..bc8a6f2 100644
 --- a/build/cmake/toolkit.cmake
 +++ b/build/cmake/toolkit.cmake
-@@ -30,6 +30,12 @@ elseif(APPLE)
+@@ -30,6 +30,11 @@ elseif(APPLE)
      set(wxDEFAULT_TOOLKIT osx_cocoa)
      set(wxTOOLKIT_OPTIONS osx_cocoa gtk2 gtk3 gtk4 qt)
      set(wxPLATFORM OSX)
@@ -11,74 +11,6 @@ index c5febca..2c5269a 100644
 +    set(wxDEFAULT_TOOLKIT gtk3)
 +    set(wxTOOLKIT_OPTIONS gtk2 gtk3 gtk4 motif qt)
 +    set(wxPLATFORM UNIX)
-+    add_definitions(-DOHOS_PLATFORM)
  elseif(UNIX)
      set(wxDEFAULT_TOOLKIT gtk3)
      set(wxTOOLKIT_OPTIONS gtk2 gtk3 gtk4 motif qt)
-diff --git a/include/wx/private/socket.h b/include/wx/private/socket.h
-index d9d4ac6..cfa935e 100644
---- a/include/wx/private/socket.h
-+++ b/include/wx/private/socket.h
-@@ -74,11 +74,19 @@
- // these definitions are for MSW when we don't use configure, otherwise these
- // symbols are defined by configure
- #ifndef WX_SOCKLEN_T
--    #define WX_SOCKLEN_T int
-+    #ifdef OHOS_PLATFORM
-+        #define WX_SOCKLEN_T socklen_t
-+    #else
-+        #define WX_SOCKLEN_T int
-+    #endif
- #endif
-
- #ifndef SOCKOPTLEN_T
--    #define SOCKOPTLEN_T int
-+    #ifdef OHOS_PLATFORM
-+        #define SOCKOPTLEN_T socklen_t
-+    #else
-+        #define SOCKOPTLEN_T int
-+    #endif
- #endif
-
- // define some symbols which winsock.h defines but traditional BSD headers
-diff --git a/src/common/sckaddr.cpp b/src/common/sckaddr.cpp
-index 979dc4e..c0e9c9c 100644
---- a/src/common/sckaddr.cpp
-+++ b/src/common/sckaddr.cpp
-@@ -105,3 +105,22 @@ wxIMPLEMENT_DYNAMIC_CLASS(wxUNIXaddress, wxSockAddress);
-         #endif
-     #endif
- #endif // __WINDOWS__
-+
-+#ifdef OHOS_PLATFORM
-+    // HarmonyOS uses musl libc, which provides the standard POSIX resolver
-+    // functions but not the glibc-specific reentrant variants.
-+    #define HAVE_INET_ATON
-+
-+    #ifndef HAVE_GETHOSTBYNAME
-+        #define HAVE_GETHOSTBYNAME
-+    #endif
-+    #ifndef HAVE_GETSERVBYNAME
-+        #define HAVE_GETSERVBYNAME
-+    #endif
-+    #ifndef HAVE_GETHOSTBYADDR
-+        #define HAVE_GETHOSTBYADDR
-+    #endif
-+
-+    // The non-reentrant functions are not thread-safe under musl. wxWidgets
-+    // serializes them with wxLOCK_GETBY_MUTEX below.
-+#endif // OHOS_PLATFORM
-+
-diff --git a/src/unix/sockunix.cpp b/src/unix/sockunix.cpp
-index ae15adf..a1fdba9 100644
---- a/src/unix/sockunix.cpp
-+++ b/src/unix/sockunix.cpp
-@@ -35,6 +35,8 @@
- #    define WX_SOCKLEN_T socklen_t
- #  elif defined(__WXMAC__)
- #    define WX_SOCKLEN_T socklen_t
-+#  elif defined(OHOS_PLATFORM)
-+#    define WX_SOCKLEN_T socklen_t
- #  else
- #    define WX_SOCKLEN_T int
- #  endif

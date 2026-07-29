@@ -55,6 +55,9 @@ class WxwidgetsConan(ConanFile):
         tc.variables["wxBUILD_TESTS"] = "OFF"
         tc.variables["wxUSE_GUI"] = "OFF"
         tc.variables["wxUSE_XLOCALE"] = "OFF"
+        tc.variables["wxUSE_ZLIB"] = "builtin"
+        tc.variables["wxUSE_REGEX"] = "builtin"
+        tc.variables["wxUSE_EXPAT"] = "builtin"
 
         # Avoid CMake policy warnings (use cache_variable for pre-project() effect)
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
@@ -110,11 +113,15 @@ class WxwidgetsConan(ConanFile):
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin"]
 
-        # Library names (strip "lib" prefix and ".a" suffix)
+        # Cross-compiled wxWidgets base/net libraries include the target OS in
+        # their filenames. Keep dependent static libraries before providers so
+        # consumers link correctly without relying on linker groups.
+        target_suffix = "-OHOS" if self.settings.os == "OHOS" else ""
         self.cpp_info.libs = [
-            "wx_baseu-3.2",
-            "wx_baseu_net-3.2",
+            f"wx_baseu_net-3.2{target_suffix}",
+            f"wx_baseu-3.2{target_suffix}",
             "wxregexu-3.2",
+            "wxexpat-3.2",
             "wxzlib-3.2",
         ]
 

@@ -4,7 +4,7 @@
 - **软件**: wxWidgets 3.2.10
 - **日期**: 2026-05-29
 - **构建系统**: CMake
-- **状态**: published
+- **状态**: built
 
 ## 编译步骤
 
@@ -20,8 +20,12 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "^(OHOS|HarmonyOS|OpenHarmony)$")
     set(wxDEFAULT_TOOLKIT gtk3)
     set(wxTOOLKIT_OPTIONS gtk2 gtk3 gtk4 motif qt)
     set(wxPLATFORM UNIX)
-    add_definitions(-DOHOS_PLATFORM)
 ```
+
+wxWidgets 的 `build/cmake/setup.cmake` 已通过编译测试探测 socket 能力：
+`WX_SOCKLEN_T`、`SOCKOPTLEN_T`、`HAVE_GETHOSTBYNAME`、
+`HAVE_GETHOSTBYNAME_R`、`HAVE_GETSERVBYNAME` 和 `HAVE_INET_ATON`。
+适配不定义平台专用能力宏，避免对不同 HarmonyOS libc 版本作硬编码假设。
 
 ### 3. CMake 配置
 ```bash
@@ -29,43 +33,22 @@ cmake .. \
   -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX \
   -DCMAKE_BUILD_TYPE=Release \
   -DwxBUILD_SHARED=OFF \
-  -DwxBUILD_TESTS=OFF \
-  -DwxUSE_GUI=OFF \
-  -DwxUSE_XLOCALE=OFF \
+-DwxBUILD_TESTS=OFF \
+-DwxUSE_GUI=OFF \
+-DwxUSE_XLOCALE=OFF \
+-DwxUSE_ZLIB=builtin \
+-DwxUSE_REGEX=builtin \
+-DwxUSE_EXPAT=builtin \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++
 ```
 
-### 4. 源码修改（解决 musl libc 兼容性）
+### 4. Socket 能力检测
 
-#### 文件1: src/common/sckaddr.cpp
-添加宏定义，使用 musl libc 提供的标准 POSIX 函数：
-```cpp
-#ifdef OHOS_PLATFORM
-    #define HAVE_INET_ATON
-    #define HAVE_GETHOSTBYNAME
-    #define HAVE_GETSERVBYNAME
-    #define HAVE_GETHOSTBYADDR
-#endif
-```
-
-#### 文件2: include/wx/private/socket.h
-定义正确的类型：
-```cpp
-#ifdef OHOS_PLATFORM
-    #define WX_SOCKLEN_T socklen_t
-    #define SOCKOPTLEN_T socklen_t
-#else
-    #define WX_SOCKLEN_T int
-    #define SOCKOPTLEN_T int
-#endif
-```
-
-#### 文件3: src/unix/sockunix.cpp
-```cpp
-#elif defined(OHOS_PLATFORM)
-#    define WX_SOCKLEN_T socklen_t
-```
+不修改 socket C++ 源码。CMake 配置阶段使用 wxWidgets 上游已有的
+`wx_get_socket_param_type()`、`check_symbol_exists()` 和
+`check_prototype_definition()`，根据目标 sysroot 的头文件和链接能力生成
+`wx/setup.h`，自动选择 socket 长度类型、标准 resolver 函数及可用的 `_r` 变体。
 
 ### 5. 编译与安装
 ```bash
@@ -77,12 +60,13 @@ cmake --install . --DESTDIR=$TEST_PREFIX
 
 **编译结束**: 2026-05-29
 
-**最终状态**: published
+**最终状态**: built
 
 **产物**:
-- libwx_baseu-3.2.a (核心库)
-- libwx_baseu_net-3.2.a (网络库)
+- libwx_baseu-3.2-OHOS.a (核心库)
+- libwx_baseu_net-3.2-OHOS.a (网络库)
 - libwxregexu-3.2.a (正则库)
+- libwxexpat-3.2.a (XML 解析库)
 - libwxzlib-3.2.a (压缩库)
 
 **补丁**: 0001-harmonyos-socket-fix.patch
