@@ -95,9 +95,16 @@ class ZigConan(ConanFile):
 
         if str(self.settings.os) != "Windows":
             zig_bin = os.path.join(bin_dir, "zig")
-            os.chmod(zig_bin, os.stat(zig_bin).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
             if str(self.settings.os) == "OHOS":
-                self._sign_ohos_executable(zig_bin)
+                real_zig = os.path.join(bin_dir, "zig-real")
+                shutil.move(zig_bin, real_zig)
+                os.chmod(real_zig, os.stat(real_zig).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                self._patch_ohos_zig_stdlib(bin_dir)
+                self._sign_ohos_executable(real_zig)
+                self._write_ohos_sign_helper(os.path.join(bin_dir, "zig-ohos-sign-generated"))
+                self._write_ohos_zig_wrapper(zig_bin)
+            else:
+                os.chmod(zig_bin, os.stat(zig_bin).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _sign_ohos_executable(self, path):
         signer = shutil.which("binary-sign-tool") or "/storage/Users/currentUser/usr/local/bin/binary-sign-tool"
@@ -109,6 +116,145 @@ class ZigConan(ConanFile):
             self.output.warning("binary-sign-tool not found; packaged Zig may require manual signing on OHOS")
             return
         self.run(f'"{signer}" sign -inFile "{path}" -outFile "{path}" -selfSign 1')
+
+    def _patch_ohos_zig_stdlib(self, bin_dir):
+        threaded = os.path.join(bin_dir, "lib", "std", "Io", "Threaded.zig")
+        with open(threaded, "r", encoding="utf-8", newline="") as stdlib_file:
+            content = stdlib_file.read()
+
+        replacements = {
+            ".OVERFLOW => |err| errnoBug(err), // We avoid passing too large of a `count`.":
+                ".OVERFLOW => return error.Unimplemented, // OHOS may report this for sendfile fallback.",
+            ".OVERFLOW => |err| errnoBug(err), // We avoid passing too large a count.":
+                ".OVERFLOW => return error.Unimplemented, // OHOS may report this for copy_file_range fallback.",
+        }
+        patch_count = 0
+        for old, new in replacements.items():
+            patch_count += content.count(old)
+            content = content.replace(old, new)
+        if patch_count != 3:
+            self.output.warning(f"expected 3 OHOS Zig stdlib fallback patches, applied {patch_count}")
+
+        with open(threaded, "w", encoding="utf-8", newline="") as stdlib_file:
+            stdlib_file.write(content)
+
+    def _write_executable_script(self, path, content):
+        with open(path, "w", encoding="utf-8", newline="\n") as script:
+            script.write(content)
+        os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_ohos_sign_helper(self, path):
+        self._write_executable_script(
+            path,
+            """#!/usr/bin/env sh
+set -eu
+
+case "${1:-}" in
+    --version)
+        echo "zig-ohos-sign-generated 0.16.0"
+        exit 0
+        ;;
+    -h|--help)
+        echo "usage: zig-ohos-sign-generated [ROOT_OR_FILE ...]"
+        exit 0
+        ;;
+esac
+
+signer=$(command -v binary-sign-tool 2>/dev/null || true)
+if [ -z "$signer" ] && [ -x /storage/Users/currentUser/usr/local/bin/binary-sign-tool ]; then
+    signer=/storage/Users/currentUser/usr/local/bin/binary-sign-tool
+fi
+[ -n "$signer" ] || exit 0
+
+objcopy=$(command -v llvm-objcopy 2>/dev/null || true)
+if [ -z "$objcopy" ] && [ -x /storage/Users/currentUser/usr/local/bin/llvm-objcopy ]; then
+    objcopy=/storage/Users/currentUser/usr/local/bin/llvm-objcopy
+fi
+
+is_elf() {
+    [ -f "$1" ] || return 1
+    magic=$(dd if="$1" bs=4 count=1 2>/dev/null | od -An -tx1 2>/dev/null | tr -d ' \\n')
+    [ "$magic" = "7f454c46" ]
+}
+
+sign_one() {
+    candidate=$1
+    [ -x "$candidate" ] || return 0
+    is_elf "$candidate" || return 0
+    if [ -n "$objcopy" ]; then
+        "$objcopy" --remove-section .codesign "$candidate" 2>/dev/null || true
+    fi
+    "$signer" sign -inFile "$candidate" -outFile "$candidate" -selfSign 1 >/dev/null 2>&1 || true
+}
+
+if [ "$#" -gt 0 ]; then
+    roots="$*"
+elif [ -n "${ZIG_OHOS_SIGN_ROOTS:-}" ]; then
+    roots=$ZIG_OHOS_SIGN_ROOTS
+else
+    roots=".zig-cache zig-cache zig-out"
+fi
+
+for root in $roots; do
+    [ -e "$root" ] || continue
+    if [ -f "$root" ]; then
+        sign_one "$root"
+    else
+        find "$root" -type f -perm -100 2>/dev/null | while IFS= read -r candidate; do
+            sign_one "$candidate"
+        done
+    fi
+done
+""",
+        )
+
+    def _write_ohos_zig_wrapper(self, path):
+        self._write_executable_script(
+            path,
+            """#!/usr/bin/env sh
+set -u
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+real_zig="$script_dir/zig-real"
+sign_generated="$script_dir/zig-ohos-sign-generated"
+max_retries=${ZIG_OHOS_SIGN_RETRIES:-3}
+attempt=0
+
+should_retry_after_signing() {
+    grep -Eq 'AccessDenied|Permission denied|failed to spawn build runner' "$1"
+}
+
+maybe_sign_after_success() {
+    case "${1:-}" in
+        build|build-exe|test)
+            "$sign_generated" >/dev/null 2>&1 || true
+            ;;
+    esac
+}
+
+while :; do
+    stderr_file="${TMPDIR:-.}/zig-ohos-wrapper-$$-$attempt.stderr"
+    "$real_zig" "$@" 2>"$stderr_file"
+    rc=$?
+    cat "$stderr_file" >&2
+
+    if [ "$rc" -eq 0 ]; then
+        rm -f "$stderr_file"
+        maybe_sign_after_success "${1:-}"
+        exit 0
+    fi
+
+    if [ "$attempt" -ge "$max_retries" ] || ! should_retry_after_signing "$stderr_file"; then
+        rm -f "$stderr_file"
+        exit "$rc"
+    fi
+
+    rm -f "$stderr_file"
+    "$sign_generated" >&2 || true
+    attempt=$((attempt + 1))
+done
+""",
+        )
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]

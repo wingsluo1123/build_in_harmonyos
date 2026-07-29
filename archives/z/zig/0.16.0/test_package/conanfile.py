@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan test_package for Zig 0.16.0."""
 import os
+import shutil
 import subprocess
 
 from conan import ConanFile
@@ -36,20 +37,22 @@ class ZigTestConan(ConanFile):
 
         project_dir = os.path.join(self.build_folder, "smoke")
         os.makedirs(project_dir, exist_ok=True)
-        source = os.path.join(self.source_folder, "smoke.zig")
+        shutil.copy2(os.path.join(self.source_folder, "build.zig"), os.path.join(project_dir, "build.zig"))
+        shutil.copy2(os.path.join(self.source_folder, "smoke.zig"), os.path.join(project_dir, "smoke.zig"))
 
         if str(self.settings.os) != "Windows":
             script = os.path.join(self.source_folder, "test.sh")
-            self.run(f'sh "{script}" "{zig}" "{source}" "{project_dir}"', env="conanrun")
+            self.run(f'sh "{script}" "{zig}" "{project_dir}"', env="conanrun")
             return
 
-        self.run(f'"{zig}" build-exe "{source}" -O ReleaseSmall --name smoke', cwd=project_dir, env="conanrun")
+        self.run(f'"{zig}" build run install --summary all -Doptimize=ReleaseSmall', cwd=project_dir, env="conanrun")
         exe = os.path.join(project_dir, "smoke.exe" if str(self.settings.os) == "Windows" else "smoke")
-        if not os.path.exists(exe):
+        installed_exe = os.path.join(project_dir, "zig-out", "bin", os.path.basename(exe))
+        if not os.path.exists(installed_exe):
             raise RuntimeError("Zig did not produce the smoke executable")
 
         run_result = subprocess.run(
-            [exe],
+            [installed_exe],
             cwd=project_dir,
             capture_output=True,
             text=True,

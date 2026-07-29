@@ -45,11 +45,19 @@ tool package.
   Conan 2 forbids accessing `self.settings` in `source()`.
 - The official distribution layout is preserved inside `bin/`, keeping the real
   `zig` executable and the required `lib/` directory as siblings.
-- No shell wrapper is used, avoiding OHOS shebang or `/bin/sh` compatibility
-  issues when downstream builds invoke `zig` from PATH.
-- On OHOS, `package()` self-signs `bin/zig` with `binary-sign-tool`. Manual
-  true-device probing showed the official static aarch64 ELF reports
-  `Permission denied` before signing and `zig version` works after signing.
+- On OHOS, the official Zig ELF is moved to `bin/zig-real`, self-signed with
+  `binary-sign-tool`, and kept beside `bin/lib`.
+- On OHOS, `bin/zig` is a compatibility wrapper that downstream recipes can
+  still call as `zig`. It retries after `AccessDenied` / `Permission denied` /
+  `failed to spawn build runner`, signing generated executable ELF files under
+  `.zig-cache`, `zig-cache`, and `zig-out`.
+- On OHOS, `bin/zig-ohos-sign-generated` is packaged as a reusable helper for
+  downstream recipes that need to explicitly sign generated Zig executables in
+  custom directories.
+- On OHOS, package-time standard-library patching changes Zig 0.16.0
+  `std/Io/Threaded.zig` `copy_file_range` / `sendfile` `OVERFLOW` branches from
+  panic behavior to `error.Unimplemented`, allowing Zig's existing read/write
+  fallback to complete `zig build install` on HarmonyOS.
 - Software-level `commands.json` is present for R38 tool package compliance.
 
 This is specifically to avoid downstream dependency gaps: recipes such as
@@ -61,9 +69,11 @@ or build type profile changes should not create new Zig binary IDs.
 Prepared tests:
 
 1. Run `zig version` and assert exact output `0.16.0`.
-2. Compile a tiny `main.zig` with `zig build-exe main.zig -O ReleaseSmall`.
-3. Assert the executable is produced.
-4. Run the executable and assert it exits successfully.
+2. Copy a tiny Zig project with `build.zig` and `smoke.zig` into the test work
+   directory.
+3. Run `zig build run install --summary all -Doptimize=ReleaseSmall`.
+4. Assert `zig-out/bin/smoke` exists after the install step.
+5. On Windows, run the installed executable directly once more.
 
 Upstream full tests are not run in this recipe because this recipe packages the
 official Zig distribution rather than building Zig itself.
@@ -78,10 +88,10 @@ Current session verification:
 - `conan graph info .` for OHOS/armv8: passed.
 - Package ID invariant check: OHOS/armv8 Release and Debug both produced package ID `876049f3ae10a4560da345bb02378e03e212bc8c`; changing build-profile compiler version also kept the same package ID.
 - `conan download "zig/0.16.0" -r=ohpcd --only-recipe`: still unavailable before this PR, remote returned `system acceleration policy not enabled`.
-- `conan create . --user=ohpcd --channel=stable --build=missing` on Windows x86_64: passed with official `zig-x86_64-windows-0.16.0.zip`.
+- `conan create . --user=ohpcd --channel=stable --build=missing` on Windows x86_64: passed with `zig-x86_64-windows-0.16.0.zip` downloaded from `https://zig.linus.dev/zig/0.16.0/` with official sha256 verification.
   - The test ran `zig version` and got `0.16.0`.
-  - The test compiled a small Zig executable with `zig build-exe main.zig -O ReleaseSmall`.
-  - The generated executable ran successfully.
+  - The test ran `zig build run install --summary all -Doptimize=ReleaseSmall`.
+  - Zig reported `Build Summary: 5/5 steps succeeded`; the generated executable ran successfully and `install` produced `zig-out/bin/smoke`.
 - `conan create . --build=missing` without user/channel was also started to mirror CI's unset `CONAN_USER/CONAN_CHANNEL` behavior, but the local Windows run hit the tool timeout while creating a separate cache entry. It is not counted as an OHOS or recipe failure; CI/shadow should run the targeted command below.
 - First OHOS runner attempt `codex-0.16.0-zig-0.16.0-manual-conan-20260728-011848-38237` reached CI L0 and failed at `L0c: No test source files in test_package/`. The initial test generated Zig source dynamically; the recipe was updated to include a real `test_package/smoke.zig` source file for CI static checks.
 - Second OHOS runner attempt `codex-0.16.0-zig-0.16.0-manual-conan-20260728-012040-39010` still failed L0c because the CI source-file allowlist only includes `.c/.cpp/.cc/.cxx/.sh/.py`, not `.zig`. Added `test_package/test.sh` as the CI-recognized test entrypoint; it runs `zig version`, compiles `smoke.zig`, and executes the generated program.
@@ -104,7 +114,32 @@ Current session verification:
   - Command: `zig build test --summary all -j1 --maxrss 20000000000` from the official `zig-0.16.0` source tree, using the signed packaged `zig/0.16.0` binary.
   - Result: failed before entering the test matrix because Zig's generated build runner was unsigned and HarmonyOS rejected execution.
   - Error: `failed to spawn build runner .zig-cache/o/.../build: AccessDenied`.
-  - This confirms why the Conan `test_package/test.sh` explicitly self-signs the Zig-generated `smoke` executable before running it on OHOS.
+  - This confirmed the need for a reusable OHOS wrapper rather than only signing the packaged `zig` binary.
+
+## Path B Candidate Work
+
+- Added an OHOS `bin/zig` wrapper and `bin/zig-ohos-sign-generated` helper to
+  handle the common Zig-generated executable signing problem for downstream
+  `zig build` / `zig build run` / `zig build test` workflows.
+- Added package-time OHOS Zig stdlib patching so `copy_file_range` /
+  `sendfile` `OVERFLOW` falls back to normal read/write copying instead of
+  panicking during `zig build install`.
+- Upgraded `test_package` from `zig build-exe` to `zig build run install`,
+  covering generated build runner execution, generated test executable
+  execution, and install output.
+- Evidence report: `reports/path-b-candidate.md`.
+- Intermediate OHOS wrapper runner
+  `codex-zig-zig-0.16.0-b-wrapper-conan-20260729-132058-47103` proved the
+  first generated build runner signing retry worked, then exposed the
+  `copy_file_range` `OVERFLOW` install-step panic.
+- Final OHOS runner
+  `/storage/Users/currentUser/ohos-test-runs/codex-zig-zig-0.16.0-b-wrapper-conan-final2-20260729-134856-64268`
+  passed with exit code 0.
+  - The log first showed generated build runner `AccessDenied`, then generated
+    `smoke` executable `AccessDenied`, and finally `Build Summary: 5/5 steps
+    succeeded` after wrapper retries.
+  - Final gates: `L0_RESULT=pass`, `L1_RESULT=pass`, `L2_RESULT=pass`,
+    `L4_RESULT=pass`, `L5_RESULT=pass`.
 
 ## Next Real-Device / Shadow CI Commands
 
