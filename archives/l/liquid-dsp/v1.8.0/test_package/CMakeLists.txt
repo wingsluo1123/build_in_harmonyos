@@ -5,7 +5,7 @@ project(test_liquid-dsp C)
 find_package(liquid-static REQUIRED)
 
 add_executable(test_liquid-dsp test.c)
-target_link_libraries(test_liquid-dsp liquid-dsp::liquid-dsp)
+target_link_libraries(test_liquid-dsp liquid::liquid-static)
 
 enable_testing()
 add_test(NAME test_liquid-dsp COMMAND test_liquid-dsp)
