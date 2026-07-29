@@ -18,7 +18,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 class DeckerTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain", "CMakeDeps", "VirtualRunEnv"
+    generators = "CMakeDeps", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
