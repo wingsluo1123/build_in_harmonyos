@@ -126,6 +126,7 @@ class BoostCompiledConan(ConanFile):
         with open(wrapper, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(
                 f"#!{python}\n"
+                "import os\n"
                 "import sys\n\n"
                 f"real_cxx = {cxx!r}\n"
                 f"target = {target!r}\n"
@@ -191,6 +192,7 @@ class BoostCompiledConan(ConanFile):
         self.cpp_info.components["chrono"].requires = ["atomic", "system"]
         self.cpp_info.components["filesystem"].requires = ["atomic", "system"]
         self.cpp_info.components["program_options"].requires = ["regex"]
+        self.cpp_info.components["serialization"].requires = ["system"]
         self.cpp_info.components["thread"].requires = ["chrono", "atomic", "system"]
         self.cpp_info.components["timer"].requires = ["chrono"]
 
