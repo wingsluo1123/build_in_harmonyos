@@ -1,5 +1,17 @@
 # ncurses 6.4 鸿蒙系统编译指南
 
+## ncurses 6.5 Conan 配方摘要
+
+- 版本：6.5
+- 构建系统：Autotools
+- 构建方式：静态 wide-character 库
+- 关键选项：`--enable-widec`、`--enable-overwrite`、`--without-shared`
+- 禁用项：`progs`、`tests`、`manpages`、C++ binding
+- Conan 目标：`ncurses::ncurses`
+- 主要下游：`readline/8.3`、`ncmpcpp/0.10.1`
+
+6.5 配方沿用静态库优先策略，避免替换系统 ncurses 共享库；新增非交互 Conan 消费测试验证 `curses_version()`、`keyname()` 和 `unctrl()`。
+
 ## 概述
 
 本文档记录了 ncurses 6.4 在鸿蒙系统上的编译适配过程，包括遇到的问题、解决方案和注意事项。

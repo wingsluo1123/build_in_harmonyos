@@ -1,41 +1,25 @@
-# ncurses 6.5 适配笔记
+# ncurses 6.5 适配记录
 
-## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-05-22}
-- 编译器: clang/clang++
-- 状态: {published|built|failed}
+## 编译状态
 
-## 编译步骤
+状态：built
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+## 配方说明
 
-## 遇到的问题与解决方案
+- 构建系统：Autotools。
+- 构建产物：静态 wide-character 库 `formw`、`menuw`、`panelw`、`ncursesw`。
+- 关键配置：`--enable-widec`、`--enable-overwrite`、`--without-shared`。
+- 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
+- 应用 `config.guess/config.sub` 补丁识别 OHOS 三元组。
 
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-{按需添加行}
+## 验证
 
-## 源码修改
+新增 Conan 消费测试 `test_ncurses.c`，非交互验证：
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
+- `curses_version()` 返回有效版本字符串；
+- `keyname(KEY_LEFT)` 映射为 `KEY_LEFT`；
+- `unctrl('\n')` 映射为 `^J`。
 
-## 依赖版本
+## 下游
 
-{列出本次编译依赖的具体软件版本}
-
-## 验证结果
-
-```bash
-{验证命令和结果}
-```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
-
-## 注意事项
-
-{需要特别注意的点；无则删除此节}
+该依赖项用于解除 `readline/8.3` 和 `ncmpcpp/0.10.1` 的 `ncurses/6.5` 依赖阻塞。
