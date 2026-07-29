@@ -44,7 +44,9 @@ pip3 install conan                            # 从配置的社区源安装 OHOS
 ## §0 初始化
 
 ```bash
-SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openharmony-compile-agent*" 2>/dev/null | head -1)")"
+SKILL_ROOT="$(dirname "$(find "${ATOMCODE_HOME:-$HOME/.atomcode}" -name "SKILL.md" -path "*openharmony-compile-agent*" 2>/dev/null | head -1)")"
+# 回退到 OpenDesk
+[ -z "$SKILL_ROOT" ] && SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openharmony-compile-agent*" 2>/dev/null | head -1)")"
 ```
 
 > `ohc-run.py` 内部自动定位项目根目录（`find_project_dir()`），不需要手动 `export` 环境变量。
@@ -56,6 +58,21 @@ SKILL_ROOT="$(dirname "$(find "$HOME/.opendesk" -name "SKILL.md" -path "*openhar
 |------|---------|------|
 | 协作者（默认） | 直接使用 | 编译软件、提取知识、生成 conanfile.py、创建分支并提交 PR |
 | 主编 | `OHC_ROLE=editor` | 审核 PR、合并知识、重建索引 |
+
+### §0.2 积分赛事 PR 模板（⭐ 积分赛专用）
+
+使用 AtomCode 提交积分赛 PR 时，必须使用专用模板：
+
+- **模板文件**：`templates/积分赛事PR模板.md`
+- **触发条件**：提示词中包含 **"积分赛"、"依赖项"、"知识库扩展"、"高难度挑战"** 时自动启用
+- **PR 标题**：提示词中包含`积分赛`必须以 `【积分赛】`为前缀，包含`依赖项`必须以 `【依赖项】`为前缀，包含`知识库扩展`必须以 `【知识库扩展】`为前缀，包含`高难度挑战`必须以 `【高难度挑战】`为前缀，且标题中仅存在一种关键词前缀
+- **PR 正文**：严格按 `templates/积分赛事PR模板.md` 填写，包含：
+  - 三方库信息（名称、版本、仓库地址、适配路径、使用知识库）
+  - 测试用例对比（上游 vs 适配后）
+  - 上游测试用例修改说明
+  - 补全测试用例说明
+  - 验证结果（编译状态、测试通过率）
+  - 补充说明
 
 **协作者 Git 铁律（违反=越权）**：
 - ❌ 不推 main，不走捷径：创建功能分支 `git checkout -b feat/{软件名}-{版本}` → push → GitCode PR
@@ -203,8 +220,17 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify <软件名> <版本>
 # Step 3: 收尾（9 步自动，详见 §3 Step 3）
 python3 $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|failed|archived
 
-# Step 4: 提交 PR（内含 W4 前置检查，HANDOFF 强制）
+# Step 4: 提交 PR（内含 W4 前置检查 + AI Review 监控 + CI 监控，HANDOFF 强制）
 python3 $SKILL_ROOT/scripts/ohc-run.py submit <软件名> <版本>
+# 如 AI Review HANDOFF 后修复并继续:
+python3 $SKILL_ROOT/scripts/ohc-run.py submit <软件名> <版本> --resume
+
+# Step 5: SKILL_FEEDBACK (submit 成功后自动调用，也可手动运行)
+python3 $SKILL_ROOT/scripts/ohc-run.py feedback <软件名> <版本>
+# 如 HANDOFF 后填写建议并验证:
+python3 $SKILL_ROOT/scripts/ohc-run.py feedback <软件名> <版本> --resume
+# 如 HANDOFF 后填写建议并验证:
+python3 $SKILL_ROOT/scripts/ohc-run.py feedback <软件名> <版本> --resume
 ```
 
 **如何选择**：已有 conanfile.py / 简单编译 → 模式 A；首次编译 / 复杂依赖 / 需深度调试 → 模式 B。
@@ -392,8 +418,26 @@ $SKILL_ROOT/scripts/ohc-run.py finish <软件名> <版本> published|built|faile
 | [9/9] gen_summary + PR 原子性 | 重新生成 SUMMARY.md (W2 检查) | 非致命 |
 
 > **W4 Pre-PR 独立审计不在 finish 内部**，在 `submit` 内部作为前置检查执行。
-> 流程顺序：`finish`（含W2+W3）→ `submit`（前置检查W4→git push→创建PR）。
+> 流程顺序：`finish`（含W2+W3）→ `submit`（前置检查W4→git push→创建PR→**AI Review 监控**(5阶段)→**CI 监控**→**SKILL_FEEDBACK 自动生成**）。
 > AI 操作路径：`finish` → `submit`，两条命令，不可跳过。
+>
+> **⭐ AI Review 监控（5 阶段，嵌入 submit，HANDOFF 强制）**：
+> PR 创建后，submit 自动进入 atomgit-bot AI 检视监控流程：
+> - Phase 1: 等待"变更摘要"生成（每 5 分钟轮询，30 分钟超时）
+>   - atomgit-bot 先发"正在生成合并请求摘要"和"AI 代码检视正在进行中" → 继续等待
+>   - 出现"变更摘要"字段 → 进入 Phase 2
+> - Phase 2: AI 评估变更摘要（HANDOFF）→ 检查摘要中是否有必须修改的点
+>   - AI 评估后 push 修复（如有）并 `--resume` 继续
+> - Phase 3: 等待检视意见出现（每 5 分钟轮询，30 分钟超时）
+>   - 继续等待 atomgit-bot 评论中出现三类以外的检视意见
+>   - 出现检视意见 → 进入 Phase 4；超时无新意见 → 直接进入 CI 监控
+> - Phase 4: AI 处理检视意见（HANDOFF）
+>   - ⚠️ **检视意见不一定正确，需严格判断是否合理才能修改**
+>   - 合理的修改并 push，不合理的回复说明原因
+>   - 所有意见处理完毕后 `--resume` 继续
+> - Phase 5: AI Review 完成 → 进入 CI 监控
+>
+> 状态文件 `.submit-state.json` 记录 review_phase（1/3/5），`--resume` 从正确阶段恢复。
 
 **前置条件**：test-report 存在 + Staging 验证完成 + conanfile.py 存在。
 **状态值**：`published`(verify通过+CI upload) | `built`(verify通过未upload) | `failed`(编译或验证失败) | `archived`(旧版本归档)。
@@ -418,6 +462,31 @@ $SKILL_ROOT/scripts/ohc-run.py verify-build <软件名> <版本>
 **CI 只读 4 文件**：`conanfile.py`/`conandata.yml`/`test_package/`/`patches/`。不读 `manifest.yaml`/`notes.md`/`reports/`。
 
 > 详解见 references/compile-guide.md
+
+### Step 6: SKILL_FEEDBACK — 流程终态反馈
+
+```bash
+# submit 成功后自动调用，也可手动运行
+$SKILL_ROOT/scripts/ohc-run.py feedback <软件名> <版本>
+```
+
+在 SKILL 整个流程结束时自动生成反馈报告，写入 `feedback/SKILL_FEEDBACK_{random}.md`（项目根，与 `knowledge/` 同级）。
+
+**报告结构**：
+| 部分 | 内容 | 自动填充 |
+|------|------|---------|
+| 背景 | 软件/版本/构建系统/上游仓库/依赖/补丁/状态 | ✅ |
+| 情况 | 执行概要/失败分析/知识图谱/AI检视/CI/效率 | ✅ (部分需 AI 补充) |
+| 建议 | SKILL设计/模板/自动化/知识图谱覆盖 | ❌ (AI 填写) |
+| 作者 | 姓名/邮箱 (git config)/Agent ID/时间戳/PR编号 | ✅ |
+
+**数据来源**：manifest.yaml + conandata.yml + conanfile.py + notes.md + test-report.md + .ci-result.json + .submit-state.json + patches/ + knowledge/graph/draft/
+
+**文件命名**：`SKILL_FEEDBACK_{8位随机hex}.md`（`secrets.token_hex(4)` 生成，防碰撞）
+
+**HANDOFF 强制**：生成后检查 `(请填写)` 占位符，有残留则 emit HANDOFF（step_failed=feedback），AI 填充建议后 `--resume` 验证完整性。状态文件 `.feedback-state.json` 记录 feedback_id。
+
+> 模板: templates/skill-feedback.md
 
 ---
 
@@ -566,7 +635,8 @@ archives/{letter}/{name}/
 
 ### 流程自省
 
-发现 SKILL 自身问题时记录到 `reports/skill-feedback.md`。
+发现 SKILL 自身问题时记录到 `reports/skill-feedback.md`（版本级）。
+流程结束时自动生成 `feedback/SKILL_FEEDBACK_*.md` 结构化反馈报告（含背景/情况/建议/作者），由 `feedback` 命令驱动。残留 `(请填写)` 时 emit HANDOFF，AI 填充后 `--resume` 验证。
 
 ---
 
@@ -607,7 +677,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 | `resolve-deps [--install]` | 查询/安装预编译依赖 |
 | `verify-build` / `refresh-patch` | 门禁复查 / 补丁管线 |
 | `status` / `handoff` / `track-edit` | 状态恢复 / 源码追踪 |
-| `search-url` / `submit` / `review` / `post-merge` | URL搜索 / **PR提交(前置W4检查,HANDOFF强制)** / 主编审核 / 合并后索引 |
+| `search-url` / `submit` / `review` / `post-merge` / `feedback` | URL搜索 / **PR提交(W4→AI Review→CI→SKILL_FEEDBACK,HANDOFF,--resume)** / 主编审核 / 合并后索引 / **流程终态反馈(HANDOFF,--resume)** |
 | `init-archive` / `close-archive` / `finalize-archive` | 归档初始化 / 关闭 / 清理校验 |
 | `check-env` / `clean-verify` / `check-knowledge-gap` | 环境检查 / 干净构建验证 / 知识缺口检查 |
 | `dispatch` / `summary` / `conan-migrate` | 多任务调度 / 统计摘要 / Conan 迁移辅助 |
@@ -620,7 +690,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 | `scripts/sync-recipes.py` | 从 conan 缓存同步配方到 archives/ |
 | `scripts/migrate_kv_to_yaml.py` | KV→YAML 渐进迁移 |
 | `scripts/pre_pr_audit.py` | ⭐ W4: Pre-PR 审计工具 (generate/report/check 子命令，由 submit 内部调用) |
-| `scripts/gitcode_pr.py` | ⭐ GitCode PR 管理 (创建PR/获取评论/CI状态/回复评论) |
+| `scripts/gitcode_pr.py` | ⭐ GitCode PR 管理 (创建PR/获取评论/CI状态/回复评论/monitor-review AI检视监控) |
 
 ### Pre-commit Hook（⭐ 建议安装）
 
@@ -642,4 +712,4 @@ cp ci/conan/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-co
 
 ---
 
-*SKILL.md v11.4 — 2026-07-10 — HANDOFF嵌入式门禁：W2/W3嵌入finish step[5/9](阻塞+HANDOFF)、W4嵌入submit前置检查(HANDOFF强制)、移除pre_pr_gate.sh独立脚本、pre_pr_audit.py收编为submit内部调用、模式B增submit步骤；AI路径简化为finish→submit两步不可跳过；v11.3→v11.4*
+*SKILL.md v11.6 — 2026-07-14 — SKILL_FEEDBACK 阶段：新增 feedback 子命令和 ohc/feedback.py 模块，submit 成功后自动生成 feedback/SKILL_FEEDBACK_{random}.md（项目根，与knowledge同级）；HANDOFF强制（残留(请填写)则emit，step_failed=feedback），--resume验证完整性，.feedback-state.json状态文件；git config获取作者，secrets.token_hex生成随机ID；新增templates/skill-feedback.md模板；v11.5→v11.6*
