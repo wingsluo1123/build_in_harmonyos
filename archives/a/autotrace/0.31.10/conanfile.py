@@ -4,6 +4,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import struct
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -88,6 +89,55 @@ class AutotraceConan(ConanFile):
         retcode = self.run(command, ignore_errors=True, **kwargs)
         if retcode not in (None, 0):
             raise RuntimeError(f"Command failed with exit code {retcode}: {command}")
+
+    def _elf_has_section(self, path, section_name):
+        try:
+            with open(path, "rb") as file:
+                data = file.read()
+        except OSError:
+            return True
+        if len(data) < 16 or data[:4] != b"\x7fELF":
+            return True
+        endian = {"\x01": "<", "\x02": ">"}.get(chr(data[5]))
+        if not endian:
+            return True
+        try:
+            if data[4] == 1:
+                fields = struct.unpack_from(endian + "16sHHIIIIIHHHHHH", data, 0)
+                section_header_format = endian + "IIIIIIIIII"
+            elif data[4] == 2:
+                fields = struct.unpack_from(endian + "16sHHIQQQIHHHHHH", data, 0)
+                section_header_format = endian + "IIQQQQIIQQ"
+            else:
+                return True
+            section_offset, section_size = fields[6], fields[11]
+            section_count, names_index = fields[12], fields[13]
+            header_size = struct.calcsize(section_header_format)
+            if section_size < header_size or names_index >= section_count:
+                return True
+
+            def section_header(index):
+                return struct.unpack_from(
+                    section_header_format,
+                    data,
+                    section_offset + index * section_size,
+                )
+
+            names_header = section_header(names_index)
+            names_offset, names_size = names_header[4], names_header[5]
+            names = data[names_offset:names_offset + names_size]
+            for index in range(section_count):
+                name_offset = section_header(index)[0]
+                if name_offset >= len(names):
+                    continue
+                end = names.find(b"\x00", name_offset)
+                if end == -1:
+                    continue
+                if names[name_offset:end].decode(errors="replace") == section_name:
+                    return True
+        except (struct.error, IndexError):
+            return True
+        return False
 
     def _pkg_config(self, args):
         pkg_config = os.environ.get("PKG_CONFIG") or shutil.which("pkg-config") or "pkg-config"
@@ -313,7 +363,10 @@ Cflags: -I${includedir}
             return
 
         tmp_signed = bin_path + ".signed"
-        self._run_checked([objcopy, "--remove-section", ".codesign", bin_path])
+        if self._elf_has_section(bin_path, ".codesign"):
+            self._run_checked([objcopy, "--remove-section", ".codesign", bin_path])
+        else:
+            self.output.info("Skipping .codesign removal for unsigned autotrace ELF")
         self._run_checked([sign_tool, "sign", "-inFile", bin_path, "-outFile", tmp_signed, "-selfSign", "1"])
         if not os.path.exists(tmp_signed):
             raise RuntimeError(f"Signing did not create output file: {tmp_signed}")

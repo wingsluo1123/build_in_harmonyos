@@ -12,10 +12,10 @@ index e93dede..30ff8bd 100644
 +
  /* Declare local data types
   */
-@@ -115,10 +116,17 @@ at_bitmap input_pnm_reader(gchar * filename, at_input_opts_type * opts, at_msg_f
+@@ -115,10 +116,18 @@ at_bitmap input_pnm_reader(gchar * filename, at_input_opts_type * opts, at_msg_f
    int ctr;
    FILE *fd;
-+  int close_fd;
++  int close_fd = 0;
    at_bitmap bitmap = at_bitmap_init(NULL, 0, 0, 0);
    at_exception_type excep = at_exception_new(msg_func, msg_data);
 -
@@ -27,7 +27,8 @@ index e93dede..30ff8bd 100644
 +    close_fd = 0;
 +  } else {
 +    fd = fopen(filename, "rb");
-+    close_fd = 1;
++    if (fd != NULL)
++      close_fd = 1;
 +  }
 -
 +
@@ -39,7 +40,7 @@ index e93dede..30ff8bd 100644
 +
    /* close the file */
 -  fclose(fd);
-+  if (close_fd)
++  if (fd != NULL && close_fd)
 +    fclose(fd);
 -
 +
