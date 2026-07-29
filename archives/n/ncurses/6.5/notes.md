@@ -10,7 +10,7 @@
 - 构建产物：静态 wide-character 库 `formw`、`menuw`、`panelw`、`ncursesw`。
 - 关键配置：`--enable-widec`、`--enable-overwrite`、`--without-shared`。
 - 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
-- 应用 `config.guess/config.sub` 补丁识别 OHOS 三元组。
+- 构建阶段用 `replace_in_file` 让 `config.guess/config.sub` 识别 OHOS 三元组。
 
 ## 验证
 
