@@ -1,0 +1,17 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -70,6 +70,14 @@
+ 
+ project(CURL C)
+ 
++# === PATCH: ZLIB::ZLIB alias for Conan CMakeDeps compatibility ===
++# Conan CMakeDeps generates zlib::zlib (lowercase), but curl expects
++# ZLIB::ZLIB (uppercase). Create an alias to bridge the two.
++if(TARGET zlib::zlib AND NOT TARGET ZLIB::ZLIB)
++  add_library(ZLIB::ZLIB ALIAS zlib::zlib)
++endif()
++
++
+ file(STRINGS ${CURL_SOURCE_DIR}/include/curl/curlver.h CURL_VERSION_H_CONTENTS REGEX "#define LIBCURL_VERSION( |_NUM )")
+ string(REGEX MATCH "#define LIBCURL_VERSION \"[^\"]*"
+   CURL_VERSION ${CURL_VERSION_H_CONTENTS})
