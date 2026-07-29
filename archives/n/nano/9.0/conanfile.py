@@ -3,8 +3,10 @@
 
 import os
 import shutil
+from pathlib import Path
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -37,6 +39,29 @@ class NanoConan(ConanFile):
 
     def generate(self):
         toolchain = AutotoolsToolchain(self)
+        default_prefix = str(Path.home() / "usr" / "local")
+        system_prefix = Path(
+            self.conf.get(
+                "user.nano:system_prefix",
+                default=default_prefix,
+                check_type=str,
+            )
+        )
+        include_dir = system_prefix / "include"
+        library_dir = system_prefix / "lib"
+        missing = [
+            str(path) for path in (include_dir, library_dir) if not path.is_dir()
+        ]
+        if missing:
+            raise ConanInvalidConfiguration(
+                "nano requires the system ncurses prefix; missing directories: "
+                + ", ".join(missing)
+                + ". Set user.nano:system_prefix in the Conan profile."
+            )
+        toolchain.extra_cflags.extend(
+            [f"-I{include_dir}", f"-I{include_dir / 'ncursesw'}"]
+        )
+        toolchain.extra_ldflags.append(f"-L{library_dir}")
         toolchain.configure_args.extend(
             ["--disable-nls", "--disable-libmagic", "--disable-speller"]
         )
