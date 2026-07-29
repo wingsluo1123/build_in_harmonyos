@@ -232,12 +232,19 @@ class TectonicConan(ConanFile):
             shutil.copy2(src_bin, dst_real)
 
             # Create wrapper script that sets LD_LIBRARY_PATH for libexpat.so
+            # and SSL_CERT_FILE/SSL_CERT_DIR for HTTPS TeX bundle downloads
             wrapper = os.path.join(self.package_folder, "bin", "tectonic")
             with open(wrapper, "w") as f:
                 f.write(
                     '#!/system/bin/sh\n'
                     'DIR="$(cd "$(dirname "$0")" && pwd)"\n'
                     'export LD_LIBRARY_PATH="$DIR/../lib:$LD_LIBRARY_PATH"\n'
+                    'if [ -f /etc/ssl/certs/cacert.pem ]; then\n'
+                    '    export SSL_CERT_FILE="/etc/ssl/certs/cacert.pem"\n'
+                    'fi\n'
+                    'if [ -d /etc/ssl/certs ]; then\n'
+                    '    export SSL_CERT_DIR="/etc/ssl/certs"\n'
+                    'fi\n'
                     'exec "$DIR/tectonic.real" "$@"\n'
                 )
             os.chmod(wrapper, 0o755)

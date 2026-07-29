@@ -61,5 +61,3 @@ class Graphite2Conan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["graphite2"]
-        if self.settings.os in ("Linux", "OHOS"):
-            self.cpp_info.system_libs = ["pthread"]
