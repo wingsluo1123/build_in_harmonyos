@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for osv-scanner 2.1.0-r8 — Go project.
+"""Conan recipe for osv-scanner 2.1.0 — Go project.
 
 osv-scanner is a Go vulnerability scanner tool. This recipe builds two
 binaries: osv-scanner and osv-reporter, using the Go toolchain.
@@ -70,7 +70,7 @@ GO_SHA256 = "d5501ee5aca0f258d5fe9bfaed401958445014495dc115f202d43d5210b45241"
 
 class OsvScannerConan(ConanFile):
     name = "osv-scanner"
-    version = "2.1.0-r8"
+    version = "2.1.0"
     description = "Vulnerability scanner that checks OSV database for dependencies"
     license = "Apache-2.0"
     homepage = "https://github.com/google/osv-scanner"

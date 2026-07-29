@@ -1,4 +1,4 @@
-# osv-scanner 2.1.0-r8 适配笔记
+# osv-scanner 2.1.0 适配笔记
 
 ## 编译环境
 - 构建系统: custom (Go 项目，使用 go build)
@@ -47,7 +47,7 @@ Go 链接器只忽略 ENOTSUP/EPERM，不忽略 EACCES，导致链接失败。
 
 ### 4. 下载依赖
 ```bash
-cd /storage/Users/currentUser/tmp/builds/osv-scanner-2.1.0-r8.work/
+cd /storage/Users/currentUser/tmp/builds/osv-scanner-2.1.0.work/
 go mod download
 ```
 

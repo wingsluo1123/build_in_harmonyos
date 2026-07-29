@@ -68,11 +68,11 @@ Go 项目，使用 `go build` 编译。非传统的 autotools/cmake 构建系统
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 2.1.0-r8 | built | 2026-07-02 | conan-verify 8/8 PASS, 功能测试 28/28 PASS |
+| 2.1.0 | built | 2026-07-02 | conan-verify 8/8 PASS, 功能测试 28/28 PASS |
 
 ## 相关文档
 
-- [版本级编译笔记](2.1.0-r8/notes.md) — 详细编译步骤、问题与解决方案
-- [Conan 配方](2.1.0-r8/conanfile.py) — Conan 构建配方
-- [功能测试报告](2.1.0-r8/reports/functional-test-report.md) — 28 项功能测试结果
-- [Conan 验证报告](2.1.0-r8/reports/conan-verify-report.md) — 8 道门禁验证结果
+- [版本级编译笔记](2.1.0/notes.md) — 详细编译步骤、问题与解决方案
+- [Conan 配方](2.1.0/conanfile.py) — Conan 构建配方
+- [功能测试报告](2.1.0/reports/functional-test-report.md) — 28 项功能测试结果
+- [Conan 验证报告](2.1.0/reports/conan-verify-report.md) — 8 道门禁验证结果
