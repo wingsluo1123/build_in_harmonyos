@@ -14,6 +14,7 @@ We pass the bindir to CMake in two complementary ways:
 import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 
 
 class DeckerTestConan(ConanFile):
@@ -37,20 +38,25 @@ class DeckerTestConan(ConanFile):
             tc.variables["DECKER_BIN_DIRS"] = bin_dirs[0]
         tc.generate()
 
+        # R34: emit LILT_BIN into a dedicated env script so self.run() in
+        # test() automatically picks it up via the env file list argument.
+        # Conan 2.x self.run(env=...) takes a list of env *file names*, not
+        # a dict; Environment() + vars(self).save_script() is the canonical
+        # way to emit custom env vars into those env files.
+        lilt_path = os.path.join(bin_dirs[0], "lilt") if bin_dirs else "lilt"
+        env = Environment()
+        env.define("LILT_BIN", lilt_path)
+        env.vars(self).save_script("lilt_env")
+
     def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
 
     def test(self):
-        # Resolve the installed lilt binary and pass it to the test binary
-        # via LILT_BIN environment variable.
-        decker = self.dependencies["decker"]
-        bin_dirs = decker.cpp_info.aggregated_components().bindirs
-        lilt_path = os.path.join(bin_dirs[0], "lilt") if bin_dirs else "lilt"
-
         # R34: run the compiled test binary directly with self.run().
-        # Pass LILT_BIN via env dict for cross-platform safety (avoids
-        # shell-specific VAR=value syntax).
+        # Pass env=["lilt_env", "conanrun"] so both the LILT_BIN emitted above
+        # and the conanrun env (PATH etc.) are applied to the subprocess.
+        # Conan 2.x requires env to be a list of env *file names*, not a dict.
         test_bin = os.path.join(self.cpp.build.bindir, "test_decker")
-        self.run(f'"{test_bin}"', env={"LILT_BIN": lilt_path, **self.build_env.vars()})
+        self.run(f'"{test_bin}"', env=["lilt_env", "conanrun"], scope="run")
