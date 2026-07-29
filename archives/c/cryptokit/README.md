@@ -10,7 +10,7 @@ OCaml 加密库 by Xavier Leroy
 ## 依赖
 - OCaml >= 4.13.0（完整构建）
 - dune >= 2.5（完整构建）
-- zlib/1.3.1
+- zlib/1.3.1（OCaml 完整构建，C stubs 层不需要）
 
 ## OHOS 适配状态
 - ⚠️ C stubs 层已编译验证通过（19 个算法文件）

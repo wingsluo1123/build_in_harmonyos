@@ -17,13 +17,13 @@
 
 - OCaml 编译器不可用 — 无法执行 configure（OCaml 脚本）和 dune build
 - Clang 15 (OHOS SDK) 可用 — 已编译 C stubs
-- zlib/1.3.1 依赖需要在 Conan 制品仓中发布
+- zlib/1.3.1 是 OCaml 完整构建依赖，C stubs 层不需要
 
 ## 已修正的质量缺陷
 
 1. **R33**: conanfile.py build() 从 Conan conf 获取编译器路径，不硬编码
 2. **R34**: test_package 通过 CMake 编译 test.c 调用 SHA-256 API（SHA256_init/add_data/finish），验证加密算法功能正确
-3. **requirements()**: 正确声明 zlib 依赖
+3. **requirements()**: C stubs 层无额外依赖，OCaml 完整构建需 zlib/1.3.1
 4. **build 系统**: 使用 VirtualBuildEnv 而非错误的 AutotoolsToolchain
 
 ## 后续步骤

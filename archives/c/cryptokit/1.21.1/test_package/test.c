@@ -6,13 +6,14 @@
 int main(void) {
     struct SHA256Context ctx;
     unsigned char hash[32];
-    const char *test_input = "The Cryptokit library - SHA-256 test";
+    const unsigned char *test_input = (const unsigned char *)"The Cryptokit library - SHA-256 test";
+    size_t test_len = strlen((const char *)test_input);
     int i;
 
     /* Initialize SHA-256 */
     SHA256_init(&ctx, 256);
     /* Feed data */
-    SHA256_add_data(&ctx, (unsigned char *)test_input, strlen(test_input));
+    SHA256_add_data(&ctx, (unsigned char *)test_input, test_len);
     /* Finalize */
     SHA256_finish(&ctx, 256, hash);
 
