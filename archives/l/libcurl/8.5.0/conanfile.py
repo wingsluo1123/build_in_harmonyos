@@ -41,23 +41,8 @@ class LibcurlConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        deps = CMakeDeps(self)
-        deps.generate()
-        # Write a CMake alias so ZLIB::ZLIB (expected by curl's lib/CMakeLists.txt:190)
-        # maps to Conan's generated zlib::zlib target.  Without this,
-        # find_package(ZLIB) from curl picks up Conan's zlib::zlib but then
-        # target_link_libraries(… ZLIB::ZLIB) fails with "target not found".
-        alias_dir = os.path.join(self.build_folder, "build",
-                                 str(self.settings.build_type), "generators")
-        os.makedirs(alias_dir, exist_ok=True)
-        alias_file = os.path.join(alias_dir, "zlib_alias.cmake")
-        with open(alias_file, "w") as f:
-            f.write("if(TARGET zlib::zlib AND NOT TARGET ZLIB::ZLIB)\n")
-            f.write("  add_library(ZLIB::ZLIB ALIAS zlib::zlib)\n")
-            f.write("endif()\n")
-
+        CMakeDeps(self).generate()
         tc = CMakeToolchain(self)
-        tc.variables["CMAKE_PROJECT_INCLUDE"] = alias_file.replace("\\", "/")
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_CURL_EXE"] = "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
