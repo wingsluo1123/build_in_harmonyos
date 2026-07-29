@@ -2,10 +2,10 @@
 
 ## 编译环境
 - 构建系统: autotools
-- 编译日期: 2026-06-10
+- 编译日期: 2026-06-10 (初始), 2026-07-27 (补全 conanfile.py + test_package)
 - 编译器: clang 15.0.4 / clang++ (aarch64)
 - 目标平台: HarmonyOS (OpenHarmony) aarch64, musl libc
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -82,3 +82,7 @@ $ readelf -d iat | grep NEEDED
 ---
 **编译结束**: 2026-06-10 22:21
 **最终状态**: published
+---
+
+**编译结束**: 2026-07-27 11:58
+**最终状态**: built
