@@ -22,6 +22,11 @@ Boost's native build metadata. The recipe limits b2 to the component subset
 above, sets a deterministic `--layout=system`, and preserves the rest of Boost
 as headers through the installed include tree.
 
+For OHOS cross builds, the recipe generates a small `clang++` wrapper for b2.
+Boost.Build's generic `clang-linux` toolset can append a Linux target triple
+after Conan's OHOS target flags; the wrapper filters that generic target and
+executes the configured OHOS compiler with the recipe's OHOS target triple.
+
 ## Validation
 
 The `test_package` builds and runs a C++ consumer that exercises:
