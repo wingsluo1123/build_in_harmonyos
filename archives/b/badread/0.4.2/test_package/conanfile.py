@@ -22,4 +22,4 @@ class BadreadTestConan(ConanFile):
         # R34: 实质依赖被测包 — 调用 bin/badread --version
         badread_dep = self.dependencies["badread"]
         badread_bin = os.path.join(badread_dep.package_folder, "bin", "badread")
-        self.run(f'"{badread_bin}" --version', env="CONAN_RUN")  # 期望输出 "Badread v0.4.2"
+        self.run(f'"{badread_bin}" --version', env="conanrun")  # 期望输出 "Badread v0.4.2"

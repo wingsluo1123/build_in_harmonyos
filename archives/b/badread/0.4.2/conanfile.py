@@ -13,6 +13,7 @@ import shutil
 import zipfile
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get
 from conan.tools.layout import basic_layout
 
@@ -49,7 +50,11 @@ class BadreadConan(ConanFile):
         # 用绝对路径 python3，避免 conan 沙箱 PATH 找不到 pip
         wheel_dir = os.path.join(self.build_folder, "wheel")
         os.makedirs(wheel_dir, exist_ok=True)
-        python3 = shutil.which("python3") or "/storage/Users/currentUser/usr/local/bin/python3"
+        python3 = shutil.which("python3")
+        if not python3:
+            raise ConanInvalidConfiguration(
+                "python3 is required to build badread; "
+                "ensure python3 is on PATH")
         self.run(
             f'"{python3}" -m pip wheel "{self.source_folder}" --no-deps '
             f'--wheel-dir="{wheel_dir}"',
