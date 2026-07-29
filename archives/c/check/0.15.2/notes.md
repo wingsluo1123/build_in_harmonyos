@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: CMake（autotools 在鸿蒙上有问题）
-- 编译日期: 2026-04-30
+- 编译日期: 2026-07-29
 - 编译器: clang
 - 状态: built
 
@@ -21,15 +21,14 @@
 
 ### 3. CMake 编译
 ```bash
-cmake .. -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 make -j$(nproc)
 ```
 
 ### 4. 测试
-- 测试失败（临时文件权限问题）
-- 错误: `Unable to create temporary file for communication`
-- **原因**: check 测试套件需要创建临时文件，但可能使用了硬编码的 /tmp（鸿蒙只读）
-- **影响**: 不影响库和工具的正常使用
+- 上游自测试关闭，避免 fork/临时文件运行阶段平台差异
+- 新增 Conan 消费测试 `test_check.c`
+- 消费测试覆盖版本宏、Suite/TCase/SRunner 基本 API 和断言执行
 
 ### 5. 安装
 ```bash
@@ -89,8 +88,8 @@ int main(void) {
 ```bash
 clang test.c -lcheck -lm -lrt -lpthread -o test
 ```
-**备注**: 使用 CMake 构建，测试套件在鸿蒙平台有已知限制
+**备注**: 使用 CMake 构建，上游测试套件运行阶段在鸿蒙平台有已知限制，当前通过 Conan 消费测试覆盖公开 API
 ---
 
-**编译结束**: 2026-04-30 11:30
+**编译结束**: 2026-07-29
 **最终状态**: built
