@@ -11,6 +11,7 @@
   require root, live services, and an OHOS device, so they are not runnable in
   the local unprivileged cross-build environment.
 - Native OHOS builds place Autoconf's temporary awk files under the worker's
-  writable `TMPDIR` and restore mode `0700` so `config.status` can execute
-  them.
+  writable `TMPDIR`, restore mode `0700`, and set `umask 022` so
+  `config.status` can read them while generated build files retain normal
+  permissions.
 - Official OHOS test and CI results remain pending.

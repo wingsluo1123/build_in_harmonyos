@@ -71,6 +71,13 @@ class OpenIsnsConan(ConanFile):
                 '(umask 077 && mkdir "$tmp")',
                 '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")',
             )
+        if "\numask 022\nac_tmp=$tmp\n" not in contents:
+            replace_in_file(
+                self,
+                path,
+                "\nac_tmp=$tmp\n",
+                "\numask 022\nac_tmp=$tmp\n",
+            )
 
     def generate(self):
         toolchain = AutotoolsToolchain(self)
