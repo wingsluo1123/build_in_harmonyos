@@ -73,6 +73,8 @@ class ProjConan(ConanFile):
         tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.variables["CMAKE_INSTALL_LIBDIR"] = "lib"
         tc.variables["EXE_SQLITE3"] = sqlite_exe
+        tc.variables["SQLite3_INCLUDE_DIR"] = os.path.join(sqlite_host, "include")
+        tc.variables["SQLite3_LIBRARY"] = sqlite_lib
         tc.variables["SQLITE3_INCLUDE_DIR"] = os.path.join(sqlite_host, "include")
         tc.variables["SQLITE3_LIBRARY"] = sqlite_lib
         tc.generate()
