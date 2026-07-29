@@ -39,7 +39,6 @@ class ZziplibConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTS"] = "OFF"
-        tc.variables["CMAKE_INSTALL_PREFIX"] = "/"
         tc.generate()
 
     def build(self):
