@@ -5,7 +5,6 @@ Build system: qmake (Qt5 addon module)
 Platform: aarch64-linux-ohos (HarmonyOS PC)
 """
 from conan import ConanFile
-from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
