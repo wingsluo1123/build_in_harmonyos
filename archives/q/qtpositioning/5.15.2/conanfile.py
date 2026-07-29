@@ -45,7 +45,7 @@ class QtpositioningConan(ConanFile):
             # qmake reads QMAKESPEC to determine target platform for OHOS cross-compilation
             qt_root = self.dependencies["qt5-qtbase"].package_folder
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
-            ohos_mkspec = os.path.join(qt_mkspecs, "ohos-aarch64-clang")
+            ohos_mkspec = os.path.join(qt_mkspecs, "harmonyos-clang")
             if os.path.isdir(ohos_mkspec):
                 # Set QMAKESPEC via VirtualBuildEnv.environment() for the build context
                 env_vars = build_env.environment()
