@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -42,9 +43,27 @@ class TmuxConan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
-        system_prefix = Path.home() / "usr" / "local"
-        tc.extra_cflags.append(f"-I{system_prefix / 'include'}")
-        tc.extra_ldflags.append(f"-L{system_prefix / 'lib'}")
+        default_prefix = str(Path.home() / "usr" / "local")
+        system_prefix = Path(
+            self.conf.get(
+                "user.tmux:system_prefix",
+                default=default_prefix,
+                check_type=str,
+            )
+        )
+        include_dir = system_prefix / "include"
+        library_dir = system_prefix / "lib"
+        missing = [
+            str(path) for path in (include_dir, library_dir) if not path.is_dir()
+        ]
+        if missing:
+            raise ConanInvalidConfiguration(
+                "tmux requires the system ncurses prefix; missing directories: "
+                + ", ".join(missing)
+                + ". Set user.tmux:system_prefix in the Conan profile."
+            )
+        tc.extra_cflags.append(f"-I{include_dir}")
+        tc.extra_ldflags.append(f"-L{library_dir}")
         tc.configure_args.append("--enable-static")
         tc.extra_ldflags.append("-static")
         tc.generate()

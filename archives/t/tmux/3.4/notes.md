@@ -20,7 +20,7 @@ conan create archives/t/tmux/3.4 -pr:h=<ohos-profile> -pr:b=default
 | configure 无法在当前目录创建临时目录 | HMDFS 对临时目录创建有限制 | 使用 `${TMPDIR:-/tmp}`，不写入用户专属绝对路径 |
 | config.guess 无法识别 HarmonyOS | 上游脚本缺少 HarmonyOS 分支 | 返回对应架构的 `*-unknown-linux-ohos` 三元组 |
 | config.sub 拒绝 linux-ohos | 上游校验列表缺少该组合 | 增加 `linux-ohos*` 校验分支 |
-| 依赖路径不可复现 | ncurses 不在 Conan 制品仓，libevent 在制品仓 | libevent 由 Conan 注入；ncurses 从当前 Worker 用户的 `usr/local` 系统前缀发现 |
+| 依赖路径不可复现 | ncurses 不在 Conan 制品仓，libevent 在制品仓 | libevent 由 Conan 注入；ncurses 默认从当前 Worker 用户的 `usr/local` 系统前缀发现，可用 Conan conf `user.tmux:system_prefix` 覆盖，缺少 `include`/`lib` 时明确终止 |
 
 ## 测试说明
 
