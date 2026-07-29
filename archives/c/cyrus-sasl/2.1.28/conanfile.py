@@ -50,6 +50,7 @@ class CyrusSaslConan(ConanFile):
         else:
             tc.configure_args.extend(["--disable-shared", "--enable-static", "--with-staticsasl"])
         tc.configure_args.extend([
+            "--prefix=/",
             "--disable-dependency-tracking",
             "--disable-sample",
             "--disable-staticdlopen",

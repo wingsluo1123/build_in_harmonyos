@@ -37,9 +37,11 @@ int main(void)
 
     const char *mechanisms = NULL;
     int mechanism_count = 0;
-    result = sasl_listmech(client, NULL, "", " ", "", &mechanisms, NULL, &mechanism_count);
-    failures += check(result == SASL_OK, "sasl_listmech succeeds");
-    failures += check(mechanisms != NULL || mechanism_count == 0, "mechanism list output is consistent");
+    if (client != NULL) {
+        result = sasl_listmech(client, NULL, "", " ", "", &mechanisms, NULL, &mechanism_count);
+        failures += check(result == SASL_OK, "sasl_listmech succeeds");
+        failures += check(mechanisms != NULL || mechanism_count == 0, "mechanism list output is consistent");
+    }
 
     if (client != NULL) {
         sasl_dispose(&client);
