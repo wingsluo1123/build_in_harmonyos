@@ -24,7 +24,7 @@ class LibcurlTestConan(ConanFile):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution; other platforms run the ELF directly.
         if self.settings.os == "OHOS":
-            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+            bash = os.environ.get("HNP_BASH", os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash"))
             self.run(f"{bash} -c './test_libcurl'", env="conanrun")
         else:
             self.run("./test_libcurl", env="conanrun")

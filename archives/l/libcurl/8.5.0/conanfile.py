@@ -3,6 +3,7 @@
 import os, glob
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
@@ -79,12 +80,18 @@ class LibcurlConan(ConanFile):
         if self.settings.os == "OHOS" and self.options.shared:
             libdir = os.path.join(self.package_folder, "lib")
             sos = glob.glob(os.path.join(libdir, "**", "*.so*"), recursive=True)
-            objcopy = "/data/service/hnp/bin/llvm-objcopy"
-            signer = "/data/service/hnp/bin/binary-sign-tool"
+            objcopy = os.environ.get("HNP_OBJCOPY", "/data/service/hnp/bin/llvm-objcopy")
+            signer = os.environ.get("HNP_SIGN_TOOL", "/data/service/hnp/bin/binary-sign-tool")
+            if not os.path.isfile(objcopy) or not os.path.isfile(signer):
+                raise ConanInvalidConfiguration(
+                    f"OHOS 共享库签名工具未找到: objcopy={objcopy}, signer={signer}. "
+                    "请通过环境变量 HNP_OBJCOPY / HNP_SIGN_TOOL 指定路径。"
+                )
             for so in sos:
                 if os.path.islink(so):
                     continue
-                self.run(f'{objcopy} --remove-section .codesign "{so}" 2>/dev/null || true')
+                # llvm-objcopy 接受缺失的 .codesign 段，但真正的错误必须失败。
+                self.run(f'{objcopy} --remove-section .codesign "{so}"')
                 self.run(f'{signer} sign -inFile "{so}" -outFile "{so}" -selfSign 1')
 
     def package_info(self):
