@@ -73,15 +73,15 @@ class PerlCryptBcryptConan(ConanFile):
         # Apply patches if any
         apply_conandata_patches(self)
         # Perl XS module: use Makefile.PL (ExtUtils::MakeMaker)
-        self.run("perl Makefile.PL", cwd=self.source_folder, env="conanbuild")
-        self.run("make -j1", cwd=self.source_folder, env="conanbuild")
+        self.run("perl Makefile.PL", cwd=self.source_folder, env=["conanbuild", "perl_bcrypt_env"], check=True)
+        self.run("make -j1", cwd=self.source_folder, env=["conanbuild", "perl_bcrypt_env"], check=True)
         # Create static library from pure C object (no Perl XS dependencies)
-        self.run("ar rcs libcrypt_blowfish.a crypt_blowfish.o", cwd=self.source_folder, env="conanbuild")
+        self.run("ar rcs libcrypt_blowfish.a crypt_blowfish.o", cwd=self.source_folder, env=["conanbuild", "perl_bcrypt_env"], check=True)
 
     def package(self):
         # Install to a temporary DESTDIR
         dest_dir = os.path.join(self.build_folder, "destdir")
-        self.run("make install DESTDIR={}".format(dest_dir), cwd=self.source_folder, env="conanbuild")
+        self.run("make install DESTDIR={}".format(dest_dir), cwd=self.source_folder, env=["conanbuild", "perl_bcrypt_env"], check=True)
 
         # Find and copy the compiled .so (XS shared library)
         so_files = glob.glob(os.path.join(dest_dir, "**", "auto", "Crypt", "Bcrypt", "Bcrypt.so"), recursive=True)
