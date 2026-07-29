@@ -14,20 +14,16 @@ Conan 2 rejects single-character package names.
 - Package the real compiler under `share/v/v` with `cmd`, `vlib`, and
   `thirdparty` beside it.
 - Install `bin/v` as a wrapper so the compiler can discover its source root.
-- Do not run upstream `v test-all` in the first package because it fans out into
-  thousands of compiler, vlib, formatter, documentation, examples, and tooling
-  checks.
+- Do not run upstream `make check` in the first package because it exercises
+  `src/test-set` compiler example programs through the freshly bootstrapped V
+  compiler and is kept as pending OHOS target validation.
 
 ## Test Inventory
 
-- `_test.v` files in the 0.5.2 release tree: 3415.
-- `.vv` compiler/input test fixtures: 2473.
-- `.out` expected-output fixtures: 2016.
-- Example `.v` programs: 338.
-- `cmd/tools` `.v` sources: 195.
+- Upstream `make check` test programs in `src/test-set`: 37.
 
 The first `test_package` compiles and runs a small V program through the
-installed wrapper. Full upstream `v test-all` remains pending OHOS target/CI.
+installed wrapper. Full upstream `make check` remains pending OHOS target/CI.
 
 ## Local Validation
 
@@ -37,5 +33,5 @@ installed wrapper. Full upstream `v test-all` remains pending OHOS target/CI.
   8.1, `mingw32-make`, and Git for Windows POSIX shell tools.
 - `test_package` ran `v version`, compiled `test_v_language.v`, executed the
   generated program, and printed `v-test-package-ok`.
-- OHOS target-profile validation and full upstream `v test-all` remain pending
+- OHOS target-profile validation and full upstream `make check` remain pending
   an OHOS/OpenDesk host or CI.
