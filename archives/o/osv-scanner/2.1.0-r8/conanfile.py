@@ -124,6 +124,7 @@ class OsvScannerConan(ConanFile):
         os.environ["GOOS"] = "linux"
         os.environ["GOARCH"] = "arm64" if str(self.settings.arch) == "armv8" else "amd64"
         os.environ["CGO_ENABLED"] = "0"
+        os.environ["GOTOOLCHAIN"] = "local"
         # Prepend Go bin dir to PATH so `go` is findable
         go_bin_dir = os.path.dirname(go_bin)
         current_path = os.environ.get("PATH", "")
@@ -195,16 +196,17 @@ class OsvScannerConan(ConanFile):
         """Auto-detect Go toolchain from PATH or common installation paths.
 
         Search order:
-        1. go in PATH (shutil.which)
+        1. go in PATH (shutil.which) — must be an ELF binary, not a wrapper script
         2. $HOME/usr/local/go/bin/go (user install — most common on OHOS CI workers)
         3. $HNP_PUBLIC_HOME/go/bin/go (HNP-managed Go)
         4. /usr/local/go/bin/go (standard Linux install path)
         """
-        # 1. Try PATH
+        # 1. Try PATH — but only if it's a real ELF binary (not a wrapper script)
         go_bin = shutil.which("go")
-        if go_bin:
-            goroot = os.path.dirname(os.path.dirname(go_bin))
-            return goroot, go_bin
+        if go_bin and self._is_elf_binary(go_bin):
+            go_real = os.path.realpath(go_bin)
+            goroot = os.path.dirname(os.path.dirname(go_real))
+            return goroot, go_real
 
         # 2. Try common installation paths
         home = os.path.expanduser("~")
@@ -215,9 +217,10 @@ class OsvScannerConan(ConanFile):
             "/usr/local/go/bin/go",
         ]
         for candidate in candidates:
-            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                goroot = os.path.dirname(os.path.dirname(candidate))
-                return goroot, candidate
+            if os.path.isfile(candidate) and self._is_elf_binary(candidate):
+                go_real = os.path.realpath(candidate)
+                goroot = os.path.dirname(os.path.dirname(go_real))
+                return goroot, go_real
 
         raise ConanInvalidConfiguration(
             "Go toolchain not found. Searched: PATH, $HOME/usr/local/go, "
@@ -226,12 +229,14 @@ class OsvScannerConan(ConanFile):
         )
 
     def _ensure_go_tools_signed(self, goroot, sign_tool):
-        """Ensure Go's internal tools are signed for OHOS execution.
+        """Ensure Go binaries are signed for OHOS execution.
 
-        Go's internal tools (compile, link, asm, etc.) are ELF binaries
-        located in GOROOT/pkg/tool/linux_arm64/. On OHOS, unsigned ELF
-        binaries cannot be executed. This method signs any unsigned tools.
+        On OHOS, unsigned ELF binaries cannot be executed. This method signs:
+        1. Go main binaries (go, gofmt) in GOROOT/bin/
+        2. Go internal tools (compile, link, asm, etc.) in GOROOT/pkg/tool/linux_arm64/
         """
+        self._sign_go_binary(goroot, sign_tool)
+
         tooldir = os.path.join(goroot, "pkg", "tool", "linux_arm64")
         if not os.path.isdir(tooldir):
             return
@@ -245,28 +250,107 @@ class OsvScannerConan(ConanFile):
             tool_path = os.path.join(tooldir, tool_name)
             if not os.path.isfile(tool_path):
                 continue
-            # Skip if already signed (has .codesign ELF section)
             if self._is_elf_signed(tool_path):
                 continue
-            # Sign the tool
-            signed_path = f"{tool_path}-signed"
+            self._sign_elf_on_ohos(tool_path, sign_tool, tool_name)
+
+    def _sign_go_binary(self, goroot, sign_tool):
+        """Sign the main go and gofmt binaries in GOROOT/bin/.
+
+        The go binary is the entry point that orchestrates all internal tools.
+        Without signing it, `go build` fails with exit code 126 (Permission denied)
+        on OHOS because the unsigned ELF binary cannot execute.
+        """
+        bindir = os.path.join(goroot, "bin")
+        if not os.path.isdir(bindir):
+            return
+        for bin_name in ["go", "gofmt"]:
+            bin_path = os.path.join(bindir, bin_name)
+            if not os.path.isfile(bin_path):
+                continue
+            if self._is_elf_signed(bin_path):
+                continue
+            self._sign_elf_on_ohos(bin_path, sign_tool, bin_name)
+
+    def _sign_elf_on_ohos(self, bin_path, sign_tool, label):
+        """Sign an ELF binary for OHOS execution with objcopy fallback.
+
+        Go ELF binaries have a non-standard ELF format where binary-sign-tool
+        cannot add a .codesign section directly. This method:
+        1. Attempts direct signing
+        2. On failure, uses objcopy to expand the ELF format (add+remove
+           .codesign section) which relocates the section header table
+        3. Retries signing on the expanded ELF
+        """
+        signed_path = f"{bin_path}-signed"
+        try:
+            self.run(
+                f'{sign_tool} sign -inFile "{bin_path}" -outFile "{signed_path}" '
+                f'-selfSign 1 -signAlg SHA256withECDSA',
+                env=None
+            )
+            os.remove(bin_path)
+            shutil.move(signed_path, bin_path)
+            os.chmod(bin_path, 0o755)
+        except Exception:
+            if os.path.exists(signed_path):
+                os.remove(signed_path)
+            # Go ELF binaries need objcopy expansion before signing
+            tmpdir = os.environ.get("TMPDIR", os.path.join(os.path.expanduser("~"), "tmp"))
+            tmp_expanded = os.path.join(tmpdir, f"{label}-expanded")
+            empty_file = os.path.join(tmpdir, "empty_codesign")
             try:
+                os.makedirs(tmpdir, exist_ok=True)
+                with open(empty_file, "w"):
+                    pass
+                # Step 1: add .codesign section (expands ELF SHT)
                 self.run(
-                    f'{sign_tool} sign -inFile "{tool_path}" -outFile "{signed_path}" '
+                    f'objcopy --add-section .codesign="{empty_file}" '
+                    f'"{bin_path}" "{tmp_expanded}"',
+                    env=None
+                )
+                # Step 2: remove .codesign section (keeps expanded ELF format)
+                tmp_stripped = os.path.join(tmpdir, f"{label}-stripped")
+                self.run(
+                    f'objcopy --remove-section .codesign '
+                    f'"{tmp_expanded}" "{tmp_stripped}"',
+                    env=None
+                )
+                # Step 3: sign the expanded binary
+                self.run(
+                    f'{sign_tool} sign -inFile "{tmp_stripped}" -outFile "{signed_path}" '
                     f'-selfSign 1 -signAlg SHA256withECDSA',
                     env=None
                 )
-                os.remove(tool_path)
-                shutil.move(signed_path, tool_path)
-                os.chmod(tool_path, 0o755)
+                os.remove(bin_path)
+                shutil.move(signed_path, bin_path)
+                os.chmod(bin_path, 0o755)
+                # Clean up temp files
+                for tmp in [tmp_expanded, tmp_stripped, empty_file]:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
             except Exception as e:
-                if os.path.exists(signed_path):
-                    os.remove(signed_path)
+                for tmp in [signed_path, tmp_expanded, tmp_stripped, empty_file]:
+                    if os.path.exists(tmp):
+                        os.remove(tmp)
                 raise ConanInvalidConfiguration(
-                    f"Failed to sign Go tool '{tool_name}' at {tool_path}: {e}. "
+                    f"Failed to sign '{label}' at {bin_path}: {e}. "
                     f"Unsigned ELF binaries cannot execute on OHOS. "
-                    f"Check binary-sign-tool availability and permissions."
+                    f"Check binary-sign-tool and objcopy availability."
                 )
+
+    def _is_elf_binary(self, path):
+        """Check if a file is an ELF binary (not a wrapper script).
+
+        On OHOS, go may be installed as a wrapper shell script in PATH
+        that execs the real binary. This check distinguishes them.
+        """
+        try:
+            with open(path, 'rb') as f:
+                magic = f.read(4)
+            return magic == b'\x7fELF'
+        except Exception:
+            return False
 
     def _is_elf_signed(self, path):
         """Check if an ELF binary has a .codesign section (OHOS signature)."""
