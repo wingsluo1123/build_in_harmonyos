@@ -48,9 +48,10 @@ class QtpositioningConan(ConanFile):
             qt_mkspecs = os.path.join(qt_root, "mkspecs")
             ohos_mkspec = os.path.join(qt_mkspecs, "harmonyos-clang")
             if os.path.isdir(ohos_mkspec):
-                # Set QMAKESPEC via VirtualBuildEnv.environment() for the build context
-                env_vars = build_env.environment()
-                env_vars.define("QMAKESPEC", ohos_mkspec)
+                # Set QMAKESPEC via buildenv_info() for the build context
+                # (build_env.environment().define() does not persist to generated files)
+                build_env_info = self.buildenv_info()
+                build_env_info.define("QMAKESPEC", ohos_mkspec)
             else:
                 raise ConanInvalidConfiguration(
                     f"OHOS mkspec (harmonyos-clang) not found in qt5-qtbase package. "
