@@ -1,8 +1,8 @@
 diff --git a/scripts/resources.sh b/scripts/resources.sh
-index 57cb15f..ec9c37b 100755
+index 57cb15f..19141fb 100644
 --- a/scripts/resources.sh
 +++ b/scripts/resources.sh
-@@ -12,9 +12,36 @@ fi
+@@ -12,9 +12,46 @@ fi
  
  DST=c/resources.h
  
@@ -22,15 +22,25 @@ index 57cb15f..ec9c37b 100755
 +	# with '_', then strip a single leading '_'. ('js/lil.js' -> 'js_lil_js',
 +	# 'examples/decks/tour.deck' -> 'examples_decks_tour_deck'.)
 +	name=$(printf '%s' "$in_path" | tr -c 'A-Za-z0-9' '_' | sed 's/^_//')
-+	{
-+		printf 'unsigned char %s[] = {\n' "$name"
-+		xxd -i "$in_path"
-+		printf '};\n'
-+		# Toybox xxd -i leaves the bytes unterminated; ensure a trailing newline
-+		# so the '};' line stands on its own. GNU xxd -i already ends with '\n'.
-+		printf '\n'
-+		printf 'unsigned int %s_len = %u;\n' "$name" "$(wc -c < "$in_path")"
-+	} >> "$dst"
++	# Write xxd -i output to a temp file so we can check its first line
++	# without capturing the full (potentially large) output in a shell
++	# variable (avoids "Argument list too long" on OHOS / system/bin/printf).
++	tmpf=$(mktemp)
++	xxd -i "$in_path" > "$tmpf"
++	if head -1 "$tmpf" | grep -q '^unsigned char'; then
++		# GNU xxd: output already contains the full declaration -- pass through.
++		cat "$tmpf" >> "$dst"
++	else
++		# Toybox xxd: wrap the raw byte list ourselves.
++		{
++			printf 'unsigned char %s[] = {\n' "$name"
++			cat "$tmpf"
++			printf '};\n'
++			printf '\n'
++			printf 'unsigned int %s_len = %u;\n' "$name" "$(wc -c < "$in_path")"
++		} >> "$dst"
++	fi
++	rm -f "$tmpf"
 +}
 +
  printf "%s\n" "// auto-generated from web-decker source!" > $DST
