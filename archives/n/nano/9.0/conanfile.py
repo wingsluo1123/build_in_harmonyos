@@ -5,7 +5,13 @@ import os
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import copy, get, replace_in_file
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    replace_in_file,
+)
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -19,6 +25,9 @@ class NanoConan(ConanFile):
     url = "https://git.savannah.gnu.org/cgit/nano.git"
     package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def layout(self):
         basic_layout(self)
@@ -34,6 +43,7 @@ class NanoConan(ConanFile):
         toolchain.generate()
 
     def build(self):
+        apply_conandata_patches(self)
         self._prepare_autotools_scripts()
         bash_path = shutil.which("bash")
         if bash_path:
@@ -83,24 +93,3 @@ class NanoConan(ConanFile):
             + "\texit ;;\n"
         )
         replace_in_file(self, guess_path, guess_anchor, harmony_case)
-
-        sub_path = os.path.join(self.source_folder, "config.sub")
-        sub_anchor = (
-            "\t\t\tandroid-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-android\n"
-            "\t\t\t\t;;\n"
-            "\t\t\t*)"
-        )
-        ohos_case = (
-            "\t\t\tandroid-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-android\n"
-            "\t\t\t\t;;\n"
-            "\t\t\tohos-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-ohos\n"
-            "\t\t\t\t;;\n"
-            "\t\t\t*)"
-        )
-        replace_in_file(self, sub_path, sub_anchor, ohos_case)
