@@ -1,7 +1,7 @@
 diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImpl.cpp
 --- a/src/SFML/System/Unix/ThreadImpl.cpp
 +++ b/src/SFML/System/Unix/ThreadImpl.cpp
-@@ -55,38 +55,43 @@
+@@ -55,38 +55,41 @@
          pthread_join(m_thread, NULL);
      }
  }
@@ -18,12 +18,11 @@ diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImp
 +        #ifdef SFML_SYSTEM_ANDROID
              // See https://stackoverflow.com/questions/4610086/pthread-cancel-al
              pthread_kill(m_thread, SIGUSR1);
-+        #elif defined(__OHOS__)
-+            // HarmonyOS doesn't support pthread_cancel or SIGUSR1
-+            // Detach the thread and let it run until it naturally exits
-+            pthread_detach(m_thread);
-+        #else
++        #elif defined(SFML_HAS_PTHREAD_CANCEL)
 +            pthread_cancel(m_thread);
++        #else
++            // Preserve object lifetime when asynchronous cancellation is unavailable.
++            pthread_join(m_thread, NULL);
          #endif
      }
  }
@@ -36,9 +35,8 @@ diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImp
      Thread* owner = static_cast<Thread*>(userData);
  
 -    #ifndef SFML_SYSTEM_ANDROID
-+    #if !defined(SFML_SYSTEM_ANDROID) && !defined(__OHOS__)
++    #if !defined(SFML_SYSTEM_ANDROID) && defined(SFML_HAS_PTHREAD_CANCEL)
          // Tell the thread to handle cancel requests immediately
-+        // HarmonyOS and Android don't support pthread_cancel
          pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
      #endif
  
@@ -49,3 +47,21 @@ diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImp
  }
  
  } // namespace priv
+
+diff -ruN a/src/SFML/System/CMakeLists.txt b/src/SFML/System/CMakeLists.txt
+--- a/src/SFML/System/CMakeLists.txt
++++ b/src/SFML/System/CMakeLists.txt
+@@ -88,3 +88,13 @@
+ # define the sfml-system target
+ sfml_add_library(sfml-system
+                  SOURCES ${SRC} ${PLATFORM_SRC})
++
++if(NOT SFML_OS_ANDROID)
++    include(CheckSymbolExists)
++    set(CMAKE_REQUIRED_LIBRARIES pthread)
++    check_symbol_exists(pthread_cancel "pthread.h" SFML_HAS_PTHREAD_CANCEL)
++    unset(CMAKE_REQUIRED_LIBRARIES)
++    if(SFML_HAS_PTHREAD_CANCEL)
++        target_compile_definitions(sfml-system PRIVATE SFML_HAS_PTHREAD_CANCEL)
++    endif()
++endif()

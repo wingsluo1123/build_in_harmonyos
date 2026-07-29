@@ -46,8 +46,7 @@
 | 3 | UDev 缺失 | HarmonyOS 没有 UDev | 修改 src/SFML/Window/CMakeLists.txt，跳过 UDev |
 | 4 | OpenAL 缺失 | 没有预编译的 OpenAL | 禁用 Audio 模块 (-DSFML_BUILD_AUDIO=OFF) |
 | 5 | X11 缺失 | HarmonyOS 没有 X11 | 禁用 Window 和 Graphics 模块 |
-| 6 | pthread_cancel 不支持 | HarmonyOS pthread 不支持线程取消 | 修改 src/SFML/System/Unix/ThreadImpl.cpp，使用 pthread_detach |
-| 7 | SIGUSR1 不存在 | HarmonyOS 没有 SIGUSR1 | 修改 ThreadImpl.cpp，使用 pthread_detach |
+| 6 | pthread_cancel 不支持 | HarmonyOS pthread 不提供可链接的异步取消接口 | 用 CMake 链接检测选择 pthread_cancel；不可用时 join，确保返回前线程已结束 |
 
 ## 源码修改
 
@@ -60,7 +59,8 @@
    - 跳过 UDev 查找
 
 3. **src/SFML/System/Unix/ThreadImpl.cpp** - 修复线程取消问题：
-   - 使用 pthread_detach 代替 pthread_cancel
+   - CMake 检测 `pthread_cancel` 是否可链接，不硬编码平台宏
+   - 接口不可用时等待线程自然退出，避免 detached 线程继续访问已释放对象
 
 ## 依赖版本
 

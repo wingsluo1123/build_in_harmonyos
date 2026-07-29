@@ -5,7 +5,13 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import copy, get, replace_in_file, rmdir
+from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    export_conandata_patches,
+    get,
+    rmdir,
+)
 
 
 class SfmlConan(ConanFile):
@@ -19,6 +25,9 @@ class SfmlConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -47,49 +56,7 @@ class SfmlConan(ConanFile):
         toolchain.generate()
 
     def build(self):
-        config_path = os.path.join(self.source_folder, "cmake", "Config.cmake")
-        replace_in_file(
-            self,
-            config_path,
-            'elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")',
-            'elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR '
-            '${CMAKE_SYSTEM_NAME} STREQUAL "HarmonyOS")',
-        )
-
-        thread_path = os.path.join(
-            self.source_folder, "src", "SFML", "System", "Unix", "ThreadImpl.cpp"
-        )
-        terminate_anchor = (
-            "        #ifndef SFML_SYSTEM_ANDROID\n"
-            "            pthread_cancel(m_thread);\n"
-            "        #else\n"
-            "            // See https://stackoverflow.com/questions/4610086/pthread-cancel-al\n"
-            "            pthread_kill(m_thread, SIGUSR1);\n"
-            "        #endif"
-        )
-        terminate_ohos = (
-            "        #if defined(__OHOS__)\n"
-            "            pthread_detach(m_thread);\n"
-            "        #elif !defined(SFML_SYSTEM_ANDROID)\n"
-            "            pthread_cancel(m_thread);\n"
-            "        #else\n"
-            "            // See https://stackoverflow.com/questions/4610086/pthread-cancel-al\n"
-            "            pthread_kill(m_thread, SIGUSR1);\n"
-            "        #endif"
-        )
-        replace_in_file(self, thread_path, terminate_anchor, terminate_ohos)
-        replace_in_file(
-            self,
-            thread_path,
-            "    #ifndef SFML_SYSTEM_ANDROID\n"
-            "        // Tell the thread to handle cancel requests immediately\n"
-            "        pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);\n"
-            "    #endif",
-            "    #if !defined(SFML_SYSTEM_ANDROID) && !defined(__OHOS__)\n"
-            "        // Tell the thread to handle cancel requests immediately\n"
-            "        pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);\n"
-            "    #endif",
-        )
+        apply_conandata_patches(self)
 
         cmake = CMake(self)
         cmake.configure()
