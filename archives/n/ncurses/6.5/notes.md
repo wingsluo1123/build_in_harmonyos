@@ -1,41 +1,51 @@
 # ncurses 6.5 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-05-22}
+- 构建系统: autotools
+- 编译日期: 2026-07-17
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: published
 
 ## 编译步骤
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+关键配置参数如下：
+
+```bash
+./configure \
+  --enable-static \
+  --without-shared \
+  --without-debug \
+  --without-ada \
+  --without-manpages \
+  --without-tests \
+  --without-cxx-binding \
+  --enable-widec \
+  --enable-overwrite \
+  --enable-pc-files
+make -j1
+make install
+```
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | `conandata.yml` 中源码 `sha256` 为空 | 版本目录只有占位模板，未补全真实校验值 | 按 CI 已下载源码计算结果补全 `136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6` |
+| 2 | GNU config 默认不识别 HarmonyOS 三元组 | `config.guess/config.sub` 缺少 `ohos` 分支 | 新增 `0001-port-for-ohos.patch`，补充 HarmonyOS 检测与 `linux-ohos` 合法性 |
+| 3 | 消费者若继续链接 `-lncurses` 或额外假设存在 `-ltinfo` 会失败 | OHOS 上推荐使用 wide-char 静态库，当前产物只有 `libncursesw.a` | 在 recipe 中统一导出 `ncursesw`，下游按包信息链接 |
 
 ## 源码修改
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
-
-## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
+- `patches/0001-port-for-ohos.patch`
+  - 为 `config.guess` 添加 HarmonyOS 识别逻辑
+  - 为 `config.sub` 添加 `ohos*` 与 `linux-ohos*` 支持
 
 ## 验证结果
 
 ```bash
-{验证命令和结果}
+python3 -m py_compile conanfile.py test_package/conanfile.py
 ```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
 
 ## 注意事项
 
-{需要特别注意的点；无则删除此节}
+- 该版本沿用仓库内 `ncurses 6.4` 的鸿蒙适配结论，只产出静态宽字符库，避免共享库污染系统运行环境。

@@ -1,77 +1,35 @@
-software: ncurses
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/6.5/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "6.5"
-
-# 编译状态
-# published | built | failed | archived
+software: ncurses
 status: published
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-22"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_date: "2026-07-17"
+build_system: autotools
 
 source:
-  # 源码下载 URL
-  url: "https://invisible-mirror.net/archives/ncurses/ncurses-6.5.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://ftp.gnu.org/gnu/ncurses/ncurses-6.5.tar.gz"
+  sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
+  configure_options:
+    - "--enable-static"
+    - "--without-shared"
+    - "--without-debug"
+    - "--without-ada"
+    - "--without-manpages"
+    - "--without-tests"
+    - "--without-cxx-binding"
+    - "--enable-widec"
+    - "--enable-overwrite"
+    - "--enable-pc-files"
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
+patches_applied:
+  - "0001-port-for-ohos.patch"
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "鸿蒙环境下必须静态编译，避免运行时误加载自建 ncurses 共享库影响系统 shell"
+  - "启用 --enable-widec 后实际导出的主库为 libncursesw.a，当前配方不单独生成 libtinfo.a，消费者应仅链接 ncursesw"
+  - "启用 --enable-overwrite 可将 curses 相关头文件安装到顶层 include 目录，减少消费者兼容性问题"
