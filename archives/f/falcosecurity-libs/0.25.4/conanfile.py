@@ -112,7 +112,7 @@ class FalcoSecurityLibsConan(ConanFile):
             if os.path.islink(so_file):
                 continue
             self.run("patchelf --set-rpath '$ORIGIN' " + so_file)
-        scap_error_a = os.path.join(self.build_folder, "build", "Release", "libscap", "libscap_error.a")
+        scap_error_a = os.path.join(self.build_folder, "libscap", "libscap_error.a")
         scap_event = os.path.join(lib_dir, "libscap_event_schema.so")
         if os.path.exists(scap_error_a) and os.path.exists(scap_event):
             fix_so = os.path.join(lib_dir, "libscap_error_fix.so")
