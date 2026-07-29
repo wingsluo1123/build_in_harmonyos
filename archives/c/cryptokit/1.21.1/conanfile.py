@@ -3,6 +3,7 @@
 
 import os
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.env import VirtualBuildEnv
 
@@ -113,7 +114,8 @@ class CryptokitConan(ConanFile):
             if not ar and cc:
                 # Derive llvm-ar from cc's directory (OHOS CI only gives c/cpp)
                 ar = os.path.join(os.path.dirname(cc), "llvm-ar")
-            if not ar or not os.path.isabs(ar):
+            if not ar:
+                # OHOS CI profile only provides c/cpp, no ar
                 ar = "llvm-ar"
             self.run(f"{ar} rcs {build_dir}/libcryptokit.a {objs_str}")
 
@@ -125,8 +127,12 @@ class CryptokitConan(ConanFile):
             copy(self, "*.so", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
         else:
             copy(self, "*.a", src=build_dir, dst=os.path.join(self.package_folder, "lib"))
-        # Package header files directly to include/ (CMakeDeps compatibility)
-        copy(self, "*.h", src=src_dir, dst=os.path.join(self.package_folder, "include"))
+        # Package algorithm header files (only src/*.h, exclude caml/ stubs)
+        import glob as _glob
+        for h_file in _glob.glob(os.path.join(src_dir, "*.h")):
+            if os.path.isfile(h_file):
+                copy(self, os.path.basename(h_file), src=src_dir,
+                     dst=os.path.join(self.package_folder, "include"))
 
     def package_info(self):
         self.cpp_info.libs = ["cryptokit"]
