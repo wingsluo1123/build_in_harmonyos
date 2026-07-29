@@ -122,12 +122,14 @@ class DeckerConan(ConanFile):
 
     def package(self):
         # Binaries are built into <source_folder>/c/build/ (see build()).
-        # Install lilt binary
-        copy(self, "c/build/lilt", self.source_folder, os.path.join(self.package_folder, "bin"))
+        bin_src = os.path.join(self.source_folder, "c", "build")
+        bin_dst = os.path.join(self.package_folder, "bin")
+        # Install lilt binary (keep_path=False to flatten: bin/lilt, not bin/c/build/lilt)
+        copy(self, "lilt", bin_src, bin_dst, keep_path=False)
         # Install decker binary if built
-        decker_bin = os.path.join(self.source_folder, "c", "build", "decker")
+        decker_bin = os.path.join(bin_src, "decker")
         if os.path.exists(decker_bin):
-            copy(self, "c/build/decker", self.source_folder, os.path.join(self.package_folder, "bin"))
+            copy(self, "decker", bin_src, bin_dst, keep_path=False)
         # Install resources
         copy(self, "*.deck", os.path.join(self.source_folder, "examples", "decks"),
              os.path.join(self.package_folder, "share", "decker", "examples"))
