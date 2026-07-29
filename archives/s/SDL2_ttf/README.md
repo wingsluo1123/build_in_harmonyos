@@ -14,7 +14,7 @@ SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applicati
 
 | Version | Status | Build System | Notes |
 |---------|--------|--------------|-------|
-| 2.24.0 | published | cmake | External FreeType + HarfBuzz; autotools fails on HMDFS |
+| 2.24.0 | built | cmake | External FreeType + HarfBuzz; autotools fails on HMDFS |
 
 ## Installation
 
