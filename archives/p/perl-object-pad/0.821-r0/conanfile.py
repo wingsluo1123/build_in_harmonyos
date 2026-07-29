@@ -4,13 +4,20 @@
 Object::Pad - simple syntax for lexical field-based objects
 Build system: perl Build.PL + ./Build (Module::Build with XS)
 Produces: Pad.so (ELF64 AArch64 shared library) + .pm modules
+
+Build dependencies (pre-installed at $HOME/usr/local/lib/perl5/):
+  - Module::Build (build system)
+  - XS::Parse::Keyword::Builder (compiler flag provider)
+  - XS::Parse::Sublike::Builder (compiler flag provider)
 """
 import json
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import Environment
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 
 
@@ -42,16 +49,75 @@ class PerlobjectpadConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def build(self):
-        apply_conandata_patches(self)
+    def _resolve_perl_libs(self):
+        """Find pre-installed Perl build dependencies dynamically (R33).
+
+        Module::Build, XS::Parse::Keyword::Builder, and
+        XS::Parse::Sublike::Builder are pre-installed at
+        $HOME/usr/local/lib/perl5/ but are not in Perl's default @INC.
+        Returns a list of existing directory paths.
+        """
+        home = os.environ.get("HOME", "")
+        if not home:
+            self.output.info("PERL5LIB: HOME not set, skipping")
+            return []
+
+        # Find perl binary: subprocess may not have same PATH as self.run()
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in [
+                "/data/service/hnp/bin/perl",
+                "/usr/bin/perl",
+                "/usr/local/bin/perl",
+            ]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        if not perl_path:
+            return []
+
+        try:
+            archname = subprocess.check_output(
+                [perl_path, "-MConfig", "-e", "print $Config{archname}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            perl_ver = subprocess.check_output(
+                [perl_path, "-MConfig", "-e", "print $Config{version}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception as e:
+            self.output.info(f"PERL5LIB: Failed to query perl config: {e}")
+            return []
+
+        perl5_base = os.path.join(home, "usr", "local", "lib", "perl5")
+        candidate_libs = [
+            perl5_base,  # Module::Build and pure Perl modules
+            os.path.join(perl5_base, archname) if archname else "",  # XS Builder modules
+            os.path.join(perl5_base, "site_perl", perl_ver) if perl_ver else "",  # File::ShareDir
+        ]
+        found = [p for p in candidate_libs if p and os.path.isdir(p)]
+        return found
+
+    def generate(self):
+        """Generate env scripts for the conanbuild scope.
+
+        Uses Conan's Environment class so that variables are properly
+        sourced by self.run(cmd, env='conanbuild').
+        """
+        env = Environment()
+
+        # PERL5LIB: find Module::Build and XS::Parse::*::Builder
+        perl_libs = self._resolve_perl_libs()
+        if perl_libs:
+            env.define("PERL5LIB", os.pathsep.join(perl_libs))
+            self.output.info(f"PERL5LIB set to: {os.pathsep.join(perl_libs)}")
+
         # R33: Derive sysroot paths from Conan config, no hardcoded user paths
-        # Get compiler path from Conan profile configuration
         cc_info = self.conf.get("tools.build:compiler_executables", default={})
         if isinstance(cc_info, str):
             cc_info = json.loads(cc_info)
         cc = cc_info.get("c", "clang") if cc_info else "clang"
 
-        # Resolve compiler path: if bare filename, search PATH
         if os.sep not in cc and "/" not in cc:
             cc_resolved = shutil.which(cc)
             if not cc_resolved:
@@ -65,19 +131,22 @@ class PerlobjectpadConan(ConanFile):
         # Resolve compiler symlink and derive sysroot:
         # clang at {sdk}/llvm/bin/clang -> sysroot at {sdk}/sysroot
         cc_real = os.path.realpath(cc_resolved)
-        cc_bin_dir = os.path.dirname(cc_real)          # .../llvm/bin
-        sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))  # .../native
+        cc_bin_dir = os.path.dirname(cc_real)
+        sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))
         sysroot = os.path.join(sdk_native, "sysroot")
-
         if os.path.isdir(sysroot):
-            os.environ["CPATH"] = os.path.join(sysroot, "usr", "include")
-            os.environ["LIBRARY_PATH"] = os.path.join(
-                sysroot, "usr", "lib", "aarch64-linux-ohos"
-            )
+            env.define("CPATH", os.path.join(sysroot, "usr", "include"))
+            env.define("LIBRARY_PATH", os.path.join(
+                sysroot, "usr", "lib", "aarch64-linux-ohos"))
 
-        os.environ["PERL_CANARY_STABILITY_NOPROMPT"] = "1"
-        # Use system TMPDIR, fallback to /tmp (R33: no hardcoded user paths)
-        os.environ.setdefault("TMPDIR", "/tmp")
+        env.define("PERL_CANARY_STABILITY_NOPROMPT", "1")
+        env.define("TMPDIR", os.environ.get("TMPDIR", "/tmp"))
+
+        envvars = env.vars(self, scope="build")
+        envvars.save_script("perl_object_pad_env")
+
+    def build(self):
+        apply_conandata_patches(self)
 
         # Perl Module::Build: configure with install_base pointing to build dir
         prefix = os.path.join(self.build_folder, "perl_prefix")
