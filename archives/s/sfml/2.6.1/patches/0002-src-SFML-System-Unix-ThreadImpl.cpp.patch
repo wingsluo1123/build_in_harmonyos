@@ -1,7 +1,7 @@
 diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImpl.cpp
 --- a/src/SFML/System/Unix/ThreadImpl.cpp
 +++ b/src/SFML/System/Unix/ThreadImpl.cpp
-@@ -55,38 +55,41 @@
+@@ -55,38 +55,42 @@
          pthread_join(m_thread, NULL);
      }
  }
@@ -23,6 +23,7 @@ diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImp
 +        #else
 +            // Preserve object lifetime when asynchronous cancellation is unavailable.
 +            pthread_join(m_thread, NULL);
++            m_isActive = false;
          #endif
      }
  }
@@ -51,7 +52,7 @@ diff -ruN a/src/SFML/System/Unix/ThreadImpl.cpp b/src/SFML/System/Unix/ThreadImp
 diff -ruN a/src/SFML/System/CMakeLists.txt b/src/SFML/System/CMakeLists.txt
 --- a/src/SFML/System/CMakeLists.txt
 +++ b/src/SFML/System/CMakeLists.txt
-@@ -88,3 +88,13 @@
+@@ -88,6 +88,16 @@
  # define the sfml-system target
  sfml_add_library(sfml-system
                   SOURCES ${SRC} ${PLATFORM_SRC})
@@ -65,3 +66,6 @@ diff -ruN a/src/SFML/System/CMakeLists.txt b/src/SFML/System/CMakeLists.txt
 +        target_compile_definitions(sfml-system PRIVATE SFML_HAS_PTHREAD_CANCEL)
 +    endif()
 +endif()
+ 
+ if(SFML_OS_ANDROID)
+     # glad sources
