@@ -49,10 +49,9 @@ def _get_registry_entry(software: str) -> dict:
 def _get_version(software: str) -> str:
     """Get the best known version for a software.
 
-    Try registry first, then archive dir, then cmd-pkgs index, then fallback.
+    Try registry first, then BUILTIN_INDEX, then fallback.
     """
     entry = _get_registry_entry(software)
-    
     # Walk all versions in the archive dir to find the latest
     project_dir = find_project_dir()
     archive_base = os.path.join(

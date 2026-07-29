@@ -1,41 +1,42 @@
 # libcbor
 
-CBOR (Concise Binary Object Representation) protocol implementation for C.
+libcbor 是一个 C 语言实现的 CBOR (Concise Binary Object Representation) 协议库。
 
 ## 简介
 
-libcbor 是一个轻量级的 CBOR 编解码库，支持 RFC 8949 标准。CBOR 是一种二进制数据序列化格式，设计用于替代 JSON，在物联网和受限设备中广泛使用。
+CBOR 是一种通用的无模式二进制数据格式，定义于 RFC 8949 (前身 RFC 7049)。
+libcbor 提供完整的 CBOR 规范实现，支持 CBOR 序列 (RFC 8742)。
 
-## 版本信息
+## 主要特性
 
-- 当前版本: 0.11.0 (2024-02-04)
-- 主页: https://github.com/PJK/libcbor
+- 完全符合 IETF RFC 8949 (STD 94) 规范
+- 支持 CBOR 序列 (RFC 8742)
+- 跨平台 C99 实现
+- 分层架构，既提供控制又提供便利
+- 灵活的内存管理
+- 无全局状态，线程友好
+- 完整的 UTF-8 处理
+- 支持流和增量处理
+- 无运行时依赖，内存占用小
 
-## 依赖
+## 应用场景
 
-无外部依赖（纯 C 实现）。
+- Yubico libfido2 (FIDO2 安全密钥)
+- AWS C SDK
+- GNOME fwupd
+- QEMU
+- OpenSSH
+- Microsoft PowerShell
+- MySQL
 
-## OpenHarmony 适配要点
+## 编译信息
 
-1. **构建系统**: CMake
-2. **编译为静态库**: 默认构建静态库 (BUILD_SHARED_LIBS=OFF)
-3. **CMake 4.x 兼容**: 需要 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`
-4. **跳过单元测试**: WITH_TESTS=OFF（需要 CMocka）
+- 构建系统: CMake
+- 编译器: Clang 15.0.4
+- 平台: OpenHarmony (aarch64)
 
-## 版本列表
+## 参考链接
 
-| 版本 | 状态 | 发布日期 |
-|------|------|----------|
-| 0.11.0 | built | 2024-02-04 |
-
-## 使用方法
-
-```bash
-# 使用 pkg-config
-pkg-config --cflags libcbor
-pkg-config --libs libcbor
-
-# CMake 集成
-find_package(libcbor REQUIRED)
-target_link_libraries(your_target PRIVATE libcbor)
-```
+- 官方网站: https://github.com/PJK/libcbor
+- CBOR 规范: https://cbor.io/
+- 文档: https://readthedocs.org/projects/libcbor/
