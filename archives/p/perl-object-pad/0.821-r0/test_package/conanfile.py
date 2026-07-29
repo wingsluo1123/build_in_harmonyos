@@ -12,9 +12,12 @@ verification of the package artifacts (R34).
 """
 import os
 import glob
+import json
+import shutil
 import subprocess
 
 from conan import ConanFile
+from conan.tools.env import Environment
 from conan.tools.files import copy
 
 
@@ -24,6 +27,34 @@ class PerlobjectpadTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+
+    def generate(self):
+        """Set sysroot include/library paths for compiling test binary (R33)."""
+        env = Environment()
+        cc_info = self.conf.get("tools.build:compiler_executables", default={})
+        if isinstance(cc_info, str):
+            cc_info = json.loads(cc_info)
+        cc = cc_info.get("c", "clang") if cc_info else "clang"
+        cc_resolved = shutil.which(cc) or cc
+        cc_real = os.path.realpath(cc_resolved)
+        cc_bin_dir = os.path.dirname(cc_real)
+        sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))
+        sysroot = os.path.join(sdk_native, "sysroot")
+        if os.path.isdir(sysroot):
+            inc_paths = [
+                os.path.join(sysroot, "usr", "include"),
+                os.path.join(sysroot, "usr", "include", "aarch64-linux-ohos"),
+            ]
+            env.define("CPATH", os.pathsep.join(
+                p for p in inc_paths if os.path.isdir(p)))
+            lib_paths = [
+                os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos"),
+                os.path.join(sdk_native, "llvm", "lib", "aarch64-linux-ohos"),
+            ]
+            env.define("LIBRARY_PATH", os.pathsep.join(
+                p for p in lib_paths if os.path.isdir(p)))
+        envvars = env.vars(self, scope="build")
+        envvars.save_script("test_sysroot_env")
 
     def _setup_perl5lib(self):
         """Set PERL5LIB to find pre-installed Perl runtime dependencies."""

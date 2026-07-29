@@ -112,12 +112,14 @@ class PerlobjectpadConan(ConanFile):
             env.define("PERL5LIB", os.pathsep.join(perl_libs))
             self.output.info(f"PERL5LIB set to: {os.pathsep.join(perl_libs)}")
 
-        # R33: Derive sysroot paths from Conan config, no hardcoded user paths
+        # R33: Derive compiler and sysroot paths from Conan config, no hardcoded paths
         cc_info = self.conf.get("tools.build:compiler_executables", default={})
         if isinstance(cc_info, str):
             cc_info = json.loads(cc_info)
         cc = cc_info.get("c", "clang") if cc_info else "clang"
+        cxx = cc_info.get("cpp", "clang++") if cc_info else "clang++"
 
+        # Resolve bare compiler names via PATH (R33: no hardcoded paths)
         if os.sep not in cc and "/" not in cc:
             cc_resolved = shutil.which(cc)
             if not cc_resolved:
@@ -128,6 +130,19 @@ class PerlobjectpadConan(ConanFile):
         else:
             cc_resolved = cc
 
+        if os.sep not in cxx and "/" not in cxx:
+            cxx_resolved = shutil.which(cxx) or cxx
+        else:
+            cxx_resolved = cxx
+
+        # Set CC/CXX/LD in conanbuild env so Perl's ExtUtils::CBuilder
+        # uses clang as linker driver instead of ld.lld. Perl's lddlflags
+        # contains -fstack-protector-strong which ld.lld doesn't understand,
+        # but clang (as driver) handles it correctly.
+        env.define("CC", cc_resolved)
+        env.define("CXX", cxx_resolved)
+        env.define("LD", cc_resolved)
+
         # Resolve compiler symlink and derive sysroot:
         # clang at {sdk}/llvm/bin/clang -> sysroot at {sdk}/sysroot
         cc_real = os.path.realpath(cc_resolved)
@@ -135,9 +150,18 @@ class PerlobjectpadConan(ConanFile):
         sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))
         sysroot = os.path.join(sdk_native, "sysroot")
         if os.path.isdir(sysroot):
-            env.define("CPATH", os.path.join(sysroot, "usr", "include"))
-            env.define("LIBRARY_PATH", os.path.join(
-                sysroot, "usr", "lib", "aarch64-linux-ohos"))
+            inc_paths = [
+                os.path.join(sysroot, "usr", "include"),
+                os.path.join(sysroot, "usr", "include", "aarch64-linux-ohos"),
+            ]
+            env.define("CPATH", os.pathsep.join(
+                p for p in inc_paths if os.path.isdir(p)))
+            lib_paths = [
+                os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos"),
+                os.path.join(sdk_native, "llvm", "lib", "aarch64-linux-ohos"),
+            ]
+            env.define("LIBRARY_PATH", os.pathsep.join(
+                p for p in lib_paths if os.path.isdir(p)))
 
         env.define("PERL_CANARY_STABILITY_NOPROMPT", "1")
         env.define("TMPDIR", os.environ.get("TMPDIR", "/tmp"))
