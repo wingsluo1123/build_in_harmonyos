@@ -381,8 +381,10 @@ class SlangConan(ConanFile):
                     found = True
                     break
             if not found:
-                self.output.warning(f"Required library {lib} not found in candidate dirs; "
-                                    f"downstream linking may fail")
+                raise ConanException(
+                    f"Required library {lib} not found in candidate dirs "
+                    f"({candidate_dirs}); downstream linking will fail"
+                )
 
     def package_info(self):
         self.cpp_info.libs = ["slang-compiler", "slang-cpp-parser", "compiler-core", "core", "slang-rt"]

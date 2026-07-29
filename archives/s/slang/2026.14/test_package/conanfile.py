@@ -30,7 +30,9 @@ class SlangTestConan(ConanFile):
 
         # Test 1: Run slangc --version (L2 smoke test)
         self.output.info("Running slangc --version...")
-        self.run(f'"{slang_bin}" --version', env="conanrun")
+        exit_code = self.run(f'"{slang_bin}" --version', env="conanrun")
+        if exit_code != 0:
+            raise AssertionError(f"slangc --version failed (exit code: {exit_code})")
 
         # Test 2: Compile a simple HLSL shader
         shader_file = os.path.join(self.source_folder, "test_shader.slang")
@@ -44,8 +46,10 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
 """)
         output_file = os.path.join(self.source_folder, "test_output.spirv")
         self.output.info("Compiling test shader...")
-        self.run(f'"{slang_bin}" "{shader_file}" -o "{output_file}" -target spirv',
-                 env="conanrun")
+        exit_code = self.run(f'"{slang_bin}" "{shader_file}" -o "{output_file}" -target spirv',
+                             env="conanrun")
+        if exit_code != 0:
+            raise AssertionError(f"Shader compilation failed (exit code: {exit_code})")
 
         if os.path.exists(output_file):
             self.output.info("PASS: Shader compiled to SPIR-V successfully")
@@ -54,4 +58,6 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
 
         # Test 3: Check the build tag matches expected version
         self.output.info("Checking slang version tag...")
-        self.run(f'"{slang_bin}" -h', env="conanrun")
+        exit_code = self.run(f'"{slang_bin}" -h', env="conanrun")
+        if exit_code != 0:
+            raise AssertionError(f"slangc -h failed (exit code: {exit_code})")
