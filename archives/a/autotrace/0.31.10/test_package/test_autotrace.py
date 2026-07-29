@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Validate autotrace package layout and public API."""
 import os
+import struct
 import subprocess
 import sys
 import tempfile
 import textwrap
+import zlib
 
 
 def require_path(name, path):
@@ -90,6 +92,37 @@ def compile_and_link_api_probe(pkg, cc, run_binary):
             subprocess.run([output], check=True)
 
 
+def png_chunk(chunk_type, data):
+    payload = chunk_type + data
+    return (
+        struct.pack(">I", len(data))
+        + payload
+        + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+    )
+
+
+def write_png_fixture(path):
+    width = 16
+    height = 16
+    rows = []
+    for y in range(height):
+        row = bytearray([0])
+        for x in range(width):
+            value = 0 if x == y or x + y == width - 1 else 255
+            row.extend([value, value, value])
+        rows.append(bytes(row))
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", ihdr)
+        + png_chunk(b"IDAT", zlib.compress(b"".join(rows)))
+        + png_chunk(b"IEND", b"")
+    )
+    with open(path, "wb") as handle:
+        handle.write(png)
+
+
 def run_cli_version(exe):
     result = subprocess.run(
         [exe, "--version"],
@@ -103,9 +136,9 @@ def run_cli_version(exe):
 
 
 def run_png_to_svg(exe):
-    fixture = os.path.join(os.path.dirname(__file__), "fixtures", "watch.png")
-    require_path("upstream PNG fixture", fixture)
     with tempfile.TemporaryDirectory() as tmpdir:
+        fixture = os.path.join(tmpdir, "generated-watch.png")
+        write_png_fixture(fixture)
         output = os.path.join(tmpdir, "watch.svg")
         subprocess.run(
             [
