@@ -14,6 +14,7 @@ SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applicati
 
 | Version | Status | Build System | Notes |
 |---------|--------|--------------|-------|
+| 2.22.0 | built | autotools | Initial HarmonyOS adaptation |
 | 2.24.0 | built | cmake | External FreeType + HarfBuzz; autotools fails on HMDFS |
 
 ## Installation
@@ -34,3 +35,4 @@ cmake --install build --prefix $HOME/usr/local
 - Uses external FreeType and HarfBuzz (not bundled)
 - CMake is required — autotools configure fails on HMDFS (config.status cannot create temp files)
 - Requires config.guess patch for HarmonyOS platform recognition
+- Adaptation completeness requires manual validation with a known TTF asset for `TTF_OpenFont` and `TTF_RenderUTF8_Solid`; the automated smoke test covers library initialization and shutdown without relying on a Worker-specific font path
