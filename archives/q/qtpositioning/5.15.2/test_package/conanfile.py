@@ -29,6 +29,6 @@ class QtpositioningTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if can_run(self):
+        if can_run(self) and self.cpp.build.bindirs:
             bin_path = os.path.join(self.cpp.build.bindirs[0], "test_qtpositioning")
             self.run(bin_path, env="conanrun")
