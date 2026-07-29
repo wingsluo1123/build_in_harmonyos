@@ -63,6 +63,37 @@ class NsdConan(ConanFile):
                 "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-android*",
             )
 
+    def _patch_config_status_tempdir(self, path):
+        contents = load(self, path)
+        if 'mktemp -d "${TMPDIR:-.}/confXXXXXX"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                'mktemp -d "./confXXXXXX"',
+                'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
+            )
+        if 'tmp="${TMPDIR:-.}/conf$$-$RANDOM"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                "tmp=./conf$$-$RANDOM",
+                'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+            )
+        if 'test -d "$tmp" && chmod 700 "$tmp"' not in contents:
+            replace_in_file(
+                self,
+                path,
+                '  test -d "$tmp"\n}  ||',
+                '  test -d "$tmp" && chmod 700 "$tmp"\n}  ||',
+            )
+        if '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")' not in contents:
+            replace_in_file(
+                self,
+                path,
+                '(umask 077 && mkdir "$tmp")',
+                '(umask 077 && mkdir "$tmp" && chmod 700 "$tmp")',
+            )
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
@@ -118,20 +149,14 @@ class NsdConan(ConanFile):
                 os.path.join(self.source_folder, "simdzone", "config.sub")
             )
             if not cross_building(self):
-                # Native OHOS workers expose a writable TMPDIR, while the
-                # Conan build tree can reject Autoconf's temporary awk files.
-                configure = os.path.join(self.source_folder, "configure")
-                replace_in_file(
-                    self,
-                    configure,
-                    'mktemp -d "./confXXXXXX"',
-                    'mktemp -d "${TMPDIR:-.}/confXXXXXX"',
+                # Native OHOS may create Autoconf temp directories without
+                # usable owner permissions. Restore the secure mode before
+                # config.status writes its generated awk files.
+                self._patch_config_status_tempdir(
+                    os.path.join(self.source_folder, "configure")
                 )
-                replace_in_file(
-                    self,
-                    configure,
-                    "tmp=./conf$$-$RANDOM",
-                    'tmp="${TMPDIR:-.}/conf$$-$RANDOM"',
+                self._patch_config_status_tempdir(
+                    os.path.join(self.source_folder, "simdzone", "configure")
                 )
         autotools = Autotools(self)
         autotools.configure()
