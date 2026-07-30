@@ -30,6 +30,7 @@ class NcursesConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        self._patch_config_scripts()
 
     def _patch_config_scripts(self):
         config_guess = os.path.join(self.source_folder, "config.guess")
@@ -117,7 +118,6 @@ class NcursesConan(ConanFile):
         tc.generate()
 
     def build(self):
-        self._patch_config_scripts()
         tmpdir = os.path.join(self.build_folder, "tmp")
         os.makedirs(tmpdir, exist_ok=True)
         env = Environment()
