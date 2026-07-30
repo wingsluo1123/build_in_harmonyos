@@ -44,10 +44,10 @@ class AtkConan(ConanFile):
         apply_conandata_patches(self)
 
     def export_sources(self):
-        # Conan 2.x: export_sources() 仅复制配方本地补丁文件到导出缓存，
-        # 不下载源码也不打补丁（源码下载在 source() 阶段）。
+        # Conan 2.x: 仅复制配方本地补丁文件到导出缓存，
+        # keep_path=True（默认）会保留 patches/ 层级，dst 不再追加 /patches 避免双重嵌套
         copy(self, "patches/*.patch",
-             dst=os.path.join(self.export_sources_folder, "patches"),
+             dst=self.export_sources_folder,
              src=self.recipe_folder)
 
     def generate(self):
