@@ -1,40 +1,62 @@
 # fluent-bit 5.0.9 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-07-29}
+- 构建系统: cmake
+- 编译日期: 2026-07-29
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: published
 
 ## 编译步骤
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+采用 CMake 零外部依赖策略，关闭所有需外部库的可选子系统：
+```bash
+cmake -B build -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DFLB_TLS=Off -DFLB_HTTP_SERVER=Off -DFLB_AWS=Off \
+  -DFLB_KAFKA=Off -DFLB_LUAJIT=Off -DFLB_SQLDB=Off \
+  -DFLB_WASM=Off -DFLB_REGEX=Off \
+  -DFLB_BINARY=On -DFLB_SHARED_LIB=Off \
+  -DFLB_IN_HTTP=Off -DFLB_OUT_HTTP=Off \
+  ...
+cmake --build build
+```
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | musl 缺 fts.h | 鸿蒙 musl 无 BSD fts | 在 ohos-stubs-bundle 中提供 fts.h stub |
+| 2 | openssl/sqlite3 头文件缺失 | 鸿蒙无这些库 | stub 头文件 + 链接期桩代码 |
+| 3 | monkey 生成头文件不可解析 | 尖括号包含路径未覆盖 build 目录 | 顶层 CMakeLists.txt 加 include_directories |
+| 4 | FLB_SQLDB=Off 时编译失败 | flb_blob_db.c #else 分支缺 include | 补全 stdint/cfl_sds/flb_config include |
+| 5 | CMake 不识别 OHOS 平台 | 无 Platform/HarmonyOS.cmake | conan_toolchain.cmake 透传 Linux 平台设置 |
 
 ## 源码修改
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
+补丁文件: `patches/0001-ohos-stubs-and-source-patches.patch`
+- CMakeLists.txt: 加 include_directories 使 stub 头文件可解析
+- lib/monkey/mk_core/CMakeLists.txt: 加 PROECT_BINARY_DIR/include/monkey/
+- lib/chunkio/src/cio_utils.c: 加 fts.h 注释
+- src/CMakeLists.txt: 加 ohos_link_stubs.c 到源列表 + 移除 TLS 相关源文件
+- src/flb_blob_db.c: 补 include + 修正函数签名
+- src/flb_http_client.c: 补上游头文件 include
 
 ## 依赖版本
 
-{列出本次编译依赖的具体软件版本}
+无运行时依赖（零外部依赖配方，所有可选子系统均已关闭）
 
 ## 验证结果
 
 ```bash
-{验证命令和结果}
+conan create archives/f/fluent-bit/5.0.9 -pr=ci/conan/profiles/ohos-aarch64 --build=missing
+fluent-bit --version
 ```
 
 ## 交付物
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-{有打包产物时添加；无则删除此节}
+| fluent-bit 二进制 | ~19MB | arm64 musl, OHOS native |
 
 ## 注意事项
 
@@ -57,8 +79,6 @@
 15. `/dev/fd/` 在本沙箱环境权限拒，bash 进程替换 `< <(cmd)` 必失败，需改临时文件管道。
 16. `/usr/local/bin/zsh` 实为 bash 仿链接，build_and_test.sh 的 zsh 特有语法（`${=VAR}`、`*.so*(N)` glob qualifier）必失败，需改 bash/zsh 通用的写法。
 
-
-{需要特别注意的点；无则删除此节}
 ## 对话记录
 
 ### 对话 #1 — fluent-bit 5.0.9 编译 (2026-07-30)
