@@ -112,14 +112,16 @@ class CryptokitConan(ConanFile):
         for src in c_sources:
             obj = src.replace(".c", ".o")
             # R33: Pass compiler explicitly from Conan toolchain
-            self.run(f"{cc} -c {cflags} -I{src_dir} -o {build_dir}/{obj} {src_dir}/{src}")
+            self.run(f"{cc} -c {cflags} -I{src_dir} -o {build_dir}/{obj} {src_dir}/{src}",
+                     env="conanbuild")
 
         # Create library archive based on shared option
         obj_files = [os.path.join(build_dir, s.replace(".c", ".o")) for s in c_sources]
         objs_str = " ".join(obj_files)
         if self.options.shared:
             # Create shared library (.so)
-            self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {objs_str}")
+            self.run(f"{cc} -shared -o {build_dir}/libcryptokit.so {objs_str}",
+                     env="conanbuild")
         else:
             # Create static library (.a) — get ar from same dict as cc
             ar = compilers.get("ar")
@@ -129,7 +131,8 @@ class CryptokitConan(ConanFile):
             if not ar:
                 # OHOS CI profile only provides c/cpp, no ar
                 ar = "llvm-ar"
-            self.run(f"{ar} rcs {build_dir}/libcryptokit.a {objs_str}")
+            self.run(f"{ar} rcs {build_dir}/libcryptokit.a {objs_str}",
+                     env="conanbuild")
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
