@@ -40,15 +40,16 @@ class SpawnFcgiConan(ConanFile):
         tc = MesonToolchain(self)
         tc.generate()
         # Inject ar into meson native file if not set by profile
-        # (OHOS HNP profile doesn't set tools.build:archiver)
+        # Uses AR env var (standard build convention) with fallback to PATH lookup
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         with open(native_file) as f:
             content = f.read()
         if "ar =" not in content:
+            ar_path = os.environ.get("AR", "llvm-ar")
             old_content = content
             content = content.replace(
                 "[binaries]\nc =",
-                "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\nc =",
+                f"[binaries]\nar = '{ar_path}'\nc =",
             )
             if content == old_content:
                 raise RuntimeError("Failed to inject ar into meson native file")

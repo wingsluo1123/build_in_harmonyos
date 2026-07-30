@@ -1,6 +1,6 @@
-#!/usr/bin/env zsh
+#!/bin/sh
 # test_package/test_spawn_fcgi.sh — 验证 spawn-fcgi 二进制功能正常
-set -euo pipefail
+set -eu
 
 # This script is a smoke test for spawn-fcgi.
 # The actual test execution is handled by conanfile.py's test() method,
