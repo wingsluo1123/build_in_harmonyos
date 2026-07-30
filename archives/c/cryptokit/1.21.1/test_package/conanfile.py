@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Conan test package — cryptokit 1.21.1 C stubs layer SHA-256 API smoke test"""
+
 import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
