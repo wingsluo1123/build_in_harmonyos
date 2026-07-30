@@ -1,0 +1,45 @@
+version: "2.23.1"
+software: "c-blosc2"
+status: built
+build_date: "2026-07-31"
+build_system: cmake
+
+source:
+  url: "https://github.com/Blosc/c-blosc2/archive/refs/tags/v2.23.1.tar.gz"
+  sha256: "3a1a55d1e3794fb2b51a12e722d611b3e577443abb7ff9951666511f576ea3da"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTS=OFF"
+    - "-DBUILD_FUZZERS=OFF"
+    - "-DBUILD_BENCHMARKS=OFF"
+    - "-DBUILD_EXAMPLES=OFF"
+    - "-DBUILD_PLUGINS=OFF"
+    - "-DBUILD_STATIC=ON"
+    - "-DBUILD_SHARED=OFF"
+    - "-DPREFER_EXTERNAL_LZ4=OFF"
+    - "-DPREFER_EXTERNAL_ZLIB=OFF"
+    - "-DPREFER_EXTERNAL_ZSTD=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "c-blosc2 使用 cmake_minimum_required(VERSION 3.16.3)，CMake 4.x 无需 CMAKE_POLICY_VERSION_MINIMUM"
+  - "内置 LZ4/zlib-ng/ZSTD 编解码器，无外部运行时依赖"
+  - "BUILD_BENCHMARKS 依赖 clock_gettime，OHOS 不可用，需关闭"
+  - "库 OUTPUT_NAME 为 blosc2，产物为 libblosc2.a / libblosc2.so"
+  - "CMake config 为 Blosc2Config.cmake，目标名 Blosc2::blosc2"
+
+test_results:
+  type: manual
+  total: 4
+  passed: 4
+  failed: 0
+  notes: "test_package 消费者测试验证 blosc2_compress/blosc2_decompress round-trip"
+
+knowledge_ref: []
