@@ -123,7 +123,7 @@ class TmuxConan(ConanFile):
         ) or self._settings_triplet(self.settings_build)
 
         configure_args = [
-            os.path.join(self._ncurses_source_folder(), "configure"),
+            "./configure",
             f"--prefix={self._ncurses_prefix()}",
             f"--build={build_triplet}",
             f"--host={host_triplet}",
