@@ -1,7 +1,7 @@
 software: mpfr
 version: "4.2.2"
 status: built
-build_date: "2026-07-30"
+build_date: "2026-06-08"
 
 source:
   url: "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz"
@@ -28,7 +28,8 @@ patches_applied:
 knowledge_gained:
   - "MPFR 4.2.2 is an Autotools project with make check as upstream validation."
   - "The recipe consumes published gmp/6.3.0 through explicit GMP include/lib configure arguments."
-  - "HarmonyOS requires linux-ohos recognition in config.guess/config.sub and TMPDIR-aware config.status temp directories."
+  - "HarmonyOS requires direct linux-ohos recognition in config.guess/config.sub and TMPDIR-aware config.status temp directories."
+  - "HarmonyOS user-storage ACLs reject config.status temporary files in 0700 directories under $HOME/tmp; 022 permissions are required for the generated awk machinery to be readable during configure."
   - "OHOS CMakeDeps test_package needs an explicit gmp/6.3.0 requirement and GMP include directories so mpfr.h can include gmp.h."
 
 validation:
@@ -64,7 +65,7 @@ patch_classification:
   - file: 0001-config.guess.patch
     type: portability
     platform_only: true
-    guard: "HarmonyOS uname/config.guess only"
+    guard: "HarmonyOS uname/config.guess only; skips Linux libc temp-file probe"
   - file: 0002-config.sub.patch
     type: portability
     platform_only: true
@@ -72,4 +73,4 @@ patch_classification:
   - file: 0003-configure-tmpdir.patch
     type: portability
     platform_only: true
-    guard: "TMPDIR fallback keeps default behavior when TMPDIR is unset"
+    guard: "TMPDIR fallback keeps default behavior when TMPDIR is unset; umask 022 avoids OHOS user-storage ACL denial for config.status awk files"

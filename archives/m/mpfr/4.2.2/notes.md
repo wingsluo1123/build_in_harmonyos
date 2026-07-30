@@ -24,9 +24,9 @@ The recipe uses Conan 2 `AutotoolsToolchain` and `Autotools`. It passes GMP incl
 
 | Patch | Purpose |
 |---|---|
-| `0001-config.guess.patch` | Add HarmonyOS uname recognition and return `*-unknown-linux-ohos`. |
+| `0001-config.guess.patch` | Add direct HarmonyOS uname recognition and return `*-unknown-linux-ohos` without the Linux libc temp-file probe. |
 | `0002-config.sub.patch` | Accept `linux-ohos` triples during Autotools canonicalization. |
-| `0003-configure-tmpdir.patch` | Use `${TMPDIR:-.}` for `config.status` temp directories to avoid HarmonyOS temporary-directory permission issues. |
+| `0003-configure-tmpdir.patch` | Use `${TMPDIR:-.}` and `umask 022` for `config.status` temp directories to avoid HarmonyOS user-storage ACL denial on generated awk files. |
 
 ## Test Package
 
@@ -51,6 +51,8 @@ Results:
 - `mpfr/*` search returned no matching recipe in `ohpcd`.
 - Conan `source()` downloaded the official tarball, verified sha256, unpacked into `src/`, and applied all three patches.
 - OHOS runner note: use the GNU canonical `/gnu/mpfr/` source path so the CI mirror fallback rewrites to valid `/gnu/mpfr/...` mirror paths.
+- OHOS permission probe: `umask 077 && mktemp -d "$HOME/tmp/confXXXXXX"` creates a directory where `config.status` cannot write/read `subs1.awk`; `umask 022` on the same path allows the generated awk machinery to run.
+- `config.guess` now handles `HarmonyOS` directly instead of entering the Linux libc probe, avoiding the same `$HOME/tmp` permission denial for `dummy.c`.
 - Temporary Conan cache export succeeded for `mpfr/4.2.2`.
 - Conan graph resolution succeeded and resolved the direct `gmp/6.3.0` dependency.
 - Full local Autotools build was not run on the Windows host because `sh`, `make`, `cmake`, and clang are not available in this environment.
