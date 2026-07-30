@@ -106,6 +106,8 @@ class CryptokitConan(ConanFile):
             cflags += " -O2 -g"
         elif self.settings.build_type == "MinSizeRel":
             cflags += " -Os -DNDEBUG"
+        else:
+            cflags += " -O2"
 
         for src in c_sources:
             obj = src.replace(".c", ".o")
