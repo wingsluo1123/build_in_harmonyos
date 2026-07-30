@@ -92,6 +92,7 @@ class Sdl2TtfConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["SDL2_ttf"]
+        self.cpp_info.includedirs = ["include/SDL2"]
         self.cpp_info.requires = [
             "sdl2::sdl2",
             "freetype::freetype",

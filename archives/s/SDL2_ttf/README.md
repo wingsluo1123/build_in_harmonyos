@@ -21,7 +21,7 @@ SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applicati
 
 ```bash
 # Install dependencies first
-conan install --requires=sdl2/2.30.10 -r=ohpcd --build=never
+conan install --requires=sdl2/2.30.10 --requires=freetype/2.14.3 --requires=harfbuzz/14.2.0 -r=ohpcd --build=never
 
 # Build SDL2_ttf (cmake required, autotools fails on HMDFS)
 cd ~/builds/SDL2_ttf-2.24.0.work
