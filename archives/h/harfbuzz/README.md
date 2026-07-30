@@ -11,7 +11,8 @@ HarfBuzz 是一个文本塑形（text shaping）引擎，用于将 Unicode 文�
 
 | 版本 | 状态 | 日期 | 说明 |
 |------|------|------|------|
-| 14.2.0 | built | 2026-07-22 | 含 graphite2 支持，CMake 构建 |
+| 14.2.0.1 | built | 2026-07-30 | CMake 重写，含 graphite2 支持 |
+| 14.2.0 | archived | 2026-07-22 | Meson 构建（已废弃） |
 
 ## OHOS 适配要点
 

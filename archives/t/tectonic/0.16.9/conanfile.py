@@ -93,20 +93,13 @@ class TectonicConan(ConanFile):
         if os.path.isdir(rustup_home):
             os.environ["RUSTUP_HOME"] = rustup_home
 
-        # ── 1b. Rust toolchain bootstrap (CI workers may lack Rust) ──
+        # ── 1b. Rust toolchain check ──
+        # CI workers must have Rust pre-installed; build() should not install tools
         if shutil.which("cargo") is None:
-            brew = shutil.which("brew") or os.path.join(home, ".harmonybrew", "bin", "brew")
-            if os.path.isfile(brew):
-                self.output.info("cargo not found, installing Rust via harmonybrew...")
-                self.run(f'"{brew}" install rust')
-                hb_bin = os.path.join(home, ".harmonybrew", "bin")
-                if os.path.isdir(hb_bin):
-                    os.environ["PATH"] = hb_bin + ":" + os.environ["PATH"]
-            if shutil.which("cargo") is None:
-                raise RuntimeError(
-                    "Rust toolchain (cargo) not found and auto-install failed. "
-                    "Install via 'harmonybrew install rust' or rustup."
-                )
+            raise RuntimeError(
+                "Rust toolchain (cargo) not found. "
+                "Install via 'harmonybrew install rust' or rustup."
+            )
 
         # Shell (R33: find bash dynamically)
         bash_path = shutil.which("bash") or "/data/service/hnp/bin/bash"
@@ -159,10 +152,17 @@ class TectonicConan(ConanFile):
         # R33: dynamically resolve compiler paths from toolchain/PATH
         cc = shutil.which("clang") or "clang"
         cxx = shutil.which("clang++") or "clang++"
+        # R33: Construct Rust target triple from Conan settings (not hardcoded)
+        _arch = str(self.settings.arch)
+        _os = str(self.settings.os).lower()
+        if _os == "ohos":
+            target_triple = f"{_arch}-unknown-linux-ohos"
+        else:
+            target_triple = f"{_arch}-unknown-{_os}"
         cargo_dir = os.path.join(self.source_folder, ".cargo")
         os.makedirs(cargo_dir, exist_ok=True)
         cargo_config = (
-            '[target.aarch64-unknown-linux-ohos]\n'
+            f'[target.{target_triple}]\n'
             f'linker = "{cc}"\n'
             'rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib"]\n\n'
             '[env]\n'
@@ -181,8 +181,11 @@ class TectonicConan(ConanFile):
         # external-harfbuzz: use system harfbuzz instead of git submodule
         self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
         # L1: Run upstream official test suite (cargo test)
-        # Some integration tests require network/TeX environment, run non-fatally
-        self.run("cargo test --release", cwd=self.source_folder, ignore_errors=True)
+        # Some integration tests require network/TeX environment
+        try:
+            self.run("cargo test --release", cwd=self.source_folder)
+        except Exception:
+            self.output.warning("cargo test had failures (some tests require network/TeX environment)")
 
     def _patch_pc_files_for_static(self, gen_folder):
         """Patch .pc files to use .a absolute paths instead of -l flags.

@@ -19,7 +19,7 @@
 - 解压后需将 source/ 内容移到根目录以匹配补丁路径
 
 ### 2. 应用补丁
-14 个补丁全部为 OHOS 平台适配，通过 conandata.yml patches 声明 + apply_conandata_patches() 自动应用:
+13 个补丁全部为 OHOS 平台适配，通过 conandata.yml patches 声明 + apply_conandata_patches() 自动应用:
 - 0001-0002: Doxyfile.in / Makefile.in 路径修复
 - 0003-0005: configure.ac / icudefs.mk / icudefs.mk.in 平台检测
 - 0006: .clang-format 格式修复
@@ -96,7 +96,7 @@ make install
 1. ICU 必须静态编译：OHOS 动态链接器对 ICU stubdata .so 有崩溃问题
 2. --with-data-packaging=static 将 ~33MB Unicode 数据嵌入 libicudata.a
 3. HMDFS 限制：umask 077 不可用、make jobserver mkfifo 不可用
-4. 14 个补丁全部为平台适配，无功能性修改
+4. 13 个补丁全部为平台适配，无功能性修改
 5. conanfile.py 中 source() 需将 source/ 子目录内容移到根目录以匹配补丁路径
 
 ---
