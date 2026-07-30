@@ -53,7 +53,9 @@ class Sdl2TtfConan(ConanFile):
         sdl2.set_property("cmake_file_name", "SDL2")
         sdl2.set_property(
             "cmake_target_name",
-            "SDL2::SDL2" if self.options.shared else "SDL2::SDL2-static",
+            "SDL2::SDL2"
+            if self.dependencies["sdl2"].options.shared
+            else "SDL2::SDL2-static",
         )
 
         freetype = self.dependencies["freetype"].cpp_info
