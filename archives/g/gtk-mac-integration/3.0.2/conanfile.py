@@ -79,7 +79,7 @@ class GtkMacIntegrationConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["gtkmacintegration-gtk3"]
-        self.cpp_info.includedirs = ["include", *self._glib_include_dirs()]
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.set_property("cmake_file_name", "gtk-mac-integration")
         self.cpp_info.set_property(
             "cmake_target_name", "gtk-mac-integration::gtk-mac-integration"
