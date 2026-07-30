@@ -2,8 +2,8 @@
 """Conan recipe for falcosecurity-libs 0.25.4."""
 
 import glob
+import json
 import os
-import shutil
 import subprocess
 
 from conan import ConanFile
@@ -78,11 +78,19 @@ class FalcoSecurityLibsConan(ConanFile):
         # Inject OHOS C++ runtime lib dir into run environment so consumers
         # (e.g. test_package) find libc++_shared.so via LD_LIBRARY_PATH.
         if self.settings.os == "OHOS":
-            _cc = shutil.which("aarch64-unknown-linux-ohos-clang")
-            if _cc:
+            # Resolve OHOS runtime lib dir from the cross-compiler (via profile)
+            _cc_path = os.path.join(
+                os.path.dirname(
+                    json.loads(
+                        self.conf.get("tools.build:compiler_executables", "{}")
+                    ).get("c", "/data/service/hnp/bin/clang")
+                ),
+                "aarch64-unknown-linux-ohos-clang"
+            )
+            if os.path.exists(_cc_path):
                 _ohos_lib_dir = os.path.dirname(
                     subprocess.check_output(
-                        [_cc, "-print-file-name=libc++_shared.so"],
+                        [_cc_path, "-print-file-name=libc++_shared.so"],
                         text=True
                     ).strip()
                 )
