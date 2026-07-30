@@ -1,46 +1,33 @@
-# 编译记录: lv2 1.18.11-git
+# LV2 1.18.11-git adaptation notes
 
-**编译开始**: 2026-07-27
-**最终状态**: built (上游 meson test 运行)
+## Scope
 
----
+- Package: `lv2/1.18.11-git`
+- Issue: #594
+- Source commit: `3c57dae`
+- Source: `https://gitlab.com/lv2/lv2/-/archive/3c57dae/lv2-3c57dae.tar.gz`
+- SHA256: `11b70869f1840d7365a884d9a9b3faf16dbe4642bb9171e257a18be63dd027ff`
 
-## 编译环境
+## Adaptation
 
-- 构建系统: meson + ninja
-- 编译器: clang (aarch64-linux-ohos)
-- 目标平台: aarch64 (OpenHarmony)
-- 源码: lv2-3c57dae.tar.gz (git 3c57dae)
+- Packages the public LV2 headers, specification bundles, and `lv2.pc`.
+- Exposes the package as a Conan header library.
+- The consumer test uses the compiler selected by the Conan profile. A cross
+  build must provide `tools.build:compiler_executables[c]` explicitly.
 
-## 源码完整性
+## Tests
 
-| 项 | 值 |
-|----|----|
-| URL | https://gitlab.com/lv2/lv2/-/archive/3c57dae/lv2-3c57dae.tar.gz |
-| SHA-256 | 11b70869f1840d7365a884d9a9b3faf16dbe4642bb9171e257a18be63dd027ff |
-| 大小 | 253819 bytes |
+The exact source revision registers 29 Meson cases in the `build`, `unit`, and
+`spec` suites. The native preflight enabled tests with documentation, tools,
+and lint disabled, while retaining every independent runtime test.
 
-## 许可证
+The added `test_package` compiles and runs a minimal C consumer and verifies the
+installed header, core bundle manifest, and pkg-config file. It contains one
+consumer scenario with seven assertions.
 
-ISC (Copyright 2006-2012 Steve Harris, David Robillard)
+## Local validation
 
-## 编译步骤
-
-1. `meson.configure()` + `meson.build()` — 编译 lv2 头文件规范和 lv2_validate
-2. `meson.test()` — 运行上游测试套件 (headers, atom, forge_overflow 等)
-3. `meson.install()` — 安装头文件、规范文件、lv2.pc
-
-## 依赖
-
-- 无编译依赖 (纯头文件规范库)
-
-## 验证结果
-
-```bash
-$ pkg-config --modversion lv2
-1.18.11
-```
-
----
-
-**编译成功** ✓
+- Upstream Meson suite: 29/29 passed; failed 0; skipped 0.
+- Linux x86_64 `conan create`, Release: passed.
+- Added consumer test: 1/1 passed; 7/7 assertions passed.
+- The local Docker preflight is not an official OHOS armv8 CI result.
