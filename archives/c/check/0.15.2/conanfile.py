@@ -53,7 +53,10 @@ class CheckConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["check"]
-        self.cpp_info.system_libs = ["m", "rt", "pthread"]
+        system_libs = ["m", "pthread"]
+        if str(self.settings.os) != "OHOS":
+            system_libs.append("rt")
+        self.cpp_info.system_libs = system_libs
         self.cpp_info.set_property("cmake_file_name", "Check")
         self.cpp_info.set_property("cmake_target_name", "Check::Check")
         self.cpp_info.set_property("pkg_config_name", "check")
