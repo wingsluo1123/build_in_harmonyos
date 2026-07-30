@@ -4,6 +4,7 @@
 import os
 
 from conan import ConanFile
+from conan.tools.env import Environment
 from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain
@@ -63,7 +64,21 @@ class Smpeg2Conan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        self.run("sh autogen.sh", cwd=self.source_folder, env="conanbuild")
+        autogen_env = Environment()
+        automake = self.dependencies.build["automake"].package_folder
+        libtool = self.dependencies.build["libtool"].package_folder
+        autogen_env.prepend_path("PATH", os.path.join(automake, "bin"))
+        autogen_env.prepend_path("PATH", os.path.join(libtool, "bin"))
+        autogen_env.prepend_path("ACLOCAL_PATH", os.path.join(automake, "share", "aclocal"))
+        autogen_env.prepend_path(
+            "ACLOCAL_PATH", os.path.join(automake, "share", "aclocal-1.18")
+        )
+        autogen_env.prepend_path("ACLOCAL_PATH", os.path.join(libtool, "share", "aclocal"))
+        autogen_env.prepend_path("PERL5LIB", os.path.join(automake, "share", "automake-1.18"))
+        autogen_env.define("ACLOCAL", os.path.join(automake, "bin", "aclocal"))
+        autogen_env.define("AUTOMAKE", os.path.join(automake, "bin", "automake"))
+        with autogen_env.vars(self).apply():
+            self.run("sh autogen.sh", cwd=self.source_folder, env="conanbuild")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
@@ -71,6 +86,14 @@ class Smpeg2Conan(ConanFile):
     def package(self):
         autotools = Autotools(self)
         autotools.install()
+        if not self.options.shared:
+            static_lib = os.path.join(self.package_folder, "lib", "libsmpeg2.a")
+            if os.path.isfile(static_lib):
+                self.output.info(
+                    "Removing nested SDL2 static archive from libsmpeg2.a; "
+                    "SDL2 remains a transitive Conan requirement"
+                )
+                self.run(f'ar d "{static_lib}" libSDL2.a')
         copy(
             self,
             "COPYING",
