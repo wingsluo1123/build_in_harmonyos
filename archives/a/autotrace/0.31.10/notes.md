@@ -10,10 +10,13 @@
 ## Adaptation
 
 - Added a Conan custom recipe that compiles the upstream C sources directly.
-- Declares `glib/2.84.0` and `libpng/1.6.58` as Conan requirements and resolves their flags through `PkgConfigDeps`.
+- Declares `glib/2.84.0`, `gettext/0.22.5`, and `libpng/1.6.58`
+  as Conan requirements and resolves their flags through `PkgConfigDeps`.
 - Retains the native PNG input backend through libpng while disabling optional ImageMagick, pstoedit, libming, and other optional image backends.
 - Extends the native PNM/PBM reader to consume standard input when the input
   filename is `-`.
+- Links `libintl` from gettext after GLib for OHOS static builds because GLib's
+  static archive references gettext symbols such as `bindtextdomain`.
 - Defaults to static library packaging.
 
 ## Tests

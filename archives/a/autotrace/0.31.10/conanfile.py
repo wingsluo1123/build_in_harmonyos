@@ -42,6 +42,7 @@ class AutotraceConan(ConanFile):
 
     def requirements(self):
         self.requires("glib/2.84.0")
+        self.requires("gettext/0.22.5")
         self.requires("libpng/1.6.58")
 
     def export_sources(self):
@@ -241,9 +242,11 @@ class AutotraceConan(ConanFile):
             os.environ.get("RANLIB") or shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib",
         )
         glib_pc = self._dependency_pkg_config_name("glib")
+        intl_pc = self._dependency_pkg_config_name("gettext")
         png_pc = self._dependency_pkg_config_name("libpng")
         glib_cflags = self._pkg_config(["--cflags", glib_pc])
         glib_libs = self._pkg_config(["--libs", glib_pc])
+        intl_libs = self._pkg_config(["--libs", intl_pc])
         png_cflags = self._pkg_config(["--cflags", png_pc])
         png_libs = self._pkg_config(["--libs", png_pc])
 
@@ -316,7 +319,17 @@ class AutotraceConan(ConanFile):
         ]
         cli_path = os.path.join(self._out_dir, "autotrace")
         self._run_checked(
-            [cc, "-o", cli_path, *cli_objects, lib_path, *glib_libs, *png_libs, "-lm"]
+            [
+                cc,
+                "-o",
+                cli_path,
+                *cli_objects,
+                lib_path,
+                *glib_libs,
+                *intl_libs,
+                *png_libs,
+                "-lm",
+            ]
         )
         os.chmod(cli_path, 0o755)
         self._run_upstream_tests(cli_path)
@@ -341,6 +354,7 @@ class AutotraceConan(ConanFile):
              dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
 
         glib_pc = self._dependency_pkg_config_name("glib")
+        intl_pc = self._dependency_pkg_config_name("gettext")
         png_pc = self._dependency_pkg_config_name("libpng")
         save(
             self,
@@ -353,7 +367,7 @@ includedir=${{prefix}}/include
 Name: autotrace
 Description: Bitmap to vector graphics converter and library
 Version: 0.31.10
-Requires: {glib_pc} {png_pc}
+Requires: {glib_pc} {intl_pc} {png_pc}
 Libs: -L${{libdir}} -lautotrace -lm
 Cflags: -I${{includedir}}
 """,
