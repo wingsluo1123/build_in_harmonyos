@@ -66,14 +66,15 @@ class HarfbuzzConan(ConanFile):
         tc.variables["HB_HAVE_CAIRO"] = False
         tc.variables["HB_HAVE_GOBJECT"] = False
         tc.variables["HB_BUILD_UTILS"] = False
-        # CMake 4.x compatibility
-        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
         cmake = CMake(self)
-        cmake.configure()
+        # CMAKE_POLICY_VERSION_MINIMUM must be passed as cache variable
+        # because CMake 4.x checks cmake_minimum_required() before
+        # processing toolchain file variables
+        cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
 
     def package(self):

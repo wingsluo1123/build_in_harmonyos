@@ -156,15 +156,18 @@ class TectonicConan(ConanFile):
             shutil.copy2(icu4c_pc, icu_uc_pc)
 
         # ── 7. Create .cargo/config.toml ──
+        # R33: dynamically resolve compiler paths from toolchain/PATH
+        cc = shutil.which("clang") or "clang"
+        cxx = shutil.which("clang++") or "clang++"
         cargo_dir = os.path.join(self.source_folder, ".cargo")
         os.makedirs(cargo_dir, exist_ok=True)
         cargo_config = (
             '[target.aarch64-unknown-linux-ohos]\n'
-            'linker = "clang"\n'
+            f'linker = "{cc}"\n'
             'rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib"]\n\n'
             '[env]\n'
-            'CC = "clang"\n'
-            'CXX = "clang++"\n\n'
+            f'CC = "{cc}"\n'
+            f'CXX = "{cxx}"\n\n'
             # crates.io mirror (network optimization for OHOS)
             '[source.crates-io]\n'
             'replace-with = "rsproxy-sparse"\n\n'
