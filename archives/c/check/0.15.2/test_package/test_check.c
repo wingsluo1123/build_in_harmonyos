@@ -33,6 +33,7 @@ int main(void)
 {
     Suite *suite = check_conan_suite();
     SRunner *runner = srunner_create(suite);
+    srunner_set_fork_status(runner, CK_NOFORK);
     srunner_run_all(runner, CK_NORMAL);
     const int failed = srunner_ntests_failed(runner);
     srunner_free(runner);
