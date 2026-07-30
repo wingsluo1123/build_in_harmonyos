@@ -23,16 +23,11 @@ class Texi2HtmlTestConan(ConanFile):
         libintl = os.path.join(package_folder, "share", "texi2html", "lib", "libintl-perl", "lib")
         assert os.path.isdir(libintl), f"bundled libintl-perl not found at {libintl}"
 
-        # Test texi2html by converting the static sample.texi from the repo
-        sample_texi = os.path.join(self.source_folder, "sample.texi")
-        assert os.path.isfile(sample_texi), f"sample.texi not found at {sample_texi}"
-        with chdir(self, self.source_folder):
-            self.run(f'PERL5LIB="{libintl}" timeout 30 "texi2html" --no-validate sample.texi 2>&1', env="conanrun")
-        sample_html = os.path.join(self.source_folder, "sample.html")
-        assert os.path.isfile(sample_html), f"texi2html did not generate sample.html"
-        with open(sample_html, "r") as f:
-            content = f.read()
-        assert "Hello from texi2html" in content, (
-            f"sample.html missing expected content, got {len(content)} bytes"
+        # Run the shell-based test script for the actual texi2html conversion test
+        test_script = os.path.join(self.source_folder, "test_texi2html.sh")
+        assert os.path.isfile(test_script), f"test_texi2html.sh not found at {test_script}"
+        self.run(
+            f'bash "{test_script}" "{texi2html}" "{libintl}" "{self.source_folder}"',
+            env="conanrun",
         )
-        self.output.info(f"texi2html SUCCESS: sample.html generated ({os.path.getsize(sample_html)} bytes, contains 'Hello from texi2html')")
+        self.output.info("texi2html SUCCESS: test_texi2html.sh passed")
