@@ -58,39 +58,24 @@ class TestPerlParamsValidate(ConanFile):
         os.environ["PERL5LIB"] = ":".join(perl5lib_paths)
 
         try:
-            # Pre-check: CI workers may lack Module::Implementation (a Perl runtime
-            # dep of Params::Validate that is not part of the system Perl install).
-            # XS.so structure is already verified above; Perl runtime test is
-            # supplementary. Skip gracefully if the dependency is unavailable.
-            perl_bin = "/data/service/hnp/bin/perl"
-            if not (os.path.isfile(perl_bin) and os.access(perl_bin, os.X_OK)):
-                perl_bin = "perl"
-
-            deps_ok = True
+            # Run Perl functional test (test.sh → test.pl).
+            # test.sh handles perl binary detection internally.
+            # If test fails due to HMDFS/SELinux (expected on HarmonyOS),
+            # skip with warning. All other failures are real test failures.
+            test_script = os.path.join(self.source_folder, "test.sh")
             try:
-                self.run(f'"{perl_bin}" -MModule::Implementation -e "exit 0"')
-            except (ConanException, OSError):
-                deps_ok = False
-                self.output.warning(
-                    "⚠️ Module::Implementation not available — "
-                    "skipping Perl runtime test (XS.so already verified)"
-                )
-
-            if deps_ok:
-                test_script = os.path.join(self.source_folder, "test.sh")
-                try:
-                    self.run(f'sh "{test_script}"')
-                    self.output.info("✅ Params::Validate PP mode test passed")
-                except ConanException as e:
-                    err_str = str(e).lower()
-                    if any(kw in err_str for kw in (
-                        "permission denied", "hmdfs", "selinux"
-                    )):
-                        self.output.warning(
-                            "⚠️ Runtime test failed "
-                            "(expected on HarmonyOS HMDFS/SELinux)"
-                        )
-                    else:
-                        raise
+                self.run(f'sh "{test_script}"')
+                self.output.info("✅ Params::Validate PP mode test passed")
+            except ConanException as e:
+                err_str = str(e).lower()
+                if any(kw in err_str for kw in (
+                    "permission denied", "hmdfs", "selinux"
+                )):
+                    self.output.warning(
+                        "⚠️ Runtime test failed "
+                        "(expected on HarmonyOS HMDFS/SELinux)"
+                    )
+                else:
+                    raise
         finally:
             os.environ["PERL5LIB"] = old_perl5lib
