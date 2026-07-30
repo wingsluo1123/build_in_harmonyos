@@ -112,5 +112,7 @@ class Sdl3Conan(ConanFile):
         self.cpp_info.libs = ["SDL3"]
         self.cpp_info.set_property("cmake_file_name", "SDL3")
         self.cpp_info.set_property("cmake_target_name", "SDL3::SDL3")
-        if not self.options.shared and self.settings.os in ("Linux", "OHOS"):
+        if not self.options.shared and self.settings.os == "OHOS":
+            self.cpp_info.system_libs.append("m")
+        elif not self.options.shared and self.settings.os == "Linux":
             self.cpp_info.system_libs.extend(["m", "pthread", "dl"])
