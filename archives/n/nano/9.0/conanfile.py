@@ -108,9 +108,11 @@ class NanoConan(ConanFile):
         if bash_path:
             os.environ["CONFIG_SHELL"] = bash_path
             os.environ["SHELL"] = bash_path
-        tmpdir = os.path.join(self.build_folder, "tmp")
-        os.makedirs(tmpdir, exist_ok=True)
-        os.environ["TMPDIR"] = tmpdir
+        tmpdir = os.environ.get("TMPDIR")
+        if not tmpdir or not os.path.isdir(tmpdir) or not os.access(tmpdir, os.W_OK):
+            raise ConanInvalidConfiguration(
+                "TMPDIR must identify a writable non-HMDFS temporary directory"
+            )
 
         self._build_ncurses()
 
