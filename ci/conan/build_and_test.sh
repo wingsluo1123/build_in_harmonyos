@@ -67,15 +67,30 @@ if [ -n "${CI_PACKAGES:-}" ]; then
         fi
     done
 else
-    # 无定向参数时扫描 archives/ 目录
-    echo "[step] No CI_PACKAGES, scanning $SCAN_ROOT/ ..."
-    while IFS= read -r f; do
-        pkg_dir=$(dirname "$f")
-        PACKAGES+=("$pkg_dir")
-    done < <(find "$REPO_ROOT/$SCAN_ROOT" -name "conanfile.py" \
-        -not -path "*/test_package/*" \
-        -not -path "*/.conan/*" \
-        2>/dev/null | sort)
+    # 无定向参数时自动检测变更包（避免全量扫描超时）
+    # 扫描本分支所有 commit 中改动过的 archives/ 路径
+    # 使用 git log（不依赖 origin/main，CI shallow clone 也能工作）
+    echo "[step] No CI_PACKAGES, detecting changed packages from git log..."
+    changed_dirs="$(cd "$REPO_ROOT" && git log --diff-filter=AM --name-only --pretty=format: \
+        2>/dev/null | grep -E "^archives/[a-z]/[^/]+" | sed 's|/[^/]*$||' | sort -u || true)"
+    for pkg_dir in $changed_dirs; do
+        abs_dir="$REPO_ROOT/$pkg_dir"
+        if [ -f "$abs_dir/conanfile.py" ]; then
+            PACKAGES+=("$abs_dir")
+            echo "[step]   auto-detected: $pkg_dir"
+        fi
+    done
+    if [ ${#PACKAGES[@]} -eq 0 ]; then
+        echo "[warn]  No changed package dirs with conanfile.py detected via git log."
+        echo "[warn]  Falling back to full archive scan (may timeout on large repos)."
+        while IFS= read -r f; do
+            pkg_dir=$(dirname "$f")
+            PACKAGES+=("$pkg_dir")
+        done < <(find "$REPO_ROOT/$SCAN_ROOT" -name "conanfile.py" \
+            -not -path "*/test_package/*" \
+            -not -path "*/.conan/*" \
+            2>/dev/null | sort)
+    fi
 fi
 
 if [ ${#PACKAGES[@]} -eq 0 ]; then
