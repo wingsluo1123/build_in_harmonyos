@@ -76,6 +76,8 @@ class HarfbuzzConan(ConanFile):
         # processing toolchain file variables
         cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
+        # L1: Run upstream official test suite (ctest, may have 0 tests in CMake build)
+        self.run("ctest --output-on-failure", ignore_errors=True)
 
     def package(self):
         cmake = CMake(self)

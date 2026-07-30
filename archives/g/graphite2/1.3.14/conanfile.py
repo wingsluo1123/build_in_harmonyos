@@ -54,6 +54,8 @@ class Graphite2Conan(ConanFile):
             "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
         })
         cmake.build()
+        # L1: Run upstream official test suite (83 tests via ctest)
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)

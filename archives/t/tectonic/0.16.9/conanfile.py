@@ -180,6 +180,9 @@ class TectonicConan(ConanFile):
         # ── 8. Build with cargo ──
         # external-harfbuzz: use system harfbuzz instead of git submodule
         self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
+        # L1: Run upstream official test suite (cargo test)
+        # Some integration tests require network/TeX environment, run non-fatally
+        self.run("cargo test --release", cwd=self.source_folder, ignore_errors=True)
 
     def _patch_pc_files_for_static(self, gen_folder):
         """Patch .pc files to use .a absolute paths instead of -l flags.
