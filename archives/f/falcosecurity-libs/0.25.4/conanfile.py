@@ -72,7 +72,7 @@ class FalcoSecurityLibsConan(ConanFile):
         tc.cache_variables["ENABLE_ENGINE_KMOD"] = False
         # R33: Store OHOS cross-compiler path in CMake cache for package()
         # to read instead of falling back to host-environment CC variable.
-        tc.cache_variables["FALCOSECURITY_OHOS_CC"] = "aarch64-linux-ohos-clang"
+        tc.cache_variables["FALCOSECURITY_OHOS_CC"] = "aarch64-unknown-linux-ohos-clang"
         tc.generate()
 
     def build(self):
@@ -124,7 +124,7 @@ class FalcoSecurityLibsConan(ConanFile):
                 # R33: Read OHOS cross-compiler from CMake cache (set in generate())
                 # instead of os.environ["CC"] to avoid host-toolchain fallback issues.
                 cmake_cache = os.path.join(self.build_folder, "CMakeCache.txt")
-                ohos_cc = "aarch64-linux-ohos-clang"
+                ohos_cc = "aarch64-unknown-linux-ohos-clang"
                 if os.path.exists(cmake_cache):
                     with open(cmake_cache) as _f:
                         for _line in _f:
