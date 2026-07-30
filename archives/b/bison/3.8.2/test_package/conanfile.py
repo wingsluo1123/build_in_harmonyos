@@ -26,7 +26,16 @@ class BisonTestConan(ConanFile):
         self.run(f"{cc} test.c -o test_bison")
 
     def test(self):
-        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
-        # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/bin/bash")
+        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries, so wrap
+        # binary execution with bash. Prefer CONFIG_SHELL (set by the build
+        # env), then common OHOS/Linux locations, then bare 'bash' (Conan's
+        # conanrun env already puts bash on PATH for OHOS toolchain nodes).
+        bash = os.environ.get("CONFIG_SHELL") or next(
+            (p for p in (
+                "/data/service/hnp/bin/bash",
+                "/bin/bash",
+                "/usr/bin/bash",
+            ) if os.path.exists(p)),
+            "bash",
+        )
         self.run(f"{bash} -c './test_bison'", env="conanrun")
