@@ -44,10 +44,11 @@ class AtkConan(ConanFile):
         apply_conandata_patches(self)
 
     def export_sources(self):
-        # Re-declare source + patches so `conan export` captures them
-        # (Conan 2.x requires export_sources() for recipes that apply patches)
-        get(self, **self.conan_data["sources"][self.version], strip_root=True)
-        apply_conandata_patches(self)
+        # Conan 2.x: export_sources() 仅复制配方本地补丁文件到导出缓存，
+        # 不下载源码也不打补丁（源码下载在 source() 阶段）。
+        copy(self, "patches/*.patch",
+             dst=os.path.join(self.export_sources_folder, "patches"),
+             src=self.recipe_folder)
 
     def generate(self):
         tc = MesonToolchain(self)
@@ -55,6 +56,8 @@ class AtkConan(ConanFile):
         tc.project_options["introspection"] = "disabled"
         tc.project_options["docs"] = "false"
         tc.project_options["enable_docs"] = "false"
+        # glib 2.88.0 已通过 Conan 可用，禁用 meson fallback 克隆行为
+        tc.project_options["wrap_mode"] = "nofallback"
         tc.generate()
 
     def build(self):
