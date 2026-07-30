@@ -103,8 +103,7 @@ class TmuxConan(ConanFile):
         tc.generate()
 
     def _build_ncurses(self):
-        build_folder = os.path.join(self.build_folder, "ncurses-build")
-        os.makedirs(build_folder, exist_ok=True)
+        build_folder = self._ncurses_source_folder()
 
         compiler_executables = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
