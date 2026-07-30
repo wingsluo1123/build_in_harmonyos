@@ -1,0 +1,14 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "R8",
+      "file": "archives/f/fluent-bit/5.0.9/patches/0001-ohos-stubs-and-source-patches.patch",
+      "line": 1,
+      "description": "openssl/sqlite3/fts stub 头文件为空声明，链接期空实现（ohos_link_stubs.c）。功能层面 TLS/HTTP_SERVER/SQLDB 已被 CMake -DFLB_TLS=Off 等关闭，stub 只解决无条件编译的核心源（flb_hmac/flb_crypto/flb_sqldb.h）的符号引用，非绕过功能。建议人工确认适配完整性。",
+      "fix_suggestion": "无需修复。stub 策略符合 R8 例外：被 stub 的功能已被 CMake 显式关闭，stub 仅解链接符号缺失（鸿蒙 musl 缺 openssl/sqlite3/fts），不绕过功能逻辑。"
+    }
+  ],
+  "summary": "fluent-bit 5.0.9 鸿蒙 aarch64 零依赖配方审计通过。P0 检查：test_package 真调 fluent-bit 二进制（--version/--help），非空壳（R34 PASS）；无 #ifdef __OHOS__ 空壳 stub，stub 仅解链接符号缺失（R8 例外）。P1 櫸查：首次适配用上游版本 5.0.9（R37 PASS）；不链同名系统库（R26 PASS）；无硬编码路径。配方正确性：conanfile.py 用 Conan 2.x 标准范式（CMake application recipe，0 deps），conandata.yml patches 段 list 格式 + patch_file 含路径前缀，stubs 段自定义 stub bundle 由 build() 解包。test_package 依赖 fluent-bit 二进制（application recipe，bindirs=[bin]），L1e 负面测试确认真依赖。"
+}

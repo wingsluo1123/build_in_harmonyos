@@ -1,0 +1,257 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/5.0.9/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "5.0.9"
+
+# 软件名
+software: "fluent-bit"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-30"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/fluent/fluent-bit/archive/refs/tags/v5.0.9.tar.gz"
+
+  # 源码校验和
+  sha256: "158e86d5fbf605e5aeced06ee94ce41a224b34311627f8f4083d722d1f6d7967"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（OHOS aarch64 零依赖配方：关闭所有需外部库的可选子系统）
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DFLB_DEBUG=Off -DFLB_RELEASE=On -DFLB_EXAMPLES=Off"
+    - "-DFLB_TESTS_INTERNAL=Off -DFLB_TESTS_RUNTIME=Off -DFLB_TESTS_OSSFUZZ=Off"
+    # 核心 TLS / HTTP / AWS / SQLDB / Kafka / Lua / WASM 等子系统全关
+    - "-DFLB_TLS=Off -DFLB_HTTP_SERVER=Off -DFLB_AWS=Off -DFLB_AWS_ERROR_REPORTER=Off"
+    - "-DFLB_SIGNV4=Off -DFLB_KAFKA=Off -DFLB_LUAJIT=Off -DFLB_SQLDB=Off"
+    - "-DFLB_BACKTRACE=Off -DFLB_WASM=Off -DFLB_AVRO_ENCODER=Off -DFLB_ARROW=Off"
+    - "-DFLB_REGEX=Off -DFLB_UTF8_ENCODER=Off -DFLB_UNICODE_ENCODER=Off"
+    - "-DFLB_JEMALLOC=Off -DFLB_VALGRIND=Off -DFLB_SHARED_LIB=Off -DFLB_BINARY=On"
+    - "-DFLB_CONFIG_YAML=Off"
+    # 输入插件（需外部依赖者）
+    - "-DFLB_IN_HTTP=Off -DFLB_IN_ELASTICSEARCH=Off -DFLB_IN_OPENTELEMETRY=Off"
+    - "-DFLB_IN_SPLUNK=Off -DFLB_IN_KAFKA=Off -DFLB_IN_PROMETHEUS_REMOTE_WRITE=Off"
+    - "-DFLB_IN_PROMETHEUS_SCRAPE=Off -DFLB_IN_PROMETHEUS_TEXTFILE=Off"
+    - "-DFLB_IN_DOCKER=Off -DFLB_IN_DOCKER_EVENTS=Off -DFLB_IN_MQTT=Off"
+    - "-DFLB_IN_NGINX_EXPORTER_METRICS=Off -DFLB_IN_NODE_EXPORTER_METRICS=Off"
+    - "-DFLB_IN_KUBERNETES_EVENTS=Off -DFLB_IN_BLOB=Off"
+    # 输出插件（需外部依赖者）
+    - "-DFLB_OUT_HTTP=Off -DFLB_OUT_KAFKA=Off -DFLB_OUT_KAFKA_REST=Off"
+    - "-DFLB_OUT_OPENTELEMETRY=Off -DFLB_OUT_PROMETHEUS_EXPORTER=Off"
+    - "-DFLB_OUT_PROMETHEUS_REMOTE_WRITE=Off -DFLB_OUT_SPLUNK=Off"
+    - "-DFLB_OUT_VIVO_EXPORTER=Off -DFLB_OUT_AZURE=Off -DFLB_OUT_AZURE_BLOB=Off"
+    - "-DFLB_OUT_AZURE_KUSTO=Off -DFLB_OUT_AZURE_LOGS_INGESTION=Off"
+    - "-DFLB_OUT_CLOUDWATCH_LOGS=Off -DFLB_OUT_DATADOG=Off"
+    - "-DFLB_OUT_KINESIS_FIREHOSE=Off -DFLB_OUT_KINESIS_STREAMS=Off"
+    - "-DFLB_OUT_LOKI=Off -DFLB_OUT_S3=Off -DFLB_OUT_STACKDRIVER=Off"
+    - "-DFLB_OUT_BIGQUERY=Off -DFLB_OUT_CHRONICLE=Off -DFLB_OUT_GELF=Off"
+    - "-DFLB_OUT_INFLUXDB=Off -DFLB_OUT_LOGDNA=Off -DFLB_OUT_NATS=Off"
+    - "-DFLB_OUT_NRLOGS=Off -DFLB_OUT_OPENSEARCH=Off -DFLB_OUT_ES=Off"
+    - "-DFLB_OUT_CALYPTIA=Off"
+    # 过滤插件（需外部依赖者）
+    - "-DFLB_FILTER_AWS=Off -DFLB_FILTER_ECS=Off -DFLB_FILTER_GEOIP2=Off"
+    - "-DFLB_FILTER_KUBERNETES=Off -DFLB_FILTER_LUA=Off -DFLB_FILTER_WASM=Off"
+
+  # 编译依赖列表（格式: name/version）
+  # OHOS 零依赖配方：所有可选依赖均已关闭，无任何 conan requires。
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-ohos-stubs-and-source-patches.patch"
+  # 源码改动涵盖：
+  #   - CMakeLists.txt: 加全局 include_directories(BEFORE ${CMAKE_BINARY_DIR}/include/{,monkey/})
+  #     使生成头文件 <mk_core/mk_core_info.h>、<monkey/mk_info.h> 可解析
+  #   - lib/monkey/mk_core/CMakeLists.txt: 加 ${PROJECT_BINARY_DIR}/include/monkey/
+  #   - lib/chunkio/src/cio_utils.c: 本地 <fts.h> 注释（头由 stub 提供）
+  #   - src/flb_http_client.c: 补 #include <flb_upstream_node.h>
+  #   - src/flb_blob_db.c: #else 分支补 stdint/cfl_sds/flb_config include + 修正
+  #     flb_blob_db_file_part_get_next 签名（加 int *part_count 参数）
+  #   - src/CMakeLists.txt: 加 ${CMAKE_BINARY_DIR}/ohos_link_stubs.c 到 src 列表
+  #
+  # stub bundle（ohos-stubs-bundle.tar.gz，由 conanfile.py build() 解包到 build_folder）：
+  #   - openssl/*.h: 空声明 stub（FLB_TLS=Off，flb_hmac/flb_crypto 等仍无条件编译）
+  #   - sqlite3.h: 空 stub（FLB_SQLDB=Off，flb_sqldb.h 仍被引用）
+  #   - fts.h: 鸿蒙 musl 缺 fts.h，chunkio 的 cio_utils.c 用 fts_open/read/close
+  #   - monkey/mk_core_info.h, mk_info.h, mk_env.h: 从 .in 模板生成
+  #   - ohos_link_stubs.c: 链接期空实现（flb_sqldb_*, flb_http_server_*,
+  #     pthread_cancel, sqlite3_clear_bindings）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（完整记录见 notes.md 的"注意事项"段）
+# 知识图谱 E-entry 不适用：这些是单次经验记录，非可复用错误模式
+knowledge_gained: []
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/fluent-bit-5.0.9.orig
+  source_work_dir: /storage/Users/currentUser/builds/fluent-bit-5.0.9.work
+  source_orig_hash: cbac3d09c963416b
+  source_work_hash: 2e43e32e62e5c49c
+  generated_at: '2026-07-30T06:47:49'
+  patches_count: 31
+
+patch_classification:
+  - file: 0001-AGENTS.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-CHUNKS.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-CODE_OF_CONDUCT.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-COMMIT_LINT.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-CONTRIBUTING.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-CONTRIBUTING_DOCS.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-DEVELOPER_GUIDE.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-GOLANG_OUTPUT_PLUGIN.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-GOVERNANCE.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-MAINTAINERS.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-MAINTENANCE.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-README.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-SECURITY.md.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0015-debian.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0016-install.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0017-run_code_analysis.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0018-update_version.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0019-.build-trigger.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0020-.dockerignore.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0021-.gitignore.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0022-.pinact.yaml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0023-CODEOWNERS.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0024-LICENSE.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0025-Vagrantfile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0026-appveyor.yml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0027-fluent-bit-5.0.9.bb.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0028-fluent-bit_git.bb.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0029-fluentbit_logo.png.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0030-valgrind.supp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0031-x.conf.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

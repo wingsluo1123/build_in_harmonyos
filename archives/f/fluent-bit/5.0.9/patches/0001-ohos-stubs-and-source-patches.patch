@@ -1,0 +1,85 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,6 +1,14 @@
+ cmake_minimum_required(VERSION 3.12)
+ project(fluent-bit C)
+ 
++# OHOS adaptation: ensure generated monkey headers are resolvable via angle-bracket
++# includes used throughout lib/monkey (e.g. <monkey/mk_info.h> in mk_scheduler.h,
++# <mk_core/mk_core_info.h> in mk_getopt.h). Generated headers live under
++# ${CMAKE_BINARY_DIR}/include/monkey/ (mk_core_info.h, mk_info.h, mk_env.h).
++include_directories(BEFORE "${CMAKE_BINARY_DIR}/include/")
++include_directories(BEFORE "${CMAKE_BINARY_DIR}/include/monkey/")
++include_directories(BEFORE "${CMAKE_BINARY_DIR}/include/")  # for <openssl/*> stubs
++
+ include(CheckCCompilerFlag)
+ 
+ # CMP0069 ensures that LTO is enabled for all compilers
+--- a/lib/chunkio/src/cio_utils.c
++++ b/lib/chunkio/src/cio_utils.c
+@@ -26,6 +26,7 @@
+ #include <fcntl.h>
+ #include <errno.h>
+ #ifndef _MSC_VER
++/* HarmonyOS musl lacks <fts.h>; use the shim in build/include/fts.h */
+ #include <fts.h>
+ #endif
+ 
+--- a/lib/monkey/mk_core/CMakeLists.txt
++++ b/lib/monkey/mk_core/CMakeLists.txt
+@@ -10,6 +10,7 @@
+ 
+ # Headers
+ include_directories(../include/monkey/)
++include_directories(${PROJECT_BINARY_DIR}/include/monkey/)
+ 
+ # It set's a definition and register into the mk_core_info.h file */
+ macro(MK_DEFINITION var)
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -99,6 +99,8 @@
+   flb_conditionals.c
+   flb_mem.c
+   flb_blob_db.c
++  # HarmonyOS link-time stubs for symbols unavailable when FLB_TLS/HTTP_SERVER/SQLDB=Off
++  ${CMAKE_BINARY_DIR}/ohos_link_stubs.c
+   )
+ 
+ # Config format
+--- a/src/flb_blob_db.c
++++ b/src/flb_blob_db.c
+@@ -1399,6 +1399,13 @@
+ 
+ #else
+ 
++#include <stdint.h>
++#include <stddef.h>
++#include <sys/types.h>          /* off_t */
++#include <cfl/cfl_sds.h>        /* cfl_sds_t */
++#include <fluent-bit/flb_config.h>  /* struct flb_config */
++#include <fluent-bit/flb_blob_db.h>
++
+ int flb_blob_db_open(struct flb_blob_db *context,
+                      struct flb_config *config,
+                      char *path)
+@@ -1512,7 +1519,8 @@
+                                    cfl_sds_t *file_path,
+                                    cfl_sds_t *destination,
+                                    cfl_sds_t *remote_file_id,
+-                                   cfl_sds_t *tag)
++                                   cfl_sds_t *tag,
++                                   int *part_count)
+ {
+     return FLB_BLOB_DB_ERROR_NO_BACKEND_AVAILABLE;
+ }
+--- a/src/flb_http_client.c
++++ b/src/flb_http_client.c
+@@ -55,6 +55,8 @@
+ #include <fluent-bit/tls/flb_tls.h>
+ #include <time.h>
+ #include <fluent-bit/flb_signv4_ng.h>
++#include <fluent-bit/flb_upstream_ha.h>
++#include <fluent-bit/flb_upstream_node.h>
+ 
+ void flb_http_client_debug(struct flb_http_client *c,
+                            struct flb_callback *cb_ctx)

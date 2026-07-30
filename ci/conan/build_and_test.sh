@@ -52,7 +52,7 @@ MISSING_CONANFILE=()
 if [ -n "${CI_PACKAGES:-}" ]; then
     # CI 传入了定向包列表（空格分隔的相对路径，如 "archives/b/bash/5.3"）
     echo "[step] CI_PACKAGES received: $CI_PACKAGES"
-    for pkg_path in ${=CI_PACKAGES}; do
+    for pkg_path in ${CI_PACKAGES}; do
         # Handle both relative and absolute paths
         if [[ "$pkg_path" = /* ]]; then
             pkg_dir="$pkg_path"
@@ -69,13 +69,16 @@ if [ -n "${CI_PACKAGES:-}" ]; then
 else
     # 无定向参数时扫描 archives/ 目录
     echo "[step] No CI_PACKAGES, scanning $SCAN_ROOT/ ..."
+    _scan_tmp="$(mktemp)"
+    find "$REPO_ROOT/$SCAN_ROOT" -name "conanfile.py" \
+        -not -path "*/test_package/*" \
+        -not -path "*/.conan/*" \
+        2>/dev/null | sort > "$_scan_tmp"
     while IFS= read -r f; do
         pkg_dir=$(dirname "$f")
         PACKAGES+=("$pkg_dir")
-    done < <(find "$REPO_ROOT/$SCAN_ROOT" -name "conanfile.py" \
-        -not -path "*/test_package/*" \
-        -not -path "*/.conan/*" \
-        2>/dev/null | sort)
+    done < "$_scan_tmp"
+    rm -f "$_scan_tmp"
 fi
 
 if [ ${#PACKAGES[@]} -eq 0 ]; then
@@ -209,6 +212,8 @@ for pkg_dir in "${PACKAGES[@]}"; do
     CONANDATA="$pkg_dir/conandata.yml"
     if [ -f "$CONANDATA" ] && grep -q "^patches:" "$CONANDATA" 2>/dev/null; then
         # 提取 patches 段下的 key (缩进的行, 取第一个 token 去掉引号/冒号)
+        _patches_tmp="$(mktemp)"
+        sed -n '/^patches:/,/^[a-z]/p' "$CONANDATA" | grep '^[[:space:]]' > "$_patches_tmp"
         while IFS= read -r raw_key; do
             # 去掉前导空格和引号
             key=$(echo "$raw_key" | sed 's/^[[:space:]]*//; s/^["'"'"']//; s/["'"'"']:$//; s/:$//')
@@ -229,7 +234,8 @@ for pkg_dir in "${PACKAGES[@]}"; do
                 L0_ERRORS="${L0_ERRORS} bad_patch_format"
                 break
             fi
-        done < <(sed -n '/^patches:/,/^[a-z]/p' "$CONANDATA" | grep '^[[:space:]]')
+        done < "$_patches_tmp"
+        rm -f "$_patches_tmp"
     fi
 
     # L0h: shell 环境变量依赖检测 (R33: 禁止在 self.run() 中裸用 ${CC}/${CFLAGS} 等)
@@ -823,7 +829,7 @@ PYEOF
                 SYS_SO="$SYS_SO $(ls "$sys_lib_dir"/*.so* 2>/dev/null | xargs -n1 basename 2>/dev/null || true)"
             done
             # 检查包产出的 .so 是否与系统同名
-            for lib_file in "$LIBS"/*.so*(N); do
+            for lib_file in "$LIBS"/*.so*; do
                 [ -f "$lib_file" ] || continue
                 lib_basename="${lib_file##*/}"
                 # 去版本号后缀比较 (libfoo.so.1.2.3 -> libfoo.so)
@@ -913,7 +919,7 @@ PYEOF
         echo "[step] L2: Smoke test (version/help check)..."
         if [ -n "$BINS" ] && [ -d "$BINS" ]; then
             _found_exec=false
-            for bin_file in "$BINS"/*(N); do
+            for bin_file in "$BINS"/*; do
                 [ -f "$bin_file" ] || continue
                 [ -x "$bin_file" ] || continue
                 _found_exec=true
