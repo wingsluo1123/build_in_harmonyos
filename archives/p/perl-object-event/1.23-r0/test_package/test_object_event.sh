@@ -4,9 +4,8 @@
 set -euo pipefail
 
 # PERL5LIB is set by Conan's conanrun environment, which includes:
-#   1. Package's lib/perl5 path (Object::Event itself)
-#   2. System Perl @INC paths (common::sense, AnyEvent)
-# No hardcoded paths needed — portability handled by conanfile.py package_info().
+#   Package's lib/perl5 path (Object::Event itself)
+# No additional system paths needed — patch removes common::sense/AnyEvent deps.
 
 # Test 1: Module loads successfully
 perl -MObject::Event -e 'exit 0'

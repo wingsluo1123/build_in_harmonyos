@@ -3,13 +3,12 @@
 
 perl-object-event 1.23-r0 — Object::Event: Perl event callback interface
 
-Runtime dependencies (Perl modules, not Conan packages):
-  - common::sense  (user-installed, not in system Perl @INC)
-  - AnyEvent        (user-installed, not in system Perl @INC)
-  - Carp            (Perl core module)
+Patch removes hard dependencies on common::sense and AnyEvent, replacing
+them with standard Perl pragmas and a minimal inline guard implementation.
+This makes the module self-contained for OHOS environments where these
+CPAN modules are not pre-installed.
 """
 import os
-import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -29,8 +28,7 @@ class PerlobjecteventConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # Runtime deps: common::sense, AnyEvent are user-installed Perl modules
-        # (not Conan packages, not in system Perl @INC in CI)
+        # Runtime deps (common::sense, AnyEvent) removed by patch — module is self-contained
         pass
 
     def source(self):
@@ -52,22 +50,3 @@ class PerlobjecteventConan(ConanFile):
         self.cpp_info.libs = []
         # Set PERL5LIB so consumers (test_package) can find Object::Event
         self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))
-        # Dynamically add system Perl @INC paths for runtime dependencies
-        # (common::sense, AnyEvent are user-installed, not in default @INC in CI)
-        try:
-            result = subprocess.run(
-                ["perl", "-e", "print join(chr(58), grep { $_ ne q{.} && -d } @INC)"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                for inc_path in result.stdout.strip().split(":"):
-                    inc_path = inc_path.strip()
-                    if inc_path:
-                        self.runenv_info.append_path("PERL5LIB", inc_path)
-            elif result.returncode != 0:
-                self.output.warning(
-                    f"perl @INC query exited with code {result.returncode}: "
-                    f"{result.stderr.strip()}"
-                )
-        except Exception as e:
-            self.output.warning(f"Failed to query system Perl @INC: {e}")
