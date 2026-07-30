@@ -72,6 +72,11 @@ class BadreadConan(ConanFile):
                 with zipfile.ZipFile(os.path.join(wheel_dir, whl)) as z:
                     z.extractall(site_pkg)
                 break
+        else:
+            raise ConanInvalidConfiguration(
+                f"No .whl file found in {wheel_dir}; "
+                "pip wheel build may have failed or output to an unexpected location"
+            )
 
         # 创建 bin/badread wrapper — 设置 PYTHONPATH 指向同级 site-packages
         bin_dir = os.path.join(self.package_folder, "bin")
