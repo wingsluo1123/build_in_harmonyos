@@ -4,7 +4,6 @@
 Depends on ncurses/6.5 (Conan package) for terminal UI.
 """
 
-import os
 import shlex
 
 from conan import ConanFile
@@ -81,7 +80,7 @@ class NbsdgamesConan(ConanFile):
         )
 
     def package(self):
-        prefix = self.package_folder
+        prefix = shlex.quote(self.package_folder)
         source_dir = shlex.quote(self.source_folder)
         make_args = self._make_arguments()
         self.run(
