@@ -1,5 +1,11 @@
 # badread 0.4.2 适配笔记
 
+## CI 审查修复（2026-07-30）
+- 删除 test_package/ 下 7 个 Conan 自动生成的 shell 脚本（硬编码路径）
+- conandata.yml 只保留官方 GitHub 源 URL，删除 6 个镜像 URL（符合 R39）
+- conanfile.py 第 61 行 env 参数修正: "conanbuild" → "BUILD"
+- 本地 conan create 验证通过，输出 Badread v0.4.2
+
 ## 编译环境
 - 构建系统: custom (pip wheel)
 - 编译日期: 2026-07-28
