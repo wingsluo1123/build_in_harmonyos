@@ -77,7 +77,7 @@ class NanoConan(ConanFile):
             )
 
         configure_args = [
-            os.path.join(self._ncurses_source_folder(), "configure"),
+            "./configure",
             f"--prefix={self._ncurses_prefix()}",
             "--build=aarch64-unknown-linux-gnu",
             "--host=aarch64-unknown-linux-gnu",
