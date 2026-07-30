@@ -19,12 +19,12 @@
 | Step 8 staging | ✅ | bin/swig + bin/ccache-swig 验证通过 |
 | Step 2.5 conan-init | ✅ | conanfile.py + conandata.yml + test_package/ 生成 |
 | Step 2.6 conan-verify | ✅ | 8 道门禁全部通过 |
-| Step 3 finish | ⏳ | 待执行 |
+| Step 3 finish | ✅ | 已完成 |
 
 ## 发现与知识
 
 ### 平台适配补丁（4 个，同 4.4.0）
-1. CCache/configure: /tmp 只读修复（mktemp 用 $TMPDIR，umask 077→007）
+1. CCache/configure: /tmp 只读修复（mktemp 用 $TMPDIR）
 2. Tools/config/config.guess: HarmonyOS 平台检测
 3. Tools/config/config.sub: OHOS OS 识别
 4. configure: /tmp 只读修复（同 #1）
