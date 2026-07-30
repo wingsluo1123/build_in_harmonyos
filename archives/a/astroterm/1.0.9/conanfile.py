@@ -6,20 +6,23 @@ positions of stars, planets, and constellations. Upstream uses the Meson build
 system and depends on argtable3, ncurses, and the math library.
 
 R26: Terminal tools must be statically linked for DevBox deployment.
-R27: ncurses is provided by the system toolchain.
+The OHOS build uses official cmd-pkgs ncurses because CI workers do not ship
+the corresponding development headers.
 """
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.files import (
+    apply_conandata_patches,
+    copy,
+    download,
     export_conandata_patches,
     get,
-    patch,
     replace_in_file,
 )
 from conan.tools.layout import basic_layout
-from conan.errors import ConanInvalidConfiguration
 
 
 class AstrotermConan(ConanFile):
@@ -31,13 +34,19 @@ class AstrotermConan(ConanFile):
     )
     license = "MIT"
     homepage = "https://github.com/da-luce/astroterm"
-    url = ""  # CI fills this
+    url = "https://github.com/da-luce/astroterm"
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
+        copy(
+            self,
+            "*",
+            src=os.path.join(self.recipe_folder, "res"),
+            dst=os.path.join(self.export_sources_folder, "res"),
+        )
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -50,17 +59,44 @@ class AstrotermConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        download(
+            self,
+            **self.conan_data["bsc5_source"],
+            filename=os.path.join(self.source_folder, "data", "bsc5"),
+        )
         get(
             self,
             **self.conan_data["argtable3_source"],
             destination=os.path.join(self.source_folder, "deps", "argtable3"),
             strip_root=True,
         )
+        get(
+            self,
+            **self.conan_data["ncurses_ohos"],
+            destination=os.path.join(self.source_folder, "deps", "ncurses-ohos"),
+        )
+        # Copy exported res/ (ncurses headers) into source folder so that
+        # generate()/build() can reference res/ncurses/include consistently.
+        copy(
+            self,
+            "*",
+            src=os.path.join(self.export_sources_folder, "res"),
+            dst=os.path.join(self.source_folder, "res"),
+        )
 
     def generate(self):
         tc = MesonToolchain(self)
         # R26: Terminal tools must be statically linked
         tc.project_options["default_library"] = "static"
+        if self.settings.os == "OHOS":
+            ncurses_include = os.path.join(
+                self.source_folder, "res", "ncurses", "include"
+            ).replace("\\", "/")
+            # Upstream public headers expose curses types to targets that do
+            # not depend directly on the Meson curses dependency.
+            tc.extra_cflags.extend(
+                [f"-I{ncurses_include}", "-DNCURSES_WIDECHAR"]
+            )
         tc.generate()
         self._inject_meson_archiver()
 
@@ -95,18 +131,7 @@ class AstrotermConan(ConanFile):
             handle.write(content.replace("[binaries]\n", binaries, 1))
 
     def build(self):
-        # Apply patches conditionally: 0003 (curses OHOS fallback) is
-        # OHOS-only. On Linux/macOS the original dependency('curses')
-        # via pkg-config is preserved, keeping the recipe portable.
-        for p in self.conan_data.get("patches", []):
-            patch_file = p["patch_file"]
-            if "0003" in patch_file and self.settings.os != "OHOS":
-                continue
-            patch(
-                self,
-                base_path=self.source_folder,
-                patch_file=os.path.join(self.export_sources_folder, patch_file),
-            )
+        apply_conandata_patches(self)
         meson_file = os.path.join(self.source_folder, "meson.build")
         replace_in_file(
             self,
@@ -117,9 +142,35 @@ class AstrotermConan(ConanFile):
             "        include_directories: include_directories('deps/argtable3/src'),\n"
             "    )",
         )
+        if self.settings.os == "OHOS":
+            ncurses_include = os.path.join(
+                self.source_folder, "res", "ncurses", "include"
+            )
+            ncurses_library = os.path.join(
+                self.source_folder,
+                "deps",
+                "ncurses-ohos",
+                "lib",
+                "libncursesw.a",
+            )
+            for required_path in (ncurses_include, ncurses_library):
+                if not os.path.exists(required_path):
+                    raise ConanInvalidConfiguration(
+                        f"required OHOS ncurses asset missing: {required_path}"
+                    )
+            ncurses_library = ncurses_library.replace("\\", "/")
+            replace_in_file(
+                self,
+                meson_file,
+                "curses = dependency('curses', required : true)",
+                "curses = declare_dependency(\n"
+                "        include_directories: include_directories('res/ncurses/include'),\n"
+                f"        link_args: ['{ncurses_library}'],\n"
+                "    )",
+            )
         meson = Meson(self)
         meson.configure()
-        meson.compile()
+        meson.build()
 
     def package(self):
         meson = Meson(self)
