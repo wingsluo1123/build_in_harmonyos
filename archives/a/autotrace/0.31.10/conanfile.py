@@ -161,7 +161,14 @@ class AutotraceConan(ConanFile):
             raise ConanInvalidConfiguration(
                 f"pkg-config {' '.join(args)} failed: {result.stderr.strip()}"
             )
-        return shlex.split(result.stdout.strip())
+        return self._without_ohos_loader_link_flags(shlex.split(result.stdout.strip()))
+
+    @staticmethod
+    def _without_ohos_loader_link_flags(flags):
+        return [
+            flag for flag in flags
+            if not (flag.startswith("-l:ld-musl-") and flag.endswith(".so.1"))
+        ]
 
     def _dependency_pkg_config_name(self, dependency):
         dependency_info = self.dependencies[dependency]

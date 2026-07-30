@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate autotrace package layout and public API."""
 import os
+import shlex
 import struct
 import subprocess
 import sys
@@ -22,6 +23,13 @@ def require_text(path, *needles):
         raise AssertionError(f"{path} is missing expected text: {missing}")
 
 
+def without_ohos_loader_link_flags(flags):
+    return [
+        flag for flag in flags
+        if not (flag.startswith("-l:ld-musl-") and flag.endswith(".so.1"))
+    ]
+
+
 def pkg_config_flags(args):
     result = subprocess.run(
         ["pkg-config", *args],
@@ -32,7 +40,7 @@ def pkg_config_flags(args):
     )
     if result.returncode != 0:
         raise AssertionError(f"pkg-config {' '.join(args)} failed: {result.stderr.strip()}")
-    return result.stdout.split()
+    return without_ohos_loader_link_flags(shlex.split(result.stdout.strip()))
 
 
 def compile_and_link_api_probe(pkg, cc, run_binary):
