@@ -48,11 +48,23 @@ class GtkMacIntegrationConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
+    def _glib_include_dirs(self):
+        glib_folder = self.dependencies["glib"].package_folder
+        return [
+            os.path.join(glib_folder, "include", "glib-2.0").replace("\\", "/"),
+            os.path.join(glib_folder, "lib", "glib-2.0", "include").replace(
+                "\\", "/"
+            ),
+        ]
+
     def generate(self):
         CMakeDeps(self).generate()
         tc = CMakeToolchain(self)
+        glib_include_dir, glib_config_include_dir = self._glib_include_dirs()
         tc.variables["BUILD_SHARED_LIBS"] = False
         tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = self.options.fPIC
+        tc.variables["GLIB_INCLUDE_DIR"] = glib_include_dir
+        tc.variables["GLIB_CONFIG_INCLUDE_DIR"] = glib_config_include_dir
         tc.generate()
 
     def build(self):
@@ -72,10 +84,11 @@ class GtkMacIntegrationConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["gtkmacintegration-gtk3"]
+        self.cpp_info.includedirs = ["include", *self._glib_include_dirs()]
         self.cpp_info.set_property("cmake_file_name", "gtk-mac-integration")
         self.cpp_info.set_property(
             "cmake_target_name", "gtk-mac-integration::gtk-mac-integration"
         )
         self.cpp_info.set_property("pkg_config_name", "gtk-mac-integration-gtk3")
         self.cpp_info.defines = ["GTKOSX_HARMONYOS_COMPAT=1"]
-        self.cpp_info.requires = ["glib::gobject-2.0"]
+        self.cpp_info.requires = ["glib::glib"]

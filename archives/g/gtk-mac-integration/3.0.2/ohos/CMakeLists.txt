@@ -13,13 +13,14 @@ target_include_directories(
     gtkmacintegration-gtk3
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+        $<BUILD_INTERFACE:${GLIB_INCLUDE_DIR}>
+        $<BUILD_INTERFACE:${GLIB_CONFIG_INCLUDE_DIR}>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(
     gtkmacintegration-gtk3
     PUBLIC
         glib::glib
-        glib::gobject
 )
 
 install(
