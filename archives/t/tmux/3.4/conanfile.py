@@ -15,7 +15,6 @@ from conan.tools.files import (
     get,
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
-from conan.tools.gnu.get_gnu_triplet import _get_gnu_triplet
 from conan.tools.layout import basic_layout
 
 
@@ -55,6 +54,40 @@ class TmuxConan(ConanFile):
     def _ncurses_prefix(self):
         return os.path.join(self.build_folder, "ncurses-prefix")
 
+    @staticmethod
+    def _settings_triplet(settings):
+        arch = str(settings.arch)
+        machine = {
+            "x86": "i686",
+            "x86_64": "x86_64",
+            "armv8": "aarch64",
+            "armv8_32": "aarch64",
+            "armv8.3": "aarch64",
+        }.get(arch)
+        if machine is None and arch.startswith("arm"):
+            machine = "arm"
+        if machine is None:
+            raise ConanInvalidConfiguration(
+                f"Cannot derive a GNU triplet for architecture {arch}"
+            )
+
+        os_name = str(settings.os)
+        system = {
+            "Linux": "linux-gnu",
+            "OHOS": "linux-ohos",
+        }.get(os_name)
+        if system is None:
+            raise ConanInvalidConfiguration(
+                f"Cannot derive a GNU triplet for operating system {os_name}"
+            )
+        if machine == "arm":
+            system += "eabi"
+            if arch in ("armv5hf", "armv7hf"):
+                system += "hf"
+        elif arch == "armv8_32":
+            system += "_ilp32"
+        return f"{machine}-{system}"
+
     def generate(self):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
@@ -83,16 +116,12 @@ class TmuxConan(ConanFile):
                 "tools.build:compiler_executables must define c and cpp"
             )
 
-        compiler = str(self.settings.compiler)
-        host_triplet = self.conf.get("tools.gnu:host_triplet") or _get_gnu_triplet(
-            str(self.settings.os), str(self.settings.arch), compiler=compiler
-        )["triplet"]
-        build_compiler = str(self.settings_build.compiler)
-        build_triplet = self.conf.get("tools.gnu:build_triplet") or _get_gnu_triplet(
-            str(self.settings_build.os),
-            str(self.settings_build.arch),
-            compiler=build_compiler,
-        )["triplet"]
+        host_triplet = self.conf.get(
+            "tools.gnu:host_triplet"
+        ) or self._settings_triplet(self.settings)
+        build_triplet = self.conf.get(
+            "tools.gnu:build_triplet"
+        ) or self._settings_triplet(self.settings_build)
 
         configure_args = [
             os.path.join(self._ncurses_source_folder(), "configure"),
