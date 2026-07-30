@@ -37,6 +37,10 @@ class Smpeg2Conan(ConanFile):
     def requirements(self):
         self.requires("sdl2/2.30.10")
 
+    def build_requirements(self):
+        self.tool_requires("automake/1.18")
+        self.tool_requires("libtool/2.5.4")
+
     def layout(self):
         basic_layout(self)
 
