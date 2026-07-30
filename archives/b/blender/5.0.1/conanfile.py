@@ -59,7 +59,7 @@ class BlenderConan(ConanFile):
         tc = CMakeToolchain(self)
 
         # Platform settings
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+        tc.variables["CMAKE_SYSTEM_NAME"] = "OHOS"
         tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
 
         # Headless mode - essential for OHOS server/renderfarm
@@ -125,5 +125,6 @@ class BlenderConan(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["bf_intern_cycles"]
-        self.cpp_info.systems = ["b"]  # bionic libc on OHOS
+        # Blender is primarily an application, no public linkable libraries
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.system_libs = ["c"]  # musl libc on OHOS
