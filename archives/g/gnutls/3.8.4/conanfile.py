@@ -21,6 +21,7 @@ class GnuTLSConan(ConanFile):
     license = "LGPL-2.1-or-later"
     homepage = "https://www.gnutls.org"
     url = "https://github.com/gnutls/gnutls"
+    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -63,6 +64,6 @@ class GnuTLSConan(ConanFile):
         copy(self, "gnutls-serv", os.path.join(self.source_folder, "src"), os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
-        self.cpp_info.libs = ["gnutls", "gnutlsxx"]
+        self.cpp_info.libs = ["gnutls"]
         self.cpp_info.includedirs = ["include"]
         self.conf_info.define("user.gnutls:cli", os.path.join(self.package_folder, "bin", "gnutls-cli"))
