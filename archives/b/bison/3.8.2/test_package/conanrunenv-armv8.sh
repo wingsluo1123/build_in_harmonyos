@@ -1,3 +1,4 @@
+set -euo pipefail
 script_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanrunenv-armv8.sh"
 for v in PATH

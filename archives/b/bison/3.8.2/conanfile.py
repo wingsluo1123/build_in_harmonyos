@@ -6,6 +6,7 @@ but the OHOS filesystem doesn't allow writing files into such directories.
 We patch config.status after configure to use umask 000 and add chmod.
 """
 import os
+import re
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -62,13 +63,31 @@ class BisonConan(ConanFile):
         if os.path.exists(cs):
             with open(cs, "r") as f:
                 content = f.read()
-            # Replace umask 077 with umask 000 so temp dirs are world-writable
-            content = content.replace("umask 077", "umask 000")
-            # Also add chmod after temp dir creation for extra safety
-            content = content.replace(
-                "ac_tmp=$tmp",
-                'ac_tmp=$tmp\n  chmod 777 "$ac_tmp" 2>/dev/null'
+            # Replace umask 077 with umask 000 so temp dirs are world-writable.
+            # Use re.sub + explicit success check: str.replace() would silently
+            # return the original string if upstream config.status changes its
+            # whitespace/variable naming, and the build would later fail with
+            # a cryptic "Permission denied" instead of a clear patch failure.
+            new_content, n = re.subn(r"umask\s+077", "umask 000", content, count=1)
+            if n == 0:
+                raise RuntimeError(
+                    "config.status patch failed: 'umask 077' pattern not found "
+                    "(upstream bison may have changed config.status format)"
+                )
+            content = new_content
+            # Also add chmod after temp dir creation for extra safety.
+            new_content, n = re.subn(
+                r"(^|(?<=\n))(\s*ac_tmp=\$tmp)",
+                r"\2\n  chmod 755 \"$ac_tmp\" 2>/dev/null",
+                content,
+                count=1,
             )
+            if n == 0:
+                raise RuntimeError(
+                    "config.status patch failed: 'ac_tmp=$tmp' pattern not found "
+                    "(upstream bison may have changed config.status format)"
+                )
+            content = new_content
             with open(cs, "w") as f:
                 f.write(content)
 
