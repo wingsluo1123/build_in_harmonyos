@@ -50,9 +50,10 @@ class TcpkaliConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # R26: ncurses is a system library, static link to avoid polluting /lib
         tc.extra_ldflags.append("-static")
-        # Force build triplet for OHOS cross-compilation (config.guess may not
-        # recognize HarmonyOS)
-        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        # config.guess may not recognize HarmonyOS; derive build triplet from
+        # settings.arch so it works for any target architecture.
+        build_arch = "aarch64" if str(self.settings.arch) == "armv8" else str(self.settings.arch)
+        tc.configure_args.append(f"--build={build_arch}-unknown-linux-gnu")
         tc.generate()
 
     def build(self):
