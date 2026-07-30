@@ -20,6 +20,11 @@
 ### 3. 平台识别
 - CMake 构建不读取 autotools 的 config.guess，因此不需要平台识别补丁。
 
+### 4. 消费者缺少 SDL2 头文件路径
+- **问题**: SDL2_ttf 本体构建成功，但 test_package 编译 `SDL_ttf.h` 时找不到 `SDL.h`。
+- **根因**: `sdl2/2.30.10` 将头文件安装到 `include/SDL2`，其已发布配方未导出该子目录。
+- **解决方案**: 在 SDL2_ttf 的 `package_info()` 中同时导出自身和 SDL2 依赖的实际头文件目录。
+
 ## 编译流程
 1. 源码下载: 从 GitHub releases 下载（网络需要长超时）
 2. cmake configure: 使用系统库（harfbuzz, freetype, SDL2）
@@ -29,7 +34,7 @@
 
 ## 依赖关系
 - SDL2 (>= 2.0.10)
-- FreeType2 (26.6.20)
+- FreeType2 (2.14.3)
 - Harfbuzz (14.2.0)
 - libpng (16.39.0)
 - zlib (1.3.1)

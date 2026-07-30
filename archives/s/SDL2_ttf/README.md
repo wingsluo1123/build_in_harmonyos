@@ -5,7 +5,7 @@ SDL2_ttf is a library that provides support for TrueType fonts in SDL2 applicati
 ## Dependencies
 
 - SDL2 2.30.10 (required)
-- FreeType 26.6.20 (external)
+- FreeType 2.14.3 (external)
 - HarfBuzz 14.2.0 (external)
 - libpng 16.39.0
 - zlib 1.3.1

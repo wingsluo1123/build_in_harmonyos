@@ -91,8 +91,11 @@ class Sdl2TtfConan(ConanFile):
         cmake.install()
 
     def package_info(self):
+        sdl2_include = os.path.join(
+            self.dependencies["sdl2"].package_folder, "include", "SDL2"
+        )
         self.cpp_info.libs = ["SDL2_ttf"]
-        self.cpp_info.includedirs = ["include/SDL2"]
+        self.cpp_info.includedirs = ["include/SDL2", sdl2_include]
         self.cpp_info.requires = [
             "sdl2::sdl2",
             "freetype::freetype",
