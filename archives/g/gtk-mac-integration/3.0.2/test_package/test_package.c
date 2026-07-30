@@ -13,6 +13,7 @@ int main(void)
 {
     GtkosxApplication *app = gtkosx_application_get();
     GtkosxApplication *same_app = gtkosx_application_get();
+    GtkosxApplicationClass *app_class;
     guint activation_count = 0;
     gchar *bundle_path = NULL;
     gchar *resource_path = NULL;
@@ -27,6 +28,12 @@ int main(void)
     }
     if (same_app != app) {
         return 2;
+    }
+    app_class = GTKOSX_APPLICATION_GET_CLASS(app);
+    if (app_class == NULL ||
+        !GTKOSX_IS_APPLICATION_CLASS(app_class) ||
+        GTKOSX_APPLICATION_CLASS(app_class) != app_class) {
+        return 11;
     }
 
     gtkosx_application_set_use_quartz_accelerators(app, FALSE);
