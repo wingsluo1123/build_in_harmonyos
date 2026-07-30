@@ -7,7 +7,7 @@
 ## v8.7 Conan 迁移 (2026-07-26)
 
 - conanfile.py: Autotools + E007 补丁 + E097 umask 修复
-- conandata.yml: https://ftp.openbsd.org/pub/OpenBSD/distfiles/popt-1.16.tar.gz
+- conandata.yml: http://ftp.rpm.org/mirror/popt/popt-1.16.tar.gz
 - test_package: CMake + test_popt.c (popt API 命令行解析)
 - conan create 验证通过: configure → make → install → test_package 1/1 ✅
 - E097 新增: autoconf umask 077 在 HMDFS setgid 下导致 config.status 权限错误
@@ -22,13 +22,13 @@
 | 版本 | 1.16 |
 | 状态 | ✅ built |
 | 构建系统 | autotools |
-| 下载源 | https://ftp.openbsd.org/pub/OpenBSD/distfiles/popt-1.16.tar.gz |
+| 下载源 | http://ftp.rpm.org/mirror/popt/popt-1.16.tar.gz |
 | 平台 | aarch64-unknown-linux-ohos |
 
 ## 二、编译步骤
 
 ### Phase 1: 环境准备
-- [x] ohc-run.py init-build popt 1.16 --url=https://ftp.openbsd.org/pub/OpenBSD/distfiles/popt-1.16.tar.gz
+- [x] ohc-run.py init-build popt 1.16 --url=http://ftp.rpm.org/mirror/popt/popt-1.16.tar.gz
 - [x] 源码下载解压完成
 
 ### Phase 2: 编译
