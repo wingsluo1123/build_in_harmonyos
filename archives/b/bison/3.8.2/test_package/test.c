@@ -2,9 +2,10 @@
  * test.c — bison test_package smoke test.
  *
  * bison is a command-line tool (not a library), so this test verifies the
- * bison binary is callable and can parse a minimal grammar. We invoke it
- * via system() with the grammar on stdin and check the generated parser
- * source is non-empty.
+ * bison binary is callable and can parse a minimal grammar. We write a
+ * minimal grammar to a temporary file and invoke bison on it, then check
+ * the generated parser source is non-empty. We avoid stdin heredoc because
+ * Conan's self.run() on OHOS may not have a usable stdin attached.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,19 +25,22 @@ static int file_exists(const char *path) {
 }
 
 int main(void) {
-    /* Path to the generated parser output (in TMPDIR or cwd). */
+    const char *in_path  = "test_minimal.y";
     const char *out_path = "test_y.tab.c";
     char cmd[1024];
+    FILE *f;
 
-    /* Run bison on a minimal grammar, writing parser to out_path.
-     * '-' tells bison to read the grammar from stdin (the heredoc). */
-    snprintf(cmd, sizeof(cmd),
-             "bison -o %s - <<'EOF'\n"
-             "%%\n"
-             "start: ;\n"
-             "%%\n"
-             "EOF",
-             out_path);
+    /* Write a minimal grammar to a temp file. */
+    f = fopen(in_path, "w");
+    if (!f) {
+        fprintf(stderr, "FAIL: cannot create %s\n", in_path);
+        return 1;
+    }
+    fprintf(f, "%s\nstart: ;\n%s\n", "%%", "%%");
+    fclose(f);
+
+    /* Run bison on the grammar file. */
+    snprintf(cmd, sizeof(cmd), "bison -o %s %s", out_path, in_path);
 
     if (run_cmd(cmd) != 0) {
         fprintf(stderr, "FAIL: bison invocation returned non-zero exit\n");
@@ -49,5 +53,9 @@ int main(void) {
     }
 
     printf("PASS: bison generated parser source %s\n", out_path);
+
+    /* Cleanup temp files (best-effort). */
+    remove(in_path);
+    remove(out_path);
     return 0;
 }
