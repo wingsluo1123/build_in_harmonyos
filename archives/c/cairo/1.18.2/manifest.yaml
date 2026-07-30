@@ -18,7 +18,7 @@ status: built
 build_system: meson
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-29"
+build_date: "2026-07-28"
 
 # ============================================================
 # 源码信息
@@ -29,7 +29,7 @@ source:
   url: "https://cairographics.org/releases/cairo-1.18.2.tar.xz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "a62b9bb42425e844cc3d6ddde043ff39dbabedd1542eba57a2eb79f85889d45a"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -49,11 +49,15 @@ build:
     - "-Dbuildtype=release"
     - "-Dxlib=disabled"
     - "-Dxcb=disabled"
-    - "-Dfontconfig=disabled"
+    - "-Dfontconfig=enabled"
+    - "-Dtests=disabled"
+    - "-Dwrap_mode=nofallback"
+    - "-Dc_args=-DHAVE_CTIME_R"
 
   # 编译依赖列表（格式: name/version）
   dependencies:
     - "pixman/0.46.4"
+    - "fontconfig/2.16.0"
     - "freetype2/26.6.20"
     - "libpng/1.6.43"
     - "glib-2.0/2.88.0"
@@ -77,7 +81,10 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "cairo static ctime_r 与 OHOS sysroot time.h 冲突, 需 -DHAVE_CTIME_R 跳过"
+  - "meson 在 conan 构建环境中 PATH 被覆盖, 需 --native-file 指定编译器全路径"
+  - "meson 会尝试 git clone 下载 subproject, 需 -Dwrap_mode=nofallback 禁止"
+  - "OHOS 强制 dlopen .so 签名校验, 需 binary-sign-tool 自签名"
+  - "test_package 运行时需 runenv_info LD_LIBRARY_PATH 指向系统库目录"
+  - "R40 headless 模式: 禁用 xlib/xcb, 保留 image/png/pdf/ps/svg 后端, 满足非窗口渲染需求"
