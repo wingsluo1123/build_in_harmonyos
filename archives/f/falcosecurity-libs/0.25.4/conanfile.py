@@ -70,6 +70,9 @@ class FalcoSecurityLibsConan(ConanFile):
         tc.cache_variables["BUILD_LIBSINSP_EXAMPLES"] = False
         tc.cache_variables["BUILD_LIBSCAP_MODERN_BPF"] = False
         tc.cache_variables["ENABLE_ENGINE_KMOD"] = False
+        # R33: Store OHOS cross-compiler path in CMake cache for package()
+        # to read instead of falling back to host-environment CC variable.
+        tc.cache_variables["FALCOSECURITY_OHOS_CC"] = "aarch64-linux-ohos-clang"
         tc.generate()
 
     def build(self):
@@ -118,8 +121,17 @@ class FalcoSecurityLibsConan(ConanFile):
             fix_so = os.path.join(lib_dir, "libscap_error_fix.so")
             if not os.path.exists(fix_so):
                 self.run("ar x " + scap_error_a + " strerror.c.obj", cwd=lib_dir)
-                cc = os.environ.get("CC", "clang")
-                self.run(cc + " -shared -fPIC -o libscap_error_fix.so strerror.c.obj", cwd=lib_dir)
+                # R33: Read OHOS cross-compiler from CMake cache (set in generate())
+                # instead of os.environ["CC"] to avoid host-toolchain fallback issues.
+                cmake_cache = os.path.join(self.build_folder, "CMakeCache.txt")
+                ohos_cc = "aarch64-linux-ohos-clang"
+                if os.path.exists(cmake_cache):
+                    with open(cmake_cache) as _f:
+                        for _line in _f:
+                            if _line.startswith("FALCOSECURITY_OHOS_CC:"):
+                                ohos_cc = _line.split("=", 1)[1].strip()
+                                break
+                self.run(ohos_cc + " -shared -fPIC -o libscap_error_fix.so strerror.c.obj", cwd=lib_dir)
                 os.unlink(os.path.join(lib_dir, "strerror.c.obj"))
             self.run("patchelf --set-rpath '$ORIGIN' " + fix_so)
             self.run("patchelf --add-needed 'libscap_error_fix.so' " + scap_event)
