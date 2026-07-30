@@ -343,6 +343,38 @@ class PerlobjectpadConan(ConanFile):
              src=os.path.join(stage, "lib", "perl5", "aarch64-linux"),
              dst=os.path.join(self.package_folder, "lib", "perl5"))
 
+        # Copy XS::Parse::Keyword and XS::Parse::Sublike runtime modules
+        # These are runtime dependencies of Object::Pad. They are installed
+        # to perl5lib during build() by _ensure_perl_deps(). Without packaging
+        # them, the Perl API test in test_package cannot load Object::Pad.
+        perl5lib_arch = os.path.join(
+            self.build_folder, "perl5lib", "lib", "perl5", "aarch64-linux")
+        if os.path.isdir(perl5lib_arch):
+            # Copy XS .pm modules (XS/Parse/Keyword.pm, Sublike.pm, etc.)
+            xs_src = os.path.join(perl5lib_arch, "XS")
+            if os.path.isdir(xs_src):
+                copy(self, "*.pm", src=xs_src,
+                     dst=os.path.join(self.package_folder, "lib", "perl5",
+                                      "aarch64-linux", "XS"))
+            # Copy XS .so files (auto/XS/Parse/Keyword/Keyword.so, etc.)
+            auto_xs_src = os.path.join(perl5lib_arch, "auto", "XS")
+            if os.path.isdir(auto_xs_src):
+                copy(self, "*.so", src=auto_xs_src,
+                     dst=os.path.join(self.package_folder, "lib", "perl5",
+                                      "aarch64-linux", "auto", "XS"))
+            # Copy Sublike module
+            sublike_src = os.path.join(perl5lib_arch, "Sublike")
+            if os.path.isdir(sublike_src):
+                copy(self, "*.pm", src=sublike_src,
+                     dst=os.path.join(self.package_folder, "lib", "perl5",
+                                      "aarch64-linux", "Sublike"))
+            # Copy shared include headers for XS modules
+            share_src = os.path.join(perl5lib_arch, "auto", "share", "module")
+            if os.path.isdir(share_src):
+                copy(self, "*.h", src=share_src,
+                     dst=os.path.join(self.package_folder, "lib", "perl5",
+                                      "aarch64-linux", "auto", "share", "module"))
+
     def package_info(self):
         # Pad.so is a Perl XS module loaded by Perl runtime via DynaLoader,
         # not linked by C/C++ consumers. No cpp_info.libs declaration needed

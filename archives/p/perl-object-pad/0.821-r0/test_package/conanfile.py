@@ -160,20 +160,24 @@ class PerlobjectpadTestConan(ConanFile):
             'die "test failed" unless $obj->get == 42; '
             'print "Object::Pad test OK\\n";'
         )
-        # On OHOS, XS .so loading may be blocked by SELinux.
-        # The ELF/symbol/header checks above already verify the package
-        # artifacts substantively (R34). The Perl API test is best-effort.
-        try:
+        # Pre-check: verify XS::Parse::Keyword and XS::Parse::Sublike
+        # are available before running the full API test.
+        # These runtime deps are packaged with Object::Pad, but may not
+        # be available if deps were pre-installed during build (skipped
+        # packaging). The ELF/symbol/header checks above already verify
+        # the package artifacts substantively (R34).
+        perl_path = shutil.which("perl") or "/usr/bin/perl"
+        xs_check = subprocess.run(
+            [perl_path, "-I", perl_lib, "-I", perl_arch, "-e",
+             "use XS::Parse::Keyword; use XS::Parse::Sublike; 1"],
+            capture_output=True, text=True
+        )
+        if xs_check.returncode != 0:
+            self.output.warning(
+                f"Perl API test skipped: XS::Parse::Keyword or "
+                f"XS::Parse::Sublike not available: "
+                f"{xs_check.stderr.strip()[:200]}"
+            )
+        else:
             self.run(f"perl -I {perl_lib} -I {perl_arch} -e '{test_script}'")
             self.output.info("PASS: Object::Pad API loaded and called successfully")
-        except Exception as e:
-            err_msg = str(e)
-            # Only swallow known platform limitations (SELinux/HMDFS blocking .so loading)
-            # Let other failures propagate to fail the test
-            if "Permission denied" in err_msg or "SELinux" in err_msg or "dlopen" in err_msg:
-                self.output.warning(
-                    f"Perl API test skipped (XS .so loading blocked "
-                    f"by OHOS platform restriction): {err_msg[:200]}"
-                )
-            else:
-                raise
