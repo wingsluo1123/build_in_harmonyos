@@ -31,7 +31,6 @@ class CwebConan(ConanFile):
     description = "C/C++/Java literate programming documentation system (ctangle and cweave)"
     license = "Knuth-CTAN"
     homepage = "https://github.com/ascherer/cweb"
-    # url: CI fills this from conandata.yml source URL
 
     package_type = "application"
 

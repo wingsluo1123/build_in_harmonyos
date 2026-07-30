@@ -82,10 +82,6 @@ make install PREFIX=$DEFAULT_PREFIX DESTDIR=$TEST_PREFIX CC=clang
 - 无外部依赖库
 ---
 
-**编译结束**: 2026-07-15 22:20
-**最终状态**: built
----
-
 **编译结束**: 2026-07-15 22:21
 **最终状态**: built
 
