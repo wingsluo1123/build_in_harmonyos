@@ -101,12 +101,33 @@ class DeckerConan(ConanFile):
 
         # Build decker (GUI app, needs SDL2 + SDL2_image)
         if self.options.with_sdl:
-            # Use with-statements so popen() pipes are always closed, even
-            # when pkg-config fails. Surface stderr instead of swallowing it.
-            with os.popen("pkg-config --cflags sdl2 SDL2_image") as cf:
-                sdl2_cflags = cf.read().strip()
-            with os.popen("pkg-config --libs sdl2 SDL2_image") as lf:
-                sdl2_libs = lf.read().strip()
+            # Query SDL2 flags via self.run() redirecting pkg-config stdout to
+            # temp files. Unlike os.popen(), self.run() sources the Conan build
+            # environment (conanbuild.sh) so PKG_CONFIG_PATH points at the
+            # PkgConfigDeps-generated .pc files. Using os.popen() would bypass
+            # the Conan env and could silently fall back to any system-installed
+            # sdl2 .pc, linking the wrong version.
+            import tempfile
+            cflags_f = tempfile.NamedTemporaryFile(
+                mode="r", delete=False, suffix=".cflags")
+            libs_f = tempfile.NamedTemporaryFile(
+                mode="r", delete=False, suffix=".libs")
+            try:
+                self.run(
+                    f"pkg-config --cflags sdl2 SDL2_image > \"{cflags_f.name}\"",
+                    cwd=src,
+                )
+                self.run(
+                    f"pkg-config --libs sdl2 SDL2_image > \"{libs_f.name}\"",
+                    cwd=src,
+                )
+                sdl2_cflags = cflags_f.read().strip()
+                sdl2_libs = libs_f.read().strip()
+            finally:
+                cflags_f.close()
+                libs_f.close()
+                os.unlink(cflags_f.name)
+                os.unlink(libs_f.name)
             if not sdl2_cflags or not sdl2_libs:
                 raise ConanException(
                     "with_sdl=True but pkg-config could not resolve "
