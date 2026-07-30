@@ -66,14 +66,21 @@ class ZigConan(ConanFile):
             if zig_arch != "aarch64":
                 raise ConanInvalidConfiguration("OHOS Zig package is prepared for armv8/aarch64 only")
             return "aarch64-linux"
-        if os_name == "Linux":
-            return f"{zig_arch}-linux"
-        if os_name == "Windows":
-            return f"{zig_arch}-windows"
-        if os_name == "Macos":
-            return f"{zig_arch}-macos"
 
-        raise ConanInvalidConfiguration(f"unsupported Zig binary platform: {os_name}/{arch}")
+        if os_name == "Linux":
+            key = f"{zig_arch}-linux"
+        elif os_name == "Windows":
+            key = f"{zig_arch}-windows"
+        elif os_name == "Macos":
+            key = f"{zig_arch}-macos"
+        else:
+            raise ConanInvalidConfiguration(f"unsupported Zig binary platform: {os_name}/{arch}")
+
+        if key not in self.conan_data["sources"]:
+            raise ConanInvalidConfiguration(
+                f"unsupported Zig 0.16.0 prebuilt binary platform: {os_name}/{arch} maps to {key}"
+            )
+        return key
 
     def source(self):
         pass
@@ -107,18 +114,45 @@ class ZigConan(ConanFile):
                 os.chmod(zig_bin, os.stat(zig_bin).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _sign_ohos_executable(self, path):
-        signer = shutil.which("binary-sign-tool") or "/storage/Users/currentUser/usr/local/bin/binary-sign-tool"
-        objcopy = shutil.which("llvm-objcopy") or "/storage/Users/currentUser/usr/local/bin/llvm-objcopy"
+        signer = self._find_ohos_tool(
+            "OHOS_BINARY_SIGN_TOOL",
+            "binary-sign-tool",
+            "/storage/Users/currentUser/usr/local/bin/binary-sign-tool",
+        )
+        objcopy = self._find_ohos_tool(
+            "OHOS_LLVM_OBJCOPY",
+            "llvm-objcopy",
+            "/storage/Users/currentUser/usr/local/bin/llvm-objcopy",
+        )
 
-        if os.path.exists(objcopy):
+        if objcopy:
             self.run(f'"{objcopy}" --remove-section .codesign "{path}" 2>/dev/null || true')
-        if not os.path.exists(signer):
+        if not signer:
             self.output.warning("binary-sign-tool not found; packaged Zig may require manual signing on OHOS")
             return
         self.run(f'"{signer}" sign -inFile "{path}" -outFile "{path}" -selfSign 1')
 
+    def _find_ohos_tool(self, env_name, command, fallback):
+        configured = os.environ.get(env_name)
+        if configured:
+            found = shutil.which(configured)
+            if found:
+                return found
+            if os.path.exists(configured):
+                return configured
+
+        found = shutil.which(command)
+        if found:
+            return found
+        if os.path.exists(fallback):
+            return fallback
+        return None
+
     def _patch_ohos_zig_stdlib(self, bin_dir):
         threaded = os.path.join(bin_dir, "lib", "std", "Io", "Threaded.zig")
+        if not os.path.exists(threaded):
+            raise ConanInvalidConfiguration(f"official Zig archive did not contain expected stdlib file: {threaded}")
+
         with open(threaded, "r", encoding="utf-8", newline="") as stdlib_file:
             content = stdlib_file.read()
 
@@ -133,7 +167,7 @@ class ZigConan(ConanFile):
             patch_count += content.count(old)
             content = content.replace(old, new)
         if patch_count != 3:
-            self.output.warning(f"expected 3 OHOS Zig stdlib fallback patches, applied {patch_count}")
+            raise ConanInvalidConfiguration(f"expected 3 OHOS Zig stdlib fallback patches, applied {patch_count}")
 
         with open(threaded, "w", encoding="utf-8", newline="") as stdlib_file:
             stdlib_file.write(content)
@@ -160,16 +194,37 @@ case "${1:-}" in
         ;;
 esac
 
-signer=$(command -v binary-sign-tool 2>/dev/null || true)
-if [ -z "$signer" ] && [ -x /storage/Users/currentUser/usr/local/bin/binary-sign-tool ]; then
-    signer=/storage/Users/currentUser/usr/local/bin/binary-sign-tool
-fi
+find_tool() {
+    configured=$1
+    command_name=$2
+    fallback=$3
+
+    if [ -n "$configured" ]; then
+        found=$(command -v "$configured" 2>/dev/null || true)
+        if [ -n "$found" ]; then
+            echo "$found"
+            return 0
+        fi
+        if [ -x "$configured" ]; then
+            echo "$configured"
+            return 0
+        fi
+    fi
+
+    found=$(command -v "$command_name" 2>/dev/null || true)
+    if [ -n "$found" ]; then
+        echo "$found"
+        return 0
+    fi
+    if [ -x "$fallback" ]; then
+        echo "$fallback"
+    fi
+}
+
+signer=$(find_tool "${OHOS_BINARY_SIGN_TOOL:-}" binary-sign-tool /storage/Users/currentUser/usr/local/bin/binary-sign-tool)
 [ -n "$signer" ] || exit 0
 
-objcopy=$(command -v llvm-objcopy 2>/dev/null || true)
-if [ -z "$objcopy" ] && [ -x /storage/Users/currentUser/usr/local/bin/llvm-objcopy ]; then
-    objcopy=/storage/Users/currentUser/usr/local/bin/llvm-objcopy
-fi
+objcopy=$(find_tool "${OHOS_LLVM_OBJCOPY:-}" llvm-objcopy /storage/Users/currentUser/usr/local/bin/llvm-objcopy)
 
 is_elf() {
     [ -f "$1" ] || return 1
