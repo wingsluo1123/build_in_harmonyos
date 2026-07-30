@@ -39,6 +39,13 @@ class ZziplibConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTS"] = "OFF"
+        tc.variables["ZZIPMMAPPED"] = "OFF"
+        tc.variables["ZZIPFSEEKO"] = "OFF"
+        tc.variables["ZZIPWRAP"] = "OFF"
+        tc.variables["ZZIPSDL"] = "OFF"
+        tc.variables["ZZIPBINS"] = "OFF"
+        tc.variables["ZZIPTEST"] = "OFF"
+        tc.variables["ZZIPDOCS"] = "OFF"
         tc.generate()
 
     def build(self):
@@ -53,3 +60,6 @@ class ZziplibConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["zzip"]
+        self.cpp_info.set_property("cmake_file_name", "zziplib")
+        self.cpp_info.set_property("cmake_target_name", "zziplib::zziplib")
+        self.cpp_info.set_property("pkg_config_name", "zziplib")
