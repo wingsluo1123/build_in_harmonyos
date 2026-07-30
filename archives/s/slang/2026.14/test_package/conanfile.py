@@ -52,7 +52,8 @@ class SlangTestConan(ConanFile):
             raise AssertionError(f"slangc -h failed (exit code: {exit_code})")
 
         # Test 2: Compile a simple HLSL shader
-        shader_file = os.path.join(self.source_folder, "test_shader.slang")
+        # Write temp files to build_folder (source_folder may be read-only in Conan cache)
+        shader_file = os.path.join(self.build_folder, "test_shader.slang")
         with open(shader_file, "w") as f:
             f.write("""RWStructuredBuffer<float> outputBuffer;
 [shader("compute")]
@@ -61,7 +62,7 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
     outputBuffer[id.x] = float(id.x);
 }
 """)
-        output_file = os.path.join(self.source_folder, "test_output.spirv")
+        output_file = os.path.join(self.build_folder, "test_output.spirv")
         self.output.info("Compiling test shader...")
         exit_code = self.run(f'"{slang_bin}" "{shader_file}" -o "{output_file}" -target spirv',
                              env="conanrun")

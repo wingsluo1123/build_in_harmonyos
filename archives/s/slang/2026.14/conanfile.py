@@ -15,7 +15,6 @@ from conan.tools.files import (
     get,
     apply_conandata_patches,
     export_conandata_patches,
-    collect_libs,
 )
 
 
@@ -63,34 +62,19 @@ class SlangConan(ConanFile):
         The GitHub release tarball does not include submodule contents.
         We download each required submodule as a tarball from GitHub's
         archive API, which works without git and without SSL issues.
+        Submodule metadata (repo, commit, sha256) is declared in conandata.yml.
         """
-        submodules = [
-            ("external/unordered_dense", "martinus/unordered_dense",
-             "73f3cbb237e84d483afafc743f1f14ec53e12314"),
-            ("external/miniz", "richgel999/miniz",
-             "6ef6c68f4fcbb8287aa8edf9c6670804932f41c6"),
-            ("external/lz4", "lz4/lz4",
-             "7f71be01f2c6f6b2c3cddb67eef8c38eab12ffd4"),
-            ("external/cmark", "swiftlang/swift-cmark",
-             "924936d0427cb25a61169739a7660230bffa6ea6"),
-            ("external/vulkan", "KhronosGroup/Vulkan-Headers",
-             "387259ecf4b0fe0cfac161b1d0b0a74e42796710"),
-            ("external/spirv-headers", "KhronosGroup/SPIRV-Headers",
-             "29981f65241605e08b0ede4cfeb999fe3b723c6a"),
-            ("external/spirv-tools", "KhronosGroup/SPIRV-Tools",
-             "0d6fd73ca73830ccab5fa1f00ed5ed40124e2c55"),
-            ("external/glslang", "KhronosGroup/glslang",
-             "d1f52c8993a501bd52d4fbd044bfeb9ecdceb9f4"),
-            ("external/fast_float", "fastfloat/fast_float",
-             "e0b53eaf63c6d00e0725788ef1dbb759aa321d79"),
-            ("external/lua", "lua/lua",
-             "3fe7be956f23385aa1950dc31e2f25127ccfc0ea"),
-        ]
+        submodules = self.conan_data.get("submodules", [])
 
         src_folder = self.source_folder
         git_bin = self._find_git()
 
-        for path, repo, commit in submodules:
+        for sub in submodules:
+            path = sub["path"]
+            repo = sub["repo"]
+            commit = sub["commit"]
+            sha256 = sub.get("sha256")
+
             full_path = os.path.join(src_folder, path)
             # Check if already populated
             if os.listdir(full_path) if os.path.exists(full_path) else []:
@@ -107,57 +91,96 @@ class SlangConan(ConanFile):
             # Try git clone first, then fallback to tarball download
             cloned = False
             if git_bin:
-                repo_url = f"https://ghfast.top/https://github.com/{repo}.git"
-                try:
-                    subprocess.run(
-                        [git_bin, "clone", "--depth", "1", repo_url, full_path],
-                        check=True, capture_output=True, timeout=300
-                    )
-                    subprocess.run(
-                        [git_bin, "fetch", "--depth", "1", repo_url, commit],
-                        cwd=full_path, check=True, capture_output=True, timeout=300
-                    )
-                    subprocess.run(
-                        [git_bin, "checkout", commit],
-                        cwd=full_path, check=True, capture_output=True, timeout=30
-                    )
-                    cloned = True
-                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-                    pass
+                # Try GitHub direct first, then ghfast.top proxy
+                for git_url in [
+                    f"https://github.com/{repo}.git",
+                    f"https://ghfast.top/https://github.com/{repo}.git",
+                ]:
+                    try:
+                        subprocess.run(
+                            [git_bin, "clone", "--depth", "1", git_url, full_path],
+                            check=True, capture_output=True, timeout=300
+                        )
+                        subprocess.run(
+                            [git_bin, "fetch", "--depth", "1", git_url, commit],
+                            cwd=full_path, check=True, capture_output=True, timeout=300
+                        )
+                        subprocess.run(
+                            [git_bin, "checkout", commit],
+                            cwd=full_path, check=True, capture_output=True, timeout=30
+                        )
+                        cloned = True
+                        break
+                    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+                        continue
 
             if not cloned:
                 # Fallback: download as tarball from GitHub archive API
-                self._download_submodule_tarball(path, repo, commit)
+                self._download_submodule_tarball(path, repo, commit, sha256)
 
-    def _download_submodule_tarball(self, path, repo, commit):
+    def _download_submodule_tarball(self, path, repo, commit, sha256=None):
         """Fallback: download submodule as tarball.
 
-        Uses Conan's built-in get() which handles SSL verification properly.
+        Tries GitHub direct URL first, then ghfast.top proxy.
+        Uses Conan's built-in get() which handles SSL verification and
+        SHA256 integrity checking internally.
         Falls back to urllib with SSL verification enabled (not disabled).
         """
-        archive_url = f"https://ghfast.top/https://github.com/{repo}/archive/{commit}.tar.gz"
+        # Try GitHub direct first, then ghfast.top proxy
+        archive_urls = [
+            f"https://github.com/{repo}/archive/{commit}.tar.gz",
+            f"https://ghfast.top/https://github.com/{repo}/archive/{commit}.tar.gz",
+        ]
 
         src_folder = self.source_folder
         full_path = os.path.join(src_folder, path)
         os.makedirs(full_path, exist_ok=True)
 
-        # Preferred: use Conan's built-in download (handles SSL verification internally)
-        try:
-            get(self, archive_url, destination=full_path, strip_root=True)
-            return
-        except Exception as e:
-            self.output.warning(f"Conan get() failed for {path}: {e}, trying urllib fallback")
+        last_error = None
+        for archive_url in archive_urls:
+            # Preferred: use Conan's built-in download (handles SSL + SHA256)
+            try:
+                get(self, archive_url, destination=full_path, strip_root=True,
+                    sha256=sha256)
+                return
+            except Exception as e:
+                last_error = e
+                self.output.warning(f"Conan get() failed for {path} via {archive_url}: {e}")
+                continue
 
-        # Fallback: urllib with SSL verification enabled
+        # Last resort: urllib with SSL verification enabled
         import ssl
         import urllib.request
         import tarfile
         import io
+        import hashlib
 
+        self.output.info(f"Trying urllib fallback for {path}...")
         ctx = ssl.create_default_context()
-        req = urllib.request.Request(archive_url, headers={"User-Agent": "conan/2"})
-        with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
-            data = resp.read()
+
+        for archive_url in archive_urls:
+            try:
+                req = urllib.request.Request(archive_url, headers={"User-Agent": "conan/2"})
+                with urllib.request.urlopen(req, timeout=300, context=ctx) as resp:
+                    data = resp.read()
+                break
+            except Exception as e:
+                last_error = e
+                continue
+        else:
+            raise ConanException(
+                f"Failed to download submodule {path} from all URLs: {last_error}"
+            )
+
+        # Verify SHA256 if provided
+        if sha256:
+            actual_sha256 = hashlib.sha256(data).hexdigest()
+            if actual_sha256 != sha256:
+                raise ConanException(
+                    f"SHA256 mismatch for submodule {path}: "
+                    f"expected {sha256}, got {actual_sha256}"
+                )
+            self.output.info(f"SHA256 verified for {path}")
 
         # Extract tarball with path traversal protection
         extract_dir = full_path + "_extract"
@@ -333,6 +356,7 @@ class SlangConan(ConanFile):
                             continue
                         # Check ELF type: only sign executables (ET_EXEC=2) and
                         # shared objects (ET_DYN=3), skip relocatable (ET_REL=1)
+                        fp.seek(16)  # e_type is at ELF header offset 16 (0x10)
                         elf_type = fp.read(2)
                         elf_type_val = int.from_bytes(elf_type, 'little')
                         if elf_type_val == 1:  # ET_REL (object files)
@@ -391,6 +415,13 @@ class SlangConan(ConanFile):
                     with open(fpath, 'rb') as fp:
                         magic = fp.read(4)
                         if magic != b'\x7fELF':
+                            continue
+                        # Skip relocatable files (ET_REL=1), consistent with
+                        # _sign_all_executables
+                        fp.seek(16)  # e_type is at ELF header offset 16 (0x10)
+                        elf_type = fp.read(2)
+                        elf_type_val = int.from_bytes(elf_type, 'little')
+                        if elf_type_val == 1:  # ET_REL (object files)
                             continue
                 except (IOError, OSError):
                     continue
