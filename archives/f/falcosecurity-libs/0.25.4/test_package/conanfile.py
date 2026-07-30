@@ -3,7 +3,8 @@
 
 import os
 
-from conan import ConanFile, ConanException
+from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
