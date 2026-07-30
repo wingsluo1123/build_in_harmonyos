@@ -1,4 +1,4 @@
-script_folder="/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bison/3.8.2/test_package"
+script_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanbuildenv-armv8.sh"
 for v in ac_cv_target ac_cv_host ac_cv_build SHELL CONFIG_SHELL
 do

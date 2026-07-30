@@ -1,6 +1,6 @@
-script_folder="/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bison/3.8.2/test_package"
+script_folder="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "echo Restoring environment" > "$script_folder/deactivate_conanrunenv-armv8.sh"
-for v in 
+for v in PATH
 do
    is_defined="true"
    value=$(printenv $v) || is_defined="" || true
@@ -11,3 +11,5 @@ do
        echo unset $v >> "$script_folder/deactivate_conanrunenv-armv8.sh"
    fi
 done
+
+export PATH="/data/service/hnp/bin:${PATH}"

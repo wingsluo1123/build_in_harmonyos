@@ -1,1 +1,1 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bison/3.8.2/test_package/deactivate_conanrunenv-armv8.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deactivate_conanrunenv-armv8.sh"

@@ -1,1 +1,1 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/build_in_harmonyos/archives/b/bison/3.8.2/test_package/conanbuildenv-armv8.sh"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/conanbuildenv-armv8.sh"
