@@ -86,8 +86,9 @@ int main(void) {
 
 编译命令：
 ```bash
-clang test.c -lcheck -lm -lrt -lpthread -o test
+clang test.c -lcheck -lm -lpthread -o test
 ```
+Linux/glibc 环境如需独立 clock 库时才追加 `-lrt`。
 **备注**: 使用 CMake 构建，上游测试套件运行阶段在鸿蒙平台有已知限制，当前通过 Conan 消费测试覆盖公开 API
 ---
 

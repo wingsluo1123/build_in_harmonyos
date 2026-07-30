@@ -21,7 +21,7 @@ Check 是一个 C 语言的单元测试框架，支持多种测试模式和自�
 
 - C 编译器
 - CMake 3.15+
-- 系统库：libm / librt / libpthread
+- 系统库：OHOS 使用 libm / libpthread；Linux/glibc 场景可能额外需要 librt
 
 ## 参考资料
 
