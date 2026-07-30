@@ -16,7 +16,6 @@ from conan import ConanFile
 from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.layout import basic_layout
 
 
 class FluentBitConan(ConanFile):
@@ -73,7 +72,6 @@ class FluentBitConan(ConanFile):
         candidates = [
             os.path.join(dl_dir, expected_sha),
             os.path.join(os.path.expanduser("~/.conan2/downloads"), expected_sha),
-            "/storage/Users/currentUser/builds/fluent-bit-5.0.9.tar.gz",
         ]
         local = next((p for p in candidates if os.path.isfile(p)), None)
         if local:
