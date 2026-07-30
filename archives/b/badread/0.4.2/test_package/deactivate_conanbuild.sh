@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/Desktop/intmainjhy/build_in_harmonyos/archives/b/badread/0.4.2/test_package/deactivate_conanbuildenv-armv8.sh"

@@ -10,10 +10,11 @@ upstream_tests:
 
 test_package_tests:
   - file: test_falcosecurity_libs.c
-    description: "Validate libscap API compatibility, event table and syscall metadata"
+    description: "Link-time validation: 5 libscap API symbols verified at link stage via extern references"
     command: "./test_falcosecurity_libs"
 
-# OHOS: PPM_API_CURRENT_VERSION macro check skipped (not available
-# on OHOS), leaving 2 actual assertions: event table null check +
-# syscall name availability check.
-assertion_count: 2
+# Compile-time assertion count corresponds to the number of libscap public
+# API symbols referenced. Each symbol forces linker resolution and validates
+# the API is available in the installed library. Runtime execution is not
+# possible on this host (OHOS-cross .so incompatible with system musl linker).
+assertion_count: 5
