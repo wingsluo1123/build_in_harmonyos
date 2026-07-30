@@ -65,7 +65,7 @@ class ProjConan(ConanFile):
                 str(self.settings.arch)
             )
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
-        tc.variables["BUILD_TESTING"] = "OFF"
+        tc.variables["BUILD_TESTING"] = "ON"
         tc.variables["BUILD_EXAMPLES"] = "OFF"
         tc.variables["BUILD_APPS"] = "ON"
         tc.variables["BUILD_PROJSYNC"] = "OFF"
@@ -89,6 +89,7 @@ class ProjConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build(cli_args=["--parallel", "1"])
+        cmake.test(cli_args=["--output-on-failure"])
 
     def package(self):
         cmake = CMake(self)

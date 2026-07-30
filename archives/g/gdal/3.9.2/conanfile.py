@@ -58,6 +58,11 @@ class GdalConan(ConanFile):
         arch_map = {
             "armv8": "arm64-v8a",
             "armv8.3": "arm64-v8a",
+            "armv8.4": "arm64-v8a",
+            "armv8.5": "arm64-v8a",
+            "armv8.6": "arm64-v8a",
+            "armv8.7": "arm64-v8a",
+            "armv8.8": "arm64-v8a",
             "armv8_32": "armeabi-v7a",
             "armv7": "armeabi-v7a",
             "x86": "x86",
@@ -122,7 +127,7 @@ class GdalConan(ConanFile):
             '-DCMAKE_SHARED_LINKER_FLAGS="{}"'.format(linker_flags),
             "-DBUILD_SHARED_LIBS={}".format("ON" if self.options.shared else "OFF"),
             "-DBUILD_APPS=ON",
-            "-DBUILD_TESTING=OFF",
+            "-DBUILD_TESTING=ON",
             "-DBUILD_PYTHON_BINDINGS=OFF",
             "-DBUILD_DOCS=OFF",
             "-DGDAL_BUILD_OPTIONAL_DRIVERS=OFF",
@@ -184,6 +189,7 @@ class GdalConan(ConanFile):
             env="conanbuild",
         )
         self.run('cmake --build "{}"'.format(build_dir), env="conanbuild")
+        self.run('ctest --test-dir "{}" --output-on-failure'.format(build_dir), env="conanbuild")
 
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")

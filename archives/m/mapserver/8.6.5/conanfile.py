@@ -75,6 +75,11 @@ class MapserverConan(ConanFile):
         arch_map = {
             "armv8": "arm64-v8a",
             "armv8.3": "arm64-v8a",
+            "armv8.4": "arm64-v8a",
+            "armv8.5": "arm64-v8a",
+            "armv8.6": "arm64-v8a",
+            "armv8.7": "arm64-v8a",
+            "armv8.8": "arm64-v8a",
             "armv8_32": "armeabi-v7a",
             "armv7": "armeabi-v7a",
             "x86": "x86",
@@ -123,7 +128,7 @@ class MapserverConan(ConanFile):
             '-DCMAKE_SHARED_LINKER_FLAGS="{}"'.format(linker_flags),
             "-DBUILD_DYNAMIC={}".format("ON" if self.options.shared else "OFF"),
             "-DBUILD_STATIC=OFF",
-            "-DBUILD_TESTING=OFF",
+            "-DBUILD_TESTING=ON",
             "-DBUILD_FUZZER_REPRODUCER=OFF",
             "-DFUZZER=OFF",
             "-DINSTALL_HTML_BOOTSTRAP=OFF",
@@ -184,6 +189,7 @@ class MapserverConan(ConanFile):
             env="conanbuild",
         )
         self.run('cmake --build "{}"'.format(build_dir), env="conanbuild")
+        self.run('ctest --test-dir "{}" --output-on-failure'.format(build_dir), env="conanbuild")
 
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")
