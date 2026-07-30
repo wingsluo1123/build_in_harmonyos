@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Conan consumer test for SDL 3.4.8."""
 
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -24,3 +26,5 @@ class Sdl3TestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        test_binary = os.path.join(self.cpp.build.bindir, "test_sdl3")
+        self.run(test_binary, env="conanrun")
