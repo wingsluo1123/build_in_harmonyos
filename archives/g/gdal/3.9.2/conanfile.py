@@ -12,7 +12,7 @@ import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import apply_conandata_patches, get
-from conan.tools.cmake import cmake_layout
+from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.env import VirtualBuildEnv
 
 
@@ -49,6 +49,8 @@ class GdalConan(ConanFile):
         cmake_layout(self, src_folder=".")
 
     def generate(self):
+        CMakeDeps(self).generate()
+        CMakeToolchain(self).generate()
         VirtualBuildEnv(self).generate()
 
     def _ohos_arch(self):
@@ -92,7 +94,6 @@ class GdalConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        toolchain = self._ohos_toolchain()
         build_dir = os.path.join(self.build_folder, "build-ohos")
 
         proj = self.dependencies["proj"].package_folder
@@ -111,8 +112,6 @@ class GdalConan(ConanFile):
         )
 
         defs = [
-            '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH={}".format(self._ohos_arch()),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
             '-DCMAKE_EXE_LINKER_FLAGS="{}"'.format(linker_flags),
@@ -169,6 +168,13 @@ class GdalConan(ConanFile):
             "-DGDAL_USE_PCRE2=OFF",
             "-DGDAL_USE_POSTGRESQL=OFF",
         ]
+        if self.settings.os == "OHOS":
+            defs.insert(0, "-DOHOS_ARCH={}".format(self._ohos_arch()))
+            defs.insert(0, '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(self._ohos_toolchain()))
+        else:
+            conan_toolchain = os.path.join(self.generators_folder, "conan_toolchain.cmake")
+            if os.path.isfile(conan_toolchain):
+                defs.insert(0, '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(conan_toolchain))
         self.run(
             'cmake -B "{}" -S "{}" {}'.format(build_dir, self.source_folder, " ".join(defs)),
             env="conanbuild",
@@ -190,16 +196,32 @@ class GdalConan(ConanFile):
         shared_libs += glob.glob(os.path.join(libdir, "**", "*.so.*"), recursive=True)
         if not shared_libs:
             return
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
-        for tool in (objcopy, signer):
-            if not os.path.isfile(tool):
-                raise FileNotFoundError(f"Required OHOS signing tool is missing: {tool}")
+        objcopy = self._ohos_tool("llvm_objcopy", "llvm-objcopy")
+        signer = self._ohos_tool("binary_sign_tool", "binary-sign-tool")
+        if not (objcopy and signer):
+            self.output.warning("Skipping OHOS shared-library signing: signing tools not found")
+            return
         for shared_lib in shared_libs:
             if os.path.islink(shared_lib):
                 continue
             self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=shared_lib))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=shared_lib))
+
+    def _ohos_tool(self, conf_name, executable):
+        configured = self.conf.get(f"user.ohos:{conf_name}", default="", check_type=str)
+        candidates = [configured]
+        for root in (
+            os.environ.get("OHOS_SDK_ROOT", ""),
+            os.environ.get("OHOS_NDK_HOME", ""),
+        ):
+            if root:
+                candidates.append(os.path.join(root, "bin", executable))
+                candidates.append(os.path.join(root, "native", "llvm", "bin", executable))
+        candidates.append(os.path.join("/data/service/hnp/bin", executable))
+        for candidate in candidates:
+            if candidate and os.path.isfile(candidate):
+                return candidate
+        return None
 
     def package_info(self):
         self.cpp_info.libs = ["gdal"]
