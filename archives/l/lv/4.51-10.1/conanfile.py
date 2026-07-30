@@ -44,8 +44,8 @@ class LvConan(ConanFile):
 
     def validate(self):
         # R32 平台兼容性检查（统模式：先 OS 后 arch）
-        if self.settings.os != "OHOS":
-            raise ConanInvalidConfiguration(f"lv {self.version} only supports OHOS, got os={self.settings.os}")
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(f"lv {self.version} only supports Linux and OHOS, got os={self.settings.os}")
         if self.settings.arch != "armv8":
             raise ConanInvalidConfiguration(f"lv {self.version} only supports armv8, got arch={self.settings.arch}")
 
