@@ -20,6 +20,19 @@ from conan.tools.files import get
 from conan.tools.files import apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
+# ─── OHOS 环境路径（可通过环境变量覆盖，适配不同设备/SDK 版本）───
+HNP = os.environ.get("OHOS_HNP", "/data/service/hnp")
+HOME = os.environ.get("OHOS_USER_HOME", "/storage/Users/currentUser")
+SDK_VER = os.environ.get("OHOS_SDK_VERSION", "26.0.0.18")
+SDK_LIB = f"{HNP}/ohos-sdk.org/ohos-sdk_{SDK_VER}/ohos/native/llvm/lib"
+SYS_LIB = f"{HOME}/usr/local/lib"
+CLANG = f"{HNP}/bin/clang"
+CLANGXX = f"{HNP}/bin/clang++"
+MESON_BIN = f"{HOME}/usr/local/bin/meson"
+NINJA_BIN = f"{HNP}/bin/ninja"
+SIGN_TOOL = f"{HNP}/bin/binary-sign-tool"
+READELF = f"{HNP}/bin/llvm-readelf"
+
 
 class CairoConan(ConanFile):
     name = "cairo"
@@ -50,54 +63,47 @@ class CairoConan(ConanFile):
 
     def generate(self):
         native_file = os.path.join(self.build_folder, "ohos-native.ini")
-        hnp = "/data/service/hnp"
         with open(native_file, "w") as f:
-            f.write(f"[binaries]\nc = '{hnp}/bin/clang'\ncpp = '{hnp}/bin/clang++'\n")
+            f.write(f"[binaries]\nc = '{CLANG}'\ncpp = '{CLANGXX}'\n")
         self._native_file = native_file
 
     def _env_prefix(self):
-        hnp = "/data/service/hnp"
-        home = "/storage/Users/currentUser"
-        sdk_lib = f"{hnp}/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib"
         return (
-            f'export CC="{hnp}/bin/clang" CXX="{hnp}/bin/clang++" '
-            f'PATH="{hnp}/bin:{home}/usr/local/bin:/usr/local/bin:$PATH" '
-            f'PKG_CONFIG_PATH="{home}/usr/local/lib/pkgconfig" '
-            f'LD_LIBRARY_PATH="{sdk_lib}:{home}/usr/local/lib:{hnp}/lib" '
-            f'GIT_TERMINAL_PROMPT=0 GIT_CEILING_DIRECTORIES="{home}" && '
+            f'export CC="{CLANG}" CXX="{CLANGXX}" '
+            f'PATH="{HNP}/bin:{HOME}/usr/local/bin:/usr/local/bin:$PATH" '
+            f'PKG_CONFIG_PATH="{SYS_LIB}/pkgconfig" '
+            f'LD_LIBRARY_PATH="{SDK_LIB}:{SYS_LIB}:{HNP}/lib" '
+            f'GIT_TERMINAL_PROMPT=0 GIT_CEILING_DIRECTORIES="{HOME}" && '
         )
 
     def build(self):
         apply_conandata_patches(self)
         build_dir = os.path.join(self.build_folder, "build-ohos")
-        meson_bin = "/storage/Users/currentUser/usr/local/bin/meson"
-        ninja_bin = "/data/service/hnp/bin/ninja"
-        home = "/storage/Users/currentUser"
         ep = self._env_prefix()
         self.run(
             ep +
-            '"%s" setup "%s" "%s" --prefix=/ --default-library=shared '
-            '-Dbuildtype=release '
-            '--native-file="%s" '
-            '-Dc_args="-I%s/usr/local/include -I/usr/local/include -DHAVE_CTIME_R" '
-            '-Dtests=disabled -Dxlib=disabled -Dxcb=disabled '
-            '-Dfontconfig=enabled -Dwrap_mode=nofallback' % (meson_bin, build_dir, self.source_folder, self._native_file, home)
+            f'"{MESON_BIN}" setup "{build_dir}" "{self.source_folder}" '
+            f'--prefix=/ --default-library=shared '
+            f'-Dbuildtype=release '
+            f'--native-file="{self._native_file}" '
+            f'-Dc_args="-I{HOME}/usr/local/include -I/usr/local/include -DHAVE_CTIME_R" '
+            f'-Dtests=disabled -Dxlib=disabled -Dxcb=disabled '
+            f'-Dfontconfig=enabled -Dwrap_mode=nofallback'
         )
-        self.run(ep + '"%s" -C "%s" -j4' % (ninja_bin, build_dir))
+        self.run(ep + f'"{NINJA_BIN}" -C "{build_dir}" -j4')
 
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")
-        ninja_bin = "/data/service/hnp/bin/ninja"
         ep = self._env_prefix()
-        self.run(ep + 'DESTDIR="%s" "%s" -C "%s" install' % (self.package_folder, ninja_bin, build_dir))
+        self.run(ep + f'DESTDIR="{self.package_folder}" "{NINJA_BIN}" -C "{build_dir}" install')
         self._sign_shared_libs()
         self._create_soname_symlinks()
 
     def _sign_shared_libs(self):
-        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-        readelf = "/data/service/hnp/bin/llvm-readelf"
+        """签名 .so 文件（OHOS 强制 dlopen 签名校验）"""
+        readelf = READELF
         if not os.path.isfile(readelf):
-            readelf = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/llvm-readelf"
+            readelf = f"{SDK_LIB}/../bin/llvm-readelf"
         lib_dir = os.path.join(self.package_folder, "lib")
         if not os.path.isdir(lib_dir):
             return
@@ -109,15 +115,15 @@ class CairoConan(ConanFile):
                 if ".codesign" in r.stdout:
                     self.output.info(f"Already signed: {os.path.basename(so)}")
                     continue
-            if os.path.isfile(sign_tool):
+            if os.path.isfile(SIGN_TOOL):
                 try:
-                    self.run('%s sign -mode localSign -selfSign 1 -inFile "%s" -outFile "%s.signed" && mv "%s.signed" "%s"' % (
-                        sign_tool, so, so, so, so))
+                    self.run(f'{SIGN_TOOL} sign -mode localSign -selfSign 1 '
+                             f'-inFile "{so}" -outFile "{so}.signed" && mv "{so}.signed" "{so}"')
                     self.output.info(f"Signed: {os.path.basename(so)}")
                 except Exception as e:
                     raise ConanException(f"Sign failed for {os.path.basename(so)}: {type(e).__name__}: {e}")
             else:
-                raise ConanException(f"binary-sign-tool not found at {sign_tool}, cannot sign {os.path.basename(so)} (OHOS requires .so signing)")
+                raise ConanException(f"binary-sign-tool not found at {SIGN_TOOL}, cannot sign {os.path.basename(so)} (OHOS requires .so signing)")
 
     def _create_soname_symlinks(self):
         lib_dir = os.path.join(self.package_folder, "lib")
@@ -144,4 +150,4 @@ class CairoConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "cairo")
         self.cpp_info.set_property("cmake_target_name", "cairo::cairo")
         self.cpp_info.set_property("pkg_config_name", "cairo")
-        self.runenv_info.define("LD_LIBRARY_PATH", "/storage/Users/currentUser/usr/local/lib:/data/service/hnp/lib")
+        self.runenv_info.define("LD_LIBRARY_PATH", f"{SYS_LIB}:{HNP}/lib")

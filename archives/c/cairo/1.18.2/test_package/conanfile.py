@@ -28,5 +28,3 @@ class CairoTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_cairo')}", env="conanrun")
