@@ -52,7 +52,7 @@ int main(void)
     printf("proj_trans(0,0) -> (%.4f, %.4f)\n", result.xy.x, result.xy.y);
 
     /* Web Mercator origin maps to (0, 0) */
-    if (result.xy.x == 0.0 && result.xy.y == 0.0) {
+    if (fabs(result.xy.x) < 1e-9 && fabs(result.xy.y) < 1e-9) {
         printf("VERIFY: origin transform correct\n");
         printf("\n=== PROJ FUNCTIONAL TEST: PASSED ===\n");
     } else {
