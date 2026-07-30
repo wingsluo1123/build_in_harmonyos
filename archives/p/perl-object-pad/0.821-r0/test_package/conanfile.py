@@ -29,13 +29,17 @@ class PerlobjectpadTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def generate(self):
-        """Set sysroot include/library paths for compiling test binary (R33)."""
+        """Set CC and sysroot include/library paths for compiling test binary (R33)."""
         env = Environment()
         cc_info = self.conf.get("tools.build:compiler_executables", default={})
         if isinstance(cc_info, str):
             cc_info = json.loads(cc_info)
         cc = cc_info.get("c", "clang") if cc_info else "clang"
         cc_resolved = shutil.which(cc) or cc
+
+        # Define CC so test() can use $CC instead of hardcoded compiler name
+        env.define("CC", cc_resolved)
+
         cc_real = os.path.realpath(cc_resolved)
         cc_bin_dir = os.path.dirname(cc_real)
         sdk_native = os.path.dirname(os.path.dirname(cc_bin_dir))
@@ -123,7 +127,7 @@ class PerlobjectpadTestConan(ConanFile):
         self.output.info(f"Testing Pad.so at {so_path}")
 
         # Compile the test binary that verifies ELF structure
-        self.run("clang -o test_pad main.c", env="conanbuild")
+        self.run("$CC -o test_pad main.c", env="conanbuild")
 
         # Run it against the actual .so from the package
         self.run(f"./test_pad {so_path}", env="conanbuild")
@@ -163,7 +167,13 @@ class PerlobjectpadTestConan(ConanFile):
             self.run(f"perl -I {perl_lib} -I {perl_arch} -e '{test_script}'")
             self.output.info("PASS: Object::Pad API loaded and called successfully")
         except Exception as e:
-            self.output.warning(
-                f"Perl API test skipped (XS .so loading may be blocked "
-                f"by OHOS SELinux): {e}"
-            )
+            err_msg = str(e)
+            # Only swallow known platform limitations (SELinux/HMDFS blocking .so loading)
+            # Let other failures propagate to fail the test
+            if "Permission denied" in err_msg or "SELinux" in err_msg or "dlopen" in err_msg:
+                self.output.warning(
+                    f"Perl API test skipped (XS .so loading blocked "
+                    f"by OHOS platform restriction): {err_msg[:200]}"
+                )
+            else:
+                raise
