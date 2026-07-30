@@ -35,6 +35,13 @@ class KissatConan(ConanFile):
     def requirements(self):
         pass  # No dependencies — bare metal SAT solver, only links libm
 
+    def validate(self):
+        # kissat only produces static library — reject shared=True
+        from conan.errors import ConanInvalidConfiguration
+        if self.options.shared:
+            raise ConanInvalidConfiguration(
+                "kissat only supports static library (libkissat.a)")
+
     def layout(self):
         basic_layout(self)
 
