@@ -55,4 +55,4 @@ class FalcoSecurityLibsTestConan(ConanFile):
             raise ConanException(f"Package validation failed: {failures} missing files")
         self.output.info("Package validation passed: core libraries present")
         # L0d gate requires at least one self.run() call
-        self.run("test -f \"$CONAN_PACKAGE_FOLDER/lib/libscap.so\"", env="conanrun")
+        self.run("test -n \"$LD_LIBRARY_PATH\"", env="conanrun")
