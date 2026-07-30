@@ -49,6 +49,7 @@ class Sdl2TtfConan(ConanFile):
 
     def generate(self):
         sdl2 = self.dependencies["sdl2"].cpp_info
+        sdl2.includedirs.append(os.path.join("include", "SDL2"))
         sdl2.set_property("cmake_file_name", "SDL2")
         sdl2.set_property(
             "cmake_target_name",
@@ -60,7 +61,10 @@ class Sdl2TtfConan(ConanFile):
         freetype.set_property("cmake_target_name", "Freetype::Freetype")
 
         CMakeDeps(self).generate()
-        tc = CMakeToolchain(self)
+        if self.settings.os == "OHOS":
+            tc = CMakeToolchain(self, generator="Ninja")
+        else:
+            tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
         if self.options.get_safe("fPIC") is not None:
             tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(self.options.fPIC)
