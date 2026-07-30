@@ -26,10 +26,10 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 ### 补丁文件
 
-- `0004-configure.patch` - 使用 TMPDIR 创建临时目录
-- `0005-etc-config.guess.patch` - HarmonyOS 系统识别
-- `0006-etc-config.sub.patch` - linux-ohos 三元组支持
-- `0007-ncurses-config.sub.patch` - 私有 ncurses 的 linux-ohos 三元组支持
+- `0001-configure.patch` - 使用 TMPDIR 创建临时目录
+- `0002-etc-config.guess.patch` - HarmonyOS 系统识别
+- `0003-etc-config.sub.patch` - linux-ohos 三元组支持
+- `0004-ncurses-config.sub.patch` - 私有 ncurses 的 linux-ohos 三元组支持
 
 ## 功能验证
 
