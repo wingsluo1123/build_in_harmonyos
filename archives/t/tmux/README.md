@@ -8,7 +8,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 | 版本 | 状态 | 编译日期 | 补丁数 | 预编译包 |
 |------|------|---------|--------|---------|
-| 3.4 | built | 2026-05-27 | 6 | 否 |
+| 3.4 | built | 2026-05-27 | 7 | 否 |
 
 ## 编译特性
 
@@ -24,6 +24,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 3. **三元组支持**：config.sub 不接受 `linux-ohos` 组合，添加 `linux-ohos*` 支持
 4. **静态链接**：强制静态链接 libevent 和 ncurses，避免动态库加载问题
 5. **HMDFS umask**：放宽 ncurses 临时目录的 umask，避免继承目录所有者后无法写入
+6. **expr 兼容性**：在 HarmonyOS 上禁用 ncurses configure 的损坏 `expr` 探测并回退到 `sed`
 
 ### 补丁文件
 
@@ -33,6 +34,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 - `0004-ncurses-config.sub.patch` - 私有 ncurses 的 linux-ohos 三元组支持
 - `0005-ncurses-configure-umask.patch` - 修复 ncurses config.status 临时目录权限
 - `0006-ncurses-config.guess-umask.patch` - 修复 ncurses config.guess 临时目录权限
+- `0007-ncurses-configure-expr-fallback.patch` - 避免 HarmonyOS expr 损坏 ncurses config.status
 
 ## 功能验证
 

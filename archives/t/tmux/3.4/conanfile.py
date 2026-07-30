@@ -107,7 +107,7 @@ class TmuxConan(ConanFile):
 
         compiler_executables = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
-        ) or {}
+        )
         cc = compiler_executables.get("c")
         cxx = compiler_executables.get("cpp")
         if not cc or not cxx:
