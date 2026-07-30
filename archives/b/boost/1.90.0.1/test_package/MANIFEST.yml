@@ -1,15 +1,14 @@
-package: boost/1.90.0.1
-homepage: "https://www.boost.org/"
-
 upstream_tests:
   source: "Boost upstream test tree"
-  scope: "Not run in the local dependency simulation; OHOS validation must record the upstream/component test policy before PR submission."
+  scope: "Not run in this dependency PR; full Boost upstream tests are large and component-wide."
   total: 0
-  reason: "Morpheus needs a small compiled component subset; local simulation only verifies package build and consumer linkage."
-
-test_package_tests:
-  - file: "test.cpp"
-    description: "Consumer link/API smoke test for ProgramOptions, Filesystem, System, and Morpheus-required header-only Boost modules."
-    command: "test_boost_morpheus_components"
-
-test_package_test_count: 1
+  reason: "This package is a compiled subset for downstream dependency closure; test_package verifies linked component behavior."
+adapted_tests:
+  - name: test_boost_compiled
+    type: consumer
+    assertions: 4
+    coverage:
+      - program_options parses provided arguments
+      - regex validates the parsed name
+      - serialization writes parsed values to an archive
+      - thread starts, mutates state, and joins

@@ -1,67 +1,50 @@
-#include <fstream>
-#include <iterator>
-#include <string>
-#include <vector>
-
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/circular_buffer.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/math/special_functions/factorials.hpp>
+#include <boost/archive/text_oarchive.hpp>
 #include <boost/program_options.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/system/error_code.hpp>
-#include <boost/tokenizer.hpp>
+#include <boost/regex.hpp>
+#include <boost/thread.hpp>
 
-int main() {
-    int failures = 0;
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
+int main(int argc, char** argv) {
     namespace po = boost::program_options;
-    po::options_description options("morpheus boost options");
-    int steps = 0;
-    options.add_options()("steps", po::value<int>(&steps));
-    const char* arguments[] = {"morpheus-smoke", "--steps", "190"};
-    po::variables_map values;
-    po::store(po::parse_command_line(3, arguments, options), values);
-    po::notify(values);
-    failures += steps != 190;
 
-    namespace fs = boost::filesystem;
-    const fs::path root("boost-morpheus-component-test");
-    const fs::path file = root / "input.txt";
-    boost::system::error_code ec;
-    fs::remove_all(root, ec);
-    failures += !fs::create_directories(root, ec) || ec;
-    {
-        std::ofstream output(file.string(), std::ios::binary);
-        output << "boost-morpheus";
+    po::options_description options("options");
+    options.add_options()
+        ("name", po::value<std::string>()->required(), "name to validate")
+        ("count", po::value<int>()->default_value(1), "thread increment count");
+
+    po::variables_map vm;
+    po::store(po::parse_command_line(argc, argv, options), vm);
+    po::notify(vm);
+
+    const std::string name = vm["name"].as<std::string>();
+    const int count = vm["count"].as<int>();
+
+    if (!boost::regex_match(name, boost::regex("[A-Za-z0-9_]+"))) {
+        throw std::runtime_error("regex validation failed");
     }
-    failures += !fs::exists(file, ec) || ec;
-    failures += fs::file_size(file, ec) != 14 || ec;
-    fs::remove_all(root, ec);
 
-    std::string csv = " alpha, beta, gamma ";
-    boost::algorithm::trim(csv);
-    boost::algorithm::replace_all(csv, " ", "");
-    std::vector<std::string> split_values;
-    boost::algorithm::split(split_values, csv, boost::is_any_of(","));
-    failures += split_values.size() != 3 || split_values[1] != "beta";
+    std::ostringstream buffer;
+    boost::archive::text_oarchive archive(buffer);
+    archive << name;
+    archive << count;
+    if (buffer.str().empty()) {
+        throw std::runtime_error("serialization produced no output");
+    }
 
-    boost::circular_buffer<int> window(2);
-    window.push_back(1);
-    window.push_back(2);
-    window.push_back(3);
-    failures += window.front() != 2 || window.back() != 3;
+    int value = 0;
+    boost::thread worker([&value, count]() {
+        for (int i = 0; i < count; ++i) {
+            ++value;
+        }
+    });
+    worker.join();
 
-    failures += boost::math::factorial<double>(5) != 120.0;
+    if (value != count) {
+        throw std::runtime_error("thread did not update value");
+    }
 
-    boost::property_tree::ptree tree;
-    tree.put("steps", steps);
-    failures += tree.get<int>("steps") != 190;
-
-    boost::tokenizer<boost::escaped_list_separator<char>> tokens(csv);
-    failures += std::distance(tokens.begin(), tokens.end()) != 3;
-
-    return failures;
+    return 0;
 }
