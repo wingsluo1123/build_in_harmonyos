@@ -12,7 +12,7 @@ title: SDL3 3.4.8 HarmonyOS 编译记录
 
 **1. CMakeLists.txt（补丁 0001）**
 - 添加 HarmonyOS 平台检测：`set(OHOS true)`
-- 定义 `__OHOS__` 宏
+- 定义 SDL 自有的 `SDL_PLATFORM_OHOS` 宏
 - 将 HarmonyOS 视为 Unix-like 系统（启用 pthread）
 - 禁用 SDL_TRAY（HarmonyOS 无 Gtk 支持）
 
