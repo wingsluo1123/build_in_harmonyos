@@ -25,9 +25,9 @@ class PycairoConan(ConanFile):
     def generate(self):
         PkgConfigDeps(self).generate()
         toolchain = MesonToolchain(self)
-        toolchain.project_options["python"] = self.conf.get(
-            "tools.build:python", default="python3"
-        )
+        # Conan 2.29 validates conf keys, and it has no tools.build:python
+        # entry. The HarmonyOS build environment provides python3 on PATH.
+        toolchain.project_options["python"] = "python3"
         # pytest is not bundled with pycairo. The package test exercises the
         # installed extension; upstream pytest is probed separately on device.
         toolchain.project_options["tests"] = "false"

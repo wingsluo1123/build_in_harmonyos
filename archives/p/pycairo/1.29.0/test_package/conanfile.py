@@ -13,6 +13,4 @@ class PycairoTestConan(ConanFile):
         if cross_building(self):
             self.output.info("Cross-building: package execution is skipped.")
             return
-        python = self.conf.get("tools.build:python", default="python3")
-        self.run(f'{python} test.py', env="conanrun")
-
+        self.run("python3 test.py", env="conanrun")
