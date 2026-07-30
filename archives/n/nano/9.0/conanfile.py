@@ -2,11 +2,12 @@
 """Conan recipe for GNU nano 9.0."""
 
 import os
+import shlex
 import shutil
-from pathlib import Path
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import Environment
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -34,37 +35,72 @@ class NanoConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        sources = self.conan_data["sources"]
+        get(self, **sources["nano"], strip_root=True)
+        get(
+            self,
+            **sources["ncurses"],
+            destination=self._ncurses_source_folder(),
+            strip_root=True,
+        )
+
+    def _ncurses_source_folder(self):
+        return os.path.join(self.source_folder, "_ncurses")
+
+    def _ncurses_prefix(self):
+        return os.path.join(self.build_folder, "ncurses-prefix")
 
     def generate(self):
         toolchain = AutotoolsToolchain(self)
-        default_prefix = str(Path.home() / "usr" / "local")
-        system_prefix = Path(
-            self.conf.get(
-                "user.nano:system_prefix",
-                default=default_prefix,
-                check_type=str,
-            )
-        )
-        include_dir = system_prefix / "include"
-        library_dir = system_prefix / "lib"
-        missing = [
-            str(path) for path in (include_dir, library_dir) if not path.is_dir()
-        ]
-        if missing:
-            raise ConanInvalidConfiguration(
-                "nano requires the system ncurses prefix; missing directories: "
-                + ", ".join(missing)
-                + ". Set user.nano:system_prefix in the Conan profile."
-            )
+        include_dir = os.path.join(self._ncurses_prefix(), "include")
+        library_dir = os.path.join(self._ncurses_prefix(), "lib")
         toolchain.extra_cflags.extend(
-            [f"-I{include_dir}", f"-I{include_dir / 'ncursesw'}"]
+            [f"-I{include_dir}", f"-I{os.path.join(include_dir, 'ncursesw')}"]
         )
         toolchain.extra_ldflags.append(f"-L{library_dir}")
         toolchain.configure_args.extend(
             ["--disable-nls", "--disable-libmagic", "--disable-speller"]
         )
         toolchain.generate()
+
+    def _build_ncurses(self):
+        build_folder = os.path.join(self.build_folder, "ncurses-build")
+        os.makedirs(build_folder, exist_ok=True)
+
+        compiler_executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = compiler_executables.get("c")
+        cxx = compiler_executables.get("cpp")
+        if not cc or not cxx:
+            raise ConanInvalidConfiguration(
+                "tools.build:compiler_executables must define c and cpp"
+            )
+
+        configure_args = [
+            os.path.join(self._ncurses_source_folder(), "configure"),
+            f"--prefix={self._ncurses_prefix()}",
+            "--build=aarch64-unknown-linux-gnu",
+            "--host=aarch64-unknown-linux-gnu",
+            "--without-shared",
+            "--with-normal",
+            "--enable-widec",
+            "--with-termlib",
+            "--without-cxx",
+            "--without-cxx-binding",
+            "--without-progs",
+            "--without-tests",
+            "--without-manpages",
+        ]
+        build_env = Environment()
+        build_env.define("CC", cc)
+        build_env.define("CXX", cxx)
+        build_env.define("CFLAGS", "-fPIC")
+        build_env.define("CPPFLAGS", "-D_GNU_SOURCE")
+        with build_env.vars(self).apply():
+            self.run(shlex.join(configure_args), cwd=build_folder)
+            self.run("make -j1", cwd=build_folder)
+            self.run("make install.libs install.includes", cwd=build_folder)
 
     def build(self):
         apply_conandata_patches(self)
@@ -76,9 +112,22 @@ class NanoConan(ConanFile):
         os.makedirs(tmpdir, exist_ok=True)
         os.environ["TMPDIR"] = tmpdir
 
+        self._build_ncurses()
+
+        ncurses_include = os.path.join(
+            self._ncurses_prefix(), "include", "ncursesw"
+        )
+        ncurses_lib = os.path.join(self._ncurses_prefix(), "lib")
+        nano_env = Environment()
+        nano_env.define("NCURSESW_CFLAGS", f"-I{ncurses_include}")
+        nano_env.define(
+            "NCURSESW_LIBS", f"-L{ncurses_lib} -lncursesw -ltinfow"
+        )
+
         autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        with nano_env.vars(self).apply():
+            autotools.configure()
+            autotools.make(args=["-j1"])
 
     def package(self):
         Autotools(self).install()
@@ -87,6 +136,12 @@ class NanoConan(ConanFile):
             "COPYING",
             src=self.source_folder,
             dst=os.path.join(self.package_folder, "licenses"),
+        )
+        copy(
+            self,
+            "COPYING",
+            src=self._ncurses_source_folder(),
+            dst=os.path.join(self.package_folder, "licenses", "ncurses"),
         )
 
     def package_info(self):
