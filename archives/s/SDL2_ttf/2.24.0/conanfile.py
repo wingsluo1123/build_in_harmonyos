@@ -87,6 +87,4 @@ class Sdl2TtfConan(ConanFile):
             "harfbuzz::harfbuzz",
         ]
         self.cpp_info.set_property("cmake_file_name", "SDL2_ttf")
-        self.cpp_info.set_property(
-            "cmake_target_name", "SDL2_ttf::SDL2_ttf-static"
-        )
+        self.cpp_info.set_property("cmake_target_name", "SDL2_ttf::SDL2_ttf")
