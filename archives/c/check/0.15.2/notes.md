@@ -21,9 +21,13 @@
 
 ### 3. CMake 编译
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF
 make -j$(nproc)
 ```
+
+Conan 配方声明 `shared/fPIC` 选项，默认按静态库构建，并显式传递
+`BUILD_SHARED_LIBS` 与 `CMAKE_POSITION_INDEPENDENT_CODE`，满足 Conan library
+包类型规则。
 
 ### 4. 测试
 - 上游自测试关闭，避免 fork/临时文件运行阶段平台差异

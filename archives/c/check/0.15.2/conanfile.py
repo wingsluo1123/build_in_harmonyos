@@ -19,6 +19,16 @@ class CheckConan(ConanFile):
     homepage = "https://libcheck.github.io/check/"
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
+
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -35,6 +45,10 @@ class CheckConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
+        tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = bool(
+            self.options.get_safe("fPIC", True)
+        )
         tc.variables["BUILD_TESTING"] = False
         tc.variables["CHECK_ENABLE_TESTS"] = False
         tc.variables["CHECK_ENABLE_TIMEOUT_TESTS"] = False
