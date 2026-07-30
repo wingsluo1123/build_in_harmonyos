@@ -91,6 +91,7 @@ int main(void)
         return 9;
     }
 
+    g_setenv("OHOS_BUNDLE_NAME", "gtk-mac-integration-test", TRUE);
     g_set_application_name("gtk-mac-integration-test");
     bundle_id = gtkosx_application_get_bundle_id();
     bundle_info_id = gtkosx_application_get_bundle_info("CFBundleIdentifier");

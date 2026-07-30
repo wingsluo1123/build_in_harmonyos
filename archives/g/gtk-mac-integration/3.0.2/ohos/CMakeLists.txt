@@ -9,6 +9,12 @@ target_compile_features(gtkmacintegration-gtk3 PRIVATE c_std_11)
 target_compile_definitions(
     gtkmacintegration-gtk3 PUBLIC GTKOSX_HARMONYOS_COMPAT=1
 )
+
+set(GTKMACINTEGRATION_GLIB_TARGETS glib::glib)
+if(TARGET glib::gobject-2.0)
+    list(APPEND GTKMACINTEGRATION_GLIB_TARGETS glib::gobject-2.0)
+endif()
+
 target_include_directories(
     gtkmacintegration-gtk3
     PUBLIC
@@ -20,7 +26,7 @@ target_include_directories(
 target_link_libraries(
     gtkmacintegration-gtk3
     PUBLIC
-        glib::glib
+        ${GTKMACINTEGRATION_GLIB_TARGETS}
 )
 
 install(

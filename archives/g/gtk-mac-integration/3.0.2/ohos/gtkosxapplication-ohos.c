@@ -172,9 +172,8 @@ void gtkosx_application_set_use_quartz_accelerators(
     GtkosxApplication *self, gboolean enabled
 )
 {
-    if (self != NULL) {
-        self->use_quartz_accelerators = enabled;
-    }
+    g_return_if_fail(GTKOSX_IS_APPLICATION(self));
+    self->use_quartz_accelerators = enabled;
 }
 
 gboolean gtkosx_application_use_quartz_accelerators(GtkosxApplication *self)

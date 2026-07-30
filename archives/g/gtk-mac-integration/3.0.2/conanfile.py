@@ -5,12 +5,7 @@ import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import (
-    apply_conandata_patches,
-    copy,
-    export_conandata_patches,
-    get,
-)
+from conan.tools.files import copy, get
 
 
 class GtkMacIntegrationConan(ConanFile):
@@ -37,7 +32,6 @@ class GtkMacIntegrationConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def export_sources(self):
-        export_conandata_patches(self)
         copy(
             self,
             "*",
@@ -68,9 +62,10 @@ class GtkMacIntegrationConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         cmake = CMake(self)
-        cmake.configure(build_script_folder=os.path.join(self.source_folder, "ohos"))
+        cmake.configure(
+            build_script_folder=os.path.join(self.export_sources_folder, "ohos")
+        )
         cmake.build()
 
     def package(self):
