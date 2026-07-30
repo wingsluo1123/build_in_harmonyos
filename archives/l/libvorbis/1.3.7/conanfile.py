@@ -26,7 +26,11 @@ class LibvorbisConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def requirements(self):
-        self.requires("libogg/1.3.6")
+        self.requires(
+            "libogg/1.3.6",
+            transitive_headers=True,
+            transitive_libs=True,
+        )
 
     def layout(self):
         cmake_layout(self)
