@@ -63,7 +63,7 @@ class Smpeg2Conan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        self.run("sh autogen.sh", cwd=self.source_folder)
+        self.run("sh autogen.sh", cwd=self.source_folder, env="conanbuild")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
