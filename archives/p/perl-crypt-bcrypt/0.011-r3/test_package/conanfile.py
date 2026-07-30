@@ -29,5 +29,5 @@ class PerlCryptBcryptTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run the C test binary directly (check=True ensures non-zero exit code fails the test)
-        self.run(os.path.join(self.cpp.build.bindirs[0], "test_crypt_bcrypt"), env="conanrun", check=True)
+        # Run the C test binary directly (non-zero exit code raises ConanException)
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_crypt_bcrypt"), env="conanrun")

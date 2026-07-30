@@ -27,17 +27,6 @@ class PerlCryptBcryptConan(ConanFile):
 
     # XS module compiles C code — needs compiler/build_type
     settings = "os", "compiler", "build_type", "arch"
-    # R33: Build paths configurable via options (not hardcoded in build())
-    options = {
-        "perl_lib_path": "ANY",
-        "sysroot_path": "ANY",
-        "llvm_lib_path": "ANY",
-    }
-    default_options = {
-        "perl_lib_path": "",
-        "sysroot_path": "",
-        "llvm_lib_path": "",
-    }
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -52,21 +41,29 @@ class PerlCryptBcryptConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # R32: Only configure Perl XS build env on Linux/OHOS
+        # R32: Only configure build env on Linux/OHOS
         if self.settings.os in ("Linux", "OHOS"):
-            perl_lib = str(self.options.perl_lib_path)
-            sysroot = str(self.options.sysroot_path)
-            llvm_lib = str(self.options.llvm_lib_path)
-            self.output.info(f"Configuring Perl XS build environment for {self.settings.os}")
-            self.output.info(f"  PERL5LIB: {perl_lib}")
-            c_include = f"{sysroot}/include:{sysroot}/include/aarch64-linux-ohos"
-            self.output.info(f"  C_INCLUDE_PATH: {c_include}")
-            library_path = f"{sysroot}/lib/aarch64-linux-ohos:{llvm_lib}"
-            self.output.info(f"  LIBRARY_PATH: {library_path}")
             env = Environment()
-            env.define("PERL5LIB", perl_lib)
-            env.define("C_INCLUDE_PATH", c_include)
-            env.define("LIBRARY_PATH", library_path)
+            # Auto-detect OHOS SDK path from standard installation directory.
+            # Scans /data/service/hnp/ohos-sdk.org/ for installed SDK versions.
+            sdk_base = "/data/service/hnp/ohos-sdk.org"
+            sdk_dirs = sorted(
+                d for d in os.listdir(sdk_base) if d.startswith("ohos-sdk_")
+            ) if os.path.isdir(sdk_base) else []
+            if sdk_dirs:
+                sdk_root = os.path.join(sdk_base, sdk_dirs[-1], "ohos/native")
+                sysroot = os.path.join(sdk_root, "sysroot/usr")
+                llvm_lib = os.path.join(sdk_root, "llvm/lib/aarch64-linux-ohos")
+                c_include = f"{sysroot}/include:{sysroot}/include/aarch64-linux-ohos"
+                library_path = f"{sysroot}/lib/aarch64-linux-ohos:{llvm_lib}"
+                env.define("C_INCLUDE_PATH", c_include)
+                env.define("LIBRARY_PATH", library_path)
+                self.output.info(f"Configuring Perl XS build environment for {self.settings.os}")
+                self.output.info(f"  SDK: {sdk_root}")
+                self.output.info(f"  C_INCLUDE_PATH: {c_include}")
+                self.output.info(f"  LIBRARY_PATH: {library_path}")
+            else:
+                self.output.warning(f"OHOS SDK not found at {sdk_base}, skipping env setup")
             env.vars(self).save_script("perl_bcrypt_env")
 
     def build(self):
@@ -75,17 +72,17 @@ class PerlCryptBcryptConan(ConanFile):
         # Build env list: perl_bcrypt_env only exists on Linux/OHOS
         env_list = ["conanbuild", "perl_bcrypt_env"] if self.settings.os in ("Linux", "OHOS") else ["conanbuild"]
         # Perl XS module: use Makefile.PL (ExtUtils::MakeMaker)
-        self.run("perl Makefile.PL", cwd=self.source_folder, env=env_list, check=True)
-        self.run("make -j1", cwd=self.source_folder, env=env_list, check=True)
+        self.run("perl Makefile.PL", cwd=self.source_folder, env=env_list)
+        self.run("make -j1", cwd=self.source_folder, env=env_list)
         # Create static library from pure C object (no Perl XS dependencies)
-        self.run("ar rcs libcrypt_blowfish.a crypt_blowfish.o", cwd=self.source_folder, env=env_list, check=True)
+        self.run("ar rcs libcrypt_blowfish.a crypt_blowfish.o", cwd=self.source_folder, env=env_list)
 
     def package(self):
         # Build env list: perl_bcrypt_env only exists on Linux/OHOS
         env_list = ["conanbuild", "perl_bcrypt_env"] if self.settings.os in ("Linux", "OHOS") else ["conanbuild"]
         # Install to a temporary DESTDIR
         dest_dir = os.path.join(self.build_folder, "destdir")
-        self.run("make install DESTDIR={}".format(dest_dir), cwd=self.source_folder, env=env_list, check=True)
+        self.run("make install DESTDIR={}".format(dest_dir), cwd=self.source_folder, env=env_list)
 
         # Find and copy the compiled .so (XS shared library)
         so_files = glob.glob(os.path.join(dest_dir, "**", "auto", "Crypt", "Bcrypt", "Bcrypt.so"), recursive=True)
