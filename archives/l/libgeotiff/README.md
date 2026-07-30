@@ -18,7 +18,7 @@ Library for reading and writing GeoTIFF tags in TIFF files. GeoTIFF 代表地理
 - conan create 编译验证通过
 - test_package ctest 1/1 通过
 - 功能测试: 创建/读取 GeoTIFF 文件，GTIFNew/GTIFKeySet/GTIFWriteKeys/GTIFKeyGet API 验证通过
-- 详见 reports/TEST_REPORT.md
+- 详见各版本 notes.md
 
 ## 参考
 - https://github.com/OSGeo/libgeotiff
