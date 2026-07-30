@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 
 from conan import ConanFile
@@ -15,5 +16,5 @@ class OpenAdventureTestConan(ConanFile):
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL") or "/data/service/hnp/bin/bash"
         self.run(f"{bash} test.sh", env="conanrun")

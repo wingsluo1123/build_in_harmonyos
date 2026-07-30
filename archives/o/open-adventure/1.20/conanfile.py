@@ -37,11 +37,19 @@ class OpenAdventureConan(ConanFile):
 
         cc = self.conf.get("tools.build:compiler_executables:c", "clang", check_type=str)
 
+        # Respect build_type setting (Debug/Release/RelWithDebInfo)
+        if self.settings.build_type == "Debug":
+            cflags = "-fPIC -g -O0"
+        elif self.settings.build_type == "RelWithDebInfo":
+            cflags = "-fPIC -g -O2"
+        else:
+            cflags = "-fPIC -O2"
+
         # PkgConfigDeps generates .pc files in the build folder;
         # the Makefile uses pkg-config --cflags libedit for include paths
         env = {"PKG_CONFIG_PATH": self.build_folder}
-        self.run(f'make CC={cc} CFLAGS="-fPIC -O2" LIBS="-ledit -lncurses" -j1', env=env)
-        self.run(f'make cheat CC={cc} CFLAGS="-fPIC -O2" LIBS="-ledit -lncurses"', env=env)
+        self.run(f'make CC={cc} CFLAGS="{cflags}" LIBS="-ledit -lncurses" -j1', env=env)
+        self.run(f'make cheat CC={cc} CFLAGS="{cflags}" LIBS="-ledit -lncurses"', env=env)
 
     def package(self):
         copy(self, "advent", self.source_folder, os.path.join(self.package_folder, "bin"))
