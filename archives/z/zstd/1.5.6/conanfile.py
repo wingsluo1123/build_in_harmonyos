@@ -93,6 +93,11 @@ class ZstdConan(ConanFile):
             if old in txt:
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(txt.replace(old, new))
+            else:
+                # 守卫未命中（上游可能微调空白/格式）→ 不静默跳过：打 warning，便于排查
+                # 链接期若仍报 undefined symbol: qsort_r，此处即为根因。
+                self.output.warning(
+                    "_patch_gnu_qsort_r: 在 {} 中未找到预期模式，qsort_r 补丁未应用".format(rel))
 
     def package(self):
         import os
