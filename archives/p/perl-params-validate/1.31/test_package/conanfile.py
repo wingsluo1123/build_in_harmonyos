@@ -8,6 +8,7 @@ Runtime .so loading may fail due to SELinux/HMDFS — PP fallback is expected.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 
 
 class TestPerlParamsValidate(ConanFile):
@@ -68,7 +69,7 @@ class TestPerlParamsValidate(ConanFile):
             deps_ok = True
             try:
                 self.run(f'"{perl_bin}" -MModule::Implementation -e "exit 0"')
-            except Exception:
+            except (ConanException, OSError):
                 deps_ok = False
                 self.output.warning(
                     "⚠️ Module::Implementation not available — "
@@ -80,7 +81,7 @@ class TestPerlParamsValidate(ConanFile):
                 try:
                     self.run(f'sh "{test_script}"')
                     self.output.info("✅ Params::Validate PP mode test passed")
-                except Exception as e:
+                except ConanException as e:
                     err_str = str(e).lower()
                     if any(kw in err_str for kw in (
                         "permission denied", "hmdfs", "selinux"
