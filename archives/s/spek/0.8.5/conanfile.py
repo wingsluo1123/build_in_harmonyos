@@ -51,7 +51,7 @@ class SpekConan(ConanFile):
         default_prefix = os.environ.get("DEFAULT_PREFIX", "")
         if default_prefix:
             pc_dir = os.path.join(default_prefix, "lib", "pkgconfig")
-            tc.environment.prepend_path("PKG_CONFIG_PATH", pc_dir)
+            tc.environment().prepend_path("PKG_CONFIG_PATH", pc_dir)
 
         tc.generate()
 
@@ -71,10 +71,22 @@ class SpekConan(ConanFile):
         ):
             if os.path.exists(pattern):
                 os.chmod(pattern, 0o755)
+        # HMDFS noexec: Autotools.configure() exec'es ./configure directly,
+        # which Permission-denies (exit 126) on noexec mounts. Invoke via
+        # explicit `sh` interpreter to bypass exec-bit requirement; this is
+        # the Autotools-standard invocation form and works on CI workers too.
+        # Configure lives in source_folder (Autotools.configure uses
+        # script_folder=source_folder, not build_folder); build runs in a
+        # separate build-release/ dir, so reference configure by its source
+        # path and let autotools make() reuse the generated Makefile.
+        tc = AutotoolsToolchain(self)
+        configure_args = tc.configure_args
+        if not self.options.shared:
+            configure_args = list(configure_args) + ["--enable-static", "--disable-shared"]
+        args_str = " ".join(configure_args)
+        configure_path = os.path.join(self.source_folder, "configure")
+        self.run(f'sh "{configure_path}" {args_str}', cwd=self.build_folder)
         autotools = Autotools(self)
-        # PKG_CONFIG_PATH 已在 generate() 通过 Environment 注入 (R33),
-        # 这里只需调用 configure, 不再硬编码本机路径.
-        autotools.configure()
         autotools.make(args=["-j1"])
 
     def package(self):
