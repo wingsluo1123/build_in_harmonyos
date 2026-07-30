@@ -15,7 +15,7 @@ class ZziplibConan(ConanFile):
     description = "Lightweight library for reading zip files."
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/gdraheim/zziplib"
-    url = ""
+    url = "https://github.com/gdraheim/zziplib"
 
     package_type = "library"
 
