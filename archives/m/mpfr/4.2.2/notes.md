@@ -57,7 +57,7 @@ Results:
 - Conan graph resolution succeeded and resolved the direct `gmp/6.3.0` dependency.
 - Full local Autotools build was not run on the Windows host because `sh`, `make`, `cmake`, and clang are not available in this environment.
 
-## OHOS Device Validation
+## OHOS Device Validation.
 
 Single-package runner command used on 2026-07-30:
 
