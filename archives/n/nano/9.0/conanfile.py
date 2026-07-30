@@ -105,31 +105,33 @@ class NanoConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         bash_path = shutil.which("bash")
+        shell_env = Environment()
         if bash_path:
-            os.environ["CONFIG_SHELL"] = bash_path
-            os.environ["SHELL"] = bash_path
+            shell_env.define("CONFIG_SHELL", bash_path)
+            shell_env.define("SHELL", bash_path)
         tmpdir = os.environ.get("TMPDIR")
         if not tmpdir or not os.path.isdir(tmpdir) or not os.access(tmpdir, os.W_OK):
             raise ConanInvalidConfiguration(
                 "TMPDIR must identify a writable non-HMDFS temporary directory"
             )
 
-        self._build_ncurses()
+        with shell_env.vars(self).apply():
+            self._build_ncurses()
 
-        ncurses_include = os.path.join(
-            self._ncurses_prefix(), "include", "ncursesw"
-        )
-        ncurses_lib = os.path.join(self._ncurses_prefix(), "lib")
-        nano_env = Environment()
-        nano_env.define("NCURSESW_CFLAGS", f"-I{ncurses_include}")
-        nano_env.define(
-            "NCURSESW_LIBS", f"-L{ncurses_lib} -lncursesw -ltinfow"
-        )
+            ncurses_include = os.path.join(
+                self._ncurses_prefix(), "include", "ncursesw"
+            )
+            ncurses_lib = os.path.join(self._ncurses_prefix(), "lib")
+            nano_env = Environment()
+            nano_env.define("NCURSESW_CFLAGS", f"-I{ncurses_include}")
+            nano_env.define(
+                "NCURSESW_LIBS", f"-L{ncurses_lib} -lncursesw -ltinfow"
+            )
 
-        autotools = Autotools(self)
-        with nano_env.vars(self).apply():
-            autotools.configure()
-            autotools.make(args=["-j1"])
+            autotools = Autotools(self)
+            with nano_env.vars(self).apply():
+                autotools.configure()
+                autotools.make(args=["-j1"])
 
     def package(self):
         Autotools(self).install()
