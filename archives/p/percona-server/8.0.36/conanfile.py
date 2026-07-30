@@ -6,13 +6,13 @@ Used by qt-percona-server as the MySQL protocol backend.
 Build system: CMake
 Produces: libperconaserverclient.so (and .a)
 
-Dependencies: boost (header-only), openssl, zlib
+Dependencies: openssl, zlib; Boost headers are fetched from upstream archives
 """
 import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get, apply_conandata_patches, copy
+from conan.tools.files import get, copy, replace_in_file, rm
 
 
 class PerconaServerConan(ConanFile):
@@ -34,13 +34,84 @@ class PerconaServerConan(ConanFile):
     def requirements(self):
         self.requires("openssl/3.5.6")
         self.requires("zlib/1.3.1")
-        self.requires("boost/1.90.0")
 
     def layout(self):
         cmake_layout(self, src_folder="src")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["boost"],
+            destination=os.path.join(self.source_folder, "boost"), strip_root=True)
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "CMakeLists.txt"),
+            r'''IF(EDITLINE_WARN_GIVEN)
+  MESSAGE(FATAL_ERROR
+    "-DWITH_EDITLINE=system, but missing system libraries.\n"
+    "You can use -DWITH_EDITLINE=bundled instead."
+    )
+ENDIF()''',
+            r'''IF(EDITLINE_WARN_GIVEN AND NOT WITHOUT_SERVER)
+  MESSAGE(FATAL_ERROR
+    "-DWITH_EDITLINE=system, but missing system libraries.\n"
+    "You can use -DWITH_EDITLINE=bundled instead."
+    )
+ELSEIF(EDITLINE_WARN_GIVEN)
+  MESSAGE(WARNING
+    "-DWITH_EDITLINE=system, but missing system libraries; "
+    "continuing because WITHOUT_SERVER=ON builds only client libraries."
+    )
+ENDIF()''',
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "libmysql", "CMakeLists.txt"),
+            'MESSAGE(FATAL_ERROR "Can\'t find neither Win32 nor Unix DNS SRV APIs")',
+            'MESSAGE(WARNING "Can\'t find neither Win32 nor Unix DNS SRV APIs; mysql_real_connect_dns_srv will return an unsupported error")',
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "libmysql", "dns_srv.cc"),
+            '''#error "No DNS SRV Support detected for your OS. Consider adjusting Cmake."
+
+#if 0
+// dummy function returning an error in case it's not supported by the OS
+
+static bool get_dns_srv(Dns_srv_data &data, const char *dnsname, int &error) {
+  error = -1;  // set a special error code for not supported
+  return true;
+}
+#endif''',
+            '''// Dummy function returning an error in case DNS SRV is not supported by the OS.
+static bool get_dns_srv(Dns_srv_data &data, const char *dnsname, int &error) {
+  error = -1;  // set a special error code for not supported
+  return true;
+}''',
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "mysys", "my_thread.cc"),
+            '''int my_thread_cancel(my_thread_handle *thread) {
+#ifndef _WIN32
+  return pthread_cancel(thread->thread);
+#else''',
+            '''int my_thread_cancel(my_thread_handle *thread) {
+#if defined(__OHOS__)
+  (void)thread;
+  return 0;
+#elif !defined(_WIN32)
+  return pthread_cancel(thread->thread);
+#else''',
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "sql-common", "get_password.cc"),
+            '''    char tmp;
+    if (my_read(fd, &tmp, 1, MYF(0)) != 1) break;''',
+            '''    uchar tmp;
+    if (my_read(fd, &tmp, 1, MYF(0)) != 1) break;''',
+        )
+
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -51,18 +122,28 @@ class PerconaServerConan(ConanFile):
         tc.variables["OPENSSL_ROOT_DIR"] = self.dependencies["openssl"].package_folder
         tc.variables["WITH_ZLIB"] = "system"
         tc.variables["ZLIB_ROOT"] = self.dependencies["zlib"].package_folder
-        # Use Conan boost package instead of CMake DOWNLOAD_BOOST (more reliable)
-        tc.variables["WITH_BOOST"] = self.dependencies["boost"].package_folder
+        # Provide the Boost version expected by Percona/MySQL 8.0.36 without
+        # declaring an unpublished Conan Boost dependency or relying on CMake's
+        # JFrog download URL, which can return a non-archive response.
+        tc.variables["DOWNLOAD_BOOST"] = "0"
+        tc.variables["WITH_BOOST"] = os.path.join(self.source_folder, "boost")
+        # Disable optional server authentication plugins that require LDAP/SASL/Kerberos.
+        tc.variables["WITH_AUTHENTICATION_LDAP"] = "OFF"
+        tc.variables["WITHOUT_COMPONENT_KEYRING_KMIP"] = "ON"
+        # Do not use the default WITH_READLINE=system path, which fails hard if
+        # curses/readline are unavailable. The source() adjustment makes missing
+        # system editline non-fatal for the client-only build.
+        tc.variables["WITH_EDITLINE"] = "system"
         # ARM64 specific: use -fPIC for shared library compatibility
         tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON"
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
-        # Build only the mysqlclient target (client library), not the whole server
-        cmake.build(target="mysqlclient")
+        # Build only the client library target, not the whole server. Use -j1
+        # because OHOS storage does not allow make jobserver FIFOs.
+        cmake.build(target="perconaserverclient", build_tool_args=["-j1"])
 
     def package(self):
         # Install source headers (top-level include/)
@@ -78,8 +159,7 @@ class PerconaServerConan(ConanFile):
              src=self.build_folder, keep_path=False)
         # Clean up unwanted files
         for pattern in ["*.la", "*.dylib"]:
-            copy(self, pattern, dst=os.path.join(self.package_folder, "lib"),
-                 src=os.path.join(self.package_folder, "lib"), keep_path=False, delete=True)
+            rm(self, pattern, folder=os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
         self.cpp_info.libs = ["perconaserverclient"]

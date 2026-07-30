@@ -7,9 +7,8 @@ Percona Server for MySQL 8.0.36 — Percona 发行的 MySQL 兼容数据库服�
 ## OHOS 适配
 
 - 仅构建客户端库（`-DWITHOUT_SERVER=ON`），不编译完整数据库服务器
-- CMake 构建系统，自动下载 Boost 头文件依赖
+- CMake 构建系统，适配时预取 Boost 1.77.0 头文件供上游构建使用
 - 产物：`libperconaserverclient.so` / `libperconaserverclient.a`
-- ARM64 X18 保留寄存器问题已在适配补丁中处理
 
 ## 依赖
 

@@ -13,19 +13,27 @@ build:
     - "-DWITHOUT_SERVER=ON"
     - "-DWITH_SSL=system"
     - "-DWITH_ZLIB=system"
-    - "-DDOWNLOAD_BOOST=1"
+    - "-DDOWNLOAD_BOOST=0"
+    - "-DWITH_AUTHENTICATION_LDAP=OFF"
+    - "-DWITHOUT_COMPONENT_KEYRING_KMIP=ON"
+    - "-DWITH_EDITLINE=system"
     - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+    - "build target: perconaserverclient (-j1)"
   dependencies:
-    - "openssl/1.1.1w"
+    - "openssl/3.5.6"
     - "zlib/1.3.1"
   cc: clang
   cxx: clang++
 
-patches_applied: []
+patches_applied:
+  - "inline source adjustment: allow client-only build without editline/curses"
+  - "inline source adjustment: provide unsupported DNS SRV stub when resolver APIs are unavailable"
+  - "inline source adjustment: make my_thread_cancel a no-op on OHOS without pthread_cancel"
+  - "inline source adjustment: use uchar buffer for my_read in get_password.cc"
 
 knowledge_gained:
   - "Percona Server 源码包约 455MB，仅构建客户端库大幅减少编译时间"
-  - "WITHOUT_SERVER=ON 仍需要 Boost 头文件（DOWNLOAD_BOOST=1 自动下载）"
+  - "WITHOUT_SERVER=ON 仍需要 Boost 1.77.0 头文件，适配时从 archives.boost.io 预取"
   - "客户端库产物名为 libperconaserverclient（不是 libmysqlclient）"
   - "ARM64 平台需确保 -fPIC 编译（CMAKE_POSITION_INDEPENDENT_CODE=ON）"
   - "被 qt-percona-server 作为 QMYSQL 驱动后端依赖"
