@@ -227,6 +227,9 @@ class SlangConan(ConanFile):
         tc.variables["SLANG_ENABLE_REPLAYER"] = "OFF"
         tc.variables["SLANG_ENABLE_PCH"] = "OFF"
         tc.variables["SLANG_STANDARD_MODULE_DEVELOP_BUILD"] = "OFF"
+        # Set RPATH so slangc can dlopen runtime .so modules from its own dir
+        tc.variables["CMAKE_BUILD_RPATH"] = "$ORIGIN"
+        tc.variables["CMAKE_INSTALL_RPATH"] = "$ORIGIN"
         tc.generate()
 
     def build(self):
@@ -254,7 +257,11 @@ class SlangConan(ConanFile):
                  then batch-sign all executables.
         Phase 2: Normal build — generators are signed, execution succeeds.
         Falls back to retry loop if new unsigned binaries appear.
+        Uses -j2 in phase 2+ to speed up compilation and stay within CI timeout.
         """
+        import select
+        import time
+
         build_dir = self.build_folder
         already_signed = set()
         failed_sign_bins = set()
@@ -271,8 +278,16 @@ class SlangConan(ConanFile):
             )
 
         max_retries = 5
+        idle_timeout = 300  # 5 min with no output = probably hung
+        # Use writable TMPDIR to avoid make jobserver fifo permission issues
+        build_env = os.environ.copy()
+        build_env["TMPDIR"] = os.environ.get("TMPDIR", os.path.expanduser("~/tmp"))
+        os.makedirs(build_env["TMPDIR"], exist_ok=True)
+
         for attempt in range(max_retries):
-            make_flags = ["-j1", "-k"] if attempt == 0 else ["-j1"]
+            # Phase 1 uses -j1 -k (keep going, single-threaded to find all generators)
+            # Phase 2+ uses -j2 (multi-threaded, generators already signed)
+            make_flags = ["-j1", "-k"] if attempt == 0 else ["-j2"]
             self.output.info(f"Build attempt {attempt+1} (flags: {' '.join(make_flags)})...")
 
             proc = subprocess.Popen(
@@ -280,21 +295,46 @@ class SlangConan(ConanFile):
                 cwd=build_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True
+                text=True,
+                env=build_env,
             )
 
             output_lines = []
             timed_out = False
-            try:
-                for line in proc.stdout:
+            last_output_time = time.time()
+
+            # Read stdout with idle timeout protection (P2 fix from AI review)
+            while True:
+                ready, _, _ = select.select([proc.stdout], [], [], 10)
+                if ready:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break  # EOF — process exited
                     print(line, end='')
                     output_lines.append(line)
+                    last_output_time = time.time()
+                else:
+                    # No output — check if process is done
+                    if proc.poll() is not None:
+                        # Process exited, drain any remaining output
+                        remaining = proc.stdout.read()
+                        if remaining:
+                            print(remaining, end='')
+                            output_lines.append(remaining)
+                        break
+                    # Check for idle timeout (process alive but no output)
+                    if time.time() - last_output_time > idle_timeout:
+                        proc.kill()
+                        proc.wait()
+                        timed_out = True
+                        self.output.info(
+                            f"Build idle timeout on attempt {attempt+1} "
+                            f"(no output for {idle_timeout}s)"
+                        )
+                        break
+
+            if not timed_out:
                 proc.wait(timeout=3600)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-                timed_out = True
-                self.output.info(f"Build timed out on attempt {attempt+1}")
 
             if timed_out:
                 self._sign_all_executables(build_dir, failed_sign_bins, already_signed)
@@ -304,8 +344,15 @@ class SlangConan(ConanFile):
                 self.output.info("Build completed successfully")
                 return
 
+            # Check for unsigned binary execution failures.
+            # Filter out "make: jobserver mkfifo" false positives — those are
+            # file permission issues with the jobserver fifo, not unsigned binaries.
             combined_output = ''.join(output_lines)
-            if "Operation not permitted" in combined_output:
+            has_unsigned_binary = any(
+                "Operation not permitted" in line and "/bin/sh:" in line
+                for line in output_lines
+            )
+            if has_unsigned_binary:
                 self.output.info(f"Unsigned binaries detected, batch signing...")
                 signed_count = self._sign_all_executables(
                     build_dir, failed_sign_bins, already_signed
@@ -490,12 +537,16 @@ class SlangConan(ConanFile):
                 )
 
         # Copy runtime .so modules to bin/ (slangc loads them by basename
-        # from its own directory at runtime)
+        # from its own directory at runtime via dlopen)
         pkg_bin = os.path.join(self.package_folder, "bin")
         for so_name in ["libslang-glslang-2026.14.so", "libslang-glsl-module-2026.14.so"]:
             so_src = os.path.join(pkg_lib, so_name)
             if os.path.exists(so_src):
                 shutil.copy2(so_src, os.path.join(pkg_bin, so_name))
+                # Also create a copy without 'lib' prefix — slangc's dlopen()
+                # looks for "slang-glslang-2026.14.so" not "libslang-...so"
+                short_name = so_name[3:]  # Strip "lib" prefix
+                shutil.copy2(so_src, os.path.join(pkg_bin, short_name))
 
     def package_info(self):
         # Link order: dependents first, dependencies last
@@ -509,3 +560,7 @@ class SlangConan(ConanFile):
         # Include bin/ in libdirs so conanrun sets LD_LIBRARY_PATH to find
         # the runtime .so modules (slang-glslang, slang-glsl-module) there
         self.cpp_info.libdirs = ["lib", "bin", "lib/slang-standard-module-2026.14"]
+        # Explicitly set LD_LIBRARY_PATH for conanrun (slangc uses dlopen to
+        # load runtime .so modules; some Conan versions don't auto-generate
+        # LD_LIBRARY_PATH from libdirs)
+        self.runenv.append_path("LD_LIBRARY_PATH", os.path.join(self.package_folder, "bin"))

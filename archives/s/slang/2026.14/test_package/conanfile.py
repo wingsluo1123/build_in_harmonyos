@@ -45,6 +45,13 @@ class SlangTestConan(ConanFile):
         if not slang_bin:
             raise AssertionError("slangc binary not found in package")
 
+        # slangc uses dlopen() to load runtime .so modules (slang-glslang,
+        # slang-glsl-module) from its own directory. Set LD_LIBRARY_PATH
+        # so the dynamic linker can find them.
+        slang_bin_dir = os.path.dirname(slang_bin)
+        old_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        os.environ["LD_LIBRARY_PATH"] = slang_bin_dir + (":" + old_ld if old_ld else "")
+
         # Test 1: Run slangc -h (L2 smoke test — slangc doesn't support --version)
         self.output.info("Running slangc -h (smoke test)...")
         exit_code = self.run(f'"{slang_bin}" -h', env="conanrun")
