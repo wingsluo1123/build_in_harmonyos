@@ -10,6 +10,7 @@ R26 不适用（非系统同名库）；R38 适用（命令行工具，需 comma
 """
 import os
 import shutil
+import sys
 import zipfile
 
 from conan import ConanFile
@@ -58,12 +59,14 @@ class BadreadConan(ConanFile):
         self.run(
             f'"{python3}" -m pip wheel "{self.source_folder}" --no-deps '
             f'--wheel-dir="{wheel_dir}"',
-            env="BUILD",
+            env="conanbuild",
         )
 
     def package(self):
-        # 解压 wheel 到 <prefix>/lib/python3.12/site-packages
-        site_pkg = os.path.join(self.package_folder, "lib", "python3.12", "site-packages")
+        # 动态获取 Python 版本，避免硬编码 python3.12
+        py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+        # 解压 wheel 到 <prefix>/lib/<py_ver>/site-packages
+        site_pkg = os.path.join(self.package_folder, "lib", py_ver, "site-packages")
         os.makedirs(site_pkg, exist_ok=True)
 
         wheel_dir = os.path.join(self.build_folder, "wheel")
@@ -77,13 +80,13 @@ class BadreadConan(ConanFile):
         bin_dir = os.path.join(self.package_folder, "bin")
         os.makedirs(bin_dir, exist_ok=True)
         wrapper = os.path.join(bin_dir, "badread")
-        # wrapper 用相对路径解析同级 ../lib/python3.12/site-packages
+        # wrapper 用相对路径解析同级 ../lib/<py_ver>/site-packages
         wrapper_content = (
             "#!/bin/sh\n"
             "# badread wrapper — by Conan recipe\n"
             'WRAPPER_DIR="$(cd "$(dirname "$0")" && pwd)"\n'
             'PREFIX_DIR="$(cd "$WRAPPER_DIR/.." && pwd)"\n'
-            'SITE_PKG="$PREFIX_DIR/lib/python3.12/site-packages"\n'
+            f'SITE_PKG="$PREFIX_DIR/lib/{py_ver}/site-packages"\n'
             'if [ -d "$SITE_PKG/badread" ]; then\n'
             '    PYTHONPATH="$SITE_PKG${PYTHONPATH:+:$PYTHONPATH}" \\\n'
             '        exec python3 -m badread "$@"\n'
