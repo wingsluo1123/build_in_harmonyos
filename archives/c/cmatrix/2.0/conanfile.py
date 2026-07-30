@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for cmatrix 2.0-r2 — autotools build system.
+"""Conan recipe for cmatrix 2.0 — autotools build system.
 
 cmatrix is a terminal screensaver that displays scrolling lines of text.
 Build: autotools with patches for OHOS platform compatibility.
@@ -14,7 +14,7 @@ from conan.tools.layout import basic_layout
 
 class CmatrixConan(ConanFile):
     name = "cmatrix"
-    version = "2.0-r2"
+    version = "2.0"
     description = "Terminal screensaver displaying scrolling lines of text."
     license = "GPL-3.0-or-later"
     homepage = "https://github.com/abishekvashok/cmatrix"

@@ -1,4 +1,4 @@
-# cmatrix 2.0-r2 适配笔记
+# cmatrix 2.0 适配笔记
 
 ## 编译环境
 - 构建系统: autotools
@@ -50,7 +50,7 @@ Web: https://github.com/abishekvashok/cmatrix
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| cmatrix-2.0-r2-ohos-aarch64.tar.gz | 317KB | 预编译包 |
+| cmatrix-2.0-ohos-aarch64.tar.gz | 317KB | 预编译包 |
 
 ## 注意事项
 
