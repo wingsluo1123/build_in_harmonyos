@@ -21,6 +21,7 @@ class BisonConan(ConanFile):
     url = ""
 
     settings = "os", "compiler", "build_type", "arch"
+    package_type = "application"
 
     def export_sources(self):
         export_conandata_patches(self)
