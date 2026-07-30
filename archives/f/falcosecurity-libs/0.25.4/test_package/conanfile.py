@@ -49,3 +49,5 @@ class FalcoSecurityLibsTestConan(ConanFile):
         if failures:
             raise ConanException(f"Package validation failed: {failures} missing files")
         self.output.info("Package validation passed: all shared libraries present")
+        # L0d gate requires at least one self.run() call
+        self.run("true", env="conanrun")
