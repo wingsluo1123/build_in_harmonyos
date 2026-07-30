@@ -5,8 +5,10 @@ Object::Pad - simple syntax for lexical field-based objects
 Build system: perl Build.PL + ./Build (Module::Build with XS)
 Produces: Pad.so (ELF64 AArch64 shared library) + .pm modules
 
-Build dependencies (pre-installed at $HOME/usr/local/lib/perl5/):
-  - Module::Build (build system)
+Build dependencies (auto-installed to local Perl lib if not available):
+  - Module::Build (build system, self-bootstrapping)
+  - ExtUtils::CChecker (C compiler feature detection, used by XSPK Build.PL)
+  - File::ShareDir (shared file location, used by XSPK Builder)
   - XS::Parse::Keyword::Builder (compiler flag provider)
   - XS::Parse::Sublike::Builder (compiler flag provider)
 """
@@ -31,6 +33,29 @@ class PerlobjectpadConan(ConanFile):
 
     # R32: Support both Linux and OHOS
     settings = "os", "compiler", "build_type", "arch"
+
+    # Perl build dependencies (CPAN official sources, R39)
+    # Installed in order to local Perl lib if not pre-installed.
+    _PERL_BUILD_DEPS = [
+        ("Module-Build-0.4234",
+         "https://cpan.metacpan.org/authors/id/L/LE/LEONT/Module-Build-0.4234.tar.gz",
+         "66aeac6127418be5e471ead3744648c766bd01482825c5b66652675f2bc86a8f"),
+        ("ExtUtils-CChecker-0.12",
+         "https://cpan.metacpan.org/authors/id/P/PE/PEVANS/ExtUtils-CChecker-0.12.tar.gz",
+         "8b87d145337dec1ee754d30871d0b105c180ad4c92c7dc0c7fadd76cec8c57d3"),
+        ("Class-Inspector-1.36",
+         "https://cpan.metacpan.org/modules/by-module/Class/Class-Inspector-1.36.tar.gz",
+         "cc295d23a472687c24489d58226ead23b9fdc2588e522f0b5f0747741700694e"),
+        ("File-ShareDir-1.118",
+         "https://cpan.metacpan.org/modules/by-module/File/File-ShareDir-1.118.tar.gz",
+         "3bb2a20ba35df958dc0a4f2306fc05d903d8b8c4de3c8beefce17739d281c958"),
+        ("XS-Parse-Keyword-0.49",
+         "https://cpan.metacpan.org/authors/id/P/PE/PEVANS/XS-Parse-Keyword-0.49.tar.gz",
+         "76c5ed142abba1f1df2335849681c83d83cc0842fe854af71081d2c411efb0bb"),
+        ("XS-Parse-Sublike-0.41",
+         "https://cpan.metacpan.org/authors/id/P/PE/PEVANS/XS-Parse-Sublike-0.41.tar.gz",
+         "a10f5e07273b105e5c0b4c6e7e2a6d2d2a68afe9ff4f989c11f38d4bf39cc86d"),
+    ]
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -98,6 +123,114 @@ class PerlobjectpadConan(ConanFile):
         found = [p for p in candidate_libs if p and os.path.isdir(p)]
         return found
 
+    def _get_local_perl_lib(self):
+        """Get local Perl lib paths for deps installed during build().
+
+        These paths are added to PERL5LIB in generate() so that
+        dependencies installed in build()'s _ensure_perl_deps() are
+        found by perl Build.PL and ./Build.
+        """
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in [
+                "/data/service/hnp/bin/perl",
+                "/usr/bin/perl",
+                "/usr/local/bin/perl",
+            ]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        if not perl_path:
+            return []
+
+        try:
+            archname = subprocess.check_output(
+                [perl_path, "-MConfig", "-e", "print $Config{archname}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            archname = "aarch64-linux"
+
+        local_base = os.path.join(self.build_folder, "perl5lib", "lib", "perl5")
+        return [local_base, os.path.join(local_base, archname)]
+
+    def _ensure_perl_deps(self):
+        """Install Perl build dependencies if not already available.
+
+        On dev machines, Module::Build and XS::Parse::*::Builder are
+        pre-installed at $HOME/usr/local/lib/perl5/. On CI workers (clean
+        environment), they are missing, causing 'Can't locate Module/Build.pm'
+        at perl Build.PL time. This method detects the absence and installs
+        all required deps to a local Perl lib directory within the build folder.
+        """
+        # Compute inc_flags for all perl commands (build() and package())
+        # Even when deps are pre-installed, the -I paths simply don't exist
+        # and Perl ignores them, so it's safe to always include them.
+        local_lib = os.path.join(self.build_folder, "perl5lib")
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        try:
+            archname = subprocess.check_output(
+                [perl_path, "-MConfig", "-e", "print $Config{archname}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            archname = "aarch64-linux"
+        self._perl_inc_flags = (
+            f"-I{local_lib}/lib/perl5 -I{local_lib}/lib/perl5/{archname}"
+        )
+
+        # Check if Module::Build is already available
+        try:
+            result = subprocess.run(
+                ["perl", "-MModule::Build", "-e", "exit 0"],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                self.output.info("Module::Build already available, skipping dep install")
+                return
+        except Exception:
+            pass
+
+        self.output.info("Module::Build not found, installing Perl build dependencies...")
+        deps_dir = os.path.join(self.build_folder, "perl_deps")
+        inc_flags = self._perl_inc_flags
+
+        for dirname, url, sha256 in self._PERL_BUILD_DEPS:
+            self.output.info(f"Installing {dirname}...")
+            dep_dir = os.path.join(deps_dir, dirname)
+            os.makedirs(dep_dir, exist_ok=True)
+            get(self, url=url, sha256=sha256, destination=dep_dir, strip_root=True)
+            if os.path.isfile(os.path.join(dep_dir, "Build.PL")):
+                self.run(
+                    f'cd "{dep_dir}" && perl {inc_flags} '
+                    f'Build.PL --install_base="{local_lib}"',
+                    env="conanbuild"
+                )
+                self.run(
+                    f'cd "{dep_dir}" && perl {inc_flags} ./Build',
+                    env="conanbuild"
+                )
+                self.run(
+                    f'cd "{dep_dir}" && perl {inc_flags} '
+                    f'./Build install --install_base="{local_lib}"',
+                    env="conanbuild"
+                )
+            else:
+                self.run(
+                    f'cd "{dep_dir}" && perl {inc_flags} '
+                    f'Makefile.PL INSTALL_BASE="{local_lib}"',
+                    env="conanbuild"
+                )
+                self.run(f'cd "{dep_dir}" && make', env="conanbuild")
+                self.run(f'cd "{dep_dir}" && make install', env="conanbuild")
+
+        self.output.info("Perl build dependencies installed to local lib")
+
     def generate(self):
         """Generate env scripts for the conanbuild scope.
 
@@ -107,10 +240,13 @@ class PerlobjectpadConan(ConanFile):
         env = Environment()
 
         # PERL5LIB: find Module::Build and XS::Parse::*::Builder
+        # Include both pre-installed paths and local lib (populated in build())
         perl_libs = self._resolve_perl_libs()
-        if perl_libs:
-            env.define("PERL5LIB", os.pathsep.join(perl_libs))
-            self.output.info(f"PERL5LIB set to: {os.pathsep.join(perl_libs)}")
+        local_libs = self._get_local_perl_lib()
+        all_libs = perl_libs + local_libs
+        if all_libs:
+            env.define("PERL5LIB", os.pathsep.join(all_libs))
+            self.output.info(f"PERL5LIB set to: {os.pathsep.join(all_libs)}")
 
         # R33: Derive compiler and sysroot paths from Conan config, no hardcoded paths
         cc_info = self.conf.get("tools.build:compiler_executables", default={})
@@ -172,10 +308,14 @@ class PerlobjectpadConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
+        # Install Perl build dependencies if not available (CI workers)
+        self._ensure_perl_deps()
+        inc = self._perl_inc_flags
+
         # Perl Module::Build: configure with install_base pointing to build dir
         prefix = os.path.join(self.build_folder, "perl_prefix")
-        self.run(f"perl Build.PL --install_base={prefix}", env="conanbuild")
-        self.run("./Build", env="conanbuild")
+        self.run(f"perl {inc} Build.PL --install_base={prefix}", env="conanbuild")
+        self.run(f"perl {inc} ./Build", env="conanbuild")
 
     def package(self):
         # Install to a staging directory
