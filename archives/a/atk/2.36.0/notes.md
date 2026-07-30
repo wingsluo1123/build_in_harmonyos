@@ -105,9 +105,11 @@ ninja -C builddir test
 
 ## 路径 B 申报
 
-本库适配过程中引用了 2 个通用问题知识条目（均为已入知识图谱的正式条目）：
+本库适配过程中引用了 3 个通用问题知识条目（均为已入知识图谱的正式条目）：
 - E090：Meson 平台检测通用问题
 - E107：glib 静态库与 libintl 符号不匹配通用问题
+- E227：ATK OHOS 适配综合条目（intl-wrapper + Meson host_system 检测 + pkg-config 传播，本 PR 新增）
+  - 知识图谱正式条目：knowledge/doc/E227.md + knowledge/graph/E227.kv
 
 ---
 
