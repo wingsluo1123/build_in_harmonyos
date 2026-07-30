@@ -41,7 +41,7 @@ XS 实现性能更高，PP 实现无需编译即可使用。
 ### 注意事项
 
 - 源码仅提供 Build.PL (Module::Build)，CI 环境无 Module::Build，改用 Makefile.PL (ExtUtils::MakeMaker)
-- 鸿蒙系统缺少 CRT 文件 (crti.o, crtn.o)，链接时需 patch Makefile LDDLFLAGS 添加 -nostartfiles -nodefaultlibs -lc
+- 鸿蒙系统缺少 CRT 文件 (crti.o, crtn.o)，XS 编译时需内联传递 -nostartfiles -nodefaultlibs -lc 给 clang
 - Perl 5.42.0 的 lddlflags 包含 -fstack-protector-strong，ld.lld 拒绝该参数 (E137)
 - musl C 库头文件不在默认搜索路径，需通过 -I 参数添加
 - SELinux HMDFS 限制 XS 模块加载，需安装到系统目录 `/data/service/hnp`

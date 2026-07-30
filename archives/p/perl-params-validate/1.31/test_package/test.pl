@@ -10,7 +10,10 @@ die "TEST FAIL: expected 1.31, got $Params::Validate::VERSION\n"
 
 # Test 2: validate() with valid named params
 sub valid_named {
-    my %p = validate(@_, { name => { type => SCALAR }, count => { type => SCALAR } });
+    my %p = validate(@_, {
+        name  => { type => SCALAR },
+        count => { type => SCALAR, optional => 0 }
+    });
     return $p{name};
 }
 valid_named(name => 'hello', count => 42);

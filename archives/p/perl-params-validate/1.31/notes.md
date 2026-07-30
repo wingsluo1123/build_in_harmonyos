@@ -11,7 +11,7 @@
 1. 从 CPAN 下载 Params-Validate-1.31.tar.gz
 2. 在 build() 中生成 Makefile.PL (源码仅有 Build.PL, Module::Build 在 CI 不可用)
 3. 运行 perl Makefile.PL INSTALLDIRS=site 生成 Makefile
-4. Patch Makefile: 添加 musl -I 路径到 INC, 添加 CRT 修复到 LDDLFLAGS (E137)
+4. 手动编译 XS: 内联传递 musl -I 路径和 CRT 修复标志给 clang (E137)
 5. 运行 make -j1 编译 XS 和纯 Perl 模块
 6. 运行 make install DESTDIR=... 安装到 staging
 
@@ -20,11 +20,11 @@
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | CI构建失败: Can't locate Module/Build.pm | CI worker Perl 未安装 Module::Build | 改用 ExtUtils::MakeMaker (Makefile.PL) 替代 Build.PL |
-| 2 | 链接错误：ld.lld 拒绝 -fstack-protector-strong | Perl 5.42.0 的 lddlflags 包含该参数 | Patch Makefile LDDLFLAGS 添加 -nostartfiles -nodefaultlibs -lc |
-| 3 | 缺少 stdio.h 等 C 标准库头文件 | 鸿蒙系统默认搜索路径无 musl 头文件 | Patch Makefile INC 添加 -I~/usr/local/include |
-| 4 | 链接找不到 libc | 系统库不在默认搜索路径 | Patch Makefile LDDLFLAGS 添加 -L~/usr/local/lib -L/system/lib64 |
+| 2 | 链接错误：ld.lld 拒绝 -fstack-protector-strong | Perl 5.42.0 的 lddlflags 包含该参数 | 内联 clang -shared -nostartfiles -nodefaultlibs -lc 编译 XS |
+| 3 | 缺少 stdio.h 等 C 标准库头文件 | 鸿蒙系统默认搜索路径无 musl 头文件 | 内联 clang -I 传递 musl 头文件路径 |
+| 4 | 链接找不到 libc | 系统库不在默认搜索路径 | 内联 clang -L 传递 ~/usr/local/lib 和 /system/lib64 |
 | 5 | SELinux HMDFS 限制 XS 模块加载 | hishell_hap domain 只能加载 hnp_file 类型 | 需安装到系统目录 /data/service/hnp |
-| 6 | patch 文件硬编码路径 | 0001-Build.PL.patch 使用 /storage/Users/currentUser/... | 删除 patch, 改用 Makefile PL + Makefile patching |
+| 6 | patch 文件硬编码路径 | 0001-Build.PL.patch 使用 /storage/Users/currentUser/... | 删除 patch, 改用 Makefile PL + 内联 clang 编译 XS |
 
 ## 与其他 Perl XS 模块编译经验对比
 
@@ -39,7 +39,7 @@
 ### 关键差异
 - perl-net-dns-sec 源码自带 Makefile.PL，直接使用
 - perl-params-validate 源码只有 Build.PL (Module::Build)，需在 conanfile.py 中生成 Makefile.PL
-- 两者都通过 patch Makefile 的 LDDLFLAGS 解决 E137 (CRT 缺失) 问题
+- perl-net-dns-sec 通过 patch Makefile LDDLFLAGS 解决 E137，perl-params-validate 通过内联 clang 标志解决
 - 两者都受 SELinux HMDFS 限制，XS 模块需安装到系统目录
 
 ## 依赖版本
