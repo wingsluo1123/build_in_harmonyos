@@ -3,7 +3,6 @@
 import os
 
 from conan import ConanFile
-from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.env import Environment
 from conan.tools.files import copy, get
@@ -50,12 +49,11 @@ class HypreConan(ConanFile):
         cmake = CMake(self)
         cmake.configure(build_script_folder=os.path.join(self.source_folder, "src"))
         cmake.build()
-        if can_run(self):
-            ctest_env = Environment()
-            ctest_env.define("CTEST_OUTPUT_ON_FAILURE", "1")
-            ctest_env.define("CTEST_PARALLEL_LEVEL", "1")
-            with ctest_env.vars(self).apply():
-                cmake.test()
+        ctest_env = Environment()
+        ctest_env.define("CTEST_OUTPUT_ON_FAILURE", "1")
+        ctest_env.define("CTEST_PARALLEL_LEVEL", "1")
+        with ctest_env.vars(self).apply():
+            cmake.test()
 
     def package(self):
         CMake(self).install()
