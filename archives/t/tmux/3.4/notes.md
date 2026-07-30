@@ -21,6 +21,7 @@ conan create archives/t/tmux/3.4 -pr:h=<ohos-profile> -pr:b=default
 | config.guess 无法识别 HarmonyOS | 上游脚本缺少 HarmonyOS 分支 | 返回对应架构的 `*-unknown-linux-ohos` 三元组 |
 | config.sub 拒绝 linux-ohos | 上游校验列表缺少该组合 | 增加 `linux-ohos*` 校验分支 |
 | Worker 缺少 ncurses | ncurses 尚未发布为 Conan 包，且 Worker 预装目录不一致 | 配方下载已校验的 ncurses 6.5 官方源码，先构建私有静态库，再编译 tmux |
+| ncurses 拒绝 Conan 推导的 OHOS triplet | ncurses 6.5 的 `config.sub` 未包含 `linux-ohos` | 对私有 ncurses 源应用最小 triplet 识别补丁 |
 
 ## 测试说明
 
@@ -36,4 +37,4 @@ tmux 3.4 提供 `make check` 目标，但默认配置下没有断言式上游测
 
 ## 交付范围
 
-PR 只提交 Conan 配方、元数据、测试和三个可复现补丁，不提交预编译二进制。
+PR 只提交 Conan 配方、元数据、测试和四个可复现补丁，不提交预编译二进制。

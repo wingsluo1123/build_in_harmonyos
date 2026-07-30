@@ -15,6 +15,7 @@ from conan.tools.files import (
     get,
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
+from conan.tools.gnu.get_gnu_triplet import _get_gnu_triplet
 from conan.tools.layout import basic_layout
 
 
@@ -82,11 +83,22 @@ class TmuxConan(ConanFile):
                 "tools.build:compiler_executables must define c and cpp"
             )
 
+        compiler = str(self.settings.compiler)
+        host_triplet = self.conf.get("tools.gnu:host_triplet") or _get_gnu_triplet(
+            str(self.settings.os), str(self.settings.arch), compiler=compiler
+        )["triplet"]
+        build_compiler = str(self.settings_build.compiler)
+        build_triplet = self.conf.get("tools.gnu:build_triplet") or _get_gnu_triplet(
+            str(self.settings_build.os),
+            str(self.settings_build.arch),
+            compiler=build_compiler,
+        )["triplet"]
+
         configure_args = [
             os.path.join(self._ncurses_source_folder(), "configure"),
             f"--prefix={self._ncurses_prefix()}",
-            "--build=aarch64-unknown-linux-gnu",
-            "--host=aarch64-unknown-linux-gnu",
+            f"--build={build_triplet}",
+            f"--host={host_triplet}",
             "--without-shared",
             "--with-normal",
             "--enable-widec",
