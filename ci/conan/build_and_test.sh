@@ -44,11 +44,88 @@ echo "[step]   channel: (no channel — plain name/version)"
 # ── 1. Discover packages (BUG-9: respect CI_PACKAGES) ──
 # CI_PACKAGES 可通过环境变量或位置参数传入（位置参数在部分鸿蒙 worker
 # 上比 env 更可靠，buildbot command= 也用位置参数传递）
+CI_PACKAGES_EXPLICIT=false
+if (( ${+CI_PACKAGES} )); then
+    CI_PACKAGES_EXPLICIT=true
+fi
+if [ $# -gt 0 ]; then
+    CI_PACKAGES_EXPLICIT=true
+fi
 if [ -z "${CI_PACKAGES:-}" ] && [ $# -gt 0 ]; then
     CI_PACKAGES="$*"
 fi
 PACKAGES=()
 MISSING_CONANFILE=()
+METADATA_ONLY_PACKAGES=()
+
+finish_without_conan_build() {
+    local reason="$1"
+    local detail="$2"
+
+    echo "L0_RESULT=pass: $detail"
+    echo "L1_RESULT=skip: $detail"
+    echo "L2_RESULT=skip: $detail"
+    echo "L4_RESULT=skip: $detail"
+    echo "L5_RESULT=skip: $detail"
+    echo ""
+    echo "━━━ Build Summary ━━━"
+    echo "  Total:   0"
+    echo "  Success: 0"
+    echo "  Failed:  0"
+    echo "[step] $reason"
+    exit 0
+}
+
+# A PR that changes only AI-facing package metadata must not rebuild or
+# republish an otherwise unchanged Conan recipe. The PR checkout applies the
+# patch on top of main, so inspect the complete worktree delta and fail closed
+# when the checkout is clean or any file outside the selected metadata paths
+# changed. --no-renames ensures both sides of a rename are inspected.
+collect_worktree_changes() {
+    {
+        git -C "$REPO_ROOT" diff --no-renames --name-only HEAD -- \
+        && git -C "$REPO_ROOT" diff --cached --no-renames --name-only HEAD -- \
+        && git -C "$REPO_ROOT" ls-files --others -- \
+            . ':(top,exclude)pr.diff' 2>/dev/null
+    } | sort -u
+}
+
+is_metadata_only_change_set() {
+    local changed_files="$1"
+    local changed_file
+    local pkg_dir
+    local rel_pkg
+    local metadata_path=false
+
+    [ -n "$changed_files" ] || return 1
+
+    while IFS= read -r changed_file; do
+        [ -z "$changed_file" ] && continue
+        metadata_path=false
+        for pkg_dir in "${PACKAGES[@]}"; do
+            rel_pkg="${pkg_dir#$REPO_ROOT/}"
+            case "$changed_file" in
+                "$rel_pkg/manifest.yaml"|"$rel_pkg/notes.md"|"$rel_pkg/reports/"*)
+                    metadata_path=true
+                    break
+                    ;;
+            esac
+        done
+        [ "$metadata_path" = true ] || return 1
+    done <<< "$changed_files"
+
+    return 0
+}
+
+if [ "$CI_PACKAGES_EXPLICIT" = true ] \
+    && [ -z "${CI_PACKAGES:-}" ] \
+    && [ "${CI_TASK_TYPE:-}" != "release" ] \
+    && [ "${CI_BUILD_ALL:-0}" != "1" ]; then
+    finish_without_conan_build \
+        "No Conan packages changed" \
+        "no applicable Conan packages"
+fi
+
 if [ -n "${CI_PACKAGES:-}" ]; then
     # CI 传入了定向包列表（空格分隔的相对路径，如 "archives/b/bash/5.3"）
     echo "[step] CI_PACKAGES received: $CI_PACKAGES"
@@ -76,6 +153,26 @@ else
         -not -path "*/test_package/*" \
         -not -path "*/.conan/*" \
         2>/dev/null | sort)
+fi
+
+if [ -n "${CI_PACKAGES:-}" ] \
+    && [ "${CI_TASK_TYPE:-}" != "release" ] \
+    && [ "${CI_BUILD_ALL:-0}" != "1" ] \
+    && git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    WORKTREE_CHANGED_FILES=$(collect_worktree_changes)
+    if is_metadata_only_change_set "$WORKTREE_CHANGED_FILES"; then
+        for pkg_dir in "${PACKAGES[@]}"; do
+            echo "[step] Metadata-only package change; skipping Conan build: ${pkg_dir#$REPO_ROOT/}"
+            METADATA_ONLY_PACKAGES+=("$pkg_dir")
+        done
+        PACKAGES=()
+    fi
+fi
+
+if [ ${#PACKAGES[@]} -eq 0 ] && [ ${#METADATA_ONLY_PACKAGES[@]} -gt 0 ]; then
+    finish_without_conan_build \
+        "Metadata-only PR requires no Conan build" \
+        "no Conan build inputs changed"
 fi
 
 if [ ${#PACKAGES[@]} -eq 0 ]; then
