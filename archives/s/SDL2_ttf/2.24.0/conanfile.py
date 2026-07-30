@@ -48,13 +48,18 @@ class Sdl2TtfConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        sdl2 = self.dependencies["sdl2"].cpp_info
-        sdl2.includedirs.append(os.path.join("include", "SDL2"))
+        sdl2_dependency = self.dependencies["sdl2"]
+        sdl2 = sdl2_dependency.cpp_info
+        sdl2_include = os.path.join(
+            sdl2_dependency.package_folder, "include", "SDL2"
+        )
+        if sdl2_include not in sdl2.includedirs:
+            sdl2.includedirs.append(sdl2_include)
         sdl2.set_property("cmake_file_name", "SDL2")
         sdl2.set_property(
             "cmake_target_name",
             "SDL2::SDL2"
-            if self.dependencies["sdl2"].options.shared
+            if sdl2_dependency.options.shared
             else "SDL2::SDL2-static",
         )
 
