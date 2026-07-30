@@ -57,6 +57,15 @@ make test
 3. **test_package/conanfile.py**: 改为文件内容验证测试（验证 .pm 文件存在性和版本号），因运行时依赖 XML::Stream 未安装，无法在 CI 环境加载模块
 4. **test_package/test_net_xmpp.py**: 新增测试源文件，修复 CI L0c 门禁 (no_test_sources)
 
+### AI Review 第二轮修复 (2026-07-30)
+
+1. **conanfile.py package()**: 移除硬编码 `data/service/hnp` 路径，改用 `glob.glob()` 方案（参考 perl-net-jabber），安装到独立 dest_dir 后递归查找 .pm 文件复制到 `lib/perl5/`
+2. **conanfile.py package_info()**: 添加 `PERL5LIB` 环境变量（`runenv_info` + `buildenv_info`），与所有同级 Perl 包保持一致
+3. **test_package/test.pl**: 新增 Perl 测试脚本，优先尝试 `require Net::XMPP` 加载模块（R34 合规）；若运行时依赖缺失则回退到 Perl 正则解析 `$VERSION`（替代脆弱的 `grep -q`）并验证 .pm 文件
+4. **test_package/conanfile.py**: 改为执行 `test.pl`，使用 `VirtualRunEnv` 生成器（确保 PERL5LIB 可用）
+5. **test_package/test_net_xmpp.py**: 删除（空壳文件，docstring 误导）
+6. **manifest.yaml**: 在 `runtime_dependencies` 中添加 `perl-digest-sha/6.04`（与软件级 manifest 和补丁 PREREQ_PM 一致）
+
 ## 依赖版本
 
 | 依赖 | 版本 | 类型 |

@@ -5,6 +5,7 @@ Net::XMPP - XMPP Support Library
 Build system: Perl Module::Build (via Makefile.PL compat wrapper).
 """
 import os
+import glob
 import shutil
 
 from conan import ConanFile
@@ -39,40 +40,39 @@ class PerlNetXmppConan(ConanFile):
         self.run("make", env="conanbuild")
 
     def package(self):
-        # Install to package directory using make install with DESTDIR
-        self.run(f'make install DESTDIR="{self.package_folder}"', env="conanbuild")
+        # Install to a temporary DESTDIR, then copy .pm files to lib/perl5/
+        dest_dir = os.path.join(self.build_folder, "destdir")
+        self.run(f'make install DESTDIR="{dest_dir}"', env="conanbuild")
 
-        # Module::Build installs to system Perl site_perl path under DESTDIR,
-        # which creates a deeply nested path. Copy .pm files to lib/ at the
-        # package root so Conan's G4 artifact integrity check can find them.
-        src_base = os.path.join(self.package_folder, "data", "service", "hnp")
-        perl_lib = None
-        if os.path.isdir(src_base):
-            # Walk to find the site_perl lib directory containing Net/XMPP.pm
-            for root, dirs, files in os.walk(src_base):
-                if "XMPP.pm" in files and root.endswith(os.path.join("Net")):
-                    perl_lib = os.path.dirname(root)  # parent of Net/
+        # Find all installed .pm files and copy to lib/perl5/ in package folder
+        pm_files = glob.glob(
+            os.path.join(dest_dir, "**", "*.pm"),
+            recursive=True,
+        )
+        for pm_file in pm_files:
+            # Extract the path relative to the dest_dir
+            rel = os.path.relpath(pm_file, dest_dir)
+            # Find site_perl/ or perl5/ in the path and extract from there
+            for prefix in ["site_perl/", "perl5/"]:
+                idx = rel.find(prefix)
+                if idx >= 0:
+                    rel = rel[idx + len(prefix):]
                     break
-
-        if perl_lib and os.path.isdir(perl_lib):
-            # Copy Net/ directory (contains XMPP.pm and XMPP/ subdir) to lib/
-            dest_lib = os.path.join(self.package_folder, "lib")
-            net_src = os.path.join(perl_lib, "Net")
-            net_dst = os.path.join(dest_lib, "Net")
-            if os.path.isdir(net_src):
-                os.makedirs(net_dst, exist_ok=True)
-                for item in os.listdir(net_src):
-                    s = os.path.join(net_src, item)
-                    d = os.path.join(net_dst, item)
-                    if os.path.isdir(s):
-                        shutil.copytree(s, d, dirs_exist_ok=True)
-                    else:
-                        shutil.copy2(s, d)
+            # Strip version-specific path components like 5.42.0/ or aarch64-linux/
+            if rel.startswith("5.") or rel.startswith("aarch64-linux/"):
+                parts = rel.split(os.sep)
+                while parts and (parts[0].startswith("5.") or parts[0] == "aarch64-linux"):
+                    parts.pop(0)
+                rel = os.sep.join(parts)
+            target = os.path.join(self.package_folder, "lib", "perl5", rel)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(pm_file, target)
 
     def package_info(self):
-        # Perl module - expose as a Perl library path
-        perl_lib = os.path.join(self.package_folder, "lib")
-        if not os.path.isdir(perl_lib):
-            perl_lib = os.path.join(self.package_folder, "usr", "local", "lib", "perl5")
-        self.cpp_info.libdirs = [perl_lib] if os.path.isdir(perl_lib) else []
-        self.cpp_info.libs = []  # Pure Perl module, no compiled libs
+        # Pure Perl module — no compiled libraries
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = []
+        # Set PERL5LIB to the package's perl lib directory
+        perl_lib = os.path.join(self.package_folder, "lib", "perl5")
+        self.runenv_info.append_path("PERL5LIB", perl_lib)
+        self.buildenv_info.append_path("PERL5LIB", perl_lib)
