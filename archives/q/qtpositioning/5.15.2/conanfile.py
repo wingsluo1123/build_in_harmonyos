@@ -44,18 +44,14 @@ class QtpositioningConan(ConanFile):
         # R32: OHOS platform support — pass mkspec via env for cross-compilation
         if self.settings.os == "OHOS":
             # qmake reads QMAKESPEC to determine target platform for OHOS cross-compilation
-            qt_root = self.dependencies["qt5-qtbase"].package_folder
-            qt_mkspecs = os.path.join(qt_root, "mkspecs")
-            ohos_mkspec = os.path.join(qt_mkspecs, "harmonyos-clang")
-            if os.path.isdir(ohos_mkspec):
-                # Set QMAKESPEC via buildenv_info() for the build context
-                # (build_env.environment().define() does not persist to generated files)
-                self.buildenv_info.define("QMAKESPEC", ohos_mkspec)
+            # Use mkspec shipped with this recipe (patches/mkspecs/harmonyos-clang/)
+            mkspec_dir = os.path.join(self.source_folder, "patches", "mkspecs", "harmonyos-clang")
+            if os.path.isdir(mkspec_dir):
+                self.buildenv_info.define("QMAKESPEC", mkspec_dir)
             else:
                 raise ConanInvalidConfiguration(
-                    f"OHOS mkspec (harmonyos-clang) not found in qt5-qtbase package. "
-                    "qmake would use default mkspec and produce host-arch binary. "
-                    "The qt5-qtbase/5.15.2 must include harmonyos-clang mkspec for OHOS cross-compilation."
+                    f"OHOS mkspec (harmonyos-clang) not found at {mkspec_dir}. "
+                    "This mkspec must be shipped with the recipe in patches/mkspecs/harmonyos-clang/."
                 )
         # Generate the conanbuild environment file for all platforms
         build_env.generate()
