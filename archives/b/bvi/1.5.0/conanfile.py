@@ -14,6 +14,7 @@ from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class BviConan(ConanFile):
@@ -45,11 +46,13 @@ class BviConan(ConanFile):
         # Force build triplet for HarmonyOS platform detection
         tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
         tc.generate()
+        # E001: OHOS has no cc/c++ symlinks; explicitly set CC/CXX for autotools
+        env = Environment()
+        env.define("CC", "clang")
+        env.define("CXX", "clang++")
+        env.vars(self).save_script("conan_cc")
 
     def build(self):
-        # E001: On OHOS, cc/c++ symlinks don't exist, only clang/clang++
-        os.environ["CC"] = "clang"
-        os.environ["CXX"] = "clang++"
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()

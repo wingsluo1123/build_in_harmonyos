@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Conan test_package — bvi 1.5.0 smoke test.
 
-bvi is a terminal-based binary editor; it requires a PTY to run.
-We verify the binary exists and is executable.
+Compiles test.c and checks the bvi binary is installed and executable.
 """
 import os
 
@@ -17,9 +16,11 @@ class BviTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def build(self):
+        # Compile test.c; clang is in PATH on OHOS
+        self.run("clang test.c -o test_bvi")
+
     def test(self):
         dep = self.dependencies["bvi"]
         bvi_bin = os.path.join(dep.package_folder, "bin", "bvi")
-        # bvi is a terminal editor (ncurses); --version fails without a PTY.
-        # Smoke test: verify binary exists and is executable.
-        self.run(f'test -x "{bvi_bin}"', env="conanrun")
+        self.run(f'./test_bvi "{bvi_bin}"', env="conanrun")
