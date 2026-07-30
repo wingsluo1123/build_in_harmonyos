@@ -23,6 +23,17 @@ smart-card support. Full validation normally requires a live SPICE server and
 desktop/display/audio/USB integration, which is outside a simple compile-only
 test environment.
 
+## R40 validation status
+
+This PR should be treated as a first-pass build and interface validation, not
+as proof that the full remote desktop stack is complete on HarmonyOS PC. The
+default package intentionally disables GTK/EGL/Wayland, USB redirection,
+WebDAV, audio codec, and smart-card integration paths until those dependency
+chains can be validated together. Human R40 confirmation is still required for
+actual display rendering and desktop integration: at minimum a follow-up should
+run a live SPICE server/client scenario or an EGL/spice-widget rendering smoke
+test on HarmonyOS PC with the GTK option enabled.
+
 ## Test counting
 
 Upstream `tests/meson.build` registers 5 base tests in the selected no-WebDAV,
