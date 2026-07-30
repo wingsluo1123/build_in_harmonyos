@@ -2,6 +2,7 @@
 """Conan recipe for Qt HTTP Server 6.11.1 on HarmonyOS PC."""
 
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -42,7 +43,8 @@ class QtHttpServerConan(ConanFile):
         tc.cache_variables["CMAKE_PREFIX_PATH"] = qtbase_gui_prefix
         tc.cache_variables.update(
             {
-                "QT_BUILD_TESTS": False,
+                "QT_BUILD_TESTS": True,
+                "QT_BUILD_TESTS_BY_DEFAULT": True,
                 "QT_BUILD_EXAMPLES": False,
                 "QT_BUILD_BENCHMARKS": False,
                 "QT_BUILD_DOCS": False,
@@ -56,6 +58,14 @@ class QtHttpServerConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        self.run(
+            "cmake -E env QT_QPA_PLATFORM=offscreen "
+            "ctest --test-dir {} --output-on-failure --parallel 1".format(
+                shlex.quote(self.build_folder)
+            ),
+            env="conanbuild",
+            ignore_errors=False,
+        )
 
     def package(self):
         cmake = CMake(self)
