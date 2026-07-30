@@ -18,14 +18,12 @@ class BisonTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def build(self):
-        # Direct compilation: link against bison from Conan package
-        dep = self.dependencies["bison"]
-        cpp = dep.cpp_info
-        inc_flags = " ".join(f"-I{d}" for d in cpp.includedirs)
-        lib_flags = " ".join(f"-L{d}" for d in cpp.libdirs)
-        link_flags = " ".join(f"-l{l}" for l in cpp.libs)
+        # bison is a CLI tool, not a library: test.c uses only standard C
+        # headers and invokes the bison binary via system(). No -I/-L/-l
+        # flags from cpp_info are needed (they'd reference dirs that don't
+        # exist for a tool package and break under strict compilers).
         cc = os.environ.get("CC", "clang")
-        self.run(f"{cc} test.c -o test_bison {inc_flags} {lib_flags} {link_flags}")
+        self.run(f"{cc} test.c -o test_bison")
 
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
