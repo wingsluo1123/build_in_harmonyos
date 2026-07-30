@@ -54,12 +54,13 @@ class HypreConan(ConanFile):
 
     def package(self):
         CMake(self).install()
-        copy(
-            self,
-            "COPYRIGHT",
-            src=os.path.dirname(self.source_folder),
-            dst=os.path.join(self.package_folder, "licenses"),
-        )
+        for license_file in ("COPYRIGHT", "LICENSE-APACHE", "LICENSE-MIT"):
+            copy(
+                self,
+                license_file,
+                src=self.source_folder,
+                dst=os.path.join(self.package_folder, "licenses"),
+            )
 
     def package_info(self):
         self.cpp_info.libs = ["HYPRE"]
