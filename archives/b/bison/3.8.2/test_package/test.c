@@ -28,12 +28,13 @@ int main(void) {
     const char *out_path = "test_y.tab.c";
     char cmd[1024];
 
-    /* Run bison on a minimal grammar, writing parser to out_path. */
+    /* Run bison on a minimal grammar, writing parser to out_path.
+     * '-' tells bison to read the grammar from stdin (the heredoc). */
     snprintf(cmd, sizeof(cmd),
-             "bison -o %s <<'EOF'\n"
+             "bison -o %s - <<'EOF'\n"
              "%%\n"
              "start: ;\n"
-             "%%%%\n"
+             "%%\n"
              "EOF",
              out_path);
 
