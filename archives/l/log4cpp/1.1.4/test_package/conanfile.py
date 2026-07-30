@@ -3,7 +3,9 @@
 import os
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.env import VirtualRunEnv
 
 
 class Log4cppTestConan(ConanFile):
@@ -20,6 +22,7 @@ class Log4cppTestConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.generate()
         CMakeDeps(self).generate()
+        VirtualRunEnv(self).generate()
 
     def build(self):
         cmake = CMake(self)
@@ -27,4 +30,7 @@ class Log4cppTestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        if not can_run(self):
+            self.output.info("Skipping runtime tests while cross-building")
+            return
         self.run(os.path.join(self.cpp.build.bindirs[0], "test_log4cpp"), env="conanrun")

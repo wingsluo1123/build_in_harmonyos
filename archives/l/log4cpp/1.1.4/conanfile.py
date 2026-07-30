@@ -42,7 +42,9 @@ class Log4cppConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         if not self.options.shared:
-            tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON" if self.options.fPIC else "OFF"
+            tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = (
+                "ON" if self.options.get_safe("fPIC", False) else "OFF"
+            )
         tc.generate()
 
     def _write_config_header(self):
