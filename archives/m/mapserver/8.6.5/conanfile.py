@@ -54,26 +54,30 @@ class MapserverConan(ConanFile):
 
     def _ohos_toolchain(self):
         user_toolchains = self.conf.get("tools.cmake.cmaketoolchain:user_toolchain", default=[], check_type=list)
+        sdk_root = self.conf.get("user.ohos:sdk_root", default="", check_type=str)
         ndk = os.environ.get("OHOS_NDK_HOME", "")
         candidates = list(user_toolchains)
+        if sdk_root:
+            candidates.append(os.path.join(sdk_root, "ohos", "native", "build", "cmake", "ohos.toolchain.cmake"))
+            candidates.append(os.path.join(sdk_root, "native", "build", "cmake", "ohos.toolchain.cmake"))
         if ndk:
             candidates.append(os.path.join(ndk, "build", "cmake", "ohos.toolchain.cmake"))
         for candidate in candidates:
             if candidate and os.path.isfile(candidate):
                 return candidate
-        globbed = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
-        if globbed:
-            return globbed[-1]
         raise ConanInvalidConfiguration(
             "Cannot find ohos.toolchain.cmake. Set OHOS_NDK_HOME or profile "
-            "tools.cmake.cmaketoolchain:user_toolchain."
+            "tools.cmake.cmaketoolchain:user_toolchain or user.ohos:sdk_root."
         )
 
     def _ohos_arch(self):
         arch = str(self.settings.arch)
         arch_map = {
             "armv8": "arm64-v8a",
+            "armv8.3": "arm64-v8a",
+            "armv8_32": "armeabi-v7a",
             "armv7": "armeabi-v7a",
+            "x86": "x86",
             "x86_64": "x86_64",
         }
         if arch not in arch_map:
@@ -217,7 +221,6 @@ class MapserverConan(ConanFile):
             if root:
                 candidates.append(os.path.join(root, "bin", executable))
                 candidates.append(os.path.join(root, "native", "llvm", "bin", executable))
-        candidates.append(os.path.join("/data/service/hnp/bin", executable))
         for candidate in candidates:
             if candidate and os.path.isfile(candidate):
                 return candidate
