@@ -38,4 +38,12 @@ class BisonTestConan(ConanFile):
             ) if os.path.exists(p)),
             "bash",
         )
-        self.run(f"{bash} -c './test_bison'", env="conanrun")
+        # bison's compiled-in pkgdatadir is /share/bison (from --prefix=),
+        # so we must redirect BISON_PKGDATADIR to the actual location
+        # inside the Conan package where the share/bison/ data live.
+        bison_pkg = self.dependencies["bison"].package_folder
+        bison_pkgdatadir = os.path.join(bison_pkg, "share", "bison")
+        self.run(
+            f"BISON_PKGDATADIR={bison_pkgdatadir} {bash} -c './test_bison'",
+            env="conanrun",
+        )
