@@ -64,6 +64,11 @@ class QtpositioningConan(ConanFile):
         qt_root = self.dependencies["qt5-qtbase"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
+        # qt5-qtbase 预编译包缺少 modules-inst/*.pri 文件
+        # 创建 qt.conf 覆盖 qmake 内置路径，指向 qt5-qtbase 包目录
+        qt_conf = os.path.join(self.build_folder, "qt.conf")
+        with open(qt_conf, "w") as f:
+            f.write(f"[Paths]\nPrefix = {qt_root}\n")
         # Pass shared/static config to qmake based on Conan options
         config_flag = ""
         if not self.options.shared:
