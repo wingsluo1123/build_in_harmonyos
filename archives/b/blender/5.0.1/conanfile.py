@@ -59,7 +59,9 @@ class BlenderConan(ConanFile):
         tc = CMakeToolchain(self)
 
         # Platform settings
-        tc.variables["CMAKE_SYSTEM_NAME"] = "OHOS"
+        # Platform settings - use Linux toolchain path which is the closest match
+        # for OHOS aarch64 (musl libc is handled by the OHOS sysroot)
+        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
 
         # Headless mode - essential for OHOS server/renderfarm

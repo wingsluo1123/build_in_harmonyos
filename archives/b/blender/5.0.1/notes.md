@@ -44,14 +44,16 @@ Blender 依赖 100+ 个外部库，包括:
 2. **考虑预编译库**: Blender 提供预编译依赖库，可下载使用
 3. **逐步完善**: 初始版本功能受限，后续可逐步添加
 
+## 源码修改
+
+无上游源码修改。最初提交的 `0002` 补丁将 OHOS 挂入 Android 路径会被 Blender 的 Android NDK 专用设置所拖累（`-fPIE`、Android 特定头文件、bionic 链接等均不适用于 OHOS musl 环境）。本次审查后彻底移除该补丁，OHOS 构建遵循标准 Linux aarch64 代码路径。
+
 ## 补丁说明
 
-### 0001-add-ohos-platform-support.patch
-- 添加 OHOS 平台检测支持
-
 ### 0002-disable-gpu-features-for-headless.patch
-- 将 OHOS 添加为 Android 类似平台处理
-- 禁用 GPU 相关功能
+- ~~将 OHOS 添加为 Android 类似平台处理~~
+- ~~禁用 GPU 相关功能~~
+- **状态**: 已删除 — 避免 OHOS 走 Android NDK 路径（musl libc 兼容性、PIE/PIC 等 Android 专属设置会与 OHOS 工具链冲突）
 
 ## 待验证项
 
