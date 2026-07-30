@@ -23,5 +23,5 @@ class PerlNetXmppTestConan(ConanFile):
 
     def test(self):
         # PERL5LIB is set by runenv_info from the package's package_info()
-        test_script = os.path.join(self.recipe_folder, "test.pl")
+        test_script = os.path.join(self.recipe_folder, "test.sh")
         self.run(f'perl "{test_script}"', env="conanrun")
