@@ -104,6 +104,28 @@ class PerlParamsValidateConan(ConanFile):
         sys_lib = next((p for p in candidates_lib if os.path.isdir(p)), "")
         return sys_inc, sys_lib
 
+    def _resolve_cc(self):
+        """Resolve compiler name to full path.
+
+        R33: Do not rely on undefined shell env vars. Perl's Config
+        returns just "clang" (the name), but CI workers may not have
+        clang in PATH (same issue as perl). Resolve to full path.
+        """
+        cc_name = self._perl_config("cc")
+        full_path = shutil.which(cc_name)
+        if full_path:
+            return full_path
+        candidates = [
+            "/data/service/hnp/bin/clang",
+            os.path.join(os.path.expanduser("~"), "usr", "local", "bin", "clang"),
+            "/usr/bin/clang",
+            "/usr/local/bin/clang",
+        ]
+        for p in candidates:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
+        return cc_name
+
     def build(self):
         # Apply conandata patches (if any)
         apply_conandata_patches(self)
@@ -159,7 +181,7 @@ WriteMakefile(
         xsubpp = os.path.join(scriptdir, "xsubpp")
         typemap = os.path.join(privlibexp, "ExtUtils", "typemap")
         perl_inc = os.path.join(archlibexp, "CORE")
-        cc = self._perl_config("cc")
+        cc = self._resolve_cc()
         ccflags = self._perl_config("ccflags")
         optimize = self._perl_config("optimize")
         cccdlflags = self._perl_config("cccdlflags")
