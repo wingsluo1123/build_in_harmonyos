@@ -12,7 +12,6 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, save
-from conan.tools.build import cross_building
 
 
 class OpenrtspConan(ConanFile):
@@ -103,10 +102,15 @@ class OpenrtspConan(ConanFile):
         # Use make install with DESTDIR staging
         destdir = os.path.join(self.build_folder, "dest_install")
         self.run(f'make install DESTDIR="{destdir}" PREFIX=""', cwd=self.source_folder)
-        # Copy from staging to package folder
+        # Only package the openRTSP binary — live555's `make install` also
+        # stages ~34 example/testProgs binaries (sapWatch, testH264VideoStreamer,
+        # etc.) that are not part of this Conan package's contract. Excluding
+        # them keeps the package focused and avoids W3 L2 smoke-test hangs on
+        # non-CLI example programs (e.g. sapWatch blocks on --version).
         staging_bin = os.path.join(destdir, "bin")
         if os.path.isdir(staging_bin):
-            copy(self, "*", src=staging_bin, dst=os.path.join(self.package_folder, "bin"))
+            copy(self, "openRTSP", src=staging_bin,
+                 dst=os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
         self.cpp_info.libs = []
