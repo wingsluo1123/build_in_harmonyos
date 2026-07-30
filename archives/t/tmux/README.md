@@ -19,7 +19,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 ### 已解决的问题
 
-1. **HMDFS 临时文件限制**：configure 无法在当前目录创建临时目录时，改用 `${TMPDIR:-/tmp}`
+1. **HMDFS 临时文件限制**：config.status 改用 `${TMPDIR:-/tmp}`，并以 `umask 022` 创建临时目录
 2. **系统识别**：config.guess 不识别 HarmonyOS，添加 `*:HarmonyOS:*:*` 分支
 3. **三元组支持**：config.sub 不接受 `linux-ohos` 组合，添加 `linux-ohos*` 支持
 4. **静态链接**：强制静态链接 libevent 和 ncurses，避免动态库加载问题
@@ -28,7 +28,7 @@ tmux is a terminal multiplexer: it enables a number of terminals to be created, 
 
 ### 补丁文件
 
-- `0001-configure.patch` - 使用 TMPDIR 创建临时目录
+- `0001-configure.patch` - 使用 TMPDIR 和 HMDFS 兼容 umask 创建临时目录
 - `0002-etc-config.guess.patch` - HarmonyOS 系统识别
 - `0003-etc-config.sub.patch` - linux-ohos 三元组支持
 - `0004-ncurses-config.sub.patch` - 私有 ncurses 的 linux-ohos 三元组支持
