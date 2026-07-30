@@ -23,7 +23,7 @@ class DeckerConan(ConanFile):
     description = "Decker is a multimedia platform for creating and sharing interactive documents, with sound, images, hypertext, and scripted behavior."
     license = "MIT"
     homepage = "https://github.com/JohnEarnest/Decker"
-    url = ""  # CI fills this
+    url = "https://github.com/JohnEarnest/Decker"
 
     package_type = "application"
 
