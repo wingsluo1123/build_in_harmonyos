@@ -44,16 +44,28 @@ Blender 依赖 100+ 个外部库，包括:
 2. **考虑预编译库**: Blender 提供预编译依赖库，可下载使用
 3. **逐步完善**: 初始版本功能受限，后续可逐步添加
 
-## 源码修改
-
-无上游源码修改。最初提交的 `0002` 补丁将 OHOS 挂入 Android 路径会被 Blender 的 Android NDK 专用设置所拖累（`-fPIE`、Android 特定头文件、bionic 链接等均不适用于 OHOS musl 环境）。本次审查后彻底移除该补丁，OHOS 构建遵循标准 Linux aarch64 代码路径。
-
 ## 补丁说明
 
-### 0002-disable-gpu-features-for-headless.patch
-- ~~将 OHOS 添加为 Android 类似平台处理~~
-- ~~禁用 GPU 相关功能~~
-- **状态**: 已删除 — 避免 OHOS 走 Android NDK 路径（musl libc 兼容性、PIE/PIC 等 Android 专属设置会与 OHOS 工具链冲突）
+无上游源码修改，无 patches/ 目录。最初提交的 `0001`（空 stub）和 `0002`（OHOS-as-Android）补丁均已在审查后移除：
+- `0001`：空 if 块，无实质逻辑
+- `0002`：将 OHOS 挂入 Android NDK 路径（PIE/PIC、bionic 链接、Android 私有头文件），与 OHOS musl 工具链不兼容
+
+OHOS 构建沿用标准 Linux aarch64 代码路径，musl libc 由工具链 sysroot 提供。
+
+## 测试说明 (R40)
+
+按照 R40 规则，图形/渲染类库的完整适配验证需要人工确认渲染管线行为。本 `test_package` 仅覆盖最小化冒烟测试：
+
+1. `blender --version` — 二进制可执行性 + 版本输出
+2. `blender --help` — CLI 参数解析与模块初始化（无需 GUI）
+3. `blender -b --factory-startup` — 无头工厂模式启动（验证动态链接完整性）
+
+**未覆盖**：
+- 实际 .blend 文件渲染（需完整运行时环境：图像库、OpenEXR 等）
+- Cycles 引擎功能（已禁用）
+- GPU 渲染路径（OHOS 不可用）
+
+需在 CI 上跑通真实场景后，再将 `manifest.yaml` 中的 `status` 从 `pending` 改为 `built`，并将 `requires_manual_verification` 改为 `false`。
 
 ## 待验证项
 

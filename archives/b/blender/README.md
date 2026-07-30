@@ -1,4 +1,4 @@
-# Blender 5.0.1
+# Blender
 
 > 专业3D创作套件 - HarmonyOS 无头版本
 
@@ -13,7 +13,13 @@ Blender 是全球领先的开源3D创作套件，支持建模、动画、模拟�
 1. **无头模式构建**: `WITH_HEADLESS=ON`，禁用所有 GUI 组件
 2. **GPU 特性禁用**: CUDA/HIP/OpenCL 在 OHOS 上不可用，默认禁用
 3. **Python 禁用**: 为降低适配复杂度，默认关闭 Python 集成
-4. **平台识别**: CMake 已添加 OHOS 平台检测
+4. **平台路径**: 沿用 Linux aarch64 工具链路径（musl libc 由 OHOS sysroot 提供）
+
+## 当前版本
+
+| 版本 | 状态 | 备注 |
+|------|------|------|
+| 5.0.1 | pending | 初始适配，未验证 |
 
 ## 功能验证
 
