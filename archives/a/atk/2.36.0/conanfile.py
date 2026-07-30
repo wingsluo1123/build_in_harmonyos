@@ -7,7 +7,7 @@ HarmonyOS PC (aarch64) adaptation. Uses Meson build system.
 
 from conan import ConanFile
 from conan.tools.meson import Meson, MesonToolchain
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, apply_conandata_patches
 from conan.tools.layout import basic_layout
 import os
 
@@ -41,6 +41,13 @@ class AtkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        apply_conandata_patches(self)
+
+    def export_sources(self):
+        # Re-declare source + patches so `conan export` captures them
+        # (Conan 2.x requires export_sources() for recipes that apply patches)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = MesonToolchain(self)
