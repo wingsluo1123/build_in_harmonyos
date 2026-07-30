@@ -40,7 +40,7 @@ class TectonicConan(ConanFile):
     def requirements(self):
         self.requires("freetype/2.14.3")
         self.requires("fontconfig/2.18.1")
-        self.requires("harfbuzz/14.2.0")
+        self.requires("harfbuzz/14.2.0.1")
         self.requires("graphite2/1.3.14")
         self.requires("icu4c/78")
         self.requires("libpng/1.6.58")
@@ -92,6 +92,21 @@ class TectonicConan(ConanFile):
         rustup_home = os.environ.get("RUSTUP_HOME", os.path.join(home, ".rustup"))
         if os.path.isdir(rustup_home):
             os.environ["RUSTUP_HOME"] = rustup_home
+
+        # ── 1b. Rust toolchain bootstrap (CI workers may lack Rust) ──
+        if shutil.which("cargo") is None:
+            brew = shutil.which("brew") or os.path.join(home, ".harmonybrew", "bin", "brew")
+            if os.path.isfile(brew):
+                self.output.info("cargo not found, installing Rust via harmonybrew...")
+                self.run(f'"{brew}" install rust')
+                hb_bin = os.path.join(home, ".harmonybrew", "bin")
+                if os.path.isdir(hb_bin):
+                    os.environ["PATH"] = hb_bin + ":" + os.environ["PATH"]
+            if shutil.which("cargo") is None:
+                raise RuntimeError(
+                    "Rust toolchain (cargo) not found and auto-install failed. "
+                    "Install via 'harmonybrew install rust' or rustup."
+                )
 
         # Shell (R33: find bash dynamically)
         bash_path = shutil.which("bash") or "/data/service/hnp/bin/bash"
@@ -161,7 +176,7 @@ class TectonicConan(ConanFile):
 
         # ── 8. Build with cargo ──
         # external-harfbuzz: use system harfbuzz instead of git submodule
-        self.run("cargo build --release --features external-harfbuzz")
+        self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
 
     def _patch_pc_files_for_static(self, gen_folder):
         """Patch .pc files to use .a absolute paths instead of -l flags.

@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/runner004/build_in_harmonyos/archives/t/tectonic/0.16.9/test_package/build-release/conan/deactivate_conanbuildenv-release-armv8.sh"

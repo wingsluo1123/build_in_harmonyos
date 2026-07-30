@@ -16,7 +16,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 class HarfbuzzConan(ConanFile):
     name = "harfbuzz"
-    version = "14.2.0"
+    version = "14.2.0.1"
     description = "HarfBuzz is a text shaping library for OpenType fonts"
     license = "MIT"
     homepage = "https://harfbuzz.github.io/"
@@ -98,11 +98,14 @@ class HarfbuzzConan(ConanFile):
 
         # Components: harfbuzz produces multiple independent libraries
         self.cpp_info.components["harfbuzz"].libs = ["harfbuzz"]
+        self.cpp_info.components["harfbuzz"].includedirs = ["include/harfbuzz"]
         self.cpp_info.components["harfbuzz"].set_property("pkg_config_name", "harfbuzz")
         self.cpp_info.components["subset"].libs = ["harfbuzz-subset"]
+        self.cpp_info.components["subset"].includedirs = ["include/harfbuzz"]
         self.cpp_info.components["subset"].requires = ["harfbuzz"]
         self.cpp_info.components["subset"].set_property("pkg_config_name", "harfbuzz-subset")
         self.cpp_info.components["vector"].libs = ["harfbuzz-vector"]
+        self.cpp_info.components["vector"].includedirs = ["include/harfbuzz"]
         self.cpp_info.components["vector"].requires = ["harfbuzz"]
         self.cpp_info.components["vector"].set_property("pkg_config_name", "harfbuzz-vector")
 
