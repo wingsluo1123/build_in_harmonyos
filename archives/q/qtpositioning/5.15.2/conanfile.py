@@ -21,6 +21,7 @@ class QtpositioningConan(ConanFile):
     url = ""  # CI fills this
 
     package_type = "library"
+    exports_sources = "patches/*"
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
@@ -77,6 +78,6 @@ class QtpositioningConan(ConanFile):
         self.cpp_info.libs = ["Qt5Positioning"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.requires = ["qt5-qtbase::qt5-qtbase"]
+        self.cpp_info.requires = ["qt5-qtbase::Qt5::Core"]
         self.cpp_info.set_property("cmake_target_name", "Qt5::Positioning")
         self.cpp_info.set_property("pkg_config_name", "Qt5Positioning")
