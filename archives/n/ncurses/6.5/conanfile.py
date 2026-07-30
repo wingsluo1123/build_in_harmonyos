@@ -31,6 +31,12 @@ class NcursesConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
         self._patch_config_scripts()
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "configure"),
+            "umask 077",
+            "umask 022",
+        )
 
     def _patch_config_scripts(self):
         config_guess = os.path.join(self.source_folder, "config.guess")

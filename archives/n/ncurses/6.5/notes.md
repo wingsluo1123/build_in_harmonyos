@@ -11,6 +11,9 @@
 - 关键配置：`--enable-widec`、`--enable-overwrite`、`--without-shared`。
 - 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
 - 构建阶段用 `replace_in_file` 让 `config.guess/config.sub` 识别 OHOS 三元组。
+- 在 `source()` 阶段将上游 `configure` 中的 `umask 077` 调整为 `umask 022`，
+  避免 `config.status` 在 OHOS/HMDFS 临时目录下创建 0700 子目录后写入
+  `subs.sed`、`out` 等临时文件时触发 Permission denied。
 
 ## 验证
 
