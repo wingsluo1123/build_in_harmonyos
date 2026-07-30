@@ -6,7 +6,7 @@ Platform: aarch64-linux-ohos (HarmonyOS PC)
 """
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
 import os
