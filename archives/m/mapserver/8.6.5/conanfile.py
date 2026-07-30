@@ -80,7 +80,10 @@ class MapserverConan(ConanFile):
             hit = glob.glob(os.path.join(libdir, name))
             if hit:
                 return hit[0]
-        return os.path.join(libdir, names[0])
+        fallback = os.path.join(libdir, names[0])
+        raise ConanInvalidConfiguration(
+            f"Cannot find {dep_name} library. Tried {names}; fallback missing: {fallback}"
+        )
 
     def build(self):
         apply_conandata_patches(self)
@@ -190,5 +193,6 @@ class MapserverConan(ConanFile):
         self.cpp_info.libs = ["mapserver"]
         self.cpp_info.set_property("cmake_file_name", "mapserver")
         self.cpp_info.set_property("cmake_target_name", "mapserver::mapserver")
+        self.cpp_info.bindirs = ["bin"]
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "pthread", "dl"]

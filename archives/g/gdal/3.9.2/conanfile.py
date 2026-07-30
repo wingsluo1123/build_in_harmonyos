@@ -13,6 +13,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import apply_conandata_patches, get
 from conan.tools.cmake import cmake_layout
+from conan.tools.env import VirtualBuildEnv
 
 
 class GdalConan(ConanFile):
@@ -47,6 +48,20 @@ class GdalConan(ConanFile):
     def layout(self):
         cmake_layout(self, src_folder=".")
 
+    def generate(self):
+        VirtualBuildEnv(self).generate()
+
+    def _ohos_arch(self):
+        arch = str(self.settings.arch)
+        arch_map = {
+            "armv8": "arm64-v8a",
+            "armv7": "armeabi-v7a",
+            "x86_64": "x86_64",
+        }
+        if arch not in arch_map:
+            raise ConanInvalidConfiguration(f"Unsupported OHOS architecture: {arch}")
+        return arch_map[arch]
+
     def _ohos_toolchain(self):
         user_toolchains = self.conf.get("tools.cmake.cmaketoolchain:user_toolchain", default=[], check_type=list)
         ndk = os.environ.get("OHOS_NDK_HOME", "")
@@ -70,7 +85,10 @@ class GdalConan(ConanFile):
             hit = glob.glob(os.path.join(libdir, name))
             if hit:
                 return hit[0]
-        return os.path.join(libdir, names[0])
+        fallback = os.path.join(libdir, names[0])
+        raise ConanInvalidConfiguration(
+            f"Cannot find {dep_name} library. Tried {names}; fallback missing: {fallback}"
+        )
 
     def build(self):
         apply_conandata_patches(self)
@@ -88,15 +106,17 @@ class GdalConan(ConanFile):
         jpeg_lib = self._library("libjpeg-turbo", ["libjpeg.so", "libjpeg.a"])
 
         libdirs = [os.path.join(dep.package_folder, "lib") for dep in self.dependencies.values()]
-        os.environ["LDFLAGS"] = " ".join(
+        linker_flags = " ".join(
             "-L{0} -Wl,-rpath-link,{0}".format(path) for path in libdirs
-        ) + " " + os.environ.get("LDFLAGS", "")
+        )
 
         defs = [
             '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH=arm64-v8a",
+            "-DOHOS_ARCH={}".format(self._ohos_arch()),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
+            '-DCMAKE_EXE_LINKER_FLAGS="{}"'.format(linker_flags),
+            '-DCMAKE_SHARED_LINKER_FLAGS="{}"'.format(linker_flags),
             "-DBUILD_SHARED_LIBS={}".format("ON" if self.options.shared else "OFF"),
             "-DBUILD_APPS=ON",
             "-DBUILD_TESTING=OFF",
@@ -149,13 +169,20 @@ class GdalConan(ConanFile):
             "-DGDAL_USE_PCRE2=OFF",
             "-DGDAL_USE_POSTGRESQL=OFF",
         ]
-        self.run('cmake -B "{}" -S "{}" {}'.format(build_dir, self.source_folder, " ".join(defs)))
-        self.run('cmake --build "{}"'.format(build_dir))
+        self.run(
+            'cmake -B "{}" -S "{}" {}'.format(build_dir, self.source_folder, " ".join(defs)),
+            env="conanbuild",
+        )
+        self.run('cmake --build "{}"'.format(build_dir), env="conanbuild")
 
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")
-        self.run('cmake --install "{}" --prefix "{}"'.format(build_dir, self.package_folder))
-        self._sign_shared_libs()
+        self.run(
+            'cmake --install "{}" --prefix "{}"'.format(build_dir, self.package_folder),
+            env="conanbuild",
+        )
+        if self.options.shared and self.settings.os == "OHOS":
+            self._sign_shared_libs()
 
     def _sign_shared_libs(self):
         libdir = os.path.join(self.package_folder, "lib")
@@ -165,10 +192,13 @@ class GdalConan(ConanFile):
             return
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
         signer = "/data/service/hnp/bin/binary-sign-tool"
+        for tool in (objcopy, signer):
+            if not os.path.isfile(tool):
+                raise FileNotFoundError(f"Required OHOS signing tool is missing: {tool}")
         for shared_lib in shared_libs:
             if os.path.islink(shared_lib):
                 continue
-            self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=shared_lib))
+            self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=shared_lib))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=shared_lib))
 
     def package_info(self):
@@ -176,5 +206,6 @@ class GdalConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "GDAL")
         self.cpp_info.set_property("cmake_target_name", "GDAL::GDAL")
         self.cpp_info.set_property("pkg_config_name", "gdal")
+        self.cpp_info.bindirs = ["bin"]
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "pthread", "dl"]
