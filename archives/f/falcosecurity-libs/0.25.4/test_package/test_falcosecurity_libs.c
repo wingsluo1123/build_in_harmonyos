@@ -8,17 +8,17 @@ int main(void) {
     // NOTE: PPM_API_CURRENT_VERSION and PPM syscall table macros are only
     // defined when the Linux driver subsystem is compiled. On OHOS these
     // are not available, so we test library API functions that exist in
-    // the OHOS build (libscap non-Linux platform stubs).
+    // the OHOS build (libscap non-Linux platform stubs). scap_get_host_root()
+    // is a simple no-argument getter exported by the OHOS libscap build.
 
-    const struct scap_machine_info *info = scap_get_machine_info();
-    if (info == NULL) {
-        fprintf(stderr, "FAIL: machine info is null\n");
+    const char *host_root = scap_get_host_root();
+    if (host_root == NULL) {
+        fprintf(stderr, "FAIL: host root is null\n");
         failures++;
     }
 
-    const char *agent = scap_get_agent_info();
-    if (agent == NULL || agent[0] == '\0') {
-        fprintf(stderr, "FAIL: agent info is unavailable\n");
+    if (failures == 0 && host_root[0] == '\0') {
+        fprintf(stderr, "FAIL: host root is empty\n");
         failures++;
     }
 
@@ -26,6 +26,6 @@ int main(void) {
         return 1;
     }
 
-    printf("falcosecurity-libs API test passed: %s\n", agent);
+    printf("falcosecurity-libs API test passed: host_root=%s\n", host_root);
     return 0;
 }
