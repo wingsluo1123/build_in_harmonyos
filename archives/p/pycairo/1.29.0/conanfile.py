@@ -1,4 +1,5 @@
 from conan import ConanFile
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import get
 from conan.tools.gnu import PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -16,6 +17,9 @@ class PycairoConan(ConanFile):
     def requirements(self):
         self.requires("cairo/1.18.4")
 
+    def build_requirements(self):
+        self.tool_requires("meson/1.11.0")
+
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
@@ -23,6 +27,7 @@ class PycairoConan(ConanFile):
         basic_layout(self, src_folder=".")
 
     def generate(self):
+        VirtualBuildEnv(self).generate()
         PkgConfigDeps(self).generate()
         toolchain = MesonToolchain(self)
         # Conan 2.29 validates conf keys, and it has no tools.build:python
