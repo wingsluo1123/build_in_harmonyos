@@ -81,7 +81,6 @@ class LibgeotiffConan(ConanFile):
             # libproj.a is a C++ static library — linking a C shared lib against it
             # requires the C++ runtime. Use -fuse-ld=bfd (bfd auto-resolves C++ symbols)
             # and add -lc++_shared explicitly.
-            '-DCMAKE_C_FLAGS="-fPIC"'
             '-DCMAKE_C_FLAGS="-fPIC"',
             '-DCMAKE_SHARED_LINKER_FLAGS="-lc++_shared -fuse-ld=bfd"',
         ]
