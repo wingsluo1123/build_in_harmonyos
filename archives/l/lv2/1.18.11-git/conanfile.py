@@ -37,7 +37,7 @@ class Lv2Conan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"], strip_root=True, verify=True)
 
     def generate(self):
         tc = MesonToolchain(self)

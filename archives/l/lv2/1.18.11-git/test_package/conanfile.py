@@ -13,6 +13,7 @@ from conan.errors import ConanInvalidConfiguration
 class Lv2TestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -32,5 +33,4 @@ class Lv2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        self.run("ctest --output-on-failure", cwd=self.build_folder)
