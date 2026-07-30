@@ -25,8 +25,20 @@ index 57cb15f..19141fb 100644
 +	# Write xxd -i output to a temp file so we can check its first line
 +	# without capturing the full (potentially large) output in a shell
 +	# variable (avoids "Argument list too long" on OHOS / system/bin/printf).
-+	tmpf=$(mktemp)
-+	xxd -i "$in_path" > "$tmpf"
++	tmpf=$(mktemp) || { printf 'emit_array: mktemp failed\n' >&2; exit 1; }
++	if ! xxd -i "$in_path" > "$tmpf" 2>/dev/null; then
++		rm -f "$tmpf"
++		printf 'emit_array: xxd -i "%s" failed\n' "$in_path" >&2
++		exit 1
++	fi
++	# Guard against empty output (e.g. xxd silently produced nothing),
++	# which would otherwise emit an empty `unsigned char NAME[] = {};`
++	# array and a zero-length `_len` variable, masking the failure.
++	if [ ! -s "$tmpf" ]; then
++		rm -f "$tmpf"
++		printf 'emit_array: xxd -i "%s" produced empty output\n' "$in_path" >&2
++		exit 1
++	fi
 +	if head -1 "$tmpf" | grep -q '^unsigned char'; then
 +		# GNU xxd: output already contains the full declaration -- pass through.
 +		cat "$tmpf" >> "$dst"
