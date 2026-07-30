@@ -74,6 +74,16 @@ class FalcoSecurityLibsConan(ConanFile):
         # to read instead of falling back to host-environment CC variable.
         tc.cache_variables["FALCOSECURITY_OHOS_CC"] = "aarch64-unknown-linux-ohos-clang"
         tc.generate()
+        # Inject OHOS C++ runtime lib dir into run environment so consumers
+        # (e.g. test_package) find libc++_shared.so via LD_LIBRARY_PATH.
+        if self.settings.os == "OHOS":
+            ohos_lib_dir = os.path.dirname(
+                subprocess.check_output(
+                    ["aarch64-unknown-linux-ohos-clang", "-print-file-name=libc++_shared.so"],
+                    text=True
+                ).strip()
+            )
+            self.runenv_info.define("LD_LIBRARY_PATH", ohos_lib_dir)
 
     def build(self):
         apply_conandata_patches(self)
