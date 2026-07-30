@@ -2,7 +2,7 @@
 """Conan recipe for libvorbis 1.3.7."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+from conan.tools.files import get, replace_in_file
 
 
 class LibvorbisConan(ConanFile):
@@ -33,6 +33,12 @@ class LibvorbisConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        replace_in_file(
+            self,
+            "CMakeLists.txt",
+            "cmake_minimum_required(VERSION 2.8.12)",
+            "cmake_minimum_required(VERSION 3.5)",
+        )
 
     def generate(self):
         CMakeDeps(self).generate()

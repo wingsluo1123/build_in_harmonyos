@@ -4,6 +4,8 @@
 
 - 新增 CMake Conan 配方，依赖 `libogg/1.3.6`。
 - 使用上游 CMake 构建路径，避开 Autotools `config.status` 临时目录权限问题。
+- 在 `source()` 阶段将上游 `cmake_minimum_required(VERSION 2.8.12)` 提升到
+  `3.5`，避免新版本 CMake 在配置阶段因移除 3.5 以下兼容模式而直接失败。
 - 导出 Conan 组件：`Vorbis::vorbis`、`Vorbis::vorbisenc`、`Vorbis::vorbisfile`。
 - 新增非交互 `test_package/test_libvorbis.c`，覆盖版本字符串、编码初始化、comment API 与 vorbisfile 符号链接。
 
