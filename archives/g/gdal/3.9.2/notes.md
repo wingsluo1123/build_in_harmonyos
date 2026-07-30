@@ -1,133 +1,60 @@
 # gdal 3.9.2 适配笔记
 
-## 编译环境
-- 构建系统: cmake (CMake 4.1.2)
-- 编译日期: 2026-05-28
-- 编译器: clang/clang++ (Clang 15.0.4)
-- 状态: built ✅
+## 本次固化范围
 
-## 编译步骤
+- 构建系统：CMake。
+- 上游源码：`https://github.com/OSGeo/gdal/releases/download/v3.9.2/gdal-3.9.2.tar.gz`。
+- SHA256：`c9767e79ca7245f704bfbcb47d771b2dc317d743536b78d648c3e92b95fbc21e`。
+- 产物：`libgdal`、CMake/pkg-config 元数据、`gdal-config` 以及 GDAL/OGR 命令行工具。
 
-### 依赖编译（前置工作）
+## 依赖与选项
 
-首先编译了 GDAL 的核心依赖链：
+GDAL 是 MapServer 的强依赖。本次作为 MapServer 前置依赖，保留核心 GDAL/OGR 能力、PROJ 坐标系统支持、SQLite/GPKG、TIFF、PNG、JPEG 和命令行工具；关闭 Python 绑定、上游测试、插件自动加载、Curl/OpenSSL/WebP/Arrow/Parquet/GEOS/PostgreSQL 等重型可选链条。
 
-1. **OpenSSL 3.5.6** ✅ 已存在（系统预编译）
-2. **SQLite3 3.46.0** ✅ 已编译（手动编译 amalgamation 版本）
-3. **TIFF 4.6.0** ✅ 已存在
-4. **PROJ 9.8.1** ✅ 已编译（需要 SQLite3 + OpenSSL）
+依赖：
 
-### GDAL 编译
+- `proj/9.3.1`
+- `sqlite3/3.49.1`
+- `libtiff/4.7.2`
+- `libpng/1.6.58`
+- `libjpeg-turbo/3.2.0`
 
-```bash
-export SKILL_ROOT="/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent"
-export PKG_CONFIG_PATH="$HOME/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
-export CMAKE_PREFIX_PATH="$HOME/usr/local:$CMAKE_PREFIX_PATH"
-python3 $SKILL_ROOT/scripts/ohc-run.py build gdal --resume-from=Step3
-```
+关键 CMake 选项：
 
-## 遇到的问题与解决方案
+- `BUILD_APPS=ON`
+- `BUILD_TESTING=OFF`
+- `BUILD_PYTHON_BINDINGS=OFF`
+- `GDAL_BUILD_OPTIONAL_DRIVERS=OFF`
+- `OGR_BUILD_OPTIONAL_DRIVERS=OFF`
+- `GDAL_USE_PROJ=ON`
+- `GDAL_USE_SQLITE3=ON`
+- `OGR_ENABLE_DRIVER_SQLITE=ON`
+- `OGR_ENABLE_DRIVER_GPKG=ON`
+- `GDAL_USE_TIFF=ON`
+- `GDAL_USE_PNG=ON`
+- `GDAL_USE_JPEG=ON`
+- `GDAL_USE_CURL=OFF`
+- `GDAL_USE_OPENSSL=OFF`
+- `GDAL_USE_WEBP=OFF`
+- `GDAL_USE_ARROW=OFF`
+- `GDAL_USE_PARQUET=OFF`
+- `GDAL_USE_ARROWDATASET=OFF`
+- `GDAL_USE_GEOS=OFF`
 
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-| 1 | GDAL CMake 配置失败：缺少 PROJ | PROJ 是 GDAL 的核心依赖 | 先编译 PROJ 9.8.1 |
-| 2 | PROJ 编译失败：缺少 SQLite3 | SQLite3 未安装 | 手动编译 SQLite3 3.46.0 |
-| 3 | WebP 链接错误：SharpYuvInit undefined | libsharpyuv 未正确链接 | 禁用 WebP：`-DGDAL_USE_WEBP=OFF` |
-| 4 | Arrow 相关警告 | Arrow 配置不完整 | 禁用 Arrow/Parquet：`-DArrow_FOUND=OFF` |
+## 测试说明
 
-## 最终 CMake 配置选项
+官方 release tarball 中不包含 `autotest/` 目录；上游 CMake 仅在该目录存在且 `BUILD_TESTING=ON` 时注册核心测试。因此本 PR 按发布包内 CMake 注册测试计数为 0。
 
-```bash
--DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local
--DCMAKE_BUILD_TYPE=Release
--DCMAKE_PREFIX_PATH=/storage/Users/currentUser/usr/local
--DArrow_FOUND=OFF
--DParquet_FOUND=OFF
--DArrowDataset_FOUND=OFF
--DGDAL_USE_WEBP=OFF
-```
+新增 `test_package/test_gdal.cpp`，包含 11 个实质检查：
 
-## 源码修改
+- GDAL release version query。
+- 驱动注册数量。
+- MEM raster driver 获取。
+- 2x2 MEM dataset 创建和尺寸校验。
+- OGR WGS84 空间参考创建、设置、WKT 导出和内容校验。
 
-无源码修改。
+## 本地验证
 
-## 依赖版本
-
-**已成功编译/存在的依赖**：
-- OpenSSL 3.5.6 ✅
-- SQLite3 3.46.0 ✅
-- TIFF 4.6.0 ✅
-- PROJ 9.8.1 ✅
-- zlib 1.3.1 ✅
-- curl 8.8.0 ✅
-- libxml2 2.12.10 ✅
-- ZSTD 1.5.6 ✅
-- PNG 1.6.43 ✅
-- JPEG 62 ✅
-- JXL (libjxl) ✅
-- PCRE2 ✅
-- libiconv ✅
-
-**禁用的依赖**：
-- WebP（因 libsharpyuv 链接问题）
-- Arrow/Parquet（配置不完整）
-
-## 验证结果
-
-```bash
-# pkg-config 验证
-$ export PKG_CONFIG_PATH="$HOME/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
-$ pkg-config --modversion gdal
-3.9.2
-
-$ pkg-config --cflags gdal
--I/storage/Users/currentUser/usr/local/include
-
-$ pkg-config --libs gdal
--L/storage/Users/currentUser/usr/local/lib -lgdal
-
-# gdal-config 验证
-$ ~/usr/local/bin/gdal-config --version
-3.9.2
-
-# 库文件
-$ ls -la ~/usr/local/lib/libgdal.so
--rwxrwx--- 1 file_manager 25799296 2026-05-28 21:31 libgdal.so (24.5MB)
-
-# 工具
-$ ls ~/usr/local/bin/gdal*
-gdal-config  gdal_contour  gdal_create  gdal_footprint  gdal_grid
-gdal_rasterize  gdal_translate  gdal_viewshed  gdaladdo  gdalbuildvrt
-gdaldem  gdalenhance  gdalinfo  gdallocationinfo  gdalmanage
-gdalmdiminfo  gdalmdimtranslate  gdalsrsinfo  gdaltindex  gdaltransform
-gdalwarp  ogr2ogr  ogrinfo  ogrlineref  ogrtindex
-```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| ~/usr/local/lib/libgdal.so | 24.5MB | GDAL 共享库 |
-| ~/usr/local/lib/pkgconfig/gdal.pc | - | pkg-config 文件 |
-| ~/usr/local/include/gdal*.h | ~ | 头文件集 |
-| ~/usr/local/bin/gdal-config | - | 配置脚本 |
-| ~/usr/local/bin/gdal_* | ~ | GDAL 工具集 (20+) |
-| ~/usr/local/bin/ogr_* | ~ | OGR 工具集 |
-
-## 运行时注意事项
-
-1. **动态链接路径**：GDAL 可执行文件使用相对路径 `../libgdal.so`，在 HarmonyOS 环境下需要：
-   - 确保 libgdal.so 在正确位置
-   - 设置 LD_LIBRARY_PATH 或在部署时调整 RPATH
-
-2. **依赖库路径**：运行时可能需要设置：
-   ```bash
-   export LD_LIBRARY_PATH="$HOME/usr/local/lib:$LD_LIBRARY_PATH"
-   ```
-
-3. **测试执行**：GDAL CMake 项目不提供 `make check` 目标，测试需使用 `ctest` 或其他方式。
-
----
-**编译结束**: 2026-05-28 21:37
-**最终状态**: built ✅
-**总耗时**: 约 2 小时（包含依赖编译）
+- 已校验官方源码 SHA256。
+- 已执行 Python 语法检查、`git diff --check` 和规则扫描。
+- 当前 Windows 工作站没有 OHOS Conan 环境，`conan create gdal/3.9.2` 等待远端 OHOS CI 验证。
