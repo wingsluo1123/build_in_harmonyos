@@ -1,7 +1,7 @@
 # git-who 1.3 适配笔记
 
 ## 编译环境
-- 构建系统: makefile (go build)
+- 构建系统: go (go build)
 - 编译日期: 2026-07-30
 - 编译器: Go
 - 状态: built
