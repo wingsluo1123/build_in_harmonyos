@@ -226,16 +226,17 @@ class SlangConan(ConanFile):
     def _build_with_signing(self, cmake):
         """Run cmake build with automatic binary signing on HarmonyOS.
 
-        The build process generates executables that are then executed
-        during the same build. On HarmonyOS, these must be signed first.
-        This method catches 'Operation not permitted' errors, signs
-        the affected binary, and retries the build.
+        Two-phase approach:
+        Phase 1: Build with make -k (keep going) to build all generators,
+                 then batch-sign all executables.
+        Phase 2: Normal build — generators are signed, execution succeeds.
+        Falls back to retry loop if new unsigned binaries appear.
         """
-        max_retries = 50  # Safety limit
         build_dir = self.build_folder
-        failed_sign_bins = set()  # Track binaries that failed to sign
+        already_signed = set()
+        failed_sign_bins = set()
 
-        # Pre-check signing tools to avoid infinite retry loop
+        # Pre-check signing tools
         sign_tool = self._find_tool("binary-sign-tool")
         objcopy = self._find_tool("llvm-objcopy")
         if not sign_tool or not objcopy:
@@ -246,75 +247,104 @@ class SlangConan(ConanFile):
                 f"Build requires these tools for ELF binary signing."
             )
 
+        max_retries = 5
         for attempt in range(max_retries):
-            try:
-                result = subprocess.run(
-                    ["cmake", "--build", ".", "--", "-j1"],
-                    cwd=build_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=3600  # 60 minutes per make invocation
-                )
-            except subprocess.TimeoutExpired:
-                self.output.info(f"Build timed out on attempt {attempt+1}, retrying...")
-                continue  # Retry - build will resume from where it left off
+            make_flags = ["-j1", "-k"] if attempt == 0 else ["-j1"]
+            self.output.info(f"Build attempt {attempt+1} (flags: {' '.join(make_flags)})...")
 
-            if result.returncode == 0:
+            proc = subprocess.Popen(
+                ["cmake", "--build", ".", "--", *make_flags],
+                cwd=build_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+
+            output_lines = []
+            timed_out = False
+            try:
+                for line in proc.stdout:
+                    print(line, end='')
+                    output_lines.append(line)
+                proc.wait(timeout=3600)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                timed_out = True
+                self.output.info(f"Build timed out on attempt {attempt+1}")
+
+            if timed_out:
+                self._sign_all_executables(build_dir, failed_sign_bins, already_signed)
+                continue
+
+            if proc.returncode == 0:
                 self.output.info("Build completed successfully")
                 return
 
-            # Check for "Operation not permitted" (unsigned binary)
-            combined_output = result.stderr + result.stdout
+            combined_output = ''.join(output_lines)
             if "Operation not permitted" in combined_output:
-                import re
-                unsigned_bins = set()
-                for line in combined_output.split('\n'):
-                    if 'Operation not permitted' not in line:
-                        continue
-                    # Error format: "/bin/sh: ../path/to/binary: Operation not permitted"
-                    # Match both absolute (/path/...) and relative (../path/...) paths
-                    matches = re.findall(r'((?:/|\.\./)[^\s:]+)', line)
-                    for match in matches:
-                        # Skip shell paths
-                        if match in ('/bin/sh', '/bin/bash', '/data/service/hnp/bin/bash'):
-                            continue
-                        basename = os.path.basename(match)
-                        # Resolve relative paths against build dir
-                        if not os.path.isabs(match):
-                            resolved = os.path.normpath(os.path.join(build_dir, match))
-                        else:
-                            resolved = match
-                        if os.path.exists(resolved) and os.access(resolved, os.X_OK):
-                            unsigned_bins.add(resolved)
-                        elif basename and basename not in ('sh', 'bash'):
-                            # Fallback: search by basename in build tree using os.walk
-                            # (relative paths may be from subdirectories like prelude/)
-                            for root, dirs, files in os.walk(build_dir):
-                                if basename in files:
-                                    found_path = os.path.join(root, basename)
-                                    if os.path.exists(found_path):
-                                        unsigned_bins.add(found_path)
-                                        break
+                self.output.info(f"Unsigned binaries detected, batch signing...")
+                signed_count = self._sign_all_executables(
+                    build_dir, failed_sign_bins, already_signed
+                )
+                if signed_count == 0:
+                    raise ConanException(
+                        f"Cannot sign binaries (all failed): {failed_sign_bins}. "
+                        f"Already signed: {already_signed}."
+                    )
+                continue
 
-                if unsigned_bins:
-                    # Skip binaries that already failed to sign
-                    new_unsigned = unsigned_bins - failed_sign_bins
-                    if not new_unsigned:
-                        raise ConanException(
-                            f"Cannot sign binaries (all failed): {failed_sign_bins}. "
-                            f"Aborting to prevent infinite retry loop."
-                        )
-                    for bin_path in new_unsigned:
-                        if not self._sign_single_binary(bin_path):
-                            failed_sign_bins.add(bin_path)
-                    continue  # Retry the build
-
-            # Different error - report it
-            self.output.error(f"Build failed (attempt {attempt+1}):")
-            self.output.error(result.stderr[-2000:] if result.stderr else result.stdout[-2000:])
-            raise ConanException(f"Build failed: {result.returncode}")
+            self.output.error(f"Build failed (attempt {attempt+1}, return code {proc.returncode})")
+            raise ConanException(f"Build failed: {proc.returncode}")
 
         raise ConanException(f"Build failed after {max_retries} retries (binary signing loop)")
+
+    def _sign_all_executables(self, build_dir, failed_bins, already_signed=None):
+        """Scan build directory for ELF executables and sign them all at once.
+
+        Skips binaries already signed in previous calls to prevent re-signing
+        (which modifies timestamps and can trigger unnecessary rebuilds).
+        Returns the number of newly signed binaries.
+        """
+        if already_signed is None:
+            already_signed = set()
+
+        sign_tool = self._find_tool("binary-sign-tool")
+        objcopy = self._find_tool("llvm-objcopy")
+        if not sign_tool or not objcopy:
+            return 0
+
+        signed_count = 0
+        for root, dirs, files in os.walk(build_dir):
+            for f in files:
+                fpath = os.path.join(root, f)
+                # Skip binaries that already failed or were successfully signed
+                if fpath in failed_bins or fpath in already_signed:
+                    continue
+                if f.endswith(".dwarf"):
+                    continue
+                if not os.access(fpath, os.X_OK):
+                    continue
+                # Check if it's an ELF file (skip scripts and AR archives)
+                try:
+                    with open(fpath, 'rb') as fp:
+                        magic = fp.read(4)
+                        if magic != b'\x7fELF':
+                            continue
+                        # Check ELF type: only sign executables (ET_EXEC=2) and
+                        # shared objects (ET_DYN=3), skip relocatable (ET_REL=1)
+                        elf_type = fp.read(2)
+                        elf_type_val = int.from_bytes(elf_type, 'little')
+                        if elf_type_val == 1:  # ET_REL (object files)
+                            continue
+                except (IOError, OSError):
+                    continue
+                if self._sign_single_binary(fpath):
+                    signed_count += 1
+                    already_signed.add(fpath)
+                else:
+                    failed_bins.add(fpath)
+        return signed_count
 
     def _sign_single_binary(self, bin_path):
         """Sign a single ELF binary on HarmonyOS. Returns True on success, False on failure."""
@@ -323,8 +353,11 @@ class SlangConan(ConanFile):
         if not sign_tool or not objcopy:
             return False
         try:
-            subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
-                          capture_output=True, timeout=10, check=True)
+            # Remove existing .codesign section if present (may not exist on new binaries)
+            r = subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
+                              capture_output=True, timeout=10)
+            # Non-zero exit is OK if .codesign section simply doesn't exist
+            # Sign the binary
             subprocess.run([sign_tool, "sign", "-inFile", bin_path,
                            "-outFile", bin_path, "-selfSign", "1"],
                           capture_output=True, timeout=10, check=True)
@@ -351,18 +384,28 @@ class SlangConan(ConanFile):
                 if f.endswith(".dwarf"):
                     continue
                 fpath = os.path.join(root, f)
-                if os.access(fpath, os.X_OK):
-                    try:
-                        subprocess.run([objcopy, "--remove-section", ".codesign", fpath],
-                                      capture_output=True, timeout=10, check=True)
-                        subprocess.run([sign_tool, "sign", "-inFile", fpath,
-                                       "-outFile", fpath, "-selfSign", "1"],
-                                      capture_output=True, timeout=10, check=True)
-                        os.chmod(fpath, 0o755)
-                    except subprocess.CalledProcessError as e:
-                        self.output.warning(f"Signing tool failed for {fpath}: {e.stderr.decode() if e.stderr else e}")
-                    except Exception as e:
-                        self.output.warning(f"Failed to sign {fpath}: {e}")
+                if not os.access(fpath, os.X_OK):
+                    continue
+                # Check if it's an ELF file (skip scripts)
+                try:
+                    with open(fpath, 'rb') as fp:
+                        magic = fp.read(4)
+                        if magic != b'\x7fELF':
+                            continue
+                except (IOError, OSError):
+                    continue
+                try:
+                    # Remove existing .codesign section if present
+                    subprocess.run([objcopy, "--remove-section", ".codesign", fpath],
+                                  capture_output=True, timeout=10)
+                    subprocess.run([sign_tool, "sign", "-inFile", fpath,
+                                   "-outFile", fpath, "-selfSign", "1"],
+                                  capture_output=True, timeout=10, check=True)
+                    os.chmod(fpath, 0o755)
+                except subprocess.CalledProcessError as e:
+                    self.output.warning(f"Signing tool failed for {fpath}: {e.stderr.decode() if e.stderr else e}")
+                except Exception as e:
+                    self.output.warning(f"Failed to sign {fpath}: {e}")
 
     def _find_tool(self, name):
         """Find a tool in common paths."""
@@ -375,17 +418,27 @@ class SlangConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        # Copy additional static libraries needed for linking
-        # (libslang-compiler.a references symbols from these)
+        # Copy all static libraries needed for downstream linking.
+        # Slang's CMakeLists.txt only installs some libs; the embedded
+        # submodule libs (cmark, miniz, lz4, glslang, SPIRV-Tools) are
+        # required by libslang-compiler.a and libcore.a but not installed.
         pkg_lib = os.path.join(self.package_folder, "lib")
-        # CMake may place libraries under a build_type subdirectory
         build_type = str(self.settings.build_type) if self.settings.build_type else "Release"
         candidate_dirs = [
             os.path.join(self.build_folder, build_type, "lib"),
             os.path.join(self.build_folder, "lib"),
         ]
-        for lib in ["libcore.a", "libcompiler-core.a", "libslang-cpp-parser.a"]:
+        # Main libs + external submodule deps
+        libs_to_copy = [
+            "libcore.a", "libcompiler-core.a", "libslang-cpp-parser.a",
+            "libslang-compiler.a", "libslang-rt.a",
+            "libcmark-gfm.a", "libminiz.a", "liblz4.a",
+            "libglslang.a", "libSPIRV.a",
+            "libSPIRV-Tools.a", "libSPIRV-Tools-opt.a", "libSPIRV-Tools-link.a",
+        ]
+        for lib in libs_to_copy:
             found = False
+            # Check candidate_dirs first, then search build tree
             for build_lib in candidate_dirs:
                 src = os.path.join(build_lib, lib)
                 if os.path.exists(src):
@@ -393,13 +446,35 @@ class SlangConan(ConanFile):
                     found = True
                     break
             if not found:
+                for root, dirs, files in os.walk(self.build_folder):
+                    if lib in files:
+                        src = os.path.join(root, lib)
+                        shutil.copy2(src, os.path.join(pkg_lib, lib))
+                        found = True
+                        break
+            if not found:
                 raise ConanException(
-                    f"Required library {lib} not found in candidate dirs "
-                    f"({candidate_dirs}); downstream linking will fail"
+                    f"Required library {lib} not found in build tree; "
+                    f"downstream linking will fail"
                 )
 
+        # Copy runtime .so modules to bin/ (slangc loads them by basename
+        # from its own directory at runtime)
+        pkg_bin = os.path.join(self.package_folder, "bin")
+        for so_name in ["libslang-glslang-2026.14.so", "libslang-glsl-module-2026.14.so"]:
+            so_src = os.path.join(pkg_lib, so_name)
+            if os.path.exists(so_src):
+                shutil.copy2(so_src, os.path.join(pkg_bin, so_name))
+
     def package_info(self):
-        self.cpp_info.libs = ["slang-compiler", "slang-cpp-parser", "compiler-core", "core", "slang-rt"]
+        # Link order: dependents first, dependencies last
+        self.cpp_info.libs = [
+            "slang-compiler", "slang-cpp-parser", "compiler-core", "core", "slang-rt",
+            "cmark-gfm", "miniz", "lz4",
+            "glslang", "SPIRV",
+            "SPIRV-Tools", "SPIRV-Tools-opt", "SPIRV-Tools-link",
+        ]
         self.cpp_info.bindirs = ["bin"]
-        # Slang modules loaded at runtime
-        self.cpp_info.libdirs = ["lib", "lib/slang-standard-module-2026.14"]
+        # Include bin/ in libdirs so conanrun sets LD_LIBRARY_PATH to find
+        # the runtime .so modules (slang-glslang, slang-glsl-module) there
+        self.cpp_info.libdirs = ["lib", "bin", "lib/slang-standard-module-2026.14"]

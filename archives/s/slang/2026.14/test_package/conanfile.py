@@ -45,11 +45,11 @@ class SlangTestConan(ConanFile):
         if not slang_bin:
             raise AssertionError("slangc binary not found in package")
 
-        # Test 1: Run slangc --version (L2 smoke test)
-        self.output.info("Running slangc --version...")
-        exit_code = self.run(f'"{slang_bin}" --version', env="conanrun")
+        # Test 1: Run slangc -h (L2 smoke test — slangc doesn't support --version)
+        self.output.info("Running slangc -h (smoke test)...")
+        exit_code = self.run(f'"{slang_bin}" -h', env="conanrun")
         if exit_code != 0:
-            raise AssertionError(f"slangc --version failed (exit code: {exit_code})")
+            raise AssertionError(f"slangc -h failed (exit code: {exit_code})")
 
         # Test 2: Compile a simple HLSL shader
         shader_file = os.path.join(self.source_folder, "test_shader.slang")
@@ -83,9 +83,3 @@ void computeMain(uint3 id : SV_DispatchThreadID) {
             self.output.info("PASS: C API test passed")
         else:
             raise AssertionError("C API test binary not found — build() may have failed silently")
-
-        # Test 4: Check slangc help
-        self.output.info("Checking slang version tag...")
-        exit_code = self.run(f'"{slang_bin}" -h', env="conanrun")
-        if exit_code != 0:
-            raise AssertionError(f"slangc -h failed (exit code: {exit_code})")
