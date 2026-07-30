@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# GNU bison 2.7 — upstream test manifest
+# Upstream testsuite: `make check` (Autotools) — ~140 DejaGnu tests
+# See: tests/ in bison-2.7.tar.gz
+
+package: bison/2.7
+homepage: "https://www.gnu.org/software/bison/"
+
+# Upstream test command (Autotools test harness)
+upstream_check_command: "make check"
+
+# conanfile.py build() does NOT include make check (manually verified on
+# OHOS dev host; gnulib tests need TMPDIR on tmpfs).
+upstream_test_in_build: false
+upstream_test_command: "手动验证：cd build-dir && TMPDIR=$HOME/tmp make check -j1"
+
+# Upstream tests: DejaGnu-based testsuite under tests/
+upstream_tests:
+  - file: "tests/testsuite"
+    source: "bison-2.7/testsuite/testsuite"
+    description: "DejaGnu testsuite — ~140 bison functional tests"
+    command: "make check"
+
+# test_package smoke tests (consumer-side verification)
+test_package_tests:
+  - file: "test.sh"
+    description: "bison --version + minimal grammar compile + yacc-compatible -y output"
+    command: "bash test.sh"
+
+# Approximate assertion count
+assertion_count: 6
