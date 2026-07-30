@@ -8,6 +8,7 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.tools.env import Environment
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -43,12 +44,17 @@ class GnuTLSConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         autotools = Autotools(self)
-        autotools.configure(args=[
-            "--with-included-libtasn1",
-            "--disable-gost"
-        ])
-        bash_path = shutil.which("bash") or "bash"
-        autotools.make(args=[f"SHELL={bash_path}"])
+        shell_env = Environment()
+        bash_path = shutil.which("bash")
+        if bash_path:
+            shell_env.define("CONFIG_SHELL", bash_path)
+            shell_env.define("SHELL", bash_path)
+        with shell_env.vars(self).apply():
+            autotools.configure(args=[
+                "--with-included-libtasn1",
+                "--disable-gost"
+            ])
+            autotools.make()
 
     def package(self):
         autotools = Autotools(self)

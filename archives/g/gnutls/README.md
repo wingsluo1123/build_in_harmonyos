@@ -9,14 +9,14 @@ GnuTLS is a secure communications library implementing TLS, SSL and DTLS protoco
 - `libgnutls`: Core TLS library
 
 ## OHOS 适配要点
-1. Requires libtasn1, nettle, gmp dependencies
-2. May have unresolved symbols on HarmonyOS
+1. Uses the bundled libtasn1 support from the GnuTLS source tree.
+2. Requires the published `nettle/3.10.2` and `gmp/6.3.0` Conan packages.
 
 ## 依赖
 | 依赖 | 版本 | 说明 |
 |------|------|------|
-| libtasn1 | 4.19 | ASN.1 parsing |
-| nettle | 3.10 | Cryptographic library |
+| libtasn1 | bundled | ASN.1 parsing |
+| nettle | 3.10.2 | Cryptographic library |
 | gmp | 6.3.0 | Large integer arithmetic |
 
 ## 功能验证
