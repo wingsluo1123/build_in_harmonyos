@@ -112,7 +112,7 @@ class ProjConan(ConanFile):
             "-DOHOS_ARCH={}".format(_ohos_arch),
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
-            "-DBUILD_SHARED_LIBS=OFF",
+            "-DBUILD_SHARED_LIBS={}".format("ON" if self.options.shared else "OFF"),
             "-DBUILD_TESTING=OFF",
             '-DCMAKE_C_FLAGS="-fPIC"',
             '-DCMAKE_CXX_FLAGS="-fPIC"',
