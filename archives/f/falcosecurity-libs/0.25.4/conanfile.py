@@ -79,11 +79,12 @@ class FalcoSecurityLibsConan(ConanFile):
         # (e.g. test_package) find libc++_shared.so via LD_LIBRARY_PATH.
         if self.settings.os == "OHOS":
             # Resolve OHOS runtime lib dir from the cross-compiler (via profile)
+            _cc_info = self.conf.get("tools.build:compiler_executables", {})
+            if isinstance(_cc_info, str):
+                _cc_info = json.loads(_cc_info)
             _cc_path = os.path.join(
                 os.path.dirname(
-                    json.loads(
-                        self.conf.get("tools.build:compiler_executables", "{}")
-                    ).get("c", "/data/service/hnp/bin/clang")
+                    _cc_info.get("c", "/data/service/hnp/bin/clang")
                 ),
                 "aarch64-unknown-linux-ohos-clang"
             )
