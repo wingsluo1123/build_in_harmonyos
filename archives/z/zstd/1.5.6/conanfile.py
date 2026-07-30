@@ -64,7 +64,7 @@ class ZstdConan(ConanFile):
         bdir = os.path.join(self.build_folder, "build-ohos")
         defs = " ".join([
             '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
-            "-DOHOS_ARCH=arm64-v8a",
+            "-DOHOS_ARCH=arm64-v8a",  # ohos.toolchain.cmake 的目标架构；与 1.5.7 一致，OHOS PC 当前仅 arm64
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
             "-DZSTD_BUILD_SHARED=ON",
@@ -76,6 +76,13 @@ class ZstdConan(ConanFile):
         self.run('cmake --build "{}"'.format(bdir))
 
     def _patch_gnu_qsort_r(self):
+        # R8 偏离说明（详见 notes.md「R8 平台条件编译宏偏离记录」）：
+        # OHOS 用 musl libc，不提供 GNU 风格的 qsort_r。zstd 的 cover.c / zstd_deps.h 在
+        # __linux__ 下自动 #define _GNU_SOURCE → 走 glibc qsort_r → 链接报 undefined symbol: qsort_r。
+        # 上游本就为 __ANDROID__（注释 "NDK doesn't ship qsort_r()"）开了同样例外；OHOS 同理，
+        # 给两处守卫追加 && !defined(__OHOS__) 例外（真机 __OHOS__=1），令其走 C90 fallback
+        # （全局 ctx + 普通 qsort）——这是有实质逻辑的平台分支适配（非空壳 stub），符合 R8。
+        # 此方案与已发布的 zstd/1.5.7 recipe 完全对齐。
         import os
         old = "#if !defined(_GNU_SOURCE) && !defined(__ANDROID__)"
         new = "#if !defined(_GNU_SOURCE) && !defined(__ANDROID__) && !defined(__OHOS__)"
