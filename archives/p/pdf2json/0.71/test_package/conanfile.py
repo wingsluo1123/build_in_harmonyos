@@ -26,7 +26,7 @@ class Pdf2JsonTestConan(ConanFile):
         pdf2json_bin = os.path.join(bin_dir, "pdf2json")
         # pdf2json -v exits with code 1 but prints version info to stdout.
         # Use grep to verify the binary outputs expected version string.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL", "bash")
         self.run(
             f'{bash} -c \'"{pdf2json_bin}" -v 2>&1 | grep -q "pdf2json"\'',
             env="conanrun",
