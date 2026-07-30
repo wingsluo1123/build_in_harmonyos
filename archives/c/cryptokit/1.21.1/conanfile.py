@@ -83,7 +83,16 @@ class CryptokitConan(ConanFile):
 
         # R33: Get compiler from Conan conf (not hardcoded)
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
-        cc = compilers.get("c", "clang")
+        cc = compilers.get("c", "")
+        if not cc:
+            # Fallback: try OHOS SDK clang, then bare clang
+            candidates = ["/data/service/hnp/bin/clang", "clang"]
+            for c in candidates:
+                if os.path.exists(c) or "/" not in c:
+                    cc = c
+                    break
+        if not cc:
+            raise ConanException("C compiler not found: set tools.build:compiler_executables in profile")
 
         c_sources = [
             "arcfour.c", "aesni.c", "blake2.c", "blake3.c",
