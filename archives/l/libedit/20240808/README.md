@@ -39,6 +39,8 @@ patch -p1 < patches/0005-configure.patch
 patch -p1 < patches/0006-depcomp.patch
 patch -p1 < patches/0007-install-sh.patch
 patch -p1 < patches/0008-missing.patch
+patch -p1 < patches/0009-termcap.h.patch
+patch -p1 < patches/0010-configure-umask.patch
 
 # 3. 配置（仅 --prefix，参数最少化）
 ./configure --prefix=$HOME/usr/local

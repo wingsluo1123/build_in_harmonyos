@@ -14,7 +14,7 @@ class LibeditConan(ConanFile):
     description = "BSD line editing library (editline)"
     license = "BSD-3-Clause"
     homepage = "https://thrysoee.dk/editline/"
-    url = ""
+    url = "https://thrysoee.dk/editline/"
 
     settings = "os", "compiler", "build_type", "arch"
 
