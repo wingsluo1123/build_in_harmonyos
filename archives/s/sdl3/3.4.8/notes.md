@@ -26,6 +26,17 @@ title: SDL3 3.4.8 HarmonyOS 编译记录
 **4. SDL_systhread.c（补丁 0004）**
 - 禁用 `pthread_setcanceltype`（HarmonyOS pthread 实现不完整）
 
+### 当前适配范围
+
+本配方在 HarmonyOS 上提供 SDL3 的核心工具 API 与 pthread 基础能力，属于
+headless/core-only 构建。由于尚未实现 OHOS 原生窗口系统、渲染、音频和输入后端，
+配方显式禁用 OpenGL/OpenGL ES/Vulkan、X11/Wayland/KMSDRM、ALSA/PulseAudio
+等后端。
+
+当前验证只覆盖包可链接、`SDL_Init(0)` 和版本查询，不代表
+`SDL_INIT_VIDEO`、`SDL_INIT_AUDIO`、窗口或 renderer 可用。需要这些能力的下游
+必须等待对应 OHOS 原生后端适配后再启用；本版本不得描述为完整多媒体适配。
+
 ### 编译
 
 ```bash
@@ -45,7 +56,7 @@ make install
 
 - G0 干净构建验证：PASS
 - G1 二进制完整性：PASS
-- G2 功能可用性：PASS
+- G2 核心范围功能可用性：PASS（不含视频、音频和输入后端）
 - G3 可移植性：PASS
 - G4 档案完整性：PASS
 
