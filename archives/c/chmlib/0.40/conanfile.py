@@ -81,9 +81,9 @@ class ChmlibConan(ConanFile):
             cwd=src
         )
 
-        # E097: HMDFS setgid — fix umask 077 → 022 for configure temp files
+        # E097: HMDFS setgid — fix umask 077 → 002 for configure temp files
         self.run(
-            "sed -i 's/umask 077/umask 022/g' configure",
+            "sed -i 's/umask 077/umask 002/g' configure",
             cwd=src
         )
 
