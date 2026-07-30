@@ -5,20 +5,20 @@
 int main(void) {
     int failures = 0;
 
-    // NOTE: PPM_API_CURRENT_VERSION macros are only defined when Linux
-    // driver subsystem is compiled. On OHOS these are not available,
-    // so we skip the API version compatibility check and only test
-    // the core library API functions.
+    // NOTE: PPM_API_CURRENT_VERSION and PPM syscall table macros are only
+    // defined when the Linux driver subsystem is compiled. On OHOS these
+    // are not available, so we test library API functions that exist in
+    // the OHOS build (libscap non-Linux platform stubs).
 
-    const struct ppm_event_info *events = scap_get_event_info_table();
-    if (events == NULL) {
-        fprintf(stderr, "FAIL: event information table is null\n");
+    const struct scap_machine_info *info = scap_get_machine_info();
+    if (info == NULL) {
+        fprintf(stderr, "FAIL: machine info is null\n");
         failures++;
     }
 
-    const char *read_name = scap_get_ppm_sc_name(PPM_SC_READ);
-    if (read_name == NULL || read_name[0] == '\0') {
-        fprintf(stderr, "FAIL: read syscall name is unavailable\n");
+    const char *agent = scap_get_agent_info();
+    if (agent == NULL || agent[0] == '\0') {
+        fprintf(stderr, "FAIL: agent info is unavailable\n");
         failures++;
     }
 
@@ -26,6 +26,6 @@ int main(void) {
         return 1;
     }
 
-    printf("falcosecurity-libs API test passed: %s\n", read_name);
+    printf("falcosecurity-libs API test passed: %s\n", agent);
     return 0;
 }
