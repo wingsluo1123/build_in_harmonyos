@@ -4,6 +4,7 @@
 import os
 import shlex
 import shutil
+import tempfile
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -50,6 +51,40 @@ class NanoConan(ConanFile):
     def _ncurses_prefix(self):
         return os.path.join(self.build_folder, "ncurses-prefix")
 
+    @staticmethod
+    def _settings_triplet(settings):
+        arch = str(settings.arch)
+        machine = {
+            "x86": "i686",
+            "x86_64": "x86_64",
+            "armv8": "aarch64",
+            "armv8_32": "aarch64",
+            "armv8.3": "aarch64",
+        }.get(arch)
+        if machine is None and arch.startswith("arm"):
+            machine = "arm"
+        if machine is None:
+            raise ConanInvalidConfiguration(
+                f"Cannot derive a GNU triplet for architecture {arch}"
+            )
+
+        os_name = str(settings.os)
+        system = {
+            "Linux": "linux-gnu",
+            "OHOS": "linux-ohos",
+        }.get(os_name)
+        if system is None:
+            raise ConanInvalidConfiguration(
+                f"Cannot derive a GNU triplet for operating system {os_name}"
+            )
+        if machine == "arm":
+            system += "eabi"
+            if arch in ("armv5hf", "armv7hf"):
+                system += "hf"
+        elif arch == "armv8_32":
+            system += "_ilp32"
+        return f"{machine}-{system}"
+
     def generate(self):
         toolchain = AutotoolsToolchain(self)
         include_dir = os.path.join(self._ncurses_prefix(), "include")
@@ -68,7 +103,7 @@ class NanoConan(ConanFile):
 
         compiler_executables = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
-        ) or {}
+        )
         cc = compiler_executables.get("c")
         cxx = compiler_executables.get("cpp")
         if not cc or not cxx:
@@ -76,11 +111,18 @@ class NanoConan(ConanFile):
                 "tools.build:compiler_executables must define c and cpp"
             )
 
+        host_triplet = self.conf.get(
+            "tools.gnu:host_triplet"
+        ) or self._settings_triplet(self.settings)
+        build_triplet = self.conf.get(
+            "tools.gnu:build_triplet"
+        ) or self._settings_triplet(self.settings_build)
+
         configure_args = [
             "./configure",
             f"--prefix={self._ncurses_prefix()}",
-            "--build=aarch64-unknown-linux-gnu",
-            "--host=aarch64-unknown-linux-gnu",
+            f"--build={build_triplet}",
+            f"--host={host_triplet}",
             "--without-shared",
             "--with-normal",
             "--enable-widec",
@@ -108,11 +150,12 @@ class NanoConan(ConanFile):
         if bash_path:
             shell_env.define("CONFIG_SHELL", bash_path)
             shell_env.define("SHELL", bash_path)
-        tmpdir = os.environ.get("TMPDIR")
-        if not tmpdir or not os.path.isdir(tmpdir) or not os.access(tmpdir, os.W_OK):
+        tmpdir = os.environ.get("TMPDIR") or tempfile.gettempdir()
+        if not os.path.isdir(tmpdir) or not os.access(tmpdir, os.W_OK):
             raise ConanInvalidConfiguration(
-                "TMPDIR must identify a writable non-HMDFS temporary directory"
+                "TMPDIR must identify a writable temporary directory"
             )
+        shell_env.define("TMPDIR", tmpdir)
 
         with shell_env.vars(self).apply():
             self._build_ncurses()
