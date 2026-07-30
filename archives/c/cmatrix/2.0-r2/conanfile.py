@@ -38,10 +38,9 @@ class CmatrixConan(ConanFile):
         apply_conandata_patches(self)
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cc = compilers.get("c", "clang") if compilers else "clang"
-        config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
 
-        self.run(f"{config_shell} ./autogen.sh", run_environment=True)
-        self.run(f"CONFIG_SHELL={config_shell} CC={cc} {config_shell} ./configure --prefix=/",
+        self.run("./autogen.sh", run_environment=True)
+        self.run(f"CC={cc} ./configure --prefix=/",
                  run_environment=True)
         self.run("make -j1")
 

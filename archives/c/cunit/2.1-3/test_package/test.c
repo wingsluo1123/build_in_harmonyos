@@ -41,8 +41,19 @@ int main(void) {
     }
 
     CU_basic_set_mode(CU_BRM_VERBOSE);
-    CU_basic_run_tests();
+    if (CUE_SUCCESS != CU_basic_run_tests()) {
+        printf("FAIL: CUnit framework error: %d\n", CU_get_error());
+        CU_cleanup_registry();
+        return CU_get_error();
+    }
+
+    unsigned int failures = CU_get_number_of_tests_failed();
     CU_cleanup_registry();
+
+    if (failures > 0) {
+        printf("FAIL: %u test(s) failed\n", failures);
+        return 1;
+    }
 
     printf("PASS: CUnit API is functional\n");
     return 0;

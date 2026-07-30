@@ -8,6 +8,7 @@ Build: Custom Makefile (autotools fails on OHOS due to temp file permissions).
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -26,6 +27,10 @@ class CUnitConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def configure(self):
+        if self.options.shared:
+            raise ConanInvalidConfiguration("cunit does not support shared builds")
 
     def requirements(self):
         pass
@@ -74,7 +79,7 @@ class CUnitConan(ConanFile):
             self.run(f"{cc} -c {source_dir}/{src} -o {obj} -I{include_dir} -fPIC")
             objects.append(obj)
 
-        ar = os.environ.get("AR", "llvm-ar")
+        ar = compilers.get("ar", "llvm-ar") if compilers else "llvm-ar"
         lib_path = os.path.join(build_dir, "libcunit.a")
         self.run(f"{ar} rcs {lib_path} {' '.join(objects)}")
 

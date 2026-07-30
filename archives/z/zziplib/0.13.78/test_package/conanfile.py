@@ -26,5 +26,4 @@ class ZziplibTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_zziplib'", env="conanrun")
+        self.run(os.path.join(self.cpp.build.bindir, "test_zziplib"), env="conanrun")
