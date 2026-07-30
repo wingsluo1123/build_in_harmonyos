@@ -115,7 +115,8 @@ class ProjConan(ConanFile):
             "-DBUILD_SHARED_LIBS=OFF",
             "-DBUILD_TESTING=OFF",
             '-DCMAKE_C_FLAGS="-fPIC -O2 -fuse-ld=bfd"',
-            '-DCMAKE_CXX_FLAGS="-fPIC -O2 -fuse-ld=bfd"',
+'-DCMAKE_C_FLAGS="-fPIC"',
+            '-DCMAKE_CXX_FLAGS="-fPIC"'
             '-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=bfd"',
             '-DCMAKE_SHARED_LINKER_FLAGS="-fuse-ld=bfd"',
             '-DCMAKE_INSTALL_PREFIX="{}"'.format(pkgdir),
