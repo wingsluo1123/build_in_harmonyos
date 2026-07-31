@@ -20,7 +20,8 @@ int main(int argc, char *argv[])
     }
 
     int status;
-    waitpid(pid, &status, 0);
+    if (waitpid(pid, &status, 0) == -1)
+        return 1;
     if (WIFEXITED(status)) {
         int code = WEXITSTATUS(status);
         /* 127 = exec failed; any other code = binary started and ran */
