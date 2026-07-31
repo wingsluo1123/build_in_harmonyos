@@ -24,6 +24,11 @@ class KubetuiConan(ConanFile):
 
     settings = "os", "arch"
 
+    def build_requirements(self):
+        # CI 环境无 Rust 工具链，依赖 rust/cargo 工具链包（同 hurl/ripgrep 等 Rust 项目）
+        self.tool_requires("rust/1.95.0")
+        self.tool_requires("cargo/1.95.0")
+
     def layout(self):
         basic_layout(self)
 
