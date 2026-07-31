@@ -24,7 +24,7 @@ fi
 perl -MObject::Event -e '
     my $obj = Object::Event->new;
     my $fired = 0;
-    $obj->reg_cb(test_event => sub { $fired = 1; });
+    my $guard = $obj->reg_cb(test_event => sub { $fired = 1; });
     $obj->event(test_event => ());
     die "Event callback not fired" unless $fired;
     print "[PASS] Event register and fire works\n";
