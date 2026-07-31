@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
@@ -61,6 +62,7 @@ class LibusbConan(ConanFile):
         args.extend([
             "--disable-dependency-tracking",
             "--disable-udev",
+            "--enable-tests-build",
             "--enable-shared" if self.options.shared else "--disable-shared",
             "--disable-static" if self.options.shared else "--enable-static",
         ])
@@ -83,6 +85,14 @@ class LibusbConan(ConanFile):
         else:
             autotools.configure()
             autotools.make(args=["-j1"])
+
+        if can_run(self):
+            if str(self.settings.os) == "OHOS":
+                self._make(ohos_build_folder, target="check", args=["-j1"])
+            else:
+                autotools.make(target="check", args=["-j1"])
+        else:
+            self.output.info("cross-building: upstream test binaries were built but not run")
 
     def _prepare_ohos_build_folder(self):
         build_folder = self._ohos_build_folder()

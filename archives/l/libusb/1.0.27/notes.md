@@ -122,3 +122,19 @@
 **编译结束**: 2026-06-24 11:32
 **功能测试**: 2026-06-24
 **最终状态**: built（功能测试通过，平台限制已记录）
+
+## 八、PR #3475 本地预审（2026-08-01）
+
+- Recipe now configures `--enable-tests-build` and invokes `make -j1 check`
+  whenever the built binaries are runnable. Cross-built binaries are compiled
+  but not executed unless Conan reports that they can run on the build host.
+- WSL/Linux x86_64 actual upstream result: `0/4`. The enabled upstream suite
+  ran `stress`, `stress_mt`, `set_option`, and `init_context`; each failed at
+  `libusb_init_context()` with `LIBUSB_ERROR_OTHER` because this environment
+  has no usable USB backend/device access. This is an unresolved merge gate,
+  not a passing result.
+- The installed-tree consumer smoke compiled, linked, and ran successfully:
+  `1/1` (`test_libusb`, version/capability/error API checks). It does not
+  replace the upstream suite or an OpenHarmony target-runtime result.
+- Logs: `pipeline_logs/libusb-pr3475-upstream-make-check-enabled-20260801.log`
+  and `pipeline_logs/libusb-pr3475-consumer-smoke-20260801.log`.
