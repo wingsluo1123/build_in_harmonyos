@@ -1,27 +1,21 @@
+#!/usr/bin/env python3
+"""Conan test_package for btop 1.4.7 — verifies the btop binary works."""
+
 import os
+
 from conan import ConanFile
-from conan.tools.build import can_run
-from conan.tools.cmake import cmake_layout, CMake
-from conan.tools.files import save
 
 
 class BtopTestConan(ConanFile):
-    settings = "os", "arch", "compiler", "build_type"
-    generators = "CMakeToolchain", "CMakeDeps", "VirtualBuildEnv"
+    settings = "os", "compiler", "build_type", "arch"
     test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def test(self):
-        if can_run(self):
-            bin_path = os.path.join(self.cpp.build.bindirs[0], "test_package")
-            self.run(bin_path, env="conanrun")
+        # OHOS: /system/bin/sh cannot execute ELF binaries, use bash wrapper
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        btop = os.path.join(self.dependencies["btop"].package_folder, "bin", "btop")
+        test_script = os.path.join(self.source_folder, "test_btop.sh")
+        self.run(f'"{bash}" "{test_script}" "{btop}"', env="conanrun")

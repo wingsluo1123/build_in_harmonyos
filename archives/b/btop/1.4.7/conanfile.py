@@ -1,10 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe for btop 1.4.7 — a resource monitor and process manager (C++17, terminal UI)."""
+
 import os
+
 from conan import ConanFile
-from conan.tools.build import can_run
 from conan.tools.files import copy, get
-from conan.tools.gnu import AutotoolsToolchain, Autotools
-from conan.tools.scm import Version
-from conan.tools.env import VirtualBuildEnv
 
 
 class BtopConan(ConanFile):
@@ -23,17 +23,12 @@ class BtopConan(ConanFile):
         get(self, **self.conan_data["sources"][self.version],
             strip_root=True)
 
-    def generate(self):
-        vb = VirtualBuildEnv(self)
-        vb.generate()
-        tc = AutotoolsToolchain(self)
-        tc.generate()
-
     def build(self):
-        self.run("make -j1 CXX={} CXXFLAGS={}".format(
-            self.conf.get("tools.build:compiler_cxx", default="g++"),
-            self.conf.get("tools.build:cxxflags", default="")
-        ))
+        # R33: Get compiler from Conan conf, NEVER from shell env vars.
+        cxx = self.conf.get("tools.build:compiler_executables:cxx", default="clang++", check_type=str)
+        cxxflags = self.conf.get("tools.build:cxxflags", default="", check_type=str)
+        # R9: Use -j1; quote CXXFLAGS to handle spaces (e.g. "-O2 -DNDEBUG").
+        self.run(f'make -j1 CXX="{cxx}" CXXFLAGS="{cxxflags}"')
 
     def package(self):
         copy(self, "btop", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))
