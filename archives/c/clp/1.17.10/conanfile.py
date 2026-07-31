@@ -46,8 +46,10 @@ class ClpConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--enable-static")
-        tc.configure_args.append("--disable-shared")
+        # R26: System-name libraries default to static; respect the shared option
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
+            tc.configure_args.append("--disable-shared")
         tc.extra_cflags.append("-fPIC")
         tc.extra_cxxflags.append("-fPIC")
         tc.generate()
