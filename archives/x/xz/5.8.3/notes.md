@@ -76,3 +76,23 @@
 
 **编译结束**: 2026-07-27 11:33
 **最终状态**: built
+
+## 六、CI 验证记录
+
+### 本地 CI 模拟构建 (2026-07-31)
+完整运行 `ci/conan/build_and_test.sh`，所有门禁通过：
+
+| 门禁 | 结果 | 详情 |
+|------|------|------|
+| L0 | ✅ pass | 结构完整性 + MANIFEST + 补丁格式全部通过 |
+| L1 | ✅ pass | 上游 make check 18/18 + test_package 执行 |
+| L1e | ✅ pass | 破坏性反向验证：测试确实依赖 xz 包 |
+| L2 | ✅ pass | 9个二进制 (xz/xzdec/lzmadec/lzmainfo/lzcat/lzma/unlzma/unxz/xzcat) --version 全部通过 |
+| L4 | ⚠️ warn | config.guess 补丁中 "targets" 误匹配 gets\b（非阻塞） |
+| L5 | ✅ pass | bin/ 产物完整 |
+
+### CI 远端失败分析
+- **失败步骤**: conan-build-test (elapsed 0.11s)
+- **错误**: `Path in CI_PACKAGES has no conanfile.py: archives/x/xz/5.8.3`
+- **根因**: CI worker git checkout 异常 — conanfile.py 在 git tree 中存在（`git ls-tree` + `git cat-file` 验证），但 CI worker 构建目录中未检出
+- **本地验证**: conan create + 完整 CI 脚本均通过，配方无问题
