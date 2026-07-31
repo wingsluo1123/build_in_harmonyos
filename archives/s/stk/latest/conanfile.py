@@ -48,6 +48,12 @@ class StkConan(ConanFile):
         #  - BUILD_SHARED/STATIC: match the Conan shared option.
         cmake.configure(variables={
             "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+            # STK calls include(TestBigEndian) + TEST_BIG_ENDIAN unconditionally
+            # (outside the REALTIME block). Under OHOS toolchain CMake may treat
+            # the build as cross-compiling and try_run() cannot execute the probe.
+            # Pinning the byte order avoids the run-based probe entirely
+            # (aarch64 is little-endian). Requires CMake >= 3.19 (present).
+            "CMAKE_CXX_BYTE_ORDER": "LITTLE_ENDIAN",
             "BUILD_SHARED": "ON" if shared else "OFF",
             "BUILD_STATIC": "OFF" if shared else "ON",
             "REALTIME": "OFF",
