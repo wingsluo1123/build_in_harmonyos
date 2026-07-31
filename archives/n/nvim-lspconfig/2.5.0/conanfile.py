@@ -33,8 +33,10 @@ class NvimLspconfigConan(ConanFile):
     def package(self):
         share = os.path.join(self.package_folder, "share", "nvim-lspconfig")
         copy(self, "*", os.path.join(self.source_folder, "lua"), os.path.join(share, "lua"))
+        copy(self, "*", os.path.join(self.source_folder, "lsp"), os.path.join(share, "lsp"))
         copy(self, "*", os.path.join(self.source_folder, "plugin"), os.path.join(share, "plugin"))
         copy(self, "*", os.path.join(self.source_folder, "doc"), os.path.join(share, "doc"))
+        copy(self, "*", os.path.join(self.source_folder, "test"), os.path.join(share, "test"))
         copy(self, "README.md", self.source_folder, share)
         copy(self, "LICENSE.md", self.source_folder, share)
 
