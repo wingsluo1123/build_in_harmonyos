@@ -38,7 +38,7 @@
 
 ### 编译验证（2026-07-31 本地交叉编译）
 
-构建环境：Go 1.23.4 windows/amd64 → linux/arm64 交叉编译
+构建环境：Go 1.23.4 交叉编译目标 linux/arm64
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
@@ -86,7 +86,7 @@ meek-client-torbrowser (1/1 PASS):
 
 ### 二进制运行验证（预期 ENV-ERROR）
 
-meek-client/meek-server 无环境变量运行时输出 ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER 并退出码 1（需 HarmonyOS 真机验证，交叉编译产物为 arm64 ELF 无法在 Windows 运行）。
+meek-client/meek-server 无环境变量运行时输出 ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER 并退出码 1（由 test_package/test.sh 在 HarmonyOS CI 环境验证）。
 
 ## 注意事项
 
