@@ -15,11 +15,6 @@ codeload, which downloaded successfully with SHA-256:
 
 `c5efcbbdb8e141d6aeac648c4833f935f5982c01f58cd26ff6b35fcc43c609fb`
 
-For CI environments with restricted outbound access, the same verified archive
-is exported with the recipe as `safekeep-1.5.1.tar.gz`. The `source()` step uses
-that local archive first and falls back to the upstream codeload URL only when
-the exported archive is unavailable.
-
 ## Runtime Notes
 
 The script imports Unix-only modules such as `pwd` and `fcntl`, and it shells out
@@ -49,8 +44,15 @@ client/server environment needed for the upstream integration flow. The Conan
 markers, while still checking the installed CLI, config, docs, and sample backup
 definition.
 
+These marker checks are not counted as upstream integration test passes. Actual
+upstream test execution result for this package is `0/2`: the upstream
+`safekeep-test` local and remote flows were not run in the OHOS runner.
+
 ## OpenHarmony Validation
 
 - run dir: `/storage/Users/currentUser/ohos-test-runs/codex-a-1.5.1-safekeep-1.5.1-upstreamtests-r1-conan-20260731-212720-26678`
 - full ref: `safekeep/1.5.1#42db37736a941feadbc70de01083dccc:fc3eeb021243959114a0318489539cad6d087e28#6ae8de352ed3d8f2b5bea74d1ebb40f4`
 - gates: `L0=pass`, `L1=pass(test_package executed)`, `L1e=pass`, `L2=pass(safekeep --version OK)`, `L4=pass(no patches)`, `L5=pass(bin/ has content)`.
+- Upstream integration result: `0/2` actual `safekeep-test` flows executed;
+  the package-level Python marker checks are recorded separately as adapted
+  consumer validation.
