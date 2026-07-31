@@ -37,7 +37,7 @@ class TestPerlParamsValidate(ConanFile):
         # site_lib:  .../site_perl/{ver}/
         site_arch = os.path.dirname(
             os.path.dirname(os.path.dirname(
-                os.path.dirname(so_path)
+                os.path.dirname(os.path.dirname(so_path))
             ))
         )
         site_lib = os.path.dirname(site_arch)
