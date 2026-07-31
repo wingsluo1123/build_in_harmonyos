@@ -9,7 +9,7 @@ from conan import ConanFile
 
 
 class Pod2manTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
     generators = "VirtualRunEnv"
     test_type = "explicit"
 
@@ -24,3 +24,7 @@ class Pod2manTestConan(ConanFile):
             f.write("=head1 NAME\n\ntest - A test POD file\n\n=head1 DESCRIPTION\n\nThis is a test.\n\n=cut\n")
         out_file = os.path.join(self.build_folder, "test.1")
         self.run(f'perl "{bin_path}" "{pod_file}" "{out_file}"', env="conanrun")
+        assert os.path.exists(out_file), f"pod2man failed to produce {out_file}"
+        with open(out_file, "r") as f:
+            content = f.read()
+        assert ".TH" in content, f"pod2man output missing .TH header: {out_file}"

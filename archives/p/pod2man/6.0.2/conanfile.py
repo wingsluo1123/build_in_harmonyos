@@ -20,7 +20,7 @@ class Pod2manConan(ConanFile):
 
     package_type = "application"
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -28,13 +28,16 @@ class Pod2manConan(ConanFile):
     def requirements(self):
         pass
 
+    def layout(self):
+        self.folders.source = "."
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
-        self.run("perl Makefile.PL")
-        self.run("make")
+        self.run("perl Makefile.PL", env="conanrun")
+        self.run("make", env="conanrun")
 
     def package(self):
         copy(self, "*.pm", src=os.path.join(self.build_folder, "blib", "lib"),
