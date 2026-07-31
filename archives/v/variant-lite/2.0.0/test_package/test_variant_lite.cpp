@@ -1,5 +1,7 @@
 // test_variant_lite.cpp — L1 smoke test for variant-lite 2.0.0 header-only library
 // 验证 nonstd/variant.hpp 头文件可正常包含、variant 构造与访问
+// Force the nonstd implementation to avoid std::variant overload-resolution
+// differences on OHOS clang 15 libc++ (see conanfile.py VARIANT_LITE_OPT_SELECT_NONSTD).
 #include <nonstd/variant.hpp>
 #include <iostream>
 #include <string>

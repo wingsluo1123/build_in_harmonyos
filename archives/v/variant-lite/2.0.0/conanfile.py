@@ -34,6 +34,15 @@ class VariantLiteConan(ConanFile):
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.variables["VARIANT_LITE_OPT_BUILD_TESTS"] = True
         tc.variables["VARIANT_LITE_OPT_BUILD_EXAMPLES"] = False
+        # Force use of nonstd::variant instead of std::variant.
+        # Upstream test/variant.t.cpp (issue 31, convert-copy-construct cases) relies on
+        # variant-lite's own converting constructor semantics that differ from std::variant
+        # (std::variant rejects int -> variant<double, std::string> by overload resolution).
+        # The OHOS clang 15 libc++ std::variant implementation triggers hard errors during
+        # template instantiation, breaking the cpp17 test target. Selecting the nonstd
+        # implementation keeps the upstream test expectations consistent across all
+        # language standards and avoids the libc++ incompatibility.
+        tc.variables["VARIANT_LITE_OPT_SELECT_NONSTD"] = True
         tc.generate()
 
     def build(self):
