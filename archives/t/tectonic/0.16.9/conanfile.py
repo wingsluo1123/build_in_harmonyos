@@ -185,16 +185,23 @@ class TectonicConan(ConanFile):
         self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
         # L1: Run upstream official test suite (cargo test)
         # Some integration tests require network/TeX environment,
-        # but compilation errors indicate real regressions and must not be silently swallowed
+        # but compilation errors and non-network test failures indicate real regressions
         test_log = os.path.join(self.build_folder, "cargo_test.log")
         try:
             self.run(f"cargo test --release > {test_log} 2>&1", cwd=self.source_folder)
         except ConanException:
             with open(test_log, "r") as f:
                 log_content = f.read()
-            # Re-raise if compilation errors detected (indicates real regression, not test failure)
+            # Re-raise if compilation errors detected (indicates real regression)
             if "could not compile" in log_content or "error[E" in log_content:
                 raise
+            # Re-raise on test assertion failures from non-network tests
+            if "test result: FAILED" in log_content:
+                network_keywords = ["geturl", "bundle", "download"]
+                failed_tests = re.findall(r'test (\S+) \.\.\. FAILED', log_content)
+                non_network_failures = [t for t in failed_tests if not any(kw in t.lower() for kw in network_keywords)]
+                if non_network_failures:
+                    raise
             self.output.warning("cargo test had failures (some tests require network/TeX environment)")
 
     def _patch_pc_files_for_static(self, gen_folder):
