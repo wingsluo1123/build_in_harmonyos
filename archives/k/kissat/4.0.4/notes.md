@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: custom（自定义configure脚本，不支持--prefix）
-- 编译日期: 2026-06-15
+- 编译日期: 2026-07-20
 - 编译器: clang 15.0.4
 - 平台: HarmonyOS, HongMeng Kernel 1.12.0 aarch64
 - 状态: built
