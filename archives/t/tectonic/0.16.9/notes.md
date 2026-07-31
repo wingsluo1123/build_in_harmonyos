@@ -63,7 +63,7 @@ curl -fsSL "$URL" -o tectonic-0.16.9.tar.gz
 ### 2. Conan 环境设置（生成 .pc 文件 + 静态库）
 ```bash
 conan install --requires=freetype/2.14.3 --requires=fontconfig/2.18.1 \
-  --requires=harfbuzz/14.2.0 --requires=graphite2/1.3.14 \
+  --requires=harfbuzz/14.2.0.1 --requires=graphite2/1.3.14 \
   --requires=icu4c/78 --requires=libpng/1.6.58 \
   --requires=zlib/1.3.1.1 --requires=openssl/3.5.6 \
   -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 \
