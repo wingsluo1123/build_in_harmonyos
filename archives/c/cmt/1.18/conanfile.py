@@ -11,7 +11,6 @@ class CmtConan(ConanFile):
     name = "cmt"
     version = "1.18"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "patches/*"
 
     def layout(self):
         basic_layout(self)
@@ -21,7 +20,7 @@ class CmtConan(ConanFile):
         self.requires("ladspa/1.15")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
     def export_sources(self):
@@ -36,12 +35,15 @@ class CmtConan(ConanFile):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
         # ladspa.h 头路径通过 CPPFLAGS 注入（ladspa Conan 包 package_folder）
         ladspa_inc = os.path.join(self.dependencies["ladspa"].package_folder, "include")
+        cxx = "clang++"
+        cppflags = f"-I{ladspa_inc} -fPIC"
+        cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
             self.run(
-                f"make -j{self.settings.arch or 1} "
-                f"CXX={self.settings.compiler.cpp} "
-                f'CPPFLAGS="-I{ladspa_inc} -fPIC" '
-                f"CXXFLAGS=$(CPPFLAGS) -Wall -Werror -O2"
+                f'make -j"$(nproc)" '
+                f'CXX={cxx} '
+                f'CPPFLAGS="{cppflags}" '
+                f'CXXFLAGS="{cxxflags}"'
             )
 
     def package(self):
