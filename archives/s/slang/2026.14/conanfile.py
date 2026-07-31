@@ -91,9 +91,10 @@ class SlangConan(ConanFile):
             # Try git clone first, then fallback to tarball download
             cloned = False
             if git_bin:
-                # Try GitHub direct first, then ghfast.top proxy
+                # Try GitHub direct first, then proxies (CI workers may need gh-proxy)
                 for git_url in [
                     f"https://github.com/{repo}.git",
+                    f"https://gh-proxy.com/https://github.com/{repo}.git",
                     f"https://ghfast.top/https://github.com/{repo}.git",
                 ]:
                     try:
@@ -126,9 +127,10 @@ class SlangConan(ConanFile):
         SHA256 integrity checking internally.
         Falls back to urllib with SSL verification enabled (not disabled).
         """
-        # Try GitHub direct first, then ghfast.top proxy
+        # Try GitHub direct first, then proxies (CI workers may need gh-proxy)
         archive_urls = [
             f"https://github.com/{repo}/archive/{commit}.tar.gz",
+            f"https://gh-proxy.com/https://github.com/{repo}/archive/{commit}.tar.gz",
             f"https://ghfast.top/https://github.com/{repo}/archive/{commit}.tar.gz",
         ]
 
@@ -285,9 +287,9 @@ class SlangConan(ConanFile):
         os.makedirs(build_env["TMPDIR"], exist_ok=True)
 
         for attempt in range(max_retries):
-            # Phase 1 uses -j1 -k (keep going, single-threaded to find all generators)
-            # Phase 2+ uses -j2 (multi-threaded, generators already signed)
-            make_flags = ["-j1", "-k"] if attempt == 0 else ["-j2"]
+            # Phase 1 uses -j2 -k (keep going, find all generators)
+            # Phase 2+ uses -j4 (multi-threaded, generators already signed)
+            make_flags = ["-j2", "-k"] if attempt == 0 else ["-j4"]
             self.output.info(f"Build attempt {attempt+1} (flags: {' '.join(make_flags)})...")
 
             proc = subprocess.Popen(
@@ -372,8 +374,7 @@ class SlangConan(ConanFile):
     def _sign_all_executables(self, build_dir, failed_bins, already_signed=None):
         """Scan build directory for ELF executables and sign them all at once.
 
-        Skips binaries already signed in previous calls to prevent re-signing
-        (which modifies timestamps and can trigger unnecessary rebuilds).
+        Always re-signs all executables to ensure valid signatures.
         Returns the number of newly signed binaries.
         """
         if already_signed is None:
@@ -388,8 +389,8 @@ class SlangConan(ConanFile):
         for root, dirs, files in os.walk(build_dir):
             for f in files:
                 fpath = os.path.join(root, f)
-                # Skip binaries that already failed or were successfully signed
-                if fpath in failed_bins or fpath in already_signed:
+                # Skip binaries that previously failed signing
+                if fpath in failed_bins:
                     continue
                 if f.endswith(".dwarf"):
                     continue
@@ -410,6 +411,8 @@ class SlangConan(ConanFile):
                             continue
                 except (IOError, OSError):
                     continue
+                # Always re-sign: previous signing may have been invalidated
+                # by a rebuild or may have produced an invalid signature.
                 if self._sign_single_binary(fpath):
                     signed_count += 1
                     already_signed.add(fpath)
@@ -424,15 +427,21 @@ class SlangConan(ConanFile):
         if not sign_tool or not objcopy:
             return False
         try:
-            # Remove existing .codesign section if present (may not exist on new binaries)
+            # Preserve original timestamp to prevent make from rebuilding
+            # the binary after signing (which would create a new unsigned binary)
+            stat = os.stat(bin_path)
+            orig_atime, orig_mtime = stat.st_atime, stat.st_mtime
+
+            # Remove existing .codesign section if present.
             r = subprocess.run([objcopy, "--remove-section", ".codesign", bin_path],
                               capture_output=True, timeout=10)
-            # Non-zero exit is OK if .codesign section simply doesn't exist
-            # Sign the binary
+            # Sign the binary (adds .codesign section with valid signature)
             subprocess.run([sign_tool, "sign", "-inFile", bin_path,
                            "-outFile", bin_path, "-selfSign", "1"],
-                          capture_output=True, timeout=10, check=True)
+                          capture_output=True, timeout=30, check=True)
             os.chmod(bin_path, 0o755)
+            # Restore original timestamp so make doesn't rebuild the binary
+            os.utime(bin_path, (orig_atime, orig_mtime))
             self.output.info(f"Signed: {os.path.basename(bin_path)}")
             return True
         except subprocess.CalledProcessError as e:
@@ -473,13 +482,16 @@ class SlangConan(ConanFile):
                 except (IOError, OSError):
                     continue
                 try:
+                    # Preserve timestamp to prevent make rebuilds
+                    stat = os.stat(fpath)
                     # Remove existing .codesign section if present
                     subprocess.run([objcopy, "--remove-section", ".codesign", fpath],
                                   capture_output=True, timeout=10)
                     subprocess.run([sign_tool, "sign", "-inFile", fpath,
                                    "-outFile", fpath, "-selfSign", "1"],
-                                  capture_output=True, timeout=10, check=True)
+                                  capture_output=True, timeout=30, check=True)
                     os.chmod(fpath, 0o755)
+                    os.utime(fpath, (stat.st_atime, stat.st_mtime))
                 except subprocess.CalledProcessError as e:
                     self.output.warning(f"Signing tool failed for {fpath}: {e.stderr.decode() if e.stderr else e}")
                 except Exception as e:
