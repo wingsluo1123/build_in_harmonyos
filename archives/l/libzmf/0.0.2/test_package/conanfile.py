@@ -6,7 +6,6 @@ The test links against libzmf-0.0 and calls the public ZMF parser API to
 verify the package is functional (R34: test must substantively depend on
 the tested package).
 """
-import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout

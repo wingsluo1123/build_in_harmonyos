@@ -66,21 +66,22 @@ class LibzmfConan(ConanFile):
         # boost spirit classic has -Wshadow warnings; suppress as non-error
         tc.extra_cxxflags.append("-Wno-error=shadow")
         tc.generate()
+        # Generate deps env (CPPFLAGS/LIBS for librevenge/boost/zlib/libpng/icu)
+        # Without this, configure cannot find the 5 declared dependencies.
+        from conan.tools.gnu import AutotoolsDeps
+        deps = AutotoolsDeps(self)
+        deps.generate()
 
     def build(self):
         apply_conandata_patches(self)
         src = self.source_folder
 
-        # E007/E072: Replace config.guess/config.sub with OHOS-aware versions.
-        # The upstream release tarball already ships config.guess/config.sub,
-        # but they predate OHOS aarch64 recognition. The patch files replace
-        # them wholesale; if the patched copy is still missing the OHOS triplet,
-        # fall back to the system automake copy.
-        am_dir = "/storage/Users/currentUser/usr/local/share/automake-1.17"
-        for script in ("config.guess", "config.sub"):
-            sys_script = os.path.join(am_dir, script)
-            if os.path.exists(sys_script):
-                shutil.copy2(sys_script, os.path.join(src, script))
+        # E007/E072: The 0001/0002 patches replace config.guess/config.sub
+        # wholesale with OHOS-aware automake-1.17 copies (timestamp 2023)
+        # that recognise the aarch64-*-linux-ohos triplet. The release
+        # tarball's original scripts (autoconf-2.69 era, 2012) cannot.
+        # No system-automake fallback: the patched copies are complete and
+        # a hardcoded am_dir would silently no-op on CI (P2 fix).
 
         # Fix: umask 077 -> 022 in generated configure (HarmonyOS FS limitation)
         configure = os.path.join(src, "configure")
