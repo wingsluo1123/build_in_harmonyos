@@ -84,15 +84,20 @@ class HarfbuzzConan(ConanFile):
         cmake.install()
 
         # If CMake install didn't copy libraries, do it manually
+        # CMake may put libraries in build root or src/ subdirectory
         lib_dir = os.path.join(self.package_folder, "lib")
         if not os.path.exists(lib_dir):
             os.makedirs(lib_dir, exist_ok=True)
         for lib_name in ("libharfbuzz.a", "libharfbuzz-subset.a",
                          "libharfbuzz-vector.a", "libharfbuzz-raster.a",
                          "libharfbuzz-gpu.a"):
-            build_lib = os.path.join(self.build_folder, lib_name)
-            if os.path.exists(build_lib) and not os.path.exists(os.path.join(lib_dir, lib_name)):
-                shutil.copy2(build_lib, lib_dir)
+            if os.path.exists(os.path.join(lib_dir, lib_name)):
+                continue
+            for search_dir in [self.build_folder, os.path.join(self.build_folder, "src")]:
+                build_lib = os.path.join(search_dir, lib_name)
+                if os.path.exists(build_lib):
+                    shutil.copy2(build_lib, lib_dir)
+                    break
 
     def package_info(self):
         # Headers are installed to include/harfbuzz/, so consumers can

@@ -13,6 +13,7 @@ Fixes applied:
 import os
 import re
 import shutil
+import glob
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -231,7 +232,6 @@ class TectonicConan(ConanFile):
                 self.output.warning(f"Failed to write {pc_name}: {e}")
 
     def package(self):
-        import glob
         # Search multiple candidate paths for the binary
         candidates = [
             os.path.join(self.build_folder, "target", "release"),
