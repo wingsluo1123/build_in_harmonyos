@@ -26,7 +26,8 @@ class AtkConan(ConanFile):
     default_options = {"shared": False, "fPIC": True}
 
     def requirements(self):
-        self.requires("glib/2.88.0")
+        # 仓库已上架 glib/2.84.0（2.88.0 未上架），降版到 2.84.0 避免 Conan 解析失败
+        self.requires("glib/2.84.0")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -56,7 +57,7 @@ class AtkConan(ConanFile):
         tc.project_options["introspection"] = "disabled"
         tc.project_options["docs"] = "false"
         tc.project_options["enable_docs"] = "false"
-        # glib 2.88.0 已通过 Conan 可用，禁用 meson fallback 克隆行为
+        # glib 2.84.0 已通过 Conan 可用，禁用 meson fallback 克隆行为
         tc.project_options["wrap_mode"] = "nofallback"
         tc.generate()
 

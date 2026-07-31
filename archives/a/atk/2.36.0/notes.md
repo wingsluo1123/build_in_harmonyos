@@ -48,7 +48,7 @@
 
 | # | 问题 | 根因 | 解决方案 | 知识引用 |
 |---|------|------|----------|----------|
-| 1 | meson fallback 尝试克隆 glib | glib 2.88.0 已通过 Conan 可用，不需要 fallback | 使用 --wrap-mode=nofallback | — |
+| 1 | meson fallback 尝试克隆 glib | glib 2.84.0 已通过 Conan 可用，不需要 fallback | 使用 --wrap-mode=nofallback | — |
 | 2 | g-ir-scanner 执行权限问题 | _giscanner.cpython-312.so 未签名 | 禁用 introspection（-Dintrospection=disabled） | — |
 | 3 | 链接失败：undefined symbol: g_libintl_* | libintl.h 将 gettext 函数宏定义为 g_libintl_*，但 libintl.so 只导出 libintl_* 符号 | 创建 intl-wrapper.c wrapper 库，将 g_libintl_* 映射到 libintl_* | E107 |
 | 4 | Meson 检测 HarmonyOS 为 harmonyos，导致 Linux 特有链接器选项缺失 | meson.build 中有 host_machine.system() == 'linux' 判断 | 修改为 host_machine.system() in ['linux', 'harmonyos'] | E090 |
@@ -68,8 +68,8 @@
 
 ## 依赖版本
 
-- glib-2.0: 2.88.0（Conan 制品仓已发布）
-- gobject-2.0: 2.88.0（随 glib）
+- glib-2.0: 2.84.0（Conan 制品仓已发布）
+- gobject-2.0: 2.84.0（随 glib）
 - libintl: 已安装（系统库）
 - pcre2-8: 已安装
 - ffi: 已安装
