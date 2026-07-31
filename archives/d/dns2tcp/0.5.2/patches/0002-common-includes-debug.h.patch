@@ -17,7 +17,7 @@
  ** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  ** GNU General Public License for more details.
  **
-@@ -17,21 +17,25 @@
+@@ -17,21 +17,22 @@
  ** along with This program; if not, write to the Free Software
  ** Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -28,11 +28,9 @@
  #include <stdio.h>
  #include <time.h>
  
-+#ifdef __OHOS__
+-int debug;
++
 +extern int debug;
-+#else
- int debug;
-+#endif
  
  #ifndef _WIN32
  #define DPRINTF(level, fmt, args...)  \
@@ -43,3 +41,26 @@
  	     {\
  	        time_t t; \
  	        struct tm *tmp; \
+@@ -39,22 +40,19 @@
+ 		\
+ 		t = time(NULL); \
+                 tmp = localtime(&t); \
+ 	        strftime(my_time, sizeof(my_time), "%R:%S", tmp); \
+ 		fprintf(stderr, "%s : ", my_time); \
+ 		}\
+ 	   fprintf(stderr, "Debug %s:%d\t", __FILE__, __LINE__); \
+            fprintf(stderr, fmt, ##args); \
+ 	}\
+ }
+-#else
+ #define DPRINTF(level, fmt, args...)  \
+ {\
+   if (debug >= level)				\
+     {								 \
+       fprintf(stderr, "Debug %s:%d\t", __FILE__, __LINE__);		\
+       fprintf(stderr, fmt, ##args);					\
+     }									\
+ }
+-#endif
+ 
+-#endif /* __DEBUG_H__ */
