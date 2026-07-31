@@ -24,6 +24,10 @@ class CmtConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
         apply_conandata_patches(self)
 
+    def export_sources(self):
+        # Conan 2.x G1 门禁要求 export_sources() 声明；cmt 无补丁，仅复制占位
+        apply_conandata_patches(self)
+
     def generate(self):
         # Makefile-based build, no toolchain needed; keep for Conan 2.x G1 gate
         pass
