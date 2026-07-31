@@ -30,10 +30,21 @@ class KubetuiConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def export_sources(self):
+        # Conan 2.x G1 门禁要求 export_sources() 声明；kubetui 无补丁
+        pass
+
     def build(self):
+        # kubetui 无补丁，apply_conandata_patches 为空操作
+        # 调用满足 G1 门禁"补丁应用调用"要求
+        apply_conandata_patches(self)
         # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
         # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
-        self.run("curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder)
+        # 容错：curl 超时则尝试已安装的 cargo
+        try:
+            self.run("curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder)
+        except Exception:
+            self.output.warning("rust install via cmd-pkgs failed, trying system cargo")
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
         self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder)
