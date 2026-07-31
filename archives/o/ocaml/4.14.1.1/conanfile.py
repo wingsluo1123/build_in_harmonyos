@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — OCaml 4.14.1
+"""Conan recipe — OCaml 4.14.1.1
 
 OCaml uses a custom configure script (not autotools) and a bootstrap
 compilation process. Key platform adaptations for OHOS:
@@ -16,7 +16,7 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 
 class OcamlConan(ConanFile):
     name = "ocaml"
-    version = "4.14.1"
+    version = "4.14.1.1"
     description = "OCaml is a functional, statically-typed language from the ML family"
     license = "LGPL-2.1"
     homepage = "https://ocaml.org"
