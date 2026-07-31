@@ -13,6 +13,9 @@
   目录下缺少这些源码子目录而导致 `cd include` 失败。
 - 构建产物：静态 wide-character 库 `formw`、`menuw`、`panelw`、`ncursesw`。
 - 关键配置：`--enable-widec`、`--enable-overwrite`、`--without-shared`。
+- `configure` 显式传入 `--srcdir=${source_folder}`，避免 OHOS CI 上
+  ncurses 自动推导 `srcdir` 后在 `include/Makefile` 中生成异常
+  `$(srcdir)/Caps` 路径，导致 `curses.h` 依赖找不到 `Caps`。
 - 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
 - 构建阶段用 `replace_in_file` 让 `config.guess/config.sub` 识别 OHOS 三元组。
 - 在 `source()` 阶段将上游 `configure` 中的 `umask 077` 调整为 `umask 022`，

@@ -104,6 +104,7 @@ class NcursesConan(ConanFile):
         tc = AutotoolsToolchain(self)
         tc.configure_args.extend(
             [
+                f"--srcdir={self.source_folder}",
                 "--without-debug",
                 "--without-ada",
                 "--without-cxx",
