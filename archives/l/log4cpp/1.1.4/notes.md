@@ -18,6 +18,11 @@
 
 The official SourceForge tarball was downloaded and SHA256-verified as
 `696113659e426540625274a8b251052cc04306d8ee5c42a0c7639f39ca90c9d6`.
+It contains a single `log4cpp/` top-level directory. The recipe explicitly
+uses `strip_root=False`, so `CMakeLists.txt`, `include/`, and the generated
+`include/log4cpp/config.h` are addressed under
+`self.source_folder/log4cpp`. This was verified in the Conan source cache
+before running the consumer test.
 
 Native validation environment:
 

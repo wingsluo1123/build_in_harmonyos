@@ -36,7 +36,9 @@ class Log4cppConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # The official tarball contains a single log4cpp/ source directory.
+        # Keep it explicitly so every path below maps to the extracted tree.
+        get(self, **self.conan_data["sources"], strip_root=False)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -110,7 +112,7 @@ class Log4cppConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        copy(self, "config.h", src=f"{self.source_folder}/log4cpp/include/log4cpp", dst=f"{self.package_folder}/include/log4cpp")
+        copy(self, "config.h", src=os.path.join(self.source_folder, "log4cpp", "include", "log4cpp"), dst=os.path.join(self.package_folder, "include", "log4cpp"))
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "log4cpp")
