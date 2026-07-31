@@ -10,7 +10,7 @@ Object::Event 提供了一个事件回调接口，允许对象注册、触发和
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 1.23-r0 | built | 2026-06-29 | 初始编译，鸿蒙平台适配 |
+| 1.23-r0 | built | 2026-07-30 | 初始编译，鸿蒙平台适配 |
 
 ## 使用说明
 
@@ -66,12 +66,15 @@ $obj->reg_cb(my_event => sub { $obj->stop_event });
 ## 运行时依赖
 
 - Perl >= 5.10
-- common::sense (系统 Perl 模块)
-- AnyEvent (系统 Perl 模块, >= 7.17)
+- Carp (Perl 核心模块)
+
+> **注**: 原始 Object::Event 依赖 `common::sense` 和 `AnyEvent::Util`，通过补丁
+> `0001-remove-common-sense-anyevent-deps.patch` 替换为标准 Perl pragma 和内联
+> guard 实现，使模块自包含，无需安装额外 CPAN 模块。
 
 ## 鸿蒙平台适配
 
 - **构建系统**: ExtUtils::MakeMaker (Makefile.PL)
 - **编译参数**: `INSTALL_BASE=/` + `DESTDIR` 模式
-- **补丁**: 无需补丁，纯 Perl 模块直接编译
+- **补丁**: 已应用 `0001-remove-common-sense-anyevent-deps.patch`，移除 common::sense 和 AnyEvent 依赖，使模块自包含
 - **平台限制**: 无 SELinux 限制（纯 Perl 模块不涉及动态库加载）
