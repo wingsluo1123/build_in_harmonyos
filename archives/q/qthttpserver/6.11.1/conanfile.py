@@ -11,7 +11,11 @@ import tempfile
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+from conan.tools.files import (
+    apply_conandata_patches,
+    export_conandata_patches,
+    get,
+)
 
 
 class QtHttpServerConan(ConanFile):
@@ -30,6 +34,9 @@ class QtHttpServerConan(ConanFile):
 
     def layout(self):
         cmake_layout(self)
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -55,9 +62,11 @@ class QtHttpServerConan(ConanFile):
         tc.generate()
 
     def build(self):
+        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        self._point_module_includes_at_qt6()
         qtbase_prefix = self.dependencies["qtbase-gui"].package_folder
         qt_libs = os.path.join(qtbase_prefix, "lib")
         qt_plugins = os.path.join(qtbase_prefix, "plugins", "platforms")
@@ -73,6 +82,36 @@ class QtHttpServerConan(ConanFile):
             env="conanbuild",
             ignore_errors=False,
         )
+
+    def _point_module_includes_at_qt6(self):
+        """Let the upstream module_includes CMake self-test locate Qt6.
+
+        The generated build_and_test wrapper configures a sub-build whose Qt
+        package lookups use NO_DEFAULT_PATH, so CMAKE_PREFIX_PATH alone is
+        ignored.  qtbase-gui's Qt6Config.cmake must be reachable through
+        QT_BUILD_CMAKE_PREFIX_PATH instead.
+        """
+        wrapper = os.path.join(
+            self.build_folder,
+            "tests",
+            "auto",
+            "cmake",
+            "build_and_test_module_includes.cmake",
+        )
+        if not os.path.isfile(wrapper):
+            return
+        with open(wrapper, "r", encoding="utf-8") as handle:
+            content = handle.read()
+        marker = '"--build-options"'
+        if marker not in content or "QT_BUILD_CMAKE_PREFIX_PATH" in content:
+            return
+        qtbase_prefix = self.dependencies["qtbase-gui"].package_folder
+        content = content.replace(
+            marker,
+            marker + ' "-DQT_BUILD_CMAKE_PREFIX_PATH={}"'.format(qtbase_prefix),
+        )
+        with open(wrapper, "w", encoding="utf-8") as handle:
+            handle.write(content)
 
     def package(self):
         cmake = CMake(self)
