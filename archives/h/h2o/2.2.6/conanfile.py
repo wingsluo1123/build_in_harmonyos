@@ -2,6 +2,7 @@
 """Conan recipe for the H2O HTTP server 2.2.6 on OpenHarmony."""
 
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import get
 from conan.tools.gnu import PkgConfigDeps
@@ -25,6 +26,10 @@ class H2OConan(ConanFile):
         self.requires("openssl/3.5.6")
         self.requires("zlib/1.3.1")
 
+    def build_requirements(self):
+        # The upstream `check` target invokes Perl's prove runner.
+        self.tool_requires("perl/5.42.2")
+
     def layout(self):
         cmake_layout(self, src_folder=".")
 
@@ -46,7 +51,8 @@ class H2OConan(ConanFile):
         cmake.configure()
         cmake.build()
         # H2O's upstream test entry is the custom CMake `check` target.
-        cmake.build(target="check")
+        if can_run(self):
+            cmake.build(target="check")
 
     def package(self):
         CMake(self).install()
