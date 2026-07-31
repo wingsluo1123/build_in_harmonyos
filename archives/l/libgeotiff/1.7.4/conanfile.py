@@ -55,6 +55,11 @@ class LibgeotiffConan(ConanFile):
         for _c in list(ut) + ([os.path.join(ndk, "build/cmake/ohos.toolchain.cmake")] if ndk else []):
             if _c and os.path.isfile(_c):
                 return _c
+        _sdk = os.environ.get("OHOS_SDK_HOME", "")
+        if _sdk:
+            _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
+            if os.path.isfile(_tc):
+                return _tc
         _g = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
         if _g:
             return _g[-1]
@@ -164,8 +169,9 @@ class LibgeotiffConan(ConanFile):
         sos += glob.glob(os.path.join(libdir, "**", "*.so.*"), recursive=True)
         if not sos:
             return
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
+        objcopy = os.path.join(_tools_dir, "llvm-objcopy")
+        signer = os.path.join(_tools_dir, "binary-sign-tool")
         if not os.path.isfile(signer):
             self.output.warn("binary-sign-tool not found, skipping .so signing")
             return

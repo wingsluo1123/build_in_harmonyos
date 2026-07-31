@@ -49,6 +49,11 @@ class ProjConan(ConanFile):
         for cand in candidates:
             if cand and os.path.isfile(cand):
                 return cand
+        _sdk = os.environ.get("OHOS_SDK_HOME", "")
+        if _sdk:
+            _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
+            if os.path.isfile(_tc):
+                return _tc
         globbed = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
         if globbed:
             return globbed[-1]
@@ -124,14 +129,19 @@ class ProjConan(ConanFile):
             "-DENABLE_TIFF=OFF",
             "-DBUILD_PROJSYNC=OFF",
             "-DNLOHMANN_JSON=internal",
-            '-DCMAKE_AR=/data/service/hnp/bin/llvm-ar',
-            '-DCMAKE_RANLIB=/data/service/hnp/bin/llvm-ranlib',
             '-DSQLITE3_INCLUDE_DIR="{}"'.format(os.path.join(sqlite_pkg, "include")),
             '-DSQLITE3_LIBRARY="{}"'.format(sqlite_lib),
             '-DTIFF_INCLUDE_DIR="{}"'.format(os.path.join(tiff_pkg, "include")),
             '-DTIFF_LIBRARY="{}"'.format(tiff_lib),
             '-DCMAKE_PREFIX_PATH="{};{}"'.format(tiff_pkg, xz_pkg),
         ])
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
+        _llvm_ar = os.path.join(_tools_dir, "llvm-ar")
+        _llvm_ranlib = os.path.join(_tools_dir, "llvm-ranlib")
+        if os.path.isfile(_llvm_ar):
+            defs += ' -DCMAKE_AR="{}"'.format(_llvm_ar)
+        if os.path.isfile(_llvm_ranlib):
+            defs += ' -DCMAKE_RANLIB="{}"'.format(_llvm_ranlib)
         if sqlite3_bin:
             defs += ' -DEXE_SQLITE3="{}"'.format(sqlite3_bin)
 
@@ -163,8 +173,9 @@ class ProjConan(ConanFile):
                 p = os.path.join(bindir, name)
                 if os.path.isfile(p) and not os.path.islink(p) and self._is_elf(p):
                     targets.append(p)
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
+        objcopy = os.path.join(_tools_dir, "llvm-objcopy")
+        signer = os.path.join(_tools_dir, "binary-sign-tool")
         if not os.path.isfile(signer):
             self.output.warn("binary-sign-tool not found, skipping ELF signing")
             return
