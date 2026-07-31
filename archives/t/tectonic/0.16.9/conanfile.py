@@ -31,6 +31,7 @@ class TectonicConan(ConanFile):
     homepage = "https://tectonic-typesetting.github.io/"
     url = ""
 
+    package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
 
     # Force ALL C/C++ dependencies to static linking so the tectonic binary
@@ -183,10 +184,17 @@ class TectonicConan(ConanFile):
         # external-harfbuzz: use system harfbuzz instead of git submodule
         self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
         # L1: Run upstream official test suite (cargo test)
-        # Some integration tests require network/TeX environment
+        # Some integration tests require network/TeX environment,
+        # but compilation errors indicate real regressions and must not be silently swallowed
+        test_log = os.path.join(self.build_folder, "cargo_test.log")
         try:
-            self.run("cargo test --release", cwd=self.source_folder)
+            self.run(f"cargo test --release > {test_log} 2>&1", cwd=self.source_folder)
         except ConanException:
+            with open(test_log, "r") as f:
+                log_content = f.read()
+            # Re-raise if compilation errors detected (indicates real regression, not test failure)
+            if "could not compile" in log_content or "error[E" in log_content:
+                raise
             self.output.warning("cargo test had failures (some tests require network/TeX environment)")
 
     def _patch_pc_files_for_static(self, gen_folder):

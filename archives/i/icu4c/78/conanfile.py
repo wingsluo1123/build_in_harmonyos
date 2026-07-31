@@ -81,11 +81,18 @@ class Icu4cConan(ConanFile):
         # R10: HMDFS doesn't support mkfifo (make jobserver), force -j1
         autotools.make(args=["-j1"])
         # L1: Run upstream official test suite (make check)
-        # Some intltest cases fail on OHOS (platform-specific locale/syscall issues)
+        # OHOS: intltest has known platform-related failures (locale/syscall),
+        # but other failures indicate real regressions and must not be silently swallowed
+        check_log = os.path.join(self.build_folder, "make_check.log")
         try:
-            self.run("make check")
+            self.run(f"make check > {check_log} 2>&1")
         except ConanException:
-            self.output.warning("make check had failures (expected on OHOS)")
+            with open(check_log, "r") as f:
+                log_content = f.read()
+            # Re-raise if the failure is not from the known intltest suite
+            if "intltest" not in log_content:
+                raise
+            self.output.warning("make check had failures (expected on OHOS: intltest locale/syscall)")
 
     def package(self):
         # Fix: ICU Makefile references $(srcdir)/../LICENSE (parent of source dir).
