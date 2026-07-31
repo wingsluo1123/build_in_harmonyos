@@ -11,7 +11,7 @@ homepage: "https://www.percona.com/"
 
 upstream_check_command: "ctest --test-dir build/Release --output-on-failure; perl mysql-test-run.pl --suite=main --do-test=1st"
 upstream_test_in_build: false
-upstream_test_command: "attempted on OHOS real device; not executed to completion because client-only build has no server test binaries and device has no perl"
+upstream_test_command: "attempted on OHOS real device; not executed to completion because client-only build has no server test binaries and device has no system perl or cached Conan perl package"
 
 upstream_tests:
   - suite: "unit/ctest"
@@ -20,7 +20,7 @@ upstream_tests:
     result: "not_applicable"
     reason: "WITHOUT_SERVER=ON configures no CTest tests for the client-only build"
   - suite: "MTR/mysql-test"
-    discovered: 1666
+    discovered: 1961
     executed: 0
     result: "blocked"
     reason: "mysql-test-run.pl requires perl and server-side binaries (mysqld/mysqltest), which are absent in the OHOS client-only build"
@@ -28,9 +28,9 @@ upstream_tests:
 upstream_test_exemption:
   reason: "This Conan package intentionally builds only libperconaserverclient for downstream client consumers; Percona/MySQL MTR and server-side unit suites validate the full server product and are outside this package scope."
   attempted_on: "OHOS aarch64 real device currentUser@frp-tip.com:33332"
-  log_dir: "/storage/Users/currentUser/ohos-users/windrel/percona-upstream-test-20260731-204253"
+  log_dir: "/storage/Users/currentUser/ohos-users/windrel/percona-pr3042-precheck-20260731-205447"
   ctest_result: "ctest -N: Total Tests: 0; ctest run: No tests were found"
-  mtr_result: "mysql-test-run.pl exists; execution failed before running tests because perl is unavailable, and mysqld/mysqltest are absent due to WITHOUT_SERVER=ON"
+  mtr_result: "mysql-test-run.pl exists; execution failed before running tests because system perl and cached Conan perl are unavailable, and mysqld/mysqltest are absent due to WITHOUT_SERVER=ON"
 
 test_package_tests:
   - file: test_client.c
