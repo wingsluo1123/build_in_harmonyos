@@ -36,15 +36,57 @@
 
 ## 验证结果
 
-```bash
-# meek-client 无环境变量运行，预期输出 ENV-ERROR 并退出码 1
-meek-client 2>/dev/null
-# 输出: ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER
+### 编译验证（2026-07-31 本地交叉编译）
 
-# meek-server 无环境变量运行，预期输出 ENV-ERROR 并退出码 1
-meek-server 2>/dev/null
-# 输出: ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER
+构建环境：Go 1.23.4 windows/amd64 → linux/arm64 交叉编译
+
 ```
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+  go build -trimpath -ldflags "-s -w" -o meek-client ./meek-client
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+  go build -trimpath -ldflags "-s -w" -o meek-server ./meek-server
+```
+
+编译产物：
+- meek-client: 6,684,824 bytes (6.38 MB)
+- meek-server: 6,619,288 bytes (6.31 MB)
+
+ELF 头验证（meek-client）：
+- ELF magic: 7f 45 4c 46 ✓
+- EI_CLASS: 2 (64-bit) ✓
+- EI_DATA: 1 (Little Endian) ✓
+- e_type: 0x0002 (ET_EXEC 可执行文件) ✓
+- e_machine: 0x00b7 (183 = EM_AARCH64) ✓
+
+### 上游测试用例验证（go test）
+
+共 6 个测试文件，16 个测试函数，全部通过（16/16 = 100%）：
+
+meek-client (9/9 PASS):
+- TestMakeProxySpec PASS
+- TestAddrForDial PASS
+- TestProxyHTTPCONNECT PASS
+- TestProxyHTTPProxyAuthorization PASS
+- TestProxyHTTPSCONNECT PASS
+- TestNewUTLSRoundTripperCase PASS
+- TestUTLSClientHello PASS
+- TestUTLSServerName PASS
+- TestUTLSHTTPWithProxy PASS
+
+meek-server (6/6 PASS):
+- TestNewCertContext PASS
+- TestDelete PASS
+- TestReplace PASS
+- TestOriginalClientIPRemoteAddr PASS
+- TestOriginalClientXForwardedFor PASS
+- TestOriginalClientPrecedence PASS
+
+meek-client-torbrowser (1/1 PASS):
+- TestGrepHelperAddr PASS
+
+### 二进制运行验证（预期 ENV-ERROR）
+
+meek-client/meek-server 无环境变量运行时输出 ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER 并退出码 1（需 HarmonyOS 真机验证，交叉编译产物为 arm64 ELF 无法在 Windows 运行）。
 
 ## 注意事项
 
