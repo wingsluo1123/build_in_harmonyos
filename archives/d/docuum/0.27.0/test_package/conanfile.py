@@ -4,10 +4,10 @@ import os
 
 class DocuumTestPkgConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "VirtualRunEnv"
 
     def requirements(self):
-        self.requires(self.tested_library_str)
+        self.requires(self.tested_reference_str)
 
     def build(self):
         pass
