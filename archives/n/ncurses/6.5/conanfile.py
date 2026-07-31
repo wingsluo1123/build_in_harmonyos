@@ -26,7 +26,8 @@ class NcursesConan(ConanFile):
             raise ConanInvalidConfiguration("ncurses supports Linux and OHOS")
 
     def layout(self):
-        basic_layout(self)
+        basic_layout(self, src_folder=".")
+        self.folders.build = "."
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)

@@ -7,6 +7,10 @@
 ## 配方说明
 
 - 构建系统：Autotools。
+- ncurses 6.5 的 `configure`/`config.status` 依赖源码树内的
+  `include/`、`ncurses/`、`panel/`、`menu/`、`form/`、`misc/` 等目录生成
+  Makefile；配方使用 in-source build，避免 out-of-tree `build-release`
+  目录下缺少这些源码子目录而导致 `cd include` 失败。
 - 构建产物：静态 wide-character 库 `formw`、`menuw`、`panelw`、`ncursesw`。
 - 关键配置：`--enable-widec`、`--enable-overwrite`、`--without-shared`。
 - 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
