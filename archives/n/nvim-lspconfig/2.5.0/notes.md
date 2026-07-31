@@ -20,6 +20,10 @@ The OHOS runner used here does not provide `nvim` or `vusted`. The local
 and executes Python assertions against the same upstream spec fixtures and
 behavior inputs.
 
+This adapted Python verification is not counted as an upstream Vusted test
+pass. Actual upstream test execution result for this package is `0/9`: the
+upstream `vusted ./test` command was not run in the OHOS runner.
+
 ## OHOS notes
 
 No native code is compiled. Runtime use still requires a target Neovim
@@ -46,3 +50,6 @@ Validated on the new OHOS device port `33332` with isolated job
 - Test evidence: `test_package` ran
   `test_nvim_lspconfig.py` and printed
   `nvim-lspconfig upstream spec cases and runtime files are packaged`.
+- Upstream test result: `0/9` actual upstream Vusted tests executed; the
+  package-level Python checks are recorded separately as adapted consumer
+  validation.
