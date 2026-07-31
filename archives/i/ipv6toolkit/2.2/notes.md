@@ -5,7 +5,7 @@
 - 编译日期: 2026-06-16
 - 编译器: clang 15.0.4 (OHOS SDK)
 - 平台: HarmonyOS aarch64, musl libc
-- 状态: published
+- 状态: built
 - 源码 URL: https://github.com/fgont/ipv6toolkit/archive/refs/tags/v2.2.tar.gz
 
 ## 编译步骤
@@ -15,7 +15,7 @@
 1. **编译**:
    ```bash
    make PREFIX=/storage/Users/currentUser/usr/local CC=clang \
-     CFLAGS="-Wall -Wno-address-of-packed-member -Wno-missing-braces -fPIC -O2 -D__OHOS__" \
+     CFLAGS="-Wall -Wno-address-of-packed-member -Wno-missing-braces -fPIC -O2" \
      CPPFLAGS="-I/storage/Users/currentUser/usr/local/include" \
      LDFLAGS="-lpcap -lm -L/storage/Users/currentUser/usr/local/lib" -j1
    ```
@@ -102,7 +102,7 @@ addr6 -a ff02::1 -q  →  ff02::1 ✅
 2. script6 是 Perl 脚本，需要 Net::IP 模块（未安装）
 3. blackhole6/messi/script6 是脚本文件而非编译产物
 4. 配置文件 ipv6toolkit.conf 中数据路径已硬编码为 `$DEFAULT_PREFIX/share/ipv6toolkit/`（运行时路径正确）
-5. `__OHOS__` 宏需要在编译时通过 CFLAGS 显式定义（`-D__OHOS__`），编译器不会自动定义
+5. 补丁通过 `#ifdef _SYS_SOCKET_H` 特性检测预定义 `_UAPI_LINUX_SOCKET_H` guard 跳过冲突头文件，不使用 `__OHOS__` 平台宏（R8 合规）
 
 **编译结束**: 2026-06-16
 **最终状态**: published

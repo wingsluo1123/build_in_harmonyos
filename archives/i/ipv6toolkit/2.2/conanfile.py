@@ -3,9 +3,9 @@
 
 Builds 16 C tools (addr6/scan6/frag6/icmp6/etc.) and 2 shell scripts
 (blackhole6/messi) plus 1 Perl script (script6) using the upstream
-GNUmakefile. On HarmonyOS the -D__OHOS__ flag activates a platform guard
-in libipv6.c that avoids a sockaddr_storage redefinition conflict between
-linux/socket.h and sys/socket.h (patch 0001).
+GNUmakefile. Patch 0001 uses POSIX feature detection (_SYS_SOCKET_H)
+to avoid a sockaddr_storage redefinition conflict between linux/socket.h
+and sys/socket.h on OHOS musl, without platform-specific macros (R8).
 """
 import os
 
@@ -51,11 +51,7 @@ class Ipv6toolkitConan(ConanFile):
         pcap_inc = " ".join(f"-I{d}" for d in pcap_info.includedirs)
         pcap_lib = " ".join(f"-L{d}" for d in pcap_info.libdirs)
 
-        # CFLAGS: -D__OHOS__ activates the platform guard in libipv6.c
-        # (patch 0001: avoids sockaddr_storage redefinition conflict).
         cflags = "-Wall -Wno-address-of-packed-member -Wno-missing-braces -fPIC -O2"
-        if self.settings.os == "OHOS":
-            cflags += " -D__OHOS__"
         ldflags = f"{pcap_lib} -lpcap -lm"
 
         # R9: always -j1.
