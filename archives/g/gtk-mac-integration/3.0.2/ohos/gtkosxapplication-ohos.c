@@ -178,7 +178,8 @@ void gtkosx_application_set_use_quartz_accelerators(
 
 gboolean gtkosx_application_use_quartz_accelerators(GtkosxApplication *self)
 {
-    return self != NULL && self->use_quartz_accelerators;
+    g_return_val_if_fail(GTKOSX_IS_APPLICATION(self), FALSE);
+    return self->use_quartz_accelerators;
 }
 
 void gtkosx_application_set_menu_bar(
