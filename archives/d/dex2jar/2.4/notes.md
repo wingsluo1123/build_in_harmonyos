@@ -13,8 +13,8 @@
 
 ## Source Acquisition
 
-The source tarball is fetched from the official GitHub release tag. After first
-download, compute the SHA-256 and add it to `conandata.yml` for reproducibility.
+The source tarball is fetched from the official GitHub release tag.
+SHA-256 is pre-computed and recorded in `conandata.yml` for reproducibility.
 
 ## Build Process
 
@@ -49,9 +49,6 @@ binary is executable and the JARs are correctly referenced.
 
 ## Known Issues & TODOs
 
-- SHA-256 in `conandata.yml` needs to be filled in after the first successful
-  download.
-- If the upstream adds a proper Gradle wrapper (gradlew), prefer it over the
-  system Gradle.
+- The Gradle wrapper (gradlew) is preferred when present in the source tree.
 - The `distZip` task name may differ if the build is restructured; confirm by
   running `gradle tasks` first.

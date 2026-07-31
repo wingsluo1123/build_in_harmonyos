@@ -24,8 +24,9 @@ class Dex2JarConan(ConanFile):
         get(self, src_data["url"], strip_root=True)
 
     def build(self):
-        # Use the Gradle wrapper if available, otherwise system gradle
-        gradle_cmd = "gradlew" if os.path.exists("gradlew") else "gradle"
+        # Use the Gradle wrapper if available, otherwise system gradle.
+        # Check in source_folder (CWD is build_folder in Conan 2.x).
+        gradle_cmd = "gradlew" if os.path.exists(os.path.join(self.source_folder, "gradlew")) else "gradle"
         if gradle_cmd == "gradlew" and os.name == "nt":
             gradle_cmd = "gradlew.bat"
 
@@ -40,7 +41,7 @@ class Dex2JarConan(ConanFile):
             raise ConanException(f"Expected distribution zip not found: {zip_path}")
 
         # Extract the zip into the source folder
-        self.run(f"cd {self.source_folder} && unzip -o {zip_path}")
+        self.run(f'cd "{self.source_folder}" && unzip -o "{zip_path}"')
         extract_dir = os.path.join(self.source_folder, dist_name)
 
         # Copy bin/ and lib/ into the package folder
