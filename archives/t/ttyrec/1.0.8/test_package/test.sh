@@ -10,7 +10,7 @@ trap 'rm -f "$TMPFILE" "${_TMPDIR}/test_prog"' EXIT
 
 # Compile and run test.c to verify it works
 echo "[step] compile and run test.c"
-clang -o "$_TMPDIR/test_prog" "$(dirname "$0")/test.c"
+"${CC:-clang}" -o "$_TMPDIR/test_prog" "$(dirname "$0")/test.c"
 "$_TMPDIR/test_prog" && echo "        [ok] test.c compiled and executed"
 
 # Create a minimal ttyrec recording (2 records)
