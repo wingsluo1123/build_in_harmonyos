@@ -36,9 +36,6 @@ class DebianutilsConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
-    def requirements(self):
-        pass
-
     def layout(self):
         basic_layout(self)
 
