@@ -28,13 +28,13 @@ class GitWhoTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if cross_building(self):
-            self.output.info("cross-building: 编译验证通过，跳过运行时测试")
-            return
         bin_path = os.path.join(self.dependencies["git-who"].package_folder,
                                 "bin", "git-who")
         if not os.path.exists(bin_path):
             raise Exception(f"git-who binary not found: {bin_path}")
+        if cross_building(self):
+            self.output.info("cross-building: 编译验证通过，跳过运行时测试")
+            return
         # Run the compiled test binary (verifies git-who --help)
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_git_who")
         self.run(f'"{test_bin}"', env="conanrun")
