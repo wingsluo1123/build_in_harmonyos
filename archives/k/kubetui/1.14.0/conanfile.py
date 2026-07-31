@@ -37,11 +37,13 @@ class KubetuiConan(ConanFile):
 
     def build(self):
         # Rust 工具链通过 cmd-pkgs 预编译包安装（E154 知识条目）
-        # cargo build --release 生成单二进制
-        self.run("cargo build --release", cwd=self.source_folder)
+        # cargo build --release 默认编为宿主架构（CI x86_64），
+        # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
+        self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder)
 
     def package(self):
-        copy(self, "kubetui", src=os.path.join(self.source_folder, "target", "release"),
+        copy(self, "kubetui",
+             src=os.path.join(self.source_folder, "target", "aarch64-unknown-linux-ohos", "release"),
              dst=os.path.join(self.package_folder, "bin"))
 
     def package_info(self):
