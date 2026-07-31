@@ -31,6 +31,10 @@ class GitWhoConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"git-who {self.version} only supports Linux and OHOS, got os={self.settings.os}")
 
+    def requirements(self):
+        # CI 环境无 go 命令，依赖 go 工具链包（同 gosec 等已发布 Go 项目）
+        self.requires("go/1.26.4")
+
     def layout(self):
         basic_layout(self)
 
