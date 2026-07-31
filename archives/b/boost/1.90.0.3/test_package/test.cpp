@@ -1,5 +1,6 @@
 #include <boost/atomic.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/beast/core/static_string.hpp>
 #include <boost/chrono.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/program_options.hpp>
@@ -36,6 +37,10 @@ int main(int argc, char** argv) {
     const boost::filesystem::path composed = boost::filesystem::path("boost") / name;
     if (composed.generic_string() != "boost/" + name) {
         throw std::runtime_error("filesystem path composition failed");
+    }
+    const boost::beast::static_string<16> beast_name(name);
+    if (beast_name != name) {
+        throw std::runtime_error("beast static string construction failed");
     }
     const boost::system::error_code ok;
     if (ok) {

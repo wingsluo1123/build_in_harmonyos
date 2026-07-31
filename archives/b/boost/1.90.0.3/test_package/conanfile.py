@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Conan test_package for Boost 1.90.0.1 compiled components."""
+"""Conan test_package for Boost 1.90.0.3 compiled components."""
 
 import os
 
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.env import VirtualRunEnv
 
 
 class BoostCompiledTestConan(ConanFile):
@@ -22,6 +23,7 @@ class BoostCompiledTestConan(ConanFile):
         tc.cache_variables["CMAKE_FIND_PACKAGE_PREFER_CONFIG"] = True
         tc.generate()
         CMakeDeps(self).generate()
+        VirtualRunEnv(self).generate()
 
     def build(self):
         cmake = CMake(self)
@@ -32,5 +34,8 @@ class BoostCompiledTestConan(ConanFile):
         if not can_run(self):
             self.output.warning("Skipping Boost compiled component runtime test while cross-building")
             return
-        test_binary = os.path.join(self.cpp.build.bindirs[0], "test_boost_compiled")
+        suffix = ".exe" if str(self.settings.os) == "Windows" else ""
+        test_binary = os.path.join(
+            self.cpp.build.bindirs[0], f"test_boost_compiled{suffix}"
+        )
         self.run(f'"{test_binary}" --name ohos --count 3', cwd=self.build_folder, env="conanrun")

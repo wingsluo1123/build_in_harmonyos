@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
-"""Conan recipe for Boost 1.90.0.1 compiled components.
+"""Conan recipe for Boost 1.90.0.3 compiled components.
 
 The existing boost/1.90.0 archive is intentionally header-only. This revision
 adds the compiled Boost libraries needed by downstream packages such as
 FastNetMon while keeping the upstream source version at 1.90.0.
 """
 
+import glob
 import os
 import stat
 import sys
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import copy, get
+from conan.tools.build import can_run
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
 
 
 class BoostCompiledConan(ConanFile):
     name = "boost"
-    version = "1.90.0.1"
+    version = "1.90.0.3"
     description = "Boost C++ Libraries 1.90.0 compiled component subset"
     license = "BSL-1.0"
     homepage = "https://www.boost.org/"
@@ -39,12 +41,17 @@ class BoostCompiledConan(ConanFile):
         "thread",
         "timer",
     )
+    _upstream_test_targets = tuple(f"libs/{component}/test" for component in _components)
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def layout(self):
         self.folders.source = "src"
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def _b2_executable(self):
         return "b2.exe" if self.settings.os == "Windows" else "./b2"
@@ -166,6 +173,14 @@ class BoostCompiledConan(ConanFile):
         self._write_ohos_user_config()
         b2_args = " ".join(self._b2_common_args())
         self.run(f"{self._b2_executable()} {b2_args} stage", cwd=self.source_folder)
+        if can_run(self):
+            targets = " ".join(self._upstream_test_targets)
+            self.run(f"{self._b2_executable()} {b2_args} {targets}", cwd=self.source_folder)
+        else:
+            self.output.info(
+                "Skipping upstream Boost runtime tests while cross-building; "
+                "run them on the target before accepting this package"
+            )
 
     def package(self):
         copy(self, "LICENSE_1_0.txt", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
@@ -173,6 +188,11 @@ class BoostCompiledConan(ConanFile):
         self._write_ohos_user_config()
         b2_args = " ".join(self._b2_common_args())
         self.run(f"{self._b2_executable()} {b2_args} --prefix=\"{prefix}\" install", cwd=self.source_folder)
+
+        include_root = os.path.join(self.package_folder, "include", "boost")
+        copy(self, "*", src=os.path.join(self.source_folder, "boost"), dst=include_root)
+        for component_include in glob.glob(os.path.join(self.source_folder, "libs", "*", "include", "boost")):
+            copy(self, "*", src=component_include, dst=include_root)
 
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "Boost")
