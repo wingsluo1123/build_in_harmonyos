@@ -1,3 +1,4 @@
+import base64
 import os
 import stat
 
@@ -17,13 +18,23 @@ class SafekeepConan(ConanFile):
     package_type = "application"
 
     settings = "os", "arch"
-    exports_sources = "safekeep-1.5.1.tar.gz"
+    exports_sources = "safekeep-1.5.1.tar.gz.b64"
 
     def layout(self):
         basic_layout(self, src_folder=".")
 
     def source(self):
         local_archive = os.path.join(self.source_folder, self.conan_data["sources"]["filename"])
+        local_archive_b64 = local_archive + ".b64"
+        if os.path.isfile(local_archive_b64):
+            self.output.info("Using exported safekeep source archive")
+            with open(local_archive_b64, "rb") as handle:
+                archive_data = base64.b64decode(handle.read())
+            with open(local_archive, "wb") as handle:
+                handle.write(archive_data)
+            check_sha256(self, local_archive, self.conan_data["sources"]["sha256"])
+            unzip(self, local_archive, strip_root=True)
+            return
         if os.path.isfile(local_archive):
             self.output.info("Using exported safekeep source archive")
             check_sha256(self, local_archive, self.conan_data["sources"]["sha256"])
