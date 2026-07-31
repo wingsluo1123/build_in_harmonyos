@@ -54,9 +54,11 @@
 
 ## 测试结果
 
-test_package 验证 libedit history API（history_init/H_ADD/H_LAST/history_end）成功。
+test_package 验证 libedit history API（history_init/H_ENTER/H_ADD/history_end）成功。
 
 ---
 
 **编译结束**: 2026-04-29 20:28
+**最终状态**: built
+0:28
 **最终状态**: built

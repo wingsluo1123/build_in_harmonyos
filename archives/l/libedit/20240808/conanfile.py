@@ -44,7 +44,6 @@ class LibeditConan(ConanFile):
             tc.extra_cflags.append("-I" + self.source_folder)
             # HarmonyOS: wchar_t stores ISO 10646 but __STDC_ISO_10646__ not defined
             tc.extra_cflags.append("-D__STDC_ISO_10646__=201206L")
-        tc.extra_ldflags.append("-L" + lib_dir)
         tc.generate()
 
     def build(self):

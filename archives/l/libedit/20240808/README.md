@@ -80,6 +80,16 @@ make install
 **目的**: 修复 build-aux 脚本 shebang 兼容性
 **修改文件**: `depcomp`、`install-sh`、`missing`
 
+### 0009-termcap.h.patch
+**目的**: 为 HarmonyOS 提供最小 termcap.h 声明（系统无 ncurses/termcap 头文件）
+**修改文件**: 新增 `termcap.h`
+**关键修改**: 声明 `tgetent`/`tgetflag`/`tgetnum`/`tgetstr`/`tgoto`/`tputs`/`tparam` 函数，链接系统 `libtinfo.so.6`
+
+### 0010-configure-umask.patch
+**目的**: 修复 HMDFS 文件系统权限问题
+**修改文件**: `configure`
+**关键修改**: 将临时目录创建的 `umask 077` 改为 `umask 022`，解决 config.status 无法写入临时文件的问题
+
 ## 遇到的问题
 
 ### 问题1: config.status 无法创建临时子目录

@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <wchar.h>
 #include <histedit.h>
 
 int main(void) {
@@ -14,7 +13,7 @@ int main(void) {
     HistEvent ev;
 
     /* Test 2: Enter a history entry (H_ENTER adds and returns entry number) */
-    int rc = history(hist, &ev, H_ENTER, L"test command");
+    int rc = history(hist, &ev, H_ENTER, "test command");
     if (rc == -1) {
         fprintf(stderr, "FAIL: history(H_ENTER) returned -1\n");
         history_end(hist);
@@ -29,7 +28,7 @@ int main(void) {
     }
 
     /* Test 3: Add another entry */
-    rc = history(hist, &ev, H_ADD, L"second command");
+    rc = history(hist, &ev, H_ADD, "second command");
     if (rc == -1) {
         fprintf(stderr, "FAIL: history(H_ADD) returned -1\n");
         history_end(hist);
