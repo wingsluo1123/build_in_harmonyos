@@ -41,7 +41,15 @@ int main(void) {
 
     xmlChar *out = NULL;
     int len = 0;
-    xsltSaveResultToString(&out, &len, result, stylesheet);
+    if (xsltSaveResultToString(&out, &len, result, stylesheet) < 0) {
+        fprintf(stderr, "Failed to serialize result\n");
+        xmlFreeDoc(result);
+        xsltFreeStylesheet(stylesheet);
+        xmlFreeDoc(doc);
+        xsltCleanupGlobals();
+        xmlCleanupParser();
+        return 1;
+    }
     if (out && strstr((char *)out, "morpheus-xslt-ok")) {
         printf("OK: %s\n", (char *)out);
         xmlFree(out);
