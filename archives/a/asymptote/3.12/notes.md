@@ -76,3 +76,18 @@ functional coverage against the upstream surface.
 
 **编译结束**: 2026-07-17
 **最终状态**: built
+
+---
+
+## Vulkan 编译修复记录
+
+**问题**: configure 检测不到 vulkan.hpp 时, Makefile 仍会编译
+thirdparty_impl/vk-mem-allocator_impl (vma_cxx.cc), 导致
+`fatal error: vulkan/vulkan.hpp file not found`.
+
+**修复**: OHOS 平台 configure 增加 `--disable-vulkan` 参数。
+configure.ac 中该参数会令 VMA_IMPL_FILES 为空, Makefile 不再编译
+vk-mem-allocator_impl。同步使用 `--disable-gl`/`--disable-lsp`
+替代无效的 `--disable-opengl`。
+
+**验证**: CI 在 aarch64-unknown-linux-ohos 上重新构建通过后确认。
