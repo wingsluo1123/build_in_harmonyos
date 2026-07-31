@@ -48,7 +48,7 @@ cmake --build build --target perconaserverclient -- -j1
 - Boost: 1.77.0 头文件（archives.boost.io，适配时预取）
 
 ## 注意事项
-- `source()` 中对上游 CMake 做最小定点调整：client-only 构建缺失 editline/curses 时降为 warning，缺失 DNS SRV resolver API 时提供 unsupported stub，并在 OHOS 上将缺失的 pthread_cancel 包装为 no-op，并修正 get_password.cc 中 my_read 的 uchar 缓冲区类型。
+- `source()` 中对上游 CMake 做最小定点调整：client-only 构建缺失 editline/curses 时降为 warning，缺失 DNS SRV resolver API 时提供 unsupported stub，并通过 HAVE_PTHREAD_CANCEL 功能宏在缺失 pthread_cancel 时包装为 no-op，并修正 get_password.cc 中 my_read 的 uchar 缓冲区类型。
 - percona-server 源码包很大 (~455MB)，CI 下载需要较长时间
 - 预取 Boost 1.77.0 头文件，避免上游 JFrog 下载地址返回非归档内容导致 CMake 解包失败
 - 通过 OPENSSL_ROOT_DIR / ZLIB_ROOT 显式指定依赖路径，避免 CMake find 失败
