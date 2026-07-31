@@ -30,7 +30,6 @@ class StkConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         shared = bool(self.options.shared)
-        tc.variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.variables["BUILD_SHARED"] = shared
         tc.variables["BUILD_STATIC"] = not shared
         tc.variables["REALTIME"] = False
@@ -39,7 +38,11 @@ class StkConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        # CMake >= 4.0 removes compatibility with cmake_minimum_required(<3.5).
+        # CMAKE_POLICY_VERSION_MINIMUM only takes effect when passed on the
+        # command line (-D), NOT via the toolchain file / tc.variables, so we
+        # set it here instead of in generate().
+        cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
 
     def package(self):
