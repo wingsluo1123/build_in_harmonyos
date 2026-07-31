@@ -1028,11 +1028,24 @@ PYEOF
                         L2_DETAIL="${L2_DETAIL}, $bin_name --help OK"
                     fi
                 else
-                    echo "[warn] L2: $bin_name --version/--help failed (non-blocking)"
-                    if [ -z "$L2_DETAIL" ] || [ "$L2_DETAIL" = "not_run" ]; then
-                        L2_DETAIL="$bin_name version/help failed"
+                    # 部分工具（如 ocamlyacc）不提供 --version/--help，无参运行打印 usage 即视为可用
+                    _usage_output="$(timeout 15 "$bin_file" </dev/null 2>&1)"
+                    _usage_rc=$?
+                    if [ "$_usage_rc" -ne 124 ] && [ -n "$_usage_output" ] && printf '%s' "$_usage_output" | grep -qi 'usage'; then
+                        echo "[ok] L2: $bin_name usage OK (no --version/--help support)"
+                        L2_RESULT="pass"
+                        if [ -z "$L2_DETAIL" ] || [ "$L2_DETAIL" = "not_run" ]; then
+                            L2_DETAIL="$bin_name usage OK"
+                        else
+                            L2_DETAIL="${L2_DETAIL}, $bin_name usage OK"
+                        fi
                     else
-                        L2_DETAIL="${L2_DETAIL}, $bin_name failed"
+                        echo "[warn] L2: $bin_name --version/--help failed (non-blocking)"
+                        if [ -z "$L2_DETAIL" ] || [ "$L2_DETAIL" = "not_run" ]; then
+                            L2_DETAIL="$bin_name version/help failed"
+                        else
+                            L2_DETAIL="${L2_DETAIL}, $bin_name failed"
+                        fi
                     fi
                 fi
             done
