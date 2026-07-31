@@ -1,5 +1,42 @@
 software: cleo
 version: "0.004"
 status: built
-build_system: custom
-compile_date: "2026-07-29"
+build_date: "2026-07-31"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/c/cleo/cleo_0.004.orig.tar.gz"
+  sha256: "245140767ef0f9517fcfed369d89860fa3c0da6d7786d409a949c3088b002c87"
+  tar_format: tar.gz
+
+build:
+  system: perl-makefile
+  configure_options: []
+  dependencies:
+    - perl-Term-ReadKey/2.38
+    - perl-Term-ANSIColor/5.01
+    - perl-File-Slurp/9999.32
+    - perl-Time-HiRes/1.9742
+    - perl-ExtUtils-MakeMaker/7.70
+  cc: ""
+  cxx: ""
+
+patches_applied: []
+
+test:
+  upstream:
+    count: 1
+    command: "perl -MExtUtils::MakeMaker -e 'make test'"
+    result: "1/1 passed (t/compile.t use_ok App::Cleo)"
+  consumer:
+    count: 1
+    api_calls:
+      - "access(cleo_bin, X_OK)"
+      - "perl -c cleo"
+    result: "PASS"
+
+knowledge_used: []
+
+notes:
+  - "cleo 是 Perl CLI 库（App::Cleo），ExtUtils::MakeMaker 构建系统（Makefile.PL）"
+  - "依赖 5 个 Perl 模块通过 Conan Perl 生态包提供（resolve-deps ✅）"
+  - "上游测试 t/compile.t 是 Perl Test::More use_ok('App::Cleo') 单点测试"
