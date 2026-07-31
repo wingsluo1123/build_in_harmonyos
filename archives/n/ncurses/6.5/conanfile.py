@@ -5,7 +5,7 @@ import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.env import Environment
-from conan.tools.files import get, replace_in_file, rm
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, rm
 from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps
 from conan.tools.layout import basic_layout
 
@@ -29,79 +29,23 @@ class NcursesConan(ConanFile):
         basic_layout(self, src_folder=".")
         self.folders.build = "."
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        self._patch_config_scripts()
-        replace_in_file(
-            self,
-            os.path.join(self.source_folder, "configure"),
-            "umask 077",
-            "umask 022",
-        )
-
-    def _patch_config_scripts(self):
-        config_guess = os.path.join(self.source_folder, "config.guess")
-        replace_in_file(
-            self,
-            config_guess,
-            "\t#if defined(__ANDROID__)\n\tLIBC=android\n\t#else",
-            "\t#if defined(__ANDROID__)\n\tLIBC=android\n"
-            "\t#elif defined(__OHOS__)\n\tLIBC=ohos\n\t#else",
-        )
-        replace_in_file(
-            self,
-            config_guess,
-            "case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in\n"
-            "    *:NetBSD:*:*)",
-            "case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in\n"
-            "    *:HarmonyOS:*:*)\n"
-            "\tcase \"$UNAME_MACHINE\" in\n"
-            "\t    aarch64|arm64) MACHINE=aarch64 ;;\n"
-            "\t    armv7*|armv8*) MACHINE=arm ;;\n"
-            "\t    x86_64|amd64)  MACHINE=x86_64 ;;\n"
-            "\t    i?86)          MACHINE=i686 ;;\n"
-            "\t    *)             MACHINE=\"$UNAME_MACHINE\" ;;\n"
-            "\tesac\n"
-            "\tGUESS=${MACHINE}-unknown-linux-ohos\n"
-            "\t;;\n"
-            "    *:NetBSD:*:*)",
-        )
-
-        config_sub = os.path.join(self.source_folder, "config.sub")
-        replace_in_file(
-            self,
-            config_sub,
-            "\t\t\tandroid-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-android\n"
-            "\t\t\t\t;;\n"
-            "\t\t\t*)",
-            "\t\t\tandroid-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-android\n"
-            "\t\t\t\t;;\n"
-            "\t\t\tohos-linux)\n"
-            "\t\t\t\tbasic_machine=$field1-unknown\n"
-            "\t\t\t\tbasic_os=linux-ohos\n"
-            "\t\t\t\t;;\n"
-            "\t\t\t*)",
-        )
-        replace_in_file(
-            self,
-            config_sub,
-            "\tgnu* | android* | bsd* | mach* | minix* | genix* | ultrix* | irix* \\\n",
-            "\tgnu* | android* | ohos* | bsd* | mach* | minix* | genix* | ultrix* | irix* \\\n",
-        )
-        replace_in_file(
-            self,
-            config_sub,
-            "\t\t    | linux-relibc*- | linux-uclibc*- )",
-            "\t\t    | linux-relibc*- | linux-uclibc*- | linux-ohos*- )",
-        )
+        apply_conandata_patches(self)
 
     def generate(self):
         AutotoolsDeps(self).generate()
         tc = AutotoolsToolchain(self)
+        if self.settings.os == "OHOS":
+            tc.configure_args.extend(
+                [
+                    "--build=aarch64-unknown-linux-ohos",
+                    "--host=aarch64-unknown-linux-ohos",
+                ]
+            )
         tc.configure_args.extend(
             [
                 f"--srcdir={self.source_folder}",

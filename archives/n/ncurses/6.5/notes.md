@@ -17,8 +17,11 @@
   ncurses 自动推导 `srcdir` 后在 `include/Makefile` 中生成异常
   `$(srcdir)/Caps` 路径，导致 `curses.h` 依赖找不到 `Caps`。
 - 禁用 `progs/tests/manpages`，避免交互式终端程序、数据库安装和测试运行阶段差异。
-- 构建阶段用 `replace_in_file` 让 `config.guess/config.sub` 识别 OHOS 三元组。
-- 在 `source()` 阶段将上游 `configure` 中的 `umask 077` 调整为 `umask 022`，
+- 构建阶段显式传入 `--build/--host=aarch64-unknown-linux-ohos`，并通过
+  正式 patch 让 `config.sub` 接受 `linux-ohos` 三元组，避免在
+  `config.guess` 中新增平台宏探测逻辑。
+- 在 `source()` 阶段通过正式 patch 将上游 `configure` 中 config.status
+  临时目录创建处的 `umask 077` 调整为 `umask 022`，
   避免 `config.status` 在 OHOS/HMDFS 临时目录下创建 0700 子目录后写入
   `subs.sed`、`out` 等临时文件时触发 Permission denied。
 
