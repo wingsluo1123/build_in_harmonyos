@@ -15,6 +15,11 @@ codeload, which downloaded successfully with SHA-256:
 
 `c5efcbbdb8e141d6aeac648c4833f935f5982c01f58cd26ff6b35fcc43c609fb`
 
+For CI environments with restricted outbound access, the same verified archive
+is exported with the recipe as `safekeep-1.5.1.tar.gz`. The `source()` step uses
+that local archive first and falls back to the upstream codeload URL only when
+the exported archive is unavailable.
+
 ## Runtime Notes
 
 The script imports Unix-only modules such as `pwd` and `fcntl`, and it shells out
