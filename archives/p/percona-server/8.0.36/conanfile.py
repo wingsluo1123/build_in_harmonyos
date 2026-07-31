@@ -95,8 +95,12 @@ static bool get_dns_srv(Dns_srv_data &data, const char *dnsname, int &error) {
 #ifndef _WIN32
   return pthread_cancel(thread->thread);
 #else''',
-            '''int my_thread_cancel(my_thread_handle *thread) {
-#if !defined(_WIN32) && defined(HAVE_PTHREAD_CANCEL) && HAVE_PTHREAD_CANCEL
+            '''#ifndef HAVE_PTHREAD_CANCEL
+#define HAVE_PTHREAD_CANCEL 0
+#endif
+
+int my_thread_cancel(my_thread_handle *thread) {
+#if !defined(_WIN32) && HAVE_PTHREAD_CANCEL
   return pthread_cancel(thread->thread);
 #elif !defined(_WIN32)
   (void)thread;
@@ -134,9 +138,8 @@ static bool get_dns_srv(Dns_srv_data &data, const char *dnsname, int &error) {
         # curses/readline are unavailable. The source() adjustment makes missing
         # system editline non-fatal for the client-only build.
         tc.variables["WITH_EDITLINE"] = "system"
-        # pthread_cancel is unavailable on some libc implementations; use a
-        # feature macro in the source adjustment instead of a platform macro.
-        tc.preprocessor_definitions["HAVE_PTHREAD_CANCEL"] = "0"
+        # pthread_cancel is unavailable on some libc implementations; the
+        # source adjustment uses a feature macro instead of a platform macro.
         # ARM64 specific: use -fPIC for shared library compatibility
         tc.variables["CMAKE_POSITION_INDEPENDENT_CODE"] = "ON"
         tc.generate()
