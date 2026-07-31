@@ -5,7 +5,7 @@
 - 编译日期: 2026-07-26
 - 编译器: clang 15.0.4 / clang++
 - 平台: x86_64 Linux (native) / aarch64-linux-ohos (cross, HarmonyOS PC)
-- 状态: built (配方就绪)
+- 状态: failed (CI 未通过，见 reports/conan-verify-report.md)
 
 ## 源码来源
 - qtpositioning 5.15.2 源码来自 qtlocation 仓库
@@ -55,8 +55,9 @@ make install
 ## 注意事项
 - Qt 5.15.x 系列 API/ABI 兼容，使用 5.15.2 作为依赖版本
 - 本配方需要 Qt5 环境，由 conan 的 `qt5-qtbase/5.15.2` 包提供
-- 本地已完成：配方结构验证 ✅、CI 模拟测试 (18/18) ✅、AI review 审查 ✅
-- 完整 conan create 编译验证需在 CI 环境中 Qt5 就绪后自动执行
+- 本地已完成：配方结构验证 ✅、AI review 审查 ✅
+- conan create 编译验证：❌ G2 FAIL（/bin/sh: syntax error: unexpected '('，见 reports/conan-verify-report.md），
+  已修复 mkspec 路径（export_sources_folder）与 test_package 静默跳过问题，待 CI 重新验证
 
 ## R40 深度适配验证
 

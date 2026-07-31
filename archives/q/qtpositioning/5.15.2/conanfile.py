@@ -46,7 +46,8 @@ class QtpositioningConan(ConanFile):
         if self.settings.os == "OHOS":
             # qmake reads QMAKESPEC to determine target platform for OHOS cross-compilation
             # Use mkspec shipped with this recipe (patches/mkspecs/harmonyos-clang/)
-            mkspec_dir = os.path.join(self.source_folder, "patches", "mkspecs", "harmonyos-clang")
+            # patches/* is exported via exports_sources → lives in export_sources_folder (Conan 2.x)
+            mkspec_dir = os.path.join(self.export_sources_folder, "patches", "mkspecs", "harmonyos-clang")
             if os.path.isdir(mkspec_dir):
                 self.buildenv_info.define("QMAKESPEC", mkspec_dir)
             else:

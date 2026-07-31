@@ -9,7 +9,6 @@ File location: archives/{letter}/qtpositioning/{version}/test_package/conanfile.
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
-from conan.tools.build import can_run
 import os
 
 
@@ -29,6 +28,7 @@ class QtpositioningTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if can_run(self) and self.cpp.build.bindirs:
-            bin_path = os.path.join(self.cpp.build.bindirs[0], "test_qtpositioning")
-            self.run(bin_path, env="conanrun")
+        # 按仓库惯例直接运行测试二进制；不做静默跳过守卫，
+        # 避免 bindirs 为空时测试被悄悄跳过、掩盖编译/链接问题
+        test_binary = os.path.join(self.cpp.build.bindirs[0], "test_qtpositioning")
+        self.run(test_binary, env="conanrun")
