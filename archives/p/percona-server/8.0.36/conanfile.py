@@ -9,6 +9,8 @@ Produces: libperconaserverclient.so (and .a)
 Dependencies: openssl, zlib; Boost headers are fetched from upstream archives
 """
 import os
+import shutil
+import threading
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -29,6 +31,7 @@ class PerconaServerConan(ConanFile):
 
     settings = "os", "arch", "compiler", "build_type"
 
+    no_copy_source = True
     exports_sources = "conandata.yml"
 
     def requirements(self):
@@ -166,6 +169,28 @@ int my_thread_cancel(my_thread_handle *thread) {
         # Clean up unwanted files
         for pattern in ["*.la", "*.dylib"]:
             rm(self, pattern, folder=os.path.join(self.package_folder, "lib"))
+        self._trim_conan_cache_after_packaging()
+
+    def _trim_conan_cache_after_packaging(self):
+        for folder in (self.build_folder, self.source_folder):
+            if folder and os.path.isdir(folder):
+                self._remove_large_folder(folder)
+
+    def _remove_large_folder(self, folder):
+        self.output.info(f"Removing large percona-server cache folder: {folder}")
+        stop = threading.Event()
+
+        def heartbeat():
+            while not stop.wait(20):
+                self.output.info(f"Still removing percona-server cache folder: {folder}")
+
+        thread = threading.Thread(target=heartbeat, daemon=True)
+        thread.start()
+        try:
+            shutil.rmtree(folder, ignore_errors=True)
+        finally:
+            stop.set()
+            thread.join(timeout=1)
 
     def package_info(self):
         self.cpp_info.libs = ["perconaserverclient"]
