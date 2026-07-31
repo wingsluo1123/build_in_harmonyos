@@ -27,7 +27,7 @@ class Sdl12CompatConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def requirements(self):
-        self.requires("SDL2/2.30.0")
+        self.requires("sdl2/2.30.0")
 
     def layout(self):
         cmake_layout(self)
