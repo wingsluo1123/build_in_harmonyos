@@ -17,6 +17,10 @@ checks that the upstream Makefile compile entry is packaged and verifies the
 main Lisp integration markers: `(require 'ol)`, `(require 'notmuch)`,
 `org-link-set-parameters`, and `(provide 'ol-notmuch)`.
 
+This package-level check is not counted as an upstream Emacs batch validation
+pass. Actual upstream validation result for this package is `0/3`: the
+upstream `make lisp` command was not run in the OHOS runner.
+
 ## OHOS notes
 
 No native code is compiled. Runtime use requires target-side Emacs, Org mode,
@@ -42,3 +46,6 @@ Validated on the new OHOS device port `33332` with isolated job
 - Test evidence: `test_package` ran
   `test_ol_notmuch.py` and printed
   `ol-notmuch upstream compile entry and Emacs Lisp files are packaged`.
+- Upstream validation result: `0/3` actual upstream Makefile/Emacs checks
+  executed; the package-level Python checks are recorded separately as adapted
+  consumer validation.
