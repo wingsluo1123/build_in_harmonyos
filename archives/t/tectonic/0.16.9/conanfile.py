@@ -15,6 +15,7 @@ import re
 import shutil
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
@@ -184,7 +185,7 @@ class TectonicConan(ConanFile):
         # Some integration tests require network/TeX environment
         try:
             self.run("cargo test --release", cwd=self.source_folder)
-        except Exception:
+        except ConanException:
             self.output.warning("cargo test had failures (some tests require network/TeX environment)")
 
     def _patch_pc_files_for_static(self, gen_folder):
@@ -315,5 +316,3 @@ class TectonicConan(ConanFile):
 
     def package_id(self):
         del self.info.settings.compiler
-o.settings.compiler
-s.compiler

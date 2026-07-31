@@ -75,12 +75,7 @@ class Icu4cConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # R6 exception: configure is an autoconf-generated file (not a source
-        # file), so it cannot be patched via patches/ directory. The umask 077
-        # comes from autoconf's config.status generation logic, not from
-        # configure.ac. Use sed for this one-line runtime fix.
-        # HMDFS: dirs created with umask 077 cannot be written to (Permission denied).
-        self.run("sed -i 's/umask 077/umask 022/g' configure")
+        # umask 077 → 022 fix applied via patches/0015-configure-umask-fix.patch
         autotools = Autotools(self)
         autotools.configure()
         # R10: HMDFS doesn't support mkfifo (make jobserver), force -j1

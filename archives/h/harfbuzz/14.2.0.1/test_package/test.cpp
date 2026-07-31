@@ -25,7 +25,6 @@ int main(void)
     hb_buffer_t *buf = hb_buffer_create();
     if (buf == hb_buffer_get_empty()) {
         fprintf(stderr, "FAIL: Buffer creation returned empty buffer\n");
-        hb_buffer_destroy(buf);
         return 1;
     }
 
