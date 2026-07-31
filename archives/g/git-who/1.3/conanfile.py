@@ -30,6 +30,9 @@ class GitWhoConan(ConanFile):
         # R32: 与 build() 硬编码的 GOOS=linux 保持一致，拒绝不支持的 OS
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"git-who {self.version} only supports Linux and OHOS, got os={self.settings.os}")
+        # build() 硬编码 GOARCH=arm64，拒绝非 arm64 架构避免静默产出错误产物
+        if str(self.settings.arch) not in ("armv8", "arm64"):
+            raise ConanInvalidConfiguration(f"git-who {self.version} only supports arm64, got arch={self.settings.arch}")
 
     def requirements(self):
         # CI 环境无 go 命令，依赖 go 工具链包（同 gosec 等已发布 Go 项目）
