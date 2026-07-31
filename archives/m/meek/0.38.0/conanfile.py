@@ -15,6 +15,7 @@ R33: GOOS/GOARCH derived from Conan settings, not hardcoded shell vars.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy
 from conan.tools.layout import basic_layout
 
@@ -41,14 +42,20 @@ class MeekConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _goarch(self):
-        """Map Conan arch to Go GOARCH."""
+        """Map Conan arch to Go GOARCH (R33: derived from Conan settings)."""
         arch_map = {
             "armv8": "arm64",
             "aarch64": "arm64",
             "x86_64": "amd64",
             "x86": "386",
         }
-        return arch_map.get(str(self.settings.arch), "arm64")
+        goarch = arch_map.get(str(self.settings.arch))
+        if goarch is None:
+            raise ConanInvalidConfiguration(
+                f"Unsupported arch: {self.settings.arch}. "
+                f"Supported: {list(arch_map.keys())}"
+            )
+        return goarch
 
     def build(self):
         # Go cross-compilation settings (R33: derived from Conan settings)
@@ -59,16 +66,19 @@ class MeekConan(ConanFile):
         os.environ["GOARCH"] = self._goarch()
         os.environ["GOFLAGS"] = "-mod=mod"
 
-        # Build meek-client
-        self.run('go build -trimpath -ldflags "-s -w" -o meek-client ./meek-client')
+        # Build meek-client (cwd=source_folder: go.mod lives in source dir)
+        self.run('go build -trimpath -ldflags "-s -w" -o meek-client ./meek-client',
+                 cwd=self.source_folder)
 
         # Build meek-server
-        self.run('go build -trimpath -ldflags "-s -w" -o meek-server ./meek-server')
+        self.run('go build -trimpath -ldflags "-s -w" -o meek-server ./meek-server',
+                 cwd=self.source_folder)
 
     def package(self):
-        copy(self, "meek-client", self.build_folder,
+        # Binaries are built into source_folder (cwd of go build)
+        copy(self, "meek-client", self.source_folder,
              os.path.join(self.package_folder, "bin"))
-        copy(self, "meek-server", self.build_folder,
+        copy(self, "meek-server", self.source_folder,
              os.path.join(self.package_folder, "bin"))
 
     def package_info(self):

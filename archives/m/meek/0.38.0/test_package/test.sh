@@ -3,12 +3,13 @@
 # Runs in conanrun env (PATH includes installed bin/).
 #
 # meek-client/meek-server require TOR_PT_MANAGED_TRANSPORT_VER env var.
-# Without it, they print "ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER" and
-# exit with code 1. This test verifies that behavior.
+# Without it, they print "ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER" to
+# stderr (per Tor PT spec / goptlib) and exit with code 1.
+# This test captures stderr (2>&1) to verify that behavior.
 set -euo pipefail
 
 echo "[test] meek-client: verify ENV-ERROR output (expected exit 1)"
-output=$(meek-client 2>/dev/null) || true
+output=$(meek-client 2>&1) || true
 echo "$output" | grep -q "ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER" || {
     echo "❌ meek-client did not output expected ENV-ERROR"
     exit 1
@@ -16,7 +17,7 @@ echo "$output" | grep -q "ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER" || {
 echo "✅ meek-client OK"
 
 echo "[test] meek-server: verify ENV-ERROR output (expected exit 1)"
-output=$(meek-server 2>/dev/null) || true
+output=$(meek-server 2>&1) || true
 echo "$output" | grep -q "ENV-ERROR no TOR_PT_MANAGED_TRANSPORT_VER" || {
     echo "❌ meek-server did not output expected ENV-ERROR"
     exit 1
