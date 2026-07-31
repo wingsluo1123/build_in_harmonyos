@@ -18,7 +18,7 @@ Object::Event 提供了一个事件回调接口，允许对象注册、触发和
 
 ```bash
 # 通过 Conan 安装
-conan install --requires=perl-object-event/1.23-r0@ohpcd/stable -pr:h=ohos-aarch64 -pr:b=ohos-aarch64
+conan install --requires=perl-object-event/1.23-r0 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64
 ```
 
 ### 基本用法

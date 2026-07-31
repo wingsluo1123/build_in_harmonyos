@@ -12,6 +12,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.layout import basic_layout
 
 
 class PerlobjecteventConan(ConanFile):
@@ -23,6 +24,9 @@ class PerlobjecteventConan(ConanFile):
     url = ""
 
     settings = "os", "compiler", "build_type", "arch"
+
+    def layout(self):
+        basic_layout(self)
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -38,12 +42,12 @@ class PerlobjecteventConan(ConanFile):
         apply_conandata_patches(self)
         os.environ["PERL_CANARY_STABILITY_NOPROMPT"] = "1"
         # Use INSTALL_BASE=/ so files install to lib/perl5/ under DESTDIR
-        self.run("perl Makefile.PL INSTALL_BASE=/")
-        self.run("make -j1")
+        self.run("perl Makefile.PL INSTALL_BASE=/", cwd=self.source_folder)
+        self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
         # Install to package folder using DESTDIR
-        self.run(f"make install DESTDIR={self.package_folder}")
+        self.run(f"make install DESTDIR={self.package_folder}", cwd=self.source_folder)
 
     def package_info(self):
         # Pure Perl module - no C libraries to link

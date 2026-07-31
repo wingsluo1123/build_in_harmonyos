@@ -42,4 +42,19 @@ perl -MObject::Event -e '
     print "[PASS] unreg_cb works correctly\n";
 ' 2>&1
 
+# Test 5: Guard auto-unregister (scope-guard DESTROY triggers unreg_cb)
+perl -MObject::Event -e '
+    my $obj = Object::Event->new;
+    my $count = 0;
+    {
+        my $guard = $obj->reg_cb(test_event => sub { $count++; });
+        $obj->event(test_event => ());
+        die "Guard: callback did not fire" if $count != 1;
+        # $guard goes out of scope here — DESTROY calls unreg_cb
+    }
+    $obj->event(test_event => ());
+    die "Guard auto-unregister failed: callback fired after scope exit" if $count != 1;
+    print "[PASS] Guard auto-unregister works correctly\n";
+' 2>&1
+
 echo "All tests passed."
