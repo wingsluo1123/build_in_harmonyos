@@ -129,7 +129,7 @@ class LibgeotiffConan(ConanFile):
                         _transitive_libs.append("-l{}".format(_lib))
             except Exception:
                 pass
-        for _extra in ["sqlite3", "lzma", "zstd", "z", "jpeg", "deflate", "lerc", "webp"]:
+        for _extra in ["sqlite3", "lzma", "zstd", "z", "jpeg", "webp"]:
             if _extra not in _seen:
                 _seen.add(_extra)
                 _transitive_libs.append("-l{}".format(_extra))
