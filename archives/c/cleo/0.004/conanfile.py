@@ -51,19 +51,16 @@ class CleoConan(ConanFile):
                     "perl-ExtUtils-MakeMaker"):
             pkg = self.dependencies[dep].package_folder
             perl_lib.append(os.path.join(pkg, "lib", "perl5"))
-        env = os.environ.copy()
-        env["PERL5LIB"] = os.pathsep.join(perl_lib)
+        perl5lib = os.pathsep.join(perl_lib)
         # 1. perl Makefile.PL PREFIX=$package_folder
         self.run(f'perl Makefile.PL INSTALL_BASE={os.path.join(self.build_folder, "staging")}',
-                 cwd=self.source_folder, env=env)
+                 cwd=self.source_folder, env=["PERL5LIB=" + perl5lib])
         # 2. make
-        self.run("make", cwd=self.source_folder, env=env)
+        self.run("make", cwd=self.source_folder, env=["PERL5LIB=" + perl5lib])
 
     def package(self):
         # make install 安装到 staging
-        env = os.environ.copy()
-        env["PERL5LIB"] = ""
-        self.run("make install", cwd=self.source_folder, env=env)
+        self.run("make install", cwd=self.source_folder, env=["PERL5LIB="])
         # copy staging 到 package_folder
         copy(self, "*", src=os.path.join(self.build_folder, "staging"),
              dst=self.package_folder)

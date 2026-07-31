@@ -37,7 +37,7 @@
 
 5. 测试：
    ```bash
-   perl -MExtUtils::MakeMaker -e 'make test'
+   make test
    # t/compile.t .. ok: 1/1 passed
    ```
 
@@ -72,7 +72,7 @@ perl -c bin/cleo
 # bin/cleo syntax OK
 
 # 上游测试
-perl -MExtUtils::MakeMaker -e 'make test'
+make test
 # t/compile.t .. ok: 1/1 passed
 ```
 
