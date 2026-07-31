@@ -24,11 +24,6 @@ class KubetuiConan(ConanFile):
 
     settings = "os", "arch"
 
-    def build_requirements(self):
-        # CI 环境无 Rust 工具链，依赖 rust/cargo 工具链包（同 hurl/ripgrep 等 Rust 项目）
-        self.tool_requires("rust/1.95.0")
-        self.tool_requires("cargo/1.95.0")
-
     def layout(self):
         basic_layout(self)
 
@@ -36,7 +31,9 @@ class KubetuiConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        # Rust 工具链通过 cmd-pkgs 预编译包安装（E154 知识条目）
+        # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
+        # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
+        self.run("curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder)
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
         self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder)
