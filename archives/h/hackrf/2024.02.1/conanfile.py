@@ -37,7 +37,7 @@ class HackrfConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         cmake = CMake(self)
-        cmake.configure(build_script_folder=os.path.join(self.source_folder, "host"))
+        cmake.configure(build_script_folder="host")
         cmake.build()
 
     def package(self):
