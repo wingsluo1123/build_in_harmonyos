@@ -42,6 +42,13 @@ class TestPerlParamsValidate(ConanFile):
         # (Module::Implementation, Try::Tiny, etc.).
         home = os.path.expanduser("~")
         local_perl5_candidates = [
+            # ~/usr/local/lib/perl5/ — where CPAN modules like
+            # Module::Implementation, Module::Runtime are installed.
+            # CI workers use /bin/sh (no .bash_profile), so PERL5LIB
+            # is not set by default — we must add these paths explicitly.
+            os.path.join(home, "usr", "local", "lib", "perl5",
+                         "aarch64-linux"),
+            os.path.join(home, "usr", "local", "lib", "perl5"),
             os.path.join(home, "usr", "local", "lib", "perl5",
                          "site_perl", "5.42.0", "aarch64-linux"),
             os.path.join(home, "usr", "local", "lib", "perl5",
