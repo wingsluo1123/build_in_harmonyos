@@ -25,10 +25,12 @@ class BtopConan(ConanFile):
 
     def build(self):
         # R33: Get compiler from Conan conf, NEVER from shell env vars.
-        cxx = self.conf.get("tools.build:compiler_executables:cxx", default="clang++", check_type=str)
+        # Access the dict form: tools.build:compiler_executables then .get("cxx")
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        cxx = compilers.get("cxx", "clang++")
         cxxflags = self.conf.get("tools.build:cxxflags", default="", check_type=str)
-        # R9: Use -j1; quote CXXFLAGS to handle spaces (e.g. "-O2 -DNDEBUG").
-        self.run(f'make -j1 CXX="{cxx}" CXXFLAGS="{cxxflags}"')
+        # R9: Use -j1; run make in the source folder; quote CXXFLAGS for spaces.
+        self.run(f'make -C "{self.source_folder}" -j1 CXX="{cxx}" CXXFLAGS="{cxxflags}"')
 
     def package(self):
         copy(self, "btop", src=self.source_folder, dst=os.path.join(self.package_folder, "bin"))
