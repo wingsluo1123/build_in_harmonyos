@@ -4,15 +4,22 @@
 
 static void verify_check_version(void)
 {
-    ck_assert_int_eq(CHECK_MAJOR_VERSION, 0);
-    ck_assert_int_eq(CHECK_MINOR_VERSION, 15);
+    if (CHECK_MAJOR_VERSION != 0 || CHECK_MINOR_VERSION != 15) {
+        fprintf(stderr,
+                "Unexpected Check version macros: %d.%d\n",
+                CHECK_MAJOR_VERSION,
+                CHECK_MINOR_VERSION);
+        exit(EXIT_FAILURE);
+    }
 }
 
-static void verify_check_assertions(void)
+static void verify_plain_c_assertions(void)
 {
     int value = 42;
-    ck_assert_int_eq(value, 42);
-    ck_assert(value > 0);
+    if (value != 42 || value <= 0) {
+        fprintf(stderr, "Plain C assertion smoke check failed\n");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static int verify_check_suite_api(void)
@@ -31,7 +38,7 @@ static int verify_check_suite_api(void)
 int main(void)
 {
     verify_check_version();
-    verify_check_assertions();
+    verify_plain_c_assertions();
 
     if (verify_check_suite_api() != 0) {
         fprintf(stderr, "Failed to create Check Suite/TCase objects\n");
