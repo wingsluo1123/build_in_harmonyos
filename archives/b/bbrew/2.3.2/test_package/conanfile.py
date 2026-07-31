@@ -47,4 +47,24 @@ class BbrewTestConan(ConanFile):
         # conanrun env (RPATH etc.) is applied correctly.
         copy(self, "bbrew", src=bin_dir, dst=self.build_folder)
         bbrew_bin = os.path.join(self.build_folder, "bbrew")
-        self.run(f'"{bbrew_bin}" --version', env="conanrun")
+
+        # R34/R9: run the actual binary and verify the output. Capture
+        # stdout/stderr so a placeholder artifact (emitted by
+        # conanfile.py._build_placeholder() when the Go toolchain is
+        # unavailable) is detected and FAILS the test — a placeholder
+        # must never pass as a genuine Go build (R9: no fake pass).
+        import subprocess
+        proc = subprocess.run(
+            [bbrew_bin, "--version"], capture_output=True, text=True, timeout=30
+        )
+        out = (proc.stdout + proc.stderr).strip()
+        if "[PLACEHOLDER]" in out:
+            raise AssertionError(
+                f"R9: bbrew --version produced a PLACEHOLDER binary output: {out!r} — "
+                "Go toolchain unavailable on this runner; genuine Go build required."
+            )
+        if proc.returncode != 0:
+            raise AssertionError(f"bbrew --version exited {proc.returncode}: {out}")
+        if "2.3.2" not in out:
+            raise AssertionError(f"bbrew --version output missing 2.3.2: {out}")
+        self.output.info(f"PASS: bbrew --version output: {out}")

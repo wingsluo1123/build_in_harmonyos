@@ -1,4 +1,4 @@
-// test_package/src/test_bbrew.go
+// test_package/src/test_bbrew_test.go
 //
 // L1/L2 smoke test for the bbrew application package.
 //
@@ -29,7 +29,12 @@ func TestBbrewVersion(t *testing.T) {
 		var err error
 		bin, err = exec.LookPath("bbrew")
 		if err != nil {
-			t.Skipf("bbrew binary not found (BBREW_BIN unset and not on PATH): %v", err)
+			// R34: the test must genuinely depend on the packaged bbrew
+			// binary. If it is missing (BBREW_BIN unset and not on PATH),
+			// fail hard instead of skipping — mirroring test_bbrew.sh
+			// (exit 1) and test_package/conanfile.py (AssertionError), so
+			// CI L1e sabotage (bin/ removed) is detected by go test too.
+			t.Fatalf("bbrew binary not found (BBREW_BIN unset and not on PATH): %v", err)
 		}
 	}
 
@@ -38,6 +43,12 @@ func TestBbrewVersion(t *testing.T) {
 		t.Fatalf("bbrew --version failed: %v\noutput: %s", err, out)
 	}
 	got := strings.TrimSpace(string(out))
+	// R9/R34: reject placeholder artifacts. conanfile.py._build_placeholder()
+	// (used when the Go toolchain is unavailable) emits a "[PLACEHOLDER]"
+	// marker; a real CI build must never ship or pass tests on that stub.
+	if strings.Contains(got, "[PLACEHOLDER]") {
+		t.Fatalf("bbrew --version = %q: placeholder binary detected (Go toolchain unavailable on runner), genuine Go build required (R9: no fake pass)", got)
+	}
 	if !strings.Contains(got, "2.3.2") {
 		t.Errorf("bbrew --version = %q, want version string containing 2.3.2", got)
 	}
@@ -49,16 +60,24 @@ func TestBbrewHelpExitCode(t *testing.T) {
 		var err error
 		bin, err = exec.LookPath("bbrew")
 		if err != nil {
-			t.Skipf("bbrew binary not found: %v", err)
+			// R34: fail hard when the packaged binary is missing (see
+			// TestBbrewVersion) instead of skipping.
+			t.Fatalf("bbrew binary not found: %v", err)
 		}
 	}
 	// bbrew -h should exit 0 (flag.Usage prints help then the flag package
 	// returns ErrHelp which main.go does not treat as fatal).
-	if err := exec.Command(bin, "-h").Run(); err != nil {
+	out, err := exec.Command(bin, "-h").CombinedOutput()
+	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			t.Errorf("bbrew -h exited with %d, expected 0", exitErr.ExitCode())
 		} else {
 			t.Errorf("bbrew -h failed to start: %v", err)
 		}
+	}
+	// R9/R34: reject placeholder artifacts here too (the placeholder stub
+	// also exits 0 on -h, so the exit-code check alone cannot catch it).
+	if strings.Contains(string(out), "[PLACEHOLDER]") {
+		t.Fatalf("bbrew -h = %q: placeholder binary detected, genuine Go build required (R9: no fake pass)", out)
 	}
 }

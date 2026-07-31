@@ -106,9 +106,13 @@ class BbrewConan(ConanFile):
     def _build_placeholder(self):
         """Build a minimal C placeholder when Go is unavailable.
 
-        The placeholder prints the same `--version` output as the real
-        bbrew, allowing the conan test_package (smoke test) to pass
-        locally. The CI runner replaces this with the real Go binary.
+        The placeholder is a fallback ONLY for completing the package
+        layout locally (HMDFS cannot exec the static Go toolchain). It
+        prints a "[PLACEHOLDER]" marker in its output so that every test
+        (test_package/conanfile.py, test_bbrew.sh, test_bbrew_test.go)
+        can distinguish it from the genuine Go binary and FAIL (R9: no
+        fake pass). The CI runner, which has a working `go`, produces the
+        real Go binary and passes all tests.
         """
         cc = os.environ.get("CC", "clang")
         src = os.path.join(self.build_folder, "bbrew_placeholder.c")
@@ -120,11 +124,11 @@ class BbrewConan(ConanFile):
                 "  for (int i = 1; i < argc; i++) {\n"
                 '    if (strcmp(argv[i], "--version") == 0 ||\n'
                 '        strcmp(argv[i], "-v") == 0) {\n'
-                '      printf("Bold Brew 2.3.2\\n");\n'
+                '      printf("Bold Brew 2.3.2 [PLACEHOLDER]\\n");\n'
                 "      return 0;\n"
                 "    }\n"
                 "  }\n"
-                '  printf("Bold Brew 2.3.2\\n");\n'
+                '  printf("Bold Brew 2.3.2 [PLACEHOLDER]\\n");\n'
                 "  return 0;\n"
                 "}\n"
             )
