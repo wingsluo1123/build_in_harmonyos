@@ -58,10 +58,17 @@ class QtHttpServerConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        qtbase_prefix = self.dependencies["qtbase-gui"].package_folder
+        qt_libs = os.path.join(qtbase_prefix, "lib")
+        qt_plugins = os.path.join(qtbase_prefix, "plugins", "platforms")
         self.run(
             "cmake -E env QT_QPA_PLATFORM=offscreen "
+            "QT_QPA_PLATFORM_PLUGIN_PATH={} "
+            "LD_LIBRARY_PATH={} "
             "ctest --test-dir {} --output-on-failure --parallel 1".format(
-                shlex.quote(self.build_folder)
+                shlex.quote(qt_plugins),
+                shlex.quote(qt_libs),
+                shlex.quote(self.build_folder),
             ),
             env="conanbuild",
             ignore_errors=False,
