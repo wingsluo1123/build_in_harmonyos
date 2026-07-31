@@ -56,6 +56,15 @@ class ClpConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # E072: autotools 项目需要替换 config.sub/config.guess 以支持 ohos 三元组
+        for name in ("config.guess", "config.sub"):
+            for root, dirs, files in os.walk(self.source_folder):
+                if name in files:
+                    path = os.path.join(root, name)
+                    replace_in_file(self, path,
+                        'Linux|GNU|K\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD',
+                        'Linux|GNU|K\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD|OHOS')
+                    self.output.info(f"patched {name}: {path}")
         configure_path = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure_path):
             replace_in_file(self, configure_path,
@@ -71,4 +80,3 @@ class ClpConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["Clp"]
-        self.cpp_info.includedirs = ["include/coin"]
