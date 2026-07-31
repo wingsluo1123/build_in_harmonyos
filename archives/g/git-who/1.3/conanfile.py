@@ -7,6 +7,7 @@ Build with `go build` to produce a single binary.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy
 from conan.tools.layout import basic_layout
 
@@ -21,7 +22,14 @@ class GitWhoConan(ConanFile):
 
     package_type = "application"
 
-    settings = "os", "compiler", "build_type", "arch"
+    # CGO_ENABLED=0 的 Go 构建不用 C 编译器，Go 也无 build_type 概念，
+    # 仅保留影响交叉编译目标的 os/arch（同项目 git-flow 等无编译包同实践）
+    settings = "os", "arch"
+
+    def validate(self):
+        # R32: 与 build() 硬编码的 GOOS=linux 保持一致，拒绝不支持的 OS
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(f"git-who {self.version} only supports Linux and OHOS, got os={self.settings.os}")
 
     def layout(self):
         basic_layout(self)
