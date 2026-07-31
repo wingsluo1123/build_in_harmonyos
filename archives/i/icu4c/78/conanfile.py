@@ -13,6 +13,7 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -88,7 +89,7 @@ class Icu4cConan(ConanFile):
         # Some intltest cases fail on OHOS (platform-specific locale/syscall issues)
         try:
             self.run("make check")
-        except Exception:
+        except ConanException:
             self.output.warning("make check had failures (expected on OHOS)")
 
     def package(self):

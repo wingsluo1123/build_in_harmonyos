@@ -226,8 +226,8 @@ class TectonicConan(ConanFile):
             try:
                 with open(pc_path, "w") as f:
                     f.write(content)
-            except (OSError, IOError):
-                pass
+            except (OSError, IOError) as e:
+                self.output.warning(f"Failed to write {pc_name}: {e}")
 
     def package(self):
         import glob
@@ -315,3 +315,5 @@ class TectonicConan(ConanFile):
 
     def package_id(self):
         del self.info.settings.compiler
+o.settings.compiler
+s.compiler

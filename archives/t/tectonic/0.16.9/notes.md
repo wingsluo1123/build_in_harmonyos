@@ -38,7 +38,7 @@ brew install rust
 |------|------|------|-------------|----------|
 | freetype | 2.14.3 | 字体光栅化 | crates/bridge_freetype2 | ✅ 静态 |
 | fontconfig | 2.18.1 | 字体查找/配置 | crates/bridge_fontconfig | ✅ 静态 |
-| harfbuzz | 14.2.0 | 文本整形（含 graphite2） | crates/bridge_harfbuzz | ✅ 静态 |
+| harfbuzz | 14.2.0.1 | 文本整形（含 graphite2） | crates/bridge_harfbuzz | ✅ 静态 |
 | graphite2 | 1.3.14 | Graphite 智能字体 | crates/bridge_graphite2 | ✅ 静态 |
 | icu4c | 78 | Unicode 17.0 支持 | crates/bridge_icu | ✅ 静态 |
 | libpng | 1.6.58 | PNG 图像解码 | crates/bridge_png | ✅ 静态 |

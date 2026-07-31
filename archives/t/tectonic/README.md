@@ -52,7 +52,7 @@ lib/libexpat.so    — 唯一动态 C/C++ 依赖 (182KB, expat 上游 bug 无法
 |------|------|------|----------|
 | freetype | 2.14.3 | 字体光栅化 | ✅ 静态 |
 | fontconfig | 2.18.1 | 字体查找/配置 | ✅ 静态 |
-| harfbuzz | 14.2.0 | 文本整形（含 graphite2 shaper） | ✅ 静态 |
+| harfbuzz | 14.2.0.1 | 文本整形（含 graphite2 shaper） | ✅ 静态 |
 | graphite2 | 1.3.14 | Graphite 智能字体系统 | ✅ 静态 |
 | icu4c | 78 | Unicode 17.0 支持 | ✅ 静态 |
 | libpng | 1.6.58 | PNG 图像解码 | ✅ 静态 |
