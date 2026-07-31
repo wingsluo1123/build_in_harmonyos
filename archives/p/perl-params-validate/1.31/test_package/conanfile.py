@@ -6,6 +6,7 @@ Attempts to load Params::Validate (PP fallback via Module::Implementation).
 Runtime .so loading may fail due to SELinux/HMDFS — PP fallback is expected.
 """
 import os
+import glob
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -21,16 +22,25 @@ class TestPerlParamsValidate(ConanFile):
         dep = self.dependencies["perl-params-validate"]
         pkg_folder = dep.package_folder
 
-        # .pm files in site_perl/5.42.0/ (arch-independent)
-        # .so files in site_perl/5.42.0/aarch64-linux/ (arch-specific)
-        site_lib = os.path.join(pkg_folder,
-                                "data", "service", "hnp", "perl.org",
-                                "perl_5.42.0", "lib", "site_perl", "5.42.0")
-        site_arch = os.path.join(site_lib, "aarch64-linux")
+        # .pm files in site_perl/{version}/ (arch-independent)
+        # .so files in site_perl/{version}/{arch}/ (arch-specific)
+        # Dynamically find paths (avoid hardcoding Perl version/arch).
+        so_candidates = glob.glob(os.path.join(
+            pkg_folder, "**", "auto", "Params", "Validate", "XS", "XS.so"
+        ), recursive=True)
+        assert so_candidates, f"XS.so not found in package: {pkg_folder}"
+        so_path = so_candidates[0]
 
-        # --- L4: Verify XS.so is a valid ELF with boot function ---
-        so_path = os.path.join(site_arch, "auto", "Params", "Validate", "XS", "XS.so")
-        assert os.path.exists(so_path), f"XS.so not found: {so_path}"
+        # Derive site_arch and site_lib from the found .so path.
+        # so_path: .../site_perl/{ver}/{arch}/auto/Params/Validate/XS/XS.so
+        # site_arch: .../site_perl/{ver}/{arch}/
+        # site_lib:  .../site_perl/{ver}/
+        site_arch = os.path.dirname(
+            os.path.dirname(os.path.dirname(
+                os.path.dirname(so_path)
+            ))
+        )
+        site_lib = os.path.dirname(site_arch)
 
         # Use self.run for CI L0d compliance (requires self.run in test())
         self.run(f'file "{so_path}"')
@@ -75,9 +85,17 @@ class TestPerlParamsValidate(ConanFile):
                 self.output.info("✅ Params::Validate PP mode test passed")
             except ConanException as e:
                 err_str = str(e).lower()
-                if any(kw in err_str for kw in (
-                    "permission denied", "hmdfs", "selinux"
-                )):
+                # Skip only if .so loading is blocked by HMDFS/SELinux
+                # (platform restriction). Require BOTH a loading failure
+                # indicator AND a platform error to avoid false positives.
+                load_failure = any(kw in err_str for kw in (
+                    "can't load", "dlopen", "shared object"
+                ))
+                platform_error = any(kw in err_str for kw in (
+                    "permission denied", "operation not permitted",
+                    "hmdfs", "selinux"
+                ))
+                if load_failure and platform_error:
                     self.output.warning(
                         "⚠️ Runtime test failed "
                         "(expected on HarmonyOS HMDFS/SELinux)"

@@ -223,11 +223,10 @@ WriteMakefile(
         dest = os.path.join(self.package_folder, "")
         self.run(f'make install DESTDIR="{dest}"', cwd=self.source_folder)
 
-        # Manually install XS.so to Perl's auto directory
-        site_arch = os.path.join(
-            dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
-        )
+        # Dynamically resolve Perl's sitearch path (avoid hardcoding version/arch).
+        # sitearchexp is like /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux
+        # make install DESTDIR=dest installs to dest + sitearchexp
+        site_arch = os.path.join(dest, self._perl_config("sitearchexp").lstrip("/"))
         so_src = os.path.join(
             self.source_folder, "blib", "arch", "auto", "Params", "Validate", "XS", "XS.so"
         )
