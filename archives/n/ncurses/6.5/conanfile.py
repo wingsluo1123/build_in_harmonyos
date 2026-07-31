@@ -36,14 +36,32 @@ class NcursesConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
         apply_conandata_patches(self)
 
+    @staticmethod
+    def _ohos_triplet(arch):
+        gnu_arch = {
+            "armv7": "arm",
+            "armv7hf": "arm",
+            "armv8": "aarch64",
+            "armv8_3": "aarch64",
+            "armv8.3": "aarch64",
+            "arm64": "aarch64",
+            "aarch64": "aarch64",
+            "x86": "i686",
+            "x86_64": "x86_64",
+        }.get(str(arch))
+        if gnu_arch is None:
+            raise ConanInvalidConfiguration(f"unsupported OHOS architecture: {arch}")
+        return f"{gnu_arch}-unknown-linux-ohos"
+
     def generate(self):
         AutotoolsDeps(self).generate()
         tc = AutotoolsToolchain(self)
         if self.settings.os == "OHOS":
+            triplet = self._ohos_triplet(self.settings.arch)
             tc.configure_args.extend(
                 [
-                    "--build=aarch64-unknown-linux-ohos",
-                    "--host=aarch64-unknown-linux-ohos",
+                    f"--build={triplet}",
+                    f"--host={triplet}",
                 ]
             )
         tc.configure_args.extend(
