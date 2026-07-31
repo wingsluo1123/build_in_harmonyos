@@ -53,14 +53,14 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | `sockaddr_storage` 重定义错误 | OHOS musl 系统中 `linux/socket.h` 与 `sys/socket.h` 都定义了 `sockaddr_storage`，导致编译冲突。源码已有 `__OHOS__` 守卫但使用了错误的 include guard 名 `_LINUX_SOCKET_H`，实际应为 `_UAPI_LINUX_SOCKET_H`。此外编译时 `__OHOS__` 宏未定义。 | 修改 `tools/libipv6.c`: 1) 修正 guard 名 `_LINUX_SOCKET_H` → `_UAPI_LINUX_SOCKET_H`; 2) 定义 `__kernel_sa_family_t`（unsigned short）替代 `linux/socket.h` 中的定义; 3) 编译时添加 `-D__OHOS__` 到 CFLAGS |
+| 1 | `sockaddr_storage` 重定义错误 | OHOS musl 系统中 `linux/socket.h` 与 `sys/socket.h` 都定义了 `sockaddr_storage`，导致编译冲突。`linux/socket.h` 使用 `_UAPI_LINUX_SOCKET_H` 作为 include guard（与标准 Linux 不同）。 | 修改 `tools/libipv6.c`: 通过 `#ifdef _SYS_SOCKET_H` 特性检测预定义 `_UAPI_LINUX_SOCKET_H` guard 跳过冲突头文件，并提供 `__kernel_sa_family_t` typedef（R8: 不使用 `#ifdef __OHOS__` 平台宏） |
 | 2 | `make install` 失败：/etc 只读 | GNUmakefile 中 `ETCPATH=$(DESTDIR)/etc`，无 DESTDIR 时路径为 `/etc`（只读文件系统） | 从 staging 手动复制 binaries 和 data 到 `$DEFAULT_PREFIX`，跳过 `/etc` 配置文件安装 |
 
 ## 源码修改清单
 
 | 文件 | 原因 | 方式 | 补丁状态 |
 |------|------|------|----------|
-| tools/libipv6.c | 修正 OHOS sockaddr_storage 冲突守卫 | 修改 `#ifdef __OHOS__` 区域：替换 `_LINUX_SOCKET_H` → `_UAPI_LINUX_SOCKET_H`，添加 `typedef unsigned short __kernel_sa_family_t` | ✅ 0001-tools-libipv6.c.patch 已生成 |
+| tools/libipv6.c | 修正 OHOS sockaddr_storage 冲突守卫 | 使用 `#ifdef _SYS_SOCKET_H` 特性检测预定义 `_UAPI_LINUX_SOCKET_H` 跳过冲突头文件，提供 `__kernel_sa_family_t` typedef | ✅ 0001-tools-libipv6.c.patch 已生成 |
 
 ## 依赖版本
 
@@ -103,10 +103,6 @@ addr6 -a ff02::1 -q  →  ff02::1 ✅
 3. blackhole6/messi/script6 是脚本文件而非编译产物
 4. 配置文件 ipv6toolkit.conf 中数据路径已硬编码为 `$DEFAULT_PREFIX/share/ipv6toolkit/`（运行时路径正确）
 5. 补丁通过 `#ifdef _SYS_SOCKET_H` 特性检测预定义 `_UAPI_LINUX_SOCKET_H` guard 跳过冲突头文件，不使用 `__OHOS__` 平台宏（R8 合规）
-
-**编译结束**: 2026-06-16
-**最终状态**: published
----
 
 **编译结束**: 2026-07-20 22:27
 **最终状态**: built
