@@ -1,7 +1,6 @@
 from conan import ConanFile
 from conan.errors import ConanException
-from conan.tools.files import get, copy, rename
-from conan.tools.gnu import AutotoolsToolchain, Autotools
+from conan.tools.files import get, copy
 import os
 
 
