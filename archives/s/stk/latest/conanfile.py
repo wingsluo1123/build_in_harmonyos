@@ -28,21 +28,33 @@ class StkConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # Only the Conan toolchain/presets here. All STK CMake *options* are
+        # passed on the cmake command line in build() because tc.variables
+        # (toolchain file) is NOT honoured by a direct `cmake` invocation,
+        # which is how Conan drives configure().
         tc = CMakeToolchain(self)
-        shared = bool(self.options.shared)
-        tc.variables["BUILD_SHARED"] = shared
-        tc.variables["BUILD_STATIC"] = not shared
-        tc.variables["REALTIME"] = False
-        tc.variables["COMPILE_PROJECTS"] = False
         tc.generate()
 
     def build(self):
         cmake = CMake(self)
-        # CMake >= 4.0 removes compatibility with cmake_minimum_required(<3.5).
-        # CMAKE_POLICY_VERSION_MINIMUM only takes effect when passed on the
-        # command line (-D), NOT via the toolchain file / tc.variables, so we
-        # set it here instead of in generate().
-        cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
+        shared = bool(self.options.shared)
+        # Every STK option MUST be on the command line (-D):
+        #  - CMAKE_POLICY_VERSION_MINIMUM=3.5: CMake >= 4.0 removed
+        #    compatibility with cmake_minimum_required(<3.5); STK declares 3.1.
+        #  - REALTIME=OFF: REQUIRED on OHOS. STK's realtime block ends with
+        #    FATAL_ERROR "Unknown system type for realtime support." for any
+        #    system that is not Linux/Darwin/Windows.
+        #  - COMPILE_PROJECTS=OFF: skip the example/demo executables.
+        #  - BUILD_SHARED/STATIC: match the Conan shared option.
+        cmake.configure(variables={
+            "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+            "BUILD_SHARED": "ON" if shared else "OFF",
+            "BUILD_STATIC": "OFF" if shared else "ON",
+            "REALTIME": "OFF",
+            "COMPILE_PROJECTS": "OFF",
+            "ENABLE_ALSA": "OFF",
+            "ENABLE_JACK": "OFF",
+        })
         cmake.build()
 
     def package(self):
