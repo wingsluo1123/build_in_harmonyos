@@ -1,1 +1,1 @@
-. "/storage/Users/currentUser/.opendesk/apps/skills/resources/harmony-compile-skill/archives/o/ocaml/4.14.1/test_package/conanbuildenv-release-armv8.sh"
+. "/storage/Users/currentUser/Documents/main/build_in_harmonyos-main (1)/ocaml-pr/archives/o/ocaml/4.14.1.1/test_package/conanbuildenv-release-armv8.sh"

@@ -10,6 +10,7 @@ compilation process. Key platform adaptations for OHOS:
   - boot/ocamlrun copy uses rm -f && cp (HMDFS workaround)
 """
 import os
+import shlex
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, replace_in_file
@@ -51,7 +52,9 @@ class OcamlConan(ConanFile):
         ar = self.conf.get("tools.build:compiler_executables", default={}).get("ar", "ar")
         # config.guess/configure 需要可写的临时目录（真机 HOME 受限），TMPDIR 指向构建目录
         build_dir = self.build_folder
-        tool_env = f"CC={cc} AS={asm} AR={ar} TMPDIR={build_dir}"
+        # shlex.quote 防御 conf 注入（R33 值可能含特殊字符）
+        tool_env = (f"CC={shlex.quote(cc)} AS={shlex.quote(asm)} "
+                    f"AR={shlex.quote(ar)} TMPDIR={shlex.quote(build_dir)}")
         # Step 1: Run configure with --no-create to generate config.status without executing it
         # OHOS hmmac 策略拒绝直接执行带 shebang 的脚本 (EACCES/126)，须用显式解释器调用
         # autoconf 只探测 gcc/cc，须显式注入 CC 指向 OHOS Clang
@@ -67,7 +70,8 @@ class OcamlConan(ConanFile):
             'tmp=${TMPDIR:-.}/conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")',
             'tmp="${TMPDIR:-.}/cs.$$"\n  rm -rf "$tmp" && mkdir -p "$tmp"')
         # Step 3: Run config.status manually
-        self.run(f"CC={cc} TMPDIR={build_dir} /bin/sh ./config.status", env="conanrun")
+        self.run(f"CC={shlex.quote(cc)} TMPDIR={shlex.quote(build_dir)} /bin/sh ./config.status",
+                 env="conanrun")
         # Step 4: Fix ASM: llvm-as expects LLVM IR, but OCaml generates GAS assembly.
         # 注入 AS=GNU as 时 configure 已生成正确 ASM，此替换仅在检测到 llvm-as 时生效（strict=False）
         replace_in_file(self, "Makefile.config", "ASM=llvm-as", "ASM=clang -c", strict=False)
