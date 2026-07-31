@@ -1,0 +1,69 @@
+# 版本级 manifest — lite (lite-xl) 2.1.8
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.1.8"
+software: "lite"
+
+# 编译状态：published | built | failed | archived
+# 未在真实环境完成 conan create/conan-verify（环境阻塞），按 R29 不能标 published，
+# 保守标 built，待真实环境验证通过后由 finish 流程更新。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-29"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 源码下载 URL（R39 官方源）
+  url: "https://github.com/lite-xl/lite-xl/archive/refs/tags/v2.1.8.tar.gz"
+
+  # 源码校验和 ——【环境阻塞待验证】沙箱无法 spawn shell，待环境可用后计算回填
+  sha256: "fcaffb946bc60583369cb040d533a4ac18075a6d474d49a2a5ff4bf87e2e9a10"   # TODO: 待环境可用后计算
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: meson
+
+  configure_options:
+    - "-Dwrap_mode=nodownload"
+    - "-Ddefault_library=static"
+    - "-Dc_std=gnu11"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "sdl2/2.30.10"
+    - "freetype/2.14.3"
+    - "lua/5.4.8"
+    - "pcre2/10.45.1"
+    # agg 本仓暂无配方 —— W0/R36 阻塞，先适配发布 agg 再构建（见 notes.md）
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+# TODO: 若 tarball 未内嵌 agg 子项目源码，需要
+#   - 先发布 agg 的 conan 配方（R36）
+#   - 补丁让 lite-xl meson.build 优先 dependency('agg')（见 conandata.yml 注释）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "lite-xl 2.1.8 用 Meson 构建，产物为 bin/lite-xl 可执行文件 + share/lite-xl 数据（R38：需 software 级 commands.json）"
+  - "依赖 SDL3/SDL2、freetype2、lua、libpcre2-8、agg；本仓有 sdl3/3.4.8 OHOS 适配归档（status built、G0-G4 pass、4 个 OHOS 补丁）但无 conan 配方 → 暂用 SDL2；SDK3 切换：sdl3 补全配方并发布后改 requires，按 prefer_sdl3 构建；agg 本仓不存在（archives/a/agg 缺失），需先发布（R36）"
+  - "sdl3/3.4.8 归档 OHOS 适配要点（SDK3 切换时复用）：0002 定义 SDL_PLATFORM_OHOS 并取消 SDL_PLATFORM_LINUX；0004 禁用 pthread_setcanceltype（OHOS pthread 不完整）；0001/0003 禁用 SDL_TRAY（无 Gtk）并排除 SDL_Gtk_Quit 调用"
+  - "luajit/2.1.rolling 仅有适配归档无 conan 配方，未纳入本配方（上游主线 2.x 用 Lua 5.4）"
+  - "OHOS Meson 需注入 ar/ranlib 全路径到 conan_meson_native.ini（沿用 dav1d/fontconfig 模式）"
+  - "应用包可执行文件需 binary-sign-tool 签名（OHOS XPM，dav1d 实证）"
+  - "lite-xl meson 用 dependency('lua') 找 Lua，本仓 lua 配方 pkg-config 名是 lua-5.4，generate() 补 lua.pc/lua5.4.pc 别名"
