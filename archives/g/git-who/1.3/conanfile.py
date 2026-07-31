@@ -30,8 +30,13 @@ class GitWhoConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        # Build using Go (requires Go toolchain in CI)
-        self.run("go build -o git-who .", cwd=self.source_folder)
+        # Build using Go with OHOS arm64 cross-compile env vars (project convention)
+        self.run(
+            "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
+            "GOPROXY=https://goproxy.cn,direct "
+            "go build -ldflags=\"-s -w\" -o git-who .",
+            cwd=self.source_folder,
+        )
 
     def package(self):
         copy(self, "git-who", src=self.source_folder,
