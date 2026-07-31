@@ -8,7 +8,7 @@ log4cpp 是一个 C++ 日志库，提供日志分类、优先级、Appender、La
 | 版本 | 状态 | 构建系统 | 本地验证 |
 |------|------|----------|----------|
 | 1.1.6 | built | CMake | 上游 CTest 17/17，消费者断言 17/17 |
-| 1.1.4 | pending | CMake | 消费者测试 4 项 API 检查，OHOS CI 待确认 |
+| 1.1.4 | pending | CMake | Autotools 上游测试 12/12，Conan 消费者 smoke 4/4，OHOS CI #11624 通过 |
 
 ## OHOS 适配
 
