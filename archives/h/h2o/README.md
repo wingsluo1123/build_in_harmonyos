@@ -16,5 +16,6 @@ it does not convert a skipped MRuby test into a passing test.
 ## Validation Status
 
 The `h2o -v` consumer check only verifies the packaged binary. No upstream
-test result is claimed until the OpenHarmony CI has run the upstream `check`
-target.
+test result is claimed until the full upstream `check` target has run on an
+OpenHarmony PC device and recorded an actual `passed/total` result. Pending CI
+and host-native results are not OpenHarmony device validation.

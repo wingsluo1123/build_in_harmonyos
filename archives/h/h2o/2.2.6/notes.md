@@ -6,4 +6,6 @@ runnable; cross builds require separate target-side test evidence. It is not
 replaced with a consumer-only smoke test. Perl is a declared build tool because
 the target invokes `prove`. MRuby is disabled because it needs host Ruby and
 Bison during the target build. The selected H2O core, event-loop, picotls and
-Perl test path remain upstream code.
+Perl test path remain upstream code. A completed adaptation requires the full
+upstream suite to run on an OpenHarmony PC device with an actual
+`passed/total` result; host results and pending CI are not target validation.
