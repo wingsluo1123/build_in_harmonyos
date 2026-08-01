@@ -28,6 +28,10 @@ class NcursesConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def export(self):
+        # conan 2.x 正道：export() 阶段把 patches/ + conandata.yml 拷到 cache e/ folder
+        export_conandata_patches(self)
+
     def requirements(self):
         pass
 
@@ -63,13 +67,8 @@ class NcursesConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # 手动应用 patch（conan 2.x 的 apply_conandata_patches 在 cache s/patches/ 找不到，
-        # 因 recipe export 阶段没拷 patches 到 export folder；直接用 patch 命令最可靠）
-        patch_file = os.path.join(self.recipe_folder, "patches", "0001-port-for-ohos.patch")
-        if os.path.exists(patch_file):
-            ret = self.run(f"patch -p1 < \"{patch_file}\"", cwd=self.source_folder, shell=True)
-            if ret != 0:
-                raise ConanException(f"patch 0001-port-for-ohos failed with exit code {ret}")
+        # conan 2.x 正道：export() 已把 patches 拷到 cache e/，apply_conandata_patches 在 e/patches/ 找
+        apply_conandata_patches(self)
         # HMDFS 不允许 cwd 写临时文件，给 configure 提供 TMPDIR
         with tempfile.TemporaryDirectory() as tmpdir:
             bash = os.environ.get("CONFIG_SHELL", "bash")
