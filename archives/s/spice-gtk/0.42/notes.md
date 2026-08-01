@@ -13,15 +13,19 @@ WebDAV/phodav/libsoup, USB redirection, USB ACL helper/libcap-ng/polkit, SASL,
 Opus, smartcard/cacard, Wayland protocol generation, EGL, introspection, VAPI,
 gtk-doc, translations, and man pages.
 
-## High-difficulty evidence
+## Path B knowledge extension
 
-`spice-gtk` is tightly coupled to desktop/session infrastructure and remote
-display paths. The source tree binds together GTK/GDK, GLib/GIO, GStreamer
-video/audio pipelines, SPICE protocol code generators, optional Wayland/X11
-window handles, USB redirection, WebDAV file transfer, SASL authentication, and
-smart-card support. Full validation normally requires a live SPICE server and
-desktop/display/audio/USB integration, which is outside a simple compile-only
-test environment.
+This is a Path B knowledge-extension submission, linked to Issue #1233. The
+reusable contribution is
+`knowledge/drafts/DRAFT-spice-gtk-remote-desktop-staging.kv`: it describes how
+to stage remote-desktop GUI clients by separating the core client library from
+device-side channels that cannot yet be validated on OpenHarmony.
+
+The rule records the diagnostic keywords, root cause, Meson feature boundary,
+recommended staged options, a verification entry point, and a guardrail against
+claiming complete remote-desktop support without a live SPICE server and real
+display/audio/USB evidence. The detailed Path B scope, evidence, and review
+questions are in `reports/path-b-knowledge-extension.md`.
 
 ## R40 validation status
 
@@ -75,4 +79,5 @@ Results:
 
 Test-rate claim from this precheck: upstream tests 0/5 executed, added
 `test_package` compile/link tests 1/1 passed. Do not claim runtime smoke
-execution passed on OHOS.
+execution passed on OHOS. The latest remote CI is dependency-blocked before the
+spice-gtk build starts; it does not add an upstream-test result.
