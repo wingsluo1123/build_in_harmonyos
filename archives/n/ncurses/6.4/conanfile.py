@@ -27,6 +27,8 @@ class NcursesConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+        # conan 2.x 默认不把 patches/ 拷到 source cache，显式 export 让 apply_conandata_patches 找到
+        export_conandata_patches(self)
 
     def requirements(self):
         pass
