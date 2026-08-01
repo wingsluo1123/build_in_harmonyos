@@ -4,7 +4,18 @@
 -project('VapourSynth', 'c', 'cpp', 'cython',
 +project('VapourSynth', 'c', 'cpp',
      default_options: ['buildtype=release', 'b_lto=true', 'b_ndebug=if-release', 'c_std=c99', 'cpp_std=c++17'],
-@@ -50,8 +50,9 @@ lang = ['c', 'cpp']
+@@ -17,6 +17,8 @@ build_wheel = get_option('build_wheel')
+ if not build_wheel
+     enable_vspipe = false
+-    enable_python_module = false
+ endif
+-
++if enable_python_module
++    add_languages('cython', required: true)
++endif
++
+ cxx = meson.get_compiler('cpp')
+@@ -50,8 +52,12 @@ lang = ['c', 'cpp']
  pkg = import('pkgconfig')
 -
 -py = import('python').find_installation(pure: false)
@@ -13,10 +24,22 @@
 -install_dir = build_wheel ? py.get_install_dir() / 'vapoursynth' : []
 -
 +install_dir = []
++python_embed_link_args = []
 +if enable_vsscript or enable_python_module or enable_vspipe or build_wheel
 +    py = import('python').find_installation(pure: false)
-+    py_dep = py.dependency(version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
-+    install_dir = build_wheel ? py.get_install_dir() / 'vapoursynth' : []
++    py_dep = py.dependency(embed: host_system == 'ohos', version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
++    install_dir = (enable_python_module or build_wheel) ? py.get_install_dir() / 'vapoursynth' : []
++    python_libdir = run_command(py, '-c', 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")', check: true).stdout().strip()
++    python_embed_link_args = ['-L' + python_libdir, '-lpython3.12']
 +endif
 +
  vs_current_release = run_command(
+@@ -251,7 +257,8 @@ if enable_core
+             files('src/common/wave.cpp', 'src/cython/vapoursynth.pyx'),
+             dependencies: [py_dep, vapoursynth_dep],
+             install: true,
+             install_rpath: '$ORIGIN',
++            link_args: python_embed_link_args,
+             limited_api: '3.12',
+             override_options: 'cython_language=cpp',
+             subdir: 'vapoursynth',

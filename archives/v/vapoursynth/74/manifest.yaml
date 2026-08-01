@@ -6,25 +6,28 @@ compile_date: 2026-07-28
 dependencies:
   required:
     - "zimg/3.0.6"
-  optional:
-    - "Python >= 3.12 for VSScript/Python module"
-    - "Cython for Python module"
+    - "Python >= 3.12 runtime for packaged Python module tests"
+    - "Cython >= 3.1 for building the Python module"
 patches_applied:
   - "patches/0001-meson-skip-python-probe-when-disabled.patch"
 test_results:
   type: conan-test-package
-  total: 3
-  passed: 3
+  total: 229
+  passed: 229
   failed: 0
   note: |
-    True-device single-package CI passed in
-    /storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20260728-233538-34842.
     test_package builds a direct C consumer, verifies getVapourSynthAPI returns
     a non-null VSAPI pointer, checks the reported API version, and creates/frees
-    a VSCore instance.
+    a VSCore instance. The Python module is enabled and packaged for the default
+    recipe so upstream tests can run on OHOS.
+    Upstream coverage now includes all 12 upstream Python test files: 11 unittest
+    modules passed with 157 cases, and expr_compiler/compiler_test.py is executed
+    through a test_package-built OHOS ExprDebugger binary over 69 expressions.
+    True-device single-package CI passed in
+    /storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20260801-111931-20060.
 knowledge_ref: []
 notes:
   - "Issue: https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/issues/1456"
   - "zimg/3.0.6 dependency PR has been merged to origin/main via issue #1459, but this workstation still cannot confirm an ohpcd binary package."
   - "True-device validation exported the merged zimg recipe and reused the locally built OHOS package while ohpcd visibility lagged on this workstation."
-  - "Recipe defaults to core library only; VSScript/Python module remains disabled pending Python/Cython dependency planning."
+  - "Recipe defaults to building and packaging the Python module so upstream Python tests execute in test_package; VSScript and vspipe remain disabled."

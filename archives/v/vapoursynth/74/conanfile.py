@@ -28,11 +28,13 @@ class VapoursynthConan(ConanFile):
         "shared": [True, False],
         "fPIC": [True, False],
         "vsscript": [True, False],
+        "python_module": [True, False],
     }
     default_options = {
         "shared": True,
         "fPIC": True,
         "vsscript": False,
+        "python_module": True,
     }
 
     def export_sources(self):
@@ -56,6 +58,9 @@ class VapoursynthConan(ConanFile):
         self.requires("zimg/3.0.6")
 
     def generate(self):
+        if self.options.python_module:
+            self._ensure_python_build_tools()
+
         PkgConfigDeps(self).generate()
         VirtualRunEnv(self).generate()
 
@@ -66,9 +71,11 @@ class VapoursynthConan(ConanFile):
         tc.project_options["enable_x86_asm"] = False
         tc.project_options["enable_vsscript"] = bool(self.options.vsscript)
         tc.project_options["enable_vspipe"] = False
-        tc.project_options["enable_python_module"] = False
+        tc.project_options["enable_python_module"] = bool(self.options.python_module)
         tc.project_options["build_wheel"] = False
         tc.generate()
+        if self.options.python_module:
+            self._inject_meson_cython()
         self._inject_meson_archiver()
         self._inject_meson_pkg_config()
         self._wrap_nonexecutable_meson_compilers()
@@ -83,6 +90,8 @@ class VapoursynthConan(ConanFile):
         copy(self, "COPYING.LESSER", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
         Meson(self).install()
         self._ensure_unversioned_shared_libraries()
+        self._package_python_module()
+        self._package_upstream_tests()
         self._sign_shared_libraries()
 
     def package_info(self):
@@ -98,6 +107,62 @@ class VapoursynthConan(ConanFile):
 
         libdir = os.path.join(self.package_folder, "lib")
         self.runenv_info.prepend_path("LD_LIBRARY_PATH", libdir)
+        pythondir = os.path.join(self.package_folder, "python")
+        if os.path.isdir(pythondir):
+            self.runenv_info.prepend_path("PYTHONPATH", pythondir)
+            self.runenv_info.prepend_path("LD_LIBRARY_PATH", os.path.join(pythondir, "vapoursynth"))
+
+    def _ensure_python_build_tools(self):
+        has_cython = False
+        try:
+            subprocess.run(
+                [
+                    "python3",
+                    "-c",
+                    (
+                        "import Cython; "
+                        "version = tuple(int(part) for part in Cython.__version__.split('.')[:2]); "
+                        "raise SystemExit(0 if version >= (3, 1) else 1)"
+                    ),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            has_cython = True
+        except (OSError, subprocess.CalledProcessError):
+            pass
+        if not has_cython:
+            self.run("python3 -m pip install --user Cython==3.1.2")
+        self._prepend_cython_wrapper()
+
+    def _prepend_cython_wrapper(self):
+        wrapper_dir = os.path.join(self.generators_folder, "cython-wrapper")
+        os.makedirs(wrapper_dir, exist_ok=True)
+        shell = "/system/bin/sh" if os.path.exists("/system/bin/sh") else "/bin/sh"
+        for name in ("cython", "cython3"):
+            wrapper = os.path.join(wrapper_dir, name)
+            with open(wrapper, "w", encoding="utf-8") as handle:
+                handle.write("#!{}\nexec python3 -m cython \"$@\"\n".format(shell))
+            os.chmod(wrapper, 0o755)
+        os.environ["PATH"] = wrapper_dir + os.pathsep + os.environ.get("PATH", "")
+
+    def _inject_meson_cython(self):
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        cython = os.path.join(self.generators_folder, "cython-wrapper", "cython")
+        if not os.path.isfile(native_file) or not os.path.isfile(cython):
+            return
+        with open(native_file, encoding="utf-8") as handle:
+            content = handle.read()
+        if "[binaries]" not in content or "\ncython =" in content:
+            return
+        shell = "/system/bin/sh" if os.path.exists("/system/bin/sh") else "/bin/sh"
+        insertion = "[binaries]\ncython = ['{}', '{}']\n".format(
+            shell.replace("\\", "/"),
+            cython.replace("\\", "/"),
+        )
+        with open(native_file, "w", encoding="utf-8") as handle:
+            handle.write(content.replace("[binaries]\n", insertion, 1))
 
     def _inject_meson_archiver(self):
         ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
@@ -200,18 +265,71 @@ class VapoursynthConan(ConanFile):
         if not self.options.shared:
             return
         libdir = os.path.join(self.package_folder, "lib")
+        os.makedirs(libdir, exist_ok=True)
         unversioned = os.path.join(libdir, "libvapoursynth.so")
         versioned = os.path.join(libdir, "libvapoursynth.so.4")
+        if not os.path.exists(versioned):
+            matches = glob.glob(os.path.join(self.package_folder, "**", "libvapoursynth.so.4"), recursive=True)
+            for match in matches:
+                if os.path.normpath(match) != os.path.normpath(versioned):
+                    shutil.copy2(match, versioned)
+                    break
         if os.path.exists(versioned) and not os.path.exists(unversioned):
             shutil.copy2(versioned, unversioned)
+
+    def _package_python_module(self):
+        if not self.options.python_module:
+            return
+        pythondir = os.path.join(self.package_folder, "python", "vapoursynth")
+        os.makedirs(pythondir, exist_ok=True)
+        for source_root, _, files in os.walk(self.package_folder):
+            if os.path.normpath(source_root).startswith(os.path.normpath(pythondir)):
+                continue
+            if os.path.basename(source_root) != "vapoursynth":
+                continue
+            for filename in files:
+                if filename.endswith((".py", ".pyi", ".so")) or filename.startswith("libvapoursynth.so"):
+                    shutil.copy2(os.path.join(source_root, filename), os.path.join(pythondir, filename))
+        if not glob.glob(os.path.join(pythondir, "vapoursynth*.so")):
+            raise RuntimeError("Python module was requested but vapoursynth extension was not packaged")
+        versioned = os.path.join(pythondir, "libvapoursynth.so.4")
+        unversioned = os.path.join(pythondir, "libvapoursynth.so")
+        if os.path.exists(versioned) and not os.path.exists(unversioned):
+            shutil.copy2(versioned, unversioned)
+
+    def _package_upstream_tests(self):
+        tests_dir = os.path.join(self.package_folder, "tests", "upstream")
+        copy(self, "*", src=os.path.join(self.source_folder, "test"), dst=tests_dir)
+        expr_src = os.path.join(self.source_folder, "src", "core", "expr")
+        expr_dst = os.path.join(self.package_folder, "tests", "exprdebugger", "src", "core", "expr")
+        copy(self, "expr.cpp", src=expr_src, dst=expr_dst)
+        copy(self, "expr.h", src=expr_src, dst=expr_dst)
+        copy(self, "main.cpp", src=expr_src, dst=expr_dst)
 
     def _sign_shared_libraries(self):
         if self.settings.os != "OHOS":
             return
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        objcopy = self._find_ohos_tool("llvm-objcopy")
+        signer = self._find_ohos_tool("binary-sign-tool")
         if not os.path.exists(objcopy) or not os.path.exists(signer):
             return
-        for shared_lib in glob.glob(os.path.join(self.package_folder, "lib", "**", "*.so*"), recursive=True):
-            self.run('{} --remove-section .codesign "{}" 2>/dev/null || true'.format(objcopy, shared_lib))
-            self.run('{} sign -inFile "{}" -outFile "{}" -selfSign 1'.format(signer, shared_lib, shared_lib))
+        for shared_lib in glob.glob(os.path.join(self.package_folder, "**", "*.so*"), recursive=True):
+            if os.path.islink(shared_lib):
+                continue
+            signed = shared_lib + ".signed"
+            self.run('{} --remove-section .codesign "{}" 2>/dev/null || true'.format(objcopy, shared_lib), quiet=True)
+            self.run(
+                '{} sign -inFile "{}" -outFile "{}" -selfSign 1'.format(signer, shared_lib, signed),
+                quiet=True,
+            )
+            os.replace(signed, shared_lib)
+
+    def _find_ohos_tool(self, name):
+        found = shutil.which(name)
+        if found:
+            return found
+        for prefix in ("/storage/Users/currentUser/usr/local/bin", "/data/service/hnp/bin"):
+            candidate = os.path.join(prefix, name)
+            if os.path.exists(candidate):
+                return candidate
+        return name

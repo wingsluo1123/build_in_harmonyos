@@ -1,15 +1,24 @@
 test:
   type: conan-test-package
-  language: c
-  framework: direct-compiler
-  assertion_count: 3
+  language: c/c++/python
+  framework: direct-compiler + upstream-unittest
+  assertion_count: 229
   commands:
     - "clang test_vapoursynth.c -o test_vapoursynth -lvapoursynth"
+    - "clang++ -std=c++17 expr.cpp main.cpp -o ExprDebugger.exe"
     - "./test_vapoursynth"
+    - "PYTHONPATH=<package>/tests/upstream:<package>/python python3 -m unittest async_test environment_test expr_test filter_test log_test lut_test prop_dict_test range_property_compat test weakref_test zimgtest"
+    - "python3 run_expr_compiler_test.py <package>/tests/upstream/expr_compiler/compiler_test.py ./ExprDebugger.exe"
   assertions:
     - "getVapourSynthAPI(VAPOURSYNTH_API_VERSION) returns a non-null VSAPI pointer"
     - "VSAPI reported version matches the headers used by the consumer"
     - "VSAPI can create and free a VSCore instance"
 upstream_tests:
-  status: not-run
-  reason: "Upstream tests are Python-module tests; this precheck recipe disables the Python module until Python/Cython packaging is handled separately."
+  status: run
+  source_files: 12
+  passed_files: 12
+  unittest_modules: 11
+  unittest_cases: 157
+  expr_compiler_harnesses: 1
+  expr_compiler_expressions: 69
+  result: "All upstream Python unittest modules pass; upstream expr_compiler/compiler_test.py is executed through a test_package-built OHOS ExprDebugger binary."

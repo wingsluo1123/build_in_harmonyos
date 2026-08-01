@@ -20,6 +20,7 @@ class VapoursynthTestConan(ConanFile):
     def build(self):
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
         cc = self._resolve_tool(compilers.get("c"), "clang")
+        cxx = self._resolve_tool(compilers.get("cpp"), "clang++")
         dep = self.dependencies["vapoursynth"].cpp_info
 
         exe = os.path.join(self.build_folder, "test_vapoursynth")
@@ -39,11 +40,73 @@ class VapoursynthTestConan(ConanFile):
             cmd.append("-pthread" if system_lib == "pthread" else "-l" + system_lib)
 
         self.run(" ".join(shlex.quote(part) for part in cmd))
+        self._build_expr_debugger(cxx)
 
     def test(self):
         if can_run(self):
             exe = os.path.join(self.build_folder, "test_vapoursynth")
             self.run(shlex.quote(exe), env="conanrun")
+            self._run_upstream_python_tests()
+
+    def _run_upstream_python_tests(self):
+        dep = self.dependencies["vapoursynth"]
+        package_folder = dep.package_folder
+        pythonpath = os.path.join(package_folder, "python")
+        tests_dir = os.path.join(package_folder, "tests", "upstream")
+        libdir = os.path.join(package_folder, "lib")
+        module_libdir = os.path.join(pythonpath, "vapoursynth")
+        test_modules = [
+            "async_test",
+            "environment_test",
+            "expr_test",
+            "filter_test",
+            "log_test",
+            "lut_test",
+            "prop_dict_test",
+            "range_property_compat",
+            "test",
+            "weakref_test",
+            "zimgtest",
+        ]
+        env = (
+            "PYTHONPATH={tests_dir}:{pythonpath} "
+            "LD_LIBRARY_PATH={module_libdir}:{libdir}:$LD_LIBRARY_PATH "
+        ).format(
+            tests_dir=shlex.quote(tests_dir),
+            pythonpath=shlex.quote(pythonpath),
+            module_libdir=shlex.quote(module_libdir),
+            libdir=shlex.quote(libdir),
+        )
+        cmd = "{} python3 -m unittest {}".format(env, " ".join(test_modules))
+        self.run(cmd, env="conanrun")
+        self._run_expr_compiler_harness(tests_dir)
+
+    def _build_expr_debugger(self, cxx):
+        dep = self.dependencies["vapoursynth"]
+        dep_cpp_info = dep.cpp_info
+        expr_src = os.path.join(dep.package_folder, "tests", "exprdebugger", "src", "core", "expr")
+        exe = os.path.join(self.build_folder, "ExprDebugger.exe")
+        cmd = [
+            *self._exec_tool(cxx),
+            "-std=c++17",
+            os.path.join(expr_src, "expr.cpp"),
+            os.path.join(expr_src, "main.cpp"),
+            "-o",
+            exe,
+        ]
+        for include_dir in dep_cpp_info.includedirs:
+            cmd.append("-I" + include_dir)
+        self.run(" ".join(shlex.quote(part) for part in cmd))
+
+    def _run_expr_compiler_harness(self, tests_dir):
+        expr_debugger = os.path.join(self.build_folder, "ExprDebugger.exe")
+        runner = os.path.join(self.source_folder, "run_expr_compiler_test.py")
+        cmd = "python3 {} {} {}".format(
+            shlex.quote(runner),
+            shlex.quote(os.path.join(tests_dir, "expr_compiler", "compiler_test.py")),
+            shlex.quote(expr_debugger),
+        )
+        self.run(cmd, env="conanrun")
 
     def _resolve_tool(self, configured, fallback):
         if configured and os.path.exists(configured):
