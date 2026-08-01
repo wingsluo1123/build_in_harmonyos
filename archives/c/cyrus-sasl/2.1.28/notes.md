@@ -51,7 +51,7 @@ consumer API without system-authentication services.
 
 PR CI build #11317 failed in `source()` before the consumer test ran because
 the conandata patches were not present in the exported source folder. The
-current local follow-up adds `exports_sources = "patches/*"`, but it has not
-been pushed to the PR source branch or validated by CI. This archive therefore
+the pushed follow-up adds `exports_sources = "patches/*"`, but the new PR head
+has not been validated by CI. This archive therefore
 uses `status: failed`; it does not claim a successful local Conan build,
 consumer test, package upload, or OpenHarmony runtime test.

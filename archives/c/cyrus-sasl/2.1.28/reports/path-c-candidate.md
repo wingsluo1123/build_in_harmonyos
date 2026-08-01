@@ -38,7 +38,7 @@ package publication, or an OpenHarmony runtime result.
 | Source integrity | `conandata.yml` uses the official 2.1.28 release URL and SHA256 `7ccfc6abd01ed67c1a0924b353e526f1b766b21f42d4562ee635a8ebfc5bb38c`. |
 | Review discussions | The PR shows 13 of 13 review discussions resolved. |
 | Latest remote CI | PR CI build #11317 failed in `source()` because patch files were not exported before `apply_conandata_patches()`. This is not a passing CI result. |
-| Local follow-up | The unpushed `exports_sources = "patches/*"` correction addresses that export failure, but it has not received a CI run. |
+| Local follow-up | The pushed `exports_sources = "patches/*"` correction addresses that export failure, but the new PR head has not received a CI run. |
 | Local execution | No local Conan build or Cyrus consumer test is claimed here. The official source download attempted for host validation was reset by the remote before extraction. |
 | OpenHarmony runtime | No target device or runtime execution has been performed. Plugin, backend, and service behavior remain out of scope for this first pass. |
 
@@ -61,6 +61,6 @@ package publication, or an OpenHarmony runtime result.
 
 ## Related Issue
 
-No Path C candidate Issue was linked to PR #3400 at inspection time. The Issue
-must link this document and record the same evidence boundaries before the PR
-can claim candidate-document compliance.
+Issue [#1718](https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/issues/1718)
+records the same candidate-only scope, actual validation boundary, acceptance
+items, and review questions, and links both this document and PR #3400.
