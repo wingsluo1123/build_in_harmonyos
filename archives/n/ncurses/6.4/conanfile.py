@@ -22,7 +22,7 @@ class NcursesConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False], "widec": [True, False]}
     default_options = {"shared": False, "fPIC": True, "widec": True}
-    generators = "AutotoolsToolchain"
+    # AutotoolsToolchain 不放 generators attribute（generate() 内实例化，conan 2.x 不允许两者并存）
     no_copy_source = True
 
     def layout(self):
