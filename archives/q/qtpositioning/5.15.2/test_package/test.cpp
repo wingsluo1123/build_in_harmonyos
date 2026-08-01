@@ -22,7 +22,8 @@ int main(int argc, char *argv[])
     qDebug() << "Rectangle:" << rect.toString();
 
     // Test QGeoPositionInfoSource symbol availability
-    QStringList sources = QGeoPositionInfoSource::availableSources();
+    // Qt 5.15.2 中 availableSources() 静态返回 QList<QByteArray>
+    QList<QByteArray> sources = QGeoPositionInfoSource::availableSources();
     qDebug() << "Available position sources:" << sources;
 
     qDebug() << "QtPositioning test PASSED!";
