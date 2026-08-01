@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Conan recipe — Clp (COIN-OR Linear Programming) 1.17.10.
 
-Autotools project. Depends on coinutils and osi.
+Autotools project. 上游 Depends on coinutils and osi，但两者未发布到制品仓，
+本配方不声明依赖（同 klystrack 删 sdl2_image 逻辑），构建时需自带或 CI worker 预装。
 """
 import os
 from conan import ConanFile
@@ -35,8 +36,8 @@ class ClpConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("coinutils/2.11.10")
-        self.requires("osi/0.108.9")
+        # coinutils/osi 未发布到制品仓，不声明依赖（CI worker 预装或自带源码）
+        pass
 
     def layout(self):
         basic_layout(self)
