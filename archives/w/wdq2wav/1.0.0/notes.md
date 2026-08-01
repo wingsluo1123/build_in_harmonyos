@@ -49,3 +49,30 @@ CI_PACKAGES="archives/w/wdq2wav/1.0.0" zsh ci/conan/build_and_test.sh
 - 编译日志是否使用 OHOS profile 注入的 `clang++`
 - `bin/wdq2wav` 和 `share/man/man1/wdq2wav.1` 是否进入包产物
 - `test_package` 是否成功编译并运行 `test_wdq2wav`，间接执行 `wdq2wav -h`
+
+## 真机验证结果
+
+统一入口规范验证：
+
+```sh
+sh "$HOME/ohos-users/windrel/wdq2wav-1.0.0-pr1715/run-conan-heavy.sh"
+```
+
+最终 runner 目录：
+
+```text
+$HOME/ohos-test-runs/windrel-1.0.0-wdq2wav-1.0.0-pr1715-conan-20260801-152916-30536
+```
+
+验证摘要：
+- `L0_RESULT=pass: all checks passed`
+- `L1_RESULT=pass: test_package executed`
+- `L2_RESULT=skip: wdq2wav version/help failed`（CI 内置探针使用 `--help/--version`，上游工具支持 `-h`；非阻塞）
+- `L4_RESULT=pass: patches clean`
+- `L5_RESULT=pass: bin/ has content`
+- `Build Summary`: `Total: 1`, `Success: 1`, `Failed: 0`
+- `test_package`: 成功编译并运行 `test_wdq2wav`，输出 `wdq2wav CLI help test: OK`
+
+保留的非阻塞提示：
+- `L0k` 提示 CLI 工具缺少 `commands.json`；本轮遵守“只改版本目录”约束，未新增软件级 `archives/w/wdq2wav/commands.json`。
+- 上游源码存在 2 个 `delete`/`new[]` 警告；未影响构建和消费者测试，本轮不扩大修复范围。
