@@ -20,8 +20,9 @@ class Dex2JarConan(ConanFile):
         self.folders.source = "."
 
     def source(self):
+        # Pass sha256 for supply-chain integrity verification (R39)
         src_data = self.conan_data["sources"][self.version]
-        get(self, src_data["url"], strip_root=True)
+        get(self, src_data["url"], sha256=src_data["sha256"], strip_root=True)
 
     def build(self):
         # Use the Gradle wrapper if available, otherwise system gradle.
