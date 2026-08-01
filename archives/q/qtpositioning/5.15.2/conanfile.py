@@ -74,7 +74,8 @@ class QtpositioningConan(ConanFile):
         config_flag = ""
         if not self.options.shared:
             config_flag = "CONFIG+=static"
-        self.run(f"{qmake_bin} {pro_file} {config_flag}", env="conanbuild")
+        # qmake 只读取自身目录或 -qtconf 指定的 qt.conf，必须显式传入
+        self.run(f"{qmake_bin} -qtconf \"{qt_conf}\" {pro_file} {config_flag}", env="conanbuild")
         self.run("make -j1", env="conanbuild")
 
     def package(self):
