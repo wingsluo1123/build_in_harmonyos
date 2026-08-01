@@ -23,7 +23,7 @@ class NcursesConan(ConanFile):
     options = {"shared": [True, False], "fPIC": [True, False], "widec": [True, False]}
     default_options = {"shared": False, "fPIC": True, "widec": True}
     # AutotoolsToolchain 不放 generators attribute（generate() 内实例化，conan 2.x 不允许两者并存）
-    no_copy_source = True
+    # 不设 no_copy_source: patches 目录需拷到 source cache 让 apply_conandata_patches 找到
 
     def layout(self):
         basic_layout(self)
