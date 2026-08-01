@@ -18,7 +18,7 @@ class NcursesTestConan(ConanFile):
         cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
         inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
         lib = os.path.join(self.dependencies["ncurses"].package_folder, "lib")
-        ret = self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses test.c -lncursesw", cwd=self.build_folder)
+        ret = self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses {os.path.join(self.source_folder, 'test.c')} -lncursesw", cwd=self.build_folder)
         if ret != 0:
             raise ConanException(f"compile test_ncurses failed with exit code {ret}")
 

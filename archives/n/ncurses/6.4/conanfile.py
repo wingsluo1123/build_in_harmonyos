@@ -4,7 +4,7 @@ import os
 import tempfile
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
+from conan.tools.files import get, copy
 from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
