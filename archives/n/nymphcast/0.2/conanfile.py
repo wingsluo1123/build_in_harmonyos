@@ -31,3 +31,4 @@ class NymphcastConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+# OHOS-CI-trigger: re-run build (no functional change)
