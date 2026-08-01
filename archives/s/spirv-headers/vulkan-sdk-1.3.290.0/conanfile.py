@@ -174,7 +174,10 @@ class SpirvHeadersConan(ConanFile):
     def _build_upstream_consumer(self, test_name, prefix, build_name):
         source_folder = os.path.join(self.source_folder, "tests", test_name)
         build_folder = os.path.join(self.build_folder, build_name)
-        definitions = [f'-DCMAKE_PREFIX_PATH="{prefix}"']
+        definitions = [
+            f'-DCMAKE_PREFIX_PATH="{prefix}"',
+            "-DCMAKE_POLICY_VERSION_MINIMUM=3.5",
+        ]
         environment = None
         if test_name == "find_package":
             definitions.append(
