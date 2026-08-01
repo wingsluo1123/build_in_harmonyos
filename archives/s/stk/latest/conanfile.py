@@ -55,6 +55,18 @@ class StkConan(ConanFile):
         # sockets, so selecting that code path is semantically correct.
         # __STK_REALTIME__ stays undefined: no realtime audio backend is built.
         tc.preprocessor_definitions["__OS_LINUX__"] = 1
+        # 选择 __OS_LINUX__ 分支后, Thread.cpp 会调用 pthread_cancel() /
+        # pthread_testcancel() —— OpenHarmony 的 musl 系 libc 并未实现这两个
+        # 函数, 上一轮 CI 即因此报 "use of undeclared identifier
+        # 'pthread_cancel'" 而编译失败。
+        #
+        # patches/0001-src-Thread.cpp.patch 用 #if defined(__OHOS__) 守卫了这
+        # 两处调用, 但该宏必须确实存在守卫才会生效。这里显式定义, 不依赖工具链
+        # 隐式注入 —— 与 archives/a/audit/4.1.2/conanfile.py 中
+        # `tc.extra_defines.append("__OHOS__")  # R8: ... so #ifdef __OHOS__
+        # guards in patches are active` 是同一套做法。
+        if self.settings.os == "OHOS":
+            tc.preprocessor_definitions["__OHOS__"] = 1
         tc.generate()
 
     def build(self):

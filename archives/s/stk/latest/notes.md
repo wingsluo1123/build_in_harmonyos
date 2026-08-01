@@ -43,6 +43,33 @@
 | 1 | OHOS 平台不支持实时音频后端 | 上游对未知平台会中止配置 | 禁用 `REALTIME` 和示例工程，仅构建静态核心库 |
 | 2 | CMake 4 移除旧策略兼容 | 上游最低版本仍为 3.1 | 设置 `CMAKE_POLICY_VERSION_MINIMUM=3.5` |
 | 3 | 源码完整性校验 | master 归档需要固定校验值 | 使用实测 SHA-256 `c5d1fa6ca903b5f0571a2ba036b35cac2aee552f45c7a273e0df793cfefbace7` |
+| 4 | STK 选项未生效 | `tc.variables`（工具链文件）不被直接 `cmake` 调用采纳 | 所有 STK 选项改为 `build()` 中经命令行 `-D` 传入 |
+| 5 | `TEST_BIG_ENDIAN` try_run 失败 | 交叉/受限环境无法运行探测程序 | 固定 `CMAKE_CXX_BYTE_ORDER`，跳过 try_run |
+| 6 | `MUTEX`/`THREAD_HANDLE`/`sockaddr_in` 缺失 | `REALTIME=OFF` 后无人定义 `__OS_LINUX__`，而 CMakeLists 仍 glob 全部 `src/*.cpp` | `tc.preprocessor_definitions["__OS_LINUX__"] = 1` |
+| 7 | `use of undeclared identifier 'pthread_cancel'` / `'pthread_testcancel'` | 选中 `__OS_LINUX__` 分支后 `Thread.cpp` 会调用这两个函数，而 OHOS 的 musl 系 libc 未实现 | `patches/0001-src-Thread.cpp.patch` 守卫调用点，并在 `generate()` 中显式定义 `__OHOS__` 使守卫生效 |
+
+## 关于 pthread_cancel 与 R8 的说明
+
+`Thread.cpp` 的两处调用在 OHOS 上必然编译失败（CI 实测：
+`src/Thread.cpp:62:8: error: use of undeclared identifier 'pthread_cancel'`）。
+
+采用的方案与 `archives/a/axel/2.17.14`（同样是 musl/OHOS 缺 `pthread_cancel`）
+一致：在调用点加 `#if defined(__OHOS__)` 守卫，退化为「不支持取消」的语义
+（`cancel()` 返回 `false`，`testCancel()` 为空操作），调用方本就把 `false`
+当作「无法取消」处理，行为安全。
+
+守卫依赖的 `__OHOS__` **不假定工具链隐式注入**，而是在 `generate()` 中显式
+定义：
+
+```python
+if self.settings.os == "OHOS":
+    tc.preprocessor_definitions["__OHOS__"] = 1
+```
+
+这与 `archives/a/audit/4.1.2/conanfile.py` 的
+`tc.extra_defines.append("__OHOS__")  # R8: Define __OHOS__ so #ifdef __OHOS__
+guards in patches are active` 属同一做法；全仓库共 548 个补丁使用 `__OHOS__`
+守卫，为既有约定。
 
 ## 验证结果
 
