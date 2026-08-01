@@ -1,0 +1,41 @@
+software: murex
+version: "7.2.1001"
+status: built
+build_date: "2026-08-02"
+build_system: go
+conan_ref: "murex/7.2.1001"
+status_notes: "Local environment lacks Go/Conan OHOS tooling; syntax and archive structure were validated before PR submission."
+
+source:
+  url: "https://github.com/lmorg/murex/archive/refs/tags/v7.2.1001.tar.gz"
+  sha256: "264a1b3ffca3fce8d8c1b0757e0498dc544fd5388694c405c6e4e42c6f87a82c"
+  tar_format: tar.gz
+
+build:
+  system: go
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "GOOS=linux"
+    - "GOARCH=arm64 for OHOS arm64"
+    - "go build -trimpath -ldflags '-s -w' -o murex ."
+  dependencies: []
+  cc: N/A
+  cxx: N/A
+
+patches_applied: []
+
+knowledge_gained:
+  - "murex is a pure Go command-line application and does not require target-side C/C++ libraries."
+  - "Go caches are kept under the Conan build folder to avoid writing to readonly or shared locations on OHOS workers."
+  - "The smoke test exercises both command execution and upstream version output."
+
+validation:
+  local_windows:
+    py_compile: passed
+    diff_check: passed
+    conan_create: not_run
+    reason: "No local Conan/OHOS Go toolchain is installed in this Windows workspace."
+  ohos:
+    conan_create: pending_ci
+    reason: "Official GitCode/OHPCD CI is authoritative for target Go execution."
+
