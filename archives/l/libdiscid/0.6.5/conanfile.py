@@ -47,3 +47,4 @@ class LibdiscidConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["discid"]
+# OHOS-CI-trigger: re-run build (no functional change)
