@@ -55,3 +55,4 @@ class StlinkConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "stlink")
         self.cpp_info.set_property("cmake_target_name", "stlink::stlink")
         self.cpp_info.requires = ["libusb::libusb"]
+# OHOS-CI-trigger: re-run build (no functional change)
