@@ -45,12 +45,13 @@ class NcursesConan(ConanFile):
         # 显式按版本取 sources，避免 ** 解包把版本号当 kwarg
         src = self.conan_data["sources"][str(self.version)]
         get(self, **src, strip_root=True)
-        # conan 2.x 默认不把 patches/ 拷到 source cache，显式 copy
-        # （export_conandata_patches 期望 export folder 已有 patches，但 recipe export 阶段没拷过去）
+        # conan 2.x 默认不把 patches/ 拷到 source cache，显式 copy 到 s/patches/
+        # （apply_conandata_patches 在 source_folder/patches/ 找 patch 文件）
         patches_dir = os.path.join(self.recipe_folder, "patches")
         if os.path.isdir(patches_dir):
+            dst_patches = os.path.join(self.source_folder, "patches")
             for pf in os.listdir(patches_dir):
-                copy(self, pf, src=patches_dir, dst=self.source_folder)
+                copy(self, pf, src=patches_dir, dst=dst_patches)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
