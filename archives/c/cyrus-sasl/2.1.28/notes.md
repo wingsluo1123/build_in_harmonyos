@@ -53,7 +53,7 @@ PR CI build #11317 initially failed in `source()` before the consumer test ran
 because the conandata patches were not present in the exported source folder.
 The `exports_sources = "patches/*"` correction was included in subsequent CI
 build #11333, which passed the Conan `test_package` and L0/L1 gates on recipe
-commit `65f19f2b`. Later commits change only Path C compliance documentation and
-do not yet have a separate CI result. This archive therefore uses
+commit `65f19f2b`. Later commits do not have a separate CI result. This archive
+therefore uses
 `status: built`; that remote result does not claim a successful local Conan
 build, package upload, or OpenHarmony runtime test.
