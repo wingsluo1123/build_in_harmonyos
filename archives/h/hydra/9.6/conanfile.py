@@ -17,7 +17,9 @@ class HydraConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):
-        self.requires("openssl/1.1.1w")
+        # 远端仓库仅上架 openssl/3.5.6，1.1.1w 未发布会导致依赖解析失败。
+        # THC Hydra 自 9.2 起已适配 OpenSSL 3.x API，可直接使用 3.x。
+        self.requires("openssl/3.5.6")
         self.requires("zlib/1.3.1")
 
     def layout(self):

@@ -12,7 +12,8 @@
 
 - 源码: https://github.com/vanhauser-thc/thc-hydra/archive/refs/tags/v9.6.tar.gz
 - SHA-256: `c839e5c64ef60185c69a07a9a59831bd2cfe9ac2eac0c4d9e87fdf38dbf04c40`
-- 依赖: `openssl/1.1.1w`、`zlib/1.3.1`
+- 依赖: `openssl/3.5.6`、`zlib/1.3.1`
+  （远端仓库仅上架 openssl 3.x；Hydra 9.6 已适配 OpenSSL 3.x API）
 
 ## Conan 配方
 
