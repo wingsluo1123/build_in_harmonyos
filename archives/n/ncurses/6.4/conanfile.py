@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Conan recipe — ncurses 6.4 (Autotools, static lib for OHOS)."""
 import os
-import tempfile
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
+from conan.tools.env import Environment, environment
 from conan.tools.files import get, copy, export_conandata_patches
 from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -82,16 +82,21 @@ class NcursesConan(ConanFile):
             ret = self.run(f"patch -p1 < \"{patch_file}\"", cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"patch 0001-port-for-ohos failed with exit code {ret}")
-        # HMDFS 不允许 cwd 写临时文件，给 configure 提供 TMPDIR
-        with tempfile.TemporaryDirectory() as tmpdir:
+        # E002/E046: OHOS HMDFS 下 /storage/Users/currentUser/tmp 不可写，
+        # tempfile.TemporaryDirectory() 创建在其下导致 config.status 写临时文件
+        # Permission denied（CI #3810）。用 sandbox 可写目录（hmmac=inherit_parent），
+        # 同 ncurses 6.5 处理。
+        sandbox = "/data/storage/el2/base/haps/entry/files/.ncurses-tmp"
+        self.run(f"mkdir -p {sandbox} && chmod 755 {sandbox}", ignore_errors=True)
+        with environment(Environment().define("TMPDIR", sandbox)):
             bash = os.environ.get("CONFIG_SHELL", "bash")
             configure = os.path.join(self.source_folder, "configure")
             # ncurses 6.4 老 autotools (2022 config.guess) �猜不出 OHOS aarch64，显式传 build/host
-            ret = self.run(f"TMPDIR={tmpdir} {bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu",
+            ret = self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu",
                          cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")
-            ret = self.run(f"make -j$(nproc) TMPDIR={tmpdir}", cwd=self.source_folder, shell=True)
+            ret = self.run("make -j$(nproc)", cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"make failed with exit code {ret}")
 
