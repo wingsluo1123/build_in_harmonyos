@@ -7,14 +7,12 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.env import Environment
 from conan.tools.files import (
     apply_conandata_patches,
     copy,
     export_conandata_patches,
     get,
     replace_in_file,
-    save,
 )
 
 
@@ -98,40 +96,21 @@ class TimewarriorConan(ConanFile):
                 src=os.path.join(self.source_folder, "doc"),
                 dst=os.path.join(self.build_folder, "doc"),
             )
-            shim_dir = os.path.join(test_build, "test-bin")
-            os.makedirs(shim_dir, exist_ok=True)
-            man_shim = os.path.join(shim_dir, "man")
-            save(
-                self,
-                man_shim,
-                "#!/bin/sh\n"
-                "name=\"$1\"\n"
-                "old_ifs=$IFS\n"
-                "IFS=:\n"
-                "for directory in ${MANPATH:-}; do\n"
-                "  for section in 1 5 7; do\n"
-                "    for page in \"$directory/$name.$section\" \"$directory/man$section/$name.$section\"; do\n"
-                "      if [ -f \"$page\" ]; then cat \"$page\"; exit 0; fi\n"
-                "    done\n"
-                "  done\n"
-                "done\n"
-                "IFS=$old_ifs\n"
-                "echo \"No manual entry for $name\" >&2\n"
-                "exit 1\n",
-            )
-            os.chmod(man_shim, 0o755)
-            test_env = Environment()
-            test_env.prepend_path("PATH", shim_dir)
-            test_env.define("MANPATH", os.path.join(self.build_folder, "doc"))
             # Center local wall-clock time at noon so relative ranges cannot
             # cross a date boundary while the upstream suite is running.
             utc_hour = datetime.now(timezone.utc).hour
             posix_offset = utc_hour - 12
-            test_env.define("TZ", f"UTC{posix_offset:+d}")
-            with test_env.vars(self).apply():
+            previous_tz = os.environ.get("TZ")
+            os.environ["TZ"] = f"UTC{posix_offset:+d}"
+            try:
                 self.run("chmod +x *.t problems run_all", cwd=test_build)
                 cmake.build(target="test")
                 self.run("./AtomicFileTest", cwd=test_build)
+            finally:
+                if previous_tz is None:
+                    os.environ.pop("TZ", None)
+                else:
+                    os.environ["TZ"] = previous_tz
 
     def package(self):
         CMake(self).install()
