@@ -1,6 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class StkConan(ConanFile):
@@ -13,7 +13,9 @@ class StkConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": False, "fPIC": True}
-    exports_sources = "patches/*"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def configure(self):
         if self.settings.os == "OHOS":
@@ -26,6 +28,9 @@ class StkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # OHOS libc lacks pthread_cancel()/pthread_testcancel(); see
+        # patches/0001-src-Thread.cpp.patch.
+        apply_conandata_patches(self)
 
     def generate(self):
         # Only the Conan toolchain/presets here. All STK CMake *options* are

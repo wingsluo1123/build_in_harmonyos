@@ -1,0 +1,33 @@
+--- a/src/Thread.cpp
++++ b/src/Thread.cpp
+@@ -57,7 +57,15 @@
+ 
+ bool Thread :: cancel()
+ {
+-#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
++#if defined(__OHOS__)
++
++  // OpenHarmony's libc (musl-derived) does not implement pthread_cancel().
++  // Thread cancellation is simply unavailable on this platform, so report
++  // failure rather than pretending the thread was cancelled. Callers already
++  // treat a false return value as "cancellation not possible".
++  return false;
++
++#elif (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
+ 
+   if ( pthread_cancel(thread_) == 0 ) {
+     return true;
+@@ -96,7 +104,12 @@
+ 
+ void Thread :: testCancel(void)
+ {
+-#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
++#if defined(__OHOS__)
++
++  // No pthread_testcancel() on OpenHarmony. Since Thread::cancel() is a no-op
++  // there, no cancellation request can ever be pending, making this a no-op too.
++
++#elif (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
+ 
+   pthread_testcancel();
+ 
