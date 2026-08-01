@@ -1,0 +1,75 @@
+# E263 — FFTW 3.3.10 CMake 写死 FFTW_VERSION 3.3.9 导致 fftw3.pc Version 错误
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E263
+trigger_tool:           pkg-config|cmake|conan
+phase:                  installation|testing
+error_signature: pkg-config --modversion fftw3.*3.3.9|Version: 3.3.9|set (FFTW_VERSION 3.3.9)
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               pkg-config-version-mismatch
+match_keywords: fftw,pkg-config,fftw3.pc,FFTW_VERSION,CMake,Version field mismatch,upstream hardcoded version
+title: FFTW 3.3.10 tarball CMakeLists.txt hardcodes FFTW_VERSION 3.3.9 leaking into fftw3.pc Version field
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: Upstream fftw-3.3.10.tar.gz CMakeLists.txt sets FFTW_VERSION 3.3.9 (stale; Autotools configure.ac derives 3.3.10 from FFTW_MAJOR/MINOR). CMake configure_file(fftw.pc.in) then writes Version: 3.3.9 into the installed fftw3.pc, so pkg-config --modversion fftw3 reports the wrong version even though the package is 3.3.10.
+affected_scope: FFTW 3.3.10 CMake builds; any consumer reading fftw3.pc Version for version checks; recipe package metadata
+verification_cmd: pkg-config --modversion fftw3 | grep -q '^3.3.10'
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach: Add a recipe patch (0002-fftw-version.patch) that bumps set (FFTW_VERSION 3.3.9) to set (FFTW_VERSION 3.3.10) in CMakeLists.txt and register it in conandata.yml patches
+rec_description: Do not modify upstream source files in place; ship a small patch via conandata.yml so conan create reproduces it from a clean tarball. Same class of issue affects any library whose CMake hardcodes a stale version while Autotools derives the real one.
+rec_command: patch -p1 < patches/0002-fftw-version.patch; conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+rec_auto_fix:           false
+rec_impl:
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach: 在 notes.md / PR 正文中说明版本不一致原因，不改配方
+fallback_description: 若不允许打补丁，则在配方 notes.md 与 PR 正文明确记录上游 CMake 版本号滞后问题，避免误用
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern: 直接修改 conan cache 内已解压源码|绕过 conandata.yml 手工 sed 源码
+forbid_1_reason: 会破坏配方可复现性，conan create 从干净 tarball 无法复现
+forbid_1_consequence: W3/CI 复现失败，submit 被拒
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E207
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E263.md
+last_updated: 2026-08-01
+source_event:           fftw 3.3.10.1 CMake 构建 fftw3.pc Version 校验
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr: PR: fftw/3.3.10.1 (this round)
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 2EBD
