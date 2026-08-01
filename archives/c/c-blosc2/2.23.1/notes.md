@@ -27,22 +27,22 @@ ctest --output-on-failure --timeout 120 -j1   # 上游 CTest 套件
 
 ## 上游测试运行结果（规则 5）
 
-启用 `BUILD_TESTS=ON` 完整运行上游 CTest 套件，`ctest -N` 实际收集 **560 个上游测试用例**：
+启用 `BUILD_TESTS=ON` 完整运行上游 CTest 套件，`ctest -N` 实际收集 **1160 个上游测试用例**：
 
 | 测试类别 | 用例数 | 通过 | 失败 | 通过率 | 说明 |
 |----------|--------|------|------|--------|------|
-| core（核心功能） | 534 | 534 | 0 | 100% | test_blosc1_compat / test_frame / test_shuffle_roundtrip / test_schunk / test_compress_roundtrip / test_contexts / test_delta 等 |
-| compat（数据兼容性） | 26 | 26 | 0 | 100% | test_compat_blosc-* / test_compat_shuffle-* 各版本压缩数据帧回读验证 |
-| **合计** | **560** | **560** | **0** | **100%** | 串行执行 `ctest -j1`，总耗时 166.82s |
+| core（核心功能） | 1134 | 1134 | 0 | 100% | test_blosc1_compat / test_frame / test_schunk / test_contexts / test_delta 等，其中参数化测试按 itemsize×chunksize 展开：test_getitem 399、test_compress_roundtrip 266、test_shuffle_roundtrip 133、test_shuffle_roundtrip_generic 133、test_bitshuffle_roundtrip 133 |
+| compat（数据兼容性） | 26 | 26 | 0 | 100% | test_compat_blosc-*（24 项）/ test_compat_shuffle-* / test_compat_bitshuffle-* 各版本压缩数据帧回读验证 |
+| **合计** | **1160** | **1160** | **0** | **100%** | 串行执行 `ctest -j1`，总耗时 169.34s |
 
 ### 上游测试运行环境
 - 构建目标：OHOS aarch64 (musl libc)，二进制为 `ELF 64-bit arm64, dynamic (/lib/ld-musl-aarch64.so.1)`
 - 运行方式：aarch64 主机原生执行（主机 musl ld `/lib/ld-musl-aarch64.so.1` 兼容 OHOS musl ABI），即"OHOS 目标环境完整运行上游 CTest 套件"
 - 串行 `-j1`：避免并行竞态（`test_fill_special` / `test_frame_get_offsets` 共享临时文件，并行 `-j4` 下偶发 flaky 失败，串行下 100% 通过）
 
-### 上游测试用例清单（560 项分类）
+### 上游测试用例清单（1160 项分类）
 
-**core 核心功能测试（534 项）**——按测试二进制分组：
+**core 核心功能测试（1134 项）**——按测试二进制分组（参数化测试展开为多用例）：
 
 | 测试二进制 | 覆盖功能 |
 |-----------|---------|
@@ -93,8 +93,8 @@ ctest --output-on-failure --timeout 120 -j1   # 上游 CTest 套件
 | test_zero_runlen | zero run-length |
 
 **compat 数据兼容性测试（26 项）**——验证历史版本压缩数据帧可被当前版本正确回读：
-- `test_compat_blosc-*`（18 项）：blosc 1.3.0 / 1.7.0 / 1.17.1 / 1.18.0 / 2.0.0 各版本 × blosclz/lz4/lz4hc/zlib/bitshuffle 各编解码组合
-- `test_compat_shuffle-*`（8 项）：shuffle 1.20.0 / 2.20.0 各版本 bitshuffle 数据回读
+- `test_compat_blosc-*`（24 项）：blosc 1.3.0 / 1.7.0 / 1.17.1 / 1.18.0 / 2.0.0 各版本 × blosclz/lz4/lz4hc/zlib/bitshuffle 各编解码组合
+- `test_compat_shuffle-*` / `test_compat_bitshuffle-*`（2 项）：shuffle 1.20.0 / 2.20.0 各版本 bitshuffle 数据回读
 
 ## 源码修改（补丁）
 
@@ -102,13 +102,13 @@ ctest --output-on-failure --timeout 120 -j1   # 上游 CTest 套件
 
 **问题根因**：内置 ZSTD 1.5.7 `dictBuilder/cover.c` 与 `common/zstd_deps.h` 在 Linux 平台默认 `#define _GNU_SOURCE` 并调用 GNU 扩展 `qsort_r()`。OHOS（musl libc）不提供 `qsort_r` 符号，链接期报 `undefined symbol: qsort_r`，导致所有依赖 ZSTD cover 字典训练的测试二进制（test_dict_schunk 等）无法链接。
 
-**修改内容**（4 处 hunk）：
-1. `common/zstd_deps.h`：`_GNU_SOURCE` 定义守卫增加 `!defined(__OHOS_FAMILY__)`，使 OHOS 不强制定义 `_GNU_SOURCE`
-2. `dictBuilder/cover.c` 第 27 行：同上，cover.c 内部的 `_GNU_SOURCE` 守卫同步排除 OHOS
-3. `dictBuilder/cover.c` 第 297 行：`COVER_strict_cmp` 函数签名选择 `#elif defined(_GNU_SOURCE)` → `#elif defined(_GNU_SOURCE) && !defined(__OHOS_FAMILY__)`，使 OHOS 走 C90 fallback 签名 `static int COVER_strict_cmp(const void *lp, const void *rp)`
-4. `dictBuilder/cover.c` 第 335 行：`stableSort()` 内 `#elif defined(_GNU_SOURCE)` 同步加 `!defined(__OHOS_FAMILY__)`，使 OHOS 走 C90 `qsort()` fallback 分支
+**修改内容**（仅 `dictBuilder/cover.c`，4 处，不引入任何平台条件编译宏）：
+1. `g_coverCtx` 全局变量声明守卫：去掉 `!defined(_GNU_SOURCE)` 条件，改为 `#if !defined(__APPLE__) && !defined(_MSC_VER)`，确保 C90 fallback 分支使用的全局上下文在任意 `_GNU_SOURCE` 状态下都可编译
+2. `COVER_strict_cmp` 签名选择：删除 `#elif defined(_GNU_SOURCE)` 的 GNU qsort_r 三参签名分支，统一走 C90 fallback 两参签名 `static int COVER_strict_cmp(const void *lp, const void *rp)`
+3. `COVER_strict_cmp8` 签名选择：同上，删除 `_GNU_SOURCE` 分支
+4. `stableSort()`：删除 `#elif defined(_GNU_SOURCE)` 的 `qsort_r()` 调用分支，使所有非 Win/Apple/OpenBSD 平台统一走 C90 `qsort()` fallback
 
-**效果**：OHOS 构建下 cover.c 使用标准 C90 `qsort()` 替代 `qsort_r()`，字典训练功能正常，所有 560 个上游测试 100% 通过。
+**效果**：cover.c 无条件使用标准 C90 `qsort()`（POSIX 接口）替代 GNU `qsort_r()`，不依赖任何平台宏（符合 R8：通过 POSIX 接口适配），字典训练功能正常，所有 1160 个上游测试 100% 通过。
 
 ## 依赖版本
 无外部依赖（内置 LZ4, zlib-ng, ZSTD 编解码器）。

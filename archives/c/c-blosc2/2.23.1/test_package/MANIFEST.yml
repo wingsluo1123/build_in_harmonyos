@@ -9,12 +9,11 @@ homepage: "https://github.com/Blosc/c-blosc2"
 upstream_check_command: "ctest -N"
 
 # conanfile.py build() 方法中是否已集成上游测试
-# 上游测试 (tests/test_*.c) 需要 BUILD_TESTS=ON 且依赖 CTest，CI 配方默认关闭；
-# 改由 test_package 消费者测试验证 blosc2 API
-upstream_test_in_build: false
-upstream_test_command: ""
+# 已集成：BUILD_TESTS=ON 构建上游测试二进制，build() 内执行 ctest 完整运行 1160 用例
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure --timeout 120 -j1"
 
-# 上游实际运行的测试程序（参考，CI 环境不执行）
+# 上游实际运行的测试程序（build() 中已执行 ctest 全量套件）
 upstream_tests:
   - file: tests/test_blosc2.c
     source: c-blosc2-2.23.1/tests/test_blosc2.c
