@@ -49,3 +49,4 @@ class HackrfConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("cmake_file_name", "hackrf")
         self.cpp_info.set_property("cmake_target_name", "hackrf::hackrf")
+# OHOS-CI-trigger: re-run build (no functional change)
