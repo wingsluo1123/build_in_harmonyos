@@ -86,10 +86,29 @@ class NcursesConan(ConanFile):
                 raise ConanException(f"patch 0001-port-for-ohos failed with exit code {ret}")
         # E002/E046: OHOS HMDFS 下 /storage/Users/currentUser/tmp 不可写，
         # tempfile.TemporaryDirectory() 创建在其下导致 config.status 写临时文件
-        # Permission denied（CI #3810）。用 sandbox 可写目录（hmmac=inherit_parent），
-        # 同 ncurses 6.5 处理。
-        sandbox = "/data/storage/el2/base/haps/entry/files/.ncurses-tmp"
-        self.run(f"mkdir -p {sandbox} && chmod 755 {sandbox}", ignore_errors=True)
+        # Permission denied（CI #3810）。用 sandbox 可写目录，多路径 fallback：
+        # CI worker 环境 sandbox 路径可能不存在，fallback 到 build_folder（Conan 保证可写）
+        sandbox_candidates = [
+            "/data/storage/el2/base/haps/entry/files/.ncurses-tmp",
+            os.path.join(self.build_folder, ".ncurses-tmp"),
+            os.path.join(self.package_folder, "..", ".ncurses-tmp"),
+        ]
+        sandbox = None
+        for cand in sandbox_candidates:
+            try:
+                self.run(f"mkdir -p \"{cand}\" && chmod 755 \"{cand}\"", ignore_errors=True)
+                # 核可写：写测试文件
+                test_file = os.path.join(cand, ".write_test")
+                with open(test_file, "w") as f: f.write("ok")
+                os.remove(test_file)
+                sandbox = cand
+                break
+            except Exception:
+                continue
+        if sandbox is None:
+            # 全 fallback 失败，用 Conan build_folder（必可写）
+            sandbox = os.path.join(self.build_folder, ".ncurses-tmp")
+            self.run(f"mkdir -p \"{sandbox}\"", ignore_errors=True)
         with environment(Environment().define("TMPDIR", sandbox)):
             bash = os.environ.get("CONFIG_SHELL", "bash")
             configure = os.path.join(self.source_folder, "configure")
