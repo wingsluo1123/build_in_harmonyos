@@ -65,6 +65,8 @@ class QtpositioningConan(ConanFile):
         qt_root = self.dependencies["qt5-qtbase"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
+        # harmonyos-clang mkspec 由本配方导出（patches/* → export_sources_folder）
+        mkspec_dir = os.path.join(self.export_sources_folder, "patches", "mkspecs", "harmonyos-clang")
         # qt5-qtbase 预编译包缺少 modules-inst/*.pri 文件（qtbase 打包问题，非本配方问题）
         # 创建 qt.conf：读路径（Prefix/Data/Mkspecs）指向 qt5-qtbase 包目录，
         # 写路径（Headers/Libraries/Binaries）指向可写 staging 目录，
@@ -87,8 +89,11 @@ class QtpositioningConan(ConanFile):
         config_flag = ""
         if not self.options.shared:
             config_flag = "CONFIG+=static"
-        # qmake 只读取自身目录或 -qtconf 指定的 qt.conf，必须显式传入
-        self.run(f"{qmake_bin} -qtconf \"{qt_conf}\" {pro_file} {config_flag}", env="conanbuild")
+        # 用 -spec 显式指定 harmonyos-clang mkspec（QMAKESPEC 环境变量可能未被 qmake 识别）
+        self.run(
+            f"{qmake_bin} -qtconf \"{qt_conf}\" -spec \"{mkspec_dir}\" {pro_file} {config_flag}",
+            env="conanbuild",
+        )
         self.run("make -j1", env="conanbuild")
         # 安装到 staging（qt.conf Prefix 已指向 qt-install），package() 再拷贝进包
         self.run("make install", env="conanbuild")
