@@ -3,7 +3,7 @@
 
 from conan import ConanFile
 from conan.tools.files import apply_conandata_patches, get
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -27,8 +27,15 @@ class IftopConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        AutotoolsDeps(self).generate()
         tc = AutotoolsToolchain(self)
         tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        # iftop 的 configure 只在 /usr /usr/local /opt /software 这几个固定
+        # 前缀下搜索 pcap.h，必须显式指向 conan 提供的 libpcap 安装根目录，
+        # 否则会以 "can't find pcap.h" 终止。
+        tc.configure_args.append(
+            "--with-libpcap={}".format(self.dependencies["libpcap"].package_folder)
+        )
         tc.generate()
 
     def build(self):
