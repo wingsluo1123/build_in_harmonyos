@@ -31,7 +31,9 @@ class KlystrackConan(ConanFile):
     def requirements(self):
         # SDL2 制品仓已就绪 (resolve-deps ✅)，包名小写 sdl2
         self.requires("sdl2/2.30.10")
-        # SDL2_image 未合入制品仓 main，不声明依赖（上游 Makefile 的 DLLs 仅 Windows 预打包用，Linux 构建不需）
+        # SDL2_image/2.8.0 已在制品仓发布（status: published），
+        # 上游 Makefile 通过 CPPFLAGS/LDFLAGS 注入其头路径/库路径（同 decker 项目）
+        self.requires("sdl2_image/2.8.0")
 
     def layout(self):
         basic_layout(self)
@@ -47,33 +49,36 @@ class KlystrackConan(ConanFile):
         # Makefile-based build, no toolchain needed; keep for Conan 2.x G1 gate
         pass
 
+    def _find_make_dir(self):
+        """定位含 Makefile 的源码根目录（build() 与 package() 共用，保持一致）。
+
+        Conan 2.x basic_layout + strip_root 解包后 Makefile 可能在
+        source_folder 根或子目录，需动态查找。遍历到第一个含 Makefile
+        的目录即 break（避免 and/or 优先级陷阱导致兜底失效）。
+        """
+        if os.path.isfile(os.path.join(self.source_folder, "Makefile")):
+            return self.source_folder
+        for candidate in (os.path.join(self.build_folder, "source"),
+                          os.path.join(self.build_folder, "src"),
+                          self.export_sources_folder):
+            if candidate and os.path.isfile(os.path.join(candidate, "Makefile")):
+                return candidate
+        # 最后兜底：os.walk 扫 build_folder 全目录，取第一个含 Makefile 的目录
+        for root, dirs, files in os.walk(self.build_folder):
+            if "Makefile" in files:
+                return root
+        raise ConanException(f"Makefile not found under {self.build_folder}")
+
     def build(self):
         apply_conandata_patches(self)
-        # SDL2 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
+        # SDL2/SDL2_image 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
         sdl2_inc = os.path.join(self.dependencies["sdl2"].package_folder, "include")
         sdl2_lib = os.path.join(self.dependencies["sdl2"].package_folder, "lib")
-        cppflags = f"-I{sdl2_inc}"
-        ldflags = f"-L{sdl2_lib}"
-        # Conan 2.x basic_layout + strip_root=True 解包后 Makefile 在 source_folder 根
-        # 但 build() 阶段 self.source_folder 可能指向空的 source cache，需动态找 Makefile
-        make_dir = self.source_folder
-        if not os.path.isfile(os.path.join(make_dir, "Makefile")):
-            # 扫 source_folder 子目录找含 Makefile 的真源码根
-            for candidate in (self.source_folder,
-                              os.path.join(self.build_folder, "source"),
-                              os.path.join(self.build_folder, "src"),
-                              self.export_sources_folder):
-                if candidate and os.path.isfile(os.path.join(candidate, "Makefile")):
-                    make_dir = candidate
-                    break
-            else:
-                # 最后兜底：os.walk 扫 build_folder 全目录
-                for root, dirs, files in os.walk(self.build_folder):
-                    if "Makefile" in files and "klystrack" in os.path.basename(root).lower() or root == self.build_folder:
-                        # 优先顶层 Makefile（上游根 Makefile）
-                        if os.path.basename(root) == os.path.basename(self.build_folder) or "klystrack" in os.path.basename(root).lower():
-                            make_dir = root
-                            break
+        sdl2_image_inc = os.path.join(self.dependencies["sdl2_image"].package_folder, "include")
+        sdl2_image_lib = os.path.join(self.dependencies["sdl2_image"].package_folder, "lib")
+        cppflags = f"-I{sdl2_inc} -I{sdl2_image_inc}"
+        ldflags = f"-L{sdl2_lib} -L{sdl2_image_lib}"
+        make_dir = self._find_make_dir()
         make_cmd = (
             f'make CFG=release '
             f'CC=clang '
@@ -84,16 +89,8 @@ class KlystrackConan(ConanFile):
         self.run(make_cmd, cwd=make_dir)
 
     def package(self):
-        # make install 安装到 staging（复用 build() 找到的 make_dir）
-        make_dir = self.source_folder
-        if not os.path.isfile(os.path.join(make_dir, "Makefile")):
-            for candidate in (self.source_folder,
-                              os.path.join(self.build_folder, "source"),
-                              os.path.join(self.build_folder, "src"),
-                              self.export_sources_folder):
-                if candidate and os.path.isfile(os.path.join(candidate, "Makefile")):
-                    make_dir = candidate
-                    break
+        # make install 安装到 staging（复用 _find_make_dir 定位源码根）
+        make_dir = self._find_make_dir()
         self.run(
             f'make install CFG=release '
             f'PREFIX={os.path.join(self.build_folder, "staging")}',
