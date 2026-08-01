@@ -20,7 +20,7 @@ class Wdq2wavTestConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.configure()
-        cmake.build()
+        cmake.build(build_tool_args=["-j1"])
 
     def test(self):
         test_binary = os.path.join(self.cpp.build.bindirs[0], "test_wdq2wav")

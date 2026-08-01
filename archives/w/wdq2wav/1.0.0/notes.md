@@ -22,8 +22,8 @@
 - `conanfile.py`: 使用 `GnuToolchain`，限制 `os in ("Linux", "OHOS")`，按 application 打包 `bin/` 与 man page
 - `conandata.yml`: 记录 Debian 源码 URL、sha256 与补丁
 - `patches/0001-Makefile-use-toolchain-and-portable-install.patch`: 将硬编码 `g++` 改为 Conan toolchain 变量，追加本地 `-I.` include，并将 `install -o root -g root` 替换为 `mkdir/cp/chmod`
-- `test_package`: 使用 CMake 编译 `test.cpp`，测试程序通过 `popen` 执行 `wdq2wav -h`，检查帮助文本包含 `usage:`, `WinDAQ`, `wav-file`
-- `test_package/MANIFEST.yml`: 记录消费者测试断言数 3
+- `test_package`: 使用 CMake 编译 `test.cpp`，测试程序通过 `popen` 执行 `wdq2wav -h`，检查帮助文本包含 `usage:`, `wdq-file`, `wav-file`
+- `test_package/MANIFEST.yml`: 记录消费者测试断言数 4
 
 ## 本机验证结果
 - 已下载源码并校验 sha256

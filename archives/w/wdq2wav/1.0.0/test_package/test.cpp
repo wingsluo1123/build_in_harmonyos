@@ -19,7 +19,7 @@ int main()
     }
 
     if (std::strstr(buffer, "usage:") == nullptr ||
-        std::strstr(buffer, "WinDAQ") == nullptr ||
+        std::strstr(buffer, "wdq-file") == nullptr ||
         std::strstr(buffer, "wav-file") == nullptr) {
         std::fprintf(stderr, "unexpected help output:\n%s\n", buffer);
         return 3;
