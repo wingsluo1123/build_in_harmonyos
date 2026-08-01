@@ -11,3 +11,21 @@ target_link_libraries(
         Vorbis::vorbisenc
         Vorbis::vorbisfile
 )
+
+add_executable(
+    libvorbis_upstream_test
+    upstream/test.c
+    upstream/util.c
+    upstream/write_read.c
+)
+target_include_directories(
+    libvorbis_upstream_test
+    PRIVATE
+        upstream
+)
+target_link_libraries(
+    libvorbis_upstream_test
+    PRIVATE
+        Vorbis::vorbis
+        Vorbis::vorbisenc
+)

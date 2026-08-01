@@ -10,6 +10,8 @@
   `3.5`，避免新版本 CMake 在配置阶段因移除 3.5 以下兼容模式而直接失败。
 - 导出 Conan 组件：`Vorbis::vorbis`、`Vorbis::vorbisenc`、`Vorbis::vorbisfile`。
 - 新增非交互 `test_package/test_libvorbis.c`，覆盖版本字符串、编码初始化、comment API 与 vorbisfile 符号链接。
+- 将上游 v1.3.7 `test/` 中的 `test.c`、`util.c`、`write_read.c` 及对应头文件原样接入
+  `test_package`，在打包后的库上执行上游编码/解码往返测试程序。
 
 ## 编译环境
 - 构建系统: autotools

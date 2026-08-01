@@ -32,5 +32,13 @@ class LibvorbisTestConan(ConanFile):
     def test(self):
         if not can_run(self):
             return
-        binary = os.path.join(self.cpp.build.bindir, "test_libvorbis")
-        self.run(binary, env="conanrun")
+        smoke_binary = os.path.join(self.cpp.build.bindir, "test_libvorbis")
+        self.run(smoke_binary, env="conanrun")
+
+        upstream_binary = os.path.join(
+            self.cpp.build.bindir,
+            "libvorbis_upstream_test",
+        )
+        runtime_dir = os.path.join(self.build_folder, "upstream-test-runtime")
+        os.makedirs(runtime_dir, exist_ok=True)
+        self.run(upstream_binary, cwd=runtime_dir, env="conanrun")
