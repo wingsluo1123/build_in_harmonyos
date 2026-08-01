@@ -1,0 +1,40 @@
+software: spicedb
+version: "1.56.0"
+status: built
+build_date: "2026-08-02"
+build_system: go
+conan_ref: "spicedb/1.56.0"
+status_notes: "Local environment lacks Go/Conan OHOS tooling; syntax and archive structure were validated before PR submission."
+
+source:
+  url: "https://github.com/authzed/spicedb/archive/refs/tags/v1.56.0.tar.gz"
+  sha256: "e8c15ecc241e3f50feeab0c63062c961e4558608f25376623ce38e44ec3897b1"
+  tar_format: tar.gz
+
+build:
+  system: go
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "GOOS=linux"
+    - "GOARCH=arm64 for OHOS arm64"
+    - "go build -trimpath -ldflags '-s -w -X github.com/jzelinskie/cobrautil/v2.Version=1.56.0' -o spicedb ./cmd/spicedb"
+  dependencies: []
+  cc: N/A
+  cxx: N/A
+
+patches_applied: []
+
+knowledge_gained:
+  - "spicedb is distributed as a Go CLI/server command rooted at ./cmd/spicedb."
+  - "The Homebrew formula injects version metadata through github.com/jzelinskie/cobrautil/v2.Version; this recipe keeps the same version flag path."
+  - "The packaged command can be smoke-tested without starting a long-running server."
+
+validation:
+  local_windows:
+    py_compile: passed
+    diff_check: passed
+    conan_create: not_run
+    reason: "No local Conan/OHOS Go toolchain is installed in this Windows workspace."
+  ohos:
+    conan_create: pending_ci
+    reason: "Official GitCode/OHPCD CI is authoritative for target Go execution."
