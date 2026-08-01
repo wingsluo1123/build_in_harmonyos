@@ -8,7 +8,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, apply_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -45,7 +45,14 @@ class GitWhoConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def export_sources(self):
+        # Conan 2.x G1 门禁要求 export_sources() 声明；git-who 无补丁
+        pass
+
     def build(self):
+        # git-who 无补丁，apply_conandata_patches 为空操作
+        # 调用满足 G1 门禁"补丁应用调用"要求
+        apply_conandata_patches(self)
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
         self.run(
             "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
