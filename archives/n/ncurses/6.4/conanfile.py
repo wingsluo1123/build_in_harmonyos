@@ -40,6 +40,8 @@ class NcursesConan(ConanFile):
         # 必须静态编译，共享库会劫持系统 libncursesw.so.6 导致 zsh 崩溃
         if self.options.shared:
             raise ConanInvalidConfiguration("ncurses must be static (--without-shared), shared lib hijacks system libncursesw.so.6")
+        if not self.options.widec:
+            raise ConanInvalidConfiguration("ncurses must compile with widec=True for OHOS (readline/bash require wide character support)")
 
     def source(self):
         # 显式按版本取 sources，避免 ** 解包把版本号当 kwarg
