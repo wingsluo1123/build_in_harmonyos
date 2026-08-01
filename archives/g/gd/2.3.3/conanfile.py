@@ -106,6 +106,7 @@ class GdConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["gd"]
+        self.cpp_info.bindirs = ["bin"]  # gd 安装 11 个 CLI 工具到 bin/（R38）
         self.cpp_info.set_property("pkg_config_name", "gdlib")
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m"]
