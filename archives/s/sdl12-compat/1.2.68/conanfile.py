@@ -27,7 +27,9 @@ class Sdl12CompatConan(ConanFile):
             self.options.rm_safe("fPIC")
 
     def requirements(self):
-        self.requires("sdl2/2.30.0")
+        # 远端仓库当前上架的是 sdl2/2.30.10；2.30.0 未发布，会触发
+        # "Package 'sdl2/2.30.0' not resolved" 的依赖解析失败。
+        self.requires("sdl2/2.30.10")
 
     def layout(self):
         cmake_layout(self)

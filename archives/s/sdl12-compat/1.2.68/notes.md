@@ -14,8 +14,8 @@
 - 上游仓库: libsdl-org/sdl12-compat
 - 许可证: Zlib
 - 描述: SDL 1.2 compatibility layer on top of SDL2
-- 产物: libSDL.a (静态库) + SDL.h (头文件)
-- 依赖: SDL2/2.30.0（构建和运行时依赖）
+- 产物: libSDL-1.2.so (共享库) + SDL.h (头文件)
+- 依赖: sdl2/2.30.10（构建和运行时依赖）
 
 ## Conan 配方说明
 
@@ -23,7 +23,7 @@
 
 - `conanfile.py`: CMAKE 构建配方
   - settings = "os", "compiler", "build_type", "arch"
-  - 通过 Conan 声明并传播 `SDL2/2.30.0`
+  - 通过 Conan 声明并传播 `sdl2/2.30.10`
   - CMake 使用 `SDL2::SDL2` 获取依赖头文件
 - `conandata.yml`: 源码 URL、已验证的 SHA-256 和依赖补丁
 - `test_package/`: 测试包，编译链接测试程序验证库核心功能
@@ -40,7 +40,7 @@
 
 | # | 问题 | 原因 | 解决方案 |
 |---|------|------|----------|
-| 1 | SDL2 依赖无法解析 | 原配方引用未发布的 `sdl2/2.30.10` | 改用已发布的 `SDL2/2.30.0` 和 Conan CMake target |
+| 1 | SDL2 依赖无法解析 | 曾误改为 `sdl2/2.30.0`，该版本并未上架远端仓库 | 校验远端 `v2/conans/search` 后确认在架版本为 `sdl2/2.30.10`，恢复引用并配合 `SDL2::SDL2` CMake target |
 | 2 | 源码完整性校验 | 下载归档需要固定校验值 | 使用实测 SHA-256 `63c6e4dcc1154299e6f363c872900be7f3dcb3e42b9f8f57e05442ec3d89d02d` |
 
 ## 验证结果
@@ -53,4 +53,5 @@ buffer flip，并验证 SDL 事件队列。该测试覆盖视频 surface 和事�
 ## 注意事项
 
 - sdl12-compat 为依赖项范畴
-- 默认静态构建（shared=False），符合系统库规则
+- 默认共享库构建（shared=True），与 `conanfile.py` 的 `default_options` 保持一致；
+  打包阶段对 `.so` 执行 `binary-sign-tool` 自签名以满足 HarmonyOS 加载要求
