@@ -7,7 +7,7 @@ c-blosc2 是高性能压缩二进制数据存储库，blosc 的第二代实现�
 """
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
 from conan.tools.files import get, copy
 import os
 
@@ -73,6 +73,20 @@ class CBlosc2Conan(ConanFile):
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = arch_map.get(
                 str(self.settings.arch), str(self.settings.arch))
         tc.generate()
+        # CMakeDeps: 生成 find_package 配置文件，让 c-blosc2 上游 CMakeLists.txt 的
+        # find_package(LZ4/ZSTD/ZLIB_NG) 能定位到 Conan 管理的依赖。
+        # 缺少 CMakeDeps 时 find_package 全部失败 → fallback find_library 只找到 .a
+        # 但未设置 include 目录 → 编译 blosc2.c 时 fatal error: 'lz4.h' file not found。
+        deps = CMakeDeps(self)
+        # c-blosc2 CMakeLists.txt 调用 find_package(LZ4) 并检查 TARGET LZ4::lz4
+        deps.set_property("lz4", "cmake_file_name", "LZ4")
+        deps.set_property("lz4", "cmake_target_name", "LZ4::lz4")
+        # zstd recipe 已设置 cmake_file_name="zstd" + cmake_target_name="zstd::libzstd"，
+        # 与 c-blosc2 的 find_package(ZSTD) + TARGET zstd::libzstd 匹配，无需覆盖。
+        # c-blosc2 CMakeLists.txt 调用 find_package(ZLIB_NG) 并检查 TARGET zlib-ng::zlib
+        deps.set_property("zlib-ng-compat", "cmake_file_name", "ZLIB_NG")
+        deps.set_property("zlib-ng-compat", "cmake_target_name", "zlib-ng::zlib")
+        deps.generate()
 
     def build(self):
         cmake = CMake(self)
