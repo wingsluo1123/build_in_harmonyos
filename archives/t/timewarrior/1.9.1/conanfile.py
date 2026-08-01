@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for Timewarrior 1.9.1."""
 import os
+from datetime import datetime, timezone
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -122,6 +123,11 @@ class TimewarriorConan(ConanFile):
             test_env = Environment()
             test_env.prepend_path("PATH", shim_dir)
             test_env.define("MANPATH", os.path.join(self.build_folder, "doc"))
+            # Center local wall-clock time at noon so relative ranges cannot
+            # cross a date boundary while the upstream suite is running.
+            utc_hour = datetime.now(timezone.utc).hour
+            posix_offset = utc_hour - 12
+            test_env.define("TZ", f"UTC{posix_offset:+d}")
             with test_env.vars(self).apply():
                 self.run("chmod +x *.t problems run_all", cwd=test_build)
                 cmake.build(target="test")
