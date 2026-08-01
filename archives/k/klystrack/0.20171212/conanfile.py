@@ -52,22 +52,17 @@ class KlystrackConan(ConanFile):
     def _find_make_dir(self):
         """定位含 Makefile 的源码根目录（build() 与 package() 共用，保持一致）。
 
-        Conan 2.x basic_layout + strip_root 解包后 Makefile 可能在
-        source_folder 根或子目录，需动态查找。遍历到第一个含 Makefile
-        的目录即 break（避免 and/or 优先级陷阱导致兜底失效）。
+        源码经 strip_root=True 解包到 source_folder，Makefile 在
+        source_folder/klystrack/ 子目录（上游 tarball 内还有一层 klystrack）。
+        遍历到第一个含 Makefile 的目录即返回（避免 and/or 优先级陷阱）。
         """
         if os.path.isfile(os.path.join(self.source_folder, "Makefile")):
             return self.source_folder
-        for candidate in (os.path.join(self.build_folder, "source"),
-                          os.path.join(self.build_folder, "src"),
-                          self.export_sources_folder):
-            if candidate and os.path.isfile(os.path.join(candidate, "Makefile")):
-                return candidate
-        # 最后兜底：os.walk 扫 build_folder 全目录，取第一个含 Makefile 的目录
-        for root, dirs, files in os.walk(self.build_folder):
+        # 源码在 source_folder，os.walk 扫 source_folder 而非 build_folder
+        for root, dirs, files in os.walk(self.source_folder):
             if "Makefile" in files:
                 return root
-        raise ConanException(f"Makefile not found under {self.build_folder}")
+        raise ConanException(f"Makefile not found under {self.source_folder}")
 
     def build(self):
         apply_conandata_patches(self)
