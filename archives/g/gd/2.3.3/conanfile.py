@@ -17,10 +17,10 @@ from conan.tools.layout import basic_layout
 class GdConan(ConanFile):
     name = "gd"
     version = "2.3.3"
-    description = "开源图像处理库，支持 PNG、JPEG、GIF、WebP 等格式"
+    description = "Open-source image processing library supporting PNG, JPEG, GIF, WebP and more"
     license = "MIT-like"
     homepage = "https://libgd.github.io/"
-    url = ""  # CI fills this
+    url = "https://github.com/libgd/libgd"
 
     package_type = "library"
 

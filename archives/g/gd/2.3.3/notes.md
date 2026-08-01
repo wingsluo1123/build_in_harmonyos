@@ -5,7 +5,7 @@
 - 编译日期: 2026-08-01
 - 编译器: clang 15.0.4 (/data/service/hnp/bin/clang)
 - 平台: HarmonyOS PC aarch64 (OHOS 6.0)，config.guess 输出 aarch64-unknown-linux-ohos
-- 状态: built（make check 160/162 通过）
+- 状态: published（make check 160/162 通过）
 
 ## 编译步骤
 1. 下载源码 libgd-2.3.3.tar.gz 并解压
