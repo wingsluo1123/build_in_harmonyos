@@ -27,8 +27,6 @@ class NcursesConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
-        # conan 2.x 默认不把 patches/ 拷到 source cache，显式 export 让 apply_conandata_patches 找到
-        export_conandata_patches(self)
 
     def requirements(self):
         pass
@@ -47,6 +45,8 @@ class NcursesConan(ConanFile):
         # 显式按版本取 sources，避免 ** 解包把版本号当 kwarg
         src = self.conan_data["sources"][str(self.version)]
         get(self, **src, strip_root=True)
+        # conan 2.x 默认不把 patches/ 拷到 source cache，source() 末尾显式 export
+        export_conandata_patches(self)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
