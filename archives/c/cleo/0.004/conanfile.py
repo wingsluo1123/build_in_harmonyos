@@ -31,7 +31,7 @@ class CleoConan(ConanFile):
         self.requires("perl-ExtUtils-MakeMaker/7.70")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
     def export_sources(self):
