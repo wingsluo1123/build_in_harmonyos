@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-h2o -v 2>&1 | grep "2.2.6"
+version=$(h2o -v 2>&1)
+printf '%s\n' "$version" | grep -F "2.2.6"
