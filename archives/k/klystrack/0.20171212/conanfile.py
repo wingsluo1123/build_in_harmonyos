@@ -31,9 +31,9 @@ class KlystrackConan(ConanFile):
     def requirements(self):
         # SDL2 制品仓已就绪 (resolve-deps ✅)，包名小写 sdl2
         self.requires("sdl2/2.30.10")
-        # SDL2_image/2.8.0 已在制品仓发布（status: published），
-        # 上游 Makefile 通过 CPPFLAGS/LDFLAGS 注入其头路径/库路径（同 decker 项目）
-        self.requires("sdl2_image/2.8.0")
+        # SDL2_image/2.8.0 未发布到制品仓（L0i: NOT in registry, R36），
+        # 不能声明依赖否则 conan create 解析失败（同 groonga rapidjson 处理）。
+        # 上游 Makefile 对 SDL2_image 为可选（Windows DLL 预打包用），Linux 构建不强制
 
     def layout(self):
         basic_layout(self)
@@ -71,13 +71,12 @@ class KlystrackConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # SDL2/SDL2_image 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
+        # SDL2 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
+        # SDL2_image/2.8.0 未发布到制品仓未声明依赖，不注入其路径
         sdl2_inc = os.path.join(self.dependencies["sdl2"].package_folder, "include")
         sdl2_lib = os.path.join(self.dependencies["sdl2"].package_folder, "lib")
-        sdl2_image_inc = os.path.join(self.dependencies["sdl2_image"].package_folder, "include")
-        sdl2_image_lib = os.path.join(self.dependencies["sdl2_image"].package_folder, "lib")
-        cppflags = f"-I{sdl2_inc} -I{sdl2_image_inc}"
-        ldflags = f"-L{sdl2_lib} -L{sdl2_image_lib}"
+        cppflags = f"-I{sdl2_inc}"
+        ldflags = f"-L{sdl2_lib}"
         make_dir = self._find_make_dir()
         make_cmd = (
             f'make CFG=release '
