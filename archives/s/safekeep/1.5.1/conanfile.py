@@ -3,7 +3,7 @@ import os
 import stat
 
 from conan import ConanFile
-from conan.tools.files import check_sha256, copy, get, unzip
+from conan.tools.files import apply_conandata_patches, check_sha256, copy, export_conandata_patches, get, unzip
 from conan.tools.layout import basic_layout
 
 
@@ -18,7 +18,10 @@ class SafekeepConan(ConanFile):
     package_type = "application"
 
     settings = "os", "arch"
-    exports_sources = "safekeep-1.5.1.tar.gz.b64"
+    exports_sources = "safekeep-1.5.1.tar.gz.b64", "patches/*"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def layout(self):
         basic_layout(self, src_folder=".")
@@ -34,13 +37,16 @@ class SafekeepConan(ConanFile):
                 handle.write(archive_data)
             check_sha256(self, local_archive, self.conan_data["sources"]["sha256"])
             unzip(self, local_archive, strip_root=True)
+            apply_conandata_patches(self)
             return
         if os.path.isfile(local_archive):
             self.output.info("Using exported safekeep source archive")
             check_sha256(self, local_archive, self.conan_data["sources"]["sha256"])
             unzip(self, local_archive, strip_root=True)
+            apply_conandata_patches(self)
             return
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def build(self):
         script = os.path.join(self.source_folder, "safekeep")
