@@ -1,6 +1,6 @@
 from conan import ConanFile
 from conan.errors import ConanException
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
 import os
 
 
@@ -13,7 +13,8 @@ class Dex2JarConan(ConanFile):
     package_type = "application"
     settings = "os", "arch"
 
-    exports_sources = "conandata.yml"
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def layout(self):
         self.folders.build = "build"
@@ -23,6 +24,7 @@ class Dex2JarConan(ConanFile):
         # Pass sha256 for supply-chain integrity verification (R39)
         src_data = self.conan_data["sources"][self.version]
         get(self, src_data["url"], sha256=src_data["sha256"], strip_root=True)
+        apply_conandata_patches(self)
 
     def build(self):
         # Use the Gradle wrapper if available, otherwise system gradle.
