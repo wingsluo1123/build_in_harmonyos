@@ -16,9 +16,8 @@ class OcamlTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
+        # 显式解释器调用 test.sh（OHOS hmmac 拒绝直执行 shebang 脚本），
+        # bin 目录由 package_folder 显式传入，不依赖 PATH，无硬编码本机路径
+        test_sh = os.path.join(self.source_folder, "test.sh")
         bin_dir = os.path.join(self.dependencies["ocaml"].package_folder, "bin")
-        ocaml = os.path.join(bin_dir, "ocaml")
-        if os.path.isfile(ocaml):
-            self.run(f'"{ocaml}" -version', env="conanrun")
-        else:
-            self.run("ocaml -version", env="conanrun")
+        self.run(f'/bin/sh "{test_sh}" "{bin_dir}"', env="conanrun")
