@@ -4,7 +4,7 @@ import os
 import tempfile
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, export_conandata_patches
 from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -27,6 +27,10 @@ class NcursesConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+
+    def export_sources(self):
+        # Conan 2.x G1 门禁要求 export_sources() 声明；ncurses 补丁通过 conandata.yml 打
+        export_conandata_patches(self)
 
     def requirements(self):
         pass
