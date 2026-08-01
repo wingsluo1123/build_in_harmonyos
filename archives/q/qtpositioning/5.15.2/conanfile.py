@@ -66,12 +66,23 @@ class QtpositioningConan(ConanFile):
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
         # qt5-qtbase 预编译包缺少 modules-inst/*.pri 文件（qtbase 打包问题，非本配方问题）
-        # 创建 qt.conf 覆盖 qmake 内置路径：Prefix 指向可写 staging 目录，
-        # 避免 INSTALL_ROOT 与绝对 Prefix 拼接产生 {package}/{qt_root}/include 嵌套安装路径
+        # 创建 qt.conf：读路径（Prefix/Data/Mkspecs）指向 qt5-qtbase 包目录，
+        # 写路径（Headers/Libraries/Binaries）指向可写 staging 目录，
+        # 避免嵌套安装路径，同时保证 qmake 能找到 qt_build_config 等特性
         install_prefix = os.path.join(self.build_folder, "qt-install")
         qt_conf = os.path.join(self.build_folder, "qt.conf")
         with open(qt_conf, "w") as f:
-            f.write(f"[Paths]\nPrefix = {install_prefix}\n")
+            f.write(
+                "[Paths]\n"
+                f"Prefix = {qt_root}\n"
+                f"Headers = {install_prefix}/include\n"
+                f"Libraries = {install_prefix}/lib\n"
+                f"Binaries = {install_prefix}/bin\n"
+                f"Plugins = {install_prefix}/plugins\n"
+                f"Data = {qt_root}\n"
+                f"ArchData = {qt_root}\n"
+                f"Mkspecs = {qt_root}/mkspecs\n"
+            )
         # Pass shared/static config to qmake based on Conan options
         config_flag = ""
         if not self.options.shared:
