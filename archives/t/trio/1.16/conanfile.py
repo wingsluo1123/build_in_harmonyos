@@ -71,11 +71,29 @@ class TrioConan(ConanFile):
         configure = os.path.join(self.source_folder, "configure")
         makefile_in = os.path.join(self.source_folder, "Makefile.in")
 
+        # config.status 默认用 `umask 077` 创建 ./confXXXXXX 临时目录再往里写
+        # subs1.awk。在 OHOS CI 的文件系统上该目录对写入进程不可写，导致
+        # "config.status: error: could not setup config files machinery"。
+        # 放宽临时目录权限（创建时 umask 000 + 创建后 chmod 777 兜底）。
+        replace_in_file(
+            self,
+            configure,
+            "umask 077 && mktemp -d",
+            "umask 000 && mktemp -d",
+            strict=False,
+        )
+        replace_in_file(
+            self,
+            configure,
+            'umask 077 && mkdir "$tmp"',
+            'umask 000 && mkdir "$tmp"',
+            strict=False,
+        )
         replace_in_file(
             self,
             configure,
             "ac_tmp=$tmp\n",
-            'chmod 755 "$tmp"\nac_tmp=$tmp\n',
+            'chmod 777 "$tmp" 2>/dev/null || :\nac_tmp=$tmp\n',
         )
         replace_in_file(self, makefile_in, "AR\t= ar", "AR\t?= ar")
         if not self.options.shared:
@@ -98,7 +116,9 @@ class TrioConan(ConanFile):
                 "$(INSTALL_DATA) $(TARGETLIB) $(libdir)/",
             )
 
-        previous_umask = os.umask(0o022)
+        # 子进程（configure / config.status / make）继承该 umask，
+        # 确保它们新建的临时目录与文件都保持可写。
+        previous_umask = os.umask(0o000)
         try:
             autotools = Autotools(self)
             autotools.configure()
