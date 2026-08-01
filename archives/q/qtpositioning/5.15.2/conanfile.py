@@ -6,7 +6,7 @@ Platform: aarch64-linux-ohos (HarmonyOS PC)
 """
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
 import os
@@ -60,16 +60,18 @@ class QtpositioningConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Qt5 addon module build: qmake → make
+        # Qt5 addon module build: qmake → make → make install (staging)
         # Note: positioning.pro is in src/positioning/ under source_folder
         qt_root = self.dependencies["qt5-qtbase"].package_folder
         qmake_bin = os.path.join(qt_root, "bin", "qmake")
         pro_file = os.path.join(self.source_folder, "src", "positioning", "positioning.pro")
-        # qt5-qtbase 预编译包缺少 modules-inst/*.pri 文件
-        # 创建 qt.conf 覆盖 qmake 内置路径，指向 qt5-qtbase 包目录
+        # qt5-qtbase 预编译包缺少 modules-inst/*.pri 文件（qtbase 打包问题，非本配方问题）
+        # 创建 qt.conf 覆盖 qmake 内置路径：Prefix 指向可写 staging 目录，
+        # 避免 INSTALL_ROOT 与绝对 Prefix 拼接产生 {package}/{qt_root}/include 嵌套安装路径
+        install_prefix = os.path.join(self.build_folder, "qt-install")
         qt_conf = os.path.join(self.build_folder, "qt.conf")
         with open(qt_conf, "w") as f:
-            f.write(f"[Paths]\nPrefix = {qt_root}\n")
+            f.write(f"[Paths]\nPrefix = {install_prefix}\n")
         # Pass shared/static config to qmake based on Conan options
         config_flag = ""
         if not self.options.shared:
@@ -77,14 +79,17 @@ class QtpositioningConan(ConanFile):
         # qmake 只读取自身目录或 -qtconf 指定的 qt.conf，必须显式传入
         self.run(f"{qmake_bin} -qtconf \"{qt_conf}\" {pro_file} {config_flag}", env="conanbuild")
         self.run("make -j1", env="conanbuild")
+        # 安装到 staging（qt.conf Prefix 已指向 qt-install），package() 再拷贝进包
+        self.run("make install", env="conanbuild")
 
     def package(self):
-        self.run(f"make install INSTALL_ROOT=\"{self.package_folder}\"")
+        copy(self, "*", os.path.join(self.build_folder, "qt-install"), self.package_folder)
 
     def package_info(self):
         self.cpp_info.libs = ["Qt5Positioning"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.requires = ["qt5-qtbase::Qt5::Core"]
+        # qt5-qtbase 的 Conan 组件名为 Qt5Core（Qt5::Core 仅是其 cmake_target_name）
+        self.cpp_info.requires = ["qt5-qtbase::Qt5Core"]
         self.cpp_info.set_property("cmake_target_name", "Qt5::Positioning")
         self.cpp_info.set_property("pkg_config_name", "Qt5Positioning")
