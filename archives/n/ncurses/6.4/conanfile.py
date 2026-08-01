@@ -74,6 +74,8 @@ class NcursesConan(ConanFile):
         # 头文件安装到顶层 include/ 而非 include/ncursesw/（aamath/catgirl 同实践）
         tc.configure_args.append("--enable-overwrite")
         tc.generate()
+        # 保存 configure_args 供 build() 中手动 configure 使用
+        self._configure_args = tc.configure_args
 
     def build(self):
         # 手动应用 patch（绕 conan 2.x apply_conandata_patches cache 查找问题）
@@ -92,7 +94,9 @@ class NcursesConan(ConanFile):
             bash = os.environ.get("CONFIG_SHELL", "bash")
             configure = os.path.join(self.source_folder, "configure")
             # ncurses 6.4 老 autotools (2022 config.guess) �猜不出 OHOS aarch64，显式传 build/host
-            ret = self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu",
+            # 追加 generate() 中定义的 configure_args（--without-shared 等，否则这些选项失效）
+            args = " ".join(self._configure_args)
+            ret = self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
                          cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")

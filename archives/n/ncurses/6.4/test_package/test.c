@@ -5,14 +5,16 @@
 int main(void) {
     int ret = 0;
 
-    printf("ncurses version: %s\n", NCURSES_VERSION);
+    /* curses_version() 是真实库函数，任意环境都至少执行一次 ncurses 库代码
+     * （NCURSES_VERSION 是编译期宏，打印它不构成库代码验证） */
+    printf("ncurses version: %s\n", curses_version());
 
     /* 尝试初始化 curses 模式，OHOS 无真实终端时 initscr 返回 NULL */
     WINDOW *w = initscr();
     if (w == NULL) {
         printf("initscr: SKIP (no terminal available on this platform)\n");
-        /* 即使无终端，链接验证已通过（前面已打印 NCURSES_VERSION 符号） */
-        return 0;
+        /* 无终端分支返回专用 SKIP 退出码 77，test() 按跳过处理（R34 反空转） */
+        return 77;
     }
 
     /* 基本 API 调用验证 */
