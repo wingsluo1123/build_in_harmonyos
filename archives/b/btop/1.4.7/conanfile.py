@@ -4,7 +4,7 @@
 import os
 
 from conan import ConanFile
-from conan.tools.files import copy, get
+from conan.tools.files import copy, get, export_conandata_patches, apply_conandata_patches
 
 
 class BtopConan(ConanFile):
@@ -19,9 +19,13 @@ class BtopConan(ConanFile):
 
     settings = "os", "arch", "compiler", "build_type"
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def source(self):
         get(self, **self.conan_data["sources"][self.version],
             strip_root=True)
+        apply_conandata_patches(self)
 
     def build(self):
         # R33: Get compiler from Conan conf, NEVER from shell env vars.
