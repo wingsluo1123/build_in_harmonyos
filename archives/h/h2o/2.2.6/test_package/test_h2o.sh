@@ -1,4 +1,4 @@
-#!/bin/sh
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
-h2o -v | grep "2.2.6"
+h2o -v 2>&1 | grep "2.2.6"
