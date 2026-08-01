@@ -42,7 +42,9 @@ class NcursesConan(ConanFile):
             raise ConanInvalidConfiguration("ncurses must be static (--without-shared), shared lib hijacks system libncursesw.so.6")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # 显式按版本取 sources，避免 ** 解包把版本号当 kwarg
+        src = self.conan_data["sources"][str(self.version)]
+        get(self, **src, strip_root=True)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
