@@ -1,0 +1,66 @@
+# Cyrus SASL 2.1.28 Path C Candidate Evidence
+
+## Application Boundary
+
+This document requests Path C candidate assessment for the initial Cyrus SASL
+2.1.28 core-library archive. It does not claim a Path C score, final acceptance,
+package publication, or an OpenHarmony runtime result.
+
+## Why This Is A High-Difficulty Candidate
+
+1. **Protocol negotiation and mechanism behavior**: SASL is a client/server
+   authentication framework. Meaningful validation covers mechanism discovery,
+   challenge-response negotiation, credential handling, and protocol-service
+   behavior rather than a single library call.
+2. **Plugin and backend closure**: the upstream project combines static and
+   dynamic mechanisms with PAM, LDAP, SQL, Kerberos/GSSAPI, database, and
+   daemon-backed authentication paths. Those paths have separate runtime
+   configuration, service, and credential-store requirements.
+3. **Platform integration boundary**: the OpenHarmony cross-build path must
+   handle generated Autotools files, build-machine helper tools, install layout,
+   and plugin discovery without treating unavailable Linux services as supported.
+
+## Implemented Adaptation Scope
+
+- Packages the core `libsasl2` public library and headers with static mechanism
+  support for the first pass.
+- Disables sample programs, daemon integration, and PAM, LDAP, SQL, database,
+  Kerberos/GSSAPI, OpenSSL, and other external authentication closures.
+- Applies two tracked source patches for the OpenHarmony temporary-directory
+  and static-archive link-source handling paths.
+- Provides a C consumer test for version reporting, client initialization,
+  connection creation, mechanism listing, disposal, and shutdown.
+
+## Evidence And Boundaries
+
+| Evidence | Current result |
+| --- | --- |
+| Source integrity | `conandata.yml` uses the official 2.1.28 release URL and SHA256 `7ccfc6abd01ed67c1a0924b353e526f1b766b21f42d4562ee635a8ebfc5bb38c`. |
+| Review discussions | The PR shows 13 of 13 review discussions resolved. |
+| Latest remote CI | PR CI build #11317 failed in `source()` because patch files were not exported before `apply_conandata_patches()`. This is not a passing CI result. |
+| Local follow-up | The unpushed `exports_sources = "patches/*"` correction addresses that export failure, but it has not received a CI run. |
+| Local execution | No local Conan build or Cyrus consumer test is claimed here. The official source download attempted for host validation was reset by the remote before extraction. |
+| OpenHarmony runtime | No target device or runtime execution has been performed. Plugin, backend, and service behavior remain out of scope for this first pass. |
+
+## Proposed Acceptance Items
+
+1. Push the patch-export correction to the PR source branch and obtain a clean
+   CI build that reaches and executes the Conan consumer test.
+2. Run the packaged consumer binary on a runnable OpenHarmony target.
+3. Add separate evidence before enabling dynamic plugin discovery, external
+   authentication backends, or service/credential-store integrations.
+
+## Review Questions
+
+1. Does the documented core-library scope and explicit backend exclusion meet
+   the Path C candidate threshold for the SASL protocol and integration surface?
+2. Which target-side client/server mechanism negotiation is required before the
+   candidate can be considered complete?
+3. Should dynamic plugin and external-backend support remain separate follow-up
+   candidates with their own service and credential handling evidence?
+
+## Related Issue
+
+No Path C candidate Issue was linked to PR #3400 at inspection time. The Issue
+must link this document and record the same evidence boundaries before the PR
+can claim candidate-document compliance.
