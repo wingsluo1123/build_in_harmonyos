@@ -4,6 +4,7 @@
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 from conan.tools.files import get
 from conan.tools.gnu import PkgConfigDeps
 
@@ -52,7 +53,10 @@ class H2OConan(ConanFile):
         cmake.build()
         # H2O's upstream test entry is the custom CMake `check` target.
         if can_run(self):
-            cmake.build(target="check")
+            test_env = Environment()
+            test_env.prepend_path("PERL5LIB", self.source_folder)
+            with test_env.vars(self).apply():
+                cmake.build(target="check")
 
     def package(self):
         CMake(self).install()
