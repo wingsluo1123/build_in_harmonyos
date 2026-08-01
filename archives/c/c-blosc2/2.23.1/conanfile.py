@@ -46,9 +46,11 @@ class CBlosc2Conan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Build only the library; skip tests/fuzzers/benchmarks/examples/plugins
+        # Build only the library; skip fuzzers/benchmarks/examples/plugins
         # (benchmarks depend on clock_gettime which is unavailable on OHOS).
-        tc.cache_variables["BUILD_TESTS"] = "OFF"
+        # BUILD_TESTS=ON enables the upstream CTest suite (test_blosc2, frame,
+        # shuffle_roundtrip, compat, etc.) so rule 5 (上游测试必须运行) is met.
+        tc.cache_variables["BUILD_TESTS"] = "ON"
         tc.cache_variables["BUILD_FUZZERS"] = "OFF"
         tc.cache_variables["BUILD_BENCHMARKS"] = "OFF"
         tc.cache_variables["BUILD_EXAMPLES"] = "OFF"
@@ -66,6 +68,15 @@ class CBlosc2Conan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        # Run the upstream CTest suite (rule 5: 上游测试必须运行).
+        # OHOS arm64 binaries are musl-based ELF; on an aarch64 host with the
+        # OHOS sysroot musl ld (/lib/ld-musl-aarch64.so.1) they execute natively.
+        # Serial -j1 execution avoids flaky parallel races (test_fill_special /
+        # test_frame_get_offsets touch shared temp files).
+        self.run(
+            "ctest --output-on-failure --timeout 120 -j1",
+            env="conanrun",
+        )
 
     def package(self):
         cmake = CMake(self)
