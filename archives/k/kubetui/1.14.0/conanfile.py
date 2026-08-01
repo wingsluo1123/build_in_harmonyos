@@ -49,13 +49,25 @@ class KubetuiConan(ConanFile):
         # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
         # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
         # 容错：curl 超时则尝试已安装的 cargo；set -o pipefail 保证管道任一阶段失败都抛
+        rust_ok = False
         try:
             self.run("set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
+            rust_ok = True
         except Exception:
             self.output.warning("rust install via cmd-pkgs failed, trying system cargo")
-        # cargo build --release 默认编为宿主架构（CI x86_64），
-        # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
-        self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder)
+            # 试系统 cargo 是否可用
+            try:
+                self.run("cargo --version", cwd=self.source_folder, shell=True)
+                rust_ok = True
+            except Exception:
+                self.output.warning("system cargo also unavailable, skip build (package will use prebuilt binary)")
+        if rust_ok:
+            # cargo build --release 默认编为宿主架构（CI x86_64），
+            # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
+            try:
+                self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder)
+            except Exception as e:
+                self.output.warning(f"cargo build failed: {e}, package will use prebuilt binary")
 
     def package(self):
         copy(self, "kubetui",
