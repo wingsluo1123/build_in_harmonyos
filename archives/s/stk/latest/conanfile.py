@@ -33,6 +33,23 @@ class StkConan(ConanFile):
         # (toolchain file) is NOT honoured by a direct `cmake` invocation,
         # which is how Conan drives configure().
         tc = CMakeToolchain(self)
+        # STK derives its platform macro from the audio backend macro:
+        #   Stk.h: #elif defined(__LINUX_OSS__) || defined(__LINUX_ALSA__)
+        #          || defined(__UNIX_JACK__) || defined(__LINUX_PULSE__)
+        #            #define __OS_LINUX__
+        # Those backend macros are only added by the CMake REALTIME block,
+        # which we must keep OFF on OHOS (its else-branch is a hard
+        # FATAL_ERROR "Unknown system type for realtime support.").
+        # With REALTIME=OFF nothing defines __OS_LINUX__, so Mutex.h and
+        # Socket.h skip <pthread.h> / <netinet/in.h> / <netinet/tcp.h> and
+        # MUTEX, CONDITION, THREAD_HANDLE, THREAD_FUNCTION, THREAD_RETURN and
+        # struct sockaddr_in all go missing -- yet CMakeLists globs *every*
+        # src/*.cpp, so InetWvIn.cpp / InetWvOut.cpp / UdpSocket.cpp are
+        # compiled anyway and fail.
+        # OHOS is a Linux-kernel POSIX platform with pthreads and BSD
+        # sockets, so selecting that code path is semantically correct.
+        # __STK_REALTIME__ stays undefined: no realtime audio backend is built.
+        tc.preprocessor_definitions["__OS_LINUX__"] = 1
         tc.generate()
 
     def build(self):
