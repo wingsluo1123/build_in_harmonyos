@@ -80,7 +80,8 @@ class NcursesConan(ConanFile):
         with tempfile.TemporaryDirectory() as tmpdir:
             bash = os.environ.get("CONFIG_SHELL", "bash")
             configure = os.path.join(self.source_folder, "configure")
-            ret = self.run(f"TMPDIR={tmpdir} {bash} {configure} --prefix={self.package_folder}",
+            # ncurses 6.4 老 autotools (2022 config.guess) �猜不出 OHOS aarch64，显式传 build/host
+            ret = self.run(f"TMPDIR={tmpdir} {bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu",
                          cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")
