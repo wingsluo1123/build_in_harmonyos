@@ -22,7 +22,7 @@
 - `conanfile.py`: 使用 `GnuToolchain`，限制 `os in ("Linux", "OHOS")`，按 application 打包 `bin/` 与 man page
 - `conandata.yml`: 记录 Debian 源码 URL、sha256 与补丁
 - `patches/0001-Makefile-use-toolchain-and-portable-install.patch`: 将硬编码 `g++` 改为 Conan toolchain 变量，追加本地 `-I.` include，并将 `install -o root -g root` 替换为 `mkdir/cp/chmod`
-- `test_package/conanfile.py`: 执行 `wdq2wav -h`，检查帮助文本包含 `usage:`, `WinDAQ`, `wav-file`
+- `test_package`: 使用 CMake 编译 `test.cpp`，测试程序通过 `popen` 执行 `wdq2wav -h`，检查帮助文本包含 `usage:`, `WinDAQ`, `wav-file`
 - `test_package/MANIFEST.yml`: 记录消费者测试断言数 3
 
 ## 本机验证结果
@@ -48,4 +48,4 @@ CI_PACKAGES="archives/w/wdq2wav/1.0.0" zsh ci/conan/build_and_test.sh
 - L0/L1 是否通过，`Build Summary` 是否显示 `Total: 1`
 - 编译日志是否使用 OHOS profile 注入的 `clang++`
 - `bin/wdq2wav` 和 `share/man/man1/wdq2wav.1` 是否进入包产物
-- `test_package` 是否成功执行 `wdq2wav -h`
+- `test_package` 是否成功编译并运行 `test_wdq2wav`，间接执行 `wdq2wav -h`
