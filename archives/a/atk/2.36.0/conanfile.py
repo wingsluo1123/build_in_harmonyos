@@ -9,6 +9,7 @@ from conan import ConanFile
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.files import get, copy, apply_conandata_patches
 from conan.tools.layout import basic_layout
+from conan.tools.gnu import PkgConfigDeps
 import os
 
 class AtkConan(ConanFile):
@@ -53,13 +54,16 @@ class AtkConan(ConanFile):
 
     def generate(self):
         tc = MesonToolchain(self)
-        # OHOS: disable introspection and docs to avoid build failures
+        # OHOS: disable introspection to avoid build failures
         tc.project_options["introspection"] = "disabled"
-        tc.project_options["docs"] = "false"
-        tc.project_options["enable_docs"] = "false"
         # glib 2.84.0 已通过 Conan 可用，禁用 meson fallback 克隆行为
         tc.project_options["wrap_mode"] = "nofallback"
+        # P3: 固定 default_library=static（shared=False 契约生效）
+        tc.project_options["default_library"] = "static"
         tc.generate()
+        # P2: PkgConfigDeps 让 atk configure 通过 pkg-config 找到 glib
+        pkg = PkgConfigDeps(self)
+        pkg.generate()
 
     def build(self):
         meson = Meson(self)
@@ -75,3 +79,5 @@ class AtkConan(ConanFile):
         self.cpp_info.libs = ["atk-1.0"]
         self.cpp_info.includedirs = ["include/atk-1.0"]
         self.cpp_info.set_property("pkg_config_name", "atk")
+        # P1: 传播 glib 依赖给消费者，否则编译/链接必然失败
+        self.cpp_info.requires = ["glib::glib"]
