@@ -52,3 +52,4 @@ class LibrtlsdrConan(ConanFile):
 
     def requirements(self):
         self.requires("libusb/1.0.27")
+# OHOS-CI-trigger: re-run build (no functional change)
