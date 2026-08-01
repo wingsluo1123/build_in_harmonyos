@@ -24,5 +24,5 @@ cargo build --release
 ## 验证结果
 
 ```bash
-./target/release/kubetui --help
+./target/aarch64-unknown-linux-ohos/release/kubetui --help
 ```

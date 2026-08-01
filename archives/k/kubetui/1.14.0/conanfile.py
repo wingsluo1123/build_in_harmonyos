@@ -8,7 +8,7 @@ Build with `cargo build --release` to produce a single binary.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, apply_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -23,6 +23,14 @@ class KubetuiConan(ConanFile):
     package_type = "application"
 
     settings = "os", "arch"
+
+    def validate(self):
+        # R32: 与 build() 硬编码 GOOS=linux/GOARCH=arm64 保持一致，拒绝不支持的 OS/arch
+        from conan.errors import ConanInvalidConfiguration
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(f"kubetui {self.version} only supports Linux and OHOS, got os={self.settings.os}")
+        if str(self.settings.arch) not in ("armv8", "arm64"):
+            raise ConanInvalidConfiguration(f"kubetui {self.version} only supports arm64, got arch={self.settings.arch}")
 
     def layout(self):
         basic_layout(self)
@@ -40,9 +48,9 @@ class KubetuiConan(ConanFile):
         apply_conandata_patches(self)
         # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
         # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
-        # 容错：curl 超时则尝试已安装的 cargo
+        # 容错：curl 超时则尝试已安装的 cargo；set -o pipefail 保证管道任一阶段失败都抛
         try:
-            self.run("curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder)
+            self.run("set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
         except Exception:
             self.output.warning("rust install via cmd-pkgs failed, trying system cargo")
         # cargo build --release 默认编为宿主架构（CI x86_64），
