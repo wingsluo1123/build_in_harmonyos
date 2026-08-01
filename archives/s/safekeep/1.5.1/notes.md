@@ -1,6 +1,6 @@
 # safekeep 1.5.1 Build Notes
 
-Date: 2026-07-31
+Date: 2026-08-01
 
 ## Summary
 
@@ -46,21 +46,31 @@ and remote backup modes. The local path creates a temporary backup tree, runs
 sums. The remote path additionally assumes SSH access, root setup, package
 deployment, and target host mutation.
 
-The OHOS runner used here does not provide `rdiff-backup` or the mutable
-client/server environment needed for the upstream integration flow. The Conan
-`test_package` packages `safekeep-test` and verifies its local/remote test
-markers, while still checking the installed CLI, config, docs, and sample backup
-definition.
+For OHOS, the recipe applies a test-only patch to `safekeep-test` and the Conan
+`test_package` runs the upstream local flow as
+`SAFEKEEP_TEST_OHOS_LOCAL=1 safekeep-test --local --reps=1`. The patch keeps the
+upstream driver structure and changes only the local test harness needed by the
+runner:
 
-These marker checks are not counted as upstream integration test passes. Actual
-upstream test execution result for this package is `0/2`: the upstream
-`safekeep-test` local and remote flows were not run in the OHOS runner.
+- uses a local safekeep client emulator for the server/client protocol;
+- launches the server from the wrapper directory so OHOS Python subprocess can
+  resolve `safekeep --client` without relying on PATH lookup;
+- disables the default `nice`/`ionice` adjustments that are unavailable in the
+  runner;
+- keeps the repository under the test temp root and restores through
+  `rdiff-backup restore --at now` with a relative repository path, avoiding
+  OHOS parent-directory permission checks under `/storage/Users`.
+
+The OHOS upstream local flow now passes. The remote flow is still identified but
+not executed because it requires SSH, root setup, package deployment, and
+mutable client/server hosts. The actual upstream integration result for the
+release driver is therefore `1/2`: local passed, remote not run.
 
 ## OpenHarmony Validation
 
-- run dir: `/storage/Users/currentUser/ohos-test-runs/codex-a-1.5.1-safekeep-1.5.1-upstreamtests-r1-conan-20260731-212720-26678`
-- full ref: `safekeep/1.5.1#42db37736a941feadbc70de01083dccc:fc3eeb021243959114a0318489539cad6d087e28#6ae8de352ed3d8f2b5bea74d1ebb40f4`
-- gates: `L0=pass`, `L1=pass(test_package executed)`, `L1e=pass`, `L2=pass(safekeep --version OK)`, `L4=pass(no patches)`, `L5=pass(bin/ has content)`.
-- Upstream integration result: `0/2` actual `safekeep-test` flows executed;
-  the package-level Python marker checks are recorded separately as adapted
-  consumer validation.
+- run dir: `/storage/Users/currentUser/ohos-test-runs/codex-a-safekeep-safekeep-1.5.1-upstream-local-patched-r5-conan-20260801-172459-7540`
+- full ref: `safekeep/1.5.1#d898cdcabe2463356b45068f5c3fdfad:fc3eeb021243959114a0318489539cad6d087e28#038652399e5f3c35c9df42c31b2d5451`
+- gates: `L0=pass`, `L1=pass(test_package executed)`, `L2=pass(safekeep --version OK)`, `L4=pass(test patch clean)`, `L5=pass(bin/ has content)`.
+- upstream local execution: `SAFEKEEP_TEST_OHOS_LOCAL=1 safekeep-test --local --reps=1`, result `1/1 passed`.
+- upstream integration result: `1/2`; local flow passed on OHOS, remote flow was
+  not executed for the SSH/root/mutable-host reasons above.
