@@ -35,8 +35,9 @@ class GitWhoConan(ConanFile):
             raise ConanInvalidConfiguration(f"git-who {self.version} only supports arm64, got arch={self.settings.arch}")
 
     def requirements(self):
-        # CI 环境无 go 命令，依赖 go 工具链包（同 gosec 等已发布 Go 项目）
-        self.requires("go/1.21.13")
+        # go 工具链：go/1.21.13 制品仓无 conanfile（未创建配方），不能 requires
+        # CI worker 预装 go 或通过 cmd-pkgs 安装，build() 直接用系统 go
+        pass
 
     def layout(self):
         basic_layout(self)
