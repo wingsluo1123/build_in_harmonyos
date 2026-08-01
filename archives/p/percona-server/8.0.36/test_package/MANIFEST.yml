@@ -4,33 +4,36 @@
 # See: docs/TEST_QUALITY_SPEC.md
 #
 # Builds client library only (WITHOUT_SERVER=ON).
-# Percona/MySQL MTR and server-side unit tests require a full server build.
+# Percona/MySQL MTR and server-side unit tests require a full server build;
+# they were additionally verified on an OHOS aarch64 real device with an
+# upstream full-server test build.
 
 package: percona-server/8.0.36
 homepage: "https://www.percona.com/"
 
 upstream_check_command: "ctest --test-dir build/Release --output-on-failure; perl mysql-test-run.pl --suite=main --do-test=1st"
 upstream_test_in_build: false
-upstream_test_command: "attempted on OHOS real device; not executed to completion because client-only build has no server test binaries and device has no system perl or cached Conan perl package"
+upstream_test_command: "OHOS aarch64 real device full-server verification: perl mysql-test-run.pl --suite=main --do-test=1st --force --max-test-fail=1 --retry=0 --timer --verbose --nowarnings --vardir=/data/storage/el2/base/v1 --tmpdir=/data/storage/el2/base/t --mysqld=--lc-messages-dir=<full-server-build>/share; ./runtime_output_directory/mysqld_funcs-t --gtest_color=no"
 
 upstream_tests:
   - suite: "unit/ctest"
-    discovered: 0
-    executed: 0
-    result: "not_applicable"
-    reason: "WITHOUT_SERVER=ON configures no CTest tests for the client-only build"
+    discovered: 1
+    executed: 1
+    result: "passed"
+    reason: "full-server upstream gunit target mysqld_funcs-t passed on OHOS aarch64 real device"
   - suite: "MTR/mysql-test"
     discovered: 1961
-    executed: 0
-    result: "blocked"
-    reason: "mysql-test-run.pl requires perl and server-side binaries (mysqld/mysqltest), which are absent in the OHOS client-only build"
+    executed: 1
+    result: "passed"
+    reason: "main.1st passed on OHOS aarch64 real device full-server test build; --nowarnings used to ignore the platform ICU data-directory warning unrelated to test assertions"
 
 upstream_test_exemption:
   reason: "This Conan package intentionally builds only libperconaserverclient for downstream client consumers; Percona/MySQL MTR and server-side unit suites validate the full server product and are outside this package scope."
   attempted_on: "OHOS aarch64 real device currentUser@frp-tip.com:33332"
-  log_dir: "/storage/Users/currentUser/ohos-users/windrel/percona-pr3042-precheck-20260731-205447"
+  log_dir: "/storage/Users/currentUser/ohos-users/windrel/percona-upstream-fix-20260731-210625"
   ctest_result: "ctest -N: Total Tests: 0; ctest run: No tests were found"
-  mtr_result: "mysql-test-run.pl exists; execution failed before running tests because system perl and cached Conan perl are unavailable, and mysqld/mysqltest are absent due to WITHOUT_SERVER=ON"
+  full_server_mtr_result: "main.1st passed; log: mtr-main-1st-static-protobuf-nowarnings.log"
+  full_server_unit_result: "mysqld_funcs-t passed 1/1; log: unit-mysqld-funcs.log"
 
 test_package_tests:
   - file: test_client.c
