@@ -11,9 +11,14 @@ class SafekeepTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        if str(self.settings.os) == "OHOS":
+            self.requires("rdiff-backup/2.2.6")
 
     def test(self):
         dep = self.dependencies[self.tested_reference_str]
         package_folder = dep.package_folder
         script = os.path.join(self.recipe_folder, "test_safekeep_package.py")
-        self.run(f'"{sys.executable}" "{script}" "{package_folder}"', env="conanrun")
+        args = [f'"{sys.executable}"', f'"{script}"', f'"{package_folder}"']
+        if str(self.settings.os) == "OHOS":
+            args.append("--run-upstream-local")
+        self.run(" ".join(args), env="conanrun")
