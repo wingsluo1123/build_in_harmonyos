@@ -120,5 +120,5 @@ class OcamlConan(ConanFile):
         copy(self, "*", src_base, self.package_folder)
 
     def package_info(self):
-        self.cpp_info.libs = ["camlrun", "camlasm"]
+        self.cpp_info.libs = ["camlrun", "asmrun"]
         self.cpp_info.includedirs = ["lib/ocaml/caml"]
