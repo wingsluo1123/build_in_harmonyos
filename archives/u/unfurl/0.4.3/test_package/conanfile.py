@@ -4,10 +4,12 @@
 This is the L1 test in the five-level test system.
 CI runs this automatically via `conan create` (which invokes test_package).
 
-unfurl is a Go CLI tool; the test verifies the packaged binary exists and
-actually processes a URL from stdin (modes: -u unique, domains).
+unfurl is a Go CLI tool; the test verifies the packaged binary exists, is
+executable, and produces the exact output documented upstream for each of
+its URL-processing modes (see test.sh).
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -17,13 +19,25 @@ from conan.tools.build import can_run
 class UnfurlTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     test_type = "explicit"
+    generators = "VirtualRunEnv"
+    exports_sources = "test.sh", "MANIFEST.yml"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
     def build(self):
-        # Go CLI 工具, 无 C/C++ 编译步骤
+        # Go CLI 工具, test_package 无 C/C++ 编译步骤;
+        # 真实校验在 test() 中通过 test.sh 完成。
         pass
+
+    def _test_script(self):
+        for folder in (self.source_folder, self.recipe_folder):
+            if not folder:
+                continue
+            candidate = os.path.join(folder, "test.sh")
+            if os.path.isfile(candidate):
+                return candidate
+        raise ConanException("FAIL: 未找到 test_package/test.sh")
 
     def test(self):
         # 产物校验: 纯文件系统检查, 与能否执行目标架构二进制无关,
@@ -36,12 +50,17 @@ class UnfurlTestConan(ConanFile):
         if not os.access(bin_path, os.X_OK):
             raise ConanException(f"FAIL: {bin_path} 缺少可执行权限")
 
-        # 运行时功能校验: 从 stdin 喂 URL 提取域名, 仅在可执行目标架构时进行
-        if can_run(self):
-            self.run(
-                f'echo "https://example.com/foo?a=b" | {bin_path} -u domains',
-                env="conanrun")
-        else:
+        if not can_run(self):
             self.output.warning(
-                "交叉编译环境无法执行 OHOS aarch64 二进制, 已跳过运行时功能校验; "
+                "交叉编译环境无法执行目标架构二进制, 已跳过运行时功能校验; "
                 "产物存在性与可执行位校验已通过")
+            return
+
+        # 运行时功能校验: 逐条比对 6 种模式的实际输出与上游 README 官方示例。
+        # OHOS 默认 PATH 下未必有 bash, 沿用 profile 提供的 CONFIG_SHELL。
+        shell = (os.environ.get("CONFIG_SHELL")
+                 or os.environ.get("SHELL")
+                 or shutil.which("bash")
+                 or "/data/service/hnp/bin/bash")
+        script = self._test_script()
+        self.run(f'"{shell}" "{script}" "{bin_path}"', env="conanrun")

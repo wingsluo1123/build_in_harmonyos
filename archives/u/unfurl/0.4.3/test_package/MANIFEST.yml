@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: unfurl/0.4.3
+homepage: "https://github.com/tomnomnom/unfurl"
+
+# 上游测试命令 (Go 项目, 无 make check / ctest / meson test)
+upstream_check_command: "go test ./..."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "go test ./..."
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: format_test.go
+    source: unfurl-0.4.3/format_test.go
+    description: "TestFormat: 表驱动用例 32 条, 覆盖 %d %p %q %f %e %u %a %S %r %t %@ %: %? %# %P 共 15 个格式动词"
+    command: "go test ./... (TestFormat)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者功能测试: 以上游 README 官方示例为输入, 逐条断言 domains / --unique 去重 / apexes / paths / keys / values 六种模式的实际输出"
+    command: "bash test.sh <package_folder>/bin/unfurl"
+  - file: conanfile.py (产物校验)
+    description: "无条件校验包内 bin/unfurl 存在且具可执行位 (交叉编译场景下也不退化为空壳), can_run 为真时再执行 test.sh"
+    command: "conan test (存在性 + 可执行位 + test.sh)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 32 (上游 TestFormat) + 6 (test.sh 输出断言) + 2 (产物存在性/可执行位)
+assertion_count: 40

@@ -43,7 +43,10 @@ build:
   build_system: custom
 
   # 配置选项列表
-  configure_options: []
+  configure_options:
+    - "CGO_ENABLED=0 GOOS=linux GOARCH=arm64"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "go build -trimpath -ldflags '-s -w'"
   # Go 工具链, 无 configure 步骤
 
   # 编译依赖列表 (格式: name/version)
@@ -69,7 +72,11 @@ patches_applied: []
 # 编译中学到的知识
 knowledge_gained:
   - "unfurl 是 Go 写的 CLI 工具 (tomnomnom/unfurl), 非 C/C++ 库, 使用 custom 构建系统 (go build)"
-  - "HarmonyOS aarch64 交叉编译: GOOS=ohos GOARCH=arm64 CGO_ENABLED=0 (Go 1.22+ 支持 ohos)"
-  - "package_type=application, cpp_info.libs=[] (无可链接库), bindirs=['bin']"
-  - "上游仅有 1 个测试函数 TestFormat (format_test.go, 32 个 case), 用 go test 验证"
-  - "go.sum 中依赖 Cgboal/DomainParser 与 jakewarren/tldomains, 由 go build 自动拉取"
+  - "标准 Go 工具链没有 ohos 目标, GOOS=ohos 会直接报 unsupported GOOS/GOARCH; HarmonyOS 基于 Linux 内核, 正确参数是 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 (与仓库内 15+ 个 Go 包一致)"
+  - "Go 1.26.0 的 HarmonyOS 二进制存在 corrupted 问题, 需使用 1.26.3 (~/usr/local/go1263); go 未必在 profile PATH 中, 配方需自行探测 GOROOT"
+  - "no_copy_source=True + basic_layout 会分离 source_folder 与 build_folder, build() 的 CWD 是 build_folder, 必须 chdir 到 source_folder 才能找到 go.mod"
+  - "self.run(env=...) 的 env 形参接收环境脚本名(str/list), 传 dict 会抛 TypeError; 注入环境变量应使用 conan.tools.env.Environment"
+  - "package_type=application, cpp_info.libs=[] (无可链接库), bindirs=['bin']; CLI 工具需在软件级目录声明 commands.json (R38)"
+  - "上游仅有 1 个测试函数 TestFormat (format_test.go, 32 个 case), 已在 build() 中通过 go test ./... 接入 CI"
+  - "unfurl 遇到未知 mode 只向 stderr 打印 unknown mode 且退出码仍为 0, 因此 test_package 必须断言 stdout 内容, 否则是恒真的假阳性测试"
+  - "go.sum 中依赖 Cgboal/DomainParser 与 jakewarren/tldomains, 由 go build 自动拉取, 需 GOPROXY=https://goproxy.cn,direct"
