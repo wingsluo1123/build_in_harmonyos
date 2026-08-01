@@ -13,6 +13,8 @@
   `proj`、`cs2cs`、`cct`、`geod`、`gie`、`projinfo` 等常用命令。
 - `test_package/test_proj.cpp` 覆盖版本查询、context 生命周期、pipeline 坐标变换、
   非法 projection 拒绝和 geodesic inverse 计算。
+- 当前 recipe 保持 `BUILD_TESTING=ON`，在 `can_run(self)` 为真时执行完整 CTest；
+  OHOS 交叉构建只编译测试目标，不会在构建主机执行目标二进制。
 - 本地 Windows 原生验证使用 CMake 4.2.1 + MinGW g++ 8.1.0 + Anaconda sqlite3：
   configure、单线程 build、install、安装树消费测试和 `ctest` 均通过；`proj --version`
   与 `projinfo EPSG:4326` smoke 通过。

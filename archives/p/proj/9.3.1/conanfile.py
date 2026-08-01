@@ -9,6 +9,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanException
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 
@@ -59,7 +60,7 @@ class ProjConan(ConanFile):
         sqlite_lib = self._sqlite3_library(sqlite_host)
 
         tc = CMakeToolchain(self)
-        if self.settings.os == "OHOS":
+        if str(self.settings.os) == "OHOS":
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = self._cmake_system_processor(
                 str(self.settings.arch)
@@ -89,7 +90,10 @@ class ProjConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build(cli_args=["--parallel", "1"])
-        cmake.test(cli_args=["--output-on-failure"])
+        if can_run(self):
+            cmake.test(cli_args=["--output-on-failure"])
+        else:
+            self.output.info("cross-building: upstream CTest execution skipped")
 
     def package(self):
         cmake = CMake(self)
@@ -102,7 +106,7 @@ class ProjConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "PROJ")
         self.cpp_info.set_property("cmake_target_name", "PROJ::proj")
         self.cpp_info.set_property("pkg_config_name", "proj")
-        if self.settings.os in ("Linux", "OHOS"):
+        if str(self.settings.os) in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "dl", "pthread"]
 
     @staticmethod

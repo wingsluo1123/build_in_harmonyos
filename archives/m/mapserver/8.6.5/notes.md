@@ -40,7 +40,9 @@ MapServer 上游 CMake 强制依赖 PNG、JPEG、Freetype、PROJ、GDAL，其中
 
 ## 测试
 
-上游发布包内 CMake 注册 1 个 `unit_test`，本次关闭上游测试以避免交叉运行测试数据和依赖闭包。
+上游发布包内 CMake 注册 1 个 `unit_test`。recipe 保持 `BUILD_TESTING=ON`：
+在可执行的原生构建中运行完整 CTest；OHOS 交叉构建中由 `can_run(self)`
+明确跳过目标二进制的执行，避免在构建主机上把 ARM 产物当作本机程序运行。
 
 新增 `test_package/test_mapserver.c`，编译并链接 `libmapserver`，检查：
 

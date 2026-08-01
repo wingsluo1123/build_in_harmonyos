@@ -10,6 +10,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.files import apply_conandata_patches, get
 from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.env import VirtualBuildEnv
@@ -177,7 +178,7 @@ class MapserverConan(ConanFile):
             "-DWITH_JAVA=OFF",
             "-DWITH_CSHARP=OFF",
         ]
-        if self.settings.os == "OHOS":
+        if str(self.settings.os) == "OHOS":
             defs.insert(0, "-DOHOS_ARCH={}".format(self._ohos_arch()))
             defs.insert(0, '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(self._ohos_toolchain()))
         else:
@@ -189,7 +190,10 @@ class MapserverConan(ConanFile):
             env="conanbuild",
         )
         self.run('cmake --build "{}"'.format(build_dir), env="conanbuild")
-        self.run('ctest --test-dir "{}" --output-on-failure'.format(build_dir), env="conanbuild")
+        if can_run(self):
+            self.run('ctest --test-dir "{}" --output-on-failure'.format(build_dir), env="conanbuild")
+        else:
+            self.output.info("cross-building: upstream CTest execution skipped")
 
     def package(self):
         build_dir = os.path.join(self.build_folder, "build-ohos")
@@ -197,7 +201,7 @@ class MapserverConan(ConanFile):
             'cmake --install "{}" --prefix "{}"'.format(build_dir, self.package_folder),
             env="conanbuild",
         )
-        if self.options.shared and self.settings.os == "OHOS":
+        if self.options.shared and str(self.settings.os) == "OHOS":
             self._sign_shared_libs()
 
     def _sign_shared_libs(self):
@@ -237,5 +241,5 @@ class MapserverConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "mapserver")
         self.cpp_info.set_property("cmake_target_name", "mapserver::mapserver")
         self.cpp_info.bindirs = ["bin"]
-        if self.settings.os in ("Linux", "OHOS"):
+        if str(self.settings.os) in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["m", "pthread", "dl"]

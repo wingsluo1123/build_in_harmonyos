@@ -9,7 +9,7 @@
 
 ## 依赖与选项
 
-GDAL 是 MapServer 的强依赖。本次作为 MapServer 前置依赖，保留核心 GDAL/OGR 能力、PROJ 坐标系统支持、SQLite/GPKG、TIFF、PNG、JPEG 和命令行工具；关闭 Python 绑定、上游测试、插件自动加载、Curl/OpenSSL/WebP/Arrow/Parquet/GEOS/PostgreSQL 等重型可选链条。
+GDAL 是 MapServer 的强依赖。本次作为 MapServer 前置依赖，保留核心 GDAL/OGR 能力、PROJ 坐标系统支持、SQLite/GPKG、TIFF、PNG、JPEG 和命令行工具；关闭 Python 绑定、插件自动加载、Curl/OpenSSL/WebP/Arrow/Parquet/GEOS/PostgreSQL 等重型可选链条。
 
 依赖：
 
@@ -22,7 +22,7 @@ GDAL 是 MapServer 的强依赖。本次作为 MapServer 前置依赖，保留�
 关键 CMake 选项：
 
 - `BUILD_APPS=ON`
-- `BUILD_TESTING=OFF`
+- `BUILD_TESTING=ON`（在可执行目标上运行 CTest；OHOS 交叉构建仅跳过执行）
 - `BUILD_PYTHON_BINDINGS=OFF`
 - `GDAL_BUILD_OPTIONAL_DRIVERS=OFF`
 - `OGR_BUILD_OPTIONAL_DRIVERS=OFF`
@@ -43,7 +43,7 @@ GDAL 是 MapServer 的强依赖。本次作为 MapServer 前置依赖，保留�
 
 ## 测试说明
 
-官方 release tarball 中不包含 `autotest/` 目录；上游 CMake 仅在该目录存在且 `BUILD_TESTING=ON` 时注册核心测试。因此本 PR 按发布包内 CMake 注册测试计数为 0。
+官方 release tarball 中不包含 `autotest/` 目录；上游 CMake 仅在该目录存在且 `BUILD_TESTING=ON` 时注册核心测试。因此本 PR 按发布包内 CMake 注册测试计数为 0。recipe 仍启用 `BUILD_TESTING` 并在 `can_run(self)` 为真时执行 CTest，避免把零测试计数误写成未执行测试。
 
 新增 `test_package/test_gdal.cpp`，包含 11 个实质检查：
 
