@@ -73,3 +73,4 @@ class Sdl12CompatConan(ConanFile):
                 f'/data/service/hnp/bin/binary-sign-tool sign -inFile "{library}" '
                 f'-outFile "{library}" -selfSign 1'
             )
+# OHOS-CI-trigger: re-run build (no functional change)
