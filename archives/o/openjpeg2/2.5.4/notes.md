@@ -7,14 +7,6 @@ This package builds the OpenJPEG core `libopenjp2` library from the official
 viewer, Java bindings, bundled third-party helpers, documentation, and upstream
 tests so the OHOS package has a focused library surface.
 
-## High-difficulty basis
-
-Path C is appropriate because OpenJPEG has a non-trivial codec API, multiple
-optional executable stacks (`opj_compress`, `opj_decompress`, `opj_dump`),
-JPIP client/server code, optional image-format helper dependencies, and a large
-upstream data-driven conformance/nonregression suite. The adaptation keeps the
-core library first, with consumer tests covering public API use directly.
-
 ## Test coverage
 
 Upstream `tests/CMakeLists.txt` plus `tests/unit/CMakeLists.txt` register 33
