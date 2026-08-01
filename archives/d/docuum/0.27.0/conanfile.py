@@ -1,5 +1,5 @@
 from conan import ConanFile
-from conan.tools.files import get, copy
+from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
 import os
 
 class DocuumConan(ConanFile):
@@ -13,9 +13,13 @@ class DocuumConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
+    def export_sources(self):
+        export_conandata_patches(self)
+
     def source(self):
         get(self, **self.conan_data["sources"][self.version],
             strip_root=True)
+        apply_conandata_patches(self)
 
     def layout(self):
         self.folders.source = "."
