@@ -8,8 +8,9 @@ Open-source, Google Zanzibar-inspired permissions database.
 
 ## Build notes
 
-- Packages the upstream linux/arm64 release archive published by AuthZed.
-- Avoids requiring a Go toolchain on the OHOS CI worker, which currently does not provide `go`.
+- Builds the upstream Go command from the official `v1.56.0` source archive.
+- Uses `CGO_ENABLED=0` and maps the Conan target arch to Go's `GOARCH`.
+- Uses `GO`, `go` in `PATH`, known harmonybrew locations, or a pinned Go 1.26.3 archive from `mirrors.aliyun.com` when the worker has no system Go.
 - Installs the `spicedb` executable to `bin/`.
 
 ## Test notes

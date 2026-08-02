@@ -2,19 +2,24 @@ software: spicedb
 version: "1.56.0"
 status: pending
 build_date: "2026-08-02"
-build_system: prebuilt
+build_system: go
 conan_ref: "spicedb/1.56.0"
-status_notes: "Uses the upstream linux/arm64 release archive because the OHOS CI worker does not provide a Go toolchain."
+status_notes: "Builds the upstream Go command from source; bootstraps the pinned Go toolchain from a mirror when the CI worker has no system Go."
 
 source:
-  url: "https://github.com/authzed/spicedb/releases/download/v1.56.0/spicedb_1.56.0_linux_arm64.tar.gz"
-  sha256: "0511f1bc4c1f772ca38861e432a11933859ebafc1cf1cc0db73dd324e9a38f41"
+  url: "https://github.com/authzed/spicedb/archive/refs/tags/v1.56.0.tar.gz"
+  sha256: "e8c15ecc241e3f50feeab0c63062c961e4558608f25376623ce38e44ec3897b1"
   tar_format: tar.gz
 
 build:
-  system: prebuilt
+  system: go
   configure_options:
-    - "Extract spicedb from the upstream linux/arm64 release archive"
+    - "CGO_ENABLED=0"
+    - "GOOS=linux"
+    - "GOARCH derived from Conan target arch"
+    - "Use GOROOT/PATH from the discovered or bootstrapped Go toolchain"
+    - "GOTOOLCHAIN=local"
+    - "GOPROXY=https://goproxy.cn,direct by default"
   dependencies: []
   cc: N/A
   cxx: N/A
@@ -24,6 +29,7 @@ patches_applied: []
 knowledge_gained:
   - "spicedb is distributed as a Go CLI/server command rooted at ./cmd/spicedb."
   - "The Homebrew formula injects version metadata through github.com/jzelinskie/cobrautil/v2.Version; this recipe keeps the same version flag path."
+  - "The OHOS CI worker may not provide Go, so the recipe falls back to a pinned Go toolchain archive from mirrors.aliyun.com."
   - "The packaged command can be smoke-tested without starting a long-running server."
 
 validation:
