@@ -110,7 +110,13 @@ class NcursesConan(ConanFile):
             sandbox = os.path.join(self.build_folder, ".ncurses-tmp")
             self.run(f"mkdir -p \"{sandbox}\"", ignore_errors=True)
         with environment(Environment().define("TMPDIR", sandbox)):
-            bash = os.environ.get("CONFIG_SHELL", "bash")
+            # CONFIG_SHELL 存在性回退（aireview P2）：os.environ.get 缺 fallback
+            bash = os.environ.get("CONFIG_SHELL")
+            if not bash or not os.path.isabs(bash):
+                for cand in ("/bin/bash", "/usr/bin/bash", "bash"):
+                    if cand == "bash" or os.path.exists(cand):
+                        bash = cand
+                        break
             configure = os.path.join(self.source_folder, "configure")
             # ncurses 6.4 老 autotools (2022 config.guess) �猜不出 OHOS aarch64，显式传 build/host
             # 追加 generate() 中定义的 configure_args（--without-shared 等，否则这些选项失效）
@@ -131,9 +137,14 @@ class NcursesConan(ConanFile):
         for lib in ("libncursesw.a", "libpanelw.a", "libmenuw.a", "libformw.a"):
             if not os.path.exists(os.path.join(self.package_folder, "lib", lib)):
                 raise ConanException(f"expected static lib {lib} not found in package")
+        # P3: 许可证随包发布
+        copy(self, "COPYING", dst=os.path.join(self.package_folder, "licenses"),
+             src=self.source_folder)
 
     def package_info(self):
         # 上游提供 4 个静态库，主库是 libncursesw（widec 版本）
-        self.cpp_info.libs = ["ncursesw", "panelw", "menuw", "formw"]
+        # P2: 龠接顺序错误，ncursesw 被它依赖的 panelw/menuw/formw 依赖，
+        # 静态链接时主库须放末（被依赖在前），否则 panel/menu/form 的未定义符号找不到 ncursesw
+        self.cpp_info.libs = ["panelw", "menuw", "formw", "ncursesw"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]

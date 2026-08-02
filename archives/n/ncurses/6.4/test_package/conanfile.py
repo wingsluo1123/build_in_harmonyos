@@ -24,7 +24,9 @@ class NcursesTestConan(ConanFile):
 
     def test(self):
         if can_run(self):
-            ret = self.run("./test_ncurses", env="conanrun")
+            # P2: self.run 非零退出码先抛 ConanException，77-SKIP 分支不可达
+            # 改 ignore_errors=True 使退出码返回给 if ret == 77 判断
+            ret = self.run("./test_ncurses", env="conanrun", ignore_errors=True)
             if ret == 77:
                 # SKIP 退出码：OHOS 无终端时 initscr 返回 NULL，测试跳过而非失败
                 self.output.info("test_ncurses: SKIP (no terminal available)")
