@@ -109,4 +109,4 @@ class SeatdConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["seat"]
         self.cpp_info.set_property("pkg_config_name", "libseat")
-# OHOS-CI-trigger: re-run build (no functional change)
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
