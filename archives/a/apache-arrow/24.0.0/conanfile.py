@@ -1,3 +1,8 @@
+import glob
+import os
+import shlex
+import shutil
+
 from conan import ConanFile
 from conan.tools.files import collect_libs, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain
@@ -63,6 +68,7 @@ class ApacheArrowConan(ConanFile):
         tc.variables["ARROW_IPC"] = "ON"
         tc.variables["ARROW_MIMALLOC"] = "OFF"
         tc.variables["ARROW_COMPUTE"] = "ON"
+        tc.variables["ARROW_ACERO"] = "ON"
         tc.variables["ARROW_CSV"] = "ON"
         tc.variables["ARROW_FILESYSTEM"] = "ON"
         tc.variables["ARROW_JSON"] = "ON"
@@ -90,13 +96,83 @@ class ApacheArrowConan(ConanFile):
         apply_conandata_patches(self)
         cmake = CMake(self)
         # CMakeLists.txt 在解压后的 cpp/ 子目录中
-        import os
         cmake.configure(build_script_folder=os.path.join(self.source_folder, "cpp"))
         cmake.build()
 
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        self._sign_shared_libraries()
+
+    def _sign_shared_libraries(self):
+        if self.settings.os != "OHOS" or not self.options.shared:
+            return
+
+        lib_dir = os.path.join(self.package_folder, "lib")
+        libraries = sorted(
+            {
+                path
+                for pattern in ("*.so", "*.so.*")
+                for path in glob.glob(os.path.join(lib_dir, pattern))
+                if os.path.isfile(path) and not os.path.islink(path)
+            }
+        )
+        if not libraries:
+            return
+
+        objcopy = self._find_ohos_tool("llvm-objcopy")
+        signer = self._find_ohos_tool("binary-sign-tool")
+        if not signer:
+            self.output.warning("binary-sign-tool not found; skip OHOS shared-library signing")
+            return
+
+        for library in libraries:
+            self._sign_elf_atomically(library, objcopy, signer)
+
+    def _sign_elf_atomically(self, path, objcopy, signer):
+        original_mode = os.stat(path).st_mode
+        temporary = f"{path}.signing"
+        signed = f"{path}.signed"
+        try:
+            shutil.copy2(path, temporary)
+            if objcopy:
+                self.run(
+                    f"{shlex.quote(objcopy)} --remove-section .codesign "
+                    f"{shlex.quote(temporary)} 2>/dev/null || true"
+                )
+            self.run(
+                shlex.join(
+                    [
+                        signer,
+                        "sign",
+                        "-inFile",
+                        temporary,
+                        "-outFile",
+                        signed,
+                        "-selfSign",
+                        "1",
+                    ]
+                )
+            )
+            os.chmod(signed, original_mode)
+            os.replace(signed, path)
+        finally:
+            for leftover in (temporary, signed):
+                if os.path.exists(leftover):
+                    os.remove(leftover)
+
+    def _find_ohos_tool(self, name):
+        compiler_executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler = compiler_executables.get("c") or compiler_executables.get("cpp") or ""
+        compiler_dir = os.path.dirname(compiler)
+        candidates = (
+            os.path.join(compiler_dir, name) if compiler_dir else "",
+            shutil.which(name) or "",
+            os.path.join("/data/service/hnp/bin", name),
+        )
+        return next((path for path in candidates if path and os.path.isfile(path)), "")
 
     def package_info(self):
         self.cpp_info.libs = collect_libs(self)
