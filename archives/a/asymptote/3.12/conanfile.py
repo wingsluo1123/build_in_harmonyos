@@ -81,3 +81,4 @@ class AsymptoteConan(ConanFile):
         self.cpp_info.libs = []
         self.cpp_info.includedirs = []
         self.cpp_info.bindirs = ["bin"]
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
