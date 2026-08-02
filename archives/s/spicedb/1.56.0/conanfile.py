@@ -2,6 +2,7 @@
 """Conan recipe for spicedb 1.56.0."""
 
 import os
+import stat
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -48,6 +49,10 @@ class SpicedbConan(ConanFile):
         os.makedirs(bin_dir, exist_ok=True)
         tarball = os.path.join(self.source_folder, self.conan_data["sources"]["filename"])
         self.run(f'tar xzf "{tarball}" -C "{bin_dir}" "{binary}"')
+        os.chmod(os.path.join(bin_dir, binary),
+                 stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
+                 stat.S_IRGRP | stat.S_IXGRP |
+                 stat.S_IROTH | stat.S_IXOTH)
         copy(self, "LICENSE", src=self.source_folder,
              dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
         copy(self, "README.md", src=self.source_folder,
