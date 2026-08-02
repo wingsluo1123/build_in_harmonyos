@@ -29,9 +29,10 @@ class BtopConan(ConanFile):
 
     def build(self):
         # R33: Get compiler from Conan conf, NEVER from shell env vars.
-        # Access the dict form: tools.build:compiler_executables then .get("cxx")
+        # CI profile 提供 tools.build:compiler_executables={"c": ..., "cpp": ...}，
+        # 键名为 "cpp"（兼容 "cxx" 兜底）。
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
-        cxx = compilers.get("cxx", "clang++")
+        cxx = compilers.get("cpp") or compilers.get("cxx") or "clang++"
         cxxflags = self.conf.get("tools.build:cxxflags", default="", check_type=str)
         # R9: Use -j1; run make in the source folder; quote CXXFLAGS for spaces.
         self.run(f'make -C "{self.source_folder}" -j1 CXX="{cxx}" CXXFLAGS="{cxxflags}"')
