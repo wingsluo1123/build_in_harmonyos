@@ -1,8 +1,9 @@
 #!/usr/bin/env sh
 set -eu
 
-snapshot="${TMPDIR:-${HOME:-/tmp}/tmp}/codex-ps-swift-check.txt"
-mkdir -p "$(dirname "$snapshot")" 2>/dev/null || true
+snapshot_dir="${TMPDIR:-${HOME:-/tmp}/tmp}"
+snapshot="${snapshot_dir}/codex-ps-swift-check-$$.txt"
+mkdir -p "$snapshot_dir" 2>/dev/null || true
 trap 'rm -f "$snapshot"' EXIT
 
 date || true

@@ -113,6 +113,23 @@ probe-machine absolute paths; real compiler, clang, opt, sysroot, resource-dir,
 and Swift arch module paths are expected from environment variables or the
 packaged toolchain layout.
 
+## Review Follow-up
+
+The 2026-08-03 AI review P0/P2/P3 items were folded back into the staged patch
+set:
+
+- Removed the dangling empty `if` block in the ClangImporter CC1 argument
+  filter.
+- Scoped the SwiftPM `sigaction` member-layout change to `os(OHOS)` so Linux
+  Glibc and Android keep their original branches.
+- Preserved the SwiftPM file-lock `blocking` parameter instead of silently
+  dropping it.
+- Freed `allocated_real` on the IR handoff wrapper sysroot error path.
+- Switched `monitor-device.sh` to a PID-qualified process snapshot file.
+- Added the software-level `archives/s/swift/commands.json` metadata.
+- Replaced the mutable OHOS LLVM branch tarball source entry with a pinned
+  commit reference for `2026_0313_llvm15_release`.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
@@ -122,8 +139,9 @@ active on the true device. When the device is quiet:
 date
 uptime
 free -h
-snapshot="${TMPDIR:-${HOME:-/tmp}/tmp}/codex-ps-swift-check.txt"
-mkdir -p "$(dirname "$snapshot")" 2>/dev/null || true
+snapshot_dir="${TMPDIR:-${HOME:-/tmp}/tmp}"
+snapshot="${snapshot_dir}/codex-ps-swift-check-$$.txt"
+mkdir -p "$snapshot_dir" 2>/dev/null || true
 ps -ef > "$snapshot"
 grep conan "$snapshot"
 grep clang "$snapshot"
@@ -136,12 +154,26 @@ rm -f "$snapshot"
 Then continue with a low-concurrency staged packaging validation:
 
 ```sh
-export SWIFT_OHOS_STAGED_ROOT=/path/to/signed/swift-ohos-stage
+export SWIFT_OHOS_BOOTSTRAP_ROOT=$HOME/swift-mainline-ohos-src
+export SWIFT_OHOS_STAGE_OUT=$SWIFT_OHOS_BOOTSTRAP_ROOT/swift-ohos-stage-$(date +%Y%m%d-%H%M%S)
+export TMPDIR=$SWIFT_OHOS_BOOTSTRAP_ROOT/tmp
+# Set SWIFT_OHOS_SIGN=1 only when the bootstrap outputs still need signing.
+sh archives/s/swift/6.0.3/scripts/assemble-stage-ohos.sh
+
+export SWIFT_OHOS_STAGED_ROOT=$SWIFT_OHOS_STAGE_OUT
 conan create archives/s/swift/6.0.3 -pr:h ohos_4_1_armv8 -pr:b default -tf ""
 conan create archives/s/swift/6.0.3 -pr:h ohos_4_1_armv8 -pr:b default
 ```
 
 The current Conan recipe intentionally packages a supplied staged toolchain
-rather than claiming a fully automated Swift source bootstrap. Source-bootstrap
-automation remains the next review item after the staged package is reproducible
-from a clean signed stage.
+rather than claiming a fully automated Swift source bootstrap. The
+`assemble-stage-ohos.sh` helper is the first automation boundary for turning a
+completed source-bootstrap workspace into a clean signed stage that can be
+reused by Conan and downstream SwiftPM packages.
+
+Current stage boundary: `swift-driver-new` is built but not copied into the
+default packaged stage. When present, `swift --version` dispatches into the new
+driver and hangs on the true device; without it, `swift`, `swiftc`,
+`swift-build`, and `swift-package` all complete their version smoke through the
+validated legacy driver path. Set `SWIFT_OHOS_INCLUDE_DRIVER_NEW=1` only for
+the separate SwiftDriver follow-up investigation.

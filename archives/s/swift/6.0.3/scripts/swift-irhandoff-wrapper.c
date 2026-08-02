@@ -206,6 +206,7 @@ int main(int argc, char **argv) {
   const char *sysroot = first_env("OHOS_SDKROOT", "OHOS_SYSROOT", "SDKROOT");
   if (!sysroot) {
     fprintf(stderr, "[ohos-irhandoff] OHOS_SDKROOT/OHOS_SYSROOT/SDKROOT is required for IR handoff\n");
+    free(allocated_real);
     return 127;
   }
 

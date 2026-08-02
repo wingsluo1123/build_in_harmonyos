@@ -146,13 +146,15 @@ diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellato
 index 934416d..d17d53b 100644
 --- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift
 +++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift
-@@ -82,8 +82,8 @@ public final class Cancellator: Cancellable, Sendable {
+@@ -82,8 +82,10 @@ public final class Cancellator: Cancellable, Sendable {
                  action.__sigaction_u.__sa_handler = SIG_DFL
                  #elseif canImport(Musl)
                  action.__sa_handler.sa_handler = SIG_DFL
 -                #elseif os(Android)
 -                action.sa_handler = SIG_DFL
-+                #elseif os(Android) || canImport(Glibc)
++                #elseif os(Android)
++                action.sa_handler = SIG_DFL
++                #elseif os(OHOS)
 +                action.__sa_handler.sa_handler = SIG_DFL
                  #else
                  action.__sigaction_handler = unsafeBitCast(
@@ -205,16 +207,53 @@ diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem
 index 76d4922..c053757 100644
 --- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
 +++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
-@@ -197,7 +197,7 @@ extension FileSystem {
-
+@@ -16,10 +16,12 @@ import struct Foundation.UUID
+ import SystemPackage
+-
+-import struct TSCBasic.ByteString
++import TSCLibc
++import struct TSCBasic.ByteString
+ import struct TSCBasic.FileInfo
+ import class TSCBasic.FileLock
+ import enum TSCBasic.FileMode
+-import protocol TSCBasic.FileSystem
++import struct TSCBasic.FileSystemError
++import protocol TSCBasic.FileSystem
+ import enum TSCBasic.FileSystemAttribute
+ import var TSCBasic.localFileSystem
+-import protocol TSCBasic.WritableByteStream
++import enum TSCBasic.ProcessLockError
++import protocol TSCBasic.WritableByteStream
+@@ -198,4 +201,27 @@ extension FileSystem {
      /// Execute the given block while holding the lock.
      public func withLock<T>(on path: AbsolutePath, type: FileLock.LockType, blocking: Bool = true, _ body: () throws -> T) throws -> T {
 -        try self.withLock(on: path.underlying, type: type, blocking: blocking, body)
-+        try TSCBasic.FileLock.withLock(fileToLock: path.underlying, type: type, body: body)
++        if blocking {
++            return try TSCBasic.FileLock.withLock(fileToLock: path.underlying, type: type, body: body)
++        }
++
++        #if os(Windows)
++        throw FileSystemError(.unsupported, path.underlying)
++        #else
++        let lockDirectory = try TSCBasic.localFileSystem.tempDirectory
++        let lockFile = lockDirectory.appending(component: path.basename + ".lock")
++        let fd = open(lockFile.pathString, O_WRONLY | O_CREAT | O_CLOEXEC, 0o666)
++        if fd == -1 {
++            throw FileSystemError(errno: errno, lockFile)
++        }
++        defer { _ = close(fd) }
++
++        let lockOperation = (type == .exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB
++        while true {
++            if flock(fd, lockOperation) == 0 { break }
++            if errno == EINTR { continue }
++            throw ProcessLockError.unableToAquireLock(errno: errno)
++        }
++        defer { _ = flock(fd, LOCK_UN) }
++        return try body()
++        #endif
      }
-
-     /// Returns any known item replacement directories for a given path. These may be used by platform-specific
-@@ -629,7 +629,9 @@ extension FileLock {
+@@ -629,7 +654,9 @@ extension FileLock {
          fileToLock: AbsolutePath,
          at lockFilesDirectory: AbsolutePath? = nil
      ) throws -> FileLock {
@@ -663,46 +702,21 @@ index c7f9334..488d3f3 100644
 
    // ClangImporter::create adds a remapped MemoryBuffer that we don't need
    // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
-@@ -1178,13 +1184,15 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
-   // to missing files and report the error that clang would throw manually.
-   // rdar://77516546 is tracking that the clang importer should be more
-   // resilient and provide a module even if there were building it.
-   auto TempVFS = clang::createVFSFromCompilerInvocation(
-       *CI, *clangDiags,
-       VFS ? VFS : importer->Impl.SwiftContext.SourceMgr.getFileSystem());
-
-   std::vector<std::string> FilteredModuleMapFiles;
-   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
--    if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
-+    if (ModuleMapFile.empty()) {
-+      continue;
-+    } else if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
-       // There is no need to add any module map file here. Issue a warning and
-       // drop the option.
-       importer->Impl.diagnose(SourceLoc(), diag::module_map_ignored,
-@@ -1198,7 +1206,16 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
-   }
-   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
-
+@@ -1198,5 +1207,8 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+  }
+  CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
+-
 -  return CI->getCC1CommandLine();
 +  auto CC1CommandLine = CI->getCC1CommandLine();
-+  auto OriginalCC1Count = CC1CommandLine.size();
 +  llvm::erase_if(CC1CommandLine, [](const std::string &Arg) {
 +    return Arg.empty() || Arg == "-fmodule-map-file=";
 +  });
-+  for (const auto &Arg : CC1CommandLine) {
-+    auto Ref = StringRef(Arg);
-+    if (Ref.contains("module") || Ref.starts_with("-std=") || Ref == "-x")
-+  }
 +  return CC1CommandLine;
  }
-
- std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
-@@ -1227,6 +1244,12 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
+@@ -1227,6 +1244,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
            *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
      return nullptr;
 
-+  auto OriginalModuleMapCount = CI->getFrontendOpts().ModuleMapFiles.size();
 +  llvm::erase_if(CI->getFrontendOpts().ModuleMapFiles,
 +                 [](const std::string &ModuleMapFile) {
 +                   return ModuleMapFile.empty();
@@ -776,7 +790,7 @@ index c7f9334..488d3f3 100644
    }
 
    // Don't stop emitting messages if we ever can't load a module.
-@@ -1445,40 +1473,46 @@ ClangImporter::create(ASTContext &ctx,
+@@ -1445,40 +1473,45 @@ ClangImporter::create(ASTContext &ctx,
    // example, if we combined the early exit below with the one above) would make
    // the compiler instance used to emit PCMs incompatible with the one used to
    // read them later.
@@ -790,7 +804,6 @@ index c7f9334..488d3f3 100644
 
 +  {
 +    auto &ModuleMapFiles = instance.getFrontendOpts().ModuleMapFiles;
-+    auto OriginalModuleMapCount = ModuleMapFiles.size();
 +    llvm::erase_if(ModuleMapFiles, [](const std::string &ModuleMapFile) {
 +      return ModuleMapFile.empty();
 +    });
