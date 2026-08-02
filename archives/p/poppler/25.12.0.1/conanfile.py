@@ -54,7 +54,6 @@ class PopplerConan(ConanFile):
 
     def requirements(self):
         self.requires("freetype/2.14.3")
-        self.requires("qt5-qtbase/5.15.2")
         self.requires("zlib/1.3.1.1")
 
     def layout(self):
@@ -145,7 +144,6 @@ class PopplerConan(ConanFile):
             '-DFREETYPE_INCLUDE_DIR_freetype2="%s"' % ft_inc,
             '-DZLIB_LIBRARY="%s"' % self._dep_lib("zlib", "z"),
             '-DZLIB_INCLUDE_DIR="%s"' % os.path.join(self._dep("zlib"), "include"),
-            '-DQt5_DIR="%s"' % os.path.join(self._dep("qt5-qtbase"), "lib", "cmake", "Qt5"),
         ]
 
         # 与 25.12.0 完全一致的功能开关（本次只改构建方式，不改功能面）
@@ -156,7 +154,7 @@ class PopplerConan(ConanFile):
             "-DENABLE_GLIB=OFF",
             "-DENABLE_GOBJECT_INTROSPECTION=OFF",
             "-DENABLE_GTK_DOC=OFF",
-            "-DENABLE_QT5=ON",
+            "-DENABLE_QT5=OFF",
             "-DENABLE_QT6=OFF",
             "-DENABLE_UNSTABLE_API_ABI_HEADERS=ON",
             "-DENABLE_NSS3=OFF",
@@ -172,7 +170,7 @@ class PopplerConan(ConanFile):
             "-DBUILD_CPP_TESTS=OFF",
             "-DBUILD_MANUAL_TESTS=OFF",
         ]
-        roots = ";".join(self._dep(n) for n in ("freetype", "zlib", "qt5-qtbase"))
+        roots = ";".join(self._dep(n) for n in ("freetype", "zlib"))
         d += ['-DCMAKE_FIND_ROOT_PATH="%s"' % roots, '-DCMAKE_PREFIX_PATH="%s"' % roots]
         return d
 
