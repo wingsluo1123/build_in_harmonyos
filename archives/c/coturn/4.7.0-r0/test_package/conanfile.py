@@ -12,4 +12,8 @@ class CoturnTestPackage(ConanFile):
         # Verify binary is a valid ELF executable
         pkg = self.dependencies["coturn"]
         binary = os.path.join(pkg.package_folder, "bin", "turnserver")
-        self.run(f'file "{binary}"')
+    def test(self):
+        # 实际执行被测二进制（R34）：运行 turnserver --version 验证可执行性
+        pkg = self.dependencies["coturn"]
+        binary = os.path.join(pkg.package_folder, "bin", "turnserver")
+        self.run(f'"{binary}" --version', env="conanrun")
