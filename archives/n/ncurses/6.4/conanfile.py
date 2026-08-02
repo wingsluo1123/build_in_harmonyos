@@ -111,9 +111,10 @@ class NcursesConan(ConanFile):
             self.run(f"mkdir -p \"{sandbox}\"", ignore_errors=True)
         with environment(Environment().define("TMPDIR", sandbox)):
             # CONFIG_SHELL 存在性回退（aireview P2）：os.environ.get 缺 fallback
-            # CI TypeError 根因: bash=None 时 os.path.isabs(None) 炸，先判 not bash 再判 isabs
+            # CI TypeError 根因: os.path.isabs 在该 Conan 环境 shadow 非 callable，
+            # 避开用 str.startswith('/') 判绝对路径 + os.path.exists 核存在
             bash = os.environ.get("CONFIG_SHELL")
-            if not bash or (os.path.isabs(bash) and not os.path.exists(bash)):
+            if not bash or (bash.startswith("/") and not os.path.exists(bash)):
                 for cand in ("/bin/bash", "/usr/bin/bash", "bash"):
                     if cand == "bash" or os.path.exists(cand):
                         bash = cand
