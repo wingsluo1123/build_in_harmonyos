@@ -34,13 +34,14 @@ class KubetuiTestConan(ConanFile):
             raise Exception(f"kubetui binary not found: {bin_path}")
         if cross_building(self):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
-            # P2: 交叉编译跳过运行时测试时，仍校验二进制可执行（--help 不依赖目标平台运行时）
-            # aireview: 交叉编译 CI 下冒烟测试恒被跳过、MANIFEST 声称验证为空
-            try:
-                self.run(f'"{bin_path}" --help', env="conanrun", ignore_errors=True)
+            # P1: 交叉编译跳过运行时测试，跨架构二进制无法在宿主执行则诚实跳过（不打印 PASSED）
+            # aireview: ignore_errors=True 丢弃退出码+无条件打印 PASSED 属伪造通过
+            ret = self.run(f'"{bin_path}" --help', env="conanrun", ignore_errors=True)
+            if ret == 0:
                 self.output.info("cross-building: kubetui --help smoke test PASSED")
-            except Exception as e:
-                self.output.warning(f"cross-building: kubetui --help smoke test skipped: {e}")
+            else:
+                # 跨架构二进制无法在宿主执行，诚实跳过（info 说明仅编译验证，不伪造 PASSED）
+                self.output.info(f"cross-building: kubetui --help skipped (exit code {ret}, cross-arch binary cannot run on host)")
             return
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_kubetui")
         self.run(f'"{test_bin}"', env="conanrun")
