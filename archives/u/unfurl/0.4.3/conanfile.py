@@ -117,3 +117,4 @@ class UnfurlConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libs = []
         self.cpp_info.includedirs = []
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
