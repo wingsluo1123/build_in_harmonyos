@@ -1,16 +1,30 @@
 # test_package/MANIFEST.yml
 package: seatd/0.9.3
 homepage: "https://git.sr.ht/~kennylevinsen/seatd"
-upstream_check_command: "make check"
+# 上游用 meson 自带的测试框架，没有 autotools，因此不存在 `make check`。
+upstream_check_command: "meson test -C <builddir>"
+# 未接入 build()：上游 3 个测试中 poller 在 OHOS 上会无限阻塞（见下），
+# 接进构建会让 CI 永久挂起，故只在 test_package 中做等价的 API 级验证。
 upstream_test_in_build: false
 upstream_test_command: ""
 upstream_tests:
-  - file: N/A
-    source: N/A
-    description: "library, smoke test via conan test"
-    command: "N/A"
+  - file: tests/linked_list.c
+    source: upstream
+    description: "双向链表的插入/删除/遍历/并发修改安全性"
+    command: "meson test -C <builddir> linked_list"
+    ohos_status: "本机 aarch64 OHOS 实测通过 (rc=0)"
+  - file: tests/connection.c
+    source: upstream
+    description: "socketpair 上的消息编解码与 SCM_RIGHTS fd 传递，覆盖 decode_cmsg()"
+    command: "meson test -C <builddir> connection"
+    ohos_status: "本机 aarch64 OHOS 实测通过 (rc=0)"
+  - file: tests/poller.c
+    source: upstream
+    description: "事件轮询器的 fd/signal 事件分发"
+    command: "meson test -C <builddir> poller"
+    ohos_status: "本机 aarch64 OHOS 实测无限阻塞（信号驱动的轮询语义不成立），故不接入 CI"
 test_package_tests:
-  - file: conanfile.py
-    description: "conan test smoke"
+  - file: test_package.c
+    description: "libseat 公共 API 的错误契约 + noop 后端完整生命周期（open/dispatch/open_device/close_device/close_seat）"
     command: "test_seatd"
-assertion_count: 1
+assertion_count: 15

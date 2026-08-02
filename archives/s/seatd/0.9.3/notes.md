@@ -36,16 +36,77 @@ API 申请设备访问权限，由 seatd 守护进程仲裁授权。
 | man-pages           | feat  | disabled   | 无 man 页                |
 | examples            | combo | disabled   | 不构建示例               |
 
-### 3. 产物
+### 3. 编译告警处理（不打补丁）
+
+本配方 **不包含任何补丁**，上游源码原样编译。
+
+seatd 的 `project()` 里写死了 `warning_level=3` + `werror=true`。在 musl 系
+libc（含 OHOS sysroot）上，`<sys/socket.h>` 的 `CMSG_NXTHDR()` 宏内部存在
+有符号/无符号比较：
+
+```
+sysroot/usr/include/sys/socket.h:360:
+  __CMSG_LEN(cmsg) + sizeof(struct cmsghdr) >= __MHDR_END(mhdr) - (unsigned char *)(cmsg)
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+`common/connection.c` 的 `decode_cmsg()` 用该宏遍历控制消息，于是编译失败：
+
+```
+common/connection.c:154:55: warning: comparison of integers of different signs:
+  'unsigned long' and 'long' [-Wsign-compare]
+```
+
+**告警产生在系统头文件里，seatd 自身代码没有符号性缺陷。** 因此处理方式是在
+工具链层精确豁免，而不是改上游源码：
+
+```python
+tc.c_args.append("-Wno-sign-compare")
+```
+
+选型说明：
+- **不用** `#ifdef` 包裹 `#pragma` 改源码 —— 平台条件编译属于禁止项，且用补丁去
+  掩盖系统头的问题不合理。
+- **不用** `-Dwerror=false` —— 那会整体放弃 warnings-as-errors，真实问题也一并
+  被放过。实测只关 `-Wsign-compare` 这一条后，`common/`、`libseat/`（noop 与
+  seatd 后端）、`seatd/` 全量编译**零告警**，没有必要一刀切。
+
+### 4. 产物
 - `bin/seatd`：seatd 守护进程可执行文件
 - `lib/libseat.a`（静态）/ `lib/libseat.so*`（动态，非 OHOS）
 - `include/libseat.h`：公共头文件
 - `lib/pkgconfig/libseat.pc`：pkg-config 文件
 
-### 4. 测试
-`test_package/test_package.c` 验证 `libseat.h` 头文件可被包含，并调用
-`libseat_open_seat()`。在无 seat 环境（如交叉编译测试）下预期返回 NULL，
-头文件可包含即说明库安装成功。
+### 5. 测试
+
+#### 上游测试
+上游用 meson 自带测试框架定义了 3 个单元测试（没有 `make check`）：
+
+| 测试        | 覆盖                                   | OHOS aarch64 实测      |
+|-------------|----------------------------------------|------------------------|
+| linked_list | 链表插入/删除/遍历                     | 通过 (rc=0)            |
+| connection  | socketpair 消息编解码 + SCM_RIGHTS 传 fd | 通过 (rc=0)            |
+| poller      | 事件轮询器的 fd/signal 分发            | **无限阻塞**，已排除   |
+
+`poller` 在 OHOS 上超过 16 分钟无任何输出，其信号驱动的轮询语义在该平台不成立。
+因此 **不在 `build()` 中调用 `meson.test()`**，否则 CI 会永久挂起
+（`upstream_test_in_build: false`）。
+
+#### test_package
+`test_package/test_package.c` 做的是真实 API 验证，不是"头文件能包含"级别的
+冒烟测试。共 **15 条断言**，任一失败即非零退出：
+
+- **错误契约**（3+1 条）：`libseat_open_seat(NULL, ...)` → `EINVAL`；
+  `listener.enable_seat == NULL` → `EINVAL`；未知 `LIBSEAT_BACKEND` → `EINVAL`
+  且错误经日志回调上报（校验回调确实被调用）。
+- **noop 后端完整生命周期**（11 条）：设 `LIBSEAT_BACKEND=noop` 后
+  `open_seat` 成功 → `seat_name()` 为 `"seat0"` → `get_fd()` 返回可轮询 fd →
+  两次 `dispatch()` 均成功且 `enable_seat` 回调**只在首次触发一次** →
+  `open_device()` 打开真实临时文件返回合法 devid 与 fd → `close_device()` 成功 →
+  `open_device()` 打开不存在路径返回 `-1` → `close_seat()` 成功。
+
+libseat 始终会编译进 `noop` 后端，无需 seatd 守护进程或 logind 即可跑通整条调用
+链，因此在 CI 沙箱内也能做实质性功能验证。
 
 ## 已知限制
 - seatd 守护进程运行需要访问输入设备（/dev/input、evdev）与 DRM 设备，OHOS

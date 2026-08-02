@@ -19,6 +19,36 @@ build:
   dependencies: []
   cc: clang
   cxx: clang++
+  extra_c_args:
+    - "-Wno-sign-compare"
 
+# 本配方不打任何补丁：上游源码在 OHOS 上无需修改即可编译。
 patches_applied: []
-knowledge_gained: []
+
+knowledge_gained:
+  - topic: "CMSG_NXTHDR 在 musl 上触发 -Wsign-compare"
+    detail: >-
+      seatd 以 warning_level=3 + werror=true 构建。OHOS sysroot 的
+      <sys/socket.h>:360 中，CMSG_NXTHDR() 宏把 __CMSG_LEN() 的 unsigned 结果与
+      __MHDR_END(mhdr) - (unsigned char *)(cmsg) 这个有符号指针差做比较，任何展开
+      该宏的代码都会报 -Wsign-compare。告警源头在系统头文件，不在 seatd 代码里。
+    resolution: >-
+      不改上游源码、不加平台条件编译，改为在 MesonToolchain 的 c_args 里追加
+      -Wno-sign-compare。实测仅关这一条诊断后，common/、libseat/（noop + seatd
+      后端）、seatd/ 全量编译零告警，因此无需用 -Dwerror=false 整体放弃
+      warnings-as-errors。
+  - topic: "上游 poller 单元测试在 OHOS 上死锁"
+    detail: >-
+      上游 meson 定义了 linked_list / connection / poller 三个测试。在 aarch64
+      OHOS 本机实测：linked_list 与 connection 均 rc=0 通过；poller 无限阻塞
+      （超过 16 分钟无输出后被强制终止），其信号驱动的事件轮询语义在 OHOS 上不成立。
+    resolution: >-
+      不在 build() 中调用 meson.test()，否则 CI 会永久挂起。改由 test_package
+      对 libseat 公共 API 做等价的运行时验证。
+  - topic: "libseat noop 后端可用于无守护进程环境的实测"
+    detail: >-
+      libseat 始终编译进 noop 后端，设置 LIBSEAT_BACKEND=noop 后无需 seatd 守护
+      进程或 logind 即可跑通 open_seat/dispatch/open_device/close_device/close_seat
+      的完整调用链。
+    resolution: >-
+      test_package 借此在 CI 沙箱内做实质性功能验证，而非仅检查头文件可包含。
