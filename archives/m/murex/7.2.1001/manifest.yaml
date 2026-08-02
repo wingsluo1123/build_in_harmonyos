@@ -4,7 +4,7 @@ status: pending
 build_date: "2026-08-02"
 build_system: go
 conan_ref: "murex/7.2.1001"
-status_notes: "Falls back to a sha256-verified Go 1.26.3 toolchain from the Aliyun mirror when the OHOS CI worker does not provide go."
+status_notes: "Falls back to a sha256-verified Go 1.26.3 toolchain from the Aliyun mirror when the OHOS CI worker does not provide go; CI #12413 chmod fix restores executable bits after extraction."
 
 source:
   url: "https://github.com/lmorg/murex/archive/refs/tags/v7.2.1001.tar.gz"
@@ -19,6 +19,7 @@ build:
     - "GOARCH=arm64 for OHOS arm64"
     - "GOTOOLCHAIN=local"
     - "Fallback Go toolchain: go1.26.3 linux-amd64/linux-arm64 from mirrors.aliyun.com, sha256 verified"
+    - "chmod-normalize fallback Go bin/pkg/tool executables before go build"
     - "go build -trimpath -ldflags '-s -w' -o murex ."
   dependencies: []
   cc: N/A
@@ -29,6 +30,7 @@ patches_applied: []
 knowledge_gained:
   - "murex is a pure Go command-line application and does not require target-side C/C++ libraries."
   - "Go caches are kept under the Conan build folder to avoid writing to readonly or shared locations on OHOS workers."
+  - "OHOS/HMDFS workers can unpack the fallback Go toolchain without executable bits, so the recipe restores them before running go."
   - "The smoke test exercises both command execution and upstream version output."
 
 validation:
