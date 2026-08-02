@@ -64,4 +64,4 @@ class LibkcapiConan(ConanFile):
         self.cpp_info.libs = ["kcapi"]
         self.cpp_info.set_property("cmake_file_name", "libkcapi")
         self.cpp_info.set_property("cmake_target_name", "libkcapi::libkcapi")
-# OHOS-CI-trigger: re-run build (no functional change)
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
