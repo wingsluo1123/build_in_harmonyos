@@ -1,21 +1,45 @@
-# docuum 0.27.0 – Adaptation Notes
+# docuum 0.27.0 适配笔记
 
-## Summary
-- **Project:** [docuum](https://github.com/stepchowfun/docuum) — a Rust Docker disk usage tool
-- **License:** MIT
-- **Build system:** Cargo (Rust)
-- **Version:** 0.27.0
+## 编译环境
+- 构建系统: custom（Cargo/Rust）
+- 编译日期: 2026-08-02
+- 平台: OHOS（OpenHarmony PC, aarch64）
+- 状态: failed（未适配）
 
-## Build steps
-1. `cargo build --release` produces the binary `target/release/docuum` (or `docuum.exe` on Windows).
-2. The binary is packaged to `bin/` in the Conan package folder.
+## 编译步骤
 
-## Adaptation details
-- `package_type = "application"` — no libraries are exposed.
-- `settings` include `os`, `compiler`, `build_type`, `arch` as required by Rust Cargo builds.
-- Source is fetched from the GitHub tag archive and stripped of the enclosing directory.
-- No extra system dependencies beyond a Rust toolchain (rustc, cargo).
+```bash
+# 下载源码
+wget https://github.com/stepchowfun/docuum/archive/refs/tags/v0.27.0.tar.gz
 
-## Status
-- **Status:** built
-- Tested locally with Rust 1.60+.
+# 解压并进入
+tar xzf v0.27.0.tar.gz && cd docuum-0.27.0
+
+# Cargo 构建（OHOS CI worker 无 Rust 工具链，无法执行）
+cargo build --release
+```
+
+## 遇到的问题与解决方案
+
+| # | 问题 | 根因 | 解决方案 |
+|---|------|------|----------|
+| 1 | `cargo build` 报 Error 127 | OHOS CI worker 无 Rust 工具链（rustc/cargo） | 采用 prefixsuffix 失败记录模式，如实标记 status: failed |
+| 2 | test_package 无可执行二进制 | 无 Rust 工具链无法编译 | 校验失败归档内容（manifest + notes）真实性 |
+
+## 验证结果
+
+```bash
+# OHOS 上无编译产物，验证失败归档内容
+$ python3 test_failed_archive.py <package_folder>
+PASS: docuum failed adaptation record is complete
+```
+
+## 注意事项
+- docuum 是 Rust/Cargo 工具，OHOS CI worker 无 Rust 工具链，无法编译
+- 失败归档包含 status: failed、failure_reason（Rust/Cargo 工具链缺失）与 OHOS 说明
+- 待 CI worker 安装 Rust 工具链后可启用真实 Cargo 构建
+
+---
+
+**编译结束**: 2026-08-02
+**最终状态**: failed
