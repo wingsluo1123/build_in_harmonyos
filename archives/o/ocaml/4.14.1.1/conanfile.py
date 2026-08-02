@@ -120,5 +120,8 @@ class OcamlConan(ConanFile):
         copy(self, "*", src_base, self.package_folder)
 
     def package_info(self):
+        # 实际库位于 lib/ocaml/ 下（libcamlrun.a/libasmrun.a），必须显式声明 libdirs，
+        # 否则下游 -L<prefix>/lib 找不到库导致链接失败
         self.cpp_info.libs = ["camlrun", "asmrun"]
-        self.cpp_info.includedirs = ["lib/ocaml/caml"]
+        self.cpp_info.libdirs = ["lib/ocaml"]
+        self.cpp_info.includedirs = ["lib/ocaml"]
