@@ -5,4 +5,5 @@ Murex is a Bash-like shell focused on safer scripting and productive command-lin
 - Homepage: <https://github.com/lmorg/murex>
 - License: GPL-2.0-only
 - Package type: command-line application
+- CI note: the recipe uses the worker-provided Go toolchain when available, and otherwise downloads a sha256-verified official Go 1.26.3 toolchain to build from source.
 
