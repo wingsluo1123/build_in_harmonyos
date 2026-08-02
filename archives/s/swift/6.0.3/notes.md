@@ -90,8 +90,8 @@ local normalized draft: swift-initial-ohos-platform.patch
 
 `patches/0001-add-ohos-platform-sdk-and-swiftpm-triple.patch` now carries the
 platform/SDK/triple work in normalized relative-path form. It intentionally
-does not include the early `ohos-probe` debug instrumentation from the
-ClangImporter experiments.
+does not include the early diagnostic instrumentation from the ClangImporter
+experiments.
 
 `patches/0002-ohos-driver-swiftpm-runtime-irhandoff.patch` carries the later
 true-device changes needed for the downstream package build:

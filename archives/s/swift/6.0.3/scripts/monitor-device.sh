@@ -3,27 +3,30 @@ set -eu
 
 snapshot="${TMPDIR:-${HOME:-/tmp}/tmp}/codex-ps-swift-check.txt"
 mkdir -p "$(dirname "$snapshot")" 2>/dev/null || true
+trap 'rm -f "$snapshot"' EXIT
 
-date
-uptime
-free -h
-ps -ef > "$snapshot"
+date || true
+uptime || true
+free -h || true
 
-echo "--- conan ---"
-grep conan "$snapshot" || true
-echo "--- clang ---"
-grep clang "$snapshot" || true
-echo "--- make ---"
-grep make "$snapshot" || true
-echo "--- ninja ---"
-grep ninja "$snapshot" || true
-echo "--- cmake ---"
-grep cmake "$snapshot" || true
-echo "--- python ---"
-grep python "$snapshot" || true
-echo "--- swift ---"
-grep swift "$snapshot" || true
+show_matches() {
+  label="$1"
+  pattern="$2"
+  echo "--- $label ---"
+  grep "$pattern" "$snapshot" || true
+}
 
-rm -f "$snapshot"
+if ps -ef > "$snapshot"; then
+  show_matches conan conan
+  show_matches clang clang
+  show_matches make make
+  show_matches ninja ninja
+  show_matches cmake cmake
+  show_matches python python
+  show_matches swift swift
+else
+  echo "--- ps snapshot failed ---"
+fi
+
 echo "--- top ---"
 top -b -n 1 || true

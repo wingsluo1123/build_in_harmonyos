@@ -57,7 +57,7 @@ class SwiftConan(ConanFile):
         stage = os.environ.get("SWIFT_OHOS_STAGED_ROOT")
         tarball = os.environ.get("SWIFT_OHOS_STAGED_TARBALL")
         stage_out = os.path.join(self.build_folder, "stage")
-        if os.path.isdir(stage):
+        if stage and os.path.isdir(stage):
             copy(self, "*", src=stage, dst=stage_out, keep_path=True)
         elif tarball and os.path.isfile(tarball):
             os.makedirs(stage_out, exist_ok=True)

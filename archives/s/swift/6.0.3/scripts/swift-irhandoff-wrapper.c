@@ -173,6 +173,20 @@ static char *prefixed(const char *prefix, const char *value) {
   return p;
 }
 
+static void cleanup_owned(char *allocated_real, char *resource_dir,
+                          char *arch_dir, char *modulemap_path,
+                          char *modulemap_arg, char *ir, char *stripped,
+                          char **irargs) {
+  free(allocated_real);
+  free(resource_dir);
+  free(arch_dir);
+  free(modulemap_path);
+  free(modulemap_arg);
+  free(ir);
+  free(stripped);
+  free(irargs);
+}
+
 int main(int argc, char **argv) {
   char *allocated_real = NULL;
   const char *real = select_real(argv, &allocated_real);
@@ -180,6 +194,7 @@ int main(int argc, char **argv) {
   if (!should_intercept(argc, argv, &out)) {
     execv(real, argv);
     fprintf(stderr, "[ohos-irhandoff] exec pass-through failed for %s: %s\n", real, strerror(errno));
+    free(allocated_real);
     return 127;
   }
 
@@ -210,7 +225,8 @@ int main(int argc, char **argv) {
 
   char *ir = make_temp_path(out, "ll");
   char *stripped = make_temp_path(out, "strip.ll");
-  if (!ir || !stripped || !resource_dir || !arch_dir) return 127;
+  int rc = 127;
+  if (!ir || !stripped || !resource_dir || !arch_dir) goto cleanup;
 
   int extra = 2; /* -I arch_dir */
   int need_sdk = !has_arg(argc, argv, "-sdk");
@@ -221,7 +237,7 @@ int main(int argc, char **argv) {
   if (need_modulemap) extra += 2;
 
   char **irargs = (char **)calloc((size_t)argc + (size_t)extra + 1, sizeof(char *));
-  if (!irargs) return 127;
+  if (!irargs) goto cleanup;
   int j = 0;
   irargs[j++] = argv[0];
   for (int i = 1; i < argc; ++i) {
@@ -249,7 +265,10 @@ int main(int argc, char **argv) {
   int ir_rc = run_wait(real, irargs);
   long ir_size = file_size(ir);
   fprintf(stderr, "[ohos-irhandoff] emit-ir rc=%d size=%ld\n", ir_rc, ir_size);
-  if (ir_size <= 0) return ir_rc ? ir_rc : 1;
+  if (ir_size <= 0) {
+    rc = ir_rc ? ir_rc : 1;
+    goto cleanup;
+  }
 
   char *optargs[] = {(char *)opt, "-S", "-strip-debug", ir, "-o", stripped, NULL};
   int opt_rc = run_wait(opt, optargs);
@@ -264,5 +283,10 @@ int main(int argc, char **argv) {
   int clang_rc = run_wait(clang, clangargs);
   long out_size = file_size(out);
   fprintf(stderr, "[ohos-irhandoff] clang rc=%d object-size=%ld\n", clang_rc, out_size);
-  return clang_rc;
+  rc = clang_rc;
+
+cleanup:
+  cleanup_owned(allocated_real, derived_resource_dir, derived_arch_dir,
+                modulemap_path, modulemap_arg, ir, stripped, irargs);
+  return rc;
 }
