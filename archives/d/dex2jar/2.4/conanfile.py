@@ -124,3 +124,5 @@ class Dex2JarConan(ConanFile):
 
     def package_info(self):
         self.buildenv_info.define("DEX2JAR_HOME", self.package_folder)
+        self.runenv_info.define("DEX2JAR_HOME", self.package_folder)
+        self.cpp_info.bindirs = ["bin"]
