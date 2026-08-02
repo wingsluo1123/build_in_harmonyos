@@ -121,7 +121,7 @@ index 2ab4e6f..531e278 100644
      }
 
 -#if os(Linux) && canImport(Glibc)
-+#if os(Linux) && canImport(Glibc) && !OHOS
++#if os(Linux) && canImport(Glibc) && !os(OHOS)
      public static var deepBind: Loader.Flags {
        Loader.Flags(rawValue: RTLD_DEEPBIND)
      }
@@ -207,7 +207,10 @@ diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem
 index 76d4922..c053757 100644
 --- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
 +++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
-@@ -16,10 +16,12 @@ import struct Foundation.UUID
+@@ -13,16 +13,18 @@
+ import struct Foundation.Data
+ import class Foundation.FileManager
+ import struct Foundation.UUID
  import SystemPackage
 -
 -import struct TSCBasic.ByteString
@@ -224,19 +227,24 @@ index 76d4922..c053757 100644
 -import protocol TSCBasic.WritableByteStream
 +import enum TSCBasic.ProcessLockError
 +import protocol TSCBasic.WritableByteStream
-@@ -198,4 +201,27 @@ extension FileSystem {
+-
++
+ public typealias FileSystem = TSCBasic.FileSystem
+ public let localFileSystem = TSCBasic.localFileSystem
+@@ -198,4 +201,28 @@ extension FileSystem {
      /// Execute the given block while holding the lock.
      public func withLock<T>(on path: AbsolutePath, type: FileLock.LockType, blocking: Bool = true, _ body: () throws -> T) throws -> T {
 -        try self.withLock(on: path.underlying, type: type, blocking: blocking, body)
++        let lockDirectory = try TSCBasic.localFileSystem.tempDirectory
++        let lockName = path.underlying.pathString.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_") + ".lock"
++        let lockFile = lockDirectory.appending(component: lockName)
 +        if blocking {
-+            return try TSCBasic.FileLock.withLock(fileToLock: path.underlying, type: type, body: body)
++            return try TSCBasic.FileLock(at: lockFile).withLock(type: type, body)
 +        }
 +
 +        #if os(Windows)
 +        throw FileSystemError(.unsupported, path.underlying)
 +        #else
-+        let lockDirectory = try TSCBasic.localFileSystem.tempDirectory
-+        let lockFile = lockDirectory.appending(component: path.basename + ".lock")
 +        let fd = open(lockFile.pathString, O_WRONLY | O_CREAT | O_CLOEXEC, 0o666)
 +        if fd == -1 {
 +            throw FileSystemError(errno: errno, lockFile)
@@ -253,13 +261,14 @@ index 76d4922..c053757 100644
 +        return try body()
 +        #endif
      }
-@@ -629,7 +654,9 @@ extension FileLock {
+@@ -629,6 +654,9 @@ extension FileLock {
          fileToLock: AbsolutePath,
          at lockFilesDirectory: AbsolutePath? = nil
      ) throws -> FileLock {
 -        return try Self.prepareLock(fileToLock: fileToLock.underlying, at: lockFilesDirectory?.underlying)
 +        let lockDirectory = try lockFilesDirectory?.underlying ?? TSCBasic.localFileSystem.tempDirectory
-+        let lockFile = lockDirectory.appending(component: fileToLock.basename + ".lock")
++        let lockName = fileToLock.pathString.replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_") + ".lock"
++        let lockFile = lockDirectory.appending(component: lockName)
 +        return TSCBasic.FileLock(at: lockFile)
      }
  }
@@ -702,9 +711,13 @@ index c7f9334..488d3f3 100644
 
    // ClangImporter::create adds a remapped MemoryBuffer that we don't need
    // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
-@@ -1198,5 +1207,8 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
-  }
-  CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
+@@ -1194,9 +1203,12 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+     } else {
+       importer->Impl.diagnose(SourceLoc(), diag::module_map_not_found,
+                               ModuleMapFile);
+     }
+   }
+   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
 -
 -  return CI->getCC1CommandLine();
 +  auto CC1CommandLine = CI->getCC1CommandLine();

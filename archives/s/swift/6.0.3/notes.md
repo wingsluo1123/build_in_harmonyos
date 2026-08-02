@@ -132,6 +132,10 @@ set:
 - Initialized the IR handoff wrapper cleanup pointer before all `goto cleanup`
   paths, and made the non-intercept pass-through path use `execvp` when the
   selected real tool has no slash.
+- Corrected the SwiftDriver loader condition to `!os(OHOS)`.
+- Made SwiftPM blocking locks, nonblocking locks, and `prepareLock` derive the
+  same lock file name from the full path string instead of only `basename`,
+  avoiding cross-directory collisions and mixed lock identities.
 - Enabled `pipefail` in `assemble-stage-ohos.sh` when the device shell supports
   it.
 - Tightened stage assembly and `test_package` after true-device smoke testing:
