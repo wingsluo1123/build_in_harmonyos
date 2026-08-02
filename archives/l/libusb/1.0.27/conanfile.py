@@ -13,9 +13,6 @@ HarmonyOS/OHOS notes
 * ``0004-configure-umask.patch``: HMDFS creates ``umask 077`` temp dirs with
   a setgid bit, which makes ``config.status`` fail with "Permission denied"
   (knowledge id E112). Relaxed to ``umask 022``.
-  This is a re-generated variant of the legacy ``0001-configure.patch``,
-  which was produced against an ``autoreconf``-regenerated ``configure`` and
-  therefore does not apply to the upstream release tarball.
 * ``0002-libusb-os-linux_netlink.c.patch``: works around the
   ``sockaddr_storage`` redefinition clash between ``linux/socket.h`` and
   ``sys/socket.h`` (knowledge id E091).
