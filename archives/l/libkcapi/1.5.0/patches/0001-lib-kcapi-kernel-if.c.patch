@@ -1,12 +1,31 @@
 diff -ruN a/lib/kcapi-kernel-if.c b/lib/kcapi-kernel-if.c
 --- a/lib/kcapi-kernel-if.c
 +++ b/lib/kcapi-kernel-if.c
-@@ -24,2 +24,8 @@
+@@ -19,14 +19,27 @@
+  */
+ 
+ #define _GNU_SOURCE
+ #include <stdarg.h>
+ #include <unistd.h>
  #include <asm/types.h>
-+#ifdef __OHOS__
-+#define sockaddr_storage __linux_sockaddr_storage
-+#endif
++/*
++ * <linux/netlink.h> and <linux/rtnetlink.h> pull in the UAPI header
++ * <linux/socket.h>.  On C libraries that do not ship <linux/libc-compat.h>
++ * that header declares its own "struct sockaddr_storage", which collides with
++ * the definition the C library provides.  Rename the kernel variant while the
++ * UAPI headers are being parsed so the libc definition stays authoritative.
++ * This translation unit only uses "struct sockaddr_alg" / "struct sockaddr_nl"
++ * from those headers, so the rename is a no-op for the code below.  The guard
++ * is unconditional on purpose: it behaves identically on every platform and
++ * involves no platform-conditional compilation.
++ */
++#define sockaddr_storage __libkcapi_uapi_sockaddr_storage
  #include <linux/netlink.h>
-+#ifdef __OHOS__
+ #include <linux/rtnetlink.h>
 +#undef sockaddr_storage
-+#endif
+ #include <unistd.h>
+ #include <sys/user.h>
+ #include <sys/eventfd.h>
+ #include <time.h>
+ #include <sys/select.h>
+ #include <sys/utsname.h>

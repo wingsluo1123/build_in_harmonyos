@@ -20,5 +20,19 @@ build:
 
 patches_applied:
   - "0001-lib-kcapi-kernel-if.c.patch"
+
+patch_classification:
+  - file: "0001-lib-kcapi-kernel-if.c.patch"
+    type: portability
+    platform_only: false
+    guard: none
+    rationale: >
+      Unconditional define-guard renaming the kernel struct sockaddr_storage
+      while <linux/netlink.h> and <linux/rtnetlink.h> are parsed.  No platform
+      conditional compilation macro is used (project rule R8); the change is a
+      no-op on C libraries that ship <linux/libc-compat.h>.
+
 knowledge_gained:
   - "CI workers lack aclocal, so the recipe exports pre-generated Autotools files."
+  - "Linux UAPI <linux/socket.h> redefines struct sockaddr_storage on C libraries without <linux/libc-compat.h>; a scoped define/undef rename around the UAPI includes fixes it without any platform macro."
+  - "Upstream has no `make check` target; the test suite is driven by test/test.sh and needs a usable AF_ALG interface."

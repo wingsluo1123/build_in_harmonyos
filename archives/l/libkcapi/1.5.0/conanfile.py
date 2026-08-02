@@ -31,9 +31,16 @@ class LibkcapiConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    # GNU triplet used for --build; config.guess cannot identify a HongMeng
+    # based host, so the value is derived from the configured architecture
+    # instead of being hardcoded to a single CPU.
+    _GNU_ARCH = {"armv8": "aarch64", "armv7": "arm", "x86_64": "x86_64", "x86": "i686"}
+
     def generate(self):
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        arch = str(self.settings.arch)
+        tc.configure_args.append(
+            "--build=%s-unknown-linux-gnu" % self._GNU_ARCH.get(arch, arch))
         tc.generate()
 
     def build(self):
@@ -64,4 +71,4 @@ class LibkcapiConan(ConanFile):
         self.cpp_info.libs = ["kcapi"]
         self.cpp_info.set_property("cmake_file_name", "libkcapi")
         self.cpp_info.set_property("cmake_target_name", "libkcapi::libkcapi")
-# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
+        self.cpp_info.set_property("pkg_config_name", "libkcapi")

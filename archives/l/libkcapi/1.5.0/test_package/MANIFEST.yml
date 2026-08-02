@@ -6,21 +6,48 @@
 package: libkcapi/1.5.0
 homepage: "https://github.com/smuellerDD/libkcapi"
 
-# 上游测试命令
-upstream_check_command: "make check"
+# 上游测试入口。
+# 说明：libkcapi 顶层 Makefile.am 未定义 check target，`make check` 并不存在；
+# 上游测试由 test/test.sh 脚本驱动，需要可用的内核 AF_ALG 接口。
+upstream_check_command: "test/test.sh"
 
 # conanfile.py build() 方法中是否已集成上游测试
 upstream_test_in_build: false
 upstream_test_command: ""
 
-# 上游实际运行的测试程序
-upstream_tests: []
+# 上游 test/ 目录下的测试。均需内核 crypto API（AF_ALG socket）与
+# 已安装的 kcapi-* 命令行工具，HarmonyOS 沙箱下不可用，故不纳入构建。
+upstream_tests:
+  - name: test.sh
+    file: test/test.sh
+    status: skipped
+    reason: "需要内核 AF_ALG 接口与已安装的 kcapi-* 工具，HarmonyOS 沙箱受限"
+  - name: kcapi-enc-test.sh
+    file: test/kcapi-enc-test.sh
+    status: skipped
+    reason: "对称加解密测试，依赖 AF_ALG skcipher 接口"
+  - name: kcapi-dgst-test.sh
+    file: test/kcapi-dgst-test.sh
+    status: skipped
+    reason: "摘要测试，依赖 AF_ALG hash 接口与命令行工具"
+  - name: hasher-test.sh
+    file: test/hasher-test.sh
+    status: skipped
+    reason: "sha*sum 兼容工具测试，本配方未安装这些工具"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test_package.c
-    description: "验证 libkcapi 安装成功"
+    description: >
+      消费者测试：① kcapi_version() 返回非零版本号；② kcapi_versionstring()
+      填充版本字符串；③ kcapi_md_sha256() 对空串的摘要与 FIPS 180-4 向量一致；
+      ④ kcapi_md_init("sha256") 成功；⑤ kcapi_md_digestsize() == 32；
+      ⑥ kcapi_md_digest() 返回 32 字节；⑦ SHA-256("abc") 与 FIPS 180-4 向量一致；
+      ⑧ kcapi_md_destroy() 正常释放。
+      ③～⑧ 会真实进入本配方补丁所修改的 lib/kcapi-kernel-if.c（AF_ALG 路径），
+      覆盖补丁改动（R40）。若内核 crypto API 在沙箱中不可用，测试显式打印
+      SKIP 并说明 errno，不把平台限制伪装成通过。
     command: "./test_package"
 
-# 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 3
+# 测试断言总数
+assertion_count: 8
