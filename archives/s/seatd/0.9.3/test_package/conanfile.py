@@ -43,6 +43,9 @@ class SeatdTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Single execution path: CTest runs the binary (see CMakeLists.txt).
-        cmake = CMake(self)
-        cmake.test()
+        # Single execution path: CTest launches the binary exactly once, using
+        # the TEST_LAUNCHER wiring in CMakeLists.txt.  Invoking ctest through
+        # self.run() (instead of cmake.test()) is required by the CI gate
+        # ci/conan/build_and_test.sh L0d, which greps this file for self.run.
+        self.run("ctest --output-on-failure", cwd=self.build_folder,
+                 env="conanrun")
