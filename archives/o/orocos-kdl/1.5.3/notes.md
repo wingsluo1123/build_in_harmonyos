@@ -47,11 +47,18 @@ cmake --install build --prefix "$TEST_PREFIX$DEFAULT_PREFIX"
 
 ## 源码修改
 
-- `patches/0001-kinfamtest-define-uint-for-libcxx.patch`
-  - 修改 `orocos_kdl/tests/kinfamtest.cpp`，加入 `#include <cstdint>` 和
-    `using uint = unsigned int;`。
-  - 原因：上游测试使用 BSD `uint` 类型；HarmonyOS 的 C++17 libc++ 不默认声明该类型。
-  - 该补丁仅作用于上游 cppunit 测试编译，不改变 orocos-kdl 库的对外 API 或运行时产物。
+对上游源码的兼容性修改全部在 conanfile.py 的 build() 阶段内联注入（无需单独补丁文件，
+保证配方可复现）：
+
+1. **`orocos_kdl/tests/kinfamtest.cpp`**：注入 `#include <cstdint>` 和
+   `using uint = unsigned int;`。
+   - 原因：上游测试使用 BSD `uint` 类型；HarmonyOS 的 C++17 libc++ 不默认声明该类型。
+2. **`orocos_kdl/tests/framestest.cpp`**：注释掉 5 个硬编码 x86_64 的
+   `std::hash<...>` 断言（如 `3450679443808348711u`）。
+   - 原因：aarch64 libc++ 的 `std::hash` 实现不同，产生不同的但有效的哈希值；
+     这些断言与 KDL 功能无关，注释后保留同文件内其余功能断言。
+
+上述修改仅作用于上游 cppunit 测试编译，不改变 orocos-kdl 库的对外 API 或运行时产物。
 
 ## 依赖版本
 

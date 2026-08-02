@@ -2,7 +2,6 @@
 #include <kdl/chain.hpp>
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainjnttojacsolver.hpp>
-#include <kdl/frames_io.hpp>
 #include <iostream>
 #include <cstdlib>
 
