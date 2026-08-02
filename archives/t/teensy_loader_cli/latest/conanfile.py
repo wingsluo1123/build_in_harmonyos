@@ -72,3 +72,4 @@ class TeensyLoaderCliConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.runenv_info.append_path(
             "PATH", os.path.join(self.package_folder, "bin"))
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
