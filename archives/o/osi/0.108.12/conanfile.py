@@ -11,8 +11,6 @@ from conan.tools.files import (
     copy,
     export_conandata_patches,
     get,
-    load,
-    save,
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -77,47 +75,8 @@ class OsiConan(ConanFile):
         ])
         tc.generate()
 
-    def _patch_config_sub(self, path):
-        contents = load(self, path)
-        marker = "# Conan OHOS config.sub hook"
-        if marker in contents:
-            return
-
-        hook = (
-            "\n"
-            f"{marker}\n"
-            "case \"$1\" in\n"
-            "    *-linux-ohos)\n"
-            "        echo \"${1%-linux-ohos}-linux-musl\"\n"
-            "        exit ;;\n"
-            "esac\n\n"
-        )
-        lines = contents.splitlines(keepends=True)
-        insert_at = 1 if lines and lines[0].startswith("#!") else 0
-        lines.insert(insert_at, hook)
-        save(self, path, "".join(lines))
-
-    def _patch_config_scripts(self):
-        for script in ("config.guess", "Osi/config.guess"):
-            path = os.path.join(self.source_folder, script)
-            if os.path.exists(path):
-                self.run(
-                    r"""sed -i '/^case $UNAME_SYSTEM in$/a\    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;' """
-                    + f"'{path}'"
-                )
-                self.run(
-                    r"""sed -i '/^case "${UNAME_SYSTEM}" in$/a\    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;' """
-                    + f"'{path}'"
-                )
-
-        for script in ("config.sub", "Osi/config.sub"):
-            path = os.path.join(self.source_folder, script)
-            if os.path.exists(path):
-                self._patch_config_sub(path)
-
     def build(self):
         apply_conandata_patches(self)
-        self._patch_config_scripts()
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
