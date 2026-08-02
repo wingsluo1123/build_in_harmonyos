@@ -1,0 +1,869 @@
+diff --git a/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/include/CFTargetConditionals.h b/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/include/CFTargetConditionals.h
+index ed36cd6..de27446 100644
+--- a/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/include/CFTargetConditionals.h
++++ b/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/include/CFTargetConditionals.h
+@@ -81,6 +81,7 @@
+ #if __APPLE__
+ #define TARGET_OS_DARWIN       1
+ #define TARGET_OS_LINUX        0
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      0
+@@ -89,14 +90,25 @@
+ #elif __ANDROID__
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        1
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      1
+ #define TARGET_OS_CYGWIN       0
+ #define TARGET_OS_WASI         0
++#elif __OHOS__
++#define TARGET_OS_DARWIN       0
++#define TARGET_OS_LINUX        1
++#define TARGET_OS_OHOS         1
++#define TARGET_OS_WINDOWS      0
++#define TARGET_OS_BSD          0
++#define TARGET_OS_ANDROID      0
++#define TARGET_OS_CYGWIN       0
++#define TARGET_OS_WASI         0
+ #elif __linux__
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        1
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      0
+@@ -105,6 +117,7 @@
+ #elif __CYGWIN__
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        1
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      0
+@@ -113,6 +126,7 @@
+ #elif _WIN32 || _WIN64
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        0
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      1
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      0
+@@ -121,6 +135,7 @@
+ #elif __unix__
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        0
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          1
+ #define TARGET_OS_ANDROID      0
+@@ -129,6 +144,7 @@
+ #elif __wasi__
+ #define TARGET_OS_DARWIN       0
+ #define TARGET_OS_LINUX        0
++#define TARGET_OS_OHOS         0
+ #define TARGET_OS_WINDOWS      0
+ #define TARGET_OS_BSD          0
+ #define TARGET_OS_ANDROID      0
+@@ -281,4 +297,3 @@
+ #endif  /* __TARGETCONDITIONALS__ */
+
+ #endif // __has_include
+-
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple+Platforms.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple+Platforms.swift
+index 4f194d0..14b737c 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple+Platforms.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple+Platforms.swift
+@@ -332,6 +332,8 @@ extension Triple {
+         return "musl"
+       case .android:
+         return "android"
++      case .ohos:
++        return "ohos"
+       default:
+         return "linux"
+       }
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple.swift
+index 0f0357b..65346f5 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Utilities/Triple.swift
+@@ -1270,6 +1270,7 @@ extension Triple {
+     case code16
+     case gnu
+     case android
++    case ohos
+     case musleabihf
+     case musleabi
+     case musl
+@@ -1306,6 +1307,8 @@ extension Triple {
+         return .gnu
+       case _ where env.hasPrefix("android"):
+         return .android
++      case _ where env.hasPrefix("ohos"):
++        return .ohos
+       case _ where env.hasPrefix("musleabihf"):
+         return .musleabihf
+       case _ where env.hasPrefix("musleabi"):
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Triple+Basics.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Triple+Basics.swift
+index 4eed26c..02d5118 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Triple+Basics.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Triple+Basics.swift
+@@ -35,6 +35,10 @@ extension Triple {
+         os == .linux && environment == .android
+     }
+
++    public func isOHOS() -> Bool {
++        os == .linux && environment == .ohos
++    }
++
+     public func isDarwin() -> Bool {
+         switch (vendor, os) {
+         case (.apple, .noneOS):
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple+Platforms.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple+Platforms.swift
+index abea035..9695a76 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple+Platforms.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple+Platforms.swift
+@@ -303,7 +303,14 @@ extension Triple {
+       return conflatingDarwin ? "darwin" : darwinPlatform.platformName
+
+     case .linux:
+-      return environment == .android ? "android" : "linux"
++      switch environment {
++      case .android:
++        return "android"
++      case .ohos:
++        return "ohos"
++      default:
++        return "linux"
++      }
+     case .freeBSD:
+       return "freebsd"
+     case .openbsd:
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple.swift
+index 91874bc..7446910 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Vendor/Triple.swift
+@@ -1271,6 +1271,7 @@ extension Triple {
+     case code16
+     case gnu
+     case android
++    case ohos
+     case musleabihf
+     case musleabi
+     case musl
+@@ -1307,6 +1308,8 @@ extension Triple {
+         return .gnu
+       case _ where env.hasPrefix("android"):
+         return .android
++      case _ where env.hasPrefix("ohos"):
++        return .ohos
+       case _ where env.hasPrefix("musleabihf"):
+         return .musleabihf
+       case _ where env.hasPrefix("musleabi"):
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Platform.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Platform.swift
+index f073e0b..9040028 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Platform.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Platform.swift
+@@ -23,6 +23,7 @@ private func isAndroid() -> Bool {
+ public enum Platform: Equatable, Sendable {
+     case android
+     case darwin
++    case ohos
+     case linux(LinuxFlavor)
+     case windows
+
+@@ -44,6 +45,8 @@ extension Platform {
+         {
+         case "darwin"?:
+             return .darwin
++        case "harmonyos"?:
++            return .ohos
+         case "linux"?:
+             return Platform.findCurrentPlatformLinux(localFileSystem)
+         default:
+@@ -89,7 +92,7 @@ extension Platform {
+     public var dynamicLibraryExtension: String {
+         switch self {
+         case .darwin: return ".dylib"
+-        case .linux, .android: return ".so"
++        case .linux, .android, .ohos: return ".so"
+         case .windows: return ".dll"
+         }
+     }
+@@ -97,7 +100,7 @@ extension Platform {
+     public var executableExtension: String {
+         switch self {
+         case .windows: return ".exe"
+-        case .linux, .android, .darwin: return ""
++        case .linux, .android, .ohos, .darwin: return ""
+         }
+     }
+ }
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Target+PkgConfig.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Target+PkgConfig.swift
+index 2eae23d..c797752 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Target+PkgConfig.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/Target+PkgConfig.swift
+@@ -180,7 +180,7 @@ extension SystemPackageProviderDescription {
+             switch platform {
+             case .darwin, .windows, .linux:
+                 return true
+-            case .android:
++            case .android, .ohos:
+                 return false
+             }
+         }
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageModel/UserToolchain.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageModel/UserToolchain.swift
+index 70c6804..e3e1f61 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageModel/UserToolchain.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageModel/UserToolchain.swift
+@@ -582,7 +582,7 @@ public final class UserToolchain: Toolchain {
+         }
+
+         return (
+-            triple.isDarwin() || triple.isAndroid() || triple.isWASI() || triple.isWindows()
++            triple.isDarwin() || triple.isAndroid() || triple.isOHOS() || triple.isWASI() || triple.isWindows()
+                 ? ["-sdk", sdkDir.pathString]
+                 : []
+         ) + swiftCompilerFlags
+diff --git a/swift-swift-6.0.3-RELEASE/CMakeLists.txt b/swift-swift-6.0.3-RELEASE/CMakeLists.txt
+index b69c797..28c55ff 100644
+--- a/swift-swift-6.0.3-RELEASE/CMakeLists.txt
++++ b/swift-swift-6.0.3-RELEASE/CMakeLists.txt
+@@ -504,6 +504,9 @@ set(SWIFT_SDK_LINUX_STATIC_ARCHITECTURES "" CACHE STRING
+ set(SWIFT_SDK_LINUX_ARCHITECTURES "" CACHE STRING
+   "The architectures to configure when using the Linux SDK.")
+
++set(SWIFT_SDK_OHOS_ARCHITECTURES "" CACHE STRING
++  "The architectures to configure when using the OHOS SDK.")
++
+ #
+ # User-configurable Android specific options.
+ #
+@@ -1205,6 +1208,19 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+
++elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OHOS")
++
++  set(SWIFT_HOST_VARIANT "ohos" CACHE STRING
++      "Deployment OS for Swift host tools (the compiler) [ohos]")
++
++  if("${SWIFT_SDK_OHOS_ARCHITECTURES}" STREQUAL "")
++    set(SWIFT_SDK_OHOS_ARCHITECTURES ${SWIFT_HOST_VARIANT_ARCH})
++  endif()
++
++  configure_sdk_unix("OHOS" "${SWIFT_SDK_OHOS_ARCHITECTURES}")
++  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
++  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
++
+ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
+   set(SWIFT_HOST_VARIANT "wasi" CACHE STRING
+       "Deployment OS for Swift host tools (the compiler) [wasi]")
+@@ -1271,6 +1287,15 @@ if(swift_build_android AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+   configure_sdk_unix("Android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}")
+ endif()
+
++# Should we cross-compile the standard library for OHOS?
++is_sdk_requested(OHOS swift_build_ohos)
++if(swift_build_ohos AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OHOS")
++  if("${SWIFT_SDK_OHOS_ARCHITECTURES}" STREQUAL "")
++    set(SWIFT_SDK_OHOS_ARCHITECTURES aarch64)
++  endif()
++  configure_sdk_unix("OHOS" "${SWIFT_SDK_OHOS_ARCHITECTURES}")
++endif()
++
+ # Should we cross-compile the standard library for Windows?
+ is_sdk_requested(WINDOWS swift_build_windows)
+ if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+diff --git a/swift-swift-6.0.3-RELEASE/cmake/modules/AddPureSwift.cmake b/swift-swift-6.0.3-RELEASE/cmake/modules/AddPureSwift.cmake
+index 291e06f..639fa3f 100644
+--- a/swift-swift-6.0.3-RELEASE/cmake/modules/AddPureSwift.cmake
++++ b/swift-swift-6.0.3-RELEASE/cmake/modules/AddPureSwift.cmake
+@@ -84,7 +84,7 @@ function(_add_host_swift_compile_options name)
+ endfunction()
+
+ function(_set_pure_swift_link_flags name relpath_to_lib_dir)
+-  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++  if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+     # Don't add builder's stdlib RPATH automatically.
+     target_compile_options(${name} PRIVATE
+       $<$<COMPILE_LANGUAGE:Swift>:-no-toolchain-stdlib-rpath>
+@@ -360,7 +360,7 @@ function(add_pure_swift_host_tool name)
+     set_property(TARGET ${name}
+       APPEND PROPERTY INSTALL_RPATH
+         "@executable_path/../lib/swift/host")
+-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+     set_property(TARGET ${name}
+       APPEND PROPERTY INSTALL_RPATH
+         "$ORIGIN/../lib/swift/host")
+diff --git a/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwift.cmake b/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwift.cmake
+index c5669ea..fea23a3 100644
+--- a/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwift.cmake
++++ b/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwift.cmake
+@@ -331,7 +331,8 @@ function(_add_host_variant_c_compile_flags target)
+   if((SWIFT_HOST_VARIANT_ARCH STREQUAL "armv7" OR
+       SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64") AND
+      (SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" OR
+-      SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID"))
++      SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID" OR
++      SWIFT_HOST_VARIANT_SDK STREQUAL "OHOS"))
+     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-funwind-tables>)
+   endif()
+
+@@ -403,6 +404,9 @@ function(_add_host_variant_link_flags target)
+       cxx_link_libraries)
+     target_link_libraries(${target} PRIVATE
+       ${cxx_link_libraries})
++  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "OHOS")
++    # OHOS provides pthread/dl/m entry points through libc and the driver
++    # supplies the C++ runtime, so do not add Linux's extra system libraries.
+   else()
+     # If lto is enabled, we need to add the object path flag so that the LTO code
+     # generator leaves the intermediate object file in a place where it will not
+@@ -555,7 +559,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
+     set_property(TARGET ${target} APPEND_STRING PROPERTY
+                  LINK_FLAGS " -lobjc ")
+
+-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD|WINDOWS")
++  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD|WINDOWS")
+     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
+     if(ASRLF_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
+       if(ASRLF_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+@@ -639,7 +643,7 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
+       get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+       target_link_directories(${target} BEFORE PUBLIC ${TOOLCHAIN_LIB_DIR})
+     endif()
+-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
++    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD" AND SWIFT_USE_LINKER STREQUAL "lld")
+       target_link_options(${target} PRIVATE "SHELL:-Xlinker -z -Xlinker nostart-stop-gc")
+     endif()
+   endif()
+diff --git a/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwiftUnittests.cmake b/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwiftUnittests.cmake
+index 6626fe8..8f189bf 100644
+--- a/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwiftUnittests.cmake
++++ b/swift-swift-6.0.3-RELEASE/cmake/modules/AddSwiftUnittests.cmake
+@@ -120,7 +120,7 @@ function(add_swift_unittest test_dirname)
+     set_property(
+       TARGET ${test_dirname}
+       APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}")
+-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+     set_property(
+       TARGET ${test_dirname}
+       APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}")
+@@ -134,11 +134,10 @@ function(add_swift_unittest test_dirname)
+       set_property(
+         TARGET ${test_dirname}
+         APPEND PROPERTY INSTALL_RPATH "@executable_path/${relative_lib_path}/swift/host")
+-    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+       set_property(
+         TARGET ${test_dirname}
+         APPEND PROPERTY INSTALL_RPATH "$ORIGIN/${relative_lib_path}/swift/host")
+     endif()
+   endif()
+ endfunction()
+-
+diff --git a/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftConfigureSDK.cmake b/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftConfigureSDK.cmake
+index ad4db28..b2d846c 100644
+--- a/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftConfigureSDK.cmake
++++ b/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftConfigureSDK.cmake
+@@ -341,6 +341,7 @@ macro(configure_sdk_unix name architectures)
+
+   if("${prefix}" STREQUAL "LINUX"
+       OR "${prefix}" STREQUAL "ANDROID"
++      OR "${prefix}" STREQUAL "OHOS"
+       OR "${prefix}" STREQUAL "FREEBSD"
+       OR "${prefix}" STREQUAL "OPENBSD")
+     set(SWIFT_SDK_${prefix}_USE_BUILD_ID TRUE)
+@@ -359,12 +360,17 @@ macro(configure_sdk_unix name architectures)
+   # but add_swift_target_library does not allow passing different values
+   # depending on the architecture, so having a single value is the only
+   # possibility right now.
+-  set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
+-      -Xcc --gcc-toolchain=/usr
+-    CACHE STRING "Extra flags for compiling the C++ overlay")
++  if("${prefix}" STREQUAL "OHOS")
++    set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
++        "" CACHE STRING "Extra flags for compiling the C++ overlay")
++  else()
++    set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS
++        -Xcc --gcc-toolchain=/usr
++      CACHE STRING "Extra flags for compiling the C++ overlay")
++  endif()
+
+   set(_default_threading_package "pthreads")
+-  if("${prefix}" STREQUAL "LINUX" OR "${prefix}" STREQUAL "LINUX_STATIC")
++  if("${prefix}" STREQUAL "LINUX" OR "${prefix}" STREQUAL "LINUX_STATIC" OR "${prefix}" STREQUAL "OHOS")
+     set(_default_threading_package "linux")
+   elseif("${prefix}" STREQUAL "WASI")
+     if(SWIFT_ENABLE_WASI_THREADS)
+@@ -419,6 +425,11 @@ macro(configure_sdk_unix name architectures)
+         else()
+           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
+         endif()
++      elseif("${prefix}" STREQUAL "OHOS")
++        if(NOT arch STREQUAL "aarch64")
++          message(FATAL_ERROR "unsupported arch for OHOS: ${arch}")
++        endif()
++        set(SWIFT_SDK_OHOS_ARCH_aarch64_TRIPLE "aarch64-unknown-linux-ohos")
+       elseif("${prefix}" STREQUAL "FREEBSD")
+         if(NOT arch MATCHES "(arm64|x86_64)")
+           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
+@@ -579,4 +590,3 @@ function(configure_target_variant prefix name sdk build_config lib_subdir)
+   set(SWIFT_VARIANT_${prefix}_STATIC_ONLY ${SWIFT_SDK_${sdk}_STATIC_ONLY})
+   get_threading_package(${prefix} ${SWIFT_SDK_${sdk}_THREADING_PACKAGE} SWIFT_VARIANT_${prefix}_THREADING_PACKAGE)
+ endfunction()
+-
+diff --git a/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftUtils.cmake b/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftUtils.cmake
+index 15b6d5f..7c75614 100644
+--- a/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftUtils.cmake
++++ b/swift-swift-6.0.3-RELEASE/cmake/modules/SwiftUtils.cmake
+@@ -108,7 +108,7 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
+       get_bootstrapping_path(bs_lib_dir ${lib_dir} "1")
+     endif()
+   elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+-    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+       # Compiler's INSTALL_RPATH is set to libs in the build directory
+       # For building stdlib, use stdlib in the builder's resource directory
+       # because the runtime may not be built yet.
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Basic/LangOptions.cpp b/swift-swift-6.0.3-RELEASE/lib/Basic/LangOptions.cpp
+index daf4f3d..37cf69f 100644
+--- a/swift-swift-6.0.3-RELEASE/lib/Basic/LangOptions.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Basic/LangOptions.cpp
+@@ -450,10 +450,14 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
+     addPlatformConditionValue(PlatformConditionKind::OS, "visionOS");
+     break;
+   case llvm::Triple::Linux:
+-    if (Target.getEnvironment() == llvm::Triple::Android)
++    if (Target.getEnvironment() == llvm::Triple::Android) {
+       addPlatformConditionValue(PlatformConditionKind::OS, "Android");
+-    else
++    } else if (Target.getEnvironmentName().starts_with("ohos")) {
++      addPlatformConditionValue(PlatformConditionKind::OS, "OHOS");
++      addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
++    } else {
+       addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
++    }
+     break;
+   case llvm::Triple::FreeBSD:
+     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Basic/Platform.cpp b/swift-swift-6.0.3-RELEASE/lib/Basic/Platform.cpp
+index 716db87..95e34ec 100644
+--- a/swift-swift-6.0.3-RELEASE/lib/Basic/Platform.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Basic/Platform.cpp
+@@ -233,6 +233,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
+   case llvm::Triple::Linux:
+     if (triple.isAndroid())
+       return "android";
++    else if (triple.getEnvironmentName().starts_with("ohos"))
++      return "ohos";
+     else if (triple.isMusl()) {
+       // The triple for linux-static is <arch>-swift-linux-musl, to distinguish
+       // it from a "normal" musl set-up (ala Alpine).
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/AddSwiftStdlib.cmake b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/AddSwiftStdlib.cmake
+index e0fe03b..5e931c9 100644
+--- a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/AddSwiftStdlib.cmake
++++ b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/AddSwiftStdlib.cmake
+@@ -145,7 +145,7 @@ function(_add_target_variant_c_compile_link_flags)
+   endif()
+
+   # Use frame pointers on Linux
+-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
++  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR "${CFLAGS_SDK}" STREQUAL "OHOS")
+     list(APPEND result "-fno-omit-frame-pointer")
+   endif()
+
+@@ -328,12 +328,12 @@ function(_add_target_variant_c_compile_flags)
+   endif()
+
+   # Use frame pointers on Linux
+-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
++  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR "${CFLAGS_SDK}" STREQUAL "OHOS")
+     list(APPEND result "-fno-omit-frame-pointer")
+   endif()
+
+   if((CFLAGS_ARCH STREQUAL "armv7" OR CFLAGS_ARCH STREQUAL "aarch64") AND
+-     (CFLAGS_SDK STREQUAL "LINUX" OR CFLAGS_SDK STREQUAL "ANDROID"))
++     (CFLAGS_SDK STREQUAL "LINUX" OR CFLAGS_SDK STREQUAL "ANDROID" OR CFLAGS_SDK STREQUAL "OHOS"))
+      list(APPEND result -funwind-tables)
+   endif()
+
+@@ -568,6 +568,9 @@ function(_add_target_variant_link_flags)
+     # link against the custom C++ library
+     swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
+     list(APPEND link_libraries ${cxx_link_libraries})
++  elseif("${LFLAGS_SDK}" STREQUAL "OHOS")
++    # OHOS resolves pthread/dl/m through libc and does not provide separate
++    # system archives for those libraries.
+   else()
+     # If lto is enabled, we need to add the object path flag so that the LTO code
+     # generator leaves the intermediate object file in a place where it will not
+@@ -2159,7 +2162,7 @@ function(add_swift_target_library name)
+     elseif(sdk STREQUAL "OPENBSD")
+       list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OPENBSD})
+-    elseif(sdk STREQUAL "LINUX")
++    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "OHOS")
+       list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_LINUX})
+     elseif(sdk STREQUAL "LINUX_STATIC")
+@@ -2210,7 +2213,7 @@ function(add_swift_target_library name)
+     elseif("${sdk}" STREQUAL "XROS" OR "${sdk}" STREQUAL "XROS_SIMULATOR")
+         list(APPEND swiftlib_swift_compile_flags_all
+             ${SWIFTLIB_SWIFT_COMPILE_FLAGS_XROS})
+-    elseif(sdk STREQUAL "LINUX")
++    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "OHOS")
+       list(APPEND swiftlib_swift_compile_flags_all
+            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
+     elseif(sdk STREQUAL "LINUX_STATIC")
+@@ -2258,7 +2261,7 @@ function(add_swift_target_library name)
+       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_FREEBSD})
+     elseif(sdk STREQUAL "OPENBSD")
+       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_OPENBSD})
+-    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
++    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID" OR sdk STREQUAL "OHOS")
+       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX})
+     elseif(sdk STREQUAL "LINUX_STATIC")
+       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX_STATIC})
+@@ -2401,7 +2404,7 @@ function(add_swift_target_library name)
+       elseif(sdk STREQUAL "WATCHOS" OR sdk STREQUAL "WATCHOS_SIMULATOR")
+         list(APPEND swiftlib_c_compile_flags_all
+              ${SWIFTLIB_C_COMPILE_FLAGS_WATCHOS})
+-      elseif(sdk STREQUAL "LINUX")
++      elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "OHOS")
+         list(APPEND swiftlib_c_compile_flags_all
+              ${SWIFTLIB_C_COMPILE_FLAGS_LINUX})
+       elseif(sdk STREQUAL "WINDOWS")
+@@ -2883,7 +2886,7 @@ function(_add_swift_target_executable_single name)
+       -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+   endif()
+
+-  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")
++  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" OR "${SWIFTEXE_SINGLE_SDK}" STREQUAL "OHOS")
+     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
+   endif()
+
+@@ -2958,7 +2961,7 @@ function(_add_swift_target_executable_single name)
+     set_target_properties(${name} PROPERTIES
+       BUILD_WITH_INSTALL_RPATH YES
+       INSTALL_RPATH "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR};@executable_path/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+-  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX")
++  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "LINUX" OR SWIFT_HOST_VARIANT_SDK STREQUAL "OHOS")
+     set_target_properties(${name} PROPERTIES
+       BUILD_WITH_INSTALL_RPATH YES
+       INSTALL_RPATH "$ORIGIN/../../../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
+@@ -3130,7 +3133,7 @@ function(add_swift_target_executable name)
+     elseif(sdk STREQUAL "OPENBSD")
+       list(APPEND swiftexe_module_depends_flattened
+         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_OPENBSD})
+-    elseif(sdk STREQUAL "LINUX")
++    elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "OHOS")
+       list(APPEND swiftexe_module_depends_flattened
+         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_LINUX})
+     elseif(sdk STREQUAL "LINUX_STATIC")
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/StdlibOptions.cmake b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/StdlibOptions.cmake
+index 81fa577..8c9ec61 100644
+--- a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/StdlibOptions.cmake
++++ b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/StdlibOptions.cmake
+@@ -78,6 +78,8 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
+ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
+   # TODO(mracek): This should get turned off, as this is not an ABI stable platform.
+   set(SWIFT_STDLIB_STABLE_ABI_default TRUE)
++elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OHOS")
++  set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
+ else()
+   # Any new platform should have non-stable ABI to start with.
+   set(SWIFT_STDLIB_STABLE_ABI_default FALSE)
+@@ -108,7 +110,7 @@ option(SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES
+
+ if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
++elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX" OR "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "OHOS")
+   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
+ else()
+   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default FALSE)
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/SwiftSource.cmake b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/SwiftSource.cmake
+index 03e525f..bba3585 100644
+--- a/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/SwiftSource.cmake
++++ b/swift-swift-6.0.3-RELEASE/stdlib/cmake/modules/SwiftSource.cmake
+@@ -283,6 +283,10 @@ function(_add_target_variant_swift_compile_flags
+       "-F${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/../../../Developer/Library/Frameworks")
+   endif()
+
++  if("${sdk}" STREQUAL "OHOS")
++    list(APPEND result "-Xcc" "-std=gnu11")
++  endif()
++
+   swift_optimize_flag_for_build_type("${build_type}" optimize_flag)
+   list(APPEND result "${optimize_flag}")
+
+@@ -858,8 +862,11 @@ function(_compile_swift_files
+     # cross-compiling the compiler.
+     list(APPEND swift_compiler_tool_dep "swift-frontend${target_suffix}")
+
+-    # If we aren't cross compiling, also depend on SwiftMacros.
+-    list(APPEND swift_compiler_tool_dep SwiftMacros)
++    # SwiftMacros is only available when swift-syntax support is part of this
++    # build. OHOS host bootstrap can build the stdlib without swift-syntax.
++    if(SWIFT_BUILD_SWIFT_SYNTAX)
++      list(APPEND swift_compiler_tool_dep SwiftMacros)
++    endif()
+   endif()
+
+   # If there are more than one output files, we assume that they are specified
+@@ -882,7 +889,7 @@ function(_compile_swift_files
+   set(custom_env "PYTHONIOENCODING=UTF8")
+   if(SWIFTFILE_IS_STDLIB OR
+      # Linux "hosttools" build require builder's runtime before building the runtime.
+-     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+   )
+     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
+     if(bs_lib_dir)
+@@ -891,7 +898,7 @@ function(_compile_swift_files
+       # stdlib in the current stage is not built yet.
+       if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+         list(APPEND custom_env "DYLD_LIBRARY_PATH=${bs_lib_dir}")
+-      elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
++      elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OHOS|OPENBSD|FREEBSD")
+         list(APPEND custom_env "LD_LIBRARY_PATH=${bs_lib_dir}")
+       endif()
+     endif()
+diff --git a/swift-swift-6.0.3-RELEASE/utils/build-script-impl b/swift-swift-6.0.3-RELEASE/utils/build-script-impl
+index c35243e..b475592 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/build-script-impl
++++ b/swift-swift-6.0.3-RELEASE/utils/build-script-impl
+@@ -494,6 +494,7 @@ function verify_host_is_supported() {
+       | linux-s390x             \
+       | linux-static-aarch64    \
+       | linux-static-x86_64     \
++      | ohos-aarch64            \
+       | macosx-x86_64           \
+       | macosx-arm64            \
+       | macosx-arm64e           \
+@@ -593,6 +594,10 @@ function set_build_options_for_host() {
+             SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
+             llvm_target_arch="ARM"
+             ;;
++        ohos-aarch64)
++            SWIFT_HOST_TRIPLE="aarch64-unknown-linux-ohos"
++            llvm_target_arch="AArch64"
++            ;;
+         macosx-*            | \
+         iphoneos-*          | \
+         iphonesimulator-*   | \
+diff --git a/swift-swift-6.0.3-RELEASE/utils/build_swift/build_swift/migration.py b/swift-swift-6.0.3-RELEASE/utils/build_swift/build_swift/migration.py
+index dc6e082..93b55af 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/build_swift/build_swift/migration.py
++++ b/swift-swift-6.0.3-RELEASE/utils/build_swift/build_swift/migration.py
+@@ -13,6 +13,8 @@ Temporary module with functionality used to migrate away from build-script-impl.
+
+
+ import itertools
++import os
++import shutil
+ import subprocess
+
+ from swift_build_support.swift_build_support.targets import \
+@@ -124,8 +126,12 @@ def check_impl_args(build_script_impl, args):
+     otherwise.
+     """
+
++    command = [build_script_impl]
++    if getattr(os, 'uname', None) and os.uname().sysname == 'HarmonyOS':
++        command = [shutil.which('bash') or '/bin/bash', build_script_impl]
++
+     pipe = subprocess.Popen(
+-        [build_script_impl, '--check-args-only=1'] + args,
++        command + ['--check-args-only=1'] + args,
+         stdout=subprocess.PIPE,
+         stderr=subprocess.PIPE)
+
+diff --git a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/build_script_invocation.py b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/build_script_invocation.py
+index e7b960f..64d0410 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/build_script_invocation.py
++++ b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/build_script_invocation.py
+@@ -13,6 +13,7 @@
+ import os
+ import platform
+ import shlex
++import shutil
+
+ from build_swift.build_swift import argparse
+ from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
+@@ -38,6 +39,12 @@ from swift_build_support.swift_build_support.utils import fatal_error
+ from swift_build_support.swift_build_support.utils import log_time_in_scope
+
+
++def _build_script_impl_command():
++    if platform.system() == 'HarmonyOS':
++        return [shutil.which('bash') or '/bin/bash', BUILD_SCRIPT_IMPL_PATH]
++    return [BUILD_SCRIPT_IMPL_PATH]
++
++
+ class BuildScriptInvocation(object):
+     """Represent a single build script invocation.
+     """
+@@ -718,7 +725,7 @@ class BuildScriptInvocation(object):
+         # `build-script-impl`.
+         if self.args.legacy_impl:
+             # Execute the underlying build script implementation.
+-            shell.call_without_sleeping([BUILD_SCRIPT_IMPL_PATH] + self.impl_args,
++            shell.call_without_sleeping(_build_script_impl_command() + self.impl_args,
+                                         env=self.impl_env, echo=True)
+             return
+
+@@ -854,7 +861,7 @@ class BuildScriptInvocation(object):
+     def _execute_action(self, action_name):
+         with log_time_in_scope(action_name):
+             shell.call_without_sleeping(
+-                [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
++                _build_script_impl_command() + self.impl_args +
+                 ["--only-execute", action_name],
+                 env=self.impl_env, echo=self.args.verbose_build)
+
+diff --git a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/cmake_product.py b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/cmake_product.py
+index 6b4eaca..5daf2a2 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/cmake_product.py
++++ b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/cmake_product.py
+@@ -207,6 +207,10 @@ class CMakeProduct(product.Product):
+                 swift_host_triple = 'x86_64-swift-linux-musl'
+                 llvm_target_arch = 'X86'
+
++        elif host_target == 'ohos-aarch64':
++            swift_host_triple = 'aarch64-unknown-linux-ohos'
++            llvm_target_arch = 'AArch64'
++
+         elif host_target.startswith('macosx') or \
+                 host_target.startswith('iphone') or \
+                 host_target.startswith('appletv') or \
+diff --git a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/product.py b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/product.py
+index a3f2bc9..15c6005 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/product.py
++++ b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/products/product.py
+@@ -291,6 +291,10 @@ class Product(object):
+         elif platform in ['xrsimulator', 'xros']:
+             target = '{}-apple-xros{}'.format(
+                 arch, self.args.darwin_deployment_version_xros)
++        elif platform == 'ohos':
++            if arch != 'aarch64':
++                raise RuntimeError('Unhandled OHOS architecture {}?!'.format(arch))
++            target = 'aarch64-unknown-linux-ohos'
+         return target
+
+     def generate_darwin_toolchain_file(self, platform, arch,
+@@ -389,6 +393,40 @@ class Product(object):
+         sysroot_arch, vendor, abi = self.get_linux_target_components(arch)
+         return '{}-{}-linux-{}'.format(sysroot_arch, vendor, abi)
+
++    def get_ohos_sysroot(self, platform, arch):
++        if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
++            return None
++        return os.environ.get('OHOS_SYSROOT')
++
++    def generate_ohos_toolchain_file(self, platform, arch):
++        shell.makedirs(self.build_dir)
++        toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
++
++        target = self.target_for_platform(platform, arch)
++        toolchain_args = {}
++        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
++        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
++        toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
++        toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
++        toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
++        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PROGRAM'] = 'NEVER'
++        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_LIBRARY'] = 'ONLY'
++        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_INCLUDE'] = 'ONLY'
++        toolchain_args['CMAKE_FIND_ROOT_PATH_MODE_PACKAGE'] = 'ONLY'
++
++        maybe_sysroot = self.get_ohos_sysroot(platform, arch)
++        if maybe_sysroot is not None:
++            toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
++
++        data = sorted(toolchain_args.items(), key=lambda x: x[0])
++        if not self.args.dry_run:
++            with open(toolchain_file, 'w') as f:
++                f.writelines("set({} {})\n".format(k, v) for k, v in data)
++        else:
++            print("DRY_RUN! Writing Toolchain file to path: {}".format(toolchain_file))
++
++        return toolchain_file
++
+     def generate_linux_toolchain_file(self, platform, arch):
+         """
+         Generates a new CMake tolchain file that specifies Linux as a target
+@@ -462,6 +500,9 @@ class Product(object):
+         elif platform == "linux":
+             toolchain_file = self.generate_linux_toolchain_file(platform, arch)
+             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
++        elif platform == "ohos":
++            toolchain_file = self.generate_ohos_toolchain_file(platform, arch)
++            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+
+         return toolchain_file
+
+diff --git a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/targets.py b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/targets.py
+index 6447c84..d1c6351 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/targets.py
++++ b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/targets.py
+@@ -290,6 +290,8 @@ class StdlibDeploymentTarget(object):
+         "riscv64",
+         "s390x"])
+
++    OHOS = Platform("ohos", sdk_name="OHOS", archs=["aarch64"])
++
+     FreeBSD = Platform("freebsd", archs=["x86_64", "arm64"])
+
+     LinuxStatic = Platform('linux-static', sdk_name='LINUX_STATIC', archs=[
+@@ -317,6 +319,7 @@ class StdlibDeploymentTarget(object):
+         XROS, XROSSimulator,
+         Freestanding,
+         Linux,
++        OHOS,
+         LinuxStatic,
+         FreeBSD,
+         OpenBSD,
+@@ -387,6 +390,10 @@ class StdlibDeploymentTarget(object):
+             elif machine == 's390x':
+                 return StdlibDeploymentTarget.Linux.s390x
+
++        elif system == 'HarmonyOS':
++            if machine == 'aarch64':
++                return StdlibDeploymentTarget.OHOS.aarch64
++
+         elif system == 'Darwin':
+             if machine == 'x86_64':
+                 return StdlibDeploymentTarget.OSX.x86_64
+diff --git a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/toolchain.py b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/toolchain.py
+index 8dadeeb..16a9846 100644
+--- a/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/toolchain.py
++++ b/swift-swift-6.0.3-RELEASE/utils/swift_build_support/swift_build_support/toolchain.py
+@@ -154,6 +154,11 @@ class Linux(GenericUnix):
+         super(Linux, self).__init__(['', '-3.8', '-3.7', '-3.6', '-3.5'])
+
+
++class OHOS(GenericUnix):
++    def __init__(self):
++        super(OHOS, self).__init__(['', '-15'])
++
++
+ class FreeBSD(GenericUnix):
+     def __init__(self):
+         # For testing toolchain initializer on non-FreeBSD systems
+@@ -213,6 +218,8 @@ def host_toolchain(**kwargs):
+         return MacOSX(kwargs.pop('xcrun_toolchain', 'default'))
+     elif sys == 'Linux':
+         return Linux()
++    elif sys == 'HarmonyOS':
++        return OHOS()
+     elif sys == 'FreeBSD':
+         return FreeBSD()
+     elif sys == 'OpenBSD':

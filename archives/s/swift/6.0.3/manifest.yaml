@@ -1,0 +1,43 @@
+software: swift
+version: "6.0.3"
+status: in-progress
+build_system: source-bootstrap
+compile_date: "2026-08-03"
+
+source:
+  upstream: "Swift 6.0.3 release source components"
+  llvm_substrate: "OpenHarmony third_party_llvm-project 2026_0313_llvm15_release"
+  sha256: "see conandata.yml per component"
+
+dependencies:
+  required:
+    - "OHOS LLVM fork / clang-15"
+    - "OHOS sysroot and signing tools"
+    - "zlib/libxml2/xz runtime dependencies for downstream SwiftPM packages"
+  optional: []
+
+patches_applied:
+  - "0001-add-ohos-platform-sdk-and-swiftpm-triple.patch"
+  - "0002-ohos-driver-swiftpm-runtime-irhandoff.patch"
+
+helper_scripts:
+  - "scripts/monitor-device.sh"
+  - "scripts/swift-irhandoff-wrapper.c"
+
+test_results:
+  type: true-device manual + downstream Conan validation
+  status: "unxip/3.3 conan create and test_package passed with the experimental OHOS-native Swift 6.0.3 path"
+  evidence:
+    - "$BASE/logs/conan-create-unxip-swiftpm-irhandoff-20260803-004816.out"
+    - "$BASE/logs/conan-test-unxip-swiftpm-irhandoff-20260803-0104-test.out"
+    - "$BASE/logs/conan-create-unxip-swiftpm-irhandoff-20260803-0105-full-create.out"
+
+quality_gates:
+  official_linux_toolchain_probe: "blocked on glibc PT_INTERP and OHOS loader/runtime mismatch"
+  swiftly_probe: "installer starts after signing but installs the same glibc-targeted toolchain unless a true OHOS host toolchain is provided"
+  ohos_source_build: "swift/swiftc/swift-frontend and SwiftPM entrypoints built and ran on true device"
+  downstream_validation: "unxip/3.3 SwiftPM release build completed under Conan; test_package returned TEST_RC=0"
+
+known_issues:
+  - "Current successful path still depends on experimental IR handoff wrapper, runtime staging, SDK/resource-dir propagation, modulewrap handling, and signing."
+  - "The Conan recipe currently packages a staged OHOS Swift toolchain supplied by SWIFT_OHOS_STAGED_ROOT or SWIFT_OHOS_STAGED_TARBALL; full source bootstrap automation is still tracked as follow-up work."

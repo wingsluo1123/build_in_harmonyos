@@ -1,0 +1,1337 @@
+diff --git a/swift-corelibs-foundation-swift-6.0.3-RELEASE/CMakeLists.txt b/swift-corelibs-foundation-swift-6.0.3-RELEASE/CMakeLists.txt
+index 256536f..4f42f4f 100644
+--- a/swift-corelibs-foundation-swift-6.0.3-RELEASE/CMakeLists.txt
++++ b/swift-corelibs-foundation-swift-6.0.3-RELEASE/CMakeLists.txt
+@@ -58,6 +58,8 @@ set(CMAKE_Swift_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/swift)
+
+ option(BUILD_SHARED_LIBS "build shared libraries" ON)
+ option(BUILD_FULLY_STATIC "build fully static" NO)
++option(FOUNDATION_ENABLE_XML "build FoundationXML" ON)
++option(FOUNDATION_ENABLE_NETWORKING "build FoundationNetworking" ON)
+
+ # Optionally build tools (on by default) but only when building shared libraries
+ if(BUILD_SHARED_LIBS)
+@@ -138,8 +140,12 @@ if(NOT dispatch_FOUND)
+         "-I${DISPATCH_INCLUDE_PATH}"
+         "-I${DISPATCH_INCLUDE_PATH}/Block")
+ endif()
+-find_package(LibXml2 REQUIRED)
+-find_package(CURL REQUIRED)
++if(FOUNDATION_ENABLE_XML)
++    find_package(LibXml2 REQUIRED)
++endif()
++if(FOUNDATION_ENABLE_NETWORKING)
++    find_package(CURL REQUIRED)
++endif()
+
+ # Common build flags (_CFURLSessionInterface, _CFXMLInterface, CoreFoundation)
+ list(APPEND _Foundation_common_build_flags
+diff --git a/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/CFPlatform.c b/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/CFPlatform.c
+index 6963118..6fa5b1b 100644
+--- a/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/CFPlatform.c
++++ b/swift-corelibs-foundation-swift-6.0.3-RELEASE/Sources/CoreFoundation/CFPlatform.c
+@@ -2279,7 +2279,10 @@ CF_EXPORT int _CFPosixSpawnFileActionsAddClose(_CFPosixSpawnFileActionsRef file_
+ }
+
+ CF_EXPORT int _CFPosixSpawnFileActionsChdir(_CFPosixSpawnFileActionsRef file_actions, const char *path) {
+-  #if defined(__GLIBC__) && !__GLIBC_PREREQ(2, 29)
++  #if defined(__OHOS__)
++  // HarmonyOS libc currently lacks this posix_spawn file action at runtime.
++  return ENOSYS;
++  #elif defined(__GLIBC__) && !__GLIBC_PREREQ(2, 29)
+   // Glibc versions prior to 2.29 don't support posix_spawn_file_actions_addchdir_np, impacting:
+   //  - Amazon Linux 2 (EoL mid-2025)
+   return ENOSYS;
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Driver/Driver.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Driver/Driver.swift
+index cf05245..5209562 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Driver/Driver.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Driver/Driver.swift
+@@ -2777,6 +2777,8 @@ extension Driver {
+       sdkPath = arg.asSingle
+     } else if let SDKROOT = env["SDKROOT"] {
+       sdkPath = SDKROOT
++    } else if targetTriple?.triple.contains("linux-ohos") == true {
++      sdkPath = try? toolchain.defaultSDKPath(targetTriple)?.pathString
+     } else if compilerMode == .immediate || compilerMode == .repl {
+       // In immediate modes, query the toolchain for a default SDK.
+       sdkPath = try? toolchain.defaultSDKPath(targetTriple)?.pathString
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Jobs/GenericUnixToolchain+LinkerSupport.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Jobs/GenericUnixToolchain+LinkerSupport.swift
+index 7dd1840..44b744a 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Jobs/GenericUnixToolchain+LinkerSupport.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Jobs/GenericUnixToolchain+LinkerSupport.swift
+@@ -42,6 +42,7 @@ extension GenericUnixToolchain {
+     targetInfo: FrontendTargetInfo
+   ) throws -> ResolvedTool {
+     let targetTriple = targetInfo.target.triple
++    let isOHOS = targetTriple.triple.contains("linux-ohos")
+     switch linkerOutputType {
+     case .dynamicLibrary:
+       // Same options as an executable, just with '-shared'
+@@ -51,7 +52,7 @@ extension GenericUnixToolchain {
+       // Select the linker to use.
+       if let arg = parsedOptions.getLastArgument(.useLd)?.asSingle {
+         commandLine.appendFlag("-fuse-ld=\(arg)")
+-      } else if lto != nil {
++      } else if isOHOS || lto != nil {
+         commandLine.appendFlag("-fuse-ld=lld")
+       }
+
+@@ -101,6 +102,12 @@ extension GenericUnixToolchain {
+         commandLine.appendPath(toolsDir)
+       }
+
++      if isOHOS && !cxxCompatEnabled,
++         let executableClang = lookupExecutablePath(filename: "clang-15",
++                                                    searchPaths: [clangPath.parentDirectory]) {
++        clangPath = executableClang
++      }
++
+       // Executables on Linux get -pie
+       if targetTriple.os == .linux && linkerOutputType == .executable {
+         commandLine.appendFlag("-pie")
+@@ -189,6 +196,11 @@ extension GenericUnixToolchain {
+       if let path = targetInfo.sdkPath?.path {
+         commandLine.appendFlag("--sysroot")
+         commandLine.appendPath(VirtualPath.lookup(path))
++      } else if isOHOS {
++        if let sdkRoot = env["OHOS_SDKROOT"] ?? env["OHOS_SYSROOT"] ?? env["SDKROOT"], !sdkRoot.isEmpty {
++          commandLine.appendFlag("--sysroot")
++          commandLine.appendPath(try VirtualPath(path: sdkRoot))
++        }
+       }
+
+       // Add the runtime library link paths.
+@@ -229,6 +239,10 @@ extension GenericUnixToolchain {
+       // Explicitly pass the target to the linker
+       commandLine.appendFlag("--target=\(targetTriple.triple)")
+
++      if isOHOS {
++        commandLine.appendFlag("-Wl,--code-sign")
++      }
++
+       // Delegate to Clang for sanitizers. It will figure out the correct linker
+       // options.
+       if linkerOutputType == .executable && !sanitizers.isEmpty {
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/SwiftScan/Loader.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/SwiftScan/Loader.swift
+index 2ab4e6f..531e278 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/SwiftScan/Loader.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/SwiftScan/Loader.swift
+@@ -134,7 +134,7 @@ extension Loader.Flags {
+       Loader.Flags(rawValue: 0)
+     }
+
+-#if os(Linux) && canImport(Glibc)
++#if os(Linux) && canImport(Glibc) && !OHOS
+     public static var deepBind: Loader.Flags {
+       Loader.Flags(rawValue: RTLD_DEEPBIND)
+     }
+diff --git a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Toolchains/GenericUnixToolchain.swift b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Toolchains/GenericUnixToolchain.swift
+index 7abe9d7..4ad55ea 100644
+--- a/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Toolchains/GenericUnixToolchain.swift
++++ b/swift-driver-swift-6.0.3-RELEASE/Sources/SwiftDriver/Toolchains/GenericUnixToolchain.swift
+@@ -102,6 +102,12 @@ public final class GenericUnixToolchain: Toolchain {
+   }
+
+   public func defaultSDKPath(_ target: Triple?) throws -> AbsolutePath? {
++    guard target?.triple.contains("linux-ohos") == true else {
++      return nil
++    }
++    if let sdkRoot = env["OHOS_SDKROOT"] ?? env["OHOS_SYSROOT"] ?? env["SDKROOT"], !sdkRoot.isEmpty {
++      return try AbsolutePath(validating: sdkRoot)
++    }
+     return nil
+   }
+
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift
+index 934416d..d17d53b 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Cancellator.swift
+@@ -82,8 +82,8 @@ public final class Cancellator: Cancellable, Sendable {
+                 action.__sigaction_u.__sa_handler = SIG_DFL
+                 #elseif canImport(Musl)
+                 action.__sa_handler.sa_handler = SIG_DFL
+-                #elseif os(Android)
+-                action.sa_handler = SIG_DFL
++                #elseif os(Android) || canImport(Glibc)
++                action.__sa_handler.sa_handler = SIG_DFL
+                 #else
+                 action.__sigaction_handler = unsafeBitCast(
+                     SIG_DFL,
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Environment/EnvironmentShims.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Environment/EnvironmentShims.swift
+index bcf90f6..f1ee66f 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Environment/EnvironmentShims.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/Environment/EnvironmentShims.swift
+@@ -1,37 +1,5 @@
+ //===----------------------------------------------------------------------===//
+-//
+-// This source file is part of the Swift open source project
+-//
+-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+-// Licensed under Apache License v2.0 with Runtime Library Exception
+-//
+-// See http://swift.org/LICENSE.txt for license information
+-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+-//
++// OHOS probe compatibility: current TSCBasic exposes Git.environment as [String: String]
++// instead of ProcessEnvironmentBlock. Environment already has a dictionary initializer.
+ //===----------------------------------------------------------------------===//
+
+-import struct TSCBasic.ProcessEnvironmentBlock
+-
+-import Dispatch
+-
+-// FIXME: remove ProcessEnvironmentBlockShims
+-// only needed outside this module for Git
+-extension Environment {
+-    @_spi(ProcessEnvironmentBlockShim)
+-    public init(_ processEnvironmentBlock: ProcessEnvironmentBlock) {
+-        self.init()
+-        for (key, value) in processEnvironmentBlock {
+-            self[.init(key.value)] = value
+-        }
+-    }
+-}
+-
+-extension ProcessEnvironmentBlock {
+-    @_spi(ProcessEnvironmentBlockShim)
+-    public init(_ environment: Environment) {
+-        self.init()
+-        for (key, value) in environment {
+-            self[.init(key.rawValue)] = value
+-        }
+-    }
+-}
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
+index 76d4922..c053757 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/FileSystem/FileSystem+Extensions.swift
+@@ -197,7 +197,7 @@ extension FileSystem {
+
+     /// Execute the given block while holding the lock.
+     public func withLock<T>(on path: AbsolutePath, type: FileLock.LockType, blocking: Bool = true, _ body: () throws -> T) throws -> T {
+-        try self.withLock(on: path.underlying, type: type, blocking: blocking, body)
++        try TSCBasic.FileLock.withLock(fileToLock: path.underlying, type: type, body: body)
+     }
+
+     /// Returns any known item replacement directories for a given path. These may be used by platform-specific
+@@ -629,7 +629,9 @@ extension FileLock {
+         fileToLock: AbsolutePath,
+         at lockFilesDirectory: AbsolutePath? = nil
+     ) throws -> FileLock {
+-        return try Self.prepareLock(fileToLock: fileToLock.underlying, at: lockFilesDirectory?.underlying)
++        let lockDirectory = try lockFilesDirectory?.underlying ?? TSCBasic.localFileSystem.tempDirectory
++        let lockFile = lockDirectory.appending(component: fileToLock.basename + ".lock")
++        return TSCBasic.FileLock(at: lockFile)
+     }
+ }
+
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/HTTPClient/URLSessionHTTPClient.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/HTTPClient/URLSessionHTTPClient.swift
+index 7c27608..bf69ea9 100644
+--- a/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/HTTPClient/URLSessionHTTPClient.swift
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/Basics/HTTPClient/URLSessionHTTPClient.swift
+@@ -16,7 +16,6 @@ import struct TSCUtility.Versioning
+ #if canImport(FoundationNetworking)
+ // FIXME: this brings OpenSSL dependency on Linux and needs to be replaced with `swift-server/async-http-client` package
+ import FoundationNetworking
+-#endif
+
+ final class URLSessionHTTPClient: Sendable {
+     private let dataSession: URLSession
+@@ -402,3 +401,27 @@ extension HTTPURLResponse {
+         )
+     }
+ }
++
++#else
++
++final class URLSessionHTTPClient: Sendable {
++    init() {}
++
++    @Sendable
++    func execute(
++        _ request: HTTPClient.Request,
++        progress: HTTPClient.ProgressHandler? = nil
++    ) async throws -> LegacyHTTPClient.Response {
++        throw HTTPClientError.invalidResponse
++    }
++
++    @Sendable
++    func execute(
++        _ request: LegacyHTTPClient.Request,
++        progress: LegacyHTTPClient.ProgressHandler? = nil,
++        completion: @escaping LegacyHTTPClient.CompletionHandler
++    ) {
++        completion(.failure(HTTPClientError.invalidResponse))
++    }
++}
++#endif
+diff --git a/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/PackageDescriptionSerialization.swift b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/PackageDescriptionSerialization.swift
+new file mode 100644
+index 0000000..ad852b9
+--- /dev/null
++++ b/swift-package-manager-swift-6.0.3-RELEASE/Sources/PackageLoading/PackageDescriptionSerialization.swift
+@@ -0,0 +1,283 @@
++//===----------------------------------------------------------------------===//
++//
++// This source file is part of the Swift open source project
++//
++// Copyright (c) 2023 Apple Inc. and the Swift project authors
++// Licensed under Apache License v2.0 with Runtime Library Exception
++//
++// See http://swift.org/LICENSE.txt for license information
++// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
++//
++//===----------------------------------------------------------------------===//
++
++#if USE_IMPL_ONLY_IMPORTS
++@_implementationOnly import Foundation
++#else
++import Foundation
++#endif
++
++enum Serialization {
++    // MARK: - build settings serialization
++
++    struct BuildConfiguration: Codable {
++        let config: String
++    }
++
++    struct BuildSettingCondition: Codable {
++        let platforms: [Platform]?
++        let config: BuildConfiguration?
++    }
++
++    struct BuildSettingData: Codable {
++        let name: String
++        let value: [String]
++        let condition: BuildSettingCondition?
++    }
++
++    struct CSetting: Codable {
++        let data: BuildSettingData
++    }
++
++    struct CXXSetting: Codable {
++        let data: BuildSettingData
++    }
++
++    struct SwiftSetting: Codable {
++        let data: BuildSettingData
++    }
++
++    struct LinkerSetting: Codable {
++        let data: BuildSettingData
++    }
++
++    // MARK: - language standards serialization
++
++    enum CLanguageStandard: String, Codable {
++        case c89
++        case c90
++        case c99
++        case c11
++        case c17
++        case c18
++        case c2x
++        case gnu89
++        case gnu90
++        case gnu99
++        case gnu11
++        case gnu17
++        case gnu18
++        case gnu2x
++        case iso9899_1990 = "iso9899:1990"
++        case iso9899_199409 = "iso9899:199409"
++        case iso9899_1999 = "iso9899:1999"
++        case iso9899_2011 = "iso9899:2011"
++        case iso9899_2017 = "iso9899:2017"
++        case iso9899_2018 = "iso9899:2018"
++    }
++
++    enum CXXLanguageStandard: String, Codable {
++        case cxx98 = "c++98"
++        case cxx03 = "c++03"
++        case cxx11 = "c++11"
++        case cxx14 = "c++14"
++        case cxx17 = "c++17"
++        case cxx1z = "c++1z"
++        case cxx20 = "c++20"
++        case cxx2b = "c++2b"
++        case gnucxx98 = "gnu++98"
++        case gnucxx03 = "gnu++03"
++        case gnucxx11 = "gnu++11"
++        case gnucxx14 = "gnu++14"
++        case gnucxx17 = "gnu++17"
++        case gnucxx1z = "gnu++1z"
++        case gnucxx20 = "gnu++20"
++        case gnucxx2b = "gnu++2b"
++    }
++
++    enum SwiftVersion: Codable {
++        case v3
++        case v4
++        case v4_2
++        case v5
++        case v6
++        case version(String)
++    }
++
++    // MARK: - version serialization
++
++    struct Version: Codable {
++        let major: Int
++        let minor: Int
++        let patch: Int
++        let prereleaseIdentifiers: [String]
++        let buildMetadataIdentifiers: [String]
++    }
++
++    // MARK: - package dependency serialization
++
++    struct PackageDependency: Codable {
++        enum SourceControlRequirement: Codable {
++            case exact(Version)
++            case range(lowerBound: Version, upperBound: Version)
++            case revision(String)
++            case branch(String)
++        }
++
++        enum RegistryRequirement: Codable {
++            case exact(Version)
++            case range(lowerBound: Version, upperBound: Version)
++        }
++
++        enum Kind: Codable {
++            case fileSystem(name: String?, path: String)
++            case sourceControl(name: String?, location: String, requirement: SourceControlRequirement)
++            case registry(id: String, requirement: RegistryRequirement)
++        }
++
++        let kind: Kind
++        let moduleAliases: [String: String]?
++    }
++
++    // MARK: - platforms serialization
++
++    struct Platform: Codable {
++        let name: String
++    }
++
++    struct SupportedPlatform: Codable {
++        let platform: Platform
++        let version: String?
++    }
++
++    // MARK: - target serialization
++
++    enum TargetDependency: Codable {
++        struct Condition: Codable {
++            let platforms: [Platform]?
++        }
++
++        case target(name: String, condition: Condition?)
++        case product(name: String, package: String?, moduleAliases: [String: String]?, condition: Condition?)
++        case byName(name: String, condition: Condition?)
++    }
++
++    enum TargetType: Codable {
++        case regular
++        case executable
++        case test
++        case system
++        case binary
++        case plugin
++        case `macro`
++    }
++
++    enum PluginCapability: Codable {
++        case buildTool
++        case command(intent: PluginCommandIntent, permissions: [PluginPermission])
++    }
++
++    enum PluginCommandIntent: Codable {
++        case documentationGeneration
++        case sourceCodeFormatting
++        case custom(verb: String, description: String)
++    }
++
++    enum PluginPermission: Codable {
++        case allowNetworkConnections(scope: PluginNetworkPermissionScope, reason: String)
++        case writeToPackageDirectory(reason: String)
++    }
++
++    enum PluginNetworkPermissionScope: Codable {
++        case none
++        case local(ports: [Int])
++        case all(ports: [Int])
++        case docker
++        case unixDomainSocket
++    }
++
++    enum PluginUsage: Codable {
++        case plugin(name: String, package: String?)
++    }
++
++    struct Target: Codable {
++        let name: String
++        let path: String?
++        let url: String?
++        let sources: [String]?
++        let resources: [Resource]?
++        let exclude: [String]
++        let dependencies: [TargetDependency]
++        let publicHeadersPath: String?
++        let type: TargetType
++        let packageAccess: Bool
++        let pkgConfig: String?
++        let providers: [SystemPackageProvider]?
++        let pluginCapability: PluginCapability?
++        let cSettings: [CSetting]?
++        let cxxSettings: [CXXSetting]?
++        let swiftSettings: [SwiftSetting]?
++        let linkerSettings: [LinkerSetting]?
++        let checksum: String?
++        let pluginUsages: [PluginUsage]?
++    }
++
++    // MARK: - resource serialization
++
++    struct Resource: Codable {
++        enum Localization: String, Codable {
++            case `default`
++            case base
++        }
++
++        let rule: String
++        let path: String
++        let localization: Localization?
++    }
++
++    // MARK: - product serialization
++
++    struct Product: Codable {
++        enum ProductType: Codable {
++            enum LibraryType: Codable {
++                case automatic
++                case dynamic
++                case `static`
++            }
++
++            case executable
++            case library(type: LibraryType)
++            case plugin
++        }
++
++        let name: String
++        let targets: [String]
++        let productType: ProductType
++    }
++
++    // MARK: - package serialization
++
++    struct LanguageTag: Codable {
++        let tag: String
++    }
++
++    enum SystemPackageProvider: Codable {
++        case brew([String])
++        case apt([String])
++        case yum([String])
++        case nuget([String])
++    }
++
++    struct Package: Codable {
++        let name: String
++        let platforms: [SupportedPlatform]?
++        let defaultLocalization: LanguageTag?
++        let pkgConfig: String?
++        let providers: [SystemPackageProvider]?
++        let targets: [Target]
++        let products: [Product]
++        let dependencies: [PackageDependency]
++        let swiftLanguageVersions: [SwiftVersion]?
++        let cLanguageStandard: CLanguageStandard?
++        let cxxLanguageStandard: CXXLanguageStandard?
++    }
++}
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt b/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt
+index fb3d662..8bd7649 100644
+--- a/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt
++++ b/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt
+@@ -90,7 +90,7 @@ add_swift_host_library(swiftBasic STATIC
+   # Platform-agnostic fallback TaskQueue implementation
+   Default/TaskQueue.inc
+
+-  LLVM_LINK_COMPONENTS support targetparser)
++  LLVM_LINK_COMPONENTS support)
+ _swift_gyb_target_sources(swiftBasic PRIVATE
+     UnicodeExtendedGraphemeClusters.cpp.gyb)
+
+@@ -144,4 +144,3 @@ if(CLANG_COMPILER_VERSION)
+   set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+     " -DCLANG_COMPILER_VERSION=\"\\\"${CLANG_COMPILER_VERSION}\\\"\"")
+ endif()
+-
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangImporter.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangImporter.cpp
+index c7f9334..488d3f3 100644
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangImporter.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangImporter.cpp
+@@ -129,9 +129,8 @@ namespace {
+         StringRef FileName, bool IsAngled, clang::CharSourceRange FilenameRange,
+         clang::OptionalFileEntryRef File, StringRef SearchPath,
+         StringRef RelativePath, const clang::Module *SuggestedModule,
+-        bool ModuleImported,
+         clang::SrcMgr::CharacteristicKind FileType) override {
+-      handleImport(ModuleImported ? SuggestedModule : nullptr);
++      handleImport(SuggestedModule);
+     }
+
+     void moduleImport(clang::SourceLocation ImportLoc,
+@@ -306,9 +305,8 @@ private:
+                           clang::OptionalFileEntryRef File,
+                           StringRef SearchPath, StringRef RelativePath,
+                           const clang::Module *SuggestedModule,
+-                          bool ModuleImported,
+                           clang::SrcMgr::CharacteristicKind FileType) override {
+-    if (!ModuleImported) {
++    if (!SuggestedModule) {
+       if (File)
+         Impl.BridgeHeaderFiles.insert(*File);
+       return;
+@@ -458,7 +456,7 @@ ClangImporter::~ClangImporter() {
+ static bool clangSupportsPragmaAttributeWithSwiftAttr() {
+   clang::AttributeCommonInfo swiftAttrInfo(clang::SourceRange(),
+      clang::AttributeCommonInfo::AT_SwiftAttr,
+-     clang::AttributeCommonInfo::Form::GNU());
++     clang::AttributeCommonInfo::AS_GNU);
+   auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
+   return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
+ }
+@@ -472,6 +470,7 @@ void
+ importer::getNormalInvocationArguments(
+     std::vector<std::string> &invocationArgStrs,
+     ASTContext &ctx) {
++  llvm::errs() << "[ohos-probe] getNormalInvocationArguments begin\n";
+   const auto &LangOpts = ctx.LangOpts;
+   const llvm::Triple &triple = LangOpts.Target;
+   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+@@ -726,6 +725,12 @@ importer::getNormalInvocationArguments(
+       "-Xclang", "-detailed-preprocessing-record",
+       "-Xclang", "-fmodule-format=raw",
+     });
++  } else if (triple.isOHOSFamily()) {
++    // OHOS' LLVM 15 fork can serialize the AST but traps while wrapping
++    // Swift importer modules in an object PCH container.
++    invocationArgStrs.insert(invocationArgStrs.end(), {
++      "-Xclang", "-fmodule-format=raw",
++    });
+   } else {
+     invocationArgStrs.insert(invocationArgStrs.end(), {
+       "-Xclang", "-fmodule-format=obj",
+@@ -733,13 +738,15 @@ importer::getNormalInvocationArguments(
+   }
+
+   // Enable API notes alongside headers/in frameworks.
+-  invocationArgStrs.push_back("-fapinotes-modules");
+-  invocationArgStrs.push_back("-fapinotes-swift-version=" +
+-                              languageVersion.asAPINotesVersionString());
+-  invocationArgStrs.push_back("-iapinotes-modules");
+-  invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
+-                               llvm::sys::path::get_separator() +
+-                               "apinotes").str());
++  if (triple.isOSDarwin()) {
++    invocationArgStrs.push_back("-fapinotes-modules");
++    invocationArgStrs.push_back("-fapinotes-swift-version=" +
++                                languageVersion.asAPINotesVersionString());
++    invocationArgStrs.push_back("-iapinotes-modules");
++    invocationArgStrs.push_back((llvm::Twine(searchPathOpts.RuntimeResourcePath) +
++                                 llvm::sys::path::get_separator() +
++                                 "apinotes").str());
++  }
+
+   auto CASOpts = ctx.CASOpts;
+   if (CASOpts.EnableCaching) {
+@@ -765,6 +772,8 @@ importer::getNormalInvocationArguments(
+       }
+     }
+   }
++  llvm::errs() << "[ohos-probe] getNormalInvocationArguments end count="
++               << invocationArgStrs.size() << "\n";
+ }
+
+ static void
+@@ -785,6 +794,8 @@ void
+ importer::addCommonInvocationArguments(
+     std::vector<std::string> &invocationArgStrs,
+     ASTContext &ctx, bool ignoreClangTarget) {
++  llvm::errs() << "[ohos-probe] addCommonInvocationArguments begin"
++               << " ignoreClangTarget=" << ignoreClangTarget << "\n";
+   using ImporterImpl = ClangImporter::Implementation;
+   llvm::Triple triple = ctx.LangOpts.Target;
+   // Use clang specific target triple if given.
+@@ -888,7 +899,8 @@ importer::addCommonInvocationArguments(
+     invocationArgStrs.push_back(overrideResourceDir);
+   }
+
+-  if (!importerOpts.IndexStorePath.empty()) {
++  const bool isOHOSTarget = triple.str().find("ohos") != std::string::npos;
++  if (!importerOpts.IndexStorePath.empty() && !isOHOSTarget) {
+     invocationArgStrs.push_back("-index-store-path");
+     invocationArgStrs.push_back(importerOpts.IndexStorePath);
+   }
+@@ -903,6 +915,9 @@ importer::addCommonInvocationArguments(
+   for (auto extraArg : importerOpts.ExtraArgs) {
+     invocationArgStrs.push_back(extraArg);
+   }
++  llvm::errs() << "[ohos-probe] addCommonInvocationArguments end triple="
++               << triple.str() << " count=" << invocationArgStrs.size()
++               << "\n";
+ }
+
+ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
+@@ -921,8 +936,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
+   invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
+       clang::DisableValidationForModuleKind::None;
+   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
+-  invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
+-  invocation->getLangOpts().CacheGeneratedPCH = true;
++  invocation->getLangOpts()->CacheGeneratedPCH = true;
+
+   // ClangImporter::create adds a remapped MemoryBuffer that we don't need
+   // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
+@@ -1070,6 +1084,7 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
+
+ std::vector<std::string>
+ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget) {
++  llvm::errs() << "[ohos-probe] getClangDriverArguments begin\n";
+   assert(!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild &&
+          "direct-clang-cc1-module-build should not call this function");
+   std::vector<std::string> invocationArgStrs;
+@@ -1079,13 +1094,20 @@ ClangImporter::getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget)
+   switch (ctx.ClangImporterOpts.Mode) {
+   case ClangImporterOptions::Modes::Normal:
+   case ClangImporterOptions::Modes::PrecompiledModule:
++    llvm::errs() << "[ohos-probe] before getNormalInvocationArguments\n";
+     getNormalInvocationArguments(invocationArgStrs, ctx);
++    llvm::errs() << "[ohos-probe] after getNormalInvocationArguments\n";
+     break;
+   case ClangImporterOptions::Modes::EmbedBitcode:
++    llvm::errs() << "[ohos-probe] before getEmbedBitcodeInvocationArguments\n";
+     getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx);
++    llvm::errs() << "[ohos-probe] after getEmbedBitcodeInvocationArguments\n";
+     break;
+   }
++  llvm::errs() << "[ohos-probe] before addCommonInvocationArguments\n";
+   addCommonInvocationArguments(invocationArgStrs, ctx, ignoreClangTarget);
++  llvm::errs() << "[ohos-probe] after addCommonInvocationArguments count="
++               << invocationArgStrs.size() << "\n";
+   return invocationArgStrs;
+ }
+
+@@ -1093,6 +1115,8 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+     ClangImporter *importer, ASTContext &ctx,
+     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
+     bool ignoreClangTarget) {
++  llvm::errs() << "[ohos-probe] getClangCC1Arguments begin"
++               << " ignoreClangTarget=" << ignoreClangTarget << "\n";
+   std::unique_ptr<clang::CompilerInvocation> CI;
+
+   // Set up a temporary diagnostic client to report errors from parsing the
+@@ -1111,6 +1135,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+   auto clangDiags = clang::CompilerInstance::createDiagnostics(
+       tempDiagOpts.get(), tempDiagClient,
+       /*owned*/ true);
++  llvm::errs() << "[ohos-probe] after temporary createDiagnostics\n";
+
+   // If using direct cc1 module build, use extra args to setup ClangImporter.
+   if (ctx.ClangImporterOpts.DirectClangCC1ModuleBuild) {
+@@ -1142,7 +1167,15 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+     CI->getFrontendOpts().IndexStorePath = ctx.ClangImporterOpts.IndexStorePath;
+   } else {
+     // Otherwise, create cc1 arguments from driver args.
++    llvm::errs() << "[ohos-probe] before getClangDriverArguments\n";
+     auto driverArgs = getClangDriverArguments(ctx, ignoreClangTarget);
++    llvm::errs() << "[ohos-probe] after getClangDriverArguments count="
++                 << driverArgs.size() << "\n";
++    llvm::errs() << "[ohos-probe] clang importer driver args: '";
++    llvm::interleave(driverArgs,
++                     [](StringRef arg) { llvm::errs() << arg; },
++                     [] { llvm::errs() << "' '"; });
++    llvm::errs() << "'\n";
+
+     llvm::SmallVector<const char *> invocationArgs;
+     invocationArgs.reserve(driverArgs.size());
+@@ -1163,9 +1196,11 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+     CIOpts.Diags = clangDiags;
+     CIOpts.RecoverOnError = false;
+     CIOpts.ProbePrecompiled = true;
++    llvm::errs() << "[ohos-probe] before clang::createInvocation\n";
+     CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+     if (!CI)
+       return std::nullopt;
++    llvm::errs() << "[ohos-probe] after clang::createInvocation\n";
+   }
+
+   // FIXME: clang fails to generate a module if there is a `-fmodule-map-file`
+@@ -1178,13 +1213,17 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+   // to missing files and report the error that clang would throw manually.
+   // rdar://77516546 is tracking that the clang importer should be more
+   // resilient and provide a module even if there were building it.
++  llvm::errs() << "[ohos-probe] before createVFSFromCompilerInvocation in getClangCC1Arguments\n";
+   auto TempVFS = clang::createVFSFromCompilerInvocation(
+       *CI, *clangDiags,
+       VFS ? VFS : importer->Impl.SwiftContext.SourceMgr.getFileSystem());
++  llvm::errs() << "[ohos-probe] after createVFSFromCompilerInvocation in getClangCC1Arguments\n";
+
+   std::vector<std::string> FilteredModuleMapFiles;
+   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
+-    if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
++    if (ModuleMapFile.empty()) {
++      continue;
++    } else if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+       // There is no need to add any module map file here. Issue a warning and
+       // drop the option.
+       importer->Impl.diagnose(SourceLoc(), diag::module_map_ignored,
+@@ -1198,7 +1237,22 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
+   }
+   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
+
+-  return CI->getCC1CommandLine();
++  llvm::errs() << "[ohos-probe] before getCC1CommandLine\n";
++  auto CC1CommandLine = CI->getCC1CommandLine();
++  auto OriginalCC1Count = CC1CommandLine.size();
++  llvm::erase_if(CC1CommandLine, [](const std::string &Arg) {
++    return Arg.empty() || Arg == "-fmodule-map-file=";
++  });
++  for (const auto &Arg : CC1CommandLine) {
++    auto Ref = StringRef(Arg);
++    if (Ref.contains("module") || Ref.starts_with("-std=") || Ref == "-x")
++      llvm::errs() << "[ohos-probe] cc1 module arg: '" << Arg << "'\n";
++  }
++  llvm::errs() << "[ohos-probe] filtered CC1 args removed="
++               << (OriginalCC1Count - CC1CommandLine.size()) << "\n";
++  llvm::errs() << "[ohos-probe] after getCC1CommandLine count="
++               << CC1CommandLine.size() << "\n";
++  return CC1CommandLine;
+ }
+
+ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
+@@ -1227,6 +1281,15 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
+           *CI, invocationArgs, clangDiags, importerOpts.clangPath.c_str()))
+     return nullptr;
+
++  auto OriginalModuleMapCount = CI->getFrontendOpts().ModuleMapFiles.size();
++  llvm::erase_if(CI->getFrontendOpts().ModuleMapFiles,
++                 [](const std::string &ModuleMapFile) {
++                   return ModuleMapFile.empty();
++                 });
++  llvm::errs() << "[ohos-probe] createClangInvocation filtered ModuleMapFiles="
++               << (OriginalModuleMapCount -
++                   CI->getFrontendOpts().ModuleMapFiles.size()) << "\n";
++
+   return CI;
+ }
+
+@@ -1234,8 +1297,10 @@ std::unique_ptr<ClangImporter>
+ ClangImporter::create(ASTContext &ctx,
+                       std::string swiftPCHHash, DependencyTracker *tracker,
+                       DWARFImporterDelegate *dwarfImporterDelegate) {
++  llvm::errs() << "[ohos-probe] ClangImporter::create begin\n";
+   std::unique_ptr<ClangImporter> importer{
+       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
++  llvm::errs() << "[ohos-probe] after ClangImporter ctor\n";
+   auto &importerOpts = ctx.ClangImporterOpts;
+
+   if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
+@@ -1254,12 +1319,16 @@ ClangImporter::create(ASTContext &ctx,
+   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+       ctx.SourceMgr.getFileSystem();
+
++  llvm::errs() << "[ohos-probe] before getClangInvocationFileMapping\n";
+   auto fileMapping = getClangInvocationFileMapping(ctx);
++  llvm::errs() << "[ohos-probe] after getClangInvocationFileMapping\n";
+   // Avoid creating indirect file system when using include tree.
+   if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+     // Wrap Swift's FS to allow Clang to override the working directory
++    llvm::errs() << "[ohos-probe] before RedirectingFileSystem::create\n";
+     VFS = llvm::vfs::RedirectingFileSystem::create(
+         fileMapping.redirectedFiles, true, *ctx.SourceMgr.getFileSystem());
++    llvm::errs() << "[ohos-probe] after RedirectingFileSystem::create\n";
+     if (importerOpts.DumpClangDiagnostics) {
+       llvm::errs() << "clang importer redirected file mappings:\n";
+       for (const auto &mapping : fileMapping.redirectedFiles) {
+@@ -1295,10 +1364,13 @@ ClangImporter::create(ASTContext &ctx,
+
+   // Create a new Clang compiler invocation.
+   {
++    llvm::errs() << "[ohos-probe] before getClangCC1Arguments\n";
+     if (auto ClangArgs = getClangCC1Arguments(importer.get(), ctx, VFS))
+       importer->Impl.ClangArgs = *ClangArgs;
+     else
+       return nullptr;
++    llvm::errs() << "[ohos-probe] after getClangCC1Arguments count="
++                 << importer->Impl.ClangArgs.size() << "\n";
+
+     if (fileMapping.requiresBuiltinHeadersInSystemModules)
+       importer->Impl.ClangArgs.push_back("-fbuiltin-headers-in-system-modules");
+@@ -1311,13 +1383,16 @@ ClangImporter::create(ASTContext &ctx,
+                        [] { llvm::errs() << "' '"; });
+       llvm::errs() << "'\n";
+     }
++    llvm::errs() << "[ohos-probe] before createClangInvocation\n";
+     importer->Impl.Invocation = createClangInvocation(
+         importer.get(), importerOpts, VFS, importer->Impl.ClangArgs);
+     if (!importer->Impl.Invocation)
+       return nullptr;
++    llvm::errs() << "[ohos-probe] after createClangInvocation\n";
+   }
+
+   {
++    llvm::errs() << "[ohos-probe] before moduleImportBuffer remap\n";
+     // Create an almost-empty memory buffer.
+     auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
+       "extern int __swift __attribute__((unavailable));",
+@@ -1326,51 +1401,68 @@ ClangImporter::create(ASTContext &ctx,
+         importer->Impl.Invocation->getPreprocessorOpts();
+     ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
+                            sourceBuffer.release());
++    llvm::errs() << "[ohos-probe] after moduleImportBuffer remap\n";
+   }
+
+   // Install a Clang module file extension to build Swift name lookup tables.
++  llvm::errs() << "[ohos-probe] before SwiftNameLookupExtension\n";
+   importer->Impl.Invocation->getFrontendOpts().ModuleFileExtensions.push_back(
+       std::make_shared<SwiftNameLookupExtension>(
+           importer->Impl.BridgingHeaderLookupTable,
+           importer->Impl.LookupTables, importer->Impl.SwiftContext,
+           importer->Impl.getBufferImporterForDiagnostics(),
+           importer->Impl.platformAvailability));
++  llvm::errs() << "[ohos-probe] after SwiftNameLookupExtension\n";
+
+   // Create a compiler instance.
+   {
+-    // The Clang modules produced by ClangImporter are always embedded in an
+-    // ObjectFilePCHContainer and contain -gmodules debug info.
+-    importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
+-
++    llvm::errs() << "[ohos-probe] before CompilerInstance ctor\n";
+     auto PCHContainerOperations =
+       std::make_shared<clang::PCHContainerOperations>();
+-    PCHContainerOperations->registerWriter(
+-        std::make_unique<clang::ObjectFilePCHContainerWriter>());
+-    PCHContainerOperations->registerReader(
+-        std::make_unique<clang::ObjectFilePCHContainerReader>());
++    llvm::Triple clangImporterTriple(
++        importer->Impl.Invocation->getTargetOpts().Triple);
++    if (clangImporterTriple.isOHOSFamily()) {
++      importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = false;
++    } else {
++      // The Clang modules produced by ClangImporter are always embedded in an
++      // ObjectFilePCHContainer and contain -gmodules debug info.
++      importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = true;
++      PCHContainerOperations->registerWriter(
++          std::make_unique<clang::ObjectFilePCHContainerWriter>());
++      PCHContainerOperations->registerReader(
++          std::make_unique<clang::ObjectFilePCHContainerReader>());
++    }
+     importer->Impl.Instance.reset(
+         new clang::CompilerInstance(std::move(PCHContainerOperations)));
++    llvm::errs() << "[ohos-probe] after CompilerInstance ctor\n";
+   }
+   auto &instance = *importer->Impl.Instance;
++  llvm::errs() << "[ohos-probe] before setInvocation\n";
+   instance.setInvocation(importer->Impl.Invocation);
++  llvm::errs() << "[ohos-probe] after setInvocation\n";
+
+   if (tracker)
+     instance.addDependencyCollector(tracker->getClangCollector());
+
+   {
++    llvm::errs() << "[ohos-probe] before createDiagnostics\n";
+     // Now set up the real client for Clang diagnostics---configured with proper
+     // options---as opposed to the temporary one we made above.
+     auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
+         importer->Impl, instance.getDiagnosticOpts(),
+         importerOpts.DumpClangDiagnostics);
+     instance.createDiagnostics(actualDiagClient.release());
++    llvm::errs() << "[ohos-probe] after createDiagnostics\n";
+   }
+
+   // Set up the file manager.
+   {
++    llvm::errs() << "[ohos-probe] before createVFSFromCompilerInvocation\n";
+     VFS = clang::createVFSFromCompilerInvocation(
+         instance.getInvocation(), instance.getDiagnostics(), std::move(VFS));
++    llvm::errs() << "[ohos-probe] before createFileManager\n";
+     instance.createFileManager(VFS);
++    llvm::errs() << "[ohos-probe] after createFileManager\n";
+   }
+
+   // Don't stop emitting messages if we ever can't load a module.
+@@ -1388,6 +1480,7 @@ ClangImporter::create(ASTContext &ctx,
+
+   // Use Clang to configure/save options for Swift IRGen/CodeGen
+   if (ctx.LangOpts.ClangTarget.has_value()) {
++    llvm::errs() << "[ohos-probe] before swift target clang args\n";
+     // If '-clang-target' is set, create a mock invocation with the Swift triple
+     // to configure CodeGen and Target options for Swift compilation.
+     auto swiftTargetClangArgs =
+@@ -1398,23 +1491,31 @@ ClangImporter::create(ASTContext &ctx,
+         importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
+     if (!swiftTargetClangInvocation)
+       return nullptr;
++    llvm::errs() << "[ohos-probe] before swift TargetInfo::CreateTargetInfo\n";
+     importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
+         clangDiags, swiftTargetClangInvocation->TargetOpts));
++    llvm::errs() << "[ohos-probe] after swift TargetInfo::CreateTargetInfo\n";
+     importer->Impl.setSwiftCodeGenOptions(new clang::CodeGenOptions(
+         swiftTargetClangInvocation->getCodeGenOpts()));
++    llvm::errs() << "[ohos-probe] after swift CodeGenOptions\n";
+   } else {
+     // Just use the existing Invocation's directly
++    llvm::errs() << "[ohos-probe] before TargetInfo::CreateTargetInfo direct\n";
+     importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
+         clangDiags, importer->Impl.Invocation->TargetOpts));
++    llvm::errs() << "[ohos-probe] after TargetInfo::CreateTargetInfo direct\n";
+     importer->Impl.setSwiftCodeGenOptions(
+         new clang::CodeGenOptions(importer->Impl.Invocation->getCodeGenOpts()));
++    llvm::errs() << "[ohos-probe] after CodeGenOptions direct\n";
+   }
+
+   // Create the associated action.
++  llvm::errs() << "[ohos-probe] before ParsingAction ctor\n";
+   importer->Impl.Action.reset(new ParsingAction(ctx, *importer,
+                                                 importer->Impl,
+                                                 importerOpts,
+                                                 swiftPCHHash));
++  llvm::errs() << "[ohos-probe] after ParsingAction ctor\n";
+   auto *action = importer->Impl.Action.get();
+
+   // Execute the action. We effectively inline most of
+@@ -1424,9 +1525,11 @@ ClangImporter::create(ASTContext &ctx,
+   // things here.
+
+   // Create the target instance.
++  llvm::errs() << "[ohos-probe] before instance.setTarget\n";
+   instance.setTarget(
+     clang::TargetInfo::CreateTargetInfo(clangDiags,
+                                         instance.getInvocation().TargetOpts));
++  llvm::errs() << "[ohos-probe] after instance.setTarget\n";
+   if (!instance.hasTarget())
+     return nullptr;
+
+@@ -1434,7 +1537,9 @@ ClangImporter::create(ASTContext &ctx,
+   //
+   // FIXME: We shouldn't need to do this, the target should be immutable once
+   // created. This complexity should be lifted elsewhere.
++  llvm::errs() << "[ohos-probe] before target.adjust\n";
+   instance.getTarget().adjust(clangDiags, instance.getLangOpts());
++  llvm::errs() << "[ohos-probe] after target.adjust\n";
+
+   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
+     return importer;
+@@ -1445,40 +1550,66 @@ ClangImporter::create(ASTContext &ctx,
+   // example, if we combined the early exit below with the one above) would make
+   // the compiler instance used to emit PCMs incompatible with the one used to
+   // read them later.
+-  instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
+-
+   // Clang implicitly enables this by default in C++20 mode.
+   instance.getLangOpts().ModulesLocalVisibility = false;
+
+   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
+     return importer;
+
++  {
++    auto &ModuleMapFiles = instance.getFrontendOpts().ModuleMapFiles;
++    auto OriginalModuleMapCount = ModuleMapFiles.size();
++    llvm::erase_if(ModuleMapFiles, [](const std::string &ModuleMapFile) {
++      return ModuleMapFile.empty();
++    });
++    llvm::errs() << "[ohos-probe] before BeginSourceFile ModuleMapFiles="
++                 << ModuleMapFiles.size() << " filtered="
++                 << (OriginalModuleMapCount - ModuleMapFiles.size()) << "\n";
++  }
++
++  llvm::errs() << "[ohos-probe] before BeginSourceFile\n";
+   bool canBegin = action->BeginSourceFile(instance,
+                                           instance.getFrontendOpts().Inputs[0]);
++  llvm::errs() << "[ohos-probe] after BeginSourceFile canBegin=" << canBegin
++               << "\n";
+   if (!canBegin)
+     return nullptr; // there was an error related to the compiler arguments.
+
++  llvm::errs() << "[ohos-probe] before getPreprocessor\n";
+   clang::Preprocessor &clangPP = instance.getPreprocessor();
+   clangPP.enableIncrementalProcessing();
++  llvm::errs() << "[ohos-probe] after enableIncrementalProcessing\n";
+
+   // Setup Preprocessor callbacks before initialing the parser to make sure
+   // we catch implicit includes.
+   auto ppTracker = std::make_unique<BridgingPPTracker>(importer->Impl);
+   clangPP.addPPCallbacks(std::move(ppTracker));
+
++  llvm::errs() << "[ohos-probe] before createASTReader\n";
+   instance.createASTReader();
++  llvm::errs() << "[ohos-probe] after createASTReader\n";
+
+   // Manually run the action, so that the TU stays open for additional parsing.
++  llvm::errs() << "[ohos-probe] before createSema\n";
+   instance.createSema(action->getTranslationUnitKind(), nullptr);
++  llvm::errs() << "[ohos-probe] after createSema\n";
++  llvm::errs() << "[ohos-probe] before clang::Parser ctor\n";
+   importer->Impl.Parser.reset(new clang::Parser(clangPP, instance.getSema(),
+                                                 /*SkipFunctionBodies=*/false));
++  llvm::errs() << "[ohos-probe] after clang::Parser ctor\n";
+
++  llvm::errs() << "[ohos-probe] before EnterMainSourceFile\n";
+   clangPP.EnterMainSourceFile();
++  llvm::errs() << "[ohos-probe] after EnterMainSourceFile\n";
++  llvm::errs() << "[ohos-probe] before Parser Initialize\n";
+   importer->Impl.Parser->Initialize();
++  llvm::errs() << "[ohos-probe] after Parser Initialize\n";
+
++  llvm::errs() << "[ohos-probe] before NameImporter ctor\n";
+   importer->Impl.nameImporter.reset(new NameImporter(
+       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
+       importer->Impl.getClangSema()));
++  llvm::errs() << "[ohos-probe] after NameImporter ctor\n";
+
+   // FIXME: These decls are not being parsed correctly since (a) some of the
+   // callbacks are still being added, and (b) the logic to parse them has
+@@ -1930,8 +2061,7 @@ std::unique_ptr<clang::FrontendAction> wrapActionForIndexingIfEnabled(
+     const clang::FrontendOptions &FrontendOpts,
+     std::unique_ptr<clang::FrontendAction> action) {
+   if (!FrontendOpts.IndexStorePath.empty()) {
+-    return clang::index::createIndexDataRecordingAction(
+-        FrontendOpts, std::move(action));
++    return action;
+   }
+   return action;
+ }
+@@ -1970,8 +2100,7 @@ bool ClangImporter::emitBridgingPCH(
+   auto emitInstance = cloneCompilerInstanceForPrecompiling();
+   auto &invocation = emitInstance->getInvocation();
+
+-  auto &LangOpts = invocation.getLangOpts();
+-  LangOpts.NeededByPCHOrCompilationUsesPCH = true;
++  auto &LangOpts = *invocation.getLangOpts();
+   LangOpts.CacheGeneratedPCH = cached;
+
+   auto language = getLanguageFromOptions(LangOpts);
+@@ -2000,7 +2129,7 @@ bool ClangImporter::runPreprocessor(
+     StringRef inputPath, StringRef outputPath) {
+   auto emitInstance = cloneCompilerInstanceForPrecompiling();
+   auto &invocation = emitInstance->getInvocation();
+-  auto &LangOpts = invocation.getLangOpts();
++  auto &LangOpts = *invocation.getLangOpts();
+   auto &OutputOpts = invocation.getPreprocessorOutputOpts();
+   OutputOpts.ShowCPP = 1;
+   OutputOpts.ShowComments = 0;
+@@ -2027,7 +2156,7 @@ bool ClangImporter::emitPrecompiledModule(
+   auto emitInstance = cloneCompilerInstanceForPrecompiling();
+   auto &invocation = emitInstance->getInvocation();
+
+-  auto &LangOpts = invocation.getLangOpts();
++  auto &LangOpts = *invocation.getLangOpts();
+   LangOpts.setCompilingModule(clang::LangOptions::CMK_ModuleMap);
+   LangOpts.ModuleName = moduleName.str();
+   LangOpts.CurrentModule = LangOpts.ModuleName;
+@@ -2153,7 +2282,11 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
+                                     bool isTestableDependencyLookup) {
+   // Look up the top-level module to see if it exists.
+   auto topModule = modulePath.front();
++  llvm::errs() << "[ohos-probe-ci] canImportModule begin module='"
++               << topModule.Item.str() << "'\n";
+   clang::Module *clangModule = Impl.lookupModule(topModule.Item.str());
++  llvm::errs() << "[ohos-probe-ci] canImportModule lookup result="
++               << (clangModule ? "hit" : "miss") << "\n";
+   if (!clangModule) {
+     return false;
+   }
+@@ -2206,10 +2339,17 @@ bool ClangImporter::canImportModule(ImportPath::Module modulePath,
+ clang::Module *
+ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
+   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
+-  if (getClangASTContext().getLangOpts().ImplicitModules)
+-    return clangHeaderSearch.lookupModule(
++  llvm::errs() << "[ohos-probe-ci] lookupModule begin module='" << moduleName
++               << "' implicit="
++               << getClangASTContext().getLangOpts().ImplicitModules << "\n";
++  if (getClangASTContext().getLangOpts().ImplicitModules) {
++    auto *result = clangHeaderSearch.lookupModule(
+         moduleName, /*ImportLoc=*/clang::SourceLocation(),
+         /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
++    llvm::errs() << "[ohos-probe-ci] lookupModule implicit result="
++                 << (result ? "hit" : "miss") << "\n";
++    return result;
++  }
+
+   // Explicit module. Try load from modulemap.
+   auto &PP = Instance->getPreprocessor();
+@@ -2240,14 +2380,22 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
+     SourceLoc importLoc, ImportPath::Module path) {
+   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
+   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
++  llvm::errs() << "[ohos-probe-ci] loadModuleClang begin module='"
++               << realModuleName << "' pathSize=" << path.size()
++               << " implicit="
++               << Instance->getInvocation().getLangOpts()->ImplicitModules
++               << "\n";
+
+   // For explicit module build, module should always exist but module map might
+   // not be exist. Go straight to module loader.
+-  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
++  if (Instance->getInvocation().getLangOpts()->ImplicitModules) {
+     // Look up the top-level module first, to see if it exists at all.
++    llvm::errs() << "[ohos-probe-ci] loadModuleClang before top lookup\n";
+     clang::Module *clangModule = clangHeaderSearch.lookupModule(
+         realModuleName, /*ImportLoc=*/clang::SourceLocation(),
+         /*AllowSearch=*/true, /*AllowExtraModuleMapSearch=*/true);
++    llvm::errs() << "[ohos-probe-ci] loadModuleClang top lookup result="
++                 << (clangModule ? "hit" : "miss") << "\n";
+     if (!clangModule)
+       return nullptr;
+   }
+@@ -2273,6 +2421,9 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
+   auto loadModule = [&](clang::ModuleIdPath path,
+                         clang::Module::NameVisibilityKind visibility)
+       -> clang::ModuleLoadResult {
++    llvm::errs() << "[ohos-probe-ci] loadModule lambda begin first='"
++                 << path.front().first->getName() << "' size=" << path.size()
++                 << " visibility=" << static_cast<int>(visibility) << "\n";
+     auto importRAII =
+         diagClient.handleImport(clangPath.front().first, diagEngine,
+                                 importLoc);
+@@ -2289,9 +2440,12 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
+     }
+
+     clang::SourceLocation clangImportLoc = getNextIncludeLoc();
++    llvm::errs() << "[ohos-probe-ci] before Instance->loadModule\n";
+     clang::ModuleLoadResult result =
+         Instance->loadModule(clangImportLoc, path, visibility,
+                              /*IsInclusionDirective=*/false);
++    llvm::errs() << "[ohos-probe-ci] after Instance->loadModule result="
++                 << (result ? "hit" : "miss") << "\n";
+
+     if (!preservedIndexStorePathOption.empty()) {
+       // Restore the -index-store-path option.
+@@ -2327,7 +2481,10 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
+     // put the Clang AST in a fatal error state if it /doesn't/ exist.
+     if (!submodule && component.Item.str() == "Private" &&
+         (&component) == (&path.getRaw()[1])) {
+-      submodule = loadModule(llvm::ArrayRef(clangPath).slice(0, 2),
++      submodule = loadModule(
++          llvm::ArrayRef<std::pair<clang::IdentifierInfo *,
++                                   clang::SourceLocation>>(clangPath)
++              .slice(0, 2),
+                              clang::Module::Hidden);
+     }
+
+@@ -2356,6 +2513,9 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
+     SourceLoc importLoc, ImportPath::Module path) {
+   ModuleDecl *MD = nullptr;
+   ASTContext &ctx = getNameImporter().getContext();
++  llvm::errs() << "[ohos-probe-ci] impl loadModule begin module='"
++               << path.front().Item.str() << "' disableSource="
++               << DisableSourceImport << "\n";
+
+   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
+   if (path.front().Item.is("std") ||
+@@ -2369,8 +2529,12 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
+
+   if (!DisableSourceImport)
+     MD = loadModuleClang(importLoc, path);
++  llvm::errs() << "[ohos-probe-ci] impl loadModule after clang result="
++               << (MD ? "hit" : "miss") << "\n";
+   if (!MD)
+     MD = loadModuleDWARF(importLoc, path);
++  llvm::errs() << "[ohos-probe-ci] impl loadModule end result="
++               << (MD ? "hit" : "miss") << "\n";
+   return MD;
+ }
+
+@@ -2397,13 +2561,13 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
+   // Builds, since we load pre-built PCMs directly, we do not get to do so. So
+   // instead, manually register all `.h` inputs of Clang module dependnecies.
+   if (SwiftDependencyTracker &&
+-      !Instance->getInvocation().getLangOpts().ImplicitModules) {
++      !Instance->getInvocation().getLangOpts()->ImplicitModules) {
+     auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
+         clangModule->getASTFile());
+-    Instance->getASTReader()->visitInputFileInfos(
+-        *moduleFile, /*IncludeSystem=*/true,
+-        [&](const clang::serialization::InputFileInfo &IFI, bool isSystem) {
+-          SwiftDependencyTracker->addDependency(IFI.Filename, isSystem);
++    Instance->getASTReader()->visitInputFiles(
++        *moduleFile, /*IncludeSystem=*/true, /*Complain=*/true,
++        [&](const clang::serialization::InputFile &IFI, bool isSystem) {
++          SwiftDependencyTracker->addDependency(IFI.getFile()->getName(), isSystem);
+         });
+   }
+
+@@ -2556,7 +2720,9 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
+     bool isAsync) const {
+   assert(!version.empty() && "Must provide version when deprecated");
+   unsigned major = version.getMajor();
+-  std::optional<unsigned> minor = version.getMinor();
++  std::optional<unsigned> minor;
++  if (auto maybeMinor = version.getMinor())
++    minor = *maybeMinor;
+
+   switch (platformKind) {
+   case PlatformKind::none:
+@@ -4064,7 +4230,7 @@ clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
+ }
+
+ std::string ClangImporter::getClangModuleHash() const {
+-  return Impl.Invocation->getModuleHash(Impl.Instance->getDiagnostics());
++  return Impl.Invocation->getModuleHash();
+ }
+
+ std::vector<std::string>
+@@ -4088,8 +4254,6 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
+     return instance.getCC1CommandLine();
+
+   // Clear some options that are not needed.
+-  instance.clearImplicitModuleBuildOptions();
+-
+   // CASOpts are forwarded from swift arguments.
+   instance.getCASOpts() = clang::CASOptions();
+
+@@ -4163,14 +4327,6 @@ ClangImporter::parseClangFunctionType(StringRef typeStr,
+   auto &sema = Impl.getClangSema();
+   StringRef filename = Impl.SwiftContext.SourceMgr.getDisplayNameForLoc(loc);
+   // TODO: Obtain a clang::SourceLocation from the swift::SourceLoc we have
+-  auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
+-  if (!parsedType.isUsable())
+-    return nullptr;
+-  clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
+-  auto *typePtr = resultType.getTypePtrOrNull();
+-  if (typePtr && (typePtr->isFunctionPointerType()
+-                  || typePtr->isBlockPointerType()))
+-      return typePtr;
+   return nullptr;
+ }
+
+@@ -4462,8 +4618,9 @@ void ClangModuleUnit::getImportedModulesForLookup(
+   }
+
+   // Cache our results for use next time.
+-  auto importsToCache = llvm::ArrayRef(imports).slice(firstImport);
+-  importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
++  auto importsToCache = llvm::ArrayRef<ImportedModule>(imports).slice(firstImport);
++  importedModulesForLookup =
++      llvm::ArrayRef<ImportedModule>(getASTContext().AllocateCopy(importsToCache));
+ }
+
+ void ClangImporter::getMangledName(raw_ostream &os,
+@@ -7513,7 +7670,7 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
+   // Swift type must be annotated with external_source_symbol attribute.
+   auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+   if (!essAttr || essAttr->getLanguage() != "Swift" ||
+-      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
++      essAttr->getDefinedIn().empty())
+     return false;
+
+   // Ensure that the baseclass is swift::RefCountedClass.
