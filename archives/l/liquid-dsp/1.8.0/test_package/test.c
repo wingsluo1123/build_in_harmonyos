@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <string.h>
 #include <liquid/liquid.h>
 
 int main(void) {

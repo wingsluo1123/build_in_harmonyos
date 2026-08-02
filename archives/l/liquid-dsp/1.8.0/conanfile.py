@@ -63,6 +63,7 @@ class LiquiddspConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["liquid"]
+        self.cpp_info.system_libs = ["m"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.set_property("cmake_file_name", "liquid-static")
         self.cpp_info.set_property("cmake_target_name", "liquid::liquid-static")
