@@ -104,6 +104,11 @@ class OsiConan(ConanFile):
             if os.path.exists(path):
                 self._patch_config_sub(path)
 
+        for script in ("configure", "Osi/configure"):
+            path = os.path.join(self.source_folder, script)
+            if os.path.exists(path):
+                self.run(f"sed -i 's/umask 077 &&/umask 022 \\&\\&/g' '{path}'")
+
     def build(self):
         self._patch_config_scripts()
         autotools = Autotools(self)
