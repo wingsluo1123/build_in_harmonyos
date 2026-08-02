@@ -2,6 +2,7 @@
 """Conan recipe for smpeg2 2.0.0."""
 
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.env import Environment
@@ -79,9 +80,20 @@ class Smpeg2Conan(ConanFile):
         autogen_env.define("AUTOMAKE", os.path.join(automake, "bin", "automake"))
         with autogen_env.vars(self).apply():
             self.run("sh autogen.sh", cwd=self.source_folder, env="conanbuild")
+        self._refresh_gnu_config_scripts(automake)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+
+    def _refresh_gnu_config_scripts(self, automake_folder):
+        automake_config_dir = os.path.join(automake_folder, "share", "automake-1.18")
+        for script in ("config.guess", "config.sub"):
+            source = os.path.join(automake_config_dir, script)
+            if not os.path.isfile(source):
+                raise RuntimeError(f"Missing GNU config helper from automake: {source}")
+            destination = os.path.join(self.source_folder, script)
+            shutil.copy2(source, destination)
+            self.output.info(f"Refreshed {script} from Conan automake package")
 
     def package(self):
         autotools = Autotools(self)

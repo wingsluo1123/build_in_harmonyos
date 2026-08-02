@@ -19,6 +19,11 @@ working pkg-config lookup. The recipe passes `SDL_CONFIG=<sdl2 package
 bin>/sdl2-config` explicitly so the build consumes the Conan-provided SDL2
 dependency instead of relying on a worker-installed SDL2.
 
+The release ships 2009-era GNU `config.guess`/`config.sub` files. On OHOS
+aarch64, `config.guess` reports `cannot guess build type`, so the recipe
+refreshes both scripts from the Conan-provided `automake/1.18` package after
+`autogen.sh` and before `configure`.
+
 The installed public header `smpeg2/smpeg.h` includes `SDL.h`, so downstream
 consumers need the SDL2 include directory while compiling against `smpeg2`.
 The recipe publishes the Conan SDL2 `include/SDL2` directory with the `smpeg2`
@@ -52,3 +57,6 @@ those x86-only assembly files from the portable library source list.
 `audio/hufftable.cpp` used `0-1` as an unsigned sentinel in three Huffman table
 entries. GCC in the C++17 profile treats that list initialization as a narrowing
 error, so the second patch changes those sentinels to the equivalent `~0u`.
+
+The recipe also refreshes GNU config helper scripts from `automake/1.18` during
+build so the Autotools configure step can identify OHOS/aarch64 workers.
