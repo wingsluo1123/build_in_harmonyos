@@ -55,33 +55,32 @@ class GitWhoConan(ConanFile):
         apply_conandata_patches(self)
         # CI worker 无 go 工具链（E154: go 不预装，且 go/1.21.13 制品仓无
         # conanfile 配方不能 requires），通过 cmd-pkgs 预编译包安装
-        go_ok = False
+        # P3: curl|sh 管道加 set -o pipefail 屽蔽 curl 失败
         try:
             self.run(
-                "curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh "
+                "set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh "
                 "| sh -s -- go 1.21.13",
                 cwd=self.source_folder,
             )
-            go_ok = True
         except Exception:
             self.output.warning("go install via cmd-pkgs failed, trying system go")
             # 试系统 go 是否可用
             try:
                 self.run("go version", cwd=self.source_folder)
-                go_ok = True
-            except Exception:
-                self.output.warning("system go also unavailable, skip build (package will use prebuilt binary)")
-        if go_ok:
-            # Build using Go with OHOS arm64 cross-compile env vars (project convention)
-            try:
-                self.run(
-                    "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
-                    "GOPROXY=https://goproxy.cn,direct "
-                    "go build -ldflags=\"-s -w\" -o git-who .",
-                    cwd=self.source_folder,
-                )
             except Exception as e:
-                self.output.warning(f"go build failed: {e}, package will use prebuilt binary")
+                # P2: 显式 raise 而非降级为 warning（aireview: 欺骗性打包，空包风险）
+                raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed): {e}")
+        # P2: go build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+虚假声明）
+        # Build using Go with OHOS arm64 cross-compile env vars (project convention)
+        try:
+            self.run(
+                "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
+                "GOPROXY=https://goproxy.cn,direct "
+                "go build -ldflags=\"-s -w\" -o git-who .",
+                cwd=self.source_folder,
+            )
+        except Exception as e:
+            raise ConanException(f"go build failed: {e}")
 
     def package(self):
         copy(self, "git-who", src=self.source_folder,
