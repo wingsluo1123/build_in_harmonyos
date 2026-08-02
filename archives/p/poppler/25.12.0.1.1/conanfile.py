@@ -55,7 +55,10 @@ class PopplerConan(ConanFile):
 
     def requirements(self):
         self.requires("freetype/2.14.3")
-        self.requires("qt5-qtbase/5.15.2")
+        # 必须用 5.15.2.1：5.15.2 以 -no-feature-xml + -no-widgets 构建，缺 Qt5Xml/Qt5Widgets
+        # 模块，而 poppler-qt5 硬链接 Qt5::Xml 且顶层 CMake 强制要求这两组件 → configure
+        # FATAL_ERROR。qt5-qtbase 5.15.2.1（PR #3804）启用了 Widgets/PrintSupport/Xml。
+        self.requires("qt5-qtbase/5.15.2.1")
         self.requires("zlib/1.3.1.1")
 
     def layout(self):
