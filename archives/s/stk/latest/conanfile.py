@@ -104,3 +104,4 @@ class StkConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["stk"]
         self.cpp_info.includedirs = ["include/stk"]
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
