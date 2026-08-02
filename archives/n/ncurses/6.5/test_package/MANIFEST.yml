@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: ncurses/6.5
+homepage: "https://invisible-island.net/ncurses/"
+
+# ncurses 上游无 make check / 单测；本 test_package 验证静态库与头文件可用
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package：编译并链接 libncursesw.a（newterm/endwin），验证头文件与静态库
+test_package_tests:
+  - file: test_ncurses.c
+    description: "Link test: compile against libncursesw.a with wide-char headers (newterm/endwin)"
+    command: "./test_ncurses"
+  - file: conanfile.py
+    description: "Static archive usable check: test_ncurses binary exists"
+    command: "test -f test_ncurses"
+
+# 测试断言总数
+assertion_count: 1

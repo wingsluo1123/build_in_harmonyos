@@ -76,7 +76,8 @@ class NbsdgamesConan(ConanFile):
         self.run(
             f"make -C {source_dir} "
             f"CC={shlex.quote(make_args['cc'])} "
-            f"CFLAGS+={shlex.quote(make_args['cflags'])} -j1"
+            f"CFLAGS+={shlex.quote(make_args['cflags'])} -j1",
+            env="conanbuild",
         )
 
     def package(self):
@@ -93,9 +94,13 @@ class NbsdgamesConan(ConanFile):
                     f"SCORES_DIR={prefix}/var/games",
                     f"MAN_DIR={prefix}/share/man",
                 ]
-            )
+            ),
+            env="conanbuild",
         )
-        self.run(f"make -C {source_dir} manpages MAN_DIR={prefix}/share/man/man6")
+        self.run(
+            f"make -C {source_dir} manpages MAN_DIR={prefix}/share/man/man6",
+            env="conanbuild",
+        )
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]

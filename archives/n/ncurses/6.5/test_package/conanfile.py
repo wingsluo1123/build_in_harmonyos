@@ -7,7 +7,6 @@ the static archive and headers are usable.
 import os
 
 from conan import ConanFile
-from conan.tools.files import copy
 from conan.tools.layout import basic_layout
 
 
@@ -27,10 +26,24 @@ class NcursesTestConan(ConanFile):
         # `-lncursesw` searches `libncursesw.a`, whereas `-llibncursesw`
         # would search `liblibncursesw.a` (which ncurses never installs).
         src = os.path.join(self.source_folder, "test_ncurses.c")
-        lib = "ncursesw" if self.dependencies["ncurses"].options.widec else "ncurses"
+        pkg = self.dependencies["ncurses"].package_folder
+        lib_name = (
+            "ncursesw" if self.dependencies["ncurses"].options.widec else "ncurses"
+        )
+
+        # R2: 从 conf 获取交叉编译工具链，避免硬编码 clang；-I/-L 使用
+        # 依赖包 package_folder 的绝对路径，而非相对 cwd 的 include/lib。
+        ce = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = ce.get("c", "clang")
+
         self.run(
-            f'clang "{src}" -o test_ncurses -Iinclude -Llib -l{lib} -static',
+            f'{cc} "{src}" -o test_ncurses '
+            f"-I{os.path.join(pkg, 'include')} "
+            f"-L{os.path.join(pkg, 'lib')} -l{lib_name} -static",
             cwd=self.source_folder,
+            env="conanbuild",
         )
 
     def test(self):
