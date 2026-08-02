@@ -8,8 +8,8 @@ Open-source, Google Zanzibar-inspired permissions database.
 
 ## Build notes
 
-- Builds the upstream Go command from `./cmd/spicedb`.
-- Uses a pure Go cross-build path with `CGO_ENABLED=0` and isolated Go caches under the Conan build folder.
+- Packages the upstream linux/arm64 release archive published by AuthZed.
+- Avoids requiring a Go toolchain on the OHOS CI worker, which currently does not provide `go`.
 - Installs the `spicedb` executable to `bin/`.
 
 ## Test notes
