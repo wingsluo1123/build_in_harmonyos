@@ -31,7 +31,7 @@ configure 命令:
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | pthread_cancel 在 musl/OHOS 上不可用 | musl 不支持 pthread_cancel | 在 iftop.c 和 config/pthread.c 中使用 #ifdef __OHOS__ 跳过 cancel，改用标志位+pthread_join |
+| 1 | pthread_cancel 在 musl/OHOS 上不可用 | musl 不支持 pthread_cancel | 在 iftop.c 和 config/pthread.c 中改用 #ifndef HAVE_PTHREAD_CANCEL 跳过 cancel，改用标志位+pthread_join（特性探测，无平台宏） |
 | 2 | config.guess 无法识别 HarmonyOS | config.guess 版本太旧，缺少 HarmonyOS 支持 | 更新 timestamp 并添加 HarmonyOS case 分支，添加 echo 和 exit 0 |
 | 3 | config.sub 不支持 linux-ohos | config.sub 缺少 ohos 支持 | 在 case 分支中添加 linux-ohos* 和 -linux-ohos* |
 | 4 | 编译时全局变量重复定义 | ui_common.h 中直接定义全局变量 | 将 ui_common.h 中的变量定义改为 extern 声明，在 ui_common.c 中定义 |
