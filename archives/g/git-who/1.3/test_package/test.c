@@ -2,7 +2,6 @@
  * 验证 git-who 二进制已安装并可执行 --help */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 int main(void) {
     /* git-who 已通过 conanrun 环境暴露在 PATH 中 */
