@@ -132,7 +132,32 @@ class SpicedbConan(ConanFile):
             os.makedirs(tools_dir, exist_ok=True)
             download(self, package["url"], archive, sha256=package["sha256"])
             self.run(f'tar xzf "{archive}" -C "{tools_dir}"')
+        self._ensure_go_toolchain_permissions(go_root)
         return go
+
+    def _ensure_go_toolchain_permissions(self, go_root):
+        executable_roots = [
+            os.path.join(go_root, "bin"),
+            os.path.join(go_root, "pkg", "tool"),
+        ]
+        for root in executable_roots:
+            if not os.path.isdir(root):
+                continue
+            for dirpath, _, filenames in os.walk(root):
+                self._chmod_read_exec(dirpath, is_dir=True)
+                for filename in filenames:
+                    self._chmod_read_exec(os.path.join(dirpath, filename))
+
+    def _chmod_read_exec(self, path, is_dir=False):
+        mode = os.stat(path).st_mode
+        read_exec = (
+            stat.S_IRUSR | stat.S_IXUSR |
+            stat.S_IRGRP | stat.S_IXGRP |
+            stat.S_IROTH | stat.S_IXOTH
+        )
+        if is_dir:
+            mode |= stat.S_IWUSR
+        os.chmod(path, mode | read_exec)
 
     def _host_goarch(self):
         machine = platform.machine().lower()

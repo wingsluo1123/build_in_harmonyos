@@ -4,7 +4,7 @@ status: pending
 build_date: "2026-08-02"
 build_system: go
 conan_ref: "spicedb/1.56.0"
-status_notes: "Builds the upstream Go command from source; bootstraps the pinned Go toolchain from a mirror when the CI worker has no system Go."
+status_notes: "Builds the upstream Go command from source; bootstraps the pinned Go toolchain from a mirror when the CI worker has no system Go; CI #12425 chmod fix restores executable bits after extraction."
 
 source:
   url: "https://github.com/authzed/spicedb/archive/refs/tags/v1.56.0.tar.gz"
@@ -20,6 +20,7 @@ build:
     - "Use GOROOT/PATH from the discovered or bootstrapped Go toolchain"
     - "GOTOOLCHAIN=local"
     - "GOPROXY=https://goproxy.cn,direct by default"
+    - "chmod-normalize fallback Go bin/pkg/tool executables before go build"
   dependencies: []
   cc: N/A
   cxx: N/A
@@ -30,6 +31,7 @@ knowledge_gained:
   - "spicedb is distributed as a Go CLI/server command rooted at ./cmd/spicedb."
   - "The Homebrew formula injects version metadata through github.com/jzelinskie/cobrautil/v2.Version; this recipe keeps the same version flag path."
   - "The OHOS CI worker may not provide Go, so the recipe falls back to a pinned Go toolchain archive from mirrors.aliyun.com."
+  - "OHOS/HMDFS workers can unpack the fallback Go toolchain without executable bits, so the recipe restores them before running go."
   - "The packaged command can be smoke-tested without starting a long-running server."
 
 validation:
