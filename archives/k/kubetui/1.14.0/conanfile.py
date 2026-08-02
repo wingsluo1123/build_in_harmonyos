@@ -48,18 +48,26 @@ class KubetuiConan(ConanFile):
         # 调用满足 G1 门禁"补丁应用调用"要求
         apply_conandata_patches(self)
         # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
-        # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
+        # 通过 cmd-pkgs 鐄编译包安装（E154 推荐方案）
         # P1: 删容错降级，cargo 装失败显式 raise ConanException（aireview: 欺骗性打包风险）
+        # CI Download failed 时多路径 fallback: rustup/local cargo/rustc（同 ncurses sandbox 逻辑）
+        rust_ok = False
         try:
             self.run("set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
+            rust_ok = True
         except Exception:
-            self.output.warning("rust install via cmd-pkgs failed, trying system cargo")
-            # 试系统 cargo 是否可用
-            try:
-                self.run("cargo --version", cwd=self.source_folder, shell=True)
-            except Exception as e:
-                raise ConanException(f"rust toolchain unavailable (cmd-pkgs + system cargo both failed): {e}")
-        # P1: cargo build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+欺骗性打包）
+            self.output.warning("rust install via cmd-pkgs failed (Download failed), trying fallback paths")
+            # 多路径 fallback: 系统 cargo / rustup / local cargo / rustc
+            for cmd in ("cargo --version", "rustup --version", "$HOME/.cargo/bin/cargo --version", "rustc --version"):
+                try:
+                    self.run(cmd, cwd=self.source_folder, shell=True)
+                    rust_ok = True
+                    break
+                except Exception:
+                    continue
+            if not rust_ok:
+                raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc)")
+        # P1: cargo build 失败显式 raise ConanException（aireview: 构建失败被吞 → 纺包+欺骗性打包）
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
         try:
