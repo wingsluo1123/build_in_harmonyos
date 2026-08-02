@@ -1,7 +1,7 @@
 diff -ruN a/libusb/os/linux_netlink.c b/libusb/os/linux_netlink.c
 --- a/libusb/os/linux_netlink.c
 +++ b/libusb/os/linux_netlink.c
-@@ -28,21 +28,28 @@
+@@ -28,21 +28,34 @@
  #include <fcntl.h>
  #include <poll.h>
  #include <pthread.h>
@@ -13,13 +13,19 @@ diff -ruN a/libusb/os/linux_netlink.c b/libusb/os/linux_netlink.c
  #endif
  #include <sys/socket.h>
 +
-+#ifdef __OHOS__
-+#define sockaddr_storage __linux_sockaddr_storage
-+#endif
++/*
++ * <linux/netlink.h> pulls in the UAPI header <linux/socket.h>.  On C libraries
++ * that do not ship <linux/libc-compat.h> that header declares a second
++ * "struct sockaddr_storage", clashing with the definition <sys/socket.h>
++ * already provided above.  Rename the kernel variant for the duration of the
++ * include so that the libc definition stays authoritative.  This file only
++ * needs "struct sockaddr_nl" from the UAPI header, so the rename is a no-op
++ * for the code below.  The guard is unconditional on purpose: it behaves
++ * identically on every platform and involves no conditional compilation.
++ */
++#define sockaddr_storage __libusb_uapi_sockaddr_storage
  #include <linux/netlink.h>
-+#ifdef __OHOS__
 +#undef sockaddr_storage
-+#endif
  
  #define NL_GROUP_KERNEL 1
  

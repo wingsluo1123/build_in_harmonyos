@@ -56,11 +56,16 @@
 **遗留问题**: 无
 
 ## 四、源码修改清单
+
+> 按项目规则 R8，补丁一律不得引入平台条件编译宏，只能使用运行时检测或
+> 跨平台等价的无条件写法。下表方式列已按此原则重写。
+
 | 文件 | 原因 | 方式 | 补丁 |
 |------|------|------|------|
-| libusb/os/linux_netlink.c | E091: sockaddr_storage 重定义 | #ifdef __OHOS__ define-guard | 0003-libusb-os-linux_netlink.c.patch |
-| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | #ifdef __OHOS__ 检测 HongMeng 内核格式 | 0004-libusb-os-linux_usbfs.c.patch |
-| configure | HMDFS umask 077 目录权限问题 | sed umask 077→022 | 0001-configure.patch |
+| libusb/os/linux_netlink.c | E091: sockaddr_storage 在 UAPI 头与 libc 头之间重定义 | 无条件 rename-guard：包含 `<linux/netlink.h>` 期间把 `sockaddr_storage` 临时改名，随后 `#undef` 撤销；本文件只用 `struct sockaddr_nl`，全平台行为一致 | 0002-libusb-os-linux_netlink.c.patch |
+| libusb/os/linux_usbfs.c | 鸿蒙内核版本解析失败（get_kernel_version） | 运行时 `strstr(uts.release, "HongMeng")` 检测，非鸿蒙平台走上游原逻辑 | 0003-libusb-os-linux_usbfs.c.patch |
+| configure | HMDFS umask 077 目录权限问题（E112） | config.status 临时目录 umask 077→022，全平台等价且安全 | 0004-configure-umask.patch |
+| config.guess / config.sub | 需识别 `aarch64-linux-ohos` triplet | 刷新至上游 GNU 2025-07-10 版本 | 0001-config.guess.patch / 0002-config.sub.patch |
 
 ## 五、预编译包交付物
 | 文件 | 大小 | 说明 |
@@ -72,7 +77,7 @@
 - **产物**: libusb-1.0.so.0.4.0（141KB 共享库）、libusb-1.0.a（235KB 静态库）、libusb.h（82KB 头文件）
 - **依赖**: 仅 libc.so（系统库）
 - **SONAME**: libusb-1.0.so.0
-- **E091 修复**: define-guard 方案（#define sockaddr_storage __linux_sockaddr_storage 包裹 linux/netlink.h）
+- **E091 修复**: 无条件 rename-guard（包含 linux/netlink.h 期间把 sockaddr_storage 临时改名，之后 #undef 撤销）
 - **内核版本修复**: get_kernel_version() 增加 HongMeng/OHOS 内核格式检测
 - **平台适配**: --disable-udev（鸿蒙无 udev 守护进程）
 
@@ -90,7 +95,7 @@
 
 **P1: 鸿蒙内核版本解析失败（已修复）** 🔴
 - 问题: `get_kernel_version()` 无法解析 `HongMeng Kernel 1.12.0` 格式
-- 修复: 在 `linux_usbfs.c` 中增加 `__OHOS__` 守卫，检测到 HongMeng 内核时报告现代 Linux 版本
+- 修复: 在 `linux_usbfs.c` 中用运行时 `strstr(uts.release, "HongMeng")` 检测，命中时报告兼容的 5.10.0 版本；非鸿蒙平台保持上游原逻辑（符合 R8，无编译期平台分支）
 - 状态: ✅ 已修复
 
 **P2: sysfs USB 设备访问被拒绝（平台限制）** 🟡

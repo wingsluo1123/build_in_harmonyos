@@ -29,26 +29,46 @@ patches_applied:
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/libusb-1.0.27.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/libusb-1.0.27.work
-  source_orig_hash: 3a7f6a7699d37495
-  source_work_hash: 4baa68b0129741b6
-  generated_at: '2026-06-24T14:59:51'
-  patches_count: 3
+  # 补丁直接针对上游 release tarball（sha256 见 source 段）生成，
+  # 不经过 autoreconf，因此行号与发布包完全一致。
+  source_reference: "upstream release tarball libusb-1.0.27.tar.bz2"
+  generated_at: '2026-08-02T22:10:00'
+  patches_count: 5
 
+# 与 patches_applied 一一对应。guard 说明补丁如何做平台适配：
+# 按项目规则 R8，补丁不得引入任何平台条件编译宏，
+# 只能使用运行时检测，或无条件且跨平台等价的写法。
 patch_classification:
-  - file: 0001-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+  - file: 0001-config.guess.patch
+    type: build-aux-refresh
+    platform_only: false
+    guard: none
+    note: "刷新 config.guess 至 2025-07-10（上游 GNU 版本），无平台分支"
+  - file: 0002-config.sub.patch
+    type: build-aux-refresh
+    platform_only: false
+    guard: none
+    note: "刷新 config.sub 至 2025-07-10，使其接受 linux-ohos triplet"
+  - file: 0004-configure-umask.patch
+    type: bugfix
+    platform_only: false
+    guard: none
+    note: "config.status 临时目录 umask 077 -> 022，所有平台等价且安全"
   - file: 0002-libusb-os-linux_netlink.c.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: portability
+    platform_only: false
+    guard: unconditional-rename
+    note: >
+      包含 <linux/netlink.h> 期间无条件把 UAPI 的 sockaddr_storage 临时改名，
+      随后 #undef 撤销。本文件只使用 struct sockaddr_nl，改名对代码无影响，
+      在所有平台行为一致，不含平台条件编译宏。
   - file: 0003-libusb-os-linux_usbfs.c.patch
-    type: auto
-    platform_only: True
-    guard: __OHOS__
+    type: portability
+    platform_only: false
+    guard: runtime-detection
+    note: >
+      通过 strstr(uts.release, "HongMeng") 运行时判断内核标识，
+      非鸿蒙平台走原有解析逻辑，无编译期平台分支。
 
 functional_testing:
   date: "2026-06-24"
@@ -73,8 +93,14 @@ platform_notes:
 
 knowledge_gained:
   - id: E091
-    description: "sockaddr_storage 重定义冲突（linux/socket.h vs sys/socket.h）"
+    description: "sockaddr_storage 重定义冲突（linux/socket.h UAPI vs sys/socket.h libc）"
+    fix: >
+      包含 <linux/netlink.h> 期间无条件将 sockaddr_storage 临时改名，
+      include 结束后 #undef 撤销；不使用平台条件编译宏（符合 R8）。
   - id: E112
-    description: "HMDFS umask 077 导致临时目录权限异常"
+    description: "HMDFS umask 077 导致 config.status 临时目录权限异常"
+    fix: "补丁把 configure 生成的 config.status 中 umask 077 改为 022"
   - description: "HongMeng 内核版本格式 'HongMeng Kernel X.Y.Z' 无法被 libusb get_kernel_version() 解析"
-    fix: "#ifdef __OHOS__ 检测 HongMeng 关键字，报告现代 Linux 内核版本"
+    fix: >
+      运行时 strstr(uts.release, "HongMeng") 检测后回报兼容的 5.10.0 版本号；
+      非鸿蒙平台保持上游原逻辑，不使用平台条件编译宏（符合 R8）。
