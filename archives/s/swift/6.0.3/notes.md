@@ -129,6 +129,56 @@ set:
 - Added the software-level `archives/s/swift/commands.json` metadata.
 - Replaced the mutable OHOS LLVM branch tarball source entry with a pinned
   commit reference for `2026_0313_llvm15_release`.
+- Initialized the IR handoff wrapper cleanup pointer before all `goto cleanup`
+  paths, and made the non-intercept pass-through path use `execvp` when the
+  selected real tool has no slash.
+- Enabled `pipefail` in `assemble-stage-ohos.sh` when the device shell supports
+  it.
+- Tightened stage assembly and `test_package` after true-device smoke testing:
+  the packaged stage now requires `swift-frontend` and
+  `swift-autolink-extract`, and the smoke compile runs with a writable
+  `TMPDIR` plus `SDKROOT`/`OHOS_SYSROOT`/`OHOS_SDKROOT` when a sysroot is
+  detectable.
+
+## True-device Stage Smoke, 2026-08-03
+
+On the shared HarmonyOS true device, `assemble-stage-ohos.sh` produced:
+
+```text
+/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/swift-ohos-stage-20260803-070326
+```
+
+The stage contains `swift`, `swiftc`, `swift-frontend`,
+`swift-autolink-extract`, `swift-build`, `swift-package`, and
+`swift-serialize-diagnostics`, plus SwiftPM runtime libraries and a minimal
+`libtinfo.so.6` compatibility shim. Version smoke passed for the four public
+entrypoints. A direct `hello.swift` compile and run passed with:
+
+```sh
+export TMPDIR=$RUN/tmp
+export SDKROOT=/storage/Users/currentUser/usr/local/sysroot
+export OHOS_SYSROOT=$SDKROOT
+export OHOS_SDKROOT=$SDKROOT
+export PATH=$STAGE/bin:/storage/Users/currentUser/validation/toolchain-bin:/storage/Users/currentUser/usr/local/bin:$PATH
+export LD_LIBRARY_PATH=$STAGE/lib:$STAGE/lib/swift/ohos:$LD_LIBRARY_PATH
+swiftc hello.swift -o hello
+./hello
+```
+
+`llvm-objdump -p` shows the staged public binaries depend on OHOS `libc.so`
+and staged Swift/SwiftPM `.so` files; their current `RUNPATH` still includes
+source-bootstrap absolute build paths. Conan run environments add package
+`lib/` and `lib/swift/ohos` to `LD_LIBRARY_PATH`, but RUNPATH relocation is
+still a follow-up automation item.
+
+Conan packaging validation then passed on the same true device:
+
+```text
+notest log: /storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/logs/conan-create-swift-notest-20260803-070911.log
+full log:   /storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/logs/conan-create-swift-full-20260803-071356.log
+package:    swift/6.0.3#f3b22d7d2d7865a8012161b9191dfb22:876049f3ae10a4560da345bb02378e03e212bc8c#d531c6f21316ff8eb61024b2f5dd4d92
+test:       swift-ohos-smoke
+```
 
 ## Next Steps
 
@@ -157,6 +207,9 @@ Then continue with a low-concurrency staged packaging validation:
 export SWIFT_OHOS_BOOTSTRAP_ROOT=$HOME/swift-mainline-ohos-src
 export SWIFT_OHOS_STAGE_OUT=$SWIFT_OHOS_BOOTSTRAP_ROOT/swift-ohos-stage-$(date +%Y%m%d-%H%M%S)
 export TMPDIR=$SWIFT_OHOS_BOOTSTRAP_ROOT/tmp
+export SDKROOT=/storage/Users/currentUser/usr/local/sysroot
+export OHOS_SYSROOT=$SDKROOT
+export OHOS_SDKROOT=$SDKROOT
 # Set SWIFT_OHOS_SIGN=1 only when the bootstrap outputs still need signing.
 sh archives/s/swift/6.0.3/scripts/assemble-stage-ohos.sh
 

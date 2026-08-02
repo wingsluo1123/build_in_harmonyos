@@ -2,9 +2,11 @@
 
 `assemble-stage-ohos.sh` assembles a package-ready Swift OHOS stage from a
 completed source-bootstrap workspace. It copies a real `bin/` toolchain,
-`lib/swift`, and optional runtime `.so` inputs into a fresh stage directory,
-optionally signs ELF files, and writes `STAGE-MANIFEST.txt` for review. The
-script is driven by environment variables such as `SWIFT_OHOS_BOOTSTRAP_ROOT`,
+including the `swift-frontend` and `swift-autolink-extract` helpers needed for
+real compilation, `lib/swift`, and optional runtime `.so` inputs into a fresh
+stage directory. It optionally signs ELF files and writes `STAGE-MANIFEST.txt`
+for review. The script is driven by environment variables such as
+`SWIFT_OHOS_BOOTSTRAP_ROOT`,
 `SWIFT_OHOS_BIN_DIR`, `SWIFT_OHOS_SWIFTPM_BIN_DIR`,
 `SWIFT_OHOS_SWIFTPM_LIB_DIR`, `SWIFT_OHOS_SWIFT_DRIVER_LIB_DIR`,
 `SWIFT_OHOS_LIB_SWIFT_DIR`, `SWIFT_OHOS_RUNTIME_DIRS`, and

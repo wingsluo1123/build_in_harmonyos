@@ -192,7 +192,8 @@ int main(int argc, char **argv) {
   const char *real = select_real(argv, &allocated_real);
   const char *out = NULL;
   if (!should_intercept(argc, argv, &out)) {
-    execv(real, argv);
+    if (strchr(real, '/')) execv(real, argv);
+    else execvp(real, argv);
     fprintf(stderr, "[ohos-irhandoff] exec pass-through failed for %s: %s\n", real, strerror(errno));
     free(allocated_real);
     return 127;
@@ -227,6 +228,7 @@ int main(int argc, char **argv) {
   char *ir = make_temp_path(out, "ll");
   char *stripped = make_temp_path(out, "strip.ll");
   int rc = 127;
+  char **irargs = NULL;
   if (!ir || !stripped || !resource_dir || !arch_dir) goto cleanup;
 
   int extra = 2; /* -I arch_dir */
@@ -237,7 +239,7 @@ int main(int argc, char **argv) {
   if (need_resource) extra += 2;
   if (need_modulemap) extra += 2;
 
-  char **irargs = (char **)calloc((size_t)argc + (size_t)extra + 1, sizeof(char *));
+  irargs = (char **)calloc((size_t)argc + (size_t)extra + 1, sizeof(char *));
   if (!irargs) goto cleanup;
   int j = 0;
   irargs[j++] = argv[0];

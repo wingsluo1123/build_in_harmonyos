@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 set -eu
+if (set -o pipefail) 2>/dev/null; then
+  set -o pipefail
+fi
 
 # Assemble a reviewable Swift OHOS stage from a completed source-bootstrap
 # workspace. The script avoids probe-machine absolute paths by accepting all
@@ -223,8 +226,12 @@ if [ -z "$swiftpm_bin_src" ]; then
 fi
 [ -n "$swiftpm_bin_src" ] || die "unable to locate SwiftPM bin directory; set SWIFT_OHOS_SWIFTPM_BIN_DIR"
 
-for tool in swift swiftc; do
+for tool in swift swiftc swift-frontend swift-autolink-extract; do
   copy_file_flattened "$bin_src/$tool" "$tmp/bin/$tool"
+done
+
+for tool in swift-serialize-diagnostics; do
+  [ -e "$bin_src/$tool" ] && copy_file_flattened "$bin_src/$tool" "$tmp/bin/$tool"
 done
 
 if [ "${SWIFT_OHOS_INCLUDE_DRIVER_NEW:-0}" = "1" ] && [ -e "$bin_src/swift-driver-new" ]; then
@@ -277,7 +284,14 @@ fi
 
 build_tinfo_shim_if_needed
 
-for required in bin/swift bin/swiftc bin/swift-build bin/swift-package lib/swift; do
+for required in \
+  bin/swift \
+  bin/swiftc \
+  bin/swift-frontend \
+  bin/swift-autolink-extract \
+  bin/swift-build \
+  bin/swift-package \
+  lib/swift; do
   [ -e "$tmp/$required" ] || die "assembled stage is missing $required"
 done
 

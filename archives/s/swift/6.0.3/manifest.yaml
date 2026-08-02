@@ -32,13 +32,18 @@ test_results:
     - "$BASE/logs/conan-create-unxip-swiftpm-irhandoff-20260803-004816.out"
     - "$BASE/logs/conan-test-unxip-swiftpm-irhandoff-20260803-0104-test.out"
     - "$BASE/logs/conan-create-unxip-swiftpm-irhandoff-20260803-0105-full-create.out"
+    - "/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/logs/conan-create-swift-notest-20260803-070911.log"
+    - "/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/logs/conan-create-swift-full-20260803-071356.log"
 
 quality_gates:
   official_linux_toolchain_probe: "blocked on glibc PT_INTERP and OHOS loader/runtime mismatch"
   swiftly_probe: "installer starts after signing but installs the same glibc-targeted toolchain unless a true OHOS host toolchain is provided"
   ohos_source_build: "swift/swiftc/swift-frontend and SwiftPM entrypoints built and ran on true device"
   downstream_validation: "unxip/3.3 SwiftPM release build completed under Conan; test_package returned TEST_RC=0"
+  toolchain_package_validation: "swift/6.0.3 Conan create -tf empty and full test_package passed; test_package printed swift-ohos-smoke"
 
 known_issues:
   - "Current successful path still depends on experimental IR handoff wrapper, runtime staging, SDK/resource-dir propagation, modulewrap handling, and signing."
   - "The Conan recipe currently packages a staged OHOS Swift toolchain supplied by SWIFT_OHOS_STAGED_ROOT or SWIFT_OHOS_STAGED_TARBALL; full source bootstrap automation is still tracked as follow-up work."
+  - "Compilation consumers need a writable TMPDIR and an OHOS sysroot exposed through SDKROOT/OHOS_SYSROOT/OHOS_SDKROOT; test_package now supplies these when detectable."
+  - "Staged SwiftPM binaries still carry source-bootstrap absolute RUNPATH entries; Conan runenv LD_LIBRARY_PATH covers this for validation, while RUNPATH relocation remains follow-up work."

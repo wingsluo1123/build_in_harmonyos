@@ -91,6 +91,8 @@ class SwiftConan(ConanFile):
         required = [
             os.path.join("bin", "swift"),
             os.path.join("bin", "swiftc"),
+            os.path.join("bin", "swift-frontend"),
+            os.path.join("bin", "swift-autolink-extract"),
             os.path.join("bin", "swift-build"),
             os.path.join("bin", "swift-package"),
             os.path.join("lib", "swift"),
