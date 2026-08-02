@@ -6,23 +6,44 @@
 package: libusb/1.0.27
 homepage: "https://libusb.info/"
 
-# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# 上游测试命令
 upstream_check_command: "make check"
 
 # conanfile.py build() 方法中是否已集成上游测试
 upstream_test_in_build: false
 upstream_test_command: ""
 
-# 上游实际运行的测试程序
+# 上游 tests/ 目录下的测试程序。
+# 本配方以 --disable-tests-build 构建：libusb 的 stress/umockdev 测试需要
+# umockdev 与可用的 USB 设备节点，二者在 HarmonyOS 沙箱中均不可用
+# (sysfs 不可访问, SELinux errno=13)，因此不纳入构建。
 upstream_tests:
-  - name: unit-tests
-    description: "libusb 上游自带单元测试 (tests/ 目录, make check 运行)"
+  - name: stress
+    file: tests/stress.c
+    status: skipped
+    reason: "需要真实 USB 设备枚举，HarmonyOS 沙箱下 sysfs 不可访问"
+  - name: stress_mt
+    file: tests/stress_mt.c
+    status: skipped
+    reason: "多线程设备枚举压力测试，同样依赖设备发现"
+  - name: umockdev
+    file: tests/umockdev.c
+    status: skipped
+    reason: "依赖 umockdev 框架，HarmonyOS 无此依赖"
+  - name: set_option
+    file: tests/set_option.c
+    status: skipped
+    reason: "依赖 tests/testlib 与 --enable-tests-build"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test_package.c
-    description: "编译 C 消费者链接 libusb-1.0 并调用 libusb_get_version() 验证库可用"
-    command: "cmake --build . --target test_package && ./test_package"
+    description: >
+      消费者测试：验证 libusb_get_version() 版本号、libusb_error_name() 错误名表、
+      libusb_strerror() 错误描述、以及 HarmonyOS 支持的初始化路径
+      libusb_init_context() + LIBUSB_OPTION_NO_DEVICE_DISCOVERY；
+      设备枚举结果仅作信息输出（平台沙箱限制，不作断言）。
+    command: "./test_package"
 
-# 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 3
+# 测试断言总数
+assertion_count: 5

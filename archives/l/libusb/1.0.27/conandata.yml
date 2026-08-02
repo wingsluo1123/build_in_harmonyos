@@ -1,20 +1,31 @@
 # conandata.yml — libusb 1.0.27
-# Source: official GitHub release archive (v1.0.27 tag)
-# Homepage: https://libusb.info/
-# GitHub: https://github.com/libusb/libusb
+#
+# Source is the upstream *release* tarball (it already contains `configure`,
+# `config.guess` and `config.sub`, so no autoreconf step is needed).
+#
+# NOTE on patches: the legacy `0001-configure.patch` in patches/ was generated
+# against an autoreconf-regenerated `configure` from a git archive and does NOT
+# apply to the release tarball (hunk offset mismatch). It is intentionally not
+# listed here; `0004-configure-umask.patch` performs the same umask 077 -> 022
+# fix and is generated against the release tarball.
 
 sources:
-  url: "https://github.com/libusb/libusb/archive/refs/tags/v1.0.27.tar.gz"
-  sha256: "e8f18a7a36ecbb11fb820bd71540350d8f61bcd9db0d2e8c18a6fb80b214a3de"
+  url: "https://github.com/libusb/libusb/releases/download/v1.0.27/libusb-1.0.27.tar.bz2"
+  sha256: "ffaa41d741a8a3bee244ac8e54a72ea05bf2879663c098c82fc5757853441575"
 
 patches:
-  "1.0.27":
-    - patch_file: "patches/0001-configure.patch"
-      patch_description: "use HMDFS-compatible umask for configure temp files"
-      patch_type: "portability"
-    - patch_file: "patches/0002-libusb-os-linux_netlink.c.patch"
-      patch_description: "avoid sockaddr_storage redefinition conflict on OHOS"
-      patch_type: "portability"
-    - patch_file: "patches/0003-libusb-os-linux_usbfs.c.patch"
-      patch_description: "parse HongMeng kernel version format in usbfs"
-      patch_type: "portability"
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "Refresh config.guess (2025-07-10) so HarmonyOS/OHOS is recognised"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "Refresh config.sub (2025-07-10) to accept the ohos-linux triplet"
+    patch_type: "portability"
+  - patch_file: "patches/0004-configure-umask.patch"
+    patch_description: "Relax config.status temp dir umask 077 -> 022 for HMDFS (E112)"
+    patch_type: "bugfix"
+  - patch_file: "patches/0002-libusb-os-linux_netlink.c.patch"
+    patch_description: "Avoid sockaddr_storage redefinition between linux/socket.h and sys/socket.h (E091)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-libusb-os-linux_usbfs.c.patch"
+    patch_description: "Parse 'HongMeng Kernel X.Y.Z' uname release and report a modern Linux version"
+    patch_type: "portability"

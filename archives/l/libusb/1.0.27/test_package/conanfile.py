@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Conan test_package for libusb 1.0.27 — verify the installed library.
+"""Conan test_package for libusb 1.0.27 — L1 official test.
 
-L1 smoke test: builds a small C consumer that links against the packaged
-libusb-1.0 and calls libusb_get_version() to verify the library is
-linkable and callable on OHOS.
+Builds a small C consumer that links against the packaged libusb-1.0 and
+exercises the version / error-string APIs plus the OHOS-supported
+initialisation path.
+
+File location: archives/l/libusb/1.0.27/test_package/conanfile.py
 """
 import os
 
 from conan import ConanFile
-from conan.tools.build import can_run
-from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class LibusbTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -28,6 +29,9 @@ class LibusbTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        if can_run(self):
-            executable = os.path.join(self.cpp.build.bindirs[0], "test_package")
-            self.run(executable, env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
+        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries directly,
+        # so wrap the invocation in bash.
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} -c './test_package'", env="conanrun")
