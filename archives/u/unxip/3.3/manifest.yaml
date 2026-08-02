@@ -1,0 +1,37 @@
+software: unxip
+version: "3.3"
+status: success
+build_system: swiftpm
+compile_date: 2026-08-03
+dependencies:
+  required:
+    - libxml2/2.15.3
+    - xz/5.6.2
+    - zlib-ng-compat/2.3.3
+  optional: []
+patches_applied:
+  - "Materialize Sources/libunxip/libunxip.swift when OHOS extraction does not preserve the upstream symlink."
+  - "Use include_next in getopt/zlib/lzma shim headers during recipe source preparation."
+  - "Pass package shim and dependency include paths through Swift ClangImporter flags."
+  - "Patch Swift 6 actor-local continuation calls with isolation: self."
+  - "For OHOS SwiftPM builds, use the OHOS Swift triple, disable index-store, cap SwiftPM jobs, and avoid Linux-only static Swift stdlib/linker flags."
+test_results:
+  type: manual
+  total: 6
+  passed: 5
+  failed: 1
+  details:
+    - "True-device CI reached conan create and failed before build because no published Swift 6 toolchain was on PATH."
+    - "Direct optimized Swift 6 IR-handoff unxip binary built and ran unxip --help with HELP_RUN_RC=0."
+    - "SwiftPM release unxip build completed through the experimental IR-handoff path and ran unxip --help with HELP_RC=0."
+    - "True-device Conan create built unxip/3.3 from source through SwiftPM release, created package revision e6fb8470213a704b353d7c0a80add145, and packaged bin/unxip."
+    - "Standalone conan test passed on the created package and printed unxip 3.3 with TEST_RC=0."
+    - "Cached full conan create rerun completed end to end with CREATE_RC=0 and test_package output unxip 3.3."
+knowledge_ref:
+  - E232-draft-unxip-swift-toolchain-ohos
+  - reports/swift-mainline-ohos.md
+known_issues:
+  - "Swift 6 toolchain is required by Package.swift and is still not available as a published ohpcd Conan toolchain dependency."
+  - "Official Swift 6.0.3 Ubuntu 22.04 aarch64 binaries request /lib/ld-linux-aarch64.so.1 and Linux/glibc runtime libraries; a minimal user-space glibc bundle can start the signed loader, but loader-mediated execution still fails with failed to map segment from shared object."
+  - "unxip/3.3 now builds and passes test_package on the true device with the experimental OHOS-native Swift 6.0.3 toolchain path; clean CI still requires formalized/published Swift toolchain integration instead of probe wrappers and staged runtime paths."
+  - "Full upstream runtime test uses a large encrypted Xcode .xip fixture and is not suitable for local preflight."
