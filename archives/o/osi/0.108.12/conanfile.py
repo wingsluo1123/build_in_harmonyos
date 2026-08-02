@@ -66,6 +66,26 @@ class OsiConan(ConanFile):
         ])
         tc.generate()
 
+    def _patch_config_sub(self, path):
+        contents = load(self, path)
+        marker = "# Conan OHOS config.sub hook"
+        if marker in contents:
+            return
+
+        hook = (
+            "\n"
+            f"{marker}\n"
+            "case \"$1\" in\n"
+            "    *-linux-ohos)\n"
+            "        echo \"${1%-linux-ohos}-linux-musl\"\n"
+            "        exit ;;\n"
+            "esac\n\n"
+        )
+        lines = contents.splitlines(keepends=True)
+        insert_at = 1 if lines and lines[0].startswith("#!") else 0
+        lines.insert(insert_at, hook)
+        save(self, path, "".join(lines))
+
     def _patch_config_scripts(self):
         for script in ("config.guess", "Osi/config.guess"):
             path = os.path.join(self.source_folder, script)
@@ -81,56 +101,8 @@ class OsiConan(ConanFile):
 
         for script in ("config.sub", "Osi/config.sub"):
             path = os.path.join(self.source_folder, script)
-            if not os.path.exists(path):
-                continue
-
-            contents = load(self, path)
-            if "linux-ohos" in contents:
-                continue
-
-            original_contents = contents
-            replacements = (
-                (
-                    "linux-musl* | linux-uclibc*",
-                    "linux-musl* | linux-ohos* | linux-uclibc*",
-                ),
-                (
-                    "linux-gnu* | linux-dietlibc | linux-uclibc*",
-                    "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
-                ),
-                (
-                    "linux-gnu* | linux-dietlibc* | linux-uclibc*",
-                    "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-uclibc*",
-                ),
-                (
-                    "-linux-musl* | -linux-uclibc*",
-                    "-linux-musl* | -linux-ohos* | -linux-uclibc*",
-                ),
-                (
-                    "-linux-gnu* | -linux-uclibc*",
-                    "-linux-gnu* | -linux-ohos* | -linux-uclibc*",
-                ),
-                (
-                    "-linux-gnu* | -linux-dietlibc* | -linux-uclibc*",
-                    "-linux-gnu* | -linux-ohos* | -linux-dietlibc* | -linux-uclibc*",
-                ),
-            )
-            for old, new in replacements:
-                if old in contents:
-                    contents = contents.replace(old, new, 1)
-
-            linux_case = "\t-linux*)\n\t\tos="
-            if "-linux-ohos*)" not in contents and linux_case in contents:
-                contents = contents.replace(
-                    linux_case,
-                    "\t-linux-ohos*)\n\t\t;;\n" + linux_case,
-                    1,
-                )
-
-            if contents == original_contents:
-                self.output.warning(f"Could not patch OHOS support into {path}")
-            else:
-                save(self, path, contents)
+            if os.path.exists(path):
+                self._patch_config_sub(path)
 
     def build(self):
         self._patch_config_scripts()
