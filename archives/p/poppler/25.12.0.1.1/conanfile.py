@@ -226,8 +226,13 @@ class PopplerConan(ConanFile):
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
 
     def package_info(self):
-        self.cpp_info.libs = ["poppler-cpp", "poppler"]   # 上层在前：poppler-cpp 依赖 poppler
-        self.cpp_info.includedirs = ["include", "include/poppler"]
+        # 链接顺序：上层在前。ENABLE_QT5=ON 时多产出一个 libpoppler-qt5.so
+        # （依赖 poppler-cpp），须排在 poppler-cpp 之前，否则消费方链接报未定义符号。
+        # 修复 AI 审查 F3：原先只暴露 poppler-cpp/poppler，消费方拿不到 Qt5 绑定。
+        self.cpp_info.libs = ["poppler-qt5", "poppler-cpp", "poppler"]
+        # Qt5 绑定头文件装在 include/poppler/qt5（qt5/src/CMakeLists 的 install DESTINATION）；
+        # 不暴露它，消费方 #include <poppler-qt5.h> 直接找不到头。
+        self.cpp_info.includedirs = ["include", "include/poppler", "include/poppler/qt5"]
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("pkg_config_name", "poppler")
         if self.settings.os in ("Linux", "OHOS"):
