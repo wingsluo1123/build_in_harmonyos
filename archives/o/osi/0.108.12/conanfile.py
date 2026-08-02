@@ -5,7 +5,15 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import collect_libs, copy, get, load, save
+from conan.tools.files import (
+    apply_conandata_patches,
+    collect_libs,
+    copy,
+    export_conandata_patches,
+    get,
+    load,
+    save,
+)
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -40,6 +48,9 @@ class OsiConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def generate(self):
         AutotoolsDeps(self).generate()
@@ -104,12 +115,8 @@ class OsiConan(ConanFile):
             if os.path.exists(path):
                 self._patch_config_sub(path)
 
-        for script in ("configure", "Osi/configure"):
-            path = os.path.join(self.source_folder, script)
-            if os.path.exists(path):
-                self.run(f"sed -i 's/umask 077 &&/umask 022 \\&\\&/g' '{path}'")
-
     def build(self):
+        apply_conandata_patches(self)
         self._patch_config_scripts()
         autotools = Autotools(self)
         autotools.configure()
