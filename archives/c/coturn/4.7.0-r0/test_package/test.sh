@@ -1,3 +1,5 @@
-#!/bin/bash
-set -euo pipefail
-turnserver --version && echo "turnserver --version: OK"
+#!/data/service/hnp/bin/bash
+set -eu
+
+echo "[test] turnserver --version"
+turnserver --version
