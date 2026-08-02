@@ -5,7 +5,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import collect_libs, copy, get
+from conan.tools.files import collect_libs, copy, get, load, save
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -66,7 +66,7 @@ class OsiConan(ConanFile):
         ])
         tc.generate()
 
-    def _patch_config_guess(self):
+    def _patch_config_scripts(self):
         for script in ("config.guess", "Osi/config.guess"):
             path = os.path.join(self.source_folder, script)
             if os.path.exists(path):
@@ -79,8 +79,61 @@ class OsiConan(ConanFile):
                     + f"'{path}'"
                 )
 
+        for script in ("config.sub", "Osi/config.sub"):
+            path = os.path.join(self.source_folder, script)
+            if not os.path.exists(path):
+                continue
+
+            contents = load(self, path)
+            if "linux-ohos" in contents:
+                continue
+
+            original_contents = contents
+            replacements = (
+                (
+                    "linux-musl* | linux-uclibc*",
+                    "linux-musl* | linux-ohos* | linux-uclibc*",
+                ),
+                (
+                    "linux-gnu* | linux-dietlibc | linux-uclibc*",
+                    "linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc*",
+                ),
+                (
+                    "linux-gnu* | linux-dietlibc* | linux-uclibc*",
+                    "linux-gnu* | linux-ohos* | linux-dietlibc* | linux-uclibc*",
+                ),
+                (
+                    "-linux-musl* | -linux-uclibc*",
+                    "-linux-musl* | -linux-ohos* | -linux-uclibc*",
+                ),
+                (
+                    "-linux-gnu* | -linux-uclibc*",
+                    "-linux-gnu* | -linux-ohos* | -linux-uclibc*",
+                ),
+                (
+                    "-linux-gnu* | -linux-dietlibc* | -linux-uclibc*",
+                    "-linux-gnu* | -linux-ohos* | -linux-dietlibc* | -linux-uclibc*",
+                ),
+            )
+            for old, new in replacements:
+                if old in contents:
+                    contents = contents.replace(old, new, 1)
+
+            linux_case = "\t-linux*)\n\t\tos="
+            if "-linux-ohos*)" not in contents and linux_case in contents:
+                contents = contents.replace(
+                    linux_case,
+                    "\t-linux-ohos*)\n\t\t;;\n" + linux_case,
+                    1,
+                )
+
+            if contents == original_contents:
+                self.output.warning(f"Could not patch OHOS support into {path}")
+            else:
+                save(self, path, contents)
+
     def build(self):
-        self._patch_config_guess()
+        self._patch_config_scripts()
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
