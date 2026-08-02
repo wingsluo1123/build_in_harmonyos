@@ -136,4 +136,4 @@ class TrioConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.set_property("cmake_file_name", "trio")
         self.cpp_info.set_property("cmake_target_name", "trio::trio")
-# OHOS-CI-trigger: re-run build (no functional change)
+# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
