@@ -1,0 +1,37 @@
+--- a/src/Thread.cpp
++++ b/src/Thread.cpp
+@@ -21,6 +21,16 @@
+ /***************************************************/
+ 
+ #include "Thread.h"
++
++// Thread cancellation is an optional facility.  POSIX specifies
++// pthread_cancel() and pthread_testcancel(), but a C library is free not
++// to provide them, and several do not.  The build system probes for the
++// symbol -- see the check_symbol_exists() call in CMakeLists.txt -- and
++// defines STK_HAVE_PTHREAD_CANCEL accordingly.  When STK is compiled by
++// other means the historical assumption (the facility is present) is kept.
++#if !defined(STK_HAVE_PTHREAD_CANCEL)
++  #define STK_HAVE_PTHREAD_CANCEL 1
++#endif
+ 
+ namespace stk {
+ 
+@@ -57,7 +67,7 @@
+ 
+ bool Thread :: cancel()
+ {
+-#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
++#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__)) && STK_HAVE_PTHREAD_CANCEL
+ 
+   if ( pthread_cancel(thread_) == 0 ) {
+     return true;
+@@ -96,7 +106,7 @@
+ 
+ void Thread :: testCancel(void)
+ {
+-#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__))
++#if (defined(__OS_IRIX__) || defined(__OS_LINUX__) || defined(__OS_MACOSX__)) && STK_HAVE_PTHREAD_CANCEL
+ 
+   pthread_testcancel();
+ 

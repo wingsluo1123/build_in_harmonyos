@@ -2,7 +2,7 @@ software: stk
 version: "latest"
 build_system: cmake
 status: built
-build_date: "2026-07-15"
+build_date: "2026-08-02"
 
 source:
   url: "https://github.com/thestk/stk/archive/refs/heads/master.tar.gz"
@@ -13,13 +13,64 @@ build:
   system: cmake
   configure_options:
     - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DCMAKE_CXX_BYTE_ORDER=LITTLE_ENDIAN"
     - "-DBUILD_SHARED=OFF"
     - "-DBUILD_STATIC=ON"
     - "-DREALTIME=OFF"
     - "-DCOMPILE_PROJECTS=OFF"
+    - "-DENABLE_ALSA=OFF"
+    - "-DENABLE_JACK=OFF"
+  extra_defines:
+    - "__OS_LINUX__"
   dependencies: []
   cc: clang
   cxx: clang++
 
-patches_applied: []
-knowledge_gained: []
+patches_applied:
+  - file: "patches/0001-CMakeLists.txt.patch"
+    type: portability
+    summary: >-
+      用 check_symbol_exists() 探测 pthread_cancel() 是否存在, 结果以
+      -DSTK_HAVE_PTHREAD_CANCEL=0/1 传给编译, 不再假定「有 pthreads 就有
+      线程取消」。探测带上 CMAKE_THREAD_LIBS_INIT, 以免在把 pthread 符号
+      放在独立 libpthread 的老 glibc 上误判。
+  - file: "patches/0002-src-Thread.cpp.patch"
+    type: portability
+    summary: >-
+      Thread::cancel() / Thread::testCancel() 改为依据探测结果编译: 无
+      pthread_cancel() 时 cancel() 返回 false, testCancel() 为空操作。
+      start()/wait() 用的 pthread_create()/pthread_join() 不受影响。
+      未提供探测结果时默认为 1, 保持上游历史行为。
+
+knowledge_gained:
+  - title: "线程取消是 POSIX 的可选设施, 必须探测而非假定"
+    detail: >-
+      本平台 sysroot 的 <pthread.h> 只保留 PTHREAD_CANCEL_* 常量宏, 没有
+      pthread_cancel()/pthread_testcancel() 的函数声明 (全 sysroot 头文件
+      grep 零命中)。等价于 check_symbol_exists 的探测程序报
+      "use of undeclared identifier 'pthread_cancel'", 而对照组
+      pthread_join 探测成功, 确认是符号缺失而非头文件路径问题。
+  - title: "REALTIME=OFF 会连带抽掉 __OS_LINUX__"
+    detail: >-
+      STK 的 __OS_LINUX__ 由音频后端宏推导, 而后端宏只在 CMake 的 REALTIME
+      块里定义。关掉 REALTIME 后没人定义它, 但 CMakeLists 用 file(GLOB)
+      收编了全部 src/*.cpp, 于是 InetWvIn/InetWvOut/UdpSocket 等仍会被编译
+      并因缺少 MUTEX/THREAD_HANDLE/sockaddr_in 而失败。需显式补上。
+  - title: "安装出的头文件不自包含, __OS_LINUX__ 必须传给消费者"
+    detail: >-
+      Thread.h/Mutex.h/Socket.h 中 THREAD_HANDLE/MUTEX/sockaddr_in 的声明
+      受 __OS_* 开关保护。库以 __OS_LINUX__ 编译, 消费者若看不到同一开关,
+      include 这些头会直接编译失败。已在 package_info() 中通过
+      cpp_info.defines 传递, 并由 test_package 覆盖回归。
+  - title: "RtAudio.cpp 的 pthread_testcancel 已被后端宏挡住"
+    detail: >-
+      src/RtAudio.cpp:9090/9366/10849 的三处调用分别位于 __LINUX_ALSA__ /
+      __LINUX_PULSE__ / __LINUX_OSS__ 条件内, REALTIME=OFF 时三个宏均未
+      定义, 不参与编译, 无需打补丁。
+  - title: "上游无测试套件"
+    detail: >-
+      Makefile.in 仅有 distclean 与 install 两个 target (无 check),
+      configure.ac 无 TESTS, 仓库无 test/ 目录, CMakeLists 无
+      enable_testing()/add_test()。projects/ 下是需要音频设备与交互输入的
+      示例程序而非自动化测试, 且以 COMPILE_PROJECTS=OFF 构建不参与编译。
+      功能验证全部由 test_package 的 20 条断言承担。

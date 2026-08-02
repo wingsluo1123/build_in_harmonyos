@@ -1,0 +1,31 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -160,6 +160,28 @@
+   add_definitions(-D__LITTLE_ENDIAN__)
+ endif()
+ add_definitions(-D_USE_MATH_DEFINES)
++
++#========================================#
++#===== Optional POSIX facilities ========#
++#========================================#
++# Thread cancellation is an *optional* part of POSIX threads: a C library
++# may implement pthreads and still omit pthread_cancel() and
++# pthread_testcancel(), since forced cancellation cannot be provided
++# safely without unwinder support.  src/Thread.cpp must therefore not
++# assume the two functions exist merely because <pthread.h> does.  Probe
++# for the symbol and let the source degrade gracefully when it is absent.
++set(THREADS_PREFER_PTHREAD_FLAG TRUE)
++find_package(Threads QUIET)
++include(CheckSymbolExists)
++set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
++check_symbol_exists(pthread_cancel "pthread.h" STK_HAVE_PTHREAD_CANCEL)
++unset(CMAKE_REQUIRED_LIBRARIES)
++if(STK_HAVE_PTHREAD_CANCEL)
++    add_definitions(-DSTK_HAVE_PTHREAD_CANCEL=1)
++else()
++    message(STATUS "pthread_cancel() unavailable: Thread::cancel() will report failure")
++    add_definitions(-DSTK_HAVE_PTHREAD_CANCEL=0)
++endif()
+ if(INSTALL_HEADERS)
+     file(GLOB STK_HEADERS "include/*.h")
+     install(FILES ${STK_HEADERS} DESTINATION include/stk)

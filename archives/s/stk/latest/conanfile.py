@@ -28,8 +28,10 @@ class StkConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
-        # OHOS libc lacks pthread_cancel()/pthread_testcancel(); see
-        # patches/0001-src-Thread.cpp.patch.
+        # Both patches are portability fixes for thread cancellation; see
+        # conandata.yml and notes.md. Neither introduces a platform macro:
+        # the CMake patch probes for pthread_cancel() with
+        # check_symbol_exists() and the source patch keys off that result.
         apply_conandata_patches(self)
 
     def generate(self):
@@ -43,7 +45,7 @@ class StkConan(ConanFile):
         #          || defined(__UNIX_JACK__) || defined(__LINUX_PULSE__)
         #            #define __OS_LINUX__
         # Those backend macros are only added by the CMake REALTIME block,
-        # which we must keep OFF on OHOS (its else-branch is a hard
+        # which we must keep OFF here (its else-branch is a hard
         # FATAL_ERROR "Unknown system type for realtime support.").
         # With REALTIME=OFF nothing defines __OS_LINUX__, so Mutex.h and
         # Socket.h skip <pthread.h> / <netinet/in.h> / <netinet/tcp.h> and
@@ -51,22 +53,12 @@ class StkConan(ConanFile):
         # struct sockaddr_in all go missing -- yet CMakeLists globs *every*
         # src/*.cpp, so InetWvIn.cpp / InetWvOut.cpp / UdpSocket.cpp are
         # compiled anyway and fail.
-        # OHOS is a Linux-kernel POSIX platform with pthreads and BSD
-        # sockets, so selecting that code path is semantically correct.
+        # __OS_LINUX__ is STK's own switch for "POSIX threads + BSD sockets",
+        # which is exactly what this target offers, so selecting that code
+        # path is semantically correct. It is NOT a platform macro of ours
+        # and it is set for every configuration, not per-OS.
         # __STK_REALTIME__ stays undefined: no realtime audio backend is built.
         tc.preprocessor_definitions["__OS_LINUX__"] = 1
-        # 选择 __OS_LINUX__ 分支后, Thread.cpp 会调用 pthread_cancel() /
-        # pthread_testcancel() —— OpenHarmony 的 musl 系 libc 并未实现这两个
-        # 函数, 上一轮 CI 即因此报 "use of undeclared identifier
-        # 'pthread_cancel'" 而编译失败。
-        #
-        # patches/0001-src-Thread.cpp.patch 用 #if defined(__OHOS__) 守卫了这
-        # 两处调用, 但该宏必须确实存在守卫才会生效。这里显式定义, 不依赖工具链
-        # 隐式注入 —— 与 archives/a/audit/4.1.2/conanfile.py 中
-        # `tc.extra_defines.append("__OHOS__")  # R8: ... so #ifdef __OHOS__
-        # guards in patches are active` 是同一套做法。
-        if self.settings.os == "OHOS":
-            tc.preprocessor_definitions["__OHOS__"] = 1
         tc.generate()
 
     def build(self):
@@ -75,7 +67,7 @@ class StkConan(ConanFile):
         # Every STK option MUST be on the command line (-D):
         #  - CMAKE_POLICY_VERSION_MINIMUM=3.5: CMake >= 4.0 removed
         #    compatibility with cmake_minimum_required(<3.5); STK declares 3.1.
-        #  - REALTIME=OFF: REQUIRED on OHOS. STK's realtime block ends with
+        #  - REALTIME=OFF: REQUIRED here. STK's realtime block ends with
         #    FATAL_ERROR "Unknown system type for realtime support." for any
         #    system that is not Linux/Darwin/Windows.
         #  - COMPILE_PROJECTS=OFF: skip the example/demo executables.
@@ -83,7 +75,7 @@ class StkConan(ConanFile):
         cmake.configure(variables={
             "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
             # STK calls include(TestBigEndian) + TEST_BIG_ENDIAN unconditionally
-            # (outside the REALTIME block). Under OHOS toolchain CMake may treat
+            # (outside the REALTIME block). Under this toolchain CMake may treat
             # the build as cross-compiling and try_run() cannot execute the probe.
             # Pinning the byte order avoids the run-based probe entirely
             # (aarch64 is little-endian). Requires CMake >= 3.19 (present).
@@ -104,4 +96,11 @@ class StkConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["stk"]
         self.cpp_info.includedirs = ["include/stk"]
-# OHOS-CI-trigger: re-run build @ 2026-08-02 21:12 (no functional change)
+        # The installed headers are not self-contained: Thread.h, Mutex.h and
+        # Socket.h only declare THREAD_HANDLE / MUTEX / sockaddr_in when one of
+        # STK's __OS_* switches is set, and Stk.h derives those from an audio
+        # backend macro that a REALTIME=OFF build never defines. The library
+        # objects were compiled with __OS_LINUX__ (see generate()), so consumers
+        # must see the same switch or they get compile errors -- and, worse,
+        # a different view of the classes than the one that was compiled.
+        self.cpp_info.defines = ["__OS_LINUX__"]
