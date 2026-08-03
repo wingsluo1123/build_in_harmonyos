@@ -17,7 +17,7 @@ class SoundTouchConan(ConanFile):
     description = "Open-source audio processing library for tempo, pitch, and rate adjustment"
     license = "LGPL-2.1-or-later"
     homepage = "https://www.surina.net/soundtouch/"
-    url = ""
+    url = "https://www.surina.net/soundtouch/"
 
     package_type = "library"
 

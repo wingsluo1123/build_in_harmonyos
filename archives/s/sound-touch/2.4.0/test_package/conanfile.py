@@ -26,5 +26,6 @@ class SoundTouchTestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        assert self.cpp.build.bindirs, "No bindirs found in build output"
         bin_path = os.path.join(self.cpp.build.bindirs[0], "test_sound_touch")
-        self.run(f'export LD_LIBRARY_PATH="{os.path.join(self.dependencies["sound-touch"].package_folder, "lib")}:$LD_LIBRARY_PATH"; {bin_path}', env="conanrun")
+        self.run(bin_path, env="conanrun")
