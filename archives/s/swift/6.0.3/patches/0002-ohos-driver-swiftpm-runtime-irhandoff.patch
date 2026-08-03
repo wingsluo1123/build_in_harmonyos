@@ -1015,12 +1015,24 @@ index c7f9334..488d3f3 100644
 diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h b/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h
 --- a/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h
 +++ b/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h
-@@ -28,0 +29 @@
+@@ -27,2 +27,3 @@
+ #include "clang/Basic/PointerAuthOptions.h"
 +#include "llvm/Config/llvm-config.h"
-@@ -515,0 +517 @@ public:
+ #include "llvm/IR/CallingConv.h"
+@@ -514,7 +515,9 @@ public:
+   bool UseCASBackend;
+-
+-  /// The output mode for the CAS Backend.
+-  llvm::CASBackendMode CASObjMode;
+-
++
 +#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
-@@ -517,0 +520 @@ public:
++  /// The output mode for the CAS Backend.
++  llvm::CASBackendMode CASObjMode;
 +#endif
++
+   /// Emit a .casid file next to the object file if CAS Backend is used.
+   bool EmitCASIDFile;
 @@ -563,3 +566,6 @@ public:
          PlatformCCallingConvention(llvm::CallingConv::C), UseCASBackend(false),
 -        CASObjMode(llvm::CASBackendMode::Native) {
@@ -1032,18 +1044,68 @@ diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h b/swift-
 diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
-@@ -3360,0 +3361 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
+@@ -3359,15 +3359,17 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
+   }
+-
+-  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
++
 +#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
-@@ -3370,0 +3372 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
++  if (Arg *A = Args.getLastArg(OPT_cas_backend_mode)) {
+     Opts.CASObjMode = llvm::StringSwitch<llvm::CASBackendMode>(A->getValue())
+                           .Case("native", llvm::CASBackendMode::Native)
+                           .Case("casid", llvm::CASBackendMode::CASID)
+                           .Case("verify", llvm::CASBackendMode::Verify)
+                           .Default(llvm::CASBackendMode::Native);
+   }
+-
++
+   Opts.UseCASBackend |= Args.hasArg(OPT_cas_backend);
+   Opts.EmitCASIDFile |= Args.hasArg(OPT_cas_emit_casid_file);
+-
 +#endif
++
+   return false;
+ }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
-@@ -131,0 +132 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
+@@ -129,10 +129,12 @@ static clang::TargetOptions getClangTargetOptions(ASTContext &Ctx) {
+   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
+   TargetOpts.FunctionSections = Opts.FunctionSections;
+-
+-  // Set option to UseCASBackend if CAS was enabled on the command line.
+-  TargetOpts.UseCASBackend = Opts.UseCASBackend;
+-
+-  // Set option to select the CASBackendMode.
+-  TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
+-
++
 +#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
-@@ -136,0 +138 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
++  // Set option to UseCASBackend if CAS was enabled on the command line.
++  TargetOpts.UseCASBackend = Opts.UseCASBackend;
++
++  // Set option to select the CASBackendMode.
++  TargetOpts.MCOptions.CASObjMode = Opts.CASObjMode;
 +#endif
-@@ -614,0 +617 @@ bool swift::performLLVM(const IRGenOptions &Opts,
++
+   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+@@ -614,16 +616,18 @@ static bool performLLVM(swift::irgen::GeneratedModule &Module,
+   std::unique_ptr<raw_fd_ostream> CASIDFile;
 +#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
-@@ -627,0 +631 @@ bool swift::performLLVM(const IRGenOptions &Opts,
+   if (Opts.UseCASBackend && Opts.EmitCASIDFile &&
+       Opts.CASObjMode != llvm::CASBackendMode::CASID &&
+       Opts.OutputKind == IRGenOutputKind::ObjectFile && OutputFilename != "-") {
+     std::string OutputFilenameCASID = std::string(OutputFilename);
+     OutputFilenameCASID.append(".casid");
+     std::error_code EC;
+     CASIDFile = std::make_unique<raw_fd_ostream>(OutputFilenameCASID, EC);
+     if (EC) {
+       diagnoseSync(Diags, DiagMutex, SourceLoc(), diag::error_opening_output,
+                    OutputFilename, std::move(EC.message()));
+       return true;
+     }
+   }
 +#endif
+-
++
+   return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
