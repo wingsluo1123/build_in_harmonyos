@@ -44,13 +44,23 @@ class PopplerTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_poppler")
-        if not os.path.exists(test_bin):
-            raise Exception("Test binary not found - build failed")
+        bindir = self.cpp.build.bindirs[0]
+        test_poppler_bin = os.path.join(bindir, "test_poppler")
+        test_qt5_bin = os.path.join(bindir, "test_poppler_qt5")
+
+        # P2 修复（AI 审查 #182841779）：本 PR 的核心交付物是 Qt5 绑定，两个测试
+        # 二进制都必须产出；缺任一即视为构建失败，覆盖 Qt5 绑定的链接验证，避免
+        # “编译过、运行期坏”的隐身风险（参见 notes.md 的教训）。
+        for _name, _b in (("test_poppler", test_poppler_bin),
+                          ("test_poppler_qt5", test_qt5_bin)):
+            if not os.path.exists(_b):
+                raise Exception("%s binary not found - build failed" % _name)
 
         if cross_building(self):
-            self.output.info("cross-building：只验编译+链接")
+            # 交叉编译（OHOS aarch64）：宿主机无法执行目标二进制，仅验产物存在。
+            self.output.info("cross-building：已验证 test_poppler 与 test_poppler_qt5 均成功链接")
             return
 
         # 真跑。失败就是失败——不 catch、不降级为 warning。
-        self.run(test_bin, env="conanrun")
+        self.run(test_poppler_bin, env="conanrun")
+        self.run(test_qt5_bin, env="conanrun")
