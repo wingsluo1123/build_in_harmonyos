@@ -272,6 +272,13 @@ to `RawComment.cpp.o` around 131/933, where another `llvm::ArrayRef(SRCs)` CTAD
 site failed against LLVM 15. The patch now uses
 `llvm::ArrayRef<SingleRawComment>(SRCs)` for that allocation.
 
+The 13:48 CST source-bootstrap run validated that fix by compiling past
+`RawComment.cpp.o`; it then stopped around 134/933 in
+`RequirementMachine/ConcreteContraction.cpp`. The OHOS libc++/LLVM 15 stream
+operators do not provide an `llvm::raw_ostream << std::optional<Type>`
+overload, so the debug trace now prints `*substBaseType` after the existing
+presence check instead of streaming the optional wrapper.
+
 At 2026-08-03 13:40 CST, the latest AI review findings were triaged before
 resuming the true-device run. Four mechanical findings were accepted and fixed:
 the ClangImporter patch no longer uses `getLangOpts()->` where the LLVM 15
