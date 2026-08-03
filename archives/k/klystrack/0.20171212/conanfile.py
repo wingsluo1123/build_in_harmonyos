@@ -9,7 +9,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanException
-from conan.tools.files import get, copy, chdir, export_conandata_patches, apply_conandata_patches
+from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
 from conan.tools.layout import basic_layout
 
 

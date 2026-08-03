@@ -13,7 +13,12 @@ int main(void) {
     }
     char buf[256] = {0};
     size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
-    pclose(fp);
+    /* P2: pclose 返回值检查（aireview: 忽略致二进制运行失败时仍报通过） */
+    int pc_ret = pclose(fp);
+    if (pc_ret != 0) {
+        fprintf(stderr, "FAIL: klystrack --version exited with code %d\n", pc_ret);
+        return 1;
+    }
     if (n == 0 || strlen(buf) == 0) {
         fprintf(stderr, "FAIL: klystrack --version produced no output\n");
         return 1;

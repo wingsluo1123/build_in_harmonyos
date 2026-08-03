@@ -4,11 +4,13 @@ import os
 
 from conan import ConanFile
 from conan.tools.build import can_run
+from conan.tools.env import VirtualRunEnv
 from conan.tools.files import copy
 
 
 class KlystrackTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "VirtualRunEnv"
     test_type = "explicit"
 
     def requirements(self):
@@ -31,4 +33,5 @@ add_executable(test_klystrack test.c)
         self.run("cmake . -DCMAKE_BUILD_TYPE=Release", cwd=self.build_folder)
         self.run("cmake --build . --config Release", cwd=self.build_folder)
         if can_run(self):
-            self.run("./test_klystrack", cwd=self.build_folder, env=["PATH=" + os.path.join(self.dependencies["klystrack"].package_folder, "bin") + os.pathsep + os.environ.get("PATH", "")])
+            # Medium: env="conanrun" + VirtualRunEnv 自动注入 PATH（aireview: 标准运行时环境）
+            self.run("./test_klystrack", cwd=self.build_folder, env="conanrun")
