@@ -21,5 +21,10 @@ class BcalTestConan(ConanFile):
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        # On OHOS, use CONFIG_SHELL or /data/service/hnp/bin/bash.
+        # On Linux, use system bash.
+        if self.settings.os == "OHOS":
+            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        else:
+            bash = "bash"
         self.run(f"{bash} test.sh", env="conanrun")

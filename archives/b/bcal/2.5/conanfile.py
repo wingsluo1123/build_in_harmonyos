@@ -73,7 +73,8 @@ class BcalConan(ConanFile):
 
         # Set up readline include path.
         # Use system headers if available, otherwise bundled res/headers/.
-        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        # DEFAULT_PREFIX is set by OHOS build context; fallback to ~/usr/local.
+        sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
         sys_inc = os.path.join(sysroot, "include")
 
         cppflags = []
@@ -137,7 +138,7 @@ class BcalConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         # Add system readline library path to runtime environment
         # libreadline.so.8 is installed by cmd-pkgs to ~/usr/local/lib/external/
-        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
         lib_external = os.path.join(sysroot, "lib", "external")
         if os.path.isdir(lib_external):
             self.runenv_info.append_path("LD_LIBRARY_PATH", lib_external)
