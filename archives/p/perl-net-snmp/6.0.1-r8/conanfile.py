@@ -14,7 +14,7 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 
 class PerlnetsnmpConan(ConanFile):
     name = "perl-net-snmp"
-    version = "6.0.1-r8"
+    version = "6.0.1"
     description = "Net::SNMP - Object oriented interface to SNMP"
     license = "GPL-1.0-or-later OR Artistic-1.0-Perl"
     homepage = "https://metacpan.org/release/DTOWN/Net-SNMP-v6.0.1"
