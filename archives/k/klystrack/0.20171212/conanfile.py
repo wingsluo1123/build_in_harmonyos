@@ -95,8 +95,11 @@ class KlystrackConan(ConanFile):
                 self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
         # aireview P2: 删 CC Python 侧解析和命令行注入，依赖 conanbuild 环境自动提供正确交叉编译器
         # （os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，覆盖 conanbuild 设的完整路径）
+        # CI 根因: omake[247]: mkdir: Resource temporarily unavailable → Error 127 → 247 层递归 make Error 2
+        # klystrack Makefile build target 递归调 make 致进程/句柄耗尽（EAGAIN）
+        # 改加 -j1 限单线程避递归耗尽资源 + --no-print-directory 减递归输出
         make_cmd = (
-            f'make CFG=release '
+            f'make -j1 --no-print-directory CFG=release '
             f'CFLAGS+="{cppflags}" '
             f'LDFLAGS+="{ldflags}" '
             f'PREFIX={os.path.join(self.build_folder, "staging")}'
