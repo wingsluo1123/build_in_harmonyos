@@ -1059,6 +1059,37 @@ diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/NameLookup.h b/swift-sw
 -    return llvm::ArrayRef(Results);
 +    return llvm::ArrayRef<LookupResultEntry>(Results);
    }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/Builtins.cpp b/swift-swift-6.0.3-RELEASE/lib/AST/Builtins.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/AST/Builtins.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/AST/Builtins.cpp
+@@ -2440,2 +2440,27 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
+     return makePointer(pointeeType, D.Pointer_AddressSpace);
+   }
++
++  // A pointer to a type argument.
++  case IITDescriptor::PtrToArgument: {
++    Type argType = getTypeArgument(D.getArgumentNumber());
++    if (!argType) return Type();
++    return makePointer(argType, 0);
++  }
++
++  // A pointer to the element type of a type argument.
++  case IITDescriptor::PtrToElt: {
++    Type argType = getTypeArgument(D.getArgumentNumber());
++    if (!argType) return Type();
++    if (auto vecType = argType->getAs<BuiltinVectorType>())
++      argType = vecType->getElementType();
++    return makePointer(argType, 0);
++  }
++
++  // A pointer whose element type is tied to another overloaded argument.
++  case IITDescriptor::AnyPtrToElt: {
++    Type refType = getTypeArgument(D.getRefArgNumber());
++    if (!refType) return Type();
++    if (auto vecType = refType->getAs<BuiltinVectorType>())
++      refType = vecType->getElementType();
++    return makePointer(refType, 0);
++  }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp

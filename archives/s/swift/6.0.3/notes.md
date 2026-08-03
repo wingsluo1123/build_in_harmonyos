@@ -243,6 +243,15 @@ deduction; with the OHOS LLVM 15 fork this deduced an `ArrayRef` over the whole
 element type explicitly as `llvm::ArrayRef<LookupResultEntry>(Results)` for the
 inner, outer, and all-results helpers.
 
+At 2026-08-03 11:27 CST, source-bootstrap accepted the `NameLookup.h` hunk and
+progressed through `AccessRequests.cpp.o`, then stopped at `Builtins.cpp.o`
+around 80/933. The OHOS LLVM 15 fork exposes additional
+`llvm::Intrinsic::IITDescriptor` pointer descriptors (`PtrToArgument`,
+`PtrToElt`, and `AnyPtrToElt`) that Swift 6.0.3 did not cover in the
+`-Werror=switch` build. The patch now handles these descriptors through the
+existing RawPointer-oriented `makePointer` path rather than adding a catch-all
+default branch.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
