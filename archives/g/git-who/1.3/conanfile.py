@@ -75,15 +75,16 @@ class GitWhoConan(ConanFile):
                 go_ok = True
             except ConanException as e:
                 raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed): {e}")
-        if not go_ok:
-            raise ConanException("go toolchain unavailable (go_ok=False after install attempts)")
+        # aireview P3: 删死代码 if not go_ok: raise — go_ok=False 分支在 except ConanException raise 后不可达
         # P2: go build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+虚假声明）
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
+        # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
+        go_arch = {"armv8": "arm64", "x86_64": "amd64"}.get(str(self.settings.arch), "arm64")
         try:
             self.run(
-                "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
+                f"CGO_ENABLED=0 GOOS=linux GOARCH={go_arch} "
                 "GOPROXY=https://goproxy.cn,direct "
-                "go build -ldflags=\"-s -w\" -o git-who .",
+                'go build -ldflags="-s -w" -o git-who .',
                 cwd=self.source_folder, env="conanbuild",
             )
         except ConanException as e:
