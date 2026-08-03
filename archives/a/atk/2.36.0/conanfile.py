@@ -45,11 +45,16 @@ class AtkConan(ConanFile):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
         # CI 根因: apply_conandata_patches 找 source_folder/patches/ 但补丁在 export_sources_folder
         # Conan 2.x 消费者侧拉源码到 .conan2/p/.../s/，补丁需复制到 source_folder/patches/ 才找得到
+        # 上轮 bug: src=recipe_folder/patches 在消费者侧不一定存在（补丁已 export 到 export_sources_folder）
+        # 改从 export_sources_folder/patches 复制到 source_folder/patches（apply_conandata_patches 找的位置）
         patches_dst = os.path.join(self.source_folder, "patches")
         if not os.path.exists(os.path.join(patches_dst, "0001-atk-intl-wrapper.c.patch")):
             os.makedirs(patches_dst, exist_ok=True)
-            copy(self, "*.patch", src=os.path.join(self.recipe_folder, "patches"),
-                 dst=patches_dst)
+            # 优先从 export_sources_folder 找补丁（Conan 2.x 消费者侧补丁 export 位置）
+            export_patches = os.path.join(self.export_sources_folder, "patches")
+            recipe_patches = os.path.join(self.recipe_folder, "patches")
+            src_patches = export_patches if os.path.exists(export_patches) else recipe_patches
+            copy(self, "*.patch", src=src_patches, dst=patches_dst)
         apply_conandata_patches(self)
 
     def export_sources(self):
