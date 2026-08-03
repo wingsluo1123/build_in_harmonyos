@@ -133,13 +133,12 @@ class NcursesConan(ConanFile):
             # aireview Medium: --host 改 linux-ohos 匹配补丁 config.guess + manifest 声明（绕补丁 OHOS 检测）
             # --build 用 x86_64 触发交叉编译模式（build!=host 避 autotools 误判本地编译跑交叉测试程序）
             self.run(f"{bash} {configure} --prefix={self.package_folder} --build=x86_64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos {args}",
-                     cwd=self.source_folder, shell=True)
-            # CI 真根因: include/Makefile:45 missing separator — toybox make 解析命令行续行缺 Tab
-            # 改用 CI 真实 bash 路径（CONFIG_SHELL 已设 /data/service/hnp/bin/bash）显式传 SHELL
-            # 删 V=1（改变 make 输出格式可能致 toybox make 解析异常）
+                     cwd=self.source_folder, shell=True, env="conanbuild")
+            # CI 真根因: make: /bin/bash: No such file or directory → Error 127
+            # os.environ.get("CONFIG_SHELL") 读宿主机环境非 conanbuild 子进程 → fallback /bin/bash（CI 无此路径）
+            # 改 env="conanbuild" 让 Conan 加载 conanbuild.sh 设的 CONFIG_SHELL/SHELL，删 Python 侧 os.environ.get
             # CI SIGKILL: make -j$(nproc) 全核并发耗尽内存被 OOM killer 杀 → 改 -j1 限单线程避 OOM
-            make_shell = os.environ.get("CONFIG_SHELL") or "/bin/bash"
-            self.run(f'make -j1 SHELL="{make_shell}"', cwd=self.source_folder, shell=True)
+            self.run('make -j1', cwd=self.source_folder, shell=True, env="conanbuild")
         finally:
             # 还原 TMPDIR（避开 environment() context manager 的等价处理）
             if _saved_tmpdir is None:
