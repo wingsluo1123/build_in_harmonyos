@@ -75,10 +75,17 @@ patches_applied:
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "Detours 核心功能（函数拦截/hooking）依赖 Windows PE 格式和进程管理，在 HarmonyOS 上完全不可用"
+  - "适配仅提供编译链接层面的兼容（Windows API 兼容头文件 + CMake 构建系统），不提供运行时拦截能力"
+  - "下游消费者链接此库后，拦截相关 API 将静默返回 stub 值，不应依赖其拦截功能"
+
+# R40: 深度适配验证 — 适配完整性声明
+adaptation_scope: "link_only"
+adaptation_limitations:
+  - "核心运行时功能（函数拦截/hooking）在 HarmonyOS 上不可用"
+  - "仅提供编译链接兼容，test_package 验证库链接成功，非功能验证"
+  - "下游消费者不应依赖 DetourAttach/DetourTransactionBegin 等拦截 API 的运行时行为"
 
 patch_generation:
   method: per-file-difflib
@@ -87,22 +94,11 @@ patch_generation:
   source_orig_hash: e8259ed0eb0df3ec
   source_work_hash: d022be7421ccea2a
   generated_at: '2026-07-29T20:53:06'
-  patches_count: 4
+  patches_count: 1
 
 patch_classification:
-  - file: 0001-src-creatwth.cpp.patch
-    type: auto
+  - file: ohos-compat.patch
+    type: portability
     platform_only: True
-    guard: 'pending'
-  - file: 0002-src-detours.cpp.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-src-detours.h.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0004-src-image.cpp.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    guard: 'none'
+    description: "CMake build system + Windows API compat layer + C++ standard fixes"

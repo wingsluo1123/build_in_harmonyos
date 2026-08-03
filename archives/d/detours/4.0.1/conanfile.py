@@ -20,11 +20,9 @@ class DetoursConan(ConanFile):
     homepage = "https://github.com/microsoft/Detours"
     url = ""  # CI fills this
 
-    package_type = "library"
+    package_type = "static-library"
 
     settings = "os", "compiler", "build_type", "arch"
-    options = {"shared": [True, False]}
-    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -40,7 +38,7 @@ class DetoursConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # R26: static library by default
+        # R26: static library (Detours only supports static linking)
         tc.variables["BUILD_SHARED_LIBS"] = "OFF"
         # E092: CMake does not recognize HarmonyOS
         tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"

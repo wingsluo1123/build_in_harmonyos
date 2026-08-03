@@ -54,8 +54,15 @@ readelf -h libdetours.a  # ELF 64-bit, aarch64
 
 ## 注意事项
 
-- Detours 是 Windows 函数拦截库，鸿蒙上仅提供库链接支持，运行时拦截功能不可用
-- test_package 验证库链接成功（DetourIsHelperProcess 调用），非功能验证
+### R40 适配完整性声明
+
+**适配范围：仅链接支持（link_only）**
+
+- Detours 核心功能（函数拦截/hooking）依赖 Windows PE 格式操作、进程/线程管理等 Windows 内部机制，在 HarmonyOS 上**完全不可用**
+- 本适配仅提供编译链接层面的兼容（Windows API 兼容头文件 + CMake 构建系统），不提供任何运行时拦截能力
+- test_package 验证库链接成功（DetourIsHelperProcess 调用），**非功能验证**
+- 下游消费者链接此库后，调用 DetourAttach/DetourTransactionBegin 等拦截 API 将静默返回 stub 值或行为异常
+- **下游消费者不应依赖此库的拦截功能**，如需函数拦截能力，需基于鸿蒙平台实现（如 ELF PLT/GOT hook、inline hook 等）
 ---
 
 **编译结束**: 2026-07-29 20:53
