@@ -56,6 +56,7 @@ build:
     - "--enable-overwrite"
     - "--enable-pc-files"
     - "--with-pkg-config-libdir=/lib/pkgconfig"
+    - "--disable-big-strings"
   # 例如:
   # - "-DCMAKE_BUILD_TYPE=Release"
   # - "-DCMAKE_SYSTEM_NAME=OHOS"
@@ -86,10 +87,11 @@ patches_applied:
 
 # 编译中学到的知识
 knowledge_gained:
-  - "OHOS runner 的 /tmp 不可写，configure 和编译阶段必须设置 TMPDIR"
+  - "OHOS runner 的 /tmp 不可写且 $HOME/tmp 权限不稳定，configure 和编译阶段必须设置 TMPDIR 到当前 Conan build 目录"
   - "OHOS HMDFS 用户/组映射下 autoconf 的 umask 077 临时目录不可写，ncurses configure 需放宽到 umask 022"
   - "OHOS runner 上 install -s 调用 strip 会失败，configure 需要 --disable-stripping"
-  - "OHOS runner PATH 默认先命中 toybox expr/sed，ncurses autotools 需要优先使用 $HOME/usr/local/bin 中的 GNU coreutils/sed"
+  - "OHOS runner PATH 默认可能先命中 toybox expr/sed，ncurses config.status 的 ac_dir 解析需避免 sed/expr 管道，并在 configure 后对 generated Makefile 做 targeted repair"
+  - "OHOS 下禁用 big-strings，避免生成的 terminfo code tables 在静态 tic 链接时缺 boolcodes/numcodes/strcodes 符号"
   - "为避免覆盖系统 shell 依赖的 ncurses 共享库，OHOS 只交付静态 wide-char ncursesw/formw/menuw/panelw 库"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
