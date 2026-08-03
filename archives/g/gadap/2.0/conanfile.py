@@ -64,8 +64,6 @@ class GadapConan(ConanFile):
         # R26: System-name libraries default to static
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
-        if not self.options.shared:
-            tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         else:
             tc.configure_args.append("--enable-shared")
