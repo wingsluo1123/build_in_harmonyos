@@ -33,7 +33,9 @@ int main(int argc, char **argv) {
     int pc_ret = pclose(fp);
     if (pc_ret != 0) {
         int real_code = WIFEXITED(pc_ret) ? WEXITSTATUS(pc_ret) : -1;
-        fprintf(stderr, "FAIL: kubetui --version exited with code %d (pclose raw %d)\n", real_code, pc_ret);
+        /* aireview P3: real_code=-1 时（WIFEXITED false）错误信息精度 — 补 pc_ret raw 帮诊断信号状态 */
+        fprintf(stderr, "FAIL: kubetui --version exited with code %d (pclose raw %d%s)\n", real_code, pc_ret,
+                 real_code == -1 ? ", WIFEXITED false (killed by signal)" : "");
         return 1;
     }
     if (n == 0 || strlen(buf) == 0) {
@@ -48,7 +50,9 @@ int main(int argc, char **argv) {
     if (ret != 0) {
         /* P3: system 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
         int real_code = WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;
-        fprintf(stderr, "FAIL: kubetui --help exited with code %d (system raw %d)\n", real_code, ret);
+        /* aireview P3: real_code=-1 时（WIFEXITED false）错误信息精度 — 补 raw 帮诊断信号状态 */
+        fprintf(stderr, "FAIL: kubetui --help exited with code %d (system raw %d%s)\n", real_code, ret,
+                 real_code == -1 ? ", WIFEXITED false (killed by signal)" : "");
         return 1;
     }
     printf("kubetui --help OK\n");
