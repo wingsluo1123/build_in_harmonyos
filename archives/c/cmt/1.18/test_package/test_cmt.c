@@ -12,17 +12,28 @@
 #include <string.h>
 #include <dlfcn.h>
 
+typedef struct _LADSPA_Handle LADSPA_Handle;
+typedef float LADSPA_Data;
+
 typedef struct {
     unsigned long UniqueID;
     const char *Label;
-    const char *Properties;
     const char *Name;
     const char *Maker;
     const char *Copyright;
     unsigned long PortCount;
     void *PortDescriptors;
+    const char * const *PortNames;
     void *PortRangeHints;
     void *ImplementationData;
+    void (*instantiate)(LADSPA_Handle *, unsigned long SampleRate);
+    void (*connect_port)(LADSPA_Handle *, unsigned long Port, void *DataLocation);
+    void (*activate)(LADSPA_Handle *);
+    void (*run)(LADSPA_Handle *, unsigned long SampleCount);
+    void (*run_adding)(LADSPA_Handle *, unsigned long SampleCount);
+    void (*set_run_adding_gain)(LADSPA_Handle *, LADSPA_Data Gain);
+    void (*deactivate)(LADSPA_Handle *);
+    void (*cleanup)(LADSPA_Handle *);
 } LADSPA_Descriptor;
 
 typedef const LADSPA_Descriptor *(*LADSPA_Descriptor_Function)(unsigned long Index);

@@ -26,8 +26,9 @@ class CmtConan(ConanFile):
         apply_conandata_patches(self)
 
     def export_sources(self):
-        # Conan 2.x G1 门禁要求 export_sources() 声明；cmt 无补丁，仅复制占位
-        apply_conandata_patches(self)
+        # Conan 2.x G1 门禁要求 export_sources() 声明；cmt 无补丁
+        # aireview P3: 误调 apply_conandata_patches（该函数属 source() 非 export_sources）
+        pass
 
     def generate(self):
         # Makefile-based build, no toolchain needed; keep for Conan 2.x G1 gate
@@ -66,4 +67,4 @@ class CmtConan(ConanFile):
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include/cmt"]
         # ladspa 头路径通过 dependency 传递给消费者
-        self.info.site = "https://www.ladspa.org/cmt/"
+        # aireview P3: self.info.site 非标准 API → 删（改用 cpp_info 系统/描述传播）
