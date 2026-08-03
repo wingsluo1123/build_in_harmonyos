@@ -5,7 +5,7 @@ set -euo pipefail
 
 echo "[step] bossac -h smoke test"
 # bossac -h exits non-zero (common CLI behavior), so check output instead of exit code
-bossac -h 2>&1 | grep -q "BOSSA" || {
+(bossac -h 2>&1 || true) | grep -q "BOSSA" || {
     echo "[fail] bossac -h did not produce expected output"
     exit 1
 }

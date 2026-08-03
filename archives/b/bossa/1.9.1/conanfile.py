@@ -97,4 +97,3 @@ class BossaConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.system_libs = ["readline"]
