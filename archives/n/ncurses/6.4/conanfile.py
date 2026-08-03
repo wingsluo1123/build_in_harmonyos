@@ -135,8 +135,9 @@ class NcursesConan(ConanFile):
             # CI 真根因: include/Makefile:45 missing separator — toybox make 解析命令行续行缺 Tab
             # 改用 CI 真实 bash 路径（CONFIG_SHELL 已设 /data/service/hnp/bin/bash）显式传 SHELL
             # 删 V=1（改变 make 输出格式可能致 toybox make 解析异常）
+            # CI SIGKILL: make -j$(nproc) 全核并发耗尽内存被 OOM killer 杀 → 改 -j1 限单线程避 OOM
             make_shell = os.environ.get("CONFIG_SHELL") or "/bin/bash"
-            self.run(f'make -j$(nproc) SHELL="{make_shell}"', cwd=self.source_folder, shell=True)
+            self.run(f'make -j1 SHELL="{make_shell}"', cwd=self.source_folder, shell=True)
         finally:
             # 还原 TMPDIR（避开 environment() context manager 的等价处理）
             if _saved_tmpdir is None:
