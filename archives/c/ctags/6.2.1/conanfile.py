@@ -5,10 +5,9 @@ Autotools project. GitHub archive requires autoreconf -i before configure.
 Platform adaptation: HMDFS umask 077 fix for config.status.
 """
 import os
-import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
