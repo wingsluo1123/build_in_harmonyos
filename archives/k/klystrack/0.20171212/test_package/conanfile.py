@@ -10,7 +10,7 @@ from conan.tools.files import copy
 
 class KlystrackTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv", "VirtualRunEnv"
     test_type = "explicit"
 
     def requirements(self):

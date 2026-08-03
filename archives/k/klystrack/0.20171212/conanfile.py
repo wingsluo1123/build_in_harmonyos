@@ -93,12 +93,10 @@ class KlystrackConan(ConanFile):
             except OSError as e:
                 # 其他 OSError 输出 warning 记录（aireview P3: 避静默失败，至少 self.output.warn）
                 self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
-        # aireview P2: CC 映射参照 kakoune 配方 dict 模式（避 self.settings.compiler 仅返类型名非路径）
-        # 从 Conan conanbuild 环境取 CC 变量，fallback 到 settings.compiler 映射
-        cc = os.environ.get("CC") or str(self.settings.compiler) or "clang"
+        # aireview P2: 删 CC Python 侧解析和命令行注入，依赖 conanbuild 环境自动提供正确交叉编译器
+        # （os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，覆盖 conanbuild 设的完整路径）
         make_cmd = (
             f'make CFG=release '
-            f'CC={cc} '
             f'CFLAGS+="{cppflags}" '
             f'LDFLAGS+="{ldflags}" '
             f'PREFIX={os.path.join(self.build_folder, "staging")}'
