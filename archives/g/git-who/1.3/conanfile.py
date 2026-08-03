@@ -55,21 +55,25 @@ class GitWhoConan(ConanFile):
         apply_conandata_patches(self)
         # CI worker 无 go 工具链（E154: go 不预装，且 go/1.21.13 制品仓无
         # conanfile 配方不能 requires），通过 cmd-pkgs 预编译包安装
-        # P3: curl|sh 管道加 set -o pipefail 屽蔽 curl 失败
+        # P3: curl|sh 管道加 set -o pipefail 屏蔽 curl 失败
+        # P2: 构建失败一律显式 raise ConanException（aireview: 避欺骗性打包，空包风险）
+        go_ok = False
         try:
             self.run(
                 "set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh "
                 "| sh -s -- go 1.21.13",
                 cwd=self.source_folder,
             )
+            go_ok = True
         except Exception:
-            self.output.warning("go install via cmd-pkgs failed, trying system go")
-            # 试系统 go 是否可用
+            # cmd-pkgs 失败试系统 go，两者全失败才 raise（无中间 warning 降级避被误读为容错）
             try:
                 self.run("go version", cwd=self.source_folder)
+                go_ok = True
             except Exception as e:
-                # P2: 显式 raise 而非降级为 warning（aireview: 欺骗性打包，空包风险）
                 raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed): {e}")
+        if not go_ok:
+            raise ConanException("go toolchain unavailable (go_ok=False after install attempts)")
         # P2: go build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+虚假声明）
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
         try:
