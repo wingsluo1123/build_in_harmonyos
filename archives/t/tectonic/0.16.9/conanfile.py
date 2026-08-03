@@ -43,7 +43,7 @@ class TectonicConan(ConanFile):
     def requirements(self):
         self.requires("freetype/2.14.3")
         self.requires("fontconfig/2.18.1")
-        self.requires("harfbuzz/14.2.0.1")
+        self.requires("harfbuzz/14.2.0.2")
         self.requires("graphite2/1.3.14")
         self.requires("icu4c/78")
         self.requires("libpng/1.6.58")

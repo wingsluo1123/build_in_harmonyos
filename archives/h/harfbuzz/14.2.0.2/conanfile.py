@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — harfbuzz 14.2.0.1 (meson)
+"""Conan recipe — harfbuzz 14.2.0.2 (meson)
 
 Text shaping library. Requires glib + freetype (cairo optional; disabled to
 avoid extra cycles — pango links cairo separately).
@@ -25,7 +25,7 @@ from conan.tools.meson import Meson, MesonToolchain
 
 class HarfbuzzConan(ConanFile):
     name = "harfbuzz"
-    version = "14.2.0.1"
+    version = "14.2.0.2"
     description = "HarfBuzz text shaping library"
     license = "MIT"
     homepage = "https://harfbuzz.github.io/"
