@@ -1,41 +1,36 @@
 software: "harfbuzz"
 version: "14.2.0.1"
-status: "built"
-build_date: "2026-07-22"
-build_system: "cmake"
+status: recipe
+build_date: "2026-07-25"
+build_system: meson
 
 source:
   url: "https://github.com/harfbuzz/harfbuzz/releases/download/14.2.0/harfbuzz-14.2.0.tar.xz"
-  sha256: "94017020f96d025bb66ae91574e4cf334bcad23e8175a8a40565b3721bc2eaff"
   tar_format: tar.xz
+  upstream_version: "14.2.0"
 
 configure_options:
-  - "BUILD_SHARED_LIBS=OFF"
-  - "HB_HAVE_GRAPHITE2=ON"
-  - "HB_HAVE_FREETYPE=ON"
-  - "HB_HAVE_GLIB=OFF"
-  - "HB_HAVE_ICU=OFF"
-  - "HB_HAVE_CAIRO=OFF"
-  - "HB_BUILD_UTILS=OFF"
-  - "CMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "-Dwrap_mode=nodownload"
+  - "-Dglib=enabled"
+  - "-Dgobject=enabled"
+  - "-Dfreetype=enabled"
+  - "-Dzlib=enabled"
+  - "-Dcairo=disabled"
+  - "-Dtests=enabled"
+  - "-Dutilities=enabled"
 
 build:
-  system: cmake
+  system: meson
   dependencies:
-    - graphite2/1.3.14
+    - glib/2.84.0.1
     - freetype/2.14.3
-  cc: clang
-  cxx: clang++
-  features:
-    - graphite2 support enabled (HB_HAVE_GRAPHITE2=ON)
-    - freetype support enabled (HB_HAVE_FREETYPE=ON)
-    - static library (BUILD_SHARED_LIBS=OFF)
+    - zlib/1.3.1.1
 
-patches_applied: []
+patches_applied:
+  - "patches/0001-static-tests.patch"
+  - "patches/0002-subset-repack-no-fonttools.patch"
 
-knowledge_gained:
-  - "harfbuzz 14.2.0 CMake build supports graphite2 via HB_HAVE_GRAPHITE2 option"
-  - "meson build fails on HMDFS due to subprocess execution restrictions"
-  - "CMake build is the recommended approach for OHOS cross-compilation"
-  - "graphite2/1.3.14 provides libgraphite2.a for static linking"
-  - "freetype/2.14.3 from conan cache provides shared library for compile-time linking"
+notes: |
+  R37 revision over archived 14.2.0. Conan meson recipe; cairo disabled
+  (pango brings cairo separately; hb-view not built). utilities=enabled so
+  upstream test/subset + test/shape are registered (236 meson tests).
