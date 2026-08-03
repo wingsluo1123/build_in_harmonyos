@@ -109,7 +109,11 @@ class NcursesConan(ConanFile):
             # 全 fallback 失败，用 Conan build_folder（必可写）
             sandbox = os.path.join(self.build_folder, ".ncurses-tmp")
             self.run(f"mkdir -p \"{sandbox}\"", ignore_errors=True)
-        with environment(Environment().define("TMPDIR", sandbox)):
+        # CI TypeError 根因: environment() context manager 在该 Conan 环境 shadow 非 callable，
+        # 避开用 os.environ 直接设 TMPDIR + try/finally 还原（同避开 os.path.isabs 逻辑）
+        _saved_tmpdir = os.environ.get("TMPDIR")
+        os.environ["TMPDIR"] = sandbox
+        try:
             # CONFIG_SHELL 存在性回退（aireview P2）：os.environ.get 缺 fallback
             # CI TypeError 根因: os.path.isabs 在该 Conan 环境 shadow 非 callable，
             # 避开用 str.startswith('/') 判绝对路径 + os.path.exists 核存在
@@ -130,6 +134,12 @@ class NcursesConan(ConanFile):
             ret = self.run("make -j$(nproc)", cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"make failed with exit code {ret}")
+        finally:
+            # 还原 TMPDIR（避开 environment() context manager 的等价处理）
+            if _saved_tmpdir is None:
+                os.environ.pop("TMPDIR", None)
+            else:
+                os.environ["TMPDIR"] = _saved_tmpdir
 
     def package(self):
         ret = self.run(f"make install DESTDIR= TMPDIR=/tmp", cwd=self.source_folder)
