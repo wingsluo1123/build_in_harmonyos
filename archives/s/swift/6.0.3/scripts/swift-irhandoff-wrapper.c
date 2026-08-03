@@ -272,8 +272,12 @@ int main(int argc, char **argv) {
   int ir_rc = run_wait(real, irargs);
   long ir_size = file_size(ir);
   fprintf(stderr, "[ohos-irhandoff] emit-ir rc=%d size=%ld\n", ir_rc, ir_size);
+  if (ir_rc != 0) {
+    rc = ir_rc;
+    goto cleanup;
+  }
   if (ir_size <= 0) {
-    rc = ir_rc ? ir_rc : 1;
+    rc = 1;
     goto cleanup;
   }
 
