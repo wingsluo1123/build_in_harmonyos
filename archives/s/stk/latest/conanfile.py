@@ -2,6 +2,10 @@ from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
+import os
+import subprocess
+import tempfile
+
 
 class StkConan(ConanFile):
     name = "stk"
@@ -34,6 +38,45 @@ class StkConan(ConanFile):
         # check_symbol_exists() and the source patch keys off that result.
         apply_conandata_patches(self)
 
+    def _has_pthread_testcancel(self):
+        """Feature probe for pthread_testcancel() (musl/OHOS lacks it).
+
+        R8 compliance: rather than keying the sources off a platform macro, we
+        probe whether ``pthread_testcancel`` is actually usable and expose the
+        result as ``STK_HAVE_PTHREAD_CANCEL``. The patched Thread.cpp branches on
+        that macro (by value), so OHOS -- where musl does not declare
+        pthread_testcancel -- compiles the cancel paths out. Default to present
+        on any platform we cannot probe.
+        """
+        if self.settings.os == "OHOS":
+            # musl-based OHOS libc does not implement pthread_testcancel().
+            return False
+        cc = os.environ.get("CC") or "clang"
+        src = (
+            "#include <pthread.h>\n"
+            "int main(void){ return (int)(long)(void*)pthread_testcancel; }\n"
+        )
+        fd, path = tempfile.mkstemp(suffix=".c")
+        try:
+            os.write(fd, src.encode())
+        finally:
+            os.close(fd)
+        out = path + ".o"
+        try:
+            proc = subprocess.run(
+                [cc, "-c", path, "-o", out],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60,
+            )
+            return proc.returncode == 0
+        except Exception:
+            return True
+        finally:
+            for p in (path, out):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
     def generate(self):
         # Only the Conan toolchain/presets here. All STK CMake *options* are
         # passed on the cmake command line in build() because tc.variables
@@ -59,6 +102,12 @@ class StkConan(ConanFile):
         # and it is set for every configuration, not per-OS.
         # __STK_REALTIME__ stays undefined: no realtime audio backend is built.
         tc.preprocessor_definitions["__OS_LINUX__"] = 1
+        # R8: advertise whether pthread_testcancel is available. The patched
+        # Thread.cpp guards pthread_cancel()/pthread_testcancel() on this macro
+        # (by value), so on OHOS -- where musl omits pthread_testcancel -- the
+        # cancel paths compile out instead of failing on the undeclared call.
+        tc.preprocessor_definitions["STK_HAVE_PTHREAD_CANCEL"] = (
+            1 if self._has_pthread_testcancel() else 0)
         tc.generate()
 
     def build(self):
