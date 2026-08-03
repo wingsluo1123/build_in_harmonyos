@@ -25,6 +25,9 @@ class GitWhoConan(ConanFile):
     # CGO_ENABLED=0 的 Go 构建不用 C 编译器，Go 也无 build_type 概念，
     # 仅保留影响交叉编译目标的 os/arch（同项目 git-flow 等无编译包同实践）
     settings = "os", "arch"
+    # 接入 Conan 2.x 交叉编译工具链机制（VirtualBuildEnv + env=conanbuild）
+    # 避依赖 CI 环境 PATH 巧合性正确（同 klystrack/kakoune 配方项目惯例）
+    generators = "VirtualBuildEnv"
 
     def validate(self):
         # R32: 与 build() 硬编码的 GOOS=linux 保持一致，拒绝不支持的 OS
@@ -62,7 +65,7 @@ class GitWhoConan(ConanFile):
             self.run(
                 "set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh "
                 "| sh -s -- go 1.21.13",
-                cwd=self.source_folder,
+                cwd=self.source_folder, env="conanbuild",
             )
             go_ok = True
         except Exception:
@@ -81,7 +84,7 @@ class GitWhoConan(ConanFile):
                 "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 "
                 "GOPROXY=https://goproxy.cn,direct "
                 "go build -ldflags=\"-s -w\" -o git-who .",
-                cwd=self.source_folder,
+                cwd=self.source_folder, env="conanbuild",
             )
         except Exception as e:
             raise ConanException(f"go build failed: {e}")
