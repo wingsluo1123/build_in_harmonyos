@@ -10,7 +10,7 @@ from conan.tools.files import copy
 
 class KlystrackTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
     test_type = "explicit"
 
     def requirements(self):
@@ -33,8 +33,9 @@ target_link_libraries(test_klystrack PRIVATE SDL2::SDL2)
 
     def test(self):
         # Build and run test binary
-        self.run("cmake . -DCMAKE_BUILD_TYPE=Release", cwd=self.build_folder)
-        self.run("cmake --build . --config Release", cwd=self.build_folder)
+        # aireview High: cmake 加 -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake（CMakeToolchain 生成）
+        self.run("cmake . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake", cwd=self.build_folder, env="conanbuild")
+        self.run("cmake --build . --config Release", cwd=self.build_folder, env="conanbuild")
         if can_run(self):
             # Medium: env="conanrun" + VirtualRunEnv 自动注入 PATH（aireview: 标准运行时环境）
             self.run("./test_klystrack", cwd=self.build_folder, env="conanrun")

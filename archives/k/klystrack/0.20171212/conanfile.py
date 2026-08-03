@@ -24,6 +24,9 @@ class KlystrackConan(ConanFile):
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"
+    # aireview P2: 接入 Conan 2.x 交叉编译工具链机制（VirtualBuildEnv + env=conanbuild）
+    # 避依赖 CI 环境 PATH 巧合性正确（release worker 可能解析到错误架构编译器）
+    generators = "VirtualBuildEnv"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -90,8 +93,9 @@ class KlystrackConan(ConanFile):
             except OSError as e:
                 # 其他 OSError 输出 warning 记录（aireview P3: 避静默失败，至少 self.output.warn）
                 self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
-        # aireview P2: CC 硬编码 clang → 改用 self.settings.compiler 动态设（避交叉编译器错）
-        cc = str(self.settings.compiler) if self.settings.compiler else "clang"
+        # aireview P2: CC 映射参照 kakoune 配方 dict 模式（避 self.settings.compiler 仅返类型名非路径）
+        # 从 Conan conanbuild 环境取 CC 变量，fallback 到 settings.compiler 映射
+        cc = os.environ.get("CC") or str(self.settings.compiler) or "clang"
         make_cmd = (
             f'make CFG=release '
             f'CC={cc} '
@@ -99,7 +103,7 @@ class KlystrackConan(ConanFile):
             f'LDFLAGS+="{ldflags}" '
             f'PREFIX={os.path.join(self.build_folder, "staging")}'
         )
-        self.run(make_cmd, cwd=make_dir)
+        self.run(make_cmd, cwd=make_dir, env="conanbuild")
 
     def package(self):
         # make install 安装到 staging（复用 _find_make_dir 定位源码根）
@@ -107,7 +111,7 @@ class KlystrackConan(ConanFile):
         self.run(
             f'make install CFG=release '
             f'PREFIX={os.path.join(self.build_folder, "staging")}',
-            cwd=make_dir
+            cwd=make_dir, env="conanbuild"
         )
         # copy staging 到 package_folder
         copy(self, "*", src=os.path.join(self.build_folder, "staging"),
