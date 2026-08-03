@@ -7,6 +7,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import can_run
 
 
 class SoundTouchTestConan(ConanFile):
@@ -26,6 +27,7 @@ class SoundTouchTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        assert self.cpp.build.bindirs, "No bindirs found in build output"
-        bin_path = os.path.join(self.cpp.build.bindirs[0], "test_sound_touch")
-        self.run(bin_path, env="conanrun")
+        if can_run(self):
+            assert self.cpp.build.bindirs, "No bindirs found in build output"
+            bin_path = os.path.join(self.cpp.build.bindirs[0], "test_sound_touch")
+            self.run(bin_path, env="conanrun")

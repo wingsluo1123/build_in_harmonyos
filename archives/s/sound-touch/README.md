@@ -9,4 +9,4 @@ SoundTouch 是一个开源音频处理库，可独立调整音频的节奏(tempo
 
 | 版本 | 状态 | 说明 |
 |------|------|------|
-| 2.4.0 | published | OHOS aarch64 适配版本，禁用 NEON 优化 |
+| 2.4.0 | built | OHOS aarch64 适配版本，禁用 NEON 优化 |
