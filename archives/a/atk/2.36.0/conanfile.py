@@ -60,8 +60,8 @@ class AtkConan(ConanFile):
         tc.project_options["introspection"] = "disabled"
         # glib 2.84.0 已通过 Conan 可用，禁用 meson fallback 克隆行为
         tc.project_options["wrap_mode"] = "nofallback"
-        # P3: 固定 default_library=static（shared=False 契约生效）
-        tc.project_options["default_library"] = "static"
+        # aireview P2: default_library 根据 shared 选项动态设（硬编码 static 致 shared=True 时产物仍 static 死选项）
+        tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.generate()
         # P2: PkgConfigDeps 让 atk configure 通过 pkg-config 找到 glib
         pkg = PkgConfigDeps(self)
