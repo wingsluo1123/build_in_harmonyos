@@ -2,7 +2,7 @@
 # test_package/test.sh — dmidecode L2 smoke test
 # Verifies the dmidecode binary is installed and reports version info.
 # Called by test_package/conanfile.py via self.run().
-set -eu
+set -euo pipefail
 
 BIN_PATH="$1"
 if [ -z "$BIN_PATH" ]; then
