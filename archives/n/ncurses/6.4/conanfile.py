@@ -132,7 +132,11 @@ class NcursesConan(ConanFile):
             # aireview P3: self.run 自带非零退出码抛 ConanException，手动 if ret!=0 raise 是死代码删
             self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
                      cwd=self.source_folder, shell=True)
-            self.run("make -j$(nproc) V=1", cwd=self.source_folder, shell=True)
+            # CI 真根因: include/Makefile:45 missing separator — toybox make 解析命令行续行缺 Tab
+            # 改用 CI 真实 bash 路径（CONFIG_SHELL 已设 /data/service/hnp/bin/bash）显式传 SHELL
+            # 删 V=1（改变 make 输出格式可能致 toybox make 解析异常）
+            make_shell = os.environ.get("CONFIG_SHELL") or "/bin/bash"
+            self.run(f'make -j$(nproc) SHELL="{make_shell}"', cwd=self.source_folder, shell=True)
         finally:
             # 还原 TMPDIR（避开 environment() context manager 的等价处理）
             if _saved_tmpdir is None:
