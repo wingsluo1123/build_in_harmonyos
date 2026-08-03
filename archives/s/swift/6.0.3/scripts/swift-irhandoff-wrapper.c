@@ -177,6 +177,10 @@ static void cleanup_owned(char *allocated_real, char *resource_dir,
                           char *arch_dir, char *modulemap_path,
                           char *modulemap_arg, char *ir, char *stripped,
                           char **irargs) {
+  if (!getenv("SWIFT_OHOS_KEEP_IRHANDOFF_TEMPS")) {
+    if (ir) unlink(ir);
+    if (stripped) unlink(stripped);
+  }
   free(allocated_real);
   free(resource_dir);
   free(arch_dir);

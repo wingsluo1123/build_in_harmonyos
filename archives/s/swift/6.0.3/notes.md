@@ -143,6 +143,19 @@ set:
   `swift-autolink-extract`, and the smoke compile runs with a writable
   `TMPDIR` plus `SDKROOT`/`OHOS_SYSROOT`/`OHOS_SDKROOT` when a sysroot is
   detectable.
+- Addressed the follow-up R19/source-bootstrap review boundary by making the
+  Conan default path download the official Swift 6.0.3 component tarballs,
+  apply the exported patches, and invoke `scripts/source-bootstrap-ohos.sh`.
+  The helper now drives cmark, Swift compiler/stdlib targets, SwiftPM
+  `Utilities/bootstrap install`, and stage assembly from a Conan build
+  directory.
+  Reusing an already assembled stage now requires the explicit
+  `SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1` escape hatch and records
+  `CONAN-STAGE-PROVENANCE.json` plus a stage/package identity hash.
+- Removed the OHOS-specific index-store suppression from the ClangImporter
+  patch, so index-store arguments are no longer silently disabled for OHOS.
+- Made `swift-irhandoff-wrapper.c` clean temporary `.ll` files by default; set
+  `SWIFT_OHOS_KEEP_IRHANDOFF_TEMPS=1` only when debugging IR handoff failures.
 
 ## True-device Stage Smoke, 2026-08-03
 
@@ -205,28 +218,37 @@ grep swift "$snapshot"
 rm -f "$snapshot"
 ```
 
-Then continue with a low-concurrency staged packaging validation:
+Then continue with a low-concurrency source-bootstrap validation. The default
+Conan path no longer consumes a prebuilt stage unless explicitly requested:
 
 ```sh
-export SWIFT_OHOS_BOOTSTRAP_ROOT=$HOME/swift-mainline-ohos-src
-export SWIFT_OHOS_STAGE_OUT=$SWIFT_OHOS_BOOTSTRAP_ROOT/swift-ohos-stage-$(date +%Y%m%d-%H%M%S)
-export TMPDIR=$SWIFT_OHOS_BOOTSTRAP_ROOT/tmp
+export SWIFT_OHOS_LLVM_BUILD_DIR=$HOME/swift-mainline-ohos-src/build/llvm-host-tools-ohos
+export SWIFT_OHOS_CC=$HOME/validation/toolchain-bin/ohos-clang
+export SWIFT_OHOS_CXX=$HOME/validation/toolchain-bin/ohos-clangxx
+export TMPDIR=$HOME/swift-mainline-ohos-src/tmp
 export SDKROOT=/storage/Users/currentUser/usr/local/sysroot
 export OHOS_SYSROOT=$SDKROOT
 export OHOS_SDKROOT=$SDKROOT
-# Set SWIFT_OHOS_SIGN=1 only when the bootstrap outputs still need signing.
-sh archives/s/swift/6.0.3/scripts/assemble-stage-ohos.sh
-
-export SWIFT_OHOS_STAGED_ROOT=$SWIFT_OHOS_STAGE_OUT
+export SWIFT_OHOS_JOBS=2
 conan create archives/s/swift/6.0.3 -pr:h ohos_4_1_armv8 -pr:b default -tf ""
 conan create archives/s/swift/6.0.3 -pr:h ohos_4_1_armv8 -pr:b default
 ```
 
-The current Conan recipe intentionally packages a supplied staged toolchain
-rather than claiming a fully automated Swift source bootstrap. The
-`assemble-stage-ohos.sh` helper is the first automation boundary for turning a
-completed source-bootstrap workspace into a clean signed stage that can be
-reused by Conan and downstream SwiftPM packages.
+If a reviewer needs to reproduce the already validated stage packaging fast
+path, make that boundary explicit and include the stage identity in the package
+ID:
+
+```sh
+export SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1
+export SWIFT_OHOS_STAGED_ROOT=/path/to/swift-ohos-stage
+conan create archives/s/swift/6.0.3 -pr:h ohos_4_1_armv8 -pr:b default
+```
+
+`source-bootstrap-ohos.sh` still depends on a pinned OHOS LLVM build substrate
+with complete `LLVM_DIR`, `Clang_DIR`, `llvm-tblgen`, `clang-tblgen`, and static
+component libraries. That substrate is intentionally explicit rather than hidden
+behind the Swift recipe, because it belongs to the OHOS LLVM toolchain layer
+and was the original missing-environment boundary for this path C work.
 
 Current stage boundary: `swift-driver-new` is built but not copied into the
 default packaged stage. When present, `swift --version` dispatches into the new

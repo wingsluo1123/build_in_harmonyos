@@ -1,5 +1,18 @@
 # Swift OHOS helper scripts
 
+`source-bootstrap-ohos.sh` is the reviewable entrypoint for rebuilding the
+current OHOS Swift stage from source. Conan `source()` downloads and verifies
+the Swift 6.0.3 component tarballs, applies the exported patches, then `build()`
+invokes this script by default. The script recreates the probe layout under a
+Conan build directory, validates the OHOS clang wrapper, sysroot, CMake/Ninja,
+and pinned OHOS LLVM CMake package, builds cmark, configures the OHOS Swift
+stdlib/compiler path, builds the requested Ninja targets, runs SwiftPM's
+`Utilities/bootstrap install` when `swift-build`/`swift-package` are not already
+present, and finally calls `assemble-stage-ohos.sh`. It defaults to
+`SWIFT_OHOS_JOBS=2`; set
+`SWIFT_OHOS_LLVM_BUILD_DIR`, `SWIFT_OHOS_CC`, `SWIFT_OHOS_CXX`, and
+`OHOS_SYSROOT`/`OHOS_SDKROOT` explicitly in a clean CI worker.
+
 `assemble-stage-ohos.sh` assembles a package-ready Swift OHOS stage from a
 completed source-bootstrap workspace. It copies a real `bin/` toolchain,
 including the `swift-frontend` and `swift-autolink-extract` helpers needed for

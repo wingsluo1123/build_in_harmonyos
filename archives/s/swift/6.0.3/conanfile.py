@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
-"""Conan package shell for the Swift 6.0.3 OHOS toolchain.
+"""Conan package for the Swift 6.0.3 OHOS toolchain.
 
-The current adaptation has proven an OHOS-native Swift toolchain on the true
-device, but the full source bootstrap is still being converted from probe
-scripts into reviewable patches. Until then this recipe packages an already
-assembled Swift stage directory or tarball. It deliberately fails clearly when
-no stage is supplied, so downstream SwiftPM recipes do not silently depend on
-absolute probe paths.
+The default path downloads the Swift 6.0.3 source components, applies the OHOS
+patch set, and runs the reviewable source-bootstrap helper to assemble a Swift
+stage from source. A preassembled stage may still be used for probe replay, but
+only when SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1 is set; that path records a stage
+identity hash so downstream recipes do not silently depend on absolute probe
+paths.
 """
 import os
 import shutil
 import stat
 import tarfile
+import hashlib
+import json
 
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
-from conan.tools.files import copy
+from conan.tools.files import apply_conandata_patches, copy, get
 from conan.tools.layout import basic_layout
 
 
@@ -27,6 +29,8 @@ class SwiftConan(ConanFile):
     homepage = "https://www.swift.org/"
     url = "https://www.swift.org/"
     package_type = "application"
+    options = {"stage_id": ["ANY"]}
+    default_options = {"stage_id": "source"}
 
     settings = "os", "arch", "compiler", "build_type"
     exports_sources = "patches/*", "scripts/*"
@@ -49,14 +53,27 @@ class SwiftConan(ConanFile):
         self.info.settings.rm_safe("compiler")
         self.info.settings.rm_safe("build_type")
         self.info.settings.rm_safe("os.version")
+        self.info.options.stage_id = self._stage_identity()
 
     def source(self):
-        pass
+        for name, source in self.conan_data["sources"].items():
+            self.output.info(f"Fetching Swift source component: {name}")
+            get(self, destination=self.source_folder, strip_root=False, **source)
+        apply_conandata_patches(self)
+        self._write_source_manifest()
 
     def build(self):
+        stage_out = os.path.join(self.build_folder, "stage")
+        if self._allow_staged_package() and self._has_supplied_stage():
+            self._copy_supplied_stage(stage_out)
+        else:
+            self._build_from_source(stage_out)
+
+        self._validate_stage(stage_out)
+
+    def _copy_supplied_stage(self, stage_out):
         stage = os.environ.get("SWIFT_OHOS_STAGED_ROOT")
         tarball = os.environ.get("SWIFT_OHOS_STAGED_TARBALL")
-        stage_out = os.path.join(self.build_folder, "stage")
         if stage and os.path.isdir(stage):
             copy(self, "*", src=stage, dst=stage_out, keep_path=True)
         elif tarball and os.path.isfile(tarball):
@@ -69,12 +86,28 @@ class SwiftConan(ConanFile):
             self._strip_single_root(stage_out)
         else:
             raise ConanException(
-                "Swift 6.0.3 OHOS stage not supplied. Set SWIFT_OHOS_STAGED_ROOT "
-                "or SWIFT_OHOS_STAGED_TARBALL after the source-bootstrap patches "
-                "have produced a signed Swift toolchain stage."
+                "SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1 was set, but neither "
+                "SWIFT_OHOS_STAGED_ROOT nor SWIFT_OHOS_STAGED_TARBALL points "
+                "to a usable Swift OHOS stage."
             )
+        self._write_stage_provenance(stage_out, source_mode="staged")
 
-        self._validate_stage(stage_out)
+    def _build_from_source(self, stage_out):
+        script = os.path.join(self.source_folder, "scripts", "source-bootstrap-ohos.sh")
+        if not os.path.isfile(script):
+            raise ConanException(f"Swift OHOS source bootstrap script is missing: {script}")
+        env = {
+            "SWIFT_OHOS_SOURCE_ROOT": self.source_folder,
+            "SWIFT_OHOS_BUILD_ROOT": os.path.join(self.build_folder, "source-bootstrap"),
+            "SWIFT_OHOS_BOOTSTRAP_ROOT": os.path.join(
+                self.build_folder, "source-bootstrap", "bootstrap"
+            ),
+            "SWIFT_OHOS_STAGE_OUT": stage_out,
+        }
+        command = " ".join(f"{key}={self._quote_sh(value)}" for key, value in env.items())
+        command = f"{command} sh {self._quote_sh(script)}"
+        self.run(command, cwd=self.source_folder)
+        self._write_stage_provenance(stage_out, source_mode="source-bootstrap")
 
     def _strip_single_root(self, stage_out):
         entries = os.listdir(stage_out)
@@ -100,6 +133,77 @@ class SwiftConan(ConanFile):
         missing = [path for path in required if not os.path.exists(os.path.join(stage, path))]
         if missing:
             raise ConanException(f"Swift OHOS stage is missing required entries: {missing}")
+
+    def _has_supplied_stage(self):
+        stage = os.environ.get("SWIFT_OHOS_STAGED_ROOT")
+        tarball = os.environ.get("SWIFT_OHOS_STAGED_TARBALL")
+        return (stage and os.path.isdir(stage)) or (tarball and os.path.isfile(tarball))
+
+    def _allow_staged_package(self):
+        return os.environ.get("SWIFT_OHOS_ALLOW_STAGED_PACKAGE") == "1"
+
+    def _stage_identity(self):
+        if not self._allow_staged_package():
+            return "source"
+        stage = os.environ.get("SWIFT_OHOS_STAGED_ROOT")
+        tarball = os.environ.get("SWIFT_OHOS_STAGED_TARBALL")
+        if tarball and os.path.isfile(tarball):
+            return "tarball-" + self._hash_file(tarball)[:32]
+        if stage and os.path.isdir(stage):
+            return "dir-" + self._hash_tree(stage)[:32]
+        return "source"
+
+    def _write_source_manifest(self):
+        manifest = {
+            "swift_version": self.version,
+            "components": sorted(self.conan_data["sources"].keys()),
+            "patches": [
+                patch["patch_file"]
+                for patch in self.conan_data.get("patches", {}).get(str(self.version), [])
+            ],
+            "toolchain_references": self.conan_data.get("toolchain_references", {}),
+        }
+        path = os.path.join(self.source_folder, "SWIFT-OHOS-SOURCE-MANIFEST.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+    def _write_stage_provenance(self, stage_out, source_mode):
+        os.makedirs(stage_out, exist_ok=True)
+        provenance = {
+            "source_mode": source_mode,
+            "stage_identity": self._stage_identity(),
+            "source_manifest": "SWIFT-OHOS-SOURCE-MANIFEST.json",
+        }
+        if os.path.isdir(stage_out):
+            provenance["stage_tree_sha256"] = self._hash_tree(stage_out)
+        path = os.path.join(stage_out, "CONAN-STAGE-PROVENANCE.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(provenance, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+
+    def _hash_file(self, path):
+        digest = hashlib.sha256()
+        with open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def _hash_tree(self, root):
+        digest = hashlib.sha256()
+        for current, dirs, files in os.walk(root):
+            dirs.sort()
+            for name in sorted(files):
+                path = os.path.join(current, name)
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                digest.update(rel.encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(self._hash_file(path).encode("ascii"))
+                digest.update(b"\0")
+        return digest.hexdigest()
+
+    def _quote_sh(self, value):
+        return "'" + str(value).replace("'", "'\"'\"'") + "'"
 
     def package(self):
         stage = os.path.join(self.build_folder, "stage")
