@@ -100,7 +100,9 @@ class SwiftConan(ConanFile):
         self._write_stage_provenance(stage_out, source_mode="staged")
 
     def _build_from_source(self, stage_out):
-        script = os.path.join(self.source_folder, "scripts", "source-bootstrap-ohos.sh")
+        script = os.path.join(
+            self.export_sources_folder, "scripts", "source-bootstrap-ohos.sh"
+        )
         if not os.path.isfile(script):
             raise ConanException(f"Swift OHOS source bootstrap script is missing: {script}")
         env = {

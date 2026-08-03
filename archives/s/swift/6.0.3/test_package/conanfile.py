@@ -50,7 +50,6 @@ class SwiftToolchainTestConan(ConanFile):
             if value and os.path.isdir(value):
                 return value
         for candidate in (
-            "/storage/Users/currentUser/usr/local/sysroot",
             "/data/service/hnp/sysroot",
             "/data/service/hnp/usr/local/sysroot",
             "/usr/local/sysroot",

@@ -152,10 +152,20 @@ set:
   Reusing an already assembled stage now requires the explicit
   `SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1` escape hatch and records
   `CONAN-STAGE-PROVENANCE.json` plus a stage/package identity hash.
-- Removed the OHOS-specific index-store suppression from the ClangImporter
-  patch, so index-store arguments are no longer silently disabled for OHOS.
 - Made `swift-irhandoff-wrapper.c` clean temporary `.ll` files by default; set
   `SWIFT_OHOS_KEEP_IRHANDOFF_TEMPS=1` only when debugging IR handoff failures.
+- The ClangImporter index-store wrapper is still a source-bootstrap boundary:
+  the current patch bypasses index data recording on this LLVM 15 fork instead
+  of claiming full index-store support. Re-enable it after the OHOS LLVM index
+  action path is verified.
+- The 2026-08-03 09:09 source-bootstrap retry reached `build()` but failed
+  before compiler work because the recipe looked for `scripts/` under the
+  copied upstream source tree. The recipe now invokes
+  `source-bootstrap-ohos.sh` from `exports_sources`, while keeping
+  `SWIFT_OHOS_SOURCE_ROOT` pointed at the patched Swift source tree.
+- `test_package` no longer probes a user-home sysroot path by default; it uses
+  explicit `SDKROOT`/`OHOS_SYSROOT`/`OHOS_SDKROOT` first, then conventional
+  system/toolchain sysroot locations.
 
 ## True-device Stage Smoke, 2026-08-03
 
@@ -227,7 +237,7 @@ export SWIFT_OHOS_SOURCE_TARBALL_DIR=$HOME/swift-mainline-ohos-src/sources
 export SWIFT_OHOS_CC=$HOME/validation/toolchain-bin/ohos-clang
 export SWIFT_OHOS_CXX=$HOME/validation/toolchain-bin/ohos-clangxx
 export TMPDIR=$HOME/swift-mainline-ohos-src/tmp
-export SDKROOT=/storage/Users/currentUser/usr/local/sysroot
+export SDKROOT=${SDKROOT:-/data/service/hnp/sysroot}
 export OHOS_SYSROOT=$SDKROOT
 export OHOS_SDKROOT=$SDKROOT
 export SWIFT_OHOS_JOBS=2
