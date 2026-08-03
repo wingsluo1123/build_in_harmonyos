@@ -100,8 +100,11 @@ void uuid_clear(uuid_t uu);
 int uuid_is_null(const uuid_t uu);
 void uuid_generate(uuid_t out);
 void uuid_generate_random(uuid_t out);
+void uuid_generate_time(uuid_t out);
 void uuid_unparse_lower(const uuid_t uu, char *out);
+void uuid_unparse_upper(const uuid_t uu, char *out);
 int uuid_parse(const char *in, uuid_t uu);
+int uuid_compare(const uuid_t a, const uuid_t b);
 #ifdef __cplusplus
 }
 #endif
@@ -138,6 +141,8 @@ void uuid_generate(uuid_t out) {
 
 void uuid_generate_random(uuid_t out) { uuid_generate(out); }
 
+void uuid_generate_time(uuid_t out) { uuid_generate(out); }
+
 void uuid_unparse_lower(const uuid_t uu, char *out) {
   static const char hex[] = "0123456789abcdef";
   int j = 0;
@@ -147,6 +152,16 @@ void uuid_unparse_lower(const uuid_t uu, char *out) {
     out[j++] = hex[uu[i] & 0xf];
   }
   out[j] = 0;
+}
+
+void uuid_unparse_upper(const uuid_t uu, char *out) {
+  uuid_unparse_lower(uu, out);
+  for (char *p = out; *p; ++p)
+    *p = (char)toupper((unsigned char)*p);
+}
+
+int uuid_compare(const uuid_t a, const uuid_t b) {
+  return memcmp(a, b, 16);
 }
 
 static int hexval(int c) {

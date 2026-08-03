@@ -224,6 +224,14 @@ wrappers, so invoking them through `/bin/sh <wrapper>` made the shell parse ELF
 bytes as a script. The bootstrap script now passes executable wrappers directly
 to CMake and only uses `/bin/sh <wrapper>` for non-executable wrapper files.
 
+At 2026-08-03 10:01 CST, source-bootstrap reached the Swift compiler build
+proper (`swiftBasic`, around 51/933). The next boundary was a too-small UUID
+shim (`uuid_generate_time`, `uuid_unparse_upper`, and `uuid_compare` were
+missing) plus Swift 6.0.3 CAS backend fields that are not present in the pinned
+OHOS LLVM 15 fork. The shim now exports the libuuid entry points used by
+`lib/Basic/UUID.cpp`, and the Swift patch compiles CAS backend object-mode
+plumbing only when the LLVM headers expose the newer CAS API.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
