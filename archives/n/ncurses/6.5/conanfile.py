@@ -52,21 +52,39 @@ class NcursesConan(ConanFile):
             return None
         return os.path.join(home, "usr", "local", "bin")
 
+    def _tool_dirs(self):
+        dirs = []
+        if self.settings.os == "OHOS":
+            dirs.extend(
+                [
+                    "/data/service/hnp/bin",
+                    "/storage/Users/currentUser/usr/local/bin",
+                    "/usr/local/bin",
+                ]
+            )
+        home_bin = self._home_prefix_bin()
+        if home_bin:
+            dirs.append(home_bin)
+        seen = set()
+        result = []
+        for path in dirs:
+            if path and path not in seen:
+                seen.add(path)
+                result.append(path)
+        return result
+
     def _path(self):
         parts = []
-        home_bin = self._home_prefix_bin()
-        if home_bin and os.path.isdir(home_bin):
-            parts.append(home_bin)
+        parts.extend(self._tool_dirs())
         current = os.environ.get("PATH")
         if current:
             parts.append(current)
         return os.pathsep.join(parts)
 
     def _shell(self):
-        home_bin = self._home_prefix_bin()
         candidates = []
-        if home_bin:
-            candidates.append(os.path.join(home_bin, "bash"))
+        for tool_dir in self._tool_dirs():
+            candidates.append(os.path.join(tool_dir, "bash"))
         candidates.extend(
             [
                 os.environ.get("CONFIG_SHELL"),
@@ -82,11 +100,28 @@ class NcursesConan(ConanFile):
         return shutil.which("sh") or "/bin/sh"
 
     def _tmpdir(self):
-        tmpdir = os.environ.get("TMPDIR")
-        if not tmpdir:
-            tmpdir = os.path.join(os.path.expanduser("~"), "tmp", "ncurses-conan")
+        if self.settings.os == "OHOS":
+            tmpdir = os.path.join(self.build_folder, ".tmp")
+        else:
+            tmpdir = os.environ.get("TMPDIR") or os.path.join(self.build_folder, ".tmp")
         os.makedirs(tmpdir, exist_ok=True)
+        try:
+            os.chmod(tmpdir, 0o755)
+        except OSError:
+            pass
         return tmpdir
+
+    def _program(self, name, alternatives=()):
+        for tool_dir in self._tool_dirs():
+            for executable in (name, *alternatives):
+                candidate = os.path.join(tool_dir, executable)
+                if self._is_usable_executable(candidate):
+                    return candidate
+        for executable in (name, *alternatives):
+            candidate = shutil.which(executable)
+            if self._is_usable_executable(candidate):
+                return candidate
+        return name
 
     def _tool(self, key, fallback):
         executables = self.conf.get(
@@ -95,9 +130,8 @@ class NcursesConan(ConanFile):
         candidate = executables.get(key)
         if self._is_usable_executable(candidate):
             return candidate
-        home_bin = self._home_prefix_bin()
-        if home_bin:
-            candidate = os.path.join(home_bin, fallback)
+        for tool_dir in self._tool_dirs():
+            candidate = os.path.join(tool_dir, fallback)
             if self._is_usable_executable(candidate):
                 return candidate
         candidate = shutil.which(fallback)
@@ -139,6 +173,8 @@ class NcursesConan(ConanFile):
             "CONFIG_SHELL": self._shell(),
             "SHELL": self._shell(),
             "PATH": self._path(),
+            "SED": self._program("sed", ("gsed",)),
+            "AWK": self._program("gawk", ("awk",)),
         }
         return " ".join(f"{key}={shlex.quote(str(value))}" for key, value in env.items())
 
@@ -159,11 +195,45 @@ class NcursesConan(ConanFile):
             "--with-pkg-config-libdir=/lib/pkgconfig",
         ]
         if self.settings.os == "OHOS":
+            args.append("--disable-big-strings")
             args.append("--build=aarch64-unknown-linux-gnu")
         return args
 
     def generate(self):
         AutotoolsToolchain(self).generate()
+
+    def _repair_ohos_makefiles(self):
+        makefiles = [
+            "Makefile",
+            "include/Makefile",
+            "ncurses/Makefile",
+            "progs/Makefile",
+            "panel/Makefile",
+            "menu/Makefile",
+            "form/Makefile",
+            "test/Makefile",
+            "misc/Makefile",
+        ]
+        for relpath in makefiles:
+            path = os.path.join(self.source_folder, relpath)
+            if not os.path.isfile(path):
+                continue
+            with open(path, "rb") as handle:
+                lines = handle.readlines()
+            changed = False
+            repaired = []
+            top_srcdir = b"." if relpath == "Makefile" else b".."
+            for line in lines:
+                if line.startswith(b"top_srcdir"):
+                    repaired.append(b"top_srcdir\t= " + top_srcdir + b"\n")
+                    changed = True
+                elif any(byte < 9 or 13 < byte < 32 or byte > 126 for byte in line):
+                    changed = True
+                else:
+                    repaired.append(line)
+            if changed:
+                with open(path, "wb") as handle:
+                    handle.writelines(repaired)
 
     def build(self):
         if self.settings.os == "OHOS":
@@ -172,6 +242,8 @@ class NcursesConan(ConanFile):
         shell = shlex.quote(self._shell())
         args = " ".join(shlex.quote(arg) for arg in self._configure_args())
         self.run(f"{env} {shell} ./configure {args}", cwd=self.source_folder, env="conanbuild")
+        if self.settings.os == "OHOS":
+            self._repair_ohos_makefiles()
         self.run(f"{env} make -j1", cwd=self.source_folder, env="conanbuild")
         self.run(f"{env} make -C test -j1", cwd=self.source_folder, env="conanbuild")
         self.run(f"{env} make -C test check", cwd=self.source_folder, env="conanbuild")
