@@ -292,21 +292,33 @@ build_llvm_static_deps() {
   [ "${SWIFT_OHOS_BUILD_LLVM_STATIC_DEPS:-1}" = "1" ] || return 0
   [ -f "$swift_build/build.ninja" ] || return 0
   targets_file=$logs/llvm-static-deps.targets
-  "$python_bin" - "$swift_build/build.ninja" > "$targets_file" <<'PY'
+  "$python_bin" - "$swift_build/build.ninja" "$llvm_build" > "$targets_file" <<'PY'
 import sys
 from pathlib import Path
+swift_build = Path(sys.argv[1]).parent.resolve()
+llvm_build = Path(sys.argv[2]).resolve()
 line = ""
 for current in Path(sys.argv[1]).read_text(errors="ignore").splitlines():
     if "bin/swift-frontend:" in current:
         line = current
         break
 names = []
+def ninja_target(item):
+    normalized = item.replace("\\", "/")
+    if normalized.startswith("lib/"):
+        return normalized
+    path = Path(item)
+    candidate = path if path.is_absolute() else swift_build / path
+    try:
+        return candidate.resolve().relative_to(llvm_build).as_posix()
+    except ValueError:
+        return normalized
 for item in line.split():
     base = Path(item).name
     if base.startswith("libLLVM") and base.endswith(".a"):
-        names.append(item)
+        names.append(ninja_target(item))
     elif base.startswith("libclang") and base.endswith(".a"):
-        names.append(item)
+        names.append(ninja_target(item))
 for name in ["clang-resource-headers"] + list(dict.fromkeys(names)):
     print(name)
 PY

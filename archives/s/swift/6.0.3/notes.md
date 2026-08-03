@@ -278,10 +278,11 @@ the ClangImporter patch no longer uses `getLangOpts()->` where the LLVM 15
 headers expose a reference, the cached-source `unzip()` path no longer passes
 Conan-unsupported `strip_root`, the test_package compile environment now quotes
 environment-derived values with `shlex.quote()`, and the LLVM static dependency
-helper keeps Ninja's full archive output target names instead of stripping them
-to bare library names. R8 platform-conditional feedback remains a separate
-design/compliance item because the current OHOS Swift platform model still
-needs targeted replacement rather than a blind text rewrite.
+helper keeps Ninja's archive output target names, normalizing LLVM build
+absolute paths to relative targets such as `lib/libLLVMMCJIT.a` instead of
+stripping them to bare library names. R8 platform-conditional feedback remains
+a separate design/compliance item because the current OHOS Swift platform model
+still needs targeted replacement rather than a blind text rewrite.
 
 ## Next Steps
 
