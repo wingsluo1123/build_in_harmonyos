@@ -38,4 +38,5 @@ class GitWhoTestConan(ConanFile):
             return
         # Run the compiled test binary (verifies git-who --help)
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_git_who")
-        self.run(f'"{test_bin}"', env="conanrun")
+        # aireview: test.c 改用 argv 传 bin_path 避依赖 PATH 巧合，同步传 git-who 二进制路径参数
+        self.run(f'"{test_bin}" "{bin_path}"', env="conanrun")
