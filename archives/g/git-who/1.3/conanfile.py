@@ -68,12 +68,12 @@ class GitWhoConan(ConanFile):
                 cwd=self.source_folder, env="conanbuild",
             )
             go_ok = True
-        except Exception:
+        except ConanException:
             # cmd-pkgs 失败试系统 go，两者全失败才 raise（无中间 warning 降级避被误读为容错）
             try:
-                self.run("go version", cwd=self.source_folder)
+                self.run("go version", cwd=self.source_folder, env="conanbuild")
                 go_ok = True
-            except Exception as e:
+            except ConanException as e:
                 raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed): {e}")
         if not go_ok:
             raise ConanException("go toolchain unavailable (go_ok=False after install attempts)")
@@ -86,7 +86,7 @@ class GitWhoConan(ConanFile):
                 "go build -ldflags=\"-s -w\" -o git-who .",
                 cwd=self.source_folder, env="conanbuild",
             )
-        except Exception as e:
+        except ConanException as e:
             raise ConanException(f"go build failed: {e}")
 
     def package(self):

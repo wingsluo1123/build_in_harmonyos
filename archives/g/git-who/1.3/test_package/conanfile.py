@@ -7,6 +7,7 @@ then runs the binary to verify git-who --help works.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import cross_building
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -14,7 +15,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class GitWhoTestConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
     test_type = "explicit"
-    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -31,7 +32,7 @@ class GitWhoTestConan(ConanFile):
         bin_path = os.path.join(self.dependencies["git-who"].package_folder,
                                 "bin", "git-who")
         if not os.path.exists(bin_path):
-            raise Exception(f"git-who binary not found: {bin_path}")
+            raise ConanException(f"git-who binary not found: {bin_path}")
         if cross_building(self):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
             return
