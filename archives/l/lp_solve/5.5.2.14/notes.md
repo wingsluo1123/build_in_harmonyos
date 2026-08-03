@@ -113,8 +113,8 @@ make_lp/set_obj/add_constraint/solve/delete_lp  ✅
 | C4 | G1 | commands.json 缺失 | 创建软件级元数据 |
 | C5 | G1 | manifest.yaml 字段错误 | 修正 build_system=makefile, system=makefile, 补充 sha256 |
 | C6 | G2 | 补丁 0001 源路径 `--- a/Makefile` | 改为 `--- /dev/null`（新文件补丁格式） |
-| C7 | G2 | Conan 2.29.1 不支持 `conf.get("tools.build:compiler_executables:c")` | 改用 `os.environ.get("CC")` 获取编译器路径 |
-| C8 | G2 | `basic_layout` 导致源码在 src/ 子目录 | 自定义 `layout()` 使 source/build 同目录 |
+| C7 | G2 | Conan 2.29.1 不支持 `conf.get("tools.build:compiler_executables:c")` | 改用 `self.conf.get("tools.build:compiler_executables", default={})` 获取编译器字典，再从中取 `c` 键 |
+| C8 | G2 | `basic_layout` 导致源码在 src/ 子目录 | `basic_layout` 当前可用，无需自定义 layout |
 | C9 | G2 | yacc 隐式规则重新生成 lp_rlp.c 导致 token 未定义 | 使用 `make -r` 禁用隐式规则 |
 | C10 | G2 | 0004 补丁在 lp_rlp.h include tokens 导致宏/enum 冲突 | 删除 0004 补丁 |
 | C11 | G2 | test_package `get_var()` 不存在于 API | 改用 `get_var_primalresult()` |

@@ -82,3 +82,5 @@ class LpSolveConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["lpsolve55"]
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.bindirs = ["bin"]
