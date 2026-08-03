@@ -20,12 +20,19 @@ int main(int argc, char **argv) {
     }
     /* git-who 已通过 conanrun 环境暴露在 PATH 中，但用 argv 传路径避依赖 PATH 巧合 */
     char cmd[8192];
-    snprintf(cmd, sizeof(cmd), "\"%s\" --help > /dev/null 2>&1", bin);
+    int sn_ret = snprintf(cmd, sizeof(cmd), "\"%s\" --help > /dev/null 2>&1", bin);
+    /* aireview P3: snprintf 截断未检查 — 返值 >=size 表示截断，bin 路径过长致命令截断注入风险 */
+    if (sn_ret < 0 || (size_t)sn_ret >= sizeof(cmd)) {
+        fprintf(stderr, "FAIL: command buffer truncated (snprintf ret %d, buf %zu)\n", sn_ret, sizeof(cmd));
+        return 4;
+    }
     int ret = system(cmd);
     if (ret != 0) {
         /* P3: system 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
         int real_code = WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;
-        fprintf(stderr, "FAIL: git-who --help exited with code %d (system raw %d)\n", real_code, ret);
+        /* aireview P3: real_code=-1 时（WIFEXITED false）错误信息精度 — 补 raw 帮诊断信号状态 */
+        fprintf(stderr, "FAIL: git-who --help exited with code %d (system raw %d%s)\n", real_code, ret,
+                 real_code == -1 ? ", WIFEXITED false (killed by signal)" : "");
         return 1;
     }
     printf("git-who smoke test PASSED\n");
