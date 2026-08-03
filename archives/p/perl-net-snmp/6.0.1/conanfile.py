@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — perl-net-snmp 6.0.1-r8 (pure Perl module).
+"""Conan recipe — perl-net-snmp 6.0.1 (pure Perl module).
 
 Net::SNMP — Object oriented interface to SNMP.
 Build system: Perl ExtUtils::MakeMaker (Makefile.PL).

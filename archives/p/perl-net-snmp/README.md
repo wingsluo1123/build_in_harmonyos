@@ -31,8 +31,27 @@ sha256sum /tmp/Crypt-DES_PP-1.00.tar.gz  # 对比上述哈希值
 tar xzf /tmp/Crypt-DES_PP-1.00.tar.gz -C /tmp/
 cp /tmp/Crypt-DES_PP-1.00/lib/Crypt/DES_PP.pm ~/usr/local/lib/site_perl/5.42.0/Crypt/
 
-# 2. 包装器文件已包含在归档中 (Crypt/DES.pm, Digest/SHA1.pm, Socket6.pm)
-# 复制到 ~/usr/local/lib/site_perl/5.42.0/
+# 2. 创建纯 Perl 包装器文件 (可选依赖, 非归档内容)
+# Crypt::DES 包装器 (使用 Crypt::DES_PP 后端)
+mkdir -p ~/usr/local/lib/site_perl/5.42.0/Crypt
+cat > ~/usr/local/lib/site_perl/5.42.0/Crypt/DES.pm <<'WRAPPER'
+package Crypt::DES;
+use parent 'Crypt::DES_PP';
+1;
+WRAPPER
+# Digest::SHA1 包装器 (使用 Digest::SHA 核心模块)
+mkdir -p ~/usr/local/lib/site_perl/5.42.0/Digest
+cat > ~/usr/local/lib/site_perl/5.42.0/Digest/SHA1.pm <<'WRAPPER'
+package Digest::SHA1;
+use Digest::SHA qw(sha1 sha1_hex sha1_base64);
+1;
+WRAPPER
+# Socket6 包装器 (使用核心 Socket v2.038)
+cat > ~/usr/local/lib/site_perl/5.42.0/Socket6.pm <<'WRAPPER'
+package Socket6;
+use Socket qw(:all);
+1;
+WRAPPER
 
 # 3. 设置 PERL5LIB (追加,不要覆盖)
 export PERL5LIB="/path/to/conan/lib:$PERL5LIB"
@@ -76,4 +95,4 @@ make install DESTDIR=/path/to/staging
 
 | 版本 | 状态 | 编译日期 |
 |------|------|----------|
-| [6.0.1-r8](./6.0.1-r8/) | built | 2026-06-26 |
+| [6.0.1](./6.0.1/) | built | 2026-06-26 |

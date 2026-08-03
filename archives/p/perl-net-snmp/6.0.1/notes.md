@@ -1,4 +1,4 @@
-# perl-net-snmp 6.0.1-r8 适配笔记
+# perl-net-snmp 6.0.1 适配笔记
 
 ## 编译环境
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
@@ -8,14 +8,14 @@
 
 ## 编译步骤
 
-1. `ohc-run.py init-build perl-net-snmp 6.0.1-r8` 初始化编译环境
-2. `source .build-context-perl-net-snmp-6.0.1-r8` 加载上下文
+1. `ohc-run.py init-build perl-net-snmp 6.0.1` 初始化编译环境
+2. `source .build-context-perl-net-snmp-6.0.1` 加载上下文
 3. `cd $BUILD_SRC_DIR` 进入源码目录
 4. `perl Makefile.PL` 生成 Makefile
 5. `make` 编译 Perl 模块
-6. `ohc-run.py conan-init perl-net-snmp 6.0.1-r8` 生成 Conan 配方
-7. `ohc-run.py conan-verify perl-net-snmp 6.0.1-r8` 验证配方 (全部通过)
-8. `ohc-run.py finish perl-net-snmp 6.0.1-r8 built` 归档收尾
+6. `ohc-run.py conan-init perl-net-snmp 6.0.1` 生成 Conan 配方
+7. `ohc-run.py conan-verify perl-net-snmp 6.0.1` 验证配方 (全部通过)
+8. `ohc-run.py finish perl-net-snmp 6.0.1 built` 归档收尾
 
 ## 可选依赖解决
 
@@ -79,7 +79,7 @@ Net::SNMP 无需补丁。所有适配通过纯 Perl 包装器实现，不修改 
 
 ```bash
 # Conan create 验证
-$ conan create . 6.0.1-r8@ohpcd/stable
+$ conan create . 6.0.1@ohpcd/stable
 Net::SNMP version: v6.0.1
 
 # conan-verify 8 道门禁全部 PASS

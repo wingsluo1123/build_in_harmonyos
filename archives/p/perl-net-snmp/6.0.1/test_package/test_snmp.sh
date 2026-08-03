@@ -2,6 +2,7 @@
 # test_snmp.sh — Net::SNMP consumer test
 # CI L0c requires .sh/.c/.cpp/.py extension for test source files
 # This shell wrapper runs the Perl test via perl -e
+set -euo pipefail
 
 PERL5LIB="${PERL5LIB:-}" perl -e '
 use strict;
