@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: cmake
-- 编译日期: 2026-06-24
+- 编译日期: 2026-07-23
 - 编译器: clang 15.0.4 / clang++ 15.0.4 (HarmonyOS SDK)
 - C++ 标准库: libc++ (非 libstdc++)
 - 系统: HarmonyOS aarch64, HongMeng Kernel 1.12.0
