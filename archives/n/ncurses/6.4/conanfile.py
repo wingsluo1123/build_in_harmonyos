@@ -3,7 +3,6 @@
 import os
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException
-from conan.tools.env import Environment, environment
 from conan.tools.files import get, copy, export_conandata_patches
 from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -69,6 +68,9 @@ class NcursesConan(ConanFile):
         tc.configure_args.append("--without-manpages")
         tc.configure_args.append("--without-tests")
         tc.configure_args.append("--without-cxx-binding")
+        # aireview P2: 补 --without-progs 跳过 11 个无用终端工具构建（违 R38）
+        # 同 alembic 等同类包惯例；make install 无 tic 编译 terminfo，TMPDIR 依赖降低
+        tc.configure_args.append("--without-progs")
         if self.options.widec:
             tc.configure_args.append("--enable-widec")
         # 头文件安装到顶层 include/ 而非 include/ncursesw/（aamath/catgirl 同实践）
@@ -127,13 +129,10 @@ class NcursesConan(ConanFile):
             # ncurses 6.4 老 autotools (2022 config.guess) �猜不出 OHOS aarch64，显式传 build/host
             # 追加 generate() 中定义的 configure_args（--without-shared 等，否则这些选项失效）
             args = " ".join(self._configure_args)
-            ret = self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
-                         cwd=self.source_folder, shell=True)
-            if ret != 0:
-                raise ConanException(f"configure failed with exit code {ret}")
-            ret = self.run("make -j$(nproc) V=1 SHELL=/bin/bash", cwd=self.source_folder, shell=True)
-            if ret != 0:
-                raise ConanException(f"make failed with exit code {ret}")
+            # aireview P3: self.run 自带非零退出码抛 ConanException，手动 if ret!=0 raise 是死代码删
+            self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
+                     cwd=self.source_folder, shell=True)
+            self.run("make -j$(nproc) V=1 SHELL=/bin/bash", cwd=self.source_folder, shell=True)
         finally:
             # 还原 TMPDIR（避开 environment() context manager 的等价处理）
             if _saved_tmpdir is None:
