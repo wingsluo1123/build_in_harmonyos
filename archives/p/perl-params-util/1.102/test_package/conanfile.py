@@ -24,4 +24,4 @@ class PerlparamsutilTestConan(ConanFile):
 
         # Run the test script which checks file existence and module functions
         script = os.path.join(self.source_folder, "test_params_util.sh")
-        self.run(f'sh "{script}" "{pkg_folder}"', env="conanrun")
+        self.run(f'bash "{script}" "{pkg_folder}"', env="conanrun")

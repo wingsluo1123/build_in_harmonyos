@@ -88,23 +88,33 @@ class PerlparamsutilConan(ConanFile):
         with open(makefile_path, "r") as f:
             content = f.read()
 
-        musl_prefix = os.environ.get("MUSL_PREFIX")
-        if not musl_prefix:
-            raise Exception("MUSL_PREFIX environment variable must be set to musl C library prefix")
-        musl_inc = os.path.join(musl_prefix, "include")
-        musl_lib = os.path.join(musl_prefix, "lib")
+        # MUSL_PREFIX is optional: on OHOS the clang sysroot already
+        # provides musl headers (sys/types.h etc.) and libc in the
+        # default search paths.  Local dev with a custom musl install
+        # can set MUSL_PREFIX to inject extra -I/-L flags.
+        musl_prefix = os.environ.get("MUSL_PREFIX", "")
+        musl_inc = os.path.join(musl_prefix, "include") if musl_prefix else ""
+        musl_lib = os.path.join(musl_prefix, "lib") if musl_prefix else ""
 
         # Add musl include path to CCFLAGS (idempotent: skip if already present)
-        content = re.sub(
-            r"^(CCFLAGS = )(?!.*" + re.escape(musl_inc) + ")",
-            rf"\1-I{musl_inc} ",
-            content,
-            flags=re.MULTILINE,
-        )
-        # Add CRT workaround and musl lib path to LDDLFLAGS (idempotent: skip if already present)
+        if musl_inc:
+            content = re.sub(
+                r"^(CCFLAGS = )(?!.*" + re.escape(musl_inc) + ")",
+                rf"\1-I{musl_inc} ",
+                content,
+                flags=re.MULTILINE,
+            )
+        # Add CRT workaround to LDDLFLAGS (idempotent: skip if already present)
+        # -nostartfiles -nodefaultlibs bypasses missing CRT files on OHOS;
+        # -lc links against musl libc (found via compiler default search path,
+        # or via -L{musl_lib} when MUSL_PREFIX is set).
+        lddlflags_extra = "-nostartfiles -nodefaultlibs"
+        if musl_lib:
+            lddlflags_extra += f" -L{musl_lib}"
+        lddlflags_extra += " -lc"
         content = re.sub(
             r"^(LDDLFLAGS = -shared)(?!.*-nostartfiles)(.*)$",
-            rf"\1 -nostartfiles -nodefaultlibs -L{musl_lib} -lc\2",
+            rf"\1 {lddlflags_extra}\2",
             content,
             flags=re.MULTILINE,
         )
@@ -118,7 +128,7 @@ class PerlparamsutilConan(ConanFile):
     def package(self):
         # Install with DESTDIR to package folder
         dest = os.path.join(self.package_folder, "")
-        self.run(f"make install DESTDIR={dest}", cwd=self.source_folder)
+        self.run(f'make install DESTDIR="{dest}"', cwd=self.source_folder)
 
         # Also copy .so to standard lib/ for package integrity checks
         import glob
