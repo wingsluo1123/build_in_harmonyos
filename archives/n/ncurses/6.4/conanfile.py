@@ -131,7 +131,7 @@ class NcursesConan(ConanFile):
                          cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"configure failed with exit code {ret}")
-            ret = self.run("make -j$(nproc)", cwd=self.source_folder, shell=True)
+            ret = self.run("make -j$(nproc) V=1 SHELL=/bin/bash", cwd=self.source_folder, shell=True)
             if ret != 0:
                 raise ConanException(f"make failed with exit code {ret}")
         finally:
