@@ -24,6 +24,6 @@ class SpekTestConan(ConanFile):
         pkg = self.dependencies["spek"]
         test_sh = os.path.join(self.source_folder, "test.sh")
         self.run(
-            f'/data/service/hnp/bin/bash "{test_sh}" "{pkg.package_folder}"',
+            f'bash "{test_sh}" "{pkg.package_folder}"',
             env="conanrun",
         )

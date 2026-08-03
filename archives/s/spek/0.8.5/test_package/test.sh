@@ -1,4 +1,4 @@
-#!/data/service/hnp/bin/bash
+#!/usr/bin/env bash
 # spek test_package smoke test — 验产物结构 + spek-cli --help smoke.
 # spek 是 headless CLI spectrum analyser (bin/spek-cli), --help 调 print_usage
 # 输出到 stderr (含 --help/--info/--stream/--channel/--samples 选项).
@@ -29,7 +29,7 @@ fi
 # Test 3: spek-cli --help 输出选项说明 (print_usage 到 stderr)
 # HMDFS noexec: 用显式 bash 调绕过 shebang 执行限制 (spek-cli 是 ELF 二进制,
 # 但 HMDFS noexec 阻止任何 exec; CI worker 上能 exec).
-if out=$(/data/service/hnp/bin/bash -c '"${1}" --help' _ "${SPEK_PKG}/bin/spek-cli" 2>&1 1>/dev/null); then
+if out=$(bash -c '"${1}" --help' _ "${SPEK_PKG}/bin/spek-cli" 2>&1 1>/dev/null); then
     if echo "$out" | grep -q -- "--help"; then
         ok "spek-cli --help shows usage (stderr)"
     else
