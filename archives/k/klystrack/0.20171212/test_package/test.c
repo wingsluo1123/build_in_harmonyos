@@ -23,9 +23,11 @@ int main(void) {
     char buf[256] = {0};
     size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
     /* P2: pclose 返回值检查（aireview: 忽略致二进制运行失败时仍报通过） */
+    /* P3: pclose 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
     int pc_ret = pclose(fp);
     if (pc_ret != 0) {
-        fprintf(stderr, "FAIL: klystrack --version exited with code %d\n", pc_ret);
+        int real_code = WIFEXITED(pc_ret) ? WEXITSTATUS(pc_ret) : -1;
+        fprintf(stderr, "FAIL: klystrack --version exited with code %d (pclose raw %d)\n", real_code, pc_ret);
         return 1;
     }
     if (n == 0 || strlen(buf) == 0) {
@@ -37,7 +39,9 @@ int main(void) {
     /* 2. 验证 klystrack --help 退出码 0 */
     int ret = system("klystrack --help > /dev/null 2>&1");
     if (ret != 0) {
-        fprintf(stderr, "FAIL: klystrack --help exited with code %d\n", ret);
+        /* P3: system 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
+        int real_code = WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;
+        fprintf(stderr, "FAIL: klystrack --help exited with code %d (system raw %d)\n", real_code, ret);
         return 1;
     }
     printf("klystrack --help OK\n");

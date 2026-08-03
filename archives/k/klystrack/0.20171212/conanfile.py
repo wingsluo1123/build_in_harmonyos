@@ -91,8 +91,11 @@ class KlystrackConan(ConanFile):
                 # 符号链接已存在，单独 pass（aireview P3: 避静默失败）
                 pass
             except OSError as e:
-                # 其他 OSError 输出 warning 记录（aireview P3: 避静默失败，至少 self.output.warn）
-                self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
+                # aireview Medium: symlink 失败改 raise ConanException 非继续执行（避 make 模糊失败排查成本）
+                raise ConanException(
+                    f"Failed to create symlink {klystron_link} -> {make_dir}: {e}. "
+                    f"The Makefile build target requires ../klystron to exist."
+                ) from e
         # aireview P2: 删 CC Python 侧解析和命令行注入，依赖 conanbuild 环境自动提供正确交叉编译器
         # （os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，覆盖 conanbuild 设的完整路径）
         # CI 根因: omake[247]: mkdir: Resource temporarily unavailable → Error 127 → 247 层递归 make Error 2

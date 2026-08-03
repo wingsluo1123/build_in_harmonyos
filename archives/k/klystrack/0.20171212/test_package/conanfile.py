@@ -5,7 +5,7 @@ import os
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.env import VirtualRunEnv
-from conan.tools.files import copy
+# aireview P3: 删未用导入 copy（test_package 用 CMake 非手动 copy）
 
 
 class KlystrackTestConan(ConanFile):
