@@ -215,6 +215,12 @@ target. `source-bootstrap-ohos.sh` now probes available LLVM ninja targets
 before building resource artifacts and also reports the real command exit code
 from logged build steps.
 
+At 2026-08-03 09:36 CST, the next run reached the cmark CMake configure step.
+The OHOS compiler wrappers under `validation/toolchain-bin` are executable ELF
+wrappers, so invoking them through `/bin/sh <wrapper>` made the shell parse ELF
+bytes as a script. The bootstrap script now passes executable wrappers directly
+to CMake and only uses `/bin/sh <wrapper>` for non-executable wrapper files.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are

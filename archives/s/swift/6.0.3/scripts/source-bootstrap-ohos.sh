@@ -218,10 +218,10 @@ build_cmark() {
       -S "$repos/cmark" \
       -B "$cmark_build" \
       -DCMAKE_SYSTEM_NAME=Linux \
-      -DCMAKE_C_COMPILER=/bin/sh \
-      -DCMAKE_C_COMPILER_ARG1="$cc" \
-      -DCMAKE_CXX_COMPILER=/bin/sh \
-      -DCMAKE_CXX_COMPILER_ARG1="$cxx" \
+      -DCMAKE_C_COMPILER="$cmake_cc" \
+      -DCMAKE_C_COMPILER_ARG1="$cmake_cc_arg1" \
+      -DCMAKE_CXX_COMPILER="$cmake_cxx" \
+      -DCMAKE_CXX_COMPILER_ARG1="$cmake_cxx_arg1" \
       -DCMAKE_MAKE_PROGRAM="$ninja" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMARK_THREADING=ON \
@@ -238,10 +238,10 @@ configure_swift() {
       -S "$repos/swift" \
       -B "$swift_build" \
       -DCMAKE_SYSTEM_NAME=Linux \
-      -DCMAKE_C_COMPILER:PATH=/bin/sh \
-      -DCMAKE_CXX_COMPILER:PATH=/bin/sh \
-      -DCMAKE_C_COMPILER_ARG1="$cc" \
-      -DCMAKE_CXX_COMPILER_ARG1="$cxx" \
+      -DCMAKE_C_COMPILER:PATH="$cmake_cc" \
+      -DCMAKE_CXX_COMPILER:PATH="$cmake_cxx" \
+      -DCMAKE_C_COMPILER_ARG1="$cmake_cc_arg1" \
+      -DCMAKE_CXX_COMPILER_ARG1="$cmake_cxx_arg1" \
       -DCMAKE_MAKE_PROGRAM="$ninja" \
       -DCMAKE_BUILD_TYPE:STRING="${SWIFT_OHOS_SWIFT_BUILD_TYPE:-Debug}" \
       -DCMAKE_Swift_COMPILER:PATH= \
@@ -420,6 +420,18 @@ if [ -z "$cxx" ]; then
 fi
 [ -n "$cc" ] || die "set SWIFT_OHOS_CC to the OHOS clang wrapper"
 [ -n "$cxx" ] || die "set SWIFT_OHOS_CXX to the OHOS clang++ wrapper"
+cmake_cc=$cc
+cmake_cxx=$cxx
+cmake_cc_arg1=
+cmake_cxx_arg1=
+if [ ! -x "$cc" ]; then
+  cmake_cc=/bin/sh
+  cmake_cc_arg1=$cc
+fi
+if [ ! -x "$cxx" ]; then
+  cmake_cxx=/bin/sh
+  cmake_cxx_arg1=$cxx
+fi
 
 sysroot=${OHOS_SYSROOT:-${OHOS_SDKROOT:-${SDKROOT:-}}}
 if [ -z "$sysroot" ]; then
