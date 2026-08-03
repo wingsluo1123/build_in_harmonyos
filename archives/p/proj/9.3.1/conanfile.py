@@ -174,7 +174,10 @@ class ProjConan(ConanFile):
                 p = os.path.join(bindir, name)
                 if os.path.isfile(p) and not os.path.islink(p) and self._is_elf(p):
                     targets.append(p)
-        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
+        if not _tools_dir:
+            self.output.warn("OHOS_TOOLS_DIR not set, skipping ELF signing")
+            return
         objcopy = os.path.join(_tools_dir, "llvm-objcopy")
         signer = os.path.join(_tools_dir, "binary-sign-tool")
         if not os.path.isfile(signer):

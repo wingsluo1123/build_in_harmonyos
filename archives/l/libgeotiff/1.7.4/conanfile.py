@@ -170,7 +170,10 @@ class LibgeotiffConan(ConanFile):
         sos += glob.glob(os.path.join(libdir, "**", "*.so.*"), recursive=True)
         if not sos:
             return
-        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
+        if not _tools_dir:
+            self.output.warn("OHOS_TOOLS_DIR not set, skipping .so signing")
+            return
         objcopy = os.path.join(_tools_dir, "llvm-objcopy")
         signer = os.path.join(_tools_dir, "binary-sign-tool")
         if not os.path.isfile(signer):
