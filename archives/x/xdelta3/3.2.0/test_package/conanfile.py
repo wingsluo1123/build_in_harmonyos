@@ -30,7 +30,8 @@ class Xdelta3TestConan(ConanFile):
         # and xd3_decode_memory for a real encode/decode round-trip.
         bindirs = self.cpp.build.bindirs
         assert bindirs, "No binary output directory found"
+        test_bin = os.path.join(bindirs[0], "test_xdelta3")
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
         bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} -c './test_xdelta3'", env="conanrun")
+        self.run(f"{bash} -c '{test_bin}'", env="conanrun")

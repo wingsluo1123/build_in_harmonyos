@@ -146,8 +146,8 @@ class Xdelta3Conan(ConanFile):
         arch = str(self.settings.arch)
         # Detect 64-bit architectures: most 64-bit arch names end with "64"
         # (x86_64, aarch64, riscv64, ppc64, mips64, loongarch64, etc.)
-        # ARMv8+ variants (armv8, armv8.3, armv8.4, ...) are also 64-bit.
-        is_64bit = arch.endswith("64") or arch.startswith("armv8")
+        # ARMv8/v9+ variants (armv8, armv8.3, armv9, ...) are also 64-bit.
+        is_64bit = arch.endswith("64") or arch.startswith(("armv8", "armv9"))
         if is_64bit:
             self.cpp_info.defines = [
                 "SIZEOF_SIZE_T=8",
