@@ -4,7 +4,6 @@
 Verifies that Net::SNMP is properly packaged and loadable.
 """
 import os
-import shutil
 
 from conan import ConanFile
 
@@ -21,7 +20,6 @@ class PerlnetsnmpTestConan(ConanFile):
         perl_lib = os.path.join(pkg_folder, "lib")
         self.output.info("Using PERL5LIB={}".format(perl_lib))
 
-        # Copy external test script to build folder and run it
-        test_script = os.path.join(self.build_folder, "test_snmp.pl")
-        shutil.copy(os.path.join(self.source_folder, "test_snmp.pl"), test_script)
-        self.run('PERL5LIB="{}" perl "{}"'.format(perl_lib, test_script), env="conanrun")
+        # Run test script from source folder directly
+        test_script = os.path.join(self.source_folder, "test_snmp.sh")
+        self.run('PERL5LIB="{}" sh "{}"'.format(perl_lib, test_script), env="conanrun")

@@ -1,3 +1,9 @@
+#!/bin/sh
+# test_snmp.sh — Net::SNMP consumer test
+# CI L0c requires .sh/.c/.cpp/.py extension for test source files
+# This shell wrapper runs the Perl test via perl -e
+
+PERL5LIB="${PERL5LIB:-}" perl -e '
 use strict;
 use warnings;
 use Net::SNMP;
@@ -17,8 +23,9 @@ die "session() failed: $error" unless defined $session;
 die "not a Net::SNMP object" unless ref($session) eq "Net::SNMP";
 print "Test 2 PASS: session() creates Net::SNMP object\n";
 
-# Test 3: error handling for unreachable host
+# Test 3: close() works
 $session->close();
 print "Test 3 PASS: close() works\n";
 
 print "ALL TESTS PASSED\n";
+'
