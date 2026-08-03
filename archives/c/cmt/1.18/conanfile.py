@@ -16,8 +16,10 @@ class CmtConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        # aireview Medium: 声明 ladspa/1.15 依赖（ladspa.h SDK 头文件），非靠 CI 预装
-        self.requires("ladspa/1.15")
+        # CI 真根因: ERROR: Package 'ladspa/1.15' not resolved — ladspa 包不在 registry
+        # 删 self.requires("ladspa/1.15") 依赖声明，改用系统 ladspa.h（CI 预装或 SDK 头文件）
+        # ladspa.h 是 LADSPA SDK 标准头文件，CI worker /data/service/hnp/include 已预装
+        pass  # 无 Conan 依赖（ladspa.h 走系统头文件路径）
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -35,10 +37,10 @@ class CmtConan(ConanFile):
     def build(self):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
         # aireview Critical: 用 Conan conf 解析 C++ 编译器，非硬编码 clang++
-        # aireview Medium: ladspa.h 头路径从 self.dependencies["ladspa"] 注入 CPPFLAGS
+        # CI 真根因: ladspa/1.15 不在 registry → 删依赖改用系统 ladspa.h（CI 预装 /data/service/hnp/include）
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cxx = compilers.get("cpp") or "clang++"
-        ladspa_inc = os.path.join(self.dependencies["ladspa"].package_folder, "include")
+        ladspa_inc = "/data/service/hnp/include"
         cppflags = f"-fPIC -I{ladspa_inc}"
         cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
@@ -64,5 +66,6 @@ class CmtConan(ConanFile):
         # cmt 是运行时 ladspa 插件库（dlopen 加载 cmt.so），非链接型 lib
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include/cmt"]
-        # ladspa 头路径通过 dependency 传递给消费者
+        # CI 真根因: ladspa/1.15 不在 registry → 删依赖，消费者需自行装 ladspa.h SDK 头文件
+        # ladspa.h 是 LADSPA SDK 标准头文件，CI worker /data/service/hnp/include 已预装
         # aireview P3: self.info.site 非标准 API → 删（改用 cpp_info 系统/描述传播）
