@@ -272,6 +272,17 @@ to `RawComment.cpp.o` around 131/933, where another `llvm::ArrayRef(SRCs)` CTAD
 site failed against LLVM 15. The patch now uses
 `llvm::ArrayRef<SingleRawComment>(SRCs)` for that allocation.
 
+At 2026-08-03 13:40 CST, the latest AI review findings were triaged before
+resuming the true-device run. Four mechanical findings were accepted and fixed:
+the ClangImporter patch no longer uses `getLangOpts()->` where the LLVM 15
+headers expose a reference, the cached-source `unzip()` path no longer passes
+Conan-unsupported `strip_root`, the test_package compile environment now quotes
+environment-derived values with `shlex.quote()`, and the LLVM static dependency
+helper keeps Ninja's full archive output target names instead of stripping them
+to bare library names. R8 platform-conditional feedback remains a separate
+design/compliance item because the current OHOS Swift platform model still
+needs targeted replacement rather than a blind text rewrite.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are

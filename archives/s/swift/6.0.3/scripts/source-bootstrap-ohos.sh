@@ -304,9 +304,9 @@ names = []
 for item in line.split():
     base = Path(item).name
     if base.startswith("libLLVM") and base.endswith(".a"):
-        names.append(base[3:-2])
+        names.append(item)
     elif base.startswith("libclang") and base.endswith(".a"):
-        names.append(base[3:-2])
+        names.append(item)
 for name in ["clang-resource-headers"] + list(dict.fromkeys(names)):
     print(name)
 PY

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Smoke tests for the Swift OHOS toolchain package."""
 import os
+import shlex
 
 from conan import ConanFile
 from conan.tools.files import copy
@@ -40,13 +41,13 @@ class SwiftToolchainTestConan(ConanFile):
         tmpdir = os.environ.get("TMPDIR") or os.path.join(self.build_folder, "tmp")
         os.makedirs(tmpdir, exist_ok=True)
         sdkroot = self._detect_sdkroot()
-        parts = [f'TMPDIR="{tmpdir}"']
+        parts = [f"TMPDIR={shlex.quote(tmpdir)}"]
         if sdkroot:
             parts.extend(
                 [
-                    f'SDKROOT="{sdkroot}"',
-                    f'OHOS_SYSROOT="{sdkroot}"',
-                    f'OHOS_SDKROOT="{sdkroot}"',
+                    f"SDKROOT={shlex.quote(sdkroot)}",
+                    f"OHOS_SYSROOT={shlex.quote(sdkroot)}",
+                    f"OHOS_SDKROOT={shlex.quote(sdkroot)}",
                 ]
             )
         return " ".join(parts)

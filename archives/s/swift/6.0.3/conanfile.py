@@ -61,7 +61,7 @@ class SwiftConan(ConanFile):
             if local_archive:
                 self.output.info(f"Using cached Swift source component: {name}")
                 self._verify_sha256(local_archive, source["sha256"], name)
-                unzip(self, local_archive, destination=self.source_folder, strip_root=False)
+                unzip(self, local_archive, destination=self.source_folder)
             else:
                 self.output.info(f"Fetching Swift source component: {name}")
                 get_args = {key: value for key, value in source.items() if key != "filename"}
