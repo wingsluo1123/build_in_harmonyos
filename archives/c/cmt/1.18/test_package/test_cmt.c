@@ -15,6 +15,7 @@
 typedef struct {
     unsigned long UniqueID;
     const char *Label;
+    const char *Properties;
     const char *Name;
     const char *Maker;
     const char *Copyright;

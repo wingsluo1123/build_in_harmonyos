@@ -37,6 +37,9 @@ class CmtConan(ConanFile):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
         # ladspa.h 头路径：ladspa/1.15 未发布到制品仓，不注入其路径
         # CI worker 预装 ladspa.h 或自带源码，用系统头路径 fallback
+        # aireview Critical: 用 Conan conf 解析 C++ 编译器，非硬编码 clang++
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cxx = compilers.get("cpp") or "clang++"
         cppflags = "-fPIC"
         cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
