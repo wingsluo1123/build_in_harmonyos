@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
+"""Conan test_package for open-adventure 1.20.
+
+Runs test.sh which invokes the advent and cheat binaries to verify
+they are executable in the conanrun environment.
+"""
 import os
+import shutil
 
 from conan import ConanFile
 
@@ -14,7 +20,8 @@ class OpenAdventureTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
-        # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL") or "/data/service/hnp/bin/bash"
-        self.run(f"{bash} test.sh", env="conanrun")
+        # R5: OHOS /system/bin/sh (mksh) cannot exec ELF binaries.
+        # Three-layer fallback: CONFIG_SHELL → shutil.which → OHOS path
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
+        script = os.path.join(self.source_folder, "test.sh")
+        self.run(f"{bash} {script}", env="conanrun")

@@ -35,7 +35,9 @@ class OpenAdventureConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        cc = self.conf.get("tools.build:compiler_executables:c", "clang", check_type=str)
+        # R33: Get compiler from Conan conf (two-step dict access, not colon path)
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c", "clang") if compilers else "clang"
 
         # Respect build_type setting
         if self.settings.build_type == "Debug":
