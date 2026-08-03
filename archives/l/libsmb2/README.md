@@ -41,6 +41,15 @@ libsmb2 是一个用于访问 SMB 共享的客户端库，支持 SMB2 和 SMB3 �
 - UTF-16 编解码往返一致性
 - 编译时符号链接验证
 
+## 上游测试套件
+
+上游 libsmb2 6.2 的 `tests/` 目录包含以下测试（由 autotools `make check` 执行）：
+
+- **C 单元测试 (2个)**：`aes128ccm-test.c`（AES-128-CCM 加密验证）、`smb2-dcerpc-coder-test.c`（DCE-RPC 编解码验证）
+- **Shell 集成测试 (13个)**：`test_0100_ls_basic.sh` ~ `test_900_dcerpc.sh`，涵盖 ls/mkdir/cp/cat/dcerpc 等功能，均需运行中的 SMB 服务端
+
+**执行情况**：CMake 构建未集成 autotools 测试目标；shell 集成测试需要运行中的 SMB 服务端，鸿蒙环境未执行。通过 test_package 消费者测试替代验证核心 API 功能。
+
 ## 已编译版本
 
 | 版本 | 状态 | 日期 | 构建系统 | 补丁 |

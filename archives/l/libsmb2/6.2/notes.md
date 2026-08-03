@@ -33,7 +33,7 @@
 |---|------|------|----------|
 | 1 | CMake "System is unknown to cmake" 警告 | HarmonyOS 平台未被 CMake 内置识别 | 警告不阻塞编译，CMake 仍能正确检测编译器和头文件 |
 | 2 | sys/errno.h, sys/poll.h 重定向警告 | 鸿蒙 sysroot 头文件重定向到标准位置 | 警告不阻塞，功能正常 |
-| 3 | make check 返回错误 | CMake 项目无 check/test 目标 | 记录为 N/A，通过 ELF 完整性和 pkg-config 验证替代 |
+| 3 | 上游测试未通过 CMake 执行 | 上游 tests/ 由 autotools `make check` 管理，CMake 构建未集成测试目标 | 上游 tests/ 目录存在 2 个 C 单元测试 + 13 个 shell 集成测试（详见下方"上游测试分析"）；C 单元测试可手动编译执行，shell 集成测试需运行中的 SMB 服务端 |
 | 4 | G0 clean-verify 失败 | manifest.yaml 错误标记为 autotools，G0 尝试运行 ./configure | 修正 manifest.yaml 为 cmake |
 | 5 | G4 报告 "manifest 缺少 build_system" | 同问题 4 | 同问题 4 修正 |
 | 6 | pkg-config .pc 文件版本为 6.1.0 | 上游 CMakeLists.txt 硬编码版本号 | 不影响功能，版本号 6.2 在包名和 manifest 中正确记录 |
@@ -43,6 +43,43 @@
 ## 源码修改
 
 无源码修改。libsmb2 6.2 在鸿蒙平台上无需任何补丁即可编译通过。
+
+## 上游测试分析
+
+### 上游测试套件 (tests/ 目录)
+
+libsmb2 6.2 上游 `tests/` 目录包含以下测试文件，由 autotools `make check` 执行：
+
+**C 单元测试 (2个，无需 SMB 服务端)：**
+
+| 文件 | 类型 | 说明 |
+|------|------|------|
+| `aes128ccm-test.c` | 单元测试 | AES-128-CCM 加密/解密算法验证 |
+| `smb2-dcerpc-coder-test.c` | 单元测试 | DCE-RPC 编解码功能验证 |
+
+**Shell 集成测试 (13个，需要运行中的 SMB 服务端)：**
+
+| 文件 | 说明 |
+|------|------|
+| `test_0100_ls_basic.sh` | ls 基本功能测试 |
+| `test_0101_ls_basic_valgrind.sh` | ls + valgrind 内存检查 |
+| `test_0102_ls_basic_socket_error.sh` | ls socket 错误注入 |
+| `test_0103_ls_basic_valgrind_malloc_error.sh` | ls valgrind malloc 错误注入 |
+| `test_0200_mkdir.sh` | mkdir 基本功能测试 |
+| `test_0201_mkdir_valgrind.sh` | mkdir + valgrind 内存检查 |
+| `test_0210_cp_basic.sh` | cp 基本功能测试 |
+| `test_0211_cp_valgrind.sh` | cp + valgrind 内存检查 |
+| `test_0212_cp_valgrind_socket_error.sh` | cp valgrind socket 错误注入 |
+| `test_0300_cat_basic.sh` | cat 基本功能测试 |
+| `test_0301_cat_valgrind.sh` | cat + valgrind 内存检查 |
+| `test_0302_cat_valgrind_socket_error.sh` | cat valgrind socket 错误注入 |
+| `test_900_dcerpc.sh` | DCE-RPC 功能测试 |
+
+### 上游测试执行情况
+
+- **C 单元测试**：`smb2-dcerpc-coder-test` 在 autotools 构建中作为 `noinst_PROGRAMS` 编译；`aes128ccm-test.c` 需手动编译。本次使用 CMake 构建，未自动编译这些测试。
+- **Shell 集成测试**：所有 shell 脚本需要连接到运行中的 SMB 服务端（如 Samba），通过 `smb://` 协议进行实际文件操作。鸿蒙 PC 环境无可用 SMB 服务端，**未执行**。
+- **替代验证**：通过 test_package 中的消费者测试（`test_libsmb2.c`）验证库的核心 API 链接和功能正确性，包括 `smb2_init_context`、`smb2_set_user`、`smb2_parse_url`、`smb2_destroy_context` 等。
 
 ## 依赖版本
 
