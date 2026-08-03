@@ -101,15 +101,18 @@ class KlystrackConan(ConanFile):
         # aireview P2: 删 CC Python 侧解析和命令行注入，依赖 conanbuild 环境自动提供正确交叉编译器
         # （os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，覆盖 conanbuild 设的完整路径）
         # CI 根因: omake[247]: mkdir: Resource temporarily unavailable → Error 127 → 247 层递归 make Error 2
-        # klystrack Makefile build target 递归调 make 致进程/句柄耗尽（EAGAIN）
-        # 改加 -j1 限单线程避递归耗尽资源 + --no-print-directory 减递归输出
-        make_cmd = (
-            f'make -j1 --no-print-directory CFG=release '
-            f'CFLAGS+="{cppflags}" '
-            f'LDFLAGS+="{ldflags}" '
-            f'PREFIX={os.path.join(self.build_folder, "staging")}'
-        )
-        self.run(make_cmd, cwd=make_dir, env="conanbuild")
+        # klystrack Makefile build target 行 129/130 递归调 make -C klystron + make all 致进程/句柄耗尽（EAGAIN）
+        # 非并发问题（-j1 无效），真根因是递归本身 → 改 build() 不调 'make build' 避递归
+        # 分步执行 Makefile build target 等价步骤：① touch src/version ② make -C klystron ③ make all
+        prefix = os.path.join(self.build_folder, "staging")
+        common_flags = f'CFG=release CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" PREFIX={prefix}'
+        # ① touch src/version（build target 第一步，行 128）
+        self.run('touch src/version', cwd=make_dir, env="conanbuild")
+        # ② make -C klystron CFG=release（行 129 等价，单独跑避递归 build target）
+        klystron_dir = os.path.join(os.path.dirname(make_dir), "klystron")
+        self.run(f'make -C "{klystron_dir}" {common_flags}', cwd=make_dir, env="conanbuild")
+        # ③ make all CFG=release（行 130 等价，单独跑避递归 build target）
+        self.run(f'make -j1 all {common_flags}', cwd=make_dir, env="conanbuild")
 
     def package(self):
         # make install 安装到 staging（复用 _find_make_dir 定位源码根）
