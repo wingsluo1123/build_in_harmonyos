@@ -23,9 +23,13 @@ SNMPv3 和 IPv6 功能需要可选依赖，通过纯 Perl 包装器解决：
 ### 安装可选依赖
 
 ```bash
-# 1. 下载 Crypt::DES_PP
-curl -sSL "https://mirrors.tuna.tsinghua.edu.cn/CPAN/authors/id/G/GU/GUIDO/Crypt-DES_PP-1.00.tar.gz" | tar xz
-cp Crypt-DES_PP-1.00/lib/Crypt/DES_PP.pm ~/usr/local/lib/site_perl/5.42.0/Crypt/
+# 1. 下载 Crypt::DES_PP (下载后先验证 SHA256 再解压)
+curl -sSL "https://mirrors.tuna.tsinghua.edu.cn/CPAN/authors/id/G/GU/GUIDO/Crypt-DES_PP-1.00.tar.gz" -o /tmp/Crypt-DES_PP-1.00.tar.gz
+# 从 CPAN CHECKSUMS 文件获取官方哈希并验证
+curl -sSL "https://mirrors.tuna.tsinghua.edu.cn/CPAN/authors/id/G/GU/GUIDO/CHECKSUMS" | grep -A2 'Crypt-DES_PP-1.00.tar.gz' | grep sha256
+sha256sum /tmp/Crypt-DES_PP-1.00.tar.gz  # 对比上述哈希值
+tar xzf /tmp/Crypt-DES_PP-1.00.tar.gz -C /tmp/
+cp /tmp/Crypt-DES_PP-1.00/lib/Crypt/DES_PP.pm ~/usr/local/lib/site_perl/5.42.0/Crypt/
 
 # 2. 包装器文件已包含在归档中 (Crypt/DES.pm, Digest/SHA1.pm, Socket6.pm)
 # 复制到 ~/usr/local/lib/site_perl/5.42.0/

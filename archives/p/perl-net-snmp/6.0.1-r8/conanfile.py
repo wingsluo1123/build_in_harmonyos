@@ -22,6 +22,10 @@ class PerlnetsnmpConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
+    def package_id(self):
+        # 纯 Perl 模块，产物与架构/编译器/构建类型无关
+        self.info.clear()
+
     def export_sources(self):
         export_conandata_patches(self)
 
