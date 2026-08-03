@@ -33,9 +33,10 @@ class DmidecodeConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # dmidecode uses CC ?= gcc and CFLAGS ?= -O2 in Makefile
-        # Override with clang and let the Makefile's CFLAGS += additions apply
-        self.run("make CC=clang -j1")
+        # R33: Get compiler path from Conan conf, not bare 'clang' in PATH
+        compilers = self.conf.get("tools.build:compiler_executables", check_type=dict, default={})
+        cc = compilers.get("c") or "clang"
+        self.run(f'make CC="{cc}" -j1')
 
     def package(self):
         # dmidecode is a tool — package the binary and man page

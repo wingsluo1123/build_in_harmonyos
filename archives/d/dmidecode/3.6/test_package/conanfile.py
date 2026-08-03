@@ -19,7 +19,8 @@ class DmidecodeTestConan(ConanFile):
         pass  # No build step — testing the prebuilt binary
 
     def test(self):
-        # L2 smoke test: run dmidecode --version using full binary path
+        # L2 smoke test: run dmidecode --version via test.sh
         dep = self.dependencies["dmidecode"]
         bin_path = os.path.join(dep.package_folder, "bin", "dmidecode")
-        self.run(f'"{bin_path}" --version')
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f'sh "{test_script}" "{bin_path}"')
