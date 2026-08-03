@@ -6,8 +6,8 @@ XS module: Util.xs → Util.c → Util.so
 Has pure Perl fallback (Params::Util::PP) activated via PERL_PARAMS_UTIL_PP=1.
 
 On OHOS:
-  - musl C library headers at ~/usr/local/include (sys/types.h etc.)
-  - musl libc at ~/usr/local/lib
+  - musl C library headers at $MUSL_PREFIX/include (sys/types.h etc.)
+  - musl libc at $MUSL_PREFIX/lib
   - CRT workaround: -nostartfiles -nodefaultlibs -lc
   - XS .so may fail to load at runtime due to ELF signing (pure Perl fallback works)
 """
@@ -88,10 +88,9 @@ class PerlparamsutilConan(ConanFile):
         with open(makefile_path, "r") as f:
             content = f.read()
 
-        musl_prefix = os.environ.get(
-            "MUSL_PREFIX",
-            os.path.join(os.path.expanduser("~"), "usr", "local"),
-        )
+        musl_prefix = os.environ.get("MUSL_PREFIX")
+        if not musl_prefix:
+            raise Exception("MUSL_PREFIX environment variable must be set to musl C library prefix")
         musl_inc = os.path.join(musl_prefix, "include")
         musl_lib = os.path.join(musl_prefix, "lib")
 
@@ -122,19 +121,20 @@ class PerlparamsutilConan(ConanFile):
         self.run(f"make install DESTDIR={dest}", cwd=self.source_folder)
 
         # Also copy .so to standard lib/ for package integrity checks
+        import glob
         import shutil
-        site_arch_src = os.path.join(
-            dest, "data", "service", "hnp", "perl.org",
-            "perl_5.42.0", "lib", "site_perl", "5.42.0", "aarch64-linux"
+        so_matches = glob.glob(
+            os.path.join(dest, "**", "auto", "Params", "Util", "Util.so"),
+            recursive=True,
         )
-        so_src = os.path.join(site_arch_src, "auto", "Params", "Util", "Util.so")
         lib_dst = os.path.join(self.package_folder, "lib")
         os.makedirs(lib_dst, exist_ok=True)
-        if os.path.isfile(so_src):
-            shutil.copy2(so_src, os.path.join(lib_dst, "Util.so"))
+        if so_matches:
+            shutil.copy2(so_matches[0], os.path.join(lib_dst, "Util.so"))
+        else:
+            self.output.warn("Util.so not found in install output; XS module may not be available")
 
     def package_info(self):
-        # Perl XS module — provides Util.so (shared library) + Perl .pm files
-        # Pure Perl fallback available via PERL_PARAMS_UTIL_PP=1
-        self.cpp_info.libs = ["Util"]
-        self.cpp_info.libdirs = ["lib"]
+        # Perl XS module — loaded at runtime by Perl's DynaLoader,
+        # not a C/C++ link library; no cpp_info declarations needed.
+        pass

@@ -6,7 +6,13 @@ set -euo pipefail
 
 PKG_FOLDER="${1:?Usage: test_params_util.sh <pkg_folder>}"
 
-SITE_ARCH="$PKG_FOLDER/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux"
+# Dynamically locate site_perl arch directory by finding Util.pm
+UTIL_PM="$(find "$PKG_FOLDER" -path "*/Params/Util.pm" -type f | head -1)"
+if [ -z "$UTIL_PM" ]; then
+    echo "FAIL: Params/Util.pm not found in package" >&2
+    exit 1
+fi
+SITE_ARCH="$(dirname "$(dirname "$UTIL_PM")")"
 
 # Check expected files exist
 for f in \
