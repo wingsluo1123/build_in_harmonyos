@@ -20,7 +20,7 @@ class GadapConan(ConanFile):
     description = "GADAP: GrADS Client Interface for OPeNDAP in-situ data"
     license = "GPL-2.0-or-later"
     homepage = "http://cola.gmu.edu/grads/"
-    url = ""  # CI fills this
+    url = "https://salsa.debian.org/science-team/gadap"
 
     package_type = "library"
 
@@ -59,13 +59,14 @@ class GadapConan(ConanFile):
             os.rmdir(sub)
 
     def generate(self):
+        import os
         tc = AutotoolsToolchain(self)
         # R26: System-name libraries default to static
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         # libdap/curl/libtirpc 由系统预编译包提供（cmd-pkgs → ~/usr/local）
-        pkg_prefix = "/storage/Users/currentUser/usr/local"
+        pkg_prefix = os.path.expanduser("~/usr/local")
         tc.extra_cppflags = [f"-I{pkg_prefix}/include/tirpc"]
         tc.extra_cflags = [f"-I{pkg_prefix}/include/libxml2"]
         tc.extra_cxxflags = [f"-I{pkg_prefix}/include/libxml2"]
