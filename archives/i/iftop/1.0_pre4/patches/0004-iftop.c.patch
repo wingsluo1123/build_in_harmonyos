@@ -12,14 +12,14 @@ diff -ruN a/iftop.c b/iftop.c
  
  sig_atomic_t foad;
  
-+#ifndef HAVE_PTHREAD_CANCEL
++#if !HAVE_PTHREAD_CANCEL
 +/* OHOS/musl does not support pthread_cancel */
 +static volatile int thread_should_exit = 0;
 +#endif
 +
  static void finish(int sig) {
      foad = sig;
-+#ifndef HAVE_PTHREAD_CANCEL
++#if !HAVE_PTHREAD_CANCEL
 +    thread_should_exit = 1;
 +#endif
  }
@@ -43,7 +43,7 @@ diff -ruN a/iftop.c b/iftop.c
  /* packet_loop:
   * Worker function for packet capture thread. */
  void packet_loop(void* ptr) {
-+#ifndef HAVE_PTHREAD_CANCEL
++#if !HAVE_PTHREAD_CANCEL
 +    /* On OHOS/musl, pthread_cancel is not available. 
 +     * We use pcap_breakloop to stop the loop when the main thread sets the flag. */
 +    while (!thread_should_exit) {
@@ -73,7 +73,7 @@ diff -ruN a/iftop.c b/iftop.c
        ui_loop();
      }
  
-+#ifndef HAVE_PTHREAD_CANCEL
++#if !HAVE_PTHREAD_CANCEL
 +    /* On OHOS/musl, pthread_cancel is not available.
 +     * Set the flag and call pcap_breakloop to stop the packet_loop thread. */
 +    thread_should_exit = 1;
