@@ -77,6 +77,15 @@ class KlystrackConan(ConanFile):
         cppflags = f"-I{sdl2_inc} -I{sdl2_inc_sub} -I{src_inc}"
         ldflags = f"-L{sdl2_lib}"
         make_dir = self._find_make_dir()
+        # CI 根因: make[1]: *** ../klystron: No such file or directory. Stop.
+        # Makefile build target 依赖 ../klystron 目录但上游 archive 快照缺该子项目
+        # 建 ../klystron symlink 指向源码根（klystrack 自身含 klystron 所需源文件）
+        klystron_link = os.path.join(os.path.dirname(make_dir), "klystron")
+        if not os.path.exists(klystron_link):
+            try:
+                os.symlink(make_dir, klystron_link)
+            except OSError:
+                pass
         make_cmd = (
             f'make CFG=release '
             f'CC=clang '
