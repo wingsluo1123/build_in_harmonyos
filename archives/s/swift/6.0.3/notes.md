@@ -223,6 +223,7 @@ Conan path no longer consumes a prebuilt stage unless explicitly requested:
 
 ```sh
 export SWIFT_OHOS_LLVM_BUILD_DIR=$HOME/swift-mainline-ohos-src/build/llvm-host-tools-ohos
+export SWIFT_OHOS_SOURCE_TARBALL_DIR=$HOME/swift-mainline-ohos-src/sources
 export SWIFT_OHOS_CC=$HOME/validation/toolchain-bin/ohos-clang
 export SWIFT_OHOS_CXX=$HOME/validation/toolchain-bin/ohos-clangxx
 export TMPDIR=$HOME/swift-mainline-ohos-src/tmp

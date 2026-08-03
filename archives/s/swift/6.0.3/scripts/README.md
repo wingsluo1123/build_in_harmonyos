@@ -12,6 +12,10 @@ present, and finally calls `assemble-stage-ohos.sh`. It defaults to
 `SWIFT_OHOS_JOBS=2`; set
 `SWIFT_OHOS_LLVM_BUILD_DIR`, `SWIFT_OHOS_CC`, `SWIFT_OHOS_CXX`, and
 `OHOS_SYSROOT`/`OHOS_SDKROOT` explicitly in a clean CI worker.
+When GitHub access is unstable, set `SWIFT_OHOS_SOURCE_TARBALL_DIR` to a
+directory containing the official tarball basenames from `conandata.yml`; the
+recipe still verifies every archive against the recorded sha256 before
+extracting it.
 
 `assemble-stage-ohos.sh` assembles a package-ready Swift OHOS stage from a
 completed source-bootstrap workspace. It copies a real `bin/` toolchain,

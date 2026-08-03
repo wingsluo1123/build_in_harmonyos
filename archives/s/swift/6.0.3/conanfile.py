@@ -17,7 +17,7 @@ import json
 
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, get
+from conan.tools.files import apply_conandata_patches, copy, get, unzip
 from conan.tools.layout import basic_layout
 
 
@@ -57,8 +57,15 @@ class SwiftConan(ConanFile):
 
     def source(self):
         for name, source in self.conan_data["sources"].items():
-            self.output.info(f"Fetching Swift source component: {name}")
-            get(self, destination=self.source_folder, strip_root=False, **source)
+            local_archive = self._local_source_archive(source)
+            if local_archive:
+                self.output.info(f"Using cached Swift source component: {name}")
+                self._verify_sha256(local_archive, source["sha256"], name)
+                unzip(self, local_archive, destination=self.source_folder, strip_root=False)
+            else:
+                self.output.info(f"Fetching Swift source component: {name}")
+                get_args = {key: value for key, value in source.items() if key != "filename"}
+                get(self, destination=self.source_folder, strip_root=False, **get_args)
         apply_conandata_patches(self)
         self._write_source_manifest()
 
@@ -167,6 +174,25 @@ class SwiftConan(ConanFile):
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle, indent=2, sort_keys=True)
             handle.write("\n")
+
+    def _local_source_archive(self, source):
+        mirror = os.environ.get("SWIFT_OHOS_SOURCE_TARBALL_DIR")
+        if not mirror:
+            return None
+        for name in (source.get("filename"), os.path.basename(source["url"])):
+            if not name:
+                continue
+            candidate = os.path.join(mirror, name)
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def _verify_sha256(self, path, expected, name):
+        actual = self._hash_file(path)
+        if actual.lower() != expected.lower():
+            raise ConanException(
+                f"Cached Swift source component {name} has sha256 {actual}, expected {expected}"
+            )
 
     def _write_stage_provenance(self, stage_out, source_mode):
         os.makedirs(stage_out, exist_ok=True)
