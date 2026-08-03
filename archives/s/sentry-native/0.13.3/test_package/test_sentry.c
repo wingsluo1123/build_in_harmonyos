@@ -41,8 +41,13 @@ int main(void) {
             printf("PASS: sentry_init() succeeded\n");
         }
 
-        sentry_close();
-        printf("PASS: sentry_close() succeeded\n");
+        int close_result = sentry_close();
+        if (close_result != 0) {
+            fprintf(stderr, "FAIL: sentry_close() returned %d\n", close_result);
+            failures++;
+        } else {
+            printf("PASS: sentry_close() succeeded\n");
+        }
     }
 
     if (failures > 0) {
