@@ -46,10 +46,12 @@ class AtkConan(ConanFile):
         apply_conandata_patches(self)
 
     def export_sources(self):
-        # Conan 2.x: 仅复制配方本地补丁文件到导出缓存，
-        # keep_path=True（默认）会保留 patches/ 层级，dst 不再追加 /patches 避免双重嵌套
+        # Conan 2.x: 复制配方本地补丁文件到导出缓存，
+        # dst 追加 patches/ 层级与 conandata.yml patch_file 路径一致
+        # CI 根因: dst=export_sources_folder 致补丁在根非 patches/ 下，
+        # apply_conandata_patches 找 patches/0001-... 找不到 → source/target does not exist
         copy(self, "patches/*.patch",
-             dst=self.export_sources_folder,
+             dst=os.path.join(self.export_sources_folder, "patches"),
              src=self.recipe_folder)
 
     def generate(self):
