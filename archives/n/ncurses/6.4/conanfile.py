@@ -134,6 +134,23 @@ class NcursesConan(ConanFile):
             # --build 用 x86_64 触发交叉编译模式（build!=host 避 autotools 误判本地编译跑交叉测试程序）
             self.run(f"{bash} {configure} --prefix={self.package_folder} --build=x86_64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos {args}",
                      cwd=self.source_folder, shell=True, env="conanbuild")
+            # CI 真根因: make[1]: No rule to make target ']Y<U+FFFD>99kkflag/Caps' needed by 'curses.h'. Stop.
+            # ncurses 6.4 老 autotools 把 --host 三元组注入 include/Makefile 的 srcdir 致路径含乱码
+            # toybox make 解析不了含三元组特殊字符的 srcdir 路径 → patch Makefile srcdir 用绝对路径
+            inc_makefile = os.path.join(self.source_folder, "include", "Makefile")
+            if os.path.exists(inc_makefile):
+                with open(inc_makefile) as f:
+                    mk = f.read()
+                # 找 srcdir = 行，改用 source_folder/include 绝对路径避三元组注入
+                import re
+                mk_new = re.sub(
+                    r'^srcdir\s*=.*$',
+                    f'srcdir = {os.path.join(self.source_folder, "include")}',
+                    mk, count=1, flags=re.MULTILINE
+                )
+                if mk_new != mk:
+                    with open(inc_makefile, "w") as f:
+                        f.write(mk_new)
             # CI 真根因: make: /bin/bash: No such file or directory → Error 127
             # os.environ.get("CONFIG_SHELL") 读宿主机环境非 conanbuild 子进程 → fallback /bin/bash（CI 无此路径）
             # 改 env="conanbuild" 让 Conan 加载 conanbuild.sh 设的 CONFIG_SHELL/SHELL，删 Python 侧 os.environ.get
