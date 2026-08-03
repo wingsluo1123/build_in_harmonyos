@@ -202,6 +202,49 @@ class NcursesConan(ConanFile):
     def generate(self):
         AutotoolsToolchain(self).generate()
 
+    def _repair_ohos_configure(self):
+        path = os.path.join(self.source_folder, "configure")
+        with open(path, encoding="utf-8") as handle:
+            text = handle.read().replace("\r\n", "\n")
+
+        marker = "  # Compute @srcdir@, @top_srcdir@, and @INSTALL@ for subdirectories.\n"
+        next_block = '\n  if test "$ac_dir" != "$ac_file" && test "$ac_dir" != .; then\n'
+        start = text.find(marker)
+        if start == -1:
+            raise ValueError("configure ac_dir block marker not found")
+        end = text.find(next_block, start)
+        if end == -1:
+            raise ValueError("configure ac_dir block end not found")
+
+        replacement = (
+            marker
+            + '  case "$ac_file" in\n'
+            + "  */*) ac_dir=${ac_file%/*} ;;\n"
+            + "  *) ac_dir=. ;;\n"
+            + "  esac\n"
+        )
+        with open(path, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text[:start] + replacement + text[end:])
+
+    @staticmethod
+    def _is_top_srcdir_assignment(line):
+        if not line.startswith(b"top_srcdir") or b"=" not in line:
+            return False
+        return line.split(b"=", 1)[0].strip() == b"top_srcdir"
+
+    @staticmethod
+    def _strip_non_printable_bytes(line):
+        return bytes(byte for byte in line if byte in (9, 10, 13) or 32 <= byte <= 126)
+
+    @staticmethod
+    def _looks_like_makefile_line(line):
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith(b"#") or line.startswith(b"\t"):
+            return True
+        if stripped.startswith((b"include ", b"-include ", b"sinclude ")):
+            return True
+        return b"=" in stripped or b":" in stripped
+
     def _repair_ohos_makefiles(self):
         makefiles = [
             "Makefile",
@@ -224,13 +267,20 @@ class NcursesConan(ConanFile):
             repaired = []
             top_srcdir = b"." if relpath == "Makefile" else b".."
             for line in lines:
-                if line.startswith(b"top_srcdir"):
+                if self._is_top_srcdir_assignment(line):
                     repaired.append(b"top_srcdir\t= " + top_srcdir + b"\n")
                     changed = True
-                elif any(byte < 9 or 13 < byte < 32 or byte > 126 for byte in line):
+                    continue
+                cleaned = self._strip_non_printable_bytes(line)
+                if cleaned != line:
                     changed = True
-                else:
-                    repaired.append(line)
+                    if not self._looks_like_makefile_line(cleaned):
+                        cleaned = b"# " + cleaned.lstrip()
+                        if not cleaned.endswith((b"\n", b"\r")):
+                            cleaned += b"\n"
+                    repaired.append(cleaned)
+                    continue
+                repaired.append(line)
             if changed:
                 with open(path, "wb") as handle:
                     handle.writelines(repaired)
@@ -238,6 +288,7 @@ class NcursesConan(ConanFile):
     def build(self):
         if self.settings.os == "OHOS":
             apply_conandata_patches(self)
+            self._repair_ohos_configure()
         env = self._env_prefix()
         shell = shlex.quote(self._shell())
         args = " ".join(shlex.quote(arg) for arg in self._configure_args())
