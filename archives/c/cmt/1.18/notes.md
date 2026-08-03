@@ -23,7 +23,7 @@
 3. 编译：
    ```bash
    cd src
-   make -j2 CXX=clang++ CPPFLAGS="-I$ladspa_inc -fPIC" CXXFLAGS=$(CPPFLAGS) -Wall -Werror -O2
+   make -j2 CXX=clang++ CPPFLAGS="-I$ladspa_inc -fPIC" CXXFLAGS="${CPPFLAGS} -Wall -Werror -O2"
    ```
    注意：ladspa.h 头路径通过 CPPFLAGS -I 注入（ladspa/1.15 Conan 包 package_folder/include）。
 

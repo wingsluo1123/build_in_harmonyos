@@ -16,10 +16,8 @@ class CmtConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        # ladspa.h SDK header — 制品仓未发布 ladspa/1.15（not resolved），
-        # 不声明依赖（同 klystrack 删 sdl2_image / clp 删 coinutils 逻辑），
-        # build() 不注入 ladspa 头路径，CI worker 预装或自带 ladspa.h
-        pass
+        # aireview Medium: 声明 ladspa/1.15 依赖（ladspa.h SDK 头文件），非靠 CI 预装
+        self.requires("ladspa/1.15")
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -36,12 +34,12 @@ class CmtConan(ConanFile):
 
     def build(self):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
-        # ladspa.h 头路径：ladspa/1.15 未发布到制品仓，不注入其路径
-        # CI worker 预装 ladspa.h 或自带源码，用系统头路径 fallback
         # aireview Critical: 用 Conan conf 解析 C++ 编译器，非硬编码 clang++
+        # aireview Medium: ladspa.h 头路径从 self.dependencies["ladspa"] 注入 CPPFLAGS
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cxx = compilers.get("cpp") or "clang++"
-        cppflags = "-fPIC"
+        ladspa_inc = os.path.join(self.dependencies["ladspa"].package_folder, "include")
+        cppflags = f"-fPIC -I{ladspa_inc}"
         cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
             self.run(
