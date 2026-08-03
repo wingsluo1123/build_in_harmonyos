@@ -28,6 +28,13 @@ class SwiftToolchainTestConan(ConanFile):
         )
         self._sign_if_possible(output)
         self.run(f'"{output}"', env="conanrun")
+        opt_output = os.path.join(self.build_folder, "hello-opt")
+        self.run(
+            f'{compile_env} swiftc -O "{os.path.join(self.build_folder, "hello.swift")}" -o "{opt_output}"',
+            env="conanbuild",
+        )
+        self._sign_if_possible(opt_output)
+        self.run(f'"{opt_output}"', env="conanrun")
 
     def _compile_env_prefix(self):
         tmpdir = os.environ.get("TMPDIR") or os.path.join(self.build_folder, "tmp")
@@ -49,13 +56,6 @@ class SwiftToolchainTestConan(ConanFile):
             value = os.environ.get(name)
             if value and os.path.isdir(value):
                 return value
-        for candidate in (
-            "/data/service/hnp/sysroot",
-            "/data/service/hnp/usr/local/sysroot",
-            "/usr/local/sysroot",
-        ):
-            if os.path.isdir(candidate):
-                return candidate
         return None
 
     def _sign_if_possible(self, path):
