@@ -64,7 +64,12 @@ class GadapConan(ConanFile):
         # R26: System-name libraries default to static
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        else:
+            tc.configure_args.append("--enable-shared")
+            tc.configure_args.append("--disable-static")
         # libdap/curl/libtirpc 由系统预编译包提供（cmd-pkgs → ~/usr/local）
         pkg_prefix = os.path.expanduser("~/usr/local")
         tc.extra_cppflags = [f"-I{pkg_prefix}/include/tirpc"]
