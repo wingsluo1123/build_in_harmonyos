@@ -7,6 +7,7 @@ then runs the binary to verify kubetui binary works.
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import cross_building
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -14,7 +15,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class KubetuiTestConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
     test_type = "explicit"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -48,4 +49,5 @@ class KubetuiTestConan(ConanFile):
                 raise ConanException(f"kubetui --help failed with exit code {ret} (not exec format error, real failure)")
             return
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_kubetui")
-        self.run(f'"{test_bin}"', env="conanrun")
+        # aireview: test.c 改用 argv 传 bin_path 避依赖 PATH 巧合，同步传 kubetui 二进制路径参数
+        self.run(f'"{test_bin}" "{bin_path}"', env="conanrun")
