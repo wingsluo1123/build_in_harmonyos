@@ -73,6 +73,67 @@ class SipsakConan(ConanFile):
             ),
             env="conanbuild",
         )
+        self._run_upstream_tests(cc, build_type_flags)
+
+    def _run_upstream_tests(self, cc, build_type_flags):
+        """Compile and run the upstream Check-based unit tests when the Check
+        framework is present in the build environment (e.g. the OHOS device)."""
+        check_prefix = "/storage/Users/currentUser/usr/local"
+        check_h = os.path.join(check_prefix, "include", "check.h")
+        if not os.path.isfile(check_h):
+            self.output.info(
+                "Check framework not found at %s; skipping upstream tests"
+                % check_prefix
+            )
+            return
+        source_folder = self.source_folder
+        # The upstream tests include "../config.h", which autoconf normally
+        # generates. Emit a minimal OHOS-compatible config header.
+        config_h = os.path.join(source_folder, "config.h")
+        if not os.path.isfile(config_h):
+            with open(config_h, "w", encoding="utf-8") as handle:
+                handle.write(
+                    "#define HAVE_CHECK_H 1\n"
+                    "#define HAVE_STDIO_H 1\n"
+                    "#define HAVE_STDLIB_H 1\n"
+                    "#define HAVE_STRING_H 1\n"
+                    "#define HAVE_STRINGS_H 1\n"
+                    "#define HAVE_UNISTD_H 1\n"
+                )
+        test_flags = (
+            build_type_flags
+            + " -DRUNNING_CHECK -DHAVE_CHECK_H "
+            + '-I"{src}" -I"{src}/src" -I"{prefix}/include" '.format(
+                src=source_folder, prefix=check_prefix
+            )
+        )
+        tests = (
+            (
+                "check_helper",
+                [
+                    os.path.join(source_folder, "tests", "check_helper.c"),
+                    os.path.join(source_folder, "src", "helper.c"),
+                    os.path.join(source_folder, "src", "exit_code.c"),
+                ],
+            ),
+            (
+                "check_md5",
+                [
+                    os.path.join(source_folder, "tests", "check_md5.c"),
+                    os.path.join(source_folder, "src", "md5.c"),
+                ],
+            ),
+        )
+        for name, test_sources in tests:
+            source_args = " ".join('"{}"'.format(item) for item in test_sources)
+            binary = os.path.join(self.build_folder, name)
+            self.run(
+                '"{}" {} {} -L"{prefix}/lib" -lcheck -o "{}"'.format(
+                    cc, test_flags, source_args, binary, prefix=check_prefix
+                ),
+                env="conanbuild",
+            )
+            self.run('"{}"'.format(binary), env="conanbuild")
 
     def package(self):
         copy(
