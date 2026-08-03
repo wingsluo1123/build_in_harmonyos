@@ -7,8 +7,6 @@ Source: https://github.com/microsoft/Detours
 Adapted for HarmonyOS PC (aarch64) with Windows API compatibility headers
 and CMake build system (replaces original NMAKE build).
 """
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
