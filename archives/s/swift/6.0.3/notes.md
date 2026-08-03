@@ -120,8 +120,10 @@ set:
 
 - Removed the dangling empty `if` block in the ClangImporter CC1 argument
   filter.
-- Scoped the SwiftPM `sigaction` member-layout change to `os(OHOS)` so Linux
-  Glibc and Android keep their original branches.
+- Removed the C-side `__OHOS__` conditionals from the exported patches where
+  OHOS can reuse the Linux or non-glibc fallback paths. The remaining Swift
+  `os(OHOS)` conditionals are tied to Swift platform/triple identity and
+  sigaction/loader layout and remain a path C review boundary.
 - Preserved the SwiftPM file-lock `blocking` parameter instead of silently
   dropping it.
 - Freed `allocated_real` on the IR handoff wrapper sysroot error path.
