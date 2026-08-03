@@ -155,9 +155,10 @@ set:
 - Made `swift-irhandoff-wrapper.c` clean temporary `.ll` files by default; set
   `SWIFT_OHOS_KEEP_IRHANDOFF_TEMPS=1` only when debugging IR handoff failures.
 - The ClangImporter index-store wrapper is still a source-bootstrap boundary:
-  the current patch bypasses index data recording on this LLVM 15 fork instead
-  of claiming full index-store support. Re-enable it after the OHOS LLVM index
-  action path is verified.
+  the current patch preserves upstream index data recording when the Clang API
+  is available, but bypasses it on this LLVM 15 fork instead of claiming full
+  index-store support. Re-enable it after the OHOS LLVM index action path is
+  verified.
 - The 2026-08-03 09:09 source-bootstrap retry reached `build()` but failed
   before compiler work because the recipe looked for `scripts/` under the
   copied upstream source tree. The recipe now invokes

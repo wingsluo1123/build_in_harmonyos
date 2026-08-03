@@ -841,13 +841,16 @@ index c7f9334..488d3f3 100644
 
    // FIXME: These decls are not being parsed correctly since (a) some of the
    // callbacks are still being added, and (b) the logic to parse them has
-@@ -1930,8 +1964,7 @@ std::unique_ptr<clang::FrontendAction> wrapActionForIndexingIfEnabled(
+@@ -1930,8 +1964,12 @@ std::unique_ptr<clang::FrontendAction> wrapActionForIndexingIfEnabled(
      const clang::FrontendOptions &FrontendOpts,
      std::unique_ptr<clang::FrontendAction> action) {
    if (!FrontendOpts.IndexStorePath.empty()) {
--    return clang::index::createIndexDataRecordingAction(
--        FrontendOpts, std::move(action));
++#if defined(CLANG_VERSION_MAJOR) && CLANG_VERSION_MAJOR >= 16
+     return clang::index::createIndexDataRecordingAction(
+         FrontendOpts, std::move(action));
++#else
 +    return action;
++#endif
    }
    return action;
  }
@@ -970,18 +973,20 @@ index c7f9334..488d3f3 100644
    // CASOpts are forwarded from swift arguments.
    instance.getCASOpts() = clang::CASOptions();
 
-@@ -4163,14 +4200,6 @@ ClangImporter::parseClangFunctionType(StringRef typeStr,
+@@ -4163,14 +4200,16 @@ ClangImporter::parseClangFunctionType(StringRef typeStr,
    auto &sema = Impl.getClangSema();
    StringRef filename = Impl.SwiftContext.SourceMgr.getDisplayNameForLoc(loc);
    // TODO: Obtain a clang::SourceLocation from the swift::SourceLoc we have
--  auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
--  if (!parsedType.isUsable())
--    return nullptr;
--  clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
--  auto *typePtr = resultType.getTypePtrOrNull();
--  if (typePtr && (typePtr->isFunctionPointerType()
--                  || typePtr->isBlockPointerType()))
--      return typePtr;
++#if defined(CLANG_VERSION_MAJOR) && CLANG_VERSION_MAJOR >= 16
+   auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
+   if (!parsedType.isUsable())
+     return nullptr;
+   clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
+   auto *typePtr = resultType.getTypePtrOrNull();
+   if (typePtr && (typePtr->isFunctionPointerType()
+                   || typePtr->isBlockPointerType()))
+       return typePtr;
++#endif
    return nullptr;
  }
 
