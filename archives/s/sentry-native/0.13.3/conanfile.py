@@ -43,7 +43,8 @@ class SentryNativeConan(ConanFile):
         tc.variables["SENTRY_BUILD_EXAMPLES"] = "OFF"
         # OHOS: CMake lacks Platform/HarmonyOS module, so CMAKE_SYSTEM_PROCESSOR
         # is "unknown" — vendored libunwind needs "aarch64" for arch detection
-        tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+        if str(self.settings.arch).lower() in ("armv8", "aarch64"):
+            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 
     def build(self):
