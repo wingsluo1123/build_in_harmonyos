@@ -132,7 +132,7 @@ class NcursesConan(ConanFile):
             # aireview P3: self.run 自带非零退出码抛 ConanException，手动 if ret!=0 raise 是死代码删
             self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
                      cwd=self.source_folder, shell=True)
-            self.run("make -j$(nproc) V=1 SHELL=/bin/bash", cwd=self.source_folder, shell=True)
+            self.run("make -j$(nproc) V=1", cwd=self.source_folder, shell=True)
         finally:
             # 还原 TMPDIR（避开 environment() context manager 的等价处理）
             if _saved_tmpdir is None:
