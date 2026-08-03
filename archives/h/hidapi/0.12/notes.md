@@ -4,7 +4,7 @@
 - 构建系统: cmake
 - 编译日期: 2026-08-03
 - 编译器: clang/clang++ (15.0.4)
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -12,7 +12,7 @@
 2. 使用 CMake 构建（hidapi 0.12 同时支持 autotools 与 CMake，CMake 更适配 OHOS 交叉编译）
 3. 关键配置参数：
    ```bash
-   cmake -DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local \
+   cmake -DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX \
          -DCMAKE_BUILD_TYPE=Release \
          -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
          -DHIDAPI_NO_ICONV=ON \

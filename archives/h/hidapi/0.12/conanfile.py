@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe template — CMake projects.
-
-Usage: Replace Hidapi, hidapi, 0.12, hidapi 0.12, MIT, 
-       Fill in requires() and cpp_info.libs as needed.
-
-This template enforces R26: BUILD_SHARED_LIBS=OFF for system-name libraries.
-"""
+"""Conan recipe for hidapi 0.12 (CMake)."""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -14,10 +8,10 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 class HidapiConan(ConanFile):
     name = "hidapi"
     version = "0.12"
-    description = "hidapi 0.12"
+    description = "A simple library for communicating with USB and Bluetooth HID devices"
     license = "MIT"
-    homepage = ""
-    url = ""  # CI fills this
+    homepage = "https://github.com/libusb/hidapi"
+    url = "https://github.com/libusb/hidapi"
 
     package_type = "library"
 
