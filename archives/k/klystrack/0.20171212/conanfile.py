@@ -84,7 +84,9 @@ class KlystrackConan(ConanFile):
         # Makefile build target 依赖 ../klystron 目录但上游 archive 快照缺该子项目
         # 建 ../klystron symlink 指向源码根（klystrack 自身含 klystron 所需源文件）
         klystron_link = os.path.join(os.path.dirname(make_dir), "klystron")
-        if not os.path.exists(klystron_link):
+        # aireview Medium: os.path.exists 跟随符号链接致断开符号链接返 False 重入分支残留
+        # 改 os.path.lexists 检测断开符号链接（lexists 不跟随，断开链接返 True）
+        if not os.path.lexists(klystron_link):
             try:
                 os.symlink(make_dir, klystron_link)
             except FileExistsError:

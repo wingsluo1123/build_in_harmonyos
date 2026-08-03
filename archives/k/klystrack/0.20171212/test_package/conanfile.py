@@ -5,7 +5,7 @@ import os
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.env import VirtualRunEnv
-# aireview P3: 删未用导入 copy（test_package 用 CMake 非手动 copy）
+from conan.tools.files import copy  # aireview High: build() 用 copy(self, "test.c", ...)，上轮误删致 NameError
 
 
 class KlystrackTestConan(ConanFile):

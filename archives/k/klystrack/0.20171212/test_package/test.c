@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <SDL2/SDL.h>
+/* aireview High+Medium: WIFEXITED/WEXITSTATUS 宏由 POSIX 定义在 sys/wait.h，OHOS musl libc 不保证间接可用 */
+#include <sys/wait.h>
 
 int main(void) {
     /* aireview P2: 增 SDL_Init/SDL_Quit 验证 SDL2 运行时可用性（非仅 --help） */
