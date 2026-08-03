@@ -73,7 +73,7 @@ make install
 **关键修改**: 添加 `ohos*` 和 `linux-ohos*-` 模式匹配
 
 ### 0005-configure.patch
-**目的**: 修复 HMDFS 兼容性（目录权限/umask）
+**目的**: automake 版本兼容性修复（1.17→1.16 降级相关变更）
 **修改文件**: `configure`
 
 ### 0006-depcomp.patch ~ 0008-missing.patch
@@ -96,7 +96,7 @@ make install
 
 **现象**: configure 执行时 config.status 报错无法创建临时目录
 **原因**: HMDFS 文件系统限制，umask 077 导致目录权限不足
-**解决**: 应用 0005-configure.patch 将 umask 从 077 改为 022
+**解决**: 应用 0010-configure-umask.patch 将 umask 从 077 改为 022
 
 ### 问题2: config.guess 不识别 HarmonyOS
 
@@ -111,7 +111,7 @@ make install
 | 测试项 | 结果 |
 |--------|------|
 | conan create 编译 | ✅ |
-| test_package (history_init/history_add) | ✅ |
+| test_package (history_init/H_ENTER/H_ADD/history_end) | ✅ |
 
 ## 验证安装
 
