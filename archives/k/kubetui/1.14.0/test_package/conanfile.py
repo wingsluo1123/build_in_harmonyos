@@ -34,14 +34,18 @@ class KubetuiTestConan(ConanFile):
             raise Exception(f"kubetui binary not found: {bin_path}")
         if cross_building(self):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
-            # P1: 交叉编译跳过运行时测试，跨架构二进制无法在宿主执行则诚实跳过（不打印 PASSED）
+            # P1: 交叉编译跨架构二进制无法在宿主执行则诚实跳过（不打印 PASSED）
             # aireview: ignore_errors=True 丢弃退出码+无条件打印 PASSED 属伪造通过
+            # 实改: ret 非 0 时判跨架构 exec format error（126/127）则 SKIPPED，其他失败 raise
             ret = self.run(f'"{bin_path}" --help', env="conanrun", ignore_errors=True)
             if ret == 0:
                 self.output.info("cross-building: kubetui --help smoke test PASSED")
+            elif ret in (126, 127):
+                # 126=exec format error（跨架构无法执行）/ 127=command not found，诚实跳过
+                self.output.info(f"cross-building: kubetui --help SKIPPED (exit code {ret}, cross-arch binary cannot run on host)")
             else:
-                # 跨架构二进制无法在宿主执行，诚实跳过（info 说明仅编译验证，不伪造 PASSED）
-                self.output.info(f"cross-building: kubetui --help skipped (exit code {ret}, cross-arch binary cannot run on host)")
+                # 其他非零退出码是真实失败，raise ConanException 避伪造通过（aireview 建议对齐）
+                raise ConanException(f"kubetui --help failed with exit code {ret} (not exec format error, real failure)")
             return
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_kubetui")
         self.run(f'"{test_bin}"', env="conanrun")
