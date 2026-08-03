@@ -27,7 +27,13 @@ int main(int argc, char **argv) {
     }
     char buf[256] = {0};
     size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
-    pclose(fp);
+    /* aireview P3: pclose 返回值检查 + WEXITSTATUS 解析真实退出码避误报 */
+    int pc_ret = pclose(fp);
+    if (pc_ret != 0) {
+        int real_code = WIFEXITED(pc_ret) ? WEXITSTATUS(pc_ret) : -1;
+        fprintf(stderr, "FAIL: kubetui --version exited with code %d (pclose raw %d)\n", real_code, pc_ret);
+        return 1;
+    }
     if (n == 0 || strlen(buf) == 0) {
         fprintf(stderr, "FAIL: kubetui --version produced no output\n");
         return 1;
@@ -38,7 +44,9 @@ int main(int argc, char **argv) {
     snprintf(cmd, sizeof(cmd), "\"%s\" --help > /dev/null 2>&1", bin);
     int ret = system(cmd);
     if (ret != 0) {
-        fprintf(stderr, "FAIL: kubetui --help exited with code %d\n", ret);
+        /* P3: system 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
+        int real_code = WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;
+        fprintf(stderr, "FAIL: kubetui --help exited with code %d (system raw %d)\n", real_code, ret);
         return 1;
     }
     printf("kubetui --help OK\n");

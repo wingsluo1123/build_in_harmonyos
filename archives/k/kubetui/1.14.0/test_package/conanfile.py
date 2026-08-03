@@ -15,7 +15,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class KubetuiTestConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
     test_type = "explicit"
-    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -32,7 +32,7 @@ class KubetuiTestConan(ConanFile):
         bin_path = os.path.join(self.dependencies["kubetui"].package_folder,
                                 "bin", "kubetui")
         if not os.path.exists(bin_path):
-            raise Exception(f"kubetui binary not found: {bin_path}")
+            raise ConanException(f"kubetui binary not found: {bin_path}")
         if cross_building(self):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
             # P1: 交叉编译跨架构二进制无法在宿主执行则诚实跳过（不打印 PASSED）
