@@ -15,6 +15,10 @@ class NymphcastConan(ConanFile):
 
     def layout(self):
         cmake_layout(self)
+        # NymphCast extracts CMakeLists.txt next to conanfile.py (strip_root=True).
+        # Pin the source folder to the recipe directory so cmake.configure() never
+        # mistakes the build folder ("b") for the source dir on this toolchain.
+        self.folders.source = "."
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -25,7 +29,9 @@ class NymphcastConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        # Point CMake explicitly at the recipe folder (absolute) so the source
+        # dir is never resolved to the build folder.
+        cmake.configure(build_script_folder=self.recipe_folder)
         cmake.build()
 
     def package(self):
