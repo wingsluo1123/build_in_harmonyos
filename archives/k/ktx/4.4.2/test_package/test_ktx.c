@@ -12,7 +12,7 @@ int main(void) {
         .vkFormat = 37,
         .baseWidth = 64,
         .baseHeight = 64,
-        .baseDepth = 0,
+        .baseDepth = 1,
         .numDimensions = 2,
         .numLevels = 1,
         .numLayers = 1,
@@ -29,10 +29,10 @@ int main(void) {
         printf("Created KTX2 texture: %ux%u\n", texture->baseWidth, texture->baseHeight);
         ktxTexture_Destroy(ktxTexture(texture));
         printf("Destroyed KTX texture\n");
+        printf("KTX test passed!\n");
+        return 0;
     } else {
         printf("ktxTexture2_Create returned: %d (%s)\n", (int)result, ktxErrorString(result));
+        return 1;
     }
-
-    printf("KTX test passed!\n");
-    return 0;
 }

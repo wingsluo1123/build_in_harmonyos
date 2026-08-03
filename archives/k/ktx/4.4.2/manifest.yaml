@@ -10,7 +10,7 @@
 version: "4.4.2"
 
 # 软件名
-software: "{software}"
+software: "ktx"
 
 # 编译状态
 # published | built | failed | archived
@@ -18,7 +18,7 @@ status: built
 
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-07-29"
-build_system: "{BUILD_SYSTEM}"
+build_system: "cmake"
 
 # ============================================================
 # 源码信息
@@ -26,10 +26,10 @@ build_system: "{BUILD_SYSTEM}"
 
 source:
   # 源码下载 URL
-  url: "file:///storage/Users/currentUser/build_in_harmonyos/.downloads/ktx-4.4.2.tar.gz"
+  url: "https://github.com/KhronosGroup/KTX-Software/archive/refs/tags/v4.4.2.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "9412cb45045a503005acd47d98f9e8b47154634a50b4df21e17a1dfa8971d323"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -42,19 +42,21 @@ source:
 build:
   # 构建系统类型
   # cmake | autotools | makefile | meson | custom
-  system: autotools
+  system: cmake
 
   # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+  configure_options:
+    - "KTX_FEATURE_VK_UPLOAD=OFF"
+    - "KTX_FEATURE_GL_UPLOAD=OFF"
+    - "KTX_FEATURE_JNI=OFF"
+    - "KTX_FEATURE_PY=OFF"
+    - "KTX_FEATURE_DOC=OFF"
+    - "KTX_FEATURE_TESTS=OFF"
+    - "KTX_FEATURE_TOOLS=OFF"
+    - "CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"
 
   # 编译依赖列表（格式: name/version）
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
 
   # 编译器
   cc: clang
@@ -66,15 +68,12 @@ build:
 
 # 应用的补丁列表
 patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "OHOS 平台无 Vulkan/OpenGL 依赖，需关闭 KTX_FEATURE_VK_UPLOAD 和 KTX_FEATURE_GL_UPLOAD"
+  - "CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY 避免 OHOS 交叉编译 try-link 失败"
