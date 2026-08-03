@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan test_package — paperkey 1.6
 
-Tests the paperkey binary by running --version.
+Tests the paperkey binary by running test.sh which verifies --version output.
 paperkey is a command-line tool, not a library, so we test the binary directly.
 """
 import os
@@ -21,6 +21,14 @@ class PaperkeyTestConan(ConanFile):
         pass
 
     def test(self):
+        # R32: Platform check — only run on Linux/OHOS
+        if self.settings.os not in ("Linux", "OHOS"):
+            return
+
         bin_dir = self.dependencies["paperkey"].cpp_info.bindirs[0]
         paperkey_bin = os.path.join(bin_dir, "paperkey")
-        self.run(f'"{paperkey_bin}" --version', env="conanrun")
+
+        # OHOS: /system/bin/sh (mksh) cannot reliably execute test scripts.
+        # Use CONFIG_SHELL or fallback to bash (R5: OHOS has no /bin/sh).
+        bash = os.environ.get("CONFIG_SHELL", "/bin/bash")
+        self.run(f'PAPERKEY_BIN="{paperkey_bin}" {bash} test.sh', env="conanrun")
