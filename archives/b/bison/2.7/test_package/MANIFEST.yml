@@ -9,10 +9,10 @@ homepage: "https://www.gnu.org/software/bison/"
 # Upstream test command (Autotools test harness)
 upstream_check_command: "make check"
 
-# conanfile.py build() does NOT include make check (manually verified on
-# OHOS dev host; gnulib tests need TMPDIR on tmpfs).
-upstream_test_in_build: false
-upstream_test_command: "手动验证：cd build-dir && TMPDIR=$HOME/tmp make check -j1"
+# conanfile.py build() runs make check after install (rule 5: integrated into CI).
+# Tests run in the source work dir with TMPDIR on the build tmpfs.
+upstream_test_in_build: true
+upstream_test_command: "cd {work} && TMPDIR={tmpdir} make check -j1"
 
 # Upstream tests: DejaGnu-based testsuite under tests/
 upstream_tests:

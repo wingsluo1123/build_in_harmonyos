@@ -117,6 +117,10 @@ class BisonConan(ConanFile):
         self.run(f'bash -c "cd {work} && export {env} && make -j1"')
         self.run(f'bash -c "cd {work} && export {env} && make install"')
 
+        # 运行上游测试套件（规则5：集成到 CI 构建）
+        # DejaGnu testsuite，单线程避免并发冲突；TMPDIR 复用 build tmpfs
+        self.run(f'bash -c "cd {work} && export {env} && make check -j1"')
+
         self._install_dir = install_dir
 
     def package(self):
