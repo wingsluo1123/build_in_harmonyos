@@ -207,6 +207,14 @@ package:    swift/6.0.3#f3b22d7d2d7865a8012161b9191dfb22:876049f3ae10a4560da345b
 test:       swift-ohos-smoke
 ```
 
+At 2026-08-03 09:24 CST, the default source-bootstrap path progressed through
+cached tarball unpacking and both OHOS patches, then stopped in the LLVM
+resource-header phase because the pinned OHOS LLVM substrate exposes
+`clang-resource-headers` but not the optional `clang-features-file` ninja
+target. `source-bootstrap-ohos.sh` now probes available LLVM ninja targets
+before building resource artifacts and also reports the real command exit code
+from logged build steps.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are

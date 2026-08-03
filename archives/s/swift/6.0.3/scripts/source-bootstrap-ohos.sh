@@ -45,10 +45,14 @@ run_logged() {
   shift
   log "$*"
   if "$@" > "$log_file" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if [ "$rc" -eq 0 ]; then
     tail -40 "$log_file" 2>/dev/null || true
     return 0
   fi
-  rc=$?
   echo "error: command failed with rc=$rc; log=$log_file" >&2
   tail -160 "$log_file" >&2 2>/dev/null || true
   exit "$rc"
@@ -186,8 +190,24 @@ EOF
 
 build_llvm_resource_targets() {
   [ -f "$llvm_build/build.ninja" ] || return 0
+  targets_file=$logs/llvm-resource-targets.targets
+  targets_log=$logs/llvm-resource-targets-list.log
+  if "$ninja" -C "$llvm_build" -t targets all > "$targets_file" 2>"$targets_log"; then
+    targets=
+    for candidate in clang-resource-headers clang-features-file; do
+      if grep -Eq "(^|/)$candidate:" "$targets_file"; then
+        targets="$targets $candidate"
+      else
+        log "skipping missing LLVM target: $candidate"
+      fi
+    done
+    [ -n "$targets" ] || return 0
+  else
+    log "could not list LLVM targets; falling back to clang-resource-headers"
+    targets=clang-resource-headers
+  fi
   run_logged "$logs/llvm-resource-targets.log" \
-    "$ninja" -C "$llvm_build" -j"$jobs" clang-resource-headers clang-features-file
+    "$ninja" -C "$llvm_build" -j"$jobs" $targets
 }
 
 build_cmark() {
@@ -279,10 +299,15 @@ PY
   targets=$(cat "$targets_file")
   log "building LLVM static dependency targets listed in $targets_file"
   if (cd "$llvm_build" && "$ninja" -j"$jobs" $targets) > "$logs/llvm-static-deps-build.log" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if [ "$rc" -eq 0 ]; then
     tail -40 "$logs/llvm-static-deps-build.log" 2>/dev/null || true
     return 0
   fi
-  rc=$?
+  echo "error: command failed with rc=$rc; log=$logs/llvm-static-deps-build.log" >&2
   tail -160 "$logs/llvm-static-deps-build.log" >&2 2>/dev/null || true
   exit "$rc"
 }
@@ -291,10 +316,15 @@ build_swift_targets() {
   targets=${SWIFT_OHOS_NINJA_TARGETS:-swift-frontend}
   log "building Swift targets: $targets"
   if "$ninja" -C "$swift_build" -j"$jobs" $targets > "$logs/swift-targets-build.log" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  if [ "$rc" -eq 0 ]; then
     tail -80 "$logs/swift-targets-build.log" 2>/dev/null || true
     return 0
   fi
-  rc=$?
+  echo "error: command failed with rc=$rc; log=$logs/swift-targets-build.log" >&2
   tail -200 "$logs/swift-targets-build.log" >&2 2>/dev/null || true
   exit "$rc"
 }
