@@ -70,10 +70,12 @@ class KlystrackConan(ConanFile):
         # SDL2_image/2.8.0 未发布到制品仓未声明依赖，不注入其路径
         # CI 报 'SDL.h' file not found: SDL2 包头在 include/SDL2/SDL.h（非根 include），
         # klystrack 源码用 #include "SDL.h"，需注入 SDL2 子目录让根 include 下也能找到
+        # CI 报 'macros.h' file not found: klystrack 源码内部头在 src/ 下，需注入源码根
         sdl2_inc = os.path.join(self.dependencies["sdl2"].package_folder, "include")
         sdl2_inc_sub = os.path.join(sdl2_inc, "SDL2")
         sdl2_lib = os.path.join(self.dependencies["sdl2"].package_folder, "lib")
-        cppflags = f"-I{sdl2_inc} -I{sdl2_inc_sub}"
+        src_inc = os.path.join(self.source_folder, "src")
+        cppflags = f"-I{sdl2_inc} -I{sdl2_inc_sub} -I{src_inc}"
         ldflags = f"-L{sdl2_lib}"
         make_dir = self._find_make_dir()
         make_cmd = (
