@@ -2,7 +2,7 @@
 # test_params_util.sh — L1 test for perl-params-util (Params::Util)
 # Tests that the installed module files exist and core functions work
 # in pure Perl fallback mode (PERL_PARAMS_UTIL_PP=1).
-set -eu
+set -euo pipefail
 
 PKG_FOLDER="${1:?Usage: test_params_util.sh <pkg_folder>}"
 

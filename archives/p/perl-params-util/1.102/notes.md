@@ -4,7 +4,7 @@
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
 - 编译日期: 2026-07-03
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -95,10 +95,9 @@
 
 ### 状态变更
 - 初始状态: built (conan-verify 通过但归档不完整)
-- 最终状态: published (归档完整，CI 模拟通过，submit 自检 6/6)
+- 最终状态: built (归档完整，CI 模拟通过，submit 自检 6/6，待 CI upload 后更新为 published)
 
 ---
 **编译结束**: 2026-07-03 16:57
 **归档完善**: 2026-07-06
-**最终状态**: published (编译成功，conan-verify 全部门禁通过，CI 模拟通过，submit 自检 6/6 PASS)
-��过，submit 自检 6/6 PASS)
+**最终状态**: built (编译成功，conan-verify 全部门禁通过，CI 模拟通过，submit 自检 6/6 PASS，待 CI upload)

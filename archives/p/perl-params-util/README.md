@@ -13,7 +13,7 @@ Simple, compact and correct param-checking functions (Perl XS module with pure P
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 1.102 | published | 2026-07-03 | 首次编译成功，conan-verify 全部门禁通过 |
+| 1.102 | built | 2026-07-03 | 首次编译成功，conan-verify 全部门禁通过 |
 
 ## 运行依赖
 
@@ -31,7 +31,7 @@ Params::Util 提供简单、紧凑且正确的参数检查函数，包括 `_STRI
 
 预编译包通过 Conan 安装：
 ```bash
-conan install --requires=perl-params-util/1.102@ohpcd/stable
+conan install --requires=perl-params-util/1.102
 ```
 
 XS 模块安装到 `/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/auto/Params/Util/` 目录。

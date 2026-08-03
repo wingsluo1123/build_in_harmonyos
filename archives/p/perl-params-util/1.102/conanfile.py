@@ -88,21 +88,24 @@ class PerlparamsutilConan(ConanFile):
         with open(makefile_path, "r") as f:
             content = f.read()
 
-        musl_prefix = os.environ.get("MUSL_PREFIX", "/storage/Users/currentUser/usr/local")
+        musl_prefix = os.environ.get(
+            "MUSL_PREFIX",
+            os.path.join(os.path.expanduser("~"), "usr", "local"),
+        )
         musl_inc = os.path.join(musl_prefix, "include")
         musl_lib = os.path.join(musl_prefix, "lib")
 
-        # Add musl include path to CCFLAGS
+        # Add musl include path to CCFLAGS (idempotent: skip if already present)
         content = re.sub(
             r"^(CCFLAGS = )(?!.*" + re.escape(musl_inc) + ")",
             rf"\1-I{musl_inc} ",
             content,
             flags=re.MULTILINE,
         )
-        # Add CRT workaround and musl lib path to LDDLFLAGS
+        # Add CRT workaround and musl lib path to LDDLFLAGS (idempotent: skip if already present)
         content = re.sub(
-            r"^LDDLFLAGS = -shared(.*)$",
-            rf"LDDLFLAGS = -shared -nostartfiles -nodefaultlibs -L{musl_lib} -lc\1",
+            r"^(LDDLFLAGS = -shared)(?!.*-nostartfiles)(.*)$",
+            rf"\1 -nostartfiles -nodefaultlibs -L{musl_lib} -lc\2",
             content,
             flags=re.MULTILINE,
         )
