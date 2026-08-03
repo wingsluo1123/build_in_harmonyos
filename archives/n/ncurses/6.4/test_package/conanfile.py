@@ -18,9 +18,8 @@ class NcursesTestConan(ConanFile):
         cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
         inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
         lib = os.path.join(self.dependencies["ncurses"].package_folder, "lib")
-        ret = self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses {os.path.join(self.source_folder, 'test.c')} -lncursesw", cwd=self.build_folder)
-        if ret != 0:
-            raise ConanException(f"compile test_ncurses failed with exit code {ret}")
+        # aireview P3: self.run 自带非零退出码抛 ConanException，手动 ret=if raise 是死代码删
+        self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses {os.path.join(self.source_folder, 'test.c')} -lncursesw", cwd=self.build_folder)
 
     def test(self):
         if can_run(self):
@@ -32,4 +31,6 @@ class NcursesTestConan(ConanFile):
                 self.output.info("test_ncurses: SKIP (no terminal available)")
                 return
             if ret != 0:
-                raise ConanException(f"test_ncurses failed with exit code {ret}")
+                # P3: ret==77 是上游约定的"特性不可用"退出码，其他非零是真实失败
+                # 但 ret==77 分支已上面处理，这里 ret!=0 非 77 是真实失败 → 让 self.run 抛异常避死代码
+                raise ConanException(f"test_ncurses failed with exit code {ret} (not 77, real failure)")

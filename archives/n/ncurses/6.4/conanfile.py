@@ -130,7 +130,9 @@ class NcursesConan(ConanFile):
             # 追加 generate() 中定义的 configure_args（--without-shared 等，否则这些选项失效）
             args = " ".join(self._configure_args)
             # aireview P3: self.run 自带非零退出码抛 ConanException，手动 if ret!=0 raise 是死代码删
-            self.run(f"{bash} {configure} --prefix={self.package_folder} --build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu {args}",
+            # aireview Medium: --host 改 linux-ohos 匹配补丁 config.guess + manifest 声明（绕补丁 OHOS 检测）
+            # --build 用 x86_64 触发交叉编译模式（build!=host 避 autotools 误判本地编译跑交叉测试程序）
+            self.run(f"{bash} {configure} --prefix={self.package_folder} --build=x86_64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos {args}",
                      cwd=self.source_folder, shell=True)
             # CI 真根因: include/Makefile:45 missing separator — toybox make 解析命令行续行缺 Tab
             # 改用 CI 真实 bash 路径（CONFIG_SHELL 已设 /data/service/hnp/bin/bash）显式传 SHELL
