@@ -235,6 +235,14 @@ OHOS LLVM 15 fork. The shim now exports the libuuid entry points used by
 `lib/Basic/UUID.cpp`, and the Swift patch compiles CAS backend object-mode
 plumbing only when the LLVM headers expose the newer CAS API.
 
+At 2026-08-03 11:11 CST, source-bootstrap validated the CAS guard by compiling
+past `TargetInfo.cpp.o` and then stopped at `AccessRequests.cpp.o`.
+`NameLookup.h` used `llvm::ArrayRef(Results)` C++17 class template argument
+deduction; with the OHOS LLVM 15 fork this deduced an `ArrayRef` over the whole
+`SmallVector` object instead of `LookupResultEntry`. The patch now spells the
+element type explicitly as `llvm::ArrayRef<LookupResultEntry>(Results)` for the
+inner, outer, and all-results helpers.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
