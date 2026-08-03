@@ -7,6 +7,7 @@ It depends on libtiff and PROJ for coordinate reference system handling.
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import cross_building
 import os
 import glob
 
@@ -60,11 +61,8 @@ class LibgeotiffConan(ConanFile):
             _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
             if os.path.isfile(_tc):
                 return _tc
-        _g = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
-        if _g:
-            return _g[-1]
         raise ConanInvalidConfiguration(
-            "Cannot find ohos.toolchain.cmake: set OHOS_NDK_HOME or profile [conf] user_toolchain")
+            "Cannot find ohos.toolchain.cmake: set OHOS_NDK_HOME or OHOS_SDK_HOME or profile [conf] user_toolchain")
 
     def build(self):
         apply_conandata_patches(self)
@@ -156,6 +154,9 @@ class LibgeotiffConan(ConanFile):
 
         self.run('cmake -B "{}" -S "{}" {}'.format(bdir, src, " ".join(defs)))
         self.run('cmake --build "{}"'.format(bdir))
+        # L1: Run upstream official tests (ctest) as required by CI gate
+        if not cross_building(self):
+            self.run('ctest --test-dir "{}"'.format(bdir))
 
     def package(self):
         bdir = os.path.join(self.build_folder, "build-ohos")

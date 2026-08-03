@@ -11,6 +11,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import cmake_layout
+from conan.tools.build import cross_building
 
 
 class ProjConan(ConanFile):
@@ -54,11 +55,8 @@ class ProjConan(ConanFile):
             _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
             if os.path.isfile(_tc):
                 return _tc
-        globbed = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
-        if globbed:
-            return globbed[-1]
         raise ConanInvalidConfiguration(
-            "ohos.toolchain.cmake not found: set OHOS_NDK_HOME or profile [conf] user_toolchain")
+            "ohos.toolchain.cmake not found: set OHOS_NDK_HOME or OHOS_SDK_HOME or profile [conf] user_toolchain")
 
     def _find_sqlite3_binary(self):
         """Find sqlite3 CLI binary from conan dependency or system."""
@@ -118,7 +116,7 @@ class ProjConan(ConanFile):
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",
             "-DBUILD_SHARED_LIBS={}".format("ON" if self.options.shared else "OFF"),
-            "-DBUILD_TESTING=OFF",
+            "-DBUILD_TESTING=ON",
             '-DCMAKE_C_FLAGS="-fPIC"',
             '-DCMAKE_CXX_FLAGS="-fPIC"',
             '-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=bfd"',
@@ -150,6 +148,9 @@ class ProjConan(ConanFile):
             bdir, self.source_folder, defs))
         # Build
         self.run('cmake --build "{}" -j1'.format(bdir))
+        # L1: Run upstream official tests (ctest) as required by CI gate
+        if not cross_building(self):
+            self.run('ctest --test-dir "{}"'.format(bdir))
 
     def package(self):
         bdir = os.path.join(self.build_folder, "build-ohos")
