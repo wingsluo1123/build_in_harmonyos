@@ -48,12 +48,12 @@ class KubetuiConan(ConanFile):
         # 调用满足 G1 门禁"补丁应用调用"要求
         apply_conandata_patches(self)
         # CI 环境无 Rust 工具链（E154: rust/cargo 不预装），
-        # 通过 cmd-pkgs 鐄编译包安装（E154 推荐方案）
+        # 通过 cmd-pkgs 预编译包安装（E154 推荐方案）
         # P1: 删容错降级，cargo 装失败显式 raise ConanException（aireview: 欺骗性打包风险）
-        # CI Download failed 时多路径 fallback: rustup/local cargo/rustc（同 ncurses sandbox 逻辑）
+        # CI Download failed 时多路径 fallback: rustup/local cargo/rustc + 包管理器装
         rust_ok = False
         try:
-            self.run("set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
+            self.run("set -o pipefail && curl -fsSL --connect-timeout 60 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
             rust_ok = True
         except Exception:
             self.output.warning("rust install via cmd-pkgs failed (Download failed), trying fallback paths")
@@ -65,8 +65,19 @@ class KubetuiConan(ConanFile):
                     break
                 except Exception:
                     continue
+            # 系统 fallback 全失败，试包管理器装 rustup（curl rustup-init）
             if not rust_ok:
-                raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc)")
+                try:
+                    self.run("curl -fsSL --connect-timeout 60 https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.81.0", cwd=self.source_folder, shell=True)
+                    # rustup 装到 ~/.cargo/bin，需更新 PATH
+                    self.run("export PATH=\"$HOME/.cargo/bin:$PATH\" && cargo --version", cwd=self.source_folder, shell=True)
+                    rust_ok = True
+                    # 后续 cargo build 需用全路径或更新 PATH
+                    os.environ["PATH"] = os.path.expanduser("~/.cargo/bin") + ":" + os.environ.get("PATH", "")
+                except Exception:
+                    pass
+            if not rust_ok:
+                raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc/rustup-init)")
         # P1: cargo build 失败显式 raise ConanException（aireview: 构建失败被吞 → 纺包+欺骗性打包）
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
