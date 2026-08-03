@@ -36,7 +36,7 @@ class DmidecodeConan(ConanFile):
         # R33: Get compiler path from Conan conf, not bare 'clang' in PATH
         compilers = self.conf.get("tools.build:compiler_executables", check_type=dict, default={})
         cc = compilers.get("c") or "clang"
-        self.run(f'make CC="{cc}" -j1')
+        self.run(f'make CC="{cc}" -j1', cwd=self.source_folder)
 
     def package(self):
         # dmidecode is a tool — package the binary and man page
