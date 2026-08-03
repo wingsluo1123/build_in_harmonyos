@@ -1,0 +1,60 @@
+software: compat
+version: "31.0.0.2"
+status: built
+build_date: "2026-08-03"
+build_system: makefile
+conan_ref: "compat/31.0.0.2"
+
+source:
+  url: "https://github.com/emacs-compat/compat/archive/refs/tags/31.0.0.2.tar.gz"
+  sha256: "bbbf48ac8964425c09a6d3b7abe2ae9ff95fb9e43154f252977290f1de79aab9"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "emacs/29.1"
+  cc: N/A
+  cxx: N/A
+
+patches_applied:
+  - "patches/0001-ohos-skip-tramp-tmp-mock-tests.patch"
+
+artifacts:
+  lisp:
+    - "share/emacs/site-lisp/compat-31.0.0.2"
+
+validation:
+  ohos:
+    date: "2026-08-03"
+    ssh_port: 56267
+    run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-a-compat-31.0.0.2-r13-20260803-140029-24622"
+    conan_full_ref: "compat/31.0.0.2#9ac87ab03d9c3a199d797b994c978f41:da39a3ee5e6b4b0d3255bfef95601890afd80709#194805efb3ae8dbf12a4c07ae9b50616"
+    upstream_commands:
+      - "make compile"
+      - "make test"
+      - "make check"
+    upstream_ert:
+      total: 223
+      passed: 221
+      unexpected: 0
+      skipped: 2
+      skipped_tests:
+        - "compat-make-nearby-temp-file"
+        - "compat-temporary-file-directory"
+    test_package: "pass"
+    ci_gates:
+      L0: "pass"
+      L1: "pass"
+      L2: "skip: no bin directory"
+      L4: "pass"
+      L5: "warn: pure Lisp package has no bin/lib artifacts"
+    dependency_note: "Validation used cached emacs/29.1 and ncurses/6.5; remote CI requires those dependencies to be published."
+
+knowledge_gained:
+  - "The official GNU ELPA tarball omits upstream tests; the GitHub tag archive is used so the package can run compat-tests.el."
+  - "compat 31.0.0.2 has 223 upstream ERT tests in compat-tests.el."
+  - "The package exports COMPAT_LISPDIR and prepends it to EMACSLOADPATH for downstream Emacs batch builds."
+  - "Upstream make check writes temporary comparison files under /tmp; on OHOS the build-local Makefile is rewritten to honor TMPDIR."
+  - "Two upstream TRAMP mock checks assume accessible remote /tmp; the OHOS runner cannot access /tmp, so those checks are skipped under an explicit test environment flag."
