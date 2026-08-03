@@ -1,10 +1,18 @@
 /* klystrack 0.20171212 consumer test
- * �实验证 klystrack 二进制：--version 输出非空 + --help 退出码 0 */
+ * 验证 klystrack 二进制：--version 输出非空 + --help 退出码 0 + SDL2 运行时可用 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <SDL2/SDL.h>
 
 int main(void) {
+    /* aireview P2: 增 SDL_Init/SDL_Quit 验证 SDL2 运行时可用性（非仅 --help） */
+    if (SDL_Init(0) != 0) {
+        fprintf(stderr, "FAIL: SDL_Init failed: %s\n", SDL_GetError());
+        return 1;
+    }
+    SDL_Quit();
+
     /* 1. 验证 klystrack --version 输出非空 */
     FILE *fp = popen("klystrack --version 2>&1", "r");
     if (!fp) {

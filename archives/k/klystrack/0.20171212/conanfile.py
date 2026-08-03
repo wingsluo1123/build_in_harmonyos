@@ -84,8 +84,12 @@ class KlystrackConan(ConanFile):
         if not os.path.exists(klystron_link):
             try:
                 os.symlink(make_dir, klystron_link)
-            except OSError:
+            except FileExistsError:
+                # 符号链接已存在，单独 pass（aireview P3: 避静默失败）
                 pass
+            except OSError as e:
+                # 其他 OSError 输出 warning 记录（aireview P3: 避静默失败，至少 self.output.warn）
+                self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
         make_cmd = (
             f'make CFG=release '
             f'CC=clang '
