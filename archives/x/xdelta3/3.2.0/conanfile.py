@@ -144,7 +144,10 @@ class Xdelta3Conan(ConanFile):
         # them from the installed CMake config.  Without these, xdelta3.h
         # fails to typedef usize_t/xoff_t (SIZEOF_* all evaluate to 0).
         arch = str(self.settings.arch)
-        is_64bit = arch in ("x86_64", "armv8", "aarch64", "armv8.3", "armv8.4")
+        # Detect 64-bit architectures: most 64-bit arch names end with "64"
+        # (x86_64, aarch64, riscv64, ppc64, mips64, loongarch64, etc.)
+        # ARMv8+ variants (armv8, armv8.3, armv8.4, ...) are also 64-bit.
+        is_64bit = arch.endswith("64") or arch.startswith("armv8")
         if is_64bit:
             self.cpp_info.defines = [
                 "SIZEOF_SIZE_T=8",
