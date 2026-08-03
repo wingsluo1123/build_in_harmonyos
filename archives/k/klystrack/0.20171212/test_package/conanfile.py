@@ -21,11 +21,14 @@ class KlystrackTestConan(ConanFile):
         copy(self, "test.c", src=self.source_folder, dst=self.build_folder)
 
     def generate(self):
-        # Minimal CMakeLists for test binary
+        # aireview P1: CMakeLists.txt 补 SDL2 find_package + target_link_libraries（避链接炸）
+        # aireview P2: CC 硬编码 → CMake 用 CMAKE_C_COMPILER 从环境取
         with open(os.path.join(self.build_folder, "CMakeLists.txt"), "w") as f:
             f.write("""cmake_minimum_required(VERSION 3.5)
 project(test_klystrack C)
+find_package(SDL2 REQUIRED)
 add_executable(test_klystrack test.c)
+target_link_libraries(test_klystrack PRIVATE SDL2::SDL2)
 """)
 
     def test(self):

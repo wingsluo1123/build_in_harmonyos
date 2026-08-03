@@ -90,9 +90,11 @@ class KlystrackConan(ConanFile):
             except OSError as e:
                 # 其他 OSError 输出 warning 记录（aireview P3: 避静默失败，至少 self.output.warn）
                 self.output.warning(f"symlink {klystron_link} -> {make_dir} failed: {e}")
+        # aireview P2: CC 硬编码 clang → 改用 self.settings.compiler 动态设（避交叉编译器错）
+        cc = str(self.settings.compiler) if self.settings.compiler else "clang"
         make_cmd = (
             f'make CFG=release '
-            f'CC=clang '
+            f'CC={cc} '
             f'CFLAGS+="{cppflags}" '
             f'LDFLAGS+="{ldflags}" '
             f'PREFIX={os.path.join(self.build_folder, "staging")}'

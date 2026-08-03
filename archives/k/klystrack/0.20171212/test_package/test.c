@@ -7,7 +7,8 @@
 
 int main(void) {
     /* aireview P2: 增 SDL_Init/SDL_Quit 验证 SDL2 运行时可用性（非仅 --help） */
-    if (SDL_Init(0) != 0) {
+    /* P3: SDL_Init(0) 无实际验证效果 → 改 SDL_INIT_VIDEO 真测试子系统初始化 */
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "FAIL: SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
