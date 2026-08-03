@@ -260,6 +260,13 @@ fully present in the pinned OHOS LLVM 15 fork. The compatibility patch now
 includes Clang's real `PointerAuthOptions.h` type definition but skips the
 `getPointerAuth()` call unless the LLVM headers are version 16 or newer.
 
+At 2026-08-03 12:34 CST, source-bootstrap validated the pointer-auth guard by
+compiling past `Decl.cpp.o` and then stopped at `DocComment.cpp.o` around
+93/933. This exposed the same LLVM 15 `ArrayRef` class template argument
+deduction issue seen in `NameLookup.h`; the patch now spells the `BodyNodes`
+and `ParamFields` element types explicitly before passing them to
+`MarkupContext::allocateCopy`.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
