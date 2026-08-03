@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+/* aireview High+Medium: WIFEXITED/WEXITSTATUS 宏由 POSIX 定义在 sys/wait.h，OHOS musl libc 不保证间接可用 */
+#include <sys/wait.h>
 
 int main(int argc, char **argv) {
     if (argc != 2) {
