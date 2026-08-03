@@ -41,7 +41,14 @@ class BcalConan(ConanFile):
 
     # System prebuilt readline is NOT in requires() (not a conan package).
     # Headers are bundled in res/headers/ for CI workers.
-    # Dynamic libreadline.so.8 is available via DEFAULT_PREFIX on OHOS.
+    # Dynamic libreadline.so.8 is installed by cmd-pkgs to ~/usr/local/lib/external/.
+
+    def _get_sysroot(self):
+        """Determine sysroot path via Conan conf, avoiding os.environ (R33)."""
+        sysroot = self.conf.get("user.build:default_prefix", default=None, check_type=str)
+        if not sysroot:
+            sysroot = os.path.expanduser("~/usr/local")
+        return sysroot
 
     def validate(self):
         # R32: Use `in ("Linux", "OHOS")` for settings.os check
@@ -73,8 +80,8 @@ class BcalConan(ConanFile):
 
         # Set up readline include path.
         # Use system headers if available, otherwise bundled res/headers/.
-        # DEFAULT_PREFIX is set by OHOS build context; fallback to ~/usr/local.
-        sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
+        # R33: sysroot via Conan conf, not os.environ.
+        sysroot = self._get_sysroot()
         sys_inc = os.path.join(sysroot, "include")
 
         cppflags = []
@@ -138,7 +145,8 @@ class BcalConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         # Add system readline library path to runtime environment
         # libreadline.so.8 is installed by cmd-pkgs to ~/usr/local/lib/external/
-        sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
+        # R33: sysroot via Conan conf, not os.environ.
+        sysroot = self._get_sysroot()
         lib_external = os.path.join(sysroot, "lib", "external")
         if os.path.isdir(lib_external):
             self.runenv_info.append_path("LD_LIBRARY_PATH", lib_external)
