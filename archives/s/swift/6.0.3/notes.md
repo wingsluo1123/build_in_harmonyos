@@ -267,6 +267,11 @@ deduction issue seen in `NameLookup.h`; the patch now spells the `BodyNodes`
 and `ParamFields` element types explicitly before passing them to
 `MarkupContext::allocateCopy`.
 
+The follow-up 12:45 CST run validated the `DocComment.cpp` fix and progressed
+to `RawComment.cpp.o` around 131/933, where another `llvm::ArrayRef(SRCs)` CTAD
+site failed against LLVM 15. The patch now uses
+`llvm::ArrayRef<SingleRawComment>(SRCs)` for that allocation.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
