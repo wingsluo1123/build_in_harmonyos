@@ -45,10 +45,11 @@ build:
   system: cmake
 
   # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+  configure_options:
+    - "BUILD_TESTING=ON"
+    - "SEARCH_LIBCRYPTO=ON"
+    - "UNSAFE_TREAT_WARNINGS_AS_ERRORS=OFF"
+    - "S2N_INTEG_TESTS=OFF"
 
   # 编译依赖列表（格式: name/version）
   dependencies: ["aws-lc/5.4.0"]
@@ -74,7 +75,11 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+  - "s2n-tls 通过 CMAKE_PREFIX_PATH 定位 aws-lc 的 crypto-config.cmake"
+  - "OHOS 不支持 execinfo/backtrace，s2n_stacktrace_test 需豁免"
+  - "BUILD_TESTING=ON 后 282/283 上游单元测试在 OHOS 上通过"
+  - "关闭 UNSAFE_TREAT_WARNINGS_AS_ERRORS 可避免测试代码的平台特定警告"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"

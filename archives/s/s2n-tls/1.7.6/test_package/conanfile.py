@@ -6,8 +6,6 @@ CI runs this automatically via `conan create` (which invokes test_package).
 
 File location: archives/{letter}/s2n-tls/{version}/test_package/conanfile.py
 """
-import os
-
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -31,4 +29,4 @@ class S2NtlsTestConan(ConanFile):
         cmake = CMake(self)
         cmake.test()
         # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_s2n-tls')}", env="conanrun")
+        # self.run(f"{self.cpp.build.bindirs[0]}/test_s2n_tls", env="conanrun")
