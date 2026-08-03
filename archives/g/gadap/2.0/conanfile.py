@@ -7,6 +7,12 @@ curl and libtirpc (libdap's XDR dependency).
 
 License: GPL-2.0-or-later
 """
+import io
+import os
+import ssl
+import tarfile
+import urllib.request
+
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -49,7 +55,6 @@ class GadapConan(ConanFile):
         # strip_root 对带 "./gadap-2.0/" 前缀的 tar 条目不生效（OHOS conan 2.29），
         # 手动剥离顶层目录，使源码直接落在 source_folder，补丁路径才能命中。
         get(self, **self.conan_data["sources"])
-        import os
         import shutil
         src = self.source_folder
         sub = os.path.join(src, "gadap-2.0")
@@ -59,7 +64,6 @@ class GadapConan(ConanFile):
             os.rmdir(sub)
 
     def generate(self):
-        import os
         tc = AutotoolsToolchain(self)
         # R26: System-name libraries default to static
         if not self.options.shared:
@@ -70,14 +74,66 @@ class GadapConan(ConanFile):
             tc.configure_args.append("--disable-static")
         # libdap/curl/libtirpc 由系统预编译包提供（cmd-pkgs → ~/usr/local）
         pkg_prefix = os.path.expanduser("~/usr/local")
-        tc.extra_cppflags = [f"-I{pkg_prefix}/include/tirpc"]
-        tc.extra_cflags = [f"-I{pkg_prefix}/include/libxml2"]
-        tc.extra_cxxflags = [f"-I{pkg_prefix}/include/libxml2"]
+        tirpc_inc = f"-I{pkg_prefix}/include/tirpc"
+        xml2_inc = f"-I{pkg_prefix}/include/libxml2"
+        tc.extra_cppflags = [tirpc_inc, xml2_inc]
+        tc.extra_cflags = [tirpc_inc, xml2_inc]
+        tc.extra_cxxflags = [tirpc_inc, xml2_inc]
         tc.generate()
         # 让 configure 的 dap-config/pkg-config 找到系统预编译包
         self.output.info(f"PKG_CONFIG_PATH={pkg_prefix}/lib/pkgconfig")
 
+    def _ensure_system_deps(self):
+        """Install missing system libraries from cmd-pkgs.
+
+        libdap/curl/libtirpc 无 conan 配方，由 cmd-pkgs 预编译包提供
+        （https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs）。CI worker 是
+        干净环境，需在此自动安装，否则 configure 报 Cannot find libdap。
+        """
+        prefix = os.path.expanduser("~/usr/local")
+        lib_dir = os.path.join(prefix, "lib")
+        bin_dir = os.path.join(prefix, "bin")
+        inc_dir = os.path.join(prefix, "include")
+
+        # (probe_file, cmd_pkgs_name, cmd_pkgs_version)
+        deps = [
+            (os.path.join(bin_dir, "dap-config"), "libdap", "3.21.1"),
+            (os.path.join(inc_dir, "tirpc", "rpc", "types.h"), "libtirpc", "1.3.3"),
+            (os.path.join(inc_dir, "curl", "curl.h"), "curl", "8.19.0"),
+            (os.path.join(inc_dir, "libxml2", "libxml", "xmlwriter.h"), "libxml2", "2.15.3"),
+        ]
+
+        def _present(probe):
+            return os.path.exists(probe) or os.path.islink(probe)
+
+        missing = [(pkg, ver) for probe, pkg, ver in deps if not _present(probe)]
+        if not missing:
+            self.output.info("All system dependencies present")
+            return
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+
+        for pkg, ver in missing:
+            self.output.info(f"Installing {pkg} {ver} from cmd-pkgs...")
+            url = (
+                "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/"
+                f"download/pkgs/{pkg}-{ver}-ohos-aarch64.tar.gz"
+            )
+            try:
+                req = urllib.request.urlopen(url, context=ctx, timeout=120)
+                data = req.read()
+                tf = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")
+                tf.extractall(prefix)
+                tf.close()
+                self.output.info(f"  Installed {pkg} {ver} from cmd-pkgs")
+            except Exception as e:
+                self.output.warning(f"  cmd-pkgs install failed for {pkg}: {e}")
+
     def build(self):
+        # CI worker 干净环境无 libdap/curl/libtirpc 预编译包，先自动安装
+        self._ensure_system_deps()
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
@@ -91,7 +147,6 @@ class GadapConan(ConanFile):
         self.cpp_info.libs = ["gadap"]
         self.cpp_info.requires = ["libxml2::libxml2"]
         # libdap/curl/libtirpc 无 conan 配方，由系统预编译包提供（cmd-pkgs → ~/usr/local）
-        import os
         prefix = os.path.expanduser("~/usr/local")
         self.cpp_info.system_libs = ["dap", "dapserver", "dapclient", "curl", "tirpc"]
         link_flags = [f"-L{prefix}/lib64", f"-L{prefix}/lib"]
