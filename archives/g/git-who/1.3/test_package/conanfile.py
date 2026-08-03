@@ -14,7 +14,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class GitWhoTestConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
     test_type = "explicit"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualBuildEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
