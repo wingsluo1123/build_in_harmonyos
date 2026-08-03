@@ -61,3 +61,8 @@ conan-verify gadap 2.0  # G0-G4 全部 PASS，test_package L1 测试通过
 - libdap/curl/libtirpc 未发布为 conan 配方，由系统预编译包（cmd-pkgs）提供，路径固定 ~/usr/local；
   未来若发布为 conan 包，可将 requirements/system_libs 收敛为 conan 依赖。
 - configure 由 Autoconf 2.59 生成，构建时需避免 autotools 重生成（否则升级到 2.72 会破坏临时目录补丁）。
+
+---
+
+**编译结束**: 2026-08-03 19:10
+**最终状态**: built
