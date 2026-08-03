@@ -4,7 +4,7 @@
 
 - 构建系统: autotools
 - 交付方式: static-only
-- 关键配置: `--without-shared --enable-widec --enable-overwrite --disable-stripping`
+- 关键配置: `--without-shared --enable-widec --enable-overwrite --disable-stripping --disable-big-strings`
 - 上游测试入口: `make -C test -j1 && make -C test check`
 
 ## B 路径证据
@@ -17,11 +17,18 @@
 
 | 问题 | 处理 |
 |---|---|
-| `/tmp` 只读 | 设置 `TMPDIR` 到 runner 可写目录 |
+| `/tmp` 只读 / `$HOME/tmp` 权限不稳定 | 设置 `TMPDIR` 到当前 Conan build 目录内的 `.tmp` |
 | `config.status` 的 `umask 077` 临时目录不可写 | OHOS 下补丁改为 `umask 022`，保留 group/other 访问位 |
-| 默认 `expr/sed` 是 toybox | 将 `$HOME/usr/local/bin` 前置到 `PATH`，优先使用 GNU coreutils/sed |
+| 默认 `expr/sed` 是 toybox | 将可用工具目录前置到 `PATH`，补丁避开 `config.status` 的 `sed/expr` 路径解析管道，并在 configure 后修正 generated Makefile |
+| `tic` 静态链接缺 `boolcodes/numcodes/strcodes` | OHOS 下禁用 big-strings，生成传统 code table 符号 |
 | `install -s` 调用 `strip` 权限失败 | configure 增加 `--disable-stripping` |
 | 共享 ncurses 可能影响系统 shell | 禁用 shared，仅打包静态 wide-char 库 |
+
+## CI 修复记录
+
+- PR !3879 Build #12510 失败点: `config.guess` 无法写入 `/storage/Users/currentUser/tmp/.../dummy.c`，随后 `config.status` 使用 toybox `sed/expr` 生成的 Makefile 路径行损坏，`make` 中 `include/Caps` 路径变为乱码。
+- 修复: OHOS recipe 不再复用外部 `TMPDIR`，改用 build-local `.tmp`；补丁把 `config.status` 的 `ac_dir` 计算改为 shell `case`；configure 后对生成 Makefile 的 `top_srcdir` 和非打印乱码行做 targeted repair。
+- 验证: 新端口 `33332` 隔离任务 `ncurses-ci-fix-20260803-conan-build-r7` 通过 `conan create`、上游测试、`test_package`、负向测试和元数据检查。
 
 ## 验证结果
 
