@@ -112,6 +112,9 @@ optimized object handoff wrapper. It deliberately avoids signed ELF binaries and
 probe-machine absolute paths; real compiler, clang, opt, sysroot, resource-dir,
 and Swift arch module paths are expected from environment variables or the
 packaged toolchain layout.
+The default `test_package` does not currently install this wrapper as `swiftc`;
+its `-O` smoke test is limited to the packaged compiler's optimized code
+generation path.
 
 ## Review Follow-up
 
