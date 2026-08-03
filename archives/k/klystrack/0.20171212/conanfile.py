@@ -65,7 +65,6 @@ class KlystrackConan(ConanFile):
         raise ConanException(f"Makefile not found under {self.source_folder}")
 
     def build(self):
-        apply_conandata_patches(self)
         # SDL2 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
         # SDL2_image/2.8.0 未发布到制品仓未声明依赖，不注入其路径
         # CI 报 'SDL.h' file not found: SDL2 包头在 include/SDL2/SDL.h（非根 include），
