@@ -1041,6 +1041,16 @@ diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/IRGenOptions.h b/swift-
 +#endif
 +        EmitCASIDFile(false) {
  #ifndef NDEBUG
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/Decl.h b/swift-swift-6.0.3-RELEASE/include/swift/AST/Decl.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/AST/Decl.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/AST/Decl.h
+@@ -51,4 +51,6 @@
+ #include "swift/Basic/OptionalEnum.h"
+ #include "swift/Basic/Range.h"
++#include "clang/Basic/PointerAuthOptions.h"
+ #include "llvm/ADT/DenseSet.h"
+ #include "llvm/ADT/TinyPtrVector.h"
++#include "llvm/Config/llvm-config.h"
 diff --git a/swift-swift-6.0.3-RELEASE/include/swift/AST/NameLookup.h b/swift-swift-6.0.3-RELEASE/include/swift/AST/NameLookup.h
 --- a/swift-swift-6.0.3-RELEASE/include/swift/AST/NameLookup.h
 +++ b/swift-swift-6.0.3-RELEASE/include/swift/AST/NameLookup.h
@@ -1090,6 +1100,20 @@ diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/Builtins.cpp b/swift-swift-6.0.3-
 +      refType = vecType->getElementType();
 +    return makePointer(refType, 0);
 +  }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/Decl.cpp b/swift-swift-6.0.3-RELEASE/lib/AST/Decl.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/AST/Decl.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/AST/Decl.cpp
+@@ -8275,8 +8275,10 @@ void VarDecl::emitLetToVarFixitIfNecessary() const {
+ clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   if (auto *clangDecl = getClangDecl()) {
+     if (auto *valueDecl = dyn_cast<clang::ValueDecl>(clangDecl)) {
+       return valueDecl->getType().getPointerAuth();
+     }
+   }
++#endif
+   return clang::PointerAuthQualifier();
+ }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp

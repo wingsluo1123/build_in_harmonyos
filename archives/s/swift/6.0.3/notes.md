@@ -252,6 +252,14 @@ around 80/933. The OHOS LLVM 15 fork exposes additional
 existing RawPointer-oriented `makePointer` path rather than adding a catch-all
 default branch.
 
+At 2026-08-03 11:59 CST, source-bootstrap validated the intrinsic descriptor
+patch by compiling past `Builtins.cpp.o` and then stopped at `Decl.cpp.o`
+around 89/933. Swift 6.0.3 references Clang pointer-authentication APIs
+(`clang::PointerAuthQualifier` and `QualType::getPointerAuth()`) that are not
+fully present in the pinned OHOS LLVM 15 fork. The compatibility patch now
+includes Clang's real `PointerAuthOptions.h` type definition but skips the
+`getPointerAuth()` call unless the LLVM headers are version 16 or newer.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
