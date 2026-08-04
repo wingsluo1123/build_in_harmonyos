@@ -8,7 +8,6 @@ Build system: Go (custom)
 Output: single static binary (argo)
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches

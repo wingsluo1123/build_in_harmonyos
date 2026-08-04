@@ -1,6 +1,7 @@
 #!/system/bin/sh
 # test_package/test.sh — smoke test for argo executable
 # Runs in conanrun env (PATH includes installed bin/)
+# pipefail not supported by /system/bin/sh (mksh) on OHOS
 set -eu
 
 echo "[test] argo version"

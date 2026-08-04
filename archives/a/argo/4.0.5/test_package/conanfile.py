@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """test_package for argo executable — runs test.sh which invokes the binary."""
-import os
-
 from conan import ConanFile
 
 
