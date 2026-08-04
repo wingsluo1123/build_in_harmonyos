@@ -4,27 +4,38 @@
 
 - 软件名: aqua
 - 版本: v2.60.0
-- 类型: go 工具
-- 编译日期: 2026-06-15
+- 类型: go 工具 (prebuilt binary)
+- 编译日期: 2026-08-05
+- 上游仓库: https://github.com/aquaproj/aqua
 
 ## 编译过程
 
 ### 编译方式
 
-使用 go install 直接安装：
-- Go 工具: `go install github.com/...@v2.60.0`
-- Rust 工具: `cargo install aqua`
+使用上游预编译的 linux/arm64 二进制包：
+- 上游发布: https://github.com/aquaproj/aqua/releases/download/v2.60.0/aqua_linux_arm64.tar.gz
+- SHA256: 2427b5212dec92ae7cd59bf62c6eb80ef5a74adda1c38876b5fa3714e2cfa95f
+- OHOS CI worker 不提供 Go 工具链，使用上游预编译二进制
+
+### 二进制签名
+
+- 使用 /data/service/hnp/bin/binary-sign-tool 对二进制进行 OHOS 平台签名
+- 使用 /data/service/hnp/bin/llvm-objcopy 移除 .codesign 段
 
 ### 验证
 
-- 二进制文件: `~/go/bin/aqua` 或 `~/.cargo/bin/aqua`
-- 功能验证: `aqua --version` ✅
+- 二进制文件: bin/aqua
+- 功能验证: aqua --version ✅ (CI 环境验证)
 
 ## 制品信息
 
-- 制品包: `packaging/aqua-v2.60.0-ohos-aarch64.tar.gz`
-- 内容: `bin/aqua`
+- 制品包: aqua-v2.60.0-ohos-aarch64 (Conan 包)
+- 内容: bin/aqua, licenses/LICENSE, share/doc/aqua/README.md
 
 ## 备注
 
-此软件通过 go install 直接安装成功，制品从已安装二进制打包创建。
+此软件通过上游预编译二进制打包创建，无需本地 Go 工具链。
+---
+
+**编译结束**: 2026-08-05 01:17
+**最终状态**: built
