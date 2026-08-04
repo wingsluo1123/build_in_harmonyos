@@ -4,12 +4,18 @@
 numen is a voice control tool written in Go. It uses `go build` to produce
 the `numen` binary and ships a companion `numenc` shell script.
 
+The recipe auto-downloads the Go SDK when `go` is not in PATH, since the
+HarmonyOS CI environment does not include a Go toolchain (E-draft-2699).
+
 References:
   - install-numen.sh upstream build script
   - R26: static linking (CGO_ENABLED=1 with static libs)
   - R38: commands.json required for application packages
+  - E081: Go linker mmap fails on HMDFS — output to TMPDIR
+  - E082: GOTOOLCHAIN=local prevents auto-download of unsigned Go toolchain
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import (
@@ -40,11 +46,41 @@ class NumenConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def validate(self):
+        # Override base-class validation: this recipe auto-downloads the Go
+        # SDK in build() when `go` is not in PATH, so we do not need the
+        # toolchain to be pre-installed on the CI worker (E-draft-2699).
+        pass
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
+
+        # ── Ensure Go toolchain is available ──
+        # HarmonyOS CI does not include Go in PATH. Download the Go SDK
+        # binary release and set up GOROOT/PATH (E-draft-2699).
+        if not shutil.which("go"):
+            self.output.info("Go not found in PATH — downloading Go SDK...")
+            # Use TMPDIR (hmfs) for extraction — HMDFS may reject mmap writes
+            tmpdir = os.environ.get("TMPDIR", "/tmp")
+            go_sdk_dir = os.path.join(tmpdir, "numen_go_sdk")
+            get(
+                self,
+                url=self.conan_data["go_toolchain"]["url"],
+                sha256=self.conan_data["go_toolchain"]["sha256"],
+                destination=go_sdk_dir,
+                strip_root=True,
+            )
+            os.environ["GOROOT"] = go_sdk_dir
+            os.environ["PATH"] = (
+                os.path.join(go_sdk_dir, "bin")
+                + os.pathsep
+                + os.environ.get("PATH", "")
+            )
+            self.output.info(f"Go SDK ready at {go_sdk_dir}")
+
         # Mirror install-numen.sh: go build with version ldflag.
         # CGO is required because vosk-api Go binding links libvosk C++.
         version = str(self.version)
@@ -53,14 +89,19 @@ class NumenConan(ConanFile):
         # - CGO_ENABLED=1: vosk-api Go binding requires CGO
         # - GOTOOLCHAIN=local: prevent auto-download of unsigned Go toolchain
         # - GOPROXY: use China mirror for module downloads
-        # Note: Conan 2.x run() env param must be a list of env-file names,
-        # not a dict; set Go vars directly on os.environ instead.
         os.environ.setdefault("CGO_ENABLED", "1")
         os.environ.setdefault("GO111MODULE", "on")
         os.environ.setdefault("GOTOOLCHAIN", "local")
         os.environ.setdefault("GOPROXY", "https://goproxy.cn,direct")
+
+        # E081: Go linker mmap fails on HMDFS — write output to TMPDIR
+        # (hmfs filesystem) instead of source_folder (HMDFS).
+        tmpdir = os.environ.get("TMPDIR", "/tmp")
+        output_bin = os.path.join(tmpdir, "numen")
+        self._numen_output = output_bin
+
         self.run(
-            f'go build -ldflags "{ldflags}" -o numen .',
+            f'go build -ldflags "{ldflags}" -o {output_bin} .',
             cwd=self.source_folder,
         )
 
@@ -68,8 +109,13 @@ class NumenConan(ConanFile):
         # Install binaries into bin/ (R38: application bindirs)
         bindir = os.path.join(self.package_folder, "bin")
         os.makedirs(bindir, exist_ok=True)
-        # Main binary produced by go build
-        copy(self, "numen", src=self.source_folder, dst=bindir)
+        # Main binary (built to TMPDIR to avoid HMDFS mmap issue E081)
+        numen_src = getattr(self, "_numen_output", None)
+        if numen_src and os.path.isfile(numen_src):
+            copy(self, "numen", src=os.path.dirname(numen_src), dst=bindir)
+        else:
+            # Fallback: try source_folder
+            copy(self, "numen", src=self.source_folder, dst=bindir)
         # Companion shell script shipped in upstream source
         copy(self, "numenc", src=self.source_folder, dst=bindir)
 
