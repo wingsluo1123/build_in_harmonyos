@@ -6,8 +6,8 @@ int main(void) {
     /* gadap_numopen() returns the number of open datasets; with no
      * network access in CI it must return 0 (not crash, not negative). */
     int n = gadap_numopen();
-    if (n < 0) {
-        std::fprintf(stderr, "FAIL: gadap_numopen() returned %d (< 0)\n", n);
+    if (n != 0) {
+        std::fprintf(stderr, "FAIL: gadap_numopen() returned %d (expected 0)\n", n);
         return 1;
     }
     std::printf("gadap_numopen() = %d (expected 0 with no open datasets)\n", n);

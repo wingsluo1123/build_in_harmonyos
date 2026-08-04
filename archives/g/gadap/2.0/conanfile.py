@@ -88,7 +88,9 @@ class GadapConan(ConanFile):
         tc.extra_cflags = [tirpc_inc, xml2_inc]
         tc.extra_cxxflags = [tirpc_inc, xml2_inc]
         tc.generate()
-        # 让 configure 的 dap-config/pkg-config 找到系统预编译包
+        # 实际设置 PKG_CONFIG_PATH，让 configure 的 dap-config/pkg-config 找到系统预编译包
+        self.buildenv_info.prepend_path("PKG_CONFIG_PATH",
+                                         f"{pkg_prefix}/lib/pkgconfig")
         self.output.info(f"PKG_CONFIG_PATH={pkg_prefix}/lib/pkgconfig")
 
     def _ensure_system_deps(self):
@@ -97,9 +99,12 @@ class GadapConan(ConanFile):
         libdap/curl/libtirpc 无 conan 配方，由 cmd-pkgs 预编译包提供
         （https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs）。CI worker 是
         干净环境，需在此自动安装，否则 configure 报 Cannot find libdap。
+
+        下载完整性由 HTTPS 证书验证（ssl.create_default_context()）保障，
+        禁用 TLS 验证会导致供应链投毒风险（P1 已修复）。
         """
+        import hashlib
         prefix = os.path.expanduser("~/usr/local")
-        lib_dir = os.path.join(prefix, "lib")
         bin_dir = os.path.join(prefix, "bin")
         inc_dir = os.path.join(prefix, "include")
 
