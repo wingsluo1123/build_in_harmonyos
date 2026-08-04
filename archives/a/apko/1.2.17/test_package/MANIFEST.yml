@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# apko 是 Go 命令行应用（Chainguard 的 APK-based OCI image builder）。
+# 上游通过 `go test ./...` 运行单元测试。
+# 本机开发环境（HMDFS）无法执行 static ET_EXEC 的 Go 工具链，
+# 因此 `go test ./...` 在 CI 阶段执行：当 runner 具备可用 Go 工具链时
+# 真实执行。test_package 采用 L2 冒烟测试：运行 `apko version` 验证
+# 二进制可用性。
+
+package: apko/1.2.17
+homepage: "https://github.com/chainguard-dev/apko"
+
+# 上游测试命令分析
+upstream_check_command: "go test ./..."
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（Go 单元测试，CI 阶段在具备 Go 工具链的 runner 上执行）
+upstream_tests:
+  - file: internal/cli/cli_test.go
+    source: apko-1.2.17/internal/cli/cli_test.go
+    description: "CLI 命令行参数解析与执行单元测试"
+    command: "go test ./internal/cli/"
+  - file: pkg/build/build_test.go
+    source: apko-1.2.17/pkg/build/build_test.go
+    description: "镜像构建逻辑单元测试"
+    command: "go test ./pkg/build/"
+
+# test_package 中自带的测试（消费者视角验证）
+# R34: 调用被测包的实际二进制（apko version），非空壳 stub
+test_package_tests:
+  - file: conanfile.py
+    description: "运行 apko version，验证二进制可执行且版本号正确"
+    command: "apko version"
+  - file: test_apko.sh
+    description: "Shell 脚本冒烟测试，运行 apko version 并验证输出"
+    command: "./test_apko.sh"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 2

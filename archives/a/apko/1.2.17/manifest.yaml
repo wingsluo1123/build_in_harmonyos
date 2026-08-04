@@ -18,7 +18,7 @@ status: built
 build_system: custom
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-17"
+build_date: "2026-08-05"
 
 # ============================================================
 # 源码信息
@@ -29,7 +29,7 @@ source:
   url: "https://github.com/chainguard-dev/apko/archive/refs/tags/v1.2.17.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "12af82ec319f989c82da2ff5ef59a19822fc0193158f6510b0ada3b72f2d7662"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -46,13 +46,13 @@ build:
 
   # 配置选项列表
   configure_options:
-    - "GOTOOLCHAIN=local"
     - "CGO_ENABLED=0"
     - "GOOS=linux GOARCH=arm64"
+    - "GOTOOLCHAIN=local"
+    - "-buildmode=pie"
 
   # 编译依赖列表（格式: name/version）
-  dependencies:
-    - golang/1.26.3
+  dependencies: []
 
   # 编译器
   cc: go
@@ -71,7 +71,9 @@ patches_applied: []
 
 # 编译中学到的知识
 knowledge_gained:
-  - "apko go.mod requires Go >= 1.26.0, need Go 1.26.3 SDK for building"
+  - "apko go.mod requires Go >= 1.26.0, need Go 1.26.0+ SDK for building"
   - "Go projects on HarmonyOS need GOTOOLCHAIN=local or proper SDK path"
-  - "binary-sign-tool selfSign mode required for ELF signing"
-  - "apko is a static Go binary, CGO_ENABLED=0 works fine"
+  - "buildmode=pie required for HMDFS to execute Go binaries (ET_DYN)"
+  - "apko is a pure Go static binary, CGO_ENABLED=0 works fine"
+  - "Go toolchain binaries need ELF signing on HarmonyOS (binary-sign-tool)"
+  - "No conan-level dependencies: Go resolves modules from proxy during build"
