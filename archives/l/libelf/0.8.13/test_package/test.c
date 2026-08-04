@@ -2,10 +2,11 @@
 #include <stdio.h>
 
 int main() {
-    if (elf_version(EV_CURRENT) == EV_NONE) {
+    long int ver = elf_version(EV_CURRENT);
+    if (ver == EV_NONE) {
         fprintf(stderr, "elf_version failed\n");
         return 1;
     }
-    printf("libelf version: %s\n", elf_version(EV_CURRENT) == EV_CURRENT ? "ok" : "unknown");
+    printf("libelf initialized, version=%ld (EV_CURRENT=%d)\n", ver, EV_CURRENT);
     return 0;
 }
