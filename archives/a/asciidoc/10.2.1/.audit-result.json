@@ -1,0 +1,234 @@
+{
+  "audit_metadata": {
+    "branch": "feat/asciidoc-10.2.1",
+    "base_branch": "main",
+    "package": "asciidoc",
+    "version": "10.2.1",
+    "auditor": "independent-code-auditor",
+    "timestamp": "2026-08-05T03:22:10Z",
+    "files_audited": 11,
+    "rules_checked": {
+      "code_style_rules": 25,
+      "review_memory_rules": 30
+    }
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "id": "P3-001",
+      "severity": "P3",
+      "category": "suggestive_improvement",
+      "file": "archives/a/asciidoc/10.2.1/conanfile.py",
+      "rule": "code-style-rule-2",
+      "description": "The `url` attribute is set to the same value as `homepage` (\"https://asciidoc.org/\"). In Conan convention, `url` typically points to the recipe repository (e.g., the ConanCenter or project repo hosting the recipe), distinct from the upstream package homepage. While no rule explicitly prohibits this, it is unconventional.",
+      "suggestion": "Consider setting `url` to the recipe repository URL if applicable, or document that this is intentional for this project's conventions."
+    },
+    {
+      "id": "P3-002",
+      "severity": "P3",
+      "category": "suggestive_improvement",
+      "file": "archives/a/asciidoc/10.2.1/manifest.yaml",
+      "rule": "code-style-rule-14",
+      "description": "`build_system: python` is not in the standard list (cmake | autotools | makefile | meson). While this is a reasonable value for a pure Python package using setup.py, the code style standard does not list 'python' as a valid build_system value.",
+      "suggestion": "Consider extending the manifest.yaml build_system standard list to include 'python' for Python package recipes, or document this as an accepted extension."
+    },
+    {
+      "id": "P3-003",
+      "severity": "P3",
+      "category": "suggestive_improvement",
+      "file": "archives/a/asciidoc/10.2.1/manifest.yaml",
+      "rule": "code-style-rule-14",
+      "description": "The build section specifies `cc: clang` and `cxx: clang++` for a pure Python package that has no C/C++ compilation. These fields are unnecessary and potentially misleading since the package uses `python3 setup.py install` with no compiler involvement.",
+      "suggestion": "Consider removing the `cc` and `cxx` fields from the build section, or set them to 'N/A' to accurately reflect that no C/C++ compilation occurs."
+    },
+    {
+      "id": "P3-004",
+      "severity": "P3",
+      "category": "suggestive_improvement",
+      "file": "archives/a/asciidoc/10.2.1/test_package/test_asciidoc.py",
+      "rule": "review-memory-R34",
+      "description": "The test_asciidoc.py file contains only a docstring with no actual test code. While the real test logic is correctly implemented in test_package/conanfile.py's test() method (which executes the asciidoc binary for version check and HTML conversion), the file itself is essentially empty. The test_package as a whole satisfies R34 because conanfile.py's test() method does execute the tested package's binary.",
+      "suggestion": "Consider adding actual pytest test code to test_asciidoc.py (e.g., subprocess-based tests invoking asciidoc) to make the file self-documenting, or clarify in the CI L0c requirement that a marker docstring file is acceptable when test logic resides in conanfile.py."
+    },
+    {
+      "id": "P3-005",
+      "severity": "P3",
+      "category": "suggestive_improvement",
+      "file": "archives/a/asciidoc/10.2.1/conanfile.py",
+      "rule": "code-style-rule-10",
+      "description": "In the `_create_wrapper` method, the `except OSError: pass` silently ignores errors from `os.chmod()`. While this is a common pattern for cross-filesystem operations where chmod may not be supported, no comment explains why the error is ignored, which is the spirit of code-style-rule-10 (no silently swallowed errors without explanation).",
+      "suggestion": "Add a brief comment explaining why the OSError is ignored, e.g., `except OSError: pass  # chmod may fail on non-POSIX filesystems`. Note: code-style-rule-10 technically applies to shell scripts, but the principle extends to Python error handling."
+    }
+  ],
+  "audit_details": {
+    "deception_detection": {
+      "R34_stub_test": {
+        "status": "pass",
+        "details": "test_package/conanfile.py test() method executes the asciidoc binary with two real tests: (1) `asciidoc --version` smoke test, (2) functional test converting an AsciiDoc document to HTML with output verification via `os.path.exists()` and `raise AssertionError`. This is NOT a stub test."
+      },
+      "R9_bypass_tests": {
+        "status": "pass",
+        "details": "No `def test(self): pass`, no commented-out test calls, no `os.system('exit 0')` or similar forced pass. The test() method has real assertions and raises exceptions on failure."
+      },
+      "fake_status": {
+        "status": "pass",
+        "details": "manifest.yaml status is 'built' (verified, not yet uploaded to repo). This is consistent with notes.md showing successful build and verification. No 'failed' marked as 'published'."
+      },
+      "fake_sha256": {
+        "status": "pass",
+        "details": "sha256='aa7be8ae894f6cc1e67784d76ffa6c6b9e9f96efdc695db43c6bd63820e5072b' is a 64-character hex string. Not all zeros, not all f's, not empty, not too short. Appears to be a legitimate SHA-256 hash."
+      },
+      "R8_ohos_stub": {
+        "status": "not_applicable",
+        "details": "No C/C++ source code or patches with #ifdef __OHOS__ in this PR. asciidoc is a pure Python package."
+      },
+      "R19_manual_packaging": {
+        "status": "pass",
+        "details": "No pre-compiled .so/.a/binary files in the PR. All build artifacts are produced from source via setup.py install in conanfile.py build()."
+      },
+      "R40_deep_adaptation": {
+        "status": "not_applicable",
+        "details": "asciidoc is not in any R40 category (graphics/rendering, UI framework, multimedia, peripherals/hardware, system low-level). It is a pure Python text document processor."
+      }
+    },
+    "recipe_quality": {
+      "R37_version_strategy": {
+        "status": "pass",
+        "details": "Version 10.2.1 matches the upstream release version. This appears to be a first-time adaptation (no version suffix like .1 or .2 needed)."
+      },
+      "R26_static_linking": {
+        "status": "not_applicable",
+        "details": "asciidoc is not a system-named library. It is an application (package_type='application')."
+      },
+      "R32_ohos_compatibility": {
+        "status": "not_applicable",
+        "details": "No OS-specific conditionals in conanfile.py. settings='os', 'arch' is appropriate for a pure Python package. No `self.settings.os == 'Linux'` checks that would miss OHOS."
+      },
+      "R33_shell_env_vars": {
+        "status": "pass",
+        "details": "No bare shell env var dependencies in self.run(). The main conanfile.py uses `self.run(f'python3 setup.py install --prefix={install_dir}')` with a computed path. The test_package conanfile.py uses `PYTHONPATH=...` inline with a value computed from package_folder (deterministic, not dependent on pre-existing env vars that might be empty on release workers)."
+      },
+      "conandata_yml": {
+        "status": "pass",
+        "details": "URL is HTTPS with quotes, sha256 present with quotes. No patches section (no patches needed). 2-space indentation. Consistent with manifest.yaml source info."
+      },
+      "R39_official_source_url": {
+        "status": "pass",
+        "details": "URL='https://github.com/asciidoc-py/asciidoc-py/releases/download/10.2.1/asciidoc-10.2.1.tar.gz' is the official GitHub release from the asciidoc-py organization's official repository. No personal fork, no unknown CDN, no manual mirror prefix. CI auto-adds mirror fallback."
+      },
+      "R6_generated_files": {
+        "status": "pass",
+        "details": "No modifications to config.h, configure, Makefile.in, CMakeCache.txt or other generated artifacts. The deleted egg-info patches were auto-generated build artifacts being cleaned up."
+      },
+      "R38_commands_json": {
+        "status": "pass",
+        "details": "commands.json exists at archives/a/asciidoc/commands.json (software level). conanfile.py has cpp_info.bindirs=['bin']. Type is 'tool', name matches package name. 2-space indent, no trailing commas, proper JSON format."
+      },
+      "conan2x_api": {
+        "status": "pass",
+        "details": "Uses `from conan import ConanFile` (not `from conans`). Uses `from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches` and `from conan.tools.layout import basic_layout`. All Conan 2.x API."
+      }
+    },
+    "file_specs": {
+      "archive_structure": {
+        "status": "pass",
+        "details": "Required files present: conanfile.py, conandata.yml, test_package/ (with conanfile.py), manifest.yaml, notes.md. commands.json exists at software level for tool-type package."
+      },
+      "deleted_patches": {
+        "status": "pass",
+        "details": "Three egg-info patches (0001-PKG-INFO, 0002-SOURCES.txt, 0003-entry_points.txt) were deleted. These were auto-generated build artifacts. conandata.yml has no patches section and does not reference them. manifest.yaml patches_applied=[] and patches_count=0. This is expected and NOT flagged as an issue."
+      },
+      "forbidden_files": {
+        "status": "pass",
+        "details": "No .build-context-*, test-report, *.log, .DS_Store, __pycache__/, pre-compiled binaries (.o/.so/.a), or SUMMARY.md modifications found in the PR."
+      }
+    },
+    "pr_compliance": {
+      "W2_pr_atomicity": {
+        "status": "pass",
+        "details": "All 11 changed files are for the asciidoc package only. No framework files (ci/scripts/) mixed in. One PR = one recipe."
+      },
+      "file_permission_boundary": {
+        "status": "pass",
+        "details": "No modifications to SKILL.md, references/, templates/, scripts/, ci/, or index.tsv. All changes are within archives/a/asciidoc/ scope."
+      },
+      "template_placeholders": {
+        "status": "pass",
+        "details": "No TODO, FIXME, XXX, empty url='', or 'pass  # TODO: implement' found in any file."
+      },
+      "hardcoded_remotes": {
+        "status": "pass",
+        "details": "No hardcoded remote names found in conanfile.py or any other file."
+      }
+    }
+  },
+  "per_file_summary": [
+    {
+      "file": "archives/a/asciidoc/10.2.1/conandata.yml",
+      "status": "pass",
+      "checks_passed": ["HTTPS URL with quotes", "sha256 present (64-char hex, not fake)", "2-space indentation", "No patches section (no patches needed)", "Official GitHub release URL (R39)", "No template placeholders", "No manual mirror prefix"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/conanfile.py",
+      "status": "pass",
+      "checks_passed": ["Shebang + docstring (rule 1)", "PascalCase class name AsciidocConan (rule 2)", "package_type='application' correct for tool (rule 2)", "Method order: export_sources→layout→source→build→package→package_info (rule 3)", "package_info sets cpp_info.bindirs (rule 4)", "No template placeholders (rule 5)", "Import order stdlib→conan with blank line (rule 16)", "Private method _create_wrapper with _ prefix (rule 17)", "Conan 2.x API (rule 16/RM-16)", "No bare shell env vars in self.run() (R33)", "No hardcoded remotes", "Proper structure: export_sources, build, package, package_info"],
+      "issues": ["P3-001: url attribute same as homepage", "P3-005: except OSError: pass without explanatory comment"]
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/manifest.yaml",
+      "status": "pass",
+      "checks_passed": ["Version quoted (rule 14)", "status: built is legitimate (not faking published)", "Source URL and sha256 match conandata.yml", "patches_applied: [] consistent with no patches", "patches_count: 0 consistent", "knowledge_gained documented"],
+      "issues": ["P3-002: build_system: python not in standard list", "P3-003: cc/cxx fields unnecessary for pure Python package"]
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/notes.md",
+      "status": "pass",
+      "checks_passed": ["Well-documented build environment", "Problems and solutions table documented", "Verification results shown", "Source modifications explained", "No template placeholders"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/patches/0001-asciidoc.egg-info-PKG-INFO.patch",
+      "status": "deleted_expected",
+      "checks_passed": ["File deleted as expected (auto-generated egg-info build artifact)", "Not referenced in conandata.yml (no patches section)", "Not referenced in manifest.yaml (patches_applied: [])"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/patches/0002-asciidoc.egg-info-SOURCES.txt.patch",
+      "status": "deleted_expected",
+      "checks_passed": ["File deleted as expected (auto-generated egg-info build artifact)", "Not referenced in conandata.yml (no patches section)", "Not referenced in manifest.yaml (patches_applied: [])"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/patches/0003-asciidoc.egg-info-entry_points.txt.patch",
+      "status": "deleted_expected",
+      "checks_passed": ["File deleted as expected (auto-generated egg-info build artifact)", "Not referenced in conandata.yml (no patches section)", "Not referenced in manifest.yaml (patches_applied: [])"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/test_package/MANIFEST.yml",
+      "status": "pass",
+      "checks_passed": ["Package reference matches", "Upstream tests documented", "Test package tests documented", "upstream_test_in_build: false (tests run in test_package)", "No template placeholders"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/test_package/conanfile.py",
+      "status": "pass",
+      "checks_passed": ["R34: test() executes asciidoc binary (version check + HTML conversion) - NOT a stub", "R9: No bypassed tests, no pass, no fake pass", "Real assertions: raise AssertionError on missing output", "Conan 2.x API: from conan import ConanFile", "self.requires(self.tested_reference_str) correct pattern", "Import order stdlib→conan with blank line (rule 16)", "PYTHONPATH computed from package structure, not bare env var (R33)"],
+      "issues": []
+    },
+    {
+      "file": "archives/a/asciidoc/10.2.1/test_package/test_asciidoc.py",
+      "status": "pass",
+      "checks_passed": ["File exists (satisfies CI L0c test source file requirement)", "Real test logic is in conanfile.py test() method which executes binary", "R34 satisfied at test_package level"],
+      "issues": ["P3-004: file is empty (only docstring), actual test logic in conanfile.py"]
+    },
+    {
+      "file": "archives/a/asciidoc/commands.json",
+      "status": "pass",
+      "checks_passed": ["R38: commands.json exists for tool-type package", "Located at software level: archives/a/asciidoc/commands.json", "type='tool' (rule 15)", "name matches package name", "2-space indentation (rule 15)", "String values quoted (rule 15)", "No trailing commas (rule 15)", "Version entry has correct ref and binary fields"],
+      "issues": []
+    }
+  ],
+  "summary": "PASS — Audit of asciidoc 10.2.1 Conan recipe completed. No P0 (deceptive behavior) or P1 (recipe correctness) issues found. Deception detection: R34 stub test check PASSED (test_package executes asciidoc binary for version check and HTML conversion with real assertions); R9 bypass check PASSED; sha256 is valid 64-char hex; manifest status 'built' is legitimate. Recipe quality: conandata.yml uses official GitHub release URL (R39); commands.json exists for tool-type package (R38); Conan 2.x API used correctly; no bare shell env vars (R33); no hardcoded remotes; no template placeholders. The 3 deleted egg-info patches are expected (auto-generated build artifacts, not referenced in conandata.yml). 5 P3 suggestions noted: (1) conanfile.py url attribute same as homepage, (2) manifest.yaml build_system:python not in standard list, (3) manifest.yaml cc/cxx unnecessary for pure Python, (4) test_asciidoc.py is empty marker file, (5) except OSError:pass without comment. Verdict: PASS."
+}
