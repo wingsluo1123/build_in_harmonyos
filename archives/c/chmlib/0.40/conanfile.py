@@ -2,9 +2,9 @@
 """
 Conan recipe for chmlib v0.40 — OHOS (OpenHarmony) aarch64 adaptation.
 
-Build system: autotools (autoreconf + configure + make).
-GitHub source lacks pre-generated configure; autoreconf generates it.
-OHOS platform fixes (config.guess / config.sub / umask) applied via sed.
+Build system: autotools (configure + make).
+Source tarball from Slackware mirror (original jedrea.com release, offline).
+4 portability patches verified on OHOS aarch64 (2026-06-03).
 """
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -47,55 +47,8 @@ class ChmlibConan(ConanFile):
         tc.generate()
 
     def build(self):
-        src = self.source_folder
-
-        # GitHub auto-tarball lacks configure; generate it
-        autotools = Autotools(self)
-        autotools.autoreconf(args=["-fi"])
-
-        # E007: Fix config.guess to recognise HarmonyOS
-        # a\ (append after case line) — NOT i\ (insert before), or it goes outside the case block
-        self.run(
-            "sed -i '/^case \"\\${UNAME_MACHINE}:\\${UNAME_SYSTEM}:\\${UNAME_RELEASE}:\\${UNAME_VERSION}\" in$/a\\\n"
-            "    *:HarmonyOS:*:*) echo ${UNAME_MACHINE}-unknown-linux-ohos; exit 0;;' "
-            "config.guess",
-            cwd=src
-        )
-
-        # E007: Fix config.sub — add linux-ohos in three places
-        self.run(
-            "sed -i 's/| linux-gnu\\* | linux-dietlibc/| linux-gnu* | linux-ohos* | linux-dietlibc/' "
-            "config.sub",
-            cwd=src
-        )
-        self.run(
-            "sed -i 's/| -linux-gnu\\* | -linux-newlib/| -linux-gnu* | -linux-ohos* | -linux-newlib/' "
-            "config.sub",
-            cwd=src
-        )
-        self.run(
-            "sed -i '/-linux\\*)$/i\\\n"
-            "\t-linux-ohos)\\\n"
-            "\t\tos=-linux-ohos\\\n"
-            "\t\t;;' "
-            "config.sub",
-            cwd=src
-        )
-
-        # E097: HMDFS setgid — fix umask 077 → 002 for configure temp files
-        # R6 deviation: configure is autoconf-generated, configure.in has no umask
-        self.run(
-            "if grep -q 'umask 077' configure; then "
-            "  sed -i 's/umask 077/umask 002/g' configure; "
-            "else "
-            "  echo 'WARNING: umask 077 not found in configure — autoconf may have changed, R6 sed fix skipped'; "
-            "fi",
-            cwd=src
-        )
-
-        # Apply source-level patch (aarch64 types in chm_lib.c)
         apply_conandata_patches(self)
-
+        autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
 
