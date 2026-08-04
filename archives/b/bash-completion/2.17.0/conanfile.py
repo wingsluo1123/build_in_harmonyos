@@ -18,7 +18,7 @@ class BashCompletionConan(ConanFile):
     description = "Programmable completion functions for bash"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/scop/bash-completion"
-    url = ""  # CI fills this
+    url = "https://github.com/scop/bash-completion"
 
     settings = "os", "compiler", "build_type", "arch"
 
