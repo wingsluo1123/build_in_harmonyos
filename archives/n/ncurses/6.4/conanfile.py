@@ -83,9 +83,8 @@ class NcursesConan(ConanFile):
         # 手动应用 patch（绕 conan 2.x apply_conandata_patches cache 查找问题）
         patch_file = os.path.join(self.source_folder, "patches", "0001-port-for-ohos.patch")
         if os.path.exists(patch_file):
-            ret = self.run(f"patch -p1 < \"{patch_file}\"", cwd=self.source_folder, shell=True)
-            if ret != 0:
-                raise ConanException(f"patch 0001-port-for-ohos failed with exit code {ret}")
+            # aireview P3: self.run 非零退出码自带抛 ConanException，手动 if ret!=0 raise 是死代码删
+            self.run(f"patch -p1 < \"{patch_file}\"", cwd=self.source_folder, shell=True)
         # E002/E046: OHOS HMDFS 下 /storage/Users/currentUser/tmp 不可写，
         # tempfile.TemporaryDirectory() 创建在其下导致 config.status 写临时文件
         # Permission denied（CI #3810）。用 sandbox 可写目录，多路径 fallback：
@@ -220,10 +219,9 @@ class NcursesConan(ConanFile):
         # --without-progs 跳过 tic 编译，但 misc/Makefile install.data 仍调用
         # run_tic.sh 用空 tic 变量执行 -V 失败 → 用 install.libs install.includes
         # 跳过 install.data（terminfo 数据库），OHOS 终端信息走系统 /etc/terminfo
-        ret = self.run(f"make install.libs install.includes DESTDIR={self.package_folder} TMPDIR=/tmp",
-                       cwd=self.source_folder)
-        if ret != 0:
-            raise ConanException(f"make install failed with exit code {ret}")
+        # aireview P3: self.run 非零退出码自带抛 ConanException，手动 ret=if raise 是死代码删
+        self.run(f"make install.libs install.includes DESTDIR={self.package_folder} TMPDIR=/tmp",
+                 cwd=self.source_folder)
         # install.includes 只装了 ncurses.h -> curses.h 符号链接，curses.h 本身没装
         # OHOS HMDFS 不支持符号链接跨目录引用，需手动复制 build folder 的头文件
         src_inc = os.path.join(self.source_folder, "include")
