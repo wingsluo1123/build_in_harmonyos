@@ -40,7 +40,7 @@ class LiquiddspConan(ConanFile):
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_STATIC_LIBS"] = "OFF" if self.options.shared else "ON"
         tc.variables["BUILD_EXAMPLES"] = "OFF"
-        tc.variables["BUILD_AUTOTESTS"] = "OFF"
+        tc.variables["BUILD_AUTOTESTS"] = "ON"    # 上游 autotest 1341 项，CI 中实际编译运行
         tc.variables["BUILD_BENCHMARKS"] = "OFF"
         tc.variables["BUILD_SANDBOX"] = "OFF"
         tc.variables["BUILD_DOC"] = "OFF"
@@ -48,7 +48,7 @@ class LiquiddspConan(ConanFile):
         tc.variables["FIND_SIMD"] = "OFF"
         tc.variables["FIND_FFTW"] = "OFF"
         tc.variables["FIND_THREADS"] = "OFF"
-        tc.variables["ENABLE_LOGGING"] = "OFF"
+        tc.variables["ENABLE_LOGGING"] = "ON"     # autotest 依赖 logging 符号
         tc.generate()
 
     def build(self):
@@ -56,6 +56,8 @@ class LiquiddspConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        # 运行上游 autotest 套件（1341 项测试），CI 构建中可复现
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)

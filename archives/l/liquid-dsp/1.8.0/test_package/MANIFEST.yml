@@ -4,16 +4,16 @@ homepage: "https://liquidsdr.org"
 # 上游测试命令 (liquid-dsp 使用 cmake CTest)
 upstream_check_command: "ctest"
 
-# conanfile.py 中未集成上游测试 (仅 test_package 消费者测试)
-upstream_test_in_build: false
-upstream_test_command: ""
+# conanfile.py 中集成上游 autotest（1341 项测试，CI 构建中实际编译运行）
+upstream_test_in_build: true
+upstream_test_command: "ctest"
 
-# 上游实际运行的测试程序 (autotests 已关闭)
+# 上游实际运行的测试程序 (autotest 已启用)
 upstream_tests:
   - file: autotest/src/autotest.c
     source: liquid-dsp-v1.8.0/autotest/
-    description: "Autotest suite (disabled in conan build, BUILD_AUTOTESTS=OFF)"
-    command: "./autotest"
+    description: "Autotest suite (1341 tests, BUILD_AUTOTESTS=ON, run via ctest in conan build)"
+    command: "xautotest"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
