@@ -7,11 +7,11 @@ int main(void) {
     int pass = 0, fail = 0;
 
     /* Test 1: Intern a string */
-    if (lwc_intern_string("hello", 5, &str1) == lwc_error_ok) {
-        pass++;
-    } else {
+    if (lwc_intern_string("hello", 5, &str1) != lwc_error_ok) {
         fail++;
+        goto cleanup;
     }
+    pass++;
 
     /* Test 2: Interning same string returns same pointer */
     if (lwc_intern_string("hello", 5, &str2) != lwc_error_ok) {
