@@ -60,13 +60,13 @@ class AbiwordPluginEmlTestConan(ConanFile):
                     if sym in result.stdout:
                         self.output.info(f"  [ok] Exported symbol found: {sym}")
                     else:
-                        self.output.warning(f"  [warn] Expected symbol not found: {sym}")
+                        self.output.warning(f"  [warn] Expected symbol not found in readelf: {sym} (ctypes check will follow)")
                 # Count total exported symbols
                 sym_count = len([l for l in result.stdout.splitlines()
                                  if "FUNC" in l and "GLOBAL" in l])
                 self.output.info(f"  Total exported FUNC symbols: {sym_count}")
             else:
-                self.output.warning(f"readelf failed (rc={result.returncode}): {result.stderr}")
+                self.output.warning(f"readelf failed (rc={result.returncode}): {result.stderr} (ctypes check will follow)")
         except FileNotFoundError:
             self.output.info("readelf not available, skipping ELF verification")
 
@@ -76,22 +76,25 @@ class AbiwordPluginEmlTestConan(ConanFile):
             lib = ctypes.CDLL(so_path)
             self.output.info("  [ok] .so loaded successfully via ctypes.CDLL")
 
-            # Verify ABI version support symbol
-            if hasattr(lib, "abi_plugin_supports_version"):
-                lib.abi_plugin_supports_version.argtypes = [ctypes.c_uint32] * 3
-                lib.abi_plugin_supports_version.restype = ctypes.c_int
-                result = lib.abi_plugin_supports_version(3, 0, 0)
-                self.output.info(f"  [ok] abi_plugin_supports_version(3,0,0) returned {result}")
-                if result != 1:
-                    self.output.warning(f"  [warn] Expected return value 1, got {result}")
-            else:
-                self.output.warning("  [warn] abi_plugin_supports_version symbol not found")
+            # Verify ABI version support symbol — must exist and return 1
+            if not hasattr(lib, "abi_plugin_supports_version"):
+                raise AssertionError("abi_plugin_supports_version symbol not found in .so")
+            lib.abi_plugin_supports_version.argtypes = [ctypes.c_uint32] * 3
+            lib.abi_plugin_supports_version.restype = ctypes.c_int
+            result = lib.abi_plugin_supports_version(3, 0, 0)
+            self.output.info(f"  [ok] abi_plugin_supports_version(3,0,0) returned {result}")
+            if result != 1:
+                raise AssertionError(f"abi_plugin_supports_version(3,0,0) returned {result}, expected 1")
 
             # Verify registration symbol exists
-            if hasattr(lib, "abi_plugin_register"):
-                self.output.info("  [ok] abi_plugin_register symbol is available")
-            else:
-                self.output.warning("  [warn] abi_plugin_register symbol not found")
+            if not hasattr(lib, "abi_plugin_register"):
+                raise AssertionError("abi_plugin_register symbol not found in .so")
+            self.output.info("  [ok] abi_plugin_register symbol is available")
+
+            # Verify unregister symbol exists
+            if not hasattr(lib, "abi_plugin_unregister"):
+                raise AssertionError("abi_plugin_unregister symbol not found in .so")
+            self.output.info("  [ok] abi_plugin_unregister symbol is available")
 
         except OSError as e:
             raise AssertionError(f"Failed to load .so via ctypes.CDLL: {e}")
