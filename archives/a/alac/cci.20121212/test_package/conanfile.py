@@ -1,34 +1,46 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
-
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/alac/{version}/test_package/conanfile.py
-"""
 import os
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import can_run
+from conan.tools.files import save
 
 
-class AlacTestConan(ConanFile):
+class TestPackageConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_alac')}", env="conanrun")
+        if can_run(self):
+            # Get compiler from conf
+            compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+            cxx = compilers.get("cpp", "clang++")
+            # Get package info from dependency
+            dep = self.dependencies["alac"]
+            include_dir = os.path.join(dep.package_folder, "include")
+            lib_dir = os.path.join(dep.package_folder, "lib")
+
+            # Write test source
+            test_src = '''#include <cstdio>
+#include "ALACEncoder.h"
+#include "ALACDecoder.h"
+
+int main() {
+    ALACEncoder encoder;
+    ALACDecoder decoder;
+    ALACSpecificConfig config;
+    encoder.GetConfig(config);
+    uint32_t cookieSize = encoder.GetMagicCookieSize(2);
+    printf("ALAC test passed! frameLength=%u\\n", (unsigned)config.frameLength);
+    return 0;
+}
+'''
+            build_dir = os.path.join(self.build_folder, "test_build")
+            os.makedirs(build_dir, exist_ok=True)
+            src_path = os.path.join(build_dir, "test_package.cpp")
+            bin_path = os.path.join(build_dir, "test_package")
+            save(self, src_path, test_src)
+            self.run(f"{cxx} -I{include_dir} -L{lib_dir} {src_path} -lalac -lm -o {bin_path}")
+            self.run(bin_path, env="conanrun")
