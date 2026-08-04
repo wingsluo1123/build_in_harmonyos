@@ -40,7 +40,7 @@ class AutojumpConan(ConanFile):
         prefix = self.package_folder
         replace_in_file(self, autojump_sh,
                         "/usr/local/share/autojump",
-                        os.path.join(prefix, "share", "autojump"))
+                        os.path.join(prefix, "usr", "local", "share", "autojump"))
 
         # Run install.py to install files to package folder
         install_prefix = "usr/local"  # relative path (os.path.join behavior)
