@@ -1,33 +1,48 @@
 software: apr-util
 version: "1.6.3"
 status: built
-build_date: "2026-05-26"
+build_date: "2026-08-05"
 build_system: autotools
 
 source:
   url: "https://dlcdn.apache.org/apr/apr-util-1.6.3.tar.gz"
-  sha256: ""
+  sha256: "2b74d8932703826862ca305b094eef2983c27b39d5c9414442e9976a9acf1983"
   tar_format: tar.gz
 
 build:
   system: autotools
-  configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
-    - "--with-apr=/storage/Users/currentUser/usr/local"
-    - "--with-expat=/storage/Users/currentUser/usr/local"
+  configure_options: []
   dependencies:
     - "apr/1.7.6"
-    - "expat/2.7.1"
+    - "expat/2.8.2"
   cc: clang
   cxx: clang++
 
 patches_applied:
-  - "0001-configure.patch"
-  - "0002-config.guess.patch"
-  - "0003-config.sub.patch"
+  - "0001-build-config.guess.patch"
+  - "0002-build-config.sub.patch"
+  - "0003-configure.patch"
 
 knowledge_gained:
-  - "E007: config.guess 需要 __OHOS__ LIBC 检测，添加 #elif defined(__OHOS__) LIBC=ohos"
-  - "E072: config.sub 需要 ohos-linux triplet 解析，添加 basic_machine=$field1-unknown basic_os=linux-ohos"
-  - "E011: configure 的 umask 077 需改为 umask 022 解决 HMDFS 权限问题"
-  - "apr-util 需要 expat 库支持 XML 解析，使用 --with-expat 指定路径"
+  - "E007: config.guess needs HarmonyOS system identification"
+  - "E072: config.sub needs ohos-linux triplet and linux-ohos kernel-OS support"
+  - "E011: configure umask 077 must change to 000 for HMDFS permission"
+  - "apr-1-config prefix fix needed for conan cross-package dependency resolution"
+
+patch_generation:
+  method: per-file-difflib
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-build-config.guess.patch
+    type: portability
+    platform_only: true
+    guard: none
+  - file: 0002-build-config.sub.patch
+    type: portability
+    platform_only: true
+    guard: none
+  - file: 0003-configure.patch
+    type: portability
+    platform_only: true
+    guard: none
