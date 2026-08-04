@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Conan recipe for dhcpstarv 0.2.3 — DHCP starvation utility.
 
-Build system: autotools (autoreconf + configure + make).
+Build system: autotools (configure + make，无需 autoreconf).
 No third-party C library dependency: uses Linux raw PF_PACKET sockets directly.
-Patches: 0001 configure HMDFS tmpdir (applied after autoreconf), 0002/0003 OHOS musl udphdr members.
+Patches: 0000 预生成 autotools 文件（configure/aclocal.m4/Makefile.in/build-aux），
+        0001 configure HMDFS tmpdir，0002/0003 OHOS musl udphdr members。
 """
 import os
-import shutil
+import stat
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, patch, copy
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 
 
@@ -28,10 +29,6 @@ class DhcpstarvConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # 0001 补丁不进入 conandata patches 列表（需在 autoreconf 后应用），手动导出
-        copy(self, "0001-configure-hmdfs-tmpdir.patch",
-             src=os.path.join(self.recipe_folder, "patches"),
-             dst=os.path.join(self.export_sources_folder, "patches"))
 
     def requirements(self):
         pass
@@ -49,48 +46,19 @@ class DhcpstarvConan(ConanFile):
         tc.configure_args.append("--disable-silent-rules")
         tc.generate()
 
-    def _inject_autotools_env(self):
-        """CI Worker 默认 PATH 可能缺少 aclocal/automake（autoreconf 前置依赖）。
-
-        动态定位 aclocal 所在目录并注入 PATH；同时把对应 share/automake-*
-        目录加入 PERL5LIB（否则 aclocal 报 Automake/Config.pm 缺失）。
-        注意：即使 aclocal 已在 PATH，也必须校验/注入 PERL5LIB——automake
-        1.17 share 目录可能为空，需指向含 Automake/Config.pm 的版本目录。
-        """
-        if not shutil.which("aclocal"):
-            candidates = [
-                "/storage/Users/currentUser/usr/local/bin",
-                "/usr/local/bin",
-                "/usr/bin",
-                "/data/service/hnp/automake.org/bin",
-            ]
-            for d in candidates:
-                aclocal = os.path.join(d, "aclocal")
-                if os.path.isfile(aclocal) and os.access(aclocal, os.X_OK):
-                    os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
-                    break
-        # 校验 PERL5LIB：保证 aclocal 能找到 Automake/Config.pm
-        cur = os.environ.get("PERL5LIB", "")
-        if "Automake" not in cur:
-            for root in ("/storage/Users/currentUser/usr/local/share", "/usr/share"):
-                if not os.path.isdir(root):
-                    continue
-                for name in sorted(os.listdir(root)):
-                    if name.startswith("automake-") and os.path.isfile(
-                            os.path.join(root, name, "Automake", "Config.pm")):
-                        os.environ["PERL5LIB"] = os.path.join(root, name) + (
-                            os.pathsep + cur if cur else "")
-                        return
-
     def build(self):
+        # 按 conandata 顺序应用补丁：0000 预生成文件 → 0001 HMDFS → 0002/0003 udphdr
         apply_conandata_patches(self)
-        self._inject_autotools_env()
-        autotools = Autotools(self)
-        autotools.autoreconf()
-        # configure 由 autoreconf 生成后，再应用 HMDFS 临时目录修复
-        patch(self, patch_file=os.path.join(self.source_folder, "patches", "0001-configure-hmdfs-tmpdir.patch"))
+        # patch 应用后 configure 等脚本丢失可执行位，恢复（R19 产物由 CI 构建，此为非产物脚本权限修复）
+        for fn in ("configure", "config.status", "build-aux/compile",
+                   "build-aux/config.guess", "build-aux/config.sub",
+                   "build-aux/install-sh", "build-aux/missing"):
+            p = os.path.join(self.source_folder, fn)
+            if os.path.exists(p):
+                os.chmod(p, os.stat(p).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         # HMDFS 上 config.status 临时目录需落在源码内 .tmp 目录（先创建）
         self.run("mkdir -p .tmp")
+        autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
 
