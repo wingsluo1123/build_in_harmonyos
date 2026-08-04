@@ -1,0 +1,38 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.2)
++cmake_minimum_required(VERSION 3.5)
+ project(abpoa LANGUAGES C VERSION 3.0.0)
+ 
+ include(GNUInstallDirs)
+@@ -10,12 +10,18 @@
+ 
+ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+ 
+-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native") # SIMD
++# SIMD: allow override for cross-compilation (e.g. -march=armv8-a+simd for OHOS arm64)
++if(NOT CMAKE_CROSSCOMPILING)
++    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
++endif()
+ 
+-# build abPOA as a static library by default
++# Build abPOA as a static library by default
+ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build all libraries as shared")
+ SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+ 
++# SIMDE: use SIMD Everywhere for cross-platform SIMD support (required for ARM64/OHOS)
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUSE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES")
++
+ add_library(abpoa
+     src/abpoa_align.c
+     src/abpoa_graph.c
+@@ -39,6 +45,8 @@
+ 
+ target_include_directories(abpoa PUBLIC
+     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
++    $<INSTALL_INTERFACE:include>
+     $<INSTALL_INTERFACE:src>)
+ 
+ 
