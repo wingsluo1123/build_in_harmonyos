@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/Desktop/intmainjhy/build_in_harmonyos/archives/a/abuild/3.17.0/test_package/deactivate_conanrunenv-release-armv8.sh"
