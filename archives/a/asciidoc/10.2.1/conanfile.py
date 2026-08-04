@@ -5,8 +5,6 @@ asciidoc converts AsciiDoc documents to HTML, DocBook and other formats.
 It provides two command-line tools: asciidoc and a2x.
 """
 import os
-import sys
-import stat
 
 from conan import ConanFile
 from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
@@ -19,7 +17,7 @@ class AsciidocConan(ConanFile):
     description = "AsciiDoc is a text document format for writing notes, documentation, articles, books, ebooks, web pages, man pages and blogs."
     license = "GPL-2.0-or-later"
     homepage = "https://asciidoc.org/"
-    url = ""
+    url = "https://asciidoc.org/"
 
     package_type = "application"
     settings = "os", "arch"
