@@ -21,15 +21,9 @@ class {class_name}(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"])
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
-        import os
-        os.environ["PATH"] = "/storage/Users/currentUser/usr/local/bin:/storage/Users/currentUser/usr/local/perl_5.42.2/bin:" + os.environ.get("PATH", "")
-        os.environ["PERL5LIB"] = "/storage/Users/currentUser/usr/local/perl_5.42.2/lib/5.42.2/aarch64-linux:/storage/Users/currentUser/usr/local/perl_5.42.2/lib/5.42.2"
-        os.environ["C_INCLUDE_PATH"] = "/storage/Users/currentUser/usr/local/include"
-        os.environ["LIBRARY_PATH"] = "/storage/Users/currentUser/usr/local/lib"
-
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
         self.run("make -j1", cwd=src)
@@ -111,7 +105,7 @@ def generate(pkg_dir):
     return path
 
 if __name__ == "__main__":
-    repo = "/storage/Users/currentUser/build_in_harmonyos"
+    repo = os.path.dirname(os.path.abspath(__file__))
     missing = [
         "perl-crypt-openssl-dsa/0.20","perl-dbd-pg/3.18.0","perl-dbd-sqlite/1.78",
         "perl-dbi/1.637","perl-devel-lexalias/0.05","perl-digest-md5/2.59",
@@ -142,6 +136,10 @@ if __name__ == "__main__":
             print(f"✅ {pv}")
             ok += 1
         else:
+            print(f"❌ {pv}: 生成失败")
+            fail += 1
+    print(f"\n生成: {ok}, 失败: {fail}")
+      else:
             print(f"❌ {pv}: 生成失败")
             fail += 1
     print(f"\n生成: {ok}, 失败: {fail}")

@@ -20,13 +20,6 @@ class PerlNetaddrIp(ConanFile):
 
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
-        # Create missing config.h for Lite/Util subdirectory
-        lite_util = os.path.join(src, "Lite", "Util")
-        if os.path.isdir(lite_util):
-            for h in ["config.h", "localconf.h", "localperl.h"]:
-                hp = os.path.join(lite_util, h)
-                if not os.path.exists(hp):
-                    pass  # skip empty file creation
         # HarmonyOS: patch Makefile for CRT linker flags
         makefile = os.path.join(src, "Makefile")
         if os.path.exists(makefile):

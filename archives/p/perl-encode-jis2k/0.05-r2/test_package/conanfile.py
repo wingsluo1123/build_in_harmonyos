@@ -29,7 +29,13 @@ class TestPackage(ConanFile):
         assert "boot_" in result.stdout, "No boot_ symbol found"
         # Attempt actual Perl module load
         perl_env = dict(os.environ)
+        # site_arch is where .pm files are installed by make install DESTDIR
+        site_arch = os.path.join(pkg_folder,
+                                 "data", "service", "hnp", "perl.org",
+                                 "perl_5.42.2", "lib", "site_perl", "5.42.2",
+                                 "aarch64-linux")
         perl_env["PERL5LIB"] = os.pathsep.join(filter(None, [
+            site_arch,
             os.path.join(pkg_folder, "lib"),
             perl_env.get("PERL5LIB", "")
         ]))
@@ -40,4 +46,6 @@ class TestPackage(ConanFile):
         if result.returncode == 0 and "OK:" in result.stdout:
             print(f"OK: {module} loaded successfully")
         else:
-            print(f"WARN: {module} load skipped (cross-compile env)")
+            self.output.warning(f"{module} load failed (may be cross-compile env): {result.stderr}")
+            if not os.environ.get("CROSS_COMPILE"):
+                raise AssertionError(f"{module} failed to load: {result.stderr}")
