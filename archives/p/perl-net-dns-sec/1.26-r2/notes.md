@@ -32,7 +32,7 @@
 
 ## 依赖版本
 
-- Perl: 5.42.0
+- Perl: 5.42.2
 - Net::DNS: 1.55 (满足 >= 1.08)
 - OpenSSL: 1.1.1w (libcrypto)
 - clang: 18.1.8

@@ -47,7 +47,7 @@ make install DESTDIR=/storage/Users/currentUser/tmp/test-install-perl-io-tty-1.3
 
 ### 6. ELF 签名
 ```bash
-python3 $SKILL_ROOT/scripts/ohc-run.py sign-elf ~/usr/local/lib/site_perl/5.42.0/aarch64-linux/auto/IO/Tty/Tty.so
+python3 $SKILL_ROOT/scripts/ohc-run.py sign-elf ~/usr/local/lib/site_perl/5.42.2/aarch64-linux/auto/IO/Tty/Tty.so
 ```
 
 ### 7. 生成预编译包
@@ -82,7 +82,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py package perl-io-tty 1.31
 
 ## 依赖版本
 
-- Perl: 5.42.0
+- Perl: 5.42.2
 - clang: 18.1.8
 - musl: 1.2.5（提供标准 C 库头文件）
 
@@ -120,7 +120,7 @@ perl -MIO::Tty -e 'print $IO::Tty::VERSION'
 
 ### 纯 Perl 模块测试
 ```bash
-export PERL5LIB="$HOME/usr/local/lib/site_perl/5.42.0:$HOME/usr/local/lib/site_perl/5.42.0/aarch64-linux"
+export PERL5LIB="$HOME/usr/local/lib/site_perl/5.42.2:$HOME/usr/local/lib/site_perl/5.42.2/aarch64-linux"
 perl -e 'use IO::Tty::Constant; print "OK\n"'
 # OK
 ```
