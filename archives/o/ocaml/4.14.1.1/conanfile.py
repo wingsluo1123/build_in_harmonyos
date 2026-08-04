@@ -58,7 +58,7 @@ class OcamlConan(ConanFile):
         # Step 1: Run configure with --no-create to generate config.status without executing it
         # OHOS hmmac 策略拒绝直接执行带 shebang 的脚本 (EACCES/126)，须用显式解释器调用
         # autoconf 只探测 gcc/cc，须显式注入 CC 指向 OHOS Clang
-        self.run(f"{tool_env} /bin/sh ./configure --prefix='{prefix}' --no-create",
+        self.run(f"{tool_env} /bin/sh ./configure --prefix={shlex.quote(prefix)} --no-create",
                  env="conanrun")
         # Step 2: Patch config.status to fix OHOS temp directory permission issue
         # mktemp -d creates dirs with umask 077 which OHOS /bin/sh cannot write to
