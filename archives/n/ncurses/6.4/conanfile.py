@@ -140,18 +140,18 @@ class NcursesConan(ConanFile):
             inc_makefile = os.path.join(self.source_folder, "include", "Makefile")
             if os.path.exists(inc_makefile):
                 # CI 真根因: UnicodeDecodeError 'utf-8' codec can't decode byte 0xe4
-                # Makefile 含 configure 生成的非 UTF-8 字节（三元组乱码）→ 用 latin-1 读避解码炸
-                with open(inc_makefile, encoding='latin-1') as f:
+                # Makefile 含 configure 生成的非 UTF-8 字节（三元组乱码）→ 用二进制读/写避所有编码问题
+                with open(inc_makefile, "rb") as f:
                     mk = f.read()
                 # 找 srcdir = 行，改用 source_folder/include 绝对路径避三元组注入
                 import re
                 mk_new = re.sub(
-                    r'^srcdir\s*=.*$',
-                    f'srcdir = {os.path.join(self.source_folder, "include")}',
+                    rb'^srcdir\s*=.*$',
+                    f'srcdir = {os.path.join(self.source_folder, "include")}'.encode('utf-8'),
                     mk, count=1, flags=re.MULTILINE
                 )
                 if mk_new != mk:
-                    with open(inc_makefile, "w", encoding='latin-1') as f:
+                    with open(inc_makefile, "wb") as f:
                         f.write(mk_new)
             # CI 真根因: make: /bin/bash: No such file or directory → Error 127
             # os.environ.get("CONFIG_SHELL") 读宿主机环境非 conanbuild 子进程 → fallback /bin/bash（CI 无此路径）
