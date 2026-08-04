@@ -3,7 +3,7 @@
 **Verdict**: PASS
 **Reference**: `aircrack-ng/1.7@ohpcd/stable`
 **Profile**: ohos-aarch64
-**Date**: 2026-08-05T04:01:49.672037
+**Date**: 2026-08-05T04:13:16.113498
 
 ## G0: ✅ PASS
   📦 构建系统: cmake

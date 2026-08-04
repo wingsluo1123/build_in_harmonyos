@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # R34: smoke test for aircrack-ng 1.7 — exercises the packaged binaries.
 # Verifies presence, executable bit, and version output.
-set -u
+set -euo pipefail
 
 BIN_DIR="${1:?usage: test_aircrack_ng.sh <package bin dir>}"
 

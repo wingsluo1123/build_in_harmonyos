@@ -25,7 +25,7 @@ add_definitions(
     -DABS_TOP_BUILDDIR="."
     -DLIBAIRCRACK_CE_WPA_PATH="."
     -DLT_OBJDIR="."
-    -DLIBDIR="/usr/local/lib"
+    -DLIBDIR="${CMAKE_INSTALL_PREFIX}/lib"
 )
 
 # Generate version.h from version.h.in
