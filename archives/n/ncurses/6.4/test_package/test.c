@@ -9,11 +9,20 @@ int main(void) {
      * （NCURSES_VERSION 是编译期宏，打印它不构成库代码验证） */
     printf("ncurses version: %s\n", curses_version());
 
-    /* 尝试初始化 curses 模式，OHOS 无真实终端时 initscr 返回 NULL */
+    /* setupterm 检测终端可用性，失败时 errret!=1 不调用 exit()，
+     * 让我们能优雅返回 77（SKIP）。initscr 内部 setupterm 失败会直接
+     * exit(EXIT_FAILURE)，无终端时到不了 return 77 分支。 */
+    int errret = 0;
+    setupterm(NULL, 1, &errret);
+    if (errret != 1) {
+        printf("setupterm: SKIP (no terminal available, errret=%d)\n", errret);
+        return 77;
+    }
+
+    /* 尝试初始化 curses 模式 */
     WINDOW *w = initscr();
     if (w == NULL) {
         printf("initscr: SKIP (no terminal available on this platform)\n");
-        /* 无终端分支返回专用 SKIP 退出码 77，test() 按跳过处理（R34 反空转） */
         return 77;
     }
 

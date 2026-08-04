@@ -134,28 +134,73 @@ class NcursesConan(ConanFile):
             # --build 用 x86_64 触发交叉编译模式（build!=host 避 autotools 误判本地编译跑交叉测试程序）
             self.run(f"{bash} {configure} --prefix={self.package_folder} --build=x86_64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos {args}",
                      cwd=self.source_folder, shell=True, env="conanbuild")
-            # CI 真根因: make[1]: No rule to make target ']Y<U+FFFD>99kkflag/Caps' needed by 'curses.h'. Stop.
-            # ncurses 6.4 老 autotools 把 --host 三元组注入 include/Makefile 的 srcdir 致路径含乱码
-            # toybox make 解析不了含三元组特殊字符的 srcdir 路径 → patch Makefile srcdir 用绝对路径
-            inc_makefile = os.path.join(self.source_folder, "include", "Makefile")
-            if os.path.exists(inc_makefile):
-                # CI 真根因: UnicodeDecodeError 'utf-8' codec can't decode byte 0xe4
-                # Makefile 含 configure 生成的非 UTF-8 字节（三元组乱码）→ 用二进制读/写避所有编码问题
-                with open(inc_makefile, "rb") as f:
+            # CI 真根因: configure 生成各子目录 Makefile 时，@srcdir@ autoconf 替换被
+            # --host=aarch64-unknown-linux-ohos 三元组通过 eval 污染，生成 ncurses/Makefile
+            # 第 50/62 行 VPATH/srcdir 含乱码字节 \x83\x86g\xf5Z\xeakk...camera
+            # → make 找不到 $(srcdir)/tinfo/MKcodes.awk 报 No rule to make target
+            # 修法：configure 后、make 前，遍历所有子目录 Makefile，把污染的 VPATH 和 srcdir
+            # 替换为真实源码绝对路径（用二进制读/写避 UnicodeDecodeError）
+            import re
+            subdirs = ["include", "ncurses", "panel", "menu", "form", "test", "misc", "man"]
+            for sub in subdirs:
+                mk_path = os.path.join(self.source_folder, sub, "Makefile")
+                if not os.path.exists(mk_path):
+                    continue
+                with open(mk_path, "rb") as f:
                     mk = f.read()
-                # 找 srcdir = 行，改用 source_folder/include 绝对路径避三元组注入
-                # CI 真根因: 上轮正则 rb'^srcdir\s*=.*\$' 太严 — Makefile 行首可能有制表符/空格缩进匹配不到
-                # 改正则容许行首空白（^\s*srcdir）+ 用 bytes 正则避 str/bytes 混用 TypeError
-                import re
+                # 该子目录真实源码绝对路径
+                real_src = os.path.join(self.source_folder, sub).encode('utf-8')
+                # 替换 VPATH = ... 和 srcdir = ... 行（容许行首空白/制表符缩进）
+                # 用 bytes 正则避 str/bytes 混用 TypeError
                 mk_new = re.sub(
-                    rb'^\s*srcdir\s*=.*$',
-                    f'srcdir = {os.path.join(self.source_folder, "include")}'.encode('utf-8'),
+                    rb'^([ \t]*VPATH[ \t]*=).*$',
+                    lambda m: m.group(1) + b'\t' + real_src,
                     mk, count=1, flags=re.MULTILINE
                 )
+                mk_new = re.sub(
+                    rb'^([ \t]*srcdir[ \t]*=).*$',
+                    lambda m: m.group(1) + b'\t' + real_src,
+                    mk_new, count=1, flags=re.MULTILINE
+                )
+                # 修复 panel/menu/form 等子目录 Makefile 缺 all:: target 的问题
+                # ncurses 6.4 mk-0th.awk 在 --host=aarch64-unknown-linux-ohos 三元组下
+                # 生成 panel/Makefile 第 1 行空行吞掉了 all:: target
+                # 检查是否缺 all:: 或 all: target，缺失则在文件开头补
+                has_all = False
+                for ln in mk_new.split(b'\n'):
+                    s = ln.strip()
+                    if s.startswith(b'all') and (b':' in s[:10]):
+                        has_all = True; break
+                if not has_all:
+                    # 补 all:: 默认 target（panel/menu/form 用 .SUFFIXES 后的 C_SRC 编译）
+                    mk_new = b'all::\n\n' + mk_new
                 if mk_new != mk:
-                    with open(inc_makefile, "wb") as f:
+                    with open(mk_path, "wb") as f:
                         f.write(mk_new)
-            # CI 真根因: make: /bin/bash: No such file or directory → Error 127
+            # 删除各子目录 Makefile 中含乱码字节的污染行
+            # ncurses 6.4 CF_LIB_RULES 在 --host 三元组下生成 form/Makefile 第 50 行
+            # D\x0b\xd3\xb6[kk\x02D\x0b... 等乱码行，make 报 missing separator
+            # 修法：删除所有含非 ASCII 字节的行（VPATH/srcdir 已正确 patch）
+            import re as _re
+            for sub in subdirs:
+                mk_path = os.path.join(self.source_folder, sub, "Makefile")
+                if not os.path.exists(mk_path):
+                    continue
+                with open(mk_path, "rb") as f:
+                    mk = f.read()
+                lines = mk.split(b'\n')
+                cleaned = []
+                for ln in lines:
+                    # 删除含非 ASCII 字节的行（乱码行）
+                    try:
+                        ln.decode('ascii')
+                        cleaned.append(ln)
+                    except UnicodeDecodeError:
+                        continue
+                mk_new = b'\n'.join(cleaned)
+                if mk_new != mk:
+                    with open(mk_path, "wb") as f:
+                        f.write(mk_new)
             # os.environ.get("CONFIG_SHELL") 读宿主机环境非 conanbuild 子进程 → fallback /bin/bash（CI 无此路径）
             # 改 env="conanbuild" 让 Conan 加载 conanbuild.sh 设的 CONFIG_SHELL/SHELL，删 Python 侧 os.environ.get
             # CI SIGKILL: make -j$(nproc) 全核并发耗尽内存被 OOM killer 杀 → 改 -j1 限单线程避 OOM
@@ -168,9 +213,30 @@ class NcursesConan(ConanFile):
                 os.environ["TMPDIR"] = _saved_tmpdir
 
     def package(self):
-        ret = self.run(f"make install DESTDIR= TMPDIR=/tmp", cwd=self.source_folder)
+        # make install: configure 用 --prefix=/ --includedir=${prefix}/include
+        # DESTDIR= 时 install 路径解析为 /include 无权限。
+        # 改 DESTDIR={package_folder} 让 install 进 package_folder/include
+        # （--prefix=/ 下 ${DESTDIR}${prefix}/include = package_folder/include）
+        # --without-progs 跳过 tic 编译，但 misc/Makefile install.data 仍调用
+        # run_tic.sh 用空 tic 变量执行 -V 失败 → 用 install.libs install.includes
+        # 跳过 install.data（terminfo 数据库），OHOS 终端信息走系统 /etc/terminfo
+        ret = self.run(f"make install.libs install.includes DESTDIR={self.package_folder} TMPDIR=/tmp",
+                       cwd=self.source_folder)
         if ret != 0:
             raise ConanException(f"make install failed with exit code {ret}")
+        # install.includes 只装了 ncurses.h -> curses.h 符号链接，curses.h 本身没装
+        # OHOS HMDFS 不支持符号链接跨目录引用，需手动复制 build folder 的头文件
+        src_inc = os.path.join(self.source_folder, "include")
+        dst_inc = os.path.join(self.package_folder, "include")
+        if os.path.isdir(src_inc):
+            for hf in os.listdir(src_inc):
+                # 只复制 .h 文件（跳过 Caps/Makefile 等）
+                if not hf.endswith(".h"):
+                    continue
+                src_h = os.path.join(src_inc, hf)
+                dst_h = os.path.join(dst_inc, hf)
+                if os.path.isfile(src_h) and not os.path.exists(dst_h):
+                    copy(self, hf, src=src_inc, dst=dst_inc)
         # 确认 4 个静态库已安装
         for lib in ("libncursesw.a", "libpanelw.a", "libmenuw.a", "libformw.a"):
             if not os.path.exists(os.path.join(self.package_folder, "lib", lib)):
