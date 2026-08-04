@@ -65,14 +65,14 @@ class GitWhoConan(ConanFile):
         # 删 cmd-pkgs curl|sh fallback 避反复试 Download 超时（CI 日志直证超时），直接试系统 go
         try:
             self.run("go version", cwd=self.source_folder, env="conanbuild")
-            go_ok = True
         except ConanException as e:
             raise ConanException(f"go toolchain unavailable (system go not found; cmd-pkgs omitted to avoid CI Download timeout) — CI worker lacks go toolchain support: {e}")
-        # aireview P3: 删死代码 if not go_ok: raise — go_ok=False 分支在 except ConanException raise 后不可达
+        # aireview P3: 删 go_ok 死代码 — 上面 except ConanException raise 后 go_ok=False 分支不可达
         # P2: go build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+虚假声明）
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
-        go_arch = {"armv8": "arm64", "x86_64": "amd64"}.get(str(self.settings.arch), "arm64")
+        # aireview P3: 删 x86_64→amd64 不可达映射 — 行37 validate() 已拦非 armv8/arm64 架构 raise ConanInvalidConfiguration
+        go_arch = "arm64"  # validate() 已确保 settings.arch 是 armv8 或 arm64
         try:
             self.run(
                 f"CGO_ENABLED=0 GOOS=linux GOARCH={go_arch} "
