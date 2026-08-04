@@ -43,6 +43,9 @@ class ChmlibConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
+        else:
+            tc.configure_args.append("--enable-shared")
+            tc.configure_args.append("--disable-static")
         tc.configure_args.append("--enable-examples=no")
         tc.generate()
 
