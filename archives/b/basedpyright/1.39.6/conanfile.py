@@ -21,16 +21,16 @@ class BasedpyrightConan(ConanFile):
     description = "A fork of pyright with various type checking improvements, pylance features and more"
     license = "MIT"
     homepage = "https://github.com/DetachHead/basedpyright"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
     settings = ("os", "arch")
 
-    def layout(self):
-        basic_layout(self)
-
     def export_sources(self):
         export_conandata_patches(self)
+
+    def layout(self):
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
