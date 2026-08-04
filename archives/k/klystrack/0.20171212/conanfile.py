@@ -138,10 +138,11 @@ class KlystrackConan(ConanFile):
         # 改用 Conan conf 解析编译器路径，显式传 CC/CXX 命令行参数覆盖 Makefile 硬编码
         # （klystrack Makefile 不读 CC 环境变量而是硬编码 gcc，故 conanbuild 设的 CC 没用需命令行传）
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
-        # 双 fallback 避 Conan 1/旧 Conan 2 不支持 conf key 返 {} 致裸名 clang 在 OHOS CI 找不到仍 Error 127
-        # os.environ.get 读 conanbuild 合入的 CC（Conan 2 在 run(env="conanbuild") 时同步到 os.environ）
-        cc = compilers.get("c") or os.environ.get("CC") or "clang"
-        cxx = compilers.get("cpp") or os.environ.get("CXX") or "clang++"
+        # aireview P2: os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，
+        # 会覆盖 conanbuild 设的完整交叉编译器路径（如 /data/service/hnp/bin/clang）
+        # 致链接宿主机 gcc 产错误架构二进制 → 删 os.environ.get fallback
+        cc = compilers.get("c") or "clang"
+        cxx = compilers.get("cpp") or "clang++"
         # CI 根因: make[1]: *** ../klystron: No such file or directory. Stop.
         # Makefile build target 依赖 ../klystron 目录但上游 archive 快照缺该子项目
         # 建 ../klystron symlink 指向源码根（klystrack 自身含 klystron 所需源文件）
@@ -209,19 +210,22 @@ class KlystrackConan(ConanFile):
             f.write('#ifndef VERSION_H\n')
             f.write('#define VERSION_H\n')
             f.write('#include "version_number.h"\n')
-            # REVISION 取 klystrack 源码 git 前缀 d775804（上游 tarball commit）
-            f.write('#define REVISION "d775804"\n')
+            # aireview P3: REVISION 硬编码 d775804 fragile — 从源码 version 文件同源取
+            # （version_str 已从 src/version 读，REVISION 取 conandata 声明的 version 即 0.20171212）
+            f.write(f'#define REVISION "{version_str}"\n')
             f.write('#define VERSION_STRING "klystrack " VERSION " " REVISION\n')
             f.write('#endif\n')
         # KLYSTRON_VERSION_STRING 宏由 klystron Makefile build: target 生成，
         # 跳过 make -C klystron 避递归 → 手动写 klystron_version.h 含宏定义
         # （klystrack 源码 #include "klystron_version.h" 取该宏）
+        # aireview P3: KLYSTRON_VERSION_STRING 硬编码 "klystron 0.20171212" fragile →
+        # 从 version_str 同源取（与 REVISION 一致，避版本飘移自相矛盾）
         klystron_version_h = os.path.join(make_dir, "klystron_version.h")
         with open(klystron_version_h, "w") as f:
             f.write('#ifndef KLYSTRON_VERSION_H\n')
             f.write('#define KLYSTRON_VERSION_H\n')
             f.write('#include "version.h"\n')
-            f.write('#define KLYSTRON_VERSION_STRING "klystron 0.20171212"\n')
+            f.write(f'#define KLYSTRON_VERSION_STRING "klystron {version_str}"\n')
             f.write('#endif\n')
         # ③ make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
         # CI 真根因: make -C klystron 在 tarball 快照缺子项目时致 247 层递归 make fallback 炸
