@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: avro-c/1.12.0
+homepage: "https://avro.apache.org"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/test_avro_schema.c
+    source: avro-c-1.12.0/tests/test_avro_schema.c
+    description: "Schema parsing and validation tests"
+    command: "./test_avro_schema"
+  - file: tests/test_avro_data.c
+    source: avro-c-1.12.0/tests/test_avro_data.c
+    description: "Data serialization/deserialization tests"
+    command: "./test_avro_data"
+  - file: tests/test_avro_values.c
+    source: avro-c-1.12.0/tests/test_avro_values.c
+    description: "Value API tests"
+    command: "./test_avro_values"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "Schema create, serialize, deserialize round-trip test"
+    command: "./test_avro-c"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10
