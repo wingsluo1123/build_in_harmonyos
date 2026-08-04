@@ -13,6 +13,7 @@ import shutil
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class ArgoConan(ConanFile):
@@ -21,7 +22,6 @@ class ArgoConan(ConanFile):
     description = "Argo Workflows CLI — Kubernetes-native workflow engine command-line tool"
     license = "Apache-2.0"
     homepage = "https://github.com/argoproj/argo-workflows"
-    url = ""  # CI fills this
 
     package_type = "application"
 
@@ -41,6 +41,18 @@ class ArgoConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        # Use Conan Environment to set Go build variables (R33 compliant)
+        env = Environment()
+        env.define("CGO_ENABLED", "0")
+        env.define("GOOS", "linux")
+        env.define("GOARCH", "arm64")
+        env.define("GOPROXY", "https://goproxy.cn,direct")
+        env.define("GOTOOLCHAIN", "local")
+        # Go linker mmap may fail on some filesystems; use Conan's TMPDIR
+        # which is already set by the profile/build environment.
+        env.vars(self).save_script("go_build_env")
+
     def build(self):
         apply_conandata_patches(self)
 
@@ -51,31 +63,17 @@ class ArgoConan(ConanFile):
             with open(os.path.join(ui_dist, "index.html"), "w") as f:
                 f.write("<!DOCTYPE html><html><head><title>Argo</title></head><body>Argo UI placeholder</body></html>")
 
-        # Go environment for HarmonyOS/OpenHarmony — set in os.environ directly
-        os.environ["CGO_ENABLED"] = "0"
-        os.environ["GOOS"] = "linux"
-        os.environ["GOARCH"] = "arm64"
-        os.environ["GOPROXY"] = "https://goproxy.cn,direct"
-        os.environ["GOTOOLCHAIN"] = "local"
-
-        # Go linker mmap fails on HMDFS — output to ext2 partition
-        ext2_tmp = "/data/storage/el2/base/haps/entry/files"
-        if os.path.isdir(ext2_tmp):
-            os.environ["TMPDIR"] = ext2_tmp
-            os.environ["GOCACHE"] = os.path.join(ext2_tmp, "go-build-cache")
-            output_path = os.path.join(ext2_tmp, "argo")
-        else:
-            output_path = os.path.join(self.build_folder, "argo")
+        # Determine output path — use build folder by default
+        output_path = os.path.join(self.build_folder, "argo")
 
         # Download Go modules (run from source folder where go.mod lives)
         self.run("go mod download", cwd=self.source_folder)
 
         # Build argo CLI binary
-        build_date = "2026-08-05T00:00:00Z"
         ldflags = (
             "-s -w "
             "-X github.com/argoproj/argo-workflows/v4.version=v4.0.5 "
-            f"-X github.com/argoproj/argo-workflows/v4.buildDate={build_date} "
+            "-X github.com/argoproj/argo-workflows/v4.buildDate=2026-08-05T00:00:00Z "
             "-X github.com/argoproj/argo-workflows/v4.gitTreeState=clean "
             "-extldflags -static"
         )
@@ -83,10 +81,6 @@ class ArgoConan(ConanFile):
             f'go build -ldflags "{ldflags}" -o {output_path} ./cmd/argo',
             cwd=self.source_folder
         )
-
-        # Copy binary to build folder for packaging
-        if output_path != os.path.join(self.build_folder, "argo"):
-            shutil.copy2(output_path, os.path.join(self.build_folder, "argo"))
 
     def package(self):
         copy(self, "argo", self.build_folder, os.path.join(self.package_folder, "bin"))

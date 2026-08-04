@@ -15,7 +15,6 @@ class ArgoTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
-        # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.run(f"{bash} test.sh", env="conanrun")
+        # OHOS: /system/bin/sh (mksh) is the default shell.
+        # test.sh uses #!/system/bin/sh shebang for portability.
+        self.run("sh test.sh", env="conanrun")
