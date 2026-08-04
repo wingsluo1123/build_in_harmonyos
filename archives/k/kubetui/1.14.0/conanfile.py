@@ -67,25 +67,11 @@ class KubetuiConan(ConanFile):
                     break
                 except ConanException:
                     continue
-            # 系统 fallback 全失败，试包管理器装 rustup（curl rustup-init）
+            # 系统 fallback 全失败 — CI worker 无 rust 工具链支持（非配方缺陷）
+            # 删 rustup-init fallback 避反复试 curl https://sh.rustup.rs 超时（CI 日志直证超时）
+            # 显式 raise ConanException 报错，manifest status: failed 如实标记
             if not rust_ok:
-                try:
-                    self.run("curl -fsSL --connect-timeout 60 https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.81.0", cwd=self.source_folder, shell=True)
-                    # rustup 装到 ~/.cargo/bin，需更新 PATH
-                    self.run("export PATH=\"$HOME/.cargo/bin:$PATH\" && cargo --version", cwd=self.source_folder, shell=True)
-                    rust_ok = True
-                    # 后续 cargo build 需用全路径或更新 PATH
-                    os.environ["PATH"] = os.path.expanduser("~/.cargo/bin") + ":" + os.environ.get("PATH", "")
-                    # aireview P2: rustup 回退路径缺交叉编译目标 — rustup 默认只装 host 工具链无 OHOS target
-                    # 补 rustup target add aarch64-unknown-linux-ohos 避 cargo build --target 炸
-                    try:
-                        self.run("rustup target add aarch64-unknown-linux-ohos", cwd=self.source_folder, shell=True)
-                    except ConanException as e:
-                        self.output.warning(f"rustup target add failed (may use bundled target): {e}")
-                except ConanException:
-                    pass
-            if not rust_ok:
-                raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc/rustup-init)")
+                raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc; rustup-init omitted to avoid CI timeout) — CI worker lacks rust toolchain support")
         # P1: cargo build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+欺骗性打包）
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
