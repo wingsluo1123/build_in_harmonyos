@@ -74,7 +74,7 @@ class ChmlibConan(ConanFile):
             cwd=src
         )
         self.run(
-            "sed -i '/^-linux\\*)$/i\\\n"
+            "sed -i '/-linux\\*)$/i\\\n"
             "\t-linux-ohos)\n"
             "\t\tos=-linux-ohos\n"
             "\t\t;;' "
