@@ -139,7 +139,9 @@ class NcursesConan(ConanFile):
             # toybox make 解析不了含三元组特殊字符的 srcdir 路径 → patch Makefile srcdir 用绝对路径
             inc_makefile = os.path.join(self.source_folder, "include", "Makefile")
             if os.path.exists(inc_makefile):
-                with open(inc_makefile) as f:
+                # CI 真根因: UnicodeDecodeError 'utf-8' codec can't decode byte 0xe4
+                # Makefile 含 configure 生成的非 UTF-8 字节（三元组乱码）→ 用 latin-1 读避解码炸
+                with open(inc_makefile, encoding='latin-1') as f:
                     mk = f.read()
                 # 找 srcdir = 行，改用 source_folder/include 绝对路径避三元组注入
                 import re
@@ -149,7 +151,7 @@ class NcursesConan(ConanFile):
                     mk, count=1, flags=re.MULTILINE
                 )
                 if mk_new != mk:
-                    with open(inc_makefile, "w") as f:
+                    with open(inc_makefile, "w", encoding='latin-1') as f:
                         f.write(mk_new)
             # CI 真根因: make: /bin/bash: No such file or directory → Error 127
             # os.environ.get("CONFIG_SHELL") 读宿主机环境非 conanbuild 子进程 → fallback /bin/bash（CI 无此路径）
