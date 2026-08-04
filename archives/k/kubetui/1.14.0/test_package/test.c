@@ -21,7 +21,12 @@ int main(int argc, char **argv) {
         fprintf(stderr, "FAIL: bin path contains shell metacharacters (injection risk)\n");
         return 3;
     }
-    snprintf(cmd, sizeof(cmd), "\"%s\" --version 2>&1", bin);
+    /* aireview P3: snprintf 截断未检查 — 返值 >=size 表示截断，bin 路径过长致命令截断注入风险（同 cleo/git-who 处理） */
+    int sn_ret = snprintf(cmd, sizeof(cmd), "\"%s\" --version 2>&1", bin);
+    if (sn_ret < 0 || (size_t)sn_ret >= sizeof(cmd)) {
+        fprintf(stderr, "FAIL: command buffer truncated (snprintf ret %d, buf %zu)\n", sn_ret, sizeof(cmd));
+        return 4;
+    }
     FILE *fp = popen(cmd, "r");
     if (!fp) {
         fprintf(stderr, "FAIL: cannot run kubetui --version\n");
@@ -29,6 +34,12 @@ int main(int argc, char **argv) {
     }
     char buf[256] = {0};
     size_t n = fread(buf, 1, sizeof(buf) - 1, fp);
+    /* aireview P3: fread 返回值未检查 — fread 失败时 n 是 size_t 无符号，n == 0 与成功空输出不可区分 */
+    if (n == 0 && ferror(fp)) {
+        pclose(fp);
+        fprintf(stderr, "FAIL: fread error reading kubetui --version output\n");
+        return 5;
+    }
     /* aireview P3: pclose 返回值检查 + WEXITSTATUS 解析真实退出码避误报 */
     int pc_ret = pclose(fp);
     if (pc_ret != 0) {
@@ -45,7 +56,12 @@ int main(int argc, char **argv) {
     printf("kubetui version: %s", buf);
 
     /* 2. 验证 kubetui --help 退出码 0（用 argv 传路径避硬编码命令名） */
-    snprintf(cmd, sizeof(cmd), "\"%s\" --help > /dev/null 2>&1", bin);
+    /* aireview P3: snprintf 截断未检查 — 同上 --version 段处理 */
+    sn_ret = snprintf(cmd, sizeof(cmd), "\"%s\" --help > /dev/null 2>&1", bin);
+    if (sn_ret < 0 || (size_t)sn_ret >= sizeof(cmd)) {
+        fprintf(stderr, "FAIL: command buffer truncated (snprintf ret %d, buf %zu)\n", sn_ret, sizeof(cmd));
+        return 6;
+    }
     int ret = system(cmd);
     if (ret != 0) {
         /* P3: system 返 shell 退出码需 WEXITSTATUS 解析真实退出码避误报 */
