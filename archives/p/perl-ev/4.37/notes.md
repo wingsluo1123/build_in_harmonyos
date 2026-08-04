@@ -72,7 +72,7 @@
 **SELinux HMDFS 限制**（同 perl-dbd-pg）:
 - XS 模块 (.so 文件) 在 HMDFS 上无法加载
 - `hishell_hap` SELinux domain 只能加载 `hnp_file` 类型文件
-- 解决方案: 管理员安装到系统目录 `/data/service/hnp/perl.org/perl_5.42.0/`
+- 解决方案: 管理员安装到系统目录 `/data/service/hnp/perl.org/perl_5.42.2/`
 
 ## 功能可用性预期
 
@@ -87,7 +87,7 @@
 
 ## 依赖版本
 
-- Perl: 5.42.0 (系统预装)
+- Perl: 5.42.2 (系统预装)
 - musl libc: 1.2.5 (提供头文件和 libc.so)
 - common::sense: 3.75 stub (本地安装)
 
@@ -98,20 +98,20 @@
 
 # 1. 解压 HNP 包
 sudo -u installs unzip perl-ev-4.37-ohos-aarch64.hnp \
-  -d /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/
+  -d /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/aarch64-linux/
 
 # 2. 重新签名
 /data/service/hnp/bin/binary-sign-tool sign \
-  -inFile /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/auto/EV/EV.so \
+  -inFile /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/aarch64-linux/auto/EV/EV.so \
   -outFile /tmp/EV.so.final -selfSign 1
 
 sudo -u installs mv /tmp/EV.so.final \
-  /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/auto/EV/EV.so
+  /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/aarch64-linux/auto/EV/EV.so
 
 # 3. 安装 common::sense 依赖
-sudo -u installs mkdir -p /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/common
+sudo -u installs mkdir -p /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/common
 sudo -u installs cp ~/usr/local/lib/perl5/common/sense.pm \
-  /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/common/
+  /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/common/
 ```
 
 ## 注意事项

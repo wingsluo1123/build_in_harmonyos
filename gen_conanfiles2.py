@@ -6,8 +6,7 @@ TEMPLATE = '''#!/usr/bin/env python3
 """Conan recipe — {name} {version} (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get, copy
-from conan.tools.layout import basic_layout
+from conan.tools.files import get
 
 class {class_name}(ConanFile):
     name = "{name}"
@@ -16,9 +15,7 @@ class {class_name}(ConanFile):
     license = "Artistic-2.0"
     homepage = "{homepage}"
     settings = "os", "compiler", "build_type", "arch"
-
-    def layout(self):
-        basic_layout(self)
+    exports_sources = "conandata.yml"
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -26,26 +23,33 @@ class {class_name}(ConanFile):
     def build(self):
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
+        # HarmonyOS: patch Makefile for CRT linker flags
+        makefile = os.path.join(src, "Makefile")
+        if os.path.exists(makefile):
+            with open(makefile, "r") as mf:
+                content = mf.read()
+            if "-nostartfiles" not in content:
+                content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
+            with open(makefile, "w") as mf:
+                mf.write(content)
         self.run("make -j1", cwd=src)
 
     def package(self):
         dest = self.package_folder
         src = self.source_folder
-        self.run(f"make install DESTDIR={{dest}}", cwd=src)
+        self.run("make install DESTDIR=" + dest, cwd=src)
 
-        # Copy .so files to lib/ for package checks
         for root, dirs, files in os.walk(dest):
-            for f in files:
-                if f.endswith(".so"):
+            for fn in files:
+                if fn.endswith(".so"):
                     lib_dir = os.path.join(dest, "lib")
                     os.makedirs(lib_dir, exist_ok=True)
-                    shutil.copy2(os.path.join(root, f), lib_dir)
+                    shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
-        self.cpp_info.libs = []
-
-    def requirements(self):
-        pass
+        self.cpp_info.libs = ["{lib_name}"]
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.includedirs = []
 '''
 
 def parse_manifest(path):
@@ -80,9 +84,10 @@ def generate(pkg_dir):
     if not name or not version:
         return None
 
-    # 如果没有 sha256，用一个占位符
+    # sha256 必须从 manifest.yaml 获取，禁止生成假值
     if not sha256:
-        sha256 = "0" * 64
+        print(f"ERROR: {pkg_dir} manifest.yaml 缺少 sha256，请手动补充真实值", file=sys.stderr)
+        return None
 
     class_name = "".join(p.capitalize() for p in name.split("-"))
 
@@ -94,9 +99,11 @@ def generate(pkg_dir):
 
     # 生成 conanfile.py
     cpan_name = name.replace("perl-", "").replace("-", "::")
+    lib_name = cpan_name.split("::")[-1]
     conanfile = TEMPLATE.format(
         name=name, version=version, class_name=class_name,
         homepage=f"https://metacpan.org/pod/{cpan_name}",
+        lib_name=lib_name,
     )
 
     path = os.path.join(pkg_dir, "conanfile.py")
@@ -136,10 +143,6 @@ if __name__ == "__main__":
             print(f"✅ {pv}")
             ok += 1
         else:
-            print(f"❌ {pv}: 生成失败")
-            fail += 1
-    print(f"\n生成: {ok}, 失败: {fail}")
-      else:
             print(f"❌ {pv}: 生成失败")
             fail += 1
     print(f"\n生成: {ok}, 失败: {fail}")

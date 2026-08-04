@@ -89,11 +89,11 @@ make
 ```bash
 # 通用版
 sudo -u installs unzip perl-ev-4.37-ohos-aarch64.hnp \
-  -d /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/
+  -d /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/aarch64-linux/
 
 # 高性能版
 sudo -u installs unzip perl-ev-4.37-epoll-ohos-aarch64.hnp \
-  -d /data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0/aarch64-linux/
+  -d /data/service/hnp/perl.org/perl_5.42.2/lib/site_perl/5.42.2/aarch64-linux/
 ```
 
 ## 后端选择（运行时）
