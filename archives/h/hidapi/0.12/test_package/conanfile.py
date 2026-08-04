@@ -3,7 +3,10 @@
 
 CI runs this automatically via `conan create` (which invokes test_package).
 """
+import os
+
 from conan import ConanFile
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, cmake_layout
 
 
@@ -23,5 +26,8 @@ class HidapiTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        if not can_run(self):
+            self.output.info("cross-building: compile+link verified only")
+            return
+        test_bin = os.path.join(self.cpp.build.bindir, "test_hidapi")
+        self.run(test_bin, env="conanrun")
