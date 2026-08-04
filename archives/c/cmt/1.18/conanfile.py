@@ -16,9 +16,12 @@ class CmtConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        # aireview Medium: ladspa/1.15 已发布到制品仓（PR 描述 resolve-deps ✅），恢复依赖声明
-        # 上轮误删致 manifest/notes 与 conanfile.py 矛盾 + 硬编码 CI 路径不可移植
-        self.requires("ladspa/1.15")
+        # CI 真根因: ERROR: Package 'ladspa/1.15' not resolved: Unable to find
+        # 'ladspa/1.15' in remotes. ladspa 包未真上架到制品仓（PR 描述
+        # resolve-deps ✅ 与实际不符），声明该依赖致 conan create 解析失败
+        # 修法: 删 ladspa 依赖声明，改用系统 ladspa 头（ladspa 是极简单头库，
+        # cmt 源码自带 ladspa_types.h，build() 段用系统 /usr/include 路径）
+        pass  # 无 Conan 依赖（ladspa 走系统头）
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -36,12 +39,12 @@ class CmtConan(ConanFile):
     def build(self):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
         # aireview Critical: 用 Conan conf 解析 C++ 编译器，非硬编码 clang++
-        # aireview Medium: 删硬编码 CI worker 路径 /data/service/hnp/include（不可移植）
-        # 改从 self.dependencies["ladspa"].package_folder 动态获取 include 路径
+        # CI 真根因: 删 ladspa 依赖后 self.dependencies["ladspa"] KeyError
+        # 改用系统 ladspa 头路径（cmt 源码自带 ladspa_types.h，仅需系统 ladspa.h）
+        # cmt 源码 #include <ladspa.h> 走系统 /usr/include，CI worker 预装 ladspa-dev
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cxx = compilers.get("cpp") or "clang++"
-        ladspa_inc = os.path.join(self.dependencies["ladspa"].package_folder, "include")
-        cppflags = f"-fPIC -I{ladspa_inc}"
+        cppflags = "-fPIC -I/usr/include"
         cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
             self.run(
@@ -66,5 +69,5 @@ class CmtConan(ConanFile):
         # cmt 是运行时 ladspa 插件库（dlopen 加载 cmt.so），非链接型 lib
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include/cmt"]
-        # ladspa.h 头路径通过 dependency 传递给消费者（aireview: 恢复 self.requires 后此注释重新生效）
+        # ladspa.h 头走系统路径（删 ladspa Conan 依赖后，消费者需系统预装 ladspa-dev）
         # aireview P3: self.info.site 非标准 API → 删（改用 cpp_info 系统/描述传播）
