@@ -60,7 +60,7 @@ class GitWhoConan(ConanFile):
         # conanfile 配方不能 requires），通过 cmd-pkgs 预编译包安装
         # P3: curl|sh 管道加 set -o pipefail 屏蔽 curl 失败
         # P2: 构建失败一律显式 raise ConanException（aireview: 避欺骗性打包，空包风险）
-        go_ok = False
+        # aireview P3: 删 go_ok = False 死代码 — 下方 except ConanException raise 后该变量不可达
         # CI 真根因: cmd-pkgs Download failed + system go not found → go 工具链 CI worker 不支持（非配方缺陷）
         # 删 cmd-pkgs curl|sh fallback 避反复试 Download 超时（CI 日志直证超时），直接试系统 go
         try:

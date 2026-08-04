@@ -14,7 +14,15 @@ go build -o git-who .
 
 ## 遇到的问题与解决方案
 
-无特殊问题。
+### CI 编译失败（status: failed）
+
+CI worker 无 go 工具链支持，`go version` 检测失败：
+- `cmd-pkgs Download failed`（CI 网络受限，下载 go 预编译包超时）
+- `system go not found`（CI worker 不预装 go）
+
+**根因**：非配方缺陷，CI worker 环境限制（E154: go 不预装，go/1.21.13 制品仓无 conanfile 配方不能 requires）。
+
+**当前状态**：如实标记 `status: failed`，与版本级 manifest、顶层 manifest 对齐。后续 CI worker 升级支持 go 工具链后可重试。
 
 ## 依赖版本
 

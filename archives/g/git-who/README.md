@@ -15,9 +15,9 @@ git-who 是一个 Git blame 查看器，为文件树提供高级 blame 操作。
 ### 关键问题
 
 1. **E154 - go 工具链缺失**：
-   - CI worker 不预装 go
-   - 解决方案：通过 cmd-pkgs 预编译包安装 go 1.21.13
-   - fallback：试系统 go
+   - CI worker 不预装 go，且 go/1.21.13 制品仓无 conanfile 配方不能 requires
+   - 当前状态：CI 编译失败（status: failed），如实标记
+   - 后续：CI worker 升级支持 go 工具链后可重试
 
 2. **交叉编译**：
    - GOOS=linux GOARCH=arm64 CGO_ENABLED=0
