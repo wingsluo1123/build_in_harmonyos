@@ -46,10 +46,10 @@ class OcamlConan(ConanFile):
         # prefix is set to package_folder; DESTDIR staging in package() handles the rest
         prefix = self.package_folder
         # 编译器路径从 Conan conf 获取（R33，不硬编码）；默认回退 clang
-        cc = self.conf.get("tools.build:compiler_executables", default={}).get("c", "clang")
+        cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "clang")
         # OHOS 下 as/ar 为 binutils 工具（GNU 汇编器/归档器），OCaml runtime 编译必需，显式注入
-        asm = self.conf.get("tools.build:compiler_executables", default={}).get("asm", "as")
-        ar = self.conf.get("tools.build:compiler_executables", default={}).get("ar", "ar")
+        asm = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("asm", "as")
+        ar = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("ar", "ar")
         # config.guess/configure 需要可写的临时目录（真机 HOME 受限），TMPDIR 指向构建目录
         build_dir = self.build_folder
         # shlex.quote 防御 conf 注入（R33 值可能含特殊字符）
