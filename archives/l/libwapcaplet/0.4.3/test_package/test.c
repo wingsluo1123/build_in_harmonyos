@@ -14,16 +14,18 @@ int main(void) {
     }
 
     /* Test 2: Interning same string returns same pointer */
-    lwc_intern_string("hello", 5, &str2);
-    if (str1 == str2) {
+    if (lwc_intern_string("hello", 5, &str2) != lwc_error_ok) {
+        fail++;
+    } else if (str1 == str2) {
         pass++;
     } else {
         fail++;
     }
 
     /* Test 3: Different string returns different pointer */
-    lwc_intern_string("world", 5, &str3);
-    if (str1 != str3) {
+    if (lwc_intern_string("world", 5, &str3) != lwc_error_ok) {
+        fail++;
+    } else if (str1 != str3) {
         pass++;
     } else {
         fail++;
@@ -44,8 +46,9 @@ int main(void) {
     }
 
     /* Test 6: Caseless comparison */
-    lwc_intern_string("HELLO", 5, &upper);
-    if (lwc_string_caseless_isequal(str1, upper, &result) == lwc_error_ok && result) {
+    if (lwc_intern_string("HELLO", 5, &upper) != lwc_error_ok) {
+        fail++;
+    } else if (lwc_string_caseless_isequal(str1, upper, &result) == lwc_error_ok && result) {
         pass++;
     } else {
         fail++;
