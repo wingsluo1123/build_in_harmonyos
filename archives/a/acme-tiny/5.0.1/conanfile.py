@@ -18,7 +18,8 @@ class AcmeTinyConan(ConanFile):
     url = "https://github.com/diafygi/acme-tiny"
 
     package_type = "application"
-    settings = "os", "compiler", "build_type", "arch"
+    # Pure Python package — only os and arch affect site-packages path
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
