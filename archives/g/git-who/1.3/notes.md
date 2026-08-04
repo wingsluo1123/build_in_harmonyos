@@ -4,7 +4,7 @@
 - 构建系统: go (go build)
 - 编译日期: 2026-07-30
 - 编译器: Go
-- 状态: failed  # aireview Critical: 与 manifest 对齐，CI go 工具链不支持编译失败如实标记
+- 状态: failed  # R9: CI 日志直证 go 工具链不支持编译失败（cmd-pkgs Download failed + system go not found），如实标记
 
 ## 编译步骤
 
