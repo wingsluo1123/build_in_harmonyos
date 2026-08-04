@@ -50,7 +50,7 @@ class ArgoConan(ConanFile):
         env.define("GOTOOLCHAIN", "local")
         # Go linker mmap may fail on some filesystems; use Conan's TMPDIR
         # which is already set by the profile/build environment.
-        env.vars(self).save_script("go_build_env")
+        env.vars(self).save_script("conanbuild")
 
     def build(self):
         apply_conandata_patches(self)
