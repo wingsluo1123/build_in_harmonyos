@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/junshi_liu/build_in_harmonyos/archives/a/alac/cci.20121212/test_package/conanrunenv-release-armv8.sh"
