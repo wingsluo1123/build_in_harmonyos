@@ -1,0 +1,76 @@
+#====================================================================
+# E215-draft-4AA8.kv — OHOS musl struct udphdr 成员名差异
+# 来源: dhcpstarv 0.2.3 适配（PR feat/dhcpstarv-0.2.3，路径 B 候选）
+# 状态: draft（查重无覆盖，待主编合入）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E215
+trigger_tool:           clang|gcc|cc
+phase:                  compilation
+error_signature: no member named 'dest' in 'struct udphdr'|no member named 'source' in 'struct udphdr'|no member named 'len' in 'struct udphdr'|no member named 'check' in 'struct udphdr'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos-musl-header-diff
+match_keywords: udphdr,uh_sport,uh_dport,uh_ulen,uh_sum,netinet/udp.h,musl,struct udphdr,BSD 风格,glibc
+title: OHOS musl struct udphdr 成员名差异（BSD 风格 uh_* vs glibc source/dest/len/check）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: HarmonyOS musl 的 sysroot 头文件 netinet/udp.h 中 struct udphdr 采用 BSD 风格成员名 uh_sport/uh_dport/uh_ulen/uh_sum；glibc 风格 source/dest/len/check 在 OHOS 上不存在，直接访问 udph->dest 等成员编译报 no member named 'dest'
+affected_scope: 使用 raw/PF_PACKET 构造 DHCP/UDP 报文并直接访问 struct udphdr 成员的 C 项目（DHCP/网络工具类库）
+verification_cmd: grep -n 'struct udphdr' -A 6 /data/service/hnp/ohos-sdk.org/*/ohos/native/sysroot/usr/include/netinet/udp.h
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach: patch
+rec_description: 将 glibc 风格成员 source/dest/len/check 替换为 OHOS musl BSD 风格 uh_sport/uh_dport/uh_ulen/uh_sum（成员名映射，无结构体布局差异：两者均为 4 个 uint16_t）
+rec_command: patch src/udp.c src/dhcp.c: udp->source->uh_sport, udp->dest->uh_dport, udp->len->uh_ulen, udp->check->uh_sum, udph->dest->uh_dport
+rec_auto_fix:           false
+rec_impl:
+
+# 回退方案
+fallback_priority:      2
+fallback_approach: ifdef
+fallback_description: 若需同时支持 glibc 与 OHOS musl，可用条件编译 #ifdef __OHOS__ 选择成员名
+fallback_command: #ifdef __OHOS__ udph->uh_dport #else udph->dest #endif
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       typedef struct udphdr|#define dest uh_dport
+forbid_1_reason:        禁止在头文件层面重定义系统结构体或宏替换成员名，会污染全局命名空间
+forbid_1_consequence:   影响其他依赖 netinet/udp.h 的翻译单元，引入隐蔽行为不一致
+forbid_2_pattern:       memset\(udph, 0, sizeof\(struct udphdr\)\) 后按 glibc 偏移直接赋值
+forbid_2_reason:        OHOS musl 布局虽同为 4×uint16_t，但应通过成员名访问保证可移植
+forbid_2_consequence:   绕过成员名检查，未来 musl 布局调整时静默出错
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R32, R8
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+source: dhcpstarv 0.2.3 PR feat/dhcpstarv-0.2.3
+doc_file:               doc/E215.md
+last_updated: 2026-08-04
+source_event:           dhcpstarv 0.2.3 conan create src/dhcp.c:110 no member named 'dest'
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                junshi_liu <liujsh2023@lzu.edu.cn>
+source_pr:              3951
+source_commit:          feat/dhcpstarv-0.2.3
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-08-04
+
+draft: true
+contributor_id: 4AA8
