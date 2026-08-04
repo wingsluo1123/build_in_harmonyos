@@ -195,14 +195,21 @@ class TectonicConan(ConanFile):
             # Re-raise if compilation errors detected (indicates real regression)
             if "could not compile" in log_content or "error[E" in log_content:
                 raise
-            # Re-raise on test assertion failures from non-network tests
+            # Re-raise on signal crashes (SIGSEGV/SIGABRT/SIGILL — real platform bugs)
+            if any(sig in log_content for sig in ("signal:", "SIGSEGV", "SIGABRT", "SIGILL")):
+                raise
+            # Check test assertion failures: only network-related test failures are tolerated
             if "test result: FAILED" in log_content:
                 network_keywords = ["geturl", "bundle", "download"]
                 failed_tests = re.findall(r'test (\S+) \.\.\. FAILED', log_content)
                 non_network_failures = [t for t in failed_tests if not any(kw in t.lower() for kw in network_keywords)]
                 if non_network_failures:
                     raise
-            self.output.warning("cargo test had failures (some tests require network/TeX environment)")
+                # All failures are network-related — safe to warn
+                self.output.warning("cargo test had failures (network/TeX environment tests only)")
+            else:
+                # Unknown failure (not compilation, not crash, not assertion) — re-raise
+                raise
 
     def _patch_pc_files_for_static(self, gen_folder):
         """Patch .pc files to use .a absolute paths instead of -l flags.

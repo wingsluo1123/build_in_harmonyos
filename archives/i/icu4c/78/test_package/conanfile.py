@@ -33,5 +33,7 @@ class Icu4cTestConan(ConanFile):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
         # R33: find bash dynamically, avoid hardcoding paths
-        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/system/bin/sh"
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash")
+        if not bash:
+            raise RuntimeError("bash is required to run test binaries on OHOS (mksh cannot execute ELF). Set CONFIG_SHELL or install bash.")
         self.run(f"{bash} -c './test_icu4c'", env="conanrun")
