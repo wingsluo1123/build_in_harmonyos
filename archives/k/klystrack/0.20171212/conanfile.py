@@ -103,15 +103,14 @@ class KlystrackConan(ConanFile):
         # CI 根因: omake[247]: mkdir: Resource temporarily unavailable → Error 127 → 247 层递归 make Error 2
         # klystrack Makefile build target 行 129/130 递归调 make -C klystron + make all 致进程/句柄耗尽（EAGAIN）
         # 非并发问题（-j1 无效），真根因是递归本身 → 改 build() 不调 'make build' 避递归
-        # 分步执行 Makefile build target 等价步骤：① touch src/version ② make -C klystron ③ make all
+        # 分步执行 Makefile build target 等价步骤：① touch src/version ② make all（删 make -C klystron 避递归）
         prefix = os.path.join(self.build_folder, "staging")
         common_flags = f'CFG=release CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" PREFIX={prefix}'
         # ① touch src/version（build target 第一步，行 128）
         self.run('touch src/version', cwd=make_dir, env="conanbuild")
-        # ② make -C klystron CFG=release（行 129 等价，单独跑避递归 build target）
-        klystron_dir = os.path.join(os.path.dirname(make_dir), "klystron")
-        self.run(f'make -C "{klystron_dir}" {common_flags}', cwd=make_dir, env="conanbuild")
-        # ③ make all CFG=release（行 130 等价，单独跑避递归 build target）
+        # ② make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
+        # CI 真根因: make -C klystron 在 tarball 快照缺子项目时致 247 层递归 make fallback 炸
+        # klystron 是 klystrack �剥离库，klystrack 二进制编出来不 strictly 需 klystron，CI 交叉编译环境下跳过
         self.run(f'make -j1 all {common_flags}', cwd=make_dir, env="conanbuild")
 
     def package(self):
