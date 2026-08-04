@@ -85,8 +85,10 @@ class KlystrackConan(ConanFile):
         # 改用 Conan conf 解析编译器路径，显式传 CC/CXX 命令行参数覆盖 Makefile 硬编码
         # （klystrack Makefile 不读 CC 环境变量而是硬编码 gcc，故 conanbuild 设的 CC 没用需命令行传）
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
-        cc = compilers.get("c") or "clang"
-        cxx = compilers.get("cpp") or "clang++"
+        # 双 fallback 避 Conan 1/旧 Conan 2 不支持 conf key 返 {} 致裸名 clang 在 OHOS CI 找不到仍 Error 127
+        # os.environ.get 读 conanbuild 合入的 CC（Conan 2 在 run(env="conanbuild") 时同步到 os.environ）
+        cc = compilers.get("c") or os.environ.get("CC") or "clang"
+        cxx = compilers.get("cpp") or os.environ.get("CXX") or "clang++"
         # CI 根因: make[1]: *** ../klystron: No such file or directory. Stop.
         # Makefile build target 依赖 ../klystron 目录但上游 archive 快照缺该子项目
         # 建 ../klystron symlink 指向源码根（klystrack 自身含 klystron 所需源文件）
