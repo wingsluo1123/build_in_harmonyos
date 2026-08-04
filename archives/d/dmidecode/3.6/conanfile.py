@@ -41,7 +41,7 @@ class DmidecodeConan(ConanFile):
     def package(self):
         # dmidecode is a tool — package the binary and man page
         copy(self, "dmidecode", self.source_folder, os.path.join(self.package_folder, "bin"))
-        copy(self, "dmidecode.8", self.source_folder,
+        copy(self, "dmidecode.8", os.path.join(self.source_folder, "man"),
              os.path.join(self.package_folder, "share", "man", "man8"))
 
     def package_info(self):
