@@ -3,7 +3,7 @@
 
 int main(void) {
     lwc_string *str1 = NULL, *str2 = NULL, *str3 = NULL, *sub = NULL, *upper = NULL;
-    bool result;
+    bool result = false;
     int pass = 0, fail = 0;
 
     /* Test 1: Intern a string */
@@ -30,16 +30,14 @@ int main(void) {
     }
 
     /* Test 4: Equality check */
-    lwc_string_isequal(str1, str2, &result);
-    if (result) {
+    if (lwc_string_isequal(str1, str2, &result) == lwc_error_ok && result) {
         pass++;
     } else {
         fail++;
     }
 
     /* Test 5: Inequality check */
-    lwc_string_isequal(str1, str3, &result);
-    if (!result) {
+    if (lwc_string_isequal(str1, str3, &result) == lwc_error_ok && !result) {
         pass++;
     } else {
         fail++;
@@ -47,8 +45,7 @@ int main(void) {
 
     /* Test 6: Caseless comparison */
     lwc_intern_string("HELLO", 5, &upper);
-    lwc_string_caseless_isequal(str1, upper, &result);
-    if (result) {
+    if (lwc_string_caseless_isequal(str1, upper, &result) == lwc_error_ok && result) {
         pass++;
     } else {
         fail++;
