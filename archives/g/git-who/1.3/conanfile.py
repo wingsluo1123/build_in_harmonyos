@@ -7,7 +7,7 @@ Build with `go build` to produce a single binary.
 import os
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanInvalidConfiguration, ConanException  # aireview High: build() 多处用 ConanException 需导入
 from conan.tools.files import get, copy, apply_conandata_patches
 from conan.tools.layout import basic_layout
 
