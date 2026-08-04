@@ -16,10 +16,9 @@ class CmtConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        # CI 真根因: ERROR: Package 'ladspa/1.15' not resolved — ladspa 包不在 registry
-        # 删 self.requires("ladspa/1.15") 依赖声明，改用系统 ladspa.h（CI 预装或 SDK 头文件）
-        # ladspa.h 是 LADSPA SDK 标准头文件，CI worker /data/service/hnp/include 已预装
-        pass  # 无 Conan 依赖（ladspa.h 走系统头文件路径）
+        # aireview Medium: ladspa/1.15 已发布到制品仓（PR 描述 resolve-deps ✅），恢复依赖声明
+        # 上轮误删致 manifest/notes 与 conanfile.py 矛盾 + 硬编码 CI 路径不可移植
+        self.requires("ladspa/1.15")
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -37,10 +36,11 @@ class CmtConan(ConanFile):
     def build(self):
         # cmt uses a flat Makefile (src/Makefile) → cxx -shared → cmt.so
         # aireview Critical: 用 Conan conf 解析 C++ 编译器，非硬编码 clang++
-        # CI 真根因: ladspa/1.15 不在 registry → 删依赖改用系统 ladspa.h（CI 预装 /data/service/hnp/include）
+        # aireview Medium: 删硬编码 CI worker 路径 /data/service/hnp/include（不可移植）
+        # 改从 self.dependencies["ladspa"].package_folder 动态获取 include 路径
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
         cxx = compilers.get("cpp") or "clang++"
-        ladspa_inc = "/data/service/hnp/include"
+        ladspa_inc = os.path.join(self.dependencies["ladspa"].package_folder, "include")
         cppflags = f"-fPIC -I{ladspa_inc}"
         cxxflags = f"{cppflags} -Wall -Werror -O2"
         with chdir(self, os.path.join(self.source_folder, "src")):
@@ -66,6 +66,5 @@ class CmtConan(ConanFile):
         # cmt 是运行时 ladspa 插件库（dlopen 加载 cmt.so），非链接型 lib
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include/cmt"]
-        # CI 真根因: ladspa/1.15 不在 registry → 删依赖，消费者需自行装 ladspa.h SDK 头文件
-        # ladspa.h 是 LADSPA SDK 标准头文件，CI worker /data/service/hnp/include 已预装
+        # ladspa.h 头路径通过 dependency 传递给消费者（aireview: 恢复 self.requires 后此注释重新生效）
         # aireview P3: self.info.site 非标准 API → 删（改用 cpp_info 系统/描述传播）

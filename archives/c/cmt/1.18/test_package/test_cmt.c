@@ -35,6 +35,8 @@ typedef struct {
     void (*set_run_adding_gain)(LADSPA_Handle, LADSPA_Data Gain);
     void (*deactivate)(LADSPA_Handle);
     void (*cleanup)(LADSPA_Handle);
+    /* aireview P3: 补 extension_data 末字段对齐 LADSPA 1.1 规范（当前无害但作为参考代码有误导风险） */
+    const void * (*extension_data)(unsigned long Index);
 } LADSPA_Descriptor;
 
 typedef const LADSPA_Descriptor *(*LADSPA_Descriptor_Function)(unsigned long Index);
