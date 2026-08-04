@@ -67,8 +67,8 @@ build:
 
 # 应用的补丁列表
 patches_applied:
-  - "Makefile: 添加 -nostartfiles -nodefaultlibs -lc 到 LDDLFLAGS (CRT 文件缺失绕过)"
-  - "Makefile: 可选 -I$MUSL_PREFIX/include 到 CCFLAGS (仅 MUSL_PREFIX 设置时注入)"
+  - "perl Makefile.PL: 传入 INC='-I$MUSL_PREFIX/include' 添加 musl 头文件路径（仅 MUSL_PREFIX 设置时）"
+  - "make OTHERLDFLAGS: 添加 -nostartfiles -nodefaultlibs -lc 到链接参数 (CRT 文件缺失绕过)"
 
 # 补丁方式: conanfile.py build() 内联 regex 修改 Makefile (R3: 探索阶段不生成 .patch)
 patch_method: inline-conanfile-build
@@ -88,7 +88,7 @@ patch_classification:
     type: inline
     platform_only: True
     guard: 'none'
-    description: "Makefile: 添加 -I (musl 头文件路径) 到 CCFLAGS 和 -nostartfiles -nodefaultlibs -lc 到 LDDLFLAGS (CRT 绕过)"
+    description: "Makefile.PL: 传入 INC 参数添加 musl 头文件路径; make OTHERLDFLAGS 添加 CRT 绕过链接参数"
 
 # ============================================================
 # 知识沉淀
@@ -100,5 +100,5 @@ knowledge_gained:
   - "鸿蒙系统缺少 CRT 文件（crti.o, crtn.o, crtbeginS.o, crtendS.o），链接需要 -nostartfiles -nodefaultlibs -lc 参数"
   - "SELinux HMDFS 文件系统限制动态库加载，XS .so 无法从用户目录加载"
   - "Params::Util 提供纯 Perl 回退模块 (Params::Util::PP)，通过 PERL_PARAMS_UTIL_PP=1 环境变量激活"
-  - "修改生成的 Makefile 的 CCFLAGS 添加 musl 头文件路径，LDDLFLAGS 添加 CRT 绕过链接参数"
+  - "通过 perl Makefile.PL INC 参数添加头文件路径，make OTHERLDFLAGS 命令行参数添加 CRT 绕过链接参数"
   - "参考 perl-dbd-pg 3.18.0 的编译经验：相同的 CRT 绕过方案和 musl 头文件依赖"

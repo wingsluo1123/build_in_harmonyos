@@ -32,7 +32,7 @@
 | 构建系统 | Perl Makefile.PL | Perl Makefile.PL |
 | CRT 绕过 | `-nostartfiles -nodefaultlibs -lc` | 相同方案 |
 | musl 头文件 | 需要 (stdio.h, ctype.h 等) | 需要 (sys/types.h 等) |
-| 链接参数注入方式 | `dynamic_lib => { OTHERLDFLAGS => ... }` (Makefile.PL) | regex 修改 Makefile LDDLFLAGS (不同方式) |
+| 链接参数注入方式 | `dynamic_lib => { OTHERLDFLAGS => ... }` (Makefile.PL) | `make OTHERLDFLAGS` 命令行参数 (不同方式) |
 | SELinux 限制 | XS .so 无法从用户目录加载 | 相同问题 |
 | 纯 Perl 回退 | 无 (DBI::PurePerl 是独立模式) | 有 (PERL_PARAMS_UTIL_PP=1) |
 | 外部依赖 | libpq, DBI | 无 |
@@ -101,3 +101,4 @@
 **编译结束**: 2026-07-03 16:57
 **归档完善**: 2026-07-06
 **最终状态**: built (编译成功，conan-verify 全部门禁通过，CI 模拟通过，submit 自检 6/6 PASS，待 CI upload)
+ 6/6 PASS，待 CI upload)

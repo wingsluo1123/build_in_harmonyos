@@ -12,7 +12,6 @@ On OHOS:
   - XS .so may fail to load at runtime due to ELF signing (pure Perl fallback works)
 """
 import os
-import re
 
 from conan import ConanFile
 from conan.tools.files import apply_conandata_patches, export_conandata_patches
@@ -75,19 +74,6 @@ class PerlparamsutilConan(ConanFile):
         # Apply conandata patches (if any)
         apply_conandata_patches(self)
 
-        # Step 1: Generate Makefile via Makefile.PL
-        # XS detection may fail due to ld.lld not supporting -fstack-protector-strong,
-        # but ExtUtils::MakeMaker still generates xsubpp rules for .xs files.
-        self.run("perl Makefile.PL", cwd=self.source_folder)
-
-        # Step 2: Patch Makefile for OpenHarmony platform
-        #   a) Add musl C library include path for system headers (sys/types.h etc.)
-        #   b) Add CRT workaround: -nostartfiles -nodefaultlibs -lc
-        #   c) Add musl lib path for finding libc
-        makefile_path = os.path.join(self.source_folder, "Makefile")
-        with open(makefile_path, "r") as f:
-            content = f.read()
-
         # MUSL_PREFIX is optional: on OHOS the clang sysroot already
         # provides musl headers (sys/types.h etc.) and libc in the
         # default search paths.  Local dev with a custom musl install
@@ -96,34 +82,22 @@ class PerlparamsutilConan(ConanFile):
         musl_inc = os.path.join(musl_prefix, "include") if musl_prefix else ""
         musl_lib = os.path.join(musl_prefix, "lib") if musl_prefix else ""
 
-        # Add musl include path to CCFLAGS (idempotent: skip if already present)
-        if musl_inc:
-            content = re.sub(
-                r"^(CCFLAGS = )(?!.*" + re.escape(musl_inc) + ")",
-                rf"\1-I{musl_inc} ",
-                content,
-                flags=re.MULTILINE,
-            )
-        # Add CRT workaround to LDDLFLAGS (idempotent: skip if already present)
+        # Step 1: Generate Makefile via Makefile.PL
+        # Pass INC via Makefile.PL parameter to add musl include path to CCFLAGS
+        # (avoids modifying the generated Makefile — R6 compliance)
+        inc_arg = f" INC='-I{musl_inc}'" if musl_inc else ""
+        self.run(f"perl Makefile.PL{inc_arg}", cwd=self.source_folder)
+
+        # Step 2: Build with CRT workaround via make OTHERLDFLAGS
         # -nostartfiles -nodefaultlibs bypasses missing CRT files on OHOS;
         # -lc links against musl libc (found via compiler default search path,
         # or via -L{musl_lib} when MUSL_PREFIX is set).
-        lddlflags_extra = "-nostartfiles -nodefaultlibs"
+        # Using OTHERLDFLAGS (not regex on Makefile) — R6 compliance
+        other_ldflags = "-nostartfiles -nodefaultlibs"
         if musl_lib:
-            lddlflags_extra += f" -L{musl_lib}"
-        lddlflags_extra += " -lc"
-        content = re.sub(
-            r"^(LDDLFLAGS = -shared)(?!.*-nostartfiles)(.*)$",
-            rf"\1 {lddlflags_extra}\2",
-            content,
-            flags=re.MULTILINE,
-        )
-
-        with open(makefile_path, "w") as f:
-            f.write(content)
-
-        # Step 3: Build (R9: use -j1)
-        self.run("make -j1", cwd=self.source_folder)
+            other_ldflags += f" -L{musl_lib}"
+        other_ldflags += " -lc"
+        self.run(f'make -j1 OTHERLDFLAGS="{other_ldflags}"', cwd=self.source_folder)
 
     def package(self):
         # Install with DESTDIR to package folder
