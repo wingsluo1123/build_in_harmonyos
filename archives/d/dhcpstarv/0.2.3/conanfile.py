@@ -6,10 +6,10 @@ No third-party C library dependency: uses Linux raw PF_PACKET sockets directly.
 Patches: 0001 configure HMDFS tmpdir (applied after autoreconf), 0002/0003 OHOS musl udphdr members.
 """
 import os
+import shutil
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, patch, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
 
 
 class DhcpstarvConan(ConanFile):
@@ -49,8 +49,42 @@ class DhcpstarvConan(ConanFile):
         tc.configure_args.append("--disable-silent-rules")
         tc.generate()
 
+    def _inject_autotools_env(self):
+        """CI Worker 默认 PATH 可能缺少 aclocal/automake（autoreconf 前置依赖）。
+
+        动态定位 aclocal 所在目录并注入 PATH；同时把对应 share/automake-*
+        目录加入 PERL5LIB（否则 aclocal 报 Automake/Config.pm 缺失）。
+        注意：即使 aclocal 已在 PATH，也必须校验/注入 PERL5LIB——automake
+        1.17 share 目录可能为空，需指向含 Automake/Config.pm 的版本目录。
+        """
+        if not shutil.which("aclocal"):
+            candidates = [
+                "/storage/Users/currentUser/usr/local/bin",
+                "/usr/local/bin",
+                "/usr/bin",
+                "/data/service/hnp/automake.org/bin",
+            ]
+            for d in candidates:
+                aclocal = os.path.join(d, "aclocal")
+                if os.path.isfile(aclocal) and os.access(aclocal, os.X_OK):
+                    os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+                    break
+        # 校验 PERL5LIB：保证 aclocal 能找到 Automake/Config.pm
+        cur = os.environ.get("PERL5LIB", "")
+        if "Automake" not in cur:
+            for root in ("/storage/Users/currentUser/usr/local/share", "/usr/share"):
+                if not os.path.isdir(root):
+                    continue
+                for name in sorted(os.listdir(root)):
+                    if name.startswith("automake-") and os.path.isfile(
+                            os.path.join(root, name, "Automake", "Config.pm")):
+                        os.environ["PERL5LIB"] = os.path.join(root, name) + (
+                            os.pathsep + cur if cur else "")
+                        return
+
     def build(self):
         apply_conandata_patches(self)
+        self._inject_autotools_env()
         autotools = Autotools(self)
         autotools.autoreconf()
         # configure 由 autoreconf 生成后，再应用 HMDFS 临时目录修复

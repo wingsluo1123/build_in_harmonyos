@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/bin/bash
 # test_package/test.sh — 验证 dhcpstarv 二进制功能正常
 # dhcpstarv --help 打印版本 0.2.3 与 Usage 并退出码 0（见 src/main.c main()）
 # 用法: test.sh <dhcpstarv 二进制路径>
