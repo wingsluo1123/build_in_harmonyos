@@ -14,7 +14,7 @@
 
 使用上游预编译的 linux/arm64 二进制包：
 - 上游发布: https://github.com/aquaproj/aqua/releases/download/v2.60.0/aqua_linux_arm64.tar.gz
-- SHA256: 2427b5212dec92ae7cd59bf62c6eb80ef5a74adda1c38876b5fa3714e2cfa95f
+- SHA256: 695e04849161feced95cda06f37f8032287168b19b6eebf2c75c8fe0069e23d1
 - OHOS CI worker 不提供 Go 工具链，使用上游预编译二进制
 
 ### 二进制签名
