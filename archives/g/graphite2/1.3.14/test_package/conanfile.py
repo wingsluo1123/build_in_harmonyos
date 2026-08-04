@@ -5,6 +5,9 @@ R34: This test substantively depends on the graphite2 package by
 calling gr_engine_version() to verify the library is correctly
 linked and functional.
 """
+import os
+import shutil
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -25,5 +28,9 @@ class Graphite2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
+        # Use bash to wrap binary execution (same pattern as icu4c test_package).
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash")
+        if not bash:
+            raise RuntimeError("bash is required to run test binaries on OHOS")
+        self.run(f"{bash} -c './test_graphite2'", env="conanrun")
