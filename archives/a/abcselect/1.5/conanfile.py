@@ -55,10 +55,10 @@ class AbcselectConan(ConanFile):
             shutil.copy2(script, dest)
             os.chmod(dest, 0o755)
 
-        # Install man page
+        # Install man page (uncompressed, as source is not gzipped)
         manpage = os.path.join(src, "abcselect.1")
         if os.path.isfile(manpage):
-            shutil.copy2(manpage, os.path.join(mandir, "abcselect.1.gz"))
+            shutil.copy2(manpage, os.path.join(mandir, "abcselect.1"))
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
