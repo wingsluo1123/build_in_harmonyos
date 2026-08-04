@@ -11,6 +11,7 @@ from conan import ConanFile
 from conan.errors import ConanException
 from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
 from conan.tools.layout import basic_layout
+import shutil
 
 
 class KlystrackConan(ConanFile):
@@ -30,6 +31,16 @@ class KlystrackConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # CI 真根因: klystrack 上游 tarball 缺 klystron git submodule 源码
+        # → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util），klystrack 源码大量
+        # #include "snd/music.h" / "gfx/font.h" 等无法编译
+        # 修法: patches/klystron-src/ 74 文件树随配方导出到 recipe 缓存
+        # （build() 阶段 self.recipe_folder 指向缓存副本，需 export_sources 把补丁同步过去）
+        patch_root = os.path.join(self.recipe_folder, "patches", "klystron-src")
+        if os.path.isdir(patch_root):
+            dst_dir = os.path.join(self.export_sources_folder, "patches", "klystron-src")
+            os.makedirs(os.path.dirname(dst_dir), exist_ok=True)
+            copy(self, "**", src=patch_root, dst=dst_dir)
 
     def requirements(self):
         # SDL2 制品仓已就绪 (resolve-deps ✅)，包名小写 sdl2
@@ -47,6 +58,46 @@ class KlystrackConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
+
+    def _inject_klystron_snd(self):
+        """CI 真根因: klystrack 上游 tarball 缺 klystron git submodule 源码
+        （.gitmodules: url = github.com/kometbomb/klystron.git）
+        → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util + 根文件），
+        klystrack 源码大量 #include "snd/music.h" / "gfx/font.h" 等无法编译
+        修法: 把 patches/klystron-src/ 74 文件树注入源码树根目录
+        在 build() 开头调（source 已解包，self.source_folder 指向真实源码根）
+
+        export_sources() 阶段 self.recipe_folder / export_sources_folder 指向 Conan
+        缓存副本路径（.conan2/p/klyst*/e/），copy() 把补丁复制到 cache 的 es/ 子目录
+        （conanmanifest.txt 记录路径为 export_source/patches/...，实际落地 es/patches/）。
+        build() 阶段 recipe_folder 指向 cache e/，补丁在父目录的 es/patches/ 下。"""
+        # 注入 klystron-src 整树到 source_folder 根（snd/gfx/gui/lib/util + 根文件）
+        import glob, os as _os, shutil as _sh
+        recipe_root = _os.path.dirname(self.recipe_folder)  # cache 根（e/ 的父目录）
+        candidates = [
+            _os.path.join(recipe_root, "es", "patches", "klystron-src"),
+            _os.path.join(self.recipe_folder, "patches", "klystron-src"),
+            _os.path.join(recipe_root, "s", "patches", "klystron-src"),  # source 缓存副本
+        ]
+        patch_root = None
+        for cand in candidates:
+            if _os.path.isdir(cand) and _os.listdir(cand):
+                patch_root = cand; break
+        if patch_root is None:
+            raise ConanException(
+                f"patches/klystron-src not found (tried {candidates}). "
+                "klystrack 上游 tarball 缺 klystron submodule src/ 源码，需补丁注入。"
+            )
+        # 遍历补丁树，复制每个文件到 source_folder 对应路径（避覆盖已存在文件）
+        for root, dirs, files in _os.walk(patch_root):
+            rel = _os.path.relpath(root, patch_root)
+            dst_dir = self.source_folder if rel == "." else _os.path.join(self.source_folder, rel)
+            _os.makedirs(dst_dir, exist_ok=True)
+            for fn in files:
+                src_f = _os.path.join(root, fn)
+                dst_f = _os.path.join(dst_dir, fn)
+                if not _os.path.exists(dst_f):
+                    _sh.copy2(src_f, dst_f)
 
     def generate(self):
         # Makefile-based build, no toolchain needed; keep for Conan 2.x G1 gate
@@ -68,6 +119,8 @@ class KlystrackConan(ConanFile):
         raise ConanException(f"Makefile not found under {self.source_folder}")
 
     def build(self):
+        # CI 真根因: 上游 tarball 缺 klystron submodule snd/ 源码 → 注入补丁
+        self._inject_klystron_snd()
         # SDL2 头路径通过 CPPFLAGS 注入（Conan 包 package_folder）
         # SDL2_image/2.8.0 未发布到制品仓未声明依赖，不注入其路径
         # CI 报 'SDL.h' file not found: SDL2 包头在 include/SDL2/SDL.h（非根 include），
@@ -81,7 +134,7 @@ class KlystrackConan(ConanFile):
         ldflags = f"-L{sdl2_lib}"
         make_dir = self._find_make_dir()
         # CI 真根因: make: *** [Makefile:153: objs.release/action.o] Error 127 (command not found)
-        # klystrack Makefile 硬编码 gcc/g++ 非 Conan 工具链 clang，OHOS CI 环境下编译器 not found
+        # klystrack Makefile �硬编码 gcc/g++ 非 Conan 工具链 clang，OHOS CI 环境下编译器 not found
         # 改用 Conan conf 解析编译器路径，显式传 CC/CXX 命令行参数覆盖 Makefile 硬编码
         # （klystrack Makefile 不读 CC 环境变量而是硬编码 gcc，故 conanbuild 设的 CC 没用需命令行传）
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
@@ -107,6 +160,21 @@ class KlystrackConan(ConanFile):
                     f"Failed to create symlink {klystron_link} -> {make_dir}: {e}. "
                     f"The Makefile build target requires ../klystron to exist."
                 ) from e
+        # CI 真根因: 'snd/music.h' file not found — klystrack 源码 #include "snd/music.h"
+        # snd/ 目录已注入 build folder 根（_inject_klystron_snd），但 Makefile L51
+        # INCLUDEFLAGS := -I src $(SDLFLAGS) -I $(KLYSTRON)/src ... 不含根目录
+        # → #include "snd/music.h"（相对根）找不到
+        # 修法: CFLAGS 注入 -I.（build folder 根）让 snd/ 可见
+        cppflags += f" -I."
+        # snd/ 也在 klystron/src/snd/（klystron symlink 指向 make_dir），
+        # 注入 -I../klystron/src 兼容上游 #include 路径
+        klystron_src_inc = os.path.join(os.path.dirname(make_dir), "klystron", "src")
+        cppflags += f" -I{klystron_src_inc}"
+        # CI 真根因: /bin/sh: sdl2-config: inaccessible or not found
+        # klystrack Makefile:36/37 硬编码 `sdl2-config --cflags`/`sdl2-config --libs`
+        # OHOS 交叉构建无 sdl2-config 命令 → 注入 SDLFLAGS/SDLLIBS 变量覆盖
+        sdl_flags = f'-I{sdl2_inc} -I{sdl2_inc_sub} -U_FORTIFY_SOURCE'
+        sdl_libs = f'-L{sdl2_lib} -lSDL2 -lSDL2main'
         # aireview P2: 删 CC Python 侧解析和命令行注入，依赖 conanbuild 环境自动提供正确交叉编译器
         # （os.environ.get("CC") 读宿主机环境非 conanbuild 子进程，覆盖 conanbuild 设的完整路径）
         # CI 根因: omake[247]: mkdir: Resource temporarily unavailable → Error 127 → 247 层递归 make Error 2
@@ -115,12 +183,49 @@ class KlystrackConan(ConanFile):
         # 分步执行 Makefile build target 等价步骤：① touch src/version ② make all（删 make -C klystron 避递归）
         prefix = os.path.join(self.build_folder, "staging")
         # CI 真根因: klystrack Makefile 硬编码 gcc/g++ → 显式传 CC/CXX 命令行参数覆盖
-        common_flags = f'CFG=release CC="{cc}" CXX="{cxx}" CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" PREFIX={prefix}'
+        # SDLFLAGS/SDLLIBS 覆盖 Makefile:36/37 的 sdl2-config 调用
+        common_flags = (
+            f'CFG=release CC="{cc}" CXX="{cxx}" '
+            f'CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" '
+            f'SDLFLAGS="{sdl_flags}" SDLLIBS="{sdl_libs}" '
+            f'PREFIX={prefix}'
+        )
         # ① touch src/version（build target 第一步，行 128）
         self.run('touch src/version', cwd=make_dir, env="conanbuild")
-        # ② make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
+        # ② 手动生成 src/version.h + src/version_number.h（等价 Makefile L133-148）
+        # CI 真根因: 跳过 make build 避递归 → src/version.h 未生成 →
+        # action.c:479 VERSION_STRING 未定义 error
+        version_h = os.path.join(make_dir, "src", "version.h")
+        version_number_h = os.path.join(make_dir, "src", "version_number.h")
+        version_file = os.path.join(make_dir, "src", "version")
+        with open(version_file, "r") as f:
+            version_str = f.read().strip() or "0.20171212"
+        with open(version_number_h, "w") as f:
+            f.write('#ifndef VERSION_NUMBER\n')
+            f.write('#define VERSION_NUMBER\n')
+            f.write(f'#define VERSION "{version_str}"\n')
+            f.write('#endif\n')
+        with open(version_h, "w") as f:
+            f.write('#ifndef VERSION_H\n')
+            f.write('#define VERSION_H\n')
+            f.write('#include "version_number.h"\n')
+            # REVISION 取 klystrack 源码 git 前缀 d775804（上游 tarball commit）
+            f.write('#define REVISION "d775804"\n')
+            f.write('#define VERSION_STRING "klystrack " VERSION " " REVISION\n')
+            f.write('#endif\n')
+        # KLYSTRON_VERSION_STRING 宏由 klystron Makefile build: target 生成，
+        # 跳过 make -C klystron 避递归 → 手动写 klystron_version.h 含宏定义
+        # （klystrack 源码 #include "klystron_version.h" 取该宏）
+        klystron_version_h = os.path.join(make_dir, "klystron_version.h")
+        with open(klystron_version_h, "w") as f:
+            f.write('#ifndef KLYSTRON_VERSION_H\n')
+            f.write('#define KLYSTRON_VERSION_H\n')
+            f.write('#include "version.h"\n')
+            f.write('#define KLYSTRON_VERSION_STRING "klystron 0.20171212"\n')
+            f.write('#endif\n')
+        # ③ make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
         # CI 真根因: make -C klystron 在 tarball 快照缺子项目时致 247 层递归 make fallback 炸
-        # klystron 是 klystrack �剥离库，klystrack 二进制编出来不 strictly 需 klystron，CI 交叉编译环境下跳过
+        # klystron 是 klystrack 剥离库，klystrack 二进制编出来不 strictly 需 klystron，CI 交叉编译环境下跳过
         self.run(f'make -j1 all {common_flags}', cwd=make_dir, env="conanbuild")
 
     def package(self):
