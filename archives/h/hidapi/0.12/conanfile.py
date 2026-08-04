@@ -40,6 +40,10 @@ class HidapiConan(ConanFile):
         # CMAKE_POLICY_VERSION_MINIMUM must be a cache variable (-D) to
         # bypass cmake_minimum_required(VERSION 3.1.3) on CMake >= 3.5.
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
+        # PKG_CONFIG_USE_CMAKE_PREFIX_PATH: 让 CMake 的 FindPkgConfig 模块
+        # 从 CMAKE_PREFIX_PATH (conan 自动设置，指向所有依赖包路径) 中搜索
+        # .pc 文件，使 hidraw 后端能找到 libudev-zero 包内的 libudev.pc
+        tc.variables["PKG_CONFIG_USE_CMAKE_PREFIX_PATH"] = "TRUE"
         tc.variables["HIDAPI_NO_ICONV"] = "ON"
         tc.variables["HIDAPI_WITH_LIBUSB"] = "OFF"
         tc.variables["HIDAPI_WITH_HIDRAW"] = "ON"
