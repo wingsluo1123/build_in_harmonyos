@@ -49,3 +49,7 @@
 ## 知识沉淀
 
 - E215-draft-4AA8.kv/.md：OHOS musl struct udphdr 成员名差异（glibc source/dest/len/check → BSD 风格 uh_*），查重无覆盖，路径 B 候选 + HarmonyOS 系统差异专项候选。
+
+## 结束
+
+- 最终状态：published（本地 finish / W3 本地 CI / .ci-result.json 全部通过，等待提交 PR 与平台 AI Review）
