@@ -80,6 +80,13 @@ class KlystrackConan(ConanFile):
         cppflags = f"-I{sdl2_inc} -I{sdl2_inc_sub} -I{src_inc}"
         ldflags = f"-L{sdl2_lib}"
         make_dir = self._find_make_dir()
+        # CI 真根因: make: *** [Makefile:153: objs.release/action.o] Error 127 (command not found)
+        # klystrack Makefile 硬编码 gcc/g++ 非 Conan 工具链 clang，OHOS CI 环境下编译器 not found
+        # 改用 Conan conf 解析编译器路径，显式传 CC/CXX 命令行参数覆盖 Makefile 硬编码
+        # （klystrack Makefile 不读 CC 环境变量而是硬编码 gcc，故 conanbuild 设的 CC 没用需命令行传）
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c") or "clang"
+        cxx = compilers.get("cpp") or "clang++"
         # CI 根因: make[1]: *** ../klystron: No such file or directory. Stop.
         # Makefile build target 依赖 ../klystron 目录但上游 archive 快照缺该子项目
         # 建 ../klystron symlink 指向源码根（klystrack 自身含 klystron 所需源文件）
@@ -105,7 +112,8 @@ class KlystrackConan(ConanFile):
         # 非并发问题（-j1 无效），真根因是递归本身 → 改 build() 不调 'make build' 避递归
         # 分步执行 Makefile build target 等价步骤：① touch src/version ② make all（删 make -C klystron 避递归）
         prefix = os.path.join(self.build_folder, "staging")
-        common_flags = f'CFG=release CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" PREFIX={prefix}'
+        # CI 真根因: klystrack Makefile 硬编码 gcc/g++ → 显式传 CC/CXX 命令行参数覆盖
+        common_flags = f'CFG=release CC="{cc}" CXX="{cxx}" CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" PREFIX={prefix}'
         # ① touch src/version（build target 第一步，行 128）
         self.run('touch src/version', cwd=make_dir, env="conanbuild")
         # ② make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
