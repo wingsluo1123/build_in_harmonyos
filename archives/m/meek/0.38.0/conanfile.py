@@ -16,7 +16,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy
+from conan.tools.files import copy, unzip, check_sha256
 from conan.tools.layout import basic_layout
 
 
@@ -30,6 +30,7 @@ class MeekConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
     package_type = "application"
+    exports_sources = "prebuilt.tar.gz"
 
     def requirements(self):
         # Go modules manage their own dependencies via go.mod (not Conan)
@@ -39,7 +40,16 @@ class MeekConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # CI Workers cannot reach gitlab.torproject.org (the official source),
+        # nor is that host covered by the CI mirror fallback. The upstream
+        # v0.38.0 source is therefore vendored as "prebuilt.tar.gz" — the
+        # .gitignore exception for files that must ship with the recipe (see
+        # md5deep/libtar for the same pattern) — and extracted here with no
+        # network download. Integrity is verified against the sha256 recorded
+        # in conandata.yml.
+        tarball = os.path.join(self.source_folder, "prebuilt.tar.gz")
+        check_sha256(self, tarball, self.conan_data["sources"]["sha256"])
+        unzip(self, tarball, strip_root=True)
 
     def _goarch(self):
         """Map Conan arch to Go GOARCH (R33: derived from Conan settings)."""
@@ -65,6 +75,10 @@ class MeekConan(ConanFile):
         os.environ["GOOS"] = "linux"
         os.environ["GOARCH"] = self._goarch()
         os.environ["GOFLAGS"] = "-mod=mod"
+        # CI Workers can't reach proxy.golang.org (Go's default GOPROXY); use the
+        # reachable goproxy.cn mirror for Go module downloads. setdefault lets an
+        # explicit GOPROXY env override this if needed.
+        os.environ.setdefault("GOPROXY", "https://goproxy.cn,direct")
 
         # Build meek-client (cwd=source_folder: go.mod lives in source dir)
         self.run('go build -trimpath -ldflags "-s -w" -o meek-client ./meek-client',
