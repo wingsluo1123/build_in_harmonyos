@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/configure
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,114 @@
 +#!/data/service/hnp/bin/bash
 +# Minimal configure script for raft 0.18.1 (OHOS compat)
 +
@@ -35,7 +35,7 @@
 +cat > Makefile << 'MAKEFILE_EOF'
 +CC = clang
 +CFLAGS = -std=c11 -g -fvisibility=hidden -D_GNU_SOURCE -DRAFT_REVISION=\"0.18.1\" -I. -Iinclude
-+LDFLAGS = -shared -fPIC
++SHARED_FLAGS = -shared -fPIC
 +AR = ar
 +ARFLAGS = rcs
 +
@@ -64,7 +64,7 @@
 +LIB = libraft.so
 +LIB_STATIC = libraft.a
 +
-+.PHONY: all install clean
++.PHONY: all test check install clean
 +
 +all: $(LIB) $(LIB_STATIC)
 +
@@ -72,10 +72,35 @@
 +	$(CC) $(CFLAGS) -c -o $@ $<
 +
 +$(LIB): $(LIB_OBJ)
-+	$(CC) $(LDFLAGS) -o $@ $(LIB_OBJ) -lm
++	$(CC) $(SHARED_FLAGS) -o $@ $(LIB_OBJ) -lm
 +
 +$(LIB_STATIC): $(LIB_OBJ)
 +	$(AR) $(ARFLAGS) $@ $(LIB_OBJ)
++
++# --- Unit tests (munit, no UV backend) ---
++TEST_CFLAGS = $(CFLAGS) -DLZ4_AVAILABLE -DMUNIT_TEST_NAME_LEN=60 \
++  -Wno-conversion $(CPPFLAGS) -Itest/lib
++
++TEST_LIB_SRC = test/lib/addrinfo.c test/lib/fault.c test/lib/fsm.c test/lib/heap.c \
++  test/lib/munit.c test/lib/tracer.c test/lib/tcp.c
++TEST_UNIT_SRC = src/byte.c src/compress.c src/configuration.c src/err.c src/flags.c \
++  src/heap.c src/log.c test/unit/main_core.c test/unit/test_byte.c \
++  test/unit/test_compress.c test/unit/test_configuration.c test/unit/test_err.c \
++  test/unit/test_flags.c test/unit/test_log.c test/unit/test_queue.c
++
++TEST_OBJ = $(TEST_LIB_SRC:.c=.test.o) $(TEST_UNIT_SRC:.c=.test.o)
++TEST_BIN = test/unit/core
++
++test: $(TEST_BIN)
++
++$(TEST_BIN): $(TEST_OBJ)
++	$(CC) -o $@ $(TEST_OBJ) $(LDFLAGS) $(LIBS) -lm
++
++%.test.o: %.c
++	$(CC) $(TEST_CFLAGS) -c -o $@ $<
++
++check: test
++	TMPDIR=$${TMPDIR:-.} ./$(TEST_BIN)
 +
 +install: all
 +	mkdir -p $(DESTDIR)$(PREFIX)/lib
