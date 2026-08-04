@@ -24,12 +24,11 @@ Required for upstream test execution in this recipe:
 Local/remote status:
 
 - `zimg/3.0.6` was merged to `origin/main` by `e4d4a930a31fbd8eeeefd1ad14345fe64fc4a3a7` (`【依赖项】feat(zimg) 3.0.6`) and is associated with issue #1459.
-- `conan download "zimg/3.0.6" -r=ohpcd --only-recipe` still fails on this workstation with remote policy error: `system acceleration policy not enabled`.
-- `conan list "zimg/3.0.6:*" -r=ohpcd` also returns `system acceleration policy not enabled` here, so ohpcd binary publication cannot be confirmed from this host.
+- Formal CI on 2026-08-04 resolved and downloaded `zimg/3.0.6` from `ohpcd`.
 - After rebasing this branch to latest `origin/main` and exporting `archives/z/zimg/3.0.6` as `zimg/3.0.6`, `conan install` resolves the zimg recipe from local cache.
 - The same `conan install ... --build=never` then stops at the expected missing binary for OHOS/armv8: `Missing binary: zimg/3.0.6:01d92cf349a0dd98ff915f4bd99a04430171517f`.
-- The true-device runner has `/storage/Users/currentUser/usr/local/bin/python3` and a matching Python 3.12 libpython under `/storage/Users/currentUser/usr/local/lib`, which is sufficient for the Python module and upstream tests.
-Conclusion: the old missing-recipe blocker is cleared in git. Final VapourSynth CI now depends on the runner being able to build or fetch the `zimg/3.0.6` OHOS binary; Python/Cython is handled in this recipe for the upstream test path.
+- Formal CI provides a Python 3.12 runtime for Cython and test execution, but it does not guarantee a linkable `libpython3.12.so` development library in the path reported by `sysconfig`.
+Conclusion: the old missing-recipe blocker is cleared in git. Python/Cython is handled in this recipe for the upstream test path, and the Python extension must link against an actually existing libpython path rather than trusting a single `sysconfig` libdir.
 
 ## Source/build-system analysis
 
@@ -45,7 +44,7 @@ Conclusion: the old missing-recipe blocker is cleared in git. Final VapourSynth 
 - Require `zimg/3.0.6` explicitly; do not use Meson wraps or vendored fallback.
 - Disable x86 asm for HarmonyOS/armv8.
 - Disable VSScript and vspipe by default; enable and package the Python module by default so upstream Python tests run in `test_package`.
-- Install or reuse `Cython >= 3.1`, inject a Conan Meson native-file `cython` wrapper, and link the OHOS Python extension against the runner's Python 3.12 embed library.
+- Install or reuse `Cython >= 3.1`, inject a Conan Meson native-file `cython` wrapper, and build the OHOS Python extension by probing real libpython candidates from `sysconfig`, the Python executable prefix, and OHOS runner locations before adding `link_args`.
 - Patch Meson so disabling the Python-related options still skips unconditional Python/Cython probing when `python_module=False`.
 - Provide a non-empty C consumer test that links against `libvapoursynth`, checks `getVapourSynthAPI`, verifies API version, and creates/frees a `VSCore`.
 - Package upstream Python tests plus the upstream expression debugger source. `test_package` compiles an OHOS `ExprDebugger.exe`, runs all 11 upstream unittest modules, and then runs `expr_compiler/compiler_test.py` through the compiled debugger.
@@ -73,13 +72,13 @@ Shadow CI runner form:
 
 ## Current blocking points
 
-- `zimg/3.0.6` recipe is merged, but ohpcd binary availability could not be confirmed from this workstation. The true-device isolated validation exported the merged local zimg recipe and reused the locally built OHOS package.
-- No local recipe/test blocker remains after the 2026-08-01 true-device run. Remote ohpcd artifact visibility for `zimg/3.0.6` may still lag on this workstation, but the CI runner resolved the merged zimg recipe/package from its cache.
+- Formal CI now resolves `zimg/3.0.6` from `ohpcd`.
+- The 2026-08-04 formal CI failure was caused by the previous patch forcing `-lpython3.12` with a single `sysconfig` libdir when linking `vapoursynth.abi3.so`; the CI Python runtime did not provide a matching linkable libpython in that location. This revision probes for an existing libpython path before adding Python extension link args.
 
 ## True-device validation
 
 - Device job: `/storage/Users/currentUser/ohos-users/codex-vapoursynth/vapoursynth-74-20260728-r1`
-- Latest passed run: `/storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20260801-111931-20060`
+- Latest passed run: `/storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20260804-131200-51092`
 - Command: `sh "$HOME/ohos-users/codex-vapoursynth/vapoursynth-74-20260728-r1/run-conan-heavy.sh"`
-- Result: pass. `vapoursynth/74` built, packaged `libvapoursynth.so.4`, copied `libvapoursynth.so` for consumers on non-symlink platforms, executed the direct C smoke test, and covered all 12 upstream Python test files: 11 unittest modules / 157 cases (`Ran 157 tests in 90.505s`, `OK`) plus `expr_compiler/compiler_test.py` / 69 expressions.
+- Result: pass. `vapoursynth/74` built, packaged `libvapoursynth.so.4`, copied `libvapoursynth.so` for consumers on non-symlink platforms, executed the direct C smoke test, and covered all 12 upstream Python test files: 11 unittest modules / 157 cases (`Ran 157 tests in 85.866s`, `OK`) plus `expr_compiler/compiler_test.py` / 69 expressions.
 - Summary: `L0_RESULT=pass`, `L1_RESULT=pass`, `L2_RESULT=skip` (no `bin/`), `L4_RESULT=pass`, `L5_RESULT=pass`, `Success: 1`, `Failed: 0`.

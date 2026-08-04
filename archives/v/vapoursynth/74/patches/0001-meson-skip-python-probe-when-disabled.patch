@@ -15,7 +15,7 @@
 +endif
 +
  cxx = meson.get_compiler('cpp')
-@@ -50,8 +52,12 @@ lang = ['c', 'cpp']
+@@ -50,8 +52,17 @@ lang = ['c', 'cpp']
  pkg = import('pkgconfig')
 -
 -py = import('python').find_installation(pure: false)
@@ -27,14 +27,19 @@
 +python_embed_link_args = []
 +if enable_vsscript or enable_python_module or enable_vspipe or build_wheel
 +    py = import('python').find_installation(pure: false)
-+    py_dep = py.dependency(embed: host_system == 'ohos', version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
++    py_dep = py.dependency(version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
 +    install_dir = (enable_python_module or build_wheel) ? py.get_install_dir() / 'vapoursynth' : []
-+    python_libdir = run_command(py, '-c', 'import sysconfig; print(sysconfig.get_config_var("LIBDIR") or "")', check: true).stdout().strip()
-+    python_embed_link_args = ['-L' + python_libdir, '-lpython3.12']
++    python_embed_link = run_command(
++        py,
++        '-c',
++        'import os, sys, sysconfig; names=[x for x in [sysconfig.get_config_var(k) for k in ("LDLIBRARY", "INSTSONAME")] if x]; names += ["libpython%d.%d.so" % sys.version_info[:2], "libpython%d.%d.so.1.0" % sys.version_info[:2]]; dirs=[x for x in [sysconfig.get_config_var(k) for k in ("LIBDIR", "LIBPL")] + [os.path.join(sys.prefix, "lib"), os.path.join(sys.base_prefix, "lib"), os.path.join(os.path.dirname(sys.executable), "..", "lib"), "/data/service/hnp/lib", "/data/service/hnp/lib64", "/storage/Users/currentUser/usr/local/lib"] if x]; seen=set(); paths=[os.path.realpath(os.path.join(d, n)) for d in dirs for n in names]; paths=[p for p in paths if not (p in seen or seen.add(p))]; print(next((p for p in paths if os.path.exists(p)), ""))',
++        check: true,
++    ).stdout().strip()
++    python_embed_link_args = python_embed_link == '' ? [] : [python_embed_link]
 +endif
 +
  vs_current_release = run_command(
-@@ -251,7 +257,8 @@ if enable_core
+@@ -251,7 +267,8 @@ if enable_core
              files('src/common/wave.cpp', 'src/cython/vapoursynth.pyx'),
              dependencies: [py_dep, vapoursynth_dep],
              install: true,
