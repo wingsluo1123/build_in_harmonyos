@@ -82,8 +82,13 @@ class ChmlibConan(ConanFile):
         )
 
         # E097: HMDFS setgid — fix umask 077 → 002 for configure temp files
+        # R6 deviation: configure is autoconf-generated, configure.in has no umask
         self.run(
-            "sed -i 's/umask 077/umask 002/g' configure",
+            "if grep -q 'umask 077' configure; then "
+            "  sed -i 's/umask 077/umask 002/g' configure; "
+            "else "
+            "  echo 'WARNING: umask 077 not found in configure — autoconf may have changed, R6 sed fix skipped'; "
+            "fi",
             cwd=src
         )
 
