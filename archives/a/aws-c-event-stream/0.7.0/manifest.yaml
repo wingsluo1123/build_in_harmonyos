@@ -1,6 +1,6 @@
 version: "0.7.0"
-status: partial
-build_date: "2026-04-24"
+status: built
+build_date: "2026-08-05"
 
 source:
   url: "https://github.com/awslabs/aws-c-event-stream/archive/refs/tags/v0.7.0.tar.gz"
@@ -12,15 +12,20 @@ build:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DBUILD_SHARED_LIBS=OFF"
     - "-DBUILD_TESTING=OFF"
+    - "-DBYO_CRYPTO=ON"
   dependencies:
-    - aws-c-common
-    - aws-c-io
-    - aws-c-http
-    - aws-checksums
+    - aws-c-common/0.12.6
+    - aws-c-cal/0.9.13
+    - aws-c-io/0.26.3
+    - aws-checksums/0.2.10
   cc: clang
   cxx: clang++
 
-patches_applied: []
+patches_applied:
+  - "fix-namespace-alias.patch: Create ALIAS target for conan namespace mismatch"
 
 knowledge_gained:
-  - "标准 CMake 构建，无需补丁"
+  - "aws-c-event-stream 依赖 aws-c-common, aws-c-io, aws-checksums"
+  - "CMake 使用 aws_use_package 宏需要 AWS:: 命名空间目标"
+  - "BYO_CRYPTO=ON 可跳过 s2n TLS 依赖"
+  - "aws-checksums 的 cmake targets 引用 aws-c-common::aws-c-common (conan 命名空间)，需要创建 ALIAS 目标"
