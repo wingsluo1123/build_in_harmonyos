@@ -144,9 +144,11 @@ class NcursesConan(ConanFile):
                 with open(inc_makefile, "rb") as f:
                     mk = f.read()
                 # 找 srcdir = 行，改用 source_folder/include 绝对路径避三元组注入
+                # CI 真根因: 上轮正则 rb'^srcdir\s*=.*\$' 太严 — Makefile 行首可能有制表符/空格缩进匹配不到
+                # 改正则容许行首空白（^\s*srcdir）+ 用 bytes 正则避 str/bytes 混用 TypeError
                 import re
                 mk_new = re.sub(
-                    rb'^srcdir\s*=.*$',
+                    rb'^\s*srcdir\s*=.*$',
                     f'srcdir = {os.path.join(self.source_folder, "include")}'.encode('utf-8'),
                     mk, count=1, flags=re.MULTILINE
                 )
