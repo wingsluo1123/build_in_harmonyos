@@ -61,20 +61,13 @@ class GitWhoConan(ConanFile):
         # P3: curl|sh 管道加 set -o pipefail 屏蔽 curl 失败
         # P2: 构建失败一律显式 raise ConanException（aireview: 避欺骗性打包，空包风险）
         go_ok = False
+        # CI 真根因: cmd-pkgs Download failed + system go not found → go 工具链 CI worker 不支持（非配方缺陷）
+        # 删 cmd-pkgs curl|sh fallback 避反复试 Download 超时（CI 日志直证超时），直接试系统 go
         try:
-            self.run(
-                "set -o pipefail && curl -fsSL --connect-timeout 30 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh "
-                "| sh -s -- go 1.21.13",
-                cwd=self.source_folder, env="conanbuild",
-            )
+            self.run("go version", cwd=self.source_folder, env="conanbuild")
             go_ok = True
-        except ConanException:
-            # cmd-pkgs 失败试系统 go，两者全失败才 raise（无中间 warning 降级避被误读为容错）
-            try:
-                self.run("go version", cwd=self.source_folder, env="conanbuild")
-                go_ok = True
-            except ConanException as e:
-                raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed): {e}")
+        except ConanException as e:
+            raise ConanException(f"go toolchain unavailable (system go not found; cmd-pkgs omitted to avoid CI Download timeout) — CI worker lacks go toolchain support: {e}")
         # aireview P3: 删死代码 if not go_ok: raise — go_ok=False 分支在 except ConanException raise 后不可达
         # P2: go build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+虚假声明）
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
