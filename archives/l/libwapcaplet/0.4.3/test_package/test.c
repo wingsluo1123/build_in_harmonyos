@@ -32,14 +32,14 @@ int main(void) {
     }
 
     /* Test 4: Equality check */
-    if (lwc_string_isequal(str1, str2, &result) == lwc_error_ok && result) {
+    if (str2 && lwc_string_isequal(str1, str2, &result) == lwc_error_ok && result) {
         pass++;
     } else {
         fail++;
     }
 
     /* Test 5: Inequality check */
-    if (lwc_string_isequal(str1, str3, &result) == lwc_error_ok && !result) {
+    if (str3 && lwc_string_isequal(str1, str3, &result) == lwc_error_ok && !result) {
         pass++;
     } else {
         fail++;

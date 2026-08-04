@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: custom（NetSurf Makefile → standalone Makefile 替换）
-- 编译日期: 2026-06-06
+- 编译日期: 2026-07-15
 - 编译器: clang/clang++ (15.0.4)
 - 状态: built
 
