@@ -1,0 +1,33 @@
+# 版本级 manifest（AI 元数据，CI 不读）
+software: abiword-plugin-eml
+version: "3.0.8"
+status: built            # published | built | failed | archived
+build_system: autotools  # 标准 conan Autotools（CI 原生 clang）
+build_date: "2026-08-04"
+
+source:
+  url: "https://gitlab.gnome.org/World/AbiWord/-/archive/release-3.0.8/AbiWord-release-3.0.8.tar.gz"
+  sha256: "7c490e46f0a6143f84d5c7e3fed246f34486ad70cd55f162c792827607cd7e9a"
+  tar_format: tar.gz     # GNOME GitLab 上游 tarball
+
+build:
+  system: autotools
+  configure_options: ["--enable-plugins=eml", "--disable-static-plugins"]
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_results:
+  type: conan-verify
+  total: 1
+  passed: 1
+  failed: 0
+
+knowledge_gained:
+  - "abiword-plugin-eml 是 AbiWord 3.0.8 的 EML 邮件导出插件，仅 2 个源文件 (ie_exp_EML.cpp/h)"
+  - "插件继承自 IE_Exp_Text，在文本导出基础上添加 X-Unsent 邮件头"
+  - "构建时需链接 libabiword-3.0.so，使用 autotools --enable-plugins=eml 启用"
+
+knowledge_ref: []
