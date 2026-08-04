@@ -44,7 +44,6 @@ class AwsceventstreamConan(ConanFile):
         # R26: System-name libraries default to static
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         # BYO_CRYPTO=ON so aws-c-io's cmake config skips find_dependency(s2n)
         tc.variables["BYO_CRYPTO"] = "ON"
         # Point CMake to all dependency package folders so find_package and

@@ -44,7 +44,6 @@ class AwschecksumsConan(ConanFile):
         # R26: System-name libraries default to static
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
 
         # aws-c-common ships CMake modules (AwsCFlags, AwsCheckHeaders, etc.)
         # in lib/cmake/aws-c-common/modules/. Add to CMAKE_MODULE_PATH.

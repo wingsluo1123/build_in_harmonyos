@@ -7,6 +7,10 @@
 int main(void) {
     /* Initialize aws-checksums library */
     struct aws_allocator *allocator = aws_default_allocator();
+    if (allocator == NULL) {
+        fprintf(stderr, "Failed to get default allocator\n");
+        return 1;
+    }
     aws_checksums_library_init(allocator);
 
     /* Test CRC32 computation */
