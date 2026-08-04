@@ -4,7 +4,7 @@
 - 构建系统: cargo (Rust)
 - 编译日期: 2026-08-05
 - 编译器: clang/clang++ (Rust 1.97.1 via Harmonybrew)
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
