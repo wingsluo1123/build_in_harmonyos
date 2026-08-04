@@ -54,8 +54,9 @@ class ChmlibConan(ConanFile):
         autotools.autoreconf(args=["-fi"])
 
         # E007: Fix config.guess to recognise HarmonyOS
+        # a\ (append after case line) — NOT i\ (insert before), or it goes outside the case block
         self.run(
-            "sed -i '/^case \"\\${UNAME_MACHINE}:\\${UNAME_SYSTEM}:\\${UNAME_RELEASE}:\\${UNAME_VERSION}\" in$/i\\\n"
+            "sed -i '/^case \"\\${UNAME_MACHINE}:\\${UNAME_SYSTEM}:\\${UNAME_RELEASE}:\\${UNAME_VERSION}\" in$/a\\\n"
             "    *:HarmonyOS:*:*) echo ${UNAME_MACHINE}-unknown-linux-ohos; exit 0;;' "
             "config.guess",
             cwd=src
@@ -74,8 +75,8 @@ class ChmlibConan(ConanFile):
         )
         self.run(
             "sed -i '/^-linux\\*)$/i\\\n"
-            "\t-linux-ohos)\\n"
-            "\t\tos=-linux-ohos\\n"
+            "\t-linux-ohos)\n"
+            "\t\tos=-linux-ohos\n"
             "\t\t;;' "
             "config.sub",
             cwd=src

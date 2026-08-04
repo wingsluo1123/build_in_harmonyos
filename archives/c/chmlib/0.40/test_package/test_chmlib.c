@@ -32,10 +32,10 @@ int main(void)
             buf[8]  = 0x60;    /* header length LE = 96 */
             buf[12] = 1;       /* unknown, always 1 */
             size_t written = fwrite(buf, 1, sizeof(buf), f);
-            fclose(f);
-            if (written != sizeof(buf)) {
-                printf("SKIP 2: failed to write test file (wrote %zu/%zu)\n",
-                       written, sizeof(buf));
+            int closed = fclose(f);
+            if (written != sizeof(buf) || closed != 0) {
+                printf("SKIP 2: failed to write/close test file (wrote %zu, close=%d)\n",
+                       written, closed);
                 remove(testfile);
                 goto done;
             }
