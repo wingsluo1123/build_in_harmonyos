@@ -259,6 +259,7 @@ configure_swift() {
       -DCMAKE_CXX_COMPILER_ARG1="$cmake_cxx_arg1" \
       -DCMAKE_MAKE_PROGRAM="$ninja" \
       -DCMAKE_BUILD_TYPE:STRING="${SWIFT_OHOS_SWIFT_BUILD_TYPE:-Debug}" \
+      -DCMAKE_CXX_STANDARD_LIBRARIES:STRING="$cxx_standard_libraries" \
       -DCMAKE_Swift_COMPILER:PATH= \
       -DLLVM_DIR:PATH="$llvm_build/lib/cmake/llvm" \
       -DClang_DIR:PATH="$llvm_build/lib/cmake/clang" \
@@ -266,11 +267,14 @@ configure_swift() {
       -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="$llvm_build/bin" \
       -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="$llvm_build/bin" \
       -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING= \
+      -DSWIFT_USE_SYMLINKS:BOOL=FALSE \
       -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="$repos/cmark" \
       -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$cmark_build" \
       -DUUID_INCLUDE_DIR:PATH="$uuid_include" \
       -DUUID_LIBRARY:FILEPATH="$uuid_library" \
       -DSWIFT_SDKS:STRING=OHOS \
+      -DSWIFT_SDK_OHOS_ARCHITECTURES:STRING=aarch64 \
+      -DSWIFT_SDK_OHOS_ARCH_aarch64_PATH:PATH="$sysroot" \
       -DSWIFT_HOST_TRIPLE:STRING=aarch64-unknown-linux-ohos \
       -DSWIFT_HOST_VARIANT=ohos \
       -DSWIFT_HOST_VARIANT_SDK=OHOS \
@@ -286,6 +290,260 @@ configure_swift() {
       -DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL=FALSE \
       -DSWIFT_BUILD_SWIFT_SYNTAX:BOOL=FALSE \
       -USWIFT_DARWIN_SUPPORTED_ARCHS
+  "$python_bin" - "$llvm_build" "$cmake_cc" "$cmake_cxx" \
+    "$swift_build/build.ninja" "$swift_build/CMakeFiles/rules.ninja" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+llvm_build = Path(sys.argv[1])
+cmake_cc = sys.argv[2]
+cmake_cxx = sys.argv[3]
+paths = [Path(arg) for arg in sys.argv[4:]]
+clang_versions_by_major = {}
+clang_root = llvm_build / "lib" / "clang"
+if clang_root.is_dir():
+    for candidate in sorted(clang_root.iterdir()):
+        if candidate.is_dir():
+            clang_versions_by_major.setdefault(candidate.name.split(".", 1)[0], candidate.name)
+
+bad_clang = str(llvm_build / "bin" / "clang")
+bad_clangxx = str(llvm_build / "bin" / "clang++")
+for path in paths:
+    if not path.is_file():
+        continue
+    text = path.read_text()
+    updated = []
+    changed = 0
+    for line in text.splitlines(keepends=True):
+        for old, new in ((bad_clangxx, cmake_cxx), (bad_clang, cmake_cc)):
+            replaced = line.replace(old, new)
+            if replaced != line:
+                changed += 1
+                line = replaced
+        for lib in ("-lLLVMirprinter", "-lLLVMtargetparser", "-lLLVMTargetParser"):
+            line = line.replace(f"  {lib}", "")
+            line = line.replace(f" {lib} ", " ")
+        for feature in ("Macros", "FreestandingMacros", "DebugDescriptionMacro"):
+            line = line.replace(f" -enable-experimental-feature {feature}", "")
+        line = re.sub(r" -external-plugin-path [^ ]+", "", line)
+        for major, actual in clang_versions_by_major.items():
+            if actual != major and not (clang_root / major).exists():
+                replaced = line.replace(f"/lib/clang/{major} ", f"/lib/clang/{actual} ")
+                replaced = replaced.replace(f"/lib/clang/{major}/", f"/lib/clang/{actual}/")
+                if replaced != line:
+                    changed += 1
+                    line = replaced
+        if "cmake -E create_symlink " in line:
+            if "/lib/clang/" in line or "FrameworkABIBaseline" in line:
+                replacement = "cmake -E copy_directory "
+            else:
+                replacement = "cmake -E copy_if_different "
+            line = line.replace("cmake -E create_symlink ", replacement)
+            changed += 1
+        updated.append(line)
+    if changed:
+        path.write_text("".join(updated))
+PY
+}
+
+patch_ohos_stdlib_outputs() {
+  [ -d "$swift_build" ] || return 0
+  "$python_bin" - "$swift_build" "$sysroot" "$repos/swift" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+swift_build = Path(sys.argv[1])
+sysroot = Path(sys.argv[2])
+swift_source = Path(sys.argv[3])
+
+def rewrite(path, transform):
+    if not path.is_file():
+        return
+    text = path.read_text()
+    updated = transform(text)
+    if updated != text:
+        path.write_text(updated)
+
+platform_dir = swift_build / "stdlib" / "public" / "Platform" / "8"
+tgmath = platform_dir / "tgmath.swift"
+
+def patch_tgmath(text):
+    if "import SwiftGlibc\n" not in text:
+        text = text.replace("import SwiftShims\n", "import SwiftShims\nimport SwiftGlibc\n", 1)
+    text = text.replace("return Float(nanf(tag))", "return Float(SwiftGlibc.nanf(tag))")
+    text = text.replace("return jn(Int32(n), x)", "return SwiftGlibc.jn(Int32(n), x)")
+    text = text.replace("return yn(Int32(n), x)", "return SwiftGlibc.yn(Int32(n), x)")
+    return text
+
+rewrite(tgmath, patch_tgmath)
+
+thread_extras = swift_source / "stdlib" / "private" / "SwiftPrivateThreadExtras" / "SwiftPrivateThreadExtras.swift"
+
+def patch_thread_extras(text):
+    return text.replace(
+        "#if (os(Linux) && !canImport(Musl)) || os(Android)",
+        "#if (os(Linux) && !canImport(Musl) && !os(OHOS)) || os(Android)",
+    )
+
+rewrite(thread_extras, patch_thread_extras)
+
+module_dir = swift_build / "lib" / "swift" / "ohos" / "aarch64"
+modulemap = module_dir / "glibc.modulemap"
+swift_glibc_h = module_dir / "SwiftGlibc.h"
+
+def patch_modulemap(text):
+    assert_header = (sysroot / "usr" / "include" / "assert.h").as_posix()
+    text = text.replace('textual header "assert.h"', f'textual header "{assert_header}"')
+    return text
+
+rewrite(modulemap, patch_modulemap)
+
+def patch_swift_glibc_h(text):
+    if "_GNU_SOURCE" not in text.splitlines()[:12]:
+        text = "#ifndef _GNU_SOURCE\n#define _GNU_SOURCE\n#endif\n" + text
+    return text
+
+rewrite(swift_glibc_h, patch_swift_glibc_h)
+
+builtin_float_module = """
+module _Builtin_float [system] [extern_c] {
+  header "float.h"
+  export *
+}
+"""
+
+def patch_builtin_float_modulemap(text):
+    if "module _Builtin_float" in text:
+        return text
+    if not text.endswith("\n"):
+        text += "\n"
+    return text + "\n" + builtin_float_module
+
+for clang_modulemap in (
+    swift_build / "lib" / "swift" / "clang" / "include" / "module.modulemap",
+    swift_build / "lib" / "swift_static" / "clang" / "include" / "module.modulemap",
+):
+    rewrite(clang_modulemap, patch_builtin_float_modulemap)
+
+modulemap_flag = f"-Xcc -fmodule-map-file={modulemap.as_posix()}"
+include_flag = f"-Xcc -I{module_dir.as_posix()}"
+glibc_dependent_modules = {
+    "SwiftPrivate",
+    "SwiftPrivateLibcExtras",
+    "SwiftPrivateThreadExtras",
+    "StdlibUnittest",
+    "StdlibCollectionUnittest",
+    "StdlibUnicodeUnittest",
+    "RuntimeUnittest",
+}
+
+def patch_ninja(text):
+    updated = []
+    for line in text.splitlines(keepends=True):
+        body = line[:-1] if line.endswith("\n") else line
+        newline = "\n" if line.endswith("\n") else ""
+        if (
+            "swiftc" in body
+            and "-frontend" in body
+            and "-target aarch64-unknown-linux-ohos" in body
+            and "-module-name SwiftOnoneSupport" in body
+            and "-parse-stdlib" not in body
+        ):
+            body += " -parse-stdlib"
+        if (
+            ("swiftc" in body or "swift-frontend" in body)
+            and "-frontend" in body
+            and "-target aarch64-unknown-linux-ohos" in body
+            and modulemap_flag not in body
+        ):
+            matched = any(f"-module-name {name}" in body for name in glibc_dependent_modules)
+            if matched:
+                body += f" {modulemap_flag} {include_flag}"
+        if (
+            "-target aarch64-unknown-linux-ohos" in body
+            and ("clang" in body or "ohos-clang" in body)
+            and "-fPIC" not in body
+            and any(token in body for token in (
+                "stdlib/public/runtime",
+                "stdlib/public/stubs",
+                "stdlib/public/Threading",
+                "stdlib/public/SwiftRemoteMirror",
+                "SwiftRemoteMirror",
+            ))
+        ):
+            body += " -fPIC"
+        updated.append(body + newline)
+    return "".join(updated)
+
+for ninja_file in (swift_build / "build.ninja", swift_build / "CMakeFiles" / "rules.ninja"):
+    rewrite(ninja_file, patch_ninja)
+PY
+}
+
+compile_irhandoff_wrapper() {
+  [ "${SWIFT_OHOS_ENABLE_IRHANDOFF_WRAPPER:-1}" = "1" ] || return 0
+  wrapper_src=$script_dir/swift-irhandoff-wrapper.c
+  [ -f "$wrapper_src" ] || die "missing IR handoff wrapper source: $wrapper_src"
+  mkdir -p "$bootstrap_root/bin"
+  irhandoff_wrapper=$bootstrap_root/bin/swift-irhandoff-wrapper
+  log "building Swift IR handoff wrapper"
+  if [ -x "$cc" ]; then
+    "$cc" -O2 -Wl,--code-sign "$wrapper_src" -o "$irhandoff_wrapper" > "$logs/irhandoff-wrapper-build.log" 2>&1
+  else
+    sh "$cc" -O2 -Wl,--code-sign "$wrapper_src" -o "$irhandoff_wrapper" > "$logs/irhandoff-wrapper-build.log" 2>&1
+  fi
+  chmod 755 "$irhandoff_wrapper" 2>/dev/null || true
+}
+
+is_irhandoff_wrapper_file() {
+  if command -v strings >/dev/null 2>&1; then
+    strings "$1" 2>/dev/null | grep -q "ohos-irhandoff"
+  else
+    grep -a -q "ohos-irhandoff" "$1" 2>/dev/null
+  fi
+}
+
+install_irhandoff_tool_wrapper() {
+  tool=$1
+  bin_dir=$swift_build/bin
+  current=$bin_dir/$tool
+  passthrough=$bin_dir/$tool.real-irhandoff
+  real=$bin_dir/$tool.real-irhandoff.real
+  [ -f "$current" ] || die "IR handoff wrapper needs $current"
+  if [ ! -f "$real" ]; then
+    if [ -f "$passthrough" ] && ! is_irhandoff_wrapper_file "$passthrough"; then
+      cp -p "$passthrough" "$real"
+    elif ! is_irhandoff_wrapper_file "$current"; then
+      cp -p "$current" "$real"
+    else
+      die "unable to find the real $tool binary before installing IR handoff wrapper"
+    fi
+  fi
+  cp -p "$irhandoff_wrapper" "$current"
+  cp -p "$irhandoff_wrapper" "$passthrough"
+  chmod 755 "$current" "$passthrough" "$real" 2>/dev/null || true
+}
+
+install_irhandoff_wrapper() {
+  [ "${SWIFT_OHOS_ENABLE_IRHANDOFF_WRAPPER:-1}" = "1" ] || return 0
+  if [ -z "${SWIFT_OHOS_LLC:-}" ]; then
+    found_llc=$(first_existing_file "$toolchain_root/bin/llc" "$llvm_build/bin/llc" "$(command_path llc)") || true
+    [ -n "$found_llc" ] && SWIFT_OHOS_LLC=$found_llc
+  fi
+  if [ -z "${SWIFT_OHOS_OPT:-}" ]; then
+    found_opt=$(first_existing_file "$toolchain_root/bin/opt" "$llvm_build/bin/opt" "$(command_path opt)") || true
+    [ -n "$found_opt" ] && SWIFT_OHOS_OPT=$found_opt
+  fi
+  [ -n "${SWIFT_OHOS_LLC:-}" ] || die "llc is required for Swift OHOS IR handoff"
+  [ -n "${SWIFT_OHOS_OPT:-}" ] || die "opt is required for Swift OHOS IR handoff"
+  export SWIFT_OHOS_LLC
+  export SWIFT_OHOS_OPT
+  compile_irhandoff_wrapper
+  install_irhandoff_tool_wrapper swiftc
+  install_irhandoff_tool_wrapper swift-frontend
+  log "installed Swift IR handoff wrapper in $swift_build/bin"
 }
 
 build_llvm_static_deps() {
@@ -341,6 +599,13 @@ PY
 
 build_swift_targets() {
   targets=${SWIFT_OHOS_NINJA_TARGETS:-swift-frontend}
+  if [ "${SWIFT_OHOS_ENABLE_IRHANDOFF_WRAPPER:-1}" = "1" ]; then
+    prereq_targets=${SWIFT_OHOS_IRHANDOFF_PREREQ_TARGETS:-swiftc swift-frontend swift-autolink-extract}
+    log "building Swift IR handoff prerequisite targets: $prereq_targets"
+    run_logged "$logs/swift-irhandoff-prereq-build.log" \
+      "$ninja" -C "$swift_build" -j"$jobs" $prereq_targets
+    install_irhandoff_wrapper
+  fi
   log "building Swift targets: $targets"
   if "$ninja" -C "$swift_build" -j"$jobs" $targets > "$logs/swift-targets-build.log" 2>&1; then
     rc=0
@@ -468,6 +733,10 @@ fi
 export SDKROOT=$sysroot
 export OHOS_SYSROOT=$sysroot
 export OHOS_SDKROOT=$sysroot
+toolchain_root=${SWIFT_OHOS_TOOLCHAIN_ROOT:-$(cd "$sysroot/.." && pwd)}
+cxx_runtime_libdir=${SWIFT_OHOS_CXX_RUNTIME_LIBDIR:-$toolchain_root/lib/aarch64-linux-ohos}
+cxx_standard_libraries=${SWIFT_OHOS_CXX_STANDARD_LIBRARIES:-"-L$cxx_runtime_libdir -lc++ -lc++abi -lunwind"}
+[ -d "$cxx_runtime_libdir" ] || die "OHOS C++ runtime library directory is missing: $cxx_runtime_libdir"
 
 llvm_build=${SWIFT_OHOS_LLVM_BUILD_DIR:-}
 if [ -z "$llvm_build" ]; then
@@ -500,6 +769,7 @@ build_uuid_shim
 build_llvm_resource_targets
 build_cmark
 configure_swift
+patch_ohos_stdlib_outputs
 build_llvm_static_deps
 build_swift_targets
 build_swiftpm

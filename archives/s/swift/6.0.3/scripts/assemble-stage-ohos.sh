@@ -71,6 +71,58 @@ copy_runtime_libs() {
   return 0
 }
 
+copy_clang_driver_tools() {
+  [ "${SWIFT_OHOS_INCLUDE_CLANG_TOOLS:-1}" = "1" ] || return 0
+
+  clang_bin=${SWIFT_OHOS_CLANG_BIN:-}
+  if [ -z "$clang_bin" ]; then
+    clang_bin=$(first_existing_file \
+      "${HOME:-/storage/Users/currentUser}/usr/local/bin/clang-15" \
+      "${HOME:-/storage/Users/currentUser}/usr/local/bin/clang") || true
+  fi
+  [ -n "$clang_bin" ] || return 0
+
+  clang_bin_dir=$(CDPATH= cd "$(dirname "$clang_bin")" && pwd)
+  clang_root=$(CDPATH= cd "$clang_bin_dir/.." && pwd)
+  copy_file_flattened "$clang_bin" "$tmp/bin/clang"
+
+  clangxx_bin=${SWIFT_OHOS_CLANGXX_BIN:-}
+  if [ -z "$clangxx_bin" ]; then
+    clangxx_bin=$(first_existing_file \
+      "$clang_bin_dir/clang++-15" \
+      "$clang_bin_dir/clang++") || true
+  fi
+  [ -n "$clangxx_bin" ] && copy_file_flattened "$clangxx_bin" "$tmp/bin/clang++"
+
+  ld_lld_bin=${SWIFT_OHOS_LD_LLD_BIN:-}
+  if [ -z "$ld_lld_bin" ]; then
+    ld_lld_bin=$(first_existing_file "$clang_bin_dir/ld.lld") || true
+  fi
+  [ -n "$ld_lld_bin" ] && copy_file_flattened "$ld_lld_bin" "$tmp/bin/ld.lld"
+
+  for tool in llc opt; do
+    tool_path=$(first_existing_file "$clang_bin_dir/$tool") || true
+    [ -n "$tool_path" ] && copy_file_flattened "$tool_path" "$tmp/bin/$tool"
+  done
+
+  if [ -d "${SWIFT_OHOS_CLANG_RESOURCE_ROOT:-$clang_root/lib/clang}" ]; then
+    copy_tree_flattened "${SWIFT_OHOS_CLANG_RESOURCE_ROOT:-$clang_root/lib/clang}" "$tmp/lib/clang"
+  fi
+  if [ -d "${SWIFT_OHOS_CLANG_ARCH_LIB_DIR:-$clang_root/lib/aarch64-linux-ohos}" ]; then
+    copy_tree_flattened "${SWIFT_OHOS_CLANG_ARCH_LIB_DIR:-$clang_root/lib/aarch64-linux-ohos}" "$tmp/lib/aarch64-linux-ohos"
+  fi
+
+  for dep in \
+    "${SWIFT_OHOS_LIBXML2:-}" \
+    "$clang_root/lib/libxml2.so.16" \
+    "$clang_root/lib/libxml2.so"; do
+    if [ -n "$dep" ] && [ -f "$dep" ]; then
+      copy_file_flattened "$dep" "$tmp/lib/$(basename "$dep")"
+      break
+    fi
+  done
+}
+
 build_tinfo_shim_if_needed() {
   [ -e "$tmp/lib/libtinfo.so.6" ] && return 0
   if [ -n "${SWIFT_OHOS_TINFO_LIB:-}" ]; then
@@ -230,6 +282,12 @@ for tool in swift swiftc swift-frontend swift-autolink-extract; do
   copy_file_flattened "$bin_src/$tool" "$tmp/bin/$tool"
 done
 
+for tool in swiftc swift-frontend; do
+  for suffix in real-irhandoff real-irhandoff.real; do
+    [ -e "$bin_src/$tool.$suffix" ] && copy_file_flattened "$bin_src/$tool.$suffix" "$tmp/bin/$tool.$suffix"
+  done
+done
+
 for tool in swift-serialize-diagnostics; do
   [ -e "$bin_src/$tool" ] && copy_file_flattened "$bin_src/$tool" "$tmp/bin/$tool"
 done
@@ -272,6 +330,7 @@ copy_runtime_libs "$swiftpm_lib_src"
 copy_runtime_libs "$swift_driver_lib_src"
 copy_runtime_libs "$root/toolchain/lib"
 copy_runtime_libs "$root/deps/lib"
+copy_clang_driver_tools
 
 if [ -n "${SWIFT_OHOS_RUNTIME_DIRS:-}" ]; then
   old_ifs=$IFS

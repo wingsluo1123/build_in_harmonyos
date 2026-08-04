@@ -56,6 +56,11 @@ class SwiftConan(ConanFile):
         self.info.options.stage_id = self._stage_identity()
 
     def source(self):
+        if self._allow_staged_package() and self._has_supplied_stage():
+            self.output.info("Using supplied Swift OHOS stage; skipping source download")
+            os.makedirs(self.source_folder, exist_ok=True)
+            self._write_source_manifest()
+            return
         for name, source in self.conan_data["sources"].items():
             local_archive = self._local_source_archive(source)
             if local_archive:
@@ -86,10 +91,7 @@ class SwiftConan(ConanFile):
         elif tarball and os.path.isfile(tarball):
             os.makedirs(stage_out, exist_ok=True)
             with tarfile.open(tarball, "r:*") as archive:
-                try:
-                    archive.extractall(stage_out, filter="data")
-                except TypeError:
-                    archive.extractall(stage_out)
+                self._extract_stage_tarball(archive, stage_out)
             self._strip_single_root(stage_out)
         else:
             raise ConanException(
@@ -135,8 +137,14 @@ class SwiftConan(ConanFile):
             os.path.join("bin", "swiftc"),
             os.path.join("bin", "swift-frontend"),
             os.path.join("bin", "swift-autolink-extract"),
+            os.path.join("bin", "clang"),
+            os.path.join("bin", "ld.lld"),
+            os.path.join("bin", "llc"),
+            os.path.join("bin", "opt"),
             os.path.join("bin", "swift-build"),
             os.path.join("bin", "swift-package"),
+            os.path.join("lib", "aarch64-linux-ohos", "libunwind.a"),
+            os.path.join("lib", "clang"),
             os.path.join("lib", "swift"),
         ]
         missing = [path for path in required if not os.path.exists(os.path.join(stage, path))]
@@ -150,6 +158,35 @@ class SwiftConan(ConanFile):
 
     def _allow_staged_package(self):
         return os.environ.get("SWIFT_OHOS_ALLOW_STAGED_PACKAGE") == "1"
+
+    def _extract_stage_tarball(self, archive, stage_out):
+        try:
+            archive.extractall(stage_out, filter="data")
+            return
+        except TypeError:
+            pass
+
+        for member in archive.getmembers():
+            self._validate_tar_member(stage_out, member)
+        archive.extractall(stage_out)
+
+    def _validate_tar_member(self, destination, member):
+        destination = os.path.abspath(destination)
+        target = os.path.abspath(os.path.join(destination, member.name))
+        if os.path.commonpath([destination, target]) != destination:
+            raise ConanException(f"Refusing to extract unsafe Swift stage path: {member.name}")
+        if member.ischr() or member.isblk() or member.isfifo():
+            raise ConanException(f"Refusing to extract special file from Swift stage: {member.name}")
+        if member.issym() or member.islnk():
+            link_target = member.linkname
+            if os.path.isabs(link_target):
+                resolved = os.path.abspath(link_target)
+            else:
+                resolved = os.path.abspath(os.path.join(os.path.dirname(target), link_target))
+            if os.path.commonpath([destination, resolved]) != destination:
+                raise ConanException(
+                    f"Refusing to extract unsafe Swift stage link: {member.name}"
+                )
 
     def _stage_identity(self):
         if not self._allow_staged_package():
@@ -264,3 +301,7 @@ class SwiftConan(ConanFile):
             self.runenv_info.prepend_path("LD_LIBRARY_PATH", swift_lib_dir)
         self.buildenv_info.define("SWIFT_EXEC", os.path.join(bin_dir, "swiftc"))
         self.buildenv_info.define("SWIFT_OHOS_TOOLCHAIN_ROOT", self.package_folder)
+        self.buildenv_info.define("SWIFT_OHOS_LLC", os.path.join(bin_dir, "llc"))
+        self.buildenv_info.define("SWIFT_OHOS_OPT", os.path.join(bin_dir, "opt"))
+        self.runenv_info.define("SWIFT_OHOS_LLC", os.path.join(bin_dir, "llc"))
+        self.runenv_info.define("SWIFT_OHOS_OPT", os.path.join(bin_dir, "opt"))

@@ -27,6 +27,17 @@ OHOS-native Swift 6.0.3 probe produced runnable `swift`, `swiftc`, and
 `swift-frontend` binaries, built the OHOS/aarch64 stdlib/runtime, staged
 Foundation/FoundationXML and Dispatch, and built SwiftPM entrypoints.
 
+As of 2026-08-04, the reviewable stage at
+`/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/swift-ohos-stage-20260804-1042`
+is usable from `PATH` for downstream Swift builds. The stage carries the Swift
+frontend/driver tools plus the OHOS clang, `ld.lld`, `llc`, `opt`, clang
+resource directory, `lib/aarch64-linux-ohos` runtime bits, and the runtime
+libraries needed by the staged Swift/SwiftPM executables. With
+`OHOS_SYSROOT/OHOS_SDKROOT/SDKROOT` pointing at the true-device sysroot and the
+stage library paths in `LD_LIBRARY_PATH`, `swift --version`, non-optimized
+`swiftc hello.swift -o hello`, and optimized `swiftc -O hello.swift -o
+hello-opt` all pass through the packaged Conan `test_package`.
+
 Most importantly, the toolchain path built a real downstream SwiftPM package:
 
 ```text
@@ -112,9 +123,12 @@ optimized object handoff wrapper. It deliberately avoids signed ELF binaries and
 probe-machine absolute paths; real compiler, clang, opt, sysroot, resource-dir,
 and Swift arch module paths are expected from environment variables or the
 packaged toolchain layout.
-The default `test_package` does not currently install this wrapper as `swiftc`;
-its `-O` smoke test is limited to the packaged compiler's optimized code
-generation path.
+The staged toolchain installs this wrapper as both `swiftc` and
+`swift-frontend`, while preserving the real binaries as
+`*.real-irhandoff.real`. The wrapper now resolves `PATH` invocation back to the
+absolute stage binary, injects the OHOS SDK/resource/tool defaults for driver
+jobs, and prefers sibling `llc`/`opt` from the stage before falling back to
+environment variables.
 
 ## Review Follow-up
 
@@ -279,6 +293,107 @@ operators do not provide an `llvm::raw_ostream << std::optional<Type>`
 overload, so the debug trace now prints `*substBaseType` after the existing
 presence check instead of streaming the optional wrapper.
 
+The 14:20 CST run validated the `ConcreteContraction.cpp` patch by compiling
+past the RequirementMachine files and stopped at `Stmt.cpp.o` around 162/933.
+This was another LLVM 15 `ArrayRef` deduction site: `llvm::ArrayRef(tmp)` was
+deduced as an array over the `SmallVector<VarDecl *, 4>` object, while
+`ASTContext::AllocateTransform<VarDecl *>` needs `VarDecl *` elements. The
+patch now spells the element type as `llvm::ArrayRef<VarDecl *>(tmp)`.
+
+The follow-up run validated the `Stmt.cpp` fix and reached
+`TypeSubstitution.cpp.o` around 172/933. The same LLVM 15 deduction issue
+appeared for `ArrayRef(ActivePackExpansions)`, which produced an array over the
+`SmallVector<ActivePackExpansion, 4>` container instead of
+`ActivePackExpansion` elements. The patch now creates an explicit
+`llvm::ArrayRef<ActivePackExpansion>` before splitting outer and inner pack
+expansion slices.
+
+The 2026-08-03 14:59 CST source-bootstrap run validated both AST fixes by
+compiling past `[172/933] TypeSubstitution.cpp.o` and linking `libswiftAST.a`.
+Follow-up AI review feedback was also triaged: the remaining `isOHOSFamily()`
+calls are intentionally tied to the OHOS LLVM fork, so the patch now carries an
+inline note at both call sites. The staged tarball fallback in `conanfile.py`
+also keeps Python's `filter="data"` fast path and adds explicit path/link/special
+file checks for older Python runtimes where `tarfile.extractall(filter=...)` is
+not available.
+
+The same run stopped at `[198/933] ClangAdapter.cpp.o`. The failures were
+version drift between Swift 6.0.3's expected Clang API surface and the OHOS LLVM
+15 fork: OpenCL AVC builtin enum spellings use `Ref` rather than `Reference`,
+`SwiftImportPropertyAsAccessorsAttr` is unavailable, and
+`QualType::getNullability()` still requires an `ASTContext`. Patch 0002 now
+includes `llvm/Config/llvm-config.h` in `ClangAdapter.cpp` and gates those sites
+with `LLVM_VERSION_MAJOR` checks.
+
+The 15:33 CST follow-up run compiled past `ClangAdapter.cpp.o` and stopped at
+`[200/933] ClangDerivedConformances.cpp.o`. The OHOS LLVM 15
+`OverloadCandidateSet::OperatorRewriteInfo` constructor only accepts
+`(OverloadedOperatorKind, bool)`, while the Swift 6.0.3 source expects the newer
+three-argument form with a `SourceLocation`. Patch 0002 now includes
+`llvm-config.h` in `ClangDerivedConformances.cpp` and selects the two-argument
+constructor for LLVM versions before 16.
+
+The 15:51 CST run validated `ClangDerivedConformances.cpp.o` and then stopped at
+`[202/933] ClangImporter.cpp.o`. The earlier AI review suggestion to use
+`getLangOpts().` does not match the current OHOS LLVM 15 fork headers for
+`CompilerInvocation::getLangOpts()`, which return a pointer in the failing
+paths. Patch 0002 now keeps `->` for `invocation->getLangOpts()` and
+`Instance->getInvocation().getLangOpts()` while leaving ASTContext-style
+`getLangOpts()` references unchanged.
+
+The 16:09 CST run validated the `ClangImporter.cpp` pointer-form
+`getLangOpts()` fix and reached `[203/933] ClangIncludePaths.cpp.o`. That file
+compiles Windows include path helpers even for the OHOS build, exposing LLVM 15
+API drift: MSVC path helpers still take `llvm::Optional<StringRef>` instead of
+`std::optional<StringRef>`, and `findVCToolChainViaSetupConfig()` has no
+VCTools-version argument. Patch 0002 now adds a small LLVM < 16 optional
+converter and selects the older setup-config signature under the same version
+guard.
+
+The 16:32 CST run validated `ClangIncludePaths.cpp.o` and stopped at
+`[206/933] ClangModuleDependencyScanner.cpp.o`. The OHOS LLVM 15 tree provides
+`DepscanPrefixMapping` through the shim header
+`clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h`, but Swift 6.0.3 did not
+include that header directly. Patch 0002 now includes it behind `__has_include`,
+which keeps standard toolchains that provide the symbol elsewhere unaffected.
+
+The 16:52 CST run validated `ClangModuleDependencyScanner.cpp.o` and exposed the
+next ClangImporter compatibility batch at `[209/933] ImportDecl.cpp.o` plus
+`[210/933] ImportEnumInfo.cpp.o`. Patch 0002 now guards Clang attributes that
+are absent in LLVM 15 (`SwiftImportAsNonGenericAttr`, `SwiftVersionedAttr`),
+uses an LLVM-version guard around pointer-auth primitive-copy handling, passes
+`ASTContext` to older `QualType::getNullability()` call sites, and makes
+`ArrayRef<Decl *>` element types explicit before constructing
+`TinyPtrVector<Decl *>` or passing completion-handler member slices.
+
+The 17:13 CST run validated the `[209]/[210]` batch and stopped at
+`[212/933] ImportName.cpp.o` plus `[213/933] ImportType.cpp.o`. Patch 0002 now
+adds LLVM 15 guards for the remaining `QualType::getNullability(ASTContext)`
+call sites in those files, skips Swift-versioned Clang attributes that are not
+available in the OHOS LLVM 15 fork, uses the LLVM 15 OpenCL AVC enum spellings
+in `ImportType.cpp`, and avoids `AttributedType::getAttr()` when building
+against LLVM versions before 16. The local patch was syntax-checked with
+`git apply --numstat`, `git diff --check`, and `conan export`.
+
+At 17:38 CST the updated recipe files were synced to the true-device recipe
+root and a new low-concurrency source-bootstrap run was started through
+`logs/launcher-20260803-173825.log` (launcher pid `43330`). Immediately after
+launch, both the FRP SSH path and the direct `10.62.230.12:2222` path stopped
+returning usable shell sessions: FRP timed out and the direct SSH service closed
+the connection. The run may still be progressing in the background; no result is
+claimed until the SSH channel is healthy enough to inspect the latest
+`swift-targets-build.log`.
+
+The 18:03 CST rerun validated the `ImportName.cpp`, `ImportType.cpp`, and
+`Options.cpp` fixes. It compiled past `[215/933] Options.cpp.o`, linked
+`libswiftOption.a`, and stopped at `[227/933] OperandOwnership.cpp.o` while
+including `include/swift/SIL/Projection.h`. The new failure is the same LLVM 15
+`ArrayRef` deduction gap seen in earlier Swift 6 sources: three accessors were
+deduced as arrays over `SmallVector<...>` containers instead of over their
+element types. Patch 0002 now spells
+`llvm::ArrayRef<unsigned>`, `llvm::ArrayRef<Operand *>`, and
+`llvm::ArrayRef<ProjectionTreeNode *>` explicitly in `Projection.h`.
+
 At 2026-08-03 13:40 CST, the latest AI review findings were triaged before
 resuming the true-device run. Four mechanical findings were accepted and fixed:
 the ClangImporter patch no longer uses `getLangOpts()->` where the LLVM 15
@@ -291,10 +406,79 @@ stripping them to bare library names. R8 platform-conditional feedback remains
 a separate design/compliance item because the current OHOS Swift platform model
 still needs targeted replacement rather than a blind text rewrite.
 
+## True-device Stage Package Smoke, 2026-08-04
+
+The stage assembled from the source-bootstrap investigation was preserved at:
+
+```text
+/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/swift-ohos-stage-20260804-1042
+```
+
+True-device probes on 2026-08-04 showed the stage is about 3.7 GiB and contains
+the entries required by `conanfile.py`:
+
+```text
+bin/swiftc
+bin/swift-frontend
+bin/swift-autolink-extract
+bin/swift-build
+bin/swift-package
+bin/clang
+bin/ld.lld
+bin/llc
+bin/opt
+lib/clang
+lib/aarch64-linux-ohos/libunwind.a
+lib/libxml2.so.16
+lib/swift/ohos/aarch64/libswiftCore.so
+```
+
+The explicit staged package path was then replayed through Conan with:
+
+```sh
+export SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1
+export SWIFT_OHOS_STAGED_ROOT=/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/swift-ohos-stage-20260804-1042
+export SDKROOT=/storage/Users/currentUser/usr/local/sysroot
+export OHOS_SYSROOT=$SDKROOT
+export OHOS_SDKROOT=$SDKROOT
+conan create <swift/6.0.3 recipe root> -pr:h <OHOS profile> -pr:b <OHOS profile>
+```
+
+Evidence log:
+
+```text
+/storage/Users/currentUser/ohos-users/codex-a/swift-6.0.3-recipe-20260803-040827/conan-create-staged-20260804-1108.log
+```
+
+The package was created as:
+
+```text
+swift/6.0.3#f3851ae855086513ff797eb00e14d21b:e2902872fbec59e67c6e08c692295c900835da05#875ccae49824a70de322cb6db4c0124c
+```
+
+The `test_package` ran `swift --version`, built and executed a normal
+`hello.swift`, then built and executed `swiftc -O hello.swift` through the same
+stage. Both executables were re-signed when `binary-sign-tool` was available and
+printed:
+
+```text
+swift-ohos-smoke
+```
+
+Remaining known boundary: `swift-driver-new` is intentionally not included in
+the default packaged stage. When it is copied in, `swift --version` dispatches
+to the new driver and hangs on the true device. The validated path therefore
+uses the legacy driver entrypoints for `swift`, `swiftc`, `swift-build`, and
+`swift-package`; `SWIFT_OHOS_INCLUDE_DRIVER_NEW=1` is reserved for a separate
+SwiftDriver follow-up.
+
 ## Next Steps
 
 Do not start another heavy Swift build while other `conan create` jobs are
-active on the true device. When the device is quiet:
+active on the true device. The staged-package replay is complete; the remaining
+heavy validation is to replay the default source-bootstrap path from Conan
+without `SWIFT_OHOS_ALLOW_STAGED_PACKAGE=1`, preferably at low concurrency
+unless the device is confirmed idle. Before starting:
 
 ```sh
 date

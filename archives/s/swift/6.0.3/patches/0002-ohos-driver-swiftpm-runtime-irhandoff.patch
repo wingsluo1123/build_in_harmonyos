@@ -602,6 +602,1142 @@ index 0000000..ad852b9
 +        let cxxLanguageStandard: CXXLanguageStandard?
 +    }
 +}
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangAdapter.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangAdapter.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangAdapter.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangAdapter.cpp
+@@ -25,3 +25,4 @@
+ #include "clang/Lex/Lexer.h"
+ #include "clang/Sema/Lookup.h"
+ #include "clang/Sema/Sema.h"
++#include "llvm/Config/llvm-config.h"
+@@ -456,9 +457,16 @@
+     case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+     case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+     case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+     case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
++    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
++    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
++    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
++#else
+     case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+     case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+     case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+     case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
++#endif
+       return OmissionTypeName();
+@@ -685,4 +693,6 @@
+ bool
+ importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   if (prop->hasAttr<clang::SwiftImportPropertyAsAccessorsAttr>())
+     return true;
++#endif
+@@ -766,4 +776,8 @@
+   // If nullability is available on the type, use it.
+   clang::QualType paramTy = param->getType();
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (auto nullability = paramTy->getNullability(param->getASTContext())) {
++#else
+   if (auto nullability = paramTy->getNullability()) {
++#endif
+     return translateNullability(*nullability);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangDerivedConformances.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangDerivedConformances.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangDerivedConformances.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangDerivedConformances.cpp
+@@ -17,3 +17,4 @@
+ #include "swift/ClangImporter/ClangImporterRequests.h"
+ #include "clang/Sema/DelayedDiagnostic.h"
+ #include "clang/Sema/Overload.h"
++#include "llvm/Config/llvm-config.h"
+@@ -271,6 +272,10 @@
+   clang::OverloadedOperatorKind opKind =
+       clang::BinaryOperator::getOverloadedOperator(operatorKind);
+   clang::OverloadCandidateSet candidateSet(
+       classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      clang::OverloadCandidateSet::OperatorRewriteInfo(opKind, false));
++#else
+       clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
+                                               clang::SourceLocation(), false));
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangIncludePaths.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangIncludePaths.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangIncludePaths.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangIncludePaths.cpp
+@@ -22,1 +22,2 @@
+ #include "llvm/WindowsDriver/MSVCPaths.h"
++#include "llvm/Config/llvm-config.h"
+@@ -26,1 +27,9 @@
+ using Path = SmallString<128>;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++static llvm::Optional<llvm::StringRef>
++toLLVMOptional(std::optional<llvm::StringRef> value) {
++  if (value)
++    return *value;
++  return llvm::None;
++}
++#endif
+@@ -439,5 +448,12 @@
+-  if (llvm::getWindowsSDKDir(VFS, SearchPathOpts.getWinSDKRoot(),
+-                             SearchPathOpts.getWinSDKVersion(), {},
+-                             WindowsSDK.Path, WindowsSDK.MajorVersion,
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (llvm::getWindowsSDKDir(VFS,
++                             toLLVMOptional(SearchPathOpts.getWinSDKRoot()),
++                             toLLVMOptional(SearchPathOpts.getWinSDKVersion()),
++                             {}, WindowsSDK.Path, WindowsSDK.MajorVersion,
++#else
++  if (llvm::getWindowsSDKDir(VFS, SearchPathOpts.getWinSDKRoot(),
++                             SearchPathOpts.getWinSDKVersion(), {},
++                             WindowsSDK.Path, WindowsSDK.MajorVersion,
++#endif
+                              WindowsSDK.IncludeVersion,
+                              WindowsSDK.LibraryVersion)) {
+@@ -460,3 +476,9 @@
+-  if (llvm::getUniversalCRTSdkDir(VFS, SearchPathOpts.getWinSDKRoot(),
+-                                  SearchPathOpts.getWinSDKVersion(), {},
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (llvm::getUniversalCRTSdkDir(
++          VFS, toLLVMOptional(SearchPathOpts.getWinSDKRoot()),
++          toLLVMOptional(SearchPathOpts.getWinSDKVersion()), {},
++#else
++  if (llvm::getUniversalCRTSdkDir(VFS, SearchPathOpts.getWinSDKRoot(),
++                                  SearchPathOpts.getWinSDKVersion(), {},
++#endif
+                                   UCRTSDK.Path, UCRTSDK.Version)) {
+@@ -490,7 +512,16 @@
+-  if (llvm::findVCToolChainViaCommandLine(VFS, SearchPathOpts.getVCToolsRoot(),
+-                                          SearchPathOpts.getVCToolsVersion(),
+-                                          {}, VCTools.Path, VCTools.Layout) ||
+-      llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (llvm::findVCToolChainViaCommandLine(
++          VFS, toLLVMOptional(SearchPathOpts.getVCToolsRoot()),
++          toLLVMOptional(SearchPathOpts.getVCToolsVersion()), {},
++          VCTools.Path, VCTools.Layout) ||
++      llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
++      llvm::findVCToolChainViaSetupConfig(VFS, VCTools.Path, VCTools.Layout)) {
++#else
++  if (llvm::findVCToolChainViaCommandLine(VFS, SearchPathOpts.getVCToolsRoot(),
++                                          SearchPathOpts.getVCToolsVersion(),
++                                          {}, VCTools.Path, VCTools.Layout) ||
++      llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
+       llvm::findVCToolChainViaSetupConfig(VFS,
+                                           SearchPathOpts.getVCToolsVersion(),
+                                           VCTools.Path, VCTools.Layout)) {
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangModuleDependencyScanner.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangModuleDependencyScanner.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangModuleDependencyScanner.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ClangModuleDependencyScanner.cpp
+@@ -25,1 +25,4 @@
+ #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
++#if __has_include("clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h")
++#include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/DependencyScan/DependencyScanningTool.cpp b/swift-swift-6.0.3-RELEASE/lib/DependencyScan/DependencyScanningTool.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/DependencyScan/DependencyScanningTool.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/DependencyScan/DependencyScanningTool.cpp
+@@ -21,1 +21,2 @@
+ #include "llvm/Support/VirtualOutputBackends.h"
++#include "llvm/Config/llvm-config.h"
+@@ -111,1 +112,5 @@
+-    Msg.print(nullptr, Stream, false, false, false);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    Msg.print(nullptr, Stream, false, false);
++#else
++    Msg.print(nullptr, Stream, false, false, false);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/Immediate/SwiftMaterializationUnit.h b/swift-swift-6.0.3-RELEASE/include/swift/Immediate/SwiftMaterializationUnit.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/Immediate/SwiftMaterializationUnit.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/Immediate/SwiftMaterializationUnit.h
+@@ -21,1 +21,2 @@
+ #include "llvm/ADT/StringRef.h"
++#include "llvm/Config/llvm-config.h"
+@@ -28,1 +29,2 @@
+ #include "llvm/ExecutionEngine/Orc/LLJIT.h"
++#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+@@ -101,1 +103,7 @@
+-    llvm::Error notifyRemovingResources(llvm::orc::JITDylib &JD,
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    llvm::Error notifyRemovingResources(llvm::orc::ResourceKey K) override;
++
++    void notifyTransferringResources(llvm::orc::ResourceKey DstKey,
++                                     llvm::orc::ResourceKey SrcKey) override;
++#else
++    llvm::Error notifyRemovingResources(llvm::orc::JITDylib &JD,
+@@ -105,1 +113,2 @@
+                                      llvm::orc::ResourceKey SrcKey) override;
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Immediate/SwiftMaterializationUnit.cpp b/swift-swift-6.0.3-RELEASE/lib/Immediate/SwiftMaterializationUnit.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Immediate/SwiftMaterializationUnit.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Immediate/SwiftMaterializationUnit.cpp
+@@ -82,2 +82,7 @@
+-  (*EPCIU)->createLazyCallThroughManager(
+-      ES, llvm::orc::ExecutorAddr::fromPtr(&handleLazyCompilationFailure));
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  (*EPCIU)->createLazyCallThroughManager(
++      ES, llvm::pointerToJITTargetAddress(&handleLazyCompilationFailure));
++#else
++  (*EPCIU)->createLazyCallThroughManager(
++      ES, llvm::orc::ExecutorAddr::fromPtr(&handleLazyCompilationFailure));
++#endif
+@@ -199,2 +204,7 @@
+-        auto NewName = G.allocateCString(Twine(mangle(Sym->getName())));
+-        Sym->setName({NewName.data(), NewName.size() - 1});
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++        auto NewName = G.allocateString(Twine(mangle(Sym->getName())));
++        Sym->setName({NewName.data(), NewName.size()});
++#else
++        auto NewName = G.allocateCString(Twine(mangle(Sym->getName())));
++        Sym->setName({NewName.data(), NewName.size() - 1});
++#endif
+@@ -222,1 +222,10 @@
+-llvm::Error
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++llvm::Error
++SwiftJIT::Plugin::notifyRemovingResources(llvm::orc::ResourceKey K) {
++  return llvm::Error::success();
++}
++
++void SwiftJIT::Plugin::notifyTransferringResources(
++    llvm::orc::ResourceKey DstKey, llvm::orc::ResourceKey SrcKey) {}
++#else
++llvm::Error
+@@ -230,1 +239,2 @@
+     llvm::orc::ResourceKey SrcKey) {}
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/ClangSyntaxPrinter.cpp b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/ClangSyntaxPrinter.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/ClangSyntaxPrinter.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/ClangSyntaxPrinter.cpp
+@@ -21,1 +21,2 @@
+ #include "clang/AST/NestedNameSpecifier.h"
++#include "llvm/Config/llvm-config.h"
+@@ -106,5 +107,9 @@
+-  const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
+-      clangCtx, clangCtx.getTranslationUnitDecl(),
+-      typeDecl->getLexicalDeclContext());
+-  if (NS)
+-    NS->print(os, pp);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  cast<clang::NamedDecl>(typeDecl)->printNestedNameSpecifier(os, pp);
++#else
++  const auto *NS = clang::NestedNameSpecifier::getRequiredQualification(
++      clangCtx, clangCtx.getTranslationUnitDecl(),
++      typeDecl->getLexicalDeclContext());
++  if (NS)
++    NS->print(os, pp);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintAsClang.cpp b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintAsClang.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintAsClang.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintAsClang.cpp
+@@ -28,0 +29 @@
++#include "llvm/Config/llvm-config.h"
+@@ -34,0 +36,18 @@
++
++static llvm::StringRef
++getModuleHeaderRealPath(const clang::Module::Header &header) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  return header.Entry->tryGetRealPathName();
++#else
++  return header.Entry.getFileEntry().tryGetRealPathName();
++#endif
++}
++
++static llvm::StringRef
++getModuleDirectoryName(const clang::Module::DirectoryName &directory) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  return directory.Entry->getName();
++#else
++  return directory.Entry.getName();
++#endif
++}
+@@ -317,6 +336,22 @@
+-  if (std::optional<clang::Module::Header> umbrellaHeader =
+-          clangModule->getUmbrellaHeaderAsWritten()) {
+-    addHeader(umbrellaHeader->Entry.getFileEntry().tryGetRealPathName(),
+-        umbrellaHeader->PathRelativeToRootModuleDirectory);
+-  } else if (std::optional<clang::Module::DirectoryName> umbrellaDir =
+-                 clangModule->getUmbrellaDirAsWritten()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  auto umbrellaHeader = clangModule->getUmbrellaHeader();
++  auto umbrellaDir = clangModule->getUmbrellaDir();
++#else
++  auto umbrellaHeader = clangModule->getUmbrellaHeaderAsWritten();
++  auto umbrellaDir = clangModule->getUmbrellaDirAsWritten();
++#endif
++
++  if (umbrellaHeader) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    const auto &header = umbrellaHeader;
++#else
++    const auto &header = *umbrellaHeader;
++#endif
++    addHeader(getModuleHeaderRealPath(header),
++              header.PathRelativeToRootModuleDirectory);
++  } else if (umbrellaDir) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    const auto &dirInfo = umbrellaDir;
++#else
++    const auto &dirInfo = *umbrellaDir;
++#endif
+@@ -325 +360 @@
+-    llvm::sys::path::native(umbrellaDir->Entry.getName(),
++    llvm::sys::path::native(getModuleDirectoryName(dirInfo),
+@@ -347,2 +382,2 @@
+-        if (umbrellaDir->PathRelativeToRootModuleDirectory != ".")
+-          relativeHeaderPath += umbrellaDir->PathRelativeToRootModuleDirectory;
++        if (dirInfo.PathRelativeToRootModuleDirectory != ".")
++          relativeHeaderPath += dirInfo.PathRelativeToRootModuleDirectory;
+@@ -363 +398 @@
+-        addHeader(header.Entry.getFileEntry().tryGetRealPathName(),
++        addHeader(getModuleHeaderRealPath(header),
+diff --git a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintSwiftToClangCoreScaffold.cpp b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintSwiftToClangCoreScaffold.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintSwiftToClangCoreScaffold.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/PrintAsClang/PrintSwiftToClangCoreScaffold.cpp
+@@ -22,0 +23 @@
++#include "llvm/Config/llvm-config.h"
+@@ -179,2 +180,9 @@
+-  bool isSwiftIntLong =
+-      clangTI.getPtrDiffType(clang::LangAS::Default) == clang::TransferrableTargetInfo::SignedLong;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  bool isSwiftIntLong =
++      clangTI.getPtrDiffType(static_cast<unsigned>(clang::LangAS::Default)) ==
++      clang::TransferrableTargetInfo::SignedLong;
++#else
++  bool isSwiftIntLong =
++      clangTI.getPtrDiffType(clang::LangAS::Default) ==
++      clang::TransferrableTargetInfo::SignedLong;
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/FrontendTool/FrontendTool.cpp b/swift-swift-6.0.3-RELEASE/lib/FrontendTool/FrontendTool.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/FrontendTool/FrontendTool.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/FrontendTool/FrontendTool.cpp
+@@ -22,0 +23 @@
++#include "llvm/Config/llvm-config.h"
+@@ -1583,1 +1585,3 @@
+-  TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
++  TargetMachine->Options.MCOptions.CAS = Instance.getSharedCASInstance();
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
+@@ -47,1 +47,3 @@
+-#include "llvm/IRPrinter/IRPrintingPasses.h"
++#if __has_include("llvm/IRPrinter/IRPrintingPasses.h")
++#include "llvm/IRPrinter/IRPrintingPasses.h"
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_llvm_opt_main.cpp
+@@ -29,0 +30 @@
++#include "llvm/Config/llvm-config.h"
+@@ -135,4 +136,11 @@
+-  return TheTarget->createTargetMachine(
+-      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
+-      std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
+-      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  return TheTarget->createTargetMachine(
++      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
++      llvm::codegen::getExplicitRelocModel(),
++      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
++#else
++  return TheTarget->createTargetMachine(
++      TheTriple.getTriple(), CPUStr, FeaturesStr, targetOptions,
++      std::optional<llvm::Reloc::Model>(llvm::codegen::getExplicitRelocModel()),
++      llvm::codegen::getExplicitCodeModel(), GetCodeGenOptLevel(options));
++#endif
+@@ -225,2 +233,7 @@
+-    if (TM)
+-      TM->setPGOOption(std::nullopt);
++    if (TM) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      TM->setPGOOption(llvm::None);
++#else
++      TM->setPGOOption(std::nullopt);
++#endif
++    }
+@@ -232,1 +245,5 @@
+-    std::optional<llvm::PGOOptions> P = std::nullopt;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    llvm::Optional<llvm::PGOOptions> P;
++#else
++    std::optional<llvm::PGOOptions> P = std::nullopt;
++#endif
+@@ -238,2 +255,8 @@
+-    llvm::StandardInstrumentations SI(M->getContext(), false, false, PrintPassOpts);
+-    SI.registerCallbacks(PIC, &MAM);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    llvm::StandardInstrumentations SI(/*DebugLogging*/ false,
++                                      /*VerifyEach*/ false, PrintPassOpts);
++    SI.registerCallbacks(PIC, &FAM);
++#else
++    llvm::StandardInstrumentations SI(M->getContext(), false, false, PrintPassOpts);
++    SI.registerCallbacks(PIC, &MAM);
++#endif
+@@ -299,1 +322,5 @@
+-    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "", false, false));
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "", false));
++#else
++    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "", false, false));
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_cache_tool_main.cpp b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_cache_tool_main.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_cache_tool_main.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/DriverTool/swift_cache_tool_main.cpp
+@@ -28,0 +29 @@
++#include "llvm/Config/llvm-config.h"
+@@ -64,4 +65,9 @@
+-#define PREFIX(NAME, VALUE)                                                    \
+-  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+-  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+-      NAME##_init, std::size(NAME##_init) - 1);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++#define PREFIX(NAME, VALUE)                                                    \
++  static constexpr const char *NAME[] = VALUE;
++#else
++#define PREFIX(NAME, VALUE)                                                    \
++  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
++  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
++      NAME##_init, std::size(NAME##_init) - 1);
++#endif
+@@ -83,4 +89,10 @@
+-class CacheToolOptTable : public llvm::opt::GenericOptTable {
+-public:
+-  CacheToolOptTable() : GenericOptTable(InfoTable) {}
+-};
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++class CacheToolOptTable : public llvm::opt::OptTable {
++public:
++  CacheToolOptTable() : OptTable(InfoTable) {}
++};
++#else
++class CacheToolOptTable : public llvm::opt::GenericOptTable {
++public:
++  CacheToolOptTable() : GenericOptTable(InfoTable) {}
++};
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportDecl.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportDecl.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportDecl.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportDecl.cpp
+@@ -66,1 +66,2 @@
+ #include "llvm/Support/Path.h"
++#include "llvm/Config/llvm-config.h"
+@@ -703,5 +704,7 @@
+ static bool
+ shouldSuppressGenericParamsImport(const LangOptions &langOpts,
+                                   const clang::ObjCInterfaceDecl *decl) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   if (decl->hasAttr<clang::SwiftImportAsNonGenericAttr>())
+     return true;
++#endif
+@@ -2103,12 +2106,16 @@
+       auto isNonTrivialDueToAddressDiversifiedPtrAuth =
+           [](const clang::RecordDecl *decl) {
+             for (auto *field : decl->fields()) {
+               if (!field->getType().isNonTrivialToPrimitiveCopy()) {
+                 continue;
+               }
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+               if (field->getType().isNonTrivialToPrimitiveCopy() !=
+                   clang::QualType::PCK_PtrAuth) {
+                 return false;
+               }
++#else
++              return false;
++#endif
+             }
+             return true;
+@@ -2247,2 +2254,6 @@
+-          if (auto nullability =
+-                  field->getType()->getNullability()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++          if (auto nullability =
++                  field->getType()->getNullability(field->getASTContext())) {
++#else
++          if (auto nullability = field->getType()->getNullability()) {
++#endif
+@@ -4567,1 +4578,6 @@
+-        if (auto typeNullability = decl->getReturnType()->getNullability()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++        if (auto typeNullability =
++                decl->getReturnType()->getNullability(decl->getASTContext())) {
++#else
++        if (auto typeNullability = decl->getReturnType()->getNullability()) {
++#endif
+@@ -7674,2 +7689,2 @@
+-        syncImports[objcMethod] = llvm::TinyPtrVector<Decl *>(
+-            llvm::ArrayRef(members).drop_front(start + 1));
++        syncImports[objcMethod] = llvm::TinyPtrVector<Decl *>(
++            llvm::ArrayRef<Decl *>(members).drop_front(start + 1));
+@@ -9484,2 +9499,2 @@
+-  addCompletionHandlerAttribute(
+-      asyncImport, llvm::ArrayRef(members).drop_front(start), SwiftContext);
++  addCompletionHandlerAttribute(
++      asyncImport, llvm::ArrayRef<Decl *>(members).drop_front(start), SwiftContext);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportEnumInfo.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportEnumInfo.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportEnumInfo.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportEnumInfo.cpp
+@@ -28,1 +28,2 @@
+ #include "llvm/ADT/Statistic.h"
++#include "llvm/Config/llvm-config.h"
+@@ -109,11 +110,13 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   // If API notes have /removed/ a FlagEnum or EnumExtensibility attribute,
+   // then we don't need to check the macros.
+   for (auto *attr : decl->specific_attrs<clang::SwiftVersionedAttr>()) {
+     if (!attr->getIsReplacedByActive())
+       continue;
+     if (isa<clang::FlagEnumAttr>(attr->getAttrToAdd()) ||
+         isa<clang::EnumExtensibilityAttr>(attr->getAttrToAdd())) {
+       kind = EnumKind::Unknown;
+       return;
+     }
+   }
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportName.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportName.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportName.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportName.cpp
+@@ -47,1 +47,2 @@
+ #include "llvm/Support/ErrorHandling.h"
++#include "llvm/Config/llvm-config.h"
+@@ -264,1 +265,6 @@
+-  if (auto nullability = method->getReturnType()->getNullability()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (auto nullability =
++          method->getReturnType()->getNullability(method->getASTContext())) {
++#else
++  if (auto nullability = method->getReturnType()->getNullability()) {
++#endif
+@@ -671,2 +677,6 @@
+     for (auto *attr : decl->attrs()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      (void)attr;
++      continue;
++#else
+       VersionedSwiftNameInfo info;
+@@ -716,1 +726,2 @@
+       }
++#endif
+@@ -1240,1 +1251,5 @@
+-  if (auto nullability = type->getNullability()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (auto nullability = type->getNullability(iface->getASTContext())) {
++#else
++  if (auto nullability = type->getNullability()) {
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportType.cpp b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportType.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportType.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ClangImporter/ImportType.cpp
+@@ -54,1 +54,2 @@
+ #include "llvm/Support/Compiler.h"
++#include "llvm/Config/llvm-config.h"
+@@ -373,9 +374,16 @@
+       case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+       case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+       case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
++#else
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
++#endif
+         return Type();
+@@ -1675,6 +1683,8 @@
+   while (const auto *AT = dyn_cast<clang::AttributedType>(type)) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+     if (auto swiftAttr =
+             dyn_cast_or_null<clang::SwiftAttrAttr>(AT->getAttr())) {
+       callback(swiftAttr);
+     }
++#endif
+     type = skipUnrelatedSugar(AT->getEquivalentType());
+@@ -1752,1 +1762,5 @@
+-  if (auto nullability = type->getNullability()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (auto nullability = type->getNullability(clangContext)) {
++#else
++  if (auto nullability = type->getNullability()) {
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Option/Options.cpp b/swift-swift-6.0.3-RELEASE/lib/Option/Options.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Option/Options.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Option/Options.cpp
+@@ -15,3 +15,4 @@
+ #include "llvm/ADT/STLExtras.h"
++#include "llvm/Config/llvm-config.h"
+ #include "llvm/Option/OptTable.h"
+ #include "llvm/Option/Option.h"
+@@ -22,4 +23,8 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++#define PREFIX(NAME, VALUE) constexpr const char *NAME[] = VALUE;
++#else
+ #define PREFIX(NAME, VALUE)                                                    \
+   constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+   constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+       NAME##_init, std::size(NAME##_init) - 1);
++#endif
+@@ -29,1 +34,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++static const llvm::opt::OptTable::Info InfoTable[] = {
++#else
+ static const llvm::opt::GenericOptTable::Info InfoTable[] = {
++#endif
+@@ -40,4 +49,11 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++class SwiftOptTable : public llvm::opt::OptTable {
++public:
++  SwiftOptTable() : OptTable(InfoTable) {}
++};
++#else
+ class SwiftOptTable : public llvm::opt::GenericOptTable {
+ public:
+   SwiftOptTable() : GenericOptTable(InfoTable) {}
+ };
++#endif
+@@ -47,3 +63,7 @@
+ std::unique_ptr<OptTable> swift::createSwiftOptTable() {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  return std::unique_ptr<OptTable>(new SwiftOptTable());
++#else
+   return std::unique_ptr<GenericOptTable>(new SwiftOptTable());
++#endif
+ }
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/SIL/Projection.h b/swift-swift-6.0.3-RELEASE/include/swift/SIL/Projection.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/SIL/Projection.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/SIL/Projection.h
+@@ -772,3 +772,3 @@
+   ArrayRef<unsigned> getChildProjections() const {
+-    return llvm::ArrayRef(ChildProjections);
++    return llvm::ArrayRef<unsigned>(ChildProjections);
+   }
+@@ -778,3 +778,3 @@
+   const ArrayRef<Operand *> getNonProjUsers() const {
+-    return llvm::ArrayRef(NonProjUsers);
++    return llvm::ArrayRef<Operand *>(NonProjUsers);
+   }
+@@ -886,3 +886,3 @@
+   llvm::ArrayRef<ProjectionTreeNode *> getProjectionTreeNodes() {
+-    return llvm::ArrayRef(ProjectionTreeNodes);
++    return llvm::ArrayRef<ProjectionTreeNode *>(ProjectionTreeNodes);
+   }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SIL/IR/SILFunctionType.cpp b/swift-swift-6.0.3-RELEASE/lib/SIL/IR/SILFunctionType.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SIL/IR/SILFunctionType.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SIL/IR/SILFunctionType.cpp
+@@ -603,2 +603,3 @@
+-        SubstitutionMap::get(genericSig, llvm::ArrayRef(substReplacements),
+-                             llvm::ArrayRef(substConformances));
++        SubstitutionMap::get(
++            genericSig, llvm::ArrayRef<Type>(substReplacements),
++            llvm::ArrayRef<ProtocolConformanceRef>(substConformances));
+@@ -766,2 +767,3 @@
+-        SubstitutionMap::get(genericSig, llvm::ArrayRef(substReplacements),
+-                             llvm::ArrayRef(substConformances));
++        SubstitutionMap::get(
++            genericSig, llvm::ArrayRef<Type>(substReplacements),
++            llvm::ArrayRef<ProtocolConformanceRef>(substConformances));
+@@ -4454,1 +4456,1 @@
+-                                     llvm::ArrayRef(params), result,
++                                     llvm::ArrayRef<AnyFunctionType::Param>(params), result,
+@@ -4577,1 +4579,2 @@
+-    return CanAnyFunctionType::get(genericSig, llvm::ArrayRef(params), result,
++    return CanAnyFunctionType::get(genericSig,
++                                   llvm::ArrayRef<AnyFunctionType::Param>(params), result,
+@@ -4748,1 +4751,2 @@
+-  auto inner = CanFunctionType::get(llvm::ArrayRef(bridgedParams),
++  auto inner = CanFunctionType::get(
++      llvm::ArrayRef<AnyFunctionType::Param>(bridgedParams),
+@@ -4788,1 +4792,2 @@
+-      genericSig, llvm::ArrayRef(bridgedParams), bridgedResultType, extInfo);
++      genericSig, llvm::ArrayRef<AnyFunctionType::Param>(bridgedParams),
++      bridgedResultType, extInfo);
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/SIL/SILRemarkStreamer.h b/swift-swift-6.0.3-RELEASE/include/swift/SIL/SILRemarkStreamer.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/SIL/SILRemarkStreamer.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/SIL/SILRemarkStreamer.h
+@@ -22,3 +22,7 @@
+ #include "swift/Basic/SourceManager.h"
+ #include "swift/SIL/OptimizationRemark.h"
++#include "llvm/Config/llvm-config.h"
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++#include "llvm/ADT/Optional.h"
++#endif
+ #include "llvm/Remarks/Remark.h"
+@@ -103,10 +107,26 @@
++template <typename LocationT>
++static inline void setRemarkLocation(
++    LocationT &destination,
++    std::optional<llvm::remarks::RemarkLocation> location) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (location) {
++    destination = *location;
++  } else {
++    destination = llvm::None;
++  }
++#else
++  destination = location;
++#endif
++}
++
+ template <typename RemarkT>
+ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
+     const OptRemark::Remark<RemarkT> &optRemark) const {
+   llvm::remarks::Remark llvmRemark; // The result.
+   llvmRemark.RemarkType = toRemarkType<RemarkT>();
+   llvmRemark.PassName = optRemark.getPassName();
+   llvmRemark.RemarkName = optRemark.getIdentifier();
+   llvmRemark.FunctionName = optRemark.getDemangledFunctionName();
+-  llvmRemark.Loc =
+-      toRemarkLocation(optRemark.getLocation(), getASTContext().SourceMgr);
++  setRemarkLocation(
++      llvmRemark.Loc,
++      toRemarkLocation(optRemark.getLocation(), getASTContext().SourceMgr));
+@@ -118,3 +134,3 @@
+-    llvmRemark.Args.back().Loc =
+-        toRemarkLocation(arg.loc, getASTContext().SourceMgr);
++    setRemarkLocation(llvmRemark.Args.back().Loc,
++                      toRemarkLocation(arg.loc, getASTContext().SourceMgr));
+   }
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/Basic/MultiMapCache.h b/swift-swift-6.0.3-RELEASE/include/swift/Basic/MultiMapCache.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/Basic/MultiMapCache.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/Basic/MultiMapCache.h
+@@ -70,1 +70,1 @@
+-            return llvm::ArrayRef(data).slice(
++            return llvm::ArrayRef<ValueTy>(data).slice(
+@@ -92,1 +92,1 @@
+-    auto result = llvm::ArrayRef(data).slice(initialOffset, length);
++    auto result = llvm::ArrayRef<ValueTy>(data).slice(initialOffset, length);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SIL/Parser/ParseSIL.cpp b/swift-swift-6.0.3-RELEASE/lib/SIL/Parser/ParseSIL.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SIL/Parser/ParseSIL.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SIL/Parser/ParseSIL.cpp
+@@ -7780,1 +7780,1 @@
+-  for (auto elt : llvm::ArrayRef(path).slice(1)) {
++  for (auto elt : llvm::ArrayRef<Identifier>(path).slice(1)) {
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Serialization/Deserialization.cpp b/swift-swift-6.0.3-RELEASE/lib/Serialization/Deserialization.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Serialization/Deserialization.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Serialization/Deserialization.cpp
+@@ -31,1 +31,2 @@
+ #include "swift/AST/ProtocolConformance.h"
++#include "llvm/Config/llvm-config.h"
+@@ -7976,4 +7977,11 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    (void)isRegularKeywordAttribute;
++    clang::AttributeCommonInfo info(name, scopeName, {rangeStart, rangeEnd},
++                                    scopeLoc, parsedKind, syntax,
++                                    spellingListIndex);
++#else
+     clang::AttributeCommonInfo info(
+         name, scopeName, {rangeStart, rangeEnd}, scopeLoc, parsedKind,
+         {syntax, spellingListIndex, /*IsAlignas=*/false,
+         isRegularKeywordAttribute});
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Serialization/Serialization.cpp b/swift-swift-6.0.3-RELEASE/lib/Serialization/Serialization.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Serialization/Serialization.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Serialization/Serialization.cpp
+@@ -64,1 +64,2 @@
+ #include "llvm/Config/config.h"
++#include "llvm/Config/llvm-config.h"
+@@ -1340,1 +1341,3 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+       pchIncludeTree = pch->IncludeTreeID;
++#endif
+@@ -5933,1 +5936,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    writeBool(false);
++#else
+     writeBool(swiftAttr->isRegularKeywordAttribute());
++#endif
+@@ -6603,1 +6610,1 @@
+-    files = llvm::ArrayRef(Scratch);
++    files = llvm::ArrayRef<const FileUnit *>(Scratch);
+@@ -6610,1 +6617,1 @@
+-    files = llvm::ArrayRef(Scratch);
++    files = llvm::ArrayRef<const FileUnit *>(Scratch);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Serialization/SerializeDoc.cpp b/swift-swift-6.0.3-RELEASE/lib/Serialization/SerializeDoc.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Serialization/SerializeDoc.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Serialization/SerializeDoc.cpp
+@@ -436,1 +436,1 @@
+-    files = llvm::ArrayRef(Scratch);
++    files = llvm::ArrayRef<const FileUnit *>(Scratch);
+@@ -725,1 +725,2 @@
+-        DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
++        DocWriter.getDocRangesOffset(D, llvm::ArrayRef<
++             std::pair<ExternalSourceLocs::RawLoc, uint32_t>>(RawLocs->DocRanges)));
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/Driver/Compilation.h b/swift-swift-6.0.3-RELEASE/include/swift/Driver/Compilation.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/Driver/Compilation.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/Driver/Compilation.h
+@@ -271,1 +271,1 @@
+-    return llvm::ArrayRef(Actions);
++    return llvm::ArrayRef<std::unique_ptr<const Action>>(Actions);
+@@ -281,1 +281,3 @@
+-  UnwrappedArrayView<const Job> getJobs() const { return llvm::ArrayRef(Jobs); }
++  UnwrappedArrayView<const Job> getJobs() const {
++    return llvm::ArrayRef<std::unique_ptr<const Job>>(Jobs);
++  }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Driver/DarwinToolChains.cpp b/swift-swift-6.0.3-RELEASE/lib/Driver/DarwinToolChains.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Driver/DarwinToolChains.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Driver/DarwinToolChains.cpp
+@@ -31,1 +31,2 @@
+ #include "llvm/ADT/StringSwitch.h"
++#include "llvm/Config/llvm-config.h"
+@@ -1043,1 +1044,7 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      auto parsedSDKInfo = *SDKInfoOrErr;
++      if (parsedSDKInfo)
++        SDKInfo = *parsedSDKInfo;
++#else
+       SDKInfo = *SDKInfoOrErr;
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Driver/FrontendUtil.cpp b/swift-swift-6.0.3-RELEASE/lib/Driver/FrontendUtil.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Driver/FrontendUtil.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Driver/FrontendUtil.cpp
+@@ -143,1 +143,1 @@
+-  return Action(llvm::ArrayRef(BaseFrontendArgs).drop_front());
++  return Action(llvm::ArrayRef<const char *>(BaseFrontendArgs).drop_front());
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Driver/Driver.cpp b/swift-swift-6.0.3-RELEASE/lib/Driver/Driver.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Driver/Driver.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Driver/Driver.cpp
+@@ -85,5 +85,8 @@
+   StringRef OptName;
++  std::string OptNameStorage;
+   // However, the driver kind may be overridden if the first argument is
+   // --driver-mode.
+   if (!Args.empty()) {
+-    OptName = getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
++    OptNameStorage =
++        getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
++    OptName = OptNameStorage;
+@@ -130,2 +132,3 @@
+-  StringRef OptName =
+-    getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
++  std::string OptNameStorage =
++      getOpts().getOption(options::OPT_driver_mode).getPrefixedName();
++  StringRef OptName = OptNameStorage;
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Sema/CSApply.cpp b/swift-swift-6.0.3-RELEASE/lib/Sema/CSApply.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Sema/CSApply.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Sema/CSApply.cpp
+@@ -5483,1 +5483,1 @@
+-          llvm::none_of(llvm::ArrayRef(ExprStack).drop_back(1),
++          llvm::none_of(llvm::ArrayRef<Expr *>(ExprStack).drop_back(1),
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Sema/CSGen.cpp b/swift-swift-6.0.3-RELEASE/lib/Sema/CSGen.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Sema/CSGen.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Sema/CSGen.cpp
+@@ -5184,1 +5184,1 @@
+-  auto Result = llvm::ArrayRef(Impl->AllDecls);
++  auto Result = llvm::ArrayRef<ValueDecl *>(Impl->AllDecls);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Sema/CSSimplify.cpp b/swift-swift-6.0.3-RELEASE/lib/Sema/CSSimplify.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Sema/CSSimplify.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Sema/CSSimplify.cpp
+@@ -5972,1 +5972,1 @@
+-      ArrayRef tmpPath(path);
++      ArrayRef<ConstraintLocator::PathElement> tmpPath(path);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckProtocol.cpp b/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckProtocol.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckProtocol.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckProtocol.cpp
+@@ -1962,1 +1962,1 @@
+-    return llvm::ArrayRef(UnsatisfiedReqs);
++    return llvm::ArrayRef<ValueDecl *>(UnsatisfiedReqs);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckStmt.cpp b/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckStmt.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckStmt.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Sema/TypeCheckStmt.cpp
+@@ -590,1 +590,1 @@
+-  auto activeLabeledStmts = llvm::ArrayRef(activeLabeledStmtsVec);
++  auto activeLabeledStmts = llvm::ArrayRef<LabeledStmt *>(activeLabeledStmtsVec);
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/IDE/Utils.h b/swift-swift-6.0.3-RELEASE/include/swift/IDE/Utils.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/IDE/Utils.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/IDE/Utils.h
+@@ -435,1 +435,1 @@
+-  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef(Labels); }
++  llvm::ArrayRef<StringRef> args() const { return llvm::ArrayRef<StringRef>(Labels); }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionCache.cpp b/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionCache.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionCache.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionCache.cpp
+@@ -271,1 +271,1 @@
+-            llvm::ArrayRef(assocUSRs).copy(*V.Allocator),
++            llvm::ArrayRef<NullTerminatedStringRef>(assocUSRs).copy(*V.Allocator),
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionResultBuilder.cpp b/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionResultBuilder.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionResultBuilder.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IDE/CodeCompletionResultBuilder.cpp
+@@ -77,1 +77,1 @@
+-    return llvm::ArrayRef(USRs).copy(Allocator);
++    return llvm::ArrayRef<NullTerminatedStringRef>(USRs).copy(Allocator);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IDE/IDERequests.cpp b/swift-swift-6.0.3-RELEASE/lib/IDE/IDERequests.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IDE/IDERequests.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IDE/IDERequests.cpp
+@@ -1249,1 +1249,1 @@
+-  return copyToContext(VD->getASTContext(), llvm::ArrayRef(Results));
++  return copyToContext(VD->getASTContext(), llvm::ArrayRef<ValueDecl *>(Results));
+diff --git a/swift-swift-6.0.3-RELEASE/include/swift/LLVMPasses/Passes.h b/swift-swift-6.0.3-RELEASE/include/swift/LLVMPasses/Passes.h
+--- a/swift-swift-6.0.3-RELEASE/include/swift/LLVMPasses/Passes.h
++++ b/swift-swift-6.0.3-RELEASE/include/swift/LLVMPasses/Passes.h
+@@ -19,1 +19,2 @@
+ #include "llvm/InitializePasses.h"
++#include "llvm/Config/llvm-config.h"
+@@ -24,2 +25,9 @@
+-  struct SwiftAAResult : llvm::AAResultBase {
++  struct SwiftAAResult :
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      llvm::AAResultBase<SwiftAAResult> {
++    using SwiftAABase = llvm::AAResultBase<SwiftAAResult>;
++#else
++      llvm::AAResultBase {
++    using SwiftAABase = llvm::AAResultBase;
++#endif
+-    friend llvm::AAResultBase;
++    friend SwiftAABase;
+@@ -27,3 +35,3 @@
+-    explicit SwiftAAResult() : AAResultBase() {}
++    explicit SwiftAAResult() : SwiftAABase() {}
+     SwiftAAResult(SwiftAAResult &&Arg)
+-        : AAResultBase(std::move(Arg)) {}
++        : SwiftAABase(std::move(Arg)) {}
+@@ -39,1 +47,1 @@
+-    using AAResultBase::getModRefInfo;
++    using SwiftAABase::getModRefInfo;
+diff --git a/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMSwiftAA.cpp b/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMSwiftAA.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMSwiftAA.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMSwiftAA.cpp
+@@ -45,1 +45,1 @@
+-  return AAResultBase::getModRefInfo(Call, Loc, AAQI);
++  return SwiftAABase::getModRefInfo(Call, Loc, AAQI);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMMergeFunctions.cpp b/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMMergeFunctions.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMMergeFunctions.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/LLVMPasses/LLVMMergeFunctions.cpp
+@@ -35,1 +35,2 @@
+ #include "llvm/Transforms/Utils/FunctionComparator.h"
++#include "llvm/Config/llvm-config.h"
+@@ -1095,1 +1096,6 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  NewFunction->getBasicBlockList().splice(NewFunction->begin(),
++                                          FirstF->getBasicBlockList());
++#else
+   NewFunction->splice(NewFunction->begin(), FirstF);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/ResultPlan.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/ResultPlan.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/ResultPlan.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/ResultPlan.cpp
+@@ -676,1 +676,1 @@
+-        auto componentInits = llvm::ArrayRef(eltInits).slice(
++        auto componentInits = llvm::ArrayRef<Initialization *>(eltInits).slice(
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGen.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGen.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGen.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGen.cpp
+@@ -47,1 +47,2 @@
+ #include "llvm/ProfileData/InstrProfReader.h"
++#include "llvm/Config/llvm-config.h"
+@@ -63,3 +64,7 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    auto ReaderOrErr = llvm::IndexedInstrProfReader::create(Opts.UseProfile);
++#else
+     auto FS = llvm::vfs::getRealFileSystem();
+     auto ReaderOrErr =
+         llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenApply.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenApply.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenApply.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenApply.cpp
+@@ -5114,1 +5114,1 @@
+-  auto yieldValues = llvm::ArrayRef(rawResults);
++  auto yieldValues = llvm::ArrayRef<SILValue>(rawResults);
+@@ -5907,1 +5907,1 @@
+-  auto directResultsArray = llvm::ArrayRef(directResults);
++  auto directResultsArray = llvm::ArrayRef<ManagedValue>(directResults);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenExpr.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenExpr.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenExpr.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenExpr.cpp
+@@ -5719,1 +5719,1 @@
+-  for (const auto &result : llvm::ArrayRef(results).slice(1))
++  for (const auto &result : llvm::ArrayRef<ManagedValue>(results).slice(1))
+@@ -5736,1 +5736,1 @@
+-  for (const auto &result : llvm::ArrayRef(results).slice(1)) {
++  for (const auto &result : llvm::ArrayRef<ManagedValue>(results).slice(1)) {
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenLValue.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenLValue.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenLValue.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenLValue.cpp
+@@ -2265,1 +2265,1 @@
+-      auto yieldsAsArray = llvm::ArrayRef(yields);
++      auto yieldsAsArray = llvm::ArrayRef<ManagedValue>(yields);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenProlog.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenProlog.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenProlog.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenProlog.cpp
+@@ -626,1 +626,1 @@
+-                               llvm::ArrayRef(substFormalParams),
++                               llvm::ArrayRef<AnyFunctionType::Param>(substFormalParams),
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenPoly.cpp b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenPoly.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenPoly.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILGen/SILGenPoly.cpp
+@@ -5236,1 +5236,1 @@
+-      auto elts = llvm::ArrayRef(outerDirectResults).slice(firstEltIndex);
++      auto elts = llvm::ArrayRef<SILValue>(outerDirectResults).slice(firstEltIndex);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Analysis/CallerAnalysis.cpp b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Analysis/CallerAnalysis.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Analysis/CallerAnalysis.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Analysis/CallerAnalysis.cpp
+@@ -150,1 +150,1 @@
+-    processApplySites(llvm::ArrayRef(result.fullApplySites));
++    processApplySites(llvm::ArrayRef<FullApplySite>(result.fullApplySites));
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/SemanticARC/OwnershipLiveRange.cpp b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/SemanticARC/OwnershipLiveRange.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/SemanticARC/OwnershipLiveRange.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/SemanticARC/OwnershipLiveRange.cpp
+@@ -150,1 +150,1 @@
+-  auto cUseArrayRef = llvm::ArrayRef(consumingUses);
++  auto cUseArrayRef = llvm::ArrayRef<Operand *>(consumingUses);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Utils/OwnershipOptUtils.cpp b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Utils/OwnershipOptUtils.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Utils/OwnershipOptUtils.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/SILOptimizer/Utils/OwnershipOptUtils.cpp
+@@ -1266,1 +1266,1 @@
+-      llvm::ArrayRef(ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
++      llvm::ArrayRef<Operand *>(ctx->extraAddressFixupInfo.allAddressUsesFromOldValue));
+diff --git a/swift-swift-6.0.3-RELEASE/lib/ConstExtract/ConstExtract.cpp b/swift-swift-6.0.3-RELEASE/lib/ConstExtract/ConstExtract.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/ConstExtract/ConstExtract.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/ConstExtract/ConstExtract.cpp
+@@ -636,1 +636,1 @@
+-            JSON.attribute("label", Label);
++            JSON.attribute("label", *Label);
+@@ -771,1 +771,1 @@
+-                  JSON.attribute("label", Label);
++                  JSON.attribute("label", *Label);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenBuiltin.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenBuiltin.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenBuiltin.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenBuiltin.cpp
+@@ -22,1 +22,2 @@
+ #include "llvm/ADT/StringSwitch.h"
++#include "llvm/Config/llvm-config.h"
+@@ -431,5 +432,9 @@
+   if ((IID == llvm::Intrinsic::ptrauth_sign ||
+        IID == llvm::Intrinsic::ptrauth_auth ||
+        IID == llvm::Intrinsic::ptrauth_resign ||
+        IID == llvm::Intrinsic::ptrauth_strip) &&
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      true) {
++#else
+       !IGF.IGM.getClangASTContext().getLangOpts().PointerAuthIntrinsics) {
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenCall.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenCall.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenCall.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenCall.cpp
+@@ -36,1 +36,2 @@
+ #include "llvm/Support/Compiler.h"
++#include "llvm/Config/llvm-config.h"
+@@ -864,1 +865,1 @@
+-                           IGM.DataLayout.getABITypeAlign(type))))
++                           IGM.DataLayout.getABITypeAlign(type).value())))
+@@ -903,1 +904,1 @@
+-                IGM.DataLayout.getABITypeAlign(type))))
++                IGM.DataLayout.getABITypeAlign(type).value())))
+@@ -1163,4 +1164,11 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
++      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
++#else
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleReferenceStreamout:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualReferenceStreamout:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleReferenceStreamin:
+       case clang::BuiltinType::OCLIntelSubgroupAVCImeDualReferenceStreamin:
++#endif
+@@ -4760,1 +4767,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  CurFn->getBasicBlockList().push_back(ReturnBB);
++#else
+   CurFn->insert(CurFn->end(), ReturnBB);
++#endif
+@@ -4802,1 +4813,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  CurFn->getBasicBlockList().push_back(EntryBB);
++#else
+   CurFn->insert(CurFn->end(), EntryBB);
++#endif
+@@ -4910,1 +4925,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    CurFn->getBasicBlockList().push_back(bb);
++#else
+     CurFn->insert(CurFn->end(), bb);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenControl.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenControl.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenControl.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenControl.cpp
+@@ -18,1 +18,2 @@
+ #include "llvm/IR/Function.h"
++#include "llvm/Config/llvm-config.h"
+@@ -31,1 +32,5 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  CurBB->getParent()->getBasicBlockList().insert(std::next(CurBB->getIterator()), BB);
++#else
+   CurBB->getParent()->insert(std::next(CurBB->getIterator()), BB);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenExistential.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenExistential.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenExistential.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenExistential.cpp
+@@ -1618,1 +1618,1 @@
+-    auto classFields = llvm::ArrayRef(fields).slice(1);
++    auto classFields = llvm::ArrayRef<llvm::Type *>(fields).slice(1);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenMeta.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenMeta.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenMeta.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenMeta.cpp
+@@ -2455,3 +2455,7 @@
+-            [&](std::optional<unsigned> value) -> llvm::ConstantInt * {
+-          return llvm::ConstantInt::get(IGM.Int32Ty, value.value_or(0));
++            [&](unsigned value) -> llvm::ConstantInt * {
++          return llvm::ConstantInt::get(IGM.Int32Ty, value);
++        };
++        auto getOptionalInt32Constant =
++            [&](auto value) -> llvm::ConstantInt * {
++          return getInt32Constant(value.value_or(0));
+         };
+@@ -2538,2 +2542,2 @@
+-              auto *minor = getInt32Constant(version.getMinor());
+-              auto *patch = getInt32Constant(version.getSubminor());
++              auto *minor = getOptionalInt32Constant(version.getMinor());
++              auto *patch = getOptionalInt32Constant(version.getSubminor());
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenObjC.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenObjC.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenObjC.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenObjC.cpp
+@@ -21,1 +21,2 @@
+ #include "llvm/IR/InlineAsm.h"
++#include "llvm/Config/llvm-config.h"
+@@ -595,2 +596,7 @@
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  record->removeFromParent();
++  Module.getGlobalList().insert(std::next(placeholder->getIterator()), record);
++#else
+  Module.removeGlobalVariable(record);
+  Module.insertGlobalVariable(std::next(placeholder->getIterator()), record);
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenProto.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenProto.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/GenProto.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/GenProto.cpp
+@@ -55,1 +55,2 @@
+ #include "llvm/IR/Module.h"
++#include "llvm/Config/llvm-config.h"
+@@ -4124,3 +4125,7 @@
+   if (IGF.IGM.getOptions().WitnessMethodElimination) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    if (isRelativeTable)
++      return IGF.emitLoadOfRelativePointer(slot, false, IGF.IGM.Int8Ty);
++#endif
+     // For LLVM IR WME, emit a @llvm.type.checked.load with the type of the
+     // method.
+@@ -4141,9 +4146,14 @@
+     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
+     // which could mean redundant loads don't get removed.
+     llvm::Value *checkedLoad =
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++        IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::type_checked_load,
++                                        args);
++#else
+         isRelativeTable ? IGF.Builder.CreateIntrinsicCall(
+                               llvm::Intrinsic::type_checked_load_relative, args)
+                         : IGF.Builder.CreateIntrinsicCall(
+                               llvm::Intrinsic::type_checked_load, args);
++#endif
+     return IGF.Builder.CreateExtractValue(checkedLoad, 0);
+   }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt b/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt
 index fb3d662..8bd7649 100644
 --- a/swift-swift-6.0.3-RELEASE/lib/Basic/CMakeLists.txt
@@ -655,11 +1791,12 @@ index c7f9334..488d3f3 100644
    auto swiftAttrParsedInfo = clang::ParsedAttrInfo::get(swiftAttrInfo);
    return swiftAttrParsedInfo.IsSupportedByPragmaAttribute;
  }
-@@ -726,6 +724,12 @@ importer::getNormalInvocationArguments(
+@@ -726,6 +724,13 @@ importer::getNormalInvocationArguments(
        "-Xclang", "-detailed-preprocessing-record",
        "-Xclang", "-fmodule-format=raw",
      });
 +  } else if (triple.isOHOSFamily()) {
++    // isOHOSFamily() is provided by the OHOS LLVM fork.
 +    // OHOS' LLVM 15 fork can serialize the AST but traps while wrapping
 +    // Swift importer modules in an object PCH container.
 +    invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -697,7 +1834,7 @@ index c7f9334..488d3f3 100644
    invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
 -  invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 -  invocation->getLangOpts().CacheGeneratedPCH = true;
-+  invocation->getLangOpts().CacheGeneratedPCH = true;
++  invocation->getLangOpts()->CacheGeneratedPCH = true;
 
    // ClangImporter::create adds a remapped MemoryBuffer that we don't need
    // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
@@ -728,7 +1865,7 @@ index c7f9334..488d3f3 100644
    return CI;
  }
 
-@@ -1326,51 +1349,56 @@ ClangImporter::create(ASTContext &ctx,
+@@ -1326,51 +1349,57 @@ ClangImporter::create(ASTContext &ctx,
          importer->Impl.Invocation->getPreprocessorOpts();
      ppOpts.addRemappedFile(Implementation::moduleImportBufferName,
                             sourceBuffer.release());
@@ -757,6 +1894,7 @@ index c7f9334..488d3f3 100644
 +    llvm::Triple clangImporterTriple(
 +        importer->Impl.Invocation->getTargetOpts().Triple);
 +    if (clangImporterTriple.isOHOSFamily()) {
++      // isOHOSFamily() is provided by the OHOS LLVM fork.
 +      importer->Impl.Invocation->getCodeGenOpts().DebugTypeExtRefs = false;
 +    } else {
 +      // The Clang modules produced by ClangImporter are always embedded in an
@@ -905,7 +2043,7 @@ index c7f9334..488d3f3 100644
    // For explicit module build, module should always exist but module map might
    // not be exist. Go straight to module loader.
 -  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
-+  if (Instance->getInvocation().getLangOpts().ImplicitModules) {
++  if (Instance->getInvocation().getLangOpts()->ImplicitModules) {
      // Look up the top-level module first, to see if it exists at all.
      clang::Module *clangModule = clangHeaderSearch.lookupModule(
          realModuleName, /*ImportLoc=*/clang::SourceLocation(),
@@ -930,7 +2068,7 @@ index c7f9334..488d3f3 100644
    // instead, manually register all `.h` inputs of Clang module dependnecies.
    if (SwiftDependencyTracker &&
 -      !Instance->getInvocation().getLangOpts().ImplicitModules) {
-+      !Instance->getInvocation().getLangOpts().ImplicitModules) {
++      !Instance->getInvocation().getLangOpts()->ImplicitModules) {
      auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
          clangModule->getASTFile());
 -    Instance->getASTReader()->visitInputFileInfos(
@@ -1135,10 +2273,33 @@ diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/RawComment.cpp b/swift-swift-6.0.
 -        return RawComment(ctx.AllocateCopy(llvm::ArrayRef(SRCs)));
 +        return RawComment(
 +            ctx.AllocateCopy(llvm::ArrayRef<SingleRawComment>(SRCs)));
+diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/Stmt.cpp b/swift-swift-6.0.3-RELEASE/lib/AST/Stmt.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/AST/Stmt.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/AST/Stmt.cpp
+@@ -808,7 +808,8 @@ getCaseVarDecls(ASTContext &ctx, ArrayRef<CaseLabelItem> labelItems) {
+   SmallVector<VarDecl *, 4> tmp;
+   labelItems.front().getPattern()->collectVariables(tmp);
+   return ctx.AllocateTransform<VarDecl *>(
+-      llvm::ArrayRef(tmp), [&](VarDecl *vOld) -> VarDecl * {
++      llvm::ArrayRef<VarDecl *>(tmp),
++      [&](VarDecl *vOld) -> VarDecl * {
+         auto *vNew = new (ctx) VarDecl(
+             /*IsStatic*/ false, vOld->getIntroducer(), vOld->getNameLoc(),
+             vOld->getName(), vOld->getDeclContext());
+diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/TypeSubstitution.cpp b/swift-swift-6.0.3-RELEASE/lib/AST/TypeSubstitution.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/AST/TypeSubstitution.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/AST/TypeSubstitution.cpp
+@@ -444,2 +444,4 @@ Type InFlightSubstitution::substType(SubstitutableType *origType,
+-  auto outerExpansions = ArrayRef(ActivePackExpansions).drop_back(level);
+-  auto innerExpansions = ArrayRef(ActivePackExpansions).take_back(level);
++  auto activeExpansionRef =
++      llvm::ArrayRef<ActivePackExpansion>(ActivePackExpansions);
++  auto outerExpansions = activeExpansionRef.drop_back(level);
++  auto innerExpansions = activeExpansionRef.take_back(level);
 diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/RequirementMachine/ConcreteContraction.cpp b/swift-swift-6.0.3-RELEASE/lib/AST/RequirementMachine/ConcreteContraction.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/AST/RequirementMachine/ConcreteContraction.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/AST/RequirementMachine/ConcreteContraction.cpp
-@@ -298,7 +298,7 @@ static std::optional<Type> substConcreteType(Type concreteType,
+@@ -299,7 +299,7 @@ static std::optional<Type> substConcreteType(Type concreteType,
        if (!conformance) {
          if (Debug) {
 -          llvm::dbgs() << "@@@ " << substBaseType << " does not conform to "
@@ -1146,6 +2307,7 @@ diff --git a/swift-swift-6.0.3-RELEASE/lib/AST/RequirementMachine/ConcreteContra
                         << proto->getName() << "\n";
          }
          return std::nullopt;
+       }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
@@ -1169,11 +2331,251 @@ diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swi
 -
 +#endif
 +
-   return false;
+ return false;
  }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CompilerInvocation.cpp
+@@ -24,2 +24,3 @@
+ #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+ #include "llvm/ADT/STLExtras.h"
++#include "llvm/Config/llvm-config.h"
+@@ -634,2 +635,5 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
+-  else if (Opts.CASOpts.CASPath.empty())
+-    Opts.CASOpts.CASPath = llvm::cas::getDefaultOnDiskCASPath();
++  else if (Opts.CASOpts.CASPath.empty()) {
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
++    Opts.CASOpts.CASPath = llvm::cas::getDefaultOnDiskCASPath();
++#endif
++  }
+@@ -2141,2 +2146,6 @@ static void ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
+-  else if (auto Env = llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING"))
+-    forceModuleLoadingMode = Env;
++  else if (auto Env = llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING"))
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    forceModuleLoadingMode = *Env;
++#else
++    forceModuleLoadingMode = Env;
++#endif
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/CachedDiagnostics.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/CachedDiagnostics.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Frontend/CachedDiagnostics.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/CachedDiagnostics.cpp
+@@ -599,1 +599,1 @@
+-  auto Ranges = ArrayRef(Storage.Ranges).take_back(Info.Ranges.size());
++  auto Ranges = ArrayRef<CharSourceRange>(Storage.Ranges).take_back(Info.Ranges.size());
+@@ -606,1 +606,1 @@
+-  auto FixIts = ArrayRef(Storage.FixIts).take_back(Info.FixIts.size());
++  auto FixIts = ArrayRef<DiagnosticInfo::FixIt>(Storage.FixIts).take_back(Info.FixIts.size());
+diff --git a/swift-swift-6.0.3-RELEASE/lib/Frontend/PrintingDiagnosticConsumer.cpp b/swift-swift-6.0.3-RELEASE/lib/Frontend/PrintingDiagnosticConsumer.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/Frontend/PrintingDiagnosticConsumer.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/Frontend/PrintingDiagnosticConsumer.cpp
+@@ -578,5 +578,7 @@ PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
+ PrintingDiagnosticConsumer::~PrintingDiagnosticConsumer() {
++#if SWIFT_BUILD_SWIFT_SYNTAX
+  for (const auto &sourceFileSyntax : sourceFileSyntax) {
+     swift_ASTGen_destroySourceFile(sourceFileSyntax.second);
+   }
++#endif
+ }
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/TBDGen.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/TBDGen.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/TBDGen.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/TBDGen.cpp
+@@ -347,3 +347,3 @@ void TBDGenVisitor::addLinkerDirectiveSymbols(
+-    static auto getMinor = [](std::optional<unsigned> Minor) {
+-      return Minor.has_value() ? *Minor : 0;
++    static auto getMinor = [](auto Minor) -> unsigned {
++      return Minor ? *Minor : 0;
+     };
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/MetadataRequest.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/MetadataRequest.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/MetadataRequest.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/MetadataRequest.cpp
+@@ -50,2 +50,3 @@
+ #include "llvm/IR/Constant.h"
+ #include "llvm/IR/GlobalVariable.h"
++#include "llvm/Config/llvm-config.h"
+@@ -2482,6 +2483,13 @@ MetadataResponse irgen::emitCallToTypeMetadataAccessFunction(
+   call->setDoesNotThrow();
+   call->setCallingConv(IGM.SwiftCC);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  if (allocatedArgsBuffer)
++    call->setOnlyAccessesInaccessibleMemOrArgMem();
++  else
++    call->setDoesNotAccessMemory();
++#else
+   call->setMemoryEffects(allocatedArgsBuffer
+                              ? llvm::MemoryEffects::inaccessibleOrArgMemOnly()
+                              : llvm::MemoryEffects::none());
++#endif
+  // If we allocated a buffer for the arguments, end its lifetime.
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenSIL.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenSIL.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenSIL.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenSIL.cpp
+@@ -65,2 +65,3 @@
+ #include "llvm/IR/Intrinsics.h"
+ #include "llvm/IR/Module.h"
++#include "llvm/Config/llvm-config.h"
+@@ -1154,1 +1155,7 @@ void emitFailBB() {
+-        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++        CurFn->getBasicBlockList().splice(CurFn->end(),
++                                          CurFn->getBasicBlockList(),
++                                          FailBB->getIterator());
++#else
++        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
++#endif
+@@ -2549,1 +2556,5 @@ void IRGenSILFunction::emitSILFunction() {
+-    CurFn->insert(CurFn->end(), llBB);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    CurFn->getBasicBlockList().insert(CurFn->end(), llBB);
++#else
++    CurFn->insert(CurFn->end(), llBB);
++#endif
+@@ -7767,1 +7778,1 @@ void IRGenSILFunction::visitIncrementProfilerCounterInst(
+-      nameVar->getValueType(), nameVar, llvm::ArrayRef(indices));
++      nameVar->getValueType(), nameVar, llvm::ArrayRef<llvm::Value *>(indices));
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenFunction.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenFunction.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenFunction.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenFunction.cpp
+@@ -23,2 +23,3 @@
+ #include "llvm/Support/raw_ostream.h"
+ #include "llvm/BinaryFormat/MachO.h"
++#include "llvm/Config/llvm-config.h"
+@@ -288,7 +289,9 @@ static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
+     return llvm::MachO::PLATFORM_TVOS;
+   case llvm::Triple::WatchOS:
+     return llvm::MachO::PLATFORM_WATCHOS;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   case llvm::Triple::XROS:
+     return llvm::MachO::PLATFORM_XROS;
++#endif
+   default:
+     return /*Unknown platform*/ 0;
+@@ -390,2 +393,2 @@ void Explosion::print(llvm::raw_ostream &OS) {
+-  for (auto value : llvm::ArrayRef(Values).slice(NextValue)) {
++  for (auto value : llvm::ArrayRef<llvm::Value *>(Values).slice(NextValue)) {
+     value->print(OS);
+diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenDebugInfo.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenDebugInfo.cpp
+--- a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenDebugInfo.cpp
++++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGenDebugInfo.cpp
+@@ -52,7 +52,9 @@
+ #include "clang/Lex/Preprocessor.h"
+ #include "clang/Serialization/ASTReader.h"
++#include "llvm/ADT/Optional.h"
+ #include "llvm/ADT/StringRef.h"
+ #include "llvm/ADT/StringSet.h"
+ #include "llvm/Config/config.h"
++#include "llvm/Config/llvm-config.h"
+ #include "llvm/IR/Constants.h"
+ #include "llvm/IR/DIBuilder.h"
+@@ -591,8 +593,20 @@ class IRGenDebugInfoImpl {
+       }
+     }
+-    llvm::DIFile *F =
+-        DBuilder.createFile(DebugPrefixMap.remapPath(File),
+-                            DebugPrefixMap.remapPath(Dir), CSInfo, Source);
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    llvm::Optional<llvm::DIFile::ChecksumInfo<llvm::StringRef>> LLVMCSInfo;
++    if (CSInfo)
++      LLVMCSInfo = *CSInfo;
++    llvm::Optional<llvm::StringRef> LLVMSource;
++    if (Source)
++      LLVMSource = *Source;
++    llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
++                                          DebugPrefixMap.remapPath(Dir),
++                                          LLVMCSInfo, LLVMSource);
++#else
++    llvm::DIFile *F =
++        DBuilder.createFile(DebugPrefixMap.remapPath(File),
++                            DebugPrefixMap.remapPath(Dir), CSInfo, Source);
++#endif
+     DIFileCache[FileName].reset(F);
+     return F;
+   }
 diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
 --- a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
 +++ b/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp
+@@ -48,2 +48,3 @@
+ #include "clang/Frontend/CompilerInstance.h"
++#include "llvm/ADT/Optional.h"
+ #include "llvm/ADT/ScopeExit.h"
+@@ -63,5 +63,10 @@
+ #include "llvm/IR/ValueSymbolTable.h"
+ #include "llvm/IR/Verifier.h"
+-#include "llvm/IRPrinter/IRPrintingPasses.h"
++#include "llvm/Config/llvm-config.h"
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++#include "llvm/IR/IRPrintingPasses.h"
++#else
++#include "llvm/IRPrinter/IRPrintingPasses.h"
++#endif
+ #include "llvm/Linker/Linker.h"
+ #include "llvm/MC/TargetRegistry.h"
+@@ -209,1 +214,5 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+-  std::optional<PGOOptions> PGOOpt;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  llvm::Optional<PGOOptions> PGOOpt;
++#else
++  std::optional<PGOOptions> PGOOpt;
++#endif
+@@ -240,7 +249,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+   PrintPassOptions PrintPassOpts;
+   PrintPassOpts.Indent = DebugPassStructure;
+   PrintPassOpts.SkipAnalyses = DebugPassStructure;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  StandardInstrumentations SI(DebugPassStructure, /*VerifyEach*/ false,
++                              PrintPassOpts);
++  SI.registerCallbacks(PIC, &FAM);
++#else
+   StandardInstrumentations SI(Module->getContext(), DebugPassStructure,
+                               /*VerifyEach*/ false, PrintPassOpts);
+   SI.registerCallbacks(PIC, &MAM);
++#endif
+  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC);
+@@ -291,14 +307,20 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+       ASOpts.Recover = bool(Opts.SanitizersWithRecoveryInstrumentation &
+                             SanitizerKind::Address);
+       ASOpts.UseAfterScope = false;
+       ASOpts.UseAfterReturn = llvm::AsanDetectStackUseAfterReturnMode::Runtime;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+       if (Opts.SanitizerUseStableABI) {
+         ASOpts.MaxInlinePoisoningSize = 0;
+         ASOpts.InstrumentationWithCallsThreshold = 0;
+         ASOpts.InsertVersionCheck = false;
+       }
+       MPM.addPass(AddressSanitizerPass(
+           ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
+           /*DestructorKind=*/llvm::AsanDtorKind::Global));
++#else
++      MPM.addPass(ModuleAddressSanitizerPass(
++          ASOpts, /*UseGlobalGC=*/true, Opts.SanitizeAddressUseODRIndicator,
++          /*DestructorKind=*/llvm::AsanDtorKind::Global));
++#endif
+     });
+   }
+@@ -316,8 +339,13 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+     PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM,
+                                            OptimizationLevel Level) {
+       std::vector<std::string> allowlistFiles;
+       std::vector<std::string> ignorelistFiles;
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++      MPM.addPass(ModuleSanitizerCoveragePass(Opts.SanitizeCoverage,
++                                              allowlistFiles, ignorelistFiles));
++#else
+       MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
+                                         allowlistFiles, ignorelistFiles));
++#endif
+     });
+   }
+@@ -387,5 +415,9 @@ void swift::performLLVMOptimizations(const IRGenOptions &Opts,
+   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++    MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false));
++#else
+     MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
+                                 /*EmitSummaryIndex=*/false));
++#endif
+     break;
+   case IRGenOutputKind::LLVMBitcode: {
 @@ -129,10 +129,12 @@ static clang::TargetOptions getClangTargetOptions(ASTContext &Ctx) {
    TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
    TargetOpts.FunctionSections = Opts.FunctionSections;
@@ -1213,4 +2615,103 @@ diff --git a/swift-swift-6.0.3-RELEASE/lib/IRGen/IRGen.cpp b/swift-swift-6.0.3-R
 +#endif
 -
 +
-   return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
+  return compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
+@@ -668,2 +697,6 @@ bool swift::compileAndWriteLLVM(
+    bool fail = targetMachine->addPassesToEmitFile(
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr);
++#else
+         EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
++#endif
+@@ -886,13 +919,15 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
+  }
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR >= 16
+   // Set up pointer-authentication.
+   if (auto loader = Ctx.getClangModuleLoader()) {
+     auto &clangInstance = loader->getClangInstance();
+     if (clangInstance.getLangOpts().PointerAuthCalls) {
+       // FIXME: This is gross. This needs to be done in the Frontend
+       // after the module loaders are set up, and where these options are
+       // formally not const.
+       setPointerAuthOptions(const_cast<IRGenOptions &>(Opts).PointerAuth,
+                             clangInstance.getCodeGenOpts().PointerAuth, Opts);
+     }
+  }
++#endif
+  std::string Error;
+@@ -908,4 +943,8 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx) {
+   // This means that the default CodeModel causes generated code to segfault
+   // when run.
++#if defined(LLVM_VERSION_MAJOR) && LLVM_VERSION_MAJOR < 16
++  llvm::Optional<CodeModel::Model> cmodel;
++#else
+   std::optional<CodeModel::Model> cmodel = std::nullopt;
++#endif
+  if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isWindowsCygwinEnvironment())
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/Platform.swift b/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/Platform.swift
+--- a/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/Platform.swift
++++ b/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/Platform.swift
+@@ -351,2 +351,5 @@ public var SIG_HOLD: sig_t { return unsafeBitCast(3, to: sig_t.self) }
+-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
++#elseif os(OHOS)
++// OHOS exposes signal handlers through its C headers, but the current OHOS
++// Swift stage crashes while lowering the Linux SIG_* overlay wrappers.
++#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Haiku)
+ #if !canImport(SwiftMusl)
+@@ -581,1 +584,1 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
+-#elseif os(Linux) && !canImport(SwiftMusl)
++#elseif os(Linux) && !canImport(SwiftMusl) && !os(OHOS)
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/tgmath.swift.gyb b/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/tgmath.swift.gyb
+--- a/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/tgmath.swift.gyb
++++ b/swift-swift-6.0.3-RELEASE/stdlib/public/Platform/tgmath.swift.gyb
+@@ -13,1 +13,4 @@
+ import SwiftShims
++#if os(OHOS)
++import SwiftGlibc
++#endif
+@@ -331,3 +334,7 @@ public func nan(_ tag: String) -> ${T} {
+ public func nan(_ tag: String) -> ${T} {
++#if os(OHOS)
++  return ${T}(SwiftGlibc.nan${f}(tag))
++#else
+   return ${T}(nan${f}(tag))
++#endif
+ }
+@@ -344,5 +351,7 @@ public func jn(_ n: Int, _ x: Double) -> Double {
+ #if os(Windows)
+   return _jn(Int32(n), x)
++#elseif os(OHOS)
++  return SwiftGlibc.jn(Int32(n), x)
+ #else
+   return jn(Int32(n), x)
+ #endif
+@@ -354,5 +363,7 @@ public func yn(_ n: Int, _ x: Double) -> Double {
+ #if os(Windows)
+   return _yn(Int32(n), x)
++#elseif os(OHOS)
++  return SwiftGlibc.yn(Int32(n), x)
+ #else
+   return yn(Int32(n), x)
+ #endif
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/public/runtime/EnvironmentVariables.cpp b/swift-swift-6.0.3-RELEASE/stdlib/public/runtime/EnvironmentVariables.cpp
+--- a/swift-swift-6.0.3-RELEASE/stdlib/public/runtime/EnvironmentVariables.cpp
++++ b/swift-swift-6.0.3-RELEASE/stdlib/public/runtime/EnvironmentVariables.cpp
+@@ -157,1 +157,1 @@ swift::once_t swift::runtime::environment::initializeToken;
+-#if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__))
++#if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || (defined(__linux__) && !defined(__OHOS__)))
+@@ -228,7 +228,7 @@ void swift::runtime::environment::initialize(void *context) {
+ #define VARIABLE(name, type, defaultValue, help)                               \
+   do {                                                                         \
+-    const char name##_string = getenv(#name);                                  \
++    const char *name##_string = getenv(#name);                                 \
+     if (name##_string)                                                         \
+       name##_isSet_variable = true;                                            \
+     name##_variable = parse_##type(#name, name##_string, defaultValue);        \
+-  } while (0)
++  } while (0);
+diff --git a/swift-swift-6.0.3-RELEASE/stdlib/private/SwiftPrivateThreadExtras/SwiftPrivateThreadExtras.swift b/swift-swift-6.0.3-RELEASE/stdlib/private/SwiftPrivateThreadExtras/SwiftPrivateThreadExtras.swift
+--- a/swift-swift-6.0.3-RELEASE/stdlib/private/SwiftPrivateThreadExtras/SwiftPrivateThreadExtras.swift
++++ b/swift-swift-6.0.3-RELEASE/stdlib/private/SwiftPrivateThreadExtras/SwiftPrivateThreadExtras.swift
+@@ -60,1 +60,1 @@ public typealias ThreadHandle = pthread_t
+-#if (os(Linux) && !canImport(Musl)) || os(Android)
++#if (os(Linux) && !canImport(Musl) && !os(OHOS)) || os(Android)
