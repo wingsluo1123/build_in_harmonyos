@@ -38,26 +38,29 @@ class BandwhichConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # Set up environment for cargo to find libpcap
+        # Collect libpcap paths for cargo to find during build
         libpcap_info = self.dependencies["libpcap"]
         libpcap_libdir = libpcap_info.cpp_info.libdir[0] if libpcap_info.cpp_info.libdir else ""
         libpcap_incdir = libpcap_info.cpp_info.includedirs[0] if libpcap_info.cpp_info.includedirs else ""
 
         envvars = []
         if libpcap_libdir:
-            pkgconfig_path = f"{libpcap_libdir}/pkgconfig"
+            pkgconfig_path = os.path.join(libpcap_libdir, "pkgconfig")
             if os.path.isdir(pkgconfig_path):
                 existing = os.environ.get("PKG_CONFIG_PATH", "")
                 envvars.append(f"PKG_CONFIG_PATH={pkgconfig_path}:{existing}" if existing else f"PKG_CONFIG_PATH={pkgconfig_path}")
             envvars.append(f"LIBPCAP_LIB_DIR={libpcap_libdir}")
         if libpcap_incdir:
             envvars.append(f"LIBPCAP_INCLUDE_DIR={libpcap_incdir}")
+
+        # Store for build() to use
         self._build_env = envvars
 
     def build(self):
         apply_conandata_patches(self)
-        # Build with cargo
-        self.run("cargo build --release", env=getattr(self, "_build_env", None))
+        # Build with cargo, passing libpcap env vars
+        build_env = getattr(self, "_build_env", None)
+        self.run("cargo build --release", env=build_env)
 
     def package(self):
         # The binary may be in source_folder/target/release or build_folder/target/release

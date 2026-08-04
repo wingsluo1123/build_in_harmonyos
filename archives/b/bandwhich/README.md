@@ -6,7 +6,7 @@ Display current network utilization by process, connection and remote IP/hostnam
 
 | Version | Status | Build System | Dependencies |
 |---------|--------|--------------|--------------|
-| 0.23.0 | published | cargo (Rust) | libpcap/1.10.6 |
+| 0.23.0 | built | cargo (Rust) | libpcap/1.10.6 |
 
 ## Description
 

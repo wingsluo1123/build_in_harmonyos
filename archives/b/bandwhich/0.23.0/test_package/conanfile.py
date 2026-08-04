@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
+"""test_package for bandwhich — runs test.sh which invokes the binary."""
 import os
 
 from conan import ConanFile
 
 
 class BandwhichTestConan(ConanFile):
-    """test_package for bandwhich — runs test.sh which invokes the binary."""
     settings = "os", "arch", "compiler", "build_type"
     generators = "VirtualRunEnv"
     test_type = "explicit"
