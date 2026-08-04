@@ -94,4 +94,4 @@ class AtkConan(ConanFile):
         self.cpp_info.includedirs = ["include/atk-1.0"]
         self.cpp_info.set_property("pkg_config_name", "atk")
         # P1: 传播 glib 依赖给消费者，否则编译/链接必然失败
-        self.cpp_info.requires = ["glib::glib"]
+        self.cpp_info.requires = ["glib::glib", "glib::gobject-2.0"]  # aireview High: 补 gobject-2.0 避消费者链接缺头/-lgobject-2.0
