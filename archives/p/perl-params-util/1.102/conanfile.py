@@ -6,8 +6,8 @@ XS module: Util.xs → Util.c → Util.so
 Has pure Perl fallback (Params::Util::PP) activated via PERL_PARAMS_UTIL_PP=1.
 
 On OHOS:
-  - musl C library headers at $MUSL_PREFIX/include (sys/types.h etc.)
-  - musl libc at $MUSL_PREFIX/lib
+  - OHOS clang sysroot provides musl headers (sys/types.h etc.) and libc by default
+  - Optional: set MUSL_PREFIX to inject extra -I/-L flags for custom musl install
   - CRT workaround: -nostartfiles -nodefaultlibs -lc
   - XS .so may fail to load at runtime due to ELF signing (pure Perl fallback works)
 """

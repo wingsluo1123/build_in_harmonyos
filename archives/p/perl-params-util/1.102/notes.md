@@ -21,8 +21,8 @@
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | 链接错误：缺少 crti.o, crtn.o, crtbeginS.o, crtendS.o | 鸿蒙系统缺少 CRT 文件 | 在 Makefile 的 LDDLFLAGS 中添加 `-nostartfiles -nodefaultlibs -L/storage/Users/currentUser/usr/local/lib -lc` |
-| 2 | 编译错误：缺少 sys/types.h 等系统头文件 | 鸿蒙系统缺少标准 C 库头文件 | 在 Makefile 的 CCFLAGS 中添加 `-I/storage/Users/currentUser/usr/local/include` (musl 头文件路径) |
+| 1 | 链接错误：缺少 crti.o, crtn.o, crtbeginS.o, crtendS.o | 鸿蒙系统缺少 CRT 文件 | 在 Makefile 的 LDDLFLAGS 中添加 `-nostartfiles -nodefaultlibs -L$MUSL_PREFIX/lib -lc` |
+| 2 | 编译错误：缺少 sys/types.h 等系统头文件 | 鸿蒙系统缺少标准 C 库头文件 | 在 Makefile 的 CCFLAGS 中添加 `-I$MUSL_PREFIX/include` (musl 头文件路径) |
 | 3 | XS 模块运行时加载失败 (Permission denied) | SELinux HMDFS 限制动态库加载 | 使用纯 Perl 回退模式 `PERL_PARAMS_UTIL_PP=1`；XS .so 需安装到系统目录 |
 
 ## 与 perl-dbd-pg 编译经验对比
@@ -32,7 +32,7 @@
 | 构建系统 | Perl Makefile.PL | Perl Makefile.PL |
 | CRT 绕过 | `-nostartfiles -nodefaultlibs -lc` | 相同方案 |
 | musl 头文件 | 需要 (stdio.h, ctype.h 等) | 需要 (sys/types.h 等) |
-| 链接参数注入方式 | `dynamic_lib => { OTHERLDFLAGS => ... }` | 相同方式 |
+| 链接参数注入方式 | `dynamic_lib => { OTHERLDFLAGS => ... }` (Makefile.PL) | regex 修改 Makefile LDDLFLAGS (不同方式) |
 | SELinux 限制 | XS .so 无法从用户目录加载 | 相同问题 |
 | 纯 Perl 回退 | 无 (DBI::PurePerl 是独立模式) | 有 (PERL_PARAMS_UTIL_PP=1) |
 | 外部依赖 | libpq, DBI | 无 |
@@ -40,8 +40,8 @@
 ## 依赖版本
 
 ### 已存在
-- musl C 库头文件: /storage/Users/currentUser/usr/local/include (371 个文件)
-- musl C 库: /storage/Users/currentUser/usr/local/lib
+- musl C 库头文件: $MUSL_PREFIX/include (sys/types.h 等)
+- musl C 库: $MUSL_PREFIX/lib
 
 ### 编译依赖
 - musl C 库头文件（提供 sys/types.h 等系统头文件）
@@ -77,7 +77,7 @@
 
 ### 修复措施
 1. 从 conan 缓存恢复 conanfile.py 和 conandata.yml
-2. 创建 test_package/conanfile.py (修复 shell 插值问题：用单引号替代双引号)
+2. 创建 test_package/conanfile.py + test_params_util.sh (L1 测试脚本化)
 3. 创建 test_package/MANIFEST.yml
 4. 创建 manifest.yaml (含 patch_generation 和 patch_classification)
 5. 创建 notes.md (编译笔记)
