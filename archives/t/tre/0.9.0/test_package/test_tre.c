@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <tre/tre.h>
 
 static int test_basic_match(void) {
@@ -19,8 +17,9 @@ static int test_basic_match(void) {
 
 static int test_no_match(void) {
     regex_t preg;
-    regcomp(&preg, "^[0-9]+$", REG_EXTENDED);
-    int err = regexec(&preg, "abc", 0, NULL, 0);
+    int err = regcomp(&preg, "^[0-9]+$", REG_EXTENDED);
+    if (err != 0) { fprintf(stderr, "regcomp failed\n"); return 0; }
+    err = regexec(&preg, "abc", 0, NULL, 0);
     regfree(&preg);
     if (err != REG_NOMATCH) { fprintf(stderr, "FAIL: no match\n"); return 0; }
     printf("PASS: no match\n");

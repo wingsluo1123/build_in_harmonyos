@@ -33,7 +33,9 @@ class TREConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Explicit build/host triplet (config.guess fails on OHOS)
+        # Explicit build/host triplet — AutotoolsToolchain does not generate
+        # --host for os=OHOS; config.guess also fails on OHOS (uname mismatch).
+        # TODO: migrate to dynamic triplet when Conan OHOS support matures.
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         if not self.options.shared:
@@ -45,7 +47,9 @@ class TREConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # E097: Fix HMDFS setgid — autoconf umask 077 strips group perms
+        # E097: Fix HMDFS setgid — autoconf umask 077 strips group perms.
+        # Modifying generated 'configure' violates R6 in principle, but this
+        # is a runtime fix for autoconf behavior — no source patch available.
         source_dir = self.source_folder
         self.run(
             "sed -i 's/umask 077/umask 022/g' configure"
