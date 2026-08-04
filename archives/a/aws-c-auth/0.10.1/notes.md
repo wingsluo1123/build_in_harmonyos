@@ -37,3 +37,7 @@
 - 无可执行二进制，safety check 跳过
 - 测试已禁用
 - 依赖 aws-c-common, aws-c-io, aws-c-http, aws-c-cal, aws-c-sdkutils
+---
+
+**编译结束**: 2026-08-05 04:24
+**最终状态**: built
