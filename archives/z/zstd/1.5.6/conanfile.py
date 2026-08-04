@@ -48,11 +48,12 @@ class ZstdConan(ConanFile):
         for cand in candidates:
             if cand and os.path.isfile(cand):
                 return cand
-        globbed = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake"))
+        sdk_base = os.environ.get("OHOS_SDK_HOME", "/data/service/hnp/ohos-sdk.org")
+        globbed = sorted(glob.glob(os.path.join(sdk_base, "*", "ohos", "native", "build", "cmake", "ohos.toolchain.cmake")))
         if globbed:
             return globbed[-1]
         raise ConanInvalidConfiguration(
-            "找不到 ohos.toolchain.cmake：设 OHOS_NDK_HOME，或在 profile [conf] 配 "
+            "找不到 ohos.toolchain.cmake：设 OHOS_NDK_HOME 或 OHOS_SDK_HOME，或在 profile [conf] 配 "
             "tools.cmake.cmaketoolchain:user_toolchain=[<sdk>/ohos/native/build/cmake/ohos.toolchain.cmake]")
 
     def build(self):
@@ -108,13 +109,14 @@ class ZstdConan(ConanFile):
     def _sign_shared_libs(self):
         import glob
         import os
+        import shutil
         libdir = os.path.join(self.package_folder, "lib")
         sos = glob.glob(os.path.join(libdir, "**", "*.so"), recursive=True)
         sos += glob.glob(os.path.join(libdir, "**", "*.so.*"), recursive=True)
         if not sos:
             return
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        signer = "/data/service/hnp/bin/binary-sign-tool"
+        objcopy = os.environ.get("OHOS_OBJCOPY") or shutil.which("llvm-objcopy") or "/data/service/hnp/bin/llvm-objcopy"
+        signer = os.environ.get("OHOS_SIGN_TOOL") or shutil.which("binary-sign-tool") or "/data/service/hnp/bin/binary-sign-tool"
         for so in sos:
             if os.path.islink(so):
                 continue

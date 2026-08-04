@@ -23,5 +23,5 @@ class TestPkg(ConanFile):
         if cross_building(self):
             self.output.info("cross-building：只验编译+链接")
             return
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL", "bash")
         self.run(f"{bash} -c './test_probe'", env="conanrun")

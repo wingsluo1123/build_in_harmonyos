@@ -10,7 +10,7 @@
 #       库逻辑（无平台特异排序路径）。
 # 用法：bash run_upstream_tests.sh [workdir]
 # =============================================================================
-set -uo pipefail
+set -euo pipefail
 
 ZSTD_VER=1.5.6
 EXPECT_SHA256=8c29e06cf42aacc1eafc4077ae2ec6c6fcb96a626157e0593d5e82a34fd403c1
