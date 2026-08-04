@@ -41,8 +41,7 @@ class AbpoaConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # SIMDE: use SIMD Everywhere for cross-platform SIMD on ARM64/OHOS
-        tc.variables["CMAKE_C_FLAGS"] = "-DUSE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES"
+        # Note: SIMDE flags (-DUSE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES) are set in CMakeLists.txt via patch
         tc.generate()
 
     def build(self):
