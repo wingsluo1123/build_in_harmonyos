@@ -38,33 +38,27 @@ class BandwhichConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # Collect libpcap paths for cargo to find during build
+        # Set up environment for cargo to find libpcap via Conan dependency info
         libpcap_info = self.dependencies["libpcap"]
         libpcap_libdir = libpcap_info.cpp_info.libdir[0] if libpcap_info.cpp_info.libdir else ""
         libpcap_incdir = libpcap_info.cpp_info.includedirs[0] if libpcap_info.cpp_info.includedirs else ""
 
-        envvars = []
         if libpcap_libdir:
             pkgconfig_path = os.path.join(libpcap_libdir, "pkgconfig")
             if os.path.isdir(pkgconfig_path):
                 existing = os.environ.get("PKG_CONFIG_PATH", "")
-                envvars.append(f"PKG_CONFIG_PATH={pkgconfig_path}:{existing}" if existing else f"PKG_CONFIG_PATH={pkgconfig_path}")
-            envvars.append(f"LIBPCAP_LIB_DIR={libpcap_libdir}")
+                os.environ["PKG_CONFIG_PATH"] = f"{pkgconfig_path}:{existing}" if existing else pkgconfig_path
+            os.environ["LIBPCAP_LIB_DIR"] = libpcap_libdir
         if libpcap_incdir:
-            envvars.append(f"LIBPCAP_INCLUDE_DIR={libpcap_incdir}")
-
-        # Store for build() to use
-        self._build_env = envvars
+            os.environ["LIBPCAP_INCLUDE_DIR"] = libpcap_incdir
 
     def build(self):
         apply_conandata_patches(self)
-        # Build with cargo, passing libpcap env vars
-        build_env = getattr(self, "_build_env", None)
-        self.run("cargo build --release", env=build_env)
+        # Build with cargo (environment vars set in generate())
+        self.run("cargo build --release")
 
     def package(self):
         # The binary may be in source_folder/target/release or build_folder/target/release
-        # depending on layout. Search both.
         search_dirs = [
             os.path.join(self.source_folder, "target", "release"),
             os.path.join(self.build_folder, "target", "release"),
@@ -77,7 +71,6 @@ class BandwhichConan(ConanFile):
                 found = True
                 break
         if not found:
-            # Last resort: glob search
             pattern = os.path.join(self.source_folder, "**", "release", "bandwhich")
             matches = glob.glob(pattern, recursive=True)
             if matches:
