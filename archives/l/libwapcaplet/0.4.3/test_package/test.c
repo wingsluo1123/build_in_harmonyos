@@ -66,6 +66,7 @@ int main(void) {
     }
 
     /* Cleanup: release all interned strings */
+cleanup:
     if (sub) lwc_string_unref(sub);
     if (upper) lwc_string_unref(upper);
     if (str3) lwc_string_unref(str3);
