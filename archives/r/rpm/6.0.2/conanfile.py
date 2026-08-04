@@ -44,6 +44,7 @@ class RpmConan(ConanFile):
             os.environ["PKG_CONFIG_PATH"] = pkg_config_path + (":" + old if old else "")
 
         tc = CMakeToolchain(self)
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         if self.settings.os in ("Linux", "OHOS"):
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
