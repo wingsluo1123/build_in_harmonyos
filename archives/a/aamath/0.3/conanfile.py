@@ -3,7 +3,7 @@
 
 aamath renders mathematical expressions as ASCII art text.
 Build system: plain Makefile (no configure script).
-Depends on readline + ncurses (pre-built system libraries).
+Depends on readline + ncurses (system pre-built libraries).
 """
 import os
 
@@ -40,42 +40,21 @@ class AamathConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def _find_sysroot(self):
-        """Find prefix containing readline headers and libs."""
-        candidates = [
-            os.environ.get("DEFAULT_PREFIX"),
-            os.path.expanduser("~/usr/local"),
-            "/data/service/hnp",
-            "/usr/local",
-            "/usr",
-        ]
-        for path in candidates:
-            if not path:
-                continue
-            if os.path.isfile(os.path.join(path, "include", "readline", "readline.h")):
-                return path
-        return None
-
-    def _ensure_deps(self):
-        """Ensure readline/ncurses are available, install from cmd-pkgs if missing."""
-        sysroot = self._find_sysroot()
-        if sysroot:
-            return sysroot
-
-        # Install readline + ncurses from cmd-pkgs
+    def _ensure_readline_headers(self, sysroot):
+        """Ensure readline dev headers exist; extract from source if missing."""
+        rl_header = os.path.join(sysroot, "include", "readline", "readline.h")
+        if os.path.isfile(rl_header):
+            return
+        # cmd-pkgs installs runtime .so only; extract dev headers from source
+        tmpdir = os.path.join(self.build_folder, "_rl_headers")
         self.run(
-            "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/"
-            "releases/download/pkgs/install.sh | sh -s -- readline 8.2 ncurses 6.5",
+            f"mkdir -p {tmpdir} {sysroot}/include/readline && "
+            f"curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/gnu/readline/readline-8.2.tar.gz "
+            f"-o {tmpdir}/rl.tar.gz && "
+            f"tar xzf {tmpdir}/rl.tar.gz -C {tmpdir} && "
+            f"cp {tmpdir}/readline-8.2/*.h {sysroot}/include/readline/",
             env="conanbuild",
         )
-        sysroot = self._find_sysroot()
-        if not sysroot:
-            raise ConanInvalidConfiguration(
-                "readline/ncurses not found and install failed. "
-                "Install: curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/"
-                "cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- readline 8.2 ncurses 6.5"
-            )
-        return sysroot
 
     def build(self):
         apply_conandata_patches(self)
@@ -83,7 +62,8 @@ class AamathConan(ConanFile):
         comp = self.conf.get("tools.build:compiler_executables", check_type=dict, default={})
         cxx = comp.get("cpp", "clang++") if comp else "clang++"
 
-        sysroot = self._ensure_deps()
+        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        self._ensure_readline_headers(sysroot)
         src = self.source_folder
 
         self.run(
