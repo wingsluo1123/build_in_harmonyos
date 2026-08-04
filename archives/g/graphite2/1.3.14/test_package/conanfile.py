@@ -5,8 +5,6 @@ R34: This test substantively depends on the graphite2 package by
 calling gr_engine_version() to verify the library is correctly
 linked and functional.
 """
-import os
-
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -29,6 +27,3 @@ class Graphite2TestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # R34: Run the test binary directly to verify substantive dependency
-        test_exe = os.path.join(self.cpp.build.bindirs[0], "test_graphite2")
-        self.run(test_exe, env="conanrun")

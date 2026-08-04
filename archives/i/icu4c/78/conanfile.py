@@ -89,13 +89,17 @@ class Icu4cConan(ConanFile):
         except ConanException:
             with open(check_log, "r") as f:
                 log_content = f.read()
-            # Parse failure lines and only suppress known intltest failures
+            # Parse failure lines: only suppress known OHOS intltest platform failures
+            # (locale/syscall). Other intltest regressions must still raise.
             fail_lines = [l for l in log_content.splitlines()
                           if "FAIL" in l or "Error" in l]
             non_intltest_fails = [l for l in fail_lines
                                   if "intltest" not in l.lower()]
-            if non_intltest_fails:
-                # Failures from non-intltest suites indicate real regressions
+            # intltest fails not related to locale/syscall are real regressions
+            unknown_intltest_fails = [l for l in fail_lines
+                                      if "intltest" in l.lower()
+                                      and not any(kw in l.lower() for kw in ("locale", "syscall"))]
+            if non_intltest_fails or unknown_intltest_fails:
                 raise
             self.output.warning("make check had failures (expected on OHOS: intltest locale/syscall)")
 

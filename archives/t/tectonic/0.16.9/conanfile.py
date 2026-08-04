@@ -195,8 +195,8 @@ class TectonicConan(ConanFile):
             # Re-raise if compilation errors detected (indicates real regression)
             if "could not compile" in log_content or "error[E" in log_content:
                 raise
-            # Re-raise on signal crashes (SIGSEGV/SIGABRT/SIGILL — real platform bugs)
-            if any(sig in log_content for sig in ("signal:", "SIGSEGV", "SIGABRT", "SIGILL")):
+            # Re-raise on signal crashes (SIGSEGV/SIGABRT/SIGILL/SIGBUS/SIGKILL — real platform bugs)
+            if any(sig in log_content for sig in ("signal:", "SIGSEGV", "SIGABRT", "SIGILL", "SIGBUS", "SIGKILL")):
                 raise
             # Check test assertion failures: only network-related test failures are tolerated
             if "test result: FAILED" in log_content:
