@@ -112,8 +112,6 @@ class GadapConan(ConanFile):
             return
 
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
 
         for pkg, ver in missing:
             self.output.info(f"Installing {pkg} {ver} from cmd-pkgs...")
@@ -123,13 +121,18 @@ class GadapConan(ConanFile):
             )
             try:
                 req = urllib.request.urlopen(url, context=ctx, timeout=120)
-                data = req.read()
-                tf = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")
-                tf.extractall(prefix)
-                tf.close()
+                try:
+                    data = req.read()
+                    tf = tarfile.open(fileobj=io.BytesIO(data), mode="r:gz")
+                    tf.extractall(prefix)
+                    tf.close()
+                finally:
+                    req.close()
                 self.output.info(f"  Installed {pkg} {ver} from cmd-pkgs")
             except Exception as e:
-                self.output.warning(f"  cmd-pkgs install failed for {pkg}: {e}")
+                # P2: 依赖安装失败必须终止构建，静默继续会掩盖根因
+                raise ConanInvalidConfiguration(
+                    f"Failed to install system dependency {pkg} {ver} from cmd-pkgs: {e}")
 
     def build(self):
         # CI worker 干净环境无 libdap/curl/libtirpc 预编译包，先自动安装
