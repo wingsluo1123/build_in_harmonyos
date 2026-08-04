@@ -7,7 +7,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 class HidapiConan(ConanFile):
     name = "hidapi"
-    version = "0.12"
+    version = "0.12.0"
     description = "A simple library for communicating with USB and Bluetooth HID devices"
     license = "MIT"
     homepage = "https://github.com/libusb/hidapi"
