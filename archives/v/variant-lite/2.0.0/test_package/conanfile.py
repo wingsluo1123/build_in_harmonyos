@@ -18,9 +18,15 @@ class VariantLiteTestConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        if self.settings.os in ("Linux", "OHOS"):
+        # E092: CMake does not recognize OHOS as a target platform.
+        # OHOS 的 Conan arch=armv8 不能直接作为 CMAKE_SYSTEM_PROCESSOR，需映射为 aarch64；
+        # Linux 保留实际架构值（str(self.settings.arch)），与主 conanfile.py 保持一致。
+        if self.settings.os == "OHOS":
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
             tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+        elif self.settings.os == "Linux":
+            tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
+            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = str(self.settings.arch)
         tc.generate()
 
     def build(self):
