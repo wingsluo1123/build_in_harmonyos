@@ -1,45 +1,58 @@
 # apr 1.7.6 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-04-30}
+- 构建系统: autotools
+- 编译日期: 2026-08-05
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: built
 
 ## 编译步骤
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+1. 下载源码: https://dlcdn.apache.org/apr/apr-1.7.6.tar.gz
+2. 应用 OHOS 平台补丁:
+   - patch-autotools-ohos.pl build/config.guess build/config.sub
+   - sed -i 's/umask 077/umask 000/g' configure
+3. ./configure --prefix=/storage/Users/currentUser/usr/local
+4. make -j2
+5. make install DESTDIR=$TEST_PREFIX
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | config.guess 无法识别 HarmonyOS | E007: 缺少 __OHOS__ LIBC 检测 | patch-autotools-ohos.pl 添加 HarmonyOS 系统识别 |
+| 2 | config.sub 不支持 ohos-linux | E072: 缺少 ohos-linux triplet | patch-autotools-ohos.pl 添加 ohos-linux 支持 |
+| 3 | config.status Permission denied | E011: HMDFS 上 umask 077 导致权限不足 | sed umask 077 → umask 000 |
 
 ## 源码修改
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
+- 0001-build-config.guess.patch: 添加 __OHOS__ LIBC 检测和 HarmonyOS 系统识别
+- 0002-build-config.sub.patch: 添加 ohos-linux triplet 支持
+- 0003-configure.patch: 修复 umask 077 → 000 解决 HMDFS 权限问题
 
 ## 依赖版本
 
-{列出本次编译依赖的具体软件版本}
+无外部依赖
 
 ## 验证结果
 
 ```bash
-{验证命令和结果}
+# conan-verify 所有门禁通过
+G1 (recipe completeness): PASS
+G2 (conan create clean build): PASS
+G3 (system library isolation): PASS
+G4 (product completeness): PASS
+L2 (smoke test): PASS
+L4 (security scan): PASS
+L5 (baseline): PASS
+W3 (local CI simulation): PASS
 ```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
 
 ## 注意事项
 
-{需要特别注意的点；无则删除此节}
+- APR 是系统级库，默认静态链接 (R26)
+- 构建产物: libapr-1.a, libapr-1.so, apr-1-config, apr-1.pc
 ---
 
-**编译结束**: 2026-04-30 12:03
+**编译结束**: 2026-08-05 01:08
 **最终状态**: built
