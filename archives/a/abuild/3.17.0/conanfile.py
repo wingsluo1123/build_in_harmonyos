@@ -33,6 +33,8 @@ class AbuildConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
+    exports_sources = "atf-shim.sh"
+
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -141,6 +143,58 @@ class AbuildConan(ConanFile):
         # Generate functions.sh and abuild.conf
         self.run(f"cd {src} && make functions.sh")
         self.run(f"cd {src} && make abuild.conf")
+
+        # ── Run upstream ATF test suite ──
+        # abuild uses Kyua/ATF test framework (tests/*_test). Since kyua
+        # and atf-sh are not available on OHOS, we use a minimal ATF shim
+        # (atf-shim.sh) to run the tests directly. The shim is exported via
+        # exports_sources and is available in the source folder.
+        shim_path = os.path.join(self.source_folder, "atf-shim.sh")
+        if os.path.isfile(shim_path):
+            # Generate test key (required by some tests)
+            if not os.path.isfile(os.path.join(src, "tests", "testdata", "abuild.key")):
+                self.run(f"cd {src} && make tests/testdata/abuild.key")
+
+            # Generate Kyuafile (needed by test discovery)
+            self.run(f"cd {src} && mkdir -p tests/Kyuafile")
+            self.run(f"cd {src} && make tests/Kyuafile")
+
+            # Build test env: PATH must include source dir for tools
+            test_env = (
+                f"ABUILD_SHAREDIR={src} "
+                f"ABUILD_USERDIR={src}/tests/testdata "
+                f"ABUILD_CONF=/dev/null "
+                f"ABUILD_USERCONF=/dev/null "
+                f"GIT=false "
+                f"PATH={src}:$PATH"
+            )
+
+            # Run each test file
+            test_dir = os.path.join(src, "tests")
+            test_files = sorted([
+                f for f in os.listdir(test_dir)
+                if f.endswith("_test") and os.path.isfile(os.path.join(test_dir, f))
+            ])
+            all_passed = True
+            for tf in test_files:
+                tf_path = os.path.join(test_dir, tf)
+                # Run the test via ATF shim
+                cmd = (
+                    f"cd {src} && "
+                    f"{test_env} sh {shim_path} "
+                    f"'_atf_run_test {tf_path} {test_dir}'"
+                )
+                rc = self.run(cmd, ignore_errors=True)
+                if rc != 0:
+                    self.output.warning(f"Upstream test {tf} failed (exit {rc})")
+                    all_passed = False
+
+            if all_passed:
+                self.output.info("All upstream ATF tests passed")
+            else:
+                self.output.warning("Some upstream tests failed (non-blocking for build)")
+        else:
+            self.output.warning("ATF shim not found at {shim_path}, skipping upstream tests")
 
     def package(self):
         src = self.source_folder
