@@ -58,14 +58,24 @@ class ClpConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # E072: autotools 项目需要替换 config.sub/config.guess 以支持 ohos 三元组
-        for name in ("config.guess", "config.sub"):
-            for root, dirs, files in os.walk(self.source_folder):
-                if name in files:
-                    path = os.path.join(root, name)
-                    replace_in_file(self, path,
-                        'Linux|GNU|K\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD',
-                        'Linux|GNU|K\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD|OHOS')
-                    self.output.info(f"patched {name}: {path}")
+        # config.sub: 在其 case 分支列表追加 OHOS（config.sub 用系统类别模式串）
+        # config.guess: 用 UNAME_SYSTEM 分支映射 HarmonyOS→Linux（参照 coinutils/2.11.13）
+        for root, dirs, files in os.walk(self.source_folder):
+            if "config.sub" in files:
+                path = os.path.join(root, "config.sub")
+                replace_in_file(self, path,
+                    'Linux|GNU|K\\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD',
+                    'Linux|GNU|K\\*BSD|NetBSD|OpenBSD|DragonFly|FreeBSD|OHOS')
+                self.output.info(f"patched config.sub: {path}")
+            if "config.guess" in files:
+                path = os.path.join(root, "config.guess")
+                replace_in_file(self, path,
+                    'case $UNAME_SYSTEM in',
+                    'case $UNAME_SYSTEM in\n    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;')
+                replace_in_file(self, path,
+                    'case "${UNAME_SYSTEM}" in',
+                    'case "${UNAME_SYSTEM}" in\n    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;')
+                self.output.info(f"patched config.guess: {path}")
         configure_path = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure_path):
             replace_in_file(self, configure_path,
