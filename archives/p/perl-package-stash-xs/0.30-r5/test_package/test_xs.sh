@@ -22,7 +22,8 @@ if ($@) {
         read($fh, my $magic, 4);
         close($fh);
         die "XS.so is not ELF" unless $magic eq "\x7fELF";
-        exit 0;
+        print STDERR "SKIP: API test skipped — SELinux HMDFS blocks .so loading (known platform limitation)\n";
+        exit 77;
     }
     die "Load failed: $@";
 }

@@ -42,17 +42,15 @@ class PerlPackageStashXsConan(ConanFile):
         apply_conandata_patches(self)
         # Perl XS module build: perl Makefile.PL && make
         # Patch already modifies Makefile.PL with HarmonyOS-specific INC and dynamic_lib flags
-        home = os.environ.get("HOME", "/storage/Users/currentUser")
-        perl_lib = f"{home}/usr/local/lib/site_perl/5.42.2:{home}/usr/local/lib/5.42.2"
-        # Set PERL5LIB in the environment
-        os.environ["PERL5LIB"] = perl_lib
-        self.run(f"perl Makefile.PL PREFIX={home}/usr/local", cwd=self.source_folder)
-        self.run("make -j1", cwd=self.source_folder)
+        home = os.environ.get("HOME", "/")
+        perl_lib = f"{home}/usr/local/lib/site_perl/5.42.0:{home}/usr/local/lib/5.42.0"
+        self.run(f"perl Makefile.PL PREFIX={home}/usr/local",
+                 cwd=self.source_folder, env={"PERL5LIB": perl_lib})
+        self.run("make -j1", cwd=self.source_folder, env={"PERL5LIB": perl_lib})
 
     def package(self):
         self.run(f"make install DESTDIR={self.package_folder}", cwd=self.source_folder)
 
     def package_info(self):
-        # The XS .so is installed under auto/Package/Stash/XS/XS.so
-        self.cpp_info.libs = ["XS"]
-        self.cpp_info.libdirs = ["lib"]
+        # Perl XS module — not a C/C++ library, no cpp_info to expose
+        pass
