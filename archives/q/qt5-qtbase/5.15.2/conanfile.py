@@ -74,6 +74,10 @@ class Qt5QtbaseConan(ConanFile):
         src_dir = self.source_folder
         pkg = self.package_folder
 
+        # 记录构建时的包目录路径（configure -prefix 会写入 qmake 二进制和
+        # modules/*.pri 中，package() 阶段需替换为最终包目录路径）
+        self._build_prefix = self.package_folder
+
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         ) or {}
@@ -266,6 +270,46 @@ class Qt5QtbaseConan(ConanFile):
         if os.path.isdir(cmake_dir):
             copy(self, "*", src=cmake_dir,
                  dst=os.path.join(self.package_folder, "lib", "cmake"), keep_path=True)
+
+        # ── 修复依赖项 relocatability ──────────────────────────────────
+        # configure -prefix 指向了构建时的包目录（self._build_prefix），
+        # 该路径被烘焙进 qmake 二进制、bin/qt.conf 与 mkspecs/modules/*.pri。
+        # 经 package() 复制到最终包目录后，这些路径失效，需修正。
+
+        # 1. 重写 bin/qt.conf：移除构建机器路径，用相对路径实现 relocatable
+        pkg = self.package_folder
+        qt_conf = os.path.join(pkg, "bin", "qt.conf")
+        if os.path.isfile(qt_conf):
+            with open(qt_conf, "w") as f:
+                f.write(
+                    "[EffectivePaths]\n"
+                    "Prefix=..\n"
+                    "[Paths]\n"
+                    f"Prefix={pkg}\n"
+                    f"HostPrefix={pkg}\n"
+                    "Sysroot=\n"
+                    "SysrootifyPrefix=false\n"
+                )
+
+        # 2. 修正 mkspecs/modules/*.pri 中的构建路径为最终包目录路径
+        modules_dir = os.path.join(pkg, "mkspecs", "modules")
+        if os.path.isdir(modules_dir) and hasattr(self, "_build_prefix"):
+            old_prefix = self._build_prefix
+            new_prefix = pkg
+            if old_prefix and old_prefix != new_prefix:
+                for fname in os.listdir(modules_dir):
+                    if not fname.endswith(".pri"):
+                        continue
+                    fpath = os.path.join(modules_dir, fname)
+                    content = open(fpath).read()
+                    if old_prefix not in content:
+                        continue
+                    content = content.replace(old_prefix, new_prefix)
+                    open(fpath, "w").write(content)
+                    self.output.info(
+                        f"Fixed path in mkspecs/modules/{fname}: "
+                        f"{old_prefix} → {new_prefix}"
+                    )
 
     def package_info(self):
         # Define components so CMakeDeps generates per-module config files
