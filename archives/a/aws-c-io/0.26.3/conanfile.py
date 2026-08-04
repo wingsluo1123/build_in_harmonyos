@@ -41,7 +41,7 @@ class AwscioConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # R26: System-name libraries default to static
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         # BYO_CRYPTO=ON disables s2n TLS dependency (not available on HarmonyOS)

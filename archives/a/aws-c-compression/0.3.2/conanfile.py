@@ -42,7 +42,7 @@ class AwsccompressionConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         # R26: System-name libraries default to static
-        tc.variables["BUILD_SHARED_LIBS"] = "OFF"
+        tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["BUILD_TESTING"] = "OFF"
         # aws-c-common installs its own cmake config (AWS:: namespace + modules)
