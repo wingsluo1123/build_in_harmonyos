@@ -75,3 +75,7 @@ class Lv2Conan(ConanFile):
         self.cpp_info.set_property("pkg_config_name", "lv2")
         self.cpp_info.libs = []
         self.cpp_info.includedirs = ["include"]
+        self.cpp_info.resdirs = ["lib/lv2"]
+        self.cpp_info.set_property("pkg_config_name", "lv2")
+        self.cpp_info.libs = []
+        self.cpp_info.includedirs = ["include"]
