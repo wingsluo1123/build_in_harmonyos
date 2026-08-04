@@ -73,13 +73,22 @@ class GadapConan(ConanFile):
             tc.configure_args.append("--enable-shared")
             tc.configure_args.append("--disable-static")
         # R33: 编译器必须从 Conan conf 获取，显式传给 configure（CI 环境
-        # AutotoolsToolchain 不会自动注入 CC/CXX 到 configure 命令）
+        # AutotoolsToolchain 不会自动注入 CC/CXX/CXXFLAGS 到 configure 命令）
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict)
         if compilers.get("c"):
             tc.configure_args.append(f"CC={compilers['c']}")
         if compilers.get("cpp"):
             tc.configure_args.append(f"CXX={compilers['cpp']}")
+        # CI 上 CXXFLAGS 环境变量未生效，显式注入编译器选项
+        cxxflags = []
+        if str(self.settings.compiler.libcxx):
+            cxxflags.append(f"-stdlib={self.settings.compiler.libcxx}")
+        if str(self.settings.compiler.cppstd):
+            cxxflags.append(f"-std=c++{self.settings.compiler.cppstd}")
+        cxxflags.append(f"-O{'3' if self.settings.build_type == 'Release' else '0'}")
+        if cxxflags:
+            tc.configure_args.append(f"CXXFLAGS={' '.join(cxxflags)}")
         # libdap/curl/libtirpc 由系统预编译包提供（cmd-pkgs → ~/usr/local）
         pkg_prefix = os.path.expanduser("~/usr/local")
         tirpc_inc = f"-I{pkg_prefix}/include/tirpc"
