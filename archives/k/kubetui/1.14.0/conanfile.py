@@ -37,7 +37,20 @@ class KubetuiConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # aireview P1 阻塞 + P2: get(self, **self.conan_data["sources"], ...)
+        # 会把 mirror_url 当 kwarg 传给 get() 报 TypeError；
+        # Conan 2.x get() 不接受 mirror_url，且 **kwargs 静默忽略致镜像下载从未触发。
+        # 参照 glib/macifrename 模式：pop mirror_url，主 URL 失败后用 mirror_url 重试。
+        sources = dict(self.conan_data["sources"])
+        mirror_url = sources.pop("mirror_url", None)
+        sha256 = sources.get("sha256")
+        try:
+            get(self, **sources, strip_root=True)
+        except ConanException as e:
+            if not mirror_url:
+                raise
+            self.output.warning(f"primary URL download failed: {e}, retrying with mirror_url")
+            get(self, url=mirror_url, sha256=sha256, strip_root=True)
 
     def export_sources(self):
         # Conan 2.x G1 门禁要求 export_sources() 声明；kubetui 无补丁
@@ -55,8 +68,12 @@ class KubetuiConan(ConanFile):
         try:
             self.run("set -o pipefail && curl -fsSL --connect-timeout 60 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
             rust_ok = True
-            # aireview P3: cmd-pkgs 主路径成功后未更新 PATH — 后续 cargo build 需找 cmd-pkgs 装的 cargo
-            # cmd-pkgs 装到 /data/service/hnp/bin（CI Profile PATH 已含），但 cargo 可能在子目录需显式找
+            # aireview P2: cmd-pkgs 装到 /data/service/hnp/bin 但后续 cargo build 用 env="conanbuild"
+            # 该环境可能不含 cmd-pkgs 安装目录 → cargo: command not found
+            # 显式把 cmd-pkgs 安装路径加入 os.environ["PATH"]，conanbuild 子进程继承
+            cmd_pkgs_bin = "/data/service/hnp/bin"
+            if os.path.isdir(cmd_pkgs_bin):
+                os.environ["PATH"] = cmd_pkgs_bin + os.pathsep + os.environ.get("PATH", "")
         except ConanException:
             self.output.warning("rust install via cmd-pkgs failed (Download failed), trying fallback paths")
             # 多路径 fallback: 系统 cargo / rustup / local cargo / rustc
