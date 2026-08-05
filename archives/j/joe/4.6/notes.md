@@ -99,7 +99,7 @@ G1-G4 全 PASS
 |---|------|------|----------|----------|
 | 1 | config.guess 不识别 OHOS | 2013年旧版不支持 | E072 | 替换为简化版脚本（直接输出三元组） |
 | 2 | config.sub 不验证 linux-ohos | 缺少 OS 白名单 | E072 | 添加 3 处 ohos 模式 |
-| 3 | configure conftest 无法执行 | OHOS 需 ELF 签名 | E064 | 在 configure 中添加 sign-elf 钩子 |
+| 3 | configure conftest 无法执行 | OHOS 安全策略限制未签名 ELF 执行 | E064 | 使用跨编译模式（--build != --host）跳过 conftest |
 | 4 | config.status 临时目录不可写 | HMDFS umask 077 + setgid | E011 | 修改 umask 为 022 |
 | 5 | ld.lld 加载 libxml2.so.16 失败 | OHOS ld.lld wrapper 依赖 libxml2 | 无现存条目 | 使用 `-fuse-ld=bfd` |
 | 6 | joe/path.c 硬编码 /tmp/ | OHOS /tmp 只读 | PSCAN-FS-001 | __OHOS__ 守卫改用 /data/local/tmp/ |

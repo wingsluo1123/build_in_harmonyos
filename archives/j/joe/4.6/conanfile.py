@@ -58,31 +58,8 @@ class JoeConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Fix CONFIG_SHELL from profile that may point to non-existent path
+        # Override CONFIG_SHELL/SHELL from profile (may point to non-existent path)
         bash_path = shutil.which("bash") or "/bin/sh"
-        configure_path = os.path.join(self.source_folder, "configure")
-        if os.path.exists(configure_path):
-            with open(configure_path, "r") as f:
-                content = f.read()
-            # Fix CONFIG_SHELL/SHELL paths (strace pattern)
-            if content.startswith("#!"):
-                shebang = content.split("\n", 1)[0]
-                rest = content.split("\n", 1)[1] if "\n" in content else ""
-                fallback = (
-                    f'{shebang}\n'
-                    f'# Override invalid paths from Conan profile\n'
-                    f'if [ ! -x "$CONFIG_SHELL" ] 2>/dev/null; then\n'
-                    f'  CONFIG_SHELL={bash_path}\n'
-                    f'  export CONFIG_SHELL\n'
-                    f'fi\n'
-                    f'if [ ! -x "$SHELL" ] 2>/dev/null; then\n'
-                    f'  SHELL={bash_path}\n'
-                    f'  export SHELL\n'
-                    f'fi\n'
-                )
-                content = fallback + rest
-                with open(configure_path, "w") as f:
-                    f.write(content)
         os.environ["CONFIG_SHELL"] = bash_path
         os.environ["SHELL"] = bash_path
         autotools = Autotools(self)
