@@ -1,32 +1,37 @@
 software: audacious-plugins
 version: "4.5.1"
-status: published
-build_date: "2026-05-29"
+status: built
+build_date: "2026-08-05"
 build_system: autotools
 
 source:
-  url: "https://api.github.com/repos/audacious-media-player/audacious-plugins/tarball/audacious-plugins-4.5.1"
-  sha256: ""
-  tar_format: tar.gz
+  url: "https://distfiles.audacious-media-player.org/audacious-plugins-4.5.1.tar.bz2"
+  sha256: "f4feedc32776acfa9d24701d3b794fc97822f76da6991e91e627e70e561fdd3b"
+  tar_format: tar.bz2
 
 build:
   system: autotools
   configure_options:
     - "--disable-gtk"
     - "--disable-qt"
-    - "--disable-opus"
-    - "--disable-wavpack"
-    - "--disable-neon"
-    - "--disable-ffaudio"
   dependencies:
     - "audacious/4.5.1"
     - "glib/2.88.0"
-    - "libmpg123/1.32.9"
-    - "vorbis/1.3.7"
+    - "libmpg123/1.33.5"
+    - "libvorbis/1.3.7"
     - "flac/1.4.3"
-    - "alsa/1.2.12"
-    - "pulseaudio/17.0"
-    - "libxml2/2.x"
+    - "alsa-lib/1.2.12"
+    - "libxml2/2.15.3"
+    - "opus/1.4"
+    - "opusfile/0.12"
+    - "ffmpeg/8.1.1"
+    - "wavpack/5.8.1"
+    - "neon/0.35.0"
+    - "openssl/3.5.6"
+    - "pcre2/10.40"
+    - "libffi/3.4.6"
+    - "libogg/1.3.5"
+    - "zlib/1.3.1"
   cc: clang
   cxx: clang++
 
@@ -35,25 +40,38 @@ patches_applied:
   - "0002-build-aux-config.rpath.patch"
 
 knowledge_gained:
-  - "config.guess 需添加 HarmonyOS 识别"
-  - "FFmpeg 静态库不支持 PIC，需禁用 ffaudio"
-  - "LD_LIBRARY_PATH 需包含 hnp python lib 目录以使 gdbus-codegen 工作"
+  - "config.guess needs HarmonyOS detection (aarch64:HarmonyOS → aarch64-linux-musl)"
+  - "config.rpath needs platform compatibility update"
+  - "lld linker requires LD_LIBRARY_PATH to include SDK lib dir for libxml2.so.16"
+  - "musl dynamic loader does not resolve $ORIGIN in RUNPATH"
+  - "umask 077 in config.status fails on HMDFS (setgid inheritance); use umask 022"
+  - "opusfile pre-compiled package places headers in wrong location (prefix root, not include/opus/)"
+  - "wavpack pre-compiled package places header in include/ not include/wavpack/"
+  - "ffmpeg static libs lack -fPIC; use ffmpeg-full shared libs instead"
+  - "neon 0.35.0 requires OpenSSL 3.0+ (SSL_get1_peer_certificate not in 1.1.1)"
+  - "gdbus-codegen from glib 2.88.0 works with correct PYTHONPATH"
+  - "No trimming: opus, wavpack, ffaudio, neon all enabled (were disabled in v4.5.1)"
+  - "GTK/Qt UI disabled: gtk+-3.0 and Qt6Svg unavailable in conan repo"
 
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/audacious-plugins-4.5.1.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/audacious-plugins-4.5.1.work
-  source_orig_hash: beb9436dd66b3bd2
-  source_work_hash: 277575f6a850e743
-  generated_at: '2026-05-29T13:56:49'
-  patches_count: 2
+conan_dependencies:
+  available_in_ohpcd:
+    - "glib/2.84.0.1"
+    - "flac/1.4.3"
+    - "libxml2/2.15.3.1"
+    - "opus/1.5.2.1"
+    - "opusfile/0.12"
+    - "ffmpeg/8.1.2"
+    - "zlib/1.3.2"
+  not_in_ohpcd:
+    - "audacious"
+    - "mpg123"
+    - "libvorbis"
+    - "alsa-lib"
+    - "wavpack"
+    - "neon"
+    - "openssl"
+    - "pcre2"
+    - "libffi"
+    - "libogg"
 
-patch_classification:
-  - file: 0001-build-aux-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-build-aux-config.rpath.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+plugin_count: 35
