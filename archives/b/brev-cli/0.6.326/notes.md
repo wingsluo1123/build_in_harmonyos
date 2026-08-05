@@ -54,3 +54,4 @@ go build -o bin/brev ./main.go
 **最终状态**: built
 
 <!-- CI trigger: Wed Aug  5 14:19:51 CST 2026 -->
+<!-- CI recheck trigger: 1785912975 -->
