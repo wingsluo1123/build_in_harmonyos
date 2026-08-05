@@ -1,0 +1,22 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-5",
+      "file": "archives/b/boost-build/1.90.0/conanfile.py",
+      "line": 20,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' is explicitly forbidden by code-style.md Rule 5 (禁止残留模板占位符). The url attribute is listed as a forbidden placeholder pattern that must be filled by the adapter before PR submission, not left empty for CI to fill.",
+      "fix_suggestion": "Replace the empty url with the actual recipe repository URL. For example: url = \"https://cnb.cool/your-org/openharmony-compile-agent\" or the appropriate Conan recipe hosting URL. If the url field is not applicable, consider removing it entirely rather than leaving a placeholder."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/b/boost-build/1.90.0/test_package/conanfile.py",
+      "line": 29,
+      "description": "The test_package test() method builds a C++ project using b2 (b2 toolset=clang) which correctly exercises the b2 binary per R34. However, it does not run the resulting compiled binary to verify its output. While b2 returning exit code 0 indicates the build succeeded, adding a step to execute the built hello binary and check its output would make the test more robust and catch potential linking or runtime issues.",
+      "fix_suggestion": "After the 'b2 toolset=clang' invocation, add a step to find and run the built binary, e.g.: self.run('./bin/clang-linux-*/debug/hello', cwd=self.build_folder, env='conanrun') or use a glob to locate the output binary and verify it prints the expected 'b2 build test: OK' message."
+    }
+  ],
+  "summary": "Audit of boost-build 1.90.0 Conan recipe (9 changed files). VERDICT: PASS with 1 P2 warning and 1 P3 suggestion. No P0 (deception) or P1 (recipe correctness) issues found. Deception detection sweep: R34 PASS (test_package actually exercises b2 binary via b2 --version and b2 toolset=clang build), R9 PASS (test is real, not skipped), fake status PASS (manifest status=published matches notes.md evidence), fake sha256 PASS (64-char hex, not all-zeros/f), R8 N/A (no #ifdef __OHOS__ in code), R19 PASS (no pre-compiled binaries in PR), R40 N/A (build tool, not in sensitive adaptation categories). Recipe correctness: R37 PASS (version 1.90.0 = upstream version, first adaptation), R26 N/A (tool not library), R32 PASS (no settings.os== comparison; no platform branching needed for custom build), R33 PASS (build uses explicit --cxx=clang++ and toolset=clang, no os.environ), R39 PASS (source URL is official github.com/boostorg/build), R38 PASS (commands.json exists at software-level path with type=tool), R6 PASS (no generated file modifications), Conan 2.x API PASS. Code style: P2 warning for url='' # CI fills this placeholder (CS-5). P3 suggestion to run built binary in test (R34 enhancement). conandata.yml, manifest.yaml, commands.json, notes.md, test_package files all conform to rules."
+}
