@@ -53,11 +53,15 @@ class ApitraceConan(ConanFile):
         cmake_layout(self)
 
     def _download_submodule(self, name, base_url, ref, dest):
-        """Download a git submodule at a fixed ref, trying mirror prefixes."""
+        """Download a git submodule at a fixed ref, trying mirror prefixes.
+
+        ref can be a tag name (e.g. 'v1.1.0') or a commit SHA (e.g. '9ae436c').
+        """
         tmp_dir = tempfile.gettempdir()
-        # Use tag-based archive URL for reproducible builds
-        for mirror in _MIRRORS:
-                archive_url = f"{base_url}/archive/refs/tags/{ref}.tar.gz"
+        # Try both tag and commit archive URL formats
+        for url_path in [f"archive/refs/tags/{ref}.tar.gz", f"archive/{ref}.tar.gz"]:
+            for mirror in _MIRRORS:
+                archive_url = f"{base_url}/{url_path}"
                 full_url = f"{mirror}{archive_url}" if mirror else archive_url
                 tmp_file = os.path.join(tmp_dir, f"apitrace_{name}.tar.gz")
                 try:
