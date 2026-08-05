@@ -1,0 +1,33 @@
+# 版本级 manifest（AI 元数据，CI 不读）
+software: abiword-plugin-docbook
+version: "3.0.8"
+status: built            # published | built | failed | archived
+build_system: autotools  # 标准 conan Autotools（CI 原生 clang）
+build_date: "2026-08-05"
+
+source:
+  url: "https://gitlab.gnome.org/World/AbiWord/-/archive/release-3.0.8/AbiWord-release-3.0.8.tar.gz"
+  sha256: "7c490e46f0a6143f84d5c7e3fed246f34486ad70cd55f162c792827607cd7e9a"
+  tar_format: tar.gz     # GNOME GitLab 上游 tarball
+
+build:
+  system: autotools
+  configure_options: ["--enable-plugins=docbook", "--disable-default-plugins", "--with-gtk2=no"]
+  dependencies: ["libgsf/1.14.53"]
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_results:
+  type: conan-verify
+  total: 1
+  passed: 1
+  failed: 0
+
+knowledge_gained:
+  - "abiword-plugin-docbook 是 AbiWord 3.0.8 的 DocBook XML 导入/导出插件"
+  - "插件依赖 libgsf-1 (gsf_req)，上游 plugin.m4 用 PKG_CHECK_MODULES(DOCBOOK,[ $gsf_req ])"
+  - "构建时需链接 libabiword-3.0.so，使用 autotools --enable-plugins=docbook 启用"
+
+knowledge_ref: []
