@@ -40,6 +40,7 @@ int main(void) {
     struct item *p = LIST_FIRST(&list);
     if (p->value != 42) {
         fprintf(stderr, "FAIL: queue value mismatch\n");
+        free(i1);
         return 1;
     }
     free(p);
@@ -49,7 +50,6 @@ int main(void) {
     struct rb_item *r = malloc(sizeof(struct rb_item));
     if (r == NULL) {
         fprintf(stderr, "FAIL: malloc failed\n");
-        free(i1);
         return 1;
     }
     r->key = 100;
@@ -58,6 +58,7 @@ int main(void) {
     struct rb_item *find = RB_FIND(rb_tree, &tree, r);
     if (find == NULL || find->key != 100) {
         fprintf(stderr, "FAIL: tree lookup failed\n");
+        free(r);
         return 1;
     }
     free(r);

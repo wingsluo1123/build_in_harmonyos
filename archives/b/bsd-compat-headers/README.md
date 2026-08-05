@@ -8,4 +8,4 @@
 - 这些头文件是许多第三方库编译的必要条件
 
 ## 参考资料
-- [bsd-compat-headers](https://github.com/NeonatoX/bsd-compat-headers)
+- [bsd-compat-headers](https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/bsd-compat-headers)
