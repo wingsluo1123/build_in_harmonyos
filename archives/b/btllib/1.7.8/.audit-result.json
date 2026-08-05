@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R5",
+      "file": "archives/b/btllib/1.7.8/conanfile.py",
+      "line": 25,
+      "description": "Template placeholder remains in merged code: 'url = \"\"  # CI fills this'. Code style rule 5 explicitly lists this pattern as a prohibited placeholder that must be filled by the adapter before merge.",
+      "fix_suggestion": "Replace with the recipe repository URL, e.g. url = \"https://cnb.cool/<repo>/btllib\" or remove the comment if the url attribute is genuinely managed by CI post-merge."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/b/btllib/1.7.8/conandata.yml",
+      "line": 5,
+      "description": "Redundant mirror URLs manually listed in conandata.yml. R39 states that CI automatically adds mirror fallbacks (gh-proxy/ghproxy/gitclone/moeyy/kkgithub), so only the official GitHub URL is needed. The six mirror entries are unnecessary noise.",
+      "fix_suggestion": "Replace the url list with a single official URL: url: \"https://github.com/BirolLab/btllib/archive/refs/tags/v1.7.8.tar.gz\""
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R10",
+      "file": "archives/b/btllib/1.7.8/test_package/conanfile.py",
+      "line": 44,
+      "description": "'except Exception: pass' silently swallows all errors when locating libomp.so via subprocess. If the compiler path resolution or subprocess fails, no diagnostic is logged, making debugging harder. The spirit of R10 (no silent error swallowing) applies.",
+      "fix_suggestion": "At minimum, log a warning when the exception is caught, e.g. 'except Exception as e: self.output.warning(f\"Could not locate libomp via compiler: {e}\")'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-none",
+      "file": "archives/b/btllib/1.7.8/manifest.yaml",
+      "line": 158,
+      "description": "Hardcoded local absolute paths in patch_generation metadata: source_orig_dir and source_work_dir point to /storage/Users/currentUser/tmp/builds/btllib-1.7.8.{orig,work}. These are machine-specific paths that should not be committed.",
+      "fix_suggestion": "Replace with relative paths or remove the patch_generation section entirely if it is only useful during local development."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R15",
+      "file": "archives/b/btllib/commands.json",
+      "line": 5,
+      "description": "commands.json declares type='tool' but conanfile.py declares package_type='library' and does not set cpp_info.bindirs. While btllib does produce executables (indexlr, randseq, mi_bf_generate), the Conan recipe only exposes the library interface. This inconsistency may confuse consumers about whether the package is a library or a tool.",
+      "fix_suggestion": "Either (a) add cpp_info.bindirs = ['bin'] to package_info() in conanfile.py and keep commands.json type='tool', or (b) change commands.json type to 'library' and remove it if the package is treated purely as a library."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-none",
+      "file": "archives/b/btllib/1.7.8/notes.md",
+      "line": 80,
+      "description": "Stale documentation: notes.md still references '18 patches' and lists '0015-0018 subprojects/*.patch' for CMake version fixes, but those 4 patch files have been deleted and replaced by runtime re.sub in conanfile.py source(). The conandata.yml now lists only 15 patches.",
+      "fix_suggestion": "Update notes.md patch count from 18 to 15 and replace the '0015-0018 subprojects' bullet with a note explaining that CMake version fixes are now applied programmatically in conanfile.py source()."
+    }
+  ],
+  "summary": "Pre-PR audit (re-run) for btllib 1.7.8. All three previously identified fixes verified as applied: (1) P1 FIXED — hardcoded libomp.so path removed from test_package/conanfile.py, now uses subprocess with compiler -print-file-name; (2) P2 FIXED — commands.json schema corrected to name/description/homepage/type/versions; (3) P2 FIXED — orphan test_package/test.c deleted, CMakeLists.txt only references test_btllib.cpp. P0 deception checks all pass: test_btllib.cpp calls real btllib NtHash API (creates NtHash object, calls roll(), hashes(), get_hash_num(), verifies non-zero hashes); sha256 is a legitimate 64-char hex value (not zeros/placeholder); test() method calls self.run() to execute the test binary. P1 recipe correctness checks all pass: no hardcoded absolute paths in conanfile.py or test_package; platform guard uses 'self.settings.os in (\"Linux\", \"OHOS\")' consistently; version 1.7.8 is consistent across all files; OHOS guard in status.cpp patch has substantive logic (strerror_r POSIX vs GNU signature). One P2 warning: url placeholder in conanfile.py. Five P3 suggestions: redundant mirror URLs, silent exception swallowing, local absolute paths in manifest, type inconsistency, stale patch documentation. No blocking (P0/P1) issues found. Verdict: PASS."
+}
