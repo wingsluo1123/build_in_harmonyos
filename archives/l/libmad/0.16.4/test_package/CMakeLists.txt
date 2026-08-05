@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.15)
+project(test_libmad C)
+
+find_package(mad REQUIRED)
+
+add_executable(test_libmad test_libmad.c)
+target_link_libraries(test_libmad mad::mad)
+
+enable_testing()
+add_test(NAME test_libmad COMMAND test_libmad)

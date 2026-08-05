@@ -1,0 +1,49 @@
+version: "0.16.4"
+upstream_version: "0.16.4"
+status: built
+build_date: "2026-08-05"
+
+software: libmad
+description: "MPEG audio decoder library"
+language: C
+license: GPL-2.0-or-later
+
+source:
+  url: "https://ftp.debian.org/debian/pool/main/libm/libmad/libmad_0.16.4.orig.tar.xz"
+  sha256: "cd4c3aa4bf894c957b9b8662eca109927b43b19adafc4ff67eb5349d29d45198"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DASO=OFF"
+    - "-DEXAMPLE=OFF"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  dependencies: []
+  outputs:
+    - "lib/libmad.so"
+    - "include/mad.h"
+    - "lib/pkgconfig/mad.pc"
+    - "lib/cmake/mad/madConfig.cmake"
+
+patches_applied: []
+
+knowledge_gained:
+  - "libmad 0.16.4 (Tenacity Team fork) uses CMake instead of autotools."
+  - "The library target name is 'mad' (not 'libmad'); CMake produces libmad.so."
+  - "On aarch64 (64-bit), FPM_64BIT is auto-selected for fixed-point math."
+  - "ASO (assembly optimization) with imdct_l_arm.S is disabled for cross-compile safety."
+  - "No external dependencies; standalone C library."
+  - "Header mad.h is generated from mad.h.in via configure_file()."
+  - "CMake 4.x requires CMAKE_POLICY_VERSION_MINIMUM=3.5 for cmake_minimum_required(VERSION 3.1.0)."
+
+verification:
+  conan_create: "passed"
+  full_ref: "libmad/0.16.4#7fca6f0b900728b76d73f53ef327b374:7a35eca5b4d416121dd283cf0eea086af29425a9#10312ea142def5e405806ee711883588"
+  recipe_revision: "7fca6f0b900728b76d73f53ef327b374"
+  package_revision: "10312ea142def5e405806ee711883588"
+  test_package:
+    total: 1
+    passed: 1
+    detail: "C consumer initializes mad_decoder, runs in sync mode, finishes, verifies version string."

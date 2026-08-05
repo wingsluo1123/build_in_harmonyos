@@ -1,0 +1,25 @@
+software: libgd
+display: "libgd"
+description: "GD graphics library for image creation and manipulation"
+category: gfx
+homepage: "https://libgd.github.io/"
+license: gd
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "libgd uses CMake built-in Find modules (FindPNG/FindJPEG/FindFreetype/FindZLIB); wire conan deps via cache variables"
+    - "OHOS: CMAKE_SYSTEM_NAME=HarmonyOS is unknown to CMake (ML-0035) but configure succeeds with warnings only"
+    - "OHOS: need ohos-cmake-rules.cmake for proper SONAME (-Wl,-soname) on shared libgd.so"
+    - "Set LDFLAGS -L/-rpath-link for shared deps (libpng16.so, libfreetype.so) so linker resolves them"
+    - "zlib must be 1.3.1.1 (static -fPIC) to match libpng/1.6.58 requirement"
+  common_dependencies:
+    - libpng
+    - libjpeg
+    - freetype
+    - zlib
+
+versions:
+  "2.3.3":
+    status: built
+    build_date: "2026-08-05"

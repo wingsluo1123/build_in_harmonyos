@@ -1,6 +1,6 @@
 version: "0.16.3"
 status: published
-build_date: "2026-05-21"
+build_date: "2026-08-05"
 
 source:
   url: "https://ftp.debian.org/debian/pool/main/libi/libid3tag/libid3tag_0.16.3.orig.tar.gz"
@@ -18,10 +18,37 @@ build:
   cc: clang
   cxx: clang++
 
-patches_applied: []
+conan:
+  recipe: "archives/l/libid3tag/0.16.3/conanfile.py"
+  recipe_hash: "7ac35bd0c68fe214787bae90fd35ca82"
+  package_id: "2bbe66435e0156d95911d24ac24af55e674c4c5e"
+  package_revision: "de939c2307efcd3aba21fd154b1b3f2b"
+  full_reference: "libid3tag/0.16.3#7ac35bd0c68fe214787bae90fd35ca82:2bbe66435e0156d95911d24ac24af55e674c4c5e#de939c2307efcd3aba21fd154b1b3f2b"
+  build_command: "CFLAGS=-fPIC conan create archives/l/libid3tag/0.16.3/conanfile.py -pr:h=$PROFILE -pr:b=default --build=missing --build=*"
+  profile: "ohos-aarch64"
+  settings: "os=OHOS arch=armv8 compiler=clang compiler.version=15 build_type=Release"
+  options: "shared=True"
+  package_contents:
+    - "lib/libid3tag.so"
+    - "include/id3tag.h"
+    - "lib/pkgconfig/id3tag.pc"
+    - "lib/cmake/id3tag/id3tagConfig.cmake"
+  test_package: "test_package/"
+  test_result: "PASSED"
+
+patches_applied:
+  - description: "CMakeLists.txt: cmake_minimum_required(VERSION 3.1.0) -> 3.5 (CMake 4.x compat)"
+    type: "inline"
+    method: "build() string replace"
+  - description: "CMakeLists.txt: ZLIB::ZLIB -> zlib::zlib (CMakeDeps target name)"
+    type: "inline"
+    method: "build() string replace"
 
 knowledge_gained:
-  - "CMake 4.x 与 cmake_minimum_required(3.1) 不兼容，需 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "CMake 4.x 与 cmake_minimum_required(3.1) 不兼容，需 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 或直接提升版本号"
   - "Savannah 镜像在 OpenHarmony 环境不可达，Debian pool mirror (ftp.debian.org) 可替代"
   - "G0 clean-verify 仅支持 autotools，CMake 项目需创建 hints/configure.sh wrapper"
   - "init-build 依赖 configure.ac 判断构建系统，纯 CMake 项目需手动修正 build_system"
+  - "Conan CMakeDeps 生成 lowercase zlib::zlib 目标，源码用 ZLIB::ZLIB 需在 build() 中替换"
+  - "CMake toolchain 中 CMAKE_POLICY_VERSION_MINIMUM 在 project() 之后加载，早于 cmake_minimum_required()，无效；需在源码中提升版本号"
+  - "ohpcd 远端的 zlib 配方为静态专用（无 fPIC 选项），链接进 .so 需 CFLAGS=-fPIC 重编译"
