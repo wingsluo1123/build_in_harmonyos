@@ -176,8 +176,8 @@ class KlystrackConan(ConanFile):
         # snd/ 目录已注入 build folder 根（_inject_klystron_snd），但 Makefile L51
         # INCLUDEFLAGS := -I src $(SDLFLAGS) -I $(KLYSTRON)/src ... 不含根目录
         # → #include "snd/music.h"（相对根）找不到
-        # 修法: CFLAGS 注入 -I.（build folder 根）让 snd/ 可见
-        cppflags += f" -I."
+        # 修法: CFLAGS 注入 -I{make_dir}（源码根）让 snd/ 可见（-I. 是 cwd 非根避）
+        cppflags += f" -I{make_dir}"
         # snd/ 也在 klystron/src/snd/（klystron symlink 指向 make_dir），
         # 注入 -I../klystron/src 兼容上游 #include 路径
         klystron_src_inc = os.path.join(os.path.dirname(make_dir), "klystron", "src")
