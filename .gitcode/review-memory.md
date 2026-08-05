@@ -1,6 +1,6 @@
 ---
 name: ohos-build-review-rules
-description: 鸿蒙PC三方库适配 PR 审查规则。覆盖配方正确性、欺骗性行为检测、文件规范、安全边界。适用于 C/C++ 库适配到 HarmonyOS PC (arm64) 的 Conan 2.x 制品仓体系。
+description: 鸿蒙PC三方库适配 PR 审查规则。覆盖配方正确性、欺骗性行为检测、文件规范、安全边界、语义正确性（补丁脚本/错误路径资源释放）。适用于 C/C++ 库适配到 HarmonyOS PC (arm64) 的 Conan 2.x 制品仓体系。
 type: project
 ---
 
@@ -181,3 +181,43 @@ archives/{letter}/{name}/
 
 ### 25. shell 脚本规范
 `set -euo pipefail` 开头，变量加双引号，Conan 2.x 用 `--only-recipe`（非 `--recipe`）。
+
+---
+
+## 五、语义正确性检查（补丁与测试代码）
+
+### 26. 补丁脚本语义检查 (P1)
+patches/ 中的脚本（configure、Makefile 模板等）必须追踪**变量展开链**，禁止字面量占位导致逻辑失效。heredoc 引号模式与变量引用必须匹配：
+```bash
+# 错误 — 单引号 heredoc 禁 shell 展开，ENABLE_UV 永远是字面量，ifeq 永不匹配
+cat > Makefile << 'MAKEFILE_EOF'
+ENABLE_UV = ENABLE_UV_VAL
+ifeq ($(ENABLE_UV),yes)
+MAKEFILE_EOF
+# 正确 — 占位符 + 生成后替换，configure 参数真正生效
+cat > Makefile << 'MAKEFILE_EOF'
+ENABLE_UV = @ENABLE_UV@
+MAKEFILE_EOF
+sed -i "s/@ENABLE_UV@/$ENABLE_UV/" Makefile
+```
+检查要点：
+1. 单引号 heredoc（`<< 'EOF'`）内禁止出现"看似变量引用"的字面量（`ENABLE_UV_VAL`、`CC_VAL` 等）
+2. 生成脚本中的条件分支（`ifeq`/`if`）必须可达，存在实际控制机制
+3. 脚本逻辑正确性（非仅语法）——特别是 configure 选项与生成 Makefile 的联动
+
+> 案例：raft 0.18.1 的 configure 脚本因 `ENABLE_UV = ENABLE_UV_VAL` 字面量，UV 控制机制完全失效（`--disable-uv` 永不生效），被 gitcode-bot 检视发现。
+
+### 27. 错误路径资源释放检查 (P2)
+test_package 及源码补丁中，`init`/`create`/`open`/`alloc` 类调用的**所有失败分支**必须成对释放（`close`/`destroy`/`free`）：
+```c
+// 错误 — add 失败直接 return，泄漏 init 分配的堆内存
+raft_configuration_init(&config);
+rv = raft_configuration_add(&config, 1, "127.0.0.1:9090", RAFT_STANDBY);
+if (rv != 0) { return 1; }
+// 正确 — 失败分支同样释放，与正常路径一致
+if (rv != 0) { raft_configuration_close(&config); return 1; }
+```
+检查要点：
+1. 每个失败 `return` 前核对资源释放，与同函数其他错误路径保持一致
+2. `init`/`create` 成功后**所有**后续失败分支都必须释放（不只是正常路径）
+3. 栈变量 `init` 后内部指向的堆内存不会自动释放，必须显式 `close`/`destroy`
