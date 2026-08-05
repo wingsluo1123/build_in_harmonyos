@@ -20,5 +20,5 @@ class ChmlibTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # self.run() required by CI L0d gate; cmake.test() is not detected
+        self.run("ctest --output-on-failure -C Release")
