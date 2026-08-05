@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: Crypt-OpenSSL-Random/0.11
+homepage: "https://metacpan.org/pod/Crypt::OpenSSL::Random"
+
+# 上游测试命令 (make test runs t/*.t)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/0-basic.t
+    source: Crypt-OpenSSL-Random-0.11/t/0-basic.t
+    description: "Basic functionality test: random_seed, random_status, random_bytes, random_pseudo_bytes"
+    command: "perl -Iblib/lib -Iblib/arch t/0-basic.t"
+  - file: t/z_kwalitee.t
+    source: Crypt-OpenSSL-Random-0.11/t/z_kwalitee.t
+    description: "Kwalitee test (author only, skipped in CI)"
+    command: "perl t/z_kwalitee.t"
+  - file: t/z_pod.t
+    source: Crypt-OpenSSL-Random-0.11/t/z_pod.t
+    description: "POD documentation test (author only, skipped in CI)"
+    command: "perl t/z_pod.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package.py
+    description: "消费者测试: 验证 Random.so 是有效 ELF 且 Random.pm 包含版本号"
+    command: "python3 test_package.py"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# t/0-basic.t: 5 assertions (ok 1-5)
+assertion_count: 5
