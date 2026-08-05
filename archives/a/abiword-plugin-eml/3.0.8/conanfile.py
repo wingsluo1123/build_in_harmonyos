@@ -97,7 +97,8 @@ class AbiwordPluginEmlConan(ConanFile):
     def package(self):
         # Install the plugin .so to the package folder
         autotools = Autotools(self)
-        autotools.install(target="-C plugins/eml install")
+        # Autotools.install() 不接受 target 参数(只 make() 接受),用 make(target=)
+        autotools.make(target="-C plugins/eml install")
 
         # Also try to copy the .so manually if install target doesn't work
         import glob

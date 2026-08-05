@@ -65,6 +65,8 @@ class AbiwordPluginEmlTestConan(ConanFile):
                 self.output.warning(f"readelf failed (rc={result.returncode}): {result.stderr} (ctypes check will follow)")
         except FileNotFoundError:
             self.output.info("readelf not available, skipping ELF verification")
+        except subprocess.TimeoutExpired:
+            self.output.warning("readelf timed out, skipping ELF verification")
 
         # Method 2: Use ctypes to attempt loading the .so
         self.output.info("Attempting to load .so with ctypes.CDLL...")
