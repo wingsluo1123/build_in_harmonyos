@@ -161,11 +161,14 @@ class AkamaiConan(ConanFile):
             self._sign_elf_if_ohos(test_bin)
             buf = io.StringIO()
             try:
-                self.run(f'"{test_bin}" -test.v', cwd=self.source_folder, env=["akamai_go_env"],
+                retcode = self.run(f'"{test_bin}" -test.v', cwd=self.source_folder, env=["akamai_go_env"],
                          stdout=buf, stderr=buf, ignore_errors=True)
-                report_lines.append(f"PASS: {package}")
+                if retcode == 0:
+                    report_lines.append(f"PASS: {package}")
+                else:
+                    report_lines.append(f"FAIL: {package} (exit {retcode})")
             except Exception:
-                report_lines.append(f"FAIL: {package}")
+                report_lines.append(f"FAIL: {package} (exception)")
             output = buf.getvalue()
             for line in output.splitlines():
                 self.output.info(f"[go test] {line}")
