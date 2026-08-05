@@ -3,10 +3,13 @@
 # Runs autojump --version to verify the installed binary works correctly.
 set -euo pipefail
 
-AUTOJUMP_BIN="${AUTOJUMP_PATH:-$(find "${PACKAGE_DIR:-/}" -name autojump -type f 2>/dev/null | head -1)}"
-
+# Find autojump binary in the package directory
+AUTOJUMP_BIN="${AUTOJUMP_PATH:-}"
+if [ -z "$AUTOJUMP_BIN" ] && [ -n "${PACKAGE_DIR:-}" ]; then
+    AUTOJUMP_BIN=$(find "${PACKAGE_DIR}" -name autojump -type f 2>/dev/null | head -1)
+fi
 if [ -z "$AUTOJUMP_BIN" ]; then
-    echo "        [fail] autojump binary not found"
+    echo "        [fail] autojump binary not found (set AUTOJUMP_PATH or PACKAGE_DIR)"
     exit 1
 fi
 
