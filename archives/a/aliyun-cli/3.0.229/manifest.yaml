@@ -1,0 +1,56 @@
+# 版本级 manifest
+# 文件位置: archives/a/aliyun-cli/3.0.229/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.0.229"
+software: aliyun-cli
+status: built
+build_date: "2026-08-05"
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/aliyun/aliyun-cli/archive/refs/tags/v3.0.229.tar.gz"
+  sha256: "21bd2b84de6e9c0380a5bee7f6b2c772199c69fd18ca9e107e9584060a3a2c74"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  build_system: go
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "GOOS=linux"
+    - "GOARCH=arm64"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "GOTOOLCHAIN=local"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Go linker 在 HMDFS 上 mmap 输出文件会 permission denied，需使用 ext2 分区路径"
+  - "aliyun-openapi-meta 是 git submodule，GitHub tarball 不包含，需单独下载"
+  - "版本注入路径: github.com/aliyun/aliyun-cli/cli.Version via ldflags -X"
+  - "ELF 签名: 构建后需 binary-sign-tool 签名才能在 HarmonyOS 上执行"
+  - "CGO_ENABLED=0 纯静态编译，无外部 C 依赖"
