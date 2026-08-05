@@ -15,6 +15,7 @@ from conan.tools.files import (
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
+from conan.tools.microsoft import unix_path
 
 
 class OsiConan(ConanFile):
@@ -41,6 +42,12 @@ class OsiConan(ConanFile):
             transitive_libs=True,
         )
 
+    def build_requirements(self):
+        if self.settings_build.os == "Windows":
+            self.win_bash = True
+            if not self.conf.get("tools.microsoft.bash:path", check_type=str):
+                self.tool_requires("msys2/cci.latest")
+
     def layout(self):
         basic_layout(self, src_folder=".")
         self.folders.build = "."
@@ -55,18 +62,23 @@ class OsiConan(ConanFile):
         AutotoolsDeps(self).generate()
         PkgConfigDeps(self).generate()
         coinutils = self.dependencies["coinutils"].package_folder
+        if self.settings_build.os == "Windows":
+            coinutils = unix_path(self, coinutils)
+        coinutils_include = f"{coinutils}/include/coin"
+        coinutils_lib = f"{coinutils}/lib"
 
         tc = AutotoolsToolchain(self)
         if self.settings.os == "OHOS":
-            tc.configure_args.extend([
-                "--build=aarch64-unknown-linux-gnu",
-                "--host=aarch64-unknown-linux-ohos",
-            ])
+            tc.update_configure_args({
+                "--build": "aarch64-unknown-linux-gnu",
+                "--host": "aarch64-unknown-linux-ohos",
+            })
         tc.configure_args.extend([
             "--disable-shared",
             "--enable-static",
             "--disable-dependency-tracking",
-            f"--with-coin-instdir={coinutils}",
+            f"--with-coinutils-incdir={coinutils_include}",
+            f"--with-coinutils-lib=-L{coinutils_lib} -lCoinUtils -lz -lm",
             "--without-glpk",
             "--without-soplex",
             "--without-cplex",
@@ -74,7 +86,12 @@ class OsiConan(ConanFile):
             "--without-xpress",
             "--without-gurobi",
         ])
-        tc.generate()
+        env = tc.environment()
+        if self.settings_build.os == "Windows":
+            # Libtool's legacy command-line limit probe can loop for minutes
+            # under MSYS. Use the conservative Windows limit explicitly.
+            env.define("lt_cv_sys_max_cmd_len", "8192")
+        tc.generate(env)
 
     def build(self):
         apply_conandata_patches(self)
