@@ -71,4 +71,5 @@ architecture: aarch64
 ---
 
 **编译结束**: 2026-08-05 09:50
-**最终状态**: built
+**最终状态**: built (conan-verify passed, CI will publish after PR merge)
+**R40 注意**: USB 硬件工具，完整功能验证需物理 Blackmagic Design USB 设备

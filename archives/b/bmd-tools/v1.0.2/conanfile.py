@@ -27,7 +27,7 @@ class BmdToolsConan(ConanFile):
     description = "Blackmagic Design USB H.264 streaming and firmware extraction tools"
     license = "GPL-2.0"
     homepage = "https://github.com/fabled/bmd-tools"
-    url = ""  # CI fills this
+    url = "https://github.com/fabled/bmd-tools"
 
     package_type = "application"
 
