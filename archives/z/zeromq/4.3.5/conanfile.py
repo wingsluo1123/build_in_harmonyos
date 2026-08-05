@@ -51,5 +51,6 @@ class ZeromqConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["zmq"]
+        self.cpp_info.includedirs = ["include"]
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread", "rt"]
