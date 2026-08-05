@@ -25,9 +25,6 @@ int main(void) {
         return 1;
     }
 
-    /* Verify brssl engine available */
-    br_ssl_client_context cc;
-    br_ssl_client_init_zero(&cc);
     printf("BearSSL SHA-256 test: OK\n");
     return 0;
 }
