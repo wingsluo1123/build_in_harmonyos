@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from conan import ConanFile
 
@@ -15,5 +16,5 @@ class AxelTestConan(ConanFile):
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
-        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "bash"
         self.run(f"{bash} test.sh", env="conanrun")
