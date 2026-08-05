@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: codespell/2.4.2
+homepage: "https://github.com/codespell-project/codespell"
+
+# 上游测试命令 (pytest，纯 Python 项目)
+upstream_check_command: "python3 -m pytest codespell_lib/tests/"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: codespell_lib/tests/test_basic.py
+    source: codespell-2.4.2/codespell_lib/tests/test_basic.py
+    description: "codespell 核心功能测试（拼写检查、字典、命令行参数等）"
+    command: "python3 -m pytest codespell_lib/tests/test_basic.py"
+  - file: codespell_lib/tests/test_dictionary.py
+    source: codespell-2.4.2/codespell_lib/tests/test_dictionary.py
+    description: "字典数据完整性测试（检查重复条目、编码等）"
+    command: "python3 -m pytest codespell_lib/tests/test_dictionary.py"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "验证 codespell CLI 可执行并输出版本号"
+    command: "codespell --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 150
