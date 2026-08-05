@@ -1,0 +1,63 @@
+--- orig/third_party/grpc/CMakeLists.txt	2025-03-23 16:22:55.000000000 +0800
++++ modified/third_party/grpc/CMakeLists.txt	2026-08-06 02:37:12.330365937 +0800
+@@ -3,7 +3,6 @@
+ pkg_check_modules(gRPC protobuf>=3.11 grpc++>=1.26)
+ if (gRPC_FOUND)
+     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
+-
+     message(STATUS "Looking for protoc")
+     find_program(PROTOC protoc)
+     if (PROTOC)
+@@ -11,7 +10,6 @@
+     else()
+         message(FATAL_ERROR "Looking for protoc -- not found")
+     endif()
+-
+     message(STATUS "Looking for grpc_cpp_plugin")
+     find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
+     if (GRPC_CPP_PLUGIN)
+@@ -19,22 +17,17 @@
+     else()
+         message(FATAL_ERROR "Looking for grpc_cpp_plugin -- not found")
+     endif()
+-
+     add_custom_target(grpc_dependency)
+ else ()
+     message(STATUS "Looking for gRPC::grpc++ dependency -- not found")
+-
+     include(ExternalProject)
+     ExternalProject_Add(grpc_dependency
+-            GIT_REPOSITORY
+-                https://github.com/grpc/grpc
+-            GIT_TAG
+-                v1.49.2
+-            GIT_SUBMODULES
+-            GIT_SHALLOW
+-                1
++            URL
++                https://codeload.github.com/grpc/grpc/tar.gz/v1.49.2
+             UPDATE_COMMAND
+                 ""
++            PATCH_COMMAND
++                sh ${CMAKE_CURRENT_SOURCE_DIR}/fetch_submodules.sh
+             LOG_CONFIGURE
+                 1
+             LOG_BUILD
+@@ -45,6 +38,9 @@
+                 -DgRPC_INSTALL:BOOL=ON
+                 -DgRPC_BUILD_TESTS:BOOL=OFF
+                 -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
++                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
++                -DCMAKE_SYSTEM_NAME=Linux
++                -DCMAKE_SYSTEM_PROCESSOR=aarch64
+                 -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency
+             CMAKE_CACHE_ARGS
+                 -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+@@ -63,7 +59,6 @@
+                 -DCMAKE_SHARED_LINKER_FLAGS:STRING=${CMAKE_SHARED_LINKER_FLAGS}
+                 -DCMAKE_MODULE_LINKER_FLAGS:STRING=${CMAKE_MODULE_LINKER_FLAGS}
+             )
+-
+     include(GNUInstallDirs)
+     list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency")
+     set(CMAKE_PREFIX_PATH ${PREFIX_PATH};${CMAKE_PREFIX_PATH}

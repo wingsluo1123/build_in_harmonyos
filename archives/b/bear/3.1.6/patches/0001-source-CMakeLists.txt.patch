@@ -1,8 +1,6 @@
-diff -ruN a/source/CMakeLists.txt b/source/CMakeLists.txt
---- a/source/CMakeLists.txt
-+++ b/source/CMakeLists.txt
-@@ -1,15 +1,15 @@
- cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
+--- orig/source/CMakeLists.txt	2025-03-23 16:22:55.000000000 +0800
++++ modified/source/CMakeLists.txt	2026-08-06 02:37:12.214369219 +0800
+@@ -2,7 +2,7 @@
  cmake_policy(VERSION 3.12)
  
  project(BearSource
@@ -11,10 +9,19 @@ diff -ruN a/source/CMakeLists.txt b/source/CMakeLists.txt
          LANGUAGES C CXX
          )
  
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSPDLOG_NO_EXCEPTIONS")
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGOOGLE_PROTOBUF_NO_RTTI")
- set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
+@@ -27,6 +27,15 @@
+ find_package(fmt REQUIRED)
+ find_package(spdlog REQUIRED)
+ find_package(PkgConfig REQUIRED)
++# Set PKG_CONFIG_PATH to include dependency install directories
++foreach(prefix ${CMAKE_PREFIX_PATH})
++    if(EXISTS "${prefix}/lib/pkgconfig")
++        set(ENV{PKG_CONFIG_PATH} "${prefix}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
++    endif()
++    if(EXISTS "${prefix}/share/pkgconfig")
++        set(ENV{PKG_CONFIG_PATH} "${prefix}/share/pkgconfig:$ENV{PKG_CONFIG_PATH}")
++    endif()
++endforeach()
+ pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET protobuf grpc++)
  
- if (ENABLE_UNIT_TESTS)
-     find_program(MEMORYCHECK_COMMAND NAMES valgrind)
+ if (fmt_VERSION_MAJOR GREATER_EQUAL 9)
