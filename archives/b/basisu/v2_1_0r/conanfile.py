@@ -18,7 +18,6 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 class BasisuConan(ConanFile):
     name = "basisu"
     version = "v2_1_0r"
-    package_type = "application"
     description = "Basis Universal GPU texture codec command-line compression tool"
     license = "Apache-2.0"
     homepage = "https://github.com/BinomialLLC/basis_universal"
