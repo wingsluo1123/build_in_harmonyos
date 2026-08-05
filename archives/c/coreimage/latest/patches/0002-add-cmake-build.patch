@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/CMakeLists.txt
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,59 @@
 +cmake_minimum_required(VERSION 3.16)
 +project(coreimage VERSION 4.0 LANGUAGES CXX)
 +
@@ -12,10 +12,7 @@
 +set(CMAKE_AUTORCC ON)
 +
 +find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Concurrent)
-+
-+# Find libcprime
-+find_library(CPRIME_LIBRARY cprime PATHS /storage/Users/currentUser/usr/local/lib)
-+set(CPRIME_INCLUDE_DIR /storage/Users/currentUser/usr/local/include/cprime)
++find_package(cprime REQUIRED)
 +
 +set(SOURCES
 +    main.cpp
@@ -36,17 +33,14 @@
 +
 +add_executable(coreimage ${SOURCES} ${HEADERS} ${FORMS} ${RESOURCES})
 +
-+target_include_directories(coreimage PRIVATE ${CPRIME_INCLUDE_DIR})
-+
 +target_link_libraries(coreimage PRIVATE
 +    Qt6::Core
 +    Qt6::Gui
 +    Qt6::Widgets
 +    Qt6::Concurrent
-+    ${CPRIME_LIBRARY}
++    cprime::cprime
 +)
 +
-+# Define COREAPPS_THEME_FOLDER
 +set(THEME_FOLDER "${CMAKE_INSTALL_PREFIX}/share/coreapps/theme")
 +target_compile_definitions(coreimage PRIVATE
 +    HAVE_POSIX_OPENPT
