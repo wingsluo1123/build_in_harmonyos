@@ -4,6 +4,7 @@
 Tests APR API: apr_initialize, apr_pool_create, apr_version_string,
 apr_pool_destroy, apr_terminate.
 """
+import os
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -26,3 +27,5 @@ class AprTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Explicitly run the test binary for CI gate verification
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_apr"), env="conanrun")
