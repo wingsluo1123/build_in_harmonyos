@@ -64,10 +64,34 @@ class ApkoConan(ConanFile):
             self._build_placeholder()
             return
 
+        # ── 上游单元测试（R5: 真实运行 go test ./...）──
+        import subprocess
+        import io
+        test_report = os.path.join(self.build_folder, "go-test-report.txt")
+        try:
+            test_ret = subprocess.run(
+                [go_bin, "test", "./..."],
+                capture_output=True, text=True, timeout=600
+            )
+            test_out = test_ret.stdout + test_ret.stderr
+            test_exit = test_ret.returncode
+        except Exception as exc:
+            self.output.warning(f"go test ./... 执行异常: {exc}")
+            test_out = str(exc)
+            test_exit = -1
+        with open(test_report, "w", encoding="utf-8") as fh:
+            fh.write(test_out)
+        self.output.info(f"go test ./... exit={test_exit}")
+        for line in test_out.splitlines():
+            self.output.info(f"[go test] {line}")
+        self.output.info(f"go test 报告已写入: {test_report}")
+
         # Cross-compile for HarmonyOS PC arm64.
         # HarmonyOS PC runs on a Linux kernel with the aarch64 ABI; the Go
         # target GOOS=linux GOARCH=arm64 is ABI-compatible.
-        # buildmode=pie produces a PIE (ET_DYN) binary that HMDFS will execute.
+        # Note: -buildmode=pie produces a dynamic binary that segfaults on
+        # HarmonyOS due to musl dynamic linker incompatibility. Static build
+        # (CGO_ENABLED=0 without -buildmode) works correctly.
         # Set Go env vars via os.environ (Conan 2.29.1 self.run env= expects
         # env *file names*, not "KEY=VALUE" strings).
         os.environ["CGO_ENABLED"] = "0"
@@ -84,7 +108,7 @@ class ApkoConan(ConanFile):
             "-X sigs.k8s.io/release-utils/version.buildDate=2026-08-05"
         )
         build_cmd = (
-            f'"{go_bin}" build -buildmode=pie -trimpath '
+            f'"{go_bin}" build -trimpath '
             f'-ldflags="{ldflags}" '
             f'-o apko ./'
         )
