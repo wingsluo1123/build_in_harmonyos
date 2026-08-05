@@ -1,31 +1,36 @@
 version: "1.12.0"
 status: published
-build_date: "2026-04-25"
+build_date: "2026-08-05"
+conan_adapted: true
 
 source:
-  url: "https://github.com/apache/avro"
-  sha256: ""
+  url: "https://codeload.github.com/apache/avro/tar.gz/refs/tags/release-1.12.0"
+  sha256: "51832f9c2e81fa95addb74be627dac27b4883ec2c8627ec8471d99cfea787555"
   tar_format: tar.gz
 
 build:
   system: cmake
   configure_options:
-    - "CMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX"
     - "CMAKE_BUILD_TYPE=Release"
     - "CMAKE_EXE_LINKER_FLAGS=-lc++"
   dependencies:
-    - jansson 2.14
+    - jansson 2.15.1
     - zlib 1.3.1
-    - snappy 1.1.10
-    - liblzma 5.6.2
+    - snappy 1.2.1
+    - lzma 5.6.2
   cc: clang
   cxx: clang++
 
 patches_applied:
   - 0001-version.sh.patch
   - 0002-src-CMakeLists.txt.patch
+  - 0003-CMakeLists.txt-conan-deps.patch
+  - 0004-src-CMakeLists.txt-shared-conditional.patch
 knowledge_gained:
   - "OpenHarmony bash 位于非标准路径，需使用 #!/usr/bin/env bash"
   - "CMake 在 HarmonyOS 上可能无法正确获取 SOVERSION，需设置默认值"
   - "snappy 是 C++ 库，链接到 C 项目需添加 -lc++ 链接参数"
   - "使用完整 Apache Avro tarball 可保留 share 目录，避免测试路径问题"
+  - "Conan integration: replaced pkg_check_modules with find_package + CMakeDeps"
+  - "Shared library build made conditional on BUILD_SHARED_LIBS to support static-only deps"
+  - "Source URL uses codeload.github.com for reliable download"

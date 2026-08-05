@@ -1,0 +1,82 @@
+--- a/lang/c/CMakeLists.txt	2024-07-26 03:52:42.000000000 +0800
++++ b/lang/c/CMakeLists.txt	2026-08-06 02:24:42.559830313 +0800
+@@ -135,58 +135,33 @@
+ include_directories(${AvroC_SOURCE_DIR}/src)
+ 
+ 
+-# Enable codecs
++# Enable codecs (Conan integration: use find_package with CMakeDeps)
+ 
+-find_package(ZLIB)
+-if (ZLIB_FOUND)
+-    set(ZLIB_PKG zlib)
+-    add_definitions(-DDEFLATE_CODEC)
+-    include_directories(${ZLIB_INCLUDE_DIRS})
+-    message("Enabled deflate codec")
+-else (ZLIB_FOUND)
+-    set(ZLIB_PKG "")
+-    set(ZLIB_LIBRARIES "")
+-    message("Disabled deflate codec. zlib not found.")
+-endif (ZLIB_FOUND)
+-
+-find_package(Snappy)
+-if (SNAPPY_FOUND AND ZLIB_FOUND)  # Snappy borrows crc32 from zlib
+-    set(SNAPPY_PKG snappy)
+-    add_definitions(-DSNAPPY_CODEC)
+-    include_directories(${SNAPPY_INCLUDE_DIRS})
+-    message("Enabled snappy codec")
+-else (SNAPPY_FOUND AND ZLIB_FOUND)
+-    set(SNAPPY_PKG "")
+-    set(SNAPPY_LIBRARIES "")
+-    message("Disabled snappy codec. libsnappy not found or zlib not found.")
+-endif (SNAPPY_FOUND AND ZLIB_FOUND)
+-
+-find_package(PkgConfig)
+-pkg_check_modules(LZMA liblzma)
+-if (LZMA_FOUND)
+-    set(LZMA_PKG liblzma)
+-    add_definitions(-DLZMA_CODEC)
+-    include_directories(${LZMA_INCLUDE_DIRS})
+-    link_directories(${LZMA_LIBRARY_DIRS})
+-    message("Enabled lzma codec")
+-else (LZMA_FOUND)
+-    set(LZMA_PKG "")
+-    set(LZMA_LIBRARIES "")
+-    message("Disabled lzma codec. liblzma not found.")
+-endif (LZMA_FOUND)
++find_package(ZLIB REQUIRED)
++set(ZLIB_PKG zlib)
++add_definitions(-DDEFLATE_CODEC)
++set(ZLIB_LIBRARIES zlib::zlib)
++message("Enabled deflate codec")
++
++find_package(Snappy REQUIRED)
++set(SNAPPY_PKG snappy)
++add_definitions(-DSNAPPY_CODEC)
++set(SNAPPY_LIBRARIES Snappy::snappy)
++message("Enabled snappy codec")
++
++find_package(lzma REQUIRED)
++set(LZMA_PKG lzma)
++add_definitions(-DLZMA_CODEC)
++set(LZMA_LIBRARIES lzma::lzma)
++message("Enabled lzma codec")
+ 
+ set(CODEC_LIBRARIES ${ZLIB_LIBRARIES} ${LZMA_LIBRARIES} ${SNAPPY_LIBRARIES})
+ set(CODEC_PKG "${ZLIB_PKG} ${LZMA_PKG} ${SNAPPY_PKG}")
+ 
+ # Jansson JSON library
+-pkg_check_modules(JANSSON jansson>=2.3)
+-if (JANSSON_FOUND)
+-    set(JANSSON_PKG libjansson)
+-    include_directories(${JANSSON_INCLUDE_DIRS})
+-    link_directories(${JANSSON_LIBRARY_DIRS})
+-else (JANSSON_FOUND)
+-    message(FATAL_ERROR "libjansson >=2.3 not found")
+-endif (JANSSON_FOUND)
++find_package(jansson REQUIRED)
++set(JANSSON_PKG libjansson)
++set(JANSSON_LIBRARIES jansson::jansson)
+ 
+ 
+ add_subdirectory(src)
