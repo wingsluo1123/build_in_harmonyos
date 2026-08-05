@@ -38,12 +38,16 @@ class CrosstoolNgConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # crosstool-ng needs ncurses headers and library
-        # ncurses is installed as system prebuilt package
-        home = os.environ.get("HOME", "")
-        if home:
-            tc.cflags.append(f"-I{home}/usr/local/include")
-            tc.ldflags.append(f"-L{home}/usr/local/lib")
+        # crosstool-ng needs ncurses headers and library.
+        # ncurses is installed as a system prebuilt package (cmd-pkgs)
+        # at $HOME/usr/local — standard HarmonyOS PC prefix.
+        home = os.path.expanduser("~")
+        inc = os.path.join(home, "usr", "local", "include")
+        lib = os.path.join(home, "usr", "local", "lib")
+        if os.path.isdir(inc):
+            tc.cflags.append(f"-I{inc}")
+        if os.path.isdir(lib):
+            tc.ldflags.append(f"-L{lib}")
         tc.generate()
 
     def build(self):
