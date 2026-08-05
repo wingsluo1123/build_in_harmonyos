@@ -29,7 +29,7 @@
 
 ## 验证结果
 - testcrypto all ✅（所有加密算法测试通过）
-- testx509 ✅（17 个证书验证测试通过）
+- testx509 ✅（18 个证书验证测试通过）
 - brssl impl ✅（平台检测正确: BR_64=1, BR_CLANG=1, BR_AES_X86NI=0）
 - conan create test_package ✅（SHA-256 验证通过）
 
