@@ -62,8 +62,7 @@
 2. texinfo 预编译包缺少 Perl 模块，需从 texinfo 源码提取
 3. ncurses 预编译包缺少头文件，需从 ncurses 源码生成
 4. libtool 从 conan ohpcd 仓安装
-
 ---
 
-**编译结束**: 2026-08-06
+**编译结束**: 2026-08-06 06:28
 **最终状态**: published
