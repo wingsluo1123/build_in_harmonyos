@@ -105,14 +105,23 @@ class DarkiceConan(ConanFile):
             if sys_pkg not in cur:
                 os.environ["PKG_CONFIG_PATH"] = sys_pkg + (":" + cur if cur else "")
 
-        # Run autoreconf with env="conanbuild" (for correct PATH to find
-        # automake/aclocal) and ACLOCAL_PATH set inline (for pkg.m4).
         src = self.source_folder
-        if aclocal_arg:
-            self.run('cd "{}" && ACLOCAL_PATH="{}" autoreconf -fi'.format(
-                src, aclocal_arg), env="conanbuild")
-        else:
-            self.run('cd "{}" && autoreconf -fi'.format(src), env="conanbuild")
+
+        # Create a wrapper script that sets ACLOCAL_PATH then runs autoreconf.
+        # Conan's env="conanbuild" sources conanbuild.sh (PATH, CC, etc.) but
+        # doesn't preserve os.environ changes. The wrapper bridges this gap:
+        # conanbuild.sh provides PATH (find automake/aclocal), wrapper provides
+        # ACLOCAL_PATH (find pkg.m4 for PKG_CHECK_MODULES expansion).
+        wrapper = os.path.join(self.build_folder, "_run_autoreconf.sh")
+        with open(wrapper, "w") as f:
+            f.write("#!/bin/sh\n")
+            f.write('cd "{}"\n'.format(src))
+            if aclocal_arg:
+                f.write('export ACLOCAL_PATH="{}"\n'.format(aclocal_arg))
+            f.write("exec autoreconf -fi\n")
+        os.chmod(wrapper, 0o755)
+
+        self.run("./_run_autoreconf.sh", env="conanbuild")
 
         # Fix: autoconf's config.status uses umask 077 when creating temp
         # directories, which triggers SELinux denial on HarmonyOS (E046).
