@@ -69,6 +69,30 @@ class BrevCliConan(ConanFile):
             self._build_placeholder()
             return
 
+        # ── 上游单元测试（R5: 真实运行 go test ./...）──
+        # CI runner 有可用的 Go 工具链时真实运行上游单元测试，
+        # 将结果写入构建日志与 go-test-report.txt。
+        test_env = {"CGO_ENABLED": "0", "GOFLAGS": "-mod=mod"}
+        test_report = os.path.join(self.build_folder, "go-test-report.txt")
+        import io
+        test_buf = io.StringIO()
+        try:
+            test_ret = self.run(
+                f'"{go_bin}" test ./... 2>&1',
+                env=test_env, stdout=test_buf, stderr=test_buf,
+                ignore_errors=True,
+            )
+        except Exception as exc:
+            self.output.warning(f"go test ./... 执行异常: {exc}")
+            test_ret = -1
+        test_out = test_buf.getvalue()
+        with open(test_report, "w", encoding="utf-8") as fh:
+            fh.write(test_out)
+        self.output.info(f"go test ./... exit={test_ret}")
+        for line in test_out.splitlines():
+            self.output.info(f"[go test] {line}")
+        self.output.info(f"go test 报告已写入: {test_report}")
+
         # Cross-compile for HarmonyOS PC arm64.
         # HarmonyOS PC runs on a Linux kernel with the aarch64 ABI; the Go
         # target GOOS=linux GOARCH=arm64 is ABI-compatible.
