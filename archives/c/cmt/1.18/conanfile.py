@@ -16,12 +16,13 @@ class CmtConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        # CI 真根因: ERROR: Package 'ladspa/1.15' not resolved: Unable to find
-        # 'ladspa/1.15' in remotes. ladspa 包未真上架到制品仓（PR 描述
-        # resolve-deps ✅ 与实际不符），声明该依赖致 conan create 解析失败
-        # 修法: 删 ladspa 依赖声明，改用系统 ladspa 头（ladspa 是极简单头库，
-        # cmt 源码自带 ladspa_types.h，build() 段用系统 /usr/include 路径）
-        pass  # 无 Conan 依赖（ladspa 走系统头）
+        # CI 真根因: ERROR: Package 'ladspa/1.17' not resolved: Unable to find
+        # 'ladspa/1.17' in remotes. ladspa 在 main 上仅 manifest.yaml 声明
+        # （archives/l/ladspa/1.17/ 无 conanfile.py），非真 Conan 包，
+        # 声明该依赖致 conan create 解析失败。
+        # 修法: 走系统 ladspa 头（ladspa 是极简单头库，cmt 源码自带
+        # ladspa_types.h，build() 段用 -I/usr/include 注入系统头路径）
+        pass  # 无 Conan 依赖（ladspa 走系统头，非真 Conan 包）
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
