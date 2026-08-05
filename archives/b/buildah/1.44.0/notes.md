@@ -66,4 +66,4 @@ go build \
 ---
 
 **编译结束**: 2026-08-06 02:48
-**最终状态**: published
+**最终状态**: built (Conan recipe added, pending PR submission)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for buildah 1.44.0 — Go-based OCI container image builder."""
 import os
-import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -37,7 +37,7 @@ class BuildahConan(ConanFile):
         apply_conandata_patches(self)
 
         # Go environment — HarmonyOS requires tmpfs for Go linker mmap
-        tmpdir = os.environ.get("TMPDIR", "/data/storage/el2/base/haps/entry/files")
+        tmpdir = os.environ.get("TMPDIR", "/tmp")
         go_cache = os.path.join(tmpdir, "go-build")
         gopath = os.path.join(os.path.expanduser("~"), "go")
         os.makedirs(go_cache, exist_ok=True)
@@ -89,8 +89,38 @@ class BuildahConan(ConanFile):
         )
 
     def package(self):
+        bindir = os.path.join(self.package_folder, "bin")
+        os.makedirs(bindir, exist_ok=True)
+
+        # Copy binary
+        buildah_bin = os.path.join(self.source_folder, "bin", "buildah")
         copy(self, "buildah", src=os.path.join(self.source_folder, "bin"),
-             dst=os.path.join(self.package_folder, "bin"), keep_path=False)
+             dst=bindir, keep_path=False)
+
+        # ELF signing for HarmonyOS (allows binary execution)
+        pkg_bin = os.path.join(bindir, "buildah")
+        sign_tool = "/data/service/hnp/bin/binary-sign-tool"
+        objcopy = "/data/service/hnp/bin/llvm-objcopy"
+        if os.path.isfile(sign_tool) and os.path.isfile(objcopy):
+            # Remove old signature
+            subprocess.run([objcopy, "--remove-section", ".codesign", pkg_bin],
+                         capture_output=True, timeout=10)
+            # Sign binary
+            tmp_signed = pkg_bin + ".signed.tmp"
+            r = subprocess.run(
+                [sign_tool, "sign", "-inFile", pkg_bin,
+                 "-outFile", tmp_signed, "-selfSign", "1"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if r.returncode == 0 and os.path.isfile(tmp_signed):
+                os.replace(tmp_signed, pkg_bin)
+            else:
+                # Non-blocking: signing may not be available on all platforms
+                if os.path.isfile(tmp_signed):
+                    os.unlink(tmp_signed)
+
+        os.chmod(pkg_bin, 0o755)
+
         # Bash completion
         completions = os.path.join(self.source_folder, "share", "bash-completion", "completions")
         if os.path.isdir(completions):
