@@ -27,10 +27,17 @@ class KDocToolsTestConan(ConanFile):
         if not binary_ok:
             raise Exception("meinproc binary not found in package")
 
+        # 编译测试源文件（C 编译器标识符 gcc/clang 均是对应二进制名）
+        cc = str(self.settings.compiler)
+        src = os.path.join(self.source_folder, "src", "test_kdoctools.c")
+        test_bin = os.path.join(self.build_folder, "test_kdoctools")
+        self.run(f"{cc} -o {test_bin} {src}")
+
         if can_run(self):
-            # 用最小 DocBook XML 验证 meinproc 转换功能
+            # 运行测试程序验证 meinproc 二进制 --help 输出用法信息
             meinproc_bin = os.path.join(self.dependencies["kdoctools"].package_folder, "bin", "meinproc")
-            self.run(f"{meinproc_bin} --help")
+            self.run(f"{test_bin} {meinproc_bin}")
             self.output.info("meinproc verified successfully")
         else:
-            self.output.info("Cross-building: skipping runtime tests, binary existence verified")
+            # 交叉编译场景：无法运行二进制，但已编译测试程序并检查产物存在
+            self.output.info("Cross-building: test compiled, binary existence verified")
