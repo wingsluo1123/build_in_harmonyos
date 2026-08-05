@@ -110,7 +110,7 @@ class LibgdConan(ConanFile):
         if self.options.shared:
             tc.cache_variables["CMAKE_BUILD_RPATH_USE_ORIGIN"] = True
             ld_dirs = []
-            for dep in ("zlib", "libpng", "freetype"):
+            for dep in ("zlib", "libpng", "libjpeg", "freetype"):
                 d = os.path.join(self._dep_pkg(dep), "lib")
                 if os.path.isdir(d):
                     ld_dirs.append(d)
