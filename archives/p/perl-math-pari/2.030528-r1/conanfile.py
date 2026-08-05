@@ -24,7 +24,7 @@ class PerlMathPariConan(ConanFile):
     description = "Perl interface to PARI/GP mathematical library"
     license = "GPL-2.0-or-later AND Artistic-1.0-Perl"
     homepage = "https://metacpan.org/pod/Math::Pari"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -48,8 +48,9 @@ class PerlMathPariConan(ConanFile):
 
     def generate(self):
         env = Environment()
-        env.define("CC", "clang")
-        env.define("CXX", "clang++")
+        cc = str(self.settings.compiler) if self.settings.compiler else "clang"
+        env.define("CC", cc)
+        env.define("CXX", f"{cc}++")
         env.define("CFLAGS", "-fPIC -O2")
         envvars = env.vars(self)
         envvars.save_script("perl_math_pari_env")
@@ -61,19 +62,21 @@ class PerlMathPariConan(ConanFile):
         self.run("perl Makefile.PL", cwd=src, env=["perl_math_pari_env"])
 
         # Patch LDDLFLAGS in Makefile for OHOS CRT compatibility
-        makefile = os.path.join(src, "Makefile")
-        if os.path.isfile(makefile):
-            with open(makefile, "r") as f:
-                content = f.read()
-            # Add -nostartfiles to LDDLFLAGS to skip missing CRT files
-            content = re.sub(
-                r"(LDDLFLAGS\s*=\s*.*)",
-                r"\1 -nostartfiles",
-                content,
-                count=1,
-            )
-            with open(makefile, "w") as f:
-                f.write(content)
+        # Only needed on OHOS where musl CRT startup files are missing
+        if self.settings.os == "OHOS":
+            makefile = os.path.join(src, "Makefile")
+            if os.path.isfile(makefile):
+                with open(makefile, "r") as f:
+                    content = f.read()
+                # Add -nostartfiles to LDDLFLAGS to skip missing CRT files
+                content = re.sub(
+                    r"(LDDLFLAGS\s*=\s*.*)",
+                    r"\1 -nostartfiles",
+                    content,
+                    count=1,
+                )
+                with open(makefile, "w") as f:
+                    f.write(content)
 
         self.run("make", cwd=src, env=["perl_math_pari_env"])
 

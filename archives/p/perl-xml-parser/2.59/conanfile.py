@@ -20,7 +20,7 @@ class PerlXmlParserConan(ConanFile):
     description = "Perl XML parsing module based on expat"
     license = "Perl Artistic License"
     homepage = "https://metacpan.org/pod/XML::Parser"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -44,8 +44,9 @@ class PerlXmlParserConan(ConanFile):
 
     def generate(self):
         env = Environment()
-        env.define("CC", "clang")
-        env.define("CXX", "clang++")
+        cc = str(self.settings.compiler) if self.settings.compiler else "clang"
+        env.define("CC", cc)
+        env.define("CXX", f"{cc}++")
         env.define("CFLAGS", "-fPIC -O2")
         # Expat shared library path for Devel::CheckLib runtime test
         expat = self.dependencies["expat"]

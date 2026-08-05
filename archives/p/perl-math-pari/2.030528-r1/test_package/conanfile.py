@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Conan test_package — perl-math-pari 2.030528-r1
 
-Verifies the package was built correctly by checking
-that the .pm module file is present in the package artifacts.
+Verifies the package was built correctly by attempting to load
+the Math::Pari module and call its API. If SELinux blocks module
+loading on OHOS (manifest G2 known failure), falls back to readelf
+verification of the boot_Math__Pari XS entry point symbol (R34 compliant).
 """
 import os
 

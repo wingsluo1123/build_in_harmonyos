@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Conan test_package — perl-xml-parser 2.59
 
-Verifies the package was built correctly by checking
-that the .pm module file is present in the package artifacts.
+Verifies the package was built correctly by attempting to load
+the XML::Parser module and call its API. If SELinux blocks module
+loading on OHOS, falls back to readelf verification of the
+boot_XML__Parser__Expat XS entry point symbol (R34 compliant).
 """
 import os
 
