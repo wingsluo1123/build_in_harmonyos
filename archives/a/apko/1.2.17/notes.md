@@ -69,7 +69,7 @@ Platform:      linux/arm64
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| apko | 38MB | release版本 (PIE, arm64) |
+| apko | 38MB | release版本 (static ET_EXEC, arm64) |
 
 ## 注意事项
 

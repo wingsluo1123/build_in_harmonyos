@@ -7,7 +7,7 @@ This recipe cross-compiles the Go binary for HarmonyOS PC (aarch64-linux-ohos).
 Build approach:
   - Uses the Go toolchain (requires `go` on the CI runner).
   - CGO disabled (pure Go, no C dependencies).
-  - buildmode=pie to produce a PIE binary that HarmonyOS HMDFS will execute.
+  - Static build (CGO_ENABLED=0, no -buildmode) produces an ET_EXEC binary.
   - GOARCH=arm64 GOOS=linux (HarmonyOS Linux kernel ABI).
 
 Note: The local dev environment (HMDFS) cannot execute the static Go toolchain,
