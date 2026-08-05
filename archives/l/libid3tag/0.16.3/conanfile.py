@@ -42,6 +42,7 @@ class Libid3tagConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        tc.cache_variables["BUILD_SHARED_LIBS"] = bool(self.options.shared)
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.generate()
 

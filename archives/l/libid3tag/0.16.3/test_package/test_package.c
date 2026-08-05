@@ -12,6 +12,7 @@ int main(void) {
     id3_field_setstrings(field, 1, (id3_ucs4_t*[]){ id3_ucs4_utf8duplicate((id3_utf8_t*)"Test Title") });
     id3_tag_attachframe(tag, frame);
     id3_length_t size = id3_tag_render(tag, 0);
+    if (size == 0) { printf("FAIL: id3_tag_render returned 0\n"); id3_tag_delete(tag); return 1; }
     printf("Rendered tag: %lu bytes\n", (unsigned long)size);
     id3_tag_delete(tag);
     printf("All tests PASSED\n");

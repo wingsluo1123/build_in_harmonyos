@@ -8,7 +8,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import get, replace_in_file
+from conan.tools.files import get, replace_in_file, export_conandata_patches, apply_conandata_patches
 
 
 class LibsndfileConan(ConanFile):
@@ -23,6 +23,9 @@ class LibsndfileConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
     default_options = {"shared": True, "fPIC": True}
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -70,6 +73,7 @@ class LibsndfileConan(ConanFile):
         tc.generate()
 
     def build(self):
+        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure(variables={"CMAKE_POLICY_VERSION_MINIMUM": "3.5"})
         cmake.build()
