@@ -89,7 +89,7 @@ class JoeConan(ConanFile):
         # R15: Force cross-compile mode to skip conftest execution on OHOS
         # OHOS security prevents running unsigned conftest binaries
         if self.settings.os == "OHOS":
-            autotools.configure(args=["--build=x86_64-pc-linux-gnu",
+            autotools.configure(args=["--build=aarch64-unknown-linux-gnu",
                                        "--host=aarch64-unknown-linux-ohos"])
         else:
             autotools.configure()

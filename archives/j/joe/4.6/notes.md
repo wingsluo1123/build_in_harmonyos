@@ -132,10 +132,10 @@ G1-G4 全 PASS
 #   而 libxml2 未预装，导致链接失败。
 #   GNU ld.bfd 不依赖 libxml2，可正常工作。
 
-# 为什么需要 sign-elf 钩子:
-#   OHOS 安全策略要求所有非系统 ELF 二进制必须先签名才能执行。
-#   configure 的 conftest 编译后直接执行会因未签名而失败。
-#   通过在 configure 中插入 sign-elf 步骤解决。
+# 为什么需要跨编译模式:
+#   OHOS 安全策略限制未签名 ELF 二进制执行，
+#   configure 的 conftest 编译后无法执行。
+#   通过 --build != --host 强制跨编译模式，跳过 conftest 运行测试。
 ```
 
 ---
@@ -191,3 +191,4 @@ share/man/ru/man1/joe.1 — 俄语 man 页面
 
 **编译结束**: 2026-08-05 10:06
 **最终状态**: built
+最终状态**: built
