@@ -31,3 +31,7 @@ echo "hello world" | bbe -e "s/hello/HELLO/"  # ✅
 ## 注意事项
 - 源码 char*/unsigned char* 混用，产生编译警告（不影响功能）
 - 无测试套件
+---
+
+**编译结束**: 2026-08-06 00:17
+**最终状态**: built
