@@ -7,6 +7,8 @@ verify the package is functional (R34: test must substantively depend on
 the tested package).
 """
 
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
@@ -36,3 +38,7 @@ class LibzmfTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # L0d: explicit self.run() so CI detects a substantive test invocation
+        # (cmake.test() alone is treated as a stub by the L0d gate).
+        cmd = os.path.join(self.cpp.build.bindirs[0], "test_libzmf")
+        self.run(cmd, env="conanrun")

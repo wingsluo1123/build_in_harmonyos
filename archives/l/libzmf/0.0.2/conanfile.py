@@ -37,7 +37,7 @@ class LibzmfConan(ConanFile):
     description = "Library for importing and converting Zoner Draw drawings"
     license = "MPL-2.0"
     homepage = "https://sourceforge.net/projects/libzmf/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"  # recipe repo
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -59,6 +59,11 @@ class LibzmfConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # P3 fix: generate deps env (CPPFLAGS/LIBS for librevenge/boost/zlib/libpng/icu)
+        # BEFORE the toolchain, so configure can find the 5 declared dependencies.
+        from conan.tools.gnu import AutotoolsDeps
+        deps = AutotoolsDeps(self)
+        deps.generate()
         tc = AutotoolsToolchain(self)
         # R26: Build static libraries (DevBox only copies bin/, no lib/)
         tc.configure_args.append("--enable-static")
@@ -66,11 +71,6 @@ class LibzmfConan(ConanFile):
         # boost spirit classic has -Wshadow warnings; suppress as non-error
         tc.extra_cxxflags.append("-Wno-error=shadow")
         tc.generate()
-        # Generate deps env (CPPFLAGS/LIBS for librevenge/boost/zlib/libpng/icu)
-        # Without this, configure cannot find the 5 declared dependencies.
-        from conan.tools.gnu import AutotoolsDeps
-        deps = AutotoolsDeps(self)
-        deps.generate()
 
     def build(self):
         apply_conandata_patches(self)
