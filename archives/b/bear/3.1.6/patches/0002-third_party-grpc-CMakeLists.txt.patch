@@ -1,14 +1,6 @@
-diff -ruN a/third_party/grpc/CMakeLists.txt b/third_party/grpc/CMakeLists.txt
 --- a/third_party/grpc/CMakeLists.txt
 +++ b/third_party/grpc/CMakeLists.txt
-@@ -19,27 +19,22 @@
-     else()
-         message(FATAL_ERROR "Looking for grpc_cpp_plugin -- not found")
-     endif()
- 
-     add_custom_target(grpc_dependency)
- else ()
-     message(STATUS "Looking for gRPC::grpc++ dependency -- not found")
+@@ -26,13 +26,12 @@
  
      include(ExternalProject)
      ExternalProject_Add(grpc_dependency
@@ -21,13 +13,24 @@ diff -ruN a/third_party/grpc/CMakeLists.txt b/third_party/grpc/CMakeLists.txt
 -                1
 +            URL
 +                https://github.com/grpc/grpc/archive/refs/tags/v1.49.2.tar.gz
++            URL_HASH
++                SHA256=cdeb805385fba23242bf87073e68d590c446751e09089f26e5e0b3f655b0f089
++            PATCH_COMMAND
++                bash ${CMAKE_CURRENT_SOURCE_DIR}/fetch_submodules.sh
              UPDATE_COMMAND
                  ""
              LOG_CONFIGURE
-                 1
-             LOG_BUILD
-                 1
-             LOG_INSTALL
-                 1
-             CMAKE_ARGS
+@@ -45,9 +44,13 @@
                  -DgRPC_INSTALL:BOOL=ON
+                 -DgRPC_BUILD_TESTS:BOOL=OFF
+                 -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
++                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
++                -DCMAKE_SYSTEM_PROCESSOR=aarch64
++                -DOPENSSL_NO_ASM=ON
+                 -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency
+             CMAKE_CACHE_ARGS
+                 -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
++                -DCMAKE_SYSTEM_PROCESSOR:STRING=aarch64
+                 -DCMAKE_TOOLCHAIN_FILE:PATH=${CMAKE_TOOLCHAIN_FILE}
+                 -DCMAKE_FIND_ROOT_PATH:PATH=${CMAKE_FIND_ROOT_PATH}
+                 -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}

@@ -1,0 +1,52 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -33,39 +33,49 @@
+ # Superbuild variables for sub projects
+ include(ExternalProject)
+ set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
+ set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
+ set(DEPENDENCIES_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/subprojects/Install)
+ include(GNUInstallDirs)
+ 
+ # Verify or install dependencies
+ add_subdirectory(third_party)
+ 
++# Set PKG_CONFIG_PATH so BearSource can find gRPC's .pc files
++# (gRPC is built as ExternalProject, installed to DEPENDENCIES_INSTALL_PREFIX)
++set(GRPC_PKGCONFIG_PATHS
++    "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency/lib/pkgconfig"
++    "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency/lib64/pkgconfig"
++    "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency/share/pkgconfig"
++)
++set(ENV{PKG_CONFIG_PATH} "${GRPC_PKGCONFIG_PATHS}:$ENV{PKG_CONFIG_PATH}")
++
+ unset(CMAKE_CACHE_ARGS_EXTRA)
+ if (CMAKE_PROJECT_INCLUDE AND NOT CMAKE_PROJECT_INCLUDE STREQUAL "")
+     set(CMAKE_CACHE_ARGS_EXTRA "-DCMAKE_PROJECT_INCLUDE:PATH=${CMAKE_PROJECT_INCLUDE}")
+ endif()
+ 
+ # Build the project itself
+ ExternalProject_Add(BearSource
+         SOURCE_DIR
+             "${CMAKE_CURRENT_SOURCE_DIR}/source"
+         DEPENDS
+             nlohmann_json_dependency
+             fmt_dependency
+             spdlog_dependency
+             grpc_dependency
+             googletest_dependency
+         CMAKE_ARGS
+             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+             -DENABLE_MULTILIB:BOOL=${ENABLE_MULTILIB}
+             -DPKG_CONFIG_EXECUTABLE:PATH=${PKG_CONFIG_EXECUTABLE}
++            -DgRPC_BINDIR:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency/bin
+         CMAKE_CACHE_ARGS
+             -DCMAKE_PROJECT_VERSION:STRING=${CMAKE_PROJECT_VERSION}
+             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+             -DCMAKE_TOOLCHAIN_FILE:PATH=${CMAKE_TOOLCHAIN_FILE}
+             -DCMAKE_FIND_ROOT_PATH:PATH=${CMAKE_FIND_ROOT_PATH}
+             -DCMAKE_IGNORE_PATH:PATH=${CMAKE_IGNORE_PATH}
+             -DCMAKE_SYSROOT:PATH=${CMAKE_SYSROOT}
+             -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}
+             -DCMAKE_C_COMPILER_TARGET:STRING=${CMAKE_C_COMPILER_TARGET}
+             -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}

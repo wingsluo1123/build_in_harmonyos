@@ -1,18 +1,61 @@
 version: "3.1.6"
-status: partial
-build_date: "2026-04-17"
+status: built
+build_date: "2026-08-05"
 
 source:
   url: "https://github.com/rizsotto/Bear/archive/refs/tags/3.1.6.tar.gz"
   tar_format: tar.gz
+  sha256: "99cd891eec6e89b734d7cafe0e623dd8c2f27d8cbf3ee9bc4807e69e5c8fb55c"
 
 build:
   system: cmake
   cc: clang
   cxx: clang++
+  superbuild: true
+  deps_bundled:
+    - "nlohmann_json 3.11.3"
+    - "fmt 11.0.2"
+    - "spdlog 1.14.1"
+    - "grpc 1.49.2 (abseil, protobuf, boringssl, re2, c-ares, zlib)"
 
 patches_applied:
   - "0001-source-CMakeLists.txt.patch"
   - "0002-third_party-grpc-CMakeLists.txt.patch"
+  - "0003-source-intercept-proto-CMakeLists.txt.patch"
+  - "0004-CMakeLists.txt.patch"
+  - "0005-fetch_submodules.sh"
+  - "0006-patch_boringssl.py"
 
-knowledge_gained: []
+knowledge_gained:
+  - "HarmonyOS CMAKE_SYSTEM_PROCESSOR is 'unknown' - boringssl needs patch"
+  - "HarmonyOS not detected as UNIX by CMake - affects ASM detection"
+  - "boringssl ASM symbols missing - use OPENSSL_NO_ASM=ON"
+  - "gRPC tarball lacks submodules - fetch separately"
+  - "pkg_check_modules fails for gRPC (openssl .pc missing) - use find_package CONFIG"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/bear-3.1.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/bear-3.1.6.work
+  source_orig_hash: cd17ddf90ecf5fe5
+  source_work_hash: ac7a60b27b45c9b7
+  generated_at: '2026-08-05T17:08:50'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-source-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-source-intercept-proto-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-third_party-grpc-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
