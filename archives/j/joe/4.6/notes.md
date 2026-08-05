@@ -186,9 +186,8 @@ share/man/ru/man1/joe.1 — 俄语 man 页面
 4. **必须使用 -fuse-ld=bfd**: ld.lld 在 OHOS 上有 libxml2 依赖问题，bfd 可正常工作
 5. **config.guess 简化版**: 原版 config.guess 内部 mktemp 在 OHOS 上有权限问题，简化版脚本避免了此问题
 6. **ncurses 静态链接**: OHOS 上 ncurses 以静态库 (.a) 安装，joe 链接后已编入二进制，无额外动态依赖
-
+**知识整理**: pending（42 条草稿待 editor 审核）
 ---
 
-**编译结束**: 2026-06-03
-**最终状态**: published
-**知识整理**: pending（42 条草稿待 editor 审核）
+**编译结束**: 2026-08-05 10:06
+**最终状态**: built
