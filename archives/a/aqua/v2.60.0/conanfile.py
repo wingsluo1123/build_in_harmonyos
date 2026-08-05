@@ -145,7 +145,7 @@ class AquaConan(ConanFile):
         else:
             root = os.environ.get(
                 "OHOS_GO_WORKDIR",
-                os.path.join(self.build_folder, ".go-work-ohos"),
+                "/data/storage/el2/base/haps/entry/files/aqua-conan-go",
             )
         workspace = os.path.join(root, self.version)
         for child in (
