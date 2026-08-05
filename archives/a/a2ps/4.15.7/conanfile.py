@@ -9,7 +9,6 @@ This recipe handles OHOS (HarmonyOS) platform adaptation including:
 - umask fix for HarmonyOS filesystem compatibility
 - LDFLAGS for unimplemented pthread syscalls
 """
-import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
