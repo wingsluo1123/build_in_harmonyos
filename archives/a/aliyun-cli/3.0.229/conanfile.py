@@ -127,17 +127,23 @@ class AliyunCliConan(ConanFile):
         sign_tool = "/data/service/hnp/bin/binary-sign-tool"
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
         if os.path.isfile(sign_tool) and os.path.isfile(objcopy):
-            # Remove old signature
-            subprocess.run([objcopy, "--remove-section", ".codesign", output_bin],
-                           capture_output=True, timeout=30)
-            # Sign
+            # Remove old signature (non-fatal if section doesn't exist)
+            r = subprocess.run([objcopy, "--remove-section", ".codesign", output_bin],
+                               capture_output=True, timeout=30)
+            if r.returncode != 0:
+                self.output.warning(f"objcopy --remove-section returned {r.returncode} (may be harmless)")
+            # Sign (fatal if fails — unsigned binaries can't execute on HarmonyOS)
             tmp_signed = output_bin + ".signed.tmp"
-            subprocess.run([sign_tool, "sign", "-inFile", output_bin,
+            r = subprocess.run([sign_tool, "sign", "-inFile", output_bin,
                             "-outFile", tmp_signed, "-selfSign", "1"],
-                           capture_output=True, timeout=30)
+                           capture_output=True, text=True, timeout=30)
+            if r.returncode != 0:
+                raise Exception(f"binary-sign-tool failed (exit {r.returncode}): {r.stderr}")
             if os.path.isfile(tmp_signed):
                 shutil.move(tmp_signed, output_bin)
                 os.chmod(output_bin, 0o755)
+            else:
+                raise Exception("binary-sign-tool produced no output file")
 
     def package(self):
         # Find the built binary
