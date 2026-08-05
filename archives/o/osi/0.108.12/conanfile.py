@@ -11,6 +11,7 @@ from conan.tools.files import (
     copy,
     export_conandata_patches,
     get,
+    replace_in_file,
 )
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -77,6 +78,23 @@ class OsiConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        if self.settings.os == "OHOS":
+            for configure in ("configure", os.path.join("Osi", "configure")):
+                path = os.path.join(self.source_folder, configure)
+                replace_in_file(
+                    self,
+                    path,
+                    "umask 077 && mktemp -d -q",
+                    "umask 022 && mktemp -d -q",
+                    strict=False,
+                )
+                replace_in_file(
+                    self,
+                    path,
+                    "umask 077 && mkdir",
+                    "umask 022 && mkdir",
+                    strict=False,
+                )
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
