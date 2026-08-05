@@ -11,7 +11,7 @@
 1. 下载源码: https://dlcdn.apache.org/apr/apr-1.7.6.tar.gz
 2. 应用 OHOS 平台补丁:
    - patch-autotools-ohos.pl build/config.guess build/config.sub
-   - sed -i 's/umask 077/umask 000/g' configure
+   - sed -i 's/umask 077/umask 022/g' configure
 3. ./configure --prefix=/storage/Users/currentUser/usr/local
 4. make -j2
 5. make install DESTDIR=$TEST_PREFIX
@@ -22,7 +22,7 @@
 |---|------|------|----------|
 | 1 | config.guess 无法识别 HarmonyOS | E007: 缺少 __OHOS__ LIBC 检测 | patch-autotools-ohos.pl 添加 HarmonyOS 系统识别 |
 | 2 | config.sub 不支持 ohos-linux | E072: 缺少 ohos-linux triplet | patch-autotools-ohos.pl 添加 ohos-linux 支持 |
-| 3 | config.status Permission denied | E011: HMDFS 上 umask 077 导致权限不足 | sed umask 077 → umask 000 |
+| 3 | config.status Permission denied | E011: HMDFS 上 umask 077 导致权限不足 | sed umask 077 → umask 022 |
 
 ## 源码修改
 
