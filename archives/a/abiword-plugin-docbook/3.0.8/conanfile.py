@@ -94,11 +94,11 @@ class AbiwordPluginDocbookConan(ConanFile):
         self.output.info("OHC_SKILL_ROOT not set or script not found, skipping autotools patch")
 
     def package(self):
-        # Install the plugin .so to the package folder
-        autotools = Autotools(self)
-        autotools.install(target="-C plugins/docbook install")
-
-        # Also try to copy the .so manually if install target doesn't work
+        # Copy the plugin .so to the package folder via glob + copy.
+        # 不用 autotools.install(target=...)：Conan 2.x 的 install/make 不追加
+        # DESTDIR，配合 configure 阶段 --prefix=/ 会把 .so 装到系统目录(/lib/)
+        # 而非 Conan 包目录，在非 root CI worker 上会因无写权限失败。
+        # glob + copy 直接从 build_folder/.libs/ 取产物到 package_folder，正确且幂等。
         import glob
         for so in glob.glob(os.path.join(self.build_folder, "plugins", "docbook", ".libs", "*.so*")):
             dst = os.path.join(self.package_folder, "lib", "abiword", "plugins")
