@@ -8,8 +8,8 @@ must be emptied before patching to avoid content duplication.
 """
 import os
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import AutotoolsToolchain
+from conan.tools.files import get, export_conandata_patches, replace_in_file
+from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
@@ -19,7 +19,7 @@ class LibpaperConan(ConanFile):
     description = "Library for handling paper sizes and paper names"
     license = "GPL-2.0"
     homepage = "https://packages.debian.org/source/libpaper"
-    url = ""
+    url = ""  # CI fills this
 
     package_type = "library"
 
@@ -49,35 +49,32 @@ class LibpaperConan(ConanFile):
     def build(self):
         # Source tarball has only configure.ac/Makefile.am — bootstrap autotools first.
         self.run("autoreconf --install --force", cwd=self.source_folder)
+
         # All 13 patches are "create" type (diff -ruN against empty files).
         # The patch command can't apply them to existing non-empty files.
         # Instead, extract patched content directly from patch files.
         patches_dir = os.path.join(self.source_folder, "patches")
         for p in self.conan_data.get("patches", []):
             patch_file = os.path.join(patches_dir, os.path.basename(p["patch_file"]))
-            # Extract target path from patch header (+++ b/path), then
-            # write patched content (lines starting with +, excluding +++ header)
             self.run(
                 f'target=$(grep "^+++ b/" "{patch_file}" | sed "s|^+++ b/||") && '
                 f'grep "^+" "{patch_file}" | grep -v "^+++" | sed "s/^+//" > "$target"',
                 cwd=self.source_folder,
             )
+
         # Fix HarmonyOS umask 077 issue: config.status cannot create temp files
-        self.run("sed -i 's/umask 077/umask 000/g' configure", cwd=self.source_folder)
-        # Run configure directly with all three triplet flags
-        self.run(
-            "./configure --prefix=/ "
-            "--bindir=${prefix}/bin --sbindir=${prefix}/bin "
-            "--libdir=${prefix}/lib --includedir=${prefix}/include "
-            "--oldincludedir=${prefix}/include "
-            "--enable-static --disable-shared "
-            "--build=aarch64-linux --host=aarch64-linux --target=aarch64-linux",
-            cwd=self.source_folder,
-        )
-        self.run("make -j1", cwd=self.source_folder)
+        replace_in_file(self, os.path.join(self.source_folder, "configure"),
+                        "umask 077", "umask 022")
+
+        # Use Autotools helper (handles triplet, CC, CXX, CFLAGS, LDFLAGS)
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make(args=["-j1"])
 
     def package(self):
-        self.run(f"make install DESTDIR={self.package_folder}", cwd=self.source_folder)
+        autotools = Autotools(self)
+        autotools.install()
 
     def package_info(self):
         self.cpp_info.libs = ["paper"]
+        self.cpp_info.set_property("pkg_config_name", "libpaper")
