@@ -7,29 +7,23 @@ software: btrfs-progs
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "5.19.1"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-16"
+build_date: "2026-08-06"
+build_system: autotools
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://mirrors.edge.kernel.org/pub/linux/kernel/people/kdave/btrfs-progs/btrfs-progs-v5.19.1.tar.xz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "26429e540343ccc7f5d4b3f8f42b916713280e898c5471da705026ef6d2c10a6"
   tar_format: tar.xz
 
 # ============================================================
@@ -37,18 +31,27 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   build_system: autotools
   system: autotools
-
-  # 配置选项列表
-  configure_options: []
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-
-  # 编译器
+  configure_options:
+    - "--disable-documentation"
+    - "--disable-python"
+    - "--enable-convert"
+    - "--enable-lzo"
+    - "--enable-zstd"
+    - "--enable-libudev"
+    - "--enable-programs"
+    - "--enable-shared"
+    - "--enable-static"
+    - "--with-crypto=builtin"
+  dependencies:
+    - "uuid/2.40.1"
+    - "zstd/1.5.7"
+    - "zlib/1.3.1"
+    - "libudev-zero/1.0.4"
+    - "blkid (built from util-linux 2.40.1 source)"
+    - "lzo2 (built from lzo 2.10 source)"
+    - "ext2fs/com_err (built from e2fsprogs 1.47.1 source)"
   cc: clang
   cxx: clang++
 
@@ -56,18 +59,38 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0001-fix-umask-077-for-hmdfs.patch"
+  - "0002-add-pthread-stubs.patch"
+  - "0003-fix-makefile-for-ohos.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
   - "应用 E011 方案解决 HMDFS umask 077 权限问题"
-  - "应用 E007 方案更新 config.guess/config.sub 识别 OpenHarmony 平台"
   - "应用 E051 方案创建 pthread-stubs.c stub 函数解决平台限制"
-  - "旧版本（v5.x）内核代码依赖较少，可在 OHOS/musl 平台编译"
-  - "新版本（v6.x）包含大量内核代码，需要完整 Linux 内核用户空间兼容层"
-  - "libblkid.so.1 未自动打包到预编译包，需依赖系统预装或手动配置"
+  - "blkid/lzo2/ext2fs 不在制品仓中，从源码构建并集成到 conan recipe"
+  - "util-linux config.guess 无法识别 OHOS，使用 --build/--host 传递 triplet"
+  - "e2fsprogs 需要修复 /bin/ln 硬链接问题（HMDFS 不支持）"
+  - "所有功能已启用：convert、lzo、zstd、libudev（未裁剪）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/btrfs-progs-5.19.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/btrfs-progs-5.19.1.work
+  source_orig_hash: 4f8a957d48ce0cce
+  source_work_hash: f96ddc4575bc6e15
+  generated_at: '2026-08-06T04:44:09'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

@@ -38,12 +38,14 @@
 - **E011 方案**: 成功应用，解决 HMDFS umask 077 权限问题
 - **E007 方案**: 更新 config.guess/config.sub 识别平台
 - **E051 方案**: pthread_cancel 等函数不可用，创建 stub 函数解决
-- **平台发现**: btrfs-progs 5.19.1 依赖 ext2fs/blkid/uuid/zstd，需确保头文件路径正确
----
-
-**编译结束**: 2026-06-16 18:03
-**最终状态**: built
----
+- **平台发现**: btrfs-progs 5.19.1 依赖 ext2fs/blkid/uuid/zstd，需确保头文件路径正确---
 
 **编译结束**: 2026-06-16 18:09
 **最终状态**: published
+---
+
+**编译结束**: 2026-08-06 04:58
+**最终状态**: built
+
+**编译结束**: 2026-08-06
+**最终状态**: built (conan adapted)
