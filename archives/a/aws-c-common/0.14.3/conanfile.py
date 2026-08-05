@@ -50,6 +50,7 @@ class AwsccommonConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        cmake.test()  # Run ctest (L1: upstream test execution verification)
 
     def package(self):
         cmake = CMake(self)

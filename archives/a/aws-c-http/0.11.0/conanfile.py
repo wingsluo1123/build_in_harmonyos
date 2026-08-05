@@ -82,6 +82,7 @@ class AwsCHttpConan(ConanFile):
             "CMAKE_PREFIX_PATH": ";".join(prefix_paths)
         })
         cmake.build()
+        cmake.test()  # Run ctest (L1: upstream test execution verification)
 
     def package(self):
         cmake = CMake(self)
