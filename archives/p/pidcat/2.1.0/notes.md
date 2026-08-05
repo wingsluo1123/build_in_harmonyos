@@ -10,7 +10,7 @@
 
 pidcat 是纯 Python 脚本，无需 configure/make 编译步骤：
 1. 从 GitHub 下载源码包 (JakeWharton/pidcat tag 2.1.0)
-2. 修改 pidcat.py shebang: `#!/usr/bin/python -u` → `#!/usr/bin/env python3`（OHOS 兼容）
+2. 修改 pidcat.py shebang: `#!/usr/bin/python -u` → `#!/usr/bin/env python3`（OHOS 兼容，-u 无缓冲由代码内等价实现）
 3. 创建 Conan 配方 (conanfile.py + conandata.yml + test_package/)
 4. 通过 conan create 验证配方可用性
 
@@ -18,13 +18,13 @@ pidcat 是纯 Python 脚本，无需 configure/make 编译步骤：
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | shebang 指向 /usr/bin/python (OHOS 上不存在) | OHOS 没有 /usr/bin/python | 添加补丁将 shebang 改为 /usr/bin/env python3 |
+| 1 | shebang 指向 /usr/bin/python (OHOS 上不存在) | OHOS 没有 /usr/bin/python | 添加补丁将 shebang 改为 /usr/bin/env python3，并在代码内用 sys.stdout.reconfigure 等价保留 -u 无缓冲语义 |
 | 2 | conandata.yml patches 格式错误 | 使用了版本键字典格式，应为列表+patch_file 字段 | 修正为标准的 patch_file 列表格式 |
 
 ## 源码修改
 
 - 补丁: `patches/0001-pidcat.py.patch`
-  - 修改 pidcat.py shebang: `#!/usr/bin/python -u` → `#!/usr/bin/env python3`
+  - 修改 pidcat.py shebang: `#!/usr/bin/python -u` → `#!/usr/bin/env python3`（env shebang 无法携带 -u 参数，改用代码内 `sys.stdout.reconfigure(line_buffering=True, write_through=True)` 等价实现无缓冲输出）
 
 ## 依赖版本
 
