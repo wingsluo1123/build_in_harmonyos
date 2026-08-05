@@ -37,7 +37,17 @@ class AquaConan(ConanFile):
 
     def source(self):
         sources = self.conan_data["sources"]
-        download(self, sources["url"], sources["filename"], sha256=sources["sha256"])
+        # Local mirror fallback for environments where GitHub is unreachable
+        local_mirror = os.path.join(
+            os.environ.get("HOME", ""), "tmp", sources["filename"]
+        )
+        if os.path.isfile(local_mirror):
+            import shutil
+            dst = os.path.join(self.source_folder, sources["filename"])
+            shutil.copy2(local_mirror, dst)
+            self.output.info(f"Using local mirror: {local_mirror}")
+        else:
+            download(self, sources["url"], sources["filename"], sha256=sources["sha256"])
         self.run(f'tar xzf "{sources["filename"]}"')
 
     def build(self):
