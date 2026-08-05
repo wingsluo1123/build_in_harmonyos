@@ -55,21 +55,21 @@ class CryptOpensslRandomConan(ConanFile):
         )
 
         # Step 2: Patch Makefile for OpenHarmony platform
-        #   Fix CRT files missing: musl does not provide standard CRT startup files
-        #   Add -nostartfiles -nodefaultlibs -lc to LDDLFLAGS
-        makefile_path = os.path.join(self.source_folder, "Makefile")
-        with open(makefile_path, "r") as f:
-            content = f.read()
+        # R32: Platform guard — CRT fix is OHOS-specific (musl lacks CRT startup files)
+        if self.settings.os in ("Linux", "OHOS"):
+            makefile_path = os.path.join(self.source_folder, "Makefile")
+            with open(makefile_path, "r") as f:
+                content = f.read()
 
-        content = re.sub(
-            r"^LDDLFLAGS = -shared -O2 -fstack-protector-strong$",
-            "LDDLFLAGS = -shared -nostartfiles -nodefaultlibs -lc -O2 -fstack-protector-strong",
-            content,
-            flags=re.MULTILINE,
-        )
+            content = re.sub(
+                r"^LDDLFLAGS = -shared -O2 -fstack-protector-strong$",
+                "LDDLFLAGS = -shared -nostartfiles -nodefaultlibs -lc -O2 -fstack-protector-strong",
+                content,
+                flags=re.MULTILINE,
+            )
 
-        with open(makefile_path, "w") as f:
-            f.write(content)
+            with open(makefile_path, "w") as f:
+                f.write(content)
 
         # Step 3: Build
         self.run("make -j1", cwd=self.source_folder)
