@@ -12,10 +12,10 @@ version: "1.0"
 
 # 编译状态
 # published | built | failed | archived
-status: built
+status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-29"
+build_date: "2026-08-06"
 
 # Build system (top-level for script compatibility)
 build_system: cmake
@@ -25,13 +25,8 @@ build_system: cmake
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://api.github.com/repos/rahmanshaber/corepdf/tarball/v.1.0"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
+  sha256: "ad07c1e2128e7c6a9464a6a5b34e3ac2aa47aa93a9945ca2dba173361bcdf540"
   tar_format: tar.gz
 
 # ============================================================
@@ -39,22 +34,13 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: cmake
-
-  # 配置选项列表
   configure_options:
-    - "-DCMAKE_INSTALL_PREFIX=/storage/Users/currentUser/usr/local"
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_AUTOMOC=ON"
-
-  # 编译依赖列表（格式: name/version）
   dependencies:
-    - "qt6/6.11.1"
-    - "poppler/23.12.0"
-
-  # 编译器
+    - "qtbase/6.11.1"
+    - "poppler/25.12.0.3"
   cc: clang
   cxx: clang++
 
@@ -62,19 +48,23 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied:
-  - "0001-poppler-qt6-adaptation.patch"
+  - "0001-ccorepdf.pro.patch"
+  - "0002-corepdf-corepdf.cpp.patch"
+  - "0003-corepdf-corepdf.pro.patch"
+  - "0004-corepdf-main.cpp.patch"
+  - "0005-qpdflib-qpdflib.pro.patch"
+  - "0006-qpdflib-qpdfwidget.cpp.patch"
+  - "0007-qpdflib-qpdfwidget.h.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
-  - "Original corepdf uses Qt WebEngine + PDF.js for rendering; OpenHarmony lacks WebEngine, replaced with poppler-qt6 — knowledge_ref: E001"
-  - "qmake on OpenHarmony cannot generate Makefiles; must use cmake instead — knowledge_ref: E002"
-  - "poppler-qt6 Document::load() returns unique_ptr (not raw pointer) in v23.12.0 — knowledge_ref: E001"
-  - "libpoppler-qt6.so has broken NEEDED entry ../../libpoppler.so; must patchelf --replace-needed — knowledge_ref: E003"
-  - "corepdf v1.0 has hardcoded PDF file path; adapted to accept command-line arguments — knowledge_ref: E001"
-  - "pdfjsbridge (WebChannel/WebEngine) replaced entirely by poppler native rendering — knowledge_ref: E001"
+  - "Original corepdf uses Qt Web Engine + PDF.js for rendering; OpenHarmony lacks WebEngine, replaced with poppler-qt6"
+  - "qmake on OpenHarmony cannot generate Makefiles; must use cmake instead"
+  - "poppler-qt6 Document::load() returns unique_ptr (not raw pointer) in v25.12.0"
+  - "poppler conan package has ENABLE_QT6=OFF hardcoded; built local version 25.12.0.3 with qt6 support"
+  - "corepdf v1.0 has hardcoded PDF file path; adapted to accept command-line arguments"
+  - "pdfjsbridge (WebChannel/WebEngine) replaced entirely by poppler native rendering"
