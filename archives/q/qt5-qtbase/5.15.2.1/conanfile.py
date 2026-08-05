@@ -276,17 +276,18 @@ class Qt5QtbaseConan(ConanFile):
         # 该路径被烘焙进 qmake 二进制、bin/qt.conf 与 mkspecs/modules/*.pri。
         # 经 package() 复制到最终包目录后，这些路径失效，需修正。
 
-        # 1. 重写 bin/qt.conf：移除构建机器路径，用相对路径实现 relocatable
+        # 1. 重写 bin/qt.conf：使用 Qt 官方推荐的 relocatable 标准格式。
+        #    [Paths] 节中 Prefix/HostPrefix 使用相对路径（相对 qt.conf 所在
+        #    的 bin/ 目录），避免写入任何绝对路径（构建机/Conan cache 路径
+        #    均不可移植，会导致 relocatability 在非 cache 环境下失效）。
         pkg = self.package_folder
         qt_conf = os.path.join(pkg, "bin", "qt.conf")
         if os.path.isfile(qt_conf):
             with open(qt_conf, "w") as f:
                 f.write(
-                    "[EffectivePaths]\n"
-                    "Prefix=..\n"
                     "[Paths]\n"
-                    f"Prefix={pkg}\n"
-                    f"HostPrefix={pkg}\n"
+                    "Prefix=..\n"
+                    "HostPrefix=..\n"
                     "Sysroot=\n"
                     "SysrootifyPrefix=false\n"
                 )
@@ -301,11 +302,13 @@ class Qt5QtbaseConan(ConanFile):
                     if not fname.endswith(".pri"):
                         continue
                     fpath = os.path.join(modules_dir, fname)
-                    content = open(fpath).read()
+                    with open(fpath) as f:
+                        content = f.read()
                     if old_prefix not in content:
                         continue
                     content = content.replace(old_prefix, new_prefix)
-                    open(fpath, "w").write(content)
+                    with open(fpath, "w") as f:
+                        f.write(content)
                     self.output.info(
                         f"Fixed path in mkspecs/modules/{fname}: "
                         f"{old_prefix} → {new_prefix}"
