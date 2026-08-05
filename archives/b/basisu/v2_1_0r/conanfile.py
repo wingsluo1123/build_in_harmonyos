@@ -47,8 +47,7 @@ class BasisuConan(ConanFile):
         # Feature detection: HAS_QSORT_R indicates qsort_r with GNU signature is available
         # OHOS musl libc does not provide GNU-sig qsort_r; skip _GNU_SOURCE to use C90 fallback
         if str(self.settings.os) != "OHOS":
-            tc.variables["CMAKE_C_FLAGS"] = "-DHAS_QSORT_R"
-            tc.variables["CMAKE_CXX_FLAGS"] = "-DHAS_QSORT_R"
+            tc.preprocessor_definitions["HAS_QSORT_R"] = 1
         tc.generate()
 
     def build(self):
