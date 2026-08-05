@@ -32,7 +32,8 @@ class CaCertificatesTestConan(ConanFile):
 
         # 3. Verify a certificate is valid PEM using openssl
         test_crt = crt_files[0]
-        self.run(f'openssl x509 -in "{test_crt}" -noout -subject')
+        ret = self.run(f'openssl x509 -in "{test_crt}" -noout -subject')
+        assert ret == 0, f"openssl x509 verification failed with exit code {ret}"
 
         # 4. Check update-ca-certificates script exists
         sbin_path = os.path.join(pkg_root, "sbin", "update-ca-certificates")

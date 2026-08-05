@@ -107,6 +107,11 @@ class CaCertificatesConan(ConanFile):
                                     self._not_valid_after = datetime.datetime.strptime(
                                         date_str, "%b %d %H:%M:%S %Y %Z"
                                     )
+                            else:
+                                import sys
+                                print(f"ERROR: openssl failed (rc={result.returncode}): {result.stderr.strip()}",
+                                      file=sys.stderr)
+                                raise RuntimeError("openssl failed to parse certificate")
                         except FileNotFoundError:
                             raise RuntimeError(
                                 "openssl not found in PATH. "
