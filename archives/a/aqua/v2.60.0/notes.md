@@ -25,7 +25,9 @@
 ### 验证
 
 - 二进制文件: bin/aqua
-- 功能验证: aqua --version ✅ (CI 环境验证)
+- 功能验证: aqua --help ✅, aqua version ✅ (本地 conan create 验证通过)
+- test_package: 3/3 通过 (test_aqua.py: --help, version)
+- binary-sign-tool: ✅ 签名成功，二进制可在 HarmonyOS 上执行
 
 ## 制品信息
 
