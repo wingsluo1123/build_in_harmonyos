@@ -22,7 +22,7 @@ class AxelConan(ConanFile):
     description = "Lightweight CLI download accelerator"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/axel-download-accelerator/axel"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
