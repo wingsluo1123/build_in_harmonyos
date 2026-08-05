@@ -68,9 +68,9 @@ class FluentBitConan(ConanFile):
         src = self.conan_data["sources"]
         url = src["url"]
         expected_sha = src["sha256"]
-        dl_dir = os.path.join(self.cache_folder, "downloads") if hasattr(self, "cache_folder") else os.path.expanduser("~/.conan2/downloads")
+        # NOTE: Conan 2.x ConanFile has no `cache_folder` attribute, so only
+        # the ~/.conan2/downloads candidate is real (AI review P3: dead code).
         candidates = [
-            os.path.join(dl_dir, expected_sha),
             os.path.join(os.path.expanduser("~/.conan2/downloads"), expected_sha),
         ]
         local = next((p for p in candidates if os.path.isfile(p)), None)
@@ -193,11 +193,12 @@ class FluentBitConan(ConanFile):
             ]
             bundle = next((p for p in candidates if os.path.isfile(p)), None)
             if not bundle:
-                self.output.warning(f"OHOS stub bundle not found: {bundle_name}")
-            else:
-                with tarfile.open(bundle, "r:gz") as tf:
-                    tf.extractall(self.build_folder)
-                self.output.info(f"Materialised OHOS stub bundle: {bundle}")
+                raise ConanException(
+                    f"OHOS stub bundle not found: {bundle_name} — "
+                    f"place it at patches/ohos-stubs-bundle.tar.gz (see conandata.yml stubs:)")
+            with tarfile.open(bundle, "r:gz") as tf:
+                tf.extractall(self.build_folder)
+            self.output.info(f"Materialised OHOS stub bundle: {bundle}")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
