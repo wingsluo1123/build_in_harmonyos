@@ -21,7 +21,7 @@ class BtllibConan(ConanFile):
     description = "Birol Lab Library - bioinformatics C++ toolkit"
     license = "GPL-3.0"
     homepage = "https://github.com/BirolLab/btllib"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -39,8 +39,8 @@ class BtllibConan(ConanFile):
         # Download main source tarball
         get(self, **self.conan_data["sources"], strip_root=True)
 
-        # Workaround: git dubious ownership in conan cache
-        self.run("git config --global --add safe.directory '*'")
+        # Workaround: git dubious ownership + GitHub mirror for OHOS network
+        GIT_SAFE = "git -c safe.directory='*' -c 'url.https://ghfast.top/https://github.com/.insteadOf=https://github.com/'"
 
         # Clone git submodules at the exact commits pinned by btllib v1.7.8
         subprojects_dir = os.path.join(self.source_folder, "subprojects")
@@ -52,29 +52,29 @@ class BtllibConan(ConanFile):
             ("argparse", "https://github.com/p-ranav/argparse.git",
              "15d745f58481158ceb65f860e379deac9f722b5d"),
         ]
-        for name, url, commit in submodules:
+        for name, surl, commit in submodules:
             target = os.path.join(subprojects_dir, name)
-            self.run(f"git clone {url} {target}")
-            self.run(f"cd {target} && git checkout {commit}")
+            self.run(f"{GIT_SAFE} clone {surl} {target}")
+            self.run(f"cd {target} && {GIT_SAFE} checkout {commit}")
 
         # Nested submodules
         # cpptoml/deps/meta-cmake
         meta_cmake = os.path.join(subprojects_dir, "cpptoml", "deps", "meta-cmake")
         os.makedirs(os.path.dirname(meta_cmake), exist_ok=True)
-        self.run(f"git clone https://github.com/meta-toolkit/meta-cmake.git {meta_cmake}")
-        self.run(f"cd {meta_cmake} && git checkout db7ff976c430a6cb6cbd03ae691be04cfaac0a07")
+        self.run(f"{GIT_SAFE} clone https://github.com/meta-toolkit/meta-cmake.git {meta_cmake}")
+        self.run(f"cd {meta_cmake} && {GIT_SAFE} checkout db7ff976c430a6cb6cbd03ae691be04cfaac0a07")
 
         # sdsl-lite/external/googletest
         gtest = os.path.join(subprojects_dir, "sdsl-lite", "external", "googletest")
         os.makedirs(os.path.dirname(gtest), exist_ok=True)
-        self.run(f"git clone https://github.com/google/googletest.git {gtest}")
-        self.run(f"cd {gtest} && git checkout c2d90bddc6a2a562ee7750c14351e9ca16a6a37a")
+        self.run(f"{GIT_SAFE} clone https://github.com/google/googletest.git {gtest}")
+        self.run(f"cd {gtest} && {GIT_SAFE} checkout c2d90bddc6a2a562ee7750c14351e9ca16a6a37a")
 
         # sdsl-lite/external/libdivsufsort
         libdivsufsort = os.path.join(subprojects_dir, "sdsl-lite", "external", "libdivsufsort")
         os.makedirs(os.path.dirname(libdivsufsort), exist_ok=True)
-        self.run(f"git clone https://github.com/simongog/libdivsufsort.git {libdivsufsort}")
-        self.run(f"cd {libdivsufsort} && git checkout 0f24acd8de208464769c782119dacf158647f7ed")
+        self.run(f"{GIT_SAFE} clone https://github.com/simongog/libdivsufsort.git {libdivsufsort}")
+        self.run(f"cd {libdivsufsort} && {GIT_SAFE} checkout 0f24acd8de208464769c782119dacf158647f7ed")
 
         # Fix CMake minimum version for CMake 4.x compatibility in all subprojects
         cmake_files = [
@@ -104,6 +104,22 @@ class BtllibConan(ConanFile):
         if self.settings.os in ("Linux", "OHOS"):
             tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.generate()
+
+        # Ensure Meson finds llvm-ar (auto-detected for clang but not in PATH)
+        # by adding it to the generated native file's [binaries] section
+        if self.settings.os == "OHOS":
+            native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+            if os.path.exists(native_file):
+                with open(native_file, 'r') as f:
+                    content = f.read()
+                if "ar = " not in content:
+                    content = content.replace(
+                        "[binaries]\n",
+                        "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\n",
+                        1
+                    )
+                    with open(native_file, 'w') as f:
+                        f.write(content)
 
     def build(self):
         apply_conandata_patches(self)
