@@ -21,7 +21,7 @@ class PerlDevelCallerConan(ConanFile):
     description = "Devel::Caller - meatier versions of caller (Perl XS module)"
     license = "perl"
     homepage = "https://metacpan.org/pod/Devel::Caller"
-    url = ""  # CI fills this
+    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
 

@@ -1,5 +1,6 @@
-#!/bin/sh
-# test.sh — Devel-Caller 2.07 consumer test (R34 compliant)
+#!/bin/bash
+set -euo pipefail
+# test.sh — perl-devel-caller 2.07 consumer test (R34 compliant)
 #
 # Verifies Caller.so is a valid ELF shared library with the expected
 # boot_Devel__Caller XS entry point symbol.
