@@ -36,10 +36,10 @@ class MinihttpdConan(ConanFile):
         # mini_httpd is a raw Makefile project with no configure script.
         # Build both mini_httpd and htpasswd executables.
         # CRYPT_LIB=-lcrypt is needed for htpasswd, provided by libc on OHOS.
-        # CC=clang: OHOS SDK uses clang, not gcc.
         # R9: Use -j1, not -j$(nproc)
-        # R33: Use explicit CC=clang instead of conf key (not available in all envs)
-        self.run("make CC=clang -j1")
+        # R33: Read CC from environment (default clang for OHOS SDK), pass to make.
+        cc = os.environ.get("CC", "clang")
+        self.run(f"make CC={cc} -j1")
 
     def package(self):
         bindir = os.path.join(self.package_folder, "bin")

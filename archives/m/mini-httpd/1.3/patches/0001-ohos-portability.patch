@@ -1,26 +1,42 @@
 diff -ruN htpasswd.c htpasswd.c
 --- htpasswd.c	2017-12-14 00:36:22.000000000 +0800
-+++ htpasswd.c	2026-08-05 09:00:48.338781249 +0800
-@@ -16,6 +16,18 @@
++++ htpasswd.c	2026-08-05 09:59:56.774780155 +0800
+@@ -15,6 +15,34 @@
+ #include <stdlib.h>
  #include <time.h>
  #include <unistd.h>
- 
-+/* getpass is not available on OHOS (musl). Provide a local replacement. */
++#include <termios.h>
++
++/* getpass is not available on OHOS (musl). Local replacement that
++** suppresses terminal echo via termios when stdin is a TTY. */
 +static char*
 +my_getpass( const char* prompt )
 +{
 +    static char buf[256];
++    struct termios tio, saved;
++    int have_tio = 0;
++
 +    (void) fprintf( stderr, "%s", prompt );
++    if ( isatty( fileno( stdin ) ) && tcgetattr( fileno( stdin ), &saved ) == 0 )
++	{
++	tio = saved;
++	tio.c_lflag &= ~( ECHO | ECHONL );
++	if ( tcsetattr( fileno( stdin ), TCSAFLUSH, &tio ) == 0 )
++	    have_tio = 1;
++	}
 +    if ( fgets( buf, sizeof(buf), stdin ) == NULL )
-+	return NULL;
-+    buf[strcspn( buf, "\n" )] = '\0';
++	buf[0] = '\0';
++    else
++	buf[strcspn( buf, "\n" )] = '\0';
++    if ( have_tio )
++	(void) tcsetattr( fileno( stdin ), TCSAFLUSH, &saved );
++    (void) fputc( '\n', stderr );
 +    return buf;
 +}
-+
+ 
  #define LF 10
  #define CR 13
- 
-@@ -119,8 +131,8 @@
+@@ -119,8 +147,8 @@
  	}
      else
  	{
@@ -33,7 +49,7 @@ diff -ruN htpasswd.c htpasswd.c
  	    if ( tfd != -1 )
 diff -ruN port.h port.h
 --- port.h	2015-09-07 08:46:42.000000000 +0800
-+++ port.h	2026-08-05 09:00:48.282780936 +0800
++++ port.h	2026-08-05 09:59:56.710780624 +0800
 @@ -9,7 +9,7 @@
  #elif defined(__NetBSD__)
  # define OS_NetBSD
