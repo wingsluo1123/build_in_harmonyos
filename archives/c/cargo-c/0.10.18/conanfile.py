@@ -49,16 +49,31 @@ class CargoCConan(ConanFile):
         # On HarmonyOS, Rust is installed via Harmonybrew (community package manager).
         cargo_bin = shutil.which("cargo")
         if not cargo_bin:
-            # Harmonybrew install path — standard on HarmonyOS PC devices.
-            # brew install rust is idempotent; || true prevents failure if
-            # brew is not available (CI workers may pre-install Rust).
+            # Try installing Rust via cmd-pkgs (fast, pre-built HNP package)
+            self.run(
+                'curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh '
+                '| sh -s -- rust 1.97.1 2>&1 || true'
+            )
+            cargo_bin = shutil.which("cargo")
+
+        if not cargo_bin:
+            # Fallback: install via Harmonybrew (community Homebrew for HarmonyOS)
             brew_bin = "/storage/Users/currentUser/.harmonybrew/bin"
             brew_shellenv = os.path.join(brew_bin, "brew")
+            if not os.path.isfile(brew_shellenv):
+                # Install harmonybrew first
+                self.run(
+                    'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)" 2>&1 || true'
+                )
             if os.path.isfile(brew_shellenv):
                 self.run(
-                    f'eval "$({brew_shellenv} shellenv)" && brew install rust 2>&1'
+                    f'eval "$({brew_shellenv} shellenv)" && brew install rust 2>&1 || true'
                 )
             cargo_bin = shutil.which("cargo") or os.path.join(brew_bin, "cargo")
+
+        if not os.path.isfile(cargo_bin):
+            raise Exception("Rust toolchain (cargo) not available and installation failed. "
+                             "Please install Rust on the build machine.")
 
         # Resolve C/C++ compiler from Conan settings or system PATH.
         # Rust build scripts invoke cc/clang for C compilation of native deps.
@@ -89,8 +104,8 @@ class CargoCConan(ConanFile):
         os.environ["CC"] = cc
         os.environ["CXX"] = cxx
         # Ensure cargo can find rustc and other Rust tools in PATH.
-        brew_bin_dir = os.path.dirname(os.path.dirname(cargo_bin))
-        os.environ["PATH"] = brew_bin_dir + os.pathsep + os.environ.get("PATH", "")
+        cargo_dir = os.path.dirname(cargo_bin)
+        os.environ["PATH"] = cargo_dir + os.pathsep + os.environ.get("PATH", "")
         # Set RPATH at link time so binaries find bundled shared libraries
         # at runtime (bin/ -> ../lib/). Using $ORIGIN for portability.
         # This avoids post-build patchelf which would invalidate ELF codesign.
