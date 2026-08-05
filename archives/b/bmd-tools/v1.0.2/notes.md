@@ -70,5 +70,5 @@ architecture: aarch64
 - OHOS SDK 头文件存在 linux/socket.h 与 sys/socket.h 冲突，需要 __OHOS__ 守卫
 ---
 
-**编译结束**: 2026-05-29 16:13
+**编译结束**: 2026-08-05 09:50
 **最终状态**: built
