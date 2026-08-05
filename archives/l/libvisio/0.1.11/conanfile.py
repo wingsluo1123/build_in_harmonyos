@@ -42,6 +42,10 @@ class LibvisioConan(ConanFile):
         self.requires("libxml2/2.15.3")
         self.requires("zlib/1.3.1")
 
+    def build_requirements(self):
+        # cppunit for upstream test suite (make check)
+        self.test_requires("cppunit/1.15.1")
+
     def layout(self):
         basic_layout(self)
 
@@ -54,8 +58,7 @@ class LibvisioConan(ConanFile):
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
-        # Disable tests and tools (avoids cppunit dependency)
-        tc.configure_args.append("--disable-tests")
+        # Disable tools (not needed for library package)
         tc.configure_args.append("--disable-tools")
 
         # Add -rpath flags so configure test programs can find shared libs
@@ -196,9 +199,36 @@ fi
             if os.path.exists(src_pc) and not os.path.exists(alias_pc):
                 shutil.copy(src_pc, alias_pc)
 
+        # When tests are enabled, configure also needs librevenge-stream-0.0
+        # and librevenge-generators-0.0 .pc files. PkgConfigDeps generates a
+        # single librevenge.pc, so we create the sub-package .pc files.
+        revenge_dep = self.dependencies.get("librevenge")
+        if revenge_dep:
+            revenge_pkg = revenge_dep.package_folder
+            for sub_name, sub_lib in [
+                ("librevenge-stream-0.0", "revenge-stream-0.0"),
+                ("librevenge-generators-0.0", "revenge-generators-0.0"),
+            ]:
+                sub_pc = os.path.join(gen_folder, f"{sub_name}.pc")
+                if not os.path.exists(sub_pc):
+                    with open(sub_pc, "w") as f:
+                        f.write(f"""prefix={revenge_pkg}
+exec_prefix=${{prefix}}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include/librevenge-0.0
+
+Name: {sub_name}
+Description: Conan package: {sub_name}
+Version: 0.0.5
+Libs: -L${{libdir}} -l{sub_lib}
+Cflags: -I${{includedir}}
+""")
+
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j2"])
+        # Run upstream test suite (unittest + importtest)
+        autotools.make(target="check")
 
     def package(self):
         autotools = Autotools(self)
