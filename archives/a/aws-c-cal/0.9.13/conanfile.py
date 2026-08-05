@@ -82,6 +82,8 @@ class AwsccalConan(ConanFile):
         cmake.install()
 
     def package_info(self):
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.libs = ["aws-c-cal"]
+        self.cpp_info.requires = ["aws-c-common::aws-c-common", "aws-lc::aws-lc"]
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread", "dl", "rt"]
