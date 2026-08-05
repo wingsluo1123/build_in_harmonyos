@@ -9,7 +9,7 @@
 ## 编译环境
 - **Node.js**: v24.13.0
 - **npm**: 11.6.2
-- **Python**: 3.12.8 (用于 node-gyp 编译原生模块)
+- **Python**: 3.12.9 (用于 node-gyp 编译原生模块)
 - **esbuild**: v0.27.3 (打包/压缩工具)
 
 ## 源码修改
@@ -21,9 +21,9 @@
 npm install --ignore-scripts
 
 # 编译 node-pty 原生模块 (需要设置 LD_LIBRARY_PATH 以便 Python 可执行)
-export LD_LIBRARY_PATH=/data/service/hnp/python.org/python_3.12/lib:/data/service/hnp/lib:/storage/Users/currentUser/usr/local/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/data/service/hnp/python.org/python_3.12/lib:/data/service/hnp/lib:$LD_LIBRARY_PATH
 cd node_modules/node-pty
-node-gyp rebuild --nodedir=/data/service/hnp/node.org/node_v24.13.0
+npx node-gyp rebuild --nodedir=/data/service/hnp/node.org/node_v24.13.0
 
 # 编译 TypeScript/JavaScript
 npm run compile
@@ -53,8 +53,18 @@ chmod +x $TEST_PREFIX/$DEFAULT_PREFIX/bin/devcontainer
 - node-pty/build/Release/pty.node (ELF 原生模块) 已签名
 - devcontainer CLI 版本验证: 0.87.0 ✅
 
+## Conan 适配
+- **package_type**: application (CLI tool)
+- **build system**: custom (npm)
+- **conandata.yml**: sha256 verified, mirror fallback URLs added by CI
+- **test_package**: shell-based test (test_devcontainer.sh) verifies --version and --help
+- **commands.json**: declared as tool type
+- **conan-verify**: G1-G4 + L2/L4/L5 all passed
+- **W3 local CI**: passed (setup.sh + build_and_test.sh)
+
 ## 注意事项
 - node-pty 原生模块需要 Python 环境来通过 node-gyp 编译
 - LD_LIBRARY_PATH 需要包含 Python 库路径，否则 Python 无法运行
 - npm install --ignore-scripts 需要先执行，然后手动编译 node-pty
 - devcontainer CLI 是 Node.js 应用，需要 Node.js 运行环境
+- nodedir 需通过 `os.path.realpath(shutil.which("node"))` 解析符号链接
