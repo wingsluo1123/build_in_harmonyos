@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/zsh
 # test_package/src/test_brev.sh
 #
 # L1/L2 smoke test for the brev-cli application package (shell wrapper).
@@ -7,14 +7,14 @@
 # with the expected version string.
 #
 # Usage:
-#   BREV_BIN=/path/to/brev sh test_brev.sh
-#   sh test_brev.sh          # looks up brev on PATH
+#   BREV_BIN=/path/to/brev zsh test_brev.sh
+#   zsh test_brev.sh          # looks up brev on PATH
 #
 # Exit codes:
 #   0 — brev --version printed a string containing the expected version
 #   1 — brev not found, version mismatch, or placeholder binary detected
 #   2 — brev --version exited non-zero
-set -eu
+set -euo pipefail
 
 BREV_BIN="${BREV_BIN:-}"
 if [ -z "$BREV_BIN" ]; then

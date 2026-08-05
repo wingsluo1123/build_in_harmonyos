@@ -74,14 +74,14 @@ class BrevCliConan(ConanFile):
         # target GOOS=linux GOARCH=arm64 is ABI-compatible.
         # buildmode=pie produces a PIE (ET_DYN) binary that HMDFS will execute.
         # CGO_ENABLED=0 disables NVML (requires CGO + NVIDIA libraries).
-        run_env = [
-            "CGO_ENABLED=0",
-            "GOOS=linux",
-            "GOARCH=arm64",
-            "GOFLAGS=-mod=mod",
-        ]
+        run_env = {
+            "CGO_ENABLED": "0",
+            "GOOS": "linux",
+            "GOARCH": "arm64",
+            "GOFLAGS": "-mod=mod",
+        }
 
-        ldflags = "-s -w -X github.com/brevdev/brev-cli/pkg/cmd/version.Version=0.6.326"
+        ldflags = f"-s -w -X github.com/brevdev/brev-cli/pkg/cmd/version.Version={self.version}"
         build_cmd = (
             f'"{go_bin}" build -buildmode=pie -trimpath '
             f'-ldflags="{ldflags}" '
@@ -120,7 +120,7 @@ class BrevCliConan(ConanFile):
                 "}\n"
             )
         out = os.path.join(self.build_folder, "brev")
-        self.run(f'{cc} -fPIE -pie -o "{out}" "{src}"')
+        self.run(f'"{cc}" -fPIE -pie -o "{out}" "{src}"')
 
     def package(self):
         copy(self, "brev", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"))
