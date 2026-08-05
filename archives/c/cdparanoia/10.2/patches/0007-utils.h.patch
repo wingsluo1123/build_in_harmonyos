@@ -1,0 +1,53 @@
+--- a/utils.h
++++ b/utils.h
+@@ -1,38 +1,46 @@
+ #include <stdlib.h>
+ #include <endian.h>
+ #include <stdio.h>
+ #include <errno.h>
+ #include <string.h>
++#include <stdint.h>
++
++#ifndef u_int32_t
++typedef uint32_t u_int32_t;
++#endif
++#ifndef u_int16_t
++typedef uint16_t u_int16_t;
++#endif
+ 
+ extern long buffering_write(int outf, char *buffer, long num);
+ extern int buffering_close(int fd);
+ 
+ /* I wonder how many alignment issues this is gonna trip in the
+    future...  it shouldn't trip any...  I guess we'll find out :) */
+ 
+ static inline int bigendianp(void){
+   int test=1;
+   char *hack=(char *)(&test);
+   if(hack[0])return(0);
+   return(1);
+ }
+ 
+ static inline int32_t swap32(int32_t x){
+-  return((((u_int32_t)x & 0x000000ffU) << 24) | 
+-	 (((u_int32_t)x & 0x0000ff00U) <<  8) | 
+-	 (((u_int32_t)x & 0x00ff0000U) >>  8) | 
++  return((((u_int32_t)x & 0x000000ffU) << 24) |
++	 (((u_int32_t)x & 0x0000ff00U) <<  8) |
++	 (((u_int32_t)x & 0x00ff0000U) >>  8) |
+ 	 (((u_int32_t)x & 0xff000000U) >> 24));
+ }
+ 
+ static inline int16_t swap16(int16_t x){
+-  return((((u_int16_t)x & 0x00ffU) <<  8) | 
++  return((((u_int16_t)x & 0x00ffU) <<  8) |
+ 	 (((u_int16_t)x & 0xff00U) >>  8));
+ }
+ 
+ #if BYTE_ORDER == LITTLE_ENDIAN
+ 
+ static inline int32_t be32_to_cpu(int32_t x){
+   return(swap32(x));
+ }
+ 
+ static inline int16_t be16_to_cpu(int16_t x){

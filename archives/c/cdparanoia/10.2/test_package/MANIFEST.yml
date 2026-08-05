@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: cdparanoia/10.2
+homepage: "https://xiph.org/paranoia/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# cdparanoia has no automated test suite; the 'test' target only builds
+# a test binary in paranoia/ directory
+upstream_tests:
+  - file: "paranoia/paranoia.c"
+    source: "cdparanoia-10.2/paranoia/paranoia.c"
+    description: "Paranoia library test build (not an automated test)"
+    command: "make test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "Verifies library linking by calling cdda_find_a_cdrom()"
+    command: "./test_cdparanoia"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 1

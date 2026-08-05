@@ -1,11 +1,12 @@
 software: cdparanoia
 version: "10.2"
-status: built
-build_date: "2026-05-30"
+status: published
+build_date: "2026-08-06"
+build_system: autotools
 
 source:
   url: "https://downloads.xiph.org/releases/cdparanoia/cdparanoia-III-10.2.src.tgz"
-  sha256: ""
+  sha256: "005db45ef4ee017f5c32ec124f913a0546e77014266c6a1c50df902a55fe64df"
   tar_format: tar.gz
 
 build:
@@ -15,7 +16,18 @@ build:
   cc: clang
   cxx: clang++
 
-patches_applied: []
+patches_applied:
+  - "0001-Makefile.in.patch: Add DESTDIR support to install target"
+  - "0002-configure.patch: Always run AC_PROG_CC; apply umask 022 fix"
+  - "0003-configure.guess.patch: Add HarmonyOS platform detection"
+  - "0004-configure.in.patch: Remove if test -z CC guard"
+  - "0005-configure.sub.patch: Add linux-ohos OS triplet support"
+  - "0006-interface-scan_devices.c.patch: Replace cuserid() for OHOS"
+  - "0007-utils.h.patch: Add u_int32_t/u_int16_t typedefs for musl libc"
 
 knowledge_gained:
-  - "Autotools build system works for OHOS"
+  - "Autotools build system works for OHOS with config.guess/sub patches"
+  - "cuserid() not available on OHOS musl libc; use getpwuid(getuid()) instead"
+  - "u_int32_t/u_int16_t BSD types not defined on musl; add typedefs from stdint.h"
+  - "config.status temp directory creation fails with umask 077 on OHOS; use umask 022"
+  - "Makefile.in install target lacks DESTDIR support; added for conan packaging"
