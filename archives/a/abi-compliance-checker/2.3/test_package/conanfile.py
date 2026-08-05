@@ -5,7 +5,7 @@ from conan import ConanFile
 
 class AbiComplianceCheckerTestConan(ConanFile):
     """test_package for abi-compliance-checker — runs --version to verify the tool."""
-    settings = "os", "arch", "compiler", "build_type"
+    settings = "os", "arch"
     generators = "VirtualRunEnv"
     test_type = "explicit"
 
