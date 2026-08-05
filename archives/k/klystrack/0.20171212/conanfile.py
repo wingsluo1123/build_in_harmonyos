@@ -206,8 +206,21 @@ class KlystrackConan(ConanFile):
             f' -L{os.path.join(os.path.dirname(make_dir), "klystron", "bin.release")} -L{sdl2_lib} '
             f'-Wl,--start-group -lengine_gfx -lengine_util -lengine_snd -lengine_gui {sdl2_main_lib} -Wl,--end-group'
         )
+        # CI 真根因2: Makefile deps 阶段（%.d: %.c）调裸 gcc + sdl2-config 而配方传的 CC=clang/SDLFLAGS
+        # 只覆盖主编译阶段不覆盖 deps 阶段（Makefile:96 用 $(CDEP) 而非 $(CC)，CDEP 默认 gcc）
+        # → 补 CDEP="{cc}" 覆盖 deps 阶段的 gcc + 触建 deps/ 目录预 touch 所有 .d 文件让 make 跳过 deps 阶段
+        deps_dir = os.path.join(make_dir, "deps")
+        os.makedirs(deps_dir, exist_ok=True)
+        # 预建空 .d 文件让 make 认为 deps 已生成跳过 deps 阶段（避调 gcc/sdl2-config 炸）
+        import glob as _glob_deps
+        for src_c in _glob_deps.glob(os.path.join(make_dir, "src", "*.c")):
+            base = os.path.splitext(os.path.basename(src_c))[0]
+            for cfg in ("release",):
+                dep_f = os.path.join(deps_dir, f"{cfg}_{base}.d")
+                if not os.path.exists(dep_f):
+                    open(dep_f, "w").close()  # 空 .d 文件让 make 跳过 deps 生成
         common_flags = (
-            f'CFG=release CC="{cc}" CXX="{cxx}" '
+            f'CFG=release CC="{cc}" CXX="{cxx}" CDEP="{cc}" '
             f'CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" '
             f'SDLFLAGS="{sdl_flags}" SDLLIBS="{sdl_libs}" '
             f'PREFIX={prefix}'
