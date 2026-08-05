@@ -180,7 +180,7 @@ class NcursesConan(ConanFile):
             # ncurses 6.4 CF_LIB_RULES 在 --host 三元组下生成 form/Makefile 第 50 行
             # D\x0b\xd3\xb6[kk\x02D\x0b... 等乱码行，make 报 missing separator
             # 修法：删除所有含非 ASCII 字节的行（VPATH/srcdir 已正确 patch）
-            import re as _re
+            # aireview P3: import re as _re 未使用 — 该段用字节操作 ln.decode('ascii') 非正则
             for sub in subdirs:
                 mk_path = os.path.join(self.source_folder, sub, "Makefile")
                 if not os.path.exists(mk_path):

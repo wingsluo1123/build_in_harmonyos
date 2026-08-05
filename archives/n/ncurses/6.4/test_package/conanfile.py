@@ -19,7 +19,7 @@ class NcursesTestConan(ConanFile):
         inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
         lib = os.path.join(self.dependencies["ncurses"].package_folder, "lib")
         # aireview P3: self.run 自带非零退出码抛 ConanException，手动 ret=if raise 是死代码删
-        self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses {os.path.join(self.source_folder, 'test.c')} -lncursesw", cwd=self.build_folder)
+        self.run(f"{cc} -I{inc} -L{lib} -o test_ncurses {os.path.join(self.source_folder, 'test.c')} -lncursesw", cwd=self.build_folder, env="conanbuild")
 
     def test(self):
         if can_run(self):
