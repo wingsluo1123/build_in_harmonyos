@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: cargo (Rust)
-- 编译日期: 2026-06-17
+- 编译日期: 2026-08-06
 - 编译器: clang/clang++ (系统C/C++), rustc 1.95.0 (Rust)
 - 状态: built
 
@@ -28,7 +28,7 @@
 
 ## 源码修改
 
-无源码修改，无补丁。
+- 补丁 0001-Cargo.lock.patch: 添加 Cargo.lock 文件用于可复现构建（GitHub 源码 tarball 不包含 Cargo.lock）
 
 ## 依赖版本
 
