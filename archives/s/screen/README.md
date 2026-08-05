@@ -24,11 +24,11 @@ Screen 允许用户在一个终端窗口中创建多个虚拟终端会话，支�
 
 1. **configure umask 077 不兼容 HMDFS**：configure 脚本使用 `umask 077` 创建临时目录，HMDFS 文件系统下创建的目录权限不可写导致 configure 失败。修改为 `umask 022`。
 
-2. **closeallfiles() 中 poll() 返回 ENOMEM**：OHOS 的 `poll()` 在轮询大量文件描述符时返回 ENOMEM 错误，导致 screen 在关闭文件时崩溃。使用 `#ifdef __OHOS__` 守卫，改为直接 `close()` 循环。
+2. **closeallfiles() 中 poll() 返回 ENOMEM**：OHOS 的 `poll()` 在轮询大量文件描述符时返回 ENOMEM 错误，导致 screen 在关闭文件时崩溃。改为 POSIX `close()` 循环（EBADF 无害）。
 
-3. **seteuid/setegid/getspnam 不可用**：OHOS 不支持 `seteuid(0)`/`setegid(0)` 获取 root 权限和 `getspnam()` 读取 shadow 密码。使用 `#ifndef __OHOS__` 守卫跳过这些调用。
+3. **seteuid/setegid/getspnam 不可用**：OHOS 不支持 `seteuid(0)`/`setegid(0)` 获取 root 权限和 `getspnam()` 读取 shadow 密码。改为失败容错处理（非 Panic）。
 
-4. **glibc malloc mock 不兼容**：screen 测试框架使用 `__libc_malloc` 符号进行 malloc mock，OHOS 的 musl libc 无此符号。通过 macros.h 和 mallocmock.c 的 `__OHOS__` 守卫禁用 mock，测试聚焦核心功能验证。
+4. **glibc malloc mock 不兼容**：screen 测试框架使用 `__libc_malloc` 符号进行 malloc mock，OHOS 的 musl libc 无此符号。通过 macros.h 和 mallocmock.c 的 `#ifdef __GLIBC__` 守卫禁用 mock（非平台宏），测试聚焦核心功能验证。
 
 5. **OHOS 无 PAM 支持**：configure 检测到 PAM 不可用，需显式 `--disable-pam`。
 
@@ -49,7 +49,7 @@ Screen 允许用户在一个终端窗口中创建多个虚拟终端会话，支�
 |------|------|------|
 | 0001 | configure | umask 077→022 HMDFS 兼容 |
 | 0002 | misc.c | closeallfiles() poll() ENOMEM → 直接 close() 循环 |
-| 0003 | socket.c | seteuid/setegid/getspnam `#ifndef __OHOS__` 守卫 |
+| 0003 | socket.c | seteuid/setegid 失败容错处理 |
 | 0004 | tests/macros.h | 禁用 glibc malloc mock on OHOS |
 | 0005 | tests/mallocmock.c | include config.h, guard `__libc_malloc` |
 | 0006 | tests/test-winmsgbuf.c | guard FAILLOC assertions on OHOS |
@@ -111,7 +111,7 @@ CI_PACKAGES="archives/s/screen/5.0.0" zsh ci/conan/build_and_test.sh
 
 1. cmd-pkgs ncurses 只发库不发头文件，需从源码或已有归档 (如 abook 的 ncurses-headers.tar.gz) 提取头文件。
 2. screen 是命令行工具而非库，conanfile.py 需设 `package_type = "application"`、`bindirs = ["bin"]`，并创建 commands.json (R38)。
-3. OHOS 的 musl libc 无 `__libc_malloc` 符号，任何使用 glibc malloc mock 的测试框架都需要 `__OHOS__` 守卫。
+3. OHOS 的 musl libc 无 `__libc_malloc` 符号，任何使用 glibc malloc mock 的测试框架都需要 `#ifdef __GLIBC__` 守卫（非平台宏）。
 4. HMDFS 文件系统对 `umask 077` 创建的目录权限处理与 ext4 不同，需统一改为 `umask 022`。
 5. `getpwuid()` 在 OHOS 上不可用是平台级限制，不影响编译质量但会影响运行时会话管理，属于已知限制。
 

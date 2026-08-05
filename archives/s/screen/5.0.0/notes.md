@@ -49,19 +49,19 @@
 | 文件 | 原因 | 方式 | 补丁状态 |
 |------|------|------|---------|
 | configure | umask 077→022 HMDFS 兼容 | patch | 0001-configure.patch |
-| misc.c | closeallfiles() poll() ENOMEM | #ifdef __OHOS__ | 0002-misc.c.patch |
-| socket.c | seteuid/setegid/getspnam 不可用 | #ifndef __OHOS__ | 0003-socket.c.patch |
-| tests/macros.h | glibc malloc mock 不兼容 | __OHOS__ guard | 0004-tests-macros.h.patch |
-| tests/mallocmock.c | __libc_malloc 不存在 | __OHOS__ guard | 0005-tests-mallocmock.c.patch |
-| tests/test-winmsgbuf.c | FAILLOC 依赖 malloc mock | __OHOS__ guard | 0006-tests-test-winmsgbuf.c.patch |
+| misc.c | closeallfiles() poll() ENOMEM | POSIX close() loop | 0002-misc.c.patch |
+| socket.c | seteuid/setegid/getspnam 不可用 | graceful failure handling | 0003-socket.c.patch |
+| tests/macros.h | glibc malloc mock 不兼容 | #ifdef __GLIBC__ | 0004-tests-macros.h.patch |
+| tests/mallocmock.c | __libc_malloc 不存在 | #ifdef __GLIBC__ | 0005-tests-mallocmock.c.patch |
+| tests/test-winmsgbuf.c | FAILLOC 依赖 malloc mock | #ifdef __GLIBC__ | 0006-tests-test-winmsgbuf.c.patch |
 | tests/test-winmsgcond.c | 类型不匹配 char*→int | 类型修复 | 0007-tests-test-winmsgcond.c.patch |
 
 ## 四、平台适配摘要
 
-1. **closeallfiles() (misc.c)**: OHOS 的 poll() 在轮询大量 fd 时返回 ENOMEM。使用 #ifdef __OHOS__ 守卫，改为直接 close() 循环。
-2. **socket.c**: seteuid/setegid 和 getspnam 在 OHOS 上不可用，用 #ifndef __OHOS__ 守卫。
+1. **closeallfiles() (misc.c)**: OHOS 的 poll() 在轮询大量 fd 时返回 ENOMEM。改为 POSIX close() 循环（EBADF 无害），移除 poll() 依赖。
+2. **socket.c**: seteuid/setegid 在 OHOS 上不可用，改为失败容错处理（非 Panic），移除 getspnam 死代码分支。
 3. **configure**: umask 077→022 解决 HMDFS 权限问题; --disable-pam 因 OHOS 无 PAM。
-4. **测试框架**: glibc malloc mock 依赖 __libc_malloc (OHOS 无此符号)，通过 macros.h 和 mallocmock.c 的 __OHOS__ 守卫禁用 mock，测试聚焦核心功能验证。
+4. **测试框架**: glibc malloc mock 依赖 __libc_malloc (OHOS 无此符号)，通过 macros.h 和 mallocmock.c 的 #ifdef __GLIBC__ 守卫禁用 mock（非平台宏），测试聚焦核心功能验证。
 
 ## 五、已知平台限制
 
@@ -77,3 +77,4 @@
 
 **编译结束**: 2026-08-04 21:24
 **最终状态**: published
+

@@ -10,8 +10,8 @@ R38: screen is a command-line tool (commands.json required).
 
 All source modifications are applied via patches declared in conandata.yml:
   0001-configure.patch             - configure umask 077→022 (HMDFS compatibility)
-  0002-misc.c.patch                 - OHOS poll() ENOMEM workaround in closeallfiles
-  0003-socket.c.patch              - socket.c seteuid/setegid/getspnam __OHOS__ guards
+  0002-misc.c.patch                 - poll() replaced with POSIX close() loop
+  0003-socket.c.patch              - socket.c seteuid/setegid graceful failure handling
   0004-tests-macros.h.patch         - Test macros.h compilation fix
   0005-tests-mallocmock.c.patch     - Test mallocmock.c compilation fix
   0006-tests-test-winmsgbuf.c.patch - Test winmsgbuf compilation fix
@@ -59,7 +59,12 @@ def _install_cmd_pkg(name, version, prefix):
     """Download and install a cmd-pkgs prebuilt package."""
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"
     cmd = f'curl -fsSL {url} | sh -s -- {name} {version} {prefix}'
-    subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True)
+    result = subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise ConanInvalidConfiguration(
+            f"Failed to install {name} {version} via cmd-pkgs: "
+            f"rc={result.returncode} stderr={result.stderr.strip()}"
+        )
 
 
 class ScreenConan(ConanFile):
