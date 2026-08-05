@@ -64,6 +64,10 @@ class LibpaperConan(ConanFile):
         replace_in_file(self, os.path.join(self.source_folder, "configure"),
                         "umask 000", "umask 022", strict=False)
 
+        # Ensure configure is executable (patch extraction doesn't set execute bit)
+        configure_path = os.path.join(self.source_folder, "configure")
+        os.chmod(configure_path, 0o755)
+
         # Use Autotools helper (handles triplet, CC, CXX, CFLAGS, LDFLAGS)
         autotools = Autotools(self)
         autotools.configure()
