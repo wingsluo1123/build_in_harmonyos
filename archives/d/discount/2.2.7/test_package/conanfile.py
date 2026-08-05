@@ -19,4 +19,4 @@ class DiscountTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run(os.path.join(self.test_build_folder, "test_discount"), env="conanrun")
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_discount"), env="conanrun")
