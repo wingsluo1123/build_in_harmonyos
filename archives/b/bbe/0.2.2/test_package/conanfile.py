@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Conan test_package for bbe — verifies the bbe binary works."""
-import os
-
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 

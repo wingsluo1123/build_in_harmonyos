@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Conan recipe for bbe — binary block editor (sed-like for binary files)."""
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
