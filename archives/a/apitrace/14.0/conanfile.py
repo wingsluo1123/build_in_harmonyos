@@ -18,16 +18,17 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, download
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
-# Submodule definitions (official GitHub URLs; mirrors handled by ohc-run.py or CI)
+# Submodule definitions with fixed tags for reproducible builds.
+# Tags correspond to versions compatible with apitrace 14.0.
 _SUBMODULES = {
-    "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli"},
-    "gtest":        {"url": "https://github.com/google/googletest",             "dest": "thirdparty/gtest"},
-    "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace"},
-    "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng"},
-    "snappy":       {"url": "https://github.com/google/snappy",                 "dest": "thirdparty/snappy"},
-    "zlib":         {"url": "https://github.com/madler/zlib",                   "dest": "thirdparty/zlib"},
-    "zstd":         {"url": "https://github.com/facebook/zstd",                "dest": "thirdparty/zstd"},
-    "directxmath":  {"url": "https://github.com/microsoft/DirectXMath",          "dest": "thirdparty/directxmath"},
+    "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli",       "ref": "v1.1.0"},
+    "gtest":        {"url": "https://github.com/google/googletest",             "dest": "thirdparty/gtest",       "ref": "v1.14.0"},
+    "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace", "ref": "9ae436c"},
+    "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng",       "ref": "libpng-1.6.43"},
+    "snappy":       {"url": "https://github.com/google/snappy",                 "dest": "thirdparty/snappy",       "ref": "1.1.10"},
+    "zlib":         {"url": "https://github.com/madler/zlib",                   "dest": "thirdparty/zlib",         "ref": "v1.3.1"},
+    "zstd":         {"url": "https://github.com/facebook/zstd",                "dest": "thirdparty/zstd",         "ref": "v1.5.5"},
+    "directxmath":  {"url": "https://github.com/microsoft/DirectXMath",          "dest": "thirdparty/directxmath",  "ref": "jan2024"},
 }
 
 # Mirror prefixes tried in order if GitHub is unreachable
@@ -51,17 +52,17 @@ class ApitraceConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
-    def _download_submodule(self, name, base_url, dest):
-        """Download a git submodule, trying mirror prefixes."""
+    def _download_submodule(self, name, base_url, ref, dest):
+        """Download a git submodule at a fixed ref, trying mirror prefixes."""
         tmp_dir = tempfile.gettempdir()
-        for branch in ("master", "main"):
-            for mirror in _MIRRORS:
-                archive_url = f"{base_url}/archive/refs/heads/{branch}.tar.gz"
+        # Use tag-based archive URL for reproducible builds
+        for mirror in _MIRRORS:
+                archive_url = f"{base_url}/archive/refs/tags/{ref}.tar.gz"
                 full_url = f"{mirror}{archive_url}" if mirror else archive_url
                 tmp_file = os.path.join(tmp_dir, f"apitrace_{name}.tar.gz")
                 try:
                     download(self, full_url, tmp_file)
-                    self.output.info(f"Downloaded {name} from {full_url}")
+                    self.output.info(f"Downloaded {name}@{ref} from {full_url}")
                     with tarfile.open(tmp_file, "r:gz") as tar:
                         members = tar.getmembers()
                         if members:
@@ -73,7 +74,7 @@ class ApitraceConan(ConanFile):
                     os.unlink(tmp_file)
                     return True
                 except Exception as e:
-                    self.output.info(f"Failed {name} from {full_url}: {e}")
+                    self.output.info(f"Failed {name}@{ref} from {full_url}: {e}")
                     if os.path.exists(tmp_file):
                         os.unlink(tmp_file)
         return False
@@ -81,12 +82,12 @@ class ApitraceConan(ConanFile):
     def source(self):
         # Download main source (conan get handles mirror lists injected by ohc-run.py)
         get(self, **self.conan_data["sources"], strip_root=True)
-        # Download required submodules
+        # Download required submodules at fixed refs for reproducible builds
         for name, info in _SUBMODULES.items():
             dest = os.path.join(self.source_folder, info["dest"])
-            self.output.info(f"Downloading submodule {name} -> {dest}")
-            if not self._download_submodule(name, info["url"], dest):
-                raise RuntimeError(f"Failed to download submodule {name}")
+            self.output.info(f"Downloading submodule {name}@{info['ref']} -> {dest}")
+            if not self._download_submodule(name, info["url"], info["ref"], dest):
+                raise RuntimeError(f"Failed to download submodule {name}@{info['ref']}")
 
     def generate(self):
         tc = CMakeToolchain(self)
