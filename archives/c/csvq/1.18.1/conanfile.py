@@ -32,12 +32,23 @@ class CsvqConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Go build environment — set via os.environ (R33: no bare shell vars)
+        # Go build environment — set via os.environ (Go has no Conan toolchain)
         os.environ["CGO_ENABLED"] = "0"
         os.environ["GOOS"] = "linux"
         os.environ["GOARCH"] = "arm64"
-        os.environ["GOPROXY"] = "https://goproxy.cn,direct"
+        os.environ["GOPROXY"] = os.environ.get("GOPROXY", "https://goproxy.cn,direct")
         os.environ["GOFLAGS"] = "-mod=mod"
+        # Ensure Go compiler is in PATH (CI workers may have Go via Harmonybrew)
+        go_paths = [
+            "/storage/Users/currentUser/.harmonybrew/bin",
+            "/usr/local/go/bin",
+            "/usr/local/lib/goenv/versions",
+        ]
+        current_path = os.environ.get("PATH", "")
+        for p in go_paths:
+            if p not in current_path:
+                current_path = f"{p}:{current_path}"
+        os.environ["PATH"] = current_path
         # Build csvq binary using Go
         self.run(
             "go build -tags urfave_cli_no_docs -trimpath "
