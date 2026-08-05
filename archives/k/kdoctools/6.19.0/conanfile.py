@@ -65,6 +65,18 @@ class KDocToolsConan(ConanFile):
         # karchive 未合入且无 Conan 配方，采用 KDE 官方 MEINPROC_NO_KARCHIVE
         # 降级（meinproc cache 选项不可用，DocBook 转换核心功能正常）
         tc.variables["MEINPROC_NO_KARCHIVE"] = "ON"
+        # ECM 的 KDEMetaInfoPlatformCheck 不认 HarmonyOS 平台（仅支持
+        # Linux/FreeBSD/Windows/macOS），KDE 官方提供 KF_IGNORE_PLATFORM_CHECK
+        # 变量绕过平台检查
+        tc.variables["KF_IGNORE_PLATFORM_CHECK"] = "true"
+        # qtbase cmake_find_mode=none（自带 Qt6Config.cmake 在 lib/cmake/），
+        # CMakeDeps 不生成 Qt6CoreConfig.cmake；显式设置 Qt6_DIR 指向
+        # qtbase 的 lib/cmake，供 find_package(Qt6Core CONFIG) 查找
+        tc.cache_variables["Qt6_DIR"] = os.path.join(qtbase_pkg, "lib", "cmake")
+        # ECM 打包产物缺 ecm_uninstall.cmake.in，ECMUninstallTarget 的
+        # configure_file 会失败；用 KDE 官方 KDE_SKIP_UNINSTALL_TARGET
+        # 跳过 uninstall target 生成
+        tc.variables["KDE_SKIP_UNINSTALL_TARGET"] = "TRUE"
         tc.generate()
 
     def build(self):
