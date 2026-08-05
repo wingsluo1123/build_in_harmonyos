@@ -33,8 +33,14 @@ int main(void) {
     /* Fill a circle with a radial gradient (same pattern as official sample) */
     BLGradientCore radial;
     BLRadialGradientValues radial_values = { 64, 64, 64, 64, 48, 0 };
-    bl_gradient_init_as(&radial, BL_GRADIENT_TYPE_RADIAL, &radial_values,
+    r = bl_gradient_init_as(&radial, BL_GRADIENT_TYPE_RADIAL, &radial_values,
         BL_EXTEND_MODE_PAD, NULL, 0, NULL);
+    if (r != BL_SUCCESS) {
+        fprintf(stderr, "bl_gradient_init_as failed: %u\n", r);
+        bl_context_destroy(&ctx);
+        bl_image_destroy(&img);
+        return 1;
+    }
     bl_gradient_add_stop_rgba32(&radial, 0.0, 0xFFFFFFFFu);
     bl_gradient_add_stop_rgba32(&radial, 1.0, 0xFFFF6F3Fu);
 
