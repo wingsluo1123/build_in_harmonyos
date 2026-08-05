@@ -5,9 +5,16 @@
 struct aws_allocator;
 extern void aws_compression_library_init(struct aws_allocator *alloc);
 extern void aws_compression_library_clean_up(void);
+/* Forward-declare aws_default_allocator from aws-c-common */
+extern struct aws_allocator *aws_default_allocator(void);
 
 int main(void) {
-    aws_compression_library_init((void *)0);
+    struct aws_allocator *allocator = aws_default_allocator();
+    if (!allocator) {
+        printf("ERROR: default allocator is NULL\n");
+        return 1;
+    }
+    aws_compression_library_init(allocator);
     printf("aws-c-compression library initialized: OK\n");
     aws_compression_library_clean_up();
     printf("aws-c-compression library cleaned up: OK\n");
