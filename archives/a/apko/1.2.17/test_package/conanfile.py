@@ -496,6 +496,8 @@ class ApkoTestConan(ConanFile):
                 % compile_fail_pkgs
             )
 
+        return status
+
     # ------------------------------------------------------------------
     # test()
     # ------------------------------------------------------------------
@@ -534,4 +536,9 @@ class ApkoTestConan(ConanFile):
 
         self._run_go("%s mod download" % go_bin, env, cwd=src)
 
-        self._run_upstream_tests(go_bin, env, src)
+        ut_status = self._run_upstream_tests(go_bin, env, src)
+
+        if ut_status == "failed":
+            raise ConanException(
+                "upstream go test suite failed (see HMBS_UPSTREAM_TEST_RESULT marker)"
+            )

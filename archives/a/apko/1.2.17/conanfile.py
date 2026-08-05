@@ -19,7 +19,6 @@ Platform notes:
 import hashlib
 import os
 import shutil
-import stat
 import tarfile
 
 from conan import ConanFile
@@ -314,7 +313,7 @@ class ApkoConan(ConanFile):
         git_version = "1.2.17"
         git_hash = "unknown"
         git_treestate = "clean"
-        build_date = "2026-06-17"
+        build_date = "2026-08-05"
         pkg = "sigs.k8s.io/release-utils/version"
         ldflags = (
             "-buildid= "
