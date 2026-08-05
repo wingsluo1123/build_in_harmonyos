@@ -29,3 +29,7 @@
 | test_package/ | L1 test (upstream basisu -test + consumer link test) |
 | patches/0001-zstd-zstd.c.patch | qsort_r compatibility for zstd.c |
 | patches/0002-zstd-zstddeclib.c.patch | qsort_r compatibility for zstddeclib.c |
+---
+
+**编译结束**: 2026-08-06 00:47
+**最终状态**: published
