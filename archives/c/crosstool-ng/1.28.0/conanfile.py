@@ -18,7 +18,7 @@ class CrosstoolNgConan(ConanFile):
     description = "Crosstool-NG is a versatile (cross) toolchain generator"
     license = "MIT"
     homepage = "https://crosstool-ng.github.io/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
@@ -39,10 +39,11 @@ class CrosstoolNgConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         # crosstool-ng needs ncurses headers and library
-        # ncurses is installed as system prebuilt package at $HOME/usr/local
-        home = os.environ.get("HOME", "/storage/Users/currentUser")
-        tc.cflags.append(f"-I{home}/usr/local/include")
-        tc.ldflags.append(f"-L{home}/usr/local/lib")
+        # ncurses is installed as system prebuilt package
+        home = os.environ.get("HOME", "")
+        if home:
+            tc.cflags.append(f"-I{home}/usr/local/include")
+            tc.ldflags.append(f"-L{home}/usr/local/lib")
         tc.generate()
 
     def build(self):
