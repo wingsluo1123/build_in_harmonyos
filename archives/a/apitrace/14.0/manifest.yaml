@@ -1,11 +1,12 @@
 software: apitrace
 version: "14.0"
-status: built
-build_date: "2026-05-30"
+status: published
+build_date: "2026-08-05"
+build_system: cmake
 
 source:
   url: "https://github.com/apitrace/apitrace/archive/refs/tags/14.0.tar.gz"
-  sha256: ""
+  sha256: "53469052b28ca56dc0d28153d218dee6c2c128c53b2aa32d6e7f906f7a5c6c7a"
   tar_format: tar.gz
 
 build:
@@ -13,6 +14,13 @@ build:
   configure_options:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DENABLE_GUI=OFF"
+    - "-DENABLE_X11=OFF"
+    - "-DENABLE_EGL=ON"
+    - "-DENABLE_WAFFLE=OFF"
+    - "-DENABLE_TESTS=OFF"
+    - "-DBUILD_TESTING=OFF"
+    - "-DENABLE_STATIC_SNAPPY=ON"
   dependencies: []
   cc: clang
   cxx: clang++
@@ -20,4 +28,8 @@ build:
 patches_applied: []
 
 knowledge_gained:
-  - "CMake build system works natively for OHOS cross-compilation"
+  - "GitHub tarball does not include git submodules; must fetch them individually in conanfile.py source()"
+  - "ENABLE_EGL=ON required to build egltrace.so wrapper (core functionality)"
+  - "ENABLE_X11=OFF since HarmonyOS has no X11; EGL uses dlsym for runtime symbol resolution"
+  - "All third-party deps (zlib, snappy, brotli, zstd, libpng, gtest, libbacktrace) are bundled as git submodules"
+  - "No external Conan dependencies needed — fully self-contained build"
