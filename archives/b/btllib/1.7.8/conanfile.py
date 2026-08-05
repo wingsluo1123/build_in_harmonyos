@@ -8,6 +8,7 @@ the submodules are cloned dynamically and not tracked by refresh-patch.
 """
 import os
 import re
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -108,6 +109,9 @@ class BtllibConan(ConanFile):
         # Ensure Meson finds llvm-ar (auto-detected for clang but not in PATH)
         # by adding it to the generated native file's [binaries] section
         if self.settings.os == "OHOS":
+            ar_bin = shutil.which("llvm-ar") or "/data/service/hnp/bin/llvm-ar"
+            if not os.path.exists(ar_bin):
+                ar_bin = "/data/service/hnp/bin/llvm-ar"
             native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
             if os.path.exists(native_file):
                 with open(native_file, 'r') as f:
@@ -115,7 +119,7 @@ class BtllibConan(ConanFile):
                 if "ar = " not in content:
                     content = content.replace(
                         "[binaries]\n",
-                        "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\n",
+                        f"[binaries]\nar = '{ar_bin}'\n",
                         1
                     )
                     with open(native_file, 'w') as f:
