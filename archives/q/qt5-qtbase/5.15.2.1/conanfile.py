@@ -74,14 +74,6 @@ class Qt5QtbaseConan(ConanFile):
         src_dir = self.source_folder
         pkg = self.package_folder
 
-        # 记录 configure 烘焙进 modules/*.pri 的路径。
-        # 注意：Qt configure 生成的 .pri 中 QT_MODULE_*_BASE 指向的是
-        # 构建目录（build_folder）而非 package_folder（产物实测确认），
-        # 因此这里必须记录 self.build_folder——若记录 package_folder，
-        # package() 中 old_prefix == new_prefix，替换逻辑将永不执行
-        # （此前即因此成为死代码，评审 P3 确认）。
-        self._build_prefix = self.build_folder
-
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
         ) or {}
@@ -276,8 +268,8 @@ class Qt5QtbaseConan(ConanFile):
                  dst=os.path.join(self.package_folder, "lib", "cmake"), keep_path=True)
 
         # ── 修复依赖项 relocatability ──────────────────────────────────
-        # configure -prefix 指向了构建时的包目录（self._build_prefix），
-        # 该路径被烘焙进 qmake 二进制、bin/qt.conf 与 mkspecs/modules/*.pri。
+        # configure -prefix 写入的构建路径被烘焙进 qmake 二进制、
+        # bin/qt.conf 与 mkspecs/modules/*.pri。
         # 经 package() 复制到最终包目录后，这些路径失效，需修正。
 
         # 1. 重写 bin/qt.conf：使用 Qt 官方推荐的 relocatable 标准格式。
