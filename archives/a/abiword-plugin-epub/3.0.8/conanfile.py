@@ -80,7 +80,12 @@ class AbiwordPluginEpubConan(ConanFile):
         )
 
     def _patch_config_for_ohos(self):
-        """Patch config.guess and config.sub for OHOS (R15)."""
+        """Patch config.guess and config.sub for OHOS (R15).
+
+        Prefer the skill's Perl script; fall back to manual Python patching
+        (mirrors addrwatch/nspr/slang) so OHOS triplet is recognized even
+        when OHC_SKILL_ROOT is unset or the Perl script is absent.
+        """
         skill_root = os.environ.get("OHC_SKILL_ROOT", "")
         if skill_root:
             script = os.path.join(skill_root, "scripts", "patch-autotools-ohos.pl")
@@ -91,7 +96,103 @@ class AbiwordPluginEpubConan(ConanFile):
                     if os.path.exists(path):
                         subprocess.run(["perl", script, path], check=True)
                 return
-        self.output.info("OHC_SKILL_ROOT not set or script not found, skipping autotools patch")
+
+        # Fallback: manual Python patching
+        self.output.info("OHC_SKILL_ROOT/Perl script unavailable, falling back to manual Python patch")
+        cg_path = os.path.join(self.source_folder, "config.guess")
+        cs_path = os.path.join(self.source_folder, "config.sub")
+        if os.path.exists(cg_path):
+            self._manual_patch_config_guess(cg_path)
+        else:
+            self.output.warning("config.guess not found, skipping guess patch")
+        if os.path.exists(cs_path):
+            self._manual_patch_config_sub(cs_path)
+        else:
+            self.output.warning("config.sub not found, skipping sub patch")
+
+    def _manual_patch_config_guess(self, cg_path):
+        """Manually patch config.guess for HarmonyOS detection."""
+        with open(cg_path, "r") as f:
+            content = f.read()
+
+        changed = False
+
+        # 1. Add __OHOS__ LIBC detection after __ANDROID__
+        if "__OHOS__" not in content:
+            old = "#if defined(__ANDROID__)\n    LIBC=android"
+            new = "#if defined(__ANDROID__)\n    LIBC=android\n#elif defined(__OHOS__)\n    LIBC=ohos"
+            if old in content:
+                content = content.replace(old, new, 1)
+                changed = True
+                self.output.info("  [ok] Added __OHOS__ LIBC detection to config.guess")
+            else:
+                self.output.warning("  [warn] Could not find __ANDROID__/LIBC=android in config.guess")
+
+        # 2. Add HarmonyOS case block before NetBSD
+        if "HarmonyOS" not in content:
+            block = (
+                '    *:HarmonyOS:*:*)\n'
+                '\tcase "$UNAME_MACHINE" in\n'
+                '\t    aarch64|arm64) MACHINE=aarch64 ;;\n'
+                '\t    armv7*|armv8*) MACHINE=arm ;;\n'
+                '\t    x86_64|amd64)  MACHINE=x86_64 ;;\n'
+                '\t    i?86)          MACHINE=i686 ;;\n'
+                '\t    *)            MACHINE="$UNAME_MACHINE" ;;\n'
+                '\tesac\n'
+                '\tGUESS=${MACHINE}-unknown-linux-ohos\n'
+                '\t;;\n\n'
+                '    *:NetBSD:*:*)'
+            )
+            if "    *:NetBSD:*:*)" in content:
+                content = content.replace("    *:NetBSD:*:*)", block, 1)
+                changed = True
+                self.output.info("  [ok] Added HarmonyOS system identification to config.guess")
+            else:
+                self.output.warning("  [warn] Could not find NetBSD insertion point in config.guess")
+
+        if changed:
+            with open(cg_path, "w") as f:
+                f.write(content)
+
+    def _manual_patch_config_sub(self, cs_path):
+        """Manually patch config.sub for ohos-linux support."""
+        with open(cs_path, "r") as f:
+            content = f.read()
+
+        changed = False
+
+        # 1. Add ohos-linux triplet after android-linux
+        if "ohos-linux" not in content:
+            import re
+            pattern = r'(android-linux\)\s*\n\s*basic_machine=\$field1-unknown\s*\n\s*basic_os=linux-android\s*\n\s*;;\s*\n)'
+            replacement = r'\1\tohos-linux)\n\tbasic_machine=$field1-unknown\n\tbasic_os=linux-ohos\n\t;;\n'
+            new_content, count = re.subn(pattern, replacement, content)
+            if count > 0:
+                content = new_content
+                changed = True
+                self.output.info("  [ok] Added ohos-linux triplet to config.sub")
+            else:
+                self.output.warning("  [warn] Could not find android-linux in config.sub")
+
+        # 2. Add ohos* to OS type list
+        if "ohos*" not in content:
+            content = content.replace("gnu* | android*", "gnu* | android* | ohos*", 1)
+            changed = True
+            self.output.info("  [ok] Added ohos* to OS list in config.sub")
+
+        # 3. Add linux-ohos to kernel-OS validation list
+        if "linux-ohos" not in content:
+            import re
+            content, count = re.subn(r'(linux-uclibc[\*/-]?\s*\))', r'\1| linux-ohos*)', content)
+            if count > 0:
+                changed = True
+                self.output.info("  [ok] Added linux-ohos to kernel list in config.sub")
+            else:
+                self.output.warning("  [warn] Could not find linux-uclibc pattern in config.sub")
+
+        if changed:
+            with open(cs_path, "w") as f:
+                f.write(content)
 
     def package(self):
         # Install the plugin .so to the package folder

@@ -8,7 +8,6 @@ import ctypes
 import subprocess
 
 from conan import ConanFile
-from conan.tools.build import can_run
 
 
 class AbiwordPluginEpubTestConan(ConanFile):
@@ -21,19 +20,16 @@ class AbiwordPluginEpubTestConan(ConanFile):
         pkg_folder = self.dependencies["abiword-plugin-epub"].package_folder
         plugin_dir = os.path.join(pkg_folder, "lib", "abiword", "plugins")
 
-        # Find the epub plugin .so
+        # Find the epub plugin .so — keep full path to avoid basename/join mismatch
+        import glob
+        epub_so = []
         if os.path.isdir(plugin_dir):
-            plugins = os.listdir(plugin_dir)
-            epub_so = [p for p in plugins if "epub" in p.lower() and p.endswith(".so")]
-        else:
-            epub_so = []
+            epub_so = [os.path.join(plugin_dir, p) for p in os.listdir(plugin_dir)
+                       if "epub" in p.lower() and p.endswith(".so")]
 
         if not epub_so:
-            # Fallback: search for epub.so anywhere in the package
-            import glob
-            epub_so = [os.path.basename(p) for p in glob.glob(
-                os.path.join(pkg_folder, "**", "*epub*.so*"), recursive=True
-            )]
+            # Fallback: search for epub.so anywhere in the package, keep full path
+            epub_so = glob.glob(os.path.join(pkg_folder, "**", "*epub*.so*"), recursive=True)
 
         if not epub_so:
             # Try listing the package contents for debugging
@@ -43,7 +39,7 @@ class AbiwordPluginEpubTestConan(ConanFile):
                     self.output.info(f"  {os.path.join(root, f)}")
             raise AssertionError("EPUB plugin .so not found in package")
 
-        so_path = os.path.join(plugin_dir if os.path.isdir(plugin_dir) else pkg_folder, epub_so[0])
+        so_path = epub_so[0]
         self.output.info(f"EPUB plugin found: {so_path}")
 
         # Method 1: Use readelf to verify it's a valid ELF with exported symbols
