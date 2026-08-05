@@ -48,6 +48,11 @@ class DarkiceConan(ConanFile):
         # alsa-lib: available as cmd-pkg (system library), not as conan package.
         # configure auto-detects via pkg-config.
 
+    def build_requirements(self):
+        # automake provides aclocal, needed by autoreconf to expand
+        # PKG_CHECK_MODULES macros. Not pre-installed on all CI workers.
+        self.tool_requires("automake/1.18")
+
     def layout(self):
         basic_layout(self)
 
@@ -122,6 +127,21 @@ class DarkiceConan(ConanFile):
         os.chmod(wrapper, 0o755)
 
         self.run("./_run_autoreconf.sh", env="conanbuild")
+
+        # Fix: config.guess/config.sub from conan automake may not recognize
+        # HarmonyOS. Install cmd-pkg automake 1.17 (which has HarmonyOS
+        # support) and copy its config.guess/config.sub.
+        am17_share = os.path.expanduser("~/usr/local/share/automake-1.17")
+        if not os.path.exists(os.path.join(am17_share, "config.guess")):
+            self.run('curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- automake 1.17')
+        config_guess_src = os.path.join(am17_share, "config.guess")
+        config_sub_src = os.path.join(am17_share, "config.sub")
+        for src_file, name in [(config_guess_src, "config.guess"),
+                                (config_sub_src, "config.sub")]:
+            dst = os.path.join(src, name)
+            if os.path.exists(src_file) and os.path.exists(dst):
+                shutil.copy(src_file, dst)
+                os.chmod(dst, 0o755)
 
         # Fix: autoconf's config.status uses umask 077 when creating temp
         # directories, which triggers SELinux denial on HarmonyOS (E046).
