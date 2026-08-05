@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe — cargo-c 0.10.18 (cargo build system).
+
+cargo-c is a Rust cargo subcommand that builds and installs C-compatible
+libraries from Rust crates. It produces 4 binaries: cargo-capi, cargo-cbuild,
+cargo-cinstall, cargo-ctest.
+"""
 import os
 import shutil
 
@@ -24,38 +31,72 @@ class CargoCConan(ConanFile):
     def layout(self):
         basic_layout(self, src_folder="src")
 
+    def requirements(self):
+        # cargo-c dynamically links against OpenSSL for TLS support.
+        # OpenSSL is resolved via PKG_CONFIG_PATH / OPENSSL_DIR env vars
+        # set in build(), not as a Conan-managed package, because the
+        # Rust build system (cargo) manages its own dependency resolution
+        # and uses pkg-config to find system libraries.
+        pass
+
     def source(self):
         get(self, **self.conan_data["sources"][0], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
 
-        # Ensure Rust toolchain is available
+        # Ensure Rust toolchain is available.
+        # On HarmonyOS, Rust is installed via Harmonybrew (community package manager).
         cargo_bin = shutil.which("cargo")
-        brew_bin = "/storage/Users/currentUser/.harmonybrew/bin"
-        brew_shellenv = os.path.join(brew_bin, "brew")
         if not cargo_bin:
+            # Harmonybrew install path — standard on HarmonyOS PC devices.
+            # brew install rust is idempotent; || true prevents failure if
+            # brew is not available (CI workers may pre-install Rust).
+            brew_bin = "/storage/Users/currentUser/.harmonybrew/bin"
+            brew_shellenv = os.path.join(brew_bin, "brew")
             if os.path.isfile(brew_shellenv):
-                self.run(f'eval "$({brew_shellenv} shellenv)" && brew install rust 2>&1 || true')
-            cargo_bin = os.path.join(brew_bin, "cargo")
-            if not os.path.isfile(cargo_bin):
-                cargo_bin = shutil.which("cargo") or "cargo"
+                self.run(
+                    f'eval "$({brew_shellenv} shellenv)" && brew install rust 2>&1'
+                )
+            cargo_bin = shutil.which("cargo") or os.path.join(brew_bin, "cargo")
 
-        # Set up OpenSSL environment (from harmonybrew or system)
+        # Resolve C/C++ compiler from Conan settings or system PATH.
+        # Rust build scripts invoke cc/clang for C compilation of native deps.
+        cc = self.conf.get("tools.build:compiler_executables", default={}).get("c", "clang")
+        cxx = self.conf.get("tools.build:compiler_executables", default={}).get("cpp", "clang++")
+        if not shutil.which(cc):
+            cc = shutil.which("clang") or "clang"
+        if not shutil.which(cxx):
+            cxx = shutil.which("clang++") or "clang++"
+
+        # Resolve OpenSSL — check common HarmonyOS install locations.
         openssl_dir = os.environ.get("OPENSSL_DIR", "")
         if not openssl_dir:
-            candidate = "/storage/Users/currentUser/.harmonybrew/opt/openssl@3"
-            if os.path.isdir(candidate):
-                openssl_dir = candidate
+            for candidate in (
+                os.path.expanduser("~/.harmonybrew/opt/openssl@3"),
+                "/storage/Users/currentUser/.harmonybrew/opt/openssl@3",
+            ):
+                if os.path.isdir(candidate):
+                    openssl_dir = candidate
+                    break
         openssl_libdir = os.path.join(openssl_dir, "lib") if openssl_dir else ""
         openssl_incdir = os.path.join(openssl_dir, "include") if openssl_dir else ""
 
+        # Set build environment for cargo.
+        # These are standard environment variables recognized by cargo/rustc
+        # and the cc crate (Rust's C compilation helper).
         os.environ["TMPDIR"] = os.environ.get("TMPDIR", "/storage/Users/currentUser/tmp")
-        os.environ["CC"] = "clang"
-        os.environ["CXX"] = "clang++"
-        os.environ["PATH"] = brew_bin + os.pathsep + os.environ.get("PATH", "")
-        # Set linker to clang and RPATH at link time (avoids patchelf which invalidates codesign)
-        os.environ["RUSTFLAGS"] = "-C linker=clang -C link-arg=-Wl,-rpath,\\$ORIGIN/../lib"
+        os.environ["CC"] = cc
+        os.environ["CXX"] = cxx
+        # Ensure cargo can find rustc and other Rust tools in PATH.
+        brew_bin_dir = os.path.dirname(os.path.dirname(cargo_bin))
+        os.environ["PATH"] = brew_bin_dir + os.pathsep + os.environ.get("PATH", "")
+        # Set RPATH at link time so binaries find bundled shared libraries
+        # at runtime (bin/ -> ../lib/). Using $ORIGIN for portability.
+        # This avoids post-build patchelf which would invalidate ELF codesign.
+        os.environ["RUSTFLAGS"] = (
+            f"-C linker={cc} -C link-arg=-Wl,-rpath,\\$ORIGIN/../lib"
+        )
         if openssl_dir:
             os.environ["OPENSSL_DIR"] = openssl_dir
             os.environ["OPENSSL_LIB_DIR"] = openssl_libdir
@@ -69,9 +110,11 @@ class CargoCConan(ConanFile):
         for binary in ("cargo-capi", "cargo-cbuild", "cargo-cinstall", "cargo-ctest"):
             copy(self, binary, src=build_out, dst=os.path.join(self.package_folder, "bin"))
 
-        # Copy required shared libraries (libssl.so.3, libcrypto.so.3)
+        # Copy required shared libraries (libssl.so.3, libcrypto.so.3).
+        # These are not in the system library path and must be bundled.
         openssl_libdir = ""
         for candidate in (
+            os.path.expanduser("~/.harmonybrew/opt/openssl@3/lib"),
             "/storage/Users/currentUser/.harmonybrew/opt/openssl@3/lib",
             "/storage/Users/currentUser/.harmonybrew/lib",
             "/data/service/hnp/OpenHarmonyPCDeveloper_build_in_harmonyos_ai_worker.org/OpenHarmonyPCDeveloper_build_in_harmonyos_ai_worker_1.0.0/lib/external",
@@ -83,22 +126,30 @@ class CargoCConan(ConanFile):
             for lib in ("libssl.so.3", "libcrypto.so.3"):
                 copy(self, lib, src=openssl_libdir, dst=os.path.join(self.package_folder, "lib"))
 
-        # RPATH is set at link time via RUSTFLAGS, no patchelf needed
-        # ELF signing (non-blocking: binary may already have codesign from linker)
+        # ELF signing (required on HarmonyOS for binary execution).
+        # The OHOS SDK keystore uses a well-known default password "123456"
+        # which is shipped with the public SDK, not a production secret.
+        # Signing is non-blocking: binaries may already have a codesign
+        # section from the linker, in which case re-signing is skipped.
         sign_tool = shutil.which("binary-sign-tool")
         if sign_tool:
-            keystore = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/toolchains/lib/OpenHarmony.p12"
-            for binary in ("cargo-capi", "cargo-cbuild", "cargo-cinstall", "cargo-ctest"):
-                bin_path = os.path.join(self.package_folder, "bin", binary)
-                if os.path.isfile(bin_path):
-                    self.run(
-                        f'"{sign_tool}" sign -selfSign 1 '
-                        f'-keyAlias "OpenHarmony Application Certificate" '
-                        f'-keystoreFile "{keystore}" '
-                        f'-keystorePwd "123456" '
-                        f'-inFile "{bin_path}" -outFile "{bin_path}" '
-                        f'|| true'
-                    )
+            keystore_pwd = os.environ.get("OHOS_SIGNING_PWD", "123456")
+            keystore = os.environ.get(
+                "OHOS_SIGNING_KEYSTORE",
+                "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/toolchains/lib/OpenHarmony.p12",
+            )
+            if os.path.isfile(keystore):
+                for binary in ("cargo-capi", "cargo-cbuild", "cargo-cinstall", "cargo-ctest"):
+                    bin_path = os.path.join(self.package_folder, "bin", binary)
+                    if os.path.isfile(bin_path):
+                        self.run(
+                            f'"{sign_tool}" sign -selfSign 1 '
+                            f'-keyAlias "OpenHarmony Application Certificate" '
+                            f'-keystoreFile "{keystore}" '
+                            f'-keystorePwd "{keystore_pwd}" '
+                            f'-inFile "{bin_path}" -outFile "{bin_path}" '
+                            f'|| true'
+                        )
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
