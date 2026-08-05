@@ -805,7 +805,7 @@ typedef size_t __size_t;
  * Type Safety Checking
  *
  * Clang provides additional attributes to enable checking type safety
- * properties that cannot be enforced by the C type system. 
+ * properties that cannot be enforced by the C type system.
  */
 
 #if __has_attribute(__argument_with_type_tag__) && \
@@ -932,7 +932,7 @@ typedef size_t __size_t;
 #endif
 #if !__has_builtin(__builtin_align_down)
 #define __builtin_align_down(x, align)	\
-	((__typeof__(x))((x)&(~((align)-1))))
+	((__typeof__(x))(((__uintptr_t)(x))&(~((align)-1))))
 #endif
 
 #define __align_up(x, y) __builtin_align_up(x, y)

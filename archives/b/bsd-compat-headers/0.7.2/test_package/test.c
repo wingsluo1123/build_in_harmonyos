@@ -30,6 +30,10 @@ int main(void) {
     LIST_INIT(&list);
 
     struct item *i1 = malloc(sizeof(struct item));
+    if (i1 == NULL) {
+        fprintf(stderr, "FAIL: malloc failed\n");
+        return 1;
+    }
     i1->value = 42;
     LIST_INSERT_HEAD(&list, i1, entries);
 
@@ -43,6 +47,11 @@ int main(void) {
     /* Test tree.h */
     struct rb_tree tree = RB_INITIALIZER(&tree);
     struct rb_item *r = malloc(sizeof(struct rb_item));
+    if (r == NULL) {
+        fprintf(stderr, "FAIL: malloc failed\n");
+        free(i1);
+        return 1;
+    }
     r->key = 100;
     RB_INSERT(rb_tree, &tree, r);
 
