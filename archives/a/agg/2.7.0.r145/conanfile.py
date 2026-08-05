@@ -30,7 +30,7 @@ class AggConan(ConanFile):
     description = "Anti-Grain Geometry (AGG) - high-quality 2D C++ rendering engine"
     license = "BSD-3-Clause"
     homepage = "https://sourceforge.net/projects/agg/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"  # recipe repo
 
     package_type = "library"
 
