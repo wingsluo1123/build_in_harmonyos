@@ -23,15 +23,16 @@ class {class_name}(ConanFile):
     def build(self):
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
-        # HarmonyOS: patch Makefile for CRT linker flags
-        makefile = os.path.join(src, "Makefile")
-        if os.path.exists(makefile):
-            with open(makefile, "r") as mf:
-                content = mf.read()
-            if "-nostartfiles" not in content:
-                content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
-            with open(makefile, "w") as mf:
-                mf.write(content)
+        # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
+        if self.settings.os == "OHOS":
+            makefile = os.path.join(src, "Makefile")
+            if os.path.exists(makefile):
+                with open(makefile, "r") as mf:
+                    content = mf.read()
+                if "-nostartfiles" not in content:
+                    content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
+                with open(makefile, "w") as mf:
+                    mf.write(content)
         self.run("make -j1", cwd=src)
 
     def package(self):
@@ -99,6 +100,7 @@ def generate(pkg_dir):
 
     # 生成 conanfile.py
     cpan_name = name.replace("perl-", "").replace("-", "::")
+    # FIXME: lib_name is derived from the package name; verify it matches the actual .so output name
     lib_name = cpan_name.split("::")[-1]
     conanfile = TEMPLATE.format(
         name=name, version=version, class_name=class_name,
@@ -117,13 +119,13 @@ if __name__ == "__main__":
         "perl-crypt-openssl-dsa/0.20","perl-dbd-pg/3.18.0","perl-dbd-sqlite/1.78",
         "perl-dbi/1.637","perl-devel-lexalias/0.05","perl-digest-md5/2.59",
         "perl-digest-sha1/2.13","perl-digest-sha3/1.01","perl-encode-hanextra/0.23",
-        "perl-encode-jis2k/0.05-r2","perl-ev/4.35","perl-html-parser/3.83-r1",
-        "perl-http-parser-xs/0.17-r9","perl-io-tty/1.20-r2","perl-ipc-sharelite/0.17-r14",
+        "perl-encode-jis2k/0.05-r2","perl-ev/4.37","perl-html-parser/3.83-r1",
+        "perl-http-parser-xs/0.17-r9","perl-io-tty/1.31","perl-ipc-sharelite/0.17-r14",
         "perl-json-maybexs/1.004008-r0","perl-json-xs/4.04","perl-list-moreutils-xs/0.430-r6",
         "perl-locale-gettext/1.07-r2","perl-match-simple-xs/0.002","perl-math-pari/2.030528-r1",
         "perl-math-random-mt-auto/6.23-r10","perl-mime-base64/3.16","perl-mouse/2.6.0-r0",
-        "perl-netaddr-ip/4.079-r14","perl-object-pad/0.821-r0","perl-package-anon/0.05-r16",
-        "perl-package-stash-xs/0.30-r5","perl-params-classify/0.015","perl-params-util/1.102",
+        "perl-netaddr-ip/4.079","perl-object-pad/0.821-r0","perl-package-anon/0.05-r16",
+        "perl-params-util/1.102",
         "perl-params-validate/1.31","perl-perlio-utf8_strict/0.010","perl-set-object/1.43-r0",
         "perl-xml-parser/2.59",
     ]

@@ -20,15 +20,16 @@ class PerlMimeBase64(ConanFile):
 
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
-        # HarmonyOS: patch Makefile for CRT linker flags
-        makefile = os.path.join(src, "Makefile")
-        if os.path.exists(makefile):
-            with open(makefile, "r") as mf:
-                content = mf.read()
-            if "-nostartfiles" not in content:
-                content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
-            with open(makefile, "w") as mf:
-                mf.write(content)
+        # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
+        if self.settings.os == "OHOS":
+            makefile = os.path.join(src, "Makefile")
+            if os.path.exists(makefile):
+                with open(makefile, "r") as mf:
+                    content = mf.read()
+                if "-nostartfiles" not in content:
+                    content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
+                with open(makefile, "w") as mf:
+                    mf.write(content)
         self.run("make -j1", cwd=src)
 
     def package(self):

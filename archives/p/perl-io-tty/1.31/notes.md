@@ -4,7 +4,7 @@
 - 构建系统: perl (Makefile.PL)
 - 编译日期: 2026-06-12
 - 编译器: clang 18.1.8
-- 状态: published
+- 状态: built
 - 目标平台: aarch64-unknown-linux-ohos
 
 ## 编译步骤
@@ -169,4 +169,4 @@ perl -e 'use IO::Tty::Constant; print "OK\n"'
 
 ---
 **编译结束**: 2026-06-12 15:02
-**最终状态**: published
+**最终状态**: built
