@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml — abiword-plugin-docbook 3.0.8
+# 上游测试声明（CI L0e 门禁要求）
+
+package: abiword-plugin-docbook
+version: "3.0.8"
+
+upstream_test:
+  has_upstream_suite: false
+  upstream_url: https://gitlab.gnome.org/World/AbiWord/-/tree/release-3.0.8/plugins/docbook
+  upstream_notes: "AbiWord docbook 插件无独立上游测试套件。本 test_package 按 R34 补全,用 C 税dlopen 加载插件 .so 并验证 ABI 符号(abi_plugin_register/unregister/supports_version)。"
+
+adapted_test:
+  description: "dlopen 加载 docbook.so + 验证 abi_plugin_supports_version(3,0,0)=1 + register/unregister 符号存在"
+  command: "cmake configure + build test_docbook + ./test_docbook"
+  source_files:
+    - test.c
+    - CMakeLists.txt
+    - conanfile.py
+
+# 测试断言总数（近似值，用于质量评估）
+# 1. dlopen 成功
+# 2. abi_plugin_supports_version 存在
+# 3. abi_plugin_supports_version(3,0,0) == 1
+# 4. abi_plugin_register 存在
+# 5. abi_plugin_unregister 存在
+assertion_count: 5
