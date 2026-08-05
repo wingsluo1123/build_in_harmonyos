@@ -1,1 +1,0 @@
-. "/storage/Users/currentUser/runner002/build_in_harmonyos/archives/f/fpart/1.7.0/test_package/conanbuildenv-release-armv8.sh"

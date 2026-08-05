@@ -1,2 +1,0 @@
-# wabt
-WebAssembly Binary Toolkit
