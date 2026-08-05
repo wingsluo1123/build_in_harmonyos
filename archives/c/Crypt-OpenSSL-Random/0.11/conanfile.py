@@ -18,13 +18,13 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 from conan.tools.layout import basic_layout
 
 
-class CryptopensslrandomConan(ConanFile):
+class CryptOpensslRandomConan(ConanFile):
     name = "crypt-openssl-random"
     version = "0.11"
     description = "OpenSSL/LibreSSL pseudo-random number generator access"
     license = "Artistic-1.0-Perl OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/pod/Crypt::OpenSSL::Random"
-    url = ""  # CI fills this
+    url = ""
 
     settings = "os", "compiler", "build_type", "arch"
 
