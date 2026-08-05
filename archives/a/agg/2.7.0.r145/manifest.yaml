@@ -1,4 +1,4 @@
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/2.7.0.r145/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -6,57 +6,36 @@
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "2.7.0.r145"
-
-# 软件名
-software: "{software}"
-
-# 编译状态
-# published | built | failed | archived
+software: "agg"
 status: published
-
-# 编译日期（YYYY-MM-DD）
 build_date: "2026-08-05"
-build_system: "{BUILD_SYSTEM}"
+build_system: autotools
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://sources.voidlinux.org/agg-2.7.0.r145/agg_2.7.0.r145+dfsg.orig.tar.xz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  sha256: "b7181085d3c06166a972211cd17741cc5429adc7c1f58e4d528206f7208e6328"
+  tar_format: tar.xz
 
 # ============================================================
 # 构建配置
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
+  configure_options:
+    - "--disable-examples"
+    - "--disable-ctrl"
+    - "--disable-platform"
+    - "--disable-freetype"
+    - "--disable-gpc"
+    - "--enable-static"
+    - "--disable-shared"
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
   cc: clang
   cxx: clang++
 
@@ -64,64 +43,32 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-configure.ac.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "E165 shebang-fix: OHOS 无 /bin/bash，需 patch shebang"
+  - "E001 cc-not-found: configure 默认查 cc，需 CC=clang"
+  - "HMDFS 700-perm tmpdir: config.status 的 mktemp -d 创建 700 子目录，HMDFS 拒写，需 patch configure 改 umask 022"
+  - "dfsg tarball 缺 configure: 需 conanfile.py build() autoreconf 链"
+  - "aclocal @am_AUTOM4TE@ 占位符未替换: 需注入 AUTOM4TE 环境变量"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/agg-2.7.0.r145.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/agg-2.7.0.r145.work
+  source_work_dir: /storage/Users/currentUser/tmp/agg-ohos
   source_orig_hash: fab79a47345d9f56
   source_work_hash: f566640f66c35936
   generated_at: '2026-08-05T18:38:37'
-  patches_count: 9
+  patches_count: 1
 
 patch_classification:
   - file: 0001-configure.ac.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-ltmain.sh.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-include-config.h.in.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0004-aclocal.m4.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-compile.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0006-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0007-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0008-install-sh.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0009-missing.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: source-edit
+    platform_only: true
+    guard: 'none'
+    description: "Strip SDL/FT2 autodetection macros (AM_PATH_SDL/PKG_CHECK_MODULES) unavailable on OHOS"

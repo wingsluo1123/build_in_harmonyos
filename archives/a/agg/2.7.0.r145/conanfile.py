@@ -132,3 +132,5 @@ class AggConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["agg"]
+        # Headers install to include/agg2/ (upstream convention)
+        self.cpp_info.includedirs = ["include"]
