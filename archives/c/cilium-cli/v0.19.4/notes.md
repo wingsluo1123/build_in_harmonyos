@@ -67,5 +67,5 @@ cilium image (running): unknown. Unable to obtain cilium version. Reason: kubern
 - kubernetes cluster 不可达属于正常现象（测试环境无 k8s 集群）
 ---
 
-**编译结束**: 2026-06-01 20:09
+**编译结束**: 2026-08-06 04:33
 **最终状态**: built
