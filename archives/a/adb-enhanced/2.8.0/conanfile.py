@@ -14,7 +14,7 @@ import sys
 import zipfile
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanInvalidConfiguration, ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -56,19 +56,23 @@ class AdbEnhancedConan(ConanFile):
             raise ConanInvalidConfiguration(
                 "python3 is required to build adb-enhanced; "
                 "ensure python3 is on PATH")
-        self.run(
+        ret = self.run(
             f'"{python3}" -m pip install --quiet setuptools wheel 2>&1',
             env="conanbuild",
         )
+        if ret != 0:
+            raise ConanException(f"pip install setuptools/wheel failed with exit code {ret}")
 
         # pip wheel 构建（--no-deps：依赖单独安装到 deps/ 目录）
         wheel_dir = os.path.join(self.build_folder, "wheel")
         os.makedirs(wheel_dir, exist_ok=True)
-        self.run(
+        ret = self.run(
             f'"{python3}" -m pip wheel "{self.source_folder}" --no-deps '
             f'--no-build-isolation --wheel-dir="{wheel_dir}"',
             env="conanbuild",
         )
+        if ret != 0:
+            raise ConanException(f"pip wheel build failed with exit code {ret}")
 
     def package(self):
         py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
