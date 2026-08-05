@@ -28,16 +28,18 @@ class BtllibTestConan(ConanFile):
 
     def test(self):
         # Locate libomp.so using the compiler's own search path
-        # This avoids hardcoding SDK version-specific paths
+        cpp = "/data/service/hnp/bin/clang++"
+        comp_exes = self.conf.get("tools.build:compiler_executables", default={})
+        if isinstance(comp_exes, dict) and "cpp" in comp_exes:
+            cpp = comp_exes["cpp"]
         try:
             result = subprocess.run(
-                [str(self.settings.compiler.cpp.executable) if hasattr(self.settings.compiler, 'cpp') and hasattr(self.settings.compiler.cpp, 'executable') else "clang++",
-                 "-print-file-name=libomp.so"],
+                [cpp, "-print-file-name=libomp.so"],
                 capture_output=True, text=True, timeout=10
             )
             libomp_path = result.stdout.strip()
             if libomp_path and libomp_path != "libomp.so":
-                libomp_dir = os.path.dirname(libomp_path)
+                libomp_dir = os.path.dirname(os.path.abspath(libomp_path))
                 current_ld = os.environ.get("LD_LIBRARY_PATH", "")
                 os.environ["LD_LIBRARY_PATH"] = libomp_dir + ":" + current_ld
         except Exception:
