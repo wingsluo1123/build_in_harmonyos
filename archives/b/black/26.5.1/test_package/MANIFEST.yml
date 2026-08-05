@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: black/26.5.1
+homepage: "https://black.readthedocs.io/"
+
+# 上游测试命令
+upstream_check_command: "pytest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/test_black.py
+    source: black-26.5.1/tests/test_black.py
+    description: "Black's own test suite (pytest-based)"
+    command: "pytest tests/"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "Run black --version and format a test Python file"
+    command: "conan test ."
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2
