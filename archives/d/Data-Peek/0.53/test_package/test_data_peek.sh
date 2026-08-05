@@ -10,8 +10,6 @@
 #   0 = test passed (module loaded + API call succeeded, or OHOS platform limitation acknowledged)
 #   1 = test failed (real error)
 
-# No set -e — we handle exit codes manually to distinguish platform limitations from real errors
-
 PERL_LIB="$1"
 if [ -z "$PERL_LIB" ]; then
     echo "ERROR: perl_lib path required as argument"
@@ -44,10 +42,8 @@ echo "Perl arch directory: $PERL_ARCH_DIR"
 # DDumper: returns a Data::Dumper-style dump of a Perl variable
 echo "Testing DPeek + DDumper API..."
 
-# Attempt to load module and call actual Data::Peek API functions
-# If this fails with Permission denied on OHOS (HMDFS SELinux), return exit 0 (platform limitation)
-# Any other failure returns exit 1 (real test failure)
-perl -I"$PERL_ARCH_DIR" -MData::Peek=DPeek,DDumper -e '
+# Capture the first perl call's output for accurate error reporting
+TEST_OUTPUT=$(perl -I"$PERL_ARCH_DIR" -MData::Peek=DPeek,DDumper -e '
     # DPeek: dump internal representation of a scalar
     my $str = "hello world";
     my $peek = DPeek($str);
@@ -63,24 +59,25 @@ perl -I"$PERL_ARCH_DIR" -MData::Peek=DPeek,DDumper -e '
     print "DDumper OK: dumped array with " . scalar(@data) . " elements\n";
 
     print "Data::Peek API test PASSED\n";
-' 2>&1
+' 2>&1)
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
+    echo "$TEST_OUTPUT"
     echo "TEST PASSED: Data::Peek module loaded and API verified"
     exit 0
 fi
 
 # Check if the failure is due to HMDFS SELinux Permission denied (OHOS platform limitation)
 # Only "Permission denied" is tolerated; all other errors are real test failures
-OUTPUT=$(perl -I"$PERL_ARCH_DIR" -MData::Peek -e '1' 2>&1 || true)
-if echo "$OUTPUT" | grep -qi "Permission denied"; then
+if echo "$TEST_OUTPUT" | grep -qi "Permission denied"; then
+    echo "$TEST_OUTPUT"
     echo "WARN: Module load blocked by Permission denied (HMDFS SELinux, OHOS platform limitation E073)"
     echo "Package contents verified: .so and .pm present."
     echo "Load failure is a known platform limitation, not a build defect."
     exit 0
 fi
 
+echo "$TEST_OUTPUT"
 echo "FAIL: Data::Peek test failed with real error (exit code $EXIT_CODE)"
-echo "Output: $OUTPUT"
 exit 1
