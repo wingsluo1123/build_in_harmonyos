@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "review_memory.R3 / code_style.13",
+      "file": "archives/c/cloudfoundry-cli/8.18.3/conandata.yml",
+      "line": 7,
+      "description": "Patch file 'patches/0001-go.mod.patch' is referenced in conandata.yml but is NOT included in the PR diff (changed_files). The file exists on disk and is tracked by git in both main and the PR branch — it was committed to main before the PR branch was created (commit 2c828f456 'feat: batch compile Go 1.21.13 and Cloud Foundry CLI 8.18.3'). While the file is functional and available in the repo, its absence from the PR diff means reviewers cannot verify the patch content within the PR context.",
+      "fix_suggestion": "Include the patch file in the PR commit by running 'git add archives/c/cloudfoundry-cli/8.18.3/patches/0001-go.mod.patch' and amending the commit, or create a separate commit adding the patches/ directory to the PR branch."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.6",
+      "file": "archives/c/cloudfoundry-cli/8.18.3/test_package/test.sh",
+      "line": 1,
+      "description": "Missing descriptive comment line after shebang. Code style rule 6 requires a comment line after the shebang (e.g., '# test.sh — Run cf --version and cf help to verify binary functionality').",
+      "fix_suggestion": "Add a comment line after the shebang: '#!/usr/bin/env bash\n# test.sh — Verify cloudfoundry-cli binary via --version and help commands'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.9",
+      "file": "archives/c/cloudfoundry-cli/8.18.3/test_package/test.sh",
+      "line": 25,
+      "description": "Final output line 'echo \"[ok] All tests passed.\"' lacks the 8-space indent required by code style rule 9 for [ok] markers. The preceding [ok] lines (lines 20, 24) correctly have 8-space indent.",
+      "fix_suggestion": "Add 8 spaces of indent: 'echo \"        [ok] All tests passed.\"'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.12",
+      "file": "archives/c/cloudfoundry-cli/8.18.3/conandata.yml",
+      "line": 8,
+      "description": "patch_description uses a full English sentence ('Lower Go version directive from 1.26.2 to 1.25.0 to match available Go toolchain') instead of the format suggested by code style rule 12 which shows the patch number prefix pattern (e.g., '0001 go mod version lowering'). The description correctly uses spaces instead of hyphens, which is compliant, but the numbering prefix convention is not followed.",
+      "fix_suggestion": "Consider using the patch number prefix format: patch_description: \"0001 go mod version 1.26.2 to 1.25.0\""
+    }
+  ],
+  "summary": "W4 Pre-PR Audit (re-run) for cloudfoundry-cli 8.18.3. VERDICT: PASS. All critical checks passed: (R34) test_package calls real binary via cf --version and cf help; (R32) OHOS platform compat verified with ('Linux', 'OHOS') tuple in validate(); sha256 'b1d752410595f21838eafe56887e57d31e1dd212db2d77137d606d5a85039bf0' is valid 64-char hex; (R39) source URL is official (github.com/cloudfoundry/cli); (R38) commands.json present at software-level directory with type='tool'; Conan 2.x API used throughout (from conan import ConanFile, conan.tools.*). No P0/P1 issues found. No deception detected (no empty shell tests, no fake status, no pre-compiled binaries, no skipped tests). 4 minor issues (1×P2, 3×P3) found: patch file not in PR diff (pre-existing in main), missing comment after shebang in test.sh, missing 8-space indent on final [ok] line, and patch_description format deviation. All issues are warnings only and do not block the PR."
+}
