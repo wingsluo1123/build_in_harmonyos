@@ -8,6 +8,7 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -18,7 +19,7 @@ class AbcselectConan(ConanFile):
     description = "Extract parts, movements, etc from abc music files"
     license = "GPL-2.0-or-later"
     homepage = "https://www.lautengesellschaft.de/cdmm/"
-    url = "http://www.lautengesellschaft.de/cdmm/"
+    url = "https://www.lautengesellschaft.de/cdmm/"
     package_type = "application"
 
     settings = "os", "arch"
@@ -54,6 +55,8 @@ class AbcselectConan(ConanFile):
             dest = os.path.join(bindir, "abcselect")
             shutil.copy2(script, dest)
             os.chmod(dest, 0o755)
+        else:
+            raise ConanException(f"abcselect script not found in source: {script}")
 
         # Install man page (uncompressed, as source is not gzipped)
         manpage = os.path.join(src, "abcselect.1")
