@@ -76,7 +76,12 @@ class CaCertificatesConan(ConanFile):
                 import subprocess
                 import tempfile
 
-                _OPENSSL = shutil.which("openssl") or "/bin/openssl"
+                _OPENSSL = shutil.which("openssl")
+                if _OPENSSL is None:
+                    raise RuntimeError(
+                        "openssl not found in PATH. "
+                        "openssl is required to parse certificate expiry dates."
+                    )
 
 
                 class Certificate:
@@ -102,8 +107,15 @@ class CaCertificatesConan(ConanFile):
                                     self._not_valid_after = datetime.datetime.strptime(
                                         date_str, "%b %d %H:%M:%S %Y %Z"
                                     )
-                        except Exception:
-                            pass
+                        except FileNotFoundError:
+                            raise RuntimeError(
+                                "openssl not found in PATH. "
+                                "openssl is required to parse certificate expiry dates."
+                            ) from None
+                        except Exception as e:
+                            import sys
+                            print(f"WARNING: Failed to parse certificate expiry: {e}",
+                                  file=sys.stderr)
                         finally:
                             if os.path.exists(tmpfile):
                                 os.unlink(tmpfile)
