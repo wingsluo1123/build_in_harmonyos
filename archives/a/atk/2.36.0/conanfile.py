@@ -70,7 +70,7 @@ char *g_libintl_bind_textdomain_codeset(const char *d, const char *cs) { (void)d
         import glob as _glob2
         for entry in patches:
             pf = entry.get("patch_file")
-            if not pf or "0001" in pf:  # 跳过 0001（已 shutil 写）
+            if not pf:  # 0001 声明已从 conandata.yml 删（shutil 直接写），无需跳过守卫
                 continue
             # glob 全 cache 找补丁 basename 避路径推算炸
             patch_basename = os.path.basename(pf)
