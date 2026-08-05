@@ -297,7 +297,16 @@ class Qt5QtbaseConan(ConanFile):
         if os.path.isdir(modules_dir) and hasattr(self, "_build_prefix"):
             old_prefix = self._build_prefix
             new_prefix = pkg
-            if old_prefix and old_prefix != new_prefix:
+            # 防御性守卫（P3）：
+            # 1. 构建前缀过短（如 "/"、"usr"）时跳过，避免误替换
+            # 2. 仅替换路径边界（后跟 / \ 空白或行尾），防止误伤以旧前缀
+            #    开头但更长的路径（如 /a/b 不应命中 /a/bc）
+            if (
+                old_prefix
+                and old_prefix != new_prefix
+                and len(old_prefix) >= 8
+            ):
+                old_pattern = re.escape(old_prefix) + r"(?=[/\\\s]|$)"
                 for fname in os.listdir(modules_dir):
                     if not fname.endswith(".pri"):
                         continue
@@ -306,9 +315,13 @@ class Qt5QtbaseConan(ConanFile):
                         content = f.read()
                     if old_prefix not in content:
                         continue
-                    content = content.replace(old_prefix, new_prefix)
+                    new_content = re.sub(
+                        old_pattern, lambda m: new_prefix, content
+                    )
+                    if new_content == content:
+                        continue
                     with open(fpath, "w") as f:
-                        f.write(content)
+                        f.write(new_content)
                     self.output.info(
                         f"Fixed path in mkspecs/modules/{fname}: "
                         f"{old_prefix} → {new_prefix}"
