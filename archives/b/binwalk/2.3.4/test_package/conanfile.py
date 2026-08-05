@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
 """test_package for binwalk 2.3.4 — smoke test (R34)."""
+import os
+
 from conan import ConanFile
 from conan.errors import ConanException
 
@@ -12,10 +15,8 @@ class BinwalkTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Verify binwalk module can be imported and runs correctly
-        ret = self.run(
-            'python3 -c "import binwalk; print(binwalk.__version__)"',
-            env="conanrun",
-        )
+        # Run test.sh which imports binwalk and runs --help
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        ret = self.run(f"{bash} test.sh", env="conanrun")
         if ret != 0:
-            raise ConanException(f"import binwalk failed with exit code {ret}")
+            raise ConanException(f"test.sh failed with exit code {ret}")
