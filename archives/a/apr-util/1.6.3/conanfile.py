@@ -6,6 +6,7 @@ Patches fix HarmonyOS platform detection (config.guess/config.sub)
 and HMDFS umask permission issue (E011).
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -46,48 +47,54 @@ class AprUtilConan(ConanFile):
             tc.configure_args.append("--disable-shared")
         apr = self.dependencies["apr"]
         expat = self.dependencies["expat"]
-        # Create a wrapper directory with bin/apr-1-config that forces
-        # the correct prefix. Conan builds apr with --prefix=/ so
-        # apr-1-config returns paths based on /. The wrapper overrides
-        # the prefix to the actual conan package folder.
-        wrapper_dir = os.path.join(self.build_folder, "apr-wrapper")
-        bin_dir = os.path.join(wrapper_dir, "bin")
-        os.makedirs(bin_dir, exist_ok=True)
-        wrapper = os.path.join(bin_dir, "apr-1-config")
-        with open(wrapper, "w") as f:
-            f.write("#!/bin/sh\n")
-            f.write(
-                f'exec "{apr.package_folder}/bin/apr-1-config" '
-                f'--prefix="{apr.package_folder}" "$@"\n'
-            )
-        os.chmod(wrapper, 0o755)
-        tc.configure_args.append(f"--with-apr={wrapper_dir}")
+        tc.configure_args.append(f"--with-apr={apr.package_folder}")
         tc.configure_args.append(f"--with-expat={expat.package_folder}")
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
-        # Fix apr_rules.mk in the APR package: it was generated with
-        # --prefix=/ so apr_builddir is //build-1 (wrong). Fix it to
-        # point to the actual package build-1 directory.
-        apr = self.dependencies["apr"]
-        rules_mk = os.path.join(apr.package_folder, "build-1", "apr_rules.mk")
-        if os.path.isfile(rules_mk):
-            with open(rules_mk, "r") as f:
-                content = f.read()
-            build_1 = os.path.join(apr.package_folder, "build-1")
-            content = content.replace(
-                "apr_builddir=//build-1",
-                f"apr_builddir={build_1}",
-            )
-            content = content.replace(
-                "apr_builders=//build-1",
-                f"apr_builders={build_1}",
-            )
-            with open(rules_mk, "w") as f:
-                f.write(content)
+
+        # E011: Fix umask 077 -> 000 for HMDFS permission
+        configure_path = os.path.join(self.source_folder, "configure")
+        with open(configure_path, "r") as f:
+            content = f.read()
+        content = content.replace("umask 077", "umask 000")
+        with open(configure_path, "w") as f:
+            f.write(content)
+
         autotools = Autotools(self)
         autotools.configure()
+
+        # Fix: configure fails to copy apr_rules.mk and references wrong
+        # paths because apr-1-config returns '/' as prefix (conan build
+        # uses --prefix=/). Copy files and fix paths in Makefile/rules.mk.
+        apr = self.dependencies["apr"]
+        apr_pkg = apr.package_folder
+        apr_build = os.path.join(apr_pkg, "build-1")
+
+        # Copy rules.mk from apr package
+        rules_dst = os.path.join(os.getcwd(), "build", "rules.mk")
+        os.makedirs(os.path.dirname(rules_dst), exist_ok=True)
+        shutil.copy2(os.path.join(apr_build, "apr_rules.mk"), rules_dst)
+
+        # Fix libtool path in rules.mk (//build-1 -> real path)
+        with open(rules_dst, "r") as f:
+            rules = f.read()
+        rules = rules.replace("//build-1", apr_build)
+        with open(rules_dst, "w") as f:
+            f.write(rules)
+
+        # Also fix Makefile if it references //build-1 or //lib
+        makefile = os.path.join(os.getcwd(), "Makefile")
+        if os.path.exists(makefile):
+            with open(makefile, "r") as f:
+                mk = f.read()
+            mk = mk.replace("//build-1", apr_build)
+            mk = mk.replace("//lib", os.path.join(apr_pkg, "lib"))
+            mk = mk.replace("//include", os.path.join(apr_pkg, "include"))
+            with open(makefile, "w") as f:
+                f.write(mk)
+
         autotools.make(args=["-j1"])
 
     def package(self):
