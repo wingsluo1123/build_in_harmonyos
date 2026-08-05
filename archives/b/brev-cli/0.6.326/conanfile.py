@@ -82,13 +82,13 @@ class BrevCliConan(ConanFile):
         # ── 上游单元测试（R5: 真实运行 go test ./...）──
         # CI runner 有可用的 Go 工具链时真实运行上游单元测试，
         # 将结果写入构建日志与 go-test-report.txt。
-        test_env = ["CGO_ENABLED=0", "GOFLAGS=-mod=mod"]
+        test_env = {"CGO_ENABLED": "0", "GOFLAGS": "-mod=mod"}
         test_report = os.path.join(self.build_folder, "go-test-report.txt")
         test_buf = io.StringIO()
         try:
-            test_ret = self.run(
+            test_ret = self._run_with_env(
                 f'"{go_bin}" test ./... 2>&1',
-                env=test_env, stdout=test_buf, stderr=test_buf,
+                test_env, stdout=test_buf, stderr=test_buf,
                 ignore_errors=True,
             )
         except Exception as exc:
@@ -107,12 +107,12 @@ class BrevCliConan(ConanFile):
         # target GOOS=linux GOARCH=arm64 is ABI-compatible.
         # buildmode=pie produces a PIE (ET_DYN) binary that HMDFS will execute.
         # CGO_ENABLED=0 disables NVML (requires CGO + NVIDIA libraries).
-        run_env = [
-            "CGO_ENABLED=0",
-            "GOOS=linux",
-            "GOARCH=arm64",
-            "GOFLAGS=-mod=mod",
-        ]
+        run_env = {
+            "CGO_ENABLED": "0",
+            "GOOS": "linux",
+            "GOARCH": "arm64",
+            "GOFLAGS": "-mod=mod",
+        }
 
         ldflags = f"-s -w -X github.com/brevdev/brev-cli/pkg/cmd/version.Version={self.version}"
         build_cmd = (
@@ -121,7 +121,27 @@ class BrevCliConan(ConanFile):
             f'-o brev ./main.go'
         )
 
-        self.run(build_cmd, env=run_env)
+        self._run_with_env(build_cmd, run_env)
+
+    def _run_with_env(self, cmd, env_dict, **kwargs):
+        """Run a command with temporary environment variables.
+
+        Conan 2.x self.run(env=...) treats list items as env file names,
+        not KEY=VALUE pairs. This helper sets env vars in os.environ
+        before running and restores them afterward.
+        """
+        saved = {}
+        try:
+            for k, v in env_dict.items():
+                saved[k] = os.environ.get(k)
+                os.environ[k] = v
+            return self.run(cmd, **kwargs)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
     def _build_placeholder(self):
         """Build a minimal C placeholder when Go is unavailable.
