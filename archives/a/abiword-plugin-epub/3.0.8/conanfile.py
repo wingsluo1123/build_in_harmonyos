@@ -181,9 +181,10 @@ class AbiwordPluginEpubConan(ConanFile):
             self.output.info("  [ok] Added ohos* to OS list in config.sub")
 
         # 3. Add linux-ohos to kernel-OS validation list
-        if "linux-ohos" not in content:
+        # 注意:linux-ohos) 不带尾通配 * —— 避免 linux-ohos-android 等不该归入 ohos 的三元组被误匹配
+        if "linux-ohos)" not in content:
             import re
-            content, count = re.subn(r'(linux-uclibc[\*/-]?\s*\))', r'\1| linux-ohos*)', content)
+            content, count = re.subn(r'(linux-uclibc[\*/-]?\s*\))', r'\1| linux-ohos)', content)
             if count > 0:
                 changed = True
                 self.output.info("  [ok] Added linux-ohos to kernel list in config.sub")
