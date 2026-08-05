@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R5-code-style",
+      "file": "archives/c/codespell/2.4.2/conanfile.py",
+      "line": 24,
+      "description": "Forbidden template placeholder: 'url = \"\"  # CI fills this'. Code-style Rule 5 explicitly prohibits this exact pattern — 'url = \"\"  # CI fills this'（应由适配者填写）. The recipe's url attribute should be filled by the adapter, not left empty with a CI-fills-this comment. This is flagged as incomplete recipe metadata.",
+      "fix_suggestion": "Set the url attribute to the recipe repository URL, e.g., url = \"https://cnb.cool/ohos-compile-agent\" or the appropriate Conan recipe hosting URL for this project. Remove the '# CI fills this' comment."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/c/codespell/2.4.2/test_package/conanfile.py",
+      "line": 22,
+      "description": "Test only runs 'codespell --version'. While this satisfies R34 (it executes the actual codespell binary, not just a print statement), the test coverage is shallow — it only verifies the binary starts and reports its version, not that spell-checking functionality works.",
+      "fix_suggestion": "Consider adding a deeper functional test, e.g., running codespell on a sample text file with known misspellings and verifying the exit code or output contains expected misspelling detection results."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-doc",
+      "file": "archives/c/codespell/2.4.2/notes.md",
+      "line": 94,
+      "description": "Duplicate '编译结束' (build end) sections at lines 94-97 and 99-100. Two build-end markers with different dates (2026-06-08 and 2026-08-06) suggest leftover from multiple build sessions that should be cleaned up.",
+      "fix_suggestion": "Remove the duplicate section, keeping only the final build end marker (2026-08-06 04:19) and remove the stale 2026-06-08 22:20 entry."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "notes-consistency",
+      "file": "archives/c/codespell/2.4.2/notes.md",
+      "line": 63,
+      "description": "Notes state '直接使用官方 wheel 包' (directly use official wheel package), but the actual conanfile.py builds from the PyPI sdist (codespell-2.4.2.tar.gz) using 'pip install --no-deps', not from a pre-built wheel. The conandata.yml URL also points to the .tar.gz sdist. This is a minor documentation inconsistency.",
+      "fix_suggestion": "Update the '源码修改' section in notes.md to accurately reflect that the recipe builds from the PyPI sdist (tar.gz) using pip, not from a pre-built wheel."
+    }
+  ],
+  "summary": "Audit of codespell 2.4.2 Conan recipe on branch feat/codespell-2.4.2 (7 files, +153/-3 lines). All 7 changed files reviewed against code_style (25 rules) and review_memory (30 rules) rule sets.\n\nDECEPTION DETECTION (highest priority) — ALL PASSED:\n- R34 (empty shell test): PASS — test_package/conanfile.py actually executes the codespell binary via 'self.run()' calling 'codespell --version'. Not a print-only stub.\n- R9 (skip/forged test): PASS — No 'def test(self): pass', no commented-out test, no 'os.system(\"exit 0\")'.\n- Forged status: PASS — manifest.yaml status is 'built' (not 'published'), consistent with notes.md showing real build work was performed.\n- Forged sha256: PASS — sha256 '3c33be9ae34543807f088aeb4832dfad8cb2dae38da61cac0a7045dd376cfdf3' verified against PyPI JSON API as the genuine hash for codespell-2.4.2.tar.gz sdist. URL also matches PyPI exactly.\n- R8 (#ifdef __OHOS__ stub): N/A — No platform guards in code.\n- R19 (manual packaging bypass): PASS — No .so/.a/.o/binary files in PR diff.\n- R40 (deep adaptation): N/A — codespell is a pure Python text tool, not in graphics/UI/multimedia/hardware/system categories.\n\nRECIPE CORRECTNESS (P1) — NO ISSUES:\n- package_type='application' is correct for CLI tool.\n- Conan 2.x API used throughout (from conan import ConanFile, conan.tools.*).\n- Source URL is official PyPI (files.pythonhosted.org), HTTPS.\n- commands.json present at software level with type='tool'.\n- Method order correct: export_sources → requirements → layout → source → build → package → package_info.\n- package_info sets cpp_info.bindirs=['bin'] (correct for application).\n- No hardcoded paths in recipe logic; Python version detected dynamically via sys.version_info.\n- Version '2.4.2' is upstream version (first adaptation, correct per R37).\n- PR is atomic (only codespell package, no framework changes mixed in).\n- No forbidden files in PR diff.\n\nCODE STYLE (P2) — 1 WARNING:\n- conanfile.py line 24: 'url = \"\"  # CI fills this' is an explicitly forbidden template placeholder per Rule 5.\n\nSUGGESTIONS (P3) — 3 HINTS:\n- Test depth could be improved (currently only --version).\n- Duplicate build-end markers in notes.md.\n- Documentation inconsistency about wheel vs sdist in notes.md.\n\nOVERALL VERDICT: PASS (no P0 or P1 issues; one P2 warning for template placeholder; three P3 suggestions for improvement)."
+}
