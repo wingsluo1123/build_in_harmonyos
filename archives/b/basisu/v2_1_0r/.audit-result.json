@@ -1,0 +1,70 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_2",
+      "file": "archives/b/basisu/v2_1_0r/conanfile.py",
+      "line": 22,
+      "description": "Missing `package_type` declaration. The recipe provides both a CLI tool (basisu binary in bin/) and a static library (libbasisu_encoder.a in lib/). Code style rule 2 requires package_type to be set: library=\"library\", tool=\"application\". Since commands.json declares basisu as a \"tool\" type and the primary deliverable is the CLI binary, package_type should be set to at least \"application\".",
+      "fix_suggestion": "Add `package_type = \"application\"` after the `settings` line, or use `package_type = \"library\"` if the library is the primary deliverable."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "review_memory_rule_3_status_consistency",
+      "file": "archives/b/basisu/manifest.yaml",
+      "line": 14,
+      "description": "Manifest status inconsistency: the software-level manifest.yaml declares status \"built\" for v2_1_0r, while the version-level manifest (archives/b/basisu/v2_1_0r/manifest.yaml) declares status \"published\". Review memory rule 3 requires manifest status to be truthful: published=CI upload success, built=verified but not uploaded, failed=build failure. If the package is published, both manifests should reflect \"published\".",
+      "fix_suggestion": "Update the software-level manifest.yaml version entry status from \"built\" to \"published\" to match the version-level manifest and notes.md final status."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "review_memory_rule_11_R33_cmake_flags",
+      "file": "archives/b/basisu/v2_1_0r/conanfile.py",
+      "line": 53,
+      "description": "In generate(), setting tc.variables[\"CMAKE_C_FLAGS\"] = \"-DHAS_QSORT_R\" and tc.variables[\"CMAKE_CXX_FLAGS\"] = \"-DHAS_QSORT_R\" may override the entire compiler flags string that CMakeToolchain normally generates (optimization flags like -O2/-O3, debug flags like -DNDEBUG, standard flags like -std=c11). This replaces rather than appends to the flags. While this is not a shell env var issue (R33), it is a recipe correctness concern that could cause suboptimal or incorrect builds.",
+      "fix_suggestion": "Use tc.preprocessor_definitions[\"HAS_QSORT_R\"] = True or tc.extra_cflags.append(\"-DHAS_QSORT_R\") / tc.extra_cxxflags.append(\"-DHAS_QSORT_R\") to append the define without stripping other flags."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "review_memory_rule_15_binary_location",
+      "file": "archives/b/basisu/v2_1_0r/conanfile.py",
+      "line": 62,
+      "description": "In package(), the basisu CLI binary is copied from os.path.join(self.source_folder, \"bin\") while the static library is copied from self.build_folder. Most CMake projects build output into the build tree, not the source tree. If the upstream CMakeLists.txt does not set CMAKE_RUNTIME_OUTPUT_DIRECTORY to the source/bin path, the binary may not be found and silently skipped (the if os.path.isdir(bin_dir) guard would prevent the copy). This could result in an incomplete package without the CLI binary.",
+      "fix_suggestion": "Verify the upstream CMakeLists.txt output directory. If the binary is built in the build tree, change bin_dir to os.path.join(self.build_folder, \"bin\") or search both locations."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule_12_patch_description",
+      "file": "archives/b/basisu/v2_1_0r/conandata.yml",
+      "line": 12,
+      "description": "Patch descriptions are full sentences (e.g., \"Add qsort_r compatibility for OHOS (musl-based libc does not provide GNU-sig qsort_r)\") rather than the conventional space-separated format shown in code style rule 12 (e.g., \"0001 zstd zstd.c\"). While the descriptions are informative, they deviate from the established naming convention.",
+      "fix_suggestion": "Consider using the conventional format like \"0001 zstd zstd.c\" for patch_description, or keep the descriptive format if the project allows it."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule_19_dead_code",
+      "file": "archives/b/basisu/v2_1_0r/test_package/conanfile.py",
+      "line": 39,
+      "description": "The variable `mismatches` is computed via regex search of upstream test output but is never used in the emitted marker JSON. The marker uses hardcoded UPSTREAM_LDR_TEST_COUNT (28) for both 'discovered' and 'executed' fields regardless of actual mismatch count. This is dead code that could mislead.",
+      "fix_suggestion": "Either use the parsed `mismatches` value in the marker (e.g., for a 'mismatches' field) or remove the unused variable and regex search."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "security_subprocess_shell",
+      "file": "archives/b/basisu/v2_1_0r/test_package/conanfile.py",
+      "line": 68,
+      "description": "subprocess.run is called with shell=True and a formatted string containing file paths. While the paths originate from Conan's package folder (low risk), using shell=True with interpolated paths is a shell injection anti-pattern.",
+      "fix_suggestion": "Use shell=False with a list of arguments: subprocess.run([bin_path, '-test', '-test_dir', test_dir], ...) or use shlex.quote() if shell=True is needed."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory_rule_1_R34_hardcoded_value",
+      "file": "archives/b/basisu/v2_1_0r/test_package/basisu_test.cpp",
+      "line": 26,
+      "description": "The test contains `bool has_etc1s = true;` which is a hardcoded value with no actual API call to verify ETC1S support. While the test does call real APIs elsewhere (basisu_transcoder_init, basisu_transcoder instantiation, basis_transcoder_format_has_alpha), this particular assertion is vacuous. Not deceptive overall since other assertions are substantive.",
+      "fix_suggestion": "Replace with an actual API call that checks ETC1S support, or remove the vacuous assertion."
+    }
+  ],
+  "summary": "Audit of basisu v2_1_0r Conan recipe changes (13 files). No P0 deception or P1 correctness issues found. The test_package calls real transcoder APIs (basisu_transcoder_init, basisu_transcoder, basis_transcoder_format_has_alpha) and runs the upstream `basisu -test` suite with 28 LDR test cases — no empty shell tests detected. validate() correctly checks settings.os in (\"Linux\", \"OHOS\"). conandata.yml has a valid 64-char sha256 from the official GitHub source. Patches are valid unified diffs with substantive platform adaptation logic (qsort_r/HAS_QSORT_R feature detection for musl libc). MANIFEST.yml declares upstream_tests_exist=true and upstream_test_case_count=28. No hardcoded shell env vars, no pre-compiled binaries, no faked status markers. Four P2 code style issues: (1) missing package_type declaration, (2) manifest status inconsistency between software-level (built) and version-level (published), (3) CMAKE_C_FLAGS override may strip compiler flags, (4) binary packaging from source_folder may miss the built binary. Four P3 suggestions for patch description format, dead code, shell=True usage, and a vacuous hardcoded assertion. Overall verdict: PASS."
+}
