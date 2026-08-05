@@ -248,6 +248,17 @@ class PerlobjectpadConan(ConanFile):
             env.define("PERL5LIB", os.pathsep.join(all_libs))
             self.output.info(f"PERL5LIB set to: {os.pathsep.join(all_libs)}")
 
+        # Ensure perl is findable in conanbuild PATH on CI workers where
+        # /data/service/hnp/bin is not in the process PATH.
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        if perl_path:
+            env.prepend("PATH", os.path.dirname(perl_path))
+
         # R33: Derive compiler and sysroot paths from Conan config, no hardcoded paths
         cc_info = self.conf.get("tools.build:compiler_executables", default={})
         if isinstance(cc_info, str):
