@@ -1,7 +1,7 @@
 #!/bin/sh
 # test_package/test.sh — smoke test for abuild
 # Verifies that the abuild binary is present and responds to --version
-set -eu
+set -euo pipefail
 
 echo "[test] abuild --version"
 abuild --version 2>&1 || {

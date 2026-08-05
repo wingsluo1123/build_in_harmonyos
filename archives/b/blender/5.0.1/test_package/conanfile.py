@@ -32,7 +32,24 @@ class BlenderTestConan(ConanFile):
         #    a non-zero status (factory startup requires arguments);
         #    we only check that it does NOT crash with missing-library
         #    errors (which would indicate broken dynamic linking).
-        self.run("blender -b --factory-startup 2>&1 || true", env="conanrun")
+        result = self.run(
+            "blender -b --factory-startup",
+            env="conanrun",
+            ignore_errors=True,
+        )
+        # A clean non-zero exit (missing required arguments) is expected.
+        # Treat signal exits (>=128, i.e. SIGSEGV/SIGABRT) and missing
+        # shared libraries (127) as test failures so broken dynamic
+        # linking is not silently swallowed.
+        if result >= 128 or result == 127:
+            raise ConanException(
+                f"blender -b --factory-startup crashed (exit code {result}): "
+                "possible missing dynamic library or initialization failure"
+            )
+        self.output.info(
+            f"blender -b --factory-startup exited with code {result} "
+            "(non-zero expected; binary loaded and initialized without crash)"
+        )
 
         # NOTE: Full rendering pipeline validation (e.g. rendering an
         # actual .blend file to PNG) requires a richer runtime environment

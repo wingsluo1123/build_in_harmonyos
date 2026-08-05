@@ -26,6 +26,7 @@ class BlenderConan(ConanFile):
     license = "GPL-3.0-or-later"
     homepage = "https://www.blender.org/"
     url = ""
+    package_type = "application"
 
     settings = "os", "arch", "compiler", "build_type"
     options = {
