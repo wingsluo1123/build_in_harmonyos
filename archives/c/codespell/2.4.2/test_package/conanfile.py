@@ -24,3 +24,10 @@ class CodespellTestConan(ConanFile):
             f'python3 {codespell_bin} --version"',
             env="conanrun",
         )
+        # Also run the functional test source (test_codespell.py)
+        test_script = os.path.join(os.path.dirname(__file__), "test_codespell.py")
+        self.run(
+            f'{bash} -c "PYTHONPATH={site_pkgs}:$PYTHONPATH '
+            f'CODESPELL_BIN={codespell_bin} python3 {test_script}"',
+            env="conanrun",
+        )
