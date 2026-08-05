@@ -74,18 +74,8 @@ class SeatdConan(ConanFile):
         tc.project_options["man-pages"] = "disabled"
         tc.project_options["examples"] = "disabled"
 
-        # seatd 以 warning_level=3 + werror=true 构建。在 musl 系 libc（含 OHOS
-        # sysroot）上，<sys/socket.h> 的 CMSG_NXTHDR() 宏内部把 __CMSG_LEN() 的
-        # unsigned 结果与一个有符号指针差做比较，展开处必然触发 -Wsign-compare：
-        #
-        #   sysroot/usr/include/sys/socket.h:360:
-        #     __CMSG_LEN(cmsg) + sizeof(struct cmsghdr) >= __MHDR_END(mhdr) - ...
-        #
-        # 告警产生于系统头文件，seatd 自身代码无符号性缺陷，因此不改上游源码，
-        # 只在工具链层精确豁免这一条诊断。其余告警与 -Werror 全部保持开启
-        # （已实测：仅关这一条，common/、libseat/、seatd/ 全量编译零告警），
-        # 避免用 -Dwerror=false 一刀切放掉真实问题。
-        tc.c_args.append("-Wno-sign-compare")
+        # CMSG_NXTHDR() 在 musl 系 sysroot 上触发的 -Wsign-compare 由
+        # patches/0001 在源码层精确豁免，工具链层无需再处理。
         tc.generate()
 
         executables = self.conf.get(
