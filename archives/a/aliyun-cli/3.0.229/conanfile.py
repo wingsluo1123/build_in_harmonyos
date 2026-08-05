@@ -72,7 +72,7 @@ class AliyunCliConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # Locate Go binary
+        # Locate Go binary — download if not available
         go_bin = shutil.which("go")
         if not go_bin:
             # Try common HarmonyOS locations
@@ -84,8 +84,74 @@ class AliyunCliConan(ConanFile):
                 if os.path.isfile(c) and os.access(c, os.X_OK):
                     go_bin = c
                     break
+
         if not go_bin:
-            raise Exception("Go binary not found on PATH or known locations")
+            # Download Go SDK to ext2 partition (HMDFS doesn't support execution)
+            ext2_base = "/data/storage/el2/base/haps/entry/files"
+            go_sdk_dir = os.path.join(ext2_base, "aliyun-cli-conan-go",
+                                     "3.0.229", "go-sdk")
+            go_root = os.path.join(go_sdk_dir, "go")
+            go_bin = os.path.join(go_root, "bin", "go")
+
+            if not os.path.isfile(go_bin):
+                os.makedirs(go_sdk_dir, exist_ok=True)
+                go_tarball = os.path.join(go_sdk_dir, "go.tar.gz")
+                # Try mirrors first, then official
+                go_urls = [
+                    "https://goproxy.cn/https://go.dev/dl/go1.24.0.linux-arm64.tar.gz",
+                    "https://mirrors.aliyun.com/golang/go1.24.0.linux-arm64.tar.gz",
+                    "https://go.dev/dl/go1.24.0.linux-arm64.tar.gz",
+                ]
+                import urllib.request
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                for url in go_urls:
+                    try:
+                        self.output.info(f"Downloading Go SDK from {url}...")
+                        urllib.request.urlretrieve(url, go_tarball)
+                        break
+                    except Exception as e:
+                        self.output.warning(f"Download failed from {url}: {e}")
+                        continue
+                else:
+                    raise Exception("Failed to download Go SDK from all mirrors")
+
+                # Extract
+                import tarfile
+                with tarfile.open(go_tarball, "r:gz") as tar:
+                    tar.extractall(go_sdk_dir)
+                os.remove(go_tarball)
+
+            if not os.path.isfile(go_bin):
+                raise Exception(f"Go binary not found after extraction: {go_bin}")
+
+            # Sign Go SDK binaries for HarmonyOS execution (SELinux requirement)
+            sign_tool_path = "/data/service/hnp/bin/binary-sign-tool"
+            objcopy_path = "/data/service/hnp/bin/llvm-objcopy"
+            if os.path.isfile(sign_tool_path) and os.path.isfile(objcopy_path):
+                self.output.info("Signing Go SDK binaries...")
+                for root, dirs, files in os.walk(go_root):
+                    for f in files:
+                        fp = os.path.join(root, f)
+                        try:
+                            if open(fp, 'rb').read(4) == b'\x7fELF':
+                                subprocess.run([objcopy_path, "--remove-section",
+                                               ".codesign", fp],
+                                              capture_output=True, timeout=10)
+                                tmp_s = fp + ".signed.tmp"
+                                r = subprocess.run([sign_tool_path, "sign",
+                                                   "-inFile", fp, "-outFile",
+                                                   tmp_s, "-selfSign", "1"],
+                                                  capture_output=True, timeout=30)
+                                if r.returncode == 0 and os.path.isfile(tmp_s):
+                                    shutil.move(tmp_s, fp)
+                                    os.chmod(fp, 0o755)
+                                else:
+                                    os.unlink(tmp_s) if os.path.exists(tmp_s) else None
+                        except Exception:
+                            pass
 
         # Set up Go environment on ext2 (HMDFS causes mmap failures)
         ext2_base = "/data/storage/el2/base/haps/entry/files"
