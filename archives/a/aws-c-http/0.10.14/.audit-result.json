@@ -1,0 +1,86 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/a/aws-c-http/0.10.14/conandata.yml",
+      "line": 6,
+      "description": "conandata.yml manually lists 7 mirror URLs (gh-proxy, mirror.ghproxy, ghproxy, gitclone, moeyy, kkgithub) plus the official GitHub URL as a list. Rule R39 explicitly states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The other conandata.yml files (aws-c-compression, aws-c-io) correctly use a single official URL string. Manually adding mirrors is redundant and could cause duplicate mirror entries when CI also adds them automatically.",
+      "fix_suggestion": "Replace the URL list with a single official URL string:\n  url: \"https://github.com/awslabs/aws-c-http/archive/refs/tags/v0.10.14.tar.gz\"\nCI will automatically add mirror fallbacks at download time."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R34/CS-11",
+      "file": "archives/a/aws-c-http/0.10.14/test_package/test.c",
+      "line": 4,
+      "description": "Test source uses `extern` forward declarations instead of `#include` for the actual package headers. The test does call real API functions (aws_default_allocator, aws_http_library_init, aws_http_library_clean_up) so R34 (empty stub test) is NOT triggered — the test genuinely invokes the tested library's API. However, code style rule §11 states '头文件引用必须与被测包的 cpp_info.libs 对应' and the canonical example shows `#include <zlib.h>`. Using forward declarations means the test does not verify that: (1) the package's include directories are correctly set up, (2) the public headers are compilable, or (3) the declared function signatures in headers match the forward declarations. This weakens the test from a header-include-verification standpoint.",
+      "fix_suggestion": "Replace forward declarations with actual header includes, e.g.:\n  #include <aws/common/common.h>\n  #include <aws/http/http.h>\nThen use the real types and function declarations from those headers. If CMakeDeps include dir propagation is broken, fix the recipe's cpp_info settings (e.g., ensure transitive include dirs propagate via cpp_info.requires) rather than working around it in the test."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R34/CS-11",
+      "file": "archives/a/aws-c-compression/0.3.2/test_package/test.c",
+      "line": 4,
+      "description": "Same forward-declaration pattern as aws-c-http test.c. Test calls real APIs (aws_default_allocator, aws_compression_library_init, aws_compression_library_clean_up) so R34 is not triggered, but code style §11 requires header includes matching cpp_info.libs. Forward declarations bypass header include path verification.",
+      "fix_suggestion": "Replace forward declarations with `#include <aws/compression/compression.h>` and use real types from the headers."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R34/CS-11",
+      "file": "archives/a/aws-c-io/0.26.3/test_package/test.c",
+      "line": 4,
+      "description": "Same forward-declaration pattern. Test calls real APIs (aws_default_allocator, aws_io_library_init, aws_io_library_clean_up) so R34 is not triggered, but code style §11 requires header includes matching cpp_info.libs.",
+      "fix_suggestion": "Replace forward declarations with `#include <aws/io/io.h>` and use real types from the headers."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "W2",
+      "file": "archives/a/aws-c-http/0.10.14/conanfile.py",
+      "line": 1,
+      "description": "PR atomicity violation (W2): the PR includes 3 new recipes (aws-c-compression/0.3.2, aws-c-http/0.10.14, aws-c-io/0.26.3) plus modifications to 2 existing recipes (aws-c-cal/0.9.13 +2 lines, aws-c-common/0.12.6 +1 line). Rule W2 states '一个 PR 只包含一个配方' (one PR contains only one recipe). While these are all part of the aws-c-http dependency chain (aws-c-http depends on aws-c-io and aws-c-compression, which depend on aws-c-common), the rule requires splitting into separate PRs merged in dependency order.",
+      "fix_suggestion": "Split into separate PRs: (1) aws-c-common modifications, (2) aws-c-cal modifications, (3) aws-c-compression new recipe, (4) aws-c-io new recipe, (5) aws-c-http new recipe. Merge in dependency order. If splitting is impractical due to tight coupling, document the rationale in the PR body and request an exception."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/a/aws-c-http/0.10.14/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml is missing the `name` field. Code style rule §14 shows the required format starting with `name: zlib`. The file starts with `version: \"0.10.14\"` but has no `name:` field. Additionally, `build_system` is nested under `build: system:` rather than at the top level as shown in the standard format (`build_system: cmake`).",
+      "fix_suggestion": "Add `name: aws-c-http` as the first field. Consider using top-level `build_system: cmake` instead of nested `build: system: cmake` to match the standard format in code style rule §14."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-recipe",
+      "file": "archives/a/aws-c-http/0.10.14/conanfile.py",
+      "line": 63,
+      "description": "In build(), CMAKE_C_FLAGS is set via `cmake.configure(variables={\"CMAKE_C_FLAGS\": f\"-I{cal_include}\"})`. This sets CMAKE_C_FLAGS as a CMake cache variable, which will replace (not append to) any C flags set by CMakeToolchain. This could silently drop important toolchain flags (e.g., -std=c11, -fPIC, optimization flags). The workaround for aws-c-cal include dir propagation is documented in notes.md, but the implementation risks clobbering existing flags.",
+      "fix_suggestion": "Use `target_include_directories` in CMake, or append to existing CMAKE_C_FLAGS: `f\"${CMAKE_C_FLAGS} -I{cal_include}\"` (though CMake variable expansion in configure() may not work as expected). Better: fix the CMakeDeps include dir propagation at the recipe level by ensuring aws-c-cal's cpp_info.includedirs propagate transitively via cpp_info.requires."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/a/aws-c-io/0.26.3/conanfile.py",
+      "line": 47,
+      "description": "CMAKE_SYSTEM_NAME is set to \"Linux\" via `tc.variables[\"CMAKE_SYSTEM_NAME\"] = \"Linux\"` to force the posix/epoll code path on HarmonyOS. This is a pragmatic workaround (HarmonyOS is Linux-compatible for posix/epoll APIs) but it masks the actual platform identity from the build system. If aws-c-io has any platform-specific code paths that should differ between Linux and HarmonyOS (e.g., different default paths, different system call behavior), this override would cause incorrect behavior. R40 (deep adaptation verification) notes that system-level libraries (procfs/sysfs/netlink/dl) may need substantive platform adaptation code.",
+      "fix_suggestion": "Prefer adding a patch to aws-c-io's CMakeLists.txt that properly detects HarmonyOS (e.g., treating CMAKE_SYSTEM_NAME=OHOS or HarmonyOS as equivalent to Linux for the posix/epoll code path). This preserves platform identity for any future platform-specific logic while still using the correct code path."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-recipe",
+      "file": "archives/a/aws-c-http/0.10.14/test_package/CMakeLists.txt",
+      "line": 4,
+      "description": "Test CMakeLists.txt explicitly find_package() and target_link_libraries() all 6 transitive dependencies (aws-c-http, aws-c-common, aws-c-io, aws-c-compression, aws-c-cal, aws-lc). While this is valid for static linking (the linker needs all transitive object files), it bypasses Conan's CMakeDeps transitive dependency resolution. If the recipe's cpp_info.requires chain is correct, finding only the top-level package should make all transitive dependencies available. The explicit approach suggests either (1) CMakeDeps transitive resolution is not working, or (2) the test author is being defensive. Same pattern in aws-c-compression and aws-c-io test CMakeLists.txt.",
+      "fix_suggestion": "If CMakeDeps transitive resolution works correctly, simplify to only find_package(aws-c-http REQUIRED) and target_link_libraries(test_aws-c-http aws-c-http::aws-c-http). If transitive resolution is broken, fix the cpp_info.requires chain in the recipes rather than working around it in every test_package."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-1",
+      "file": "archives/a/aws-c-common/0.12.6/conanfile.py",
+      "line": 33,
+      "description": "The `def requirements(self): pass` method is technically correct (aws-c-common has no dependencies) but redundant — when there are no requirements, the method can be omitted entirely. Conan 2.x does not require an empty requirements() method. This is a minor style suggestion.",
+      "fix_suggestion": "Remove the empty `def requirements(self): pass` method. If the method is kept for documentation purposes, add a comment explaining why it's empty."
+    }
+  ],
+  "summary": "Audit of aws-c-http 0.10.14 Conan recipe PR (branch: feat/aws-c-http-0.10.14). Audited 23 changed files across 5 packages (aws-c-cal, aws-c-common, aws-c-compression, aws-c-http, aws-c-io) against code style and PR review rules.\n\n**Deception detection (P0): PASS** — No empty stub tests (R34): all 3 test.c files call real library API functions (aws_http_library_init, aws_compression_library_init, aws_io_library_init). No skipped/forged tests (R9): all test_package conanfile.py have proper test() with self.run(). No forged status: manifest 'built' is consistent with test-report 'SUCCESS/PASSED'. No forged sha256: all 3 sha256 values are 64-char hex, not all-zeros or all-f's. No pre-built binaries (R19). No empty #ifdef __OHOS__ stubs (R8).\n\n**Recipe correctness (P1): PASS** — All conanfile.py use Conan 2.x API (from conan import ConanFile, conan.tools.cmake). Platform checks use `in (\"Linux\", \"OHOS\")` not `== \"Linux\"` (R32). No raw env vars (R33). Source URLs point to official github.com/awslabs repos (R39). cpp_info.libs and cpp_info.requires correctly declared. All packages are library type (no commands.json needed, R38). Version numbers match upstream (R37).\n\n**Code style (P2): 6 issues** — (1) aws-c-http conandata.yml manually lists 7 mirror URLs, violating R39's instruction to only use the official URL (CI adds mirrors automatically). (2-4) All 3 test.c files use forward declarations instead of #include headers, violating code style §11. (5) W2 atomicity: 3 new recipes + 2 modified recipes in one PR. (6) manifest.yaml missing `name` field.\n\n**Suggestive improvements (P3): 4 issues** — CMAKE_C_FLAGS clobbering risk, CMAKE_SYSTEM_NAME=Linux override for OHOS, overly explicit find_package in test CMakeLists, redundant empty requirements() method.\n\n**Verdict: PASS** — No P0 (deceptive) or P1 (recipe correctness) issues found. The P2 issues are code style warnings and PR organization concerns that should be addressed but do not block the PR. The test approach (forward declarations) is not deceptive since real APIs are called, but it should be improved to include actual headers for stronger verification."
+}

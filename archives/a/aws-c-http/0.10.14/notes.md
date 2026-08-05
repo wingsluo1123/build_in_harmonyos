@@ -30,6 +30,10 @@ conan create . -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
 - aws-c-http 的 websocket_bootstrap.c 直接引用 aws/cal/hash.h（来自 aws-c-cal）
 - conan recipe 中需要将 aws-c-cal 声明为直接依赖
 - 所有 AWS C 库使用 aws_use_package() 宏，需要 CMakeDeps 设置 cmake_target_name 为 AWS:: 前缀
+
+## 结束
+- 最终状态: built (conan create + conan-verify 通过)
+- COMPLETED
 ---
 
 **编译结束**: 2026-08-06 00:41

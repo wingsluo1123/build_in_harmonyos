@@ -47,7 +47,8 @@ class AwscioConan(ConanFile):
         # BYO_CRYPTO=ON skips s2n-tls dependency
         tc.variables["BYO_CRYPTO"] = "ON"
         # HarmonyOS is Linux-compatible; use Linux code path for posix/epoll
-        tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+        if self.settings.os == "OHOS":
+            tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.generate()
 
         deps = CMakeDeps(self)
