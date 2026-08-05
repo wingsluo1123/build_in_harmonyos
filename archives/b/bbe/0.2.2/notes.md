@@ -34,3 +34,6 @@ echo "hello world" | bbe -e "s/hello/HELLO/"  # ✅ HELLO world
 - 源码 char*/unsigned char* 混用，产生编译警告（不影响功能）
 - 无测试套件
 - 源码 URL 使用 Debian pool 镜像（savannah 原始 URL 返回 404）
+
+## 最终状态: COMPLETED
+
