@@ -68,3 +68,7 @@ chmod +x $TEST_PREFIX/$DEFAULT_PREFIX/bin/devcontainer
 - npm install --ignore-scripts 需要先执行，然后手动编译 node-pty
 - devcontainer CLI 是 Node.js 应用，需要 Node.js 运行环境
 - nodedir 需通过 `os.path.realpath(shutil.which("node"))` 解析符号链接
+
+## 结束
+
+COMPLETED — devcontainer 0.87.0 conan 适配完成
