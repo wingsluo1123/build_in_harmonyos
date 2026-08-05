@@ -1,0 +1,48 @@
+--- a/tests/macros.h
++++ b/tests/macros.h
+@@ -69,22 +69,23 @@
+ /* STREQ (str1, str2)
+    Return true if two strings compare equal.  */
+ #define STREQ(a, b) (strcmp (a, b) == 0)
+ 
+ /* Some numbers in the interval [0,1).  */
+ extern const float randomf[1000];
+ extern const double randomd[1000];
+ extern const long double randoml[1000];
+ 
+ /* GNU supports malloc hooks; otherwise, assertions will be skipped (but calls
+- * will still be run for side-effects) */
+-#ifdef _GNU_SOURCE
++ * will still be run for side-effects). OHOS does not have __libc_malloc/realloc,
++ * so mock overrides are disabled and assertions become no-ops. */
++#if defined(_GNU_SOURCE) && !defined(__OHOS__)
+ 	extern size_t _mallocmock_malloc_size;
+ 	extern size_t _mallocmock_realloc_size;
+ 	extern bool   _mallocmock_fail;
+ 	void mallocmock_reset();
+ 
+ 	#define ASSERT_ALLOC(type, cmp, x) \
+ 		MALLOC_RESET_COUNT(); x; ASSERT(_mallocmock_##type##_size cmp)
+ 	#define ASSERT_MALLOC(cmp, x) ASSERT_ALLOC(malloc, cmp, x);
+ 	#define ASSERT_REALLOC(cmp, x) ASSERT_ALLOC(realloc, cmp, x);
+ 	#define MALLOC_RESET_COUNT() mallocmock_reset()
+@@ -104,16 +105,16 @@
+ 	})
+ 	#define FAILLOC_VOID(x) \
+ 		_mallocmock_fail = true; \
+ 		x; \
+ 		_mallocmock_fail = false;
+ 
+ 	#define ASSERT_GCC(x) ASSERT(x)
+ #else
+ 	#define ASSERT_MALLOC(cmp, x) x
+ 	#define ASSERT_REALLOC(cmp, x) x
+-	#define ASSERT_NOALLOC(cmp, x) x
++	#define ASSERT_NOALLOC(x) x
+ 	#define MALLOC_RESET_COUNT()
+-	#define FAILLOC(x) /* no portable equivalent! */
+-	#define FAILLOC_VOID(x)  /* no portable equivalent! */
++	#define FAILLOC(x) (x)
++	#define FAILLOC_VOID(x) x
+ 	#define ASSERT_GCC(x)
+ #endif

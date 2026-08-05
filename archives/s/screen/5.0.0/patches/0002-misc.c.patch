@@ -1,0 +1,49 @@
+--- a/misc.c
++++ b/misc.c
+@@ -151,38 +151,46 @@
+ }
+ 
+ void closeallfiles(int except)
+ {
+ 	struct pollfd pfd[1024];
+ 	int maxfd, i, fd, ret, z;
+ 
+ 	i = 3; /* skip stdin, stdout and stderr */
+ 	maxfd = getdtablesize();
+ 
++#ifdef __OHOS__
++	/* OHOS: poll() fails with ENOMEM when polling many fds.
++	 * Simply close all fds >= 3 (EBADF on closed fds is harmless). */
++	for (fd = 3; fd < maxfd; fd++)
++		if (fd != except)
++			close(fd);
++#else
+ 	while (i < maxfd) {
+ 		memset(pfd, 0, sizeof(pfd));
+ 
+ 		z = 0;
+ 		for (fd = i; fd < maxfd && fd < i + 1024; fd++)
+ 			pfd[z++].fd = fd;
+ 
+ 		ret = poll(pfd, fd - i, 0);
+ 		if (ret < 0)
+ 			Panic(errno, "poll");
+ 
+ 		z = 0;
+ 		for (fd = i; fd < maxfd && fd < i + 1024; fd++)
+ 			if (!(pfd[z++].revents & POLLNVAL) && fd != except)
+ 				close(fd);
+ 
+ 		i = fd;
+ 	}
++#endif
+ }
+ 
+ /*
+  *  Security - switch to real uid
+  */
+ 
+ static int UserSTAT;
+ 
+ int UserContext(void)
+ {

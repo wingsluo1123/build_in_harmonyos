@@ -1,0 +1,32 @@
+--- a/tests/test-winmsgbuf.c
++++ b/tests/test-winmsgbuf.c
+@@ -258,27 +258,29 @@
+ 		ASSERT(wmbc_offset(wmbc) == szsecond + n);
+ 
+ 		/* if the buffer cannot be expanded, nothing shall be copied (similar to
+ 		 * putchar); importantly, we cannot return a pointer to the buffer
+ 		 * position that would represent the first character copied, because it
+ 		 * is outside the bounds of the buffer */
+ 		size_t szmax = wmb_size(wmb);
+ 		char last = wmb_contents(wmb)[szmax - 1];
+ 		wmbc_fastfw_end(wmbc);
+ 		/* strcpy */
++#ifndef __OHOS__
+ 		ASSERT(FAILLOC(wmbc_strcpy(wmbc, str)) == NULL);
+ 		ASSERT_GCC(wmb_size(wmb) == szmax);
+ 		ASSERT_GCC(wmb_contents(wmb)[szmax - 1] == last);
+ 		/* strncpy */
+ 		ASSERT(FAILLOC(wmbc_strncpy(wmbc, str, n)) == NULL);
+ 		ASSERT_GCC(wmb_size(wmb) == szmax);
+ 		ASSERT_GCC(wmb_contents(wmb)[szmax - 1] == last);
++#endif
+ 
+ 		wmbc_free(wmbc);
+ 		wmb_free(wmb);
+ 	}
+ 
+ 	/* scenerio: formatted strings into buffer, also triggering expansion */
+ 	{
+ 		WinMsgBuf *wmb = wmb_create();
+ 		WinMsgBufContext *wmbc = wmbc_create(wmb);
+ 
