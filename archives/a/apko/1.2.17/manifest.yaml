@@ -15,10 +15,10 @@ version: "1.2.17"
 status: built
 
 # 构建系统
-build_system: custom
+build_system: go
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-17"
+build_date: "2026-08-05"
 
 # ============================================================
 # 源码信息
@@ -29,10 +29,9 @@ source:
   url: "https://github.com/chainguard-dev/apko/archive/refs/tags/v1.2.17.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "12af82ec319f989c82da2ff5ef59a19822fc0193158f6510b0ada3b72f2d7662"
 
   # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -40,21 +39,15 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: custom
+  system: go
 
-  # 配置选项列表
   configure_options:
-    - "GOTOOLCHAIN=local"
-    - "CGO_ENABLED=0"
-    - "GOOS=linux GOARCH=arm64"
+    - "CGO_ENABLED=0 go build -trimpath -ldflags='-buildid= -X sigs.k8s.io/release-utils/version.gitVersion=1.2.17 ...' -o apko ./"
+    - "CGO_ENABLED=0 go test -short -count=1 -timeout 120s ./..."
 
-  # 编译依赖列表（格式: name/version）
   dependencies:
-    - golang/1.26.3
+    - "go/1.26.3 (self-bootstrapped linux-arm64)"
 
-  # 编译器
   cc: go
   cxx: ""
 
@@ -62,16 +55,25 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied: []
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
   - "apko go.mod requires Go >= 1.26.0, need Go 1.26.3 SDK for building"
   - "Go projects on HarmonyOS need GOTOOLCHAIN=local or proper SDK path"
-  - "binary-sign-tool selfSign mode required for ELF signing"
+  - "binary-sign-tool selfSign mode required for ELF signing (E128)"
   - "apko is a static Go binary, CGO_ENABLED=0 works fine"
+  - "E128: Go binaries and Go toolchain ELFs require .codesign section for HongMeng execve"
+  - "E166: Go linker mmap fails on HMDFS, route output to ext2 partition"
+  - "E077: ELF signing pipeline: llvm-objcopy --remove-section .codesign -> binary-sign-tool sign -selfSign 1 -> chmod 0o755"
+
+platform_workarounds:
+  - problem: "Go toolchain not available on HarmonyOS PC preflight worker"
+    solution: "Self-bootstrap Go 1.26.3 from golang.google.cn, re-sign all toolchain ELFs"
+    knowledge_ref: "E128 + E077"
+  - problem: "Go linker mmap fails on HMDFS"
+    solution: "Route GOCACHE/GOTMPDIR/linker output to ext2 partition"
+    knowledge_ref: "E166"
