@@ -23,9 +23,9 @@
 3. 编译：
    ```bash
    cd src
-   make -j2 CXX=clang++ CPPFLAGS="-I$ladspa_inc -fPIC" CXXFLAGS="${CPPFLAGS} -Wall -Werror -O2"
+   make -j2 CXX=clang++ CPPFLAGS="-I/usr/include -fPIC" CXXFLAGS="${CPPFLAGS} -Wall -Werror -O2"
    ```
-   注意：ladspa.h 头路径通过 CPPFLAGS -I 注入（ladspa/1.15 Conan 包 package_folder/include）。
+   注意：ladspa.h 头走系统路径 /usr/include（CI worker 预装 ladspa-dev），无 Conan 依赖声明。
 
 4. 安装到 staging：
    ```bash
@@ -37,16 +37,16 @@
 
 | # | 问题 | 根因 | 解决方案 | 知识引用 |
 |---|------|------|----------|----------|
-| 1 | ladspa.h 头找不到 | cmt 源码 `#include <ladspa.h>` 但 tarball 不含 ladspa.h SDK | 通过 ladspa/1.15 Conan 包提供头（resolve-deps ladspa ✅） | — |
+| 1 | ladspa.h 头找不到 | cmt 源码 `#include <ladspa.h>` 但 tarball 不含 ladspa.h SDK | 走系统路径 /usr/include（CI worker 预装 ladspa-dev），无 Conan 依赖声明 | — |
 | 2 | 上游测试不可跑 | Makefile test target 霈 `play` 命令音频播放，headless 环境无 audio daemon | 消费者测试 test_cmt.c 用 dlopen + ladspa_descriptor 符号验证替代（R34 非空壳） | — |
 
 ## 源码修改
 
-无补丁文件（cmt 源码无需修改，ladspa.h 通过 Conan 依赖注入）。
+无补丁文件（cmt 源码无需修改，ladspa.h 走系统路径 /usr/include）。
 
 ## 依赖版本
 
-- ladspa: 1.15（Conan 制品仓已发布，resolve-deps ladspa ✅）
+- ladspa: 1.15（走系统头 /usr/include，CI worker 预装 ladspa-dev，无 Conan 依赖声明）
 - 无别的库依赖（cmt 是纯 LADSPA 插件库，Makefile 只调 cxx -shared 链 .o）
 
 ## 验证结果
@@ -75,7 +75,7 @@ nm src/cmt.so | grep -c ladspa_descriptor
 ## 注意事项
 
 1. **cmt.so 是运行时 LADSPA 插件**，消费者通过 dlopen 加载非链接型 lib，package_info.libs=[]。
-2. **ladspa.h 必须通过 ladspa/1.15 Conan 包提供**，cmt 源码不含 ladspa.h SDK 头。
+2. **ladspa.h 走系统路径 /usr/include**（CI worker 预装 ladspa-dev），无 Conan 依赖声明，cmt 源码不含 ladspa.h SDK 头。
 3. **上游无自动化测试套件**，Makefile test target 霈 `play` 命令音频播放，headless 环境不可跑；消费者测试 test_cmt.c 用 dlopen + ladspa_descriptor 符号验证替代（R34 非空壳）。
 
 ## 路径 B 申报
