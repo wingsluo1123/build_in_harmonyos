@@ -208,8 +208,10 @@ class CiliumCliConan(ConanFile):
             return
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
         if os.path.isfile(objcopy):
-            subprocess.run([objcopy, "--remove-section", ".codesign", path],
-                           capture_output=True, timeout=10)
+            r = subprocess.run([objcopy, "--remove-section", ".codesign", path],
+                               capture_output=True, timeout=10)
+            if r.returncode != 0:
+                self.output.warning(f"llvm-objcopy failed to remove .codesign section: {r.stderr.decode(errors='replace')[:200]}")
         tmp = path + ".signed.tmp"
         for attempt in range(3):
             r = subprocess.run(
