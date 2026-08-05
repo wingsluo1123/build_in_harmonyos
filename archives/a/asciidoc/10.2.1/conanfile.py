@@ -33,13 +33,15 @@ class AsciidocConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        install_dir = os.path.join(self.build_folder, "install")
-        os.makedirs(install_dir, exist_ok=True)
-        self.run(f"python3 setup.py install --prefix={install_dir}", cwd=self.source_folder)
+        # Pure Python package: install via pip to a flat staging directory
+        # pip install --target creates: asciidoc/, bin/asciidoc, bin/a2x, asciidoc-10.2.1.dist-info/
+        staging = os.path.join(self.build_folder, "staging")
+        self.run(f'python3 -m pip install "{self.source_folder}" --no-deps --target="{staging}"')
 
     def package(self):
-        install_dir = os.path.join(self.build_folder, "install")
-        copy(self, "*", src=install_dir, dst=self.package_folder)
+        staging = os.path.join(self.build_folder, "staging")
+        # Copy everything: Python package, bin scripts, dist-info
+        copy(self, "*", src=staging, dst=self.package_folder)
         # Replace entry point scripts with self-contained wrappers
         bin_dir = os.path.join(self.package_folder, "bin")
         for script_name in ("asciidoc", "a2x"):
@@ -61,10 +63,8 @@ class AsciidocConan(ConanFile):
             "import os, sys\n"
             "_d = os.path.dirname(os.path.abspath(__file__))\n"
             "_p = os.path.dirname(_d)\n"
-            "_v = 'python%d.%d' % (sys.version_info.major, sys.version_info.minor)\n"
-            "_s = os.path.join(_p, 'lib', _v, 'site-packages')\n"
-            "if os.path.isdir(_s):\n"
-            "    sys.path.insert(0, _s)\n"
+            "if _p not in sys.path:\n"
+            "    sys.path.insert(0, _p)\n"
             f"from {module} import cli\n"
             "sys.exit(cli())\n"
         )

@@ -12,26 +12,23 @@ class AsciidocTestConan(ConanFile):
 
     def test(self):
         pkg = self.dependencies["asciidoc"]
-        bin_dir = os.path.join(pkg.package_folder, "bin")
-        lib_dir = os.path.join(pkg.package_folder, "lib")
-
-        # Find site-packages for PYTHONPATH
-        py_ver = "python%d.%d" % (sys.version_info.major, sys.version_info.minor)
-        site_packages = os.path.join(lib_dir, py_ver, "site-packages")
+        pkg_root = pkg.package_folder
+        bin_dir = os.path.join(pkg_root, "bin")
 
         asciidoc_bin = os.path.join(bin_dir, "asciidoc")
 
         # Smoke test: version check
-        self.run('PYTHONPATH="%s" "%s" --version' % (site_packages, asciidoc_bin))
+        # With pip install --target, Python modules are at package root
+        # The wrapper scripts auto-set PYTHONPATH, so just run directly
+        self.run(f'"{asciidoc_bin}" --version')
 
         # Functional test: convert an AsciiDoc document to HTML
-        test_adoc = "test.adoc"
+        test_adoc = os.path.join(self.build_folder, "test.adoc")
+        output_html = os.path.join(self.build_folder, "test.html")
         with open(test_adoc, "w") as f:
             f.write("= Test Document\n\nHello *world*.\n")
 
-        output_html = "test.html"
-        self.run('PYTHONPATH="%s" "%s" -o "%s" "%s"' % (
-            site_packages, asciidoc_bin, output_html, test_adoc))
+        self.run(f'"{asciidoc_bin}" -o "{output_html}" "{test_adoc}"')
 
         if not os.path.exists(output_html):
             raise AssertionError("asciidoc did not produce output HTML")
