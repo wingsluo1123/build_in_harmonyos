@@ -1,26 +1,52 @@
 software: perl-devel-caller
+# 版本级 manifest
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
 version: "2.07"
 status: built
 build_date: "2026-08-06"
+build_system: perl
+
+# ============================================================
+# 源码信息
+# ============================================================
 
 source:
   url: "https://github.com/richardc/perl-devel-caller/archive/refs/tags/release-2.07.tar.gz"
   sha256: "d4cf424c6d71ed8515a35e9e80f492f2ccff74fc050ef05ee0242c09e0f791a3"
   tar_format: tar.gz
 
+# ============================================================
+# 构建配置
+# ============================================================
+
 build:
-  system: perl
-  build_system: Makefile.PL
+  system: makefile
+  build_system: perl
   configure_options:
     - "perl Makefile.PL"
+  link_options:
+    - "-nostartfiles -nodefaultlibs -lc"
   dependencies:
     - "perl-padwalker/2.5-r5"
     - "perl/5.42.2"
   cc: clang
   cxx: clang++
 
+# ============================================================
+# 补丁信息
+# ============================================================
+
 patches_applied:
   - "0001-Makefile.PL.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
 
 knowledge_gained:
   - "Perl XS 模块需要特殊链接参数 -nostartfiles -nodefaultlibs"
@@ -29,8 +55,7 @@ knowledge_gained:
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/Devel-Caller-2.07.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/Devel-Caller-2.07.work
+  notes: "0001-Makefile.PL.patch 添加 dynamic_lib 链接参数，INC 路径由 conanfile.py build() 动态添加"
   source_orig_hash: a3f4dc195fd072e5
   source_work_hash: b283864925418b00
   generated_at: '2026-08-06T06:30:45'
@@ -38,6 +63,6 @@ patch_generation:
 
 patch_classification:
   - file: 0001-Makefile.PL.patch
-    type: auto
-    platform_only: True
+    type: portability
+    platform_only: true
     guard: 'pending'
