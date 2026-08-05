@@ -250,7 +250,11 @@ class VipsConan(ConanFile):
                                 )
                             )
                 except Exception as e:
-                    self.output.warning("patchelf on {}: {}".format(fname, e))
+                    raise Exception(
+                        "patchelf failed on {}: {}. "
+                        "This will leave absolute DT_NEEDED paths, "
+                        "making the library non-portable.".format(fname, e)
+                    )
 
     def package_info(self):
         self.cpp_info.libs = ["vips"]
