@@ -8,6 +8,7 @@ find_package(aws-c-sdkutils REQUIRED)
 find_package(aws-c-io REQUIRED)
 find_package(aws-c-http REQUIRED)
 find_package(aws-c-compression REQUIRED)
+find_package(aws-lc REQUIRED)
 
 add_executable(test_aws-c-auth test.c stub.c)
 
@@ -27,6 +28,7 @@ target_link_libraries(test_aws-c-auth
     aws-c-io::aws-c-io
     aws-c-http::aws-c-http
     aws-c-compression::aws-c-compression
+    aws-lc::aws-lc
 )
 
 # Fallback: CMakeDeps stubs may have empty LIBS and INCLUDE_DIRS.
@@ -35,6 +37,7 @@ find_path(AWS_COMMON_INCLUDE_DIR aws/common/common.h)
 find_library(AWS_COMMON_LIB aws-c-common)
 find_path(AWS_AUTH_INCLUDE_DIR aws/auth/auth.h)
 find_library(AWS_AUTH_LIB aws-c-auth)
+find_library(AWS_CRYPTO_LIB crypto)
 
 if(AWS_COMMON_INCLUDE_DIR)
     target_include_directories(test_aws-c-auth PRIVATE ${AWS_COMMON_INCLUDE_DIR})
@@ -47,6 +50,9 @@ if(AWS_COMMON_LIB)
 endif()
 if(AWS_AUTH_LIB)
     target_link_libraries(test_aws-c-auth ${AWS_AUTH_LIB})
+endif()
+if(AWS_CRYPTO_LIB)
+    target_link_libraries(test_aws-c-auth ${AWS_CRYPTO_LIB})
 endif()
 
 enable_testing()
