@@ -19,7 +19,7 @@ class AquaConan(ConanFile):
     url = "https://github.com/aquaproj/aqua"
     package_type = "application"
 
-    settings = "os", "compiler", "build_type", "arch"
+    settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -61,19 +61,24 @@ class AquaConan(ConanFile):
         binary = self.conan_data["build"]["binary"]
         bin_dir = os.path.join(self.package_folder, "bin")
         os.makedirs(bin_dir, exist_ok=True)
-        tarball = os.path.join(self.source_folder, self.conan_data["sources"]["filename"])
-        self.run(f'tar xzf "{tarball}" -C "{bin_dir}" "{binary}"')
+        # Copy from source_folder (already extracted in source()) so patches
+        # applied in build() are reflected in the packaged binary.
+        copy(self, binary, src=self.source_folder, dst=bin_dir, keep_path=False)
         binary_path = os.path.join(bin_dir, binary)
         os.chmod(binary_path,
                  stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
                  stat.S_IRGRP | stat.S_IXGRP |
                  stat.S_IROTH | stat.S_IXOTH)
         self._sign_ohos_binary(binary_path)
-        copy(self, "LICENSE", src=self.source_folder,
-             dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
-        copy(self, "README.md", src=self.source_folder,
-             dst=os.path.join(self.package_folder, "share", "doc", "aqua"),
-             keep_path=False)
+        license_src = os.path.join(self.source_folder, "LICENSE")
+        if os.path.isfile(license_src):
+            copy(self, "LICENSE", src=self.source_folder,
+                 dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
+        readme_src = os.path.join(self.source_folder, "README.md")
+        if os.path.isfile(readme_src):
+            copy(self, "README.md", src=self.source_folder,
+                 dst=os.path.join(self.package_folder, "share", "doc", "aqua"),
+                 keep_path=False)
 
     def _sign_ohos_binary(self, binary_path):
         if str(self.settings.os) != "OHOS":
