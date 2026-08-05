@@ -1,105 +1,50 @@
 software: a2ps
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/4.15.7/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "4.15.7"
-
-# 编译状态
-# published | built | failed | archived
 status: built
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_date: "2026-08-05"
 
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/tmp/a2ps-4.15.7.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://ftp.gnu.org/gnu/a2ps/a2ps-4.15.7.tar.gz"
+  sha256: "715f38670afd950b4ca71c01f468feefad265ca52d3f112934c63c0a8bfbb8af"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
   configure_options:
     - "--prefix=/storage/Users/currentUser/usr/local"
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  dependencies:
+    - bdw-gc/8.2.6@ohpcd/stable
+    - libpaper/1.1.28@ohpcd/stable
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-ogonkify-configure.patch"
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "config.guess/config.sub needs OHOS platform detection patches"
+  - "umask 077 causes Permission denied on HarmonyOS filesystem"
+  - "pthread_cancel/pthread_setcancelstate not implemented on OHOS - need --allow-shlib-undefined"
+  - "AUTOMAKE=true to skip autotools regeneration when automake not installed"
+  - "PkgConfigDeps generator needed for configure to find conan dependencies via pkg-config"
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/a2ps-4.15.7.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/a2ps-4.15.7.work
-  source_orig_hash: ec1243495441f62c
-  source_work_hash: c695e693c2948622
-  generated_at: '2026-08-05T21:05:27'
   patches_count: 4
 
 patch_classification:
   - file: 0001-build-aux-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: portability
+    platform_only: true
   - file: 0002-build-aux-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: portability
+    platform_only: true
   - file: 0003-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: portability
+    platform_only: true
   - file: 0004-ogonkify-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    type: portability
+    platform_only: true
