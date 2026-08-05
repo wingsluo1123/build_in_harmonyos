@@ -14,7 +14,7 @@ abi-compliance-checker 是一个纯 Perl 脚本工具，无需传统编译步骤
 
 1. **下载源码**: 从 GitHub 下载 abi-compliance-checker 2.3 版本
    ```bash
-   curl -k -L https://github.com/lvc/abi-compliance-checker/archive/refs/tags/2.3.tar.gz
+   curl -L https://github.com/lvc/abi-compliance-checker/archive/refs/tags/2.3.tar.gz
    ```
 
 2. **修改 shebang**: 适配 HarmonyOS Perl 路径
