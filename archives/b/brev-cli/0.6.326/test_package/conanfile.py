@@ -35,8 +35,8 @@ class BrevCliTestConan(ConanFile):
         if not go_bin or not os.access(go_bin, os.X_OK):
             return False
         try:
-            subprocess.run([go_bin, "version"], capture_output=True, timeout=10)
-            return True
+            result = subprocess.run([go_bin, "version"], capture_output=True, timeout=10)
+            return result.returncode == 0
         except Exception:
             return False
 

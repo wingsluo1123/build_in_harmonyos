@@ -37,7 +37,7 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 case "$out" in
-    *"[PLACEHOLDER]"*)
+    *\[PLACEHOLDER\]*)
         # R9: conanfile.py builds a C placeholder when the Go toolchain is
         # unavailable; a placeholder must never pass as a genuine build.
         echo "FAIL: brev --version output contains placeholder marker (R9: no fake pass)" >&2
