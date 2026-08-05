@@ -37,9 +37,10 @@ class DiffSoFancyConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Fix shebang to use system perl on OHOS
+        # Fix shebang to use system perl on OHOS (R32: platform guard)
         script = os.path.join(self.source_folder, "diff-so-fancy")
-        replace_in_file(self, script, "#!/usr/bin/env perl", "#!/data/service/hnp/bin/perl")
+        if self.settings.os in ("Linux", "OHOS"):
+            replace_in_file(self, script, "#!/usr/bin/env perl", "#!/data/service/hnp/bin/perl")
         # Verify the script can be syntax-checked
         self.run(f'perl -c "{script}"')
 
