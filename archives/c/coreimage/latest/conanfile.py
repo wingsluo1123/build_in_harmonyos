@@ -1,7 +1,6 @@
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
-import os
 
 
 class CoreimageConan(ConanFile):

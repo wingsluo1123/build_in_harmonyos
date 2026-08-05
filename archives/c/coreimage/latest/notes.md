@@ -8,7 +8,7 @@
 
 ## 编译步骤
 
-1. 下载源码: https://api.github.com/repos/rahanshaber/coreimage/tarball/master
+1. 下载源码: https://api.github.com/repos/rahmanshaber/coreimage/tarball/master
 2. 应用 Qt6 兼容性补丁 (0001-qt6-compat.patch)
 3. 应用 CMakeLists.txt 补丁 (0002-add-cmake-build.patch, 使用 conan 管理依赖)
 4. conan create + conan test

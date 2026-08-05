@@ -33,5 +33,8 @@ class CoreimageTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        test_exe = os.path.join(self.cpp.build.bindirs[0], "test_coreimage")
-        self.run(test_exe, env="conanrun")
+        # R34: Execute the coreimage binary to verify the package was built correctly
+        # coreimage is a GUI app, --help should print usage and exit
+        coreimage_pkg = self.dependencies["coreimage"].package_folder
+        coreimage_exe = os.path.join(coreimage_pkg, "bin", "coreimage")
+        self.run(f'"{coreimage_exe}" --help', env="conanrun")
