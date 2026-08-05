@@ -56,7 +56,7 @@ class CryptOpensslRandomConan(ConanFile):
 
         # Step 2: Patch Makefile for OpenHarmony platform
         # R32: Platform guard — CRT fix is OHOS-specific (musl lacks CRT startup files)
-        if self.settings.os in ("Linux", "OHOS"):
+        if self.settings.os == "OHOS":
             makefile_path = os.path.join(self.source_folder, "Makefile")
             with open(makefile_path, "r") as f:
                 content = f.read()
