@@ -26,7 +26,7 @@ class CargoBinstallConan(ConanFile):
     description = "Install Rust binaries from release assets — prebuilt musl static binary"
     license = "MPL-2.0"
     homepage = "https://github.com/cargo-bins/cargo-binstall"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
