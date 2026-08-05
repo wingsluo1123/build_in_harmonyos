@@ -8,7 +8,6 @@ import ctypes
 import subprocess
 
 from conan import ConanFile
-from conan.tools.build import can_run
 
 
 class AbiwordPluginEmlTestConan(ConanFile):
@@ -21,19 +20,16 @@ class AbiwordPluginEmlTestConan(ConanFile):
         pkg_folder = self.dependencies["abiword-plugin-eml"].package_folder
         plugin_dir = os.path.join(pkg_folder, "lib", "abiword", "plugins")
 
-        # Find the eml plugin .so
+        # Find the eml plugin .so — keep full path to avoid basename/join mismatch
+        import glob
+        eml_so = []
         if os.path.isdir(plugin_dir):
-            plugins = os.listdir(plugin_dir)
-            eml_so = [p for p in plugins if "eml" in p.lower() and p.endswith(".so")]
-        else:
-            eml_so = []
+            eml_so = [os.path.join(plugin_dir, p) for p in os.listdir(plugin_dir)
+                      if "eml" in p.lower() and p.endswith(".so")]
 
         if not eml_so:
-            # Fallback: search for eml.so anywhere in the package
-            import glob
-            eml_so = [os.path.basename(p) for p in glob.glob(
-                os.path.join(pkg_folder, "**", "*eml*.so*"), recursive=True
-            )]
+            # Fallback: search anywhere in the package, keep full path
+            eml_so = glob.glob(os.path.join(pkg_folder, "**", "*eml*.so*"), recursive=True)
 
         if not eml_so:
             # Try listing the package contents for debugging
@@ -43,7 +39,7 @@ class AbiwordPluginEmlTestConan(ConanFile):
                     self.output.info(f"  {os.path.join(root, f)}")
             raise AssertionError("EML plugin .so not found in package")
 
-        so_path = os.path.join(plugin_dir if os.path.isdir(plugin_dir) else pkg_folder, eml_so[0])
+        so_path = eml_so[0]
         self.output.info(f"EML plugin found: {so_path}")
 
         # Method 1: Use readelf to verify it's a valid ELF with exported symbols
