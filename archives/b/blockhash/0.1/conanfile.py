@@ -36,8 +36,17 @@ class BlockhashConan(ConanFile):
         # Get compiler from Conan configuration (R33: no bare shell variables)
         compilers = self.conf.get("tools.build:compiler_executables", default={})
         cc = compilers.get("c", "clang")
-        # Compile in source directory where blockhash.c lives
-        self.run(f'"{cc}" -O3 -o blockhash blockhash.c -lm', cwd=self.source_folder)
+        # Set optimization flags based on build_type
+        bt = str(self.settings.build_type)
+        if bt == "Debug":
+            cflags = "-g -O0"
+        elif bt == "RelWithDebInfo":
+            cflags = "-g -O2"
+        elif bt == "MinSizeRel":
+            cflags = "-Os"
+        else:
+            cflags = "-O3"
+        self.run(f'"{cc}" {cflags} -o blockhash blockhash.c -lm', cwd=self.source_folder)
 
     def package(self):
         copy(self, "blockhash", self.source_folder, os.path.join(self.package_folder, "bin"))

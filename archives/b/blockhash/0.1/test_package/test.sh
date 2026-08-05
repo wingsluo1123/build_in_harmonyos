@@ -1,3 +1,4 @@
 #!/bin/sh
+set -e
 # L1 test: verify blockhash binary is installed and functional
 blockhash --version
