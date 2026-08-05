@@ -71,7 +71,13 @@ class AdbEnhancedTestConan(ConanFile):
             self.run(f'"{adbe_bin}" --version', env="conanrun")
             self.output.info("✓ adbe --version executed successfully")
         except Exception as e:
-            self.output.warning(
-                f"adbe --version failed (likely OHOS SELinux .so loading restriction): {e}")
-            self.output.warning(
-                "This is a known platform limitation (E046), not a recipe defect.")
+            err_msg = str(e)
+            # 仅对已知的 OHOS SELinux .so 加载限制放行
+            if "Permission denied" in err_msg and "_psutil_linux.so" in err_msg:
+                self.output.warning(
+                    f"adbe --version failed (OHOS SELinux .so loading restriction E046): {e}")
+                self.output.warning(
+                    "This is a known platform limitation, not a recipe defect.")
+            else:
+                # 其他错误表明配方有实际问题，必须失败
+                raise
