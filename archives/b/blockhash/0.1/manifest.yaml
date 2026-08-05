@@ -1,5 +1,5 @@
 software: blockhash
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/0.1/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -7,29 +7,22 @@ software: blockhash
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "0.1"
 
-# 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-07"
+build_date: "2026-08-05"
+
+build_system: custom
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "https://download.savannah.nongnu.org/releases/blockhash/blockhash-0.1.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://github.com/commonsmachinery/blockhash/archive/refs/tags/0.1.tar.gz"
+  sha256: "aef300f39be2cbc1b508af15d7ddb5b851b671b27680d8b7ab1d043cc0369893"
   tar_format: tar.gz
 
 # ============================================================
@@ -37,57 +30,62 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: custom
-
-  # 构建工具
   build_tool: manual
-  
-  # 配置选项列表
+
   configure_options:
     - "使用 stb_image 替代 MagickWand（HarmonyOS 适配）"
-  
-  # 编译依赖列表（格式: name/version）
+
   dependencies:
-    - stb_image/2.29 (单头文件库，已内嵌)
-  
-  # 编译器
+    - stb_image (单头文件库，已内嵌，无外部依赖)
+
   cc: clang
   cxx: clang++
-  
-  # 编译命令
-  compile_command: "clang -O3 -DVERSION='\"0.3.2-harmonyos\"' -o build/blockhash blockhash.c -lm"
+
+  compile_command: "clang -O3 -o blockhash blockhash.c -lm"
 
 # ============================================================
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied:
-  - "0001-use-stb-image.patch"
+  - "0001-blockhash.c.patch"
 
 # ============================================================
 # HarmonyOS 适配说明
 # ============================================================
 
 harmonyos_adaptation:
-  reason: "原版依赖 MagickWand (ImageMagick)，ImageMagick 编译在 HMDFS 上有权限问题"
+  reason: "原版依赖 MagickWand (ImageMagick)，ImageMagick 不在制品仓中且依赖链过长"
   solution: "使用 stb_image.h 单头文件库替代 MagickWand，无外部依赖"
   changes:
     - "移除 MagickWand 头文件引用"
     - "添加 stb_image.h（单头文件图像加载库）"
     - "修改 process_image() 使用 stbi_load()"
     - "移除 MagickWandGenesis/Terminus"
-    - "版本号改为 0.3.2-harmonyos"
+    - "添加 translate_blocks_to_bits 函数改进哈希质量"
+    - "修复 median 计算中的索引错误"
+    - "修复 void main 为 int main"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
-  - "E064: HMDFS 上 autotools configure 有权限问题，临时目录创建失败"
-  - "解决方案: 使用 clang-wrapper 自动签名 conftest 可绕过权限问题"
   - "替代方案: 使用 stb_image 替代 MagickWand 避免复杂依赖链"
   - "stb_image 是单头文件库，无需编译，直接 #include 即可使用"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/blockhash-0.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/blockhash-0.1.work
+  source_orig_hash: 16c1df5d37a17b0f
+  source_work_hash: ce2079b4857e6d74
+  generated_at: '2026-08-05T08:56:43'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-blockhash.c.patch
+    type: portability
+    platform_only: True
+    guard: none
