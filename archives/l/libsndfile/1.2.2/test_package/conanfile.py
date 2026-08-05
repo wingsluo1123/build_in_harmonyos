@@ -1,6 +1,6 @@
+import os
 from conan import ConanFile
-from conan.tools.cmake import CMakeDeps, CMakeToolchain, cmake_layout
-
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 class SndfileTestConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
@@ -13,9 +13,11 @@ class SndfileTestConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
-    def test(self):
-        from conan.tools.cmake import CMake
+    def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        cmake.test()
+
+    def test(self):
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} -c './test_sndfile'", env="conanrun")
