@@ -1,0 +1,48 @@
+--- a/src/os/shared.rs
++++ b/src/os/shared.rs
+@@ -6,21 +6,21 @@
+ 
+ use anyhow::{anyhow, bail};
+ use crossterm::event::{read, Event};
+ use itertools::Itertools;
+ use log::{debug, warn};
+ use pnet::datalink::{self, Channel::Ethernet, Config, DataLinkReceiver, NetworkInterface};
+ use tokio::runtime::Runtime;
+ 
+ use crate::{network::dns, os::errors::GetInterfaceError, OsInputOutput};
+ 
+-#[cfg(any(target_os = "android", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+ use crate::os::linux::get_open_sockets;
+ #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+ use crate::os::lsof::get_open_sockets;
+ #[cfg(target_os = "windows")]
+ use crate::os::windows::get_open_sockets;
+ 
+ #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+ pub struct ProcessInfo {
+     pub name: String,
+     pub pid: u32,
+@@ -213,21 +213,21 @@
+     })
+ }
+ 
+ #[inline]
+ #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+ fn eperm_message() -> &'static str {
+     "Insufficient permissions to listen on network interface(s). Try running with sudo."
+ }
+ 
+ #[inline]
+-#[cfg(any(target_os = "android", target_os = "linux"))]
++#[cfg(any(target_os = "android", target_os = "linux", target_os = "ohos"))]
+ fn eperm_message() -> &'static str {
+     r#"
+     Insufficient permissions to listen on network interface(s). You can work around
+     this issue like this:
+ 
+     * Try running `bandwhich` with `sudo`
+ 
+     * Build a `setcap(8)` wrapper for `bandwhich` with the following rules:
+         `cap_sys_ptrace,cap_dac_read_search,cap_net_raw,cap_net_admin+ep`
+     "#

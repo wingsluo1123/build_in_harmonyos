@@ -4,10 +4,10 @@
 set -euo pipefail
 
 echo "[step] bandwhich --version"
-bandwhich --version && echo "[ok] --version passed" || {
-    echo "[step] --version failed, trying --help..."
-    bandwhich --help > /dev/null 2>&1 && echo "[ok] --help passed" || {
-        echo "[fail] bandwhich failed both --version and --help"
+bandwhich --version && echo "        [ok] --version passed" || {
+    echo "        [fail] --version failed, trying --help..."
+    bandwhich --help > /dev/null 2>&1 && echo "        [ok] --help passed" || {
+        echo "        [fail] bandwhich failed both --version and --help"
         exit 1
     }
 }
