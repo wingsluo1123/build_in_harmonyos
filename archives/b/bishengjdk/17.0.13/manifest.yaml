@@ -1,0 +1,62 @@
+# 版本级 manifest
+# 文件位置: archives/b/bishengjdk/17.0.13/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "17.0.13"
+software: "bishengjdk"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-05"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://mirrors.huaweicloud.com/kunpeng/archive/compiler/bisheng_jdk/bisheng-jdk-17.0.13-linux-aarch64.tar.gz"
+  sha256: "8ff88725454aaa53524a5b838ebceb626f3d209a265d150a285e99f6fa640df3"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 预编译二进制包，非源码编译
+  system: custom
+
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "glibc_compat.c"
+  # glibc-to-musl 适配: ELF interpreter patch + NEEDED entry replacement
+  # + glibc compatibility shim library (libgcompat.so)
+  # + binary-sign-tool self-signing
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "BiSheng JDK Linux aarch64 二进制是 glibc 编译，HarmonyOS 使用 musl"
+  - "需要 patchelf 修改 interpreter (ld-linux-aarch64.so.1 -> ld-musl-aarch64.so.1)"
+  - "需要 patchelf 替换 NEEDED entries (libc.so.6 -> libc.so 等)"
+  - "需要 glibc 兼容层 (libgcompat.so) 提供 __getpagesize, malloc_trim 等缺失符号"
+  - "所有 ELF 文件需要 binary-sign-tool -selfSign 1 自签名 (E083)"
+  - "创建 musl 兼容符号链接 (libc.so -> /lib/ld-musl-aarch64.so.1)"
