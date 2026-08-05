@@ -63,7 +63,7 @@ class DevcontainerConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Step 1: Install npm dependencies without running native build scripts
-        self.run("npm install --ignore-scripts", env="conanbuild")
+        self.run("npm install --ignore-scripts", cwd=self.source_folder, env="conanbuild")
 
         # Step 2: Build node-pty native module with node-gyp
         node_pty = os.path.join(self.source_folder, "node_modules", "node-pty")
@@ -77,7 +77,7 @@ class DevcontainerConan(ConanFile):
         )
 
         # Step 3: Compile TypeScript/JavaScript via esbuild
-        self.run("npm run compile", env="conanbuild")
+        self.run("npm run compile", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
         libdir = os.path.join(self.package_folder, "lib", "devcontainer")
