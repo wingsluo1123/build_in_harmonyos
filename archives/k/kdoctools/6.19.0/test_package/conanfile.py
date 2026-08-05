@@ -27,8 +27,10 @@ class KDocToolsTestConan(ConanFile):
         if not binary_ok:
             raise Exception("meinproc binary not found in package")
 
-        # 编译测试源文件（C 编译器标识符 gcc/clang 均是对应二进制名）
-        cc = str(self.settings.compiler)
+        # 编译测试源文件：优先使用 VirtualBuildEnv 设置的 CC 环境变量
+        # （OHOS 交叉编译时为 aarch64-linux-ohos-clang），未设置时回退
+        # settings.compiler 名称（gcc/clang 均为对应二进制名）
+        cc = os.environ.get("CC", str(self.settings.compiler))
         src = os.path.join(self.source_folder, "src", "test_kdoctools.c")
         test_bin = os.path.join(self.build_folder, "test_kdoctools")
         self.run(f"{cc} -o {test_bin} {src}")
