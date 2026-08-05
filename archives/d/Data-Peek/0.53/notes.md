@@ -126,12 +126,11 @@ ohc-run.py package Data-Peek 0.53
 | 链接参数 | `-nostartfiles --sysroot=... -L... -l:libunwind.a -lc` | `-nostartfiles -nodefaultlibs -lc` |
 | 需要库路径 | ✅ 需要 sysroot 和 llvm 路径 | 可能已通过其他方式解决 |
 | 编译状态 | built | built |
-
----
-
-**编译结束**: 2026-06-10 15:59
-**最终状态**: built (编译成功，补丁固化，打包完成)
 ---
 
 **编译结束**: 2026-06-10 16:00
+**最终状态**: built
+---
+
+**编译结束**: 2026-08-06 06:00
 **最终状态**: built

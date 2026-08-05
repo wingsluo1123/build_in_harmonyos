@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: data-peek/0.53
+homepage: "https://metacpan.org/pod/Data::Peek"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "perl Makefile.PL && make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/10_DDumper.t
+    source: Data-Peek-0.53/t/10_DDumper.t
+    description: "上游 DDumper 函数测试"
+    command: "perl -Iblib/lib -Iblib/arch t/10_DDumper.t"
+  - file: t/20_DPeek.t
+    source: Data-Peek-0.53/t/20_DPeek.t
+    description: "上游 DPeek 函数测试"
+    command: "perl -Iblib/lib -Iblib/arch t/20_DPeek.t"
+  - file: t/50_DDual.t
+    source: Data-Peek-0.53/t/50_DDual.t
+    description: "上游 DDual 函数测试"
+    command: "perl -Iblib/lib -Iblib/arch t/50_DDual.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_data_peek.sh
+    description: "消费者测试：加载 Data::Peek 模块并调用 DPeek + DDumper API"
+    command: "sh test_data_peek.sh <perl_lib>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
