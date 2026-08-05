@@ -63,6 +63,8 @@ class FluentBitTestConan(ConanFile):
         os.environ["FLUENT_BIT_BIN"] = bin
         # self.run() satisfies the L0d destructive gate: the test genuinely
         # executes and depends on the fluent-bit package being present.
-        self.run(os.path.join(self.build_folder, "test_fluent_bit"))
+        # Quote the path: build_folder may contain spaces/parens (e.g. a
+        # workspace named "... (1)") which would break the shell invocation.
+        self.run('"%s"' % os.path.join(self.build_folder, "test_fluent_bit"))
         cmake = CMake(self)
         cmake.test()

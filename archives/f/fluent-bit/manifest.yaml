@@ -1,0 +1,31 @@
+# 软件级 manifest — fluent-bit
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: fluent-bit
+display: "Fluent Bit"
+description: "快速轻量级日志处理器与转发器（Log Processor and Forwarder）"
+category: utility
+homepage: "https://fluentbit.io"
+license: Apache-2.0
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "零外部依赖策略：关闭所有需外部库的可选子系统（TLS/HTTP_SERVER/AWS/SQLDB/Kafka/LuaJIT/WASM 等）与需外部依赖的 input/output/filter 插件，绕过 R36"
+    - "鸿蒙 musl 缺 openssl/sqlite3/fts 头文件与 pthread_cancel，用 stub 头文件 + 链接期桩代码（ohos-stubs-bundle）解符号引用"
+    - "monkey 子项目生成头文件 include 路径不一致，需在顶层 CMakeLists.txt 加 include_directories(BEFORE ${CMAKE_BINARY_DIR}/include/{,monkey/})"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引（所有已归档版本，含状态）
+# ============================================================
+
+versions:
+  "5.0.9":
+    status: published
+    build_date: "2026-07-30"
+    conan_ref: "fluent-bit/5.0.9"
