@@ -12,11 +12,13 @@ class AwscauthTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-        self.requires("aws-c-common/0.12.6")
-        self.requires("aws-c-cal/0.9.13")
-        self.requires("aws-c-sdkutils/0.2.4")
-        self.requires("aws-c-io/0.26.3")
-        self.requires("aws-c-http/0.10.14")
+        self.requires("aws-c-common/0.14.3")
+        self.requires("aws-c-cal/0.9.15")
+        self.requires("aws-c-sdkutils/0.2.7")
+        self.requires("aws-c-io/0.27.5")
+        self.requires("aws-c-http/0.11.0")
+        self.requires("aws-c-compression/0.3.2")
+        self.requires("aws-lc/5.4.0")
 
     def layout(self):
         cmake_layout(self)
@@ -27,4 +29,7 @@ class AwscauthTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run(os.path.join(self.cpp.build.bindirs[0], "test_aws-c-auth"), env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
+        test_binary = os.path.join(self.cpp.build.bindir, "test_aws-c-auth")
+        self.run(test_binary, env="conanrun")
