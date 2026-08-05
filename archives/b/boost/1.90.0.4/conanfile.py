@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for Boost 1.90.0.1 Morpheus compiled components."""
+"""Conan recipe for Boost 1.90.0.4 Morpheus compiled components."""
 
 import glob
 import os
@@ -84,7 +84,7 @@ class BoostConan(ConanFile):
             # 实证：1.90.0.2 起 numeric_conversion 就是错的，一直没人发现，
             # 因为它被别的库当依赖捎带进来了；而 interval/odeint/ublas 没人捎带，头就真缺了。
             # 前三个 + interval/odeint/ublas 都是 header-only（INTERFACE 库），
-            # 加进来零编译开销；**regex 是编译型**，是本次唯一有实际构建成本的。
+            # 加进来零编译开销；**regex 和 date_time 是编译型**，有实际构建成本。
             "format;multi_array;ptr_container;date_time;regex;"
             "numeric/interval;numeric/odeint;numeric/ublas"
         )

@@ -11,8 +11,10 @@ find_package(Boost REQUIRED)
 add_executable(test_mailio test.cpp)
 target_link_libraries(test_mailio mailio::mailio Boost::headers)
 
-# 临时方案：CMakeDeps 将 boost INCLUDE_DIRS_RELEASE 设为空字符串。
-# 使用包文件夹变量手动添加 include 目录。
-if(DEFINED boost_PACKAGE_FOLDER_RELEASE)
-    target_include_directories(test_mailio PRIVATE ${boost_PACKAGE_FOLDER_RELEASE}/include)
-endif()
+# 临时方案：CMakeDeps 将 boost INCLUDE_DIRS 设为空字符串。
+# 使用包文件夹变量手动添加 include 目录（兼容 Release/Debug 等配置）。
+foreach(_cfg RELEASE DEBUG RELWITHDEBINFO MINSIZEREL)
+    if(DEFINED boost_PACKAGE_FOLDER_${_cfg})
+        target_include_directories(test_mailio PRIVATE ${boost_PACKAGE_FOLDER_${_cfg}}/include)
+    endif()
+endforeach()

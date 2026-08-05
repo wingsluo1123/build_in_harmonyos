@@ -7,10 +7,12 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/math/special_functions/factorials.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <boost/regex.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/tokenizer.hpp>
 
@@ -62,6 +64,20 @@ int main() {
 
     boost::tokenizer<boost::escaped_list_separator<char>> tokens(csv);
     failures += std::distance(tokens.begin(), tokens.end()) != 3;
+
+    // date_time component verification (compiled library)
+    boost::gregorian::date epoch(1970, 1, 1);
+    boost::gregorian::date today(2026, 8, 5);
+    failures += epoch.year() != 1970 || today.year() != 2026;
+    boost::gregorian::date_duration duration = today - epoch;
+    failures += duration.days() <= 0;
+
+    // regex component verification (header-only, validates CMakeDeps target)
+    boost::regex email_pattern(R"((\w+)@(\w+)\.(\w+))");
+    std::string email("user@example.com");
+    boost::smatch email_matches;
+    failures += !boost::regex_match(email, email_matches, email_pattern);
+    failures += email_matches[1] != "user" || email_matches[2] != "example" || email_matches[3] != "com";
 
     return failures;
 }
