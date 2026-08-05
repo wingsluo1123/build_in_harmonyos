@@ -101,6 +101,13 @@ class GadapConan(ConanFile):
         self.buildenv_info.prepend_path("PKG_CONFIG_PATH",
                                          f"{pkg_prefix}/lib/pkgconfig")
         self.output.info(f"PKG_CONFIG_PATH={pkg_prefix}/lib/pkgconfig")
+        # E002: /tmp 只读 — configure 编译测试程序时 clang 需可写 TMPDIR，
+        # CI 干净环境下 TMPDIR 指向只读路径会导致
+        # "clang: error: unable to make temporary file: Read-only file system"
+        tmpdir = os.path.expanduser("~/tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        self.buildenv_info.define("TMPDIR", tmpdir)
+        self.output.info(f"TMPDIR={tmpdir}")
 
     def _ensure_system_deps(self):
         """Install missing system libraries from cmd-pkgs.
@@ -157,6 +164,12 @@ class GadapConan(ConanFile):
                     f"Failed to install system dependency {pkg} {ver} from cmd-pkgs: {e}")
 
     def build(self):
+        # E002: /tmp 只读 — configure 编译测试程序时 clang 需可写 TMPDIR，
+        # CI 干净环境下 TMPDIR 指向只读路径会报
+        # "clang: error: unable to make temporary file: Read-only file system"
+        tmpdir = os.path.expanduser("~/tmp")
+        os.makedirs(tmpdir, exist_ok=True)
+        os.environ["TMPDIR"] = tmpdir
         # CI worker 干净环境无 libdap/curl/libtirpc 预编译包，先自动安装
         self._ensure_system_deps()
         apply_conandata_patches(self)
