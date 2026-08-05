@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(test_agg CXX)  # agg is template-only C++; test.c uses agg::pod_array
+project(test_agg CXX)  # agg is template-only C++; test.cpp uses agg::pod_array
 
 # Find the package via Conan-generated CMakeDeps
 find_package(agg REQUIRED)

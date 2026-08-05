@@ -1,4 +1,4 @@
-// test_package/test.c — R34: substantive agg API test
+// test_package/test.cpp — R34: substantive agg API test
 // Exercises agg::pod_array<int> (core container, no platform deps),
 // verifying libagg headers link correctly. C++ required (agg is template-only).
 #include <agg2/agg_array.h>
