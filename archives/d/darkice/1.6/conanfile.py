@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Conan recipe for darkice 1.6 — live audio streamer.
+
+darkice is a CLI application (not a library). It uses autotools but the
+upstream source (SVN-imported GitHub repo) ships only configure.in, so
+autoreconf -fi must be run before configure.
+
+Key adaptation notes:
+- Source is in darkice/trunk/ subdirectory (SVN-imported repo structure)
+- autoreconf needs ACLOCAL_PATH with pkg.m4 for PKG_CHECK_MODULES
+- autoconf's config.status uses umask 077 which triggers SELinux denial
+  on HarmonyOS; patch configure to use umask 022 instead
+- lame and faac detection uses LA_SEARCH_LIB (not pkg-config), needs
+  --with-lame-prefix pointing to the dependency's package folder
+"""
+
+import os
+import shutil
+
+from conan import ConanFile
+from conan.tools.files import get, export_conandata_patches, replace_in_file
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.layout import basic_layout
+
+
+class DarkiceConan(ConanFile):
+    name = "darkice"
+    version = "1.6"
+    description = "DarkIce is a live audio streamer that records audio from an audio interface and streams it to an Icecast or ShoutCast server"
+    license = "GPL-3.0"
+    homepage = "https://github.com/rafael2k/darkice"
+    url = ""
+
+    package_type = "application"
+
+    settings = "os", "compiler", "build_type", "arch"
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        # Override libogg version: flac/1.4.3 needs 1.3.5, libvorbis/1.3.7
+        # needs 1.3.6 — force 1.3.6 for all to resolve the conflict.
+        self.requires("libogg/1.3.6", override=True)
+        self.requires("libvorbis/1.3.7")
+        self.requires("opus/1.5.2.1")
+        self.requires("flac/1.4.3")
+        self.requires("lame/4.0")
+        # alsa-lib: available as cmd-pkg (system library), not as conan package.
+        # configure auto-detects via pkg-config.
+
+    def layout(self):
+        basic_layout(self)
+
+    def source(self):
+        # The tarball is from a SVN-imported GitHub repo; it extracts to
+        # rafael2k-darkice-<hash>/ containing darkice/trunk/ (the actual
+        # source), darkice-gui/trunk/, website/, etc.
+        get(self, **self.conan_data["sources"], strip_root=False)
+        src_folder = self.source_folder
+        for entry in os.listdir(src_folder):
+            if entry.startswith("rafael2k-darkice"):
+                trunk = os.path.join(src_folder, entry, "darkice", "trunk")
+                if os.path.isdir(trunk):
+                    for item in os.listdir(trunk):
+                        shutil.move(os.path.join(trunk, item),
+                                    os.path.join(src_folder, item))
+                    # Remove the now-empty wrapper directory tree
+                    shutil.rmtree(os.path.join(src_folder, entry))
+                    break
+
+    def generate(self):
+        tc = AutotoolsToolchain(self)
+        # Enable conan-managed features (required — will fail if not found)
+        tc.configure_args.append("--with-vorbis")
+        tc.configure_args.append("--with-opus")
+        tc.configure_args.append("--with-flac")
+        # lame uses LA_SEARCH_LIB (not pkg-config), needs prefix
+        lame_dep = self.dependencies["lame"]
+        tc.configure_args.append("--with-lame")
+        tc.configure_args.append("--with-lame-prefix={}".format(lame_dep.package_folder))
+        # Auto-detect for non-conan system deps (alsa, faac, fdk-aac, jack,
+        # samplerate): configure will enable if found, silently disable if not.
+        # Explicitly disable truly unavailable deps (no conan recipe, no cmd-pkg)
+        tc.configure_args.append("--without-twolame")
+        tc.configure_args.append("--without-pulseaudio")
+        tc.generate()
+
+    def build(self):
+        # Source ships only configure.in; run autoreconf to generate
+        # configure, Makefile.in, config.guess, etc.
+        # PKG_CHECK_MODULES requires pkg.m4 on ACLOCAL_PATH.
+        aclocal_paths = []
+        for p in [
+            "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
+            os.path.expanduser("~/usr/local/share/aclocal"),
+            "/usr/local/share/aclocal",
+            "/usr/share/aclocal",
+        ]:
+            if os.path.isdir(p) and p not in aclocal_paths:
+                aclocal_paths.append(p)
+        existing = os.environ.get("ACLOCAL_PATH", "")
+        if existing:
+            aclocal_paths.append(existing)
+        os.environ["ACLOCAL_PATH"] = ":".join(aclocal_paths)
+
+        # Also ensure system pkg-config path covers cmd-pkg installs
+        # (alsa, faac, fdk-aac, jack, samplerate) so configure auto-detect works.
+        sys_pkg = os.path.expanduser("~/usr/local/lib/pkgconfig")
+        cur_pkg = os.environ.get("PKG_CONFIG_PATH", "")
+        if sys_pkg not in cur_pkg:
+            os.environ["PKG_CONFIG_PATH"] = sys_pkg + (":" + cur_pkg if cur_pkg else "")
+
+        # Run autoreconf in the source folder (not build folder)
+        src = self.source_folder
+        self.run(f'cd "{src}" && autoreconf -fi', env="conanbuild")
+
+        # Fix: autoconf's config.status uses umask 077 when creating temp
+        # directories, which triggers SELinux denial on HarmonyOS (E046).
+        # Patch the generated configure script to use umask 022 instead.
+        replace_in_file(self, os.path.join(src, "configure"),
+                        "umask 077", "umask 022")
+
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make(args=["-j1"])
+
+    def package(self):
+        autotools = Autotools(self)
+        autotools.install()
+
+    def package_info(self):
+        self.cpp_info.bindirs = ["bin"]

@@ -1,12 +1,12 @@
 software: darkice
 version: "1.6"
 status: published
-build_date: "2026-05-29"
+build_date: "2026-08-06"
 build_system: autotools
 
 source:
   url: "https://api.github.com/repos/rafael2k/darkice/tarball/v1.6"
-  sha256: ""
+  sha256: "9eb2adac1999e6da0552e59ff7b0cba0a360b382934ec5f16a5cf5061badd15e"
   tar_format: tar.gz
 
 build:
@@ -15,101 +15,93 @@ build:
     - "--with-vorbis"
     - "--with-opus"
     - "--with-flac"
-    - "--with-alsa"
-    - "--without-lame"
-    - "--without-faac"
-    - "--without-fdkaac"
+    - "--with-lame"
     - "--without-twolame"
     - "--without-pulseaudio"
-    - "--without-jack"
   dependencies:
-    - ogg
-    - vorbis
-    - opus
-    - flac
-    - alsa
+    - libogg (conan)
+    - libvorbis (conan)
+    - opus (conan)
+    - flac (conan)
+    - lame (conan)
+    - alsa-lib (system cmd-pkg, auto-detected)
   cc: clang
   cxx: clang++
   bootstrap: "autoreconf -fi (需要ACLOCAL_PATH包含pkg.m4)"
 
-patches_applied:
-  - "0001-Makefile.in.patch"
-  - "0002-man-Makefile.in.patch"
-  - "0003-src-Makefile.in.patch"
-  - "0004-src-config.h.in.patch"
-  - "0005-INSTALL.patch"
-  - "0006-aclocal.m4.patch"
-  - "0007-compile.patch"
-  - "0008-config.guess.patch"
-  - "0009-config.sub.patch"
-  - "0010-depcomp.patch"
-  - "0011-install-sh.patch"
-  - "0012-missing.patch"
+conan:
+  recipe: conanfile.py
+  conandata: conandata.yml
+  test_package: test_package/
+  commands_json: true
+
+patches_applied: []
 
 knowledge_gained:
-  - "SVN-imported仓库的源码在darkice/trunk/子目录中，init-build嵌套检测可能选择错误子目录"
+  - "SVN-imported仓库的源码在darkice/trunk/子目录中，conanfile.py source()需要手动提取"
   - "autoreconf需要ACLOCAL_PATH设置pkg.m4才能正确展开PKG_CHECK_MODULES"
-  - "pulseaudio共享库不完整（缺libpulsecommon），建议不启用"
+  - "autoconf的config.status使用umask 077在HarmonyOS上触发SELinux拒绝(E046)，需patch为umask 022"
+  - "darkice对lame/faac使用LA_SEARCH_LIB而非pkg-config检测，需--with-lame-prefix指向依赖包目录"
+  - "libogg版本冲突：flac/1.4.3需要1.3.5，libvorbis/1.3.7需要1.3.6，用override=True解决"
+  - "alsa-lib/1.2.16.1 conan配方topology模块有链接错误(snd_lib_log未定义)，暂用系统cmd-pkg替代"
+  - "GitHub tarball API URL缺少.tar.gz扩展名，conan get()会误判为zip，需在conandata.yml指定filename"
+  - "twolame和pulseaudio在制品仓和cmd-pkgs中均不可用，configure时--without-*禁用"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/darkice-1.6.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/darkice-1.6.work
   source_orig_hash: 0775fcb74e7a894c
-  source_work_hash: 8cb291fea8d74987
-  generated_at: '2026-05-29T11:02:03'
-  patches_count: 13
+  source_work_hash: 5e10f3cb46e73108
+  generated_at: '2026-08-06T06:20:42'
+  patches_count: 12
 
 patch_classification:
-  - file: 0001-.patch-ai-review.txt.patch
+  - file: 0001-Makefile.in.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0002-Makefile.in.patch
+  - file: 0002-man-Makefile.in.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0003-man-Makefile.in.patch
+  - file: 0003-src-Makefile.in.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0004-src-Makefile.in.patch
+  - file: 0004-src-config.h.in.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0005-src-config.h.in.patch
+  - file: 0005-INSTALL.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0006-INSTALL.patch
+  - file: 0006-aclocal.m4.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0007-aclocal.m4.patch
+  - file: 0007-compile.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0008-compile.patch
+  - file: 0008-config.guess.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0009-config.guess.patch
+  - file: 0009-config.sub.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0010-config.sub.patch
+  - file: 0010-depcomp.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0011-depcomp.patch
+  - file: 0011-install-sh.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0012-install-sh.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0013-missing.patch
+  - file: 0012-missing.patch
     type: auto
     platform_only: True
     guard: 'pending'
