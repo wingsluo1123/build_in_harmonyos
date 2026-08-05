@@ -1,10 +1,14 @@
+software: csvq
 version: "1.18.1"
 status: built
 build_date: "2026-06-12"
+build_system: go
+conan_date: "2026-08-06"
 
 source:
   url: "https://github.com/mithrandie/csvq/archive/refs/tags/v1.18.1.tar.gz"
   tar_format: tar.gz
+  sha256: "69f98d0d26c055cbe4ebfe2cedf79c744bebafac604ea55fb0081826b1ac7b74"
 
 build:
   system: go
@@ -14,6 +18,7 @@ build:
     - "GOARCH=arm64"
   dependencies:
     - go >= 1.21
+  go_build_flags: "-tags urfave_cli_no_docs -trimpath -ldflags=-X github.com/mithrandie/csvq/lib/query.Version=v1.18.1 -s -w"
 
 patches_applied: []
 
@@ -21,3 +26,5 @@ knowledge_gained:
   - "csvq 是 Go 语言项目，标准 CGO_ENABLED=0 go build 流程编译"
   - "无补丁，源码无需修改即可编译"
   - "SQL 查询引擎功能验证通过（WHERE、ORDER BY、COUNT、AVG 等聚合函数）"
+  - "Go 编译器需要通过 Harmonybrew 安装（预签名二进制），goenv 安装的 Go 无法执行（E128）"
+  - "Conan 配方使用 package_type=application，build() 直接调用 go build"
