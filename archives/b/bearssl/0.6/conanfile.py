@@ -3,10 +3,9 @@
 
 BearSSL uses a custom Makefile with configuration files in conf/.
 Build: make CONF=Ohos lib  (static library)
-The conf/Ohos.mk is generated in build() to configure clang for OHOS.
+The conf/Ohos.mk is generated in generate() to configure clang for OHOS.
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches
@@ -19,7 +18,7 @@ class BearsslConan(ConanFile):
     description = "Optimized SSL/TLS library for embedded systems, pure C with no external dependencies"
     license = "MIT"
     homepage = "https://www.bearssl.org/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -50,6 +49,7 @@ class BearsslConan(ConanFile):
                 'CC = clang\n'
                 'LD = clang\n'
                 'LDDLL = clang\n'
+                'AR = llvm-ar\n'
             )
 
     def build(self):
