@@ -5,21 +5,50 @@
 package: libvisio/0.1.11
 homepage: "https://github.com/LibreOffice/libvisio"
 
-# 上游测试命令 (make check requires cppunit, disabled via --disable-tests)
+# 上游测试命令 (make check requires cppunit)
 upstream_check_command: "make check"
 
 # conanfile.py build() 方法中是否已集成上游测试
+# 上游测试需要 cppunit，鸿蒙平台无 cppunit，故 --disable-tests 禁用
 upstream_test_in_build: false
-upstream_test_command: ""
+upstream_test_command: "make check (requires cppunit, not available on OHOS)"
 
-# 上游实际运行的测试程序 (disabled via --disable-tests, no cppunit)
-upstream_tests: []
+# 上游实际运行的测试程序
+# 源码: src/test/Makefile.am
+# tests = importtest unittest
+# unittest_SOURCES = VSDInternalStreamTest.cpp VSDXMLHelperTest.cpp (9 CPPUNIT_TEST cases)
+# importtest_SOURCES = importtest.cpp xmldrawinggenerator.cpp (37 data files)
+upstream_tests:
+  - file: src/test/VSDInternalStreamTest.cpp
+    source: libvisio-0.1.11/src/test/VSDInternalStreamTest.cpp
+    description: "VSDInternalStream 单元测试 (5 CPPUNIT_TEST cases)"
+    command: "./unittest"
+  - file: src/test/VSDXMLHelperTest.cpp
+    source: libvisio-0.1.11/src/test/VSDXMLHelperTest.cpp
+    description: "VSDXMLHelper 单元测试 (4 CPPUNIT_TEST cases)"
+    command: "./unittest"
+  - file: src/test/importtest.cpp
+    source: libvisio-0.1.11/src/test/importtest.cpp
+    description: "导入测试，使用 37 个 .vsd/.vsdx/.wmf/.png 数据文件验证解析"
+    command: "./importtest"
+  - file: src/test/data/
+    source: libvisio-0.1.11/src/test/data/
+    description: "37 个测试数据文件 (.vsd/.vsdx/.wmf/.png)"
+    command: "importtest 使用"
+
+# 上游测试未运行原因：cppunit 在鸿蒙平台不可用，--disable-tests 禁用
+# 测试程序总数: 2 (unittest + importtest)
+# 单元测试用例: 9 (VSDInternalStreamTest 5 + VSDXMLHelperTest 4)
+# 导入测试数据: 37 个文件
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.cpp
-    description: "Consumer test: verifies libvisio API can be linked and called"
+    description: "消费者测试: 创建 RVNGStringStream 并调用 VisioDocument::isSupported() API"
     command: "./test_libvisio"
 
 # 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 1
+# 上游 unittest: 9 CPPUNIT_TEST cases (未运行)
+# 上游 importtest: ~63 test assertions with 37 data files (未运行)
+# test_package: 1 assertion (isSupported() returns false for non-Visio data)
+assertion_count: 10
