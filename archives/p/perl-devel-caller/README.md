@@ -1,4 +1,4 @@
-# Devel-Caller
+# perl-devel-caller
 
 Devel::Caller is a Perl module that provides utilities for accessing the call stack and caller information in Perl programs.
 
@@ -10,19 +10,18 @@ This module provides enhanced access to caller information beyond what Perl's bu
 
 | Version | Status | Date |
 |---------|--------|------|
-| 2.07 | built | 2026-06-11 |
+| 2.07 | built | 2026-08-06 |
 
 ## Dependencies
 
-- Perl 5.42.0
-- PadWalker 2.5
-- musl 1.2.5
+- perl 5.42.2
+- perl-padwalker 2.5-r5
 
 ## Known Limitations
 
 1. **XS Module Loading**: The XS module (Caller.so) cannot be loaded from HMDFS due to SELinux restrictions. Requires administrator installation to system directory `/data/service/hnp/`.
 
-2. **Compilation Requirements**: Requires special linker flags (`-nostartfiles -nodefaultlibs -lc`) and environment variables (`CPATH`, `LIBRARY_PATH`) for musl compatibility.
+2. **Compilation Requirements**: Requires special linker flags (`-nostartfiles -nodefaultlibs -lc`) and system header include paths (OHOS SDK sysroot) for OHOS compatibility.
 
 ## Usage
 
