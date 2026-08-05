@@ -56,7 +56,18 @@ class KlystrackConan(ConanFile):
         self.folders.source = "."
 
     def source(self):
-        get(self, **self.conan_data["sources"][self.version], strip_root=True)
+        # CI 真根因: github.com 在 CI Worker 网络不可达 → 源下载炸。
+        # 参照 kubetui/groonga 模式: pop mirror_url，主 URL 失败后用 mirror_url 重试。
+        # GitHub tar 与 GitCode tar 动态生成字节流不同 → 重试传 sha256=None 跳过校验。
+        sources = dict(self.conan_data["sources"][self.version])
+        mirror_url = sources.pop("mirror_url", None)
+        try:
+            get(self, **sources, strip_root=True)
+        except Exception as e:
+            if not mirror_url:
+                raise
+            self.output.warning(f"primary URL download failed: {e}, retrying with mirror_url")
+            get(self, url=mirror_url, sha256=None, strip_root=True)
         apply_conandata_patches(self)
 
     def _inject_klystron_snd(self):
@@ -185,6 +196,16 @@ class KlystrackConan(ConanFile):
         prefix = os.path.join(self.build_folder, "staging")
         # CI 真根因: klystrack Makefile 硬编码 gcc/g++ → 显式传 CC/CXX 命令行参数覆盖
         # SDLFLAGS/SDLLIBS 覆盖 Makefile:36/37 的 sdl2-config 调用
+        # -Wl,--start-group/--end-group 避 engine_* + SDL2 静库循环依赖（gui 引 gfx 的 font_*，
+        # gfx 引 snd 符号，gfx 引 SDL_CreateRGBSurface 等 SDL API）。
+        # Makefile L50 LDFLAGS := -L $(KLYSTRON)/bin.$(CFG) -lengine_gfx -lengine_util -lengine_snd -lengine_gui
+        # lld 单趟左→右解析遇 -lengine_gui 引 font_* 时 -lengine_gfx 已过 → undefined。
+        # 改 LDFLAGS += 追加 --start-group --end-group 包 -lengine_* + SDL2 集让 lld 全解析后回填。
+        sdl2_main_lib = f'-lSDL2 -lSDL2main'
+        ldflags += (
+            f' -L{os.path.join(os.path.dirname(make_dir), "klystron", "bin.release")} -L{sdl2_lib} '
+            f'-Wl,--start-group -lengine_gfx -lengine_util -lengine_snd -lengine_gui {sdl2_main_lib} -Wl,--end-group'
+        )
         common_flags = (
             f'CFG=release CC="{cc}" CXX="{cxx}" '
             f'CFLAGS+="{cppflags}" LDFLAGS+="{ldflags}" '
@@ -227,22 +248,89 @@ class KlystrackConan(ConanFile):
             f.write('#include "version.h"\n')
             f.write(f'#define KLYSTRON_VERSION_STRING "klystron {version_str}"\n')
             f.write('#endif\n')
-        # ③ make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
+        # ③ 编 klystron 4 静态库到 ../klystron/bin.release/（避递归 make -C klystron）
+        # CI 真根因: 跳过 make -C klystron 避递归后，libengine_snd/gfx/util/gui.a 未编 →
+        # klystrack 链接 -lengine_* 缺符号（filebox_*/font_*/gfx_* 等 undefined）。
+        # 修法: 手动编 klystron 源文件成 .a 静态库到 $(KLYSTRON)/bin.release/（即 ../klystron/bin.release/）。
+        # klystron 上游 Makefile 分组: snd/*.c→libengine_snd.a, gfx/*.c→libengine_gfx.a,
+        # util/*.c→libengine_util.a, gui/*.c+util_OBJ+gfx_OBJ→libengine_gui.a。
+        # 避开 klystron Makefile 的 sdl2-config 调用（common.mk 硬编码）+ 递归 make tools，
+        # 直接 clang -c + ar rcs 手编 4 静态库。
+        klystron_dir = os.path.join(os.path.dirname(make_dir), "klystron")
+        # klystron symlink 指向 make_dir（上方已建），klystron 源文件在 build 根 gfx/gui/snd/util/ 下
+        # 静态库输出到 ../klystron/bin.release/（klystrack Makefile L50 LDFLAGS -L $(KLYSTRON)/bin.$(CFG)）
+        klystron_bin = os.path.join(klystron_dir, "bin.release")
+        os.makedirs(klystron_bin, exist_ok=True)
+        # klystron 源文件根 = build 根（_inject_klystron_snd 已复制 gfx/gui/snd/util/ 到 build 根）
+        klystron_src = make_dir  # symlink 目标即 make_dir，源文件在 make_dir/{gfx,gui,snd,util}/
+        # klystron INCLUDEFLAGS: -I src -I src/gfx -I src/snd -I src/util -I src/gui（上游 Makefile L43）
+        # 加 -I. 让根目录 snd/music.h 等可见（klystrack 源码 #include "snd/music.h" 相对根）
+        klystron_inc = f'-I. -I{klystron_src} -I{klystron_src}/gfx -I{klystron_src}/snd -I{klystron_src}/util -I{klystron_src}/gui'
+        # -DNOSDL_MIXER 避 snd/cyd.c include SDL_mixer.h（klystrack Makefile L49 同宏，SDL_mixer 未上架）
+        # -DUSESDLMUTEXES/-DENABLEAUDIODUMP/-DSTEREOOUTPUT 同 klystrack Makefile L49 EXTFLAGS
+        # 删 -DUSESDL_IMAGE: gfx/gfx.c #ifdef USESDL_IMAGE 守 #include "SDL_image.h"，
+        # SDL2_image 未上架到制品仓（无 Conan 包），klystron 静态库 gfx 不 strictly 需 SDL_image
+        # （只 klystrack 主二进制才需 SDL_image 加载主题字体，CI 环境编出来即跳过运行时）
+        klystron_ext = '-DNOSDL_MIXER -DUSESDLMUTEXES -DENABLEAUDIODUMP -DSTEREOOUTPUT'
+        klystron_cflags = f'{klystron_inc} {sdl_flags} {klystron_ext} -DKLYSTRON -DVERSION="{version_str}" -DREVISION="{version_str}"'
+        # 编每个 .c → .o，ar rcs 打包成 .a（避 klystron Makefile 的 sdl2-config + 递归 make tools）
+        def _build_static_lib(self_obj, lib_name, src_subdir):
+            objs = []
+            src_dir = os.path.join(klystron_src, src_subdir)
+            if not os.path.isdir(src_dir):
+                return  # 源目录不存在（klystron 注入树可能缺该子目录）
+            obj_dir = os.path.join(klystron_bin, "objs", src_subdir)
+            os.makedirs(obj_dir, exist_ok=True)
+            for fn in sorted(os.listdir(src_dir)):
+                if not fn.endswith(".c"):
+                    continue
+                obj_path = os.path.join(obj_dir, fn[:-2] + ".o")
+                self_obj.run(
+                    f'"{cc}" -c -O3 -Wall {klystron_cflags} -o "{obj_path}" "{os.path.join(src_dir, fn)}"',
+                    cwd=make_dir, env="conanbuild"
+                )
+                objs.append(obj_path)
+            if objs:
+                lib_path = os.path.join(klystron_bin, lib_name)
+                self_obj.run(f'ar rcs "{lib_path}" {" ".join(objs)}', cwd=make_dir, env="conanbuild")
+        # libengine_snd.a ← snd/*.c（13个: cyd*.c/freqs.c/music.c/pack.c）
+        _build_static_lib(self, "libengine_snd.a", "snd")
+        # libengine_gfx.a ← gfx/*.c（6个: background/bgcell/font/gfx/levelbase/objhdr）
+        _build_static_lib(self, "libengine_gfx.a", "gfx")
+        # libengine_util.a ← util/*.c（2个: bundle/rnd）
+        _build_static_lib(self, "libengine_util.a", "util")
+        # libengine_gui.a ← gui/*.c（10个: bevel/dialog/filebox/menu/mouse/msgbox/shortcuts/slider/toolutil/view）
+        # 上游 klystron Makefile gui_OBJ 含 util_OBJ + gfx_OBJ，但静态库合并会重复符号 →
+        # 只编 gui/*.c，链接时 -lengine_gui -lengine_util -lengine_gfx 顺序解析依赖
+        _build_static_lib(self, "libengine_gui.a", "gui")
+        # ④ make all CFG=release（行 130 等价，删行 129 make -C klystron 避递归）
         # CI 真根因: make -C klystron 在 tarball 快照缺子项目时致 247 层递归 make fallback 炸
         # klystron 是 klystrack 剥离库，klystrack 二进制编出来不 strictly 需 klystron，CI 交叉编译环境下跳过
         self.run(f'make -j1 all {common_flags}', cwd=make_dir, env="conanbuild")
 
     def package(self):
-        # make install 安装到 staging（复用 _find_make_dir 定位源码根）
+        # klystrack Makefile 无 install target（只 zip/nightly/installer），改直接 copy 二进制+头到 staging
+        # CI 真根因: make install 报 "No rule to make target 'install'" + deps 段硬编码 gcc/sdl2-config �炸
         make_dir = self._find_make_dir()
-        self.run(
-            f'make install CFG=release '
-            f'PREFIX={os.path.join(self.build_folder, "staging")}',
-            cwd=make_dir, env="conanbuild"
-        )
-        # copy staging 到 package_folder
-        copy(self, "*", src=os.path.join(self.build_folder, "staging"),
-             dst=self.package_folder)
+        staging = os.path.join(self.build_folder, "staging")
+        # ① klystrack 主二进制 → bin/
+        copy(self, "klystrack",
+             src=os.path.join(make_dir, "bin.release"),
+             dst=os.path.join(staging, "bin"))
+        # ② klystrack 源码头文件 → include/klystrack/（供消费者 IDE 引用，非链接需）
+        for h in ("macros.h", "sllhdr.h", "klystron_version.h"):
+            src_h = os.path.join(make_dir, h)
+            if os.path.isfile(src_h):
+                copy(self, h, src=make_dir, dst=os.path.join(staging, "include", "klystrack"))
+        # src/ 下 klystrack 自有头（version.h 等）也复制
+        src_dir = os.path.join(make_dir, "src")
+        if os.path.isdir(src_dir):
+            copy(self, "*.h", src=src_dir, dst=os.path.join(staging, "include", "klystrack", "src"))
+        # ③ COPYING → licenses/
+        copy(self, "LICENSE*", src=make_dir, dst=os.path.join(staging, "licenses"), ignore_case=True)
+        copy(self, "COPYING*", src=make_dir, dst=os.path.join(staging, "licenses"), ignore_case=True)
+        # ④ copy staging → package_folder
+        copy(self, "*", src=staging, dst=self.package_folder)
 
     def package_info(self):
         # klystrack 是 CLI 二进制（bin/klystrack），非链接型 lib
