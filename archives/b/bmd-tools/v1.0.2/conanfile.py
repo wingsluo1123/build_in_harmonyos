@@ -101,15 +101,23 @@ class BmdToolsConan(ConanFile):
         if not (os.path.isfile(sign_tool) and os.path.isfile(objcopy)):
             self.output.warning("ELF signing tools not found; skipping.")
             return
-        subprocess.run(
-            [objcopy, "--remove-section", ".codesign", path],
-            check=False, capture_output=True, timeout=10,
-        )
+        try:
+            subprocess.run(
+                [objcopy, "--remove-section", ".codesign", path],
+                check=False, capture_output=True, timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            self.output.warning(f"ELF objcopy timed out for {os.path.basename(path)}; skipping signing.")
+            return
         tmp = path + ".signed"
-        r = subprocess.run(
-            [sign_tool, "sign", "-inFile", path, "-outFile", tmp, "-selfSign", "1"],
-            capture_output=True, text=True, timeout=30,
-        )
+        try:
+            r = subprocess.run(
+                [sign_tool, "sign", "-inFile", path, "-outFile", tmp, "-selfSign", "1"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except subprocess.TimeoutExpired:
+            self.output.warning(f"ELF signing timed out for {os.path.basename(path)}; skipping.")
+            return
         if r.returncode == 0 and os.path.exists(tmp):
             os.replace(tmp, path)
             os.chmod(path, 0o755)
