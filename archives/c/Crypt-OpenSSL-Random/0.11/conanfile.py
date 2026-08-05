@@ -62,8 +62,8 @@ class CryptOpensslRandomConan(ConanFile):
                 content = f.read()
 
             content = re.sub(
-                r"^LDDLFLAGS = -shared -O2 -fstack-protector-strong$",
-                "LDDLFLAGS = -shared -nostartfiles -nodefaultlibs -lc -O2 -fstack-protector-strong",
+                r"^(LDDLFLAGS = -shared)",
+                r"\1 -nostartfiles -nodefaultlibs -lc",
                 content,
                 flags=re.MULTILINE,
             )

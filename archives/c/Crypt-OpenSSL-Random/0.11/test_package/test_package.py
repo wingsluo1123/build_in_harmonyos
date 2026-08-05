@@ -19,7 +19,7 @@ def main():
     errors = []
 
     # Check Random.so exists and is valid ELF
-    if not os.path.exists(so_path):
+    if not os.path.isfile(so_path):
         errors.append(f"Random.so not found at {so_path}")
     else:
         with open(so_path, "rb") as f:
@@ -28,7 +28,7 @@ def main():
                 errors.append(f"Random.so is not valid ELF (magic: {magic})")
 
     # Check Random.pm exists and has version
-    if not os.path.exists(pm_path):
+    if not os.path.isfile(pm_path):
         errors.append(f"Random.pm not found at {pm_path}")
     else:
         with open(pm_path, "r") as f:
