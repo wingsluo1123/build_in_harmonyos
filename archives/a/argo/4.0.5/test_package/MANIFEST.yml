@@ -1,0 +1,24 @@
+package: argo/4.0.5
+homepage: https://github.com/argoproj/argo-workflows
+
+# argo is a Go CLI tool. Upstream test suite requires Kubernetes cluster and
+# is not feasible in CI. CI runs `go test ./...` but most packages require
+# network/K8s resources. Consumer test validates the binary directly.
+upstream_test_in_build: false
+upstream_tests: []
+
+# Consumer test: run packaged `argo version` and `argo help`, assert exit 0
+# and stable keywords.
+test_package_tests:
+  - file: test.sh
+    description: "Run argo version and argo help; assert exit 0 and version/subcommand keywords"
+    command: "bash test.sh <bin/argo>"
+
+# Assertions in test.sh:
+#   1. exit code of `argo version` is 0
+#   2. version output contains "v4.0.5"
+#   3. exit code of `argo help` is 0
+#   4. help output contains "submit"
+#   5. help output contains "list"
+#   6. help output contains "lint"
+assertion_count: 6
