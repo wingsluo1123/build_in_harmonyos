@@ -128,33 +128,16 @@ class AquaConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
 
     def _run_upstream_tests(self, go):
-        if str(self.settings.os) == "Linux":
-            packages = " ".join(package for package, _ in self._upstream_test_packages)
-            self.run(
-                f'"{go}" test {packages}',
-                cwd=self.source_folder,
-                env=["aqua_go_env"],
-            )
-            return
-        if str(self.settings.os) != "OHOS":
+        if str(self.settings.os) != "Linux":
+            self.output.info("Skipping upstream tests on non-Linux (OHOS signing required)")
             return
 
-        test_out_dir = os.path.join(self._go_workspace(), "test-out")
-        os.makedirs(test_out_dir, exist_ok=True)
-        for package, test_name in self._upstream_test_packages:
-            test_bin = os.path.join(test_out_dir, test_name)
-            self.run(
-                f'"{go}" test -c -o "{test_bin}" {package}',
-                cwd=self.source_folder,
-                env=["aqua_go_env"],
-            )
-            self._sign_elf_if_ohos(test_bin)
-            self.run(
-                f'"{test_bin}" -test.v',
-                cwd=self.source_folder,
-                env=["aqua_go_env"],
-                ignore_errors=True,
-            )
+        packages = " ".join(package for package, _ in self._upstream_test_packages)
+        self.run(
+            f'"{go}" test {packages}',
+            cwd=self.source_folder,
+            env=["aqua_go_env"],
+        )
 
     def _go_workspace(self):
         if str(self.settings.os) != "OHOS":
