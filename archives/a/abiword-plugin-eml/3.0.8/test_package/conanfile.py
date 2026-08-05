@@ -68,7 +68,13 @@ class AbiwordPluginEmlTestConan(ConanFile):
         except subprocess.TimeoutExpired:
             self.output.warning("readelf timed out, skipping ELF verification")
 
-        # Method 2: Use ctypes to attempt loading the .so
+        # Method 2: Use ctypes to attempt loading the .so (native only)
+        # P1: can_run() 交叉编译守卫必须在 try 块外——否则交叉编译时 ctypes.CDLL
+        # 加载 aarch64 .so 会在 import 期崩溃,守卫需先于 try 拦截。
+        from conan.tools.build import can_run
+        if not can_run(self):
+            self.output.info("Cross-compiling detected, skipping ctypes.CDLL load test")
+            return
         self.output.info("Attempting to load .so with ctypes.CDLL...")
         try:
             lib = ctypes.CDLL(so_path)
@@ -94,12 +100,7 @@ class AbiwordPluginEmlTestConan(ConanFile):
                 raise AssertionError("abi_plugin_unregister symbol not found in .so")
             self.output.info("  [ok] abi_plugin_unregister symbol is available")
 
+        # P2: 记录 OSError 错误详情(errno + strerror),不丢弃诊断信息
         except OSError as e:
-        # Method 2: Use ctypes to attempt loading the .so (native only)
-        from conan.tools.build import can_run
-        if not can_run(self):
-            self.output.info("Cross-compiling detected, skipping ctypes.CDLL load test")
-            return
-        self.output.info("Attempting to load .so with ctypes.CDLL...")
-        try:
-            lib = ctypes.CDLL(so_path)
+            self.output.warning(f"ctypes.CDLL({so_path}) failed: errno={e.errno} {e.strerror}")
+            raise AssertionError(f"Failed to load .so via ctypes.CDLL: errno={e.errno} {e.strerror}") from e
