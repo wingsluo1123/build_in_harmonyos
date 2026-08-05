@@ -15,6 +15,11 @@ class AwsCHttpTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        self.requires("aws-c-common/0.14.3")
+        self.requires("aws-c-io/0.27.5")
+        self.requires("aws-c-compression/0.3.2")
+        self.requires("aws-c-cal/0.9.15")
+        self.requires("aws-lc/5.4.0")
 
     def layout(self):
         cmake_layout(self)

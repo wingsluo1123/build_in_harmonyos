@@ -15,8 +15,8 @@ class AwsccalTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-        # Explicitly require transitive deps so CMakeDeps generates their configs
         self.requires("aws-c-common/0.14.3")
+        self.requires("aws-lc/5.4.0")
 
     def layout(self):
         cmake_layout(self)
@@ -28,5 +28,6 @@ class AwsccalTestConan(ConanFile):
 
     def test(self):
         cmake = CMake(self)
-        # Run the test binary directly to ensure it executes on the target platform
-        self.run(os.path.join(self.cpp.build.bindirs[0], "test_aws_c_cal"), env="conanrun")
+        cmake.test()
+        test_binary = os.path.join(self.cpp.build.bindirs[0], "test_aws_c_cal")
+        self.run(test_binary, env="conanrun")
