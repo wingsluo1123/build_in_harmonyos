@@ -9,7 +9,6 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
-from conan.tools.gnu import PkgConfigDeps
 
 
 class VipsTestConan(ConanFile):
@@ -22,11 +21,14 @@ class VipsTestConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
-    def build(self):
-        # On OHOS, system dependencies (glib, etc.) are in /usr/local
+    def generate(self):
+        # Add system pkg-config path for OHOS system dependencies (glib, etc.)
         if self.settings.os in ("Linux", "OHOS"):
-            pc_path = "/storage/Users/currentUser/usr/local/lib/pkgconfig"
-            os.environ["PKG_CONFIG_PATH"] = pc_path + ":" + os.environ.get("PKG_CONFIG_PATH", "")
+            home_pc = os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "pkgconfig")
+            if os.path.isdir(home_pc):
+                self.conf_info.append("tools.gnu:pkg_config_path", home_pc)
+
+    def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
@@ -36,8 +38,14 @@ class VipsTestConan(ConanFile):
         binary = os.path.join(self.cpp.build.bindirs[0], "test_vips")
         try:
             self.run('"' + binary + '"')
-        except Exception:
-            self.output.warning(
-                "Test binary compiled and linked successfully. "
-                "Runtime failure expected on OHOS (E088: musl namespace)."
-            )
+        except Exception as e:
+            err_msg = str(e).lower()
+            # E088: musl namespace prevents loading shared libraries at runtime.
+            # Exit code 127 = shared library not found (dynamic linker failure)
+            if "127" in err_msg or "namespace" in err_msg or "library" in err_msg or ".so" in err_msg:
+                self.output.warning(
+                    "Test binary compiled and linked successfully. "
+                    "Runtime failure expected on OHOS (E088: musl namespace)."
+                )
+            else:
+                raise

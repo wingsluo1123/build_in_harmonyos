@@ -4,7 +4,7 @@
 - 构建系统: meson
 - 编译日期: 2026-07-10
 - 编译器: clang 15.0.4 / clang++ 15.0.4 (LLVM)
-- 状态: published（conan-verify 全部通过）
+- 状态: built（conan-verify 全部通过，未上传制品仓）
 
 ## 依赖安装
 

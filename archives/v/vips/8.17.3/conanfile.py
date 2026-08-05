@@ -6,6 +6,7 @@ System dependencies (glib, pcre2, libffi, libjpeg, libwebp, lcms2, expat, zlib)
 are pre-installed via cmd-pkgs on OHOS.
 """
 import os
+import shutil
 import hashlib
 import tarfile
 
@@ -21,9 +22,13 @@ class VipsConan(ConanFile):
     description = "High-performance image processing library"
     license = "LGPL-2.1+"
     homepage = "https://libvips.github.io/libvips/"
-    url = ""  # CI fills this
+    url = "https://github.com/libvips/libvips"
 
     settings = "os", "compiler", "build_type", "arch"
+    package_type = "library"
+
+    options = {"shared": [True, False]}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -88,7 +93,7 @@ class VipsConan(ConanFile):
                         downloaded = True
                         break
                 except Exception:
-                    self.output.warn("Download failed: {}".format(url))
+                    self.output.warning("Download failed: {}".format(url))
                     if os.path.exists(download_path):
                         os.remove(download_path)
             if not downloaded:
@@ -115,19 +120,6 @@ class VipsConan(ConanFile):
                     os.path.join(self.source_folder, item),
                 )
             os.rmdir(extracted_path)
-
-    @staticmethod
-    def _verify_sha256(filepath, expected):
-        if not expected or expected == "REPLACE_WITH_ACTUAL_SHA256":
-            return True
-        h = hashlib.sha256()
-        with open(filepath, "rb") as f:
-            while True:
-                chunk = f.read(65536)
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest() == expected
 
     def generate(self):
         tc = MesonToolchain(self)
@@ -156,10 +148,34 @@ class VipsConan(ConanFile):
         # and add -Wl,-rpath for clean install RUNPATH
         native_ini = os.path.join(self.generators_folder, "conan_meson_native.ini")
         if os.path.isfile(native_ini):
-            sdk_bin = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin"
-            ar_path = os.path.join(sdk_bin, "llvm-ar")
-            sys_pc = "/storage/Users/currentUser/usr/local/lib/pkgconfig"
+            # Find llvm-ar: check PATH first, then derive from compiler dir
+            ar_path = shutil.which("llvm-ar")
+            if not ar_path:
+                cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "")
+                if cc and os.path.isfile(cc):
+                    candidate = os.path.join(os.path.dirname(cc), "llvm-ar")
+                    if os.path.isfile(candidate):
+                        ar_path = candidate
+                if not ar_path:
+                    ar_path = "llvm-ar"
+            # Find system pkgconfig: check user home, then standard paths
+            home_pc = os.path.join(os.path.expanduser("~"), "usr", "local", "lib", "pkgconfig")
+            sys_pc = home_pc if os.path.isdir(home_pc) else "/usr/local/lib/pkgconfig"
             rpath_flag = "-Wl,-rpath,$ORIGIN/../lib"
+            # Extra link flags for static transitive deps not in pkg-config
+            home_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
+            extra_flags = []
+            if os.path.isdir(home_lib):
+                extra_flags.append("-L{}".format(home_lib))
+            for lib in ("libintl", "libsharpyuv"):
+                static_lib = os.path.join(home_lib, lib + ".a")
+                if os.path.isfile(static_lib):
+                    extra_flags.append(static_lib)
+                elif any(os.path.isfile(os.path.join(home_lib, lib + ext))
+                         for ext in (".a", ".so")):
+                    extra_flags.append("-l{}".format(lib[3:]))
+            all_flags = [rpath_flag] + extra_flags
+            flags_str = ", ".join("'{}'".format(f) for f in all_flags)
             with open(native_ini, "r") as f:
                 lines = f.readlines()
             out = []
@@ -174,12 +190,20 @@ class VipsConan(ConanFile):
                         "pkg_config_path = '",
                         "pkg_config_path = '{}:".format(sys_pc),
                     ))
-                # Add rpath to C link args
+                # Add rpath and extra link flags to C link args
                 elif line.strip().startswith("c_link_args ="):
-                    out.append(line.rstrip().rstrip("]") + ", '{}']\n".format(rpath_flag))
-                # Add rpath to C++ link args
+                    stripped = line.rstrip()
+                    if stripped.endswith("[]"):
+                        out.append(stripped[:-1] + flags_str + "]\n")
+                    else:
+                        out.append(stripped.rstrip("]") + ", " + flags_str + "]\n")
+                # Add rpath and extra link flags to C++ link args
                 elif line.strip().startswith("cpp_link_args ="):
-                    out.append(line.rstrip().rstrip("]") + ", '{}']\n".format(rpath_flag))
+                    stripped = line.rstrip()
+                    if stripped.endswith("[]"):
+                        out.append(stripped[:-1] + flags_str + "]\n")
+                    else:
+                        out.append(stripped.rstrip("]") + ", " + flags_str + "]\n")
                 else:
                     out.append(line)
             with open(native_ini, "w") as f:
@@ -226,8 +250,22 @@ class VipsConan(ConanFile):
                                 )
                             )
                 except Exception as e:
-                    self.output.warn("patchelf on {}: {}".format(fname, e))
+                    self.output.warning("patchelf on {}: {}".format(fname, e))
 
     def package_info(self):
         self.cpp_info.libs = ["vips"]
+        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("pkg_config_name", "vips")
+
+    @staticmethod
+    def _verify_sha256(filepath, expected):
+        if not expected:
+            raise Exception("sha256 not set in conandata.yml")
+        h = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            while True:
+                chunk = f.read(65536)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest() == expected

@@ -12,24 +12,21 @@ package: vips/8.17.3
 homepage: "https://libvips.github.io/libvips/"
 
 # 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
-upstream_check_command: "make check"
+upstream_check_command: "meson test"
 
 # conanfile.py build() 方法中是否已集成上游测试
 upstream_test_in_build: false
 upstream_test_command: ""
 
 # 上游实际运行的测试程序
-upstream_tests:
-  - file: <TODO: 测试源文件>
-    source: vips-8.17.3/<TODO: 测试源文件>
-    description: "<TODO: 测试描述>"
-    command: "./<TODO: 测试程序>"
+# vips meson test 套件需要完整依赖链（libtiff, libpng 等），本适配禁用了这些格式
+upstream_tests: []
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.c
-    description: "消费者测试"
+    description: "消费者测试：调用 vips_init/vips_version_string/vips_shutdown 验证库可用性"
     command: "./test_vips"
 
 # 测试断言总数 (近似值, 用于质量评估)
-assertion_count: <TODO: 断言数>
+assertion_count: 1
