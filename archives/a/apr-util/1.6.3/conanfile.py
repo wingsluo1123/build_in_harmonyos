@@ -5,13 +5,13 @@ Build system: autotools (configure + make).
 License: Apache-2.0
 Homepage: https://apr.apache.org/
 
-Dependencies: apr/1.7.6, expat/2.7.1
+Dependencies: apr/1.7.6, expat/2.8.2.1
 """
 import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, load, save
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -48,10 +48,11 @@ class AprUtilConan(ConanFile):
 
     def requirements(self):
         self.requires("apr/1.7.6")
-        self.requires("expat/2.7.1")
+        self.requires("expat/2.8.2.1")
 
     def layout(self):
-        basic_layout(self)
+        basic_layout(self, src_folder=".")
+        self.folders.build = "."
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -75,51 +76,27 @@ class AprUtilConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
 
-        # Fix libtool: when --prefix=/ (Conan DESTDIR convention), libtool
-        # generates hardcoded library search paths. Fix the generated libtool
-        # script to use the correct Conan package paths.
-        self._fix_libtool_paths()
+        # Fix //build-1 paths: apr-1-config returns //build-1 due to --prefix=/
+        apr_prefix = self.dependencies["apr"].package_folder
+        correct_builddir = os.path.join(apr_prefix, "build-1")
+        for fname in ["Makefile", os.path.join("build", "rules.mk")]:
+            fpath = os.path.join(self.build_folder, fname)
+            if os.path.exists(fpath):
+                content = load(self, fpath)
+                content = content.replace("//build-1", correct_builddir)
+                save(self, fpath, content)
+
+        # Also fix //lib, //include, //bin paths from apr-1-config
+        for fname in ["Makefile", os.path.join("build", "rules.mk")]:
+            fpath = os.path.join(self.build_folder, fname)
+            if os.path.exists(fpath):
+                content = load(self, fpath)
+                content = content.replace("//lib", os.path.join(apr_prefix, "lib"))
+                content = content.replace("//include", os.path.join(apr_prefix, "include"))
+                content = content.replace("//bin", os.path.join(apr_prefix, "bin"))
+                save(self, fpath, content)
 
         autotools.make(args=["-j1"])
-
-    def _fix_libtool_paths(self):
-        """Fix libtool script for HarmonyOS/Conan --prefix=/ convention.
-
-        The generated libtool script has sys_lib_search_path_spec that may
-        not include Conan dependency library paths. Prepend our dependency
-        paths to ensure the linker can find all required libraries.
-        """
-        libtool_path = os.path.join(self.source_folder, "libtool")
-        if not os.path.exists(libtool_path):
-            return
-
-        with open(libtool_path, "r") as f:
-            content = f.read()
-
-        # Build the library search path from all dependencies
-        lib_paths = []
-        for dep_name in ["apr", "expat"]:
-            dep = self.dependencies.get(dep_name)
-            if dep:
-                for libdir in dep.cpp_info.aggregated_components().libdirs:
-                    abs_dir = os.path.join(dep.package_folder, str(libdir))
-                    if os.path.isdir(abs_dir):
-                        lib_paths.append(abs_dir)
-
-        if lib_paths:
-            search_path = ":".join(lib_paths)
-            # Find the original sys_lib_search_path_spec value and prepend our paths
-            old_pattern = 'sys_lib_search_path_spec="'
-            if old_pattern in content:
-                idx = content.index(old_pattern) + len(old_pattern)
-                # Find the closing quote
-                end_idx = content.index('"', idx)
-                original_value = content[idx:end_idx]
-                new_value = f"{search_path}:{original_value}"
-                content = content[:idx] + new_value + content[end_idx:]
-                with open(libtool_path, "w") as f:
-                    f.write(content)
-                self.output.info("Fixed libtool library search paths")
 
     def package(self):
         autotools = Autotools(self)
