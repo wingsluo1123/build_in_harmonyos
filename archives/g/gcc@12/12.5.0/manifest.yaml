@@ -1,0 +1,90 @@
+software: gcc@12
+version: 12.5.0
+status: partial
+build_system: autotools
+compile_date: 2026-07-30
+issue: TBD
+source:
+  url: "https://ftp.gnu.org/gnu/gcc/gcc-12.5.0/gcc-12.5.0.tar.xz"
+  sha256: "71cd373d0f04615e66c5b5b14d49c1a4c1a08efa7b30625cd240b11bab4062b3"
+  size: 85897368
+dependencies:
+  required:
+    - gmp/6.3.0
+    - mpfr/4.2.2
+    - mpc/1.3.1
+  optional:
+    - isl
+patches_applied: []
+test_results:
+  type: remote_single_package_with_resume
+  total: 5
+  passed: 3
+  failed: 2
+  details:
+    - name: fresh_conan_create
+      status: failed
+      reason: "Current runner timeout killed the fresh conan create after the build phase and before package(); no deterministic compiler failure remained."
+      log: "/storage/Users/currentUser/ohos-users/codex/gcc12-12.5.0-20260804-192814/repo/build_in_harmonyos/.ci_logs/conan_build_gcc@12_12.5.0.log"
+    - name: conan_export_pkg_resume
+      status: passed
+      result: "EXPORT_PKG_RC=0; package() and test_package completed from the existing build cache."
+      log: "/storage/Users/currentUser/ohos-users/codex/gcc12-12.5.0-20260804-192814/resume-export-pkg-gcc12.log"
+    - name: upstream_subset
+      status: passed
+      result: "32/32 upstream GCC execution subset tests passed on OHOS."
+      report: "reports/upstream-test-results.md"
+    - name: dejagnu_probe
+      status: passed
+      result: "DejaGnu/Tcl/Expect bootstrap plus OHOS board probe passed 16/16 checks for gcc.c-torture/execute/20000112-1.c, including execution and -O3 -g."
+      log: "/storage/Users/currentUser/ohos-users/codex/gcc12-12.5.0-20260804-192814/conan-home/p/b/gcc12e130de926e59f/b/build/gcc/testsuite/gcc/gcc.sum"
+    - name: dejagnu_full
+      status: failed
+      result: "Full make -k check RUNTESTFLAGS=\"--target_board=ohos-gcc\" was attempted from the completed build cache but did not complete cleanly; no rc file was produced, make-check.log stopped at a Musl FD_SETSIZE abort, and the partial gcc.sum snapshot had PASS=27266, FAIL=4012, UNRESOLVED=3992."
+      log: "/storage/Users/currentUser/ohos-users/codex/gcc12-12.5.0-20260804-192814/dejagnu-full-ohos-20260805-164112/make-check.log"
+upstream_test_results:
+  scope: "GCC upstream execution subset plus DejaGnu bootstrap/probe; full DejaGnu was attempted but interrupted before a complete result and is not reported as a full-suite pass rate."
+  total: 32
+  passed: 32
+  failed: 0
+  pass_rate: "100.0%"
+  report: "reports/upstream-test-results.md"
+consumer_test_results:
+  scope: "Conan test_package C and C++ smoke"
+  total: 2
+  passed: 2
+  failed: 0
+  pass_rate: "100.0%"
+knowledge_ref: []
+notes:
+  - "Issue number was not found in local project files; keep issue as TBD until task owner confirms it."
+  - "Archive path keeps the task name gcc@12; Conan recipe name is gcc12 because conan create/export rejects @ in package names."
+  - "Software-level commands.json was added under archives/g/gcc@12/ for CLI tool metadata; version 12.5.0 maps to Conan ref gcc12/12.5.0."
+  - "W0 rechecked on 2026-07-31: mpfr/4.2.2 is now published in ohpcd with an OHOS armv8 package."
+  - "W0 rechecked on 2026-08-04: mpc/1.3.1 is now published in ohpcd with an OHOS armv8 package and depends on mpfr/4.2.Z."
+  - "Remote single-package build on 2026-08-04 resolved gmp/mpfr/mpc and reached GCC configure, then failed because OHOS mktemp -d created an inaccessible Autoconf temp directory."
+  - "Recipe now injects an OHOS-only mktemp wrapper plus TMPDIR/TMPPREFIX/SHELL/CONFIG_SHELL for configure/make/install; manual config.status replay with the wrapper passed."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-200157-2794 passed L0k commands.json and top-level configure, then failed in libiberty/fibheap.c because LONG_MIN was undeclared after limits.h was misdetected."
+  - "Recipe now also exports ac_cv_header_limits_h=yes for OHOS configure/make/install; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-201814-15900 passed fibheap.c, then failed in libiberty/pex-unix.c because fcntl.h was misdetected and open/O_* macros were undeclared."
+  - "Recipe now also exports ac_cv_header_fcntl_h=yes for OHOS configure/make/install; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-203139-27886 passed pex-unix.c and failed archiving libiberty.a because bare ar was not found."
+  - "Recipe now exports AR/RANLIB/NM/STRIP from the clang toolchain directory as llvm-ar/llvm-ranlib/llvm-nm/llvm-strip; rerun required."
+  - "Retry runner queued on 2026-08-04 after AR/RANLIB/NM/STRIP fix: /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-204445-42045."
+  - "Current runner was observed active at 2026-08-04 21:08 CST; it passed libiberty/libcpp/libcody archive steps with llvm tools and was compiling GCC frontend sources (gimple-match.cc), with no exit code yet."
+  - "Runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-204445-42045 failed linking cc1: OHOS ld.lld rejected non-PIC AArch64 host objects with improper alignment for relocation R_AARCH64_LDST64_ABS_LO12_NC."
+  - "Recipe now appends -fPIC to OHOS CFLAGS/CXXFLAGS so GCC host compiler objects are rebuilt as PIC before cc1 links; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-213845-35783 passed the cc1 link and reached xgcc/cpp, then failed in stmp-fixinc because GCC still used /usr/include for native system headers on OHOS."
+  - "Recipe now derives the OHOS sysroot from the configured clang path and passes --with-sysroot, --with-build-sysroot, and --with-native-system-header-dir=<sysroot>/usr/include; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-222849-39415 confirmed sysroot propagation but failed stmp-fixinc with a doubled sysroot path."
+  - "Recipe now keeps --with-native-system-header-dir=/usr/include while passing --with-sysroot/--with-build-sysroot so GCC composes the effective header directory as <sysroot>/usr/include; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260804-230847-25437 passed stmp-fixinc and then failed configuring target libgcc because xgcc's generated as wrapper had no real assembler behind it."
+  - "Recipe now creates an OHOS-only recipe-local as wrapper around clang -c -x assembler, passes it via AS/AS_FOR_TARGET and --with-as, and exports LLVM ld/objcopy/objdump/readelf tools; rerun required."
+  - "Retry runner /storage/Users/currentUser/ohos-test-runs/codex-12.5.0-gcc12-12.5.0-20260804-192814-conan-20260805-000659-61216 used the clang assembler wrapper, then target libgcc configure failed because clang integrated assembler rejected GCC-generated .eh_frame/.debug_str section flag changes under default -g unwind-producing conftest flags."
+  - "Manual xgcc probe passed with target flags -O2 -fPIC -g0 -fno-asynchronous-unwind-tables -fno-unwind-tables; recipe now exports these through CFLAGS_FOR_TARGET/CXXFLAGS_FOR_TARGET; rerun required."
+  - "Formal Conan continuation on 2026-08-05 succeeded with conan export-pkg from the completed build cache: package() and test_package both passed, including C and C++ smoke executables."
+  - "Upstream subset testing on 2026-08-05 passed 32/32 official GCC execution tests: 20 gcc.c-torture/execute C tests and 12 g++.dg/rtti C++ dg-do-run tests. Full DejaGnu was initially blocked because runtest/expect were unavailable on the validation device, then attempted after an on-device Tcl/Expect/DejaGnu bootstrap."
+  - "DejaGnu bootstrap on 2026-08-05 built Tcl 8.6.14, Expect 5.45.4, and DejaGnu 1.6.3 on the validation device, then added OHOS shims/board handling for read-only /tmp, missing stty, code-sign flags, and multiarch sysroot includes."
+  - "Recipe assembler wrapper now also normalizes GCC-generated .debug_str,\"\",@progbits to .debug_str,\"MS\",@progbits,1 so clang's integrated assembler accepts upstream -g test assembly."
+  - "DejaGnu probe passed 16/16 expected checks for gcc.c-torture/execute/20000112-1.c with --target_board=ohos-gcc, including execution tests and -O3 -g."
+  - "Full DejaGnu make -k check RUNTESTFLAGS=\"--target_board=ohos-gcc\" was attempted from the completed build cache, but the run stopped without an rc file after make-check.log reported Musl Fortify runtime error: file descriptor 5138 >= FD_SETSIZE 1024. The partial gcc.sum snapshot had PASS=27266, FAIL=4012, UNRESOLVED=3992 and is recorded only as incomplete evidence, not as a full-suite pass rate."

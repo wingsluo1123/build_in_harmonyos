@@ -1,0 +1,28 @@
+package: "gcc12/12.5.0"
+homepage: "https://gcc.gnu.org/"
+
+upstream_check_command: "make -k check"
+upstream_test_in_build: false
+upstream_test_command: "make -k check-gcc check-target-libgcc check-target-libstdc++-v3"
+upstream_test_result: "32/32 (100.0%) upstream execution subset; full DejaGnu attempted after on-device DejaGnu bootstrap but interrupted by FD/resource exhaustion before complete results."
+
+upstream_tests:
+  - file: gcc/testsuite/
+    source: gcc-12.5.0/gcc/testsuite/
+    description: "GCC DejaGnu compiler tests; deferred to single-package OHOS/shadow CI because the suite is large and requires target runner coordination."
+    command: "make -k check-gcc"
+  - file: libstdc++-v3/testsuite/
+    source: gcc-12.5.0/libstdc++-v3/testsuite/
+    description: "libstdc++ DejaGnu tests for the C++ runtime; deferred to single-package OHOS/shadow CI."
+    command: "make -k check-target-libstdc++-v3"
+
+test_package_tests:
+  - file: test.c
+    description: "Runs packaged gcc --version, compiles a C program, and executes it."
+    command: "gcc test.c -o gcc12_c_smoke && ./gcc12_c_smoke"
+  - file: test.cpp
+    description: "Runs packaged g++ if present, compiles a C++ program using std::string/iostream, and executes it."
+    command: "g++ test.cpp -o gcc12_cxx_smoke && ./gcc12_cxx_smoke"
+
+assertion_count: 6
+result: "2/2 consumer smoke executables passed on OHOS via conan export-pkg continuation."
