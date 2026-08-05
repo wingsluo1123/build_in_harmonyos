@@ -52,8 +52,33 @@ $ ~/usr/local/bin/aliyun version
 - G0验证不适用于Go/custom构建系统
 - 子模块需单独下载（tarball不含git submodule）
 - TMPDIR=/data/storage/el2/base/cache (R10铁律)
-
 ---
 
-**编译结束**: 2026-06-03 11:00
-**最终状态**: published
+**编译结束**: 2026-08-05 19:18
+**最终状态**: built
+---
+
+**编译结束**: 2026-08-05 19:27
+**最终状态**: built
+
+## Conan 适配 (2026-08-05)
+
+### 变更内容
+- 新增 conanfile.py — Go 项目 Conan 配方
+- 新增 conandata.yml — 源码 URL + sha256
+- 新增 test_package/ — 测试包 (conanfile.py + test.sh + MANIFEST.yml)
+- 新增 commands.json — 软件级命令行工具声明 (R38)
+- 新增 README.md — 软件级描述
+- 更新 manifest.yaml — status 改为 published, 添加 sha256
+
+### Conan 配方要点
+- package_type = application (CLI 工具)
+- Go SDK 自动检测和下载 (支持 OHOS ELF 签名)
+- aliyun-openapi-meta 子模块作为 conandata.yml 中的 meta 源
+- CGO_ENABLED=1, 版本注入 via -ldflags -X
+- CI 镜像 fallback: conandata.yml 使用单值 url 格式, CI 自动添加镜像
+- 测试: aliyun version 输出 3.0.229
+
+### 验证结果
+- conan-verify: G1-G4 + L2/L4/L5 全部 PASS
+- W3 本地 CI 模拟: setup.sh + build_and_test.sh 全部 PASS
