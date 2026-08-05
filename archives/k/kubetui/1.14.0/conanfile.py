@@ -80,6 +80,9 @@ class KubetuiConan(ConanFile):
         except ConanException:
             self.output.warning("rust install via cmd-pkgs failed (Download failed), trying fallback paths")
             # 多路径 fallback: 系统 cargo / rustup / local cargo / rustc
+            # aireview P2: rustup 回退缺交叉编译目标说明 — CI 真根因是 rustup 工具链本身缺非目标未配
+            # rustup target add aarch64-unknown-linux-ohos 需 rustup 真存在才调，此处只检测 rustup 存在性
+            # 交叉编译目标在 cargo build 段用 --target aarch64-unknown-linux-ohos 显式传（line 99）
             for cmd in ("cargo --version", "rustup --version", "$HOME/.cargo/bin/cargo --version", "rustc --version"):
                 try:
                     self.run(cmd, cwd=self.source_folder, shell=True)
