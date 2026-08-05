@@ -15,6 +15,7 @@ self-signed with binary-sign-tool before execution.
 """
 
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -276,7 +277,6 @@ class CiliumCliConan(ConanFile):
 
     @staticmethod
     def _go_host_arch():
-        import platform
         m = platform.machine()
         if m in ("x86_64", "amd64"):
             return "amd64"
