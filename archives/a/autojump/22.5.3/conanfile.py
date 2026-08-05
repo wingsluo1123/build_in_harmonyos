@@ -35,12 +35,13 @@ class AutojumpConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # Fix hardcoded /usr/local path in autojump.sh to use the package prefix
+        # Fix hardcoded /usr/local path in autojump.sh to use AUTOJUMP_SHARE_DIR env var
+        # set by package_info() via runenv_info, so the path resolves correctly
+        # in the consumer's Conan cache, not the build-time temporary path
         autojump_sh = os.path.join(self.source_folder, "bin", "autojump.sh")
-        prefix = self.package_folder
         replace_in_file(self, autojump_sh,
                         "/usr/local/share/autojump",
-                        os.path.join(prefix, "usr", "local", "share", "autojump"))
+                        "${AUTOJUMP_SHARE_DIR:-/usr/local/share/autojump}")
 
         # Run install.py to install files to package folder
         install_prefix = "usr/local"  # relative path (os.path.join behavior)
@@ -70,3 +71,6 @@ class AutojumpConan(ConanFile):
         share_dir = os.path.join("usr", "local", "share", "autojump")
         self.cpp_info.bindirs = [bin_dir]
         self.cpp_info.resdirs = [share_dir]
+        # Set AUTOJUMP_SHARE_DIR for autojump.sh runtime path resolution
+        full_share_dir = os.path.join(self.package_folder, "usr", "local", "share", "autojump")
+        self.runenv_info.define("AUTOJUMP_SHARE_DIR", full_share_dir)
