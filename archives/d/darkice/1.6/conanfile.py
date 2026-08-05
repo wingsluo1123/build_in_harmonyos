@@ -123,7 +123,18 @@ class DarkiceConan(ConanFile):
                         "umask 077", "umask 022")
 
         autotools = Autotools(self)
-        autotools.configure()
+        try:
+            autotools.configure()
+        except Exception as e:
+            # Print config.log tail for CI debugging
+            log_file = os.path.join(src, "config.log")
+            if os.path.exists(log_file):
+                with open(log_file) as f:
+                    lines = f.readlines()
+                print("=== config.log (last 30 lines) ===")
+                for line in lines[-30:]:
+                    print(line.rstrip())
+            raise
         autotools.make(args=["-j1"])
 
     def package(self):
