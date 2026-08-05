@@ -125,5 +125,5 @@ diff --recursive -u /path/folder_a /path/folder_b | diff-so-fancy
 5. **测试跳过**：缺少 bats 测试框架，使用功能测试替代单元测试
 ---
 
-**编译结束**: 2026-05-19 23:18
+**编译结束**: 2026-08-06 06:49
 **最终状态**: built
