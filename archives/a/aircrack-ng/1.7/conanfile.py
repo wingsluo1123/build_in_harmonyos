@@ -173,10 +173,12 @@ class AircrackNgConan(ConanFile):
         path = os.path.join(self.build_folder, "config.status")
         if not os.path.exists(path):
             return
-        content = load(self, path)
+        with open(path, "r") as f:
+            content = f.read()
         content = content.replace("umask 077 && mktemp", "umask 022 && mktemp")
         content = content.replace("umask 077 && mkdir", "umask 022 && mkdir")
-        save(self, path, content)
+        with open(path, "w") as f:
+            f.write(content)
 
     def _run_autoreconf(self):
         """Run autoreconf to generate configure script.
@@ -193,15 +195,27 @@ class AircrackNgConan(ConanFile):
         ]
 
         # Copy pkg.m4 into build/m4/ so PKG_CHECK_MODULES macro expands
-        pkg_m4_candidates = [
-            "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal/pkg.m4",
-            os.path.join(prefix, "share", "aclocal", "pkg.m4"),
-        ]
         m4_dst = os.path.join(self.source_folder, "build", "m4", "pkg.m4")
-        for candidate in pkg_m4_candidates:
-            if os.path.exists(candidate) and not os.path.exists(m4_dst):
-                shutil.copy2(candidate, m4_dst)
-                break
+        if not os.path.exists(m4_dst):
+            # Search common locations for pkg.m4
+            search_paths = [
+                "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal/pkg.m4",
+                os.path.join(prefix, "share", "aclocal", "pkg.m4"),
+                "/usr/share/aclocal/pkg.m4",
+                "/usr/local/share/aclocal/pkg.m4",
+            ]
+            # Also try finding via pkg-config --variable=pc_path
+            try:
+                result = subprocess.run(
+                    ["pkg-config", "--variable=pc_top_builddir"],
+                    capture_output=True, text=True, timeout=5
+                )
+            except Exception:
+                pass
+            for candidate in search_paths:
+                if os.path.exists(candidate):
+                    shutil.copy2(candidate, m4_dst)
+                    break
 
         # Create AC_VERSION file (needed by evalrev in configure.ac)
         ac_ver_src = os.path.join(self.source_folder, "AC_VERSION.in")
@@ -210,18 +224,15 @@ class AircrackNgConan(ConanFile):
             shutil.copy2(ac_ver_src, ac_ver_dst)
 
         # Fix automake's @am_AUTOM4TE@ variable (cmd-pkgs may not substitute it)
-        aclocal_path = os.path.join(prefix, "bin", "aclocal")
-        if os.path.exists(aclocal_path):
-            content = load(self, aclocal_path)
-            if "@am_AUTOM4TE@" in content:
-                content = content.replace("@am_AUTOM4TE@", "autom4te")
-                save(self, aclocal_path, content)
-            automake_path = os.path.join(prefix, "bin", "automake")
-            if os.path.exists(automake_path):
-                content = load(self, automake_path)
+        for tool_name in ["aclocal", "automake"]:
+            tool_path = shutil.which(tool_name) or os.path.join(prefix, "bin", tool_name)
+            if os.path.exists(tool_path):
+                with open(tool_path, "r") as f:
+                    content = f.read()
                 if "@am_AUTOM4TE@" in content:
                     content = content.replace("@am_AUTOM4TE@", "autom4te")
-                    save(self, automake_path, content)
+                    with open(tool_path, "w") as f:
+                        f.write(content)
 
         # Run autoreconf (must run in source folder where configure.ac lives)
         self.run("autoreconf -fi", env=env, cwd=self.source_folder)
@@ -229,9 +240,11 @@ class AircrackNgConan(ConanFile):
         # Patch configure: replace umask 077 with umask 022
         configure_path = os.path.join(self.source_folder, "configure")
         if os.path.exists(configure_path):
-            content = load(self, configure_path)
+            with open(configure_path, "r") as f:
+                content = f.read()
             content = content.replace("umask 077", "umask 022")
-            save(self, configure_path, content)
+            with open(configure_path, "w") as f:
+                f.write(content)
 
     def build(self):
         # Step 1: Run autoreconf to generate configure
