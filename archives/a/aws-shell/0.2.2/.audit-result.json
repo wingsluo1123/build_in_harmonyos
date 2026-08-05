@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule5_template_placeholder",
+      "file": "archives/a/aws-shell/0.2.2/conanfile.py",
+      "line": 25,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' found in conanfile.py. Code style Rule 5 explicitly forbids this pattern in merged code, listing it as an unfinished placeholder that should be filled by the adapter.",
+      "fix_suggestion": "Replace the empty url with the actual recipe repository URL, e.g. url = \"https://cnb.cool/your-org/ohos-3rdparty-archives/-/tree/main/archives/a/aws-shell/0.2.2\" or remove the url attribute entirely if not applicable."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule7_safe_mode",
+      "file": "archives/a/aws-shell/0.2.2/test_package/test.sh",
+      "line": 5,
+      "description": "Shell script uses 'set -e' only, missing '-u' (undefined variable error) and '-o pipefail' (pipe failure propagation). Code style Rule 7 requires all scripts to start with 'set -euo pipefail'.",
+      "fix_suggestion": "Change 'set -e' to 'set -euo pipefail' to catch undefined variables and pipe failures."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule14_manifest_format",
+      "file": "archives/a/aws-shell/0.2.2/manifest.yaml",
+      "line": 1,
+      "description": "Manifest field names deviate from the standard format defined in Rule 14. Uses 'software:' instead of 'name:' and nests build system as 'build.system:' instead of top-level 'build_system:'. The rule specifies: name, version, build_system, status as top-level fields.",
+      "fix_suggestion": "Rename 'software' to 'name' and either move 'build.system' to top-level 'build_system' or ensure the project schema explicitly documents this alternate format as an accepted variant."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule12_patch_description",
+      "file": "archives/a/aws-shell/0.2.2/conandata.yml",
+      "line": 9,
+      "description": "patch_description values do not follow the convention shown in Rule 12. The rule example shows patch_description starting with the patch number (e.g., '0001 build aux config.guess'), but the actual descriptions are prose-style without the patch number prefix.",
+      "fix_suggestion": "Consider prefixing patch descriptions with the patch number for consistency, e.g. '0001 Update PKG-INFO metadata format to 2.1 and add Requires-Dist' and '0002 Remove trailing blank line from entry_points.txt'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule9_output_format",
+      "file": "archives/a/aws-shell/0.2.2/test_package/test.sh",
+      "line": 0,
+      "description": "Output format in test.sh uses [ok] and [fail] markers but does not follow the [step] prefix convention with 8-space indented sub-results as specified in Rule 9. The test script outputs [ok]/[fail] without a preceding [step] line or the 8-space indent alignment.",
+      "fix_suggestion": "Consider wrapping test sections with [step] headers and indenting [ok]/[fail] results with 8 spaces for better structured output, e.g. echo '[step] Checking entry points...' then echo '        [ok] aws-shell found at: ...'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule6_shebang",
+      "file": "archives/a/aws-shell/0.2.2/test_package/test.sh",
+      "line": 1,
+      "description": "Shebang is '#!/bin/bash' instead of '#!/usr/bin/zsh' as specified in Rule 6. However, this deviation appears justified: the test_package/conanfile.py explicitly invokes bash (via CONFIG_SHELL or /data/service/hnp/bin/bash) for OHOS compatibility, and bash is the standard shell on the target platform.",
+      "fix_suggestion": "This is an acceptable deviation for OHOS platform compatibility. No change needed unless the project standard is strictly enforced."
+    }
+  ],
+  "summary": "W4 Pre-PR Audit for aws-shell 0.2.2 (re-run). Audited 11 changed files against code_style (25 rules) and review_memory (30 rules). P0 (Deception Detection): ALL CLEAR — R34 empty shell test check PASSED (test.sh calls real APIs: fuzzy_search() and substring_search() via importlib, which IS a real API call); R9 skip/fake test check PASSED (test() runs test.sh, no pass/exit 0); fake status check PASSED (manifest status='built' is honest — notes confirm Conan Verify PASS, Local CI PASS, test_package PASS); fake sha256 check PASSED (64-char hex hash, not all-zeros/all-f); R8 __OHOS__ stub N/A (pure Python package); R19 precompiled binaries check PASSED (no .so/.a/binaries in PR); R40 deep adaptation N/A (Python CLI tool, not graphics/UI/multimedia/hardware). P1 (Recipe Correctness): ALL CLEAR — R37 version numbering correct (first adaptation, upstream 0.2.2); R32 platform compatibility correct (settings='os' only, appropriate for pure Python); R33 no bare env vars (uses self.run with env='conan_build'); R39 source URL is official (pypi.io is PyPI's official file host); R6 patches modify source-dist metadata via apply_conandata_patches (correct approach); R38 commands.json present at software-level with type='tool'; Conan 2.x API used (from conan import ConanFile, conan.tools.files); no breaking hardcoded paths (/data/service/hnp/bin/bash has env var override). P2 (Code Style): 4 warnings — (1) conanfile.py url='' placeholder (Rule 5); (2) test.sh missing 'set -uo pipefail' (Rule 7); (3) manifest.yaml field names deviate from standard (Rule 14); (4) conandata.yml patch_description missing patch number prefix (Rule 12). P3 (Suggestions): 2 hints — (1) test.sh output format doesn't use [step]/8-space convention (Rule 9); (2) test.sh shebang bash vs zsh, justified for OHOS (Rule 6). VERDICT: PASS — no P0 or P1 issues found. 4 P2 warnings and 2 P3 hints are non-blocking."
+}
