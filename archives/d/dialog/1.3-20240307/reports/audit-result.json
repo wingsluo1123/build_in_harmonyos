@@ -1,0 +1,102 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-5",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 79,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' found in conanfile.py. Code style rule 5 explicitly prohibits this pattern — the url attribute should be filled by the adapter with the recipe repository URL, not left empty for CI.",
+      "fix_suggestion": "Set the url attribute to the actual recipe repository URL, e.g. url = \"https://cnb.cool/OpenHarmonyPCDeveloper/build_in_harmonyos/-/tree/main/archives/d/dialog/1.3-20240307\". If the URL is genuinely unknown, remove the '# CI fills this' comment and leave a descriptive placeholder or remove the attribute entirely."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-3",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 96,
+      "description": "Method order violation: layout() (line 96) is defined before requirements() (line 99). Code style rule 3 specifies the standard order as: export_sources → requirements → layout → source → generate → build → package → package_info. The requirements() and layout() methods are swapped.",
+      "fix_suggestion": "Move the requirements() method (lines 99-101) to before the layout() method (lines 96-97), so the order matches: export_sources → validate → requirements → layout → source → ..."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-5",
+      "file": "archives/d/dialog/1.3-20240307/notes.md",
+      "line": 4,
+      "description": "notes.md is an entirely unedited template. All sections contain unfilled placeholders: '{cmake|autotools|makefile|meson|custom}' (line 4), '{2026-08-06}' (line 5), '{published|built|failed}' (line 7), '{用文字描述实际编译步骤...}' (line 11), '{按需添加行}' (line 17), '{如有补丁...}' (line 21), '{列出本次编译依赖...}' (line 25), '{验证命令和结果}' (line 30), '{有打包产物时...}' (line 37), '{需要特别注意的点...}' (line 41). The conanfile.py docstring (line 6) references 'see notes.md for the full rationale' but no rationale exists. This will also cause the submit gate to block (rule 26: PR body auto-filled from notes.md will contain placeholders).",
+      "fix_suggestion": "Fill in all template sections with actual adaptation details: build system (autotools), compiler (clang), status (built), actual build steps, problems encountered and solutions, dependency versions (ncurses 6.4), verification commands and results."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "RM-17",
+      "file": "archives/d/dialog/1.3-20240307/manifest.yaml",
+      "line": 7,
+      "description": "patches_applied field is empty ([]) despite a patch being declared in conandata.yml (patches/0001-config.sub.patch) and patches_count being 1 (line 18) in the same file. This metadata inconsistency makes it appear no patches were applied when one was.",
+      "fix_suggestion": "Set patches_applied to list the actual patch: patches_applied: ['0001-config.sub.patch'] or similar, matching the patch declared in conandata.yml."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "RM-17",
+      "file": "archives/d/dialog/1.3-20240307/manifest.yaml",
+      "line": 13,
+      "description": "Hardcoded local paths in manifest.yaml: source_orig_dir: '/storage/Users/currentUser/tmp/builds/dialog-1.3-20240307.orig' (line 13) and source_work_dir: '/storage/Users/currentUser/tmp/builds/dialog-1.3-20240307.work' (line 14). These absolute local paths will not exist on CI workers or other developers' machines, making the patch generation metadata non-reproducible.",
+      "fix_suggestion": "Use relative paths or remove the absolute path prefix. For example, use 'tmp/builds/dialog-1.3-20240307.orig' or just 'dialog-1.3-20240307.orig' to avoid machine-specific paths."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-12",
+      "file": "archives/d/dialog/1.3-20240307/conandata.yml",
+      "line": 9,
+      "description": "patch_description does not follow the convention '0001 xxx' (sequence number prefix + space-separated description). The current value 'Add OHOS platform recognition to config.sub (E007)' omits the '0001' sequence number prefix shown in the code style example '0001 build aux config.guess'.",
+      "fix_suggestion": "Change patch_description to follow the numbered convention, e.g. '0001 config sub ohos platform recognition' or '0001 add ohos to config.sub'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RM-11",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 61,
+      "description": "_install_cmd_pkg() uses subprocess.run() with shell=True and f-string interpolation (line 61). While the parameters are recipe-controlled, shell=True with string interpolation is a security anti-pattern. Additionally, the function downloads and pipes a remote script to sh ('curl | sh' pattern, line 59-60), which is a security concern.",
+      "fix_suggestion": "Consider using shell=False with a list of arguments, or use Conan's built-in tools for downloading and executing scripts. Add input validation for name, version, and prefix parameters."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RM-11",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 38,
+      "description": "_get_prefix() reads the DEFAULT_PREFIX environment variable (line 38). While it has a fallback to ~/usr/local, R33 prefers using Conan toolchain/settings over environment variables. On a release worker where DEFAULT_PREFIX is unset, the fallback path may not contain the expected dependencies.",
+      "fix_suggestion": "Consider using a Conan option (e.g. options['prefix']) or a well-documented system convention instead of an environment variable. At minimum, add a log warning when falling back to the default."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RM-14",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 145,
+      "description": "build() modifies the 'configure' script (a generated autotools file) via replace_in_file() at lines 145-146, and also modifies config.status (a generated file) at lines 158-159. R6 states that generated files (config.h, configure, Makefile.in, etc.) should be handled through generate() or patches/, not direct modification in build().",
+      "fix_suggestion": "Create a patch for the umask 077 fix in configure (e.g. patches/0002-umask-hmdfs.patch), declare it in conandata.yml, and apply it via apply_conandata_patches() in source(). This is more maintainable and follows the project's patch workflow."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-3",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 127,
+      "description": "The build/host triplet is hardcoded as 'aarch64-linux-ohos' (lines 127-128). This means the recipe only works on aarch64 architecture. The validate() method checks settings.os but not settings.arch, so a non-arm64 build would silently use the wrong triplet.",
+      "fix_suggestion": "Add an architecture check in validate(), e.g. 'if self.settings.arch != \"arm64\": raise ConanInvalidConfiguration(...)'. Alternatively, construct the triplet dynamically from settings.arch."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-3",
+      "file": "archives/d/dialog/1.3-20240307/test_package/conanfile.py",
+      "line": 19,
+      "description": "test_package layout() method is empty (just 'pass', line 20). In Conan 2.x, an empty layout can cause issues with source/build folder resolution. While it works for this simple test (build() is also empty), it's not best practice.",
+      "fix_suggestion": "Use basic_layout(self) instead of pass, or remove the layout() method entirely if the default layout is sufficient."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RM-12",
+      "file": "archives/d/dialog/1.3-20240307/conanfile.py",
+      "line": 113,
+      "description": "The ncurses version is hardcoded as '6.4' in _install_cmd_pkg('ncurses', '6.4', prefix) (line 113). This is not configurable and may become outdated if a newer ncurses version is required.",
+      "fix_suggestion": "Consider making the ncurses version a class attribute or option, or at minimum add a comment documenting why 6.4 was chosen and how to update it."
+    }
+  ],
+  "summary": "Audit of dialog 1.3-20240307 Conan recipe (10 changed files). VERDICT: PASS (no P0 or P1 issues). Deception checks (highest priority): R34 test_package executes the real dialog binary (--version) — not a shell stub. sha256 verified correct by downloading source from invisible-mirror.net (339d311c...34ef matches). manifest.yaml status='built' is consistent with test-report.md. No pre-compiled .so/.a binaries in PR (ncurses-headers.tar.gz contains only .h header files). No #ifdef __OHOS__ stubs. R26 static linking for ncurses (system same-name library) is correct. R32 settings.os validates ('Linux','OHOS'). R38 commands.json present for CLI tool. R39 source URL is official (invisible-mirror.net is Thomas Dickey's official mirror). Conan 2.x API used correctly. Patch 0001-config.sub.patch is properly formatted unified diff adding ohos* OS recognition. 6 P2 warnings found: (1) conanfile.py url='' placeholder (CS-5), (2) method order layout-before-requirements (CS-3), (3) notes.md is entirely unedited template with placeholders (CS-5) — this will also block the submit gate per rule 26 as PR body is auto-filled from notes.md, (4) manifest patches_applied=[] inconsistent with actual patch, (5) hardcoded local paths in manifest, (6) patch_description missing '0001' prefix (CS-12). 6 P3 suggestions for security (shell=True, curl|sh), R6 (modify configure at build-time instead of patch), arch validation, test_package layout, and hardcoded ncurses version. P2/P3 issues do not block PR but should be addressed; the notes.md template issue (P2) will effectively block submit until filled."
+}
