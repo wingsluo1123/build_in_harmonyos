@@ -27,7 +27,7 @@
 
 3. 编译 release 版本:
    ```
-   go build -buildmode=pie -trimpath -ldflags "-buildid= -X sigs.k8s.io/release-utils/version.gitVersion=1.2.17 -X sigs.k8s.io/release-utils/version.gitCommit=unknown -X sigs.k8s.io/release-utils/version.gitTreeState=clean -X sigs.k8s.io/release-utils/version.buildDate=2026-08-05" -o apko ./
+   go build -trimpath -ldflags "-buildid= -X sigs.k8s.io/release-utils/version.gitVersion=1.2.17 -X sigs.k8s.io/release-utils/version.gitCommit=unknown -X sigs.k8s.io/release-utils/version.gitTreeState=clean -X sigs.k8s.io/release-utils/version.buildDate=2026-08-05" -o apko ./
    ```
 
 4. 签名 (HarmonyOS ELF 签名):
@@ -43,7 +43,7 @@
 | 2 | Go toolchain binaries permission denied | HarmonyOS 需要ELF签名 | 使用 binary-sign-tool 签名所有 Go 工具链二进制 |
 | 3 | Go module download timeout | proxy.golang.org 在国内不可达 | 使用 GOPROXY=https://goproxy.cn,direct |
 | 4 | go build link mapping output failed | HMDFS 权限限制写入 | 使用 /data/storage 路径作为 GOCACHE/GOTMPDIR |
-| 5 | HMDFS 无法执行 static ET_EXEC | Go 默认生成静态二进制 | 使用 -buildmode=pie 生成 PIE (ET_DYN) 二进制 |
+| 5 | buildmode=pie 二进制 segfault | PIE 模式链接 musl 动态库不兼容 | 使用静态编译（不使用 -buildmode） |
 
 ## 依赖版本
 
@@ -75,7 +75,7 @@ Platform:      linux/arm64
 
 - apko是Chainguard的APK-based OCI image builder，纯Go项目
 - CGO_ENABLED=0编译，不依赖musl libc
-- -buildmode=pie 生成 ET_DYN 二进制，HMDFS 可执行
+- 静态编译模式（不使用 -buildmode），生成 ET_EXEC 二进制
 - 版本信息通过ldflags注入sigs.k8s.io/release-utils/version包
 - 无Conan依赖声明，Go module依赖在build时从proxy下载
 ---
