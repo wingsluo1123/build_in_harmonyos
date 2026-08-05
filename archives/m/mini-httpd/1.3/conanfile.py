@@ -12,7 +12,7 @@ class MinihttpdConan(ConanFile):
     name = "mini-httpd"
     version = "1.3"
     description = "Small HTTP server with SSL support"
-    license = "GPL-2.0-or-later"
+    license = "BSD-2-Clause"
     homepage = "https://acme.com/software/mini_httpd/"
     url = ""
 
