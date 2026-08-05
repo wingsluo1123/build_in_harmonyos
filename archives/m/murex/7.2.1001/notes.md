@@ -6,13 +6,13 @@
 - Build system: Go module, single `murex` command from the repository root.
 - OHOS strategy: build a pure Go `linux/arm64` executable with `CGO_ENABLED=0`.
 - The recipe keeps `GOCACHE`, `GOMODCACHE`, `GOPATH`, and `TMPDIR` inside the Conan build folder so the worker does not depend on writable global cache paths.
-- The fallback Go toolchain is chmod-normalized after extraction so `go/bin/go` and the bundled host tools remain executable on OHOS/HMDFS workers.
+- The fallback Go toolchain is chmod-normalized recursively after extraction so the toolchain root directories are traversable and `go/bin/go` plus bundled host tools remain executable on OHOS/HMDFS workers.
 
 ## Validation
 
 - `python -m py_compile` passed for the recipe and test package.
 - `git diff --check` passed.
-- CI #12413 reached the fallback Go extraction step but failed with `PermissionError: [Errno 13] Permission denied` for `go/bin/go`; the recipe now restores read/execute bits for `go/bin` and `go/pkg/tool` before invoking `go build`.
+- CI #13020 still failed with `PermissionError: [Errno 13] Permission denied` for `go/bin/go`; the recipe now normalizes the whole fallback toolchain tree, including parent/root directories, and verifies `go/bin/go` is executable before invoking `go build`.
 - Local `conan create` was not run because this Windows workspace does not provide the competition OHOS Conan/Go toolchain.
 - The test package runs `murex -c "echo ohpcd"` and `murex -version` when the target binary can be executed.
 
