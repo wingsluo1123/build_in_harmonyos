@@ -12,6 +12,7 @@ Build approach:
   - GOPROXY uses goproxy.cn mirror for reliable module downloads.
 """
 import os
+import io
 import platform
 import re
 import shutil
@@ -64,11 +65,11 @@ class AkamaiConan(ConanFile):
 
     settings = "os", "arch"
 
-    def layout(self):
-        basic_layout(self)
-
     def export_sources(self):
         export_conandata_patches(self)
+
+    def layout(self):
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -147,7 +148,6 @@ class AkamaiConan(ConanFile):
         test_out_dir = os.path.join(self._go_workspace(), "test-out")
         os.makedirs(test_out_dir, exist_ok=True)
         test_report = os.path.join(self.build_folder, "go-test-report.txt")
-        import io
         report_lines = []
         for package, test_name in self._upstream_test_packages:
             pkg_subdir = os.path.join(test_out_dir, package.replace("./", "").replace("/", "-"))
