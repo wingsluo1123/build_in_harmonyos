@@ -19,17 +19,18 @@ build:
         Add HarmonyOS system detection to config.guess (echo + exit)
         Add linux-ohos to config.sub OS pattern lists
 
+    - description: Patch configure mktemp workaround
+      details: |
+        HarmonyOS restricts file creation in mktemp-created directories.
+        Patch configure to use a pre-created fixed temp directory (.cstmp).
+
     - description: Configure with dependency paths
       details: |
         ./configure --prefix=$PREFIX \
           --with-pcap-include=$LIBPCAP_INC \
           --with-pcap-lib=$LIBPCAP_LIB \
-          --with-libnet=$LIBNET_PREFIX
-
-    - description: Workaround config.status temp directory issue
-      details: |
-        HarmonyOS restricts file creation in mktemp-created directories.
-        Patch config.status to use a pre-created fixed temp directory.
+          --with-libnet-include=$LIBNET_INC \
+          --with-libnet-lib=$LIBNET_LIB
 
     - description: Build and install
       details: |
@@ -48,11 +49,14 @@ dependencies:
       notes: Required for packet construction; libnet_cq_end_loop() included
 
 patches:
-  - name: 0001-config-guess-ohos.patch
+  - name: 0001-config-config.guess.patch
     description: Add HarmonyOS detection to config.guess
     status: applied
-  - name: 0002-config-sub-ohos.patch
+  - name: 0002-config-config.sub.patch
     description: Add linux-ohos to config.sub OS pattern lists
+    status: applied
+  - name: 0003-configure-mktemp-workaround.patch
+    description: Workaround HarmonyOS mktemp temp directory permission issue
     status: applied
 
 packaging:
@@ -71,7 +75,8 @@ date: 2026-08-06
 notes: |
   Conan adaptation of previously manually-compiled dhcp-probe.
   - config.guess/config.sub patched for OHOS platform detection
-  - config.status workaround for HarmonyOS temp directory permission issue
+  - configure mktemp workaround for HarmonyOS temp directory permission issue
+  - config.status runtime patch (generated file, can't pre-patch)
   - Default paths (/etc, /var/run) replaced with package prefix paths at build time
   - libnet_cq_end_loop() already present in libnet 1.2 from cmd-pkgs
   - No automated test suite; test_package verifies binary runs with -v
