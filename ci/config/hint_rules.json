@@ -33,13 +33,17 @@
     "id": "depchain_missing",
     "pattern": "not found in (local cache|remotes)|Unable to find.*remotes|not resolved|Unable to find package",
     "hint": "依赖包未构建, 请先提交依赖包的 PR 并等待 CI 通过\n       请检查 conanfile.py 的 requirements() 是否正确声明了所有依赖",
-    "extract": { "dep": "(?:not found|Unable to find).*['\"]([a-z0-9_-]+/[0-9][^'\"]*)['\"]" }
+    "extract": {
+      "dep": "(?:not found|Unable to find).*['\"]([a-z0-9_-]+/[0-9][^'\"]*)['\"]"
+    }
   },
   {
     "id": "recipe_syntax",
     "pattern": "SyntaxError|unterminated string|unexpected EOF",
     "hint": "conanfile.py Python 语法错误 (如未闭合的引号/括号)\n       请检查引号/括号是否闭合, 缩进是否正确",
-    "extract": { "detail": "(SyntaxError|unterminated|string.*)" }
+    "extract": {
+      "detail": "(SyntaxError|unterminated|string.*)"
+    }
   },
   {
     "id": "recipe_sha256",
@@ -65,13 +69,17 @@
     "id": "compile_linker",
     "pattern": "undefined reference|cannot find -l|ld returned|ld\\.lld: error|unable to find library",
     "hint": "链接错误: 找不到符号或库\n       请在 conanfile.py 的 requirements() 中声明提供该符号的依赖包",
-    "extract": { "symbol": "undefined reference to (\\S+)" }
+    "extract": {
+      "symbol": "undefined reference to (\\S+)"
+    }
   },
   {
     "id": "compile_header",
     "pattern": "fatal error.*\\.h.*No such file|Cannot find.*\\.h",
     "hint": "缺少头文件\n       请在 conanfile.py 的 requirements() 中声明提供该头文件的依赖包",
-    "extract": { "header": "([a-z_][a-z0-9_/]*\\.h)" }
+    "extract": {
+      "header": "([a-z_][a-z0-9_/]*\\.h)"
+    }
   },
   {
     "id": "compile_configure",
@@ -82,7 +90,9 @@
     "id": "compile_make",
     "pattern": "(make|cc|clang|gcc).*[Ee]rror [0-9]|^.*error:|ConanException: Error [0-9]|BEGIN failed|compilation aborted",
     "hint": "编译失败\n       请检查源码在鸿蒙 PC (clang/ohos) 上的兼容性\n       常见原因: 1) 编译器差异(gcc→clang) 2) 平台宏未覆盖 3) 缺少系统头文件",
-    "extract": { "detail": "((?:error:|Error [0-9]|BEGIN failed|compilation aborted)[^\\n]*)" }
+    "extract": {
+      "detail": "((?:error:|Error [0-9]|BEGIN failed|compilation aborted)[^\\n]*)"
+    }
   },
   {
     "id": "conanfile_missing",
@@ -93,6 +103,11 @@
     "id": "checkout_failed",
     "pattern": "rc=128|checkout.*fail|fetch.*failed",
     "hint": "代码检出失败\n       可能是分支已删除或 SHA 不可达, 请检查 PR 分支状态"
+  },
+  {
+    "id": "checkout_pr_diff_url",
+    "pattern": "curl.*\\.diff|pull/[0-9]+\\)\\.diff|exit code 60|exit code 7",
+    "hint": "checkout-pr step 下载 PR diff 失败\n       常见原因: curl URL 误写成 markdown 链接格式 [标题](URL).diff, 或 GitCode .diff 端点返回空\n       正确做法: 用 git 协议拉取 PR 分支后本地生成 diff:\n         git fetch origin <pr-branch>:pr-ref main:base-ref\n         git diff base-ref...pr-ref > pr.diff\n       或使用 API: https://gitcode.com/api/v5/repos/{owner}/{repo}/pulls/{number}/files (返回每文件 patch)"
   },
   {
     "id": "worker_pip_dep_resolution",
