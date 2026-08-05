@@ -14,7 +14,7 @@ Attempts to discover DHCP and BootP servers on a network.
 
 | 版本 | 状态 | 发布日期 |
 |------|------|----------|
-| 1.3.1 | ✅ published | 2026-08-06 |
+| 1.3.1 | ✅ built | 2026-08-06 |
 
 ## 依赖
 

@@ -41,9 +41,16 @@ class DhcpProbeConan(ConanFile):
 
     def source(self):
         # Use curl to download - server has Content-Encoding issue that breaks conan's downloader
+        import hashlib
         url = self.conan_data["sources"]["url"]
+        expected_sha = self.conan_data["sources"]["sha256"]
         tarball = os.path.join(self.source_folder, "dhcp_probe-1.3.1.tar.gz")
         self.run(f'curl -fsSL -o "{tarball}" "{url}"')
+        # Verify sha256
+        with open(tarball, "rb") as f:
+            actual_sha = hashlib.sha256(f.read()).hexdigest()
+        if actual_sha != expected_sha:
+            raise Exception(f"sha256 mismatch: expected {expected_sha}, got {actual_sha}")
         shutil.unpack_archive(tarball, self.source_folder)
         os.remove(tarball)
         # Move contents up from dhcp_probe-1.3.1/ to source_folder (strip root)
