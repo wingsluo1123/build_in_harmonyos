@@ -1,4 +1,4 @@
-#!/data/service/hnp/bin/bash
+#!/usr/bin/env bash
 # test_package/test.sh — smoke test for aamath executable
 # aamath renders math expressions as ASCII art text.
 # Runs in conanrun env (PATH includes installed bin/)

@@ -46,11 +46,14 @@ class AamathConan(ConanFile):
         if os.path.isfile(rl_header):
             return
         # cmd-pkgs installs runtime .so only; extract dev headers from source
+        rl_src = self.conan_data.get("readline_source", {})
+        rl_url = rl_src.get("url", "https://mirrors.tuna.tsinghua.edu.cn/gnu/readline/readline-8.2.tar.gz")
+        rl_sha256 = rl_src.get("sha256", "")
         tmpdir = os.path.join(self.build_folder, "_rl_headers")
         self.run(
             f"mkdir -p {tmpdir} {sysroot}/include/readline && "
-            f"curl -fsSL https://mirrors.tuna.tsinghua.edu.cn/gnu/readline/readline-8.2.tar.gz "
-            f"-o {tmpdir}/rl.tar.gz && "
+            f"curl -fsSL {rl_url} -o {tmpdir}/rl.tar.gz && "
+            f"echo '{rl_sha256}  {tmpdir}/rl.tar.gz' | sha256sum -c && "
             f"tar xzf {tmpdir}/rl.tar.gz -C {tmpdir} && "
             f"cp {tmpdir}/readline-8.2/*.h {sysroot}/include/readline/",
             env="conanbuild",
