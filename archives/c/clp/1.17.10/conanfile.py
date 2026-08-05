@@ -69,12 +69,9 @@ class ClpConan(ConanFile):
                 self.output.info(f"patched config.sub: {path}")
             if "config.guess" in files:
                 path = os.path.join(root, "config.guess")
-                replace_in_file(self, path,
-                    'case $UNAME_SYSTEM in',
-                    'case $UNAME_SYSTEM in\n    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;')
-                replace_in_file(self, path,
-                    'case "${UNAME_SYSTEM}" in',
-                    'case "${UNAME_SYSTEM}" in\n    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;')
+                # 对照 coinutils/2.11.13 使用 sed 而非 replace_in_file（避免 strict=True 不匹配时崩溃）
+                self.run(r"""sed -i '/^case $UNAME_SYSTEM in$/a\    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;' """ + f"'{path}'")
+                self.run(r"""sed -i '/^case "${UNAME_SYSTEM}" in$/a\    HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;' """ + f"'{path}'")
                 self.output.info(f"patched config.guess: {path}")
         configure_path = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure_path):
