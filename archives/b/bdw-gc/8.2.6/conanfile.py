@@ -66,6 +66,7 @@ class BdwgcConan(ConanFile):
         self.cpp_info.set_property("pkg_config_name", "bdw-gc")
         if self.settings.os in ("Linux", "OHOS"):
             self.cpp_info.system_libs = ["pthread", "dl"]
+        if self.settings.os == "OHOS":
             # OHOS lacks pthread_cancel/pthread_setcancelstate; allow undefined
             # symbols in shared libs to pass linking
             self.cpp_info.exelinkflags = ["-Wl,--allow-shlib-undefined"]

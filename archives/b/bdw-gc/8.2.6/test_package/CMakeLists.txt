@@ -7,7 +7,7 @@ find_package(bdw-gc REQUIRED)
 add_executable(test_bdw-gc test.c)
 target_link_libraries(test_bdw-gc bdw-gc::bdw-gc)
 # OHOS lacks pthread_cancel/pthread_setcancelstate; allow undefined shlib symbols
-target_link_options(test_bdw-gc PRIVATE -Wl,--allow-shlib-undefined)
+target_link_options(test_bdw-gc PRIVATE $<$<STREQUAL:${CMAKE_SYSTEM_NAME},OHOS>:-Wl,--allow-shlib-undefined>)
 
 enable_testing()
 add_test(NAME test_bdw-gc COMMAND test_bdw-gc)

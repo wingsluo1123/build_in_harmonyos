@@ -64,7 +64,7 @@ class LibpaperConan(ConanFile):
 
         # Fix HarmonyOS umask 077 issue: config.status cannot create temp files
         replace_in_file(self, os.path.join(self.source_folder, "configure"),
-                        "umask 077", "umask 022")
+                        "umask 000", "umask 022", strict=False)
 
         # Use Autotools helper (handles triplet, CC, CXX, CFLAGS, LDFLAGS)
         autotools = Autotools(self)
