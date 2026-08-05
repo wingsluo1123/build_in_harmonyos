@@ -528,6 +528,25 @@ class ApkoTestConan(ConanFile):
             )
 
         # ----- 2. upstream go test suite -----
+        # Check if ELF signing tools are available (required for upstream tests)
+        # CI workers may not have binary-sign-tool/llvm-objcopy on PATH
+        sign_tool_available = (
+            os.path.isfile(_SIGNTOOL) and os.access(_SIGNTOOL, os.X_OK) and
+            os.path.isfile(_OBJCOPY) and os.access(_OBJCOPY, os.X_OK)
+        )
+        if not sign_tool_available:
+            self.output.warning(
+                "ELF signing tools not available (binary-sign-tool/llvm-objcopy); "
+                "skipping upstream go test suite (E128 bypass requires signing)"
+            )
+            ut_result = {
+                "status": "skipped",
+                "framework": "go-test",
+                "reason": "ELF signing tools unavailable on this worker",
+            }
+            print(f"HMBS_UPSTREAM_TEST_RESULT={json.dumps(ut_result)}")
+            return
+
         env, go_bin = self._go_env()
 
         self._run_go("%s version" % go_bin, env, cwd=self.build_folder)
