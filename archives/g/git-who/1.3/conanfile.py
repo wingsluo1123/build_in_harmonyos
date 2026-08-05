@@ -56,30 +56,16 @@ class GitWhoConan(ConanFile):
         # git-who 无补丁，apply_conandata_patches 为空操作
         # 调用满足 G1 门禁"补丁应用调用"要求
         apply_conandata_patches(self)
-        # CI worker 无 go 工具链（E154: go 不预装，且 go/1.21.13 制品仓无
-        # conanfile 配方不能 requires），通过 cmd-pkgs 预编译包安装 go 1.21.13。
-        # aireview High: cmd-pkgs curl|sh fallback 上轮误删致 CI 裸跑系统 go 失败
-        # → 恢复 cmd-pkgs 主方案 + 系统 go 兜底（CI 日志直证 cmd-pkgs 阶段超时但本应重试）
-        # P3: curl|sh 管道加 set -o pipefail 屏蔽 curl 失败
+        # CI 真根因: cmd-pkgs release 从未上架 go 工具链本身（只有 goaccess/goenv 等
+        # Go 应用包），sh -s -- go 1.21.13 下载 go-1.21.13.tar.gz 必 404 →
+        # cmd-pkgs 装go路径是死路。CI worker 也无系统 go（E154: go 不预装）。
+        # go/1.21.13 制品仓无 conanfile 配方不能 requires → go 工具链 CI 真不支持。
+        # 如实检测 go 可用性，缺则显式 raise（status: failed 如实标，非配方缺陷）。
         # P2: 构建失败一律显式 raise ConanException（aireview: 避欺骗性打包，空包风险）
-        go_ok = False
         try:
-            self.run("set -o pipefail && curl -fsSL --connect-timeout 60 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- go 1.21.13",
-                     cwd=self.source_folder, shell=True, env="conanbuild")
-            go_ok = True
-            # cmd-pkgs 装到 /data/service/hnp/bin 但后续 go build 用 env="conanbuild"
-            # 可能不含该目录 → 显式把 cmd-pkgs 安装路径加入 os.environ["PATH"]，conanbuild 子进程继承
-            cmd_pkgs_bin = "/data/service/hnp/bin"
-            if os.path.isdir(cmd_pkgs_bin):
-                os.environ["PATH"] = cmd_pkgs_bin + os.pathsep + os.environ.get("PATH", "")
+            self.run("go version", cwd=self.source_folder, env="conanbuild")
         except ConanException as e:
-            self.output.warning(f"cmd-pkgs go install failed: {e}, fallback to system go")
-        # 验证 go 工具链可用（cmd-pkgs 装的或系统的）
-        if not go_ok:
-            try:
-                self.run("go version", cwd=self.source_folder, env="conanbuild")
-            except ConanException as e:
-                raise ConanException(f"go toolchain unavailable (cmd-pkgs + system go both failed) — CI worker lacks go toolchain support: {e}")
+            raise ConanException(f"go toolchain unavailable (system go not found; cmd-pkgs has no go toolchain asset, only Go apps like goaccess/goenv) — CI worker lacks go toolchain support: {e}")
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
         # validate() 已确保 settings.arch 是 armv8 或 arm64
