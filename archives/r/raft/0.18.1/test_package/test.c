@@ -13,6 +13,7 @@ int main(void) {
     rv = raft_configuration_add(&config, 1, "127.0.0.1:9090", RAFT_STANDBY);
     if (rv != 0) {
         fprintf(stderr, "raft_configuration_add failed: %s\n", raft_strerror(rv));
+        raft_configuration_close(&config);
         return 1;
     }
 
