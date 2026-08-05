@@ -21,7 +21,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 # Submodule definitions with fixed tags for reproducible builds.
 # Tags correspond to versions compatible with apitrace 14.0.
 _SUBMODULES = {
-    "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli",       "ref": "v1.1.0"},
+    "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli",       "ref": "v1.2.0"},  # v1.2.0+ has prefix.c, static_init.c, static_dict_lut.c
     "gtest":        {"url": "https://github.com/google/googletest",             "dest": "thirdparty/gtest",       "ref": "v1.14.0"},
     "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace", "ref": "master"},  # no version tags available
     "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng",       "ref": "master"},  # fork, no version tags
