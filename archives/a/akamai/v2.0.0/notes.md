@@ -10,7 +10,7 @@
 ## 源码信息
 
 - 上游仓库: https://github.com/akamai/cli
-- 源码SHA256: b85b0b2552fffd40873af93d010a981c799f497fa2e151aae77093f7330e8803
+- 源码SHA256: f9657d51f971ef6f65a6dd8f2f7791d78afd7e1065989ceb552f1701f5434927
 - Go模块: github.com/akamai/cli/v2
 - Go版本要求: 1.22 (go.mod)
 
