@@ -24,11 +24,11 @@ _SUBMODULES = {
     "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli",       "ref": "v1.1.0"},
     "gtest":        {"url": "https://github.com/google/googletest",             "dest": "thirdparty/gtest",       "ref": "v1.14.0"},
     "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace", "ref": "master"},  # no version tags available
-    "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng",       "ref": "libpng-1.6.43"},
+    "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng",       "ref": "master"},  # fork, no version tags
     "snappy":       {"url": "https://github.com/google/snappy",                 "dest": "thirdparty/snappy",       "ref": "1.1.10"},
     "zlib":         {"url": "https://github.com/madler/zlib",                   "dest": "thirdparty/zlib",         "ref": "v1.3.1"},
     "zstd":         {"url": "https://github.com/facebook/zstd",                "dest": "thirdparty/zstd",         "ref": "v1.5.5"},
-    "directxmath":  {"url": "https://github.com/microsoft/DirectXMath",          "dest": "thirdparty/directxmath",  "ref": "jan2024"},
+    "directxmath":  {"url": "https://github.com/microsoft/DirectXMath",          "dest": "thirdparty/directxmath",  "ref": "main"},  # no version tags, uses main branch
 }
 
 # Mirror prefixes tried in order if GitHub is unreachable
