@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package for cdparanoia 10.2."""
+"""Conan test_package for cdparanoia 10.2 — verifies library links correctly."""
 import os
 
 from conan import ConanFile
@@ -22,6 +22,5 @@ class CdparanoiaTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run test binary directly instead of CTest to avoid CTest exit code issues
-        exe = os.path.join(self.build_folder, "test_cdparanoia")
-        self.run(f'"{exe}"', env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
