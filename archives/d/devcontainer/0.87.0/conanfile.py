@@ -4,6 +4,7 @@
 A Node.js CLI tool for creating and managing development containers.
 Build system: npm (Node.js/TypeScript with native module node-pty).
 """
+import json
 import os
 import shutil
 
@@ -20,14 +21,13 @@ class DevcontainerConan(ConanFile):
     description = "Dev Containers CLI - create and manage development containers"
     license = "MIT"
     homepage = "https://github.com/devcontainers/cli"
-    url = ""
     package_type = "application"
 
     settings = "os", "arch"
 
     def validate(self):
-        if str(self.settings.os) not in ("Linux", "OHOS"):
-            raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
+        if str(self.settings.os) != "OHOS":
+            raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}. Only OHOS is supported (requires HarmonyOS system paths).")
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -43,7 +43,6 @@ class DevcontainerConan(ConanFile):
         # R33: Get compiler paths from Conan configuration, not raw shell vars
         ce = self.conf.get("tools.build:compiler_executables", default={})
         if isinstance(ce, str):
-            import json
             try:
                 ce = json.loads(ce)
             except (json.JSONDecodeError, ValueError):

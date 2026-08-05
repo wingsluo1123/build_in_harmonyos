@@ -32,5 +32,5 @@ devcontainer build
 
 ## 注意事项
 - npm 项目，仅编译原生模块 node-pty
-- 无需源码修改，无补丁文件（yarn.lock 补丁为构建产物）
+- 无需源码修改，无补丁文件
 - Conan 配方: conanfile.py (package_type=application, build system=npm)
