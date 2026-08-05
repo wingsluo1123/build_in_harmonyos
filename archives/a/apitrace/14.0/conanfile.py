@@ -23,7 +23,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 _SUBMODULES = {
     "brotli":       {"url": "https://github.com/google/brotli",                "dest": "thirdparty/brotli",       "ref": "v1.1.0"},
     "gtest":        {"url": "https://github.com/google/googletest",             "dest": "thirdparty/gtest",       "ref": "v1.14.0"},
-    "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace", "ref": "9ae436c"},
+    "libbacktrace": {"url": "https://github.com/ianlancetaylor/libbacktrace",   "dest": "thirdparty/libbacktrace", "ref": "master"},  # no version tags available
     "libpng":       {"url": "https://github.com/apitrace/libpng",               "dest": "thirdparty/libpng",       "ref": "libpng-1.6.43"},
     "snappy":       {"url": "https://github.com/google/snappy",                 "dest": "thirdparty/snappy",       "ref": "1.1.10"},
     "zlib":         {"url": "https://github.com/madler/zlib",                   "dest": "thirdparty/zlib",         "ref": "v1.3.1"},
