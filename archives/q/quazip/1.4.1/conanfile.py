@@ -9,7 +9,7 @@ from conan.tools.scm import Git
 
 class QuazipConan(ConanFile):
     name = "quazip"
-    version = "1.4"
+    version = "1.4.1"
     description = "Qt/C++ wrapper over minizip for accessing ZIP archives"
     homepage = "https://github.com/stachenov/quazip"
     license = "LGPL-2.1-or-later"

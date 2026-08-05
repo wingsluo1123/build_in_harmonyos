@@ -74,9 +74,13 @@ class Qt5QtbaseConan(ConanFile):
         src_dir = self.source_folder
         pkg = self.package_folder
 
-        # 记录构建时的包目录路径（configure -prefix 会写入 qmake 二进制和
-        # modules/*.pri 中，package() 阶段需替换为最终包目录路径）
-        self._build_prefix = self.package_folder
+        # 记录 configure 烘焙进 modules/*.pri 的路径。
+        # 注意：Qt configure 生成的 .pri 中 QT_MODULE_*_BASE 指向的是
+        # 构建目录（build_folder）而非 package_folder（产物实测确认），
+        # 因此这里必须记录 self.build_folder——若记录 package_folder，
+        # package() 中 old_prefix == new_prefix，替换逻辑将永不执行
+        # （此前即因此成为死代码，评审 P3 确认）。
+        self._build_prefix = self.build_folder
 
         compilers = self.conf.get(
             "tools.build:compiler_executables", default={}, check_type=dict
@@ -293,10 +297,29 @@ class Qt5QtbaseConan(ConanFile):
                 )
 
         # 2. 修正 mkspecs/modules/*.pri 中的构建路径为最终包目录路径
+        # 注意：Conan 2.x 中 build() 与 package() 分属不同进程/阶段，
+        # self.build_folder 在 package() 中不可靠，因此不从属性取前缀，
+        # 而是从 .pri 内容中动态提取 configure 烘焙的构建路径前缀
+        # （形如 ~/.conan2/p/<首字母>/<hash>/b），再替换为最终包目录。
         modules_dir = os.path.join(pkg, "mkspecs", "modules")
-        if os.path.isdir(modules_dir) and hasattr(self, "_build_prefix"):
-            old_prefix = self._build_prefix
+        if os.path.isdir(modules_dir):
             new_prefix = pkg
+            # 匹配 Conan 缓存构建目录前缀：…/.conan2/p/<ch>/<hash>/b
+            build_prefix_pattern = re.compile(
+                r"/\.conan2/p/[^/\s]+/[^/\s]+/b(?=[/\\\s]|$)"
+            )
+            # 先扫描找到实际烘焙的构建前缀（取首个出现的）
+            old_prefix = None
+            for fname in os.listdir(modules_dir):
+                if not fname.endswith(".pri"):
+                    continue
+                fpath = os.path.join(modules_dir, fname)
+                with open(fpath) as f:
+                    content = f.read()
+                m = build_prefix_pattern.search(content)
+                if m:
+                    old_prefix = m.group(0)
+                    break
             # 防御性守卫（P3）：
             # 1. 构建前缀过短（如 "/"、"usr"）时跳过，避免误替换
             # 2. 仅替换路径边界（后跟 / \ 空白或行尾），防止误伤以旧前缀
