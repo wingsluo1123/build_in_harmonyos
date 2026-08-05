@@ -8,13 +8,13 @@
 - Go toolchain strategy: use `GO`, `go` in `PATH`, known harmonybrew paths, or download the pinned Go 1.26.3 archive from `mirrors.aliyun.com`.
 - The recipe keeps `GOCACHE`, `GOMODCACHE`, `GOPATH`, and `TMPDIR` inside the Conan build folder.
 - The recipe exports `GOROOT`, prepends the selected Go `bin` directory to `PATH`, and sets `GOTOOLCHAIN=local` so the worker does not try to auto-download another Go toolchain.
-- The fallback Go toolchain is chmod-normalized after extraction so `go/bin/go` and the bundled host tools remain executable on OHOS/HMDFS workers.
+- The fallback Go toolchain is chmod-normalized recursively after extraction so the toolchain root directories are traversable and `go/bin/go` plus bundled host tools remain executable on OHOS/HMDFS workers.
 - Version metadata is injected through `github.com/jzelinskie/cobrautil/v2.Version`, matching the upstream Homebrew packaging approach.
 
 ## Validation
 
 - `python -m py_compile` passed for the recipe and test package.
 - `git diff --check` passed.
-- CI #12425 reached the fallback Go extraction step but failed with `PermissionError: [Errno 13] Permission denied` for `go/bin/go`; the recipe now restores read/execute bits for `go/bin` and `go/pkg/tool` before invoking `go build`.
+- CI #13022 still failed with `PermissionError: [Errno 13] Permission denied` for `go/bin/go`; the recipe now normalizes the whole fallback toolchain tree, including parent/root directories, and verifies `go/bin/go` is executable before invoking `go build`.
 - Local `conan create` was not run because this Windows workspace does not provide the competition OHOS Conan/Go toolchain.
 - The test package checks `spicedb --help` and `spicedb version` when the target binary can be executed.

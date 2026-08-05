@@ -132,30 +132,45 @@ class SpicedbConan(ConanFile):
             os.makedirs(tools_dir, exist_ok=True)
             download(self, package["url"], archive, sha256=package["sha256"])
             self.run(f'tar xzf "{archive}" -C "{tools_dir}"')
-        self._ensure_go_toolchain_permissions(go_root)
+        self._ensure_go_toolchain_permissions(tools_dir, go_root)
+        if not os.access(go, os.X_OK):
+            raise ConanInvalidConfiguration(
+                f"Bootstrapped Go executable is not runnable after chmod: {go}"
+            )
         return go
 
-    def _ensure_go_toolchain_permissions(self, go_root):
-        executable_roots = [
+    def _ensure_go_toolchain_permissions(self, tools_dir, go_root):
+        # Some OHOS/HMDFS workers unpack cached tarballs without traversable
+        # directory bits, so normalize the whole toolchain tree first instead
+        # of touching only go/bin and go/pkg/tool.
+        for directory in (tools_dir, go_root):
+            if os.path.isdir(directory):
+                self._chmod_read_exec(directory, is_dir=True)
+        executable_prefixes = (
             os.path.join(go_root, "bin"),
             os.path.join(go_root, "pkg", "tool"),
-        ]
-        for root in executable_roots:
-            if not os.path.isdir(root):
-                continue
-            for dirpath, _, filenames in os.walk(root):
-                self._chmod_read_exec(dirpath, is_dir=True)
-                for filename in filenames:
-                    self._chmod_read_exec(os.path.join(dirpath, filename))
-
-    def _chmod_read_exec(self, path, is_dir=False):
-        mode = os.stat(path).st_mode
-        read_exec = (
-            stat.S_IRUSR | stat.S_IXUSR |
-            stat.S_IRGRP | stat.S_IXGRP |
-            stat.S_IROTH | stat.S_IXOTH
         )
+        for dirpath, dirnames, filenames in os.walk(go_root):
+            self._chmod_read_exec(dirpath, is_dir=True)
+            for dirname in dirnames:
+                self._chmod_read_exec(os.path.join(dirpath, dirname), is_dir=True)
+            for filename in filenames:
+                path = os.path.join(dirpath, filename)
+                executable = any(
+                    os.path.commonpath([path, root]) == root
+                    for root in executable_prefixes
+                    if os.path.isdir(root)
+                )
+                self._chmod_read_exec(path, executable=executable)
+
+    def _chmod_read_exec(self, path, is_dir=False, executable=False):
+        mode = os.stat(path).st_mode
+        read_exec = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        if executable or is_dir:
+            read_exec |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
         if is_dir:
+            mode |= stat.S_IWUSR
+        if not is_dir:
             mode |= stat.S_IWUSR
         os.chmod(path, mode | read_exec)
 
