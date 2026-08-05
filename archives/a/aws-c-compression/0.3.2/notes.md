@@ -26,9 +26,7 @@ cmake --build build -j$(nproc)
 ## 依赖版本
 - aws-c-common/0.12.6
 
-## 注意事项
-- 生成静态库 libaws-c-compression.a，无可执行二进制
-- 打包产物约 33.5KB
+## 结束
 ---
 
 **编译结束**: 2026-08-05 05:49

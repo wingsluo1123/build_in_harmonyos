@@ -18,6 +18,7 @@ class AwsccompressionTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        self.requires("aws-c-common/0.12.6")
 
     def layout(self):
         cmake_layout(self)

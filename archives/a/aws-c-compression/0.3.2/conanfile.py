@@ -47,7 +47,7 @@ class AwsccompressionConan(ConanFile):
         # Point aws-c-common_DIR to the original config so find_package uses it.
         aws_common = self.dependencies["aws-c-common"]
         config_dir = os.path.join(aws_common.package_folder, "lib", "cmake", "aws-c-common")
-        tc.variables["aws-c-common_DIR"] = config_dir
+        tc.cache_variables["aws-c-common_DIR"] = config_dir
         tc.generate()
 
     def build(self):
