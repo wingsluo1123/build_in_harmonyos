@@ -48,3 +48,7 @@ go build -o bin/brev ./main.go
 ## 文件修改
 - pkg/cmd/register/gpu_nvml.go: 构建标签修改
 - pkg/cmd/register/gpu_stub.go: 新增 stub 文件
+---
+
+**编译结束**: 2026-08-05 11:22
+**最终状态**: built

@@ -4,6 +4,20 @@ diff --git a/pkg/cmd/register/gpu_nvml.go b/pkg/cmd/register/gpu_nvml.go
 @@ -1,4 +1,4 @@
 -//go:build linux || windows
 +//go:build (linux || windows) && nvml
- 
+
  package register
- 
+
+diff --git a/pkg/cmd/register/gpu_stub.go b/pkg/cmd/register/gpu_stub.go
+new file mode 100644
+--- /dev/null
++++ b/pkg/cmd/register/gpu_stub.go
+@@ -0,0 +1,9 @@
++//go:build (linux || windows) && !nvml
++
++package register
++
++// probeGPUsNVML is a stub when NVML is disabled (CGO_ENABLED=0).
++// Returns (nil, nil) — no GPUs detected.
++func probeGPUsNVML() ([]GPU, []Interconnect) {
++	return nil, nil
++}
