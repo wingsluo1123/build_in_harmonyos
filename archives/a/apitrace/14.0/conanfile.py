@@ -95,7 +95,7 @@ class ApitraceConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["ENABLE_LTO"] = "OFF"
+        tc.cache_variables["ENABLE_LTO"] = "OFF"
         tc.variables["ENABLE_GUI"] = "OFF"
         tc.variables["ENABLE_CLI"] = "ON"
         tc.variables["ENABLE_X11"] = "OFF"  # OHOS has no X11
