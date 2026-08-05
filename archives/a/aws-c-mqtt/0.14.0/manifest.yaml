@@ -1,9 +1,12 @@
 version: "0.14.0"
-status: partial
-build_date: "2026-04-24"
+software: "aws-c-mqtt"
+status: built
+build_date: "2026-08-05"
+build_system: cmake
 
 source:
   url: "https://github.com/awslabs/aws-c-mqtt/archive/refs/tags/v0.14.0.tar.gz"
+  sha256: "d7b881f3154a4d7282aca1aab9926b2ff9a67de3a07b2eee3c229629520e492d"
   tar_format: tar.gz
 
 build:
@@ -13,11 +16,18 @@ build:
     - "-DBUILD_SHARED_LIBS=OFF"
     - "-DBUILD_TESTING=OFF"
   dependencies:
-    - aws-c-common
-    - aws-c-io
-    - aws-c-http
+    - aws-c-common/0.12.6
+    - aws-c-http/0.10.14
+    - aws-c-io/0.26.3
+    - aws-c-cal/0.9.13
+    - aws-c-compression/0.3.2
   cc: clang
   cxx: clang++
 
 patches_applied: []
-knowledge_gained: []
+
+knowledge_gained:
+  - "aws-c-mqtt CMakeLists.txt uses aws_use_package(aws-c-http) and find_package(aws-c-common REQUIRED)"
+  - "aws-c-mqtt source includes aws/http/ and aws/io/ headers from transitively dependent packages"
+  - "BYO_CRYPTO=ON is set in aws-c-io dependency to avoid s2n-tls requirement"
+  - "aws-c-io requires HarmonyOS platform patch to enable epoll event loop"

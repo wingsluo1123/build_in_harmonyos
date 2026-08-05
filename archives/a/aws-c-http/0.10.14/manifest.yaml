@@ -1,9 +1,12 @@
 version: "0.10.14"
-status: partial
-build_date: "2026-04-24"
+software: "aws-c-http"
+status: built
+build_date: "2026-08-05"
+build_system: cmake
 
 source:
   url: "https://github.com/awslabs/aws-c-http/archive/refs/tags/v0.10.14.tar.gz"
+  sha256: "d44866920b89e07b9db17e9c84587c6dca6c796d691597f1bee5e17b16b79d39"
   tar_format: tar.gz
 
 build:
@@ -13,11 +16,15 @@ build:
     - "-DBUILD_SHARED_LIBS=OFF"
     - "-DBUILD_TESTING=OFF"
   dependencies:
-    - aws-c-common
-    - aws-c-io
-    - aws-c-compression
+    - aws-c-common/0.12.6
+    - aws-c-io/0.26.3
+    - aws-c-compression/0.3.2
+    - aws-c-cal/0.9.13
   cc: clang
   cxx: clang++
 
 patches_applied: []
-knowledge_gained: []
+
+knowledge_gained:
+  - "aws-c-http 源码直接 include aws/cal/hash.h，需声明 aws-c-cal 为直接依赖"
+  - "aws_http_library_init 要求非 NULL allocator，测试需使用 aws_default_allocator()"
