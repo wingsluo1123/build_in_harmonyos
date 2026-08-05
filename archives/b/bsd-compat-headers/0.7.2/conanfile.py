@@ -15,8 +15,8 @@ class BsdCompatHeadersConan(ConanFile):
     version = "0.7.2"
     description = "OpenHarmony 系统缺失的 BSD 兼容头文件（sys/cdefs.h, sys/queue.h, sys/tree.h）"
     license = "BSD-3-Clause"
-    homepage = "https://github.com/OpenHarmonyPCDeveloper/bsd-compat-headers"
-    url = "https://github.com/OpenHarmonyPCDeveloper/bsd-compat-headers"
+    homepage = "https://github.com/NeonatoX/bsd-compat-headers"
+    url = ""  # CI fills this
 
     package_type = "header-library"
     settings = "os", "compiler", "build_type", "arch"
