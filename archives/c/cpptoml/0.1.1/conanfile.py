@@ -10,7 +10,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 class CpptomlConan(ConanFile):
     name = "cpptoml"
-    version = "v0.1.1"
+    version = "0.1.1"
     description = "C++ TOML configuration file parser (header-only)"
     license = "MIT"
     homepage = "https://github.com/skystrife/cpptoml"
