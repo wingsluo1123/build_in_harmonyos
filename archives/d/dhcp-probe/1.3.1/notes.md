@@ -300,3 +300,7 @@ dhcp-probe 1.3.1 已成功适配 HarmonyOS 平台：
 **后续改进**：
 - 考虑添加 systemd service 文件支持
 - 考虑添加 SELinux 策略配置
+## 结束
+
+Conan adaptation completed. Status: built.
+
