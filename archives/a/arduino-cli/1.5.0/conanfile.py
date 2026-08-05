@@ -25,7 +25,7 @@ class ArduinoCliConan(ConanFile):
                 "https://golang.google.cn/dl/go1.26.5.linux-amd64.tar.gz",
                 "https://dl.google.com/go/go1.26.5.linux-amd64.tar.gz",
             ],
-            "ce011249c9ad5c4212d9421a8c2846e2e3f59dc4f9b3e4a8a8b0f9e3e8e9e8e9",
+            "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
         ),
         "arm64": (
             [
@@ -313,10 +313,10 @@ class ArduinoCliConan(ConanFile):
             candidates.append(os.path.join(os.environ["GOROOT"], "bin", "go"))
         candidates.extend(
             [
-                os.path.expanduser("~/usr/local/go1263/bin/go"),
-                os.path.expanduser("~/sdk/go1.26.3/bin/go"),
-                "/storage/Users/currentUser/usr/local/go1263/bin/go",
-                "/storage/Users/currentUser/sdk/go1.26.3/bin/go",
+                os.path.expanduser("~/usr/local/go1265/bin/go"),
+                os.path.expanduser("~/sdk/go1.26.5/bin/go"),
+                "/storage/Users/currentUser/usr/local/go1265/bin/go",
+                "/storage/Users/currentUser/sdk/go1.26.5/bin/go",
                 os.path.expanduser("~/.harmonybrew/bin/go"),
                 os.path.expanduser("~/.harmonybrew/Cellar/go/1.26.5/bin/go"),
                 "/storage/Users/currentUser/.harmonybrew/bin/go",
@@ -349,7 +349,6 @@ class ArduinoCliConan(ConanFile):
             raise ConanInvalidConfiguration(
                 f"arduino-cli 1.5.0 requires Go >= 1.26.1, got: {output}"
             )
-
     @staticmethod
     def _go_version_tuple(go, output=None):
         if output is None:
