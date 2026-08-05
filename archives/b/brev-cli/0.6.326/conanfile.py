@@ -14,8 +14,10 @@ Note: The local dev environment (HMDFS) cannot execute the static Go toolchain,
 so the actual `go build` happens in the Conan CI runner where Go is available.
 The local `finish` step marks this as `built` and defers final verification to CI.
 """
+import io
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -57,10 +59,18 @@ class BrevCliConan(ConanFile):
         go_bin = shutil.which("go") or os.environ.get("GOROOT_BIN", "")
         go_runnable = False
         if go_bin and os.access(go_bin, os.X_OK):
-            import subprocess
             try:
-                subprocess.run([go_bin, "version"], capture_output=True, timeout=10)
-                go_runnable = True
+                result = subprocess.run(
+                    [go_bin, "version"], capture_output=True, timeout=10
+                )
+                if result.returncode == 0:
+                    go_runnable = True
+                else:
+                    self.output.warning(
+                        f"Go version check returned {result.returncode}, "
+                        f"falling back to placeholder"
+                    )
+                    go_runnable = False
             except Exception as exc:
                 self.output.warning(f"Go version check failed ({exc}), falling back to placeholder")
                 go_runnable = False
@@ -72,9 +82,8 @@ class BrevCliConan(ConanFile):
         # ── 上游单元测试（R5: 真实运行 go test ./...）──
         # CI runner 有可用的 Go 工具链时真实运行上游单元测试，
         # 将结果写入构建日志与 go-test-report.txt。
-        test_env = {"CGO_ENABLED": "0", "GOFLAGS": "-mod=mod"}
+        test_env = ["CGO_ENABLED=0", "GOFLAGS=-mod=mod"]
         test_report = os.path.join(self.build_folder, "go-test-report.txt")
-        import io
         test_buf = io.StringIO()
         try:
             test_ret = self.run(
@@ -98,12 +107,12 @@ class BrevCliConan(ConanFile):
         # target GOOS=linux GOARCH=arm64 is ABI-compatible.
         # buildmode=pie produces a PIE (ET_DYN) binary that HMDFS will execute.
         # CGO_ENABLED=0 disables NVML (requires CGO + NVIDIA libraries).
-        run_env = {
-            "CGO_ENABLED": "0",
-            "GOOS": "linux",
-            "GOARCH": "arm64",
-            "GOFLAGS": "-mod=mod",
-        }
+        run_env = [
+            "CGO_ENABLED=0",
+            "GOOS=linux",
+            "GOARCH=arm64",
+            "GOFLAGS=-mod=mod",
+        ]
 
         ldflags = f"-s -w -X github.com/brevdev/brev-cli/pkg/cmd/version.Version={self.version}"
         build_cmd = (
