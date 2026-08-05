@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe for libpaper 1.1.28 — Autotools (autoreconf + configure + make).
+"""Conan recipe for libpaper 1.1.28 — Autotools (configure + make).
 
-The source tarball only contains configure.ac/Makefile.am (no generated
-autotools files), so autoreconf must run to generate them. The 13 patches
-are "create" type (diff -ruN against empty files), so the generated files
-must be emptied before patching to avoid content duplication.
+The 13 patches are "create" type (diff -ruN against empty files) containing
+the full content of each generated autotools file. The patch extraction step
+creates all necessary files (configure, Makefile.in, config.guess, etc.)
+without needing autoreconf/automake.
 """
 import os
 from conan import ConanFile
@@ -47,12 +47,10 @@ class LibpaperConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # Source tarball has only configure.ac/Makefile.am — bootstrap autotools first.
-        self.run("autoreconf --install --force", cwd=self.source_folder)
-
         # All 13 patches are "create" type (diff -ruN against empty files).
-        # The patch command can't apply them to existing non-empty files.
-        # Instead, extract patched content directly from patch files.
+        # They contain the full content of each generated autotools file.
+        # Extract patched content directly from patch files to create
+        # configure, Makefile.in, config.guess, config.sub, etc.
         patches_dir = os.path.join(self.source_folder, "patches")
         for p in self.conan_data.get("patches", []):
             patch_file = os.path.join(patches_dir, os.path.basename(p["patch_file"]))
@@ -62,7 +60,7 @@ class LibpaperConan(ConanFile):
                 cwd=self.source_folder,
             )
 
-        # Fix HarmonyOS umask 077 issue: config.status cannot create temp files
+        # Fix HarmonyOS umask issue in configure
         replace_in_file(self, os.path.join(self.source_folder, "configure"),
                         "umask 000", "umask 022", strict=False)
 
