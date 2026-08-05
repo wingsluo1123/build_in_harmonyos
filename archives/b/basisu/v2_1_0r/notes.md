@@ -1,27 +1,31 @@
-# Basis Universal v2_1_0r 适配笔记
+# Basis Universal v2_1_0r Adaptation Notes
 
-## 编译环境
-- 构建系统: cmake
-- 编译日期: 2026-05-30
-- 编译器: clang/clang++
-- 状态: built
+## Build Environment
+- Build system: CMake
+- Build date: 2026-08-05
+- Compiler: clang/clang++
+- Status: built (conan adaptation added)
 
-## 编译步骤
+## Build Steps
 
-1. 从 GitHub 下载 basis_universal v2_1_0r 源码
-2. 使用 CMake 构建：
-   ```bash
-   cmake -DCMAKE_BUILD_TYPE=Release \
-         -DCMAKE_SYSTEM_NAME=Linux \
-         -DCMAKE_INSTALL_PREFIX=$HOME/usr/local
-   make -j2
-   make install DESTDIR=$HOME/tmp/test-install-basisu-v2_1_0r
-   ```
-3. 预编译包制作：ohc package basisu v2_1_0r
+1. Download basis_universal v2_1_0r source from GitHub
+2. Apply qsort_r compatibility patches:
+   - patches/0001-zstd-zstd.c.patch: qsort_r fix for zstd.c
+   - patches/0002-zstd-zstddeclib.c.patch: qsort_r fix for zstddeclib.c
+3. Build with CMake
 
-## 交付物
+## Key Adaptation: qsort_r Compatibility
+- Bundled zstd library uses qsort_r() (GNU extension) not available in OHOS musl libc
+- Fix: Add `&& defined(HAS_QSORT_R)` guard to prevent _GNU_SOURCE definition
+- On non-OHOS: conanfile.py generate() sets -DHAS_QSORT_R
+- On OHOS: HAS_QSORT_R not set, code falls back to C90 qsort() with global context
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| basisu-v2_1_0r-ohos-aarch64.tar.gz | 9.8MB | 预编译包（编码器+库+头文件） |
-| basisu-v2_1_0r-ohos-aarch64-debug.tar.gz | 420KB | 调试符号包 |
+## Deliverables
+
+| File | Description |
+|------|-------------|
+| conanfile.py | Conan recipe |
+| conandata.yml | Source + patch declarations |
+| test_package/ | L1 test (upstream basisu -test + consumer link test) |
+| patches/0001-zstd-zstd.c.patch | qsort_r compatibility for zstd.c |
+| patches/0002-zstd-zstddeclib.c.patch | qsort_r compatibility for zstddeclib.c |
