@@ -1,8 +1,8 @@
 #include <QCoreApplication>
 #include <QString>
 #include <QDebug>
-#include <cprime.h>
-#include <stringfunc.h>
+#include <cprime/cprime.h>
+#include <cprime/stringfunc.h>
 
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);

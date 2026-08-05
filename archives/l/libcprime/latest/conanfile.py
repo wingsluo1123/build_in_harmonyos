@@ -59,4 +59,4 @@ class LibcprimeConan(ConanFile):
         self.cpp_info.libs = ["cprime"]
         self.cpp_info.set_property("cmake_file_name", "cprime")
         self.cpp_info.set_property("cmake_target_name", "cprime::cprime")
-        self.cpp_info.includedirs = ["include/cprime"]
+        self.cpp_info.includedirs = ["include"]
