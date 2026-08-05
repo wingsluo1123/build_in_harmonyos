@@ -37,6 +37,10 @@ class GitWhoTestConan(ConanFile):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
             return
         # Run the compiled test binary (verifies git-who --help)
-        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_git_who")
+        # aireview P3: bindirs[0] 未做空列表防护 — 交叉编译场景 bindirs 可能为空致 IndexError
+        bindirs = self.cpp.build.bindirs
+        if not bindirs:
+            raise ConanException("test_git_who build folder (bindirs) is empty — cannot locate test binary")
+        test_bin = os.path.join(bindirs[0], "test_git_who")
         # aireview: test.c 改用 argv 传 bin_path 避依赖 PATH 巧合，同步传 git-who 二进制路径参数
         self.run(f'"{test_bin}" "{bin_path}"', env="conanrun")

@@ -4,7 +4,7 @@
 - 构建系统: go (go build)
 - 编译日期: 2026-07-30
 - 编译器: Go
-- 状态: failed  # R9: CI 日志直证 go 工具链不支持编译失败（cmd-pkgs Download failed + system go not found），如实标记
+- 状态: failed  # R9: CI 实际结果——go 工具链 cmd-pkgs 装载超时+系统 go 缺，conan-build-test 阶段 build() 失败。修复后待重跑 CI 验证。
 
 ## 编译步骤
 
