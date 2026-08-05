@@ -52,3 +52,5 @@ go build -o bin/brev ./main.go
 
 **编译结束**: 2026-08-05 11:22
 **最终状态**: built
+
+<!-- CI trigger: Wed Aug  5 14:19:51 CST 2026 -->
