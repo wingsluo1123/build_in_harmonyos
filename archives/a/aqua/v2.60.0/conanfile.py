@@ -1,117 +1,330 @@
 #!/usr/bin/env python3
-"""Conan recipe for aqua v2.60.0."""
+"""Conan recipe for aqua v2.60.0.
 
+aqua is a Declarative CLI Version manager written in Go.
+This recipe cross-compiles the Go binary for HarmonyOS PC (aarch64-linux-ohos).
+
+Build approach:
+  - Uses the Go toolchain (auto-detected or downloaded if missing).
+  - CGO disabled (pure Go, no C dependencies).
+  - GOARCH=arm64 GOOS=linux (HarmonyOS Linux kernel ABI).
+  - Version injected via ldflags: -X main.version=v2.60.0.
+"""
 import os
-import stat
+import platform
+import re
+import shutil
+import subprocess
+from pathlib import Path
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import copy, download, export_conandata_patches, apply_conandata_patches
+from conan.tools.env import Environment
+from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
 class AquaConan(ConanFile):
     name = "aqua"
     version = "v2.60.0"
-    description = "Declarative version manager for CLI tools"
+    _go_version = "1.26.5"
+    _go_archives = {
+        "amd64": (
+            [
+                "https://golang.google.cn/dl/go1.26.5.linux-amd64.tar.gz",
+                "https://dl.google.com/go/go1.26.5.linux-amd64.tar.gz",
+            ],
+            "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
+        ),
+        "arm64": (
+            [
+                "https://golang.google.cn/dl/go1.26.5.linux-arm64.tar.gz",
+                "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz",
+            ],
+            "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49",
+        ),
+    }
+    _upstream_test_packages = (
+        ("./pkg/checksum", "aqua-checksum.test"),
+        ("./pkg/config-finder", "aqua-config-finder.test"),
+        ("./pkg/config-reader", "aqua-config-reader.test"),
+    )
+    package_type = "application"
+
+    description = "Declarative CLI Version manager. Support Lazy Install and Sharable configuration mechanism named Registry."
     license = "MIT"
     homepage = "https://github.com/aquaproj/aqua"
     url = "https://github.com/aquaproj/aqua"
-    package_type = "application"
+    topics = ("version-manager", "cli", "package-manager", "go")
 
     settings = "os", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
 
-    def validate(self):
-        if self.settings.os not in ("Linux", "OHOS"):
-            raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
-        if str(self.settings.arch) not in ("armv8", "arm64", "aarch64"):
-            raise ConanInvalidConfiguration(
-                "The upstream pre-built aqua package used for OHOS PC is linux/arm64 only"
-            )
-
     def layout(self):
         basic_layout(self)
 
     def source(self):
-        sources = self.conan_data["sources"]
-        # Local mirror fallback for environments where GitHub is unreachable
-        local_mirror = os.path.join(
-            os.environ.get("HOME", ""), "tmp", sources["filename"]
-        )
-        if os.path.isfile(local_mirror):
-            import shutil
-            dst = os.path.join(self.source_folder, sources["filename"])
-            shutil.copy2(local_mirror, dst)
-            self.output.info(f"Using local mirror: {local_mirror}")
-        else:
-            download(self, sources["url"], sources["filename"], sha256=sources["sha256"])
-        self.run(f'tar xzf "{sources["filename"]}"')
+        get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
+
+    def validate(self):
+        if str(self.settings.os) not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration("aqua is prepared for Linux/OHOS targets only")
+
+    def generate(self):
+        env = Environment()
+        env.define("CGO_ENABLED", "0")
+        env.define("GOOS", self._goos())
+        env.define("GOARCH", self._goarch())
+        env.define("GOPROXY", os.environ.get("GOPROXY", "https://goproxy.cn,https://proxy.golang.org,direct"))
+        env.define("GOSUMDB", os.environ.get("GOSUMDB", "sum.golang.google.cn"))
+        env.define("GOTOOLCHAIN", "local")
+
+        go_workspace = self._go_workspace()
+        env.define("TMPDIR", os.path.join(go_workspace, "tmp"))
+        env.define("GOTMPDIR", os.path.join(go_workspace, "tmp"))
+        env.define("GOCACHE", os.path.join(go_workspace, "go-build-cache"))
+        env.define("GOMODCACHE", os.path.join(go_workspace, "go-mod-cache"))
+
+        gobin = self._go_executable()
+        goroot = self._goroot_for_go(gobin)
+        if goroot:
+            env.define("GOROOT", goroot)
+        env.prepend_path("PATH", os.path.dirname(gobin))
+
+        env.vars(self).save_script("aqua_go_env")
 
     def build(self):
-        apply_conandata_patches(self)
-        self.output.info(
-            "Using upstream pre-built aqua linux/arm64 release package; "
-            "the OHOS CI worker currently does not provide a Go toolchain."
+        go = self._go_executable()
+        self._check_go_version(go)
+        self.run(f'"{go}" mod download', cwd=self.source_folder, env=["aqua_go_env"])
+
+        self._run_upstream_tests(go)
+
+        out_dir = os.path.join(self.build_folder, "bin")
+        os.makedirs(out_dir, exist_ok=True)
+        link_out_dir = os.path.join(self._go_workspace(), "link-out") if str(self.settings.os) == "OHOS" else out_dir
+        os.makedirs(link_out_dir, exist_ok=True)
+        linked_exe = os.path.join(link_out_dir, self._exe_name())
+        final_exe = os.path.join(out_dir, self._exe_name())
+        ldflags = f"-s -w -X main.version={self.version}"
+        self.run(
+            f'"{go}" build -trimpath -ldflags "{ldflags}" -o "{linked_exe}" ./cmd/aqua',
+            cwd=self.source_folder,
+            env=["aqua_go_env"],
         )
+        self._sign_elf_if_ohos(linked_exe)
+        if os.path.abspath(linked_exe) != os.path.abspath(final_exe):
+            shutil.copy2(linked_exe, final_exe)
 
     def package(self):
-        binary = self.conan_data["build"]["binary"]
-        bin_dir = os.path.join(self.package_folder, "bin")
-        os.makedirs(bin_dir, exist_ok=True)
-        # Copy from source_folder (already extracted in source()) so patches
-        # applied in build() are reflected in the packaged binary.
-        copy(self, binary, src=self.source_folder, dst=bin_dir, keep_path=False)
-        binary_path = os.path.join(bin_dir, binary)
-        os.chmod(binary_path,
-                 stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
-                 stat.S_IRGRP | stat.S_IXGRP |
-                 stat.S_IROTH | stat.S_IXOTH)
-        self._sign_ohos_binary(binary_path)
-        license_src = os.path.join(self.source_folder, "LICENSE")
-        if os.path.isfile(license_src):
-            copy(self, "LICENSE", src=self.source_folder,
-                 dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
-        readme_src = os.path.join(self.source_folder, "README.md")
-        if os.path.isfile(readme_src):
-            copy(self, "README.md", src=self.source_folder,
-                 dst=os.path.join(self.package_folder, "share", "doc", "aqua"),
-                 keep_path=False)
+        copy(self, self._exe_name(), os.path.join(self.build_folder, "bin"), os.path.join(self.package_folder, "bin"))
+        copy(self, "LICENSE", self.source_folder, os.path.join(self.package_folder, "licenses"))
 
-    def _sign_ohos_binary(self, binary_path):
+    def package_info(self):
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]
+
+    def _run_upstream_tests(self, go):
+        if str(self.settings.os) == "Linux":
+            packages = " ".join(package for package, _ in self._upstream_test_packages)
+            self.run(
+                f'"{go}" test {packages}',
+                cwd=self.source_folder,
+                env=["aqua_go_env"],
+            )
+            return
         if str(self.settings.os) != "OHOS":
             return
 
-        signer = "/data/service/hnp/bin/binary-sign-tool"
-        objcopy = "/data/service/hnp/bin/llvm-objcopy"
-        if not os.path.isfile(signer):
-            self.output.warning(
-                "binary-sign-tool is unavailable; the OHOS release worker must sign aqua"
+        test_out_dir = os.path.join(self._go_workspace(), "test-out")
+        os.makedirs(test_out_dir, exist_ok=True)
+        for package, test_name in self._upstream_test_packages:
+            test_bin = os.path.join(test_out_dir, test_name)
+            self.run(
+                f'"{go}" test -c -o "{test_bin}" {package}',
+                cwd=self.source_folder,
+                env=["aqua_go_env"],
             )
+            self._sign_elf_if_ohos(test_bin)
+            self.run(f'"{test_bin}" -test.v', cwd=self.source_folder, env=["aqua_go_env"])
+
+    def _go_workspace(self):
+        if str(self.settings.os) != "OHOS":
+            root = os.path.join(self.build_folder, ".go-work")
+        else:
+            root = os.environ.get(
+                "OHOS_GO_WORKDIR",
+                os.path.join(self.build_folder, ".go-work-ohos"),
+            )
+        workspace = os.path.join(root, self.version)
+        for child in (
+            "tmp",
+            "go-build-cache",
+            "go-mod-cache",
+            "link-out",
+            "test-out",
+            "go-sdk",
+        ):
+            Path(workspace, child).mkdir(parents=True, exist_ok=True)
+        return workspace
+
+    def _ensure_go_toolchain(self):
+        host_arch = self._go_host_arch()
+        if host_arch not in self._go_archives:
+            raise ConanInvalidConfiguration(f"Go SDK bootstrap is not prepared for host arch: {host_arch}")
+
+        sdk_root = os.path.join(self._go_workspace(), "go-sdk", f"go{self._go_version}-{host_arch}")
+        goroot = os.path.join(sdk_root, "go")
+        gobin = os.path.join(goroot, "bin", "go")
+        if not os.path.isfile(gobin):
+            urls, sha256 = self._go_archives[host_arch]
+            self.output.info(f"Go >= {self._go_version} not found; downloading {urls[0]}")
+            get(self, url=urls, sha256=sha256, destination=sdk_root, strip_root=False)
+        self._sign_go_sdk_if_ohos(goroot)
+        return gobin
+
+    def _sign_go_sdk_if_ohos(self, goroot):
+        if str(self.settings.os) != "OHOS":
+            return
+        marker = os.path.join(goroot, ".ohos-signed")
+        if os.path.isfile(marker):
             return
 
-        signed_path = binary_path + ".signed"
-        if os.path.isfile(objcopy):
-            self.run(
-                f'"{objcopy}" --remove-section .codesign "{binary_path}" || true',
-                quiet=True,
-            )
-        self.run(
-            f'"{signer}" sign -inFile "{binary_path}" '
-            f'-outFile "{signed_path}" -selfSign 1',
-            quiet=True,
-        )
-        os.replace(signed_path, binary_path)
-        os.chmod(binary_path,
-                 stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
-                 stat.S_IRGRP | stat.S_IXGRP |
-                 stat.S_IROTH | stat.S_IXOTH)
+        tool_dir = os.path.join(goroot, "pkg", "tool", f"linux_{self._go_host_arch()}")
+        candidates = [
+            os.path.join(goroot, "bin", "go"),
+            os.path.join(goroot, "bin", "gofmt"),
+        ]
+        if os.path.isdir(tool_dir):
+            candidates.extend(os.path.join(tool_dir, filename) for filename in os.listdir(tool_dir))
 
-    def package_info(self):
-        self.cpp_info.includedirs = []
-        self.cpp_info.libdirs = []
-        self.cpp_info.libs = []
-        self.cpp_info.bindirs = ["bin"]
-        self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
+        for candidate in candidates:
+            if os.path.isfile(candidate) and self._is_elf(candidate):
+                self._sign_elf_if_ohos(candidate)
+        Path(marker).write_text("signed\n", encoding="utf-8")
+
+    @staticmethod
+    def _is_elf(path):
+        try:
+            with open(path, "rb") as binary:
+                return binary.read(4) == b"\x7fELF"
+        except OSError:
+            return False
+
+    @staticmethod
+    def _has_ohos_signature(path):
+        try:
+            with open(path, "rb") as binary:
+                data = binary.read()
+        except OSError:
+            return False
+        return b".codesign" in data or b".note.ohos" in data
+
+    def _sign_elf_if_ohos(self, path):
+        if str(self.settings.os) != "OHOS":
+            return
+        if self._has_ohos_signature(path):
+            os.chmod(path, 0o755)
+            return
+        signer = shutil.which("binary-sign-tool")
+        if not signer:
+            raise ConanInvalidConfiguration("binary-sign-tool is required to sign OHOS Go executables")
+        signed = f"{path}.signed"
+        subprocess.check_call([
+            signer,
+            "sign",
+            "-selfSign",
+            "1",
+            "-inFile",
+            path,
+            "-outFile",
+            signed,
+            "-signAlg",
+            "SHA256withECDSA",
+        ])
+        shutil.move(signed, path)
+        os.chmod(path, 0o755)
+
+    def _goos(self):
+        if str(self.settings.os) == "OHOS":
+            return "linux"
+        return str(self.settings.os).lower()
+
+    def _goarch(self):
+        arch = str(self.settings.arch)
+        return {
+            "x86_64": "amd64",
+            "x86": "386",
+            "armv8": "arm64",
+            "armv8_32": "arm",
+            "armv7": "arm",
+            "armv7hf": "arm",
+            "armv6": "arm",
+        }.get(arch, arch)
+
+    def _exe_name(self):
+        return "aqua.exe" if self._goos() == "windows" else "aqua"
+
+    def _go_executable(self):
+        candidates = []
+        if os.environ.get("GO"):
+            candidates.append(os.environ["GO"])
+        if os.environ.get("GOROOT"):
+            candidates.append(os.path.join(os.environ["GOROOT"], "bin", "go"))
+        candidates.extend([
+            os.path.expanduser("~/.harmonybrew/bin/go"),
+            os.path.expanduser("~/usr/local/go/bin/go"),
+            os.path.expanduser("~/sdk/go/bin/go"),
+        ])
+        found = shutil.which("go")
+        if found:
+            candidates.append(found)
+
+        for candidate in candidates:
+            if candidate and os.path.isfile(candidate) and self._go_version_is_supported(candidate):
+                return candidate
+        return self._ensure_go_toolchain()
+
+    def _go_version_is_supported(self, go):
+        try:
+            major, minor = self._go_version_tuple(go)
+        except (ConanInvalidConfiguration, OSError, subprocess.SubprocessError):
+            return False
+        return (major, minor) >= (1, 26)
+
+    def _check_go_version(self, go):
+        output = subprocess.check_output([go, "version"], text=True).strip()
+        self.output.info(output)
+        major, minor = self._go_version_tuple(go, output)
+        if (major, minor) < (1, 26):
+            raise ConanInvalidConfiguration(f"aqua v2.60.0 requires Go >= 1.26, got: {output}")
+
+    @staticmethod
+    def _go_version_tuple(go, output=None):
+        if output is None:
+            output = subprocess.check_output([go, "version"], text=True).strip()
+        match = re.search(r"go(\d+)\.(\d+)", output)
+        if not match:
+            raise ConanInvalidConfiguration(f"Unable to parse Go version from: {output}")
+        return int(match.group(1)), int(match.group(2))
+
+    @staticmethod
+    def _goroot_for_go(go):
+        go_path = Path(go).resolve()
+        goroot = go_path.parent.parent
+        if go_path.parent.name == "bin" and (goroot / "pkg").is_dir():
+            return str(goroot)
+        return None
+
+    @staticmethod
+    def _go_host_arch():
+        machine = platform.machine().lower()
+        return {
+            "aarch64": "arm64",
+            "arm64": "arm64",
+            "x86_64": "amd64",
+            "amd64": "amd64",
+        }.get(machine, machine)

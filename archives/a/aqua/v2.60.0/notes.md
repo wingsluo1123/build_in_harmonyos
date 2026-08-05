@@ -4,40 +4,54 @@
 
 - 软件名: aqua
 - 版本: v2.60.0
-- 类型: go 工具 (prebuilt binary)
-- 编译日期: 2026-08-05
+- 类型: go 工具
 - 上游仓库: https://github.com/aquaproj/aqua
+- 编译日期: 2026-08-05
 
 ## 编译过程
 
 ### 编译方式
 
-使用上游预编译的 linux/arm64 二进制包：
-- 上游发布: https://github.com/aquaproj/aqua/releases/download/v2.60.0/aqua_linux_arm64.tar.gz
-- SHA256: 695e04849161feced95cda06f37f8032287168b19b6eebf2c75c8fe0069e23d1
-- OHOS CI worker 不提供 Go 工具链，使用上游预编译二进制
+Go 项目，使用 `go build` 直接编译：
 
-### 二进制签名
+```bash
+# 环境
+eval "$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)"
+export GOPROXY="https://goproxy.cn,direct"
+export CGO_ENABLED=0
+export GOOS=linux
+export GOARCH=arm64
 
-- 使用 /data/service/hnp/bin/binary-sign-tool 对二进制进行 OHOS 平台签名
-- 使用 /data/service/hnp/bin/llvm-objcopy 移除 .codesign 段
+# 编译（使用 ldflags 注入版本号）
+cd $BUILD_SRC_DIR
+go build -ldflags="-s -w -X main.version=v2.60.0" -o aqua ./cmd/aqua
+```
+
+- Go 版本: go1.26.5 (linux/arm64)
+- Go 模块: github.com/aquaproj/aqua/v2
+- 入口: cmd/aqua/main.go
+- 版本注入: `var version = ""` 在 main.go，通过 ldflags `-X main.version=v2.60.0` 设置
+- CGO: 禁用 (CGO_ENABLED=0)
 
 ### 验证
 
-- 二进制文件: bin/aqua
-- 功能验证: aqua --help ✅, aqua version ✅ (本地 conan create 验证通过)
-- test_package: 3/3 通过 (test_aqua.py: --help, version)
-- binary-sign-tool: ✅ 签名成功，二进制可在 HarmonyOS 上执行
+- 二进制文件: `$TEST_PREFIX/bin/aqua`
+- 功能验证: `aqua version` → `v2.60.0` ✅
+
+### 依赖
+
+- 无外部 C/C++ 依赖
+- Go 模块依赖通过 GOPROXY 自动解析
 
 ## 制品信息
 
-- 制品包: aqua-v2.60.0-ohos-aarch64 (Conan 包)
-- 内容: bin/aqua, licenses/LICENSE, share/doc/aqua/README.md
+- 制品: `bin/aqua` (23MB, ELF aarch64)
 
 ## 备注
 
-此软件通过上游预编译二进制打包创建，无需本地 Go 工具链。
+此软件为纯 Go 项目，无 C/C++ 依赖，无 configure/make 构建系统。
+使用 `go build` 直接编译，通过 ldflags 注入版本号。
 ---
 
-**编译结束**: 2026-08-05 01:17
+**编译结束**: 2026-08-05 20:40
 **最终状态**: built

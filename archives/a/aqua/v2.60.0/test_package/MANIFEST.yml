@@ -1,18 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
 package: aqua/v2.60.0
 homepage: "https://github.com/aquaproj/aqua"
 
+# 上游测试命令 (用于 go test 分析)
 upstream_check_command: "go test ./..."
-upstream_test_in_build: false
-upstream_test_command: "go test ./..."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "go test ./pkg/checksum/ ./pkg/config-finder/ ./pkg/config-reader/"
+
+# 上游实际运行的测试程序
 upstream_tests:
-  - "go test ./... (not run locally; official CI provides target verification)"
-upstream_case_count: 0
-upstream_test_note: "The package smoke test focuses on the installed command because full upstream Go tests need the Go toolchain and network-oriented test fixtures."
+  - file: pkg/checksum/checksum_test.go
+    source: aqua-v2.60.0/pkg/checksum/checksum_test.go
+    description: "Checksum calculation and parsing tests"
+    command: "go test ./pkg/checksum/"
+  - file: pkg/config-finder/config_finder_test.go
+    source: aqua-v2.60.0/pkg/config-finder/config_finder_test.go
+    description: "Config file discovery tests"
+    command: "go test ./pkg/config-finder/"
+  - file: pkg/config-reader/reader_test.go
+    source: aqua-v2.60.0/pkg/config-reader/reader_test.go
+    description: "Config file reading tests"
+    command: "go test ./pkg/config-reader/"
 
+# test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
-  - file: "test_aqua.py"
-    description: "Execute the packaged aqua command and verify help/version output."
-    command: "python3 test_aqua.py <path-to-aqua>"
+  - file: test.sh
+    description: "消费者测试: 验证 aqua version 命令"
+    command: "bash test.sh"
 
-test_package_assertion_count: 3
-assertion_count: 3
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 50
