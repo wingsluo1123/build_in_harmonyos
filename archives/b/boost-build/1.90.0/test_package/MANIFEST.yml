@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration
+# CI script (build_and_test.sh L0e) requires this file to exist
+
+package: boost-build/1.90.0
+homepage: "https://github.com/boostorg/build"
+
+# boost-build uses b2's own test runner (test/test_system.py), not make check
+upstream_check_command: ""
+
+# conanfile.py build() method does not integrate upstream tests
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream tests (from boost-build test/ directory)
+upstream_tests:
+  - file: test/test_system.py
+    source: boost-build-1.90.0/test/test_system.py
+    description: "Core Jam language and build system test suite"
+    command: "b2 test"
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: hello.cpp
+    description: "Build a simple C++ project with b2 to verify it works"
+    command: "b2 toolset=clang"
+
+assertion_count: 2
