@@ -6,11 +6,19 @@
 set -euo pipefail
 
 # Test 1: aws-shell entry point exists in PATH
-AWS_SHELL_PATH=$(which aws-shell)
+AWS_SHELL_PATH=$(command -v aws-shell || true)
+if [ -z "$AWS_SHELL_PATH" ]; then
+    echo "[fail] aws-shell not found in PATH"
+    exit 1
+fi
 echo "[ok] aws-shell found at: $AWS_SHELL_PATH"
 
 # Test 2: aws-shell-mkindex entry point exists in PATH
-AWS_MKINDEX_PATH=$(which aws-shell-mkindex)
+AWS_MKINDEX_PATH=$(command -v aws-shell-mkindex || true)
+if [ -z "$AWS_MKINDEX_PATH" ]; then
+    echo "[fail] aws-shell-mkindex not found in PATH"
+    exit 1
+fi
 echo "[ok] aws-shell-mkindex found at: $AWS_MKINDEX_PATH"
 
 # Test 3: awsshell Python package is discoverable
@@ -56,6 +64,9 @@ python3 -c "
 import importlib.util, os, sys
 
 spec = importlib.util.find_spec('awsshell')
+if not spec or not spec.origin:
+    print('[fail] Cannot find awsshell package')
+    sys.exit(1)
 pkg_dir = os.path.dirname(spec.origin)
 
 sub_spec = importlib.util.spec_from_file_location(
@@ -73,9 +84,12 @@ print('[ok] awsshell.substring API call successful')
 
 # Test 6: Verify data files exist (completion data)
 python3 -c "
-import importlib.util, os
+import importlib.util, os, sys
 
 spec = importlib.util.find_spec('awsshell')
+if not spec or not spec.origin:
+    print('[fail] Cannot find awsshell package')
+    sys.exit(1)
 pkg_dir = os.path.dirname(spec.origin)
 data_dir = os.path.join(pkg_dir, 'data')
 if os.path.isdir(data_dir):

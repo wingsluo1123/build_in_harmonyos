@@ -21,7 +21,6 @@ class AwsShellConan(ConanFile):
     description = "AWS Shell - The interactive productivity booster for the AWS CLI"
     license = "Apache License 2.0"
     homepage = "https://github.com/awslabs/aws-shell"
-    url = ""  # CI fills this
 
     package_type = "application"
 
