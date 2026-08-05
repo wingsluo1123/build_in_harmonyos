@@ -17,8 +17,9 @@ int main(void) {
     /* Verify error codes are registered correctly */
     const char *err_name = aws_error_name(AWS_ERROR_COMPRESSION_UNKNOWN_SYMBOL);
     const char *expected = "AWS_ERROR_COMPRESSION_UNKNOWN_SYMBOL";
-    if (strcmp(err_name, expected) != 0) {
-        fprintf(stderr, "FAIL: error name mismatch: got %s, expected %s\n", err_name, expected);
+    if (err_name == NULL || strcmp(err_name, expected) != 0) {
+        fprintf(stderr, "FAIL: error name mismatch: got %s, expected %s\n",
+                err_name ? err_name : "(null)", expected);
         aws_compression_library_clean_up();
         aws_common_library_clean_up();
         return 1;
