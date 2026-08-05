@@ -4,7 +4,7 @@
 - 构建系统: makefile (data-only package)
 - 编译日期: 2026-08-05
 - 编译器: N/A (no compilation needed)
-- 状态: published
+- 状态: built
 
 ## 源码说明
 - 版本 20250416 不在 Debian FTP 上存在（可用版本: 20241223, 20250419, 20260601）

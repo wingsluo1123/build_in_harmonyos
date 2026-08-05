@@ -23,7 +23,7 @@ class CaCertificatesConan(ConanFile):
     description = "Mozilla CA root certificate bundle for TLS trust"
     license = "MPL-2.0"
     homepage = "https://salsa.debian.org/debian/ca-certificates"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
     settings = "os", "arch"
