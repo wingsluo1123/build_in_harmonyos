@@ -29,7 +29,6 @@ class DarkiceConan(ConanFile):
     description = "DarkIce is a live audio streamer that records audio from an audio interface and streams it to an Icecast or ShoutCast server"
     license = "GPL-3.0"
     homepage = "https://github.com/rafael2k/darkice"
-    url = ""
 
     package_type = "application"
 
@@ -87,9 +86,9 @@ class DarkiceConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # Source ships only configure.in; run autoreconf to generate
-        # configure, Makefile.in, config.guess, etc.
-        # PKG_CHECK_MODULES requires pkg.m4 on ACLOCAL_PATH.
+        # Set up ACLOCAL_PATH for autoreconf (pkg.m4 for PKG_CHECK_MODULES)
+        # and PKG_CONFIG_PATH for system deps. These are set via os.environ
+        # so they're inherited by all subprocesses.
         aclocal_paths = []
         for p in [
             "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
@@ -99,21 +98,23 @@ class DarkiceConan(ConanFile):
         ]:
             if os.path.isdir(p) and p not in aclocal_paths:
                 aclocal_paths.append(p)
-        existing = os.environ.get("ACLOCAL_PATH", "")
-        if existing:
-            aclocal_paths.append(existing)
-        os.environ["ACLOCAL_PATH"] = ":".join(aclocal_paths)
+        if aclocal_paths:
+            os.environ["ACLOCAL_PATH"] = ":".join(aclocal_paths)
 
-        # Also ensure system pkg-config path covers cmd-pkg installs
-        # (alsa, faac, fdk-aac, jack, samplerate) so configure auto-detect works.
+        # System pkg-config path for cmd-pkg installs (alsa, faac, etc.)
         sys_pkg = os.path.expanduser("~/usr/local/lib/pkgconfig")
-        cur_pkg = os.environ.get("PKG_CONFIG_PATH", "")
-        if sys_pkg not in cur_pkg:
-            os.environ["PKG_CONFIG_PATH"] = sys_pkg + (":" + cur_pkg if cur_pkg else "")
+        if os.path.isdir(sys_pkg):
+            cur = os.environ.get("PKG_CONFIG_PATH", "")
+            if sys_pkg not in cur:
+                os.environ["PKG_CONFIG_PATH"] = sys_pkg + (":" + cur if cur else "")
 
-        # Run autoreconf in the source folder (not build folder)
+        # Run autoreconf in the source folder.
+        # Note: NOT using env="conanbuild" for autoreconf because the
+        # conanbuild env script may not preserve os.environ changes.
+        # autoreconf only needs autotools + ACLOCAL_PATH, not the compiler
+        # toolchain which Autotools.configure() will provide later.
         src = self.source_folder
-        self.run(f'cd "{src}" && autoreconf -fi', env="conanbuild")
+        self.run('cd "{}" && autoreconf -fi'.format(src))
 
         # Fix: autoconf's config.status uses umask 077 when creating temp
         # directories, which triggers SELinux denial on HarmonyOS (E046).
