@@ -1,0 +1,55 @@
+software: pam-wrapper
+version: "1.1.8"
+status: built
+build_system: cmake
+build_date: "2026-08-06"
+issue: 1763
+
+source:
+  url: "https://ftp.samba.org/pub/cwrap/pam_wrapper-1.1.8.tar.gz"
+  sha256: "6549c0b3e41d1ebe0c94a1be63c25eec918191462b602ab6f47d4a5fa709c3e4"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  options:
+    - "UNIT_TESTING=OFF by default"
+    - "with_upstream_tests=True enables UNIT_TESTING=ON and runs ctest"
+
+dependencies:
+  hard:
+    - "linux-pam/1.7.2"
+  runtime:
+    - "POSIX dynamic loader with LD_PRELOAD support"
+test_dependencies:
+  - "cmocka/2.0.2 when with_upstream_tests=True"
+
+patches:
+  - "0001-use-conan-pam-paths.patch"
+
+platform_requirements:
+  - "POSIX dynamic loader with LD_PRELOAD support"
+  - "A PAM implementation providing headers under security/ and libpam"
+  - "Writable service/passdb directory for PAM_WRAPPER_SERVICE_DIR and pam_matrix test data"
+
+verification:
+  local:
+    - "Downloaded official source tarball and computed sha256"
+    - "Inspected CMakeLists.txt, ConfigureChecks.cmake, src/, modules/, python/, and tests/"
+    - "Prepared Conan recipe and non-empty test_package"
+    - "ast.parse checked conanfile.py and test_package/conanfile.py"
+    - "git diff --check -- archives/p/pam-wrapper/1.1.8"
+  ohos_real_device:
+    - "Run: /storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-pam-wrapper-pam-wrapper-1.1.8-r3-conan4-20260806-014917-45723"
+    - "L0 pass: conan create completed"
+    - "L1 pass: test_package executed and printed pam-wrapper libpamtest authentication check passed"
+    - "L2 skip: no bin/ directory"
+    - "L4 pass: patch scan clean"
+    - "L5 pass: lib/ has content"
+
+next_commands:
+  optional_w0_on_ohos:
+    - "conan download \"cmocka/2.0.2\" -r=ohpcd --only-recipe"
+  real_device_or_shadow_ci:
+    - "CI_PACKAGES=\"archives/p/pam-wrapper/1.1.8\" zsh ci/conan/build_and_test.sh"
+    - "/path/to/run-ohos-shadow-ci.sh archives/p/pam-wrapper/1.1.8"

@@ -1,0 +1,47 @@
+--- a/ConfigureChecks.cmake
++++ b/ConfigureChecks.cmake
+@@ -33,2 +33,8 @@
+ # HEADERS
++if (PAM_INCLUDE_DIRS)
++    list(APPEND CMAKE_REQUIRED_INCLUDES ${PAM_INCLUDE_DIRS})
++elseif (PAM_INCLUDE_DIR)
++    list(APPEND CMAKE_REQUIRED_INCLUDES ${PAM_INCLUDE_DIR})
++endif()
++
+ check_include_file(sys/types.h HAVE_SYS_TYPES_H)
+@@ -177,2 +183,5 @@
+     find_library(DLFCN_LIBRARY dl)
++    if (NOT DLFCN_LIBRARY)
++        set(DLFCN_LIBRARY "")
++    endif()
+ endif (HAVE_LIBDL)
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -10,2 +10,3 @@
+                                ${pam_wrapper-headers_SOURCE_DIR}
++                               ${PAM_INCLUDE_DIRS}
+                                ${pam_wrapper_BINARY_DIR})
+@@ -47,4 +48,4 @@
+-set(PAM_LIBRARIES pam)
++set(PAM_LIBRARIES ${PAM_LIBRARY})
+ if (HAVE_PAM_MISC)
+-	list(APPEND PAM_LIBRARIES pam_misc)
++    list(APPEND PAM_LIBRARIES ${PAM_MISC_LIBRARY})
+ endif (HAVE_PAM_MISC)
+@@ -58,2 +59,3 @@
+                                $<INSTALL_INTERFACE:include>)
++target_include_directories(pamtest PRIVATE ${PAM_INCLUDE_DIRS})
+ add_library(pamtest::pamtest ALIAS pamtest)
+--- a/src/modules/CMakeLists.txt
++++ b/src/modules/CMakeLists.txt
+@@ -5,4 +5,4 @@
+-set(PAM_LIBRARIES pam)
++set(PAM_LIBRARIES ${PAM_LIBRARY})
+ if (HAVE_PAM_MISC)
+-	list(APPEND PAM_LIBRARIES pam_misc)
++    list(APPEND PAM_LIBRARIES ${PAM_MISC_LIBRARY})
+ endif (HAVE_PAM_MISC)
+@@ -14,2 +14,3 @@
+                                    ${pam_wrapper-headers_SOURCE_DIR}
++                                   ${PAM_INCLUDE_DIRS}
+                                    ${pam_wrapper_BINARY_DIR})
