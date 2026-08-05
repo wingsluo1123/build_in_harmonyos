@@ -7,10 +7,7 @@
 int main(void) {
     /* Initialize the aws-c-common library with the default allocator */
     struct aws_allocator *allocator = aws_default_allocator();
-    if (aws_common_library_init(allocator) != 0) {
-        fprintf(stderr, "FAIL: aws_common_library_init failed\n");
-        return 1;
-    }
+    aws_common_library_init(allocator);
 
     /* Create a string and verify its contents */
     const char *test_str = "Hello, OHOS!";
