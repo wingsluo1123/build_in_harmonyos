@@ -2,7 +2,7 @@
 # test_package/test.sh — smoke test for the asciiquarium Perl script
 # Runs in conanrun env (PATH includes the installed bin/)
 # R34: genuinely exercises the tested package's binary.
-set -eu
+set -euo pipefail
 
 # 1. Check the script exists in the package
 SCRIPT_PATH=$(command -v asciiquarium 2>/dev/null || echo "")

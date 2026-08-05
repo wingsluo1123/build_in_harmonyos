@@ -26,7 +26,7 @@ class AsciiquariumConan(ConanFile):
     description = "An aquarium/sea animation in ASCII art for terminal"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/nothub/asciiquarium"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
@@ -34,6 +34,9 @@ class AsciiquariumConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def requirements(self):
+        pass  # No conan dependencies (Perl modules are not conan packages)
 
     def layout(self):
         basic_layout(self)
