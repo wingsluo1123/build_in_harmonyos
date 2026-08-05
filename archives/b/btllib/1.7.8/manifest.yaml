@@ -12,10 +12,10 @@ version: "1.7.8"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-16"
+build_date: "2026-08-05"
 
 # ============================================================
 # 源码信息
@@ -26,7 +26,7 @@ source:
   url: "https://github.com/BirolLab/btllib/archive/refs/tags/v1.7.8.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "1bfc83f639d04dd55d57c5bc32c1b12cfd77fac571220655e443f41243205c5f"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -44,14 +44,37 @@ build:
   # 配置选项列表
   configure_options:
     - "--prefix=$DEFAULT_PREFIX"
+    - "-Db_coverage=false"
+    - "-Dwerror=false"
 
   # 编译依赖列表（格式: name/version）
-  dependencies:
-    - openmp/5.0
+  # OpenMP provided by system clang, no conan dependency needed
+  dependencies: []
 
   # 编译器
   cc: clang
   cxx: clang++
+
+  # Git submodules (cloned in conanfile.py source())
+  submodules:
+    - name: cpptoml
+      url: "https://github.com/skystrife/cpptoml.git"
+      commit: "fededad7169e538ca47e11a9ee9251bc361a9a65"
+    - name: sdsl-lite
+      url: "https://github.com/simongog/sdsl-lite.git"
+      commit: "c32874cb2d8524119f25f3b501526fe692df29f4"
+    - name: argparse
+      url: "https://github.com/p-ranav/argparse.git"
+      commit: "15d745f58481158ceb65f860e379deac9f722b5d"
+    - name: meta-cmake (nested in cpptoml)
+      url: "https://github.com/meta-toolkit/meta-cmake.git"
+      commit: "db7ff976c430a6cb6cbd03ae691be04cfaac0a07"
+    - name: googletest (nested in sdsl-lite)
+      url: "https://github.com/google/googletest.git"
+      commit: "c2d90bddc6a2a562ee7750c14351e9ca16a6a37a"
+    - name: libdivsufsort (nested in sdsl-lite)
+      url: "https://github.com/simongog/libdivsufsort.git"
+      commit: "0f24acd8de208464769c782119dacf158647f7ed"
 
 # ============================================================
 # 补丁信息
@@ -73,29 +96,35 @@ patches_applied:
   - "0012-scripts-quality-assurance.patch"
   - "0013-scripts-sanitize.patch"
   - "0014-scripts-test-wrappers.patch"
-  - "0015-subprojects-cpptoml-CMakeLists.txt.patch"
-  - "0016-subprojects-sdsl-lite-CMakeLists.txt.patch"
-  - "0017-subprojects-sdsl-lite-external-googletest-googletest-CMakeLists.txt.patch"
-  - "0018-subprojects-sdsl-lite-external-libdivsufsort-CMakeLists.txt.patch"
+  - "0015-src-btllib-status.cpp.patch"
+
+# Subproject CMake version fixes applied via sed in conanfile.py source()
+subproject_fixes:
+  - "subprojects/cpptoml/CMakeLists.txt: cmake_minimum_required VERSION 3.5...4.1"
+  - "subprojects/sdsl-lite/CMakeLists.txt: cmake_minimum_required VERSION 3.5...4.1"
+  - "subprojects/sdsl-lite/external/googletest/googletest/CMakeLists.txt: cmake_minimum_required VERSION 3.5...4.1"
+  - "subprojects/sdsl-lite/external/libdivsufsort/CMakeLists.txt: cmake_minimum_required VERSION 3.5...4.1"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "strerror_r returns int (POSIX) on HarmonyOS, not char* (GNU); need __OHOS__ guard"
+  - "Python wrappers fail on HarmonyOS due to getcwd issues; disabled via meson.build patch"
+  - "Submodules must be cloned manually in conanfile.py source() since tarball excludes them"
+  - "OpenMP provided by system clang, no conan dependency needed"
+  - "CMake 4.x requires cmake_minimum_required >= 3.5"
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/btllib-1.7.8.orig
-  source_work_dir: /storage/Users/currentUser/builds/btllib-1.7.8.work
-  source_orig_hash: 7a3f919af0f1fd02
-  source_work_hash: a3d18c8535c83cf5
-  generated_at: '2026-06-16T16:48:47'
-  patches_count: 18
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/btllib-1.7.8.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/btllib-1.7.8.work
+  source_orig_hash: 16f00bb346406170
+  source_work_hash: e59380e3f5cd4474
+  generated_at: '2026-08-05T12:10:50'
+  patches_count: 15
 
 patch_classification:
   - file: 0001-meson.build.patch
@@ -154,19 +183,7 @@ patch_classification:
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0015-subprojects-cpptoml-CMakeLists.txt.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0016-subprojects-sdsl-lite-CMakeLists.txt.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0017-subprojects-sdsl-lite-external-googletest-googletest-CMakeLists.txt.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0018-subprojects-sdsl-lite-external-libdivsufsort-CMakeLists.txt.patch
+  - file: 0015-src-btllib-status.cpp.patch
     type: auto
     platform_only: True
     guard: 'pending'

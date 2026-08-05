@@ -78,12 +78,7 @@ $ ls ~/usr/local/include/btllib/
 
 - 测试被禁用（缺少 samtools），无法进行完整的测试验证
 - 所有子项目的 CMakeLists.txt 都需要修改 CMake 版本要求
-- 所有 bash 脚本需要修改 shebang 以适配鸿蒙系统
----
-
-**编译结束**: 2026-06-16 16:48
-**最终状态**: published
-## 补丁修复记录（2026-06-16）
+- 所有 bash 脚本需要修改 shebang 以适配鸿蒙系统## 补丁修复记录（2026-06-16）
 
 ### 问题诊断
 1. edit-tracker.json记录了编辑但实际源码未修改（可能被覆盖）
@@ -115,3 +110,7 @@ $ ls ~/usr/local/include/btllib/
 - G0干净构建验证因Python subprocess平台限制无法自动完成
 - 手动验证meson setup成功，补丁应用正确
 - 实际编译已成功通过，预编译包已制作
+---
+
+**编译结束**: 2026-08-05 12:10
+**最终状态**: built
