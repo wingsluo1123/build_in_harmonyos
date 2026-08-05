@@ -58,7 +58,7 @@ class AprUtilConan(ConanFile):
         configure_path = os.path.join(self.source_folder, "configure")
         with open(configure_path, "r") as f:
             content = f.read()
-        content = content.replace("umask 077", "umask 000")
+        content = content.replace("umask 077", "umask 022")
         with open(configure_path, "w") as f:
             f.write(content)
 
