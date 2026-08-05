@@ -15,6 +15,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 static int g_failed = 0;
 static int g_total = 0;
@@ -85,7 +86,8 @@ int main() {
         const QSizeF sz = pg->pageSize();
         char d[64];
         std::snprintf(d, sizeof(d), "%.0fx%.0f", sz.width(), sz.height());
-        check(sz.width() == 300.0 && sz.height() == 200.0, "页面尺寸 300x200", d);
+        check(std::abs(sz.width() - 300.0) < 1e-6 && std::abs(sz.height() - 200.0) < 1e-6,
+              "页面尺寸 300x200", d);
 
         // 真正渲染到 QImage——走到 Qt5 绑定 + Splash 后端，而非只解析元数据
         QImage img = pg->renderToImage(72, 72);
