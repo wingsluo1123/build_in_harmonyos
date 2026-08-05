@@ -2,8 +2,8 @@
 
 ## 软件简介
 
-Argo Workflows CLI — Kubernetes-native workflow引擎的命令行工具。  
-源码: https://github.com/argoproj/argo-workflows  
+Argo Workflows CLI — Kubernetes-native workflow引擎的命令行工具。
+源码: https://github.com/argoproj/argo-workflows
 Homebrew #771, 3965 installs。
 
 ## 编译环境
@@ -73,10 +73,17 @@ Homebrew #771, 3965 installs。
 - DESTDIR staging: $TEST_PREFIX/$DEFAULT_PREFIX/bin/argo
 - 本地安装: $DEFAULT_PREFIX/bin/argo (已签名)
 
-**编译开始**: 2026-06-01T15:09:42Z  
-**编译结束**: 2026-06-01T15:40:00Z  
-**最终状态**: published
+**编译开始**: 2026-06-01T15:09:42Z
+**编译结束**: 2026-06-01T15:40:00Z
+**最终状态**: built
+
 ---
 
-**编译结束**: 2026-08-05 19:28
-**最终状态**: built
+## Conan 配方适配 (2026-08-05)
+
+- **适配内容**: 创建 conanfile.py + conandata.yml + test_package/ + commands.json
+- **Go SDK**: goenv 安装 go1.26.3，签名后可用
+- **conan create**: PASS (源码从 gh-proxy.com 下载，go mod download + go build)
+- **test_package**: PASS (argo version + argo help smoke test, 6 assertions)
+- **W3 本地 CI 模拟**: PASS (setup.sh + build_and_test.sh)
+- **最终状态**: built (PR 阶段，待 CI 验证后合并上传)
