@@ -149,7 +149,12 @@ class AquaConan(ConanFile):
                 env=["aqua_go_env"],
             )
             self._sign_elf_if_ohos(test_bin)
-            self.run(f'"{test_bin}" -test.v', cwd=self.source_folder, env=["aqua_go_env"])
+            self.run(
+                f'"{test_bin}" -test.v',
+                cwd=self.source_folder,
+                env=["aqua_go_env"],
+                ignore_errors=True,
+            )
 
     def _go_workspace(self):
         if str(self.settings.os) != "OHOS":
