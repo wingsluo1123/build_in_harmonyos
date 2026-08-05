@@ -3,6 +3,8 @@
 
 CI runs this automatically via `conan create` (which invokes test_package).
 """
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -23,5 +25,5 @@ class CpptomlTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        bin_path = os.path.join(self.cpp.build.bindirs[0], "test_cpptoml")
+        self.run(bin_path, env="conanrun")
