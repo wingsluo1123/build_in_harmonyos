@@ -6,33 +6,19 @@
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "0.27.5"
-
-# 软件名
 software: "aws-c-io"
-
-# 编译状态
-# published | built | failed | archived
 status: built
-
-# 编译日期（YYYY-MM-DD）
 build_date: "2026-07-27"
-build_system: "cmake"
+build_system: cmake
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://github.com/awslabs/aws-c-io/archive/refs/tags/v0.27.5.tar.gz"
-
-  # 源码校验和
   sha256: "aa132d5a728f18ab8e0a6ea96d3d2f7e66bc8d3fe029d9ed1b05c06aa0c5b900"
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -40,23 +26,14 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: cmake
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  configure_options:
+    - "-DBUILD_TESTING=OFF"
+    - "-DBYO_CRYPTO=ON"
+  dependencies:
+    - aws-c-common/0.14.3
+    - aws-c-cal/0.9.15
+    - aws-lc/5.4.0
   cc: clang
   cxx: clang++
 
@@ -64,17 +41,16 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-CMakeLists-add-harmonyos-platform.patch"
+  - "0002-CMakeLists-add-threads-before-cal.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "BYO_CRYPTO=ON disables s2n-tls TLS backend, basic IO still available"
+  - "Uses CMAKE_PREFIX_PATH instead of CMakeDeps for AWS CMake module compatibility"
+  - "find_package(Threads) must be called before find_package(aws-c-cal) for crypto-config.cmake"
+  - "HarmonyOS platform patch needed for epoll event loop detection"
