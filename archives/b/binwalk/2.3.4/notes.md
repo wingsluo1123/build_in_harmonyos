@@ -59,12 +59,11 @@ Usage: binwalk [OPTIONS] [FILE1] [FILE2] [FILE3] ...
 2. 需要修改源码以兼容 Python 3.12（imp 模块已移除）
 3. wrapper script 需使用鸿蒙的 bash 路径：`/data/service/hnp/bin/bash`
 4. v3 (Rust版本) 在鸿蒙上无法编译，需要使用 v2 (Python版本)
-
----
-
-**编译结束**: 2026-06-05 10:55
-**最终状态**: built
 ---
 
 **编译结束**: 2026-06-05 10:57
+**最终状态**: built
+---
+
+**编译结束**: 2026-08-05 10:00
 **最终状态**: built
