@@ -102,12 +102,14 @@ class StkConan(ConanFile):
         # and it is set for every configuration, not per-OS.
         # __STK_REALTIME__ stays undefined: no realtime audio backend is built.
         tc.preprocessor_definitions["__OS_LINUX__"] = 1
-        # R8: advertise whether pthread_testcancel is available. The patched
-        # Thread.cpp guards pthread_cancel()/pthread_testcancel() on this macro
-        # (by value), so on OHOS -- where musl omits pthread_testcancel -- the
-        # cancel paths compile out instead of failing on the undeclared call.
-        tc.preprocessor_definitions["STK_HAVE_PTHREAD_CANCEL"] = (
-            1 if self._has_pthread_testcancel() else 0)
+        # R8: advertise whether pthread_cancel()/pthread_testcancel() are
+        # *declared* (not merely linkable).  The patched Thread.cpp guards the
+        # cancel paths on STK_HAVE_PTHREAD_CANCEL (by value), so on OHOS -- where
+        # musl omits the declarations -- the paths compile out.  We pass the
+        # probe result as a CMake cache variable here (the mechanism that is
+        # actually honoured by Conan's direct cmake invocation); the CMakeLists
+        # patch deliberately no longer runs check_symbol_exists(), which returns
+        # a false positive on OHOS (the symbol links but is undeclared).
         tc.generate()
 
     def build(self):
@@ -135,6 +137,12 @@ class StkConan(ConanFile):
             "COMPILE_PROJECTS": "OFF",
             "ENABLE_ALSA": "OFF",
             "ENABLE_JACK": "OFF",
+            # Declaration-based probe result for thread cancellation.  Passed as
+            # a CMake cache variable (honoured by Conan's cmake invocation) so
+            # the patched Thread.cpp compiles the cancel paths out on OHOS,
+            # where pthread_cancel()/pthread_testcancel() are undeclared.
+            "STK_HAVE_PTHREAD_CANCEL": (
+                "1" if self._has_pthread_testcancel() else "0"),
         })
         cmake.build()
 
