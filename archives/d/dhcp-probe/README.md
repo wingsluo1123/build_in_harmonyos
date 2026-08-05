@@ -1,6 +1,6 @@
 # dhcp-probe
 
-DHCP 网络探测工具，用于检测网络中的 DHCP 服务器响应。
+Attempts to discover DHCP and BootP servers on a network.
 
 ## 功能特性
 
@@ -14,14 +14,14 @@ DHCP 网络探测工具，用于检测网络中的 DHCP 服务器响应。
 
 | 版本 | 状态 | 发布日期 |
 |------|------|----------|
-| 1.3.1 | ✅ published | 2026-05-29 |
+| 1.3.1 | ✅ published | 2026-08-06 |
 
 ## 依赖
 
-- libnet >= 1.2 (网络数据包构造)
-- libpcap (数据包捕获)
+- libpcap >= 1.0 (数据包捕获) — Conan: libpcap/1.10.6
+- libnet >= 1.2 (网络数据包构造) — Conan: libnet/1.2
 
 ## 相关链接
 
-- 官方网站: https://www.yellowdogis.com/software/dhcp_probe/
-- 源码下载: https://www.yellowdogis.com/software/dhcp_probe/dhcp_probe-1.3.1.tar.gz
+- 官方网站: https://www.net.princeton.edu/software/dhcp_probe/
+- 源码下载: https://www.net.princeton.edu/software/dhcp_probe/dhcp_probe-1.3.1.tar.gz
