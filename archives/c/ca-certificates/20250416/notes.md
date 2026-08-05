@@ -39,6 +39,9 @@ ca-certificates 是纯数据包，不需要 C/C++ 编译。主要工作：
 ## 交付物
 - 150 个 Mozilla CA 证书文件 (share/ca-certificates/mozilla/*.crt)
 - update-ca-certificates 脚本 (sbin/)
+
+编译结束: 2026-08-05
+最终状态: built
 ---
 
 **编译结束**: 2026-08-05 13:11
