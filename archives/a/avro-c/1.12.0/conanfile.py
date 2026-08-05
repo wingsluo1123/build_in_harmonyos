@@ -66,6 +66,8 @@ class AvroCConan(ConanFile):
     def source(self):
         # Manual download + extract: codeload URL lacks .tar.gz extension
         from conan.tools.files import download
+        # Save the original source_folder (root) before generate() changes it
+        self._source_root = self.source_folder
         sources = self.conan_data["sources"][self.version]
         archive = "avro-src-1.12.0.tar.gz"
         download(self, url=sources["url"], filename=archive, sha256=sources.get("sha256"))
@@ -87,7 +89,9 @@ class AvroCConan(ConanFile):
         # Point CMake to lang/c/ subdirectory of the extracted Avro tarball
         self.folders.source = os.path.join("lang", "c")
         tc = CMakeToolchain(self)
-        tc.variables["CMAKE_EXE_LINKER_FLAGS"] = "-lc++"
+        # snappy is a C++ library; linking into C project needs libc++ (Clang only)
+        if self.settings.compiler == "clang":
+            tc.variables["CMAKE_EXE_LINKER_FLAGS"] = "-lc++"
         tc.generate()
         cd = CMakeDeps(self)
         cd.generate()
@@ -100,7 +104,9 @@ class AvroCConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
-        copy(self, "LICENSE", src=self.source_folder,
+        # Copy license from the original source root (before folders.source change)
+        src_root = getattr(self, "_source_root", self.source_folder)
+        copy(self, "LICENSE", src=src_root,
              dst=os.path.join(self.package_folder, "licenses"))
 
     def package_info(self):
