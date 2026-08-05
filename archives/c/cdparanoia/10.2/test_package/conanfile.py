@@ -23,5 +23,5 @@ class CdparanoiaTestConan(ConanFile):
 
     def test(self):
         # Run test binary directly instead of CTest to avoid CTest exit code issues
-        exe = os.path.join(self.cpp.build.bindirs[0], "test_cdparanoia")
+        exe = os.path.join(self.build_folder, "test_cdparanoia")
         self.run(f'"{exe}"', env="conanrun")
