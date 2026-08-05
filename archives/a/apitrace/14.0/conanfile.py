@@ -100,7 +100,6 @@ class ApitraceConan(ConanFile):
         tc.variables["ENABLE_CLI"] = "ON"
         tc.variables["ENABLE_X11"] = "OFF"  # OHOS has no X11
         tc.variables["ENABLE_EGL"] = "ON"   # OHOS has EGL
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         if self.settings.os in ("Linux", "OHOS"):
             tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
         tc.generate()
