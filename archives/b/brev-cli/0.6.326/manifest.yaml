@@ -1,31 +1,74 @@
-software:
-  name: brev-cli
-  display: Brev CLI
-  category: network
-  description: Cloud development environment connector
+# 版本级 manifest
+# 文件位置: archives/b/brev-cli/0.6.326/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
 
-version:
-  number: 0.6.326
-  status: built
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.6.326"
+
+software: "brev-cli"
+
+status: built
+
+build_date: "2026-08-05"
+build_system: "go"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/brevdev/brev-cli/archive/refs/tags/v0.6.326.tar.gz"
+  sha256: "582aa4307abefe7914f3988fadd28d059fbd14977fa5c90cbe4a45dba66e3aff"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
 
 build:
   system: go
   configure_options: []
-  date: 2026-06-08
-  go_version: 1.26.1
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  go_version: "1.26.1"
   cgo_enabled: false
   build_tags: ["!nvml"]
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-disable-nvml-build-tag.patch"
+
+# ============================================================
+# 产物信息
+# ============================================================
 
 artifacts:
   binaries:
     - bin/brev
-  size: 39M
 
-dependencies:
-  runtime:
-    - go-runtime (optional)
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "brev-cli 是 Go 应用，HMDFS 无法执行 static ET_EXEC 的 Go 工具链"
+  - "Go -buildmode=pie 生成 PIE (ET_DYN) 二进制，HMDFS 可执行"
+  - "NVML GPU 探测需要 CGO，禁用后纯 Go 编译"
+  - "本机无 Go 工具链，需依赖 CI runner 交叉编译"
+
+platform_limitations:
+  - "HMDFS 仅执行 PIE (ET_DYN) 二进制，Go 默认 static ET_EXEC 被拒"
+  - "NVML 依赖 NVIDIA CGO 库，鸿蒙平台无此依赖"
+  - "本机无 Go 工具链，无法本地 go build"
 
 special_notes:
-  - NVML support disabled (requires CGO and NVIDIA libraries)
-  - Pure Go build for portability
-  - May need ELF signature on HongMeng systems
+  - "NVML support disabled (requires CGO and NVIDIA libraries)"
+  - "Pure Go build for portability"
+  - "May need ELF signature on HongMeng systems"
