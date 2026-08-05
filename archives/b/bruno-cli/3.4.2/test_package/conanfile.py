@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Test package — bruno-cli 3.4.2 consumer test."""
+
 import os
 
 from conan import ConanFile
