@@ -17,7 +17,7 @@ class BoostBuildConan(ConanFile):
     description = "Boost.Build (b2) - a C++ build system from the Boost project"
     license = "BSL-1.0"
     homepage = "https://github.com/boostorg/build"
-    url = ""  # CI fills this
+    url = "https://github.com/boostorg/build"
 
     package_type = "application"
 
