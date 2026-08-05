@@ -95,4 +95,11 @@ class AbiwordPluginEmlTestConan(ConanFile):
             self.output.info("  [ok] abi_plugin_unregister symbol is available")
 
         except OSError as e:
-            raise AssertionError(f"Failed to load .so via ctypes.CDLL: {e}")
+        # Method 2: Use ctypes to attempt loading the .so (native only)
+        from conan.tools.build import can_run
+        if not can_run(self):
+            self.output.info("Cross-compiling detected, skipping ctypes.CDLL load test")
+            return
+        self.output.info("Attempting to load .so with ctypes.CDLL...")
+        try:
+            lib = ctypes.CDLL(so_path)
