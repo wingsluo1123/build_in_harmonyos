@@ -476,7 +476,7 @@ class ApkoTestConan(ConanFile):
                ran_pkgs, compile_fail_pkgs)
         )
 
-        status = "passed" if failed == 0 and passed > 0 else "failed"
+        status = "passed" if failed == 0 and passed > 0 and compile_fail_pkgs == 0 else "failed"
         ut_result = {
             "status": status,
             "framework": "go-test",
