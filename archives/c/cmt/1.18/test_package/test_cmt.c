@@ -14,10 +14,16 @@
 
 typedef void *LADSPA_Handle;
 typedef float LADSPA_Data;
-
-typedef struct {
+/* aireview P3: test_cmt.c 自建 typedef 漏 LADSPA_Descriptor 别名致 instantiate 参数 unknown type，
+ * 前置声明非真定义致 d->Name incomplete → 改 struct _LADSPA_Descriptor {...} 真定义，
+ * 段内 instantiate 参数用 LADSPA_Descriptor �前向声明避段内自引用 unknown type */
+typedef struct _LADSPA_Descriptor LADSPA_Descriptor;
+/* aireview P3: 补 Properties 字段对齐庠 ladspa.h 钾像头真布局避 d->Name 段错位 Signal 11 */
+typedef long LADSPA_Properties;
+struct _LADSPA_Descriptor {
     unsigned long UniqueID;
     const char *Label;
+    LADSPA_Properties Properties;
     const char *Name;
     const char *Maker;
     const char *Copyright;
@@ -37,7 +43,7 @@ typedef struct {
     void (*cleanup)(LADSPA_Handle);
     /* aireview P3: 补 extension_data 末字段对齐 LADSPA 1.1 规范（当前无害但作为参考代码有误导风险） */
     const void * (*extension_data)(unsigned long Index);
-} LADSPA_Descriptor;
+};
 
 typedef const LADSPA_Descriptor *(*LADSPA_Descriptor_Function)(unsigned long Index);
 
