@@ -58,11 +58,12 @@ _UPSTREAM_MODULE = "chainguard.dev/apko"
 
 # Upstream test packages that are likely to work offline (no network,
 # no Docker). These packages have unit tests that test pure logic.
+# pkg/tarfs/ excluded: TestTarFS calls bc.BuildLayer which fetches
+# APK packages from network repositories — CI worker is network-isolated.
 _UPSTREAM_TEST_PKGS = [
     "pkg/paths/",
     "pkg/passwd/",
     "pkg/vcs/",
-    "pkg/tarfs/",
 ]
 
 
