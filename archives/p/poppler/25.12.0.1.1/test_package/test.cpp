@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 static int g_failed = 0;
 static int g_total = 0;
@@ -103,7 +104,8 @@ int main() {
         const poppler::rectf r = pg->page_rect();
         char d[96];
         std::snprintf(d, sizeof(d), "%.0fx%.0f", r.width(), r.height());
-        check(r.width() == 300.0 && r.height() == 200.0, "页面尺寸 300x200", d);
+        check(std::abs(r.width() - 300.0) < 1e-6 && std::abs(r.height() - 200.0) < 1e-6,
+              "页面尺寸 300x200", d);
 
         // ── 文本抽取：真正走到字体与内容流解析 ──────────────────────────
         const poppler::ustring txt = pg->text();
