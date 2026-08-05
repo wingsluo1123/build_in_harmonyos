@@ -40,4 +40,4 @@
 ## 注意事项
 - 无可执行二进制，safety check 跳过
 - 测试已禁用（BUILD_TESTING=OFF）
-- test_package 验证 aws_auth_library_init 返回值检查
+- test_package 调用 aws_auth_library_init 和 aws_auth_library_clean_up API（函数返回 void，无需返回值检查）

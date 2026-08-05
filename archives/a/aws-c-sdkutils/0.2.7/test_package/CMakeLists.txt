@@ -17,21 +17,11 @@ if(DEFINED aws-c-common_PACKAGE_FOLDER_RELEASE)
 elseif(DEFINED aws-c-common_PACKAGE_FOLDER_DEBUG)
     target_include_directories(test_aws_c_sdkutils PRIVATE
         ${aws-c-common_PACKAGE_FOLDER_DEBUG}/include)
-if(DEFINED aws-c-common_PACKAGE_FOLDER_RELEASE)
+elseif(DEFINED aws-c-common_PACKAGE_FOLDER)
     target_include_directories(test_aws_c_sdkutils PRIVATE
-        ${aws-c-common_PACKAGE_FOLDER_RELEASE}/include)
-elseif(DEFINED aws-c-common_PACKAGE_FOLDER_DEBUG)
-    target_include_directories(test_aws_c_sdkutils PRIVATE
-        ${aws-c-common_PACKAGE_FOLDER_DEBUG}/include)
+        ${aws-c-common_PACKAGE_FOLDER}/include)
 else()
-    # Fallback: try to use the first available config-specific package folder.
-    # CMakeDeps may define aws-c-common_PACKAGE_FOLDER for single-config generators.
-    if(DEFINED aws-c-common_PACKAGE_FOLDER)
-        target_include_directories(test_aws_c_sdkutils PRIVATE
-            ${aws-c-common_PACKAGE_FOLDER}/include)
-    else()
-        message(FATAL_ERROR "aws-c-common package folder not found for current build type")
-    endif()
+    message(FATAL_ERROR "aws-c-common package folder not found for current build type")
 endif()
 
 enable_testing()
