@@ -44,8 +44,11 @@ class AbiwordPluginEpubTestConan(ConanFile):
         so_path = epub_so[0]
         self.output.info(f"EPUB plugin found: {so_path}")
 
-        # Build the test executable via CMake, passing the .so path as TARGET_SO
-        tc = CMakeToolchain(self, variables={"TARGET_SO": so_path})
+        # Build the test executable via CMake, passing the .so path as TARGET_SO.
+        # P0: Conan 2.x CMakeToolchain 不接受 variables= 构造参数(会抛 TypeError)，
+        # 改为构造后用 tc.variables[...] 设置，再 generate()。
+        tc = CMakeToolchain(self)
+        tc.variables["TARGET_SO"] = so_path
         tc.generate()
         cmake = CMake(self)
         cmake.configure()
