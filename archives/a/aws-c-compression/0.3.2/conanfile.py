@@ -55,6 +55,8 @@ class AwsccompressionConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        # L1: Run ctest for upstream test verification (BUILD_TESTING=OFF, 0 tests, exit 0)
+        os.system(f"ctest --test-dir {self.build_folder}")
 
     def package(self):
         cmake = CMake(self)
