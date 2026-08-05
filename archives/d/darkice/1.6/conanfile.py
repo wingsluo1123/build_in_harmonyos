@@ -86,9 +86,7 @@ class DarkiceConan(ConanFile):
         tc.generate()
 
     def build(self):
-        # Set up ACLOCAL_PATH for autoreconf (pkg.m4 for PKG_CHECK_MODULES)
-        # and PKG_CONFIG_PATH for system deps. These are set via os.environ
-        # so they're inherited by all subprocesses.
+        # Find pkg.m4 location for ACLOCAL_PATH (PKG_CHECK_MODULES macro)
         aclocal_paths = []
         for p in [
             "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
@@ -98,8 +96,7 @@ class DarkiceConan(ConanFile):
         ]:
             if os.path.isdir(p) and p not in aclocal_paths:
                 aclocal_paths.append(p)
-        if aclocal_paths:
-            os.environ["ACLOCAL_PATH"] = ":".join(aclocal_paths)
+        aclocal_arg = ":".join(aclocal_paths) if aclocal_paths else ""
 
         # System pkg-config path for cmd-pkg installs (alsa, faac, etc.)
         sys_pkg = os.path.expanduser("~/usr/local/lib/pkgconfig")
@@ -108,13 +105,14 @@ class DarkiceConan(ConanFile):
             if sys_pkg not in cur:
                 os.environ["PKG_CONFIG_PATH"] = sys_pkg + (":" + cur if cur else "")
 
-        # Run autoreconf in the source folder.
-        # Note: NOT using env="conanbuild" for autoreconf because the
-        # conanbuild env script may not preserve os.environ changes.
-        # autoreconf only needs autotools + ACLOCAL_PATH, not the compiler
-        # toolchain which Autotools.configure() will provide later.
+        # Run autoreconf with env="conanbuild" (for correct PATH to find
+        # automake/aclocal) and ACLOCAL_PATH set inline (for pkg.m4).
         src = self.source_folder
-        self.run('cd "{}" && autoreconf -fi'.format(src))
+        if aclocal_arg:
+            self.run('cd "{}" && ACLOCAL_PATH="{}" autoreconf -fi'.format(
+                src, aclocal_arg), env="conanbuild")
+        else:
+            self.run('cd "{}" && autoreconf -fi'.format(src), env="conanbuild")
 
         # Fix: autoconf's config.status uses umask 077 when creating temp
         # directories, which triggers SELinux denial on HarmonyOS (E046).
