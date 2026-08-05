@@ -33,8 +33,8 @@ class ZeromqConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["BUILD_SHARED"] = "ON" if self.options.shared else "OFF"
-        tc.variables["BUILD_STATIC"] = "OFF" if self.options.shared else "ON"
+        tc.variables["BUILD_SHARED"] = "ON"
+        tc.variables["BUILD_STATIC"] = "ON"
         tc.variables["BUILD_TESTS"] = "OFF"
         tc.variables["ENABLE_DRAFTS"] = "OFF"
         tc.generate()
