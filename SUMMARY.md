@@ -2108,8 +2108,8 @@
 | **qt-mariadb** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt-mariadb/5.15.2/) |
 | **qt-mysql** | 5.15.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/q/qt-mysql/5.15.2/) |
 | **qt-unixodbc** | 5.15.2 | ✅ 已编译 |  |  | 1 | - | [📄](archives/q/qt-unixodbc/5.15.2/) |
-| **qt5-qt3d** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qt3d/5.15.2/) |
-| **qt5-qtcharts** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qtcharts/5.15.2/) |
+| **qt5-qt3d** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2.1,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qt3d/5.15.2/) |
+| **qt5-qtcharts** | 5.15.2 | ✅ 已编译 |  | qmake | - | qt5-qtbase 5.15.2.1,qt5-qtdeclarative 5.15.2 | [📄](archives/q/qt5-qtcharts/5.15.2/) |
 | **qt5-qtgraphicaleffects** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt5-qtgraphicaleffects/5.15.2/) |
 | **qt5-qtimageformats** | 5.15.2 | ✅ 已编译 |  | qmake | - | - | [📄](archives/q/qt5-qtimageformats/5.15.2/) |
 | **qt5-qtsvg** | 5.15.2 | ✅ 已编译 |  |  | - | - | [📄](archives/q/qt5-qtsvg/5.15.2/) |

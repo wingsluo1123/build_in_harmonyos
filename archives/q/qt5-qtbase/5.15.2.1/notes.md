@@ -1,4 +1,4 @@
-# qt5-qtbase 5.15.2 适配笔记
+# qt5-qtbase 5.15.2.1 适配笔记
 
 ## 编译环境
 - 构建系统: configure + make

@@ -26,7 +26,7 @@ _OHOS_SKIPPED_CORELIB_TESTS = {
 
 class Qt5QtbaseConan(ConanFile):
     name = "qt5-qtbase"
-    version = "5.15.2"
+    version = "5.15.2.1"
     description = "Qt5 Base Core, Gui, Network and Test modules for OpenHarmony"
     license = "LGPL-3.0"
     homepage = "https://www.qt.io/"
