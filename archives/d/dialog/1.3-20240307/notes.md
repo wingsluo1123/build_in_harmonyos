@@ -33,3 +33,6 @@ ncurses 未发布到 Conan 制品仓，通过 cmd-pkgs 安装静态库 (`libncur
 - `dialog --version`: PASS (Version: 1.3-20240307)
 - `conan create`: PASS (G2 验证通过)
 - `test_package`: PASS (dialog --version)
+
+## COMPLETED
+status: closed
