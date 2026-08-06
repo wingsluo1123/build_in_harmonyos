@@ -17,7 +17,7 @@ class MtoolsConan(ConanFile):
     description = "GNU mtools — collection of tools to access MS-DOS disks from Unix"
     license = "GPL-3.0-or-later"
     homepage = "https://www.gnu.org/software/mtools/"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
     settings = "os", "compiler", "build_type", "arch"
@@ -55,6 +55,29 @@ class MtoolsConan(ConanFile):
         for f in os.listdir(self.source_folder):
             if f.endswith(".orig"):
                 os.remove(os.path.join(self.source_folder, f))
+
+        # E165: Fix shebang for HarmonyOS (/bin/bash -> /data/service/hnp/bin/bash)
+        if self.settings.os in ("Linux", "OHOS"):
+            import glob as _glob
+            for script in _glob.glob(os.path.join(self.source_folder, "*")):
+                try:
+                    with open(script, "r") as fh:
+                        first_line = fh.readline()
+                    if "#!/bin/bash" in first_line:
+                        from conan.tools.files import replace_in_file
+                        replace_in_file(self, script, "#!/bin/bash", "#!/data/service/hnp/bin/bash")
+                    elif "#! /bin/bash" in first_line:
+                        from conan.tools.files import replace_in_file
+                        replace_in_file(self, script, "#! /bin/bash", "#!/data/service/hnp/bin/bash")
+                    elif "#!/bin/sh" in first_line:
+                        from conan.tools.files import replace_in_file
+                        replace_in_file(self, script, "#!/bin/sh", "#!/system/bin/sh")
+                    elif "#! /bin/sh" in first_line:
+                        from conan.tools.files import replace_in_file
+                        replace_in_file(self, script, "#! /bin/sh", "#!/system/bin/sh")
+                except (IOError, OSError, UnicodeDecodeError):
+                    pass
+
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
