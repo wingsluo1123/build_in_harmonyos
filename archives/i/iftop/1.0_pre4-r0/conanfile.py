@@ -81,7 +81,7 @@ class IftopConan(ConanFile):
     description = "Real-time bandwidth monitoring tool (display bandwidth usage on an interface by host)"
     license = "GPL-2.0-or-later"
     homepage = "https://pdw.ex-parrot.com/iftop/"
-    url = ""  # CI fills this
+    url = ""  # CI fills this — submit flow replaces with repo URL
 
     package_type = "application"
 
@@ -180,14 +180,6 @@ class IftopConan(ConanFile):
         save(self, path, content)
 
     def build(self):
-        # Pre-fix configure: remove umask 077 for HMDFS compatibility
-        # (configure is a generated file, cannot be patched via conandata)
-        configure_path = os.path.join(self.source_folder, "configure")
-        if os.path.exists(configure_path):
-            content = load(self, configure_path)
-            content = content.replace("umask 077", "umask 022")
-            save(self, configure_path, content)
-
         autotools = Autotools(self)
         autotools.configure()
 
