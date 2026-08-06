@@ -53,20 +53,20 @@ class GitLfsConan(ConanFile):
         # Try Harmonybrew
         brew_bin = "/storage/Users/currentUser/.harmonybrew/bin/brew"
         if not os.path.isfile(brew_bin):
-            # Install Harmonybrew
+            # Install Harmonybrew using self.run (uses Conan's shell/PATH)
             self.output.info("Installing Harmonybrew for Go toolchain...")
-            subprocess.run(
-                ["zsh", "-c", "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"],
-                check=True,
+            self.run(
+                'curl -fsSL https://harmonybrew.atomgit.com/install.sh | /usr/bin/zsh -',
             )
 
         # Install Go via brew
         self.output.info("Installing Go via Harmonybrew...")
-        subprocess.run([brew_bin, "install", "go"], check=True)
+        self.run(f'{brew_bin} install go')
 
         # Locate Go
         result = subprocess.run(
-            [brew_bin, "--prefix", "go"], capture_output=True, text=True
+            ["bash", "-c", f"{brew_bin} --prefix go"],
+            capture_output=True, text=True
         )
         go_prefix = result.stdout.strip()
         goroot = os.path.join(go_prefix, "libexec")
