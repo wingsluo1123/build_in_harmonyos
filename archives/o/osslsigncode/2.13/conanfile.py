@@ -11,7 +11,7 @@ class OsslsigncodeConan(ConanFile):
     description = "OpenSSL-based code signing tool for Authenticode and PE/MSI/CAB/CAT/APPX files"
     license = "GPL-3.0"
     homepage = "https://github.com/mtrojnar/osslsigncode"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
