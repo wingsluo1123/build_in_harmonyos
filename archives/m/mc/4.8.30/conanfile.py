@@ -26,6 +26,8 @@ class McConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Export gettext po-files (autopoint is skipped on CI)
+        self.copy("po-*", src="patches", dst="patches")
 
     def requirements(self):
         self.requires("glib2/2.88.0")
@@ -86,6 +88,18 @@ class McConan(ConanFile):
 
         # Create m4 directory (GitHub archive doesn't include it)
         os.makedirs(os.path.join(self.source_folder, "m4"), exist_ok=True)
+
+        # Copy gettext po-files (autopoint is skipped with AUTOPOINT=true)
+        patches_dir = os.path.join(self.source_folder, "patches")
+        po_dir = os.path.join(self.source_folder, "po")
+        if os.path.isdir(patches_dir):
+            import shutil
+            for f in os.listdir(patches_dir):
+                if f.startswith("po-"):
+                    src = os.path.join(patches_dir, f)
+                    dst = os.path.join(po_dir, f[3:])  # Remove "po-" prefix
+                    if os.path.isfile(src):
+                        shutil.copy2(src, dst)
 
         # Run autoreconf to generate configure script
         # (GitHub archive doesn't include pre-generated configure)
