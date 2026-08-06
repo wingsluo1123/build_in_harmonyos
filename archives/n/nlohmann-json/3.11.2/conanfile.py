@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe for nlohmann-json 3.11.2 — header-only JSON library for Modern C++."""
+import os
+
 from conan import ConanFile
 from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
-import os
 
 
 class NlohmannJsonConan(ConanFile):
