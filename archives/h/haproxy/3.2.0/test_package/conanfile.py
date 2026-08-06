@@ -14,6 +14,6 @@ class HaproxyTestConan(ConanFile):
 
     def test(self):
         haproxy_bin = os.path.join(self.dependencies["haproxy"].package_folder, "sbin", "haproxy")
-        self.run(f'"{haproxy_bin}" -vv', env="conanrun")
         test_cfg = os.path.join(self.source_folder, "test_config.cfg")
-        self.run(f'"{haproxy_bin}" -c -f "{test_cfg}"', env="conanrun")
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f'{bash} test_haproxy.sh "{haproxy_bin}" "{test_cfg}"', env="conanrun")
