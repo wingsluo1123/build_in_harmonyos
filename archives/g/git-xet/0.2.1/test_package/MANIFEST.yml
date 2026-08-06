@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration file
+# CI script (build_and_test.sh L0e) requires this file to exist
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: git-xet/0.2.1
+homepage: "https://github.com/huggingface/xet-core"
+
+# Upstream test command (Rust workspace — no direct `make check`)
+upstream_check_command: "cargo test"
+
+# conanfile.py build() method - upstream test integration
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream actual test programs
+upstream_tests:
+  - file: test.sh
+    source: git-xet-0.2.1/test_package/test.sh
+    description: "Run git-xet --version (smoke test) and verify ELF structure"
+    command: "git-xet --version"
+
+# test_package tests (consumer perspective verification)
+test_package_tests:
+  - file: conanfile.py
+    description: "Run git-xet --version via bash test.sh, with HMDFS fallback"
+    command: "git-xet --version"
+  - file: test.sh
+    description: "Shell script: git-xet --version, --help, ELF structure verification"
+    command: "sh test.sh"
+
+# Test assertion count (approximate, for quality assessment)
+assertion_count: 9
