@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_9",
+      "file": "archives/g/gifify/2.4.0/test_package/test.sh",
+      "line": 6,
+      "description": "Output format uses non-standard markers. test.sh uses '[test]' prefix and emoji characters (✅, ❌) instead of the standard '[step]', '[ok]', '[fail]', '[warn]' markers with 8-space indentation for [ok]/[fail] as specified in code_style rule 9.",
+      "fix_suggestion": "Replace '[test]' with '[step]', replace '✅ --version OK' with '        [ok] --version OK' (8-space indent), and replace '❌ gifify failed...' with '        [fail] gifify failed...' (8-space indent)."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_14",
+      "file": "archives/g/gifify/2.4.0/manifest.yaml",
+      "line": 26,
+      "description": "Uses 'software: gifify' instead of 'name: gifify' for the package name field. Code_style rule 14 specifies the field should be 'name' as shown in the manifest.yaml example: name: zlib.",
+      "fix_suggestion": "Change 'software: gifify' to 'name: gifify' to align with the manifest.yaml field naming convention."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_14",
+      "file": "archives/g/gifify/2.4.0/manifest.yaml",
+      "line": 10,
+      "description": "Uses nested 'build: system: npm' structure instead of the flat 'build_system' field specified in code_style rule 14. Additionally, 'npm' is not in the allowed values list (cmake | autotools | makefile | meson). While 'npm' is the correct build system for a Node.js project, the rule's allowed values should be updated to include it.",
+      "fix_suggestion": "Use a flat 'build_system: npm' field, or if the nested build structure is intentional for this project's manifest schema, update code_style rule 14 to include 'npm' (or 'node') in the allowed build_system values and document the nested schema."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_14",
+      "file": "archives/g/gifify/2.4.0/manifest.yaml",
+      "line": 32,
+      "description": "Version field is unquoted: 'version: 2.4.0'. Code_style rule 14 example shows 'version: \"1.3.1\"' with double quotes for string values.",
+      "fix_suggestion": "Add double quotes: version: \"2.4.0\" to match the YAML quoting convention for string values."
+    }
+  ],
+  "summary": "Audit PASSED with 4 P2 (code style) issues and no P0 (deception) or P1 (recipe correctness) blockers. Key findings: (1) P0 Deception Detection — ALL CLEAR: test_package genuinely depends on gifify binary (R34 satisfied — test.sh executes 'gifify --version' which requires the installed binary); no skipped/fake tests (R9 — def test() runs test.sh, no 'pass' or 'exit 0' bypass); sha256 '7fab5b76...' is a valid 64-char hex, not all-zeros/f's/short (not fake); manifest status 'built' is consistent across manifest.yaml, notes.md, and README.md (not fake); no pre-compiled .so/.a/.o binaries in PR (R19). (2) P1 Recipe Correctness — ALL CLEAR: source URL 'https://github.com/vvo/gifify/archive/refs/tags/v2.4.0.tar.gz' is the OFFICIAL GitHub archive URL for vvo/gifify (R39 — no mirror/fork/CDN URLs); package_type='application' correct for CLI tool; settings='os','arch' appropriate for Node.js project (no compiler needed); build() runs npm install --omit=dev; package() manually copies files + creates relative symlink; package_info() sets cpp_info.bindirs=['bin'] (required for tools); no url='' placeholder; Conan 2.x API used (from conan import ConanFile, conan.tools.*); commands.json type='tool', name='gifify', version='2.4.0' all correct (R38); no bare shell env var assignments (R33); no OHOS platform compatibility gaps (R32). (3) P2 Code Style — 4 minor issues found: test.sh output markers (emoji instead of [ok]/[fail]), manifest.yaml field naming (software vs name, nested build.system vs flat build_system, npm not in allowed values), and unquoted version string. These are style nits that do not block merge. Overall the recipe is well-structured, the test is genuine, the source URL is official, and no deception or correctness issues were found."
+}
