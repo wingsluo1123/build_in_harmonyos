@@ -45,7 +45,7 @@ int main(void) {
         fprintf(stderr, "FAIL: sha256_init returned %d\n", ret);
         return 1;
     }
-    ret = sha256_update(&ctx, message, 3);
+    ret = sha256_update(&ctx, (const unsigned char *)message, 3);
     if (ret != 0) {
         fprintf(stderr, "FAIL: sha256_update returned %d\n", ret);
         return 1;
