@@ -35,7 +35,15 @@ class PerlobjectpadTestConan(ConanFile):
         if isinstance(cc_info, str):
             cc_info = json.loads(cc_info)
         cc = cc_info.get("c", "clang") if cc_info else "clang"
-        cc_resolved = shutil.which(cc) or cc
+        if os.sep not in cc and "/" not in cc:
+            cc_resolved = shutil.which(cc)
+            if not cc_resolved:
+                raise ConanInvalidConfiguration(
+                    f"Compiler '{cc}' not found in PATH. "
+                    "Configure tools.build:compiler_executables in your Conan profile."
+                )
+        else:
+            cc_resolved = cc
 
         # Define CC so test() can use $CC instead of hardcoded compiler name
         env.define("CC", cc_resolved)
@@ -60,19 +68,23 @@ class PerlobjectpadTestConan(ConanFile):
         envvars = env.vars(self, scope="build")
         envvars.save_script("test_sysroot_env")
 
+    def _resolve_perl_path(self):
+        """Find perl binary path, checking PATH and common locations."""
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl", "/usr/local/bin/perl"]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        return perl_path
+
     def _setup_perl5lib(self):
         """Set PERL5LIB to find pre-installed Perl runtime dependencies."""
         home = os.environ.get("HOME", "")
         if not home:
             return
 
-        # Find perl binary (subprocess may not have same PATH as self.run)
-        perl_path = shutil.which("perl")
-        if not perl_path:
-            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
-                if os.path.isfile(candidate):
-                    perl_path = candidate
-                    break
+        perl_path = self._resolve_perl_path()
         if not perl_path:
             return
 
@@ -152,7 +164,7 @@ class PerlobjectpadTestConan(ConanFile):
 
         perl_lib = os.path.join(pkg_folder, "lib", "perl5")
         # Resolve Perl archname dynamically (not hardcoded)
-        _perl = shutil.which("perl") or "/usr/bin/perl"
+        _perl = self._resolve_perl_path() or "/usr/bin/perl"
         try:
             archname = subprocess.check_output(
                 [_perl, "-MConfig", "-e", "print $Config{archname}"],
@@ -174,7 +186,7 @@ class PerlobjectpadTestConan(ConanFile):
         # be available if deps were pre-installed during build (skipped
         # packaging). The ELF/symbol/header checks above already verify
         # the package artifacts substantively (R34).
-        perl_path = shutil.which("perl") or "/usr/bin/perl"
+        perl_path = self._resolve_perl_path() or "/usr/bin/perl"
         xs_check = subprocess.run(
             [perl_path, "-I", perl_lib, "-I", perl_arch, "-e",
              "use XS::Parse::Keyword; use XS::Parse::Sublike; 1"],

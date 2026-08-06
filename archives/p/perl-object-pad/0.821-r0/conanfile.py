@@ -74,6 +74,24 @@ class PerlobjectpadConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _resolve_perl_path(self):
+        """Find perl binary path, checking PATH and common locations.
+
+        Centralized helper to ensure all methods use the same candidate
+        fallback path list.
+        """
+        perl_path = shutil.which("perl")
+        if not perl_path:
+            for candidate in [
+                "/data/service/hnp/bin/perl",
+                "/usr/bin/perl",
+                "/usr/local/bin/perl",
+            ]:
+                if os.path.isfile(candidate):
+                    perl_path = candidate
+                    break
+        return perl_path
+
     def _resolve_perl_libs(self):
         """Find pre-installed Perl build dependencies dynamically (R33).
 
@@ -87,17 +105,7 @@ class PerlobjectpadConan(ConanFile):
             self.output.info("PERL5LIB: HOME not set, skipping")
             return []
 
-        # Find perl binary: subprocess may not have same PATH as self.run()
-        perl_path = shutil.which("perl")
-        if not perl_path:
-            for candidate in [
-                "/data/service/hnp/bin/perl",
-                "/usr/bin/perl",
-                "/usr/local/bin/perl",
-            ]:
-                if os.path.isfile(candidate):
-                    perl_path = candidate
-                    break
+        perl_path = self._resolve_perl_path()
         if not perl_path:
             return []
 
@@ -130,16 +138,7 @@ class PerlobjectpadConan(ConanFile):
         dependencies installed in build()'s _ensure_perl_deps() are
         found by perl Build.PL and ./Build.
         """
-        perl_path = shutil.which("perl")
-        if not perl_path:
-            for candidate in [
-                "/data/service/hnp/bin/perl",
-                "/usr/bin/perl",
-                "/usr/local/bin/perl",
-            ]:
-                if os.path.isfile(candidate):
-                    perl_path = candidate
-                    break
+        perl_path = self._resolve_perl_path()
         if not perl_path:
             return []
 
@@ -167,12 +166,7 @@ class PerlobjectpadConan(ConanFile):
         # Even when deps are pre-installed, the -I paths simply don't exist
         # and Perl ignores them, so it's safe to always include them.
         local_lib = os.path.join(self.build_folder, "perl5lib")
-        perl_path = shutil.which("perl")
-        if not perl_path:
-            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
-                if os.path.isfile(candidate):
-                    perl_path = candidate
-                    break
+        perl_path = self._resolve_perl_path()
         try:
             archname = subprocess.check_output(
                 [perl_path, "-MConfig", "-e", "print $Config{archname}"],
@@ -255,12 +249,7 @@ class PerlobjectpadConan(ConanFile):
 
         # Ensure perl is findable in conanbuild PATH on CI workers where
         # /data/service/hnp/bin is not in the process PATH.
-        perl_path = shutil.which("perl")
-        if not perl_path:
-            for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
-                if os.path.isfile(candidate):
-                    perl_path = candidate
-                    break
+        perl_path = self._resolve_perl_path()
         if perl_path:
             env.prepend("PATH", os.path.dirname(perl_path))
 
