@@ -70,22 +70,26 @@ class MongocDriverConan(ConanFile):
     def source(self):
         # Support local builds where GitHub may be unreachable:
         # check several locations for a pre-downloaded tarball before falling
-        # back to the official URL.
+        # back to the official URL. Also handle CI mirror fallback that
+        # converts url from string to list format.
         import os
         from conan.tools.files import unzip
-        src_url = self.conan_data["sources"]["url"]
-        filename = os.path.basename(src_url)
+        src_data = self.conan_data["sources"]
+        url = src_data.get("url", "")
+        if isinstance(url, list):
+            url = url[0] if url else ""
+        filename = os.path.basename(url) if url else ""
 
         # 1. Source folder (Conan may have cached a partial download)
-        candidates = [
-            os.path.join(self.source_folder, filename),
-        ]
+        candidates = []
+        if filename:
+            candidates.append(os.path.join(self.source_folder, filename))
         # 2. Directory pointed by MONGOC_LOCAL_SOURCE env var
         env_dir = os.environ.get("MONGOC_LOCAL_SOURCE", "")
-        if env_dir:
+        if env_dir and filename:
             candidates.append(os.path.join(env_dir, filename))
         # 3. Recipe folder parent (export cache layout: <hash>/e/ and <hash>/s/)
-        if self.recipe_folder:
+        if self.recipe_folder and filename:
             candidates.append(
                 os.path.join(os.path.dirname(self.recipe_folder), "s", filename)
             )
@@ -95,7 +99,7 @@ class MongocDriverConan(ConanFile):
                 unzip(self, local_file, strip_root=True)
                 return
 
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **src_data, strip_root=True)
 
     def generate(self):
         import os
