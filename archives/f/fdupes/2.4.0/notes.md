@@ -1,43 +1,47 @@
-# fdupes 2.4.0 适配笔记
+# fdupes 2.4.0 适配笔记 (Conan 适配)
 
 ## 编译环境
-- 构建系统: autotools
-- 编译日期: 2026-05-21
+- 构建系统: autotools (configure + make)
+- 编译日期: 2026-08-06
 - 编译器: clang/clang++
-- 状态: success
+- 状态: success (Conan 适配完成)
+- 版本号: 2.4.0 (首次 Conan 适配，上游版本不变)
+
+## 特性说明
+
+本次适配**不裁剪任何功能**，所有特性均已启用：
+
+| 特性 | 依赖 | 状态 |
+|------|------|------|
+| 交互模式 (ncurses) | ncurses/6.5 (本地源码编译) | ✅ 启用 |
+| 正则表达式 (pcre2) | pcre2/10.45.1 (ohpcd 制品仓) | ✅ 启用 |
+| 哈希数据库 (sqlite3) | sqlite3/3.49.1 (ohpcd 制品仓) | ✅ 启用 |
 
 ## 编译步骤
 
-由于 HMDFS 平台限制，autotools configure 无法在当前目录创建临时文件，采用手动编译方式：
-
-1. **下载源码**: 从 GitHub releases 获取 fdupes-2.4.0.tar.gz (152KB)
-2. **创建 config.h**: 手动定义必要的宏，禁用 ncurses 和 sqlite
-3. **编译源文件**: 
-   ```bash
-   clang -c -I. -fPIC -O2 fdupes.c errormsg.c dir.c log.c fmatch.c sigint.c flags.c confirmmatch.c removeifnotchanged.c mbstowcs_escape_invalid.c md5/md5.c
-   ```
-4. **链接可执行文件**: 
-   ```bash
-   clang -fPIC -O2 *.o md5/md5.o -o fdupes
-   ```
-5. **安装**: 手动复制到 staging 和 DEFAULT_PREFIX
-6. **签名**: 使用 ohc-run.py sign-elf 进行 ELF 签名
+1. **下载源码**: 从 GitHub releases 获取 fdupes-2.4.0.tar.gz (release tarball, 含 autotools 生成文件)
+2. **安装依赖**: conan install pcre2/10.45.1 sqlite3/3.49.1 (从 ohpcd 制品仓)
+3. **构建 ncurses**: 从源码编译 ncurses 6.5 (静态库, 宽字符)
+4. **configure**: 使用 clang 编译器, 依赖路径通过 Conan 管理
+5. **config.status 修复**: HMDFS 平台 mktemp -d 不工作 (E002), 修补 config.status 使用固定目录
+6. **make**: 编译所有源文件 (含 ncurses-interface, hashdb 等)
+7. **make install**: 安装到 staging 目录
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | 网络连接 GitHub 超时 | HarmonyOS 网络限制 | 使用 aria2c --check-certificate=false |
-| 2 | configure 失败：pcre2 library not found | 需要 libpcre2-32（32位字符支持），但系统只有 libpcre2-8 | 使用 --without-ncurses 禁用 ncurses 接口（不依赖 pcre2-32） |
-| 3 | configure 失败：cannot create temporary file | HMDFS 不支持 ./confXXXXXX 临时文件创建（E002） | 手动创建 config.h，直接编译源文件 |
-
-## 源码修改
-
-无源码修改，仅手动创建 config.h 文件。
+| 1 | GitHub 下载超时 | HarmonyOS 网络限制 | 使用 GitHub API (api.github.com) 下载 |
+| 2 | configure config.guess 不识别平台 | 缺少 HarmonyOS 检测 | 修补 config.guess 添加 *:HarmonyOS:* case |
+| 3 | config.status mktemp -d 失败 | HMDFS 不支持 mktemp 创建的目录写入 (E002) | 修补 config.status 使用固定目录 + bash 执行 |
+| 4 | ncurses 不在制品仓 | ncurses 从未进行 Conan 适配 | 创建 ncurses conanfile.py, CI 使用 --build=missing 从源码编译 |
+| 5 | ncurses progs/tic 链接失败 | boolcodes/strcodes/numcodes 未编译到 tic | 跳过 progs 构建 (消费者不需要 tic 工具) |
 
 ## 依赖版本
 
-- 无外部依赖（禁用 ncurses 和 sqlite）
+- ncurses/6.5 (本地源码编译, 静态库, 宽字符)
+- pcre2/10.45.1 (ohpcd 制品仓, 静态库, 含 pcre2-32 组件)
+- sqlite3/3.49.1 (ohpcd 制品仓, 静态库)
 
 ## 验证结果
 
@@ -46,19 +50,17 @@ $ fdupes --version
 fdupes 2.4.0
 ```
 
-## 交付物
+## 源码修改
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| fdupes | 55KB | 可执行文件（已签名） |
-| fdupes.1 | 5KB | man 手册页 |
+无源码修改。release tarball 的 configure/make 直接可用。
+旧版补丁 (0001-0007) 已移除，因为它们只是更新 autotools 辅助脚本版本，不影响编译。
 
 ## 注意事项
 
-- **禁用 ncurses**: fdupes 使用 --without-ncurses 编译，仅支持 plain 模式（命令行界面）
-- **禁用 sqlite**: 不支持缓存数据库功能
-- **手动编译**: 由于 HMDFS autotools 限制，无法使用标准 configure/make 流程
+- **ncurses 依赖**: ncurses/6.5 尚未发布到 ohpcd 制品仓。CI 的 L0i-1 fallback 机制会从 archives/ 目录查找本地 conanfile.py 并使用 --build=missing 从源码编译。
+- **HMDFS mktemp 问题**: config.status 使用 mktemp -d 在 HMDFS 上失败，conanfile.py 的 build() 方法已自动修补此问题。
+- **全功能编译**: 本配方不使用 --without-ncurses 或 --without-sqlite，所有功能均已启用。
 ---
 
-**编译结束**: 2026-05-21 23:19
+**编译结束**: 2026-08-06 12:34
 **最终状态**: built
