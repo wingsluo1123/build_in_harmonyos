@@ -6,7 +6,7 @@
 ## 编译环境
 - 平台: OpenHarmony (aarch64-unknown-linux-ohos)
 - Perl 版本: 5.42.0
-- 编译器: clang 18.1.8
+- 编译器: clang 15.0.4
 - OpenSSL: 1.1.1w
 
 ## 模块信息
