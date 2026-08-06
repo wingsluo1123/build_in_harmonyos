@@ -9,7 +9,7 @@
 
 ## 依赖
 - glib 2.84.0.1 (from conan remote ohpcd)
-- libarchive 3.8.7 (locally built and conan-published)
+- libarchive 3.8.7 (locally built and conan-published, separate PR)
 
 ## 主要问题及解决方案
 
@@ -19,50 +19,33 @@
 
 ### 问题2: glib pkg-config 缺少 glib_mkenums 变量
 - **问题**: Conan PkgConfigDeps 生成的 glib-2.0.pc 缺少 glib_mkenums 变量, 导致 meson gnome.mkenums() 失败
-- **解决**: 手动在 glib-2.0.pc 中添加 glib_mkenums 变量指向 conan 包中的 glib-mkenums 二进制
+- **解决**: 在 conanfile.py generate() 中添加 _fix_glib_mkenums() 方法, 手动在 glib-2.0.pc 中添加 glib_mkenums 变量
 
-### 问题3: meson 找不到 clang 编译器
-- **问题**: conanrun.sh 修改 PATH 后, /data/service/hnp/bin 不在 PATH 中
-- **解决**: 显式设置 CC, CXX, AR, RANLIB 环境变量, 并在 source conanrun.sh 后重新 prepend /data/service/hnp/bin 到 PATH
+### 问题3: meson 找不到 llvm-ar
+- **问题**: Conan MesonToolchain 生成的 native file 缺少 ar/ranlib, meson 报 "Unknown linker(s): [['llvm-ar']]"
+- **解决**: 在 conanfile.py generate() 中添加 _inject_meson_binaries() 方法, 从 compiler_executables conf 中推导 ar/ranlib 路径并注入到 native file
+
+### 问题4: Conan CMakeDeps 不填充组件级 includedirs
+- **问题**: OHOS 适配版 Conan 的 CMakeDeps 生成器不填充 glib 组件的 includedirs, 导致 test_package 编译时找不到 glib-object.h
+- **解决**: 在 test_package/CMakeLists.txt 中手动添加 glib include 路径
+
+### 问题5: E088 HarmonyOS musl namespace 隔离
+- **问题**: 共享库运行时加载失败, musl namespace 忽略 LD_LIBRARY_PATH 和 RUNPATH, 系统库路径只读
+- **解决**: 将 meson.build 中的 shared_library() 改为 library(), 设置 default_library=static, 静态链接避免运行时加载
 
 ## 编译命令总结
 
 ```bash
-# 设置环境
-export CC=/data/service/hnp/bin/clang
-export CXX=/data/service/hnp/bin/clang++
-export AR=/data/service/hnp/bin/llvm-ar
-export RANLIB=/data/service/hnp/bin/llvm-ranlib
-export PATH="/data/service/hnp/bin:$PATH"
-
-# 安装 glib 依赖 (conan)
-conan install --requires="glib/2.84.0.1" -r=ohpcd --build=missing -g PkgConfigDeps
-
-# 修复 glib-2.0.pc (添加 glib_mkenums 变量)
-echo 'glib_mkenums=${bindir}/glib-mkenums' >> glib-2.0.pc
-
-# 配置
-source conanrun.sh
-export PATH="/data/service/hnp/bin:$PATH"
-export PKG_CONFIG_PATH="$PWD:/storage/Users/currentUser/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH"
-meson setup build --prefix=$DEFAULT_PREFIX -Dgtk=false -Dintrospection=disabled -Dtests=false
-
-# 编译
-meson compile -C build -j2
-
-# 安装到 staging
-meson install -C build --destdir=$TEST_PREFIX
+# 配置 (通过 Conan)
+conan create . -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
 ```
 
 ## 功能验证
-- libgnome-autoar-0.so ✅
+- libgnome-autoar-0.a ✅ (static library)
 - gnome-autoar-0.pc ✅
 - 头文件完整 ✅
+- test_package: cmake.test() PASS ✅
 
 ---
-*编译者: OpenDesk Compile Agent*
+*编译者: OpenDesk AI Worker*
 *日期: 2026-08-06*
----
-
-**编译结束**: 2026-08-06 16:09
-**最终状态**: built
