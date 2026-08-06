@@ -68,6 +68,9 @@ class McConan(ConanFile):
         # Fix .la files in conan dependencies (libdir path is incorrect)
         self._fix_la_files()
 
+        # Create dummy libtermcap (slang needs termcap symbols, not available on HarmonyOS)
+        self._create_dummy_termcap()
+
         # Add m4_pattern_allow to configure.ac (workaround for autoconf 2.73+
         # treating dnl/AC_MSG_WARN/AC_MSG_ERROR as undefined macros)
         configure_ac = os.path.join(self.source_folder, "configure.ac")
@@ -163,6 +166,37 @@ class McConan(ConanFile):
                         "clean:\n\tdistclean:\n\tcheck:\n")
 
         autotools.make(args=["-j1"])
+
+    def _create_dummy_termcap(self):
+        """Create dummy libtermcap.a (slang references termcap symbols)."""
+        import subprocess
+        # Use user-local lib dir which is in conan profile's LDFLAGS
+        lib_dir = os.path.expanduser("~/usr/local/lib")
+        os.makedirs(lib_dir, exist_ok=True)
+
+        tmp_dir = os.path.join(self.build_folder, "termcap_dummy")
+        os.makedirs(tmp_dir, exist_ok=True)
+        src = os.path.join(tmp_dir, "termcap_dummy.c")
+        obj = os.path.join(tmp_dir, "termcap_dummy.o")
+        lib = os.path.join(lib_dir, "libtermcap.a")
+
+        with open(src, "w") as f:
+            f.write("""/* Dummy termcap - slang provides its own terminal handling */
+void tgoto(void) {}
+void tgetent(void) {}
+void tgetstr(void) {}
+void tputs(void) {}
+void tgetflag(void) {}
+void tgetnum(void) {}
+char *BC = 0;
+char *UP = 0;
+char PC = 0;
+""")
+
+        cc = os.environ.get("CC", "clang")
+        subprocess.run([cc, "-c", "-fPIC", src, "-o", obj], check=True)
+        ar = os.environ.get("AR", "llvm-ar")
+        subprocess.run([ar, "rcs", lib, obj], check=True)
 
     def _fix_la_files(self):
         """Delete .la files with incorrect libdir paths to force direct .a/.so linking."""
