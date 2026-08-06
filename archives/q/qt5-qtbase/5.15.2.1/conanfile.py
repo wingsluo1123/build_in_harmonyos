@@ -296,9 +296,12 @@ class Qt5QtbaseConan(ConanFile):
         modules_dir = os.path.join(pkg, "mkspecs", "modules")
         if os.path.isdir(modules_dir):
             new_prefix = pkg
-            # 匹配 Conan 缓存构建目录前缀：…/.conan2/p/<ch>/<hash>/b
+            # 匹配 Conan 缓存构建目录的完整绝对路径前缀：
+            #   <绝对路径根>/.conan2/p/<首字母>/<hash>/b
+            # （P1 修复：必须包含 / 之前的绝对路径根，否则提取到的是
+            #   /.conan2/... 局部路径，替换时会产生前缀重复）
             build_prefix_pattern = re.compile(
-                r"/\.conan2/p/[^/\s]+/[^/\s]+/b(?=[/\\\s]|$)"
+                r"(?:/[^/\s]+)+/\.conan2/p/[^/\s]+/[^/\s]+/b(?=[/\\\s]|$)"
             )
             # 先扫描找到实际烘焙的构建前缀（取首个出现的）
             old_prefix = None
