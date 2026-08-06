@@ -70,8 +70,19 @@ class LibsoupConan(ConanFile):
         # separately (gmodule-2.0, gobject-2.0, gio-2.0, gthread-2.0).
         # The glib Conan package puts all libs in a single glib-2.0.pc,
         # but meson's dependency() checks for each component separately.
+        # Also add pkg-config variables (glib_compile_resources, etc.) that
+        # the meson gnome module needs to find glib build tools.
         import os
+        glib_root = self.dependencies["glib"].package_folder
+        glib_bin = os.path.join(glib_root, "bin")
         pc_dir = self.generators_folder
+        glib_vars = {
+            "glib_compile_resources": f"{glib_bin}/glib-compile-resources",
+            "glib_genmarshal": f"{glib_bin}/glib-genmarshal",
+            "glib_mkenums": f"{glib_bin}/glib-mkenums",
+            "glib_querymodulesdir": f"{glib_root}/lib/gio/modules",
+        }
+        var_lines = "\n".join(f"{k}={v}" for k, v in glib_vars.items())
         for comp in ["gmodule-2.0", "gobject-2.0", "gio-2.0", "gthread-2.0"]:
             pc_path = os.path.join(pc_dir, f"{comp}.pc")
             if not os.path.exists(pc_path):
@@ -80,6 +91,7 @@ class LibsoupConan(ConanFile):
                     f"Description: {comp} (via glib conan package)\n"
                     f"Version: 2.84.0\n"
                     f"Requires: glib-2.0\n"
+                    f"{var_lines}\n"
                 )
                 with open(pc_path, "w") as f:
                     f.write(content)
