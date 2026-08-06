@@ -15,7 +15,7 @@ version: "7.1.2-23"
 status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
+build_date: "2026-08-06"
 
 # 构建系统
 build_system: autotools
@@ -29,10 +29,9 @@ source:
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.2-23.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "f129f7d87fc21da453d032dd291b80ea13faf2497f13ef8279d97759ed7d5c46"
 
   # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -41,20 +40,37 @@ source:
 
 build:
   # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
 
   # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+  configure_options:
+    - "--enable-shared"
+    - "--with-jpeg"
+    - "--with-png"
+    - "--with-tiff"
+    - "--with-freetype"
+    - "--with-fontconfig"
+    - "--with-openjp2"
+    - "--with-webp"
+    - "--with-xml"
+    - "--with-fftw"
+    - "--without-heic"
+    - "--without-djvu"
+    - "--without-raw"
+    - "--disable-openmp"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
+  dependencies:
+    - libjpeg-turbo/3.2.0
+    - libpng/1.6.58
+    - libtiff/4.7.2
+    - freetype/2.14.3
+    - fontconfig/2.18.1.1
+    - openjpeg/2.5.4
+    - libwebp/1.6.0
+    - libxml2/2.15.3.1
+    - zstd/1.5.7
+    - fftw/3.3.10
 
   # 编译器
   cc: clang
@@ -64,109 +80,45 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0003-config-config.guess.patch"
+  - "0004-config-config.sub.patch"
+  - "0006-configure.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
   - "HMDFS上config.status创建临时目录需将umask 077改为022，否则目录owner继承父目录uid导致当前用户无法写入"
   - "rm -rf conf* 会误删config/目录和configure文件，应避免使用glob模式清理"
   - "autotools项目需patch-autotools-ohos.pl添加__OHOS__/ohos-linux triplet检测"
-  - "无webp/heic/xml预编译依赖，configure时需禁用对应选项"
+  - "webp/xml/fftw依赖现已发布到制品仓，可启用（之前版本因无预编译包而禁用）"
+  - "libheif(lcms2/djvulibre)依赖链未发布到制品仓，需后续适配"
+  - "conan PkgConfigDeps生成器不自动为zlib/xz生成.pc文件，需手动创建zlib.pc和liblzma.pc"
+  - "ImageMagick configure查找libopenjp2而非openjpeg，需创建libopenjp2.pc别名"
+  - "libwebp包包含libwebpmux.so和libwebpdemux.so但无对应.pc文件，需手动创建"
+  - "系统lld链接器依赖libxml2.so.16但系统lib路径只读，make check可能失败（非ImageMagick问题）"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/imagemagick-full-7.1.2-23.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/imagemagick-full-7.1.2-23.work
-  source_orig_hash: ff468ddbef393797
-  source_work_hash: ea469b2965dc3774
-  generated_at: '2026-05-26T23:20:50'
-  patches_count: 20
+  source_orig_hash: 2241
+  source_work_hash: 2241
+  generated_at: '2026-08-06T22:00:00'
+  patches_count: 3
 
 patch_classification:
-  - file: 0001-config.log.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-config.status.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
   - file: 0003-config-config.guess.patch
-    type: auto
+    type: platform
     platform_only: True
     guard: 'pending'
   - file: 0004-config-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-config-type-urw-base35-type1.xml.patch
-    type: auto
+    type: platform
     platform_only: True
     guard: 'pending'
   - file: 0006-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0007-utilities-ImageMagick.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0008-utilities-animate.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0009-utilities-compare.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0010-utilities-composite.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0011-utilities-conjure.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0012-utilities-convert.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0013-utilities-display.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0014-utilities-identify.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0015-utilities-import.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0016-utilities-magick-script.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0017-utilities-magick.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0018-utilities-mogrify.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0019-utilities-montage.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0020-utilities-stream.1.patch
-    type: auto
+    type: platform
     platform_only: True
     guard: 'pending'
