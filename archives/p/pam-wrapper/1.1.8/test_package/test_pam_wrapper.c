@@ -21,7 +21,6 @@ int main(void)
     struct pamtest_conv_data conv_data;
     struct pam_testcase tests[] = {
         pam_test(PAMTEST_AUTHENTICATE, PAM_SUCCESS),
-        pam_test(PAMTEST_SENTINEL, 0),
     };
     enum pamtest_err perr;
     void *handle;

@@ -58,6 +58,7 @@ class PamWrapperConan(ConanFile):
         pam_include = linux_pam.cpp_info.includedirs[0]
         pam_libdir = linux_pam.cpp_info.libdirs[0]
         pam_library = os.path.join(pam_libdir, "libpam.so")
+        pam_misc_library = os.path.join(pam_libdir, "libpam_misc.so")
 
         tc = CMakeToolchain(self)
         tc.variables["UNIT_TESTING"] = bool(self.options.with_upstream_tests)
@@ -65,6 +66,7 @@ class PamWrapperConan(ConanFile):
         tc.cache_variables["PAM_INCLUDE_DIR"] = pam_include
         tc.cache_variables["PAM_INCLUDE_DIRS"] = pam_include
         tc.cache_variables["PAM_LIBRARY"] = pam_library
+        tc.cache_variables["PAM_MISC_LIBRARY"] = pam_misc_library
         tc.cache_variables["CMAKE_REQUIRED_INCLUDES"] = pam_include
         tc.cache_variables["PAM_LIBRARIES"] = pam_library
         tc.cache_variables["CMAKE_DISABLE_FIND_PACKAGE_Python"] = True
@@ -140,7 +142,6 @@ class PamWrapperConan(ConanFile):
         self.cpp_info.libs = ["pamtest"]
         self.cpp_info.requires = ["linux-pam::pam"]
 
-        self.cpp_info.bindirs = ["bin"]
         self.runenv_info.define_path("PAM_WRAPPER_LIB", wrapper_path)
         self.buildenv_info.define_path("PAM_WRAPPER_LIB", wrapper_path)
         self.runenv_info.append_path("LD_LIBRARY_PATH", libdir)

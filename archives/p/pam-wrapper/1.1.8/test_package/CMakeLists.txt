@@ -9,5 +9,4 @@ target_link_libraries(test_pam_wrapper PRIVATE pam_wrapper::pam_wrapper linux-pa
 target_include_directories(test_pam_wrapper PRIVATE "${LINUX_PAM_INCLUDE_DIR}")
 target_compile_definitions(test_pam_wrapper PRIVATE
     PAM_WRAPPER_TEST_LIBRARY="${PAM_WRAPPER_TEST_LIBRARY}"
-    PAM_MATRIX_TEST_MODULE="${PAM_MATRIX_TEST_MODULE}"
 )
