@@ -5,9 +5,10 @@ Autotools build (configure + make). Produces command-line tools: icotool, wresto
 extresso, genresscript.
 """
 import os
+import tarfile
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
@@ -26,6 +27,10 @@ class IcoutilsConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Include source tarball to avoid network download on CI workers
+        copy(self, "icoutils-0.32.3.tar.bz2",
+             src=os.path.join(self.recipe_folder, "sources"),
+             dst=self.export_sources_folder)
 
     def requirements(self):
         self.requires("libpng/1.6.58")
@@ -34,7 +39,23 @@ class IcoutilsConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Try local copy first (from export_sources), fall back to download
+        tarball = os.path.join(self.export_sources_folder, "icoutils-0.32.3.tar.bz2")
+        if os.path.exists(tarball):
+            # Use Python tarfile to avoid toybox tar compatibility issues
+            with tarfile.open(tarball, "r:bz2") as tf:
+                members = tf.getmembers()
+                # strip_root=True: remove first path component
+                for m in members:
+                    parts = m.name.split("/", 1)
+                    if len(parts) > 1:
+                        m.name = parts[1]
+                    else:
+                        m.name = ""
+                    if m.name:
+                        tf.extract(m, self.source_folder)
+        else:
+            get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         env = VirtualBuildEnv(self)
