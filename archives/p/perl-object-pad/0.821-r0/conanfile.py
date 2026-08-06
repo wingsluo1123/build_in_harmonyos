@@ -180,6 +180,7 @@ class PerlobjectpadConan(ConanFile):
             ).strip()
         except Exception:
             archname = "aarch64-linux"
+        self._archname = archname
         self._perl_inc_flags = (
             f"-I{local_lib}/lib/perl5 -I{local_lib}/lib/perl5/{archname}"
         )
@@ -187,7 +188,7 @@ class PerlobjectpadConan(ConanFile):
         # Check if Module::Build is already available
         try:
             result = subprocess.run(
-                ["perl", "-MModule::Build", "-e", "exit 0"],
+                [perl_path or "perl", "-MModule::Build", "-e", "exit 0"],
                 capture_output=True, text=True
             )
             if result.returncode == 0:
@@ -221,6 +222,10 @@ class PerlobjectpadConan(ConanFile):
                     env="conanbuild"
                 )
             else:
+                if not shutil.which("make"):
+                    raise ConanInvalidConfiguration(
+                        "make not found in PATH, required for Makefile.PL-based deps"
+                    )
                 self.run(
                     f'cd "{dep_dir}" && perl {inc_flags} '
                     f'Makefile.PL INSTALL_BASE="{local_lib}"',
@@ -329,29 +334,30 @@ class PerlobjectpadConan(ConanFile):
         self.run(f"perl {inc} ./Build", env="conanbuild")
 
     def package(self):
+        archname = getattr(self, "_archname", "aarch64-linux")
         # Install to a staging directory
         stage = os.path.join(self.build_folder, "stage")
         self.run(f"./Build install --install_base={stage}", env="conanbuild")
 
         # Copy .so to lib/ (standard Conan layout for G4 check)
         copy(self, "Pad.so",
-             src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"),
+             src=os.path.join(stage, "lib", "perl5", archname, "auto", "Object", "Pad"),
              dst=os.path.join(self.package_folder, "lib"))
         # Copy .so to Perl auto directory for DynaLoader
         copy(self, "Pad.so",
-             src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"),
-             dst=os.path.join(self.package_folder, "lib", "perl5", "aarch64-linux", "auto", "Object", "Pad"))
+             src=os.path.join(stage, "lib", "perl5", archname, "auto", "Object", "Pad"),
+             dst=os.path.join(self.package_folder, "lib", "perl5", archname, "auto", "Object", "Pad"))
         # Copy header to include/
         copy(self, "object_pad.h",
-             src=os.path.join(stage, "lib", "perl5", "aarch64-linux", "auto", "share", "module", "Object-Pad", "include"),
+             src=os.path.join(stage, "lib", "perl5", archname, "auto", "share", "module", "Object-Pad", "include"),
              dst=os.path.join(self.package_folder, "include"))
         # Copy .pm files to lib/perl5/ (preserve Perl directory structure)
         copy(self, "*.pm",
-             src=os.path.join(stage, "lib", "perl5", "aarch64-linux"),
+             src=os.path.join(stage, "lib", "perl5", archname),
              dst=os.path.join(self.package_folder, "lib", "perl5"))
         # Copy .pod files
         copy(self, "*.pod",
-             src=os.path.join(stage, "lib", "perl5", "aarch64-linux"),
+             src=os.path.join(stage, "lib", "perl5", archname),
              dst=os.path.join(self.package_folder, "lib", "perl5"))
 
         # Copy XS::Parse::Keyword and XS::Parse::Sublike runtime modules
@@ -359,32 +365,32 @@ class PerlobjectpadConan(ConanFile):
         # to perl5lib during build() by _ensure_perl_deps(). Without packaging
         # them, the Perl API test in test_package cannot load Object::Pad.
         perl5lib_arch = os.path.join(
-            self.build_folder, "perl5lib", "lib", "perl5", "aarch64-linux")
+            self.build_folder, "perl5lib", "lib", "perl5", archname)
         if os.path.isdir(perl5lib_arch):
             # Copy XS .pm modules (XS/Parse/Keyword.pm, Sublike.pm, etc.)
             xs_src = os.path.join(perl5lib_arch, "XS")
             if os.path.isdir(xs_src):
                 copy(self, "*.pm", src=xs_src,
                      dst=os.path.join(self.package_folder, "lib", "perl5",
-                                      "aarch64-linux", "XS"))
+                                      archname, "XS"))
             # Copy XS .so files (auto/XS/Parse/Keyword/Keyword.so, etc.)
             auto_xs_src = os.path.join(perl5lib_arch, "auto", "XS")
             if os.path.isdir(auto_xs_src):
                 copy(self, "*.so", src=auto_xs_src,
                      dst=os.path.join(self.package_folder, "lib", "perl5",
-                                      "aarch64-linux", "auto", "XS"))
+                                      archname, "auto", "XS"))
             # Copy Sublike module
             sublike_src = os.path.join(perl5lib_arch, "Sublike")
             if os.path.isdir(sublike_src):
                 copy(self, "*.pm", src=sublike_src,
                      dst=os.path.join(self.package_folder, "lib", "perl5",
-                                      "aarch64-linux", "Sublike"))
+                                      archname, "Sublike"))
             # Copy shared include headers for XS modules
             share_src = os.path.join(perl5lib_arch, "auto", "share", "module")
             if os.path.isdir(share_src):
                 copy(self, "*.h", src=share_src,
                      dst=os.path.join(self.package_folder, "lib", "perl5",
-                                      "aarch64-linux", "auto", "share", "module"))
+                                      archname, "auto", "share", "module"))
 
     def package_info(self):
         # Pad.so is a Perl XS module loaded by Perl runtime via DynaLoader,

@@ -67,7 +67,6 @@ class PerlobjectpadTestConan(ConanFile):
             return
 
         # Find perl binary (subprocess may not have same PATH as self.run)
-        import shutil
         perl_path = shutil.which("perl")
         if not perl_path:
             for candidate in ["/data/service/hnp/bin/perl", "/usr/bin/perl"]:
@@ -152,7 +151,16 @@ class PerlobjectpadTestConan(ConanFile):
         self._setup_perl5lib()
 
         perl_lib = os.path.join(pkg_folder, "lib", "perl5")
-        perl_arch = os.path.join(perl_lib, "aarch64-linux")
+        # Resolve Perl archname dynamically (not hardcoded)
+        _perl = shutil.which("perl") or "/usr/bin/perl"
+        try:
+            archname = subprocess.check_output(
+                [_perl, "-MConfig", "-e", "print $Config{archname}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            archname = "aarch64-linux"
+        perl_arch = os.path.join(perl_lib, archname)
         test_script = (
             'use Object::Pad; '
             'class MyTest { field $x :param = 0; method get { return $x } } '
