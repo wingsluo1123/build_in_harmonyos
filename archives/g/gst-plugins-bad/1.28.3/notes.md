@@ -106,5 +106,5 @@ accurip, adpcmdec, adpcmenc, aes, aiff, analyticsoverlay, asfmux, audiobufferspl
 6. gst-inspect-1.0 在 OHOS 上运行需 LD_LIBRARY_PATH 设置正确
 ---
 
-**编译结束**: 2026-06-03 23:59
-**最终状态**: built
+**编译结束**: 2026-08-07 00:17
+**最终状态**: failed
