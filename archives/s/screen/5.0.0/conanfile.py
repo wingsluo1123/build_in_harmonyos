@@ -9,9 +9,9 @@ R32: settings.os must check in ("Linux", "OHOS").
 R38: screen is a command-line tool (commands.json required).
 
 All source modifications are applied via patches declared in conandata.yml:
-  0001-configure.patch             - configure umask 077→022 (HMDFS compatibility)
+  0001-configure.patch             - configure umask 077→022 (HMDFS) + getspnam detection
   0002-misc.c.patch                 - poll() replaced with POSIX close() loop
-  0003-socket.c.patch              - socket.c seteuid/setegid graceful failure handling
+  0003-socket.c.patch              - socket.c seteuid/setegid graceful failure + HAVE_GETSPNAM
   0004-tests-macros.h.patch         - Test macros.h compilation fix
   0005-tests-mallocmock.c.patch     - Test mallocmock.c compilation fix
   0006-tests-test-winmsgbuf.c.patch - Test winmsgbuf compilation fix
