@@ -1,0 +1,39 @@
+software: coinor-cgl
+display: "COIN-OR Cgl"
+description: "COIN-OR Cut Generation Library for mixed integer programming"
+category: library
+homepage: "https://github.com/coin-or/Cgl"
+license: EPL-2.0
+build_system: autotools
+
+versions:
+  "0.60.9":
+    status: built
+    build_date: "2026-08-06"
+    notes: >-
+      首个鸿蒙 PC conan 配方，未打补丁。
+
+      **需要一个转发型 `osi-clp.pc`。** 上游 Clp 会装 `clp.pc` **和** `osi-clp.pc`
+      两个 .pc，而我们的 clp 包只声明了 `pkg_config_name="clp"`。Cgl 的 configure
+      看到 clp.pc 就启用 Clp 代码路径，那段代码 include 的 `OsiClpSolverInterface.hpp`
+      却只由 osi-clp.pc 广告 —— 于是它一边报 `No package 'osi-clp' found`，
+      一边照样去编那段代码，最后 fatal error 找不到头（实撞）。
+      配方用 `--alias-pc "osi-clp=clp"` 在 generators 目录补了转发 .pc。
+
+      test_package 的断言落在「割真的切到东西」上，而不是「生成了 N 条割」——
+      一条恒成立的废割也算生成。流程是：确认 LP 松弛最优解 (3,1.5) 确实是分数的，
+      生成 Gomory 割，再逐条检查是否被当前分数解违反，至少一条真的切掉了它。
+
+      ---
+
+      **与 clp 适配者的协同提示（重要）**
+
+      `clp/1.17.10` 由另一位同事（Gjy_joye）在 `feat/clp-1.17.10` 上适配，本包依赖它。
+      本包自己用 `--alias-pc` 补了转发 .pc，**不需要 clp 那边改任何东西**，
+      但有一个前提必须满足：
+
+      > clp 包的 `cpp_info.includedirs` 必须包含 **`include/coin`**。
+
+      COIN-OR 把公开头装在 `include/coin/` 下，而源码按 `#include "OsiClpSolverInterface.hpp"`
+      裸名引用。若 clp 只声明了 `include` 这一层，本包构建时仍会报找不到头。
+      这个缺陷**在 clp 自己构建装包时完全不暴露**，要到本包才炸 —— 建议合入 clp 前对一下。
