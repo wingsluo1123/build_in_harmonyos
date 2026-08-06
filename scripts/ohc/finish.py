@@ -5,6 +5,7 @@ to hand over to AI for knowledge graph organization as contributor.
 """
 from __future__ import annotations
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -305,17 +306,74 @@ class FinishPipeline:
         try:
             rc2 = check_knowledge_gap(self.software, self.version, pdir=str(self.pdir))
         except Exception as e:
-            rc = 1; log_warn(f"  check_knowledge_gap 异常: {e}")
-        if rc == 0 and rc2 in (0, 3):
+            rc = 1; rc2 = -1; log_warn(f"  check_knowledge_gap 异常: {e}")
+        if rc == 0 and rc2 == 0:
             self.steps["step5b"] = True
             self._task_card("11e", "✅完成", "knowledge OK"); log_ok("  知识图谱完整性通过")
         elif rc2 == 3:
-            # Probe/local mode: knowledge gap with only unreferenced entries
-            # (pending=0, failed=0, unrelated to current diff) is a warning,
-            # not a failure. Hard failures (current-diff graph issues,
-            # pending/failed nonzero, command anomaly, strict mode) stay False.
-            self.steps["step5b"] = True
-            self._task_card("11e", "⚠️部分", "有知识遗漏(仅 warning)"); log_warn("  知识库存在遗漏(仅 warning, 不阻塞)")
+            # Knowledge gap found. Only downgrade to a warning when ALL of:
+            #   (a) probe/local mode (no .build-closed), i.e. not final submit,
+            #   (b) gap is only unreferenced manifest entries (pending=0,
+            #       failed=0), i.e. no pending/failed notes items, and
+            #   (c) the unreferenced entries are unrelated to the current diff
+            #       (archive manifest is unchanged vs origin/main).
+            # Any other rc2==3 (strict/final mode, pending/failed nonzero,
+            # current-diff graph issue) stays a hard failure (False).
+            probe_mode = (self.archive_dir / ".build-closed").exists()  # same as step8
+            only_unreferenced = False
+            current_diff_free = False
+            if probe_mode:
+                try:
+                    txt = (self.archive_dir / "notes.md").read_text(encoding="utf-8", errors="replace")
+                    pend = fail = 0
+                    in_sec = False
+                    for line in txt.split("\n"):
+                        if re.search(r'(发现与知识|知识积累|discoveries|findings)', line, re.I):
+                            in_sec = True; continue
+                        if in_sec and (line.startswith("## ") or line.strip() == "---"):
+                            in_sec = False; continue
+                        if not in_sec or not line.strip(): continue
+                        st = line.strip()
+                        if st.startswith("<!--") or st.startswith("#"): continue
+                        if "✅" in st: continue
+                        if re.search(r'(⏳|TODO|待评估|待提取|FIXME)', st, re.I): pend += 1
+                        elif "❌" in st: fail += 1
+                        elif st.startswith("- ") or st.startswith("* "): pend += 1
+                    only_unreferenced = (pend == 0 and fail == 0)
+                except Exception:
+                    only_unreferenced = False
+                # (c) current-diff free: archive manifest unchanged vs origin/main
+                try:
+                    rel = self.archive_dir.relative_to(self.pdir)
+                    # Knowledge-related files only: manifest knowledge_gained
+                    # section and notes.md knowledge section. Unrelated archive
+                    # changes (conanfile, patches, test_package) do not make
+                    # the gap current-diff related.
+                    kfiles = [str(rel / "manifest.yaml"), str(rel / "notes.md")]
+                    _git = shutil.which("git") or "git"
+                    proc = subprocess.run(
+                        [_git, "-C", str(self.pdir), "diff",
+                         "origin/main...HEAD", "--"] + kfiles,
+                        capture_output=True, text=True, timeout=30)
+                    # If no knowledge-related lines changed, gap is pre-existing
+                    klines = [l for l in proc.stdout.splitlines()
+                              if l.startswith(("+", "-"))
+                              and not l.startswith(("+++", "---"))
+                              and any(k in l for k in
+                                      ("knowledge_gained", "knowledge_ref",
+                                       "ref:", "发现与知识", "知识积累",
+                                       "discoveries", "findings"))]
+                    current_diff_free = (not klines)
+                except Exception:
+                    current_diff_free = False
+            if only_unreferenced and current_diff_free:
+                self.steps["step5b"] = True
+                self._task_card("11e", "⚠️部分", "有知识遗漏(仅 unreferenced, warning)")
+                log_warn("  知识库存在遗漏(仅 unreferenced, 不阻塞)")
+            else:
+                self.steps["step5b"] = False
+                self._task_card("11e", "⚠️部分", "有知识遗漏(硬失败)")
+                log_warn("  知识库存在遗漏(非仅 unreferenced/非 probe/与当前 diff 相关, 阻塞)")
         else:
             self.steps["step5b"] = False
             self._task_card("11e", "⚠️部分", f"检查异常 RC={rc}")
@@ -524,8 +582,9 @@ class FinishPipeline:
         data = HandoffData(
             exit_reason="finish_knowledge_required" if is_blocking else "finish_success",
             exit_code=1 if is_blocking else 0,
-            step_failed=("Step0" if is_blocking else
-                        (",".join(k for k, v in self.steps.items() if not v) or "none")),
+            step_failed=(
+                ",".join(k for k, v in self.steps.items() if not v)
+                or ("early-blocking" if is_blocking else "none")),
             resume_cmd=f"python3 scripts/ohc-run.py finish {self.software} {self.version} {self.status}",
             knowledge_hit="none",
             knowledge_gap=is_blocking,
