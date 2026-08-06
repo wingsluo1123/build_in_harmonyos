@@ -9,7 +9,9 @@ The APK (which is a tar.gz) contains:
   usr/bin/hyperfine  — ELF aarch64 musl binary
 
 The binary depends on libgcc_s.so.1 (GCC runtime for _Unwind_* functions).
-This library is bundled in lib/ since HarmonyOS does not provide it by default.
+This library is downloaded from Alpine Linux CDN during build() since
+HarmonyOS does not provide it and committing precompiled .so files is
+prohibited by code review rules.
 
 R32: settings.os must check in ("Linux", "OHOS").
 R38: Command-line tool — commands.json declared at software level.
@@ -25,6 +27,10 @@ from conan.tools.layout import basic_layout
 
 
 HNP_BIN = "/data/service/hnp/bin"
+
+# libgcc_s.so.1 source (Alpine Linux CDN — official, aarch64 musl)
+LIBGCC_URL = "https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/libgcc-15.2.0-r8.apk"
+LIBGCC_SHA256 = "dd0d4ca96d24d1e0e694b735a2fed8545362835ba84d287a75865f6afd91f3e0"
 
 
 def _sign_elf(filepath):
@@ -90,8 +96,8 @@ class HyperfineConan(ConanFile):
     # Precompiled binary — only depends on os and arch
     settings = "os", "arch"
 
-    # Export the man page and bundled libgcc_s.so.1
-    exports = ["res/hyperfine.1", "res/libgcc_s.so.1"]
+    # Export the man page (no precompiled .so files committed)
+    exports = ["res/hyperfine.1"]
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -107,7 +113,14 @@ class HyperfineConan(ConanFile):
     def build(self):
         # Apply patches (none currently, but required by G1 check)
         apply_conandata_patches(self)
-        # Precompiled binary — no compilation step needed
+
+        # Download libgcc_s.so.1 from Alpine Linux CDN
+        # Required by hyperfine for _Unwind_* functions (GCC runtime)
+        # Not committed to repo per code review rules (no precompiled .so)
+        libgcc_dir = os.path.join(self.source_folder, "libgcc")
+        get(self, url=LIBGCC_URL, sha256=LIBGCC_SHA256,
+            filename="libgcc-15.2.0-r8.tar.gz",
+            destination=libgcc_dir)
 
     def package(self):
         # Copy the precompiled binary from the extracted APK
@@ -116,12 +129,9 @@ class HyperfineConan(ConanFile):
              src=os.path.join(self.source_folder, "usr", "bin"),
              dst=bin_dst)
 
-        # Copy bundled libgcc_s.so.1 (GCC runtime for _Unwind_* functions)
-        # R19: Bundled because HarmonyOS does not provide libgcc_s.so.1.
-        #      The musl dynamic linker requires it in a system path, but
-        #      all system paths are read-only on HarmonyOS.
+        # Copy libgcc_s.so.1 from the downloaded libgcc APK
         copy(self, "libgcc_s.so.1",
-             src=os.path.join(self.recipe_folder, "res"),
+             src=os.path.join(self.source_folder, "libgcc", "usr", "lib"),
              dst=os.path.join(self.package_folder, "lib"))
 
         # Set RPATH so binary can find libgcc_s.so.1 at $ORIGIN/../lib
@@ -142,5 +152,4 @@ class HyperfineConan(ConanFile):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.resdirs = ["share"]
-        # Declare system library dependency
         self.cpp_info.system_libs = ["c"]
