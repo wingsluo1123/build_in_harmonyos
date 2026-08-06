@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: git-secrets/1.3.0
+homepage: "https://github.com/awslabs/git-secrets"
+
+# 上游使用 bats 测试框架，但 git config --local 在 HarmonyOS 上不可用
+# 上游测试因平台限制无法运行（git config --local 安全策略冲突）
+upstream_check_command: "make test"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试程序（bats 框架，平台限制无法运行）
+upstream_tests:
+  - file: test/test_helper.bash
+    source: git-secrets-1.3.0/test/test_helper.bash
+    description: "bats 测试辅助函数（setup_repo 使用 git config --local，HarmonyOS 不支持）"
+    command: "bats test/"
+  - file: test/git-secrets.bats
+    source: git-secrets-1.3.0/test/git-secrets.bats
+    description: "git-secrets 功能测试（50 个用例，依赖 git config --local）"
+    command: "bats test/git-secrets.bats"
+
+# test_package 自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "调用 test_git_secrets.sh 验证 git-secrets 脚本已安装、可执行且 bash 语法正确"
+    command: "conan create (test_package: bash test_git_secrets.sh <bin_dir>)"
+  - file: test_git_secrets.sh
+    description: "真实冒烟测试:检查 bin/git-secrets 存在且可执行、shebang 为 bash、bash -n 语法检查通过、--help 功能正常"
+    command: "bash test_git_secrets.sh <package bin dir>"
+
+assertion_count: 4
