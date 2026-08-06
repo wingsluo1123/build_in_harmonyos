@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: gnugo/3.8
+homepage: "https://www.gnu.org/software/gnugo/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: regression/reading.tst
+    source: gnugo-3.8/regression/reading.tst
+    description: "Reading (life and death) regression tests"
+    command: "./regress.sh . reading.tst"
+  - file: regression/owl.tst
+    source: gnugo-3.8/regression/owl.tst
+    description: "Owl (eye space) regression tests"
+    command: "./regress.sh . owl.tst"
+  - file: regression/optics.tst
+    source: gnugo-3.8/regression/optics.tst
+    description: "Optics (influence) regression tests"
+    command: "./regress.sh . optics.tst"
+  - file: regression/unconditional.tst
+    source: gnugo-3.8/regression/unconditional.tst
+    description: "Unconditional life/death regression tests"
+    command: "./regress.sh . unconditional.tst"
+  - file: regression/strategy.tst
+    source: gnugo-3.8/regression/strategy.tst
+    description: "Strategy regression tests"
+    command: "./regress.sh . strategy.tst"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试：运行 gnugo --version 验证二进制可用"
+    command: "gnugo --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 100
