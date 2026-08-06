@@ -8,6 +8,7 @@ Homepage: https://github.com/orhun/git-cliff
 """
 import os
 import shutil
+import subprocess
 import stat
 
 from conan import ConanFile
@@ -15,8 +16,8 @@ from conan.tools.files import get, copy, apply_conandata_patches, export_conanda
 from conan.tools.layout import basic_layout
 from conan.errors import ConanException
 
-# Rust bottle URL (Harmonybrew, OHOS-native build)
-RUST_BOTTLE_URL = "https://harmonybrew.atomgit.com/bottles/rust-1.97.1.arm64_ohos.bottle.tar.gz"
+# Harmonybrew install script
+HOMEBREW_INSTALL = "https://harmonybrew.atomgit.com/install.sh"
 
 # Cargo mirror config (crates.io is unreachable on OHOS network)
 CARGO_CONFIG = """[source.crates-io]
@@ -46,7 +47,6 @@ class GitCliffConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # Rust crate dependencies are managed by Cargo via Cargo.lock, not Conan.
         pass
 
     def layout(self):
@@ -56,61 +56,45 @@ class GitCliffConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ensure_rust(self):
-        """Find or install Rust toolchain. Returns (cargo_path, rustc_path, env_dict)."""
-        env = {}
-
-        # 1. Try to find existing cargo
+        """Find or install Rust toolchain. Returns cargo binary path."""
+        # 1. Try existing cargo in PATH
         cargo = shutil.which("cargo")
-        rustc = shutil.which("rustc")
-        if cargo and rustc:
-            return cargo, rustc, env
+        if cargo:
+            return cargo
 
-        # 2. Check common installation locations
-        for base in [
-            os.path.expanduser("~/.harmonybrew/bin"),
-            "/storage/Users/currentUser/.harmonybrew/bin",
-            "/storage/Users/currentUser/usr/local/bin",
-        ]:
-            c = os.path.join(base, "cargo")
-            r = os.path.join(base, "rustc")
-            if os.path.isfile(c) and os.access(c, os.X_OK):
-                return c, r, env
+        # 2. Check Harmonybrew installation
+        brew_cargo = "/storage/Users/currentUser/.harmonybrew/bin/cargo"
+        if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
+            return brew_cargo
 
-        # 3. Download and install Rust bottle locally
-        rust_dir = os.path.join(self.build_folder, ".rust-toolchain")
-        # cargo.real is the actual binary; 'cargo' is a wrapper that hardcodes
-        # the Harmonybrew Cellar path, so we use cargo.real directly.
-        cargo_path = os.path.join(rust_dir, "bin", "cargo.real")
-        rustc_path = os.path.join(rust_dir, "bin", "rustc")
+        # 3. Install Harmonybrew + Rust
+        self.output.info("Rust toolchain not found, installing via Harmonybrew...")
+        brew_bin = "/storage/Users/currentUser/.harmonybrew/bin"
+        brew = os.path.join(brew_bin, "brew")
 
-        if not os.path.isfile(cargo_path):
-            self.output.info("Rust toolchain not found, downloading from Harmonybrew...")
-            bottle_path = os.path.join(self.build_folder, ".rust-bottle.tar.gz")
-            self.run(f'curl -fsSL -o "{bottle_path}" "{RUST_BOTTLE_URL}"')
-            os.makedirs(rust_dir, exist_ok=True)
-            # Bottle structure: rust/1.97.1/bin/cargo.real -> strip 2 levels
-            self.run(f'tar xzf "{bottle_path}" -C "{rust_dir}" --strip-components=2')
-            # Make binaries executable
-            import stat as stat_mod
-            for name in os.listdir(os.path.join(rust_dir, "bin")):
-                p = os.path.join(rust_dir, "bin", name)
-                if os.path.isfile(p):
-                    os.chmod(p, os.stat(p).st_mode | stat_mod.S_IEXEC)
+        if not os.path.isfile(brew):
+            # Install Harmonybrew
+            self.run(f'zsh -c "$(curl -fsSL {HOMEBREW_INSTALL})"')
 
-        if not os.path.isfile(cargo_path):
-            raise ConanException("Failed to install Rust toolchain from Harmonybrew bottle")
+        # Install Rust via brew
+        self.run(f'eval "$({brew} shellenv)" && brew install rust 2>&1')
 
-        # Set up PATH so cargo can find rustc, and RUSTC for explicit rustc path
-        env["RUSTC"] = rustc_path
-        return cargo_path, rustc_path, env
+        if os.path.isfile(brew_cargo):
+            return brew_cargo
+
+        raise ConanException(
+            "Failed to install Rust toolchain. "
+            "Manual install: zsh -c \"$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)\" && "
+            "brew install rust"
+        )
 
     def _ensure_cc(self):
         """Ensure cc/c++ symlinks exist (cargo uses 'cc' as default linker)."""
         if shutil.which("cc"):
-            return
+            return None
 
         clang = shutil.which("clang") or "/data/service/hnp/bin/clang"
-        clangxx = shutil.which("clang++") or "/data/service/hnp/bin/clang++"
+        clangpp = shutil.which("clang++") or "/data/service/hnp/bin/clang++"
 
         local_bin = os.path.join(self.build_folder, ".local-bin")
         os.makedirs(local_bin, exist_ok=True)
@@ -119,8 +103,8 @@ class GitCliffConan(ConanFile):
         cxx_link = os.path.join(local_bin, "c++")
         if not os.path.exists(cc_link) and os.path.isfile(clang):
             os.symlink(clang, cc_link)
-        if not os.path.exists(cxx_link) and os.path.isfile(clangxx):
-            os.symlink(clangxx, cxx_link)
+        if not os.path.exists(cxx_link) and os.path.isfile(clangpp):
+            os.symlink(clangpp, cxx_link)
 
         return local_bin
 
@@ -139,31 +123,38 @@ class GitCliffConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        cargo, rustc, rust_env = self._ensure_rust()
+        cargo = self._ensure_rust()
         local_bin = self._ensure_cc()
         cargo_home = self._setup_cargo_mirror()
 
-        # Build environment paths
-        rust_bin = os.path.dirname(cargo)
-        rust_lib = os.path.join(os.path.dirname(rust_bin), "lib")
-        extra_path = rust_bin
+        # Build environment
+        env = dict(os.environ)
+        env["CARGO_HOME"] = cargo_home
+
+        # Set up PATH
+        paths = [os.path.dirname(cargo)]
         if local_bin:
-            extra_path += ":" + local_bin
+            paths.append(local_bin)
+        paths.append(env.get("PATH", ""))
+        env["PATH"] = ":".join(paths)
 
-        # Set up SSL cert for cargo (HTTPS downloads from crates.io mirror)
-        ssl_cert = os.environ.get("SSL_CERT_FILE", "/storage/Users/currentUser/usr/local/ssl/cert.pem")
+        # Set RUSTC if we can find it
+        rustc = shutil.which("rustc") or os.path.join(os.path.dirname(cargo), "rustc")
+        if os.path.isfile(rustc):
+            env["RUSTC"] = rustc
 
-        # Use a single shell command to set up environment and run cargo.
-        # cargo.real is the actual binary (not the wrapper script).
-        cmd = (
-            f'export PATH="{extra_path}:$PATH" && '
-            f'export CARGO_HOME="{cargo_home}" && '
-            f'export RUSTC="{rustc}" && '
-            f'export SSL_CERT_FILE="{ssl_cert}" && '
-            f'export LD_LIBRARY_PATH="{rust_lib}:$LD_LIBRARY_PATH" && '
-            f'"{cargo}" build --release'
+        # Run cargo build using subprocess for full environment control
+        self.output.info(f"Running: {cargo} build --release")
+        result = subprocess.run(
+            [cargo, "build", "--release"],
+            env=env,
+            cwd=self.build_folder,
+            capture_output=False,
         )
-        self.run(cmd)
+        if result.returncode != 0:
+            raise ConanException(
+                f"cargo build failed with exit code {result.returncode}"
+            )
 
     def package(self):
         # Copy the release binary to bin/
