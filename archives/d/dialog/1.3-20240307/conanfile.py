@@ -58,7 +58,7 @@ def _install_cmd_pkg(name, version, prefix):
     """Download and install a cmd-pkgs prebuilt package."""
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"
     cmd = f'curl -fsSL {url} | sh -s -- {name} {version} {prefix}'
-    subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True)
+    subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True, check=True)
 
 
 def _install_ncurses_headers(prefix, header_tarball):
@@ -76,7 +76,7 @@ class DialogConan(ConanFile):
     description = "display dialog boxes from shell scripts"
     license = "LGPL-2.1"
     homepage = "https://invisible-island.net/dialog/dialog.html"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
@@ -91,6 +91,10 @@ class DialogConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(
                 "dialog is only supported on Linux/OHOS, not " + str(self.settings.os)
+            )
+        if str(self.settings.arch) not in ("armv8", "arm64"):
+            raise ConanInvalidConfiguration(
+                "dialog is only supported on armv8/arm64, not " + str(self.settings.arch)
             )
 
     def layout(self):
@@ -160,7 +164,7 @@ class DialogConan(ConanFile):
                 save(self, cs_path, content)
                 # Re-run config.status to regenerate Makefiles
                 if not os.path.exists(mk_path):
-                    self.run("cd " + self.build_folder + " && bash config.status")
+                    self.run(f'cd "{self.build_folder}" && bash config.status')
 
         # Build with -j1 to avoid HMDFS FIFO issues (make jobserver)
         autotools.make(args=["-j1"])
