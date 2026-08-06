@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Conan recipe for libimobiledevice-glue 1.3.0 — common glue code for libimobiledevice.
 
+# Dependency: libplist/2.3.0 (PR #4429)
 libimobiledevice-glue provides socket helpers, thread/mutex abstraction,
 string/file helpers, plist helpers, and SHA-1/256/512 functions shared
 across libimobiledevice ecosystem libraries. The pkg-config name is
