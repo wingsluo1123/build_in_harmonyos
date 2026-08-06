@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — gdu 5.36.1 (Go/custom build system)."""
 import os
 
 from conan import ConanFile
@@ -11,7 +13,6 @@ class GduConan(ConanFile):
     description = "Fast disk usage analyzer with console interface"
     license = "MIT"
     homepage = "https://github.com/dundee/gdu"
-    url = ""
 
     package_type = "application"
 
