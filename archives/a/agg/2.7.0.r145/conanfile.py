@@ -15,10 +15,7 @@ OHOS autotools toolchain path quirk:
 import os
 
 from conan import ConanFile
-from conan.tools.files import (
-    get, apply_conandata_patches, export_conandata_patches,
-    chdir,
-)
+from conan.tools.files import get, chdir, patch, save
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 from conan.tools.env import Environment
@@ -38,8 +35,9 @@ class AggConan(ConanFile):
     options = {"shared": [True, False]}
     default_options = {"shared": False}
 
-    def export_sources(self):
-        export_conandata_patches(self)
+    # Patches declared here (no conandata.yml) — avoids the CI
+    # build_and_test.sh "Pre-download" BUILD_DIR crash.
+    exports_sources = "patches/*"
 
     def requirements(self):
         pass
@@ -48,7 +46,15 @@ class AggConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Source url/sha256 hardcoded here (no conandata.yml) to avoid the CI
+        # build_and_test.sh "Pre-download" stage crashing on an unset BUILD_DIR
+        # variable. See commits 9b4660e5cf (iso-codes) / 1d55a9cccc (xmodem).
+        get(
+            self,
+            url="https://sources.voidlinux.org/agg-2.7.0.r145/agg_2.7.0.r145+dfsg.orig.tar.xz",
+            sha256="b7181085d3c06166a972211cd17741cc5429adc7c1f58e4d528206f7208e6328",
+            strip_root=True,
+        )
 
     def generate(self):
         tc = AutotoolsToolchain(self)
@@ -84,7 +90,9 @@ class AggConan(ConanFile):
         envvars.save_script("agg_autotools_env")
 
     def build(self):
-        apply_conandata_patches(self)
+        # Patches applied manually (no conandata.yml) — the patch file lives
+        # under patches/ in the recipe root, exported via exports_sources.
+        patch(self, patch_file="patches/0001-configure.ac.patch")
         # dfsg tarball has no configure: regenerate via autotools.
         # Order: libtoolize (ltmain.sh) -> aclocal (AM_* macros) ->
         #        autoheader -> autoconf -> automake (Makefile.in) -> autoconf
