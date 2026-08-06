@@ -3,7 +3,7 @@
 # Verifies that install-fabric.sh exists, has a valid shebang,
 # passes bash -n syntax check, and responds to --help.
 
-set -e
+set -euo pipefail
 
 BIN_DIR="$1"
 
