@@ -85,3 +85,35 @@ ls ~/usr/local/lib/gstreamer-1.0/libgst*.so | wc -l
 
 **编译结束**: 2026-06-03 23:59
 **最终状态**: built
+
+## Conan 适配（2026-08-06）
+
+### Conan 配方
+
+生成了完整的 Conan 配方：
+- `conanfile.py` — meson 构建，声明所有依赖
+- `conandata.yml` — 源码 URL + sha256
+- `test_package/` — 验证插件 .so 文件存在并可加载
+
+### 依赖状态
+
+| 依赖 | 版本 | 制品仓状态 |
+|------|------|-----------|
+| gstreamer | 1.28.3 | ❌ 未发布（需先适配） |
+| gst-plugins-base | 1.28.3 | ❌ 未发布（需先适配） |
+| glib | 2.84.0.1 | ✅ 已发布 |
+| cairo | 1.18.4 | ✅ 已发布 |
+| flac | 1.4.3 | ✅ 已发布 |
+| libjpeg-turbo | 3.2.0 | ✅ 已发布 |
+| libpng | 1.6.58 | ✅ 已发布 |
+
+### 本地编译验证
+
+- gstreamer 1.28.3：191 targets 编译成功，安装到 ~/usr/local
+- gst-plugins-base 1.28.3：530 targets 编译成功，安装到 ~/usr/local
+- gst-plugins-good 1.28.3：457 targets 编译成功，72 个插件安装到 ~/usr/local
+
+### 待解决
+
+gstreamer/1.28.3 和 gst-plugins-base/1.28.3 需要先发布到制品仓，
+才能完成 gst-plugins-good 的 `conan create` 验证。
