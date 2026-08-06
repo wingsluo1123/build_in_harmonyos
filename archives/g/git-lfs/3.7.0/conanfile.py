@@ -103,12 +103,21 @@ class GitLfsConan(ConanFile):
         go_bin, goroot = self._ensure_go()
 
         # Set up Go environment for HarmonyOS
+        # GOTMPDIR must be on a filesystem that supports mmap (Go linker requirement)
         gocache = os.path.join(self.build_folder, ".gocache")
-        gotmpdir = os.path.join(self.build_folder, ".gotmpdir")
+        # Use home tmp dir which supports mmap on HarmonyOS
+        home_tmp = os.path.join(os.path.expanduser("~"), "tmp")
+        os.makedirs(home_tmp, exist_ok=True)
+        gotmpdir = os.path.join(home_tmp, f"gotmpdir-{os.getpid()}")
+        os.makedirs(gotmpdir, exist_ok=True)
         gopath = os.path.join(self.build_folder, ".gopath")
         os.makedirs(gocache, exist_ok=True)
-        os.makedirs(gotmpdir, exist_ok=True)
         os.makedirs(gopath, exist_ok=True)
+
+        self.output.info(f"Go binary: {go_bin}")
+        self.output.info(f"GOROOT: {goroot}")
+        self.output.info(f"GOTMPDIR: {gotmpdir}")
+        self.output.info(f"GOCACHE: {gocache}")
 
         # Build env as list of "VAR=value" strings (Conan 2.x requirement)
         path = os.environ.get("PATH", "")
