@@ -1,22 +1,40 @@
 software: mp3splt-gtk
 version: "0.9.2"
 status: built
-build_date: "2026-06-01"
+build_date: "2026-08-07"
 
 source:
   url: "https://downloads.sourceforge.net/project/mp3splt/mp3splt-gtk/0.9.2/mp3splt-gtk-0.9.2.tar.gz"
-  sha256: ""
+  sha256: "2084cc942b5d1aa6ff74848a41d05cb37876cbc74dfdc341ceb424c763887650"
   tar_format: tar.gz
 
 build:
   system: autotools
-  configure_options: []
+  configure_options:
+    - "--disable-audacious"
+    - "--disable-gstreamer"
+    - "--disable-gnome"
+    - "--disable-doxygen_doc"
+    - "--disable-cutter"
   dependencies:
-    - mp3splt/2.6.2
+    - libmp3splt >= 0.9.2
+    - gtk >= 3.4.2
+    - glib
+    - libltdl
   cc: clang
   cxx: clang++
 
 patches_applied: []
 
+conan:
+  recipe: true
+  dependencies:
+    - libmp3splt/0.9.2
+    - gtk/3.24.51
+    - glib/2.84.0.1
+
 knowledge_gained:
-  - "mp3splt-gtk 依赖 mp3splt/libmp3splt 库需先编译"
+  - "mp3splt-gtk 依赖 GTK3 和 libmp3splt，需要先构建这些依赖"
+  - "GTK3 需要 cairo-gobject 支持，ohpcd 的 cairo 未包含此功能"
+  - "OHOS 上无法从临时目录执行 ELF 二进制文件（安全限制）"
+  - "libltdl 需要从源码构建为共享库"
