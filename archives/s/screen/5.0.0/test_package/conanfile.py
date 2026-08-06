@@ -9,7 +9,6 @@ Tests:
   2. screen --help      - verify help output is produced
 """
 import os
-import subprocess
 
 from conan import ConanFile
 

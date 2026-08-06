@@ -24,7 +24,7 @@ from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import (
     get, save, load, apply_conandata_patches,
-    export_conandata_patches, copy,
+    export_conandata_patches,
 )
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -70,6 +70,7 @@ def _install_cmd_pkg(name, version, prefix):
 class ScreenConan(ConanFile):
     name = "screen"
     version = "5.0.0"
+    package_type = "application"
     description = "Terminal multiplexer for managing multiple terminal sessions"
     license = "GPL-3.0-or-later"
     homepage = "https://www.gnu.org/software/screen/"
@@ -152,7 +153,7 @@ class ScreenConan(ConanFile):
         mk_path = os.path.join(self.build_folder, "Makefile")
         if os.path.exists(cs_path) and not os.path.exists(mk_path):
             self._fix_config_status(self.build_folder)
-            self.run("cd " + self.build_folder + " && bash config.status")
+            self.run(f'cd "{self.build_folder}" && bash config.status')
         # Build
         autotools.make(args=["-j1"])
 
