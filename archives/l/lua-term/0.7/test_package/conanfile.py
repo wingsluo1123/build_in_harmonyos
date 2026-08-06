@@ -1,54 +1,41 @@
 #!/usr/bin/env python3
-"""Test package — lua-term 0.7 (CMake)
+"""Test package for lua-term."""
 
-Builds lua from source with LUA_USE_DLOPEN (conancenter lua doesn't
-support dlopen on OHOS), then loads the lua-term module and tests isatty().
-"""
 import os
 
 from conan import ConanFile
-from conan.tools.files import get
-from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import can_run
+from conan.tools.env import Environment
 
 
 class LuaTermTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain"
+    settings = "os", "arch", "compiler", "build_type"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-
-    def layout(self):
-        cmake_layout(self)
+        self.requires("lua/5.4.8.1")
 
     def build(self):
-        # Build lua from source with LUA_USE_DLOPEN support.
-        # The conancenter lua package doesn't enable dlopen on OHOS because
-        # CMake doesn't set UNIX for the HarmonyOS platform.
-        get(self, "https://www.lua.org/ftp/lua-5.4.7.tar.gz",
-            sha256="9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30",
-            destination=self.build_folder, strip_root=False)
-
-        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
-        cc = compilers.get("c", "clang") if compilers else "clang"
-
-        lua_dir = os.path.join(self.build_folder, "lua-5.4.7", "src")
-        self.run(f"make -C {os.path.dirname(lua_dir)} linux CC={cc} -j1")
-
-        cmake = CMake(self)
-        cmake.configure(cli_args=[f"-DLUA_DIR={lua_dir}"])
-        cmake.build()
+        source = os.path.join(self.recipe_folder, "test_lua_term.c")
+        lua = self.dependencies["lua"].cpp_info
+        cc = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("c", "cc")
+        exe = os.path.join(self.build_folder, "test_lua_term")
+        includes = " ".join(f'-I"{path}"' for path in lua.includedirs)
+        libdirs = " ".join(f'-L"{path}"' for path in lua.libdirs)
+        libs = " ".join(f"-l{name}" for name in lua.libs)
+        system_libs = " ".join(f"-l{name}" for name in lua.system_libs)
+        self.run(f'"{cc}" "{source}" -o "{exe}" {includes} {libdirs} {libs} {system_libs} -Wl,-E')
+        self._exe = exe
 
     def test(self):
-        lua_term = self.dependencies["lua-term"]
-        pkg = lua_term.package_folder
-
-        os.environ["LUA_CPATH"] = os.path.join(pkg, "lib", "lua", "5.4", "?.so")
-        os.environ["LUA_PATH"] = ";".join([
-            os.path.join(pkg, "res", "lua", "5.4", "?.lua"),
-            os.path.join(pkg, "res", "lua", "5.4", "?", "init.lua"),
-            "",
-        ])
-
-        test_exe = os.path.join(self.cpp.build.bindirs[0], "test_lua_term")
-        self.run(test_exe)
+        if not can_run(self):
+            return
+        pkg = self.dependencies["lua-term"].package_folder
+        lua_share = os.path.join(pkg, "share", "lua", "5.4")
+        lua_lib = os.path.join(pkg, "lib", "lua", "5.4")
+        env = Environment()
+        env.define("LUA_PATH", os.path.join(lua_share, "?.lua") + ";" + os.path.join(lua_share, "?", "init.lua") + ";;")
+        env.define("LUA_CPATH", os.path.join(lua_lib, "?.so") + ";" + os.path.join(lua_lib, "?", "core.so") + ";;")
+        with env.vars(self).apply():
+            self.run(f'"{self._exe}"')

@@ -36,7 +36,7 @@ lua-term 使用简单的 Makefile 构建系统，主要步骤：
 
 ## 依赖版本
 
-- Lua 5.4.7（已安装）
+- Lua 5.4.8.1（Conan package）
 - clang 15.0.4
 
 ## 验证结果
@@ -72,5 +72,17 @@ lua -e "local term = require 'term'; print('lua-term loaded successfully'); prin
 4. HMDFS 文件系统不支持 ln -s，已使用 cp 替代
 ---
 
-**编译结束**: 2026-08-07 02:49
-**最终状态**: published
+**编译结束**: 2026-06-09 11:58
+**最终状态**: built
+
+## 2026-08-07 Path B rerun note
+
+The upstream 0.7 tarball contains no first-party test suite; the source files
+are limited to `core.c`, `term/*.lua`, README/CHANGES/COPYING, Makefile, and
+rockspec. Validation therefore uses the package consumer smoke and downstream
+Busted coverage only; no upstream pass is claimed for this package.
+
+- OHOS new-port run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-lua-term-r2-20260807-072059-21544`
+- Full ref: `lua-term/0.7#4af85952759283756c9b8cb97bbf85e2:b3c0011005d51381f1539bc96e0d2a6e4f804b4e#04d690b68049b57af7747d889880c8c0`
+- Consumer smoke: `lua-term smoke ok`
+- Gates: L0 pass, L1 pass, L2 skip-no-bin-dir, L4 pass, L5 pass
