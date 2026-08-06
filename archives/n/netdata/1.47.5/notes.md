@@ -85,5 +85,5 @@ netdata v1.47.5
 - threads.c已有`#ifndef __OHOS__`守卫（pthread_cancel）
 ---
 
-**编译结束**: 2026-06-04 03:51
+**编译结束**: 2026-08-07 07:10
 **最终状态**: built
