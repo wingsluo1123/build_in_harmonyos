@@ -1,84 +1,56 @@
 # lua-struct 0.9.2 适配笔记
 
 ## 编译环境
-- 构建系统: makefile (custom Makefile created)
-- 编译日期: 2026-06-10
-- 编译器: N/A (pure Lua library)
+- 构建系统: Pure Lua library (no compilation)
+- 编译日期: 2026-08-07
+- 编译器: clang 15.0.4 (for test_package C program)
 - 状态: published
 
-## 编译步骤
+## Conan 适配
 
-lua-struct 是一个纯 Lua 库，无编译步骤，只需安装 .lua 文件到正确的路径。
+### 适配概述
+lua-struct 是纯 Lua 库，无需编译步骤。Conan 配方使用 no-op build() 方法，
+仅将 struct.lua 文件安装到 lib/lua/5.4/ 目录。
 
-1. 下载源码: https://github.com/iryont/lua-struct/archive/refs/tags/0.9.2-1.tar.gz
-2. 解压源码到 ~/builds/lua-struct-0.9.2.work
-3. 创建 Makefile 以处理安装
-4. 执行 `make install PREFIX=$DEFAULT_PREFIX DESTDIR=$TEST_PREFIX` (staging)
-5. 执行 `make install PREFIX=$DEFAULT_PREFIX` (本地安装)
-6. 执行测试验证功能
+### 关键文件
+- conanfile.py: Conan 配方，依赖 lua/5.4.7
+- conandata.yml: 源码 URL + sha256 + 补丁声明
+- test_package/: C 程序嵌入 Lua 解释器测试 struct 模块
+- patches/0001-lua54-compat-frexp-ldexp.patch: Lua 5.4 兼容性补丁
 
-## 遇到的问题与解决方案
+### 依赖
+- lua/5.4.7 (从 conancenter 获取，--build=missing 从源码构建)
+
+### 补丁
+1. **0001-lua54-compat-frexp-ldexp.patch**
+   - 问题: Lua 5.4 移除了 math.frexp 和 math.ldexp 函数
+   - 修复: 添加纯 Lua 实现的 fallback 函数
+   - 类型: portability
+
+### 测试
+- test_package 使用 C 程序链接 liblua.a，嵌入 Lua 解释器
+- 测试覆盖: pack/unpack for I, h, B, b, ss, d 类型
+- 所有断言通过
+
+### 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | 源码无构建文件 | 纯 Lua 库无 configure/make | 创建 Makefile 处理安装 |
-| 2 | Lua 模块加载失败 | package.path 硬编码为 /usr/local | 设置 LUA_PATH 环境变量 |
-| 3 | manifest.yaml build_system 字段缺失 | verify_build.py 检查顶层字段 | 添加顶层 build_system 字段 |
-
-## 源码修改
-
-创建了 Makefile 文件（无补丁，仅新增构建文件）:
-
-```makefile
-# Makefile for lua-struct
-# Pure Lua library - no compilation needed
-
-PREFIX ?= /usr/local
-LUA_VERSION = 5.4
-LUADIR = $(PREFIX)/share/lua/$(LUA_VERSION)
-
-install:
-	mkdir -p $(DESTDIR)$(LUADIR)
-	cp -f src/struct.lua $(DESTDIR)$(LUADIR)/struct.lua
-
-test:
-	LUA_PATH="$(PREFIX)/share/lua/$(LUA_VERSION)/?.lua;;" lua -e "..."
-```
-
-## 依赖版本
-
-- Lua 5.4.7 (已安装在系统中)
+| 1 | conan 报 package_type=library 但无 shared option | Conan 2.x 要求 library 类型必须声明 shared 选项 | 添加 options={"shared": [True, False]} |
+| 2 | test_package 找不到 lua.h | CMakeDeps 未正确传播 lua 的 include 目录 | 改用直接编译方式，通过 cpp_info 获取路径 |
+| 3 | math.frexp 调用失败 | Lua 5.4 移除了 math.frexp 和 math.ldexp | 添加纯 Lua fallback 实现 |
 
 ## 验证结果
+- conan-verify: ✅ PASS (G0-G4, L2/L4/L5)
+- 本地 CI 模拟: ✅ PASS (setup.sh + build_and_test.sh)
+- test_package: ✅ All tests passed
 
-```bash
-LUA_PATH="/storage/Users/currentUser/usr/local/share/lua/5.4/?.lua;;" lua -e "local struct = require 'struct'; local packed = struct.pack('<I', 12345); local unpacked = struct.unpack('<I', packed); assert(unpacked == 12345, 'Test failed'); print('All tests passed.')"
-```
-
-输出: `All tests passed.`
-
-## 交付物
-
-| 文件 | 路径 | 说明 |
-|------|------|------|
-| struct.lua | ~/usr/local/share/lua/5.4/struct.lua | Lua 模块文件 |
-| lua-struct-0.9.2-ohos-aarch64.tar.gz | packaging/ 目录 | 预编译包 (20KB) |
-
-## 后续维护记录
-
-- 2026-06-10 14:48: 重新制作预编译包（原 packaging 目录为空）
+## 编译产物
+- `lib/lua/5.4/struct.lua` — Lua 模块文件
 
 ## 注意事项
-
 1. lua-struct 是纯 Lua 实现，无二进制文件
 2. 使用时需要设置 LUA_PATH 环境变量或在 Lua 代码中设置 package.path
-3. 模块路径为 `require "struct"`
+3. 模块路径为 `require("struct")`
 4. 支持 pack/unpack 操作，类似 PHP 的 pack/unpack 函数
-5. 支持多种数据类型: b/B/h/H/i/I/l/L/f/d/s/cn
-**质量门禁**: G1-G4 全部通过
-**G0 干净构建**: FAIL（纯 Lua 库无 configure，已手动验证）
-**知识整理**: 已完成（无新知识沉淀）
----
-
-**编译结束**: 2026-06-10 10:32
-**最终状态**: published
+5. Lua 5.4 兼容性补丁必须应用，否则 float/double 打包解包功能不可用
