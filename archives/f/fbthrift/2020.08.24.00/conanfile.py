@@ -27,7 +27,7 @@ class FbthriftConan(ConanFile):
     }
     default_options = {
         "shared": False,
-        "compiler_only": False,
+        "compiler_only": True,
     }
 
     def export_sources(self):
