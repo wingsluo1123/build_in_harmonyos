@@ -4,13 +4,15 @@
 Gleam is a Rust project built with Cargo. This recipe:
 1. Downloads source from GitHub (v1.17.0)
 2. Applies patches to use ring crypto provider (avoids aws-lc-rs assembly issues on OHOS)
-3. Builds with cargo build --release --bin gleam
-4. Packages the gleam binary
+3. Installs Rust toolchain via Harmonybrew if not available
+4. Builds with cargo build --release --bin gleam
+5. Packages the gleam binary
 
-Build dependencies: Rust toolchain (rustc/cargo), clang (for C linking)
+Build dependencies: Rust toolchain (rustc/cargo, auto-installed via Harmonybrew), clang (for C linking)
 Runtime: musl libc (system-provided on HarmonyOS)
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -76,14 +78,30 @@ linker = "%s"
         with open(os.path.join(cargo_dir, "config.toml"), "w") as f:
             f.write(cargo_config)
 
-        # Set CC/CXX/AR explicitly (R33: defined, not undefined shell vars)
-        os.environ["CC"] = cc
-        os.environ["CXX"] = cxx
-        os.environ["AR"] = "ar"
-        os.environ["CARGO_NET_RETRY"] = "5"
+        # Ensure Rust toolchain is available (install via Harmonybrew if missing)
+        brew_prefix = os.path.expanduser("~/.harmonybrew")
+        cargo_bin = os.path.join(brew_prefix, "bin", "cargo")
+        if not shutil.which("cargo") and not os.path.exists(cargo_bin):
+            self.output.info("Rust toolchain not found, installing via Harmonybrew...")
+            self.run(
+                'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)" && '
+                f'eval "$({brew_prefix}/bin/brew shellenv)" && '
+                f'{brew_prefix}/bin/brew install rust'
+            )
 
-        # Build with cargo
-        self.run("cargo build --release --bin gleam")
+        # Build with cargo — set CC/CXX/AR explicitly (R33)
+        # Use a single shell command to ensure environment is consistent
+        build_cmd = (
+            f'export CC="{cc}" && '
+            f'export CXX="{cxx}" && '
+            f'export AR="ar" && '
+            f'export CARGO_NET_RETRY=5 && '
+            f'if [ -f {brew_prefix}/bin/brew ]; then '
+            f'  eval "$({brew_prefix}/bin/brew shellenv)"; '
+            f'fi && '
+            f'cargo build --release --bin gleam'
+        )
+        self.run(build_cmd)
 
     def package(self):
         # Copy the built binary
