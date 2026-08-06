@@ -21,7 +21,7 @@ class AggTestConan(ConanFile):
         # Resolve the installed package's include/ and lib/ dirs.
         agg = self.dependencies["agg"]
         cpp = agg.cpp_info
-        inc = cpp.include_dirs[0] if cpp.include_dirs else "include"
+        inc = cpp.includedirs[0] if cpp.includedirs else "include"
         libdir = cpp.libdirs[0] if cpp.libdirs else "lib"
         # Compile and link test.cpp against libagg.a.
         # C++17 (agg is template-only), static lib, no system deps.
