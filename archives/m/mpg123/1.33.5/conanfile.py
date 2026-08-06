@@ -75,6 +75,7 @@ class Mpg123Conan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["mpg123", "out123", "syn123"]
+        self.cpp_info.system_libs = ["m"]
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
 
