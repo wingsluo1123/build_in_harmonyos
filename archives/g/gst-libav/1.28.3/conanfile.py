@@ -5,14 +5,14 @@ GStreamer libav (FFmpeg) plug-in — wraps FFmpeg's libavcodec/libavformat
 into a GStreamer plugin. Produces libgstlibav.so (pure plugin, no bin).
 
 FFmpeg is not declared as a conan dependency to avoid zlib version conflict
-(glib/2.84.0.1 uses zlib/1.3.1.1, ffmpeg/7.1.5 also uses zlib/1.3.1.1,
-but glib2/2.88.0 from gstreamer uses zlib/1.3.1). Instead, ffmpeg is
-installed from the conan remote and its .pc files are used directly.
+(glib2/2.88.0 uses zlib/1.3.1, ffmpeg/7.1.5 uses zlib/1.3.1.1).
+Instead, ffmpeg is installed from the conan remote and its .pc files are
+copied to the generators folder with fixed prefixes.
 """
 import os
+import re
 import glob as _glb
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -40,9 +40,7 @@ class GstLibavConan(ConanFile):
     def requirements(self):
         self.requires("gstreamer/1.28.3")
         self.requires("gst-plugins-base/1.28.3")
-        self.requires("glib/2.84.0.1")
-        # FFmpeg not declared as conan dep — installed separately to avoid
-        # zlib version conflict between glib2 (from gstreamer) and ffmpeg
+        self.requires("glib2/2.88.0")
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -71,21 +69,45 @@ class GstLibavConan(ConanFile):
         tc.generate()
         PkgConfigDeps(self).generate()
 
-        # Copy ALL .pc files from conan cache (same as gstreamer recipe)
-        import re
+        # Fix zlib.pc: conan's zlib/1.3.1 is static without -fPIC
+        _zlib_pc = os.path.join(self.generators_folder, "zlib.pc")
+        _sdk_libz = _glb.glob(
+            "/data/service/hnp/ohos-sdk.org/*/ohos/native/sysroot/usr/lib/aarch64-linux-ohos/libz.so"
+        )
+        if _sdk_libz:
+            _sdk_lib = os.path.dirname(_sdk_libz[0])
+            _sdk_inc = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(_sdk_lib))), "include"
+            )
+            with open(_zlib_pc, "w") as f:
+                f.write(f"""prefix={_sdk_lib}
+libdir={_sdk_lib}
+includedir={_sdk_inc}
+
+Name: zlib
+Description: OHOS system zlib (shared, -fPIC)
+Version: 1.3.1
+Libs: -L${{libdir}} -lz
+Cflags: -I${{includedir}}
+""")
+
+        # Copy ALL .pc files from conan cache (glib2, pcre2, ffmpeg, etc.)
+        # PkgConfigDeps only generates .pc from conan components, but the
+        # meson-installed .pc files have correct Requires, variables, etc.
         conan_pkg_dir = os.path.expanduser("~/.conan2/p")
         for pc_path in _glb.glob(os.path.join(conan_pkg_dir, "*", "p", "lib", "pkgconfig", "*.pc")):
             pc_name = os.path.basename(pc_path)
+            if pc_name == "zlib.pc":  # Already fixed above
+                continue
             dep_pkg = os.path.dirname(os.path.dirname(os.path.dirname(pc_path)))
             dst = os.path.join(self.generators_folder, pc_name)
             with open(pc_path, "r") as f:
                 text = f.read()
-            # Replace any prefix= line with correct package path
             text = re.sub(r'^prefix=.*$', f'prefix={dep_pkg}', text, flags=re.MULTILINE)
             with open(dst, "w") as f:
                 f.write(text)
 
-        # Copy gstreamer and gst-plugins-base .pc files (meson-installed)
+        # Copy gstreamer and gst-plugins-base meson-installed .pc files
         for dep_name in ("gstreamer", "gst-plugins-base"):
             dep = self.dependencies.get(dep_name)
             if dep and dep.package_folder:
@@ -97,33 +119,9 @@ class GstLibavConan(ConanFile):
                         dst = os.path.join(self.generators_folder, pc_name)
                         with open(pc_file, "r") as f:
                             text = f.read()
-                        if "prefix=/" in text and f"prefix={dep_pkg}" not in text:
-                            text = text.replace("prefix=/", f"prefix={dep_pkg}")
+                        text = re.sub(r'^prefix=.*$', f'prefix={dep_pkg}', text, flags=re.MULTILINE)
                         with open(dst, "w") as f:
                             f.write(text)
-
-        # Install ffmpeg from conan remote if not in cache
-        try:
-            subprocess.run(
-                ["conan", "install", "--requires=ffmpeg/7.1.5",
-                 "-r=ohpcd",
-                 f"-pr:h=ci/conan/profiles/ohos-aarch64",
-                 f"-pr:b=ci/conan/profiles/ohos-aarch64"],
-                check=True, capture_output=True, text=True,
-                cwd=os.path.dirname(os.path.dirname(os.path.dirname(self.recipe_folder))))
-        except Exception:
-            pass  # ffmpeg might already be in cache
-
-        # Copy ffmpeg .pc files from conan cache
-        for pc_path in _glb.glob(os.path.join(conan_pkg_dir, "ffmpeg*", "p", "lib", "pkgconfig", "*.pc")):
-            pc_name = os.path.basename(pc_path)
-            ff_pkg = os.path.dirname(os.path.dirname(os.path.dirname(pc_path)))
-            dst = os.path.join(self.generators_folder, pc_name)
-            with open(pc_path, "r") as f:
-                text = f.read()
-            text = text.replace("prefix=/", f"prefix={ff_pkg}")
-            with open(dst, "w") as f:
-                f.write(text)
 
     def build(self):
         if not shutil.which("meson"):
@@ -143,7 +141,7 @@ class GstLibavConan(ConanFile):
             for pc in _glb.glob(os.path.join(pc_dir, "*.pc")):
                 with open(pc, "r") as f:
                     text = f.read()
-                text = text.replace("prefix=/", f"prefix={pkg}")
+                text = re.sub(r'^prefix=.*$', f'prefix={pkg}', text, flags=re.MULTILINE)
                 with open(pc, "w") as f:
                     f.write(text)
 
@@ -158,7 +156,7 @@ class GstLibavConan(ConanFile):
         libav.requires = [
             "gstreamer::gstreamer-1.0",
             "gst-plugins-base::gstvideo-1.0",
-            "glib::glib-2.0",
+            "glib2::glib2",
         ]
 
         self.cpp_info.bindirs = []
