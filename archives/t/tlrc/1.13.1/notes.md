@@ -22,6 +22,7 @@ cargo build --release --target aarch64-unknown-linux-ohos
 
 CI 环境无预装 Rust 工具链（E154），通过 cmd-pkgs 预编译包安装：
 
+<!-- CI 内部操作：以下命令仅在 CI worker 跑，非用户应执行命令（aireview P3: curl|sh 管道到 shell 风险标注） -->
 ```bash
 curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0
 ```
