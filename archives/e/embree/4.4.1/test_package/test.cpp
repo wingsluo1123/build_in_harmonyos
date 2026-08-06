@@ -38,13 +38,12 @@ int main(void) {
     rtcCommitScene(scene);
 
     /* Cast a ray and check intersection */
-    struct RTCRayHit rayhit = {};
+    struct RTCRayHit rayhit;
     rayhit.ray.org_x = 0.3f; rayhit.ray.org_y = 0.3f; rayhit.ray.org_z = -1.0f;
     rayhit.ray.dir_x = 0.0f; rayhit.ray.dir_y = 0.0f; rayhit.ray.dir_z = 1.0f;
     rayhit.ray.tnear = 0.0f;
     rayhit.ray.tfar = 100.0f;
     rayhit.ray.flags = 0;
-    rayhit.ray.mask = 0xFFFFFFFF;
     rayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
