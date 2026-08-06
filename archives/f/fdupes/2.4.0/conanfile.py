@@ -27,7 +27,7 @@ class FdupesConan(ConanFile):
     description = "fdupes - finds and deletes duplicate files"
     license = "MIT"
     homepage = "https://github.com/adrianlopezroche/fdupes"
-    url = ""  # CI fills this
+    url = ""
 
     package_type = "application"
     settings = "os", "compiler", "build_type", "arch"

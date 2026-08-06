@@ -24,7 +24,7 @@ class NcursesConan(ConanFile):
     description = "Terminal handling library providing cursor movement, screen optimization, and window management"
     license = "X11"
     homepage = "https://invisible-island.net/ncurses/"
-    url = ""  # CI fills this
+    url = ""
 
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
@@ -83,7 +83,7 @@ echo "$result"
         self.run(
             f"cd {src} && "
             f"PATH={wrapper_dir}:$PATH "
-            f"TMPDIR={tmpdir} CONFIG_SHELL=/data/service/hnp/bin/bash "
+            f"TMPDIR={tmpdir} CONFIG_SHELL=bash "
             f"CC=clang CXX=clang++ CFLAGS=\"{cflags}\" "
             f"./configure "
             f"--prefix={self.package_folder} "
