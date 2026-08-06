@@ -6,6 +6,7 @@ that produces a single static binary. This recipe builds it using the Go
 toolchain with CGO disabled for a fully static binary.
 
 Key adaptation points:
+  - Installs Go toolchain via Harmonybrew if not available on the system.
   - go:generate directives create temporary binaries that cannot execute
     on HarmonyOS without ELF signing. Stub generated files are created in
     build() to skip go generate.
@@ -13,6 +14,8 @@ Key adaptation points:
   - GOTMPDIR set to a writable path that supports mmap (required by Go linker).
 """
 import os
+import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -25,7 +28,7 @@ class GitLfsConan(ConanFile):
     description = "Git extension for versioning large files"
     license = "MIT"
     homepage = "https://git-lfs.github.com/"
-    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"  # CI fills
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
@@ -40,8 +43,39 @@ class GitLfsConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _ensure_go(self):
+        """Ensure Go toolchain is available. Install via Harmonybrew if needed."""
+        # Try system go first
+        go_bin = shutil.which("go")
+        if go_bin:
+            return go_bin, ""
+
+        # Try Harmonybrew
+        brew_bin = "/storage/Users/currentUser/.harmonybrew/bin/brew"
+        if not os.path.isfile(brew_bin):
+            # Install Harmonybrew
+            self.output.info("Installing Harmonybrew for Go toolchain...")
+            subprocess.run(
+                ["zsh", "-c", "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"],
+                check=True,
+            )
+
+        # Install Go via brew
+        self.output.info("Installing Go via Harmonybrew...")
+        subprocess.run([brew_bin, "install", "go"], check=True)
+
+        # Locate Go
+        result = subprocess.run(
+            [brew_bin, "--prefix", "go"], capture_output=True, text=True
+        )
+        go_prefix = result.stdout.strip()
+        goroot = os.path.join(go_prefix, "libexec")
+        go_bin = os.path.join(goroot, "bin", "go")
+        return go_bin, goroot
+
     def build(self):
         apply_conandata_patches(self)
+
         # Create stub generated files to skip go generate.
         # go generate normally runs mangen.go and trgen.go which produce
         # temporary binaries that cannot execute on HarmonyOS without ELF signing.
@@ -61,6 +95,9 @@ class GitLfsConan(ConanFile):
             f.write("\t// Use 'go generate ./tr/trgen' to update\n")
             f.write("}\n")
 
+        # Ensure Go toolchain is available
+        go_bin, goroot = self._ensure_go()
+
         # Set up Go environment for HarmonyOS
         gocache = os.path.join(self.build_folder, ".gocache")
         gotmpdir = os.path.join(self.build_folder, ".gotmpdir")
@@ -68,15 +105,6 @@ class GitLfsConan(ConanFile):
         os.makedirs(gocache, exist_ok=True)
         os.makedirs(gotmpdir, exist_ok=True)
         os.makedirs(gopath, exist_ok=True)
-
-        # GOROOT: use brew-installed Go if available, else system Go
-        brew_go = "/storage/Users/currentUser/.harmonybrew/opt/go/libexec"
-        if os.path.isdir(brew_go):
-            goroot = brew_go
-            go_bin = os.path.join(goroot, "bin", "go")
-        else:
-            goroot = ""
-            go_bin = "go"
 
         # Build env as list of "VAR=value" strings (Conan 2.x requirement)
         path = os.environ.get("PATH", "")
@@ -98,12 +126,12 @@ class GitLfsConan(ConanFile):
             env.append(f"GOROOT={goroot}")
 
         # Download Go module dependencies
-        self.run(f"{go_bin} mod download", cwd=self.source_folder, env=env)
+        self.run(f'"{go_bin}" mod download', cwd=self.source_folder, env=env)
 
         # Build git-lfs binary
         ldflags = "-X github.com/git-lfs/git-lfs/v3/config.GitCommit=v3.7.0 -s -w"
         self.run(
-            f'{go_bin} build -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
+            f'"{go_bin}" build -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
             cwd=self.source_folder,
             env=env,
         )
