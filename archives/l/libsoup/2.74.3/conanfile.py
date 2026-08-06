@@ -66,6 +66,23 @@ class LibsoupConan(ConanFile):
         tc.generate()
         pkg = PkgConfigDeps(self)
         pkg.generate()
+        # Generate pkg-config files for glib components that meson looks for
+        # separately (gmodule-2.0, gobject-2.0, gio-2.0, gthread-2.0).
+        # The glib Conan package puts all libs in a single glib-2.0.pc,
+        # but meson's dependency() checks for each component separately.
+        import os
+        pc_dir = self.generators_folder
+        for comp in ["gmodule-2.0", "gobject-2.0", "gio-2.0", "gthread-2.0"]:
+            pc_path = os.path.join(pc_dir, f"{comp}.pc")
+            if not os.path.exists(pc_path):
+                content = (
+                    f"Name: {comp}\n"
+                    f"Description: {comp} (via glib conan package)\n"
+                    f"Version: 2.84.0\n"
+                    f"Requires: glib-2.0\n"
+                )
+                with open(pc_path, "w") as f:
+                    f.write(content)
 
     def build(self):
         import os
