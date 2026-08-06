@@ -31,11 +31,11 @@ class DvgrabConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
-    # Build requirements: autotools needed since source is from git (no pre-generated configure)
+    # Build requirements: automake and libtool from Conan, autoconf from system PATH
+    # (autoconf is not in ohpcd remote; system autoconf from hnp provides autoreconf)
     tool_requires = (
-        "autoconf/2.72",
-        "automake/1.17",
-        "libtool/2.4.7",
+        "automake/1.18",
+        "libtool/2.5.4",
     )
 
     def export_sources(self):
