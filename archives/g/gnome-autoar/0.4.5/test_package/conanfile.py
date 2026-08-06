@@ -30,3 +30,7 @@ class GnomeAutoarTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # Also run the binary directly to verify runtime behavior
+        exe = os.path.join(self.cpp.build.bindirs[0], "test_gnome_autoar")
+        if os.path.isfile(exe):
+            self.run(exe, env="conanrun")
