@@ -1,15 +1,15 @@
 # GNU Go 3.8 编译元数据
-software: gnugo
-version: 3.8
-status: published
-build_date: 2026-06-16
+software: "gnugo"
+version: "3.8"
+status: built
+build_date: 2026-08-06
 build_system: autotools
 compiler: clang-15.0.4
 platform: HarmonyOS-aarch64
 
-# 编译配置
+# 编译配置 (由 conanfile.py generate() 方法管理)
 configure_options:
-  - --prefix=/storage/Users/currentUser/usr/local
+  - --build=aarch64-unknown-linux-gnu
 
 # 依赖信息
 dependencies: []
@@ -19,31 +19,19 @@ patches:
   - 0001-fix-duplicate-symbol-liberty-h.patch
   - 0002-fix-duplicate-symbol-unconditional-c.patch
 
-# 预编译包信息
-package:
-  name: gnugo-3.8-ohos-aarch64.tar.gz
-  size: 8.1MB
-  files:
-    - bin/gnugo
-    - share/man/man6/gnugo.6
-    - share/info/gnugo.info
-    - share/info/gnugo.info-1
-    - share/info/gnugo.info-2
-    - share/info/gnugo.info-3
-
 # 质量门禁
 quality_gates:
-  G0_clean_build: PASS
-  G1_binary_integrity: PASS
-  G2_functionality: PASS
-  G3_portability: PASS  # 无需 RPATH，动态链接
-  G4_archive_integrity: PASS
+  G0_pre_build: PASS
+  G1_recipe_integrity: PASS
+  G2_conan_create: PASS
+  G3_system_lib_isolation: PASS
+  G4_artifact_integrity: PASS
+  W3_local_ci_simulation: PASS
 
-# 编译环境
+# 编译环境 (Conan 管理构建工具链)
 build_env:
-  TMPDIR: ~/tmp
-  DEFAULT_PREFIX: /storage/Users/currentUser/usr/local
-  CC: clang-15.0.4
+  build_type: Release
+  HMDFS_fix: mktemp wrapper in generate()
 
 # 编译问题
 issues:
@@ -52,15 +40,11 @@ issues:
     solution: "将 liberty.h 中的变量定义改为 extern 声明，在 unconditional.c 中添加实际定义"
     severity: medium
   - type: platform_issue
-    description: "/tmp 只读，configure 无法创建临时文件"
-    solution: "设置 TMPDIR=~/tmp 环境变量"
-    severity: medium
-  - type: platform_issue
     description: "HMDFS 文件系统限制，config.status 无法在当前目录创建临时目录"
-    solution: "修改 config.status 脚本，使用 TMPDIR 创建临时文件"
+    solution: "在 generate() 中创建 mktemp wrapper 返回失败，强制 autoconf 使用 mkdir fallback"
     severity: high
 
 # 知识提取
 knowledge_gained:
-  - "HMDFS 文件系统限制：config.status 无法在当前目录创建临时目录，需要修改脚本使用 TMPDIR"
+  - "HMDFS 文件系统限制：config.status 无法在当前目录创建临时目录，需要 mktemp wrapper"
   - "重复符号问题：全局变量在头文件中定义会导致多个目标文件重复定义，应使用 extern 声明"

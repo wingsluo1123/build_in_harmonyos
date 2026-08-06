@@ -1,10 +1,9 @@
-import os
-
+#!/usr/bin/env python3
+"""test_package for gnugo — runs gnugo --version to verify the binary."""
 from conan import ConanFile
 
 
 class GnugoTestConan(ConanFile):
-    """test_package for gnugo — runs gnugo --version to verify the binary."""
     settings = "os", "arch", "compiler", "build_type"
     generators = "VirtualRunEnv"
     test_type = "explicit"
