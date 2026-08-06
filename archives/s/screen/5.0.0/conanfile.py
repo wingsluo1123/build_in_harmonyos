@@ -50,11 +50,6 @@ def _is_ncurses_installed(prefix):
     return False
 
 
-def _is_ncurses_headers_installed(prefix):
-    """Check if ncurses headers are installed at prefix."""
-    return os.path.exists(os.path.join(prefix, "include", "curses.h"))
-
-
 def _install_cmd_pkg(name, version, prefix):
     """Download and install a cmd-pkgs prebuilt package."""
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"
