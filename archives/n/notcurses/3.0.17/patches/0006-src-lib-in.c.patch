@@ -1,13 +1,15 @@
---- a/src/lib/in.c
-+++ b/src/lib/in.c
-@@ -2552,21 +2552,26 @@
-   // on exit (in cancel_and_join()).
-   sigdelset(&smask, SIGTHR);
- #endif
-   int events;
- #if defined(__APPLE__) || defined(__MINGW32__)
-   int timeoutms = nonblock ? 0 : -1;
-   while((events = poll(pfds, pfdcount, timeoutms)) < 0){ // FIXME smask?
+--- a/src/lib/in.c	2025-10-29 00:02:11.000000000 +0800
++++ b/src/lib/in.c	2026-08-07 06:40:58.375687969 +0800
+@@ -860,7 +860,7 @@
+   return 2;
+ }
+ 
+-static int 
++static int
+ kitty_cb_atxtn(inputctx* ictx, int n, int with_event){
+   uint32_t txt[5]={0};
+   unsigned val = amata_next_numeric(&ictx->amata, "\x1b[", ';');
+@@ -2559,8 +2559,13 @@
  #else
    struct timespec ts = { .tv_sec = 0, .tv_nsec = 0, };
    struct timespec* pts = nonblock ? &ts : NULL;
@@ -16,31 +18,22 @@
 +  while((events = poll(pfds, pfdcount, timeoutms)) < 0){
 +#else
    while((events = ppoll(pfds, pfdcount, pts, &smask)) < 0){
-+#endif
  #endif
++#endif
      if(errno == EINTR){
        loginfo("interrupted by signal");
        return resize_seen;
-     }else if(errno != EAGAIN && errno != EBUSY && errno != EWOULDBLOCK){
-       logerror("error polling (%s)", strerror(errno));
-       return -1;
-     }
-   }
-   loginfo("poll returned %d", events);
-@@ -2652,29 +2657,52 @@
-   return 0;
- }
- 
- int stop_inputlayer(tinfo* ti){
-   int ret = 0;
-   if(ti){
-     // FIXME cancellation on shutdown does not yet work on windows #2192
+@@ -2659,9 +2664,18 @@
  #ifndef __MINGW32__
      if(ti->ictx){
        loginfo("tearing down input thread");
 +#ifdef __OHOS__
-+      // OHOS: pthread_cancel 被禁用，detach 代替 cancel_and_join
++      // OHOS: pthread_cancel is unavailable, use pthread_detach instead.
 +      pthread_detach(ti->ictx->tid);
++      // Restore stdin fd blocking mode for terminal cleanup
++      ret |= set_fd_nonblocking(ti->ictx->stdinfd, ti->stdio_blocking_save, NULL);
++      // Skip free_inputctx: detached thread may still reference ictx.
++      // Memory will be freed on process exit.
 +#else
        ret |= cancel_and_join("input", ti->ictx->tid, NULL);
        ret |= set_fd_nonblocking(ti->ictx->stdinfd, ti->stdio_blocking_save, NULL);
@@ -49,10 +42,10 @@
        ti->ictx = NULL;
      }
  #endif
-   }
+@@ -2669,6 +2683,24 @@
    return ret;
  }
-+
+ 
 +#ifdef __OHOS__
 +// OHOS: Clear initdata so input thread processes keyboard input normally.
 +// Called after skipping handle_responses (no queries were sent).
@@ -70,13 +63,7 @@
 +  }
 +}
 +#endif
- 
++
  int inputready_fd(const inputctx* ictx){
  #ifndef __MINGW32__
    return ictx->readypipes[0];
- #else
-   (void)ictx;
-   logerror("readiness descriptor unavailable on windows");
-   return -1;
- #endif
- }
