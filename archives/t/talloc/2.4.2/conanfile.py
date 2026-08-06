@@ -6,11 +6,11 @@ Key OHOS adaptations:
   - --disable-python: Python embedding doesn't work on OHOS
   - Patch: HAVE_SECURE_MKSTEMP check uses /tmp (read-only on OHOS), made non-mandatory
 """
-import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsLayout
 
 
 class TallocConan(ConanFile):
@@ -19,7 +19,7 @@ class TallocConan(ConanFile):
     description = "Talloc is a hierarchical, reference counted memory pool system with destructors"
     license = "MIT"
     homepage = "https://talloc.samba.org/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -32,6 +32,9 @@ class TallocConan(ConanFile):
 
     def requirements(self):
         pass
+
+    def layout(self):
+        AutotoolsLayout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -51,8 +54,10 @@ class TallocConan(ConanFile):
         ]
         tc.configure_args.append("--disable-python")
         # Set PYTHON env var for waf (configure wrapper calls $PYTHON)
+        # Use shutil.which for robust path detection (R33: avoid hardcoded paths)
+        python_path = shutil.which("python3") or "/data/service/hnp/bin/python3"
         env = tc.environment()
-        env.define("PYTHON", "/data/service/hnp/bin/python3")
+        env.define("PYTHON", python_path)
         tc.generate()
 
     def build(self):

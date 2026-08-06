@@ -1,45 +1,38 @@
-# talloc 2.4.2 适配笔记
+# Notes — talloc 2.4.2
 
-## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-08-07}
-- 编译器: clang/clang++
-- 状态: {published|built|failed}
+## 基本信息
+- 软件名: talloc
+- 版本: 2.4.2
+- 构建系统: waf
+- 状态: built
 
 ## 编译步骤
+1. `./configure --prefix=/usr/local --disable-python CC=clang CXX=clang++`
+2. `make -j2`
+3. `make install`
+4. `make check` (C testsuite passed, Python test skipped due to --disable-python)
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+## 补丁
+- `0001-lib-replace-wscript.patch`: 修改 `lib/replace/wscript` 中 `HAVE_SECURE_MKSTEMP` 检查从 `mandatory=True` 改为 `mandatory=False`
+  - 原因: OHOS 平台 `/tmp` 目录只读，`mkstemp` 检查失败导致 configure 中断
+  - 回退方案: `replace.c` 中的 `rep_mkstemp()` 提供安全替代实现
 
-## 遇到的问题与解决方案
+## 依赖
+无外部依赖。talloc 是独立的内存分配库。
 
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-{按需添加行}
-
-## 源码修改
-
-{如有补丁，列出文件名和修改内容；无则删除此节}
-
-## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
-
-## 验证结果
-
+## 验证命令和结果
 ```bash
-{验证命令和结果}
+# conan create 验证
+conan create archives/t/talloc/2.4.2 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing --user=ohpcd --channel=stable
+# G1-G4 全部通过，L2/L4/L5 通过
+
+# 本地 CI 模拟
+bash ci/conan/setup.sh && bash ci/conan/build_and_test.sh talloc/2.4.2
+# 通过
 ```
 
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
-
-## 注意事项
-
-{需要特别注意的点；无则删除此节}
----
-
-**编译结束**: 2026-08-07 06:20
-**最终状态**: built
+## OHOS 适配注意事项
+- talloc 使用 Samba 的 waf 构建系统，非标准 autotools
+- `--disable-python` 必须添加，OHOS 不支持 Python 嵌入
+- conanfile.py 使用 AutotoolsToolchain 但过滤掉 `${}` 模板参数和 shared/static 参数
+- PYTHON 环境变量需设置为 python3 完整路径
