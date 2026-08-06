@@ -124,6 +124,18 @@ class GstPluginsBadConan(ConanFile):
         replace_in_file(self, meson_options_path,
                         "option('opensles', type : 'feature', value : 'auto'",
                         "option('opensles', type : 'feature', value : 'disabled'")
+        # Disable gl in gst-plugins-base (requires jpeglib.h which is not available)
+        gst_base_options_path = os.path.join(self.source_folder, "subprojects", "gst-plugins-base", "meson_options.txt")
+        if os.path.exists(gst_base_options_path):
+            replace_in_file(self, gst_base_options_path,
+                            "option('gl', type : 'feature', value : 'auto'",
+                            "option('gl', type : 'feature', value : 'disabled'")
+        else:
+            # Try meson.options (newer format)
+            gst_base_options_path = os.path.join(self.source_folder, "subprojects", "gst-plugins-base", "meson.options")
+            replace_in_file(self, gst_base_options_path,
+                            "option('gl', type : 'feature', value : 'auto'",
+                            "option('gl', type : 'feature', value : 'disabled'")
         meson = Meson(self)
         meson.configure()
         meson.build()
