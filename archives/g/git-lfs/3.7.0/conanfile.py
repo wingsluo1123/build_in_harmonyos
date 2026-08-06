@@ -6,7 +6,7 @@ that produces a single static binary. This recipe builds it using the Go
 toolchain with CGO disabled for a fully static binary.
 
 Key adaptation points:
-  - Installs Go toolchain via Harmonybrew if not available on the system.
+  - Downloads Go toolchain from official source if not available.
   - go:generate directives create temporary binaries that cannot execute
     on HarmonyOS without ELF signing. Stub generated files are created in
     build() to skip go generate.
@@ -16,6 +16,8 @@ Key adaptation points:
 import os
 import shutil
 import subprocess
+import tarfile
+import urllib.request
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -44,33 +46,35 @@ class GitLfsConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ensure_go(self):
-        """Ensure Go toolchain is available. Install via Harmonybrew if needed."""
+        """Ensure Go toolchain is available. Download from official source if needed."""
         # Try system go first
         go_bin = shutil.which("go")
         if go_bin:
             return go_bin, ""
 
-        # Try Harmonybrew
-        brew_bin = "/storage/Users/currentUser/.harmonybrew/bin/brew"
-        if not os.path.isfile(brew_bin):
-            # Install Harmonybrew using self.run (uses Conan's shell/PATH)
-            self.output.info("Installing Harmonybrew for Go toolchain...")
-            self.run(
-                'curl -fsSL https://harmonybrew.atomgit.com/install.sh | /usr/bin/zsh -',
-            )
+        # Try Harmonybrew Go
+        brew_go = "/storage/Users/currentUser/.harmonybrew/opt/go/libexec"
+        if os.path.isdir(brew_go):
+            go_bin = os.path.join(brew_go, "bin", "go")
+            if os.path.isfile(go_bin):
+                return go_bin, brew_go
 
-        # Install Go via brew
-        self.output.info("Installing Go via Harmonybrew...")
-        self.run(f'{brew_bin} install go')
-
-        # Locate Go
-        result = subprocess.run(
-            ["bash", "-c", f"{brew_bin} --prefix go"],
-            capture_output=True, text=True
-        )
-        go_prefix = result.stdout.strip()
-        goroot = os.path.join(go_prefix, "libexec")
+        # Download Go from official source
+        go_version = "1.23.4"
+        go_url = f"https://golang.google.cn/dl/go{go_version}.linux-arm64.tar.gz"
+        go_dir = os.path.join(self.build_folder, f"go-{go_version}")
+        goroot = os.path.join(go_dir, "go")
         go_bin = os.path.join(goroot, "bin", "go")
+
+        if not os.path.isfile(go_bin):
+            self.output.info(f"Downloading Go {go_version} from official source...")
+            tarball = os.path.join(self.build_folder, f"go{go_version}.linux-arm64.tar.gz")
+            urllib.request.urlretrieve(go_url, tarball)
+            os.makedirs(go_dir, exist_ok=True)
+            with tarfile.open(tarball, "r:gz") as tar:
+                tar.extractall(go_dir)
+            os.unlink(tarball)
+
         return go_bin, goroot
 
     def build(self):
