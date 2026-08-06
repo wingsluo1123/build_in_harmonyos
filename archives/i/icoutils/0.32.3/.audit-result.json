@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_7",
+      "file": "archives/i/icoutils/0.32.3/test_package/test_icoutils.sh",
+      "line": 5,
+      "description": "Script uses 'set -eu' but is missing '-o pipefail'. All shell scripts must use 'set -euo pipefail' as the safe mode. Without pipefail, a failure in a pipeline component (e.g., 'echo ... | grep ...') would not be caught, potentially masking test failures.",
+      "fix_suggestion": "Change 'set -eu' to 'set -euo pipefail' on line 5."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_rule_9",
+      "file": "archives/i/icoutils/0.32.3/test_package/test_icoutils.sh",
+      "line": 17,
+      "description": "Output uses 'PASS:'/'FAIL:' instead of the required '[ok]'/'[fail]' format. Rule 9 specifies step markers as [step], success as [ok], failure as [fail], and warnings as [warn], with [ok]/[fail] prefixed by 8 spaces for alignment.",
+      "fix_suggestion": "Replace 'echo \"PASS: ...\"' with 'echo \"        [ok] ...\"' and 'echo \"FAIL: ...\"' with 'echo \"        [fail] ...\"' throughout the script."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule_8",
+      "file": "archives/i/icoutils/0.32.3/test_package/conanfile.py",
+      "line": 26,
+      "description": "Script path is not quoted in the self.run() call: f\"sh {script_path}\". If the recipe_folder path contains spaces, the command would break. Rule 8 requires variables to be double-quoted in shell commands.",
+      "fix_suggestion": "Use f'sh \"{script_path}\"' to quote the path argument, e.g.: self.run(f'sh \"{script_path}\"', env=\"conanrun\")."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_rule_14",
+      "file": "archives/i/icoutils/0.32.3/manifest.yaml",
+      "line": 1,
+      "description": "Manifest uses 'software:' instead of 'name:' and nested 'build.system:' instead of flat 'build_system:' as specified in code style rule 14. The rule example shows 'name: zlib' and 'build_system: cmake' as top-level fields. The manifest header states it follows ARCHIVE-SPEC v2.0, which may define a different schema, but the code style rule does not distinguish between software-level and version-level manifests.",
+      "fix_suggestion": "If the code style rule applies to version-level manifests, change 'software: icoutils' to 'name: icoutils' and flatten 'build: system: autotools' to 'build_system: autotools'. If ARCHIVE-SPEC v2.0 supersedes the code style rule for version-level manifests, document the exception."
+    }
+  ],
+  "summary": "Audit of icoutils 0.32.3 Conan recipe (11 changed files) found no P0 (deception) or P1 (recipe correctness) issues. The recipe is well-structured: conanfile.py uses Conan 2.x API correctly with proper method ordering, package_type='application', and bindirs set; conandata.yml has a valid HTTPS official source URL (savannah.gnu.org), legitimate 64-char SHA256, and properly declared patches; all 3 patches follow naming conventions and contain genuine HarmonyOS portability logic (config.guess/config.sub triplet support, umask fix for HMDFS); test_package executes real binaries (icotool/wrestool --version) satisfying R34; commands.json is correctly placed at software level with type='tool'. Four minor issues found: two P2 code-style violations in test_icoutils.sh (missing pipefail, non-standard output format) and two P3 suggestions (unquoted script path in test_package conanfile.py, manifest field naming deviation). Verdict: pass with style warnings."
+}
