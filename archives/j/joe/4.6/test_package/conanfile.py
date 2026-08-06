@@ -25,5 +25,7 @@ class JoeTestConan(ConanFile):
                 if "joe" in files:
                     bin_path = os.path.join(root, "joe")
                     break
+        if not os.path.exists(bin_path):
+            raise Exception(f"joe binary not found in package: {self.dependencies['joe'].package_folder}")
         # joe --help outputs version info on first line
         self.run(f'"{bin_path}" --help', env="conanrun")
