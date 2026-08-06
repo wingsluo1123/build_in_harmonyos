@@ -26,7 +26,10 @@ class CryptOpensslRandomConan(ConanFile):
     homepage = "https://metacpan.org/pod/Crypt::OpenSSL::Random"
     url = ""
 
+    package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)

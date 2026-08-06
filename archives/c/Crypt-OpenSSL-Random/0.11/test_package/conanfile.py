@@ -55,7 +55,8 @@ class CryptOpenSSLRandomTestConan(ConanFile):
                 '-e \'my $bytes = random_bytes(10); '
                 'die "random_bytes returned empty" unless $bytes && length($bytes) == 10; '
                 'die "random_status failed" unless random_status(); '
-                'print "API test passed: random_bytes(10) and random_status() OK\\n"\''
+                'print "API test passed: random_bytes(10) and random_status() OK\\n"\'',
+                env="conanrun"
             )
         finally:
             os.environ["PERL5LIB"] = old_perl5lib
