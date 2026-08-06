@@ -24,6 +24,13 @@ class TlrcTestConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def build(self):
+        # L0c 门禁要求 test_package 有 test 源文件；编译 test_tlrc.c 使其真实生效
+        from conan.tools.cmake import CMake
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
         # P1: 删空壳测试 — 真验证 tldr 二进制存在 + ELF header 段（aireview: rm -f 掩盖 wait 退出码）
         bin_dir = self.dependencies["tlrc"].cpp_info.bindirs[0]
