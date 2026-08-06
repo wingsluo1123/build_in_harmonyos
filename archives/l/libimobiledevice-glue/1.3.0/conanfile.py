@@ -123,3 +123,4 @@ class LibimobiledeviceGlueConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "libimobiledevice-glue-1.0")
         self.cpp_info.set_property("pkg_config_name", "libimobiledevice-glue-1.0")
         self.cpp_info.libs = ["imobiledevice-glue-1.0"]
+
