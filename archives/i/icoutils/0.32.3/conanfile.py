@@ -40,7 +40,11 @@ class IcoutilsConan(ConanFile):
 
     def source(self):
         # Try local copy first (from export_sources), fall back to download
-        tarball = os.path.join(self.export_sources_folder, "icoutils-0.32.3.tar.bz2")
+        # In Conan 2.x, exported sources are in self.source_folder
+        tarball = os.path.join(self.source_folder, "icoutils-0.32.3.tar.bz2")
+        if not os.path.exists(tarball):
+            # Also check export_sources_folder
+            tarball = os.path.join(self.export_sources_folder, "icoutils-0.32.3.tar.bz2")
         if os.path.exists(tarball):
             # Use Python tarfile to avoid toybox tar compatibility issues
             with tarfile.open(tarball, "r:bz2") as tf:
