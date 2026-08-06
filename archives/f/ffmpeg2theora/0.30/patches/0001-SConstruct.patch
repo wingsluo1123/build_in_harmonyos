@@ -1,14 +1,19 @@
-diff -ruN a/SConstruct b/SConstruct
---- a/SConstruct
-+++ b/SConstruct
-@@ -14,38 +14,38 @@
+--- ffmpeg2theora-0.30-orig/SConstruct	2026-08-06 11:21:47.284872812 +0800
++++ ffmpeg2theora-0.30/SConstruct	2026-08-06 11:16:36.640871718 +0800
+@@ -6,11 +6,7 @@
+ import SCons
+ 
+ def version():
+-    #return "0.29"
+-    f = os.popen("./version.sh")
+-    version = f.read().strip()
+-    f.close()
+-    return version
++    return "0.30"
  
  pkg_version=version()
  
- pkg_name="ffmpeg2theora"
- 
- scons_version=(1,2,0)
- 
+@@ -21,7 +17,7 @@
  try:
      EnsureSConsVersion(*scons_version)
  except TypeError:
@@ -17,39 +22,16 @@ diff -ruN a/SConstruct b/SConstruct
      Exit(2)
  
  opts = Variables()
- opts.AddVariables(
-   BoolVariable('static', 'Set to 1 for static linking', 0),
-   BoolVariable('debug', 'Set to 1 to enable debugging', 0),
-   BoolVariable('build_ffmpeg', 'Set to 1 to build local copy of ffmpeg', 0),
-   ('prefix', 'install files in', '/usr/local'),
-   ('bindir', 'user executables', 'PREFIX/bin'),
-   ('mandir', 'man documentation', 'PREFIX/man'),
-   ('destdir', 'extra install time prefix', ''),
-   ('APPEND_CCFLAGS', 'Additional C/C++ compiler flags'),
-   ('APPEND_LINKFLAGS', 'Additional linker flags'),
+@@ -38,7 +34,7 @@
    BoolVariable('libkate', 'enable libkate support', 1),
    BoolVariable('crossmingw', 'Set to 1 for crosscompile with mingw', 0)
  )
 -env = Environment(options = opts)
-+env = Environment(options = opts, CC=os.environ.get('CC', 'gcc'), CXX=os.environ.get('CXX', 'g++'))
++env = Environment(options = opts, CC=os.environ.get('CC', 'gcc'), CXX=os.environ.get('CXX', 'g++'), SHELL='/system/bin/sh')
  Help(opts.GenerateHelpText(env))
  
  pkg_flags="--cflags --libs"
- if env['static']:
-   pkg_flags+=" --static"
-   env.Append(LINKFLAGS=["-static"])
- 
- if env['crossmingw']:
-     env.Tool('crossmingw', toolpath = ['scons-tools'])
- 
-@@ -66,102 +66,104 @@
- 
- env.Append(CCFLAGS = Split('$APPEND_CCFLAGS'))
- env.Append(LINKFLAGS = Split('$APPEND_LINKFLAGS'))
- 
- if env['debug'] and env['CC'] == 'gcc':
-   env.Append(CCFLAGS=["-g", "-O2", "-Wall"])
- 
+@@ -73,7 +69,7 @@
  if GetOption("help"):
      Return()
  
@@ -58,13 +40,7 @@ diff -ruN a/SConstruct b/SConstruct
    if os.environ.get('PKG_CONFIG_PATH', ''):
      action = 'PKG_CONFIG_PATH=%s pkg-config %s "%s"' % (os.environ['PKG_CONFIG_PATH'], pkg_flags, name)
    else:
-     action = 'pkg-config %s "%s"' % (pkg_flags, name)
-   return env.ParseConfig(action)
- 
- def TryAction(action):
-     import os
-     ret = os.system(action)
-     if ret == 0:
+@@ -87,20 +83,20 @@
          return (1, '')
      return (0, '')
  
@@ -73,14 +49,13 @@ diff -ruN a/SConstruct b/SConstruct
 -  ret = TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0] 
 -  context.Result( ret ) 
 -  return ret 
--
--def CheckPKG(context, name): 
 +def CheckPKGConfig(context, version):
 +  context.Message( 'Checking for pkg-config... ' )
 +  ret = TryAction('pkg-config --atleast-pkgconfig-version=%s' % version)[0]
 +  context.Result( ret )
 +  return ret
-+
+ 
+-def CheckPKG(context, name): 
 +def CheckPKG(context, name):
    context.Message( 'Checking for %s... ' % name )
    if os.environ.get('PKG_CONFIG_PATH', ''):
@@ -93,17 +68,7 @@ diff -ruN a/SConstruct b/SConstruct
    return ret
  
  env.PrependENVPath ('PATH', os.environ['PATH'])
- 
- conf = Configure(env, custom_tests = {
-   'CheckPKGConfig' : CheckPKGConfig,
-   'CheckPKG' : CheckPKG,
- })
- 
- if env["build_ffmpeg"]:
-   if env.GetOption('clean'):
-     TryAction("cd ffmpeg;make distclean")
-   else:
-     TryAction("./build_ffmpeg.sh")
+@@ -118,43 +114,45 @@
  
  if not env.GetOption('clean'):
    pkgconfig_version='0.15.0'
@@ -158,8 +123,9 @@ diff -ruN a/SConstruct b/SConstruct
        "libavdevice",
        "libavformat",
        "libavfilter",
-       "libavcodec >= 52.30.0",
+-      "libavcodec >= 52.30.0",
 -      "libpostproc",
++      "libavcodec",
        "libswscale",
        "libswresample",
        "libavutil",
@@ -170,21 +136,7 @@ diff -ruN a/SConstruct b/SConstruct
    if os.path.exists("./ffmpeg"):
      pkg_path = list(set(map(os.path.dirname, glob('./ffmpeg/*/*.pc'))))
      pkg_path.append(os.environ.get('PKG_CONFIG_PATH', ''))
-     os.environ['PKG_CONFIG_PATH'] = ':'.join(pkg_path)
-     env.Append(CCFLAGS=[
-       '-Iffmpeg'
-     ])
-     for lib in FFMPEG_LIBS:
-       lib = lib.split(' ')[0]
-       env.Append(LINKFLAGS=[
-@@ -169,68 +171,68 @@
-       ])
- 
-   if conf.CheckPKG('libswresample'):
-     FFMPEG_LIBS.append('libswresample')
-     env.Append(CCFLAGS=[
-       '-DUSE_SWRESAMPLE'
-     ])
+@@ -176,15 +174,15 @@
    elif conf.CheckPKG('libavresample'):
      FFMPEG_LIBS.append('libavresample')
  
@@ -204,19 +156,7 @@ diff -ruN a/SConstruct b/SConstruct
  
    for lib in FFMPEG_LIBS:
        ParsePKGConfig(env, lib)
- 
-   if conf.CheckCHeader('libavformat/framehook.h'):
-       env.Append(CCFLAGS=[
-         '-DHAVE_FRAMEHOOK'
-       ])
- 
-   KATE_LIBS="oggkate"
-   if env['libkate']:
-     if os.path.exists("./libkate/misc/pkgconfig"):
-       os.environ['PKG_CONFIG_PATH'] = "./libkate/misc/pkgconfig:" + os.environ.get('PKG_CONFIG_PATH', '')
-     if os.path.exists("./libkate/pkg/pkgconfig"):
-       os.environ['PKG_CONFIG_PATH'] = "./libkate/pkg/pkgconfig:" + os.environ.get('PKG_CONFIG_PATH', '')
-     if conf.CheckPKG(KATE_LIBS):
+@@ -204,11 +202,11 @@
        ParsePKGConfig(env, KATE_LIBS)
        env.Append(CCFLAGS=['-DHAVE_KATE', '-DHAVE_OGGKATE'])
      else:
@@ -230,17 +170,7 @@ diff -ruN a/SConstruct b/SConstruct
  
    if conf.CheckCHeader('iconv.h'):
        env.Append(CCFLAGS=[
-         '-DHAVE_ICONV'
-       ])
-       if conf.CheckLib('iconv'):
-           env.Append(LIBS=['iconv'])
- 
-   if env['crossmingw']:
-       env.Append(CCFLAGS=['-Wl,-subsystem,windows'])
-       env.Append(LIBS=['m'])
-   elif env['static']:
-       env.Append(LIBS=['m', 'dl'])
- 
+@@ -226,7 +224,7 @@
  
  env = conf.Finish()
  
@@ -249,7 +179,3 @@ diff -ruN a/SConstruct b/SConstruct
  ffmpeg2theora = env.Clone()
  ffmpeg2theora_sources = glob('src/*.c')
  ffmpeg2theora.Program('ffmpeg2theora', ffmpeg2theora_sources)
- 
- ffmpeg2theora.Install(bin_dir, 'ffmpeg2theora')
- ffmpeg2theora.Install(man_dir + "/man1", 'ffmpeg2theora.1')
- ffmpeg2theora.Alias('install', prefix)
