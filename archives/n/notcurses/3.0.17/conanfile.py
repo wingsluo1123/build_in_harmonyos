@@ -145,10 +145,14 @@ class NotcursesConan(ConanFile):
         tc.variables["USE_MULTIMEDIA"] = "none"
         tc.variables["USE_DOCTEST"] = "OFF"
         tc.variables["USE_PANDOC"] = "OFF"
-        # Include/lib paths for system ncurses
-        tc.variables["CMAKE_FIND_ROOT_PATH"] = prefix
-        tc.variables["CMAKE_INCLUDE_PATH"] = os.path.join(prefix, "include")
-        tc.variables["CMAKE_LIBRARY_PATH"] = os.path.join(prefix, "lib")
+        # System ncurses: add include/lib paths via flags (not CMAKE_FIND_ROOT_PATH
+        # which would restrict Conan dependency searches and break check_include_file)
+        ncurses_inc = os.path.join(prefix, "include")
+        ncurses_lib = os.path.join(prefix, "lib")
+        if os.path.isdir(ncurses_inc):
+            tc.extra_cflags.append("-I" + ncurses_inc)
+        if os.path.isdir(ncurses_lib):
+            tc.extra_ldflags.append("-L" + ncurses_lib)
         # Set PKG_CONFIG_PATH for ncursesw discovery
         pkgconfig_path = os.path.join(prefix, "lib", "pkgconfig")
         if os.path.isdir(pkgconfig_path):
