@@ -55,10 +55,16 @@ The test package performs a real consumer exercise: it pre-creates a
 `pam_matrix` service and passdb, loads `libpam_wrapper.so`, and calls
 `run_pamtest()` from `libpamtest`.
 
+`test_package/test_pam_wrapper.c` was rechecked against the official
+`pam_wrapper-1.1.8` source. In the non-DOXYGEN build path,
+`run_pamtest()` passes `sizeof(test_cases) / sizeof(test_cases[0])` to
+`_pamtest()`, and `src/libpamtest.c` iterates with `tcindex <
+num_test_cases`. The test array is bounded by that explicit count.
+
 ## OHOS real-device result
 
 Run:
-`/storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-pam-wrapper-pam-wrapper-1.1.8-r3-conan4-20260806-014917-45723`
+`/storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-pam-wrapper-pam-wrapper-1.1.8-r3-conan5-20260806-132958-13395`
 
 - L0: pass
 - L1: pass, `test_package` executed and printed

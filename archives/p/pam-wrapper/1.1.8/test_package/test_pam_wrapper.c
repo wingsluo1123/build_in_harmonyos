@@ -19,6 +19,9 @@ int main(void)
         NULL,
     };
     struct pamtest_conv_data conv_data;
+    /* pam-wrapper 1.1.8 defines run_pamtest() as a macro that passes
+     * sizeof(tests) / sizeof(tests[0]) to _pamtest(); _pamtest()
+     * iterates by that explicit count. */
     struct pam_testcase tests[] = {
         pam_test(PAMTEST_AUTHENTICATE, PAM_SUCCESS),
     };

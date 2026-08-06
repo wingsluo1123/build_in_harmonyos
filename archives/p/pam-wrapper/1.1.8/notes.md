@@ -52,6 +52,13 @@ The consumer test is not an empty smoke test. It:
 - uses a small passdb created before the test process starts
 - runs `run_pamtest()` and verifies a successful authentication result
 
+`test_package/test_pam_wrapper.c` was rechecked against the official
+`pam_wrapper-1.1.8` sources. In the non-DOXYGEN build path,
+`run_pamtest()` is a macro that passes `sizeof(test_cases) /
+sizeof(test_cases[0])` to `_pamtest()`, and `src/libpamtest.c` iterates
+with `tcindex < num_test_cases`. The single-entry `tests[]` array is
+therefore bounded by an explicit count rather than a sentinel.
+
 ## Local verification
 
 Performed locally:
@@ -69,7 +76,7 @@ Not performed locally:
 
 ## OHOS real-device verification
 
-Device run: `/storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-pam-wrapper-pam-wrapper-1.1.8-r3-conan4-20260806-014917-45723`
+Device run: `/storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-pam-wrapper-pam-wrapper-1.1.8-r3-conan5-20260806-132958-13395`
 
 Command shape:
 
@@ -77,7 +84,7 @@ Command shape:
 sh "$HOME/bin/ohos-test-runner.sh" --try-lock \
   --user codex-pam-wrapper \
   --lib pam-wrapper \
-  --task pam-wrapper-1.1.8-r3-conan4 \
+  --task pam-wrapper-1.1.8-r3-conan5 \
   --mode heavy \
   --workdir /storage/Users/currentUser/ohos-users/codex-pam-wrapper/pam-wrapper-1.1.8-r3/repo/build_in_harmonyos \
   --path "$HOME/.local/bin:$HOME/usr/local/bin:/data/service/hnp/bin" \
