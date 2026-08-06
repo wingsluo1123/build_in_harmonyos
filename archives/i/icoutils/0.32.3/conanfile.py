@@ -9,6 +9,7 @@ from conan.tools.files import get, apply_conandata_patches, export_conandata_pat
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
+from conan.tools.gnu import PkgConfigDeps
 
 
 class IcoutilsConan(ConanFile):
@@ -37,6 +38,8 @@ class IcoutilsConan(ConanFile):
     def generate(self):
         env = VirtualBuildEnv(self)
         env.generate()
+        pkg = PkgConfigDeps(self)
+        pkg.generate()
         tc = AutotoolsToolchain(self)
         tc.generate()
 
