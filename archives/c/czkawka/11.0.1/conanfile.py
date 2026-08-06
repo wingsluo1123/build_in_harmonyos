@@ -10,33 +10,11 @@ If the Rust toolchain is not available, it is installed via Harmonybrew.
 import json
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanException
 from conan.tools.files import get, copy, export_conandata_patches, apply_conandata_patches
 from conan.tools.layout import basic_layout
-
-
-def _ensure_rust_toolchain():
-    """Ensure cargo/rustc are available. Install via Harmonybrew if missing."""
-    if shutil.which("cargo") and shutil.which("rustc"):
-        return
-    harmonybrew = os.path.expanduser("~/.harmonybrew/bin/brew")
-    if not os.path.exists(harmonybrew):
-        # Install Harmonybrew
-        subprocess.run(
-            ["zsh", "-c",
-             '$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)'],
-            check=True, timeout=300,
-            capture_output=True,
-        )
-    # Install Rust via brew
-    subprocess.run(
-        [harmonybrew, "install", "rust"],
-        check=True, timeout=600,
-        capture_output=True,
-    )
 
 
 class CzkawkaConan(ConanFile):
@@ -59,11 +37,24 @@ class CzkawkaConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _ensure_rust_toolchain(self):
+        """Ensure cargo/rustc are available. Install via Harmonybrew if missing."""
+        if shutil.which("cargo") and shutil.which("rustc"):
+            return
+        self.output.info("Rust toolchain not found, installing via Harmonybrew...")
+        harmonybrew = os.path.expanduser("~/.harmonybrew/bin/brew")
+        if not os.path.exists(harmonybrew):
+            self.run(
+                'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"',
+                timeout=300,
+            )
+        self.run(f"{harmonybrew} install rust", timeout=600)
+
     def build(self):
         apply_conandata_patches(self)
 
         # Ensure Rust toolchain is available (install via Harmonybrew if missing).
-        _ensure_rust_toolchain()
+        self._ensure_rust_toolchain()
 
         # Resolve C/C++ compiler path from Conan conf or environment.
         clang = "clang"
