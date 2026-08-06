@@ -36,9 +36,10 @@ class KubetuiTestConan(ConanFile):
         if cross_building(self):
             self.output.info("cross-building: 编译验证通过，跳过运行时测试")
             # P1: 交叉编译跨架构二进制无法在宿主执行则诚实跳过（不打印 PASSED）
-            # aireview: ignore_errors=True 丢弃退出码+无条件打印 PASSED 属伪造通过
-            # 实改: ret 非 0 时判跨架构 exec format error（126/127）则 SKIPPED，其他失败 raise
-            ret = self.run(f'"{bin_path}" --help', env="conanrun", ignore_errors=True)
+            # aireview: ignore_errors=True 是 subprocess 参数，Conan 2.x self.run()
+            # 不接受该参数会 TypeError 崩溃；实改: 直接取退出码，非 0 时判跨架构
+            # exec format error（126/127）则 SKIPPED，其他失败 raise
+            ret = self.run(f'"{bin_path}" --help', env="conanrun")
             if ret == 0:
                 self.output.info("cross-building: kubetui --help smoke test PASSED")
             elif ret in (126, 127):

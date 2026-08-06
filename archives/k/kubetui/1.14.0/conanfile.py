@@ -69,7 +69,9 @@ class KubetuiConan(ConanFile):
         # CI Download failed 时多路径 fallback: rustup/local cargo/rustc + 包管理器装
         rust_ok = False
         try:
-            self.run("set -o pipefail && curl -fsSL --connect-timeout 60 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder, shell=True)
+            # Conan 2.x self.run() 不接受 shell=True 参数（P0: TypeError 崩溃），
+            # 管道命令由 Conan 内部 shell 执行
+            self.run("set -o pipefail && curl -fsSL --connect-timeout 60 https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0", cwd=self.source_folder)
             rust_ok = True
             # aireview P2: cmd-pkgs 装到 /data/service/hnp/bin 但后续 cargo build 用 env="conanbuild"
             # 该环境可能不含 cmd-pkgs 安装目录 → cargo: command not found
@@ -85,7 +87,7 @@ class KubetuiConan(ConanFile):
             # 交叉编译目标在 cargo build 段用 --target aarch64-unknown-linux-ohos 显式传（line 99）
             for cmd in ("cargo --version", "rustup --version", "$HOME/.cargo/bin/cargo --version", "rustc --version"):
                 try:
-                    self.run(cmd, cwd=self.source_folder, shell=True)
+                    self.run(cmd, cwd=self.source_folder)
                     rust_ok = True
                     break
                 except ConanException:
