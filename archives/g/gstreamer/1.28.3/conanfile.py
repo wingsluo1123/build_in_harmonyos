@@ -53,7 +53,18 @@ class GstreamerConan(ConanFile):
         # which have correct absolute paths for glib/gobject/gio/gmodule.
         pkg_config_paths = [self.generators_folder]
         # System pkgconfig directories from OHOS development environment
-        system_paths = os.environ.get("PKG_CONFIG_PATH", "").split(":")
+        # System pkgconfig dirs (OHOS dev environment) with fallback paths
+        sys_pc = os.environ.get("PKG_CONFIG_PATH", "")
+        system_paths = sys_pc.split(":") if sys_pc else []
+        # Fallback: common OHOS system pkgconfig locations
+        fallback_paths = [
+            os.path.expanduser("~/usr/local/lib/pkgconfig"),
+            "/data/service/hnp/pcre2.org/pcre2_10.47/lib/pkgconfig",
+            "/data/service/hnp/libffi.org/libffi_3.4.4/lib/pkgconfig",
+        ]
+        for fp in fallback_paths:
+            if fp not in system_paths and os.path.isdir(fp):
+                system_paths.append(fp)
         for sp in system_paths:
             if sp and os.path.isdir(sp):
                 pkg_config_paths.append(sp)
