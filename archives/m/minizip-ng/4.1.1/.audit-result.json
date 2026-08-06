@@ -1,0 +1,118 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/m/minizip-ng/4.1.1/conandata.yml",
+      "line": 6,
+      "description": "URL list manually includes gh-proxy.com mirror prefix as first entry. Rule R39 explicitly states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The manual mirror prefix is unnecessary and violates this guideline.",
+      "fix_suggestion": "Remove the first URL entry (gh-proxy.com mirror) and keep only the official GitHub URL as a single string: url: \"https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.1.1.tar.gz\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/conanfile.py",
+      "line": 20,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' found in conanfile.py. Code style rule 5 explicitly lists this exact pattern as a forbidden template placeholder: 'url = \"\"  # CI fills this（应由适配者填写）'. This indicates the recipe URL field was not filled in by the adapter.",
+      "fix_suggestion": "Fill in the recipe URL (e.g., url = \"https://github.com/zlib-ng/minizip-ng\") or remove the url attribute entirely if not applicable. The url field is optional in Conan 2.x."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R14",
+      "file": "archives/m/minizip-ng/4.1.1/manifest.yaml",
+      "line": 34,
+      "description": "Patch file reference mismatch: manifest.yaml patches section references 'patches/cmake-conan-deps-bridge.patch' but the actual patch file (declared in conandata.yml and present in changed files) is 'patches/0001-CMakeLists.txt.patch'. The patch_classification section correctly references '0001-CMakeLists.txt.patch', creating an internal inconsistency within the same file.",
+      "fix_suggestion": "Update the patches.file field to match the actual file name: 'patches/0001-CMakeLists.txt.patch'"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 13,
+      "description": "Build system incorrectly listed as 'autotools' in the basic info table. The actual build system is CMake, as confirmed by conanfile.py docstring ('Conan recipe — minizip-ng 4.1.1 (CMake)'), manifest.yaml ('build: system: cmake'), and software-level manifest ('build_system: cmake'). The Phase 2 section also references 'configure + make + make install' which is autotools-style, inconsistent with the CMake build used.",
+      "fix_suggestion": "Change 'autotools' to 'cmake' in the build system row of the basic info table. Update Phase 2 description from 'configure + make + make install' to 'cmake configure + cmake build + cmake install'."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 12,
+      "description": "Status inconsistency: notes.md basic info table (line 12) says '⚠️ partial' and section 六 (line 65) says '最终状态: partial', but manifest.yaml status is 'built' and the final line (line 70) says '最终状态: built'. The stale 'partial' status was not updated when the build completed successfully.",
+      "fix_suggestion": "Update all 'partial' status references in notes.md to 'built' to match the manifest.yaml status and the final build outcome."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 50,
+      "description": "Template placeholder '待补充具体问题记录' (to be supplemented with specific issue records) found in conversation log section. This indicates the issues encountered during build were not documented.",
+      "fix_suggestion": "Fill in the actual issues encountered during the build, or state 'No issues encountered' if none."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 57,
+      "description": "Template placeholder '待补充' found in the source modification list table. The section for documenting source file modifications is unfilled.",
+      "fix_suggestion": "Fill in the actual source file modifications (e.g., 'CMakeLists.txt | Bridge CMakeDeps targets | patch | applied') or remove the placeholder row."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 62,
+      "description": "Template placeholder '待补充' found in the deliverables table for the file size of minizip-ng-4.1.1-ohos-aarch64.tar.gz.",
+      "fix_suggestion": "Fill in the actual file size of the precompiled package, or remove the deliverables table if no precompiled package was produced."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style_R14",
+      "file": "archives/m/minizip-ng/4.1.1/manifest.yaml",
+      "line": 39,
+      "description": "Local filesystem paths (/storage/Users/currentUser/tmp/builds/minizip-ng-4.1.1.orig and .work) are included in the committed manifest.yaml under the patch_generation section. These paths are specific to the build machine and not meaningful in the shared repository.",
+      "fix_suggestion": "Remove local filesystem paths or replace with relative/generic paths. Keep only the patch generation method, hashes, and timestamp."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_R14",
+      "file": "archives/m/minizip-ng/4.1.1/manifest.yaml",
+      "line": 1,
+      "description": "Version-level manifest.yaml is missing a 'name' field at the top level. Code style rule 14 example shows 'name: zlib' as the first field. The version-level manifest starts with 'version:' directly.",
+      "fix_suggestion": "Consider adding 'name: minizip-ng' at the top of the version-level manifest, or confirm that the directory structure implies the name and this field is intentionally omitted."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R26",
+      "file": "archives/m/minizip-ng/4.1.1/conanfile.py",
+      "line": 34,
+      "description": "zstd dependency is set to shared ('zstd/*:shared': True) while all other system-named dependencies (zlib, bzip2, openssl, xz) are set to static (False). zstd may be available as a system library on some platforms; R26 recommends static linking for system-named libraries. The CMake patch does handle both static and shared zstd targets correctly, so this is not a build-breaking issue.",
+      "fix_suggestion": "Consider changing 'zstd/*:shared' to False for consistency with other system-named dependencies, unless shared zstd is specifically required."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_R14",
+      "file": "archives/m/minizip-ng/4.1.1/manifest.yaml",
+      "line": 50,
+      "description": "patch_classification has 'guard: pending' which is unclear in meaning. The patch does not use #ifdef __OHOS__ guards (it uses CMake find_package/target logic), so a 'pending' guard status may be misleading.",
+      "fix_suggestion": "Clarify the guard field (e.g., 'none' if no platform guard is needed, or 'n/a' for CMake-level patches) or remove the field if not applicable."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_R14",
+      "file": "archives/m/minizip-ng/manifest.yaml",
+      "line": 1,
+      "description": "Software-level manifest uses 'software:' as the field name instead of 'name:' as shown in the code style rule 14 example ('name: zlib').",
+      "fix_suggestion": "Consider using 'name: minizip-ng' for consistency with the code style guideline, or confirm that 'software' is the correct field name for the software-level manifest format."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_R5",
+      "file": "archives/m/minizip-ng/4.1.1/notes.md",
+      "line": 3,
+      "description": "Date inconsistency: notes.md header says '档案创建时间: 2026-04-24' and '最后更新: 2026-04-24', but manifest.yaml build_date is '2026-08-06' and final lines say '编译结束: 2026-08-07 00:32'. The April dates appear to be stale template values from an earlier session.",
+      "fix_suggestion": "Update the creation and last-updated dates to reflect the actual build timeline (August 2026)."
+    }
+  ],
+  "summary": "Audit PASSED. No P0 (deception) or P1 (recipe correctness) issues found — PR is not blocked.\n\nDeception detection (P0) — ALL CLEAR:\n- R34 (empty shell test): PASS. test_package/test_minizip_ng.c performs real API calls including mz_zip_create(), mz_stream_os_create(), mz_stream_open(), mz_zip_open(), mz_zip_entry_write_open(), mz_zip_entry_write(), mz_zip_entry_read_open(), mz_zip_entry_read(), mz_zip_goto_first_entry(), and content verification via memcmp(). It creates a zip archive, writes test content, reads it back, and verifies integrity — a genuine functional test, not a stub.\n- R9 (skip/fake test): PASS. test_package/conanfile.py test() method runs the test binary via self.run(test_bin, env='conanrun'). No pass/skip/os.system('exit 0').\n- Fake sha256: PASS. sha256 'ecc1a514f9e455cb627a768e1219369c576a761bc04196941590906c8b622d7e' is 64 hex characters, not all zeros/f's, not too short. Consistent between conandata.yml and manifest.yaml.\n- Fake build status: PASS. manifest.yaml status 'built' is consistent with notes.md final status 'built'.\n- R8 (__OHOS__ guards): PASS. No #ifdef __OHOS__ in code or patches. CMake patch has substantive portability logic.\n- R19 (precompiled binaries): PASS. No .so/.a/.o files in changed files.\n- R40 (deep adaptation): PASS. minizip-ng is a compression library, not in special categories (graphics/UI/multimedia/peripherals/system).\n\nRecipe correctness (P1) — ALL CLEAR:\n- R37 (version): First adaptation uses upstream version 4.1.1. Correct.\n- R26 (system lib static): minizip-ng is not a system-named library. Dependencies zlib/bzip2/openssl/xz are static. (P3 note: zstd is shared.)\n- R32 (OHOS compat): No Linux-only os checks in conanfile.py. Platform adaptation handled via CMake patch.\n- R33 (no bare env vars): No os.environ usage in conanfile.py.\n- R39 (official URL): Official GitHub URL present. (P2 note: manual mirror prefix should be removed.)\n- R6 (source files only): Patch modifies CMakeLists.txt (source file, not generated).\n- R38 (commands.json): minizip-ng is a library, not a CLI tool. No commands.json needed.\n- Conan 2.x API: Uses 'from conan import ConanFile' and 'conan.tools.cmake'. Correct.\n- Method order: export_sources → requirements → layout → source → generate → build → package → package_info. Correct.\n- package_info: cpp_info.libs set to ['minizip', 'ppmd']. Correct.\n- PR atomicity (W2): All 10 changed files belong to one recipe (minizip-ng 4.1.1). No framework files.\n\nCode style warnings (P2) — 9 issues found (do not block PR):\n1. conandata.yml: Manual gh-proxy.com mirror URL prefix (R39 guideline violation)\n2. conanfile.py: Unfilled template placeholder 'url = \"\" # CI fills this' (code_style R5)\n3. manifest.yaml: Patch file reference mismatch (cmake-conan-deps-bridge.patch vs 0001-CMakeLists.txt.patch)\n4. notes.md: Build system incorrectly listed as 'autotools' (should be 'cmake')\n5. notes.md: Stale 'partial' status not updated to 'built'\n6-8. notes.md: Three '待补充' template placeholders in conversation log, source modification list, and deliverables table\n9. manifest.yaml: Local filesystem paths in patch_generation section\n\nSuggestions (P3) — 5 issues found (do not block PR):\n1. manifest.yaml: Missing 'name' field at top level\n2. conanfile.py: zstd set to shared (consider static for system lib consistency)\n3. manifest.yaml: 'guard: pending' field unclear\n4. software-level manifest: 'software:' vs 'name:' field naming\n5. notes.md: Date inconsistency (April vs August)\n\nConclusion: The PR is structurally sound with no deception or recipe correctness issues. The test package exercises real API functionality. The CMake patch contains substantive portability logic for bridging Conan CMakeDeps targets. The 14 P2/P3 issues are warnings and suggestions for documentation quality and style improvements that should be addressed in follow-up commits but do not block this PR."
+}
