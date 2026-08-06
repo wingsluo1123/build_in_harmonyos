@@ -1,0 +1,48 @@
+--- a/thrift/compiler/generate/t_py_generator.cc
++++ b/thrift/compiler/generate/t_py_generator.cc
+@@ -19,21 +19,21 @@
+ 
+ #include <algorithm>
+ #include <cassert>
+ #include <fstream>
+ #include <iostream>
+ #include <sstream>
+ #include <string>
+ #include <unordered_set>
+ #include <vector>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/ast/base_types.h>
+ #include <thrift/compiler/generate/t_concat_generator.h>
+ #include <thrift/compiler/generate/t_generator.h>
+ #include <thrift/compiler/lib/py3/util.h>
+ 
+ using namespace std;
+ 
+ namespace apache {
+ namespace thrift {
+@@ -734,21 +734,21 @@
+  *
+  * @param tprogram The program to generate
+  */
+ void t_py_generator::init_generator() {
+   // Make output directory
+   string module = get_real_py_module(program_);
+   package_dir_ = get_out_dir();
+   assert(package_dir_.back() == '/');
+   while (true) {
+     // TODO: Do better error checking here.
+-    boost::filesystem::create_directory(package_dir_);
++    std::filesystem::create_directory(package_dir_);
+     std::ofstream init_py((package_dir_ + "__init__.py").c_str());
+     init_py << py_autogen_comment();
+     init_py.close();
+     if (module.empty()) {
+       break;
+     }
+     string::size_type pos = module.find('.');
+     if (pos == string::npos) {
+       package_dir_ += module;
+       package_dir_ += "/";

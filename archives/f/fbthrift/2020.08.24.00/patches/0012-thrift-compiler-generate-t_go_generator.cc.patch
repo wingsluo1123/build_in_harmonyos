@@ -1,0 +1,71 @@
+--- a/thrift/compiler/generate/t_go_generator.cc
++++ b/thrift/compiler/generate/t_go_generator.cc
+@@ -22,21 +22,21 @@
+  * guide for ensuring uniformity and readability.
+  */
+ 
+ #include <fstream>
+ #include <iostream>
+ #include <string>
+ #include <unordered_map>
+ #include <vector>
+ 
+ #include <boost/algorithm/string/join.hpp>
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <stdlib.h>
+ #include <sys/types.h>
+ #include <thrift/compiler/generate/t_concat_generator.h>
+ #include <thrift/compiler/generate/t_generator.h>
+ #include <algorithm>
+ #include <clocale>
+ #include <sstream>
+ 
+ using namespace std;
+@@ -751,21 +751,21 @@
+   commonInitialisms.insert("XML");
+   commonInitialisms.insert("XSRF");
+   commonInitialisms.insert("XSS");
+ 
+   // Methods that we define on some structures
+   protectedMethods.insert("Error");
+   protectedMethods.insert("String");
+ 
+   while (true) {
+     // TODO: Do better error checking here.
+-    boost::filesystem::create_directory(package_dir_);
++    std::filesystem::create_directory(package_dir_);
+ 
+     if (module.empty()) {
+       break;
+     }
+ 
+     string::size_type pos = module.find('.');
+ 
+     if (pos == string::npos) {
+       package_dir_ += "/";
+       package_dir_ += module;
+@@ -790,21 +790,21 @@
+ 
+   f_consts_name_ = package_dir_ + "/" + "constants.go";
+   f_consts_.open(f_consts_name_.c_str());
+ 
+   vector<t_service*> services = program_->get_services();
+   vector<t_service*>::iterator sv_iter;
+ 
+   for (sv_iter = services.begin(); sv_iter != services.end(); ++sv_iter) {
+     string service_dir =
+         package_dir_ + "/" + underscore((*sv_iter)->get_name()) + "-remote";
+-    boost::filesystem::create_directory(service_dir);
++    std::filesystem::create_directory(service_dir);
+   }
+ 
+   // Print header
+   f_types_ << go_autogen_comment() << go_package() << render_includes()
+            << render_import_protection();
+ 
+   f_consts_ << go_autogen_comment() << go_package() << render_includes();
+ 
+   f_const_values_ << endl << "func init() {" << endl;
+ }

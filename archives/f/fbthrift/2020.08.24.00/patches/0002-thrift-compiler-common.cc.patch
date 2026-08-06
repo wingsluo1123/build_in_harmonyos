@@ -1,0 +1,76 @@
+--- a/thrift/compiler/common.cc
++++ b/thrift/compiler/common.cc
+@@ -12,21 +12,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+ 
+ #include <thrift/compiler/common.h>
+ #include <thrift/compiler/parse/parsing_driver.h>
+ 
+ #include <cstdarg>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+ /**
+  * Current compilation stage. One of: arguments, parse, generation
+  */
+ std::string g_stage;
+ 
+@@ -55,25 +55,25 @@
+  * The last parsed doctext comment.
+  */
+ char* g_doctext;
+ 
+ /**
+  * The location of the last parsed doctext comment.
+  */
+ int g_doctext_lineno;
+ 
+ std::string compute_absolute_path(const std::string& path) {
+-  boost::filesystem::path abspath{path};
++  std::filesystem::path abspath{path};
+   try {
+-    abspath = boost::filesystem::absolute(abspath);
++    abspath = std::filesystem::absolute(abspath);
+     return abspath.string();
+-  } catch (const boost::filesystem::filesystem_error& e) {
++  } catch (const std::filesystem::filesystem_error& e) {
+     failure("Could not find file: %s. Error: %s", path.c_str(), e.what());
+   }
+ }
+ 
+ void pdebug(const char* fmt, ...) {
+   if (g_debug == 0) {
+     return;
+   }
+   va_list args;
+   printf("[PARSE] ");
+@@ -219,18 +219,19 @@
+             "[FAILURE:%s:%d] %s\n",
+             message.filename.c_str(),
+             message.lineno,
+             message.message.c_str());
+         break;
+     }
+   }
+ }
+ 
+ void mark_file_executable(std::string const& path) {
+-  namespace fs = boost::filesystem;
++  namespace fs = std::filesystem;
+   fs::permissions(
+-      path, fs::add_perms | fs::owner_exe | fs::group_exe | fs::others_exe);
++      path, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
++      fs::perm_options::add);
+ }
+ 
+ } // namespace compiler
+ } // namespace thrift
+ } // namespace apache

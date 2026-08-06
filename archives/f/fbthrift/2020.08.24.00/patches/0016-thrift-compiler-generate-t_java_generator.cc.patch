@@ -1,0 +1,60 @@
+--- a/thrift/compiler/generate/t_java_generator.cc
++++ b/thrift/compiler/generate/t_java_generator.cc
+@@ -18,53 +18,53 @@
+ 
+ #include <cctype>
+ #include <fstream>
+ #include <iostream>
+ #include <sstream>
+ #include <string>
+ #include <vector>
+ 
+ #include <stdexcept>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/ast/base_types.h>
+ 
+ using namespace std;
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+ /**
+  * Prepares for file generation by opening up the necessary file output
+  * streams.
+  *
+  * @param tprogram The program to generate
+  */
+ void t_java_generator::init_generator() {
+   // Make output directory
+-  boost::filesystem::create_directory(get_out_dir());
++  std::filesystem::create_directory(get_out_dir());
+   namespace_key_ = "java";
+   package_name_ = program_->get_namespace(namespace_key_);
+ 
+   string dir = package_name_;
+   string subdir = get_out_dir();
+   string::size_type loc;
+   while ((loc = dir.find('.')) != string::npos) {
+     subdir = subdir + "/" + dir.substr(0, loc);
+-    boost::filesystem::create_directory(subdir);
++    std::filesystem::create_directory(subdir);
+     dir = dir.substr(loc + 1);
+   }
+   if (dir.size() > 0) {
+     subdir = subdir + "/" + dir;
+-    boost::filesystem::create_directory(subdir);
++    std::filesystem::create_directory(subdir);
+   }
+ 
+   package_dir_ = subdir;
+ }
+ 
+ /**
+  * Packages the generated file
+  *
+  * @return String of the package, i.e. "package com.facebook.thriftdemo;"
+  */

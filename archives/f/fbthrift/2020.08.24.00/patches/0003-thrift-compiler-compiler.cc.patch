@@ -1,0 +1,60 @@
+--- a/thrift/compiler/compiler.cc
++++ b/thrift/compiler/compiler.cc
+@@ -26,21 +26,21 @@
+ 
+ #ifdef _WIN32
+ #include <process.h> // @manual
+ #else
+ #include <unistd.h>
+ #endif
+ #include <ctime>
+ 
+ #include <boost/algorithm/string/join.hpp>
+ #include <boost/algorithm/string/split.hpp>
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/compiler.h>
+ 
+ #include <thrift/compiler/generate/t_generator.h>
+ #include <thrift/compiler/mutator/mutator.h>
+ #include <thrift/compiler/platform.h>
+ #include <thrift/compiler/validator/validator.h>
+ 
+ #include <thrift/compiler/parse/parsing_driver.h>
+ 
+@@ -339,31 +339,31 @@
+         int last = out_path.length() - 1;
+         if (out_path[last] == '\\') {
+           out_path.erase(last);
+         }
+       }
+ 
+       if (out_path_is_absolute) {
+         // Invoker specified `-out blah`. We are supposed to output directly
+         // into blah, e.g. `blah/Foo.java`. Make the directory if necessary,
+         // just like how for `-o blah` we make `o/gen-java`
+-        boost::system::error_code errc;
+-        boost::filesystem::create_directory(out_path, errc);
++        std::error_code errc;
++        std::filesystem::create_directory(out_path, errc);
+         if (errc) {
+           fprintf(
+               stderr,
+               "Output path %s is unusable or not a directory\n",
+               out_path.c_str());
+           return result;
+         }
+       }
+-      if (!boost::filesystem::is_directory(out_path)) {
++      if (!std::filesystem::is_directory(out_path)) {
+         fprintf(
+             stderr,
+             "Output path %s is unusable or not a directory\n",
+             out_path.c_str());
+         return result;
+       }
+       continue;
+     } else {
+       fprintf(stderr, "!!! Unrecognized option: %s\n", arguments[i].c_str());
+       usage();

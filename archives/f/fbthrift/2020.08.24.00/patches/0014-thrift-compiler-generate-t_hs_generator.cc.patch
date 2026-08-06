@@ -1,0 +1,60 @@
+--- a/thrift/compiler/generate/t_hs_generator.cc
++++ b/thrift/compiler/generate/t_hs_generator.cc
+@@ -16,21 +16,21 @@
+ 
+ #include <stdlib.h>
+ #include <sys/types.h>
+ #include <cctype>
+ #include <fstream>
+ #include <iostream>
+ #include <sstream>
+ #include <string>
+ #include <vector>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/generate/common.h>
+ #include <thrift/compiler/generate/t_oop_generator.h>
+ 
+ using namespace std;
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+@@ -221,32 +221,32 @@
+ 
+ /**
+  * Prepares for file generation by opening up the necessary file output
+  * streams.
+  *
+  * @param tprogram The program to generate
+  */
+ void t_hs_generator::init_generator() {
+   // Make output directory
+   package_dir_ = get_out_dir();
+-  boost::filesystem::create_directory(package_dir_);
++  std::filesystem::create_directory(package_dir_);
+ 
+   string hs_namespace = program_->get_namespace("hs");
+   if (!hs_namespace.empty()) {
+     vector<string> components = split_namespace(hs_namespace);
+     for (const auto& component : components) {
+       if (component.empty() || !std::isupper(component[0])) {
+         throw "compiler error: Invalid Haskell Module " + hs_namespace;
+       }
+       package_dir_ += component;
+       package_dir_.push_back('/');
+-      boost::filesystem::create_directory(package_dir_);
++      std::filesystem::create_directory(package_dir_);
+     }
+   }
+ 
+   // Make output file
+   string pname = capitalize(program_name_);
+   string f_types_name = get_package_dir() + pname + "_Types.hs";
+   f_types_.open(f_types_name.c_str());
+   record_genfile(f_types_name);
+ 
+   string f_consts_name = get_package_dir() + pname + "_Consts.hs";

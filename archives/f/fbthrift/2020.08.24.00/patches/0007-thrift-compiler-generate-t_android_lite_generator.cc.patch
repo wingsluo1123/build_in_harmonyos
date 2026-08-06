@@ -1,0 +1,62 @@
+--- a/thrift/compiler/generate/t_android_lite_generator.cc
++++ b/thrift/compiler/generate/t_android_lite_generator.cc
+@@ -13,21 +13,21 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+ 
+ #include <fstream>
+ #include <iostream>
+ #include <sstream>
+ #include <string>
+ #include <vector>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/generate/t_java_generator.h>
+ 
+ using namespace std;
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+ /**
+@@ -171,33 +171,33 @@
+ 
+ string t_android_lite_generator::temp_variable(
+     const string& prefix,
+     int postfix) {
+   ostringstream stream;
+   stream << prefix << postfix;
+   return stream.str();
+ }
+ 
+ void t_android_lite_generator::init_generator() {
+-  boost::filesystem::create_directory(get_out_dir());
++  std::filesystem::create_directory(get_out_dir());
+   string dir = package_name_;
+   string subdir = get_out_dir();
+   string::size_type loc;
+ 
+   while ((loc = dir.find('.')) != string::npos) {
+     subdir = subdir + "/" + dir.substr(0, loc);
+-    boost::filesystem::create_directory(subdir);
++    std::filesystem::create_directory(subdir);
+     dir = dir.substr(loc + 1);
+   }
+   if (dir.size() > 0) {
+     subdir = subdir + "/" + dir;
+-    boost::filesystem::create_directory(subdir);
++    std::filesystem::create_directory(subdir);
+   }
+ 
+   package_dir_ = subdir;
+ }
+ 
+ void t_android_lite_generator::write_logger_file() {
+   string file_name;
+   ofstream out_logger;
+   file_name = package_dir_ + "/" + logger_name() + ".java";
+   out_logger.open(file_name.c_str());

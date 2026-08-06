@@ -1,0 +1,68 @@
+--- a/thrift/compiler/parse/parsing_driver.cc
++++ b/thrift/compiler/parse/parsing_driver.cc
+@@ -11,21 +11,21 @@
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+ 
+ #include <thrift/compiler/parse/parsing_driver.h>
+ 
+ #include <cstdarg>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ /**
+  * Note macro expansion because this is different between OSS and internal
+  * build, sigh.
+  */
+ #include THRIFTY_HH
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+@@ -182,38 +182,38 @@
+   std::string::size_type slash = filename.rfind('/');
+   // No slash, just use the current directory
+   if (slash == std::string::npos) {
+     return ".";
+   }
+   return filename.substr(0, slash);
+ }
+ 
+ std::string parsing_driver::include_file(const std::string& filename) {
+   // Absolute path? Just try that
+-  boost::filesystem::path path{filename};
++  std::filesystem::path path{filename};
+   if (path.has_root_directory()) {
+     try {
+-      auto abspath = boost::filesystem::canonical(path);
++      auto abspath = std::filesystem::canonical(path);
+       return abspath.string();
+-    } catch (const boost::filesystem::filesystem_error& e) {
++    } catch (const std::filesystem::filesystem_error& e) {
+       failure("Could not find file: %s. Error: %s", filename.c_str(), e.what());
+     }
+   } else { // relative path, start searching
+     // new search path with current dir global
+     std::vector<std::string> sp = params.incl_searchpath;
+     sp.insert(sp.begin(), directory_name(program->get_path()));
+ 
+     // iterate through paths
+     std::vector<std::string>::iterator it;
+     for (it = sp.begin(); it != sp.end(); it++) {
+       std::string sfilename = *(it) + "/" + filename;
+-      if (boost::filesystem::exists(sfilename)) {
++      if (std::filesystem::exists(sfilename)) {
+         return sfilename;
+       } else {
+         debug("Could not find: %s.", sfilename.c_str());
+       }
+     }
+ 
+     // File was not found
+     failure("Could not find include file %s", filename.c_str());
+   }
+ }

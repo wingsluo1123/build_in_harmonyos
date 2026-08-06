@@ -1,0 +1,135 @@
+--- a/thrift/compiler/generate/t_mstch_generator.h
++++ b/thrift/compiler/generate/t_mstch_generator.h
+@@ -14,36 +14,36 @@
+  * limitations under the License.
+  */
+ 
+ #pragma once
+ 
+ #include <fstream>
+ #include <memory>
+ #include <sstream>
+ #include <stdexcept>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ #include <thrift/compiler/mustache/mstch.h>
+ 
+ #include <thrift/compiler/generate/t_generator.h>
+ #include <thrift/compiler/generate/t_mstch_objects.h>
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+ class t_mstch_generator : public t_generator {
+  public:
+   t_mstch_generator(
+       t_program* program,
+       t_generation_context context,
+-      boost::filesystem::path template_prefix,
++      std::filesystem::path template_prefix,
+       std::map<std::string, std::string> parsed_options,
+       bool convert_delimiter = false);
+ 
+  protected:
+   /**
+    * Option pairs specified on command line for influencing generation behavior
+    */
+   const std::map<std::string, std::string> parsed_options_;
+ 
+   /**
+@@ -73,65 +73,65 @@
+    */
+   std::string render(
+       const std::string& template_name,
+       const mstch::node& context);
+ 
+   /**
+    * Write an output file with the given contents to a path
+    * under the output directory.
+    */
+   void write_output(
+-      const boost::filesystem::path& path,
++      const std::filesystem::path& path,
+       const std::string& data);
+ 
+   /**
+    * Render the mstch template with name `template_name` in the given context
+    * and write to a path under the output directory. Same as calling `render`
+    * and `write_output` in succession.
+    */
+   void render_to_file(
+       const mstch::map& context,
+       const std::string& template_name,
+-      const boost::filesystem::path& path);
++      const std::filesystem::path& path);
+ 
+   /**
+    * Render the mstch template with name `template_name` in the context of the
+    * given Thrift AST and write to a path under the output directory. Same as
+    * calling `dump` and `render` and `write_output` in succession.
+    */
+   template <typename T>
+   void render_to_file(
+       const T& obj,
+       const std::string& template_name,
+-      const boost::filesystem::path& path) {
++      const std::filesystem::path& path) {
+     render_to_file(dump(obj), template_name, path);
+   }
+ 
+   template <typename T>
+   void render_to_file(
+       const T& obj,
+       const mstch::map& extra_context,
+       const std::string& template_name,
+-      const boost::filesystem::path& path) {
++      const std::filesystem::path& path) {
+     mstch::map result = this->dump(obj);
+     result.insert(extra_context.begin(), extra_context.end());
+     this->render_to_file(result, template_name, path);
+   }
+ 
+   /**
+    * Render the mstch template with name `template_name` with the given context.
+    * This writes to a path under the output directory.
+    */
+   void render_to_file(
+       const std::shared_ptr<mstch_base> context,
+       const std::string& template_name,
+-      const boost::filesystem::path& path) {
++      const std::filesystem::path& path) {
+     write_output(path, render(template_name, context));
+   }
+ 
+   /**
+    * Dump map of command line flags passed to generator
+    */
+   mstch::map dump_options();
+ 
+   /**
+    * Subclasses should call the dump functions to convert elements
+@@ -206,21 +206,21 @@
+     }
+   }
+ 
+   bool has_option(const std::string& key) const;
+   std::unique_ptr<std::string> get_option(const std::string& key);
+ 
+  private:
+   std::map<std::string, std::string> template_map_;
+   bool convert_delimiter_;
+ 
+-  void gen_template_map(const boost::filesystem::path& root);
++  void gen_template_map(const std::filesystem::path& root);
+ 
+   /**
+    * For every key in the map, prepends a prefix to that key for mstch.
+    */
+   static mstch::map prepend_prefix(const std::string& prefix, mstch::map map);
+ 
+   template <typename T>
+   static const T* as_const_pointer(const T* x) {
+     return x;
+   }

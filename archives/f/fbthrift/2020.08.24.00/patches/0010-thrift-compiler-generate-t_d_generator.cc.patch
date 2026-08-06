@@ -1,0 +1,62 @@
+--- a/thrift/compiler/generate/t_d_generator.cc
++++ b/thrift/compiler/generate/t_d_generator.cc
+@@ -14,21 +14,21 @@
+  * limitations under the License.
+  */
+ 
+ #include <fstream>
+ #include <iostream>
+ #include <set>
+ #include <sstream>
+ #include <string>
+ #include <vector>
+ 
+-#include <boost/filesystem.hpp>
++#include <filesystem>
+ 
+ #include <thrift/compiler/generate/t_oop_generator.h>
+ 
+ using namespace std;
+ 
+ namespace apache {
+ namespace thrift {
+ namespace compiler {
+ 
+ /*
+@@ -66,33 +66,33 @@
+       const string& option_string)
+       : t_oop_generator(program, std::move(context)) {
+     (void)parsed_options;
+     (void)option_string;
+     out_dir_base_ = "gen-d";
+   }
+ 
+  protected:
+   void init_generator() override {
+     // Make output directory
+-    boost::filesystem::create_directory(get_out_dir());
++    std::filesystem::create_directory(get_out_dir());
+ 
+     string dir = program_->get_namespace("d");
+     string subdir = get_out_dir();
+     string::size_type loc;
+     while ((loc = dir.find('.')) != string::npos) {
+       subdir = subdir + "/" + dir.substr(0, loc);
+-      boost::filesystem::create_directory(subdir);
++      std::filesystem::create_directory(subdir);
+       dir = dir.substr(loc + 1);
+     }
+     if (!dir.empty()) {
+       subdir = subdir + "/" + dir;
+-      boost::filesystem::create_directory(subdir);
++      std::filesystem::create_directory(subdir);
+     }
+ 
+     package_dir_ = subdir + "/";
+ 
+     // Make output file
+     string f_types_name = package_dir_ + program_name_ + "_types.d";
+     f_types_.open(f_types_name.c_str());
+ 
+     // Print header
+     f_types_ << autogen_comment() << "module " << render_package(*program_)
