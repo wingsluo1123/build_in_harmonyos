@@ -126,36 +126,26 @@ class GitLfsConan(ConanFile):
         path = os.path.join(gopath, "bin") + os.pathsep + path
 
         env = [
-            "GOPROXY=https://goproxy.cn,https://goproxy.io,direct",
+            "GOPROXY=https://goproxy.cn",
             "GO111MODULE=on",
             "CGO_ENABLED=0",
             "GOTOOLCHAIN=local",
-            f"GOCACHE={gocache}",
+            f"GOCACHE={os.path.join(home_tmp, f'gocache-{os.getpid()}')}",
             f"GOTMPDIR={gotmpdir}",
             f"GOPATH={gopath}",
             f"PATH={path}",
             f"HOME={os.path.expanduser('~')}",
             "GODEBUG=netdns=go,x509usefallbackroots=1",
             "GOFLAGS=-mod=mod",
+            "GONOSUMDB=1",
         ]
         if goroot:
             env.append(f"GOROOT={goroot}")
 
-        # Set SSL cert path for Go (HarmonyOS may not have standard CA cert locations)
-        cert_paths = [
-            "/storage/Users/currentUser/usr/local/ssl/cert.pem",
-            "/etc/ssl/cert.pem",
-            "/etc/pki/tls/certs/ca-bundle.crt",
-        ]
-        for cert in cert_paths:
-            if os.path.isfile(cert):
-                env.append(f"SSL_CERT_FILE={cert}")
-                break
-
         # Build git-lfs binary (go build auto-downloads modules)
         ldflags = "-X github.com/git-lfs/git-lfs/v3/config.GitCommit=v3.7.0 -s -w"
         self.run(
-            f'"{go_bin}" build -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
+            f'"{go_bin}" build -v -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
             cwd=self.source_folder,
             env=env,
         )
