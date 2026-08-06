@@ -14,6 +14,7 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.gnu import PkgConfigDeps
+from conan.tools.env import Environment
 
 
 class LibsoupConan(ConanFile):
@@ -66,6 +67,11 @@ class LibsoupConan(ConanFile):
         tc.generate()
         pkg = PkgConfigDeps(self)
         pkg.generate()
+        # Fix: meson auto-detects llvm-ar as archiver for clang but can't find it
+        env = Environment()
+        env.define("AR", "/data/service/hnp/bin/llvm-ar")
+        env.define("RANLIB", "/data/service/hnp/bin/llvm-ranlib")
+        env.vars(self, "build").save()
 
     def build(self):
         apply_conandata_patches(self)
