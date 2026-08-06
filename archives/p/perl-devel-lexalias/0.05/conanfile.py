@@ -8,7 +8,7 @@ class PerlDevelLexalias(ConanFile):
     name = "perl-devel-lexalias"
     version = "0.05"
     description = "perl-devel-lexalias 0.05"
-    license = "Artistic-2.0"
+    license = "Artistic-1.0"
     homepage = "https://metacpan.org/pod/devel::lexalias"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "conandata.yml"

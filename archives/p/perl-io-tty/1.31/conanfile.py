@@ -2,7 +2,7 @@
 """Conan recipe — perl-io-tty 1.31 (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches
 
 class PerlIoTty(ConanFile):
     name = "perl-io-tty"
@@ -19,6 +19,7 @@ class PerlIoTty(ConanFile):
     def build(self):
 
         src = self.source_folder
+        apply_conandata_patches(self)
         self.run("perl Makefile.PL", cwd=src)
         # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
         if self.settings.os == "OHOS":

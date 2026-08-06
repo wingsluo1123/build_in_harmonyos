@@ -8,7 +8,7 @@ class PerlCryptOpensslDsa(ConanFile):
     name = "perl-crypt-openssl-dsa"
     version = "0.20"
     description = "perl-crypt-openssl-dsa 0.20"
-    license = "Artistic-2.0"
+    license = "Artistic-2.0, OpenSSL"
     homepage = "https://metacpan.org/pod/crypt::openssl::dsa"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "conandata.yml"

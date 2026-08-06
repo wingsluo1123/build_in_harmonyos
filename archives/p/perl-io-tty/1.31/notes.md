@@ -66,19 +66,12 @@ python3 $SKILL_ROOT/scripts/ohc-run.py package perl-io-tty 1.31
 
 ## 源码修改
 
-应用了 7 个补丁：
-- 0001-.patch-ai-review.txt.patch（AI判断标记）
-- 0002-Makefile.PL.patch（硬编码配置 + 跳过检测循环）
-- 0003-Tty.c.patch（预生成的 XS C 代码）
-- 0004-xssubs.c.patch（预生成的符号常量代码）
-- 0005-.pre-scan-report.yaml.patch（预扫描报告）
-- 0006-MYMETA.json.patch（元数据）
-- 0007-MYMETA.yml.patch（元数据）
+应用了 1 个补丁：
+- 0001-Makefile.PL.patch（硬编码配置 + 跳过检测循环 + 跳过符号检测）
 
 **关键补丁说明**：
 - Makefile.PL.patch 硬编码了 PTY/TTY 函数检测结果，避免 CRT 缺失导致的编译失败
 - Makefile.PL.patch 添加了跳过符号检测的逻辑（检查 xssubs.c 是否已存在）
-- xssubs.c.patch 预置了所有终端常量定义，跳过符号检测循环
 
 ## 依赖版本
 

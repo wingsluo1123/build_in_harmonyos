@@ -8,7 +8,7 @@ class PerlDbi(ConanFile):
     name = "perl-dbi"
     version = "1.637"
     description = "perl-dbi 1.637"
-    license = "Artistic-2.0"
+    license = "Artistic-1.0"
     homepage = "https://metacpan.org/pod/dbi"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "conandata.yml"

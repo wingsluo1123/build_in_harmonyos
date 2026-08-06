@@ -12,7 +12,7 @@ class {class_name}(ConanFile):
     name = "{name}"
     version = "{version}"
     description = "{name} {version}"
-    license = "Artistic-2.0"
+    license = "FIXME_VERIFY_LICENSE"  # FIXME: verify actual license (Artistic-1.0, Artistic-2.0, etc.)
     homepage = "{homepage}"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "conandata.yml"
