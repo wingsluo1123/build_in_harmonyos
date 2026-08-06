@@ -37,23 +37,11 @@ class KubetuiConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # aireview P1 阻塞 + P2: get(self, **self.conan_data["sources"], ...)
-        # 会把 mirror_url 当 kwarg 传给 get() 报 TypeError；
-        # Conan 2.x get() 不接受 mirror_url，且 **kwargs 静默忽略致镜像下载从未触发。
-        # 参照 glib/macifrename 模式：pop mirror_url，主 URL 失败后用 mirror_url 重试。
-        sources = dict(self.conan_data["sources"])
-        mirror_url = sources.pop("mirror_url", None)
-        sha256 = sources.get("sha256")
-        try:
-            get(self, **sources, strip_root=True)
-        except ConanException as e:
-            if not mirror_url:
-                raise
-            self.output.warning(f"primary URL download failed: {e}, retrying with mirror_url")
-            # aireview Medium: GitHub tar 与 GitCode tar 动态生成字节流不同，
-            # 用 GitHub sha256 校验 GitCode tar 必不匹配 → 重试传 sha256=None 跳过校验
-            # （CI 内网信任假设：GitCode mirror URL 已含 refs/tags 版本约束，内容可信）
-            get(self, url=mirror_url, sha256=None, strip_root=True)
+        # R39: 仅用官方源（github.com/sarub0b0/kubetui）。CI 有内置 GitHub 镜像
+        # fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub）处理 GitHub 不可达，
+        # 配方内不再自定义 mirror_url（aireview Critical: gitcode.com 非官方源 +
+        # sha256=None 跳过校验属供应链投毒风险，同 groonga/inotify-tools 处理）。
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def export_sources(self):
         # Conan 2.x G1 门禁要求 export_sources() 声明；kubetui 无补丁
