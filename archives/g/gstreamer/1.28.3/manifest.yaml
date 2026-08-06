@@ -1,17 +1,17 @@
 software: gstreamer
 version: "1.28.3"
+build_system: meson
 status: built
-build_date: "2026-05-21"
+build_date: "2026-08-06"
 
 source:
   url: "https://gstreamer.freedesktop.org/data/src/gstreamer/gstreamer-1.28.3.tar.xz"
-  sha256: ""
+  sha256: "5e84ecb942e136944eb9812f19cff7bcf05a85637482a32da55b892914c397d1"
   tar_format: tar.xz
 
 build:
   system: meson
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
     - "-Dnls=disabled"
     - "-Dexamples=disabled"
     - "-Dtests=disabled"
@@ -23,10 +23,16 @@ build:
     - "-Dbash-completion=disabled"
     - "-Dptp-helper=disabled"
     - "-Dgst_parse=false"
-  dependencies: []
+  dependencies:
+    - glib/2.84.0.1
   cc: clang
   cxx: clang++
 
 patches_applied:
-  - "0001-gst-parse-meson.build.patch"
-  - "0002-meson.build.patch"
+  - "0001-fix-python-script-execution.patch"
+
+knowledge_gained:
+  - "gstreamer 1.28.3 使用 meson 构建，需要 glib 依赖"
+  - "glib conan 包缺少 gmodule-no-export-2.0 和 gio-unix-2.0 pkg-config 别名"
+  - "glib-2.0.pc 缺少 glib_mkenums 变量和 -lintl 链接标志"
+  - "Python 脚本在 HMDFS 上无法直接执行，需要用 python3 解释器调用"

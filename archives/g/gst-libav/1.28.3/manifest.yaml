@@ -2,11 +2,11 @@ software: gst-libav
 build_system: meson
 version: "1.28.3"
 status: built
-build_date: "2026-05-30"
+build_date: "2026-08-06"
 
 source:
   url: "https://gstreamer.freedesktop.org/src/gst-libav/gst-libav-1.28.3.tar.xz"
-  sha256: ""
+  sha256: "28fcd45d9ace261d4bda896466d5326af6efd2fcf0a20f24502094b5a9955bdf"
   tar_format: tar.xz
 
 build:
@@ -17,8 +17,8 @@ build:
   dependencies:
     - gstreamer/1.28.3
     - gst-plugins-base/1.28.3
-    - glib/2.88.0
-    - ffmpeg/7.1
+    - glib/2.84.0.1
+    - ffmpeg/7.1.5
   cc: clang
   cxx: clang++
   build_commands:
@@ -26,9 +26,13 @@ build:
     compile: "ninja -C _build"
     install: "ninja -C _build install DESTDIR=$TEST_PREFIX"
 
-patches_applied: []
+patches_applied:
+  - "0001-skip-docs-when-disabled.patch"
 
 knowledge_gained:
-  - "gst-libav 1.28.3 使用 meson 构建，直接编译无需平台适配补丁"
-  - "gst-libav 是纯插件包，无独立可执行文件（bin/ 目录为空）"
-  - "FFmpeg 库静态链接到插件中，导致插件体积较大（78MB）"
+  - "gst-libav 1.28.3 使用 meson 构建，需要 gstreamer、gst-plugins-base、glib、ffmpeg 依赖"
+  - "gst-libav 是纯插件包，无独立可执行文件，产物为 lib/gstreamer-1.0/libgstlibav.so"
+  - "FFmpeg 库静态链接到插件中（449KB）"
+  - "conan PkgConfigDeps 生成的 ffmpeg .pc 文件使用 conan 版本号而非库版本号，需要修补"
+  - "glib conan 包缺少 gmodule-no-export-2.0、gio-unix-2.0 pkg-config 别名和工具路径变量"
+  - "docs/meson.build 在 doc=disabled 时不跳过，需要补丁修复"
