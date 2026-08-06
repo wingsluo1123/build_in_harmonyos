@@ -44,27 +44,15 @@ class GeckodriverConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+
         # Ensure Rust toolchain is available on the build machine.
         # On HarmonyOS, Rust is installed via Harmonybrew (not pre-installed).
+        brew_bin = os.path.join(os.path.expanduser("~"), ".harmonybrew", "bin")
         if not shutil.which("cargo"):
             self.output.info("cargo not found, installing Rust toolchain via Harmonybrew...")
-            brew_bin = os.path.join(os.path.expanduser("~"), ".harmonybrew", "bin", "brew")
             if not os.path.exists(brew_bin):
                 self.run('zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"')
-            self.run(f'eval "$({brew_bin} shellenv)" && brew install rust')
-            # Ensure cargo is in PATH for subsequent commands
-            cargo_dir = os.path.join(os.path.expanduser("~"), ".harmonybrew", "bin")
-            current_path = os.environ.get("PATH", "")
-            os.environ["PATH"] = f"{cargo_dir}:{current_path}"
-
-        # Ensure cc linker is available (cargo's build scripts look for 'cc')
-        if not shutil.which("cc"):
-            clang = shutil.which("clang")
-            if clang:
-                os.environ["CC"] = clang
-            clangxx = shutil.which("clang++")
-            if clangxx:
-                os.environ["CXX"] = clangxx
+            self.run(f'eval "$({brew_bin}/brew shellenv)" && brew install rust')
 
         # Configure cargo sparse registry for faster downloads
         cargo_home = os.path.join(os.path.expanduser("~"), ".cargo")
@@ -74,12 +62,17 @@ class GeckodriverConan(ConanFile):
             with open(config_path, "w") as f:
                 f.write('[registries.crates-io]\nprotocol = "sparse"\n')
 
-        # Cargo manages its own dependencies and toolchain.
-        # The binary is a standalone ELF executable (no shared lib deps).
-        # Explicitly set CC/CXX for cargo's build scripts (cc crate).
+        # Build with cargo. Must explicitly set PATH and CC/CXX because
+        # self.run() uses the conanbuild environment which doesn't include
+        # Harmonybrew bin or the cc symlink.
         clang = shutil.which("clang") or "/data/service/hnp/bin/clang"
         clangxx = shutil.which("clang++") or "/data/service/hnp/bin/clang++"
-        self.run(f"CC={clang} CXX={clangxx} cargo build --release")
+        self.run(
+            f'export PATH="{brew_bin}:$PATH" && '
+            f'export CC="{clang}" && '
+            f'export CXX="{clangxx}" && '
+            f'cargo build --release'
+        )
 
     def package(self):
         # Cargo creates target/release/ relative to the build directory.
