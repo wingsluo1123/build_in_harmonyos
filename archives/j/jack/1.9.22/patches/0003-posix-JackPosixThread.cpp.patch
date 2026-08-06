@@ -11,7 +11,7 @@
      JackRunnableInterface* runnable = obj->fRunnable;
      int err;
  
-+#ifndef __OHOS__
++#ifdef HAVE_PTHREAD_CANCEL
      if ((err = pthread_setcanceltype(obj->fCancellation, NULL)) != 0) {
          jack_error("pthread_setcanceltype err = %s", strerror(err));
      }
@@ -37,7 +37,7 @@
      if (fThread != (jack_native_thread_t)NULL) { // If thread has been started
          jack_log("JackPosixThread::Kill");
          void* status;
-+#ifndef __OHOS__
++#ifdef HAVE_PTHREAD_CANCEL
          pthread_cancel(fThread);
 +#else
 +        pthread_kill(fThread, SIGTERM);
@@ -63,7 +63,7 @@
      if (thread != (jack_native_thread_t)NULL) { // If thread has been started
          jack_log("JackPosixThread::Kill");
          void* status;
-+#ifndef __OHOS__
++#ifdef HAVE_PTHREAD_CANCEL
          pthread_cancel(thread);
 +#else
 +        pthread_kill(thread, SIGTERM);
