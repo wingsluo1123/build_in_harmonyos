@@ -236,3 +236,7 @@ conan create archives/t/tectonic/0.16.9/conanfile.py \
 
 **编译结束**: 2026-07-23 13:27
 **最终状态**: built
+
+## 清理记录 (2026-08-06)
+- 移除 harfbuzz 14.2.0.2 非标准归档文件（ADAPTATION_REPORT.md, PR.md, patches/.empty）
+- 修正 manifest.yaml 中 harfbuzz graphite2 状态（含→disabled）
