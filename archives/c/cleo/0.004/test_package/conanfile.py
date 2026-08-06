@@ -14,11 +14,16 @@ from conan.tools.cmake import CMake, cmake_layout
 
 class CleoTestConan(ConanFile):
     settings = "os", "compiler", "arch", "build_type"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
     test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        # aireview P2: 补 cleo 5 个 Perl 模块依赖到测试包，避 perl -c 找不到 App::Cleo 及依赖模块
+        for dep in ("perl-Term-ReadKey", "perl-Term-ANSIColor",
+                    "perl-File-Slurp", "perl-Time-HiRes",
+                    "perl-ExtUtils-MakeMaker"):
+            self.requires(f"{dep}/@latest")
 
     def layout(self):
         cmake_layout(self)

@@ -36,7 +36,8 @@ class CleoConan(ConanFile):
 
     def export_sources(self):
         # Conan 2.x G1 门禁要求 export_sources() 声明；cleo 无补丁
-        apply_conandata_patches(self)
+        # aireview P3: 勿调 apply_conandata_patches（该函数属 source() 非 export_sources，误调致 NameError）
+        pass
 
     def generate(self):
         # Perl 构建无 toolchain 需生成
@@ -68,5 +69,12 @@ class CleoConan(ConanFile):
     def package_info(self):
         # cleo 是 Perl CLI 脚本（bin/cleo），非链接型 lib
         self.cpp_info.libs = []
-        # Perl 模块路径通过 dependencies 传递给消费者
-        self.info.site = "https://github.com/thaljef/App-Cleo"
+        # aireview P1: 补 cleo 自身 PERL5LIB 路径，避消费者 perl -c 找不到 App::Cleo 模块
+        for dep in ("perl-Term-ReadKey", "perl-Term-ANSIColor",
+                    "perl-File-Slurp", "perl-Time-HiRes",
+                    "perl-ExtUtils-MakeMaker"):
+            pkg = self.dependencies[dep].package_folder
+            self.runenv_info.append_path("PERL5LIB", os.path.join(pkg, "lib", "perl5"))
+        # cleo 自身模块路径（lib/perl5/.../App/Cleo.pm）
+        self.runenv_info.append_path("PERL5LIB", os.path.join(self.package_folder, "lib", "perl5"))
+        # aireview P3: 删 self.info.site 无效 API（Conan 2.x 无此属性，应改 self.info.settings ego if needed）
