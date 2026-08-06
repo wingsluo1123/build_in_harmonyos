@@ -3,42 +3,56 @@ version: "7.1.0"
 
 status: built
 build_system: custom
-build_date: "2026-06-17"
+build_date: "2026-08-06"
 
 source:
   url: "https://github.com/lxc/incus/archive/refs/tags/v7.1.0.tar.gz"
-  sha256: ""
+  sha256: "f57be28430d1c7add68829eabf9eea5700f3b1ac89b2172ac0aac0909f9a7c84"
   tar_format: tar.gz
 
 build:
   system: custom
   configure_options:
-    - "CGO_ENABLED=0"
-    - "GOOS=linux GOARCH=arm64"
     - "GOTOOLCHAIN=local"
+    - "GOOS=linux GOARCH=arm64"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "CGO_ENABLED=0 (client tools)"
+    - "CGO_ENABLED=1 -D__MUSL__ (fuidshift, incus-benchmark, lxd-to-incus)"
   dependencies:
-    - golang/1.26.0
-  cc: go
+    - golang/1.26.5
+    - libacl/2.4.0
+    - libcap/2.78
+    - gettext/1.0
+  cc: clang
   cxx: ""
   binaries:
     - incus
     - incus-migrate
     - incus-simplestreams
     - incus-user
+    - incus-agent
+    - fuidshift
+    - incus-benchmark
+    - lxd-to-incus
   excluded_binaries:
     - incusd
-    - incus-agent
-    - incus-benchmark
-    - fuidshift
     - lxc-to-incus
-    - lxd-to-incus
+    - generate-config
+    - generate-database
 patches_applied: []
 
 knowledge_gained:
-  - "incus requires Go 1.25.6+ for CGO_ENABLED=0 build, Go 1.26.0 sufficient"
-  - "incusd (server daemon) cannot be built with CGO_ENABLED=0 due to missing quota/warningtype packages"
-  - "incusd requires CGO_ENABLED=1 and liblxc, cowsql, libudev, sys/acl.h - unavailable on HarmonyOS"
-  - "sockaddr_storage redefinition conflict in OHOS SDK prevents CGO_ENABLED=1 builds"
-  - "incus client,4 client tools built successfully with CGO_ENABLED=0"
-  - "fuidshift requires CGO (依赖 (idmap.ShiftPath/UnshiftPath)"
-  - "incus is a partial build - server components excluded due to CGO dependency requirements"
+  - "OHOS SDK does not define __MUSL__ macro, causing sockaddr_storage redefinition conflict between linux/socket.h and sys/socket.h"
+  - "Fix: add -D__MUSL__ to CGO_CFLAGS to skip sys/socket.h sockaddr_storage definition"
+  - "OHOS HMDFS filesystem does not support mmap for Go linker output, causes 'mapping output file failed: permission denied'"
+  - "Fix: set TMPDIR/GOTMPDIR/TMP/TEMP to /data/storage/el2/base/files/tmp (OHOS sandbox path)"
+  - "Go linker -tmpdir flag needed for external linker temp files (/tmp is read-only on OHOS)"
+  - "OHOS SDK lld linker depends on libxml2.so.16 which is not in default library search path"
+  - "Fix: use GNU ld via --ld-path=/path/to/binutils/bin/ld for C/C++ compilation"
+  - "ACL_UNDEFINED_ID macro redefinition between sys/acl.h and incus_posix_acl_xattr.h"
+  - "Fix: add -Wno-macro-redefined to CGO_CFLAGS"
+  - "incusd requires cowsql, liblxc, libudev - none available on OHOS or Conan artifact repo"
+  - "GitHub is not accessible from OHOS device, preventing source downloads for C dependencies"
+  - "autotools config.status fails on HMDFS filesystem (can't create config files)"
+  - "OHOS requires ELF signing for compiled binaries, configure can't run test binaries"
+  - "Fix: use --build=x86_64-pc-linux-gnu --host=aarch64-unknown-linux-gnu to enable cross-compile mode"
