@@ -155,10 +155,10 @@ class NotcursesConan(ConanFile):
             tc.variables["CMAKE_LIBRARY_PATH"] = ncurses_lib
         # Explicitly add Conan dependency include dirs for check_include_file
         # (CMakeToolchain should do this, but some packages' headers aren't found)
-        for dep_name in self.deps_cpp_info:
-            dep = self.deps_cpp_info[dep_name]
-            for inc_dir in dep.include_dirs:
-                tc.extra_cflags.append("-I" + inc_dir)
+        for dep in self.dependencies.values():
+            if dep.cpp_info:
+                for inc_dir in dep.cpp_info.includedirs:
+                    tc.extra_cflags.append("-I" + inc_dir)
         # Set PKG_CONFIG_PATH for ncursesw discovery
         pkgconfig_path = os.path.join(prefix, "lib", "pkgconfig")
         if os.path.isdir(pkgconfig_path):
