@@ -17,7 +17,7 @@ class MinizipNgConan(ConanFile):
     description = "Next-gen zip manipulation library with multi-format compression and encryption support"
     license = "Zlib"
     homepage = "https://github.com/zlib-ng/minizip-ng"
-    url = ""  # CI fills this
+    url = "https://github.com/zlib-ng/minizip-ng"
 
     package_type = "library"
 
