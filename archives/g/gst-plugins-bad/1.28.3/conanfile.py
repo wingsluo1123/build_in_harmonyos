@@ -97,8 +97,16 @@ class GstPluginsBadConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Install system glib from cmd-pkgs if not present (needed for meson build)
+        import subprocess
+        glib_lib = "/storage/Users/currentUser/usr/local/lib/libglib-2.0.a"
+        if not os.path.exists(glib_lib):
+            self.output.info("Installing glib 2.88.0 from cmd-pkgs...")
+            subprocess.run(
+                ["sh", "-c", "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.88.0"],
+                check=True
+            )
         # Ensure system glib tools (glib-mkenums, etc.) are found first
-        # The HNP bin has glib-genmarshal but not glib-mkenums
         os.environ["PATH"] = "/storage/Users/currentUser/usr/local/bin:" + os.environ.get("PATH", "")
         # Disable opensles plugin (Android-specific) by modifying meson.options
         meson_options_path = os.path.join(self.source_folder, "subprojects", "gst-plugins-bad", "meson.options")
