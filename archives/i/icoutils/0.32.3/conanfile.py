@@ -4,8 +4,6 @@
 Autotools build (configure + make). Produces command-line tools: icotool, wrestool,
 extresso, genresscript.
 """
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -19,7 +17,6 @@ class IcoutilsConan(ConanFile):
     description = "Extract and convert Windows icon and cursor resources (ICO/CUR/ANI)"
     license = "GPL-3.0"
     homepage = "https://www.nongnu.org/icoutil/"
-    url = ""  # CI fills this
 
     package_type = "application"
 
