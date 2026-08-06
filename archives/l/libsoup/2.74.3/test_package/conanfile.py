@@ -27,5 +27,5 @@ class LibsoupTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # R34: test must actually execute the test binary via self.run()
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_libsoup"), env="conanrun")
