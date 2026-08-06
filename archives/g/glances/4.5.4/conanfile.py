@@ -32,7 +32,7 @@ class GlancesConan(ConanFile):
     description = "A cross-platform curses-based monitoring tool"
     license = "LGPL-3.0-only"
     homepage = "https://github.com/nicolargo/glances"
-    url = ""
+    url = "https://github.com/nicolargo/glances"
 
     package_type = "application"
     settings = "os", "arch"
