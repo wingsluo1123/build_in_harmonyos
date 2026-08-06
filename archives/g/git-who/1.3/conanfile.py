@@ -7,6 +7,7 @@ Build with `go build` to produce a single binary.
 import os
 import platform
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException  # aireview High: build() 多处用 ConanException 需导入
@@ -122,7 +123,61 @@ class GitWhoConan(ConanFile):
             get(self, url=urls, sha256=sha256, destination=sdk_root, strip_root=False)
         if not os.path.isfile(gobin):
             raise ConanException(f"Go SDK download failed: {gobin} not found")
+        # E128: OHOS 上未签名 ELF 无法执行（CI #14497 go version Error 126），
+        # 用 binary-sign-tool 签名 go 工具链（同 git-town 16.4.1 方案）
+        self._sign_go_sdk_if_ohos(goroot)
         return gobin
+
+    def _sign_go_sdk_if_ohos(self, goroot):
+        """Sign all Go SDK ELF binaries for OHOS execution (E128, git-town 同方案)."""
+        if str(self.settings.os) != "OHOS":
+            return
+        marker = os.path.join(goroot, ".ohos-signed")
+        if os.path.isfile(marker):
+            return
+        tool_dir = os.path.join(goroot, "pkg", "tool", f"linux_{self._go_host_arch()}")
+        candidates = [
+            os.path.join(goroot, "bin", "go"),
+            os.path.join(goroot, "bin", "gofmt"),
+        ]
+        if os.path.isdir(tool_dir):
+            candidates.extend(os.path.join(tool_dir, filename) for filename in os.listdir(tool_dir))
+        for candidate in candidates:
+            if os.path.isfile(candidate) and self._is_elf(candidate):
+                self._sign_elf_if_ohos(candidate)
+        with open(marker, "w", encoding="utf-8") as f:
+            f.write("signed\n")
+
+    def _sign_elf_if_ohos(self, path):
+        if self._has_ohos_signature(path):
+            os.chmod(path, 0o755)
+            return
+        signer = shutil.which("binary-sign-tool") or "/storage/Users/currentUser/usr/local/bin/binary-sign-tool"
+        if not os.path.isfile(signer):
+            raise ConanInvalidConfiguration("binary-sign-tool is required to sign OHOS Go executables")
+        signed = f"{path}.signed"
+        subprocess.check_call([
+            signer, "sign", "-selfSign", "1",
+            "-inFile", path, "-outFile", signed,
+            "-signAlg", "SHA256withECDSA",
+        ])
+        shutil.move(signed, path)
+        os.chmod(path, 0o755)
+
+    def _is_elf(self, path):
+        try:
+            with open(path, "rb") as f:
+                return f.read(4) == b"\x7fELF"
+        except OSError:
+            return False
+
+    def _has_ohos_signature(self, path):
+        try:
+            with open(path, "rb") as f:
+                data = f.read(4096)
+        except OSError:
+            return False
+        return b".codesign" in data or b".note.ohos" in data
 
     @staticmethod
     def _go_host_arch():
