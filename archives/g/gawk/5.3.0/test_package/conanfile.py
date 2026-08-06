@@ -25,17 +25,5 @@ class GawkTestConan(ConanFile):
         pass
 
     def test(self):
-        # 1. Version check
-        self.run("gawk --version", env="conanrun")
-
-        # 2. Arithmetic: 1+2*3 should equal 7
-        self.run("gawk 'BEGIN {exit (1+2*3==7) ? 0 : 1}'", env="conanrun")
-
-        # 3. Field extraction: create input file, verify $1=="hello"
-        test_input = os.path.join(self.build_folder, "gawk_test_input.txt")
-        with open(test_input, "w") as f:
-            f.write("hello world\n")
-        self.run(
-            "gawk '{exit ($1==\"hello\") ? 0 : 1}' " + test_input,
-            env="conanrun",
-        )
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} test.sh", env="conanrun")
