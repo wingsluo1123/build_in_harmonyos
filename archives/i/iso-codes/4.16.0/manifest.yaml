@@ -1,11 +1,12 @@
 software: iso-codes
-version: 4.16.0
+version: "4.16.0"
 status: built
+build_date: "2026-08-06"
 build_system: autotools
-configure_options: []
+configure_options: ["--prefix=${PREFIX}"]
 dependencies: []
-install_prefix: /storage/Users/currentUser/usr/local
-install_time: 2026-05-21T17:38:00
+install_prefix: ""
+install_time: ""
 domains:
   - iso_639-2
   - iso_639-3
@@ -15,11 +16,14 @@ domains:
   - iso_3166-3
   - iso_4217
   - iso_15924
+patches:
+  - 0001-configure-umask-hmdfs
 notes: |
-  Due to HMDFS filesystem limitations (cat - permission denied), 
-  configure script failed to run. Manually created Makefile and 
-  installed data files directly. pkg-config file manually configured.
+  HMDFS filesystem incompatibility: autotools configure uses umask 077 for temp
+  directory creation, which causes Permission denied on HMDFS. Fixed by changing
+  to umask 022 and using TMPDIR for temp directory path.
 validation:
-  pkg_config: success
-  version_check: 4.16.0
-  domains_check: pass
+  conan_create: success
+  make_check: pass
+  test_package: pass
+最终状态: built
