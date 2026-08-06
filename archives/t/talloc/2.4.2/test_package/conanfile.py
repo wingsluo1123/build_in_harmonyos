@@ -4,6 +4,8 @@
 CI runs this automatically via `conan create` (which invokes test_package).
 File location: archives/t/talloc/2.4.2/test_package/conanfile.py
 """
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -24,5 +26,6 @@ class TallocTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test binary directly to validate talloc API
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_talloc")
+        self.run(test_bin, env="conanrun")
