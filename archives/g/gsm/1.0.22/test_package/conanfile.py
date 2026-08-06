@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""Conan test_package — gsm 1.0.22 L1 test (encode/decode roundtrip)."""
+
+import os
+
+from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
+
+
+class GsmTestConan(ConanFile):
+    settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps", "CMakeToolchain"
+
+    def requirements(self):
+        self.requires(self.tested_reference_str)
+
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
+    def test(self):
+        test_exe = os.path.join(self.build_folder, "test_gsm")
+        self.run(test_exe, env="conanrun")
