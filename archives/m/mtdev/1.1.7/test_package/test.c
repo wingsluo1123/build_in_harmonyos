@@ -7,17 +7,26 @@ int main(void) {
     struct mtdev dev;
     memset(&dev, 0, sizeof(dev));
 
-    /* Test mtdev_has_mt_event - checks if an MT event code is present.
-     * With a zeroed-out struct, this should return 0 (no event). */
-    int result = mtdev_has_mt_event(&dev, ABS_MT_POSITION_X);
-    if (result != 0) {
-        fprintf(stderr, "mtdev_has_mt_event returned unexpected value: %d\n", result);
-        return 1;
-    }
-
     /* Verify struct layout: state pointer should be NULL after memset */
     if (dev.state != NULL) {
         fprintf(stderr, "dev.state should be NULL after memset\n");
+        return 1;
+    }
+
+    /* Verify caps are zeroed */
+    if (dev.caps.has_mtdata != 0) {
+        fprintf(stderr, "caps.has_mtdata should be 0 after memset\n");
+        return 1;
+    }
+
+    /* Verify mtdev_close is safe on zeroed struct (free(NULL) is no-op) */
+    mtdev_close(&dev);
+
+    /* Verify mtdev_new_open with invalid fd returns NULL (API linking check) */
+    struct mtdev *new_dev = mtdev_new_open(-1);
+    if (new_dev != NULL) {
+        mtdev_close_delete(new_dev);
+        fprintf(stderr, "mtdev_new_open(-1) should return NULL\n");
         return 1;
     }
 
