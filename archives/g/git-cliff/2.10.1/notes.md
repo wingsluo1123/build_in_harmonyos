@@ -59,7 +59,28 @@ ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked
 - GitHub 在 OpenHarmony 网络环境下可能超时，需使用代理（ghfast.top）
 - Cargo 构建系统不支持 DESTDIR 模式，需要手动复制二进制到 staging 目录
 - verify-build 脚本的 install_prefix 使用 TEST_PREFIX 而非 TEST_PREFIX/$DEFAULT_PREFIX，与 DESTDIR 模式不完全兼容
+## Conan 适配 (2026-08-06)
+
+### 适配内容
+- 生成 conanfile.py: `package_type = "application"`, `build()` 调用 `cargo build --release`
+- 生成 conandata.yml: 源码 URL 指向官方 GitHub (R39), sha256 验证
+- 生成 test_package/: 使用 executable 模板, test.sh 运行 `git-cliff --version` (R34)
+- 创建 commands.json (R38): 声明命令行工具
+- 创建软件级 manifest.yaml 和 README.md
+
+### 关键决策
+- `package_type = "application"` (非 library), 因为 git-cliff 是命令行工具
+- `requirements()` 为空: Rust crate 依赖由 Cargo 管理, 非 Conan 包
+- `build()` 使用 `self.run("cargo build --release")`, 不依赖 shell 环境变量 (R33)
+- `package_info()`: `bindirs = ["bin"]`, `libs = []`
+- conandata.yml URL 使用官方 GitHub 直链 (R39), CI 自动添加镜像 fallback
+
+### 编译验证
+- rustc 1.97.1 (Harmonybrew), cargo 1.97.1
+- cc/c++ -> clang/clang++ 软链接 (cargo 默认使用 cc 作为 linker)
+- Cargo mirror: rsproxy.cn (crates.io 不可达)
+- `cargo build --release` 成功, 耗时 ~6m26s
 ---
 
-**编译结束**: 2026-06-17 01:55
-**最终状态**: published
+**编译结束**: 2026-08-06 13:40
+**最终状态**: built
