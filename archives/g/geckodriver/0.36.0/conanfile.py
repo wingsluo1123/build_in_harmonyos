@@ -76,7 +76,10 @@ class GeckodriverConan(ConanFile):
 
         # Cargo manages its own dependencies and toolchain.
         # The binary is a standalone ELF executable (no shared lib deps).
-        self.run("cargo build --release")
+        # Explicitly set CC/CXX for cargo's build scripts (cc crate).
+        clang = shutil.which("clang") or "/data/service/hnp/bin/clang"
+        clangxx = shutil.which("clang++") or "/data/service/hnp/bin/clang++"
+        self.run(f"CC={clang} CXX={clangxx} cargo build --release")
 
     def package(self):
         # Cargo creates target/release/ relative to the build directory.
