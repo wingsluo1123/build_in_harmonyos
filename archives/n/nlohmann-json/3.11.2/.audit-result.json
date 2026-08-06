@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-12",
+      "file": "archives/n/nlohmann-json/3.11.2/conandata.yml",
+      "line": 10,
+      "description": "patch_description uses a hyphen separator after the sequence number: '0001-Bump cmake_minimum_required...'. Rule CS-12 states 'patch_description 用空格分隔（非连字符）' — description words must be space-separated, not hyphen-separated. The example format is '0001 build aux config.guess' (all spaces).",
+      "fix_suggestion": "Change patch_description from '0001-Bump cmake_minimum_required from 3.1 to 3.5 (CMake 4.x dropped support for < 3.5)' to '0001 Bump cmake_minimum_required from 3.1 to 3.5 (CMake 4.x dropped support for < 3.5)' (replace hyphen after 0001 with a space)."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/n/nlohmann-json/3.11.2/manifest.yaml",
+      "line": 2,
+      "description": "version field is not quoted. CS-14 example format shows version: \"1.3.1\" with double quotes. Current value 'version: 3.11.2' is unquoted. While YAML parses this as a string (multiple dots prevent float interpretation), the rule example explicitly uses quotes for consistency and safety.",
+      "fix_suggestion": "Change 'version: 3.11.2' to 'version: \"3.11.2\"' to match the CS-14 standard format."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-14",
+      "file": "archives/n/nlohmann-json/3.11.2/manifest.yaml",
+      "line": 1,
+      "description": "Field name 'software' does not match the standard format. CS-14 example uses 'name: zlib' as the field name for the package name. The current manifest uses 'software: nlohmann-json' instead.",
+      "fix_suggestion": "Rename the field from 'software:' to 'name:' to match the CS-14 standard format (example: name: zlib)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-5",
+      "file": "archives/n/nlohmann-json/3.11.2/notes.md",
+      "line": 46,
+      "description": "Stale template placeholder section '### 对话 #N — 2026-04-26 HH:MM' remains in the file with unfilled Chinese placeholder text (e.g., '（做了什么，如\"执行 configure\"、\"修复 xxx bug\"、\"制作预编译包\"）'). This is leftover template content that should have been removed or filled in before submission. CS-5 prohibits residual template placeholders in submitted code.",
+      "fix_suggestion": "Remove the template placeholder section (### 对话 #N — 2026-04-26 HH:MM and its placeholder content) since actual conversation #1 is already filled in below it."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-5",
+      "file": "archives/n/nlohmann-json/3.11.2/notes.md",
+      "line": 85,
+      "description": "Stale patch status in the source modification table: '补丁状态' column says '待生成补丁' (patch to be generated), but the patch file patches/0001-CMakeLists.txt.patch already exists and is included in the PR. This is inconsistent and misleading.",
+      "fix_suggestion": "Update the patch status from '待生成补丁' to '已生成' (generated) or '已完成' (completed) to reflect the actual state."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "MANIFEST",
+      "file": "archives/n/nlohmann-json/3.11.2/test_package/MANIFEST.yml",
+      "line": 28,
+      "description": "assertion_count is 8 but test_package/test.cpp contains 9 assert() calls (3 in Test 1, 2 in Test 2, 3 in Test 3, 1 in Test 4). The MANIFEST.yml comment labels this as '近似值' (approximate), but an off-by-one discrepancy should be corrected for accuracy.",
+      "fix_suggestion": "Update assertion_count from 8 to 9 to match the actual number of assert() calls in test.cpp."
+    }
+  ],
+  "summary": "W4 Pre-PR Audit Re-check for nlohmann-json 3.11.2 (branch: feat/nlohmann-json-3.11.2-6EA2). VERDICT: PASS.\n\n=== Previous Issues Verification (all 3 FIXED) ===\n1. P1 R39 (gh-proxy.com mirror URL): FIXED. conandata.yml URL is now 'https://github.com/nlohmann/json/archive/v3.11.2.tar.gz' — the official GitHub source archive URL. Verified against ConanCenter (conan-io/conan-center-index) which uses the exact same URL and sha256. No mirror/proxy prefix present.\n2. P2 CS-1 (missing shebang+docstring): FIXED. conanfile.py now starts with '#!/usr/bin/env python3' and has docstring '\"\"\"Conan recipe for nlohmann-json 3.11.2 — header-only JSON library for Modern C++.\"\"\"'.\n3. P2 CS-16 (import order): FIXED. Imports are now correctly ordered: stdlib 'import os' first, blank line, then third-party 'from conan import ConanFile' / 'from conan.tools.files import ...' / 'from conan.tools.layout import basic_layout'.\n\n=== Deception Detection (Highest Priority — No P0 Issues Found) ===\n- R34 (empty shell test): PASS. test_package/test.cpp calls real nlohmann-json APIs extensively: json object creation (j[\"name\"]=...), serialization (j.dump()), parsing (nlohmann::json::parse()), array operations ({1,2,3,4,5}), and type conversion (get<double>()). 9 assert() calls verify correctness. NOT an empty shell.\n- R9 (skip test / fake pass): PASS. test_package/conanfile.py test() method runs the actual test binary via self.run(os.path.join(self.cpp.build.bindirs[0], \"test_nlohmann_json\")). No 'def test(self): pass', no commented-out cmake.test(), no os.system('exit 0').\n- Fake sha256: PASS. sha256 'd69f9deb6a75e2580465c6c4c5111b89c4dc2fa94e3a85fcd2ffcd9a143d9273' verified against ConanCenter — exact match. Not all-zeros, not all-f's, 64 hex chars.\n- Fake status: PASS. manifest.yaml status 'built' (verified, not uploaded) is consistent with notes.md which confirms successful build and verify-build PASS.\n- R8 (#ifdef __OHOS__ stubs): PASS. No #ifdef __OHOS__ guards in any file. The patch modifies cmake_minimum_required (CMake 4.x compatibility), not a platform guard.\n- R19 (pre-compiled binaries): PASS. No .so/.a/.o or binary files in the PR changed_files list.\n- R40 (deep adaptation): PASS. nlohmann-json is a pure JSON parsing/serialization library, not in the deep adaptation categories (graphics/UI/multimedia/peripherals/system-level). No platform-specific adaptation needed.\n\n=== Recipe Correctness (No P1 Issues Found) ===\n- R37 (version strategy): PASS. Version '3.11.2' is upstream version (first adaptation, no suffix needed).\n- R39 (official source URL): PASS. URL is official GitHub (github.com/nlohmann/json), verified against ConanCenter.\n- R32 (OHOS platform compat): PASS. No Linux-only checks. settings includes 'os' for all platforms. Header-only library, no platform-specific code needed.\n- R33 (no bare shell env vars): PASS. No os.environ usage.\n- R26 (system same-name lib static link): N/A. nlohmann-json is not a system library name.\n- R38 (commands.json): N/A. Header-only library (package_type='header-library'), not a CLI tool.\n- Conan 2.x API: PASS. Uses 'from conan import ConanFile', 'conan.tools.files', 'conan.tools.cmake', 'conan.tools.layout'. No 'from conans'.\n- File structure (R17): PASS. All required files present: conanfile.py, conandata.yml, test_package/, patches/, manifest.yaml, notes.md.\n- PR atomicity (W2): PASS. All 9 files belong to a single recipe (nlohmann-json 3.11.2).\n\n=== Code Style Issues (2 P2 warnings, 4 P3 suggestions) ===\nP2 issues (warnings, non-blocking):\n- CS-12: conandata.yml patch_description has hyphen after sequence number ('0001-Bump' should be '0001 Bump').\n- CS-14: manifest.yaml version field not quoted (should be version: \"3.11.2\").\n\nP3 issues (suggestions):\n- CS-14: manifest.yaml uses field name 'software' instead of standard 'name'.\n- CS-5: notes.md has stale template placeholder section (### 对话 #N with unfilled text).\n- CS-5: notes.md source modification table says '待生成补丁' but patch already exists.\n- MANIFEST: test_package/MANIFEST.yml assertion_count=8 but test.cpp has 9 asserts.\n\nOverall: All previously identified issues (P1 R39, P2 CS-1, P2 CS-16) are confirmed fixed. No P0 (deception) or P1 (correctness) issues remain. The recipe is ready for PR submission with minor style cleanup recommended."
+}
