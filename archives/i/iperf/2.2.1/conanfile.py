@@ -6,6 +6,7 @@ It supports tuning various parameters related to timing, protocols, and
 buffering, and reports bandwidth, delay jitter, and datagram loss.
 """
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
@@ -24,6 +25,11 @@ class IperfConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def validate(self):
+        # R32: os check must include OHOS
+        if str(self.settings.os) not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
 
     def requirements(self):
         pass
