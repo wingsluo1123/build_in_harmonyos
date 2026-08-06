@@ -745,7 +745,8 @@ PYEOF
     if [ -f "$CONANDATA" ]; then
         echo "[step] Pre-download: extracting source URLs from conandata.yml..."
 
-        # 创建预下载缓存目录
+        # 创建预下载缓存目录 (BUILD_DIR defaults to REPO_ROOT for CI workers)
+        : "${BUILD_DIR:=$REPO_ROOT}"
         PREDL_DIR="${BUILD_DIR}/predl_cache"
         mkdir -p "$PREDL_DIR"
 
