@@ -35,4 +35,10 @@ class TestGstPluginsBad(ConanFile):
     def test(self):
         bin_path = os.path.join(self.cpp.build.bindirs[0], "test_gst_plugins_bad")
         if can_run(self):
+            # Set GST_PLUGIN_PATH so gstreamer can find plugins
+            for dep in self.dependencies.values():
+                plugin_path = os.path.join(dep.package_folder, "lib", "gstreamer-1.0")
+                if os.path.isdir(plugin_path):
+                    current = os.environ.get("GST_PLUGIN_PATH", "")
+                    os.environ["GST_PLUGIN_PATH"] = plugin_path + (":" + current if current else "")
             self.run(f'"{bin_path}"', env="conanrun")

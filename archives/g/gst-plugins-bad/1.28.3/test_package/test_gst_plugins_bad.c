@@ -15,7 +15,8 @@ int main(int argc, char *argv[]) {
         g_print("gst-plugins-bad plugin 'accurip' loaded successfully\n");
         gst_object_unref(plugin);
     } else {
-        g_print("Note: 'accurip' plugin not found (may need GST_PLUGIN_PATH)\n");
+        g_print("ERROR: 'accurip' plugin not found - gst-plugins-bad may not be properly installed\n");
+        return 1;
     }
 
     gst_deinit();
