@@ -8,6 +8,7 @@ Build: cargo build --release
 Output: target/release/geckodriver (ELF binary)
 """
 import os
+import shutil
 import glob
 
 from conan import ConanFile
@@ -43,6 +44,36 @@ class GeckodriverConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Ensure Rust toolchain is available on the build machine.
+        # On HarmonyOS, Rust is installed via Harmonybrew (not pre-installed).
+        if not shutil.which("cargo"):
+            self.output.info("cargo not found, installing Rust toolchain via Harmonybrew...")
+            brew_bin = os.path.join(os.path.expanduser("~"), ".harmonybrew", "bin", "brew")
+            if not os.path.exists(brew_bin):
+                self.run('zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"')
+            self.run(f'eval "$({brew_bin} shellenv)" && brew install rust')
+            # Ensure cargo is in PATH for subsequent commands
+            cargo_dir = os.path.join(os.path.expanduser("~"), ".harmonybrew", "bin")
+            current_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = f"{cargo_dir}:{current_path}"
+
+        # Ensure cc linker is available (cargo's build scripts look for 'cc')
+        if not shutil.which("cc"):
+            clang = shutil.which("clang")
+            if clang:
+                os.environ["CC"] = clang
+            clangxx = shutil.which("clang++")
+            if clangxx:
+                os.environ["CXX"] = clangxx
+
+        # Configure cargo sparse registry for faster downloads
+        cargo_home = os.path.join(os.path.expanduser("~"), ".cargo")
+        os.makedirs(cargo_home, exist_ok=True)
+        config_path = os.path.join(cargo_home, "config.toml")
+        if not os.path.exists(config_path):
+            with open(config_path, "w") as f:
+                f.write('[registries.crates-io]\nprotocol = "sparse"\n')
+
         # Cargo manages its own dependencies and toolchain.
         # The binary is a standalone ELF executable (no shared lib deps).
         self.run("cargo build --release")
