@@ -5,6 +5,8 @@ git-who is a Git blame viewer for file trees, written in Go.
 Build with `go build` to produce a single binary.
 """
 import os
+import platform
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration, ConanException  # aireview High: build() 多处用 ConanException 需导入
@@ -29,6 +31,27 @@ class GitWhoConan(ConanFile):
     # 避依赖 CI 环境 PATH 巧合性正确（同 klystrack/kakoune 配方项目惯例）
     generators = "VirtualBuildEnv"
 
+    # CI worker 无系统 go（E154: go 不预装），cmd-pkgs 无 go 工具链资产，
+    # go/1.21.13 制品仓无 conanfile 不能 requires → 从官方镜像下载 go SDK
+    # （同 git-town 16.4.1 方案：golang.google.cn 主源 + dl.google.com 兜底）
+    _go_version = "1.21.13"
+    _go_archives = {
+        "amd64": (
+            [
+                "https://golang.google.cn/dl/go1.21.13.linux-amd64.tar.gz",
+                "https://dl.google.com/go/go1.21.13.linux-amd64.tar.gz",
+            ],
+            "502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7",
+        ),
+        "arm64": (
+            [
+                "https://golang.google.cn/dl/go1.21.13.linux-arm64.tar.gz",
+                "https://dl.google.com/go/go1.21.13.linux-arm64.tar.gz",
+            ],
+            "2ca2d70dc9c84feef959eb31f2a5aac33eefd8c97fe48f1548886d737bffabd4",
+        ),
+    }
+
     def validate(self):
         # R32: 与 build() 硬编码的 GOOS=linux 保持一致，拒绝不支持的 OS
         if self.settings.os not in ("Linux", "OHOS"):
@@ -38,8 +61,8 @@ class GitWhoConan(ConanFile):
             raise ConanInvalidConfiguration(f"git-who {self.version} only supports arm64, got arch={self.settings.arch}")
 
     def requirements(self):
-        # go 工具链：go/1.21.13 制品仓无 conanfile（未创建配方），不能 requires
-        # CI worker 预装 go 或通过 cmd-pkgs 安装，build() 直接用系统 go
+        # go 工具链：go/1.21.13 制品仓无 conanfile（未创建配方），不能 requires；
+        # build() 检测系统 go，缺失时从官方镜像下载 go SDK（git-town 同方案）
         pass
 
     def layout(self):
@@ -56,29 +79,60 @@ class GitWhoConan(ConanFile):
         # git-who 无补丁，apply_conandata_patches 为空操作
         # 调用满足 G1 门禁"补丁应用调用"要求
         apply_conandata_patches(self)
-        # CI 真根因: cmd-pkgs release 从未上架 go 工具链本身（只有 goaccess/goenv 等
-        # Go 应用包），sh -s -- go 1.21.13 下载 go-1.21.13.tar.gz 必 404 →
-        # cmd-pkgs 装go路径是死路。CI worker 也无系统 go（E154: go 不预装）。
-        # go/1.21.13 制品仓无 conanfile 配方不能 requires → go 工具链 CI 真不支持。
-        # 如实检测 go 可用性，缺则显式 raise（status: failed 如实标，非配方缺陷）。
-        # P2: 构建失败一律显式 raise ConanException（aireview: 避欺骗性打包，空包风险）
-        try:
-            self.run("go version", cwd=self.source_folder, env="conanbuild")
-        except ConanException as e:
-            raise ConanException(f"go toolchain unavailable (system go not found; cmd-pkgs has no go toolchain asset, only Go apps like goaccess/goenv) — CI worker lacks go toolchain support: {e}")
+        go = self._go_executable()
         # Build using Go with OHOS arm64 cross-compile env vars (project convention)
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
         # validate() 已确保 settings.arch 是 armv8 或 arm64
         go_arch = "arm64"
         try:
             self.run(
+                f'"{go}" version',
+                cwd=self.source_folder, env="conanbuild",
+            )
+            self.run(
                 f"CGO_ENABLED=0 GOOS=linux GOARCH={go_arch} "
+                f"GOROOT={os.path.dirname(os.path.dirname(go))} "
+                f"GOPATH={os.path.join(self.build_folder, 'gopath')} "
                 "GOPROXY=https://goproxy.cn,direct "
-                'go build -ldflags="-s -w" -o git-who .',
+                f'"{go}" build -ldflags="-s -w" -o git-who .',
                 cwd=self.source_folder, env="conanbuild",
             )
         except ConanException as e:
             raise ConanException(f"go build failed: {e}")
+
+    def _go_executable(self):
+        """Locate a usable go; fall back to downloading the official Go SDK.
+
+        CI worker 无系统 go（E154），cmd-pkgs 无 go 工具链资产，
+        go/1.21.13 制品仓无 conanfile 配方 → 参考 git-town 16.4.1：
+        从 golang.google.cn / dl.google.com 下载 go SDK（sha256 校验）。
+        """
+        found = shutil.which("go")
+        if found:
+            return found
+        host_arch = self._go_host_arch()
+        if host_arch not in self._go_archives:
+            raise ConanInvalidConfiguration(f"Go SDK bootstrap not prepared for host arch: {host_arch}")
+        sdk_root = os.path.join(self.build_folder, "go-sdk", f"go{self._go_version}-{host_arch}")
+        goroot = os.path.join(sdk_root, "go")
+        gobin = os.path.join(goroot, "bin", "go")
+        if not os.path.isfile(gobin):
+            urls, sha256 = self._go_archives[host_arch]
+            self.output.info(f"system go not found; downloading Go {self._go_version} from {urls[0]}")
+            get(self, url=urls, sha256=sha256, destination=sdk_root, strip_root=False)
+        if not os.path.isfile(gobin):
+            raise ConanException(f"Go SDK download failed: {gobin} not found")
+        return gobin
+
+    @staticmethod
+    def _go_host_arch():
+        machine = platform.machine().lower()
+        return {
+            "aarch64": "arm64",
+            "arm64": "arm64",
+            "x86_64": "amd64",
+            "amd64": "amd64",
+        }.get(machine, machine)
 
     def package(self):
         copy(self, "git-who", src=self.source_folder,
