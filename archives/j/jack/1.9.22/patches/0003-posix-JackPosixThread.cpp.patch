@@ -26,7 +26,7 @@
          jack_error("Thread init fails: thread quits");
          return 0;
      }
-@@ -155,21 +157,25 @@
+@@ -155,21 +157,24 @@
  
      pthread_attr_destroy(&attributes);
      return 0;
@@ -39,9 +39,8 @@
          void* status;
 +#ifdef HAVE_PTHREAD_CANCEL
          pthread_cancel(fThread);
-+#else
-+        pthread_kill(fThread, SIGTERM);
 +#endif
++        fStatus = kIdle; // Request thread to stop before joining
          pthread_join(fThread, &status);
          fStatus = kIdle;
          fThread = (jack_native_thread_t)NULL;
@@ -52,7 +51,7 @@
  }
  
  int JackPosixThread::Stop()
-@@ -184,21 +190,25 @@
+@@ -184,21 +189,23 @@
      } else {
          return -1;
      }
@@ -65,8 +64,6 @@
          void* status;
 +#ifdef HAVE_PTHREAD_CANCEL
          pthread_cancel(thread);
-+#else
-+        pthread_kill(thread, SIGTERM);
 +#endif
          pthread_join(thread, &status);
          return 0;
