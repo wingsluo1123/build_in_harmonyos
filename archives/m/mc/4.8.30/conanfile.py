@@ -84,13 +84,16 @@ class McConan(ConanFile):
             with open(configure_ac, "w") as f:
                 f.write(content)
 
+        # Create m4 directory (GitHub archive doesn't include it)
+        os.makedirs(os.path.join(self.source_folder, "m4"), exist_ok=True)
+
         # Run autoreconf to generate configure script
         # (GitHub archive doesn't include pre-generated configure)
         # Skip autopoint (gettext) since it's not available on CI worker
         os.environ["AUTOPOINT"] = "true"
         aclocal_paths = [
-            "m4",
-            "m4.include",
+            os.path.join(self.source_folder, "m4"),
+            os.path.join(self.source_folder, "m4.include"),
         ]
         # Add system pkg-config m4 path if available
         pkg_m4 = "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal"
