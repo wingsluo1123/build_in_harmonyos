@@ -1,0 +1,102 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS1",
+      "file": "archives/l/lua-term/0.7/conanfile.py",
+      "line": 1,
+      "description": "Missing required shebang and docstring file header. Code style rule CS1 requires conanfile.py to start with '#!/usr/bin/env python3' followed by a docstring specifying the software name and build system, e.g. '\"\"\"Conan recipe — lua-term 0.7 (makefile)\"\"\"'.",
+      "fix_suggestion": "Add '#!/usr/bin/env python3\\n\\n\"\"\"Conan recipe — lua-term 0.7 (makefile)\"\"\"' before the 'import os' line."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS1",
+      "file": "archives/l/lua-term/0.7/test_package/conanfile.py",
+      "line": 1,
+      "description": "Missing required shebang and docstring file header. The test_package conanfile.py should also have a file header per code style rule CS1.",
+      "fix_suggestion": "Add '#!/usr/bin/env python3\\n\\n\"\"\"Test package — lua-term 0.7 (CMake)\"\"\"' before the 'import os' line."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/l/lua-term/0.7/conanfile.py",
+      "line": 14,
+      "description": "url = \"\" is a template placeholder. Code style rule CS5 prohibits empty/placeholder values in merged code. The 'url' attribute should point to the recipe repository URL or be removed entirely.",
+      "fix_suggestion": "Set url to the recipe repository URL (e.g. the cnb.cool repo URL) or remove the 'url' attribute if not needed."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/l/lua-term/0.7/conandata.yml",
+      "line": 3,
+      "description": "First URL entry manually adds gh-proxy.com mirror prefix ('https://gh-proxy.com/https://github.com/...'). Review rule R39 states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The mirror prefix should not be in conandata.yml.",
+      "fix_suggestion": "Remove the first URL entry (line 3) with the gh-proxy.com prefix. Keep only the official GitHub URL (line 4). CI will add mirror fallbacks automatically."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/l/lua-term/0.7/patches/0001-Makefile.patch",
+      "line": 12,
+      "description": "Patch hardcodes user-specific local path '/storage/Users/currentUser/usr/local' as default LUA_DIR. While this default is overridden by the conanfile.py build command (which sets LUA_INC directly and uses copy() for packaging), the hardcoded path in a committed patch is bad practice and won't exist on CI or other developers' machines.",
+      "fix_suggestion": "Replace '/storage/Users/currentUser/usr/local' with a generic path like '/usr/local' or '/usr'. The conanfile.py already overrides LUA_INC at build time, so the default value only needs to be reasonable."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 32,
+      "description": "source.sha256 is empty (\"\") in manifest.yaml, while conandata.yml has the correct hash 'd91d41b29552b2d0849323f94e274df7eee613fc8ec3d82ed1fae749246a5d25' (verified by downloading the tarball and computing sha256). The manifest should be consistent with conandata.yml.",
+      "fix_suggestion": "Set source.sha256 to 'd91d41b29552b2d0849323f94e274df7eee613fc8ec3d82ed1fae749246a5d25' to match conandata.yml."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 56,
+      "description": "build.dependencies is empty ([]) but conanfile.py declares self.requires('lua/5.4.7') in requirements(). The manifest is inaccurate and should list all build dependencies.",
+      "fix_suggestion": "Set dependencies to ['lua/5.4.7'] to match the conanfile.py requirements."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 50,
+      "description": "configure_options contains hardcoded local path 'PREFIX=/storage/Users/currentUser/usr/local' that won't work on CI. This is a user-specific path that only exists on the adapter's local machine.",
+      "fix_suggestion": "Remove the PREFIX option from configure_options, or replace with a generic path like '/usr/local'. The conanfile.py does not use this PREFIX value during build."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS12",
+      "file": "archives/l/lua-term/0.7/conandata.yml",
+      "line": 9,
+      "description": "patch_description does not follow the standard format '{序号} {描述用空格分隔}'. The current value 'Fix Makefile for OHOS: Lua 5.4, DESTDIR support, cp instead of ln -s' is a descriptive sentence. Code style rule CS12 recommends format like '0001 Makefile OHOS portability'.",
+      "fix_suggestion": "Consider changing patch_description to a concise standard format like '0001 Makefile OHOS Lua5.4 DESTDIR cp' to match the convention."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 90,
+      "description": "patch_generation.method is 'per-file-difflib', but review rule R3 states patches should be generated by 'refresh-patch --auto'. This may be an internal implementation name for the same process, but cannot be verified from the manifest alone.",
+      "fix_suggestion": "Verify that 'per-file-difflib' is the internal implementation of refresh-patch --auto. If not, regenerate the patch using the standard refresh-patch --auto method."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 102,
+      "description": "patch_classification guard is 'pending', indicating the patch guard classification was not completed. Since the patch modifies a Makefile (not C code with #ifdef guards), 'none' or 'n/a' might be more appropriate.",
+      "fix_suggestion": "Complete the guard classification or set guard to 'none' since the 0001-Makefile.patch does not use #ifdef __OHOS__ guards."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/l/lua-term/0.7/manifest.yaml",
+      "line": 91,
+      "description": "patch_generation contains local machine-specific paths (source_orig_dir and source_work_dir pointing to /storage/Users/currentUser/tmp/builds/...) that won't be meaningful on CI or for other developers. These are only relevant for the local patch generation process.",
+      "fix_suggestion": "Use relative paths or remove the source_orig_dir and source_work_dir fields from the manifest, as they are only relevant during local patch generation."
+    }
+  ],
+  "summary": "Audit of lua-term 0.7 Conan recipe PR (branch: feat/lua-term-0.7). VERDICT: PASS with warnings. No P0 (deceptive behavior) or P1 (recipe correctness) issues found.\\n\\nKey deception checks (all PASSED):\\n- R34 (empty stub test): VERIFIED PASS. test_package/test.c creates a Lua state via luaL_newstate(), loads the 'term' module via require('term'), and calls term.isatty(io.stdout) — this genuinely exercises the lua-term package's API, not a stub.\\n- R9 (skip/fake test): VERIFIED PASS. test() method runs the test executable via self.run(test_exe); no 'def test(self): pass' or forced exit 0.\\n- Fake sha256: VERIFIED PASS. Both sha256 hashes verified correct by downloading tarballs and computing hashes: lua-term 0.7 = d91d41b29552b2d0849323f94e274df7eee613fc8ec3d82ed1fae749246a5d25 (matches conandata.yml), lua-5.4.7 = 9fbf5e28ef86c69858f6d3d34eccc32e911c1a28b4120ff3e84aaa70cfbf1e30 (matches test_package conanfile.py).\\n- Fake status: No evidence of faking. manifest.yaml status=published, notes.md footer '最终状态: published' — consistent.\\n- R8 (#ifdef __OHOS__ stubs): No #ifdef __OHOS__ used anywhere. Patch modifies Makefile with substantive changes (LUA_VER 5.1→5.4, ln -s→cp for HMDFS compat, DESTDIR support).\\n- R19 (pre-compiled binaries): No .so/.a/.o files in changed_files list.\\n\\nRecipe quality checks (all PASSED):\\n- R32 (OHOS compat): No 'if os == Linux' checks that would miss OHOS. Build runs make directly, works on OHOS.\\n- R33 (no raw shell env vars): Compiler obtained from self.conf.get('tools.build:compiler_executables') in both conanfile.py files.\\n- R37 (version): 0.7 = upstream version, correct for first-time adaptation.\\n- R39 (official URL): GitHub official URL present (gh-proxy mirror prefix is a P2 style issue, not a fake source).\\n- R38 (commands.json): Not applicable — lua-term is a library (package_type='shared-library'), not a CLI tool.\\n- Conan 2.x API: All imports use 'from conan import ConanFile' and 'conan.tools.*' — no deprecated 'from conans'.\\n- package_info: cpp_info.libs, libdirs, resdirs, and requires all set correctly.\\n- Method order: export_sources → requirements → layout → source → build → package → package_info — correct.\\n\\n8 P2 issues (non-blocking warnings): missing shebang/docstring in both conanfile.py files, empty url placeholder, manual mirror prefix in conandata.yml, hardcoded local paths in patch and manifest, empty sha256 and dependencies in manifest.\\n4 P3 issues (hints): patch_description format, patch generation method, incomplete guard classification, local paths in manifest patch_generation."
+}
