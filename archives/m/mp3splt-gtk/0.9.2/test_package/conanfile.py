@@ -24,8 +24,10 @@ class Mp3SpltGtkTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Verify the mp3splt-gtk binary is installed
-        bin_dir = self.dependencies["mp3splt-gtk"].cpp_info.bindirs[0]
-        bin_path = os.path.join(bin_dir, "mp3splt-gtk")
-        assert os.path.exists(bin_path), f"mp3splt-gtk binary not found at {bin_path}"
-        self.output.info(f"mp3splt-gtk binary verified at: {bin_path}")
+        # Also verify the binary exists in the package
+        for bindir in self.dependencies["mp3splt-gtk"].cpp_info.bindirs:
+            bin_path = os.path.join(bindir, "mp3splt-gtk")
+            if os.path.exists(bin_path):
+                self.output.info(f"mp3splt-gtk binary found at: {bin_path}")
+                return
+        raise Exception("mp3splt-gtk binary not found in any bindir!")
