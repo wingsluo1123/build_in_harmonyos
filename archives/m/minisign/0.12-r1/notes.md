@@ -56,5 +56,5 @@ minisign 0.12
 - libsodium 运行时需要 LD_LIBRARY_PATH 包含 ~/usr/local/lib 或设置 RPATH
 ---
 
-**编译结束**: 2026-06-04 15:00
-**最终状态**: published
+**编译结束**: 2026-08-07 00:23
+**最终状态**: built

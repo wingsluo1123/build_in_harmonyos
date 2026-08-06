@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/m/minisign/0.12-r1/conandata.yml",
+      "line": 6,
+      "description": "URL field is a list that manually includes a gh-proxy mirror prefix (https://gh-proxy.com/https://github.com/...). R39 explicitly states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' Manually adding mirrors may cause double-proxying or conflict with CI's automatic mirror handling.",
+      "fix_suggestion": "Remove the gh-proxy URL entry and use only the official GitHub URL as a single string: url: \"https://github.com/jedisct1/minisign/archive/refs/tags/0.12.tar.gz\". CI will automatically add mirror fallbacks."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS12-patch_type",
+      "file": "archives/l/libsodium/1.0.22/conandata.yml",
+      "line": 11,
+      "description": "patch_type is \"platform\" but Code Style Rule 12 requires patch_type to be fixed as \"portability\". The rule states: 'patch_type 固定 \"portability\"'.",
+      "fix_suggestion": "Change patch_type from \"platform\" to \"portability\" to comply with the standard."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS12-patch_desc",
+      "file": "archives/l/libsodium/1.0.22/conandata.yml",
+      "line": 10,
+      "description": "patch_description does not follow the required format. Code Style Rule 12 specifies: 'patch_description 用空格分隔（非连字符）：\"0001 build aux config.guess\"'. The description should start with the 4-digit patch number. Current value: \"Remove umask 077 from config.status temp-dir creation (E114: HMDFS setgid + umask 077 produces unwritable drwx--S--- dir)\".",
+      "fix_suggestion": "Reformat to include the patch number prefix, e.g.: \"0001 configure umask fix for HMDFS setgid compatibility\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R3-Status",
+      "file": "archives/l/libsodium/manifest.yaml",
+      "line": 12,
+      "description": "libsodium version 1.0.22 has status \"published\" but the task context states 'libsodium is not yet published to the conan registry'. Per Rule 3, published = CI upload succeeded; built = verified but not uploaded. If libsodium has not been uploaded to the conan registry, the status should be \"built\" not \"published\". Note: The task context confirms including libsodium in this PR is BY DESIGN (unpublished dependency handled by CI local recipe export), but the manifest status should still be truthful.",
+      "fix_suggestion": "If libsodium 1.0.22 has not been uploaded to the conan registry, change status from \"published\" to \"built\". If it was published in a prior CI run, add a note in notes.md clarifying the publication history."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS13-patches",
+      "file": "archives/m/minisign/0.12-r1/conandata.yml",
+      "line": 10,
+      "description": "patches field uses empty dict {} instead of empty list []. While functionally equivalent for apply_conandata_patches() (no patches to apply), it deviates from the expected YAML list format shown in Code Style Rule 13.",
+      "fix_suggestion": "Change patches: {} to patches: [] or omit the patches key entirely if no patches are needed."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS6-shebang",
+      "file": "archives/m/minisign/0.12-r1/test_package/test.sh",
+      "line": 1,
+      "description": "Shebang uses #!/usr/bin/env bash instead of #!/usr/bin/zsh per Code Style Rule 6. This deviation is justified by the OHOS context: the test_package conanfile.py explicitly invokes bash (CONFIG_SHELL or /data/service/hnp/bin/bash) because OHOS /system/bin/sh (mksh) cannot execute ELF binaries. However, it technically deviates from the standard shebang.",
+      "fix_suggestion": "This deviation is acceptable given the platform constraint. If zsh is available in the OHOS test environment, consider using #!/usr/bin/zsh for consistency. Otherwise, document the justification."
+    }
+  ],
+  "summary": "Pre-PR re-audit for minisign 0.12-r1 (post-fixes). VERDICT: PASS. No P0 (deception) or P1 (recipe correctness) issues found. 4 P2 warnings and 2 P3 suggestions.\n\nP0 checks (all clear): No stub tests — libsodium test_libsodium.c calls sodium_init(), sodium_library_version_string(), sodium_library_version_major() (R34 compliant); minisign test.sh verifies binary existence, ELF format, and libsodium dynamic linkage with honest skip of binary execution on OHOS (platform limitation, not recipe defect). No fake sha256 — both values are 64 hex chars, non-zero, non-pattern. No bypassed CI gates. No pre-compiled binaries (R19). No empty #ifdef __OHOS__ stubs (R8). No template placeholders or TODOs.\n\nP1 checks (all clear): Conan 2.x API used throughout (from conan import ConanFile, conan.tools.cmake, conan.tools.gnu). OHOS platform compatibility properly handled — both recipes validate settings.os in ('Linux', 'OHOS') (R32). No bare shell env vars for compilers (R33) — both use Conan Toolchains. Version 0.12-r1 is task-specified (R37 exempt per context). commands.json declared for CLI tool with type='tool' (R38). Patch modifies configure via patches/ directory (R6 compliant). Source URLs point to official GitHub repos (R39, except the manually-added mirror in minisign conandata.yml).\n\nP2 issues: (1) minisign conandata.yml manually adds gh-proxy mirror URL — should only contain official URL per R39; (2) libsodium patch_type 'platform' should be 'portability' per CS12; (3) libsodium patch_description format doesn't start with '0001' prefix per CS12; (4) libsodium manifest status 'published' may be premature given the unpublished dependency context.\n\nP3 suggestions: (1) minisign conandata.yml patches: {} should be patches: []; (2) test.sh shebang bash vs zsh — justified by OHOS platform constraint.\n\nContext compliance: Including both libsodium/1.0.22 and minisign/0.12-r1 recipes in one PR is BY DESIGN per task context (unpublished dependency handled by CI local recipe export from archives/). The test.sh graceful skip of binary execution on OHOS is a platform limitation, not a recipe defect. Tests 1-3 (binary existence, ELF format, libsodium linkage) are substantive checks."
+}
