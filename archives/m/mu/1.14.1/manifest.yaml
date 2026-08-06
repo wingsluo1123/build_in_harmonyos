@@ -1,6 +1,6 @@
 version: "1.14.1"
-status: built
-build_date: "2026-05-27"
+status: published
+build_date: "2026-08-07"
 
 source:
   url: "https://github.com/djcb/mu/releases/download/v1.14.1/mu-1.14.1.tar.xz"
@@ -9,7 +9,15 @@ source:
 
 build_system: meson
 configure_options:
-  - "--prefix=/storage/Users/currentUser/usr/local"
+  - "--prefix=/"
+  - "-Dscm=disabled"
+  - "-Dguile=disabled"
+  - "-Dcld2=disabled"
+  - "-Dreadline=disabled"
+  - "-Dtests=disabled"
+  - "-Duse-embedded-fmt=true"
+  - "-Duse-embedded-cli11=true"
+  - "-Demacs="
 dependencies:
   - glib/2.84.0
   - gmime/3.2.7
@@ -17,5 +25,12 @@ dependencies:
 cc: clang
 cxx: clang++
 
-patches_applied: []
-knowledge_gained: []
+patches_applied:
+  - "0001-meson-lower-gmime-version-requirement.patch"
+  - "0002-replace-std-ranges-with-std-algorithms.patch"
+knowledge_gained:
+  - "OHOS: clang 15 needs C++20 (std=c++20) for mu source"
+  - "OHOS: clang 15 lacks std::ranges support, need to replace with std:: algorithms"
+  - "OHOS: need to copy .pc files from dependency package dirs to generators folder for meson"
+  - "OHOS: need AR/NM/RANLIB env vars for meson to find llvm tools"
+  - "mu 1.14.1 requires gmime >= 3.2.13 but only 3.2.7 available (patched to accept 3.2.7)"

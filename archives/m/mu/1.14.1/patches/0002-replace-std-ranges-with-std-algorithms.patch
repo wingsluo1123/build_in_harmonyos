@@ -1,0 +1,45 @@
+--- a/lib/mu-indexer.cc	2026-08-07 05:09:43.920817968 +0800
++++ b/lib/mu-indexer.cc	2026-08-07 05:18:17.504817968 +0800
+@@ -351,18 +351,18 @@
+ 	fs_terms.reserve(seen_maildir_paths_.size());
+ 	for (std::string_view fullpath : seen_maildir_paths_)
+ 		fs_terms.emplace_back(field_from_id(Field::Id::Path).xapian_term(fullpath));
+-	std::ranges::sort(fs_terms);
++	std::sort(fs_terms.begin(), fs_terms.end());
+ 
+ 	// Discard duplicates from fs_terms in case two paths collided to one term, e.g. over
+ 	// case.  That shouldn't happen, but be correct-ish if it does.
+-	auto [new_end, old_end] = std::ranges::unique(fs_terms);
+-	if (new_end != old_end) {
++	auto new_end = std::unique(fs_terms.begin(), fs_terms.end());
++	if (new_end != fs_terms.end()) {
+ 		mu_warning("collisions under term normalization: using regular cleanup");
+ 		cleanup_from_scratch();
+ 		return;
+ 	}
+ 
+-	fs_terms.erase(new_end, old_end);
++	fs_terms.erase(new_end, fs_terms.end());
+ 	seen_maildir_paths_.clear();
+ 
+ 	// Walk through all the path terms.  If the DB has a path term that we didn't see in our
+--- a/lib/mu-store.cc	2026-08-07 05:09:43.952818281 +0800
++++ b/lib/mu-store.cc	2026-08-07 05:09:44.136817656 +0800
+@@ -471,7 +471,7 @@
+ 		terms = terms.subspan(chunk.size());
+ 		qvec.clear();
+ 		qvec.reserve(chunk.size());
+-		std::ranges::copy(chunk, std::back_inserter(qvec));
++		std::copy(chunk.begin(), chunk.end(), std::back_inserter(qvec));
+ 		auto enq = xapian_db().enquire();
+ 		enq.set_weighting_scheme(Xapian::BoolWeight());  // No score
+ 		enq.set_docid_order(Xapian::Enquire::ASCENDING);
+@@ -491,7 +491,7 @@
+ 	// storage engines in general will get the best locality accessing terms
+ 	// in this order. We're allowed to delete in any order we want, so if we
+ 	// have to choose an order, this one seems reasonable.
+-	std::ranges::sort(ids_to_remove);
++	std::sort(ids_to_remove.begin(), ids_to_remove.end());
+ 	for (Id id : ids_to_remove) {
+ 		nr_removed += priv_->remove_message_by_id_unlocked(id);
+ 		if (nr_removed % 500 == 0)
