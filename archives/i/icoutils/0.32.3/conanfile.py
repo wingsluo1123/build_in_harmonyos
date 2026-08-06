@@ -9,6 +9,7 @@ from conan.tools.files import get, apply_conandata_patches, export_conandata_pat
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
+import os
 
 
 class IcoutilsConan(ConanFile):
@@ -44,6 +45,13 @@ class IcoutilsConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Create libpng.so symlink: conan installs libpng16.so but configure checks -lpng
+        libpng_folder = self.dependencies["libpng"].package_folder
+        libpng_libdir = os.path.join(libpng_folder, "lib")
+        libpng_so = os.path.join(libpng_libdir, "libpng.so")
+        libpng16_so = os.path.join(libpng_libdir, "libpng16.so")
+        if os.path.exists(libpng16_so) and not os.path.exists(libpng_so):
+            os.symlink("libpng16.so", libpng_so)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j2"])
