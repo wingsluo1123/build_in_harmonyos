@@ -4,7 +4,7 @@
 - 构建系统: cargo (Rust)
 - 编译日期: 2026-06-16
 - 编译器: clang/clang++ (底层), rustc 1.95.0
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -71,3 +71,7 @@ Cargo tests: 79 passed, 0 failed, 4 ignored (Android-specific, expected on OpenH
 ---
 **编译结束**: 2026-06-17 01:09
 **最终状态**: published
+---
+
+**编译结束**: 2026-08-06 13:19
+**最终状态**: built
