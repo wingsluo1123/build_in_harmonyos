@@ -3,6 +3,8 @@
 
 CI runs this automatically via `conan create` (which invokes test_package).
 """
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -23,5 +25,4 @@ class M17nLibTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        self.run(os.path.join(self.test_build_folder, "test_m17n-lib"), env="conanrun")
