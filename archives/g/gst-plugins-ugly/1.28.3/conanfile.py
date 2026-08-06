@@ -35,7 +35,6 @@ class GstPluginsUglyConan(ConanFile):
     def requirements(self):
         self.requires("gstreamer/1.28.3")
         self.requires("gst-plugins-base/1.28.3")
-        self.requires("glib/2.84.0")
 
     def layout(self):
         basic_layout(self)
@@ -50,28 +49,32 @@ class GstPluginsUglyConan(ConanFile):
         tc.project_options["doc"] = "disabled"
         tc.project_options["nls"] = "disabled"
         tc.project_options["orc"] = "disabled"
-        # Build pkg-config search path from conan deps + system paths
-        # System PKG_CONFIG_PATH (OHOS dev environment) has correct glib .pc files
+
         pkg_config_paths = [self.generators_folder]
-        # System pkgconfig dirs (OHOS dev environment) with fallback paths
+
+        # Fix conan dependency .pc files by copying with correct prefix
+        for dep_name in ["gstreamer", "gst-plugins-base", "glib", "pcre2", "libffi"]:
+            if dep_name in self.dependencies:
+                dep_pkg = self.dependencies[dep_name].package_folder
+                dep_pc_dir = os.path.join(dep_pkg, "lib", "pkgconfig")
+                if os.path.isdir(dep_pc_dir):
+                    for pc_file in os.listdir(dep_pc_dir):
+                        if pc_file.endswith(".pc"):
+                            src = os.path.join(dep_pc_dir, pc_file)
+                            dst = os.path.join(self.generators_folder, pc_file)
+                            if not os.path.exists(dst):
+                                with open(src) as f:
+                                    content = f.read()
+                                content = content.replace("prefix=/", f"prefix={dep_pkg}")
+                                with open(dst, "w") as f:
+                                    f.write(content)
+
         sys_pc = os.environ.get("PKG_CONFIG_PATH", "")
         system_paths = sys_pc.split(":") if sys_pc else []
-        # Fallback: common OHOS system pkgconfig locations
-        fallback_paths = [
-            os.path.expanduser("~/usr/local/lib/pkgconfig"),
-            "/data/service/hnp/pcre2.org/pcre2_10.47/lib/pkgconfig",
-            "/data/service/hnp/libffi.org/libffi_3.4.4/lib/pkgconfig",
-        ]
-        for fp in fallback_paths:
-            if fp not in system_paths and os.path.isdir(fp):
-                system_paths.append(fp)
         for sp in system_paths:
             if sp and os.path.isdir(sp):
                 pkg_config_paths.append(sp)
-        for dep in ["gstreamer", "gst-plugins-base", "glib", "pcre2", "libffi"]:
-            if dep in self.dependencies:
-                pkg = self.dependencies[dep].package_folder
-                pkg_config_paths.append(f"{pkg}/lib/pkgconfig")
+
         tc.pkg_config_path = ":".join(pkg_config_paths)
         tc.generate()
 

@@ -18,8 +18,8 @@ class GstPluginsUglyTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-        self.requires("gstreamer/1.28.3")
         self.requires("glib/2.84.0")
+        self.requires("gstreamer/1.28.3")
 
     def layout(self):
         cmake_layout(self)
