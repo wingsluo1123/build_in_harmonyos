@@ -41,8 +41,9 @@ class MinijinjaCliConan(ConanFile):
             )
 
     def source(self):
+        # .crate files are tar.gz archives; tell Conan the correct format
         get(self, **self.conan_data["sources"], strip_root=True,
-            filename="minijinja-2.20.0.tar.gz")
+            filename="minijinja-cli-2.20.0.tar.gz")
 
     def generate(self):
         # Create .cargo/config.toml with linker and target settings
@@ -111,8 +112,8 @@ class MinijinjaCliConan(ConanFile):
                         ),
                     )
 
-        # Build release binary
-        self.run("cargo build --release -p minijinja-cli", env="conanbuild")
+        # Build release binary (crates.io source is already just the CLI package)
+        self.run("cargo build --release", env="conanbuild")
 
     def _ensure_rust_toolchain(self):
         """Install Rust toolchain via Harmonybrew if cargo is not in PATH."""
