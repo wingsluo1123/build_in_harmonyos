@@ -143,21 +143,42 @@ class InteloneapiDpcppConan(ConanFile):
             "--cmake-opt=-DUR_ENABLE_SYMBOLIZER=OFF",
         ]
         # 本地依赖镜像注入（可选）：CI 可通过环境变量提供本地缓存，
-        # 避免构建期网络抖动；缺省时由上游 FetchContent 从 GitHub 拉取。
+        # 避免构建期网络抖动。受限 CI worker 无法直连 github.com（compute-runtime
+        # clone 已实证），但 gh-proxy.com 镜像可达（主源码即经其下载成功）；
+        # 未注入本地镜像时，为 FetchContent 依赖注入 gh-proxy 仓库 URL 回退，
+        # 与 conandata.yml sources.url 镜像策略保持一致。
         mirrors = [
-            ("FETCHCONTENT_SOURCE_DIR_VC-INTRINSICS", "OHOS_MIRROR_VC_INTRINSICS"),
-            ("FETCHCONTENT_SOURCE_DIR_EMHASH", "OHOS_MIRROR_EMHASH"),
-            ("FETCHCONTENT_SOURCE_DIR_UNIFIED-MEMORY-FRAMEWORK", "OHOS_MIRROR_UMF"),
-            ("FETCHCONTENT_SOURCE_DIR_LEVEL-ZERO-LOADER", "OHOS_MIRROR_L0"),
-            ("FETCHCONTENT_SOURCE_DIR_OCL-HEADERS", "OHOS_MIRROR_OCL_HEADERS"),
-            ("FETCHCONTENT_SOURCE_DIR_OCL-ICD", "OHOS_MIRROR_OCL_ICD"),
-            ("FETCHCONTENT_SOURCE_DIR_PARALLEL-HASHMAP", "OHOS_MIRROR_PARALLEL_HASHMAP"),
-            ("LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR", "OHOS_MIRROR_SPIRV_HEADERS"),
+            ("FETCHCONTENT_SOURCE_DIR_VC-INTRINSICS", "OHOS_MIRROR_VC_INTRINSICS",
+             "https://gh-proxy.com/https://github.com/intel/vc-intrinsics.git"),
+            ("FETCHCONTENT_SOURCE_DIR_EMHASH", "OHOS_MIRROR_EMHASH",
+             "https://gh-proxy.com/https://github.com/ktprime/emhash.git"),
+            ("FETCHCONTENT_SOURCE_DIR_UNIFIED-MEMORY-FRAMEWORK", "OHOS_MIRROR_UMF",
+             "https://gh-proxy.com/https://github.com/oneapi-src/unified-memory-framework.git"),
+            ("FETCHCONTENT_SOURCE_DIR_LEVEL-ZERO-LOADER", "OHOS_MIRROR_L0",
+             "https://gh-proxy.com/https://github.com/oneapi-src/level-zero.git"),
+            ("FETCHCONTENT_SOURCE_DIR_OCL-HEADERS", "OHOS_MIRROR_OCL_HEADERS",
+             "https://gh-proxy.com/https://github.com/KhronosGroup/OpenCL-Headers.git"),
+            ("FETCHCONTENT_SOURCE_DIR_OCL-ICD", "OHOS_MIRROR_OCL_ICD",
+             "https://gh-proxy.com/https://github.com/KhronosGroup/OpenCL-ICD-Loader.git"),
+            ("FETCHCONTENT_SOURCE_DIR_PARALLEL-HASHMAP", "OHOS_MIRROR_PARALLEL_HASHMAP",
+             "https://gh-proxy.com/https://github.com/greg7mdp/parallel-hashmap.git"),
+            ("LLVM_EXTERNAL_SPIRV_HEADERS_SOURCE_DIR", "OHOS_MIRROR_SPIRV_HEADERS",
+             "https://gh-proxy.com/https://github.com/KhronosGroup/SPIRV-Headers.git"),
         ]
-        for cmake_var, env_var in mirrors:
+        for cmake_var, env_var, gh_url in mirrors:
             val = os.environ.get(env_var, "")
             if val:
                 cfg.append(f"--cmake-opt=-D{cmake_var}={val}")
+            elif gh_url:
+                # 未注入本地镜像：覆盖 FetchContent 仓库 URL 为 gh-proxy 镜像。
+                # LLVM 外部项目变量（LLVM_EXTERNAL_*_SOURCE_DIR）与 FetchContent
+                # 仓库覆盖变量（FETCHCONTENT_REMOTE_REPOSITORY_*）都设置，双保险。
+                repo_var = cmake_var.replace("_SOURCE_DIR", "_REMOTE_REPOSITORY")
+                if cmake_var.startswith("LLVM_EXTERNAL_"):
+                    repo_var = cmake_var.replace(
+                        "LLVM_EXTERNAL_", "FETCHCONTENT_REMOTE_REPOSITORY_").replace(
+                        "_SOURCE_DIR", "")
+                cfg.append(f"--cmake-opt=-D{repo_var}={gh_url}")
         import shlex
         self.run(" ".join(shlex.quote(a) for a in cfg), cwd=bdir)
 
