@@ -11,6 +11,7 @@ import os
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class GitCliffConan(ConanFile):
@@ -38,10 +39,23 @@ class GitCliffConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        # Ensure Rust toolchain is discoverable.
+        # On OHOS, cargo/rustc may be installed via Harmonybrew or as system symlinks.
+        env = Environment()
+        for candidate in [
+            os.path.expanduser("~/.harmonybrew/bin"),
+            "/storage/Users/currentUser/.harmonybrew/bin",
+            "/storage/Users/currentUser/usr/local/bin",
+        ]:
+            if os.path.isdir(candidate):
+                env.append_path("PATH", candidate)
+        env.vars(self).save_script("cargo_env")
+
     def build(self):
         apply_conandata_patches(self)
         # Cargo manages its own toolchain, flags, and dependency resolution.
-        # R33: Do not rely on shell env vars (CC/CFLAGS) — cargo handles compilation internally.
+        # env="conanbuild" activates the PATH from generate() so cargo is found.
         self.run("cargo build --release", env="conanbuild")
 
     def package(self):
