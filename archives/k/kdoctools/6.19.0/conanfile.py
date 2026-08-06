@@ -71,9 +71,13 @@ class KDocToolsConan(ConanFile):
         tc.variables["KF_IGNORE_PLATFORM_CHECK"] = "true"
         # qtbase cmake_find_mode=none（自带 Qt6Config.cmake 在 lib/cmake/），
         # CMakeDeps 不生成 Qt6CoreConfig.cmake；显式设置 Qt6_DIR 与
-        # Qt6Core_DIR 指向 qtbase 的 lib/cmake：find_package(Qt6) 用 Qt6_DIR，
-        # find_package(Qt6Core)（kdoctools CMakeLists 独立组件查找）用 Qt6Core_DIR
+        # Qt6Core_DIR 指向 qtbase 的 config 目录：find_package(Qt6) 用 Qt6_DIR，
+        # find_package(Qt6Core)（kdoctools CMakeLists 独立组件查找）用 Qt6Core_DIR。
+        # 兼容两种布局：标准 Qt6 安装为 lib/cmake/Qt6/Qt6Config.cmake（多一层
+        # 子目录），扁平布局为 lib/cmake/Qt6Config.cmake；检测 Qt6 子目录优先
         qtbase_cmake = os.path.join(qtbase_pkg, "lib", "cmake")
+        if os.path.isdir(os.path.join(qtbase_cmake, "Qt6")):
+            qtbase_cmake = os.path.join(qtbase_cmake, "Qt6")
         tc.cache_variables["Qt6_DIR"] = qtbase_cmake
         tc.cache_variables["Qt6Core_DIR"] = qtbase_cmake
         # ECM 打包产物缺 ecm_uninstall.cmake.in，ECMUninstallTarget 的
