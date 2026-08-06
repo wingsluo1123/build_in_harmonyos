@@ -1,6 +1,6 @@
 --- a/src/cat.c
 +++ b/src/cat.c
-@@ -647,21 +647,34 @@
+@@ -647,21 +647,32 @@
          case_GETOPT_VERSION_CHAR (PROGRAM_NAME, AUTHORS);
  
          default:
@@ -13,7 +13,6 @@
    if (fstat (STDOUT_FILENO, &ostat_buf) < 0)
 -    error (EXIT_FAILURE, errno, _("standard output"));
 +    {
-+# ifdef __OHOS__
 +      /* HarmonyOS returns EACCES for pipes/terminals/sockets.
 +         Use sensible defaults and continue. */
 +      if (errno == EACCES || errno == EPERM)
@@ -23,7 +22,6 @@
 +          ostat_buf.st_mode = S_IFIFO;
 +        }
 +      else
-+# endif
 +        error (EXIT_FAILURE, errno, _("standard output"));
 +    }
  
@@ -36,7 +34,7 @@
    /* True if the output is a regular file.  */
    bool out_isreg = S_ISREG (ostat_buf.st_mode) != 0;
  
-@@ -698,23 +711,35 @@
+@@ -698,23 +709,33 @@
              {
                error (0, errno, "%s", quotef (infile));
                ok = false;
@@ -50,7 +48,6 @@
 -          error (0, errno, "%s", quotef (infile));
 -          ok = false;
 -          goto contin;
-+# ifdef __OHOS__
 +          /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +          if (errno == EACCES || errno == EPERM)
 +            {
@@ -59,7 +56,6 @@
 +              istat_buf.st_mode = S_IFIFO;
 +            }
 +          else
-+# endif
 +            {
 +              error (0, errno, "%s", quotef (infile));
 +              ok = false;

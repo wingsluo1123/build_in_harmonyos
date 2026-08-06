@@ -1,6 +1,6 @@
 --- a/src/od.c
 +++ b/src/od.c
-@@ -1205,20 +1205,52 @@
+@@ -1205,20 +1205,50 @@
                        if (feof (in_stream))
                          break;
                      }
@@ -11,7 +11,6 @@
              break;
          }
  
-+#ifdef __OHOS__
 +      /* HarmonyOS returns EACCES for fstat on pipes/terminals/sockets.
 +         Treat as non-seekable and fall through to read-based skip. */
 +      else if (errno == EACCES || errno == EPERM)
@@ -41,7 +40,6 @@
 +          if (n_skip == 0)
 +            break;
 +        }
-+#endif
 +
        else   /* cannot fstat() file */
          {

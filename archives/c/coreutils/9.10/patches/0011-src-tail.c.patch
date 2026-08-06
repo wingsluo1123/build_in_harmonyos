@@ -1,6 +1,6 @@
 --- a/src/tail.c
 +++ b/src/tail.c
-@@ -1021,20 +1021,33 @@
+@@ -1021,20 +1021,31 @@
                   be seen to be the same file (dev/ino).  Otherwise, tail prints
                   the entire contents of the file when it becomes readable.  */
                error (0, f->errnum, _("%s has become inaccessible"),
@@ -11,7 +11,6 @@
                /* say nothing... it's still not tailable */
              }
          }
-+# ifdef __OHOS__
 +      else if (errno == EACCES || errno == EPERM)
 +        {
 +          /* HarmonyOS returns EACCES for pipes/terminals/sockets.
@@ -23,7 +22,6 @@
 +          /* Fall through to the success path below. */
 +          goto ohos_tail_success_1;
 +        }
-+# endif
        else if (prev_errnum != f->errnum)
          error (0, f->errnum, "%s", quotef (f->prettyname));
      }
@@ -34,7 +32,7 @@
        if (f->tailable || ! (prev_errnum < 0 || prev_errnum == EISDIR))
          error (0, 0, _("%s has been replaced with an untailable file%s"),
                 quoteaf (f->prettyname),
-@@ -1042,20 +1055,23 @@
+@@ -1042,20 +1053,21 @@
      }
    else if ((f->remote = fremote (fd, f)) && ! disable_inotify)
      {
@@ -45,9 +43,7 @@
      }
    else
      {
-+# ifdef __OHOS__
 +    ohos_tail_success_1:
-+# endif
        ok = true;
        f->errnum = 0;
      }
@@ -58,7 +54,7 @@
    if (!ok)
      {
        close_fd (fd, f);
-@@ -1231,25 +1247,37 @@
+@@ -1231,25 +1243,35 @@
                  }
                else
                  f[i].blocking = blocking;
@@ -74,7 +70,6 @@
 -                  error (0, errno, "%s", quotef (prettyname));
 -                  close (fd); /* ignore failure */
 -                  continue;
-+# ifdef __OHOS__
 +                  /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +                  if (errno == EACCES || errno == EPERM)
 +                    {
@@ -83,7 +78,6 @@
 +                      stats.st_mode = S_IFIFO;
 +                    }
 +                  else
-+# endif
 +                    {
 +                      f[i].fd = -1;
 +                      f[i].errnum = errno;
@@ -101,7 +95,7 @@
                    if ((max_n_unchanged_stats_between_opens
                         <= f[i].n_unchanged_stats++)
                        && follow_mode == Follow_name)
-@@ -1432,24 +1460,36 @@
+@@ -1432,24 +1454,34 @@
     PREV_FSPEC records the last File_spec for which we output.  */
  static void
  check_fspec (struct File_spec *fspec, struct File_spec **prev_fspec)
@@ -116,7 +110,6 @@
 -      close_fd (fspec->fd, fspec);
 -      fspec->fd = -1;
 -      return;
-+# ifdef __OHOS__
 +      /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +      if (errno == EACCES || errno == EPERM)
 +        {
@@ -125,7 +118,6 @@
 +          stats.st_mode = S_IFIFO;
 +        }
 +      else
-+# endif
 +        {
 +          fspec->errnum = errno;
 +          close_fd (fspec->fd, fspec);
@@ -142,7 +134,7 @@
       Though in the inotify case it's more likely we'll get
       separate events for truncate() and write().  */
    if (S_ISREG (fspec->mode) && stats.st_size < fspec->read_pos)
-@@ -2030,24 +2070,37 @@
+@@ -2030,24 +2062,35 @@
    else
      {
        if (print_headers)
@@ -155,9 +147,6 @@
          {
 -          f->errnum = errno;
 -          error (0, f->errnum, _("cannot fstat %s"), quoteaf (f->prettyname));
--        }
--      else
-+# ifdef __OHOS__
 +          /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +          if (errno == EACCES || errno == EPERM)
 +            {
@@ -167,12 +156,12 @@
 +              ok = true;
 +            }
 +          else
-+# endif
 +            {
 +              f->errnum = errno;
 +              error (0, f->errnum, _("cannot fstat %s"), quoteaf (f->prettyname));
 +            }
-+        }
+         }
+-      else
 +      if (ok)
          {
            read_pos = tail (f->prettyname, fd, &stats, n_units);
@@ -184,7 +173,7 @@
            else if (forever)
              {
                ok = false;
-@@ -2415,23 +2468,38 @@
+@@ -2415,22 +2458,31 @@
        error (EXIT_FAILURE, 0, _("cannot follow %s by name"), quoteaf ("-"));
  
      /* When following forever, and not using simple blocking, warn if
@@ -195,7 +184,6 @@
        {
          struct stat in_stat;
          bool blocking_stdin;
-+# ifdef __OHOS__
 +        /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +        int stdin_fstat_ret = fstat (STDIN_FILENO, &in_stat);
 +        if (stdin_fstat_ret < 0 && (errno == EACCES || errno == EPERM))
@@ -205,14 +193,10 @@
 +            in_stat.st_mode = S_IFIFO;
 +            stdin_fstat_ret = 0;
 +          }
-+        blocking_stdin = (!nbpids && follow_mode == Follow_descriptor
-+                          && n_files == 1 && stdin_fstat_ret == 0
-+                          && ! S_ISREG (in_stat.st_mode));
-+# else
          blocking_stdin = (!nbpids && follow_mode == Follow_descriptor
-                           && n_files == 1 && ! fstat (STDIN_FILENO, &in_stat)
+-                          && n_files == 1 && ! fstat (STDIN_FILENO, &in_stat)
++                          && n_files == 1 && stdin_fstat_ret == 0
                            && ! S_ISREG (in_stat.st_mode));
-+# endif
  
          if (! blocking_stdin && isatty (STDIN_FILENO))
            error (0, 0, _("warning: following standard input"
@@ -222,8 +206,7 @@
  
    /* Don't read anything if we'll never output anything.  */
    if (! forever && n_units == (from_start ? COUNT_MAX : 0))
-     return EXIT_SUCCESS;
-@@ -2453,21 +2521,33 @@
+@@ -2453,21 +2505,31 @@
  
    for (int i = 0; i < n_files; i++)
      ok &= tail_file (&F[i], n_files, n_units);
@@ -236,7 +219,6 @@
        if (fstat (STDOUT_FILENO, &out_stat) < 0)
 -        error (EXIT_FAILURE, errno, _("standard output"));
 +        {
-+# ifdef __OHOS__
 +          /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +          if (errno == EACCES || errno == EPERM)
 +            {
@@ -245,7 +227,6 @@
 +              out_stat.st_mode = S_IFIFO;
 +            }
 +          else
-+# endif
 +            error (EXIT_FAILURE, errno, _("standard output"));
 +        }
        monitor_output = (S_ISFIFO (out_stat.st_mode)

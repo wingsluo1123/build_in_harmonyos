@@ -1,6 +1,6 @@
 --- a/src/split.c
 +++ b/src/split.c
-@@ -1676,21 +1676,33 @@
+@@ -1676,21 +1676,31 @@
  
    /* Binary I/O is safer when byte counts are used.  */
    xset_binary_mode (STDIN_FILENO, O_BINARY);
@@ -13,7 +13,6 @@
    if (fstat (STDIN_FILENO, &in_stat_buf) != 0)
 -    error (EXIT_FAILURE, errno, "%s", quotef (infile));
 +    {
-+# ifdef __OHOS__
 +      /* HarmonyOS returns EACCES for pipes/terminals/sockets. */
 +      if (errno == EACCES || errno == EPERM)
 +        {
@@ -22,7 +21,6 @@
 +          in_stat_buf.st_mode = S_IFIFO;
 +        }
 +      else
-+# endif
 +        error (EXIT_FAILURE, errno, "%s", quotef (infile));
 +    }
  

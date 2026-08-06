@@ -1,6 +1,6 @@
 --- a/src/sort.c
 +++ b/src/sort.c
-@@ -1631,21 +1631,33 @@
+@@ -1631,21 +1631,31 @@
    for (size_t i = 0; i < nfiles; i++)
      {
        struct stat st;
@@ -13,7 +13,6 @@
            != 0)
 -        sort_die (_("stat failed"), files[i]);
 +        {
-+# ifdef __OHOS__
 +          /* HarmonyOS returns EACCES for fstat on pipes/terminals. */
 +          if (errno == EACCES || errno == EPERM)
 +            {
@@ -22,7 +21,6 @@
 +              st.st_mode = S_IFIFO;
 +            }
 +          else
-+# endif
 +            sort_die (_("stat failed"), files[i]);
 +        }
  
