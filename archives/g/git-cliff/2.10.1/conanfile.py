@@ -7,11 +7,12 @@ License: MIT OR Apache-2.0
 Homepage: https://github.com/orhun/git-cliff
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
+from conan.errors import ConanException
 
 
 class GitCliffConan(ConanFile):
@@ -39,24 +40,31 @@ class GitCliffConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def generate(self):
-        # Ensure Rust toolchain is discoverable.
-        # On OHOS, cargo/rustc may be installed via Harmonybrew or as system symlinks.
-        env = Environment()
+    def _find_cargo(self):
+        """Find the cargo binary, checking PATH and common installation locations."""
+        cargo = shutil.which("cargo")
+        if cargo:
+            return cargo
         for candidate in [
-            os.path.expanduser("~/.harmonybrew/bin"),
-            "/storage/Users/currentUser/.harmonybrew/bin",
-            "/storage/Users/currentUser/usr/local/bin",
+            os.path.expanduser("~/.harmonybrew/bin/cargo"),
+            "/storage/Users/currentUser/.harmonybrew/bin/cargo",
+            "/storage/Users/currentUser/usr/local/bin/cargo",
         ]:
-            if os.path.isdir(candidate):
-                env.append_path("PATH", candidate)
-        env.vars(self).save_script("cargo_env")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate
+        raise ConanException(
+            "cargo not found. Install Rust toolchain: "
+            "zsh -c \"$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)\" && "
+            "eval \"$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)\" && "
+            "brew install rust"
+        )
 
     def build(self):
         apply_conandata_patches(self)
-        # Cargo manages its own toolchain, flags, and dependency resolution.
-        # env="conanbuild" activates the PATH from generate() so cargo is found.
-        self.run("cargo build --release", env="conanbuild")
+        cargo = self._find_cargo()
+        # Use full path to cargo to avoid PATH issues in CI environments.
+        # R33: No reliance on shell env vars for compiler flags.
+        self.run(f'"{cargo}" build --release')
 
     def package(self):
         # Copy the release binary to bin/
