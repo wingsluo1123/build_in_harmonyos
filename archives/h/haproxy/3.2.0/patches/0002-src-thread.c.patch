@@ -1,0 +1,15 @@
+--- a/src/thread.c
++++ b/src/thread.c
+@@ -291,7 +291,12 @@
+ #  else
+ 		struct hap_cpuset *set = &cpu_map[tgid - 1].thread[ti->ltid];
+ 
++#ifdef __OHOS__
++		/* OHOS/musl: sched_setaffinity(0,...) sets affinity for calling thread */
++		sched_setaffinity(0, sizeof(set->cpuset), &set->cpuset);
++#else
+ 		pthread_setaffinity_np(pthread_self(), sizeof(set->cpuset), &set->cpuset);
++#endif
+ #  endif
+ 	}
+ #endif /* USE_CPU_AFFINITY */
