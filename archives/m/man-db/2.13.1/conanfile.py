@@ -9,6 +9,7 @@ import shutil
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.layout import basic_layout
 
 
@@ -39,6 +40,8 @@ class MandbConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # VirtualBuildEnv sets CPPFLAGS/LDFLAGS from dependencies' cpp_info
+        VirtualBuildEnv(self).generate()
         tc = AutotoolsToolchain(self)
         # man-db-specific configure options
         tc.configure_args.append("--disable-setuid")
