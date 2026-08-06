@@ -6,25 +6,33 @@ build_date: "2026-05-30"
 
 source:
   url: "https://gstreamer.freedesktop.org/src/gst-plugins-ugly/gst-plugins-ugly-1.28.3.tar.xz"
-  sha256: ""
+  sha256: "0c04763200467b9b61a916b33646a6916a97cc9869d8b6dca57427b1f2734dee"
   tar_format: tar.xz
 
 build:
   system: meson
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
-    - "-Dbuildtype=debugoptimized"
+    - "-Dnls=disabled"
+    - "-Dorc=disabled"
+    - "-Dorc-compiler=disabled"
+    - "-Dtests=disabled"
+    - "-Ddoc=disabled"
+    - "-Dintrospection=disabled"
+    - "-Dexamples=disabled"
+    - "-Dgpl=disabled"
   dependencies:
     - gstreamer/1.28.3
     - gst-plugins-base/1.28.3
   cc: clang
   cxx: clang++
 
-patches_applied: []
+patches_applied:
+  - "0001-fix-python-script-execution.patch"
 
 knowledge_gained:
   - "gst-plugins-ugly uses meson (not autotools) - must use meson setup + ninja"
-  - "gst-plugins-base libraries on HMDFS can be broken symlinks - need to copy .so files manually from builddir"
-  - "iso-codes.pc needs 'domains' variable (not just 'iso_codes_domains') for meson compatibility"
-  - "HMDFS filesystem has temp file rename issues affecting meson setup and clang compilation"
-  - "Tests fail due to musl dynamic linker not finding shared libs - environment issue not code"
+  - "Same Python script execution issue as gstreamer (find_program -> files+python3)"
+  - "GPL plugins (x264, cdio, dvdread, mpeg2dec, sidplay, a52dec) disabled by default"
+  - "Built plugins: asf, dvdlpcmdec, dvdsub, realmedia"
+  - "gettext/ngettext stubbed via c_args macros (same as gstreamer recipe)"
+  - "glib2/gstreamer/gst-plugins-base sub-package .pc files needed in generate()"

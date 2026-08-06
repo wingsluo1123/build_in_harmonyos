@@ -1,0 +1,62 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style.rule5",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/conanfile.py",
+      "line": 36,
+      "description": "Forbidden template placeholder: `url = \"\"  # CI fills this`. Code style rule 5 explicitly lists this pattern as a forbidden placeholder that indicates incomplete work. The url field should be filled by the adapter with the actual recipe repository URL (e.g., the cnb.cool制品仓 URL).",
+      "fix_suggestion": "Replace `url = \"\"  # CI fills this` with the actual recipe URL, e.g., `url = \"https://cnb.cool/<org>/<repo>/-/tree/main/archives/g/gst-plugins-ugly\"` or the appropriate Conan recipe hosting URL."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style.rule16",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/conanfile.py",
+      "line": 103,
+      "description": "`import pathlib` is declared inside the generate() method body instead of at the top of the file with other imports. Code style rule 16 requires imports to be at the module top level, ordered as: standard library → third-party → project internal, with blank lines between groups.",
+      "fix_suggestion": "Move `import pathlib` to the top of the file, placing it after `import shutil` and before the blank line separating standard library from conan imports."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style.rule14",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml uses `software:` as the top-level field name, but code style rule 14 specifies the field should be `name:`. The rule example shows `name: zlib` not `software: zlib`.",
+      "fix_suggestion": "Rename the field from `software:` to `name:` to match the code style standard."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory.R34",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/test_package/test_gst_plugins_ugly.c",
+      "line": 16,
+      "description": "gst_plugin_register_static() returns gboolean (TRUE on success, FALSE on failure) but the test does not check the return value. If static plugin registration fails (e.g., missing symbol, version mismatch), the test still returns 0 (pass). While the test does call real GStreamer APIs (gst_init, gst_version_string, gst_plugin_register_static) and is NOT an empty shell test, adding return value verification would strengthen the test.",
+      "fix_suggestion": "Check the return value: `if (!gst_plugin_register_static(...)) { fprintf(stderr, \"Failed to register ASF plugin\\n\"); return 1; }`"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.rule1",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/conanfile.py",
+      "line": 2,
+      "description": "Docstring uses `--` (double ASCII hyphen) instead of `—` (em dash) as shown in the code style rule 1 example: `\"\"\"Conan recipe — zlib 1.3.1 (CMake)\"\"\"`. The test_package/conanfile.py correctly uses `—` (em dash), creating an inconsistency between the two files.",
+      "fix_suggestion": "Replace `--` with `—` (em dash, U+2014) in the docstring: `\"\"\"Conan recipe — gst-plugins-ugly 1.28.3 (Meson).`"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory.R40",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/conanfile.py",
+      "line": 1,
+      "description": "GStreamer is a multimedia framework (R40 category: FFmpeg/GStreamer/编解码). While the built plugins (asf, dvdlpcmdec, dvdsub, realmedia) are software-only demuxer/subtitle decoders without hardware acceleration dependencies, and the test calls real APIs (gst_init + gst_plugin_register_static), R40 requires noting that adaptation completeness should be confirmed by human review. The patch fixes Python script execution (build system fix, not platform adaptation). No #ifdef __OHOS__ stubs or empty platform guards were found.",
+      "fix_suggestion": "Informational note only. The recipe appears to build only non-hardware-dependent demuxer/subtitle plugins. No action required, but human reviewer should confirm that no hardware-accelerated codec plugins are needed for the intended use case."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory.rule4",
+      "file": "archives/g/gst-plugins-ugly/1.28.3/conandata.yml",
+      "line": 7,
+      "description": "sha256 `0c04763200467b9b61a916b33646a6916a97cc9869d8b6dca57427b1f2734dee` could not be independently verified against the official GStreamer source server. As of the latest directory listing (August 2025), version 1.28.3 is not yet published at https://gstreamer.freedesktop.org/src/gst-plugins-ugly/. The metadata timestamp (2026-08-06) and build_date (2026-05-30) indicate this is a future-dated recipe. The hash format is correct (64 hex characters, not all-zeros, not all-f, not a placeholder string), and the URL follows the official GStreamer source pattern.",
+      "fix_suggestion": "No action needed if the version is legitimately released in the future context. If this is a test/fictional scenario, verify the sha256 matches the actual downloaded tarball before CI build."
+    }
+  ],
+  "summary": "Audit of gst-plugins-ugly 1.28.3 Conan recipe PASSED with 3 P2 warnings and 4 P3 suggestions. No P0 (deception) or P1 (recipe correctness) issues found.\n\nP0 Deception checks (all PASS):\n- No empty shell test: test_gst_plugins_ugly.c calls real GStreamer APIs (gst_init, gst_version_string, gst_plugin_register_static with gst_plugin_asf_register callback). NOT just printf.\n- No forged status: manifest.yaml status is 'built' (legitimate, not falsely marked 'published').\n- No forged sha256: hash is 64 hex chars, not all-zeros/all-f/placeholder. Could not verify online (version not yet on server) but format is valid.\n- No empty #ifdef __OHOS__ stubs: no such guards found in any file.\n- No pre-compiled binaries in changed files.\n- test_package/conanfile.py test() method runs the actual binary (not pass/commented out).\n\nP1 Recipe correctness checks (all PASS):\n- No hardcoded platform-specific values (uses shutil.which() to resolve tools dynamically).\n- No `if self.settings.os == \"Linux\"` (no OS checks at all, uses meson toolchain properly).\n- No ${CC}/${CFLAGS} shell variables in build() or generate().\n- Conan 2.x API used correctly (from conan import ConanFile, conan.tools.meson).\n- Patch is properly formatted unified diff with real adaptation logic.\n- Version 1.28.3 follows GStreamer versioning scheme.\n- URL is official GStreamer freedesktop.org source.\n- Method order correct: export_sources → requirements → layout → source → generate → build → package → package_info.\n- package_info() sets cpp_info.libs correctly.\n\nP2 Warnings (should fix before merge but not blocking):\n1. url=\"\" # CI fills this — forbidden placeholder (rule 5)\n2. import pathlib inside generate() — should be at top (rule 16)\n3. manifest.yaml uses 'software:' instead of 'name:' (rule 14)\n\nP3 Suggestions (optional improvements):\n1. Test should check gst_plugin_register_static() return value.\n2. Docstring uses '--' instead of '—' (inconsistent with test_package).\n3. R40: GStreamer multimedia framework — human review recommended.\n4. sha256 could not be independently verified (future-dated version)."
+}
