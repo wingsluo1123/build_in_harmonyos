@@ -7,7 +7,6 @@ License: MIT OR Apache-2.0
 Homepage: https://github.com/orhun/git-cliff
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -20,7 +19,7 @@ class GitCliffConan(ConanFile):
     description = "A highly customizable changelog generator — see your git history in style"
     license = "MIT OR Apache-2.0"
     homepage = "https://github.com/orhun/git-cliff"
-    url = ""  # CI fills this
+    url = "https://github.com/orhun/git-cliff"
 
     package_type = "application"
 
