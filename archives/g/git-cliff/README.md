@@ -18,5 +18,5 @@ git-cliff is a Rust/Cargo project that builds natively on OpenHarmony without so
 ## Version 2.10.1
 
 - **Status**: built
-- **Build date**: 2026-06-17
+- **Build date**: 2026-08-06
 - **Build command**: `cargo build --release`
