@@ -29,3 +29,5 @@ class IsyncTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        # R34: Explicitly run the test binary to verify mbsync is functional
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_isync"), env="conanrun")
