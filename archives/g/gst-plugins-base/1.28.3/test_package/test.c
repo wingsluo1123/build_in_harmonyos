@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
         gst_object_unref(sink);
     } else {
         printf("appsink creation failed\n");
+        return 1;
     }
     printf("gstreamer version: %s\n", gst_version_string());
     return 0;
