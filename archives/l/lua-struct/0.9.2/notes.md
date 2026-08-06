@@ -4,7 +4,7 @@
 - 构建系统: Pure Lua library (no compilation)
 - 编译日期: 2026-08-07
 - 编译器: clang 15.0.4 (for test_package C program)
-- 状态: published
+- 状态: built
 
 ## Conan 适配
 
