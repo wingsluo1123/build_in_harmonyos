@@ -26,5 +26,6 @@ class LibimobiledeviceGlueTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test binary directly (CI L0e requires self.run())
+        bin_path = os.path.join(self.cpp.build.bindirs[0], "test_libimobiledevice_glue")
+        self.run(bin_path, env="conanrun")
