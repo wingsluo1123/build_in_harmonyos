@@ -6,7 +6,6 @@ cargo build process for HarmonyOS PC (aarch64).
 """
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.tools.files import get, copy
@@ -44,26 +43,22 @@ class GpingConan(ConanFile):
         if shutil.which("cargo") and shutil.which("rustc"):
             return
 
+        brew_bin = os.path.expanduser("~/.harmonybrew/bin")
+
         # Install harmonybrew if not present
-        if not shutil.which("brew"):
+        if not os.path.isfile(os.path.join(brew_bin, "brew")):
             self.output.info("Installing harmonybrew for Rust toolchain...")
-            # Use CONFIG_SHELL or SHELL from conan profile buildenv
-            shell = os.environ.get("CONFIG_SHELL") or os.environ.get("SHELL") or "/data/service/hnp/bin/bash"
-            subprocess.run(
-                [shell, '-c',
-                 '$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)'],
-                check=True
-            )
+            # Use self.run() which inherits conan build environment (PATH from profile)
+            self.run('curl -fsSL https://harmonybrew.atomgit.com/install.sh | bash')
 
         # Add harmonybrew to PATH
-        brew_bin = os.path.expanduser("~/.harmonybrew/bin")
         os.environ["PATH"] = brew_bin + ":" + os.environ.get("PATH", "")
 
-        # Install Rust via harmonybrew
+        # Install Rust via harmonybrew (use full path to brew)
+        brew_cmd = os.path.join(brew_bin, "brew")
         if not shutil.which("rustc"):
             self.output.info("Installing Rust via harmonybrew...")
-            brew_cmd = os.path.join(brew_bin, "brew")
-            subprocess.run([brew_cmd, 'install', 'rust'], check=True)
+            self.run(f'{brew_cmd} install rust')
 
     def _setup_cargo_config(self):
         """Configure cargo to use China mirror for crates.io."""
