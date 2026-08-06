@@ -90,18 +90,39 @@ class InteloneapiDpcppConan(ConanFile):
                 self.run(f"cp -r {shlex.quote(seeded)} {shlex.quote(ceh)}", env="conanbuild")
             else:
                 git_cmd = "git"
-                cr_url = os.environ.get("OHOS_MIRROR_COMPUTE_RUNTIME",
-                                        "https://github.com/intel/compute-runtime.git")
-                for attempt in range(5):
-                    rc = self.run(
-                        f"{git_cmd} clone --depth 1 --branch 26.18.38308.1 --no-checkout "
-                        f"--filter=blob:none --sparse "
-                        f"{cr_url} {ceh}",
-                        env="conanbuild", ignore_errors=True)
-                    if rc == 0:
+                # CI worker 网络受限（github.com:443 不可达，gh-proxy 类镜像可达，
+                # 与 conandata.yml sources.url 镜像列表一致）：按序尝试镜像源。
+                cr_candidates = []
+                injected = os.environ.get("OHOS_MIRROR_COMPUTE_RUNTIME", "").strip()
+                if injected:
+                    cr_candidates.append(injected)
+                cr_candidates += [
+                    "https://gh-proxy.com/https://github.com/intel/compute-runtime.git",
+                    "https://mirror.ghproxy.com/https://github.com/intel/compute-runtime.git",
+                    "https://ghproxy.com/https://github.com/intel/compute-runtime.git",
+                    "https://gitclone.com/github.com/intel/compute-runtime.git",
+                    "https://github.com/intel/compute-runtime.git",
+                ]
+                cloned = False
+                for cr_url in cr_candidates:
+                    for attempt in range(2):
+                        rc = self.run(
+                            f"{git_cmd} clone --depth 1 --branch 26.18.38308.1 --no-checkout "
+                            f"--filter=blob:none --sparse "
+                            f"{cr_url} {ceh}",
+                            env="conanbuild", ignore_errors=True)
+                        if rc == 0:
+                            cloned = True
+                            break
+                        self.run(f"rm -rf {ceh}", env="conanbuild", ignore_errors=True)
+                        self.output.warning(
+                            f"compute-runtime sparse clone failed ({cr_url}, attempt {attempt + 1})")
+                    if cloned:
                         break
-                    self.run(f"rm -rf {ceh}", env="conanbuild", ignore_errors=True)
-                    self.output.warning(f"compute-runtime sparse clone attempt {attempt + 1} failed")
+                if not cloned:
+                    self.output.error(
+                        "compute-runtime sparse clone failed on all candidate URLs; "
+                        "UR exp-headers 将缺失，构建后续步骤会报错")
                 self.run(f"{git_cmd} -C {ceh} sparse-checkout set level_zero/include", env="conanbuild")
                 self.run(f"{git_cmd} -C {ceh} checkout", env="conanbuild")
 
