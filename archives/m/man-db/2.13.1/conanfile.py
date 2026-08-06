@@ -67,6 +67,14 @@ class MandbConan(ConanFile):
             # Ensure the wrapper is in PATH
             current_path = os.environ.get("PATH", "")
             os.environ["PATH"] = os.path.dirname(nroff_path) + ":" + current_path
+        # Explicitly set CPPFLAGS/LDFLAGS from Conan dependencies
+        # The AutotoolsToolchain may not include dependency include dirs in CPPFLAGS
+        gdbm_pkg = self.dependencies["gdbm"].package_folder
+        libpipeline_pkg = self.dependencies["libpipeline"].package_folder
+        cppflags = os.environ.get("CPPFLAGS", "")
+        ldflags = os.environ.get("LDFLAGS", "")
+        os.environ["CPPFLAGS"] = f"-I{gdbm_pkg}/include " + cppflags
+        os.environ["LDFLAGS"] = f"-L{gdbm_pkg}/lib -L{libpipeline_pkg}/lib " + ldflags
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
