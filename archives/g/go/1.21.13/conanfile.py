@@ -20,8 +20,8 @@ OBJCOPY = f"{HNP_BIN}/llvm-objcopy"
 STRIP = f"{HNP_BIN}/strip"
 BASH = f"{HNP_BIN}/bash"
 
-# Go 1.24.3 bootstrap binary (linux-arm64) — pre-built from go.dev
-GO_BOOTSTRAP_URL = "https://go.dev/dl/go1.24.3.linux-arm64.tar.gz"
+# Go 1.24.3 bootstrap binary (linux-arm64) — pre-built from go.dev mirror
+GO_BOOTSTRAP_URL = "https://golang.google.cn/dl/go1.24.3.linux-arm64.tar.gz"
 GO_BOOTSTRAP_SHA256 = "a463cb59382bd7ae7d8f4c68846e73c4d589f223c589ac76871b66811ded7836"
 
 
