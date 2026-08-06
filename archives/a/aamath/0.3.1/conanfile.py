@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — aamath 0.3 (Makefile).
+"""Conan recipe — aamath 0.3.1 (Makefile).
 
 aamath renders mathematical expressions as ASCII art text.
 Build system: plain Makefile (no configure script).
@@ -15,7 +15,7 @@ from conan.tools.layout import basic_layout
 
 class AamathConan(ConanFile):
     name = "aamath"
-    version = "0.3"
+    version = "0.3.1"
     description = "Render mathematical expressions as ASCII art text"
     license = "GPL-2.0-or-later"
     homepage = "https://cdn.netbsd.org/pub/pkgsrc/distfiles/"
@@ -47,7 +47,7 @@ class AamathConan(ConanFile):
             return
         # cmd-pkgs installs runtime .so only; extract dev headers from source
         rl_src = self.conan_data.get("readline_source", {})
-        rl_url = rl_src.get("url", "https://mirrors.tuna.tsinghua.edu.cn/gnu/readline/readline-8.2.tar.gz")
+        rl_url = rl_src.get("url", "https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz")
         rl_sha256 = rl_src.get("sha256", "")
         tmpdir = os.path.join(self.build_folder, "_rl_headers")
         self.run(

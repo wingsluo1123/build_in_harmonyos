@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: makefile (无 configure 脚本)
-- 编译日期: 2026-06-16
+- 编译日期: 2026-08-05
 - 编译器: clang/clang++
 - 状态: built
 
@@ -66,7 +66,7 @@ ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1), stripp
 
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| aamath-0.3-ohos-aarch64.tar.gz | 649KB | 预编译包 |
+| aamath-0.3.1-ohos-aarch64.tar.gz | 649KB | 预编译包 |
 
 ## 注意事项
 
@@ -81,3 +81,4 @@ ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1), stripp
 
 **编译结束**: 2026-07-14 22:18
 **最终状态**: built
+t

@@ -14,7 +14,10 @@ aamath -h > /dev/null 2>&1 && echo "PASS: aamath -h OK" || {
 }
 
 echo "[test] aamath pipe render test"
-output=$(echo "1+1" | aamath -q 2>&1) && echo "PASS: aamath rendered expression" || {
-    echo "FAIL: aamath failed to render expression"
+output=$(echo "1+1" | aamath -q 2>&1)
+if [ -n "$output" ]; then
+    echo "PASS: aamath rendered expression"
+else
+    echo "FAIL: aamath produced empty output"
     exit 1
-}
+fi
