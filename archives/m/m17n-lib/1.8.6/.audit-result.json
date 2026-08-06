@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "code_style/13",
+      "file": "archives/m/m17n-lib/1.8.6/conandata.yml",
+      "line": 4,
+      "description": "url field uses a YAML list (array) with two entries instead of a single string. The code_style rule example (section 13) shows url as a scalar string. While Conan 2.x supports list URLs for mirror fallback and both URLs are HTTPS/quoted, this differs from the documented style guide pattern.",
+      "fix_suggestion": "If mirror fallback is needed for non-GitHub sources, consider keeping the list but add a comment explaining the rationale. Alternatively, use a single official URL and rely on Conan/CI mirror mechanisms."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "manifest-consistency",
+      "file": "archives/m/m17n-lib/1.8.6/manifest.yaml",
+      "line": 14,
+      "description": "build_date is '2026-06-02' in manifest.yaml but notes.md records '编译日期: 2026-06-03'. A one-day discrepancy between metadata and build notes.",
+      "fix_suggestion": "Align build_date in manifest.yaml with the actual build completion date recorded in notes.md (2026-06-03)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "manifest-consistency",
+      "file": "archives/m/m17n-lib/1.8.6/manifest.yaml",
+      "line": 44,
+      "description": "configure_options lists '--prefix=$DEFAULT_PREFIX' but conanfile.py generate() only appends '--with-included-gettext'. The --prefix is handled internally by Conan's AutotoolsToolchain (not an explicit configure arg in the recipe). Documenting it as a configure_option creates a minor mismatch between manifest metadata and actual recipe behavior.",
+      "fix_suggestion": "Either add a comment in manifest.yaml noting that prefix is managed by Conan toolchain, or remove --prefix from configure_options since it is not explicitly set in the recipe."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "patch-format-consistency",
+      "file": "archives/m/m17n-lib/1.8.6/patches/",
+      "line": 1,
+      "description": "Patch format inconsistency: patches 0001-0006 use 'diff -ruN a/file b/file' header format (GNU diff with -ruN flags), while patches 0007-0008 use standard unified diff format ('--- a/file' / '+++ b/file' without the diff header line). Both formats are valid and applyable, but they are inconsistent within the same package.",
+      "fix_suggestion": "Use a consistent patch format across all 8 patch files. If using refresh-patch --auto (R3), verify that all patches are regenerated with the same tool to ensure format uniformity."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "build-robustness",
+      "file": "archives/m/m17n-lib/1.8.6/conanfile.py",
+      "line": 60,
+      "description": "_generate_plural_h() runs 'bison -d' which generates both plural.c and plural.h. If triggered (plural.h missing AND bison available), bison would regenerate plural.c, potentially overwriting patch 0005's changes to plural.c (yyparse signature and yylex call). The method only fixes the header (plural.h) afterward, not the .c file. This is an edge case: release tarballs typically include pre-generated plural.h, so bison would not be invoked. The code also has try/except fallbacks.",
+      "fix_suggestion": "Consider adding a guard to skip bison execution if plural.c has already been patched (e.g., check if 'void *arg' is already present in plural.c), or use 'bison --defines=plural.h -o /dev/null' to only generate the header without overwriting plural.c."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "documentation-consistency",
+      "file": "archives/m/m17n-lib/1.8.6/notes.md",
+      "line": 1,
+      "description": "Notes.md '依赖版本' section records 'libxml2: 2.x' (generic) while conanfile.py and manifest.yaml both specify the exact version 'libxml2/2.15.3.1'. Minor version documentation mismatch.",
+      "fix_suggestion": "Update notes.md to specify the exact dependency version 'libxml2/2.15.3.1' to match conanfile.py and manifest.yaml."
+    }
+  ],
+  "summary": "Audit PASSED for m17n-lib 1.8.6 (branch feat/m17n-lib-1.8.6). No P0 (deception) or P1 (correctness) blocking issues found.\n\nDeception checks (all clear):\n- R34 Empty shell test: PASS — test_package/test.c calls real m17n-lib API (m17n_init, msymbol, msymbol_name, m17n_fini) with proper return-value assertions. Not a printf-only stub.\n- R9 Skip/forged test: PASS — test_package/conanfile.py defines test() that calls cmake.test(). No 'pass' stub or exit-0 bypass.\n- Forged status: PASS — manifest.yaml status='built' is consistent with notes.md (build succeeded, runtime verified).\n- Forged sha256: PASS — '7129fe3b7ad500f88b8af8605ef07b96c87a75ec986a695fffc0a409f44a7c86' is valid 64-char hex, not all-zero/all-f placeholder. Matches between conandata.yml and manifest.yaml.\n- R8 #ifdef __OHOS__ stubs: PASS — patches contain substantive platform adaptation (libintl.a static linking, config.guess/sub OHOS detection, pthread_self detection fix, bison yyparse signature fix). No empty stubs.\n- R19 Manual packaging: PASS — no .so/.a/.o binary artifacts in PR.\n- R40 Deep adaptation: PASS — m17n-lib is a text processing library; adaptations are for libintl compatibility (system-level), with substantive patches.\n\nCorrectness checks (all clear):\n- conanfile.py: url field filled (gitcode.com repo), proper requirements() (libxml2/2.15.3.1), package_info() sets cpp_info.libs, validate() uses R32 pattern (not in ('Linux','OHOS')), no hardcoded paths (R33), Conan 2.x API.\n- conandata.yml: sha256 valid, URL is official Savannah GNU source (R39), all 8 patch_file paths verified to exist on disk.\n- test_package/test.c: calls actual m17n-lib API (R34).\n- manifest.yaml: sha256 matches conandata.yml, dependencies match conanfile.py, patches_applied (8) matches conandata.yml patches (8), patches_count=8 matches actual files on disk.\n- patches/: all 8 files exist with valid unified diff content.\n- W2 (PR atomicity): PASS — all 10 changed files are under archives/m/m17n-lib/1.8.6/, no framework files (SKILL.md, scripts/, ci/, templates/, references/, index.tsv) modified.\n- No forbidden files (.so, .a, .o, .log, .DS_Store, state files) in PR.\n\n6 P3 hints (non-blocking) noted for: conandata.yml url-as-list style, build_date discrepancy, --prefix documentation, patch format inconsistency, bison regeneration edge case, and notes.md version specificity."
+}
