@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
-int main(int argc, char *argv[]) {
+int main(void) {
     // Try to find the mp3splt-gtk binary
     const char *binary = getenv("MP3SPLT_GTK_BINARY");
     if (!binary) {
