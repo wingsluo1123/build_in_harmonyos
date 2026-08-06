@@ -5,7 +5,6 @@ Midnight Commander is a visual file manager for Unix-like systems.
 Built with S-Lang terminal library and GLib on HarmonyOS.
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -33,8 +32,9 @@ class McConan(ConanFile):
         self.requires("slang/2.3.3")
 
     def build_requirements(self):
-        # Build tools are installed system-wide via Harmonybrew
-        pass
+        # automake and libtool available as Conan packages
+        self.tool_requires("automake/1.18")
+        self.tool_requires("libtool/2.5.4")
 
     def layout(self):
         basic_layout(self)
@@ -74,6 +74,10 @@ class McConan(ConanFile):
             "m4_pattern_allow([dnl])\n"
             "m4_pattern_allow([AC_MSG_WARN])\n"
             "m4_pattern_allow([AC_MSG_ERROR])\n"
+            "m4_pattern_allow([AM_GNU_GETTEXT])\n"
+            "m4_pattern_allow([AM_GNU_GETTEXT_VERSION])\n"
+            "m4_ifdef([AM_GNU_GETTEXT], [], [AC_DEFUN([AM_GNU_GETTEXT], [])])\n"
+            "m4_ifdef([AM_GNU_GETTEXT_VERSION], [], [AC_DEFUN([AM_GNU_GETTEXT_VERSION], [])])\n"
         )
         if "m4_pattern_allow([dnl])" not in content:
             content = allow + content
@@ -82,13 +86,16 @@ class McConan(ConanFile):
 
         # Run autoreconf to generate configure script
         # (GitHub archive doesn't include pre-generated configure)
-        # Include pkg.m4 and libtool m4 paths for aclocal
+        # Skip autopoint (gettext) since it's not available on CI worker
+        os.environ["AUTOPOINT"] = "true"
         aclocal_paths = [
             "m4",
             "m4.include",
-            os.path.expanduser("~/.harmonybrew/share/aclocal"),
-            "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
         ]
+        # Add system pkg-config m4 path if available
+        pkg_m4 = "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal"
+        if os.path.isdir(pkg_m4):
+            aclocal_paths.append(pkg_m4)
         aclocal_args = " ".join(f"-I {p}" for p in aclocal_paths if os.path.isdir(p))
         self.run(f"autoreconf --install --force {aclocal_args}",
                  env="conanbuild", cwd=self.source_folder)
