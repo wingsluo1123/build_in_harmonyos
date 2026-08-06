@@ -1,0 +1,47 @@
+--- src/qsort_r_shim.h	1970-01-01 08:00:00.000000000 +0800
++++ src/qsort_r_shim.h	2026-08-07 00:13:23.261151250 +0800
+@@ -0,0 +1,44 @@
++/* musl libc compatibility shims for efivar.
++ *
++ * musl libc does not provide:
++ * - qsort_r (GNU extension: qsort with context argument)
++ * - secure_getenv (GNU extension: getenv that returns NULL when setuid)
++ *
++ * On OHOS (musl libc), neither is available. These shims provide compatibility.
++ */
++#ifndef MUSL_SHIM_H
++#define MUSL_SHIM_H
++
++#include <stdlib.h>
++
++/* --- qsort_r shim (non-thread-safe, uses globals) --- */
++typedef int (*qsort_r_compar_fn)(const void *, const void *, void *);
++
++static qsort_r_compar_fn _qsort_r_cmp;
++static void *_qsort_r_arg;
++
++static inline int _qsort_r_wrapper(const void *a, const void *b) {
++    return _qsort_r_cmp(a, b, _qsort_r_arg);
++}
++
++static inline void qsort_r(void *base, size_t nmemb, size_t size,
++                           qsort_r_compar_fn compar, void *arg) {
++    _qsort_r_cmp = compar;
++    _qsort_r_arg = arg;
++    qsort(base, nmemb, size, _qsort_r_wrapper);
++}
++
++/* --- secure_getenv shim --- */
++/* On OHOS there is no setuid/setgid, so getenv is safe. */
++static inline char *secure_getenv(const char *name) {
++    return getenv(name);
++}
++
++/* --- program_invocation_short_name shim --- */
++/* glibc provides program_invocation_short_name in <errno.h>; musl does not.
++ * __progname is the musl equivalent (basename of argv[0]).
++ */
++extern char *__progname;
++#define program_invocation_short_name (__progname)
++
++#endif /* MUSL_SHIM_H */
