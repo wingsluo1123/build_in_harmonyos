@@ -56,7 +56,23 @@ ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1), not st
 
 - OpenHarmony 使用 musl libc，缺少部分 POSIX 函数
 - 密码输入功能已适配，但建议使用 PassCmd 配置选项
+
+## Conan 适配 (2026-08-06)
+
+### 新增修复
+| # | 问题 | 根因 | 解决方案 |
+|---|------|------|----------|
+| 3 | config.status 无法创建临时文件 | E129: HMDFS setgid 导致 umask 077 创建 drwx--S--- 目录 | conanfile.py build() 中 sed 替换 umask 077→022 |
+
+### Conan 配方要点
+- package_type: application (非 library，产物为可执行文件 mbsync/mbsync-get-cert)
+- 依赖: openssl/1.1.1w, zlib/1.3.1 (Conan 制品仓版本)
+- generate(): 使用 self.dependencies 获取依赖路径，传递 --with-ssl/--with-zlib
+- build(): apply_conandata_patches + umask fix (E129) + autotools configure + make -j1
+- package_info(): bindirs=["bin"], 无 libs (应用程序无库文件)
+- test_package: 运行 mbsync --version 验证二进制可用 (R34)
+- commands.json: 已创建 (R38)
 ---
 
-**编译结束**: 2026-05-26 20:09
+**编译结束**: 2026-08-06 20:40
 **最终状态**: built
