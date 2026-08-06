@@ -25,8 +25,7 @@ class LibsodiumConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
-    # R26: system-name library defaults to static
-    default_options = {"shared": False}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -46,10 +45,6 @@ class LibsodiumConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: static linking for system-name library
-        if not self.options.shared:
-            tc.configure_args.append("--enable-static")
-            tc.configure_args.append("--disable-shared")
         tc.generate()
 
     def build(self):

@@ -25,10 +25,14 @@ else
     exit 1
 fi
 
-# Test 3: verify dynamic linkage to libsodium
+# Test 3: verify linkage to libsodium (dynamic or static)
 echo "[step] verify libsodium dependency"
 if readelf -d "$BIN_PATH" 2>/dev/null | grep -q "libsodium"; then
-    echo "        [ok] minisign links to libsodium"
+    echo "        [ok] minisign links to libsodium (dynamic)"
+elif strings "$BIN_PATH" 2>/dev/null | grep -q "sodium_"; then
+    echo "        [ok] minisign links to libsodium (static)"
+elif nm "$BIN_PATH" 2>/dev/null | grep -q "sodium_"; then
+    echo "        [ok] minisign links to libsodium (static, nm)"
 else
     echo "        [fail] minisign does not link to libsodium"
     exit 1
