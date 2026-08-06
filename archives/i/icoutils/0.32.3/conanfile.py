@@ -4,12 +4,13 @@
 Autotools build (configure + make). Produces command-line tools: icotool, wrestool,
 extresso, genresscript.
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 from conan.tools.env import VirtualBuildEnv
-import os
 
 
 class IcoutilsConan(ConanFile):
@@ -48,10 +49,13 @@ class IcoutilsConan(ConanFile):
         # Create libpng.so symlink: conan installs libpng16.so but configure checks -lpng
         libpng_folder = self.dependencies["libpng"].package_folder
         libpng_libdir = os.path.join(libpng_folder, "lib")
-        libpng_so = os.path.join(libpng_libdir, "libpng.so")
         libpng16_so = os.path.join(libpng_libdir, "libpng16.so")
+        libpng_so = os.path.join(libpng_libdir, "libpng.so")
         if os.path.exists(libpng16_so) and not os.path.exists(libpng_so):
-            os.symlink("libpng16.so", libpng_so)
+            try:
+                os.symlink("libpng16.so", libpng_so)
+            except OSError:
+                pass
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j2"])
