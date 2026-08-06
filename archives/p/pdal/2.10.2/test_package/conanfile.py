@@ -9,6 +9,7 @@ execution fails, the test falls back to verifying correct linkage via readelf.
 import os
 import subprocess
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.cmake import CMake, cmake_layout
 from conan.tools.files import copy
 
@@ -38,7 +39,7 @@ class PdalTestConan(ConanFile):
         binary = os.path.join(self.cpp.build.bindirs[0], "test_pdal")
         try:
             self.run(binary, env="conanrun")
-        except Exception:
+        except ConanException:
             # HarmonyOS musl dynamic linker can't load .so from conan cache
             # paths due to MAC restrictions. Verify correct linkage instead.
             result = subprocess.run(
