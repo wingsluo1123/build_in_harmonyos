@@ -18,6 +18,11 @@ int main(void) {
 
     /* Add a boolean node */
     plist_t bool_node = plist_new_bool(1);
+    if (!bool_node) {
+        fprintf(stderr, "FAIL: plist_new_bool returned NULL\n");
+        plist_free(dict);
+        return 1;
+    }
     plist_dict_set_item(dict, "test_key", bool_node);
 
     /* Serialize to XML */
