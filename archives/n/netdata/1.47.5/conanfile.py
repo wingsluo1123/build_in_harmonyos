@@ -8,6 +8,7 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.gnu.pkgconfigdeps import PkgConfigDeps
+import os
 
 
 def _create_pc_alias(gen_dir, source_pc, target_pc, source_name, target_name):
@@ -29,7 +30,7 @@ class NetdataConan(ConanFile):
     description = "Real-time system monitoring tool with built-in web dashboard"
     license = "GPL-3.0-or-later"
     homepage = "https://github.com/netdata/netdata"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
@@ -55,7 +56,6 @@ class NetdataConan(ConanFile):
     def source(self):
         # netdata tarball has a './' entry at root which breaks strip_root=True
         get(self, **self.conan_data["sources"], strip_root=False)
-        import os, shutil
         src_dir = "netdata-v1.47.5"
         if os.path.isdir(src_dir):
             for item in os.listdir(src_dir):
