@@ -72,5 +72,5 @@ lua -e "local term = require 'term'; print('lua-term loaded successfully'); prin
 4. HMDFS 文件系统不支持 ln -s，已使用 cp 替代
 ---
 
-**编译结束**: 2026-06-09 11:58
-**最终状态**: built
+**编译结束**: 2026-08-07 02:49
+**最终状态**: published
