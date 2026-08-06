@@ -21,7 +21,7 @@ class HtopConan(ConanFile):
     description = "Interactive process viewer for Unix systems"
     license = "GPL-2.0"
     homepage = "https://htop.dev/"
-    url = ""  # CI fills this
+    url = "https://github.com/htop-dev/htop"
 
     package_type = "application"
 
@@ -45,9 +45,11 @@ class HtopConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R33: All paths from Conan Toolchain or self.conf_info, not shell vars
-        # System prebuilt ncurses via DEFAULT_PREFIX (cmd-pkgs install path)
-        sysroot = os.environ.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+        # R33: Compiler/flags from Conan Toolchain, not shell env vars.
+        # ncurses is a system prebuilt package (cmd-pkgs), installed to DEFAULT_PREFIX.
+        # On OHOS CI workers, DEFAULT_PREFIX is set by the build environment.
+        # Fallback to ~/usr/local for local development.
+        sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
         sys_inc = os.path.join(sysroot, "include")
         sys_lib = os.path.join(sysroot, "lib")
 
@@ -55,6 +57,9 @@ class HtopConan(ConanFile):
         tc.extra_cflags.append(f"-I{os.path.join(sys_inc, 'ncursesw')}")
         tc.extra_cflags.append("-DNCURSES_WIDECHAR")
         tc.extra_ldflags.append(f"-L{sys_lib}")
+        # R26: ncurses is a system-name library, must be statically linked
+        # to avoid polluting /lib and SELinux runtime issues on OHOS
+        tc.extra_ldflags.append("-static")
 
         # Fix: AutotoolsToolchain defaults to --prefix=package_folder,
         # and autotools.install() sets DESTDIR=package_folder.
@@ -73,6 +78,7 @@ class HtopConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
+        # Use -j1 to avoid HMDFS FIFO issues with make jobserver
         autotools.make(args=["-j1"])
 
     def package(self):
