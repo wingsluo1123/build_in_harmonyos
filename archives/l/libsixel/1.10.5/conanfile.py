@@ -4,6 +4,8 @@
 Build system: Meson
 Upstream: https://github.com/libsixel/libsixel
 """
+import shutil
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
@@ -16,7 +18,7 @@ class LibsixelConan(ConanFile):
     description = "Sixel graphics encoding library"
     license = "MIT"
     homepage = "https://github.com/libsixel/libsixel"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -51,7 +53,6 @@ class LibsixelConan(ConanFile):
         # OHOS: meson's subprocess can't find llvm-ar via shutil.which,
         # so explicitly set archiver path in the meson native file
         if self.settings.os in ("Linux", "OHOS"):
-            import shutil
             tc.ar = shutil.which("llvm-ar") or "/data/service/hnp/bin/llvm-ar"
             tc.binaries["ranlib"] = shutil.which("llvm-ranlib") or "/data/service/hnp/bin/llvm-ranlib"
         tc.generate()
