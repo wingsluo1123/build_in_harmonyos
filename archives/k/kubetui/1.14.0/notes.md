@@ -9,7 +9,7 @@
 ## 编译步骤
 
 ```bash
-cargo build --release
+cargo build --release --target aarch64-unknown-linux-ohos
 ```
 
 ## 遇到的问题与解决方案

@@ -51,4 +51,7 @@ class KubetuiTestConan(ConanFile):
             return
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_kubetui")
         # aireview: test.c 改用 argv 传 bin_path 避依赖 PATH 巧合，同步传 kubetui 二进制路径参数
-        self.run(f'"{test_bin}" "{bin_path}"', env="conanrun")
+        ret = self.run(f'"{test_bin}" "{bin_path}"', env="conanrun")
+        # R9 反伪造通过：非零退出码必须显式失败，Conan 2.x self.run() 不抛异常
+        if ret != 0:
+            raise ConanException(f"test_kubetui failed with exit code {ret}")
