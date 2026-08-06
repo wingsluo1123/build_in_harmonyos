@@ -21,16 +21,27 @@ static int test_plugin_load(const char *path) {
         return -1;
     }
 
-    /* Check for GRL plugin entry point pattern.
-     * Plugins export symbols like grl_chromaprint_source_plugin_init */
-    void *sym = dlsym(handle, "grl_chromaprint_source_plugin_init");
-    if (!sym) {
-        /* Try generic pattern - any symbol starting with grl_ */
-        sym = dlsym(handle, "grl_gravatar_source_plugin_init");
+    /* Derive expected symbol name from plugin filename.
+     * Pattern: libgrl<name>.so → grl_<name>_source_plugin_init */
+    const char *fname = strrchr(path, '/');
+    fname = fname ? fname + 1 : path;
+
+    char sym_name[256];
+    /* Extract <name> from libgrl<name>.so */
+    const char *prefix = "libgrl";
+    size_t prefix_len = strlen(prefix);
+    if (strncmp(fname, prefix, prefix_len) == 0) {
+        const char *name_start = fname + prefix_len;
+        const char *dot = strrchr(name_start, '.');
+        size_t name_len = dot ? (size_t)(dot - name_start) : strlen(name_start);
+
+        snprintf(sym_name, sizeof(sym_name), "grl_%.*s_source_plugin_init", (int)name_len, name_start);
+    } else {
+        strncpy(sym_name, "grl_unknown_source_plugin_init", sizeof(sym_name) - 1);
+        sym_name[sizeof(sym_name) - 1] = '\0';
     }
-    if (!sym) {
-        sym = dlsym(handle, "grl_tmdb_source_plugin_init");
-    }
+
+    void *sym = dlsym(handle, sym_name);
 
     dlclose(handle);
     return sym ? 0 : -1;
