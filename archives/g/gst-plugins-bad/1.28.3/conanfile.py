@@ -191,3 +191,5 @@ class GstPluginsBadConan(ConanFile):
         self.cpp_info.includedirs = ["include/gstreamer-1.0"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.bindirs = ["bin"]
+
+# Force CI rebuild after gl disable fix
