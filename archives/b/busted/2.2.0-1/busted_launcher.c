@@ -36,6 +36,16 @@ static int apply_tmpdir_tmpname(lua_State *L) {
         "      counter = counter + 1\n"
         "      return tmpdir .. '/lua_' .. token .. '_' .. tostring(counter) .. '.tmp'\n"
         "    end\n"
+        "    local original_tmpfile = io.tmpfile\n"
+        "    io.tmpfile = function()\n"
+        "      local handle, err, code = original_tmpfile()\n"
+        "      if handle then return handle end\n"
+        "      local name = os.tmpname()\n"
+        "      handle, err, code = io.open(name, 'w+')\n"
+        "      if not handle then return nil, err, code end\n"
+        "      os.remove(name)\n"
+        "      return handle\n"
+        "    end\n"
         "  end\n"
         "end\n";
     return luaL_dostring(L, script);

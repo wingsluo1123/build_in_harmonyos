@@ -21,6 +21,8 @@ by Vusted and the nvim-lspconfig Path B validation chain.
 - Installs a native `bin/busted` launcher linked against packaged Lua
 - The native launcher exposes Lua CLI-compatible negative `arg` entries for
   downstream `pl.app.lua()` users.
+- The native launcher also maps `os.tmpname()` and `io.tmpfile()` to
+  `TMPDIR`-backed temporary files for OHOS runner sandboxes.
 - Copies the MIT license to `licenses/LICENSE`
 
 ## Dependency notes
@@ -49,7 +51,7 @@ The upstream tarball includes a Busted self-test suite under `spec/`. Full
 execution passed on the OHOS new-port validation run after all test-runner
 dependencies were available in the same isolated Conan home.
 
-- Run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-upstream-specs-r8-20260807-055241-50167`
+- Run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-upstream-specs-r9-20260807-060351-53729`
 - Result: `1670 successes / 0 failures / 0 errors / 7 pending`
 - Pending cases are upstream-declared pending items for async token callbacks,
   `__gc` error output, Moonscript, and LuaJIT FFI paths.
@@ -65,10 +67,10 @@ invocation for Penlight `pl.app.lua()`.
 
 ## Validation results
 
-- OHOS new-port build/test_package run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-luacov-chain-r9-20260807-055111-49066`
-- Full ref: `busted/2.2.0-1#cfe1cde2e2ab45e3d447238ffdccc02b:4df0932bd77659124e53ec83e89473d223e318ac#252dfd9a0e1660048a6d297136813d30`
+- OHOS new-port build/test_package run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-luacov-chain-r10-20260807-060245-52696`
+- Full ref: `busted/2.2.0-1#2722ce1e253a8bef4ebc1b5043014b28:4df0932bd77659124e53ec83e89473d223e318ac#a1f9c8e5e3b4aac9cc28199a6aa51d8d`
 - Test output: `busted smoke ok`, `2.2.0`, and launcher compatibility smoke `1/1`
 - Gates: L0 pass, L1 pass, L2 skip-nonblocking, L4 pass, L5 pass
-- Upstream run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-upstream-specs-r8-20260807-055241-50167`
+- Upstream run: `/storage/Users/currentUser/ohos-users/codex-a/neovim-vusted-pathb-integration-20260806/runs/codex-a-busted-upstream-specs-r9-20260807-060351-53729`
 - Upstream result: `1670 successes / 0 failures / 0 errors / 7 pending`
 
