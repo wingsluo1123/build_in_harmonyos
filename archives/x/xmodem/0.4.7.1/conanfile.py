@@ -7,12 +7,7 @@ import sys
 
 from conan import ConanFile
 from conan.tools.env import Environment
-from conan.tools.files import (
-    apply_conandata_patches,
-    copy,
-    export_conandata_patches,
-    get,
-)
+from conan.tools.files import copy, get
 
 
 class XmodemConan(ConanFile):
@@ -25,9 +20,8 @@ class XmodemConan(ConanFile):
 
     package_type = "unknown"
     settings = "os", "arch"
-
-    def export_sources(self):
-        export_conandata_patches(self)
+    _source_url = "https://codeload.github.com/tehmaze/xmodem/tar.gz/refs/tags/0.4.7"
+    _source_sha256 = "ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519"
 
     def configure(self):
         self.settings.rm_safe("os.version")
@@ -36,11 +30,14 @@ class XmodemConan(ConanFile):
         self.info.clear()
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(
+            self,
+            url=self._source_url,
+            sha256=self._source_sha256,
+            strip_root=True,
+        )
 
     def build(self):
-        apply_conandata_patches(self)
-
         test_deps = os.path.join(self.build_folder, "_test_deps")
         self.run(
             f'"{sys.executable}" -m pip install '

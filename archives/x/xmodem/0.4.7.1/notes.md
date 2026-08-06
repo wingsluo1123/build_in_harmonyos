@@ -23,20 +23,21 @@
 - Source SHA256: `ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519`
 - Source URL uses GitHub codeload for the same tag archive, avoiding the CI
   mirror pre-download path that failed with `BUILD_DIR: parameter not set`.
+  URL and SHA256 are defined in `conanfile.py` because the CI pre-download
+  branch runs only when `conandata.yml` exists.
 - The PyPI sdist omits the upstream `test/` directory. The recipe therefore
   uses the official GitHub tag archive.
 
 ## Packaging
 
 1. Download and verify the official tag archive.
-2. Apply declared Conan patches. This version has no patches.
-3. Install pytest into the isolated Conan build folder.
-4. Run all 16 dependency-free upstream protocol tests.
-5. When `lrzsz` provides both sender and receiver commands, also run all 8
+2. Install pytest into the isolated Conan build folder.
+3. Run all 16 dependency-free upstream protocol tests.
+4. When `lrzsz` provides both sender and receiver commands, also run all 8
    upstream external-tool integration tests.
-6. Copy the pure Python module into `lib/python/site-packages/xmodem`.
-7. Copy the MIT license and protocol documents into the package.
-8. Run the deterministic consumer test through Conan's run environment.
+5. Copy the pure Python module into `lib/python/site-packages/xmodem`.
+6. Copy the MIT license and protocol documents into the package.
+7. Run the deterministic consumer test through Conan's run environment.
 
 ## Upstream test inventory
 
@@ -54,6 +55,8 @@
   - Source archive remains upstream tag `0.4.7` with the same SHA256.
 - 2026-08-06 CI pre-download fix:
   - Switched the source URL to GitHub codeload for the same tag archive.
+  - Moved source URL/SHA256 from `conandata.yml` into `conanfile.py` to avoid
+    the CI pre-download `BUILD_DIR` unset path.
   - Verified the SHA256 is unchanged:
     `ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519`.
 - Source audit collection: 24 upstream cases.
