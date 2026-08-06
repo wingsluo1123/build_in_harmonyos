@@ -1,0 +1,37 @@
+--- a/cmake/Tests.cmake
++++ b/cmake/Tests.cmake
+@@ -35,27 +35,27 @@
+ add_custom_target(fish_run_tests
+   COMMAND env CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL} FISH_FORCE_COLOR=1
+           FISH_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+           ${CMAKE_CTEST_COMMAND} --force-new-ctest-process # --verbose
+           --output-on-failure --progress
+   DEPENDS fish_tests tests_buildroot_target
+   USES_TERMINAL
+ )
+ 
+ # If CMP0037 is available, also make an alias "test" target.
+-# Note that this policy may not be available, in which case definining such a target silently fails.
+-cmake_policy(PUSH)
+-if(POLICY CMP0037)
+-  cmake_policy(SET CMP0037 OLD)
+-  add_custom_target(test DEPENDS fish_run_tests)
+-endif()
+-cmake_policy(POP)
++# Note: disabled for CMake 4.x compatibility (reserved target name + policy removed)
++# cmake_policy(PUSH)
++# if(POLICY CMP0037)
++#   cmake_policy(SET CMP0037 OLD)
++#   add_custom_target(test DEPENDS fish_run_tests)
++# endif()
++# cmake_policy(POP)
+ 
+ # Build the low-level tests code
+ add_executable(fish_tests EXCLUDE_FROM_ALL
+                src/fish_tests.cpp)
+ fish_link_deps_and_sign(fish_tests)
+ 
+ # The "test" directory.
+ set(TEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/test)
+ 
+ # CMake doesn't really support dynamic test discovery where a test harness is executed to list the
