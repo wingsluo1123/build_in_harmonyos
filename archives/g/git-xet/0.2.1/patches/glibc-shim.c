@@ -15,10 +15,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-/* glibc's __res_state returns a per-thread resolver state structure.
- * musl's resolver is simpler; we provide a static dummy. */
+/* glibc's __res_state returns a per-thread resolver state structure (~512 bytes in glibc).
+ * musl's resolver is simpler; we provide a large enough buffer to prevent memory corruption. */
 struct __res_state_shim {
-    int dummy;
+    char _padding[512];
 };
 
 static struct __res_state_shim _res_shim;

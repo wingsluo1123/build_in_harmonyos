@@ -54,7 +54,7 @@ GLIBC_SHIM_SOURCE = r"""
 #include <unistd.h>
 #include <sys/types.h>
 
-struct __res_state_shim { int dummy; };
+struct __res_state_shim { char _padding[512]; };
 static struct __res_state_shim _res_shim;
 struct __res_state_shim *__res_state(void) { return &_res_shim; }
 int __res_init(void) { return 0; }
