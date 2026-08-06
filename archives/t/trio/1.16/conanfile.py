@@ -68,33 +68,12 @@ class TrioConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        configure = os.path.join(self.source_folder, "configure")
         makefile_in = os.path.join(self.source_folder, "Makefile.in")
 
-        # config.status 默认用 `umask 077` 创建 ./confXXXXXX 临时目录再往里写
-        # subs1.awk。在 OHOS CI 的文件系统上该目录对写入进程不可写，导致
-        # "config.status: error: could not setup config files machinery"。
-        # 放宽临时目录权限（创建时 umask 000 + 创建后 chmod 777 兜底）。
-        replace_in_file(
-            self,
-            configure,
-            "umask 077 && mktemp -d",
-            "umask 000 && mktemp -d",
-            strict=False,
-        )
-        replace_in_file(
-            self,
-            configure,
-            'umask 077 && mkdir "$tmp"',
-            'umask 000 && mkdir "$tmp"',
-            strict=False,
-        )
-        replace_in_file(
-            self,
-            configure,
-            "ac_tmp=$tmp\n",
-            'chmod 777 "$tmp" 2>/dev/null || :\nac_tmp=$tmp\n',
-        )
+        # OHOS CI 的构建目录挂载 noexec，config.status 用 `$AWK -f
+        # "$ac_tmp/subs.awk"` 时会因 awk mmap 脚本（PROT_EXEC）而报
+        # "Permission denied"。该问题由 patches/0001 修复：把替换程序改为
+        # 经 stdin 读取（避免 mmap），并让临时目录尊重 $TMPDIR。
         replace_in_file(self, makefile_in, "AR\t= ar", "AR\t?= ar")
         if not self.options.shared:
             replace_in_file(
