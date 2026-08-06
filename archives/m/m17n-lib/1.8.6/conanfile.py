@@ -50,6 +50,7 @@ class M17nLibConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         tc.configure_args.append("--with-included-gettext")
+        tc.configure_args.append("--without-x")
         tc.generate()
 
     def build(self):
