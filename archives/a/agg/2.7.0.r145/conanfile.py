@@ -74,6 +74,7 @@ class AggConan(ConanFile):
         env.define_path("SED", "/usr/bin/sed")
         env.define_path("AUTOCONF", "/data/service/hnp/bin/autoconf")
         env.define_path("AC_AUTOCONF", "/data/service/hnp/bin/autoconf")
+        env.define_path("AUTOHEADER", "/data/service/hnp/bin/autoheader")
         env.define_path("AUTOMAKE", "/storage/Users/currentUser/usr/local/bin/automake")
         env.define_path("ACLOCAL", "/storage/Users/currentUser/usr/local/bin/aclocal")
         env.define_path(
@@ -88,15 +89,24 @@ class AggConan(ConanFile):
         # Order: libtoolize (ltmain.sh) -> aclocal (AM_* macros) ->
         #        autoheader -> autoconf -> automake (Makefile.in) -> autoconf
         autotools_cmds = (
-            "libtoolize --copy --force",
-            "aclocal",
-            "autoheader -f",
-            "autoconf -f",
-            "automake --foreign --add-missing --copy --force-missing",
-            "autoconf -f",
+            "$LIBTOOLIZE --copy --force",
+            "$ACLOCAL",
+            "$AUTOHEADER -f",
+            "$AUTOCONF -f",
+            "$AUTOMAKE --foreign --add-missing --copy --force-missing",
+            "$AUTOCONF -f",
         )
         with chdir(self, self.source_folder):
-            self.run(" && ".join(autotools_cmds), env=["conanbuild"])
+            # Use the agg_autotools_env script (saved by generate()) which
+            # exports absolute paths for LIBTOOLIZE/AUTOM4TE/SED/AUTOCONF/
+            # AUTOMAKE/ACLOCAL. CI workers may not have these on PATH and
+            # libtoolize has group-only x perms (file_manager group), so
+            # resolving via PATH is unreliable — absolute paths via $VAR
+            # from agg_autotools_env are robust.
+            self.run(
+                " && ".join(autotools_cmds),
+                env=["agg_autotools_env"],
+            )
         # HMDFS workaround: configure's generated config.status uses
         # `(umask 077 && mktemp -d "./confXXXXXX")` which creates a 700-permission
         # subdir; HMDFS refuses writes inside such dirs.
@@ -106,6 +116,22 @@ class AggConan(ConanFile):
         if os.path.isfile(configure_path):
             with open(configure_path, "r", encoding="utf-8") as f:
                 cfg = f.read()
+            # E165: autoreconf-generated configure shebang is #!/bin/bash or
+            # #!/bin/sh — neither exists on OHOS. Rewrite to the real paths.
+            # Note: autoconf emits "#! /bin/sh" (with a space); handle both.
+            cfg = cfg.replace("#!/bin/bash", "#!/data/service/hnp/bin/bash")
+            cfg = cfg.replace("#! /bin/bash", "#! /data/service/hnp/bin/bash")
+            cfg = cfg.replace("#!/bin/sh", "#!/system/bin/sh")
+            cfg = cfg.replace("#! /bin/sh", "#! /system/bin/sh")
+            # Also fix SHELL=${CONFIG_SHELL-/bin/sh} fallbacks inside configure
+            # (make invokes ${SHELL} which resolves to /bin/sh → exit 127).
+            # autoconf emits several nested forms; replace them all.
+            cfg = cfg.replace("${CONFIG_SHELL-/bin/sh}", "${CONFIG_SHELL-/system/bin/sh}")
+            cfg = cfg.replace("${SHELL-/bin/sh}", "${SHELL-/system/bin/sh}")
+            cfg = cfg.replace("${SHELL-${CONFIG_SHELL-/bin/sh}}", "${SHELL-${CONFIG_SHELL-/system/bin/sh}}")
+            # Makefile.in templates set `SHELL = /bin/sh` (autoconf's @SHELL@)
+            # — catch the literal assignment so make's SHELL doesn't fall back.
+            cfg = cfg.replace("SHELL = /bin/sh", "SHELL = /system/bin/sh")
             orig = (
                 '  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&\n'
                 '  test -d "$tmp"'
