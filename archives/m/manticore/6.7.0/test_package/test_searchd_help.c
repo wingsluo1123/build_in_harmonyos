@@ -37,7 +37,11 @@ int main(void) {
             break;
         }
     }
-    pclose(fp);
+    int ret = pclose(fp);
+    if (ret == -1) {
+        fprintf(stderr, "pclose failed\n");
+        return 1;
+    }
 
     if (!found_manticore) {
         fprintf(stderr, "searchd --help did not produce expected output\n");

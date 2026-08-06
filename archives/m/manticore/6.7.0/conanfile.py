@@ -90,6 +90,8 @@ class ManticoreConan(ConanFile):
         tc.variables["WITH_POSTGRESQL"] = "OFF"
         # Static binary
         tc.variables["STATIC_BINARY"] = "OFF"
+        # Enable testing
+        tc.variables["BUILD_TESTING"] = "ON"
         # R26: System-name libraries default to static
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.generate()
@@ -99,6 +101,8 @@ class ManticoreConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        # Run upstream tests (CI L1 gate check)
+        cmake.test()
 
     def package(self):
         cmake = CMake(self)
