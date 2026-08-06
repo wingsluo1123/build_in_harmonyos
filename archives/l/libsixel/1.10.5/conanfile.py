@@ -8,8 +8,8 @@ import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.meson import Meson, MesonToolchain
 
 
 class LibsixelConan(ConanFile):
