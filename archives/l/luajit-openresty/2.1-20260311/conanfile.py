@@ -18,7 +18,7 @@ class LuajitOpenrestyConan(ConanFile):
     description = "OpenResty's Branch of LuaJIT 2 - High-performance Lua interpreter with JIT compiler"
     license = "MIT"
     homepage = "https://github.com/openresty/luajit2"
-    url = ""  # CI fills this
+    url = "https://github.com/openresty/luajit2"
 
     package_type = "library"
 
@@ -72,5 +72,6 @@ class LuajitOpenrestyConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["luajit-5.1"]
         self.cpp_info.includedirs = ["include/luajit-2.1"]
+        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("cmake_file_name", "luajit-openresty")
         self.cpp_info.set_property("cmake_target_name", "luajit-openresty::luajit-openresty")
