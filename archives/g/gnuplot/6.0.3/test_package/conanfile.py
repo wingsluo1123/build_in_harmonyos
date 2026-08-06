@@ -4,7 +4,6 @@
 Verifies that the gnuplot binary is installed and can report its version.
 gnuplot is a command-line plotting tool (application), not a library.
 """
-import os
 
 from conan import ConanFile
 

@@ -21,8 +21,8 @@
 
 ### E011: HMDFS umask 问题
 - **问题**: configure 脚本第 17884/17889 行 `umask 077` 在 HMDFS 文件系统上导致临时目录创建失败
-- **修复**: `sed -i 's/umask 077/umask 022/g' configure`
-- **补丁**: patches/0001-umask-022-for-hmdfs.patch
+- **修复**: 通过 Conan 配方的 apply_conandata_patches 自动应用补丁
+- **补丁**: patches/0001-configure.patch
 - **参考**: 5.4.10 版本同样问题
 
 ### make check 部分失败
@@ -45,4 +45,4 @@ gnuplot 的所有终端库都是可选的，configure 检测不到就自动跳�
 ---
 
 **编译结束**: 2026-07-23 20:32
-**最终状态**: built
+**最终状态**: published
