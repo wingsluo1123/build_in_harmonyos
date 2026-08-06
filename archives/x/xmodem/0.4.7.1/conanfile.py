@@ -20,7 +20,7 @@ class XmodemConan(ConanFile):
 
     package_type = "unknown"
     settings = "os", "arch"
-    _source_url = "https://codeload.github.com/tehmaze/xmodem/tar.gz/refs/tags/0.4.7"
+    _source_url = "https://github.com/tehmaze/xmodem/archive/refs/tags/0.4.7.tar.gz"
     _source_sha256 = "ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519"
 
     def configure(self):

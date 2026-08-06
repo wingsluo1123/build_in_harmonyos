@@ -21,10 +21,9 @@
 - Tag: `0.4.7`
 - Tag commit: `7c3666fe604fd1144188e484ea86cce74c1d242e`
 - Source SHA256: `ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519`
-- Source URL uses GitHub codeload for the same tag archive, avoiding the CI
-  mirror pre-download path that failed with `BUILD_DIR: parameter not set`.
-  URL and SHA256 are defined in `conanfile.py` because the CI pre-download
-  branch runs only when `conandata.yml` exists.
+- Source URL and SHA256 are defined in `conanfile.py` because the CI
+  pre-download branch that failed with `BUILD_DIR: parameter not set` runs
+  only when `conandata.yml` exists.
 - The PyPI sdist omits the upstream `test/` directory. The recipe therefore
   uses the official GitHub tag archive.
 
@@ -54,7 +53,6 @@
   - Package version was incremented from `xmodem/0.4.7` to `xmodem/0.4.7.1`.
   - Source archive remains upstream tag `0.4.7` with the same SHA256.
 - 2026-08-06 CI pre-download fix:
-  - Switched the source URL to GitHub codeload for the same tag archive.
   - Moved source URL/SHA256 from `conandata.yml` into `conanfile.py` to avoid
     the CI pre-download `BUILD_DIR` unset path.
   - Verified the SHA256 is unchanged:
