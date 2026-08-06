@@ -49,3 +49,7 @@ conan create . -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
 ---
 *编译者: OpenDesk AI Worker*
 *日期: 2026-08-06*
+---
+
+**编译结束**: 2026-08-06
+**最终状态**: built

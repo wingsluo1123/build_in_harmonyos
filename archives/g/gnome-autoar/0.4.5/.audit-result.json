@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "check-7-process-state-files",
+      "file": "archives/g/gnome-autoar/0.4.5/.handoff.json",
+      "line": 1,
+      "description": "Process state file .handoff.json is present in the PR with content. This file contains build process state (exit_reason, step_failed, resume_cmd, ai_next_actions) and should not be committed to the repository. Note: .knowledge-done and .verify-passed appear to have been deleted (marked as non-existent), but .handoff.json still has content indicating it exists.",
+      "fix_suggestion": "Remove the file from the repository and add .handoff.json to .gitignore to prevent future accidental commits."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "W2-pr-atomicity",
+      "file": "archives/l/libarchive/3.8.7/manifest.yaml",
+      "line": 0,
+      "description": "PR includes changes to files from a different package (libarchive 3.8.7: manifest.yaml and notes.md). While these files appear to be deleted (cleanup), touching another package's files in a gnome-autoar PR violates PR atomicity (W2: one PR = one recipe).",
+      "fix_suggestion": "Remove libarchive file changes from this PR. Handle cleanup of stray files in a separate PR or ensure they are properly gitignored."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-conanfile-url",
+      "file": "archives/g/gnome-autoar/0.4.5/conanfile.py",
+      "line": 25,
+      "description": "The url attribute is empty (url = \"\"). While this is the recipe URL (not source URL), having it empty looks like an incomplete template field per the code style guide which prohibits template placeholders.",
+      "fix_suggestion": "Set url to the recipe repository URL or remove the line if not applicable."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-patch-description",
+      "file": "archives/g/gnome-autoar/0.4.5/conandata.yml",
+      "line": 13,
+      "description": "patch_description does not follow the recommended format \"0001 xxx\" (patch number prefix + space-separated description). Current value: \"Change shared_library to library to respect default_library option for static build\" lacks the 0001 prefix.",
+      "fix_suggestion": "Consider using format like \"0001 meson static library for static build\" to match the style guide convention."
+    }
+  ],
+  "summary": "Audit of gnome-autoar 0.4.5 Conan recipe (round 3). Verdict: PASS with warnings. No P0 (deception) or P1 (correctness) issues found. Key checks passed: (1) conanfile.py uses Conan 2.x API correctly (from conan import ConanFile, conan.tools.meson), no hardcoded absolute paths in generate/build (R33 compliant — uses self.conf.get(), self.generators_folder, shutil.which(), no os.environ), no Linux-only OS checks that would exclude OHOS (R32 — only checks self.settings.os == 'Windows' for fPIC removal), proper method order (export_sources→config_options→configure→requirements→layout→source→generate→build→package→package_info), package_info sets cpp_info.libs=['gnome-autoar-0']. (2) test.c calls real API functions: autoar_libarchive_quark(), autoar_format_is_valid(AUTOAR_FORMAT_ZIP), autoar_format_get_mime_type(AUTOAR_FORMAT_ZIP) — R34 compliant, no empty shell test. (3) test_package/conanfile.py has cmake.test() and self.run(exe, env='conanrun') in test() method. (4) conandata.yml: HTTPS source URL, sha256 present (64 hex chars, not zero/forged), patch_file path exists. (5) MANIFEST.yml: no TODO/FIXME/XXX placeholders. (6) patches/0001-meson-static-library.patch: real source patch (shared_library→library in meson.build), not a conan-generated file. (7) Source URL is official gitlab.gnome.org/GNOME/gnome-autoar. (8) No hardcoded absolute paths in manifest.yaml or notes.md. (9) No precompiled binaries (.so/.a/.o). (10) No #ifdef __OHOS__ empty stubs. Issues found: P2 — .handoff.json process state file present in PR (should be in .gitignore); P2 — PR touches libarchive files violating W2 PR atomicity; P3 — empty url field in conanfile.py; P3 — patch_description missing 0001 prefix format."
+}
