@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe — lua-term 0.7 (makefile)
+
+A terminal manipulation library for Lua.
+Depends on lua/5.4.7 for headers.
+Produces core.so Lua C extension module.
+"""
 import os
 
 from conan import ConanFile
@@ -11,7 +18,6 @@ class LuaTermConan(ConanFile):
     description = "A terminal manipulation library for Lua"
     license = "MIT"
     homepage = "https://github.com/hoelzro/lua-term"
-    url = ""
 
     package_type = "shared-library"
 

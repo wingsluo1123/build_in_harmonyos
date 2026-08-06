@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""Test package — lua-term 0.7 (CMake)
+
+Builds lua from source with LUA_USE_DLOPEN (conancenter lua doesn't
+support dlopen on OHOS), then loads the lua-term module and tests isatty().
+"""
 import os
 
 from conan import ConanFile
