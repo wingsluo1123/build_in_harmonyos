@@ -19,7 +19,11 @@ int main(void) {
         fprintf(stderr, "ERROR: mold produced no output\n");
         return 1;
     }
-    pclose(fp);
+    int ret = pclose(fp);
+    if (ret != 0) {
+        fprintf(stderr, "ERROR: mold exited with status %d\n", ret);
+        return 1;
+    }
 
     /* Verify mold version string is present */
     if (strstr(buf, "mold") == NULL) {
