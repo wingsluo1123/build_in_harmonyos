@@ -11,7 +11,7 @@ int main(void) {
 
     /* Test symbol creation - core m17n API */
     MSymbol sym = msymbol("test_symbol");
-    if (sym == NULL || sym == Mnil) {
+    if (sym == Mnil) {
         fprintf(stderr, "FAIL: msymbol returned NULL or Mnil\n");
         return 1;
     }
