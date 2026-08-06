@@ -136,7 +136,7 @@ class JellyfinFfmpegConan(ConanFile):
             "--enable-libopenh264",
             "--enable-bzlib",
             "--enable-lzma",
-            "--extra-cflags=" + " ".join(self._dep_incflags()),
+            "--extra-cflags=" + " ".join(["-I" + os.path.join(self.build_folder, "_vkstub")] + self._dep_incflags()),
             "--extra-ldflags=" + " ".join(self._dep_libflags()),
             "--disable-doc",
             "--disable-ffplay",
@@ -151,6 +151,22 @@ class JellyfinFfmpegConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+
+        # Create vulkan_beta.h stub — OHOS Vulkan SDK's vulkan.h
+        # includes vulkan_beta.h when VK_ENABLE_BETA_EXTENSIONS is defined
+        # (FFmpeg source defines it). OHOS SDK doesn't ship this file.
+        _vk = os.path.join(self.build_folder, "_vkstub")
+        os.makedirs(_vk, exist_ok=True)
+        with open(os.path.join(_vk, "vulkan_beta.h"), "w") as _f:
+            _f.write(
+                "#ifndef VULKAN_BETA_H_\n"
+                "#define VULKAN_BETA_H_ 1\n"
+                "#define VK_KHR_portability_subset 1\n"
+                "#define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "
+                "\"VK_KHR_portability_subset\"\n"
+                "#define VK_KHR_PORTABILITY_SUBSET_SPEC_VERSION 1\n"
+                "#endif\n"
+            )
 
         for _var in ("CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "LIBS",
                      "PKG_CONFIG_PATH", "PKG_CONFIG_LIBDIR",
