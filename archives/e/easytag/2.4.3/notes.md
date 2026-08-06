@@ -32,3 +32,7 @@ make install DESTDIR=$TEST_PREFIX
 ---
 **编译结束**: 2026-05-30
 **最终状态**: published
+---
+
+**编译结束**: 2026-08-06 09:37
+**最终状态**: failed
