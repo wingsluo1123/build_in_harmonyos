@@ -168,3 +168,7 @@ class AggConan(ConanFile):
         self.cpp_info.libs = ["agg"]
         # Headers install to include/agg2/ (upstream convention)
         self.cpp_info.includedirs = ["include"]
+        # Conan 2.x: emit CMake config files (aggConfig.cmake + agg::agg
+        # target) so test_package's find_package(agg) / agg::agg resolve.
+        self.cpp_info.set_property("cmake_file_name", "agg")
+        self.cpp_info.set_property("cmake_target_name", "agg::agg")
