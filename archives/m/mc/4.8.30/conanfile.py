@@ -26,8 +26,6 @@ class McConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Export gettext po-files (autopoint is skipped on CI)
-        self.copy("po-*", src="patches", dst="patches")
 
     def requirements(self):
         self.requires("glib2/2.88.0")
@@ -89,17 +87,8 @@ class McConan(ConanFile):
         # Create m4 directory (GitHub archive doesn't include it)
         os.makedirs(os.path.join(self.source_folder, "m4"), exist_ok=True)
 
-        # Copy gettext po-files (autopoint is skipped with AUTOPOINT=true)
-        patches_dir = os.path.join(self.source_folder, "patches")
-        po_dir = os.path.join(self.source_folder, "po")
-        if os.path.isdir(patches_dir):
-            import shutil
-            for f in os.listdir(patches_dir):
-                if f.startswith("po-"):
-                    src = os.path.join(patches_dir, f)
-                    dst = os.path.join(po_dir, f[3:])  # Remove "po-" prefix
-                    if os.path.isfile(src):
-                        shutil.copy2(src, dst)
+        # Create minimal gettext po-files (autopoint is skipped with AUTOPOINT=true)
+        self._create_gettext_po_files()
 
         # Run autoreconf to generate configure script
         # (GitHub archive doesn't include pre-generated configure)
@@ -171,6 +160,80 @@ class McConan(ConanFile):
                         "clean:\n\tdistclean:\n\tcheck:\n")
 
         autotools.make(args=["-j1"])
+
+    def _create_gettext_po_files(self):
+        """Create minimal gettext po-files (replaces autopoint)."""
+        po_dir = os.path.join(self.source_folder, "po")
+        os.makedirs(po_dir, exist_ok=True)
+
+        # Minimal po/Makefile.in.in (needed by config.status)
+        makefile_in_in = os.path.join(po_dir, "Makefile.in.in")
+        if not os.path.exists(makefile_in_in):
+            content = """# Minimal po/Makefile.in.in for mc (autopoint skipped)
+PACKAGE = mc
+VERSION = 4.8.30
+SHELL = /bin/sh
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+top_builddir = @top_builddir@
+VPATH = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+datadir = @datadir@
+datarootdir = @datarootdir@
+localedir = $(datadir)/locale
+gettextsrcdir = $(datadir)/gettext/po
+INSTALL = @INSTALL@
+INSTALL_DATA = @INSTALL_DATA@
+MSGFMT = @MSGFMT@
+GMSGFMT = @GMSGFMT@
+XGETTEXT = @XGETTEXT@
+MSGMERGE = @MSGMERGE@
+DOMAIN = $(PACKAGE)
+COPYRIGHT_HOLDER = Free Software Foundation, Inc.
+PACKAGE_BUGREPORT = https://www.midnight-commander.org/wiki/NewTicket
+SOURCES = $(srcdir)/*.c
+POFILES = @POFILES@
+GMOFILES = @GMOFILES@
+UPDATEPOFILES = @UPDATEPOFILES@
+DUMMYPOFILES = @DUMMYPOFILES@
+DISTFILES = Makefile.in.in Makevars $(DOMAIN).pot.in
+POTFILES = \\
+all: all-@USE_NLS@
+all-yes: $(DOMAIN).pot
+all-no:
+$(DOMAIN).pot: $(POTFILES)
+	$(XGETTEXT) --default-domain=$(DOMAIN) --add-comments=TRANSLATORS: $(POTFILES)
+install: install-exec
+install-exec:
+install-data: install-data-@USE_NLS@
+install-data-no:
+install-data-yes:
+clean:
+distclean:
+mostlyclean:
+maintainer-clean:
+check:
+.PHONY: all install install-exec install-data clean distclean mostlyclean maintainer-clean check
+"""
+            with open(makefile_in_in, "w") as f:
+                f.write(content)
+
+        # Create other required gettext files
+        for fname, fcontent in [
+            ("Makevars.template", "# Makevars.template\n"),
+            ("Rules-quot", "# Rules-quot\n"),
+            ("boldquot.sed", ""),
+            ("en@boldquot.header", ""),
+            ("en@quot.header", ""),
+            ("insert-header.sin", ""),
+            ("quot.sed", ""),
+            ("remove-potcdate.sin", ""),
+        ]:
+            fpath = os.path.join(po_dir, fname)
+            if not os.path.exists(fpath):
+                with open(fpath, "w") as f:
+                    f.write(fcontent)
 
     def _patch_config_guess(self):
         """Patch config.guess and config.sub for HarmonyOS support."""
