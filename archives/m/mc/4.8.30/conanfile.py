@@ -169,7 +169,6 @@ class McConan(ConanFile):
 
     def _create_dummy_termcap(self):
         """Create dummy libtermcap.a (slang references termcap symbols)."""
-        import subprocess
         # Use user-local lib dir which is in conan profile's LDFLAGS
         lib_dir = os.path.expanduser("~/usr/local/lib")
         os.makedirs(lib_dir, exist_ok=True)
@@ -193,10 +192,9 @@ char *UP = 0;
 char PC = 0;
 """)
 
-        cc = os.environ.get("CC", "clang")
-        subprocess.run([cc, "-c", "-fPIC", src, "-o", obj], check=True)
-        ar = os.environ.get("AR", "llvm-ar")
-        subprocess.run([ar, "rcs", lib, obj], check=True)
+        # Use self.run with conanbuild env to get correct CC/AR/PATH
+        self.run(f'$CC -c -fPIC "{src}" -o "{obj}"', env="conanbuild")
+        self.run(f'llvm-ar rcs "{lib}" "{obj}"', env="conanbuild")
 
     def _fix_la_files(self):
         """Delete .la files with incorrect libdir paths to force direct .a/.so linking."""
