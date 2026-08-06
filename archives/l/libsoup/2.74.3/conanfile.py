@@ -95,6 +95,21 @@ class LibsoupConan(ConanFile):
                 )
                 with open(pc_path, "w") as f:
                     f.write(content)
+        # Generate pkg-config wrappers for brotli components
+        # (brotli Conan package may only generate libbrotlicommon.pc)
+        brotli_root = self.dependencies["brotli"].package_folder
+        for comp in ["libbrotlidec", "libbrotlienc"]:
+            pc_path = os.path.join(pc_dir, f"{comp}.pc")
+            if not os.path.exists(pc_path):
+                content = (
+                    f"Name: {comp}\n"
+                    f"Description: {comp} (via brotli conan package)\n"
+                    f"Version: 1.2.0\n"
+                    f"Requires: libbrotlicommon\n"
+                    f"Libs: -L{brotli_root}/lib -l{comp.replace('lib', '')}\n"
+                )
+                with open(pc_path, "w") as f:
+                    f.write(content)
 
     def build(self):
         import os
