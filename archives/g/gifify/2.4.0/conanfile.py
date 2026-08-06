@@ -36,8 +36,9 @@ class GififyConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Install npm production dependencies
-        self.run("npm install --omit=dev")
+        # basic_layout separates source and build folders;
+        # npm install must run in source folder where package.json lives.
+        self.run("npm install --omit=dev", cwd=self.source_folder)
 
     def package(self):
         # Copy project files to lib/gifify/
