@@ -2,7 +2,7 @@
 """Conan recipe — perl-io-tty 1.31 (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 class PerlIoTty(ConanFile):
     name = "perl-io-tty"
@@ -11,7 +11,9 @@ class PerlIoTty(ConanFile):
     license = "Artistic-2.0"
     homepage = "https://metacpan.org/pod/io::tty"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "conandata.yml"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)

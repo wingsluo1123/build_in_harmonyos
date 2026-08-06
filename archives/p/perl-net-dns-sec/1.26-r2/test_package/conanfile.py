@@ -38,7 +38,7 @@ class PerlnetdnssecTestConan(ConanFile):
 
         # Try loading the module with PERL5LIB set to package path
         # Also include user's local site_perl for Net::DNS dependency
-        user_site = os.path.join(os.environ.get("HOME",""), "usr/local/lib/site_perl/5.42.2")
+        user_site = os.path.join(os.path.expanduser("~"), "usr/local/lib/site_perl/5.42.2")
         old_perl5lib = os.environ.get("PERL5LIB", "")
         os.environ["PERL5LIB"] = f"{site_arch}:{user_site}"
         try:
