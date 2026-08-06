@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: jsonrpc-glib/3.44.0
+homepage: "https://gitlab.gnome.org/GNOME/jsonrpc-glib"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "meson test --list"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/test-message.c
+    source: jsonrpc-glib-3.44.0/tests/test-message.c
+    description: "Test JSON-RPC message handling"
+    command: "./test-message"
+  - file: tests/test-server.c
+    source: jsonrpc-glib-3.44.0/tests/test-server.c
+    description: "Test JSON-RPC server functionality"
+    command: "./test-server"
+  - file: tests/test-gauntlet.c
+    source: jsonrpc-glib-3.44.0/tests/test-gauntlet.c
+    description: "Stress test for JSON-RPC protocol"
+    command: "./test-gauntlet"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: src/main.c
+    description: "Create JsonrpcServer and verify JSON-RPC message serialization"
+    command: "./test_package"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3
