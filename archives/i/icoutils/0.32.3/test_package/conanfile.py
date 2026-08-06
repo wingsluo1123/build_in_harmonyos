@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Test package for icoutils 0.32.3 (Autotools) — smoke test for command-line tools."""
 import os
 from conan import ConanFile
 
