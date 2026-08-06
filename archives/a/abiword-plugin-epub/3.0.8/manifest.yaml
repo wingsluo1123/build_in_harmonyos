@@ -1,9 +1,8 @@
 # 版本级 manifest（AI 元数据，CI 不读）
 software: abiword-plugin-epub
 version: "3.0.8"
-status: built            # published | built | failed | archived
-build_system: autotools  # 标准 conan Autotools（CI 原生 clang）
-build_date: "2026-02-18"  # 上游 AbiWord 3.0.8 release tarball 发布日,无未来日期歧义
+status: pending_ci        # published | built | failed | archived | pending_ci（CI 验证前不预标 built）
+build_date: "2026-08-06"
 
 source:
   url: "https://gitlab.gnome.org/World/AbiWord/-/archive/release-3.0.8/AbiWord-release-3.0.8.tar.gz"
@@ -12,7 +11,7 @@ source:
 
 build:
   system: autotools
-  configure_options: ["--enable-plugins=epub", "--disable-default-plugins", "--with-gtk2=no"]
+  configure_options: ["--enable-plugins=epub", "--disable-default-plugins", "--with-gtk2=no", "--build=aarch64-linux", "--host=aarch64-linux"]
   dependencies: ["libgsf/1.14.53"]
   dependencies_note: "R36: libgsf/1.14.53 鸿蒙制品仓尚未发布,CI 用 --build=missing 从源编译。libgsf 已在 PR #4060 适配,合入发布后本 PR CI 可构建。libgsf 间接依赖 glib/libxml2/zlib 三者均未发布,CI 同样 --build=missing。"
   cc: clang
@@ -22,9 +21,10 @@ patches_applied: []
 
 test_results:
   type: conan-verify
-  total: 1
-  passed: 1
+  total: 0
+  passed: 0
   failed: 0
+  note: "CI 验证前不预标测试结果,等实构建后如实填"
 
 knowledge_gained:
   - "abiword-plugin-epub 是 AbiWord 3.0.8 的 EPUB 电子书导出插件"
