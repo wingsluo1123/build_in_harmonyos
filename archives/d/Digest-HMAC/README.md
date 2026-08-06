@@ -56,13 +56,13 @@ my $signature = $hmac->hexdigest;
 ### 使用预编译包
 
 ```bash
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- Digest-HMAC 1.05
+conan install --requires=digest-hmac/1.05@ohpcd/stable
 ```
 
 ### 手动编译
 
 ```bash
-wget http://cpan.metacpan.org/authors/id/A/AR/ARODLAND/Digest-HMAC-1.05.tar.gz
+wget https://cpan.metacpan.org/authors/id/A/AR/ARODLAND/Digest-HMAC-1.05.tar.gz
 tar xzf Digest-HMAC-1.05.tar.gz
 cd Digest-HMAC-1.05
 perl Makefile.PL INSTALL_BASE=$HOME/usr/local
