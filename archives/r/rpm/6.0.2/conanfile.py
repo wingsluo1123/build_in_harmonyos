@@ -47,7 +47,7 @@ class RpmConan(ConanFile):
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         if self.settings.os in ("Linux", "OHOS"):
             tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"
-            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
+            tc.cache_variables["CMAKE_SYSTEM_PROCESSOR"] = str(self.settings.arch)
         tc.cache_variables["CMAKE_PREFIX_PATH"] = sys_prefix
         tc.variables["ENABLE_PYTHON"] = False
         tc.variables["ENABLE_PLUGINS"] = True
