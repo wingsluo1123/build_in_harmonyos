@@ -1,7 +1,7 @@
 #!/bin/bash
 # test.sh — gleam test_package
 # Tests that the gleam binary works correctly by running --version
-set -e
+set -euo pipefail
 
 # Find the gleam binary from the conan package
 GLEAM_BIN=$(find "$(dirname "$0")/.." -name "gleam" -path "*/bin/*" -type f 2>/dev/null | head -1)
@@ -26,7 +26,7 @@ exit_code=$?
 echo "Output: $output"
 echo "Exit code: $exit_code"
 
-if [ $exit_code -ne 0 ]; then
+if [ "$exit_code" -ne 0 ]; then
     echo "FAIL: gleam --version exited with $exit_code"
     exit 1
 fi

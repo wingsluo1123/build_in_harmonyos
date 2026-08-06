@@ -24,7 +24,7 @@ class GleamConan(ConanFile):
     description = "Statically-typed language for the Erlang VM"
     license = "Apache-2.0"
     homepage = "https://gleam.run/"
-    url = ""  # CI fills this
+    url = "https://github.com/gleam-lang/gleam"
 
     package_type = "application"
 
