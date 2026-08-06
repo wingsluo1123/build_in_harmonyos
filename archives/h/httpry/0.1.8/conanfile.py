@@ -2,8 +2,8 @@
 """Conan recipe for httpry 0.1.8 — HTTP logging and information retrieval tool.
 
 Build system: Makefile (plain make, no configure).
-Dependencies: libpcap (static), libm, pthread.
-Patch: pthread_cancel replaced with flag-based cancellation (OHOS lacks pthread_cancel).
+Dependencies: libpcap, libm, pthread.
+Patch: pthread_cancel replaced with cooperative flag-based cancellation (OHOS lacks pthread_cancel).
 """
 import os
 
@@ -38,19 +38,24 @@ class HttpryConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        cc = compilers.get("c", "clang")
         pcap = self.dependencies["libpcap"]
         inc_dir = os.path.join(pcap.package_folder, "include")
         lib_dir = os.path.join(pcap.package_folder, "lib")
         self.run(
-            f"make CC=clang "
-            f"CCFLAGS='-Wall -O2 -fPIC -I{inc_dir}' "
-            f"LIBS='-L{lib_dir} -lpcap -lm -pthread'",
+            f'make -j{os.cpu_count() or 1} '
+            f'"CC={cc}" '
+            f'"CCFLAGS=-Wall -O3 -funroll-loops -I{inc_dir}" '
+            f'"LIBS=-L{lib_dir} -lpcap -lm -pthread"',
             cwd=self.source_folder,
         )
 
     def package(self):
         copy(self, "httpry", self.source_folder, os.path.join(self.package_folder, "bin"))
-        copy(self, "httpry.1", self.source_folder, os.path.join(self.package_folder, "man", "man1"))
+        copy(self, "httpry.1", self.source_folder, os.path.join(self.package_folder, "share", "man", "man1"))
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.includedirs = []
+        self.cpp_info.libdirs = []
