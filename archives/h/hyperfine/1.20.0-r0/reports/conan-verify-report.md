@@ -3,7 +3,7 @@
 **Verdict**: PASS
 **Reference**: `hyperfine/1.20.0-r0@ohpcd/stable`
 **Profile**: ohos-aarch64
-**Date**: 2026-08-06T19:05:43.898707
+**Date**: 2026-08-06T19:59:26.138948
 
 ## G0: ✅ PASS
   📦 构建系统: unknown
