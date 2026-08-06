@@ -55,7 +55,7 @@
 
 | 文件 | 原因 | 方式 | 补丁 |
 |------|------|------|------|
-| configure | HMDFS mktemp 权限修复 | 手动编辑 | 0001-configure.patch |
+| configure | HMDFS mktemp 权限修复 | refresh-patch --auto 生成 | 0001-configure.patch |
 
 ---
 
