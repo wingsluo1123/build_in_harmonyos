@@ -2,20 +2,36 @@ software: hwinfo
 version: 25.2
 status: built
 build_system: makefile
+build_date: "2026-08-06"
 url: https://api.opensuse.org/public/source/openSUSE:Factory/hwinfo/hwinfo-25.2.tar.xz
-dependencies: []
+dependencies:
+  - uuid/2.40.1
 configure_options: []
 compiler: clang
 platform: aarch64
 kernel_version: 5.10.0
-last_updated: 2026-04-29
+last_updated: 2026-08-06
 
 compilation_notes:
-  - "手动生成 version.h 文件以解决 HD_VERSION_STRING 未定义错误"
-  - "系统缺少 install 命令，手动复制文件到 staging 目录"
+  - "version.h auto-generation fails (git2log requires .git dir) — generated in conanfile build()"
+  - "sockaddr_storage redefinition (OHOS sys/socket.h vs linux/socket.h) — fixed with -D__MUSL__"
+  - "lex command missing — used flex directly"
+  - "ln -s hangs on HMDFS — pre-created ISDN.CDB.txt by copy"
+  - "GNU install command missing — used conan copy() in package()"
 
 issues_fixed:
   - issue: "HD_VERSION_STRING 未定义"
-    root_cause: "Makefile 应自动生成 version.h 但未生成"
-    solution: "手动执行 echo '#define HD_VERSION_STRING \"25.2\"' > src/hd/version.h"
-    knowledge_ref: "新建知识条目 E-git2log-permission"
+    root_cause: "Makefile git2log requires .git dir, version.h not auto-generated"
+    solution: "Generated version.h in conanfile build() with correct version string"
+  - issue: "sockaddr_storage redefinition"
+    root_cause: "OHOS sys/socket.h and linux/socket.h define conflicting sockaddr_storage"
+    solution: "Added -D__MUSL__ to suppress linux/socket.h definition"
+  - issue: "lex command not found"
+    root_cause: "OHOS system has flex but not lex"
+    solution: "Used flex directly to generate lex.yy.c"
+  - issue: "ln -s hangs on HMDFS"
+    root_cause: "HMDFS does not support symbolic link creation"
+    solution: "Pre-created ISDN.CDB.txt by copying ISDN.ppc.txt"
+  - issue: "GNU install command missing"
+    root_cause: "OpenHarmony uses toybox, lacks GNU coreutils install"
+    solution: "Used conan copy() in package() instead of make install"
