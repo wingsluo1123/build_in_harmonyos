@@ -50,8 +50,8 @@ class TREConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
-        # Upstream make check (wretest 4/53447 expected fail: OHOS locale limit)
-        self.run("make check || true", cwd=self.source_folder)
+        # Upstream make check — wretest ~4/53447 expected fail (OHOS locale limit)
+        self.run("make check", cwd=self.build_folder, ignore_errors=True)
 
     def package(self):
         autotools = Autotools(self)
