@@ -105,10 +105,11 @@ class StkConan(ConanFile):
         # R8: advertise whether pthread_cancel()/pthread_testcancel() are
         # *declared* (not merely linkable).  The patched Thread.cpp guards the
         # cancel paths on STK_HAVE_PTHREAD_CANCEL (by value), so on OHOS -- where
-        # musl omits the declarations -- the paths compile out.  We pass the
-        # probe result as a CMake cache variable here (the mechanism that is
-        # actually honoured by Conan's direct cmake invocation); the CMakeLists
-        # patch deliberately no longer runs check_symbol_exists(), which returns
+        # musl omits the declarations -- the paths compile out.  The probe result
+        # is passed as the STK_HAVE_PTHREAD_CANCEL CMake cache variable in build()
+        # (the mechanism actually honoured by Conan's direct cmake invocation); the
+        # CMakeLists patch deliberately no longer runs check_symbol_exists(), which
+        # returns
         # a false positive on OHOS (the symbol links but is undeclared).
         tc.generate()
 
