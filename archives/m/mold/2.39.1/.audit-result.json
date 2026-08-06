@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_r5",
+      "file": "archives/m/mold/2.39.1/conanfile.py",
+      "line": 21,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' is explicitly forbidden by code_style rule 5 (禁止残留模板占位符). The url attribute should point to the recipe repository URL, not be left empty with a CI-fills-this comment.",
+      "fix_suggestion": "Set url to the recipe repository URL. Example: url = \"https://cnb.cool/your-org/build_in_harmonyos/-/tree/main/archives/m/mold\""
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_r16",
+      "file": "archives/m/mold/2.39.1/test_package/conanfile.py",
+      "line": 8,
+      "description": "Unused import: 'import os' is imported but never referenced anywhere in the test_package conanfile.py. All methods (requirements, layout, build, test) use only Conan API calls, none of which require the os module.",
+      "fix_suggestion": "Remove the 'import os' line since it is not used."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/m/mold/2.39.1/test_package/test.c",
+      "line": 4,
+      "description": "test.c only prints a string ('printf(\"test mold: build OK\\n\")') without testing any mold functionality, matching the 'deceptive — only prints' pattern from R34. While R34 is satisfied at the package level (conanfile.py test() runs 'mold --version' to execute the binary), the test.c source itself could be more meaningful for a linker tool.",
+      "fix_suggestion": "Consider using mold as a linker in the test (e.g., compile a minimal object file and link it with mold, then verify the output binary runs), rather than just printing a success message."
+    }
+  ],
+  "summary": "Audit of mold 2.39.1 Conan recipe (branch feat/mold-2.39.1, 9 changed files reviewed against code_style and review_memory rules). No P0 (deceptive behavior) or P1 (recipe correctness) issues found. R34 PASS: test_package executes mold binary via 'mold --version' in conanfile.py test() method. SHA-256 in conandata.yml is valid (64 hex chars, not all-zeros/all-f, not fake). manifest.yaml status 'built' is consistent with README and not fake (not marking failed as published). R33 PASS: no hardcoded shell variables in build() method — uses CMake(self) API. R32 PASS: no OS check that would exclude OHOS — recipe uses CMakeToolchain with CMAKE_SYSTEM_NAME=Linux workaround for E092. Version 2.39.1 consistent across all files (conanfile.py, conandata.yml, manifest.yaml, commands.json, README.md, MANIFEST.yml). R39 PASS: source URL is official GitHub (rui314/mold). R37 PASS: first adaptation uses upstream version 2.39.1 (no suffix needed). 2 patches exist (0001-lib-common.h.patch 6615 bytes, 0002-src-gdb-index.cc.patch 993 bytes) with substantive OHOS adaptation logic (C++20 std::ranges shim, operator<=> replacement) — not empty stubs. commands.json correctly declares mold as 'tool' type. One P2 issue: 'url = \"\"  # CI fills this' template placeholder in conanfile.py (code_style rule 5). Two P3 suggestions: unused 'import os' in test_package/conanfile.py, and test.c is print-only (R34 satisfied at package level but test.c could test actual linking). Verdict: PASS."
+}

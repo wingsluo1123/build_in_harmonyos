@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration file
+# CI script (build_and_test.sh L0e) requires this file
+
+package: mold/2.39.1
+homepage: "https://github.com/rui314/mold"
+
+upstream_check_command: "ctest"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: test/hello-dynamic.sh
+    source: mold-2.39.1/test/hello-dynamic.sh
+    description: "Dynamic linking test (requires cc + crt objects, skipped on OHOS)"
+    command: "ctest -R aarch64-hello-dynamic"
+
+test_package_tests:
+  - file: test.c
+    description: "Build test: verify CMake toolchain integration"
+    command: "./test_mold"
+  - file: conanfile.py
+    description: "Binary test: run mold --version to verify installed binary"
+    command: "mold --version"
+
+assertion_count: 2
