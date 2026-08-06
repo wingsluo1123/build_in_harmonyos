@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "CS2",
+      "file": "archives/n/nkf/2.1.5/conanfile.py",
+      "line": 15,
+      "description": "url is set to the same value as homepage (url = homepage). Conan convention recommends url point to the recipe repository while homepage points to the upstream project page. While not a placeholder (it has a real value), separating them improves traceability.",
+      "fix_suggestion": "Set url to the recipe repository URL if different from homepage, or leave as-is if the recipe is hosted in the same repo."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/n/nkf/2.1.5/manifest.yaml",
+      "line": 38,
+      "description": "patch_classification marks platform_only: True for the 0001-Makefile.patch, but the patch is a general FHS portability fix (changing man page path from $(prefix)/man to $(prefix)/share/man) applicable to all Linux/Unix systems, not HarmonyOS-specific. The conandata.yml correctly classifies it as patch_type: portability.",
+      "fix_suggestion": "Consider setting platform_only: False to reflect that this is a general portability fix, not a platform-specific adaptation."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS9",
+      "file": "archives/n/nkf/2.1.5/test_package/test.sh",
+      "line": 14,
+      "description": "The SJIS-to-UTF-8 test depends on the xxd utility (xxd -p) to convert nkf output to hex for comparison. If xxd is not available on the test system, the test will fail (which is correct behavior due to set -euo pipefail), but it could cause false failures on minimal systems.",
+      "fix_suggestion": "Consider using od -A n -t x1 | tr -d ' \\n' as a more universally available alternative to xxd -p, or document xxd as a test prerequisite."
+    }
+  ],
+  "summary": "Audit of nkf 2.1.5 Conan recipe (branch feat/nkf-2.1.5, 11 changed files) — VERDICT: PASS. No P0 (deception) or P1 (correctness) issues found. 3 minor P3 (hint) observations noted.\n\nDECEPTION DETECTION (all PASS):\n- R34 (empty shell test): test_package/test.sh actually executes the nkf binary with 3 real functional tests: (1) nkf --version, (2) SJIS-to-UTF-8 encoding conversion with hex output verification, (3) UTF-8 passthrough verification. NOT an empty shell test.\n- R9 (skip/fake test): test_package/conanfile.py test() method runs test.sh via self.run() — no pass/skip/os.system('exit 0').\n- Fake status: status is consistently 'built' across version manifest.yaml, software manifest.yaml, and notes.md — honest (not marked published without CI upload).\n- Fake sha256: sha256 '10cf6eb3d4d095919185ac224d5a634e9926d731e656d04bacb270e5cae0e28c' is 64 hex chars, not all-zeros/all-f, consistent across conandata.yml and manifest.yaml.\n- R8 (#ifdef __OHOS__ stub): No #ifdef __OHOS__ guards in code or patches.\n- R19 (pre-compiled binaries): No .so/.a/.o or binary artifacts in PR.\n- R40 (deep adaptation): nkf is a pure C text encoding converter — not in sensitive categories (graphics/UI/multimedia/hardware/system-level). No deep adaptation required.\n\nKEY CHECKS (all PASS):\n- R34: test_package invokes nkf binary with real encoding conversion tests ✓\n- R33: build() uses CC=clang as a make variable (hardcoded), not bare shell env var (os.environ) ✓\n- R39: Source URL is official GitHub repo (https://github.com/nurse/nkf) ✓\n- R38: commands.json exists at software level with type='tool' for CLI tool ✓\n- CS1: conanfile.py has shebang #!/usr/bin/env python3 + docstring ✓ (both main and test_package)\n- CS5: No template placeholders (TODO/FIXME/XXX/url='') anywhere ✓\n- CS7: test.sh has set -euo pipefail ✓\n- CS9: test.sh uses [step]/[ok]/[fail] format with 8-space indent ✓\n- CS12: patch_description '0001 Fix man page install path' is space-separated ✓\n\nCROSS-FILE CONSISTENCY (all consistent):\n- Status: 'built' in version manifest.yaml, software manifest.yaml, notes.md ✓\n- URL: https://github.com/nurse/nkf in conandata.yml, manifest.yaml, commands.json, README.md, MANIFEST.yml ✓\n- sha256: identical in conandata.yml and version manifest.yaml ✓\n- Package type: 'application' in conanfile.py, 'tool' in commands.json and manifest.yaml ✓\n- Patch: declared in conandata.yml, file exists, listed in manifest.yaml patches_applied ✓\n- Conan 2.x API: from conan import ConanFile, conan.tools.files, conan.tools.layout ✓\n- Method order (CS3): export_sources → layout → source → build → package → package_info ✓\n- No forbidden files (.build-context-*, .log, .DS_Store, pre-compiled binaries, SUMMARY.md) ✓\n\n3 P3 hints identified (do not affect verdict): (1) url=homepage could be separated, (2) platform_only=True metadata inconsistent with general portability fix, (3) xxd dependency in test.sh."
+}
