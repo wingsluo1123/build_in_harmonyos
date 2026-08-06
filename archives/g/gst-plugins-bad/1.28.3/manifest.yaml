@@ -2,50 +2,51 @@ software: gst-plugins-bad
 version: "1.28.3"
 build_system: meson
 status: built
-build_date: "2026-05-30"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_date: "2026-08-06"
 
 source:
-  url: "https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad-1.28.3.tar.xz"
+  url: "https://github.com/GStreamer/gstreamer/archive/refs/tags/1.28.3.tar.gz"
   sha256: ""
-  tar_format: tar.xz
-
-# ============================================================
-# 构建配置
-# ============================================================
+  tar_format: tar.gz
 
 build:
   system: meson
   configure_options:
-    - "-Dgl=disabled"
-    - "-Dopensles=disabled"
-    - "-Dwebp=disabled"
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--buildtype=release"
+    - "-Dbase=enabled"
+    - "-Dbad=enabled"
+    - "-Dgood=disabled"
+    - "-Dugly=disabled"
+    - "-Dlibav=disabled"
+    - "-Ddevtools=disabled"
+    - "-Dges=disabled"
+    - "-Drtsp_server=disabled"
+    - "-Dpython=disabled"
+    - "-Dsharp=disabled"
+    - "-Dtests=disabled"
+    - "-Dexamples=disabled"
+    - "-Dintrospection=disabled"
+    - "-Dtls=disabled"
+    - "-Dbenchmarks=disabled"
+    - "-Dorc=disabled"
+    - "-Dgpl=disabled"
+    - "-Dgst-full=disabled"
+    - "-Dgst-plugins-bad:opensles=disabled"
+    - "--wrap-mode=nodownload"
   dependencies:
-    - gstreamer/1.28.3
-    - gst-plugins-base/1.28.3
     - glib/2.88.0
+    - pcre2/10.47
+    - libffi/3.4.6
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
-
 patches_applied: []
 
-# ============================================================
-# 知识沉淀
-# ============================================================
-
 knowledge_gained:
-  - "gst-plugins-bad 1.28.3 使用 meson 构建系统（非 autotools）"
-  - "GL 插件需禁用（OHOS GL 头文件冲突：GL_CONTEXT_PROFILE_MASK 等宏未定义）"
-  - "opensles 插件需禁用（Android OpenSLES_Android.h 不存在于 OHOS）"
-  - "webp 插件需禁用（静态库符号冲突：SharpYuvInit/SharpYuvConvert）"
-  - "gst-plugins-base 是必要依赖（gstreamer-plugins-base-1.0.pc）"
-  - "meson builddir 必须放在源码目录外（HMDFS 文件系统限制）"
-  - "sys/nvcodec, opensles 等 15 个子目录从 .orig 复制到 .work 才能通过 meson 配置"
-  - "源码 tarball 中部分 sys 子目录缺失（nvcodec 等），需从 .orig 复制"
+  - "GStreamer 1.28.x uses monorepo structure; gst-plugins-bad is a subproject"
+  - "Must build from monorepo root to resolve gstreamer/gst-plugins-base subproject dependencies"
+  - "OpenSLES plugin (Android-specific) must be disabled with -Dgst-plugins-bad:opensles=disabled"
+  - "System glib from cmd-pkgs requires pcre2 and libffi to be built from source for static linking"
+  - "Network restrictions prevent downloading meson wraps from gitlab.freedesktop.org"
+  - "glib.wrap must be removed to force meson to use system-installed glib (avoid GNOME download timeout)"
