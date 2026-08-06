@@ -86,11 +86,13 @@ class GithubMcpServerConan(ConanFile):
         goarch = "arm64" if self.settings.arch == "armv8" else str(self.settings.arch)
 
         # Set up Go build environment (R33: use os.environ, not shell vars in self.run)
-        goroot = os.path.dirname(os.path.dirname(go_bin))
+        # Resolve symlink to find actual GOROOT
+        go_bin_real = os.path.realpath(go_bin)
+        goroot = os.path.dirname(os.path.dirname(go_bin_real))
         gopath = os.path.join(self.build_folder, "gopath")
         os.makedirs(gopath, exist_ok=True)
 
-        os.environ["GOROOT"] = os.environ.get("GOROOT", goroot)
+        os.environ["GOROOT"] = goroot
         os.environ["GOPATH"] = gopath
         os.environ["GOPROXY"] = "https://goproxy.cn,direct"
         os.environ["CGO_ENABLED"] = "0"
