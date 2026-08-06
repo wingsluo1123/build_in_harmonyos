@@ -6,10 +6,10 @@ Cargo/Rust workspace project. Builds a single binary: git-cliff.
 License: MIT OR Apache-2.0
 Homepage: https://github.com/orhun/git-cliff
 """
+import glob
 import os
 import shutil
 import subprocess
-import stat
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -56,31 +56,33 @@ class GitCliffConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ensure_rust(self):
-        """Find or install Rust toolchain. Returns cargo binary path."""
-        # 1. Try existing cargo in PATH
-        cargo = shutil.which("cargo")
-        if cargo:
-            return cargo
+        """Find or install Rust toolchain. Returns cargo binary path (ELF, not wrapper)."""
+        brew_prefix = "/storage/Users/currentUser/.harmonybrew"
+        brew_bin = os.path.join(brew_prefix, "bin")
+        brew = os.path.join(brew_bin, "brew")
 
-        # 2. Check Harmonybrew installation
-        brew_cargo = "/storage/Users/currentUser/.harmonybrew/bin/cargo"
-        if os.path.isfile(brew_cargo) and os.access(brew_cargo, os.X_OK):
-            return brew_cargo
+        # 1. Check for cargo.real in Harmonybrew Cellar (the actual ELF binary)
+        cellar_cargo = glob.glob(os.path.join(brew_prefix, "Cellar/rust/*/bin/cargo.real"))
+        if cellar_cargo:
+            return cellar_cargo[0], brew_bin
+
+        # 2. Try cargo.real in PATH (if Harmonybrew bin is in PATH)
+        for path_dir in os.environ.get("PATH", "").split(":"):
+            candidate = os.path.join(path_dir, "cargo.real")
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                return candidate, path_dir
 
         # 3. Install Harmonybrew + Rust
         self.output.info("Rust toolchain not found, installing via Harmonybrew...")
-        brew_bin = "/storage/Users/currentUser/.harmonybrew/bin"
-        brew = os.path.join(brew_bin, "brew")
-
         if not os.path.isfile(brew):
-            # Install Harmonybrew
             self.run(f'zsh -c "$(curl -fsSL {HOMEBREW_INSTALL})"')
 
-        # Install Rust via brew
         self.run(f'eval "$({brew} shellenv)" && brew install rust 2>&1')
 
-        if os.path.isfile(brew_cargo):
-            return brew_cargo
+        # Check again for cargo.real
+        cellar_cargo = glob.glob(os.path.join(brew_prefix, "Cellar/rust/*/bin/cargo.real"))
+        if cellar_cargo:
+            return cellar_cargo[0], brew_bin
 
         raise ConanException(
             "Failed to install Rust toolchain. "
@@ -123,7 +125,7 @@ class GitCliffConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        cargo = self._ensure_rust()
+        cargo, rust_bin = self._ensure_rust()
         local_bin = self._ensure_cc()
         cargo_home = self._setup_cargo_mirror()
 
@@ -131,25 +133,34 @@ class GitCliffConan(ConanFile):
         env = dict(os.environ)
         env["CARGO_HOME"] = cargo_home
 
-        # Set up PATH
-        paths = [os.path.dirname(cargo)]
+        # Set up PATH (include rust bin dir for rustc, and local bin for cc/c++)
+        rustc_path = os.path.join(rust_bin, "rustc")
+        paths = [rust_bin]
         if local_bin:
             paths.append(local_bin)
         paths.append(env.get("PATH", ""))
         env["PATH"] = ":".join(paths)
 
-        # Set RUSTC if we can find it
-        rustc = shutil.which("rustc") or os.path.join(os.path.dirname(cargo), "rustc")
-        if os.path.isfile(rustc):
-            env["RUSTC"] = rustc
+        # Set RUSTC explicitly
+        if os.path.isfile(rustc_path):
+            env["RUSTC"] = rustc_path
 
-        # Run cargo build using subprocess for full environment control
+        # Set SSL cert for HTTPS downloads
+        ssl_cert = env.get("SSL_CERT_FILE", "/storage/Users/currentUser/usr/local/ssl/cert.pem")
+        env["SSL_CERT_FILE"] = ssl_cert
+
+        # Set LD_LIBRARY_PATH for Rust shared libs
+        rust_lib = os.path.join(os.path.dirname(rust_bin), "lib")
+        if os.path.isdir(rust_lib):
+            existing_ld = env.get("LD_LIBRARY_PATH", "")
+            env["LD_LIBRARY_PATH"] = rust_lib + (":" + existing_ld if existing_ld else "")
+
+        # Run cargo.real directly (ELF binary, no shell wrapper needed)
         self.output.info(f"Running: {cargo} build --release")
         result = subprocess.run(
             [cargo, "build", "--release"],
             env=env,
             cwd=self.build_folder,
-            capture_output=False,
         )
         if result.returncode != 0:
             raise ConanException(
@@ -157,7 +168,6 @@ class GitCliffConan(ConanFile):
             )
 
     def package(self):
-        # Copy the release binary to bin/
         target_dir = os.path.join(self.build_folder, "target", "release")
         copy(self, "git-cliff", target_dir, os.path.join(self.package_folder, "bin"))
 
