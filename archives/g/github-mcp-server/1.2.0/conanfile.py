@@ -46,7 +46,7 @@ class GithubMcpServerConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        # Verify Go toolchain is available
+        # Verify Go toolchain is available; install if missing
         go_bin = shutil.which("go")
         if not go_bin or not os.path.isfile(go_bin):
             # Try common HarmonyOS Go locations
@@ -58,9 +58,27 @@ class GithubMcpServerConan(ConanFile):
                     go_bin = candidate
                     break
             else:
-                raise RuntimeError(
-                    "Go toolchain not found. Install Go (e.g. via Harmonybrew: brew install go)"
-                )
+                # Go not found — install via Harmonybrew
+                self.output.info("Go toolchain not found, installing via Harmonybrew...")
+                brew = shutil.which("brew") or os.path.expanduser("~/.harmonybrew/bin/brew")
+                if brew and os.path.isfile(brew):
+                    self.run(f'"{brew}" install go')
+                else:
+                    # Install Harmonybrew first, then Go
+                    self.run(
+                        'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)" || true'
+                    )
+                    brew = os.path.expanduser("~/.harmonybrew/bin/brew")
+                    if os.path.isfile(brew):
+                        self.run(f'"{brew}" install go')
+
+                # Re-check after installation
+                go_bin = shutil.which("go") or os.path.expanduser("~/.harmonybrew/bin/go")
+                if not go_bin or not os.path.isfile(go_bin):
+                    raise RuntimeError(
+                        "Go toolchain installation failed. "
+                        "Install Go manually: brew install go"
+                    )
 
         # Map Conan settings to Go environment
         # OHOS maps to linux for Go cross-compilation
