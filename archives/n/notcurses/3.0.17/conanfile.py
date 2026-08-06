@@ -152,7 +152,7 @@ class NotcursesConan(ConanFile):
         if os.path.isdir(ncurses_inc):
             tc.extra_cflags.append("-I" + ncurses_inc)
         if os.path.isdir(ncurses_lib):
-            tc.extra_ldflags.append("-L" + ncurses_lib)
+            tc.variables["CMAKE_LIBRARY_PATH"] = ncurses_lib
         # Set PKG_CONFIG_PATH for ncursesw discovery
         pkgconfig_path = os.path.join(prefix, "lib", "pkgconfig")
         if os.path.isdir(pkgconfig_path):
