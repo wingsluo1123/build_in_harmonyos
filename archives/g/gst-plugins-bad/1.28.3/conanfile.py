@@ -101,7 +101,7 @@ class GstPluginsBadConan(ConanFile):
         # 1. Install glib from cmd-pkgs if not present
         if not os.path.exists(f"{prefix}/lib/libglib-2.0.a"):
             self.output.info("Installing glib 2.88.0 from cmd-pkgs...")
-            self.run("curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.88.0")
+            self.run("sh -c 'curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.88.0'", env="conanbuild")
         # 2. Build pcre2 from source if not present (glib dependency)
         if not os.path.exists(f"{prefix}/lib/libpcre2-8.a"):
             self.output.info("Building pcre2 from source...")
