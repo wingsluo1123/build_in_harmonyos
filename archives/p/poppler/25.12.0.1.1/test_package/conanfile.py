@@ -35,7 +35,11 @@ class PopplerTestConan(ConanFile):
         poppler = self.dependencies["poppler"]
         lib_dir = os.path.join(poppler.package_folder, "lib")
         if os.path.isdir(lib_dir):
-            tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = f"-Wl,-rpath,{lib_dir}"
+            existing = tc.cache_variables.get("CMAKE_EXE_LINKER_FLAGS", "")
+            if existing:
+                tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = f"{existing} -Wl,-rpath,{lib_dir}"
+            else:
+                tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = f"-Wl,-rpath,{lib_dir}"
         tc.generate()
 
     def build(self):
