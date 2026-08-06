@@ -34,11 +34,11 @@ class KlystrackConan(ConanFile):
         # CI 真根因: klystrack 上游 tarball 缺 klystron git submodule 源码
         # → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util），klystrack 源码大量
         # #include "snd/music.h" / "gfx/font.h" 等无法编译
-        # 修法: patches/klystron-src/ 74 文件树随配方导出到 recipe 缓存
+        # 修法: klystron-src/ 74 文件树随配方导出到 recipe 缓存
         # （build() 阶段 self.recipe_folder 指向缓存副本，需 export_sources 把补丁同步过去）
-        patch_root = os.path.join(self.recipe_folder, "patches", "klystron-src")
+        patch_root = os.path.join(self.recipe_folder, "klystron-src")
         if os.path.isdir(patch_root):
-            dst_dir = os.path.join(self.export_sources_folder, "patches", "klystron-src")
+            dst_dir = os.path.join(self.export_sources_folder, "klystron-src")
             os.makedirs(os.path.dirname(dst_dir), exist_ok=True)
             copy(self, "**", src=patch_root, dst=dst_dir)
 
@@ -75,7 +75,7 @@ class KlystrackConan(ConanFile):
         （.gitmodules: url = github.com/kometbomb/klystron.git）
         → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util + 根文件），
         klystrack 源码大量 #include "snd/music.h" / "gfx/font.h" 等无法编译
-        修法: 把 patches/klystron-src/ 74 文件树注入源码树根目录
+        修法: 把 klystron-src/ 74 文件树注入源码树根目录
         在 build() 开头调（source 已解包，self.source_folder 指向真实源码根）
 
         export_sources() 阶段 self.recipe_folder / export_sources_folder 指向 Conan
@@ -86,9 +86,9 @@ class KlystrackConan(ConanFile):
         import glob, os as _os, shutil as _sh
         recipe_root = _os.path.dirname(self.recipe_folder)  # cache 根（e/ 的父目录）
         candidates = [
-            _os.path.join(recipe_root, "es", "patches", "klystron-src"),
-            _os.path.join(self.recipe_folder, "patches", "klystron-src"),
-            _os.path.join(recipe_root, "s", "patches", "klystron-src"),  # source 缓存副本
+            _os.path.join(recipe_root, "es", "klystron-src"),
+            _os.path.join(self.recipe_folder, "klystron-src"),
+            _os.path.join(recipe_root, "s", "klystron-src"),  # source 缓存副本
         ]
         patch_root = None
         for cand in candidates:
@@ -96,7 +96,7 @@ class KlystrackConan(ConanFile):
                 patch_root = cand; break
         if patch_root is None:
             raise ConanException(
-                f"patches/klystron-src not found (tried {candidates}). "
+                f"klystron-src not found (tried {candidates}). "
                 "klystrack 上游 tarball 缺 klystron submodule src/ 源码，需补丁注入。"
             )
         # 遍历补丁树，复制每个文件到 source_folder 对应路径（避覆盖已存在文件）
