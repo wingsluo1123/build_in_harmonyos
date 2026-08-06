@@ -27,7 +27,7 @@ class GnomeAutoarConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": True, "fPIC": True}
+    default_options = {"shared": False, "fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -50,7 +50,16 @@ class GnomeAutoarConan(ConanFile):
         basic_layout(self, src_folder=".")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        sources = dict(self.conan_data["sources"])
+        mirror_url = sources.pop("mirror_url", None)
+        mirror_sha = sources.pop("mirror_sha256", None)
+        try:
+            get(self, **sources, strip_root=True)
+        except Exception as e:
+            if not mirror_url:
+                raise
+            self.output.warning(f"Primary source failed ({e}), trying mirror")
+            get(self, url=mirror_url, sha256=mirror_sha, strip_root=True)
 
     def _inject_meson_binaries(self):
         ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
@@ -117,6 +126,7 @@ class GnomeAutoarConan(ConanFile):
         tc.project_options["gtk"] = "false"
         tc.project_options["introspection"] = "disabled"
         tc.project_options["tests"] = "false"
+        tc.project_options["default_library"] = "static"
         tc.generate()
         self._inject_meson_binaries()
 
