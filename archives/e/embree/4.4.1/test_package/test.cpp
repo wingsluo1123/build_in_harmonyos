@@ -44,6 +44,7 @@ int main(void) {
     rayhit.ray.tnear = 0.0f;
     rayhit.ray.tfar = 100.0f;
     rayhit.ray.flags = 0;
+    rayhit.ray.mask = 0xFFFFFFFF;
     rayhit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
     rayhit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
 
