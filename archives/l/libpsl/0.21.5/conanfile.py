@@ -15,7 +15,6 @@ from conan import ConanFile
 from conan.tools.files import get, copy, rmdir, rm
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.gnu import PkgConfigDeps
-from conan.tools.env import Environment
 
 
 class LibpslConan(ConanFile):
@@ -58,13 +57,12 @@ class LibpslConan(ConanFile):
         tc.generate()
         deps = PkgConfigDeps(self)
         deps.generate()
-        # Fix: meson auto-detects llvm-ar as archiver for clang but can't find it
-        env = Environment()
-        env.define("AR", "/data/service/hnp/bin/llvm-ar")
-        env.define("RANLIB", "/data/service/hnp/bin/llvm-ranlib")
-        env.vars(self, "build").save()
 
     def build(self):
+        import os
+        # Fix: meson auto-detects llvm-ar as archiver for clang but can't find it
+        os.environ["AR"] = "/data/service/hnp/bin/llvm-ar"
+        os.environ["RANLIB"] = "/data/service/hnp/bin/llvm-ranlib"
         meson = Meson(self)
         meson.configure()
         meson.build()
