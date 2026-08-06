@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/tmp/skill/build_in_harmonyos/archives/h/hyperfine/1.20.0-r0/test_package/conanbuildenv-armv8.sh"

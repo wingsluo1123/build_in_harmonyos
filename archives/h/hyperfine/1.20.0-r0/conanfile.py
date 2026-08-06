@@ -26,7 +26,7 @@ from pathlib import Path
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import download, copy, apply_conandata_patches, export_conandata_patches
 
 
 class HyperfineConan(ConanFile):
@@ -52,10 +52,14 @@ class HyperfineConan(ConanFile):
         export_conandata_patches(self)
 
     def source(self):
-        # Download the Alpine APK (tar.gz) containing the precompiled binary.
-        # strip_root=False because the APK has multiple top-level entries
-        # (.SIGN.RSA, .PKGINFO, usr/).
-        get(self, **self.conan_data["sources"], strip_root=False)
+        # Download the Alpine APK (tar.gz format, not zip despite .apk extension).
+        # Conan's get() auto-detects .apk as zip, so we use download() + manual
+        # tar extraction instead.
+        src = self.conan_data["sources"]
+        apk_path = os.path.join(self.source_folder, "hyperfine.apk")
+        download(self, url=src["url"], filename=apk_path, sha256=src["sha256"])
+        # Extract using tar (Alpine APK is a gzip-compressed tar archive)
+        self.run(f'tar xzf "{apk_path}" -C "{self.source_folder}"')
 
     def build(self):
         # No compilation step — the binary is precompiled by Alpine Linux
