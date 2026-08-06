@@ -13,10 +13,10 @@
 - CI Build #12414 已进入 configure 阶段，失败点为 `config.status` 在
   OHOS/HMDFS Worker 上创建 `confstatXXXXXX` 临时目录后写入
   `subs.sed`、`subs.frag`、`out`、`config.h` 报 `Permission denied`，
-  最终未生成 Makefile。本轮通过正式 `conandata.yml` 补丁
-  `patches/0001-configure-hmdfs-umask.patch` 在 `configure` 与
-  `Osi/configure` 中将 config.status 临时目录创建处的 `umask 077`
-  调整为 `umask 022`，避免构建阶段 runtime sed 改写生成脚本。
+  最终未生成 Makefile。本轮由 `conanfile.py` 的 `build()` 使用
+  `replace_in_file`，在 `configure` 与 `Osi/configure` 中将
+  config.status 临时目录创建处的 `umask 077` 调整为 `umask 022`。
+  该替换只处理源码包中确定的生成脚本内容，不对应独立补丁文件。
 - `patches/0002-config-scripts-ohos.patch` 同时修补顶层和 `Osi/`
   子目录的 `config.guess/config.sub`，将 HarmonyOS 识别为 Linux/musl，
   取代配方构建阶段对生成脚本的运行时改写。

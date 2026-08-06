@@ -9,7 +9,8 @@ Osi 是 COIN-OR 项目的 Open Solver Interface，提供统一的 C++ 接口来�
 ## OHOS 适配要点
 
 - 使用 autotools 构建系统。
-- 依赖 `coinutils/2.11.13`，通过 `--with-coin-instdir` 指向 Conan 依赖包。
+- 依赖 `coinutils/2.11.13`，通过 `--with-coinutils-incdir` 和
+  `--with-coinutils-lib` 分别传入 Conan 依赖包的头文件目录和链接参数。
 - 默认构建静态库，避免运行时 RPATH 和可选求解器动态链接问题。
 
 ## 依赖
