@@ -138,16 +138,25 @@ class GitCliffConan(ConanFile):
         local_bin = self._ensure_cc()
         cargo_home = self._setup_cargo_mirror()
 
-        # Build environment: cargo + rustc in PATH, cc/c++ available, cargo mirror configured
-        build_env = dict(rust_env)
-        build_env["CARGO_HOME"] = cargo_home
+        # Set up environment for cargo build
+        # PATH: include rust bin, local bin (for cc/c++), and existing PATH
+        paths = [os.path.dirname(cargo)]
         if local_bin:
-            existing_path = build_env.get("PATH", os.environ.get("PATH", ""))
-            build_env["PATH"] = local_bin + ":" + existing_path
+            paths.append(local_bin)
+        paths.append(os.environ.get("PATH", ""))
+        os.environ["PATH"] = ":".join(paths)
 
-        # Export env vars and run cargo build
-        env_str = " ".join(f'{k}="{v}"' for k, v in build_env.items())
-        self.run(f'{env_str} "{cargo}" build --release')
+        # CARGO_HOME: use local mirror config
+        os.environ["CARGO_HOME"] = cargo_home
+
+        # LD_LIBRARY_PATH: Rust binaries may need shared libs from the toolchain
+        rust_lib = os.path.join(os.path.dirname(os.path.dirname(cargo)), "lib")
+        if os.path.isdir(rust_lib):
+            existing_ld = os.environ.get("LD_LIBRARY_PATH", "")
+            os.environ["LD_LIBRARY_PATH"] = rust_lib + (":" + existing_ld if existing_ld else "")
+
+        # Run cargo build with the full path to the binary
+        self.run(f'"{cargo}" build --release')
 
     def package(self):
         # Copy the release binary to bin/
