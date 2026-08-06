@@ -87,6 +87,7 @@ class OsiConan(ConanFile):
             "--without-gurobi",
         ])
         env = tc.environment()
+        env.append("CPPFLAGS", f"-I{coinutils_include}")
         if self.settings_build.os == "Windows":
             # Libtool's legacy command-line limit probe can loop for minutes
             # under MSYS. Use the conservative Windows limit explicitly.
@@ -122,7 +123,13 @@ class OsiConan(ConanFile):
 
     def package_info(self):
         libs = collect_libs(self)
+        coinutils_headers = os.path.join(
+            self.dependencies["coinutils"].package_folder,
+            "include",
+            "coin",
+        )
         self.cpp_info.libs = ["Osi"] if "Osi" in libs else libs
-        self.cpp_info.includedirs = ["include"]
+        self.cpp_info.includedirs = ["include", coinutils_headers]
+        self.cpp_info.requires = ["coinutils::coinutils"]
         self.cpp_info.set_property("cmake_file_name", "osi")
         self.cpp_info.set_property("cmake_target_name", "osi::osi")

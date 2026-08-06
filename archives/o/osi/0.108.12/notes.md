@@ -20,6 +20,12 @@
 - `patches/0002-config-scripts-ohos.patch` 同时修补顶层和 `Osi/`
   子目录的 `config.guess/config.sub`，将 HarmonyOS 识别为 Linux/musl，
   取代配方构建阶段对生成脚本的运行时改写。
+- MSYS 下 configure 生成的 CoinUtils 头文件参数可能被转换为反斜杠路径；
+  配方在 `CPPFLAGS` 中额外追加 POSIX 形式的 `include/coin` 目录，确保
+  Libtool 调用 OHOS Clang 时可以找到 `CoinPragma.hpp` 等传递头文件。
+- `osi::osi` 显式传递 `coinutils::coinutils` 以及依赖包的 `include/coin`
+  目录，确保消费端编译 Osi 公开头文件时可以自动获得 CoinUtils 的头文件
+  和静态库依赖。
 
 ## 风险
 
