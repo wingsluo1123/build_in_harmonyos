@@ -55,8 +55,9 @@
 
 ## 源码修改
 
-### patches/0001-atk-intl-wrapper.c.patch（新增文件）
-- 创建 intl-wrapper.c，将 g_libintl_* 符号映射到 libintl_* 符号
+### intl-wrapper.c（source() 内联写入，非补丁）
+- source() 方法通过 shutil 直接内联写入 atk/intl-wrapper.c（避 Conan 2.x patch 路径解析炸）
+- 实现：g_libintl_* wrapper 用 (char*) 转型返回 msgid/m 避 g_strdup 内存泄漏（aireview P2 已修）
 - 解决 glib 静态库引用 g_libintl_* 符号但 libintl.so 只导出 libintl_* 的问题（E107）
 
 ### patches/0002-atk-meson.build.patch

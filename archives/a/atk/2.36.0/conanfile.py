@@ -52,17 +52,17 @@ class AtkConan(ConanFile):
         # → 改走 g_strdup/字符串兜底避 gettext 依赖（g_libintl_* 返 g_strdup(msgid) 避 int 转换）
         intl_wrapper = os.path.join(self.source_folder, "atk", "intl-wrapper.c")
         with open(intl_wrapper, "w") as f:
-            f.write("""/* Wrapper: g_libintl_* 兜底避 OHOS musl libintl.h 无 gettext 声明（全 implicit int 炸） */
+            f.write("""/* Wrapper: g_libintl_* 转型避 OHOS musl libintl.h 无 gettext 声明 + 避 g_strdup 内存泄漏（aireview P2） */
 #include <glib.h>
-char *g_libintl_gettext(const char *msgid) { return g_strdup(msgid); }
-char *g_libintl_dgettext(const char *d, const char *m) { (void)d; return g_strdup(m); }
-char *g_libintl_dcgettext(const char *d, const char *m, int c) { (void)d; (void)c; return g_strdup(m); }
-char *g_libintl_ngettext(const char *m1, const char *m2, unsigned long n) { return g_strdup((n==1)?m1:m2); }
-char *g_libintl_dngettext(const char *d, const char *m1, const char *m2, unsigned long n) { (void)d; return g_strdup((n==1)?m1:m2); }
-char *g_libintl_dcngettext(const char *d, const char *m1, const char *m2, unsigned long n, int c) { (void)d; (void)c; return g_strdup((n==1)?m1:m2); }
-char *g_libintl_textdomain(const char *d) { return g_strdup(d); }
-char *g_libintl_bindtextdomain(const char *d, const char *dir) { (void)dir; return g_strdup(d); }
-char *g_libintl_bind_textdomain_codeset(const char *d, const char *cs) { (void)d; return g_strdup(cs); }
+char *g_libintl_gettext(const char *msgid) { return (char *)(msgid); }
+char *g_libintl_dgettext(const char *d, const char *m) { (void)d; return (char *)(m); }
+char *g_libintl_dcgettext(const char *d, const char *m, int c) { (void)d; (void)c; return (char *)(m); }
+char *g_libintl_ngettext(const char *m1, const char *m2, unsigned long n) { return (char *)((n==1)?m1:m2); }
+char *g_libintl_dngettext(const char *d, const char *m1, const char *m2, unsigned long n) { (void)d; return (char *)((n==1)?m1:m2); }
+char *g_libintl_dcngettext(const char *d, const char *m1, const char *m2, unsigned long n, int c) { (void)d; (void)c; return (char *)((n==1)?m1:m2); }
+char *g_libintl_textdomain(const char *d) { return (char *)(d); }
+char *g_libintl_bindtextdomain(const char *d, const char *dir) { (void)dir; return (char *)(d); }
+char *g_libintl_bind_textdomain_codeset(const char *d, const char *cs) { (void)d; return (char *)(cs); }
 """)
         # 补丁 0002/0003 走 patch() 应用（meson.build 改动是真 patch 真改非新建文件）
         patches = self.conan_data.get("patches", {}).get(str(self.version), []) if self.conan_data else []
@@ -116,21 +116,28 @@ char *g_libintl_bind_textdomain_codeset(const char *d, const char *cs) { (void)d
         # OHOS 工具链 llvm-ar 在 /data/service/hnp/bin/llvm-ar（无 -15 后缀）
         # Conan 生成的 native file [binaries] 段只注入 c/cpp 无 ar → tc.generate() 后手动追加 ar 行
         compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
-        ar = compilers.get("archive") or "/data/service/hnp/bin/llvm-ar"
+        # aireview P3: 避硬编码路径脆弱性 — compilers.get 拿 Conan 解析的 ar，fallback shutil.which 解析绝对路径
+        import shutil as _shutil
+        ar = compilers.get("archive") or _shutil.which("llvm-ar") or "/data/service/hnp/bin/llvm-ar"
         tc.generate()
         # 手动追加 ar 到 Conan 生成的 meson native file [binaries] 段（避 meson guess linker 炸）
+        # aireview P3: 硬编码 clang++ 路径脆弱 → 动态拿 compilers.get("cpp") 匹配真 cpp 行
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         if os.path.exists(native_file):
             with open(native_file, "r") as _nf:
                 content = _nf.read()
             if "ar = " not in content:
-                # 在 [binaries] 段 cpp 行后追加 ar 行
-                content = content.replace(
-                    "cpp = '/data/service/hnp/bin/clang++'",
-                    f"cpp = '/data/service/hnp/bin/clang++'\nar = '{ar}'"
+                # 动态匹配真 cpp 行（避硬编码 /data/service/hnp/bin/clang++ 路径脆弱性）
+                import re as _re
+                content_new, n = _re.subn(
+                    r"(cpp = '[^']*')",
+                    rf"\1\nar = '{ar}'",
+                    content,
+                    count=1,
                 )
-                with open(native_file, "w") as _nf:
-                    _nf.write(content)
+                if n:
+                    with open(native_file, "w") as _nf:
+                        _nf.write(content_new)
         # P2: PkgConfigDeps 让 atk configure 通过 pkg-config 找到 glib
         pkg = PkgConfigDeps(self)
         pkg.generate()
