@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — fig2dev 3.2.9a (Autotools application)"""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -10,7 +12,7 @@ class Fig2DevConan(ConanFile):
     description = "Convert Xfig drawings to various formats (EPS, PDF, PNG, etc.)"
     license = "Xfig"
     homepage = "https://sourceforge.net/projects/mcj/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 

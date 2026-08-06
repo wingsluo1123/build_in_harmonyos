@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""test_package for fig2dev — runs fig2dev --version smoke test."""
 import os
 
 from conan import ConanFile
