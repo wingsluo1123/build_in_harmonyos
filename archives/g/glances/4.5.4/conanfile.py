@@ -21,7 +21,7 @@ R38: Command-line tool — commands.json declared at software level.
 import os
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanInvalidConfiguration, ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -61,7 +61,7 @@ class GlancesConan(ConanFile):
             cwd=src,
         )
         if ret != 0:
-            raise ConanInvalidConfiguration(
+            raise ConanException(
                 f"pip install glances failed with exit code {ret}"
             )
 
@@ -74,7 +74,7 @@ class GlancesConan(ConanFile):
             cwd=src,
         )
         if ret != 0:
-            raise ConanInvalidConfiguration(
+            raise ConanException(
                 f"pip install runtime deps failed with exit code {ret}"
             )
 
@@ -122,10 +122,11 @@ class GlancesConan(ConanFile):
         self.cpp_info.resdirs = ["share", "glances", "glances-deps"]
 
         # Set PYTHONPATH so glances can find its modules and bundled deps
+        # PYTHONPATH must include package root (parent of glances/) and deps
         pkg = self.package_folder
         self.runenv_info.append_path(
             "PYTHONPATH",
-            os.path.join(pkg, "glances"),
+            pkg,
         )
         self.runenv_info.append_path(
             "PYTHONPATH",
