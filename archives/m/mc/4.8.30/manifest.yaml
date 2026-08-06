@@ -1,10 +1,58 @@
-software: mc
-version: 4.8.30
-status: published
-build_system: autotools
-compiler: clang
-dependencies:
-  - glib 2.88.0
-  - ncurses 6.4
-  - libintl
-  - pcre2
+# 版本级 manifest — mc 4.8.30
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.8.30"
+software: "mc"
+status: built
+build_date: "2026-08-07"
+build_system: "autotools"
+
+source:
+  url: "https://github.com/MidnightCommander/mc/archive/refs/tags/4.8.30.tar.gz"
+  sha256: "6f17de6c380ad4e8b71b31c3e9e3a6bae8cb05f08d42d8896dd26e269ceeb387"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-slang"
+    - "--without-x"
+  dependencies:
+    - "glib2/2.88.0"
+    - "slang/2.3.3"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "configure.ac: m4_pattern_allow for dnl/AC_MSG_WARN/AC_MSG_ERROR (autoconf 2.73 compat)"
+  - "config.guess: HarmonyOS platform recognition"
+  - "config.sub: ohos OS alias"
+  - "configure: umask 077 -> 022 (HarmonyOS temp dir permission fix)"
+  - "po/Makefile.in: add top_builddir variable (gettext 1.0 compat)"
+
+knowledge_gained:
+  - "autoconf 2.73 treats dnl/AC_MSG_WARN/AC_MSG_ERROR as undefined macros; use m4_pattern_allow"
+  - "HarmonyOS umask 077 creates 700-permission dirs that the build process can't write to; use umask 022"
+  - "config.guess/config.sub need HarmonyOS (uname -s) and ohos triplet support"
+  - "conan .la files have incorrect libdir paths; remove .la files to force direct .a/.so linking"
+  - "mc needs libtermcap when slang uses termcap; create dummy libtermcap.a"
+  - "gettext 1.0 po/Makefile.in.in missing top_builddir variable; patch po/Makefile.in"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/mc-4.8.30.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/mc-4.8.30.work
+  source_orig_hash: ef8abc90a56b0999
+  source_work_hash: 32dadc4ca3d57e71
+  generated_at: '2026-08-07T04:29:29'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-INSTALL.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
