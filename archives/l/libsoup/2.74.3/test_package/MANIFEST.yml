@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration file
+# CI script (build_and_test.sh L0e) requires this file
+
+package: libsoup/2.74.3
+homepage: "https://gitlab.gnome.org/GNOME/libsoup"
+
+# Upstream test command
+upstream_check_command: "meson test --list"
+
+# Conanfile.py build() method does not integrate upstream tests
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream test programs (reference)
+upstream_tests:
+  - file: tests/cookies-test.c
+    source: libsoup-2.74.3/tests/cookies-test.c
+    description: "Cookie handling test"
+    command: "./cookies-test"
+  - file: tests/soup-test.c
+    source: libsoup-2.74.3/tests/soup-test.c
+    description: "General libsoup test utilities"
+    command: "./soup-test"
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test.c
+    description: "Verify libsoup API: create SoupMessage and unref"
+    command: "./test_libsoup"
+
+# Approximate assertion count
+assertion_count: 2
