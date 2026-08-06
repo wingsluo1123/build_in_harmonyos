@@ -2,21 +2,30 @@
 """Conan test_package for isync 1.5.1.
 
 isync is a command-line tool (mbsync), not a library.
-This test verifies the installed binary works by running `mbsync --version`.
+This test builds a C test program that runs mbsync --version
+to verify the installed binary is functional (R34).
 """
 import os
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class IsyncTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
-        # R34: Test must substantively use the tested package
-        # Run mbsync --version to verify the binary is functional
-        self.run("mbsync --version", env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
