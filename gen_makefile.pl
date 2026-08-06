@@ -26,11 +26,7 @@ open(my $sh, '<', $sh_file) or die "Cannot open $sh_file: $!";
 my @lines = <$sh>;
 close($sh);
 
-# 3. 设置变量
-my $spitshell = $config{spitshell} || 'cat';
-my $makefile = $config{Makefile} || 'Makefile';
-
-# 4. 提取所有 heredoc 块并处理变量替换
+# 3. Process heredoc blocks with variable substitution
 my $output = '';
 my $in_heredoc = 0;
 my $delimiter = '!GROK!THIS!';
@@ -49,11 +45,19 @@ for my $line (@lines) {
             $in_heredoc = 0;
             next;
         }
-        # 在 heredoc 内容中进行变量替换
+        # 在 heredoc 内容中进行变量替换 (avoid /e for safety)
         # 替换 ${var} 格式
-        $line =~ s/\$\{(\w+)\}/exists $config{$1} ? $config{$1} : "\${$1}"/ge;
+        while ($line =~ /\$\{(\w+)\}/) {
+            my $key = $1;
+            my $val = exists $config{$key} ? $config{$key} : "\$\{$key\}";
+            $line =~ s/\$\{$key\}/$val/;
+        }
         # 替换 $var 格式（但不是 $$ 或 $@ 等）
-        $line =~ s/\$([A-Za-z_]\w*)/exists $config{$1} ? $config{$1} : "\$$1"/ge;
+        while ($line =~ /\$([A-Za-z_]\w*)/) {
+            my $key = $1;
+            my $val = exists $config{$key} ? $config{$key} : "\$$key";
+            $line =~ s/\$$key\b/$val/;
+        }
         $output .= $line;
     }
 }

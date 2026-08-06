@@ -42,11 +42,13 @@ class PerlJsonXs(ConanFile):
                 if fn.endswith(".so"):
                     lib_dir = os.path.join(dest, "lib")
                     os.makedirs(lib_dir, exist_ok=True)
-                    shutil.copy2(os.path.join(root, fn), lib_dir)
+                    # Rename to avoid conflict with other XS.so packages
+                    target = os.path.join(lib_dir, "JSON_XS.so")
+                    shutil.copy2(os.path.join(root, fn), target)
 
     def package_info(self):
-        # The shared library is XS.so (Perl XS extension)
-        self.cpp_info.libs = ["XS"]
+        # Renamed from XS to JSON_XS to avoid .so naming conflict
+        self.cpp_info.libs = ["JSON_XS"]
         self.cpp_info.libdirs = ["lib"]
         # Perl module path for consumers
         self.cpp_info.includedirs = []

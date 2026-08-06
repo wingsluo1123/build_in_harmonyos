@@ -48,6 +48,7 @@ class {class_name}(ConanFile):
                     shutil.copy2(os.path.join(root, fn), lib_dir)
 
     def package_info(self):
+        # FIXME: replace "FIXME_SO_NAME" with the actual .so name (e.g. "DSA", "MD5")
         self.cpp_info.libs = ["{lib_name}"]
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.includedirs = []
@@ -100,8 +101,10 @@ def generate(pkg_dir):
 
     # 生成 conanfile.py
     cpan_name = name.replace("perl-", "").replace("-", "::")
-    # FIXME: lib_name is derived from the package name; verify it matches the actual .so output name
-    lib_name = cpan_name.split("::")[-1]
+    # lib_name cannot be auto-derived: Perl XS .so names use mixed case (DSA.so, MD5.so)
+    # that doesn't follow a deterministic pattern from the package name.
+    # Use a placeholder that forces manual correction.
+    lib_name = "FIXME_SO_NAME"
     conanfile = TEMPLATE.format(
         name=name, version=version, class_name=class_name,
         homepage=f"https://metacpan.org/pod/{cpan_name}",
