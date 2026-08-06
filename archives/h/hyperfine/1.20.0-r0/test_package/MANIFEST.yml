@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: hyperfine/1.20.0-r0
+homepage: "https://github.com/sharkdp/hyperfine"
+
+# 上游测试命令分析
+# hyperfine 是 Rust 命令行工具，上游通过 `cargo test` 运行单元测试。
+# 由于 rustc 在鸿蒙 musl 平台上 SIGSEGV (E072)，无法从源码编译或运行测试。
+# 本包使用 Alpine Linux 预编译二进制，上游 cargo test 无法在本地执行。
+upstream_check_command: "cargo test"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（Rust 集成测试，CI 阶段在具备 Rust 工具链的 runner 上执行）
+# 由于使用预编译二进制，上游测试不在 build() 中集成
+upstream_tests:
+  - file: tests/integration_tests.rs
+    source: hyperfine-1.20.0/tests/integration_tests.rs
+    description: "hyperfine 集成测试（运行基准测试、参数验证等）"
+    command: "cargo test --test integration_tests"
+    status_on_ohos: "blocked（rustc SIGSEGV on musl，无法编译测试）"
+
+# test_package 中自带的测试（消费者视角验证）
+# R34: 调用被测包的实际二进制（hyperfine --version），非空壳 stub
+test_package_tests:
+  - file: conanfile.py
+    description: "运行 hyperfine --version，验证二进制可执行且输出包含 'hyperfine'"
+    command: "hyperfine --version"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 2
