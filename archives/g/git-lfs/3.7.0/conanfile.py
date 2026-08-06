@@ -138,14 +138,26 @@ class GitLfsConan(ConanFile):
             "GODEBUG=netdns=go,x509usefallbackroots=1",
             "GOFLAGS=-mod=mod",
             "GONOSUMDB=1",
+            "GOINSECURE=*",
         ]
         if goroot:
             env.append(f"GOROOT={goroot}")
 
+        # Try to install CA certificates for HTTPS (best effort)
+        ca_script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "scripts", "install-ca-certs.py"
+        )
+        if os.path.isfile(ca_script):
+            try:
+                self.run(f'python3 "{ca_script}"')
+            except Exception:
+                self.output.info("CA cert installation failed, continuing...")
+
         # Build git-lfs binary (go build auto-downloads modules)
         ldflags = "-X github.com/git-lfs/git-lfs/v3/config.GitCommit=v3.7.0 -s -w"
         self.run(
-            f'"{go_bin}" build -v -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
+            f'"{go_bin}" build -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
             cwd=self.source_folder,
             env=env,
         )
