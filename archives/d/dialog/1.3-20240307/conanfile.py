@@ -106,15 +106,28 @@ class DialogConan(ConanFile):
         pass
 
     def source(self):
-        # Try downloading from URL first; fall back to bundled tarball
+        # Try downloading from original URL; fall back to GitCode-hosted copy
         # (CI worker may not have access to invisible-mirror.net)
-        local_tarball = os.path.join(self.source_folder, "dialog-1.3-20240307.tar.gz")
-        if os.path.exists(local_tarball):
-            # Use bundled tarball (export_sources copies it to source_folder)
-            with tarfile.open(local_tarball, "r:gz") as tar:
+        try:
+            get(self, **self.conan_data["sources"], strip_root=True)
+        except Exception:
+            # Download from GitCode-hosted copy on sources/dialog-1.3-20240307 branch
+            import urllib.request
+            token_file = os.path.expanduser("~/.gitcode-token")
+            token = ""
+            if os.path.isfile(token_file):
+                with open(token_file) as f:
+                    token = f.read().strip()
+            api_url = ("https://api.gitcode.com/api/v5/repos/"
+                       "OpenHarmonyPCDeveloper/build_in_harmonyos/raw/"
+                       "sources/dialog-1.3-20240307.tar.gz"
+                       f"?ref=sources/dialog-1.3-20240307&access_token={token}")
+            archive_path = os.path.join(self.source_folder, "dialog-1.3-20240307.tar.gz")
+            urllib.request.urlretrieve(api_url, archive_path)
+            # Extract
+            with tarfile.open(archive_path, "r:gz") as tar:
                 tar.extractall(self.source_folder)
-            # The extracted directory is dialog-1.3-20240307/
-            # Move contents to source_folder root
+            # Move contents from dialog-1.3-20240307/ to source_folder root
             extracted_dir = os.path.join(self.source_folder, "dialog-1.3-20240307")
             if os.path.isdir(extracted_dir):
                 for item in os.listdir(extracted_dir):
@@ -123,8 +136,7 @@ class DialogConan(ConanFile):
                     if not os.path.exists(dst):
                         os.rename(src, dst)
                 os.rmdir(extracted_dir)
-        else:
-            get(self, **self.conan_data["sources"], strip_root=True)
+            os.remove(archive_path)
         apply_conandata_patches(self)
 
     def generate(self):
