@@ -6,6 +6,8 @@ System prebuilt ncurses via DEFAULT_PREFIX env var.
 htop is a command-line application (not a library).
 """
 import os
+import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -43,12 +45,84 @@ class HtopConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _ensure_ncurses(self):
+        """Ensure ncursesw is available (install via cmd-pkgs if missing)."""
+        prefix = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
+        lib = os.path.join(prefix, "lib", "libncursesw.a")
+        if os.path.exists(lib):
+            return prefix
+        # Install ncurses via cmd-pkgs
+        try:
+            subprocess.run(
+                ["curl", "-fsSL",
+                 "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"],
+                capture_output=True, text=True, timeout=120,
+            ).stdout
+            subprocess.run(
+                ["sh", "-s", "--", "ncurses", "6.4"],
+                input=subprocess.run(
+                    ["curl", "-fsSL",
+                     "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"],
+                    capture_output=True, text=True, timeout=120,
+                ).stdout,
+                shell=True, timeout=180,
+            )
+        except Exception:
+            pass
+        return prefix
+
+    def _ensure_mktemp_wrapper(self):
+        """Create a mktemp wrapper to work around HMDFS permission issue.
+
+        toybox mktemp -d creates directories with SGID bit that are unwritable
+        on HMDFS. This wrapper uses mkdir instead.
+        """
+        prefix = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
+        wrapper_path = os.path.join(prefix, "bin", "mktemp")
+        if os.path.exists(wrapper_path) and os.access(wrapper_path, os.X_OK):
+            # Check if it's already our wrapper (not toybox)
+            try:
+                with open(wrapper_path, "r") as f:
+                    content = f.read(100)
+                if "HMDFS" in content or "mkdir" in content:
+                    return wrapper_path
+            except Exception:
+                pass
+
+        wrapper_content = '''#!/bin/sh
+# mktemp wrapper for HMDFS - use mkdir instead of mktemp -d
+create_dir=false
+template=""
+for arg in "$@"; do
+    [ "$arg" = "-d" ] && create_dir=true
+    [ "$arg" = "-p" ] && continue
+    template="$arg"
+done
+if $create_dir; then
+    [ -z "$template" ] && template="${TMPDIR:-/tmp}/confXXXXXX"
+    random=$(cat /dev/urandom 2>/dev/null | tr -dc 'a-zA-Z0-9' | head -c 6 || echo $$)
+    dirname=$(echo "$template" | sed "s/XXXXXX/$random/")
+    umask 077 && mkdir -p "$dirname" 2>/dev/null && echo "$dirname"
+else
+    exec /bin/mktemp "$@"
+fi
+'''
+        try:
+            os.makedirs(os.path.dirname(wrapper_path), exist_ok=True)
+            with open(wrapper_path, "w") as f:
+                f.write(wrapper_content)
+            os.chmod(wrapper_path, 0o755)
+        except Exception:
+            pass
+        return wrapper_path
+
     def generate(self):
+        # Ensure mktemp wrapper is in place for HMDFS
+        self._ensure_mktemp_wrapper()
+
         tc = AutotoolsToolchain(self)
-        # R33: Compiler/flags from Conan Toolchain, not shell env vars.
-        # ncurses is a system prebuilt package (cmd-pkgs), installed to DEFAULT_PREFIX.
-        # On OHOS CI workers, DEFAULT_PREFIX is set by the build environment.
-        # Fallback to ~/usr/local for local development.
+        # R33: Compiler/flags from Conan Toolchain.
+        # ncurses is a system prebuilt package (cmd-pkgs).
         sysroot = os.environ.get("DEFAULT_PREFIX") or os.path.expanduser("~/usr/local")
         sys_inc = os.path.join(sysroot, "include")
         sys_lib = os.path.join(sysroot, "lib")
@@ -58,23 +132,24 @@ class HtopConan(ConanFile):
         tc.extra_cflags.append("-DNCURSES_WIDECHAR")
         tc.extra_ldflags.append(f"-L{sys_lib}")
         # R26: ncurses is a system-name library, must be statically linked
-        # to avoid polluting /lib and SELinux runtime issues on OHOS
         tc.extra_ldflags.append("-static")
 
-        # Fix: AutotoolsToolchain defaults to --prefix=package_folder,
-        # and autotools.install() sets DESTDIR=package_folder.
-        # Setting --prefix=/ makes install path: DESTDIR/bin/htop
         tc.configure_args.append("--prefix=/")
         tc.generate()
 
-        # Set TMPDIR for config.status (OHOS /tmp is read-only, E002)
+        # Set TMPDIR and ensure mktemp wrapper is in PATH
         env = Environment()
         tmpdir = os.path.expanduser("~/tmp")
         os.makedirs(tmpdir, exist_ok=True)
         env.define("TMPDIR", tmpdir)
-        env.vars(self).save_script("env_tmpdir")
+        # Prepend sysroot/bin to PATH for mktemp wrapper
+        env.prepend_path("PATH", os.path.join(sysroot, "bin"))
+        env.vars(self).save_script("env_htop")
 
     def build(self):
+        # Ensure ncurses is available
+        self._ensure_ncurses()
+
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
