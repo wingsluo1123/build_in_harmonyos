@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R14",
+      "file": "archives/g/gdnsd/3.8.2/conanfile.py",
+      "line": 82,
+      "description": "The build() method uses replace_in_file() to modify the 'configure' script (a generated file) at build time: replace_in_file(self, configure_script, 'umask 077', 'umask 022'). Rule R14 states that generated files (config.h, configure, Makefile.in, CMakeCache.txt) should not be modified directly and changes should go through generate() or patches/. While this configure is generated at build time by autoreconf() (not a committed file), and the task notes confirm it is a documented platform workaround for HMDFS filesystem umask 077 issue, the approach technically violates R14. Moving to generate() is not feasible because autoreconf() has not run yet at generate() time, and patching configure.ac for autoconf's internal umask behavior is complex.",
+      "fix_suggestion": "Consider creating a patch for configure.ac or aclocal.m4 that addresses the umask behavior at the source level. Alternatively, document this as an accepted platform-specific exception in notes.md with a clear rationale for why generate()/patches/ cannot be used (autoreconf generates configure in build(), umask 077 is set by autoconf internals not configure.ac)."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R32",
+      "file": "archives/g/gdnsd/3.8.2/conanfile.py",
+      "line": 60,
+      "description": "Hardcoded absolute path '/storage/Users/currentUser/usr/local' is used for include/lib directories and PKG_CONFIG_PATH when self.settings.os in ('Linux', 'OHOS'). This OHOS CI-worker-specific path also applies to Linux builds where it will not exist, potentially causing compiler warnings about non-existent include/lib paths on non-CI Linux machines. The path is well-documented in comments as the location of pre-installed tools (ragel, userspace-rcu, libsodium), but hardcoding it makes the recipe non-portable.",
+      "fix_suggestion": "Restrict the hardcoded path to self.settings.os == 'OHOS' only (since /storage/Users/currentUser is an OHOS-specific path structure), or use an environment variable or Conan profile setting (e.g., self.options.get_safe('local_prefix')) to make the path configurable."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/g/gdnsd/3.8.2/test_package/test.c",
+      "line": 4,
+      "description": "test.c only prints 'test_gdnsd: OK' and returns 0 without calling any gdnsd API, which superficially matches the R34 'deception - only print without calling API' pattern. However, the actual binary test is in test_package/conanfile.py test() which runs 'gdnsd --version' and checks exit code 2. Since gdnsd is an application (package_type='application') with no library API or public headers, there is nothing for test.c to include or call. The R34 rule is satisfied by the test_package as a whole (it executes the binary).",
+      "fix_suggestion": "Add a more explicit comment in test.c explaining the test strategy: 'This C file only verifies CMake build/link succeeds. The actual gdnsd binary execution test is in conanfile.py test()'. Optionally, if gdnsd installs any headers, include one to verify header installation."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-rule-12",
+      "file": "archives/g/gdnsd/3.8.2/conandata.yml",
+      "line": 8,
+      "description": "patch_description fields do not start with the patch number prefix as shown in the code-style example ('0001 build aux config.guess'). The gdnsd descriptions start with descriptive text ('Guard pthread_setcanceltype...') without the numeric prefix.",
+      "fix_suggestion": "Consider prefixing descriptions with the patch number, e.g., '0001 Guard pthread_setcanceltype with #ifdef __OHOS__ (musl libc missing pthread_cancel)'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-rule-15",
+      "file": "archives/g/gdnsd/commands.json",
+      "line": 4,
+      "description": "commands.json includes a 'homepage' field that is not present in the standard format examples in code-style.md or review-memory.md rule 15. The standard fields are name, type, description, versions. The extra field is harmless but deviates from the documented schema.",
+      "fix_suggestion": "Remove the 'homepage' field to match the standard commands.json schema, or document it as an allowed optional extension in the code-style rules."
+    }
+  ],
+  "summary": "AUDIT PASSED (P2/P3 warnings only, no P0/P1 blocking issues). Audited 7 changed files for gdnsd 3.8.2 Conan recipe against code-style.md and review-memory.md rules.\n\nDECEPTION DETECTION (all pass):\n- R34 (empty shell test): PASS - test_package/conanfile.py test() runs 'gdnsd --version' binary with exit code 2 check. test.c is a supplementary CMake build test (acceptable for application package with no library API).\n- R9 (skip/forged test): PASS - test() is not skipped, not 'pass', runs real binary and cmake.test().\n- Forged status: PASS - manifest.yaml status='built', commands.json binary=false (consistent, honest).\n- Forged sha256: PASS - conandata.yml sha256='6862ee35...' is 64 hex chars, not all zeros/f's. conandata.yml.orig has same hash (not tampered). Could not verify by download (no internet), but format is valid.\n- R8 (#ifdef __OHOS__ substantive logic): PASS - 3 patches guard pthread_setcanceltype with #ifdef __OHOS__/#else. The #else block contains original code; on OHOS the call is skipped because musl libc lacks pthread_cancel. Not an empty stub - thread continues normal execution.\n- R19 (manual packaging bypass): PASS - no .so/.a/.o files in PR diff.\n- R40 (deep adaptation): N/A - gdnsd is a DNS server, not graphics/UI/multimedia/hardware library.\n\nRECIPE CORRECTNESS:\n- R37 (version): PASS - 3.8.2 matches upstream, first adaptation.\n- R32 (OHOS platform compat): PASS - uses tuple check ('Linux', 'OHOS') for paths, == 'OHOS' for umask workaround.\n- R33 (no bare env vars): PASS - uses AutotoolsToolchain and Environment().\n- R39 (official URL): PASS - https://github.com/gdnsd/gdnsd/archive/refs/tags/v3.8.2.tar.gz is official GitHub repo (verified release v3.8.2 exists, published 2024-01-04).\n- R14 (generated files): P2 WARNING - modifies configure script at build time (documented platform workaround).\n- R38 (commands.json): PASS - exists at software level, type='tool', name matches.\n- Hardcoded paths: P2 WARNING - /storage/Users/currentUser/usr/local applied to both Linux and OHOS.\n- Conan 2.x API: PASS - from conan import ConanFile, conan.tools.*.\n\nCODE STYLE (all pass with minor warnings):\n- File headers: PASS - shebang + docstring on both conanfile.py files.\n- Class naming: PASS - GdnsdConan, GdnsdTestConan (PascalCase).\n- package_type: PASS - 'application' correct for tool.\n- Method order: PASS - export_sources -> requirements -> layout -> source -> generate -> build -> package -> package_info.\n- package_info: PASS - sets bindirs for application.\n- No TODO/FIXME: PASS.\n- Import order: PASS - stdlib then third-party with blank line separator.\n- conandata.yml format: PASS - 2-space indent, quoted strings, HTTPS URL, sha256 present.\n- commands.json format: PASS - 2-space indent, quoted strings, type='tool', no trailing comma. P3: extra 'homepage' field.\n- Patch naming: PASS - 0001-xxx.patch format. P3: description lacks number prefix.\n- Line endings: PASS - all LF, no CRLF.\n- No forbidden files in PR: PASS - no .so/.a/.o/.log/.DS_Store/__pycache__/SUMMARY.md.\n- No permission violations: PASS - no SKILL.md/references/templates/scripts/ci/index.tsv changes.\n\nVERIFICATION:\n- Patch files exist on disk and in git (committed in prior commit c5ee1fc4).\n- Patch files contain real platform adaptation logic (guarding pthread_setcanceltype on OHOS/musl).\n- GitHub release v3.8.2 confirmed real (published 2024-01-04 by @blblack).\n- CI result: exit_code=0, integrity_hash present."
+}

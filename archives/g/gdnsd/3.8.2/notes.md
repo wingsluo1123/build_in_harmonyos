@@ -70,5 +70,5 @@
 - GDNSD GitHub owner 是 "gdnsd/gdnsd" 非 "blblack/gdnsd"
 ---
 
-**编译结束**: 2026-06-02 15:21
+**编译结束**: 2026-08-06 14:27
 **最终状态**: built

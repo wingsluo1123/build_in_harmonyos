@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: gdnsd/3.8.2
+homepage: "https://gdnsd.org"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# gdnsd's make check requires Perl modules (Socket6, IO::Socket::INET6, etc.)
+# not available on OHOS. Skipped with documented reason.
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_skip_reason: "make check requires Perl modules (Socket6, IO::Socket::INET6, HTTP::Daemon, Net::DNS 1.03+) not available on OHOS"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/000_meta.t
+    source: gdnsd-3.8.2/t/000_meta.t
+    description: "Meta test suite (Perl-based, requires Socket6 etc.)"
+    command: "prove t/000_meta.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 验证 gdnsd --version 输出正确版本号"
+    command: "gdnsd --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 1
