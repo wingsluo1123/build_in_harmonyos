@@ -1,5 +1,7 @@
-# HAProxy 3.2.0 构建清单
-# HAProxy 3.2.0 Build Manifest
+version: '3.2.0'
+status: built
+build_date: '2026-08-07'
+build_system: makefile
 
 software:
   name: haproxy
@@ -8,62 +10,56 @@ software:
   homepage: https://www.haproxy.org/
   license: GPL-2.0-or-later
 
-status: built
-
 build:
   platform: OpenHarmony
   architecture: aarch64
-  date: 2026-05-23
-  compiler: gcc
-  build_env: TMPDIR=/data/storage/el2/base/cache
-  
+  compiler: clang
+  target: linux-musl
+  build_env: TMPDIR=/storage/Users/currentUser/.local/tmp
+
 dependencies:
   - name: openssl
-    version: ">=1.1.1"
+    version: "3.5.6.1"
     required: true
-    description: SSL/TLS 加密库
   - name: zlib
-    version: ">=1.2.11"
+    version: "1.3.1.1"
     required: true
-    description: 压缩库
   - name: pcre2
-    version: ">=10.0"
+    version: "10.45"
     required: true
-    description: 正则表达式库
-    
+
 features:
   - ssl
   - compression
   - pcre2
-  - http2
+  - thread
   - prometheus-exporter
+
+build_flags:
+  - USE_OPENSSL=1
+  - USE_ZLIB=1
+  - USE_PCRE2=1
+  - USE_THREAD=1
+  - USE_PROMEX=1
 
 artifacts:
   bin:
     - name: haproxy
       type: executable
-      size: 14M
       format: ELF 64-bit LSB arm64, dynamic linked
 
 notes:
-  - HAProxy is a dynamic executable linked against musl libc
-  - Requires OpenSSL, zlib, and pcre2 libraries at runtime
+  - HAProxy binary dynamically linked to libc only (all deps statically linked)
   - Suitable for production use on OpenHarmony aarch64 systems
+
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/.local/tmp/builds/haproxy-3.2.0.orig
-  source_work_dir: /storage/Users/currentUser/.local/tmp/builds/haproxy-3.2.0.work
-  source_orig_hash: 1f01b65dfeeaa98b
-  source_work_hash: f47a2f8ba1934a15
-  generated_at: '2026-08-07T02:45:36'
   patches_count: 2
 
 patch_classification:
   - file: 0001-include-haproxy-compat.h.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
   - file: 0002-src-thread.c.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
