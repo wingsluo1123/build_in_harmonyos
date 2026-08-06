@@ -1,126 +1,59 @@
-# json-glib 1.6.6 编译笔记
+# json-glib 1.6.6 Conan Adaptation Notes
 
-## 编译概述
+## Overview
 
-json-glib是一个用于GLib的JSON解析库，使用Meson构建系统。
+json-glib is a JSON serialization/deserialization library for GLib, using the Meson build system. This adaptation creates a Conan recipe for HarmonyOS PC (aarch64).
 
-## 版本信息
+## Version Info
 
-- 版本：1.6.6
-- 构建系统：Meson
-- 编译日期：2026-05-22
+- Version: 1.6.6
+- Build system: Meson
+- Adaptation date: 2026-08-06
 
-## 下载源码
+## Source
 
-从华为镜像成功下载：
-- URL: https://repo.huaweicloud.com/gnome/sources/json-glib/1.6/json-glib-1.6.6.tar.xz
-- 大小：1.3MB
+- URL: https://repo.huaweicloud.com/gnome/sources/json-glib/1.6.6/json-glib-1.6.6.tar.xz
+- SHA256: 96ec98be7a91f6dde33636720e3da2ff6ecbb90e76ccaa49497f31a6855a490e
 
-其他镜像尝试失败（GNOME官方源、清华镜像均返回404）。
+## Conan Recipe Approach
 
-## 编译过程
+### Dependencies
 
-### 1. Meson配置
+json-glib depends on GLib (glib-2.0, gio-2.0, gobject-2.0, etc.). The glib2/2.88.0 Conan package provides all these libraries in a single package.
 
-```bash
-meson setup builddir \
-    --prefix=$DEFAULT_PREFIX \
-    --buildtype=release \
-    --default-library=static \
-    -Dintrospection=disabled \
-    -Dgtk_doc=disabled \
-    -Dtests=false \
-    -Dman=false
-```
+### Key Adaptations
 
-配置成功。
+1. **glib2 .pc file fix**: The glib2 Conan package declares only `pkg_config_name="glib-2.0"`, so PkgConfigDeps generates only `glib-2.0.pc`. But json-glib's meson.build needs `gio-2.0`, `gobject-2.0`, etc. The glib2 package ships these .pc files in `lib/pkgconfig/` with `prefix=/` (broken). The recipe copies them to the generators folder with the correct prefix.
 
-### 2. 编译遇到的问题
+2. **glib-mkenums PATH**: meson's `gnome.mkenums()` calls `glib-mkenums` which is in glib2's `bin/` directory. The recipe adds this to PATH in `generate()`.
 
-**问题1：glib-mkenums权限错误**
+3. **GNU binutils pinning**: Same as glib2 — pin real `ar`, `as`, `strip`, `nm`, `ranlib` by absolute path because CI exports llvm-* names not on PATH.
 
-Meson的`gnome.mkenums`调用glib-mkenums生成enum类型文件，但subprocess.Popen调用失败：
-```
-PermissionError: [Errno 13] Permission denied: '/storage/Users/currentUser/usr/local/bin/glib-mkenums'
-```
+4. **basic_layout**: The OHOS-adapted Conan lacks `meson_layout`; use `basic_layout` instead.
 
-**解决方案**：
-手动生成enum文件并修改meson.build：
-```bash
-glib-mkenums --template json-enum-types.h.in ... > json-enum-types.h
-glib-mkenums --template json-enum-types.c.in ... > json-enum-types.c
-```
+### Build Configuration
 
-修改`json-glib/meson.build`第19-26行，使用预生成的文件而非动态生成。
+- Static library (`default_library=static`)
+- Introspection disabled
+- gtk_doc disabled
+- Tests disabled
+- Man pages disabled
 
-**问题2：/bin/sh无法调用rm命令**
+## Build Artifacts
 
-静态库链接时ninja执行`rm -f`失败：
-```
-/bin/sh: rm: inaccessible or not found
-```
+- Static library: `libjson-glib-1.0.a`
+- Headers: 13 `.h` files in `include/json-glib-1.0/json-glib/`
+- pkg-config: `json-glib-1.0.pc`
+- Tools: `json-glib-validate`, `json-glib-format`
 
-原因：OpenHarmony上/bin/sh是musl动态链接的程序，无法调用toybox的rm命令。
+## Verification
 
-**解决方案**：
-修改build.ninja，将`rm -f`改为`/usr/bin/rm -f`。
-
-**问题3：工具程序链接失败**
-
-json-glib-validate和json-glib-format链接失败，缺少多个依赖：
-- libintl (g_libintl_bindtextdomain)
-- libffi (ffi_type_void)
-- libz (inflateEnd)
-- gmodule (g_module_supported)
-
-**状态**：
-工具程序暂不编译，仅编译静态库和头文件。
-
-### 3. 最终产物
-
-成功编译并安装：
-- 静态库：libjson-glib-1.0.a (368KB)
-- 头文件：json-glib-1.0/json-glib/*.h (18个文件)
-- pkg-config文件：json-glib-1.0.pc
-
-## 质量验证结果
-
-- G1（二进制完整性）：✅ 通过
-- G2（功能可用性）：⚠️ 跳过（无工具程序）
-- G3（可移植性）：✅ 通过（静态库）
-- G4（档案完整性）：❌ 失败
-
-## 补丁说明
-
-### 0001-meson-enum-types.patch
-
-修改`json-glib/meson.build`，使用预生成的enum文件：
-```diff
-- json_glib_enums = gnome.mkenums(
--   'json-enum-types',
--   sources: source_h,
--   h_template: 'json-enum-types.h.in',
--   c_template: 'json-enum-types.c.in',
--   install_header: true,
--   install_dir: install_header_dir,
-- )
-- # Keep a reference to the generated header, for internal dependencies
-- json_enum_types_h = json_glib_enums.get(1)
-+ # Use pre-generated enum files instead of gnome.mkenums (to avoid subprocess permission issues)
-+ json_glib_enums = [
-+   'json-enum-types.c',
-+   'json-enum-types.h',
-+ ]
-+ # Keep a reference to the generated header, for internal dependencies
-+ json_enum_types_h = files('json-enum-types.h')
-```
-
-## 后续改进建议
-
-1. 工具程序需要完整的依赖链（libintl, libffi, zlib, gmodule）
-2. 需要将enum文件生成规则固化为补丁
-3. 建议在知识图谱中添加"meson构建系统在OpenHarmony上的权限问题"
+- conan-verify: ✅ PASS (G0-G4, L2/L4/L5)
+- W3 local CI simulation: ✅ PASS
+- test_package: ✅ PASS (JSON parse + field access test)
 
 ---
+**Adaptation complete**
+**Final status**: published
+
 **编译结束**
-**最终状态**: built（静态库成功，工具程序待完善）
