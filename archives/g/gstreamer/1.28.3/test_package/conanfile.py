@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-"""Test package for gstreamer 1.28.3"""
 import os
-import ctypes
 from conan import ConanFile
 from conan.tools.build import cross_building
 
@@ -13,18 +10,19 @@ class TestPkg(ConanFile):
         self.requires(self.tested_reference_str)
 
     def build(self):
-        pass
+        dep = self.dependencies["gstreamer"].cpp_info
+        incs = []
+        for _ref, _d in self.dependencies.items():
+            incs += ["-I" + p for p in _d.cpp_info.includedirs]
+        inc = " ".join(incs)
+        libdir = dep.libdirs[0] if dep.libdirs else ""
+        so = os.path.join(libdir, "libgstreamer-1.0.so") if libdir else "libgstreamer-1.0.so"
+        cc = os.environ.get("CC", "clang")
+        self.run(f"{cc} test_gstreamer.c -o test_probe {inc} -DTARGET_SO='\"{so}\"' -ldl")
 
     def test(self):
-        pkg = self.dependencies["gstreamer"]
-        libdirs = pkg.cpp_info.aggregated.libdirs
-        found = False
-        for libdir in libdirs:
-            for f in os.listdir(str(libdir)):
-                if f.startswith("libgstreamer-1.0") and (f.endswith(".so") or f.endswith(".a")):
-                    found = True
-                    self.output.info(f"Found library: {f}")
-                    break
-        if not found:
-            raise Exception("libgstreamer-1.0 not found in package")
-        self.output.info("gstreamer test passed!")
+        if cross_building(self):
+            self.output.info("cross-building: compile+link only")
+            return
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} -c './test_probe'", env="conanrun")
