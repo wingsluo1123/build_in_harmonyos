@@ -1,0 +1,49 @@
+########### AGGREGATED COMPONENTS AND DEPENDENCIES FOR THE MULTI CONFIG #####################
+#############################################################################################
+
+set(pcre2_COMPONENT_NAMES "")
+if(DEFINED pcre2_FIND_DEPENDENCY_NAMES)
+  list(APPEND pcre2_FIND_DEPENDENCY_NAMES )
+  list(REMOVE_DUPLICATES pcre2_FIND_DEPENDENCY_NAMES)
+else()
+  set(pcre2_FIND_DEPENDENCY_NAMES )
+endif()
+
+########### VARIABLES #######################################################################
+#############################################################################################
+set(pcre2_PACKAGE_FOLDER_RELEASE "/storage/Users/currentUser/.conan2/p/pcre23869309333782/p")
+set(pcre2_BUILD_MODULES_PATHS_RELEASE )
+
+
+set(pcre2_INCLUDE_DIRS_RELEASE )
+set(pcre2_RES_DIRS_RELEASE )
+set(pcre2_DEFINITIONS_RELEASE )
+set(pcre2_SHARED_LINK_FLAGS_RELEASE )
+set(pcre2_EXE_LINK_FLAGS_RELEASE )
+set(pcre2_OBJECTS_RELEASE )
+set(pcre2_COMPILE_DEFINITIONS_RELEASE )
+set(pcre2_COMPILE_OPTIONS_C_RELEASE )
+set(pcre2_COMPILE_OPTIONS_CXX_RELEASE )
+set(pcre2_LIB_DIRS_RELEASE "${pcre2_PACKAGE_FOLDER_RELEASE}/lib")
+set(pcre2_BIN_DIRS_RELEASE )
+set(pcre2_LIBRARY_TYPE_RELEASE UNKNOWN)
+set(pcre2_IS_HOST_WINDOWS_RELEASE 0)
+set(pcre2_LIBS_RELEASE pcre2-8 pcre2-posix)
+set(pcre2_SYSTEM_LIBS_RELEASE )
+set(pcre2_FRAMEWORK_DIRS_RELEASE )
+set(pcre2_FRAMEWORKS_RELEASE )
+set(pcre2_BUILD_DIRS_RELEASE )
+set(pcre2_NO_SONAME_MODE_RELEASE FALSE)
+
+
+# COMPOUND VARIABLES
+set(pcre2_COMPILE_OPTIONS_RELEASE
+    "$<$<COMPILE_LANGUAGE:CXX>:${pcre2_COMPILE_OPTIONS_CXX_RELEASE}>"
+    "$<$<COMPILE_LANGUAGE:C>:${pcre2_COMPILE_OPTIONS_C_RELEASE}>")
+set(pcre2_LINKER_FLAGS_RELEASE
+    "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:${pcre2_SHARED_LINK_FLAGS_RELEASE}>"
+    "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,MODULE_LIBRARY>:${pcre2_SHARED_LINK_FLAGS_RELEASE}>"
+    "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${pcre2_EXE_LINK_FLAGS_RELEASE}>")
+
+
+set(pcre2_COMPONENTS_RELEASE )
