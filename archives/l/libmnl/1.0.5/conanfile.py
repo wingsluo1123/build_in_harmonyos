@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
-
-Usage: Replace Libmnl, libmnl, 1.0.5, Minimalistic user-space library oriented to Netlink developers, LGPL-2.1-or-later, https://www.netfilter.org/projects/libmnl/
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for system-name libraries.
-"""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -18,7 +10,7 @@ class LibmnlConan(ConanFile):
     description = "Minimalistic user-space library oriented to Netlink developers"
     license = "LGPL-2.1-or-later"
     homepage = "https://www.netfilter.org/projects/libmnl/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -29,9 +21,6 @@ class LibmnlConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
-    def requirements(self):
-        pass
-
     def layout(self):
         basic_layout(self)
 
@@ -40,12 +29,9 @@ class LibmnlConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: System-name libraries default to static
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
         tc.generate()
 
     def build(self):

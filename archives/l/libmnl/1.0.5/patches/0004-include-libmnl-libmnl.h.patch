@@ -1,16 +1,19 @@
 --- a/include/libmnl/libmnl.h
 +++ b/include/libmnl/libmnl.h
-@@ -1,18 +1,28 @@
+@@ -1,18 +1,30 @@
  #ifndef _LIBMNL_H_
  #define _LIBMNL_H_
- 
+
  #include <stdbool.h>
  #include <stdio.h>
  #include <stdint.h>
  #include <unistd.h>
  #include <sys/socket.h> /* for sa_family_t */
-+#ifdef __OHOS__
-+/* E119: Prevent linux/socket.h from redefining sockaddr_storage on OHOS */
++/* E119: On some platforms (e.g. OHOS SDK), sys/socket.h and linux/socket.h
++ * both define sockaddr_storage, causing a redefinition error. Since
++ * sys/socket.h is already included above, skip linux/socket.h (which
++ * linux/netlink.h includes transitively) by predefining its include guards.
++ * Provide __kernel_sa_family_t which linux/netlink.h depends on. */
 +#ifndef _UAPI_LINUX_SOCKET_H
 +#define _UAPI_LINUX_SOCKET_H
 +#endif
@@ -18,14 +21,13 @@
 +#define _LINUX_SOCKET_H
 +#endif
 +typedef unsigned short __kernel_sa_family_t;
-+#endif
  #include <linux/netlink.h>
- 
+
  #ifdef __cplusplus
  extern "C" {
  #endif
- 
+
  /*
   * Netlink socket API
   */
- 
+
