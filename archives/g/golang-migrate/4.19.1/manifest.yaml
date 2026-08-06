@@ -1,0 +1,82 @@
+software: golang-migrate
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/4.19.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.19.1"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://codeload.github.com/golang-migrate/migrate/tar.gz/refs/tags/v4.19.1"
+
+  # 源码校验和
+  sha256: "677bf03c19d684dc5bef47e981ec1b4564482cbf5f9b190cb48e110183fd6d25"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: custom
+
+  # Go 构建系统标识
+  build_system: go
+
+  # 配置选项列表
+  configure_options:
+    - "build_system=go"
+    - "CGO_ENABLED=0"
+    - "GOOS=linux"
+    - "GOARCH=arm64"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "build_tags=postgres mysql redshift cassandra spanner cockroachdb yugabytedb clickhouse mongodb sqlserver firebird neo4j pgx pgx5 rqlite file go_bindata github github_ee bitbucket aws_s3 google_cloud_storage godoc_vfs gitlab sqlite"
+    - "ldflags=-s -w -X main.Version=v4.19.1"
+    - "entry=./cmd/migrate"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go build with CGO_ENABLED=0 matches upstream Makefile default build target"
+  - "Version injection: -X main.Version=v4.19.1 via ldflags (cmd/migrate/version.go)"
+  - "Build tags: DATABASE + SOURCE tags from Makefile + sqlite (pure-Go modernc.org/sqlite)"
+  - "sqlite3/sqlcipher tags require CGO and are only in upstream test target (DATABASE_TEST)"
+  - "codeload.github.com works for SSL-challenged environments when github.com fails"
+  - "HMDFS: Go linker needs tmpfs workspace on OHOS for mmap output"
+  - "OHOS: Go SDK binaries must be self-signed with binary-sign-tool before execution"

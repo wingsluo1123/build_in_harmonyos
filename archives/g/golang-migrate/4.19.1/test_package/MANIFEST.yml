@@ -1,0 +1,24 @@
+package: golang-migrate/4.19.1
+homepage: https://github.com/golang-migrate/migrate
+
+# golang-migrate v4.19.1 has many *_test.go files but they all require
+# live database connections (PostgreSQL, MySQL, etc.) to run. The
+# upstream Makefile `test` target uses `go test -v ./...` with Docker
+# containers for each database. On OHOS these tests cannot run without
+# the database servers, so upstream_tests is empty.
+upstream_test_in_build: false
+upstream_tests: []
+
+# Consumer test: run packaged `migrate -help` and assert exit 0 + stable keywords.
+test_package_tests:
+  - file: test.sh
+    description: "Run migrate -help against the packaged binary; assert exit 0 and stable driver keywords"
+    command: "bash test.sh <bin/migrate>"
+
+# Assertions in test.sh:
+#   1. exit code of `migrate -help` is 0
+#   2. stdout contains "postgres"
+#   3. stdout contains "mysql"
+#   4. stdout contains "sqlite"
+#   5. stdout contains "file"
+assertion_count: 5

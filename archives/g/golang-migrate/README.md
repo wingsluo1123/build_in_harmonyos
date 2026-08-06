@@ -11,7 +11,8 @@ back database migrations from the command line.
 
 ## Version
 
-- **homebrew**: v4.19.1 (latest from GitHub)
+- **4.19.1**: v4.19.1 (latest from GitHub, Conan recipe)
+- **homebrew**: v4.19.1 (legacy non-Conan build)
 
 ## Build System
 
