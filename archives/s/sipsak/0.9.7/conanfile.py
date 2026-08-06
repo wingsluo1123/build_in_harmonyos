@@ -100,7 +100,7 @@ class SipsakConan(ConanFile):
                 )
         test_flags = (
             build_type_flags
-            + " -DRUNNING_CHECK -DHAVE_CHECK_H "
+            + " -fcommon -DRUNNING_CHECK -DHAVE_CHECK_H "
             + '-I"{src}" -I"{src}/src" -I"{prefix}/include" '.format(
                 src=source_folder, prefix=check_prefix
             )
