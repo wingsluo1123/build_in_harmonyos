@@ -50,11 +50,12 @@ else
     exit 1
 fi
 
-# Test 2: Verify architecture (aarch64)
-if file "$BINARY" 2>/dev/null | grep -q "arm64\|aarch64"; then
+# Test 2: Verify architecture (aarch64) using readelf
+if readelf -h "$BINARY" 2>/dev/null | grep -q "AArch64"; then
     echo "[ok] aarch64 architecture verified"
 else
-    echo "[warn] Architecture check inconclusive"
+    echo "[FAIL] Architecture is not aarch64"
+    exit 1
 fi
 
 # Test 3: Verify NEEDED dependencies
