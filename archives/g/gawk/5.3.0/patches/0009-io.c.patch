@@ -1,0 +1,45 @@
+--- a/io.c
++++ b/io.c
+@@ -3383,23 +3383,39 @@
+ 	IOBUF *iop;
+ 
+ 	ezalloc(iop, IOBUF *, sizeof(IOBUF), "iop_alloc");
+ 
+ 	iop->public.fd = fd;
+ 	iop->public.name = name;
+ 	iop->public.read_func = ( ssize_t(*)() ) read;
+ 	iop->valid = false;
+ 	iop->errcode = errno_val;
+ 
+-	if (fd != INVALID_HANDLE)
+-		fstat(fd, & iop->public.sbuf);
+-	else {
++	if (fd != INVALID_HANDLE) {
++		if (fstat(fd, & iop->public.sbuf) < 0
++#ifdef __OHOS__
++		    && errno != EACCES && errno != EPERM
++#endif
++		    ) {
++			/* fstat failed for reasons other than HarmonyOS restrictions */
++			memset(& iop->public.sbuf, 0, sizeof(struct stat));
++		}
++#ifdef __OHOS__
++		/* HarmonyOS returns EACCES for fstat on pipes/terminals/sockets.
++		 * Use default values so I/O can proceed normally. */
++		if (errno == EACCES || errno == EPERM) {
++			memset(& iop->public.sbuf, 0, sizeof(struct stat));
++			iop->public.sbuf.st_blksize = 4096;  /* default I/O block size */
++			iop->public.sbuf.st_mode = S_IFIFO;  /* treat as pipe/FIFO */
++		}
++#endif
++	} else {
+ #ifdef HAVE_LSTAT
+ 		int (*statf)(const char *, struct stat *) = lstat;
+ #else
+ 		int (*statf)(const char *, struct stat *) = stat;
+ #endif
+ 		/*
+ 		 * Try to fill in the stat struct. If it fails, zero
+ 		 * it out.
+ 		 */
+ 		if (statf(name, & iop->public.sbuf) < 0)

@@ -1,0 +1,39 @@
+--- a/posix/gawkmisc.c
++++ b/posix/gawkmisc.c
+@@ -95,22 +95,35 @@
+ {
+ 	char *val;
+ 	static size_t env_val = 0;
+ 	static bool first = true;
+ 	static bool exact = false;
+ 
+ 	/* force all members to zero in case OS doesn't use all of them. */
+ 	memset(stb, '\0', sizeof(struct stat));
+ 
+ 	/* always stat, in case stb is used by higher level code. */
+-	if (fstat(fd, stb) == -1)
++	if (fstat(fd, stb) == -1
++#ifdef __OHOS__
++	    && errno != EACCES && errno != EPERM
++#endif
++	    )
+ 		fatal("can't stat fd %d (%s)", fd, strerror(errno));
++
++#ifdef __OHOS__
++	/* HarmonyOS returns EACCES for fstat on pipes/terminals/sockets.
++	 * Use default values so I/O can proceed normally. */
++	if (errno == EACCES || errno == EPERM) {
++		stb->st_blksize = 4096;  /* default I/O block size */
++		stb->st_mode = S_IFIFO;  /* treat as pipe/FIFO */
++	}
++#endif
+ 
+ 	if (first) {
+ 		first = false;
+ 
+ 		if ((val = getenv("AWKBUFSIZE")) != NULL) {
+ 			if (strcmp(val, "exact") == 0)
+ 				exact = true;
+ 			else if (isdigit((unsigned char) *val)) {
+ 				for (; *val && isdigit((unsigned char) *val); val++)
+ 					env_val = (env_val * 10) + *val - '0';

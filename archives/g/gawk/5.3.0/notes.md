@@ -48,3 +48,7 @@ gawk -l fork 'BEGIN { if (fork() == 0) print "Child"; else print "Parent" }'  # 
 ## 注意事项
 - 13 个扩展模块中 readdir 部分受 fstat 限制，其余全部正常
 - 编译后务必进行管道输入测试，确保 fstat 兼容性修复有效
+---
+
+**编译结束**: 2026-08-06 12:35
+**最终状态**: built
