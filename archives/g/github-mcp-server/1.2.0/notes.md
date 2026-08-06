@@ -4,39 +4,44 @@
 - 软件: github-mcp-server
 - 版本: 1.2.0
 - 构建系统: Go (go build)
-- 构建模式: manual (Mode B)
+- 构建模式: conan (Conan 2.x recipe)
 - 架构: aarch64 (arm64)
-- 日期: 2026-06-10
+- 日期: 2026-08-06
 
 ## 编译过程
-- 源码获取: 通过 Go module proxy (goproxy.cn) 下载 github.com/github/github-mcp-server@v1.2.0
+- 源码获取: GitHub archive tarball (https://github.com/github/github-mcp-server/archive/refs/tags/v1.2.0.tar.gz)
+- SHA256: 02b3865518fa189d066a14d81b891e939e93b60bb1723eeea728f4720d1a1e60
 - 编译命令: `CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "-X main.version=1.2.0 -X main.commit=v1.2.0" -o github-mcp-server ./cmd/github-mcp-server/`
 - 附加二进制: mcpcurl (`CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o mcpcurl ./cmd/mcpcurl/`)
-- 安装方式: DESTDIR 模式 (`DESTDIR=$TEST_PREFIX`)
-- Strip: 已 strip，减小体积 (24MB→17MB 主二进制)
+- 安装方式: Conan package (bin/ directory)
+- Strip: 不 strip（HarmonyOS MAC 安全策略禁止执行 stripped ELF 二进制）
 
 ## 关键决策
-- GitHub 无法直接访问，使用 goproxy.cn 中国镜像获取 Go module 源码
-- 选择 v1.2.0 (最新稳定版本)
+- GitHub archive URL 作为 conandata.yml 源码地址 (R39: 官方源)
+- CI 自动添加 GitHub 镜像 fallback (gh-proxy.com 等)
+- GOPROXY 设为 goproxy.cn,direct 以解决 Go module 下载问题
 - CGO_ENABLED=0 静态编译，无外部 C 库依赖
 - 编译两个二进制: github-mcp-server (主程序) + mcpcurl (辅助工具)
+- Go toolchain 通过 Harmonybrew 安装 (brew install go)
+- package_type = "application" (命令行工具，非库)
+- commands.json 声明在软件级别目录 (R38)
 
 ## 遇到的问题及解决
-1. **GitHub 连接超时**: github.com 443端口无法连接 → 使用 goproxy.cn Go模块代理解决
-2. **init-build URL自动搜索失败**: ohc search_url 不支持自定义GitHub组织 → 手动创建构建上下文文件
+1. **Go 未安装**: 系统未预装 Go → 通过 Harmonybrew 安装 (brew install go)
+2. **GitHub 无法直接访问**: github.com 443端口无法连接 → CI 自动添加镜像 fallback; 本地通过 goproxy.cn 获取 Go module 源码
+3. **Go module cache 只读**: go.sum 条目缺失 → 复制源码到可写目录后 go mod download
+4. **HarmonyOS tmpfs 禁止执行**: 从 golang.google.cn 下载的 Go binary 无法执行 (MAC 策略) → 使用 Harmonybrew 安装的 Go (可执行)
 
 ## 质量门禁结果
-- G0: ⚠️ 无原始tarball（Go模块方式获取源码）
-- G1: ✅ 二进制完整性通过
-- G2: ✅ 功能可用性通过 (1 ⚠️)
-- G3: ✅ 可移植性通过
-- G4: ✅ 档案完整性通过 (1 ⚠️)
+- G1: ✅ 配方完整性通过
+- G2: ✅ conan create 验证通过
+- R34: ✅ test_package 实质测试 (--version 执行)
+- R38: ✅ commands.json 声明
 
 ## 产出文件
-- github-mcp-server: 17MB ELF arm64 static binary
-- mcpcurl: 4.4MB ELF arm64 static binary
-- github-mcp-server-1.2.0-ohos-aarch64.tar.gz: 22MB
+- github-mcp-server: 25MB ELF arm64 static binary
+- mcpcurl: 6.8MB ELF arm64 static binary
 ---
 
-**编译结束**: 2026-06-10 14:18
-**最终状态**: built
+**编译结束**: 2026-08-06
+**最终状态**: built (Conan adapted)
