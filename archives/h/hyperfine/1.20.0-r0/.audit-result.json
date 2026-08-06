@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/h/hyperfine/1.20.0-r0/conanfile.py",
+      "line": 39,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' found in conanfile.py. Code style rule 5 (禁止残留模板占位符) explicitly lists 'url = \"\"  # CI fills this' as a forbidden placeholder that should be filled by the adapter, not left for CI. This indicates incomplete work.",
+      "fix_suggestion": "Replace with the actual recipe repository URL, e.g. url = \"https://cnb.cool/ohpcd/recipes/-/tree/main/archives/h/hyperfine\", or remove the url attribute and the '# CI fills this' comment."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/h/hyperfine/1.20.0-r0/manifest.yaml",
+      "line": 5,
+      "description": "build_system value 'rust' is not in the standard list defined in code style rule 14 (cmake | autotools | makefile | meson). While understandable for a precompiled binary package, it does not match the defined schema values.",
+      "fix_suggestion": "Consider using 'precompiled' as the build_system value, or extend the allowed values in the code style rules to include 'rust' or 'precompiled' for binary repackaging recipes."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "DOC",
+      "file": "archives/h/hyperfine/1.20.0-r0/notes.md",
+      "line": 7,
+      "description": "Status inconsistency: notes.md line 7 says '状态: published' in the 编译环境 section, but line 58 says '最终状态: built'. manifest.yaml (line 3) correctly says 'built'. The notes should be consistent with the manifest's authoritative status.",
+      "fix_suggestion": "Change line 7 from '状态: published' to '状态: built' to match manifest.yaml and the final status at line 58."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS16",
+      "file": "archives/h/hyperfine/1.20.0-r0/conanfile.py",
+      "line": 120,
+      "description": "Deferred import 'import time' inside _sign_elf() method (line 120). Code style rule 16 (import 顺序) requires standard library imports at the top of the file, not deferred inside methods.",
+      "fix_suggestion": "Move 'import time' to the top of the file with other standard library imports (os, shutil, subprocess, pathlib)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS16",
+      "file": "archives/h/hyperfine/1.20.0-r0/test_package/conanfile.py",
+      "line": 233,
+      "description": "Deferred import 'import io' inside test() method (line 233) and redundant 'import struct' inside _get_needed_libs() fallback section (line 90, struct already imported at top on line 26). Code style rule 16 requires imports at the top of the file.",
+      "fix_suggestion": "Move 'import io' to the top of the file with other standard library imports. Remove the redundant 'import struct' at line 90 inside _get_needed_libs() since struct is already imported at module level (line 26)."
+    }
+  ],
+  "summary": "Audit of hyperfine 1.20.0-r0 Conan recipe (precompiled Alpine Linux aarch64 musl binary). 10 changed files audited against code_style and review_memory rules.\n\nP0 (deceptive behavior) checks — ALL PASS:\n- R34 (stub test): test_package substantively depends on the hyperfine package — verifies binary existence, ELF 64-bit aarch64 format, executable permission, NEEDED entries (libgcc_s.so.1, musl libc), binary size, and attempts runtime execution via self.run(). NOT a stub test.\n- R9 (skip/fake test): No 'def test(self): pass', no os.system('exit 0'). Real assertions with raise AssertionError on failure.\n- Fake status: manifest.yaml status='built' (honest, verified-but-not-uploaded). Consistent with conan-verify-report.md (G2 PASS) and test-report.md.\n- Fake sha256: '511a1fcc8643c9f40237c20f972b2eb9375caf9d82a1cd17671c0d749410ba00' — 64 hex chars, not all-zeros or all-f's, format valid.\n- R19 (precompiled binary in PR): Binary is downloaded via get() during build(), not committed to the PR.\n- R8/R40: No #ifdef __OHOS__ stubs; hyperfine is a CLI benchmarking tool, not graphics/UI/multimedia — no deep adaptation needed.\n\nP1 (recipe correctness) checks — ALL PASS:\n- R32 (OHOS platform): validate() uses 'str(self.settings.os) not in (\"Linux\", \"OHOS\")' — correct, includes OHOS.\n- R33 (undefined shell env vars): build() only calls apply_conandata_patches(self), no os.environ access.\n- R39 (official source URL): Alpine CDN (dl-cdn.alpinelinux.org) is an authoritative official mirror source.\n- R37 (version strategy): '1.20.0-r0' uses upstream version with '-r0' Alpine release suffix.\n- R38 (commands.json): Present at software level with type='tool', binary=true.\n\n5 minor issues found (1 P2, 4 P3) — all non-blocking:\n- P2: Template placeholder 'url = \"\"  # CI fills this' (CS5)\n- P3: build_system 'rust' not in standard list (CS14)\n- P3: Status inconsistency in notes.md (DOC)\n- P3: Deferred 'import time' in conanfile.py (CS16)\n- P3: Deferred 'import io' and redundant 'import struct' in test_package/conanfile.py (CS16)\n\nVerdict: PASS — No P0 or P1 issues. Precompiled binary packaging approach is acceptable per alpine-chroot-install precedent. Static smoke testing with runtime attempt is a legitimate R34-compliant test strategy for precompiled binary packages."
+}
