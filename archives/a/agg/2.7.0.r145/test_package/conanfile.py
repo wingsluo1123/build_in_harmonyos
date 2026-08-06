@@ -18,9 +18,9 @@ class AggTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def build(self):
-        # Resolve the installed package root (contains include/ and lib/).
-        agg_info = self.dependencies["agg"]
-        cpp = agg_info.cpp_info.aggregates[0] if agg_info.cpp_info.aggregates else agg_info.cpp_info
+        # Resolve the installed package's include/ and lib/ dirs.
+        agg = self.dependencies["agg"]
+        cpp = agg.cpp_info
         inc = cpp.include_dirs[0] if cpp.include_dirs else "include"
         libdir = cpp.libdirs[0] if cpp.libdirs else "lib"
         # Compile and link test.cpp against libagg.a.
