@@ -18,7 +18,7 @@ class NmapConan(ConanFile):
     description = "Network security scanner and discovery tool"
     license = "GPL-2.0"
     homepage = "https://nmap.org/"
-    url = ""
+    url = "https://cnb.cool/ohos-archives/nmap"
 
     package_type = "application"
     settings = "os", "compiler", "build_type", "arch"

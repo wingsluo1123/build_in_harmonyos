@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for nmap executable
 # Runs in conanrun env (PATH includes installed bin/)
-set -eu
+set -euo pipefail
 
 echo "[test] nmap --version"
 nmap --version && echo "✅ nmap --version OK" || {

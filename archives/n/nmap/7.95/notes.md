@@ -1,81 +1,74 @@
-# nmap 7.95 — 编译进度
+# nmap 7.95 适配笔记
 
-> 档案创建时间: 2026-04-27 00:00:00
-> 最后更新: 2026-04-27 (当前状态)
-> 当前会话 ID: (可选，用于多轮对话追踪)
+## 编译环境
+- 构建系统: autotools
+- 编译日期: 2026-08-07
+- 编译器: clang/clang++
+- 状态: built
 
-## 一、基本信息
-| 项目 | 值 |
-|------|-----|
-| 软件 | nmap |
-| 版本 | 7.95 |
-| 状态 | 🔵 进行中 / ✅ success / ⚠️ partial / ❌ failed |
-| 构建系统 | autotools/cmake/meson/... |
-| 源码路径 | URL |
+## 编译步骤
+```bash
+# 1. 初始化
+python3 ohc-run.py init-build nmap 7.95 --url=https://nmap.org/dist/nmap-7.95.tgz --no-download
 
-## 二、编译阶段（checkbox 实时更新）
+# 2. 配置（需要设置 TMPDIR）
+export TMPDIR=~/.tmp
+./configure --build=aarch64-unknown-linux-ohos --host=aarch64-unknown-linux-ohos --without-zenmap --without-ndiff --without-nmap-update
 
-### Phase 1: 环境准备
-- [ ] ohc-run.py init-build 完成 / 源码下载解压
+# 3. 编译（跳过 zenmap）
+make nmap -j1
+make -C ncat
+make -C nping
+```
 
-### Phase 2: 编译（configure + make + make install）
-- [ ] configure 完成（记录参数和耗时）
-- [ ] make 编译完成（记录错误和修复）
-- [ ] make install 完成
+## 遇到的问题与解决方案
 
-### Phase 2.5: 独立目录安装验证（⭐ 必须做）
-- [ ] 干净源码 + 补丁应用
-- [ ] 独立 TEST_PREFIX configure + make install
-- [ ] 功能回归测试结果
+| # | 问题 | 根因 | 解决方案 | 知识图谱 |
+|---|------|------|----------|----------|
+| 1 | configure: umask 077 创建临时目录权限拒绝 | E011: HMDFS 文件系统 UID 映射导致权限问题 | conanfile.py 中 _fix_umask_all() 方法替换 umask 077→022 | E011 |
+| 2 | config.guess/config.sub 不识别 HarmonyOS | E007: GNU config.guess 不包含 HarmonyOS 检测 | conanfile.py 中 _fix_config_sub_all() 方法添加 linux-ohos 支持 | E007 |
+| 3 | sockaddr_storage 重定义冲突 | E091/E119: OHOS 内核头文件冲突 | conanfile.py 中 _fix_sockaddr_storage() 方法添加 #define 守卫 | E091 |
+| 4 | libpcre automake 试图重新生成 aclocal.m4 | automake 缺失，Makefile 依赖时间戳触发 | conanfile.py 中 _touch_source_files() 设置源文件旧时间戳 | - |
 
-### Phase 3: 测试验证
-- [ ] make check / make test 结果
-- [ ] 安全弹窗触发确认
+## 源码修改
+所有修改在 conanfile.py build() 方法中通过 Python 代码完成，不使用 patch 文件。
+原因：patches 难以应用到官方 tarball（git repo 与 SVN tarball 差异），代码方式更可靠。
 
-### Phase 4: 预编译包制作（⭐ verify PASS 后必须）
-- [ ] Step 1-10 打包流程（见 packaging.md）
+## 依赖版本
+- pcre2: 内嵌 libpcre2-10.43
+- zlib: 内嵌 zlib-1.3.1
+- lua: 内嵌 liblua-5.4.6
+- libpcap: 内嵌 libpcap-1.10.4
+- libdnet: 内嵌 libdnet-1.12
 
-### Phase 5: 归档收尾
-- [ ] 补丁生成（ohc-run.py refresh-patch --auto）
-- [ ] manifest.yaml / README.md / PROGRESS.md 更新
-- [ ] ohc-run.py verify-build 质量门禁
+## 验证结果
+```bash
+# nmap 二进制生成成功
+nmap --version
+# Nmap version 7.95 ( https://nmap.org )
+# Platform: aarch64-unknown-linux-ohos
 
-## 三、对话记录（⭐ 断点续传核心）
+# ncat 二进制生成成功
+ncat --version
+# Ncat: Version 7.95
 
-> **每轮对话结束时必须更新此节。新 AI 会从这里恢复上下文。**
+# nping 二进制生成成功
+nping --version
+# Nping version 0.7.95
+```
 
-### 对话 #N — 2026-04-27 HH:MM
-**操作**: （做了什么，如"执行 configure"、"修复 xxx bug"、"制作预编译包"）
-**结果**: （成功/失败/部分成功，附关键输出摘要）
-**发现的问题**: （遇到的坑、错误信息、根因分析）
-**当前状态**: （精确到哪个步骤，下一步该做什么）
-**遗留问题**: （未解决的、需要下轮继续的）
-
----
-
-### 对话 #1 — 2026-04-27 00:00
-**操作**: 执行 ./configure --prefix=$DEFAULT_PREFIX
-**结果**: （待填写）
-**发现的问题**: （待填写）
-**当前状态**: Phase 2 configure 进行中
-**遗留问题**: 无
-
-（后续每轮对话追加...）
-
-## 四、源码修改清单
-| 文件 | 原因 | 方式 | 补丁状态 |
-|------|------|------|---------|
-| ... | ... | ... | ... |
-
-## 五、预编译包交付物
+## 交付物
 | 文件 | 大小 | 说明 |
 |------|------|------|
-| ... | ... | ... |
+| nmap | 3.6MB | 主扫描工具 |
+| ncat | 689KB | netcat 替代工具 |
+| nping | 780KB | ping 工具 |
 
-## 六、结束记录
-- **最终状态**: ...
-- **结束时间**: ...
----
+## 注意事项
+1. zenmap (Python GUI) 因缺少 Python build 模块未编译，使用 --without-zenmap 跳过
+2. 所有 configure 脚本需要修复 umask 077 → 022（在 conanfile.py 中处理）
+3. 所有 config.guess/config.sub 需要应用 HarmonyOS 补丁（在 conanfile.py 中处理）
+4. 包含 linux/if.h 的源文件需要添加 sockaddr_storage 守卫（在 conanfile.py 中处理）
 
-**编译结束**: 2026-08-07 07:00
+**编译结束**: 2026-08-07
 **最终状态**: built
