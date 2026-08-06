@@ -35,18 +35,9 @@ class ScooterConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # mirror_url fallback 参照 kubetui/tlrc 模式：pop mirror_url，主 URL 失败后用 mirror_url 重试
-        sources = dict(self.conan_data["sources"])
-        mirror_url = sources.pop("mirror_url", None)
-        try:
-            get(self, **sources, strip_root=True)
-        except ConanException as e:
-            if not mirror_url:
-                raise
-            self.output.warning(f"primary URL download failed: {e}, retrying with mirror_url")
-            # GitHub tar 与 GitCode tar 动态生成字节流不同，用 GitHub sha256 校验 GitCode tar 必不匹配
-            # → 重试传 sha256=None 跳过校验（CI 内网信任假设：GitCode mirror URL 已含 refs/tags 版本约束）
-            get(self, url=mirror_url, sha256=None, strip_root=True)
+        # aireview P0+P2: 删版本键包装（conandata.yml sources 下直接放 url/sha256）+ 删 mirror_url fallback
+        # CI 自动为 GitHub URL 添加 gh-proxy/ghproxy 镜像 fallback（R39），勿手动硬编码非官方镜像
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def export_sources(self):
         # Conan 2.x G1 门禁要求 export_sources() 声明；scooter 无补丁
