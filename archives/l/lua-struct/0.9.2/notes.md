@@ -54,3 +54,8 @@ lua-struct 是纯 Lua 库，无需编译步骤。Conan 配方使用 no-op build(
 3. 模块路径为 `require("struct")`
 4. 支持 pack/unpack 操作，类似 PHP 的 pack/unpack 函数
 5. Lua 5.4 兼容性补丁必须应用，否则 float/double 打包解包功能不可用
+
+## 最终状态
+
+**编译结束**: 2026-08-07
+**最终状态**: built (conan verify passed, awaiting CI upload)
