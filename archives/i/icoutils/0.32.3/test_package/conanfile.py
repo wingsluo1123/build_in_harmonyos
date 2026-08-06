@@ -14,6 +14,5 @@ class IcoutilsTestConan(ConanFile):
         pkg_folder = self.dependencies["icoutils"].package_folder
         bin_dir = os.path.join(pkg_folder, "bin")
         # R34: exercise the packaged binary to verify it works
-        self.run(f"{os.path.join(bin_dir, 'icotool')} --version", env="conanrun")
-        self.run(f"{os.path.join(bin_dir, 'wrestool')} --version", env="conanrun")
+        self.run(f"sh {os.path.join(self.source_folder, 'test_icoutils.sh')} {bin_dir}", env="conanrun")
         self.output.info("icoutils: OK")
