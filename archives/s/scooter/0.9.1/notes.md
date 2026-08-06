@@ -22,7 +22,8 @@ cargo build --release --target aarch64-unknown-linux-ohos
 
 CI 环境无预装 Rust 工具链（E154），通过 cmd-pkgs 预编译包安装：
 
-<!-- CI 内部操作：以下命令仅在 CI worker 跑，非用户应执行命令（aireview P3: curl|sh 管道到 shell 风险标注） -->
+> ⚠️ **CI 内部操作**：以下命令仅在 CI worker 跑，非用户应执行命令。`curl | sh` 管道到 shell 模式有安全风险，CI 环境假设 gitcode.com 可信。
+
 ```bash
 curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- rust 1.81.0
 ```
@@ -68,6 +69,6 @@ CI worker 内网环境 + 无 TTY 交互 → 跳过上游测试（app_runner 需 
 
 ## 验证结果
 
-- 编译状态：通过（CI worker 需 rust 工具链可用，cmd-pkgs 装 rust 1.81.0 + 多路径 fallback）
+- 编译状态：未通过（CI worker 需 rust 工具链可用，cmd-pkgs 装 rust 1.81.0 + 多路径 fallback；本地无 rust 工具链无法验证，manifest.yaml status: failed 如实标记）
 - 上游测试用例通过率：0/3（0% 执行，100% 因 OHOS 平台内网限制 + 无 TTY 交互跳过）
 - 新增测试用例通过率：1/1（100%，交叉编译场景诚实跳过 runtime 只验 ELF header）
