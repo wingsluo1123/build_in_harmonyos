@@ -40,9 +40,21 @@ class CzkawkaConan(ConanFile):
 
     def _ensure_rust_toolchain(self):
         """Ensure cargo/rustc are available. Install via Harmonybrew if missing."""
-        if shutil.which("cargo") and shutil.which("rustc"):
-            self.output.info("Rust toolchain already available.")
-            return
+        # Check if cargo actually works (not just exists in PATH)
+        cargo_path = shutil.which("cargo")
+        if cargo_path:
+            try:
+                result = subprocess.run(
+                    [cargo_path, "--version"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                if result.returncode == 0:
+                    self.output.info(f"Rust toolchain already available: {cargo_path}")
+                    return
+                else:
+                    self.output.warn(f"cargo found at {cargo_path} but --version failed (rc={result.returncode})")
+            except Exception as e:
+                self.output.warn(f"cargo found at {cargo_path} but invocation failed: {e}")
 
         self.output.info("Rust toolchain not found, installing via Harmonybrew...")
 
@@ -50,18 +62,35 @@ class CzkawkaConan(ConanFile):
         harmonybrew = os.path.expanduser("~/.harmonybrew/bin/brew")
         if not os.path.exists(harmonybrew):
             self.output.info("Installing Harmonybrew...")
-            subprocess.run(
+            result = subprocess.run(
                 ["zsh", "-c",
-                 '$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)'],
-                check=True, timeout=300,
+                 'curl -fsSL https://harmonybrew.atomgit.com/install.sh | zsh'],
+                capture_output=True, text=True, timeout=300,
+            )
+            if result.returncode != 0:
+                raise ConanException(
+                    f"Harmonybrew installation failed (rc={result.returncode}):\n"
+                    f"stdout: {result.stdout[-500:]}\n"
+                    f"stderr: {result.stderr[-500:]}"
+                )
+
+        if not os.path.exists(harmonybrew):
+            raise ConanException(
+                f"brew not found at {harmonybrew} after installation"
             )
 
         # Install Rust via brew
         self.output.info("Installing Rust via brew...")
-        subprocess.run(
+        result = subprocess.run(
             [harmonybrew, "install", "rust"],
-            check=True, timeout=600,
+            capture_output=True, text=True, timeout=600,
         )
+        if result.returncode != 0:
+            raise ConanException(
+                f"brew install rust failed (rc={result.returncode}):\n"
+                f"stdout: {result.stdout[-500:]}\n"
+                f"stderr: {result.stderr[-500:]}"
+            )
 
         # Verify installation
         cargo_path = os.path.join(os.path.dirname(harmonybrew), "cargo")
