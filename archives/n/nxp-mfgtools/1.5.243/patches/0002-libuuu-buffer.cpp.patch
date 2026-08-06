@@ -1,0 +1,95 @@
+--- a/libuuu/buffer.cpp
++++ b/libuuu/buffer.cpp
+@@ -47,20 +47,23 @@
+ #include "http.h"
+ #include "zstd.h"
+ #include "libusb.h"
+ #include <chrono>
+ 
+ #ifdef WIN32
+ #define stat_os _stat64
+ #elif defined(__APPLE__)
+ #define stat_os stat
+ #include "dirent.h"
++#elif defined(__OHOS__)
++#define stat_os stat
++#include "dirent.h"
+ #else
+ #define stat_os stat64
+ #include "dirent.h"
+ #endif
+ 
+ static map<string, shared_ptr<FileBuffer>> g_filebuffer_map;
+ static mutex g_mutex_map;
+ static bool g_small_memory = true;
+ 
+ #define MAGIC_PATH '>'
+@@ -733,21 +736,21 @@
+ 		set_last_err_string(err);
+ 		return -1;
+ 	}
+ }g_fs_data;
+ 
+ int FSBackFile::get_file_timesample(const string &filename, uint64_t *ptime)
+ {
+ 	string back, file;
+ 	if (split(filename, &back, &file))
+ 		return -1;
+-	
++
+ 	return g_fs_data.get_file_timesample(back, ptime);
+ }
+ 
+ bool FSZip::exist(const string &backfile, const string &filename)
+ {
+ 	Zip zip;
+ 	if (zip.Open(backfile))
+ 		return false;
+ 
+ 	return zip.check_file_exist(filename);
+@@ -869,21 +872,21 @@
+ 	return fat.m_filemap.find(filename) != fat.m_filemap.end();
+ }
+ 
+ int FSFat::load(const string &backfile, const string &filename, shared_ptr<FileBuffer> p)
+ {
+ 	Fat fat;
+ 	if (fat.Open(backfile))
+ 	{
+ 		return -1;
+ 	}
+-	
++
+ 	if(fat.get_file_buff(filename, p))
+ 		return -1;
+ 
+ 	atomic_fetch_or(&p->m_dataflags, FILEBUFFER_FLAG_LOADED);
+ 	p->m_request_cv.notify_all();
+ 
+ 	return 0;
+ }
+ 
+ int FSFat::for_each_ls(uuu_ls_file fn, const string &backfile, const string &filename, void *p)
+@@ -1636,21 +1639,21 @@
+ 	{
+ 		if (m_seg_map.empty())
+ 		{
+ 			std::shared_ptr<FragmentBlock> p(new FragmentBlock);
+ 			lock_guard<mutex> lock(m_seg_map_mutex);
+ 			p->m_output_size = m_seg_blk_size;
+ 			p->m_data.resize(m_seg_blk_size);
+ 			m_seg_map[0] = p;
+ 			return p;
+ 		}
+-		
++
+ 		size_t offset;
+ 
+ 		if (g_small_memory)
+ 		{
+ 			truncate_old_data_in_pool();
+ 
+ 			{
+ 				lock_guard<mutex> lock(m_seg_map_mutex);
+ 				shared_ptr <FragmentBlock> p = m_seg_map.begin()->second;
+ 				offset = p->m_output_offset;
