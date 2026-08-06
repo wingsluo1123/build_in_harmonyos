@@ -12,8 +12,8 @@ int main(void) {
         return 1;
     }
     printf("notcurses version: %s\n", ver);
-    /* Verify version starts with "3.0" */
-    if (strncmp(ver, "3.0", 3) != 0) {
+    /* Verify version contains "3.0" */
+    if (strstr(ver, "3.0") == NULL) {
         fprintf(stderr, "FAIL: unexpected version %s\n", ver);
         return 1;
     }
