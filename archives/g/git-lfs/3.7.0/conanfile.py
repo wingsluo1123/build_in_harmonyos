@@ -6,7 +6,7 @@ that produces a single static binary. This recipe builds it using the Go
 toolchain with CGO disabled for a fully static binary.
 
 Key adaptation points:
-  - Downloads Go toolchain from official source if not available.
+  - Downloads Go toolchain from Harmonybrew bottle (pre-signed for HarmonyOS).
   - go:generate directives create temporary binaries that cannot execute
     on HarmonyOS without ELF signing. Stub generated files are created in
     build() to skip go generate.
@@ -15,7 +15,6 @@ Key adaptation points:
 """
 import os
 import shutil
-import subprocess
 import tarfile
 import urllib.request
 
@@ -46,30 +45,31 @@ class GitLfsConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ensure_go(self):
-        """Ensure Go toolchain is available. Download from official source if needed."""
+        """Ensure Go toolchain is available. Try system, Harmonybrew, or bottle download."""
         # Try system go first
         go_bin = shutil.which("go")
         if go_bin:
             return go_bin, ""
 
-        # Try Harmonybrew Go
+        # Try Harmonybrew installed Go
         brew_go = "/storage/Users/currentUser/.harmonybrew/opt/go/libexec"
         if os.path.isdir(brew_go):
             go_bin = os.path.join(brew_go, "bin", "go")
             if os.path.isfile(go_bin):
                 return go_bin, brew_go
 
-        # Download Go from official source
-        go_version = "1.23.4"
-        go_url = f"https://golang.google.cn/dl/go{go_version}.linux-arm64.tar.gz"
-        go_dir = os.path.join(self.build_folder, f"go-{go_version}")
-        goroot = os.path.join(go_dir, "go")
+        # Download Go from Harmonybrew bottle (pre-signed for HarmonyOS)
+        go_version = "1.26.5"
+        bottle_url = f"https://harmonybrew.atomgit.com/bottles/go-{go_version}.arm64_ohos.bottle.tar.gz"
+        go_dir = os.path.join(self.build_folder, "go-toolchain")
+        # Bottle extracts to: go/{version}/libexec/ (GOROOT)
+        goroot = os.path.join(go_dir, "go", go_version, "libexec")
         go_bin = os.path.join(goroot, "bin", "go")
 
         if not os.path.isfile(go_bin):
-            self.output.info(f"Downloading Go {go_version} from official source...")
-            tarball = os.path.join(self.build_folder, f"go{go_version}.linux-arm64.tar.gz")
-            urllib.request.urlretrieve(go_url, tarball)
+            self.output.info(f"Downloading Go {go_version} from Harmonybrew bottle...")
+            tarball = os.path.join(self.build_folder, f"go-{go_version}.bottle.tar.gz")
+            urllib.request.urlretrieve(bottle_url, tarball)
             os.makedirs(go_dir, exist_ok=True)
             with tarfile.open(tarball, "r:gz") as tar:
                 tar.extractall(go_dir)
