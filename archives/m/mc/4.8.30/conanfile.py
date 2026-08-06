@@ -165,11 +165,11 @@ class McConan(ConanFile):
         autotools.make(args=["-j1"])
 
     def _fix_la_files(self):
-        """Fix or remove .la files with incorrect libdir paths."""
-        import re
+        """Delete .la files with incorrect libdir paths to force direct .a/.so linking."""
         conan_cache = os.path.expanduser("~/.conan2/p")
         if not os.path.isdir(conan_cache):
             return
+        count = 0
         for root, dirs, files in os.walk(conan_cache):
             for f in files:
                 if f.endswith(".la"):
@@ -177,20 +177,13 @@ class McConan(ConanFile):
                     try:
                         with open(la_path, "r") as fh:
                             content = fh.read()
-                        # Check for incorrect libdir (//lib or /lib)
                         if "libdir='//lib'" in content or "libdir='/lib'" in content:
-                            la_dir = os.path.dirname(la_path)
-                            content = re.sub(
-                                r"libdir='[^']*'",
-                                f"libdir='{la_dir}'",
-                                content,
-                            )
-                            content = content.replace("-L/lib", f"-L{la_dir}")
-                            content = content.replace("-L//lib", f"-L{la_dir}")
-                            with open(la_path, "w") as fh:
-                                fh.write(content)
+                            os.unlink(la_path)
+                            count += 1
                     except (IOError, OSError):
                         pass
+        if count > 0:
+            self.output.info(f"Deleted {count} .la files with incorrect libdir")
 
     def _create_gettext_po_files(self):
         """Create minimal gettext po-files (replaces autopoint)."""
