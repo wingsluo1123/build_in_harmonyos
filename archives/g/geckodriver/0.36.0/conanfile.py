@@ -11,6 +11,7 @@ import os
 import glob
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -63,6 +64,8 @@ class GeckodriverConan(ConanFile):
         matches = glob.glob(pattern, recursive=True)
         if matches:
             copy(self, "geckodriver", os.path.dirname(matches[0]), os.path.join(self.package_folder, "bin"))
+        else:
+            raise ConanException("geckodriver binary not found — cargo build may have failed or output path mismatch")
 
     def package_info(self):
         # CLI tool: expose bin directory, not libs
