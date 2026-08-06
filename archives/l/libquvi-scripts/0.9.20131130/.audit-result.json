@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R12",
+      "file": "archives/l/libquvi-scripts/0.9.20131130/conandata.yml",
+      "line": 7,
+      "description": "conandata.yml has no 'patches' field, but conanfile.py calls export_conandata_patches(self) (line 34) and apply_conandata_patches(self) (line 51), and manifest.yaml lists 2 patches (0001-config.aux-config.guess.patch, 0002-config.aux-config.sub.patch). Neither patch file is included in the PR's changed_files. The actual modifications are done via inline replace_in_file() calls in build(). Code style rule #13 (conandata.yml spec) requires patches to be declared in the 'patches' field and files to actually exist. Additionally, manifest.yaml lists '0002-config.aux-config.sub.patch' as applied, but notes.md explicitly states 'config.sub: 上游已支持 linux-ohos* (无需修改)' — a direct contradiction.",
+      "fix_suggestion": "Option A: Convert inline replace_in_file modifications into proper .patch files, add a 'patches' section to conandata.yml declaring them, and include the patch files in the PR. Remove the '0002-config.aux-config.sub.patch' entry from manifest.yaml since config.sub needs no modification. Option B: Remove export_conandata_patches/apply_conandata_patches calls from conanfile.py, remove patches_applied and patch_generation sections from manifest.yaml, and document that patching is done inline in notes.md."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R14",
+      "file": "archives/l/libquvi-scripts/0.9.20131130/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml uses 'software:' as the field name for the package name, but code style rule #14 specifies 'name:'. Additionally, 'build_system' is nested under 'build:' as 'build.system:' (line 12) instead of being a top-level field 'build_system:' as specified in the code style guide.",
+      "fix_suggestion": "Change 'software: libquvi-scripts' to 'name: libquvi-scripts' to match the code style. Consider flattening 'build.system' to a top-level 'build_system' field, or document if the nested format is an intentional schema evolution."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/l/libquvi-scripts/0.9.20131130/manifest.yaml",
+      "line": 34,
+      "description": "patch_generation.method is 'per-file-difflib' instead of 'refresh-patch --auto' as required by R3. Since no actual patch files are included in the PR, this field is misleading and inconsistent with the declared patches_count of 2.",
+      "fix_suggestion": "If patches are generated via refresh-patch --auto, update the method field accordingly and include the patch files. If patching is done entirely inline via replace_in_file, remove the patch_generation section or set method to 'inline-replace' and patches_count to 0."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "style",
+      "file": "archives/l/libquvi-scripts/0.9.20131130/conanfile.py",
+      "line": 34,
+      "description": "export_conandata_patches(self) (line 34) and apply_conandata_patches(self) (line 51) are no-ops since conandata.yml declares no patches. These calls add unnecessary complexity and may confuse maintainers into thinking patches are being applied through the standard Conan mechanism.",
+      "fix_suggestion": "Remove the export_conandata_patches call from export_sources() and the apply_conandata_patches call from build() if patches are managed inline. Alternatively, migrate inline replace_in_file modifications to proper patch files declared in conandata.yml."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "style",
+      "file": "archives/l/libquvi-scripts/0.9.20131130/notes.md",
+      "line": 62,
+      "description": "Typo: '构建 类型为 unknown (无 shared/static 概念)' has an extra space between '构建' and '类型', should be '构建类型'.",
+      "fix_suggestion": "Fix to '构建类型为 unknown (无 shared/static 概念)'."
+    }
+  ],
+  "summary": "W4 Pre-PR audit for libquvi-scripts 0.9.20131130 (pure Lua scripts package, no binary). No P0 (deception) or P1 (recipe quality) issues found. P0 checks: test_package uses real self.run assertions (R34 pass), sha256 is 64-hex non-trivial (R8 pass), manifest status 'built' consistent with test report (R9 pass), no pre-compiled binaries in PR (R19 pass). P1 checks: not a system lib (R26 N/A), no os checks needed (R32 pass), uses conanbuild env not bare os.environ (R33 pass), upstream version for first adaptation (R37 pass), not a CLI tool so no commands.json needed (R38 pass), repo.or.cz is official source (R39 pass). 2 P2 issues found: (1) conandata.yml missing patches field while conanfile.py calls patch functions as no-ops and manifest lists non-existent patches including a config.sub patch that notes.md says was NOT needed; (2) manifest.yaml field naming deviates from code style ('software' vs 'name', nested 'build.system' vs 'build_system'). 3 P3 suggestions for cleanup (patch_generation method, no-op patch calls, notes.md typo). Overall verdict: PASS."
+}
