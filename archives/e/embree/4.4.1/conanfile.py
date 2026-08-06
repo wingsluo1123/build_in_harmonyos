@@ -36,7 +36,6 @@ class EmbreeConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        tc.variables["CMAKE_BUILD_TYPE"] = "Release"
         tc.variables["EMBREE_TASKING_SYSTEM"] = "INTERNAL"
         tc.variables["EMBREE_TUTORIALS"] = "OFF"
         tc.variables["EMBREE_ARM"] = "ON"
