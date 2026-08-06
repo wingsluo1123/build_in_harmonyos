@@ -16,22 +16,27 @@ int main(int argc, char *argv[]) {
     /* Test 1: meinproc binary --help outputs usage info.
      * 不依赖退出码（上游可能非零），用 popen 捕获输出并检查关键字。 */
     printf("Test 1: %s --help (output check)\n", meinproc);
-    snprintf(cmd, sizeof(cmd), "%s --help 2>&1", meinproc);
-    FILE *fp = popen(cmd, "r");
-    if (fp == NULL) {
-        printf("  ✗ popen failed\n");
+    int cmd_len = snprintf(cmd, sizeof(cmd), "%s --help 2>&1", meinproc);
+    if (cmd_len < 0 || (size_t)cmd_len >= sizeof(cmd)) {
+        printf("  ✗ command line too long (need %d, have %zu)\n", cmd_len, sizeof(cmd));
         failed++;
     } else {
-        n = fread(buf, 1, sizeof(buf) - 1, fp);
-        buf[n] = '\0';
-        pclose(fp);
-        if (strstr(buf, "Usage") != NULL || strstr(buf, "meinproc") != NULL
-            || strstr(buf, "usage") != NULL) {
-            printf("  ✓ %s --help printed usage info\n", meinproc);
-            passed++;
-        } else {
-            printf("  ✗ %s --help output missing usage info\n", meinproc);
+        FILE *fp = popen(cmd, "r");
+        if (fp == NULL) {
+            printf("  ✗ popen failed\n");
             failed++;
+        } else {
+            n = fread(buf, 1, sizeof(buf) - 1, fp);
+            buf[n] = '\0';
+            pclose(fp);
+            if (strstr(buf, "Usage") != NULL || strstr(buf, "meinproc") != NULL
+                || strstr(buf, "usage") != NULL) {
+                printf("  ✓ %s --help printed usage info\n", meinproc);
+                passed++;
+            } else {
+                printf("  ✗ %s --help output missing usage info\n", meinproc);
+                failed++;
+            }
         }
     }
 
