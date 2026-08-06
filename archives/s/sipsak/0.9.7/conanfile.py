@@ -78,12 +78,10 @@ class SipsakConan(ConanFile):
     def _run_upstream_tests(self, cc, build_type_flags):
         """Compile and run the upstream Check-based unit tests when the Check
         framework is present in the build environment (e.g. the OHOS device)."""
-        check_prefix = "/storage/Users/currentUser/usr/local"
-        check_h = os.path.join(check_prefix, "include", "check.h")
-        if not os.path.isfile(check_h):
+        check_prefix = self._find_check_prefix()
+        if not check_prefix:
             self.output.info(
-                "Check framework not found at %s; skipping upstream tests"
-                % check_prefix
+                "Check framework not found; skipping upstream tests"
             )
             return
         source_folder = self.source_folder
@@ -134,6 +132,35 @@ class SipsakConan(ConanFile):
                 env="conanbuild",
             )
             self.run('"{}"'.format(binary), env="conanbuild")
+
+    def _find_check_prefix(self):
+        """Locate the Check framework without hardcoding a developer path.
+
+        Honor the CHECK_PREFIX environment variable, ask pkg-config when
+        available, then probe the conventional /usr/local prefixes.
+        """
+        candidates = []
+        env_prefix = os.environ.get("CHECK_PREFIX")
+        if env_prefix:
+            candidates.append(env_prefix)
+        try:
+            import subprocess
+
+            output = subprocess.check_output(
+                ["pkg-config", "--variable=prefix", "check"],
+                stderr=subprocess.STDOUT,
+                timeout=20,
+            ).decode("utf-8", errors="replace").strip()
+            if output:
+                candidates.append(output)
+        except Exception:
+            pass
+        candidates.append("/usr/local")
+        candidates.append("/storage/Users/currentUser/usr/local")
+        for prefix in candidates:
+            if os.path.isfile(os.path.join(prefix, "include", "check.h")):
+                return prefix
+        return None
 
     def package(self):
         copy(

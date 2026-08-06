@@ -3,7 +3,7 @@
 ## 源码
 
 - 版本：0.9.7
-- 来源：Debian Snapshot 保存的未修改上游发行包
+- 来源：官方 GitHub Release (nils-ohlmeier/sipsak 0.9.7)
 - 校验：`conandata.yml` 中固定 SHA-256
 
 ## 构建方式
@@ -29,6 +29,7 @@
 - `tests/check_helper.c`
 - `tests/check_md5.c`
 
-OHOS 交叉构建环境没有可用的 Check 依赖，因此配方不运行 `make check`。
+OHOS 设备环境提供 Check 框架（/storage/Users/currentUser/usr/local）时，
+配方会编译并运行上游 `tests/check_helper` 与 `tests/check_md5` 两个单元测试；找不到 Check 时才跳过。
 `test_package/test_sipsak.sh` 使用 Bash 严格模式验证安装后的可执行文件存在，并确认
 `sipsak --version` 输出版本 0.9.7。
