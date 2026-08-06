@@ -9,11 +9,8 @@ project(test_gst_libav C)
 add_executable(test_gst_libav test.c)
 target_link_libraries(test_gst_libav ${CMAKE_DL_LIBS})
 
-# Set the plugin path from conan-generated info
-# The gst-libav package installs to lib/gstreamer-1.0/
-target_compile_definitions(test_gst_libav PRIVATE
-    GST_LIBAV_PLUGIN_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../../lib/gstreamer-1.0"
-)
+# Plugin path is provided at runtime via GST_LIBAV_PLUGIN_PATH env var
+# (set by test_package/conanfile.py test() method)
 
 enable_testing()
 add_test(NAME test_gst_libav COMMAND test_gst_libav)

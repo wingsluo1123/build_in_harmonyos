@@ -23,4 +23,5 @@ class GstPluginsBaseTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run(os.path.join(self.cpp.build.bindirs[0], "test_gst_plugins_base"), env="conanrun")
+        plugin_path = os.path.join(self.dependencies["gst-plugins-base"].package_folder, "lib", "gstreamer-1.0")
+        self.run(f"GST_PLUGIN_PATH={plugin_path} {os.path.join(self.cpp.build.bindirs[0], 'test_gst_plugins_base')}", env="conanrun")
