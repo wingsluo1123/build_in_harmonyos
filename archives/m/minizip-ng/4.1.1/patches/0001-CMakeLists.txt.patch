@@ -1,0 +1,190 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -189,20 +189,30 @@
+ 
+ if(MZ_ZLIB)
+     # Check if zlib is present
+     if(NOT MZ_FORCE_FETCH_LIBS)
+         if (MZ_ZLIB_FLAVOR STREQUAL "zlib-ng" OR MZ_ZLIB_FLAVOR STREQUAL "auto")
+             find_package(ZLIB-NG QUIET)
+         endif()
+         if (MZ_ZLIB_FLAVOR STREQUAL "zlib" OR MZ_ZLIB_FLAVOR STREQUAL "auto")
+             find_package(ZLIB QUIET)
+         endif()
++        # Bridge conan CMakeDeps: use target when uppercase vars not set
++        if(NOT ZLIB_FOUND AND TARGET zlib::zlib)
++            set(ZLIB_FOUND TRUE)
++            set(ZLIB_LIBRARIES zlib::zlib)
++            set(ZLIB_INCLUDE_DIRS ${zlib_INCLUDE_DIRS})
++            set(ZLIB_VERSION_STRING ${zlib_VERSION_STRING})
++            set(ZLIB_VERSION ${zlib_VERSION_STRING})
++        elseif(NOT ZLIB_LIBRARIES AND TARGET zlib::zlib)
++            set(ZLIB_LIBRARIES zlib::zlib)
++        endif()
+         set(ZLIB_VERSION ${ZLIB_VERSION_STRING})
+     endif()
+ 
+     if(ZLIB-NG_FOUND AND NOT MZ_FORCE_FETCH_LIBS)
+         message(STATUS "Using ZLIB-NG")
+ 
+         list(APPEND MINIZIP_INC ${ZLIB-NG_INCLUDE_DIRS})
+         list(APPEND MINIZIP_LIB ${ZLIB-NG_LIBRARIES})
+         list(APPEND MINIZIP_LBD ${ZLIB-NG_LIBRARY_DIRS})
+ 
+@@ -256,20 +266,28 @@
+         endif()
+         list(APPEND MINIZIP_SRC mz_strm_zlib.c)
+         list(APPEND MINIZIP_HDR mz_strm_zlib.h)
+     endif()
+ endif()
+ 
+ if(MZ_BZIP2)
+     # Check if bzip2 is present
+     if(NOT MZ_FORCE_FETCH_LIBS)
+         find_package(BZip2 QUIET)
++    endif()
++
++    # Bridge conan CMakeDeps: check for target existence when _FOUND not set
++    if(NOT BZIP2_FOUND AND TARGET bzip2::bzip2)
++        set(BZIP2_FOUND TRUE)
++        set(BZIP2_INCLUDE_DIRS ${bzip2_INCLUDE_DIRS})
++        set(BZIP2_LIBRARIES bzip2::bzip2)
++        set(BZIP2_VERSION_STRING ${bzip2_VERSION_STRING})
+     endif()
+ 
+     if(BZIP2_FOUND AND NOT MZ_FORCE_FETCH_LIBS)
+         message(STATUS "Using BZIP2 ${BZIP2_VERSION_STRING}")
+ 
+         list(APPEND MINIZIP_INC ${BZIP2_INCLUDE_DIRS})
+         list(APPEND MINIZIP_LIB ${BZIP2_LIBRARIES})
+         list(APPEND MINIZIP_LBD ${BZIP2_LIBRARY_DIRS})
+ 
+         set(PC_PRIVATE_LIBS "${PC_PRIVATE_LIBS} -lbz2")
+@@ -394,26 +412,34 @@
+ 
+ if(MZ_ZSTD)
+     # Check if zstd is present
+     if(NOT MZ_FORCE_FETCH_LIBS)
+         find_package(PkgConfig QUIET)
+         if(PKGCONFIG_FOUND)
+             pkg_check_modules(ZSTD libzstd)
+         endif()
+         if(NOT ZSTD_FOUND)
+             find_package(ZSTD QUIET)
+-            if(ZSTD_FOUND)
+-                if(TARGET zstd::libzstd_static)
+-                    list(APPEND ZSTD_LIBRARIES zstd::libzstd_static)
+-                else()
+-                    list(APPEND ZSTD_LIBRARIES zstd::libzstd_shared)
+-                endif()
++        endif()
++        # Bridge conan CMakeDeps: check for target existence when _FOUND not set
++        if(NOT ZSTD_FOUND AND TARGET zstd::libzstd)
++            set(ZSTD_FOUND TRUE)
++            set(ZSTD_INCLUDE_DIRS ${zstd_INCLUDE_DIRS})
++            set(ZSTD_VERSION ${zstd_VERSION_STRING})
++        endif()
++        if(ZSTD_FOUND)
++            if(TARGET zstd::libzstd)
++                list(APPEND ZSTD_LIBRARIES zstd::libzstd)
++            elseif(TARGET zstd::libzstd_static)
++                list(APPEND ZSTD_LIBRARIES zstd::libzstd_static)
++            else()
++                list(APPEND ZSTD_LIBRARIES zstd::libzstd_shared)
+             endif()
+         endif()
+     endif()
+ 
+     if(ZSTD_FOUND AND NOT MZ_FORCE_FETCH_LIBS)
+         message(STATUS "Using ZSTD ${ZSTD_VERSION}")
+ 
+         list(APPEND MINIZIP_INC ${ZSTD_INCLUDE_DIRS})
+         list(APPEND MINIZIP_LIB ${ZSTD_LIBRARIES})
+         list(APPEND MINIZIP_LBD ${ZSTD_LIBRARY_DIRS})
+@@ -452,20 +478,28 @@
+ endif()
+ 
+ if(MZ_OPENSSL)
+     # Check to see if openssl installation is present
+     find_package(PkgConfig)
+     if(PKGCONFIG_FOUND)
+         pkg_check_modules(OPENSSL openssl)
+     endif()
+     if(NOT OPENSSL_FOUND)
+         find_package(OpenSSL)
++    endif()
++
++    # Bridge conan CMakeDeps: check for target existence when _FOUND not set
++    if(NOT OPENSSL_FOUND AND TARGET openssl::openssl)
++        set(OPENSSL_FOUND TRUE)
++        set(OPENSSL_INCLUDE_DIRS ${openssl_INCLUDE_DIRS})
++        set(OPENSSL_LIBRARIES openssl::openssl)
++        set(OPENSSL_VERSION ${openssl_VERSION_STRING})
+     endif()
+ 
+     if(OPENSSL_FOUND)
+         message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
+ 
+         list(APPEND MINIZIP_SRC mz_crypt_openssl.c)
+         list(APPEND MINIZIP_LIB ${OPENSSL_LIBRARIES})
+         list(APPEND MINIZIP_LBD ${OPENSSL_LIBRARY_DIRS})
+ 
+         if(OPENSSL_INCLUDE_DIRS)
+@@ -612,21 +646,34 @@
+                 message(WARNING "Low quality entropy function used for encryption")
+             endif()
+         endif()
+     else()
+         list(APPEND MINIZIP_DEF -DMZ_ZIP_NO_CRYPTO)
+     endif()
+ 
+     # Iconv is only necessary when it is not already built-in
+     # FindIconv requires cmake 3.11 or higher
+     if (MZ_ICONV)
++        # On OHOS/other platforms, iconv.h may be in the compiler's implicit
++        # include directories (sysroot) but CMake's FindIconv can't locate it.
++        # Search CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES as fallback.
+         find_package(Iconv QUIET)
++        if(NOT Iconv_FOUND)
++            foreach(_dir ${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES})
++                if(EXISTS "${_dir}/iconv.h")
++                    set(Iconv_FOUND TRUE)
++                    set(Iconv_INCLUDE_DIRS "${_dir}")
++                    set(Iconv_IS_BUILT_IN TRUE)
++                    break()
++                endif()
++            endforeach()
++        endif()
+     endif()
+ 
+     if(Iconv_FOUND)
+         message(STATUS "Using Iconv")
+ 
+         list(APPEND MINIZIP_DEF -DHAVE_ICONV)
+         list(APPEND MINIZIP_INC ${Iconv_INCLUDE_DIRS})
+         list(APPEND MINIZIP_DEP_PKG Iconv)
+         if(NOT Iconv_IS_BUILT_IN)
+             list(APPEND MINIZIP_LIB ${Iconv_LIBRARIES})
+@@ -813,21 +860,21 @@
+     configure_package_config_file(
+         ${CMAKE_CURRENT_BINARY_DIR}/minizip-config.cmake.in
+         ${MINIZIP_TARGET}-config.cmake
+         INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${MINIZIP_TARGET}")
+ 
+     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${MINIZIP_TARGET}-config-version.cmake
+                   ${CMAKE_CURRENT_BINARY_DIR}/${MINIZIP_TARGET}-config.cmake
+             DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${MINIZIP_TARGET}")
+ endif()
+ if(NOT SKIP_INSTALL_HDR AND NOT SKIP_INSTALL_ALL)
+-    install(FILES ${MINIZIP_HDR} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${MINIZIP_TARGET}")
++    install(FILES ${MINIZIP_HDR} ${CMAKE_CURRENT_SOURCE_DIR}/mz_config.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${MINIZIP_TARGET}")
+ endif()
+ if(NOT SKIP_INSTALL_FILES AND NOT SKIP_INSTALL_ALL)
+     install(FILES ${MINIZIP_PC} DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+ endif()
+ 
+ # Build test executables
+ if(MZ_BUILD_TESTS)
+     if(MZ_ZLIB AND NOT MZ_LIBCOMP)
+         add_executable(minigzip_cli minigzip.c)
+         set_target_properties(minigzip_cli PROPERTIES OUTPUT_NAME minigzip)
