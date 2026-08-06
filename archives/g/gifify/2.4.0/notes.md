@@ -70,5 +70,5 @@ $ ~/usr/local/bin/gifify --version
 - npm 已知 4 个漏洞（1 moderate, 2 high, 1 critical）为上游问题，不影响功能
 ---
 
-**编译结束**: 2026-05-28 11:26
+**编译结束**: 2026-08-06 13:30
 **最终状态**: built
