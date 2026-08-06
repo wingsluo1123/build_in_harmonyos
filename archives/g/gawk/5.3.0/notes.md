@@ -8,10 +8,10 @@
 
 ## 编译步骤
 1. 下载源码 `gawk-5.3.0.tar.xz` 并解压
-2. 应用补丁 `0001-port-for-ohos.patch`
-3. `./configure --prefix=$HOME/usr/local`
-4. `make -j1`（跳过部分扩展模块）
-5. `mkdir -p $HOME/usr/local/bin && cp gawk $HOME/usr/local/bin/ && ln -sf gawk $HOME/usr/local/bin/awk`
+2. 应用 11 个补丁 (0001-0011，通过 conan apply_conandata_patches)
+3. `./configure --prefix=$HOME/usr/local` (Conan: AutotoolsToolchain 管理 prefix)
+4. `make -j1` (全部扩展模块成功编译)
+5. `make install DESTDIR=$TEST_PREFIX`
 
 ## 遇到的问题与解决方案
 | # | 问题 | 根因 | 解决方案 |
