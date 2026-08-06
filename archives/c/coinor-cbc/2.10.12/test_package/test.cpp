@@ -45,6 +45,13 @@ int main(void)
     /* 先单独确认 LP 松弛确实是分数的 —— 否则这个测试验不到分支定界 */
     solver.initialSolve();
     {
+        /* 读解之前必须确认求解成功：失败时 getColSolution() 返回的不是计算结果，
+         * 后面「y 是否为 1.5」这条前提断言就会以误导性的方式失败 ——
+         * 看起来像模型建错了，其实是求解器没跑成。 */
+        if (!solver.isProvenOptimal()) {
+            std::printf("FAIL LP 松弛未求到最优，无法验证分支定界前提\n");
+            return 1;
+        }
         const double *r = solver.getColSolution();
         if (std::fabs(r[1] - 1.5) > 1e-6) {
             std::printf("FAIL LP 松弛 y=%.9f，本应为分数 1.5"
