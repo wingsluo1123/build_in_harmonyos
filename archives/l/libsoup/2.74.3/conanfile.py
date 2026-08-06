@@ -127,7 +127,7 @@ class LibsoupConan(ConanFile):
         apply_conandata_patches(self)
         meson = Meson(self)
         meson.configure()
-        meson.compile()
+        meson.build()
 
     def package(self):
         meson = Meson(self)
