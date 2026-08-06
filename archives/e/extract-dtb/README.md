@@ -1,6 +1,6 @@
 # extract-dtb
 
-> Tool to extract device tree blobs from Android kernel images
+> Tool to extract device tree blobs (dtb) from kernel images
 
 ## 简介
 
@@ -8,11 +8,13 @@ extract-dtb 是一个用于从 Android 内核映像中提取设备树 blob（DTB
 
 ## OHOS 适配要点
 
-- Pure Python 包，无需编译
-- 通过 setuptools 安装
+- Pure Python 包，无需 C/C++ 编译
+- 通过 setuptools (pip install) 安装
+- 修复源码中缺失的 `__version__` 变量定义（patch: 0001-extract_dtb-extract_dtb.py.patch）
 - `extract-dtb --version` 返回 `1.2`
 - `extract-dtb --help` 显示正常
+- 支持实际 DTB 提取功能测试
 
 ## 参考
 
-- [源码仓库](https://github.com/PabloLec/extract-dtb)
+- [源码仓库](https://github.com/PabloCastellano/extract-dtb)

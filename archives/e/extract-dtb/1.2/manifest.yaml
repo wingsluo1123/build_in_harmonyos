@@ -1,23 +1,39 @@
+software: extract-dtb
 version: "1.2"
-status: published
-build_date: "2026-05-30"
-build_system: custom
+status: built
+build_date: "2026-08-06"
+build_system: setuptools
 
 source:
-  url: "https://github.com/PabloLec/extract-dtb/archive/refs/tags/1.2.tar.gz"
-  sha256: ""
+  url: "https://github.com/PabloCastellano/extract-dtb/archive/refs/tags/1.2.tar.gz"
+  sha256: "2fa2683e8c6db61d6edf8ed08a740959f6d447c188f4781e5e24af60b9decf43"
   tar_format: tar.gz
 
 build:
-  system: custom
+  system: setuptools
   configure_options: []
-  dependencies:
-    - "python/3.12"
-  cc: clang
-  cxx: clang++
+  dependencies: []
 
-patches_applied: []
+patches_applied:
+  - "0001-extract_dtb-extract_dtb.py.patch: Add missing __version__ variable to fix --version/--help crash"
 
 knowledge_gained:
-  - "Pure Python 包在 OHOS 上无需编译，直接 pip install 即可"
+  - "Pure Python 包在 OHOS 上无需 C/C++ 编译，通过 pip install 安装"
+  - "extract-dtb 1.2 源码缺少 __version__ 变量定义，导致 --version/--help 崩溃"
+  - "修复方案：在 extract_dtb.py 中添加 __version__ = '1.2'"
   - "file 命令在 OHOS 上不可用（缺少 magic 数据库），但不影响功能"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/extract-dtb-1.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/extract-dtb-1.2.work
+  source_orig_hash: d7c7f704c479ce7e
+  source_work_hash: c56113dc540f3d7a
+  generated_at: '2026-08-06T09:45:07'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-extract_dtb-extract_dtb.py.patch
+    type: portability
+    platform_only: False
+    guard: ''
