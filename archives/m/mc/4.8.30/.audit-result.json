@@ -1,0 +1,90 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/conandata.yml",
+      "rule": "R13 (review_memory §13) / code_style §13",
+      "title": "Manual mirror prefix in source URL",
+      "description": "conandata.yml lists 'https://gh-proxy.com/https://github.com/MidnightCommander/mc/archive/refs/tags/4.8.30.tar.gz' as the first URL. Rule R13 states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The gh-proxy mirror prefix should not be manually added; CI handles mirror fallback automatically. Only the official GitHub URL should be present."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/conanfile.py",
+      "rule": "code_style §5 (forbidden template placeholders)",
+      "title": "Template placeholder 'url = \"\"  # CI fills this' in merged code",
+      "description": "Line: url = \"\"  # CI fills this. Code style rule §5 explicitly lists 'url = \"\"  # CI fills this' as a forbidden template placeholder that indicates unfinished work. The url field should be filled with the recipe repository URL by the adapter before merge."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/conanfile.py",
+      "rule": "R6 (review_memory §14)",
+      "title": "Directly modifies generated files (configure, po/Makefile.in)",
+      "description": "The build() method directly patches the generated 'configure' script (replacing 'umask 077' with 'umask 022') and 'po/Makefile.in' (adding top_builddir, replacing @POMAKEFILEDEPS@). Rule R6 states: '禁止修改 config.h、configure、Makefile.in、CMakeCache.txt 等生成产物。应通过 generate() 或 patches/ 处理。' While these are practical workarounds for HarmonyOS-specific issues (file permission and gettext version mismatch), the rule is violated. Consider moving these modifications to generate() or declaring them as proper patches in conandata.yml."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/conanfile.py",
+      "rule": "R33 (review_memory §11)",
+      "title": "Bare environment variable manipulation for CC/CXX/PATH instead of Conan Toolchain",
+      "description": "build() uses os.environ.setdefault('CC', 'clang'), os.environ.setdefault('CXX', 'clang++'), and os.environ['PATH'] = hb_bin + ':' + env_path. Rule R33 states these should be obtained from Conan Toolchain (e.g., AutotoolsToolchain) rather than setting bare environment variables. The code does use AutotoolsToolchain for configure_args but bypasses it for compiler selection. On release workers, bare env var manipulation risks silent failures if values are empty."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/conandata.yml",
+      "rule": "review_memory §12 / code_style §13",
+      "title": "Patches not declared in conandata.yml patches field",
+      "description": "conandata.yml has 'patches: {}' (empty), but two patch files exist in the patches/ directory: 0001-INSTALL.patch and 0002-configure.ac.patch. Rule §12 states: '补丁需在 patches 字段声明且文件实际存在'. The patches are not wired into the Conan patch system — export_conandata_patches() exports nothing, and apply_conandata_patches() applies nothing. All patching is done inline in build() instead. The patch files serve only as documentation. For consistency, either declare the patches in conandata.yml or remove the patch files if they are purely for record-keeping."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/test_package/test_mc.sh",
+      "rule": "code_style §6",
+      "title": "Incorrect shebang for shell script",
+      "description": "Uses '#!/bin/sh' instead of '#!/usr/bin/zsh' as specified by code style rule §6. While /bin/sh is more portable, the project standard requires /usr/bin/zsh."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/test_package/test_mc.sh",
+      "rule": "code_style §7",
+      "title": "Missing safe mode options (set -euo pipefail)",
+      "description": "Script uses only 'set -e' but code style rule §7 requires 'set -euo pipefail' for all scripts. Missing -u (undefined variable error) and -o pipefail (pipe failure propagation)."
+    },
+    {
+      "severity": "P2",
+      "file": "archives/m/mc/4.8.30/test_package/test_mc.sh",
+      "rule": "code_style §9",
+      "title": "Output format non-compliant with [ok]/[fail] markers",
+      "description": "Uses 'echo \"PASS: ...\"' and 'echo \"FAIL: ...\"' instead of the required '[ok]' and '[fail]' step markers with 8-space indentation as specified by code style rule §9."
+    },
+    {
+      "severity": "P3",
+      "file": "archives/m/mc/4.8.30/conanfile.py",
+      "rule": "code_style §16 (import order / unused imports)",
+      "title": "Unused import: shutil",
+      "description": "'import shutil' is imported but never used anywhere in conanfile.py. Remove unused import for cleanliness."
+    },
+    {
+      "severity": "P3",
+      "file": "archives/m/mc/4.8.30/patches/0001-INSTALL.patch",
+      "rule": "code_style §12 (patch file naming)",
+      "title": "Patch on documentation file with no build impact",
+      "description": "0001-INSTALL.patch (834 lines) replaces the mc-specific INSTALL instructions with the generic GNU autoconf INSTALL file. This is a documentation-only change with no build impact. Consider removing this patch as it adds noise without functional value for HarmonyOS adaptation."
+    },
+    {
+      "severity": "P3",
+      "file": "archives/m/mc/4.8.30/test_package/MANIFEST.yml",
+      "rule": "consistency",
+      "title": "assertion_count (3) does not match actual test assertions (2)",
+      "description": "MANIFEST.yml declares assertion_count: 3, but test_mc.sh only has 2 explicit assertions: (1) mc --version exits 0, (2) output contains 'Midnight Commander'. Update the count or add a third assertion to match."
+    },
+    {
+      "severity": "P3",
+      "file": "archives/m/mc/4.8.30/manifest.yaml",
+      "rule": "portability",
+      "title": "Build-specific absolute paths in patch_generation metadata",
+      "description": "patch_generation contains machine-specific absolute paths: source_orig_dir: /storage/Users/currentUser/tmp/builds/mc-4.8.30.orig and source_work_dir: /storage/Users/currentUser/tmp/builds/mc-4.8.30.work. These paths are not portable and could leak build environment details. Consider using relative paths or removing these fields from the published manifest."
+    }
+  ],
+  "summary": "AUDIT VERDICT: PASS (with warnings). Audited 11 changed files for mc 4.8.30 (Midnight Commander) against code_style and review_memory rules. No P0 (deceptive) or P1 (correctness) issues found. SHA256 verified correct against actual GitHub tarball download. R34 (empty shell test) check PASSED — test_package requires mc and runs the actual mc binary via test_mc.sh (--version check with output verification). No forged status (status='built' is consistent across all manifests and notes.md). No pre-compiled binaries. No #ifdef __OHOS__ stubs. Conan 2.x API used correctly. commands.json present with type='tool' for this application package. 8 P2 style issues found (manual mirror URL prefix, template placeholder, generated file modification, bare env vars, undeclared patches, non-compliant shell script shebang/safe-mode/output-format). 4 P3 suggestions (unused import, unnecessary doc patch, assertion count mismatch, build-specific paths in manifest). All issues are style/completeness level and do not affect build correctness or indicate deceptive behavior."
+}
