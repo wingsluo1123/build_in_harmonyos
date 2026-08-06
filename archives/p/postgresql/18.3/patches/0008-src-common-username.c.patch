@@ -1,0 +1,37 @@
+--- a/src/common/username.c
++++ b/src/common/username.c
+@@ -33,24 +33,34 @@
+ #ifndef WIN32
+ 	struct passwd *pw;
+ 	uid_t		user_id = geteuid();
+ 
+ 	*errstr = NULL;
+ 
+ 	errno = 0;					/* clear errno before call */
+ 	pw = getpwuid(user_id);
+ 	if (!pw)
+ 	{
++#ifdef __OHOS__
++		/*
++		 * OHOS: getpwuid may fail for users not in /etc/passwd.
++		 * Fall back to using the numeric UID as the user name.
++		 */
++		static char uid_name[32];
++		snprintf(uid_name, sizeof(uid_name), "%ld", (long) user_id);
++		return uid_name;
++#else
+ 		*errstr = psprintf(_("could not look up effective user ID %ld: %s"),
+ 						   (long) user_id,
+ 						   errno ? strerror(errno) : _("user does not exist"));
+ 		return NULL;
++#endif
+ 	}
+ 
+ 	return pw->pw_name;
+ #else
+ 	/* Microsoft recommends buffer size of UNLEN+1, where UNLEN = 256 */
+ 	/* "static" variable remains after function exit */
+ 	static char username[256 + 1];
+ 	DWORD		len = sizeof(username);
+ 
+ 	*errstr = NULL;

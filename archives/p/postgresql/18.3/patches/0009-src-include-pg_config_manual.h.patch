@@ -1,0 +1,32 @@
+--- a/src/include/pg_config_manual.h
++++ b/src/include/pg_config_manual.h
+@@ -183,21 +183,29 @@
+  * If set to an empty string, then AF_UNIX sockets are not used by default: A
+  * server will not create an AF_UNIX socket unless the run-time configuration
+  * is changed, a client will connect via TCP/IP by default and will only use
+  * an AF_UNIX socket if one is explicitly specified.
+  *
+  * This is done by default on Windows because there is no good standard
+  * location for AF_UNIX sockets and many installations on Windows don't
+  * support them yet.
+  */
+ #ifndef WIN32
++#ifdef __OHOS__
++/*
++ * OHOS: /tmp is read-only and Unix-domain sockets are not supported.
++ * Use empty string to disable Unix sockets by default (TCP/IP only).
++ */
++#define DEFAULT_PGSOCKET_DIR ""
++#else
+ #define DEFAULT_PGSOCKET_DIR  "/tmp"
++#endif /* __OHOS__ */
+ #else
+ #define DEFAULT_PGSOCKET_DIR ""
+ #endif
+ 
+ /*
+  * This is the default event source for Windows event log.
+  */
+ #define DEFAULT_EVENT_SOURCE  "PostgreSQL"
+ 
+ /*

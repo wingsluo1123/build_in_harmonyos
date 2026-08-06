@@ -1,0 +1,92 @@
+--- a/src/backend/utils/init/miscinit.c
++++ b/src/backend/utils/init/miscinit.c
+@@ -374,46 +374,89 @@
+ 	/*
+ 	 * Check that the directory belongs to my userid; if not, reject.
+ 	 *
+ 	 * This check is an essential part of the interlock that prevents two
+ 	 * postmasters from starting in the same directory (see CreateLockFile()).
+ 	 * Do not remove or weaken it.
+ 	 *
+ 	 * XXX can we safely enable this check on Windows?
+ 	 */
+ #if !defined(WIN32) && !defined(__CYGWIN__)
++#ifdef __OHOS__
++	/*
++	 * OHOS: On hmdfs filesystem, the directory owner may not match our UID
++	 * due to how the filesystem handles permissions. Instead, check if the
++	 * directory's group matches any of our groups (relaxed ownership check).
++	 */
++	if (stat_buf.st_uid != geteuid())
++	{
++		gid_t dir_gid = stat_buf.st_gid;
++		gid_t my_gids[64];
++		int ngroups;
++		bool same_group = false;
++		int i;
++
++		ngroups = getgroups(64, my_gids);
++		for (i = 0; i < ngroups && !same_group; i++)
++			if (my_gids[i] == dir_gid)
++				same_group = true;
++
++		if (!same_group)
++			ereport(FATAL,
++					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
++					 errmsg("data directory \"%s\" has wrong ownership",
++							DataDir),
++					 errhint("The server must be started by the user that owns the data directory or belongs to its group.")));
++	}
++#else
+ 	if (stat_buf.st_uid != geteuid())
+ 		ereport(FATAL,
+ 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+ 				 errmsg("data directory \"%s\" has wrong ownership",
+ 						DataDir),
+ 				 errhint("The server must be started by the user that owns the data directory.")));
++#endif /* __OHOS__ */
+ #endif
+ 
+ 	/*
+ 	 * Check if the directory has correct permissions.  If not, reject.
+ 	 *
+ 	 * Only two possible modes are allowed, 0700 and 0750.  The latter mode
+ 	 * indicates that group read/execute should be allowed on all newly
+ 	 * created files and directories.
+ 	 *
+ 	 * XXX temporarily suppress check when on Windows, because there may not
+ 	 * be proper support for Unix-y file permissions.  Need to think of a
+ 	 * reasonable check to apply on Windows.
+ 	 */
+ #if !defined(WIN32) && !defined(__CYGWIN__)
++#ifdef __OHOS__
++	/*
++	 * OHOS: hmdfs filesystem doesn't handle permissions properly, causing
++	 * S-bit issues and abnormal group permissions. Relax the permission check -
++	 * only verify that the user has full rwx access. The S-bit and extra
++	 * group/other permissions imposed by hmdfs are harmless for our use case.
++	 */
++	if ((stat_buf.st_mode & S_IRWXU) != S_IRWXU)
++		ereport(FATAL,
++				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
++				 errmsg("data directory \"%s\" has invalid permissions",
++						DataDir),
++				 errdetail("Permissions for owner should include read, write, and execute.")));
++#else
+ 	if (stat_buf.st_mode & PG_MODE_MASK_GROUP)
+ 		ereport(FATAL,
+ 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+ 				 errmsg("data directory \"%s\" has invalid permissions",
+ 						DataDir),
+ 				 errdetail("Permissions should be u=rwx (0700) or u=rwx,g=rx (0750).")));
++#endif /* __OHOS__ */
+ #endif
+ 
+ 	/*
+ 	 * Reset creation modes and mask based on the mode of the data directory.
+ 	 *
+ 	 * The mask was set earlier in startup to disallow group permissions on
+ 	 * newly created files and directories.  However, if group read/execute
+ 	 * are present on the data directory then modify the create modes and mask
+ 	 * to allow group read/execute on newly created files and directories and
+ 	 * set the data_directory_mode GUC.
