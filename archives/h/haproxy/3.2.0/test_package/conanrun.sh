@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/h/haproxy/3.2.0/test_package/conanrunenv-release-armv8.sh"
