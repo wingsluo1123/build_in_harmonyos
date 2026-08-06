@@ -34,7 +34,10 @@ int main(void)
     }
     printf("proj_create_crs_to_crs(EPSG:4326 -> EPSG:3857): OK\n");
 
-    /* Normalize for visualization (handles axis ordering) */
+    /* Normalize for visualization (handles axis ordering).
+     * Ownership note: proj_normalize_for_visualization() may return the same
+     * PJ* pointer when no axis reorder is needed; only destroy the original
+     * when it differs from the normalized result. */
     PJ *pj_norm = proj_normalize_for_visualization(ctx, pj);
     if (!pj_norm) {
         printf("ERROR: proj_normalize_for_visualization failed\n");
@@ -42,7 +45,8 @@ int main(void)
         proj_context_destroy(ctx);
         return 1;
     }
-    proj_destroy(pj);
+    if (pj_norm != pj)
+        proj_destroy(pj);
     printf("proj_normalize_for_visualization: OK\n");
 
     /* --- Transform origin (lat=0, lon=0) -> should be (0, 0) --- */
