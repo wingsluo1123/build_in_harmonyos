@@ -136,3 +136,5 @@ class LibsoupConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["soup-2.4"]
         self.cpp_info.set_property("pkg_config_name", "libsoup-2.4")
+        # Headers installed to include/libsoup-2.4/libsoup/ by meson
+        self.cpp_info.includedirs = ["include/libsoup-2.4"]
