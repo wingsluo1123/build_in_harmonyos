@@ -58,7 +58,40 @@ class M17nLibConan(ConanFile):
         self._generate_plural_h()
         autotools = Autotools(self)
         autotools.configure()
+        self._fix_generated_makefile()
         autotools.make(args=["-j1"])
+
+    def _fix_generated_makefile(self):
+        """Fix generated src/Makefile to add libintl.a static linking.
+
+        Patch 0008 modifies Makefile.in, but configure may regenerate
+        Makefile with different LIBADD. This ensures libintl.a is linked.
+        """
+        import re
+        makefile = os.path.join(self.build_folder, "src", "Makefile")
+        if not os.path.exists(makefile):
+            return
+        with open(makefile, "r") as f:
+            content = f.read()
+        changed = False
+        if "intl/libintl.a" not in content:
+            # Add libintl.a to DEPENDENCIES
+            content = re.sub(
+                r'^(libm17n_core_la_DEPENDENCIES\s*=\s*)$',
+                r'\1$(top_builddir)/intl/libintl.a',
+                content, flags=re.MULTILINE
+            )
+            # Add libintl.a to LIBADD
+            content = re.sub(
+                r'^(libm17n_core_la_LIBADD\s*=\s*.*?)(\s*$)',
+                r'\1 $(top_builddir)/intl/libintl.a\2',
+                content, flags=re.MULTILINE
+            )
+            changed = True
+        if changed:
+            with open(makefile, "w") as f:
+                f.write(content)
+            self.output.info("Fixed generated Makefile: added libintl.a linking")
 
     def _generate_plural_h(self):
         """Generate plural.h from plural.y using bison, then fix signature.
