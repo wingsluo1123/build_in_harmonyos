@@ -56,26 +56,31 @@ class GitCliffConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ensure_rust(self):
-        """Find or install Rust toolchain. Returns (cargo_path, env_dict)."""
+        """Find or install Rust toolchain. Returns (cargo_path, rustc_path, env_dict)."""
         env = {}
 
         # 1. Try to find existing cargo
         cargo = shutil.which("cargo")
-        if cargo:
-            return cargo, env
+        rustc = shutil.which("rustc")
+        if cargo and rustc:
+            return cargo, rustc, env
 
         # 2. Check common installation locations
-        for candidate in [
-            os.path.expanduser("~/.harmonybrew/bin/cargo"),
-            "/storage/Users/currentUser/.harmonybrew/bin/cargo",
-            "/storage/Users/currentUser/usr/local/bin/cargo",
+        for base in [
+            os.path.expanduser("~/.harmonybrew/bin"),
+            "/storage/Users/currentUser/.harmonybrew/bin",
+            "/storage/Users/currentUser/usr/local/bin",
         ]:
-            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
-                return candidate, env
+            c = os.path.join(base, "cargo")
+            r = os.path.join(base, "rustc")
+            if os.path.isfile(c) and os.access(c, os.X_OK):
+                return c, r, env
 
         # 3. Download and install Rust bottle locally
         rust_dir = os.path.join(self.build_folder, ".rust-toolchain")
-        cargo_path = os.path.join(rust_dir, "bin", "cargo")
+        # cargo.real is the actual binary; 'cargo' is a wrapper that hardcodes
+        # the Harmonybrew Cellar path, so we use cargo.real directly.
+        cargo_path = os.path.join(rust_dir, "bin", "cargo.real")
         rustc_path = os.path.join(rust_dir, "bin", "rustc")
 
         if not os.path.isfile(cargo_path):
@@ -83,21 +88,21 @@ class GitCliffConan(ConanFile):
             bottle_path = os.path.join(self.build_folder, ".rust-bottle.tar.gz")
             self.run(f'curl -fsSL -o "{bottle_path}" "{RUST_BOTTLE_URL}"')
             os.makedirs(rust_dir, exist_ok=True)
-            # Bottle structure: rust/1.97.1/bin/cargo -> strip 2 levels
+            # Bottle structure: rust/1.97.1/bin/cargo.real -> strip 2 levels
             self.run(f'tar xzf "{bottle_path}" -C "{rust_dir}" --strip-components=2')
             # Make binaries executable
-            for name in ["cargo", "rustc", "rustfmt", "clippy-driver"]:
+            import stat as stat_mod
+            for name in os.listdir(os.path.join(rust_dir, "bin")):
                 p = os.path.join(rust_dir, "bin", name)
                 if os.path.isfile(p):
-                    os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC)
+                    os.chmod(p, os.stat(p).st_mode | stat_mod.S_IEXEC)
 
         if not os.path.isfile(cargo_path):
             raise ConanException("Failed to install Rust toolchain from Harmonybrew bottle")
 
-        # Set up PATH so cargo can find rustc
-        env["PATH"] = os.path.join(rust_dir, "bin") + ":" + os.environ.get("PATH", "")
-
-        return cargo_path, env
+        # Set up PATH so cargo can find rustc, and RUSTC for explicit rustc path
+        env["RUSTC"] = rustc_path
+        return cargo_path, rustc_path, env
 
     def _ensure_cc(self):
         """Ensure cc/c++ symlinks exist (cargo uses 'cc' as default linker)."""
@@ -134,7 +139,7 @@ class GitCliffConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        cargo, _ = self._ensure_rust()
+        cargo, rustc, rust_env = self._ensure_rust()
         local_bin = self._ensure_cc()
         cargo_home = self._setup_cargo_mirror()
 
@@ -145,11 +150,16 @@ class GitCliffConan(ConanFile):
         if local_bin:
             extra_path += ":" + local_bin
 
+        # Set up SSL cert for cargo (HTTPS downloads from crates.io mirror)
+        ssl_cert = os.environ.get("SSL_CERT_FILE", "/storage/Users/currentUser/usr/local/ssl/cert.pem")
+
         # Use a single shell command to set up environment and run cargo.
-        # This ensures all env vars are set before cargo is invoked.
+        # cargo.real is the actual binary (not the wrapper script).
         cmd = (
             f'export PATH="{extra_path}:$PATH" && '
             f'export CARGO_HOME="{cargo_home}" && '
+            f'export RUSTC="{rustc}" && '
+            f'export SSL_CERT_FILE="{ssl_cert}" && '
             f'export LD_LIBRARY_PATH="{rust_lib}:$LD_LIBRARY_PATH" && '
             f'"{cargo}" build --release'
         )
