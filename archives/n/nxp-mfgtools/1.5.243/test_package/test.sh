@@ -6,5 +6,5 @@ set -euo pipefail
 # the uuu binary and its shared library deps are found.
 
 echo "[step] Running uuu -h..."
-uuu -h 2>&1 | head -5
+uuu -h > /dev/null 2>&1
 echo "        [ok] uuu binary executed successfully"
