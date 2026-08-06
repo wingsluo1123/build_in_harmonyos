@@ -50,7 +50,8 @@ class LpSolveConan(ConanFile):
         ranlib = "llvm-ranlib"
 
         # GNU ld (ld.bfd) required — lld has missing libxml2 dependency on OHOS
-        ldflags = "-fuse-ld=/data/service/hnp/bin/ld.bfd"
+        ld_path = os.environ.get("LP_SOLVE_LD_PATH", "/data/service/hnp/bin/ld.bfd")
+        ldflags = f"-fuse-ld={ld_path}"
         cflags = "-fPIC -O2"
 
         # R9: Use -j1, never -j$(nproc)
@@ -71,7 +72,16 @@ class LpSolveConan(ConanFile):
             copy(self, "liblpsolve55.so", plat_dir, os.path.join(self.package_folder, "lib"))
 
         # Executable
-        copy(self, "lp_solve", plat_dir, os.path.join(self.package_folder, "bin"))
+        # Executable — write directly to fd with execute permissions
+        # (OHOS filesystem does not support chmod on existing files)
+        exe_dst = os.path.join(self.package_folder, "bin", "lp_solve")
+        exe_src = os.path.join(plat_dir, "lp_solve")
+        os.makedirs(os.path.dirname(exe_dst), exist_ok=True)
+        with open(exe_src, "rb") as f_src:
+            data = f_src.read()
+        fd = os.open(exe_dst, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o755)
+        os.write(fd, data)
+        os.close(fd)
 
         # Headers — all installed to flat include/ (matching Makefile install target)
         copy(self, "*.h", self.source_folder, os.path.join(self.package_folder, "include"))
@@ -82,5 +92,4 @@ class LpSolveConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["lpsolve55"]
-        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.bindirs = ["bin"]

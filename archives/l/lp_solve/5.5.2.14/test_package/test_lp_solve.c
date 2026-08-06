@@ -15,12 +15,24 @@ int main(void) {
 
     /* Objective: maximize x1 + x2 */
     set_maxim(lp);
-    set_obj(lp, 1, 1.0);
-    set_obj(lp, 2, 1.0);
+    if (!set_obj(lp, 1, 1.0)) {
+        fprintf(stderr, "ERROR: set_obj(1) failed\n");
+        delete_lp(lp);
+        return 1;
+    }
+    if (!set_obj(lp, 2, 1.0)) {
+        fprintf(stderr, "ERROR: set_obj(2) failed\n");
+        delete_lp(lp);
+        return 1;
+    }
 
     /* Constraint: x1 + x2 <= 10 */
     REAL row[] = {0, 1, 1};
-    add_constraint(lp, row, LE, 10);
+    if (!add_constraint(lp, row, LE, 10)) {
+        fprintf(stderr, "ERROR: add_constraint failed\n");
+        delete_lp(lp);
+        return 1;
+    }
 
     int ret = solve(lp);
     if (ret != OPTIMAL) {
