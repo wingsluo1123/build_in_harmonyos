@@ -138,6 +138,10 @@ class FluentBitConan(ConanFile):
             "FLB_IN_BLOB":                  "Off",
             # --- output plugins needing external deps ---
             "FLB_OUT_HTTP":                 "Off",
+            # FLB_OUT_TD defaults ON and forces set(FLB_TLS ON), which would
+            # re-enable TLS sources (tls/flb_tls.c, flb_oauth2*.c) even with
+            # -DFLB_TLS=Off; disable it to keep the OHOS zero-dep build.
+            "FLB_OUT_TD":                   "Off",
             "FLB_OUT_KAFKA":                "Off",
             "FLB_OUT_KAFKA_REST":           "Off",
             "FLB_OUT_OPENTELEMETRY":        "Off",
@@ -166,6 +170,10 @@ class FluentBitConan(ConanFile):
             "FLB_OUT_OPENSEARCH":           "Off",
             "FLB_OUT_ES":                   "Off",
             "FLB_OUT_CALYPTIA":             "Off",
+            # out_forward: io_net_write/io_net_read are static helpers defined
+            # inside `#ifdef FLB_HAVE_TLS`; they cannot be satisfied by the
+            # link-time stub, so the plugin must stay off when FLB_TLS=Off.
+            "FLB_OUT_FORWARD":              "Off",
             # --- filter plugins needing external deps ---
             "FLB_FILTER_AWS":               "Off",
             "FLB_FILTER_ECS":               "Off",
