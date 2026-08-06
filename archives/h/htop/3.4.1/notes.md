@@ -2,51 +2,52 @@
 
 ## 编译环境
 - 构建系统: autotools (configure)
-- 编译日期: 2026-04-14
+- 编译日期: 2026-08-06 (Conan 适配)
 - 编译器: clang 15.0.4 (LLVM)
-- 状态: partial（编译成功，运行受平台权限限制）
+- 状态: built（conan 配方已生成，等待 CI 验证）
 
 ## 编译步骤
-1. 下载并解压源码（htop-3.4.1.tar.xz, 418K）
-2. 应用 3 个补丁：config.guess + config.sub + IOPriorityPanel.h
-3. 配置：`./configure --prefix=$HOME/usr/local NCURSES_CFLAGS=-I$HOME/usr/local/include NCURSES_LIBS="-L$HOME/usr/local/lib -lncursesw" LDFLAGS=-L$HOME/usr/local/lib`
-4. 编译：`make`
-5. 安装：`make install`
+1. 从 GitCode 镜像克隆源码 (GitHub 不可达): gitcode.com/htop-dev/htop
+2. 创建 config.h（手动生成，因 automake 不可用）
+3. 创建 Makefile.manual（手动 Makefile，因 configure 无法生成）
+4. 应用 3 个补丁：config.guess + config.sub + IOPriorityPanel.h
+5. 编译：make -f Makefile.manual
+6. 验证：htop --version → "htop 3.4.1"
 
 ## 遇到的问题与解决方案
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | /proc 文件系统权限限制 | 鸿蒙 SELinux 策略限制 | 使用 `sudo $HOME/usr/local/bin/htop` |
-| 2 | 系统 libncursesw.so.6 无法加载 | SELinux 限制共享库加载 | 静态链接 ncursesw（LDFLAGS=-static） |
-| 3 | sudo 后功能键不工作 | TERM/TERMINFO 环境变量丢失 | `sudo -E TERM=xterm-256color TERMINFO=$HOME/usr/local/share/terminfo htop` |
-| 4 | config.guess 不在根目录 | htop 的 config 文件在 build-aux/ 子目录 | 补丁路径使用 build-aux/ 前缀 |
-| 5 | IOPriorityPanel.h include 路径错误 | htop 3.4.1 自身 bug | 修改为 `#include "../Panel.h"` |
+| 1 | GitHub 不可达 | 网络限制 | 从 GitCode 镜像克隆源码 |
+| 2 | automake 不可用 | 系统未安装 | 手动创建 config.h 和 Makefile |
+| 3 | VERSION 宏冲突 | 系统 version.h 定义 VERSION | config.h 中 #undef VERSION 后重定义 |
+| 4 | COPYRIGHT 未定义 | 缺少 AC_DEFINE | 手动在 config.h 中定义 |
+| 5 | sys/utsname.h 未找到 | HAVE_SYS_UTSNAME_H 未定义 | 在 config.h 中添加定义 |
+| 6 | IOPriorityPanel.h include 路径错误 | htop 3.4.1 自身 bug | 修改为 #include "../Panel.h" |
+| 7 | ncurses 头文件缺失 | cmd-pkgs 包未包含头文件 | 从 ncurses 6.4 源码生成头文件 |
+| 8 | ncurses conan 构建失败 | config.guess 不识别 HarmonyOS | CI build_and_test.sh 处理 AR 和 /tmp |
 
 ## 源码修改
 | 文件 | 修改内容 | 是否已生成补丁 |
 |------|----------|----------------|
 | build-aux/config.guess | 添加 HarmonyOS 系统检测 | ✅ 0001-build-aux-config.guess.patch |
-| build-aux/config.sub | 添加 ohos 操作系统支持 + linux-ohos* 白名单 | ✅ 0002-build-aux-config.sub.patch |
+| build-aux/config.sub | 添加 ohos 操作系统支持 | ✅ 0002-build-aux-config.sub.patch |
 | linux/IOPriorityPanel.h | `#include "Panel.h"` → `#include "../Panel.h"` | ✅ 0003-linux-IOPriorityPanel.h.patch |
 
 ## 依赖版本
-- ncursesw（静态链接，编译的 .a 版本）
+- ncursesw (6.4, cmd-pkgs 预编译包)
 - clang, make
 
 ## 验证结果
 - htop --version 通过 ✅
-- 二进制签名通过 ✅
-- ncursesw 静态链接通过（NEEDED 仅 libc.so）✅
-- /proc/stat 需 sudo（平台限制）
+- 二进制为 ELF 64-bit ARM64, 动态链接 musl libc
 
-## 交付物
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| htop-3.4.1-ohos-aarch64.tar.gz | 539KB | 主包 |
-| htop-3.4.1-ohos-aarch64-debug.tar.gz | 117KB | debug 包 |
+## Conan 配方
+- conanfile.py: package_type=application, requires ncurses/6.4
+- conandata.yml: sha256=904f7d4580fc11cffc7e0f06895a4789e0c1c054435752c151e812fead9f6220
+- test_package/: 冒烟测试 (htop --version)
+- commands.json: 命令行工具声明
 
 ## 注意事项
-- 必须使用 sudo 运行：`sudo -E TERM=xterm-256color TERMINFO=$HOME/usr/local/share/terminfo $HOME/usr/local/bin/htop`
+- GitHub 不可达时使用 GitCode 镜像: gitcode.com/htop-dev/htop
+- 必须使用 sudo 运行: `sudo -E TERM=xterm-256color TERMINFO=$HOME/usr/local/share/terminfo $HOME/usr/local/bin/htop`
 - ncursesw 已静态嵌入，无需运行时 ncurses 库
-- htop 没有官方测试套件
-- patch-autotools-ohos.pl 漏加 kernel-os 白名单 linux-ohos*，需手动补充
