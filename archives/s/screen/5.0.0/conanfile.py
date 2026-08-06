@@ -58,8 +58,20 @@ def _is_ncurses_headers_installed(prefix):
 def _install_cmd_pkg(name, version, prefix):
     """Download and install a cmd-pkgs prebuilt package."""
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh"
-    cmd = f'curl -fsSL {url} | sh -s -- {name} {version} {prefix}'
-    result = subprocess.run(cmd, shell=True, timeout=300, capture_output=True, text=True)
+    # Download install script first, then execute with safe argument list (no shell=True)
+    dl = subprocess.run(
+        ["curl", "-fsSL", url],
+        timeout=300, capture_output=True, text=True,
+    )
+    if dl.returncode != 0:
+        raise ConanInvalidConfiguration(
+            f"Failed to download cmd-pkgs install script: "
+            f"rc={dl.returncode} stderr={dl.stderr.strip()}"
+        )
+    result = subprocess.run(
+        ["sh", "-s", "--", name, version, prefix],
+        input=dl.stdout, timeout=300, capture_output=True, text=True,
+    )
     if result.returncode != 0:
         raise ConanInvalidConfiguration(
             f"Failed to install {name} {version} via cmd-pkgs: "
