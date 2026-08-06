@@ -61,7 +61,7 @@ class MateMenusConan(ConanFile):
 
         # The glib conan recipe doesn't expose gio-unix-2.0 as a
         # PkgConfigDeps component. Set GIO_UNIX_CFLAGS and GIO_UNIX_LIBS
-        # directly from the conan-managed glib package.
+        # directly, collecting lib paths from all conan dependencies.
         glib_pkg = self.dependencies["glib"].package_folder
         if glib_pkg:
             glib_inc = os.path.join(glib_pkg, "include")
@@ -70,6 +70,14 @@ class MateMenusConan(ConanFile):
             glib_inc_internal = os.path.join(glib_pkg, "lib", "glib-2.0", "include")
             glib_lib = os.path.join(glib_pkg, "lib")
 
+            # Collect lib paths from all dependencies (including transitive)
+            lib_paths = [f"-L{glib_lib}"]
+            for dep in self.dependencies.host.values():
+                if dep.package_folder:
+                    dep_lib = os.path.join(dep.package_folder, "lib")
+                    if os.path.isdir(dep_lib) and dep_lib != glib_lib:
+                        lib_paths.append(f"-L{dep_lib}")
+
             env = Environment()
             cflags = " ".join([
                 f"-I{glib_inc_gio}",
@@ -77,8 +85,7 @@ class MateMenusConan(ConanFile):
                 f"-I{glib_inc_glib}",
                 f"-I{glib_inc_internal}",
             ])
-            libs = " ".join([
-                f"-L{glib_lib}",
+            libs = " ".join(lib_paths + [
                 "-lgio-2.0",
                 "-lgobject-2.0",
                 "-lgmodule-2.0",
