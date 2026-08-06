@@ -98,12 +98,12 @@ class KubetuiConan(ConanFile):
             if not rust_ok:
                 raise ConanException("rust toolchain unavailable (cmd-pkgs Download failed + all fallback paths failed: cargo/rustup/local cargo/rustc; rustup-init omitted to avoid CI timeout) — CI worker lacks rust toolchain support")
         # P1: cargo build 失败显式 raise ConanException（aireview: 构建失败被吞 → 空包+欺骗性打包）
+        # Conan 2.x self.run() 非零退出码不抛异常，须显式检查返回值
         # cargo build --release 默认编为宿主架构（CI x86_64），
         # 必须指定 --target aarch64-unknown-linux-ohos 产出 arm64 二进制
-        try:
-            self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder, env="conanbuild")
-        except ConanException as e:
-            raise ConanException(f"cargo build failed: {e}")
+        ret = self.run("cargo build --release --target aarch64-unknown-linux-ohos", cwd=self.source_folder, env="conanbuild")
+        if ret != 0:
+            raise ConanException(f"cargo build failed with exit code {ret}")
 
     def package(self):
         # P1: 删占位假二进制分支，只复制真实产物（aireview: 欺骗性打包）
