@@ -1,6 +1,13 @@
---- notcurses-3.0.17.orig/src/lib/termdesc.c	2025-10-29 00:02:11.000000000 +0800
-+++ notcurses-3.0.17.work/src/lib/termdesc.c	2026-04-17 00:42:07.731288436 +0800
-@@ -521,16 +521,31 @@
+--- a/src/lib/termdesc.c
++++ b/src/lib/termdesc.c
+@@ -514,30 +514,45 @@
+ // any identification queries (we've already identified the terminal). write
+ // DSRCPR as early as possible, so that it precedes any query material that's
+ // bled onto stdin and echoed. if 'noaltscreen' is set, do not send an smcup.
+ // if 'draininput' is set, do not send any keyboard modifiers.
+ // precondition: ti->ttyfd is a valid fd (we're connected to a terminal)
+ static int
+ send_initial_queries(tinfo* ti, unsigned minimal, unsigned noaltscreen,
                       unsigned draininput){
    int fd = ti->ttyfd;
    size_t total = 0;
@@ -36,7 +43,21 @@
    if(blocking_write(fd, DSRCPR, strlen(DSRCPR))){
      return -1;
    }
-@@ -554,6 +569,7 @@
+   total += strlen(DSRCPR);
+   if(!draininput){
+     if(blocking_write(fd, KKBDENTER, strlen(KKBDENTER))){
+       return -1;
+     }
+     total += strlen(KKBDENTER);
+   }
+@@ -547,20 +562,21 @@
+     }
+     total += strlen(IDQUERIES);
+   }
+   ssize_t directiveb = send_initial_directives(ti->qterm, fd);
+   if(directiveb < 0){
+     return -1;
+   }
    total += directiveb;
    loginfo("sent %" PRIuPTR "B", total);
    return 0;
@@ -44,7 +65,21 @@
  }
  
  int enter_alternate_screen(int fd, FILE* ttyfp, tinfo* ti, unsigned drain){
-@@ -1492,6 +1508,15 @@
+   if(ti->in_alt_screen){
+     return 0;
+   }
+   const char* popcolors = get_escape(ti, ESCAPE_RESTORECOLORS);
+   if(popcolors){
+     if(term_emit(popcolors, ttyfp, true)){
+       return -1;
+@@ -1485,34 +1501,44 @@
+   // available. this ought be asserted by extension capability "ax", but
+   // no terminal i've found seems to do so. =[
+   const char* op = get_escape(ti, ESCAPE_OP);
+   if(op && strcmp(op, "\x1b[39;49m") == 0){
+     if(grow_esc_table(ti, "\x1b[39m", ESCAPE_FGOP, &tablelen, &tableused) ||
+        grow_esc_table(ti, "\x1b[49m", ESCAPE_BGOP, &tablelen, &tableused)){
+       goto err;
      }
    }
    unsigned kitty_graphics = 0;
@@ -60,7 +95,14 @@
    if(ti->ttyfd >= 0){
      if(handle_responses(ti, &tablelen, &tableused, cursor_y, cursor_x,
                          draininput, &kitty_graphics)){
-@@ -1506,6 +1531,7 @@
+       goto err;
+     }
+     if(nocbreak){
+       // FIXME do this in input later, upon signaling completion?
+       if(tcsetattr(ti->ttyfd, TCSANOW, ti->tpreserved)){
+         goto err;
+       }
+     }
    }else{
      ti->kbdlevel = 0; // confirmed no support, don't bother popping
    }
@@ -68,3 +110,10 @@
    // now look up any terminfo elements we might not have received via requests
    if(ti->escindices[ESCAPE_HPA] == 0){
      if(init_terminfo_esc(ti, "hpa", ESCAPE_HPA, &tablelen, &tableused)){
+       goto err;
+     }
+   }
+   if(*cursor_x >= 0 && *cursor_y >= 0){
+     if(add_u7_escape(ti, &tablelen, &tableused)){
+       goto err;
+     }
