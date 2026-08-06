@@ -36,3 +36,5 @@ bash ci/conan/setup.sh && bash ci/conan/build_and_test.sh talloc/2.4.2
 - `--disable-python` 必须添加，OHOS 不支持 Python 嵌入
 - conanfile.py 使用 AutotoolsToolchain 但过滤掉 `${}` 模板参数和 shared/static 参数
 - PYTHON 环境变量需设置为 python3 完整路径
+
+## COMPLETED
