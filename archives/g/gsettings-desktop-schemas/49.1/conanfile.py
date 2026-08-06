@@ -5,6 +5,8 @@ A collection of GSettings schemas for the GNOME desktop, including helper
 header files with enum definitions. This is a header-only/data package —
 no libraries are produced (introspection is disabled).
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
@@ -38,14 +40,25 @@ class GsettingsDesktopSchemasConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # Create glib-mkenums wrapper: the original Perl script has
+        # shebang #!/usr/bin/perl but OHOS has perl at /data/service/hnp/bin/perl
+        orig_path = "/data/service/hnp/bin/glib-mkenums"
+        wrapper_path = os.path.join(self.generators_folder, "glib-mkenums")
+        with open(orig_path, "r") as f:
+            content = f.read()
+        content = content.replace("#! /usr/bin/perl", "#!/data/service/hnp/bin/perl", 1)
+        with open(wrapper_path, "w") as f:
+            f.write(content)
+        os.chmod(wrapper_path, 0o755)
+
         tc = MesonToolchain(self)
         # Disable GObject introspection — not available on OHOS
         tc.project_options["introspection"] = "false"
         # Explicitly set ar/ranlib for OHOS (not auto-detected like Android)
         tc.binaries["ar"] = "/data/service/hnp/bin/llvm-ar"
         tc.binaries["ranlib"] = "/data/service/hnp/bin/llvm-ranlib"
-        # glib-mkenums is a Perl script with broken shebang on OHOS; use wrapper
-        tc.binaries["glib-mkenums"] = "/storage/Users/currentUser/usr/local/bin/glib-mkenums"
+        # Use the wrapper for glib-mkenums
+        tc.binaries["glib-mkenums"] = wrapper_path
         tc.generate()
 
     def build(self):
