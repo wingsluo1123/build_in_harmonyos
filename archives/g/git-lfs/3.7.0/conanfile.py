@@ -138,6 +138,20 @@ class GitLfsConan(ConanFile):
         if goroot:
             env.append(f"GOROOT={goroot}")
 
+        # Set SSL cert path for Go (HarmonyOS may not have standard CA cert locations)
+        cert_paths = [
+            "/storage/Users/currentUser/usr/local/ssl/cert.pem",
+            "/etc/ssl/cert.pem",
+            "/etc/pki/tls/certs/ca-bundle.crt",
+        ]
+        for cert in cert_paths:
+            if os.path.isfile(cert):
+                env.append(f"SSL_CERT_FILE={cert}")
+                break
+
+        # Use Go's built-in root CAs as fallback
+        env.append("GODEBUG=x509usefallbackroots=1")
+
         # Download Go module dependencies
         self.run(f'"{go_bin}" mod download', cwd=self.source_folder, env=env)
 
