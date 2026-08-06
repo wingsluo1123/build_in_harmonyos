@@ -11,7 +11,7 @@ import glob
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, replace_in_file
+from conan.tools.files import get, copy, replace_in_file, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -26,6 +26,9 @@ class MinijinjaCliConan(ConanFile):
     package_type = "application"
 
     settings = "os", "arch", "compiler", "build_type"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def layout(self):
         basic_layout(self)
@@ -55,6 +58,8 @@ class MinijinjaCliConan(ConanFile):
                 )
 
     def build(self):
+        apply_conandata_patches(self)
+
         # Set writable TMPDIR on OHOS (/tmp is read-only, E002)
         if str(self.settings.os) == "OHOS":
             tmpdir = os.path.expanduser("~/tmp/minijinja-cli")
