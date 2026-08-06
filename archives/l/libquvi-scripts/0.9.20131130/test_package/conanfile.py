@@ -27,6 +27,7 @@ class LibquviScriptsTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run the compiled test binary
+        # Pass the package folder to the test binary
         test_bin = os.path.join(self.cpp.build.bindirs[0], "test_libquvi-scripts")
-        self.run(test_bin, env="conanrun")
+        pkg_folder = self.dependencies["libquvi-scripts"].package_folder
+        self.run(f'{test_bin} "{pkg_folder}"', env="conanrun")
