@@ -1,34 +1,39 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
+"""Conan test_package — agg 2.7.0.r145.
 
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/agg/{version}/test_package/conanfile.py
+Direct compile+run (no CMake/find_package): test.cpp links against the
+installed libagg.a and agg2/ headers from the main package. This avoids
+relying on Conan's CMakeDeps config-file generation, which is unreliable
+on this OHOS Conan build.
 """
-import os
-
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout
 
 
 class AggTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    # No generators: we compile test.cpp directly with the package's
+    # headers and static lib, no CMake config needed.
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
     def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
+        # Resolve the installed package root (contains include/ and lib/).
+        agg_info = self.dependencies["agg"]
+        cpp = agg_info.cpp_info.aggregates[0] if agg_info.cpp_info.aggregates else agg_info.cpp_info
+        inc = cpp.include_dirs[0] if cpp.include_dirs else "include"
+        libdir = cpp.libdirs[0] if cpp.libdirs else "lib"
+        # Compile and link test.cpp against libagg.a.
+        # C++17 (agg is template-only), static lib, no system deps.
+        self.run(
+            f"clang++ -std=c++17 -O2"
+            f" -I{inc}"
+            f" test.cpp"
+            f" -L{libdir} -lagg"
+            f" -o test_agg",
+            cwd=self.build_folder,
+        )
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_agg')}", env="conanrun")
+        # Run the compiled binary; non-zero exit fails the test.
+        self.run("./test_agg", cwd=self.build_folder)
