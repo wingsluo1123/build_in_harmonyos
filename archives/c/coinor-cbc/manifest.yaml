@@ -1,0 +1,34 @@
+software: coinor-cbc
+display: "COIN-OR Cbc"
+description: "COIN-OR branch-and-cut solver for mixed integer programming"
+category: library
+homepage: "https://github.com/coin-or/Cbc"
+license: EPL-2.0
+build_system: autotools
+
+versions:
+  "2.10.12":
+    status: built
+    build_date: "2026-08-06"
+    notes: >-
+      首个鸿蒙 PC conan 配方，未打补丁。同样需要转发型 `osi-clp.pc`（原因见 Cgl）。
+
+      test_package 特意挑了一个「整数最优 ≠ LP 松弛最优」的问题，
+      以确保验到的是**分支定界真的跑了**、而不是把松弛解原样返回：
+      LP 松弛最优 (3, 1.5) 目标 21，整数最优 (4, 0) 目标 20，且整数最优唯一
+      （枚举可行整点核对过）。断言整数最优值为 -20 而非 -21、解为 (4,0)、
+      各分量确为整数、且满足全部约束，共 4 组。
+
+      ---
+
+      **与 clp 适配者的协同提示（重要）**
+
+      `clp/1.17.10` 由另一位同事（Gjy_joye）在 `feat/clp-1.17.10` 上适配，本包依赖它。
+      本包自己用 `--alias-pc` 补了转发 .pc，**不需要 clp 那边改任何东西**，
+      但有一个前提必须满足：
+
+      > clp 包的 `cpp_info.includedirs` 必须包含 **`include/coin`**。
+
+      COIN-OR 把公开头装在 `include/coin/` 下，而源码按 `#include "OsiClpSolverInterface.hpp"`
+      裸名引用。若 clp 只声明了 `include` 这一层，本包构建时仍会报找不到头。
+      这个缺陷**在 clp 自己构建装包时完全不暴露**，要到本包才炸 —— 建议合入 clp 前对一下。
