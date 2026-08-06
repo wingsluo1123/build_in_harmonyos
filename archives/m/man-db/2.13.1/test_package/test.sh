@@ -1,21 +1,19 @@
-#!/data/service/hnp/bin/bash
+#!/usr/bin/env bash
 # test_package/test.sh — smoke test for man-db executable
 set -eu
 
 echo "[test] man --version"
-man --version && echo "✅ --version OK" || {
-    echo "[test] --version failed, trying --help..."
-    man --help > /dev/null 2>&1 && echo "✅ --help OK" || {
-        echo "❌ man failed both --version and --help"
-        exit 1
-    }
-}
+man --version || { echo "❌ man --version failed"; exit 1; }
+echo "✅ man --version OK"
 
 echo "[test] mandb --version"
-mandb --version && echo "✅ mandb OK" || echo "⚠️ mandb --version failed (non-fatal)"
+mandb --version || { echo "❌ mandb --version failed"; exit 1; }
+echo "✅ mandb --version OK"
 
 echo "[test] whatis --version"
-whatis --version && echo "✅ whatis OK" || echo "⚠️ whatis --version failed (non-fatal)"
+whatis --version || { echo "❌ whatis --version failed"; exit 1; }
+echo "✅ whatis --version OK"
 
 echo "[test] lexgrog --version"
-lexgrog --version && echo "✅ lexgrog OK" || echo "⚠️ lexgrog --version failed (non-fatal)"
+lexgrog --version || { echo "❌ lexgrog --version failed"; exit 1; }
+echo "✅ lexgrog --version OK"

@@ -1,5 +1,6 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+import os
 
 
 class LibpipelineTestConan(ConanFile):
@@ -19,5 +20,5 @@ class LibpipelineTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run test binary directly to satisfy L0 gate (R34: test must use self.run)
+        self.run(os.path.join(self.build_folder, "test_pipeline"), env="conanrun")
