@@ -1,0 +1,230 @@
+{
+  "verdict": "pass",
+  "audit_type": "W4 Pre-PR Audit (re-check)",
+  "package": "fdupes",
+  "version": "2.4.0",
+  "branch": "feat/fdupes-2.4.0",
+  "timestamp": "2026-08-06T12:56:00Z",
+  "files_reviewed": 21,
+  "issues": [
+    {
+      "id": "P2-001",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "R39 / conandata.yml规范",
+      "file": "archives/f/fdupes/2.4.0/conandata.yml",
+      "description": "Manual mirror prefixes in URL list. conandata.yml contains 6 mirror URLs (gh-proxy.com, mirror.ghproxy.com, ghproxy.com, gitclone.com, moeyy.cn, kkgithub.com) plus the official GitHub URL. R39 states: 'CI 会自动为 GitHub URL 添加镜像 fallback...因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀'. Should contain only the official URL: https://github.com/adrianlopezroche/fdupes/releases/download/v2.4.0/fdupes-2.4.0.tar.gz",
+      "recommendation": "Remove all mirror URLs, keep only the official GitHub URL. CI auto-adds mirror fallbacks."
+    },
+    {
+      "id": "P2-002",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 16 / import顺序",
+      "file": "archives/f/fdupes/2.4.0/conanfile.py",
+      "description": "'import shutil' is placed inside the package() method (line ~90) instead of at the top of the file with other imports. Rule 16 requires imports at file top: standard library → third-party → project internal, with blank lines between groups.",
+      "recommendation": "Move 'import shutil' to the top of the file, after 'import os' and before Conan imports."
+    },
+    {
+      "id": "P2-003",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 5 / 禁止残留模板占位符",
+      "file": "archives/f/fdupes/2.4.0/conanfile.py",
+      "description": "url = \"\" — empty recipe URL field. While the homepage is correctly set, the empty url field resembles a template placeholder. Rule 5 prohibits residual template placeholders including 'url = \"\"  # CI fills this'.",
+      "recommendation": "Either fill in the recipe URL (e.g., the制品仓 recipe URL) or remove the url attribute if not applicable. The homepage field is sufficient for metadata."
+    },
+    {
+      "id": "P2-004",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 5 / 禁止残留模板占位符",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "url = \"\" — empty recipe URL field, same as P2-003. The homepage is correctly set to https://invisible-island.net/ncurses/.",
+      "recommendation": "Either fill in the recipe URL or remove the url attribute."
+    },
+    {
+      "id": "P2-005",
+      "severity": "P2",
+      "category": "conanfile_quality",
+      "rule": "R33 / 禁止裸用shell环境变量",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "Hardcoded 'CC=clang CXX=clang++ CFLAGS=\"-fPIC -O2\"' in the self.run() shell command instead of using Conan's AutotoolsToolchain. The generate() method is just 'pass'. R33 recommends using Conan Toolchain (e.g., AutotoolsToolchain) to derive compiler settings from Conan settings. The fdupes recipe correctly uses AutotoolsToolchain; ncurses should follow the same pattern. Note: this is not using os.environ[] (which could be empty on release workers), so it's not a P1 R33 violation — the values are literal strings. But it ignores Conan's compiler settings.",
+      "recommendation": "Use AutotoolsToolchain in generate() to set CC/CXX/CFLAGS from Conan settings, similar to the fdupes recipe. At minimum, derive compiler from self.settings.compiler if not using toolchain."
+    },
+    {
+      "id": "P2-006",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 10 / 错误处理",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "'|| true' used on panel/menu/form make commands without explanatory comment. Rule 10 states: '禁止 || true 吞掉错误（除非有明确注释说明为何忽略）'. The build() method has: make -j1 -C panel 2>/dev/null || true (and same for menu, form). No comment explains why failures are acceptable.",
+      "recommendation": "Add a comment explaining why panel/menu/form build failures are tolerated (e.g., '# panel/menu/form optional - may fail on HMDFS, not needed by fdupes')."
+    },
+    {
+      "id": "P2-007",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Python resource management",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "File I/O in _patch_config_guess() and _patch_config_sub() uses open().read() and open('w').write() without 'with' statements, risking resource leaks. Examples: 'content = open(cg).read()' and 'open(cg, \"w\").write(content)'.",
+      "recommendation": "Use 'with open(cg) as f: content = f.read()' and 'with open(cg, \"w\") as f: f.write(content)' for proper resource management."
+    },
+    {
+      "id": "P2-008",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Shell script logic",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "Redundant condition in mktemp wrapper: 'if [ \"$1\" = \"-d\" ] || [ \"$1\" = \"-d\" ]; then' — the same condition is checked twice with ||. This is a copy-paste bug. The fdupes version correctly uses 'if [ \"$1\" = \"-d\" ]; then shift; fi'.",
+      "recommendation": "Fix to 'if [ \"$1\" = \"-d\" ]; then' (single condition, matching the fdupes version)."
+    },
+    {
+      "id": "P2-009",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 7 / 安全模式",
+      "file": "archives/f/fdupes/2.4.0/test_package/test_fdupes.sh",
+      "description": "Shell script missing 'set -euo pipefail' safe mode at the top. Rule 7 requires all scripts to start with safe mode: set -e (exit on failure), set -u (undefined variable error), set -o pipefail (pipe failure propagation).",
+      "recommendation": "Add 'set -euo pipefail' after the shebang line."
+    },
+    {
+      "id": "P2-010",
+      "severity": "P2",
+      "category": "code_style",
+      "rule": "Rule 6 / 文件头",
+      "file": "archives/f/fdupes/2.4.0/test_package/test_fdupes.sh",
+      "description": "Uses '#!/bin/sh' instead of '#!/usr/bin/zsh' as specified in Rule 6. While /bin/sh is more portable for simple POSIX scripts, the project standard requires /usr/bin/zsh. Note: this script is a standalone test helper, not invoked by the Conan test_package conanfile.py.",
+      "recommendation": "Change to '#!/usr/bin/zsh' to comply with project standard, or document why /bin/sh is preferred for this specific script."
+    },
+    {
+      "id": "P2-011",
+      "severity": "P2",
+      "category": "deception_borderline",
+      "rule": "R34 / 空壳测试",
+      "file": "archives/n/ncurses/6.5/test_package/test_ncurses.c",
+      "description": "Test only uses NCURSES_VERSION compile-time macro and prints hardcoded 'wide char support: yes' without calling any ncurses API functions at runtime (e.g., initscr(), endwin(), getmaxyx()). The test does verify compilation and linking (not a complete stub — it uses a macro from the included header), but printing 'wide char support: yes' without actually testing wide character functionality is misleading. Borderline R34: not a clear-cut deception (header IS used), but should call actual API to verify runtime behavior.",
+      "recommendation": "Add at least one ncurses API call, e.g.: 'SCREEN *sp = newterm(NULL, stdout, stdin); if (sp == NULL) return 1; endwin();' to verify actual runtime API functionality. Remove the hardcoded 'wide char support: yes' print or replace with actual verification."
+    },
+    {
+      "id": "P3-001",
+      "severity": "P3",
+      "category": "file_structure",
+      "rule": "test_package completeness",
+      "file": "archives/f/fdupes/2.4.0/test_package/test_fdupes.sh",
+      "description": "Orphan file: test_fdupes.sh exists in test_package/ but is not invoked by test_package/conanfile.py. The conanfile.py directly runs 'self.run(\"fdupes --version\", env=\"conanrun\")' without calling the shell script. The script provides more thorough version checking (grep for 'fdupes 2.4.0') but is unused.",
+      "recommendation": "Either integrate test_fdupes.sh into the conanfile.py test() method, or remove it if redundant."
+    },
+    {
+      "id": "P3-002",
+      "severity": "P3",
+      "category": "pr_compliance",
+      "rule": "R20/W2 / PR原子性",
+      "file": "(PR scope)",
+      "description": "PR contains two recipes: fdupes/2.4.0 (main package) and ncurses/6.5 (new dependency). R20 states '一个 PR 只包含一个配方'. However, ncurses is a direct dependency of fdupes that does not yet exist in the制品仓 — fdupes cannot build without it. This is a pragmatically justified exception, not a random recipe mix.",
+      "recommendation": "Acceptable as-is given the dependency relationship. If strict enforcement is needed, ncurses could be merged first, then fdupes in a separate PR. Document the dependency justification in PR body."
+    },
+    {
+      "id": "P3-003",
+      "severity": "P3",
+      "category": "packaging",
+      "rule": "package completeness",
+      "file": "archives/n/ncurses/6.5/conanfile.py",
+      "description": "ncurses package() only copies libncursesw.a. panel/menu/form libraries are built (with || true) but not packaged. Future consumers needing libpanelw, libmenuw, or libformw will not find them. Acceptable for fdupes (only needs ncursesw), but may limit other future consumers.",
+      "recommendation": "Consider packaging panel/menu/form libraries if they build successfully, or document that this recipe only provides the core ncursesw library."
+    }
+  ],
+  "positive_findings": [
+    {
+      "check": "P1 hardcoded paths (previous audit)",
+      "result": "FIXED",
+      "detail": "All paths in both conanfile.py files use Conan-managed properties (self.build_folder, self.source_folder, self.generators_folder, self.package_folder). No hardcoded absolute paths like /storage/... or /home/... found."
+    },
+    {
+      "check": "R34 empty/stub tests",
+      "result": "PASS",
+      "detail": "fdupes test_package executes the actual binary: self.run('fdupes --version', env='conanrun'). ncurses test includes header and uses NCURSES_VERSION macro (borderline — see P2-011). No 'def test(self): pass' or 'return 0' stubs."
+    },
+    {
+      "check": "R9 skip tests / fake pass",
+      "result": "PASS",
+      "detail": "fdupes test runs real binary. ncurses test calls cmake.test(). No os.system('exit 0') or commented-out test calls."
+    },
+    {
+      "check": "R3 fake status",
+      "result": "PASS",
+      "detail": "manifest.yaml status='built' is consistent with notes.md '最终状态: built'. commands.json binary=false (CI builds from source)."
+    },
+    {
+      "check": "R4 fake sha256",
+      "result": "PASS",
+      "detail": "fdupes sha256='527b27a39d031dcbe1d29a220b3423228c28366c2412887eb72c25473d7b1736' (64 hex chars, valid). ncurses sha256='136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6' (64 hex chars, valid). Neither is all-zeros or all-f's."
+    },
+    {
+      "check": "R8 #ifdef __OHOS__ real logic",
+      "result": "PASS",
+      "detail": "No #ifdef __OHOS__ stubs. Platform adaptation done via config.guess/config.sub patches with real HarmonyOS detection logic (architecture mapping for aarch64/arm/x86_64/i686)."
+    },
+    {
+      "check": "R19 manual packaging bypass",
+      "result": "PASS",
+      "detail": "No pre-compiled .so/.a/binary files in PR. All artifacts built from source by CI."
+    },
+    {
+      "check": "R40 deep adaptation",
+      "result": "PASS",
+      "detail": "Neither fdupes (CLI tool) nor ncurses (terminal library) fall into critical adaptation categories (graphics/UI/multimedia/peripherals/system-level). HMDFS mktemp workaround is substantive with real directory creation logic, not a stub."
+    },
+    {
+      "check": "R26 system library static linking",
+      "result": "PASS",
+      "detail": "ncurses conanfile has default_options = {'shared': False}, building static to avoid polluting /lib with shared libncursesw.so."
+    },
+    {
+      "check": "R32 OHOS platform compatibility",
+      "result": "PASS",
+      "detail": "No 'if self.settings.os == Linux' checks that would miss OHOS. ncurses patches config.guess/config.sub for HarmonyOS detection. fdupes uses Conan-managed environment."
+    },
+    {
+      "check": "R38 commands.json for tools",
+      "result": "PASS",
+      "detail": "fdupes commands.json present at archives/f/fdupes/commands.json with type='tool', name='fdupes', binary=false."
+    },
+    {
+      "check": "R39 official source URL (ncurses)",
+      "result": "PASS",
+      "detail": "ncurses conandata.yml URL: https://invisible-mirror.net/archives/ncurses/ncurses-6.5.tar.gz — official ncurses mirror site, no manual mirror prefixes."
+    },
+    {
+      "check": "R6 only source files not generated",
+      "result": "PASS",
+      "detail": "Old patches 0001-0007 removed (they updated autotools helper scripts, not needed). No modifications to config.h, configure, Makefile.in, CMakeCache.txt committed. Build-time patches done in build() method."
+    },
+    {
+      "check": "Conan 2.x API",
+      "result": "PASS",
+      "detail": "Both recipes use 'from conan import ConanFile' (not 'from conans'). fdupes uses conan.tools.gnu (AutotoolsToolchain, AutotoolsDeps, PkgConfigDeps). ncurses uses conan.tools.files and conan.tools.layout."
+    },
+    {
+      "check": "Archive directory structure",
+      "result": "PASS",
+      "detail": "fdupes: conanfile.py, conandata.yml, test_package/, manifest.yaml, notes.md, commands.json all present. ncurses: conanfile.py, conandata.yml, test_package/ all present."
+    },
+    {
+      "check": "PR forbidden files",
+      "result": "PASS",
+      "detail": "No .build-context-*, test-report, *.log, .DS_Store, __pycache__/, or pre-compiled binaries (.o/.so/.a) in changed files."
+    },
+    {
+      "check": "Method order (conanfile.py)",
+      "result": "PASS",
+      "detail": "fdupes: export_sources → requirements → layout → source → generate → build → package → package_info ✓. ncurses: layout → source → generate → build → package → package_info (no export_sources/requirements needed — no patches, no deps) ✓."
+    },
+    {
+      "check": "package_info completeness",
+      "result": "PASS",
+      "detail": "fdupes: cpp_info.libs=[] (application), cpp_info.bindirs=['bin'] ✓. ncurses: cpp_info.libs=['ncursesw'], cpp_info.includedirs=['include'], pkg_config_name='ncursesw' ✓."
+    }
+  ],
+  "summary": "W4 Pre-PR re-check audit for fdupes 2.4.0 + ncurses 6.5 dependency. VERDICT: PASS. No P0 (deception) or P1 (blocking) issues found. Previous P1 (hardcoded paths) has been FIXED — all paths now use Conan-managed properties. 14 P2/P3 warnings identified, none blocking. Key positives: tests execute real binaries/API, sha256 values are valid, ncurses uses static linking (R26), HMDFS mktemp workaround is substantive (not stub), config.guess/config.sub patches have real HarmonyOS detection, Conan 2.x API used correctly, commands.json present for tool. Key warnings: fdupes conandata.yml has manual mirror URLs (R39), ncurses hardcodes CC=clang instead of using AutotoolsToolchain (R33/P2), ncurses test only uses compile-time macro not runtime API (borderline R34), test_fdupes.sh missing set -euo pipefail, redundant condition in ncurses mktemp wrapper. All P2/P3 issues are warnings only and do not block merge."
+}
