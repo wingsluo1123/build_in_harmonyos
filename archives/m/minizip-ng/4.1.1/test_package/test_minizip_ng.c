@@ -122,6 +122,11 @@ int main(void) {
     }
 
     stream = mz_stream_os_create();
+    if (!stream) {
+        fprintf(stderr, "FAIL: mz_stream_os_create (read) failed\n");
+        mz_zip_delete(&handle);
+        return 1;
+    }
     err = mz_stream_open(stream, TEST_ARCHIVE, MZ_OPEN_MODE_READ);
     if (err != MZ_OK) {
         fprintf(stderr, "FAIL: mz_stream_open (read) failed (%d)\n", err);
