@@ -1,0 +1,38 @@
+--- a/unified-runtime/source/common/linux/ur_lib_loader.cpp	2026-07-30 11:04:04.000000000 +0800
++++ b/unified-runtime/source/common/linux/ur_lib_loader.cpp	2026-08-02 08:34:29.528036250 +0800
+@@ -10,8 +10,15 @@
+ #include <dlfcn.h>
+ #if __has_include(<link.h>)
+ #include <link.h>
++// dlinfo() is a glibc extension that is not available on all libc
++// implementations (e.g. OHOS/HarmonyOS musl-based libc provides <link.h>
++// but does not declare dlinfo()). Only enable the full-path log when the
++// dlinfo/RTLD_DI_LINKMAP capability is actually present; otherwise fall
++// back to the plain log below.
++#if defined(RTLD_DI_LINKMAP) && !defined(__OHOS__)
+ #define ADD_FULL_PATH_LOG
+ #endif
++#endif
+ 
+ #include "logger/ur_logger.hpp"
+ #include "ur_lib_loader.hpp"
+@@ -44,7 +51,19 @@
+            "to cause issues. Consider disabling {} environment variable.",
+            DEEP_BIND_ENV);
+ #endif
++// RTLD_DEEPBIND is a glibc extension that is not available on all libc
++// implementations (e.g. OHOS/HarmonyOS musl-based libc). When the capability
++// is absent, safely fall back to the default dlopen flags (deep binding is
++// simply not performed) and record that the requested capability is
++// unavailable.
++#if defined(RTLD_DEEPBIND)
+     mode |= RTLD_DEEPBIND;
++#else
++    UR_LOG(WARN,
++           "RTLD_DEEPBIND is not supported by this platform; ignoring "
++           "{} environment variable.",
++           DEEP_BIND_ENV);
++#endif
+   }
+ #endif
+   HMODULE handle = dlopen(name, mode);

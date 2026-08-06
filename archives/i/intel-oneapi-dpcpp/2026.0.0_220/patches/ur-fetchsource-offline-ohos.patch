@@ -1,0 +1,20 @@
+--- a/unified-runtime/cmake/helpers.cmake
++++ b/unified-runtime/cmake/helpers.cmake
+@@ -264,8 +264,15 @@
+             WORKING_DIRECTORY ${DEST})
+         file(APPEND ${DEST}/.git/info/sparse-checkout ${GIT_DIR}/)
+     endif()
+-    execute_process(COMMAND git fetch --depth=1 origin refs/tags/${GIT_TAG}:refs/tags/${GIT_TAG}
+-        WORKING_DIRECTORY ${DEST})
++    # OHOS/offline 兼容：若稀疏 checkout 已就绪（tag 已存在），跳过网络 fetch/checkout，
++    # 避免构建期 GitHub 网络抖动导致 configure 失败。glibc/Linux 在线行为不变。
++    execute_process(COMMAND git rev-parse --verify --quiet refs/tags/${GIT_TAG}
++        WORKING_DIRECTORY ${DEST}
++        RESULT_VARIABLE _git_tag_present)
++    if(NOT _git_tag_present EQUAL 0)
++        execute_process(COMMAND git fetch --depth=1 origin refs/tags/${GIT_TAG}:refs/tags/${GIT_TAG}
++            WORKING_DIRECTORY ${DEST})
++    endif()
+     execute_process(COMMAND git checkout --quiet ${GIT_TAG}
+         WORKING_DIRECTORY ${DEST})
+ endfunction()

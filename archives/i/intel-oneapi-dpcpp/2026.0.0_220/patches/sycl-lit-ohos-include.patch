@@ -1,0 +1,18 @@
+--- a/sycl/test/lit.site.cfg.py.in
++++ b/sycl/test/lit.site.cfg.py.in
+@@ -42,6 +42,15 @@
+ 
+ # Let the main config do the real work.
+ lit_config.load_config(config, "@SYCL_SOURCE_DIR@/test/lit.cfg.py")
++# OHOS libc++/sysroot include 注入（load_config 后写 config.environment 才生效：
++# lit 测试子进程环境取自 config.environment，os.environ 注入会被 lit 过滤）
++_ohos_inc = "@SYCL_OHOS_INCLUDE@"
++if _ohos_inc and _ohos_inc != "@" + "SYCL_OHOS_INCLUDE" + "@":
++    if config.environment is None:
++        config.environment = {}
++    config.environment["CPLUS_INCLUDE_PATH"] = _ohos_inc
++    config.environment["C_INCLUDE_PATH"] = _ohos_inc
++
+ 
+ 
+ import site

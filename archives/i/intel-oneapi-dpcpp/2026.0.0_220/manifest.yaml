@@ -1,0 +1,98 @@
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/2026.0.0_220/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2026.0.0_220"
+
+# 软件名
+software: "intel-oneapi-dpcpp"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-02"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（与 conandata.yml sources.url 官方条目一致；
+  # 版本映射未确认：上游无精确 2026.0.0_220 tag，使用候选 nightly-2026-07-30 快照）
+  url: "https://github.com/intel/llvm/archive/9084ec7d34d89b9b63613665f5bf8b9757566c58.tar.gz"
+
+  # 源码校验和（配方 source() 实际下载 GitHub archive 的 conan 实测 SHA-256）
+  sha256: "f85dd457dd3ebb7ed4c714928f373cc982c5792a713c5252ebbfccf2f259133f"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表（与 conanfile.py build() 实际参数一致）
+  configure_options:
+  - "-t Release"
+  - "--cmake-opt=-DCMAKE_MODULE_PATH=<export>/patches"
+  - "--cmake-opt=-DSYCL_LIBDEVICE_CXX_FLAGS=<OHOS libc++/sysroot isystem>"
+  - "--cmake-opt=-DSYCL_OHOS_INCLUDE=<OHOS_SYCL_INCLUDE>"
+  - "--cmake-opt=-DUR_ENABLE_SANITIZER=OFF"
+  - "--cmake-opt=-DUR_ENABLE_SYMBOLIZER=OFF"
+  - "-j 4 -t deploy-sycl-toolchain"
+
+  # 构建期依赖（FetchContent/镜像注入，见 conanfile.py；无 conan requirements）
+  dependencies:
+  - "compute-runtime/26.18.38308.1"
+  - "parallel-hashmap/1.3.12"
+  - "SPIRV-Headers/5c50cbd"
+  - "OpenCL-Headers/v2025.07.22"
+  - "OpenCL-ICD-Loader/v2025.07.22"
+  - "Level-Zero/v1.32.0"
+  - "vc-intrinsics/4fc83e1"
+  - "emhash/5e131ba"
+  - "unified-memory-framework/v1.2.0"
+  - "hwloc/2.13.0"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（conandata.yml patches 6 项 + build() 中手动应用的 hwloc 补丁；
+# Platform/HarmonyOS.cmake 为 CMAKE_MODULE_PATH 注入的平台模块，非补丁）
+patches_applied:
+- "patches/ur_lib_loader-ohos.patch"
+- "patches/config-guess-ohos.patch"
+- "patches/sycl-posix-ur-ohos.patch"
+- "patches/ur-fetchsource-offline-ohos.patch"
+- "patches/ur-common-lib-loader-ohos.patch"
+- "patches/sycl-lit-ohos-include.patch"
+- "patches/hwloc/hwloc-config-guess-ohos.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（真实记录，见 notes.md）
+knowledge_gained:
+- "版本映射未确认：上游无 2026.0.0_220 tag，本归档为 nightly-2026-07-30 候选快照"
+- "DPC++ 工具链自举：先用系统 clang 15 构建 bin/clang-23，再将 SYCL ninja 规则切到 clang-23"
+- "OHOS 为 Linux ABI：CMAKE_SYSTEM_NAME=Linux + host triple aarch64-unknown-linux-ohos + errc_exit_code=0"
+- "conan package() 在 HMFS 复制会丢可执行属性，需 shell cp 保留（hishell_hap_data_file 问题）"
+- "无 Intel GPU/Level Zero/OpenCL runtime：设备运行时相关测试记 unsupported/skip"

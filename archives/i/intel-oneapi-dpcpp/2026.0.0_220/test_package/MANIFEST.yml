@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+
+package: intel-oneapi-dpcpp/2026.0.0_220
+homepage: "https://github.com/intel/llvm"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# DPC++/LLVM 工具链测试为 lit 驱动，90226 全量总账见 notes.md（round 16 只读解析收口）
+upstream_tests:
+  - file: llvm/test/CodeGen/AArch64/fmv-unreachable-version.c
+    source: intel-oneapi-dpcpp-2026.0.0_220/llvm/test/CodeGen/AArch64/fmv-unreachable-version.c
+    description: "AArch64 function-multiversioning 诊断测试（90226 总账中唯一 gap FAIL，按 lit 结果语义计数）"
+    command: "lit -sv llvm/test/CodeGen/AArch64/fmv-unreachable-version.c"
+  - file: sycl/test
+    source: intel-oneapi-dpcpp-2026.0.0_220/sycl/test
+    description: "SYCL lit 测试套件（无 Intel GPU/L0 driver/OpenCL runtime 的设备测试记 Unsupported，见 notes.md 平台缺口）"
+    command: "lit -sv sycl/test"
+  - file: clang/test
+    source: intel-oneapi-dpcpp-2026.0.0_220/clang/test
+    description: "Clang lit 测试套件（含 Frontend/CodeGen gap 补跑，见 notes.md 90226 构成）"
+    command: "lit -sv clang/test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_sycl.cpp
+    description: "使用包内 DPC++ clang++ 以 -fsycl -fsycl-targets=spir64 -fsycl-device-only 编译最小 SYCL 程序，验证 device 阶段编译与 libsycl.so 存在性（不依赖 GPU/runtime）"
+    command: "clang++ --version && clang++ -fsycl -fsycl-targets=spir64 -fsycl-device-only test_sycl.cpp"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test_package 断言：clang++ 存在 / libsycl.so 存在 / --version rc=0 / device-only 编译 rc=0
+# 上游 90226 全量断言统计见 notes.md（PASS 37667 / FAIL 7542 / Unsupported 44933 / XFAIL 84）
+assertion_count: 4
