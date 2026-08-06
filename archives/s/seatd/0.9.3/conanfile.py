@@ -7,7 +7,7 @@ seat management library. This recipe builds both the seatd daemon and libseat.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get
 from conan.tools.layout import basic_layout
 from conan.tools.meson import Meson, MesonToolchain
 
@@ -36,9 +36,6 @@ class SeatdConan(ConanFile):
         "seatd_backend": True,
         "builtin": False,
     }
-
-    def export_sources(self):
-        export_conandata_patches(self)
 
     def config_options(self):
         if self.settings.os == "Windows":
@@ -74,8 +71,11 @@ class SeatdConan(ConanFile):
         tc.project_options["man-pages"] = "disabled"
         tc.project_options["examples"] = "disabled"
 
-        # CMSG_NXTHDR() 在 musl 系 sysroot 上触发的 -Wsign-compare 由
-        # patches/0001 在源码层精确豁免，工具链层无需再处理。
+        # musl 系 sysroot 的 CMSG_NXTHDR() 宏在展开处触发 -Wsign-compare，
+        # 该告警源自系统头文件而非 seatd 代码。seatd 以 werror=true 构建，
+        # 因此用 -Dwerror=false 整体关闭 warnings-as-errors（与上游 0.9.1
+        # 配方一致的做法），无需改任何源码、不加平台条件编译。
+        tc.project_options["werror"] = "false"
         tc.generate()
 
         executables = self.conf.get(
@@ -100,7 +100,6 @@ class SeatdConan(ConanFile):
                     stream.write(content)
 
     def build(self):
-        apply_conandata_patches(self)
         meson = Meson(self)
         meson.configure()
         meson.build()

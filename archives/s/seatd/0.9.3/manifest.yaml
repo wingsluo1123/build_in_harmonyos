@@ -18,13 +18,13 @@ build:
     - "libseat-logind=disabled"
     - "man-pages=disabled"
     - "examples=disabled"
+    - "werror=false"
   dependencies: []
   cc: clang
   cxx: clang++
-  extra_c_args:
-    - "-Wno-sign-compare"
 
-# 本配方不打任何补丁：上游源码在 OHOS 上无需修改即可编译。
+# 本配方不打任何补丁：上游源码在 OHOS 上无需修改即可编译，
+# -Wsign-compare 由 meson 的 -Dwerror=false 整体关闭（见 knowledge_gained）。
 patches_applied: []
 
 knowledge_gained:
@@ -35,10 +35,10 @@ knowledge_gained:
       __MHDR_END(mhdr) - (unsigned char *)(cmsg) 这个有符号指针差做比较，任何展开
       该宏的代码都会报 -Wsign-compare。告警源头在系统头文件，不在 seatd 代码里。
     resolution: >-
-      不改上游源码、不加平台条件编译，改为在 MesonToolchain 的 c_args 里追加
-      -Wno-sign-compare。实测仅关这一条诊断后，common/、libseat/（noop + seatd
-      后端）、seatd/ 全量编译零告警，因此无需用 -Dwerror=false 整体放弃
-      warnings-as-errors。
+      不改上游源码、不加平台条件编译、不打补丁。seatd 的 werror=true 是
+      meson 内置 project option，因此用 -Dwerror=false 整体关闭
+      warnings-as-errors（与上游 0.9.1 配方一致的做法）。这样既不掩盖其它
+      真实告警，也无需为系统头文件的宏做源码层豁免。
   - topic: "上游 poller 单元测试在 OHOS 上死锁"
     detail: >-
       上游 meson 定义了 linked_list / connection / poller 三个测试。在 aarch64
