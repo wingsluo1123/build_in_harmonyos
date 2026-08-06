@@ -33,7 +33,7 @@ int main(void) {
         "local busted = core({})\n"
         "assert(busted.version == '2.2.0')\n"
         "assert(type(require('busted.status')) == 'function')\n"
-        "assert(type(require('busted.modules.cli')) == 'table')\n"
+        "assert(type(require('busted.modules.cli')) == 'function')\n"
         "assert(type(require('pl.dir').getfiles('.')) == 'table')\n"
         "assert(type(require('term').isatty(io.stdout)) == 'boolean')\n";
 

@@ -22,12 +22,14 @@ class BustedTestConan(ConanFile):
         "lua-term",
         "lua-penlight",
         "mediator_lua",
+        "luacov",
+        "datafile",
     )
     lua_cpath_deps = ("luasystem", "lua-term", "luafilesystem")
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-        self.requires("lua/5.4.8")
+        self.requires("lua/5.4.8.1")
         self.requires("lua_cliargs/3.0.2-1")
         self.requires("luasystem/0.6.3-1")
         self.requires("dkjson/2.8-1")
@@ -36,6 +38,8 @@ class BustedTestConan(ConanFile):
         self.requires("lua-term/0.7")
         self.requires("lua-penlight/1.15.0")
         self.requires("mediator_lua/1.1.2-0")
+        self.requires("luacov/0.16.0-1")
+        self.requires("datafile/0.11-1")
         self.requires("luafilesystem/1.8.0-1")
 
     def build(self):
@@ -74,3 +78,5 @@ class BustedTestConan(ConanFile):
         env.define("LUA_CPATH", self._lua_cpath())
         with env.vars(self).apply():
             self.run(f'"{self._exe}"')
+            busted = os.path.join(self.dependencies["busted"].package_folder, "bin", "busted")
+            self.run(f'"{busted}" --version')
