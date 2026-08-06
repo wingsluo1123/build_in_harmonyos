@@ -19,7 +19,6 @@ class GififyConan(ConanFile):
     description = "Convert any video file to an optimized animated GIF"
     license = "ISC"
     homepage = "https://github.com/vvo/gifify"
-    url = ""  # CI fills this
 
     package_type = "application"
 

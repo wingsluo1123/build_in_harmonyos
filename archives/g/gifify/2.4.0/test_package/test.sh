@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test.sh — smoke test for gifify executable
 # Runs in conanrun env (PATH includes installed bin/)
-set -eu
+set -euo pipefail
 
 echo "[test] gifify --version"
 gifify --version && echo "✅ --version OK" || {
