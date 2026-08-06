@@ -1,156 +1,84 @@
-# grilo-plugins 0.3.16 适配笔记
+# grilo-plugins 0.3.16 Conan 适配笔记
+
+## 基本信息
+- 软件名称: grilo-plugins
+- 版本: 0.3.16
+- 构建系统: meson
+- 编译日期: 2026-08-06
+- 状态: built (Conan 适配完成)
+
+## 源码信息
+- URL: https://download.gnome.org/sources/grilo-plugins/0.3/grilo-plugins-0.3.16.tar.xz
+- SHA256: fe6f4dbe586c6b8ba2406394e202f22d009d642a96eb3a54f32f6a21d084cdcb
 
 ## 编译环境
-- 构建系统: meson
-- 编译日期: 2026-06-16
-- 编译器: clang/clang++
-- 状态: built
+- 目标平台: OpenHarmony (aarch64)
+- 编译器: clang 15.0.4
+- 构建工具: meson 1.11.1, ninja 1.13.1
+
+## 插件状态
+
+### 已启用插件 (11个)
+1. chromaprint - 音频指纹识别插件 (依赖: gstreamer)
+2. dleyna - DLNA/UPnP 媒体服务器插件 (依赖: gio, gio-unix)
+3. gravatar - Gravatar 头像插件 (无额外依赖)
+4. local-metadata - 本地元数据插件 (依赖: gio, libmediaart)
+5. lua-factory - Lua 工厂插件 (依赖: lua, libarchive, grilo-net, json-glib, libxml2)
+6. magnatune - Magnatune 音乐插件 (依赖: sqlite3, grilo-net)
+7. metadata-store - 元数据存储插件 (依赖: sqlite3)
+8. opensubtitles - OpenSubtitles 字幕插件 (依赖: gio, libsoup-2.4)
+9. raitv - Rai.tv 插件 (依赖: grilo-net, libxml2)
+10. shoutcast - Shoutcast 电台插件 (依赖: grilo-net, libxml2)
+11. tmdb - TMDb 电影数据库插件 (依赖: json-glib, grilo-net)
+
+### 自动禁用插件 (12个) - 缺少依赖
+| 插件 | 缺失依赖 |
+|------|----------|
+| bookmarks | gom |
+| dmap | libdmapsharing |
+| filesystem | grilo-pls (totem-pl-parser) |
+| flickr | oauth |
+| freebox | grilo-pls, avahi |
+| optical-media | totem-plparser |
+| podcasts | totem-plparser |
+| thetvdb | gom |
+| tracker | tracker-sparql-2.0 |
+| tracker3 | tracker-sparql-3.0 |
+| youtube | libgdata, totem-plparser |
+
+## Conan 依赖
+- glib2/2.88.0 (Conan repo)
+- libxml2/2.15.3 (Conan repo)
+- sqlite3/3.49.1 (Conan repo)
+- lua/5.4.8 (Conan repo)
+
+## 非 Conan 依赖 (通过 pkg-config 在 CI 环境中解析)
+- grilo-0.3 >= 0.3.19 (本地从源码编译安装)
+- json-glib-1.0 >= 1.6.6 (预编译包)
+- libsoup-2.4 >= 2.74.3 (预编译包)
+- libarchive >= 3.7.4 (预编译包)
+- gstreamer-1.0 >= 1.28.3 (预编译包)
+- libmediaart-2.0 >= 1.9.7 (预编译包)
 
 ## 编译步骤
 
-1. **下载源码**
-   ```bash
-   curl -k -L -o ~/tmp/downloads/grilo-plugins-0.3.16.tar.xz \
-     https://download.gnome.org/sources/grilo-plugins/0.3/grilo-plugins-0.3.16.tar.xz
-   ```
+1. 安装预编译依赖: glib, json-glib, libsoup, libarchive, gstreamer, libxml2, sqlite3, libmediaart, pcre2, libffi, brotli, libpsl
+2. 从源码编译 lua 5.4.8 并安装
+3. 从源码编译 grilo 0.3.19 并安装 (启用 grl-net, 禁用 grl-pls 因 totem-pl-parser 不可用)
+4. 修复 pkg-config 依赖: 创建 libpsl.pc, libbrotlidec.pc, gdk-pixbuf-2.0.pc; 修复 libarchive.pc
+5. 创建 clang wrapper 脚本解决 lld linker 的 libxml2.so.16 加载问题
+6. 修复 libffi 损坏的共享库 (用 HNP 版本替换)
+7. 创建共享库符号链接 (glib, gstreamer, libarchive 等)
+8. 运行 meson setup 配置 grilo-plugins
+9. 运行 ninja 编译
+10. 运行 ninja install 安装到测试目录
 
-2. **初始化编译环境**
-   ```bash
-   python3 $SKILL_ROOT/scripts/ohc-run.py init-build grilo-plugins 0.3.16 \
-     --url=https://download.gnome.org/sources/grilo-plugins/0.3/grilo-plugins-0.3.16.tar.xz \
-     --no-download --force
-   ```
+## 编译产物
+- 11 个插件共享库 (.so) 安装到 lib/grilo-0.3/
+- 1 个 pkg-config 文件 (grilo-plugins-0.3.pc)
+- 12 个 Lua 源文件 (lua-factory 插件资源)
+- 51 个翻译文件 (.mo)
 
-3. **配置 Meson 构建**
-   ```bash
-   export PKG_CONFIG_PATH=~/usr/local/lib/pkgconfig:~/usr/local/share/pkgconfig:$PKG_CONFIG_PATH
-   cd ~/builds/grilo-plugins-0.3.16.work
-   meson setup build --prefix=/storage/Users/currentUser/usr/local \
-     -Denable-lua-factory=no \
-     -Denable-youtube=no \
-     -Denable-flickr=no \
-     -Denable-dmap=no \
-     -Denable-tracker=no \
-     -Denable-tracker3=no \
-     -Denable-podcasts=no \
-     -Denable-magnatune=no \
-     -Denable-metadata-store=no \
-     -Denable-bookmarks=no \
-     -Dhelp=no
-   ```
-
-4. **编译**
-   ```bash
-   cd build && ninja -j1
-   ```
-
-5. **安装到测试目录**
-   ```bash
-   DESTDIR=/storage/Users/currentUser/test-install-grilo-plugins-0.3.16 ninja install
-   ```
-
-## 遇到的问题与解决方案
-
-| # | 问题 | 根因 | 解决方案 |
-|---|------|------|----------|
-| 1 | SSL证书验证失败下载源码失败 | GitCode SSL证书问题 | 使用 curl -k 禁用验证下载 |
-| 2 | configure 文件不存在 | grilo-plugins 使用 Meson 构建系统，不是 autotools | 使用 meson setup 命令替代 ./configure |
-| 3 | glib-2.0 未找到 | PKG_CONFIG_PATH 未包含本地安装路径 | 设置 PKG_CONFIG_PATH=~/usr/local/lib/pkgconfig:~/usr/local/share/pkgconfig |
-| 4 | lua-factory 插件依赖缺失 | 默认启用 lua-factory，缺少 lua 库 | 禁用 lua-factory 插件（-Denable-lua-factory=no） |
-| 5 | 缺少 itstool | help 文档构建依赖 itstool | 禁用 help 文档构建（-Dhelp=no） |
-| 6 | 多个插件缺少依赖 | libsoup、lua、libarchive 等未安装 | 禁用相关插件（-Denable-xxx=no） |
-
-## 源码修改
-
-无源码修改，所有问题通过配置选项解决。
-
-## 依赖版本
-
-### 必需依赖（已满足）
-- glib-2.0: 2.88.0
-- gmodule-2.0: 2.88.0
-- gobject-2.0: 2.88.0
-- grilo-0.3: 0.3.19
-- gio-2.0: 2.88.0
-- gio-unix-2.0: 2.88.0
-- json-glib-1.0: 1.6.6
-- libxml-2.0: 2.15.3
-- sqlite3: 3.49.1
-
-### 缺失的可选依赖
-- libsoup-3.0 / libsoup-2.4
-- lua 5.3 / 5.4
-- libarchive
-- gstreamer-1.0
-- avahi-client
-
-## 验证结果
-
-### 编译产物检查
-```bash
-ls ~/builds/grilo-plugins-0.3.16.work/build/src/
-# 输出:
-# dleyna/libgrldleyna.so
-# gravatar/libgrlgravatar.so
-```
-
-### 安装文件检查
-```bash
-ls /storage/Users/currentUser/test-install-grilo-plugins-0.3.16/storage/Users/currentUser/usr/local/lib/grilo-0.3/
-# 输出:
-# libgrldleyna.so
-# libgrlgravatar.so
-```
-
-### 测试执行
-```bash
-ninja test
-# 输出: No tests defined.
-```
-
-## 编译的插件
-
-### 已启用插件（2个）
-1. **dleyna** - DLNA/UPnP 媒体服务器插件
-2. **gravatar** - Gravatar 头像插件
-
-### 已禁用插件（10个）
-- lua-factory
-- youtube
-- flickr
-- dmap
-- tracker
-- tracker3
-- podcasts
-- magnatune
-- metadata-store
-- bookmarks
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| libgrldleyna.so | ~50KB | dleyna 插件库 |
-| libgrlgravatar.so | ~20KB | gravatar 插件库 |
-| grilo-plugins.mo (多语言) | ~1KB/个 | 51个翻译文件 |
-| grilo-plugins-0.3.pc | ~1893B | pkg-config 文件 |
-
-## 注意事项
-
-1. **构建系统**: grilo-plugins 使用 Meson 构建，不是 autotools，需要使用 meson 和 ninja 命令
-2. **插件依赖**: 大部分插件依赖 libsoup、lua 等库，这些库在 OpenHarmony 上可能不可用
-3. **PKG_CONFIG_PATH**: 必须设置 PKG_CONFIG_PATH 包含本地安装路径，否则找不到已安装的依赖
-4. **最小化编译**: 本次编译仅启用 2 个插件（dleyna 和 gravatar），其他插件因缺少依赖被禁用
-5. **无测试套件**: 项目没有定义测试，无法执行功能验证
-
-## 编译开始
-**时间**: 2026-06-16 18:02
-
-## 编译结束
-**时间**: 2026-06-16 18:20
-**最终状态**: built (编译成功，部分插件启用)
-**产物**: 2个插件库 + 翻译文件
----
-
-**编译结束**: 2026-06-16 18:18
-**最终状态**: built
+## 测试
+- 上游测试: meson test --list (4 个测试可执行文件)
+- Conan test_package: dlopen 加载插件 .so 验证
