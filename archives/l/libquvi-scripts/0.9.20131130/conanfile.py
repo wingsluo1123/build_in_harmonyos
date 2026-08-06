@@ -32,6 +32,12 @@ class LibquviScriptsConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def build_requirements(self):
+        # automake and libtool are needed for autoreconf (bootstrap)
+        # The CI worker may not have them installed
+        self.tool_requires("automake/1.18")
+        self.tool_requires("libtool/2.5.4")
+
     def layout(self):
         basic_layout(self)
 
