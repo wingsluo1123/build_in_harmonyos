@@ -25,4 +25,4 @@ class M17nLibTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        self.run(os.path.join(self.test_build_folder, "test_m17n-lib"), env="conanrun")
+        self.run(os.path.join(self.build_folder, "test_m17n-lib"), env="conanrun")
