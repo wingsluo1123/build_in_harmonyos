@@ -53,6 +53,17 @@ class DrillConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # 启用 drill 组件构建
         tc.configure_args.append("--with-drill")
+        # ldns 的 acx_openssl.m4 在硬编码路径（/usr/local/ssl 等）查找 openssl，
+        # openssl 是 conan 依赖包不在这些路径；用 --with-ssl 指向 conan openssl
+        # 安装前缀（含 include/openssl/ssl.h + lib/），并注入 CPPFLAGS/LDFLAGS
+        openssl_pkg = self.dependencies["openssl"].package_folder
+        tc.configure_args.append(f"--with-ssl={openssl_pkg}")
+        ssl_inc = os.path.join(openssl_pkg, "include")
+        ssl_lib = os.path.join(openssl_pkg, "lib")
+        tc.configure_args.extend([
+            f"CPPFLAGS=-I{ssl_inc}",
+            f"LDFLAGS=-L{ssl_lib}",
+        ])
         # ldns 的 config.guess 可能无法识别 HarmonyOS，指定 --build/--host 三元组
         machine = self._machine(self.settings.arch)
         triplet = f"{machine}-unknown-linux-gnu"
