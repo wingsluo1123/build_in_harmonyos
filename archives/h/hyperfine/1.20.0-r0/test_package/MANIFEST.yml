@@ -6,7 +6,7 @@
 package: hyperfine/1.20.0-r0
 homepage: "https://github.com/sharkdp/hyperfine"
 
-# Upstream test command
+# Upstream test command (Rust cargo test — cannot run on HarmonyOS)
 upstream_check_command: "cargo test"
 
 # conanfile.py build() method - upstream test integration
@@ -17,17 +17,17 @@ upstream_test_command: ""
 upstream_tests:
   - file: test.sh
     source: "hyperfine-1.20.0-r0/test_package/test.sh"
-    description: "Run hyperfine --version, --help, and a simple benchmark"
-    command: "hyperfine --version; hyperfine --help; hyperfine 'echo hello' --runs 2"
+    description: "Verify binary exists, ELF format, NEEDED deps, attempt execution"
+    command: "file hyperfine; readelf -d hyperfine; hyperfine --version"
 
 # test_package tests (consumer perspective verification)
 test_package_tests:
   - file: conanfile.py
-    description: "Run hyperfine binary: --version, --help, simple benchmark"
-    command: "hyperfine --version && hyperfine --help && hyperfine 'echo hello' --runs 2"
+    description: "Run test.sh: binary existence, ELF format, deps, execution"
+    command: "bash test.sh"
   - file: test.sh
-    description: "Shell script running hyperfine --version, --help, and benchmark"
+    description: "Shell script: find binary, check ELF, check NEEDED, run --version"
     command: "sh test.sh"
 
 # Test assertion count (approximate, for quality assessment)
-assertion_count: 3
+assertion_count: 5

@@ -9,7 +9,7 @@ The APK (which is a tar.gz) contains:
   usr/bin/hyperfine  — ELF aarch64 musl binary
 
 The binary depends on libgcc_s.so.1 (GCC runtime for _Unwind_* functions).
-This library is bundled in lib/ since HarmonyOS doesn't provide it by default.
+This library is bundled in lib/ since HarmonyOS does not provide it by default.
 
 R32: settings.os must check in ("Linux", "OHOS").
 R38: Command-line tool — commands.json declared at software level.
@@ -17,6 +17,7 @@ R38: Command-line tool — commands.json declared at software level.
 import os
 import shutil
 import subprocess
+import time
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -27,7 +28,10 @@ HNP_BIN = "/data/service/hnp/bin"
 
 
 def _sign_elf(filepath):
-    """Sign an ELF binary for HarmonyOS execution (self-signed)."""
+    """Sign an ELF binary for HarmonyOS execution (self-signed).
+
+    Returns True on success, False on failure.
+    """
     objcopy = os.path.join(HNP_BIN, "llvm-objcopy")
     if not os.path.exists(objcopy):
         objcopy = shutil.which("llvm-objcopy") or objcopy
@@ -51,7 +55,7 @@ def _sign_elf(filepath):
             shutil.move(tmp, filepath)
             os.chmod(filepath, 0o755)
             return True
-        import time; time.sleep(1)
+        time.sleep(1)
 
     if os.path.exists(tmp):
         os.unlink(tmp)
@@ -59,14 +63,17 @@ def _sign_elf(filepath):
 
 
 def _set_rpath(filepath, rpath):
-    """Set RPATH/RUNPATH on an ELF binary using patchelf."""
+    """Set RPATH/RUNPATH on an ELF binary using patchelf.
+
+    Returns True on success, False if patchelf unavailable or failed.
+    """
     patchelf = shutil.which("patchelf")
     if not patchelf:
         return False
     try:
-        subprocess.run([patchelf, "--set-rpath", rpath, filepath],
-                       capture_output=True, timeout=10)
-        return True
+        r = subprocess.run([patchelf, "--set-rpath", rpath, filepath],
+                           capture_output=True, timeout=10)
+        return r.returncode == 0
     except Exception:
         return False
 
@@ -77,7 +84,6 @@ class HyperfineConan(ConanFile):
     description = "A command-line benchmarking tool"
     license = "MIT OR Apache-2.0"
     homepage = "https://github.com/sharkdp/hyperfine"
-    url = ""  # CI fills this
 
     package_type = "application"
 
@@ -85,7 +91,7 @@ class HyperfineConan(ConanFile):
     settings = "os", "arch"
 
     # Export the man page and bundled libgcc_s.so.1
-    exports = "res/hyperfine.1", "res/libgcc_s.so.1"
+    exports = ["res/hyperfine.1", "res/libgcc_s.so.1"]
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -111,6 +117,9 @@ class HyperfineConan(ConanFile):
              dst=bin_dst)
 
         # Copy bundled libgcc_s.so.1 (GCC runtime for _Unwind_* functions)
+        # R19: Bundled because HarmonyOS does not provide libgcc_s.so.1.
+        #      The musl dynamic linker requires it in a system path, but
+        #      all system paths are read-only on HarmonyOS.
         copy(self, "libgcc_s.so.1",
              src=os.path.join(self.recipe_folder, "res"),
              dst=os.path.join(self.package_folder, "lib"))
@@ -118,9 +127,11 @@ class HyperfineConan(ConanFile):
         # Set RPATH so binary can find libgcc_s.so.1 at $ORIGIN/../lib
         hyperfine_bin = os.path.join(bin_dst, "hyperfine")
         if os.path.exists(hyperfine_bin):
-            _set_rpath(hyperfine_bin, "$ORIGIN/../lib")
+            if not _set_rpath(hyperfine_bin, "$ORIGIN/../lib"):
+                self.output.warn("patchelf unavailable or failed; RPATH not set")
             # Sign the ELF binary for HarmonyOS execution
-            _sign_elf(hyperfine_bin)
+            if not _sign_elf(hyperfine_bin):
+                self.output.warn("ELF signing failed; binary may not execute")
 
         # Copy the man page from the recipe exports
         copy(self, "hyperfine.1",
