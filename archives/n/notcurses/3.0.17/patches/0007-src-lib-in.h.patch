@@ -1,0 +1,30 @@
+--- a/src/lib/in.h
++++ b/src/lib/in.h
+@@ -12,20 +12,27 @@
+ struct tinfo;
+ struct inputctx;
+ struct ncsharedstats;
+ 
+ int init_inputlayer(struct tinfo* ti, FILE* infp, int lmargin, int tmargin,
+                     int rmargin, int bmargin, struct ncsharedstats* stats,
+                     unsigned drain, int linesigs_enabled)
+   __attribute__ ((nonnull (1, 2, 7)));
+ 
+ int stop_inputlayer(struct tinfo* ti);
++
++#ifdef __OHOS__
++// OHOS: Clear initdata so input thread processes keyboard input normally.
++// Defined in in.c where inputctx is fully defined.
++struct inputctx;
++void inputlayer_clear_initdata(struct inputctx* ictx);
++#endif
+ 
+ int inputready_fd(const struct inputctx* ictx)
+   __attribute__ ((nonnull (1)));
+ 
+ // allow another source provide raw input for distribution to client code.
+ // drops input if there is no room in appropriate output queue.
+ int ncinput_shovel(struct inputctx* ictx, const void* buf, int len)
+   __attribute__ ((nonnull (1, 2)));
+ 
+ typedef enum {

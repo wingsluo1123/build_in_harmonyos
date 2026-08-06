@@ -1,6 +1,18 @@
---- notcurses-3.0.17.orig/src/lib/reader.c	2025-10-29 00:02:11.000000000 +0800
-+++ notcurses-3.0.17.work/src/lib/reader.c	2026-04-17 00:40:44.203288436 +0800
-@@ -70,6 +70,10 @@
+--- a/src/lib/reader.c
++++ b/src/lib/reader.c
+@@ -63,24 +63,29 @@
+   if(ncplane_set_widget(n, nr, (void(*)(void*))ncreader_destroy_internal)){
+     ncplane_destroy(nr->textarea);
+     ncplane_destroy(nr->ncp);
+     free(nr);
+     return NULL;
+   }
+   return nr;
+ }
+ 
+ // empty both planes of all input, and home the cursors.
++static int ncreader_redraw(ncreader* n);
+ int ncreader_clear(ncreader* n){
    ncplane_erase(n->ncp);
    ncplane_erase(n->textarea);
    n->xproject = 0;
@@ -11,12 +23,25 @@
    return 0;
  }
  
-@@ -397,8 +401,24 @@
+ ncplane* ncreader_plane(ncreader* n){
+   return n->ncp;
+ }
+ 
+ // copy the viewed area down from the textarea
+ static int
+ ncreader_redraw(ncreader* n){
+@@ -390,21 +395,40 @@
+     return true;
+   }else if(ni->id == NCKEY_RIGHT){
+     ncreader_move_right(n);
+     return true;
+   }else if(ni->id == NCKEY_UP){
+     ncreader_move_up(n);
+     return true;
    }else if(ni->id == NCKEY_DOWN){
      ncreader_move_down(n);
      return true;
 -  }else if(nckey_synthesized_p(ni->id)){
--    return false;
 +  }
 +#ifdef __OHOS__
 +  // OHOS: Handle Enter as actual newline (cursor to start of next line).
@@ -34,11 +59,16 @@
 +      ncreader_redraw(n);
 +    }
 +    return true;
-   }
--  // FIXME deal with multicolumn EGCs -- probably extract these and make them
--  // general ncplane_cursor_{left, right, up, down}()
++  }
 +#endif
 +  if(nckey_synthesized_p(ni->id)){
-+    return false;
-+  }
+     return false;
+   }
  
+   for (int c=0; ni->eff_text[c]!=0; c++){
+     unsigned char egc[5]={0};
+     if(notcurses_ucs32_to_utf8(&ni->eff_text[c], 1, egc, 4)>=0){
+       ncreader_write_egc(n, (char*)egc);
+     }
+   }
+   return true;

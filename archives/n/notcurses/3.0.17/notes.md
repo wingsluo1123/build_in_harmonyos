@@ -34,9 +34,7 @@
 3. **DA1/DA2/DSRCPR 必须跳过**：OHOS 终端不响应，会导致 `pthread_cond_wait` 永久阻塞
 4. **`pthread_cancel` 不可用**：OHOS 内核不支持，`cancel_and_join` 会永久阻塞在 `pthread_join`，需要 `pthread_detach` 替代
 5. **`ppoll` 不可用**：用 `poll` 替代
-
 ---
 
-**编译结束**: 2026-04-16 17:57
-**补丁更新**: 2026-04-17 00:24
-**最终状态**: success
+**编译结束**: 2026-08-07 06:14
+**最终状态**: built
