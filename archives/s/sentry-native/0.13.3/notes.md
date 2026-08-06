@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: cmake
-- 编译日期: 2026-07-14
+- 编译日期: 2026-08-06
 - 编译器: clang/clang++
 - 状态: published
 
@@ -76,5 +76,5 @@ ls ~/usr/local/include/sentry.h → 存在
 - G0 clean-verify 脚本不支持 cmake 构建系统，需手动验证
 - CMAKE_SYSTEM_PROCESSOR 必须明确设置为 aarch64
 ---
-**编译结束**: 2026-07-14 11:07
+**编译结束**: 2026-08-06 10:35
 **最终状态**: published

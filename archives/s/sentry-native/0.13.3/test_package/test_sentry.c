@@ -39,14 +39,16 @@ int main(void) {
             failures++;
         } else {
             printf("PASS: sentry_init() succeeded\n");
-        }
 
-        int close_result = sentry_close();
-        if (close_result != 0) {
-            fprintf(stderr, "FAIL: sentry_close() returned %d\n", close_result);
-            failures++;
-        } else {
-            printf("PASS: sentry_close() succeeded\n");
+            /* Only call sentry_close() when init succeeded — calling close()
+             * on an uninitialized SDK is undefined behavior per API contract. */
+            int close_result = sentry_close();
+            if (close_result != 0) {
+                fprintf(stderr, "FAIL: sentry_close() returned %d\n", close_result);
+                failures++;
+            } else {
+                printf("PASS: sentry_close() succeeded\n");
+            }
         }
     }
 
