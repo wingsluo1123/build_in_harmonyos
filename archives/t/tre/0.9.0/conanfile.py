@@ -35,7 +35,6 @@ class TREConan(ConanFile):
         tc = AutotoolsToolchain(self)
         # Explicit build/host triplet — AutotoolsToolchain does not generate
         # --host for os=OHOS; config.guess also fails on OHOS (uname mismatch).
-        # TODO: migrate to dynamic triplet when Conan OHOS support matures.
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         if not self.options.shared:

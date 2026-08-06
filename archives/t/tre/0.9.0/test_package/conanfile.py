@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Test package for TRE — CMake + CTest validation of regex API."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
