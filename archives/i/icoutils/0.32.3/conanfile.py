@@ -63,6 +63,14 @@ class IcoutilsConan(ConanFile):
         pkg = PkgConfigDeps(self)
         pkg.generate()
         tc = AutotoolsToolchain(self)
+        # Explicitly add libpng lib/include dirs since configure uses AC_CHECK_LIB not pkg-config
+        libpng_folder = self.dependencies["libpng"].package_folder
+        libpng_libdir = os.path.join(libpng_folder, "lib")
+        libpng_incdir = os.path.join(libpng_folder, "include", "libpng16")
+        if not os.path.isdir(libpng_incdir):
+            libpng_incdir = os.path.join(libpng_folder, "include")
+        tc.ldflags.append(f"-L{libpng_libdir}")
+        tc.cflags.append(f"-I{libpng_incdir}")
         tc.generate()
 
     def build(self):
