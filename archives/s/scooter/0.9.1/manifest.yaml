@@ -1,0 +1,65 @@
+software: scooter
+# 版本级 manifest 模板
+# 文件位置: archives/s/scooter/0.9.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.9.1"
+
+# 编译状态
+# published | built | failed | archived
+status: failed
+
+# 构建系统类型
+# cmake | autotools | makefile | meson | cargo | custom
+build_system: cargo
+
+# 构建日期
+build_date: "2026-08-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://github.com/thomasschafer/scooter/archive/refs/tags/v0.9.1.tar.gz"
+  sha256: "2cd3e936ac1c4c534461b54253b4facf5197fb5a472f48993ef71cc29571e2c6"
+  mirror_url: "https://gitcode.com/thomasschafer/scooter/archive/refs/tags/v0.9.1.tar.gz"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: cargo
+  configure_options:
+    - "cargo build --release --target aarch64-unknown-linux-ohos"
+  dependencies: []
+  cc: rustc
+  cxx: ""
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+patch_classification: []
+
+# ============================================================
+# 适配知识
+# ============================================================
+knowledge_gained:
+  - "E154: install-rust-prebuilt (cmd-pkgs 装 rust 1.81.0 预编译包)"
+  - "E180: rust-native-compile (新 HNP 工具链 Rust 1.95.0 支持 OHOS target)"
+  - "E186: patchelf-fix-runpath (cargo RUNPATH musl ldso namespace 修)"
+
+# ============================================================
+# 上游测试信息
+# ============================================================
+upstream_tests:
+  total: 3
+  passed: 0
+  skipped: 3
+  notes: "tests/app_runner.rs + headless.rs + utils.rs 需 TTY 交互 + 网络访问，CI worker 内网环境跳过"
