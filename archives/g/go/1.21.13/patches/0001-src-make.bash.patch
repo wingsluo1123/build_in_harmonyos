@@ -1,0 +1,54 @@
+--- a/src/make.bash
++++ b/src/make.bash
+@@ -159,21 +159,21 @@
+ 			GOROOT_BOOTSTRAP="$HOME/$d"
+ 		fi
+ 	done
+ fi
+ export GOROOT_BOOTSTRAP
+ 
+ nogoenv() {
+ 	GO111MODULE=off GOENV=off GOOS= GOARCH= GOEXPERIMENT= GOFLAGS= "$@"
+ }
+ 
+-export GOROOT="$(cd .. && pwd)"
++export GOROOT="${GOROOT:-$(cd .. && pwd)}"
+ IFS=$'\n'; for go_exe in $(type -ap go); do
+ 	if [ ! -x "$GOROOT_BOOTSTRAP/bin/go" ]; then
+ 		goroot=$(GOROOT= nogoenv "$go_exe" env GOROOT)
+ 		if [ "$goroot" != "$GOROOT" ]; then
+ 			if [ "$goroot_bootstrap_set" = "true" ]; then
+ 				printf 'WARNING: %s does not exist, found %s from env\n' "$GOROOT_BOOTSTRAP/bin/go" "$go_exe" >&2
+ 				printf 'WARNING: set %s as GOROOT_BOOTSTRAP\n' "$goroot" >&2
+ 			fi
+ 			GOROOT_BOOTSTRAP="$goroot"
+ 		fi
+@@ -193,20 +193,28 @@
+ 	echo cmd/dist
+ fi
+ if [ "$GOROOT_BOOTSTRAP" = "$GOROOT" ]; then
+ 	echo "ERROR: \$GOROOT_BOOTSTRAP must not be set to \$GOROOT" >&2
+ 	echo "Set \$GOROOT_BOOTSTRAP to a working Go tree >= Go $bootgo." >&2
+ 	exit 1
+ fi
+ rm -f cmd/dist/dist
+ GOROOT="$GOROOT_BOOTSTRAP" nogoenv "$GOROOT_BOOTSTRAP/bin/go" build -o cmd/dist/dist ./cmd/dist
+ 
++# OHOS: Sign the dist binary for HarmonyOS (unsigned ELF binaries cannot execute)
++if [ -f /data/service/hnp/bin/binary-sign-tool ]; then
++	strip cmd/dist/dist 2>/dev/null || true
++	/data/service/hnp/bin/llvm-objcopy --remove-section .codesign cmd/dist/dist 2>/dev/null || true
++	/data/service/hnp/bin/binary-sign-tool sign -inFile cmd/dist/dist -outFile cmd/dist/dist.signed.tmp -selfSign 1 2>/dev/null && mv cmd/dist/dist.signed.tmp cmd/dist/dist
++	chmod 755 cmd/dist/dist
++fi
++
+ # -e doesn't propagate out of eval, so check success by hand.
+ eval $(./cmd/dist/dist env -p || echo FAIL=true)
+ if [ "$FAIL" = true ]; then
+ 	exit 1
+ fi
+ 
+ if $verbose; then
+ 	echo
+ fi
+ 

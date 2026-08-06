@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: go/1.21.13
+homepage: "https://go.dev"
+
+# Go uses its own test runner (go test), not make check
+# The upstream test suite is extensive and not suitable for CI smoke testing
+upstream_check_command: "go test ./..."
+
+# conanfile.py build() method does not run upstream tests
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# No upstream test files are copied — Go's tests are part of the source tree
+upstream_tests: []
+
+# test_package tests (consumer-side verification)
+test_package_tests:
+  - file: test.sh
+    description: "Verify go version, go env GOROOT, and go env GOVERSION"
+    command: "bash test.sh"
+
+# Number of assertions (go version + go env GOROOT + go env GOVERSION)
+assertion_count: 3

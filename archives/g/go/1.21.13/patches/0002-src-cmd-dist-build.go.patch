@@ -1,0 +1,187 @@
+--- a/src/cmd/dist/build.go
++++ b/src/cmd/dist/build.go
+@@ -633,20 +633,69 @@
+ 	{"cmd/go/internal/cfg", "zdefaultcc.go", mkzdefaultcc},
+ 	{"runtime/internal/sys", "zversion.go", mkzversion},
+ 	{"time/tzdata", "zzipdata.go", mktzdata},
+ }
+ 
+ // installed maps from a dir name (as given to install) to a chan
+ // closed when the dir's package is installed.
+ var installed = make(map[string]chan struct{})
+ var installedMu sync.Mutex
+ 
++// OHOS: signElfBinary strips and signs an ELF file for HarmonyOS.
++// Unsigned ELF binaries cannot execute on HarmonyOS due to code signing requirements.
++var signTool = "/data/service/hnp/bin/binary-sign-tool"
++var llvmObjcopy = "/data/service/hnp/bin/llvm-objcopy"
++var stripBin = "/data/service/hnp/bin/strip"
++
++func signElfBinary(path string) {
++	if !isfile(path) {
++		return
++	}
++	// Check if ELF by reading magic bytes
++	f, err := os.Open(path)
++	if err != nil {
++		return
++	}
++	magic := make([]byte, 4)
++	_, err = f.Read(magic)
++	f.Close()
++	if err != nil || string(magic) != "\x7fELF" {
++		return
++	}
++
++	// Strip to fix non-standard ELF format (Go binaries have SHT_STRTAB not null-terminated)
++	run("", 0, stripBin, path)
++
++	// Remove any existing .codesign section
++	run("", 0, llvmObjcopy, "--remove-section", ".codesign", path)
++
++	// Sign the binary
++	tmpFile := path + ".signed.tmp"
++	run("", CheckExit, signTool, "sign", "-inFile", path, "-outFile", tmpFile, "-selfSign", "1")
++	os.Rename(tmpFile, path)
++	os.Chmod(path, 0755)
++}
++
++// signToolchainDir signs all ELF files in the given directory.
++func signToolchainDir(dir string) {
++	if !isdir(dir) {
++		return
++	}
++	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
++		if err != nil || info.IsDir() {
++			return nil
++		}
++		signElfBinary(path)
++		return nil
++	})
++}
++
+ func install(dir string) {
+ 	<-startInstall(dir)
+ }
+ 
+ func startInstall(dir string) chan struct{} {
+ 	installedMu.Lock()
+ 	ch := installed[dir]
+ 	if ch == nil {
+ 		ch = make(chan struct{})
+ 		installed[dir] = ch
+@@ -1405,20 +1454,22 @@
+ 
+ 	if rebuildall {
+ 		clean()
+ 	}
+ 
+ 	setup()
+ 
+ 	timelog("build", "toolchain1")
+ 	checkCC()
+ 	bootstrapBuildTools()
++	// OHOS: Sign toolchain1 binaries for HarmonyOS
++	signToolchainDir(tooldir)
+ 
+ 	// Remember old content of $GOROOT/bin for comparison below.
+ 	oldBinFiles, err := filepath.Glob(pathf("%s/bin/*", goroot))
+ 	if err != nil {
+ 		fatalf("glob: %v", err)
+ 	}
+ 
+ 	// For the main bootstrap, building for host os/arch.
+ 	oldgoos = goos
+ 	oldgoarch = goarch
+@@ -1427,20 +1478,22 @@
+ 	os.Setenv("GOHOSTARCH", gohostarch)
+ 	os.Setenv("GOHOSTOS", gohostos)
+ 	os.Setenv("GOARCH", goarch)
+ 	os.Setenv("GOOS", goos)
+ 
+ 	timelog("build", "go_bootstrap")
+ 	xprintf("Building Go bootstrap cmd/go (go_bootstrap) using Go toolchain1.\n")
+ 	install("runtime")     // dependency not visible in sources; also sets up textflag.h
+ 	install("time/tzdata") // no dependency in sources; creates generated file
+ 	install("cmd/go")
++	// OHOS: Sign go_bootstrap for HarmonyOS
++	signElfBinary(pathf("%s/go_bootstrap%s", tooldir, exe))
+ 	if vflag > 0 {
+ 		xprintf("\n")
+ 	}
+ 
+ 	gogcflags = os.Getenv("GO_GCFLAGS") // we were using $BOOT_GO_GCFLAGS until now
+ 	setNoOpt()
+ 	goldflags = os.Getenv("GO_LDFLAGS") // we were using $BOOT_GO_LDFLAGS until now
+ 	goBootstrap := pathf("%s/go_bootstrap", tooldir)
+ 	if debug {
+ 		run("", ShowOutput|CheckExit, pathf("%s/compile", tooldir), "-V=full")
+@@ -1466,20 +1519,22 @@
+ 	timelog("build", "toolchain2")
+ 	if vflag > 0 {
+ 		xprintf("\n")
+ 	}
+ 	xprintf("Building Go toolchain2 using go_bootstrap and Go toolchain1.\n")
+ 	os.Setenv("CC", compilerEnvLookup("CC", defaultcc, goos, goarch))
+ 	// Now that cmd/go is in charge of the build process, enable GOEXPERIMENT.
+ 	os.Setenv("GOEXPERIMENT", goexperiment)
+ 	// No need to enable PGO for toolchain2.
+ 	goInstall(toolenv(), goBootstrap, append([]string{"-pgo=off"}, toolchain...)...)
++	// OHOS: Sign toolchain2 binaries for HarmonyOS
++	signToolchainDir(tooldir)
+ 	if debug {
+ 		run("", ShowOutput|CheckExit, pathf("%s/compile", tooldir), "-V=full")
+ 		copyfile(pathf("%s/compile2", tooldir), pathf("%s/compile", tooldir), writeExec)
+ 	}
+ 
+ 	// Toolchain2 should be semantically equivalent to toolchain1,
+ 	// but it was built using the newly built compiler instead of the Go bootstrap compiler,
+ 	// so it should at the least run faster. Also, toolchain1 had no build IDs
+ 	// in the binaries, while toolchain2 does. In non-release builds, the
+ 	// toolchain's build IDs feed into constructing the build IDs of built targets,
+@@ -1493,20 +1548,22 @@
+ 	// we force-install everything here.
+ 	//
+ 	//	toolchain3 = mk(new toolchain, toolchain2, go_bootstrap)
+ 	//
+ 	timelog("build", "toolchain3")
+ 	if vflag > 0 {
+ 		xprintf("\n")
+ 	}
+ 	xprintf("Building Go toolchain3 using go_bootstrap and Go toolchain2.\n")
+ 	goInstall(toolenv(), goBootstrap, append([]string{"-a"}, toolchain...)...)
++	// OHOS: Sign toolchain3 binaries for HarmonyOS
++	signToolchainDir(tooldir)
+ 	if debug {
+ 		run("", ShowOutput|CheckExit, pathf("%s/compile", tooldir), "-V=full")
+ 		copyfile(pathf("%s/compile3", tooldir), pathf("%s/compile", tooldir), writeExec)
+ 	}
+ 
+ 	// Now that toolchain3 has been built from scratch, its compiler and linker
+ 	// should have accurate build IDs suitable for caching.
+ 	// Now prime the build cache with the rest of the standard library for
+ 	// testing, and so that the user can run 'go install std cmd' to quickly
+ 	// iterate on local changes without waiting for a full rebuild.
+@@ -1547,20 +1604,22 @@
+ 		}
+ 		goos = oldgoos
+ 		goarch = oldgoarch
+ 		os.Setenv("GOOS", goos)
+ 		os.Setenv("GOARCH", goarch)
+ 		os.Setenv("CC", compilerEnvLookup("CC", defaultcc, goos, goarch))
+ 		xprintf("Building packages and commands for target, %s/%s.\n", goos, goarch)
+ 	}
+ 	goInstall(nil, goBootstrap, "std")
+ 	goInstall(toolenv(), goBootstrap, "cmd")
++	// OHOS: Sign final go and gofmt binaries for HarmonyOS
++	signToolchainDir(gorootBin)
+ 	checkNotStale(toolenv(), goBootstrap, toolchain...)
+ 	checkNotStale(nil, goBootstrap, "std")
+ 	checkNotStale(toolenv(), goBootstrap, "cmd")
+ 	checkNotStale(nil, gorootBinGo, "std")
+ 	checkNotStale(toolenv(), gorootBinGo, "cmd")
+ 	if debug {
+ 		run("", ShowOutput|CheckExit, pathf("%s/compile", tooldir), "-V=full")
+ 		checkNotStale(toolenv(), goBootstrap, toolchain...)
+ 		copyfile(pathf("%s/compile4", tooldir), pathf("%s/compile", tooldir), writeExec)
+ 	}

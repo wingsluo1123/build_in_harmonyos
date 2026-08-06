@@ -1,7 +1,7 @@
 software: go
 version: 1.21.13
-status: published
-build_date: "2026-06-08"
+status: built
+build_date: "2026-08-06"
 source_url: "https://go.dev/dl/go1.21.13.src.tar.gz"
 configure_options: ""
 build_system: go_bootstrap
@@ -25,9 +25,29 @@ notes:
   - "Go 自举编译使用已签名的 Go 1.24.3 作为 bootstrap"
   - "Go 生成的二进制格式非标准 ELF（SHT_STRTAB 未 null-terminated）"
   - "必须先用 strip 处理二进制使其符合标准 ELF 格式，然后再 ELF 签名"
-  - "源码修改：src/cmd/dist/buildtool.go 和 src/cmd/dist/build.go 添加签名调用"
+  - "源码修改：src/make.bash 添加 dist 签名，src/cmd/dist/build.go 添加 signing 函数和调用"
   - "临时目录设置为 /data/storage/el2/base/cache（HMDFS 权限限制）"
+  - "Go linker mmap 在 tmpfs 上失败，必须使用 HMFS 文件系统"
 
 knowledge_gained:
   - E046: "chmod 不生效（SELinux 限制）"
   - 新发现: "Go 二进制 ELF 签名前需要 strip 处理"
+  - 新发现: "Go linker mmap 在 tmpfs 上失败，需要 HMFS 文件系统"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/go-1.21.13.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/go-1.21.13.work
+  source_orig_hash: 5df632234a371b06
+  source_work_hash: 8b05cb9ffc9a0af5
+  generated_at: '2026-08-06T15:52:33'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-src-make.bash.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-src-cmd-dist-build.go.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
