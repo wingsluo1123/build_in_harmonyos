@@ -4,7 +4,7 @@
 This is the L1 test in the five-level test system.
 CI runs this automatically via `conan create` (which invokes test_package).
 
-File location: archives/{letter}/krb5/{version}/test_package/conanfile.py
+File location: archives/k/krb5/1.22.1/test_package/conanfile.py
 """
 import os
 

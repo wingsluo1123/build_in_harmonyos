@@ -14,7 +14,7 @@
 **触发工具**: config.status, configure  
 **错误特征**: config.status: error: could not setup config files machinery | Permission denied.*confXXXXXX  
 **解决方案**:
-  - 在configure中强制设置TMPDIR为可写目录: `: "${TMPDIR:=/storage/Users/currentUser/tmp}"`
+  - 在configure中强制设置TMPDIR为可写目录: `: "${TMPDIR:=$HOME/tmp}"`
   - 修改umask 077为umask 022
   - 使用绝对路径$TMPDIR/confXXXXXX而非相对路径./confXXXXXX
   - 使用make -e确保环境变量传递给子进程
@@ -72,7 +72,7 @@
 - 相对路径: src/config/config.sub
 
 ### 0003-configure.patch
-- 强制设置TMPDIR: `: "${TMPDIR:=/storage/Users/currentUser/tmp}"`
+- 强制设置TMPDIR: `: "${TMPDIR:=$HOME/tmp}"`
 - 修改umask: 077→022
 - 使用绝对路径$TMPDIR/confXXXXXX
 - 类型: platform_only
