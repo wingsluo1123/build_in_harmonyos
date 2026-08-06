@@ -96,8 +96,8 @@ class CryptOpensslRandomConan(ConanFile):
              dst=os.path.join(self.package_folder, "lib", "Crypt", "OpenSSL"))
 
     def package_info(self):
-        # Perl XS module — provides Random.so (shared library) + Random.pm (Perl module)
-        self.cpp_info.libs = ["Random"]
+        # Perl XS module — provides Random.so (loaded by Perl DynaLoader at runtime, not linked)
+        self.cpp_info.libs = []
         self.cpp_info.libdirs = ["lib/auto/Crypt/OpenSSL/Random"]
         self.cpp_info.includedirs = []
 
