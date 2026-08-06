@@ -77,3 +77,4 @@ go version
 **编译结束**: 2026-08-06 15:52
 **最终状态**: built
 # Go 1.21.13 - Conan recipe for HarmonyOS PC (aarch64)
+<!-- CI trigger Thu Aug  6 16:48:10 CST 2026 -->
