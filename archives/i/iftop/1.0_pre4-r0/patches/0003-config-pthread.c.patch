@@ -1,17 +1,10 @@
---- a/config/pthread.c
-+++ b/config/pthread.c
-@@ -11,30 +11,41 @@
- #include <pthread.h>
- #include <stdio.h>
- #include <string.h>
- #include <time.h>
- #include <unistd.h>
- 
- static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+--- a/config/pthread.c	2026-08-06 20:03:44.598640936 +0800
++++ b/config/pthread.c	2026-08-06 20:03:44.638652968 +0800
+@@ -18,16 +18,27 @@
  static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
  static int return_value = -1;
  
-+#ifdef __OHOS__
++#ifndef HAVE_PTHREAD_CANCEL
 +/* OHOS/musl does not support pthread_cancel */
 +static volatile int worker_should_exit = 0;
 +#endif
@@ -22,7 +15,7 @@
      pthread_mutex_lock(&mtx);
      pthread_cond_signal(&cond);
      pthread_mutex_unlock(&mtx);
-+#ifdef __OHOS__
++#ifndef HAVE_PTHREAD_CANCEL
 +    while (!worker_should_exit) {
 +        sleep(1);
 +    }
@@ -35,25 +28,11 @@
  }
  
  /* Start a thread, and have it set a variable to some other value, then signal
-  * a condition variable. If this doesn't happen within some set time, we assume
-  * that something's gone badly wrong and abort (for instance, the thread never
-  * got started). */
- int main(void) {
-     pthread_t thr;
-     int res;
-     struct timespec deadline = {0};
-@@ -48,18 +59,28 @@
-      * variable. */
-     do
-         deadline.tv_sec = 2 + time(NULL);
-     while ((res = pthread_cond_timedwait(&cond, &mtx, &deadline)) == EINTR);
-     
-     if (res != 0) {
-         fprintf(stderr, "%s\n", strerror(res));
+@@ -55,11 +66,21 @@
          return -1;
      }
  
-+#ifdef __OHOS__
++#ifndef HAVE_PTHREAD_CANCEL
 +    /* On OHOS/musl, pthread_cancel is not available.
 +     * Set the flag and join the thread instead. */
 +    worker_should_exit = 1;
