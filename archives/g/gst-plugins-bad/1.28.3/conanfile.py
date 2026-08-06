@@ -97,17 +97,28 @@ class GstPluginsBadConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Install system glib from cmd-pkgs if not present (needed for meson build)
         import subprocess
-        glib_lib = "/storage/Users/currentUser/usr/local/lib/libglib-2.0.a"
-        if not os.path.exists(glib_lib):
+        prefix = "/storage/Users/currentUser/usr/local"
+        # 1. Install glib from cmd-pkgs if not present
+        if not os.path.exists(f"{prefix}/lib/libglib-2.0.a"):
             self.output.info("Installing glib 2.88.0 from cmd-pkgs...")
-            subprocess.run(
-                ["sh", "-c", "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.88.0"],
-                check=True
-            )
-        # Ensure system glib tools (glib-mkenums, etc.) are found first
-        os.environ["PATH"] = "/storage/Users/currentUser/usr/local/bin:" + os.environ.get("PATH", "")
+            subprocess.run(["sh", "-c",
+                "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | sh -s -- glib 2.88.0"],
+                check=True)
+        # 2. Build pcre2 from source if not present (glib dependency)
+        if not os.path.exists(f"{prefix}/lib/libpcre2-8.a"):
+            self.output.info("Building pcre2 from source...")
+            subprocess.run(["sh", "-c",
+                f"cd $TMPDIR && curl -fsSL 'https://wrapdb.mesonbuild.com/v2/pcre2_10.47-3/get_source/pcre2-10.47.tar.bz2' -o pcre2.tar.bz2 && tar xjf pcre2.tar.bz2 && cd pcre2-10.47 && mkdir -p build && cd build && cmake .. -DCMAKE_C_COMPILER=/data/service/hnp/bin/clang -DCMAKE_INSTALL_PREFIX={prefix} -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DPCRE2_BUILD_PCRE2GREP=OFF -DPCRE2_BUILD_TESTS=OFF && make -j2 && make install"],
+                check=True)
+        # 3. Build libffi from source if not present (gobject dependency)
+        if not os.path.exists(f"{prefix}/lib/libffi.a"):
+            self.output.info("Building libffi from source...")
+            subprocess.run(["sh", "-c",
+                f"cd $TMPDIR && curl -fsSL 'https://gstreamer.freedesktop.org/src/mirror/libffi/libffi-meson-3.2.9999.5.tar.bz2' -o libffi.tar.bz2 && tar xjf libffi.tar.bz2 && cd libffi-meson-3.2.9999.5 && meson setup build --prefix={prefix} --buildtype=release --default-library=static && ninja -C build && ninja -C build install"],
+                check=True)
+        # Ensure system glib tools are found first
+        os.environ["PATH"] = f"{prefix}/bin:" + os.environ.get("PATH", "")
         # Disable opensles plugin (Android-specific) by modifying meson.options
         meson_options_path = os.path.join(self.source_folder, "subprojects", "gst-plugins-bad", "meson.options")
         replace_in_file(self, meson_options_path,
