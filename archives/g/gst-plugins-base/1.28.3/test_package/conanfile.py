@@ -33,5 +33,8 @@ class GstPluginsBaseTestConan(ConanFile):
                 "cross-building / cannot run: only verify compile+link"
             )
             return
+        import os
+        exe = os.path.join(self.cpp.build.bindirs[0], "test_gst_plugins_base")
+        self.run(exe, env="conanrun")
         cmake = CMake(self)
         cmake.test()

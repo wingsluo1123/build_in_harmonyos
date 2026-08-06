@@ -29,5 +29,6 @@ class GstreamerTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        import os
+        exe = os.path.join(self.cpp.build.bindirs[0], "test_gstreamer")
+        self.run(exe, env="conanrun")
