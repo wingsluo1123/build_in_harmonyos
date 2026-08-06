@@ -7,11 +7,12 @@ This build includes: asf, dvdlpcmdec, dvdsub, realmedia (non-GPL plugins).
 GPL plugins (a52dec, cdio, dvdread, mpeg2dec, sidplay, x264) are not enabled
 because their external dependencies are not available in the artifact repo.
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
-import os
 
 
 class GstPluginsUglyConan(ConanFile):
@@ -20,7 +21,7 @@ class GstPluginsUglyConan(ConanFile):
     description = "GStreamer plugins with potential licensing/patent issues"
     license = "LGPL-2.1-or-later"
     homepage = "https://gstreamer.freedesktop.org/"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -49,16 +50,12 @@ class GstPluginsUglyConan(ConanFile):
         tc.project_options["doc"] = "disabled"
         tc.project_options["nls"] = "disabled"
         tc.project_options["orc"] = "disabled"
-        # Use system glib/pcre2/libffi .pc files (with correct prefix paths)
-        home = os.path.expanduser("~")
+        # Build pkg-config search path from conan deps + system paths
+        # System PKG_CONFIG_PATH (OHOS dev environment) has correct glib .pc files
         pkg_config_paths = [self.generators_folder]
-        system_paths = [
-            f"{home}/usr/local/lib/pkgconfig",
-            "/data/service/hnp/pcre2.org/pcre2_10.47/lib/pkgconfig",
-            "/data/service/hnp/libffi.org/libffi_3.4.4/lib/pkgconfig",
-        ]
+        system_paths = os.environ.get("PKG_CONFIG_PATH", "").split(":")
         for sp in system_paths:
-            if os.path.isdir(sp):
+            if sp and os.path.isdir(sp):
                 pkg_config_paths.append(sp)
         for dep in ["gstreamer", "gst-plugins-base", "glib", "pcre2", "libffi"]:
             if dep in self.dependencies:
@@ -78,6 +75,7 @@ class GstPluginsUglyConan(ConanFile):
         meson.install()
 
     def package_info(self):
+        # Plugin-only package: .so files are loaded at runtime, not linked
         self.cpp_info.libs = []
         self.cpp_info.libdirs = ["lib/gstreamer-1.0"]
         self.cpp_info.bindirs = ["lib/gstreamer-1.0"]

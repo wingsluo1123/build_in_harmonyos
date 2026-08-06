@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Conan recipe for gst-plugins-base 1.28.3 on OpenHarmony."""
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
-import os
 
 
 class GstPluginsBaseConan(ConanFile):
@@ -13,7 +14,7 @@ class GstPluginsBaseConan(ConanFile):
     description = "GStreamer base plugins and support libraries"
     license = "LGPL-2.1-or-later"
     homepage = "https://gstreamer.freedesktop.org/"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -48,16 +49,11 @@ class GstPluginsBaseConan(ConanFile):
         tc.project_options["vorbis"] = "disabled"
         tc.project_options["theora"] = "disabled"
         tc.project_options["ogg"] = "disabled"
-        # Use system glib/pcre2/libffi .pc files (with correct prefix paths)
-        home = os.path.expanduser("~")
+        # Build pkg-config search path from conan deps + system paths
         pkg_config_paths = [self.generators_folder]
-        system_paths = [
-            f"{home}/usr/local/lib/pkgconfig",
-            "/data/service/hnp/pcre2.org/pcre2_10.47/lib/pkgconfig",
-            "/data/service/hnp/libffi.org/libffi_3.4.4/lib/pkgconfig",
-        ]
+        system_paths = os.environ.get("PKG_CONFIG_PATH", "").split(":")
         for sp in system_paths:
-            if os.path.isdir(sp):
+            if sp and os.path.isdir(sp):
                 pkg_config_paths.append(sp)
         for dep in ["gstreamer", "glib", "pcre2", "libffi"]:
             if dep in self.dependencies:

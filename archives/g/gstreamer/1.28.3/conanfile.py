@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Conan recipe for gstreamer 1.28.3 on OpenHarmony."""
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.meson import Meson, MesonToolchain
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
 
 
 class GstreamerConan(ConanFile):
@@ -13,7 +14,7 @@ class GstreamerConan(ConanFile):
     description = "GStreamer core library"
     license = "LGPL-2.1-or-later"
     homepage = "https://gstreamer.freedesktop.org/"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -46,19 +47,15 @@ class GstreamerConan(ConanFile):
         tc.project_options["libunwind"] = "disabled"
         tc.project_options["libdw"] = "disabled"
         tc.project_options["gst_parse"] = "false"
-        # Use system glib/pcre2/libffi .pc files (with correct prefix paths) first,
-        # then conan packages' .pc files as fallback
-        import os
-        home = os.path.expanduser("~")
+        # Build pkg-config search path from conan deps + system paths
+        # The conan glib package's .pc files use prefix=/ causing wrong paths,
+        # so we include system pkgconfig dirs (part of OHOS dev environment)
+        # which have correct absolute paths for glib/gobject/gio/gmodule.
         pkg_config_paths = [self.generators_folder]
-        # System pkgconfig directories with correct absolute paths
-        system_paths = [
-            f"{home}/usr/local/lib/pkgconfig",
-            "/data/service/hnp/pcre2.org/pcre2_10.47/lib/pkgconfig",
-            "/data/service/hnp/libffi.org/libffi_3.4.4/lib/pkgconfig",
-        ]
+        # System pkgconfig directories from OHOS development environment
+        system_paths = os.environ.get("PKG_CONFIG_PATH", "").split(":")
         for sp in system_paths:
-            if os.path.isdir(sp):
+            if sp and os.path.isdir(sp):
                 pkg_config_paths.append(sp)
         for dep in ["glib", "pcre2", "libffi"]:
             if dep in self.dependencies:
