@@ -10,6 +10,7 @@ If the Rust toolchain is not available, it is installed via Harmonybrew.
 import json
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -40,15 +41,35 @@ class CzkawkaConan(ConanFile):
     def _ensure_rust_toolchain(self):
         """Ensure cargo/rustc are available. Install via Harmonybrew if missing."""
         if shutil.which("cargo") and shutil.which("rustc"):
+            self.output.info("Rust toolchain already available.")
             return
+
         self.output.info("Rust toolchain not found, installing via Harmonybrew...")
+
+        # Install Harmonybrew if not present
         harmonybrew = os.path.expanduser("~/.harmonybrew/bin/brew")
         if not os.path.exists(harmonybrew):
-            self.run(
-                'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"',
-                timeout=300,
+            self.output.info("Installing Harmonybrew...")
+            subprocess.run(
+                ["zsh", "-c",
+                 '$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)'],
+                check=True, timeout=300,
             )
-        self.run(f"{harmonybrew} install rust", timeout=600)
+
+        # Install Rust via brew
+        self.output.info("Installing Rust via brew...")
+        subprocess.run(
+            [harmonybrew, "install", "rust"],
+            check=True, timeout=600,
+        )
+
+        # Verify installation
+        cargo_path = os.path.join(os.path.dirname(harmonybrew), "cargo")
+        if not os.path.exists(cargo_path):
+            raise ConanException(
+                f"cargo not found at {cargo_path} after brew install rust"
+            )
+        self.output.info(f"Rust installed: {cargo_path}")
 
     def build(self):
         apply_conandata_patches(self)
@@ -106,6 +127,15 @@ class CzkawkaConan(ConanFile):
         if os.path.exists(ssl_cert):
             os.environ["SSL_CERT_FILE"] = ssl_cert
             os.environ["CARGO_HTTP_CAINFO"] = ssl_cert
+
+        # Verify cargo is available before running build.
+        cargo = shutil.which("cargo")
+        if not cargo:
+            raise ConanException(
+                "cargo not found in PATH after Rust installation. "
+                "PATH=" + os.environ.get("PATH", "")
+            )
+        self.output.info(f"Using cargo: {cargo}")
 
         # Run cargo build for the CLI sub-crate only.
         self.run("cargo build --release -p czkawka_cli")
