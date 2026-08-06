@@ -2,7 +2,7 @@
 """Conan recipe — perl-ipc-sharelite 0.17-r14 (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 class PerlIpcSharelite(ConanFile):
     name = "perl-ipc-sharelite"
@@ -11,7 +11,8 @@ class PerlIpcSharelite(ConanFile):
     license = "Artistic-2.0"
     homepage = "https://metacpan.org/pod/ipc::sharelite"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "conandata.yml"
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -19,6 +20,7 @@ class PerlIpcSharelite(ConanFile):
     def build(self):
 
         src = self.source_folder
+        apply_conandata_patches(self)
         self.run("perl Makefile.PL", cwd=src)
         # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
         if self.settings.os == "OHOS":
