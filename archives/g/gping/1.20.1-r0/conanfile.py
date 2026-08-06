@@ -48,9 +48,9 @@ class GpingConan(ConanFile):
         if not shutil.which("brew"):
             self.output.info("Installing harmonybrew for Rust toolchain...")
             subprocess.run(
-                ['zsh', '-c',
+                ['bash', '-c',
                  '"$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"'],
-                check=True, shell=False
+                check=True
             )
 
         # Add harmonybrew to PATH
