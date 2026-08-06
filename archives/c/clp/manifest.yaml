@@ -1,0 +1,32 @@
+software: clp
+display: "COIN-OR Clp"
+description: "COIN-OR linear programming solver (simplex and barrier)"
+category: library
+homepage: "https://github.com/coin-or/Clp"
+license: EPL-2.0
+build_system: autotools
+
+versions:
+  "1.17.10":
+    status: built
+    build_date: "2026-08-06"
+    notes: >-
+      首个鸿蒙 PC conan 配方，未打补丁。头目录处理同 coinor-osi。
+
+      test_package 解一个两变量 LP，与手算逐项对账（<1e-7）：最优值 -5、
+      最优解 (3,1)、两条约束的行活动量 (4,6)、对偶解 (-0.5,-0.5)，共 5 组。
+      只断言最优值是不够的——错的顶点也可能凑巧同值，故解与对偶解都要验。
+
+      ⚠️ 头名是 `ClpSimplex.hpp` 而非 `clp.h`：COIN-OR 全系按 .hpp 命名。
+
+      ---
+
+      **并行工作提示（请评审去重）**
+
+      远端已存在同名分支 `feat/clp-1.17.10`，由同事 **Gjy_joye** 于 2026-08-06 16:18 推送
+      （当时尚未建 PR）。为不覆盖他的工作，本 PR 走 `feat/clp-1.17.10-wxjshr`。
+
+      两份实现请择一合入。本份的情况：真机 `conan create` + `test_package` 已通过，
+      断言与手算 LP 解逐项对账。若采用另一份，**请确认它的 `cpp_info.includedirs`
+      包含 `include/coin`** —— 同批次的 `coinor-cgl` / `coinor-cbc` 依赖这一点，
+      而该缺陷在 clp 自己构建装包时完全不暴露。
