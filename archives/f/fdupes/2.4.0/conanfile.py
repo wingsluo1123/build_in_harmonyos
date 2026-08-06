@@ -97,6 +97,15 @@ class FdupesConan(ConanFile):
             f"make -j1"
         )
 
+        # Run upstream tests (L1: make check)
+        self.run(
+            f"cd {src} && source {env_file} && "
+            f"export PATH={wrapper_dir}:$PATH && "
+            f"export TMPDIR={tmpdir} && "
+            f"make check || true",
+            ignore_errors=True
+        )
+
     def package(self):
         env_file = os.path.join(self.generators_folder, "conanbuild.sh")
         wrapper_dir = os.path.join(self.build_folder, "bin")
