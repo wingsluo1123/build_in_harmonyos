@@ -58,6 +58,28 @@ class ProjConan(ConanFile):
         raise ConanInvalidConfiguration(
             "ohos.toolchain.cmake not found: set OHOS_NDK_HOME or OHOS_SDK_HOME or profile [conf] user_toolchain")
 
+    def _find_llvm_tool(self, tool_name):
+        """Find an LLVM tool (llvm-ar, llvm-ranlib, etc.) from multiple sources.
+
+        Search order: OHOS_TOOLS_DIR → OHOS_NDK_HOME/llvm/bin → OHOS_SDK_HOME/ohos/native/llvm/bin
+        """
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
+        if _tools_dir:
+            p = os.path.join(_tools_dir, tool_name)
+            if os.path.isfile(p):
+                return p
+        ndk = os.environ.get("OHOS_NDK_HOME", "")
+        if ndk:
+            p = os.path.join(ndk, "llvm/bin", tool_name)
+            if os.path.isfile(p):
+                return p
+        _sdk = os.environ.get("OHOS_SDK_HOME", "")
+        if _sdk:
+            p = os.path.join(_sdk, "ohos/native/llvm/bin", tool_name)
+            if os.path.isfile(p):
+                return p
+        return None
+
     def _find_sqlite3_binary(self):
         """Find sqlite3 CLI binary from conan dependency or system."""
         # Try conan dependency package
@@ -133,13 +155,16 @@ class ProjConan(ConanFile):
             '-DTIFF_LIBRARY="{}"'.format(tiff_lib),
             '-DCMAKE_PREFIX_PATH="{};{}"'.format(tiff_pkg, xz_pkg),
         ])
-        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "/data/service/hnp/bin")
-        _llvm_ar = os.path.join(_tools_dir, "llvm-ar")
-        _llvm_ranlib = os.path.join(_tools_dir, "llvm-ranlib")
-        if os.path.isfile(_llvm_ar):
+        _llvm_ar = self._find_llvm_tool("llvm-ar")
+        _llvm_ranlib = self._find_llvm_tool("llvm-ranlib")
+        if _llvm_ar:
             defs += ' -DCMAKE_AR="{}"'.format(_llvm_ar)
-        if os.path.isfile(_llvm_ranlib):
+        else:
+            self.output.warn("llvm-ar not found; CMake may use system default ar (potential ABI issues)")
+        if _llvm_ranlib:
             defs += ' -DCMAKE_RANLIB="{}"'.format(_llvm_ranlib)
+        else:
+            self.output.warn("llvm-ranlib not found; CMake may use system default ranlib (potential ABI issues)")
         if sqlite3_bin:
             defs += ' -DEXE_SQLITE3="{}"'.format(sqlite3_bin)
 
@@ -178,7 +203,7 @@ class ProjConan(ConanFile):
         if not _tools_dir:
             self.output.warn("OHOS_TOOLS_DIR not set, skipping ELF signing")
             return
-        objcopy = os.path.join(_tools_dir, "llvm-objcopy")
+        objcopy = self._find_llvm_tool("llvm-objcopy")
         signer = os.path.join(_tools_dir, "binary-sign-tool")
         if not os.path.isfile(signer):
             self.output.warn("binary-sign-tool not found, skipping ELF signing")
