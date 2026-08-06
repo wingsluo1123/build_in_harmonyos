@@ -65,6 +65,9 @@ class McConan(ConanFile):
         os.environ.setdefault("CC", "clang")
         os.environ.setdefault("CXX", "clang++")
 
+        # Fix .la files in conan dependencies (libdir path is incorrect)
+        self._fix_la_files()
+
         # Add m4_pattern_allow to configure.ac (workaround for autoconf 2.73+
         # treating dnl/AC_MSG_WARN/AC_MSG_ERROR as undefined macros)
         configure_ac = os.path.join(self.source_folder, "configure.ac")
@@ -160,6 +163,34 @@ class McConan(ConanFile):
                         "clean:\n\tdistclean:\n\tcheck:\n")
 
         autotools.make(args=["-j1"])
+
+    def _fix_la_files(self):
+        """Fix or remove .la files with incorrect libdir paths."""
+        import re
+        conan_cache = os.path.expanduser("~/.conan2/p")
+        if not os.path.isdir(conan_cache):
+            return
+        for root, dirs, files in os.walk(conan_cache):
+            for f in files:
+                if f.endswith(".la"):
+                    la_path = os.path.join(root, f)
+                    try:
+                        with open(la_path, "r") as fh:
+                            content = fh.read()
+                        # Check for incorrect libdir (//lib or /lib)
+                        if "libdir='//lib'" in content or "libdir='/lib'" in content:
+                            la_dir = os.path.dirname(la_path)
+                            content = re.sub(
+                                r"libdir='[^']*'",
+                                f"libdir='{la_dir}'",
+                                content,
+                            )
+                            content = content.replace("-L/lib", f"-L{la_dir}")
+                            content = content.replace("-L//lib", f"-L{la_dir}")
+                            with open(la_path, "w") as fh:
+                                fh.write(content)
+                    except (IOError, OSError):
+                        pass
 
     def _create_gettext_po_files(self):
         """Create minimal gettext po-files (replaces autopoint)."""
