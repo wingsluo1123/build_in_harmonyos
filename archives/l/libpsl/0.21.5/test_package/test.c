@@ -3,7 +3,7 @@
 
 int main(void) {
     /* Test: load built-in PSL data and verify it works */
-    const psl_t *psl = psl_builtin();
+    const psl_ctx_t *psl = psl_builtin();
     if (psl == NULL) {
         fprintf(stderr, "FAIL: psl_builtin() returned NULL\n");
         return 1;

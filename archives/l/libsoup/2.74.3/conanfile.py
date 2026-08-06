@@ -136,5 +136,3 @@ class LibsoupConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["soup-2.4"]
         self.cpp_info.set_property("pkg_config_name", "libsoup-2.4")
-        # Public transitive dependencies
-        self.cpp_info.requires = ["glib", "libpsl", "libxml2"]
