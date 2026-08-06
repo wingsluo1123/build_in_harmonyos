@@ -47,9 +47,11 @@ class GpingConan(ConanFile):
         # Install harmonybrew if not present
         if not shutil.which("brew"):
             self.output.info("Installing harmonybrew for Rust toolchain...")
+            # Use CONFIG_SHELL or SHELL from conan profile buildenv
+            shell = os.environ.get("CONFIG_SHELL") or os.environ.get("SHELL") or "/data/service/hnp/bin/bash"
             subprocess.run(
-                ['bash', '-c',
-                 '"$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"'],
+                [shell, '-c',
+                 '$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)'],
                 check=True
             )
 
@@ -60,7 +62,8 @@ class GpingConan(ConanFile):
         # Install Rust via harmonybrew
         if not shutil.which("rustc"):
             self.output.info("Installing Rust via harmonybrew...")
-            subprocess.run(['brew', 'install', 'rust'], check=True)
+            brew_cmd = os.path.join(brew_bin, "brew")
+            subprocess.run([brew_cmd, 'install', 'rust'], check=True)
 
     def _setup_cargo_config(self):
         """Configure cargo to use China mirror for crates.io."""
