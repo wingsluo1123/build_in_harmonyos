@@ -5,6 +5,7 @@ libsodium is a modern, easy-to-use software library for key generation,
 encryption, decryption, signatures, hashing, and password hashing.
 
 Build system: Autotools (configure + make).
+Patches: config.guess/config.sub OHOS support, configure umask HMDFS fix.
 """
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -24,7 +25,8 @@ class LibsodiumConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
-    default_options = {"shared": True}
+    # R26: system-name library defaults to static
+    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -44,11 +46,10 @@ class LibsodiumConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Fix for HarmonyOS: config.guess doesn't recognize OHOS, and /tmp
-        # is read-only so the compile-test in config.guess fails too.
-        # Pass --build explicitly to skip auto-detection.
-        if self.settings.os == "OHOS":
-            tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        # R26: static linking for system-name library
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
+            tc.configure_args.append("--disable-shared")
         tc.generate()
 
     def build(self):
