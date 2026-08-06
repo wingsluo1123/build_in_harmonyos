@@ -3,14 +3,20 @@
 
 htop is a command-line application (not a library).
 Build system: Autotools (configure + make).
+
+ncurses is installed from cmd-pkgs pre-compiled package (not conancenter)
+because conancenter's ncurses recipe cannot build on HarmonyOS
+(config.guess doesn't recognize OHOS, sockaddr_storage redefinition).
 """
+import os
+import shutil
+
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 from conan.tools.env import Environment
-import os
 
 
 class HtopConan(ConanFile):
@@ -33,9 +39,6 @@ class HtopConan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanInvalidConfiguration(f"htop only supports Linux/OHOS, got {self.settings.os}")
 
-    def requirements(self):
-        self.requires("ncurses/6.4")
-
     def layout(self):
         basic_layout(self)
 
@@ -45,16 +48,29 @@ class HtopConan(ConanFile):
     def generate(self):
         # R33: Set CC/CXX via Conan environment (HarmonyOS has clang but no cc symlink)
         env = Environment()
-        cc = self.conf_info.get("tools.build:compiler_executables", {}).get("c") if self.conf_info else None
-        cxx = self.conf_info.get("tools.build:compiler_executables", {}).get("cpp") if self.conf_info else None
-        env.define("CC", cc or "clang")
-        env.define("CXX", cxx or "clang++")
+        env.define("CC", "clang")
+        env.define("CXX", "clang++")
         env.vars(self).save_script("conanautotools_cc")
 
         tc = AutotoolsToolchain(self)
+        # Pass ncurses paths to configure
+        home = os.path.expanduser("~")
+        tc.configure_args.append(f"NCURSES_CFLAGS=-I{home}/usr/local/include")
+        tc.configure_args.append(f"NCURSES_LIBS=-L{home}/usr/local/lib -lncursesw")
+        tc.configure_args.append(f"LDFLAGS=-L{home}/usr/local/lib")
         tc.generate()
 
     def build(self):
+        # Install ncurses from cmd-pkgs if not already installed
+        home = os.path.expanduser("~")
+        ncurses_h = os.path.join(home, "usr/local/include/curses.h")
+        if not os.path.exists(ncurses_h):
+            self.run(
+                "curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/install.sh | "
+                "sh -s -- ncurses 6.4",
+                env="conanbuild"
+            )
+
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
