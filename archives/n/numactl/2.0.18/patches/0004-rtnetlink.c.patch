@@ -1,0 +1,20 @@
+--- a/rtnetlink.c
++++ b/rtnetlink.c
+@@ -1,12 +1,17 @@
+ /* Simple LPGLed rtnetlink library */
+ #include <sys/socket.h>
++#ifdef __OHOS__
++/* HarmonyOS: prevent sockaddr_storage redefinition from <linux/socket.h> */
++typedef unsigned short __kernel_sa_family_t;
++#define _UAPI_LINUX_SOCKET_H
++#endif
+ #include <linux/rtnetlink.h>
+ #include <linux/netlink.h>
+ #include <netinet/in.h>
+ #include <errno.h>
+ #include <unistd.h>
+ #define hidden __attribute__((visibility("hidden")))
+ #include "rtnetlink.h"
+ 
+ hidden void *rta_put(struct nlmsghdr *m, int type, int len)
+ {

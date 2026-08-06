@@ -1,0 +1,30 @@
+--- a/affinity.c
++++ b/affinity.c
+@@ -30,20 +30,27 @@
+ #include <errno.h>
+ #include <sys/stat.h>
+ #include <netdb.h>
+ #include <unistd.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <sys/socket.h>
+ #include <sys/ioctl.h>
+ #include <net/if.h>
+ #include <dirent.h>
++#ifdef __OHOS__
++/* HarmonyOS: <linux/socket.h> (included transitively by <linux/netlink.h>)
++ * redefines struct sockaddr_storage already defined in <sys/socket.h>.
++ * Define __kernel_sa_family_t and skip the kernel header to avoid conflict. */
++typedef unsigned short __kernel_sa_family_t;
++#define _UAPI_LINUX_SOCKET_H
++#endif
+ #include <linux/rtnetlink.h>
+ #include <linux/netlink.h>
+ #include <sys/types.h>
+ #include <sys/sysmacros.h>
+ #include <ctype.h>
+ #include <assert.h>
+ #include <regex.h>
+ #include <sys/sysmacros.h>
+ #include "numa.h"
+ #include "numaint.h"
