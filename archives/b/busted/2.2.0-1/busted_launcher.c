@@ -13,6 +13,18 @@ static void set_arg_table(lua_State *L, int argc, char **argv) {
     lua_setglobal(L, "arg");
 }
 
+static int apply_lua_cli_arg_compat(lua_State *L) {
+    const char *script =
+        "do\n"
+        "  local lua = os.getenv('BUSTED_LUA')\n"
+        "  if not lua or lua == '' then lua = 'lua' end\n"
+        "  arg[-3] = lua\n"
+        "  arg[-2] = '-e'\n"
+        "  arg[-1] = ('package.path=%q;package.cpath=%q;local _busted_launcher=true'):format(package.path, package.cpath)\n"
+        "end\n";
+    return luaL_dostring(L, script);
+}
+
 static int apply_tmpdir_tmpname(lua_State *L) {
     const char *script =
         "do\n"
@@ -38,6 +50,13 @@ int main(int argc, char **argv) {
 
     luaL_openlibs(L);
     set_arg_table(L, argc, argv);
+
+    if (apply_lua_cli_arg_compat(L) != LUA_OK) {
+        const char *message = lua_tostring(L, -1);
+        fprintf(stderr, "busted: %s\n", message != NULL ? message : "failed to initialize Lua CLI arg compatibility");
+        lua_close(L);
+        return 1;
+    }
 
     if (apply_tmpdir_tmpname(L) != LUA_OK) {
         const char *message = lua_tostring(L, -1);

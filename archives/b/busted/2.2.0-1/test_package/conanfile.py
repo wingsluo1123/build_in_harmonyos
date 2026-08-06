@@ -76,7 +76,10 @@ class BustedTestConan(ConanFile):
         env = Environment()
         env.define("LUA_PATH", self._lua_path())
         env.define("LUA_CPATH", self._lua_cpath())
+        env.define("BUSTED_LUA", os.path.join(self.dependencies["lua"].package_folder, "bin", "lua"))
         with env.vars(self).apply():
             self.run(f'"{self._exe}"')
             busted = os.path.join(self.dependencies["busted"].package_folder, "bin", "busted")
             self.run(f'"{busted}" --version')
+            smoke = os.path.join(self.recipe_folder, "smoke_spec.lua")
+            self.run(f'"{busted}" --loaders lua --output plainTerminal "{smoke}"')

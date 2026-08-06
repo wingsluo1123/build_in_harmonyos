@@ -1,0 +1,7 @@
+describe("busted native launcher", function()
+  it("exposes a reusable Lua invocation", function()
+    local command = require("pl.app").lua()
+    assert.is.truthy(command:match("lua.+package.+busted"))
+    assert.is.truthy(os.execute(command .. [[ -e "n=1;os.exit(n-1)" ]]))
+  end)
+end)
