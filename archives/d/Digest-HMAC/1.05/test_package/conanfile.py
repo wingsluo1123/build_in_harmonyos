@@ -16,6 +16,6 @@ class DigestHmacTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Run the Perl test script that validates RFC 2202 HMAC vectors
-        test_script = os.path.join(os.path.dirname(__file__), "test.pl")
-        self.run(f"perl {test_script}", env="conanrun")
+        # Run the test script that validates RFC 2202 HMAC vectors
+        test_script = os.path.join(os.path.dirname(__file__), "test.sh")
+        self.run(f"sh {test_script}", env="conanrun")
