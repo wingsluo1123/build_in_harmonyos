@@ -85,6 +85,7 @@ class DialogConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
         copy(self, "ncurses-headers.tar.gz", self.recipe_folder, self.export_sources_folder)
+        copy(self, "dialog-1.3-20240307.tar.gz", self.recipe_folder, self.export_sources_folder)
 
     def validate(self):
         # R32: settings.os must check in ("Linux", "OHOS")
@@ -105,7 +106,25 @@ class DialogConan(ConanFile):
         pass
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Try downloading from URL first; fall back to bundled tarball
+        # (CI worker may not have access to invisible-mirror.net)
+        import tarfile
+        local_tarball = os.path.join(self.export_sources_folder, "dialog-1.3-20240307.tar.gz")
+        if os.path.exists(local_tarball):
+            # Use bundled tarball
+            with tarfile.open(local_tarball, "r:gz") as tar:
+                tar.extractall(self.source_folder)
+            # The extracted directory is dialog-1.3-20240307/
+            # Move contents to source_folder root
+            extracted_dir = os.path.join(self.source_folder, "dialog-1.3-20240307")
+            if os.path.isdir(extracted_dir):
+                for item in os.listdir(extracted_dir):
+                    src = os.path.join(extracted_dir, item)
+                    dst = os.path.join(self.source_folder, item)
+                    os.rename(src, dst)
+                os.rmdir(extracted_dir)
+        else:
+            get(self, **self.conan_data["sources"], strip_root=True)
         apply_conandata_patches(self)
 
     def generate(self):
