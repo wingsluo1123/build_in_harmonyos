@@ -34,6 +34,12 @@ class FinishPipeline:
         self.gate_miss = 0
         self.gate_warnings = []
         self.steps = {}
+        # Explicit probe/strict mode: 'published' is the final submit/release
+        # path (strict); 'built' and any other status are probe/local.
+        # Never inferred from .build-closed existence (close_archive always
+        # creates that marker, so it cannot distinguish the two modes).
+        self.mode = "strict" if status == "published" else "probe"
+        self.probe_mode = (self.mode == "probe")
 
     def _run_sub(self, cmd, env_extra=None, cwd=None):
         """Run a subprocess, return exit code."""
@@ -310,7 +316,7 @@ class FinishPipeline:
         if rc == 0 and rc2 == 0:
             self.steps["step5b"] = True
             self._task_card("11e", "✅完成", "knowledge OK"); log_ok("  知识图谱完整性通过")
-        elif rc2 == 3:
+        elif rc == 0 and rc2 == 3:
             # Knowledge gap found. Only downgrade to a warning when ALL of:
             #   (a) probe/local mode (no .build-closed), i.e. not final submit,
             #   (b) gap is only unreferenced manifest entries (pending=0,
@@ -319,7 +325,7 @@ class FinishPipeline:
             #       (archive manifest is unchanged vs origin/main).
             # Any other rc2==3 (strict/final mode, pending/failed nonzero,
             # current-diff graph issue) stays a hard failure (False).
-            probe_mode = (self.archive_dir / ".build-closed").exists()  # same as step8
+            probe_mode = self.probe_mode  # explicit mode, not .build-closed existence
             only_unreferenced = False
             current_diff_free = False
             if probe_mode:
@@ -355,15 +361,19 @@ class FinishPipeline:
                         [_git, "-C", str(self.pdir), "diff",
                          "origin/main...HEAD", "--"] + kfiles,
                         capture_output=True, text=True, timeout=30)
-                    # If no knowledge-related lines changed, gap is pre-existing
-                    klines = [l for l in proc.stdout.splitlines()
-                              if l.startswith(("+", "-"))
-                              and not l.startswith(("+++", "---"))
-                              and any(k in l for k in
-                                      ("knowledge_gained", "knowledge_ref",
-                                       "ref:", "发现与知识", "知识积累",
-                                       "discoveries", "findings"))]
-                    current_diff_free = (not klines)
+                    # git diff failure (nonzero rc) or missing origin/main must
+                    # be treated as NOT diff-free; empty stdout must not mask it.
+                    if proc.returncode != 0:
+                        current_diff_free = False
+                    else:
+                        klines = [l for l in proc.stdout.splitlines()
+                                  if l.startswith(("+", "-"))
+                                  and not l.startswith(("+++", "---"))
+                                  and any(k in l for k in
+                                          ("knowledge_gained", "knowledge_ref",
+                                           "ref:", "发现与知识", "知识积累",
+                                           "discoveries", "findings"))]
+                        current_diff_free = (not klines)
                 except Exception:
                     current_diff_free = False
             if only_unreferenced and current_diff_free:
@@ -439,7 +449,7 @@ class FinishPipeline:
         else:
             checks.append(("❌", "build-closed marker", "需运行 close-archive 或手动添加标记"))
 
-        probe_mode = build_closed.exists()  # .build-closed => probe/local (not final submit)
+        probe_mode = self.probe_mode  # explicit probe/strict mode, not .build-closed existence
         if probe_mode:
             downgrade = {"test-report.md", "packaging/", ".staging-verified"}
             checks = [(("⚠️" if name in downgrade else icon), name, hint)
