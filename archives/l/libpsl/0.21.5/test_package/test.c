@@ -9,7 +9,7 @@ int main(void) {
         return 1;
     }
     /* Test: verify 'com' is recognized as a public suffix */
-    if (psl_is_public_suffix(psl, "com", 3) == 0) {
+    if (psl_is_public_suffix(psl, "com") == 0) {
         fprintf(stderr, "FAIL: 'com' not recognized as public suffix\n");
         return 1;
     }
