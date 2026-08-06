@@ -47,6 +47,9 @@ class LibexifConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        # Use triplet matching patched config.guess output
+        tc.configure_args.append("--build=aarch64-unknown-harmonyos")
+        tc.configure_args.append("--host=aarch64-unknown-harmonyos")
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
