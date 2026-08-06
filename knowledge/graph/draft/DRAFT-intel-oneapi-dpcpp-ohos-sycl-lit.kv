@@ -1,0 +1,80 @@
+# Candidate knowledge contribution for intel-oneapi-dpcpp 2026.0.0_220.
+id:                     DRAFT-intel-oneapi-dpcpp-ohos-sycl-lit
+status:                 candidate
+trigger_tool:           llvm-lit|clang++|cmake|conan
+phase:                  build|test
+severity:               2
+category:               llvm|sycl|lit|toolchain|ohos|cross-compilation
+match_keywords:         SYCL_OHOS_INCLUDE, CPLUS_INCLUDE_PATH, C_INCLUDE_PATH,
+                        lit.site.cfg.py, config.environment, sycl/sycl.hpp,
+                        algorithm file not found, libcxx-ohos, sysroot,
+                        fsycl-device-only, FetchSource, FETCHCONTENT_SOURCE_DIR,
+                        RTLD_DEEPBIND, dlinfo, Intel LLVM, DPC++
+
+root_cause: >
+  DPC++/SYCL lit child processes are constructed from dict(config.environment).
+  Supplying OHOS libc++ and sysroot paths through the parent process environment
+  or lit extra_environment therefore does not reliably reach test commands after
+  the site configuration is loaded. The compiler then sees its resource headers
+  but not the OHOS C++ standard library, producing sycl/sycl.hpp errors such as
+  fatal error: algorithm file not found. This is distinct from E075: the need
+  is a narrowly scoped test-child environment, while global CPLUS_INCLUDE_PATH
+  remains unsafe for pkg-config-driven builds.
+
+rec_approach:           scoped-lit-environment
+rec_description: >
+  Add an empty-by-default CMake cache variable SYCL_OHOS_INCLUDE. After the
+  generated SYCL lit.site.cfg.py loads the main configuration, write that value
+  to config.environment for CPLUS_INCLUDE_PATH and C_INCLUDE_PATH. Pass the
+  OHOS libcxx-ohos and sysroot include sequence only for the SYCL lit suite.
+  Do not export it globally, and leave Linux/glibc behavior unchanged when the
+  variable is empty.
+rec_command: |
+  cmake -DSYCL_OHOS_INCLUDE="<OHOS libc++ and sysroot include list>" ...
+  llvm-lit -j1 --max-time=<limit> sycl/test/basic_tests
+  llvm-lit -j1 --max-time=<limit> sycl/test/check_device_code
+  clang++ -fsycl -fsycl-targets=spir64 -fsycl-device-only test_sycl.cpp
+
+related_to:             E075, E217-draft-apache-arrow-cpp-test-ohos,
+                        musl-glibc-full-comparison-iso-posix
+deduplication: >
+  E075 documents why a global CPLUS_INCLUDE_PATH can make pkg-config discard
+  cflags; this draft instead constrains the variable to lit test children.
+  E217 documents generic CTest/GTest and FetchContent migration, but not
+  generated lit site configuration or SYCL device compilation. The musl/glibc
+  comparison records RTLD_DEEPBIND capability differences, but not the DPC++
+  loader's source-level mitigation. The combined method is related, not a
+  duplicate.
+
+verified_on:            2026-08-06
+verified_platform:      HarmonyOS PC aarch64-unknown-linux-ohos
+verified_result: >
+  A/B testing showed that compiler-only parent environment injection was not
+  sufficient for lit, while setting config.environment after load_config made
+  the value visible to child tests. The previous algorithm missing-header class
+  was reduced from 51 occurrences to 0; reduction_range_deduction changed from
+  FAIL to PASS; device compilation moved from 0/2 to 2/2 and group_algorithms
+  from 0/1 to 1/1. Package consumer validation also passed clang++ --version
+  and -fsycl-device-only.
+
+limitations: >
+  This does not make device runtime tests executable without Intel GPU, Level
+  Zero driver, and OpenCL runtime. Remaining lit failures include expected
+  diagnostic differences and target-registration/configuration limits. The UR
+  dlinfo/RTLD_DI_LINKMAP review concern remains open and is not claimed as a
+  completed portable capability-detection solution.
+
+reusable_scope: >
+  LLVM-derived projects on OHOS whose generated lit configuration copies
+  config.environment into child commands, particularly SYCL or C++ tests that
+  need SDK libc++ and target sysroot headers. The same evidence also shows how
+  to separate scoped test-header injection, pre-seeded FetchContent source
+  directories, and glibc-extension capability boundaries during a toolchain
+  port.
+
+evidence:
+  - archives/i/intel-oneapi-dpcpp/2026.0.0_220/patches/sycl-lit-ohos-include.patch
+  - archives/i/intel-oneapi-dpcpp/2026.0.0_220/conanfile.py
+  - archives/i/intel-oneapi-dpcpp/2026.0.0_220/notes.md
+  - PR #4458, commit 66b8a6c5bfb0ce396317147704b0f9d739d9832d
+author:                 junshi_liu
