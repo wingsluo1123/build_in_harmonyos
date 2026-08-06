@@ -18,6 +18,7 @@ static int encode_one(const char *enc_name) {
     ctx->bit_rate = 200000; ctx->max_b_frames = 0; ctx->gop_size = 1;
     if (avcodec_open2(ctx, codec, NULL) < 0) { avcodec_free_context(&ctx); return -1; }
     AVFrame *frame = av_frame_alloc();
+    if (!frame) { avcodec_free_context(&ctx); return -1; }
     frame->format = ctx->pix_fmt; frame->width = W; frame->height = H;
     if (av_frame_get_buffer(frame, 0) < 0) { av_frame_free(&frame); avcodec_free_context(&ctx); return -1; }
     for (int y = 0; y < H; y++) memset(frame->data[0] + y * frame->linesize[0], y & 0xFF, W);
@@ -26,6 +27,7 @@ static int encode_one(const char *enc_name) {
     frame->pts = 0;
     int total = 0;
     AVPacket *pkt = av_packet_alloc();
+    if (!pkt) { av_frame_free(&frame); avcodec_free_context(&ctx); return -1; }
     if (avcodec_send_frame(ctx, frame) >= 0 && avcodec_send_frame(ctx, NULL) >= 0)
         while (avcodec_receive_packet(ctx, pkt) >= 0) { total += pkt->size; av_packet_unref(pkt); }
     av_packet_free(&pkt); av_frame_free(&frame); avcodec_free_context(&ctx);
