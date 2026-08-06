@@ -99,7 +99,7 @@ class Icu4cConan(ConanFile):
             unknown_intltest_fails = [l for l in fail_lines
                                       if "intltest" in l.lower()
                                       and not any(kw in l.lower() for kw in ("locale", "syscall"))]
-            if non_intltest_fails or unknown_intltest_fails:
+            if non_intltest_fails or unknown_intltest_fails or not fail_lines:
                 raise
             self.output.warning("make check had failures (expected on OHOS: intltest locale/syscall)")
 
