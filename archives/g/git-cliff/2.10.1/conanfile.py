@@ -134,29 +134,26 @@ class GitCliffConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
-        cargo, rust_env = self._ensure_rust()
+        cargo, _ = self._ensure_rust()
         local_bin = self._ensure_cc()
         cargo_home = self._setup_cargo_mirror()
 
-        # Set up environment for cargo build
-        # PATH: include rust bin, local bin (for cc/c++), and existing PATH
-        paths = [os.path.dirname(cargo)]
+        # Build environment paths
+        rust_bin = os.path.dirname(cargo)
+        rust_lib = os.path.join(os.path.dirname(rust_bin), "lib")
+        extra_path = rust_bin
         if local_bin:
-            paths.append(local_bin)
-        paths.append(os.environ.get("PATH", ""))
-        os.environ["PATH"] = ":".join(paths)
+            extra_path += ":" + local_bin
 
-        # CARGO_HOME: use local mirror config
-        os.environ["CARGO_HOME"] = cargo_home
-
-        # LD_LIBRARY_PATH: Rust binaries may need shared libs from the toolchain
-        rust_lib = os.path.join(os.path.dirname(os.path.dirname(cargo)), "lib")
-        if os.path.isdir(rust_lib):
-            existing_ld = os.environ.get("LD_LIBRARY_PATH", "")
-            os.environ["LD_LIBRARY_PATH"] = rust_lib + (":" + existing_ld if existing_ld else "")
-
-        # Run cargo build with the full path to the binary
-        self.run(f'"{cargo}" build --release')
+        # Use a single shell command to set up environment and run cargo.
+        # This ensures all env vars are set before cargo is invoked.
+        cmd = (
+            f'export PATH="{extra_path}:$PATH" && '
+            f'export CARGO_HOME="{cargo_home}" && '
+            f'export LD_LIBRARY_PATH="{rust_lib}:$LD_LIBRARY_PATH" && '
+            f'"{cargo}" build --release'
+        )
+        self.run(cmd)
 
     def package(self):
         # Copy the release binary to bin/
