@@ -74,7 +74,7 @@ class OsvScannerConan(ConanFile):
     description = "Vulnerability scanner that checks OSV database for dependencies"
     license = "Apache-2.0"
     homepage = "https://github.com/google/osv-scanner"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     # Go application — pure binary, no shared libraries
     package_type = "application"
@@ -137,7 +137,7 @@ class OsvScannerConan(ConanFile):
         # Prepend Go bin dir to PATH so `go` is findable
         go_bin_dir = os.path.dirname(go_bin)
         current_path = os.environ.get("PATH", "")
-        if go_bin_dir not in current_path:
+        if go_bin_dir not in current_path.split(os.pathsep):
             os.environ["PATH"] = f"{go_bin_dir}:{current_path}"
 
         # Create required directories
@@ -294,7 +294,7 @@ class OsvScannerConan(ConanFile):
         # Extract
         self.output.info(f"Extracting Go toolchain to {cache_dir}...")
         with tarfile.open(tarball_path, "r:gz") as tar:
-            tar.extractall(cache_dir)
+            tar.extractall(cache_dir, filter='data')
 
         if not os.path.isfile(go_bin):
             raise ConanInvalidConfiguration(
