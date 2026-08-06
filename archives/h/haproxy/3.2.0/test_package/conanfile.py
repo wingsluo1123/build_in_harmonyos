@@ -4,7 +4,7 @@ from conan import ConanFile
 
 class HaproxyTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualBuildEnv"
+    generators = "VirtualBuildEnv", "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
