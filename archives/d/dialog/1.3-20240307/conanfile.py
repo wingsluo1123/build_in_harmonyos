@@ -108,10 +108,9 @@ class DialogConan(ConanFile):
     def source(self):
         # Try downloading from URL first; fall back to bundled tarball
         # (CI worker may not have access to invisible-mirror.net)
-        import tarfile
-        local_tarball = os.path.join(self.export_sources_folder, "dialog-1.3-20240307.tar.gz")
+        local_tarball = os.path.join(self.source_folder, "dialog-1.3-20240307.tar.gz")
         if os.path.exists(local_tarball):
-            # Use bundled tarball
+            # Use bundled tarball (export_sources copies it to source_folder)
             with tarfile.open(local_tarball, "r:gz") as tar:
                 tar.extractall(self.source_folder)
             # The extracted directory is dialog-1.3-20240307/
@@ -121,7 +120,8 @@ class DialogConan(ConanFile):
                 for item in os.listdir(extracted_dir):
                     src = os.path.join(extracted_dir, item)
                     dst = os.path.join(self.source_folder, item)
-                    os.rename(src, dst)
+                    if not os.path.exists(dst):
+                        os.rename(src, dst)
                 os.rmdir(extracted_dir)
         else:
             get(self, **self.conan_data["sources"], strip_root=True)
