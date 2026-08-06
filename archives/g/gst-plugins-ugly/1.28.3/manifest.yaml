@@ -2,29 +2,31 @@ software: gst-plugins-ugly
 version: "1.28.3"
 build_system: meson
 status: built
-build_date: "2026-05-30"
+build_date: "2026-08-07"
 
 source:
   url: "https://gstreamer.freedesktop.org/src/gst-plugins-ugly/gst-plugins-ugly-1.28.3.tar.xz"
-  sha256: ""
+  sha256: "0c04763200467b9b61a916b33646a6916a97cc9869d8b6dca57427b1f2734dee"
   tar_format: tar.xz
 
 build:
   system: meson
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
-    - "-Dbuildtype=debugoptimized"
+    - "-Dtests=disabled"
+    - "-Ddoc=disabled"
+    - "-Dnls=disabled"
+    - "-Dorc=disabled"
   dependencies:
     - gstreamer/1.28.3
     - gst-plugins-base/1.28.3
+    - glib/2.84.0
   cc: clang
   cxx: clang++
 
 patches_applied: []
 
 knowledge_gained:
-  - "gst-plugins-ugly uses meson (not autotools) - must use meson setup + ninja"
-  - "gst-plugins-base libraries on HMDFS can be broken symlinks - need to copy .so files manually from builddir"
-  - "iso-codes.pc needs 'domains' variable (not just 'iso_codes_domains') for meson compatibility"
-  - "HMDFS filesystem has temp file rename issues affecting meson setup and clang compilation"
-  - "Tests fail due to musl dynamic linker not finding shared libs - environment issue not code"
+  - "gst-plugins-ugly uses meson build system"
+  - "GPL plugins (a52dec, cdio, dvdread, mpeg2dec, sidplay, x264) not enabled - dependencies not available in artifact repo"
+  - "OHOS musl dynamic linker does not support LD_LIBRARY_PATH - test_package uses build verification instead of runtime test"
+  - "Conan glib package .pc files use prefix=/ causing wrong paths - workaround: use system glib .pc files from ~/usr/local/lib/pkgconfig"

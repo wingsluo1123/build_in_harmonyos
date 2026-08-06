@@ -60,5 +60,5 @@ readelf -h ~/usr/local/lib/gstreamer-1.0/libgstasf.so
 - gst-plugins-base 的符号链接在 HMDFS 上容易损坏，需要手动复制实际 .so 文件
 ---
 
-**编译结束**: 2026-06-03 23:59
+**编译结束**: 2026-08-07 02:42
 **最终状态**: built
