@@ -134,6 +134,9 @@ class GitLfsConan(ConanFile):
             f"GOTMPDIR={gotmpdir}",
             f"GOPATH={gopath}",
             f"PATH={path}",
+            f"HOME={os.path.expanduser('~')}",
+            "GODEBUG=netdns=go,x509usefallbackroots=1",
+            "GOFLAGS=-mod=mod",
         ]
         if goroot:
             env.append(f"GOROOT={goroot}")
@@ -149,13 +152,7 @@ class GitLfsConan(ConanFile):
                 env.append(f"SSL_CERT_FILE={cert}")
                 break
 
-        # Use Go's built-in root CAs as fallback
-        env.append("GODEBUG=x509usefallbackroots=1")
-
-        # Download Go module dependencies
-        self.run(f'"{go_bin}" mod download', cwd=self.source_folder, env=env)
-
-        # Build git-lfs binary
+        # Build git-lfs binary (go build auto-downloads modules)
         ldflags = "-X github.com/git-lfs/git-lfs/v3/config.GitCommit=v3.7.0 -s -w"
         self.run(
             f'"{go_bin}" build -buildvcs=false -o git-lfs -ldflags "{ldflags}" .',
