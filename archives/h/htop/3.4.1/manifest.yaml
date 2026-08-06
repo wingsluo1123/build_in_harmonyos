@@ -1,26 +1,28 @@
 version: "3.4.1"
-status: partial
-build_date: "2026-04-14"
+status: built
+build_date: "2026-08-06"
 
 source:
   url: "https://github.com/htop-dev/htop/releases/download/3.4.1/htop-3.4.1.tar.xz"
   tar_format: tar.xz
+  sha256: "904f7d4580fc11cffc7e0f06895a4789e0c1c054435752c151e812fead9f6220"
 
 build:
   system: autotools
   configure_options:
-    - "--prefix=$HOME/usr/local"
-    - "NCURSES_CFLAGS=-I$HOME/usr/local/include"
+    - "--prefix=/"
+    - "NCURSES_CFLAGS=-I$HOME/usr/local/include -I$HOME/usr/local/include/ncursesw"
     - "NCURSES_LIBS=-L$HOME/usr/local/lib -lncursesw"
     - "LDFLAGS=-L$HOME/usr/local/lib"
   dependencies:
-    - ncursesw
+    - ncursesw (system prebuilt via cmd-pkgs)
   cc: clang
 
 patches_applied:
   - "0001-build-aux-config.guess.patch"
   - "0002-build-aux-config.sub.patch"
   - "0003-linux-IOPriorityPanel.h.patch"
+  - "0004-Macros.h-fix-noreturn.patch"
 
 knowledge_gained:
   - "htop 3.4.1 有 bug: linux/IOPriorityPanel.h 中 #include \"Panel.h\" 路径不正确"
@@ -28,3 +30,33 @@ knowledge_gained:
   - "sudo 后需使用 sudo -E 保留环境变量"
   - "htop config.guess/config.sub 在 build-aux/ 子目录"
   - "patch-autotools-ohos.pl 漏加 kernel-os 白名单 linux-ohos*"
+  - "OHOS 系统头文件 <stdnoreturn.h> 将 noreturn 宏展开为 _Noreturn -> __attribute__((__noreturn__))，导致 ATTR_NORETURN 双重展开失败，需用 __noreturn__ 替代 noreturn"
+  - "HMDFS 上 mktemp -d 创建的目录不可写入文件，需用 mkdir 替代（config.status 需要修改 PATH 或使用包装器）"
+  - "ncurses 预编译包(cmd-pkgs)不含头文件，需从 ncurses 源码生成 term.h（用 awk -f MKterm.h.awk Caps Caps-ncurses > term.h）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/htop-3.4.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/htop-3.4.1.work
+  source_orig_hash: 6c3a68be84ecfab7
+  source_work_hash: 6fdb365c41f67b44
+  generated_at: '2026-08-06T19:27:59'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-Macros.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-build-aux-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-build-aux-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-linux-IOPriorityPanel.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
