@@ -54,18 +54,12 @@ class KlystrackConan(ConanFile):
         self.folders.source = "."
 
     def source(self):
-        # CI 真根因: github.com 在 CI Worker 网络不可达 → 源下载炸。
-        # 参照 kubetui/groonga 模式: pop mirror_url，主 URL 失败后用 mirror_url 重试。
-        # GitHub tar 与 GitCode tar 动态生成字节流不同 → 重试传 sha256=None 跳过校验。
-        sources = dict(self.conan_data["sources"][self.version])
-        mirror_url = sources.pop("mirror_url", None)
-        try:
-            get(self, **sources, strip_root=True)
-        except Exception as e:
-            if not mirror_url:
-                raise
-            self.output.warning(f"primary URL download failed: {e}, retrying with mirror_url")
-            get(self, url=mirror_url, sha256=None, strip_root=True)
+        # R39: 仅用官方源（github.com/kometbomb/klystrack）。CI 有内置 GitHub 镜像
+        # fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub）处理 GitHub 不可达，
+        # 配方内不再自定义 mirror_url（aireview Critical/Medium: gitcode.com/aurawalker
+        # 个人 fork 非官方源 + sha256=None 跳过校验属供应链投毒风险，同 groonga/kubetui
+        # 处理）。
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
     def _inject_klystron_snd(self):
