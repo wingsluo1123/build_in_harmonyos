@@ -10,7 +10,8 @@ import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsLayout
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.layout import basic_layout
 
 
 class TallocConan(ConanFile):
@@ -34,7 +35,7 @@ class TallocConan(ConanFile):
         pass
 
     def layout(self):
-        AutotoolsLayout(self)
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
