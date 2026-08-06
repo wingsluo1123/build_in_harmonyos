@@ -33,12 +33,12 @@ class KDocToolsTestConan(ConanFile):
         cc = os.environ.get("CC", str(self.settings.compiler))
         src = os.path.join(self.source_folder, "src", "test_kdoctools.c")
         test_bin = os.path.join(self.build_folder, "test_kdoctools")
-        self.run(f"{cc} -o {test_bin} {src}")
+        self.run(f"{cc} -o {test_bin} {src}", env="conanbuild")
 
         if can_run(self):
             # 运行测试程序验证 meinproc 二进制 --help 输出用法信息
             meinproc_bin = os.path.join(self.dependencies["kdoctools"].package_folder, "bin", "meinproc")
-            self.run(f"{test_bin} {meinproc_bin}")
+            self.run(f"{test_bin} {meinproc_bin}", env="conanrun")
             self.output.info("meinproc verified successfully")
         else:
             # 交叉编译场景：无法运行二进制，但已编译测试程序并检查产物存在
