@@ -14,11 +14,10 @@ Gleam是一个静态类型的函数式编程语言，运行在Erlang虚拟机（
 当前版本：1.17.0-r0
 
 ## 部署方式
-使用Alpine Linux musl动态链接二进制部署（预编译musl binary方式）
+从源码编译 (Rust/Cargo)，生成动态链接 musl 二进制
 
 ## 运行时依赖
-- libc.musl-aarch64.so.1
-- libgcc_s.so.1
+- musl libc (系统自带 /lib/ld-musl-aarch64.so.1)
 - Erlang/OTP（用于编译后的Gleam程序运行，编译器本身不需要）
 
 ## 官方网站

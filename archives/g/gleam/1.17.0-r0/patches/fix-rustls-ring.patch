@@ -1,0 +1,34 @@
+--- a/compiler-cli/Cargo.toml
++++ b/compiler-cli/Cargo.toml
+@@ -22,7 +22,10 @@
+ fs_extra = "1"
+ tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+ # HTTP client
+-reqwest = { version = "^0.13", default-features = false, features = ["rustls"] }
++reqwest = { version = "^0.13", default-features = false, features = ["rustls-no-provider"] }
++# Ring crypto provider for rustls (avoids aws-lc-rs assembly issues on OHOS)
++rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
++rustls-pki-types = "1"
+ # Checksums
+ sha2 = "0"
+ # Getting hostname
+--- a/gleam-bin/Cargo.toml
++++ b/gleam-bin/Cargo.toml
+@@ -7,6 +7,8 @@
+ 
+ [dependencies]
+ gleam-cli = { path = "../compiler-cli" }
++# Ring crypto provider for rustls (avoids aws-lc-rs assembly issues on OHOS)
++rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+ 
+ [target.'cfg(windows)'.build-dependencies]
+ # For statically linking the VCRuntime on Windows when
+--- a/gleam-bin/src/main.rs
++++ b/gleam-bin/src/main.rs
+@@ -1,3 +1,6 @@
+ pub fn main() {
++    // Install ring as the default crypto provider for rustls
++    // (avoids aws-lc-rs assembly issues on HarmonyOS)
++    let _ = rustls::crypto::ring::default_provider().install_default();
+     gleam_cli::main();
+ }

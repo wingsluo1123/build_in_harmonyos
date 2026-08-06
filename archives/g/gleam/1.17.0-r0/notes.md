@@ -1,77 +1,73 @@
 # gleam 1.17.0-r0 适配笔记
 
 ## 编译环境
-- 构建系统: Rust (Cargo) — 预编译 musl 二进制方式部署
-- 编译日期: 2026-06-08
-- 编译器: 预编译 musl 动态 ELF (aarch64)
-- 状态: published
+- 构建系统: Rust (Cargo) — 从源码编译
+- 编译日期: 2026-08-06
+- 编译器: Rust 1.97.1 (Harmonybrew), clang 15.0.4 (系统)
+- 状态: built
 
 ## 编译步骤
 
-### 部署流程（Alpine musl动态链接）
-1. 从清华镜像下载 Alpine Linux edge community gleam 1.17.0-r0 APK
-   - URL: https://mirrors.tuna.tsinghua.edu.cn/alpine/edge/community/aarch64/gleam-1.17.0-r0.apk
-   - 文件大小: 4.93MB
-2. 提取 APK 包内容
-   - `tar -xzf gleam-1.17.0-r0.apk`
-   - 提取二进制: usr/bin/gleam
-   - 文件类型: ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1)
-3. 检查运行时依赖
-   - 需要2个依赖库: libc.musl-aarch64.so.1 和 libgcc_s.so.1
-   - 两个依赖库已在 ~/usr/local/lib/ 中存在
-4. ELF签名
-   - 使用 binary-sign-tool sign -selfSign 1 -inFile usr/bin/gleam -outFile usr/bin/gleam-signed
-   - 签名成功，输出: "add codesign section success"
-5. 验证执行
-   - `LD_LIBRARY_PATH=~/usr/local/lib ./usr/bin/gleam-signed --version`
-   - 输出: gleam 1.17.0
-   - Exit code: 0 ✓
+### 1. 环境准备
+1. 安装 Rust 工具链 (via Harmonybrew)
+   - `brew install rust` → rustc 1.97.1, cargo 1.97.1
+   - Rust target: aarch64-unknown-linux-ohos
+2. 配置 clang 编译器 (系统自带)
+   - CC=/data/service/hnp/bin/clang
+   - CXX=/data/service/hnp/bin/aarch64-unknown-linux-ohos-clang++
+   - AR=/data/service/hnp/bin/ar
+3. 配置 crates.io 镜像 (rsproxy.cn)
+   - 在 ~/.cargo/config.toml 中配置 rsproxy-sparse 镜像
+
+### 2. 源码获取
+- 从 GitHub 下载 v1.17.0 源码
+- URL: https://github.com/gleam-lang/gleam/archive/refs/tags/v1.17.0.tar.gz
+- SHA256: 644db4b25596d5f27f03614ef1cc10646baaabbd559407acc278bb24c6502f8b
+
+### 3. 源码补丁
+- **fix-rustls-ring.patch**: 将 reqwest 的 TLS 后端从 aws-lc-rs 切换为 ring
+  - 原因: aws-lc-sys 的汇编符号在 OHOS 上链接失败 (undefined bn_* symbols in bcm.c)
+  - 修改: compiler-cli/Cargo.toml 中 `features = ["rustls"]` → `features = ["rustls-no-provider"]`
+  - 添加: rustls + ring 作为直接依赖
+  - 添加: gleam-bin/src/main.rs 中安装 ring crypto provider
+
+### 4. 编译
+```bash
+cargo build --release --bin gleam
+```
+- 编译时间: ~3分钟
+- 产物: target/release/gleam (27.4MB)
+- 链接类型: 动态链接 musl libc (/lib/ld-musl-aarch64.so.1)
+- 依赖: 仅 libc.so (系统提供)
+
+### 5. 签名与验证
+1. binary-sign-tool sign -selfSign 1 -inFile gleam -outFile gleam-signed
+2. ./gleam-signed --version → "gleam 1.17.0" ✓
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | GitHub源码下载超时 | 网络访问GitHub受限 | 使用Alpine Linux预编译APK |
-| 2 | Rust工具链不可用 | rustc/cargo是Linux ELF无法在HarmonyOS执行 | 使用预编译二进制 |
-| 3 | gleam需要Erlang？ | PKGINFO显示依赖erlang-dev | 测试发现gleam编译器本身不需要Erlang即可运行 |
-| 4 | binary-sign-tool签名格式 | self-sign参数格式错误 | 使用 sign -selfSign 1 -inFile -outFile |
-| 5 | 需要国内镜像下载 | Alpine CDN下载超时 | 使用清华镜像 mirrors.tuna.tsinghua.edu.cn |
-
-## Gleam特性说明
-
-**重要发现**：Gleam编译器本身可以独立运行，不需要Erlang运行时。但编译出的Gleam程序需要Erlang VM才能执行。
-
-**编译器功能测试**：
-- `gleam --version` ✓ 成功
-- `gleam new project_name` - 需要进一步测试
-- `gleam build` - 需要Erlang环境来运行编译后的程序
+| 1 | GitHub 预编译静态 musl 二进制 SIGSEGV | Rust static musl binary 与 HarmonyOS 不兼容 (E081) | 从源码编译，生成动态链接 musl 二进制 |
+| 2 | aws-lc-sys 链接失败 | aws-lc-sys 汇编符号未编译 (OHOS 平台未识别) | 切换到 ring crypto provider |
+| 3 | crates.io 不可访问 | 网络限制 | 使用 rsproxy.cn 镜像 |
+| 4 | cargo 找不到 cc linker | clang 不在 PATH 中 | 设置 CC=/data/service/hnp/bin/clang |
+| 5 | 删除 Cargo.lock 导致版本不兼容 | cargo 解析到不兼容的新版本 | 保留原始 Cargo.lock |
 
 ## 知识提取
 
-### E081: Rust static musl二进制在HarmonyOS上的兼容性问题
-- **触发条件**: Rust项目编译为static musl或从源码编译
-- **错误特征**: SIGSEGV (exit 139) 或 rustc崩溃
-- **根因**: Rust musl版本与HarmonyOS/musl存在兼容性问题
-- **解决方案**: 使用Alpine Linux musl动态链接预编译二进制
-- **适用范围**: 所有Rust项目（gleam, xh, pixi等）
+### Rust 项目在 HarmonyOS 上的编译
+- Rust 1.97.1 (Harmonybrew) 可以正常工作，之前的 rustc SIGSEGV 问题已解决
+- 默认 target 为 aarch64-unknown-linux-ohos，生成动态链接 musl 二进制
+- 需要配置 crates.io 镜像 (rsproxy.cn) 才能下载依赖
+- aws-lc-rs 的汇编代码在 OHOS 上无法正确编译/链接，需用 ring 替代
 
-### 预编译二进制部署最佳实践
-1. 优先查找Alpine Linux APK包（edge/community分支）
-2. 提取二进制并检查依赖（readelf -d | grep NEEDED）
-3. 确保所有依赖库已在 ~/usr/local/lib/ 中
-4. 使用 binary-sign-tool self-sign 签名
-5. 设置 LD_LIBRARY_PATH 测试执行
-6. 验证功能后完成归档
-
-## 后续建议
-
-如果需要完整的Gleam开发环境（编译并运行Gleam程序），需要：
-1. 编译或部署Erlang/OTP运行时
-2. 确保erl命令可用
-3. 测试gleam new/build/run完整流程
-
-当前部署满足编译器本身的使用需求。
+### 预编译二进制 vs 源码编译
+- GitHub 官方 aarch64-unknown-linux-musl 二进制是**静态**链接，在 OHOS 上 SIGSEGV
+- Alpine APK 中的二进制是**动态**链接 musl，可以在 OHOS 上运行
+- 从源码编译生成的二进制也是**动态**链接 musl，可以正常运行
+- 结论: 动态链接 musl 二进制是 OHOS 上运行 Rust 项目的正确方式
 ---
 
-**编译结束**: 2026-06-08 11:53
-**最终状态**: published
+**编译结束**: 2026-08-06 14:36
+**最终状态**: built
