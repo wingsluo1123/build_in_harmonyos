@@ -1,0 +1,17 @@
+import os
+from conan import ConanFile
+
+
+class IcoutilsTestConan(ConanFile):
+    settings = "os", "arch"
+
+    def requirements(self):
+        self.requires(self.tested_reference_str)
+
+    def test(self):
+        pkg_folder = self.dependencies["icoutils"].package_folder
+        bin_dir = os.path.join(pkg_folder, "bin")
+        # R34: exercise the packaged binary to verify it works
+        self.run(f"{os.path.join(bin_dir, 'icotool')} --version", env="conanrun")
+        self.run(f"{os.path.join(bin_dir, 'wrestool')} --version", env="conanrun")
+        self.output.info("icoutils: OK")
