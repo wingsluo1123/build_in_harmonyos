@@ -21,6 +21,8 @@
 - Tag: `0.4.7`
 - Tag commit: `7c3666fe604fd1144188e484ea86cce74c1d242e`
 - Source SHA256: `ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519`
+- Source URL uses GitHub codeload for the same tag archive, avoiding the CI
+  mirror pre-download path that failed with `BUILD_DIR: parameter not set`.
 - The PyPI sdist omits the upstream `test/` directory. The recipe therefore
   uses the official GitHub tag archive.
 
@@ -50,6 +52,10 @@
 - 2026-08-06 R37 fix:
   - Package version was incremented from `xmodem/0.4.7` to `xmodem/0.4.7.1`.
   - Source archive remains upstream tag `0.4.7` with the same SHA256.
+- 2026-08-06 CI pre-download fix:
+  - Switched the source URL to GitHub codeload for the same tag archive.
+  - Verified the SHA256 is unchanged:
+    `ed5d0563d6b5bfbeeaceb7a17e07738b7ce60af0e7323ca3e2a6e49942855519`.
 - Source audit collection: 24 upstream cases.
 - Windows source audit: 16 unit cases collected; the POSIX functional test
   module cannot be collected because the upstream helper invokes `which`.
