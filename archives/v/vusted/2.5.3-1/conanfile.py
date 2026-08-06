@@ -16,6 +16,7 @@ class VustedConan(ConanFile):
     homepage = "https://github.com/notomo/vusted"
     url = "https://github.com/notomo/vusted"
 
+    exports_sources = "compat/*", "compat/system/*", "compat/term/*"
     no_copy_source = True
 
     def layout(self):
@@ -37,6 +38,11 @@ class VustedConan(ConanFile):
             src=os.path.join(self.source_folder, "lua", "busted", "outputHandlers", "vusted"),
             dst=os.path.join(lua_share, "busted", "outputHandlers", "vusted"),
         )
+        compat = os.path.join(self.export_sources_folder, "compat")
+        copy(self, "lfs.lua", src=compat, dst=lua_share)
+        copy(self, "init.lua", src=os.path.join(compat, "system"), dst=os.path.join(lua_share, "system"))
+        copy(self, "init.lua", src=os.path.join(compat, "term"), dst=os.path.join(lua_share, "term"))
+        copy(self, "colors.lua", src=os.path.join(compat, "term"), dst=os.path.join(lua_share, "term"))
         copy(self, "vusted", src=os.path.join(self.source_folder, "bin"), dst=os.path.join(self.package_folder, "bin"))
         copy(self, "vusted_entry.vim", src=os.path.join(self.source_folder, "bin"), dst=os.path.join(self.package_folder, "bin"))
         copy(self, "LICENSE", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))

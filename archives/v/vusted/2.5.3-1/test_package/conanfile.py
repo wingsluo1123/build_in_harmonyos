@@ -2,11 +2,11 @@
 """Test package for vusted."""
 
 import os
+import sys
 
 from conan import ConanFile
 from conan.tools.build import can_run
 from conan.tools.env import Environment
-from conan.tools.files import copy
 
 
 class VustedTestConan(ConanFile):
@@ -25,7 +25,6 @@ class VustedTestConan(ConanFile):
         "lua-penlight",
         "mediator_lua",
     )
-    lua_cpath_deps = ("luasystem", "lua-term", "luafilesystem")
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -39,10 +38,6 @@ class VustedTestConan(ConanFile):
         self.requires("lua-term/0.7")
         self.requires("lua-penlight/1.15.0")
         self.requires("mediator_lua/1.1.2-0")
-        self.requires("luafilesystem/1.8.0-1")
-
-    def build(self):
-        copy(self, "smoke_spec.lua", src=self.recipe_folder, dst=self.build_folder)
 
     def _lua_path(self):
         paths = []
@@ -52,22 +47,19 @@ class VustedTestConan(ConanFile):
             paths.extend([os.path.join(lua_share, "?.lua"), os.path.join(lua_share, "?", "init.lua")])
         return ";".join(paths) + ";;"
 
-    def _lua_cpath(self):
-        paths = []
-        for dep_name in self.lua_cpath_deps:
-            pkg = self.dependencies[dep_name].package_folder
-            lua_lib = os.path.join(pkg, "lib", "lua", "5.4")
-            paths.extend([os.path.join(lua_lib, "?.so"), os.path.join(lua_lib, "?", "core.so")])
-        return ";".join(paths) + ";;"
-
     def test(self):
+        check = os.path.join(self.recipe_folder, "check_smoke_spec.py")
+        spec = os.path.join(self.recipe_folder, "smoke_spec.lua")
+        self.run(f'"{sys.executable}" "{check}" "{spec}"')
         if not can_run(self):
             return
+        nvim = os.path.join(self.dependencies["neovim"].package_folder, "bin", "nvim")
         env = Environment()
         env.prepend_path("PATH", os.path.join(self.dependencies["vusted"].package_folder, "bin"))
         env.prepend_path("PATH", os.path.join(self.dependencies["neovim"].package_folder, "bin"))
         env.define("LUA_PATH", self._lua_path())
-        env.define("LUA_CPATH", self._lua_cpath())
+        env.define("LUA_CPATH", "")
+        env.define("VUSTED_NVIM", nvim)
         env.define("VUSTED_ARGS", "--headless --clean -u NONE -i NONE")
         with env.vars(self).apply():
-            self.run(f'vusted "{os.path.join(self.build_folder, "smoke_spec.lua")}"')
+            self.run(f'vusted "{spec}"')
