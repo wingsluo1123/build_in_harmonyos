@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration
+# CI script (build_and_test.sh L0e) requires this file to exist
+
+package: git-remote-codecommit/1.17
+homepage: "https://github.com/aws/git-remote-codecommit"
+
+# Upstream test command (tox-based Python tests)
+upstream_check_command: "python3 -m pytest test/"
+
+# conanfile.py build() method does not integrate upstream tests
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream test programs (Python unit tests in test/ directory)
+upstream_tests:
+  - file: test/context_test.py
+    source: git-remote-codecommit-1.17/test/context_test.py
+    description: "Unit tests for Context class (URL parsing, profile/region resolution)"
+    command: "python3 -m pytest test/context_test.py"
+  - file: test/git_url_test.py
+    source: git-remote-codecommit-1.17/test/git_url_test.py
+    description: "Unit tests for git_url and sign functions (URL generation, SigV4 signing)"
+    command: "python3 -m pytest test/git_url_test.py"
+  - file: test/main_test.py
+    source: git-remote-codecommit-1.17/test/main_test.py
+    description: "Unit tests for main() entry point (argument validation, error handling)"
+    command: "python3 -m pytest test/main_test.py"
+
+# test_package tests (consumer perspective verification)
+test_package_tests:
+  - file: test.sh
+    description: "Smoke test: run git-remote-codecommit without args, verify expected error message"
+    command: "bash test.sh"
+
+# Approximate assertion count (for quality assessment)
+assertion_count: 15
