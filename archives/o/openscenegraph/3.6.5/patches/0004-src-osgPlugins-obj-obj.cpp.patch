@@ -1,0 +1,27 @@
+--- a/src/osgPlugins/obj/obj.cpp
++++ b/src/osgPlugins/obj/obj.cpp
+@@ -31,22 +31,22 @@
+ 
+ 
+ #ifdef _MSC_VER
+ #define strncasecmp strnicmp
+ #endif
+ 
+ 
+ static std::string strip( const std::string& ss )
+ {
+     std::string result;
+-    result.assign( std::find_if( ss.begin(), ss.end(), std::not1( std::ptr_fun< int, int >( isspace ) ) ),
+-                   std::find_if( ss.rbegin(), ss.rend(), std::not1( std::ptr_fun< int, int >( isspace ) ) ).base() );
++    result.assign( std::find_if( ss.begin(), ss.end(), [](unsigned char c) { return !std::isspace(c); } ),
++                   std::find_if( ss.rbegin(), ss.rend(), [](unsigned char c) { return !std::isspace(c); } ).base() );
+     return( result );
+ }
+ 
+ /*
+  * parse a subset of texture options, following
+  * http://local.wasp.uwa.edu.au/~pbourke/dataformats/mtl/
+  */
+ static Material::Map parseTextureMap( const std::string& ss, Material::Map::TextureMapType type)
+ {
+     Material::Map map;
