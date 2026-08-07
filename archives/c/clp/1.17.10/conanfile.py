@@ -31,7 +31,11 @@ class ClpConan(ConanFile):
 
     def requirements(self):
         self.requires("coinutils/2.11.13")
-        self.requires("zlib/1.3.1")
+        # force=True：已合入的 coinor-osi/0.108.11 钉的是 zlib/1.3.1，
+        # 那个包 ./configure --static 不带 -fPIC，libz.a 非 PIC，链进本包的
+        # 共享库会报 R_AARCH64_ADR_PREL_PG_HI21 ... 'z_errmsg'（MR #4352 实撞）。
+        # 不加 force 则两个 zlib 版本同图，conan 直接判版本冲突。
+        self.requires("zlib/1.3.1.1", force=True)
         self.requires("coinor-osi/0.108.11")
 
     def layout(self):
