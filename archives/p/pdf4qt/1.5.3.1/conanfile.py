@@ -73,13 +73,11 @@ class Pdf4QtConan(ConanFile):
         # Set blend2d_DIR to point to the installed blend2d cmake config
         blend2d_install = os.path.join(self.build_folder, "blend2d-install")
         blend2d_cmake_dir = os.path.join(blend2d_install, "lib", "cmake", "blend2d")
-        tc.variables["blend2d_DIR"] = blend2d_cmake_dir
-        # Also add blend2d install to CMAKE_PREFIX_PATH as fallback
-        tc.variables["CMAKE_PREFIX_PATH"] = blend2d_install
+        tc.cache_variables["blend2d_DIR"] = blend2d_cmake_dir
         # Set Qt6_DIR to point to the qtbase package's Qt6 cmake config
         qtbase = self.dependencies["qtbase"]
         qt6_cmake_dir = os.path.join(qtbase.package_folder, "lib", "cmake", "Qt6")
-        tc.variables["Qt6_DIR"] = qt6_cmake_dir
+        tc.cache_variables["Qt6_DIR"] = qt6_cmake_dir
         # Set OpenJPEG_DIR if the package provides its own cmake config
         openjpeg = self.dependencies["openjpeg"]
         openjpeg_cmake_dir = os.path.join(openjpeg.package_folder, "lib", "cmake")
