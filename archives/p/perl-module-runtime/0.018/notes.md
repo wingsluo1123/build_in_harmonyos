@@ -110,5 +110,5 @@ $ perl -MModule::Runtime=use_module -e 'use_module("Cwd"); print Cwd::getcwd(), 
 4. **下游依赖**: Module::Runtime 是许多 Perl 模块的运行时依赖（如 Module::Implementation、Dist::CheckConflicts 等）
 ---
 
-**编译结束**: 2026-06-23 11:06
-**最终状态**: published
+**编译结束**: 2026-08-07 11:29
+**最终状态**: built

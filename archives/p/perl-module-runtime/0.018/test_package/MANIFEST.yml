@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-module-runtime/0.018
+homepage: "https://metacpan.org/dist/Module-Runtime"
+
+# 上游测试命令 (ExtUtils::MakeMaker)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (Perl test suite)
+upstream_tests:
+  - file: t/cmn.t
+    source: perl-module-runtime-0.018/t/cmn.t
+    description: "compose_module_name tests"
+    command: "perl -Iblib/lib t/cmn.t"
+  - file: t/rm.t
+    source: perl-module-runtime-0.018/t/rm.t
+    description: "require_module tests"
+    command: "perl -Iblib/lib t/rm.t"
+  - file: t/um.t
+    source: perl-module-runtime-0.018/t/um.t
+    description: "use_module tests"
+    command: "perl -Iblib/lib t/um.t"
+  - file: t/mnf.t
+    source: perl-module-runtime-0.018/t/mnf.t
+    description: "module_notional_filename tests"
+    command: "perl -Iblib/lib t/mnf.t"
+  - file: t/upo.t
+    source: perl-module-runtime-0.018/t/upo.t
+    description: "use_package_optimistically tests"
+    command: "perl -Iblib/lib t/upo.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "消费者测试 - 加载 Module::Runtime 并调用 API"
+    command: "perl test_module_runtime.pl"
+
+# 测试断言总数 (上游 11 个测试文件, 365 个测试用例)
+assertion_count: 365
