@@ -73,8 +73,7 @@ function lfs.chdir(path)
     end
     return true
   end
-  vim.cmd("cd " .. vim.fn.fnameescape(path))
-  return true
+  return nil, "changing directory is not supported by this Neovim runtime"
 end
 
 function lfs.mkdir(path)

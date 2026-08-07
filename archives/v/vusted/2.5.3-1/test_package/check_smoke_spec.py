@@ -5,7 +5,13 @@ import sys
 from pathlib import Path
 
 
+if len(sys.argv) != 2:
+    raise SystemExit("usage: check_smoke_spec.py <smoke_spec.lua>")
+
 spec = Path(sys.argv[1])
+if not spec.is_file():
+    raise SystemExit(f"smoke spec not found: {spec}")
+
 text = spec.read_text(encoding="utf-8")
 required = [
     'describe("vusted smoke"',

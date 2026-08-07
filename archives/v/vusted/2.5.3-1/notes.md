@@ -9,7 +9,6 @@ the nvim-lspconfig Path B validation chain.
 
 - Upstream repository: https://github.com/notomo/vusted
 - Source archive: https://github.com/notomo/vusted/archive/refs/tags/v2.5.3.tar.gz
-- Mirror: https://gh-proxy.com/https://github.com/notomo/vusted/archive/refs/tags/v2.5.3.tar.gz
 - SHA256: b7e15560ecc822fe5da5dfa8229ea1e30895f3c28c79e16c694f57f43416ba42
 - LuaRocks release: 2.5.3-1
 
