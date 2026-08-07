@@ -69,3 +69,7 @@ readline 的 shlib/Makefile.in 中 TERMCAP_LIB 未正确传递，添加 `$(TERMC
 - readline 不在制品仓时可在 conanfile.py 内从源码编译
 - HMDFS umask 077 + mktemp -d 创建的目录不可写，需移除 umask
 - readline config.sub 需要三处修改才能识别 linux-ohos
+
+---
+**编译结束**: 2026-08-08
+**最终状态**: built (编译成功，已验证)
