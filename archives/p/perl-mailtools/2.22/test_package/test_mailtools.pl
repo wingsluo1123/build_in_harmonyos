@@ -34,6 +34,8 @@ print "Mail::Address ok\n";
 
 # Test Mail::Util
 use Mail::Util qw(mailaddress);
+my $ma = mailaddress();
+die "Mail::Util mailaddress failed" unless $ma && $ma =~ /@/;
 print "Mail::Util ok\n";
 
 print "All MailTools tests passed\n";
