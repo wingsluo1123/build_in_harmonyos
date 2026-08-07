@@ -1,5 +1,4 @@
 software: perf
-# 版本级 manifest 模板
 # 文件位置: archives/{letter}/{name}/6.6.9/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -7,53 +6,31 @@ software: perf
 # 必须字段
 # ============================================================
 
-# 版本号
 version: "6.6.9"
-
-# 编译状态
-# published | built | failed | archived
 status: built
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-04-29"
+build_date: "2026-08-07"
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "https://mirrors.tuna.tsinghua.edu.cn/kernel/v6.x/linux-6.6.9.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  url: "https://mirrors.tuna.tsinghua.edu.cn/kernel/v6.x/linux-6.6.9.tar.xz"
+  sha256: "8ebc65af0cfc891ba63dce0546583da728434db0f5f6a54d979f25ec47f548b3"
+  tar_format: tar.xz
 
 # ============================================================
 # 构建配置
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  system: makefile
+  configure_options:
+    - "JOBS=1"
+    - "NO_LIBELF=1"
+    - "NO_LIBTRACEEVENT=1"
+  dependencies:
+    - zlib/1.3.1.1
   cc: clang
   cxx: clang++
 
@@ -61,17 +38,301 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-fix-shebang-bash-path.patch"
+  - "0002-fix-open-mode-bits.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "perf from Linux kernel 6.6.9 builds on OHOS with make JOBS=1 (mkfifo not supported)"
+  - "#!/bin/bash shebang must be patched to #!/data/service/hnp/bin/bash (HarmonyOS /bin is read-only)"
+  - "open(path, O_RDONLY, O_NONBLOCK) triggers OHOS fortify warning; fix to open(path, O_RDONLY | O_NONBLOCK)"
+  - "NO_LIBELF=1 required because elfutils binary not in conan repo; libelf feature detection fails without glibc/bionic"
+  - "NO_LIBTRACEEVENT=1 required because libtraceevent is not available on OHOS platform"
+  - "perf source is in tools/perf/ within the Linux kernel source tree"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/perf-6.6.9.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/perf-6.6.9.work
+  source_orig_hash: 543a991cb59b96b3
+  source_work_hash: 7632a240e46e2d0a
+  generated_at: '2026-08-07T10:30:09'
+  patches_count: 68
+
+patch_classification:
+  - file: 0001-tools-perf-Documentation-android.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-tools-perf-Documentation-perf-record.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-tools-perf-Documentation-perf-script-python.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-tools-perf-Documentation-perf-stat.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-tools-perf-builtin-daemon.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-tools-perf-check-headers.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-tools-perf-perf-archive.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-tools-perf-perf-iostat.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-tools-perf-scripts-perl-bin-check-perf-trace-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-tools-perf-scripts-perl-bin-failed-syscalls-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-tools-perf-scripts-perl-bin-failed-syscalls-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-tools-perf-scripts-perl-bin-rw-by-file-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-tools-perf-scripts-perl-bin-rw-by-file-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-tools-perf-scripts-perl-bin-rw-by-pid-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0015-tools-perf-scripts-perl-bin-rw-by-pid-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0016-tools-perf-scripts-perl-bin-rwtop-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0017-tools-perf-scripts-perl-bin-rwtop-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0018-tools-perf-scripts-perl-bin-wakeup-latency-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0019-tools-perf-scripts-perl-bin-wakeup-latency-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0020-tools-perf-scripts-python-bin-compaction-times-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0021-tools-perf-scripts-python-bin-compaction-times-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0022-tools-perf-scripts-python-bin-event_analyzing_sample-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0023-tools-perf-scripts-python-bin-event_analyzing_sample-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0024-tools-perf-scripts-python-bin-export-to-postgresql-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0025-tools-perf-scripts-python-bin-export-to-postgresql-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0026-tools-perf-scripts-python-bin-export-to-sqlite-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0027-tools-perf-scripts-python-bin-export-to-sqlite-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0028-tools-perf-scripts-python-bin-failed-syscalls-by-pid-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0029-tools-perf-scripts-python-bin-failed-syscalls-by-pid-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0030-tools-perf-scripts-python-bin-flamegraph-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0031-tools-perf-scripts-python-bin-flamegraph-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0032-tools-perf-scripts-python-bin-futex-contention-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0033-tools-perf-scripts-python-bin-futex-contention-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0034-tools-perf-scripts-python-bin-gecko-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0035-tools-perf-scripts-python-bin-gecko-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0036-tools-perf-scripts-python-bin-intel-pt-events-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0037-tools-perf-scripts-python-bin-intel-pt-events-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0038-tools-perf-scripts-python-bin-mem-phys-addr-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0039-tools-perf-scripts-python-bin-mem-phys-addr-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0040-tools-perf-scripts-python-bin-net_dropmonitor-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0041-tools-perf-scripts-python-bin-net_dropmonitor-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0042-tools-perf-scripts-python-bin-netdev-times-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0043-tools-perf-scripts-python-bin-netdev-times-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0044-tools-perf-scripts-python-bin-powerpc-hcalls-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0045-tools-perf-scripts-python-bin-powerpc-hcalls-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0046-tools-perf-scripts-python-bin-sched-migration-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0047-tools-perf-scripts-python-bin-sched-migration-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0048-tools-perf-scripts-python-bin-sctop-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0049-tools-perf-scripts-python-bin-sctop-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0050-tools-perf-scripts-python-bin-syscall-counts-by-pid-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0051-tools-perf-scripts-python-bin-syscall-counts-by-pid-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0052-tools-perf-scripts-python-bin-syscall-counts-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0053-tools-perf-scripts-python-bin-syscall-counts-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0054-tools-perf-scripts-python-bin-task-analyzer-record.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0055-tools-perf-scripts-python-bin-task-analyzer-report.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0056-tools-perf-tests-shell-daemon.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0057-tools-perf-tests-shell-lib-probe.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0058-tools-perf-tests-shell-lib-stat_output.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0059-tools-perf-tests-shell-stat+csv_output.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0060-tools-perf-tests-shell-stat+json_output.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0061-tools-perf-tests-shell-stat+std_output.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0062-tools-perf-tests-shell-stat_all_metrics.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0063-tools-perf-tests-shell-stat_metrics_values.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0064-tools-perf-tests-shell-test_data_symbol.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0065-tools-perf-tests-shell-test_java_symbol.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0066-tools-perf-tests-shell-test_perf_data_converter_json.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0067-tools-perf-tests-shell-test_task_analyzer.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0068-tools-perf-tests-shell-test_uprobe_from_different_cu.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

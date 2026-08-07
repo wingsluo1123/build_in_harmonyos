@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: perf/6.6.9
+homepage: "https://perf.wiki.kernel.org/"
+
+# perf does not have a standard `make check` target;
+# upstream testing is done via `make -C tools/perf tests` and shell tests
+upstream_check_command: "make -C tools/perf tests"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# perf upstream tests are in tools/perf/tests/
+upstream_tests:
+  - file: tools/perf/tests/builtin-test.c
+    source: linux-6.6.9/tools/perf/tests/builtin-test.c
+    description: "perf built-in test suite (perf test)"
+    command: "perf test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "Run perf --version to verify binary is functional"
+    command: "perf --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 1
