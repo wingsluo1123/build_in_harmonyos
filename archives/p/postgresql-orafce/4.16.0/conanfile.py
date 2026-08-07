@@ -80,46 +80,92 @@ class PostgresqlOrafceConan(ConanFile):
             self.output.info("Extracting PostgreSQL source...")
             self.run(f'tar xzf "{pg_tarball}" -C "{pg_src_dir}" --strip-components=1')
 
-        # Fix config.guess for OHOS
+        # Patch config.guess for HarmonyOS/OHOS
         config_guess = os.path.join(pg_src_dir, "config", "config.guess")
-        config_sub = os.path.join(pg_src_dir, "config", "config.sub")
         if os.path.isfile(config_guess):
-            # Add OHOS detection to config.guess
             with open(config_guess, "r") as f:
                 content = f.read()
-            if "OHOS" not in content and "ohos" not in content:
-                # Append OHOS detection
-                with open(config_guess, "a") as f:
-                    f.write('\n# OHOS detection\n')
-                    f.write('case "$UNAME_SYSTEM" in\n')
-                    f.write('  *OHOS*|*ohos*|*OpenHarmony*|*HarmonyOS*)\n')
-                    f.write('    echo "aarch64-unknown-linux-ohos"; exit 0 ;;\n')
-                    f.write('esac\n')
+            if "HarmonyOS" not in content:
+                # Add __OHOS__ libc detection
+                content = content.replace(
+                    '#if defined(__ANDROID__)\n\tLIBC=android',
+                    '#if defined(__ANDROID__)\n\tLIBC=android\n#elif defined(__OHOS__)\n\tLIBC=ohos'
+                )
+                # Add HarmonyOS case after the case statement
+                content = content.replace(
+                    'case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in',
+                    'case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in\n'
+                    '    *:HarmonyOS:*:*)\n'
+                    '\tcase "$UNAME_MACHINE" in\n'
+                    '\t    aarch64|arm64) MACHINE=aarch64 ;;\n'
+                    '\t    x86_64|amd64)  MACHINE=x86_64 ;;\n'
+                    '\t    *)            MACHINE="$UNAME_MACHINE" ;;\n'
+                    '\tesac\n'
+                    '\tGUESS=${MACHINE}-unknown-linux-ohos\n'
+                    '\t;;\n'
+                )
+                with open(config_guess, "w") as f:
+                    f.write(content)
+                self.output.info("Patched config.guess for HarmonyOS")
 
+        # Patch config.sub for linux-ohos
+        config_sub = os.path.join(pg_src_dir, "config", "config.sub")
         if os.path.isfile(config_sub):
             with open(config_sub, "r") as f:
                 content = f.read()
-            if "linux-ohos" not in content:
-                # Add linux-ohos to the valid configurations
-                with open(config_sub, "r") as f:
-                    content = f.read()
-                # Add ohos after linux in the kernel list
+            if "ohos" not in content:
+                # Add ohos-linux handling
                 content = content.replace(
-                    '| linux*',
-                    '| linux* | linux-ohos*'
+                    'basic_os=linux-android',
+                    'basic_os=linux-android\n\t\t\t;;\n\t\tohos-linux)\n\t\t\t\tbasic_machine=$field1-unknown\n\t\t\t\tbasic_os=linux-ohos'
+                )
+                # Add ohos* to system types
+                content = content.replace(
+                    'gnu* | android* | bsd*',
+                    'gnu* | android* | ohos* | bsd*'
+                )
+                # Add linux-ohos* to kernel validation
+                content = content.replace(
+                    '| linux-relibc*- | linux-uclibc*- )',
+                    '| linux-relibc*- | linux-uclibc*- | linux-ohos*- )'
                 )
                 with open(config_sub, "w") as f:
                     f.write(content)
+                self.output.info("Patched config.sub for linux-ohos")
+
+        # Patch configure for TMPDIR
+        configure_script = os.path.join(pg_src_dir, "configure")
+        if os.path.isfile(configure_script):
+            with open(configure_script, "r") as f:
+                content = f.read()
+            if "TMPDIR" not in content[content.find("Create a (secure) tmp"):content.find("Create a (secure) tmp")+500]:
+                content = content.replace(
+                    'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`',
+                    '_tmp_dir="${TMPDIR:-$HOME/tmp}"\n  tmp=`(umask 000 && mktemp -d "$_tmp_dir/confXXXXXX") 2>/dev/null`'
+                )
+                content = content.replace(
+                    'tmp=./conf$$-$RANDOM',
+                    'tmp="$_tmp_dir/conf$$-$RANDOM"'
+                )
+                content = content.replace(
+                    'cannot create a temporary directory in .',
+                    'cannot create a temporary directory in $TMPDIR'
+                )
+                with open(configure_script, "w") as f:
+                    f.write(content)
+                self.output.info("Patched configure for TMPDIR")
 
         # Configure PostgreSQL
         prefix = os.path.join(self.build_folder, "postgresql-install")
         tmpdir = os.environ.get("TMPDIR", os.path.join(os.environ.get("HOME", "/tmp"), "tmp"))
         os.makedirs(tmpdir, exist_ok=True)
 
+        config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         self.output.info("Configuring PostgreSQL...")
         self.run(
             f'cd "{pg_src_dir}" && '
             f'TMPDIR="{tmpdir}" '
+            f'CONFIG_SHELL="{config_shell}" '
             f'./configure --prefix="{prefix}" '
             f'--without-readline --without-zlib --without-icu'
         )
