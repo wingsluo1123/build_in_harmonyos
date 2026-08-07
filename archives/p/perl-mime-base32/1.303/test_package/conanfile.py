@@ -23,5 +23,5 @@ class Perlmimebase32TestConan(ConanFile):
     def test(self):
         dep = self.dependencies["perl-mime-base32"]
         perl_lib = os.path.join(dep.package_folder, "lib")
-        test_script = os.path.join(self.source_folder, "test.pl")
-        self.run(f'perl -I"{perl_lib}" {test_script}')
+        test_script = os.path.join(self.source_folder, "test.sh")
+        self.run(f'sh "{test_script}" "{perl_lib}"')
