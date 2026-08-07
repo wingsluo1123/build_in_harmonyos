@@ -104,6 +104,9 @@ class OpenImageIOConan(ConanFile):
         replace_in_file(self, oiio_cmake,
             "            OpenColorIO::OpenColorIO\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>",
             "            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIO>\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>")
+        # Fix: color_ocio.cpp includes <OpenColorIO/OpenColorIO.h> but OpenColorIO is
+        # disabled. Remove it from source lists to prevent compilation failure.
+        replace_in_file(self, oiio_cmake, "color_ocio.cpp\n", "")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
