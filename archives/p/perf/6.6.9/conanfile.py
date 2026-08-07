@@ -1,5 +1,4 @@
 import os
-import glob
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -12,7 +11,7 @@ class PerfConan(ConanFile):
     description = "Linux performance analysis tool (perf) from kernel 6.6.9"
     license = "GPL-2.0-only"
     homepage = "https://perf.wiki.kernel.org/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
