@@ -150,11 +150,9 @@ perl -e "use List::Compare; my @a = qw(1 2 3); my @b = qw(2 3 4); my \$lc = List
    export PERL5LIB="/path/to/lib/site_perl/5.42.0:/path/to/lib/5.42.0"
    perl -e 'use List::Compare; my $lc = List::Compare->new([1,2,3], [2,3,4]); print $lc->get_version;'
    ```
-
----
-
-**编译结束**: 2026-06-15 11:00
-**测试完成**: 2026-06-15 11:23
-**最终状态**: built
 **测试结果**: ✅ PASS (52 文件, 4190 测试)
 **上库状态**: ✅ 可上库（推荐 published）
+---
+
+**编译结束**: 2026-08-07 09:58
+**最终状态**: built

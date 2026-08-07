@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-list-compare/0.55
+homepage: "https://metacpan.org/dist/List-Compare"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/01_regular.t
+    source: perl-list-compare-0.55/t/01_regular.t
+    description: "Regular mode: two-list comparison methods"
+    command: "perl t/01_regular.t"
+  - file: t/02_accelerated.t
+    source: perl-list-compare-0.55/t/02_accelerated.t
+    description: "Accelerated mode: single comparison optimization"
+    command: "perl t/02_accelerated.t"
+  - file: t/03_multiple.t
+    source: perl-list-compare-0.55/t/03_multiple.t
+    description: "Multiple mode: three or more lists"
+    command: "perl t/03_multiple.t"
+  - file: t/04_seen-hash.t
+    source: perl-list-compare-0.55/t/04_seen-hash.t
+    description: "Seen-hash constructor variant"
+    command: "perl t/04_seen-hash.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "Consumer test: load List::Compare and verify intersection/union/unique/complement"
+    command: "conan test"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4190
