@@ -14,7 +14,6 @@ OHOS adaptation notes:
 - Digest::base and XSLoader are Perl core modules (no external dependencies)
 """
 import os
-import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -46,14 +45,6 @@ class PerlDigestMd5Conan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def _perl_config(self, key):
-        """Get a value from Perl's Config module."""
-        result = subprocess.run(
-            ["perl", "-MConfig", "-e", f"print $Config{{{key}}}"],
-            capture_output=True, text=True
-        )
-        return result.stdout.strip()
-
     def build(self):
         apply_conandata_patches(self)
 
@@ -61,19 +52,12 @@ class PerlDigestMd5Conan(ConanFile):
         if self.settings.os not in ("Linux", "OHOS"):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
-        # Perl XS module build: Makefile.PL generates Makefile, then make compiles C/XS code
-        # ExtUtils::MakeMaker reads Perl's %Config (cc, ccflags, lddlflags) automatically.
-        # On OHOS, system Perl's %Config already has correct compiler/linker settings.
-        # Pass CC and CCFLAGS explicitly from Perl config for cross-environment compatibility.
-        cc = self._perl_config("cc")
-        ccflags = self._perl_config("ccflags")
-        optimize = self._perl_config("optimize")
-
-        # Pass CC and CCFLAGS to Makefile.PL for build reproducibility
-        self.run(
-            f'perl Makefile.PL CC="{cc}" CCFLAGS="{ccflags} {optimize}"',
-            cwd=self.source_folder
-        )
+        # Perl XS module build: Makefile.PL generates Makefile, then make compiles C/XS code.
+        # ExtUtils::MakeMaker reads Perl's %Config (cc, ccflags, lddlflags, libpth)
+        # which already contains correct OHOS compiler/linker settings.
+        # The Conan profile PATH includes /data/service/hnp/bin where perl resides.
+        # No manual CCFLAGS/LDDLFLAGS needed — MakeMaker handles everything via %Config.
+        self.run("perl Makefile.PL", cwd=self.source_folder)
         self.run("make", cwd=self.source_folder)
 
     def package(self):
