@@ -1,5 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 # test_utf8_strict.sh — PerlIO::utf8_strict Perl XS module test source file
+set -euo pipefail
 #
 # Satisfies:
 #   - L0c: test source file exists in test_package/
@@ -17,7 +18,7 @@ if [ -z "$PERL_LIB" ]; then
 fi
 
 # Verify .so exists in the package
-SO_FILE=$(find "$PERL_LIB" -path "*/auto/PerlIO/utf8_strict/utf8_strict.so" 2>/dev/null | head -1)
+SO_FILE=$(find "$PERL_LIB" -path "*/auto/PerlIO/utf8_strict/utf8_strict.so" 2>/dev/null | head -1 || true)
 if [ -z "$SO_FILE" ]; then
     echo "FAIL: utf8_strict.so not found in package under $PERL_LIB"
     exit 1
@@ -25,7 +26,7 @@ fi
 echo "Found utf8_strict.so: $SO_FILE"
 
 # Verify .pm exists
-PM_FILE=$(find "$PERL_LIB" -path "*/PerlIO/utf8_strict.pm" 2>/dev/null | head -1)
+PM_FILE=$(find "$PERL_LIB" -path "*/PerlIO/utf8_strict.pm" 2>/dev/null | head -1 || true)
 if [ -z "$PM_FILE" ]; then
     echo "FAIL: utf8_strict.pm not found in package under $PERL_LIB"
     exit 1
@@ -41,8 +42,10 @@ echo "Perl arch directory: $PERL_ARCH_DIR"
 # Also test rejection of invalid UTF-8 sequences
 echo "Testing PerlIO::utf8_strict UTF-8 IO..."
 
-TMPFILE=$(mktemp "$TMPDIR/utf8test_XXXXXX" 2>/dev/null || mktemp /tmp/utf8test_XXXXXX 2>/dev/null || echo "testfile.txt")
+TMPFILE=$(mktemp "${TMPDIR:-/tmp}/utf8test_XXXXXX" 2>/dev/null || mktemp /tmp/utf8test_XXXXXX 2>/dev/null || echo "testfile.txt")
 
+# Capture perl exit code without triggering set -e
+EXIT_CODE=0
 perl -I"$PERL_ARCH_DIR" -MPerlIO::utf8_strict -e '
     use strict;
     use warnings;
@@ -70,7 +73,7 @@ perl -I"$PERL_ARCH_DIR" -MPerlIO::utf8_strict -e '
     # Test 3: Reject invalid UTF-8 (0xFF)
     open(my $bh, ">", $testfile) or die;
     binmode($bh);
-    print $bh "\xFF\xFE\xFD";
+    print $bh "\xFF\xFe\xFD";
     close($bh);
 
     eval {
@@ -93,11 +96,10 @@ perl -I"$PERL_ARCH_DIR" -MPerlIO::utf8_strict -e '
     unlink $testfile;
 
     print "PerlIO::utf8_strict API test PASSED\n";
-' "$TMPFILE" 2>&1
-EXIT_CODE=$?
+' "$TMPFILE" 2>&1 || EXIT_CODE=$?
 
 # Cleanup
-rm -f "$TMPFILE" 2>/dev/null
+rm -f "$TMPFILE" 2>/dev/null || true
 
 if [ $EXIT_CODE -eq 0 ]; then
     echo "TEST PASSED: PerlIO::utf8_strict module loaded and UTF-8 IO verified"
