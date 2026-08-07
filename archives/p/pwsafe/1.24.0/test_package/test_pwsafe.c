@@ -22,7 +22,11 @@ int main(void) {
         if (strstr(buf, "create"))
             found_create = 1;
     }
-    pclose(fp);
+    int rc = pclose(fp);
+    if (rc != 0) {
+        fprintf(stderr, "pwsafe-cli exited with non-zero status\n");
+        return 1;
+    }
 
     if (!found_add || !found_create) {
         fprintf(stderr, "pwsafe-cli did not output expected arguments\n");
