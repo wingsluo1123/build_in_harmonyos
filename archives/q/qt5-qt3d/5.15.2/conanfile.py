@@ -42,7 +42,10 @@ class Qt5Qt3dConan(ConanFile):
             urls = [urls]
         for url in urls:
             try:
-                get(self, url=url, sha256=source_data.get("sha256", ""), strip_root=True)
+                get_kwargs = {"url": url, "strip_root": True}
+                if source_data.get("sha256"):
+                    get_kwargs["sha256"] = source_data["sha256"]
+                get(self, **get_kwargs)
                 return
             except ConanException as error:
                 self.output.warning(f"Failed to download source from {url}: {error}")
