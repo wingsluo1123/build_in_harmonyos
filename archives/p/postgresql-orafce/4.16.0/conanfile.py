@@ -209,6 +209,48 @@ class PostgresqlOrafceConan(ConanFile):
         pg_config = shutil.which("pg_config")
         if pg_config:
             self.output.info(f"PostgreSQL bootstrapped successfully: {pg_config}")
+
+            # Query actual PGXS path from pg_config and install there
+            try:
+                pgxs_path = subprocess.check_output(
+                    [pg_config, "--pgxs"]
+                ).decode().strip()
+                self.output.info(f"pg_config --pgxs reports: {pgxs_path}")
+
+                # pgxs_path is like: $prefix/lib/.../pgxs/src/makefiles/pgxs.mk
+                # We need to install PGXS files relative to this path
+                pgxs_dir = os.path.dirname(os.path.dirname(pgxs_path))  # .../pgxs/src
+                pgxs_root = os.path.dirname(pgxs_dir)  # .../pgxs
+                pgxs_parent = os.path.dirname(pgxs_root)  # e.g. lib/ or lib/postgresql
+
+                # Copy Makefile* files to the src directory
+                pgxs_src_dir = os.path.join(pg_src_dir, "src")
+                dest_src = pgxs_dir  # .../pgxs/src
+                os.makedirs(dest_src, exist_ok=True)
+                for f in os.listdir(pgxs_src_dir):
+                    if f.startswith("Makefile"):
+                        shutil.copy2(os.path.join(pgxs_src_dir, f), os.path.join(dest_src, f))
+
+                # Copy makefiles directory
+                mk_src = os.path.join(pgxs_src_dir, "makefiles")
+                dest_mk = os.path.join(dest_src, "makefiles")
+                if os.path.isdir(mk_src):
+                    os.makedirs(dest_mk, exist_ok=True)
+                    for f in os.listdir(mk_src):
+                        shutil.copy2(os.path.join(mk_src, f), os.path.join(dest_mk, f))
+
+                # Copy config directory
+                cfg_src = os.path.join(pg_src_dir, "config")
+                dest_cfg = os.path.join(pgxs_root, "config")
+                if os.path.isdir(cfg_src):
+                    os.makedirs(dest_cfg, exist_ok=True)
+                    for f in os.listdir(cfg_src):
+                        shutil.copy2(os.path.join(cfg_src, f), os.path.join(dest_cfg, f))
+
+                self.output.info(f"PGXS files installed to: {pgxs_root}")
+            except Exception as e:
+                self.output.info(f"Warning: Failed to query/install PGXS path: {e}")
+
             return pg_config
         return None
 
