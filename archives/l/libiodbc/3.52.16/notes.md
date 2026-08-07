@@ -63,5 +63,5 @@ $ make check
 - config.guess正确识别 aarch64-unknown-linux-ohos，无需修改
 ---
 
-**编译结束**: 2026-05-26 01:09
-**最终状态**: published
+**编译结束**: 2026-08-08 03:31
+**最终状态**: built
