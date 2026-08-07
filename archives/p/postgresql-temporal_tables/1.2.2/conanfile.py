@@ -3,7 +3,7 @@
 
 PostgreSQL extension for system-period temporal tables (SQL:2011 standard).
 Uses PGXS (PostgreSQL Extension Build Infrastructure) — no configure step.
-Requires pg_config from a system or Conan-managed PostgreSQL installation.
+If pg_config is not available, PostgreSQL is built from source as a build step.
 """
 import os
 import shutil
@@ -40,22 +40,87 @@ class PostgresqlTemporalTablesConan(ConanFile):
         pg_config = os.environ.get("PG_CONFIG")
         if pg_config and os.path.isfile(pg_config):
             return pg_config
-        # Try pg_config from PATH
         path = shutil.which("pg_config")
         if path and os.path.isfile(path):
             return path
-        raise RuntimeError(
-            "pg_config not found. Install PostgreSQL or set PG_CONFIG env var."
+        return None
+
+    def _ensure_pg_config(self):
+        """Ensure pg_config is available. Build PostgreSQL from source if needed."""
+        pg_config = self._find_pg_config()
+        if pg_config:
+            return pg_config
+
+        # Build PostgreSQL from source to get pg_config and headers
+        pg_version = "18.3"
+        pg_url = f"https://github.com/postgres/postgres/archive/refs/tags/REL_18_3.tar.gz"
+        pg_dir = os.path.join(self.build_folder, "postgresql-build")
+        pg_install = os.path.join(self.build_folder, "pg-install")
+
+        self.output.info("pg_config not found, building PostgreSQL from source...")
+
+        # Download PostgreSQL source
+        get(self, pg_url, strip_root=True, destination=pg_dir)
+
+        # Fix config.guess for HarmonyOS
+        config_guess = os.path.join(pg_dir, "config", "config.guess")
+        if os.path.isfile(config_guess):
+            with open(config_guess, 'r') as f:
+                content = f.read()
+            if "HarmonyOS" not in content:
+                # Add HarmonyOS detection
+                content = content.replace(
+                    "aarch64:Linux:*:*)",
+                    "aarch64:HarmonyOS:*:*)\n\tGUESS=$UNAME_MACHINE-unknown-linux-ohos\n\t;;\n    aarch64:Linux:*:*)"
+                )
+                # Fix umask for hmdfs
+                content = content.replace("umask 077", "umask 022")
+                with open(config_guess, 'w') as f:
+                    f.write(content)
+
+        # Configure PostgreSQL (generates pg_config.h and Makefile.global)
+        import subprocess
+        env = os.environ.copy()
+        env["TMPDIR"] = env.get("TMPDIR", "/tmp")
+        env["CC"] = shutil.which("clang") or "clang"
+        env["SHELL"] = shutil.which("bash") or "/bin/sh"
+
+        build_dir = os.path.join(pg_dir, "build-ohos")
+        os.makedirs(build_dir, exist_ok=True)
+
+        self.run(
+            f'../configure --prefix="{pg_install}" '
+            f'--without-icu --without-readline --without-zlib --without-openssl',
+            cwd=build_dir, env=env
         )
+
+        # Build minimal components: common, port, pg_config, headers, pgxs
+        for target in ["src/common", "src/port", "src/bin/pg_config"]:
+            self.run(f"make -C {target}", cwd=build_dir, env=env)
+
+        # Install minimal PostgreSQL (pg_config, headers, pgxs)
+        self.run("make -C src/bin/pg_config install", cwd=build_dir, env=env)
+        self.run("make -C src/include install", cwd=build_dir, env=env)
+        self.run("make -C src/common install", cwd=build_dir, env=env)
+        self.run("make -C src/port install", cwd=build_dir, env=env)
+        # Install PGXS makefiles
+        self.run("make -C src/makefiles install", cwd=build_dir, env=env)
+
+        pg_config_path = os.path.join(pg_install, "bin", "pg_config")
+        if os.path.isfile(pg_config_path):
+            self.output.info(f"PostgreSQL built, pg_config at {pg_config_path}")
+            return pg_config_path
+
+        raise RuntimeError("Failed to build pg_config from PostgreSQL source")
 
     def build(self):
         apply_conandata_patches(self)
-        pg_config = self._find_pg_config()
+        pg_config = self._ensure_pg_config()
         # PGXS builds in the source directory (GNUmakefile is there)
         self.run(f'make PG_CONFIG="{pg_config}"', cwd=self.source_folder)
 
     def package(self):
-        pg_config = self._find_pg_config()
+        pg_config = self._ensure_pg_config()
         # PGXS install with DESTDIR puts files under $DESTDIR/$PREFIX/...
         self.run(
             f'make install PG_CONFIG="{pg_config}" DESTDIR="{self.package_folder}"',
