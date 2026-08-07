@@ -5,6 +5,7 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
+import os
 
 
 class ReadlineConan(ConanFile):
@@ -50,10 +51,9 @@ class ReadlineConan(ConanFile):
         apply_conandata_patches(self)
         # HMDFS can't create ./confXXXXXX temp dirs (E002).
         # Redirect config.status tmpdir to $HOME/tmp.
-        self.run("sed -i 's|\"\\./conf|\"'\"$HOME\"'/tmp/conf|g' configure")
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make(args=["-j1"])
+        cfg = os.path.join(self.source_folder, "configure")
+        home = os.environ.get("HOME", "/storage/Users/currentUser")
+        self.run(f"sed -i 's|\"\\./conf|\"{home}/tmp/conf|g' {cfg}")
 
     def package(self):
         autotools = Autotools(self)
