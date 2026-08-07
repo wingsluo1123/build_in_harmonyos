@@ -44,10 +44,9 @@ echo "Perl arch directory: $PERL_ARCH_DIR"
 # isprime(n) — primality test
 echo "Testing factorint + isprime API..."
 
-# Attempt to load module and call actual PARI API functions
-# If this fails with Permission denied on OHOS (HMDFS SELinux), return exit 0 (platform limitation)
-# Any other failure returns exit 1 (real test failure)
-perl -I"$PERL_ARCH_DIR" -MMath::Pari=factorint,isprime -e '
+# Capture both stdout and stderr from the same perl call to ensure consistency
+# This avoids the issue of running a second perl call with different state
+OUTPUT=$(perl -I"$PERL_ARCH_DIR" -MMath::Pari=factorint,isprime -e '
     # Test factorint: factorize 123456789
     my $f = factorint(123456789);
     die "factorint returned undef" unless defined $f;
@@ -63,8 +62,11 @@ perl -I"$PERL_ARCH_DIR" -MMath::Pari=factorint,isprime -e '
     print "isprime(15) OK: not prime\n";
 
     print "Math::Pari API test PASSED\n";
-' 2>&1
+' 2>&1)
 EXIT_CODE=$?
+
+# Display the captured output
+echo "$OUTPUT"
 
 if [ $EXIT_CODE -eq 0 ]; then
     echo "TEST PASSED: Math::Pari module loaded and API verified"
@@ -72,8 +74,8 @@ if [ $EXIT_CODE -eq 0 ]; then
 fi
 
 # Check if the failure is due to HMDFS SELinux Permission denied (OHOS platform limitation)
+# Use the same OUTPUT from the first (and only) perl call to detect platform limitation
 # Only "Permission denied" is tolerated; all other errors are real test failures
-OUTPUT=$(perl -I"$PERL_ARCH_DIR" -MMath::Pari -e '1' 2>&1 || true)
 if echo "$OUTPUT" | grep -qi "Permission denied"; then
     echo "WARN: Module load blocked by Permission denied (HMDFS SELinux, OHOS platform limitation E073)"
     echo "Package contents verified: .so and .pm present."
@@ -83,5 +85,4 @@ if echo "$OUTPUT" | grep -qi "Permission denied"; then
 fi
 
 echo "FAIL: Math::Pari test failed with real error (exit code $EXIT_CODE)"
-echo "Output: $OUTPUT"
 exit 1
