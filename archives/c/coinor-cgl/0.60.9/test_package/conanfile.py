@@ -26,7 +26,7 @@ class TestPkg(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
         self.requires("coinutils/2.11.13")
-        self.requires("zlib/1.3.1")
+        self.requires("zlib/1.3.1.1")
         self.requires("coinor-osi/0.108.11")
         self.requires("clp/1.17.10")
 

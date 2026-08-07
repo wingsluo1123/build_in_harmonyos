@@ -7,4 +7,4 @@ set -euo pipefail
 # 插件索引 config8 不再生成，dlopen 全失效）。
 #
 # --out/--src 未记录（本地绝对路径），跑的时候自己补。
-python3 <conan_packager.py 的路径> gen --name coinor-cgl --version 0.60.9 --build-system autotools --source-url https://github.com/coin-or/Cgl/archive/refs/tags/releases/0.60.9.tar.gz --sha256 558421ccd6aa91d6922dd1baa04e37aa4c75ba0472118dc11779e5d6a19bfb38 --test-lang cpp --pc-cflags 'coinutils=-I${includedir}/coin' --requires coinutils/2.11.13,zlib/1.3.1,coinor-osi/0.108.11,clp/1.17.10 --alias-pc osi-clp=clp --libs Cgl --pkgconfig-name cgl --pkgconfig-deps --out <输出根目录>
+python3 <conan_packager.py 的路径> gen --name coinor-cgl --version 0.60.9 --build-system autotools --source-url https://github.com/coin-or/Cgl/archive/refs/tags/releases/0.60.9.tar.gz --sha256 558421ccd6aa91d6922dd1baa04e37aa4c75ba0472118dc11779e5d6a19bfb38 --test-lang cpp --pc-cflags 'coinutils=-I${includedir}/coin' --requires coinutils/2.11.13,zlib/1.3.1.1,coinor-osi/0.108.11,clp/1.17.10 --alias-pc osi-clp=clp --libs Cgl --pkgconfig-name cgl --pkgconfig-deps --out <输出根目录>
