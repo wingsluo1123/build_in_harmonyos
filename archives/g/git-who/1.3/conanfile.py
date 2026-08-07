@@ -142,8 +142,17 @@ class GitWhoConan(ConanFile):
         ]
         if os.path.isdir(tool_dir):
             candidates.extend(os.path.join(tool_dir, filename) for filename in os.listdir(tool_dir))
+        # E128: Go 生成的二进制为非标准 ELF（SHT_STRTAB 未 null-terminated），
+        # binary-sign-tool 直接签名报 "Failed to save 4K data to .codesign section"（CI #14731）。
+        # 必须先 strip 使 ELF 符合标准格式再签名（同 go/1.21.13 适配笔记记载）。
+        strip_tool = shutil.which("llvm-strip") or shutil.which("strip")
         for candidate in candidates:
             if os.path.isfile(candidate) and self._is_elf(candidate):
+                if strip_tool:
+                    try:
+                        subprocess.check_call([strip_tool, candidate], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except Exception:
+                        self.output.warning(f"strip failed for {candidate}, signing as-is")
                 self._sign_elf_if_ohos(candidate)
         with open(marker, "w", encoding="utf-8") as f:
             f.write("signed\n")
