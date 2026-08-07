@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: postgresql-temporal_tables/1.2.2
+homepage: "https://github.com/arkhipov/temporal_tables"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make installcheck"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make installcheck"
+
+# 上游实际运行的测试程序
+# temporal_tables 使用 PGXS regression tests (pg_regress)
+# 测试用例定义在 GNUmakefile 的 REGRESS 变量中
+upstream_tests:
+  - file: sql/install.sql
+    source: postgresql-temporal_tables-1.2.2/sql/install.sql
+    description: "Extension installation test"
+    command: "make installcheck REGRESS=install"
+  - file: sql/versioning.sql
+    source: postgresql-temporal_tables-1.2.2/sql/versioning.sql
+    description: "Versioning trigger functionality test"
+    command: "make installcheck REGRESS=versioning"
+  - file: sql/combinations.sql
+    source: postgresql-temporal_tables-1.2.2/sql/combinations.sql
+    description: "Combined versioning operations test"
+    command: "make installcheck REGRESS=combinations"
+  - file: sql/structure.sql
+    source: postgresql-temporal_tables-1.2.2/sql/structure.sql
+    description: "Table structure validation test"
+    command: "make installcheck REGRESS=structure"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "dlopen加载temporal_tables.so并验证Pg_magic_func/versioning/_PG_init符号存在"
+    command: "./test_temporal_tables"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4

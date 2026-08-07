@@ -12,10 +12,11 @@ version: "1.2.2"
 
 # 编译状态
 # published | built | failed | archived
-status: built
+status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-04"
+build_date: "2026-08-08"
+build_system: makefile
 
 # ============================================================
 # 源码信息
@@ -23,10 +24,10 @@ build_date: "2026-06-04"
 
 source:
   # 源码下载 URL
-  url: "https://github.com/mlt/temporal_tables/archive/refs/tags/v1.2.2.tar.gz"
+  url: "https://github.com/arkhipov/temporal_tables/archive/refs/tags/v1.2.2.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "85517266748a438ab140147cb70d238ca19ad14c5d7acd6007c520d378db662e"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -39,15 +40,15 @@ source:
 build:
   # 构建系统类型
   # cmake | autotools | makefile | meson | custom
-  system: pgxs
+  system: makefile
 
   # 配置选项列表
   configure_options:
-    - "PG_CONFIG=/storage/Users/currentUser/usr/local/bin/pg_config"
+    - "PG_CONFIG=pg_config"
 
   # 编译依赖列表（格式: name/version）
   dependencies:
-    - postgresql/17.0
+    - postgresql/18.3
 
   # 编译器
   cc: clang
@@ -65,11 +66,11 @@ patches_applied: []
 # ============================================================
 
 test_results:
-  type: skipped
-  total: 0
-  passed: 0
+  type: conan_test
+  total: 4
+  passed: 4
   failed: 0
-  note: "PGXS扩展无标准测试套件"
+  note: "ELF inspection + nm symbol verification (Pg_magic_func, versioning, _PG_init, pg_finfo_versioning)"
 
 # ============================================================
 # 知识沉淀
@@ -79,3 +80,5 @@ test_results:
 knowledge_gained:
   - "PGXS构建系统无需configure步骤"
   - "时态表扩展支持SQL:2011标准"
+  - "PostgreSQL扩展无法在服务器外dlopen，使用ELF检查+nm符号验证替代"
+  - "Conan basic_layout需要cwd=self.source_folder在源码目录执行make"

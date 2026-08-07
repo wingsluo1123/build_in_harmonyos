@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "review_memory.R34",
+      "file": "archives/p/postgresql-temporal_tables/1.2.2/test_package/MANIFEST.yml",
+      "line": 34,
+      "description": "MANIFEST.yml test_package_tests description says 'dlopen加载temporal_tables.so并验证Pg_magic_func/versioning/_PG_init符号存在' but the actual test.c code does NOT use dlopen(). Instead it uses open()/mmap() for ELF header inspection and popen('nm -D ...') for symbol verification. The notes.md correctly documents this approach ('PostgreSQL 扩展无法在 PostgreSQL 服务器外部 dlopen'), so the MANIFEST.yml description is inaccurate and could mislead reviewers into thinking the test performs a runtime dlopen when it only does static binary inspection.",
+      "fix_suggestion": "Update the MANIFEST.yml description to accurately reflect the test approach, e.g.: 'ELF header检查+nm符号验证temporal_tables.so的Pg_magic_func/versioning/_PG_init/pg_finfo_versioning符号存在'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory.R36",
+      "file": "archives/p/postgresql-temporal_tables/README.md",
+      "line": 4,
+      "description": "README.md states 'PostgreSQL >= 17.0 (需要 pg_config)' as the dependency requirement, but both manifest.yaml files and notes.md consistently reference PostgreSQL 18.3 (software manifest: '依赖 PostgreSQL 18.3+', version manifest: 'postgresql/18.3', notes.md: 'PostgreSQL: 18.3'). The README version ceiling is lower than the documented OHOS adaptation version. While '>= 17.0' may represent the upstream minimum supported version, it creates confusion with the manifest-declared Conan dependency version.",
+      "fix_suggestion": "Update README.md to say 'PostgreSQL >= 18.3 (需要 pg_config)' to match the manifest and notes, or add a clarifying note distinguishing upstream minimum support from OHOS tested version."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.rule3",
+      "file": "archives/p/postgresql-temporal_tables/1.2.2/conanfile.py",
+      "line": 0,
+      "description": "The conanfile.py does not declare a requirements() method, yet manifest.yaml (version-level) lists 'postgresql/18.3' under build.dependencies and the software-level manifest lists 'postgresql/18.3' under common_dependencies. The notes.md explains this is intentional ('PostgreSQL 尚未发布到制品仓'), but the discrepancy between manifest-declared dependencies and actual Conan recipe requirements could cause confusion or CI verification issues if the build system cross-checks manifest dependencies against conanfile.py requirements().",
+      "fix_suggestion": "Either add a comment in conanfile.py (e.g., '# PostgreSQL not declared as Conan dependency — uses system pg_config until postgresql/18.3 is published') or add a note in manifest.yaml dependencies field indicating the dependency is system-level rather than Conan-managed."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style.rule17",
+      "file": "archives/p/postgresql-temporal_tables/1.2.2/test_package/conanfile.py",
+      "line": 25,
+      "description": "The _find_lib() Method 2 fallback walks the entire Conan cache directory (~/.conan2/p) using os.walk() to find 'temporal_tables.so'. This brute-force approach is slow and could match a stale or wrong-version package if multiple builds exist in the cache. The hardcoded path '~/.conan2/p' also assumes the default Conan 2.x cache location and would fail if CONAN_HOME is set to a custom path.",
+      "fix_suggestion": "Consider removing Method 2 entirely and relying on Method 1 (dependency cpp_info libdirs), which should correctly find the library via the declared libdirs ['lib/postgresql', 'lib']. If a fallback is needed, filter by package reference or use Conan's cache API instead of os.walk()."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory.R9",
+      "file": "archives/p/postgresql-temporal_tables/1.2.2/test_package/conanfile.py",
+      "line": 44,
+      "description": "In test(), after cmake.test() succeeds (which runs ctest and executes the test binary), the additional self.run(f'test -x \"{test_bin}\"', env=\"conanrun\") call is redundant — if cmake.test() passed, the binary already exists and is executable. This adds unnecessary shell overhead and a potential false-failure point.",
+      "fix_suggestion": "Remove the redundant test -x check since cmake.test() already validates binary execution. Alternatively, use os.access(test_bin, os.X_OK) for a Python-native check if post-test verification is desired."
+    }
+  ],
+  "summary": "W4 Pre-PR Audit v2 for postgresql-temporal_tables 1.2.2 — VERDICT: PASS. All 10 previously identified issues from the first audit have been verified as fixed: (1) notes.md status is 'published', (2) dependency version is consistently postgresql/18.3, (3) url='' placeholder removed from conanfile.py, (4) conandata.yml uses only official arkhipov/temporal_tables GitHub URL with no gh-proxy mirror, (5) notes.md uses arkhipov URL, (6) build_date is 2026-08-08 in all manifests, (7) PG_CONFIG path is generic 'pg_config' in manifest and shutil.which() in conanfile.py, (8) subprocess.run replaced with shutil.which(), (9) paths quoted in self.run() calls, (10) build_system is 'makefile' in both manifests. Deception detection (P0) sweep found no issues: test.c performs real ELF header validation + nm symbol verification (not a stub), cmake.test() is called (no skipped tests), sha256 is valid 64-char hex (not all-zeros/f's), status='published' is consistent across all files, no pre-compiled binaries present, no #ifdef __OHOS__ stubs. Recipe correctness (P1) check passed: no hardcoded paths in conanfile.py, Conan 2.x API used correctly, official source URL, method order follows standard. Five minor issues found (1 P2, 4 P3): P2 — MANIFEST.yml description inaccurately says 'dlopen' when test.c uses open/mmap/nm; P3 — README version mismatch (17.0 vs 18.3), conanfile.py missing requirements() for declared dependency (documented limitation), _find_lib() brute-force cache walk, redundant test -x after cmake.test(). None of these are blocking for PR merge."
+}
