@@ -2,27 +2,21 @@
 
 ## 编译环境
 - 构建系统: makefile（基于 Redis 构建系统，无 configure 脚本）
-- 编译日期: 2026-06-13
-- 编译器: clang/clang++ (aarch64-unknown-linux-ohos, clang 15.0.4)
-- 状态: published
+- 编译日期: 2026-08-08
+- 编译器: clang/clang++ (aarch64, clang 15.0.4)
+- 状态: built
 
 ## 编译步骤
 
 ```bash
-# 解压源码到 .work 目录
-cd /storage/Users/currentUser/tmp/builds/redict-7.3.0.work
-
 # 编译（MALLOC=libc 替代默认的 jemalloc）
-make -j2 CC=clang CXX=clang++ MALLOC=libc CFLAGS="-fPIC -O2" LDFLAGS="-lm"
+make -j1 CC=clang CXX=clang++ MALLOC=libc CFLAGS="-fPIC -O2" LDFLAGS="-lm"
 
 # 安装到 staging 目录
-make install DESTDIR=/storage/Users/currentUser/tmp/test-install-redict-7.3.0 PREFIX=/storage/Users/currentUser/usr/local
-
-# 本地安装
-make install PREFIX=/storage/Users/currentUser/usr/local
+make install PREFIX=$TEST_PREFIX
 
 # 验证
-/storage/Users/currentUser/usr/local/bin/redict-server --version
+$TEST_PREFIX/bin/redict-server --version
 ```
 
 ## 遇到的问题与解决方案
@@ -30,12 +24,15 @@ make install PREFIX=/storage/Users/currentUser/usr/local
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | redict 默认在 Linux 上使用 jemalloc | jemalloc 在 HarmonyOS/musl 上兼容性差 | 使用 `MALLOC=libc` 参数替代 jemalloc |
-
-说明：redict 7.3.0 在 HarmonyOS aarch64 上编译时无需修改任何源码，仅需在 make 命令中指定 `MALLOC=libc` 即可完成编译。任务描述中提到的 setproctitle、fstatfs、secure_getenv 等潜在问题在本版本中均未出现。
+| 2 | setproctitle.c 编译错误: program_invocation_name 未定义 | musl libc 不提供 program_invocation_name/program_invocation_short_name（glibc 特有） | 使用 `#ifdef __GLIBC__` 守卫，非 glibc 时跳过此段代码 |
+| 3 | 链接错误: pthread_cancel/pthread_setcancelstate/pthread_setcanceltype 未定义 | musl libc 不提供 pthread 线程取消函数 | 在 setproctitle.c 中添加 weak 符号桩函数 |
 
 ## 源码修改
 
-无源码修改。编译过程干净通过，不需要任何补丁。
+- `src/setproctitle.c`:
+  - 添加 `#ifdef __GLIBC__` 守卫保护 `program_invocation_name` 和 `program_invocation_short_name` 的使用
+  - 添加 `pthread_cancel`、`pthread_setcancelstate`、`pthread_setcanceltype` 的 weak 符号桩实现
+  - 补丁文件: `patches/0001-src-setproctitle.c.patch`
 
 ## 依赖版本
 
@@ -45,30 +42,13 @@ make install PREFIX=/storage/Users/currentUser/usr/local
 ## 验证结果
 
 ```bash
-$ /storage/Users/currentUser/usr/local/bin/redict-server --version
-Redis server v=7.2.4 sha=00000000:0 malloc=libc bits=64 build=8b6a716fd4f52c89
-
-$ ls /storage/Users/currentUser/tmp/test-install-redict-7.3.0/storage/Users/currentUser/usr/local/bin/
-redict-benchmark  redict-check-aof  redict-check-rdb  redict-cli  redict-sentinel  redict-server
-
-$ file /storage/Users/currentUser/usr/local/bin/redict-server
-ELF shared object, 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1), not stripped
+$ redict-server --version
+Redis server v=7.2.4 sha=00000000:0 malloc=libc bits=64 build=ebcc85ef73a851f1
 ```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| redict-7.3.0-ohos-aarch64.tar.gz | - | 主交付包（6个二进制 + 配置文件） |
-| redict-7.3.0-ohos-aarch64-debug.tar.gz | - | 调试符号包 |
 
 ## 注意事项
 
 - redict 是 Redis OSS 7.2.4 的 LGPL-3.0 分支，`--version` 输出仍显示 "Redis server v=7.2.4"
 - 二进制名称从 redis-* 改为 redict-*（redict-server, redict-cli, redict-benchmark, redict-check-rdb, redict-check-aof, redict-sentinel）
 - 编译时必须使用 `MALLOC=libc`，不能用默认的 jemalloc
-- 未使用 TLS 支持（如需 TLS，需额外指定 BUILD_TLS=yes 及 openssl 依赖）
----
-
-**编译结束**: 2026-08-08 04:21
-**最终状态**: built
+- 源码来源: codeberg.org/redict/redict (官方源)

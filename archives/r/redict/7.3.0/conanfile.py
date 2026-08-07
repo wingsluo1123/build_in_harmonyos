@@ -24,7 +24,6 @@ class RedictConan(ConanFile):
     description = "LGPLv3 fork of Redis, distributed in-memory key-value store"
     license = "LGPL-3.0-only"
     homepage = "https://redict.io"
-    url = ""  # CI fills this
 
     package_type = "application"
 
@@ -54,17 +53,13 @@ class RedictConan(ConanFile):
 
         # Ensure binaries have redict-* names (Redict source uses redict-*,
         # but if built from Redis source, rename redis-* to redict-*)
-        src_dir = os.path.join(self.source_folder, "src")
         for name in ["server", "cli", "benchmark", "sentinel", "check-rdb", "check-aof"]:
-            redis_name = f"redis-{name}"
-            redict_name = f"redict-{name}"
-            redis_path = os.path.join(src_dir, redis_name)
-            redict_path = os.path.join(src_dir, redict_name)
+            redis_path = os.path.join(src_dir, f"redis-{name}")
+            redict_path = os.path.join(src_dir, f"redict-{name}")
             if os.path.exists(redis_path) and not os.path.exists(redict_path):
                 os.rename(redis_path, redict_path)
 
     def package(self):
-        # Copy executables from src/ to bin/
         src_dir = os.path.join(self.source_folder, "src")
         for name in ["redict-server", "redict-cli", "redict-benchmark",
                       "redict-sentinel", "redict-check-rdb", "redict-check-aof"]:

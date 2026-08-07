@@ -10,7 +10,7 @@ from conan import ConanFile
 
 class RedictTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualBuildEnv"
+    generators = "VirtualRunEnv"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
