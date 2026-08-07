@@ -6,6 +6,7 @@ This recipe builds a static library for OpenHarmony (aarch64).
 """
 import os
 import glob
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -43,20 +44,48 @@ class ProjConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def _ohos_toolchain(self):
-        """Self-discover OHOS NDK ohos.toolchain.cmake."""
+        """Self-discover OHOS NDK ohos.toolchain.cmake.
+
+        Search order:
+        1. Conan conf: tools.cmake.cmaketoolchain:user_toolchain
+        2. Environment: OHOS_NDK_HOME
+        3. Environment: OHOS_SDK_HOME
+        4. Derive from compiler path in Conan conf
+        """
         ut = self.conf.get("tools.cmake.cmaketoolchain:user_toolchain", default=[], check_type=list)
-        ndk = os.environ.get("OHOS_NDK_HOME", "")
-        candidates = list(ut) + ([os.path.join(ndk, "build/cmake/ohos.toolchain.cmake")] if ndk else [])
-        for cand in candidates:
+        for cand in ut:
             if cand and os.path.isfile(cand):
                 return cand
+        ndk = os.environ.get("OHOS_NDK_HOME", "")
+        if ndk:
+            tc = os.path.join(ndk, "build/cmake/ohos.toolchain.cmake")
+            if os.path.isfile(tc):
+                return tc
         _sdk = os.environ.get("OHOS_SDK_HOME", "")
         if _sdk:
             _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
             if os.path.isfile(_tc):
                 return _tc
+        # Derive from compiler path: the toolchain file lives in the same
+        # SDK tree as the compiler binary. Walk up from the compiler's
+        # directory and search for ohos.toolchain.cmake.
+        _compilers = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        for _key in ("c", "cpp"):
+            _cc = _compilers.get(_key, "") if _compilers else ""
+            if not _cc:
+                continue
+            _dir = os.path.dirname(os.path.realpath(_cc))
+            for _ in range(3):
+                _dir = os.path.dirname(_dir)
+                if _dir == "/":
+                    break
+                _hits = sorted(glob.glob(
+                    os.path.join(_dir, "**", "ohos.toolchain.cmake"), recursive=True))
+                if _hits:
+                    return _hits[0]
         raise ConanInvalidConfiguration(
-            "ohos.toolchain.cmake not found: set OHOS_NDK_HOME or OHOS_SDK_HOME or profile [conf] user_toolchain")
+            "ohos.toolchain.cmake not found: set OHOS_NDK_HOME or OHOS_SDK_HOME "
+            "or profile [conf] user_toolchain")
 
     def _find_llvm_tool(self, tool_name):
         """Find an LLVM tool (llvm-ar, llvm-ranlib, etc.) from multiple sources.
@@ -199,19 +228,16 @@ class ProjConan(ConanFile):
                 p = os.path.join(bindir, name)
                 if os.path.isfile(p) and not os.path.islink(p) and self._is_elf(p):
                     targets.append(p)
-        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
-        if not _tools_dir:
-            self.output.warn("OHOS_TOOLS_DIR not set, skipping ELF signing")
-            return
         objcopy = self._find_llvm_tool("llvm-objcopy")
-        signer = os.path.join(_tools_dir, "binary-sign-tool")
-        if not os.path.isfile(signer):
+        _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
+        signer = os.path.join(_tools_dir, "binary-sign-tool") if _tools_dir else shutil.which("binary-sign-tool")
+        if not signer or not os.path.isfile(signer):
             self.output.warn("binary-sign-tool not found, skipping ELF signing")
             return
         for f in targets:
             if os.path.islink(f):
                 continue
-            if os.path.isfile(objcopy):
+            if objcopy and os.path.isfile(objcopy):
                 self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=f), ignore_errors=True)
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
 

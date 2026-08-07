@@ -10,6 +10,7 @@ from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import cross_building
 import os
 import glob
+import shutil
 
 
 class LibgeotiffConan(ConanFile):
@@ -171,18 +172,15 @@ class LibgeotiffConan(ConanFile):
         if not sos:
             return
         _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
-        if not _tools_dir:
-            self.output.warn("OHOS_TOOLS_DIR not set, skipping .so signing")
-            return
-        objcopy = os.path.join(_tools_dir, "llvm-objcopy")
-        signer = os.path.join(_tools_dir, "binary-sign-tool")
-        if not os.path.isfile(signer):
+        objcopy = os.path.join(_tools_dir, "llvm-objcopy") if _tools_dir else shutil.which("llvm-objcopy")
+        signer = os.path.join(_tools_dir, "binary-sign-tool") if _tools_dir else shutil.which("binary-sign-tool")
+        if not signer or not os.path.isfile(signer):
             self.output.warn("binary-sign-tool not found, skipping .so signing")
             return
         for so in sos:
             if os.path.islink(so):
                 continue
-            if os.path.isfile(objcopy):
+            if objcopy and os.path.isfile(objcopy):
                 self.run('{oc} --remove-section .codesign "{f}"'.format(oc=objcopy, f=so), ignore_errors=True)
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=so))
 
