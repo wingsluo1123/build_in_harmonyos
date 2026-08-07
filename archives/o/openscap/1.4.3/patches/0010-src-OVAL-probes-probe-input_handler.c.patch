@@ -1,12 +1,6 @@
---- a/src/OVAL/probes/probe/input_handler.c
-+++ b/src/OVAL/probes/probe/input_handler.c
-@@ -1,44 +1,55 @@
- /*
-  * Copyright 2011 Red Hat Inc., Durham, North Carolina.
-  * All Rights Reserved.
-  *
-  * This library is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU Lesser General Public
+--- /storage/Users/currentUser/tmp/builds/openscap-1.4.3.orig/src/OVAL/probes/probe/input_handler.c	2026-08-07 07:08:16.000000000 +0800
++++ /storage/Users/currentUser/tmp/builds/openscap-1.4.3.work/src/OVAL/probes/probe/input_handler.c	2026-08-07 08:46:08.930477812 +0800
+@@ -7,13 +7,13 @@
   * License as published by the Free Software Foundation; either
   * version 2.1 of the License, or (at your option) any later version.
   *
@@ -22,23 +16,10 @@
   * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
   *
   * Authors:
-  *      Daniel Kopecek <dkopecek@redhat.com>
-  */
- 
- #ifdef HAVE_CONFIG_H
- #include <config.h>
+@@ -34,6 +34,17 @@
+ #include <pthread_np.h>
  #endif
  
- #include <errno.h>
- #include <pthread.h>
- #include <string.h>
- #include "_seap.h"
- #include <probe-api.h>
- 
- #if defined(OS_FREEBSD)
- #include <pthread_np.h>
-+#endif
-+
 +#ifdef __OHOS__
 +/* HarmonyOS doesn't support pthread_cancel */
 +#define pthread_cancel(thread) (0)
@@ -46,26 +27,14 @@
 +#define pthread_setcanceltype(type, oldtype) (0)
 +#define PTHREAD_CANCEL_ENABLE 0
 +#define PTHREAD_CANCEL_DISABLE 1
-+#define PTHREAD_CANCEL_ASYNCHRONOUS 0
++#define PTHREAD_CANCEL_ASYNCHRONOUS 1
 +#define PTHREAD_CANCEL_DEFERRED 0
- #endif
- 
++#endif
++
  #include "common/debug_priv.h"
  #include "../SEAP/generic/rbt/rbt.h"
  #include "probe.h"
- #include "worker.h"
- #include "rcache.h"
- #include "input_handler.h"
- #include "common/compat_pthread_barrier.h"
- 
-@@ -77,21 +88,21 @@
- 
-         if (pthread_attr_init(&pth_attr))
-                 return (NULL);
- 
-         if (pthread_attr_setdetachstate(&pth_attr, PTHREAD_CREATE_JOINABLE)) {
-                 pthread_attr_destroy(&pth_attr);
-                 return (NULL);
+@@ -84,7 +95,7 @@
          }
  
  	pthread_cleanup_push(pthread_attr_cleanup_handler, (void *)&pth_attr);
@@ -74,10 +43,3 @@
          switch (errno = pthread_barrier_wait(probe->th_barrier))
          {
          case 0:
-         case PTHREAD_BARRIER_SERIAL_THREAD:
- 	        break;
-         default:
- 	        dE("pthread_barrier_wait: %d, %s.",
- 	           errno, strerror(errno));
- 	        return (NULL);
-         }
