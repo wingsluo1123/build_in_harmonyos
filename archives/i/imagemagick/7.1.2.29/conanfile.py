@@ -17,7 +17,7 @@ class ImageMagickConan(ConanFile):
     description = "Open-source software suite for creating, editing, converting, and displaying images"
     license = "ImageMagick"
     homepage = "https://imagemagick.org"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 

@@ -1,163 +1,64 @@
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/7.1.2.29/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
+# 版本级 manifest
+# 文件位置: archives/i/imagemagick/7.1.2.29/manifest.yaml
 
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "7.1.2.29"
-
-# 软件名
-software: "{software}"
-
-# 编译状态
-# published | built | failed | archived
+software: "imagemagick"
 status: built
-
-# 编译日期（YYYY-MM-DD）
 build_date: "2026-08-06"
-build_system: "{BUILD_SYSTEM}"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_system: "autotools"
 
 source:
-  # 源码下载 URL
   url: "https://github.com/ImageMagick/ImageMagick/archive/refs/tags/7.1.2-29.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "b05924ad73c6932ba62c9b32f338f0619b90b767162c8b767f3566556187a284"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  configure_options:
+    - "--disable-openmp"
+    - "--without-heic"
+    - "--without-openjp2"
+    - "--without-openexr"
+    - "--without-raw"
+    - "--without-djvu"
+    - "--without-jxl"
+    - "--without-lqr"
+    - "--without-pango"
+    - "--without-lcms"
+    - "--without-zstd"
+    - "--without-jbig"
+    - "--without-raqm"
+    - "--without-gdi32"
+    - "--without-bzlib"
+    - "--without-zip"
+    - "--without-dmr"
+  dependencies:
+    - "zlib/1.3.1.1"
+    - "libjpeg-turbo/3.2.0"
+    - "libpng/1.6.58"
+    - "libtiff/4.7.2"
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
+patches_applied:
+  - "0001-config-config.guess.patch"
+  - "0002-config-config.sub.patch"
+  - "0003-configure-umask.patch"
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/imagemagick-7.1.2.29.orig
-  source_work_dir: /storage/Users/currentUser/builds/imagemagick-7.1.2.29.work
-  source_orig_hash: 157bb4be3e88e925
-  source_work_hash: 5f90db071d5a82d6
-  generated_at: '2026-08-06T21:35:32'
-  patches_count: 18
+knowledge_gained:
+  - "E007: config.guess 需要修补以识别 HarmonyOS"
+  - "E011: configure 中 umask 077 需改为 022 以适配 HMDFS"
 
 patch_classification:
   - file: 0001-config-config.guess.patch
-    type: auto
+    type: platform
     platform_only: True
-    guard: 'pending'
+    guard: 'E007'
   - file: 0002-config-config.sub.patch
-    type: auto
+    type: platform
     platform_only: True
-    guard: 'pending'
-  - file: 0003-config-type-urw-base35-type1.xml.patch
-    type: auto
+    guard: 'E007'
+  - file: 0003-configure-umask.patch
+    type: platform
     platform_only: True
-    guard: 'pending'
-  - file: 0004-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-utilities-ImageMagick.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0006-utilities-animate.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0007-utilities-compare.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0008-utilities-composite.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0009-utilities-conjure.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0010-utilities-convert.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0011-utilities-display.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0012-utilities-identify.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0013-utilities-import.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0014-utilities-magick-script.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0015-utilities-magick.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0016-utilities-mogrify.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0017-utilities-montage.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0018-utilities-stream.1.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    guard: 'E011'
