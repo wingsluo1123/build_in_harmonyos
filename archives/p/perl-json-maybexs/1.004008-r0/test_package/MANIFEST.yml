@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-json-maybexs/1.004008-r0
+homepage: "https://metacpan.org/release/JSON-MaybeXS"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "perl Makefile.PL && make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/new.t
+    source: JSON-MaybeXS-1.004008/t/new.t
+    description: "JSON::MaybeXS constructor and basic functionality tests"
+    command: "perl -Ilib t/new.t"
+  - file: t/pp.t
+    source: JSON-MaybeXS-1.004008/t/pp.t
+    description: "JSON::PP backend selection tests"
+    command: "perl -Ilib t/pp.t"
+  - file: t/legacy.t
+    source: JSON-MaybeXS-1.004008/t/legacy.t
+    description: "Legacy API compatibility tests"
+    command: "perl -Ilib t/legacy.t"
+  - file: t/none.t
+    source: JSON-MaybeXS-1.004008/t/none.t
+    description: "No backend available scenario tests"
+    command: "perl -Ilib t/none.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_maybexs.sh
+    description: "消费者测试：加载 JSON::MaybeXS 模块并调用 encode_json/decode_json API"
+    command: "sh test_maybexs.sh <perl_lib>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 15

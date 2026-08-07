@@ -130,11 +130,6 @@ $ find /storage/Users/currentUser/tmp/test-install-perl-json-maybexs-1.004008-r0
 模块已成功安装到 `/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0/JSON/MaybeXS.pm`。
 ---
 
-**编译结束**: 2026-06-12 17:39
-**最终状态**: built
-
----
-
 ## 功能测试记录（2026-06-13）
 
 ### 测试概况
@@ -181,3 +176,7 @@ $ find /storage/Users/currentUser/tmp/test-install-perl-json-maybexs-1.004008-r0
 **理由**: 功能完全可用，测试全部通过，符合上库要求
 
 详细测试报告见: `reports/test-report.md`
+---
+
+**编译结束**: 2026-08-07 09:59
+**最终状态**: built

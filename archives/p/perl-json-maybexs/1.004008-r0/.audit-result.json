@@ -1,0 +1,62 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/conanfile.py",
+      "line": 25,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' — code_style rule #5 explicitly prohibits this pattern in merged code. The url attribute should be filled by the adapter or removed if not applicable to this recipe type.",
+      "fix_suggestion": "Set url to the recipe repository URL (e.g., 'https://cnb.cool/your-org/build-in-harmonyos/-/tree/main/archives/p/perl-json-maybexs/1.004008-r0'), or remove the url attribute entirely if the recipe does not have its own repository."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS2",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/conanfile.py",
+      "line": 19,
+      "description": "Class name 'PerljsonmaybexsConan' is not proper PascalCase. code_style rule #2 requires class name in format '{SoftwareName}Conan' with PascalCase. The package name 'perl-json-maybexs' has word segments separated by hyphens (perl, json, maybexs); each should be capitalized: 'PerlJsonMaybexsConan'.",
+      "fix_suggestion": "Rename the class to 'PerlJsonMaybexsConan' to properly capitalize each word segment from the package name."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS2",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/test_package/conanfile.py",
+      "line": 15,
+      "description": "Class name 'PerljsonmaybexsTestConan' is not proper PascalCase. code_style rule #2 requires PascalCase format. Should be 'PerlJsonMaybexsTestConan' with each word segment capitalized.",
+      "fix_suggestion": "Rename the class to 'PerlJsonMaybexsTestConan' to properly capitalize each word segment."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS7",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/test_package/test_maybexs.sh",
+      "line": 9,
+      "description": "Shell script uses 'set -eu' but is missing '-o pipefail'. code_style rule #7 requires all scripts to use 'set -euo pipefail' for safe mode. Without pipefail, pipeline failures (e.g., grep in a pipe) can be silently swallowed.",
+      "fix_suggestion": "Change 'set -eu' to 'set -euo pipefail'. If the script must use #!/bin/sh (POSIX), consider switching to #!/bin/bash for pipefail support, or add explicit error checking for each pipeline."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS10",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/test_package/test_maybexs.sh",
+      "line": 20,
+      "description": "'|| true' used on the find command without an explicit inline comment explaining why the error is suppressed. code_style rule #10 requires a comment on the same line as '|| true' usage. While the context is clear (find returns non-zero when no files match, handled by the subsequent [ -z ] check), the rule mandates an inline comment.",
+      "fix_suggestion": "Add an inline comment: PM_FILE=$(find \"$PERL_LIB\" -name \"MaybeXS.pm\" -print -quit 2>/dev/null || true)  # find exits non-zero if no match; checked below"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS9",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/test_package/test_maybexs.sh",
+      "line": 25,
+      "description": "Output format uses 'OK:'/'ERROR:' instead of the '[ok]'/'[fail]' tags specified in code_style rule #9. While this is a test_package consumer script rather than a CI build script, using standardized output tags improves consistency and parseability.",
+      "fix_suggestion": "Consider using '[ok]' for success messages and '[fail]' for failure messages with 8-space indentation, e.g.: echo '        [ok] Found MaybeXS.pm at $PM_FILE'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/p/perl-json-maybexs/1.004008-r0/manifest.yaml",
+      "line": 24,
+      "description": "build_system value 'perl-extutils-makemaker' is not in the standard list (cmake | autotools | makefile | meson) defined in code_style rule #14. While more descriptive for a Perl module, CI tooling may expect standard values. The build section already uses 'system: makefile' which is standard.",
+      "fix_suggestion": "Consider using 'makefile' as the top-level build_system value (since ExtUtils::MakeMaker generates a Makefile) and keep the Perl-specific details in comments or knowledge_gained section."
+    }
+  ],
+  "summary": "Audit of perl-json-maybexs 1.004008-r0 Conan recipe (6 changed files). VERDICT: PASS. No P0 (deceptive behavior) or P1 (recipe correctness) issues found. Deception detection (highest priority): R34 PASSED — test_package/test_maybexs.sh calls actual JSON::MaybeXS API (encode_json, decode_json, JSON::MaybeXS::true/false, unicode encoding) with output validation via grep and string comparison; not a stub print test. R9 PASSED — no test skipping or fake pass. sha256 is valid (64 hex chars, not all-zeros/f). manifest.yaml status 'built' is honest. No pre-compiled binaries (R19). No #ifdef __OHOS__ stubs (R8). R40 N/A — pure Perl module, no graphics/UI/multimedia/hardware adaptation needed. Recipe correctness: R32 PASSED (uses 'not in (\"Linux\", \"OHOS\")'), R33 PASSED (no bare env vars), R39 PASSED (official CPAN source URL), R37 PASSED (version 1.004008-r0 is first adaptation with -r0 suffix). Perl dependency omission is intentional and documented per task context. 5 P2 code style warnings (template placeholder url, class naming x2, shell safe mode missing pipefail, || true without inline comment) and 2 P3 suggestions (output format, non-standard build_system). All P2 issues are non-blocking style warnings."
+}
