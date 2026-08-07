@@ -35,6 +35,7 @@ class PerlModuleRuntimeTestConan(ConanFile):
         with open(test_script, "w") as f:
             f.write("use Module::Runtime qw(require_module use_module is_module_name);\n")
             f.write("die 'not a valid module name' unless is_module_name('Cwd');\n")
+            f.write("require_module('Cwd');\n")
             f.write("use_module('Cwd');\n")
             f.write("print Cwd::getcwd(), \"\\n\";\n")
             f.write("print \"OK\\n\";\n")

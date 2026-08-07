@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: makefile (ExtUtils::MakeMaker)
-- 编译日期: 2026-06-18
+- 编译日期: 2026-08-07
 - 编译器: clang/clang++
 - Perl 版本: 5.42.0 (aarch64-linux)
 - 操作系统: OpenHarmony (aarch64-unknown-linux-ohos)
@@ -111,4 +111,4 @@ $ perl -MModule::Runtime=use_module -e 'use_module("Cwd"); print Cwd::getcwd(), 
 ---
 
 **编译结束**: 2026-08-07 11:29
-**最终状态**: built
+**最终状态**: published
