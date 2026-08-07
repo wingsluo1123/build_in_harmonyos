@@ -1,26 +1,89 @@
 software: pdf4qt
 version: "1.5.3.1"
-status: built
-compile_date: "2026-06-05"
+status: published
+compile_date: "2026-08-07"
 build_system: cmake
 
 source:
   url: "https://github.com/JakubMelka/PDF4QT/archive/refs/tags/v1.5.3.1.tar.gz"
-  sha256: ""
+  sha256: "0c8f5251e5a20ac916b9cf932ee0bea26052f6c543315b312c5cc064d85b6f6a"
   tar_format: tar.gz
 
 build:
   system: cmake
-  configure_options: []
-  dependencies: []
+  configure_options:
+    - "PDF4QT_BUILD_ONLY_CORE_LIBRARY=ON"
+    - "PDF4QT_INSTALL_INCLUDE=ON"
+  dependencies:
+    - qtbase/6.11.1
+    - openssl/3.5.6.1.1
+    - freetype/2.14.3
+    - openjpeg/2.5.4
+    - libjpeg/10
+    - libpng/1.6.58
+    - lcms2/2.19
+    - zlib/1.3.1.1
+    - fontconfig/2.18.1.1
+  vendored_dependencies:
+    - blend2d (from github.com/blend2d/blend2d, with asmjit)
   cc: clang
   cxx: clang++
 
-patches_applied: []
-knowledge_gained: []
+patches_applied:
+  - patches/ohos-adapt.patch
+
+knowledge_gained:
+  - "OHOS libc++ does not support std::execution parallel algorithms (replaced with sequential)"
+  - "Qt6Svg not available in Conan repo (removed from core library - not actually used)"
+  - "Qt6LinguistTools not available (made conditional)"
+  - "Conan target names differ from standard CMake (added aliases for OpenSSL, Freetype, JPEG, OpenJPEG)"
+  - "blend2d not in Conan repo - vendored as static library"
 
 test_results:
-  total: 0
-  passed: 0
+  total: 1
+  passed: 1
   failed: 0
-  skipped: "no test suite"
+  skipped: "full application build requires Qt6Svg, Qt6PrintSupport, Qt6TextToSpeech (not in Conan repo)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pdf4qt-1.5.3.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pdf4qt-1.5.3.1.work
+  source_orig_hash: 4998e29b14f90e1e
+  source_work_hash: 96522bcd81112da3
+  generated_at: '2026-08-07T10:11:39'
+  patches_count: 8
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-Pdf4QtLibCore-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-Pdf4QtLibCore-sources-pdfcolorspaces.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-Pdf4QtLibCore-sources-pdfdocumentreader.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-Pdf4QtLibCore-sources-pdfexecutionpolicy.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-Pdf4QtLibCore-sources-pdfpattern.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-Pdf4QtLibCore-sources-pdftextlayout.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-Pdf4QtLibCore-sources-pdfvisitor.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

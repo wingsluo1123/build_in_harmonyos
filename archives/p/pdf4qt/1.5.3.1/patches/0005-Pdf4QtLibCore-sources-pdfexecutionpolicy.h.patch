@@ -1,0 +1,60 @@
+--- a/Pdf4QtLibCore/sources/pdfexecutionpolicy.h
++++ b/Pdf4QtLibCore/sources/pdfexecutionpolicy.h
+@@ -22,21 +22,22 @@
+ 
+ #ifndef PDFEXECUTIONPOLICY_H
+ #define PDFEXECUTIONPOLICY_H
+ 
+ #include "pdfglobal.h"
+ 
+ #include <QSemaphore>
+ #include <QThreadPool>
+ 
+ #include <atomic>
+-#include <execution>
++// OHOS libc++ does not support std::execution parallel algorithms
++// Use regular sequential algorithms instead
+ 
+ namespace pdf
+ {
+ struct PDFExecutionPolicyHolder;
+ 
+ /// Defines thread execution policy based on settings and actual number of page content
+ /// streams being processed. It can regulate number of threads executed at each
+ /// point, where execution policy is used.
+ class PDF4QTLIBCORESHARED_EXPORT PDFExecutionPolicy
+ {
+@@ -131,31 +132,31 @@
+                 remainder -= currentSize;
+                 std::advance(it, currentSize);
+             }
+ 
+             Q_ASSERT(it == last);
+ 
+             semaphore.acquire(count);
+         }
+         else
+         {
+-            std::for_each(std::execution::seq, first, last, f);
++            std::for_each(first, last, f);
+         }
+     }
+ 
+     template<typename ForwardIt, typename Comparator>
+     static void sort(Scope scope, ForwardIt first, ForwardIt last, Comparator f)
+     {
+         Q_UNUSED(scope);
+ 
+         // We always sort by single thread
+-        std::sort(std::execution::seq, first, last, f);
++        std::sort(first, last, f);
+     }
+ 
+     /// Returns number of active threads for given scope
+     static int getActiveThreadCount(Scope scope);
+ 
+     /// Returns maximal number of threads for given scope
+     static int getMaxThreadCount(Scope scope);
+ 
+     /// Sets maximal number of threads for given scope
+     static void setMaxThreadCount(Scope scope, int count);

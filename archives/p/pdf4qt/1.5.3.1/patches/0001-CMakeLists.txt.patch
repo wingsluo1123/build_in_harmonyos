@@ -1,0 +1,167 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -52,43 +52,80 @@
+ 
+ if(VCPKG_TOOLCHAIN AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Installation directory" FORCE)
+ endif()
+ 
+ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+ include(GNUInstallDirs)
+ 
+-find_package(Qt6 REQUIRED COMPONENTS Core LinguistTools)
+-
+ if(PDF4QT_BUILD_ONLY_CORE_LIBRARY)
+-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Svg Xml)
++    find_package(Qt6 REQUIRED COMPONENTS Core Gui Xml)
+ else()
+-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport TextToSpeech Test)
+-endif()
+-
+-qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES en de cs es ko zh_CN zh_TW fr tr ru)
++    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg Xml PrintSupport TextToSpeech Test LinguistTools)
++    qt_standard_project_setup(I18N_TRANSLATED_LANGUAGES en de cs es ko zh_CN zh_TW fr tr ru)
++endif()
+ 
+ find_package(OpenSSL REQUIRED)
++# Workaround: Conan's openssl package provides openssl::openssl but not OpenSSL::SSL/OpenSSL::Crypto
++if(TARGET openssl::openssl AND NOT TARGET OpenSSL::SSL)
++    add_library(OpenSSL::SSL INTERFACE IMPORTED)
++    target_link_libraries(OpenSSL::SSL INTERFACE openssl::openssl)
++    add_library(OpenSSL::Crypto INTERFACE IMPORTED)
++    target_link_libraries(OpenSSL::Crypto INTERFACE openssl::openssl)
++endif()
+ find_package(ZLIB REQUIRED)
+ find_package(Freetype REQUIRED)
++# Workaround: Conan's freetype provides freetype::freetype but not Freetype::Freetype
++if(TARGET freetype::freetype AND NOT TARGET Freetype::Freetype)
++    add_library(Freetype::Freetype INTERFACE IMPORTED)
++    target_link_libraries(Freetype::Freetype INTERFACE freetype::freetype)
++endif()
+ find_package(OpenJPEG CONFIG REQUIRED)
++# Workaround: Conan's OpenJPEG provides OPENJPEG::OpenJPEG but pdf4qt uses openjp2 library name
++if(TARGET OPENJPEG::OpenJPEG AND NOT TARGET openjp2)
++    add_library(openjp2 INTERFACE IMPORTED)
++    target_link_libraries(openjp2 INTERFACE OPENJPEG::OpenJPEG)
++endif()
+ find_package(JPEG REQUIRED)
++# Workaround: Conan's libjpeg provides libjpeg::libjpeg but not JPEG::JPEG
++if(TARGET libjpeg::libjpeg AND NOT TARGET JPEG::JPEG)
++    add_library(JPEG::JPEG INTERFACE IMPORTED)
++    target_link_libraries(JPEG::JPEG INTERFACE libjpeg::libjpeg)
++endif()
+ find_package(PNG REQUIRED)
+ find_package(blend2d CONFIG REQUIRED)
++
++# Fontconfig for font handling on Linux
++find_package(fontconfig CONFIG QUIET)
++if(NOT TARGET fontconfig::fontconfig)
++    find_path(FONTCONFIG_INCLUDE_DIR fontconfig/fontconfig.h)
++    find_library(FONTCONFIG_LIBRARIES fontconfig)
++endif()
+ 
+ if(VCPKG_TOOLCHAIN)
+     find_package(lcms2 REQUIRED)
+     set(LCMS2_LIBRARIES lcms2::lcms2 CACHE INTERNAL "LCMS2 libraries")
+-else() # lcms usually doesn't provide a config file
+-    find_library(LCMS2_LIBRARIES lcms2 REQUIRED)
++else()
++    # Try Conan's cmake config first, then fall back to find_library
++    find_package(lcms2 CONFIG QUIET)
++    if(TARGET lcms2::lcms2)
++        set(LCMS2_LIBRARIES lcms2::lcms2 CACHE INTERNAL "LCMS2 libraries")
++    else()
++        find_library(LCMS2_LIBRARIES lcms2 REQUIRED)
++    endif()
++endif()
++
++# Workaround: Use Conan's lcms2 target if available and find_library didn't work
++if(TARGET lcms2::lcms2 AND (NOT LCMS2_LIBRARIES OR LCMS2_LIBRARIES STREQUAL "LCMS2_LIBRARIES-NOTFOUND"))
++    set(LCMS2_LIBRARIES lcms2::lcms2 CACHE INTERNAL "LCMS2 libraries")
+ endif()
+ 
+ set(CMAKE_AUTOMOC ON)
+ set(CMAKE_AUTOUIC ON)
+ set(CMAKE_AUTORCC ON)
+ 
+ set(CMAKE_AUTORCC_OPTIONS "--threshold;0;--compress;9")
+ 
+ if (MSVC)
+     add_compile_options(/bigobj /W4 /wd5054 /wd4127 /wd4702)
+@@ -137,62 +174,66 @@
+ if(PDF4QT_INSTALL_INCLUDE)
+     # Install public headers from Pdf4QtLibCore/include
+     install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Pdf4QtLibCore/sources/
+             DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibCore
+             FILES_MATCHING PATTERN "*.h")
+ 
+     # Install generated export header
+     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pdf4qtlibcore_export.h
+             DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibCore)
+ 
+-    # Install public headers from Pdf4QtLibWidgets/include
+-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Pdf4QtLibWidgets/sources/
+-            DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibWidgets
+-            FILES_MATCHING PATTERN "*.h")
+-
+-    # Install generated export header
+-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pdf4qtlibwidgets_export.h
+-            DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibWidgets)
++    if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
++        # Install public headers from Pdf4QtLibWidgets/include
++        install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Pdf4QtLibWidgets/sources/
++                DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibWidgets
++                FILES_MATCHING PATTERN "*.h")
++
++        # Install generated export header
++        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pdf4qtlibwidgets_export.h
++                DESTINATION ${PDF4QT_INSTALL_INCLUDE_DIR}/Pdf4QtLibWidgets)
++    endif()
+ endif()
+ 
+ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
+     add_subdirectory(Pdf4QtLibWidgets)
+     add_subdirectory(CodeGenerator)
+     add_subdirectory(JBIG2_Viewer)
+     add_subdirectory(PdfExampleGenerator)
+     add_subdirectory(PdfTool)
+     add_subdirectory(UnitTests)
+     add_subdirectory(Pdf4QtLibGui)
+     add_subdirectory(Pdf4QtEditorPlugins)
+     add_subdirectory(Pdf4QtEditor)
+     add_subdirectory(Pdf4QtViewer)
+     add_subdirectory(Pdf4QtPageMaster)
+     add_subdirectory(Pdf4QtDiff)
+     add_subdirectory(Pdf4QtLaunchPad)
+     add_subdirectory(WixInstaller)
+ endif()
+ 
++if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
+ qt_collect_translation_source_targets(i18n_targets)
+ message("CMAKE_TRANSLATION_TARGETS = " ${i18n_targets})
+ 
+ set(PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/translations)
+ set(PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR}/translations)
+ 
+ message("PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY})
+ message("PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY" ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY})
+ 
+ qt_add_translations(TARGETS Pdf4QtEditor Pdf4QtViewer Pdf4QtPageMaster Pdf4QtDiff PdfTool
+                     SOURCE_TARGETS ${i18n_targets}
+                     MERGE_QT_TRANSLATIONS
+                     TS_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_TS_OUTPUT_DIRECTORY}
+                     QM_OUTPUT_DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
+                     QM_FILES_OUTPUT_VARIABLE pdf4qt_qm_files)
++endif()
+ 
+ message("CMAKE_PREFIX_PATH = " ${CMAKE_PREFIX_PATH})
+ message("CMAKE_TOOLCHAIN_FILE = " ${CMAKE_TOOLCHAIN_FILE})
+ 
+ configure_file(version.txt.in version.txt)
+ 
+ if(NOT PDF4QT_BUILD_ONLY_CORE_LIBRARY)
+     install(DIRECTORY ${PDF4QT_TRANSLATION_QM_OUTPUT_DIRECTORY}
+             RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR}
+             FILES_MATCHING

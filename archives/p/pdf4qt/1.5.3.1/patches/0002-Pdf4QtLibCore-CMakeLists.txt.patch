@@ -1,0 +1,50 @@
+--- a/Pdf4QtLibCore/CMakeLists.txt
++++ b/Pdf4QtLibCore/CMakeLists.txt
+@@ -163,38 +163,46 @@
+     fonts.qrc
+ )
+ 
+ include(GenerateExportHeader)
+ 
+ GENERATE_EXPORT_HEADER(Pdf4QtLibCore
+                        EXPORT_MACRO_NAME
+                        PDF4QTLIBCORESHARED_EXPORT
+                        EXPORT_FILE_NAME "${CMAKE_BINARY_DIR}/${INSTALL_INCLUDEDIR}/pdf4qtlibcore_export.h")
+ 
+-target_link_libraries(Pdf4QtLibCore PRIVATE Qt6::Core Qt6::Gui Qt6::Xml Qt6::Svg)
++target_link_libraries(Pdf4QtLibCore PRIVATE Qt6::Core Qt6::Gui Qt6::Xml)
+ target_link_libraries(Pdf4QtLibCore PRIVATE ${LCMS2_LIBRARIES})
+ target_link_libraries(Pdf4QtLibCore PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+ target_link_libraries(Pdf4QtLibCore PRIVATE ZLIB::ZLIB)
+ target_link_libraries(Pdf4QtLibCore PRIVATE Freetype::Freetype)
+ target_link_libraries(Pdf4QtLibCore PRIVATE openjp2)
+ target_link_libraries(Pdf4QtLibCore PRIVATE JPEG::JPEG)
+ 
+ if(LINUX_GCC)
+     target_link_libraries(Pdf4QtLibCore PUBLIC TBB::tbb)
+ endif()
+ 
+ if(MINGW)
+     target_link_libraries(Pdf4QtLibCore PRIVATE Secur32 Mscms Gdi32 User32 crypt32)
+ endif()
+ 
+ target_include_directories(Pdf4QtLibCore INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sources)
+ target_include_directories(Pdf4QtLibCore PUBLIC ${CMAKE_BINARY_DIR}/${INSTALL_INCLUDEDIR})
+ 
+ target_link_libraries(Pdf4QtLibCore PRIVATE blend2d::blend2d)
+ 
++# Fontconfig for font handling
++if(TARGET fontconfig::fontconfig)
++    target_link_libraries(Pdf4QtLibCore PRIVATE fontconfig::fontconfig)
++elseif(FONTCONFIG_LIBRARIES)
++    target_link_libraries(Pdf4QtLibCore PRIVATE ${FONTCONFIG_LIBRARIES})
++    target_include_directories(Pdf4QtLibCore PRIVATE ${FONTCONFIG_INCLUDE_DIR})
++endif()
++
+ set_target_properties(Pdf4QtLibCore PROPERTIES
+                       VERSION ${PDF4QT_VERSION}
+                       SOVERSION ${PDF4QT_VERSION}
+                       LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_LIB_DIR}
+                       RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${PDF4QT_INSTALL_BIN_DIR})
+ 
+ install(TARGETS Pdf4QtLibCore RUNTIME DESTINATION ${PDF4QT_INSTALL_BIN_DIR} LIBRARY DESTINATION ${PDF4QT_INSTALL_LIB_DIR})
