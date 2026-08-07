@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 
 static int is_elf_magic(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -45,7 +46,13 @@ int main(int argc, char *argv[]) {
     }
     int ret = system(cmd);
     if (ret != 0) {
-        fprintf(stderr, "scooter --version failed with exit code %d\n", ret);
+        /* P2: system() 返回 POSIX wait status 编码值（退出码 1 显示为 256），
+         * 需 WIFEXITED/WEXITSTATUS 解析真实退出码（同 tlrc test_package 处理） */
+        if (WIFEXITED(ret)) {
+            fprintf(stderr, "scooter --version failed with exit code %d\n", WEXITSTATUS(ret));
+        } else {
+            fprintf(stderr, "scooter --version aborted abnormally (wait status %d)\n", ret);
+        }
         return 1;
     }
     printf("scooter runtime test PASSED (scooter --version exit 0)\n");
