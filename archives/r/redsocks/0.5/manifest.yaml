@@ -12,10 +12,14 @@ version: "0.5"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-29"
+build_date: "2026-08-08"
+
+# 构建系统类型 (top-level required field)
+# cmake | autotools | makefile | meson | custom
+build_system: makefile
 
 # ============================================================
 # 源码信息
@@ -23,10 +27,10 @@ build_date: "2026-05-29"
 
 source:
   # 源码下载 URL
-  url: "https://..."
+  url: "https://github.com/darkk/redsocks/archive/refs/tags/release-0.5.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "bbeb531d7f1986d7102f1bd6733dacce41d3f3ba7d604f1aab61c63e0ba2ee62"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -39,7 +43,7 @@ source:
 build:
   # 构建系统类型
   # cmake | autotools | makefile | meson | custom
-  system: unknown
+  system: makefile
 
   # 配置选项列表
   configure_options: []
@@ -48,7 +52,8 @@ build:
   # - "-DCMAKE_SYSTEM_NAME=OHOS"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
+  dependencies:
+    - libevent/2.1.12
   # 例如:
   # - openssl/1.1.1w
   # - curl/8.19.0
@@ -62,7 +67,9 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-base.c.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -71,7 +78,26 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "linux/netfilter_ipv4.h include causes sockaddr_storage redefinition conflict on OHOS sysroot, define SO_ORIGINAL_DST=80 directly"
+  - "uname returns HarmonyOS (not Linux), need to add HarmonyOS to Makefile case pattern for USE_IPTABLES"
+  - "redsocks uses plain Makefile, not autotools/cmake, conanfile.py needs custom build() with make invocation"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/redsocks-0.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/redsocks-0.5.work
+  source_orig_hash: fea08c0d26efa41c
+  source_work_hash: d8d1feb6cfac6b06
+  generated_at: '2026-08-08T04:17:09'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-base.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
