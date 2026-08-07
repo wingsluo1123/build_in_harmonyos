@@ -1,0 +1,24 @@
+package: Crypt-OpenSSL-DSA
+version: "0.20"
+upstream_tests:
+  - name: "00-use.t"
+    description: "Module load test"
+    upstream_command: "make test"
+    expected_result: "skipped (SELinux HMDFS prevents XS module loading)"
+    notes: |
+      Upstream test suite requires XS module runtime loading.
+      SELinux HMDFS restriction prevents XS module loading on HarmonyOS.
+      Tests are validated via static analysis (perl -c, readelf) instead.
+  - name: "10-selftest.t"
+    description: "DSA self-test (key generation, sign, verify)"
+    upstream_command: "make test"
+    expected_result: "skipped (SELinux HMDFS prevents XS module loading)"
+  - name: "90-openssl-compat.t"
+    description: "OpenSSL compatibility tests"
+    upstream_command: "make test"
+    expected_result: "skipped (SELinux HMDFS prevents XS module loading)"
+adapted_tests:
+  - name: "test_package"
+    description: "Verify package contents (DSA.pm + DSA.so ELF)"
+    command: "conan test test_package"
+    expected_result: "pass"

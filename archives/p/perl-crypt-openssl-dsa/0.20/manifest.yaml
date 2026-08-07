@@ -15,7 +15,7 @@ version: "0.20"
 status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-22"
+build_date: "2026-08-07"
 
 # ============================================================
 # 源码信息
@@ -23,10 +23,10 @@ build_date: "2026-05-22"
 
 source:
   # 源码下载 URL
-  url: "https://cpan.metacpan.org/authors/id/KM/KMX/perl-Crypt-OpenSSL-DSA-0.20.tar.gz"
+  url: "https://cpan.metacpan.org/authors/id/K/KM/KMX/Crypt-OpenSSL-DSA-0.20.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "e4575d787d44e49b3b59cc39eda2e461fe0606dd0e87d3a9c3df5011b133e702"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -42,17 +42,16 @@ build_system: custom
 
 build:
   # 构建系统类型（冗余字段，保持兼容性）
-  # cmake | autotools | makefile | meson | custom
   system: custom
 
   # 配置选项列表
   configure_options:
-    - "perl Makefile.PL PREFIX=$HOME/usr/local INC="-I$HOME/usr/local/include" LIBS="-L$HOME/usr/local/lib -lcrypto""
+    - "perl Makefile.PL LIBS=\"-L$HOME/usr/local/lib -lcrypto\" INC=\"-I$HOME/usr/local/include\""
 
   # 编译依赖列表（格式: name/version）
   dependencies:
     - perl/5.42.0
-    - openssl/3.5.6
+    - openssl/1.1.1w
 
   # 编译器
   cc: clang
@@ -60,8 +59,7 @@ build:
 
   # 环境变量
   env:
-    PKG_CONFIG_PATH: "$HOME/usr/local/lib/pkgconfig:$HOME/usr/local/libressl/lib/pkgconfig"
-    OPENSSL_PREFIX: "$HOME/usr/local"
+    LD_LIBRARY_PATH: "$HOME/usr/local/lib"
 
 # ============================================================
 # 补丁信息
@@ -76,10 +74,12 @@ patches_applied: []
 
 # 编译中学到的知识
 knowledge_gained:
-  - "Perl Makefile.PL 需要使用 $HOME 变量，不能使用 ~ 符号"
-  - "ExtUtils::MakeMaker 需要通过 INC 和 LIBS 参数指定 OpenSSL 路径"
-  - "编译产物需要 ELF 签名才能在鸿蒙系统加载"
-  - "用户安装目录下的 .so 文件可能因 SELinux 限制无法加载（E046）"
+  - "Makefile.PL natively supports OPENSSL_PREFIX env var and LIBS/INC parameters"
+  - "No Crypt::OpenSSL::Guess dependency (unlike Crypt::OpenSSL::RSA)"
+  - "No LDDLFLAGS patch needed (default linker flags work on OHOS)"
+  - "Build produces only char/unsigned char pointer sign warnings (harmless)"
+  - "DSA.so links against libcrypto.so.1.1 only (not libssl)"
+  - "Conan adaptation: conanfile.py + conandata.yml + test_package/ added"
 
 # ============================================================
 # 预编译包信息
@@ -94,7 +94,8 @@ package_size: 70K
 # 预编译包内容摘要
 package_contents:
   - "lib/site_perl/5.42.0/aarch64-linux/Crypt/OpenSSL/DSA.pm"
-  - "lib/site_perl/5.42.0/aarch64-linux/auto/Crypt/OpenSSL/DSA/DSA.so (已签名)"
+  - "lib/site_perl/5.42.0/aarch64-linux/auto/Crypt/OpenSSL/DSA/DSA.so"
+  - "lib/site_perl/5.42.0/Crypt/OpenSSL/DSA/Signature.pod"
 
 # 安装方法
-install_method: "解压到 ~/usr/local，然后设置 PERL5LIB 环境变量"
+install_method: "conan install --requires=perl-crypt-openssl-dsa/0.20"

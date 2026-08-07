@@ -14,46 +14,34 @@ Crypt::OpenSSL::DSA 是 Perl 的 OpenSSL DSA 绑定模块，提供：
 
 | 版本 | 状态 | 发布日期 |
 |------|------|---------|
-| 0.20 | published | 2026-05-22 |
+| 0.20 | published | 2026-08-07 |
 
 ## 安装方法
 
-### 方法 1：使用预编译包
+### 使用 Conan 安装
 
 ```bash
-# 从 GitCode 下载预编译包
-curl -fsSL https://gitcode.com/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/perl-crypt-openssl-dsa-0.20-ohos-aarch64.tar.gz -O
+# 安装 Conan 制品仓 remote（如未配置）
+conan remote add ohpcd https://conan.cnb.cool/OpenHarmonyPCDeveloper/Conan/-/packages/
 
-# 解压到 ~/usr/local
-tar xzf perl-crypt-openssl-dsa-0.20-ohos-aarch64.tar.gz -C ~/usr/local
+# 安装 perl-crypt-openssl-dsa
+conan install --requires=perl-crypt-openssl-dsa/0.20 -r=ohpcd
 
 # 设置 PERL5LIB 环境变量
-export PERL5LIB="$HOME/usr/local/lib/site_perl/5.42.0/aarch64-linux:$PERL5LIB"
-
-# 验证安装
-perl -e "use Crypt::OpenSSL::DSA; print 'OK\n';"
+export PERL5LIB="$(conan cache path perl-crypt-openssl-dsa/0.20)/lib/site_perl/5.42.0:$(conan cache path perl-crypt-openssl-dsa/0.20)/lib/site_perl/5.42.0/aarch64-linux:$PERL5LIB"
 ```
-
-### 方法 2：从源码编译
-
-参见版本级归档目录中的 `notes.md`。
 
 ## 依赖
 
 - Perl 5.42.0+
-- OpenSSL 3.5.6+
-
-## 已知问题
-
-- 用户安装目录下的 .so 文件可能因 SELinux 限制无法加载（平台限制 E046）
-- 建议在系统目录安装或等待平台限制解除
+- OpenSSL 1.1.1w+
 
 ## 授权协议
 
-- Perl 模块：Artistic License 2.0
-- OpenSSL 绑定：OpenSSL License
+- Perl 模块：Artistic License 2.0 (perl_5)
 
 ## 链接
 
 - CPAN：https://metacpan.org/pod/Crypt::OpenSSL::DSA
+- GitHub：https://github.com/kmx/perl-Crypt-OpenSSL-DSA
 - OpenSSL：https://www.openssl.org/
