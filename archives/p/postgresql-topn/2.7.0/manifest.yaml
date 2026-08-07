@@ -1,4 +1,5 @@
 software: postgresql-topn
+build_system: makefile
 # 版本级 manifest
 # 文件位置: archives/p/postgresql-topn/2.7.0/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
@@ -15,7 +16,7 @@ version: "2.7.0"
 status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-03"
+build_date: "2026-08-08"
 
 # ============================================================
 # 源码信息
@@ -23,10 +24,10 @@ build_date: "2026-06-03"
 
 source:
   # 源码下载 URL
-  url: "https://api.github.com/repos/citusdata/postgresql-topn/tarball/v2.7.0"
+  url: "https://github.com/citusdata/postgresql-topn/archive/refs/tags/v2.7.0.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "59a56a8d5681cd89cea54e07b01ae46c13e57f1fb4dab077dc11464873073491"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -46,8 +47,10 @@ build:
   # PostgreSQL 扩展使用 PGXS，无需 configure
 
   # 编译依赖列表（格式: name/version）
+  # PostgreSQL is a system-level build dependency (pg_config required)
+  # Not a conan dependency since postgresql is not published to conan repo
   dependencies:
-    - postgresql/17.0
+    - postgresql/18.3
 
   # 编译器
   cc: clang
@@ -69,3 +72,6 @@ knowledge_gained:
   - "PostgreSQL 扩展使用 PGXS 构建系统，无需 configure 步骤"
   - "使用 pg_config 获取 PostgreSQL 安装路径"
   - "编译产物：topn.so（共享库）+ SQL 文件 + control 文件"
+  - "Conan 适配：使用 PGXS make 构建，package_type=shared-library"
+  - "PGXS 需要 cpp 预处理器生成 SQL 文件，OHOS 平台使用 clang-cpp"
+  - "PostgreSQL 作为系统级构建依赖，不声明为 conan 依赖（制品仓无 postgresql 包）"

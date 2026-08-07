@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml — Upstream test declaration
+# Declares the upstream test source and adaptation status.
+
+package: postgresql-topn
+version: 2.7.0
+
+upstream_tests:
+  - name: "make check (regression tests)"
+    source: "https://github.com/citusdata/postgresql-topn/blob/v2.7.0/sql/"
+    type: sql_regression
+    status: skipped
+    reason: "PGXS regression tests require a running PostgreSQL server with initdb, which may not be available in CI. Tests are run manually during local build verification."
+
+adapted_tests:
+  - name: "Artifact verification (test.sh)"
+    source: test.sh
+    type: shell
+    description: |
+      Verifies package artifacts:
+      - topn.so is a valid ELF shared object
+      - topn.control file exists
+      - SQL migration files exist (topn--*.sql)
+      - Base migration topn--2.0.0.sql exists
+    depends_on_package: true
