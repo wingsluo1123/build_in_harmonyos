@@ -4,6 +4,7 @@
 Verifies that the package contains the expected artifacts:
 - JIS2K.so (shared library, valid ELF)
 - JIS2K.pm (Perl module file with version 0.05)
+- Attempts to load the Perl module and test encode/decode (R34)
 """
 import os
 
@@ -27,7 +28,8 @@ class PerlEncodeJIS2KTestConan(ConanFile):
         # Paths to verify
         so_path = os.path.join(pkg_folder, "lib", "auto", "Encode", "JIS2K", "JIS2K.so")
         pm_path = os.path.join(pkg_folder, "lib", "Encode", "JIS2K.pm")
+        lib_dir = os.path.join(pkg_folder, "lib")
 
         # Run the test script with paths as arguments
         test_script = os.path.join(os.path.dirname(__file__), "test_package.py")
-        self.run(f'python3 "{test_script}" "{so_path}" "{pm_path}"')
+        self.run(f'python3 "{test_script}" "{so_path}" "{pm_path}" "{lib_dir}"')
