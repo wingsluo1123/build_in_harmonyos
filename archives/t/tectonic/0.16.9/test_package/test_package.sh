@@ -9,7 +9,10 @@ set -o pipefail 2>/dev/null || true
 TECTONIC_BIN="${TECTONIC_BIN:-tectonic}"
 
 # Run tectonic --version
-output=$("$TECTONIC_BIN" --version 2>&1)
+output=$("$TECTONIC_BIN" --version 2>&1) || {
+    echo "FAIL: tectonic --version failed to execute"
+    exit 1
+}
 echo "$output"
 
 # Verify output contains "Tectonic"
