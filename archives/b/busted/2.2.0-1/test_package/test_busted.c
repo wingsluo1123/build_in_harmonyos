@@ -38,7 +38,8 @@ int main(void) {
         "assert(type(require('term').isatty(io.stdout)) == 'boolean')\n";
 
     if (luaL_dostring(L, script) != LUA_OK) {
-        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        const char *message = lua_tostring(L, -1);
+        fprintf(stderr, "%s\n", message != NULL ? message : "unknown Lua error");
         lua_close(L);
         return 1;
     }

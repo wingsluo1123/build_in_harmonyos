@@ -75,13 +75,21 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (luaL_dostring(L, "require('busted.runner')({ standalone = false })") != LUA_OK) {
+    int status = luaL_dostring(L, "return require('busted.runner')({ standalone = false })");
+    if (status != LUA_OK) {
         const char *message = lua_tostring(L, -1);
         fprintf(stderr, "busted: %s\n", message != NULL ? message : "unknown Lua error");
         lua_close(L);
         return 1;
     }
 
+    int exit_code = 0;
+    if (lua_isinteger(L, -1)) {
+        exit_code = (int)lua_tointeger(L, -1);
+    } else if (lua_isboolean(L, -1)) {
+        exit_code = lua_toboolean(L, -1) ? 0 : 1;
+    }
+
     lua_close(L);
-    return 0;
+    return exit_code;
 }
