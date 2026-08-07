@@ -6,6 +6,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int is_elf_magic(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -26,7 +27,9 @@ int main(int argc, char *argv[]) {
     }
     /* 原生场景：先校验 ELF magic（R34 反空壳），再尝试执行 --version 检查退出码 */
     const char *scooter = argv[1];
-    if (strchr(scooter, '"') || strchr(scooter, ';') || strchr(scooter, '|') || strchr(scooter, '&')) {
+    /* P1: 修正元字符检测。cmd 中路径被双引号包裹，; | & 在引号内无害；
+     * 真正危险的是 " $ ` \（提前结束引号 / 变量展开 / 命令替换 / 转义） */
+    if (strchr(scooter, '"') || strchr(scooter, '$') || strchr(scooter, '`') || strchr(scooter, '\\')) {
         fprintf(stderr, "scooter path contains shell metacharacters: %s\n", scooter);
         return 2;
     }
