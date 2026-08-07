@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan test_package — zbar 0.23.93
 
-Tests that libzbar can be linked and the zbarimg binary works.
+Tests that libzbar can be linked and the scanner API works.
 """
 import os
 
@@ -27,6 +27,6 @@ class ZbarTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Also verify zbarimg binary is functional
+        # Also run test_zbar directly to verify runtime linkage
         bin_path = os.path.join(self.cpp.build.bindirs[0], "test_zbar")
         self.run(f"{bin_path}", env="conanrun")
