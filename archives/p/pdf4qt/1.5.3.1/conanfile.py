@@ -100,13 +100,11 @@ class Pdf4QtConan(ConanFile):
         blend2d_install = os.path.join(self.build_folder, "blend2d-install")
         os.makedirs(blend2d_build, exist_ok=True)
 
-        # Configure blend2d with Conan toolchain for cross-compilation
-        toolchain_file = os.path.join(self.build_folder, "generators", "conan_toolchain.cmake")
+        # Configure blend2d (native build - no Conan toolchain to avoid CMAKE_INSTALL_PREFIX override)
         subprocess.run([
             "cmake", blend2d_src,
             "-DCMAKE_INSTALL_PREFIX=" + blend2d_install,
             "-DCMAKE_BUILD_TYPE=" + str(self.settings.build_type),
-            "-DCMAKE_TOOLCHAIN_FILE=" + toolchain_file,
             "-DBLEND2D_STATIC=ON",
             "-DBLEND2D_NO_JIT=OFF",
             "-DBLEND2D_NO_FUTEX=OFF",
