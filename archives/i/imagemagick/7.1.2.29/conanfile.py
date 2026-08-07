@@ -86,8 +86,6 @@ class ImageMagickConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Fix umask 077 on HMDFS (E011) - configure is autoconf-generated
-        self.run("sed -i 's/umask 077/umask 022/g' configure", cwd=self.source_folder)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
