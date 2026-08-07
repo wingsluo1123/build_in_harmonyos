@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
+"""Conan recipe — nnn 5.0 (Makefile, CLI tool)"""
 import os
+import glob
 
 from conan import ConanFile
 from conan.tools.files import get, copy, replace_in_file, apply_conandata_patches, export_conandata_patches
@@ -28,6 +31,9 @@ class NnnConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         pkg_config = PkgConfigDeps(self)
@@ -161,7 +167,6 @@ class NnnConan(ConanFile):
         if not os.path.exists(rl_lib):
             self.output.info("Readline install incomplete, retrying...")
             # Fix any sub-config.status files
-            import glob
             for cs in glob.glob(os.path.join(readline_dir, "**", "config.status"), recursive=True):
                 replace_in_file(self, cs, "umask 077 && mktemp", "mktemp")
                 replace_in_file(self, cs, "umask 077 && mkdir", "mkdir")
@@ -221,4 +226,5 @@ class NnnConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.exelinkflags = []
