@@ -1,4 +1,6 @@
 import os
+import re
+import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
@@ -52,7 +54,6 @@ class OpenAdventureConan(ConanFile):
 
     def _fix_scripts(self, src_dir):
         """Fix umask 077 and shebang in ALL scripts for HMDFS/OHOS."""
-        import re
         for root, dirs, files in os.walk(src_dir):
             for fname in files:
                 fpath = os.path.join(root, fname)
@@ -108,12 +109,12 @@ class OpenAdventureConan(ConanFile):
         self.run(f"cd {ncurses_src}/include && make CC={cc} CFLAGS='{ncurses_cflags}'")
         self.run(f"cd {ncurses_src}/ncurses && make CC={cc} CFLAGS='{ncurses_cflags}'")
 
-        import shutil as shutil_mod
+
         lib_dir = os.path.join(prefix, "lib")
         inc_dir = os.path.join(prefix, "include")
         src_lib = os.path.join(ncurses_src, "lib", "libncurses.a")
         if os.path.exists(src_lib):
-            shutil_mod.copy2(src_lib, os.path.join(lib_dir, "libncurses.a"))
+            shutil.copy2(src_lib, os.path.join(lib_dir, "libncurses.a"))
         ncurses_a = os.path.join(lib_dir, "libncurses.a")
         if os.path.exists(ncurses_a):
             for name in ("libncursesw.a", "libtinfo.a", "libcurses.a"):
@@ -123,11 +124,11 @@ class OpenAdventureConan(ConanFile):
 
         for hdr in os.listdir(os.path.join(ncurses_src, "include")):
             if hdr.endswith(".h"):
-                shutil_mod.copy2(os.path.join(ncurses_src, "include", hdr), os.path.join(inc_dir, hdr))
+                shutil.copy2(os.path.join(ncurses_src, "include", hdr), os.path.join(inc_dir, hdr))
         for hdr in ("curses.h", "term.h", "ncurses_def.h", "hashsize.h", "parametrized.h"):
             src_hdr = os.path.join(ncurses_src, "ncurses", hdr)
             if os.path.exists(src_hdr):
-                shutil_mod.copy2(src_hdr, os.path.join(inc_dir, hdr))
+                shutil.copy2(src_hdr, os.path.join(inc_dir, hdr))
 
     def _build_libedit(self, build_dir, prefix, cc):
         libedit_src = os.path.join(build_dir, "libedit-20240808-3.1")
