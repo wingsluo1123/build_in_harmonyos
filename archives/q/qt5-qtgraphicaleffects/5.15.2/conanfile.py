@@ -42,10 +42,7 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
             urls = [urls]
         for url in urls:
             try:
-                get_kwargs = {"url": url, "strip_root": True}
-                if source_data.get("sha256"):
-                    get_kwargs["sha256"] = source_data["sha256"]
-                get(self, **get_kwargs)
+                get(self, url=url, sha256=source_data.get("sha256", ""), strip_root=True)
                 return
             except ConanException as error:
                 self.output.warning(f"Failed to download source from {url}: {error}")
@@ -63,7 +60,7 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
         build_env.prepend_path("PATH", os.path.join(qtbase.package_folder, "bin"))
         with build_env.vars(self).apply():
             self.run(
-                f'cd "{self.source_folder}" && {shlex.quote(qmake)} qtgraphicaleffects.pro'
+                f'cd "{self.source_folder}" && {shlex.quote(qmake)} -spec linux-clang qtgraphicaleffects.pro'
             )
             jobs = self.conf.get("tools.build:jobs", default=4, check_type=int)
             self.run(f'cd "{self.source_folder}" && make -j{jobs}')
