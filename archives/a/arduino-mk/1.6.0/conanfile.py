@@ -9,6 +9,7 @@ Homepage: https://github.com/sudar/Arduino-Makefile
 """
 import os
 import shutil
+
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 
@@ -19,7 +20,7 @@ class ArduinomkConan(ConanFile):
     description = "Makefile and scripts for compiling Arduino sketches from the command line"
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/sudar/Arduino-Makefile"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     # R38: This is a command-line tool package (scripts), not a library
     package_type = "application"
@@ -29,9 +30,6 @@ class ArduinomkConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-
-    def layout(self):
-        pass
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)

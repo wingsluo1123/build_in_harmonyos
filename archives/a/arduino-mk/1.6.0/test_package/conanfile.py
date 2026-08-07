@@ -23,7 +23,7 @@ class ArduinomkTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def generate(self):
-        env = VirtualRunEnv(self).generate()
+        VirtualRunEnv(self).generate()
 
     def build(self):
         # No build step needed — we validate installed files
