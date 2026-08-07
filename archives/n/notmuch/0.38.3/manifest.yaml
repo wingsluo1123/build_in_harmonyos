@@ -1,24 +1,46 @@
-software: notmuch
+# 版本级 manifest
+# 文件位置: archives/n/notmuch/0.38.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
 version: "0.38.3"
+software: "notmuch"
 status: built
-build_date: "2026-05-27"
+build_date: "2026-08-07"
+build_system: "custom"
 
 source:
   url: "https://notmuchmail.org/releases/notmuch-0.38.3.tar.xz"
-  sha256: ""
+  sha256: "9af46cc80da58b4301ca2baefcc25a40d112d0315507e632c0f3f0f08328d054"
   tar_format: tar.xz
 
 build:
-  system: autotools
+  system: custom
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
-    - "CC=clang"
-    - "CXX=clang++"
+    - "--without-ruby"
   dependencies:
-    - xapian-core/1.4.26
-    - zlib/1.3.1
+    - "xapian-core/1.4.26"
+    - "gmime/3.2.7"
+    - "talloc/2.4.2"
+    - "zlib/1.3.1"
   cc: clang
   cxx: clang++
 
-patches_applied: []
-knowledge_gained: []
+patches_applied:
+  - "0001-configure-crypto-ohos.patch"
+
+knowledge_gained:
+  - "notmuch uses custom configure script, not autotools"
+  - "Crypto checks (gpg/gpgme) need to be non-fatal on OHOS"
+  - "xapian-config returns empty paths from conan cache"
+  - "Ruby bindings incompatible with Ruby 3.4.5 on OHOS"
+  - "glib gettext requires musl loader linking"
+
+patch_generation:
+  method: per-file-difflib
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure-crypto-ohos.patch
+    type: portability
+    platform_only: True
+    guard: false
