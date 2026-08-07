@@ -255,3 +255,7 @@ share/man/man1/rc.1
 2. umask 测试失败是 HMDFS 平台限制，不影响 rc 功能
 3. rc 是 shell 程序，不支持 `--version` 命令行参数（但 `$version` 变量可用）
 4. 补丁 0003/0004 是平台必需修复，其他补丁为 autoreconf 自动生成
+---
+
+**编译结束**: 2026-08-08 04:06
+**最终状态**: published
