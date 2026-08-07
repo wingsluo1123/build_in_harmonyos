@@ -1,0 +1,86 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/p/postgresql-topn/2.7.0/conandata.yml",
+      "line": 3,
+      "description": "conandata.yml manually adds gh-proxy.com mirror prefix as the first URL entry in the sources.url list. R39 explicitly states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The official GitHub URL is already present as the second entry, making the gh-proxy entry redundant and against the convention.",
+      "fix_suggestion": "Remove the gh-proxy.com URL entry (line 3). Keep only the official GitHub URL: \"https://github.com/citusdata/postgresql-topn/archive/refs/tags/v2.7.0.tar.gz\". CI will automatically add mirror fallbacks at build time."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS1",
+      "file": "archives/p/postgresql-topn/2.7.0/conanfile.py",
+      "line": 1,
+      "description": "conanfile.py is missing the required shebang (#!/usr/bin/env python3) and docstring specifying software name and build system. Code style rule 1 requires: '#!/usr/bin/env python3' followed by a docstring like '\"\"\"Conan recipe — postgresql-topn 2.7.0 (Makefile)\"\"\"'.",
+      "fix_suggestion": "Add the following two lines at the very top of the file, before the import statements:\n#!/usr/bin/env python3\n\"\"\"Conan recipe — postgresql-topn 2.7.0 (Makefile)\"\"\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS1",
+      "file": "archives/p/postgresql-topn/2.7.0/test_package/conanfile.py",
+      "line": 1,
+      "description": "test_package/conanfile.py is missing the required shebang and docstring header. Code style rule 1 applies to all conanfile.py files, including test package recipes.",
+      "fix_suggestion": "Add the following two lines at the very top of the file:\n#!/usr/bin/env python3\n\"\"\"Test package — postgresql-topn 2.7.0\"\"\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS7",
+      "file": "archives/p/postgresql-topn/2.7.0/test_package/test.sh",
+      "line": 7,
+      "description": "test.sh only uses 'set -e' but is missing 'set -u' (undefined variable error) and 'set -o pipefail' (pipe failure propagation). Code style rule 7 requires all scripts to start with 'set -euo pipefail'. Without -u, typos in variable names silently expand to empty strings. Without pipefail, a failing command in a pipeline (e.g., 'find ... | wc -l' at line 33) could be masked by the success of the downstream command.",
+      "fix_suggestion": "Replace 'set -e' with 'set -euo pipefail' on line 7."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS9",
+      "file": "archives/p/postgresql-topn/2.7.0/test_package/test.sh",
+      "line": 14,
+      "description": "test.sh uses non-standard output format: '[test]' prefix for step markers and 'FAIL:' for failures. Code style rule 9 requires step markers to use '[step]', success to use '[ok]' (with 8-space indent), failures to use '[fail]' (with 8-space indent), and warnings to use '[warn]'. The current '[test]' and 'FAIL:' format does not conform to the project convention.",
+      "fix_suggestion": "Replace '[test]' with '[step]' for step markers. Replace 'FAIL: ...' with '        [fail] ...' (8-space indent + [fail]). Replace the final success message with '        [ok] All artifact checks passed'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS5",
+      "file": "archives/p/postgresql-topn/2.7.0/conanfile.py",
+      "line": 16,
+      "description": "Recipe 'url' field is empty (url = \"\"). Code style rule 5 lists 'url = \"\"  # CI fills this' as a forbidden template placeholder. While this instance lacks the '# CI fills this' comment, an empty url field is still considered an incomplete placeholder per the rule's intent.",
+      "fix_suggestion": "Fill in the recipe URL (e.g., the repository URL where this conanfile.py is hosted), or remove the url attribute entirely if not applicable."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS6",
+      "file": "archives/p/postgresql-topn/2.7.0/test_package/test.sh",
+      "line": 1,
+      "description": "test.sh uses '#!/bin/bash' instead of the project standard '#!/usr/bin/zsh' specified in code style rule 6. Note: since test_package/conanfile.py invokes the script with explicit 'bash {test_script}', the shebang is cosmetic and does not affect execution. Using bash may be intentional for portability in Conan test environments.",
+      "fix_suggestion": "Change to '#!/usr/bin/zsh' for consistency with project conventions, or keep '#!/bin/bash' if portability across Conan build environments is a deliberate choice."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/p/postgresql-topn/2.7.0/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml uses field name 'software' (line 1) instead of 'name', and nested 'build.system' (line 42) instead of flat 'build_system', differing from the schema specified in code style rule 14 (name/build_system). The file header states it follows 'ARCHIVE-SPEC v2.0', which may define a different schema. If the spec has evolved, the code style rule may need updating rather than the manifest.",
+      "fix_suggestion": "If ARCHIVE-SPEC v2.0 legitimately defines 'software' and 'build.system' as field names, update code style rule 14 to match the current spec. Otherwise, rename 'software' to 'name' and flatten 'build.system' to 'build_system'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS2",
+      "file": "archives/p/postgresql-topn/2.7.0/conanfile.py",
+      "line": 18,
+      "description": "package_type is set to 'shared-library' instead of 'library' as specified in code style rule 2. While 'shared-library' is a valid Conan 2.x package_type (more specific than 'library'), it does not match the project convention which uses 'library' for all library packages.",
+      "fix_suggestion": "Consider using 'library' for consistency with the code style rule. Alternatively, update the rule to explicitly allow 'shared-library' and 'static-library' as valid library subtypes."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "DOC",
+      "file": "archives/p/postgresql-topn/2.7.0/notes.md",
+      "line": 69,
+      "description": "notes.md references 'PostgreSQL 17.0' in two places (line 69: '扩展依赖 PostgreSQL 17.0' and line 139: '依赖检查: PostgreSQL 17.0 已安装') while manifest.yaml lists the build dependency as 'postgresql/18.3'. This version inconsistency in documentation could cause confusion about which PostgreSQL version is actually required.",
+      "fix_suggestion": "Update notes.md to consistently reference PostgreSQL 18.3 (matching manifest.yaml), or add a note clarifying that 17.0 was used during the initial build session and 18.3 is the current target version."
+    }
+  ],
+  "summary": "Audit of postgresql-topn 2.7.0 Conan recipe (7 changed files) completed against code_style and review_memory rules. VERDICT: PASS. No P0 (deception) or P1 (recipe correctness) issues found. All key checks pass: (1) sha256 '59a56a8d...' is a valid 64-char hex hash, not a placeholder; (2) test_package has real artifact verification tests via test.sh (readelf ELF check, file existence, SQL file count) — not just echo/print; (3) test() method calls self.run() (R34 satisfied); (4) platform check uses 'not in (Linux, OHOS)' — correct R32 pattern; (5) no ${CC}/${CFLAGS} in self.run() calls (R33 satisfied); (6) no hardcoded remote names; (7) no pre-compiled binaries in PR (R19 satisfied); (8) manifest status 'built' is consistent with notes.md; (9) Conan 2.x API used correctly (from conan import ConanFile); (10) upstream test skip is transparently documented in MANIFEST.yml with valid reason (PostgreSQL server required). 5 P2 code convention warnings found: manual gh-proxy.com mirror prefix in conandata.yml (R39), missing shebang/docstring in both conanfile.py files (CS1), missing set -euo pipefail in test.sh (CS7), non-standard output format in test.sh (CS9). 5 P3 hints: empty recipe url, bash shebang vs zsh, manifest field naming divergence, package_type 'shared-library' vs 'library', PostgreSQL version inconsistency in notes.md (17.0 vs 18.3)."
+}
