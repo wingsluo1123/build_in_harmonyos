@@ -19,7 +19,7 @@ class ZbarConan(ConanFile):
     description = "Open source software suite for reading bar codes from images and video"
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/mchehab/zbar"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
