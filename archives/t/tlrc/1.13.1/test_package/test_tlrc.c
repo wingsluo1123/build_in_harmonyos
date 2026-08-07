@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]) {
@@ -30,8 +31,15 @@ int main(int argc, char *argv[]) {
         return 3;
     }
     /* P2: system() 返回的是 POSIX wait status 编码值（退出码 1 显示为 256），非真实退出码。
-     * 需 WIFEXITED/WEXITSTATUS 解析真实退出码（OHOS musl libc 不保证间接可用，显式 include sys/wait.h）。 */
+     * 需 WIFEXITED/WEXITSTATUS 解析真实退出码（OHOS musl libc 不保证间接可用，显式 include sys/wait.h）。
+     * 终审 P2: system() 返回 -1 表示 fork/exec 失败（资源耗尽），此时 ret 非合法 wait status，
+     * 直接传入 WIFEXITED/WEXITSTATUS 是 UB（读取未定义编码位）→ 先检测 -1 再解析。
+     * 同时避免系统未安装 sh 时 system() 以 127 退出且 stderr 无输出的模糊失败。 */
     int ret = system(cmd);
+    if (ret == -1) {
+        fprintf(stderr, "tldr --version failed to launch (system() returned -1: %s)\n", strerror(errno));
+        return 1;
+    }
     if (ret != 0) {
         if (WIFEXITED(ret)) {
             fprintf(stderr, "tldr --version failed with exit code %d\n", WEXITSTATUS(ret));
