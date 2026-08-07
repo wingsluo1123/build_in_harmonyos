@@ -17,7 +17,12 @@ class OpenImageIOTestConan(ConanFile):
     generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
+        # R34: test must actually depend on the package
         self.requires(self.tested_reference_str)
+        # OpenImageIO headers include <fmt/format.h> and <Imath/...> without prefix.
+        # Add these deps explicitly so CMakeDeps generates their include dirs.
+        self.requires("fmt/8.1.1")
+        self.requires("imath/3.2.2")
 
     def layout(self):
         cmake_layout(self)
