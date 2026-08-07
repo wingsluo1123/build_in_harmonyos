@@ -83,5 +83,5 @@ lib/libpgexporter.so (shared library)
 - 测试子目录因缺少 libev include path 而跳过
 ---
 
-**编译结束**: 2026-06-12 19:09
-**最终状态**: published
+**编译结束**: 2026-08-08 01:10
+**最终状态**: built

@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration file
+# CI script (build_and_test.sh L0e) requires this file to exist
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: pgexporter/0.8.0
+homepage: "https://github.com/pgexporter/pgexporter"
+
+# Upstream test command (for make -n check / ctest -N analysis)
+upstream_check_command: "make check"
+
+# Whether upstream tests are integrated in conanfile.py build()
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream test programs (from source tree)
+upstream_tests:
+  - file: test/test_oom.c
+    source: pgexporter-0.8.0/test/test_oom.c
+    description: "OOM stress test"
+    command: "./test_oom"
+  - file: test/test_art.c
+    source: pgexporter-0.8.0/test/test_art.c
+    description: "ART (Adaptive Radix Tree) data structure test"
+    command: "./test_art"
+  - file: test/test_bridge.c
+    source: pgexporter-0.8.0/test/test_bridge.c
+    description: "Bridge functionality test"
+    command: "./test_bridge"
+  - file: test/test_json.c
+    source: pgexporter-0.8.0/test/test_json.c
+    description: "JSON parser test"
+    command: "./test_json"
+  - file: test/test_deque.c
+    source: pgexporter-0.8.0/test/test_deque.c
+    description: "Deque data structure test"
+    command: "./test_deque"
+
+# test_package tests (consumer perspective verification)
+test_package_tests:
+  - file: conanfile.py
+    description: "Smoke test: run pgexporter --version to verify binary works"
+    command: "conan test"
+
+# Test assertion count (approximate, for quality assessment)
+assertion_count: 1
