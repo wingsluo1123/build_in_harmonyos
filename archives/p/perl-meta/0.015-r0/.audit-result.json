@@ -1,0 +1,126 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS5",
+      "file": "archives/p/perl-meta/0.015-r0/conanfile.py",
+      "line": 33,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' found in conanfile.py. Code-style rule 5 explicitly lists this exact pattern as forbidden in merged code, indicating incomplete work. The url attribute should be filled by the adapter with the recipe repository URL.",
+      "fix_suggestion": "Set the url attribute to the recipe repository URL (e.g., the cnb.cool制品仓 repo URL), or remove the '# CI fills this' comment if the CI submit process handles it automatically."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/p/perl-meta/0.015-r0/manifest.yaml",
+      "line": 21,
+      "description": "build_system field is 'module-build', which is not in the standard list (cmake | autotools | makefile | meson) defined in code-style rule 14. Additionally, the conanfile.py docstring states the build system is ExtUtils::MakeMaker (Makefile.PL), not Module::Build (Build.PL), creating an inconsistency between manifest metadata and actual recipe.",
+      "fix_suggestion": "Change build_system to 'makefile' (since ExtUtils::MakeMaker generates and uses a Makefile), or add 'module-build'/'perl-xs' as a recognized build system type if this is a project-wide convention for Perl modules."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R12",
+      "file": "archives/p/perl-meta/0.015-r0/manifest.yaml",
+      "line": 72,
+      "description": "manifest.yaml lists 'patches_applied: [\"0001-Build.PL.patch\"]' but conandata.yml has 'patches: {}' (empty) and the patch file content is '[文件不存在]' (file does not exist). The conanfile.py creates Makefile.PL inline and no longer uses Build.PL, making this patch reference stale and inconsistent. Review-memory rule 12 requires patches declared in conandata.yml to have the file actually exist.",
+      "fix_suggestion": "Remove '0001-Build.PL.patch' from patches_applied in manifest.yaml since the recipe now creates Makefile.PL inline instead of patching Build.PL. Also update notes.md line 64 and line 31 which reference this patch."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/p/perl-meta/0.015-r0/manifest.yaml",
+      "line": 49,
+      "description": "configure_options references 'perl Build.PL --install_base=$BUILD_DIR/lib/perl5' but the conanfile.py creates a Makefile.PL inline and runs 'perl Makefile.PL INSTALL_BASE=...'. The manifest describes the original upstream Module::Build process, not the actual adapted ExtUtils::MakeMaker approach used in the recipe.",
+      "fix_suggestion": "Update configure_options to reflect the actual build command used in conanfile.py: 'perl Makefile.PL INSTALL_BASE=$BUILD_DIR/lib/perl5'."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R3",
+      "file": "archives/p/perl-meta/0.015-r0/notes.md",
+      "line": 70,
+      "description": "notes.md contains conflicting final status entries: line 70 says '最终状态: published ✅' while line 74 says '最终状态: built'. The manifest.yaml authoritative status is 'built'. The stale 'published ✅' entry creates confusion about the actual package status and could be misinterpreted as a faked status.",
+      "fix_suggestion": "Remove or update the earlier '最终状态: published ✅' entry (line 70) to reflect the current status 'built'. Keep only the most recent and accurate status entry."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/p/perl-meta/0.015-r0/notes.md",
+      "line": 11,
+      "description": "notes.md line 11 states '构建系统: Module::Build (Build.PL)' and line 35 says '实际使用 perl Build.PL (Module::Build)', but the conanfile.py uses ExtUtils::MakeMaker (Makefile.PL) created inline. The notes describe the original upstream build process, not the adapted approach. This inconsistency could mislead reviewers.",
+      "fix_suggestion": "Update notes.md to reflect that the recipe uses ExtUtils::MakeMaker (Makefile.PL) as a replacement for Module::Build (Build.PL), explaining that Module::Build is not available in Perl 5.42.2 core."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/p/perl-meta/0.015-r0/test_package/MANIFEST.yml",
+      "line": 10,
+      "description": "upstream_check_command is 'perl Build.PL && ./Build test' but the conanfile.py uses ExtUtils::MakeMaker (Makefile.PL), not Module::Build (Build.PL). This creates an inconsistency between the test manifest and the actual recipe build approach.",
+      "fix_suggestion": "Update upstream_check_command to 'perl Makefile.PL && make test' to match the ExtUtils::MakeMaker approach used in conanfile.py."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS7",
+      "file": "archives/p/perl-meta/0.015-r0/test_package/test_meta.sh",
+      "line": 13,
+      "description": "Shell script does not start with 'set -euo pipefail' as required by code-style rule 7. The script has a comment explaining: 'No set -e — we handle exit codes manually to distinguish platform limitations from real errors'. While the rationale is reasonable, the rule requires safety mode for all scripts.",
+      "fix_suggestion": "Use 'set -uo pipefail' (without -e) to catch undefined variables and pipe failures while allowing manual exit code handling. This partially satisfies the safety mode requirement."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R37",
+      "file": "archives/p/perl-meta/0.015-r0/conanfile.py",
+      "line": 29,
+      "description": "Version is '0.015-r0' for what appears to be the first adaptation of perl-meta. R37 states first adaptation should use the upstream version (e.g., '0.015'). The '-r0' suffix is a non-standard format compared to R37's examples ('.1', '.2' for adaptation fixes). However, the upstream version '0.015' is preserved within the version string and '-r0' appears consistently across branch name, metadata, and recipe, suggesting a project-wide convention.",
+      "fix_suggestion": "If '-r0' is a project-wide convention for packaging revisions, this can be disregarded. Otherwise, change version to '0.015' for the first adaptation, reserving suffixes for subsequent adaptation fixes."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS16",
+      "file": "archives/p/perl-meta/0.015-r0/conanfile.py",
+      "line": 18,
+      "description": "Standard library imports are not in alphabetical order: 'import os' appears before 'import glob' (should be 'glob' before 'os' alphabetically). Code-style rule 16 expects standard import ordering.",
+      "fix_suggestion": "Reorder imports to: 'import glob', 'import os', 'import subprocess'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS4",
+      "file": "archives/p/perl-meta/0.015-r0/conanfile.py",
+      "line": 195,
+      "description": "package_info() sets self.cpp_info.libs = [] (empty list). Code-style rule 4 expects cpp_info.libs to contain actual library names. The recipe explains this is a Perl XS module where the .so is loaded by Perl's XSLoader at runtime (not a linkable C library), which is a reasonable justification.",
+      "fix_suggestion": "This is acceptable for a Perl XS module. The existing comment explaining the rationale is good practice. No change required."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/p/perl-meta/0.015-r0/conanfile.py",
+      "line": 78,
+      "description": "Compiler is obtained via 'cc = compilers.get(\"c\") or os.environ.get(\"CC\") or \"clang\"'. R33 discourages bare shell environment variable usage as it may be empty on release workers. The code does prioritize Conan's tools.build:compiler_executables first, with env as a last-resort fallback before defaulting to 'clang'.",
+      "fix_suggestion": "The fallback chain (Conan conf → env → default 'clang') is reasonable. Consider adding a log warning when the env fallback is used: 'self.output.warn(\"CC not found in Conan conf, falling back to env/default\")'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS9",
+      "file": "archives/p/perl-meta/0.015-r0/test_package/test_meta.sh",
+      "line": 24,
+      "description": "Script output uses plain echo statements (e.g., 'echo \"FAIL: ...\"', 'echo \"TEST PASSED: ...\"') instead of the standard [step]/[ok]/[fail]/[warn] markers defined in code-style rule 9.",
+      "fix_suggestion": "Consider adopting [step]/[ok]/[fail] output format for consistency, though this is a test source file rather than a CI script. Low priority."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS10",
+      "file": "archives/p/perl-meta/0.015-r0/test_package/test_meta.sh",
+      "line": 82,
+      "description": "Uses '|| true' to suppress command failure when re-running perl to check for 'Permission denied' error. Code-style rule 10 prefers explicit comments on || true usage. The surrounding context makes the intent clear, but a direct inline comment would improve clarity.",
+      "fix_suggestion": "Add an inline comment: 'env -u LD perl ... 2>&1 || true  # expected to fail; checking output for Permission denied'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/p/perl-meta/0.015-r0/test_package/test_meta.sh",
+      "line": 83,
+      "description": "Test tolerates 'Permission denied' (HMDFS SELinux E073) on OHOS and exits 0 after verifying .so and .pm presence, without calling the actual API. The test genuinely attempts API calls first (meta::get_package, meta::package->get, meta::get_this_package), so this is NOT an empty/shell test. However, the tolerance could mask real issues if the platform limitation is resolved but the module remains broken.",
+      "fix_suggestion": "Add a tracking note (e.g., '# TODO: remove Permission denied tolerance when HMDFS/SELinux E073 is resolved') and consider logging when the tolerance is triggered so CI reports show it."
+    }
+  ],
+  "summary": "Audit of perl-meta 0.015-r0 recipe (8 changed files) completed against code-style.md (25 rules) and review-memory.md (30 rules). VERDICT: PASS. No P0 (deception) or P1 (recipe correctness) issues found. Deception detection (highest priority) all passed: (1) R34 — test_meta.sh calls real meta API functions (meta::get_package, meta::package->get, meta::get_this_package), not just print; test_package/conanfile.py depends on tested package via self.requires(self.tested_reference_str). (2) R9 — no 'def test(self): pass' or skipped tests; test runs actual shell script. (3) Faked sha256 — sha256 '04eae3e0...' is valid 64-char hex, not all-zeros/f's, matches between conandata.yml and manifest.yaml. (4) Faked status — manifest status 'built' is consistent with notes.md final entry. (5) R8 — no empty #ifdef __OHOS__ stubs. (6) R19 — no prebuilt binaries in PR. R32 check uses correct 'not in (\"Linux\", \"OHOS\")' form. R39 source URL is official CPAN (https://www.cpan.org/authors/id/P/PE/PEVANS/meta-0.015.tar.gz). R37 version '0.015-r0' preserves upstream version with '-r0' revision suffix (appears to be project convention). 9 P2 warnings found: template placeholder url (CS5), manifest build_system inconsistency (CS14), stale patch reference (R12), configure_options mismatch (CS14), notes.md conflicting status (R3), notes.md build system inconsistency (CS14), MANIFEST.yml upstream_check_command inconsistency (CS14), missing set -euo pipefail in test script (CS7), version suffix format (R37). 6 P3 hints: import ordering (CS16), empty cpp_info.libs (CS4), env var fallback (R33), output format (CS9), || true usage (CS10), Permission denied tolerance (R34). The main theme of P2 issues is metadata inconsistency: manifest.yaml, notes.md, and MANIFEST.yml all describe the original upstream Module::Build/Build.PL approach, while the conanfile.py was adapted to use ExtUtils::MakeMaker/Makefile.PL. Updating these metadata files to match the actual recipe would resolve most warnings."
+}
