@@ -26,7 +26,7 @@ set +e
 blender -b --factory-startup > /dev/null 2>&1
 rc=$?
 set -e
-if [ "$rc" -ge 128 ] || [ "$rc" -eq 127 ]; then
+if [ "$rc" -ge 128 ] || [ "$rc" -eq 127 ] || [ "$rc" -eq 126 ]; then
     echo "❌ blender -b --factory-startup crashed (exit code $rc)"
     exit 1
 fi
