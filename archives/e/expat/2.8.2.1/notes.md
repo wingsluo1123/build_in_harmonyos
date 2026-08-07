@@ -46,3 +46,21 @@ Error relocating …/libfontconfig.so.1: XML_ParserCreate: symbol not found
 
 按 R37：`2.8.2` 已发布到制品仓，改配方须递增后缀 → `2.8.2.1`。
 下游 `fontconfig` 需同步升到 `2.18.1.1` 以引用本版。
+
+
+## 2026-08-07 issue #1912 follow-up
+
+`vips/8.18.4` shadow CI exposed a device filesystem limitation while building
+this dependency:
+
+```text
+CMake Error: failed to create symbolic link 'libexpat.so.1': Permission denied
+CMake Error: cmake_symlink_library: System Error: Permission denied
+```
+
+The failure happened in the build tree before `package()`, so post-install
+symlink cleanup cannot help. The recipe now passes
+`CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON` while keeping the OHOS toolchain SONAME
+flag (`-Wl,-soname,`). This asks CMake to emit an unversioned shared library on
+platforms where versioned shared-object links are not usable, while still
+avoiding the previous no-SONAME downstream `DT_NEEDED` path contamination.
