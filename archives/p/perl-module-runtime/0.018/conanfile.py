@@ -12,7 +12,7 @@ import glob
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -22,7 +22,7 @@ class PerlModuleRuntimeConan(ConanFile):
     description = "Runtime module handling for Perl - provides functions for loading modules at runtime"
     license = "GPL-1.0-or-later OR Artistic-1.0"
     homepage = "https://metacpan.org/dist/Module-Runtime"
-    url = ""  # CI fills this
+    url = "https://cpan.metacpan.org/authors/id/H/HA/HAARG/Module-Runtime-0.018.tar.gz"
 
     # Pure Perl module — no compiler/build_type needed
     settings = "os", "arch"
