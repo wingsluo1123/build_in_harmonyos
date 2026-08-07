@@ -118,3 +118,7 @@ Can't load '.../Pari.so' for module Math::Pari: Permission denied
 ---
 **编译结束**: 2026-06-17 14:20
 **最终状态**: built (编译成功，XS需HNP安装)
+---
+
+**编译结束**: 2026-08-07 10:41
+**最终状态**: built
