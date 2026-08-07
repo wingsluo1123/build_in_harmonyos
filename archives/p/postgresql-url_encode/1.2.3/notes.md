@@ -94,9 +94,11 @@ PostgreSQL 17 内部 API 变更可能导致扩展编译失败，需要检查：
 ## 参考
 
 - PGXN: https://api.pgxn.org/dist/url_encode/
-- PostgreSQL 17 Release Notes: https://www.postgresql.org/docs/17/release-17.html
+- PostgreSQL 17 Release Notes: https://www.postgresql.org/docs/17/release-17.html---
 
+**编译结束**: 2026-08-08 02:12
+**最终状态**: built
 ---
 
-**编译结束**: 2026-06-04
-**最终状态**: published - postgresql-url_encode 1.2.3 已成功编译和归档
+**编译结束**: 2026-08-08 02:15
+**最终状态**: built
