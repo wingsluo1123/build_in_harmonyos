@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 # Smoke test: verify postgresql-rum extension artifacts
 RUM_SO="${1:-rum.so}"
 echo "Testing rum extension artifacts"
