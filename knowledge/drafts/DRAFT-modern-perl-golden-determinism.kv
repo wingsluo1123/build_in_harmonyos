@@ -1,0 +1,84 @@
+#====================================================================
+# DRAFT-modern-perl-golden-determinism.kv
+# 现代 Perl hash 顺序导致的 golden 输出非确定性 + 固定顺序修复 + 受控 golden 重基线
+# 证据来源: texi2html 5.0 (PR !2728 / 路径 B 候选)
+# 日期: 2026-08-06
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-modern-perl-golden-determinism
+category:               runtime|testing|determinism
+trigger_tool:           make check|perl
+phase:                  testing
+error_signature:        golden.*diff|res.*out.*diff|node equivalent.*order|
+                        anchor.*number.*unstable|Duplicate specification.*intermittent|
+                        make check.*D:|hash traversal.*unstable
+
+# ═══ Layer 1: 最小症状 (Minimal Symptoms) ═══
+# 同一确定性源码在相同环境下连续多次运行 make check 或单用例,
+# 输出(尤其 .2 诊断顺序行、锚点 a-N 编号、索引/菜单条目顺序)在多次运行间
+# 出现少量且随机的差异 (例如 a-7/a-9 互换、Node equivalent 消息行序翻转);
+# 偶尔伴随间歇性警告 (如 "Duplicate specification")。
+# 关键特征: 失败用例集合和差异内容逐次不同, 无源码/配置变化。
+
+# ═══ Layer 2: 根因 (Root Cause) ═══
+# 现代 Perl (>=5.18) 的 hash 遍历顺序随机化 (PERL_HASH_SEED 每次进程随机):
+# 代码中对 %hash 的 keys/values/each 未排序遍历, 一旦该遍历顺序影响
+# (a) 锚点/节点编号分配, (b) 等价节点消息生成顺序, (c) 选项解析/汇总顺序,
+# 输出中凡与遍历顺序相关的部分即逐次不同。
+# 根因要点: 输出"语义上不依赖顺序"并不保证"文本上稳定"——只要文本中有
+# 编号或先后关系, hash 序就会泄漏到 golden 输出。
+
+# ═══ Layer 3: 通用修复模式 (Generic Fix Pattern) ═══
+# 保存单调 source/parse order, 作为排序 tie-break:
+#   1. 在解析/注册阶段为每个节点/锚点/节/条目维护一个单调递增计数器
+#      (如 $order = ++$counter), 与数据结构一同保存;
+#   2. 所有输出相关的遍历按该 order 排序 (sort { $a->{order} <=> $b->{order} }),
+#      或对 keys()/values()/each() 的迭代先 sort 再遍历;
+#   3. 需要稳定的其余 hash 遍历同样先排序 (sort keys %h)。
+# 原则: 修复的是"遍历顺序", 而非"数据内容"; 不得改变诊断消息文本本身。
+
+# ═══ Layer 4: golden 更新边界 (Golden Update Boundaries) ═══
+# 只允许固定、可读的期望输出 (res) 补丁:
+#   - 补丁必须由确定性源码的一次干净运行生成, 存放于库内 patches/ 下,
+#     以可读 unified diff 呈现, 禁止压缩/二进制化/下载或运行时生成;
+#   - 必须附 manifest: 每个变更 res 文件、增删行、关联 base_test、关联修复点;
+#   - 禁止改动: 测试输入 (.texi/.init), 测试命令, 断言范围, skip 规则,
+#     tests.txt, 测试脚本; 不得删除断言、扩大 skip、屏蔽 stderr。
+
+# ═══ Layer 5: 验证门槛 (Verification Gates) ═══
+#   1. 默认环境干净运行 make check 至少三次; 每次输出自洽
+#      PASS/FAIL/SKIP/ERROR 统计与日志 sha256; 三次应结果相同且 FAIL=0/ERROR=0;
+#   2. 跨进程 byte-identical 断言 (同一输入两个独立进程输出逐字节一致);
+#   3. 完整门禁链: conan create / conan-verify / finish / W3 /
+#      .ci-result.json exit_code=0;
+#   4. 新增/替代测试通过; 依赖已在制品库/Conan/已合入 PR。
+
+# ═══ Layer 6: 禁止手段 (Forbidden Means) ═══
+#   - 固定 PERL_HASH_SEED / 设置 perl 固定 seed;
+#   - perl -X / 关闭 warnings / 宽泛白名单 / ignore_errors;
+#   - make check || true 或吞掉非零退出码;
+#   - 在 recipe 中从实际输出动态覆盖/生成 expected 文件;
+#   - 为缩小补丁回退确定性修复。
+
+# ═══ Layer 7: 适用边界与拒绝条件 (Applicability / Reject) ═══
+# 适用: 纯 Perl/脚本型测试, 输出含编号/先后关系, hash 序可泄漏;
+#       修复后输出在相同源码下逐次稳定。
+# 拒绝 golden 更新的条件:
+#   - 差异源于测试输入/命令/断言/skip 变更而非确定性输出;
+#   - 补丁无法按 manifest 归入(解析序/锚点编号/诊断顺序/images_quotes)任一类别;
+#   - 三次运行统计不一致或存在 FAIL/ERROR;
+#   - 需固定 seed/白名单/关闭 warnings 才能通过。
+
+# ═══ Layer 8: texi2html 5.0 实际证据引用 ═══
+#   - 确定性修复: MySimple.pm 选项解析按单调解析序 sort 迭代
+#     (消除间歇 "Duplicate specification"); 节点/锚点/节注册 order 计数器
+#     作为 tie-break (a-N 编号、Node equivalent 消息顺序、菜单/索引顺序);
+#   - 三次 make check 全通过: D=0, F=0, S=6/9
+#     (日志 sha256: bd6bed84f6c5c898 / 76029fd171226e4a / 19a70ba92a5a5d1f);
+#   - 候选 golden: 217 个上游 res 文件, 117 个非空补丁 + 2 个零字节补丁,
+#     约 +13967/-12484 行; MANIFEST.txt 含 base_test 与修复点关联;
+#   - images_quotes 反斜杠文件名差异为合法确定性变更 (单独归类);
+#   - test_package: test_texi2html.sh 4/4 + test_determinism.sh 跨进程
+#     byte-identical 断言; 门禁链 conan create/verify/finish/W3 与
+#     .ci-result.json exit_code=0 全部通过。

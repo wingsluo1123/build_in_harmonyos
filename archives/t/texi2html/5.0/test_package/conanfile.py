@@ -34,3 +34,14 @@ class Texi2HtmlTestConan(ConanFile):
             env="conanrun",
         )
         self.output.info("texi2html SUCCESS: test_texi2html.sh passed")
+
+        # Determinism consumer regression: two independent processes on the
+        # same multi-node/multi-section input must produce byte-identical HTML
+        # (perl hash-order determinism).
+        determinism_script = os.path.join(self.source_folder, "test_determinism.sh")
+        assert os.path.isfile(determinism_script), f"test_determinism.sh not found at {determinism_script}"
+        self.run(
+            f'bash "{determinism_script}" "{texi2html}" "{libintl}" "{self.source_folder}" "{work_dir}"',
+            env="conanrun",
+        )
+        self.output.info("texi2html SUCCESS: test_determinism.sh passed")

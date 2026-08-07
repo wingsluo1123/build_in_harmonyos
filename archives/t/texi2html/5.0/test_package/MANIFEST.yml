@@ -14,10 +14,13 @@ upstream_tests:
 
 test_package_tests:
   - file: conanfile.py
-    description: "Checks texi2html binary exists and libintl-perl dir is bundled, then invokes test_texi2html.sh with an explicit writable work dir (self.build_folder/texi2html-test-work)."
-    command: "conan create ... invokes test() -> binary/libintl checks -> test_texi2html.sh <bin> <libintl> <source_dir> <work_dir>"
+    description: "Checks texi2html binary exists and libintl-perl dir is bundled, then invokes test_texi2html.sh with an explicit writable work dir (self.build_folder/texi2html-test-work) and test_determinism.sh."
+    command: "conan create ... invokes test() -> binary/libintl checks -> test_texi2html.sh <bin> <libintl> <source_dir> <work_dir> -> test_determinism.sh"
   - file: test_texi2html.sh
     description: "Creates and probes the explicit work dir for writability, runs texi2html --no-validate sample.texi, and asserts sample.html is generated with expected content 'Hello from texi2html'."
     command: "test_texi2html.sh <texi2html_bin> <libintl_dir> <source_dir> <work_dir>"
+  - file: test_determinism.sh
+    description: "Determinism consumer regression: converts the same multi-node/multi-section input in two independent texi2html processes and asserts the HTML outputs are byte-identical."
+    command: "test_determinism.sh <texi2html_bin> <libintl_dir> <source_dir> <work_dir>"
 
-assertion_count: 5
+assertion_count: 6
