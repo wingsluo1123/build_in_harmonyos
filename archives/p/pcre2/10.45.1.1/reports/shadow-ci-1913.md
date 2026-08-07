@@ -1,4 +1,4 @@
-# pcre2 10.45.1 shadow CI report
+# pcre2 10.45.1.1 shadow CI report
 
 Date: 2026-08-07
 Issue: 1913
@@ -6,9 +6,10 @@ Branch: feat/pcre2-10.45-1913
 
 ## Change
 
-The first PR revision modified `pcre2/10.45`, but CI reported that version was
-already published. The HarmonyOS configure permission workaround has therefore
-been carried on the existing follow-up package version `pcre2/10.45.1`.
+The first PR revision modified `pcre2/10.45`, and the next revision used
+`pcre2/10.45.1`. CI reported both versions were already published. The
+HarmonyOS configure permission workaround has therefore been carried on the
+incremented package version `pcre2/10.45.1.1`.
 
 The recipe restores executable bits for autotools helper scripts copied into
 the Conan work directories, then runs `configure` through `sh`. This avoids the
@@ -22,19 +23,19 @@ Device: `currentUser@10.62.189.79:2222`
 Job directory:
 
 ```text
-/storage/Users/currentUser/ohos-users/codex/pcre2-10.45.1-1913-20260807
+/storage/Users/currentUser/ohos-users/codex/pcre2-10.45.1.1-1913-20260807
 ```
 
 Runner directory:
 
 ```text
-/storage/Users/currentUser/ohos-test-runs/codex-10.45.1-pcre2-10.45.1-1913-20260807-conan-20260807-140010-46553
+/storage/Users/currentUser/ohos-test-runs/codex-10.45.1.1-pcre2-10.45.1.1-1913-20260807-conan-20260807-143133-6157
 ```
 
 Command:
 
 ```sh
-zsh ci/conan/build_and_test.sh archives/p/pcre2/10.45.1
+zsh ci/conan/build_and_test.sh archives/p/pcre2/10.45.1.1
 ```
 
 Result:
