@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: postgresql-uint/3.0.0
+homepage: "https://github.com/nad2000/postgresql-contrib-uint"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# 上游实际运行的测试程序 (需要 PostgreSQL 服务器运行)
+# 上游测试使用 regression test framework (pg_regress)
+upstream_tests:
+  - file: sql/init.sql
+    source: postgresql-uint-3.0.0/sql/init.sql
+    description: "Initialize test data for uint types"
+    command: "make installcheck"
+  - file: sql/cast.sql
+    source: postgresql-uint-3.0.0/sql/cast.sql
+    description: "Test type casting operations"
+    command: "make installcheck"
+  - file: sql/insert.sql
+    source: postgresql-uint-3.0.0/sql/insert.sql
+    description: "Test INSERT operations with uint types"
+    command: "make installcheck"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "Verify uint.so is loadable and exports Pg_magic_func entry point"
+    command: "./test_postgresql_uint"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3
