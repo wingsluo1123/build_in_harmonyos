@@ -35,7 +35,7 @@ Job directory:
 Runner directory:
 
 ```text
-/storage/Users/currentUser/ohos-test-runs/codex-2.8.2.1.1-expat-2.8.2.1.1-1912-20260807-conan-20260807-132755-27107
+/storage/Users/currentUser/ohos-test-runs/codex-2.8.2.1.1-expat-2.8.2.1.1-1912-api-20260807-conan-20260807-134642-37963
 ```
 
 Command:
@@ -66,7 +66,9 @@ Additional checks:
   was created.
 - `cmake --install` installed `lib/libexpat.so` successfully.
 - `binary-sign-tool` signed `libexpat.so` successfully.
-- `test_package` built and executed `dlopen(.../libexpat.so)` successfully.
+- `test_package` built and executed `dlopen(.../libexpat.so)` successfully,
+  then resolved and called `XML_ParserCreate`, `XML_Parse`, and
+  `XML_ParserFree` against a minimal XML document.
 - Negative test moved `lib/` and `include/` away and confirmed the test package
   genuinely depends on expat.
 - `llvm-readelf -d libexpat.so` reports:
