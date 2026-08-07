@@ -6,7 +6,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <sys/wait.h>
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -26,9 +26,15 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "tldr path too long\n");
         return 3;
     }
+    /* P2: system() 返回的是 POSIX wait status 编码值（退出码 1 显示为 256），非真实退出码。
+     * 需 WIFEXITED/WEXITSTATUS 解析真实退出码（OHOS musl libc 不保证间接可用，显式 include sys/wait.h）。 */
     int ret = system(cmd);
     if (ret != 0) {
-        fprintf(stderr, "tldr --version failed with exit code %d\n", ret);
+        if (WIFEXITED(ret)) {
+            fprintf(stderr, "tldr --version failed with exit code %d\n", WEXITSTATUS(ret));
+        } else {
+            fprintf(stderr, "tldr --version aborted abnormally (wait status %d)\n", ret);
+        }
         return 1;
     }
     printf("tlrc runtime test PASSED (tldr --version exit 0)\n");
