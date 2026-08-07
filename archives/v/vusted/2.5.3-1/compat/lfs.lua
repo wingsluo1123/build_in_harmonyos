@@ -102,7 +102,7 @@ end
 function lfs.dir(path)
   local scan, err = uv.fs_scandir(path)
   if not scan then
-    error(err or ("cannot open directory: " .. tostring(path)), 2)
+    return nil, err or ("cannot open directory: " .. tostring(path))
   end
   if type(scan) == "table" then
     if scan.name or scan.type then

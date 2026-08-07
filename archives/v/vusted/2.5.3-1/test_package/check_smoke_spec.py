@@ -17,10 +17,13 @@ required = [
     'describe("vusted smoke"',
     'it("runs inside Neovim"',
     'it("exposes lfs.dir entry types"',
+    'it("returns nil and an error for missing lfs.dir paths"',
     'vim.fn.has("nvim")',
     'require("vusted.helper")',
     'require("lfs")',
     "lfs.dir(root)",
+    "pcall(lfs.dir, missing)",
+    "assert.is.equal(nil, iterator)",
     "entry_type",
 ]
 missing = [token for token in required if token not in text]

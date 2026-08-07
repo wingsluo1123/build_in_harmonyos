@@ -22,5 +22,17 @@ describe("vusted smoke", function()
     vim.fn.delete(root, "rf")
     assert.is.equal("file", found_type)
   end)
+
+  it("returns nil and an error for missing lfs.dir paths", function()
+    local lfs = require("lfs")
+    local missing = vim.fn.tempname() .. "/missing"
+
+    local ok, iterator, err = pcall(lfs.dir, missing)
+
+    assert.is.truthy(ok)
+    assert.is.equal(nil, iterator)
+    assert.is.equal("string", type(err))
+    assert.is.truthy(#err > 0)
+  end)
 end)
 
