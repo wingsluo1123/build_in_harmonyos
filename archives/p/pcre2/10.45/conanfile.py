@@ -45,8 +45,9 @@ class Pcre2Conan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        self._restore_autotools_script_modes()
         autotools = Autotools(self)
-        autotools.configure()
+        self.run('sh "{}/configure" {}'.format(self.source_folder, autotools._configure_args))
         autotools.make(args=["-j1"])
 
     def package(self):
@@ -55,3 +56,17 @@ class Pcre2Conan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["pcre2-8", "pcre2-posix"]
+
+    def _restore_autotools_script_modes(self):
+        import os
+        import stat
+
+        roots = (self.recipe_folder, self.source_folder, self.build_folder)
+        script_names = {"configure", "config.guess", "config.sub", "install-sh", "missing"}
+        for root in roots:
+            if not root or not os.path.isdir(root):
+                continue
+            for current, _, files in os.walk(root):
+                for name in script_names.intersection(files):
+                    path = os.path.join(current, name)
+                    os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
