@@ -17,6 +17,10 @@ class Qt5QtgraphicaleffectsTestConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         variables = {}
+        # 传入被测包内 QML 模块目录的绝对路径（R34：test 必须真实校验被测包）
+        dep = self.dependencies["qt5-qtgraphicaleffects"]
+        qml_dir = os.path.join(dep.package_folder, "qml")
+        variables["QML_MODULE_DIR"] = qml_dir
         if str(self.settings.os) == "OHOS":
             compilers = self.conf.get(
                 "tools.build:compiler_executables", default={}, check_type=dict
