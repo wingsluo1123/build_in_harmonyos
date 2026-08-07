@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS3",
+      "file": "archives/n/nnn/5.0/conanfile.py",
+      "line": 45,
+      "description": "Duplicate source() method: source() is defined twice — once before generate() at line 35 (correct position per method ordering rule) and again after generate() at line 45 (leftover from the previous incorrect order). In Python, the second definition silently overrides the first. Both have identical bodies so behavior is unchanged, but this is a code style violation (rule 3: method order) and was introduced by the method-order fix that added source() before generate() without removing the old one.",
+      "fix_suggestion": "Remove the duplicate source() method at line 45 (the one after generate()). Keep only the source() at line 35 which is correctly positioned before generate()."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/n/nnn/5.0/conandata.yml",
+      "line": 6,
+      "description": "The first URL in sources.url manually adds a gh-proxy.com mirror prefix: 'https://gh-proxy.com/https://github.com/jarun/nnn/releases/download/v5.0/nnn-v5.0.tar.gz'. R39 states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀。' The manually-added mirror is redundant since CI handles this automatically.",
+      "fix_suggestion": "Remove the 'https://gh-proxy.com/https://github.com/jarun/nnn/...' URL from the list. Keep only 'https://github.com/jarun/nnn/releases/download/v5.0/nnn-v5.0.tar.gz'. CI will add mirror fallbacks automatically."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS13",
+      "file": "archives/n/nnn/5.0/conandata.yml",
+      "line": 18,
+      "description": "Three patch files exist in patches/ directory (readline-0001-config-guess.patch, readline-0002-config-sub.patch, readline-0003-termcap-link.patch) and are declared in manifest.yaml patches_applied, but conandata.yml has patches: {} (empty). Code style rule 13 states: '补丁需在 patches 字段声明且文件实际存在'. The patches are for readline (a sub-build within _build_readline()) and are applied via replace_in_file() instead of the Conan patch system, making the patch files documentation-only. Additionally, patch filenames use 'readline-0001-' prefix format instead of the standard '0001-' format per rule 12.",
+      "fix_suggestion": "Either (a) declare the readline patches in conandata.yml patches field with patch_file/patch_description/patch_type entries and rename to standard '0001-' format, or (b) add a comment in conandata.yml explaining that patches are applied inline via replace_in_file() in _build_readline() because they target readline (a sub-build) rather than the main nnn source."
+    }
+  ],
+  "summary": "RE-AUDIT for nnn 5.0 after fixes. Previous audit found 7 issues (1×P1, 4×P2, 2×P3). Verification results: P1 (notes.md now has substantive real content — software info table, dependencies, build steps, 4 key fixes, verification results, knowledge gained) → FIXED ✓. P2 (shebang '#!/usr/bin/env python3' present on line 1) → FIXED ✓. P2 (bindirs: self.cpp_info.bindirs = [\"bin\"] in package_info) → FIXED ✓. P2 (pipefail: 'set -euo pipefail' in test.sh) → FIXED ✓. P3 (import glob at top level, not inside function) → FIXED ✓. P3 (_meta.yaml has no absolute paths) → FIXED ✓. P2 (method order: source() now before generate()) → PARTIALLY FIXED — the fix added source() before generate() correctly but left the old source() after generate() as a duplicate (new P2 issue, line 45). Additional new issues: (1) P3/R39 — conandata.yml manually adds gh-proxy.com mirror prefix to first URL, redundant per R39 since CI auto-adds fallbacks; (2) P3/CS13 — three patch files exist but conandata.yml patches:{} is empty, patches are applied via replace_in_file() in _build_readline() for readline sub-build. Key compliance checks all PASS: R34 (test.sh runs 'nnn -V' and 'nnn -h' — actual binary execution) ✓; R33 (_get_cc() uses self.conf.get('tools.build:compiler_executables') with 'clang' fallback, CC passed as make arg not bare env var) ✓; R9 (no skipped/fake tests, test() runs test.sh) ✓; R8 (patches have real HarmonyOS detection logic, not stubs) ✓; R19 (no pre-compiled .so/.a/.o binaries in PR) ✓; R39 (nnn URL is official GitHub release; readline URLs are authoritative mirrors: TUNA/USTC/Aliyun/GNU-FTP) ✓; R38 (commands.json: type=\"tool\", name=\"nnn\", binary=false) ✓; package_type=\"application\" ✓; sha256 values are 64-char hex, not all-zeros/f's (nnn: ba82d6c6..., readline: 3feb7171...) ✓; Conan 2.x API (from conan import ConanFile, conan.tools.*) ✓; W2 PR atomicity (all files for nnn only) ✓; status='built' consistent with binary=false ✓. No P0 (deceptive) or P1 (correctness) issues found. Verdict: PASS with 1 P2 warning and 2 P3 hints."
+}
