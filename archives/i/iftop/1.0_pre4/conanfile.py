@@ -71,7 +71,9 @@ class IftopConan(ConanFile):
     def generate(self):
         AutotoolsDeps(self).generate()
         tc = AutotoolsToolchain(self)
-        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        # 不再硬编码 --build：0001/0002 补丁已让 config.guess 直接输出
+        # aarch64-unknown-linux-ohos，config.sub 也不会再把它归一化成
+        # linux-gnu-ohos，因此让 autoconf 自行探测真实三元组即可。
         # iftop 的 configure 只在 /usr /usr/local /opt /software 这几个固定
         # 前缀下搜索 pcap.h，必须显式指向 conan 提供的 libpcap 安装根目录，
         # 否则会以 "can't find pcap.h" 终止。
