@@ -62,7 +62,7 @@ class Qt5Qt3dConan(ConanFile):
         build_env.define("QTDIR", qtbase.package_folder)
         build_env.prepend_path("PATH", os.path.join(qtbase.package_folder, "bin"))
         with build_env.vars(self).apply():
-            self.run(f'cd "{self.source_folder}" && {shlex.quote(qmake)} qt3d.pro')
+            self.run(f'cd "{self.source_folder}" && {shlex.quote(qmake)} -spec linux-clang qt3d.pro')
             jobs = self.conf.get("tools.build:jobs", default=4, check_type=int)
             self.run(f'cd "{self.source_folder}" && make -j{jobs}')
 
