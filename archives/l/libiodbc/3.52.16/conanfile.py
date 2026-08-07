@@ -15,7 +15,6 @@ class LibiodbcConan(ConanFile):
     description = "iODBC (Independent Open Database Connectivity) Driver Manager"
     license = "LGPL-2.1"
     homepage = "https://www.iodbc.org/"
-    url = ""
 
     package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
