@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 """Conan recipe — agg 2.7.0.r145 (Anti-Grain Geometry).
 
-dfsg orig tarball only ships configure.ac (no pre-generated configure),
-so we must run autoreconf in build(). SDL/FT2 autodetection macros are
-stripped from configure.ac via patch (AM_PATH_SDL / PKG_CHECK_MODULES
-not available on OHOS); all optional layers are disabled.
+The dfsg orig tarball only ships configure.ac (no pre-generated
+configure). We therefore run autoreconf LOCALLY (on a machine that
+has libtoolize/aclocal/automake) and ship the result as a second
+tarball (agg-2.7.0.r145-preconf.tar.xz) inside the recipe. The CI
+buildbot worker lacks libtoolize/aclocal/automake, so it cannot run
+autoreconf itself — this pre-generated configure lets CI build
+without any host autotools toolchain.
 
-OHOS autotools toolchain path quirk:
-  aclocal internally invokes `@am_AUTOM4TE@` (unsubstituted automake
-  placeholder) which fails. We export AUTOM4TE to point at the real
-  autom4te binary, plus SED/AUTOCONF to fix libtoolize/automake
-  hard-coded paths to non-existent binaries.
+SDL/FT2 autodetection macros are stripped from configure.ac via
+patch (AM_PATH_SDL / PKG_CHECK_MODULES not available on OHOS); all
+optional layers are disabled.
 """
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, chdir, patch, save
+from conan.tools.files import get, chdir, patch
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
 
 
 class AggConan(ConanFile):
@@ -38,6 +38,13 @@ class AggConan(ConanFile):
     # Patches declared here (no conandata.yml) — avoids the CI
     # build_and_test.sh "Pre-download" BUILD_DIR crash.
     exports_sources = "patches/*"
+    # Ship the pre-generated autoreconf products (configure, aclocal.m4,
+    # ltmain.sh, Makefile.in, config.{sub,guess}, install-sh, missing,
+    # depcomp) as a second tarball. CI workers lack
+    # libtoolize/aclocal/automake, so they cannot run autoreconf
+    # themselves. `exports` copies this file into the recipe cache so
+    # source() can reference it via self.recipe_folder.
+    exports = "agg-2.7.0.r145-preconf.tar.xz"
 
     def requirements(self):
         pass
@@ -55,6 +62,17 @@ class AggConan(ConanFile):
             sha256="b7181085d3c06166a972211cd17741cc5429adc7c1f58e4d528206f7208e6328",
             strip_root=True,
         )
+        # Overlay the pre-generated autoreconf products (configure,
+        # aclocal.m4, ltmain.sh, Makefile.in, config.{sub,guess},
+        # install-sh, missing, depcomp) on top of the dfsg tree.
+        # CI workers lack libtoolize/aclocal/automake, so they cannot
+        # run autoreconf themselves. We generated these locally and
+        # ship them as a second tarball alongside the recipe.
+        get(
+            self,
+            url="file://{}".format(os.path.join(self.recipe_folder, "agg-2.7.0.r145-preconf.tar.xz")),
+            strip_root=True,
+        )
 
     def generate(self):
         tc = AutotoolsToolchain(self)
@@ -69,52 +87,11 @@ class AggConan(ConanFile):
         tc.configure_args.append("--disable-freetype")
         tc.configure_args.append("--disable-gpc")
         tc.generate()
-        # Fix OHOS autotools toolchain paths:
-        #   - aclocal's @am_AUTOM4TE@ placeholder fails -> export real AUTOM4TE
-        #   - libtoolize hard-codes /storage/Users/currentUser/usr/local/bin/sed (non-existent)
-        #   - automake hard-codes /storage/Users/currentUser/usr/local/bin/autoconf (non-existent)
-        env = Environment()
-        env.define_path(
-            "AUTOM4TE", "/data/service/hnp/autoconf.org/autoconf_2.72/bin/autom4te"
-        )
-        env.define_path("SED", "/usr/bin/sed")
-        env.define_path("AUTOCONF", "/data/service/hnp/bin/autoconf")
-        env.define_path("AC_AUTOCONF", "/data/service/hnp/bin/autoconf")
-        env.define_path("AUTOHEADER", "/data/service/hnp/bin/autoheader")
-        env.define_path("AUTOMAKE", "/storage/Users/currentUser/usr/local/bin/automake")
-        env.define_path("ACLOCAL", "/storage/Users/currentUser/usr/local/bin/aclocal")
-        env.define_path(
-            "LIBTOOLIZE", "/storage/Users/currentUser/usr/local/bin/libtoolize"
-        )
-        envvars = env.vars(self)
-        envvars.save_script("agg_autotools_env")
 
     def build(self):
-        # Patches applied manually (no conandata.yml) — the patch file lives
-        # under patches/ in the recipe root, exported via exports_sources.
-        patch(self, patch_file="patches/0001-configure.ac.patch")
-        # dfsg tarball has no configure: regenerate via autotools.
-        # Order: libtoolize (ltmain.sh) -> aclocal (AM_* macros) ->
-        #        autoheader -> autoconf -> automake (Makefile.in) -> autoconf
-        autotools_cmds = (
-            "$LIBTOOLIZE --copy --force",
-            "$ACLOCAL",
-            "$AUTOHEADER -f",
-            "$AUTOCONF -f",
-            "$AUTOMAKE --foreign --add-missing --copy --force-missing",
-            "$AUTOCONF -f",
-        )
-        with chdir(self, self.source_folder):
-            # Use the agg_autotools_env script (saved by generate()) which
-            # exports absolute paths for LIBTOOLIZE/AUTOM4TE/SED/AUTOCONF/
-            # AUTOMAKE/ACLOCAL. CI workers may not have these on PATH and
-            # libtoolize has group-only x perms (file_manager group), so
-            # resolving via PATH is unreliable — absolute paths via $VAR
-            # from agg_autotools_env are robust.
-            self.run(
-                " && ".join(autotools_cmds),
-                env=["agg_autotools_env"],
-            )
+        # 0001-configure.ac.patch already applied to the preconf tarball
+        # (PKG_CHECK_MODULES/FREETYPE and AM_PATH_SDL removed before
+        # autoreconf). No need to re-apply here.
         # HMDFS workaround: configure's generated config.status uses
         # `(umask 077 && mktemp -d "./confXXXXXX")` which creates a 700-permission
         # subdir; HMDFS refuses writes inside such dirs.
