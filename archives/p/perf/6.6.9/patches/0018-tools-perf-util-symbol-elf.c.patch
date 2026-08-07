@@ -1,0 +1,74 @@
+--- a/tools/perf/util/symbol-elf.c
++++ b/tools/perf/util/symbol-elf.c
+@@ -166,21 +166,21 @@
+ }
+ 
+ static inline bool elf_sec__is_data(const GElf_Shdr *shdr,
+ 				    const Elf_Data *secstrs)
+ {
+ 	return strstr(elf_sec__name(shdr, secstrs), "data") != NULL;
+ }
+ 
+ static bool elf_sec__filter(GElf_Shdr *shdr, Elf_Data *secstrs)
+ {
+-	return elf_sec__is_text(shdr, secstrs) || 
++	return elf_sec__is_text(shdr, secstrs) ||
+ 	       elf_sec__is_data(shdr, secstrs);
+ }
+ 
+ static size_t elf_addr_to_index(Elf *elf, GElf_Addr addr)
+ {
+ 	Elf_Scn *sec = NULL;
+ 	GElf_Shdr shdr;
+ 	size_t cnt = 1;
+ 
+ 	while ((sec = elf_nextscn(elf, sec)) != NULL) {
+@@ -359,40 +359,42 @@
+ 		gelf_getrela(ri->reldata, x, &rela);
+ 		return rela.r_offset;
+ 	} else {
+ 		GElf_Rel rel;
+ 
+ 		gelf_getrel(ri->reldata, x, &rel);
+ 		return rel.r_offset;
+ 	}
+ }
+ 
+-static int rel_cmp(const void *a, const void *b, void *r)
+-{
+-	struct rel_info *ri = r;
+-	u64 a_offset = get_rel_offset(ri, *(const u32 *)a);
+-	u64 b_offset = get_rel_offset(ri, *(const u32 *)b);
++/* OHOS: qsort_r not available, use qsort with static context */
++static struct rel_info *sort_rel_ri;
++static int rel_cmp(const void *a, const void *b)
++{
++	u64 a_offset = get_rel_offset(sort_rel_ri, *(const u32 *)a);
++	u64 b_offset = get_rel_offset(sort_rel_ri, *(const u32 *)b);
+ 
+ 	return a_offset < b_offset ? -1 : (a_offset > b_offset ? 1 : 0);
+ }
+ 
+ static int sort_rel(struct rel_info *ri)
+ {
+ 	size_t sz = sizeof(ri->sorted[0]);
+ 	u32 i;
+ 
+ 	ri->sorted = calloc(ri->nr_entries, sz);
+ 	if (!ri->sorted)
+ 		return -1;
+ 	for (i = 0; i < ri->nr_entries; i++)
+ 		ri->sorted[i] = i;
+-	qsort_r(ri->sorted, ri->nr_entries, sz, rel_cmp, ri);
++	sort_rel_ri = ri;
++	qsort(ri->sorted, ri->nr_entries, sz, rel_cmp);
+ 	return 0;
+ }
+ 
+ /*
+  * For x86_64, the GNU linker is putting IFUNC information in the relocation
+  * addend.
+  */
+ static bool addend_may_be_ifunc(GElf_Ehdr *ehdr, struct rel_info *ri)
+ {
+ 	return ehdr->e_machine == EM_X86_64 && ri->is_rela &&
