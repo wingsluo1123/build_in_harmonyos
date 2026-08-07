@@ -1,45 +1,41 @@
-#!/bin/sh
+#!/usr/bin/zsh
 # test_arename.sh — Smoke test for arename package installation
 # Verifies that arename and ataglist scripts are installed and syntactically valid
 # Called by test_package/conanfile.py test() method
-set -e
+set -euo pipefail
 
-ARENAME_BIN="${1:-bin/arename}"
-ATAGLIST_BIN="${1:-bin/ataglist}"
+PKG_DIR="${1:?Usage: test_arename.sh <package_dir>}"
 PERL_BIN="${PERL:-/data/service/hnp/bin/perl}"
 
-# If first arg is a directory (package folder), construct paths
-if [ -d "$1" ]; then
-    ARENAME_BIN="$1/bin/arename"
-    ATAGLIST_BIN="$1/bin/ataglist"
-fi
+ARENAME_BIN="$PKG_DIR/bin/arename"
+ATAGLIST_BIN="$PKG_DIR/bin/ataglist"
 
 # Verify arename script exists
 if [ ! -f "$ARENAME_BIN" ]; then
-    echo "FAIL: arename not found at $ARENAME_BIN"
-    exit 1
+        echo "[fail] arename not found at $ARENAME_BIN"
+        exit 1
 fi
-echo "OK: arename found at $ARENAME_BIN"
+        echo "        [ok] arename found at $ARENAME_BIN"
 
 # Verify ataglist script exists
 if [ ! -f "$ATAGLIST_BIN" ]; then
-    echo "FAIL: ataglist not found at $ATAGLIST_BIN"
-    exit 1
+        echo "[fail] ataglist not found at $ATAGLIST_BIN"
+        exit 1
 fi
-echo "OK: ataglist found at $ATAGLIST_BIN"
+        echo "        [ok] ataglist found at $ATAGLIST_BIN"
 
 # Check shebang contains perl
-head -1 "$ARENAME_BIN" | grep -q perl || { echo "FAIL: invalid shebang"; exit 1; }
-echo "OK: arename shebang valid"
+head -1 "$ARENAME_BIN" | grep -q perl || { echo "[fail] invalid shebang"; exit 1; }
+        echo "        [ok] arename shebang valid"
 
-head -1 "$ATAGLIST_BIN" | grep -q perl || { echo "FAIL: invalid shebang"; exit 1; }
-echo "OK: ataglist shebang valid"
+head -1 "$ATAGLIST_BIN" | grep -q perl || { echo "[fail] invalid shebang"; exit 1; }
+        echo "        [ok] ataglist shebang valid"
 
-# Perl syntax check (verifies generated script is valid Perl)
-"$PERL_BIN" -c "$ARENAME_BIN" 2>&1 || {
-    echo "WARN: perl -c failed (may need runtime modules)"
-    # Non-fatal: syntax check may fail due to missing Readonly module
-}
-echo "OK: arename syntax check completed"
+# Perl syntax check (non-fatal: may fail due to missing runtime modules)
+if "$PERL_BIN" -c "$ARENAME_BIN" 2>/dev/null; then
+        echo "        [ok] arename perl syntax check passed"
+else
+        echo "        [warn] perl -c failed (may need runtime modules — non-fatal)"
+fi
 
-echo "All smoke tests passed"
+        echo "        [ok] all smoke tests completed"
