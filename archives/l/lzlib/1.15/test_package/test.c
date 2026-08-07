@@ -26,28 +26,31 @@ int main(void) {
     uint8_t compressed[4096];
     long comp_pos = 0;
     long inpos = 0;
+    int finish_called = 0;
 
-    while (1) {
-        int ret = LZ_compress_write(encoder, (const uint8_t *)test_data + inpos,
-                                    min_int(INT_MAX, (int)(insize - inpos)));
-        if (ret < 0) {
-            fprintf(stderr, "FAIL: LZ_compress_write error\n");
-            LZ_compress_close(encoder);
-            return 1;
+    while (LZ_compress_finished(encoder) != 1) {
+        if (!finish_called) {
+            int ret = LZ_compress_write(encoder, (const uint8_t *)test_data + inpos,
+                                        min_int(INT_MAX, (int)(insize - inpos)));
+            if (ret < 0) {
+                fprintf(stderr, "FAIL: LZ_compress_write error\n");
+                LZ_compress_close(encoder);
+                return 1;
+            }
+            inpos += ret;
+            if (inpos >= insize) {
+                LZ_compress_finish(encoder);
+                finish_called = 1;
+            }
         }
-        inpos += ret;
-        if (inpos >= insize)
-            LZ_compress_finish(encoder);
-        ret = LZ_compress_read(encoder, compressed + comp_pos,
-                               (int)(sizeof(compressed) - comp_pos));
+        int ret = LZ_compress_read(encoder, compressed + comp_pos,
+                                   (int)(sizeof(compressed) - comp_pos));
         if (ret < 0) {
             fprintf(stderr, "FAIL: LZ_compress_read error\n");
             LZ_compress_close(encoder);
             return 1;
         }
         comp_pos += ret;
-        if (LZ_compress_finished(encoder) == 1)
-            break;
     }
     LZ_compress_close(encoder);
 
@@ -62,28 +65,31 @@ int main(void) {
     uint8_t decompressed[4096];
     long decomp_pos = 0;
     long cpos = 0;
+    int df_finish_called = 0;
 
-    while (1) {
-        int ret = LZ_decompress_write(decoder, compressed + cpos,
-                                      min_int(INT_MAX, (int)(comp_pos - cpos)));
-        if (ret < 0) {
-            fprintf(stderr, "FAIL: LZ_decompress_write error\n");
-            LZ_decompress_close(decoder);
-            return 1;
+    while (LZ_decompress_finished(decoder) != 1) {
+        if (!df_finish_called) {
+            int ret = LZ_decompress_write(decoder, compressed + cpos,
+                                          min_int(INT_MAX, (int)(comp_pos - cpos)));
+            if (ret < 0) {
+                fprintf(stderr, "FAIL: LZ_decompress_write error\n");
+                LZ_decompress_close(decoder);
+                return 1;
+            }
+            cpos += ret;
+            if (cpos >= comp_pos) {
+                LZ_decompress_finish(decoder);
+                df_finish_called = 1;
+            }
         }
-        cpos += ret;
-        if (cpos >= comp_pos)
-            LZ_decompress_finish(decoder);
-        ret = LZ_decompress_read(decoder, decompressed + decomp_pos,
-                                 (int)(sizeof(decompressed) - decomp_pos));
+        int ret = LZ_decompress_read(decoder, decompressed + decomp_pos,
+                                     (int)(sizeof(decompressed) - decomp_pos));
         if (ret < 0) {
             fprintf(stderr, "FAIL: LZ_decompress_read error\n");
             LZ_decompress_close(decoder);
             return 1;
         }
         decomp_pos += ret;
-        if (LZ_decompress_finished(decoder) == 1)
-            break;
     }
     LZ_decompress_close(decoder);
 
