@@ -1,17 +1,23 @@
 --- a/meson.build
 +++ b/meson.build
-@@ -172,7 +172,9 @@
+@@ -172,10 +172,15 @@
  cdata.set_quoted('DESKTOPFILEDIR', join_paths(datadir, 'applications'))
  cdata.set_quoted('PULSE_LOCALEDIR', localedir)
  cdata.set_quoted('GETTEXT_PACKAGE', 'pulseaudio')
 -cdata.set('ENABLE_NLS', 1)
-+if host_machine.system() != 'harmonyos'
++if host_machine.system() != 'ohos'
 +  cdata.set('ENABLE_NLS', 1)
 +endif
  cdata.set('top_srcdir', meson.source_root())
  
  # Platform specifics
-@@ -378,10 +380,10 @@
++if cc.has_function("gethostid")
++  cdata.set("HAVE_GETHOSTID", 1)
++endif
+ # First some defaults to keep config file generation happy
+ cdata.set('HAVE_COREAUDIO', 0)
+ cdata.set('HAVE_WAVEOUT', 0)
+@@ -378,10 +383,10 @@
    if host_machine.system() != 'windows'
      libintl_dep = []
    else
@@ -24,7 +30,7 @@
  endif
  
  # Symbols
-@@ -612,7 +614,7 @@
+@@ -612,7 +617,7 @@
    cdata.set('HAVE_GLIB20', 1) # to match the AM_CONDITIONAL for CMake file generation
  endif
  
