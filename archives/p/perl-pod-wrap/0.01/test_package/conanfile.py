@@ -3,6 +3,10 @@
 
 Verifies that the package contains the Wrap.pm file and that the module
 can be loaded and used to wrap POD text.
+
+Pod::Parser (a dependency of Pod::Wrap) was removed from Perl 5.36+ core.
+This test_package automatically downloads and installs Pod::Parser from CPAN
+if it is not available on the system.
 """
 import os
 import glob
@@ -19,8 +23,48 @@ class PodWrapTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def _build_perl5lib(self, pkg_perl_lib):
-        """Construct PERL5LIB including system Pod::Parser path."""
+    def _ensure_pod_parser(self):
+        """Download and install Pod::Parser from CPAN if not available.
+
+        Returns the Perl lib directory where Pod::Parser was installed,
+        or None if it was already available on the system.
+        """
+        # Check if Pod::Parser is already available
+        try:
+            result = subprocess.run(
+                ["perl", "-MPod::Parser", "-e", "1"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                return None  # Already available
+        except Exception:
+            pass
+
+        # Download and install Pod::Parser from CPAN
+        tmp_dir = tempfile.mkdtemp(prefix="pod-parser-")
+        parser_url = "https://cpan.metacpan.org/authors/id/M/MA/MAREKR/Pod-Parser-1.67.tar.gz"
+
+        self.run(f'curl -k -L "{parser_url}" -o "{tmp_dir}/Pod-Parser.tar.gz"')
+        self.run(f'cd "{tmp_dir}" && tar -xzf Pod-Parser.tar.gz')
+
+        parser_src = os.path.join(tmp_dir, "Pod-Parser-1.67")
+        install_base = os.path.join(tmp_dir, "perl5lib")
+
+        self.run(
+            f'cd "{parser_src}" && perl Makefile.PL INSTALL_BASE="{install_base}" '
+            f'&& make -j1 && make install'
+        )
+
+        return os.path.join(install_base, "lib", "perl5")
+
+    def _build_perl5lib(self, pkg_perl_lib, extra_paths=None):
+        """Construct PERL5LIB with all relevant paths."""
+        parts = []
+        if extra_paths:
+            parts.extend(extra_paths)
+        parts.append(pkg_perl_lib)
+
+        # Also add system Perl module paths if they exist
         home = os.path.expanduser("~")
         try:
             result = subprocess.run(
@@ -34,7 +78,6 @@ class PodWrapTestConan(ConanFile):
         except Exception:
             perl_ver = "5.42.0"
 
-        parts = [pkg_perl_lib]
         site_perl = os.path.join(home, "usr", "local", "lib", "site_perl", perl_ver)
         std_perl = os.path.join(home, "usr", "local", "lib", perl_ver)
         if os.path.isdir(site_perl):
@@ -66,7 +109,11 @@ class PodWrapTestConan(ConanFile):
         test_script = os.path.join(os.path.dirname(__file__), "test_package.py")
         self.run('python3 "{}" "{}"'.format(test_script, wrap_files[0]))
 
-        # 2. Functional test: load module and use it to wrap POD text
+        # 2. Ensure Pod::Parser is available (download from CPAN if needed)
+        parser_lib = self._ensure_pod_parser()
+        extra_paths = [parser_lib] if parser_lib else []
+
+        # 3. Functional test: load module and use it to wrap POD text
         func_test = os.path.join(tempfile.gettempdir(), "test_pod_wrap.pl")
         with open(func_test, "w") as f:
             f.write("use strict;\n")
@@ -95,6 +142,6 @@ class PodWrapTestConan(ConanFile):
             f.write('die "FAIL: verbatim text not preserved" unless $output =~ /verbatim text should not be wrapped/;\n')
             f.write('print "ALL ASSERTIONS PASSED\\n";\n')
 
-        # Set PERL5LIB to include both package lib and system Pod::Parser path
-        perl5lib = self._build_perl5lib(perl_lib_dir)
+        # Set PERL5LIB to include all relevant paths
+        perl5lib = self._build_perl5lib(perl_lib_dir, extra_paths)
         self.run('PERL5LIB="{}" perl {}'.format(perl5lib, func_test))
