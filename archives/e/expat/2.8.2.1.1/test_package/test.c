@@ -6,15 +6,29 @@
 #define TARGET_SO "libexpat.so"
 #endif
 
+static void *load_symbol(void *handle, const char *name) {
+    dlerror();
+    void *symbol = dlsym(handle, name);
+    const char *error = dlerror();
+    if (error || !symbol) {
+        fprintf(stderr, "missing expat API symbol %s: %s\n", name, error ? error : "unknown error");
+        return NULL;
+    }
+    return symbol;
+}
+
 int main(void) {
     void *h = dlopen(TARGET_SO, RTLD_NOW | RTLD_GLOBAL);
-    if (!h) { fprintf(stderr, "dlopen %s failed: %s\n", TARGET_SO, dlerror()); return 1; }
+    if (!h) {
+        const char *error = dlerror();
+        fprintf(stderr, "dlopen %s failed: %s\n", TARGET_SO, error ? error : "unknown error");
+        return 1;
+    }
 
-    XML_Parser (*create_parser)(const XML_Char *) = (XML_Parser (*)(const XML_Char *))dlsym(h, "XML_ParserCreate");
-    enum XML_Status (*parse)(XML_Parser, const char *, int, int) = (enum XML_Status (*)(XML_Parser, const char *, int, int))dlsym(h, "XML_Parse");
-    void (*free_parser)(XML_Parser) = (void (*)(XML_Parser))dlsym(h, "XML_ParserFree");
+    XML_Parser (*create_parser)(const XML_Char *) = (XML_Parser (*)(const XML_Char *))load_symbol(h, "XML_ParserCreate");
+    XML_Status (*parse)(XML_Parser, const char *, int, int) = (XML_Status (*)(XML_Parser, const char *, int, int))load_symbol(h, "XML_Parse");
+    void (*free_parser)(XML_Parser) = (void (*)(XML_Parser))load_symbol(h, "XML_ParserFree");
     if (!create_parser || !parse || !free_parser) {
-        fprintf(stderr, "missing expat API symbol: %s\n", dlerror());
         dlclose(h);
         return 1;
     }
