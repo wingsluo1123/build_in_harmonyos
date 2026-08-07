@@ -13,6 +13,7 @@
 - Repo/index: `archives/_index.yaml`, `SUMMARY.md`, and `scripts/ohc/dependency_resolver.py` point to Autoconf 2.72.
 - Existing archive: `archives/a/autoconf/2.72` already existed but lacked `conanfile.py`, `conandata.yml`, `test_package`, and `commands.json`.
 - Upstream: GNU FTP provides `autoconf-2.72.tar.gz`; downloaded SHA-256 is `afb181a76e1ee72832f6581c0eddf8df032b83e2e0239ef79ebedc4467d92d6e`.
+- Source mirror note: PR CI build #15421 failed before recipe execution while downloading the PR diff from `gitcode.com`, not while downloading Autoconf. However, the same CI diagnostic says `ftp.gnu.org` is not reachable from the worker, so `conandata.yml` now tries TUNA, Aliyun, and `mirrors.kernel.org` GNU mirrors before falling back to the official GNU FTP URL. The SHA-256 remains the official tarball hash.
 - Upstream also has newer Autoconf 2.73, but the current project dependency mapping still targets 2.72.
 
 ## W0 dependency and remote checks
@@ -31,6 +32,9 @@ conan list "perl/5.42.2:*" -r=ohpcd
 conan download "perl/5.42.2" -r=ohpcd --only-recipe
 conan list "automake/*" -r=ohpcd
 conan list "libtool/*" -r=ohpcd
+curl -I -L https://mirrors.tuna.tsinghua.edu.cn/gnu/autoconf/autoconf-2.72.tar.gz
+curl -I -L https://mirrors.aliyun.com/gnu/autoconf/autoconf-2.72.tar.gz
+curl -I -L https://mirrors.kernel.org/gnu/autoconf/autoconf-2.72.tar.gz
 ```
 
 Results:
@@ -41,6 +45,7 @@ Results:
 - Earlier `m4/*` checks returned 0 recipes while the dependency adaptation was still pending.
 - 2026-08-06 recheck after the `m4` merge: `m4/1.4.19` is visible in `ohpcd`; recipe revision `9a84a566238ea69b63e725d646354933` and OHOS armv8 package revision `8b566d24f4ee8ccaea3bc86a3eb00a93` downloaded successfully.
 - `automake/1.18` and `libtool/2.5.4`: visible in `ohpcd`; useful for downstream `autoreconf`, but not built into this package.
+- 2026-08-07 source mirror check from local Windows: TUNA, Aliyun, and `mirrors.kernel.org` returned HTTP 200 for `autoconf-2.72.tar.gz`; USTC returned HTTP 403 and was not added; `ftpmirror.gnu.org` timed out in 30 seconds.
 
 Dependency status:
 
