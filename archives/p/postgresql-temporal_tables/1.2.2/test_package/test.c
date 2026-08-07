@@ -45,7 +45,8 @@ static int check_elf_shared(const char *path) {
 static int check_symbol_via_nm(const char *path, const char *sym_name) {
     char cmd[512];
     /* nm -D lists dynamic symbols; T = text (code) section */
-    snprintf(cmd, sizeof(cmd), "nm -D '%s' 2>/dev/null | grep -w '%s' | grep -E '^[0-9a-f]+ T'", path, sym_name);
+    int n = snprintf(cmd, sizeof(cmd), "nm -D '%s' 2>/dev/null | grep -w '%s' | grep -E '^[0-9a-f]+ T'", path, sym_name);
+    if (n < 0 || (size_t)n >= sizeof(cmd)) return 0;  /* truncated command, unsafe to run */
     FILE *fp = popen(cmd, "r");
     if (!fp) return 0;
     char buf[256];
