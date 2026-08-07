@@ -32,5 +32,8 @@ class PerlListMoreUtilsXSTestConan(ConanFile):
         pm_path = os.path.join(pkg_folder, "lib", "List", "MoreUtils", "XS.pm")
 
         # Run the test script with paths as arguments
+        # R34: test_package.py calls actual List::MoreUtils::XS API (any, all, uniq, minmax)
+        # On OHOS HMDFS, "Permission denied" (E073) is tolerated
+        perl_lib = os.path.join(pkg_folder, "lib")
         test_script = os.path.join(os.path.dirname(__file__), "test_package.py")
-        self.run(f'python3 "{test_script}" "{so_path}" "{pm_path}"')
+        self.run(f'python3 "{test_script}" "{so_path}" "{pm_path}" "{perl_lib}"')
