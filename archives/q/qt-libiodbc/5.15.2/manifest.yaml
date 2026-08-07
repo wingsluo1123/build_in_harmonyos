@@ -1,27 +1,30 @@
 version: "5.15.2"
 status: built
-build_date: "2026-06-12"
+build_date: "2026-08-08"
 
 source:
   url: "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz"
+  sha256: "909fad2591ee367993a75d7e2ea50ad4db332f05e1c38dd7a5a274e156a4e0f8"
   tar_format: tar.xz
 
 build:
   system: custom
   configure_options:
-    - "Manual compilation: clang++ with Qt5 5.12.12 headers and iODBC libiodbc"
+    - "Manual clang++ compilation with Qt5 5.15.2 headers and iODBC libiodbc"
+    - "Builds Qt5Sql from source (qt5-qtbase built with -no-feature-sql)"
+    - "Driver keys changed from QODBC3/QODBC to QIODBC3/QIODBC"
   dependencies:
-    - "qt5-qtbase/5.12.12"
-    - "libiodbc"
+    - "qt5-qtbase/5.15.2"
+    - "libiodbc/3.52.16"
   cc: clang
   cxx: clang++
 
 patches_applied: []
 
 knowledge_gained:
-  - "Qt5 iODBC plugin requires Qt5-specific headers; installed headers are mixed Qt5/Qt6"
-  - "Mixed Qt5/Qt6 header environment requires explicit Qt5 header paths for plugin compilation"
+  - "Qt5 iODBC plugin builds from qtbase source with manual clang++ compilation"
+  - "Qt5Sql must be built from source when qt5-qtbase was configured with -no-feature-sql"
   - "libqsqliodbc.so uses unique keys QIODBC3/QIODBC (distinct from unixODBC's QODBC3/QODBC)"
   - "iODBC driver links against libiodbc.so.2 and libiodbcinst.so.2"
-  - "Driver needs manual deployment to sqldrivers/ directory (auto-install not working)"
+  - "Driver needs deployment to sqldrivers/ directory to be loaded by Qt apps"
   - "Runtime dlopen testing blocked by OHOS ELF signing requirement (platform limitation)"
