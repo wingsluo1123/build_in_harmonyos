@@ -17,7 +17,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -35,6 +35,10 @@ class PartcloneUtilsConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Include pre-generated autotools files (configure, Makefile.in, etc.)
+        # since CI may not have automake/aclocal installed
+        copy(self, "pre_generated/autotools-files.tar.gz", self.recipe_folder,
+             self.export_sources_folder)
 
     def validate(self):
         # R32: settings.os must check in ("Linux", "OHOS")
@@ -155,16 +159,24 @@ class PartcloneUtilsConan(ConanFile):
 
         autotools = Autotools(self)
 
-        # Step 2: Autoreconf (GitHub archive has no pre-generated configure)
+        # Step 2: Use pre-generated autotools files (CI may not have automake)
         if not os.path.isfile(os.path.join(self.source_folder, "configure")):
-            self.output.info("Source has no configure, running autoreconf -fi")
-            # Ensure automake/aclocal is in PATH (CI env may not include it)
-            automake_bin = os.path.join(os.path.expanduser("~"), "usr", "local", "bin")
-            self.run(
-                f'export PATH="{automake_bin}:$PATH" && '
-                f'cd "{self.source_folder}" && autoreconf --force --install',
-                env="conanbuild"
-            )
+            self.output.info("Source has no configure, extracting pre-generated autotools files")
+            import tarfile
+            tarball = os.path.join(self.source_folder, "pre_generated", "autotools-files.tar.gz")
+            if not os.path.exists(tarball):
+                # Look in export_sources_folder
+                tarball = os.path.join(self.export_sources_folder, "pre_generated", "autotools-files.tar.gz")
+            if os.path.exists(tarball):
+                with tarfile.open(tarball) as tf:
+                    tf.extractall(self.source_folder)
+                self.output.info("Pre-generated autotools files extracted")
+            else:
+                self.output.warning("No pre-generated files found, trying autoreconf")
+                self.run(
+                    f'cd "{self.source_folder}" && autoreconf --force --install',
+                    env="conanbuild"
+                )
 
         # Step 3: Patch config.guess/config.sub for HarmonyOS (E007)
         # Must be after autoreconf since it installs fresh copies
