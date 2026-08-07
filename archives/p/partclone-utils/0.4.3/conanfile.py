@@ -158,13 +158,13 @@ class PartcloneUtilsConan(ConanFile):
         # Step 2: Autoreconf (GitHub archive has no pre-generated configure)
         if not os.path.isfile(os.path.join(self.source_folder, "configure")):
             self.output.info("Source has no configure, running autoreconf -fi")
-            # Ensure automake/aclocal is in PATH (may not be in CI env)
+            # Ensure automake/aclocal is in PATH (CI env may not include it)
             automake_bin = os.path.join(os.path.expanduser("~"), "usr", "local", "bin")
-            if os.path.isdir(automake_bin):
-                cur_path = os.environ.get("PATH", "")
-                if automake_bin not in cur_path:
-                    os.environ["PATH"] = automake_bin + ":" + cur_path
-            autotools.autoreconf(build_script_folder=self.source_folder)
+            self.run(
+                f'export PATH="{automake_bin}:$PATH" && '
+                f'cd "{self.source_folder}" && autoreconf --force --install',
+                env="conanbuild"
+            )
 
         # Step 3: Patch config.guess/config.sub for HarmonyOS (E007)
         # Must be after autoreconf since it installs fresh copies
