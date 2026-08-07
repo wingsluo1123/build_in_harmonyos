@@ -109,5 +109,5 @@ make check CC=clang CFLAGS="-fPIC -O2" LIBS="-ledit -lncurses"
 5. pylint 和 cppcheck 不可用，make check 中跳过（不影响功能测试）
 ---
 
-**编译结束**: 2026-06-17 16:15
+**编译结束**: 2026-08-07 07:59
 **最终状态**: published
