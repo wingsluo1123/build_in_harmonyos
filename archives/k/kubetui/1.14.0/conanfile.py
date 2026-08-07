@@ -115,13 +115,9 @@ class KubetuiConan(ConanFile):
                 ],
                 "00c5185b49a885df529832327d2584a9c26dd03df64f0a52b32a3f34bf3498c1",
             ),
-            "rust-std": (
-                [
-                    f"https://mirrors.ustc.edu.cn/rust-static/dist/rust-std-1.81.0-{triple}.tar.gz",
-                    f"https://static.rust-lang.org/dist/rust-std-1.81.0-{triple}.tar.gz",
-                ],
-                "234673e33b7a523818a81dc233ba636ffc5e4c94b9766f12e19a63c985ed7d21",
-            ),
+            # 宿主 rust-std 已内嵌在 rustc 组件包中（lib/rustlib/<host>/），无需单独下载；
+            # 交叉编译目标 aarch64-unknown-linux-ohos 的 rust-std 在下方单独获取。
+            # 删除冗余宿主 rust-std 下载（CI #15526: 工具链下载量过大致 3600s 超时）
         }
         rust_root = os.path.join(self.build_folder, "rust-sdk", f"rust-1.81.0-{host_arch}")
         cargo = os.path.join(rust_root, "bin", "cargo")
