@@ -12,7 +12,6 @@ R32: settings.os check uses `in ("Linux", "OHOS")`
 """
 
 import os
-import glob
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -22,10 +21,11 @@ from conan.tools.files import get, copy
 class PerlMatchSimpleXsConan(ConanFile):
     name = "perl-match-simple-xs"
     version = "0.002"
+    package_type = "library"
     description = "XS backend for match::simple — high performance pattern matching in C"
     license = "perl_5"
     homepage = "https://metacpan.org/release/match-simple-XS"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     settings = "os", "compiler", "build_type", "arch"
 

@@ -11,6 +11,7 @@
 #   1 = test failed (real error)
 
 # No set -e — we handle exit codes manually to distinguish platform limitations from real errors
+set -uo pipefail
 
 PERL_LIB="$1"
 if [ -z "$PERL_LIB" ]; then
@@ -100,7 +101,7 @@ fi
 
 # Check if the failure is due to HMDFS SELinux Permission denied (OHOS platform limitation)
 # Only "Permission denied" is tolerated; all other errors are real test failures
-OUTPUT=$(perl -I"$PERL_ARCH_DIR" -Mmatch::simple::XS -e '1' 2>&1 || true)
+OUTPUT=$(perl -I"$PERL_ARCH_DIR" -Mmatch::simple::XS -e '1' 2>&1 || true)  # expected to fail; checking error type
 if echo "$OUTPUT" | grep -qi "Permission denied"; then
     echo "WARN: Module load blocked by Permission denied (HMDFS SELinux, OHOS platform limitation E073)"
     echo "Package contents verified: .so and .pm present."
