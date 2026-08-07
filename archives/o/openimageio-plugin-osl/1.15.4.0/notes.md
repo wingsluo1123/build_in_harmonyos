@@ -50,3 +50,4 @@ cmake --install build DESTDIR=$TEST_PREFIX
 4. OpenImageIO: Added TARGET guard for OpenColorIO::OpenColorIO
 5. OpenImageIO: Added TARGET guard for fmt::fmt-header-only
 6. OpenImageIO: Disabled optional deps (WebP, Freetype, GIF, OpenCV, etc.)
+
