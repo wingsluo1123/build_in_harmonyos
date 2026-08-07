@@ -1,0 +1,35 @@
+#====================================================================
+# E227.kv — ATK OHOS 适配 (intl-wrapper + Meson host_system 检测)
+#====================================================================
+
+# ═══ Layer 0: 错误面 ═══
+id:                     E227
+trigger_tool:           meson|linker
+phase:                  configure,linking
+error_signature:        g_libintl_.*|undefined symbol.*g_libintl|host_system.*harmonyos|implicit declaration.*dgettext
+
+# ═══ Layer 1: 识别层 ═══
+severity:               3
+category:               linking|platform_detection
+match_keywords:         atk, accessibility, g_libintl, libintl, gettext, meson, host_system, harmonyos, glib, intl-wrapper
+
+# ═══ Layer 2: 根因层 ═══
+root_cause:             glib libintl.h 将 gettext 宏定义为 g_libintl_*，OHOS musl libintl.so 只导出 libintl_*；meson 报 host_system=harmonyos 不匹配 'linux' 条件分支
+triggers:               meson configure, glib 静态库链接, dgettext 隐式声明
+preconditions:          OHOS 平台 + glib 依赖 + meson 构建
+
+# ═══ Layer 3: 解决层 ═══
+fix_1_name:             intl-wrapper
+fix_1_type:             source_shim
+fix_1_cmd:              intl-wrapper.c 将 g_libintl_* 符号映射到 libintl_* 符号（与 E107 方案一致）；OHOS musl libintl 无 g_libintl_* 导出时退化为返回 msgid 的兜底实现 + -Ddgettext(a,b)=((char*)(b))
+fix_2_name:             meson-host_system
+fix_2_type:             source_patch
+fix_2_cmd:              sed "s/if host_machine.system() == 'linux'/if host_machine.system() in ['linux', 'harmonyos']/g"
+fix_3_name:             pkg-config-propagation
+fix_3_type:             recipe
+fix_3_cmd:              PkgConfigDeps + package_info().cpp_info.requires=["glib::glib"] + 复制 glib 子模块 .pc
+
+# ═══ Layer 4: 验证层 ═══
+verify_1:               pkg-config --modversion atk → 2.36.0
+verify_2:               meson test -C builddir → 5/5 passed
+related_ids:            E090, E107, E046
