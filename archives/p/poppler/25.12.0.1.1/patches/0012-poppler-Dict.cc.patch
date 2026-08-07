@@ -21,7 +21,8 @@ diff -ruN a/poppler/Dict.cc b/poppler/Dict.cc
  
      if (sorted) {
 -        const auto pos = std::ranges::lower_bound(entries, key, std::less<> {}, &DictEntry::first);
-+        const auto pos = std::lower_bound(entries.begin(), entries.end(), key, CmpDictEntry {});
++        const auto pos = std::lower_bound(entries.begin(), entries.end(), key,
++                                          [](const DictEntry &e, std::string_view k) { return e.first < k; });
          if (pos != entries.end() && pos->first == key) {
              return &*pos;
          }
