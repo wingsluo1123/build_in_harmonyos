@@ -4,7 +4,7 @@
 
 - Target: OpenHarmony aarch64
 - Build system: CMake
-- Dependencies: qt5-qtbase/5.15.2.1 and zlib/1.3.1
+- Dependencies: qt5-qtbase/5.15.2 and zlib/1.3.1
 
 ## Adaptation
 

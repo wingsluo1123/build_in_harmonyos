@@ -70,7 +70,7 @@
 
 ## 依赖
 
-- qt5-qtbase 5.15.2.1（已安装）
+- qt5-qtbase 5.15.2（已安装）
 - qt5-qtdeclarative 5.15.2（已安装，提供Qml和Quick模块）
 
 ## 注意事项

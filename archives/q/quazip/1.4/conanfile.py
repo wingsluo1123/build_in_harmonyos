@@ -9,7 +9,7 @@ from conan.tools.scm import Git
 
 class QuazipConan(ConanFile):
     name = "quazip"
-    version = "1.4.1"
+    version = "1.4"
     description = "Qt/C++ wrapper over minizip for accessing ZIP archives"
     homepage = "https://github.com/stachenov/quazip"
     license = "LGPL-2.1-or-later"
@@ -26,7 +26,7 @@ class QuazipConan(ConanFile):
 
     def requirements(self):
         self.requires("zlib/1.3.1")
-        self.requires("qt5-qtbase/5.15.2.1")
+        self.requires("qt5-qtbase/5.15.2")
 
     def layout(self):
         cmake_layout(self)
@@ -75,7 +75,7 @@ class QuazipConan(ConanFile):
         )
         if not os.path.isfile(moc_path):
             raise ConanException(
-                "qt5-qtbase/5.15.2.1 does not provide the required bin/moc tool"
+                "qt5-qtbase/5.15.2 does not provide the required bin/moc tool"
             )
         # CMakeDeps exports Qt5 libraries but not the Qt5::moc executable
         # target used by QuaZip's AUTOMOC configuration.
@@ -85,7 +85,7 @@ class QuazipConan(ConanFile):
         )
         if not os.path.isfile(rcc_path):
             raise ConanException(
-                "qt5-qtbase/5.15.2.1 does not provide the required bin/rcc tool"
+                "qt5-qtbase/5.15.2 does not provide the required bin/rcc tool"
             )
         # qztest compiles a .qrc file, but CMakeDeps does not export the
         # Qt5::rcc executable target used by AUTORCC.

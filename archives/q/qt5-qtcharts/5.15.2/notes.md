@@ -7,7 +7,7 @@
 - 构建系统: qmake
 
 ## 依赖
-- qt5-qtbase 5.15.2.1 (Qt Core, Gui, Widgets, Network)
+- qt5-qtbase 5.15.2 (Qt Core, Gui, Widgets, Network)
 - qt5-qtdeclarative 5.15.2 (Qml, Quick, QmlModels)
 
 ## 编译步骤
