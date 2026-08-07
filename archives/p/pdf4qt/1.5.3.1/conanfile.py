@@ -80,6 +80,15 @@ class Pdf4QtConan(ConanFile):
         qtbase = self.dependencies["qtbase"]
         qt6_cmake_dir = os.path.join(qtbase.package_folder, "lib", "cmake", "Qt6")
         tc.variables["Qt6_DIR"] = qt6_cmake_dir
+        # Set OpenJPEG_DIR if the package provides its own cmake config
+        openjpeg = self.dependencies["openjpeg"]
+        openjpeg_cmake_dir = os.path.join(openjpeg.package_folder, "lib", "cmake")
+        if os.path.isdir(openjpeg_cmake_dir):
+            # Find the OpenJPEG cmake config subdirectory
+            for d in os.listdir(openjpeg_cmake_dir):
+                if "openjpeg" in d.lower():
+                    tc.variables["OpenJPEG_DIR"] = os.path.join(openjpeg_cmake_dir, d)
+                    break
         tc.generate()
         # Generate CMakeDeps for all dependencies
         deps = CMakeDeps(self)
