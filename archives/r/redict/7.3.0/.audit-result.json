@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R4",
+      "file": "archives/r/redict/7.3.0/conandata.yml",
+      "line": 6,
+      "description": "sha256 is empty (\"\"). Source integrity cannot be verified during download — Conan's get() will skip hash verification. Per task context, codeberg.org blocks the build machine (HTTP 429), so this is a known environmental limitation, NOT deceptive behavior. The same empty sha256 appears in manifest.yaml line 11. Both are documented with explanatory comments.",
+      "fix_suggestion": "Once codeberg.org is accessible from the CI environment, compute the actual sha256 of the 7.3.0 source tarball and fill it in both conandata.yml and manifest.yaml. Alternatively, configure an official mirror or fallback URL for CI download."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "rule14",
+      "file": "archives/r/redict/7.3.0/manifest.yaml",
+      "line": 14,
+      "description": "manifest.yaml uses nested `build: system: makefile` instead of the flat `build_system: makefile` format shown in code_style rule 14. Additionally, the top-level `name` field (e.g., `name: redict`) is absent — the rule example shows it as required. The extended manifest format (with source, patches_applied, knowledge_gained, etc.) is comprehensive and well-structured, but deviates from the minimal rule 14 schema.",
+      "fix_suggestion": "Consider adding `name: redict` at the top level (before `version`) and either using `build_system: makefile` as a flat field, or formally updating code_style rule 14 to accept the extended nested format as the project standard."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "rule16",
+      "file": "archives/r/redict/7.3.0/conanfile.py",
+      "line": 14,
+      "description": "Import ordering: `import os` (stdlib) is followed by a blank line then `from conan import ...` (third-party). This is correct per rule 16. No issue — verified compliant. (Listed as confirmation only.)",
+      "fix_suggestion": "No action needed — import ordering is correct."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "rule15",
+      "file": "archives/r/redict/commands.json",
+      "line": 1,
+      "description": "commands.json schema verified: has required {name, type, versions} fields. `name` = \"redict\" (matches package name), `type` = \"tool\" (correct for CLI application), `versions` object has correct nested {ref, binary} structure. Extra fields (description, homepage) are acceptable extensions. 2-space indent, quoted strings, no trailing comma — all compliant.",
+      "fix_suggestion": "No action needed — commands.json schema is correct per rule 15 and R38."
+    }
+  ],
+  "summary": "W4 Pre-PR Audit (round 3) for redict 7.3.0. 9 changed files reviewed against code_style (25 rules) and review_memory (30 rules). No P0 (deceptive) or P1 (correctness) issues found.\n\nKey verifications:\n1. R34 (empty shell test): PASS — test_package/conanfile.py test() runs `redict-server --version` via self.run() with conanrun env. This executes the real binary; failure to run would fail the test. Not an empty shell.\n2. commands.json schema: PASS — uses correct {name, type, versions} structure with {ref, binary} per version entry. type=\"tool\" matches the application package_type.\n3. No test.c file: CONFIRMED — no empty shell C test file exists. Testing is done via binary execution in conanfile.py test().\n4. sha256 empty: P2 (warning) — codeberg.org blocks build machine (HTTP 429). Not deceptive per task context. Documented in both conandata.yml and manifest.yaml with explanatory comments.\n5. Patch 0001-src-setproctitle.c.patch: PASS — substantive musl/HarmonyOS adaptation. #ifdef __GLIBC__ guards program_invocation_name (real code inside guard, not empty stub). Weak pthread stubs (pthread_cancel→ESRCH, pthread_setcancelstate/setcanceltype→store+return 0) have real implementations, not return-0-only stubs.\n6. Conan 2.x API: PASS — uses `from conan import ConanFile`, `conan.tools.files`, `conan.tools.layout`.\n7. R33 (no bare shell env vars): PASS — compiler obtained via self.conf.get(\"tools.build:compiler_executables\"), not os.environ.\n8. Method order: PASS — export_sources → layout → source → build → package → package_info (correct relative order; requirements/generate omitted as not needed for Makefile build with no deps).\n9. package_info: PASS — cpp_info.bindirs = [\"bin\"] for application type. No libs needed.\n10. Source URL (R39): PASS — https://codeberg.org/redict/redict/archive/7.3.0.tar.gz is the official Redict repository on Codeberg.\n11. PR atomicity (W2): PASS — only redict 7.3.0 recipe files + .gitignore addition.\n12. No forbidden files: PASS — no .so/.a/.o binaries, no test-report/*.log, no state files (.ci-result.json, .submit-state.json) in git diff.\n13. .gitignore: correctly adds .staging-verified (state file) to ignore list.\n14. manifest.yaml status: \"built\" (honest — built but not yet published to artifact repo, consistent with commands.json binary=false).\n\nVerdict: PASS — no blocking P0/P1 issues. Two P2/P3 items are non-blocking warnings/suggestions."
+}

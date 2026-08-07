@@ -1,37 +1,91 @@
-# 版本级 manifest — redict 7.3.0
-# 文件位置: archives/r/redict/7.3.0/manifest.yaml
+software: redict
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/7.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
 
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
 version: "7.3.0"
+
+# 编译状态
+# published | built | failed | archived
 status: built
-build_date: "2026-08-08"
+
+# 构建系统类型
+build_system: makefile
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-13"
+
+# ============================================================
+# 源码信息
+# ============================================================
 
 source:
+  # 源码下载 URL
   url: "https://codeberg.org/redict/redict/archive/7.3.0.tar.gz"
-  # sha256 留空：构建机无法访问 codeberg（HTTP 429），CI 下载时自动验证
+
+  # 源码校验和
   sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
+# ============================================================
+# 构建配置
+# ============================================================
+
 build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
   system: makefile
+
+  # 配置选项列表
   configure_options:
+    - "CC=clang"
+    - "CXX=clang++"
     - "MALLOC=libc"
-  dependencies: []
+    - "CFLAGS=-fPIC -O2"
+    - "LDFLAGS=-lm"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - musl/1.2
+    - clang/15.0
+
+  # 编译器
   cc: clang
   cxx: clang++
 
-patches_applied:
-  - file: "0001-src-setproctitle.c.patch"
-    description: "Fix setproctitle.c for musl: guard program_invocation_name with __GLIBC__ and add weak pthread cancellation stubs"
-    type: portability
+# ============================================================
+# 补丁信息
+# ============================================================
 
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
 knowledge_gained:
   - "redict 默认使用 jemalloc，HarmonyOS/musl 上需使用 MALLOC=libc 替代"
   - "redict 是 Redis OSS 7.2.4 的 LGPL-3.0 分支，基于 Makefile 构建（无 configure 脚本）"
-  - "setproctitle.c 中 program_invocation_name 是 glibc 特有，musl 不可用，需 #ifdef __GLIBC__ 守卫"
-  - "musl libc 不提供 pthread_cancel/pthread_setcancelstate/pthread_setcanceltype，需添加 weak 桩函数"
+  - "二进制名称从 redis-* 改为 redict-*"
+
+# ============================================================
+# 补丁生成记录（保留元数据）
+# ============================================================
 
 patch_generation:
-  method: refresh-patch --auto
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/redict-7.3.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/redict-7.3.0.work
   source_orig_hash: a23aaf86bbb2309c
   source_work_hash: 0f7acca47b7fbbee
   generated_at: '2026-08-08T04:21:23'
@@ -39,6 +93,6 @@ patch_generation:
 
 patch_classification:
   - file: 0001-src-setproctitle.c.patch
-    type: portability
+    type: auto
     platform_only: True
-    guard: '#ifdef __GLIBC__'
+    guard: 'pending'
