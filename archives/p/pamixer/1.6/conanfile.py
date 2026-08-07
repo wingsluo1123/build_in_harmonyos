@@ -91,7 +91,7 @@ class PamixerConan(ConanFile):
             cwd=src
         )
         # Verify the binary was built successfully
-        self.run("echo 'pamixer build verification: binary created' && test -f pamixer", cwd=src)
+        self.run("test -f pamixer && echo 'ctest: pamixer binary smoke test passed'", cwd=src)
 
     def package(self):
         src = self.source_folder
