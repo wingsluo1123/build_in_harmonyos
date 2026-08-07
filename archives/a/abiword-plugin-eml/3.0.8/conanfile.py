@@ -10,7 +10,7 @@ import subprocess
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
 
@@ -32,7 +32,9 @@ class AbiwordPluginEmlConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        pass
+        # AbiWord 主 configure 强检 libgsf-1 >= 1.14.18(PKG_CHECK_MODULES),
+        # eml 插件亦需 libgsf 处理 MIME/OLE 附件,必须声明依赖
+        self.requires("libgsf/1.14.53")
 
     def layout(self):
         basic_layout(self)
@@ -41,6 +43,9 @@ class AbiwordPluginEmlConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        # PkgConfigDeps: AbiWord 主 configure 用 PKG_CHECK_MODULES 发现
+        # libgsf-1/glib 等依赖,必须生成依赖的 .pc 文件并注入 PKG_CONFIG_PATH
+        PkgConfigDeps(self).generate()
         tc = AutotoolsToolchain(self)
         # Enable only the eml plugin, disable all others
         tc.configure_args.append("--enable-plugins=eml")
@@ -50,6 +55,105 @@ class AbiwordPluginEmlConan(ConanFile):
         # OHOS 不被 config.guess 识别,显式传 --build/--host 跳 config.guess
         tc.configure_args.append("--build=aarch64-linux")
         tc.configure_args.append("--host=aarch64-linux")
+        # AbiWord 主 configure 强依赖 png.h/jpeglib.h/boost(AX_BOOST_BASE 硬检查),
+        # libpng/libjpeg 未在制品仓发布时 CI 用 --build=missing 从源编译,
+        # boost 用 stub version.hpp(eml 插件本身不 include boost 头)满足检查;
+        # 注入 include+lib 路径供 pkg-config/头检查/链接检查
+        import glob as _glob
+        _cpps = []
+        _lds = []
+        _png_incs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libpn*/p/include")
+        if _png_incs:
+            _cpps.append(_png_incs[0])
+        _png_libs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libpn*/p/lib")
+        if _png_libs:
+            _lds.append(_png_libs[0])
+        _jpeg_incs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libjp*/p/include")
+        if _jpeg_incs:
+            _cpps.append(_jpeg_incs[0])
+        _jpeg_libs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libjp*/p/lib")
+        if _jpeg_libs:
+            _lds.append(_jpeg_libs[0])
+        # boost stub(eml 插件不用 boost,仅满足 AbiWord 主 configure 的 AX_BOOST_BASE 检查)
+        _boost_stub = os.path.join(self.build_folder, "boost_stub")
+        _boost_vh = os.path.join(_boost_stub, "boost", "version.hpp")
+        if not os.path.exists(_boost_vh):
+            os.makedirs(os.path.dirname(_boost_vh), exist_ok=True)
+            with open(_boost_vh, "w", encoding="utf-8") as _f:
+                _f.write("#ifndef BOOST_VERSION_HPP\n#define BOOST_VERSION_HPP\n"
+                         "#define BOOST_VERSION 108300\n#define BOOST_LIB_VERSION \"1_83\"\n#endif\n")
+        _cpps.append(_boost_stub)
+        if _cpps:
+            tc.configure_args.append("CPPFLAGS={}".format(
+                " ".join("-I{}".format(i) for i in _cpps)))
+        if _lds:
+            tc.configure_args.append("LDFLAGS={}".format(
+                " ".join("-L{}".format(i) for i in _lds)))
+        # PkgConfigDeps 生成的 .pc 在 generators_folder,但 conanbuild env 未自动
+        # 注入 PKG_CONFIG_PATH,configure 的 PKG_CHECK_MODULES 找不到 libgsf-1。
+        # 显式注入 PKG_CONFIG_PATH 指向 generators_folder(含 libgsf-1.pc 等)。
+        _gens = self.generators_folder
+        tc.configure_args.append("PKG_CONFIG_PATH={}".format(_gens))
+        # AbiWord 主 configure 强检全套 GUI 依赖(gtk+-3.0/cairo/pangocairo 等),
+        # eml 插件仅需 libgsf/glib。configure 支持 DEPS_CFLAGS/DEPS_LIBS 预置
+        # 绕过 pkg-config 检测,注入指向 libgsf/glib 的 include/lib 路径。
+        import glob as _glob2
+        _deps_cflags = []
+        _deps_libs = []
+        _gsf_incs = _glob2.glob("/storage/Users/currentUser/.conan2/p/b/libgs*/p/include/libgsf-1")
+        if _gsf_incs:
+            _deps_cflags.append("-I{}".format(_gsf_incs[0]))
+        _gsf_libs = _glob2.glob("/storage/Users/currentUser/.conan2/p/b/libgs*/p/lib")
+        if _gsf_libs:
+            _deps_libs.append("-L{} -lgsf-1".format(_gsf_libs[0]))
+        _glib_incs = _glob2.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p/include/glib-2.0")
+        if _glib_incs:
+            _deps_cflags.append("-I{}".format(_glib_incs[0]))
+        _glib_incs2 = _glob2.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p/lib/glib-2.0/include")
+        if _glib_incs2:
+            _deps_cflags.append("-I{}".format(_glib_incs2[0]))
+        _glib_libs = _glob2.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p/lib")
+        if _glib_libs:
+            _deps_libs.append("-L{} -lglib-2.0 -lgobject-2.0".format(_glib_libs[0]))
+        if _deps_cflags:
+            tc.configure_args.append("DEPS_CFLAGS={}".format(" ".join(_deps_cflags)))
+        if _deps_libs:
+            tc.configure_args.append("DEPS_LIBS={}".format(" ".join(_deps_libs)))
+        # eml 插件编译需 AbiWord 主程序接口头(ut_string/ut_assert/ie_exp_Text/xap_Module),
+        # 且 ie_types.h 需 glib.h,注入源码 include + glib include 目录到 CXXFLAGS
+        _src = self.source_folder
+        _src_incs = [
+            os.path.join(_src, "src", "af", "util", "xp"),
+            os.path.join(_src, "src", "wp", "impexp", "xp"),
+            os.path.join(_src, "src", "af", "xap", "xp"),
+            os.path.join(_src, "src", "af", "xap", "unix"),
+            os.path.join(_src, "src", "text", "ptbl", "xp"),
+            os.path.join(_src, "src", "text", "fmt", "xp"),
+        ]
+        _src_incs = [i for i in _src_incs if os.path.isdir(i)]
+        # glib 头目录(ie_types.h 需 glib.h)也注入
+        import glob as _glob3
+        for _g in _glob3.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p/include/glib-2.0"):
+            if _g not in _src_incs:
+                _src_incs.append(_g)
+        for _g in _glob3.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p/lib/glib-2.0/include"):
+            if _g not in _src_incs:
+                _src_incs.append(_g)
+        # libgsf 头目录(ut_go_file.h 需 gsf/gsf.h)也注入
+        for _g in _glob3.glob("/storage/Users/currentUser/.conan2/p/b/libgs*/p/include/libgsf-1"):
+            if _g not in _src_incs:
+                _src_incs.append(_g)
+        # libxml2 头目录(gsf-libxml.h 需 libxml/parser.h)也注入
+        for _g in _glob3.glob("/storage/Users/currentUser/.conan2/p/b/libxm*/p/include/libxml2"):
+            if _g not in _src_incs:
+                _src_incs.append(_g)
+        # fribidi 头目录(ut_string.h 需 <fribidi.h>,头在 include/fribidi/ 子目录)也注入
+        for _g in _glob3.glob("/storage/Users/currentUser/.conan2/p/b/fribi*/p/include/fribidi"):
+            if _g not in _src_incs:
+                _src_incs.append(_g)
+        if _src_incs:
+            tc.configure_args.append("CXXFLAGS={}".format(
+                " ".join("-I{}".format(i) for i in _src_incs)))
         tc.generate()
 
     def build(self):
@@ -113,14 +217,8 @@ class AbiwordPluginEmlConan(ConanFile):
             open(_cfg_h_in, "w").close()
 
         # automake 补 Makefile.in + install-sh 等(--add-missing)
-        self.output.info("Running automake to generate Makefile.in...")
-        subprocess.run(
-            ["automake", "--add-missing", "--copy", "--no-force"],
-            cwd=self.source_folder,
-            check=False,  # 部分 Makefile.am 有 GNU make 扩展 warning
-        )
-
-        # 补 ltmain.sh(libtool build-aux,automake 要求)
+        # 注意: ltmain.sh 必须先于 automake 补齐,否则 automake 报
+        # "required file './ltmain.sh' not found" 而不生成 Makefile.in
         _ltmain = os.path.join(self.source_folder, "ltmain.sh")
         if not os.path.exists(_ltmain):
             _libtool_aux = os.path.join(
@@ -132,6 +230,12 @@ class AbiwordPluginEmlConan(ConanFile):
                 self.output.info("  [ok] Copied ltmain.sh from libtool build-aux")
             else:
                 self.output.warning("  [warn] ltmain.sh not found, libtool macros may fail")
+        self.output.info("Running automake to generate Makefile.in...")
+        subprocess.run(
+            ["automake", "--add-missing", "--copy", "--no-force"],
+            cwd=self.source_folder,
+            check=False,  # 部分 Makefile.am 有 GNU make 扩展 warning
+        )
 
     def _patch_config_for_ohos(self):
         """Patch config.guess and config.sub for OHOS (R15)."""
