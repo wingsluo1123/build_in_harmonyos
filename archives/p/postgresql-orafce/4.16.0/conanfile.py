@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
-"""Conan recipe for postgresql-orafce 4.16.0
+"""Conan recipe — postgresql-orafce 4.16.0 (PGXS)
 
 PostgreSQL extension providing Oracle compatibility functions.
-Built with PGXS (PostgreSQL Extension Building Infrastructure).
+Built using PGXS (PostgreSQL Extension Build Infrastructure).
 
-This recipe is self-contained: if pg_config is not found on the system,
-it downloads and configures PostgreSQL 17.0 source to provide the
-required development files (headers, pg_config, PGXS makefiles).
+Since PostgreSQL server development files (pg_config, server headers, PGXS)
+are not available as a separate conan package, this recipe downloads PostgreSQL
+18.1 source as the main source (so HarmonyOS patches apply via
+apply_conandata_patches), builds the required dev files, then downloads
+orafce source and builds it using PGXS.
 """
 import os
 import shutil
-import glob
-import subprocess
-import tempfile
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
-
-# PostgreSQL source for bootstrapping pg_config when not available on system
-PG_VERSION = "17.0"
-PG_SOURCE_URL = "https://github.com/postgres/postgres/archive/refs/tags/REL_17_0.tar.gz"
 
 
 class PostgresqlOrafceConan(ConanFile):
@@ -29,287 +24,129 @@ class PostgresqlOrafceConan(ConanFile):
     description = "Oracle compatibility functions for PostgreSQL"
     license = "PostgreSQL"
     homepage = "https://github.com/orafce/orafce"
-    url = ""  # CI fills this
 
-    package_type = "shared-library"
-
+    package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)
+
+    def requirements(self):
+        pass
 
     def layout(self):
         basic_layout(self)
 
     def source(self):
+        # Download PostgreSQL source as main source (patches apply to it)
         get(self, **self.conan_data["sources"], strip_root=True)
-
-    def _find_pg_config(self):
-        """Find pg_config in PATH or common locations"""
-        path = os.environ.get("PATH", "")
-        result = shutil.which("pg_config", path=path)
-        if result:
-            return result
-        home = os.environ.get("HOME", "")
-        for p in [
-            os.path.join(home, "usr", "local", "bin"),
-            "/usr/local/bin",
-            "/usr/bin",
-        ]:
-            candidate = os.path.join(p, "pg_config")
-            if os.path.isfile(candidate):
-                os.environ["PATH"] = p + os.pathsep + path
-                return candidate
-        return None
-
-    def _bootstrap_postgresql(self):
-        """Download and configure PostgreSQL to provide pg_config and headers"""
-        self.output.info("pg_config not found - bootstrapping PostgreSQL from source...")
-
-        pg_src_dir = os.path.join(self.build_folder, "postgresql-src")
-        os.makedirs(pg_src_dir, exist_ok=True)
-
-        # Download PostgreSQL source
-        pg_tarball = os.path.join(self.build_folder, f"postgresql-{PG_VERSION}.tar.gz")
-        if not os.path.isfile(pg_tarball):
-            self.output.info(f"Downloading PostgreSQL {PG_VERSION} source...")
-            self.run(f'curl -fSL -o "{pg_tarball}" "{PG_SOURCE_URL}"')
-
-        # Extract
-        if not os.path.isfile(os.path.join(pg_src_dir, "configure")):
-            self.output.info("Extracting PostgreSQL source...")
-            self.run(f'tar xzf "{pg_tarball}" -C "{pg_src_dir}" --strip-components=1')
-
-        # Patch config.guess for HarmonyOS/OHOS
-        config_guess = os.path.join(pg_src_dir, "config", "config.guess")
-        if os.path.isfile(config_guess):
-            with open(config_guess, "r") as f:
-                content = f.read()
-            if "HarmonyOS" not in content:
-                # Add __OHOS__ libc detection
-                content = content.replace(
-                    '#if defined(__ANDROID__)\n\tLIBC=android',
-                    '#if defined(__ANDROID__)\n\tLIBC=android\n#elif defined(__OHOS__)\n\tLIBC=ohos'
-                )
-                # Add HarmonyOS case after the case statement
-                content = content.replace(
-                    'case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in',
-                    'case $UNAME_MACHINE:$UNAME_SYSTEM:$UNAME_RELEASE:$UNAME_VERSION in\n'
-                    '    *:HarmonyOS:*:*)\n'
-                    '\tcase "$UNAME_MACHINE" in\n'
-                    '\t    aarch64|arm64) MACHINE=aarch64 ;;\n'
-                    '\t    x86_64|amd64)  MACHINE=x86_64 ;;\n'
-                    '\t    *)            MACHINE="$UNAME_MACHINE" ;;\n'
-                    '\tesac\n'
-                    '\tGUESS=${MACHINE}-unknown-linux-ohos\n'
-                    '\t;;\n'
-                )
-                with open(config_guess, "w") as f:
-                    f.write(content)
-                self.output.info("Patched config.guess for HarmonyOS")
-
-        # Patch config.sub for linux-ohos
-        config_sub = os.path.join(pg_src_dir, "config", "config.sub")
-        if os.path.isfile(config_sub):
-            with open(config_sub, "r") as f:
-                content = f.read()
-            if "ohos" not in content:
-                # Add ohos-linux handling
-                content = content.replace(
-                    'basic_os=linux-android',
-                    'basic_os=linux-android\n\t\t\t;;\n\t\tohos-linux)\n\t\t\t\tbasic_machine=$field1-unknown\n\t\t\t\tbasic_os=linux-ohos'
-                )
-                # Add ohos* to system types
-                content = content.replace(
-                    'gnu* | android* | bsd*',
-                    'gnu* | android* | ohos* | bsd*'
-                )
-                # Add linux-ohos* to kernel validation
-                content = content.replace(
-                    '| linux-relibc*- | linux-uclibc*- )',
-                    '| linux-relibc*- | linux-uclibc*- | linux-ohos*- )'
-                )
-                with open(config_sub, "w") as f:
-                    f.write(content)
-                self.output.info("Patched config.sub for linux-ohos")
-
-        # Patch configure for TMPDIR
-        configure_script = os.path.join(pg_src_dir, "configure")
-        if os.path.isfile(configure_script):
-            with open(configure_script, "r") as f:
-                content = f.read()
-            if "TMPDIR" not in content[content.find("Create a (secure) tmp"):content.find("Create a (secure) tmp")+500]:
-                content = content.replace(
-                    'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`',
-                    '_tmp_dir="${TMPDIR:-$HOME/tmp}"\n  tmp=`(umask 000 && mktemp -d "$_tmp_dir/confXXXXXX") 2>/dev/null`'
-                )
-                content = content.replace(
-                    'tmp=./conf$$-$RANDOM',
-                    'tmp="$_tmp_dir/conf$$-$RANDOM"'
-                )
-                content = content.replace(
-                    'cannot create a temporary directory in .',
-                    'cannot create a temporary directory in $TMPDIR'
-                )
-                with open(configure_script, "w") as f:
-                    f.write(content)
-                self.output.info("Patched configure for TMPDIR")
-
-        # Configure PostgreSQL
-        prefix = os.path.join(self.build_folder, "postgresql-install")
-        tmpdir = os.environ.get("TMPDIR", os.path.join(os.environ.get("HOME", "/tmp"), "tmp"))
-        os.makedirs(tmpdir, exist_ok=True)
-
-        config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        self.output.info("Configuring PostgreSQL...")
-        self.run(
-            f'cd "{pg_src_dir}" && '
-            f'TMPDIR="{tmpdir}" '
-            f'CONFIG_SHELL="{config_shell}" '
-            f'./configure --prefix="{prefix}" '
-            f'--without-readline --without-zlib --without-icu'
-        )
-
-        # Install pg_config and headers
-        self.output.info("Installing PostgreSQL development files...")
-        self.run(f'cd "{pg_src_dir}" && make -C src/bin/pg_config install')
-        self.run(f'cd "{pg_src_dir}" && make -C src/include install')
-        self.run(f'cd "{pg_src_dir}" && make -C src/common install')
-        self.run(f'cd "{pg_src_dir}" && make -C src/port install')
-
-        # Install PGXS makefiles
-        pgxs_src = os.path.join(pg_src_dir, "src")
-        pgxs_dest = os.path.join(prefix, "lib", "postgresql", "pgxs", "src")
-        os.makedirs(pgxs_dest, exist_ok=True)
-
-        # Copy all Makefile* files
-        for f in os.listdir(pgxs_src):
-            if f.startswith("Makefile"):
-                shutil.copy2(os.path.join(pgxs_src, f), os.path.join(pgxs_dest, f))
-
-        # Copy makefiles directory
-        mk_src = os.path.join(pgxs_src, "makefiles")
-        mk_dest = os.path.join(pgxs_dest, "makefiles")
-        if os.path.isdir(mk_src):
-            os.makedirs(mk_dest, exist_ok=True)
-            for f in os.listdir(mk_src):
-                shutil.copy2(os.path.join(mk_src, f), os.path.join(mk_dest, f))
-
-        # Copy config directory (install-sh etc.)
-        cfg_src = os.path.join(pg_src_dir, "config")
-        cfg_dest = os.path.join(prefix, "lib", "postgresql", "pgxs", "config")
-        if os.path.isdir(cfg_src):
-            os.makedirs(cfg_dest, exist_ok=True)
-            for f in os.listdir(cfg_src):
-                shutil.copy2(os.path.join(cfg_src, f), os.path.join(cfg_dest, f))
-
-        # Add to PATH
-        os.environ["PATH"] = os.path.join(prefix, "bin") + os.pathsep + os.environ.get("PATH", "")
-
-        pg_config = shutil.which("pg_config")
-        if pg_config:
-            self.output.info(f"PostgreSQL bootstrapped successfully: {pg_config}")
-
-            # Query actual PGXS path from pg_config and install there
-            try:
-                pgxs_path = subprocess.check_output(
-                    [pg_config, "--pgxs"]
-                ).decode().strip()
-                self.output.info(f"pg_config --pgxs reports: {pgxs_path}")
-
-                # pgxs_path is like: $prefix/lib/.../pgxs/src/makefiles/pgxs.mk
-                # We need to install PGXS files relative to this path
-                pgxs_dir = os.path.dirname(os.path.dirname(pgxs_path))  # .../pgxs/src
-                pgxs_root = os.path.dirname(pgxs_dir)  # .../pgxs
-                pgxs_parent = os.path.dirname(pgxs_root)  # e.g. lib/ or lib/postgresql
-
-                # Copy Makefile* files to the src directory
-                pgxs_src_dir = os.path.join(pg_src_dir, "src")
-                dest_src = pgxs_dir  # .../pgxs/src
-                os.makedirs(dest_src, exist_ok=True)
-                for f in os.listdir(pgxs_src_dir):
-                    if f.startswith("Makefile"):
-                        shutil.copy2(os.path.join(pgxs_src_dir, f), os.path.join(dest_src, f))
-
-                # Copy makefiles directory
-                mk_src = os.path.join(pgxs_src_dir, "makefiles")
-                dest_mk = os.path.join(dest_src, "makefiles")
-                if os.path.isdir(mk_src):
-                    os.makedirs(dest_mk, exist_ok=True)
-                    for f in os.listdir(mk_src):
-                        shutil.copy2(os.path.join(mk_src, f), os.path.join(dest_mk, f))
-
-                # Copy config directory
-                cfg_src = os.path.join(pg_src_dir, "config")
-                dest_cfg = os.path.join(pgxs_root, "config")
-                if os.path.isdir(cfg_src):
-                    os.makedirs(dest_cfg, exist_ok=True)
-                    for f in os.listdir(cfg_src):
-                        shutil.copy2(os.path.join(cfg_src, f), os.path.join(dest_cfg, f))
-
-                self.output.info(f"PGXS files installed to: {pgxs_root}")
-            except Exception as e:
-                self.output.info(f"Warning: Failed to query/install PGXS path: {e}")
-
-            return pg_config
-        return None
+        # Download orafce source to subdirectory
+        get(self, **self.conan_data["orafce_sources"], strip_root=True,
+            destination=os.path.join(self.source_folder, "orafce"))
 
     def build(self):
+        # Apply HarmonyOS patches (config.guess, config.sub) to PostgreSQL source
         apply_conandata_patches(self)
 
-        # Find or bootstrap pg_config
-        pg_config = self._find_pg_config()
-        if not pg_config:
-            pg_config = self._bootstrap_postgresql()
+        pg_prefix = os.path.join(self.build_folder, "pg_prefix")
 
-        if not pg_config:
-            raise Exception("Failed to obtain pg_config after bootstrap. "
-                            "PostgreSQL development files are required to build orafce.")
+        # Fix configure: use TMPDIR instead of cwd, and umask 000 instead of 077
+        # (HarmonyOS media filesystem: umask 077 strips group write permission,
+        #  and /tmp may be read-only)
+        configure_path = os.path.join(self.source_folder, "configure")
+        with open(configure_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+        # Replace tmpdir creation to use $TMPDIR and umask 000
+        text = text.replace(
+            'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`',
+            '_tmp_dir="${TMPDIR:-$HOME/tmp}"\n  tmp=`(umask 000 && mktemp -d "$_tmp_dir/confXXXXXX") 2>/dev/null`'
+        )
+        text = text.replace(
+            'tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")',
+            'tmp="$_tmp_dir/conf$$-$RANDOM"\n  (umask 000 && mkdir "$tmp")'
+        )
+        text = text.replace(
+            'cannot create a temporary directory in .',
+            'cannot create a temporary directory in $TMPDIR'
+        )
+        # Fix any remaining umask 077
+        text = text.replace("umask 077", "umask 022")
+        with open(configure_path, "w", encoding="utf-8") as f:
+            f.write(text)
 
-        self.output.info(f"Using pg_config: {pg_config}")
+        # Configure PostgreSQL (minimal, no optional deps)
+        self.run(
+            f"cd {self.source_folder} && ./configure --prefix={pg_prefix} "
+            f"--without-readline --without-zlib --without-icu "
+            f"--without-openssl --without-libxml --without-gssapi "
+            f"--without-pam --without-systemd --without-lz4 --without-zstd",
+            env="conanbuild"
+        )
 
-        # PGXS build: make uses pg_config to find PostgreSQL build settings
-        self.run("make -j1", cwd=self.source_folder)
+        # Build pg_config and prerequisite libraries
+        self.run(f"cd {self.source_folder} && make -C src/port -j1", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C src/common -j1", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C src/bin/pg_config -j1", env="conanbuild")
+
+        # Install pg_config, server headers, and PGXS infrastructure
+        self.run(f"cd {self.source_folder} && make -C src/bin/pg_config install", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C src/include install", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C src/makefiles install", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C config install", env="conanbuild")
+        self.run(f"cd {self.source_folder} && make -C src/port install", env="conanbuild")
+
+        # Install Makefile.global and support files for PGXS
+        # Makefile.port is a symlink created by configure (→ Makefile.linux),
+        # shutil.copy2 follows symlinks to copy the actual file content
+        pgxs_dir = os.path.join(pg_prefix, "lib", "postgresql", "pgxs", "src")
+        os.makedirs(pgxs_dir, exist_ok=True)
+        for fname in ["Makefile.global", "Makefile.port", "Makefile.shlib", "nls.mk"]:
+            src_file = os.path.join(self.source_folder, "src", fname)
+            dst_file = os.path.join(pgxs_dir, fname)
+            if os.path.islink(src_file) or os.path.isfile(src_file):
+                shutil.copy2(src_file, dst_file)
+            elif fname == "Makefile.port":
+                # Fallback: Makefile.port symlink not created, use Makefile.linux
+                linux_mk = os.path.join(self.source_folder, "src", "makefiles", "Makefile.linux")
+                if os.path.exists(linux_mk):
+                    shutil.copy2(linux_mk, dst_file)
+
+        # Install postgres_ext.h and pg_config_ext.h
+        inc_dir = os.path.join(pg_prefix, "include")
+        for fname in ["postgres_ext.h", "pg_config_ext.h"]:
+            src_file = os.path.join(self.source_folder, "src", "include", fname)
+            if os.path.exists(src_file):
+                copy(self, fname, os.path.dirname(src_file), inc_dir)
+
+        # Build orafce using PGXS
+        orafce_dir = os.path.join(self.source_folder, "orafce")
+        pg_config_bin = os.path.join(pg_prefix, "bin", "pg_config")
+        self.run(
+            f"cd {orafce_dir} && make PG_CONFIG={pg_config_bin}",
+            env="conanbuild"
+        )
 
     def package(self):
-        # Find orafce.so - it should be in the source folder after make
-        so_files = []
-        for pattern in ["orafce.so", "**/orafce.so"]:
-            so_files.extend(glob.glob(os.path.join(self.source_folder, pattern)))
-
-        if not so_files:
-            for pattern in ["orafce.so", "**/orafce.so"]:
-                so_files.extend(glob.glob(os.path.join(self.build_folder, pattern)))
-
-        if so_files:
-            dst_lib = os.path.join(self.package_folder, "lib", "postgresql")
-            os.makedirs(dst_lib, exist_ok=True)
-            shutil.copy2(so_files[0], os.path.join(dst_lib, "orafce.so"))
-            self.output.info(f"Packaged orafce.so from: {so_files[0]}")
-
-        # Copy .control file
-        for pattern in ["orafce.control", "**/orafce.control"]:
-            controls = glob.glob(os.path.join(self.source_folder, pattern))
-            if controls:
-                dst_ext = os.path.join(self.package_folder, "share", "postgresql", "extension")
-                os.makedirs(dst_ext, exist_ok=True)
-                shutil.copy2(controls[0], os.path.join(dst_ext, "orafce.control"))
-                break
-
-        # Copy SQL files
-        dst_ext = os.path.join(self.package_folder, "share", "postgresql", "extension")
-        os.makedirs(dst_ext, exist_ok=True)
-        for sql_file in glob.glob(os.path.join(self.source_folder, "orafce--*.sql")):
-            shutil.copy2(sql_file, os.path.join(dst_ext, os.path.basename(sql_file)))
-
-        # Copy doc files
-        dst_doc = os.path.join(self.package_folder, "share", "doc", "postgresql", "extension")
-        os.makedirs(dst_doc, exist_ok=True)
+        orafce_dir = os.path.join(self.source_folder, "orafce")
+        # Copy orafce.so (shared library)
+        copy(self, "orafce.so", orafce_dir,
+             os.path.join(self.package_folder, "lib", "postgresql"))
+        # Copy extension control and SQL files
+        copy(self, "orafce.control", orafce_dir,
+             os.path.join(self.package_folder, "share", "postgresql", "extension"))
+        copy(self, "orafce--*.sql", orafce_dir,
+             os.path.join(self.package_folder, "share", "postgresql", "extension"))
+        # Copy documentation
         for doc_file in ["README.asciidoc", "COPYRIGHT.orafce", "INSTALL.orafce"]:
-            doc_path = os.path.join(self.source_folder, doc_file)
-            if os.path.isfile(doc_path):
-                shutil.copy2(doc_path, os.path.join(dst_doc, doc_file))
+            copy(self, doc_file, orafce_dir,
+                 os.path.join(self.package_folder, "share", "doc", "postgresql", "extension"))
 
     def package_info(self):
         self.cpp_info.libs = ["orafce"]
         self.cpp_info.libdirs = ["lib/postgresql"]
+        self.cpp_info.set_property("cmake_file_name", "postgresql-orafce")
+        self.cpp_info.set_property("cmake_target_name", "postgresql-orafce::orafce")
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["m"]

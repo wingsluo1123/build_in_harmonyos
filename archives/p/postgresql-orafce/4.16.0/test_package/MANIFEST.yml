@@ -6,26 +6,28 @@
 package: postgresql-orafce/4.16.0
 homepage: "https://github.com/orafce/orafce"
 
-# 上游测试命令
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
 upstream_check_command: "make check"
 
 # conanfile.py build() 方法中是否已集成上游测试
-# PGXS 'make check' requires a running PostgreSQL server, not integrated in build
+# orafce 的 make check 需要运行中的 PostgreSQL 服务器，CI 环境无法满足
 upstream_test_in_build: false
 upstream_test_command: ""
 
 # 上游实际运行的测试程序
+# orafce 使用 PostgreSQL 的 regression test 框架 (pg_regress)
+# 需要运行中的 PostgreSQL 服务器 + initdb，CI 环境不支持
 upstream_tests:
-  - file: expected/*.out
-    source: postgresql-orafce-4.16.0/expected/
-    description: "PostgreSQL regression tests for orafce extension"
-    command: "make check"
+  - file: "sql/*.sql"
+    source: "postgresql-orafce-4.16.0/sql/"
+    description: "PostgreSQL regression tests for Oracle compatibility functions"
+    command: "make installcheck"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
-  - file: conanfile.py
-    description: "Validates orafce.so is valid ELF, checks .control and SQL files, attempts dlopen"
-    command: "conan test"
+  - file: test.c
+    description: "Verify orafce.so is a valid ELF shared library for AArch64 by reading ELF header"
+    command: "test_orafce"
 
-# 测试断言总数
-assertion_count: 8
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3

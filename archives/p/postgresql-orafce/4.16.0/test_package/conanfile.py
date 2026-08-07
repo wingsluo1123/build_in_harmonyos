@@ -1,40 +1,56 @@
 #!/usr/bin/env python3
-"""Test package for postgresql-orafce 4.16.0
+"""Conan test_package — postgresql-orafce 4.16.0
 
-Tests that the orafce extension shared library is a valid ELF
-and can be loaded with dlopen. Compiles test.c directly without CMake.
+Tests that orafce.so is a valid ELF shared library for AArch64.
+Also verifies that extension control/SQL files are packaged correctly.
+
+A full dlopen test is not possible because PostgreSQL extensions have
+undefined symbols that are resolved by the PostgreSQL server at runtime.
 """
 import os
 
 from conan import ConanFile
-from conan.tools.layout import basic_layout
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class PostgresqlOrafceTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
     def layout(self):
-        basic_layout(self)
+        cmake_layout(self)
 
     def build(self):
-        # Compile test.c directly - no CMake needed
-        cc = "clang"
-        test_src = os.path.join(self.source_folder, "test.c")
-        test_bin = os.path.join(self.build_folder, "test_postgresql_orafce")
-        self.run(f'{cc} -o "{test_bin}" "{test_src}" -ldl')
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def test(self):
-        # Get the path to orafce.so from the package
+        exe = os.path.join(self.cpp.build.bindirs[0], "test_orafce")
         dep = self.dependencies["postgresql-orafce"]
-        pkg_folder = dep.package_folder
-        so_path = os.path.join(pkg_folder, "lib", "postgresql", "orafce.so")
+        so_path = os.path.join(dep.package_folder, "lib", "postgresql", "orafce.so")
 
-        # Verify the .so file exists
-        assert os.path.isfile(so_path), f"orafce.so not found at {so_path}"
+        # Test 1: Verify orafce.so is a valid ELF shared library (C test)
+        self.run(f'"{exe}" "{so_path}"', env="conanrun")
 
-        # Run the test binary with the .so path as argument
-        test_bin = os.path.join(self.build_folder, "test_postgresql_orafce")
-        self.run(f'"{test_bin}" "{so_path}"')
+        # Test 2: Verify extension control file exists
+        control_path = os.path.join(
+            dep.package_folder, "share", "postgresql", "extension", "orafce.control")
+        if not os.path.exists(control_path):
+            raise AssertionError("orafce.control not found in package")
+
+        # Test 3: Verify SQL definition file exists
+        sql_path = os.path.join(
+            dep.package_folder, "share", "postgresql", "extension", "orafce--4.16.sql")
+        if not os.path.exists(sql_path):
+            raise AssertionError("orafce--4.16.sql not found in package")
+
+        # Test 4: Verify .so file size is reasonable (> 100KB)
+        so_size = os.path.getsize(so_path)
+        if so_size < 100000:
+            raise AssertionError(f"orafce.so too small: {so_size} bytes")
+
+        print("All postgresql-orafce package tests passed")

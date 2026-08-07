@@ -72,5 +72,5 @@ ls /storage/Users/currentUser/usr/local/share/postgresql/extension/orafce*
 4. **功能验证**：完整的功能验证需要 PostgreSQL 服务器运行，并执行 `CREATE EXTENSION orafce;`。
 ---
 
-**编译结束**: 2026-08-08 01:29
+**编译结束**: 2026-08-08 04:27
 **最终状态**: built

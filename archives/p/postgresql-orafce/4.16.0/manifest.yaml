@@ -17,8 +17,8 @@ status: built
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-08-08"
 
-# 构建系统类型 (顶层字段, 供 CI 解析)
-build_system: makefile
+# 构建系统（顶层字段，submit 自检要求）
+build_system: pgxs
 
 # ============================================================
 # 源码信息
@@ -50,7 +50,7 @@ build:
 
   # 编译依赖列表（格式: name/version）
   dependencies:
-  - postgresql/17.0
+  - "postgresql/18.1 (source, not conan package)"
 
   # 编译器
   cc: clang
@@ -61,7 +61,9 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0001-config.guess-harmonyos.patch"
+  - "0002-config.sub-ohos.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -70,7 +72,10 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+  - "PostgreSQL extension (PGXS) requires pg_config, server headers, and PGXS makefiles; not available as conan package, must build from PostgreSQL source"
+  - "Makefile.port is a symlink created by configure; use shutil.copy2() to follow symlink when copying to PGXS dir"
+  - "0003-configure-tmpdir.patch line numbers do not match PG18.1 configure; fix programmatically via text replacement"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"
