@@ -27,8 +27,9 @@ class PerlMathPariConan(ConanFile):
     description = "Perl interface to PARI/GP mathematical library for number theory computations"
     license = "GPL-2.0-or-later AND Artistic-1.0-Perl"
     homepage = "https://metacpan.org/pod/Math::Pari"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
+    package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
@@ -61,13 +62,24 @@ class PerlMathPariConan(ConanFile):
         # Step 2: Fix LDDLFLAGS for OHOS CRT files missing (E002)
         # OpenHarmony musl does not provide standard CRT startup files (crti.o, crtbeginS.o)
         # Add -nostartfiles and -L<path> -lc to link stage
+        # Use expanduser to resolve OHOS user lib path dynamically (not hardcoded)
+        libc_dir = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
         makefile_path = os.path.join(self.build_folder, "Makefile")
         with open(makefile_path, "r") as f:
             content = f.read()
-        content = content.replace(
-            "LDDLFLAGS = -shared -O2 -fstack-protector-strong",
-            "LDDLFLAGS = -shared -nostartfiles -L/storage/Users/currentUser/usr/local/lib -lc -O2 -fstack-protector-strong",
-        )
+        old_lddl = "LDDLFLAGS = -shared -O2 -fstack-protector-strong"
+        new_lddl = f"LDDLFLAGS = -shared -nostartfiles -L{libc_dir} -lc -O2 -fstack-protector-strong"
+        if old_lddl not in content:
+            # Fallback: try regex-style match for any LDDLFLAGS with -shared
+            import re
+            content = re.sub(
+                r"^LDDLFLAGS\s*=.*$",
+                new_lddl,
+                content,
+                flags=re.MULTILINE,
+            )
+        else:
+            content = content.replace(old_lddl, new_lddl)
         with open(makefile_path, "w") as f:
             f.write(content)
 
