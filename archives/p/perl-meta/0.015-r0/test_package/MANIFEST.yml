@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: perl-meta/0.015-r0
+homepage: "https://metacpan.org/dist/meta"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "perl Build.PL && ./Build test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/00use.t
+    source: meta-0.015/t/00use.t
+    description: "上游模块加载测试 (require meta)"
+    command: "perl -Ilib t/00use.t"
+  - file: t/01package.t
+    source: meta-0.015/t/01package.t
+    description: "上游包元数据测试 (meta::get_package, meta::package->get)"
+    command: "perl -Ilib t/01package.t"
+  - file: t/10variables.t
+    source: meta-0.015/t/10variables.t
+    description: "上游变量符号操作测试"
+    command: "perl -Ilib t/10variables.t"
+  - file: t/20add.t
+    source: meta-0.015/t/20add.t
+    description: "上游符号添加测试"
+    command: "perl -Ilib t/20add.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_meta.sh
+    description: "消费者测试：加载 meta 模块并调用 meta::get_package + meta::package->get API"
+    command: "sh test_meta.sh <perl_lib>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
