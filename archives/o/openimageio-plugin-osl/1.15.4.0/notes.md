@@ -29,3 +29,7 @@ cmake --install build DESTDIR=$TEST_PREFIX
 
 **编译结束**: 2026-06-01
 **最终状态**: built
+---
+
+**编译结束**: 2026-08-08 01:06
+**最终状态**: failed
