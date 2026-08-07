@@ -1,24 +1,44 @@
-# plzip 1.13 编译进度
+# plzip 1.13 — Adaptation Notes
 
-**日期**: 2026-04-24
-**状态**: 🔄 编译中
+## Basic Information
+- **Software**: plzip
+- **Version**: 1.13
+- **Status**: built (conan-verify passed)
+- **Build System**: custom_configure (custom shell-based configure, not autotools)
+- **Source**: https://download.savannah.gnu.org/releases/lzip/plzip/plzip-1.13.tar.gz
+- **SHA256**: 64d49dde20daa5fdff2b3ff28e3348082de10dd54eb10df6da7d1bc6c7a6db64
 
-## 步骤记录
+## Key Findings
 
-| 步骤 | 状态 | 备注 |
-|------|------|------|
-| Step 1 init | ⏳ | |
-| Step 2 patches | ⏳ | |
-| Step 3 configure | ⏳ | |
-| Step 4 make | ⏳ | |
-| Step 5 install | ⏳ | |
-| Step 6 safety | ⏳ | |
-| Step 7 check | ⏳ | |
-| Step 8 staging | ⏳ | |
-| Step 9 package | ⏳ | |
-| Step 10 deploy | ⏳ | |
-| Step 11 finish | ⏳ | |
+### Custom Configure Script
+- plzip uses a custom configure script (not autoconf-generated)
+- The configure script hardcodes `CXX=g++` and falls back to `c++`
+- CXX must be passed as a configure argument (`CXX=clang++`), not via environment
+- The configure script links with `-llz -lpthread` (lzlib + pthread)
 
-## 发现与知识
+### Dependency
+- plzip depends on lzlib (liblz.a)
+- Managed through Conan requires: `self.requires("lzlib/1.15")`
+- Conan automatically provides include and library paths for lzlib
 
-<!-- 编译过程中发现的问题和解决方案 -->
+### Build & Test Results
+- `./configure --prefix=... CXX=clang++ CXXFLAGS=-fPIC -O2` → OK
+- `make -j1` → OK (builds plzip binary)
+- `make check` → PASS (compression, decompression, bad input tests)
+- `make install DESTDIR=...` → OK (installs plzip to bin/)
+
+### Package Type
+- plzip is an application (command-line tool), not a library
+- `package_type = "application"`
+- `cpp_info.bindirs = ["bin"]`
+- commands.json created at software level (R38)
+
+## 最终状态
+
+- **状态**: built
+- **结束时间**: 2026-08-08
+- COMPLETED
+---
+
+**编译结束**: 2026-08-08 01:28
+**最终状态**: built
