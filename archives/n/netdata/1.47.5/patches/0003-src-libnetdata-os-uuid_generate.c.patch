@@ -1,19 +1,12 @@
---- a/src/libnetdata/os/uuid_generate.c
-+++ b/src/libnetdata/os/uuid_generate.c
-@@ -19,27 +19,50 @@
- void os_uuid_generate_random(void *out) {
-     os_uuid_generate(out);
- }
- 
- void os_uuid_generate_time(void *out) {
-     os_uuid_generate(out);
- }
+--- a/src/libnetdata/os/uuid_generate.c	2026-08-07 05:27:06.360684686 +0800
++++ b/src/libnetdata/os/uuid_generate.c	2026-08-07 09:05:09.188681249 +0800
+@@ -26,9 +26,31 @@
  
  #else
  
 -#if !defined(OS_MACOS)
-+#if defined(__OHOS__)
-+/* OHOS does not provide uuid.h; use arc4random_buf for UUID generation */
++#if defined(NO_UUID_H)
++/* No uuid.h available; use arc4random_buf for UUID generation */
 +#include <stdlib.h>
 +
 +static void generate_uuid_v4(unsigned char *out) {
@@ -35,18 +28,13 @@
 +    generate_uuid_v4(out);
 +}
 +
-+#elif !defined(OS_MACOS)
++#elif !defined(OS_MACOS) && !defined(NO_UUID_H)
  #include <uuid.h>
 -#endif
  
  void os_uuid_generate(void *out) {
      uuid_generate(out);
- }
- 
- void os_uuid_generate_random(void *out) {
-     uuid_generate_random(out);
- }
- 
+@@ -41,5 +63,6 @@
  void os_uuid_generate_time(void *out) {
      uuid_generate_time(out);
  }

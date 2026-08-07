@@ -1,13 +1,6 @@
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -98,21 +98,28 @@
-         set(OS_MACOS True)
-         find_library(IOKIT IOKit)
-         find_library(FOUNDATION Foundation)
-         message(STATUS " Compiling for MacOS... ")
- elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-         set(OS_FREEBSD True)
-         message(STATUS " Compiling for FreeBSD... ")
+--- a/CMakeLists.txt	2026-08-07 05:27:04.876683905 +0800
++++ b/CMakeLists.txt	2026-08-07 09:05:03.680684530 +0800
+@@ -105,7 +105,14 @@
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
          set(OS_LINUX True)
          add_definitions(-D_GNU_SOURCE)
@@ -23,21 +16,7 @@
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
          set(OS_WINDOWS True)
  
-         if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
-                 message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
-         endif()
- 
-         if(BUILD_FOR_PACKAGING)
-                 set(NETDATA_RUNTIME_PREFIX "/")
-         endif()
-@@ -128,22 +135,25 @@
-                                 include_directories(c:/msys64/usr/include/w32api)
-                         elseif("$ENV{MSYSTEM}" STREQUAL "MINGW64")
-                                 include_directories(c:/msys64/mingw64/include)
-                         elseif("$ENV{MSYSTEM}" STREQUAL "UCRT64")
-                                 include_directories(c:/msys64/ucrt64/include)
-                         endif()
-                 endif()
+@@ -135,8 +142,11 @@
          endif()
  
          message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
@@ -51,21 +30,31 @@
  endif()
  
  # This is intended to make life easier for developers who are working on one
- # specific feature.
- #
- # NOTE: DO NOT USE THIS OPTION FOR PRODUCTION BUILDS.
- option(DEFAULT_FEATURE_STATE "Specify the default state for most optional features" True)
- mark_as_advanced(DEFAULT_FEATURE_STATE)
- 
- # High-level features
-@@ -523,21 +533,21 @@
- check_c_source_compiles("
- int my_function() __attribute__((warn_unused_result));
- int main() {
-         return my_function();
- }
- int my_function() {
-         return 1;
+@@ -331,6 +341,23 @@
+ check_include_file("inttypes.h" HAVE_INTTYPES_H)
+ check_include_file("stdint.h" HAVE_STDINT_H)
+ check_include_file("arpa/inet.h" HAVE_ARPA_INET_H)
++check_include_file("uuid.h" HAVE_UUID_H)
++if(NOT HAVE_UUID_H)
++    add_definitions(-DNO_UUID_H)
++endif()
++
++include(CheckCSourceCompiles)
++check_c_source_compiles("
++#include <pthread.h>
++int main() {
++    int type;
++    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &type);
++    return 0;
++}
++" HAVE_PTHREAD_SETCANCEL)
++if(NOT HAVE_PTHREAD_SETCANCEL)
++    add_definitions(-DNO_PTHREAD_SETCANCEL)
++endif()
+ check_include_file("netinet/tcp.h" HAVE_NETINET_TCP_H)
+ check_include_file("sys/ioctl.h" HAVE_SYS_IOCTL_H)
+ check_include_file("grp.h" HAVE_GRP_H)
+@@ -530,7 +557,7 @@
  }
  " HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT)
  
@@ -74,21 +63,7 @@
          set(HAVE_BUILTIN_ATOMICS True)
  endif()
  
- # openssl/crypto
- set(ENABLE_OPENSSL True)
- pkg_check_modules(TLS IMPORTED_TARGET openssl)
- 
- if(NOT TARGET PkgConfig::TLS)
-         if(OS_MACOS)
-                 execute_process(COMMAND
-@@ -1650,28 +1660,33 @@
- # brotli
- pkg_check_modules(LIBBROTLI libbrotlidec libbrotlienc libbrotlicommon)
- if(LIBBROTLI_FOUND)
-         set(ENABLE_BROTLI On)
-         target_include_directories(libnetdata PUBLIC ${LIBBROTLI_INCLUDE_DIRS})
-         target_compile_options(libnetdata PUBLIC ${LIBBROTLI_CFLAGS_OTHER})
-         target_link_libraries(libnetdata PUBLIC ${LIBBROTLI_LDFLAGS})
+@@ -1657,14 +1684,19 @@
  endif()
  
  # uuid
@@ -114,10 +89,3 @@
  endif()
  
  # uv
- pkg_check_modules(LIBUV REQUIRED libuv)
- target_include_directories(libnetdata BEFORE PUBLIC ${LIBUV_INCLUDE_DIRS})
- target_compile_options(libnetdata PUBLIC ${LIBUV_CFLAGS_OTHER})
- target_link_libraries(libnetdata PUBLIC ${LIBUV_LDFLAGS})
- 
- # crypto
- target_link_libraries(libnetdata PUBLIC PkgConfig::CRYPTO)
