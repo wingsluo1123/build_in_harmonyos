@@ -17,6 +17,8 @@ class DocuumTestConan(ConanFile):
     def test(self):
         package_folder = self.dependencies[self.tested_reference_str].package_folder
         script = os.path.join(self.source_folder, "test_failed_archive.py")
-        # R34: check=True 使测试脚本非零退出时 test_package 正确失败，
-        # 避免断言失败仍被 Conan 判定通过（AI review P1）
-        self.run(f'"{sys.executable}" "{script}" "{package_folder}"', check=True)
+        # R34: Conan 2.x self.run() 不支持 check 参数，改用返回码检查，
+        # 使测试脚本非零退出时 test_package 正确失败（避免断言失败仍被判通过）
+        rc = self.run(f'"{sys.executable}" "{script}" "{package_folder}"')
+        if rc != 0:
+            raise Exception(f"test_failed_archive.py exited with code {rc}")
