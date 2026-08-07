@@ -95,3 +95,8 @@ $ ohc-run.py conan-verify ncurses 6.5
 - **R26/R4**: ncurses 是系统同名库, 禁止 .so 动态库 (污染 /lib /lib64 致系统崩溃)。配方 generate() 显式 `--without-shared`。
 - 制品仓 remote 访问受限 ("system acceleration policy not enabled"), 未执行 conan upload。
 - 远端 feat/ncurses-6.5 为他人工作 (2026-07-31 提交), 本分支 (feat/ncurses-6.5-2E1D3D81) 独立实现, 参考其适配思路但配方独立编写 (新增 as_expr/Makefile 乱码修复)。
+
+## 结束
+
+编译状态：built（conan-verify 八门禁通过；制品仓 remote 受限未 upload）。
+最终状态：本次适配完成，归档提交分支 feat/ncurses-6.5-2E1D3D81。
