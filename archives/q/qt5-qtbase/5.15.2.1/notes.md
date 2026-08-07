@@ -1,8 +1,8 @@
-# qt5-qtbase 5.15.2 适配笔记
+# qt5-qtbase 5.15.2.1 适配笔记
 
 ## 编译环境
 - 构建系统: configure + make
-- 编译日期: 2026-08-03
+- 编译日期: 2026-07-02
 - 编译器: clang/clang++ 15.0.4
 - 状态: built（Gui/OpenGL 扩展待 CI 验证）
 
