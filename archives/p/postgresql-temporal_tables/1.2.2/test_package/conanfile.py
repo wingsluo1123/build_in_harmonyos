@@ -28,10 +28,14 @@ class PostgresqlTemporalTablesTestConan(ConanFile):
 
     def _find_lib(self):
         """Find temporal_tables.so in the package output."""
-        # Check dependency cpp_info libdirs (absolute paths)
+        # Check dependency cpp_info libdirs (resolve relative to package folder)
         for dep in self.dependencies.values():
+            pkg_folder = str(dep.package_folder) if dep.package_folder else ""
             for libdir in getattr(dep.cpp_info, "libdirs", []):
                 libdir = str(libdir)
+                # Resolve relative libdir against package folder
+                if not os.path.isabs(libdir) and pkg_folder:
+                    libdir = os.path.join(pkg_folder, libdir)
                 candidate = os.path.join(libdir, "temporal_tables.so")
                 if os.path.isfile(candidate):
                     return candidate

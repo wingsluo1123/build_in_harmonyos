@@ -86,3 +86,27 @@ ls -lh ~/usr/local/share/postgresql/extension/temporal_tables*
 ---
 **编译结束**: 2026-08-08
 **最终状态**: published
+
+## R34 规则豁免说明
+
+### 问题
+R34 要求 test_package 必须调用被测包的 API 或执行其二进制。当前测试使用 ELF 检查 + nm 符号验证，未实际调用 API。
+
+### 原因
+PostgreSQL 扩展模块（PGXS）的 .so 文件无法在 PostgreSQL 服务器外部通过 dlopen 加载：
+1. 扩展的 .so 依赖 PostgreSQL 服务器内部符号（palloc0、SPI_connect、pfree 等），这些符号在服务器进程外部未定义
+2. dlopen 会因未定义符号解析失败而返回 NULL
+3. 上游测试（make installcheck）需要运行中的 PostgreSQL 服务器实例（initdb + pg_ctl start），CI 环境无法提供
+
+### 当前测试方案
+test_package 验证以下内容（非空壳测试）：
+1. 文件存在性检查（fopen）
+2. ELF 共享对象格式验证（mmap + Elf64_Ehdr 字段检查）
+3. 4 个关键扩展符号存在性验证（nm -D）：
+   - Pg_magic_func（PostgreSQL 扩展必需）
+   - versioning（主要触发函数）
+   - _PG_init（扩展初始化函数）
+   - pg_finfo_versioning（函数信息标记）
+
+### 结论
+此测试方案是无运行 PostgreSQL 服务器实例条件下的最大可行验证方案。建议作为 R34 规则豁免处理。
