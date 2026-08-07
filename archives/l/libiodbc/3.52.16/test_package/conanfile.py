@@ -1,3 +1,5 @@
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain
 
@@ -15,5 +17,6 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test binary directly to verify libiodbc API works
+        bin_path = os.path.join(self.build_folder, "test_package")
+        self.run(f'"{bin_path}"', env="conanrun")
