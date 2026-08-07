@@ -1,0 +1,37 @@
+--- a/liboath/configure
++++ b/liboath/configure
+@@ -43400,7 +43400,7 @@
+                                                       if {
+               # Use the mktemp program if available. If not available, hide the error
+               # message.
+-              tmp=`(umask 077 && mktemp -d /tmp/gtXXXXXX) 2>/dev/null` &&
++              tmp=`(umask 022 && mktemp -d "${TMPDIR:-/tmp}/gtXXXXXX") 2>/dev/null` &&
+               test -n "$tmp" && test -d "$tmp"
+             } ||
+             {
+@@ -43409,8 +43409,8 @@
+               # other than bash, ksh and zsh.  Its use does not increase security;
+               # rather, it minimizes the probability of failure in a very cluttered /tmp
+               # directory.
+-              tmp=/tmp/gt$$-$RANDOM
+-              (umask 077 && mkdir "$tmp")
++              tmp=${TMPDIR:-/tmp}/gt$$-$RANDOM
++              (umask 022 && mkdir "$tmp")
+             }; then
+            mkdir "$tmp/subdir"
+            GL_SUBDIR_FOR_UNLINK="$tmp/subdir"
+@@ -46156,12 +46156,12 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 

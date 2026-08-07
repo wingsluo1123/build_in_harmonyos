@@ -12,10 +12,10 @@ version: "2.6.13-r0"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-04"
+build_date: "2026-08-07"
 
 # ============================================================
 # 源码信息
@@ -26,7 +26,7 @@ source:
   url: "https://download.savannah.nongnu.org/releases/oath-toolkit/oath-toolkit-2.6.13.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "5b5d82e9a4455206d24fcbd7ee58bf4c79398a2e67997d80bd45ae927586b18b"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -43,16 +43,13 @@ build:
 
   # 配置选项列表
   configure_options:
-    # - "--prefix=/storage/Users/currentUser/usr/local"
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+    - "--enable-pam"
+    - "--enable-pskc"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
+  dependencies:
+    - libxml2/2.15.3.1
+    - linux-pam/1.7.2
 
   # 编译器
   cc: clang
@@ -63,63 +60,96 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+  - "0003-liboath-build-aux-config.guess.patch"
+  - "0004-liboath-build-aux-config.sub.patch"
+  - "0005-liboath-usersfile.c.patch"
+  - "0006-libpskc-build-aux-config.guess.patch"
+  - "0007-libpskc-build-aux-config.sub.patch"
+  - "0008-pam_oath-build-aux-config.guess.patch"
+  - "0009-pam_oath-build-aux-config.sub.patch"
+  - "0010-configure-umask-fix.patch"
+  - "0011-liboath-configure-umask-tmpdir-fix.patch"
+  - "0012-libpskc-configure-umask-fix.patch"
+  - "0013-pam_oath-configure-umask-fix.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "HarmonyOS SGID directory + umask 077 prevents file creation in mktemp directories; fix: umask 022"
+  - "/tmp is read-only on HarmonyOS; use $TMPDIR instead"
+  - "lld linker depends on system libxml2; do NOT add conan libxml2 to LD_LIBRARY_PATH during compilation"
+  - "config.guess/config.sub need OHOS platform detection patches in all subdirectories"
+  - "umask in usersfile.c needs & 0777 mask for HarmonyOS compatibility"
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /data/storage/el2/base/cache/builds/oath-toolkit-2.6.13-r0.orig
-  source_work_dir: /data/storage/el2/base/cache/builds/oath-toolkit-2.6.13-r0.work
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/oath-toolkit-2.6.13-r0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/oath-toolkit-2.6.13-r0.work
   source_orig_hash: c674fbf7a68d997c
-  source_work_hash: 72afc30bc03c5b1d
-  generated_at: '2026-06-04T12:26:08'
-  patches_count: 9
+  source_work_hash: f816ac2130b0b2ae
+  generated_at: '2026-08-07T07:35:34'
+  patches_count: 14
 
 patch_classification:
-  - file: 0001-build-aux-config.guess.patch
+  - file: 0001-liboath-usersfile.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0002-build-aux-config.sub.patch
+  - file: 0002-build-aux-config.guess.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0003-liboath-build-aux-config.guess.patch
+  - file: 0003-build-aux-config.sub.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0004-liboath-build-aux-config.sub.patch
+  - file: 0004-liboath-build-aux-config.guess.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0005-liboath-usersfile.c.patch
+  - file: 0005-liboath-build-aux-config.sub.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0006-libpskc-build-aux-config.guess.patch
+  - file: 0006-liboath-gtk-doc-version.xml.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0007-libpskc-build-aux-config.sub.patch
+  - file: 0007-libpskc-build-aux-config.guess.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0008-pam_oath-build-aux-config.guess.patch
+  - file: 0008-libpskc-build-aux-config.sub.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0009-pam_oath-build-aux-config.sub.patch
+  - file: 0009-libpskc-gtk-doc-version.xml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-libpskc-schemas-catalog-pskc.xml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-oathtool-oathtool.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-pam_oath-build-aux-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-pam_oath-build-aux-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-pskctool-pskctool.patch
     type: auto
     platform_only: True
     guard: 'pending'
