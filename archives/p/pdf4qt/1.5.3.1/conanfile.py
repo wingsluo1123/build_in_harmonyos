@@ -124,7 +124,9 @@ class Pdf4QtConan(ConanFile):
 
         # Step 2: Build pdf4qt with blend2d path
         cmake = CMake(self)
-        cmake.configure()
+        # Pass blend2d_DIR directly as a CMake argument
+        blend2d_cmake_dir = os.path.join(blend2d_install, "lib", "cmake", "blend2d")
+        cmake.configure(args=[f"-Dblend2d_DIR={blend2d_cmake_dir}"])
         cmake.build()
 
     def package(self):
