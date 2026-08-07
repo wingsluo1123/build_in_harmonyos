@@ -191,11 +191,11 @@ class GitWhoConan(ConanFile):
     @staticmethod
     def _go_host_arch():
         machine = platform.machine().lower()
+        # aireview P3: validate() 已拒非 arm64 架构，此处只需 aarch64/arm64 映射
+        # 删 x86_64/amd64 不可达映射避死代码误导
         return {
             "aarch64": "arm64",
             "arm64": "arm64",
-            "x86_64": "amd64",
-            "amd64": "amd64",
         }.get(machine, machine)
 
     def package(self):
