@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_qt5_qtbase CXX)
-find_package(Qt5 CONFIG REQUIRED)
+find_package(qt5-qtbase CONFIG REQUIRED)
 add_executable(test_qt5_qtbase test.cpp)
-target_link_libraries(test_qt5_qtbase PRIVATE
-    Qt5::Core Qt5::Gui Qt5::Network Qt5::Test
-    Qt5::Widgets Qt5::Xml Qt5::PrintSupport)
+target_link_libraries(test_qt5_qtbase PRIVATE Qt5::Core Qt5::Gui Qt5::Network Qt5::Test)
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
     target_link_options(test_qt5_qtbase PRIVATE -stdlib=libc++)
 endif()
