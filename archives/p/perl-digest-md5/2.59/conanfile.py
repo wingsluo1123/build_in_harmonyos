@@ -28,7 +28,6 @@ class PerlDigestMd5Conan(ConanFile):
     license = "Artistic-1.0-Perl OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/dist/Digest-MD5"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
-    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
 
