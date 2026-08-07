@@ -1,9 +1,9 @@
 --- a/src/backend/port/sysv_shmem.c
 +++ b/src/backend/port/sysv_shmem.c
-@@ -124,6 +124,32 @@
+@@ -124,6 +124,33 @@
  	void	   *requestedAddress = NULL;
  	void	   *memAddress;
-
+ 
 +#ifdef __OHOS__
 +	/*
 +	 * OHOS: shmget syscall causes SIGSYS (unimplemented syscall).
@@ -34,30 +34,30 @@
  	/*
  	 * Normally we just pass requestedAddress = NULL to shmat(), allowing the
  	 * system to choose where the segment gets mapped.  But in an EXEC_BACKEND
-@@ -275,6 +301,7 @@
+@@ -275,6 +302,7 @@
  	}
-
+ 
  	return memAddress;
 +#endif /* __OHOS__ */
  }
-
+ 
  /****************************************************************************/
-@@ -285,9 +312,11 @@
+@@ -285,9 +313,14 @@
  static void
  IpcMemoryDetach(int status, Datum shmaddr)
  {
 +#ifdef __OHOS__
-+	/* OHOS: No SysV shared memory to detach; anonymous mmap is cleaned up
-+	 * automatically by the OS when the process exits. */
++	/* OHOS: No SysV shared memory to detach; anonymous mmap is cleaned
++	 * up automatically by the OS when the process exits. */
 +#else
  	/* Detach System V shared memory block. */
  	if (shmdt(DatumGetPointer(shmaddr)) < 0)
  		elog(LOG, "shmdt(%p) failed: %m", DatumGetPointer(shmaddr));
-+#endif
++#endif /* __OHOS__ */
  }
-
+ 
  /****************************************************************************/
-@@ -297,9 +326,11 @@
+@@ -297,9 +330,14 @@
  static void
  IpcMemoryDelete(int status, Datum shmId)
  {
@@ -68,11 +68,11 @@
  	if (shmctl(DatumGetInt32(shmId), IPC_RMID, NULL) < 0)
  		elog(LOG, "shmctl(%d, %d, 0) failed: %m",
  			 DatumGetInt32(shmId), IPC_RMID);
-+#endif
++#endif /* __OHOS__ */
  }
-
+ 
  /*
-@@ -316,6 +347,13 @@
+@@ -316,6 +354,15 @@
  bool
  PGSharedMemoryIsInUse(unsigned long id1, unsigned long id2)
  {
@@ -87,39 +87,38 @@
 +#else
  	PGShmemHeader *memAddress;
  	IpcMemoryState state;
-
-@@ -333,6 +371,7 @@
+ 
+@@ -333,6 +380,7 @@
  			return true;
  	}
  	return true;
-+#endif
++#endif /* __OHOS__ */
  }
-
+ 
  /*
-@@ -348,6 +387,12 @@
- 			void *attachAt,
- 			PGShmemHeader **addr)
+@@ -348,6 +396,11 @@
+ 					 void *attachAt,
+ 					 PGShmemHeader **addr)
  {
 +#ifdef __OHOS__
-+	/* OHOS: No SysV shared memory segments exist. mmap-based shared memory
-+	 * is process-private after fork(), so there's nothing to re-attach to. */
++	/* OHOS: System V shared memory not supported */
 +	*addr = NULL;
 +	return SHMSTATE_ENOENT;
 +#else
  	struct shmid_ds shmStat;
  	struct stat statbuf;
  	PGShmemHeader *hdr;
-@@ -451,6 +496,7 @@
+@@ -451,6 +504,7 @@
  	 * before we attached to it.)
  	 */
  	return shmStat.shm_nattch == 0 ? SHMSTATE_UNATTACHED : SHMSTATE_ATTACHED;
-+#endif
++#endif /* __OHOS__ */
  }
-
+ 
  /*
 --- a/src/backend/utils/init/miscinit.c
 +++ b/src/backend/utils/init/miscinit.c
-@@ -381,12 +381,39 @@
+@@ -381,12 +381,49 @@
  	 * XXX can we safely enable this check on Windows?
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -167,9 +166,9 @@
  				 errhint("The server must be started by the user that owns the data directory.")));
 +#endif /* __OHOS__ */
  #endif
-
+ 
  	/*
-@@ -401,12 +429,27 @@
+@@ -401,12 +438,27 @@
  	 * reasonable check to apply on Windows.
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -195,7 +194,7 @@
  				 errdetail("Permissions should be u=rwx (0700) or u=rwx,g=rx (0750).")));
 +#endif /* __OHOS__ */
  #endif
-
+ 
  	/*
 --- a/src/bin/initdb/initdb.c
 +++ b/src/bin/initdb/initdb.c
@@ -219,7 +218,7 @@
  #endif
 +#endif /* __OHOS__ */
  }
-
+ 
  /*
 @@ -3021,6 +3029,15 @@
  		if (mkdir(subdirloc, pg_dir_create_mode) < 0)
@@ -235,10 +234,10 @@
 +					 subdirloc);
 +#endif
  	}
-
+ 
  	free(subdirloc);
 @@ -3077,6 +3094,14 @@
- 	 */
+ 		 */
  		if (mkdir(path, pg_dir_create_mode) < 0)
  			pg_fatal("could not create directory \"%s\": %m", path);
 +#ifdef __OHOS__
@@ -249,7 +248,7 @@
 +		if (chmod(path, pg_dir_create_mode) < 0)
 +			pg_fatal("could not change permissions of directory \"%s\": %m", path);
 +#endif
-
+ 
  		free(path);
  	}
 --- a/src/common/file_perm.c
@@ -267,7 +266,7 @@
 +#else
  int			pg_mode_mask = PG_MODE_MASK_OWNER;
 +#endif
-
+ 
  /*
   * Set create modes and mask to use when writing to PGDATA based on the data
 --- a/src/common/username.c
@@ -291,7 +290,7 @@
  		return NULL;
 +#endif
  	}
-
+ 
  	return pw->pw_name;
 --- a/src/include/pg_config_manual.h
 +++ b/src/include/pg_config_manual.h
@@ -334,7 +333,7 @@
  #define USE_DSM_MMAP
 +#endif /* __OHOS__ */
  #endif
-
+ 
  /* GUC. */
 --- a/src/interfaces/libpq/fe-auth.c
 +++ b/src/interfaces/libpq/fe-auth.c
@@ -371,7 +370,7 @@
 +#else
 +			S_IRWXU | S_IRWXG | S_IRWXO
 +#endif
-+		)) < 0)
++			)) < 0)
  		{
  			retval = -1;
  			break;
