@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R7",
+      "file": "archives/p/perl-math-pari/2.030528-r1/test_package/test_pari.sh",
+      "line": 13,
+      "description": "Shell script does not start with 'set -euo pipefail' as required by code style rule 7. The script has a documented reason ('# No set -e — we handle exit codes manually to distinguish platform limitations from real errors'), which makes this a style deviation with justification rather than a silent omission. The script manually checks exit codes and uses proper variable quoting throughout.",
+      "fix_suggestion": "Consider using 'set -uo pipefail' (without -e) to at least catch undefined variables and pipe failures, while still allowing manual exit code handling for the Permission denied check. The -e flag can be intentionally omitted with the existing comment as justification."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R9",
+      "file": "archives/p/perl-math-pari/2.030528-r1/test_package/test_pari.sh",
+      "line": 30,
+      "description": "Shell script uses plain echo statements (e.g., 'echo \"FAIL: ...\"', 'echo \"TEST PASSED: ...\"') instead of the standardized output format with [step]/[ok]/[fail] markers and 8-space indentation as specified in code style rule 9. The script's output is readable but does not conform to the project's logging convention.",
+      "fix_suggestion": "Replace echo markers with the project standard format: 'echo \"[step] Testing Math::Pari API...\"', 'echo \"        [ok] factorint and isprime verified\"', 'echo \"        [fail] module load failed\"'. Use [warn] for the Permission denied platform limitation notice."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/p/perl-math-pari/2.030528-r1/conanfile.py",
+      "line": 40,
+      "description": "The conanfile.py method order follows export_sources -> requirements -> source -> generate -> build -> package -> package_info, but omits the layout() method that the code style standard (rule 3) lists in the standard sequence between requirements() and source(). For a Perl XS module recipe that uses Makefile.PL (not CMake/Autotools/Meson), layout() may not be strictly necessary since default Conan folder layout is sufficient.",
+      "fix_suggestion": "Add an empty layout() method with a comment between requirements() and source() for completeness: 'def layout(self):\\n    pass  # Perl Makefile.PL uses default Conan layout'. This is optional for non-CMake recipes but improves method order compliance."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R16",
+      "file": "archives/p/perl-math-pari/2.030528-r1/conanfile.py",
+      "line": 74,
+      "description": "The 'import re' statement appears as a local import inside the build() method (in the LDDLFLAGS fallback regex branch) rather than at the module top level with other standard library imports. Code style rule 16 specifies that imports should be organized at the module level: standard library first, then third-party, with group separation.",
+      "fix_suggestion": "Move 'import re' to the module-level import block alongside 'import os' and 'import glob' at the top of the file. This follows PEP 8 and the project's import ordering convention."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R32",
+      "file": "archives/p/perl-math-pari/2.030528-r1/notes.md",
+      "line": 27,
+      "description": "The notes.md documentation still references the old hardcoded path '/storage/Users/currentUser/usr/local/lib' in the LDDLFLAGS solution description and the experience summary table, while the conanfile.py has been updated to use os.path.expanduser('~') for dynamic path resolution. This creates a documentation inconsistency where the build record shows a different approach than what the recipe actually implements.",
+      "fix_suggestion": "Update notes.md to reflect the dynamic path resolution approach used in conanfile.py. For example, change '-L/storage/Users/currentUser/usr/local/lib' to '-L$(os.path.expanduser('~')/usr/local/lib)' or add a note explaining that the recipe now uses dynamic home directory resolution via os.path.expanduser('~')."
+    }
+  ],
+  "summary": "AUDIT PASSED — perl-math-pari 2.030528-r1 (W4 Pre-PR Re-Audit after P1 fix). The P1 hardcoded path issue has been properly resolved: conanfile.py now uses os.path.expanduser('~') to dynamically resolve the OHOS user lib path instead of the hardcoded '/storage/Users/currentUser/usr/local/lib'. No P0 (deceptive behavior) or P1 (recipe correctness) issues found. Deception detection (Category 1) all passed: R34 test calls actual Math::Pari API (factorint, isprime); R9 no fake/skipped tests (Permission denied tolerance is documented and specific to OHOS HMDFS SELinux); sha256 is valid; status 'built' is consistent; R19 no prebuilt binaries; R40 not in special adaptation categories. Recipe quality (Category 2) all passed: R32 platform check uses ('Linux', 'OHOS'); R33 no shell env vars; R39 official CPAN source URL; no hardcoded paths in conanfile.py; Conan 2.x API correct. 5 non-blocking issues found (2 P2 code style, 3 P3 improvements): test_pari.sh lacks set -euo pipefail (documented reason) and standardized output format; conanfile.py missing optional layout() method and has local import re; notes.md references old hardcoded paths while recipe is fixed. None of these block the PR."
+}
