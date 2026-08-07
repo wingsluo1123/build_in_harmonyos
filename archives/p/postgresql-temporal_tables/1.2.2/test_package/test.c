@@ -26,7 +26,8 @@ static int check_elf_shared(const char *path) {
 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)map;
     /* Check ELF magic and shared object type */
-    int ok = (ehdr->e_ident[EI_MAG0] == ELFMAG0 &&
+    int ok = (st.st_size >= (off_t)sizeof(Elf64_Ehdr) &&
+              ehdr->e_ident[EI_MAG0] == ELFMAG0 &&
               ehdr->e_ident[EI_MAG1] == ELFMAG1 &&
               ehdr->e_ident[EI_MAG2] == ELFMAG2 &&
               ehdr->e_ident[EI_MAG3] == ELFMAG3 &&
