@@ -29,7 +29,6 @@ class PerlMathPariConan(ConanFile):
     homepage = "https://metacpan.org/pod/Math::Pari"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
-    package_type = "library"
     settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
