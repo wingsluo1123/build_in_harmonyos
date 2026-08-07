@@ -62,3 +62,4 @@ class ReadlineConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["readline", "history"]
+        self.cpp_info.system_libs = ["ncursesw"]
