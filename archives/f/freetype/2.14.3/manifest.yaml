@@ -1,21 +1,27 @@
-version: "2.14.3"
+version: '2.14.3'
 status: built
-build_date: "2026-04-25"
+build_date: '2026-07-07'
 
 source:
-  url: "https://download.savannah.gnu.org/releases/freetype/freetype-2.14.3.tar.xz"
-  tar_format: tar.xz
+  url: 'https://download.savannah.gnu.org/releases/freetype/freetype-2.14.3.tar.gz'
+  sha256: 'e61b31ab26358b946e767ed7eb7f4bb2e507da1cfefeb7a8861ace7fd5c899a1'
+  tar_format: tar.gz
 
 build:
   system: autotools
   configure_options:
-    - "--prefix=$HOME/usr/local"
-  dependencies:
-    - zlib
-    - libpng
+    - '--with-zlib=no'
+    - '--with-bzip2=no'
+    - '--with-png=no'
+    - '--with-harfbuzz=no'
+    - '--with-brotli=no'
+    - '--disable-static'
+  cc: clang
 
 patches_applied: []
 
 knowledge_gained:
-  - "freetype 依赖 harfbuzz（可选），但 harfbuzz 又依赖 freetype 形成循环依赖"
-  - "建议先编译不带 harfbuzz 依赖的 freetype，再编译 harfbuzz"
+  - '禁全部可选依赖（harfbuzz 与 freetype 循环，须先建无 hb 版）→ 零外部依赖叶子'
+  - 'uname-shim 修 config.guess（设备 uname=HarmonyOS）'
+  - '头 include/freetype2/ → includedirs=["include/freetype2","include"]'
+  - 'freetype2.pc Version=26.6.20（libtool，version_info=26:6:20）非 release；system_package_version 覆盖，供 fontconfig/cairo 判 >=21.0.15'

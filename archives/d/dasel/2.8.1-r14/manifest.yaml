@@ -1,0 +1,76 @@
+software: dasel
+build_system: custom
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.8.1-r14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.8.1-r14"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-02"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/TomWright/dasel/archive/refs/tags/v2.8.1.tar.gz"
+
+  # 源码校验和
+  sha256: "ba8da9569f38e7f33453c03ac988382291a01004a96c307d52cccadb9ef7837e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options:
+    - "CGO_ENABLED=0"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "GO=auto-downloaded SDK (go1.24.0)"
+    - "LDFLAGS=-s -w -X github.com/tomwright/dasel/v2/internal.Version=v2.8.1"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "go/1.24.0"
+
+  # 编译器
+  cc: go
+  cxx: ""
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go项目使用 go build 编译，无 configure/make 流程"
+  - "版本注入通过 -ldflags -X github.com/tomwright/dasel/v2/internal.Version=2.8.1"
+  - "DESTDIR模式需手动创建目录结构并复制二进制"
+  - "CGO_ENABLED=0 ensures pure Go static binary, no C library dependency"

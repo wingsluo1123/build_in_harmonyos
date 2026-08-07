@@ -1,0 +1,28 @@
+software: spirv-cross
+version: 1.4.341.0
+status: built
+build_date: "2026-07-16"
+build_system: cmake
+category: graphics
+description: SPIR-V reflection and shader cross-compilation libraries and CLI
+source:
+  url: https://github.com/KhronosGroup/SPIRV-Cross/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz
+  sha256: b2665ac9ddb65ff75a7ca2f6d410e73da443692742a1e3a5b7728ca6069a400c
+  tar_format: tar.gz
+build:
+  dependencies: []
+  target: ohos-armv8
+  format: conan
+  configure_options:
+    - SPIRV_CROSS_STATIC=ON
+    - SPIRV_CROSS_CLI=ON
+    - SPIRV_CROSS_ENABLE_TESTS=ON
+patches_applied:
+  - "0001-keep-native-tests-without-external-tools.patch"
+knowledge_gained:
+  - "The Vulkan SDK tag builds on OHOS without source patches when the OHOS libc++ ABI headers are selected."
+  - "Static C API consumers must link every enabled backend before util and core."
+  - "The installed C API and CLI both translate a minimal compute module to GLSL."
+validation:
+  command: conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+  result: pass

@@ -1,0 +1,38 @@
+software: argtable3
+version: "3.3.1"
+status: built
+build_date: "2026-07-26"
+build_system: cmake
+
+source:
+  url: "https://github.com/argtable/argtable3/releases/download/v3.3.1/argtable-v3.3.1.tar.gz"
+  sha256: "c08bca4b88ddb9234726b75455b3b1670d7c864d8daf198eaa7a3b4d41addf2c"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DARGTABLE3_ENABLE_TESTS=ON"
+    - "-DARGTABLE3_ENABLE_EXAMPLES=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-CMakeLists.txt.patch"
+  - "0002-tools-build.patch"
+
+knowledge_gained:
+  - "HarmonyOS needs an explicit CMake install-directory branch."
+  - "The amalgamation helper must not require a fixed /bin/bash path."
+  - "dos2unix is optional when the release archive already uses Unix line endings."
+
+validation:
+  native_linux:
+    conan_create: passed
+    upstream_tests: "510/510"
+    consumer_assertions: "6/6"
+  ohos:
+    conan_create: not_run
+    reason: "Official competition CI is the authoritative OHOS validation."

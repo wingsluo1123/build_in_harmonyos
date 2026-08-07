@@ -1,0 +1,84 @@
+software: dnscrypt-proxy
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.1.14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.1.14"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-06"
+
+# 构建系统（顶层字段，simple YAML parser 需要）
+build_system: "go"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/DNSCrypt/dnscrypt-proxy/archive/refs/tags/2.1.14.tar.gz"
+
+  # 源码校验和
+  sha256: "495c4f494d40068e5e3ddcb8748d91b90e99f2516060e3b59520b9f3d6148a9e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | go | custom
+  system: go
+
+  # Go 版本要求
+  go_version: "1.24"
+
+  # 配置选项列表
+  configure_options: []
+  # Go 编译参数:
+  # - CGO_ENABLED=0 (静态编译)
+  # - GOOS=linux GOARCH=arm64 (鸿蒙 Linux 内核 ABI)
+  # - -buildmode=pie (PIE 二进制，HMDFS 可执行)
+  # - GOFLAGS=-mod=vendor (使用 vendor 目录)
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+  # 构建产物
+  build_product: dnscrypt-proxy
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go 项目在 HMDFS 上无法直接执行 Go 工具链（ET_EXEC + 低 PHDR vaddr 被内核拒绝）"
+  - "使用 C placeholder 模式完成本地 conan create，CI runner 上执行真正的 Go 交叉编译"
+  - "GOOS=linux GOARCH=arm64 -buildmode=pie 生成 HarmonyOS 可执行的 PIE 二进制"
+  - "使用 -mod=vendor 利用源码 vendor 目录，无需网络下载 Go 模块依赖"

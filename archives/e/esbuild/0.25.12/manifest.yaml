@@ -1,0 +1,30 @@
+software: esbuild
+# 版本级 manifest
+# 文件位置: archives/e/esbuild/0.25.12/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.25.12"
+status: built
+build_date: "2026-08-06"
+build_system: custom
+
+source:
+  url: "https://github.com/evanw/esbuild/archive/refs/tags/v0.25.12.tar.gz"
+  sha256: "eca56e4242e68ebde6f327458c71457e614a2b0564b30a45d60fc633e0ccaab4"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options:
+    - "CGO_ENABLED=0 go build -toolexec seccomp_wrap -ldflags=-s -w -trimpath ./cmd/esbuild"
+  dependencies:
+    - go/1.26.5
+  cc: ""
+  cxx: ""
+
+patches_applied: []
+
+knowledge_gained:
+  - "HarmonyOS fallocate syscall returns EACCES, Go linker needs seccomp wrapper"
+  - "HarmonyOS uses __NR_fallocate=47 (asm-generic), not 285 (standard Linux)"
+  - "GOPROXY=https://goproxy.cn needed for Go module downloads"

@@ -1,0 +1,76 @@
+software: mpfr
+version: "4.2.2"
+status: built
+build_date: "2026-06-08"
+
+source:
+  url: "https://ftp.gnu.org/gnu/mpfr/mpfr-4.2.2.tar.xz"
+  sha256: "b67ba0383ef7e8a8563734e2e889ef5ec3c3b898a01d00fa0a6869ad81c6ce01"
+  tar_format: tar.xz
+
+build:
+  build_system: autotools
+  configure_options:
+    - "--with-gmp-include=<gmp include dir>"
+    - "--with-gmp-lib=<gmp lib dir>"
+    - "--enable-shared/--disable-static or inverse from Conan options"
+    - "--with-pic for static fPIC builds"
+  dependencies:
+    - gmp/6.3.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure-tmpdir.patch"
+
+knowledge_gained:
+  - "MPFR 4.2.2 is an Autotools project with make check as upstream validation."
+  - "The recipe consumes published gmp/6.3.0 through explicit GMP include/lib configure arguments."
+  - "HarmonyOS requires direct linux-ohos recognition in config.guess/config.sub and TMPDIR-aware config.status temp directories."
+  - "HarmonyOS user-storage ACLs reject config.status temporary files in 0700 directories under $HOME/tmp; 022 permissions are required for the generated awk machinery to be readable during configure."
+  - "OHOS CMakeDeps test_package needs an explicit gmp/6.3.0 requirement and GMP include directories so mpfr.h can include gmp.h."
+
+validation:
+  ohos_device:
+    date: "2026-07-30"
+    runner_task: mpfr-4.2.2-conan-r7
+    run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-mpfr-mpfr-mpfr-4.2.2-conan-r7-20260730-132332-45286"
+    result: pass
+    exit_code: 0
+    package_reference: "mpfr/4.2.2#1bb5a74372e0802ea1e8414798a2f9bb:504014e02a7e90aad722612f5b3526cd5f20316b#37d778fa8956640cca6cbfad85116a04"
+    upstream_tests:
+      command: "make check -j1"
+      total: 198
+      pass: 195
+      skip: 3
+      fail: 0
+      error: 0
+    test_package:
+      ctest: "1/1 passed"
+      executable_output: "MPFR 4.2.2 result: 42.0"
+    runner_checks:
+      L0: pass
+      L1: pass
+      L2: "skip: no bin/ dir"
+      L4: pass
+      L5: pass
+    build_summary:
+      total: 1
+      success: 1
+      failed: 0
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: true
+    guard: "HarmonyOS uname/config.guess only; skips Linux libc temp-file probe"
+  - file: 0002-config.sub.patch
+    type: portability
+    platform_only: true
+    guard: "linux-ohos triples only"
+  - file: 0003-configure-tmpdir.patch
+    type: portability
+    platform_only: true
+    guard: "TMPDIR fallback keeps default behavior when TMPDIR is unset; umask 022 avoids OHOS user-storage ACL denial for config.status awk files"

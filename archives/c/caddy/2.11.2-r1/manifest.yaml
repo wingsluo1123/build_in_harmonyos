@@ -1,0 +1,76 @@
+software: caddy
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.11.2-r1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.11.2-r1"
+
+# 软件名
+software: caddy
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-05"
+build_system: "go"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/caddyserver/caddy/archive/refs/tags/v2.11.2.tar.gz"
+
+  # 源码校验和
+  sha256: "ee12f7b5f97308708de5067deebb3d3322fc24f6d54f906a47a0a4e8db799122"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+  build_system: go
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Go项目编译需要通过 -ldflags '-X module.CustomVersion=version' 注入版本号，因为Go从tarball编译时debug.ReadBuildInfo无法获取主模块版本"
+  - "Go项目不能用 -ldflags='-s -w' 全部strip，'-s' 会剥离Go build info导致caddy版本检测返回unknown"
+  - "Go项目init-build会误检测为autotools，需手动修正manifest.yaml: system=custom, build_system=go"
+  - "CGO_ENABLED=1是鸿蒙Go编译必需的，否则ELF签名可能失败"
+  - "Conan适配参考chkbit/6.6.0的Go conanfile.py模板，包含Go SDK bootstrap、ELF签名、环境变量管理"

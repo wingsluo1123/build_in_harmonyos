@@ -1,0 +1,24 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -46,7 +46,7 @@ else(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wconversion")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wextra")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
++  # Do not promote platform-specific warnings to errors on HarmonyOS.
+   if ((CMAKE_C_COMPILER_ID MATCHES "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.2)
+     OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
+@@ -99,8 +99,11 @@ set_target_properties(argtable3 PROPERTIES
+ # Install rules
+ ################################################################################
+
+-if(UNIX OR MSYS OR MINGW OR PSP)
++if(UNIX OR MSYS OR MINGW OR PSP OR (CMAKE_SYSTEM_NAME MATCHES "OHOS|HarmonyOS|Unknown"))
+   set(ARGTABLE3_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/argtable3)
+ elseif(WIN32)
+   set(ARGTABLE3_INSTALL_CMAKEDIR "cmake")
++else()
++  # Keep install destinations valid for unrecognized cross targets.
++  set(ARGTABLE3_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/argtable3)
+ endif()

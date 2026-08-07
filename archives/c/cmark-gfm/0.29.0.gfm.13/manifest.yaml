@@ -1,0 +1,85 @@
+software: cmark-gfm
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.29.0.gfm.13/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.29.0.gfm.13"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-06"
+
+# 构建系统类型（顶层字段，用于 G4 检查）
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/github/cmark-gfm/archive/refs/tags/0.29.0.gfm.13.tar.gz"
+
+  # 源码校验和
+  sha256: "5abc61798ebd9de5660bc076443c07abad2b8d15dbc11094a3a79644b8ad243a"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMARK_SHARED=OFF"
+    - "-DCMARK_STATIC=ON"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "CMake 4.x 不支持 cmake_minimum_required VERSION < 3.5，需修改为 3.5"
+  - "Python ctypes CDLL 加载 .so 在 OHOS 上因 ELF 签名要求失败，不影响编译"
+  - "构建静态库避免 OHOS ELF 签名问题"
+
+patch_generation:
+  method: per-file-difflib
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: 'none'

@@ -1,0 +1,86 @@
+software: sdl2_net
+version: "2.2.0"
+status: built
+build_date: "2026-07-23"
+conan_ref: "sdl2_net/2.2.0"
+
+w0:
+  status: blocked
+  dependency: "sdl2/2.30.10"
+  reason: "Target validation used the frozen, independently validated SDL2 r30 package trees; fresh consumption from the published artifact remains unavailable"
+
+source:
+  url: "https://github.com/libsdl-org/SDL_net/releases/download/release-2.2.0/SDL2_net-2.2.0.tar.gz"
+  sha256: "4e4a891988316271974ff4e9585ed1ef729a123d22c08bd473129179dc857feb"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=<shared option>"
+    - "-DSDL2NET_INSTALL=ON"
+    - "-DSDL2NET_SAMPLES=OFF"
+  dependencies:
+    - "sdl2/2.30.10"
+  cc: clang
+  cxx: clang++
+
+package_contract:
+  options:
+    - shared
+    - fPIC
+  shared_target: "SDL2_net::SDL2_net"
+  static_target: "SDL2_net::SDL2_net-static"
+  dependency_shared_target: "SDL2::SDL2"
+  dependency_static_target: "SDL2::SDL2-static"
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+test_results:
+  upstream_independent_total: 1
+  upstream_passed: 1
+  upstream_not_run: 0
+  adapted_independent_total: 6
+  adapted_passed: 6
+  adapted_not_run: 0
+  shared_static_counted_once: true
+
+validation:
+  recipe_static: pass
+  offline_dependency_graph: "pass (frozen local SDL2 candidate; no remote access; not formal W0 or W3)"
+  host_c_syntax: pass
+  host_static_build: "pass (one fresh r15 root from verified official archives)"
+  host_runtime: "pass (1/1 upstream + 6/6 adapted; seven unique terminals; local loopback only)"
+  sdk12_library_compile: "pass (4/4 sources in shared and static modes)"
+  sdk12_consumer_link: "pass (7/7 shared and 7/7 static AArch64 ELF files)"
+  conan_cross_shared: "pass (r35; frozen local SDL2 candidate; 7/7 consumers compiled and linked; target execution not run)"
+  conan_cross_static: "pass (r36; frozen local SDL2 candidate; 7/7 consumers compiled and linked; target execution not run)"
+  conan_cross_evidence: "pass (r35/r36 binding, exit, log, complete, and seven consumer hashes validated)"
+  cmake_unpatched_shared_install: "failed as expected (duplicate unversioned symlink install)"
+  cmake_patched_shared_install: "pass (one real libSDL2_net.so)"
+  cmake_patched_static_install: "pass (one libSDL2_net.a and no shared library)"
+  cmake_installed_metadata_link: "pass (7/7 shared and 7/7 static AArch64 consumers; not executed)"
+  signing_helpers: "pass (2/2 recipe classes; simulated tools and atomic failure fixtures)"
+  target_fresh_r27: "pass (shared 7/7 and static 7/7 executions; logical upstream 1/1 and adapted 6/6; zero unexpected failures)"
+  target_evidence_manifest_sha256: "7c00d97af51a2c56e1fe8b10d9bf78391eac8c684843855b358e9610a08d3122"
+  target_evidence_archive_sha256: "5e1f8a705e4b735feafccfdf9c1a3101b97d63c7d9ff95f8d00bc8d0b8058210"
+  target_evidence_validator: "pass (candidate, 171-file evidence closure, signed ELF semantics, dependency package integrity, and 14 execution terminals)"
+  validator_fail_closed: "pass (6/6 adversarial candidate mutations rejected)"
+  validator_clean_base: "pass (offline-candidate-clean-r6.log retained)"
+  ohos_real_signing: pass
+  sdk12_runtime: not_run
+  ohos_shared: pass
+  ohos_static: pass
+  w4: not_run
+
+knowledge_reused:
+  - "E207: reject path-bearing shared-library dependencies and require a basename SONAME"
+  - "E077: perform ELF post-processing before one atomic final signature and read the result back"
+  - "Global knowledge openharmony-pc-libtool-avoid-version-hmdfs: avoid version-symlink output on HMDFS"
+test_method_reused:
+  - "Global knowledge openharmony-pc-wire-protocol-test-matrix: count independent inputs and failure boundaries, keep traffic on loopback, and do not double-count shared/static modes"
+candidate_fresh_target_observations:
+  - "Installed SDL2_net CMake metadata and the SDL2 dependency target resolved from fresh per-mode Conan homes"
+  - "Seven signed consumers and the one-real-library shared/static artifact contracts passed on the target"
+knowledge_path_b_claimed: false

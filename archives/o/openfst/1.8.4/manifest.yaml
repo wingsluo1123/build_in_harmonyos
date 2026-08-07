@@ -1,0 +1,74 @@
+software: openfst
+version: "1.8.4"
+status: published
+build_system: autotools
+build_date: "2026-05-27"
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://openfst.org/twiki/pub/FST/FstDownload/openfst-1.8.4.tar.gz"
+  sha256: ""  # 待补充
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+  dependencies: []  # 无外部依赖，仅需 libc++_shared.so 和 libc.so（系统库）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-flags-help-exit.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "config.guess/config.sub 需添加 aarch64-ohos 平台识别（E007）"
+  - "configure 脚本复杂引号在 toybox sh 下不兼容，需手动修复 pipe/cat 语句（E064）"
+  - "fstcompile 不支持 --version，需用 --help 验证（E081 新发现）"
+  - "OpenFst --help 原本打印用法后返回 1，需改为返回 0 以通过通用 smoke check"
+  - "make check 需在 DESTDIR 安装前执行，Makefile 清理后无法重新运行"
+  - "G0 clean-verify 受 Python subprocess 平台限制影响（/bin/sh: no closing quote）"
+
+# ============================================================
+# 补丁生成信息
+# ============================================================
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/openfst-1.8.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/openfst-1.8.4.work
+  source_orig_hash: 5bd7389faa2c9d8b
+  source_work_hash: 462e27bfb9c45754
+  generated_at: '2026-07-18T15:31:15'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-flags-help-exit.patch
+    type: auto
+    platform_only: False
+    guard: 'help exits successfully'

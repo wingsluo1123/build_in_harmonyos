@@ -1,0 +1,58 @@
+version: "2.5.8"
+upstream_version: "2.5.8"
+status: built
+build_date: "2026-07-30"
+
+source:
+  url: "https://downloads.sourceforge.net/project/mcrypt/Libmcrypt/2.5.8/libmcrypt-2.5.8.tar.gz"
+  sha256: "e4eb6c074bbab168ac47b947c195ff8cef9d51a211cdd18ca9c9ef34d27a373e"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--disable-dynamic-loading"
+    - "--disable-shared"
+    - "--enable-static"
+  dependencies: []
+  outputs:
+    - "lib/libmcrypt.a"
+    - "include/mcrypt.h"
+    - "include/mutils/mcrypt.h"
+
+patches_applied: []
+
+knowledge_gained:
+  - "libmcrypt 2.5.8 disables dynamic loading by default and can preload all algorithms/modes into the library."
+  - "The release tarball ships stale config.status/config.log/libtool files that must be removed after extraction."
+  - "Old Autotools configure on OHOS needs explicit LLVM AR/RANLIB/NM/LD/STRIP and CPP/CXXCPP."
+  - "Out-of-source builds need source/build root include paths because some modules include headers as <lib/libdefs.h>."
+  - "Out-of-source libtool links need lib/libmcrypt.sym copied into the build lib directory."
+  - "Out-of-source static builds need the generated lib/Makefile mcrypt_symb.c rule pointed at a build-local module source mirror so disabled dynamic loading still preloads algorithms and modes."
+  - "Out-of-source static builds also need generated lib/Makefile libmcrypt_la_LIBADD filled from modules/*/Makefile metadata because upstream configure computes EXTRA_OBJECTS with source-tree-relative file probes."
+  - "Autotools helper shebangs must use a job-local shell on the OHOS worker."
+  - "Historical config.guess/config.sub patch files in this archive did not apply cleanly to the official tarball; the recipe now applies those OHOS hooks programmatically."
+
+verification:
+  run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-a-libmcrypt-libmcrypt-2.5.8-conan-r8-newport-libadd-expand-20260730-142520-24217"
+  full_ref: "libmcrypt/2.5.8#aaccb7ca04cb4c8f642ad0a0d8ffc3c6:21b17f8b2bc0e9511e276e3d57a23893067cefe5#9e537cb022689b229eccc56201e46c27"
+  recipe_revision: "aaccb7ca04cb4c8f642ad0a0d8ffc3c6"
+  package_revision: "9e537cb022689b229eccc56201e46c27"
+  runner:
+    L0: "pass"
+    L1: "pass(upstream tests + test_package executed)"
+    L2: "pass(libmcrypt-config --version OK)"
+    L4: "pass(patches clean)"
+    L5: "pass(bin/ has content)"
+    L1e: "pass(test genuinely depends on libmcrypt)"
+  upstream_tests:
+    total: 2
+    passed: 2
+    failed: 0
+    command: "make -j1 check"
+    detail: "ciphertest and aestest passed on OHOS."
+  test_package:
+    total: 1
+    passed: 1
+    detail: "C consumer opens rijndael-128/cbc and verifies encrypt/decrypt roundtrip."

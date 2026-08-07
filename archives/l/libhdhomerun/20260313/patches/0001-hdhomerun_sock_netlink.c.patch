@@ -1,0 +1,26 @@
+--- a/hdhomerun_sock_netlink.c
++++ b/hdhomerun_sock_netlink.c
+@@ -15,20 +15,23 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public
+  * License along with this library; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+ #include "hdhomerun.h"
+ 
+ #include <sys/ioctl.h>
+ #include <net/if.h>
++/* HarmonyOS: Avoid sockaddr_storage redefinition conflict between linux/socket.h and sys/socket.h */
++#define _UAPI_LINUX_SOCKET_H
++typedef unsigned short __kernel_sa_family_t;
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ 
+ #define HDHOMERUN_SOCK_NETLINK_BUFFER_SIZE 32768
+ 
+ struct nlmsghdr_ifaddrmsg {
+ 	struct nlmsghdr nlh;
+ 	struct ifaddrmsg msg;
+ };
+ 

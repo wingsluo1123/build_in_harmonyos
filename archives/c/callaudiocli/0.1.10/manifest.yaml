@@ -1,0 +1,94 @@
+software: callaudiocli
+build_system: meson
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.1.10/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.1.10"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://gitlab.com/mobian1/callaudiod/-/archive/0.1.10/callaudiod-0.1.10.tar.gz"
+
+  # 源码校验和
+  sha256: "7e70c0eb26f05c9b9967fc3814306d28e996c3757b7c303410e97b96bb4a704a"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "--prefix=/usr/local"
+    - "--buildtype=debugoptimized"
+    - "-Dgtk_doc=false"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib/2.84.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-meson.build.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "callaudiod 0.1.10 使用 meson 构建系统，项目名与包名不同"
+  - "callaudiocli CLI 工具只依赖 glib，不需要 PulseAudio/ALSA"
+  - "PulseAudio 不可用时跳过守护进程(src/)构建，仍可构建 CLI 工具和库"
+  - "libffi cmd-pkgs 包可能损坏，需从系统 HNP 目录复制正确的 .so 文件"
+  - "meson --native-file 可指定完整编译器路径解决 PATH 继承问题"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/callaudiocli-0.1.10.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/callaudiocli-0.1.10.work
+  source_orig_hash: 8ad4097cb3d70d8c
+  source_work_hash: 9083bf3ba05c98b5
+  generated_at: '2026-08-06T02:40:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

@@ -10,16 +10,23 @@ _MODULES = {
     "check-knowledge-gap": "check_knowledge_gap",
     "close-archive": "close_archive", "search-url": "search_url",
     "refresh-patch": "refresh_patch", "finalize-archive": "finalize_archive",
-    "verify-build": "verify_build", "sign-elf": "sign_elf",
-    "package": "package_builder",
+    "verify-build": "verify_build",
     "summary": "summary",
     "submit": "submission",
     "review": "submission",
     "post-merge": "submission",
+    "feedback": "feedback",
     "resolve-deps": "dependency_resolver",
     "track-edit": "edit_tracker",
     "dispatch": "dispatch",
     "clean-verify": "clean_verify",
+    # v3.0: Conan recipe generation + verification
+    "conan-init": "conan_recipe",
+    "conan-verify": "conan_verify",
+    "conan-migrate": "conan_recipe",
+    # v8.6: Pre-analysis + Requirements graph
+    "pre-analysis": "pre_analysis",
+    "req": "requirements",
 }
 
 
@@ -55,6 +62,7 @@ Commands: {' | '.join(sorted(_MODULES.keys()))}
   submit <software> <version>       编译自检，不生成提交单
   review <software> <version>        本地审核辅助，直接扫描目录
   post-merge <software> <version>    PR 合并后重建索引与知识库
+  feedback <software> <version>      SKILL_FEEDBACK 流程终态反馈报告
 
 Run 'python3 ohc-run.py <command> --help' for details.""")
 

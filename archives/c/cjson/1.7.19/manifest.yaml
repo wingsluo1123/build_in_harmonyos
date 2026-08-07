@@ -1,0 +1,41 @@
+software: cjson
+version: "1.7.19"
+status: built
+build_system: cmake
+build_date: "2026-07-26"
+
+source:
+  url: "https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.19.tar.gz"
+  sha256: "7fa616e3046edfa7a28a32d5f9eacfd23f92900fe1f8ccd988c1662f30454562"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+test_results:
+  type: official
+  test_package:
+    total: 1
+    passed: 1
+    failed: 0
+    note: "test_cjson.c — JSON parse + field value verification"
+  upstream_tests:
+    total: 19
+    passed: 19
+    failed: 0
+    note: "CTest via cmake -DENABLE_CJSON_TEST=ON -DBUILD_SHARED_LIBS=OFF -DENABLE_CUSTOM_COMPILER_FLAGS=OFF"
+
+knowledge_gained:
+  - "cJSON 是纯 C JSON 解析库，零外部依赖"
+  - "CMake 构建，需修改 cmake_minimum_required 3.0→3.5 和 -std=c89→-std=c99"
+  - "ENABLE_CJSON_TEST 需关闭，由 test_package 替代"
+  - "上游 CTest 需手动加 -DBUILD_SHARED_LIBS=OFF (避免 so 链接器错误)"
+  - "OHOS clang 15 不支持 -Wlong-long in C99 mode，上游测试需 -DENABLE_CUSTOM_COMPILER_FLAGS=OFF"

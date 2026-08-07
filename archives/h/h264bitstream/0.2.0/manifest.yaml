@@ -1,0 +1,72 @@
+software: h264bitstream
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.2.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.2.0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-17"
+
+# 构建系统类型（必填）
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://downloads.sourceforge.net/project/h264bitstream/h264bitstream/0.2.0/h264bitstream-0.2.0.tar.gz"
+
+  # 源码校验和
+  sha256: "94912cb07ef67da762be9c580b325fd8957ad400793c9030f3fb6565c6d263a7"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "HMDFS umask 077 导致 autoconf config.status 临时目录无法写入（owner UID 不匹配），需改为 umask 007"
+  - "h264bitstream 需要先用 autoreconf -fi 生成 configure 脚本"
+  - "h264bitstream 无自带测试套件"
+  - "h264_analyze --version 导致 segfault（软件自身bug），--help 正常"
+  - "R6: 生成文件补丁（Makefile/config.log/config.status/libtool）不应保留，已删除"
+  - "umask 修复通过 conanfile.py build() 中 sed 命令实现，不固化为补丁"

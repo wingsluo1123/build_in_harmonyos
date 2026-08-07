@@ -1,0 +1,38 @@
+version: "1.9"
+status: built
+build_date: "2026-07-26"
+build_system: autotools
+
+source:
+  url: "https://ftp.gnu.org/gnu/datamash/datamash-1.9.tar.gz"
+  sha256: "f382ebda03650dd679161f758f9c0a6cc9293213438d4a77a8eda325aacb87d2"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-nls"
+    - "--with-bash-completion-dir=local"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-configure.patch"
+
+validation:
+  linux_native:
+    build: passed
+    upstream_tests: "27 passed, 3 skipped, 0 failed (30 registered suites)"
+    test_package: "10/10 passed"
+  ohos:
+    status: "official competition CI pending"
+    upstream_tests: "30 registered; expected 22 passed, 3 skipped, 5 xfailed"
+    xfail_reason: "glibc-specific locale, random sequence, selection ordering, and diagnostic text expectations"
+
+knowledge_gained:
+  - "Upstream registers 30 Automake test programs and 1,312 explicit Perl cases."
+  - "NLS is disabled to avoid an external libintl dependency."
+  - "MAKEINFO=true keeps make check focused on tests when Texinfo is unavailable."
+  - "install-exec packages the commands without regenerating Texinfo documentation."

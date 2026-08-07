@@ -1,0 +1,54 @@
+software: caps
+version: "0.9.26"
+status: published
+build_date: "2026-08-05"
+build_system: makefile
+
+source:
+  url: "https://quitte.de/dsp/caps_0.9.26.tar.bz2"
+  sha256: "e7496c5bce05abebe3dcb635926153bbb58a9337a6e423f048d3b61d8a4f98c9"
+  tar_format: tar.bz2
+
+build:
+  system: makefile
+  configure_options:
+    - "PREFIX=$DEFAULT_PREFIX"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-basics.h.patch"
+  - "0003-dsp-v4f.h.patch"
+  - "0004-dsp-v4f_IIR2.h.patch"
+
+knowledge_gained:
+  - "caps uses custom configure.py + Makefile, not autotools"
+  - "basics.h uses glibc-specific __int8_t etc., replaced with standard C99 int8_t (unconditional)"
+  - "v4f.h/v4f_IIR2.h use GCC builtins (__builtin_sinf) as template args, replaced with standard sinf/cosf"
+  - "exp10f is GNU extension not in musl, replaced with powf(10,x) fallback"
+  - "configure.py SSE detection naturally fails on aarch64 (no /proc/cpuinfo or no SSE), make clean fails silently"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: 438ec697c650764f
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: toolchain
+    platform_only: false
+    guard: none
+  - file: 0002-basics.h.patch
+    type: libc
+    platform_only: false
+    guard: none
+  - file: 0003-dsp-v4f.h.patch
+    type: compiler
+    platform_only: false
+    guard: none
+  - file: 0004-dsp-v4f_IIR2.h.patch
+    type: compiler+libc
+    platform_only: false
+    guard: none

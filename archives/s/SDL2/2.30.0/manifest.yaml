@@ -1,0 +1,80 @@
+software: SDL2
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/2.30.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.30.0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 构建系统类型
+build_system: cmake
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-07-14"
+
+# Conan 引用
+conan_ref: "sdl2/2.30.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（与 conandata.yml 一致）
+  url: "https://github.com/libsdl-org/SDL/releases/download/release-2.30.0/SDL2-2.30.0.tar.gz"
+  # 源码校验和
+  sha256: "36e2e41557e0fa4a1519315c0f5958a87ccb27e25c51776beb6f1239526447b0"
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+  # 配置选项列表
+  configure_options:
+    - "-DSDL_X11=OFF"
+    - "-DSDL_WAYLAND=OFF"
+    - "-DSDL_KMSDRM=OFF"
+    - "-DSDL_OPENGL=OFF"
+    - "-DSDL_OPENGLES=OFF"
+    - "-DSDL_VULKAN=OFF"
+    - "-DSDL_HIDAPI=OFF"
+    - "-DSDL_DUMMYVIDEO=ON"
+    - "-DSDL_OFFSCREEN=ON"
+    - "-DSDL_TESTS=OFF"
+    - "-DSDL_TEST=OFF"
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-src-thread-pthread-SDL_systhread.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E092: SDL2 CMake does not recognize OHOS; set CMAKE_SYSTEM_NAME=Linux for platform detection"
+  - "E085: musl does not implement pthread_setcanceltype; guard with #ifndef __OHOS__"
+  - "OHOS video: use dummy and offscreen video drivers (no X11/Wayland/KMSDRM)"
+  - "SDL2 has no external dependencies (self-contained library)"

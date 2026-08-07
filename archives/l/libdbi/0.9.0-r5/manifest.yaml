@@ -1,0 +1,44 @@
+software: libdbi
+version: "0.9.0-r5"
+status: built
+build_date: "2026-07-17"
+build_system: autotools
+
+source:
+  url: "https://sourceforge.net/projects/libdbi/files/libdbi/libdbi-0.9.0/libdbi-0.9.0.tar.gz/download"
+  sha256: "dafb6cdca524c628df832b6dd0bf8fabceb103248edb21762c02d3068fca4503"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+    - "--disable-docs"
+    - "--without-ltdl"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0005-ohos-config.guess.patch"
+  - "0006-ohos-config.sub.patch"
+  - "0007-ohos-configure.patch"
+
+validation:
+  conan_create:
+    platform: "Linux x86_64"
+    status: passed
+    consumer_assertions: "29/29"
+  ohos_target:
+    sdk: "OpenHarmony 6.0 API 20"
+    triple: "aarch64-unknown-linux-ohos"
+    library_compile: passed
+    consumer_link: passed
+    runtime: "not run; no HarmonyOS PC device"
+
+knowledge_gained:
+  - "The competition r5 suffix is a packaging revision; the upstream release is 0.9.0"
+  - "The 2003 GNU config scripts need a narrow HarmonyOS target compatibility patch"
+  - "The core library can initialize against an empty driver directory without database drivers"
+  - "The upstream release has no declared TESTS or check_PROGRAMS targets"

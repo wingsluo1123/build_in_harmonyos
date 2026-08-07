@@ -1,0 +1,41 @@
+software: shntool
+version: "3.0.10"
+status: built
+build_date: "2026-06-04"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/s/shntool/shntool_3.0.10.orig.tar.gz"
+  sha256: "74302eac477ca08fb2b42b9f154cc870593aec8beab308676e4373a5e4ca2102"
+  tar_format: tar.gz
+
+build:
+  configure_options:
+    - "--prefix=/"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+
+knowledge_gained:
+  - "shntool 3.0.10 ships old autotools triplet helpers, so config.guess/config.sub need portability patches for aarch64-unknown-linux-ohos."
+  - "The release configure script consumes the patched config.guess/config.sub helpers directly, so autoreconf is not required."
+  - "Use the Debian HTTPS orig tarball as the reproducible source and verify it with the pinned SHA256."
+  - "shntool does not support --version; use shntool -v for version smoke tests."
+
+patch_generation:
+  method: refreshed-autotools-triplet-helpers
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: true
+    guard: "aarch64-unknown-linux-ohos"
+  - file: 0002-config.sub.patch
+    type: portability
+    platform_only: true
+    guard: "linux-ohos"

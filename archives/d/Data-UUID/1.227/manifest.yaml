@@ -1,0 +1,93 @@
+software: Data-UUID
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.227/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.227"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-06"
+
+# 编译完成日期（YYYY-MM-DD HH:MM:SS）
+compile_date: "2026-08-06 06:09:00"
+
+# 构建系统
+build_system: "perl-xs"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://cpan.metacpan.org/authors/id/G/GT/GTERMARS/Data-UUID-1.227.tar.gz"
+
+  # 源码校验和
+  sha256: "95bda7276265f57bc48ffdeddec5ef28cd6f765e3a183757fa5f09f0ce6b98ac"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - file: "0001-UUID.xs.patch"
+    description: "Skip gethostid() on OHOS (not available, E051-class)"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Perl XS 模块可通过 ExtUtils::MakeMaker (Makefile.PL) 在 OHOS 上构建"
+  - "gethostid() 在 OHOS 平台不可用，需添加 __OHOS__ 守卫跳过"
+  - "SELinux HMDFS 限制阻止 .so 从用户目录加载 (E212)，非构建缺陷"
+  - "Data::UUID 功能完整：UUID v1/v3 生成、字符串转换、比较等功能均实现"
+  - "Conan 配方使用 perl Makefile.PL INSTALL_BASE + make + make install 模式"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/Data-UUID-1.227.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/Data-UUID-1.227.work
+  source_orig_hash: 215fa8206619bd12
+  source_work_hash: 2d9abace5af7fe4d
+  generated_at: '2026-08-06T06:09:18'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-UUID.xs.patch
+    type: auto
+    platform_only: True
+    guard: '__OHOS__'

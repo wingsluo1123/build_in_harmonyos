@@ -1,0 +1,60 @@
+software: fprobe-ulog
+version: "1.2"
+status: published
+build_date: "2026-08-06"
+
+source:
+  url: "https://github.com/opoplawski/fprobe-ulog/releases/download/v1.2/fprobe-ulog-1.2.tar.gz"
+  sha256: "72a8c13001dd512acff9b85594dd29a435947072e20abefe85c29468a3967121"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix="
+  dependencies:
+    - "libnfnetlink/1.0.2"
+  inline_dependencies:
+    - "libmnl/1.0.5 (built from source, not in conan repo)"
+    - "libnetfilter_log/1.0.2 (built from source, not in conan repo)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "config.guess: replaced with HarmonyOS-compatible version (outputs aarch64-unknown-linux-gnu)"
+  - "config.sub: replaced with pass-through version"
+  - "configure: umask 077→022 fix for HMDFS temp directory creation"
+  - "compat_fixup.h: header conflict resolution (sockaddr_storage, __kernel_sa_family_t)"
+  - "libnfnetlink linux_nfnetlink.h: forward to system header to avoid nfgenmsg redefinition"
+
+knowledge_gained:
+  - "HarmonyOS HMDFS: directories created with umask 077 cannot have files created inside them; fix umask to 022"
+  - "OHOS SDK has header conflicts: linux/socket.h vs sys/socket.h (sockaddr_storage), linux/netfilter/nfnetlink.h vs libnfnetlink's bundled copy (nfgenmsg)"
+  - "compat_fixup.h: include sys/socket.h first, define _UAPI_LINUX_SOCKET_H to block linux/socket.h, provide __kernel_sa_family_t typedef"
+  - "libnetfilter_log libnfnetlink header conflict: replace bundled linux_nfnetlink.h with forward to system linux/netfilter/nfnetlink.h"
+  - "fprobe-ulog is an application (binary tool), not a library; package_type=application, cpp_info.bindirs=['sbin']"
+  - "Inline dependency build: libmnl and libnetfilter_log are not in conan repo; build from source in recipe build()"
+  - "fprobe-ulog configure hardcodes OS_LINUX; HarmonyOS is Linux-based so config.guess outputs aarch64-unknown-linux-gnu"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/fprobe-ulog-1.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/fprobe-ulog-1.2.work
+  source_orig_hash: b5dfb9a59c2e209f
+  source_work_hash: a1c4a195f45cd587
+  generated_at: '2026-08-06T12:34:11'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

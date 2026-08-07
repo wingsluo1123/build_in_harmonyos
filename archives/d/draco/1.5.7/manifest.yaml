@@ -1,0 +1,36 @@
+# 版本级 manifest — draco 1.5.7
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: draco
+version: "1.5.7"
+status: built
+build_date: "2026-07-16"
+build_system: cmake
+
+source:
+  url: "https://github.com/google/draco/archive/refs/tags/1.5.7.tar.gz"
+  sha256: "bf6b105b79223eab2b86795363dfe5e5356050006a96521477973aba8f036fe1"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DDRACO_INSTALL=ON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "CMake 不识别 HarmonyOS 系统，但不影响编译（编译器自动检测）"
+  - "draco 为独立库，无必须的外部依赖"
+  - "编码器和解码器功能完整，支持 OBJ/PLY/STL 格式"
+  - "压缩率可达 50-90%，实际测试立方体模型压缩率 56.6%"
+  - "使用 OHOS NDK 的 ohos.toolchain.cmake 设置 CMAKE_TOOLCHAIN_FILE 进行交叉编译"
+  - "E012: ohos.toolchain.cmake 以 INTERNAL/FORCE 覆写 CMAKE_AR 为 bare name（llvm-ar）；"
+    "CMAKE_<LANG>_CREATE_STATIC_LIBRARY 优先于 ARCHIVE_* 规则，需用绝对路径 llvm-ar rcs 覆盖该高优先级规则"
+  - "draco 1.5.7 的 StatusOr<T> 不支持 operator! 和 operator->；"
+    "必须用 .ok() 检查状态，用 .value() 获取内部值后再访问成员"
