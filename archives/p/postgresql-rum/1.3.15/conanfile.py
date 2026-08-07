@@ -1,7 +1,7 @@
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, copy, unpack, export_conandata_patches
+from conan.tools.files import get, copy, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -20,10 +20,6 @@ class PostgresqlRumConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Export source tarball for offline CI builds (GitHub not accessible from CI workers)
-        copy(self, "rum-1.3.15.tar.gz",
-             os.path.join(self.recipe_folder, "sources"),
-             self.export_sources_folder)
 
     def requirements(self):
         self.requires("postgresql/18.3")
@@ -32,12 +28,7 @@ class PostgresqlRumConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # Use exported source tarball if available (offline CI), otherwise download
-        local_tarball = os.path.join(self.source_folder, "rum-1.3.15.tar.gz")
-        if os.path.isfile(local_tarball):
-            unpack(self, local_tarball, strip_root=True)
-        else:
-            get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         # Get pg_config from PostgreSQL dependency

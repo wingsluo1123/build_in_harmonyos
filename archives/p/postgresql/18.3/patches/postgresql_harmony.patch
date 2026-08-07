@@ -1,101 +1,125 @@
 --- a/src/backend/port/sysv_shmem.c
 +++ b/src/backend/port/sysv_shmem.c
-@@ -124,6 +124,17 @@
+@@ -124,6 +124,32 @@
  	void	   *requestedAddress = NULL;
  	void	   *memAddress;
- 
+
 +#ifdef __OHOS__
 +	/*
 +	 * OHOS: shmget syscall causes SIGSYS (unimplemented syscall).
-+	 * For mmap-based shared memory, the SysV segment is only needed for
-+	 * interlocking. We skip this requirement and rely on file-based locking.
-+	 * Return a fake address that will be overwritten later.
++	 * Use mmap with MAP_SHARED|MAP_ANONYMOUS for inter-process shared memory.
++	 * This works with PostgreSQL's fork-based process model: postmaster
++	 * creates the mapping, forked backend processes inherit it automatically
++	 * via fork(). The mapping is truly shared (not a per-process copy).
 +	 */
-+	static PGShmemHeader fake_header;
-+	memset(&fake_header, 0, sizeof(PGShmemHeader));
-+	return &fake_header;
++	memAddress = mmap(requestedAddress, size, PROT_READ | PROT_WRITE,
++					  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
++	if (memAddress == MAP_FAILED)
++		elog(FATAL, "mmap(%zu) failed: %m", size);
++
++	/* Initialize the shared memory header at the start of the mapping */
++	((PGShmemHeader *) memAddress)->magic = PGShmemMagic;
++	((PGShmemHeader *) memAddress)->length = size;
++	/* device/inode are not relevant for anonymous mmap */
++	((PGShmemHeader *) memAddress)->device = 0;
++	((PGShmemHeader *) memAddress)->inode = 0;
++
++	/* Register cleanup callbacks (no-ops for anonymous mmap, but
++	 * registered for consistency with the SysV code path) */
++	on_shmem_exit(IpcMemoryDetach, PointerGetDatum(memAddress));
++	on_shmem_exit(IpcMemoryDelete, Int32GetDatum(0));
++
++	return (PGShmemHeader *) memAddress;
 +#else
  	/*
  	 * Normally we just pass requestedAddress = NULL to shmat(), allowing the
  	 * system to choose where the segment gets mapped.  But in an EXEC_BACKEND
-@@ -275,6 +286,7 @@
+@@ -275,6 +301,7 @@
  	}
- 
+
  	return memAddress;
 +#endif /* __OHOS__ */
  }
- 
+
  /****************************************************************************/
-@@ -285,9 +297,13 @@
+@@ -285,9 +312,11 @@
  static void
  IpcMemoryDetach(int status, Datum shmaddr)
  {
 +#ifdef __OHOS__
-+	/* OHOS: No System V shared memory to detach, using mmap-based DSM */
++	/* OHOS: No SysV shared memory to detach; anonymous mmap is cleaned up
++	 * automatically by the OS when the process exits. */
 +#else
  	/* Detach System V shared memory block. */
  	if (shmdt(DatumGetPointer(shmaddr)) < 0)
  		elog(LOG, "shmdt(%p) failed: %m", DatumGetPointer(shmaddr));
-+#endif /* __OHOS__ */
++#endif
  }
- 
+
  /****************************************************************************/
-@@ -297,9 +313,13 @@
+@@ -297,9 +326,11 @@
  static void
  IpcMemoryDelete(int status, Datum shmId)
  {
 +#ifdef __OHOS__
-+	/* OHOS: No System V shared memory to delete, using mmap-based DSM */
++	/* OHOS: No SysV shared memory to delete; anonymous mmap has no
++	 * persistent resource to clean up. */
 +#else
  	if (shmctl(DatumGetInt32(shmId), IPC_RMID, NULL) < 0)
  		elog(LOG, "shmctl(%d, %d, 0) failed: %m",
  			 DatumGetInt32(shmId), IPC_RMID);
-+#endif /* __OHOS__ */
++#endif
  }
- 
+
  /*
-@@ -316,6 +336,10 @@
+@@ -316,6 +347,13 @@
  bool
  PGSharedMemoryIsInUse(unsigned long id1, unsigned long id2)
  {
 +#ifdef __OHOS__
-+	/* OHOS: System V shared memory not supported, assume not in use */
++	/*
++	 * OHOS: SysV shared memory is not used (mmap-based instead), so there
++	 * is no SysV segment to check. Concurrent postmaster instance detection
++	 * is handled by CreateLockFile() which checks postmaster.pid via flock()
++	 * before this function is ever called. Thus returning false here is safe.
++	 */
 +	return false;
 +#else
  	PGShmemHeader *memAddress;
  	IpcMemoryState state;
- 
-@@ -333,6 +357,7 @@
+
+@@ -333,6 +371,7 @@
  			return true;
  	}
  	return true;
-+#endif /* __OHOS__ */
++#endif
  }
- 
+
  /*
-@@ -348,6 +373,11 @@
- 					 void *attachAt,
- 					 PGShmemHeader **addr)
+@@ -348,6 +387,12 @@
+ 			void *attachAt,
+ 			PGShmemHeader **addr)
  {
 +#ifdef __OHOS__
-+	/* OHOS: System V shared memory not supported */
++	/* OHOS: No SysV shared memory segments exist. mmap-based shared memory
++	 * is process-private after fork(), so there's nothing to re-attach to. */
 +	*addr = NULL;
 +	return SHMSTATE_ENOENT;
 +#else
  	struct shmid_ds shmStat;
  	struct stat statbuf;
  	PGShmemHeader *hdr;
-@@ -451,6 +481,7 @@
+@@ -451,6 +496,7 @@
  	 * before we attached to it.)
  	 */
  	return shmStat.shm_nattch == 0 ? SHMSTATE_UNATTACHED : SHMSTATE_ATTACHED;
-+#endif /* __OHOS__ */
++#endif
  }
- 
+
  /*
 --- a/src/backend/utils/init/miscinit.c
 +++ b/src/backend/utils/init/miscinit.c
-@@ -381,12 +381,40 @@
+@@ -381,12 +381,39 @@
  	 * XXX can we safely enable this check on Windows?
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -114,6 +138,15 @@
 +		int i;
 +
 +		ngroups = getgroups(64, my_gids);
++		if (ngroups < 0)
++		{
++			/* getgroups() failed; fall back to strict ownership check */
++			ereport(FATAL,
++					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
++					 errmsg("data directory \"%s\" has wrong ownership",
++							DataDir),
++					 errhint("The server must be started by the user that owns the data directory.")));
++		}
 +		for (i = 0; i < ngroups && !same_group; i++)
 +			if (my_gids[i] == dir_gid)
 +				same_group = true;
@@ -134,7 +167,7 @@
  				 errhint("The server must be started by the user that owns the data directory.")));
 +#endif /* __OHOS__ */
  #endif
- 
+
  	/*
 @@ -401,12 +429,27 @@
  	 * reasonable check to apply on Windows.
@@ -162,7 +195,7 @@
  				 errdetail("Permissions should be u=rwx (0700) or u=rwx,g=rx (0750).")));
 +#endif /* __OHOS__ */
  #endif
- 
+
  	/*
 --- a/src/bin/initdb/initdb.c
 +++ b/src/bin/initdb/initdb.c
@@ -186,7 +219,7 @@
  #endif
 +#endif /* __OHOS__ */
  }
- 
+
  /*
 @@ -3021,6 +3029,15 @@
  		if (mkdir(subdirloc, pg_dir_create_mode) < 0)
@@ -202,10 +235,10 @@
 +					 subdirloc);
 +#endif
  	}
- 
+
  	free(subdirloc);
 @@ -3077,6 +3094,14 @@
- 		 */
+ 	 */
  		if (mkdir(path, pg_dir_create_mode) < 0)
  			pg_fatal("could not create directory \"%s\": %m", path);
 +#ifdef __OHOS__
@@ -216,7 +249,7 @@
 +		if (chmod(path, pg_dir_create_mode) < 0)
 +			pg_fatal("could not change permissions of directory \"%s\": %m", path);
 +#endif
- 
+
  		free(path);
  	}
 --- a/src/common/file_perm.c
@@ -234,7 +267,7 @@
 +#else
  int			pg_mode_mask = PG_MODE_MASK_OWNER;
 +#endif
- 
+
  /*
   * Set create modes and mask to use when writing to PGDATA based on the data
 --- a/src/common/username.c
@@ -258,7 +291,7 @@
  		return NULL;
 +#endif
  	}
- 
+
  	return pw->pw_name;
 --- a/src/include/pg_config_manual.h
 +++ b/src/include/pg_config_manual.h
@@ -301,7 +334,7 @@
  #define USE_DSM_MMAP
 +#endif /* __OHOS__ */
  #endif
- 
+
  /* GUC. */
 --- a/src/interfaces/libpq/fe-auth.c
 +++ b/src/interfaces/libpq/fe-auth.c
@@ -338,7 +371,7 @@
 +#else
 +			S_IRWXU | S_IRWXG | S_IRWXO
 +#endif
-+			)) < 0)
++		)) < 0)
  		{
  			retval = -1;
  			break;
