@@ -189,11 +189,11 @@ class ProjConan(ConanFile):
         if _llvm_ar:
             defs += ' -DCMAKE_AR="{}"'.format(_llvm_ar)
         else:
-            self.output.warn("llvm-ar not found; CMake may use system default ar (potential ABI issues)")
+            self.output.warning("llvm-ar not found; CMake may use system default ar (potential ABI issues)")
         if _llvm_ranlib:
             defs += ' -DCMAKE_RANLIB="{}"'.format(_llvm_ranlib)
         else:
-            self.output.warn("llvm-ranlib not found; CMake may use system default ranlib (potential ABI issues)")
+            self.output.warning("llvm-ranlib not found; CMake may use system default ranlib (potential ABI issues)")
         if sqlite3_bin:
             defs += ' -DEXE_SQLITE3="{}"'.format(sqlite3_bin)
 
@@ -232,7 +232,7 @@ class ProjConan(ConanFile):
         _tools_dir = os.environ.get("OHOS_TOOLS_DIR", "")
         signer = os.path.join(_tools_dir, "binary-sign-tool") if _tools_dir else shutil.which("binary-sign-tool")
         if not signer or not os.path.isfile(signer):
-            self.output.warn("binary-sign-tool not found, skipping ELF signing")
+            self.output.warning("binary-sign-tool not found, skipping ELF signing")
             return
         for f in targets:
             if os.path.islink(f):

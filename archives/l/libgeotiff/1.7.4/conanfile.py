@@ -175,7 +175,7 @@ class LibgeotiffConan(ConanFile):
         objcopy = os.path.join(_tools_dir, "llvm-objcopy") if _tools_dir else shutil.which("llvm-objcopy")
         signer = os.path.join(_tools_dir, "binary-sign-tool") if _tools_dir else shutil.which("binary-sign-tool")
         if not signer or not os.path.isfile(signer):
-            self.output.warn("binary-sign-tool not found, skipping .so signing")
+            self.output.warning("binary-sign-tool not found, skipping .so signing")
             return
         for so in sos:
             if os.path.islink(so):
