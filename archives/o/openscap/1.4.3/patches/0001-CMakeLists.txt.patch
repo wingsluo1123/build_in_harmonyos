@@ -1,13 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -139,30 +139,88 @@
- 	check_library_exists("${RPM_LIBRARY}" rpmFreeFilesystems "" HAVE_RPMFREEFILESYSTEMS)
- 	check_library_exists("${RPM_LIBRARY}" rpmVerifyFile "" HAVE_RPMVERIFYFILE)
- 	set(HAVE_RPMVERCMP 1)
- 	include_directories("${RPM_INCLUDE_DIRS}")
- endif()
- 
- find_package(SELinux)
+@@ -146,16 +146,74 @@
  find_package(SWIG)
  find_package(LibXml2 REQUIRED)
  find_package(LibXslt REQUIRED)
@@ -86,21 +79,7 @@
  
  # PThread
  if (WIN32)
- 	find_package(ZLIB REQUIRED)
- endif()
- 
- if (WIN32 AND NOT MINGW)
- 	find_package(pthread CONFIG REQUIRED)
- 	set(CMAKE_THREAD_LIBS_INIT ${PThreads4W_LIBRARY})
- else()
-@@ -237,21 +295,21 @@
- 	option(ENABLE_SCE "enables Script Check Engine - an alternative checking engine that lets you use executables instead of OVAL for checks" ON)
- endif()
- 
- # ---------- OVAL FEATURE SWITCHES
- 
- option(ENABLE_PROBES "build OVAL probes - each probe implements an OVAL test" TRUE)
- set(SEAP_MSGID_BITS 32 CACHE STRING "Size of SEAP_msgid_t in bits [32|64]")
+@@ -244,7 +302,7 @@
  cmake_dependent_option(ENABLE_PROBES_INDEPENDENT "build OVAL probes for independent (cross platform) OVAL tests" ON "ENABLE_PROBES" OFF)
  # On some platforms (Windows..) UNIX ends up being empty instead of "false"
  set(IS_UNIX FALSE)
@@ -109,21 +88,7 @@
      set(IS_UNIX TRUE)
  endif()
  cmake_dependent_option(ENABLE_PROBES_UNIX "build OVAL probes for the UNIX OVAL tests" ${IS_UNIX} "ENABLE_PROBES" OFF)
- string(COMPARE EQUAL ${CMAKE_SYSTEM_NAME} "Linux" IS_LINUX)
- cmake_dependent_option(ENABLE_PROBES_LINUX "build OVAL probes for the Linux OVAL tests" ${IS_LINUX} "ENABLE_PROBES" OFF)
- string(COMPARE EQUAL ${CMAKE_SYSTEM_NAME} "Solaris" IS_SOLARIS)
- cmake_dependent_option(ENABLE_PROBES_SOLARIS "build OVAL probes for the Solaris OVAL tests" ${IS_SOLARIS} "ENABLE_PROBES" OFF)
- set(IS_WIN32 FALSE)
- if (WIN32)
-     set(IS_WIN32 TRUE)
-@@ -569,20 +627,22 @@
- 	"src/XCCDF_POLICY/"
- 	"src/XCCDF_POLICY/public/"
- 	"yaml-filter/src/"
- 	${CMAKE_BINARY_DIR} # config.h is generated to build directory
- 	# Required dependencies include dirs can be added inconditionally
- 	${LIBXML2_INCLUDE_DIR}
- 	${XMLSEC_INCLUDE_DIRS}
+@@ -576,6 +634,8 @@
  	${LIBXSLT_INCLUDE_DIR}
  	${OPENSSL_INCLUDE_DIR}
  	${PCRE2_INCLUDE_DIRS}
@@ -132,10 +97,3 @@
  )
  
  if (GCRYPT_FOUND)
- 	include_directories("${GCRYPT_INCLUDE_DIRS}")
- endif()
- 
- if (POPT_FOUND)
- 	include_directories("${POPT_INCLUDE_DIRS}")
- endif()
- 

@@ -20,6 +20,8 @@ class OpenscapConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        from conan.tools.files import copy
+        copy(self, "openscap-1.4.3.tar.gz", os.path.join(self.recipe_folder, "sources"), self.export_sources_folder)
 
     def requirements(self):
         self.requires("pcre2/10.45.1")
@@ -34,7 +36,13 @@ class OpenscapConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"][0], strip_root=True)
+        import os
+        from conan.tools.files import unzip
+        tarball = os.path.join(self.export_sources_folder, "openscap-1.4.3.tar.gz")
+        if os.path.exists(tarball):
+            unzip(self, tarball, strip_root=True)
+        else:
+            get(self, **self.conan_data["sources"][0], strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)

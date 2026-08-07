@@ -1,13 +1,6 @@
 --- a/src/common/debug.c
 +++ b/src/common/debug.c
-@@ -55,20 +55,22 @@
- 
- #ifndef PATH_SEPARATOR
- # define PATH_SEPARATOR '/'
- #endif
- 
- #if defined(OS_WINDOWS)
- # include <windows.h>
+@@ -62,6 +62,8 @@
  # define GET_PROGRAM_NAME get_program_name()
  #elif defined(OS_APPLE) || defined(OS_FREEBSD)
  # define GET_PROGRAM_NAME getprogname()
@@ -16,21 +9,7 @@
  #else
  # define GET_PROGRAM_NAME program_invocation_short_name
  #endif
- 
- static const struct oscap_string_map OSCAP_VERBOSITY_LEVELS[] = {
-     {DBG_E, "ERROR"},
-     {DBG_W, "WARNING"},
-     {DBG_I, "INFO"},
-     {DBG_D, "DEVEL"},
-     {DBG_UNKNOWN, NULL}
-@@ -88,21 +90,35 @@
- #if defined(OSCAP_THREAD_SAFE)
- # define __LOCK_FP    do { if (pthread_mutex_lock   (&__debuglog_mutex) != 0) abort(); } while(0)
- # define __UNLOCK_FP  do { if (pthread_mutex_unlock (&__debuglog_mutex) != 0) abort(); } while(0)
- #else
- # define __LOCK_FP   while(0)
- # define __UNLOCK_FP while(0)
- #endif
+@@ -95,7 +97,21 @@
  
  #define THREAD_NAME_LEN 16
  
@@ -53,10 +32,3 @@
  static char * get_program_name()
  {
          char path[PATH_MAX + 1];
-         int path_size = GetModuleFileName(NULL, path, sizeof(path) - 1);
- 
-         if(path_size < 0)
-                 return NULL;
-         if(path_size == sizeof(path) - 1)
-                 path[path_size] = '\0';
-         return strdup(path);
