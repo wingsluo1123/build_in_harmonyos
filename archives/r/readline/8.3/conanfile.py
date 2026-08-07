@@ -60,5 +60,4 @@ class ReadlineConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["readline", "history"]
-        # Termcap library discovered by configure; downstream consumers
-        # that link libreadline.a must also link the detected termcap lib.
+        self.cpp_info.system_libs = ["gnutermcap"]
