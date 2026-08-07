@@ -83,11 +83,20 @@ class PostgresqlTemporalTablesConan(ConanFile):
         os.environ["CC"] = shutil.which("clang") or "clang"
         os.environ["SHELL"] = shutil.which("bash") or "/bin/sh"
 
+        # Fix umask 077 -> 022 for hmdfs filesystem compatibility
+        import glob as _glob
+        for f in _glob.glob(os.path.join(pg_dir, "**", "configure"), recursive=True):
+            with open(f, 'r') as fh:
+                content = fh.read()
+            content = content.replace("umask 077", "umask 022")
+            with open(f, 'w') as fh:
+                fh.write(content)
+
         build_dir = os.path.join(pg_dir, "build-ohos")
         os.makedirs(build_dir, exist_ok=True)
 
         self.run(
-            f'../configure --prefix="{pg_install}" '
+            f'umask 022 && ../configure --prefix="{pg_install}" '
             f'--without-icu --without-readline --without-zlib --without-openssl',
             cwd=build_dir
         )
