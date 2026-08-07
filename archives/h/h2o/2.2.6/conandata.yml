@@ -2,6 +2,37 @@ sources:
   url: "https://github.com/h2o/h2o/archive/refs/tags/v2.2.6.tar.gz"
   sha256: "f8cbc1b530d85ff098f6efc2c3fdbc5e29baffb30614caac59d5c710f7bda201"
   archive: "h2o-v2.2.6.tar.gz"
+# These directories are vendored in the official v2.2.6 source archive, not
+# Git submodules. CMake compiles them for this recipe's default configuration
+# (WITH_MRUBY=OFF, WITH_PICOTLS=ON), so source() verifies the complete closure
+# before it applies the platform patches.
+bundled_dependencies:
+  - path: "deps/brotli"
+    required_file: "enc/encode.cc"
+  - path: "deps/cloexec"
+    required_file: "cloexec.c"
+  - path: "deps/golombset"
+    required_file: "golombset.h"
+  - path: "deps/klib"
+    required_file: "khash.h"
+  - path: "deps/libgkc"
+    required_file: "gkc.c"
+  - path: "deps/libyrmcds"
+    required_file: "close.c"
+  - path: "deps/neverbleed"
+    required_file: "neverbleed.c"
+  - path: "deps/picohttpparser"
+    required_file: "picohttpparser.c"
+  - path: "deps/picotest"
+    required_file: "picotest.c"
+  - path: "deps/picotls"
+    required_file: "lib/picotls.c"
+  - path: "deps/ssl-conservatory"
+    required_file: "openssl/openssl_hostname_validation.c"
+  - path: "deps/yaml"
+    required_file: "src/api.c"
+  - path: "deps/yoml"
+    required_file: "yoml.h"
 submodules:
   - path: "misc/picotemplate"
     url: "https://codeload.github.com/kazuho/picotemplate/tar.gz/55d6d242ae1e00ddf16199e15b1acaf6d5c84e42"
@@ -21,7 +52,7 @@ submodules:
     archive: "cache-digest.js.tar.gz"
 patches:
   "2.2.6":
-    - patch_file: "patches/0001-ohos-disable-incomplete-tcp-info.patch"
+    - patch_file: "patches/0001-cmake-detect-tcp-info-capability.patch"
       base_path: "."
     - patch_file: "patches/0002-ohos-neverbleed-test-tmpdir.patch"
       base_path: "."

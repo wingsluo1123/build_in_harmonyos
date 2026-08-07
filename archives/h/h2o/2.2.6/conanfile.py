@@ -58,11 +58,23 @@ class H2OConan(ConanFile):
     def source(self):
         archive_dir = os.environ.get("H2O_SOURCE_ARCHIVE_DIR")
         self._extract_source(self.conan_data["sources"], self.source_folder, archive_dir)
+        self._verify_bundled_dependencies()
         for submodule in self.conan_data["submodules"]:
             destination = os.path.join(self.source_folder, submodule["path"])
             self._extract_source(submodule, destination, archive_dir)
         apply_conandata_patches(self)
         self._disable_neverbleed_for_ohos_upstream_tests()
+
+    def _verify_bundled_dependencies(self):
+        for dependency in self.conan_data["bundled_dependencies"]:
+            required_file = os.path.join(
+                self.source_folder, dependency["path"], dependency["required_file"]
+            )
+            if not os.path.isfile(required_file):
+                raise ConanInvalidConfiguration(
+                    "H2O source archive is missing the bundled dependency input: "
+                    f"{dependency['path']}/{dependency['required_file']}"
+                )
 
     def _disable_neverbleed_for_ohos_upstream_tests(self):
         """Bypass the target-rejected neverbleed child only in native tests."""
