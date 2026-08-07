@@ -9,7 +9,7 @@
 ## 编译流程概要
 
 ### Phase 1: 初始化 (已完成)
-- ✅ 源码下载: `http://cpan.metacpan.org/authors/id/T/TO/TODDR/Digest-MD5-2.59.tar.gz`
+- ✅ 源码下载: `https://cpan.metacpan.org/authors/id/T/TO/TODDR/Digest-MD5-2.59.tar.gz`
 - ✅ 解压完成
 - ✅ 骨架目录创建
 

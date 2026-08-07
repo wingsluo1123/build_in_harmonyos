@@ -6,8 +6,15 @@ This is a Perl XS module with C extension code (MD5.xs → MD5.c → MD5.so).
 
 Digest::MD5 provides a Perl interface to the RSA MD5 Message-Digest Algorithm
 (RFC 1321). The XS implementation provides high-performance native MD5 hashing.
+
+OHOS adaptation notes:
+- System Perl (5.42.0) is pre-installed at /data/service/hnp/bin/perl
+- Perl's %Config already contains correct cc, ccflags, lddlflags for OHOS
+- ExtUtils::MakeMaker reads %Config automatically, no manual CCFLAGS/LDDLFLAGS needed
+- Digest::base and XSLoader are Perl core modules (no external dependencies)
 """
 import os
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanException
@@ -20,7 +27,8 @@ class PerlDigestMd5Conan(ConanFile):
     description = "Perl interface to the MD-5 algorithm (Digest::MD5 XS module)"
     license = "Artistic-1.0-Perl OR GPL-1.0-or-later"
     homepage = "https://metacpan.org/dist/Digest-MD5"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
+    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
 
@@ -28,7 +36,8 @@ class PerlDigestMd5Conan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # No Conan dependencies — Digest::base and XSLoader are Perl core modules
+        # No Conan dependencies — Perl 5.42.0 is a system tool (not a Conan package)
+        # Digest::base and XSLoader are Perl core modules bundled with Perl
         pass
 
     def layout(self):
@@ -38,6 +47,14 @@ class PerlDigestMd5Conan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def _perl_config(self, key):
+        """Get a value from Perl's Config module."""
+        result = subprocess.run(
+            ["perl", "-MConfig", "-e", f"print $Config{{{key}}}"],
+            capture_output=True, text=True
+        )
+        return result.stdout.strip()
+
     def build(self):
         apply_conandata_patches(self)
 
@@ -46,8 +63,18 @@ class PerlDigestMd5Conan(ConanFile):
             raise ConanException(f"Unsupported OS: {self.settings.os}")
 
         # Perl XS module build: Makefile.PL generates Makefile, then make compiles C/XS code
-        # R1: 参数最少化 — no PREFIX needed, system Perl config has correct CC/LDFLAGS
-        self.run("perl Makefile.PL", cwd=self.source_folder)
+        # ExtUtils::MakeMaker reads Perl's %Config (cc, ccflags, lddlflags) automatically.
+        # On OHOS, system Perl's %Config already has correct compiler/linker settings.
+        # Pass CC and CCFLAGS explicitly from Perl config for cross-environment compatibility.
+        cc = self._perl_config("cc")
+        ccflags = self._perl_config("ccflags")
+        optimize = self._perl_config("optimize")
+
+        # Pass CC and CCFLAGS to Makefile.PL for build reproducibility
+        self.run(
+            f'perl Makefile.PL CC="{cc}" CCFLAGS="{ccflags} {optimize}"',
+            cwd=self.source_folder
+        )
         self.run("make", cwd=self.source_folder)
 
     def package(self):
