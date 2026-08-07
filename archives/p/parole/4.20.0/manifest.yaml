@@ -1,36 +1,63 @@
 software: parole
 version: "4.20.0"
-status: failed
-build_date: "2026-06-05"
+status: built
+build_date: "2026-08-07"
 build_system: meson
 
 source:
   url: "https://github.com/xfce-mirror/parole/archive/refs/tags/parole-4.20.0.tar.gz"
-  sha256: ""
+  sha256: "f44d0c314440da414ab10e6e8681285b8264e9d0f65f9cc47bc748ea93e46836"
   tar_format: tar.gz
 
 build:
   system: meson
-  configure_options: []
+  configure_options:
+    - "-Dtaglib=disabled"
+    - "-Dnotify-plugin=disabled"
+    - "-Dx11=enabled"
+    - "-Dwayland=disabled"
+    - "-Dgtk-doc=false"
+    - "-Dintrospection=false"
   dependencies:
-    - "gtk+-3.0/3.24.38"
-    - "libxfce4ui-2/missing"
-    - "xfconf/missing"
-    - "libnotify/missing"
-    - "taglib/missing"
-    - "dbus-glib-1/0.112"
-    - "gstreamer-1.0/1.28.3"
+    - "glib/2.84.0.1"
+    - "gtk/3.24.38"
+    - "dbus/1.14.10"
+    - "dbus-glib/0.112"
+    - "gstreamer/1.28.3"
+    - "libxfce4util/4.20.0"
+    - "xfconf/4.20.0"
+    - "libxfce4ui/4.20.0"
   cc: clang
   cxx: clang++
 
 patches_applied: []
+
 knowledge_gained:
-  - "parole依赖XFCE桌面环境库(libxfce4ui-2, xfconf)，无预编译包，无法编译"
+  - "parole是XFCE桌面环境的媒体播放器，使用meson构建系统"
+  - "依赖GTK3、GStreamer、D-Bus、dbus-glib和XFCE库(libxfce4ui, libxfce4util, xfconf)"
+  - "可选依赖taglib和libnotify可通过meson选项禁用"
+  - "GTK3(3.24.38)在cmd-pkgs中列出但下载返回404，制品仓中无gtk3包"
+  - "XFCE库(libxfce4ui, libxfce4util, xfconf)在cmd-pkgs和制品仓中均不可用"
+  - "dbus-glib在cmd-pkgs和制品仓中均不可用"
 
 test_results:
   total: 0
   passed: 0
   failed: 0
-  skipped: "configure失败：依赖缺失"
+  skipped: "conan-verify未通过：依赖缺失(gtk3, dbus-glib, libxfce4ui, libxfce4util, xfconf未发布到制品仓)"
 
-failure_reason: "XFCE桌面环境依赖链缺失(libxfce4ui-2, xfconf, libnotify, taglib无预编译包)"
+conan_adaptation:
+  recipe_created: true
+  conanfile_py: true
+  conandata_yml: true
+  test_package: true
+  commands_json: true
+  conan_verify_passed: false
+  missing_dependencies:
+    - "gtk/3.24.38"
+    - "dbus-glib/0.112"
+    - "libxfce4util/4.20.0"
+    - "xfconf/4.20.0"
+    - "libxfce4ui/4.20.0"
+
+failure_reason: "依赖链缺失：GTK3、dbus-glib及XFCE库(libxfce4ui, libxfce4util, xfconf)未发布到制品仓，无法完成conan create构建验证"
