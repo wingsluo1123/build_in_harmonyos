@@ -6,7 +6,7 @@
 #
 # Usage: sh test_maybexs.sh <perl_lib_path>
 
-set -eu
+set -euo pipefail
 
 PERL_LIB="$1"
 
@@ -17,6 +17,7 @@ if [ ! -d "$PERL_LIB" ]; then
 fi
 
 # Find MaybeXS.pm (could be in a subdirectory)
+# `|| true` because find exits non-zero if no match; checked below
 PM_FILE=$(find "$PERL_LIB" -name "MaybeXS.pm" -print -quit 2>/dev/null || true)
 if [ -z "$PM_FILE" ]; then
     echo "ERROR: MaybeXS.pm not found in package" >&2
@@ -54,7 +55,7 @@ RESULT=$(perl -I"$PERL_LIB" -MJSON::MaybeXS=decode_json -e '
 echo "OK: decode_json works: decoded test=$RESULT"
 [ "$RESULT" = "value" ] || { echo "ERROR: decode result mismatch" >&2; exit 1; }
 
-# Test 4: Boolean values (true/false/null)
+# Test 4: Boolean values (true/false) — verify output contains JSON literals
 RESULT=$(perl -I"$PERL_LIB" -MJSON::MaybeXS -e '
     my $json = encode_json({
         enabled => JSON::MaybeXS::true(),
@@ -66,17 +67,22 @@ RESULT=$(perl -I"$PERL_LIB" -MJSON::MaybeXS -e '
     exit 1
 }
 echo "OK: boolean encoding works: $RESULT"
+echo "$RESULT" | grep -q '"enabled":true' || { echo "ERROR: true boolean not found in output" >&2; exit 1; }
+echo "$RESULT" | grep -q '"disabled":false' || { echo "ERROR: false boolean not found in output" >&2; exit 1; }
 
-# Test 5: Unicode support
+# Test 5: Unicode support — encode_json returns UTF-8 bytes directly
+# No need for encode_utf8 wrapper (encode_json already outputs UTF-8)
 RESULT=$(perl -I"$PERL_LIB" -MJSON::MaybeXS=encode_json -e '
-    use Encode qw(encode_utf8);
     my $json = encode_json({name => "\x{5f20}\x{4e09}"});
-    print encode_utf8($json);
+    print $json;
 ' 2>&1) || {
     echo "ERROR: unicode test failed: $RESULT" >&2
     exit 1
 }
-echo "OK: unicode encoding works"
+echo "OK: unicode encoding works: $RESULT"
+# Verify the output contains the Unicode character 张 (U+5F20)
+printf '%s' "$RESULT" | od -A n -t x1 2>/dev/null | grep -q 'e5 bc a0' || \
+    { echo "ERROR: unicode character 张 (U+5F20) not found in output" >&2; exit 1; }
 
 echo ""
 echo "=== All JSON::MaybeXS tests passed ==="
