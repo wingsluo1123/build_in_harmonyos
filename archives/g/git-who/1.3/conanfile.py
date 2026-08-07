@@ -33,23 +33,25 @@ class GitWhoConan(ConanFile):
     generators = "VirtualBuildEnv"
 
     # CI worker 无系统 go（E154: go 不预装），cmd-pkgs 无 go 工具链资产，
-    # go/1.21.13 制品仓无 conanfile 不能 requires → 从官方镜像下载 go SDK
+    # go/1.23.0 制品仓无 conanfile 不能 requires → 从官方镜像下载 go SDK
     # （同 git-town 16.4.1 方案：golang.google.cn 主源 + dl.google.com 兜底）
-    _go_version = "1.21.13"
+    # go.mod 声明 go 1.23：1.21.13 SDK 会触发 go 自动下载 1.23 toolchain（GOPROXY 超时）
+    # → 直接升 SDK 到 1.23.0 匹配 go.mod（本地实证 go version 不再触发 toolchain 下载）
+    _go_version = "1.23.0"
     _go_archives = {
         "amd64": (
             [
-                "https://golang.google.cn/dl/go1.21.13.linux-amd64.tar.gz",
-                "https://dl.google.com/go/go1.21.13.linux-amd64.tar.gz",
+                "https://golang.google.cn/dl/go1.23.0.linux-amd64.tar.gz",
+                "https://dl.google.com/go/go1.23.0.linux-amd64.tar.gz",
             ],
-            "502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7",
+            "905a297f19ead44780548933e0ff1a1b86e8327bb459e92f9c0012569f76f5e3",
         ),
         "arm64": (
             [
-                "https://golang.google.cn/dl/go1.21.13.linux-arm64.tar.gz",
-                "https://dl.google.com/go/go1.21.13.linux-arm64.tar.gz",
+                "https://golang.google.cn/dl/go1.23.0.linux-arm64.tar.gz",
+                "https://dl.google.com/go/go1.23.0.linux-arm64.tar.gz",
             ],
-            "2ca2d70dc9c84feef959eb31f2a5aac33eefd8c97fe48f1548886d737bffabd4",
+            "62788056693009bcf7020eedc778cdd1781941c6145eab7688bd087bce0f8659",
         ),
     }
 
@@ -85,6 +87,10 @@ class GitWhoConan(ConanFile):
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
         # validate() 已确保 settings.arch 是 armv8 或 arm64
         go_arch = "arm64"
+        # go link 需要在 TMPDIR 创建临时文件；CI/本地环境 /tmp 只读
+        # （本地实证：link "mapping output file failed: permission denied"）→ 指到 build_folder 下可写 tmp
+        go_tmpdir = os.path.join(self.build_folder, "go-tmp")
+        os.makedirs(go_tmpdir, exist_ok=True)
         try:
             self.run(
                 f'"{go}" version',
@@ -94,6 +100,7 @@ class GitWhoConan(ConanFile):
                 f"CGO_ENABLED=0 GOOS=linux GOARCH={go_arch} "
                 f"GOROOT={os.path.dirname(os.path.dirname(go))} "
                 f"GOPATH={os.path.join(self.build_folder, 'gopath')} "
+                f"GOTMPDIR={go_tmpdir} "
                 "GOPROXY=https://goproxy.cn,direct "
                 f'"{go}" build -ldflags="-s -w" -o git-who .',
                 cwd=self.source_folder, env="conanbuild",
@@ -145,24 +152,39 @@ class GitWhoConan(ConanFile):
         # E128: Go 生成的二进制为非标准 ELF（SHT_STRTAB 未 null-terminated），
         # binary-sign-tool 直接签名报 "Failed to save 4K data to .codesign section"（CI #14731/#15463）。
         # 必须先 strip 使 ELF 符合标准格式再签名（同 go/1.21.13 适配笔记记载）。
-        # strip 工具不在 PATH 时用绝对路径候选（/data/service/hnp/bin/llvm-strip 等），
-        # 全部缺失则显式 raise（CI #15463: shutil.which 返回 None 被静默跳过导致签名仍失败）
-        strip_tool = (shutil.which("llvm-strip")
-                      or shutil.which("strip")
-                      or "/data/service/hnp/bin/llvm-strip"
-                      or "/usr/bin/strip"
-                      or "/bin/strip")
-        if not os.path.isfile(strip_tool):
+        # 本地实证：llvm-strip/llvm-objcopy 对非标准 SHT_STRTAB 直接报错拒绝（"SHT_STRTAB ...
+        # non-null terminated"），只有 GNU strip 能容忍并修复成标准 ELF（rc=0 输出 stripped）。
+        # 因此优先 GNU strip，llvm-strip 仅作兜底；工具可能在 /data/service/hnp/bin/（非默认 PATH）。
+        # CI #15463: shutil.which 返回 None 时补绝对路径候选，全部缺失显式 raise 避免静默跳过
+        strip_tools = []
+        for candidate_tool in ("strip", "llvm-strip"):
+            found = shutil.which(candidate_tool)
+            if found:
+                strip_tools.append(found)
+        for abs_candidate in ("/data/service/hnp/bin/strip", "/data/service/hnp/bin/llvm-strip",
+                              "/usr/bin/strip", "/bin/strip"):
+            if os.path.isfile(abs_candidate) and abs_candidate not in strip_tools:
+                strip_tools.append(abs_candidate)
+        if not strip_tools:
             raise ConanInvalidConfiguration(
-                f"strip tool not found (tried which llvm-strip/strip + absolute paths), "
+                "strip tool not found (tried which strip/llvm-strip + absolute paths), "
                 "required to normalize Go ELF before OHOS signing"
             )
+        self.output.info(f"git-who strip_tools={strip_tools!r}, {len(candidates)} candidates")
         for candidate in candidates:
             if os.path.isfile(candidate) and self._is_elf(candidate):
-                try:
-                    subprocess.check_call([strip_tool, candidate], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                except Exception as e:
-                    self.output.warning(f"strip failed for {candidate}: {e}, signing as-is")
+                self.output.info(f"git-who strip candidate={candidate} is_elf=True strip_tools={strip_tools!r}")
+                stripped = False
+                for strip_tool in strip_tools:
+                    try:
+                        subprocess.check_call([strip_tool, candidate], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        self.output.info(f"git-who strip OK via {strip_tool}: {candidate}")
+                        stripped = True
+                        break
+                    except Exception as e:
+                        self.output.warning(f"strip via {strip_tool} failed for {candidate} ({e!r})")
+                if not stripped:
+                    self.output.warning(f"no strip tool succeeded for {candidate}, signing as-is")
                 self._sign_elf_if_ohos(candidate)
         with open(marker, "w", encoding="utf-8") as f:
             f.write("signed\n")
