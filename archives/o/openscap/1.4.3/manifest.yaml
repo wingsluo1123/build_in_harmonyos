@@ -1,77 +1,52 @@
 software: openscap
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.4.3/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "1.4.3"
-
-# 编译状态
-# published | built | failed | archived
-status: published
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-21"
-
-# ============================================================
-# 源码信息
-# ============================================================
+status: built
+build_date: "2026-08-07"
+build_system: cmake
 
 source:
-  # 源码下载 URL
   url: "https://github.com/OpenSCAP/openscap/archive/refs/tags/1.4.3.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "858799e405b58c662a6f32df02fe216ac1a88b7e372d4461ee9bb17875c68f10"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  system: cmake
+  configure_options:
+    - "-DENABLE_PROBES_LINUX=ON"
+    - "-DENABLE_PROBES_UNIX=ON"
+    - "-DENABLE_TESTS=OFF"
+    - "-DENABLE_OSCAP_UTIL_DOCKER=OFF"
+  dependencies:
+    - "pcre2/10.45.1"
+    - "libxslt/1.1.45.1"
+    - "xmlsec1/1.3.11"
+    - "bzip2/1.0.8"
+    - "libcurl/8.5.0"
+    - "libgcrypt/1.12.2"
+    - "libgpg-error/1.55"
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-compat-CMakeLists.txt.patch"
+  - "0003-src-OVAL-CMakeLists.txt.patch"
+  - "0004-src-OVAL-fts_sun.c.patch"
+  - "0005-src-OVAL-probes-SEAP-sch_queue.c.patch"
+  - "0006-src-OVAL-probes-crapi-CMakeLists.txt.patch"
+  - "0007-src-OVAL-probes-oval_fts.c.patch"
+  - "0008-src-OVAL-probes-oval_fts.h.patch"
+  - "0009-src-OVAL-probes-probe-icache.c.patch"
+  - "0010-src-OVAL-probes-probe-input_handler.c.patch"
+  - "0011-src-OVAL-probes-probe-probe_main.c.patch"
+  - "0012-src-OVAL-probes-probe-worker.c.patch"
+  - "0013-src-OVAL-probes-unix-password_probe.c.patch"
+  - "0014-src-OVAL-probes-unix-shadow_probe.c.patch"
+  - "0015-src-common-debug.c.patch"
 
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "HarmonyOS lacks fts.h, use fts_sun.h fallback with __OHOS__ guard"
+  - "CMake IS_UNIX variable is FALSE on HarmonyOS, need HarmonyOS detection"
+  - "HarmonyOS lacks fgetpwent/fgetspent/getspent/endspent, provide compat implementations"
+  - "pthread_cancel not supported on HarmonyOS, use no-op stubs"
+  - "CMake built-in UNIX variable is FALSE on HarmonyOS (CMAKE_SYSTEM_NAME=HarmonyOS)"

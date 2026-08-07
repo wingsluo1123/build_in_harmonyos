@@ -1,0 +1,82 @@
+--- a/src/OVAL/probes/unix/shadow_probe.c
++++ b/src/OVAL/probes/unix/shadow_probe.c
+@@ -70,20 +70,79 @@
+ 
+ 	item_sexp = probe_item_create(OVAL_UNIX_SHADOW, NULL, NULL);
+         probe_item_setstatus (item_sexp, SYSCHAR_STATUS_NOT_COLLECTED);
+         probe_item_collect(ctx, item_sexp);
+ 
+         return 0;
+ }
+ #else
+ /* shadow.h is present */
+ #include <shadow.h>
++
++#ifdef __OHOS__
++/* HarmonyOS has shadow.h but doesn't provide fgetspent/getspent/endspent */
++static FILE *__ohos_shadow_fp = NULL;
++
++static struct spwd *__ohos_parse_spwd(char *line)
++{
++	static struct spwd sp;
++	static char buf[1024];
++	char *fields[9];
++	int n = 0;
++	char *saveptr;
++	char *tok = strtok_r(line, ":", &saveptr);
++	while (tok && n < 9) {
++		fields[n++] = tok;
++		tok = strtok_r(NULL, ":", &saveptr);
++	}
++	if (n < 2)
++		return NULL;
++	sp.sp_namp = fields[0];
++	sp.sp_pwdp = fields[1];
++	sp.sp_lstchg = (n > 2 && fields[2][0]) ? strtol(fields[2], NULL, 10) : -1;
++	sp.sp_min = (n > 3 && fields[3][0]) ? strtol(fields[3], NULL, 10) : -1;
++	sp.sp_max = (n > 4 && fields[4][0]) ? strtol(fields[4], NULL, 10) : -1;
++	sp.sp_warn = (n > 5 && fields[5][0]) ? strtol(fields[5], NULL, 10) : -1;
++	sp.sp_inact = (n > 6 && fields[6][0]) ? strtol(fields[6], NULL, 10) : -1;
++	sp.sp_expire = (n > 7 && fields[7][0]) ? strtol(fields[7], NULL, 10) : -1;
++	sp.sp_flag = (n > 8 && fields[8][0]) ? strtoul(fields[8], NULL, 10) : (unsigned long)-1;
++	return &sp;
++}
++
++struct spwd *fgetspent(FILE *fp)
++{
++	static char line[1024];
++	if (fgets(line, sizeof(line), fp) == NULL)
++		return NULL;
++	char *nl = strchr(line, '\n');
++	if (nl) *nl = '\0';
++	return __ohos_parse_spwd(line);
++}
++
++struct spwd *getspent(void)
++{
++	if (__ohos_shadow_fp == NULL) {
++		__ohos_shadow_fp = fopen("/etc/shadow", "r");
++		if (__ohos_shadow_fp == NULL)
++			return NULL;
++	}
++	return fgetspent(__ohos_shadow_fp);
++}
++
++void endspent(void)
++{
++	if (__ohos_shadow_fp) {
++		fclose(__ohos_shadow_fp);
++		__ohos_shadow_fp = NULL;
++	}
++}
++#endif
+ 
+ static oval_schema_version_t over;
+ 
+ /* Convenience structure for the results being reported */
+ struct result_info {
+         const char *username;
+         const char *password;
+         long chg_lst;
+         long chg_allow;
+         long chg_req;

@@ -1,0 +1,141 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -139,30 +139,88 @@
+ 	check_library_exists("${RPM_LIBRARY}" rpmFreeFilesystems "" HAVE_RPMFREEFILESYSTEMS)
+ 	check_library_exists("${RPM_LIBRARY}" rpmVerifyFile "" HAVE_RPMVERIFYFILE)
+ 	set(HAVE_RPMVERCMP 1)
+ 	include_directories("${RPM_INCLUDE_DIRS}")
+ endif()
+ 
+ find_package(SELinux)
+ find_package(SWIG)
+ find_package(LibXml2 REQUIRED)
+ find_package(LibXslt REQUIRED)
+-find_package(XMLSEC REQUIRED)
++find_package(xmlsec1 CONFIG REQUIRED)
+ if (APPLE)
+ 	set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl/")
+ endif()
+ find_package(OpenSSL REQUIRED)
+ add_definitions(${XMLSEC_DEFINITIONS})
+-if (WIN32)
+-	add_compile_definitions("XMLSEC_CRYPTO_OPENSSL")
+-endif()
++add_compile_definitions("XMLSEC_CRYPTO_OPENSSL")
+ find_package(BZip2)
++
++# Bridge conan CMakeDeps targets to old-style variables used by openscap
++if(TARGET pcre2::pcre2-8)
++    set(PCRE2_INCLUDE_DIRS ${pcre2_INCLUDE_DIRS})
++    set(PCRE2_LIBRARIES pcre2::pcre2-8)
++    set(PCRE2_FOUND TRUE)
++endif()
++if(TARGET LibXml2::LibXml2)
++    set(LIBXML2_INCLUDE_DIR ${LibXml2_INCLUDE_DIRS})
++    set(LIBXML2_LIBRARIES LibXml2::LibXml2)
++    set(LIBXML2_FOUND TRUE)
++endif()
++if(TARGET LibXslt::LibXslt)
++    set(LIBXSLT_INCLUDE_DIR ${LibXslt_INCLUDE_DIRS})
++    set(LIBXSLT_LIBRARIES LibXslt::LibXslt)
++    set(LIBXSLT_EXSLT_LIBRARIES "")
++    set(LIBXSLT_FOUND TRUE)
++endif()
++if(TARGET xmlsec1::xmlsec1)
++    set(XMLSEC_INCLUDE_DIRS ${xmlsec1_INCLUDE_DIRS})
++    set(XMLSEC_LIBRARIES xmlsec1::xmlsec1)
++    set(XMLSEC_FOUND TRUE)
++    set(XMLSEC_DEFINITIONS "")
++endif()
++if(TARGET openssl::openssl)
++    set(OPENSSL_INCLUDE_DIR ${openssl_INCLUDE_DIRS})
++    set(OPENSSL_LIBRARIES openssl::openssl)
++    set(OPENSSL_FOUND TRUE)
++endif()
++if(TARGET bzip2::bzip2)
++    set(BZIP2_LIBRARIES bzip2::bzip2)
++    set(BZIP2_INCLUDE_DIR ${bzip2_INCLUDE_DIRS})
++    set(BZIP2_FOUND TRUE)
++    set(BZip2_FOUND TRUE)
++endif()
++# Clear NOTFOUND variables for optional packages not found
++if(NOT CURL_FOUND)
++    set(CURL_LIBRARIES "")
++    set(CURL_LIBRARY "")
++    set(CURL_INCLUDE_DIR "")
++endif()
++if(TARGET CURL::libcurl)
++    set(CURL_LIBRARIES CURL::libcurl)
++    set(CURL_INCLUDE_DIR ${CURL_INCLUDE_DIRS})
++    set(CURL_FOUND TRUE)
++    set(CURL_LIBRARY CURL::libcurl)
++endif()
++if(TARGET libgcrypt::libgcrypt)
++    set(GCRYPT_LIBRARIES libgcrypt::libgcrypt)
++    set(GCRYPT_INCLUDE_DIRS ${libgcrypt_INCLUDE_DIRS})
++    set(GCRYPT_FOUND TRUE)
++endif()
++if(NOT TARGET libgcrypt::libgcrypt)
++    find_package(libgcrypt CONFIG QUIET)
++    if(TARGET libgcrypt::libgcrypt)
++        set(GCRYPT_LIBRARIES libgcrypt::libgcrypt)
++        set(GCRYPT_INCLUDE_DIRS ${libgcrypt_INCLUDE_DIRS})
++        set(GCRYPT_FOUND TRUE)
++    endif()
++endif()
+ 
+ # PThread
+ if (WIN32)
+ 	find_package(ZLIB REQUIRED)
+ endif()
+ 
+ if (WIN32 AND NOT MINGW)
+ 	find_package(pthread CONFIG REQUIRED)
+ 	set(CMAKE_THREAD_LIBS_INIT ${PThreads4W_LIBRARY})
+ else()
+@@ -237,21 +295,21 @@
+ 	option(ENABLE_SCE "enables Script Check Engine - an alternative checking engine that lets you use executables instead of OVAL for checks" ON)
+ endif()
+ 
+ # ---------- OVAL FEATURE SWITCHES
+ 
+ option(ENABLE_PROBES "build OVAL probes - each probe implements an OVAL test" TRUE)
+ set(SEAP_MSGID_BITS 32 CACHE STRING "Size of SEAP_msgid_t in bits [32|64]")
+ cmake_dependent_option(ENABLE_PROBES_INDEPENDENT "build OVAL probes for independent (cross platform) OVAL tests" ON "ENABLE_PROBES" OFF)
+ # On some platforms (Windows..) UNIX ends up being empty instead of "false"
+ set(IS_UNIX FALSE)
+-if (UNIX)
++if (UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+     set(IS_UNIX TRUE)
+ endif()
+ cmake_dependent_option(ENABLE_PROBES_UNIX "build OVAL probes for the UNIX OVAL tests" ${IS_UNIX} "ENABLE_PROBES" OFF)
+ string(COMPARE EQUAL ${CMAKE_SYSTEM_NAME} "Linux" IS_LINUX)
+ cmake_dependent_option(ENABLE_PROBES_LINUX "build OVAL probes for the Linux OVAL tests" ${IS_LINUX} "ENABLE_PROBES" OFF)
+ string(COMPARE EQUAL ${CMAKE_SYSTEM_NAME} "Solaris" IS_SOLARIS)
+ cmake_dependent_option(ENABLE_PROBES_SOLARIS "build OVAL probes for the Solaris OVAL tests" ${IS_SOLARIS} "ENABLE_PROBES" OFF)
+ set(IS_WIN32 FALSE)
+ if (WIN32)
+     set(IS_WIN32 TRUE)
+@@ -569,20 +627,22 @@
+ 	"src/XCCDF_POLICY/"
+ 	"src/XCCDF_POLICY/public/"
+ 	"yaml-filter/src/"
+ 	${CMAKE_BINARY_DIR} # config.h is generated to build directory
+ 	# Required dependencies include dirs can be added inconditionally
+ 	${LIBXML2_INCLUDE_DIR}
+ 	${XMLSEC_INCLUDE_DIRS}
+ 	${LIBXSLT_INCLUDE_DIR}
+ 	${OPENSSL_INCLUDE_DIR}
+ 	${PCRE2_INCLUDE_DIRS}
++	${CURL_INCLUDE_DIR}
++	${BZIP2_INCLUDE_DIR}
+ )
+ 
+ if (GCRYPT_FOUND)
+ 	include_directories("${GCRYPT_INCLUDE_DIRS}")
+ endif()
+ 
+ if (POPT_FOUND)
+ 	include_directories("${POPT_INCLUDE_DIRS}")
+ endif()
+ 
