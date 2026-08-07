@@ -51,12 +51,35 @@ int main(int argc, char *argv[]) {
 
     /* Read section header string table */
     Elf64_Shdr shstrtab_shdr;
-    fseek(f, ehdr.e_shoff + ehdr.e_shstrndx * sizeof(Elf64_Shdr), SEEK_SET);
-    fread(&shstrtab_shdr, sizeof(shstrtab_shdr), 1, f);
+    if (fseek(f, ehdr.e_shoff + ehdr.e_shstrndx * sizeof(Elf64_Shdr), SEEK_SET) != 0) {
+        fprintf(stderr, "FAIL: Cannot seek to section header string table\n");
+        fclose(f);
+        return 1;
+    }
+    if (fread(&shstrtab_shdr, sizeof(shstrtab_shdr), 1, f) != 1) {
+        fprintf(stderr, "FAIL: Cannot read section header string table entry\n");
+        fclose(f);
+        return 1;
+    }
 
     char *shstrtab = malloc(shstrtab_shdr.sh_size);
-    fseek(f, shstrtab_shdr.sh_offset, SEEK_SET);
-    fread(shstrtab, shstrtab_shdr.sh_size, 1, f);
+    if (!shstrtab) {
+        fprintf(stderr, "FAIL: Cannot allocate shstrtab (%zu bytes)\n", shstrtab_shdr.sh_size);
+        fclose(f);
+        return 1;
+    }
+    if (fseek(f, shstrtab_shdr.sh_offset, SEEK_SET) != 0) {
+        fprintf(stderr, "FAIL: Cannot seek to shstrtab data\n");
+        free(shstrtab);
+        fclose(f);
+        return 1;
+    }
+    if (fread(shstrtab, shstrtab_shdr.sh_size, 1, f) != 1) {
+        fprintf(stderr, "FAIL: Cannot read shstrtab data\n");
+        free(shstrtab);
+        fclose(f);
+        return 1;
+    }
 
     /* Find .dynsym and .dynstr sections */
     Elf64_Shdr dynsym_shdr, dynstr_shdr;
@@ -64,8 +87,18 @@ int main(int argc, char *argv[]) {
 
     Elf64_Shdr shdr;
     for (int i = 0; i < ehdr.e_shnum; i++) {
-        fseek(f, ehdr.e_shoff + i * sizeof(Elf64_Shdr), SEEK_SET);
-        fread(&shdr, sizeof(shdr), 1, f);
+        if (fseek(f, ehdr.e_shoff + i * sizeof(Elf64_Shdr), SEEK_SET) != 0) {
+            fprintf(stderr, "FAIL: Cannot seek to section header %d\n", i);
+            free(shstrtab);
+            fclose(f);
+            return 1;
+        }
+        if (fread(&shdr, sizeof(shdr), 1, f) != 1) {
+            fprintf(stderr, "FAIL: Cannot read section header %d\n", i);
+            free(shstrtab);
+            fclose(f);
+            return 1;
+        }
         char *secname = shstrtab + shdr.sh_name;
         if (strcmp(secname, ".dynsym") == 0) {
             dynsym_shdr = shdr;
@@ -86,13 +119,35 @@ int main(int argc, char *argv[]) {
 
     /* Read dynamic string table */
     char *dynstr = malloc(dynstr_shdr.sh_size);
-    fseek(f, dynstr_shdr.sh_offset, SEEK_SET);
-    fread(dynstr, dynstr_shdr.sh_size, 1, f);
+    if (!dynstr) {
+        fprintf(stderr, "FAIL: Cannot allocate dynstr (%zu bytes)\n", dynstr_shdr.sh_size);
+        free(shstrtab);
+        fclose(f);
+        return 1;
+    }
+    if (fseek(f, dynstr_shdr.sh_offset, SEEK_SET) != 0 ||
+        fread(dynstr, dynstr_shdr.sh_size, 1, f) != 1) {
+        fprintf(stderr, "FAIL: Cannot read dynstr data\n");
+        free(shstrtab); free(dynstr);
+        fclose(f);
+        return 1;
+    }
 
     /* Read dynamic symbol table and search for expected symbols */
     Elf64_Sym *dynsym = malloc(dynsym_shdr.sh_size);
-    fseek(f, dynsym_shdr.sh_offset, SEEK_SET);
-    fread(dynsym, dynsym_shdr.sh_size, 1, f);
+    if (!dynsym) {
+        fprintf(stderr, "FAIL: Cannot allocate dynsym (%zu bytes)\n", dynsym_shdr.sh_size);
+        free(shstrtab); free(dynstr);
+        fclose(f);
+        return 1;
+    }
+    if (fseek(f, dynsym_shdr.sh_offset, SEEK_SET) != 0 ||
+        fread(dynsym, dynsym_shdr.sh_size, 1, f) != 1) {
+        fprintf(stderr, "FAIL: Cannot read dynsym data\n");
+        free(shstrtab); free(dynstr); free(dynsym);
+        fclose(f);
+        return 1;
+    }
     int nsyms = dynsym_shdr.sh_size / sizeof(Elf64_Sym);
 
     int found_magic = 0, found_encode = 0, found_decode = 0;
