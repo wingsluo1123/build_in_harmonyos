@@ -1,5 +1,4 @@
 diff --git a/Makefile b/Makefile
-index fc4aa88..8c50400 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -1,5 +1,9 @@
@@ -12,13 +11,23 @@ index fc4aa88..8c50400 100644
  # Web page: http://the.sunnyspot.org/gimp/
  #
  # This program is free software; you can redistribute it and/or modify
-@@ -14,21 +18,29 @@
- #
- # You should have received a copy of the GNU General Public License
+@@ -16,19 +20,27 @@
  # along with this program; if not, write to the Free Software
--# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
-+
+ # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ 
+-CC				= gcc
+-CDEBUG		= $(DEBUG) -g #-DDEBUG
+-CCFLAGS		= -Wall -Wstrict-prototypes -Wmissing-declarations -I. $(CDEBUG)
+-CLIBS			=
+-SOURCES		= $(wildcard *.c)
+-
+-OBJDIR		= .obj
+-BINDIR		=	/usr/bin
+-CFLAGS		= $(CCFLAGS) $(shell $(BINDIR)/glib-config --cflags)
+-LIBS			= $(CLIBS) $(shell $(BINDIR)/glib-config --libs)
+-DESTS			= $(addprefix $(OBJDIR)/, $(SOURCES:.c=.o))
+-BIN				= abr2gbr
+-DEPEND		= $(OBJDIR)/.depend
 +CC ?= gcc
 +CDEBUG = $(DEBUG) -g
 +CCFLAGS = -Wall -Wstrict-prototypes -Wmissing-declarations -I. $(CDEBUG)
@@ -27,24 +36,12 @@ index fc4aa88..8c50400 100644
 +
 +OBJDIR = .obj
 +BINDIR = /usr/bin
- 
--CC				= gcc
--CDEBUG		= $(DEBUG) -g #-DDEBUG
--CCFLAGS		= -Wall -Wstrict-prototypes -Wmissing-declarations -I. $(CDEBUG)
--CLIBS			=
--SOURCES		= $(wildcard *.c)
++
 +# Honor environment overrides for cross-compilation (Conan).
 +# GLIB_CFLAGS / GLIB_LIBS may be passed in; otherwise fall back to pkg-config.
 +GLIB_CFLAGS ?= $(shell pkg-config --cflags glib-2.0 2>/dev/null)
 +GLIB_LIBS ?= $(shell pkg-config --libs glib-2.0 2>/dev/null)
- 
--OBJDIR		= .obj
--BINDIR		=	/usr/bin
--CFLAGS		= $(CCFLAGS) $(shell $(BINDIR)/glib-config --cflags)
--LIBS			= $(CLIBS) $(shell $(BINDIR)/glib-config --libs)
--DESTS			= $(addprefix $(OBJDIR)/, $(SOURCES:.c=.o))
--BIN				= abr2gbr
--DEPEND		= $(OBJDIR)/.depend
++
 +BIN = abr2gbr
 +DESTS = $(addprefix $(OBJDIR)/, $(SOURCES:.c=.o))
 +DEPEND = $(OBJDIR)/.depend
@@ -55,16 +52,17 @@ index fc4aa88..8c50400 100644
  
  
  default: all
-@@ -40,21 +52,26 @@ $(OBJDIR):
+@@ -38,23 +50,24 @@
+ 	if [ ! -d $@ ]; then mkdir $@; fi
  
- all: $(OBJDIR) $(OBJDIR)/$(BIN)
+ 
+-all: $(OBJDIR) $(OBJDIR)/$(BIN)
++all: $(OBJDIR) $(OBJDIR)/$(BIN) $(BIN)
  
 -$(OBJDIR)/%.o: %.c
-+
 +$(OBJDIR)/%.o: %.c | $(OBJDIR)
  	$(CC) -o $@ $(CFLAGS) -c $<
  
-+
 +abr2gbr: $(OBJDIR)/$(BIN)
 +	cp -f $(OBJDIR)/$(BIN) abr2gbr
 +	ln -sf $(OBJDIR)/$(BIN) jbr2gbr
@@ -77,23 +75,13 @@ index fc4aa88..8c50400 100644
 -		ln -s $(OBJDIR)/$(BIN) jbr2gbr; \
 -	fi
 +	$(CC) -o $@ $(LDFLAGS) $(CFLAGS) $(LIBS) $(DESTS)
-+
  
  dep depend:
  	$(CC) $(CFLAGS) -M $(SOURCES) > $(DEPEND)
  
-+
  install: $(BIN)
 -	strip $(BIN)
 +	@echo "Install handled by Conan package step"
  
  
  clean:
-@@ -64,6 +80,7 @@ clean:
- 		font_selection jbr2gbr
- 	-rmdir $(OBJDIR)
- 
-+
- cleandests:
- 	-rm -f core $(DESTS)
- 
