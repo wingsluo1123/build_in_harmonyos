@@ -2,62 +2,98 @@
 
 ## 编译环境
 - 平台: aarch64-linux-ohos (鸿蒙)
-- 编译器: clang++ (OHOS SDK)
-- Qt5版本: 5.15.2 (已安装在 ~/usr/local/Qt5/)
-- 构建系统: qmake
+- 编译器: clang++ (OHOS SDK, clang 15.0.4)
+- Qt5版本: 5.15.2
+- 构建系统: qmake (Qt5 addon module)
 
 ## 依赖
 - qt5-qtbase 5.15.2 (Qt Core, Gui, Widgets, Network)
+  - 远程制品仓中 qt5-qtbase/5.15.2 使用 `-no-widgets` 构建，缺少 Qt5Widgets 模块
+  - 本地归档 qt5-qtbase/5.15.2.1 包含完整 Widgets 支持但未发布到制品仓
 - qt5-qtdeclarative 5.15.2 (Qml, Quick, QmlModels)
+  - 制品仓中不存在 qt5-qtdeclarative/5.15.2
+  - 本地归档中也不存在 qt5-qtdeclarative 的任何版本
+
+## 源码结构
+```
+qtcharts-everywhere-src-5.15.2/
+├── qtcharts.pro          # 主项目文件
+├── .qmake.conf           # 模块版本配置 (MODULE_VERSION = 5.15.2)
+├── src/
+│   ├── src.pro           # 子目录: charts + chartsqml2
+│   ├── charts/           # C++ 图表库 (libQt5Charts.so)
+│   └── chartsqml2/       # QML 插件 (libqtchartsqml2.so, 需要 Qt5Quick)
+├── include/              # 头文件
+├── tests/                # 自动测试
+├── examples/             # 示例
+└── plugins/              # 插件
+```
+
+### qtcharts.pro 依赖检查
+```qmake
+requires(qtHaveModule(widgets))     # 必须有 Qt5Widgets
+qtHaveModule(quick) {              # 可选: 如果有 Qt5Quick 才构建 QML 插件
+    SUBDIRS += chartsqml2
+}
+```
 
 ## 编译步骤
 
-### 1. 设置环境
+### 1. 设置环境（使用 Conan 提供的 qt5-qtbase）
 ```bash
-export PATH=/storage/Users/currentUser/usr/local/Qt5/bin:$PATH
-export QTDIR=/storage/Users/currentUser/usr/local/Qt5
+QT5_BASE=<conan_package_folder>/p
+export PATH="$QT5_BASE/bin:$PATH"
+export QTDIR="$QT5_BASE"
+export LD_LIBRARY_PATH="$QT5_BASE/lib:$LD_LIBRARY_PATH"
 ```
 
-### 2. qmake配置
+### 2. qmake 配置
 ```bash
-cd ~/tmp/qt5-qtcharts-src
-/storage/Users/currentUser/usr/local/Qt5/bin/qmake qtcharts.pro
+$QT5_BASE/bin/qmake qtcharts.pro
 ```
-成功，生成了.qmake.stash和.qmake.cache文件。
+- 需要修复 qt5-qtbase 包的 .pri 文件中的硬编码路径（指向已删除的 build 目录）
+- 创建符号链接: build_path → package_folder
 
 ### 3. 编译
 ```bash
 make -j2
 ```
-成功完成，耗时约478秒。有一个deprecation warning（createTextureFromId -> createTextureFromNativeObject），不影响编译。
+- 当 qt5-qtbase/5.15.2 缺少 Widgets 时，qmake 输出 "Some of the required modules (qtHaveModule(widgets)) are not available." 并跳过构建
 
-### 4. 安装
-```bash
-make install
+## 阻塞原因
+
+### 依赖缺失
+1. **qt5-qtdeclarative/5.15.2**: 制品仓中完全不存在
+2. **Qt5Widgets 模块**: qt5-qtbase/5.15.2 制品使用 `-no-widgets` 构建
+
+### Conan 配方验证 (conan-verify G2)
 ```
-安装到 ~/usr/local/Qt5/，包括：
-- libQt5Charts.so.5.15.2 (1669192 bytes, stripped)
-- libQt5Charts.prl, libQt5Charts.la
-- Qt5Charts.pc (pkgconfig)
-- Qt5Charts headers (include/QtCharts/)
-- qt_lib_charts.pri, qt_lib_charts_private.pri
-- Qt5Charts cmake config
-- QML plugin: qml/QtCharts/libqtchartsqml2.so
-- QML types: qml/QtCharts/plugins.qmltypes, qmldir
-- Designer QML files
+ERROR: Package 'qt5-qtdeclarative/5.15.2' not resolved:
+  Unable to find 'qt5-qtdeclarative/5.15.2' in remotes.
+  Required by 'qt5-qtcharts/5.15.2@ohpcd/stable'
+```
 
-## 安装产物验证
-- `file libQt5Charts.so.5.15.2`: ELF 64-bit LSB shared object, ARM aarch64, dynamically linked, stripped ✅
-- 所有头文件正确安装 ✅
-- pkgconfig文件正确安装 ✅
-- QML插件正确安装 ✅
+### 本地 CI 模拟 (W3)
+```
+[fail] qt5-qtcharts/5.15.2 — conan create failed
+[hint] 依赖包未构建, 请先提交依赖包的 PR 并等待 CI 通过
+```
 
-## 无源码修改
-本次编译无需修改任何源码，直接使用原始git clone的v5.15.2源码即可编译通过。
+## 解决方案
+1. 先适配并发布 qt5-qtdeclarative/5.15.2 到制品仓
+2. 发布 qt5-qtbase/5.15.2.1 (包含 Widgets 模块) 到制品仓
+3. 依赖发布后，重新运行 conan-verify 验证 qt5-qtcharts 配方
+
+## Conan 配方
+- conanfile.py: 已创建，正确声明 qt5-qtbase/5.15.2 和 qt5-qtdeclarative/5.15.2 依赖
+- conandata.yml: 已配置官方源码 URL 和 sha256
+- test_package/: 已创建 CMake-based 测试，验证 Qt5Charts 库链接
 
 ## 编译结束
-**最终状态**: built
+**最终状态**: failed (dependency_missing)
+**缺失依赖**: qt5-qtdeclarative/5.15.2, qt5-qtbase (with Widgets)
+
 ---
 
-**编译结束**: 2026-05-31 03:37
-**最终状态**: built
+**编译结束**: 2026-08-08
+**最终状态**: failed (dependency_missing)
