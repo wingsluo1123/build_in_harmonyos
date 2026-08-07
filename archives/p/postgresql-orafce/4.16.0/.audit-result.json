@@ -1,0 +1,110 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-5",
+      "file": "archives/p/postgresql-orafce/4.16.0/conanfile.py",
+      "line": 23,
+      "description": "Template placeholder 'url = \"\"  # CI fills this' not filled. Code style rule CS-5 explicitly prohibits 'url = \"\"  # CI fills this' in merged code — it is considered unfinished. The url attribute should be set to the recipe repository URL by the adapter.",
+      "fix_suggestion": "Set url to the Conan recipe repository URL (e.g., the cnb.cool制品仓 archive path), or remove the placeholder comment and set url to the upstream repository URL."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R39",
+      "file": "archives/p/postgresql-orafce/4.16.0/conandata.yml",
+      "line": 6,
+      "description": "First source URL manually includes gh-proxy.com mirror prefix (https://gh-proxy.com/https://github.com/...). Rule R39 states: 'CI 会自动为 GitHub URL 添加镜像 fallback（gh-proxy/ghproxy/gitclone/moeyy/kkgithub），因此 conandata.yml 中只需写官方原始 URL，不要手动加镜像前缀.' The conandata.yml should only contain the official GitHub URL; CI handles mirror fallbacks automatically.",
+      "fix_suggestion": "Remove the first URL entry (the gh-proxy.com one). Keep only the official URL: https://github.com/orafce/orafce/archive/refs/tags/VERSION_4_16_0.tar.gz. CI will automatically add mirror fallbacks at build time."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/p/postgresql-orafce/4.16.0/manifest.yaml",
+      "line": 29,
+      "description": "manifest.yaml source.sha256 is empty (sha256: \"\"). While conandata.yml has the correct hash (cee32bf74063e17219c7ac8cbe855c849fb3d7cff7591449aa22d06cbeaef854), the manifest cannot verify source integrity with an empty checksum. This is an incomplete manifest field.",
+      "fix_suggestion": "Copy the sha256 from conandata.yml: sha256: \"cee32bf74063e17219c7ac8cbe855c849fb3d7cff7591449aa22d06cbeaef854\""
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/p/postgresql-orafce/4.16.0/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml uses 'software:' as the top-level field name for the package name, but code style standard CS-14 specifies 'name:' for this field (example: name: zlib).",
+      "fix_suggestion": "Rename 'software:' to 'name:' to match the manifest convention specified in CS-14."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/p/postgresql-orafce/4.16.0/manifest.yaml",
+      "line": 42,
+      "description": "manifest.yaml uses nested 'build.system' with value 'custom'. Code style standard CS-14 specifies a flat field 'build_system' with allowed values: cmake | autotools | makefile | meson. The nested structure and 'custom' value deviate from the standard. PGXS is fundamentally a Makefile-based system.",
+      "fix_suggestion": "Use 'build_system: makefile' (PGXS uses Makefile internally) to match the standard field name and value list, or extend the spec to formally include 'custom' as an allowed value."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-11",
+      "file": "archives/p/postgresql-orafce/4.16.0/test_package/MANIFEST.yml",
+      "line": 31,
+      "description": "assertion_count is declared as 5, but test_package/conanfile.py contains 8 actual assert statements: (1) orafce.so file exists, (2) ELF magic bytes, (3) ELF class 64-bit, (4) orafce.control file exists, (5) control content mentions 'orafce', (6) orafce--4.16.sql exists, (7) SQL file count > 0, (8) .so size > 100KB. The declared count does not match reality.",
+      "fix_suggestion": "Update assertion_count to 8 to accurately reflect the number of assertions in test_package/conanfile.py."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R33",
+      "file": "archives/p/postgresql-orafce/4.16.0/conanfile.py",
+      "line": 49,
+      "description": "Direct os.environ['PATH'] manipulation in _ensure_pg_config(). Rule R33 prohibits bare shell environment variable manipulation because it may silently fail on release workers where the expected paths differ. While this is PATH manipulation (not CC/CXX), the spirit of R33 is to avoid direct os.environ usage for build configuration.",
+      "fix_suggestion": "Consider using Conan's build_requires or toolchain mechanism to locate pg_config, or at minimum add explicit error handling (raise ConanException) if pg_config cannot be found in any searched path."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R33",
+      "file": "archives/p/postgresql-orafce/4.16.0/manifest.yaml",
+      "line": 46,
+      "description": "manifest.yaml configure_options lists 'CC=clang' (line 46) and manifest declares cc: clang (line 53), but conanfile.py does not set CC=clang anywhere. The build relies on pg_config to determine the compiler, which may differ from the documented clang on different systems. notes.md (line 14) documents 'export CC=clang && make -j1' as the manual build command, but the recipe does not replicate this.",
+      "fix_suggestion": "Either set CC in the conanfile.py build() method (e.g., via make environment or os.environ with explicit handling), or update the manifest to reflect that the compiler is determined by pg_config rather than explicitly set."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "DOC",
+      "file": "archives/p/postgresql-orafce/4.16.0/notes.md",
+      "line": 5,
+      "description": "Build date inconsistency: notes.md line 5 states '编译日期: 2026-06-02' but the same file ends with '编译结束: 2026-08-08 01:29' (line 75) and manifest.yaml build_date is '2026-08-08' (line 18). The June date appears to be a leftover from an earlier build attempt.",
+      "fix_suggestion": "Correct the build date on line 5 to '2026-08-02' or '2026-08-08' to match the manifest build_date and the ending timestamp."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-2",
+      "file": "archives/p/postgresql-orafce/4.16.0/conanfile.py",
+      "line": 25,
+      "description": "package_type is 'shared-library' but project convention CS-2 specifies 'library' for library packages ('库=\"library\"'). While 'shared-library' is a valid Conan 2.x package_type and arguably more precise for a .so extension, it deviates from the project standard.",
+      "fix_suggestion": "Consider using package_type = \"library\" to match the project convention, or document this as an accepted deviation since orafce is specifically a shared library."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "DOC",
+      "file": "archives/p/postgresql-orafce/4.16.0/conanfile.py",
+      "line": 58,
+      "description": "Comment '# R9: Always use -j1' references rule R9, but in the review rules R9 is about '跳过测试 / 伪造通过' (skipping/faking tests), not about build parallelism. The rule reference is misleading and may confuse future maintainers.",
+      "fix_suggestion": "Remove the incorrect 'R9' reference or replace it with the correct rule number if a parallelism rule exists, or simply describe the rationale: '# Use -j1: PGXS does not support parallel builds'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/p/postgresql-orafce/4.16.0/test_package/conanfile.py",
+      "line": 46,
+      "description": "The dlopen test (lines 46-53) catches OSError silently and only logs an info message. The test passes even if the shared library cannot be loaded. While the comment explains this is 'expected on non-PostgreSQL systems', it weakens the test's ability to verify actual loadability. The _PG_init symbol check (line 49) only runs if dlopen succeeds.",
+      "fix_suggestion": "Consider making dlopen a hard assertion on Linux/OHOS where the library should be loadable (it only depends on libc), or at minimum assert that the OSError is specifically about unresolved symbols rather than a fundamental load failure."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "DOC",
+      "file": "archives/p/postgresql-orafce/4.16.0/conanfile.py",
+      "line": 38,
+      "description": "_ensure_pg_config() silently returns if pg_config is not found in any searched path (lines 38-50). No error, warning, or exception is raised. When the subsequent 'make -j1' fails due to missing pg_config, the user may not understand the root cause from the recipe's perspective.",
+      "fix_suggestion": "Add a warning or raise an exception if pg_config cannot be found, e.g.: self.output.warning('pg_config not found in PATH; PGXS build may fail') or raise ConanException('pg_config not found — install PostgreSQL development headers')."
+    }
+  ],
+  "summary": "Audit of postgresql-orafce 4.16.0 Conan recipe (6 changed files). VERDICT: PASS. No P0 (deception) or P1 (recipe correctness) issues found. Deception checks (P0) all pass: test_package contains 8 real assertions verifying ELF format, file existence, and library loadability — not a stub test (R34 pass). No test skipping or faked pass (R9 pass). manifest status 'built' is honest, not faking 'published' (status pass). conandata.yml sha256 is a valid 64-character hex hash, not all-zeros/f (sha256 pass). No pre-compiled binaries in PR (R19 pass). No #ifdef __OHOS__ stubs (R8 N/A — no C/C++ sources or patches). postgresql-orafce is not in R40 deep-adapt domains (database extension, not graphics/UI/multimedia/hardware). Recipe correctness checks (P1) all pass: no hardcoded build output paths, build is platform-agnostic (no 'if os==Linux' missing OHOS — R32 pass), version 4.16.0 is consistent across all files (R37 pass), Conan 2.x API used correctly. 9 P2 (warning) issues found: unfilled url placeholder (CS-5), manual gh-proxy mirror prefix in conandata.yml (R39), empty sha256 in manifest (CS-14), manifest field name 'software' vs 'name' (CS-14), manifest 'build.system'/'custom' deviation (CS-14), assertion_count mismatch 5 vs 8 (CS-11), direct os.environ PATH manipulation (R33), CC=clang declared in manifest but not set in recipe (R33), build date inconsistency in notes.md. 4 P3 (hint) issues: package_type convention, misreferenced R9 comment, silent dlopen failure handling, silent pg_config not-found. All issues are fixable without architectural changes."
+}
