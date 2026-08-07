@@ -17,7 +17,7 @@ class LzlibConan(ConanFile):
     description = "LZMA library providing in-memory LZMA compression/decompression functions"
     license = "GPL-2.0+"
     homepage = "https://www.nongnu.org/lzip/lzlib.html"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
