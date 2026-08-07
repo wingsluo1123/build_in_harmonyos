@@ -36,7 +36,7 @@ class Qt5QtchartsConan(ConanFile):
             )
 
     def source(self):
-        source_data = self.conan_data["sources"]
+        source_data = self.conan_data["sources"][self.version]
         urls = source_data["url"]
         if isinstance(urls, str):
             urls = [urls]
