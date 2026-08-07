@@ -1,26 +1,63 @@
 software: perl-ipc-sharelite
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.17-r14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
 version: "0.17-r14"
+
+# 编译状态
 status: built
-build_date: "2026-08-07"
-build_system: conan
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-06-12"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
 source:
   url: "https://cpan.metacpan.org/authors/id/A/AN/ANDYA/IPC-ShareLite-0.17.tar.gz"
-  sha256: "14d406b91da96d6521d0d1a82d22a306274765226b86b0a56e7ffddcf96ae7bf"
+  sha256: ""
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
 build:
-  system: "conan"
-  type: "perl-xs-makemaker"
+  system: perl
+  configure_options:
+    - "PREFIX=/storage/Users/currentUser/usr/local"
   dependencies:
-    - "perl/5.42.2"
+    - "perl/5.42.0"
+    - "musl/1.2.5"
   cc: clang
   cxx: clang++
-validation:
-  - "OHOS conan create with upstream make test"
-  - "ELF signing for XS shared objects on OHOS"
-  - "test_package: IPC::ShareLite 0.17 load + functional check"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Makefile.PL.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
 knowledge_gained:
-  - "IPC::ShareLite is a Perl XS module using SysV IPC (shmget/semget/shmat)"
-  - "Conan recipe follows p5-compress-raw-bzip2 pattern: perl Makefile.PL + make + ELF sign"
-  - "No external C library dependencies; SysV IPC is part of the system"
-  - "Devel::CheckLib in inc/ checks for C compiler; CC env var set in generate()"
-  - "Previous adaptation used hardcoded paths in Makefile.PL patch; conan recipe uses env vars"
-patches_applied: []
+  - "Perl XS 模块需要修改 Makefile.PL 添加 musl 头文件和库路径"
+  - "LDDLFLAGS 参数需要包含 -L 和 -B 选项指定 musl 库路径"
+  - "XS 模块（.so）在 HMDFS 上受 SELinux 限制无法加载，需管理员安装"
+  - "IPC::ShareLite 依赖 SysV IPC（共享内存和信号量），目标系统需支持"
+
+patch_classification:
+  - file: 0001-Makefile.PL.patch
+    type: build-config
+    platform_only: true
+    guard: "#ifdef __OHOS__"
