@@ -49,7 +49,8 @@ echo "Testing meta::get_package + meta::package->get API..."
 # If this fails with Permission denied on OHOS (HMDFS SELinux), return exit 0 (platform limitation)
 # Any other failure returns exit 1 (real test failure)
 # Unset LD to avoid musl dynamic linker interference (known OHOS platform limitation)
-env -u LD perl -I"$PERL_ARCH_DIR" -Mmeta -e '
+# Capture output for reuse in error diagnosis (avoid running a second diagnostic perl call)
+TEST_OUTPUT=$(env -u LD perl -I"$PERL_ARCH_DIR" -Mmeta -e '
     # Test meta::get_package (older interface)
     my $metapkg = meta::get_package("meta");
     die "meta::get_package returned undef" unless defined $metapkg;
@@ -69,8 +70,11 @@ env -u LD perl -I"$PERL_ARCH_DIR" -Mmeta -e '
     print "meta::get_this_package() OK: name=", $thispkg->name, "\n";
 
     print "meta API test PASSED\n";
-' 2>&1
+' 2>&1)
 EXIT_CODE=$?
+
+# Display the test output
+echo "$TEST_OUTPUT"
 
 if [ $EXIT_CODE -eq 0 ]; then
     echo "TEST PASSED: meta module loaded and API verified"
@@ -79,8 +83,8 @@ fi
 
 # Check if the failure is due to HMDFS SELinux Permission denied (OHOS platform limitation)
 # Only "Permission denied" is tolerated; all other errors are real test failures
-OUTPUT=$(env -u LD perl -I"$PERL_ARCH_DIR" -Mmeta -e '1' 2>&1 || true)
-if echo "$OUTPUT" | grep -qi "Permission denied"; then
+# Reuse the captured output from the first perl call (no second diagnostic call needed)
+if echo "$TEST_OUTPUT" | grep -qi "Permission denied"; then
     echo "WARN: Module load blocked by Permission denied (HMDFS SELinux, OHOS platform limitation E073)"
     echo "Package contents verified: .so and .pm present."
     echo "Load failure is a known platform limitation, not a build defect."
@@ -89,5 +93,5 @@ if echo "$OUTPUT" | grep -qi "Permission denied"; then
 fi
 
 echo "FAIL: meta test failed with real error (exit code $EXIT_CODE)"
-echo "Output: $OUTPUT"
+echo "Output: $TEST_OUTPUT"
 exit 1
