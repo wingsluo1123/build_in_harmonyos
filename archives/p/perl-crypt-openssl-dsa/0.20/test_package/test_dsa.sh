@@ -6,13 +6,12 @@
 # 2. DSA.so is a valid ELF shared object (file)
 # 3. DSA.so contains the XS bootstrap function (readelf -s)
 # 4. DSA.so links against OpenSSL libcrypto (readelf -d)
+# 5. Runtime API test: attempt to load module and call DSA functions
+#    (tolerates SELinux HMDFS "Permission denied" on OHOS)
 #
 # Usage: test_dsa.sh <package_folder>
-#
-# Note: XS module runtime loading may be blocked by SELinux HMDFS on HarmonyOS.
-# This script uses static analysis for guaranteed verification.
 
-set -e
+set -euo pipefail
 
 PKG_DIR="${1:?Usage: test_dsa.sh <package_folder>}"
 
@@ -56,6 +55,53 @@ echo "PASS: XS boot function present"
 echo "Checking OpenSSL dependency..."
 readelf -d "$DSA_SO" | grep -E "libcrypto"
 echo "PASS: OpenSSL dependency verified"
+
+# Test 5: Runtime API test — attempt to load module and call DSA functions
+# On OHOS, SELinux HMDFS may block .so loading with "Permission denied"
+# This is a known platform limitation (E073), not a build defect
+# Any other load failure is a real test failure
+PERL_ARCH_DIR="$PKG_DIR/lib/site_perl/$PERL_VER/$PERL_ARCH"
+echo "Testing runtime API: DSA key generation + signing + verification..."
+
+# Attempt to load module and call actual DSA API
+# If "Permission denied" (HMDFS SELinux): tolerate and exit 0
+# Any other failure: exit 1 (real test failure)
+perl -I"$PERL_ARCH_DIR" -MCrypt::OpenSSL::DSA -e '
+    # Generate DSA parameters and key
+    my $dsa = Crypt::OpenSSL::DSA->generate_parameters(1024);
+    $dsa->generate_key();
+
+    # Sign and verify a message
+    my $msg = "Hello DSA";
+    my $sig = $dsa->sign($msg);
+    die "sign() returned undef" unless defined $sig;
+
+    my $ok = $dsa->verify($msg, $sig);
+    die "verify() failed for correct message" unless $ok;
+
+    print "DSA API test PASSED: sign+verify roundtrip OK\n";
+' 2>&1 || true
+
+# Check the exit result
+RT_OUTPUT=$(perl -I"$PERL_ARCH_DIR" -MCrypt::OpenSSL::DSA -e '1' 2>&1 || true)
+if echo "$RT_OUTPUT" | grep -qi "Permission denied"; then
+    echo "WARN: Module load blocked by Permission denied (HMDFS SELinux, OHOS platform limitation E073)"
+    echo "Package contents verified: .so and .pm present, ELF + XS boot + libcrypto dependency confirmed."
+    echo "Runtime load failure is a known platform limitation, not a build defect."
+    echo ""
+    echo "=== All tests passed (static analysis) ==="
+    exit 0
+fi
+
+# If no Permission denied, the runtime test should have passed
+# Re-run to check exit code
+perl -I"$PERL_ARCH_DIR" -MCrypt::OpenSSL::DSA -e '
+    my $dsa = Crypt::OpenSSL::DSA->generate_parameters(1024);
+    $dsa->generate_key();
+    my $sig = $dsa->sign("test");
+    die "verify failed" unless $dsa->verify("test", $sig);
+    print "DSA API test PASSED\n";
+' 2>&1
 
 echo ""
 echo "=== All tests passed ==="
