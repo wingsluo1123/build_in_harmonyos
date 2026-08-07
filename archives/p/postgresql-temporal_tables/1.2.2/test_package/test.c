@@ -24,6 +24,11 @@ static int check_elf_shared(const char *path) {
     close(fd);
     if (map == MAP_FAILED) return 0;
 
+    if (st.st_size < (off_t)sizeof(Elf64_Ehdr)) {
+        munmap(map, st.st_size);
+        return 0;
+    }
+
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)map;
     /* Check ELF magic and shared object type */
     int ok = (st.st_size >= (off_t)sizeof(Elf64_Ehdr) &&
