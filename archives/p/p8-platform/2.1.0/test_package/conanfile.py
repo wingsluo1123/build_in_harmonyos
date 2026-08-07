@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Conan test_package for p8-platform 2.1.0 — L1 consumer-side test."""
 
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -21,5 +23,5 @@ class P8PlatformTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_p8_platform")
+        self.run(test_bin, env="conanrun")
