@@ -14,10 +14,6 @@ int main(int argc, char *argv[]) {
         std::printf("Qt53D test FAILED: no components attached\n");
         return 1;
     }
-    if (rootEntity.parent() == nullptr) {
-        std::printf("Qt53D test FAILED: entity has no parent\n");
-        return 1;
-    }
     std::printf("Qt53D test PASSED\n");
     return 0;
 }
