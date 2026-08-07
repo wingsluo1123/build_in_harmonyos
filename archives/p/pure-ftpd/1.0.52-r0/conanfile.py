@@ -6,7 +6,7 @@ Autotools-based build with TLS support via OpenSSL.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps
 from conan.tools.layout import basic_layout
 
@@ -62,6 +62,14 @@ class PureFtpdConan(ConanFile):
         apply_conandata_patches(self)
         autotools = Autotools(self)
         autotools.configure()
+
+        # Fix statvfs64 false positive: configure detects statvfs64() as
+        # available but struct statvfs64 is only forward-declared on OHOS.
+        # Undefine HAVE_STATVFS64 so the code falls back to struct statvfs.
+        replace_in_file(self, "config.h",
+                        "#define HAVE_STATVFS64",
+                        "/* #undef HAVE_STATVFS64 */")
+
         autotools.make(args=["-j1"])
 
     def package(self):
