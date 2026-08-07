@@ -65,6 +65,9 @@ class OpenImageIOConan(ConanFile):
         tc.variables["OIIO_INTERNALIZE_FMT"] = "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
         tc.variables["OpenImageIO_BUILD_MISSING_DEPS"] = "OFF"
+        tc.variables["OIIO_BUILD_APPS"] = "OFF"
+        tc.variables["BUILD_APPS"] = "OFF"
+        tc.variables["OIIO_BUILD_TOOLS"] = "OFF"
         # Add fmt include directory to CMake flags since fmt::fmt-header-only
         # target doesn't exist in Conan CMakeDeps
         import os
@@ -104,9 +107,11 @@ class OpenImageIOConan(ConanFile):
         replace_in_file(self, oiio_cmake,
             "            OpenColorIO::OpenColorIO\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>",
             "            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIO>\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>")
-        # Fix: color_ocio.cpp includes <OpenColorIO/OpenColorIO.h> but OpenColorIO is
-        # disabled. Remove it from source lists to prevent compilation failure.
+        # Fix: color_ocio.cpp needs OpenColorIO headers which aren't available.
+        # Remove it from source lists and disable oiiotool (its only consumer).
         replace_in_file(self, oiio_cmake, "color_ocio.cpp\n", "")
+        # Also need to handle the UNITY_GROUP reference to color_ocio.cpp
+        replace_in_file(self, oiio_cmake, "color_ocio.cpp ", "")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
