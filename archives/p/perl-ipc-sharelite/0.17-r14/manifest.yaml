@@ -11,18 +11,28 @@ software: perl-ipc-sharelite
 version: "0.17-r14"
 
 # 编译状态
+# published | built | failed | archived
 status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-06-12"
+build_date: "2026-08-07"
+
+# 构建系统类型 (顶层字段, 供 submit 自检扁平解析)
+build_system: makefile
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
+  # 源码下载 URL
   url: "https://cpan.metacpan.org/authors/id/A/AN/ANDYA/IPC-ShareLite-0.17.tar.gz"
-  sha256: ""
+
+  # 源码校验和
+  sha256: "14d406b91da96d6521d0d1a82d22a306274765226b86b0a56e7ffddcf96ae7bf"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -30,12 +40,16 @@ source:
 # ============================================================
 
 build:
-  system: perl
-  configure_options:
-    - "PREFIX=/storage/Users/currentUser/usr/local"
-  dependencies:
-    - "perl/5.42.0"
-    - "musl/1.2.5"
+  # 构建系统类型
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
   cc: clang
   cxx: clang++
 
@@ -43,21 +57,17 @@ build:
 # 补丁信息
 # ============================================================
 
-patches_applied:
-  - "0001-Makefile.PL.patch"
+# 应用的补丁列表
+patches_applied: []
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
+# 编译中学到的知识
 knowledge_gained:
-  - "Perl XS 模块需要修改 Makefile.PL 添加 musl 头文件和库路径"
-  - "LDDLFLAGS 参数需要包含 -L 和 -B 选项指定 musl 库路径"
-  - "XS 模块（.so）在 HMDFS 上受 SELinux 限制无法加载，需管理员安装"
-  - "IPC::ShareLite 依赖 SysV IPC（共享内存和信号量），目标系统需支持"
-
-patch_classification:
-  - file: 0001-Makefile.PL.patch
-    type: build-config
-    platform_only: true
-    guard: "#ifdef __OHOS__"
+  - "Perl XS 模块构建系统为 ExtUtils::MakeMaker (Makefile.PL), 非 autotools"
+  - "IPC::ShareLite 包含 C 代码 (sharestuff.c + ShareLite.xs) 实现 SysV IPC 共享内存和信号量"
+  - "使用 /data/service/hnp/bin/clang 编译器时无需额外 musl 头文件/库路径补丁"
+  - "ShareLite.so 仅依赖 libc.so, 导出 boot_IPC__ShareLite 等 XS 符号"
+  - "Conan basic_layout 会创建 build-release 子目录, 需用 cwd=self.source_folder"
