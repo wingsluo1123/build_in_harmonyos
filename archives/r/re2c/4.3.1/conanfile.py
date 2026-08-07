@@ -17,7 +17,7 @@ class Re2cConan(ConanFile):
     description = "Lexer generator that produces C/C++ code from regular expressions"
     license = "Public-Domain"
     homepage = "https://re2c.org/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 

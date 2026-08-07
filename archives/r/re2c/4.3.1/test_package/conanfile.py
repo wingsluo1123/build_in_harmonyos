@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Conan test_package for re2c — verifies the re2c binary works.
 
-This test exercises the re2c lexer generator by processing a .re file
-and verifying the generated C code compiles and runs.
+This test exercises the re2c lexer generator by processing a C file
+containing re2c directives and verifying the generated C code compiles
+and runs.
 """
 import os
 

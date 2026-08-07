@@ -1,7 +1,7 @@
 # re2c 4.3.1 编译进度
 
 **日期**: 2026-08-08
-**状态**: ✅ 已完成 (published)
+**状态**: ✅ 已完成 (built)
 
 ## 基本信息
 - 软件: re2c
@@ -43,4 +43,4 @@ re2c 的 `run_tests.py` 测试套件在 OHOS 上因 Python `posix_spawn` 无法�
 ---
 
 **编译结束**: 2026-08-08
-**最终状态**: published
+**最终状态**: built
