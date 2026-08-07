@@ -75,32 +75,68 @@ class ScooterConan(ConanFile):
 
         CI worker 无系统 rust（E154），cmd-pkgs 无 rust 工具链资产（404），
         rust/1.81.0 制品仓无 conanfile 配方 → 参考 kubetui 同方案：
-        从 static.rust-lang.org 下载 rust 1.81.0（宿主架构）+ rust-std
+        从官方/USTC 镜像下载 rust 1.81.0 组件包（rustc/cargo）+ rust-std
         （aarch64-unknown-linux-ohos），sha256 校验。
+
+        CI #15558: 完整 rust-1.81.0 工具链 tarball 488MB，下载在 3600s 超时限制
+        内仅完成 12% → 改下组件包（rustc/cargo，总量约 210MB），
+        解包到统一 rust_root 后 cargo/rustc 均在 rust_root/bin 下。
         """
         found = shutil.which("cargo")
         if found:
             return os.path.dirname(os.path.dirname(found))
         host_arch = self._rust_host_arch()
-        rust_src = {
-            "amd64": (
-                "https://static.rust-lang.org/dist/rust-1.81.0-x86_64-unknown-linux-gnu.tar.gz",
-                "4ca7c24e573dae2f382d8d266babfddc307155e1a0a4025f3bc11db58a6cab3e",
+        # 组件包（triple 按宿主架构；比完整 rust-*.tar.gz 小一半以上）。
+        # CI #15558: static.rust-lang.org 对 CI worker 下载极慢（3600s 超时内
+        # 完整工具链仅 12%）→ USTC 镜像优先（同 kubetui CI #15412 实测方案），官方兜底。
+        triple = "x86_64-unknown-linux-gnu" if host_arch == "amd64" else "aarch64-unknown-linux-gnu"
+        rustc_sha256 = (
+            "08acb66f6cfc3d44d06c349edf947f41f30bb9fc74a28b0f003ad2d6fa96e878"
+            if host_arch == "arm64"
+            else "13f9d5cec8b8613074d0e021d967840a162c6d7e1534c6e577e1c2b1b60d2775"
+        )
+        components = {
+            "rustc": (
+                [
+                    f"https://mirrors.ustc.edu.cn/rust-static/dist/rustc-1.81.0-{triple}.tar.gz",
+                    f"https://static.rust-lang.org/dist/rustc-1.81.0-{triple}.tar.gz",
+                ],
+                rustc_sha256,
             ),
-            "arm64": (
-                "https://static.rust-lang.org/dist/rust-1.81.0-aarch64-unknown-linux-gnu.tar.gz",
-                "ef4da9c1ecd56bbbb36f42793524cce3062e6a823ae22cb679a945c075c7755b",
+            "cargo": (
+                [
+                    f"https://mirrors.ustc.edu.cn/rust-static/dist/cargo-1.81.0-{triple}.tar.gz",
+                    f"https://static.rust-lang.org/dist/cargo-1.81.0-{triple}.tar.gz",
+                ],
+                "00c5185b49a885df529832327d2584a9c26dd03df64f0a52b32a3f34bf3498c1",
             ),
+            # 宿主 rust-std 已内嵌在 rustc 组件包中（lib/rustlib/<host>/），无需单独下载；
+            # 交叉编译目标 aarch64-unknown-linux-ohos 的 rust-std 在下方单独获取。
+            # 删除冗余宿主 rust-std 下载（CI #15526: 工具链下载量过大致 3600s 超时）
         }
-        if host_arch not in rust_src:
-            raise ConanException(f"Rust toolchain bootstrap not prepared for host arch: {host_arch}")
-        rust_url, rust_sha256 = rust_src[host_arch]
         rust_root = os.path.join(self.build_folder, "rust-sdk", f"rust-1.81.0-{host_arch}")
         cargo = os.path.join(rust_root, "bin", "cargo")
         rustc = os.path.join(rust_root, "bin", "rustc")
+        import shutil as _sh
         if not (os.path.isfile(cargo) and os.path.isfile(rustc)):
-            self.output.info(f"system cargo not found; downloading Rust 1.81.0 from {rust_url}")
-            get(self, url=rust_url, sha256=rust_sha256, destination=rust_root, strip_root=False)
+            for comp_name, (comp_urls, comp_sha256) in components.items():
+                comp_tmp = os.path.join(self.build_folder, f"rust-comp-{comp_name}")
+                if os.path.isdir(os.path.join(comp_tmp, "bin")):
+                    continue
+                self.output.info(f"downloading {comp_name} 1.81.0 from {comp_urls[0]}")
+                get(self, url=comp_urls, sha256=comp_sha256, destination=comp_tmp, strip_root=False)
+                # 组件包解包后为 {comp_name}-1.81.0-{triple}/，把 bin/ lib/ 合并进 rust_root
+                for dirpath, dirnames, filenames in os.walk(comp_tmp):
+                    rel = os.path.relpath(dirpath, comp_tmp)
+                    parts = rel.split(os.sep)
+                    if parts and parts[0] in ("bin", "lib", "share", "etc"):
+                        target_dir = os.path.join(rust_root, *parts)
+                        os.makedirs(target_dir, exist_ok=True)
+                        for fn in filenames:
+                            src_f = os.path.join(dirpath, fn)
+                            dst_f = os.path.join(target_dir, fn)
+                            if not os.path.exists(dst_f):
+                                _sh.copy2(src_f, dst_f)
         # rust-std for aarch64-unknown-linux-ohos（交叉编译目标）
         std_root = os.path.join(rust_root, "lib", "rustlib", "aarch64-unknown-linux-ohos")
         if not os.path.isdir(std_root):
@@ -110,7 +146,6 @@ class ScooterConan(ConanFile):
             std_tmp = os.path.join(self.build_folder, "rust-std-ohos")
             get(self, url=std_url, sha256=std_sha256, destination=std_tmp, strip_root=False)
             # rust-std tarball 解包后为 rust-std-aarch64-unknown-linux-ohos/，把 lib/rustlib 合并进 rust_root
-            import shutil as _sh
             for dirpath, dirnames, filenames in os.walk(std_tmp):
                 rel = os.path.relpath(dirpath, std_tmp)
                 parts = rel.split(os.sep)
