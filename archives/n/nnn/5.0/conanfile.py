@@ -42,9 +42,6 @@ class NnnConan(ConanFile):
         env.generate()
         VirtualRunEnv(self).generate(scope="build")
 
-    def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
-
     def build(self):
         apply_conandata_patches(self)
         readline_install = self._build_readline()
