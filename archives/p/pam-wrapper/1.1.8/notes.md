@@ -3,7 +3,7 @@
 ## Scope
 
 - Issue: 1763
-- Worktree: `D:\harmonyos\worktrees\pam-wrapper`
+- Worktree: `D:\harmonyos\worktrees\pam-wrapper-pr4234`
 - Branch: `feat/pam-wrapper-1.1.8`
 - Allowed edit scope: `archives/p/pam-wrapper/1.1.8/`
 
@@ -22,18 +22,19 @@ use of `security/pam_appl.h`, `security/pam_modules.h`, `security/pam_ext.h`,
 `libpam`, and optionally `pam_misc`. No `linux-pam`, `openpam`, or equivalent
 Conan recipe was found under `origin/main` in this repository.
 
-The optional upstream CTest suite also requires `cmocka >= 1.1.0`. The
-repository contains `archives/c/cmocka/2.0.2`, but that archive is currently
-metadata-only in this checkout and local Windows does not provide `conan`, so
-the remote `ohpcd` recipe check could not be run here.
+The upstream CTest suite also requires `cmocka >= 1.1.0`. Conan 2.29.1
+successfully downloaded the `cmocka/2.0.2` and `linux-pam/1.7.2` recipes from
+the `ohpcd` remote. The default dependency graph resolves cmocka as a
+non-visible test requirement, and `conan install --build=never` resolved both
+OHOS dependency binaries.
 
 ## Source and build analysis
 
 - Source URL: `https://ftp.samba.org/pub/cwrap/pam_wrapper-1.1.8.tar.gz`
 - SHA256: `6549c0b3e41d1ebe0c94a1be63c25eec918191462b602ab6f47d4a5fa709c3e4`
 - Build system: CMake, top-level `CMakeLists.txt`, minimum CMake 3.20
-- Default recipe mode: `UNIT_TESTING=OFF`
-- Optional upstream test mode: `-o pam-wrapper/*:with_upstream_tests=True`
+- Default recipe mode: `with_upstream_tests=True`, `UNIT_TESTING=ON`
+- Opt-out mode for non-runnable cross-builds: `with_upstream_tests=False`
 
 Upstream always adds `src/python`; the Python extension target is only built
 when CMake finds Python 3.10 development files, so no patch is needed for the
@@ -66,13 +67,14 @@ Performed locally:
 - Downloaded the official tarball
 - Computed SHA256
 - Inspected CMake dependency detection and upstream tests
-- Prepared `conanfile.py`, `conandata.yml`, `test_package/`, `manifest.yaml`,
-  and reports
+- Confirmed the default Conan graph and OHOS dependency binaries
+- Regenerated four per-file portability patches through
+  `ohc-run.py refresh-patch --auto`; all passed `patch --dry-run -p1`
+- Parsed recipe Python files and checked the archive diff for whitespace errors
 
 Not performed locally:
 
-- `conan download`: `conan` is not installed on this Windows host
-- `conan create`: local Windows host has no Conan/OHOS toolchain
+- Upstream CTest execution: the Windows host cannot execute OHOS binaries
 
 ## OHOS real-device verification
 
@@ -110,13 +112,39 @@ Portability fixes found during device validation:
   initialization, before `main()`, so the test service/passdb files must be
   created by the Conan test recipe before launching the executable.
 
+## Upstream CTest validation
+
+The default recipe now builds and runs upstream `test_pam_wrapper`, which
+contains 23 CMocka cases. CMocka is a test requirement rather than a runtime
+dependency. Before CTest on OHOS, the recipe signs the built test executable,
+`pam_wrapper`/`pamtest`, and test PAM modules. A private writable `TMPDIR` is
+used for the suite, and CTest prints its inventory and full verbose output.
+
+Actual execution completed on the aarch64 OHOS 6.0 device. The default
+`conan create` command used `with_upstream_tests=True` without an option
+override, resolved `cmocka/2.0.2` as `test=True, visible=False`, signed the
+build-tree ELF files, and ran the registered `test_pam_wrapper` CTest target.
+All 23 CMocka cases passed, followed by successful packaging and the consumer
+`test_package` authentication check.
+
+- Run: `/storage/Users/currentUser/ohos-test-runs/codex-pam-wrapper-upstream-20260807-144624`
+- Package: `pam-wrapper/1.1.8#2f2f502a01f65d32961ddcb33f306d87:e1f2846c4ee5b18d6bc5c6d0966b2fee34777e5a#cc0baa281cc9b34bad9fab1da9e674b9`
+- CTest result: 1/1 target passed, 23/23 CMocka cases passed
+- Log: `upstream-ctest.log`, SHA256
+  `9660199e69663db0bcced0d4bf802d3d6e318219030ecad4e731bd7806c9ed87`
+- Repository CI: L0/L1/L4/L5 pass; L2 skipped because this library has no
+  `bin/` directory
+- Repository CI log: `repo/.ci_logs/conan_build_pam-wrapper_1.1.8.log`,
+  SHA256 `a181e7753188788ad47bd24a4196d2d68e47208a377d4949a9ba3370283d59c7`
+- `ohc-run.py conan-verify`: overall pass; G0/G1/G2/G3 passed. Its G4
+  package-ID lookup did not resolve the hyphenated package reference, so its
+  L2/L4/L5 checks were skipped; the repository CI independently passed L4/L5.
+- Conan verify report SHA256:
+  `8c5d26bc22cc70ec7371e01ebd55639cb59a7ebc879a87aaf1731294e4b7a50e`
+
 ## Next steps
 
-Before enabling optional upstream tests, verify:
+Follow-up validation:
 
-1. The optional test dependency is available:
-   `conan download "cmocka/2.0.2" -r=ohpcd --only-recipe`.
-2. Run the optional test variant if needed:
-   `conan create archives/p/pam-wrapper/1.1.8 -o pam-wrapper/*:with_upstream_tests=True`.
-3. Re-run single-package validation after dependency publication:
-   `CI_PACKAGES="archives/p/pam-wrapper/1.1.8" zsh ci/conan/build_and_test.sh`.
+1. Confirm the GitCode PR pipeline uses the default test option.
+2. Keep the upstream CTest result visible in the PR description.

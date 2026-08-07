@@ -6,6 +6,7 @@ import shutil
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
 
 
@@ -25,7 +26,7 @@ class PamWrapperConan(ConanFile):
     }
     default_options = {
         "shared": True,
-        "with_upstream_tests": False,
+        "with_upstream_tests": True,
     }
 
     def export_sources(self):
@@ -44,8 +45,10 @@ class PamWrapperConan(ConanFile):
 
     def requirements(self):
         self.requires("linux-pam/1.7.2")
+
+    def build_requirements(self):
         if self.options.with_upstream_tests:
-            self.requires(self.conan_data["requirements"]["cmocka"])
+            self.test_requires(self.conan_data["requirements"]["cmocka"])
 
     def source(self):
         get(self, **self.conan_data["sources"][self.version], strip_root=True)
@@ -78,7 +81,15 @@ class PamWrapperConan(ConanFile):
         cmake.configure()
         cmake.build()
         if self.options.with_upstream_tests:
-            self.run("ctest --output-on-failure", cwd=self.build_folder)
+            if str(self.settings.os) == "OHOS":
+                self._sign_upstream_test_artifacts()
+            test_runtime_dir = os.path.join(self.build_folder, "upstream-test-runtime")
+            os.makedirs(test_runtime_dir, exist_ok=True)
+            test_env = Environment()
+            test_env.define("TMPDIR", test_runtime_dir)
+            with test_env.vars(self).apply():
+                self.run("ctest -N", cwd=self.build_folder)
+                self.run("ctest --output-on-failure --verbose -j1", cwd=self.build_folder)
 
     def package(self):
         cmake = CMake(self)
@@ -89,6 +100,38 @@ class PamWrapperConan(ConanFile):
 
 
     def _sign_shared_objects(self):
+        self._sign_elf_files(
+            glob.glob(
+                os.path.join(self.package_folder, "lib", "**", "*.so*"),
+                recursive=True,
+            )
+        )
+
+    def _sign_upstream_test_artifacts(self):
+        candidates = glob.glob(
+            os.path.join(self.build_folder, "**", "*.so*"), recursive=True
+        )
+        candidates.extend(
+            glob.glob(
+                os.path.join(self.build_folder, "**", "test_pam_wrapper"),
+                recursive=True,
+            )
+        )
+        self._sign_elf_files(candidates)
+
+    def _sign_elf_files(self, candidates):
+        paths = sorted(
+            {
+                path
+                for path in candidates
+                if os.path.isfile(path)
+                and not os.path.islink(path)
+                and self._is_elf(path)
+            }
+        )
+        if not paths:
+            return
+
         objcopy = self._find_ohos_tool("OHOS_LLVM_OBJCOPY", "llvm-objcopy")
         signer = self._find_ohos_tool("OHOS_BINARY_SIGN_TOOL", "binary-sign-tool")
         missing = [
@@ -98,9 +141,7 @@ class PamWrapperConan(ConanFile):
         ]
         if missing:
             raise ConanException("OHOS signing tools unavailable: %s" % ", ".join(missing))
-        for path in glob.glob(os.path.join(self.package_folder, "lib", "**", "*.so"), recursive=True):
-            if os.path.islink(path) or not os.path.isfile(path):
-                continue
+        for path in paths:
             strip_result = self.run(
                 f'{objcopy} --remove-section .codesign "{path}"',
                 ignore_errors=True,
@@ -115,6 +156,14 @@ class PamWrapperConan(ConanFile):
             )
             if sign_result != 0:
                 raise ConanException("binary-sign-tool failed for %s" % path)
+
+    @staticmethod
+    def _is_elf(path):
+        try:
+            with open(path, "rb") as stream:
+                return stream.read(4) == b"\x7fELF"
+        except OSError:
+            return False
 
     @staticmethod
     def _find_ohos_tool(env_name, command):
