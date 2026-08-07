@@ -63,6 +63,11 @@ class RcConan(ConanFile):
             # in drwx--S--- (unwritable) directories. Remove umask 077.
             self.run("sed -i 's|umask 077 && mktemp -d|mktemp -d|g' configure", env="conanbuild")
             self.run("sed -i 's|umask 077 && mkdir|mkdir|g' configure", env="conanbuild")
+            # Touch generated files to prevent make from trying to run automake/autoconf
+            # (automake is not available on CI worker)
+            self.run("touch Makefile.in aclocal.m4 config.h.in missing depcomp compile install-sh mkinstalldirs 2>/dev/null || true", env="conanbuild")
+            # Touch configure LAST so it's newer than all its dependencies
+            self.run("touch configure 2>/dev/null || true", env="conanbuild")
 
         autotools = Autotools(self)
         autotools.configure()
