@@ -32,6 +32,12 @@ class PostgresqlTemporalTablesConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    # PostgreSQL is not declared as a Conan dependency — the recipe uses
+    # system pg_config (or builds PostgreSQL from source in _ensure_pg_config).
+    # When postgresql/18.3 is published to the artifact repo, replace with:
+    #   def requirements(self):
+    #       self.requires("postgresql/18.3")
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 

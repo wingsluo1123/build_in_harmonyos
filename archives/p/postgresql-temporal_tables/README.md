@@ -4,6 +4,6 @@ PostgreSQL Temporal Tables 是实现 SQL:2011 标准系统周期时态表的扩�
 ## OHOS 适配
 使用 PGXS 构建系统。
 ## 依赖
-PostgreSQL >= 17.0
+PostgreSQL >= 18.3 (需要 pg_config)
 ## 参考
-https://github.com/mlt/temporal_tables
+https://github.com/arkhipov/temporal_tables
