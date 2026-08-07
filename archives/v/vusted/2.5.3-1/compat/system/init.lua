@@ -32,6 +32,10 @@ function system.sleep(delay)
   if delay <= 0 then
     return true
   end
+  if uv and uv.sleep then
+    uv.sleep(math.floor(delay * 1000))
+    return true
+  end
   if vim and vim.wait then
     vim.wait(math.floor(delay * 1000))
     return true

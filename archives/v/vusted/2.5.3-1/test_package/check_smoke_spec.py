@@ -16,8 +16,12 @@ text = spec.read_text(encoding="utf-8")
 required = [
     'describe("vusted smoke"',
     'it("runs inside Neovim"',
+    'it("exposes lfs.dir entry types"',
     'vim.fn.has("nvim")',
     'require("vusted.helper")',
+    'require("lfs")',
+    "lfs.dir(root)",
+    "entry_type",
 ]
 missing = [token for token in required if token not in text]
 if missing:

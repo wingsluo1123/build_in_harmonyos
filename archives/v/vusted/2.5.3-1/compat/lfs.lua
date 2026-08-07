@@ -92,14 +92,38 @@ function lfs.rmdir(path)
   return nil, err
 end
 
+local function scandir_entry(entry, entry_type)
+  if type(entry) == "table" then
+    return entry.name or entry[1], entry.type or entry[2]
+  end
+  return entry, entry_type
+end
+
 function lfs.dir(path)
   local scan, err = uv.fs_scandir(path)
   if not scan then
     error(err or ("cannot open directory: " .. tostring(path)), 2)
   end
+  if type(scan) == "table" then
+    if scan.name or scan.type then
+      local done = false
+      return function()
+        if done then
+          return nil
+        end
+        done = true
+        return scandir_entry(scan)
+      end
+    end
+    local index = 0
+    return function()
+      index = index + 1
+      return scandir_entry(scan[index])
+    end
+  end
   return function()
-    local name = uv.fs_scandir_next(scan)
-    return name
+    local name, entry_type = uv.fs_scandir_next(scan)
+    return scandir_entry(name, entry_type)
   end
 end
 
