@@ -27,5 +27,13 @@ class PostgresqlOrafceTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test binary directly to verify orafce.so can be loaded
+        test_bin = os.path.join(self.test_build_folder, "test_postgresql_orafce")
+
+        # Get the path to orafce.so from the package
+        dep = self.dependencies["postgresql-orafce"]
+        pkg_folder = dep.package_folder
+        so_path = os.path.join(pkg_folder, "lib", "postgresql", "orafce.so")
+
+        # Run the test binary with the .so path as argument
+        self.run(f'"{test_bin}" "{so_path}"', env="conanrun")
