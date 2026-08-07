@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Conan recipe for siril 1.2.3 — astronomy image processing GUI application.
+
+siril is a free astronomy image processing software. It is built with autotools
+and uses GTK3 for its GUI. This recipe adapts it for HarmonyOS PC (aarch64).
+
+Key adaptations:
+- librtprocess submodule is empty in tarball; made optional (HAVE_LIBRTPROCESS)
+- intltool not available; replaced with direct msgfmt-based po handling
+- config.status umask 077 causes setgid permission issues on OHOS; patched to 022
+- OPENCV_LIBS was hardcoded; now uses pkg-config --libs opencv4
+- Added LIBHEIF/LIBRAW/EXIV2 CFLAGS to AM_CPPFLAGS (missing upstream)
+- Added -lintl for glib's proxy gettext functions
+- gio-unix-2.0.pc generated manually (conan glib doesn't provide it separately)
+"""
+import os
+
+from conan import ConanFile
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, rmdir, save, load
+from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
+from conan.tools.env import Environment
+from conan.tools.layout import basic_layout
+
+
+class SirilConan(ConanFile):
+    name = "siril"
+    version = "1.2.3"
+    description = "Siril is a free astronomy image processing software for pre-processing and post-processing of astronomical images"
+    license = "GPL-3.0-only"
+    homepage = "https://free-astro.org/index.php/Siril"
+    url = "https://gitlab.com/free-astro/siril"
+
+    package_type = "application"
+
+    settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": False}
+
+    def export_sources(self):
+        export_conandata_patches(self)
+        # Also export the po/Makefile.am file (new file not in original tarball)
+        copy(self, "po-Makefile.am", self.recipe_folder, self.export_sources_folder + "/patches")
+
+    def requirements(self):
+        # 8 dependencies compiled in this session
+        self.requires("cfitsio/4.6.4@ohpcd/stable")
+        self.requires("json-glib/1.6.6@ohpcd/stable")
+        self.requires("libde265/1.0.18@ohpcd/stable")
+        self.requires("exiv2/0.28.7@ohpcd/stable")
+        self.requires("libraw/0.22.1@ohpcd/stable")
+        self.requires("ffms2/5.0@ohpcd/stable")
+        self.requires("wcslib/8.4@ohpcd/stable")
+        self.requires("libheif/1.18.2@ohpcd/stable")
+
+        # Pre-existing dependencies from artifact repository
+        self.requires("gtk/3.24.38@ohpcd/stable")
+        self.requires("gsl/2.8")
+        self.requires("fftw3f/3.3.10")
+        self.requires("opencv/4.12.0")
+        self.requires("ffmpeg/7.1.5")
+        self.requires("libtiff/4.7.2")
+        self.requires("libjpeg/10")
+        self.requires("libpng/1.6.58")
+        self.requires("libcurl/8.5.0")
+        self.requires("lcms2/2.19")
+
+    def configure(self):
+        # Resolve version conflicts in transitive dependencies
+        self.requires("fontconfig/2.18.1.1", override=True)
+        self.requires("harfbuzz/14.2.0.1", override=True)
+        self.requires("glib/2.84.0.1", override=True)
+
+    def layout(self):
+        basic_layout(self)
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+        # Replace intltool-based po/Makefile.am with msgfmt-based version.
+        # intltool is not available on OHOS; this minimal Makefile.am uses
+        # msgfmt directly. Done in source() so it's in place BEFORE autoreconf
+        # runs in build() — otherwise autoreconf --force deletes the original
+        # po/Makefile.in and automake fails with "required file not found".
+        po_makefile = (
+            "localedir = $(datadir)/locale\n"
+            "MSGFMT = msgfmt\n"
+            ".po.gmo:\n"
+            "\t$(MSGFMT) -o $@ $<\n"
+            "all-local:\n"
+            "\t@true\n"
+            "install-data-local:\n"
+            "\t@true\n"
+            "clean-local:\n"
+            "\t@true\n"
+            "EXTRA_DIST = LINGUAS POTFILES.in\n"
+        )
+        save(self, os.path.join(self.source_folder, "po", "Makefile.am"), po_makefile)
+        # Remove pre-generated intltool po/Makefile.in so autoreconf
+        # regenerates it cleanly from the new Makefile.am above
+        po_in = os.path.join(self.source_folder, "po", "Makefile.in")
+        if os.path.exists(po_in):
+            os.remove(po_in)
+
+    def generate(self):
+        # R33: Use AutotoolsToolchain for compiler flags, not shell env vars
+        tc = AutotoolsToolchain(self)
+        # R26: Static build
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
+            tc.configure_args.append("--disable-shared")
+
+        # Generate pkg-config files for all dependencies
+        pkg = PkgConfigDeps(self)
+        pkg.generate()
+
+        # Add dep package pkgconfig dirs to PKG_CONFIG_PATH.
+        # Some .pc files (e.g. gdk-3.0.pc from gtk) are shipped in dep
+        # package folders but not generated by PkgConfigDeps, causing
+        # "No package 'gdk-3.0' found" during configure.
+        env = Environment()
+        for _, dep in self.dependencies.items():
+            if not dep.package_folder:
+                continue
+            for pcdir in ["lib/pkgconfig", "share/pkgconfig"]:
+                pc_path = os.path.join(dep.package_folder, pcdir)
+                if os.path.isdir(pc_path):
+                    env.prepend_path("PKG_CONFIG_PATH", pc_path)
+        envvars = env.vars(self)
+        envvars.save_script("conanpkgconfig_paths")
+
+        tc.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
+
+        # Create gio-unix-2.0.pc (conan glib doesn't generate it separately,
+        # but siril's configure.ac requires it on non-Windows)
+        for dep_name, dep in self.dependencies.items():
+            if str(dep.ref).startswith("glib/"):
+                glib_pkg = dep.package_folder
+                if glib_pkg:
+                    gio_unix_pc = f"""prefix={glib_pkg}
+libdir=${{prefix}}/lib
+includedir=${{prefix}}/include
+includedir1=${{prefix}}/include/glib-2.0
+includedir2=${{prefix}}/lib/glib-2.0/include
+includedir3=${{prefix}}/include/gio-unix-2.0
+
+Name: gio-unix-2.0
+Description: Conan component: gio-unix-2.0 (Unix GIO)
+Version: 2.84.0.1
+Libs: -L"${{libdir}}" -lgio-2.0 -lm -lpthread -ldl
+Cflags: -I"${{includedir}}" -I"${{includedir1}}" -I"${{includedir2}}" -I"${{includedir3}}"
+Requires: glib-2.0 gobject-2.0 gmodule-2.0
+"""
+                    gen_folder = os.path.join(self.generators_folder)
+                    save(self, os.path.join(gen_folder, "gio-unix-2.0.pc"), gio_unix_pc)
+                    break
+
+        # Fix aclocal version conflict: /usr/local/bin/aclocal is broken 1.17,
+        # but aclocal-1.16 works. Create wrappers in a PATH-accessible location.
+        wrapper_dir = os.path.join(self.build_folder, "aclocal_wrappers")
+        os.makedirs(wrapper_dir, exist_ok=True)
+        for tool in ["aclocal", "automake"]:
+            wrapper_path = os.path.join(wrapper_dir, tool)
+            tool_1_16 = f"/storage/Users/currentUser/usr/local/bin/{tool}-1.16"
+            if os.path.exists(tool_1_16):
+                save(self, wrapper_path, f'#!/bin/sh\nexec {tool_1_16} "$@"\n')
+                os.chmod(wrapper_path, 0o755)
+
+        # Run autoreconf manually with correct PATH (conan's autotools.autoreconf
+        # doesn't pick up our PATH modifications)
+        wrapper_path_env = wrapper_dir + ":" + os.environ.get("PATH", "")
+        self.run(
+            f'cd "{self.source_folder}" && PATH="{wrapper_path_env}" autoreconf --install --force',
+            env="conanbuild"
+        )
+
+        # Fix umask 077 in configure script BEFORE running it.
+        # OHOS setgid dirs + umask 077 (hardcoded by automake in config.status
+        # template) cause "Permission denied" when config.status creates temp
+        # files (confXXXX/subs1.awk). Patch configure source so the generated
+        # config.status uses umask 022 from the start.
+        configure_script = os.path.join(self.source_folder, "configure")
+        if os.path.exists(configure_script):
+            cfg_content = load(self, configure_script)
+            cfg_content = cfg_content.replace("(umask 077", "(umask 022")
+            save(self, configure_script, cfg_content)
+
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make(args=["-j2"])
+
+    def package(self):
+        autotools = Autotools(self)
+        autotools.install()
+
+    def package_info(self):
+        # siril is an application (executable), not a library
+        self.cpp_info.libs = []
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.libdirs = []
+        # The main executable
+        self.cpp_info.system_libs = ["m", "pthread", "dl", "intl"]

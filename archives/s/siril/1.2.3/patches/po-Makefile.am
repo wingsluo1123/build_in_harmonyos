@@ -1,0 +1,28 @@
+# Minimal po/Makefile.am - compiles .po to .gmo using msgfmt
+# Replaces intltool-based po handling
+
+localedir = $(datadir)/locale
+
+LANGUAGES = $(shell cat $(srcdir)/LINGUAS | grep -v '^#')
+
+.po.gmo:
+	$(MSGFMT) -o $@ $<
+
+gmo_DATA = $(addsuffix .gmo,$(LANGUAGES))
+gmodir = $(localedir)
+
+%.gmo: %.po
+	$(MSGFMT) -o $@ $<
+
+all-local: $(gmo_DATA)
+
+install-data-local: $(gmo_DATA)
+	@for lang in $(LANGUAGES); do \
+		$(MKDIR_P) $(DESTDIR)$(localedir)/$$lang/LC_MESSAGES; \
+		$(INSTALL_DATA) $$lang.gmo $(DESTDIR)$(localedir)/$$lang/LC_MESSAGES/siril.mo; \
+	done
+
+clean-local:
+	rm -f *.gmo
+
+EXTRA_DIST = LINGUAS POTFILES.in $(addsuffix .po,$(LANGUAGES))
