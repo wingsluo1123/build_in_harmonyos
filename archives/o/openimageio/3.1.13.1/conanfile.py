@@ -65,6 +65,16 @@ class OpenImageIOConan(ConanFile):
         tc.variables["OIIO_INTERNALIZE_FMT"] = "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
         tc.variables["OpenImageIO_BUILD_MISSING_DEPS"] = "OFF"
+        # Add fmt include directory to CMake flags since fmt::fmt-header-only
+        # target doesn't exist in Conan CMakeDeps
+        import os
+        fmt_folder = self.dependencies["fmt"].package_folder
+        tc.variables["CMAKE_C_FLAGS"] = f"-I{fmt_folder}/include"
+        tc.variables["CMAKE_CXX_FLAGS"] = f"-I{fmt_folder}/include"
+        # Add Imath include dirs for headers included without Imath/ prefix
+        imath_folder = self.dependencies["imath"].package_folder
+        tc.variables["CMAKE_C_FLAGS"] = f"-I{fmt_folder}/include -I{imath_folder}/include -I{imath_folder}/include/Imath"
+        tc.variables["CMAKE_CXX_FLAGS"] = f"-I{fmt_folder}/include -I{imath_folder}/include -I{imath_folder}/include/Imath"
         tc.generate()
 
     def build(self):
