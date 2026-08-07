@@ -91,21 +91,35 @@ class KubetuiConan(ConanFile):
         if found:
             return os.path.dirname(os.path.dirname(found))
         host_arch = self._rust_host_arch()
-        # 组件包（triple 按宿主架构；比完整 rust-*.tar.gz 小一半以上）
+        # 组件包（triple 按宿主架构；比完整 rust-*.tar.gz 小一半以上）。
+        # CI #15412: static.rust-lang.org 对 CI worker 下载极慢（45 分钟超时内
+        # rustc 164.5MB 仅下载 10%）→ USTC 镜像优先（实测可达 200），官方兜底。
         triple = "x86_64-unknown-linux-gnu" if host_arch == "amd64" else "aarch64-unknown-linux-gnu"
+        rustc_sha256 = (
+            "08acb66f6cfc3d44d06c349edf947f41f30bb9fc74a28b0f003ad2d6fa96e878"
+            if host_arch == "arm64"
+            else "13f9d5cec8b8613074d0e021d967840a162c6d7e1534c6e577e1c2b1b60d2775"
+        )
         components = {
             "rustc": (
-                f"https://static.rust-lang.org/dist/rustc-1.81.0-{triple}.tar.gz",
-                "08acb66f6cfc3d44d06c349edf947f41f30bb9fc74a28b0f003ad2d6fa96e878"
-                if host_arch == "arm64"
-                else "13f9d5cec8b8613074d0e021d967840a162c6d7e1534c6e577e1c2b1b60d2775",
+                [
+                    f"https://mirrors.ustc.edu.cn/rust-static/dist/rustc-1.81.0-{triple}.tar.gz",
+                    f"https://static.rust-lang.org/dist/rustc-1.81.0-{triple}.tar.gz",
+                ],
+                rustc_sha256,
             ),
             "cargo": (
-                f"https://static.rust-lang.org/dist/cargo-1.81.0-{triple}.tar.gz",
+                [
+                    f"https://mirrors.ustc.edu.cn/rust-static/dist/cargo-1.81.0-{triple}.tar.gz",
+                    f"https://static.rust-lang.org/dist/cargo-1.81.0-{triple}.tar.gz",
+                ],
                 "00c5185b49a885df529832327d2584a9c26dd03df64f0a52b32a3f34bf3498c1",
             ),
             "rust-std": (
-                f"https://static.rust-lang.org/dist/rust-std-1.81.0-{triple}.tar.gz",
+                [
+                    f"https://mirrors.ustc.edu.cn/rust-static/dist/rust-std-1.81.0-{triple}.tar.gz",
+                    f"https://static.rust-lang.org/dist/rust-std-1.81.0-{triple}.tar.gz",
+                ],
                 "234673e33b7a523818a81dc233ba636ffc5e4c94b9766f12e19a63c985ed7d21",
             ),
         }
@@ -114,12 +128,12 @@ class KubetuiConan(ConanFile):
         rustc = os.path.join(rust_root, "bin", "rustc")
         import shutil as _sh
         if not (os.path.isfile(cargo) and os.path.isfile(rustc)):
-            for comp_name, (comp_url, comp_sha256) in components.items():
+            for comp_name, (comp_urls, comp_sha256) in components.items():
                 comp_tmp = os.path.join(self.build_folder, f"rust-comp-{comp_name}")
                 if os.path.isdir(os.path.join(comp_tmp, "bin")):
                     continue
-                self.output.info(f"downloading {comp_name} 1.81.0 from {comp_url}")
-                get(self, url=comp_url, sha256=comp_sha256, destination=comp_tmp, strip_root=False)
+                self.output.info(f"downloading {comp_name} 1.81.0 from {comp_urls[0]}")
+                get(self, url=comp_urls, sha256=comp_sha256, destination=comp_tmp, strip_root=False)
                 # 组件包解包后为 {comp_name}-1.81.0-{triple}/，把 bin/ lib/ 合并进 rust_root
                 for dirpath, dirnames, filenames in os.walk(comp_tmp):
                     rel = os.path.relpath(dirpath, comp_tmp)
