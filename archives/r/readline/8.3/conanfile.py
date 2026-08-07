@@ -48,6 +48,9 @@ class ReadlineConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # HMDFS can't create ./confXXXXXX temp dirs (E002).
+        # Redirect config.status tmpdir to $HOME/tmp.
+        self.run("sed -i 's|\"\\./conf|\"'\"$HOME\"'/tmp/conf|g' configure")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
