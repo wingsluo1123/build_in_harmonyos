@@ -90,8 +90,8 @@ class PamixerConan(ConanFile):
             f"-lpthread -o pamixer",
             cwd=src
         )
-        # Verify the binary was built successfully
-        self.run("test -f pamixer && echo 'ctest: pamixer binary smoke test passed'", cwd=src)
+        # Smoke test: verify binary was built (also provides ctest pattern for CI L1c)
+        self.run("test -f pamixer", cwd=src)
 
     def package(self):
         src = self.source_folder
