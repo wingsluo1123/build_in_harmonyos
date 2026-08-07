@@ -1,19 +1,12 @@
 --- a/src/bin/initdb/initdb.c
 +++ b/src/bin/initdb/initdb.c
-@@ -1068,20 +1068,27 @@
-  * segment in dsm_impl.c; if it doesn't work, we assume it won't work for
-  * the postmaster either, and configure the cluster for System V shared
-  * memory instead.
-  *
-  * We avoid choosing Solaris's implementation of shm_open() by default.  It
-  * can sleep and fail spuriously under contention.
-  */
+@@ -1075,6 +1075,13 @@
  static const char *
  choose_dsm_implementation(void)
  {
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_SHM_OPEN
 +	/*
-+	 * OHOS: shm_open is detected but causes SIGSYS (unimplemented syscall).
++	 * shm_open is detected but causes SIGSYS (unimplemented syscall).
 +	 * Use mmap-based DSM directly, bypassing shm_open test.
 +	 */
 +	return "mmap";
@@ -21,49 +14,21 @@
  #if defined(HAVE_SHM_OPEN) && !defined(__sun__)
  	int			ntries = 10;
  	pg_prng_state prng_state;
- 
- 	/* Initialize prng; this function is its only user in this program. */
- 	pg_prng_seed(&prng_state, (uint64) (getpid() ^ time(NULL)));
- 
- 	while (ntries > 0)
- 	{
- 		uint32		handle;
-@@ -1100,20 +1107,21 @@
- 			break;
- 		--ntries;
- 	}
- #endif
- 
- #ifdef WIN32
- 	return "windows";
+@@ -1107,6 +1114,7 @@
  #else
  	return "sysv";
  #endif
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_UMASK */
  }
  
  /*
-  * Determine platform-specific config settings
-  *
-  * Use reasonable values if kernel will let us, else scale back.
-  */
- static void
- test_config_settings(void)
- {
-@@ -3014,20 +3022,29 @@
- 		if (symlink(xlog_dir, subdirloc) != 0)
- 			pg_fatal("could not create symbolic link \"%s\": %m",
- 					 subdirloc);
- 	}
- 	else
- 	{
- 		/* Without -X option, just make the subdirectory normally */
+@@ -3021,6 +3029,15 @@
  		if (mkdir(subdirloc, pg_dir_create_mode) < 0)
  			pg_fatal("could not create directory \"%s\": %m",
  					 subdirloc);
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_UMASK
 +		/*
-+		 * OHOS: hmdfs creates directories with abnormal S-bit permissions.
++		 * hmdfs creates directories with abnormal S-bit permissions.
 +		 * Need to chmod to correct the permissions after mkdir.
 +		 */
 +		if (chmod(subdirloc, pg_dir_create_mode) < 0)
@@ -73,27 +38,13 @@
  	}
  
  	free(subdirloc);
- }
- 
- 
- void
- warn_on_mount_point(int error)
- {
- 	if (error == 2)
-@@ -3070,20 +3087,28 @@
- 		char	   *path;
- 
- 		path = psprintf("%s/%s", pg_data, subdirs[i]);
- 
- 		/*
- 		 * The parent directory already exists, so we only need mkdir() not
- 		 * pg_mkdir_p() here, which avoids some failure modes; cf bug #13853.
+@@ -3077,6 +3094,14 @@
  		 */
  		if (mkdir(path, pg_dir_create_mode) < 0)
  			pg_fatal("could not create directory \"%s\": %m", path);
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_UMASK
 +		/*
-+		 * OHOS: hmdfs creates directories with abnormal S-bit permissions.
++		 * hmdfs creates directories with abnormal S-bit permissions.
 +		 * Need to chmod to correct the permissions after mkdir.
 +		 */
 +		if (chmod(path, pg_dir_create_mode) < 0)
@@ -102,10 +53,3 @@
  
  		free(path);
  	}
- 
- 	check_ok();
- 
- 	/* Top level PG_VERSION is checked by bootstrapper, so make it first */
- 	write_version_file(NULL);
- 
- 	/* Select suitable configuration settings */

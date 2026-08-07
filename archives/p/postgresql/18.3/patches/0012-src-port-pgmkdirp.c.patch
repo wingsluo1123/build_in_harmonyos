@@ -1,20 +1,13 @@
 --- a/src/port/pgmkdirp.c
 +++ b/src/port/pgmkdirp.c
-@@ -125,24 +125,47 @@
- 			if (!S_ISDIR(sb.st_mode))
- 			{
- 				if (last)
- 					errno = EEXIST;
- 				else
- 					errno = ENOTDIR;
- 				retval = -1;
+@@ -132,11 +132,34 @@
  				break;
  			}
  		}
 -		else if (mkdir(path, last ? omode : S_IRWXU | S_IRWXG | S_IRWXO) < 0)
 +		else if (mkdir(path, last ? omode : (
-+#ifdef __OHOS__
-+			/* OHOS: hmdfs doesn't support group/other permissions in mkdir */
++#ifdef HAVE_BROKEN_UMASK
++			/* hmdfs doesn't support group/other permissions in mkdir */
 +			S_IRWXU
 +#else
 +			S_IRWXU | S_IRWXG | S_IRWXO
@@ -24,11 +17,11 @@
  			retval = -1;
  			break;
  		}
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_UMASK
 +		else
 +		{
 +			/*
-+			 * OHOS: hmdfs creates directories with abnormal S-bit permissions.
++			 * hmdfs creates directories with abnormal S-bit permissions.
 +			 * Need to chmod to correct the permissions after mkdir.
 +			 * Note: chmod is only done when we actually created the directory,
 +			 * not when it already existed (handled by the stat branch above).
@@ -43,9 +36,3 @@
  		if (!last)
  			*p = '/';
  	}
- 
- 	/* ensure we restored umask */
- 	(void) umask(oumask);
- 
- 	return retval;
- }

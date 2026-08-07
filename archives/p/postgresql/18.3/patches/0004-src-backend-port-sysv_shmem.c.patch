@@ -1,169 +1,96 @@
 --- a/src/backend/port/sysv_shmem.c
 +++ b/src/backend/port/sysv_shmem.c
-@@ -117,20 +117,31 @@
-  * If we fail with a failure code other than collision-with-existing-segment,
-  * print out an error and abort.  Other types of errors are not recoverable.
-  */
- static void *
- InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
- {
- 	IpcMemoryId shmid;
+@@ -124,6 +124,18 @@
  	void	   *requestedAddress = NULL;
  	void	   *memAddress;
  
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_SHMGET
 +	/*
-+	 * OHOS: shmget syscall causes SIGSYS (unimplemented syscall).
-+	 * For mmap-based shared memory, the SysV segment is only needed for
-+	 * interlocking. We skip this requirement and rely on file-based locking.
-+	 * Return a fake address that will be overwritten later.
++	 * shmget syscall not functional (SIGSYS). Use anonymous mmap
++	 * for shared memory instead of SysV IPC. The returned mapping
++	 * is shared across fork() and sized to the requested amount.
 +	 */
-+	static PGShmemHeader fake_header;
-+	memset(&fake_header, 0, sizeof(PGShmemHeader));
-+	return &fake_header;
++	memAddress = mmap(NULL, size, PROT_READ | PROT_WRITE,
++					  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
++	if (memAddress == MAP_FAILED)
++		elog(FATAL, "mmap(%zu) failed: %m", size);
++	return memAddress;
 +#else
  	/*
  	 * Normally we just pass requestedAddress = NULL to shmat(), allowing the
  	 * system to choose where the segment gets mapped.  But in an EXEC_BACKEND
- 	 * build, it's possible for whatever is chosen in the postmaster to not
- 	 * work for backends, due to variations in address space layout.  As a
- 	 * rather klugy workaround, allow the user to specify the address to use
- 	 * via setting the environment variable PG_SHMEM_ADDR.  (If this were of
- 	 * interest for anything except debugging, we'd probably create a cleaner
- 	 * and better-documented way to set it, such as a GUC.)
- 	 */
-@@ -268,93 +279,112 @@
- 	 */
- 	{
- 		char		line[64];
- 
- 		sprintf(line, "%9lu %9lu",
- 				(unsigned long) memKey, (unsigned long) shmid);
- 		AddToDataDirLockFile(LOCK_FILE_LINE_SHMEM_KEY, line);
+@@ -275,6 +287,7 @@
  	}
  
  	return memAddress;
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_SHMGET */
  }
  
  /****************************************************************************/
- /*	IpcMemoryDetach(status, shmaddr)	removes a shared memory segment		*/
- /*										from process' address space			*/
- /*	(called as an on_shmem_exit callback, hence funny argument list)		*/
- /****************************************************************************/
+@@ -285,9 +298,13 @@
  static void
  IpcMemoryDetach(int status, Datum shmaddr)
  {
-+#ifdef __OHOS__
-+	/* OHOS: No System V shared memory to detach, using mmap-based DSM */
++#ifdef HAVE_BROKEN_SHMGET
++	/* No System V shared memory to detach, using mmap-based DSM */
 +#else
  	/* Detach System V shared memory block. */
  	if (shmdt(DatumGetPointer(shmaddr)) < 0)
  		elog(LOG, "shmdt(%p) failed: %m", DatumGetPointer(shmaddr));
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_SHMGET */
  }
  
  /****************************************************************************/
- /*	IpcMemoryDelete(status, shmId)		deletes a shared memory segment		*/
- /*	(called as an on_shmem_exit callback, hence funny argument list)		*/
- /****************************************************************************/
+@@ -297,9 +314,13 @@
  static void
  IpcMemoryDelete(int status, Datum shmId)
  {
-+#ifdef __OHOS__
-+	/* OHOS: No System V shared memory to delete, using mmap-based DSM */
++#ifdef HAVE_BROKEN_SHMGET
++	/* No System V shared memory to delete, using mmap-based DSM */
 +#else
  	if (shmctl(DatumGetInt32(shmId), IPC_RMID, NULL) < 0)
  		elog(LOG, "shmctl(%d, %d, 0) failed: %m",
  			 DatumGetInt32(shmId), IPC_RMID);
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_SHMGET */
  }
  
  /*
-  * PGSharedMemoryIsInUse
-  *
-  * Is a previously-existing shmem segment still existing and in use?
-  *
-  * The point of this exercise is to detect the case where a prior postmaster
-  * crashed, but it left child backends that are still running.  Therefore
-  * we only care about shmem segments that are associated with the intended
-  * DataDir.  This is an important consideration since accidental matches of
-  * shmem segment IDs are reasonably common.
-  */
+@@ -316,6 +337,10 @@
  bool
  PGSharedMemoryIsInUse(unsigned long id1, unsigned long id2)
  {
-+#ifdef __OHOS__
-+	/* OHOS: System V shared memory not supported, assume not in use */
++#ifdef HAVE_BROKEN_SHMGET
++	/* System V shared memory not supported, assume not in use */
 +	return false;
 +#else
  	PGShmemHeader *memAddress;
  	IpcMemoryState state;
  
- 	state = PGSharedMemoryAttach((IpcMemoryId) id2, NULL, &memAddress);
- 	if (memAddress && shmdt(memAddress) < 0)
- 		elog(LOG, "shmdt(%p) failed: %m", memAddress);
- 	switch (state)
- 	{
- 		case SHMSTATE_ENOENT:
- 		case SHMSTATE_FOREIGN:
- 		case SHMSTATE_UNATTACHED:
- 			return false;
- 		case SHMSTATE_ANALYSIS_FAILURE:
- 		case SHMSTATE_ATTACHED:
+@@ -333,6 +358,7 @@
  			return true;
  	}
  	return true;
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_SHMGET */
  }
  
  /*
-  * Test for a segment with id shmId; see comment at IpcMemoryState.
-  *
-  * If the segment exists, we'll attempt to attach to it, using attachAt
-  * if that's not NULL (but it's best to pass NULL if possible).
-  *
-  * *addr is set to the segment memory address if we attached to it, else NULL.
-  */
- static IpcMemoryState
- PGSharedMemoryAttach(IpcMemoryId shmId,
+@@ -348,6 +374,11 @@
  					 void *attachAt,
  					 PGShmemHeader **addr)
  {
-+#ifdef __OHOS__
-+	/* OHOS: System V shared memory not supported */
++#ifdef HAVE_BROKEN_SHMGET
++	/* System V shared memory not supported */
 +	*addr = NULL;
 +	return SHMSTATE_ENOENT;
 +#else
  	struct shmid_ds shmStat;
  	struct stat statbuf;
  	PGShmemHeader *hdr;
- 
- 	*addr = NULL;
- 
- 	/*
- 	 * First, try to stat the shm segment ID, to see if it exists at all.
- 	 */
- 	if (shmctl(shmId, IPC_STAT, &shmStat) < 0)
-@@ -444,20 +474,21 @@
- 		 */
- 		return SHMSTATE_FOREIGN;
- 	}
- 
- 	/*
- 	 * It does match our data directory, so now test whether any processes are
- 	 * still attached to it.  (We are, now, but the shm_nattch result is from
+@@ -451,6 +482,7 @@
  	 * before we attached to it.)
  	 */
  	return shmStat.shm_nattch == 0 ? SHMSTATE_UNATTACHED : SHMSTATE_ATTACHED;
-+#endif /* __OHOS__ */
++#endif /* HAVE_BROKEN_SHMGET */
  }
  
  /*
-  * Identify the huge page size to use, and compute the related mmap flags.
-  *
-  * Some Linux kernel versions have a bug causing mmap() to fail on requests
-  * that are not a multiple of the hugepage size.  Versions without that bug
-  * instead silently round the request up to the next hugepage multiple ---
-  * and then munmap() fails when we give it a size different from that.
-  * So we have to round our request up to a multiple of the actual hugepage

@@ -1,19 +1,12 @@
 --- a/src/interfaces/libpq/fe-auth.c
 +++ b/src/interfaces/libpq/fe-auth.c
-@@ -1309,22 +1309,32 @@
- #else
- 	rc = getpwuid_r(user_id, &pwbuf, buf, sizeof buf, &pw);
- 	if (rc != 0)
- 	{
- 		errno = rc;
- 		if (errorMessage)
- 			libpq_append_error(errorMessage, "could not look up local user ID %ld: %m", (long) user_id);
+@@ -1316,8 +1316,18 @@
  	}
  	else if (!pw)
  	{
-+#ifdef __OHOS__
++#ifdef HAVE_BROKEN_GETPWUID
 +		/*
-+		 * OHOS: getpwuid may fail for users not in /etc/passwd.
++		 * getpwuid may fail for users not in /etc/passwd.
 +		 * Fall back to using the numeric UID as the user name.
 +		 */
 +		static char uid_name[32];
@@ -26,10 +19,3 @@
  	}
  	else
  		name = pw->pw_name;
- #endif
- 
- 	if (name)
- 	{
- 		result = strdup(name);
- 		if (result == NULL && errorMessage)
- 			libpq_append_error(errorMessage, "out of memory");

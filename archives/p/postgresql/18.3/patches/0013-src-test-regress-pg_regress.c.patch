@@ -1,29 +1,15 @@
 --- a/src/test/regress/pg_regress.c
 +++ b/src/test/regress/pg_regress.c
-@@ -2114,20 +2114,26 @@
- 
- 	atexit(stop_postmaster);
- 
- #if defined(WIN32)
- 
- 	/*
- 	 * We don't use Unix-domain sockets on Windows by default (see comment at
+@@ -2121,6 +2121,12 @@
  	 * remove_temp() for a reason).  Override at your own risk.
  	 */
  	use_unix_sockets = getenv("PG_TEST_USE_UNIX_SOCKETS") ? true : false;
-+#elif defined(__OHOS__)
++#elif defined(HAVE_NO_UNIX_SOCKETS)
 +	/*
-+	 * OHOS does not support Unix-domain sockets (bind() returns EPERM).
++	 * This platform does not support Unix-domain sockets (bind() returns EPERM).
 +	 * Use TCP/IP connections instead.
 +	 */
 +	use_unix_sockets = false;
  #else
  	use_unix_sockets = true;
  #endif
- 
- 	if (!use_unix_sockets)
- 		hostname = "localhost";
- 
- 	/*
- 	 * We call the initialization function here because that way we can set
- 	 * default parameters and let them be overwritten by the commandline.

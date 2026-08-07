@@ -74,6 +74,15 @@ class PostgresqlConan(ConanFile):
             "--without-zlib",
             "--without-openssl",
         ])
+        # Feature macros for platform limitations (R8: semantic macros, not platform macros)
+        if str(self.settings.os) == "OHOS":
+            tc.extra_defines.extend([
+                "HAVE_BROKEN_SHMGET",
+                "HAVE_BROKEN_SHM_OPEN",
+                "HAVE_BROKEN_GETPWUID",
+                "HAVE_BROKEN_UMASK",
+                "HAVE_NO_UNIX_SOCKETS",
+            ])
         tc.generate()
 
     def build(self):
