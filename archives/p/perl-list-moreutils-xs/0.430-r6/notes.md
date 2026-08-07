@@ -11,8 +11,8 @@
 
 ### 1. 源码下载
 ```bash
-源码位于: perl-list-moreutils-xs-0.430-r6.tar.gz
-URL: https://download.savannah.nongnu.org/releases/perl-list-moreutils-xs/perl-list-moreutils-xs-0.430-r6.tar.gz
+源码位于: List-MoreUtils-XS-0.430.tar.gz
+URL: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/List-MoreUtils-XS-0.430.tar.gz
 ```
 
 ### 2. 初始化编译环境
@@ -68,9 +68,8 @@ make install  # 本地安装
 
 ## 源码修改
 
-应用了 2 个补丁：
-- 0001-LMUconfig.h.patch（手动添加类型检测宏定义）
-- 0002-Makefile.patch（编译配置调整）
+应用了 1 个补丁：
+- 0001-LMU.pm.patch（跳过 Config::AutoConf::LMU 编译器检查，手动生成 LMUconfig.h）
 
 ## 依赖版本
 
@@ -104,10 +103,28 @@ ls -lh /storage/Users/currentUser/tmp/builds/perl-list-moreutils-xs-0.430-r6.wor
 ## 注意事项
 
 1. **SELinux HMDFS 限制**：XS 模块（.so 文件）在 HMDFS 上无法加载，需要管理员安装到系统目录 `/data/service/hnp/`。
-2. **编译参数**：所有 Perl XS 模块编译需要 `-nostartfiles -nodefaultlibs` 参数。
-3. **环境变量**：必须设置 CPATH 和 LIBRARY_PATH，否则找不到 musl 头文件和库文件。
-4. **Config::AutoConf 问题**：该模块在 OpenHarmony 上无法正确检测类型定义，需要手动修复 LMUconfig.h。
+2. **编译参数**：当前系统 perl 的 lddlflags 已包含正确的 CRT 链接参数，无需额外 OTHERLDFLAGS。
+3. **环境变量**：系统 clang 的 include 路径已包含 musl/sysroot 头文件，无需额外设置 CPATH。
+4. **Config::AutoConf 问题**：该模块在 OpenHarmony 上无法正确检测类型定义，patch 0001 跳过检测并直接生成 LMUconfig.h。
 5. **质量门禁 G4**：无二进制文件是 Perl XS 模块的正常情况，不影响发布。
+
+## Conan 配方适配 (2026-08-07)
+
+### 配方文件
+- `conanfile.py`: Perl XS 模块 Conan 配方（Makefile.PL + make）
+- `conandata.yml`: 源码 URL (CPAN) + SHA256 + 补丁声明
+- `test_package/conanfile.py`: 消费者测试（验证 XS.so ELF + XS.pm 版本）
+- `test_package/test_package.py`: 测试脚本
+- `test_package/MANIFEST.yml`: 测试声明文件
+
+### 验证结果
+- conan-verify 全门禁通过 (G1-G4 + L2/L4/L5)
+- conan create 成功，产物: XS.so (150KB, ELF arm64) + XS.pm
+- test_package 测试通过
+
+### 源码信息
+- CPAN URL: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/List-MoreUtils-XS-0.430.tar.gz
+- SHA256: e8ce46d57c179eecd8758293e9400ff300aaf20fefe0a9d15b9fe2302b9cb242
 
 ## 参考经验
 
@@ -116,4 +133,8 @@ ls -lh /storage/Users/currentUser/tmp/builds/perl-list-moreutils-xs-0.430-r6.wor
 
 ---
 **编译结束**: 2026-06-13 17:10
+**最终状态**: built
+---
+
+**编译结束**: 2026-08-07 10:04
 **最终状态**: built
