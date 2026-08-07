@@ -37,14 +37,13 @@ class AggConan(ConanFile):
 
     # Patches declared here (no conandata.yml) — avoids the CI
     # build_and_test.sh "Pre-download" BUILD_DIR crash.
-    exports_sources = "patches/*"
-    # Ship the pre-generated autoreconf products (configure, aclocal.m4,
-    # ltmain.sh, Makefile.in, config.{sub,guess}, install-sh, missing,
-    # depcomp) as a second tarball. CI workers lack
-    # libtoolize/aclocal/automake, so they cannot run autoreconf
-    # themselves. `exports` copies this file into the recipe cache so
-    # source() can reference it via self.recipe_folder.
-    exports = "agg-2.7.0.r145-preconf.tar.xz"
+    # preconf/ ships pre-generated autoreconf products (configure,
+    # aclocal.m4, ltmain.sh, Makefile.in, config.{sub,guess},
+    # install-sh, missing, depcomp) as plain text files. CI workers
+    # lack libtoolize/aclocal/automake, so they cannot run autoreconf
+    # themselves. These are committed alongside the recipe (not as a
+    # binary tarball) so the PR diff applies cleanly on CI.
+    exports_sources = "patches/*", "preconf/*"
 
     def requirements(self):
         pass
@@ -63,16 +62,23 @@ class AggConan(ConanFile):
             strip_root=True,
         )
         # Overlay the pre-generated autoreconf products (configure,
-        # aclocal.m4, ltmain.sh, Makefile.in, config.{sub,guess},
-        # install-sh, missing, depcomp) on top of the dfsg tree.
+        # aclocal.m4, ltmain.sh, Makefile.in [all subdirs], config.{sub,guess},
+        # install-sh, missing, depcomp, compile) on top of the dfsg tree.
         # CI workers lack libtoolize/aclocal/automake, so they cannot
-        # run autoreconf themselves. We generated these locally and
-        # ship them as a second tarball alongside the recipe.
-        get(
-            self,
-            url="file://{}".format(os.path.join(self.recipe_folder, "agg-2.7.0.r145-preconf.tar.xz")),
-            strip_root=True,
-        )
+        # run autoreconf themselves. These are plain-text files shipped
+        # via exports_sources="preconf/*" and copied into the source tree.
+        import shutil
+        # source() runs with cwd = the unpacked source tree root.
+        # preconf/ preserves subdirectory structure (gpc/Makefile.in etc).
+        preconf_dir = os.path.join(os.getcwd(), "preconf")
+        if os.path.isdir(preconf_dir):
+            for root, dirs, files in os.walk(preconf_dir):
+                rel = os.path.relpath(root, preconf_dir)
+                dst_root = os.getcwd() if rel == "." else os.path.join(os.getcwd(), rel)
+                os.makedirs(dst_root, exist_ok=True)
+                for name in files:
+                    shutil.copy2(os.path.join(root, name), os.path.join(dst_root, name))
+                    os.chmod(os.path.join(dst_root, name), 0o755)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
