@@ -36,6 +36,8 @@ for my $line (@lines) {
             $in_heredoc = 1;
             next;
         }
+        # Preserve non-heredoc lines (shell preamble, variable definitions, etc.)
+        $output .= $line;
     } else {
         if ($line =~ /^!GROK!THIS!\s*$/) {
             $in_heredoc = 0;

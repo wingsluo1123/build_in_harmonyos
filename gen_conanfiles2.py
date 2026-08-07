@@ -6,7 +6,7 @@ TEMPLATE = '''#!/usr/bin/env python3
 """Conan recipe — {name} {version} (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 class {class_name}(ConanFile):
     name = "{name}"
@@ -15,13 +15,16 @@ class {class_name}(ConanFile):
     license = "FIXME_VERIFY_LICENSE"  # FIXME: verify actual license (Artistic-1.0, Artistic-2.0, etc.)
     homepage = "{homepage}"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "conandata.yml"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def build(self):
         src = self.source_folder
+        apply_conandata_patches(self)
         self.run("perl Makefile.PL", cwd=src)
         # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
         if self.settings.os == "OHOS":
