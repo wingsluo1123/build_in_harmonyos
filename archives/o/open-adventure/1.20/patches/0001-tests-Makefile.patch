@@ -12,55 +12,55 @@
  # Generate bogus savegames.
  cheat_numdie.adv:
 -	@$(PARDIR)/cheat -d -900 -o cheat_numdie.adv > /tmp/cheat_numdie
-+	@$(PARDIR)/cheat -d -900 -o cheat_numdie.adv > $$(TMPDIR)/cheat_numdie
++	@$(PARDIR)/cheat -d -900 -o cheat_numdie.adv > $${TMPDIR}/cheat_numdie
  cheat_numdie1000.adv:
 -	@$(PARDIR)/cheat -d -1000 -o cheat_numdie1000.adv > /tmp/cheat_numdie1000
-+	@$(PARDIR)/cheat -d -1000 -o cheat_numdie1000.adv > $$(TMPDIR)/cheat_numdie1000
++	@$(PARDIR)/cheat -d -1000 -o cheat_numdie1000.adv > $${TMPDIR}/cheat_numdie1000
  cheat_savetamper.adv:
 -	@$(PARDIR)/cheat -d 2000 -o cheat_savetamper.adv > /tmp/cheat_savetamper
-+	@$(PARDIR)/cheat -d 2000 -o cheat_savetamper.adv > $$(TMPDIR)/cheat_savetamper
++	@$(PARDIR)/cheat -d 2000 -o cheat_savetamper.adv > $${TMPDIR}/cheat_savetamper
  resume_badversion.adv:
 -	@$(PARDIR)/cheat -v -1337 -o resume_badversion.adv > /tmp/cheat_badversion
-+	@$(PARDIR)/cheat -v -1337 -o resume_badversion.adv > $$(TMPDIR)/cheat_badversion
++	@$(PARDIR)/cheat -v -1337 -o resume_badversion.adv > $${TMPDIR}/cheat_badversion
  thousand_saves.adv:
 -	@$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > /tmp/cheat_1000saves
-+	@$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > $$(TMPDIR)/cheat_1000saves
++	@$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > $${TMPDIR}/cheat_1000saves
  thousand_turns.adv:
 -	@$(PARDIR)/cheat -t -1000 -o thousand_turns.adv > /tmp/cheat_1000turns
-+	@$(PARDIR)/cheat -t -1000 -o thousand_turns.adv > $$(TMPDIR)/cheat_1000turns
++	@$(PARDIR)/cheat -t -1000 -o thousand_turns.adv > $${TMPDIR}/cheat_1000turns
  thousand_limit.adv:
 -	@$(PARDIR)/cheat -l -1000 -o thousand_limit.adv > /tmp/cheat_1000limit
-+	@$(PARDIR)/cheat -l -1000 -o thousand_limit.adv > $$(TMPDIR)/cheat_1000limit
++	@$(PARDIR)/cheat -l -1000 -o thousand_limit.adv > $${TMPDIR}/cheat_1000limit
  SGAMES = cheat_numdie.adv cheat_numdie1000.adv cheat_savetamper.adv resume_badversion.adv \
  	thousand_saves.adv thousand_turns.adv thousand_limit.adv
  
  # Force coverage of cheat edgecases
  scheck1:
 -	@$(PARDIR)/cheat -QqQ 2> /tmp/coverage_cheat_batopt | true
-+	@$(PARDIR)/cheat -QqQ 2> $$(TMPDIR)/coverage_cheat_batopt | true
++	@$(PARDIR)/cheat -QqQ 2> $${TMPDIR}/coverage_cheat_batopt | true
  	@./outcheck.sh "cheat: bogus option for save file generation"
  scheck2:
  	@$(PARDIR)/cheat 2>/dev/null | true
  	@./outcheck.sh "cheat: No save file specified"
  scheck3:
 -	@$(PARDIR)/cheat -d 1 2> /tmp/coverage_cheat_nooutput | true
-+	@$(PARDIR)/cheat -d 1 2> $$(TMPDIR)/coverage_cheat_nooutput | true
++	@$(PARDIR)/cheat -d 1 2> $${TMPDIR}/coverage_cheat_nooutput | true
  	@./outcheck.sh "cheat: doesn't save because we omit -o"
  scheck4:
 -	@$(PARDIR)/cheat -o / 2> /tmp/coverage_cheat_badoutput | true
-+	@$(PARDIR)/cheat -o / 2> $$(TMPDIR)/coverage_cheat_badoutput | true
++	@$(PARDIR)/cheat -o / 2> $${TMPDIR}/coverage_cheat_badoutput | true
  	@./outcheck.sh "cheat: doesn't save to invalid path"
  scheck5:
 -	@$(advent) -r /badfilename < pitfall.log > /tmp/coverage_advent_readfail 2>&1 || exit 1
-+	@$(advent) -r /badfilename < pitfall.log > $$(TMPDIR)/coverage_advent_readfail 2>&1 || exit 1
++	@$(advent) -r /badfilename < pitfall.log > $${TMPDIR}/coverage_advent_readfail 2>&1 || exit 1
  	@./outcheck.sh "cheat: doesn't start with invalid file with -r"
  scheck6:
 -	@$(advent) -l / < pitfall.log > /tmp/coverage_advent_logfail 2>&1 || exit 1
-+	@$(advent) -l / < pitfall.log > $$(TMPDIR)/coverage_advent_logfail 2>&1 || exit 1
++	@$(advent) -l / < pitfall.log > $${TMPDIR}/coverage_advent_logfail 2>&1 || exit 1
  	@./outcheck.sh "cheat: doesn't start with invalid file passed to -l"
  scheck7:
 -	@$(advent) -r thousand_saves.adv < pitfall.log > /tmp/coverage_advent_readfail 2>&1 || exit 1
-+	@$(advent) -r thousand_saves.adv < pitfall.log > $$(TMPDIR)/coverage_advent_readfail 2>&1 || exit 1
++	@$(advent) -r thousand_saves.adv < pitfall.log > $${TMPDIR}/coverage_advent_readfail 2>&1 || exit 1
  	@./outcheck.sh "test -r with valid input"
  SCHECKS = scheck1 scheck2 scheck3 scheck4 scheck5 scheck6 scheck7
  
@@ -75,7 +75,7 @@
  # Rebuild characterizing tests
  buildchecks: savegames
 -	$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > /tmp/regress1000saves
-+	$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > $$(TMPDIR)/regress1000saves
++	$(PARDIR)/cheat -s -1000 -o thousand_saves.adv > $${TMPDIR}/regress1000saves
  	@for file in $(TESTLOADS); do \
  	    echo "Remaking $${file}.chk"; \
  	    OPTS=`sed -n /#options:/s///p <$${file}.log`; \
@@ -97,7 +97,7 @@
  
  tap: count $(SGAMES) $(TEST_TARGETS)
 -	@rm -f scratch.tmp /tmp/coverage* /tmp/cheat*
-+	@rm -f scratch.tmp $$(TMPDIR)/coverage* $$(TMPDIR)/cheat*
++	@rm -f scratch.tmp $${TMPDIR}/coverage* $${TMPDIR}/cheat*
  count:
  	@echo 1..$(words $(TEST_TARGETS))
  
