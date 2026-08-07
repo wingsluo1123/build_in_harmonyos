@@ -104,11 +104,6 @@ make test
 3. **安装路径**: 使用 INSTALL_BASE=$DEFAULT_PREFIX 安装到 ~/usr/local/lib/perl5/。
 4. **使用方式**: 需要通过 `-I/storage/Users/currentUser/usr/local/lib/perl5` 参数指定模块路径。
 
----
-
-**编译结束**: 2026-06-12 16:03
-**最终状态**: published
-
 ## 功能测试结果 (2026-06-12)
 
 测试日期: 2026-06-12 16:05
@@ -130,3 +125,7 @@ make test
 ## 结论
 
 IO::Tee 在 OpenHarmony 平台功能正常，建议发布预编译包。
+---
+
+**编译结束**: 2026-08-07 09:46
+**最终状态**: built
