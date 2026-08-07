@@ -19,7 +19,6 @@ print "OK: IO::Tty::Constant loaded successfully\n";
 
 # Test 2: Check some terminal constants are defined
 my @check_consts = qw(B0 B115200 B9600 BRKINT ECHO ICANON ISIG TCSANOW);
-my $all_defined = 1;
 for my $c (@check_consts) {
     my $val = eval $c;
     if (defined $val) {
