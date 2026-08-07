@@ -1,77 +1,63 @@
 software: ncurses
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/6.5/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
 
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
+# ─────────────────────────────────────────────────────────────
+# ncurses 6.5 — HarmonyOS PC (aarch64) 适配
+# 状态: built (conan-verify 通过; 未上传制品仓)
+# ─────────────────────────────────────────────────────────────
 version: "6.5"
 
-# 编译状态
-# published | built | failed | archived
-status: published
+# 编译状态: published | built | failed | archived
+status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-22"
+build_date: "2026-08-07"
 
 # ============================================================
 # 源码信息
 # ============================================================
-
 source:
-  # 源码下载 URL
+  # 官方源 (R39)
   url: "https://invisible-mirror.net/archives/ncurses/ncurses-6.5.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  # 两次从官方 URL 下载验证一致
+  sha256: "136d91bc269a9a5785e5f9e980bc76ab57428f604ce3e5a5a90cebc767971cc6"
   tar_format: tar.gz
 
 # ============================================================
 # 构建配置
 # ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
 
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+  # 关键: --without-shared 系统同名库强制静态编译 (R26/R4)
+  configure_options:
+    - "--without-shared"
+    - "--with-normal"
+    - "--without-debug"
+    - "--without-ada"
+    - "--without-manpages"
+    - "--without-cxx-binding"
+    - "--enable-widec"
+    - "--enable-overwrite"
 
-  # 编译依赖列表（格式: name/version）
+  # ncurses 无外部依赖 (W0)
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
 
-  # 编译器
   cc: clang
   cxx: clang++
 
 # ============================================================
-# 补丁信息
+# 补丁信息 (配方内联 sed 实现, 无独立补丁文件)
 # ============================================================
-
-# 应用的补丁列表
 patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+# 配方 build() 内联执行:
+# - E160: config.guess/sub 识别 HarmonyOS (uname -s=HarmonyOS)
+# - as_expr=false: 绕过 /usr/bin/expr 对 BRE 交替 "\|" 的 bug (Makefile 乱码)
+# - umask 077 移除: HMDFS UID 映射导致 0700 临时目录不可写
 
 # ============================================================
 # 知识沉淀
 # ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "HMDFS expr bug: /usr/bin/expr 对 '\\|' 交替模式返回垃圾字节, config.status 计算 ac_top_srcdir 出错导致子目录 Makefile 变量行乱码; as_expr=false 强制 sed fallback"
+  - "HMDFS UID 映射: config.status umask 077 建的 0700 临时目录对进程不可写, 需移除 umask 077 或 TMPDIR 指向可写目录"
+  - "GNU make -jN jobserver 使用 mkfifo, HMDFS 不支持 (Operation not permitted), 需 -j1"
