@@ -24,6 +24,10 @@ class PerfConan(ConanFile):
         if self.settings.os in ("Linux", "OHOS"):
             self.requires("zlib/1.3.1.1")
 
+    def configure(self):
+        # R26: System-named library must be static
+        self.options["zlib"].shared = False
+
     def layout(self):
         basic_layout(self)
 
