@@ -182,5 +182,5 @@ nm -D utf8_strict.so  # PerlIO functions exported ✅
 | 功能测试替代方案 | 嵌入式 Perl + dlopen | 嵌入式 Perl + dlopen |
 ---
 
-**编译结束**: 2026-08-07 11:50
-**最终状态**: built
+**编译结束**: 2026-08-08 00:15
+**最终状态**: published
