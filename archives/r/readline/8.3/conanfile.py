@@ -49,11 +49,9 @@ class ReadlineConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # HMDFS can't create ./confXXXXXX temp dirs (E002).
-        # Patch configure to use $HOME/tmp instead of ./ for mktemp.
-        cfg = os.path.join(self.source_folder, "configure")
-        home = os.environ.get("HOME", "/storage/Users/currentUser")
-        self.run(f"sed -i 's|\"\\./conf|\"{home}/tmp/conf|g' {cfg}")
+        # HMDFS: umask 077 prevents writing inside mktemp dir.
+        # Same fix as chmlib (0003-configure.patch): umask 077 → 002.
+        self.run(f"sed -i 's/umask 077/umask 002/g' {self.source_folder}/configure")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
