@@ -125,6 +125,14 @@ class PostgresqlTemporalTablesConan(ConanFile):
             src = os.path.join(build_dir, "..", "src", mf)
             if os.path.isfile(src) and not os.path.isfile(os.path.join(pgxs_src, mf)):
                 _shutil.copy2(src, os.path.join(pgxs_src, mf))
+        # Install config/ directory (install-sh, missing) — required by PGXS
+        config_dst = os.path.join(pg_install, "lib", "postgresql", "pgxs", "config")
+        os.makedirs(config_dst, exist_ok=True)
+        for cf in ["install-sh", "missing"]:
+            src = os.path.join(build_dir, "..", "config", cf)
+            if os.path.isfile(src):
+                _shutil.copy2(src, os.path.join(config_dst, cf))
+                os.chmod(os.path.join(config_dst, cf), 0o755)
 
         pg_config_path = os.path.join(pg_install, "bin", "pg_config")
         if os.path.isfile(pg_config_path):
