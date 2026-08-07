@@ -9,7 +9,7 @@
 
 ## 依赖
 - openssl 1.1.1w（已预编译）
-- pcre2 10.42（已预编译）
+- pcre2 10.40（已预编译）
 
 ## 编译过程
 
@@ -84,3 +84,7 @@ make install DESTDIR=/storage/Users/currentUser/test-install-pound-4.22
 - **现象**: pthread_mutexattr_settype undeclared
 - **解决方案**: 使用默认mutex属性
 - **适用场景**: 需要递归锁的软件
+---
+
+**编译结束**: 2026-08-08 02:31
+**最终状态**: built

@@ -12,10 +12,11 @@ version: "4.22"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
+build_system: autotools
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-21"
+build_date: "2026-08-08"
 
 # ============================================================
 # 源码信息
@@ -23,10 +24,10 @@ build_date: "2026-05-21"
 
 source:
   # 源码下载 URL
-  url: "file:///storage/Users/currentUser/tmp/builds/pound-4.22.tar.gz"
+  url: "https://github.com/graygnuorg/pound/archive/refs/tags/v4.22.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "5781ba7fe2740f118ce846a32d861ae926f00496e0f2be31880886512407c887"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -44,13 +45,12 @@ build:
   # 配置选项列表
   configure_options:
     - "--prefix=/storage/Users/currentUser/usr/local"
-    - "CFLAGS=-I/storage/Users/currentUser/usr/local/include"
-    - "LDFLAGS=-L/storage/Users/currentUser/usr/local/lib"
+    - "--disable-dynamic-backends"
 
   # 编译依赖列表（格式: name/version）
   dependencies:
     - openssl/1.1.1w
-    - pcre2/10.42
+    - pcre2/10.40
 
   # 编译器
   cc: clang
@@ -61,16 +61,17 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-openharmony-pthread-compat.patch"
+  - "0002-skip-doc-build.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "pthread_cancel not available on OpenHarmony, use pthread_detach instead"
+  - "pthread_mutexattr_settype not fully supported, use default mutex"
+  - "makeinfo not available, skip doc directory in SUBDIRS"
+  - "Source from git tag requires bootstrap (autoreconf) before configure"
