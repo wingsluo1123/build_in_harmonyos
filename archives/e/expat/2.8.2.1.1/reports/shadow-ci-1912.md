@@ -62,6 +62,8 @@ Build Summary:
 Additional checks:
 
 - R37 version-collision check passed for `expat/2.8.2.1.1`.
+- AI review was re-run after the `test_package` API check was added and
+  reported no remaining issues.
 - `cmake --build` linked `libexpat.so` successfully; no `libexpat.so.1` symlink
   was created.
 - `cmake --install` installed `lib/libexpat.so` successfully.
