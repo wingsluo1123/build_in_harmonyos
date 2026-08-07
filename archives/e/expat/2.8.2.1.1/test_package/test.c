@@ -6,6 +6,10 @@
 #define TARGET_SO "libexpat.so"
 #endif
 
+typedef XML_Parser (*XML_ParserCreateFunc)(const XML_Char *);
+typedef enum XML_Status (*XML_ParseFunc)(XML_Parser, const char *, int, int);
+typedef void (*XML_ParserFreeFunc)(XML_Parser);
+
 static void *load_symbol(void *handle, const char *name) {
     dlerror();
     void *symbol = dlsym(handle, name);
@@ -25,9 +29,9 @@ int main(void) {
         return 1;
     }
 
-    XML_Parser (*create_parser)(const XML_Char *) = (XML_Parser (*)(const XML_Char *))load_symbol(h, "XML_ParserCreate");
-    XML_Status (*parse)(XML_Parser, const char *, int, int) = (XML_Status (*)(XML_Parser, const char *, int, int))load_symbol(h, "XML_Parse");
-    void (*free_parser)(XML_Parser) = (void (*)(XML_Parser))load_symbol(h, "XML_ParserFree");
+    XML_ParserCreateFunc create_parser = (XML_ParserCreateFunc)load_symbol(h, "XML_ParserCreate");
+    XML_ParseFunc parse = (XML_ParseFunc)load_symbol(h, "XML_Parse");
+    XML_ParserFreeFunc free_parser = (XML_ParserFreeFunc)load_symbol(h, "XML_ParserFree");
     if (!create_parser || !parse || !free_parser) {
         dlclose(h);
         return 1;
