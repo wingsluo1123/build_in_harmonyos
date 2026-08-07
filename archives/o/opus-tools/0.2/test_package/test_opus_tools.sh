@@ -1,6 +1,11 @@
 #!/bin/sh
+set -euo pipefail 2>/dev/null || set -eu
 # Functional test for opus-tools executables
 # Usage: test_opus_tools.sh <bin_dir>
+if [ $# -lt 1 ] || [ -z "$1" ]; then
+    echo "Usage: $0 <bin_dir>"
+    exit 1
+fi
 BIN_DIR="$1"
 OPUSENC="$BIN_DIR/opusenc"
 OPUSDEC="$BIN_DIR/opusdec"
