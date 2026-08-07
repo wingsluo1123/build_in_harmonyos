@@ -9,7 +9,7 @@ import os
 from conan import ConanFile
 
 
-class PerllistcompareTestConan(ConanFile):
+class PerlListCompareTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):

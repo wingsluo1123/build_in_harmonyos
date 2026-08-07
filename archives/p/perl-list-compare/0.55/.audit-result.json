@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-2",
+      "file": "archives/p/perl-list-compare/0.55/conanfile.py",
+      "line": 21,
+      "description": "Missing 'package_type' class attribute. Code style rule CS-2 (类与属性) requires package_type to be explicitly set — not left empty. For a Perl module that provides reusable library code, package_type should be \"library\". Conan 2.x defaults to None when unset, which is less explicit.",
+      "fix_suggestion": "Add 'package_type = \"library\"' to the class attributes, e.g. after the 'settings' line: 'package_type = \"library\"  # Pure Perl module (no compiled libraries)'"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-14",
+      "file": "archives/p/perl-list-compare/0.55/manifest.yaml",
+      "line": 18,
+      "description": "Build date inconsistency: version-level manifest.yaml has build_date \"2026-08-07\" while notes.md (line 5) and software-level manifest.yaml (line 21) both use build_date \"2026-06-12\". The version manifest date appears to have been updated during the audit/fix process without synchronizing the other files.",
+      "fix_suggestion": "Align build_date across all files. Either use the original build date 2026-06-12 consistently, or update notes.md and software manifest.yaml to 2026-08-07 if a rebuild was performed."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-13",
+      "file": "archives/p/perl-list-compare/manifest.yaml",
+      "line": 13,
+      "description": "Software-level manifest homepage uses HTTP instead of HTTPS: 'http://thenceforward.net/perl/modules/List-Compare/'. While CS-13's HTTPS requirement is primarily for conandata.yml source URLs, using HTTPS for all URLs is best practice. The conanfile.py correctly uses 'https://metacpan.org/dist/List-Compare' as homepage, making this inconsistent.",
+      "fix_suggestion": "Change homepage to 'https://metacpan.org/dist/List-Compare' to match the conanfile.py homepage, or verify if thenceforward.net supports HTTPS and use 'https://thenceforward.net/...'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-11",
+      "file": "archives/p/perl-list-compare/0.55/test_package/conanfile.py",
+      "line": 28,
+      "description": "Hardcoded Perl version '5.42.0' as fallback in the glob path for site_perl directory. If the Perl version changes (e.g., upgrade to 5.44.0), this fallback path will not match and the test will fail silently. The glob.glob() approach on line 21-23 is the correct dynamic method, but the hardcoded fallback could become stale.",
+      "fix_suggestion": "Consider removing the hardcoded fallback and failing with a clear error message if glob finds no site_perl directory, or document that this fallback tracks the CI environment's Perl version and must be updated on Perl upgrades."
+    }
+  ],
+  "summary": "Round 2 audit of perl-list-compare 0.55 — VERDICT: PASS. All six P1/P2 fixes from Round 1 are correctly applied: (1) license changed from 'MIT' to 'perl_5' (correct SPDX identifier for Perl 5 dual license), (2) manifest status changed from 'published' to 'built' (honest — built and tested but not yet uploaded to CI artifact repo), (3) URL placeholder replaced with actual GitHub repo 'https://github.com/jkeenan/list-compare', (4) class names fixed to PascalCase (PerlListCompareConan, PerlListCompareTestConan), (5) unused 'import os' removed from main conanfile.py, (6) package() method simplified to single 'make install DESTDIR=...' call. No P0 (deception) issues: test_package calls real List::Compare API methods (get_intersection, get_union, get_unique, get_complement) with result assertions — not a stub (R34 pass); no fake test pass (R9 pass); status 'built' is honest (R3 pass); sha256 is a real 64-char hash not all-zeros/f (R4 pass); no pre-compiled binaries in PR (R19 pass). No P1 (recipe correctness) issues: version hardcoded at '0.55' (R37 pass); source URL is official CPAN/MetaCPAN (R39 pass); Conan 2.x API used correctly (R16 pass); no platform-specific code needed for pure Perl module (R32 N/A); no hardcoded compiler env vars (R33 pass); no generated file modifications (R6 pass). Remaining issues are minor: one P2 (missing package_type attribute) and three P3 (build date inconsistency, HTTP homepage in software manifest, hardcoded Perl version fallback in test_package). These do not block PR merge. The package is a pure Perl module with no C/XS code, correctly using Makefile.PL + make build system, with comprehensive test coverage (4190 upstream tests + functional consumer test)."
+}
