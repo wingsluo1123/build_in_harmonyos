@@ -79,11 +79,9 @@ class PostgresqlTemporalTablesConan(ConanFile):
                     f.write(content)
 
         # Configure PostgreSQL (generates pg_config.h and Makefile.global)
-        import subprocess
-        env = os.environ.copy()
-        env["TMPDIR"] = env.get("TMPDIR", "/tmp")
-        env["CC"] = shutil.which("clang") or "clang"
-        env["SHELL"] = shutil.which("bash") or "/bin/sh"
+        os.environ["TMPDIR"] = os.environ.get("TMPDIR", "/tmp")
+        os.environ["CC"] = shutil.which("clang") or "clang"
+        os.environ["SHELL"] = shutil.which("bash") or "/bin/sh"
 
         build_dir = os.path.join(pg_dir, "build-ohos")
         os.makedirs(build_dir, exist_ok=True)
@@ -91,20 +89,20 @@ class PostgresqlTemporalTablesConan(ConanFile):
         self.run(
             f'../configure --prefix="{pg_install}" '
             f'--without-icu --without-readline --without-zlib --without-openssl',
-            cwd=build_dir, env=env
+            cwd=build_dir
         )
 
         # Build minimal components: common, port, pg_config, headers, pgxs
         for target in ["src/common", "src/port", "src/bin/pg_config"]:
-            self.run(f"make -C {target}", cwd=build_dir, env=env)
+            self.run(f"make -C {target}", cwd=build_dir)
 
         # Install minimal PostgreSQL (pg_config, headers, pgxs)
-        self.run("make -C src/bin/pg_config install", cwd=build_dir, env=env)
-        self.run("make -C src/include install", cwd=build_dir, env=env)
-        self.run("make -C src/common install", cwd=build_dir, env=env)
-        self.run("make -C src/port install", cwd=build_dir, env=env)
+        self.run("make -C src/bin/pg_config install", cwd=build_dir)
+        self.run("make -C src/include install", cwd=build_dir)
+        self.run("make -C src/common install", cwd=build_dir)
+        self.run("make -C src/port install", cwd=build_dir)
         # Install PGXS makefiles
-        self.run("make -C src/makefiles install", cwd=build_dir, env=env)
+        self.run("make -C src/makefiles install", cwd=build_dir)
 
         pg_config_path = os.path.join(pg_install, "bin", "pg_config")
         if os.path.isfile(pg_config_path):
