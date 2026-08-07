@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Conan recipe — zbar 0.23.93
+
+ZBar is an open source software suite for reading bar codes from
+various sources, including video streams, image files and raw intensity
+sensors. The zbarimg command-line tool scans image files for barcodes.
+"""
+from conan import ConanFile
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
+import os
+
+
+class ZbarConan(ConanFile):
+    name = "zbar"
+    version = "0.23.93"
+    description = "Open source software suite for reading bar codes from images and video"
+    license = "LGPL-2.1-or-later"
+    homepage = "https://github.com/mchehab/zbar"
+    url = ""  # CI fills this
+
+    package_type = "library"
+
+    settings = "os", "compiler", "build_type", "arch"
+    options = {
+        "shared": [True, False],
+    }
+    default_options = {
+        "shared": False,
+    }
+
+    def export_sources(self):
+        export_conandata_patches(self)
+
+    def requirements(self):
+        self.requires("imagemagick/7.1.2.29")
+
+    def layout(self):
+        basic_layout(self)
+
+    def source(self):
+        get(self, **self.conan_data["sources"], strip_root=True)
+
+    def generate(self):
+        tc = AutotoolsToolchain(self)
+        # R26: static linking for system-name libraries
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
+            tc.configure_args.append("--disable-shared")
+        else:
+            tc.configure_args.append("--enable-shared")
+            tc.configure_args.append("--disable-static")
+        # Disable features not available on OHOS
+        tc.configure_args.append("--without-x")
+        tc.configure_args.append("--without-dbus")
+        tc.configure_args.append("--without-qt")
+        tc.configure_args.append("--without-gtk")
+        tc.configure_args.append("--without-python")
+        tc.configure_args.append("--without-java")
+        tc.generate()
+
+    def build(self):
+        apply_conandata_patches(self)
+        # zbar ships configure.ac only, need autoreconf
+        self.run("autoreconf -fi", cwd=self.source_folder)
+        # Fix umask 077 on HMDFS (E011)
+        self.run("sed -i 's/umask 077/umask 022/g' configure", cwd=self.source_folder)
+        autotools = Autotools(self)
+        autotools.configure()
+        autotools.make(args=["-j1"])
+
+    def package(self):
+        autotools = Autotools(self)
+        autotools.install()
+
+    def package_info(self):
+        self.cpp_info.libs = ["zbar"]
+        self.cpp_info.requires = ["imagemagick::MagickWand"]
+        # zbar.pc for pkg-config
+        self.cpp_info.set_property("pkg_config_name", "zbar")
+        self.cpp_info.set_property("cmake_file_name", "zbar")
+        self.cpp_info.set_property("cmake_target_name", "zbar::zbar")
