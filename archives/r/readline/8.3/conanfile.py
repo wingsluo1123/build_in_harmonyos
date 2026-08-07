@@ -5,7 +5,6 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-import os
 
 
 class ReadlineConan(ConanFile):
@@ -25,7 +24,7 @@ class ReadlineConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        pass
+        self.requires("ncurses/6.6")
 
     def layout(self):
         basic_layout(self)
@@ -38,8 +37,8 @@ class ReadlineConan(ConanFile):
         # R26: system-named library — default static to avoid polluting /lib /lib64
         tc.configure_args.append("--enable-static")
         tc.configure_args.append("--disable-shared")
-        # --with-curses lets configure auto-detect the termcap library
-        tc.configure_args.append("--with-curses")
+        # ncurses provides libncursesw (wide-char), not libncurses
+        tc.configure_args.append("bash_cv_termcap_lib=libncursesw")
         # Static lib needs -fPIC to be linkable into shared libraries downstream
         tc.extra_cflags.append("-fPIC")
         tc.extra_cflags.append("-O2")
@@ -60,4 +59,3 @@ class ReadlineConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["readline", "history"]
-        self.cpp_info.system_libs = ["gnutermcap"]
