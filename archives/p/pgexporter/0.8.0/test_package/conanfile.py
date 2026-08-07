@@ -2,7 +2,7 @@
 """Conan test_package for pgexporter 0.8.0.
 
 Verifies the installed pgexporter binary works correctly by running
-`pgexporter --version` and checking the output contains the version string.
+the test_pgexporter.sh smoke test script.
 """
 import os
 
@@ -28,5 +28,6 @@ class PgexporterTestConan(ConanFile):
         if not bin_path:
             raise Exception("pgexporter binary not found in package")
 
-        # Run --version to verify the binary is functional (L2 smoke test)
-        self.run(f'"{bin_path}" --version', env="conanrun")
+        # Run the smoke test script
+        test_script = os.path.join(os.path.dirname(__file__), "test_pgexporter.sh")
+        self.run(f'sh "{test_script}" "{bin_path}"', env="conanrun")
