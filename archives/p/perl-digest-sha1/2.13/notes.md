@@ -61,8 +61,8 @@ sh test_sha1.sh <perl_lib>
 
 ## 源码信息
 
-- 官方源: https://cpan.metacpan.org/authors/id/G/GA/GAAS/Digest-SHA1-2.13.tar.gz
-- SHA256: 68c1dac2187421f0eb7abf71452a06f190181b8fc4b28ededf5b90296fb943cc
+- 官方源: https://github.com/gisle/digest-sha1/archive/refs/tags/2.13.tar.gz
+- SHA256: edcbe9e049165bb326c1dcb41fc60f274b90bd37f64ea6cbf9fc77458579c24e
 
 ## 依赖版本
 
