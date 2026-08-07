@@ -7,6 +7,7 @@ This satisfies R34 (test must exercise the tested package's binary).
 import os
 
 from conan import ConanFile
+from conan.tools.build import can_run, cross_building
 from conan.tools.layout import basic_layout
 
 
@@ -27,6 +28,9 @@ class TectonicTestConan(ConanFile):
         pass
 
     def test(self):
+        if cross_building(self) or not can_run(self):
+            self.output.info("cross-building / cannot run host: skip test")
+            return
         # R34: Execute the tectonic binary directly
         tectonic_bin = os.path.join(
             self.dependencies["tectonic"].package_folder, "bin", "tectonic"

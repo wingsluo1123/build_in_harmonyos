@@ -9,6 +9,7 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.tools.build import can_run, cross_building
 from conan.tools.cmake import CMake, cmake_layout
 
 
@@ -28,6 +29,9 @@ class Graphite2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        if cross_building(self) or not can_run(self):
+            self.output.info("cross-building / cannot run host: skip test")
+            return
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution (same pattern as icu4c test_package).
         bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash")

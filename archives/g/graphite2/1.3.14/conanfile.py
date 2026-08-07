@@ -9,6 +9,7 @@ This recipe enforces R5/R26: static linking by default.
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.build import can_run
 
 
 class Graphite2Conan(ConanFile):
@@ -55,7 +56,8 @@ class Graphite2Conan(ConanFile):
         })
         cmake.build()
         # L1: Run upstream official test suite (83 tests via ctest)
-        cmake.test()
+        if can_run(self):
+            cmake.test()
 
     def package(self):
         cmake = CMake(self)
