@@ -52,12 +52,11 @@ pgimportdoc (PostgreSQL) 17.10
 - PGXS项目依赖pg_config，需要已安装的PostgreSQL提供构建支持
 - 编译产物pgimportdoc是PostgreSQL客户端工具，需要libpq运行时支持
 - make check需要运行中的PostgreSQL服务器，在编译环境中不可用
-
----
-
-**编译结束**: 2026-06-12 18:21
-**最终状态**: published
 ---
 
 **编译结束**: 2026-06-12 18:28
 **最终状态**: published
+---
+
+**编译结束**: 2026-08-08 01:30
+**最终状态**: built
