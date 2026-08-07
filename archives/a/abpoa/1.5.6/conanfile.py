@@ -37,7 +37,8 @@ class AbpoaConan(ConanFile):
         if not os.path.exists(os.path.join(simde_dir, "simde", "x86", "sse2.h")):
             mkdir(self, simde_dir)
             simde_url = "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"
-            get(self, simde_url, destination=simde_dir, strip_root=True)
+            get(self, simde_url, destination=simde_dir, strip_root=True,
+                sha256="ed2a3268658f2f2a9b5367628a85ccd4cf9516460ed8604eed369653d49b25fb")
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -55,21 +56,13 @@ class AbpoaConan(ConanFile):
         cmake.install()
         # Remove .git and test data from simde installation
         simde_inc = os.path.join(self.package_folder, "include", "simde")
+        excluded_dirs = {".git", "test", "docker", ".circleci", ".github",
+                         ".packit", ".no-test"}
         for root, dirs, files in os.walk(simde_inc, topdown=True):
-            if ".git" in dirs:
-                dirs.remove(".git")
-            if "test" in dirs:
-                dirs.remove("test")
-            if "docker" in dirs:
-                dirs.remove("docker")
-            if ".circleci" in dirs:
-                dirs.remove(".circleci")
-            if ".github" in dirs:
-                dirs.remove(".github")
-            if ".packit" in dirs:
-                dirs.remove(".packit")
-            if ".no-test" in dirs:
-                dirs.remove(".no-test")
+            for d in list(dirs):
+                if d in excluded_dirs:
+                    shutil.rmtree(os.path.join(root, d), ignore_errors=True)
+                    dirs.remove(d)
         # Also copy the abpoa.pc.in for pkg-config
         copy(self, "abpoa-1.pc",
              src=os.path.join(self.build_folder),

@@ -58,10 +58,28 @@ int main(void) {
 
     /* convert sequences to internal representation */
     int *seq_lens = (int*)malloc(sizeof(int) * n_seqs);
+    if (seq_lens == NULL) {
+        fprintf(stderr, "FAIL: malloc(seq_lens) returned NULL\n");
+        abpoa_free(ab); abpoa_free_para(abpt);
+        return 1;
+    }
     uint8_t **bseqs = (uint8_t**)malloc(sizeof(uint8_t*) * n_seqs);
+    if (bseqs == NULL) {
+        fprintf(stderr, "FAIL: malloc(bseqs) returned NULL\n");
+        free(seq_lens);
+        abpoa_free(ab); abpoa_free_para(abpt);
+        return 1;
+    }
     for (i = 0; i < n_seqs; ++i) {
         seq_lens[i] = strlen(seqs[i]);
         bseqs[i] = (uint8_t*)malloc(sizeof(uint8_t) * seq_lens[i]);
+        if (bseqs[i] == NULL) {
+            fprintf(stderr, "FAIL: malloc(bseqs[%d]) returned NULL\n", i);
+            for (j = 0; j < i; ++j) free(bseqs[j]);
+            free(bseqs); free(seq_lens);
+            abpoa_free(ab); abpoa_free_para(abpt);
+            return 1;
+        }
         for (j = 0; j < seq_lens[i]; ++j)
             bseqs[i][j] = nt4_table[(int)seqs[i][j]];
     }

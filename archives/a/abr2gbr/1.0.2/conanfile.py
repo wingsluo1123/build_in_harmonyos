@@ -62,8 +62,9 @@ class Abr2gbrConan(ConanFile):
                         incdirs.append(d)
             if incdirs:
                 return " ".join(f"-I{d}" for d in incdirs)
-        except Exception:
-            pass
+        except KeyError:
+            # glib dep missing from graph (shouldn't happen — declared in requires)
+            self.output.warning("glib not in dependency graph; glib include flags empty")
         return ""
 
     def _glib_libs(self):
@@ -98,7 +99,9 @@ class Abr2gbrConan(ConanFile):
                         syslibs.append(s)
             if syslibs:
                 parts.append(" ".join(f"-l{s}" for s in syslibs))
-        except Exception:
+        except KeyError:
+            # glib dep missing from graph — fall back to bare -lglib-2.0
+            self.output.warning("glib not in dependency graph; using -lglib-2.0 fallback")
             parts.append("-lglib-2.0")
         # gettext/intl symbols live in system musl libc on OHOS
         if str(self.settings.os) == "OHOS":

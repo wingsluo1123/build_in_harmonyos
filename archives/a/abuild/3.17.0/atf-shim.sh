@@ -244,3 +244,8 @@ _atf_run_test() {
     fi
     return 0
 }
+
+# Main entry point: execute the command passed as arguments (e.g.
+# "_atf_run_test <tc> <dir>"). Without this, the script only defines
+# functions and exits 0, silently skipping all upstream ATF tests.
+eval "$@"

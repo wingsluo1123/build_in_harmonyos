@@ -45,7 +45,7 @@ class AbuildTestConan(ConanFile):
 
         # 3. Run abuild-tar (ELF binary) to verify it can execute without crash
         abuild_tar = os.path.join(bindir, "abuild-tar")
-        result = self.run(f"{abuild_tar} 2>&1; exit 0",
+        result = self.run(f"{abuild_tar} 2>&1",
                           env="conanrun", ignore_errors=True)
         if result >= 128 or result == 127:
             raise ConanException(

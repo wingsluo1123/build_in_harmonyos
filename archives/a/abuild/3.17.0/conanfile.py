@@ -156,7 +156,7 @@ class AbuildConan(ConanFile):
                 self.run(f"cd {src} && make tests/testdata/abuild.key")
 
             # Generate Kyuafile (needed by test discovery)
-            self.run(f"cd {src} && mkdir -p tests/Kyuafile")
+            self.run(f"cd {src} && mkdir -p tests")
             self.run(f"cd {src} && make tests/Kyuafile")
 
             # Build test env: PATH must include source dir for tools
