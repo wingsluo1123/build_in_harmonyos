@@ -1,6 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -63,20 +63,22 @@
+@@ -63,20 +63,25 @@
  
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COVERAGE_FLAGS}")
  endif()
@@ -13,6 +13,9 @@
  include(GNUInstallDirs)
 +include(CheckFunctionExists)
 +check_function_exists(secure_getenv HAVE_SECURE_GETENV)
++if (HAVE_SECURE_GETENV)
++  add_compile_options(-DHAVE_SECURE_GETENV)
++endif()
  
  if (NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: Debug Release" FORCE)
@@ -23,7 +26,7 @@
  
  set(SUPPORTED_COMPILERS "GNU" "Clang" "AppleClang")
  
-@@ -89,27 +91,27 @@
+@@ -89,27 +94,27 @@
  if(NOT COMPILER_SUPPORTS_C17)
    message(FATAL_ERROR "The compiler ${CMAKE_C_COMPILER} has no C17 support. Please use a different C compiler.")
  endif()
@@ -54,7 +57,7 @@
  else ()
    message(FATAL_ERROR "zlib needed")
  endif()
-@@ -146,21 +148,22 @@
+@@ -146,21 +151,22 @@
  if (OPENSSL_FOUND)
    message(STATUS "OpenSSL found")
  else ()
@@ -78,7 +81,7 @@
  endif()
  
  if (DOCS)
-@@ -216,24 +219,24 @@
+@@ -216,24 +222,24 @@
  else()
    message(STATUS "Python3 not found; contrib file generation will be skipped")
  endif()
