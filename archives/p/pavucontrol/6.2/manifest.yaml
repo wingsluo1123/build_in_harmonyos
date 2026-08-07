@@ -1,34 +1,56 @@
 software: pavucontrol
 version: "6.2"
 status: failed
-compile_date: "2026-06-05"
+compile_date: "2026-08-07"
 build_system: meson
 
 source:
-  url: "https://www.freedesktop.org/software/pulseaudio/pavucontrol/pavucontrol-6.2.tar.xz"
-  sha256: ""
-  tar_format: tar.xz
+  url: "https://gitlab.freedesktop.org/pulseaudio/pavucontrol/-/archive/v6.2/pavucontrol-v6.2.tar.gz"
+  sha256: "e3677926f1eec42e24dd14ac5208e8ad557a807c3c18b1cd6c5faea531e840de"
+  tar_format: tar.gz
 
 build:
   system: meson
-  configure_options: []
+  configure_options:
+    - "default_library=shared"
+    - "audio-feedback=disabled"
   dependencies:
-    - "gtkmm-4.0/missing"
-    - "sigc++-3.0/3.6.0"
-    - "libpulse/16.1"
-    - "libpulse-mainloop-glib/missing"
-    - "json-glib-1.0/1.6.6"
+    - "gtkmm-4.0/4.16.0 (missing from conan repo)"
+    - "libsigc/3.6.0 (built from source)"
+    - "libpulse/17.0 (missing from conan repo)"
+    - "json-glib/1.10.8 (built from source)"
   cc: clang
   cxx: clang++
 
 patches_applied: []
+
 knowledge_gained:
-  - "pavucontrol 6.2依赖gtkmm-4.0(GTK4 C++包装)，无预编译包，无法编译"
+  - "pavucontrol 6.2 is a GTK4 C++ application requiring gtkmm-4.0, libpulse, and json-glib"
+  - "The entire GTK4 stack (gtk4, gtkmm-4.0, cairomm, pangomm, etc.) is not available in the conan repo"
+  - "9 of 12 dependencies were built from source successfully"
+  - "Remaining blockers: gtk4 (glib-compile-resources ELF execution restriction on OHOS), libpulse (libintl/dgettext declaration issues), gtkmm-4.0 (depends on gtk4)"
 
 test_results:
   total: 0
   passed: 0
   failed: 0
-  skipped: "configure失败：依赖缺失"
+  skipped: "configure failed: missing dependencies (gtkmm-4.0, libpulse)"
 
-failure_reason: "gtkmm-4.0(GTK4 C++包装)和libpulse-mainloop-glib缺失，无预编译包"
+failure_reason: "gtkmm-4.0 and libpulse not available in conan repo. Building from source blocked by OHOS platform limitations (ELF binary execution restriction for glib-compile-resources, missing libintl function declarations)"
+
+dependencies_built_from_source:
+  - "sigc++-3.0: 3.6.0"
+  - "harfbuzz: 14.2.0"
+  - "graphene: 1.10.8"
+  - "json-glib: 1.10.8"
+  - "pango: 1.56.4"
+  - "cairomm: 1.16.2"
+  - "glibmm-2.68: 2.82.0"
+  - "pangomm: 2.50.1"
+  - "cairo-gobject: 1.18.4"
+
+dependencies_missing:
+  - "gtk4 (not in conan repo, build blocked by OHOS ELF execution restriction)"
+  - "gtkmm-4.0 (not in conan repo, depends on gtk4)"
+  - "libpulse (not in conan repo, build blocked by libintl/dgettext issues)"
+  - "libpulse-mainloop-glib (not in conan repo, part of libpulse)"
