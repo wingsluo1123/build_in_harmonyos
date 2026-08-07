@@ -6,6 +6,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]) {
@@ -16,7 +17,9 @@ int main(int argc, char *argv[]) {
     }
     /* 原生场景：实际执行 tldr --version 并检查退出码（R34 反空壳） */
     const char *tldr = argv[1];
-    if (strchr(tldr, '"') || strchr(tldr, ';') || strchr(tldr, '|') || strchr(tldr, '&')) {
+    /* P2: 修正元字符检测。cmd 中路径被双引号包裹，; | & 在引号内无害；
+     * 真正危险的是 " $ ` \（提前结束引号 / 变量展开 / 命令替换 / 转义） */
+    if (strchr(tldr, '"') || strchr(tldr, '$') || strchr(tldr, '`') || strchr(tldr, '\\')) {
         fprintf(stderr, "tldr path contains shell metacharacters: %s\n", tldr);
         return 2;
     }
