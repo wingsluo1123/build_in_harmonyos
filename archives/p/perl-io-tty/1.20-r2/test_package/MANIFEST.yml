@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: perl-io-tty/1.20-r2
+homepage: "https://metacpan.org/pod/IO::Tty"
+
+# 上游测试命令
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: t/test.t
+    source: IO-Tty-1.20/t/test.t
+    description: "IO::Tty main test suite - tests pty creation, terminal operations"
+    command: "perl -Mblib t/test.t"
+  - file: t/pty_get_winsize.t
+    source: IO-Tty-1.20/t/pty_get_winsize.t
+    description: "Tests pty window size operations"
+    command: "perl -Mblib t/pty_get_winsize.t"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.pl
+    description: "Verifies IO::Tty::Constant loads and terminal constants are defined"
+    command: "perl test.pl"
+
+# 测试断言总数 (近似值)
+assertion_count: 12

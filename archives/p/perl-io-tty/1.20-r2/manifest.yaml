@@ -1,76 +1,65 @@
 software: perl-io-tty
 version: "1.20-r2"
 status: published
-build_date: "2026-06-11"
+build_date: "2026-08-07"
+build_system: perl-Makefile.PL
 
 source:
-  url: "https://cpan.metacpan.org/authors/id/T/TO/TODDR/IO-Tty-1.20.tar.gz"
-  sha256: ""
+  url: "https://github.com/toddr/IO-Tty/archive/refs/tags/1.20.tar.gz"
+  sha256: "4cfb9a18721679bfeb43fd1b286d33c039ddf6d177473411399c73435fbd4c0f"
   tar_format: tar.gz
 
 build:
   system: perl
   build_system: perl-Makefile.PL
   configure_options:
-    - "perl Makefile.PL PREFIX=/storage/Users/currentUser/usr/local"
+    - "perl Makefile.PL"
   dependencies:
-    - perl/5.42.0
+    - perl (system)
   cc: clang
   cxx: clang++
 
-patches_applied: []
+conan:
+  recipe: conanfile.py
+  conandata: conandata.yml
+  test_package: test_package/
+  profile: ohos-aarch64
+  verify_status: passed
+
+patches_applied:
+  - "0001-Makefile.PL.patch"
 
 knowledge_gained:
   - "Perl XS 模块编译需要 PERL_MM_OPT='LDFLAGS=-nostartfiles -nodefaultlibs'"
   - "SELinux HMDFS 限制：XS 模块在用户目录无法加载"
   - "IO::Tty 提供 PTY/TTY 操作接口，用于进程间通信"
+  - "符号检测使用 -c (compile-only) 避免链接失败"
+  - "Conan package_type=shared-library 适用于 Perl XS 模块"
 
 test_result:
   status: built
-  reason: "SELinux HMDFS 限制导致 XS 模块无法加载"
+  reason: "SELinux HMDFS 限制导致 XS 模块无法加载（纯 Perl 模块正常）"
 
 ohos_adaptation:
   key_points:
     - "使用 PERL_MM_OPT 传递链接参数绕过 CRT 文件缺失"
-    - "XS 模块需要 -nostartfiles -nodefaultlibs 链接参数"
-    - "配置阶段检测到 openpty, grantpt, ptsname 等函数"
+    - "XS 模块需要 -nostartfiles -nodefaultlibs -lc 链接参数"
+    - "配置阶段硬编码 PTY/TTY 函数检测结果"
+    - "符号检测使用 -c 标志避免链接（正确检测未定义符号）"
   common_dependencies:
-    - perl
+    - perl (system, not conan managed)
+
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/perl-io-tty-1.20-r2.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/perl-io-tty-1.20-r2.work
-  source_orig_hash: bcfa4ae7a9061b05
-  source_work_hash: c8b049ca0c2026e7
-  generated_at: '2026-06-12T15:38:23'
-  patches_count: 7
+  source_orig_hash: ff2f1199ac6e7260
+  source_work_hash: 04147151b0fcd626
+  generated_at: '2026-08-07T09:44:18'
+  patches_count: 1
 
 patch_classification:
-  - file: 0001-.patch-ai-review.txt.patch
-    type: auto
+  - file: 0001-Makefile.PL.patch
+    type: portability
     platform_only: True
-    guard: 'pending'
-  - file: 0002-Makefile.PL.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-Tty.c.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0004-xssubs.c.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-.pre-scan-report.yaml.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0006-MYMETA.json.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0007-MYMETA.yml.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+    guard: __OHOS__
