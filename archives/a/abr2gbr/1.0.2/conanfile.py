@@ -147,6 +147,12 @@ class Abr2gbrConan(ConanFile):
                 os.rename(obj_bin, dest)
                 os.chmod(dest, 0o755)
 
+        # jbr2gbr is an alias of the same binary (upstream Makefile creates the
+        # symlink; restored per review so the JBR→GBR entry point stays usable).
+        jbr_link = os.path.join(bindir, "jbr2gbr")
+        if os.path.isfile(dest) and not os.path.exists(jbr_link):
+            os.symlink("abr2gbr", jbr_link)
+
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libs = []
