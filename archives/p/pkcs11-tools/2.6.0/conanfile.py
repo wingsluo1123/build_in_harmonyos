@@ -2,7 +2,6 @@ import os
 import shutil
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
-from conan.tools.env import Environment
 from conan.tools.gnu import AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -37,12 +36,6 @@ class Pkcs11ToolsConan(ConanFile):
         # AutotoolsToolchain sets CC, CXX, CFLAGS, CPPFLAGS, LDFLAGS from profile and dependencies
         tc = AutotoolsToolchain(self)
         tc.generate()
-
-        # Append PKG_CONFIG_PATH for OpenSSL detection via pkg-config
-        openssl = self.dependencies["openssl"]
-        env = Environment()
-        env.define("PKG_CONFIG_PATH", os.path.join(openssl.package_folder, "lib", "pkgconfig"))
-        env.vars(self).save_script("conanbuild")
 
     def build(self):
         apply_conandata_patches(self)
@@ -84,6 +77,10 @@ class Pkcs11ToolsConan(ConanFile):
             "--includedir=${prefix}/include",
             "--oldincludedir=${prefix}/include",
         ]
+
+        # Set PKG_CONFIG_PATH for OpenSSL detection (not a compiler flag, R33 compliant)
+        openssl = self.dependencies["openssl"]
+        os.environ["PKG_CONFIG_PATH"] = os.path.join(openssl.package_folder, "lib", "pkgconfig")
 
         self.run(f'./configure {" ".join(configure_args)}', env=["conanbuild"], cwd=src)
         self.run("make -j1", env=["conanbuild"], cwd=src)
