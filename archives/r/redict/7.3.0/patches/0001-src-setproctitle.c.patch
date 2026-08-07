@@ -1,0 +1,71 @@
+--- a/src/setproctitle.c
++++ b/src/setproctitle.c
+@@ -226,29 +226,31 @@
+ 	envc = i;
+ 
+ 	/* We're going to deep copy argv[], but argv[0] will still point to
+ 	 * the old memory for the purpose of updating the title so we need
+ 	 * to keep the original value elsewhere.
+ 	 */
+ 	if (!(SPT.arg0 = strdup(argv[0])))
+ 		goto syerr;
+ 
+ #if __linux__
++#ifdef __GLIBC__
+ 	if (!(tmp = strdup(program_invocation_name)))
+ 		goto syerr;
+ 
+ 	program_invocation_name = tmp;
+ 
+ 	if (!(tmp = strdup(program_invocation_short_name)))
+ 		goto syerr;
+ 
+ 	program_invocation_short_name = tmp;
++#endif /* __GLIBC__ */
+ #elif __APPLE__
+ 	if (!(tmp = strdup(getprogname())))
+ 		goto syerr;
+ 
+ 	setprogname(tmp);
+ #endif
+ 
+     /* Now make a full deep copy of the environment and argv[] */
+ 	if ((error = spt_copyenv(envc, envp)))
+ 		goto error;
+@@ -312,20 +314,36 @@
+ 
+ 	return;
+ error:
+ 	SPT.error = error;
+ } /* setproctitle() */
+ 
+ 
+ #endif /* __linux || __APPLE__ */
+ #endif /* !HAVE_SETPROCTITLE */
+ 
++/* HarmonyOS/musl compatibility stubs for pthread cancellation functions */
++#include <pthread.h>
++#include <errno.h>
++__attribute__((weak)) int pthread_cancel(pthread_t t) {
++    (void)t;
++    return ESRCH;
++}
++__attribute__((weak)) int pthread_setcancelstate(int state, int *oldstate) {
++    if (oldstate) *oldstate = state;
++    return 0;
++}
++__attribute__((weak)) int pthread_setcanceltype(int type, int *oldtype) {
++    if (oldtype) *oldtype = type;
++    return 0;
++}
++
+ #ifdef SETPROCTITLE_TEST_MAIN
+ int main(int argc, char *argv[]) {
+ 	spt_init(argc, argv);
+ 
+ 	printf("SPT.arg0: [%p] '%s'\n", SPT.arg0, SPT.arg0);
+ 	printf("SPT.base: [%p] '%s'\n", SPT.base, SPT.base);
+ 	printf("SPT.end: [%p] (%d bytes after base)'\n", SPT.end, (int) (SPT.end - SPT.base));
+ 	return 0;
+ }
+ #endif
