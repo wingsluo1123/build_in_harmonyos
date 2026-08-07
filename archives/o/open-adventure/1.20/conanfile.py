@@ -77,9 +77,9 @@ class OpenAdventureConan(ConanFile):
 
     def _build_ncurses(self, build_dir, prefix, cc):
         ncurses_src = os.path.join(build_dir, "ncurses-6.4")
-        get(self, url="https://ftp.gnu.org/pub/gnu/ncurses/ncurses-6.4.tar.gz",
+        get(self, url="https://mirrors.kernel.org/gnu/ncurses/ncurses-6.4.tar.gz",
             sha256="6931283d9ac87c5073f30b6290c4c75f21632bb4fc3603ac8100812bed248159",
-            destination=build_dir, strip_root=False)
+            destination=build_dir, strip_root=False, verify_ssl=False)
 
         self._fix_scripts(ncurses_src)
 
@@ -134,7 +134,7 @@ class OpenAdventureConan(ConanFile):
         libedit_src = os.path.join(build_dir, "libedit-20240808-3.1")
         get(self, url="https://thrysoee.dk/editline/libedit-20240808-3.1.tar.gz",
             sha256="5f0573349d77c4a48967191cdd6634dd7aa5f6398c6a57fe037cc02696d6099f",
-            destination=build_dir, strip_root=False)
+            destination=build_dir, strip_root=False, verify_ssl=False)
 
         self._fix_scripts(libedit_src)
 
