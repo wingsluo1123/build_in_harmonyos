@@ -2,9 +2,20 @@
 
 ## 编译环境
 - 构建系统: custom（Cargo/Rust）
-- 编译日期: 2026-08-02
+- 编译日期: 2026-08-02（本地 CI 模拟复验 2026-08-07）
 - 平台: OHOS（OpenHarmony PC, aarch64）
 - 状态: failed（未适配）
+
+## 本地 CI 模拟验证（2026-08-07）
+
+- **conan create 通过（rc=0）**：失败记录模式 build() 校验 manifest/notes 完整不抛错，
+  成功打包 share/docuum/{manifest.yaml,notes.md}；test_package 执行
+  `test_failed_archive.py` 校验失败归档真实性 → **PASS: docuum failed adaptation record is complete**。
+- **上游测试无法运行（详细原因）**：docuum 是 Rust/Cargo 工具，真实构建需 cargo/rustc；
+  本地为 HarmonyOS musl 环境无 glibc ld-linux-aarch64.so.1，官方 rust 工具链
+  （glibc 动态链接 ELF）签名后仍 rc=126 无法加载，cmd-pkgs 无 OHOS rust 资产（404）——
+  与 kubetui/trlc 同根因，属本地环境限制；上游 `cargo test` 单元测试同样被挡。
+- 该库按 prefixsuffix 模式如实记录失败适配（status: failed），本地验证确认记录包可构建、CI 不红。
 
 ## 编译步骤
 
