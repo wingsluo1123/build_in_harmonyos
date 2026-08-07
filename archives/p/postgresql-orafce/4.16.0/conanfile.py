@@ -8,9 +8,10 @@ Requires pg_config from a system PostgreSQL installation.
 import os
 import shutil
 import glob
+import subprocess
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
 
 
@@ -35,44 +36,66 @@ class PostgresqlOrafceConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def _ensure_pg_config(self):
-        """Ensure pg_config is in PATH"""
-        if shutil.which("pg_config"):
-            return
+    def _find_pg_config(self):
+        """Find pg_config in PATH or common locations"""
+        path = os.environ.get("PATH", "")
+        # Check if pg_config is already in PATH
+        result = shutil.which("pg_config", path=path)
+        if result:
+            return result
+        # Check common locations
         home = os.environ.get("HOME", "")
         for p in [
             os.path.join(home, "usr", "local", "bin"),
             "/usr/local/bin",
             "/usr/bin",
+            "/usr/pgsql-17/bin",
+            "/usr/pgsql-16/bin",
         ]:
-            if os.path.isfile(os.path.join(p, "pg_config")):
-                os.environ["PATH"] = p + os.pathsep + os.environ.get("PATH", "")
-                return
+            candidate = os.path.join(p, "pg_config")
+            if os.path.isfile(candidate):
+                os.environ["PATH"] = p + os.pathsep + path
+                return candidate
+        return None
 
     def build(self):
         apply_conandata_patches(self)
 
-        # PGXS uses pg_config to find build settings (compiler, flags, include dirs)
-        self._ensure_pg_config()
+        pg_config = self._find_pg_config()
+        if not pg_config:
+            raise Exception("pg_config not found - PostgreSQL development files required. "
+                            "Install PostgreSQL or ensure pg_config is in PATH.")
 
-        # R9: Always use -j1
-        # R32: Support both Linux and OHOS
+        self.output.info(f"Using pg_config: {pg_config}")
+
+        # PGXS build: make uses pg_config to find PostgreSQL build settings
         self.run("make -j1", cwd=self.source_folder)
 
     def package(self):
-        # Copy built .so from source folder
-        so_path = os.path.join(self.source_folder, "orafce.so")
-        if os.path.isfile(so_path):
+        # Find orafce.so - it should be in the source folder after make
+        so_files = []
+        for pattern in ["orafce.so", "**/orafce.so"]:
+            so_files.extend(glob.glob(os.path.join(self.source_folder, pattern)))
+
+        if not so_files:
+            # Also check build folder
+            for pattern in ["orafce.so", "**/orafce.so"]:
+                so_files.extend(glob.glob(os.path.join(self.build_folder, pattern)))
+
+        if so_files:
             dst_lib = os.path.join(self.package_folder, "lib", "postgresql")
             os.makedirs(dst_lib, exist_ok=True)
-            shutil.copy2(so_path, os.path.join(dst_lib, "orafce.so"))
+            shutil.copy2(so_files[0], os.path.join(dst_lib, "orafce.so"))
+            self.output.info(f"Packaged orafce.so from: {so_files[0]}")
 
         # Copy .control file
-        control_path = os.path.join(self.source_folder, "orafce.control")
-        if os.path.isfile(control_path):
-            dst_ext = os.path.join(self.package_folder, "share", "postgresql", "extension")
-            os.makedirs(dst_ext, exist_ok=True)
-            shutil.copy2(control_path, os.path.join(dst_ext, "orafce.control"))
+        for pattern in ["orafce.control", "**/orafce.control"]:
+            controls = glob.glob(os.path.join(self.source_folder, pattern))
+            if controls:
+                dst_ext = os.path.join(self.package_folder, "share", "postgresql", "extension")
+                os.makedirs(dst_ext, exist_ok=True)
+                shutil.copy2(controls[0], os.path.join(dst_ext, "orafce.control"))
+                break
 
         # Copy SQL files (*.sql)
         dst_ext = os.path.join(self.package_folder, "share", "postgresql", "extension")
