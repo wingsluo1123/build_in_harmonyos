@@ -18,7 +18,7 @@ status: built
 build_system: makefile
 
 # 编译日期 (YYYY-MM-DD)
-build_date: "2026-07-15"
+build_date: "2026-08-05"
 
 # ============================================================
 # 源码信息
@@ -48,7 +48,8 @@ build:
   configure_options: ""
 
   # 编译依赖列表 (格式: name/version)
-  dependencies: []
+  dependencies:
+    - libusb/1.0.27
 
   # 编译器
   cc: clang
@@ -59,7 +60,8 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - 0001-teensy_loader_cli.c-libusb-1.0.patch
 
 # ============================================================
 # 知识沉淀
@@ -68,7 +70,8 @@ patches_applied: []
 # 编译中学到的知识
 knowledge_gained:
   - "纯 Makefile 项目，无 autotools/configure，直接调用编译器构建"
-  - "上游 Linux 分支硬编码 -DUSE_LIBUSB -lusb (libusb-0.1 compat API)"
-  - "无 Conan libusb 包可用，使用 stub USB 后端实现无依赖编译"
-  - "源码 USB 访问函数声明: teensy_open/teensy_write/teensy_close/hard_reboot/soft_reboot"
-  - "MakeToolchain 生成 CC/CFLAGS/LDFLAGS 环境变量，用于直接编译"
+  - "上游 Linux 分支使用 libusb-0.1 compat API (usb.h / -lusb)，已移植到 libusb 1.0"
+  - "libusb 1.0 头文件位于 include/libusb-1.0/libusb.h，编译时需追加该子目录到 -I 路径"
+  - "USB 后端函数已用真实 libusb 1.0 实现: teensy_open/teensy_write/teensy_close/hard_reboot/soft_reboot"
+  - "错误处理使用 libusb_strerror(真实返回码)，不再硬编码错误码"
+  - "AutotoolsToolchain 生成 CC/CFLAGS/LDFLAGS 环境变量，配合 libusb cpp_info 直接编译"
