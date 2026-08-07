@@ -83,6 +83,17 @@ class OpenImageIOConan(ConanFile):
         replace_in_file(self, ext_pkg,
             "get_target_property(FMT_INCLUDE_DIR fmt::fmt-header-only INTERFACE_INCLUDE_DIRECTORIES)",
             "if (TARGET fmt::fmt-header-only)\n    get_target_property(FMT_INCLUDE_DIR fmt::fmt-header-only INTERFACE_INCLUDE_DIRECTORIES)\nendif ()")
+        # Fix: libutil/CMakeLists.txt links fmt::fmt-header-only which doesn't exist in CMakeDeps
+        libutil_cmake = os.path.join(self.source_folder, "src", "libutil", "CMakeLists.txt")
+        replace_in_file(self, libutil_cmake,
+            "target_link_libraries (${targetname}\n                               PUBLIC fmt::fmt-header-only)",
+            "target_link_libraries (${targetname}\n                               PUBLIC $<TARGET_NAME_IF_EXISTS:fmt::fmt-header-only>)")
+        # Fix: libOpenImageIO/CMakeLists.txt links OpenColorIO::OpenColorIO directly
+        # (other optional deps use $<TARGET_NAME_IF_EXISTS:...>, this one doesn't)
+        oiio_cmake = os.path.join(self.source_folder, "src", "libOpenImageIO", "CMakeLists.txt")
+        replace_in_file(self, oiio_cmake,
+            "            OpenColorIO::OpenColorIO\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>",
+            "            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIO>\n            $<TARGET_NAME_IF_EXISTS:OpenColorIO::OpenColorIOHeaders>")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()

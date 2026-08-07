@@ -35,7 +35,7 @@ class ImathConan(ConanFile):
         cmake_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["sources"][0], strip_root=True)
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         tc = CMakeToolchain(self)
