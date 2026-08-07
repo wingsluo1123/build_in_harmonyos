@@ -5,6 +5,7 @@ PDF4QT is an open-source PDF editor based on Qt6. This recipe builds the
 core library (Pdf4QtLibCore) with vendored blend2d (2D vector graphics engine).
 """
 import os
+import shutil
 import subprocess
 
 from conan import ConanFile
@@ -91,11 +92,13 @@ class Pdf4QtConan(ConanFile):
         blend2d_install = os.path.join(self.build_folder, "blend2d-install")
         os.makedirs(blend2d_build, exist_ok=True)
 
-        # Configure blend2d
+        # Configure blend2d with Conan toolchain for cross-compilation
+        toolchain_file = os.path.join(self.build_folder, "generators", "conan_toolchain.cmake")
         subprocess.run([
             "cmake", blend2d_src,
             "-DCMAKE_INSTALL_PREFIX=" + blend2d_install,
-            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCMAKE_BUILD_TYPE=" + str(self.settings.build_type),
+            "-DCMAKE_TOOLCHAIN_FILE=" + toolchain_file,
             "-DBLEND2D_STATIC=ON",
             "-DBLEND2D_NO_JIT=OFF",
             "-DBLEND2D_NO_FUTEX=OFF",
@@ -126,7 +129,6 @@ class Pdf4QtConan(ConanFile):
         cmake.install()
 
         # Move shared library from bin/ to lib/ (OHOS CMake treats .so as RUNTIME)
-        import shutil
         bin_dir = os.path.join(self.package_folder, "bin")
         lib_dir = os.path.join(self.package_folder, "lib")
         os.makedirs(lib_dir, exist_ok=True)
