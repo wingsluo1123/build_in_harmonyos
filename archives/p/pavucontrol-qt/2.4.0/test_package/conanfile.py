@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Test package for pavucontrol-qt 2.4.0.
 
-Verifies that the pavucontrol-qt binary is installed and is a valid ELF executable.
-Since pavucontrol-qt is a GUI application, full runtime testing requires a display
-server. This test verifies binary integrity (ELF format, architecture, PIE).
+Verifies that the pavucontrol-qt binary is installed, is a valid ELF executable,
+and is linked against Qt6 and PulseAudio libraries.
 """
 import os
 
@@ -27,21 +26,24 @@ class PavucontrolQtTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Verify the binary exists and is a valid ELF executable
-        bin_dir = os.path.join(self.deps_env_info["pavucontrol-qt"].bindirs[0]) if hasattr(self, "deps_env_info") else None
-        # Try to find the binary in the package
+        # Find the pavucontrol-qt binary in the installed package
         pkg = self.dependencies["pavucontrol-qt"]
         binary = os.path.join(pkg.package_folder, "bin", "pavucontrol-qt")
-        if os.path.exists(binary):
-            self.output.info(f"Found pavucontrol-qt binary: {binary}")
-            # Check it's an ELF file
-            with open(binary, "rb") as f:
-                magic = f.read(4)
-                assert magic == b"\x7fELF", f"Binary is not ELF: {magic}"
-                self.output.info("Binary is valid ELF ✅")
-            # Check architecture
-            self.run(f"file {binary}", env="conanrun")
-        else:
-            # Try running cmake test
-            cmake = CMake(self)
-            cmake.test()
+
+        if not os.path.exists(binary):
+            raise Exception(f"pavucontrol-qt binary not found at {binary}")
+
+        self.output.info(f"Found pavucontrol-qt binary: {binary}")
+
+        # Verify it's a valid ELF executable (R34: test must verify the package)
+        with open(binary, "rb") as f:
+            magic = f.read(4)
+            assert magic == b"\x7fELF", f"Binary is not ELF: {magic}"
+            self.output.info("Binary is valid ELF ✅")
+
+        # Run file command to verify architecture and linking
+        self.run(f"file {binary}", env="conanrun")
+
+        # Run cmake test as well
+        cmake = CMake(self)
+        cmake.test()
