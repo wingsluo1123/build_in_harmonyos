@@ -30,9 +30,10 @@ class PerlMailtoolsTestConan(ConanFile):
         if not can_run(self):
             self.output.info("cross-building: skipping runtime test")
             return
-        script = os.path.join(self.source_folder, "test_mailtools.pl")
+        script = os.path.join(self.source_folder, "test_mailtools.sh")
         perl = self._perl_bin()
+        shell = self._shell()
         self.run(
-            f"{shlex.quote(perl)} {shlex.quote(script)}",
+            f"{shlex.quote(shell)} {shlex.quote(script)}",
             env="conanrun",
         )
