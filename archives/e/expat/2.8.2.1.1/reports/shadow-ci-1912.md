@@ -1,4 +1,4 @@
-# expat 2.8.2.1 shadow CI report
+# expat 2.8.2.1.1 shadow CI report
 
 Date: 2026-08-07
 Issue: 1912
@@ -6,7 +6,7 @@ Branch: feat/expat-2.8.2.1-1912
 
 ## Change
 
-The previous `vips/8.18.4` shadow CI run failed while building this dependency:
+The previous `vips/8.18.4` shadow CI run failed while building `expat/2.8.2.1`:
 
 ```text
 CMake Error: failed to create symbolic link 'libexpat.so.1': Permission denied
@@ -19,6 +19,9 @@ sets `CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON` and keeps
 unversioned real `libexpat.so` without symlink creation, while preserving a
 valid ELF SONAME.
 
+Because `expat/2.8.2.1` is already published in the artifact registry, this fix
+is published as the incremented package version `expat/2.8.2.1.1`.
+
 ## Verification
 
 Device: `currentUser@10.62.189.79:2222`
@@ -26,19 +29,19 @@ Device: `currentUser@10.62.189.79:2222`
 Job directory:
 
 ```text
-/storage/Users/currentUser/ohos-users/codex/expat-2.8.2.1-1912-20260807
+/storage/Users/currentUser/ohos-users/codex/expat-2.8.2.1.1-1912-20260807
 ```
 
 Runner directory:
 
 ```text
-/storage/Users/currentUser/ohos-test-runs/codex-2.8.2.1-expat-2.8.2.1-1912-20260807-conan-20260807-120742-41685
+/storage/Users/currentUser/ohos-test-runs/codex-2.8.2.1.1-expat-2.8.2.1.1-1912-20260807-conan-20260807-132755-27107
 ```
 
 Command:
 
 ```sh
-zsh ci/conan/build_and_test.sh archives/e/expat/2.8.2.1
+zsh ci/conan/build_and_test.sh archives/e/expat/2.8.2.1.1
 ```
 
 Result:
@@ -58,6 +61,7 @@ Build Summary:
 
 Additional checks:
 
+- R37 version-collision check passed for `expat/2.8.2.1.1`.
 - `cmake --build` linked `libexpat.so` successfully; no `libexpat.so.1` symlink
   was created.
 - `cmake --install` installed `lib/libexpat.so` successfully.

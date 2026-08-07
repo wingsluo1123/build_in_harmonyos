@@ -66,8 +66,6 @@ class ExpatConan(ConanFile):
             "-DOHOS_ARCH=arm64-v8a",
             "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
             "-DCMAKE_INSTALL_LIBDIR=lib",      # ohos.toolchain 64 位默认装 lib64/
-            "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON",
-            "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,",
             "-DEXPAT_BUILD_TOOLS=OFF",
             "-DEXPAT_BUILD_EXAMPLES=OFF",
             "-DEXPAT_BUILD_TESTS=OFF",
