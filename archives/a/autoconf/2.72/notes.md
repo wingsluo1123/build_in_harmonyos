@@ -85,11 +85,12 @@ Results:
 - Python syntax check: pass.
 - YAML/JSON metadata parse check: pass.
 - Patch apply check against the official 2.72 tarball: pass.
-- `conan export`: pass; exported `autoconf/2.72#63b1786b7d3a8fd21dca9e64b28b4e99`.
+- `conan export`: pass; latest exported recipe revision after the true-device profile fixes is `autoconf/2.72#ded5821bccb80a62dddc24f4b5002f07`.
 - First `conan create`: blocked during dependency graph resolution because `m4/1.4.19` was not yet in local cache or `ohpcd`.
 - 2026-08-06 `conan create` with OHOS profile: dependency graph resolved with `m4/1.4.19` and `perl/5.42.2` from cache/`ohpcd`.
 - The same run initially caught stale hunk line numbers in `0001-support-linux-ohos-config-triplet.patch`; the patch was refreshed and then applied successfully during Conan `source()`.
 - Current local Windows limit: build reaches `autotools.configure()`, then fails with `'.' is not recognized as an internal or external command` because this host cannot execute the POSIX `configure` script under the OHOS profile. True OHOS runner verification has passed.
+- 2026-08-07 true-device reruns with the current OHOS profile first exposed `CONFIG_SHELL=/data/service/hnp/bin/bash` from `ci/conan/profiles/ohos-aarch64`; that path is not present on the current device. The recipe now overrides `SHELL` and `CONFIG_SHELL` in the generated Conan build environment with the executable shell discovered by `_config_shell()`, which resolves to `/bin/sh` or `/system/bin/sh` on current OHOS devices. The profile also defines `PATH` directly, so test_package adds autoconf, m4, and perl package `bin` directories through an explicit `autoconf_test_env` script after `conanbuild`.
 
 ## OHOS isolated device verification
 
@@ -116,7 +117,7 @@ sh "$OHOS_JOB_BASE/run-conan-heavy.sh"
 Final successful run:
 
 ```text
-/storage/Users/currentUser/ohos-test-runs/codex-autoconf-2.72-autoconf-2.72-conan-20260806-193142-48576
+/storage/Users/currentUser/ohos-test-runs/codex-autoconf-autoconf-autoconf-2.72-pr4410-122fa92-conan-rerun5-testenv-20260807-182328-20260807-182328-47927
 ```
 
 Result:
@@ -126,7 +127,7 @@ Result:
 - `L1_RESULT=pass: test_package executed`.
 - `L5_RESULT=pass: bin/ has content`.
 - `L4_RESULT=warn: dangerous functions in patches`; warning comes from portability patch content and is non-blocking in this run.
-- `L2_RESULT=skip`: generic direct `bin/* --version/--help` probe does not load Conan dependency PATH, so Perl-backed Autoconf wrapper commands cannot find `perl`/`m4` there. The explicit `test_package` runs with `env="conanbuild"` and verifies command startup, `autoconf`/`autoheader` generation, `autom4te` macro processing, generated `configure`, and `config.h.in`.
+- `L2_RESULT=skip`: generic direct `bin/* --version/--help` probe does not load Conan dependency PATH, so Perl-backed Autoconf wrapper commands cannot find `perl`/`m4` there. The explicit `test_package` runs with `env=["conanbuild", "autoconf_test_env"]` and verifies command startup by name, `autoconf`/`autoheader` generation, `autom4te` macro processing, generated `configure`, and `config.h.in`.
 
 Additional test-package findings:
 
@@ -136,7 +137,7 @@ Additional test-package findings:
 Successful package reference:
 
 ```text
-autoconf/2.72#4a4f5d8b92e5c34053bcaacc81da543f:6b129b068851896169fae42d399fa922d239ce8a#af59c120d154f45ff574fa1d8a63eb6d
+autoconf/2.72#ded5821bccb80a62dddc24f4b5002f07:6b129b068851896169fae42d399fa922d239ce8a#8a1aae9d15192163ba32f34e79cdc95c
 ```
 
 ## Upstream `make check` on OHOS

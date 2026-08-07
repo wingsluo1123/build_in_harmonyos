@@ -47,6 +47,10 @@ class AutoconfConan(ConanFile):
 
     def generate(self):
         build_env = VirtualBuildEnv(self)
+        shell = self._config_shell()
+        env = build_env.environment()
+        env.define("SHELL", shell)
+        env.define("CONFIG_SHELL", shell)
         build_env.generate()
         run_env = VirtualRunEnv(self)
         run_env.generate()
@@ -97,7 +101,7 @@ class AutoconfConan(ConanFile):
             "sh",
         ]
         for candidate in candidates:
-            if candidate and (not os.path.isabs(candidate) or os.path.exists(candidate)):
+            if candidate and (not os.path.isabs(candidate) or os.access(candidate, os.X_OK)):
                 return candidate
         return "sh"
 
@@ -129,6 +133,25 @@ share="$prefix/share/autoconf"
 : "${{PERL:=perl}}"
 : "${{M4:=m4}}"
 
+if [ -n "${{CONFIG_SHELL:-}}" ] && [ ! -x "$CONFIG_SHELL" ]; then
+    CONFIG_SHELL=
+fi
+if [ -z "${{CONFIG_SHELL:-}}" ]; then
+    for candidate in "${{SHELL:-}}" /system/bin/sh /bin/sh sh; do
+        if [ -z "$candidate" ]; then
+            continue
+        fi
+        case "$candidate" in
+            /*) [ -x "$candidate" ] || continue ;;
+        esac
+        CONFIG_SHELL="$candidate"
+        break
+    done
+fi
+: "${{CONFIG_SHELL:=sh}}"
+: "${{SHELL:=$CONFIG_SHELL}}"
+
+export SHELL CONFIG_SHELL
 export M4
 export autom4te_perllibdir="${{autom4te_perllibdir:-$share}}"
 export AC_MACRODIR="${{AC_MACRODIR:-$share}}"
@@ -151,6 +174,7 @@ exec "$PERL" "$here/{real_name}" "$@"
     def package_info(self):
         bindir = os.path.join(self.package_folder, "bin")
         sharedir = os.path.join(self.package_folder, "share", "autoconf")
+        shell = self._config_shell()
 
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
@@ -158,8 +182,9 @@ exec "$PERL" "$here/{real_name}" "$@"
         self.cpp_info.bindirs = ["bin"]
 
         for env_info in (self.buildenv_info, self.runenv_info):
-            env_info.prepend_path("PATH", bindir)
-            env_info.define("M4", "m4")
+            env_info.append_path("PATH", bindir)
+            env_info.define("SHELL", shell)
+            env_info.define("CONFIG_SHELL", shell)
             env_info.define_path("autom4te_perllibdir", sharedir)
             env_info.define_path("AC_MACRODIR", sharedir)
             env_info.define_path("trailer_m4", os.path.join(sharedir, "autoconf", "trailer.m4"))
