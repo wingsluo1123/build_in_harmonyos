@@ -9,7 +9,6 @@ libargus_client.a).
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.layout import basic_layout
 
 
 class ArgusclientsConan(ConanFile):
@@ -18,7 +17,7 @@ class ArgusclientsConan(ConanFile):
     description = "Argus Clients - Network flow data analysis client tools"
     license = "GPL-3.0-or-later"
     homepage = "http://qosient.com/argus"
-    url = ""  # CI fills this
+    url = "https://github.com/openargus/clients"
 
     package_type = "application"
 

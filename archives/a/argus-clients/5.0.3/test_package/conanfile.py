@@ -11,7 +11,6 @@ import os
 from conan import ConanFile
 from conan.tools.build import can_run
 
-
 class ArgusclientsTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "VirtualRunEnv"
