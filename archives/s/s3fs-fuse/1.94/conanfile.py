@@ -269,16 +269,17 @@ int pthread_setcancelstate(int state, int *oldstate)
         self._patch_config_guess_sub(self.source_folder)
 
         # 5. Configure with PKG_CONFIG_PATH pointing to fuse2
-        env = Environment()
-        env.append("PKG_CONFIG_PATH", f"{fuse_install}/pkgconfig")
-        env.define("TMPDIR", self.build_folder)
-        # lld linker needs libxml2.so from OHOS SDK lib dir
+        # Set PKG_CONFIG_PATH directly in os.environ so configure finds fuse.pc
+        pkg_config_path = os.environ.get("PKG_CONFIG_PATH", "")
+        os.environ["PKG_CONFIG_PATH"] = f"{fuse_install}/pkgconfig:{pkg_config_path}" if pkg_config_path else f"{fuse_install}/pkgconfig"
+        # Also set TMPDIR for HMDFS and LD_LIBRARY_PATH for lld
+        os.environ["TMPDIR"] = self.build_folder
         sdk_lib = os.path.join(os.path.dirname(os.path.dirname(
             self.conf_info.get("tools.build:compiler_executables", {}).get("c", "/data/service/hnp/bin/clang") if self.conf_info else "/data/service/hnp/bin/clang"
         )), "lib")
         if os.path.isdir(sdk_lib):
-            env.append("LD_LIBRARY_PATH", sdk_lib)
-        env.vars(self).save_script("conanbuild_fuse")
+            ld_path = os.environ.get("LD_LIBRARY_PATH", "")
+            os.environ["LD_LIBRARY_PATH"] = f"{sdk_lib}:{ld_path}" if ld_path else sdk_lib
 
         autotools = Autotools(self)
         # Try configure - may fail due to HMDFS config.status temp dir issue
