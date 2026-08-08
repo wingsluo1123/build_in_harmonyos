@@ -4,7 +4,7 @@
 
 ### Phase 1: Init
 - [x] init-build completed
-- [x] Source downloaded and extracted
+- [x] Source downloaded (single Python script)
 - [x] Dependencies checked (Python only — no external deps)
 
 ### Phase 2: Build & Install
@@ -16,25 +16,22 @@
 - [x] Version verification: PASS
 - Note: waf is a single Python script, no traditional test suite
 
-### Phase 4: Packaging
-- [ ] Package with ohc-run.py package
-- [ ] Local install verification
-- [ ] finish
+### Phase 4: Conan Adaptation
+- [x] conanfile.py created (package_type=application, download single script)
+- [x] conandata.yml created (source URL + SHA256)
+- [x] test_package/ created (runs waf --version)
+- [x] commands.json created (CLI tool declaration)
+- [x] conan-verify passed (G1-G4 all PASS)
+- [x] W3 local CI simulation passed
 
 ## Build Notes
 - waf is a Python single-file script — no compile step needed
 - Installation is simply copying the waf executable to `$PREFIX/bin/`
 - No patches required
 - No source modifications needed
-
-
----
-
-**编译结束**: 2026-04-17 13:37
-**最终状态**: success
-
+- Conan recipe uses download() instead of get() to avoid zip extraction
 
 ---
 
-**编译结束**: 2026-04-20 23:50
-**最终状态**: success
+**编译结束**: 2026-08-09 00:43
+**最终状态**: built
