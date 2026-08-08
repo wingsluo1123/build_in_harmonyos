@@ -5,6 +5,7 @@ Zix is a lightweight C library providing common data structures and utilities
 (B-tree, ring buffer, semaphores, filesystem operations, etc.) used by the
 LV2 audio plugin ecosystem.
 """
+import shutil
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -18,7 +19,7 @@ class ZixConan(ConanFile):
     description = "Lightweight C library of portability wrappers and data structures"
     license = "ISC"
     homepage = "https://drobilla.net/software/zix"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -47,13 +48,14 @@ class ZixConan(ConanFile):
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.generate()
         # OHOS: meson cannot find llvm-ar via PATH, inject into native file
+        ar_path = shutil.which("ar") or "/data/service/hnp/bin/ar"
         native_file = self.generators_folder + "/conan_meson_native.ini"
         with open(native_file) as f:
             content = f.read()
         old_content = content
         content = content.replace(
             "[binaries]\nc =",
-            "[binaries]\nar = '/data/service/hnp/bin/ar'\nc ="
+            f"[binaries]\nar = '{ar_path}'\nc ="
         )
         if content == old_content:
             raise RuntimeError(
