@@ -2,27 +2,31 @@
 
 ## 编译环境
 - 构建系统: cmake
-- 编译日期: 2026-08-05
+- 编译日期: 2026-08-09
 - 编译器: clang 15.0.4
-- 状态: built
+- 状态: published
 
 ## 编译步骤
-标准 CMake 构建，静态库模式。
+标准 CMake 构建，依赖 aws-c-common/0.14.3。
 
-## 依赖关系
-- aws-c-common/0.12.6 (Conan 制品仓未发布，CI 从源码构建)
+关键点：
+1. CMakeLists.txt 调用 `find_package(aws-c-common REQUIRED)`，需要 CMakeDeps 生成配置
+2. CMakeLists.txt 引用 AWS CMake 模块 (AwsSIMD, AwsCFlags 等)，需要将 aws-c-common 的 modules 目录加入 CMAKE_MODULE_PATH
+3. aarch64 平台自动检测 ARM64 架构，使用 NEON CRC 加速 (crc32c_arm.c, crc64_arm.c)
+4. aws-c-common 的 CMake target 名为 `AWS::aws-c-common`，通过 CMakeDeps.set_property 设置（替代了之前的 patch 方案）
+
+## 改进说明
+- 从 aws-c-common/0.12.6 升级到 0.14.3（制品仓最新版本）
+- 使用 CMakeDeps.set_property("cmake_target_name", "AWS::aws-c-common") 替代 0001-cmake-alias-target.patch，避免修改源码
+- 添加 package_info() system_libs (pthread, dl) for Linux/OHOS
+- 修正描述：CRC32/CRC32C/CRC64/XXHash（非 MD5/SHA）
 
 ## 遇到的问题与解决方案
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | AWS CMake 模块未找到 | aws-c-common conan recipe 未暴露 CMAKE_MODULE_PATH | 在 generate() 中通过 helper cmake 文件 list(APPEND CMAKE_MODULE_PATH ...) |
-| 2 | AWS:: target 命名空间不匹配 | conan CMakeDeps 生成 aws-c-common:: 而非 AWS:: | 添加 0001-cmake-alias-target.patch 创建别名 |
-| 3 | test_package 找不到 aws-c-common 头文件 | aws-c-common recipe 未设置 cpp_info.includedirs | test_package CMakeLists.txt 手动添加 include path |
+| 1 | find_package(aws-c-common) 找不到 | CMakeDeps 默认 target 名不匹配 | set_property cmake_target_name = "AWS::aws-c-common" |
+| 2 | include(AwsSIMD) 等模块找不到 | CMakeDeps 不设置 CMAKE_MODULE_PATH | 在 build() 中传入 CMAKE_MODULE_PATH = aws-c-common modules 目录 |
+| 3 | test_package CMakeDeps 重复 | generators 和 generate() 中都声明了 CMakeDeps | 从 generators 移除 CMakeDeps，仅保留 CMakeToolchain |
 
-## 上游测试
-- 17/17 测试通过
-- CRC32, CRC32C, CRC64, xxHash 全部正常
-
-## 结束
-status: closed
-COMPLETED
+**编译结束**: 2026-08-09 05:59
+**最终状态**: published

@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
-"""Test package for aws-checksums 0.2.10 — verifies CRC32/CRC32C/CRC64 API calls."""
+"""Conan test_package — Conan L1 official test for aws-checksums 0.2.10.
+
+Verifies CRC32 and CRC32C computation against standard check values.
+"""
+import os
+
 from conan import ConanFile
-from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 
 
 class AwsChecksumsTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        # Explicitly require aws-c-common for the test_package
+        self.requires("aws-c-common/0.14.3")
 
     def layout(self):
         cmake_layout(self)
 
     def generate(self):
-        tc = CMakeToolchain(self)
-        tc.generate()
         deps = CMakeDeps(self)
+        deps.set_property("aws-c-common", "cmake_target_name", "AWS::aws-c-common")
         deps.generate()
 
     def build(self):
@@ -25,5 +32,6 @@ class AwsChecksumsTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmd = f"{self.build_folder}/test_aws_checksums"
-        self.run(cmd, env="conanrun")
+        # Run the test binary directly to verify CRC32/CRC32C correctness
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_aws_checksums")
+        self.run(test_bin, env="conanrun")
