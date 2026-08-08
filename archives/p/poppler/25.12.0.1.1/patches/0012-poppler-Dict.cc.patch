@@ -1,7 +1,7 @@
 diff -ruN a/poppler/Dict.cc b/poppler/Dict.cc
 --- a/poppler/Dict.cc
 +++ b/poppler/Dict.cc
-@@ -108,33 +108,33 @@
+@@ -108,34 +108,35 @@
  }
  
  inline const Dict::DictEntry *Dict::find(std::string_view key) const
@@ -21,7 +21,8 @@ diff -ruN a/poppler/Dict.cc b/poppler/Dict.cc
  
      if (sorted) {
 -        const auto pos = std::ranges::lower_bound(entries, key, std::less<> {}, &DictEntry::first);
-+        const auto pos = std::lower_bound(entries.begin(), entries.end(), key, CmpDictEntry {});
++        const auto pos = std::lower_bound(entries.begin(), entries.end(), key,
++                                          [](const DictEntry &e, const std::string_view &k) { return e.first < k; });
          if (pos != entries.end() && pos->first == key) {
              return &*pos;
          }
