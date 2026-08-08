@@ -1,0 +1,63 @@
+--- a/CMakeLists.txt	2026-08-09 04:50:08.294602969 +0800
++++ b/CMakeLists.txt	2026-08-09 04:50:14.206603750 +0800
+@@ -49,7 +49,7 @@
+                         PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/KF6CrashConfigVersion.cmake"
+                         SOVERSION 6)
+ 
+-find_package(KF6CoreAddons ${KF_DEP_VERSION} REQUIRED)
++# find_package(KF6CoreAddons ${KF_DEP_VERSION} REQUIRED)  # Disabled: kcoreaddons not available on OHOS
+ 
+ set(KCRASH_CORE_PATTERN_RAISE_DEFAULT ON)
+ 
+
+--- a/KF6CrashConfig.cmake.in	2026-08-09 04:50:08.294602969 +0800
++++ b/KF6CrashConfig.cmake.in	2026-08-09 04:50:14.438606250 +0800
+@@ -7,7 +7,7 @@
+ 
+ if (NOT @BUILD_SHARED_LIBS@)
+     find_dependency(Qt6Gui @REQUIRED_QT_VERSION@)
+-    find_dependency(KF6CoreAddons REQUIRED)
++    # find_dependency(KF6CoreAddons REQUIRED)  # Disabled on OHOS
+ 
+     if (@WITH_X11@)
+         find_dependency(X11 REQUIRED)
+
+--- a/src/CMakeLists.txt	2026-08-09 04:50:08.298603594 +0800
++++ b/src/CMakeLists.txt	2026-08-09 04:50:14.338602969 +0800
+@@ -45,7 +45,7 @@
+ target_include_directories(KF6Crash INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR_KF}/KCrash>")
+ 
+ target_link_libraries(KF6Crash PUBLIC Qt6::Core)
+-target_link_libraries(KF6Crash PRIVATE Qt6::Gui KF6::CoreAddons)
++target_link_libraries(KF6Crash PRIVATE Qt6::Gui)
+ 
+ if (HAIKU)
+        target_link_libraries(KF6Crash PRIVATE network)
+
+--- a/src/kcrash.cpp	2026-08-09 04:50:08.302605469 +0800
++++ b/src/kcrash.cpp	2026-08-09 04:50:23.638607344 +0800
+@@ -33,7 +33,7 @@
+ #include <sys/prctl.h>
+ #endif
+ 
+-#include <KAboutData>
++// #include <KAboutData>  // Disabled: KCoreAddons not available on OHOS
+ 
+ #include <algorithm>
+ #include <array>
+@@ -560,6 +560,7 @@
+         sprintf(pidtxt, "%lld", QCoreApplication::applicationPid());
+         data.add("--pid", pidtxt);
+ 
++#if 0  // KAboutData not available on OHOS (kcoreaddons not in conan cache)
+         const KAboutData *about = KAboutData::applicationDataPointer();
+         if (about) {
+             if (about->internalVersion()) {
+@@ -578,6 +579,7 @@
+                 data.add("--productname", about->internalProductName());
+             }
+         }
++#endif
+ 
+         if (s_flags & SaferDialog) {
+             data.addBool("--safer");
