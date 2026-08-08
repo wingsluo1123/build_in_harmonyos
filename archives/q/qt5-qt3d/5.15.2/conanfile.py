@@ -205,6 +205,8 @@ class Qt5Qt3dConan(ConanFile):
                  dst=os.path.join(self.package_folder, "bin"), keep_path=False)
 
     def package_info(self):
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.libs = [
             "Qt53DCore", "Qt53DRender", "Qt53DInput", "Qt53DLogic",
             "Qt53DAnimation", "Qt53DExtras",
