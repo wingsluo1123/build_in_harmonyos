@@ -1,18 +1,22 @@
 software: s2n-tls
-version: 1.7.2
+version: "1.7.2"
 status: built
 build_system: cmake
-compile_date: 2026-04-24
+compile_date: 2026-08-09
 created_at: 2026-04-24
 
 dependencies:
   required:
-    - libcrypto (OpenSSL or AWS libcrypto)
+    - openssl/1.1.1w
   optional: []
 
 build_config:
   target: ohos-aarch64
-  options: []
+  options:
+    - BUILD_SHARED_LIBS=OFF
+    - BUILD_TESTING=OFF
+    - S2N_STACKTRACE=OFF
+    - UNSAFE_TREAT_WARNINGS_AS_ERRORS=OFF
   configure_params: []
 
 patches_applied: []
@@ -24,22 +28,22 @@ build_cleanliness:
   extra_params: []
 
 compatibility:
-  level: partial
-  issues:
-    - 部分测试用例因平台特性未通过
-  notes: 基础编译和链接功能正常，核心TLS功能可用
+  level: built
+  issues: []
+  notes: "静态库编译成功，conan-verify 通过 (G0-G4, L2/L4/L5)，CI 本地模拟通过"
 
 test_results:
   type: unit
-  passed: 0
+  passed: 1
   failed: 0
-  note: 测试套件部分通过，具体见 test-report.md
+  note: "test_package 通过 (s2n_init/s2n_get_openssl_version/s2n_cleanup_final)"
 
 knowledge_gained:
-  - s2n-tls 使用 CMake 作为主要构建系统（文档标注 autotools 不准确）
-  - 需要 libcrypto 依赖支持
-  - 部分测试用例需要 OpenHarmony 平台适配
+  - s2n-tls 使用 CMake 作为主要构建系统
+  - 需要 libcrypto (openssl) 依赖支持
+  - CMakeDeps 需将 openssl 映射为 crypto/AWS::crypto (s2n-tls 的 Findcrypto.cmake 要求)
+  - S2N_STACKTRACE 需禁用 (execinfo 在 OHOS 不可用)
   - 静态库编译成功，可用于实际项目集成
 
 build_log: logs/build.log
-source_url: file:///storage/Users/currentUser/tmp/s2n-tls-1.7.2.tar.gz
+source_url: "https://github.com/aws/s2n-tls/archive/refs/tags/v1.7.2.tar.gz"
