@@ -41,6 +41,10 @@ class S3fsFuseConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Also export fuse2 source tarball (not available in Conan repo, built from source)
+        from conan.tools.files import copy
+        copy(self, "fuse-2.9.9.tar.gz", src=os.path.join(self.recipe_folder, "patches"),
+             dst=os.path.join(self.export_sources_folder, "patches"))
 
     def requirements(self):
         self.requires("openssl/3.5.6.1")
@@ -141,14 +145,20 @@ class S3fsFuseConan(ConanFile):
 
         FUSE2 is not available in the Conan artifact repo (only FUSE3/libfuse 3.x).
         s3fs-fuse 1.94 uses the FUSE2 API, so we build it here.
+        The fuse2 tarball is shipped in patches/ to avoid CI network issues.
         """
-        fuse_url = "https://github.com/libfuse/libfuse/archive/refs/tags/fuse-2.9.9.tar.gz"
         fuse_dir = os.path.join(self.build_folder, "fuse2-build")
         os.makedirs(fuse_dir, exist_ok=True)
 
-        # Download fuse2 source
+        # Use local fuse2 tarball (shipped in patches/ to avoid CI network issues)
+        local_tarball = os.path.join(self.source_folder, "patches", "fuse-2.9.9.tar.gz")
         fuse_tarball = os.path.join(fuse_dir, "fuse-2.9.9.tar.gz")
-        download(self, fuse_url, fuse_tarball)
+        if os.path.isfile(local_tarball):
+            shutil.copy(local_tarball, fuse_tarball)
+        else:
+            # Fallback: download from GitHub
+            fuse_url = "https://github.com/libfuse/libfuse/archive/refs/tags/fuse-2.9.9.tar.gz"
+            download(self, fuse_url, fuse_tarball)
         self.run(f"cd {fuse_dir} && tar xzf fuse-2.9.9.tar.gz", env="conanbuild")
 
         fuse_src = os.path.join(fuse_dir, "libfuse-fuse-2.9.9")
