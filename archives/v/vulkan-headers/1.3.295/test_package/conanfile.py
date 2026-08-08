@@ -2,6 +2,7 @@
 """Test package for vulkan-headers 1.3.295."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+import os
 
 
 class VulkanHeadersTestConan(ConanFile):
@@ -22,3 +23,4 @@ class VulkanHeadersTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_vulkan_headers"), env="conanrun")
