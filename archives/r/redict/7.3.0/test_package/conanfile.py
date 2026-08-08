@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 """Conan test_package for redict 7.3.0.
 
-Runs redict-server --version to verify the binary is functional.
+Compiles and runs a test that verifies redict-server binary is functional.
 """
 import os
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class RedictTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
     def build(self):
-        pass  # No build needed, we test the binary directly
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
 
     def test(self):
-        # R34: Test must actually exercise the package's binary
-        binary = os.path.join(self.dependencies["redict"].cpp_info.bindirs[0], "redict-server")
-        self.run(f"{binary} --version", env="conanrun")
+        cmake = CMake(self)
+        cmake.test()
