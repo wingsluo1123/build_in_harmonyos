@@ -40,6 +40,12 @@ class PostgresqlSharedIspellConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # Also manually copy patches directory (fallback if export_conandata_patches fails)
+        recipe_dir = self.recipe_folder if hasattr(self, 'recipe_folder') and self.recipe_folder else os.path.dirname(os.path.abspath(__file__))
+        patches_dir = os.path.join(recipe_dir, "patches")
+        if os.path.isdir(patches_dir) and hasattr(self, 'export_folder') and self.export_folder:
+            copy(self, "*.patch", patches_dir, os.path.join(self.export_folder, "patches"))
+            copy(self, "*", os.path.join(patches_dir, "9.6-update"), os.path.join(self.export_folder, "patches", "9.6-update"))
 
     def layout(self):
         basic_layout(self)
