@@ -1,0 +1,52 @@
+--- a/src/osd/modules/lib/osdlib_unix.cpp
++++ b/src/osd/modules/lib/osdlib_unix.cpp
+@@ -5,24 +5,26 @@
+ //  osdlib_unix.cpp - OS specific low level code for POSIX-like systems
+ //
+ //  SDLMAME by Olivier Galibert and R. Belmont
+ //
+ //============================================================
+ 
+ // MAME headers
+ #include "osdcore.h"
+ #include "osdlib.h"
+ 
++#if !defined(__OHOS__)
+ #ifdef SDLMAME_SDL3
+ #include <SDL3/SDL.h>
+ #else
+ #include <SDL2/SDL.h>
++#endif // !defined(__OHOS__)
+ #endif
+ 
+ #include <csignal>
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
+ #include <iomanip>
+ #include <memory>
+ #include <string_view>
+ 
+@@ -132,21 +134,21 @@
+ 	if (1 == cnt)
+ 		return std::make_pair(std::error_condition(), result);
+ 	else
+ 		return std::make_pair(std::errc::io_error, 0U);
+ #else // defined(__linux__)
+ 	return std::make_pair(std::errc::not_supported, 0U);
+ #endif
+ }
+ 
+ 
+-#ifdef SDLMAME_ANDROID
++#if defined(SDLMAME_ANDROID) || defined(__OHOS__)
+ std::string osd_get_clipboard_text() noexcept
+ {
+ 	return std::string();
+ }
+ 
+ std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
+ {
+ 	return std::errc::io_error; // TODO: better error code?
+ }
+ #else
