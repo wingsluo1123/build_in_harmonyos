@@ -32,7 +32,7 @@ class AwsccalConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("aws-c-common/0.12.6")
+        self.requires("aws-c-common/0.14.3")
         self.requires("aws-lc/5.4.0")
 
     def layout(self):

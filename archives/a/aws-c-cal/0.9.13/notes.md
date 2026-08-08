@@ -13,7 +13,7 @@
 4. 安装到 staging 目录
 
 ## 依赖
-- aws-c-common/0.12.6: AWS SDK 核心库
+- aws-c-common/0.14.3: AWS SDK 核心库（0.12.6 未发布到制品仓，使用已发布的 0.14.3）
 - aws-lc/5.4.0: AWS libcrypto，作为 crypto 后端
 
 ## 遇到的问题与解决方案
