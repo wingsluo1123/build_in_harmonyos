@@ -14,7 +14,11 @@ from conan.tools.cmake import CMake, CMakeToolchain
 
 class AbiwordPluginEpubTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain", "CMakeDeps"
+    # 注意: CMakeToolchain 不在 generators 属性声明——test() 里需手动实例化
+    # 以设置 TARGET_SO 变量(见 P0 注释),若两者都有会报
+    # "CMakeToolchain is declared in the generators attribute, but was
+    # instantiated in the generate() method too"。CMakeDeps 保留属性声明。
+    generators = "CMakeDeps"
     test_type = "explicit"
 
     def requirements(self):
