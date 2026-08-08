@@ -20,7 +20,7 @@ import shutil
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, download, load, save
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 from conan.tools.env import Environment
 
@@ -72,6 +72,10 @@ class S3fsFuseConan(ConanFile):
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
         tc.generate()
+        # Generate pkg-config files for Conan dependencies (libcurl, libxml2, openssl, zlib)
+        # This is required so autotools configure can find them via PKG_CHECK_MODULES
+        pg = PkgConfigDeps(self)
+        pg.generate()
 
     def _fix_config_status(self, build_dir):
         """Fix config.status: remove umask 077 for temp dir (HMDFS permission).
