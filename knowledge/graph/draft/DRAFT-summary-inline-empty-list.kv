@@ -1,0 +1,56 @@
+#====================================================================
+# DRAFT-summary-inline-empty-list.kv — summary.py 手写 YAML 解析器
+#   inline 空列表 "key: []" 被存为字符串后重复键 .append 崩溃
+#====================================================================
+
+# ═══ Layer 0: 错误面 ═══
+id:                     DRAFT (proposed E-SUMMARY-INLINE-LIST)
+trigger_tool:           ohc-run.py finish|ohc-run.py summary|generate_summary
+phase:                  build|report
+error_signature:        AttributeError: 'str' object has no attribute 'append'|
+                         _parse_yaml_simple|
+                         knowledge_gained: \[\]|
+                         could not setup config files
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               toolchain|report|yaml-parse|framework
+match_keywords:         summary.py, _parse_yaml_simple, knowledge_gained, [] ,
+                         inline empty list, duplicate key, manifest.yaml,
+                         AttributeError, .append, gen_summary, finish,
+                         qpdf, YAML, hand-written parser
+
+# ═══ Layer 2: 根因层 ═══
+root_cause: >
+  scripts/ohc/summary.py 的 _parse_yaml_simple 是手写简易解析器，不依赖 PyYAML。
+  顶层 "key: value" 分支对非空 value 直接 data[key]=val 存为字符串；
+  当 manifest 出现 inline 空列表形态 "knowledge_gained: []"（如
+  archives/q/qpdf/12.3.2/manifest.yaml 第 8 行）时，"[]" 被当作普通字符串存入。
+  随后同文件更晚位置再次出现重复键 "knowledge_gained:" 的列表项时，
+  解析器走 current_list_key 分支执行 data.setdefault(key, []).append(item)，
+  而该键已存在为字符串，setdefault 返回既有字符串，调用 .append 触发
+  AttributeError: 'str' object has no attribute 'append'。
+
+# ═══ Layer 3: 修复层 ═══
+fix: >
+  在顶层 key:value 分支对 val 做类型归一化：val == "[]" 时 data[key] = []（空
+  列表）而非字符串，使后续重复列表键的 .append 操作落到列表上。仅此一处最小
+  改动，普通标量、多行块（| / >）与既有列表解析行为不变。
+fix_files:
+  - scripts/ohc/summary.py (if val == "[]": data[key] = [])
+regression:
+  - scripts/ohc/tests/test_summary_inline_empty_list.py (unittest, RED→GREEN)
+  - 标量控制组: name/version/manifest_version 保持 str
+  - 窄真实 summary: generate_summary 全仓库扫描越过 qpdf 输入完成
+
+# ═══ Layer 4: 边界 ═══
+boundary: >
+  这是本仓库手写解析器的行为修复，不是通用 YAML 规范声明；PyYAML 等标准解析器
+  无此问题。修复仅针对 inline 空列表 "[]" 形态，不扩展到其他 YAML 语法。
+
+# ═══ 验证证据 ═══
+evidence:
+  - RED : AttributeError: 'str' object has no attribute 'append' (qpdf 形态)
+  - GREEN: knowledge_gained 为 list 且含后续列表项 (unittest OK, 2 tests)
+  - 标量控制: 标量字段未被转成列表
+  - 窄真实 summary: len=275763 完成，越过 qpdf 输入

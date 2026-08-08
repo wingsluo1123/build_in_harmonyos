@@ -116,7 +116,13 @@ def _parse_yaml_simple(path: Path) -> dict:
                 val = val[1:-1]
 
             if val:
-                data[key] = val
+                # Inline empty list (e.g. "knowledge_gained: []") must be a
+                # list, not a string; otherwise a later repeated list key
+                # calls .append() on the stored string. (R35 framework fix)
+                if val == "[]":
+                    data[key] = []
+                else:
+                    data[key] = val
                 current_key = None
                 current_list_key = None
             else:
