@@ -76,6 +76,8 @@ class LibngfQtConan(ConanFile):
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
 
     def package_info(self):
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.libs = ["ngf-qt"]
         self.cpp_info.requires = ["qt5-qtbase::Qt5Core"]
         self.cpp_info.set_property("cmake_file_name", "NGF-Qt")
