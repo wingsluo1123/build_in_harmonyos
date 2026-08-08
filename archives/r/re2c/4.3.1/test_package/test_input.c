@@ -2,8 +2,9 @@
 #include <stdio.h>
 
 int scan(const char *str) {
-    const char *YYCURSOR = str;
-    const char *YYMARKER;
+    /* re2c default simple API modifies YYCURSOR, so use non-const */
+    char *YYCURSOR = (char *)str;
+    char *YYMARKER;
     /*!re2c
         re2c:yyfill:enable = 0;
         re2c:define:YYCTYPE = "char";
