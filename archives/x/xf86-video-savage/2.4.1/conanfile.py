@@ -71,23 +71,6 @@ class Xf86VideoSavageConan(ConanFile):
     def build(self):
         self.build_env()
         apply_conandata_patches(self)
-        # Manually fix configure for HMDFS umask 077 issue (configure is a generated file,
-        # refresh-patch skips it; the fix adds HarmonyOS umask bypass before mktemp)
-        import subprocess
-        configure_path = os.path.join(self.source_folder, "configure")
-        with open(configure_path, "r") as f:
-            content = f.read()
-        if "HMDFS fix" not in content:
-            old = '(umask 077 && mktemp -d "./confXXXXXX")'
-            new = '$(uname -s) = "HarmonyOS" && { tmp=`(mktemp -d "./confXXXXXX") 2>/dev/null` && test -d "$tmp"; } || { tmp=./conf$$-$RANDOM; mkdir "$tmp"; } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5\nelse\n  tmp=`(umask 077 && mktemp -d "./confXXXXXX")'
-            # Apply the HMDFS umask fix to configure
-            content = content.replace(
-                'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&\n  test -d "$tmp"\n}  ||\n{\n  tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")\n} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5',
-                '# HMDFS fix: on HarmonyOS, umask 077 creates directories that are not writable\nif test "$(uname -s)" = "HarmonyOS"; then\n{\n  tmp=`(mktemp -d "./confXXXXXX") 2>/dev/null` &&\n  test -d "$tmp"\n}  ||\n{\n  tmp=./conf$$-$RANDOM\n  mkdir "$tmp"\n} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5\nelse\n{\n  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&\n  test -d "$tmp"\n}  ||\n{\n  tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")\n} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5\nfi'
-            )
-            with open(configure_path, "w") as f:
-                f.write(content)
-            self.output.info("Applied HMDFS umask fix to configure")
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
