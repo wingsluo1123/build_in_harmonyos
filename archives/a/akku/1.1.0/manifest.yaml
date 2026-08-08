@@ -1,0 +1,54 @@
+software: akku
+# 版本级 manifest
+# 文件位置: archives/a/akku/1.1.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.1.0"
+
+# published | built | failed | archived
+# R29: conan_verify 通过后才可标记 published；本地 create 通过先标 built
+status: built
+
+build_date: "2026-08-09"
+build_system: autotools
+
+source:
+  url: "https://gitlab.com/akkuscm/akku/uploads/819fd1f988c6af5e7df0dfa70aa3d3fe/akku-1.1.0.tar.gz"
+  sha256: "12decdc8a2caba0f67dfcd57b65e4643037757e86da576408d41a5c487552c08"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options: ["--disable-dependency-tracking"]
+  # guile/2.2.7 为制品仓依赖（别人发布，PR #470）；构建/运行时通过
+  # GUILE/GUILE_LOAD_PATH/GUILE_LOAD_COMPILED_PATH/LD_LIBRARY_PATH 注入
+  dependencies:
+    - "guile/2.2.7"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure-umask.patch"
+
+knowledge_gained:
+  - "akku 是 Scheme 包管理器（Autotools），configure 硬性依赖 guild 二进制与 guile-2.2.pc（GUILE_PKG/GUILE_PROGS）"
+  - "guile 2.2 查找 .go 字节码用 GUILE_LOAD_COMPILED_PATH（GUILE_CCACHE_DIR 是 guile 3.0 变量，2.2 下无效）"
+  - "OHOS 上 guile 自动编译（auto-compilation）失败，须设 GUILE_AUTO_COMPILE=0 让 guild 直接使用 ccache 字节码"
+  - "guild 脚本用 ${GUILE:-//bin/guile} 回退，安装前缀 / 使回退路径无效，须显式指定 GUILE 环境变量"
+  - "configure 运行 guile 二进制检查版本，须把 guile 包 lib 加入 LD_LIBRARY_PATH"
+  - "akku 用 version 子命令输出版本（非 --version），CLI 基于 srfi-37 args-fold"
+  - "HMDFS umask 077 导致 config.status 临时文件 Permission denied（E011），configure 补丁 077→022"
+
+test_result:
+  round: 1
+  upstream_pytest_discovered: 0
+  upstream_pytest_passed: 0
+  upstream_pytest_failed: 0
+  upstream_pytest_errors: 0
+  upstream_pytest_deselected: 0
+  upstream_pytest_exempted_test: ""
+  upstream_pytest_exempted_reason: "上游测试套件走 GitLab CI（run-tests.sh），依赖完整 Scheme 模块生态与网络，OHOS 以冒烟验证为主"
+  upstream_pytest_pass_rate: "N/A (上游无本地可跑测试)"
+  consumer_pytest_passed: 1
+  consumer_pytest_total: 1
+  consumer_pytest_pass_rate: "100%"
