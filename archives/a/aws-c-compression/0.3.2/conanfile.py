@@ -29,7 +29,7 @@ class AwsccompressionConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("aws-c-common/0.12.6")
+        self.requires("aws-c-common/0.14.3")
 
     def layout(self):
         cmake_layout(self)
@@ -41,14 +41,21 @@ class AwsccompressionConan(ConanFile):
         tc = CMakeToolchain(self)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["BUILD_TESTING"] = "OFF"
+        tc.generate()
+
         # AWS C SDK uses custom CMake modules (AwsCFlags, AwsSharedLibSetup, etc.)
         # from aws-c-common, and AWS:: target namespace. CMakeDeps generates its
         # own config that doesn't include CMAKE_MODULE_PATH or AWS:: namespace.
-        # Point aws-c-common_DIR to the original config so find_package uses it.
+        # Append aws-c-common package dir to CMAKE_PREFIX_PATH so find_package
+        # finds the upstream config which sets CMAKE_MODULE_PATH + AWS:: targets.
         aws_common = self.dependencies["aws-c-common"]
-        config_dir = os.path.join(aws_common.package_folder, "lib", "cmake", "aws-c-common")
-        tc.cache_variables["aws-c-common_DIR"] = config_dir
-        tc.generate()
+        toolchain_file = os.path.join(self.generators_folder,
+                                      "conan_toolchain.cmake")
+        with open(toolchain_file, "a") as f:
+            f.write("\n# aws-c-compression: use upstream aws-c-common "
+                    "config (AWS:: namespace + custom modules)\n")
+            f.write(f'list(APPEND CMAKE_PREFIX_PATH '
+                    f'"{aws_common.package_folder}")\n')
 
     def build(self):
         apply_conandata_patches(self)
@@ -62,5 +69,3 @@ class AwsccompressionConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["aws-c-compression"]
-        self.cpp_info.requires = ["aws-c-common::aws-c-common"]
-
