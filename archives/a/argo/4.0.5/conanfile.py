@@ -8,7 +8,6 @@ Build system: Go (custom)
 Output: single static binary (argo)
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -53,13 +52,17 @@ class ArgoConan(ConanFile):
         env.define("GOARCH", "arm64")
         env.define("GOPROXY", "https://goproxy.cn,direct")
         env.define("GOTOOLCHAIN", "local")
+
+        # Add Harmonybrew bin to PATH for Go toolchain discovery
+        brew_bin = os.path.expanduser("~/.harmonybrew/bin")
+        current_path = os.environ.get("PATH", "")
+        if brew_bin not in current_path:
+            env.define("PATH", brew_bin + ":" + current_path)
+
         env.vars(self).save_script("conanbuild")
 
     def build(self):
         apply_conandata_patches(self)
-
-        # Ensure Go toolchain is available
-        go_bin = self._ensure_go_toolchain()
 
         # Set writable TMPDIR on OHOS (/tmp is read-only, E002)
         # Go linker uses mmap which fails on HMDFS
@@ -84,7 +87,7 @@ class ArgoConan(ConanFile):
         )
 
         # Download Go modules (run from source folder where go.mod lives)
-        self.run(f'"{go_bin}" mod download', env="conanbuild", cwd=self.source_folder)
+        self.run("go mod download", env="conanbuild", cwd=self.source_folder)
 
         # Build argo CLI binary
         ldflags = (
@@ -96,40 +99,15 @@ class ArgoConan(ConanFile):
             "-extldflags -static"
         )
         self.run(
-            f'"{go_bin}" build -ldflags "{ldflags}" -o "{output_path}" ./cmd/argo',
+            f'go build -ldflags "{ldflags}" -o "{output_path}" ./cmd/argo',
             env="conanbuild",
             cwd=self.source_folder,
         )
 
         # Copy built binary to build folder for packaging
         if os.path.exists(output_path):
+            import shutil
             shutil.copy2(output_path, os.path.join(self.build_folder, "argo"))
-
-    def _ensure_go_toolchain(self):
-        """Ensure Go toolchain is available, install via Harmonybrew if needed."""
-        go_path = shutil.which("go")
-        if go_path:
-            return go_path
-
-        brew_go = os.path.expanduser("~/.harmonybrew/bin/go")
-        if os.path.isfile(brew_go):
-            os.environ["PATH"] = (
-                os.path.dirname(brew_go) + ":" + os.environ.get("PATH", "")
-            )
-            return brew_go
-
-        brew_bin = os.path.expanduser("~/.harmonybrew/bin/brew")
-        if not os.path.isfile(brew_bin):
-            self.run(
-                'zsh -c "$(curl -fsSL https://harmonybrew.atomgit.com/install.sh)"',
-                env="conanbuild",
-            )
-
-        self.run(f'"{brew_bin}" install go', env="conanbuild")
-
-        brew_bin_dir = os.path.expanduser("~/.harmonybrew/bin")
-        os.environ["PATH"] = brew_bin_dir + ":" + os.environ.get("PATH", "")
-        return os.path.join(brew_bin_dir, "go")
 
     def package(self):
         copy(self, "argo", self.build_folder, os.path.join(self.package_folder, "bin"))
