@@ -5,7 +5,8 @@
 - Issue: 1763
 - Worktree: `D:\harmonyos\worktrees\pam-wrapper-pr4234`
 - Branch: `feat/pam-wrapper-1.1.8`
-- Allowed edit scope: `archives/p/pam-wrapper/1.1.8/`
+- Allowed edit scope: `archives/p/pam-wrapper/1.1.8/` and the two
+  pam-wrapper knowledge drafts under `knowledge/graph/draft/`
 
 ## W0 dependency check
 
@@ -141,6 +142,24 @@ All 23 CMocka cases passed, followed by successful packaging and the consumer
   L2/L4/L5 checks were skipped; the repository CI independently passed L4/L5.
 - Conan verify report SHA256:
   `8c5d26bc22cc70ec7371e01ebd55639cb59a7ebc879a87aaf1731294e4b7a50e`
+
+## Knowledge captured
+
+This adaptation adds two draft entries for review rather than changing the
+formal graph index directly:
+
+- `DRAFT-pam-wrapper-ctest-elf-runtime-closure` records why package-time ELF
+  signing cannot make build-tree CTest binaries, shared libraries, and PAM
+  modules executable. It extends E077 from post-install processing to the
+  pre-CTest runtime closure without changing E077's existing scope.
+- `DRAFT-pam-wrapper-preload-startup-context` records that an `LD_PRELOAD`
+  library can copy environment-driven configuration before the consumer's
+  `main()` starts. It extends E200's basic LD_PRELOAD verification with the
+  parent-setup/child-exec ordering required by stateful interposition tests.
+
+Both drafts cite the same successful OHOS run and CTest log hash above. They
+remain drafts so the editor can assign stable E-numbers and merge them with a
+newer equivalent entry if one lands first.
 
 ## Next steps
 
