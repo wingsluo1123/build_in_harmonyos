@@ -1,22 +1,23 @@
 software: rsyslog
 version: "8.2404.0"
-status: built
-build_date: "2026-05-28"
+status: published
+build_date: "2026-08-09"
+conan_adaptation_date: "2026-08-09"
 
 source:
   url: "https://www.rsyslog.com/files/download/rsyslog/rsyslog-8.2404.0.tar.gz"
-  sha256: ""
+  sha256: "30528d140ec1b1f079224081fa37df6e06587ff42b02e3e61f2daa0526c54d33"
   tar_format: tar.gz
 
 build:
   system: autotools
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--prefix=/usr/local"
   dependencies:
-    - "libestr/latest"
-    - "libfastjson/latest"
+    - "libestr/0.1.11"
+    - "libfastjson/1.2304.0"
     - "libgcrypt/1.11.0"
-    - "libuuid/latest"
+    - "uuid/2.40.1"
   cc: clang
   cxx: clang++
 
@@ -28,33 +29,12 @@ patches_applied:
   - "0005-runtime-net.c-pthread-cancel.patch"
   - "0006-threads.c-pthread-cancel.patch"
 
-packaging:
-  package_file: "rsyslog-8.2404.0-ohos-aarch64.tar.gz"
-  package_size: 1972114
-  package_contents:
-    binaries:
-      - "sbin/rsyslogd"
-    libraries:
-      - "lib/rsyslog/lmregexp.so"
-      - "lib/rsyslog/lmzlibw.so"
-      - "lib/rsyslog/lmnet.so"
-      - "lib/rsyslog/lmnetstrms.so"
-      - "lib/rsyslog/lmnsd_ptcp.so"
-      - "lib/rsyslog/lmcry_gcry.so"
-      - "lib/rsyslog/lmtcpsrv.so"
-      - "lib/rsyslog/lmtcpclt.so"
-      - "lib/rsyslog/immark.so"
-      - "lib/rsyslog/imuxsock.so"
-      - "lib/rsyslog/imtcp.so"
-      - "lib/rsyslog/imudp.so"
-      - "lib/rsyslog/omtesting.so"
-      - "lib/rsyslog/mmexternal.so"
-      - "lib/rsyslog/imklog.so"
-      - "lib/rsyslog/fmhash.so"
-    documentation:
-      - "share/man/man5/rsyslog.conf.5"
-      - "share/man/man8/rsyslogd.8"
-
 knowledge_gained:
-  - "E011: HMDFS文件系统umask 077权限问题，需使用$TMPDIR绝对路径替代相对路径mktemp"
-  - "鸿蒙系统缺少pthread_cancel/pthread_setcancelstate函数，需使用条件编译HAVE_PTHREAD_CANCEL"
+  - "E011: HMDFS umask 077 fix for configure temp directory"
+  - "E007: config.guess/config.sub update for HarmonyOS detection"
+  - "E001: CC=clang for systems without cc symlink"
+  - "OHOS/musl lacks pthread_cancel - condition compilation guards"
+  - "HMDFS symlinks (E050) affect conan package library resolution"
+  - "Unsigned ELF binaries can't be executed on HarmonyOS during configure"
+  - "PkgConfigDeps needed for autotools projects using PKG_CHECK_MODULES"
+  - "AutotoolsDeps + LD_LIBRARY_PATH needed for configure run tests"
