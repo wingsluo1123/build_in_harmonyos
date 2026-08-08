@@ -188,6 +188,10 @@ cmake .. \
 ## 依赖
 
 - freetype/2.14.3@ohpcd/stable (R27: self.requires 声明)
+- qt5-qtbase/5.15.2.1@ohpcd/stable (R27: self.requires 声明；本版新增，供 -DENABLE_QT5=ON 的 Qt5 绑定)
+- zlib/1.3.1.1@ohpcd/stable (R27: self.requires 声明；**必须 1.3.1.1**，其 libz.a 以 CFLAGS=-fPIC 编译。
+  用 zlib/1.3.1 会因非 PIC 静态对象链入共享 libpoppler.so，在 AArch64 报
+  `relocation R_AARCH64_ADR_PREL_PG_HI21 cannot be used against symbol z_errmsg; recompile with -fPIC`)
 - fontconfig: 绕过 (-DFONT_CONFIGURATION=generic)
 - liblcms2 2.16: 系统预装
 - libc++_shared: 系统提供
@@ -195,7 +199,7 @@ cmake .. \
 ## Conan 配方
 
 - conanfile.py: CMake 构建, R27 依赖 freetype/2.14.3@ohpcd/stable, R33 不依赖 shell 变量
-- conandata.yml: sha256=c18b40eb36b1a0c5b86e29ca054bf0770304583da4f2cdd42fe86eca6a20de48, 37 补丁
+- conandata.yml: sha256=c18b40eb36b1a0c5b86e29ca054bf0770304583da4f2cdd42fe86eca6a20de48, 39 补丁
 - test_package/: test.cpp + CMakeLists.txt + conanfile.py + MANIFEST.yml (4 源文件)
 
 ## 功能测试 (2026-07-08)
