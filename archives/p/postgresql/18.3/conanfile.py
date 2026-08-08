@@ -60,10 +60,22 @@ class PostgresqlConan(ConanFile):
 
     def _patch_config_for_ohos(self):
         """Patch config.guess and config.sub to recognize HarmonyOS/OHOS (R15)."""
-        cg_path = os.path.join(self.source_folder, "config.guess")
-        cs_path = os.path.join(self.source_folder, "config.sub")
+        # Search common locations for config.guess/config.sub
+        candidates = [
+            self.source_folder,
+            os.path.join(self.source_folder, "config"),
+            os.path.join(self.source_folder, "build-aux"),
+        ]
+        cg_path = cs_path = None
+        for d in candidates:
+            cg = os.path.join(d, "config.guess")
+            cs = os.path.join(d, "config.sub")
+            if os.path.exists(cg) and os.path.exists(cs):
+                cg_path = cg
+                cs_path = cs
+                break
 
-        if not os.path.exists(cg_path) or not os.path.exists(cs_path):
+        if not cg_path or not cs_path:
             self.output.info("config.guess/config.sub not found, skipping OHOS patch")
             return
 
