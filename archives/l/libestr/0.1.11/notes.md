@@ -37,3 +37,7 @@
 - 纯库无可执行二进制，G2 ⚠️1 正常
 - `autoreconf -fiv` bootstrap 需预先删除 `install-sh~`
 - `install-sh~` 触发 automake BUG.am 虚警
+---
+
+**编译结束**: 2026-08-09 00:51
+**最终状态**: published
