@@ -2,7 +2,11 @@
 # test_zarith.sh — Verify ZArith library is installed and functional
 # Usage: sh test_zarith.sh <zarith_package_folder>
 # Called by test_package/conanfile.py test() method (env=conanbuild, ocaml toolchain in PATH)
-set -e
+set -euo pipefail
+
+# 临时目录：mktemp -d 保证可移植性与并发安全，trap 退出时清理
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/zarith_test.XXXXXX")
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 ZARITH_PKG="${1:-}"
 if [ -n "$ZARITH_PKG" ]; then
@@ -29,8 +33,6 @@ fi
 
 # 3. Verify big integer arithmetic: 42 + 1 = 43 (bytecode via ocamlrun)
 echo "Running big integer addition test (42 + 1 = 43)..."
-TMP_DIR="/storage/Users/currentUser/tmp"
-mkdir -p "$TMP_DIR"
 echo 'print_endline (string_of_int (Z.to_int (Z.add (Z.of_int 42) (Z.of_int 1))))' > "$TMP_DIR/zarith_test.ml"
 # 字节码运行需要 C stubs 动态库（dllzarith.so），设置 CAML_LD_LIBRARY_PATH 指向 stublibs
 STUBLIB="$(dirname "$ZARITH_DIR")/stublibs"
