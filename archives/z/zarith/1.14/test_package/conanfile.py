@@ -15,8 +15,15 @@ class ZarithTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def build_requirements(self):
+        # 测试需要 ocaml 工具链（ocamlrun/ocamlc），声明为 tool_requires
+        self.tool_requires("ocaml/4.14.1.1")
+
     def build(self):
         pass
 
     def test(self):
-        self.run("sh test_zarith.sh", env="conanrun")
+        # 通过 conan 依赖 API 获取 zarith 包路径，显式传给测试脚本
+        zarith_pkg = self.dependencies["zarith"].package_folder
+        # 使用 conanbuild 环境使 ocaml 工具链（tool_requires bin）进入 PATH
+        self.run(f"sh test_zarith.sh {zarith_pkg}", env="conanbuild", cwd=self.build_folder)

@@ -26,9 +26,10 @@ class ZarithConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        # GMP is system-installed at /storage/Users/currentUser/usr/local
-        # Not available as Conan package in ohpcd channel
-        pass
+        # OCaml 4.14.1.1 已在制品仓（PR #3767 合入），zarith 构建需要 ocaml 编译器
+        self.tool_requires("ocaml/4.14.1.1")
+        # GMP 6.3.0 已在制品仓，zarith 需要 gmp.h（configure 检测 GMP/MPIR）
+        self.requires("gmp/6.3.0")
 
     def layout(self):
         basic_layout(self)
@@ -38,9 +39,12 @@ class ZarithConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # GMP is pre-installed at system prefix; set env vars for configure
-        os.environ["CFLAGS"] = os.environ.get("CFLAGS", "") + " -I/storage/Users/currentUser/usr/local/include"
-        os.environ["LDFLAGS"] = os.environ.get("LDFLAGS", "") + " -L/storage/Users/currentUser/usr/local/lib"
+        # GMP 6.3.0 来自 conan 依赖（制品仓），注入其 include/lib 路径
+        gmp_dep = self.dependencies["gmp"]
+        gmp_inc = os.path.join(gmp_dep.package_folder, "include")
+        gmp_lib = os.path.join(gmp_dep.package_folder, "lib")
+        os.environ["CFLAGS"] = os.environ.get("CFLAGS", "") + f" -I{gmp_inc}"
+        os.environ["LDFLAGS"] = os.environ.get("LDFLAGS", "") + f" -L{gmp_lib}"
         # ZArith uses a custom configure script (not standard autotools)
         # The configure script takes -installdir, not --prefix
         install_dir = os.path.join(self.package_folder, "lib", "ocaml")
