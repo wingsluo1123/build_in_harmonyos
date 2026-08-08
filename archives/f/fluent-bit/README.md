@@ -17,7 +17,7 @@ the unconditional core sources that still `#include <openssl/...>` /
 
 ## Package layout
 - `5.0.9/conanfile.py` — Conan 2.x recipe (application, 0 deps)
-- `5.0.9/patches/` — source patch + stub bundle
+- `5.0.9/patches/` — source patch + stub sources (plain-text, no binary tar.gz)
 - `5.0.9/test_package/` — L1 official test (runs the installed binary)
 - `5.0.9/manifest.yaml` — version manifest
 - `5.0.9/notes.md` — adaptation notes & lessons learned

@@ -7,10 +7,10 @@ regex, Avro/Arrow, many input/output plugins) are disabled via CMake options,
 so the recipe has ZERO Conan requires — it builds a standalone core binary.
 
 Stub headers (openssl, sqlite3, fts) and stub monkey generated headers
-(mk_core_info.h, mk_info.h, mk_env.h) are injected through a patch bundle that
-materialises them under ${BUILD_FOLDER}/include/.  A link-time stubs source
-provides empty implementations for the few symbols referenced by callers when
-the corresponding subsystem is compiled out.
+(mk_core_info.h, mk_info.h, mk_env.h) are injected from a plain-text stub
+tree (patches/stubs) that materialises them under ${BUILD_FOLDER}/include/.
+A link-time stubs source provides empty implementations for the few symbols
+referenced by callers when the corresponding subsystem is compiled out.
 """
 from conan import ConanFile
 from conan.errors import ConanException
@@ -41,18 +41,21 @@ class FluentBitConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Manually copy the OHOS stub bundle (.tar.gz) listed under the custom
-        # `stubs:` key (NOT under patches: — conan 2.x apply_conandata_patches
-        # would try to parse it as a .patch and fail).
+        # Manually copy the OHOS stub sources (headers + link-time stubs file)
+        # listed under the custom `stubs:` key (NOT under patches: — conan 2.x
+        # apply_conandata_patches would try to parse every entry as a .patch).
+        # The stub tree is kept as plain text files in git (no binary tar.gz)
+        # so PR diffs remain text-only and CI's `git apply` succeeds.
         import os, shutil
         stubs = self.conan_data.get("stubs", {}) or {}
-        bundle_name = stubs.get("bundle") if isinstance(stubs, dict) else None
-        if bundle_name:
-            src = os.path.join(self.recipe_folder, bundle_name)
-            if os.path.isfile(src):
-                dst = os.path.join(self.export_sources_folder, bundle_name)
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                shutil.copy(src, dst)
+        stub_dir = stubs.get("dir") if isinstance(stubs, dict) else None
+        if stub_dir:
+            src = os.path.join(self.recipe_folder, stub_dir)
+            if os.path.isdir(src):
+                dst = os.path.join(self.export_sources_folder, stub_dir)
+                if os.path.isdir(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
 
     def layout(self):
         cmake_layout(self)
@@ -188,25 +191,36 @@ class FluentBitConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # Materialise OHOS stub bundle (headers + link-time stubs source) under
-        # the build folder before cmake.configure runs. The bundle lives under
-        # the custom `stubs:` conandata key (NOT patches:) so apply skipped it.
-        import os, tarfile
+        # Materialise OHOS stub sources (headers + link-time stubs file) under
+        # the build folder before cmake.configure runs. The stub tree lives
+        # under the custom `stubs:` conandata key (NOT patches:) so apply
+        # skipped it. It is plain text (no binary tar.gz) so PR diffs stay
+        # text-only and CI `git apply` can apply them.
+        import os, shutil
         stubs = self.conan_data.get("stubs", {}) or {}
-        bundle_name = stubs.get("bundle") if isinstance(stubs, dict) else None
-        if bundle_name:
+        stub_dir = stubs.get("dir") if isinstance(stubs, dict) else None
+        if stub_dir:
             candidates = [
-                os.path.join(self.export_sources_folder, bundle_name),
-                os.path.join(self.recipe_folder, bundle_name),
+                os.path.join(self.export_sources_folder, stub_dir),
+                os.path.join(self.recipe_folder, stub_dir),
             ]
-            bundle = next((p for p in candidates if os.path.isfile(p)), None)
-            if not bundle:
+            stub_root = next((p for p in candidates if os.path.isdir(p)), None)
+            if not stub_root:
                 raise ConanException(
-                    f"OHOS stub bundle not found: {bundle_name} — "
-                    f"place it at patches/ohos-stubs-bundle.tar.gz (see conandata.yml stubs:)")
-            with tarfile.open(bundle, "r:gz") as tf:
-                tf.extractall(self.build_folder)
-            self.output.info(f"Materialised OHOS stub bundle: {bundle}")
+                    f"OHOS stubs dir not found: {stub_dir} — "
+                    f"place it at patches/stubs (see conandata.yml stubs:)")
+            # Copy the whole stub tree into the build folder: include/ lands at
+            # ${BUILD_FOLDER}/include/ (stub headers + generated monkey headers)
+            # and ohos_link_stubs.c at ${BUILD_FOLDER}/ohos_link_stubs.c, which
+            # the source patch adds to src/CMakeLists.txt.
+            for root, dirs, files in os.walk(stub_root):
+                rel = os.path.relpath(root, stub_root)
+                for f in files:
+                    src_f = os.path.join(root, f)
+                    dst_f = os.path.join(self.build_folder, rel, f)
+                    os.makedirs(os.path.dirname(dst_f), exist_ok=True)
+                    shutil.copy(src_f, dst_f)
+            self.output.info(f"Materialised OHOS stubs from: {stub_root}")
         cmake = CMake(self)
         cmake.configure()
         cmake.build()

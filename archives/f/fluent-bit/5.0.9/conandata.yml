@@ -22,13 +22,15 @@ patches:
 # conan 2.x apply_conandata_patches tries to parse every patches: entry as a
 # .patch, so the .tar.gz bundle lives here under a custom key instead.
 stubs:
-  bundle: "patches/ohos-stubs-bundle.tar.gz"
-  # Stub bundle materialised under ${BUILD_FOLDER}/include/ by build() before
-  # cmake.configure runs (extracted manually, not by apply_conandata_patches):
-  #   - openssl/*.h (empty, FLB_TLS=Off)
-  #   - sqlite3.h (empty, FLB_SQLDB=Off)
-  #   - fts.h (musl lacks fts.h; chunkio's cio_utils.c uses fts_open/read/close)
-  #   - monkey/mk_core_info.h, monkey/mk_info.h, monkey/mk_env.h
+  dir: "patches/stubs"
+  # Stub sources materialised under ${BUILD_FOLDER}/ by build() before
+  # cmake.configure runs (copied manually, not by apply_conandata_patches):
+  #   - include/openssl/*.h (empty, FLB_TLS=Off)
+  #   - include/sqlite3.h (empty, FLB_SQLDB=Off)
+  #   - include/fts.h (musl lacks fts.h; chunkio's cio_utils.c uses fts_open/read/close)
+  #   - include/monkey/mk_core_info.h, mk_info.h, mk_env.h
+  #   - include/fluent-bit/tls/flb_tls.h (declaration stub for FLB_TLS=Off)
   #   - ohos_link_stubs.c (empty impls for flb_sqldb_*, flb_http_server_*, pthread_cancel)
-  sha256: "b67a3bab8d032ed440c96936121adfecb13191ed44e18b2a28f561b925d6d33d"
+  # Kept as plain text files (no binary tar.gz) so PR diffs stay text-only
+  # and CI's checkout-pr `git apply` can apply them.
   description: "HarmonyOS stub headers + generated monkey headers + link-time stubs source"

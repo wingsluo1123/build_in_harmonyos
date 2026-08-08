@@ -106,11 +106,12 @@ patches_applied:
   #     flb_blob_db_file_part_get_next 签名（加 int *part_count 参数）
   #   - src/CMakeLists.txt: 加 ${CMAKE_BINARY_DIR}/ohos_link_stubs.c 到 src 列表
   #
-  # stub bundle（ohos-stubs-bundle.tar.gz，由 conanfile.py build() 解包到 build_folder）：
-  #   - openssl/*.h: 空声明 stub（FLB_TLS=Off，flb_hmac/flb_crypto 等仍无条件编译）
-  #   - sqlite3.h: 空 stub（FLB_SQLDB=Off，flb_sqldb.h 仍被引用）
-  #   - fts.h: 鸿蒙 musl 缺 fts.h，chunkio 的 cio_utils.c 用 fts_open/read/close
-  #   - monkey/mk_core_info.h, mk_info.h, mk_env.h: 从 .in 模板生成
+  # stub sources（patches/stubs 文本目录，由 conanfile.py build() 复制到 build_folder）：
+  #   - include/openssl/*.h: 空声明 stub（FLB_TLS=Off，flb_hmac/flb_crypto 等仍无条件编译）
+  #   - include/sqlite3.h: 空 stub（FLB_SQLDB=Off，flb_sqldb.h 仍被引用）
+  #   - include/fts.h: 鸿蒙 musl 缺 fts.h，chunkio 的 cio_utils.c 用 fts_open/read/close
+  #   - include/monkey/mk_core_info.h, mk_info.h, mk_env.h: 从 .in 模板生成
+  #   - include/fluent-bit/tls/flb_tls.h: 声明 stub（FLB_TLS=Off 时上游声明被 FLB_HAVE_TLS 隐藏）
   #   - ohos_link_stubs.c: 链接期空实现（flb_sqldb_*, flb_http_server_*,
   #     pthread_cancel, sqlite3_clear_bindings）
 
