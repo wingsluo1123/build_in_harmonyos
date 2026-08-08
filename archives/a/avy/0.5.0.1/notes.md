@@ -1,9 +1,9 @@
-# avy 0.5.0 — 适配笔记
+# avy 0.5.0.1 — 适配笔记
 
 ## 软件信息
 
 - **名称**: avy
-- **版本**: 0.5.0
+- **版本**: 0.5.0.1（recipe 递增后缀，上游源码标签仍为 0.5.0，制品仓 R37 不支持同版本多 revision）
 - **描述**: GNU Emacs Lisp package for jumping to tree-based visual selections
 - **许可证**: GPL-3.0-or-later
 - **源码**: https://github.com/abo-abo/avy/archive/refs/tags/0.5.0.tar.gz
@@ -37,7 +37,7 @@ avy 是一个纯 Emacs Lisp 包。它不需要 C/C++ 编译：
 
 ### conandata.yml 修复
 - 原版使用 `source:` 键（Conan 1.x 格式），已改为 `sources:` 键（Conan 2.29 格式）
-- 版本号 `"0.5.0"` 作为子键，包含 `url` 和 `sha256`
+- 版本号 `"0.5.0.1"` 作为子键，包含 `url` 和 `sha256`（源码标签仍为 0.5.0）
 
 ### conanfile.py 设计
 - `package_type = "header-library"` — 纯 Elisp 内容包，无编译产物
