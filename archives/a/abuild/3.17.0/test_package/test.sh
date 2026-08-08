@@ -1,6 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 # test_package/test.sh — smoke test for abuild
 # Verifies that the abuild binary is present and responds to --version
+# NOTE: uses bash-specific `set -o pipefail`, so the shebang must be bash
+# (POSIX /bin/sh on OHOS may not support pipefail).
 set -euo pipefail
 
 echo "[test] abuild --version"
