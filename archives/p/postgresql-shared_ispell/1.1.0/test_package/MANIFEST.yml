@@ -1,0 +1,15 @@
+manifest_version: 1
+package: postgresql-shared_ispell
+version: 1.1.0
+upstream_tests:
+  - name: "Extension file verification"
+    type: file_check
+    description: "Verify shared_ispell.so, .sql, and .control files exist in package"
+    upstream_command: "make USE_PGXS=1 && make USE_PGXS=1 install"
+    expected_output: "shared_ispell.so installed to pg_config --pkglibdir"
+  - name: "Extension loading"
+    type: sql
+    description: "CREATE EXTENSION shared_ispell in PostgreSQL"
+    upstream_command: "psql -c 'CREATE EXTENSION shared_ispell;'"
+    expected_output: "Extension created successfully"
+    skip_on_ci: true  # Requires running PostgreSQL server

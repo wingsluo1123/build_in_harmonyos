@@ -2,10 +2,44 @@ software: postgresql-shared_ispell
 version: 1.1.0
 status: built
 build_system: pgxs
+build_tool: conan
 created_at: 2026-06-04
+updated_at: 2026-08-08
 knowledge_gained:
   - meson 构建失败，改用 PGXS (Makefile USE_PGXS=1)
   - PostgreSQL 扩展在 HarmonyOS 上使用 PGXS 构建更可靠
-patches_applied: []
+  - 9.6-update 分支代码修复了 LWLock API 兼容性问题
+  - PostgreSQL 18.3 未在 conan 制品仓发布，conan 配方自包含构建 PostgreSQL
+patches_applied:
+  - postgresql_harmony.patch (PostgreSQL OHOS 平台补丁)
+  - 9.6-update source files (LWLock API 兼容性修复)
 build_log: logs/build.log
-source_url: https://github.com/slintes/shared_ispell
+source_url: https://api.pgxn.org/dist/shared_ispell/1.0.0/shared_ispell-1.0.0.zip
+conan:
+  recipe: conanfile.py
+  data: conandata.yml
+  test_package: test_package/
+  status: built
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/postgresql-shared_ispell-1.1.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/postgresql-shared_ispell-1.1.0.work
+  source_orig_hash: bb0721272dd006f9
+  source_work_hash: 0ff36509d0f9ec21
+  generated_at: '2026-08-09T00:39:39'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-src-shared_ispell.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-spell.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-spell.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
