@@ -57,13 +57,8 @@ class PostgresqlSharedIspellConan(ConanFile):
         src_dir = self.source_folder
         export_dir = os.path.dirname(os.path.abspath(__file__))
 
-        # Apply shared_ispell compatibility patch (9.6-update + PG18 fixes)
-        # Only the first patch applies to shared_ispell source; the harmony
-        # patch is applied to PostgreSQL source later in build().
-        compat_patch = os.path.join(export_dir, "patches", "shared_ispell-pg18-compat.patch")
-        if os.path.exists(compat_patch):
-            self.output.info("Applying shared_ispell PG18 compatibility patch...")
-            self.run(f'patch -d "{src_dir}" -p1 < "{compat_patch}"')
+        # Apply shared_ispell compatibility patch via Conan's built-in mechanism
+        apply_conandata_patches(self)
 
         # --- Build PostgreSQL from source ---
         pg_build_dir = os.path.join(self.build_folder, "postgresql_build")
