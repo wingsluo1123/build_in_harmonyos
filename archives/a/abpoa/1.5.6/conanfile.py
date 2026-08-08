@@ -71,3 +71,7 @@ class AbpoaConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["abpoa"]
         self.cpp_info.requires = ["zlib::zlib"]
+        # simd_instruction.h includes x86-only <immintrin.h> unless USE_SIMDE
+        # is defined; propagate the SIMDE macros so consumers (test_package)
+        # compile with the SIMDe emulation layer on non-x86 (aarch64/OHOS).
+        self.cpp_info.defines = ["USE_SIMDE", "SIMDE_ENABLE_NATIVE_ALIASES"]

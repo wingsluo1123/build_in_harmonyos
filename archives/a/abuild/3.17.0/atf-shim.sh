@@ -97,8 +97,10 @@ atf_check() {
     done
 
     # Run the command
-    _atf_stdout_file=$(mktemp /tmp/atf_stdout.XXXXXX)
-    _atf_stderr_file=$(mktemp /tmp/atf_stderr.XXXXXX)
+    # NOTE: use TMPDIR (not hardcoded /tmp) — /tmp is read-only on OHOS.
+    _atf_tmpdir="${TMPDIR:-/data/storage/el2/base/cache}"
+    _atf_stdout_file=$(mktemp "$_atf_tmpdir/atf_stdout.XXXXXX")
+    _atf_stderr_file=$(mktemp "$_atf_tmpdir/atf_stderr.XXXXXX")
     "$@" >"$_atf_stdout_file" 2>"$_atf_stderr_file"
     _atf_actual_exit=$?
     _atf_stdout=$(cat "$_atf_stdout_file")

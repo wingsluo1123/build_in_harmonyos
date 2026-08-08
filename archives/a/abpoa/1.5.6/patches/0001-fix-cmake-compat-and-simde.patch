@@ -6,15 +6,14 @@
  project(abpoa LANGUAGES C VERSION 3.0.0)
  
  include(GNUInstallDirs)
-@@ -10,12 +10,18 @@
+@@ -10,12 +10,17 @@
  
  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
  
 -set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native") # SIMD
-+# SIMD: allow override for cross-compilation (e.g. -march=armv8-a+simd for OHOS arm64)
-+if(NOT CMAKE_CROSSCOMPILING)
-+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
-+endif()
++# SIMD: aarch64/OHOS build — -march=armv8-a+simd and -D__AVX2__ let SIMDE
++# emulate the AVX2 path (required to avoid "Error in cg_backtrack" at runtime).
++set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=armv8-a+simd -D__AVX2__")
  
 -# build abPOA as a static library by default
 +# Build abPOA as a static library by default
@@ -27,7 +26,7 @@
  add_library(abpoa
      src/abpoa_align.c
      src/abpoa_graph.c
-@@ -39,6 +45,8 @@
+@@ -39,6 +44,8 @@
  
  target_include_directories(abpoa PUBLIC
      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
