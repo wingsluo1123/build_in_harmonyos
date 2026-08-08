@@ -18,6 +18,10 @@ class LibzmfTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        # libzmf's public header ZMFDocument.h #includes <librevenge/librevenge.h>,
+        # so the test consumer must also require librevenge to surface its
+        # include path via CMakeDeps (libzmf's target does not propagate it).
+        self.requires("librevenge/0.0.5")
 
     def layout(self):
         cmake_layout(self)
