@@ -11,6 +11,7 @@ _atf_skip=0
 _atf_total=0
 _atf_current_test=""
 _atf_srcdir=""
+_atf_test_failed=0
 
 # atf_get_srcdir — returns the directory containing the test script
 atf_get_srcdir() {
@@ -25,7 +26,8 @@ atf_get_srcdir() {
 # atf_fail — fail the current test with a message
 atf_fail() {
     echo "FAIL: $_atf_current_test: $*"
-    _atf_fail=$((_atf_fail + 1))
+    _atf_test_failed=1
+    return 1
 }
 
 # atf_require_prog — skip test if program is not found
@@ -175,6 +177,7 @@ atf_check() {
     done
 
     if [ "$_atf_failed" = true ]; then
+        _atf_test_failed=1
         return 1
     fi
     return 0
@@ -224,11 +227,30 @@ _atf_run_test() {
         _atf_test_body="${_tc}_body"
 
         if command -v "$_atf_test_body" >/dev/null 2>&1; then
+            _atf_skip_before=$_atf_skip
+            _atf_test_failed=0
             if "$_atf_test_body"; then
-                echo "  PASS: $_tc"
-                _atf_pass=$((_atf_pass + 1))
+                if [ "$_atf_test_failed" -eq 1 ]; then
+                    # atf_fail/atf_check 已置失败标志，即使测试体返回 0 也判 FAIL
+                    echo "  FAIL: $_tc"
+                    _atf_fail=$((_atf_fail + 1))
+                elif [ "$_atf_skip" -gt "$_atf_skip_before" ]; then
+                    # atf_require_prog 缺失程序 → SKIP 而非 FAIL
+                    echo "  SKIP: $_tc"
+                else
+                    echo "  PASS: $_tc"
+                    _atf_pass=$((_atf_pass + 1))
+                fi
             else
-                _atf_fail=$((_atf_fail + 1))
+                if [ "$_atf_test_failed" -eq 1 ]; then
+                    echo "  FAIL: $_tc"
+                    _atf_fail=$((_atf_fail + 1))
+                elif [ "$_atf_skip" -gt "$_atf_skip_before" ]; then
+                    echo "  SKIP: $_tc"
+                else
+                    echo "  FAIL: $_tc"
+                    _atf_fail=$((_atf_fail + 1))
+                fi
             fi
         else
             echo "  FAIL: $_tc: test body function not found"
