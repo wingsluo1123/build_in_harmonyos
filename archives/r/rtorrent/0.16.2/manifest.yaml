@@ -1,0 +1,34 @@
+# manifest.yaml — rtorrent 0.16.2
+version: "0.16.2"
+software: "rtorrent"
+status: built
+build_date: "2026-08-08"
+build_system: autotools
+
+source:
+  url: "https://github.com/rakshasa/rtorrent/archive/refs/tags/v0.16.2.tar.gz"
+  sha256: "7fdeb5c98f1dd34e44a40f1fa1aaba7e7d21776ffd75b2d7cdaa2de464039922"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies:
+    - libtorrent-rakshasa/0.16.2
+    - ncurses/6.6
+    - openssl/3.5.6
+    - zlib/1.3.1
+    - curl/8.15.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0002-config.h.patch"
+  - "patches/0004-src-display-attributes.h.patch"
+
+knowledge_gained:
+  - "Autotools config.status has shell compatibility issues on HarmonyOS (print command and mktemp)"
+  - "Used custom build method: compile .cc files directly instead of autotools"
+  - "libtorrent-rakshasa dependency needed conan adaptation"
+  - "ncursesw headers need ncursesw/ subdirectory symlink"
+  - "udns_library.cc has extern C + C++ template conflict, needs separate compilation without -Isrc/torrent"
