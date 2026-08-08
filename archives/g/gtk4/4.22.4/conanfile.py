@@ -65,6 +65,7 @@ class Gtk4Conan(ConanFile):
         )
         self.requires("pango/1.56.4")
         self.requires("cairo/1.18.4")
+        self.requires("cairo-gobject/1.18.4")
         self.requires("harfbuzz/14.2.0.1")
         self.requires("fribidi/1.0.16")
         self.requires("gdk-pixbuf/2.44.6")
