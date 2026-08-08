@@ -84,10 +84,11 @@ class AudiotubeConan(ConanFile):
 
     def _ensure_pybind11(self):
         """Install pybind11 via pip if not already available."""
+        import sys
         try:
             import pybind11  # noqa: F401
         except ImportError:
-            subprocess.check_call(["pip3", "install", "pybind11==3.0.4"])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pybind11==3.0.4"])
 
     def _get_pybind11_cmake_dir(self):
         """Return the cmake config directory for pybind11."""
