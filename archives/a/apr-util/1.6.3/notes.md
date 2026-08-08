@@ -1,45 +1,32 @@
 # apr-util 1.6.3 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-05-26}
+- 构建系统: autotools
+- 编译日期: 2026-08-09
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: published (conan create 验证通过)
 
 ## 编译步骤
-
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+1. 下载源码: https://archive.apache.org/dist/apr/apr-util-1.6.3.tar.gz
+2. 应用补丁: config.guess HarmonyOS, configure umask, config.sub ohos-linux
+3. configure: --disable-shared --enable-static --with-apr=... --with-expat=...
+4. make -j1
+5. make install
 
 ## 遇到的问题与解决方案
-
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
-
-## 源码修改
-
-{如有补丁，列出文件名和修改内容；无则删除此节}
+| 1 | config.guess 不识别 HarmonyOS | UNAME_SYSTEM 不在 Linux case | 添加 HarmonyOS case，设置 LIBC=ohos |
+| 2 | config.sub 不识别 ohos | 旧版 config.sub 缺少 ohos 支持 | 添加 ohos* / ohos-linux / linux-ohos* |
+| 3 | configure umask 077 权限 | HMDFS 限制 | umask 077 → 022 |
+| 4 | apr_rules.mk 路径错误 | APR DESTDIR 安装后 prefix=/ | 在 APR package() 修复 apr-1-config 和 apr_rules.mk |
 
 ## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
+- apr/1.7.6 (本地构建)
+- expat/2.8.2 (制品仓)
 
 ## 验证结果
+conan create: PASSED, 1/1 test passed
 
-```bash
-{验证命令和结果}
-```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
-
-## 注意事项
-
-{需要特别注意的点；无则删除此节}
----
-
-**编译结束**: 2026-05-26 16:37
-**最终状态**: built
+**编译结束**: 2026-08-09
+**最终状态**: published
