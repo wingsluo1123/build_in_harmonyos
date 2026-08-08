@@ -59,7 +59,7 @@ class PopplerConan(ConanFile):
         # 模块，而 poppler-qt5 硬链接 Qt5::Xml 且顶层 CMake 强制要求这两组件 → configure
         # FATAL_ERROR。qt5-qtbase 5.15.2.1（PR #3804）启用了 Widgets/PrintSupport/Xml。
         self.requires("qt5-qtbase/5.15.2.1")
-        self.requires("zlib/1.3.1.1")  # 必须用 1.3.1.1（CFLAGS=-fPIC 编的静态 libz.a）：1.3.1 非 PIC，链入共享 libpoppler.so 时 AArch64 报 R_AARCH64_ADR_PREL_PG_HI21 / recompile with -fPIC
+        self.requires("zlib/1.3.1.1", override=True)  # override 强制覆盖 qt5-qtbase 传递的 zlib/1.3.1：否则 Conan 报 Version conflict（zlib/1.3.1 非 PIC，AArch64 链入共享库报 R_AARCH64；1.3.1.1 才是 CFLAGS=-fPIC 编的静态 libz.a）
 
     def layout(self):
         cmake_layout(self)
