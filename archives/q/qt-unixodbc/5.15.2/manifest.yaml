@@ -1,6 +1,8 @@
 version: "5.15.2"
+software: qt-unixodbc
 status: built
-build_date: "2026-06-12"
+build_date: "2026-08-08"
+build_system: custom
 
 source:
   url: "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz"
@@ -9,10 +11,12 @@ source:
 build:
   system: custom
   configure_options:
-    - "Manual compilation: clang++ with Qt5 5.12.12 headers and unixODBC libodbc"
+    - "Manual clang++ compilation with Qt5 5.15.2 headers (from qt5-qtbase/5.15.2 Conan package)"
+    - "Builds Qt5Sql from qtbase source (qt5-qtbase was built with -no-feature-sql)"
+    - "Builds unixODBC 2.3.12 from source (pre-configured release tarball)"
   dependencies:
-    - "qt5-qtbase/5.12.12"
-    - "unixodbc"
+    - "qt5-qtbase/5.15.2"
+    - "unixodbc/2.3.12 (built from source within recipe)"
   cc: clang
   cxx: clang++
 
@@ -20,9 +24,30 @@ patches_applied:
   - "0001-src-plugins-sqldrivers-odbc-qsql_odbc.cpp.patch"
 
 knowledge_gained:
-  - "Qt5 ODBC plugin requires Qt5-specific headers; installed headers are mixed Qt5/Qt6"
-  - "Mixed Qt5/Qt6 header environment requires explicit Qt5 header paths for plugin compilation"
-  - "libqsqlodbc.so supports QODBC3 and QODBC keys"
-  - "ODBC driver links against unixODBC (libodbc.so.2)"
-  - "Runtime dlopen testing blocked by OHOS ELF signing requirement (platform limitation)"
-  - "ODBC source code requires patch for OHOS compatibility"
+  - "Qt5Sql not included in qt5-qtbase/5.15.2 (built with -no-feature-sql)"
+  - "Qt5Sql can be built from qtbase source by manually compiling SQL module .cpp files"
+  - "Config headers (qtsql-config.h, qtsql-config_p.h) must be copied from qt5-qtbase package to source include tree"
+  - "unixODBC release tarball has configure pre-generated (no autoreconf needed)"
+  - "config.guess 2023-08-22 doesn't recognize HarmonyOS; --build=aarch64-unknown-linux-gnu required"
+  - "E011: umask 022 required for HMDFS compatibility during configure"
+  - "ODBC driver links against Qt5Sql, Qt5Core, libodbc, libohenvironment"
+  - "Runtime dlopen loading requires ELF signing (OHOS platform limitation)"
+
+products:
+  libraries:
+    - "libqsqlodbc.so (~140KB) - Qt5 unixODBC SQL driver plugin"
+    - "libQt5Sql.so (~800KB) - Qt5 SQL module library"
+  headers:
+    - "include/QtSql/ (public headers from qt5-qtbase)"
+
+verification:
+  conan_create: pass
+  conan_verify: pass
+  test_package: pass
+  staging_verify: pass
+
+quality_gates:
+  G1_recipe_integrity: pass
+  G2_conan_create: pass
+  G3_system_lib_isolation: pass
+  G4_product_integrity: pass
