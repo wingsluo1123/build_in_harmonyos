@@ -36,11 +36,8 @@ class PostgresqlConan(ConanFile):
             "--without-zlib",
             "--without-openssl",
         ])
-        if self.settings.os in ("Linux", "OHOS"):
-            tc.configure_args.extend([
-                "--build=aarch64-linux-ohos",
-                "--host=aarch64-linux-ohos",
-            ])
+        # R15: AutotoolsToolchain handles cross-compilation flags automatically
+        # from the Conan profile settings (os=OHOS, arch=armv8)
         tc.generate()
 
     def build(self):

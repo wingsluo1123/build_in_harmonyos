@@ -10,12 +10,16 @@ class TestPostgresqlRumConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Verify rum.so exists in the package lib directory
+        # R34: Verify rum.so exists and exports the extension entry symbol
         # conanrun env sets LD_LIBRARY_PATH to include postgresql-rum's libdirs
         self.run(
             'for d in $(echo $LD_LIBRARY_PATH | tr ":" " "); do '
-            'test -f "$d/rum.so" && echo "rum.so found in $d" && exit 0; '
-            'done; echo "rum.so NOT found" && exit 1',
+            'if [ -f "$d/rum.so" ]; then '
+            '  echo "rum.so found in $d"; '
+            '  nm -D "$d/rum.so" 2>/dev/null | grep -q " _PG_init" '
+            '    && echo "_PG_init symbol verified" && exit 0; '
+            '  echo "ERROR: _PG_init not found" && exit 1; '
+            'fi; done; echo "rum.so NOT found" && exit 1',
             env="conanrun",
         )
         # Verify pg_config from PostgreSQL dependency

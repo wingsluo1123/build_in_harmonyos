@@ -1,40 +1,31 @@
---- a/src/backend/port/sysv_shmem.c
-+++ b/src/backend/port/sysv_shmem.c
-@@ -124,6 +124,33 @@
+--- a/src/backend/port/sysv_shmem.c	2026-08-09 00:23:36.761697032 +0800
++++ b/src/backend/port/sysv_shmem.c	2026-08-09 00:23:59.569692501 +0800
+@@ -124,6 +124,24 @@
  	void	   *requestedAddress = NULL;
  	void	   *memAddress;
  
 +#ifdef __OHOS__
 +	/*
 +	 * OHOS: shmget syscall causes SIGSYS (unimplemented syscall).
-+	 * Use mmap with MAP_SHARED|MAP_ANONYMOUS for inter-process shared memory.
-+	 * This works with PostgreSQL's fork-based process model: postmaster
-+	 * creates the mapping, forked backend processes inherit it automatically
-+	 * via fork(). The mapping is truly shared (not a per-process copy).
++	 * Use mmap with MAP_SHARED|MAP_ANONYMOUS. Header initialization
++	 * is handled by PGSharedMemoryCreate after this function returns.
 +	 */
 +	memAddress = mmap(requestedAddress, size, PROT_READ | PROT_WRITE,
 +					  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 +	if (memAddress == MAP_FAILED)
 +		elog(FATAL, "mmap(%zu) failed: %m", size);
 +
-+	/* Initialize the shared memory header at the start of the mapping */
-+	((PGShmemHeader *) memAddress)->magic = PGShmemMagic;
-+	((PGShmemHeader *) memAddress)->length = size;
-+	/* device/inode are not relevant for anonymous mmap */
-+	((PGShmemHeader *) memAddress)->device = 0;
-+	((PGShmemHeader *) memAddress)->inode = 0;
-+
 +	/* Register cleanup callbacks (no-ops for anonymous mmap, but
 +	 * registered for consistency with the SysV code path) */
 +	on_shmem_exit(IpcMemoryDetach, PointerGetDatum(memAddress));
 +	on_shmem_exit(IpcMemoryDelete, Int32GetDatum(0));
 +
-+	return (PGShmemHeader *) memAddress;
++	return memAddress;
 +#else
  	/*
  	 * Normally we just pass requestedAddress = NULL to shmat(), allowing the
  	 * system to choose where the segment gets mapped.  But in an EXEC_BACKEND
-@@ -275,6 +302,7 @@
+@@ -275,6 +293,7 @@
  	}
  
  	return memAddress;
@@ -42,7 +33,7 @@
  }
  
  /****************************************************************************/
-@@ -285,9 +313,14 @@
+@@ -285,9 +304,14 @@
  static void
  IpcMemoryDetach(int status, Datum shmaddr)
  {
@@ -57,7 +48,7 @@
  }
  
  /****************************************************************************/
-@@ -297,9 +330,14 @@
+@@ -297,9 +321,14 @@
  static void
  IpcMemoryDelete(int status, Datum shmId)
  {
@@ -72,7 +63,7 @@
  }
  
  /*
-@@ -316,6 +354,15 @@
+@@ -316,6 +345,15 @@
  bool
  PGSharedMemoryIsInUse(unsigned long id1, unsigned long id2)
  {
@@ -88,7 +79,7 @@
  	PGShmemHeader *memAddress;
  	IpcMemoryState state;
  
-@@ -333,6 +380,7 @@
+@@ -333,6 +371,7 @@
  			return true;
  	}
  	return true;
@@ -96,7 +87,7 @@
  }
  
  /*
-@@ -348,6 +396,11 @@
+@@ -348,6 +387,11 @@
  					 void *attachAt,
  					 PGShmemHeader **addr)
  {
@@ -108,7 +99,7 @@
  	struct shmid_ds shmStat;
  	struct stat statbuf;
  	PGShmemHeader *hdr;
-@@ -451,6 +504,7 @@
+@@ -451,6 +495,7 @@
  	 * before we attached to it.)
  	 */
  	return shmStat.shm_nattch == 0 ? SHMSTATE_UNATTACHED : SHMSTATE_ATTACHED;
@@ -116,9 +107,9 @@
  }
  
  /*
---- a/src/backend/utils/init/miscinit.c
-+++ b/src/backend/utils/init/miscinit.c
-@@ -381,12 +381,49 @@
+--- a/src/backend/utils/init/miscinit.c	2026-08-09 00:23:37.357699532 +0800
++++ b/src/backend/utils/init/miscinit.c	2026-08-09 00:24:13.909694063 +0800
+@@ -381,12 +381,56 @@
  	 * XXX can we safely enable this check on Windows?
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -136,19 +127,26 @@
 +		bool same_group = false;
 +		int i;
 +
-+		ngroups = getgroups(64, my_gids);
-+		if (ngroups < 0)
++		/* Check primary GID first (getgroups only returns supplementary) */
++		if (getegid() == dir_gid)
++			same_group = true;
++
++		if (!same_group)
 +		{
-+			/* getgroups() failed; fall back to strict ownership check */
-+			ereport(FATAL,
-+					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-+					 errmsg("data directory \"%s\" has wrong ownership",
-+							DataDir),
-+					 errhint("The server must be started by the user that owns the data directory.")));
++			ngroups = getgroups(64, my_gids);
++			if (ngroups < 0)
++			{
++				/* getgroups() failed; fall back to strict ownership check */
++				ereport(FATAL,
++						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
++						 errmsg("data directory \"%s\" has wrong ownership",
++								DataDir),
++						 errhint("The server must be started by the user that owns the data directory.")));
++			}
++			for (i = 0; i < ngroups && !same_group; i++)
++				if (my_gids[i] == dir_gid)
++					same_group = true;
 +		}
-+		for (i = 0; i < ngroups && !same_group; i++)
-+			if (my_gids[i] == dir_gid)
-+				same_group = true;
 +
 +		if (!same_group)
 +			ereport(FATAL,
@@ -168,7 +166,7 @@
  #endif
  
  	/*
-@@ -401,12 +438,27 @@
+@@ -401,12 +445,27 @@
  	 * reasonable check to apply on Windows.
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
@@ -196,8 +194,8 @@
  #endif
  
  	/*
---- a/src/bin/initdb/initdb.c
-+++ b/src/bin/initdb/initdb.c
+--- a/src/bin/initdb/initdb.c	2026-08-09 00:23:37.573695469 +0800
++++ b/src/bin/initdb/initdb.c	2026-08-09 00:23:42.213699844 +0800
 @@ -1075,6 +1075,13 @@
  static const char *
  choose_dsm_implementation(void)
@@ -251,16 +249,17 @@
  
  		free(path);
  	}
---- a/src/common/file_perm.c
-+++ b/src/common/file_perm.c
-@@ -22,7 +22,15 @@
+--- a/src/common/file_perm.c	2026-08-09 00:23:38.305693282 +0800
++++ b/src/common/file_perm.c	2026-08-09 00:24:13.913695938 +0800
+@@ -22,7 +22,16 @@
   * Mode mask to pass to umask().  This is more of a preventative measure since
   * all file/directory creates should be performed using the create modes above.
   */
 +#ifdef __OHOS__
 +/*
 + * OHOS: hmdfs doesn't handle umask properly, causing S-bit issues.
-+ * Use umask(0) to disable masking on hmdfs (avoids S-bit issues).
++ * Set mask to 0 so umask(0) passes all create mode permissions through
++ * unchanged, avoiding hmdfs S-bit conflicts.
 + */
 +int			pg_mode_mask = 0;
 +#else
@@ -269,8 +268,8 @@
  
  /*
   * Set create modes and mask to use when writing to PGDATA based on the data
---- a/src/common/username.c
-+++ b/src/common/username.c
+--- a/src/common/username.c	2026-08-09 00:23:38.349693438 +0800
++++ b/src/common/username.c	2026-08-09 00:23:42.237699688 +0800
 @@ -40,10 +40,20 @@
  	pw = getpwuid(user_id);
  	if (!pw)
@@ -292,8 +291,8 @@
  	}
  
  	return pw->pw_name;
---- a/src/include/pg_config_manual.h
-+++ b/src/include/pg_config_manual.h
+--- a/src/include/pg_config_manual.h	2026-08-09 00:23:38.925695938 +0800
++++ b/src/include/pg_config_manual.h	2026-08-09 00:23:42.257694219 +0800
 @@ -190,7 +190,15 @@
   * support them yet.
   */
@@ -310,8 +309,8 @@
  #else
  #define DEFAULT_PGSOCKET_DIR ""
  #endif
---- a/src/include/storage/dsm_impl.h
-+++ b/src/include/storage/dsm_impl.h
+--- a/src/include/storage/dsm_impl.h	2026-08-09 00:23:39.049695001 +0800
++++ b/src/include/storage/dsm_impl.h	2026-08-09 00:23:42.257694219 +0800
 @@ -27,6 +27,14 @@
  #define USE_DSM_WINDOWS
  #define DEFAULT_DYNAMIC_SHARED_MEMORY_TYPE		DSM_IMPL_WINDOWS
@@ -335,8 +334,8 @@
  #endif
  
  /* GUC. */
---- a/src/interfaces/libpq/fe-auth.c
-+++ b/src/interfaces/libpq/fe-auth.c
+--- a/src/interfaces/libpq/fe-auth.c	2026-08-09 00:23:39.525697501 +0800
++++ b/src/interfaces/libpq/fe-auth.c	2026-08-09 00:23:42.329695626 +0800
 @@ -1316,8 +1316,18 @@
  	}
  	else if (!pw)
@@ -356,8 +355,8 @@
  	}
  	else
  		name = pw->pw_name;
---- a/src/port/pgmkdirp.c
-+++ b/src/port/pgmkdirp.c
+--- a/src/port/pgmkdirp.c	2026-08-09 00:23:39.757693751 +0800
++++ b/src/port/pgmkdirp.c	2026-08-09 00:23:42.341696251 +0800
 @@ -132,11 +132,34 @@
  				break;
  			}
@@ -394,8 +393,8 @@
  		if (!last)
  			*p = '/';
  	}
---- a/src/test/regress/pg_regress.c
-+++ b/src/test/regress/pg_regress.c
+--- a/src/test/regress/pg_regress.c	2026-08-09 00:23:41.181695001 +0800
++++ b/src/test/regress/pg_regress.c	2026-08-09 00:23:42.421698126 +0800
 @@ -2121,6 +2121,12 @@
  	 * remove_temp() for a reason).  Override at your own risk.
  	 */
