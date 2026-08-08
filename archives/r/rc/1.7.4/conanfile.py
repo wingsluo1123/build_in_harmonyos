@@ -81,7 +81,7 @@ class RcConan(ConanFile):
 
     def package(self):
         autotools = Autotools(self)
-        autotools.install()
+        autotools.install(args=["AUTOMAKE=true", "ACLOCAL=true", "AUTOHEADER=true", "AUTOCONF=true"])
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]
