@@ -1,0 +1,56 @@
+software: xcb-util
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.4.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.4.1"
+
+# 编译状态
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-09"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://xorg.freedesktop.org/archive/individual/lib/xcb-util-0.4.1.tar.gz"
+  sha256: "21c6e720162858f15fe686cef833cf96a3e2a79875f84007d76f6d00417f593a"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies:
+  - libxcb/1.17.0
+  - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "x.org release tarball includes pre-generated configure and m4 macros, unlike GitLab archive"
+  - "Conan PkgConfigDeps generates minimal xcb.pc that lacks xcbproto_version variable; need to patch it from the original xcb.pc in libxcb package"
+  - "Dependency .la files from autotools packages have stale build-time paths; need to fix libdir and replace .la references with -l flags"
