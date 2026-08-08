@@ -14,7 +14,7 @@ import sys
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import can_run
-from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get
+from conan.tools.files import apply_conandata_patches, copy, export_conandata_patches, get, replace_in_file
 
 
 class BoostCompiledConan(ConanFile):
@@ -169,6 +169,14 @@ class BoostCompiledConan(ConanFile):
         return "arm-linux-ohos"
 
     def build(self):
+        if self.settings.os == "OHOS":
+            replace_in_file(
+                self,
+                os.path.join(self.source_folder, "bootstrap.sh"),
+                '"$my_dir/tools/build/src/engine/build.sh" ${TOOLSET}',
+                'sh "$my_dir/tools/build/src/engine/build.sh" ${TOOLSET}',
+                strict=True,
+            )
         self.run(self._bootstrap_command(), cwd=self.source_folder)
         self._write_ohos_user_config()
         b2_args = " ".join(self._b2_common_args())
