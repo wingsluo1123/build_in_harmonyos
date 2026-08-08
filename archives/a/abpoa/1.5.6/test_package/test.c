@@ -71,7 +71,7 @@ int main(void) {
         return 1;
     }
     for (i = 0; i < n_seqs; ++i) {
-        seq_lens[i] = strlen(seqs[i]);
+        seq_lens[i] = (int)strlen(seqs[i]);
         bseqs[i] = (uint8_t*)malloc(sizeof(uint8_t) * seq_lens[i]);
         if (bseqs[i] == NULL) {
             fprintf(stderr, "FAIL: malloc(bseqs[%d]) returned NULL\n", i);
