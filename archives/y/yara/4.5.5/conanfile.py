@@ -96,10 +96,14 @@ class YaraConan(ConanFile):
         build_aux = os.path.join(src, "build-aux")
         os.makedirs(build_aux, exist_ok=True)
 
+        hnp_home = os.environ.get("HNP_PUBLIC_HOME", "/data/service/hnp")
+        home = os.environ.get("HOME", "")
         automake_dirs = [
-            os.path.join(os.environ.get("HOME", ""), "usr/local/share/automake-1.16"),
-            "/storage/Users/currentUser/usr/local/share/automake-1.16",
+            os.path.join(home, "usr/local/share/automake-1.16"),
+            os.path.join(hnp_home, "automake.org/automake_1.16.5/share/automake-1.16"),
+            os.path.join(hnp_home, "automake.org/automake_1.16/share/automake-1.16"),
             "/usr/share/automake-1.16",
+            "/usr/local/share/automake-1.16",
         ]
 
         aux_files = [
@@ -117,12 +121,26 @@ class YaraConan(ConanFile):
                         os.chmod(target, 0o755)
                         break
 
-        # ltmain.sh from libtool
+        # ltmain.sh from libtool - search multiple paths
         ltmain_candidates = [
-            "/storage/Users/currentUser/tmp/libtool-2.4.7/build-aux/ltmain.sh",
+            os.path.join(home, "tmp/libtool-2.4.7/build-aux/ltmain.sh"),
+            os.path.join(hnp_home, "libtool.org/libtool_2.4.7/build-aux/ltmain.sh"),
+            os.path.join(hnp_home, "libtool.org/libtool_2.4.7/share/libtool/build-aux/ltmain.sh"),
             "/usr/share/libtool/build-aux/ltmain.sh",
             "/usr/local/share/libtool/build-aux/ltmain.sh",
         ]
+        # Also try libtoolize --version to find the data dir
+        try:
+            result = self.run("libtoolize --version", cwd=src, output=True)
+            if result and result.stdout:
+                # libtoolize is available, try to find ltmain.sh near it
+                lt_path = self.run("which libtoolize", cwd=src, output=True)
+                if lt_path and lt_path.stdout:
+                    lt_bin = lt_path.stdout.strip()
+                    lt_dir = os.path.dirname(os.path.dirname(lt_bin))
+                    ltmain_candidates.insert(0, os.path.join(lt_dir, "share/libtool/build-aux/ltmain.sh"))
+        except Exception:
+            pass
         ltmain_target = os.path.join(build_aux, "ltmain.sh")
         if not os.path.exists(ltmain_target):
             for lt in ltmain_candidates:
