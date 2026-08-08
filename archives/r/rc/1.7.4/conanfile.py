@@ -77,7 +77,7 @@ class RcConan(ConanFile):
             self.run("sed -i 's|umask 077 && mktemp -d|mktemp -d|g' config.status 2>/dev/null || true", env="conanbuild")
             self.run("sed -i 's|umask 077 && mkdir|mkdir|g' config.status 2>/dev/null || true", env="conanbuild")
 
-        autotools.make(args=["-j1"])
+        autotools.make(args=["-j1", "AUTOMAKE=true", "ACLOCAL=true", "AUTOHEADER=true", "AUTOCONF=true"])
 
     def package(self):
         autotools = Autotools(self)
