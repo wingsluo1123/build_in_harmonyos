@@ -75,6 +75,8 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
 
     def package_info(self):
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.includedirs = ["include"]
         self.cpp_info.libs = ["Qt5GraphicalEffects"]
         self.cpp_info.requires = ["qt5-qtbase::Qt5Core", "qt5-qtbase::Qt5Gui"]
         self.cpp_info.set_property("cmake_file_name", "Qt5GraphicalEffects")
