@@ -35,7 +35,7 @@ class PostgresqlSharedIspellConan(ConanFile):
 
     # PostgreSQL source (not in conan remote, built from source)
     PG_VERSION = "18.3"
-    PG_SOURCE_URL = "https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2"
+    PG_SOURCE_URL = "https://mirrors.aliyun.com/postgresql/source/v18.3/postgresql-18.3.tar.bz2"
     PG_SOURCE_SHA256 = "d95663fbbf3a80f81a9d98d895266bdcb74ba274bcc04ef6d76630a72dee016f"
 
     def export_sources(self):
