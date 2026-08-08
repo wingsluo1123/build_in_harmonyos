@@ -73,7 +73,7 @@ class RomToolsConan(ConanFile):
         # Common defines for MAME
         defines = (
             "-DLSB_FIRST -DCRLF=2 -DUTF8PROC_STATIC "
-            "-DZ7_PPMD_SUPPORT -DZ7_ST -DSDLMAME_UNIX -DSDLMAME_LINUX"
+            "-DZ7_PPMD_SUPPORT -DZ7_ST -DSDLMAME_UNIX -DSDLMAME_LINUX -DSDLMAME_NO_SDL"
         )
 
         # FLAC-specific defines (from genie 3rdparty.lua)
