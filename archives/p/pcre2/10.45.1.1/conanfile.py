@@ -57,6 +57,7 @@ class Pcre2Conan(ConanFile):
         autotools = Autotools(self)
         self.run('sh "{}/configure" {}'.format(self.source_folder, autotools._configure_args))
         autotools.make(args=["-j1"])
+        autotools.make(args=["-j1", "check"])
 
     def package(self):
         autotools = Autotools(self)
