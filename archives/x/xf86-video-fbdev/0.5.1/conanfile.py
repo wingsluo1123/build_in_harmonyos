@@ -29,7 +29,7 @@ class Xf86VideoFbdevConan(ConanFile):
     description = "X.Org framebuffer device video driver"
     license = "MIT"
     homepage = "https://gitlab.freedesktop.org/xorg/driver/xf86-video-fbdev"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     # This is a shared library module (X.Org driver), not a static library
     package_type = "shared-library"
