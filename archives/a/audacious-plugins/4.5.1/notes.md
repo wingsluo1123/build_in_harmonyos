@@ -49,7 +49,7 @@
 ## 验证结果
 
 ```bash
-# 32个插件.so文件正确安装到 ~/usr/local/lib/audacious/*/ 
+# 32个插件.so文件正确安装到 ~/usr/local/lib/audacious/*/
 # 包含 Input(9), Output(4), Effect(10), General(2), Container(6), Transport(1)
 ```
 
@@ -63,10 +63,21 @@
 ## 注意事项
 
 - ffaudio(FFmpeg解码)已禁用，因静态libavcodec不支持PIC
-- opus/wavpack/neon已禁用，因缺少对应预编译包
+- opus/wavpack/neon 在 conan 配方中已启用（依赖包已发布到制品仓）
 - GTK/Qt已禁用（纯插件模式，无GUI界面）
 - 需设置LD_LIBRARY_PATH确保gdbus-codegen能正常运行
+
+## Conan 配方适配 (2026-08-09)
+
+- 新增 conanfile.py + conandata.yml + test_package/
+- 配置选项优化: 移除 --disable-opus --disable-wavpack --disable-neon（依赖已可用）
+- 保留 --disable-gtk --disable-qt（鸿蒙无桌面GUI框架）
+- 保留 --disable-ffaudio（FFmpeg静态库无PIC支持）
+- 依赖列表更新: 20个conan依赖（含转传递依赖）
+- 缺失conan依赖: audacious, alsa-lib, dbus, neon, mpg123, pulseaudio
+- test_package: 使用dlopen验证插件.so文件有效性
 ---
 
 **编译结束**: 2026-05-29 13:56
 **最终状态**: published
+**Conan适配**: 2026-08-09 (conan recipe added, pending dependency publishing)
