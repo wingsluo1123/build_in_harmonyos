@@ -1,7 +1,7 @@
 #!/bin/bash
 # test_zutils.sh — functional test for zutils package
 # Creates a gzip-compressed file, decompresses with zcat, and verifies output.
-set -e
+set -euo pipefail
 
 TMPDIR="${TMPDIR:-/tmp}"
 TEST_FILE="$TMPDIR/zutils_test_input.txt"

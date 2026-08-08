@@ -8,8 +8,8 @@ Source is distributed as .tar.lz (lzip compressed tar). Conan's built-in
 extraction does not support lzip, so a custom source() method decompresses
 the lzip format using Python's lzma module.
 """
-import os
 import lzma
+import os
 import tarfile
 
 from conan import ConanFile

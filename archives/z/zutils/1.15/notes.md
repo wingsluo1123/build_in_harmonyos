@@ -10,7 +10,7 @@
 | 软件 | zutils |
 | 版本 | 1.15 |
 | 状态 | ✅ success |
-| 构建系统 | unknown |
+| 构建系统 | autotools |
 | 源码路径 |  |
 
 ## 二、编译阶段（checkbox 实时更新）
