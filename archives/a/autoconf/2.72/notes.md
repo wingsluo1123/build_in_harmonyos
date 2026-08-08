@@ -44,7 +44,7 @@ Results:
 - `perl/5.42.2:*`: OHOS armv8 package `6b129b068851896169fae42d399fa922d239ce8a` visible in `ohpcd`.
 - Earlier `m4/*` checks returned 0 recipes while the dependency adaptation was still pending.
 - 2026-08-06 recheck after the `m4` merge: `m4/1.4.19` is visible in `ohpcd`; recipe revision `9a84a566238ea69b63e725d646354933` and OHOS armv8 package revision `8b566d24f4ee8ccaea3bc86a3eb00a93` downloaded successfully.
-- `automake/1.18` and `libtool/2.5.4`: visible in `ohpcd`; useful for downstream `autoreconf`, but not built into this package.
+- `automake/1.18` and `libtool/2.5.4`: visible in `ohpcd`; useful for downstream `autoreconf`, but their adaptations belong to their own packages and are not rebuilt or vendored in this `autoconf` PR.
 - 2026-08-07 source mirror check from local Windows: TUNA, Aliyun, and `mirrors.kernel.org` returned HTTP 200 for `autoconf-2.72.tar.gz`; USTC returned HTTP 403 and was not added; `ftpmirror.gnu.org` timed out in 30 seconds.
 
 Dependency status:
@@ -54,6 +54,8 @@ Dependency status:
 ## Source and build-system analysis
 
 - Official release tarball contains `configure`, `configure.ac`, `Makefile.in`, `bin/*.in`, and `build-aux/config.guess/config.sub`.
+- The previous archive already had six OHOS patch files but no Conan recipe. Those patch files mixed real OHOS triplet support with generated outputs from a manual build (`bin/autoconf`, `lib/version.m4`, `tests/atconfig`, `tests/atlocal`) and embedded fixed device paths such as `/storage/Users/currentUser/...` and `/data/service/hnp/bin/...`.
+- This Conan version keeps the old patch numbering and adaptation intent visible for review, but only applies the portable source patches that do not force maintainer-generated files to be rebuilt.
 - Build system is Autotools; recipe uses `configure && make -j1 && make install`.
 - No `autoreconf` is needed to build Autoconf itself.
 - Autoconf installed commands are Perl scripts that need `perl`, `m4`, and the package's `share/autoconf` data directory at runtime.
@@ -61,10 +63,12 @@ Dependency status:
 ## Changes prepared
 
 - Added `conanfile.py` with `package_type = "application"`.
-- Added `conandata.yml` with official GNU source URL, SHA-256, and patch declaration.
+- Added `conandata.yml` with official GNU source URL, SHA-256, and patch declarations.
 - Added software-level `commands.json` because Autoconf installs CLI commands.
 - Added `test_package` that runs the installed commands, uses `autoconf`/`autoheader` to generate a minimal `configure` project, and directly exercises `autom4te` macro processing.
-- Replaced six old hardcoded/generated-file patches with one portability patch for `config.guess` and `config.sub`.
+- Retained the previous OHOS patch file names for review traceability while keeping Conan's active patch set reproducible:
+  - Applied by `conandata.yml`: `0001-support-linux-ohos-config-triplet.patch` and `0002-use-mkdir-for-config-status-tempdirs-on-ohos.patch`.
+  - Retained/audited but not applied by `conandata.yml`: `0001-bin-autoconf.patch`, `0002-build-aux-config.guess.patch`, `0003-build-aux-config.sub.patch`, `0004-lib-version.m4.patch`, `0005-tests-atconfig.patch`, and `0006-tests-atlocal.patch`. The current active triplet patch already covers the portable `config.guess`/`config.sub` parts. The previous generated-file patches embedded fixed device paths. Applying source-template replacements for those generated-file names on the release tarball marks man page dependencies stale and makes `make` require missing maintainer tools such as `help2man`; Conan instead lets `configure` generate those files and the recipe wraps installed commands to provide relocatable Perl/macro paths.
 - Added wrapper scripts after install so `share/autoconf` paths are derived from the package prefix instead of baked absolute paths.
 - The `autom4te` wrapper prepends the current package `share/autoconf` directory on every invocation. This compensates for upstream `autom4te.cfg` being configured with `//share/autoconf` when Conan installs with `DESTDIR`.
 
@@ -76,6 +80,7 @@ Checks run:
 python -m py_compile archives\a\autoconf\2.72\conanfile.py archives\a\autoconf\2.72\test_package\conanfile.py
 conan export archives\a\autoconf\2.72
 git -C <unpacked-autoconf-2.72> apply --check --verbose archives\a\autoconf\2.72\patches\0001-support-linux-ohos-config-triplet.patch
+git -C <unpacked-autoconf-2.72> apply --check --verbose archives\a\autoconf\2.72\patches\0002-use-mkdir-for-config-status-tempdirs-on-ohos.patch
 conan create archives\a\autoconf\2.72 --build=missing
 conan create archives\a\autoconf\2.72 -pr:h=ci\conan\profiles\ohos-aarch64 -pr:b=ci\conan\profiles\ohos-aarch64 --build=autoconf/*
 ```
@@ -85,12 +90,13 @@ Results:
 - Python syntax check: pass.
 - YAML/JSON metadata parse check: pass.
 - Patch apply check against the official 2.72 tarball: pass.
-- `conan export`: pass; latest exported recipe revision after the true-device profile fixes is `autoconf/2.72#ded5821bccb80a62dddc24f4b5002f07`.
+- `conan export`: pass; latest exported recipe revision after the review patch cleanup is `autoconf/2.72#ded5821bccb80a62dddc24f4b5002f07`.
 - First `conan create`: blocked during dependency graph resolution because `m4/1.4.19` was not yet in local cache or `ohpcd`.
 - 2026-08-06 `conan create` with OHOS profile: dependency graph resolved with `m4/1.4.19` and `perl/5.42.2` from cache/`ohpcd`.
-- The same run initially caught stale hunk line numbers in `0001-support-linux-ohos-config-triplet.patch`; the patch was refreshed and then applied successfully during Conan `source()`.
+- The same run initially caught stale hunk line numbers in the triplet-support patch; the patch set was refreshed and then applied successfully during Conan `source()`.
 - Current local Windows limit: build reaches `autotools.configure()`, then fails with `'.' is not recognized as an internal or external command` because this host cannot execute the POSIX `configure` script under the OHOS profile. True OHOS runner verification has passed.
 - 2026-08-07 true-device reruns with the current OHOS profile first exposed `CONFIG_SHELL=/data/service/hnp/bin/bash` from `ci/conan/profiles/ohos-aarch64`; that path is not present on the current device. The recipe now overrides `SHELL` and `CONFIG_SHELL` in the generated Conan build environment with the executable shell discovered by `_config_shell()`, which resolves to `/bin/sh` or `/system/bin/sh` on current OHOS devices. The profile also defines `PATH` directly, so test_package adds autoconf, m4, and perl package `bin` directories through an explicit `autoconf_test_env` script after `conanbuild`.
+- 2026-08-08 review-fix rerun proved that applying template replacements for the retained generated-file patch names makes `make` try to regenerate man pages and fail because `help2man` is not installed on the device. The active Conan patch set therefore stays on the already verified triplet patch plus the OHOS temp-directory workaround; the generated-file patch names stay present for audit but are not listed in `conandata.yml`.
 
 ## OHOS isolated device verification
 
@@ -114,10 +120,10 @@ cp "$HOME/.conan2/settings.yml" "$CONAN_HOME/settings.yml"
 sh "$OHOS_JOB_BASE/run-conan-heavy.sh"
 ```
 
-Final successful run:
+Final successful run after retaining/auditing the old OHOS patch names:
 
 ```text
-/storage/Users/currentUser/ohos-test-runs/codex-autoconf-autoconf-autoconf-2.72-pr4410-122fa92-conan-rerun5-testenv-20260807-182328-20260807-182328-47927
+/storage/Users/currentUser/ohos-test-runs/codex-autoconf-autoconf-autoconf-2.72-pr4410-review-patches-final-20260808-171755-20260808-171755-45265
 ```
 
 Result:
@@ -132,7 +138,7 @@ Result:
 Additional test-package findings:
 
 - Running generated `configure` is intentionally not part of the final smoke test because the runner user's `/tmp` behavior is inconsistent: shell here-doc temp files may attempt `/tmp/sh*.tmp` and fail with `Read-only file system`.
-- `autoreconf --force --install` is not part of the final smoke test because it can call optional `aclocal`; that belongs to Automake, not Autoconf's independent package.
+- `autoreconf --force --install` is not part of the final smoke test because it can call optional `aclocal`; Automake/libtool are handled as separate packages. This `autoconf` test verifies that the installed `autoreconf` command starts under the Conan runtime environment.
 
 Successful package reference:
 
