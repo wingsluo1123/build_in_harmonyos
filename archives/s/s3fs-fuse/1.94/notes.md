@@ -70,5 +70,5 @@ Copyright (C) 2010 Randy Rizun <rrizun@gmail.com>
 4. **HMDFS限制**：config.status在HMDFS上创建临时目录受限，需手动修改
 ---
 
-**编译结束**: 2026-05-28 10:21
-**最终状态**: published
+**编译结束**: 2026-08-09 01:19
+**最终状态**: built

@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R5",
+      "file": "archives/s/s3fs-fuse/1.94/conanfile.py",
+      "line": 34,
+      "description": "Forbidden template placeholder: `url = \"\"  # CI fills this`. Code style rule 5 explicitly lists this pattern as unfinished code that must be filled by the adapter before merge.",
+      "fix_suggestion": "Set the url attribute to the project's Conan recipe repository URL, e.g. `url = \"https://cnb.cool/yourorg/yourrepo/-/tree/main/archives/s/s3fs-fuse\"` or remove the comment and set an appropriate recipe source URL."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R16",
+      "file": "archives/s/s3fs-fuse/1.94/conanfile.py",
+      "line": 19,
+      "description": "Import order violation: no blank line between standard library imports (os, shutil on lines 18-19) and third-party imports (from conan import ConanFile on line 20). Code style rule 16 requires a blank line between import groups: stdlib → third-party → project-internal.",
+      "fix_suggestion": "Add a blank line between `import shutil` and `from conan import ConanFile`:\n```python\nimport os\nimport shutil\n\nfrom conan import ConanFile\n```"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-recipe-quality",
+      "file": "archives/s/s3fs-fuse/1.94/conanfile.py",
+      "line": 287,
+      "description": "Overly broad exception handling: `except Exception:` around `autotools.configure()` silently swallows all errors, including those unrelated to the HMDFS config.status temp dir issue. If configure fails for other reasons (missing dependency, wrong flags), the error is hidden and diagnosis becomes difficult.",
+      "fix_suggestion": "Catch a more specific exception type or at least log the original error message. Consider:\n```python\ntry:\n    autotools.configure()\nexcept ConanException as e:\n    self.output.info(f\"Configure failed ({e}), attempting config.status fix...\")\n```"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/s/s3fs-fuse/1.94/conanfile.py",
+      "line": 147,
+      "description": "FUSE2 source (libfuse 2.9.9) is downloaded via `download(self, fuse_url, fuse_tarball)` without sha256 verification. While the main package source in conandata.yml has a verified sha256, the FUSE2 dependency download lacks integrity checking. A corrupted or tampered tarball would go undetected.",
+      "fix_suggestion": "Add sha256 verification for the FUSE2 download. Compute the sha256 of fuse-2.9.9.tar.gz and pass it to the download() call, or use `get()` with sha256 parameter:\n```python\nfuse_sha256 = \"<computed-sha256>\"\ndownload(self, fuse_url, fuse_tarball, sha256=fuse_sha256)\n```"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-portability",
+      "file": "archives/s/s3fs-fuse/1.94/conanfile.py",
+      "line": 162,
+      "description": "Hardcoded path `#define FUSERMOUNT_DIR \"/usr/local/bin\"` in the FUSE2 config.h. This path likely does not exist on HarmonyOS. While s3fs-fuse uses its own mount logic and may not rely on fusermount, this path is still compiled into the binary.",
+      "fix_suggestion": "Set FUSERMOUNT_DIR to a path that exists on the target system, or use a Conan-provided path. If fusermount is not used by s3fs, consider setting it to an empty string or a neutral path like `\"/bin\"`."
+    }
+  ],
+  "summary": "Audit of s3fs-fuse 1.94 Conan recipe (7 changed files). DECEPTION DETECTION (P0): No issues. The test_package runs `s3fs --version` (real binary execution, R34 satisfied). sha256 in conandata.yml verified against actual source tarball (46eb3bcc16eff63008ae2c3177765264b88627482bdb978fc3d10e34e9d52284 — match confirmed). manifest.yaml status 'published' is consistent across files. No pre-compiled binaries in PR. No empty #ifdef __OHOS__ stubs — config.guess/config.sub patches contain substantive platform detection logic. No test skipping or forced pass (R9). RECIPE QUALITY (P1): No issues. R32 uses `not in (\"Linux\", \"OHOS\")` correctly. R33 obtains compiler from conf_info, not hardcoded env vars. R38 commands.json present at software level with type=\"tool\". R39 source URL is official GitHub repo. FUSE2 built from source is an intentional design decision (FUSE2 not in Conan artifact repo). Patch file 0001-configure.ac.patch exists in repo and is valid. CODE STYLE (P2): 2 issues — (1) `url = \"\"  # CI fills this` is a forbidden template placeholder per rule 5; (2) missing blank line between stdlib and third-party import groups per rule 16. SUGGESTIONS (P3): 3 hints — broad exception catching around configure(), FUSE2 download without sha256 verification, hardcoded FUSERMOUNT_DIR path. VERDICT: pass (no P0/P1 blocking issues; P2 warnings are non-blocking style issues)."
+}
