@@ -88,7 +88,9 @@ class ScooterConan(ConanFile):
         host_arch = self._rust_host_arch()
         # 组件包（triple 按宿主架构；比完整 rust-*.tar.gz 小一半以上）。
         # CI #15558: static.rust-lang.org 对 CI worker 下载极慢（3600s 超时内
-        # 完整工具链仅 12%）→ USTC 镜像优先（同 kubetui CI #15412 实测方案），官方兜底。
+        # 完整工具链仅 12%）→ 曾改 USTC 镜像优先（同 kubetui CI #15412 实测方案）。
+        # CI #15674: USTC 对 CI worker 下载仍慢（3600s 仅 30%）→ 加入 rsproxy.cn
+        # （字节跳动镜像，本地实测 3.4MB/s 且 sha256 与官方一致）优先，USTC/官方兜底。
         triple = "x86_64-unknown-linux-gnu" if host_arch == "amd64" else "aarch64-unknown-linux-gnu"
         rustc_sha256 = (
             "08acb66f6cfc3d44d06c349edf947f41f30bb9fc74a28b0f003ad2d6fa96e878"
@@ -98,6 +100,7 @@ class ScooterConan(ConanFile):
         components = {
             "rustc": (
                 [
+                    f"https://rsproxy.cn/dist/rustc-1.81.0-{triple}.tar.gz",
                     f"https://mirrors.ustc.edu.cn/rust-static/dist/rustc-1.81.0-{triple}.tar.gz",
                     f"https://static.rust-lang.org/dist/rustc-1.81.0-{triple}.tar.gz",
                 ],
@@ -105,6 +108,7 @@ class ScooterConan(ConanFile):
             ),
             "cargo": (
                 [
+                    f"https://rsproxy.cn/dist/cargo-1.81.0-{triple}.tar.gz",
                     f"https://mirrors.ustc.edu.cn/rust-static/dist/cargo-1.81.0-{triple}.tar.gz",
                     f"https://static.rust-lang.org/dist/cargo-1.81.0-{triple}.tar.gz",
                 ],
@@ -125,12 +129,16 @@ class ScooterConan(ConanFile):
                     continue
                 self.output.info(f"downloading {comp_name} 1.81.0 from {comp_urls[0]}")
                 get(self, url=comp_urls, sha256=comp_sha256, destination=comp_tmp, strip_root=False)
-                # 组件包解包后为 {comp_name}-1.81.0-{triple}/，把 bin/ lib/ 合并进 rust_root
+                # 组件包解包后为 {comp_name}-1.81.0-{triple}/{comp_name}/bin|lib|share|etc
+                # （实际层级：rustc-1.81.0-aarch64-unknown-linux-gnu/rustc/bin/...），
+                # 遍历时跳过顶层 {comp}-{ver}-{triple} 目录，把 bin/lib/share/etc 合并进 rust_root。
                 for dirpath, dirnames, filenames in os.walk(comp_tmp):
                     rel = os.path.relpath(dirpath, comp_tmp)
                     parts = rel.split(os.sep)
-                    if parts and parts[0] in ("bin", "lib", "share", "etc"):
-                        target_dir = os.path.join(rust_root, *parts)
+                    # 匹配任意层级中出现的 bin/lib/share/etc（避顶层目录名干扰）
+                    if any(p in ("bin", "lib", "share", "etc") for p in parts):
+                        idx = next(i for i, p in enumerate(parts) if p in ("bin", "lib", "share", "etc"))
+                        target_dir = os.path.join(rust_root, *parts[idx:])
                         os.makedirs(target_dir, exist_ok=True)
                         for fn in filenames:
                             src_f = os.path.join(dirpath, fn)
@@ -140,11 +148,16 @@ class ScooterConan(ConanFile):
         # rust-std for aarch64-unknown-linux-ohos（交叉编译目标）
         std_root = os.path.join(rust_root, "lib", "rustlib", "aarch64-unknown-linux-ohos")
         if not os.path.isdir(std_root):
-            std_url = "https://static.rust-lang.org/dist/rust-std-1.81.0-aarch64-unknown-linux-ohos.tar.gz"
+            # CI #15674: 同 rustc/cargo——rsproxy.cn 优先，USTC/官方兜底
+            std_urls = [
+                "https://rsproxy.cn/dist/rust-std-1.81.0-aarch64-unknown-linux-ohos.tar.gz",
+                "https://mirrors.ustc.edu.cn/rust-static/dist/rust-std-1.81.0-aarch64-unknown-linux-ohos.tar.gz",
+                "https://static.rust-lang.org/dist/rust-std-1.81.0-aarch64-unknown-linux-ohos.tar.gz",
+            ]
             std_sha256 = "2f6034e52a1513c2615036c38c55b3452744623a2151b27b5aa997c3fd801d31"
             self.output.info("downloading rust-std for aarch64-unknown-linux-ohos")
             std_tmp = os.path.join(self.build_folder, "rust-std-ohos")
-            get(self, url=std_url, sha256=std_sha256, destination=std_tmp, strip_root=False)
+            get(self, url=std_urls, sha256=std_sha256, destination=std_tmp, strip_root=False)
             # rust-std tarball 解包后为 rust-std-aarch64-unknown-linux-ohos/，把 lib/rustlib 合并进 rust_root
             for dirpath, dirnames, filenames in os.walk(std_tmp):
                 rel = os.path.relpath(dirpath, std_tmp)
