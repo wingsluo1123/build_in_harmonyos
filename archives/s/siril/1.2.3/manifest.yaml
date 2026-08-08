@@ -1,5 +1,5 @@
 # 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.2.3/manifest.yaml
+# 文件位置: archives/s/siril/1.2.3/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
 # ============================================================
@@ -10,7 +10,7 @@
 version: "1.2.3"
 
 # 软件名
-software: "{software}"
+software: "siril"
 
 # 编译状态
 # published | built | failed | archived
@@ -18,7 +18,7 @@ status: built
 
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-08-07"
-build_system: "{BUILD_SYSTEM}"
+build_system: autotools
 
 # ============================================================
 # 源码信息
@@ -29,11 +29,11 @@ source:
   url: "https://gitlab.com/free-astro/siril/-/archive/1.2.3/siril-1.2.3.tar.bz2"
 
   # 源码校验和
-  sha256: ""
+  sha256: "47dcaa34bbe32f9f866e07233519d5ccc8ce487beb6932c050cf4ff505e63833"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
+  tar_format: tar.bz2
 
 # ============================================================
 # 构建配置
@@ -45,16 +45,30 @@ build:
   system: autotools
 
   # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+  configure_options:
+    - "--enable-static"
+    - "--disable-shared"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
+  dependencies:
+    - cfitsio/4.6.4@ohpcd/stable
+    - json-glib/1.6.6@ohpcd/stable
+    - libde265/1.0.18@ohpcd/stable
+    - exiv2/0.28.7@ohpcd/stable
+    - libraw/0.22.1@ohpcd/stable
+    - ffms2/5.0@ohpcd/stable
+    - wcslib/8.4@ohpcd/stable
+    - libheif/1.18.2@ohpcd/stable
+    - gtk/3.24.38@ohpcd/stable
+    - gsl/2.8
+    - fftw3f/3.3.10
+    - opencv/4.12.0
+    - ffmpeg/7.1.5
+    - libtiff/4.7.2
+    - libjpeg/10
+    - libpng/1.6.58
+    - libcurl/8.5.0
+    - lcms2/2.19
 
   # 编译器
   cc: clang
@@ -65,27 +79,35 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-configure.ac.patch"
+  - "0002-src-Makefile.am.patch"
+  - "0003-src-algos-demosaicing.c.patch"
+  - "0004-src-algos-demosaicing_rtp.cpp.patch"
+  - "0005-subprojects-Makefile.am.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "librtprocess submodule is empty in release tarball; made optional via HAVE_LIBRTPROCESS"
+  - "intltool not available on OHOS; replaced with direct msgfmt-based po handling"
+  - "config.status umask 077 causes setgid permission issues on OHOS; patched to 022"
+  - "OPENCV_LIBS was hardcoded; now uses pkg-config --libs opencv4"
+  - "Added LIBHEIF/LIBRAW/EXIV2 CFLAGS to AM_CPPFLAGS (missing upstream)"
+  - "Added -lintl for glib's proxy gettext functions"
+  - "gio-unix-2.0.pc generated manually (conan glib doesn't provide it separately)"
+  - "aclocal 1.17 broken on build host; aclocal-1.16 wrapper used"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/siril-1.2.3.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/siril-1.2.3.work
   source_orig_hash: 762bbe738faa5f71
-  source_work_hash: 26f95219ecb5b306
-  generated_at: '2026-08-08T02:07:58'
+  source_work_hash: 576f3206666160ba
+  generated_at: '2026-08-08T23:56:29'
   patches_count: 5
 
 patch_classification:

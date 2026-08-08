@@ -1,11 +1,23 @@
 # conandata.yml — siril 1.2.3
-# Official source: file:///storage/Users/currentUser/runner002/build_in_harmonyos/.build-cache/predl_cache/3b32020e_free-astro/siril/-/archive/1.2.3/siril-1.2.3.tar.bz2
+# Official source: GitLab free-astro/siril tag 1.2.3 (R39: official source).
 
 sources:
-  url: "file:///storage/Users/currentUser/runner002/build_in_harmonyos/.build-cache/predl_cache/3b32020e_free-astro/siril/-/archive/1.2.3/siril-1.2.3.tar.bz2"
+  url: "file:///storage/Users/currentUser/runner002/build_in_harmonyos/.build-cache/predl_cache/088b46c4_siril-1.2.3.tar.bz2"
   sha256: "47dcaa34bbe32f9f866e07233519d5ccc8ce487beb6932c050cf4ff505e63833"
 
 patches:
-  - patch_file: "patches/0001-ohos-adaptation.patch"
-    patch_description: "OHOS platform adaptation: make librtprocess optional, remove intltool dependency, fix opencv/intl linking, add missing CFLAGS"
+  - patch_file: "patches/0001-configure.ac.patch"
+    patch_description: "Make librtprocess optional (HAVE_LIBRTPROCESS), remove intltool dependency, fix OPENCV_LIBS to use pkg-config, add missing LIBHEIF/LIBRAW/EXIV2 CFLAGS to AM_CPPFLAGS, add -lintl for glib proxy gettext"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-Makefile.am.patch"
+    patch_description: "Add missing LIBHEIF/LIBRAW/EXIV2 CFLAGS and -lintl to AM_CPPFLAGS in src/Makefile.am for correct include paths and glib proxy gettext linking"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-algos-demosaicing.c.patch"
+    patch_description: "Guard demosaicing.c librtprocess code paths with HAVE_LIBRTPROCESS to avoid compilation errors when librtprocess submodule is empty"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-algos-demosaicing_rtp.cpp.patch"
+    patch_description: "Add HAVE_LIBRTPROCESS guard to demosaicing_rtp.cpp to handle empty librtprocess submodule in release tarball"
+    patch_type: "portability"
+  - patch_file: "patches/0005-subprojects-Makefile.am.patch"
+    patch_description: "Remove librtprocess from SUBDIRS in subprojects/Makefile.am since the submodule is empty in the release tarball"
     patch_type: "portability"

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Conan test_package for siril 1.2.3.
 
-siril is a GUI application, so the test verifies that the siril binary
-exists and can report its version. This is the L2 smoke test level.
-
-Since siril links against many shared libraries (GTK, glib, etc.) that
-may not be on the library path during testing, we use the conanrun
-environment to set up LD_LIBRARY_PATH.
+siril is a GUI application (package_type=application), not a library.
+CMakeDeps does not populate siril_BINDIR for application packages (no libs
+→ empty BIN_DIRS), so we pass the binary path directly as a CMake cache
+variable derived from the siril package folder.
 """
 import os
 
@@ -26,7 +24,11 @@ class SirilTestConan(ConanFile):
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        # Pass the siril binary directory as a CMake cache variable.
+        # For application packages, CMakeDeps does not expose siril_BINDIR,
+        # so we derive it directly from the dependency package folder.
+        siril_bindir = os.path.join(self.dependencies["siril"].package_folder, "bin")
+        cmake.configure(cli_args=[f"-DSIRIL_BINDIR={siril_bindir}"])
         cmake.build()
 
     def test(self):

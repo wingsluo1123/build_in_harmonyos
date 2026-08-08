@@ -156,15 +156,27 @@ Requires: glib-2.0 gobject-2.0 gmodule-2.0
                     save(self, os.path.join(gen_folder, "gio-unix-2.0.pc"), gio_unix_pc)
                     break
 
-        # Fix aclocal version conflict: /usr/local/bin/aclocal is broken 1.17,
-        # but aclocal-1.16 works. Create wrappers in a PATH-accessible location.
+        # Fix aclocal version conflict: system aclocal may be broken (e.g.
+        # aclocal 1.17), but a working aclocal-1.16 may coexist. Probe common
+        # locations and create wrappers in a PATH-accessible location.
         wrapper_dir = os.path.join(self.build_folder, "aclocal_wrappers")
         os.makedirs(wrapper_dir, exist_ok=True)
         for tool in ["aclocal", "automake"]:
             wrapper_path = os.path.join(wrapper_dir, tool)
-            tool_1_16 = f"/storage/Users/currentUser/usr/local/bin/{tool}-1.16"
-            if os.path.exists(tool_1_16):
-                save(self, wrapper_path, f'#!/bin/sh\nexec {tool_1_16} "$@"\n')
+            # Probe candidate locations for a working <tool>-1.16
+            tool_1_16 = None
+            search_dirs = [
+                os.path.join(os.environ.get("HOME", ""), "usr", "local", "bin"),
+                "/usr/local/bin",
+                "/usr/bin",
+            ]
+            for d in search_dirs:
+                cand = os.path.join(d, f"{tool}-1.16")
+                if os.path.isfile(cand) and os.access(cand, os.X_OK):
+                    tool_1_16 = cand
+                    break
+            if tool_1_16:
+                save(self, wrapper_path, f'#!/bin/sh\nexec "{tool_1_16}" "$@"\n')
                 os.chmod(wrapper_path, 0o755)
 
         # Run autoreconf manually with correct PATH (conan's autotools.autoreconf
@@ -195,9 +207,15 @@ Requires: glib-2.0 gobject-2.0 gmodule-2.0
         autotools.install()
 
     def package_info(self):
-        # siril is an application (executable), not a library
+        # siril is an application (executable), not a library.
+        # Clear transitive deps so CMakeDeps does not generate link targets
+        # that reference transitive dependency CMake targets (e.g.
+        # opencv::opencv) which may not resolve in consumer projects.
+        # An application's dependencies are linked at build time, not at
+        # consumption time, so they should not propagate via cpp_info.
         self.cpp_info.libs = []
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libdirs = []
+        self.cpp_info.requires = []
         # The main executable
         self.cpp_info.system_libs = ["m", "pthread", "dl", "intl"]
