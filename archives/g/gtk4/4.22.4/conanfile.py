@@ -37,20 +37,7 @@ class Gtk4Conan(ConanFile):
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {
-        "shared": True,
-        "fPIC": True,
-        "harfbuzz/*:shared": True,
-        "cairo/*:shared": True,
-        "cairo-gobject/*:shared": True,
-        "fontconfig/*:shared": True,
-        "pango/*:shared": True,
-        "gdk-pixbuf/*:shared": True,
-        "fribidi/*:shared": True,
-        "freetype/*:shared": True,
-        "libpng/*:shared": True,
-        "graphene/*:shared": True,
-    }
+    default_options = {"shared": True, "fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -83,7 +70,7 @@ class Gtk4Conan(ConanFile):
         self.requires("fribidi/1.0.16")
         self.requires("gdk-pixbuf/2.44.6")
         self.requires("libepoxy/1.5.10")
-        self.requires("fontconfig/2.18.1.1")
+        self.requires("fontconfig/2.18.1")
         self.requires("freetype/2.14.3")
         self.requires("graphene/1.10.8")
 
