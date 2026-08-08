@@ -59,3 +59,8 @@ conan-verify 全 8 道门禁通过（G0-G4 + L2/L4/L5）。
 1. **player 未构建**：alda-player 是 Java/Gradle 应用，需要 JVM，不在本次适配范围。client CLI 功能完整，但 play 命令需要 alda-player。
 2. **telemetry 弹窗**：首次运行 alda 会弹遥测同意框，测试时用 `ALDA_TELEMETRY_DISABLED=1` 跳过。
 3. **Go 工具链路径**：Conan 沙箱剥离 PATH，conanfile.py 中硬编码 `~/.harmonybrew/bin` 注入 Go 工具链。
+
+---
+
+**编译结束**: 2026-08-08
+**最终状态**: built
