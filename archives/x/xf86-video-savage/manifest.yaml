@@ -1,0 +1,62 @@
+software: xf86-video-savage
+version: "2.4.1"
+status: built
+build_date: "2026-08-09"
+build_system: autotools
+
+source:
+  url: "https://xorg.freedesktop.org/archive/individual/driver/xf86-video-savage-2.4.1.tar.gz"
+  sha256: "5eea7a0391e8c93f6528135ad9b0c8550f287bbf838ac86d0b82b8b16493f965"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options: "--disable-xaa --disable-dri SED=/storage/Users/currentUser/usr/local/bin/sed HELP2MAN=/bin/true MAKEINFO=/bin/true"
+  dependencies:
+    - "xorgproto/2025.1"
+    - "pixman/0.46.4.2"
+  cc: clang
+  cxx: clang++
+  system_dependencies:
+    - "xorg-server/21.1.15 (system, via cmd-pkgs)"
+    - "libpciaccess/0.17 (system, via cmd-pkgs)"
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0003-config.sub.patch"
+  - "0004-configure.patch"
+  - "0005-src-savage_driver.c.patch"
+  - "0006-src-savage_vbe.c.patch"
+
+knowledge_gained:
+  - "E007: config.guess/config.sub 需要添加 HarmonyOS 平台检测和 HMDFS umask fix"
+  - "E046: HMDFS 上 umask 077 + mktemp 创建目录不可写，需 HarmonyOS 临时目录跳过 umask 077"
+  - "OHOS xorg-server 不支持 XAA/DRI，需 --disable-xaa --disable-dri"
+  - "OHOS xf86int10.h 是 stub，BIOSseg/xf86int10Addr 未定义需 #ifdef __OHOS__ 守卫"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xf86-video-savage-2.4.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xf86-video-savage-2.4.1.work
+  source_orig_hash: fd23fdc5a3254ace
+  source_work_hash: c42fb60eb921e845
+  generated_at: '2026-08-09T04:21:13'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-src-savage_driver.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-savage_vbe.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
