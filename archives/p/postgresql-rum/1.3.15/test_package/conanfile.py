@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 from conan import ConanFile
 
@@ -11,19 +12,13 @@ class TestPostgresqlRumConan(ConanFile):
 
     def test(self):
         # R34: Verify rum.so exists and exports the extension entry symbol
-        # conanrun env sets LD_LIBRARY_PATH to include postgresql-rum's libdirs
-        self.run(
-            'for d in $(echo $LD_LIBRARY_PATH | tr ":" " "); do '
-            'if [ -f "$d/rum.so" ]; then '
-            '  echo "rum.so found in $d"; '
-            '  nm -D "$d/rum.so" 2>/dev/null | grep -q " _PG_init" '
-            '    && echo "_PG_init symbol verified" && exit 0; '
-            '  echo "ERROR: _PG_init not found" && exit 1; '
-            'fi; done; echo "rum.so NOT found" && exit 1',
-            env="conanrun",
-        )
-        # OHOS: unsigned ELF binaries cannot be executed in CI
-        # Verify pg_config exists and is a valid ELF binary
-        bin_dir = os.path.join(self.dependencies["postgresql"].package_folder, "bin")
-        pg_config = os.path.join(bin_dir, "pg_config")
+        pkg_folder = self.dependencies["postgresql-rum"].package_folder
+        rum_so = os.path.join(pkg_folder, "lib", "rum.so")
+        assert os.path.isfile(rum_so), f"rum.so not found at {rum_so}"
+        # Verify _PG_init symbol is exported (R34: real API verification)
+        result = subprocess.run(["nm", "-D", rum_so], capture_output=True, text=True)
+        assert "_PG_init" in result.stdout, f"_PG_init not found in rum.so"
+        # Verify pg_config from PostgreSQL dependency exists
+        pg_folder = self.dependencies["postgresql"].package_folder
+        pg_config = os.path.join(pg_folder, "bin", "pg_config")
         assert os.path.isfile(pg_config), f"pg_config not found at {pg_config}"
