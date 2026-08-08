@@ -58,14 +58,17 @@ class PostgresqlOrafceConan(ConanFile):
         configure_path = os.path.join(self.source_folder, "configure")
         with open(configure_path, "r", encoding="utf-8", errors="ignore") as f:
             text = f.read()
-        # Replace tmpdir creation to use $TMPDIR (keep umask 077 for security)
+        # Replace tmpdir creation to use $TMPDIR and umask 022
+        # (HarmonyOS media filesystem: umask 077 strips group write,
+        #  causing config.status Permission denied. umask 022 is a safe
+        #  compromise - standard Linux umask, no world-writable dirs)
         text = text.replace(
             'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`',
-            '_tmp_dir="${TMPDIR:-$HOME/tmp}"\n  tmp=`(umask 077 && mktemp -d "$_tmp_dir/confXXXXXX") 2>/dev/null`'
+            '_tmp_dir="${TMPDIR:-$HOME/tmp}"\n  tmp=`(umask 022 && mktemp -d "$_tmp_dir/confXXXXXX") 2>/dev/null`'
         )
         text = text.replace(
             'tmp=./conf$$-$RANDOM\n  (umask 077 && mkdir "$tmp")',
-            'tmp="$_tmp_dir/conf$$-$RANDOM"\n  (umask 077 && mkdir "$tmp")'
+            'tmp="$_tmp_dir/conf$$-$RANDOM"\n  (umask 022 && mkdir "$tmp")'
         )
         text = text.replace(
             'cannot create a temporary directory in .',
