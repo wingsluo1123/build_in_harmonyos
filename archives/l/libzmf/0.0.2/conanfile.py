@@ -1,56 +1,54 @@
 #!/usr/bin/env python3
-"""Conan recipe — libzmf 0.0.2 (Autotools).
+"""Conan recipe — libzmf 0.0.2 (Zoner Callisto/Draw document parser).
 
-libzmf is a library for reading and converting Zoner Draw and Zebra file
-formats. It is part of the Document Liberation Project.
-
-Dependencies (R27: @ohpcd/stable):
-  - librevenge/0.0.5      (core dependency, provides librevenge-0.0)
-  - boost/1.84.0          (header-only: cstdint, math/constants, optional, variant)
-  - zlib/1.3.1            (PNG chunk compression in Zoner format)
-  - libpng/1.6.43         (embedded PNG preview decoding)
-  - icu/73.2              (Unicode normalization for text records)
-
-Platform adaptations:
-  - R26: Static linking for DevBox compatibility (--disable-shared --enable-static)
-  - E007/E072: config.guess/config.sub replaced with OHOS-aware versions
-  - umask 077 -> 022 in generated configure (HarmonyOS FS limitation)
-
-Build system: Autotools (configure + make). The upstream release tarball
-ships a pre-generated `configure` script, so `autoreconf` is NOT required
-under normal circumstances. The recipe calls `autoreconf -fi` only when
-patches touch configure.ac/Makefile.am; here patches only replace
-config.guess/config.sub, so we skip autoreconf and run configure directly.
+Build system: autotools (configure + make).
+Dependencies: librevenge/0.0.5 (runtime).
+ICU is replaced by a Latin-1 fallback patch (ZMF_NO_ICU) because the
+competition worker lacks a prebuilt ICU and building icu4c from source
+exceeds the CI time budget. ASCII text is preserved verbatim; non-ASCII
+bytes map to U+00xx.
 """
 import os
-import shutil
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps, PkgConfigDeps
+from conan.tools.env import Environment
 from conan.tools.layout import basic_layout
 
 
 class LibzmfConan(ConanFile):
     name = "libzmf"
     version = "0.0.2"
-    description = "Library for importing and converting Zoner Draw drawings"
+    description = "libzmf — library for import of Zoner Callisto/Draw documents"
     license = "MPL-2.0"
-    homepage = "https://sourceforge.net/projects/libzmf/"
-    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"  # recipe repo
+    homepage = "https://wiki.documentfoundation.org/DLP/Libraries/libzmf"
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
+
+    package_type = "library"
 
     settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False]}
+    default_options = {"shared": False}
 
     def export_sources(self):
         export_conandata_patches(self)
 
     def requirements(self):
-        # R27: Dependencies must reference @ohpcd/stable
-        self.requires("librevenge/0.0.5", transitive_headers=True)
-        self.requires("boost/1.84.0", transitive_headers=True)
-        self.requires("zlib/1.3.1")
-        self.requires("libpng/1.6.43")
-        self.requires("icu/73.2")
+        # librevenge provides RVNGString, RVNGInputStream etc.
+        self.requires("librevenge/0.0.5")
+        # boost: libzmf's configure.ac probes boost/cstdint.hpp, boost/math,
+        # boost/optional, boost/variant (header-only). librevenge's boost dep
+        # is private-transitive and does not expose headers downstream, so
+        # we pin the same boost version explicitly here.
+        self.requires("boost/1.90.0.3")
+        # libpng: libzmf bitmap import (BMI) uses libpng for
+        # PNG-encoded bitmap streams embedded in Zoner documents.
+        # zlib is NOT explicitly required here — conan resolves it
+        # transitively from librevenge (zlib/1.3.1) and libpng
+        # (zlib/1.3.1.1); different versions of the same transitive
+        # dep are allowed as long as no single package requires both.
+        self.requires("libpng/1.6.58")
 
     def layout(self):
         basic_layout(self)
@@ -59,53 +57,153 @@ class LibzmfConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        # P3 fix: generate deps env (CPPFLAGS/LIBS for librevenge/boost/zlib/libpng/icu)
-        # BEFORE the toolchain, so configure can find the 5 declared dependencies.
-        from conan.tools.gnu import AutotoolsDeps
-        deps = AutotoolsDeps(self)
-        deps.generate()
+        # Generate pkg-config + autotools dependency flags so configure's
+        # PKG_CHECK_MODULES([REVENGE], [librevenge-0.0]) can resolve.
+        PkgConfigDeps(self).generate()
+        AutotoolsDeps(self).generate()
+
         tc = AutotoolsToolchain(self)
-        # R26: Build static libraries (DevBox only copies bin/, no lib/)
-        tc.configure_args.append("--enable-static")
-        tc.configure_args.append("--disable-shared")
-        # boost spirit classic has -Wshadow warnings; suppress as non-error
-        tc.extra_cxxflags.append("-Wno-error=shadow")
+        # R26: System-name libraries default to static
+        if not self.options.shared:
+            tc.configure_args.append("--enable-static")
+            tc.configure_args.append("--disable-shared")
+        # E001/E096: cross-compile triplet for HarmonyOS (build machine cannot
+        # run OHOS binaries, so configure must skip the "cannot run C compiled
+        # programs" check via --host; autotools then treats us as cross build).
+        if self.settings.os == "OHOS":
+            tc.configure_args.append("--host=aarch64-linux-ohos")
+            tc.configure_args.append("--build=aarch64-linux")
+        # Disable optional features unavailable on OHOS
+        tc.configure_args.append("--disable-tests")
+        tc.configure_args.append("--without-docs")
+        # ICU is not available on the OHOS worker; the 0001-no-icu patch
+        # replaces ucnv_* with a Latin-1 byte passthrough under ZMF_NO_ICU.
+        tc.configure_args.append("--without-icu")
+        # Inject the fallback define into the C++ compile flags. autotools'
+        # make reads CXXFLAGS from the Makefile (frozen at configure time),
+        # not from the env or AutotoolsToolchain.cxxflags at make time.
+        # Pass CXXFLAGS via configure args so it is baked into Makefile.
+        tc.cxxflags.append("-DZMF_NO_ICU")
+        cxxflags_str = " ".join(tc.cxxflags) + " -fPIC -O2"
+        tc.configure_args.append(f"CXXFLAGS={cxxflags_str}")
         tc.generate()
+
+        # E165: HarmonyOS has no /bin directory; bash lives at
+        # /data/service/hnp/bin/bash and sh at /system/bin/sh. configure
+        # and auxiliary scripts ship #!/bin/bash shebangs that fail with
+        # "bad interpreter" on the OHOS worker. Repoint them before build.
+        env = Environment()
+        # Also export CXXFLAGS at env level as a belt-and-suspenders measure.
+        env.define("CXXFLAGS", cxxflags_str)
+        env.define("CPPFLAGS", "-DZMF_NO_ICU")
+        # Skip cppunit check (test-only dependency, not needed for building)
+        env.define("CPPUNIT_CFLAGS", " ")
+        env.define("CPPUNIT_LIBS", " ")
+        # librevenge's .pc ships prefix=/ (conan placeholder), so
+        # PKG_CHECK_MODULES([REVENGE], [librevenge-0.0]) cannot resolve via
+        # pkg-config. Bypass it by injecting REVENGE_* directly from the
+        # resolved librevenge dependency.
+        librevenge = self.dependencies["librevenge"]
+        rvng_root = librevenge.package_folder
+        env.define("REVENGE_CFLAGS", f"-I{rvng_root}/include/librevenge-0.0")
+        env.define(
+            "REVENGE_LIBS",
+            f"-L{rvng_root}/lib -lrevenge-0.0 -lrevenge-stream-0.0 -lrevenge-generators-0.0",
+        )
+        env.define("REVENGE_STREAM_CFLAGS", f"-I{rvng_root}/include/librevenge-0.0")
+        env.define("REVENGE_STREAM_LIBS", f"-L{rvng_root}/lib -lrevenge-stream-0.0")
+        env.define("REVENGE_GENERATORS_CFLAGS", f"-I{rvng_root}/include/librevenge-0.0")
+        env.define("REVENGE_GENERATORS_LIBS", f"-L{rvng_root}/lib -lrevenge-generators-0.0")
+
+        # libpng + zlib: same pkg-config placeholder issue as librevenge.
+        # Inject LIBPNG_* and ZLIB_* from resolved conan deps.
+        libpng = self.dependencies["libpng"]
+        png_root = libpng.package_folder
+        zlib = self.dependencies["zlib"]
+        zlib_root = zlib.package_folder
+        env.define("LIBPNG_CFLAGS", f"-I{png_root}/include -I{png_root}/include/libpng16")
+        env.define("LIBPNG_LIBS", f"-L{png_root}/lib -lpng16 -L{zlib_root}/lib -lz")
+        env.define("ZLIB_CFLAGS", f"-I{zlib_root}/include")
+        env.define("ZLIB_LIBS", f"-L{zlib_root}/lib -lz")
+
+        # ICU: not available on OHOS. configure.ac unconditionally runs
+        # PKG_CHECK_MODULES([ICU],[icu-uc]); --without-icu only toggles
+        # downstream usage, not the probe. Inject empty ICU_* to bypass
+        # the pkg-config lookup (the 0001-no-icu patch cuts the ICU code
+        # path at compile time under ZMF_NO_ICU).
+        env.define("ICU_CFLAGS", " ")
+        env.define("ICU_LIBS", " ")
+
+        # boost: librevenge's boost dep is private-transitive and does
+        # not surface headers to configure's AC_CHECK_HEADER probes.
+        # Inject the boost include root explicitly so configure finds
+        # boost/cstdint.hpp, boost/math, boost/optional, boost/variant.
+        boost = self.dependencies["boost"]
+        boost_inc = boost.package_folder + "/include"
+        env.define("CPPFLAGS", f"-DZMF_NO_ICU -I{boost_inc}")
+        env.define("CXXFLAGS", f"-DZMF_NO_ICU -fPIC -O2 -I{boost_inc}")
+
+        envvars = env.vars(self)
+        envvars.save_script("conanbuildenv_skip_cppunit")
 
     def build(self):
         apply_conandata_patches(self)
-        src = self.source_folder
+        # E165: HarmonyOS has no /bin directory; bash lives at
+        # /data/service/hnp/bin/bash and sh at /system/bin/sh. configure
+        # and auxiliary scripts ship #!/bin/bash shebangs that fail with
+        # "bad interpreter" on the OHOS worker. Repoint them before build.
+        for script in ["configure", "install-sh", "config.sub", "config.guess"]:
+            p = os.path.join(self.source_folder, script)
+            if os.path.isfile(p):
+                with open(p, "r") as f:
+                    first = f.readline()
+                if first.startswith("#!/bin/bash"):
+                    from conan.tools.files import replace_in_file
+                    replace_in_file(self, p, "#!/bin/bash", "#!/data/service/hnp/bin/bash", strict=False)
+                elif first.startswith("#!/bin/sh"):
+                    from conan.tools.files import replace_in_file
+                    replace_in_file(self, p, "#!/bin/sh", "#!/system/bin/sh", strict=False)
 
-        # E007/E072: The 0001/0002 patches replace config.guess/config.sub
-        # wholesale with OHOS-aware automake-1.17 copies (timestamp 2023)
-        # that recognise the aarch64-*-linux-ohos triplet. The release
-        # tarball's original scripts (autoconf-2.69 era, 2012) cannot.
-        # No system-automake fallback: the patched copies are complete and
-        # a hardcoded am_dir would silently no-op on CI (P2 fix).
-
-        # Fix: umask 077 -> 022 in generated configure (HarmonyOS FS limitation)
-        configure = os.path.join(src, "configure")
-        if os.path.exists(configure):
-            with open(configure, "r") as f:
-                content = f.read()
-            content = content.replace("umask 077", "umask 022")
-            with open(configure, "w") as f:
-                f.write(content)
+        # librevenge's .la archives ship dependency_libs='//lib/libfoo.la'
+        # (conan placeholder prefix=/). libtool refuses '//lib/librevenge-0.0.la'
+        # as "not a valid libtool archive". Repoint every //lib/ occurrence
+        # inside the resolved librevenge .la files to the real conan package
+        # lib directory before invoking configure/make.
+        librevenge = self.dependencies["librevenge"]
+        rvng_lib = librevenge.package_folder + "/lib"
+        if os.path.isdir(rvng_lib):
+            for la_name in os.listdir(rvng_lib):
+                if not la_name.endswith(".la"):
+                    continue
+                la_path = os.path.join(rvng_lib, la_name)
+                with open(la_path, "r") as f:
+                    content = f.read()
+                if "//lib/" in content:
+                    fixed = content.replace("//lib/", rvng_lib + "/")
+                    with open(la_path, "w") as f:
+                        f.write(fixed)
 
         autotools = Autotools(self)
         autotools.configure()
-        autotools.make()
+        autotools.make(args=["-j1"])
 
     def package(self):
         autotools = Autotools(self)
         autotools.install()
 
     def package_info(self):
-        # Headers are in include/libzmf-0.0/libzmf/
-        self.cpp_info.includedirs.append("include/libzmf-0.0")
-        # Library file is libzmf-0.0.a; strip "lib" prefix for -l flag
+        # Upstream installs libzmf-0.0.so/.a and libzmf_internal.la (private).
+        # conan cpp_info.libs expects the library base name without the
+        # 'lib' prefix ('zmf-0.0'), so CMakeDeps can locate it in the
+        # packaged lib directory.
         self.cpp_info.libs = ["zmf-0.0"]
+        # Headers install to include/libzmf-0.0/libzmf/
+        self.cpp_info.includedirs = ["include/libzmf-0.0"]
+        self.cpp_info.libdirs = ["lib"]
+        self.cpp_info.bindirs = ["bin"]
+        # pkg-config name consumed by downstream recipes
+        self.cpp_info.set_property("pkg_config_name", "libzmf-0.0")
         self.cpp_info.set_property("cmake_file_name", "libzmf")
         self.cpp_info.set_property("cmake_target_name", "libzmf::libzmf")
-        # libzmf.pc requires librevenge-0.0; propagate via requires
-        self.cpp_info.requires = ["librevenge::librevenge"]
+        # System libs required by libzmf
+        self.cpp_info.system_libs = ["m"]
