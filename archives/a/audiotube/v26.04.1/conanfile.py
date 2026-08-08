@@ -87,7 +87,7 @@ class AudiotubeConan(ConanFile):
         try:
             import pybind11  # noqa: F401
         except ImportError:
-            subprocess.check_call(["pip3", "install", "pybind11"])
+            subprocess.check_call(["pip3", "install", "pybind11==3.0.4"])
 
     def _get_pybind11_cmake_dir(self):
         """Return the cmake config directory for pybind11."""
