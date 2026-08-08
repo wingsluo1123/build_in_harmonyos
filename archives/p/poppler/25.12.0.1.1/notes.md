@@ -129,6 +129,29 @@ clang 15 的 C++23 缺口而存在。**本配方刻意不传 `-DCMAKE_CXX_STANDA
 - 字体走 `FONT_CONFIGURATION=generic`，不依赖 fontconfig
 - 上游 ctest 需单独 git clone 测试数据（源码包不含），未在 CI 中运行
 
+## zlib 版本统一（override=True 的必要性）
+
+qt5-qtbase/5.15.2.1 的配方 `self.requires("zlib/1.3.1")`，并通过
+`qt5core.requires=["zlib::zlib"]` 把 zlib 作为公开传递依赖链入 libQt5Core.so。
+而本包因把 zlib 静态链入共享库 `libpoppler.so`，**必须使用 PIC 版的 `zlib/1.3.1.1`**
+（其 `libz.a` 以 `CFLAGS="-fPIC -O2"` 编译；`zlib/1.3.1` 的静态对象非 PIC，AArch64
+链入共享库会报 `R_AARCH64_ADR_PREL_PG_HI21 … recompile with -fPIC`）。
+
+两者版本不同 → Conan 2.29.1 在计算依赖图时直接报：
+
+```
+ERROR: Version conflict: Conflict between zlib/1.3.1 and zlib/1.3.1.1 in the graph.
+Conflict originates from qt5-qtbase/5.15.2.1
+```
+
+**解法**：在本包 `requirements()` 中用 `self.requires("zlib/1.3.1.1", override=True)`。
+`override=True` 强制整个依赖图（含 qt5-qtbase）统一到 `zlib/1.3.1.1`，既消除版本冲突，
+又让 qt5 也链上 PIC 版的 `libz.a`（qt5 的 AArch64 构建一并受益，避免潜在的 -fPIC 隐患）。
+注意：qt5-qtbase 在制品仓未发布，CI 始终 `--build=missing` 从源码编，故 override 不会
+引入"缺 1.3.1.1 二进制"的问题。
+
+> 若日后 qt5-qtbase 升到也 require `zlib/1.3.1.1`，本 override 可保留（无害）或移除。
+
 ---
 
 <details>
