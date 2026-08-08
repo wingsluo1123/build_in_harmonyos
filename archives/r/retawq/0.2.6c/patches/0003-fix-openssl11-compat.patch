@@ -1,0 +1,21 @@
+--- a/resource.c	2006-03-19 15:21:20.000000000 +0800
++++ b/resource.c	2026-08-08 04:29:38.240267500 +0800
+@@ -2248,7 +2248,7 @@
+ 
+ #elif OPTION_TLS == TLS_OPENSSL
+ 
+-  { SSL_METHOD* m;
++  { const SSL_METHOD* m;
+     char seedfilenamebuf[512];
+     const char* seedfilename;
+     time_t seedval;
+@@ -2271,7 +2271,9 @@
+         my_spf_cleanup(debugstrbuf, spfbuf);
+       }
+ #endif
++#ifndef OPENSSL_NO_EGD
+       if (RAND_egd(seedfilename) >= 0) goto rand_finish;
++#endif
+       debugmsg("TLS: random D\n");
+       (void) RAND_load_file(seedfilename, -1);
+         /* ("-1" is allowed for OpenSSL >= 0.9.5) */

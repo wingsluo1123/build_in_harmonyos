@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "CS-17",
+      "file": "archives/r/retawq/0.2.6c/conanfile.py",
+      "line": 54,
+      "description": "Unused variable 'dep_name' in _build_env() loop: 'for dep_name, dep in self.dependencies.items()'. The variable dep_name is never referenced in the loop body.",
+      "fix_suggestion": "Use 'for _, dep in self.dependencies.items()' to follow Python convention for unused loop variables."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "SUGGEST",
+      "file": "archives/r/retawq/0.2.6c/conanfile.py",
+      "line": 91,
+      "description": "Build uses 'make -j1' which limits parallelism to a single job. This may unnecessarily slow CI builds if the retawq build system supports parallel compilation.",
+      "fix_suggestion": "If the itchconfig build system supports parallel builds, consider using 'make -j' (unlimited) or 'make -j8' to speed up CI. If -j1 is required due to build system limitations, add a comment explaining why."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/r/retawq/0.2.6c/test_package/conanfile.py",
+      "line": 17,
+      "description": "test_package only runs 'retawq --version' as a smoke test. While this verifies the binary starts and is linked correctly, it does not test actual web browsing functionality (HTTP fetch, ncurses rendering, TLS handshake).",
+      "fix_suggestion": "Consider adding a more functional test if feasible in CI, e.g., starting a local HTTP server and running 'retawq http://localhost:port/' to verify HTTP fetching and HTML rendering. Note: terminal-based testing may require a virtual terminal (e.g., screen/dtach)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/r/retawq/0.2.6c/conanfile.py",
+      "line": 64,
+      "description": "Compiler fallback uses str(self.settings.compiler) which yields a compiler name (e.g., 'clang') rather than a full executable path. In edge cases where the compiler is not in PATH, this may fail silently.",
+      "fix_suggestion": "Consider using shutil.which() to verify the compiler is available, or use the full path from the Conan profile conf as the primary source (which the code already does correctly via self.conf.get())."
+    }
+  ],
+  "summary": "AUDIT PASSED — retawq 0.2.6c (feat/retawq-0.2.6c branch). No P0 or P1 issues found. All critical and important checks pass:\n\nP0 (Critical - 0 issues):\n- No empty shell tests: test_package executes the retawq binary via self.run('retawq --version')\n- No fake status: manifest status 'published' is consistent across version-level and package-level manifests, and notes.md confirms successful build\n- No fake sha256: source sha256 (64 hex chars) and all 3 patch sha256s are valid length, not all-zeros or all-f\n- No template placeholders: No TODO/FIXME/XXX markers (the 'XXX' in patch 0001 is part of mktemp template 'icXXXXXX', not a placeholder)\n- No pre-compiled binaries: No .so/.a/.o files in PR\n\nP1 (Important - 0 issues):\n- R33 (hardcoded compiler): Uses self.conf.get('tools.build:compiler_executables') — correct Conan 2.x API, not self.conf_info\n- R26 (system-named libs static): ncurses/*:shared=False and openssl/*:shared=False both set in default_options\n- conandata.yml patches match files: All 3 patch files exist in changed_files\n- Manifest consistency: Name, version, status, sha256, URL, dependencies, and patches all consistent across conandata.yml, version manifest, package manifest, and conanfile.py\n- Conan 2.x API: Uses 'from conan import ConanFile' (not from conans), conan.tools.* modules, self.conf.get(), self.dependencies\n- R38 (commands.json): Present at package level with type='tool', name='retawq', matching conanfile package_type='application'\n- R32 (OHOS platform compat): No problematic os=='Linux' checks\n- R39 (official source URL): SourceForge is the official source for retawq, uses HTTPS\n- R8 (#ifdef __OHOS__): No __OHOS__ stubs; patches have real adaptation logic\n- R40 (deep adaptation): Patches have substantive changes (umask fix, ncurses6 API, OpenSSL 1.1 compat)\n\nP2 (Code Style - 0 issues):\n- Shebang + docstring present\n- Class names correct (RetawqConan, RetawqTestConan)\n- Method order correct (export_sources → requirements → layout → source → generate → build → package → package_info)\n- Import order correct (stdlib → conan, blank line separator)\n- YAML quoting correct (all string values quoted)\n- commands.json: 2-space indent, no trailing commas, type='tool'\n- package_info sets cpp_info.bindirs for application\n- Patch naming: 4-digit prefix, space-separated descriptions, patch_type='portability'\n- No print() statements\n- All files use LF line endings\n\nP3 (Suggestions - 4 items):\n- Unused loop variable dep_name (line 54)\n- Build parallelism limited to -j1 (line 91)\n- Test coverage limited to --version smoke test (line 17)\n- Compiler fallback gives name not full path (line 64)\n\nOverall: This is a well-structured, correctly implemented Conan 2.x recipe for retawq 0.2.6c. The recipe properly handles a custom (itchconfig) build system with correct dependency management, system-named library static linking, PkgConfigDeps for dependency resolution, and substantive platform adaptation patches."
+}

@@ -1,41 +1,40 @@
 # retawq 0.2.6c 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-05-29}
-- 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 构建系统: custom (itchconfig)
+- 编译日期: 2026-08-08
+- 编译器: clang
+- 状态: published
 
 ## 编译步骤
-
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+```bash
+conan install --requires=ncurses/6.6 --requires=openssl/1.1.1w -g PkgConfigDeps
+export PKG_CONFIG_PATH=. CFLAGS="-fPIC -O2 -I<ncurses-include> -I<openssl-include>"
+export LDFLAGS="-L<ncurses-lib> -L<openssl-lib>" TMPDIR=<writable-tmp>
+./configure --path-prefix=$PREFIX --set-tg=curses:ncurses.h:ncursesw --set-tls=2 \
+  --enable-news --enable-cookies --enable-textmodemouse --enable-ipv6 --enable-local-cgi --set-threading=1
+make -j1 && make install
+```
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | configure: Permission denied | HMDFS SGID + umask 077 | umask 077→022 (patch 0001) |
+| 2 | incomplete struct _win_st | ncurses 6.x opaque WINDOW | getcury()/getcurx() API (patch 0002) |
+| 3 | undefined symbol RAND_egd | OpenSSL 1.1.1w OPENSSL_NO_EGD | #ifndef OPENSSL_NO_EGD (patch 0003) |
+| 4 | const qualifier warning | OpenSSL 1.1.1 const return | const SSL_METHOD* (patch 0003) |
 
-## 源码修改
-
-{如有补丁，列出文件名和修改内容；无则删除此节}
-
-## 依赖版本
-
-{列出本次编译依赖的具体软件版本}
-
-## 验证结果
-
+## 验证
 ```bash
-{验证命令和结果}
+$ retawq --version
+retawq 0.2.6c - Copyright (C) 2001-2006 Arne Thomassen
 ```
 
-## 交付物
+## 依赖
+- ncurses/6.6, openssl/1.1.1w, pthread (system), dl (system)
+---
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
+**编译结束**: 2026-08-09 00:11
+**最终状态**: published
 
-## 注意事项
-
-{需要特别注意的点；无则删除此节}
