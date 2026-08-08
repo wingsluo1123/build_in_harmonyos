@@ -6,8 +6,6 @@ and verifying the output contains "Ra Version 5.0.3".
 
 R34: test executes the tested package's binary.
 """
-import os
-
 from conan import ConanFile
 from conan.tools.build import can_run
 
