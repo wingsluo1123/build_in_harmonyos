@@ -69,6 +69,12 @@ class AudiotubeConan(ConanFile):
         tc.generate()
 
     def build(self):
+        # Add qtbase bin to PATH so ECM's find_program can locate qtpaths6
+        qtbase = self.dependencies["qtbase"]
+        for bindir in qtbase.cpp_info.bindirs:
+            binpath = os.path.join(qtbase.package_folder, bindir)
+            if os.path.isdir(binpath):
+                os.environ["PATH"] = binpath + os.pathsep + os.environ.get("PATH", "")
         apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
