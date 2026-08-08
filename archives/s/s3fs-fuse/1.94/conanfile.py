@@ -142,7 +142,7 @@ class S3fsFuseConan(ConanFile):
         FUSE2 is not available in the Conan artifact repo (only FUSE3/libfuse 3.x).
         s3fs-fuse 1.94 uses the FUSE2 API, so we build it here.
         """
-        fuse_url = "https://ghfast.top/https://github.com/libfuse/libfuse/archive/refs/tags/fuse-2.9.9.tar.gz"
+        fuse_url = "https://github.com/libfuse/libfuse/archive/refs/tags/fuse-2.9.9.tar.gz"
         fuse_dir = os.path.join(self.build_folder, "fuse2-build")
         os.makedirs(fuse_dir, exist_ok=True)
 
