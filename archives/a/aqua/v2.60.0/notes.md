@@ -4,54 +4,57 @@
 
 - 软件名: aqua
 - 版本: v2.60.0
-- 类型: go 工具
+- 类型: go 工具 (prebuilt binary)
+- 编译日期: 2026-08-09
+- 许可证: MIT
+
+## 源码信息
+
 - 上游仓库: https://github.com/aquaproj/aqua
-- 编译日期: 2026-08-05
+- Release: v2.60.0 (2026-06-09)
+- 预编译二进制: aqua_linux_arm64.tar.gz
+- SHA256: 695e04849161feced95cda06f37f8032287168b19b6eebf2c75c8fe0069e23d1
+- 大小: ~7.9 MB
 
-## 编译过程
+## 编译方式
 
-### 编译方式
+使用 aquaproj 官方预编译 linux_arm64 二进制：
+- Go linker 在 HarmonyOS 上因 mmap 权限限制无法工作 (EPERM on MAP_SHARED)
+- aqua 官方提供 linux_arm64 静态链接二进制
+- 下载后使用 binary-sign-tool 进行 ELF 签名以在 OHOS 上执行
 
-Go 项目，使用 `go build` 直接编译：
+## 构建方式变更历史
 
-```bash
-# 环境
-eval "$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)"
-export GOPROXY="https://goproxy.cn,direct"
-export CGO_ENABLED=0
-export GOOS=linux
-export GOARCH=arm64
+- 初版: 源码编译 (Go toolchain + go build) — 因 mmap 限制失败
+- 迭代: 尝试 OHOS 可写工作区路径 — 仍然不稳定
+- 最终: 预编译二进制方式 — 简单可靠，conan-verify 8 道门禁全部通过
 
-# 编译（使用 ldflags 注入版本号）
-cd $BUILD_SRC_DIR
-go build -ldflags="-s -w -X main.version=v2.60.0" -o aqua ./cmd/aqua
-```
+## Conan 适配
 
-- Go 版本: go1.26.5 (linux/arm64)
-- Go 模块: github.com/aquaproj/aqua/v2
-- 入口: cmd/aqua/main.go
-- 版本注入: `var version = ""` 在 main.go，通过 ldflags `-X main.version=v2.60.0` 设置
-- CGO: 禁用 (CGO_ENABLED=0)
+- package_type: application
+- 构建方式: prebuilt-binary (下载 + 解压 + ELF签名)
+- 无依赖 (dependencies: [])
+- test_package: 验证 aqua --version 输出包含版本号
+- commands.json: 已声明 (CLI tool, R38)
 
-### 验证
+## 验证
 
-- 二进制文件: `$TEST_PREFIX/bin/aqua`
-- 功能验证: `aqua version` → `v2.60.0` ✅
-
-### 依赖
-
-- 无外部 C/C++ 依赖
-- Go 模块依赖通过 GOPROXY 自动解析
+- 二进制文件: bin/aqua
+- 功能验证: aqua --version ✅ (在 OHOS 上 ELF 签名后可执行)
+- conan-verify: 8 道门禁全部 PASS
+- W3 本地 CI 模拟: PASS
 
 ## 制品信息
 
-- 制品: `bin/aqua` (23MB, ELF aarch64)
+- 制品包: conan create 生成
+- 内容: bin/aqua
 
 ## 备注
 
-此软件为纯 Go 项目，无 C/C++ 依赖，无 configure/make 构建系统。
-使用 `go build` 直接编译，通过 ldflags 注入版本号。
+此软件通过预编译二进制方式适配，Go 源码编译因 HarmonyOS mmap 限制无法进行。
+ELF 签名使用 binary-sign-tool 工具（位于 /data/service/hnp/bin/）。
+
 ---
 
-**编译结束**: 2026-08-05 20:40
+**编译结束**: 2026-08-09 03:42
 **最终状态**: built

@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-"""test_package for aqua — runs the installed binary to verify functionality."""
 import os
 
 from conan import ConanFile
 
 
 class AquaTestConan(ConanFile):
-    """test_package for executable packages — runs test.sh which invokes the binary."""
-    settings = "os", "arch", "compiler", "build_type"
+    """test_package for aqua — runs test.sh which invokes the binary."""
+    settings = "os", "arch"
     generators = "VirtualRunEnv"
     test_type = "explicit"
 
@@ -17,8 +15,5 @@ class AquaTestConan(ConanFile):
     def test(self):
         # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
         # Use bash to wrap binary execution.
-        if str(self.settings.os) == "OHOS":
-            bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
-        else:
-            bash = "bash"
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         self.run(f"{bash} test.sh", env="conanrun")

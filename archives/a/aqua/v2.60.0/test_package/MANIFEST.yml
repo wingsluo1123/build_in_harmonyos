@@ -6,33 +6,20 @@
 package: aqua/v2.60.0
 homepage: "https://github.com/aquaproj/aqua"
 
-# 上游测试命令 (用于 go test 分析)
-upstream_check_command: "go test ./..."
+# aqua 是 Go 预编译二进制，上游无 make check / ctest 等构建系统测试
+# 上游验证来源: GitHub releases 自带 --version 输出
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
 
-# conanfile.py build() 方法中是否已集成上游测试
-upstream_test_in_build: true
-upstream_test_command: "go test ./pkg/checksum/ ./pkg/config-finder/ ./pkg/config-reader/"
-
-# 上游实际运行的测试程序
-upstream_tests:
-  - file: pkg/checksum/checksum_test.go
-    source: aqua-v2.60.0/pkg/checksum/checksum_test.go
-    description: "Checksum calculation and parsing tests"
-    command: "go test ./pkg/checksum/"
-  - file: pkg/config-finder/config_finder_test.go
-    source: aqua-v2.60.0/pkg/config-finder/config_finder_test.go
-    description: "Config file discovery tests"
-    command: "go test ./pkg/config-finder/"
-  - file: pkg/config-reader/reader_test.go
-    source: aqua-v2.60.0/pkg/config-reader/reader_test.go
-    description: "Config file reading tests"
-    command: "go test ./pkg/config-reader/"
+# 预编译二进制包，无源码级测试程序
+upstream_tests: []
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.sh
-    description: "消费者测试: 验证 aqua version 命令"
+    description: "运行 aqua --version 验证输出包含 2.60.0 版本号"
     command: "bash test.sh"
 
-# 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 50
+# 测试断言总数 (--version 退出码 + 版本号匹配 = 2 个断言)
+assertion_count: 2
