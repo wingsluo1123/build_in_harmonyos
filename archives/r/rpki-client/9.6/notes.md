@@ -1,80 +1,98 @@
-# rpki-client 9.6 适配笔记
+# rpki-client 9.6 Conan 适配笔记
 
 ## 编译环境
-- 构建系统: custom（手动编译）
-- 编译日期: 2026-06-11
+- 构建系统: autotools (configure.ac + Makefile.am)
+- 编译日期: 2026-08-08
 - 编译器: clang 15.0.4
-- 状态: published
+- 状态: built
+
+## 源码
+- 源码 URL: https://github.com/rpki-client/rpki-client-portable/releases/download/9.6/rpki-client-9.6.tar.gz
+- SHA256: 07cbd27af99f1b6096769e697e38631519c69cb642bee3af39a763fa1590d947
+- 注意: GitHub auto-generated archive (refs/tags/9.6) 仅含移植层，不含 OpenBSD 源码
+  必须使用 release asset (releases/download/9.6/rpki-client-9.6.tar.gz) 包含完整源码
 
 ## 编译步骤
 
-由于 HMDFS 文件系统限制导致 configure/config.status 无法创建临时文件，采用手动编译流程：
+### 1. 依赖安装 (Conan)
+```bash
+conan install --requires=libressl/3.9.1 --requires=musl-fts/1.2.7 \
+  --requires=expat/2.8.2 --requires=zlib/1.3.1 --requires=rsync/3.3.0 \
+  -r=ohpcd --build=missing
+```
 
-1. **创建 config.h**：手动定义 HAVE_* 宏和路径配置
-2. **编译源文件**：
-   ```bash
-   clang -c src/*.c -I. -I./include -I./compat -I~/usr/local/include
-   clang -c compat/*.c（选择需要的兼容函数）
-   ```
-3. **链接**：
-   ```bash
-   clang *.o -L~/usr/local/lib -lfts -ltls -lssl -lcrypto -lexpat -lz -lpthread -ldl -o rpki-client
-   ```
-4. **安装**：复制到 ~/usr/local/sbin/ 和 ~/usr/local/etc/rpki/
+### 2. 构建
+```bash
+# autoreconf (需 automake/1.18 + libtool/2.5.4 作为 build_requires)
+autoreconf -i -f
+
+# 创建 config.guess (HarmonyOS 不被 GNU config.guess 识别)
+echo '#!/bin/sh\necho "aarch64-unknown-linux-gnu"' > config.guess
+
+# 修补 configure 的 mktemp 在 HMDFS 上失败的问题
+# 将 mktemp -d "./confXXXXXX" 替换为 mktemp -d (使用 TMPDIR)
+
+# 运行 configure
+./configure --host=aarch64-unknown-linux-gnu \
+  --with-tal-dir=/usr/local/etc/rpki \
+  --with-base-dir=/usr/local/cache/rpki-client \
+  --with-output-dir=/usr/local/db/rpki-client
+
+# 修补 config.status 的 umask 077 在 HMDFS 上创建不可写目录的问题
+# 将 umask 077 && mktemp -d 替换为 mktemp -d
+
+# 生成 Makefile
+./config.status
+
+# 编译 (j1 因 HMDFS 不支持 mkfifo)
+make -j1
+
+# 安装
+make install
+```
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-| 1 | HMDFS 临时文件限制 | HarmonyOS 分布式文件系统不支持 shell 脚本临时文件创建 | 手动创建 config.h，绕过 configure |
-| 2 | 缺少 libtls | rpki-client 需要 LibreSSL（非 OpenSSL）的 libtls | 编译 LibreSSL 3.9.2，使用 CMAKE_SYSTEM_NAME=Linux |
-| 3 | BIO_sock_init 符号缺失 | LibreSSL CMake 未识别为 UNIX，未编译 b_posix.c | 重新配置 CMAKE_SYSTEM_NAME=Linux |
-| 4 | fts_open 符号缺失 | OpenHarmony 缺少 fts 文件树遍历函数 | 编译 musl-fts 静态库 |
-| 5 | setgroups 类型冲突 | include/unistd.h 与系统头文件重复声明 | 移除 setgroups 声明 |
-| 6 | 字节序函数缺失 | htobe16/be16toh 等宏未定义 | 创建 endian.h 兼容性头文件 |
-
-## 源码修改
-
-| 补丁 | 文件 | 说明 |
-|------|------|------|
-| 0001-include-unistd-harmony.patch | include/unistd.h | OpenHarmony 兼容性 shim，移除 setgroups 冲突 |
-| 0002-include-endian-harmony.patch | include/endian.h | 字节序转换宏定义 |
-| 0003-config-h-manual.patch | config.h | 手动配置文件，定义 HAVE_* 宏 |
+| 1 | config.guess 无法识别 HarmonyOS | GNU config.guess 不含 HarmonyOS 支持 | 创建自定义 config.guess 返回 aarch64-unknown-linux-gnu |
+| 2 | configure 创建临时文件失败 | HMDFS 不支持 shell 脚本在当前目录创建临时文件 | 修补 configure 将 mktemp -d "./confXXXXXX" 改为 mktemp -d |
+| 3 | config.status 写入临时文件失败 | umask 077 创建的目录在 HMDFS 上不可写 | 移除 config.status 中的 umask 077 |
+| 4 | make -j2 失败 | HMDFS 不支持 mkfifo (jobserver) | 使用 make -j1 |
+| 5 | automake/libtool 路径问题 | Conan 包安装路径与脚本预期不一致 | 设置 PERL5LIB, ACLOCAL_PATH, _lt_pkgdatadir 环境变量 |
+| 6 | GitHub archive 缺少源码 | auto-generated archive 仅含移植层文件 | 使用 release asset (含完整 OpenBSD 源码) |
 
 ## 依赖版本
 
 | 软件 | 版本 | 说明 |
 |------|------|------|
-| LibreSSL | 3.9.2 | 提供 libcrypto, libssl, libtls（静态链接） |
-| musl-fts | 1.2.1 | 文件树遍历函数（静态链接） |
-| expat | 2.6.4 | XML 解析（动态链接） |
-| zlib | 1.3.1 | 压缩库（静态链接） |
-| rsync | 3.3.0 | RPKI 数据同步工具 |
+| LibreSSL | 3.9.1 | 提供 libcrypto, libssl, libtls |
+| musl-fts | 1.2.7 | 文件树遍历函数 |
+| expat | 2.8.2 | XML 解析 |
+| zlib | 1.3.1 | 压缩库 |
+| rsync | 3.3.0 | RPKI 数据同步工具 (configure 时检测) |
+| automake | 1.18 | 构建工具 (build_requires) |
+| libtool | 2.5.4 | 构建工具 (build_requires) |
 
 ## 验证结果
 
 ```bash
-$ ~/usr/local/sbin/rpki-client -V
+$ rpki-client -V
 rpki-client-portable 9.6
 
-$ file ~/usr/local/sbin/rpki-client
+$ file rpki-client
 ELF shared object, 64-bit LSB arm64, dynamic
-
-$ ldd ~/usr/local/sbin/rpki-client
-libexpat.so => /storage/Users/currentUser/usr/local/lib/libexpat.so
-libc.so
 ```
 
 ## 交付物
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| rpki-client-9.6-ohos-aarch64.tar.gz | 2.0 MB | 预编译包（包含二进制+配置） |
-| rpki-client | 2.3 MB | 可执行文件 |
+| 文件 | 说明 |
+|------|------|
+| sbin/rpki-client | 可执行文件 |
+| share/man/man8/rpki-client.8 | man page |
+| etc/rpki/*.tal | RIR Trust Anchor Locator 文件 |
+| etc/rpki/*.constraints | RPKI 约束文件 |
+---
 
-## 注意事项
-
-1. **HMDFS 限制**：configure 无法在 HMDFS 挂载点创建临时文件，后续编译需使用手动方式
-2. **LibreSSL 必需**：rpki-client 依赖 LibreSSL 的 libtls，不能使用 OpenSSL
-3. **静态链接**：LibreSSL 和 musl-fts 需静态链接到二进制中
-4. **RIR TAL 文件**：安装时需复制 5 个 RIR 的 TAL 文件到 /usr/local/etc/rpki/
+**编译结束**: 2026-08-09 00:55
+**最终状态**: built

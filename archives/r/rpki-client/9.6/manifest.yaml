@@ -9,15 +9,16 @@ software: rpki-client
 
 version: "9.6"
 status: published
-build_date: "2026-06-11"
+build_date: "2026-08-08"
+build_system: autotools
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  url: "https://download.savannah.nongnu.org/releases/rpki-client/rpki-client-9.6.tar.gz"
-  sha256: ""
+  url: "https://github.com/rpki-client/rpki-client-portable/releases/download/9.6/rpki-client-9.6.tar.gz"
+  sha256: "07cbd27af99f1b6096769e697e38631519c69cb642bee3af39a763fa1590d947"
   tar_format: tar.gz
 
 # ============================================================
@@ -25,22 +26,23 @@ source:
 # ============================================================
 
 build:
-  # 手动编译绕过 HMDFS 限制
-  system: custom
-
-  # 手动编译命令
+  system: autotools
   configure_options:
-    - "手动创建 config.h"
-    - "手动编译 src/*.c 和 compat/*.c"
-    - "手动链接: -lfts -ltls -lssl -lcrypto -lexpat -lz"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--with-tal-dir=${package_folder}/etc/rpki"
+    - "--with-base-dir=/usr/local/cache/rpki-client"
+    - "--with-output-dir=/usr/local/db/rpki-client"
 
-  # 编译依赖
   dependencies:
-    - "libressl/3.9.2"
-    - "musl-fts/1.2.1"
-    - "expat/2.6.4"
+    - "libressl/3.9.1"
+    - "musl-fts/1.2.7"
+    - "expat/2.8.2"
     - "zlib/1.3.1"
     - "rsync/3.3.0"
+
+  build_requires:
+    - "automake/1.18"
+    - "libtool/2.5.4"
 
   cc: clang
   cxx: clang++
@@ -49,17 +51,16 @@ build:
 # 补丁信息
 # ============================================================
 
-patches_applied:
-  - "0001-include-unistd-harmony.patch"
-  - "0002-include-endian-harmony.patch"
-  - "0003-config-h-manual.patch"
+patches_applied: []
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 knowledge_gained:
-  - "HMDFS 文件系统限制导致 configure 无法创建临时文件，需手动编译"
-  - "OpenHarmony 需要兼容性头文件 unistd.h 和 endian.h"
-  - "rpki-client 需要 LibreSSL（不是 OpenSSL）提供 libtls"
-  - "fts 文件树遍历函数需要 musl-fts 库"
+  - "HMDFS 文件系统限制导致 configure/config.status 无法创建临时文件"
+  - "config.guess 不识别 HarmonyOS，需手动指定 --host=aarch64-unknown-linux-gnu"
+  - "config.status 的 umask 077 在 HMDFS 上创建不可写的临时目录，需移除 umask"
+  - "GitHub release tarball 包含完整源码，auto-generated archive 仅含移植层"
+  - "rpki-client 依赖 LibreSSL（非 OpenSSL）的 libtls"
+  - "rpki-client 使用 autotools 构建，需 automake + libtool 作为 build_requires"

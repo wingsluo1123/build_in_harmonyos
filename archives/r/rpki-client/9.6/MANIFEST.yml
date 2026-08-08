@@ -1,0 +1,39 @@
+# MANIFEST.yml — rpki-client 9.6
+# Conan recipe manifest (ARCHIVE-SPEC v2.0)
+
+software: rpki-client
+version: "9.6"
+status: published
+build_date: "2026-08-08"
+
+source:
+  url: "https://github.com/rpki-client/rpki-client-portable/releases/download/9.6/rpki-client-9.6.tar.gz"
+  sha256: "07cbd27af99f1b6096769e697e38631519c69cb642bee3af39a763fa1590d947"
+
+build:
+  system: autotools
+  configure_options:
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--with-tal-dir=${package_folder}/etc/rpki"
+    - "--with-base-dir=/usr/local/cache/rpki-client"
+    - "--with-output-dir=/usr/local/db/rpki-client"
+
+dependencies:
+  - "libressl/3.9.1"
+  - "musl-fts/1.2.7"
+  - "expat/2.8.2"
+  - "zlib/1.3.1"
+  - "rsync/3.3.0"
+
+build_dependencies:
+  - "automake/1.18"
+  - "libtool/2.5.4"
+
+patches_applied: []
+
+knowledge_gained:
+  - "HarmonyOS not recognized by config.guess; override --host to aarch64-unknown-linux-gnu"
+  - "HMDFS restricts mktemp in working dir; patch configure/config.status to use TMPDIR"
+  - "HMDFS restricts umask 077 directories; patch to umask 022"
+  - "Release tarball from GitHub includes all OpenBSD source (update.sh pre-run)"
+  - "make -j1 required; HMDFS doesn't support mkfifo for jobserver"
