@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_qt5_qtgraphicaleffects CXX)
-find_package(qt5-qtbase CONFIG REQUIRED)
+find_package(Qt5 CONFIG REQUIRED)
 find_package(Qt5GraphicalEffects CONFIG REQUIRED)
 add_executable(test_qt5_qtgraphicaleffects test.cpp)
 target_link_libraries(test_qt5_qtgraphicaleffects PRIVATE Qt5::GraphicalEffects Qt5::Core)
