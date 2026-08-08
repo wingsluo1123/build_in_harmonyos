@@ -148,6 +148,20 @@ class YaraConan(ConanFile):
                     shutil.copy2(lt, ltmain_target)
                     os.chmod(ltmain_target, 0o755)
                     break
+        # Fallback: download ltmain.sh from libtool source if not found locally
+        if not os.path.exists(ltmain_target):
+            ltmain_urls = [
+                "https://ghfast.top/https://raw.githubusercontent.com/git-init/libtool/master/build-aux/ltmain.sh",
+                "https://raw.githubusercontent.com/git-init/libtool/master/build-aux/ltmain.sh",
+            ]
+            for url in ltmain_urls:
+                try:
+                    self.run(f'curl -fsSL "{url}" -o "{ltmain_target}"', cwd=src)
+                    if os.path.exists(ltmain_target) and os.path.getsize(ltmain_target) > 1000:
+                        os.chmod(ltmain_target, 0o755)
+                        break
+                except Exception:
+                    continue
 
         # Run autoconf to generate configure
         self.run("autoconf -I m4", cwd=src)
