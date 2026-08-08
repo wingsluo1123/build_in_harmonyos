@@ -161,9 +161,16 @@ Both drafts cite the same successful OHOS run and CTest log hash above. They
 remain drafts so the editor can assign stable E-numbers and merge them with a
 newer equivalent entry if one lands first.
 
+Together with E077, E200, and the E223 draft pattern, these entries support a
+Path C high-difficulty candidate application. The evidence, counting rules,
+and explicit non-claims are in `reports/high-difficulty-evidence.md`; the
+ready-to-use PR title and body are in `reports/pr-body.md`. This is an
+application for review rather than a claim of an already-approved
+classification or score.
+
 ## Next steps
 
 Follow-up validation:
 
-1. Confirm the GitCode PR pipeline uses the default test option.
+1. Confirm the AtomGit PR pipeline uses the default test option.
 2. Keep the upstream CTest result visible in the PR description.
