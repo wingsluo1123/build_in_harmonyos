@@ -170,6 +170,13 @@ class BoostCompiledConan(ConanFile):
             return "aarch64-linux-ohos"
         return "arm-linux-ohos"
 
+    def _with_ohos_tempdir(self, command):
+        if self.settings.os != "OHOS":
+            return command
+        tmp_dir = os.path.join(self.build_folder, "tmp").replace("\\", "/")
+        os.makedirs(tmp_dir, exist_ok=True)
+        return f'TMPDIR="{tmp_dir}" TMP="{tmp_dir}" TEMP="{tmp_dir}" {command}'
+
     def build(self):
         if self.settings.os == "OHOS":
             replace_in_file(
@@ -179,13 +186,16 @@ class BoostCompiledConan(ConanFile):
                 'sh "$my_dir/tools/build/src/engine/build.sh" ${TOOLSET}',
                 strict=True,
             )
-        self.run(self._bootstrap_command(), cwd=self.source_folder)
+        self.run(self._with_ohos_tempdir(self._bootstrap_command()), cwd=self.source_folder)
         self._write_ohos_user_config()
         b2_args = " ".join(self._b2_common_args())
-        self.run(f"{self._b2_executable()} {b2_args} stage", cwd=self.source_folder)
+        self.run(self._with_ohos_tempdir(f"{self._b2_executable()} {b2_args} stage"), cwd=self.source_folder)
         if can_run(self):
             targets = " ".join(self._upstream_test_targets)
-            self.run(f"{self._b2_executable()} {b2_args} {targets}", cwd=self.source_folder)
+            self.run(
+                self._with_ohos_tempdir(f"{self._b2_executable()} {b2_args} {targets}"),
+                cwd=self.source_folder,
+            )
         else:
             self.output.info(
                 "Skipping upstream Boost runtime tests while cross-building; "
@@ -197,7 +207,12 @@ class BoostCompiledConan(ConanFile):
         prefix = self.package_folder.replace("\\", "/")
         self._write_ohos_user_config()
         b2_args = " ".join(self._b2_common_args())
-        self.run(f"{self._b2_executable()} {b2_args} --prefix=\"{prefix}\" install", cwd=self.source_folder)
+        self.run(
+            self._with_ohos_tempdir(
+                f"{self._b2_executable()} {b2_args} --prefix=\"{prefix}\" install"
+            ),
+            cwd=self.source_folder,
+        )
 
         include_root = os.path.join(self.package_folder, "include", "boost")
         copy(self, "*", src=os.path.join(self.source_folder, "boost"), dst=include_root)
