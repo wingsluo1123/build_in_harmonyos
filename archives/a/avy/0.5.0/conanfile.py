@@ -19,7 +19,7 @@ class AvyConan(ConanFile):
     homepage = "https://github.com/abo-abo/avy"
     url = ""  # CI fills this
 
-    # 纯 Elisp 内容包，无需 shared 选项
+    # Pure Elisp content package, no compiled binary
     package_type = "header-library"
 
     settings = "os", "arch"
@@ -36,13 +36,13 @@ class AvyConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["source"], strip_root=True)
+        get(self, **self.conan_data["sources"][str(self.version)], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
 
         # avy is pure Emacs Lisp — no C/C++ compilation.
-        # Just copy .el files. The Makefile only does byte-compilation,
+        # The Makefile only does byte-compilation via Emacs,
         # which requires Emacs runtime, not a cross-compilation toolchain.
         pass
 
