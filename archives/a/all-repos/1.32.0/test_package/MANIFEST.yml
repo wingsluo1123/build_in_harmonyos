@@ -1,0 +1,56 @@
+# MANIFEST.yml — test_package structure for all-repos 1.32.0
+#
+# Documents the test structure, upstream tests, and the test_package tests.
+
+software: all-repos
+version: "1.32.0"
+test_package_type: python_source_validation
+
+# Upstream test suite
+upstream_tests:
+  location: "tests/"
+  framework: "pytest"
+  total_tests: 169
+  upstream_result: "163 passed, 6 failed (96.4%)"
+  failures:
+    - test: "tests/config_test.py::test_load_config_too_permissive"
+      cause: "HarmonyOS chmod no-op (E046) — test expects chmod(0o777) to work"
+    - test: "tests/clone_test.py::test_clones_all_branches_true"
+      cause: "Git version 2.45.2 doesn't create origin/HEAD symref in refs/remotes"
+    - test: "tests/autofix/pre_commit_autoupdate_test.py::test_main"
+      cause: "pre-commit 4.6.1 output format differs from test expectations"
+    - test: "tests/autofix/pre_commit_autoupdate_test.py::test_main_freeze"
+      cause: "pre-commit 4.6.1 output format differs from test expectations"
+    - test: "tests/autofix/pre_commit_migrate_config_test.py::test_main"
+      cause: "pre-commit 4.6.1 config format + posix_spawn PATH issue"
+    - test: "tests/autofix/azure_pipelines_autoupdate_test.py::test_clone"
+      cause: "Network: GitHub unreachable from HarmonyOS PC build environment"
+
+# test_package tests
+test_package_tests:
+  file: "test_all_repos.py"
+  description: "Validates packaged all_repos .py files — existence, content, syntax"
+  checks:
+    - "all_repos/__init__.py exists (namespace marker)"
+    - "all_repos/cli.py exists and contains add_common_args"
+    - "all_repos/config.py exists and contains class Config"
+    - "all_repos/clone.py exists and contains def main + git operations"
+    - "all_repos/grep.py exists and contains def grep"
+    - "all_repos/find_files.py exists and contains def find_files"
+    - "all_repos/mapper.py exists and contains thread_mapper"
+    - "all_repos/git.py exists and contains def remote"
+    - "all_repos/sed.py exists and contains def main"
+    - "all_repos/color.py exists and contains BLUE_B constant"
+    - "all_repos/list_repos.py exists and contains def main"
+    - "Total .py files >= 5"
+    - "Git-related content found across .py files"
+    - "Subdirectory packages (push/, source/, autofix/) exist"
+    - "Package structured correctly (all_repos/ under lib/)"
+    - "All .py files pass Python syntax validation"
+
+# Platform workarounds applied
+platform_workarounds:
+  - "posix_spawn PATH lookup: disabled via sitecustomize.py (fork+exec)"
+  - "pytest tmpdir ownership: patched _pytest/tmpdir.py to skip uid check"
+  - "git safe.directory: set global safe.directory '*'"
+  - "all_repos config.py: accept 0o660 as valid permission (chmod no-op, E046)"
