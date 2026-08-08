@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_libngf_qt CXX)
-find_package(qt5-qtbase CONFIG REQUIRED)
+find_package(Qt5 CONFIG REQUIRED)
 find_package(NGF-Qt CONFIG REQUIRED)
 add_executable(test_libngf_qt test.cpp)
 target_link_libraries(test_libngf_qt PRIVATE NGF::Qt Qt5::Core)
