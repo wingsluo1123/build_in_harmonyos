@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Conan test_package — postgresql-orafce 4.16.0
 
-Tests that orafce.so is a valid ELF shared library for AArch64.
-Also verifies that extension control/SQL files are packaged correctly.
-
-A full dlopen test is not possible because PostgreSQL extensions have
-undefined symbols that are resolved by the PostgreSQL server at runtime.
+Verifies that orafce.so is a valid ELF shared library with the expected
+PostgreSQL extension entry-point symbols. Since orafce.so depends on
+PostgreSQL server symbols that are only available when loaded by a running
+PostgreSQL server, we cannot dlopen it in the test environment. Instead:
+  1. The C test program reads the ELF header to verify format validity
+  2. nm -D checks for exported symbols (_PG_init, Pg_magic_func)
+  3. Extension control and SQL files are verified to exist
 """
 import os
 
@@ -33,24 +35,14 @@ class PostgresqlOrafceTestConan(ConanFile):
         dep = self.dependencies["postgresql-orafce"]
         so_path = os.path.join(dep.package_folder, "lib", "postgresql", "orafce.so")
 
-        # Test 1: Verify orafce.so is a valid ELF shared library (C test)
-        self.run(f'"{exe}" "{so_path}"', env="conanrun")
+        # Test 1: Verify orafce.so is a valid ELF shared library
+        self.run(f"{exe} {so_path}", env="conanrun")
 
-        # Test 2: Verify extension control file exists
-        control_path = os.path.join(
-            dep.package_folder, "share", "postgresql", "extension", "orafce.control")
-        if not os.path.exists(control_path):
-            raise AssertionError("orafce.control not found in package")
+        # Test 2: Verify expected PostgreSQL extension symbols are exported
+        self.run(f"nm -D {so_path} | grep -q _PG_init", env="conanrun")
+        self.run(f"nm -D {so_path} | grep -q Pg_magic_func", env="conanrun")
 
-        # Test 3: Verify SQL definition file exists
-        sql_path = os.path.join(
-            dep.package_folder, "share", "postgresql", "extension", "orafce--4.16.sql")
-        if not os.path.exists(sql_path):
-            raise AssertionError("orafce--4.16.sql not found in package")
-
-        # Test 4: Verify .so file size is reasonable (> 100KB)
-        so_size = os.path.getsize(so_path)
-        if so_size < 100000:
-            raise AssertionError(f"orafce.so too small: {so_size} bytes")
-
-        print("All postgresql-orafce package tests passed")
+        # Test 3: Verify extension control and SQL files exist
+        ext_dir = os.path.join(dep.package_folder, "share", "postgresql", "extension")
+        self.run(f"test -f {ext_dir}/orafce.control", env="conanrun")
+        self.run(f"test -f {ext_dir}/orafce--4.16.sql", env="conanrun")
