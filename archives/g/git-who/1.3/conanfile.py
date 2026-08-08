@@ -87,9 +87,12 @@ class GitWhoConan(ConanFile):
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
         # validate() 已确保 settings.arch 是 armv8 或 arm64
         go_arch = "arm64"
-        # go link 需要在 TMPDIR 创建临时文件；CI/本地环境 /tmp 只读
-        # （本地实证：link "mapping output file failed: permission denied"）→ 指到 build_folder 下可写 tmp
-        go_tmpdir = os.path.join(self.build_folder, "go-tmp")
+        # go link 需在 fallocate 可用的目录创建输出文件。CI #15671 实证：
+        # build_folder/go-tmp 所在文件系统（/storage/Users 下）对 fallocate 返回 EACCES
+        # → go link 报 "mapping output file failed: permission denied"；
+        # 而 CI 的 TMPDIR=/data/storage/el2/base/cache fallocate 正常（本地实证 OK）。
+        # → 优先继承环境 TMPDIR，缺失时回退 CI 沙箱临时目录。
+        go_tmpdir = os.environ.get("TMPDIR") or "/data/storage/el2/base/cache"
         os.makedirs(go_tmpdir, exist_ok=True)
         try:
             self.run(
@@ -105,6 +108,11 @@ class GitWhoConan(ConanFile):
                 f'"{go}" build -ldflags="-s -w" -o git-who .',
                 cwd=self.source_folder, env="conanbuild",
             )
+            # E128: OHOS 上未签名 ELF 无法执行（test_package 运行 git-who 报 exit 126）。
+            # go build 产物与 go SDK 工具链一样需 binary-sign-tool 签名才能在 OHOS 运行。
+            git_who_bin = os.path.join(self.source_folder, "git-who")
+            if os.path.isfile(git_who_bin):
+                self._sign_elf_if_ohos(git_who_bin)
         except ConanException as e:
             raise ConanException(f"go build failed: {e}")
 
