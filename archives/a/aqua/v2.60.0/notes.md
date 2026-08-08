@@ -53,8 +53,7 @@
 
 此软件通过预编译二进制方式适配，Go 源码编译因 HarmonyOS mmap 限制无法进行。
 ELF 签名使用 binary-sign-tool 工具（位于 /data/service/hnp/bin/）。
-
 ---
 
-**编译结束**: 2026-08-09 03:42
+**编译结束**: 2026-08-09 04:00
 **最终状态**: built
