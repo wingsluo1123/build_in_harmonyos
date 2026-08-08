@@ -206,6 +206,22 @@ class S3fsFuseConan(ConanFile):
             f.write("Libs: -L${libdir} -l:libfuse.a -lpthread\n")
             f.write("Cflags: -I${includedir} -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26\n")
 
+        # Create libcrypto.pc pointing to Conan's openssl package
+        # (PkgConfigDeps may generate openssl-*.pc but configure.ac checks for 'libcrypto')
+        openssl_dep = self.dependencies["openssl"]
+        openssl_inc = openssl_dep.cpp_info.aggregated_includedirs[0] if openssl_dep.cpp_info.aggregated_includedirs else openssl_dep.cpp_info.includedirs[0]
+        openssl_lib = openssl_dep.cpp_info.aggregated_libdirs[0] if openssl_dep.cpp_info.aggregated_libdirs else openssl_dep.cpp_info.libdirs[0]
+        libcrypto_pc = os.path.join(fuse_install, "pkgconfig", "libcrypto.pc")
+        with open(libcrypto_pc, "w") as f:
+            f.write(f"prefix={openssl_lib}\n")
+            f.write("exec_prefix=${prefix}\n")
+            f.write(f"includedir={openssl_inc}\n\n")
+            f.write("Name: libcrypto\n")
+            f.write("Description: OpenSSL cryptography library\n")
+            f.write("Version: 3.5.6.1\n")
+            f.write(f"Libs: -L{openssl_lib} -lcrypto\n")
+            f.write(f"Cflags: -I{openssl_inc}\n")
+
         return fuse_install
 
     def build(self):
