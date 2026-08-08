@@ -77,7 +77,8 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
     def package_info(self):
         self.cpp_info.libdirs = ["lib"]
         self.cpp_info.includedirs = ["include"]
-        self.cpp_info.libs = ["Qt5GraphicalEffects"]
+        # QtGraphicalEffects 是纯 QML 模块（无 C++ 链接库），
+        # 不声明 libs，避免 CMakeDeps 报 "Library not found in package"
         self.cpp_info.requires = ["qt5-qtbase::Qt5Core", "qt5-qtbase::Qt5Gui"]
         self.cpp_info.set_property("cmake_file_name", "Qt5GraphicalEffects")
         self.cpp_info.set_property("cmake_target_name", "Qt5::GraphicalEffects")
