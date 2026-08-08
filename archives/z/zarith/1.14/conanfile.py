@@ -48,8 +48,9 @@ class ZarithConan(ConanFile):
         # ZArith uses a custom configure script (not standard autotools)
         # The configure script takes -installdir, not --prefix
         install_dir = os.path.join(self.package_folder, "lib", "ocaml")
-        self.run(f"./configure -installdir {install_dir}", cwd=self.source_folder)
-        self.run("make -j1", cwd=self.source_folder)
+        # env="conanbuild" 注入 tool_requires（ocaml）的 bin 到 PATH，configure 才能找到 ocaml
+        self.run(f"./configure -installdir {install_dir}", cwd=self.source_folder, env="conanbuild")
+        self.run("make -j1", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
         # make install uses INSTALLDIR from configure
