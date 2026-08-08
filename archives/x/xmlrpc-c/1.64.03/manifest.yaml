@@ -1,6 +1,6 @@
 software: xmlrpc-c
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.64.03/manifest.yaml
+# 版本级 manifest
+# 文件位置: archives/x/xmlrpc-c/1.64.03/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
 # ============================================================
@@ -10,29 +10,23 @@ software: xmlrpc-c
 # 版本号
 version: "1.64.03"
 
-# 构建系统类型（验证工具期望的顶层字段）
+# 构建系统类型
 build_system: autotools
 
 # 编译状态
 # published | built | failed | archived
 status: built
 
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-04-30"
+# 编译日期
+build_date: "2026-08-09"
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
   url: "https://sourceforge.net/projects/xmlrpc-c/files/Xmlrpc-c%20Super%20Stable/1.64.03/xmlrpc-1.64.03.tgz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "74729d364edbedbe42e782822da1e076f3f45c65c4278a3cfba5f2342d7cedbe"
   tar_format: tar.gz
 
 # ============================================================
@@ -40,23 +34,11 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
   configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  dependencies:
+    - curl/8.15.0
+    - openssl/3.5.6.1
   cc: clang
   cxx: clang++
 
@@ -64,19 +46,36 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied:
   - "0001-config.guess.patch"
   - "0002-configure.patch"
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "xmlrpc-c configure uses curl-config to detect curl; conan recipe generates wrapper curl-config pointing to conan curl package"
+  - "xmlrpc-c configure uses pkg-config openssl to detect openssl; conan recipe generates openssl.pc pointing to conan openssl package"
+  - "xmlrpc-c bundles its own expat (no external libxml2 dependency required for default build)"
+  - "umask 077 in config.guess and configure breaks on HarmonyOS HMDFS; patched to 022"
+  - "C++ test suite (test/cpp/server_abyss.cpp) has std::bind/POSIX bind conflict; main library builds fine"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xmlrpc-c-1.64.03.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xmlrpc-c-1.64.03.work
+  source_orig_hash: 10a6994689e3eb52
+  source_work_hash: 92a4e6bc803abb88
+  generated_at: '2026-08-09T02:57:32'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
