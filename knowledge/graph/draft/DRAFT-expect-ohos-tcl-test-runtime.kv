@@ -1,0 +1,107 @@
+#====================================================================
+# DRAFT-expect-ohos-tcl-test-runtime.kv — OHOS 上 Tcl/Expect testsuite
+# 运行时入口选择、只读 /tmp 的 TMPDIR 路由与 PTY raw-mode capability constraint
+# 库: expect 5.45.4（依赖 tcl 8.6.14）| 路径 B 候选，最终以官方审核为准
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT (proposed E-OHOS-TCL-TEST-RUNTIME)
+trigger_tool:           expect|tclsh|tcltest|conan|make
+phase:                  runtime|testing|configuration
+error_signature:        can't find package Expect|
+                         error loading shared library libtcl8\.6\.so|
+                         couldn't open "/tmp/.*" read-only file system|
+                         sh: /bin/stty: inaccessible or not found|
+                         exp_stty raw.*(not supported|inaccessible)
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               testsuite-runtime|platform-limitation|capability-constraint|tmpfs-routing
+match_keywords:         Expect, Tcl, tcltest, tests/all.tcl, static tclsh, dynamic load,
+                         TMPDIR, env(TMPDIR), /tmp read-only, PTY, raw mode, exp_stty,
+                         tcltest testConstraint, ohosPtyRaw, spawn noise, PASS/FAIL/SKIPPED
+title:                  OHOS 上 Tcl/Expect testsuite 需选实际运行时入口、用 env(TMPDIR) 路由只读 /tmp，并以 capability constraint 处理 PTY raw-mode 差异
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: >
+  OHOS（HarmonyOS aarch64）上运行上游 Tcl/Expect testsuite 时存在三类平台差异：
+  1) 运行时入口：静态 Tcl 构建的 tclsh 无法动态加载 Expect 扩展（can't find package
+     Expect），标准 make test 入口（$(TCLSH) tests/all.tcl）不是实际可执行入口；
+     实际入口是构建后的 ./expect tests/all.tcl。
+  2) 只读 /tmp：OHOS /tmp 为只读文件系统，测试若直接写 /tmp（如 /tmp/null.[pid]）
+     必然失败；应经 Tcl env(TMPDIR) 路由到可写目录（$HOME/tmp），由配方先创建并验证。
+  3) PTY raw-mode：OHOS PTY 不支持 raw mode（/bin/stty 缺失），依赖 raw 的用例
+     （如 exp_stty raw 相关的 gate-keeping 测试）会失败；应使用 tcltest
+     testConstraint 做运行时 capability 探测，仅对确实依赖该能力的用例标
+     Unsupported/Skipped，不得扩大跳过范围。
+affected_scope:         OHOS 上需要运行 Tcl/Expect 类 testsuite 的库（expect、Tcl 扩展等）；
+                         入口选择影响所有 tcltest 驱动的测试；TMPDIR 影响所有写临时文件的用例；
+                         PTY raw 影响 spawn 交互类用例
+verification_cmd:       TMPDIR=$HOME/tmp TCL_LIBRARY=<tcl_lib> LD_LIBRARY_PATH=<tcl_lib> \
+                          ./expect tests/all.tcl; echo "rc=$?"
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           runtime-entry-selection-and-capability-constraint
+rec_description: >
+  1) 以构建后的 ./expect tests/all.tcl 作为真实测试入口，静态 tclsh 入口如实单列为
+     不可用（can't find package Expect），不得宣称"上游测试未执行"。
+  2) 测试写临时文件一律走 env(TMPDIR)（如 set filename [file join $::env(TMPDIR)
+     "null.[pid]"]），配方在运行前 export TMPDIR=$HOME/tmp 并 mkdir + 校验可写；
+     禁止硬编码固定用户路径。
+  3) 对 PTY raw-mode 依赖用例，用 ::tcltest::testConstraint 做运行时探测
+     （如 [expr {[file executable /bin/stty]}]），仅对真正依赖 raw 的用例标
+     Unsupported/Skipped；其余 spawn 交互用例保持原语义实际执行，不得扩大跳过。
+  4) spawn 子进程 shell 噪音（如 sh: /bin/stty: inaccessible or not found）混入
+     buffer 时，断言用尾部匹配（regexp {ab$}）而非上游脆弱的 pattern/string 颠倒用法，
+     修复须有修复前后证据。
+rec_command:            见 expect PR !3194 patches/0009-ohos-pty-raw-constraint.patch 与
+                         0010-ohos-tests-compat.patch；验证: ./expect tests/all.tcl
+                         输出 29 Total / 28 Passed / 1 Skipped / 0 Failed
+rec_auto_fix:           true
+rec_impl:               patch-0009-0010-ohos-tests-compat
+
+# 回退方案
+fallback_priority:      2
+fallback_approach:      constrain-and-document-only
+fallback_description:   若无法改动测试源码（patch 被拒），至少用 tcltest constraint
+                         标记不可用能力并如实记录 PASS/FAIL/SKIPPED 统计与原因，
+                         禁止把 SKIPPED 写成 PASS 或伪造 100%。
+fallback_command:       仅加 constraint 定义并记录真实统计；不修改断言逻辑。
+fallback_auto_fix:      false
+fallback_impl:          constraint-only
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       把.*SKIPPED.*写成.*PASS|声称.*100%.*通过|测试未执行.*但.*通过
+forbid_1_reason:        必须如实报告 29 Total / 28 Passed / 1 Skipped / 0 Failed，SKIPPED 不得伪装为 PASS
+forbid_1_consequence:   掩盖真实回归，误导验收判断
+forbid_2_pattern:       因同一 raw 调用扩大跳过.*1\.1[123]|修改断言预期伪造.*通过
+forbid_2_reason:        只允许对确实依赖 PTY raw-mode 的用例用 constraint 跳过，其他用例保持原语义
+forbid_2_consequence:   跳过范围失真，丧失对平台差异的真实覆盖
+forbid_3_pattern:       硬编码 \$HOME/tmp|固定用户路径.*TMPDIR
+forbid_3_reason:        测试临时文件路径必须来自 env(TMPDIR)，由配方统一设置
+forbid_3_consequence:   不可复用且换用户即失效
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P003, P013, P014, P016
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E215]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-expect-ohos-tcl-test-runtime.md
+last_updated:           2026-08-08
+source_event:           expect 5.45.4 PR !3194 路径 B 候选（OHOS testsuite 运行时适配）
+authors:
+source_pr:              !3194
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-08-08
+draft:                  true
+contributor_id:         OHOS-TCL-TEST-RUNTIME

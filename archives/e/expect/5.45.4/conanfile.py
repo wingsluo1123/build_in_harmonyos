@@ -53,53 +53,8 @@ class ExpectConan(ConanFile):
         self.run(r"sed -i 's|@TCL_DL_LIBS@ @PKG_LIBS@ @MATH_LIBS@|& -lz|' Makefile.in",
                   cwd=self.source_folder)
 
-        # Apply patches FIRST (patches 0002-0009) before source-modifying fixes
+        # Apply patches FIRST (patches 0002-0008) before source-modifying fixes
         apply_conandata_patches(self)
-
-        # Fix /tmp/null write in tests/expect.test (OHOS /tmp is read-only, line ~161)
-        self.run(r"sed -i 's|/tmp/null|/tmp/null_ohos_skip|' tests/expect.test",
-                  cwd=self.source_folder)
-
-        # Ensure $HOME/tmp exists for test suite TMPDIR fallback (P2 #182217251)
-        # Use a non-raw string for proper \t handling; escape shell specials
-        self.run("sed -i '/^test spawn-1.4 {spawn open file} {/a\\\tfile mkdir [expr {[info exists ::env(TMPDIR)] ? \"$::env(TMPDIR)\" : \"$::env(HOME)/tmp\"}]' tests/spawn.test",
-                  cwd=self.source_folder)
-        self.run("sed -i '/^test logfile-1.1 {basic logfile} {/a\\\tfile mkdir [expr {[info exists ::env(TMPDIR)] ? \"$::env(TMPDIR)\" : \"$::env(HOME)/tmp\"}]' tests/logfile.test",
-                  cwd=self.source_folder)
-
-        # === 替代修复: OHOS 平台差异导致的上游测试失败 ===
-        # 1) logfile.test: unset spawn_id 前无 spawn session → catch
-        self.run("sed -i 's/unset spawn_id/catch {unset spawn_id}/' tests/logfile.test",
-                  cwd=self.source_folder)
-        # 2) expect-1.3: PTY 缓冲差异导致多匹配一次，预期值 2→3
-        self.run("sed -i '/^test expect-1.3 /,/^} [23]$/{s/^} {2}$/} {3}/}' tests/expect.test",
-                  cwd=self.source_folder)
-        # 3) expect-1.10～1.13: exp_stty raw 在 OHOS PTY 上不生效
-        # 用 python 脚本逐行处理（heredoc 避免嵌套转义）
-        self.run(r"""python3 << 'PYEOF'
-import re, os
-fn = 'tests/expect.test'
-with open(fn) as f: lines = f.readlines()
-out = []
-active = None
-for line in lines:
-    m = re.match(r'^test expect-1\.(\d+) ', line)
-    if m and int(m.group(1)) in {10,11,12,13}:
-        active = int(m.group(1))
-    if active:
-        indent = re.match(r'^([ \t]*)', line).group(1)
-        if re.match(r'^[ \t]*exp_stty raw < \$', line):
-            line = 'catch "' + line.strip() + '"\n'
-        elif re.match(r'^[ \t]*exp_stty -raw < \$', line):
-            line = 'catch "' + line.strip() + '"\n'
-        elif re.match(r'^} \{[01]\}$', line):
-            line = line.replace('} {1}', '} {0}')
-            active = None
-    out.append(line)
-with open(fn, 'w') as f: f.writelines(out)
-print('expect.test patched OK')
-PYEOF
-""", cwd=self.source_folder)
 
         # Fix mktemp to use $HOME/tmp (patch 0002 applies the same change but
         # leaves umask 077; this sed fixes the rest of configure scripts)
@@ -129,27 +84,58 @@ PYEOF
         # 3) Run config.status to generate Makefile
         self.run("./config.status", cwd=self.source_folder)
 
+        # Fix TCL_LIB_SPEC baked into the generated Makefile: the tcl package
+        # was configured with prefix '/' so it emits '-L//lib -ltcl8.6', which
+        # is not resolvable. Point it at the real tcl package lib dir.
+        tcl_pkg_lib2 = _os.path.join(self.dependencies["tcl"].package_folder, "lib")
+        self.run(r"sed -i 's|-L//lib -ltcl8.6|-L%s -ltcl8.6|g; s|-Wl,-rpath,//lib|-Wl,-rpath,%s|g' Makefile" % (tcl_pkg_lib2, tcl_pkg_lib2),
+                 cwd=self.source_folder)
+
         # Remove USE_TCL_STUBS from generated Makefile (static Tcl doesn't support stubs)
         self.run(r"sed -i 's/-DUSE_TCL_STUBS=1 //g' Makefile", cwd=self.source_folder)
 
-        # Build with -Wno-error flags to suppress musl/clang warnings (E063)
-        self.run("make -j1 CFLAGS='-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=deprecated-non-prototype -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=knr-promoted-parameter -Wno-error=#warnings -Wno-error=implicit-int' LIBS='-lz'", cwd=self.source_folder)
+        # Build with -Wno-error flags to suppress musl/clang warnings (E063).
+        # TCL_LIB_SPEC from the tcl fallback package points to //lib (empty
+        # prefix); override it to the real tcl package lib dir for linking.
+        tcl_pkg_lib = _os.path.join(self.dependencies["tcl"].package_folder, "lib")
+        self.run("make -j1 CFLAGS='-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=deprecated-non-prototype -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=knr-promoted-parameter -Wno-error=#warnings -Wno-error=implicit-int' LIBS='-lz' TCL_LIB_SPEC='-L%s -ltcl8.6'" % tcl_pkg_lib, cwd=self.source_folder)
 
         # Run upstream test suite via expect binary (tclsh 'load' not available in static Tcl build)
-        self.run(r"""set -e
+        tcl_pkg_lib_run = _os.path.join(self.dependencies["tcl"].package_folder, "lib")
+        tclsh_bin = _os.path.join(self.dependencies["tcl"].package_folder, "bin", "tclsh8.6")
+        awk_failed = "{for (i=1; i<=NF; i++) if ($i == \"Failed\") print $(i+1)}"
+        self.run(f"""export TMPDIR=$HOME/tmp
+mkdir -p "$HOME/tmp"
+# 验证测试子进程使用的 TMPDIR 目录确实可写（OHOS /tmp 只读）
+if [ ! -d "$HOME/tmp" ] || [ ! -w "$HOME/tmp" ]; then
+  echo "TMPDIR not writable: $HOME/tmp" >> tests/upstream-test-report.log
+  exit 1
+fi
+export TCL_LIBRARY={_os.path.join(tcl_pkg_lib_run, "tcl8.6")}
+export LD_LIBRARY_PATH={tcl_pkg_lib_run}:$LD_LIBRARY_PATH
 REPORT=tests/upstream-test-report.log
-> "$REPORT"
-PASS=0 FAIL=0 SKIP=0 TOTAL=0
-for tf in tests/cat.test tests/expect.test tests/logfile.test tests/pid.test tests/send.test tests/spawn.test tests/stty.test; do
-    name=$(basename "$tf")
-    echo "=== $name ===" >> "$REPORT"
-    TCL_LIBRARY=$(pwd)/library ./expect "$tf" >> "$REPORT" 2>&1
-    summary=$(grep -E 'Total|Passed|Failed|Skipped' "$REPORT" | tail -1)
-    echo "$summary"
-done
-echo "=== Summary ===" >> "$REPORT"
-echo "Tests executed via expect binary (tclsh 'load' not available)" >> "$REPORT"
+: > "$REPORT"
+
+echo "=== [1] static tclsh tests/all.tcl ===" >> "$REPORT"
+if {tclsh_bin} tests/all.tcl >> "$REPORT" 2>&1; then
+  echo "tclsh tests/all.tcl: OK" >> "$REPORT"
+else
+  echo "tclsh tests/all.tcl: FAILED (static Tcl cannot dynamically load Expect extension)" >> "$REPORT"
+fi
+
+echo "=== [2] ./expect tests/all.tcl (upstream cases) ===" >> "$REPORT"
+./expect tests/all.tcl >> "$REPORT" 2>&1
+RC=$?
+echo "expect exit code: $RC" >> "$REPORT"
+
+grep -E 'Total.*Passed.*Skipped.*Failed' "$REPORT" | tail -3 >> "$REPORT"
+FAILED_N=$(grep -E 'Total.*Passed.*Skipped.*Failed' "$REPORT" | tail -1 | awk '{awk_failed}')
+[ -z "$FAILED_N" ] && FAILED_N=0
+echo "UPSTREAM RESULT: rc=$RC failed=$FAILED_N" >> "$REPORT"
 cat "$REPORT"
+if [ "$RC" -ne 0 ] || [ "$FAILED_N" -gt 0 ]; then
+  exit 1
+fi
 """, cwd=self.source_folder)
 
     def package(self):
@@ -167,3 +153,11 @@ cat "$REPORT"
 
     def package_info(self):
         self.cpp_info.libs = []
+        # expect dynamically links libtcl8.6.so; consumers (test_package) need
+        # the tcl package libdir on LD_LIBRARY_PATH to load it at runtime.
+        tcl_runtime_lib = _os.path.join(self.dependencies["tcl"].package_folder, "lib")
+        self.runenv_info.prepend_path("LD_LIBRARY_PATH", tcl_runtime_lib)
+        # expect embeds Tcl and needs the tcl package library (init.tcl etc.)
+        # at runtime; export TCL_LIBRARY so consumers (test_package) run it.
+        tcl_runtime = _os.path.join(self.dependencies["tcl"].package_folder, "lib", "tcl8.6")
+        self.runenv_info.define("TCL_LIBRARY", tcl_runtime)
