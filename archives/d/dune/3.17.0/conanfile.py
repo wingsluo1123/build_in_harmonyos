@@ -39,6 +39,26 @@ class DuneConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # R8 合规：功能探测 pthread_setcancelstate（替代平台宏 __OHOS__）。
+        # vendor/spawn 的 spawn_stubs.c 用 HAVE_PTHREAD_SETCANCELSTATE 宏守卫，
+        # 编译小测试程序检测该函数是否可用（OHOS 未实现则不定义宏）。
+        probe = os.path.join(self.source_folder, "_spawn_probe.c")
+        with open(probe, "w") as f:
+            f.write("#include <pthread.h>\nint main(void){int s;pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,&s);return 0;}\n")
+        probe_obj = os.path.join(self.source_folder, "_spawn_probe.o")
+        cc = "clang"
+        # -Werror=implicit-function-declaration：OHOS 上 pthread_setcancelstate 未声明，
+        # 隐式声明会使编译失败（正确判定 NOT available），而非仅 warning 误判可用
+        probe_cmd = f"{cc} -Werror=implicit-function-declaration -c {probe} -o {probe_obj}"
+        self.run(probe_cmd, cwd=self.source_folder, env="conanbuild", ignore_errors=True)
+        have_pthread = os.path.isfile(probe_obj)
+        os.remove(probe) if os.path.isfile(probe) else None
+        os.remove(probe_obj) if os.path.isfile(probe_obj) else None
+        if have_pthread:
+            self.output.info("pthread_setcancelstate available - enabling HAVE_PTHREAD_SETCANCELSTATE")
+            os.environ["CFLAGS"] = os.environ.get("CFLAGS", "") + " -DHAVE_PTHREAD_SETCANCELSTATE"
+        else:
+            self.output.info("pthread_setcancelstate NOT available (OHOS) - feature macro disabled")
         # Step 1: Bootstrap - build _boot/dune.exe
         # env="conanbuild" 注入 tool_requires（ocaml）的 bin 到 PATH，bootstrap 才能找到 ocaml
         self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
