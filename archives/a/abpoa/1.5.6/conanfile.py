@@ -42,7 +42,8 @@ class AbpoaConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        # Note: SIMDE flags (-DUSE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES) are set in CMakeLists.txt via patch
+        # Note: SIMDE flags (-DUSE_SIMDE -DSIMDE_ENABLE_NATIVE_ALIASES) are set
+        # in CMakeLists.txt via patch, guarded to aarch64/arm64 only.
         tc.generate()
 
     def build(self):
@@ -73,5 +74,9 @@ class AbpoaConan(ConanFile):
         self.cpp_info.requires = ["zlib::zlib"]
         # simd_instruction.h includes x86-only <immintrin.h> unless USE_SIMDE
         # is defined; propagate the SIMDE macros so consumers (test_package)
-        # compile with the SIMDe emulation layer on non-x86 (aarch64/OHOS).
-        self.cpp_info.defines = ["USE_SIMDE", "SIMDE_ENABLE_NATIVE_ALIASES"]
+        # compile with the SIMDe emulation layer on non-x86 (aarch64/OHOS) only.
+        # On x86_64 the library uses native SSE/AVX, so the SIMDE defines must
+        # NOT be propagated (they would shadow native SIMD with emulation).
+        arch = str(self.settings.arch)
+        if arch in ("armv8", "armv8.1", "armv8.2", "armv8.3", "aarch64", "arm64"):
+            self.cpp_info.defines = ["USE_SIMDE", "SIMDE_ENABLE_NATIVE_ALIASES"]
