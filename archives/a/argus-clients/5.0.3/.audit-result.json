@@ -1,0 +1,199 @@
+{
+  "audit_metadata": {
+    "timestamp": "2026-08-09T05:20:00.000Z",
+    "auditor": "independent-code-auditor",
+    "package": "argus-clients",
+    "version": "5.0.3",
+    "branch": "feat/argus-clients-5.0.3",
+    "base_branch": "main",
+    "audit_round": "W4 (re-audit after fixes)",
+    "previous_round": "W3"
+  },
+  "verdict": "pass",
+  "summary": "All previously identified P0/P1 issues have been resolved. The conanfile.py url is now correctly set, manifest.yaml is consistent with conandata.yml and conanfile.py, unused imports were removed from the main conanfile.py, CMakeLists.txt dead code was removed, conandata.yml patch_type was changed to 'portability', and test_package/MANIFEST.yml description was fixed. No new P0 or P1 issues found. Two P2 and three P3 issues remain but are non-blocking.",
+  "fixes_verified": [
+    {
+      "fix": "conanfile.py url set to https://github.com/openargus/clients",
+      "status": "verified",
+      "details": "Line: url = \"https://github.com/openargus/clients\". Previously empty, now correctly set to official repo URL."
+    },
+    {
+      "fix": "manifest.yaml updated with correct deps, source URL, sha256, patch names",
+      "status": "verified",
+      "details": "source.url and source.sha256 match conandata.yml exactly. dependencies list (curl/8.15.0, zlib/1.3.1.1) matches conanfile.py requirements. patches_applied matches conandata.yml patches list. status='built' is honest (not faked as 'published')."
+    },
+    {
+      "fix": "Unused imports removed from conanfile.py (basic_layout, os)",
+      "status": "verified",
+      "details": "Main conanfile.py imports are clean: only ConanFile, get/apply_conandata_patches/export_conandata_patches, Autotools/AutotoolsToolchain. No unused imports. Note: test_package/conanfile.py still has unused 'import os' (see P2-001)."
+    },
+    {
+      "fix": "CMakeLists.txt removed (dead code)",
+      "status": "verified",
+      "details": "CMakeLists.txt is not present in changed_files list. The build system is correctly autotools-only."
+    },
+    {
+      "fix": "conandata.yml patch_type changed from 'bugfix' to 'portability'",
+      "status": "verified",
+      "details": "All three patches now have patch_type: \"portability\" which is the correct value per code style rules."
+    },
+    {
+      "fix": "test_package/MANIFEST.yml description fixed",
+      "status": "verified",
+      "details": "MANIFEST.yml now correctly documents that upstream has no automated test suite, and the test_package test runs 'ra --version' and verifies output contains 'Ra Version 5.0.3'. assertion_count is 1."
+    }
+  ],
+  "findings": [
+    {
+      "id": "P0-001",
+      "severity": "P0",
+      "category": "deceptive_behavior",
+      "title": "Fake tests (R34)",
+      "file": "archives/a/argus-clients/5.0.3/test_package/conanfile.py",
+      "status": "cleared",
+      "description": "Checked whether test_package fakes the test by only printing without calling the package API or executing its binary.",
+      "resolution": "CLEARED — test_package/conanfile.py test() method runs 'ra --version 2>&1 | grep \"Ra Version 5.0.3\"' which actually executes the installed binary and verifies its output. This is a legitimate test that would fail if the binary is missing or outputs wrong version. Not a fake test."
+    },
+    {
+      "id": "P0-002",
+      "severity": "P0",
+      "category": "deceptive_behavior",
+      "title": "Fake sha256",
+      "file": "archives/a/argus-clients/5.0.3/conandata.yml",
+      "status": "cleared",
+      "description": "Checked whether sha256 is fake (all zeros, all f's, too short, or missing).",
+      "resolution": "CLEARED — sha256 is '8a38dd25cfe6f25b9d1da1a0f88ede5f2bb3a51bb9857bad32ee8100ea5760ee' (64 hex chars, realistic hash, not all-zeros or all-f's). Present in both conandata.yml and manifest.yaml with matching values."
+    },
+    {
+      "id": "P0-003",
+      "severity": "P0",
+      "category": "deceptive_behavior",
+      "title": "Hardcoded paths in recipe or patches",
+      "file": "archives/a/argus-clients/5.0.3/conanfile.py, patches/*.patch",
+      "status": "cleared",
+      "description": "Checked for hardcoded absolute paths (e.g., /storage/Users/currentUser/...) in the Conan recipe, conandata.yml, or patch files.",
+      "resolution": "CLEARED — conanfile.py contains no hardcoded paths. Patches use $HOME/tmp (not /storage/Users/...). notes.md mentions /storage/Users/currentUser paths but these describe the manual build process, not the Conan recipe or patches. The actual patch 0003-configure.patch uses $HOME/tmp/configure.tmp, and 0002-config-config.guess.patch uses $HOME/tmp."
+    },
+    {
+      "id": "P1-001",
+      "severity": "P1",
+      "category": "template_placeholder",
+      "title": "Template placeholders or empty URLs",
+      "file": "archives/a/argus-clients/5.0.3/conanfile.py",
+      "status": "cleared",
+      "description": "Checked for TODO, FIXME, XXX, empty url, or other template placeholders.",
+      "resolution": "CLEARED — conanfile.py url is properly set to 'https://github.com/openargus/clients'. No TODO/FIXME/XXX or pass statements found. No '(请填写)' placeholders in any file."
+    },
+    {
+      "id": "P1-002",
+      "severity": "P1",
+      "category": "dependency_correctness",
+      "title": "Incorrect dependencies",
+      "file": "archives/a/argus-clients/5.0.3/conanfile.py",
+      "status": "cleared",
+      "description": "Checked whether declared dependencies are correct for argus-clients.",
+      "resolution": "CLEARED — curl/8.15.0 and zlib/1.3.1.1 are appropriate dependencies. notes.md confirms curl/curl.h is needed. c-ares and maxminddb were optional dependencies that were disabled (PKG_CHECK_MODULES commented out, documented in notes.md section 2). Dependencies in manifest.yaml match conanfile.py."
+    },
+    {
+      "id": "P1-003",
+      "severity": "P1",
+      "category": "version_mismatch",
+      "title": "Version mismatches across files",
+      "file": "multiple",
+      "status": "cleared",
+      "description": "Checked for version inconsistencies across conanfile.py, conandata.yml, manifest.yaml, commands.json, test_package files.",
+      "resolution": "CLEARED — All files consistently use version 5.0.3. conanfile.py version='5.0.3', manifest.yaml version='5.0.3', commands.json versions key '5.0.3', test_package references 'argus-clients/5.0.3'. sha256 values in conandata.yml and manifest.yaml match."
+    },
+    {
+      "id": "P1-004",
+      "severity": "P1",
+      "category": "source_url",
+      "title": "Source URL must be official (R39)",
+      "file": "archives/a/argus-clients/5.0.3/conandata.yml",
+      "status": "cleared",
+      "description": "Checked whether source URL points to official source or authoritative mirror.",
+      "resolution": "CLEARED — URL 'https://codeload.github.com/openargus/clients/tar.gz/refs/heads/main' points to the official openargus/clients GitHub repository. HTTPS. Not a personal fork or unknown CDN."
+    },
+    {
+      "id": "P1-005",
+      "severity": "P1",
+      "category": "commands_json",
+      "title": "commands.json for tool-type package (R38)",
+      "file": "archives/a/argus-clients/commands.json",
+      "status": "cleared",
+      "description": "Checked whether commands.json exists at software level with correct type and name.",
+      "resolution": "CLEARED — commands.json present at archives/a/argus-clients/ (software level). type='tool', name='argus-clients', version 5.0.3 with correct ref. binary=false (source-built)."
+    },
+    {
+      "id": "P1-006",
+      "severity": "P1",
+      "category": "conan_api",
+      "title": "Conan 2.x API usage",
+      "file": "archives/a/argus-clients/5.0.3/conanfile.py",
+      "status": "cleared",
+      "description": "Checked for Conan 2.x API compliance.",
+      "resolution": "CLEARED — Uses 'from conan import ConanFile', 'conan.tools.files', 'conan.tools.gnu'. No deprecated 'from conans' imports."
+    },
+    {
+      "id": "P1-007",
+      "severity": "P1",
+      "category": "fake_status",
+      "title": "Fake status in manifest.yaml (R9)",
+      "file": "archives/a/argus-clients/5.0.3/manifest.yaml",
+      "status": "cleared",
+      "description": "Checked whether status is honestly reported.",
+      "resolution": "CLEARED — status is 'built' (not 'published'). This is honest — package is built and verified but not uploaded to remote."
+    },
+    {
+      "id": "P2-001",
+      "severity": "P2",
+      "category": "code_style",
+      "title": "Unused import in test_package/conanfile.py",
+      "file": "archives/a/argus-clients/5.0.3/test_package/conanfile.py",
+      "status": "open",
+      "description": "test_package/conanfile.py imports 'os' (line: import os) but never uses it anywhere in the file. The main conanfile.py had unused imports removed, but this one was missed.",
+      "recommendation": "Remove 'import os' from test_package/conanfile.py. It is not referenced in any method."
+    },
+    {
+      "id": "P3-001",
+      "severity": "P3",
+      "category": "best_practice",
+      "title": "Source URL uses refs/heads/main instead of tagged release",
+      "file": "archives/a/argus-clients/5.0.3/conandata.yml",
+      "status": "open",
+      "description": "The source URL 'https://codeload.github.com/openargus/clients/tar.gz/refs/heads/main' downloads from the main branch rather than a specific tag or release. While the sha256 pins the exact content for reproducibility, using a tagged release URL would be more robust against upstream changes.",
+      "recommendation": "If a v5.0.3 tag exists upstream, consider using 'refs/tags/v5.0.3' instead of 'refs/heads/main'. Non-blocking since sha256 ensures reproducibility."
+    },
+    {
+      "id": "P3-002",
+      "severity": "P3",
+      "category": "documentation",
+      "title": "notes.md has outdated '遗留问题' (remaining issues) section",
+      "file": "archives/a/argus-clients/5.0.3/notes.md",
+      "status": "open",
+      "description": "notes.md '遗留问题' section lists '归档结构未完成（缺少 manifest.yaml）' as a remaining issue, but manifest.yaml is now present in this PR. The notes also say '预编译包: 未完成（归档结构问题）' which is outdated. These sections were not updated to reflect the current state.",
+      "recommendation": "Update the '遗留问题' section in notes.md to reflect the current state, or remove items that have been resolved."
+    },
+    {
+      "id": "P3-003",
+      "severity": "P3",
+      "category": "test_quality",
+      "title": "test_package/test.c is a stub file",
+      "file": "archives/a/argus-clients/5.0.3/test_package/test.c",
+      "status": "open",
+      "description": "test_package/test.c only prints a message and does not call any argus-clients API. The comment states 'The actual test runs the installed ra binary via conanfile.py test().' This is acceptable since the real test is in conanfile.py (which runs the binary), but the stub file is unnecessary and could be confused with a fake test (R34) by automated scanners.",
+      "recommendation": "Consider removing test.c entirely if it's only required for a structural check, or add a comment making it clearer that this is not the test itself. Alternatively, the file could include a minimal call to an argus-clients library function if linkable."
+    }
+  ],
+  "stats": {
+    "total_findings": 14,
+    "p0_count": 0,
+    "p1_count": 0,
+    "p2_count": 1,
+    "p3_count": 3,
+    "p0_open": 0,
+    "p1_open": 0,
+    "p2_open": 1,
+    "p3_open": 3
+  }
+}
