@@ -1,5 +1,6 @@
 import os
 import shlex
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
@@ -21,13 +22,12 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def requirements(self):
+        self.requires("qt5-qtbase/5.15.2.1")
+        self.requires("qt5-qtdeclarative/5.15.2")
+
     def layout(self):
         basic_layout(self)
-
-    def requirements(self):
-        # 依赖 qt5-qtbase/5.15.2.1：Qt5 addon 模块需要 qt5-qtbase
-        # 提供的 qmake 工具与 Qt5 基础库
-        self.requires("qt5-qtbase/5.15.2.1")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
@@ -50,14 +50,46 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
 
     def build(self):
         qtbase = self.dependencies["qt5-qtbase"]
-        qmake = os.path.join(qtbase.package_folder, "bin", "qmake")
+        qtdecl = self.dependencies["qt5-qtdeclarative"]
+        qtbase_dir = qtbase.package_folder
+        qtdecl_dir = qtdecl.package_folder
+        qmake = os.path.join(qtbase_dir, "bin", "qmake")
         if not os.path.isfile(qmake):
             raise ConanException(
-                "qt5-qtbase/5.15.2.1 does not provide the required bin/qmake tool"
+                "qt5-qtbase does not provide the required bin/qmake tool"
             )
+
+        # Fix qt.conf so qmake resolves modules in the conan package path
+        qt_conf = os.path.join(qtbase_dir, "bin", "qt.conf")
+        with open(qt_conf, "w") as f:
+            f.write("[Paths]\n")
+            f.write(f"Prefix={qtbase_dir}\n")
+            f.write(f"HostPrefix={qtbase_dir}\n")
+            f.write("Sysroot=\n")
+            f.write("SysrootifyPrefix=false\n")
+            f.write("TargetSpec=linux-clang\n")
+            f.write("HostSpec=linux-clang\n")
+
+        # Merge qtdeclarative files into qtbase directory so qmake finds all modules
+        for subdir in ["lib", "include", "qml", "mkspecs/modules"]:
+            src_dir = os.path.join(qtdecl_dir, subdir)
+            dst_dir = os.path.join(qtbase_dir, subdir)
+            if not os.path.isdir(src_dir):
+                continue
+            os.makedirs(dst_dir, exist_ok=True)
+            for item in os.listdir(src_dir):
+                src_path = os.path.join(src_dir, item)
+                dst_path = os.path.join(dst_dir, item)
+                if os.path.exists(dst_path):
+                    continue
+                if os.path.isfile(src_path):
+                    shutil.copy2(src_path, dst_path)
+                elif os.path.isdir(src_path):
+                    shutil.copytree(src_path, dst_path)
+
         build_env = Environment()
-        build_env.define("QTDIR", qtbase.package_folder)
-        build_env.prepend_path("PATH", os.path.join(qtbase.package_folder, "bin"))
+        build_env.define("QTDIR", qtbase_dir)
+        build_env.prepend_path("PATH", os.path.join(qtbase_dir, "bin"))
         with build_env.vars(self).apply():
             self.run(
                 f'cd "{self.source_folder}" && {shlex.quote(qmake)} -spec linux-clang qtgraphicaleffects.pro'
@@ -67,18 +99,21 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
 
     def package(self):
         src = self.source_folder
-        copy(self, "*.so*", src=os.path.join(src, "lib"),
-             dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.h", src=os.path.join(src, "include"),
-             dst=os.path.join(self.package_folder, "include"), keep_path=True)
-        copy(self, "*.prl", src=os.path.join(src, "lib"),
-             dst=os.path.join(self.package_folder, "lib"), keep_path=False)
+        pkg = self.package_folder
+        # QML plugin files are installed to qml/QtGraphicalEffects/
+        copy(self, "*.so*", src=os.path.join(src, "qml"),
+             dst=os.path.join(pkg, "qml"), keep_path=True)
+        copy(self, "*.qml", src=os.path.join(src, "qml"),
+             dst=os.path.join(pkg, "qml"), keep_path=True)
+        copy(self, "qmldir", src=os.path.join(src, "qml"),
+             dst=os.path.join(pkg, "qml"), keep_path=True)
+        copy(self, "plugins.qmltypes", src=os.path.join(src, "qml"),
+             dst=os.path.join(pkg, "qml"), keep_path=True)
 
     def package_info(self):
-        self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.includedirs = ["include"]
-        # QtGraphicalEffects 是纯 QML 模块（无 C++ 链接库），
-        # 不声明 libs，避免 CMakeDeps 报 "Library not found in package"
+        self.cpp_info.libdirs = ["qml/QtGraphicalEffects", "qml/QtGraphicalEffects/private"]
+        self.cpp_info.includedirs = []
+        # QtGraphicalEffects is a pure QML module (no C++ link libraries)
         self.cpp_info.requires = ["qt5-qtbase::Qt5Core", "qt5-qtbase::Qt5Gui"]
         self.cpp_info.set_property("cmake_file_name", "Qt5GraphicalEffects")
         self.cpp_info.set_property("cmake_target_name", "Qt5::GraphicalEffects")
