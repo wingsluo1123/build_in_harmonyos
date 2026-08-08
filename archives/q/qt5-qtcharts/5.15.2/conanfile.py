@@ -70,10 +70,17 @@ class Qt5QtchartsConan(ConanFile):
         src = self.source_folder
         copy(self, "*.so*", src=os.path.join(src, "lib"),
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.h", src=os.path.join(src, "include"),
-             dst=os.path.join(self.package_folder, "include"), keep_path=True)
         copy(self, "*.prl", src=os.path.join(src, "lib"),
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
+        # Qt5 模块公开头文件位于源码 include/（含 QtCharts 子目录），
+        # 由 syncqt 生成，需随包发布；src/charts 下也有部分头文件
+        if os.path.isdir(os.path.join(src, "include")):
+            copy(self, "*", src=os.path.join(src, "include"),
+                 dst=os.path.join(self.package_folder, "include"), keep_path=True)
+        if os.path.isdir(os.path.join(src, "src", "charts")):
+            copy(self, "*.h", src=os.path.join(src, "src", "charts"),
+                 dst=os.path.join(self.package_folder, "include", "QtCharts"),
+                 keep_path=False)
 
     def package_info(self):
         self.cpp_info.libdirs = ["lib"]
