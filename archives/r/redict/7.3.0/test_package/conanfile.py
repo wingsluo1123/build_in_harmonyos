@@ -25,5 +25,6 @@ class RedictTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # L0 compliance: use self.run() to execute the test binary
+        test_binary = os.path.join(self.test_build_folder, "test_redict")
+        self.run(test_binary, env="conanrun")
