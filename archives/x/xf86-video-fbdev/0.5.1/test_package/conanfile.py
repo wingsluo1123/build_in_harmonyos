@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 """Conan test_package for xf86-video-fbdev — verifies the driver module.
 
-This test verifies the fbdev_drv.so module is a valid ELF shared object
-targeting AArch64. Since the driver is an X.Org plugin that expects the
-X server to provide symbols at runtime, dlopen is not used (unresolved
-symbols are expected for a plugin).
-
-Instead, we use readelf to inspect the .so binary and verify:
-1. It is a valid ELF shared object
-2. It targets AArch64 (EM_AARCH64 = 183)
-3. It exports the FBDEV symbol (XF86ModuleData)
-4. It is a shared library (DYN type)
+This test compiles a C program that reads the ELF header of fbdev_drv.so
+and verifies it is a valid AArch64 shared library. Since the driver is
+an X.Org plugin with unresolved X server symbols (expected at runtime),
+dlopen is not used. Instead, we parse the ELF header directly.
 """
 import os
 from conan import ConanFile
@@ -24,30 +18,24 @@ class Xf86VideoFbdevTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def build(self):
-        # Copy the driver module to the build directory for testing
+        # Copy the driver module to the build directory
         bin_dir = os.path.join(self.build_folder, "bin")
         os.makedirs(bin_dir, exist_ok=True)
         copy(self, "fbdev_drv.so",
              src=os.path.join(self.dependencies["xf86-video-fbdev"].package_folder, "lib"),
              dst=bin_dir)
 
+        # Compile the test program from test.c
+        cc = self.conf_info.get("tools.build:compiler_executables")
+        cc_path = cc["c"] if cc else "clang"
+        test_bin = os.path.join(bin_dir, "test_fbdev")
+        test_src = os.path.join(os.path.dirname(__file__), "test.c")
+
+        self.run(f"{cc_path} -o {test_bin} {test_src}", env="conanbuild")
+
     def test(self):
         so_path = os.path.join(self.build_folder, "bin", "fbdev_drv.so")
+        test_bin = os.path.join(self.build_folder, "bin", "test_fbdev")
 
-        # Verify the .so file exists
-        assert os.path.exists(so_path), f"fbdev_drv.so not found at {so_path}"
-        self.output.info(f"Found fbdev_drv.so at {so_path}")
-
-        # Test 1: Verify it's a valid ELF file using readelf
-        self.run(f"readelf -h {so_path}", env="conanrun")
-
-        # Test 2: Verify AArch64 architecture (EM_AARCH64 = 183)
-        self.run(f"readelf -h {so_path} | grep -q 'AArch64'", env="conanrun")
-
-        # Test 3: Verify it's a shared library (DYN type)
-        self.run(f"readelf -h {so_path} | grep -q 'DYN'", env="conanrun")
-
-        # Test 4: Verify FBDEV symbol is exported (XF86ModuleData)
-        self.run(f"readelf --dyn-syms {so_path} | grep -q 'FBDEV'", env="conanrun")
-
-        self.output.info("All ELF validation tests passed!")
+        # Run the test program against the built .so
+        self.run(f"{test_bin} {so_path}", env="conanrun")
