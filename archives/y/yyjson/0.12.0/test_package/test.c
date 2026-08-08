@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "yyjson.h"
 
@@ -50,6 +51,10 @@ int main(void) {
 
     /* Test 4: Mutable document write */
     yyjson_mut_doc *mdoc = yyjson_mut_doc_new(NULL);
+    if (!mdoc) {
+        fprintf(stderr, "FAIL: yyjson_mut_doc_new returned NULL\n");
+        return 1;
+    }
     yyjson_mut_val *mroot = yyjson_mut_obj(mdoc);
     yyjson_mut_doc_set_root(mdoc, mroot);
     yyjson_mut_obj_add_str(mdoc, mroot, "status", "ok");
