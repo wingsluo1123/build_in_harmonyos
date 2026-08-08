@@ -13,7 +13,7 @@ from conan.tools.layout import basic_layout
 
 class AvyConan(ConanFile):
     name = "avy"
-    version = "0.5.0"
+    version = "0.5.0.1"
     description = "GNU Emacs Lisp package for jumping to tree-based visual selections"
     license = "GPL-3.0-or-later"
     homepage = "https://github.com/abo-abo/avy"
