@@ -1,0 +1,22 @@
+# test_package/MANIFEST.yml — postgresql-pllua REL_2_0_12
+# CI L0e requires this file to exist.
+
+package: postgresql-pllua/rel_2_0_12
+homepage: "https://github.com/pllua/pllua"
+
+# PL/Lua is a PostgreSQL extension; no standalone `make check` without a running server
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# No upstream test programs that run without PostgreSQL server
+upstream_tests: []
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: CMakeLists.txt
+    description: "Verifies pllua.so is a valid ELF shared library by loading it with dlopen and checking for _PG_init symbol"
+    command: "cmake --build . && ctest"
+
+# Assertion count: dlopen success + _PG_init symbol check
+assertion_count: 2

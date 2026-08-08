@@ -1,1 +1,40 @@
-software: postgresql-pllua version: REL_2_0_12 status: built
+software: postgresql-pllua
+version: "rel_2_0_12"
+status: built
+compile_date: "2026-08-08"
+build_date: "2026-08-08"
+build_system: makefile
+
+source:
+  url: "https://github.com/pllua/pllua/archive/refs/tags/REL_2_0_12.tar.gz"
+  sha256: "7b3b4b5d749a2d1e040739c0eaad4b5b37b677866ead7f6a6e349f840c5eb4c3"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libpq/18.1 (conan)
+    - lua/5.4.8 (conan)
+    - postgresql 18.1 source (build-only, for pg_config/PGXS)
+    - lua 5.4.8 source (build-only, for lua/luac interpreter)
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-pg_attribute_noreturn_compat.patch"
+
+knowledge_gained:
+  - "PostgreSQL 18 removed pg_attribute_noreturn() in favor of pg_noreturn"
+  - "PGXS build system requires pg_config, server headers, and PGXS makefiles"
+  - "HarmonyOS umask 077 creates unwritable directories (fix: umask 022)"
+  - "LLVM ld.lld requires -m aarch64elf for -r -b binary embedding"
+  - "VPATH detection triggers incorrectly on HarmonyOS filesystem"
+
+build_notes: >
+  PL/Lua uses PostgreSQL's PGXS (Extension Build System).
+  PostgreSQL server dev headers are not available as a conan package,
+  so the recipe downloads PostgreSQL 18.1 source, configures it to
+  generate pg_config + PGXS + server headers, then builds PL/Lua.
+  Also requires a Lua interpreter (lua/luac) for codegen during build,
+  which is built from the Lua 5.4.8 source.
