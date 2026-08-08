@@ -40,9 +40,10 @@ class DuneConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # Step 1: Bootstrap - build _boot/dune.exe
-        self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder)
+        # env="conanbuild" 注入 tool_requires（ocaml）的 bin 到 PATH，bootstrap 才能找到 ocaml
+        self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
         # Step 2: Release build
-        self.run("make release", cwd=self.source_folder)
+        self.run("make release", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
         # Copy the built binary and install artifacts
