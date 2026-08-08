@@ -25,6 +25,8 @@ class YaraConan(ConanFile):
 
     package_type = "library"
 
+    exports = "ltmain.sh"
+
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = {"shared": False}
@@ -141,14 +143,22 @@ class YaraConan(ConanFile):
                     ltmain_candidates.insert(0, os.path.join(lt_dir, "share/libtool/build-aux/ltmain.sh"))
         except Exception:
             pass
+        # Copy ltmain.sh from exports (included with recipe)
         ltmain_target = os.path.join(build_aux, "ltmain.sh")
         if not os.path.exists(ltmain_target):
-            for lt in ltmain_candidates:
-                if os.path.exists(lt):
-                    shutil.copy2(lt, ltmain_target)
-                    os.chmod(ltmain_target, 0o755)
-                    break
-        # Fallback: download ltmain.sh from libtool source if not found locally
+            # Try to copy from recipe's export folder
+            ltmain_export = os.path.join(self.recipe_folder, "ltmain.sh")
+            if os.path.exists(ltmain_export):
+                shutil.copy2(ltmain_export, ltmain_target)
+                os.chmod(ltmain_target, 0o755)
+            else:
+                # Fallback: search system paths
+                for lt in ltmain_candidates:
+                    if os.path.exists(lt):
+                        shutil.copy2(lt, ltmain_target)
+                        os.chmod(ltmain_target, 0o755)
+                        break
+        # Last resort: download ltmain.sh
         if not os.path.exists(ltmain_target):
             ltmain_urls = [
                 "https://ghfast.top/https://raw.githubusercontent.com/git-init/libtool/master/build-aux/ltmain.sh",
