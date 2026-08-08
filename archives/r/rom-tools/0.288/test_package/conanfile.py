@@ -3,23 +3,31 @@
 import os
 
 from conan import ConanFile
+from conan.tools.gnu import AutotoolsToolchain
+from conan.tools.files import save
 
 
 class RomToolsTestConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
-    generators = "VirtualBuildEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def test(self):
+    def generate(self):
+        # Generate a simple Makefile to compile the test
         bindir = self.dependencies["rom-tools"].cpp_info.bindirs[0]
+        save(self, "Makefile", f"""
+CFLAGS = -O2 -Wall
+test: test.c
+\t$(CC) $(CFLAGS) -o test test.c
 
-        # chdman: run with 'info' subcommand (expects error but prints version banner)
-        chdman = os.path.join(bindir, "chdman")
-        # Verify chdman produces expected output containing version string
-        self.run(f'"{chdman}" info 2>&1 | grep -q "chdman.*CHD"', env="conanrun")
+run: test
+\tPATH="{bindir}:$$PATH" ./test
+""")
 
-        # romcmp: run without args (prints usage)
-        romcmp = os.path.join(bindir, "romcmp")
-        self.run(f'"{romcmp}" 2>&1 | grep -q "romcmp"', env="conanrun")
+    def build(self):
+        self.run("make test")
+
+    def test(self):
+        self.run("make run")
