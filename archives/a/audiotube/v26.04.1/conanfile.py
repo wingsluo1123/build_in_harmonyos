@@ -98,9 +98,10 @@ class AudiotubeConan(ConanFile):
 
     def _get_pybind11_cmake_dir(self):
         """Return the cmake config directory for pybind11."""
+        import sys
         try:
             result = subprocess.run(
-                ["python3", "-c", "import pybind11; print(pybind11.get_cmake_dir())"],
+                [sys.executable, "-c", "import pybind11; print(pybind11.get_cmake_dir())"],
                 capture_output=True, text=True, check=True
             )
             return result.stdout.strip()
