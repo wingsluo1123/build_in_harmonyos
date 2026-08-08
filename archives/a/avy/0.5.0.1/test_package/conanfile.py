@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-"""test_package for avy — verifies that avy.el was properly installed and contains expected Elisp content."""
+"""test_package for avy — verifies that avy.el was properly installed."""
 import os
 
 from conan import ConanFile
 
 
 class AvyTestConan(ConanFile):
-    """test_package for avy — validates avy.el content."""
+    """test_package for avy — verifies avy.el exists."""
     test_type = "explicit"
-
-    settings = "os", "arch"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # Run the Python test script that validates avy.el content
+        # Run test script to verify avy.el exists and content is valid
         dep = self.dependencies["avy"]
-        test_script = os.path.join(self.source_folder, "test_avy.py")
-        self.run(f'python3 "{test_script}" "{dep.package_folder}"', env="conanrun")
+        self.run(f"python3 \"{os.path.join(self.source_folder, 'test_avy.py')}\" \"{dep.package_folder}\"", env="conanrun")
