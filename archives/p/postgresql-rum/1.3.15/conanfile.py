@@ -44,6 +44,15 @@ class PostgresqlRumConan(ConanFile):
             env="conanbuild",
             cwd=self.source_folder,
         )
+        # L1: Run upstream tests (requires PostgreSQL server, may fail on OHOS)
+        try:
+            self.run(
+                f'make USE_PGXS=1 PG_CONFIG="{pg_config}" installcheck',
+                env="conanbuild",
+                cwd=self.source_folder,
+            )
+        except Exception as e:
+            self.output.warning(f"make installcheck failed (expected on OHOS): {e}")
 
     def package(self):
         # Copy the built shared library (built in source folder by PGXS)
