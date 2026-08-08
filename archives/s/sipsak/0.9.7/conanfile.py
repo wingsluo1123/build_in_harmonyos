@@ -23,6 +23,18 @@ class SipsakConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def export_sources(self):
+        # Ship the bundled minimal Check-compatible shim so the upstream
+        # unit tests can be compiled and executed without the Check
+        # framework, which is not available in the OHOS build environment.
+        copy(
+            self,
+            "files",
+            self.recipe_folder,
+            self.export_sources_folder,
+            keep_path=True,
+        )
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
@@ -73,18 +85,14 @@ class SipsakConan(ConanFile):
             ),
             env="conanbuild",
         )
-        self._run_upstream_tests(cc, build_type_flags)
+        self._run_upstream_tests(cc, flags)
 
-    def _run_upstream_tests(self, cc, build_type_flags):
-        """Compile and run the upstream Check-based unit tests when the Check
-        framework is present in the build environment (e.g. the OHOS device)."""
-        check_prefix = self._find_check_prefix()
-        if not check_prefix:
-            self.output.info(
-                "Check framework not found; skipping upstream tests"
-            )
-            return
+    def _run_upstream_tests(self, cc, flags):
+        """Compile and run the upstream Check-based unit tests using the
+        bundled minimal Check-compatible shim, so the upstream test sources
+        are exercised even when the Check framework is not installed."""
         source_folder = self.source_folder
+        shim_dir = os.path.join(source_folder, "files")
         # The upstream tests include "../config.h", which autoconf normally
         # generates. Emit a minimal OHOS-compatible config header.
         config_h = os.path.join(source_folder, "config.h")
@@ -98,11 +106,13 @@ class SipsakConan(ConanFile):
                     "#define HAVE_STRINGS_H 1\n"
                     "#define HAVE_UNISTD_H 1\n"
                 )
+        # Reuse the full feature macro set of the main build and enable the
+        # upstream prototypes used by the old-style md5 sources.
         test_flags = (
-            build_type_flags
-            + " -fcommon -D_GNU_SOURCE -DRUNNING_CHECK -DHAVE_CHECK_H "
-            + '-I"{src}" -I"{src}/src" -I"{prefix}/include" '.format(
-                src=source_folder, prefix=check_prefix
+            flags
+            + " -DRUNNING_CHECK -DHAVE_CHECK_H -DPROTOTYPES=1 "
+            + '-I"{src}" -I"{src}/src" -I"{shim}" '.format(
+                src=source_folder, shim=shim_dir
             )
         )
         tests = (
@@ -112,6 +122,7 @@ class SipsakConan(ConanFile):
                     os.path.join(source_folder, "tests", "check_helper.c"),
                     os.path.join(source_folder, "src", "helper.c"),
                     os.path.join(source_folder, "src", "exit_code.c"),
+                    os.path.join(shim_dir, "check_shim.c"),
                 ],
             ),
             (
@@ -119,6 +130,7 @@ class SipsakConan(ConanFile):
                 [
                     os.path.join(source_folder, "tests", "check_md5.c"),
                     os.path.join(source_folder, "src", "md5.c"),
+                    os.path.join(shim_dir, "check_shim.c"),
                 ],
             ),
         )
@@ -126,41 +138,10 @@ class SipsakConan(ConanFile):
             source_args = " ".join('"{}"'.format(item) for item in test_sources)
             binary = os.path.join(self.build_folder, name)
             self.run(
-                '"{}" {} {} -L"{prefix}/lib" -lcheck -o "{}"'.format(
-                    cc, test_flags, source_args, binary, prefix=check_prefix
-                ),
+                '"{}" {} {} -o "{}"'.format(cc, test_flags, source_args, binary),
                 env="conanbuild",
             )
             self.run('"{}"'.format(binary), env="conanbuild")
-
-    def _find_check_prefix(self):
-        """Locate the Check framework without hardcoding a developer path.
-
-        Honor the CHECK_PREFIX environment variable, ask pkg-config when
-        available, then probe the conventional /usr/local prefixes.
-        """
-        candidates = []
-        env_prefix = os.environ.get("CHECK_PREFIX")
-        if env_prefix:
-            candidates.append(env_prefix)
-        try:
-            import subprocess
-
-            output = subprocess.check_output(
-                ["pkg-config", "--variable=prefix", "check"],
-                stderr=subprocess.STDOUT,
-                timeout=20,
-            ).decode("utf-8", errors="replace").strip()
-            if output:
-                candidates.append(output)
-        except Exception:
-            pass
-        candidates.append("/usr/local")
-        candidates.append("/storage/Users/currentUser/usr/local")
-        for prefix in candidates:
-            if os.path.isfile(os.path.join(prefix, "include", "check.h")):
-                return prefix
-        return None
 
     def package(self):
         copy(
