@@ -1,7 +1,7 @@
 #!/bin/sh
 # test_package/test.sh -- Dune 3.17.0 consumer test
 # Verifies dune binary is functional
-set -e
+set -euo pipefail
 
 DUNE_BIN="${1:-dune}"
 
@@ -10,6 +10,7 @@ echo "=== Dune version check ==="
 
 echo "=== Dune build check ==="
 TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
 cd "$TMPDIR"
 cat > dune-project << EOF
 (lang dune 3.0)
