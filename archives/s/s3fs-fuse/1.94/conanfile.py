@@ -41,10 +41,14 @@ class S3fsFuseConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Also export fuse2 source tarball (not available in Conan repo, built from source)
+        # Also export fuse2 source tarball and main source tarball
+        # (shipped locally to avoid CI network issues - workers can't access GitHub)
         from conan.tools.files import copy
-        copy(self, "fuse-2.9.9.tar.gz", src=os.path.join(self.recipe_folder, "patches"),
-             dst=os.path.join(self.export_sources_folder, "patches"))
+        for tarball in ["fuse-2.9.9.tar.gz", "s3fs-fuse-1.94.tar.gz"]:
+            src_path = os.path.join(self.recipe_folder, "patches", tarball)
+            if os.path.isfile(src_path):
+                copy(self, tarball, src=src_path,
+                     dst=os.path.join(self.export_sources_folder, "patches"))
 
     def requirements(self):
         self.requires("openssl/3.5.6.1")
@@ -64,7 +68,22 @@ class S3fsFuseConan(ConanFile):
         self.tool_requires("automake/1.18")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # Use local tarball if available (CI workers can't access GitHub)
+        local_tarball = os.path.join(self.source_folder, "patches", "s3fs-fuse-1.94.tar.gz")
+        if os.path.isfile(local_tarball):
+            import tarfile
+            with tarfile.open(local_tarball, "r:gz") as tar:
+                # Extract with strip_root=True equivalent
+                members = tar.getmembers()
+                if members and members[0].isdir():
+                    prefix = members[0].name + "/"
+                    for m in members[1:]:
+                        m.name = m.name[len(prefix):]
+                        tar.extract(m, self.source_folder)
+                else:
+                    tar.extractall(self.source_folder)
+        else:
+            get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
         tc = AutotoolsToolchain(self)
