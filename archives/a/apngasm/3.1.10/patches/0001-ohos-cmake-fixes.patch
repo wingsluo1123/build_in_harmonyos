@@ -1,0 +1,117 @@
+--- a/lib/CMakeLists.txt	2026-08-09 04:44:29.623150781 +0800
++++ b/lib/CMakeLists.txt	2026-08-09 04:44:29.687150781 +0800
+@@ -43,7 +43,17 @@
+   set(Boost_ROOT "/mingw64")
+ endif ()
+ 
+-# Add the dynamic/shared library
++# Find dependencies first
++find_package(PNG REQUIRED)
++find_package(ZLIB REQUIRED)
++find_package(Boost REQUIRED COMPONENTS program_options regex system)
++
++include_directories(${PNG_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
++include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
++message(${PNG_VERSION_STRING})
++
++# Add the dynamic/shared library (only when BUILD_SHARED_LIBS is ON)
++if(BUILD_SHARED_LIBS)
+ set(APNGASM_DYNAMIC_LIB_TARGET apngasm-dynamic)
+ add_library(${APNGASM_DYNAMIC_LIB_TARGET} SHARED
+   ${APNGASM_SOURCES}
+@@ -54,6 +64,8 @@
+   OUTPUT_NAME apngasm
+   CXX_STANDARD 20
+ )
++target_link_libraries(${APNGASM_DYNAMIC_LIB_TARGET} PNG::PNG ZLIB::ZLIB Boost::program_options Boost::regex Boost::system)
++endif()
+ 
+ # Add the static library/archive
+ set(APNGASM_STATIC_LIB_TARGET apngasm-static)
+@@ -66,36 +78,18 @@
+   OUTPUT_NAME apngasm
+   CXX_STANDARD 20
+ )
++target_link_libraries(${APNGASM_STATIC_LIB_TARGET} PNG::PNG ZLIB::ZLIB Boost::program_options Boost::regex Boost::system)
+ 
+-# Add libraries/includes
+-#target_link_libraries(${APNGASM_DYNAMIC_LIB_TARGET} stdc++fs)
+-#target_link_libraries(${APNGASM_STATIC_LIB_TARGET} stdc++fs)
+-
+-find_package(PNG REQUIRED)
+-include_directories(${PNG_INCLUDE_DIR})
+-target_link_libraries(${APNGASM_DYNAMIC_LIB_TARGET} ${PNG_LIBRARY})
+-target_link_libraries(${APNGASM_STATIC_LIB_TARGET} ${PNG_LIBRARY})
+-message(${PNG_VERSION_STRING})
+-
+-target_link_libraries(${APNGASM_DYNAMIC_LIB_TARGET} ${ZLIB_LIBRARIES})
+-target_link_libraries(${APNGASM_STATIC_LIB_TARGET} ${ZLIB_LIBRARIES})
+-
+-#if (APPLE OR WIN32)
+-#    set(Boost_USE_STATIC_LIBS ON)
+-#endif ()
+-#set(Boost_USE_STATIC_LIBS OFF)
+-#SET(CMAKE_FIND_LIBRARY_SUFFIXES .dll.a .a .lib ${CMAKE_FIND_LIBRARY_SUFFIXES})
+-find_package(Boost REQUIRED COMPONENTS program_options regex system)
+-include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
+-target_link_libraries(${APNGASM_DYNAMIC_LIB_TARGET} Boost::program_options Boost::regex Boost::system)
+-target_link_libraries(${APNGASM_STATIC_LIB_TARGET} Boost::program_options Boost::regex Boost::system)
+-
++if(BUILD_SHARED_LIBS)
+ get_target_property(APNGASM_DYNAMIC_LIB_TARGET_NAME ${APNGASM_DYNAMIC_LIB_TARGET} OUTPUT_NAME)
++endif()
+ get_target_property(APNGASM_STATIC_LIB_TARGET_NAME ${APNGASM_STATIC_LIB_TARGET} OUTPUT_NAME)
+ set(APNGASM_LIBRARIES
+-  ${PROJECT_BINARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${APNGASM_DYNAMIC_LIB_TARGET_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}
+   ${PROJECT_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${APNGASM_STATIC_LIB_TARGET_NAME}${CMAKE_STATIC_LIBRARY_SUFFIX}
+ )
++if(BUILD_SHARED_LIBS)
++list(APPEND APNGASM_LIBRARIES ${PROJECT_BINARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${APNGASM_DYNAMIC_LIB_TARGET_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX})
++endif()
+ 
+ # Installation
+ install(FILES ${APNGASM_HEADERS}
+@@ -106,10 +100,16 @@
+ endif ()
+ install(
+   TARGETS
+-    ${APNGASM_DYNAMIC_LIB_TARGET}
+     ${APNGASM_STATIC_LIB_TARGET}
+   DESTINATION ${LIB_INSTALL_DIR}
+ )
++if(BUILD_SHARED_LIBS)
++install(
++  TARGETS
++    ${APNGASM_DYNAMIC_LIB_TARGET}
++  DESTINATION ${LIB_INSTALL_DIR}
++)
++endif()
+ 
+ # Create package command
+ set(PACKAGE_DIR ${PROJECT_BINARY_DIR}/package)
+--- a/cli/CMakeLists.txt	2026-08-09 04:44:29.647150781 +0800
++++ b/cli/CMakeLists.txt	2026-08-09 04:44:29.863151250 +0800
+@@ -35,7 +35,9 @@
+   set(Boost_USE_STATIC_LIBS ON)
+ endif ()
+ find_package(Boost REQUIRED COMPONENTS program_options regex system)
+-include_directories(${Boost_INCLUDE_DIRS})
++find_package(PNG REQUIRED)
++find_package(ZLIB REQUIRED)
++include_directories(${Boost_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
+ 
+ # Generate executable
+ add_executable(apngasm-cli
+@@ -51,8 +53,10 @@
+ 
+ # Link to built apngasm library
+ target_link_libraries(apngasm-cli
+-  apngasm
+-  ${Boost_LIBRARIES}
++  apngasm-static
++  PNG::PNG
++  ZLIB::ZLIB
++  Boost::program_options Boost::regex Boost::system
+ )
+ 
+ # Installation
