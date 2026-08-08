@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration
+# CI script (build_and_test.sh L0e) requires this file to exist
+
+package: audiotube/v26.04.1
+homepage: "https://github.com/KDE/audiotube"
+
+# Upstream test command
+upstream_check_command: "ctest"
+
+# Whether upstream tests are integrated in conanfile.py build()
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream tests: audiotube uses QML/Kirigami GUI, no standalone C++ tests
+# In OHOS_MINIMAL_BUILD mode, ctest reports "No tests were found"
+upstream_tests: []
+
+# test_package tests (consumer perspective verification)
+# Note: Cannot compile/link against ytm because pybind11::embed requires
+# Python C API symbols at link time, and pybind11 is not in the conan repo.
+# Test verifies library existence and symbol presence via nm.
+test_package_tests:
+  - file: verify.sh
+    description: "Verify ytm static library exists and contains YTMusic symbols via nm"
+    command: "conan test_package test()"
+
+# Approximate assertion count for quality assessment
+assertion_count: 3
