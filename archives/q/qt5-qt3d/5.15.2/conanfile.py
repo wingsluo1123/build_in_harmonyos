@@ -132,15 +132,19 @@ class Qt5Qt3dConan(ConanFile):
                     src_link = os.path.join(old_mkspecs, sub)
                     dst_link = os.path.join(combined_dir, "mkspecs", sub)
                     if os.path.isdir(dst_link):
-                        if os.path.islink(src_link) or os.path.exists(src_link):
+                        if os.path.islink(src_link) or os.path.isfile(src_link):
                             os.remove(src_link)
+                        elif os.path.isdir(src_link):
+                            shutil.rmtree(src_link)
                         os.symlink(dst_link, src_link)
                 for sub in ("include", "lib", "src", "bin"):
                     src_link = os.path.join(old_build_dir, sub)
                     dst_link = os.path.join(combined_dir, sub)
                     if os.path.isdir(dst_link):
-                        if os.path.islink(src_link) or os.path.exists(src_link):
+                        if os.path.islink(src_link) or os.path.isfile(src_link):
                             os.remove(src_link)
+                        elif os.path.isdir(src_link):
+                            shutil.rmtree(src_link)
                         os.symlink(dst_link, src_link)
 
         combined_qmake = os.path.join(combined_dir, "bin", "qmake")
