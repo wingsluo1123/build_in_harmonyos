@@ -1,16 +1,29 @@
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <elf.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <elf.h>
 
-/* Verify orafce.so is a valid ELF shared library by reading its header.
- * We cannot dlopen it because orafce.so has undefined symbols (PostgreSQL
- * server functions) that are only resolved when loaded by the PostgreSQL
- * server process. Instead, we verify the binary format and structure. */
+/* Verify orafce.so is a valid AArch64 ELF shared library AND contains
+ * the required PostgreSQL extension entry-point symbols (_PG_init,
+ * Pg_magic_func) by parsing the ELF dynamic symbol table.
+ *
+ * We cannot use dlopen because orafce.so has undefined symbols (PostgreSQL
+ * server functions like pg_detoast_datum_packed) that are only resolved
+ * when loaded by a running PostgreSQL server. Instead, we parse the
+ * ELF .dynsym section to verify the expected symbols are exported. */
+static int find_symbol(Elf64_Sym *syms, int count, const char *strtab, const char *name) {
+    for (int i = 0; i < count; i++) {
+        if (syms[i].st_name == 0) continue;
+        const char *sym_name = strtab + syms[i].st_name;
+        if (strcmp(sym_name, name) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s <path_to_orafce.so>\n", argv[0]);
@@ -19,7 +32,7 @@ int main(int argc, char *argv[]) {
 
     int fd = open(argv[1], O_RDONLY);
     if (fd < 0) {
-        fprintf(stderr, "Cannot open %s: %s\n", argv[1], strerror(errno));
+        fprintf(stderr, "Cannot open %s\n", argv[1]);
         return 1;
     }
 
@@ -38,57 +51,88 @@ int main(int argc, char *argv[]) {
     }
 
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)map;
+    int failures = 0;
 
     /* Check ELF magic */
     if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
-        fprintf(stderr, "Not an ELF file\n");
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+        fprintf(stderr, "FAIL: Not an ELF file\n");
+        failures++;
+        goto done;
     }
 
-    /* Check it's a 64-bit ELF */
+    /* Check 64-bit */
     if (ehdr->e_ident[EI_CLASS] != ELFCLASS64) {
-        fprintf(stderr, "Not a 64-bit ELF\n");
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+        fprintf(stderr, "FAIL: Not 64-bit ELF\n");
+        failures++;
+        goto done;
     }
 
-    /* Check it's a shared library (ET_DYN) */
+    /* Check shared library */
     if (ehdr->e_type != ET_DYN) {
-        fprintf(stderr, "Not a shared library (e_type=%d)\n", ehdr->e_type);
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+        fprintf(stderr, "FAIL: Not a shared library (e_type=%d)\n", ehdr->e_type);
+        failures++;
+        goto done;
     }
 
-    /* Check machine type is AArch64 */
+    /* Check AArch64 */
     if (ehdr->e_machine != EM_AARCH64) {
-        fprintf(stderr, "Not AArch64 (e_machine=%d)\n", ehdr->e_machine);
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+        fprintf(stderr, "FAIL: Not AArch64 (e_machine=%d)\n", ehdr->e_machine);
+        failures++;
+        goto done;
     }
 
-    /* Check for program headers (shared library must have them) */
-    if (ehdr->e_phnum == 0) {
-        fprintf(stderr, "No program headers\n");
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+    printf("ELF header: valid 64-bit AArch64 shared library\n");
+
+    /* Parse section headers to find .dynsym and .dynstr */
+    Elf64_Shdr *shdrs = (Elf64_Shdr *)((char *)map + ehdr->e_shoff);
+    Elf64_Shdr *dynsym = NULL, *dynstr = NULL;
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        if (shdrs[i].sh_type == SHT_DYNSYM)
+            dynsym = &shdrs[i];
     }
 
-    /* Check for section headers (for symbol table) */
-    if (ehdr->e_shnum == 0) {
-        fprintf(stderr, "No section headers\n");
-        munmap(map, st.st_size);
-        close(fd);
-        return 1;
+    if (!dynsym) {
+        fprintf(stderr, "FAIL: No .dynsym section found\n");
+        failures++;
+        goto done;
     }
 
-    printf("orafce.so verified: valid 64-bit AArch64 ELF shared library\n");
+    /* dynstr is linked from dynsym->sh_link */
+    dynstr = &shdrs[dynsym->sh_link];
+    if (dynstr->sh_type != SHT_STRTAB) {
+        fprintf(stderr, "FAIL: .dynstr section not found\n");
+        failures++;
+        goto done;
+    }
+
+    Elf64_Sym *syms = (Elf64_Sym *)((char *)map + dynsym->sh_offset);
+    int sym_count = dynsym->sh_size / sizeof(Elf64_Sym);
+    const char *strtab = (const char *)map + dynstr->sh_offset;
+
+    /* Check for required PostgreSQL extension symbols */
+    if (find_symbol(syms, sym_count, strtab, "_PG_init")) {
+        printf("Symbol check: _PG_init found\n");
+    } else {
+        fprintf(stderr, "FAIL: _PG_init symbol not found\n");
+        failures++;
+    }
+
+    if (find_symbol(syms, sym_count, strtab, "Pg_magic_func")) {
+        printf("Symbol check: Pg_magic_func found\n");
+    } else {
+        fprintf(stderr, "FAIL: Pg_magic_func symbol not found\n");
+        failures++;
+    }
+
+done:
     munmap(map, st.st_size);
     close(fd);
+
+    if (failures > 0) {
+        fprintf(stderr, "FAIL: %d check(s) failed\n", failures);
+        return 1;
+    }
+    printf("All orafce.so checks passed\n");
     return 0;
 }
