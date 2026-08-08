@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_qt5_qtgraphicaleffects CXX)
-find_package(Qt5 CONFIG REQUIRED)
+find_package(qt5-qtbase CONFIG REQUIRED)
 find_package(Qt5GraphicalEffects CONFIG REQUIRED)
 add_executable(test_qt5_qtgraphicaleffects test.cpp)
 # QtGraphicalEffects 是 QML 模块（无 C++ 库），仅链接 Qt5::Core
