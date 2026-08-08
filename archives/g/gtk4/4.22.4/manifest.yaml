@@ -2,12 +2,12 @@ software: gtk4
 version: "4.22.4"
 status: built
 build_system: meson
-build_date: "2026-05-30"
+build_date: "2026-08-09"
 
 source:
-  url: "https://download.gnome.org/sources/gtk/4.22/gtk-4.22.4.tar.xz"
-  sha256: ""
-  tar_format: tar.xz
+  url: "https://github.com/GNOME/gtk/archive/refs/tags/4.22.4.tar.gz"
+  sha256: "91bf607b80a9259805bdddd821f1040e189620eba20159502f251313e7e6cb6f"
+  tar_format: tar.gz
 
 build:
   system: meson
@@ -33,16 +33,17 @@ build:
     - "-Daccesskit=disabled"
     - "-Df16c=disabled"
     - "-Dscreenshots=false"
-    - "-Ddefault_library=shared"
   dependencies:
-    - glib/2.88.0
-    - pango/system
-    - cairo/system
-    - harfbuzz/14.2.0
-    - gdk-pixbuf/system
-    - graphene/system
-    - fribidi/system
-    - epoxy/1.5.10
+    - "glib/2.84.0.1"
+    - "pango/1.56.4"
+    - "cairo/1.18.4"
+    - "harfbuzz/14.2.0.1"
+    - "fribidi/1.0.16"
+    - "gdk-pixbuf/2.44.6"
+    - "libepoxy/1.5.10"
+    - "fontconfig/2.18.1"
+    - "freetype/2.14.3"
+    - "graphene/1.10.8"
   cc: clang
   cxx: clang++
 
@@ -53,6 +54,8 @@ knowledge_gained:
   - "gdkdmabuf.c的epoxy/egl.h include需要HAVE_EGL守卫，因为OHOS不提供EGL"
   - "harfbuzz必须启用glib集成才能编译GTK4（hb-glib.h依赖）"
   - "libepoxy需要手动创建.so符号链接（HMDFS不支持ln -sf覆盖）"
+  - "graphene 1.10.8 作为 conan 依赖替代 system graphene"
+  - "所有依赖通过 conan 管理（不再使用 system 依赖）"
 
 patch_generation:
   method: per-file-difflib
