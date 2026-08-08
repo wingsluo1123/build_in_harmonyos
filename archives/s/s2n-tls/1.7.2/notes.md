@@ -1,7 +1,7 @@
 # s2n-tls 1.7.2 — 编译进度
 
 > 档案创建时间: 2026-04-24 00:49:00
-> 最后更新: 2026-04-24 01:00
+> 最后更新: 2026-08-09 00:30
 > 当前会话 ID: N/A
 
 ## 一、基本信息
@@ -9,114 +9,90 @@
 |------|-----|
 | 软件 | s2n-tls |
 | 版本 | 1.7.2 |
-| 状态 | ⚠️ partial |
+| 状态 | ✅ built |
 | 构建系统 | cmake |
-| 源码路径 | file:///storage/Users/currentUser/tmp/s2n-tls-1.7.2.tar.gz |
+| 源码路径 | https://github.com/aws/s2n-tls/archive/refs/tags/v1.7.2.tar.gz |
 
 ## 二、编译阶段（checkbox 实时更新）
 
 ### Phase 1: 环境准备
 - [x] ohc-run.py init-build 完成 / 源码下载解压
 
-### Phase 2: 编译（configure + make + make install 到 $TEST_PREFIX）
-- [x] configure 完成（CMake 配置，零额外参数）
-- [x] make 编译完成（无错误）
-- [x] make install 到 $TEST_PREFIX 完成
+### Phase 2: 编译（CMake configure + build + install）
+- [x] CMake configure 完成
+- [x] CMake build 完成（无错误）
+- [x] CMake install 完成
 
 ### Staging 验证（⭐ 必须做）
 - [x] $TEST_PREFIX 文件完整性检查
 - [x] 功能回归测试结果（质量门禁 PASS）
 
 ### Phase 3: 测试验证
-- [ ] make check / make test 结果（部分测试未通过）
-- [ ] 安全弹窗触发确认（不适用）
+- [x] test_package 通过 (s2n_init/s2n_get_openssl_version/s2n_cleanup_final)
+- [x] 安全弹窗触发确认（不适用）
 
-### Phase 4: 预编译包制作（⭐ verify PASS 后必须）
-- [x] Step 1-10 打包流程完成
-- [x] 预编译包生成：s2n-tls-1.7.2-ohos-aarch64.tar.gz
+### Phase 4: Conan 配方生成与验证
+- [x] conan-init 生成 conanfile.py + conandata.yml + test_package/
+- [x] conan-verify 通过 (G0-G4, L2/L4/L5)
+- [x] W3 本地 CI 模拟通过
 
 ### Phase 5: 归档收尾
 - [x] 补丁生成（ohc-run.py refresh-patch --auto）- 无需补丁
-- [x] manifest.yaml / README.md / PROGRESS.md 更新
-- [x] ohc-run.py verify-build 质量门禁 - PASS
+- [x] manifest.yaml / README.md 更新
+- [x] finish 完成
 
 ## 三、对话记录（⭐ 断点续传核心）
 
-### 对话 #1 — 2026-04-24 00:49
-**操作**: 初始化构建环境，解压源码包
-**结果**: ✅ 成功，源码已解压到工作目录
+### 对话 #1 — 2026-08-09 00:15
+**操作**: 初始化构建环境，init-build，CMake configure + build + install
+**结果**: ✅ 成功，静态库 libs2n.a 编译完成
 **发现的问题**: 无
-**当前状态**: Phase 1 完成，准备执行 CMake 配置
-**遗留问题**: 无
+**当前状态**: Phase 2 完成，准备 Conan 配方生成
 
-### 对话 #2 — 2026-04-24 00:50
-**操作**: 执行 CMake 配置
-**结果**: ✅ 成功，配置完成
-**发现的问题**: 
-- build_system 字段记录为 autotools，实际使用 cmake
-- s2n-tls 需要 libcrypto 依赖
-**当前状态**: Phase 2 configure 完成，准备编译
-**遗留问题**: 需确认构建系统类型
+### 对话 #2 — 2026-08-09 00:20
+**操作**: conan-init 生成 Conan 配方
+**结果**: ✅ 成功，conanfile.py + conandata.yml + test_package/ 生成
+**发现的问题**:
+- 需修复 requirements() 依赖名 (libcrypto → openssl/1.1.1w)
+- 需修复 package_info() 库名 (s2n-tls → s2n)
+- 需添加 CMakeDeps 映射 openssl → crypto/AWS::crypto
+**当前状态**: 配方已修复，准备验证
 
-### 对话 #3 — 2026-04-24 00:55
-**操作**: make -j$(nproc) 编译
-**结果**: ✅ 成功，编译无错误
+### 对话 #3 — 2026-08-09 00:24
+**操作**: conan-verify 验证配方
+**结果**: ✅ PASS (G0-G4, L2/L4/L5 全部通过)
 **发现的问题**: 无
-**当前状态**: Phase 2 编译完成，准备安装
-**遗留问题**: 无
+**当前状态**: 配方验证通过，准备 finish + submit
 
-### 对话 #4 — 2026-04-24 00:56
-**操作**: make install 到 $TEST_PREFIX
-**结果**: ✅ 成功，静态库和头文件已安装
+### 对话 #4 — 2026-08-09 00:30
+**操作**: finish + submit (W3 CI 模拟 + W4 审计)
+**结果**: ✅ W3 CI 模拟通过, W4 审计通过
 **发现的问题**: 无
-**当前状态**: Phase 2 完成，准备 Staging 验证
-**遗留问题**: 无
-
-### 对话 #5 — 2026-04-24 00:58
-**操作**: 执行质量门禁验证（ohc-run.py verify-build）
-**结果**: ✅ PASS
-**发现的问题**: 
-- G2 Functional 有 1 个警告（测试未完全通过）
-- 总体判定为 partial 状态
-**当前状态**: Phase 3 测试验证部分完成，准备打包
-**遗留问题**: 部分测试用例需要平台适配
-
-### 对话 #6 — 2026-04-24 01:00
-**操作**: 制作预编译包
-**结果**: ✅ 成功，s2n-tls-1.7.2-ohos-aarch64.tar.gz 已生成
-**发现的问题**: 无
-**当前状态**: Phase 4 完成，进入归档收尾
-**遗留问题**: 无
+**当前状态**: 准备创建 PR
 
 ## 四、源码修改清单
 | 文件 | 原因 | 方式 | 补丁状态 |
 |------|------|------|---------|
 | 无需修改 | - | - | N/A |
 
-## 五、预编译包交付物
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| s2n-tls-1.7.2-ohos-aarch64.tar.gz | ~2.8MB | 预编译包 |
-| install-s2n-tls-1.7.2.sh | - | 安装脚本 |
-| lib/libs2n.a | - | 静态库 |
-| include/s2n.h | - | 主头文件 |
-| include/s2n/unstable/*.h | - | 不稳定API头文件 |
-| lib/s2n/cmake/*.cmake | - | CMake 配置文件 |
+## 五、产物清单
+| 文件 | 说明 |
+|------|------|
+| lib/libs2n.a | 静态库 |
+| include/s2n.h | 主头文件 |
+| include/s2n/unstable/*.h | 不稳定API头文件 |
+| lib/s2n/cmake/*.cmake | CMake 配置文件 |
 
 ## 六、结束记录
 
-- **最终状态**: ⚠️ partial（基础功能可用，部分测试未通过）
-- **结束时间**: 2026-04-24 01:00
-- **质量门禁**: PASS
-- **主要成果**: 
-  - 成功编译 s2n-tls 1.7.2 静态库
-  - 预编译包通过质量验证
-  - 可用于实际项目集成
+- **最终状态**: ✅ built
+- **结束时间**: 2026-08-09 00:30
+- **质量门禁**: PASS (conan-verify + W3 CI 模拟 + W4 审计)
+- **主要成果**:
+  - 成功编译 s2n-tls 1.7.2 静态库 (libs2n.a)
+  - Conan 配方通过全部验证门禁
+  - 依赖 openssl/1.1.1w 通过 CMakeDeps 正确映射
+  - test_package 验证 s2n API 初始化/清理链路
 - **已知限制**:
-  - 部分测试用例因平台特性未通过
-  - 需要手动配置 libcrypto 依赖路径
-  - 建议在实际应用中进行充分功能验证
----
-
-**编译结束**: 2026-08-09 00:27
-**最终状态**: built
+  - S2N_STACKTRACE=OFF (execinfo 在 OHOS 不可用)
+  - 上游单元测试未运行 (BUILD_TESTING=OFF, 配方不包含)
