@@ -72,6 +72,8 @@ class BoostCompiledConan(ConanFile):
             toolset = "gcc" if compiler == "gcc" else "clang" if compiler == "clang" else ""
             return "bootstrap.bat" + (f" {toolset}" if toolset else "")
         libraries = ",".join(self._components)
+        if self.settings.os == "OHOS":
+            return f"sh bootstrap.sh clang --with-libraries={libraries}"
         return f"sh bootstrap.sh --with-libraries={libraries}"
 
     def _b2_common_args(self):
