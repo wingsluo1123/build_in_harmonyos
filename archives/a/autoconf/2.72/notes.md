@@ -3,7 +3,7 @@
 ## Scope
 
 - Target package: `autoconf/2.72`
-- Branch: `feat/autoconf-2.72`
+- Branch: `docs/autoconf-2.72-retain-ohos-patches`
 - Worktree: `D:\harmonyos\worktrees\autoconf`
 - Issue: not found in local project files or handoff context; pending issue number in PR/handoff.
 - Do not mix this into `libao`; `D:\harmonyos\worktrees\libao` was not modified.
@@ -97,6 +97,7 @@ Results:
 - Current local Windows limit: build reaches `autotools.configure()`, then fails with `'.' is not recognized as an internal or external command` because this host cannot execute the POSIX `configure` script under the OHOS profile. True OHOS runner verification has passed.
 - 2026-08-07 true-device reruns with the current OHOS profile first exposed `CONFIG_SHELL=/data/service/hnp/bin/bash` from `ci/conan/profiles/ohos-aarch64`; that path is not present on the current device. The recipe now overrides `SHELL` and `CONFIG_SHELL` in the generated Conan build environment with the executable shell discovered by `_config_shell()`, which resolves to `/bin/sh` or `/system/bin/sh` on current OHOS devices. The profile also defines `PATH` directly, so test_package adds autoconf, m4, and perl package `bin` directories through an explicit `autoconf_test_env` script after `conanbuild`.
 - 2026-08-08 review-fix rerun proved that applying template replacements for the retained generated-file patch names makes `make` try to regenerate man pages and fail because `help2man` is not installed on the device. The active Conan patch set therefore stays on the already verified triplet patch plus the OHOS temp-directory workaround; the generated-file patch names stay present for audit but are not listed in `conandata.yml`.
+- 2026-08-09 PR CI revalidation build #16919 passed source download and dependency resolution, then failed during `autotools.configure()` with `./config.status: can't create ./conf*/subs1.awk: Permission denied`. This is the known OHOS/HMDFS Autoconf temp-directory case, not a mirror-source failure. Patch `0002-use-mkdir-for-config-status-tempdirs-on-ohos.patch` now keeps the OHOS controlled `mkdir` branch but relaxes its temp-directory `umask` from `077` to `022` in both the release `configure` script and `lib/m4sugar/m4sh.m4`, so generated `config.status` inherits the same behavior.
 
 ## OHOS isolated device verification
 
@@ -193,8 +194,8 @@ sh "$HOME/bin/ohos-prepare-isolated-conan-job.sh" \
 
 . "$HOME/ohos-users/codex-autoconf/autoconf-2.72/env.sh"
 cd "$CI_REPO_ROOT"
-git fetch origin feat/autoconf-2.72
-git checkout feat/autoconf-2.72
+git fetch origin docs/autoconf-2.72-retain-ohos-patches
+git checkout docs/autoconf-2.72-retain-ohos-patches
 sh "$OHOS_JOB_BASE/run-conan-heavy.sh"
 ```
 
