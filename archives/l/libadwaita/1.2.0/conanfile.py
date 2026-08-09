@@ -149,26 +149,27 @@ class LibadwaitaConan(ConanFile):
         tc.project_options["gtk_doc"] = "false"
         tc.generate()
         self._inject_meson_binaries()
+        self._setup_lld_env()
 
-    def _fix_lld_env(self):
-        """Fix LD_LIBRARY_PATH for OHOS SDK lld linker (needs libxml2.so.16)."""
+    def _setup_lld_env(self):
+        """Set LD_LIBRARY_PATH for OHOS SDK lld linker (needs libxml2.so.16)."""
         ce = self.conf.get('tools.build:compiler_executables', default={}, check_type=dict) or {}
         cc = ce.get('c') or ''
         if not cc:
             return
-        bindir = os.path.dirname(cc)
-        for libdir in [os.path.join(bindir, '..', 'lib'),
-                      os.path.join(bindir, '..', '..', 'lib')]:
+        real_cc = os.path.realpath(cc)
+        bindir = os.path.dirname(real_cc)
+        for libdir in [os.path.join(bindir, 'lib'),
+                       os.path.join(bindir, '..', 'lib')]:
             abspath = os.path.abspath(libdir)
             if os.path.isfile(os.path.join(abspath, 'libxml2.so.16')):
-                cur = os.environ.get('LD_LIBRARY_PATH', '')
-                if abspath not in cur:
-                    os.environ['LD_LIBRARY_PATH'] = abspath + (':' + cur if cur else '')
+                env = Environment()
+                env.prepend_path('LD_LIBRARY_PATH', abspath)
+                env.vars(self, scope='build').save_script('conanbuildenv_lld')
                 break
 
     def build(self):
         apply_conandata_patches(self)
-        self._fix_lld_env()
         meson = Meson(self)
         meson.configure()
         meson.build()
