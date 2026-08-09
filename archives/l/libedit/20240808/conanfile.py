@@ -32,11 +32,8 @@ class LibeditConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # HarmonyOS: use system libtinfo for termcap
-        # HarmonyOS only has libtinfo.so.6, not the dev symlink libtinfo.so
+        # HarmonyOS: create libtinfo.so symlink (only .so.6 exists)
         if self.settings.os in ("Linux", "OHOS"):
-            # Create libtinfo.so symlink in a persistent location
-            # so both main build and test_package can find it
             persistent_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
             os.makedirs(persistent_lib, exist_ok=True)
             tinfo_persistent = os.path.join(persistent_lib, "libtinfo.so")
@@ -45,35 +42,40 @@ class LibeditConan(ConanFile):
                     os.symlink("/usr/lib/libtinfo.so.6", tinfo_persistent)
                 except OSError:
                     pass
-            # Ensure linker can find it via LD_LIBRARY_PATH
             current_ld = os.environ.get("LD_LIBRARY_PATH", "")
             if persistent_lib not in current_ld:
                 os.environ["LD_LIBRARY_PATH"] = (
                     f"{persistent_lib}:{current_ld}" if current_ld else persistent_lib
                 )
-            # Also create in build folder for main build -L flag
-            lib_dir = os.path.join(self.build_folder, "lib")
-            os.makedirs(lib_dir, exist_ok=True)
-            tinfo_link = os.path.join(lib_dir, "libtinfo.so")
-            if not os.path.exists(tinfo_link):
-                os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
-            tc.extra_ldflags.append("-L" + lib_dir)
-            tc.extra_cflags.append("-I" + self.source_folder)
-            # HarmonyOS: wchar_t stores ISO 10646 but __STDC_ISO_10646__ not defined
-            tc.extra_cflags.append("-D__STDC_ISO_10646__=201206L")
         tc.generate()
 
     def build(self):
         apply_conandata_patches(self)
-        # Touch timestamps of generated files to prevent make from
-        # trying to regenerate them (automake not available on OHOS)
+        # Touch timestamps to prevent make from regenerating autotools files
         for f in ["Makefile.in", "src/Makefile.in", "doc/Makefile.in",
                   "examples/Makefile.in", "configure", "aclocal.m4"]:
             path = os.path.join(self.source_folder, f)
             if os.path.exists(path):
                 os.utime(path, None)
+        # Create libtinfo.so symlink BEFORE configure (needed for -ltinfo check)
+        if self.settings.os in ("Linux", "OHOS"):
+            lib_dir = os.path.join(self.build_folder, "lib")
+            os.makedirs(lib_dir, exist_ok=True)
+            tinfo_link = os.path.join(lib_dir, "libtinfo.so")
+            if not os.path.exists(tinfo_link):
+                try:
+                    os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
+                except OSError:
+                    pass
         autotools = Autotools(self)
-        autotools.configure()
+        # Pass HarmonyOS-specific flags via configure args
+        if self.settings.os in ("Linux", "OHOS"):
+            autotools.configure(args=[
+                "CPPFLAGS=-D__STDC_ISO_10646__=201206L -I" + self.source_folder,
+                "LDFLAGS=-L" + os.path.join(self.build_folder, "lib"),
+            ])
+        else:
+            autotools.configure()
         # HMDFS doesn't support mkfifo (make jobserver), use -j1
         # Set AUTOMAKE/AUTOCONF=true to bypass missing tools on OHOS
         autotools.make(args=["-j1", "AUTOMAKE=true", "ACLOCAL=true",
