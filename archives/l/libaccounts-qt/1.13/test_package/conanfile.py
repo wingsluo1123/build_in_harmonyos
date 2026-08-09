@@ -5,6 +5,7 @@ Tests that the library can be linked and basic API (Manager, Account)
 can be used. This validates the Qt5 + libaccounts-glib integration.
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
@@ -36,8 +37,25 @@ class LibaccountsqtTestConan(ConanFile):
 
     def test(self):
         # Run the test binary via self.run (required by L0d gate)
-        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_libaccounts-qt")
-        # On HarmonyOS, the musl dynamic linker may not find shared libraries
-        # via LD_LIBRARY_PATH (E088). Try running, but allow failure for
-        # known platform limitation.
-        self.run(f'"{test_bin}"', env=["conanrun"], ignore_errors=True)
+        test_bin_dir = self.cpp.build.bindirs[0]
+        test_bin = os.path.join(test_bin_dir, "test_libaccounts-qt")
+
+        # Copy shared library next to test binary (HarmonyOS musl namespace workaround E088)
+        # The musl linker can find libraries in the same directory as the binary
+        tested_pkg = self.dependencies[str(self.tested_reference).split("/")[0]]
+        for libdir in tested_pkg.cpp_info.libdirs:
+            lib_path = os.path.join(tested_pkg.package_folder, libdir)
+            for f in os.listdir(lib_path):
+                if f.startswith("libaccounts-qt5"):
+                    src = os.path.join(lib_path, f)
+                    dst = os.path.join(test_bin_dir, f)
+                    if os.path.islink(src):
+                        target = os.readlink(src)
+                        if not os.path.isabs(target):
+                            target = os.path.join(lib_path, target)
+                        if os.path.exists(target):
+                            shutil.copy(target, dst)
+                    elif os.path.exists(src):
+                        shutil.copy(src, dst)
+
+        self.run(f'"{test_bin}"', env=["conanrun"])

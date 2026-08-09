@@ -13,18 +13,12 @@ as part of the build process.
 """
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 from conan.tools.env import Environment
-
-
-# Qt5 source URL for building the XML module
-QT5_SOURCE_URL = "https://mirrors.tuna.tsinghua.edu.cn/qt/archive/qt/5.15/5.15.2/submodules/qtbase-everywhere-src-5.15.2.tar.xz"
-QT5_SOURCE_SHA256 = "909fad2591ee367993a75d7e2ea50ad4db332f05e1c38dd7a5a274e156a4e0f8"
 
 
 class LibaccountsQtConan(ConanFile):
@@ -58,16 +52,37 @@ class LibaccountsQtConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
-    def _build_qt5xml(self, qt5_prefix):
+    def _get_cxx(self):
+        """Get C++ compiler from Conan profile (R33)."""
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cxx = compilers.get("cpp") or compilers.get("cxx")
+        if not cxx:
+            raise ConanInvalidConfiguration(
+                "libaccounts-qt requires cpp compiler from Conan profile"
+            )
+        return cxx
+
+    def _build_qt5xml(self, qt5_prefix, cxx):
         """Build Qt5Xml module from Qt5 source (qt5-qtbase was built with -no-feature-xml)."""
         # Check if Qt5Xml already exists
         qt5xml_lib = os.path.join(qt5_prefix, "lib", "libQt5Xml.so")
         if os.path.exists(qt5xml_lib):
+            self.output.info("Qt5Xml already available, skipping build")
             return
+
+        # Get Qt5 source URL from conandata
+        qt5_src_data = self.conan_data.get("qt5_source", {})
+        qt5_src_url = qt5_src_data.get("url", "")
+        qt5_src_sha256 = qt5_src_data.get("sha256", "")
+
+        if not qt5_src_url:
+            raise ConanInvalidConfiguration("Qt5 source URL not found in conandata.yml")
 
         # Download Qt5 source
         qt5_src_dir = os.path.join(self.build_folder, "qt5-src")
-        get(self, QT5_SOURCE_URL, sha256=QT5_SOURCE_SHA256,
+        get(self, qt5_src_url, sha256=qt5_src_sha256,
             destination=os.path.dirname(qt5_src_dir))
         qt5_src = qt5_src_dir
 
@@ -94,7 +109,6 @@ class LibaccountsQtConan(ConanFile):
                 os.symlink(target, link)
 
         # Compile flags
-        cxx = "clang++"
         cxxflags = "-fPIC -O2 -std=c++11 -DQT_NO_USING_NAMESPACE -DQT_NO_FOREACH "
         cxxflags += "-DQT_BUILDING_QT -DQT_XML_LIB -DQT_CORE_LIB -DQT_SHARED "
         cxxflags += "-fvisibility=hidden -fno-exceptions"
@@ -115,12 +129,12 @@ class LibaccountsQtConan(ConanFile):
         objs = []
         for src in ["dom/qdom.cpp", "dom/qdomhelpers.cpp", "sax/qxml.cpp"]:
             obj = os.path.join(xml_src, os.path.basename(src).replace(".cpp", ".o"))
-            self.run(f'{cxx} {cxxflags} {includes} -c "{os.path.join(xml_src, src)}" -o "{obj}"')
+            self.run(f'"{cxx}" {cxxflags} {includes} -c "{os.path.join(xml_src, src)}" -o "{obj}"')
             objs.append(obj)
 
         # Link
         lib_out = os.path.join(xml_src, "libQt5Xml.so.5.15.2")
-        self.run(f'{cxx} -shared -Wl,-soname,libQt5Xml.so.5 -o "{lib_out}" '
+        self.run(f'"{cxx}" -shared -Wl,-soname,libQt5Xml.so.5 -o "{lib_out}" '
                  f'{" ".join(objs)} -L{qt5_prefix}/lib -lQt5Core -lpthread -ldl')
 
         # Install to Qt5 package
@@ -148,7 +162,7 @@ class LibaccountsQtConan(ConanFile):
                 shutil.copy(src_file, priv_dest)
 
         # Create qt_lib_xml.pri
-        pri_content = f"""QT.xml.VERSION = 5.15.2
+        pri_content = """QT.xml.VERSION = 5.15.2
 QT.xml.name = QtXml
 QT.xml.module = Qt5Xml
 QT.xml.libs = $$QT_MODULE_LIB_BASE
@@ -183,7 +197,7 @@ Requires: Qt5Core
         with open(os.path.join(qt5_lib, "Qt5Xml.pc"), "w") as f:
             f.write(pc_content)
 
-        # Fix qt.conf
+        # Fix qt.conf with absolute paths
         qt_conf = os.path.join(qt5_prefix, "bin", "qt.conf")
         with open(qt_conf, "w") as f:
             f.write(f"""[EffectivePaths]
@@ -200,33 +214,37 @@ HostSpec=linux-clang
 """)
 
         # Create build dir symlinks (qmake uses hardcoded build paths)
-        # The build dir hash is in the conan cache
-        for d in os.listdir(os.path.expanduser("~/.conan2/p/b")):
-            if d.startswith("qt5-"):
-                build_path = os.path.join(os.path.expanduser("~/.conan2/p/b"), d, "b")
-                for sub in ["mkspecs", "include", "lib", "bin", "src",
-                             "plugins", "libexec"]:
-                    link = os.path.join(build_path, sub)
-                    if not os.path.exists(link):
-                        try:
-                            os.symlink(os.path.join(qt5_prefix, sub), link)
-                        except (OSError, FileExistsError):
-                            pass
-                break
+        conan_b_dir = os.path.join(os.path.expanduser("~"), ".conan2", "p", "b")
+        if os.path.isdir(conan_b_dir):
+            for d in os.listdir(conan_b_dir):
+                if d.startswith("qt5-"):
+                    build_path = os.path.join(conan_b_dir, d, "b")
+                    for sub in ["mkspecs", "include", "lib", "bin", "src",
+                                 "plugins", "libexec"]:
+                        link = os.path.join(build_path, sub)
+                        if not os.path.exists(link):
+                            try:
+                                os.symlink(os.path.join(qt5_prefix, sub), link)
+                            except (OSError, FileExistsError):
+                                pass
+                    break
 
     def generate(self):
         qt5 = self.dependencies["qt5-qtbase"]
         qt5_prefix = qt5.package_folder
 
-        # Include both Qt5 pkgconfig and system pkgconfig (for libaccounts-glib)
-        system_pkg = "/storage/Users/currentUser/usr/local/lib/pkgconfig:/storage/Users/currentUser/usr/local/share/pkgconfig"
         env = Environment()
+        # Add Qt5 pkgconfig path and system pkgconfig for libaccounts-glib
         env.prepend_path("PKG_CONFIG_PATH", os.path.join(qt5_prefix, "lib"))
-        env.prepend_path("PKG_CONFIG_PATH", system_pkg)
-        # Prepend to LD_LIBRARY_PATH so lld can find libxml2.so.16
+        # Prepend to LD_LIBRARY_PATH for lld linker and runtime
         env.prepend_path("LD_LIBRARY_PATH", os.path.join(qt5_prefix, "lib"))
-        env.prepend_path("LD_LIBRARY_PATH", "/storage/Users/currentUser/usr/local/lib")
-        env.prepend_path("LD_LIBRARY_PATH", "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib")
+        # Use environment paths for system libraries (libaccounts-glib, etc.)
+        sys_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        if sys_ld:
+            env.prepend_path("LD_LIBRARY_PATH", sys_ld)
+        sys_pkg = os.environ.get("PKG_CONFIG_PATH", "")
+        if sys_pkg:
+            env.prepend_path("PKG_CONFIG_PATH", sys_pkg)
         env.define("TMPDIR", os.environ.get("TMPDIR", os.path.expanduser("~/tmp")))
         envvars = env.vars(self)
         envvars.save_script("libaccounts_qt_env")
@@ -237,10 +255,14 @@ HostSpec=linux-clang
         qt5 = self.dependencies["qt5-qtbase"]
         qt5_prefix = qt5.package_folder
 
+        # Get compiler from Conan profile (R33)
+        cxx = self._get_cxx()
+
         # Build Qt5Xml module (qt5-qtbase was built without XML support)
-        self._build_qt5xml(qt5_prefix)
+        self._build_qt5xml(qt5_prefix, cxx)
 
         # Remove doc generation (doxygen not available on OHOS)
+        # Done in build() before qmake generates Makefile
         pro_path = os.path.join(self.source_folder, "accounts-qt.pro")
         with open(pro_path, "r") as f:
             pro_content = f.read()
