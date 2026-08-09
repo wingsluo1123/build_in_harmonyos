@@ -25,12 +25,15 @@ class VapoursynthTestConan(ConanFile):
         dep = self.dependencies["vapoursynth"].cpp_info
 
         exe = os.path.join(self.build_folder, "test_vapoursynth")
+        linker_flag = self._ohos_linker_flag()
         cmd = [
             *self._exec_tool(cc),
             os.path.join(self.source_folder, "test_vapoursynth.c"),
             "-o",
             exe,
         ]
+        if linker_flag:
+            cmd.append(linker_flag)
         for include_dir in dep.includedirs:
             cmd.append("-I" + include_dir)
         for lib_dir in dep.libdirs:
@@ -103,6 +106,9 @@ class VapoursynthTestConan(ConanFile):
             "-o",
             exe,
         ]
+        linker_flag = self._ohos_linker_flag()
+        if linker_flag:
+            cmd.append(linker_flag)
         for include_dir in dep_cpp_info.includedirs:
             cmd.append("-I" + include_dir)
         self.run(" ".join(shlex.quote(part) for part in cmd))
@@ -147,3 +153,11 @@ class VapoursynthTestConan(ConanFile):
                 return handle.read(2) == b"#!"
         except OSError:
             return False
+
+    def _ohos_linker_flag(self):
+        if self.settings.os != "OHOS":
+            return ""
+        for candidate in ("/data/service/hnp/bin/ld", "/data/service/hnp/bin/ld.bfd"):
+            if os.path.exists(candidate):
+                return "-fuse-ld=" + candidate
+        return ""

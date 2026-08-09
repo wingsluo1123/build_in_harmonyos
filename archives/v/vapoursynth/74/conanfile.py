@@ -73,6 +73,7 @@ class VapoursynthConan(ConanFile):
         tc.project_options["enable_vspipe"] = False
         tc.project_options["enable_python_module"] = bool(self.options.python_module)
         tc.project_options["build_wheel"] = False
+        self._select_ohos_meson_linker(tc)
         tc.generate()
         if self.options.python_module:
             self._inject_meson_cython()
@@ -249,6 +250,16 @@ class VapoursynthConan(ConanFile):
             with open(native_file, "w", encoding="utf-8") as handle:
                 handle.writelines(lines)
 
+    def _select_ohos_meson_linker(self, toolchain):
+        if self.settings.os != "OHOS":
+            return
+        linker = self._find_ohos_linker()
+        if not linker:
+            return
+        # Meson probes the linker before normal link_args are applied.
+        toolchain.c_ld = linker.replace("\\", "/")
+        toolchain.cpp_ld = linker.replace("\\", "/")
+
     @staticmethod
     def _can_execute(path):
         try:
@@ -341,3 +352,10 @@ class VapoursynthConan(ConanFile):
             if os.path.exists(candidate):
                 return candidate
         return name
+
+    @staticmethod
+    def _find_ohos_linker():
+        for candidate in ("/data/service/hnp/bin/ld", "/data/service/hnp/bin/ld.bfd"):
+            if os.path.exists(candidate):
+                return candidate
+        return ""
