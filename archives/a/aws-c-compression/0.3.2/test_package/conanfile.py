@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
-
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/aws-c-compression/{version}/test_package/conanfile.py
-"""
-import os
-
+"""Conan test_package for aws-c-compression 0.3.2 — Conan L1 official test."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
