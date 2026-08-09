@@ -125,3 +125,8 @@ class OcamlConan(ConanFile):
         self.cpp_info.libs = ["camlrun", "asmrun"]
         self.cpp_info.libdirs = ["lib/ocaml"]
         self.cpp_info.includedirs = ["lib/ocaml"]
+        # 声明 bindirs：下游通过 env="conanbuild" 即可自动获得 ocaml bin 路径
+        # （ocamlc/ocamlrun/ocamlopt 等），无需手动注入
+        self.cpp_info.bindirs = ["bin"]
+        # 显式将 ocaml bin 追加到下游构建环境 PATH（Conan 2 兼容）
+        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
