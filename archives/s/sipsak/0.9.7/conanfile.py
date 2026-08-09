@@ -32,9 +32,9 @@ class SipsakConan(ConanFile):
         # framework, which is not available in the OHOS build environment.
         copy(
             self,
-            "files",
-            self.recipe_folder,
-            self.export_sources_folder,
+            "*",
+            os.path.join(self.recipe_folder, "files"),
+            os.path.join(self.export_sources_folder, "files"),
             keep_path=True,
         )
 
