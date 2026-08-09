@@ -207,6 +207,13 @@ class Gtk4Conan(ConanFile):
                     libdir = os.path.join(dep.package_folder, libdir)
                 if os.path.isdir(libdir):
                     env.prepend_path("LD_LIBRARY_PATH", libdir)
+            # Also add lib/pkgconfig to PKG_CONFIG_PATH for deps with sub-pc files
+            for libdir in dep.cpp_info.libdirs:
+                if not os.path.isabs(libdir):
+                    libdir = os.path.join(dep.package_folder, libdir)
+                pcdir = os.path.join(libdir, "pkgconfig")
+                if os.path.isdir(pcdir):
+                    env.prepend_path("PKG_CONFIG_PATH", pcdir)
         env.vars(self, scope="build").save_script(
             "conanbuildenv_gtk4_tools"
         )
