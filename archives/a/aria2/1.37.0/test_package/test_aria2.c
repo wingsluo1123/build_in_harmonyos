@@ -1,16 +1,16 @@
 /* test_aria2.c — Smoke test for aria2 package
- * Runs the aria2c binary and checks version output.
- * This is a source file required by CI L0c quality gate.
+ * Executes the aria2c binary and verifies it works.
+ * This satisfies CI L0c (test source file) and R34 (substantial test).
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 int main(void) {
-    /* The actual test is run via conanfile.py test() method,
-     * which executes "aria2c --version". This file exists to
-     * satisfy the CI L0c check for test source files. */
-    printf("test_aria2: smoke test source for aria2 package\n");
-    printf("This file verifies that the aria2 package contains a test source.\n");
+    int ret = system("aria2c --version");
+    if (ret != 0) {
+        fprintf(stderr, "aria2c --version failed with status %d\n", ret);
+        return 1;
+    }
+    printf("test_aria2: aria2c --version succeeded\n");
     return 0;
 }
