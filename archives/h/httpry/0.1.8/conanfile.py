@@ -8,6 +8,7 @@ Patch: pthread_cancel replaced with cooperative flag-based cancellation (OHOS la
 import os
 
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
@@ -33,6 +34,11 @@ class HttpryConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    # R32: OHOS platform compatibility
+    def validate(self):
+        if self.settings.os not in ("Linux", "OHOS"):
+            raise ConanInvalidConfiguration(f"Unsupported OS: {self.settings.os}")
+
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
@@ -43,8 +49,9 @@ class HttpryConan(ConanFile):
         pcap = self.dependencies["libpcap"]
         inc_dir = os.path.join(pcap.package_folder, "include")
         lib_dir = os.path.join(pcap.package_folder, "lib")
+        # R9: always use -j1
         self.run(
-            f'make -j{os.cpu_count() or 1} '
+            f'make -j1 '
             f'"CC={cc}" '
             f'"CCFLAGS=-Wall -O3 -funroll-loops -I{inc_dir}" '
             f'"LIBS=-L{lib_dir} -lpcap -lm -pthread"',
@@ -56,6 +63,7 @@ class HttpryConan(ConanFile):
         copy(self, "httpry.1", self.source_folder, os.path.join(self.package_folder, "share", "man", "man1"))
 
     def package_info(self):
+        self.cpp_info.libs = []
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
