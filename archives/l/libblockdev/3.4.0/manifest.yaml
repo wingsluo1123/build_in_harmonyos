@@ -32,13 +32,9 @@ build:
     - "--without-mdraid"
     - "--with-loop"
   dependencies:
-    - "glib-2.0/2.88.0"
-    - "libintl/0.22.5"
-    - "libpcre2-8/10.44"
-    - "libffi/3.4.6"
+    - "glib2/2.88.0"
     - "zlib/1.3.1"
-    - "libudev/219 (stub)"
-    - "libkmod/33 (stub)"
+    - "libudev-zero/1.0.4"
   cc: clang
   cxx: clang++
 
@@ -47,6 +43,8 @@ patches_applied:
   - "02-configure.patch"
   - "03-m4-libtool-downgrade.patch"
   - "04-Makefile.in-automake-downgrade.patch"
+  - "05-sysname-harmonyos.patch"
+  - "06-nvme-remove-uuid-include.patch"
 
 knowledge_gained:
   - "HMDFS不支持umask 077, 需改为022"
@@ -59,7 +57,7 @@ knowledge_gained:
 
 patch_generation:
   method: manual-merge
-  patches_count: 4
+  patches_count: 6
   merged_from: 30
   note: "30个原始补丁精简为4个：01=config.guess, 02=umask, 03=m4降级合并(0010+0011+0013), 04=Makefile.in降级合并(17个)"
 
@@ -80,3 +78,11 @@ patch_classification:
     type: toolchain
     platform_only: True
     description: "全部 Makefile.in 从 automake 1.17 降级到 1.16.5 语法 (合并原17个补丁, 删除非必需的spec/版权/tests硬编码)"
+  - file: 05-sysname-harmonyos.patch
+    type: platform
+    platform_only: True
+    description: "Accept HarmonyOS/OHOS sysname in uname check for kernel version detection"
+  - file: 06-nvme-remove-uuid-include.patch
+    type: portability
+    platform_only: True
+    description: "Remove uuid/uuid.h include from nvme API header (unavailable on OHOS)"
