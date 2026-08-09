@@ -1,0 +1,6 @@
+#ifndef OPENSSL_OPENSSLV_H_STUB
+#define OPENSSL_OPENSSLV_H_STUB
+/* HarmonyOS stub */
+#define OPENSSL_VERSION_TEXT "OpenSSL stub for HarmonyOS"
+#define OPENSSL_VERSION_NUMBER 0x10101000L
+#endif
