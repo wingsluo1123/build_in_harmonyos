@@ -22,7 +22,6 @@ class LibfmExtraConan(ConanFile):
     description = "XML file processing library from LXDE libfm (extra-only, no GTK)"
     license = "GPL-2.0-or-later"
     homepage = "https://github.com/lxde/libfm"
-    url = ""  # CI fills this
 
     package_type = "library"
 
