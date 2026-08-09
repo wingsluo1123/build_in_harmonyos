@@ -30,5 +30,11 @@ class GstRtspServerTestConan(ConanFile):
         self.output.info(f"Found gst-rtsp-server library: {libs[0]}")
 
         bin_path = os.path.join(self.cpp.build.bindirs[0], "test_gst_rtsp_server")
-        self.run(f'{bin_path}', ignore_errors=True)
+        # On OHOS, the test binary may fail to run due to static glib / shared
+        # gstreamer linkage mismatch. Compilation + linking success verifies
+        # the library's headers and symbols are correct.
+        try:
+            self.run(f'{bin_path}', env="conanrun")
+        except Exception:
+            self.output.info("Test binary could not run (expected on OHOS with static glib)")
         self.output.info("Test binary compiled and linked successfully against gst-rtsp-server library")
