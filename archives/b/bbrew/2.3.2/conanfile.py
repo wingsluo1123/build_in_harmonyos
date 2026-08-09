@@ -70,7 +70,8 @@ class BbrewConan(ConanFile):
             try:
                 subprocess.run([go_bin, "version"], capture_output=True, timeout=10)
                 go_runnable = True
-            except Exception:
+            except Exception as exc:
+                self.output.warning(f"Go version check failed ({exc}), falling back to placeholder")
                 go_runnable = False
 
         if not go_runnable:
@@ -81,6 +82,38 @@ class BbrewConan(ConanFile):
             # is produced on CI runners that have a working `go`.
             self._build_placeholder()
             return
+
+        # ── 上游单元测试（R5: 真实运行 go test ./...）──
+        # 本机 HMDFS 无法执行 static ET_EXEC 的 Go 工具链（低 PHDR vaddr 被拒），
+        # 但 CI runner 有可用的 Go。在具备 Go 工具链的环境（CI）上真实运行
+        # 上游单元测试，将结果写入构建日志与 go-test-report.txt，供
+        # ci-metadata.json / PR 描述回填真实通过率。
+        # 上游 internal/models、internal/services 的测试大多是 hermetic 纯逻辑
+        # 测试（构造结构体断言、纯文本解析、t.TempDir 临时文件），不依赖
+        # Homebrew/TTY；mas_test.go 等对外部命令的调用在设计上容忍失败（_ = err），
+        # 因此 go test ./... 可在 CI 上完整运行。
+        # 注意: go test 必须用宿主架构（不设 GOOS/GOARCH），测试二进制才能在
+        # runner 上执行；交叉编译 GOOS=linux GOARCH=arm64 仅用于 go build。
+        test_env = ["CGO_ENABLED=0", "GOFLAGS=-mod=mod"]
+        test_report = os.path.join(self.build_folder, "go-test-report.txt")
+        import io
+        test_buf = io.StringIO()
+        try:
+            test_ret = self.run(
+                f'"{go_bin}" test ./... 2>&1',
+                env=test_env, stdout=test_buf, stderr=test_buf,
+                ignore_errors=True,
+            )
+        except Exception as exc:
+            self.output.warning(f"go test ./... 执行异常: {exc}")
+            test_ret = -1
+        test_out = test_buf.getvalue()
+        with open(test_report, "w", encoding="utf-8") as fh:
+            fh.write(test_out)
+        self.output.info(f"go test ./... exit={test_ret}")
+        for line in test_out.splitlines():
+            self.output.info(f"[go test] {line}")
+        self.output.info(f"go test 报告已写入: {test_report}")
 
         # Cross-compile for HarmonyOS PC arm64.
         # HarmonyOS PC runs on a Linux kernel with the aarch64 ABI; the Go
@@ -106,9 +139,13 @@ class BbrewConan(ConanFile):
     def _build_placeholder(self):
         """Build a minimal C placeholder when Go is unavailable.
 
-        The placeholder prints the same `--version` output as the real
-        bbrew, allowing the conan test_package (smoke test) to pass
-        locally. The CI runner replaces this with the real Go binary.
+        The placeholder is a fallback ONLY for completing the package
+        layout locally (HMDFS cannot exec the static Go toolchain). It
+        prints a "[PLACEHOLDER]" marker in its output so that every test
+        (test_package/conanfile.py, test_bbrew.sh, test_bbrew_test.go)
+        can distinguish it from the genuine Go binary and FAIL (R9: no
+        fake pass). The CI runner, which has a working `go`, produces the
+        real Go binary and passes all tests.
         """
         cc = os.environ.get("CC", "clang")
         src = os.path.join(self.build_folder, "bbrew_placeholder.c")
@@ -120,11 +157,11 @@ class BbrewConan(ConanFile):
                 "  for (int i = 1; i < argc; i++) {\n"
                 '    if (strcmp(argv[i], "--version") == 0 ||\n'
                 '        strcmp(argv[i], "-v") == 0) {\n'
-                '      printf("Bold Brew 2.3.2\\n");\n'
+                '      printf("Bold Brew 2.3.2 [PLACEHOLDER]\\n");\n'
                 "      return 0;\n"
                 "    }\n"
                 "  }\n"
-                '  printf("Bold Brew 2.3.2\\n");\n'
+                '  printf("Bold Brew 2.3.2 [PLACEHOLDER]\\n");\n'
                 "  return 0;\n"
                 "}\n"
             )
