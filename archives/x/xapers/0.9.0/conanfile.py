@@ -98,6 +98,13 @@ class XapersConan(ConanFile):
         else:
             self.output.info("xapian-bindings already downloaded, reusing")
 
+        # sphinx: xapian-bindings configure 硬性检查 python3 sphinx 模块
+        # (仅构建期文档工具；CI 干净环境没有，必须先安装)
+        self.run(
+            f'{python_exe} -m pip install --break-system-packages "sphinx"',
+            env="conanrun",
+        )
+
         # E011: HMDFS umask 077 → 022 (configure/config.status 临时目录权限)
         for f in ("configure", "config.status"):
             p = os.path.join(bind_dir, f)
