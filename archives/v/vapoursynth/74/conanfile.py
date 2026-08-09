@@ -3,8 +3,10 @@
 
 import glob
 import os
+import shlex
 import shutil
 import subprocess
+import sys
 
 from conan import ConanFile
 from conan.tools.env import VirtualRunEnv
@@ -73,13 +75,13 @@ class VapoursynthConan(ConanFile):
         tc.project_options["enable_vspipe"] = False
         tc.project_options["enable_python_module"] = bool(self.options.python_module)
         tc.project_options["build_wheel"] = False
-        self._select_ohos_meson_linker(tc)
         tc.generate()
         if self.options.python_module:
             self._inject_meson_cython()
         self._inject_meson_archiver()
         self._inject_meson_pkg_config()
         self._wrap_nonexecutable_meson_compilers()
+        self._prepend_ohos_sdk_runtime_paths()
 
     def build(self):
         apply_conandata_patches(self)
@@ -195,9 +197,7 @@ class VapoursynthConan(ConanFile):
             handle.write(content.replace("[binaries]\n", insertion, 1))
 
     def _inject_meson_pkg_config(self):
-        pkg_config = self.conf.get("tools.gnu:pkg_config", default=None)
-        if not pkg_config or not os.path.isfile(str(pkg_config)):
-            pkg_config = shutil.which("pkg-config") or shutil.which("pkgconf")
+        pkg_config = self._pkg_config_binary_entry()
         if not pkg_config:
             return
 
@@ -209,7 +209,7 @@ class VapoursynthConan(ConanFile):
         if "[binaries]" not in content:
             return
         if "\npkg-config =" not in content and "\npkgconfig =" not in content:
-            insertion = "[binaries]\npkg-config = '{}'\n".format(str(pkg_config).replace("\\", "/"))
+            insertion = "[binaries]\npkg-config = {}\n".format(pkg_config)
             content = content.replace("[binaries]\n", insertion, 1)
         if "pkg_config_path =" not in content and "[built-in options]" in content:
             pc_path = self.generators_folder.replace("\\", "/")
@@ -220,6 +220,282 @@ class VapoursynthConan(ConanFile):
             )
         with open(native_file, "w", encoding="utf-8") as handle:
             handle.write(content)
+
+    def _pkg_config_binary_entry(self):
+        pkg_config = self.conf.get("tools.gnu:pkg_config", default=None)
+        if pkg_config and os.path.isfile(str(pkg_config)):
+            return "'{}'".format(str(pkg_config).replace("\\", "/"))
+        pkg_config = shutil.which("pkg-config") or shutil.which("pkgconf")
+        if pkg_config:
+            return "'{}'".format(pkg_config.replace("\\", "/"))
+        wrapper = self._write_pkg_config_wrapper()
+        if not wrapper:
+            return ""
+        shell = "/system/bin/sh" if os.path.exists("/system/bin/sh") else "/bin/sh"
+        if not os.path.exists(shell):
+            return ""
+        return "['{}', '{}']".format(shell.replace("\\", "/"), wrapper.replace("\\", "/"))
+
+    def _write_pkg_config_wrapper(self):
+        wrapper_dir = os.path.join(self.generators_folder, "pkg-config-wrapper")
+        os.makedirs(wrapper_dir, exist_ok=True)
+        script = os.path.join(wrapper_dir, "pkg_config_wrapper.py")
+        launcher = os.path.join(wrapper_dir, "pkg-config")
+        code = r'''#!/usr/bin/env python3
+import os
+import re
+import shlex
+import sys
+
+DEFAULT_PATHS = "@@PKG_CONFIG_PATH@@".split(os.pathsep)
+OPERATORS = {"=", "==", "!=", "<", ">", "<=", ">="}
+FIELD_RE = re.compile(r"\$\{([^}]+)\}")
+
+
+def unique_paths(paths):
+    seen = set()
+    result = []
+    for path in paths:
+        if path and path not in seen and os.path.isdir(path):
+            result.append(path)
+            seen.add(path)
+    return result
+
+
+def search_paths():
+    env = os.environ.get("PKG_CONFIG_LIBDIR") or os.environ.get("PKG_CONFIG_PATH", "")
+    return unique_paths(env.split(os.pathsep) + DEFAULT_PATHS)
+
+
+def expand(value, variables):
+    for _ in range(20):
+        updated = FIELD_RE.sub(lambda match: variables.get(match.group(1), ""), value)
+        if updated == value:
+            return updated
+        value = updated
+    return value
+
+
+def parse_pc(path, overrides):
+    variables = {"pcfiledir": os.path.dirname(path)}
+    variables.update(overrides)
+    fields = {}
+    with open(path, encoding="utf-8") as handle:
+        for raw in handle:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            colon = line.find(":")
+            equal = line.find("=")
+            if equal != -1 and (colon == -1 or equal < colon):
+                key, value = line.split("=", 1)
+                variables[key.strip()] = expand(value.strip(), variables)
+                continue
+            if colon != -1:
+                key, value = line.split(":", 1)
+                fields[key.strip().lower()] = expand(value.strip(), variables)
+    return variables, fields
+
+
+def find_pc(module):
+    for base in search_paths():
+        candidate = os.path.join(base, module + ".pc")
+        if os.path.isfile(candidate):
+            return candidate
+    for base in search_paths():
+        for name in os.listdir(base):
+            if not name.endswith(".pc"):
+                continue
+            path = os.path.join(base, name)
+            _, fields = parse_pc(path, {})
+            if fields.get("name") == module:
+                return path
+    return ""
+
+
+def version_parts(version):
+    parts = []
+    for item in re.split(r"[^0-9A-Za-z]+", version):
+        if not item:
+            continue
+        parts.append(int(item) if item.isdigit() else item)
+    return parts
+
+
+def compare_version(actual, expected):
+    left = version_parts(actual)
+    right = version_parts(expected)
+    for index in range(max(len(left), len(right))):
+        lhs = left[index] if index < len(left) else 0
+        rhs = right[index] if index < len(right) else 0
+        if lhs == rhs:
+            continue
+        if isinstance(lhs, int) and isinstance(rhs, int):
+            return -1 if lhs < rhs else 1
+        lhs = str(lhs)
+        rhs = str(rhs)
+        return -1 if lhs < rhs else 1
+    return 0
+
+
+def flag_filter(flags, mode):
+    tokens = shlex.split(flags)
+    if mode == "all":
+        return tokens
+    if mode == "lib_dirs":
+        return [token for token in tokens if token.startswith("-L")]
+    if mode == "libs":
+        return [token for token in tokens if token.startswith("-l")]
+    if mode == "lib_other":
+        return [token for token in tokens if not token.startswith(("-L", "-l"))]
+    if mode == "include_dirs":
+        return [token for token in tokens if token.startswith("-I")]
+    if mode == "cflags_other":
+        return [token for token in tokens if not token.startswith("-I")]
+    return []
+
+
+def module_args(args):
+    modules = []
+    skip = False
+    for arg in args:
+        if skip:
+            skip = False
+            continue
+        if arg in OPERATORS:
+            skip = True
+            continue
+        if any(arg.startswith(op) for op in ("<=", ">=", "==", "!=", "<", ">")):
+            continue
+        modules.append(arg)
+    return modules
+
+
+def main():
+    args = sys.argv[1:]
+    if "--version" in args:
+        print("0.29.2")
+        return 0
+
+    overrides = {}
+    queries = []
+    positional = []
+    static = False
+    atleast_version = None
+    variable = None
+    for arg in args:
+        if arg.startswith("--define-variable="):
+            item = arg.split("=", 1)[1]
+            if "=" in item:
+                key, value = item.split("=", 1)
+                overrides[key] = value
+            continue
+        if arg == "--static":
+            static = True
+            continue
+        if arg in ("--print-errors", "--silence-errors", "--errors-to-stdout", "--short-errors"):
+            continue
+        if arg == "--exists":
+            queries.append("exists")
+            continue
+        if arg.startswith("--atleast-version="):
+            atleast_version = arg.split("=", 1)[1]
+            queries.append("atleast")
+            continue
+        if arg == "--modversion":
+            queries.append("modversion")
+            continue
+        if arg.startswith("--variable="):
+            variable = arg.split("=", 1)[1]
+            queries.append("variable")
+            continue
+        mapping = {
+            "--cflags": "cflags",
+            "--cflags-only-I": "cflags_i",
+            "--cflags-only-other": "cflags_other",
+            "--libs": "libs",
+            "--libs-only-L": "libs_l_dirs",
+            "--libs-only-l": "libs_l",
+            "--libs-only-other": "libs_other",
+            "--path": "path",
+        }
+        if arg in mapping:
+            queries.append(mapping[arg])
+            continue
+        if arg.startswith("-"):
+            continue
+        positional.append(arg)
+
+    modules = module_args(positional)
+    if not modules:
+        return 0
+
+    loaded = []
+    for module in modules:
+        pc_path = find_pc(module)
+        if not pc_path:
+            return 1
+        variables, fields = parse_pc(pc_path, overrides)
+        loaded.append((pc_path, variables, fields))
+
+    if not queries:
+        queries = ["exists"]
+    output = []
+    for query in queries:
+        if query == "exists":
+            continue
+        if query == "atleast":
+            version = loaded[0][2].get("version", "0")
+            if compare_version(version, atleast_version or "0") < 0:
+                return 1
+            continue
+        if query == "modversion":
+            output.extend(item[2].get("version", "") for item in loaded)
+            continue
+        if query == "variable":
+            pc_path, variables, fields = loaded[0]
+            output.append(variables.get(variable, fields.get(variable, "")))
+            continue
+        if query == "path":
+            output.extend(item[0] for item in loaded)
+            continue
+        for _, _, fields in loaded:
+            libs = fields.get("libs", "")
+            if static and fields.get("libs.private"):
+                libs = libs + " " + fields.get("libs.private", "")
+            cflags = fields.get("cflags", "")
+            if query == "cflags":
+                output.extend(flag_filter(cflags, "all"))
+            elif query == "cflags_i":
+                output.extend(flag_filter(cflags, "include_dirs"))
+            elif query == "cflags_other":
+                output.extend(flag_filter(cflags, "cflags_other"))
+            elif query == "libs":
+                output.extend(flag_filter(libs, "all"))
+            elif query == "libs_l_dirs":
+                output.extend(flag_filter(libs, "lib_dirs"))
+            elif query == "libs_l":
+                output.extend(flag_filter(libs, "libs"))
+            elif query == "libs_other":
+                output.extend(flag_filter(libs, "lib_other"))
+
+    if output:
+        print(" ".join(item for item in output if item))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+        code = code.replace("@@PKG_CONFIG_PATH@@", self.generators_folder.replace("\\", "/"))
+        with open(script, "w", encoding="utf-8") as handle:
+            handle.write(code)
+        python = sys.executable.replace("\\", "/")
+        with open(launcher, "w", encoding="utf-8") as handle:
+            handle.write("#!/system/bin/sh\nexec \"{}\" \"{}\" \"$@\"\n".format(python, script.replace("\\", "/")))
+        os.chmod(script, 0o755)
+        os.chmod(launcher, 0o755)
+        return launcher
 
     def _wrap_nonexecutable_meson_compilers(self):
         if self.settings.os != "OHOS":
@@ -250,15 +526,15 @@ class VapoursynthConan(ConanFile):
             with open(native_file, "w", encoding="utf-8") as handle:
                 handle.writelines(lines)
 
-    def _select_ohos_meson_linker(self, toolchain):
+    def _prepend_ohos_sdk_runtime_paths(self):
         if self.settings.os != "OHOS":
             return
-        linker = self._find_ohos_linker()
-        if not linker:
+        runtime_dirs = self._ohos_sdk_runtime_dirs()
+        if not runtime_dirs:
             return
-        # Meson probes the linker before normal link_args are applied.
-        toolchain.c_ld = linker.replace("\\", "/")
-        toolchain.cpp_ld = linker.replace("\\", "/")
+        current = os.environ.get("LD_LIBRARY_PATH", "")
+        parts = runtime_dirs + ([current] if current else [])
+        os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(parts)
 
     @staticmethod
     def _can_execute(path):
@@ -342,6 +618,7 @@ class VapoursynthConan(ConanFile):
         for shared_lib in glob.glob(os.path.join(self.package_folder, "**", "*.so*"), recursive=True):
             if not os.path.islink(shared_lib):
                 os.chmod(shared_lib, 0o755)
+                self.run("chmod 755 {}".format(shlex.quote(shared_lib)), quiet=True)
 
     def _find_ohos_tool(self, name):
         found = shutil.which(name)
@@ -354,8 +631,9 @@ class VapoursynthConan(ConanFile):
         return name
 
     @staticmethod
-    def _find_ohos_linker():
-        for candidate in ("/data/service/hnp/bin/ld", "/data/service/hnp/bin/ld.bfd"):
-            if os.path.exists(candidate):
-                return candidate
-        return ""
+    def _ohos_sdk_runtime_dirs():
+        runtime_dirs = []
+        for candidate in glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/llvm/lib"):
+            if os.path.isdir(candidate):
+                runtime_dirs.append(candidate)
+        return runtime_dirs
