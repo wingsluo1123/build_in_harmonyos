@@ -89,7 +89,7 @@ class ZathuraPdfMupdfConan(ConanFile):
         mupdf_dest = os.path.join(self.source_folder, "mupdf-src")
         os.makedirs(mupdf_dest, exist_ok=True)
         tmpfile = os.path.join(self.source_folder, ".mupdf.tar.gz")
-        self.run(f'curl -L -o "{tmpfile}" "{MUPDF_URL}" --connect-timeout 30 --max-time 300 -k -s')
+        self.run(f'curl -L -o "{tmpfile}" "{MUPDF_URL}" --connect-timeout 30 --max-time 300 -s')
         self.run(f'tar xzf "{tmpfile}" -C "{mupdf_dest}" --strip-components=1')
         os.remove(tmpfile)
 
@@ -168,6 +168,13 @@ class ZathuraPdfMupdfConan(ConanFile):
                  os.path.join(local_prefix, "include"))
         else:
             # Build mupdf from source (slow path, first run only)
+            # Apply mupdf mujs patches (fill thirdparty/mujs/ with source files)
+            mupdf_patches = os.path.join(src, "patches", "mupdf")
+            if os.path.isdir(mupdf_patches):
+                for pf in sorted(os.listdir(mupdf_patches)):
+                    if pf.endswith(".patch"):
+                        self.run(f'patch -p1 -d "{mupdf_dir}" < "{os.path.join(mupdf_patches, pf)}"')
+
             import multiprocessing
             nproc = multiprocessing.cpu_count() or 1
             nproc = min(nproc, 4)  # cap at 4 for memory safety
