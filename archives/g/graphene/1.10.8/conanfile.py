@@ -190,7 +190,7 @@ class GrapheneConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["graphene-1.0"]
         self.cpp_info.libdirs = ["lib"]
-        self.cpp_info.includedirs = ["include/graphene-1.0"]
+        self.cpp_info.includedirs = ["include/graphene-1.0", "lib/graphene-1.0/include"]
         self.cpp_info.set_property("cmake_file_name", "graphene-1.0")
         self.cpp_info.set_property(
             "cmake_target_name", "graphene-1.0::graphene-1.0"
