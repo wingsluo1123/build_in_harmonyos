@@ -283,6 +283,15 @@ class Qt5QtbaseConan(ConanFile):
         qt5openglext.set_property("cmake_file_name", "Qt5OpenGLExtensions")
         qt5openglext.set_property("cmake_target_name", "Qt5::OpenGLExtensions")
 
+        # Qt5DBus: D-Bus module (configure -dbus), required by libngf-qt
+        # and other Qt consumers using QtDBus
+        qt5dbus = self.cpp_info.components["Qt5DBus"]
+        qt5dbus.libs = ["Qt5DBus"]
+        qt5dbus.includedirs = ["include", "include/QtDBus"]
+        qt5dbus.requires = ["Qt5Core", "dbus::dbus"]
+        qt5dbus.set_property("cmake_file_name", "Qt5DBus")
+        qt5dbus.set_property("cmake_target_name", "Qt5::DBus")
+
         qt5widgets = self.cpp_info.components["Qt5Widgets"]
         qt5widgets.libs = ["Qt5Widgets"]
         qt5widgets.includedirs = ["include", "include/QtWidgets"]
