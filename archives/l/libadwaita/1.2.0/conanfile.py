@@ -155,6 +155,7 @@ class LibadwaitaConan(ConanFile):
         meson = Meson(self)
         meson.configure()
         meson.build()
+        meson.test()
 
     def package(self):
         Meson(self).install()
