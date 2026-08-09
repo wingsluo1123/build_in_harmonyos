@@ -8,6 +8,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <dlfcn.h>
 
 typedef int (*supports_version_fn)(unsigned, unsigned, unsigned);
