@@ -221,6 +221,8 @@ class Gtk4Conan(ConanFile):
                     f.write("Requires: graphene-1.0 gobject-2.0\n")
                     f.write("Libs: -L${libdir} -lgraphene-1.0\n")
                     f.write("Cflags: -I${includedir}/graphene-1.0 -I${libdir}/graphene-1.0/include\n")
+                    f.write("graphene_has_sse2=0\n")
+                    f.write("graphene_has_gcc=0\n")
         # pangoft2.pc
         pangoft2_pc = os.path.join(self.generators_folder, "pangoft2.pc")
         if not os.path.isfile(pangoft2_pc):
