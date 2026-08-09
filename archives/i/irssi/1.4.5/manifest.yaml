@@ -15,7 +15,7 @@ version: "1.4.5"
 status: published
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
+build_date: "2026-08-10"
 build_system: autotools
 
 # ============================================================
@@ -27,7 +27,7 @@ source:
   url: "https://github.com/irssi/irssi/releases/download/1.4.5/irssi-1.4.5.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "31653e8e0c5b1ef9b89905c330a0d77fe3f0592f88d163e504c1923dcd28ac47"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -44,14 +44,13 @@ build:
 
   # 配置选项列表
   configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
     - "--with-perl=no"
 
   # 编译依赖列表（格式: name/version）
   dependencies:
-    - glib/2.88.0
+    - glib/2.84.0
     - openssl/3.5.6
-    - ncurses/6.5-20250215
+    - ncurses/6.5
 
   # 编译器
   cc: clang
@@ -65,9 +64,8 @@ build:
 patches_applied:
   - "0001-build-aux-config.guess.patch"
   - "0002-build-aux-config.sub.patch"
-  - "0003-irssi-config.h.patch"
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+  - "0003-configure.patch"
+  - "0004-irssi-config.h.patch"
 
 # ============================================================
 # 知识沉淀
@@ -77,17 +75,21 @@ patches_applied:
 knowledge_gained:
   - "E007: config.guess/config.sub HarmonyOS识别，使用patch-autotools-ohos.pl一键补丁"
   - "Perl模块编译在HarmonyOS上失败(pm_to_blib错误)，使用--with-perl=no禁用"
-  - "ncurses静态库需设置CFLAGS/LDFLAGS/LIBS才能被configure检测到"
+  - "ncurses静态库需设置CFLAGS/LDFLAGS才能被configure的AC_CHECK_LIB检测到"
   - "test-796失败因getpwuid_r()不支持非系统UID(E051平台限制)"
+  - "glib/2.84.0.1版本号4段导致irssi configure sed解析失败，改用glib/2.84.0"
+  - "HarmonyOS mktemp -d创建的目录带SGID位阻止写入，需patch configure跳过mktemp用mkdir"
+  - "glib-2.0.pc含-l:ld-musl-aarch64.so.1，需-L/system/lib才能找到musl动态链接器"
+  - "conan pcre2/libffi的.la文件libdir='//lib'错误，需修正为实际路径"
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /data/storage/el2/base/cache/builds/irssi-1.4.5.orig
-  source_work_dir: /data/storage/el2/base/cache/builds/irssi-1.4.5.work
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/irssi-1.4.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/irssi-1.4.5.work
   source_orig_hash: ec6339d3df78e475
-  source_work_hash: 8b484a3c7bf6eb3b
-  generated_at: '2026-05-26T16:42:27'
-  patches_count: 3
+  source_work_hash: 672b151af5da9068
+  generated_at: '2026-08-10T05:47:02'
+  patches_count: 4
 
 patch_classification:
   - file: 0001-build-aux-config.guess.patch
@@ -98,7 +100,11 @@ patch_classification:
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0003-irssi-config.h.patch
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-irssi-config.h.patch
     type: auto
     platform_only: True
     guard: 'pending'
