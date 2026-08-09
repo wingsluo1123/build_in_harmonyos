@@ -149,12 +149,28 @@ class XapersConan(ConanFile):
         mf = os.path.join(bind_dir, "python3", "Makefile")
         if os.path.isfile(mf):
             replace_in_file(self, mf, "-lstdc++", "-lc++")
-            # PYTHON3_LIBS 追加 -lpython3.12（python3 主程序未导出 C API 符号）
-            libdir = os.path.dirname(os.path.dirname(python_exe))
+            # PYTHON3_LIBS 追加 -lpython3.12（python3 主程序未导出 C API 符号）。
+            # CI 的 HNP python 的 sysconfig LIBDIR 可能指向不存在的路径，
+            # 从 include 路径推导 prefix 下的 lib 目录（多候选，取实际存在者）。
+            probe = (
+                "import sysconfig, os, sys\n"
+                "inc = sysconfig.get_paths()['include']\n"
+                "prefix = os.path.dirname(os.path.dirname(inc))\n"
+                "cands = [os.path.join(prefix, 'lib'),\n"
+                "         sysconfig.get_config_var('LIBDIR') or '',\n"
+                "         sysconfig.get_config_var('LIBPL') or '']\n"
+                "name = 'libpython%d.%d.so' % sys.version_info[:2]\n"
+                "for c in cands:\n"
+                "    if c and os.path.exists(os.path.join(c, name)):\n"
+                "        print(c)\n"
+                "        break\n"
+                "else:\n"
+                "    print(cands[0] or '')\n"
+            )
             py_libdir = subprocess.run(
-                [python_exe, "-c",
-                 "import sysconfig; print(sysconfig.get_config_var('LIBDIR') or '')"],
-                capture_output=True, text=True).stdout.strip() or libdir
+                [python_exe, "-c", probe],
+                capture_output=True, text=True).stdout.strip()
+            self.output.info(f"xapian bindings: py_libdir={py_libdir}")
             replace_in_file(
                 self, mf,
                 "PYTHON3_LIBS = ",
