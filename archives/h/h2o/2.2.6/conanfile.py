@@ -192,15 +192,31 @@ class H2OConan(ConanFile):
         PkgConfigDeps(self).generate()
         self._write_openssl_compat_module()
         self._write_zlib_compat_module()
+        compat_prelude = self._write_cmake_compat_prelude()
         toolchain = CMakeToolchain(self)
         # H2O 2.2.6 calls FIND_PACKAGE(OpenSSL) and consumes FindOpenSSL's
         # legacy variables, while CMakeDeps exports lowercase `openssl`.
         toolchain.variables["CMAKE_MODULE_PATH"] = self.generators_folder
+        # H2O checks the uppercase legacy OpenSSL variables after PROJECT().
+        # CMakeDeps exposes a Config package first on the CI image, so load the
+        # bridge explicitly before H2O's subsequent FIND_PACKAGE calls.
+        toolchain.variables["CMAKE_PROJECT_h2o_INCLUDE"] = compat_prelude
         toolchain.variables["BUILD_SHARED_LIBS"] = self.options.shared
         toolchain.variables["WITH_BUNDLED_SSL"] = False
         toolchain.variables["WITH_MRUBY"] = False
         toolchain.variables["WITH_PICOTLS"] = True
         toolchain.generate()
+
+    def _write_cmake_compat_prelude(self):
+        """Load Conan dependency bridges immediately after H2O's PROJECT call."""
+        prelude = os.path.join(self.generators_folder, "h2o-conan-compat.cmake")
+        save(
+            self,
+            prelude,
+            "include(\"${CMAKE_CURRENT_LIST_DIR}/FindOpenSSL.cmake\")\n"
+            "include(\"${CMAKE_CURRENT_LIST_DIR}/FindZLIB.cmake\")\n",
+        )
+        return prelude
 
     def _write_openssl_compat_module(self):
         openssl_version = self.dependencies["openssl"].ref.version
