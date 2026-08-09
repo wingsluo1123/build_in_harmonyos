@@ -10,7 +10,10 @@ sha256 `dffdd0915ceb028541fe3bed77d63ba35e78514591c043736b450d62634eeb31`），
 
 上游完整测试套件在 `build()` 内通过 `python3 run_tests.py` 执行，包含三个子套件：
 `run_meson_command_tests.py`、`run_unittests.py`（pytest，647 项）、`run_project_tests.py`
-（按类别运行全部 project test cases）。
+（按类别运行全部 project test cases）。`self.run(..., env="conanbuild")` 注入 profile
+`[buildenv]` 的 PATH（`/data/service/hnp/bin`），确保测试子进程能找到 clang/ninja
+（CI worker 的 conan 进程 PATH 不含该目录，缺失会报 `No such file or directory: 'clang'/'ninja'`
+导致套件失败；本地 shell PATH 恰好包含故本地通过——已按此修复 PR CI）。
 
 ## 依赖（仅测试用）
 

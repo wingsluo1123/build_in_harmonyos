@@ -96,7 +96,11 @@ class MesonConan(ConanFile):
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)
         with test_env.vars(self).apply():
-            self.run("python3 run_tests.py", cwd=self.source_folder)
+            # env="conanbuild" 注入 profile [buildenv] 的 PATH（/data/service/hnp/bin），
+            # 使 run_tests.py 子进程能找到 clang/ninja。CI worker 的 conan 进程 PATH
+            # 不含该目录，缺少此参数时 clang --version / ninja 报 "No such file or
+            # directory" 导致上游测试套件失败（本地 shell PATH 恰好包含故本地通过）。
+            self.run("python3 run_tests.py", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
         site_packages = os.path.join(
