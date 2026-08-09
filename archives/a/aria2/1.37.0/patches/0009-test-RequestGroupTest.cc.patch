@@ -1,0 +1,25 @@
+--- a/test/RequestGroupTest.cc
++++ b/test/RequestGroupTest.cc
+@@ -108,21 +108,21 @@
+   group.setDownloadContext(ctx);
+   group.initPieceStorage();
+   {
+     std::shared_ptr<DownloadResult> result = group.createDownloadResult();
+ 
+     CPPUNIT_ASSERT_EQUAL(std::string("/tmp/myfile"),
+                          result->fileEntries[0]->getPath());
+     CPPUNIT_ASSERT_EQUAL((int64_t)1_m,
+                          result->fileEntries.back()->getLastOffset());
+     CPPUNIT_ASSERT_EQUAL((uint64_t)0, result->sessionDownloadLength);
+-    CPPUNIT_ASSERT_EQUAL((int64_t)0, result->sessionTime.count());
++    CPPUNIT_ASSERT_EQUAL((int64_t)0, (int64_t)result->sessionTime.count());
+     // result is UNKNOWN_ERROR if download has not completed and no specific
+     // error has been reported
+     CPPUNIT_ASSERT_EQUAL(error_code::UNKNOWN_ERROR, result->result);
+ 
+     // if haltReason is set to RequestGroup::USER_REQUEST, download
+     // result will become REMOVED.
+     group.setHaltRequested(true, RequestGroup::USER_REQUEST);
+     result = group.createDownloadResult();
+     CPPUNIT_ASSERT_EQUAL(error_code::REMOVED, result->result);
+     // if haltReason is set to RequestGroup::SHUTDOWN_SIGNAL, download

@@ -1,18 +1,44 @@
 version: "1.37.0"
-status: archived
-build_date: "2026-04-27"
+status: built
+software: aria2
+build_date: "2026-08-10"
+build_system: autotools
 
 source:
   url: "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.gz"
-  sha256: ""
+  sha256: "8e7021c6d5e8f8240c9cc19482e0c8589540836747744724d86bf8af5a21f0e8"
   tar_format: tar.gz
 
 build:
   system: autotools
-  configure_options: []
-  dependencies: []
+  configure_options:
+    - "--with-libuv"
+    - "--without-gnutls"
+  dependencies:
+    - openssl/3.5.6.1
+    - c-ares/1.34.6
+    - expat/2.8.2.1
+    - zlib/1.3.1.1.1
+    - sqlite3/3.49.1
+    - gmp/6.3.0
+    - libxml2/2.15.3.1
+    - libuv/1.52.1
   cc: clang
   cxx: clang++
 
-patches_applied: []
-knowledge_gained: []
+patches_applied:
+  - "0001-config.guess.patch: Add HarmonyOS platform detection"
+  - "0002-config.sub.patch: Add linux-ohos triplet support"
+  - "0003-configure.patch: Remove umask 077 for HMDFS compatibility"
+  - "0004-deps-wslay-config.guess.patch: wslay HarmonyOS detection"
+  - "0005-deps-wslay-config.sub.patch: wslay linux-ohos support"
+  - "0006-deps-wslay-configure.patch: wslay umask fix"
+  - "0007-src-Platform.cc.patch: OpenSSL legacy provider non-fatal"
+  - "0008-test-DefaultBtAnnounceTest.cc.patch: int64_t type fix"
+  - "0009-test-RequestGroupTest.cc.patch: int64_t type fix"
+
+knowledge_gained:
+  - "E007: config.guess needs OHOS patching for HarmonyOS"
+  - "HMDFS umask 077 + SGID bit prevents file creation"
+  - "make jobserver mkfifo not supported on HMDFS"
+  - "deps/wslay subdirectory needs separate config.guess patching"

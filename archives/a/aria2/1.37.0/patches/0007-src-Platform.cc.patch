@@ -1,0 +1,31 @@
+--- a/src/Platform.cc
++++ b/src/Platform.cc
+@@ -113,23 +113,27 @@
+ #ifdef ENABLE_NLS
+   setlocale(LC_CTYPE, "");
+   setlocale(LC_MESSAGES, "");
+   bindtextdomain(PACKAGE, LOCALEDIR);
+   textdomain(PACKAGE);
+ #endif // ENABLE_NLS
+ 
+ #ifdef HAVE_OPENSSL
+ #  if OPENSSL_VERSION_NUMBER >= 0x30000000L
+   // RC4 is in the legacy provider.
++  // On platforms where OpenSSL is built without the legacy provider module
++  // (e.g. static-only builds), loading 'legacy' may fail. This is non-fatal —
++  // RC4 is rarely used in modern BitTorrent; all other algorithms remain
++  // available through the default provider.
+   legacy_provider_ = OSSL_PROVIDER_load(nullptr, "legacy");
+   if (!legacy_provider_) {
+-    throw DL_ABORT_EX("OSSL_PROVIDER_load 'legacy' failed.");
++    fprintf(stderr, "Warning: OSSL_PROVIDER_load 'legacy' failed. RC4 algorithm will be unavailable.\n");
+   }
+ 
+   default_provider_ = OSSL_PROVIDER_load(nullptr, "default");
+   if (!default_provider_) {
+     throw DL_ABORT_EX("OSSL_PROVIDER_load 'default' failed.");
+   }
+ #  elif !OPENSSL_101_API
+   // for SSL initialization
+   SSL_load_error_strings();
+   SSL_library_init();
