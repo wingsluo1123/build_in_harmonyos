@@ -1,7 +1,7 @@
 software: compat
 version: "31.0.0.2"
 status: built
-build_date: "2026-08-03"
+build_date: "2026-08-09"
 build_system: makefile
 conan_ref: "compat/31.0.0.2"
 
@@ -18,8 +18,7 @@ build:
   cc: N/A
   cxx: N/A
 
-patches_applied:
-  - "patches/0001-ohos-skip-tramp-tmp-mock-tests.patch"
+patches_applied: []
 
 artifacts:
   lisp:
@@ -27,20 +26,22 @@ artifacts:
 
 validation:
   ohos:
-    date: "2026-08-03"
-    ssh_port: 56267
-    run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-a-compat-31.0.0.2-r13-20260803-140029-24622"
-    conan_full_ref: "compat/31.0.0.2#9ac87ab03d9c3a199d797b994c978f41:da39a3ee5e6b4b0d3255bfef95601890afd80709#194805efb3ae8dbf12a4c07ae9b50616"
+    date: "2026-08-09"
+    ssh_port: 33332
+    run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-a-compat-ol-chain-ncurses65-20260809-r1-compat-r1-conan-20260809-121741-15972"
+    conan_full_ref: "compat/31.0.0.2#0cfcaa3e5f23dbaca798952aba53f80b:da39a3ee5e6b4b0d3255bfef95601890afd80709#194805efb3ae8dbf12a4c07ae9b50616"
     upstream_commands:
       - "make compile"
       - "make test"
       - "make check"
     upstream_ert:
       total: 223
-      passed: 221
+      passed: 219
       unexpected: 0
-      skipped: 2
+      skipped: 4
       skipped_tests:
+        - "compat-exec-path"
+        - "compat-executable-find"
         - "compat-make-nearby-temp-file"
         - "compat-temporary-file-directory"
     test_package: "pass"
@@ -50,7 +51,7 @@ validation:
       L2: "skip: no bin directory"
       L4: "pass"
       L5: "warn: pure Lisp package has no bin/lib artifacts"
-    dependency_note: "Validation used cached emacs/29.1 and ncurses/6.5; remote CI requires those dependencies to be published."
+    dependency_note: "Validation reused the same isolated Conan home after emacs/29.1 was rebuilt against remote ncurses/6.5. Remote CI requires emacs/29.1 to be published before compat/31.0.0.2."
 
 knowledge_gained:
   - "The official GNU ELPA tarball omits upstream tests; the GitHub tag archive is used so the package can run compat-tests.el."
@@ -58,3 +59,4 @@ knowledge_gained:
   - "The package exports COMPAT_LISPDIR and prepends it to EMACSLOADPATH for downstream Emacs batch builds."
   - "Upstream make check writes temporary comparison files under /tmp; on OHOS the build-local Makefile is rewritten to honor TMPDIR."
   - "Two upstream TRAMP mock checks assume accessible remote /tmp; the OHOS runner cannot access /tmp, so those checks are skipped under an explicit test environment flag."
+  - "2026-08-09 new-port validation reported 223 total ERT tests, 219 expected results, 0 unexpected, and 4 skipped."
