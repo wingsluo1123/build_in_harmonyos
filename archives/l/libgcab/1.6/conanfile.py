@@ -62,6 +62,8 @@ class LibgcabConan(ConanFile):
         env.define_path("AR", "/data/service/hnp/bin/llvm-ar")
         env.define_path("NM", "/data/service/hnp/bin/llvm-nm")
         env.define_path("STRIP", "/data/service/hnp/bin/llvm-strip")
+        # Add OHOS SDK llvm lib to LD_LIBRARY_PATH (lld needs libxml2.so.16)
+        env.define_path("LD_LIBRARY_PATH", "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib")
         # Set PKG_CONFIG_PATH to include generated .pc files and dependency .pc files
         pkg_config_paths = [self.generators_folder]
         for dep in self.dependencies.values():
