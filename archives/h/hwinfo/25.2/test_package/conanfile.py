@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
-"""Conan test_package for hwinfo — verifies the hwinfo binary works."""
+"""Conan test_package for hwinfo — links against libhd and runs hwinfo binary."""
 import os
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class HwinfoTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "VirtualRunEnv"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
-        # R34: test must execute the tested package's binary
+        # R34: test links against libhd (substantial dependency on tested package)
+        cmake = CMake(self)
+        cmake.test()
+        # Also verify the hwinfo binary works
         bin_path = os.path.join(self.dependencies["hwinfo"].package_folder, "bin", "hwinfo")
         self.run(f'"{bin_path}" --version', env="conanrun")
