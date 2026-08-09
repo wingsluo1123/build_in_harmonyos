@@ -127,20 +127,6 @@ class GrapheneConan(ConanFile):
                 f.write(content)
 
     def generate(self):
-        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm lib
-        import glob
-        ce = self.conf.get('tools.build:compiler_executables', default={}, check_type=dict) or {}
-        cc = ce.get('c') or ''
-        if cc:
-            bindir = os.path.dirname(cc)
-            for libdir in [os.path.join(bindir, '..', 'lib'),
-                          os.path.join(bindir, '..', '..', 'lib')]:
-                abspath = os.path.abspath(libdir)
-                if os.path.isfile(os.path.join(abspath, 'libxml2.so.16')):
-                    env = Environment()
-                    env.prepend_path('LD_LIBRARY_PATH', abspath)
-                    env.vars(self, scope='build').save_script('conanbuildenv_lld_fix')
-                    break
         PkgConfigDeps(self).generate()
         tc = MesonToolchain(self)
         tc.project_options["libdir"] = "lib"
@@ -155,8 +141,25 @@ class GrapheneConan(ConanFile):
         tc.generate()
         self._inject_meson_binaries()
 
+    def _fix_lld_env(self):
+        """Fix LD_LIBRARY_PATH for OHOS SDK lld linker (needs libxml2.so.16)."""
+        ce = self.conf.get('tools.build:compiler_executables', default={}, check_type=dict) or {}
+        cc = ce.get('c') or ''
+        if not cc:
+            return
+        bindir = os.path.dirname(cc)
+        for libdir in [os.path.join(bindir, '..', 'lib'),
+                      os.path.join(bindir, '..', '..', 'lib')]:
+            abspath = os.path.abspath(libdir)
+            if os.path.isfile(os.path.join(abspath, 'libxml2.so.16')):
+                cur = os.environ.get('LD_LIBRARY_PATH', '')
+                if abspath not in cur:
+                    os.environ['LD_LIBRARY_PATH'] = abspath + (':' + cur if cur else '')
+                break
+
     def build(self):
         apply_conandata_patches(self)
+        self._fix_lld_env()
         meson = Meson(self)
         meson.configure()
         meson.build()
