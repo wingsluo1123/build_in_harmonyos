@@ -103,6 +103,12 @@ class MesonConan(ConanFile):
         test_env.define("NINJA", "/data/service/hnp/bin/ninja")
         test_env.define("CC", "/data/service/hnp/bin/clang")
         test_env.define("CXX", "/data/service/hnp/bin/clang++")
+        # meson 探测静态链接器走 PATH 找 llvm-ar/ar（"Unknown linker(s):
+        # [['llvm-ar']]"），CI worker PATH 无工具链目录时报 No such file；
+        # AR/RANLIB/NM 显式注入绝对路径，与 CC/CXX 同机制。
+        test_env.define("AR", "/data/service/hnp/bin/llvm-ar")
+        test_env.define("RANLIB", "/data/service/hnp/bin/llvm-ranlib")
+        test_env.define("NM", "/data/service/hnp/bin/llvm-nm")
         test_env.prepend_path("PKG_CONFIG_PATH", pkgconfig_dir)
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)

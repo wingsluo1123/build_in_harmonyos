@@ -12,10 +12,11 @@ sha256 `dffdd0915ceb028541fe3bed77d63ba35e78514591c043736b450d62634eeb31`），
 `run_meson_command_tests.py`、`run_unittests.py`（pytest，647 项）、`run_project_tests.py`
 （按类别运行全部 project test cases）。`build()` 显式注入工具链环境变量
 （`PATH` 前插 `/data/service/hnp/bin`，`NINJA=/data/service/hnp/bin/ninja`、
-`CC`/`CXX` 指向 clang 绝对路径），确保测试子进程定位 clang/ninja——CI worker
-的 conan 进程 PATH 不含该目录，仅靠 `env="conanbuild"` 注入 profile buildenv
-仍会报 `No such file or directory: 'clang'/'ninja'`（本地 shell PATH 恰好包含
-故本地通过，PR CI 失败即由此；已按此修复）。
+`CC`/`CXX` 指向 clang 绝对路径、`AR`/`RANLIB`/`NM` 指向 llvm-* 绝对路径），
+确保测试子进程定位 clang/ninja/llvm-ar——CI worker 的 conan 进程 PATH
+不含该目录，仅靠 `env="conanbuild"` 注入 profile buildenv 仍会报
+`No such file or directory: 'clang'/'ninja'/'llvm-ar'`（本地 shell PATH
+恰好包含故本地通过，PR CI 失败即由此；已按此修复）。
 
 ## 依赖（仅测试用）
 
