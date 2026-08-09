@@ -68,7 +68,7 @@ class XapersConan(ConanFile):
             env="conanrun",
         )
 
-        # Step 2: Build and install the package to the package folder
+        # Step 3: Build and install the package to the package folder
         src_dir = self.source_folder
         self.run(
             f'{python_exe} -m pip install --break-system-packages --no-deps '
