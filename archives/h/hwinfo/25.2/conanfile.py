@@ -122,6 +122,12 @@ class HwinfoConan(ConanFile):
         os.environ["SO_LIBS"] = "-luuid"
         os.environ["PATH"] = f"{local_bin}:{os.environ.get('PATH', '')}"
 
+        # Ensure lld linker can find libxml2.so.16 (in the LLVM lib dir)
+        cc_real = os.path.realpath(cc)
+        llvm_lib_dir = os.path.join(os.path.dirname(os.path.dirname(cc_real)), "lib")
+        if os.path.isdir(llvm_lib_dir):
+            os.environ["LD_LIBRARY_PATH"] = f"{llvm_lib_dir}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+
         # R9: use -j1
         self.run("make -j1", cwd=src)
 
