@@ -2,7 +2,7 @@
 # test_package/test.sh — smoke test for irssi executable
 # On HarmonyOS, ELF binaries may require signing before execution.
 # This test verifies the binary exists and is a valid ELF, then attempts execution.
-set -eu
+set -euo pipefail
 
 # Find the irssi binary
 IRSSI_BIN=$(which irssi 2>/dev/null || echo "")
