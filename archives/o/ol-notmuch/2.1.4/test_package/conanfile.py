@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conan test_package for ol-notmuch 2.1.4."""
 import os
-import sys
+import shlex
 
 from conan import ConanFile
 
@@ -15,7 +15,5 @@ class OlNotmuchTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        pkg = self.dependencies["ol-notmuch"].package_folder
-        root = os.path.join(pkg, "share", "ol-notmuch")
-        script = os.path.join(self.recipe_folder, "test_ol_notmuch.py")
-        self.run(f'"{sys.executable}" "{script}" "{root}"', env="conanrun")
+        script = os.path.join(self.recipe_folder, "test_ol_notmuch.sh")
+        self.run(f"sh {shlex.quote(script)}", env="conanrun")
