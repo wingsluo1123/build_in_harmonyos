@@ -194,6 +194,10 @@ class Qt5QtbaseConan(ConanFile):
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
         copy(self, "*.pc", src=lib_dir,
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
+        # Copy static libs (e.g. libQt5OpenGLExtensions.a required by Qt3D
+        # opengl renderer plugin; built as static in qtbase)
+        copy(self, "*.a", src=lib_dir,
+             dst=os.path.join(self.package_folder, "lib"), keep_path=False)
 
         # Copy headers
         if os.path.isdir(include_dir):
@@ -269,6 +273,15 @@ class Qt5QtbaseConan(ConanFile):
         qt5concurrent.requires = ["Qt5Core"]
         qt5concurrent.set_property("cmake_file_name", "Qt5Concurrent")
         qt5concurrent.set_property("cmake_target_name", "Qt5::Concurrent")
+
+        # Qt5OpenGLExtensions: static lib built by qtbase (src/openglextensions),
+        # required by Qt3D opengl renderer plugin and QtOpenGL consumers
+        qt5openglext = self.cpp_info.components["Qt5OpenGLExtensions"]
+        qt5openglext.libs = ["Qt5OpenGLExtensions"]
+        qt5openglext.includedirs = ["include", "include/QtOpenGLExtensions"]
+        qt5openglext.requires = ["Qt5Core", "Qt5Gui"]
+        qt5openglext.set_property("cmake_file_name", "Qt5OpenGLExtensions")
+        qt5openglext.set_property("cmake_target_name", "Qt5::OpenGLExtensions")
 
         qt5widgets = self.cpp_info.components["Qt5Widgets"]
         qt5widgets.libs = ["Qt5Widgets"]
