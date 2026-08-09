@@ -4,11 +4,13 @@
 Provides Huffman coding for HTTP/2 HPACK compression.
 Depends on aws-c-common for core platform abstractions.
 """
+import glob
 import os
 
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 
 
 class AwsccompressionConan(ConanFile):
@@ -56,6 +58,16 @@ class AwsccompressionConan(ConanFile):
                     "config (AWS:: namespace + custom modules)\n")
             f.write(f'list(APPEND CMAKE_PREFIX_PATH '
                     f'"{aws_common.package_folder}")\n')
+
+        # Workaround: CI worker's lld linker can't find libxml2.so.16
+        # The library is in the llvm/lib directory but not in LD_LIBRARY_PATH
+        for lib in glob.glob(
+                "/data/service/hnp/ohos-sdk.org/ohos-sdk_*/ohos/native/llvm/lib/libxml2.so*"):
+            lib_dir = os.path.dirname(lib)
+            build_env = os.path.join(self.generators_folder, "conanbuild.sh")
+            with open(build_env, "a") as f:
+                f.write(f'\nexport LD_LIBRARY_PATH="{lib_dir}:$LD_LIBRARY_PATH"\n')
+            break
 
     def build(self):
         apply_conandata_patches(self)
