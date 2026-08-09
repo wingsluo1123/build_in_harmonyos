@@ -1,6 +1,6 @@
 --- rsyslog-8.2604.0.orig/runtime/tcpsrv.c	2026-08-07 23:56:16.373681094 +0800
 +++ rsyslog-8.2604.0.work/runtime/tcpsrv.c	2026-08-07 23:59:22.397682188 +0800
-@@ -1272,7 +1272,11 @@
+@@ -1272,7 +1272,14 @@
          /* If any threads were created, cancel and join them. */
          if (created > 0) {
              for (unsigned i = 0; i < created; ++i) {
@@ -8,6 +8,9 @@
                  (void)pthread_cancel(queue->wrkr_tids[i]); /* cond_wait is a cancellation point */
 +        #else
 +        pthread_kill(queue->wrkr_tids[i], SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++        /* OHOS: 10ms for SIGUSR1 handler to set atomic flag */
++        struct timespec ts_ohos = {0, 10000000};
++        nanosleep(&ts_ohos, NULL);
 +#endif
              }
              for (unsigned i = 0; i < created; ++i) {

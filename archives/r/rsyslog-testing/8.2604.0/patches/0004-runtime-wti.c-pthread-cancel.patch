@@ -1,6 +1,6 @@
 --- rsyslog-8.2604.0.orig/runtime/wti.c	2026-08-07 23:56:16.369682344 +0800
 +++ rsyslog-8.2604.0.work/runtime/wti.c	2026-08-07 23:58:06.213680000 +0800
-@@ -210,7 +210,11 @@
+@@ -210,7 +210,14 @@
          if (dbgTimeoutToStderr) {
              fprintf(stderr, "rsyslog debug: %s: need to do hard cancellation\n", cancelobj);
          }
@@ -8,11 +8,14 @@
          pthread_cancel(thrdID);
 +        #else
 +        pthread_kill(thrdID, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++        /* OHOS: 10ms for SIGUSR1 handler to set atomic flag */
++        struct timespec ts_ohos = {0, 10000000};
++        nanosleep(&ts_ohos, NULL);
 +#endif
          pthread_kill(thrdID, SIGTTIN);
          DBGPRINTF("cooperative worker termination failed, using cancellation...\n");
          DBGOPRINT((obj_t *)pThis, "canceling worker thread\n");
-@@ -415,7 +417,9 @@
+@@ -415,7 +224,9 @@
       * - queue consumers enable it only around explicitly cancel-safe work
       * - critical cleanup/state transitions run with cancellation disabled
       */
@@ -22,7 +25,7 @@
      DBGPRINTF("wti %p: worker starting\n", pThis);
      /* now we have our identity, on to real processing */
  
-@@ -499,7 +503,9 @@
+@@ -499,7 +233,9 @@
  
      /* indicate termination */
      pthread_cleanup_pop(0); /* remove cleanup handler */

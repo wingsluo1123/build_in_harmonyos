@@ -184,3 +184,13 @@ r30 在原 3 条 OHOS 适配 smoke（rsyslogd -v / -N1 / E011 TMPDIR）基础上
 | 11 | rsyslogd tcpflood 注入 | imtcp + tcpflood 端到端 | r19/r20 端口+时序 |
 
 **11 条 smoke 全部 PASS**（OHPC 真实环境验证 OHOS 平台差异适配正确性）
+
+## R32 修复 AI Review P1 信号处理器问题（pthread_kill 完善）
+
+**问题**：r26 用 `pthread_kill(thrdID, SIGUSR1)` 替代 pthread_cancel，但未注册 SIGUSR1 handler——musl/OHOS 默认行为是 terminate 整个进程，`pthread_join` 看似"成功"实际是进程崩溃。
+
+**修复**：
+- 6 个 patch（0004/0006/0008/0009/0010/0012）在 pthread_kill 调用后加 `nanosleep(10ms)` 给信号处理器时间设置 atomic flag
+- 工作线程注册 SIGUSR1 handler（设置 atomic flag）后自然退出，pthread_join 真正正常返回
+- 新增 smoke 12：pthread_kill + SIGUSR1 handler 真实优雅退出验证（SMOKE12=PASS nIterations=5）
+- 对比验证：smoke_no_handler 无 handler 时进程被 Signal 10 终止（rc=138），证明注册 handler 必要性

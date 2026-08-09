@@ -1,6 +1,6 @@
 --- rsyslog-8.2604.0.orig/plugins/omazureeventhubs/omazureeventhubs.c	2026-08-07 23:56:17.197682032 +0800
 +++ rsyslog-8.2604.0.work/plugins/omazureeventhubs/omazureeventhubs.c	2026-08-07 23:59:35.413680625 +0800
-@@ -1173,7 +1173,11 @@
+@@ -1173,7 +1173,14 @@
      DEFiRet;
      if (pWrkrData->bThreadRunning) {
          DBGPRINTF("omazureeventhubs[%p]: STOPPING Thread\n", pWrkrData);
@@ -8,6 +8,9 @@
          int r = pthread_cancel(pWrkrData->tid);
 +#else
 +        int r = pthread_kill(pWrkrData->tid, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++        /* OHOS: 10ms for SIGUSR1 handler to set atomic flag */
++        struct timespec ts_ohos = {0, 10000000};
++        nanosleep(&ts_ohos, NULL);
 +#endif
          if (r == 0) {
              pthread_join(pWrkrData->tid, NULL);
