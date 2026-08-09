@@ -185,6 +185,20 @@ class Gtk4Conan(ConanFile):
         open(pc, "w").write("".join(out))
 
     def generate(self):
+        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm lib
+        import glob
+        ce = self.conf.get('tools.build:compiler_executables', default={}, check_type=dict) or {}
+        cc = ce.get('c') or ''
+        if cc:
+            bindir = os.path.dirname(cc)
+            for libdir in [os.path.join(bindir, '..', 'lib'),
+                          os.path.join(bindir, '..', '..', 'lib')]:
+                abspath = os.path.abspath(libdir)
+                if os.path.isfile(os.path.join(abspath, 'libxml2.so.16')):
+                    env = Environment()
+                    env.prepend_path('LD_LIBRARY_PATH', abspath)
+                    env.vars(self, scope='build').save_script('conanbuildenv_lld_fix')
+                    break
         PkgConfigDeps(self).generate()
         self._prepare_glib_build_tools()
         self._fix_glib_pc()

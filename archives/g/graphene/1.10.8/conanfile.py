@@ -14,11 +14,17 @@ import os
 import shutil
 
 from conan import ConanFile
+from conan.tools.env import Environment
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import Environment
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.env import Environment
 from conan.tools.gnu import PkgConfigDeps
+from conan.tools.env import Environment
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 from conan.tools.meson import Meson, MesonToolchain
+from conan.tools.env import Environment
 
 
 class GrapheneConan(ConanFile):
@@ -121,6 +127,20 @@ class GrapheneConan(ConanFile):
                 f.write(content)
 
     def generate(self):
+        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm lib
+        import glob
+        ce = self.conf.get('tools.build:compiler_executables', default={}, check_type=dict) or {}
+        cc = ce.get('c') or ''
+        if cc:
+            bindir = os.path.dirname(cc)
+            for libdir in [os.path.join(bindir, '..', 'lib'),
+                          os.path.join(bindir, '..', '..', 'lib')]:
+                abspath = os.path.abspath(libdir)
+                if os.path.isfile(os.path.join(abspath, 'libxml2.so.16')):
+                    env = Environment()
+                    env.prepend_path('LD_LIBRARY_PATH', abspath)
+                    env.vars(self, scope='build').save_script('conanbuildenv_lld_fix')
+                    break
         PkgConfigDeps(self).generate()
         tc = MesonToolchain(self)
         tc.project_options["libdir"] = "lib"
