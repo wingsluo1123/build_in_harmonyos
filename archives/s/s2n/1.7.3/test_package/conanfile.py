@@ -23,5 +23,4 @@ class S2nTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        self.run("ctest --output-on-failure", env="conanrun")
