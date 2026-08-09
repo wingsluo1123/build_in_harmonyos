@@ -89,7 +89,8 @@ class LibaccountsQtConan(ConanFile):
         # Run syncqt.pl to generate QtXml headers
         syncqt = os.path.join(qt5_src, "bin", "syncqt.pl")
         self.run(f'perl "{syncqt}" -version 5.15.2 -module QtCore -module QtXml '
-                 f'-outdir "{qt5_src}/include" "{qt5_src}"')
+                 f'-outdir "{qt5_src}/include" "{qt5_src}"',
+                 env=["conanbuild", "libaccounts_qt_env"])
 
         # Create qtxml-config.h
         qtxml_inc_dir = os.path.join(qt5_src, "include", "QtXml")
@@ -129,13 +130,15 @@ class LibaccountsQtConan(ConanFile):
         objs = []
         for src in ["dom/qdom.cpp", "dom/qdomhelpers.cpp", "sax/qxml.cpp"]:
             obj = os.path.join(xml_src, os.path.basename(src).replace(".cpp", ".o"))
-            self.run(f'"{cxx}" {cxxflags} {includes} -c "{os.path.join(xml_src, src)}" -o "{obj}"')
+            self.run(f'"{cxx}" {cxxflags} {includes} -c "{os.path.join(xml_src, src)}" -o "{obj}"',
+                     env=["conanbuild", "libaccounts_qt_env"])
             objs.append(obj)
 
         # Link
         lib_out = os.path.join(xml_src, "libQt5Xml.so.5.15.2")
         self.run(f'"{cxx}" -shared -Wl,-soname,libQt5Xml.so.5 -o "{lib_out}" '
-                 f'{" ".join(objs)} -L{qt5_prefix}/lib -lQt5Core -lpthread -ldl')
+                 f'{" ".join(objs)} -L{qt5_prefix}/lib -lQt5Core -lpthread -ldl',
+                 env=["conanbuild", "libaccounts_qt_env"])
 
         # Install to Qt5 package
         qt5_lib = os.path.join(qt5_prefix, "lib")
