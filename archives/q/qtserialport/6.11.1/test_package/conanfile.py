@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Consumer test for qtserialport."""
+"""Consumer test for qtserialport on HarmonyOS PC."""
 
 import os
 
@@ -21,8 +21,13 @@ class QtserialportTestConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        package_prefix = self.dependencies["qtserialport"].package_folder
-        tc.cache_variables["CMAKE_PREFIX_PATH"] = package_prefix
+        qtbase_pkg = self.dependencies["qtbase"].package_folder
+        pkg = self.dependencies["qtserialport"].package_folder
+        # Qt6Config lives in the qtbase package; Qt6SerialPortConfig lives in
+        # the qtserialport package. Qt only searches the additional prefixes
+        # listed in QT_ADDITIONAL_PACKAGES_PREFIX_PATH for module configs.
+        tc.cache_variables["CMAKE_PREFIX_PATH"] = qtbase_pkg
+        tc.cache_variables["QT_ADDITIONAL_PACKAGES_PREFIX_PATH"] = pkg
         tc.generate()
 
     def build(self):
