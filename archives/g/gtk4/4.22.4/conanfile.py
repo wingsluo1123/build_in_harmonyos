@@ -205,6 +205,22 @@ class Gtk4Conan(ConanFile):
                 f.write("Requires: pango, cairo\n")
                 f.write("Libs: -L${libdir} -lpangocairo-1.0\n")
                 f.write("Cflags: -I${includedir}/pango-1.0\n")
+        # graphene-gobject-1.0.pc
+        graphene = self.dependencies.get("graphene")
+        if graphene:
+            graphene_folder = graphene.package_folder
+            graphene_gobject_pc = os.path.join(self.generators_folder, "graphene-gobject-1.0.pc")
+            if not os.path.isfile(graphene_gobject_pc):
+                with open(graphene_gobject_pc, "w") as f:
+                    f.write("prefix=%s\n" % graphene_folder)
+                    f.write("libdir=${prefix}/lib\n")
+                    f.write("includedir=${prefix}/include\n\n")
+                    f.write("Name: Graphene GObject\n")
+                    f.write("Description: GObject types for Graphene\n")
+                    f.write("Version: 1.10.8\n")
+                    f.write("Requires: graphene-1.0 gobject-2.0\n")
+                    f.write("Libs: -L${libdir} -lgraphene-1.0\n")
+                    f.write("Cflags: -I${includedir}/graphene-1.0 -I${libdir}/graphene-1.0/include\n")
         # pangoft2.pc
         pangoft2_pc = os.path.join(self.generators_folder, "pangoft2.pc")
         if not os.path.isfile(pangoft2_pc):
