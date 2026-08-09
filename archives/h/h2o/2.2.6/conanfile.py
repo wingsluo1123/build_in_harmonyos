@@ -182,6 +182,7 @@ class H2OConan(ConanFile):
             self,
             url=source["url"],
             sha256=source["sha256"],
+            filename=source["archive"],
             destination=destination,
             strip_root=True,
         )
