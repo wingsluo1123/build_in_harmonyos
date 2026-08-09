@@ -92,14 +92,21 @@ class MesonConan(ConanFile):
         )
 
         test_env = Environment()
+        # 显式注入 OHOS 工具链目录到 PATH，并直接指定 NINJA/CC/CXX：
+        # - run_tests.py 顶部优先读 os.environ['NINJA']（detect_ninja 先查 NINJA 变量）
+        # - meson 经 PATH/CC 探测 C/C++ 编译器（clang --version）
+        # CI worker 的 conan 进程 PATH 不含 /data/service/hnp/bin，仅靠
+        # env="conanbuild" 注入 profile [buildenv] 不可靠（实测仍报
+        # "No such file or directory: 'clang'/'ninja'"），故在此显式设置。
+        test_env.prepend_path("PATH", "/data/service/hnp/bin")
+        test_env.prepend_path("PATH", "/storage/Users/currentUser/usr/local/bin")
+        test_env.define("NINJA", "/data/service/hnp/bin/ninja")
+        test_env.define("CC", "/data/service/hnp/bin/clang")
+        test_env.define("CXX", "/data/service/hnp/bin/clang++")
         test_env.prepend_path("PKG_CONFIG_PATH", pkgconfig_dir)
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)
         with test_env.vars(self).apply():
-            # env="conanbuild" 注入 profile [buildenv] 的 PATH（/data/service/hnp/bin），
-            # 使 run_tests.py 子进程能找到 clang/ninja。CI worker 的 conan 进程 PATH
-            # 不含该目录，缺少此参数时 clang --version / ninja 报 "No such file or
-            # directory" 导致上游测试套件失败（本地 shell PATH 恰好包含故本地通过）。
             self.run("python3 run_tests.py", cwd=self.source_folder, env="conanbuild")
 
     def package(self):
