@@ -22,7 +22,7 @@
 | 1 | config.guess不识别HarmonyOS | E007 | 0001补丁添加HarmonyOS检测 |
 | 2 | config.sub拒绝linux-ohos | E007/E072 | 0002补丁添加linux-ohos到验证列表 |
 | 3 | Perl模块编译失败 | HarmonyOS Perl不完整 | --with-perl=no |
-| 4 | config.status Permission denied | mktemp -d创建目录带SGID位 | 0004补丁跳过mktemp用mkdir |
+| 4 | config.status Permission denied | mktemp -d创建目录带SGID位 | 0003补丁跳过mktemp用mkdir |
 | 5 | glib版本检测失败(48.0.xxx) | glib/2.84.0.1四段版本号致sed解析错误 | 改用glib/2.84.0(三段版本) |
 | 6 | 链接失败 -l:ld-musl-aarch64.so.1 | glib-2.0.pc含-L/lib但linker不跟随符号链接 | 添加-L/system/lib到LDFLAGS |
 | 7 | libtool: cannot find //lib/libpcre2-8.la | pcre2/libffi .la文件libdir='//lib' | 修正.la文件libdir为实际路径 |
@@ -35,8 +35,8 @@
 |------|------|------|
 | 0001 | build-aux/config.guess | 添加HarmonyOS平台检测 |
 | 0002 | build-aux/config.sub | 添加linux-ohos到OS验证列表 |
-| 0003 | irssi-config.h | 禁用utf8proc, static perl, term.h |
-| 0004 | configure | 跳过mktemp用mkdir(HarmonyOS SGID限制) |
+| 0003 | configure | 跳过mktemp用mkdir(HarmonyOS SGID限制) |
+| 0004 | irssi-config.h | 禁用utf8proc, static perl, term.h |
 
 ## 依赖版本
 
