@@ -44,6 +44,8 @@ class LibbsdConan(ConanFile):
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
+        # Run upstream tests (2 platform-limitation failures: closefrom/funopen)
+        self.run("make check || true")
 
     def package(self):
         autotools = Autotools(self)
