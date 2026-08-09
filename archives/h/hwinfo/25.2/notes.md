@@ -162,5 +162,5 @@ hd.c:5807:10: error: use of undeclared identifier 'HD_VERSION_STRING'
 **归档路径**: `/storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/archives/h/hwinfo/25.2`
 ---
 
-**编译结束**: 2026-04-29 22:02
+**编译结束**: 2026-08-10 04:21
 **最终状态**: built

@@ -1,0 +1,62 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R38",
+      "file": "archives/h/hwinfo/commands.json",
+      "line": 1,
+      "description": "commands.json uses a non-standard schema: a top-level \"commands\" array with per-command objects (name/description/path/usage/examples), instead of the required flat structure with top-level \"name\" (matching package name), \"type\" (must be \"tool\"), and \"versions\" (dict mapping version → ref/binary). The file is missing the mandatory \"type\" and \"versions\" fields entirely. Additionally, the file uses 4-space indentation instead of the mandated 2-space (code_style §15). CI tooling that parses commands.json expecting the standard schema will fail to extract package metadata (type, versions, binary flag).",
+      "fix_suggestion": "Rewrite commands.json to match the standard schema. Example:\n{\n  \"name\": \"hwinfo\",\n  \"description\": \"Probe for hardware information\",\n  \"homepage\": \"https://github.com/openSUSE/hwinfo\",\n  \"type\": \"tool\",\n  \"versions\": {\n    \"25.2\": {\n      \"ref\": \"hwinfo/25.2\",\n      \"binary\": false\n    }\n  }\n}\nIf per-command documentation is desired, it can be placed in a separate file or in the manifest.yaml."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/h/hwinfo/25.2/test_package/conanfile.py",
+      "line": 18,
+      "description": "hwinfo is a hardware probing tool (reads /proc, /sys, performs ioctls on devices). R40 lists \"外设/硬件\" as a domain requiring deep adaptation verification. The test_package only runs `hwinfo --version`, which does not exercise any hardware probing functionality — it merely confirms the binary loads and prints its version string. While R34 (no empty shell test) is satisfied (the binary IS executed), the test does not cover platform-specific hardware probing paths on OHOS. Additionally, there are no patches modifying the core hardware probing source code for OHOS — all patches are pre-generated data files (hd_ids.h, hd_ids_tiny.h, hd.ids) and version.h generation.",
+      "fix_suggestion": "Consider adding a read-only smoke test that exercises actual hwinfo functionality (e.g., `hwinfo --short` or `hwinfo --cpu` which reads /proc/cpuinfo) in the test_package, or document in notes.md why --version is deemed sufficient for CI validation. Mark this as \"需人工确认适配完整性\" per R40."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R36",
+      "file": "archives/h/hwinfo/25.2/notes.md",
+      "line": 13,
+      "description": "notes.md states \"无外部依赖\" (no external dependencies) in the dependency check section, but conanfile.py declares `self.requires(\"uuid/2.40.1\")` as a build/runtime dependency. The notes.md does not mention uuid at all. This is a documentation inconsistency that could mislead reviewers about the recipe's dependency chain.",
+      "fix_suggestion": "Update notes.md dependency section to reflect: \"- 外部依赖: uuid/2.40.1 (libuuid for ISDN CDB handling)\". Verify uuid/2.40.1 is published to the cnb.cool repository via `conan download \"uuid/2.40.1\" --only-recipe` (R36)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_12",
+      "file": "archives/h/hwinfo/25.2/conandata.yml",
+      "line": 12,
+      "description": "Three patches share the same sequence number 0002 (0002-hd_ids.h.patch at line 12, 0002-hd_ids_tiny.h.patch at line 15, 0002-hd.ids.patch at line 18). Code_style §12 and R3 expect sequentially numbered patch files (001, 002, 003...). While the grouping is logically coherent (all pre-generated hardware ID database files), unique numbering aids traceability and patch ordering.",
+      "fix_suggestion": "Consider renumbering to 0002-hd_ids.h.patch, 0003-hd_ids_tiny.h.patch, 0004-hd.ids.patch for unique sequential numbering, or add a comment in conandata.yml documenting the intentional grouping under 0002."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_12",
+      "file": "archives/h/hwinfo/25.2/conandata.yml",
+      "line": 11,
+      "description": "patch_description values are full descriptive sentences (e.g., \"Generate version.h with HD_VERSION_STRING (git2log needs .git)\") rather than the conventional format shown in code_style §12 examples which prefix with the patch number (e.g., \"0001 build aux config.guess\"). The descriptions do use spaces as separators (compliant with the \"spaces not hyphens\" rule), but don't follow the {序号} {描述} convention.",
+      "fix_suggestion": "Optionally prefix descriptions with patch numbers, e.g., \"0001 Generate version.h with HD_VERSION_STRING\", \"0002 Pre-generated hd_ids.h\", etc. This is a minor style consistency suggestion."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R19",
+      "file": "archives/h/hwinfo/25.2/notes.md",
+      "line": 136,
+      "description": "notes.md patch list (补丁清单) only documents 0001-version.h.patch. The three new 0002-* patches (hd.ids, hd_ids.h, hd_ids_tiny.h) added in this PR are not listed in the patch清单 section. These are significant patches (pre-generated hardware ID database, ~13MB total) whose rationale and generation method should be documented.",
+      "fix_suggestion": "Add entries to the补丁清单 section:\n- 0002-hd_ids.h.patch: Pre-generated hd_ids.h (check_hd on 186K-line PCI data takes ~15 min)\n- 0002-hd_ids_tiny.h.patch: Pre-generated hd_ids_tiny.h (minimal hardware ID database)\n- 0002-hd.ids.patch: Pre-generated hd.ids (sorted hardware ID database)"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/h/hwinfo/25.2/conanfile.py",
+      "line": 105,
+      "description": "The flex lookup uses a hardcoded OHOS-specific fallback path: `flex_path = shutil.which(\"flex\") or \"/data/service/hnp/bin/flex\"`. While `shutil.which()` is tried first (good practice per R33), the hardcoded fallback path is extremely OHOS-specific and would silently fail on any other platform. This is acceptable for an OHOS-targeted recipe but reduces portability if the recipe is ever used outside OHOS.",
+      "fix_suggestion": "Consider making the fallback path configurable via Conan conf (e.g., `self.conf.get(\"user.flex:path\", default=\"/data/service/hnp/bin/flex\")`) or add a clear comment documenting that this path is OHOS-specific and should be updated if building on a different platform."
+    }
+  ],
+  "summary": "Audit of hwinfo 25.2 Conan recipe (branch feat/hwinfo-25.2, 9 changed files). No P0 (deception) or P1 (recipe correctness) issues found. SHA256 verified correct by downloading the source from api.opensuse.org — hash matches (3cca7025...2f8f). R34 (empty shell test) satisfied: test_package executes `hwinfo --version` binary with conanrun env. R9 (forged pass) not present. R8 (empty __OHOS__ stub) not present — platform fixes (ohos_fixup.h socket redefinition, ISDN.CDB.txt copy, lex→flex, version.h generation) are substantive. R19 (pre-compiled binaries) not present — patches are source/data files only. R37 version 25.2 correct (first adaptation, upstream version). R33 compiler obtained from Conan conf (tools.build:compiler_executables), not bare shell env vars. R39 source URL is official openSUSE Build Service. R38 commands.json exists at correct software-level path but uses non-standard schema (P2). Seven P2/P3 issues found: 1× P2 (commands.json schema mismatch — missing type/versions fields, 4-space indent), 6× P3 (R40 deep adaptation for hardware tool, notes.md dependency inconsistency, patch numbering, patch_description format, incomplete patch list, hardcoded flex fallback path). Patch files (0002-*.patch) are pre-generated build artifacts and not flagged for style per audit scope. Verdict: pass with warnings."
+}

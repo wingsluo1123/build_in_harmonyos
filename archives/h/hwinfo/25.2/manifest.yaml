@@ -1,21 +1,33 @@
 software: hwinfo
 version: 25.2
 status: built
+build_date: 2026-08-10
 build_system: makefile
-url: https://api.opensuse.org/public/source/openSUSE:Factory/hwinfo/hwinfo-25.2.tar.xz
-dependencies: []
+url: https://api.opensuse.org/public/source/openSUSE:Factory/hwinfo/hwinfo-25.2.tar.xz?rev=201
+dependencies:
+  - uuid/2.40.1
 configure_options: []
 compiler: clang
 platform: aarch64
 kernel_version: 5.10.0
-last_updated: 2026-04-29
+last_updated: 2026-08-10
 
 compilation_notes:
-  - "手动生成 version.h 文件以解决 HD_VERSION_STRING 未定义错误"
-  - "系统缺少 install 命令，手动复制文件到 staging 目录"
+  - "Pre-generated hd_ids.h patches skip slow check_hd --check --sort step"
+  - "ohos_fixup.h prevents sockaddr_storage redefinition (OHOS sysroot bug)"
+  - "ISDN.CDB.txt copied instead of symlinked (HMDFS ln -s issue)"
+  - "lex→flex symlink created for ISDN CDB lexer"
 
 issues_fixed:
-  - issue: "HD_VERSION_STRING 未定义"
-    root_cause: "Makefile 应自动生成 version.h 但未生成"
-    solution: "手动执行 echo '#define HD_VERSION_STRING \"25.2\"' > src/hd/version.h"
-    knowledge_ref: "新建知识条目 E-git2log-permission"
+  - issue: "sockaddr_storage redefinition"
+    root_cause: "OHOS sysroot linux/socket.h redefines sockaddr_storage without guard"
+    solution: "ohos_fixup.h with #define _UAPI_LINUX_SOCKET_H"
+  - issue: "HD_VERSION_STRING not defined"
+    root_cause: "git2log needs .git directory which is absent in tarball"
+    solution: "version.h generated via 0001-version.h.patch"
+  - issue: "check_hd slow on PCI data (186K lines, ~15 min)"
+    root_cause: "O(n²) complexity in --check --sort on large hardware ID files"
+    solution: "Pre-generated hd_ids.h/hd_ids_tiny.h/hd.ids patches"
+  - issue: "lex command not found"
+    root_cause: "OHOS has flex but not lex"
+    solution: "Symlink flex to lex in local_bin"
