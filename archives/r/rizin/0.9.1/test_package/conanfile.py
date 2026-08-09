@@ -4,10 +4,10 @@
 Compiles test.c which links librz_core and calls rz_core_new/cmd0/free —
 NOT a printf stub. CI's L1 gate confirms this test depends on rizin.
 
-On HarmonyOS the dynamic linker (ld-musl) uses a namespace security API
-and may gate run-time .so loading outside the signed system namespace;
-test() tolerates that platform gating via ignore_errors (CI signs ELF
-first via ci/artifacts/sign.sh).
+HarmonyOS 要求 ELF 签名后才能执行（§3 鸿蒙主机约束：可执行 ELF 必须
+sign-elf 签名）。本 test() 在运行前用 binary-sign-tool 对 test_rizin 及其
+依赖的 librz 共享库链自签名，然后严格断言退出码为 0——任何非 0 即失败，
+不再容忍"平台门禁"跳过（新增测试必须真实通过）。
 """
 import os
 from conan import ConanFile
@@ -34,26 +34,61 @@ class RizinTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run the compiled test_rizin which exercises librz_core API (R34).
+        # 新增测试必须真实通过：签名后严格运行 test_rizin，退出码非 0 即失败。
         import subprocess
         test_bin = os.path.join(self.build_folder, "test_rizin")
         if not os.path.isfile(test_bin):
-            self.output.warning("test_rizin not found — skipping (platform-gated locally)")
-            return
-        self.run(test_bin, ignore_errors=True, env=None, scope="run")
-        result = subprocess.run([test_bin], capture_output=True, text=True)
-        err = (result.stderr or "") + (result.stdout or "")
-        platform_gated = (
-            result.returncode != 0 and (
-                "Operation not permitted" in err or          # unsigned ELF
-                "Error loading shared library" in err or     # ld-musl namespace gate
-                "dlopen" in err or "namespace" in err.lower()
-            )
-        )
-        if platform_gated:
-            self.output.warning(f"test_rizin platform-gated (expected locally, passes in CI after sign): {err[:200]}")
-        elif result.returncode != 0:
             from conan.errors import ConanException
-            raise ConanException(f"test_rizin FAILED (exit {result.returncode}, NOT platform-gating): {err[:400]}")
+            raise ConanException("test_rizin 未构建 — L1 消费者测试必须真实构建")
+
+        hnp_bin = os.environ.get("HNP_BIN_DIR", "/data/service/hnp/bin")
+        sign_tool = os.path.join(hnp_bin, "binary-sign-tool")
+
+        # 签名范围：test_rizin 本身 + rizin 包内 librz_*.so 库链
+        # （ld-musl 加载 .so 链时同样要求已签名 ELF）。
+        targets = [test_bin]
+        dep = self.dependencies.get("rizin") if hasattr(self, "dependencies") else None
+        if dep is not None and getattr(dep, "package_folder", None):
+            pkg_lib = os.path.join(dep.package_folder, "lib")
+            if os.path.isdir(pkg_lib):
+                for f in sorted(os.listdir(pkg_lib)):
+                    if f.startswith("librz_") and f.endswith(".so"):
+                        targets.append(os.path.join(pkg_lib, f))
+
+        for t in targets:
+            real = os.path.realpath(t)
+            if not os.path.isfile(real) or not os.path.isfile(sign_tool):
+                continue
+            tmp = real + ".signed.tmp"
+            try:
+                r = subprocess.run(
+                    [sign_tool, "sign", "-inFile", real, "-outFile", tmp, "-selfSign", "1"],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if r.returncode == 0 and os.path.isfile(tmp):
+                    os.replace(tmp, real)
+                    # binary-sign-tool 输出文件无执行位，签名替换后补回（否则 shell 报
+                    # "can't execute: Permission denied"，Error 126）。
+                    os.chmod(real, 0o755)
+                    self.output.info(f"ELF 签名成功: {os.path.basename(real)}")
+                else:
+                    self.output.warning(f"ELF 签名失败 {os.path.basename(real)}: {(r.stderr or '')[:200]}")
+            except Exception as e:
+                self.output.warning(f"ELF 签名异常 {os.path.basename(real)}: {e}")
+            finally:
+                if os.path.isfile(tmp):
+                    os.unlink(tmp)
+
+        # 严格运行：self.run 默认在非 0 退出码时抛 ConanException（无 ignore_errors 容错）。
+        # test_rizin 运行需加载 librz 链 + 全部依赖（含传递依赖 zstd 等）的 .so；
+        # 用 shell 显式 source VirtualRunEnv 的 conanrun.sh（该脚本设置完整
+        # LD_LIBRARY_PATH，含 rizin 与 zstd 等全部依赖 lib 目录）后再运行 test_rizin，
+        # 与手动验证（source conanrun.sh 后运行 exit 0）完全一致。
+        import shlex
+        runenv_sh = os.path.join(self.build_folder, "generators", "conanrun.sh")
+        if os.path.isfile(runenv_sh):
+            cmd = "bash -c '. {} && {}'".format(shlex.quote(runenv_sh), shlex.quote(test_bin))
         else:
-            self.output.info("test_rizin PASS (rz_core API round-trip OK)")
+            cmd = test_bin
+        self.run(cmd, env=None, scope="run")
+        self.output.info("test_rizin PASS (rz_core API round-trip OK, 签名后真实运行 exit 0)")
