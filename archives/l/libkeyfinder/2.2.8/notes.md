@@ -44,3 +44,6 @@ conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos
 
 - 上游测试使用 Catch2 via FetchContent，在 OHOS 上无法运行，已禁用
 - 共享库需要在 OHOS 上进行二进制签名
+
+## 编译结束
+COMPLETED
