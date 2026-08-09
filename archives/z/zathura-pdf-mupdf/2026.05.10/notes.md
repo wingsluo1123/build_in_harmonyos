@@ -43,7 +43,7 @@
 
 | 依赖 | 版本 | 来源 |
 |------|------|------|
-| glib | 2.88.0 | cmd-pkgs → conan recipe: glib/2.84.0.1 |
+| glib | 2.84.0.1 | conan repo (glib/2.84.0.1) |
 | cairo | 1.18.4 | conan repo |
 | mupdf | 1.27.2 | built from source (bundled thirdparty) |
 | girara | 2026.02.04 | source (headers only) |

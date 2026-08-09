@@ -100,7 +100,7 @@ class ZathuraPdfMupdfConan(ConanFile):
             shutil.rmtree(dest, ignore_errors=True)
             os.makedirs(dest, exist_ok=True)
             tmpfile = os.path.join(self.source_folder, f".{dir_name}.tar.gz")
-            self.run(f'curl -L -o "{tmpfile}" "{url}" --connect-timeout 30 --max-time 120 -k -s')
+            self.run(f'curl -L -o "{tmpfile}" "{url}" --connect-timeout 30 --max-time 120 -s')
             self.run(f'tar xzf "{tmpfile}" -C "{dest}" --strip-components=1')
             os.remove(tmpfile)
 
