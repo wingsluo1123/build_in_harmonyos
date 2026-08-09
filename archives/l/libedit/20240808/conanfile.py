@@ -33,8 +33,25 @@ class LibeditConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         # HarmonyOS: use system libtinfo for termcap
-        # Create symlink libtinfo.so -> libtinfo.so.6 in build lib dir
+        # HarmonyOS only has libtinfo.so.6, not the dev symlink libtinfo.so
         if self.settings.os in ("Linux", "OHOS"):
+            # Create libtinfo.so symlink in a persistent location
+            # so both main build and test_package can find it
+            persistent_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
+            os.makedirs(persistent_lib, exist_ok=True)
+            tinfo_persistent = os.path.join(persistent_lib, "libtinfo.so")
+            if not os.path.exists(tinfo_persistent):
+                try:
+                    os.symlink("/usr/lib/libtinfo.so.6", tinfo_persistent)
+                except OSError:
+                    pass
+            # Ensure linker can find it via LD_LIBRARY_PATH
+            current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+            if persistent_lib not in current_ld:
+                os.environ["LD_LIBRARY_PATH"] = (
+                    f"{persistent_lib}:{current_ld}" if current_ld else persistent_lib
+                )
+            # Also create in build folder for main build -L flag
             lib_dir = os.path.join(self.build_folder, "lib")
             os.makedirs(lib_dir, exist_ok=True)
             tinfo_link = os.path.join(lib_dir, "libtinfo.so")
@@ -48,13 +65,24 @@ class LibeditConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+        # Touch timestamps of generated files to prevent make from
+        # trying to regenerate them (automake not available on OHOS)
+        for f in ["Makefile.in", "src/Makefile.in", "doc/Makefile.in",
+                  "examples/Makefile.in", "configure", "aclocal.m4"]:
+            path = os.path.join(self.source_folder, f)
+            if os.path.exists(path):
+                os.utime(path, None)
         autotools = Autotools(self)
         autotools.configure()
-        autotools.make()
+        # HMDFS doesn't support mkfifo (make jobserver), use -j1
+        # Set AUTOMAKE/AUTOCONF=true to bypass missing tools on OHOS
+        autotools.make(args=["-j1", "AUTOMAKE=true", "ACLOCAL=true",
+                             "AUTOCONF=true", "AUTOHEADER=true"])
 
     def package(self):
         autotools = Autotools(self)
-        autotools.install()
+        autotools.install(args=["-j1", "AUTOMAKE=true", "ACLOCAL=true",
+                                "AUTOCONF=true", "AUTOHEADER=true"])
 
     def package_info(self):
         self.cpp_info.libs = ["edit"]
