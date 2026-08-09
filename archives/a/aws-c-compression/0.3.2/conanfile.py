@@ -14,7 +14,7 @@ from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 class AwsccompressionConan(ConanFile):
     name = "aws-c-compression"
     version = "0.3.2"
-    description = "AWS C 库中的 Huffman 编码/解码组件，为 HTTP/2 HPACK 压缩提供基础"
+    description = "AWS C SDK compression library providing Huffman encoding/decoding for HTTP/2 HPACK"
     license = "Apache-2.0"
     homepage = "https://github.com/awslabs/aws-c-compression"
     url = "https://github.com/awslabs/aws-c-compression"

@@ -24,7 +24,7 @@ cmake --build build -j$(nproc)
 | 2 | test_package 找不到 aws-c-common 头文件 | CMakeDeps 在 OHOS 上不生成 includedirs | 在 CMakeLists.txt 手动添加 include 目录 |
 
 ## 依赖版本
-- aws-c-common/0.12.6
+- aws-c-common/0.14.3
 
 ## 结束
 ---
