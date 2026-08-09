@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Consumer test for vapoursynth 74."""
 
+import glob
 import os
 import shlex
 import shutil
@@ -55,6 +56,7 @@ class VapoursynthTestConan(ConanFile):
         tests_dir = os.path.join(package_folder, "tests", "upstream")
         libdir = os.path.join(package_folder, "lib")
         module_libdir = os.path.join(pythonpath, "vapoursynth")
+        self._ensure_runtime_shared_library_permissions(package_folder)
         test_modules = [
             "async_test",
             "environment_test",
@@ -80,6 +82,13 @@ class VapoursynthTestConan(ConanFile):
         cmd = "{} python3 -m unittest {}".format(env, " ".join(test_modules))
         self.run(cmd, env="conanrun")
         self._run_expr_compiler_harness(tests_dir)
+
+    def _ensure_runtime_shared_library_permissions(self, package_folder):
+        if self.settings.os != "OHOS":
+            return
+        for shared_lib in glob.glob(os.path.join(package_folder, "**", "*.so*"), recursive=True):
+            if not os.path.islink(shared_lib):
+                os.chmod(shared_lib, 0o755)
 
     def _build_expr_debugger(self, cxx):
         dep = self.dependencies["vapoursynth"]
