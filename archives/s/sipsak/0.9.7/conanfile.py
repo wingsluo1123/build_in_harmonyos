@@ -37,6 +37,15 @@ class SipsakConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # Exported sources are not automatically placed in the source folder
+        # during cache builds; overlay the bundled Check shim explicitly.
+        copy(
+            self,
+            "files",
+            self.export_sources_folder,
+            self.source_folder,
+            keep_path=True,
+        )
 
     def generate(self):
         VirtualBuildEnv(self).generate()
