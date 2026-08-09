@@ -1,6 +1,19 @@
 --- rsyslog-8.2604.0.orig/plugins/omprog/omprog.c	2026-08-07 23:56:17.177681407 +0800
 +++ rsyslog-8.2604.0.work/plugins/omprog/omprog.c	2026-08-07 23:59:35.409682813 +0800
-@@ -794,7 +794,14 @@
+@@ -653,1 +653,4 @@
++/* OHOS: SIGUSR1 handler: set atomic flag so worker loop can exit */
++static volatile sig_atomic_t rsyslogd_sigusr1_flag = 0;
++static void rsyslogd_sigusr1_handler(int sig) { (void)sig; rsyslogd_sigusr1_flag = 1; }
+ static void *captureOutput(void *_pCtx) {
+@@ -654,1 +657,7 @@
++    /* OHOS: register SIGUSR1 handler for graceful shutdown */
++    struct sigaction sa_ohos;
++    memset(&sa_ohos, 0, sizeof(sa_ohos));
++    sa_ohos.sa_handler = rsyslogd_sigusr1_handler;
++    sigemptyset(&sa_ohos.sa_mask);
++    sigaction(SIGUSR1, &sa_ohos, NULL);
+     outputCaptureCtx_t *pCtx = (outputCaptureCtx_t *)_pCtx;
+@@ -794,7 +803,14 @@
          LogMsg(0, NO_ERRCODE, LOG_WARNING,
                 "omprog: forcing termination of output capture "
                 "thread because of unresponsive child process");

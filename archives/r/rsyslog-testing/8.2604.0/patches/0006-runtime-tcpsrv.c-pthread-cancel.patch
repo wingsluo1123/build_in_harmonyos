@@ -15,3 +15,16 @@
              }
              for (unsigned i = 0; i < created; ++i) {
                  (void)pthread_join(queue->wrkr_tids[i], NULL);
+@@ -1401,1 +1408,4 @@
++/* OHOS: SIGUSR1 handler: set atomic flag so worker loop can exit */
++static volatile sig_atomic_t rsyslogd_sigusr1_flag = 0;
++static void rsyslogd_sigusr1_handler(int sig) { (void)sig; rsyslogd_sigusr1_flag = 1; }
+ static void ATTR_NONNULL() * wrkr(void *arg) {
+@@ -1402,1 +1412,7 @@
++    /* OHOS: register SIGUSR1 handler for graceful shutdown */
++    struct sigaction sa_ohos;
++    memset(&sa_ohos, 0, sizeof(sa_ohos));
++    sa_ohos.sa_handler = rsyslogd_sigusr1_handler;
++    sigemptyset(&sa_ohos.sa_mask);
++    sigaction(SIGUSR1, &sa_ohos, NULL);
+     tcpsrv_t *const pThis = (tcpsrv_t *)arg;

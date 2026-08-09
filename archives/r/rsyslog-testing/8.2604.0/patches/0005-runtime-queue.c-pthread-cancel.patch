@@ -94,7 +94,14 @@
      DBGOPRINT((obj_t *)pThis, "MultiEnqObj advised worker start\n");
  
      RETiRet;
-@@ -3697,7 +3719,9 @@
+@@ -3692,4 +3714,6 @@
+ rsRetVal qqueueEnqMsg(qqueue_t *pThis, flowControl_t flowCtlType, smsg_t *pMsg) {
+     DEFiRet;
++#ifdef HAVE_PTHREAD_CANCEL
+     int iCancelStateSave;
++#endif
+     ISOBJ_TYPE_assert(pThis, qqueue);
+@@ -3697,7 +3721,9 @@
      const int isNonDirectQ = pThis->qType != QUEUETYPE_DIRECT;
  
      if (isNonDirectQ) {
@@ -104,7 +111,7 @@
          d_pthread_mutex_lock(pThis->mut);
      }
  
-@@ -3711,7 +3735,9 @@
+@@ -3711,7 +3737,9 @@
          qqueueAdviseMaxWorkers(pThis);
          /* and release the mutex */
          d_pthread_mutex_unlock(pThis->mut);

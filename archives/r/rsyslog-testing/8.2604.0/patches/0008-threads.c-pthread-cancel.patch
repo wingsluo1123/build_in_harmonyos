@@ -15,7 +15,7 @@
              break;
          } else if (ret != 0) {
              char errStr[1024];
-@@ -180,7 +157,14 @@
+@@ -180,7 +187,14 @@
                      "input thread %s\n",
                      pThis->name);
          }
@@ -30,3 +30,16 @@
      } else {
          thrdTerminateNonCancel(pThis);
      }
+@@ -208,1 +222,4 @@
++/* OHOS: SIGUSR1 handler: set atomic flag so worker loop can exit */
++static volatile sig_atomic_t rsyslogd_sigusr1_flag = 0;
++static void rsyslogd_sigusr1_handler(int sig) { (void)sig; rsyslogd_sigusr1_flag = 1; }
+ static ATTR_NORETURN void *thrdStarter(void *const arg) {
+@@ -209,1 +226,7 @@
++    /* OHOS: register SIGUSR1 handler for graceful shutdown */
++    struct sigaction sa_ohos;
++    memset(&sa_ohos, 0, sizeof(sa_ohos));
++    sa_ohos.sa_handler = rsyslogd_sigusr1_handler;
++    sigemptyset(&sa_ohos.sa_mask);
++    sigaction(SIGUSR1, &sa_ohos, NULL);
+     DEFiRet;

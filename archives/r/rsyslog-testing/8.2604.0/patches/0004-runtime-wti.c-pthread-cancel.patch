@@ -15,13 +15,26 @@
          pthread_kill(thrdID, SIGTTIN);
          DBGPRINTF("cooperative worker termination failed, using cancellation...\n");
          DBGOPRINT((obj_t *)pThis, "canceling worker thread\n");
-@@ -405,3 +412,5 @@
+@@ -400,1 +407,4 @@
++/* OHOS: SIGUSR1 handler: set atomic flag so worker loop can exit */
++static volatile sig_atomic_t rsyslogd_sigusr1_flag = 0;
++static void rsyslogd_sigusr1_handler(int sig) { (void)sig; rsyslogd_sigusr1_flag = 1; }
+ PRAGMA_IGNORE_Wempty_body rsRetVal wtiWorker(wti_t *__restrict__ const pThis) {
+@@ -401,1 +411,7 @@
++    /* OHOS: register SIGUSR1 handler for graceful shutdown */
++    struct sigaction sa_ohos;
++    memset(&sa_ohos, 0, sizeof(sa_ohos));
++    sa_ohos.sa_handler = rsyslogd_sigusr1_handler;
++    sigemptyset(&sa_ohos.sa_mask);
++    sigaction(SIGUSR1, &sa_ohos, NULL);
+     wtp_t *__restrict__ const pWtp = pThis->pWtp; /* our worker thread pool -- shortcut */
+@@ -405,3 +421,5 @@
      actWrkrInfo_t *__restrict__ wrkrInfo;
 +#ifdef HAVE_PTHREAD_CANCEL
      int iCancelStateSave;
 +#endif
      int i, j, k;
-@@ -415,7 +424,9 @@
+@@ -415,7 +433,9 @@
       * - queue consumers enable it only around explicitly cancel-safe work
       * - critical cleanup/state transitions run with cancellation disabled
       */
@@ -31,7 +44,7 @@
      DBGPRINTF("wti %p: worker starting\n", pThis);
      /* now we have our identity, on to real processing */
  
-@@ -499,7 +510,9 @@
+@@ -499,7 +519,9 @@
  
      /* indicate termination */
      pthread_cleanup_pop(0); /* remove cleanup handler */

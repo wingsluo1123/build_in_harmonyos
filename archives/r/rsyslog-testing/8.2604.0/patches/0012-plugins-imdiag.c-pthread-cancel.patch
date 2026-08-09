@@ -1,6 +1,19 @@
 --- rsyslog-8.2604.0.orig/plugins/imdiag/imdiag.c	2026-08-07 23:56:17.217681563 +0800
 +++ rsyslog-8.2604.0.work/plugins/imdiag/imdiag.c	2026-08-07 23:59:42.585680469 +0800
-@@ -986,7 +986,14 @@
+@@ -730,1 +730,4 @@
++/* OHOS: SIGUSR1 handler: set atomic flag so worker loop can exit */
++static volatile sig_atomic_t rsyslogd_sigusr1_flag = 0;
++static void rsyslogd_sigusr1_handler(int sig) { (void)sig; rsyslogd_sigusr1_flag = 1; }
+ static void *timeoutGuard(ATTR_UNUSED void *arg) {
+@@ -731,1 +734,7 @@
++    /* OHOS: register SIGUSR1 handler for graceful shutdown */
++    struct sigaction sa_ohos;
++    memset(&sa_ohos, 0, sizeof(sa_ohos));
++    sa_ohos.sa_handler = rsyslogd_sigusr1_handler;
++    sigemptyset(&sa_ohos.sa_mask);
++    sigaction(SIGUSR1, &sa_ohos, NULL);
+     assert(abortTimeout != -1);
+@@ -986,7 +995,14 @@
  
      /* clean up timeoutGuard if active */
      if (abortTimeout != -1) {
