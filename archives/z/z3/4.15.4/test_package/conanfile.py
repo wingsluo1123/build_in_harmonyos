@@ -26,7 +26,6 @@ class Z3TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Also run the binary directly to verify z3 C API
-        self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_z3')}", env="conanrun")
+        # Run the test binary that uses z3 C API to verify the library
+        test_bin = os.path.join(self.cpp.build.bindirs[0], "test_z3")
+        self.run(test_bin, env="conanrun")
