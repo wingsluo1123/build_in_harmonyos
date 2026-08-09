@@ -1,0 +1,1 @@
+. "/storage/Users/currentUser/tmp/skill/build_in_harmonyos/archives/l/libexif/0.6.26/test_package/build/clang-15-armv8-17-release/generators/conanrunenv-release-armv8.sh"
