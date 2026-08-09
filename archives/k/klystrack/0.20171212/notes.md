@@ -23,6 +23,9 @@ make install CFG=release PREFIX=/staging
 # 上游无自动化测试套件
 # klystrack 是 chiptune tracker 纯音频应用，C 项目无 test/ 目录无 Makefile test target
 # test_package 验证 bin/klystrack --version 输出非空 + --help 退出码 0
+# 上游测试核对（2026-08-09，CI #16863 checkout-pr 网络问题后复核）：
+#   源码树无 tests/ 无 test/ 目录，Makefile 无 test/check target（仅 install bundle 用
+#   test -d），确认上游无自动化测试；适配后 test_package 消费测试为唯一验证点
 
 ## 适配要点
 - Makefile 构建（非 configure），用 CPPFLAGS/LDFLAGS 注入 SDL2/SDL2_image 头路径+库路径
