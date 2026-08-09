@@ -4,6 +4,8 @@
 CI runs this automatically via `conan create` (which invokes test_package).
 File location: archives/a/aws-c-sdkutils/0.2.4/test_package/conanfile.py
 """
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -26,3 +28,4 @@ class AwscsdkutilsTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_aws_c_sdkutils"), env="conanrun")
