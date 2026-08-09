@@ -24,3 +24,4 @@
 ## 结束
 status: closed
 COMPLETED — aws-checksums 0.2.10 适配完成，conan-verify 全部通过。
+# CI trigger
