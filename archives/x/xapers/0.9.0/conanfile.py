@@ -123,6 +123,12 @@ class XapersConan(ConanFile):
         cc_cmd = cc.get("c", "clang")
         cxx_cmd = cc.get("cpp", cc_cmd + "++")
         config_shell = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/system/bin/sh"
+        # 完整工具链：CI 干净 PATH 无 ar/ranlib/nm/ld（本地有才没暴露），
+        # configure 的 C compiler 测试需要它们（参照 xapian-core 配方）
+        ar = shutil.which("llvm-ar") or shutil.which("ar") or "ar"
+        ranlib = shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib"
+        nm = shutil.which("llvm-nm") or shutil.which("nm") or "nm"
+        ld = shutil.which("ld.lld") or shutil.which("ld") or "ld"
 
         configure_args = (
             f'--build=aarch64-linux-gnu --host=aarch64-linux-gnu '
@@ -133,7 +139,8 @@ class XapersConan(ConanFile):
             f'LDFLAGS="-L{xc_lib}"'
         )
         self.run(
-            f'CC="{cc_cmd}" CXX="{cxx_cmd}" CONFIG_SHELL="{config_shell}" '
+            f'CC="{cc_cmd}" CXX="{cxx_cmd}" AR="{ar}" RANLIB="{ranlib}" '
+            f'NM="{nm}" LD="{ld}" CONFIG_SHELL="{config_shell}" '
             f'{config_shell} ./configure {configure_args}',
             cwd=bind_dir,
         )
