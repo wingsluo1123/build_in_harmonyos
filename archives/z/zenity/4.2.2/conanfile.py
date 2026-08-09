@@ -138,6 +138,9 @@ class ZenityConan(ConanFile):
                     libdir = os.path.join(dep.package_folder, libdir)
                 if os.path.isdir(libdir):
                     env.prepend_path("LD_LIBRARY_PATH", libdir)
+                pcdir = os.path.join(libdir, "pkgconfig")
+                if os.path.isdir(pcdir):
+                    env.prepend_path("PKG_CONFIG_PATH", pcdir)
         env.vars(self, scope="build").save_script(
             "conanbuildenv_zenity_tools"
         )
