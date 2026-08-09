@@ -4,6 +4,7 @@
 L1 test: verify the plugin .so is a valid ELF with expected exported symbols.
 """
 import os
+import shutil
 import ctypes
 import subprocess
 
@@ -18,6 +19,17 @@ class AbiwordPluginEmlTestConan(ConanFile):
 
     def test(self):
         pkg_folder = self.dependencies["abiword-plugin-eml"].package_folder
+
+        # L0d: run a real test program via self.run() — test_eml.sh verifies
+        # eml.so ELF validity + ABI exported symbols via readelf (L0c 测试源文件,
+        # 否则 CI 报 'no_test_sources stub_test_method no_manifest' 门禁失败)。
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
+        script = os.path.join(self.source_folder, "test_eml.sh")
+        self.run(
+            f'"{bash}" "{script}" "{pkg_folder}"',
+            env="conanrun",
+        )
+
         plugin_dir = os.path.join(pkg_folder, "lib", "abiword", "plugins")
 
         # Find the eml plugin .so — keep full path to avoid basename/join mismatch

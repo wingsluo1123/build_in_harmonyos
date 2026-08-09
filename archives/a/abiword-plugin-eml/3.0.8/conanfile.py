@@ -5,6 +5,7 @@ AbiWord EML (Outlook Express Email) export plugin.
 Part of the AbiWord 3.0.8 source tree.
 """
 import os
+import re
 import subprocess
 
 from conan import ConanFile
@@ -94,6 +95,62 @@ class AbiwordPluginEmlConan(ConanFile):
         # 显式注入 PKG_CONFIG_PATH 指向 generators_folder(含 libgsf-1.pc 等)。
         _gens = self.generators_folder
         tc.configure_args.append("PKG_CONFIG_PATH={}".format(_gens))
+        # AbiWord 主 configure 用 PKG_CHECK_MODULES 单独检查 glib-2.0/gthread-2.0/
+        # gobject-2.0(PkgConfigDeps 因 glib 无 components 且经 libgsf 传递依赖,
+        # 未生成 glib-2.0.pc),configure 报 "No package 'glib-2.0' found"
+        # (CI 实测)。补写 glib-2.0.pc 本体(探测 glib 包目录) + 从它派生
+        # gobject/gthread .pc(同 libgsf 修复)。
+        import glob as _glob
+        _glib_root = None
+        for _gp in _glob.glob("/storage/Users/currentUser/.conan2/p/b/glib*/p"):
+            if os.path.isdir(os.path.join(_gp, "include", "glib-2.0")):
+                _glib_root = _gp
+                break
+        _glib_pc_src = os.path.join(_gens, "glib-2.0.pc")
+        _glib_pc_cflags = "-I${includedir} -I${includedir1}"
+        if os.path.exists(_glib_pc_src):
+            with open(_glib_pc_src, "r", encoding="utf-8", errors="ignore") as _f:
+                _glib_pc_text = _f.read()
+            _m = re.search(r"^Cflags:\s*(.+)$", _glib_pc_text, re.M)
+            if _m:
+                _glib_pc_cflags = _m.group(1).strip()
+        # glib-2.0.pc 本体(缺失时补写: Requires 链的根,不写则 gthread/gobject
+        # 的 Requires: glib-2.0 解析失败 → configure 报 No package 'glib-2.0')
+        if not os.path.exists(_glib_pc_src) and _glib_root:
+            _pc_text = (
+                "prefix={}\n"
+                "libdir=${{prefix}}/lib\n"
+                "includedir=${{prefix}}/include/glib-2.0\n"
+                "includedir1=${{prefix}}/lib/glib-2.0/include\n"
+                "\n"
+                "Name: glib-2.0\n"
+                "Description: Conan package: glib-2.0\n"
+                "Version: 2.84.0\n"
+                "Libs: -L${{libdir}} -lglib-2.0\n"
+                "Cflags: -I${{includedir}} -I${{includedir1}}\n"
+            ).format(_glib_root)
+            with open(_glib_pc_src, "w", encoding="utf-8") as _f:
+                _f.write(_pc_text)
+        for _pcname, _libname in (("gobject-2.0.pc", "gobject-2.0"),
+                                  ("gthread-2.0.pc", "gthread-2.0")):
+            _pf = os.path.join(_gens, _pcname)
+            if not os.path.exists(_pf):
+                _pc_text = (
+                    "prefix=${{pcfiledir}}/../..\n"
+                    "libdir=${{prefix}}/lib\n"
+                    "includedir=${{prefix}}/include/glib-2.0\n"
+                    "includedir1=${{prefix}}/lib/glib-2.0/include\n"
+                    "\n"
+                    "Name: {}\n"
+                    "Description: Conan package: {}\n"
+                    "Version: 2.84.0\n"
+                    "Libs: -L${{libdir}} -l{}\n"
+                    "Cflags: {}\n"
+                    "Requires: glib-2.0\n"
+                ).format(_pcname.replace(".pc", ""), _pcname.replace(".pc", ""),
+                         _libname, _glib_pc_cflags)
+                with open(_pf, "w", encoding="utf-8") as _f:
+                    _f.write(_pc_text)
         # AbiWord 主 configure 强检全套 GUI 依赖(gtk+-3.0/cairo/pangocairo 等),
         # eml 插件仅需 libgsf/glib。configure 支持 DEPS_CFLAGS/DEPS_LIBS 预置
         # 绕过 pkg-config 检测,注入指向 libgsf/glib 的 include/lib 路径。
