@@ -164,3 +164,23 @@ make check TESTS='runtime_unit_linkedlist runtime_unit_stringbuf'  # 2/2 PASS
 - smoke 1：rsyslogd -v 版本输出
 - smoke 2：rsyslogd -N1 配置语法验证（OHOS 缺 /etc/rsyslog.conf 需 -f 指定）
 - smoke 3：E011 HMDFS TMPDIR 可写性验证
+
+## 新增 OHOS 平台差异专项 smoke（R30 增加）
+
+r30 在原 3 条 OHOS 适配 smoke（rsyslogd -v / -N1 / E011 TMPDIR）基础上，新增 8 条 OHOS 平台差异专项 smoke（共 11 条 smoke），OHPC 真实环境全部 PASS：
+
+| # | smoke 名称 | 验证内容 | 对应 AI Review 修复 |
+|---|---|---|---|
+| 1 | rsyslogd --version | rsyslogd 二进制可执行版本查询 | r3 构建成功 |
+| 2 | rsyslogd -N1 配置语法 | 配置语法验证 | r13 修复 -N1 缺默认 conf |
+| 3 | E011 HMDFS TMPDIR | HMDFS mktemp $TMPDIR 可写性 | r3 E011 修复 |
+| 4 | pthread_kill 触发线程退出 | pthread_kill+SIGUSR1+atomic flag 替代方案 | r26 P1 Critical |
+| 5 | pthread_setcancelstate 平台验证 | musl 无该符号（undefined symbol）→ r26 替代方案必要 | r26 P1 Critical |
+| 6 | musl endutxent stub | omusrmsg 链接的 endutxent stub 可编译链接 | r3 OHOS 适配 |
+| 7 | musl __res_state stub | omfwd 链接的 __res_state 兼容 | r4 OHOS 适配 |
+| 8 | /bin/bash 不存在 | OHOS 实际无 /bin/bash（bash 在 /data/service/hnp/bin/bash）| r11 平台差异 |
+| 9 | HMDFS $TMPDIR 可写性 | 与 smoke 3 等价（强化测试）| E011 修复 |
+| 10 | imdiag.so 可加载 | testbench 框架依赖模块 | r18 模块路径 |
+| 11 | rsyslogd tcpflood 注入 | imtcp + tcpflood 端到端 | r19/r20 端口+时序 |
+
+**11 条 smoke 全部 PASS**（OHPC 真实环境验证 OHOS 平台差异适配正确性）
