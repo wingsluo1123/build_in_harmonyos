@@ -32,7 +32,7 @@ class DuneConan(ConanFile):
 
     def requirements(self):
         # OCaml 4.14.1.1 已在制品仓（PR #3767 合入），dune 自举需要 ocaml 编译器
-        self.tool_requires("ocaml/4.14.1.1")
+        self.tool_requires("ocaml/4.14.1.1.1")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -59,6 +59,13 @@ class DuneConan(ConanFile):
             os.environ["CFLAGS"] = os.environ.get("CFLAGS", "") + " -DHAVE_PTHREAD_SETCANCELSTATE"
         else:
             self.output.info("pthread_setcancelstate NOT available (OHOS) - feature macro disabled")
+        # OCaml 来自 tool_requires（制品仓），但其配方未声明 bindirs，
+        # conanbuild 环境不会自动注入 bin——显式注入 ocaml bin 到 PATH
+        # （ocaml 是 build 依赖 tool_requires，须用 dependencies.build 访问）
+        ocaml_dep = self.dependencies.build["ocaml"]
+        ocaml_bin = os.path.join(ocaml_dep.package_folder, "bin")
+        os.environ["PATH"] = ocaml_bin + os.pathsep + os.environ.get("PATH", "")
+        self.output.info(f"ocaml bin 注入 PATH: {ocaml_bin}")
         # Step 1: Bootstrap - build _boot/dune.exe
         # env="conanbuild" 注入 tool_requires（ocaml）的 bin 到 PATH，bootstrap 才能找到 ocaml
         self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
