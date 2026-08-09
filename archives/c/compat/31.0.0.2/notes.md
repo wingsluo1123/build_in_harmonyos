@@ -52,18 +52,20 @@ dependency paths.
 
 Validated on OHOS PC through the repository Conan CI scripts.
 
-- SSH port: `56267`
+- SSH port: `33332`
 - Run directory:
-  `/storage/Users/currentUser/ohos-test-runs/codex-a-compat-31.0.0.2-r13-20260803-140029-24622`
+  `/storage/Users/currentUser/ohos-test-runs/codex-a-compat-ol-chain-ncurses65-20260809-r1-compat-r1-conan-20260809-121741-15972`
 - Package:
-  `compat/31.0.0.2#9ac87ab03d9c3a199d797b994c978f41:da39a3ee5e6b4b0d3255bfef95601890afd80709#194805efb3ae8dbf12a4c07ae9b50616`
+  `compat/31.0.0.2#0cfcaa3e5f23dbaca798952aba53f80b:da39a3ee5e6b4b0d3255bfef95601890afd80709#194805efb3ae8dbf12a4c07ae9b50616`
 - Upstream commands: `make compile`, `make test`, `make check`
-- Upstream ERT result: 223 registered and executed, 221 expected results,
-  0 unexpected results, 2 skipped
-- Skipped ERT tests: `compat-make-nearby-temp-file`,
+- Upstream ERT result: 223 registered and executed, 219 expected results,
+  0 unexpected results, 4 skipped
+- Skipped ERT tests: `compat-exec-path`, `compat-executable-find`,
+  `compat-make-nearby-temp-file`,
   `compat-temporary-file-directory`
-- Skip reason: the OHOS runner cannot access `/tmp` through the mock TRAMP
-  remote used by those upstream checks
+- Skip reason: the OHOS runner command environment intentionally isolates
+  executable lookup, and it cannot access `/tmp` through the mock TRAMP remote
+  used by the temporary-file checks.
 - `make check`: passed after redirecting temporary comparison files to
   `TMPDIR`
 - `test_package`: passed; output included
@@ -73,6 +75,6 @@ Validated on OHOS PC through the repository Conan CI scripts.
   pass, L5 warn because this pure Emacs Lisp package has no `bin/` or `lib/`
   artifact directory
 
-The validation used the already-built local `emacs/29.1` and `ncurses/6.5`
-packages in the isolated Conan cache. Remote CI will require those dependencies
-to be published in the package registry.
+This validation reused the same isolated Conan home after `emacs/29.1` was
+rebuilt against remote `ncurses/6.5`. Remote CI will require `emacs/29.1` to
+be published before `compat/31.0.0.2`.
