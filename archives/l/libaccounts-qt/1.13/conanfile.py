@@ -83,7 +83,7 @@ class LibaccountsQtConan(ConanFile):
         # Download Qt5 source
         qt5_src_dir = os.path.join(self.build_folder, "qt5-src")
         get(self, qt5_src_url, sha256=qt5_src_sha256,
-            destination=os.path.dirname(qt5_src_dir))
+            destination=qt5_src_dir, strip_root=True)
         qt5_src = qt5_src_dir
 
         # Run syncqt.pl to generate QtXml headers
@@ -213,20 +213,23 @@ TargetSpec=linux-clang
 HostSpec=linux-clang
 """)
 
-        # Create build dir symlinks (qmake uses hardcoded build paths)
+        # Create build dir symlinks (qmake has hardcoded build paths in binary)
+        # This is necessary because qmake looks for mkspecs in the build directory
+        # even when qt.conf is set. The symlinks redirect to the package directory.
         conan_b_dir = os.path.join(os.path.expanduser("~"), ".conan2", "p", "b")
         if os.path.isdir(conan_b_dir):
             for d in os.listdir(conan_b_dir):
                 if d.startswith("qt5-"):
                     build_path = os.path.join(conan_b_dir, d, "b")
-                    for sub in ["mkspecs", "include", "lib", "bin", "src",
-                                 "plugins", "libexec"]:
-                        link = os.path.join(build_path, sub)
-                        if not os.path.exists(link):
-                            try:
-                                os.symlink(os.path.join(qt5_prefix, sub), link)
-                            except (OSError, FileExistsError):
-                                pass
+                    if os.path.isdir(build_path):
+                        for sub in ["mkspecs", "include", "lib", "bin", "src",
+                                     "plugins", "libexec"]:
+                            link = os.path.join(build_path, sub)
+                            if not os.path.exists(link):
+                                try:
+                                    os.symlink(os.path.join(qt5_prefix, sub), link)
+                                except OSError:
+                                    pass  # Symlink creation may fail, non-critical
                     break
 
     def generate(self):
