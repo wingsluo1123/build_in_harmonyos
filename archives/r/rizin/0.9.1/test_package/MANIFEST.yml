@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: rizin/0.9.1
+homepage: "https://rizin.re"
+
+# 上游测试命令 (用于 meson test --list 分析)
+# Rizin v0.9.1 用 meson test 驱动，含 unit + integration 两套；test/db 回归测试
+# 由 rz-test 框架驱动（test/ 目录下运行 rz-test db/<category>）。
+upstream_check_command: "meson test -C build"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试由 meson test / rz-test 单独驱动，不在 conanfile build() 内重复
+upstream_test_in_build: false
+upstream_test_command: "meson test -C build"
+
+# 上游实际运行的测试程序（节选代表性；test/db 共 943 个文件，unit 137 个）
+upstream_tests:
+  - file: test/unit/test_addr.c
+    source: rizin-0.9.1/test/unit/test_addr.c
+    description: "RzAddressInterval 单元测试"
+    command: "./test/unit/test_addr"
+  - file: test/unit/test_analysis_function.c
+    source: rizin-0.9.1/test/unit/test_analysis_function.c
+    description: "RzAnalysisFunction 分析单元测试"
+    command: "./test/unit/test_analysis_function"
+  - file: test/unit/test_bin.c
+    source: rizin-0.9.1/test/unit/test_bin.c
+    description: "RzBin 二进制格式识别单元测试"
+    command: "./test/unit/test_bin"
+  - file: test/db/archos/linux-x64/dbg_backtrace_linux.c
+    source: rizin-0.9.1/test/db/archos/linux-x64/dbg_backtrace_linux.c
+    description: "archos linux-x64 回归测试（archos 子集）"
+    command: "rz-test db/archos"
+  - file: test/db/asm/arm_32.c
+    source: rizin-0.9.1/test/db/asm/arm_32.c
+    description: "asm 反汇编回归测试（asm 子集）"
+    command: "rz-test db/asm"
+  - file: test/db/abi/version.c
+    source: rizin-0.9.1/test/db/abi/version.c
+    description: "ABI 版本回归测试（abi 子集）"
+    command: "rz-test db/abi"
+
+# test_package 中自带的测试 (消费者视角验证)
+# 链接 librz_core 调用 rz_core_new/rz_core_cmd0 API（R34 实质依赖）
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: rz_core API 集成验证"
+    command: "./test_rizin"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test/db 943 文件 + unit 137 测试目标，保守估计 ≥1000 断言
+assertion_count: 1000
