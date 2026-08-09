@@ -27,7 +27,7 @@ class ZarithConan(ConanFile):
 
     def requirements(self):
         # OCaml 4.14.1.1 已在制品仓（PR #3767 合入），zarith 构建需要 ocaml 编译器
-        self.tool_requires("ocaml/4.14.1.1")
+        self.tool_requires("ocaml/4.14.1.1.1")
         # GMP 6.3.0 已在制品仓，zarith 需要 gmp.h（configure 检测 GMP/MPIR）
         self.requires("gmp/6.3.0")
 
