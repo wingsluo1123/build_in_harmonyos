@@ -70,9 +70,9 @@ class Gtk4Conan(ConanFile):
         self.requires("fribidi/1.0.16")
         self.requires("gdk-pixbuf/2.44.6")
         self.requires("libepoxy/1.5.10")
-        self.requires("fontconfig/2.18.1")
-        self.requires("freetype/2.14.3")
         self.requires("graphene/1.10.8")
+        # Override fontconfig to resolve version conflict between cairo-gobject (2.18.1.1) and pango (2.18.1)
+        self.requires("fontconfig/2.18.1.1", override=True)
 
     def layout(self):
         basic_layout(self, src_folder=".")
