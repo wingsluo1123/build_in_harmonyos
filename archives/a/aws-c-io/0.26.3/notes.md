@@ -33,3 +33,7 @@ cmake --build build -j$(nproc)
 ## 注意事项
 - BYO_CRYPTO=ON 禁用 TLS，不影响基本 IO
 - 编译产物: libaws-c-io.a (422KB)
+---
+
+**编译结束**: 2026-08-05 05:13
+**最终状态**: built
