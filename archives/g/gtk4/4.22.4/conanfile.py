@@ -184,8 +184,44 @@ class Gtk4Conan(ConanFile):
             )
         open(pc, "w").write("".join(out))
 
+    def _generate_pango_pc_files(self):
+        """Generate pangocairo.pc and pangoft2.pc that PkgConfigDeps misses."""
+        pango = self.dependencies.get("pango")
+        if not pango:
+            return
+        pango_folder = pango.package_folder
+        pango_libdir = os.path.join(pango_folder, "lib")
+        pango_incdir = os.path.join(pango_folder, "include", "pango-1.0")
+        # pangocairo.pc
+        pangocairo_pc = os.path.join(self.generators_folder, "pangocairo.pc")
+        if not os.path.isfile(pangocairo_pc):
+            with open(pangocairo_pc, "w") as f:
+                f.write("prefix=%s\n" % pango_folder)
+                f.write("libdir=${prefix}/lib\n")
+                f.write("includedir=${prefix}/include\n\n")
+                f.write("Name: Pango Cairo\n")
+                f.write("Description: Cairo rendering support for Pango\n")
+                f.write("Version: 1.56.4\n")
+                f.write("Requires: pango, cairo\n")
+                f.write("Libs: -L${libdir} -lpangocairo-1.0\n")
+                f.write("Cflags: -I${includedir}/pango-1.0\n")
+        # pangoft2.pc
+        pangoft2_pc = os.path.join(self.generators_folder, "pangoft2.pc")
+        if not os.path.isfile(pangoft2_pc):
+            with open(pangoft2_pc, "w") as f:
+                f.write("prefix=%s\n" % pango_folder)
+                f.write("libdir=${prefix}/lib\n")
+                f.write("includedir=${prefix}/include\n\n")
+                f.write("Name: Pango FT2\n")
+                f.write("Description: FT2 and FC support for Pango\n")
+                f.write("Version: 1.56.4\n")
+                f.write("Requires: pango\n")
+                f.write("Libs: -L${libdir} -lpangoft2-1.0\n")
+                f.write("Cflags: -I${includedir}/pango-1.0\n")
+
     def generate(self):
         PkgConfigDeps(self).generate()
+        self._generate_pango_pc_files()
         self._prepare_glib_build_tools()
         self._fix_glib_pc()
 
