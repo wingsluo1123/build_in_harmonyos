@@ -4,7 +4,7 @@ from conan import ConanFile
 from conan.tools.files import get
 import os
 from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps, cmake_layout
-from conan.tools.files import apply_conandata_patches
+from conan.tools.files import apply_conandata_patches, export_conandata_patches
 
 
 
@@ -24,6 +24,11 @@ class FftwConan(ConanFile):
     def configure(self):
         if self.options.shared:
             self.options.rm_safe("fPIC")
+
+    def export_sources(self):
+        # 把 patches/ 一起导出到 conan 缓存，apply_conandata_patches 才能在源码树里找到补丁。
+        # exports_sources = "patches/*" 已声明，export_sources() 方法保证新版 conan 也导出。
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -64,7 +69,7 @@ class FftwConan(ConanFile):
         # 里 configure_extra 拒绝 --enable-shared 那段）。
         tc.variables["BUILD_SHARED_LIBS"] = self.options.shared
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
-        tc.variables["BUILD_TESTS"] = "OFF"
+        tc.variables["BUILD_TESTS"] = "ON"
         tc.variables["ENABLE_THREADS"] = "ON"
         tc.variables["WITH_COMBINED_THREADS"] = "OFF"
         tc.variables["ENABLE_OPENMP"] = "OFF"
@@ -81,6 +86,8 @@ class FftwConan(ConanFile):
         cmake = CMake(self)
         cmake.configure(build_script_folder="")
         cmake.build()
+        # ── 上游官方测试 (必做) ──
+        cmake.test()
 
     def package(self):
         CMake(self).install()
