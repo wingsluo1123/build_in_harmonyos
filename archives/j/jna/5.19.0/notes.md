@@ -51,3 +51,6 @@
 - BiSheng JDK 需拷贝至可写路径并全量自签名后才能加载自定义 JNI 库
 - Platform.getOSType() 返回 -1（HarmonyOS 不被识别）
 - 使用方式：`$JAVA_HOME/bin/java -cp jna.jar:your-app.jar YourApp`
+
+## 结束
+COMPLETED: jna 5.19.0 Conan adaptation finished successfully

@@ -1,23 +1,30 @@
 version: "5.19.0"
-status: published
-build_date: "2026-04-21"
+software: jna
+status: built
+build_date: "2026-08-10"
+build_system: custom
 
 source:
-  url: "https://github.com/java-native-access/jna"
-  tar_format: git
+  url: "https://github.com/java-native-access/jna/archive/refs/tags/5.19.0.tar.gz"
+  sha256: "5dc3b1eb7e9030c9cee3b503f5d0891d81f55f81222f2ebfb435e7d6731111f6"
+  tar_format: tar.gz
 
 build:
   system: custom
+  configure_options: []
   dependencies:
-    - bishengjdk17
-    - libffi/8.2.0
+    - libffi/3.4.4
   cc: clang
+  cxx: clang++
 
 patches_applied: []
 
 knowledge_gained:
-  - "BiSheng JDK System.load 要求 .so 与 JVM 使用同一签名体系，需拷贝 JDK 并全量自签名"
-  - "JNA 检测鸿蒙为 harmonyos-aarch64（非 linux-aarch64）"
-  - "JAR 必须包含 com/sun/jna/harmonyos-aarch64/libjnidispatch.so"
-  - "ffi_closure 回调在 HarmonyOS 上正常工作"
-  - "Version.java TEMPLATE 必须在 javac 前替换"
+  - "BiSheng JDK System.load requires .so with same signature as JVM"
+  - "JNA detects HarmonyOS as harmonyos-aarch64 (not linux-aarch64)"
+  - "JAR must contain com/sun/jna/harmonyos-aarch64/libjnidispatch.so"
+  - "ffi_closure callbacks work on HarmonyOS"
+  - "Version.java TEMPLATE must be replaced before javac"
+  - "NO_JAWT define needed to skip X11/jawt includes on HarmonyOS"
+  - "JNI headers (jni.h, jni_md.h, com_sun_jna_*.h) must be bundled since no Conan JDK package exists"
+  - "libffi/3.4.4 from conan repo works (static linked, only libc.so dependency)"

@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration
+# CI script (build_and_test.sh L0e) requires this file
+
+package: jna/5.19.0
+homepage: "https://github.com/java-native-access/jna"
+
+# Upstream test command (from make -n check analysis)
+upstream_check_command: "make check"
+
+# conanfile.py build() integrates upstream tests?
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream test programs
+upstream_tests:
+  - file: testlib.c
+    source: jna-5.19.0/native/testlib.c
+    description: "JNA native test library (dlopen/dlsym, FFI calls)"
+    command: "java -cp jna.jar:tests.jar com.sun.jna.NativeTest"
+  - file: testlib2.c
+    source: jna-5.19.0/native/testlib2.c
+    description: "JNA native test library 2 (callback test)"
+    command: "java -cp jna.jar:tests.jar com.sun.jna.NativeTest2"
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test_jna.c
+    description: "dlopen + dlsym smoke test for JNI exports"
+    command: "./test_jna"
+
+# Approximate assertion count
+assertion_count: 10
