@@ -31,14 +31,28 @@ class KlystrackConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # CI #16890: klystron-src.tar.gz 二进制文件在 gitcode PR diff 中只有
+        # "Binary files differ" 标记无数据，CI 的 git apply 必失败 → 改为
+        # klystron-src/ 文本源码目录直接随配方导出（72 个 .c/.h 全文本）。
         # CI 真根因: klystrack 上游 tarball 缺 klystron git submodule 源码
         # → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util），klystrack 源码大量
         # #include "snd/music.h" / "gfx/font.h" 等无法编译
-        # 修法: klystron-src 打包为单个 tarball 随配方导出（Septest 审查：72 个散文件
-        # 冒充补丁违规 + 变更量过大致 AI 检视跳过 → 拆分为 1 个 tarball，PR 变更 <20 文件）
-        tarball = os.path.join(self.recipe_folder, "klystron-src.tar.gz")
-        if os.path.isfile(tarball):
-            copy(self, "klystron-src.tar.gz", src=self.recipe_folder, dst=self.export_sources_folder)
+        # conan copy() 的 pattern 匹配文件而非目录 → 用 os.walk 手动复制
+        # （同 groonga onigmo/rapidjson 注入方式）。目标为
+        # export_sources_folder/klystron-src/（与 _inject_klystron_snd 查找路径一致）。
+        src_dir = os.path.join(self.recipe_folder, "klystron-src")
+        if os.path.isdir(src_dir):
+            import shutil as _sh
+            dst_root = os.path.join(self.export_sources_folder, "klystron-src")
+            for root, dirs, files in os.walk(src_dir):
+                rel = os.path.relpath(root, src_dir)
+                dst_dir = dst_root if rel == "." else os.path.join(dst_root, rel)
+                os.makedirs(dst_dir, exist_ok=True)
+                for fn in files:
+                    src_f = os.path.join(root, fn)
+                    dst_f = os.path.join(dst_dir, fn)
+                    if not os.path.exists(dst_f):
+                        _sh.copy2(src_f, dst_f)
 
     def requirements(self):
         # SDL2 制品仓已就绪 (resolve-deps ✅)，包名小写 sdl2
@@ -67,33 +81,31 @@ class KlystrackConan(ConanFile):
         （.gitmodules: url = github.com/kometbomb/klystron.git）
         → 整个 klystron/src 树缺失（snd/gfx/gui/lib/util + 根文件），
         klystrack 源码大量 #include "snd/music.h" / "gfx/font.h" 等无法编译
-        修法: 解包 klystron-src.tar.gz（单 tarball，Septest 拆分方案）注入源码树根目录
+        修法: 把 klystron-src/ 文本源码目录（随配方 export_sources 导出，
+        CI #16890 由 tarball 改目录，避 gitcode PR diff 二进制无数据）注入源码树根
         在 build() 开头调（source 已解包，self.source_folder 指向真实源码根）"""
-        import tarfile, os as _os
+        import os as _os
         candidates = [
-            _os.path.join(self.export_sources_folder, "klystron-src.tar.gz"),
-            _os.path.join(self.recipe_folder, "klystron-src.tar.gz"),
-            _os.path.join(_os.path.dirname(self.recipe_folder), "es", "klystron-src.tar.gz"),
+            _os.path.join(self.export_sources_folder, "klystron-src"),
+            _os.path.join(self.recipe_folder, "klystron-src"),
+            _os.path.join(_os.path.dirname(self.recipe_folder), "es", "klystron-src"),
         ]
-        tarball = next((c for c in candidates if c and _os.path.isfile(c)), None)
-        if tarball is None:
+        src_dir = next((c for c in candidates if c and _os.path.isdir(c)), None)
+        if src_dir is None:
             raise ConanException(
-                f"klystron-src.tar.gz not found (tried {candidates}). "
-                "klystrack 上游 tarball 缺 klystron submodule src/ 源码，需 tarball 注入。"
+                f"klystron-src/ directory not found (tried {candidates}). "
+                "klystrack 上游 tarball 缺 klystron submodule src/ 源码，需 klystron-src/ 注入。"
             )
-        # 解包 tarball（内含 klystron-src/ 顶层目录），逐文件复制到 source_folder 对应路径
-        with tarfile.open(tarball, "r:gz") as tf:
-            for member in tf.getmembers():
-                if not member.isfile():
-                    continue
-                # tarball 顶层为 klystron-src/，剥掉该前缀取相对路径
-                parts = member.name.split("/", 1)
-                rel = parts[1] if len(parts) > 1 else parts[0]
-                dst_f = _os.path.join(self.source_folder, rel)
+        # 逐文件复制到 source_folder 对应路径（klystron-src/ 下即 gfx/snd/gui/lib/util + 根文件）
+        for root, dirs, files in _os.walk(src_dir):
+            rel = _os.path.relpath(root, src_dir)
+            for fn in files:
+                src_f = _os.path.join(root, fn)
+                dst_f = _os.path.join(self.source_folder, rel, fn) if rel != "." else _os.path.join(self.source_folder, fn)
                 if not _os.path.exists(dst_f):
                     _os.makedirs(_os.path.dirname(dst_f), exist_ok=True)
-                    with tf.extractfile(member) as src, open(dst_f, "wb") as dst:
-                        dst.write(src.read())
+                    with open(src_f, "rb") as s, open(dst_f, "wb") as d:
+                        d.write(s.read())
 
     def generate(self):
         # Makefile-based build, no toolchain needed; keep for Conan 2.x G1 gate
