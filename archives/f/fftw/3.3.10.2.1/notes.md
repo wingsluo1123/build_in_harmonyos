@@ -1,4 +1,4 @@
-# fftw 3.3.10.2 编译笔记（HarmonyOS PC · 标准 Conan cmake）
+# fftw 3.3.10.2.1 编译笔记（HarmonyOS PC · 标准 Conan cmake）
 
 ## 定位
 - 产出 libfftw3.so 等 2 个库，供链接与 dlopen。

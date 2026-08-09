@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — fftw 3.3.10.2 (cmake)"""
+"""Conan recipe — fftw 3.3.10.2.1 (cmake)"""
 from conan import ConanFile
 from conan.tools.files import get
 import os
@@ -10,7 +10,7 @@ from conan.tools.files import apply_conandata_patches, export_conandata_patches
 
 class FftwConan(ConanFile):
     name = "fftw"
-    version = "3.3.10.2"
+    version = "3.3.10.2.1"
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}

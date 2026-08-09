@@ -1,4 +1,4 @@
-# fftw 3.3.10.2 — 鸿蒙 PC conan 制品
+# fftw 3.3.10.2.1 — 鸿蒙 PC conan 制品
 
 `os=OHOS, arch=armv8`(= aarch64)的 conan 包，支持两种消费形态。
 
@@ -27,7 +27,7 @@ conan create . -pr ohos-native
 
 ```bash
 # 鸿蒙 PC：显式给 profile
-conan install --requires=fftw/3.3.10.2 -pr ohos-native
+conan install --requires=fftw/3.3.10.2.1 -pr ohos-native
 ```
 
 生成 `fftw-config.cmake` / `fftw3.pc`（指向 cache）；`find_package(fftw)` 消费，运行期 `source conanrun.sh`。
@@ -35,7 +35,7 @@ conan install --requires=fftw/3.3.10.2 -pr ohos-native
 ## 消费 B：裸程序（设备 ~/usr/local + dlopen）
 
 ```bash
-conan install --requires=fftw/3.3.10.2 -pr ohos-native \
+conan install --requires=fftw/3.3.10.2.1 -pr ohos-native \
     --deployer=usr_local --deployer-folder=$HOME/usr/local
 ```
 
@@ -44,6 +44,6 @@ conan install --requires=fftw/3.3.10.2 -pr ohos-native \
 ## 点对点搬运预编译包（免 remote）
 
 ```bash
-conan cache save "fftw/3.3.10.2:*" --file fftw.tgz   # 出包机导出（recipe + 二进制）
+conan cache save "fftw/3.3.10.2.1:*" --file fftw.tgz   # 出包机导出（recipe + 二进制）
 conan cache restore fftw.tgz                               # 目标机导入
 ```
