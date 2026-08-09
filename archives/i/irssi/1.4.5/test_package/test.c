@@ -2,7 +2,9 @@
 #include <stdlib.h>
 
 int main(void) {
-    /* Simple test: check that irssi package is available */
-    printf("irssi test package: OK\n");
+    /* This test binary is built by CMake to verify the build environment.
+     * The actual functional test runs irssi --version in conanfile.py test().
+     */
+    printf("irssi test package: build OK\n");
     return 0;
 }

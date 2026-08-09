@@ -59,4 +59,4 @@ irssi 1.4.5 (20231003 1405)
 ---
 
 **编译结束**: 2026-08-10 05:47
-**最终状态**: built
+**最终状态**: published (Conan适配, conan-verify G2 PASS)

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Conan recipe for irssi 1.4.5 — IRC client for HarmonyOS PC."""
-import os
-
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -14,7 +12,7 @@ class IrssiConan(ConanFile):
     description = "Modular IRC client for UNIX systems with text-based terminal UI"
     license = "GPL-2.0-or-later"
     homepage = "https://irssi.org"
-    url = ""
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "application"
 
