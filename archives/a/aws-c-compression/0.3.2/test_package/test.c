@@ -11,15 +11,8 @@ int main(void) {
         return 1;
     }
 
-    if (aws_common_library_init(allocator) != 0) {
-        fprintf(stderr, "FAIL: aws_common_library_init() failed\n");
-        return 1;
-    }
-    if (aws_compression_library_init(allocator) != 0) {
-        fprintf(stderr, "FAIL: aws_compression_library_init() failed\n");
-        aws_common_library_clean_up();
-        return 1;
-    }
+    aws_common_library_init(allocator);
+    aws_compression_library_init(allocator);
 
     /* Verify error codes are registered correctly */
     const char *err_name = aws_error_name(AWS_ERROR_COMPRESSION_UNKNOWN_SYMBOL);
