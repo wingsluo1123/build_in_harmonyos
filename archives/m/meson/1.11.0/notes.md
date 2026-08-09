@@ -35,6 +35,7 @@ sha256 `dffdd0915ceb028541fe3bed77d63ba35e78514591c043736b450d62634eeb31`），
 | `0006-test-identity-cross-cc-fallback.patch` | `test cases/unit/60 identity cross` 的 build/host wrapper 在无 `cc` 时回退到 `clang` | OHOS 工具链只提供 `clang` 无 `cc` 别名；使 identity-cross 两个用例真实通过而非跳过。 |
 | `0007-unittest-rewrite-timeout.patch` | `unittests/rewritetests.py` 的 `rewrite_raw()` 子进程超时 60s → 600s | OHOS 文件系统（HMDFS）较慢，`meson rewrite` 子进程在 60s 内未完成导致 `test_target_add_sources` 被 `TimeoutExpired` 误杀（returncode -9）；调大超时使其真实通过。 |
 | `0008-unittest-skip-wrapdb-network.patch` | `unittests/platformagnostictests.py` 的 `test_update_wrapdb` 在 OHOS 上 `SkipTest` | 崩溃点：`wrapdb.mesonbuild.com` 连接 `read operation timed out`（构建环境无法访问外部 WrapDB 服务）；测试核心逻辑是拉取 WrapDB 元数据做 wrap 更新验证，依赖外部网络服务，构建环境不可达 → 不可行。 |
+| `0009-project-tests-ninja-env.patch` | `run_project_tests.py` 的 `detect_tools()` 尊重 `$NINJA` 环境变量 | 崩溃点：`get_version()` 用裸 `ninja` 经 `shutil.which`/`Popen` 走 PATH，CI worker 的 PATH 不含工具链目录 → `FileNotFoundError: 'ninja'`（该函数不读 run_tests.py 已导出的 `$NINJA`）；改为 ninja 工具直接使用 `os.environ['NINJA']`。 |
 
 > 注：参考先例 `codex/meson-1.11.0-validate` 分支的 0003/0004 补丁存在 fuzzy 匹配
 > 问题（harmonyos 映射被追加到文件末尾导致语法错误、skip 块被放到文件末尾），

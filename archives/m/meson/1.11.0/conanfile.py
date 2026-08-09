@@ -107,6 +107,16 @@ class MesonConan(ConanFile):
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)
         with test_env.vars(self).apply():
+            # CI worker 的 python3 未装 pytest-xdist：run_unittests.py 只能单线程
+            # 运行 647 项用例（约 3600s），超过 CI 的 3600s 超时上限导致
+            # conan create TIMED OUT。安装 xdist 后恢复 20 workers 并行（约 540s）。
+            # 参照 buku/5.0 先例（build() 内 pip install 测试依赖）。
+            import importlib.util
+            if importlib.util.find_spec("xdist") is None:
+                self.run(
+                    "python3 -m pip install pytest-xdist --quiet --disable-pip-version-check",
+                    cwd=self.source_folder,
+                )
             self.run("python3 run_tests.py", cwd=self.source_folder, env="conanbuild")
 
     def package(self):

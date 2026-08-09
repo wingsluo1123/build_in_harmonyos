@@ -1,0 +1,18 @@
+diff --git a/run_project_tests.py b/run_project_tests.py
+index 4b1c5e2..8f9a3d1 100644
+--- a/run_project_tests.py
++++ b/run_project_tests.py
+@@ -1492,7 +1492,12 @@
+     ]
+ 
+     def get_version(t: ToolInfo) -> str:
+-        exe = shutil.which(t.tool)
++        # On OHOS the toolchain dir is not in the worker PATH; run_tests.py
++        # already exports the resolved tool via $NINJA, so honour it here.
++        if t.tool == 'ninja' and os.environ.get('NINJA'):
++            exe = os.environ['NINJA']
++        else:
++            exe = shutil.which(t.tool)
+         if not exe:
+             return 'not found'
+ 
