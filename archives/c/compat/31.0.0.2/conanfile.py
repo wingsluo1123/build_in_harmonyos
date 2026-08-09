@@ -8,9 +8,7 @@ import shutil
 from conan import ConanFile
 from conan.tools.env import Environment, VirtualBuildEnv, VirtualRunEnv
 from conan.tools.files import (
-    apply_conandata_patches,
     copy,
-    export_conandata_patches,
     get,
     replace_in_file,
 )
@@ -27,9 +25,6 @@ class CompatConan(ConanFile):
     package_type = "unknown"
 
     settings = "os", "arch"
-
-    def export_sources(self):
-        export_conandata_patches(self)
 
     def layout(self):
         basic_layout(self)
@@ -48,8 +43,6 @@ class CompatConan(ConanFile):
         VirtualRunEnv(self).generate()
 
     def build(self):
-        apply_conandata_patches(self)
-
         tmpdir = os.path.normpath(
             os.path.abspath(os.path.join(self.build_folder, "compat-check-tmp"))
         )
@@ -69,6 +62,8 @@ class CompatConan(ConanFile):
                 or (filename.startswith("compat") and filename.endswith(".el"))
             ):
                 shutil.copy2(source_file, os.path.join(test_source, filename))
+
+        self._patch_ohos_test_source(test_source)
 
         makefile = os.path.join(test_source, "Makefile")
         replace_in_file(
@@ -112,6 +107,35 @@ class CompatConan(ConanFile):
         self.run(f"{make} compile", cwd=test_source, env=build_env)
         self.run(f"{make} test", cwd=test_source, env=build_env)
         self.run(f"{make} check", cwd=test_source, env=build_env)
+
+    def _patch_ohos_test_source(self, test_source):
+        if self.settings.os != "OHOS":
+            return
+
+        tests = os.path.join(test_source, "compat-tests.el")
+        skip = (
+            '    (when (getenv "COMPAT_OHOS_SKIP_TRAMP_TMP")\n'
+            '      (ert-skip\n'
+            '       "OHOS runner cannot access /tmp through the mock TRAMP remote"))\n'
+        )
+        replace_in_file(
+            self,
+            tests,
+            '    ;; Tramp test (mock protocol)\n'
+            '    (let* ((default-directory "/mock::/")',
+            '    ;; Tramp test (mock protocol)\n'
+            + skip
+            + '    (let* ((default-directory "/mock::/")',
+        )
+        replace_in_file(
+            self,
+            tests,
+            '  ;; Tramp test (mock protocol)\n'
+            '  (let ((default-directory "/mock::/"))',
+            '  ;; Tramp test (mock protocol)\n'
+            + skip.replace("    ", "  ", 1)
+            + '  (let ((default-directory "/mock::/"))',
+        )
 
     def package(self):
         lisp_dir = os.path.join(
