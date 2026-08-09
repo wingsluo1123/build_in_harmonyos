@@ -30,7 +30,7 @@ class Qt5QtDeclarativeConan(ConanFile):
 
     def requirements(self):
         # qmake 工具与 Qt5 基础库由 qt5-qtbase 提供
-        self.requires("qt5-qtbase/5.15.2.1")
+        self.requires("qt5-qtbase/5.15.2")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
