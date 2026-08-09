@@ -1,17 +1,11 @@
 # libmd
 
-## 简介
-Message digest library (MD5, SHA, etc.)
+Message Digest functions from BSD systems.
 
-## OHOS 适配
-- 构建系统: autotools
-- 详见各版本 notes.md 获取适配详情
+Provides MD2, MD4, MD5, RIPEMD-160, SHA-1, SHA-2 (SHA-224/256/384/512/512-256) hash functions.
 
-## 依赖
-待补充
+## Homepage
+https://www.hadrons.org/software/libmd/
 
-## 功能验证
-待补充
-
-## 参考
-- https://www.hadrons.org/software/libmd/
+## License
+BSD-3-Clause
