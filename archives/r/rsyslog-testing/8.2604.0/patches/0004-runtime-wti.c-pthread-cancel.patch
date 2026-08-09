@@ -15,7 +15,13 @@
          pthread_kill(thrdID, SIGTTIN);
          DBGPRINTF("cooperative worker termination failed, using cancellation...\n");
          DBGOPRINT((obj_t *)pThis, "canceling worker thread\n");
-@@ -415,7 +224,9 @@
+@@ -405,3 +412,5 @@
+     actWrkrInfo_t *__restrict__ wrkrInfo;
++#ifdef HAVE_PTHREAD_CANCEL
+     int iCancelStateSave;
++#endif
+     int i, j, k;
+@@ -415,7 +424,9 @@
       * - queue consumers enable it only around explicitly cancel-safe work
       * - critical cleanup/state transitions run with cancellation disabled
       */
@@ -25,7 +31,7 @@
      DBGPRINTF("wti %p: worker starting\n", pThis);
      /* now we have our identity, on to real processing */
  
-@@ -499,7 +233,9 @@
+@@ -499,7 +510,9 @@
  
      /* indicate termination */
      pthread_cleanup_pop(0); /* remove cleanup handler */
