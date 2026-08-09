@@ -200,6 +200,11 @@ class KlystrackConan(ConanFile):
         # 改 LDFLAGS += 追加 --start-group --end-group 包 -lengine_* + SDL2 集让 lld 全解析后回填。
         sdl2_main_lib = f'-lSDL2 -lSDL2main'
         ldflags += (
+            # CI #16923: 链接阶段 clang 默认调 ohos-sdk 的
+            # /data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/bin/ld.lld
+            # 报 xmlKeepBlanksDefault: symbol not found（该 lld 依赖 libxml2 符号缺失）
+            # → -fuse-ld=ld 强制用系统 /data/service/hnp/bin/ld（本地实测链接成功 rc=0）
+            f' -fuse-ld=ld'
             f' -L{os.path.join(os.path.dirname(make_dir), "klystron", "bin.release")} -L{sdl2_lib} '
             f'-Wl,--start-group -lengine_gfx -lengine_util -lengine_snd -lengine_gui {sdl2_main_lib} -Wl,--end-group'
         )
