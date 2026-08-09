@@ -6,7 +6,6 @@ import os
 from conan import ConanFile
 from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import copy, get
-from conan.tools.layout import basic_layout
 
 
 class SipsakConan(ConanFile):
@@ -21,7 +20,11 @@ class SipsakConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
 
     def layout(self):
-        basic_layout(self)
+        # Keep source and build together: the recipe compiles the upstream
+        # sources directly with clang and needs the bundled Check shim
+        # (shipped via export_sources) visible from build().
+        self.folders.build = "."
+        self.folders.generators = "."
 
     def export_sources(self):
         # Ship the bundled minimal Check-compatible shim so the upstream
