@@ -2,9 +2,12 @@
 #include <stdlib.h>
 
 int main(void) {
-    /* This test binary is built by CMake to verify the build environment.
-     * The actual functional test runs irssi --version in conanfile.py test().
-     */
-    printf("irssi test package: build OK\n");
+    /* R34: Execute the irssi binary to verify functionality */
+    int ret = system("irssi --version");
+    if (ret != 0) {
+        fprintf(stderr, "irssi --version failed with exit code %d\n", ret);
+        return 1;
+    }
+    printf("irssi test package: OK\n");
     return 0;
 }

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe for irssi 1.4.5 — IRC client for HarmonyOS PC."""
+"""Conan recipe for irssi 1.4.5 (Autotools) — IRC client for HarmonyOS PC."""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
+from conan.tools.env import Environment
 
 
 class IrssiConan(ConanFile):
@@ -53,6 +54,17 @@ class IrssiConan(ConanFile):
         for lib in ncurses_cpp.libs:
             tc.extra_ldflags.append(f"-l{lib}")
         tc.generate()
+
+        # Set LD_LIBRARY_PATH so configure's runtime tests can find
+        # shared libraries (glib is shared; musl linker is in /system/lib)
+        env = Environment()
+        if self.settings.os in ("Linux", "OHOS"):
+            env.append("LD_LIBRARY_PATH", ["/system/lib"])
+        # Add glib shared library path
+        glib_cpp = self.dependencies["glib"].cpp_info
+        for lib_dir in glib_cpp.libdirs:
+            env.append("LD_LIBRARY_PATH", [lib_dir])
+        env.vars(self, "conanbuild").save()
 
     def build(self):
         apply_conandata_patches(self)
