@@ -1,0 +1,21 @@
+--- CMakeLists.txt.orig	2026-08-10 00:58:01.175100781 +0800
++++ CMakeLists.txt	2026-08-10 00:58:01.255106875 +0800
+@@ -73,7 +73,7 @@
+     #Kernel32 and wsock2 are pulled in automatically. Here we add the lib containing the schannel API.
+     #Also note, you don't get a choice on TLS implementation for Windows.
+     set(PLATFORM_LIBS secur32 crypt32)
+-elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
++elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+     option(USE_VSOCK
+ 	    "Build in support for VSOCK sockets"
+ 	    OFF)
+--- cmake/aws-c-io-config.cmake.orig	2026-08-10 00:58:01.211101406 +0800
++++ cmake/aws-c-io-config.cmake	2026-08-10 00:58:01.295102344 +0800
+@@ -1,6 +1,6 @@
+ include(CMakeFindDependencyMacro)
+ 
+-if (UNIX AND NOT APPLE AND NOT BYO_CRYPTO)
++if ((UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS") AND NOT APPLE AND NOT BYO_CRYPTO)
+     find_dependency(s2n)
+ endif()
+ 

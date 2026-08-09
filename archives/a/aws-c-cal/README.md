@@ -1,9 +1,8 @@
-# aws-c-cal
+# AWS C CAL
 
-AWS 加密抽象层，提供 HMAC、块加密、哈希、RSA、ECDH 等密码学功能接口。
+Cryptographic abstraction layer for AWS SDK for C.
 
-## 版本列表
-
-| 版本 | 状态 | 编译日期 |
-|------|------|----------|
-| [0.9.13](./0.9.13/) | published | 2026-04-24 |
+- Homepage: https://github.com/awslabs/aws-c-cal
+- License: Apache-2.0
+- Build system: CMake
+- Dependencies: aws-c-common, OpenSSL

@@ -1,34 +1,27 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
-
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/aws-c-cal/{version}/test_package/conanfile.py
-"""
-import os
-
+"""Conan test_package for aws-c-cal 0.9.13 — Conan L1 official test."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
 
 class AwsccalTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        self.requires("openssl/3.5.6.1")
 
     def layout(self):
         cmake_layout(self)
 
     def build(self):
         cmake = CMake(self)
-        cmake.configure()
+        prefix_paths = [d.package_folder for d in self.dependencies.values() if hasattr(d, 'package_folder') and d.package_folder]
+        vars_dict = {"CMAKE_PREFIX_PATH": ";".join(prefix_paths)} if prefix_paths else {}
+        cmake.configure(variables=vars_dict)
         cmake.build()
 
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_aws-c-cal')}", env="conanrun")
