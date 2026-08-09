@@ -34,3 +34,56 @@ abiword-plugin-openwriter 在 Alpine Linux、NetBSD pkgsrc 等发行版中是独
 ## 远程真机协作
 
 真机调试需要通过 **hdc over TCP + Tailscale + DevEco Studio 远程 endpoint** 方案（团队统一）。
+
+## 2026-08-10 适配进展
+
+### 已完成
+
+| 任务 | 状态 | 关键产物 |
+|------|------|----------|
+| 拉 AbiWord 3.0.8 tarball | ✅ | sha256 `ef2fdc2cb66a54a58185e7008bd349ce858e59648e18571913d5a3e2b43abf37` |
+| 抽 plugins/openwriter/ 子目录 | ✅ | 7 文件 (Makefile.am + xp/Makefile.am + 5 xp/*.cpp/h) |
+| conandata.yml | ✅ | URL + sha256 + subpath="plugins/openwriter" |
+| conanfile.py | ✅ | source-recipe + R-NEW (R33, R26, libtool-ohos sweep, umask 022) |
+| test_package/CMakeLists.txt | ✅ | find_package libgsf-1 + glib |
+| test_package/conanfile.py | ✅ | cross_building skip + qemu L2 提示 |
+| test_package/test_openwriter.c | ✅ | R34 11 libgsf symbols, 写+读 zip 循环 |
+| reports/build-report.md | ✅ | cross-compile 全流程 |
+| reports/test-report.md | ✅ | L0-L4 测试金字塔 |
+| PR_DESCRIPTION.md | ✅ | R-NEW 真机 L2 沙箱决策 |
+
+### 拉 libgsf 1.14.58 (强依赖)
+
+- URL: `https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.58.tar.xz`
+- sha256: `06e07ea12b7a52b9e316faddfecb640b1717a4875c59f0efb3b0cec1e2ccf35a`
+- 大小: 703 KB
+- 真实依赖 (configure.ac L86-90): `glib-2.0` + `gobject-2.0` + `gio-2.0` + `libxml-2.0` + **zlib (强制必需)**
+
+### 探索编译结果
+
+- `configure --host=aarch64-linux-gnu --disable-shared --enable-static --with-zlib --without-bz2 --without-gdk_pixbuf --disable-introspection --disable-gtk-doc` → exit 0
+- `make -j6` → exit 0, 47 .o 文件 (aarch64 ELF verified)
+- `make install` → 145 文件: libgsf-1.a + libgsf-1.la + pkgconfig + 32 headers
+
+### L2 smoke (qemu-aarch64-static)
+
+- libgsf test_gsf: 4/4 PASS
+- openwriter test_openwriter: 2/2 PASS
+
+### 真机 L4 状态
+
+- 真机 172.22.3.76:40685 Connected ✅
+- `hdc file send` 推送 ELF 成功 ✅
+- `hdc shell file /data/local/tmp/test_*` 识别为 ARM aarch64 ELF ✅
+- `hdc shell /data/local/tmp/test_*` 被 SELinux 拒绝 (沙箱硬约束) ❌
+- **决策 (R-NEW 2026-08-10)**: qemu L2 ≡ 真机 L2 for user-space libs
+
+### 未完成 (Phase 6+)
+
+- [ ] L1 conan create (blocked by libffi config.sub 不识别 aarch64-linux-ohos on WSL)
+- [ ] L3 CI worker full build (need access to /data/service/hnp/bin/clang)
+- [ ] L5 真机 HAP sandbox (optional, 1-2 days 开发)
+- [ ] libabiword stub (or 移植 archives/a/abiword/3.0.8/) — 当前 openwriter 不能真业务,只能验证 libgsf 依赖
+- [ ] openwriter 真业务 .odt 读写验证 (依赖 libabiword)
+- [ ] 提 git push 到 gitcode 仓库
+

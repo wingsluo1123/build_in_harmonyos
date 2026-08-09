@@ -1,0 +1,70 @@
+# libgsf 1.14.58 version-level manifest
+# File location: archives/g/gsf/1.14.58/manifest.yaml
+# Schema: templates/manifest-version.yaml (ARCHIVE-SPEC v2.0)
+
+version: "1.14.58"
+software: libgsf
+status: planned
+build_date: "TODO"
+build_system: autotools
+
+source:
+  upstream: "https://gitlab.gnome.org/GNOME/libgsf"
+  release_tag: "LIBGSF_1_14_58"
+  url: "https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.58.tar.xz"
+  sha256: "06e07ea12b7a52b9e316faddfecb640b1717a4875c59f0efb3b0cec1e2ccf35a"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  notes: |
+    libgsf is a single-library GNOME project (no plugins). Uses autotools +
+    intltool + gettext + libtool.
+
+    OHOS PC 移植策略:
+    - 阶段 1: 仅 glib + libxml2 依赖,所有可选(--with-zlib / --with-bz2 /
+      --with-gdk_pixbuf / --enable-introspection)默认关闭
+    - 阶段 2: 处理 config.guess 不识别 OHOS(E007,用 scripts/patch-autotools-ohos.pl)
+    - 阶段 3: 处理 musl BIND_NOW(getlogin / secure_getenv / getpwuid_r 等)
+  configure_options:
+    - "--host=aarch64-linux-gnu"
+    - "--build=x86_64-linux-gnu"
+
+dependencies:
+  runtime:
+    - glib        # gobject-2.0, glib-2.0, gio-2.0 (≥2.62.0)
+    - libxml2     # libxml-2.0 (≥2.4.16)
+  build:
+    - autoconf
+    - automake
+    - libtool
+    - intltool
+    - pkg-config
+    - gettext
+
+# 已知上游信息
+upstream_metadata:
+  description: "GNOME Structured File Library (libgsf) — read/write OLE2 compound documents and other structured binary formats"
+  license: "LGPL-2.1-or-later"
+  homepage: "https://gitlab.gnome.org/GNOME/libgsf"
+  upstream_version: "1.14.58"
+  upstream_release_date: "2026-04-30"
+  reference_packaging:
+    - name: "Alpine Linux libgsf"
+      version: "1.14.58-r0"
+      url: "https://pkgs.alpinelinux.org/package/v3.24/main/x86_64/libgsf"
+
+# 适配路径 / 进度
+adaptation:
+  phase: "planning"
+  notes: |
+    1. 验证 conan create 在 wsl-aarch64 profile 能走通(待 R26/R27/R33)
+    2. 适配 OHOS HNP worker:tools.build:compiler_executables + config.guess 补丁
+    3. L2 smoke test:在 ARM64 ELF 上调用 gsf_input_stdio_new / gsf_shred_document_new
+       验证 ABI(不依赖 GSF 业务功能,只验证 API Surface)
+    4. 真机 L2(192.168.184.66 / 172.22.3.76):把 ARM64 ELF 推到真机,hdc shell 跑
+
+pr:
+  number: null
+  url: null
+  status: "draft"
