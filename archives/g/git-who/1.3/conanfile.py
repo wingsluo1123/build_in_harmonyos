@@ -87,12 +87,29 @@ class GitWhoConan(ConanFile):
         # aireview: GOARCH=arm64 硬编码 → 改 self.settings.arch 动态设避跨架构构建错误
         # validate() 已确保 settings.arch 是 armv8 或 arm64
         go_arch = "arm64"
-        # go link 需在 fallocate 可用的目录创建输出文件。CI #15671 实证：
+        # go link 需在 fallocate 可用的目录创建输出文件。CI #15671/#16873 实证：
         # build_folder/go-tmp 所在文件系统（/storage/Users 下）对 fallocate 返回 EACCES
-        # → go link 报 "mapping output file failed: permission denied"；
-        # 而 CI 的 TMPDIR=/data/storage/el2/base/cache fallocate 正常（本地实证 OK）。
-        # → 优先继承环境 TMPDIR，缺失时回退 CI 沙箱临时目录。
-        go_tmpdir = os.environ.get("TMPDIR") or "/data/storage/el2/base/cache"
+        # → go link 报 "mapping output file failed: permission denied"。
+        # CI worker 上 conan 进程内 TMPDIR 可能被 profile/setup 覆盖成
+        # /storage/Users/currentUser/tmp（同样 EACCES，CI #16873）→ 不能盲信环境
+        # TMPDIR，需 fallocate 探测：优先实测 OK 的 /data/storage/el2/base/cache，
+        # 环境 TMPDIR 仅在其 fallocate 可用时采用。
+        def _fallocate_ok(path):
+            try:
+                probe = os.path.join(path, ".fa_probe")
+                fd = os.open(probe, os.O_CREAT | os.O_RDWR, 0o700)
+                try:
+                    os.posix_fallocate(fd, 0, 4096)
+                    return True
+                finally:
+                    os.close(fd)
+                    os.unlink(probe)
+            except OSError:
+                return False
+        go_tmpdir = "/data/storage/el2/base/cache"
+        env_tmp = os.environ.get("TMPDIR")
+        if env_tmp and os.path.isdir(env_tmp) and _fallocate_ok(env_tmp):
+            go_tmpdir = env_tmp
         os.makedirs(go_tmpdir, exist_ok=True)
         try:
             self.run(
