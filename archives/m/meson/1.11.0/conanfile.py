@@ -109,6 +109,14 @@ class MesonConan(ConanFile):
         test_env.define("AR", "/data/service/hnp/bin/llvm-ar")
         test_env.define("RANLIB", "/data/service/hnp/bin/llvm-ranlib")
         test_env.define("NM", "/data/service/hnp/bin/llvm-nm")
+        # OHOS SDK 的 lld 动态依赖 libxml2.so.16（llvm/lib 下）；CI worker 上
+        # lld 报 "Error relocating lld: xmlFreeDoc: symbol not found"（加载到
+        # 了版本不匹配的 libxml2）。显式注入 SDK llvm/lib 到 LD_LIBRARY_PATH，
+        # 保证 lld 运行时加载正确的 libxml2，与 PATH 注入同机制。
+        test_env.prepend_path(
+            "LD_LIBRARY_PATH",
+            "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib",
+        )
         test_env.prepend_path("PKG_CONFIG_PATH", pkgconfig_dir)
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)
