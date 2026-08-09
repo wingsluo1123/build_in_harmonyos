@@ -179,7 +179,11 @@ Result:
 - Official summary: `ERROR: 539 tests were run, 247 failed (5 expected failures). 70 tests were skipped.`
 - Inventory: 609 GNU Autotest cases total; 70 skipped; 539 non-skipped cases executed.
 - Pass-rate statement for PR: 297/539 (about 55.1%) when counting 292 `ok` cases plus 5 expected failures as expected outcomes; 242 unexpected failures remain.
-- Failure clusters are mainly OHOS shell/path/temp-directory semantics and generated configure probes across Autoconf's language, compiler, header, type, function, and program macro suites.
+- The 242 unexpected failures were classified from `tests/testsuite.log` and representative `testsuite.dir/*/testsuite.log` files:
+  - 236 failures are generated-configure probe tests that complete the macro probe but then fail Autoconf's `ath_fn_check_env` clean-environment assertion. The OHOS `/bin/sh`/ksh compatibility layer changes dynamic shell variables such as `BASHPID`, `EPOCHREALTIME`, and `KSH_MATCH` between the before/after snapshots; representative groups include `acc.at`, `semantics.at`, `acheaders.at`, `actypes.at`, and `acfunctions.at`.
+  - The largest source-file clusters are `semantics.at` 38, `actypes.at` 35, `acfunctions.at` 30, `acspecific.at` 23, `acgeneral.at` 22, `acheaders.at` 22, `acc.at` 20, and `acprograms.at` 17.
+  - Several early tool/shell cases fail on concrete OHOS filesystem behavior: `tools.at:145` reports shell here-doc temporary files under `/tmp/sh*.tmp` as `Read-only file system`; `base.at:977` shows directory canonicalization/diagnostic bytes changing for `--prefix=/usr//`; `tools.at:672` fails timestamp ordering (`configure -nt configure.1`).
+  - Compiler-probe logs repeatedly show OHOS clang/ld diagnostics that Autoconf's generic test harness records in `config.log`, for example `ld.lld: error: undefined symbol: main` during compiler-version probing and clang rejecting legacy `-V`/`-qversion`/`-version` options. The compiler itself is usable for package build and `test_package`; these failures are upstream macro self-test assumptions interacting with the OHOS shell/toolchain environment.
 
 ## Next OHOS device / shadow CI commands
 
