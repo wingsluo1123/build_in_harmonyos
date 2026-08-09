@@ -53,3 +53,7 @@
 
 - libblockdev-3.4.0-ohos-aarch64.tar.gz (12.8MB, strip+签名)
 - libblockdev-3.4.0-ohos-aarch64-debug.tar.gz (25.8MB, debug symbols)
+---
+
+**编译结束**: 2026-08-10 05:36
+**最终状态**: built
