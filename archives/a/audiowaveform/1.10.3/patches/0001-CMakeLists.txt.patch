@@ -1,17 +1,25 @@
-diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -92,20 +92,31 @@
-             set(ZLIB_ROOT "/usr/local/opt/zlib")
-         endif()
-     endif()
- endif(BUILD_STATIC)
+@@ -54,6 +54,15 @@
+     cmake_policy(SET CMP0167 NEW)
+ endif()
+ 
++# HarmonyOS: pthread_setcancelstate is not available.
++# Create a header that defines a no-op stub and force-include it.
++set(OHOS_PTHREAD_FIX_H "${CMAKE_BINARY_DIR}/ohos_pthread_fix.h")
++file(WRITE ${OHOS_PTHREAD_FIX_H}
++    "#pragma once\n"
++    "#define pthread_setcancelstate(a, b) ((void)(a), (void)(b))\n"
++)
++add_compile_options(-include ${OHOS_PTHREAD_FIX_H})
++
+ if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+    message(STATUS "Build type not specified: default is Release")
+@@ -96,6 +105,17 @@
  
  find_package(LibGD REQUIRED)
  if(LIBGD_FOUND)
-     message(STATUS "LIBGD_INCLUDE_DIRS='${LIBGD_INCLUDE_DIRS}'")
-     message(STATUS "LIBGD_LIBRARIES=${LIBGD_LIBRARIES}")
-     include_directories(${LIBGD_INCLUDE_DIRS})
 +    # When libgd.a (static) is found, add its transitive dependencies
 +    if(LIBGD_LIBRARIES MATCHES "\\.a$")
 +        find_package(PNG REQUIRED)
@@ -23,13 +31,23 @@ diff -ruN a/CMakeLists.txt b/CMakeLists.txt
 +        list(APPEND LIBGD_INCLUDE_DIRS ${PNG_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${TIFF_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
 +        include_directories(${PNG_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${TIFF_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
 +    endif()
- endif(LIBGD_FOUND)
- 
- find_package(LibSndFile REQUIRED)
- if(LIBSNDFILE_FOUND)
-     message(STATUS "LIBSNDFILE_INCLUDE_DIRS='${LIBSNDFILE_INCLUDE_DIRS}'")
-     message(STATUS "LIBSNDFILE_LIBRARIES=${LIBSNDFILE_LIBRARIES}")
+     message(STATUS "LIBGD_INCLUDE_DIRS='${LIBGD_INCLUDE_DIRS}'")
+     message(STATUS "LIBGD_LIBRARIES=${LIBGD_LIBRARIES}")
+     include_directories(${LIBGD_INCLUDE_DIRS})
+@@ -108,6 +128,16 @@
      include_directories(${LIBSNDFILE_INCLUDE_DIRS})
  endif(LIBSNDFILE_FOUND)
  
++# libsndfile static depends on mpg123 and lame for MP3 support
++find_library(MPG123_LIBRARIES mpg123)
++find_library(LAME_LIBRARIES mp3lame)
++if(MPG123_LIBRARIES)
++    list(APPEND LIBSNDFILE_LIBRARIES ${MPG123_LIBRARIES})
++endif()
++if(LAME_LIBRARIES)
++    list(APPEND LIBSNDFILE_LIBRARIES ${LAME_LIBRARIES})
++endif()
++
  find_package(LibMad REQUIRED)
+ if(LIBMAD_FOUND)
+     message(STATUS "LIBMAD_INCLUDE_DIRS='${LIBMAD_INCLUDE_DIRS}'")
