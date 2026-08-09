@@ -29,25 +29,30 @@ int flb_sqldb_query(void *db, const char *sql, int (*cb)(void*,int,char**,char**
 int flb_sqldb_execute(void *db, const char *sql) { return -1; }
 long long flb_sqldb_last_id(void *db) { return 0; }
 
-/* --- HTTP Server stubs (FLB_HTTP_SERVER=Off) --- */
-int flb_http_server_init(struct flb_http_server *session,
-                         int protocol_version,
-                         unsigned long long flags,
-                         void *request_callback,
-                         char *address,
-                         unsigned short port,
-                         struct flb_tls *tls_provider,
-                         int networking_flags,
-                         void *networking_setup,
-                         void *event_loop,
-                         struct flb_config *system_context,
-                         void *user_data) { return -1; }
-int flb_http_server_start(struct flb_http_server *session) { return -1; }
-int flb_http_server_stop(struct flb_http_server *session) { return -1; }
-int flb_http_server_destroy(struct flb_http_server *session) { return -1; }
-void flb_http_server_config_init(struct flb_http_server_config *config) {}
-struct mk_list *flb_http_server_get_config_map(struct flb_config *config) { return NULL; }
-int flb_http_server_property_is_allowed(const char *property_name) { return 0; }
+/* --- HTTP Server stubs (FLB_HTTP_SERVER=Off) ---
+ * Weak symbols: when runtime tests force FLB_HTTP_SERVER=ON the real
+ * libflb-http-server.a provides strong definitions that override these;
+ * otherwise (FLB_HTTP_SERVER=Off) the stubs satisfy the linker. */
+#define FLB_WEAK __attribute__((weak))
+FLB_WEAK int flb_http_server_init(struct flb_http_server *session,
+                                  int protocol_version,
+                                  unsigned long long flags,
+                                  void *request_callback,
+                                  char *address,
+                                  unsigned short port,
+                                  struct flb_tls *tls_provider,
+                                  int networking_flags,
+                                  void *networking_setup,
+                                  void *event_loop,
+                                  struct flb_config *system_context,
+                                  void *user_data) { return -1; }
+FLB_WEAK int flb_http_server_start(struct flb_http_server *session) { return -1; }
+FLB_WEAK int flb_http_server_stop(struct flb_http_server *session) { return -1; }
+FLB_WEAK int flb_http_server_destroy(struct flb_http_server *session) { return -1; }
+FLB_WEAK void flb_http_server_config_init(struct flb_http_server_config *config) {}
+FLB_WEAK struct mk_list *flb_http_server_get_config_map(struct flb_config *config) { return NULL; }
+FLB_WEAK int flb_http_server_property_is_allowed(const char *property_name) { return 0; }
+#undef FLB_WEAK
 
 /* --- TLS stubs (FLB_TLS=Off; tls/flb_tls.c excluded) --- */
 int flb_tls_init() { return 0; }
@@ -90,3 +95,7 @@ struct mk_list *flb_oauth2_jwt_get_config_map(struct flb_config *config) { retur
 #ifndef HAVE_PTHREAD_CANCEL
 int pthread_cancel(void *thread) { return 0; }
 #endif
+
+/* --- pthread cancel state/type stubs (musl lacks them on OHOS) --- */
+int pthread_setcancelstate(int state, int *oldstate) { if (oldstate) *oldstate = 0; return 0; }
+int pthread_setcanceltype(int type, int *oldtype) { if (oldtype) *oldtype = 0; return 0; }

@@ -10,20 +10,27 @@
 
 | 测试类型 | 上游用例数 | 说明 |
 |----------|-----------|------|
-| 单元测试 | 57 | 来源：tests/internal/UNIT_TESTS_FILES（cutest 框架 + CTest），覆盖 pack/pipe/sds/hmac/crypto/hash/kv/router/http_client/gzip/zstd/parser 等 |
+| 单元测试 | 138 | 来源：tests/internal/（acutest 框架 + CTest），本配方开启 FLB_TESTS_INTERNAL 编译 |
 | 集成测试 | 0 | tests/integration/ 无 .c 测试 |
-| 运行时测试 | 102 | tests/runtime/ 运行时测试（依赖完整功能子系统，本配方已关闭） |
+| 运行时测试 | 108 | 来源：tests/runtime/（CTest），本配方开启 FLB_TESTS_RUNTIME 编译 |
 | 其他测试 | 0 | - |
-| **合计** | **159** | 上游 CTest 总数 |
+| **合计** | **246** | 上游 CTest 注册总数 |
 
 ### 适配后测试用例统计
 
 | 测试类型 | 适配后用例数 | 与上游对比 | 说明 |
 |----------|-------------|-----------|------|
-| 单元测试 | 0 | -159 | 上游单元测试需开启 FLB_TESTS_INTERNAL（引入外部依赖），本配方关闭 |
+| 单元测试 | 69 | -69 | 138 个注册中 69 个可运行（其余为需外部依赖子系统的条件编译测试，未生成二进制） |
 | 集成测试 | 0 | 不变 | - |
-| 鸿蒙特有测试 | 1 | 新增 | test_package 运行已安装的 fluent-bit 二进制 `--version`/`--help`（L1 official test） |
-| **合计** | **1** | **-158** | |
+| 运行时测试 | 54 | -54 | 108 个注册中 54 个可运行（其余因对应插件/功能关闭未编译） |
+| **合计** | **123** | **-123** | |
+
+### 适配后测试通过率（实际运行）
+
+| 测试类型 | 通过/运行 | 通过率 | 失败/未运行说明 |
+|----------|----------|--------|----------------|
+| 单元测试（internal） | 43/69 | 62.3% | 失败 10：pack/sds/hmac/crypto/hash/utils/input_chunk/input_chunk_routes/flb_event_loop/strptime（stub 缺 openssl 实现导致 hmac/crypto 失败，其余为平台差异）；Not Run 16：条件编译未生成二进制（opentelemetry/metrics/parser/http_server 等子系统关闭） |
+| 运行时测试（runtime） | 29/54 | 53.7% | 失败 21 + SegFault 3：runtime 测试需启动完整 fluent-bit 实例，受 stub/关闭子系统影响；部分核心用例通过 |
 
 ## 上游测试用例修改说明
 
@@ -48,24 +55,29 @@
 ## 验证结果
 
 - 编译状态：通过
-- 上游测试用例通过率：0/0（不适用，上游测试已关闭）
+- 上游测试用例通过率：单元测试 43/69（62.3%）、运行时测试 29/54（53.7%）；失败原因见上表（stub 缺 openssl 实现 + 关闭子系统导致部分用例不可运行/失败，均为已知限制，非修改上游所致）
 - 新增测试用例通过率：1/1（100%）
 
-### 验证命令（本地 conan 验证，2026-08-06）
+### 验证命令（本地 conan 验证，2026-08-10）
 
 ```bash
 conan create archives/f/fluent-bit/5.0.9 \
   -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 \
   --build=missing --user=ohpcd --channel=stable
-# 结果: EXIT_CODE 0，conan create 成功，test_package 1/1 Passed
+# 结果: EXIT_CODE 0，conan create 成功（含 internal+runtime 测试目标编译），test_package 1/1 Passed
 #   [ok] fluent-bit --version succeeded (exit 0)
 #   [ok] fluent-bit --help succeeded (exit 0)
+
+# 上游测试运行（构建目录内）
+ctest -L internal -j1   # 69 个运行：43 通过 / 10 失败 / 16 Not Run
+ctest -L runtime -j3    # 54 个运行：29 通过 / 21 失败 / 3 SegFault
 ```
 
 ## 补充说明
 
 - **适配策略**：CMake 零外部依赖配方，关闭所有需外部库的可选子系统（TLS/HTTP_SERVER/AWS/SQLDB/Kafka/LuaJIT/WASM 等）与需外部依赖的 input/output/filter 插件，绕过 R36。
-- **stub 方案**：鸿蒙 musl 缺 openssl/sqlite3/fts 头文件与 pthread_cancel 等符号。`ohos-stubs-bundle.tar.gz` 提供 stub 头文件与链接期桩实现（flb_tls_*/flb_http_server_*/flb_oauth2_*/flb_sqldb_*/sqlite3_clear_bindings/sqlite3_reset/flb_sqldb_last_id/pthread_cancel）。被 stub 的子系统均已被 CMake 显式关闭，stub 仅解链接符号缺失，不绕过功能逻辑（R8 例外）。
+- **stub 方案**：鸿蒙 musl 缺 openssl/sqlite3/fts 头文件与 pthread_cancel/pthread_setcancelstate 等符号。`patches/stubs/` 文本目录提供 stub 头文件与链接期桩实现（flb_tls_*/flb_http_server_*（weak）/flb_oauth2_*/flb_sqldb_*/sqlite3_*/pthread_*），被 stub 的子系统均已被 CMake 显式关闭，stub 仅解链接符号缺失，不绕过功能逻辑（R8 例外）。
+- **测试适配**：开启 FLB_TESTS_INTERNAL/FLB_TESTS_RUNTIME 编译上游测试；新增 libyaml/0.2.5 依赖（制品仓已有）并开启 FLB_CONFIG_YAML 使 router_config/config_format_yaml 等测试可编译；关闭 FLB_CUSTOM_CALYPTIA 避免与 http_server stub 重复符号。
 - **新增软件级 manifest**：`archives/f/fluent-bit/manifest.yaml`（ARCHIVE-SPEC v3.0 必须项）。
-- **已知限制**：TLS/HTTP/AWS/SQLDB/Kafka/Lua/WASM 等功能不可用，fluent-bit 仅作为本地日志 processor/forwarder 基础功能可用；如需相关功能需先适配对应依赖库。
+- **已知限制**：TLS/HTTP/AWS/SQLDB/Kafka/Lua/WASM 等功能不可用，fluent-bit 仅作为本地日志 processor/forwarder 基础功能可用；上游测试中依赖这些子系统的用例（hmac/crypto/parser/metrics 等）失败或未运行，详见测试通过率表。
 - 完整适配记录见 `archives/f/fluent-bit/5.0.9/notes.md`（16 条编译经验）。

@@ -61,8 +61,10 @@ class FluentBitConan(ConanFile):
         cmake_layout(self)
 
     def requirements(self):
-        # OHOS build is self-contained: every optional dep is disabled below.
-        pass
+        # libyaml is required by the upstream YAML config-format tests
+        # (tests/internal/router_config.c uses flb_cf_yaml_create). It is
+        # published on the ohpcd registry (libyaml/0.2.5).
+        self.requires("libyaml/0.2.5")
 
     def source(self):
         # OHOS CI: avoid flaky ghfast.top mirror timeouts by preferring a local
@@ -95,13 +97,20 @@ class FluentBitConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
+        # fluent-bit's CMake looks for libyaml via pkg_check_modules(LIBYAML
+        # QUIET yaml-0.1); the conan PkgConfigDeps would emit libyaml.pc (name
+        # mismatch). Instead, point FLB_LIBYAML_DIR at the conan package dir,
+        # which CMakeLists.txt supports explicitly.
+        libyaml = self.dependencies.get("libyaml")
+        if libyaml is not None and libyaml.package_folder:
+            tc.cache_variables["FLB_LIBYAML_DIR"] = libyaml.package_folder
         # --- Disable every optional subsystem that needs an unavailable dep ---
         opts = {
             "FLB_DEBUG":                    "Off",
             "FLB_RELEASE":                  "On",
             "FLB_EXAMPLES":                 "Off",
-            "FLB_TESTS_INTERNAL":           "Off",
-            "FLB_TESTS_RUNTIME":            "Off",
+            "FLB_TESTS_INTERNAL":           "On",
+            "FLB_TESTS_RUNTIME":            "On",
             "FLB_TESTS_OSSFUZZ":            "Off",
             "FLB_TLS":                      "Off",
             "FLB_HTTP_SERVER":              "Off",
@@ -122,7 +131,10 @@ class FluentBitConan(ConanFile):
             "FLB_VALGRIND":                 "Off",
             "FLB_SHARED_LIB":               "Off",
             "FLB_BINARY":                   "On",
-            "FLB_CONFIG_YAML":              "Off",
+            # YAML config format: enabled so upstream tests/internal tests
+            # (router_config.c uses flb_cf_yaml_create) can build & run.
+            # Requires libyaml (conan requirement, see requirements()).
+            "FLB_CONFIG_YAML":              "On",
             # --- input plugins needing external deps ---
             "FLB_IN_HTTP":                  "Off",
             "FLB_IN_ELASTICSEARCH":         "Off",
