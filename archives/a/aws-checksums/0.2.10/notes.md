@@ -13,20 +13,14 @@
 1. CMakeLists.txt 调用 `find_package(aws-c-common REQUIRED)`，需要 CMakeDeps 生成配置
 2. CMakeLists.txt 引用 AWS CMake 模块 (AwsSIMD, AwsCFlags 等)，需要将 aws-c-common 的 modules 目录加入 CMAKE_MODULE_PATH
 3. aarch64 平台自动检测 ARM64 架构，使用 NEON CRC 加速 (crc32c_arm.c, crc64_arm.c)
-4. aws-c-common 的 CMake target 名为 `AWS::aws-c-common`，通过 CMakeDeps.set_property 设置（替代了之前的 patch 方案）
-
-## 改进说明
-- 从 aws-c-common/0.12.6 升级到 0.14.3（制品仓最新版本）
-- 使用 CMakeDeps.set_property("cmake_target_name", "AWS::aws-c-common") 替代 0001-cmake-alias-target.patch，避免修改源码
-- 添加 package_info() system_libs (pthread, dl) for Linux/OHOS
-- 修正描述：CRC32/CRC32C/CRC64/XXHash（非 MD5/SHA）
+4. aws-c-common 的 CMake target 名为 `AWS::aws-c-common`，需通过 CMakeDeps.set_property 设置
 
 ## 遇到的问题与解决方案
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
 | 1 | find_package(aws-c-common) 找不到 | CMakeDeps 默认 target 名不匹配 | set_property cmake_target_name = "AWS::aws-c-common" |
 | 2 | include(AwsSIMD) 等模块找不到 | CMakeDeps 不设置 CMAKE_MODULE_PATH | 在 build() 中传入 CMAKE_MODULE_PATH = aws-c-common modules 目录 |
-| 3 | test_package CMakeDeps 重复 | generators 和 generate() 中都声明了 CMakeDeps | 从 generators 移除 CMakeDeps，仅保留 CMakeToolchain |
 
-**编译结束**: 2026-08-09 05:59
-**最终状态**: published
+## 结束
+status: closed
+COMPLETED — aws-checksums 0.2.10 适配完成，conan-verify 全部通过。
