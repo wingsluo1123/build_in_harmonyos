@@ -72,7 +72,7 @@ class GsoapConan(ConanFile):
                     try:
                         os.utime(os.path.join(root, f), None)
                     except OSError:
-                        pass
+                        pass  # HMDFS may have read-only files, timestamps not critical
         # Fix execute permissions lost during zip extraction on OHOS/HMDFS
         scripts = ["configure", "config.guess", "config.sub", "install-sh",
                    "depcomp", "mkinstalldirs", "ylwrap", "missing", "compile"]
