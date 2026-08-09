@@ -155,34 +155,39 @@ class Gtk4Conan(ConanFile):
         return tools_folder
 
     def _fix_glib_pc(self):
-        """Add glib_mkenums variable to glib-2.0.pc so meson can find it."""
-        pc = os.path.join(self.generators_folder, "glib-2.0.pc")
-        if not os.path.isfile(pc):
+        """Add glib tool variables to glib-2.0.pc and gio-2.0.pc for meson gnome module."""
+        glib_pkg = self.dependencies.get("glib")
+        if not glib_pkg:
             return
-        text = open(pc).read()
-        if "glib_mkenums=" in text:
-            return
-        tools_folder = os.path.join(
-            self.build_folder, "conan-native-tools"
-        )
-        glib_mkenums = os.path.join(tools_folder, "glib-mkenums")
-        if not os.path.isfile(glib_mkenums):
-            glib_mkenums = os.path.join(
-                self.dependencies["glib"].package_folder, "bin", "glib-mkenums"
-            )
-        lines = text.splitlines(True)
-        out = []
-        injected = False
-        for line in lines:
-            out.append(line)
-            if not injected and line.startswith("bindir="):
-                out.append("glib_mkenums=%s\n" % glib_mkenums)
-                injected = True
-        if not injected:
-            out.append(
-                "glib_mkenums=${prefix}/bin/glib-mkenums\n"
-            )
-        open(pc, "w").write("".join(out))
+        glib_bin = os.path.join(glib_pkg.package_folder, "bin")
+        tools_folder = os.path.join(self.build_folder, "conan-native-tools")
+        # Variables to inject into .pc files
+        tool_vars = {
+            "glib_mkenums": "glib-mkenums",
+            "glib_genmarshal": "glib-genmarshal",
+            "gobject_query": "gobject-query",
+            "glib_compile_resources": "glib-compile-resources",
+            "gdbus_codegen": "gdbus-codegen",
+        }
+        for pc_name in ("glib-2.0.pc", "gio-2.0.pc"):
+            pc = os.path.join(self.generators_folder, pc_name)
+            if not os.path.isfile(pc):
+                continue
+            text = open(pc).read()
+            lines = text.splitlines(True)
+            out = []
+            for line in lines:
+                out.append(line)
+            # Append missing tool variables
+            for var_name, tool_name in tool_vars.items():
+                if var_name + "=" not in text:
+                    # Try tools_folder first (copied tools), then glib bin
+                    tool_path = os.path.join(tools_folder, tool_name)
+                    if not os.path.isfile(tool_path):
+                        tool_path = os.path.join(glib_bin, tool_name)
+                    if os.path.isfile(tool_path):
+                        out.append("%s=%s\n" % (var_name, tool_path))
+            open(pc, "w").write("".join(out))
 
     def _generate_pango_pc_files(self):
         """Generate pangocairo.pc and pangoft2.pc that PkgConfigDeps misses."""
