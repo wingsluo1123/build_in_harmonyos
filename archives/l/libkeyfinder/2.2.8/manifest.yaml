@@ -1,0 +1,49 @@
+software: libkeyfinder
+build_system: cmake
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.2.8"
+status: published
+build_date: "2026-08-10"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/mixxxdj/libkeyfinder/archive/refs/tags/2.2.8.tar.gz"
+  sha256: "a54fc6c5ff435bb4b447f175bc97f9081fb5abf0edd5d125e6f5215c8fff4d11"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=OFF"
+    - "-DBUILD_SHARED_LIBS=ON"
+  dependencies:
+    - "fftw/3.3.10.2"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "CMakeLists.txt uses find_package(FFTW3) with custom FindFFTW3.cmake module; patched to use conan's find_package(fftw) with fftw::fftw target"
+  - "Upstream tests use Catch2 via FetchContent which fails on OHOS; disabled with BUILD_TESTING=OFF"
+  - "Shared library requires binary signing on OHOS platform"
