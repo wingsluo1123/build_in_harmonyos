@@ -23,6 +23,9 @@ class XapersConan(ConanFile):
     homepage = "https://finestructure.net/xapers"
     url = ""
 
+    # xapers is a CLI tool (console_scripts entry point), not a library
+    package_type = "application"
+
     # Pure Python package — no compiler settings needed
     settings = "os", "arch"
 
