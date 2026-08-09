@@ -23,9 +23,9 @@ class ApngasmConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("libpng/1.6.43")
-        self.requires("boost/1.84.0")
-        self.requires("zlib/1.3.1")
+        self.requires("libpng/1.6.58")
+        self.requires("boost/1.91.0.1")
+        self.requires("zlib/1.3.1.1")
 
     def layout(self):
         cmake_layout(self)

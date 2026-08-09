@@ -16,8 +16,8 @@ class ApngasmTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
-        self.requires("libpng/1.6.43")
-        self.requires("zlib/1.3.1")
+        self.requires("libpng/1.6.58")
+        self.requires("zlib/1.3.1.1")
 
     def layout(self):
         cmake_layout(self)
