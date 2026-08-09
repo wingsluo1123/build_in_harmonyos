@@ -93,6 +93,7 @@ class VapoursynthConan(ConanFile):
         self._package_python_module()
         self._package_upstream_tests()
         self._sign_shared_libraries()
+        self._ensure_shared_library_permissions()
 
     def package_info(self):
         self.cpp_info.libs = ["vapoursynth"]
@@ -323,6 +324,13 @@ class VapoursynthConan(ConanFile):
                 quiet=True,
             )
             os.replace(signed, shared_lib)
+
+    def _ensure_shared_library_permissions(self):
+        if self.settings.os != "OHOS":
+            return
+        for shared_lib in glob.glob(os.path.join(self.package_folder, "**", "*.so*"), recursive=True):
+            if not os.path.islink(shared_lib):
+                os.chmod(shared_lib, 0o755)
 
     def _find_ohos_tool(self, name):
         found = shutil.which(name)
