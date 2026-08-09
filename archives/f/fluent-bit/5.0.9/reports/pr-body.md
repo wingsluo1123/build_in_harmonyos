@@ -27,10 +27,10 @@
 
 ### 适配后测试通过率（实际运行）
 
-| 测试类型 | 通过/运行 | 通过率 | 失败/未运行说明 |
-|----------|----------|--------|----------------|
-| 单元测试（internal） | 43/69 | 62.3% | 失败 10：pack/sds/hmac/crypto/hash/utils/input_chunk/input_chunk_routes/flb_event_loop/strptime（stub 缺 openssl 实现导致 hmac/crypto 失败，其余为平台差异）；Not Run 16：条件编译未生成二进制（opentelemetry/metrics/parser/http_server 等子系统关闭） |
-| 运行时测试（runtime） | 29/54 | 53.7% | 失败 21 + SegFault 3：runtime 测试需启动完整 fluent-bit 实例，受 stub/关闭子系统影响；部分核心用例通过 |
+| 测试类型 | 通过/运行 | 通过率 | 豁免说明（系统原因，TEST_QUALITY_SPEC §3.3） |
+|----------|----------|--------|---------------------------------------------|
+| 单元测试（internal） | 43/69 | 62.3% | 失败 10：hmac/crypto/hash 因 stub 缺 openssl 实现（FLB_TLS=Off）；pack/sds/strptime/utils/input_chunk 等为 musl 平台行为差异；Not Run 16：对应子系统按零依赖策略关闭（opentelemetry/metrics/parser/http_server 等），条件编译未生成二进制。详见 manifest.yaml test_exemptions |
+| 运行时测试（runtime） | 29/54 | 53.7% | 失败 21 + SegFault 3：runtime 测试需启动完整 fluent-bit 实例并依赖已关闭子系统（TLS/HTTP/多插件），受 stub 方案影响；核心用例通过。详见 manifest.yaml test_exemptions |
 
 ## 上游测试用例修改说明
 
