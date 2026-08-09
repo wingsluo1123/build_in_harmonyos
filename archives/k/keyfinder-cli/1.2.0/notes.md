@@ -1,41 +1,52 @@
 # keyfinder-cli 1.2.0 适配笔记
 
 ## 编译环境
-- 构建系统: {cmake|autotools|makefile|meson|custom}
-- 编译日期: {2026-06-05}
+- 构建系统: cmake
+- 编译日期: 2026-08-10
 - 编译器: clang/clang++
-- 状态: {published|built|failed}
+- 状态: published
 
 ## 编译步骤
 
-{用文字描述实际编译步骤，包括关键的 configure/cmake 命令}
+1. 下载源码: https://github.com/EvanPurkhiser/keyfinder-cli/archive/refs/tags/v1.2.0.tar.gz
+2. conan install libkeyfinder/2.2.8 + ffmpeg/7.1.5 获取依赖
+3. cmake 配置 (使用 CMakeDeps + PkgConfigDeps)
+4. make 编译
+5. make install 安装
+6. 二进制签名 (OHOS 平台)
 
 ## 遇到的问题与解决方案
 
 | # | 问题 | 根因 | 解决方案 |
 |---|------|------|----------|
-{按需添加行}
+| 1 | 历史补丁不再需要 | 历史补丁为 FFmpeg < 7.x 兼容性修复，源码已有 #if LIBAVFORMAT_VERSION_MAJOR > 60 块支持 FFmpeg 7.x | 使用 ffmpeg/7.1.5，移除历史补丁 |
 
 ## 源码修改
 
-{如有补丁，列出文件名和修改内容；无则删除此节}
+无（源码已原生支持 FFmpeg 7.x）
 
 ## 依赖版本
 
-{列出本次编译依赖的具体软件版本}
+- libkeyfinder/2.2.8 (from ohpcd registry, PR #4859)
+- ffmpeg/7.1.5 (from ohpcd registry)
 
 ## 验证结果
 
 ```bash
-{验证命令和结果}
+conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing --user=ohpcd --channel=stable
+# G0-G4 all PASS
+# Test package: keyfinder-cli --help PASS
 ```
-
-## 交付物
-
-| 文件 | 大小 | 说明 |
-|------|------|------|
-{有打包产物时添加；无则删除此节}
 
 ## 注意事项
 
-{需要特别注意的点；无则删除此节}
+- 历史补丁(0001-0004)为 FFmpeg < 7.x 兼容性修复，使用 ffmpeg/7.1.5 时不需要
+- 源码已有 FFmpeg 7.x 原生支持 (#if LIBAVFORMAT_VERSION_MAJOR > 60)
+- 需要先生成并发布 libkeyfinder/2.2.8 到制品仓
+
+## 编译结束
+COMPLETED
+---
+
+**编译结束**: 2026-08-10 03:10
+**最终状态**: published
