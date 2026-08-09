@@ -1,7 +1,6 @@
 --- a/config/config.guess
 +++ b/config/config.guess
-@@ -92,21 +92,21 @@
- # headache to deal with in a portable fashion.
+@@ -93,20 +93,21 @@
  
  # Historically, `CC_FOR_BUILD' used to be named `HOST_CC'. We still
  # use `HOST_CC' if defined, but it is deprecated.
@@ -11,8 +10,8 @@
  set_cc_for_build='
  trap "exitcode=\$?; (rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null) && exit \$exitcode" 0 ;
  trap "rm -f \$tmpfiles 2>/dev/null; rmdir \$tmp 2>/dev/null; exit 1" 1 2 13 15 ;
--: ${TMPDIR=/tmp} ;
-+: ${TMPDIR=$HOME/tmp} ;
+ : ${TMPDIR=/tmp} ;
++case "$(uname -s)" in HarmonyOS) TMPDIR=${TMPDIR:-$HOME/tmp} ;; esac
   { tmp=`(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
   { test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir $tmp) ; } ||
   { tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir $tmp) && echo "Warning: creating insecure temp directory" >&2 ; } ||
@@ -23,7 +22,7 @@
   ,,)    echo "int x;" > $dummy.c ;
  	for c in cc gcc c89 c99 ; do
  	  if ($c -c -o $dummy.o $dummy.c) >/dev/null 2>&1 ; then
-@@ -126,20 +126,24 @@
+@@ -126,20 +127,24 @@
  if (test -f /.attbin/uname) >/dev/null 2>&1 ; then
  	PATH=$PATH:/.attbin ; export PATH
  fi
@@ -48,7 +47,7 @@
  	#include <features.h>
  	#if defined(__UCLIBC__)
  	LIBC=uclibc
-@@ -879,20 +883,23 @@
+@@ -879,20 +884,23 @@
      *:GNU/*:*:*)
  	# other systems with GNU libc and userland
  	echo ${UNAME_MACHINE}-unknown-`echo ${UNAME_SYSTEM} | sed 's,^[^/]*/,,' | tr '[A-Z]' '[a-z]'``echo ${UNAME_RELEASE}|sed -e 's/[-(].*//'`-${LIBC}
