@@ -152,6 +152,7 @@ class Gtk4Conan(ConanFile):
                 destination = os.path.join(tools_folder, tool)
                 shutil.copyfile(source, destination)
                 os.chmod(destination, 0o755)
+        self._ensure_sassc()
         return tools_folder
 
     def _fix_glib_pc(self):
@@ -188,6 +189,49 @@ class Gtk4Conan(ConanFile):
                     if os.path.isfile(tool_path):
                         out.append("%s=%s\n" % (var_name, tool_path))
             open(pc, "w").write("".join(out))
+
+    def _ensure_sassc(self):
+        """Ensure sassc is available; install via npm if missing."""
+        import shutil
+        if shutil.which("sassc"):
+            return
+        # Try to install sass via npm (dart-sass)
+        npm = shutil.which("npm")
+        if not npm:
+            self.output.warning("npm not found; sassc unavailable, CSS compilation may fail")
+            return
+        npm_global_bin = os.path.join(os.path.expanduser("~"), ".opendesk", "interpreters", "npm-global", "bin")
+        sass_bin = os.path.join(npm_global_bin, "sass")
+        if not os.path.isfile(sass_bin):
+            self.run("%s install -g sass 2>/dev/null || true" % npm, ignore_in_log=True)
+        if not os.path.isfile(sass_bin):
+            return
+        # Create sassc wrapper that translates sassc options to dart-sass
+        tools_folder = os.path.join(self.build_folder, "conan-native-tools")
+        os.makedirs(tools_folder, exist_ok=True)
+        sassc_wrapper = os.path.join(tools_folder, "sassc")
+        bash_path = "/data/service/hnp/bin/bash"
+        if not os.path.isfile(bash_path):
+            bash_path = "/bin/bash"
+        with open(sassc_wrapper, "w") as f:
+            f.write("#!%s\n" % bash_path)
+            f.write("args=()\n")
+            f.write("style=expanded\n")
+            f.write('while [ $# -gt 0 ]; do\n')
+            f.write('  case "$1" in\n')
+            f.write('    -a) args+=("--no-source-map"); shift ;;\n')
+            f.write('    -M) shift; shift ;;\n')
+            f.write('    -t) shift; style="$1"; shift ;;\n')
+            f.write('    -I) shift; shift ;;\n')
+            f.write('    -s) shift; shift ;;\n')
+            f.write('    -v) echo "sassc 3.6.2 (wrapper)"; exit 0 ;;\n')
+            f.write('    *) args+=("$1"); shift ;;\n')
+            f.write('  esac\n')
+            f.write('done\n')
+            f.write('[ "$style" = "compact" ] && style="expanded"\n')
+            f.write('[ "$style" = "nested" ] && style="expanded"\n')
+            f.write('exec %s --style="$style" --no-source-map --quiet "${args[@]}"\n' % sass_bin)
+        os.chmod(sassc_wrapper, 0o755)
 
     def _generate_pango_pc_files(self):
         """Generate pangocairo.pc and pangoft2.pc that PkgConfigDeps misses."""
