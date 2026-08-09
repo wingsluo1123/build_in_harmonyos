@@ -1,9 +1,11 @@
 version: "0.12.2"
-status: partial
-build_date: "2026-04-24"
+software: "aws-c-s3"
+status: built
+build_date: "2026-08-09"
 
 source:
   url: "https://github.com/awslabs/aws-c-s3/archive/refs/tags/v0.12.2.tar.gz"
+  sha256: "76348249b4bc305c1a40d089270a5a419f58c03c231b757de0a49a7a234eec76"
   tar_format: tar.gz
 
 build:
@@ -12,15 +14,22 @@ build:
     - "-DCMAKE_BUILD_TYPE=Release"
     - "-DBUILD_SHARED_LIBS=OFF"
     - "-DBUILD_TESTING=OFF"
+    - "-DENABLE_S3_ENDPOINT_RESOLVER=OFF"
   dependencies:
-    - aws-c-common
-    - aws-c-io
-    - aws-c-http
-    - aws-c-auth
-    - aws-c-event-stream
-    - aws-checksums
+    - aws-c-common/0.14.3
+    - aws-c-auth/0.10.1
+    - aws-checksums/0.2.10
+    - aws-c-io/0.26.3
+    - aws-c-http/0.10.14
+    - aws-c-cal/0.9.13
+    - aws-c-sdkutils/0.2.4
+    - aws-c-compression/0.3.2
+    - aws-c-event-stream/0.7.0
   cc: clang
   cxx: clang++
 
 patches_applied: []
-knowledge_gained: []
+knowledge_gained:
+  - "CMake 4.x on OHOS evaluates if(WIN32) as true even when WIN32 is empty"
+  - "aws-c-io BYO_CRYPTO=ON requires stub for aws_tls_handler_protocol"
+  - "cpp_info.includedirs not auto-detected for locally built packages on OHOS"
