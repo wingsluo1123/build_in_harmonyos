@@ -1,0 +1,86 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R17",
+      "file": "archives/l/libblockdev/3.4.0/notes.md",
+      "line": 0,
+      "description": "Patch documentation table only describes 4 patches (01-04) but conandata.yml lists 6 patches (01-06). Patches 05-sysname-harmonyos.patch and 06-nvme-remove-uuid-include.patch are not documented in the notes.md patch table, creating an inconsistency between documentation and recipe.",
+      "fix_suggestion": "Add rows for patches 05 and 06 to the patch table in notes.md, describing their content and origin."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS14",
+      "file": "archives/l/libblockdev/3.4.0/manifest.yaml",
+      "line": 1,
+      "description": "manifest.yaml uses field name 'software:' instead of 'name:' as specified in code style rule 14. The rule example shows 'name: zlib' but the actual file uses 'software: libblockdev'.",
+      "fix_suggestion": "Rename the 'software:' field to 'name:' to match the code style specification: 'name: libblockdev'."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R18",
+      "file": "archives/l/libblockdev/3.4.0/manifest.yaml",
+      "line": 0,
+      "description": "manifest.yaml declares patch_generation.method as 'manual-merge'. R18 states patches must be generated via 'refresh-patch --auto' and must not be manually created. While the note indicates 30 original auto-generated patches were merged into 6, the declared method deviates from the required auto-generation process.",
+      "fix_suggestion": "Regenerate patches using 'refresh-patch --auto' or document an approved exception for manual merging with justification."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R40",
+      "file": "archives/l/libblockdev/3.4.0/test_package/test.c",
+      "line": 0,
+      "description": "Test only calls bd_is_initialized() and bd_init_error_quark() — basic API existence checks. libblockdev is a system-level block device library (R40 category: system底层). The test does not verify the loop plugin functionality (the only enabled plugin). While the current tests do call real API functions (not a stub), the coverage could be more comprehensive for a system-level library adaptation. The notes.md mentions bd_loop_init() as the recommended initialization path, but the test does not exercise it.",
+      "fix_suggestion": "Consider adding bd_loop_init() or bd_loop_get_status() calls to verify the loop plugin is functional, or document why only basic API checks are feasible in the test environment."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS12",
+      "file": "archives/l/libblockdev/3.4.0/conandata.yml",
+      "line": 8,
+      "description": "Patch filenames use 2-digit prefix (01-, 02-, ...) instead of the 4-digit prefix (0001-, 0002-, ...) specified in code style rule 12. The rule example shows '0001-build-aux-config.guess.patch'.",
+      "fix_suggestion": "Rename patch files to use 4-digit prefixes: 0001-config.guess.patch, 0002-configure.patch, etc."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS5",
+      "file": "archives/l/libblockdev/3.4.0/conanfile.py",
+      "line": 0,
+      "description": "The kmod stub header uses __builtin_va_list instead of va_list from <stdarg.h>. While this works with clang (the target compiler), it is a compiler-specific extension rather than standard C. The real libkmod.h uses va_list with #include <stdarg.h>.",
+      "fix_suggestion": "Add '#include <stdarg.h>' to the stub header and replace __builtin_va_list with va_list for portability."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS17",
+      "file": "archives/l/libblockdev/3.4.0/conanfile.py",
+      "line": 0,
+      "description": "In the kmod stub header string, the 'typedef void (*kmod_log_fn)(...)' line has inconsistent indentation — it is indented further than the surrounding function declarations, breaking the visual alignment of the header.",
+      "fix_suggestion": "Align the typedef declaration with the same indentation as the surrounding function declarations in the stub header."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/l/libblockdev/3.4.0/conanfile.py",
+      "line": 0,
+      "description": "In _create_kmod_stub(), the C compiler is fetched from Conan configuration ('tools.build:compiler_executables') but the archiver is hardcoded as 'ar = \"llvm-ar\"'. This inconsistency means the ar path won't respect user configuration if a different archiver is set.",
+      "fix_suggestion": "Fetch ar from compiler_executables or Conan configuration as well, e.g.: ar = compiler_executables.get('ar', 'llvm-ar')."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS14",
+      "file": "archives/l/libblockdev/3.4.0/manifest.yaml",
+      "line": 0,
+      "description": "Patch type classification in manifest.yaml (types: platform, toolchain, portability) is inconsistent with conandata.yml which uses 'portability' for all patches. This creates ambiguity about the actual patch types.",
+      "fix_suggestion": "Align patch types between manifest.yaml and conandata.yml, or document why the classification differs."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS2",
+      "file": "archives/l/libblockdev/3.4.0/conanfile.py",
+      "line": 0,
+      "description": "License is declared as 'LGPL-2.0' but libblockdev upstream (storaged-project) typically uses LGPL-2.1-or-later. The SPDX identifier may be inaccurate.",
+      "fix_suggestion": "Verify the exact license from the upstream source (COPYING file) and update to the correct SPDX identifier, likely 'LGPL-2.1-or-later'."
+    }
+  ],
+  "summary": "Audit of libblockdev 3.4.0 Conan recipe (re-run). 10 changed files reviewed against code_style and review_memory rules. Verdict: PASS (no P0/P1 blocking issues found). Deception detection: all clear — sha256 is valid format and URL verified as official GitHub release (github.com/storaged-project/libblockdev/releases/tag/3.4.0); status 'built' is honest; test calls real API functions (bd_is_initialized, bd_init_error_quark); no pre-compiled binaries in PR; kmod stub returns NULL/-1 for graceful degradation (documented, not deceptive). Recipe correctness: Conan 2.x API used correctly; source URL is official; version 3.4.0 is first adaptation (no suffix needed); no hardcoded system paths; no bare CC/CXX env vars; static by default; method order correct. 4 P2 warnings: (1) notes.md patch table missing entries for patches 05-06; (2) manifest.yaml uses 'software:' instead of 'name:' field; (3) manifest.yaml declares manual-merge patch method (R18 requires auto-generation); (4) test coverage could be more comprehensive for system-level library (R40). 6 P3 minor issues: patch filename numbering (2-digit vs 4-digit), __builtin_va_list usage, indentation inconsistency, hardcoded ar path, patch type inconsistency, license SPDX accuracy. No blocking issues; recipe is fundamentally sound."
+}
