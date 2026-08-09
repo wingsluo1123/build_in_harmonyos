@@ -1,0 +1,149 @@
+--- a/configure
++++ b/configure
+@@ -13649,29 +13649,30 @@
+ 
+ case "$am__api_version" in
+     1.01234)
+ 	as_fn_error $? "Automake 1.5 or newer is required to use intltool" "$LINENO" 5
+     ;;
+     *)
+     ;;
+ esac
+ 
+ INTLTOOL_REQUIRED_VERSION_AS_INT=`echo 0.40.0 | awk -F. '{ print $ 1 * 1000 + $ 2 * 100 + $ 3; }'`
+-INTLTOOL_APPLIED_VERSION=`intltool-update --version | head -1 | cut -d" " -f3`
++INTLTOOL_APPLIED_VERSION=0.40.0
+ INTLTOOL_APPLIED_VERSION_AS_INT=`echo $INTLTOOL_APPLIED_VERSION | awk -F. '{ print $ 1 * 1000 + $ 2 * 100 + $ 3; }'`
+ if test -n "0.40.0"; then
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for intltool >= 0.40.0" >&5
+ $as_echo_n "checking for intltool >= 0.40.0... " >&6; }
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $INTLTOOL_APPLIED_VERSION found" >&5
+ $as_echo "$INTLTOOL_APPLIED_VERSION found" >&6; }
+     test "$INTLTOOL_APPLIED_VERSION_AS_INT" -ge "$INTLTOOL_REQUIRED_VERSION_AS_INT" ||
+-	as_fn_error $? "Your intltool is too old.  You need intltool 0.40.0 or later." "$LINENO" 5
++	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: intltool check skipped on OHOS" >&5
++$as_echo "$as_me: WARNING: intltool check skipped on OHOS" >&6; }
+ fi
+ 
+ # Extract the first word of "intltool-update", so it can be a program name with args.
+ set dummy intltool-update; ac_word=$2
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+ $as_echo_n "checking for $ac_word... " >&6; }
+ if ${ac_cv_path_INTLTOOL_UPDATE+:} false; then :
+   $as_echo_n "(cached) " >&6
+ else
+   case $INTLTOOL_UPDATE in
+@@ -13781,21 +13782,25 @@
+ if test -n "$INTLTOOL_EXTRACT"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $INTLTOOL_EXTRACT" >&5
+ $as_echo "$INTLTOOL_EXTRACT" >&6; }
+ else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+ $as_echo "no" >&6; }
+ fi
+ 
+ 
+ if test -z "$INTLTOOL_UPDATE" -o -z "$INTLTOOL_MERGE" -o -z "$INTLTOOL_EXTRACT"; then
+-    as_fn_error $? "The intltool scripts were not found. Please install intltool." "$LINENO" 5
++    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: The intltool scripts were not found. NLS features will be disabled." >&5
++$as_echo "$as_me: WARNING: The intltool scripts were not found. NLS features will be disabled." >&6; }
++    INTLTOOL_UPDATE=/bin/true
++    INTLTOOL_MERGE=/bin/true
++    INTLTOOL_EXTRACT=/bin/true
+ fi
+ 
+ if test -z "$AM_DEFAULT_VERBOSITY"; then
+   AM_DEFAULT_VERBOSITY=1
+ fi
+ 
+ 
+ INTLTOOL_V_MERGE='$(INTLTOOL__v_MERGE_$(V))'
+ INTLTOOL__v_MERGE_='$(INTLTOOL__v_MERGE_$(AM_DEFAULT_VERBOSITY))'
+ INTLTOOL__v_MERGE_0='@echo "  ITMRG " $@;'
+@@ -14086,27 +14091,29 @@
+ if test -n "$GMSGFMT"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GMSGFMT" >&5
+ $as_echo "$GMSGFMT" >&6; }
+ else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+ $as_echo "no" >&6; }
+ fi
+ 
+ 
+ if test -z "$XGETTEXT" -o -z "$MSGMERGE" -o -z "$MSGFMT"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
++    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: GNU gettext tools not found; NLS disabled" >&5
++$as_echo "$as_me: WARNING: GNU gettext tools not found; NLS disabled" >&6; }
+ fi
+ xgversion="`$XGETTEXT --version|grep '(GNU ' 2> /dev/null`"
+ mmversion="`$MSGMERGE --version|grep '(GNU ' 2> /dev/null`"
+ mfversion="`$MSGFMT --version|grep '(GNU ' 2> /dev/null`"
+ if test -z "$xgversion" -o -z "$mmversion" -o -z "$mfversion"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
++    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: GNU gettext version check skipped on OHOS" >&5
++$as_echo "$as_me: WARNING: GNU gettext version check skipped on OHOS" >&6; }
+ fi
+ 
+ # Extract the first word of "perl", so it can be a program name with args.
+ set dummy perl; ac_word=$2
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+ $as_echo_n "checking for $ac_word... " >&6; }
+ if ${ac_cv_path_INTLTOOL_PERL+:} false; then :
+   $as_echo_n "(cached) " >&6
+ else
+   case $INTLTOOL_PERL in
+@@ -14155,21 +14162,22 @@
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: $IT_PERL_VERSION" >&5
+ $as_echo "$IT_PERL_VERSION" >&6; }
+ fi
+ if test "x" != "xno-xml"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for XML::Parser" >&5
+ $as_echo_n "checking for XML::Parser... " >&6; }
+    if `$INTLTOOL_PERL -e "require XML::Parser" 2>/dev/null`; then
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+ $as_echo "ok" >&6; }
+    else
+-       as_fn_error $? "XML::Parser perl module is required for intltool" "$LINENO" 5
++       { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: XML::Parser perl module not found - intltool features disabled" >&5
++$as_echo "$as_me: WARNING: XML::Parser perl module not found - intltool features disabled" >&6; }
+    fi
+ fi
+ 
+ # Substitute ALL_LINGUAS so we can use it in po/Makefile
+ 
+ 
+ 
+ 
+ 
+ 
+@@ -17318,27 +17326,23 @@
+   tmp= ac_tmp=
+   trap 'exit_status=$?
+   : "${ac_tmp:=$tmp}"
+   { test ! -d "$ac_tmp" || rm -fr "$ac_tmp"; } && exit $exit_status
+ ' 0
+   trap 'as_fn_exit 1' 1 2 13 15
+ }
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+-  test -d "$tmp"
+-}  ||
+-{
+-  tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
+-} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
++  tmp="${TMPDIR:-/storage/Users/currentUser/tmp}/confstat_$$"
++  (umask 077 && mkdir -p "$tmp")
++} || as_fn_error $? "cannot create a temporary directory in ${TMPDIR:-.}" "$LINENO" 5
+ ac_tmp=$tmp
+ 
+ # Set up the scripts for CONFIG_FILES section.
+ # No need to generate them if there are no CONFIG_FILES.
+ # This happens for instance with `./config.status config.h'.
+ if test -n "$CONFIG_FILES"; then
+ 
+ 
+ ac_cr=`echo X | tr X '\015'`
+ # On cygwin, bash can eat \r inside `` if the user requested igncr.

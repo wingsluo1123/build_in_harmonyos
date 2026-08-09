@@ -192,3 +192,7 @@ export LD_LIBRARY_PATH=/storage/Users/currentUser/usr/local/lib
    ```bash
    clang your_program.c $(pkg-config --cflags --libs libfm-extra) -lintl_glib
    ```
+---
+
+**编译结束**: 2026-08-10 06:20
+**最终状态**: built
