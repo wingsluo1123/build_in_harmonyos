@@ -1,0 +1,97 @@
+--- rsyslog-8.2604.0.orig/runtime/queue.c	2026-08-07 23:56:16.405680469 +0800
++++ rsyslog-8.2604.0.work/runtime/queue.c	2026-08-07 23:59:02.953680313 +0800
+@@ -2722,10 +2722,14 @@
+ 
+     int iCancelStateSave;
+     /* at this spot, we must not be cancelled */
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &iCancelStateSave);
++#endif
+     DeleteProcessedBatch(pThis, &pWti->batch);
+     qqueueChkPersist(pThis, pWti->batch.nElemDeq);
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+ 
+     RETiRet;
+ }
+@@ -2772,7 +2776,9 @@
+     }
+ 
+     /* at this spot, we may be cancelled */
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &iCancelStateSave);
++#endif
+ 
+ 
+     pWti->pbShutdownImmediate = &pThis->bShutdownImmediate;
+@@ -2787,7 +2793,9 @@
+     }
+ 
+     /* but now cancellation is no longer permitted */
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+ 
+ finalize_it:
+     DBGPRINTF("regular consumer finished, iret=%d, szlog %d sz phys %d\n", iRet, getLogicalQueueSize(pThis),
+@@ -2826,7 +2834,9 @@
+     bNeedReLock = 1;
+ 
+     /* at this spot, we may be cancelled */
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &iCancelStateSave);
++#endif
+ 
+     /* iterate over returned results and enqueue them in DA queue */
+     for (i = 0; i < pWti->batch.nElem && !pThis->bShutdownImmediate; i++) {
+@@ -2849,7 +2859,9 @@
+     }
+ 
+     /* but now cancellation is no longer permitted */
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+ 
+ finalize_it:
+     /*	Check the last return state of qqueueEnqMsg. If an error was returned, we acknowledge it only.
+@@ -3648,7 +3660,9 @@
+     ISOBJ_TYPE_assert(pThis, qqueue);
+     assert(pMultiSub != NULL);
+ 
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &iCancelStateSave);
++#endif
+     d_pthread_mutex_lock(pThis->mut);
+     for (i = 0; i < pMultiSub->nElem; ++i) {
+         localRet = doEnqSingleObj(pThis, pMultiSub->ppMsgs[i]->flowCtlType, (void *)pMultiSub->ppMsgs[i]);
+@@ -3661,7 +3675,9 @@
+     qqueueAdviseMaxWorkers(pThis);
+     /* and release the mutex */
+     d_pthread_mutex_unlock(pThis->mut);
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+     DBGOPRINT((obj_t *)pThis, "MultiEnqObj advised worker start\n");
+ 
+     RETiRet;
+@@ -3697,7 +3713,9 @@
+     const int isNonDirectQ = pThis->qType != QUEUETYPE_DIRECT;
+ 
+     if (isNonDirectQ) {
++#ifdef HAVE_PTHREAD_CANCEL
+         pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &iCancelStateSave);
++#endif
+         d_pthread_mutex_lock(pThis->mut);
+     }
+ 
+@@ -3711,7 +3729,9 @@
+         qqueueAdviseMaxWorkers(pThis);
+         /* and release the mutex */
+         d_pthread_mutex_unlock(pThis->mut);
++#ifdef HAVE_PTHREAD_CANCEL
+         pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+         DBGOPRINT((obj_t *)pThis, "EnqueueMsg advised worker start\n");
+     }
+ 

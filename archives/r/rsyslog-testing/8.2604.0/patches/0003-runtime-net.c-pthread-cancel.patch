@@ -1,0 +1,16 @@
+--- rsyslog-8.2604.0.orig/runtime/net.c	2026-08-07 23:56:16.365681719 +0800
++++ rsyslog-8.2604.0.work/runtime/net.c	2026-08-07 23:57:35.477681563 +0800
+@@ -498,9 +498,13 @@
+     int iCancelStateSave;
+     int i;
+ 
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &iCancelStateSave);
++#endif
+     i = getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(iCancelStateSave, NULL);
++#endif
+     return i;
+ }
+ 

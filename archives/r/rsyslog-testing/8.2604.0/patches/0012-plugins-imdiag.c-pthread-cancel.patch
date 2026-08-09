@@ -1,0 +1,14 @@
+--- rsyslog-8.2604.0.orig/plugins/imdiag/imdiag.c	2026-08-07 23:56:17.217681563 +0800
++++ rsyslog-8.2604.0.work/plugins/imdiag/imdiag.c	2026-08-07 23:59:42.585680469 +0800
+@@ -986,7 +986,11 @@
+ 
+     /* clean up timeoutGuard if active */
+     if (abortTimeout != -1) {
++#ifdef HAVE_PTHREAD_CANCEL
+         int r = pthread_cancel(timeoutGuard_thrd);
++#else
++        int r = pthread_kill(timeoutGuard_thrd, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++#endif
+         if (r == 0) {
+             void *dummy;
+             pthread_join(timeoutGuard_thrd, &dummy);

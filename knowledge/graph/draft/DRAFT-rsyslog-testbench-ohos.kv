@@ -1,0 +1,94 @@
+#====================================================================
+# DRAFT-rsyslog-testbench-ohos — rsyslog testbench OHOS 迁移
+# 组合方案：E011 HMDFS + musl pthread_cancel + musl stub
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-rsyslog-testbench-ohos
+trigger_tool:           configure|config.status|make|clang|ld.lld
+phase:                  configuration|compile|link
+error_signature:        Permission denied.*subs[0-9]*\.awk|
+                         cannot create.*conf.*Permission denied|
+                         undefined symbol: pthread_cancel|
+                         undefined symbol: pthread_setcancelstate|
+                         call to undeclared function 'endutxent'|
+                         use of undeclared identifier '_res'|
+                         can't create.*dummy.c.*Permission denied
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               autotools|hmdfs|musl|test-framework
+match_keywords:         rsyslog, testbench, pthread_cancel, HMDFS, E011,
+                         musl endutxent, __res_state, RainerScript, umask 077,
+                         mktemp, confXXXXXX, HAVE_PTHREAD_CANCEL, TMPDIR,
+                         syslog daemon, test framework migration
+title:                  rsyslog testbench OHOS 迁移：E011 HMDFS + musl pthread_cancel + musl stub 组合方案
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             rsyslog testbench（1426 RainerScript/shell 用例 + 3 C 单元测试 + 13 Python mock）
+                         在 OHOS/musl/HMDFS 环境遇到三类障碍：
+                         1) E011：autotools configure/config.status 用 `umask 077 && mktemp -d "./confXXXXXX"`
+                            在 HMDFS 上创建 0700 目录后 UID 映射导致不可写（rsyslog-8.2604.0 configure:37783）；
+                         2) musl 无 pthread_cancel/pthread_setcancelstate：源码 25 处调用需条件编译；
+                         3) musl 缺 utmpx 接口函数（endutxent）与全局 _res（glibc libresolv 扩展）。
+                         此外 HMDFS 不支持 make jobserver mkfifo，需 make -j1。
+affected_scope:         所有 autotools 构建的服务类测试框架（1000+ 用例 + daemon 依赖）迁移 OHOS 时
+                         可能遇到：E011 临时目录权限、musl 线程取消缺失、musl 缺失 glibc 扩展接口
+verification_cmd:       grep -n "umask 077" configure | head -3;
+                         grep -rn "pthread_cancel" runtime/ plugins/ | wc -l;
+                         grep -n "endutxent" /path/to/sysroot/usr/include/utmpx.h;
+                         grep -n "_res" /path/to/sysroot/usr/include/resolv.h
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           e011-tmpdir-plus-musl-conditional
+rec_description:        三合一修复：
+                         1) E011：configure 与 config.status 生成模板的 mktemp 改为
+                            `umask 000 && mktemp -d "$TMPDIR/confXXXXXX"`（$TMPDIR 绝对路径）；
+                         2) pthread_cancel 25 处调用（runtime/net.c、wti.c、tcpsrv.c、dnscache.c、
+                            wtp.c、queue.c、plugins/omprog.c、omazureeventhubs.c、imsolaris、imdiag、
+                            threads.c）全部添加 HAVE_PTHREAD_CANCEL 条件编译；
+                         3) musl stub：omusrmsg.c 的 setutent/getutent/endutent 空实现
+                            （OHOS utmpx.h 仅 struct 无函数）+ omfwd.c 静态 struct __res_state 兼容
+                            （musl 无全局 _res）。
+                         make 必须 -j1（HMDFS 不支持 jobserver mkfifo）。
+rec_command:            TMPDIR=$HOME/tmp CC=clang CXX=clang++ \
+                         AUTOCONF=/data/service/hnp/bin/autoconf \
+                         ACLOCAL_PATH=<pkg-config m4 目录> \
+                         ./configure --enable-testbench --build=aarch64-linux-gnu \
+                         --host=aarch64-linux-gnu --disable-uuid --disable-libgcrypt \
+                         --disable-fmhttp --disable-impstats-push && \
+                         make -j1 && make check TESTS='runtime_unit_linkedlist runtime_unit_stringbuf'
+rec_auto_fix:           true
+rec_impl:               apply-12-patches-plus-runtime-stubs
+rec_result:             configure exit 0 + make exit 0 + 2/2 C 单元测试 PASS
+                         （rsyslog-testing 8.2604.0，r4 实测）
+
+# ═══ Layer 4: 回退方案 (Fallbacks) ═══
+fallback_approach:      e011-bypass-build-flags
+fallback_description:   若不便改 configure：用 `--build=aarch64-linux-gnu` 绕过 config.guess 平台识别，
+                         并设置 TMPDIR=$HOME/tmp + LIBESTR_CFLAGS/LIBS 环境变量覆盖依赖 .pc 错误 prefix
+fallback_command:       ./configure --build=aarch64-linux-gnu --host=aarch64-linux-gnu \
+                         TMPDIR=$HOME/tmp LIBESTR_CFLAGS="-I<libestr include>" \
+                         LIBESTR_LIBS="-L<libestr lib> -lestr" ...
+
+# ═══ 测试框架约束 ═══
+test_framework_constraint: 1426 shell/RainerScript 用例需 rsyslogd daemon/root/网络环境
+                           （imfile-logrotate 21 条需 root；elasticsearch/mysql/kubernetes mock 需网络），
+                           OHPC probe 环境不满足；单次全量运行 >1 小时。
+                           C 单元测试（runtime_unit_linkedlist/stringbuf）无 daemon 依赖，2/2 PASS。
+cross_lib_reuse:        可跨库复用于任何使用 rsyslogd daemon 测试的 autotools 库；
+                         E011+pthread_cancel+musl stub 三合一模式是通用 OHOS 迁移路径
+
+# 元数据
+source_software:        rsyslog-testing 8.2604.0
+source_round:           r2/r3/r4（probe + 构建 + smoke）
+source_patches:         archives/r/rsyslog/8.2604.0/patches/（12 个，git apply --check 全 OK）
+source_notes:           archives/r/rsyslog-testing/8.2604.0/notes.md
+
+# OHOS 额外差异（R12 补充）
+ohos_bash_path: /data/service/hnp/bin/bash（无 /bin/bash）
+shebang_fix: sed -i "1s|#!/bin/bash|#!/data/service/hnp/bin/bash|" tests/*.sh
+shebang_scope: rsyslog 全部 1426 个 .sh 测试脚本
+
+pr_ref: !4708

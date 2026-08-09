@@ -1,0 +1,14 @@
+--- rsyslog-8.2604.0.orig/plugins/omprog/omprog.c	2026-08-07 23:56:17.177681407 +0800
++++ rsyslog-8.2604.0.work/plugins/omprog/omprog.c	2026-08-07 23:59:35.409682813 +0800
+@@ -794,7 +794,11 @@
+         LogMsg(0, NO_ERRCODE, LOG_WARNING,
+                "omprog: forcing termination of output capture "
+                "thread because of unresponsive child process");
++#ifdef HAVE_PTHREAD_CANCEL
+         pthread_cancel(pCtx->thrdID);
++        #else
++        pthread_kill(pCtx->thrdID, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++#endif
+         pCtx->bIsRunning = 0;
+     }
+ 

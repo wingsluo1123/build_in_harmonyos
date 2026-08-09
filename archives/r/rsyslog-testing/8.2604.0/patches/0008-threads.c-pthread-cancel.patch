@@ -1,0 +1,26 @@
+--- rsyslog-8.2604.0.orig/threads.c	2026-08-07 23:56:16.345680782 +0800
++++ rsyslog-8.2604.0.work/threads.c	2026-08-07 23:59:28.865680313 +0800
+@@ -143,7 +143,11 @@
+                         "termination - canceling\n",
+                         pThis->name);
+             }
++#ifdef HAVE_PTHREAD_CANCEL
+             pthread_cancel(pThis->thrdID);
++        #else
++        pthread_kill(pThis->thrdID, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++#endif
+             break;
+         } else if (ret != 0) {
+             char errStr[1024];
+@@ -180,7 +182,11 @@
+                     "input thread %s\n",
+                     pThis->name);
+         }
++#ifdef HAVE_PTHREAD_CANCEL
+         pthread_cancel(pThis->thrdID);
++        #else
++        pthread_kill(pThis->thrdID, SIGUSR1);  /* OHOS: signal triggers atomic-flag exit */
++#endif
+     } else {
+         thrdTerminateNonCancel(pThis);
+     }

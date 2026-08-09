@@ -1,0 +1,25 @@
+--- rsyslog-8.2604.0.orig/runtime/dnscache.c	2026-08-07 23:56:16.373681094 +0800
++++ rsyslog-8.2604.0.work/runtime/dnscache.c	2026-08-07 23:57:53.285680313 +0800
+@@ -31,6 +31,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <signal.h>
++#include <pthread.h>
+ #include <netdb.h>
+ #include <unistd.h>
+ #include <ctype.h>
+@@ -190,10 +191,14 @@
+     int iCancelStateSave;
+     int i;
+ 
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &iCancelStateSave);
+     i = getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
+     pthread_setcancelstate(iCancelStateSave, NULL);
+     return i;
++#else
++    return getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
++#endif
+ }
+ 
+ 

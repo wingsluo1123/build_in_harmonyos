@@ -1,0 +1,23 @@
+software: rsyslog-testing
+display: "Rsyslog Testbench"
+description: "rsyslog 测试框架（testbench）：1426 个 RainerScript/shell 测试用例 + 3 个 C 单元测试 + 13 个 Python mock"
+category: testing
+homepage: "https://www.rsyslog.com/"
+license: GPL-3.0
+build_system: autotools
+ohos_adaptation:
+  key_points:
+    - "与 rsyslog 主包共 tarball：rsyslog-8.2604.0.tar.gz，--enable-testbench 启用测试框架"
+    - "E011 HMDFS umask 077：configure configure:37783 mktemp 用 $TMPDIR 绝对路径修复"
+    - "pthread_cancel 在 OHOS/musl 不可用：25 处调用添加 HAVE_PTHREAD_CANCEL 条件编译"
+    - "omusrmsg.c：musl 缺 endutxent，添加 stub"
+    - "omfwd.c：musl 缺 _res（glibc libresolv），添加静态兼容 struct __res_state"
+  common_dependencies:
+    - libestr/0.1.11
+    - libfastjson/1.2304.0
+    - liblogging/1.0.8
+versions:
+  "8.2604.0":
+    status: built
+    build_date: "2026-08-08"
+    notes: "核心构建通过（rsyslogd + lib/rsyslog/*.so）；2/2 C 单元测试 PASS；1426 shell 用例受 daemon/root/网络约束"

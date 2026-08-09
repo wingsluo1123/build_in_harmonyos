@@ -1,0 +1,80 @@
+software: rsyslog-testing
+version: "8.2604.0"
+status: built
+build_date: "2026-08-08"
+compile_date: "2026-08-08"
+
+source:
+  url: "https://www.rsyslog.com/files/download/rsyslog/rsyslog-8.2604.0.tar.gz"
+  sha256: "2a04b1cd6f0a5e2b60eec231acce3cf9927c4ed02bc5fbbe5dc4c35fcf887b64"
+  tar_format: tar.gz
+  archive_root: "rsyslog-8.2604.0/"
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/usr/local"
+    - "--enable-testbench"
+    - "--build=aarch64-linux-gnu"
+    - "--host=aarch64-linux-gnu"
+    - "--disable-uuid"
+    - "--disable-libgcrypt"
+    - "--disable-fmhttp"
+    - "--disable-impstats-push"
+  environment_overrides:
+    - "TMPDIR=$HOME/tmp"
+    - "CC=clang CXX=clang++"
+    - "AUTOCONF=/data/service/hnp/bin/autoconf"
+    - "ACLOCAL_PATH=/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal"
+    - "LIBESTR_CFLAGS/LIBS 与 LIBFASTJSON_CFLAGS/LIBS 指向 conan 缓存 pkgconfig"
+  dependencies:
+    - "libestr/0.1.11"
+    - "libfastjson/1.2304.0"
+    - "liblogging/1.0.8"
+
+patches_applied:
+  - "0001-configure-E011-HMDFS-fix.patch"
+  - "0002-runtime-dnscache.c-pthread-cancel.patch"
+  - "0003-runtime-net.c-pthread-cancel.patch"
+  - "0004-runtime-wti.c-pthread-cancel.patch"
+  - "0005-runtime-queue.c-pthread-cancel.patch"
+  - "0006-runtime-tcpsrv.c-pthread-cancel.patch"
+  - "0007-runtime-wtp.c-pthread-cancel.patch"
+  - "0008-threads.c-pthread-cancel.patch"
+  - "0009-plugins-omprog.c-pthread-cancel.patch"
+  - "0010-plugins-omazureeventhubs.c-pthread-cancel.patch"
+  - "0011-plugins-imsolaris-sun_cddl.c-pthread-cancel.patch"
+  - "0012-plugins-imdiag.c-pthread-cancel.patch"
+  # 构建期额外修复（未落补丁文件，写入 r4 回报）：
+  # - configure config.status 生成模板 E011（$TMPDIR + umask 000）
+  # - tools/omusrmsg.c musl endutxent stub
+  # - tools/omfwd.c musl _res 静态 struct __res_state 兼容
+
+build_results:
+  configure_exit: 0
+  make_exit: 0
+  products:
+    binaries:
+      - "sbin/rsyslogd"
+    modules:
+      - "lib/rsyslog/*.so（immark/imuxsock/imtcp/imudp/omtesting 等）"
+    tests:
+      - "tests/runtime_unit_linkedlist"
+      - "tests/runtime_unit_stringbuf"
+
+test_results:
+  entry: "make check TESTS='runtime_unit_linkedlist runtime_unit_stringbuf'"
+  total: 1429
+  executed: 2
+  pass: 2
+  skip: 0
+  fail: 0
+  unsupported: 1427
+  unsupported_reason: "1426 shell/RainerScript 用例需要 rsyslogd daemon/root/网络环境，OHPC probe 环境不满足；13 Python mock 需 daemon；单次全量运行 >1 小时"
+
+knowledge_gained:
+  - "E011：HMDFS umask 077 导致 configure/config.status 的 mktemp './confXXXXXX' 不可写；需 $TMPDIR 绝对路径 + umask 000（configure:37783 + config.status 生成模板同步修复）"
+  - "musl pthread_cancel/pthread_setcancelstate 缺失：25 处调用需 HAVE_PTHREAD_CANCEL 条件编译（net/wti/tcpsrv/dnscache/wtp/queue/omprog/omazureeventhubs/imsolaris/imdiag/threads）"
+  - "OHOS utmpx.h 仅声明 struct utmpx、无 setutxent/getutxent/endutxent 函数：omusrmsg.c 需 musl stub（E213 模式）"
+  - "OHOS musl 无全局 _res（glibc libresolv 扩展）：omfwd.c 需静态 struct __res_state 兼容"
+  - "HMDFS 不支持 make jobserver mkfifo：必须 make -j1"
