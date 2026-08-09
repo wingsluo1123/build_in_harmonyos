@@ -1,5 +1,8 @@
 #!/usr/bin/env sh
 set -eu
+if (set -o pipefail) 2>/dev/null; then
+    set -o pipefail
+fi
 
 if [ -z "${COMPAT_LISPDIR:-}" ]; then
     echo "COMPAT_LISPDIR is not set" >&2
