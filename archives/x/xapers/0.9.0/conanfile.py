@@ -178,8 +178,14 @@ class XapersConan(ConanFile):
             )
             self.output.info("link fixes applied to python3/Makefile")
 
-        # 构建 python3 绑定
-        self.run("make -C python3 -j1", cwd=bind_dir)
+        # 构建 python3 绑定。
+        # 注意：跳过 make 默认 all 中的 import 验证目标
+        # (xapian/__pycache__/__init__.cpython-*.pyc) —— CI 的 HNP python
+        # 在 conan build 目录 (.conan2/p/b/...) 加载 _xapian.so 会报
+        # Permission denied（沙箱限制），绑定安装到 site-packages 后再验证。
+        self.run("make -C python3 _xapian.la", cwd=bind_dir)
+        # 生成 xapian/__init__.py（BUILT_SOURCES 产物）
+        self.run("make -C python3 xapian/__init__.py", cwd=bind_dir)
 
         # 安装绑定到 python 用户 site-packages（CI 的 normal site-packages
         # 通常不可写，pip 也默认装到用户目录；确保目录存在）
@@ -194,6 +200,8 @@ class XapersConan(ConanFile):
         os.makedirs(site_packages, exist_ok=True)
         pydir = os.path.join(bind_dir, "python3", "xapian")
         dest_pkg = os.path.join(site_packages, "xapian")
+        # HMDFS 上覆盖已存在文件会报 Operation not permitted，先清理旧目录
+        self.run(f'rm -rf {dest_pkg}')
         os.makedirs(dest_pkg, exist_ok=True)
         self.output.info(f"installing xapian bindings to {dest_pkg}")
         # 包目录 (__init__.py 等)
