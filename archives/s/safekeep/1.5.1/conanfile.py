@@ -84,3 +84,4 @@ class SafekeepConan(ConanFile):
         self.cpp_info.includedirs = []
         self.cpp_info.libdirs = []
         self.cpp_info.libs = []
+        self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
