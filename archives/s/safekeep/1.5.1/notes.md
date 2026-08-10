@@ -46,11 +46,9 @@ and remote backup modes. The local path creates a temporary backup tree, runs
 sums. The remote path additionally assumes SSH access, root setup, package
 deployment, and target host mutation.
 
-For OHOS, the recipe applies a test-only patch to `safekeep-test` and the Conan
-`test_package` runs the upstream local flow as
-`SAFEKEEP_TEST_OHOS_LOCAL=1 safekeep-test --local --reps=1`. The patch keeps the
-upstream driver structure and changes only the local test harness needed by the
-runner:
+For OHOS, the recipe applies a test-only patch to `safekeep-test`. The patch
+keeps the upstream driver structure and changes only the local test harness
+needed by the runner:
 
 - uses a local safekeep client emulator for the server/client protocol;
 - launches the server from the wrapper directory so OHOS Python subprocess can
@@ -60,22 +58,29 @@ runner:
 - keeps the repository under the test temp root and restores through
   `rdiff-backup restore --at now` with a relative repository path, avoiding
   OHOS parent-directory permission checks under `/storage/Users`.
-- relocates the `rdiff-backup/2.2.6` package tree into an OHOS app-cache/TMPDIR
-  workdir, prepends that copy to `PATH` and `PYTHONPATH`, and marks copied
-  Python extension modules executable. This avoids OHOS HNP Python rejecting
-  `dlopen` from Conan package-cache paths while still running the real
-  `rdiff-backup` entry point and Python modules.
 
-The OHOS upstream local flow now passes. The remote flow is still identified but
-not executed because it requires SSH, root setup, package deployment, and
-mutable client/server hosts. The actual upstream integration result for the
-release driver is therefore `1/2`: local passed, remote not run.
+CI #18961 showed that copying `rdiff-backup/2.2.6` into an OHOS app-cache/TMPDIR
+workdir is still not a reliable execution route: HNP Python rejected
+`rdiff_backup.C` with `dlopen` `Permission denied`. This is the same
+Conan/HMDFS user-path policy limitation documented by the `rdiff-backup`
+recipe, not a missing dependency declaration.
+
+The OHOS `test_package` therefore does not count either upstream integration
+flow as passed. It validates the packaged safekeep command, config, docs,
+sample data, and `safekeep-test` flow markers, then checks the
+`rdiff-backup/2.2.6` dependency package statically: console entry point metadata,
+entry_points mapping, and the signed `rdiff_backup.C` and
+`rdiff_backup._librsync` CPython extension artifacts. The remote flow is still
+identified but not executed because it also requires SSH, root setup, package
+deployment, and mutable client/server hosts.
 
 ## OpenHarmony Validation
 
-- run dir: `/storage/Users/currentUser/ohos-test-runs/codex-a-safekeep-safekeep-1.5.1-upstream-local-patched-r5-conan-20260801-172459-7540`
-- full ref: `safekeep/1.5.1#d898cdcabe2463356b45068f5c3fdfad:fc3eeb021243959114a0318489539cad6d087e28#038652399e5f3c35c9df42c31b2d5451`
-- gates: `L0=pass`, `L1=pass(test_package executed)`, `L2=pass(safekeep --version OK)`, `L4=pass(test patch clean)`, `L5=pass(bin/ has content)`.
-- upstream local execution: `SAFEKEEP_TEST_OHOS_LOCAL=1 safekeep-test --local --reps=1`, result `1/1 passed`.
-- upstream integration result: `1/2`; local flow passed on OHOS, remote flow was
-  not executed for the SSH/root/mutable-host reasons above.
+- CI #18961 before this fix reached test_package and failed only when
+  `rdiff-backup` imported its CPython extension from the copied app-cache
+  runtime path: `ImportError: ... rdiff_backup/C.cpython-312-aarch64-linux-ohos.so:
+  Permission denied`.
+- The corrected OHOS test route avoids this platform load-policy oracle and
+  performs signed-artifact checks for the `rdiff-backup` dependency instead.
+- upstream integration result in CI: `0/2`; local and remote flows are
+  identified but not counted as passed under the current runner constraints.
