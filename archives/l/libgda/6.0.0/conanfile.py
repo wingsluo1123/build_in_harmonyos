@@ -47,7 +47,13 @@ class LibgdaConan(ConanFile):
 
     def layout(self):
         self.folders.source = "."
-        self.folders.build = "build"
+        # Use TMPDIR for build directory if available (on OHOS, TMPDIR is on hmfs
+        # which allows executing compiled binaries, unlike hmdfs HOME)
+        tmpdir = os.environ.get("TMPDIR", "")
+        if tmpdir and os.path.isdir(tmpdir):
+            self.folders.build = os.path.join(tmpdir, "libgda-6.0.0-build")
+        else:
+            self.folders.build = "build"
         self.cpp.source.includedirs = ["include"]
 
     def source(self):
