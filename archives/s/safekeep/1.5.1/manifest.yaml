@@ -18,14 +18,12 @@ build:
     - "openssh"
 validation:
   - "Windows MinGW Conan create with latest OHOS test patch passed: safekeep/1.5.1#d898cdcabe2463356b45068f5c3fdfad:522dcea5982a3f8a5b624c16477e47195da2f84f#89d4b759f39c023325e67721fd8e19df"
-  - "OHOS 6.0 armv8 CI-like Conan build_and_test.sh with CI_PACKAGES=archives/s/safekeep/1.5.1 passed: /storage/Users/currentUser/ohos-test-runs/codex-a-safekeep-safekeep-1.5.1-upstream-local-patched-r5-conan-20260801-172459-7540"
-  - "OHOS full ref: safekeep/1.5.1#d898cdcabe2463356b45068f5c3fdfad:fc3eeb021243959114a0318489539cad6d087e28#038652399e5f3c35c9df42c31b2d5451"
-  - "OHOS gates: L0=pass, L1=pass(test_package executed and safekeep-test --local --reps=1 passed), L2=pass(safekeep --version OK), L4=pass(test patch clean), L5=pass(bin/ has content)"
+  - "OHOS CI #18961 reached test_package and showed HNP Python rejects rdiff_backup.C from copied app-cache paths with dlopen Permission denied; the OHOS test now uses rdiff-backup signed-artifact checks instead of counting safekeep-test local execution as passed."
 knowledge_gained:
   - "safekeep 1.5.1 ships a single upstream integration test driver, safekeep-test, with local and remote backup flows."
   - "The OHOS test patch executes safekeep-test local mode under SAFEKEEP_TEST_OHOS_LOCAL=1 with a local client emulator, disabled nice/ionice adjustments, an OHOS-safe safekeep wrapper cwd, and rdiff-backup's explicit restore CLI."
-  - "The OHOS test_package relocates rdiff-backup/2.2.6 into an OHOS app-cache/TMPDIR workdir before running safekeep-test, because HNP Python can reject dlopen of Python extension modules from Conan package-cache paths."
-  - "The upstream local integration flow now passes on OHOS; the remote flow still requires SSH, root setup, package deployment, and mutable client/server hosts, so it remains not executed and is not counted as passed."
-  - "The package-level Python test validates packaged CLI/docs/config/sample data and runs the patched upstream local flow on OHOS; marker checks remain separate from upstream pass counts."
+  - "HNP Python can reject signed rdiff-backup CPython extensions from Conan/cache-like user paths with dlopen Permission denied; safekeep's OHOS test_package therefore verifies rdiff-backup console metadata and signed extension artifacts instead of executing the local integration flow from those paths."
+  - "The upstream local and remote integration flows are identified but not counted as passed in CI; remote still requires SSH, root setup, package deployment, and mutable client/server hosts."
+  - "The package-level Python test validates packaged CLI/docs/config/sample data and rdiff-backup dependency artifacts; marker checks remain separate from upstream pass counts."
   - "The packaged command needs a portable #!/usr/bin/env python3 shebang on OpenHarmony because python3 is provided from the user runtime prefix, not /usr/bin/python3."
   - "The verified safekeep-1.5.1 source archive is committed as base64 text in this version directory and exported by the recipe, so CI does not need to reach GitHub/codeload for source retrieval or apply binary PR diffs."
