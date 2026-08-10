@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.15)
 project(test_irssi C)
 
 # irssi is an application (CLI tool), not a library.
-# The test_package just builds a trivial binary and the conanfile.py test()
-# runs the installed irssi --version to verify functionality.
+# test.c calls system("irssi --version") to verify the binary works.
+# The conanfile.py test() also runs irssi --version directly.
 
 add_executable(test_irssi test.c)
 

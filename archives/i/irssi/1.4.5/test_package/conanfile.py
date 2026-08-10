@@ -22,6 +22,9 @@ class IrssiTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        # Run the irssi binary to verify it works
+        # Run ctest which executes test.c (calls system("irssi --version"))
+        cmake = CMake(self)
+        cmake.test()
+        # Also directly verify the irssi binary
         irssi_bin = os.path.join(self.dependencies["irssi"].cpp_info.bindirs[0], "irssi")
         self.run(f'"{irssi_bin}" --version', env="conanrun")
