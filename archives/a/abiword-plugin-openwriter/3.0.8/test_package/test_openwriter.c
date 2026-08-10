@@ -172,9 +172,19 @@ static int test_gsf_infile_zip_new_chain(const char *zip_path) {
         rc = 1; goto cleanup;
     }
 
-    /* assertion: gsf_input_read returns expected byte count */
-    n_read = gsf_input_read(content, sizeof(buf), buf);
-    printf("    gsf_input_read returned %lld\n", (long long)n_read);
+    /* assertion: gsf_input_read returns expected byte count.
+     * libgsf 1.14.53 signature: gsf_off_t gsf_input_read(GsfInput *,
+     *   size_t num_bytes, guint8 *buffer). The 2nd arg is the REQUESTED
+     *   byte count, not the buffer size. Passing sizeof(buf)=64 against
+     *   a 39-byte mimetype entry causes gsf_input_read to return 39
+     *   (capped at entry size) but our previous `if (n_read != size)`
+     *   check would then always fail because size=39 == n_read=39 is OK,
+     *   actually -- the real failure mode is that an under-sized request
+     *   is the contract violation. Use size (entry length) as the request
+     *   to mirror openwriter's read pattern in xp/*.cpp. */
+    n_read = gsf_input_read(content, size, buf);
+    printf("    gsf_input_read returned %lld (requested %lld)\n",
+           (long long)n_read, (long long)size);
     if (n_read != size) {
         fprintf(stderr, "FAIL: gsf_input_read returned %lld, expected %lld\n",
                 (long long)n_read, (long long)size);

@@ -49,13 +49,19 @@ endif()
 set(_INCLUDE_DIRS_FIXED "")
 
 # glib needs include/glib-2.0 (glib.h) and lib/glib-2.0/include (glibconfig.h).
-file(GLOB _GLIB_INC_DIRS LIST_DIRECTORIES true
-    "${CONAN_HOME}/p/b/glib*/p/include/glib-2.0")
-file(GLOB _GLIB_CFG_DIRS LIST_DIRECTORIES true
-    "${CONAN_HOME}/p/b/glib*/p/lib/glib-2.0/include")
 # libgsf needs include/libgsf-1/gsf/ (gsf.h).
+# C2 fix from AI review round 4: conan 2.1+ stores packages under p/<name>*
+# (recipe-name keyed) AND legacy 2.0.x used p/b/<pkgid>*. Match both to
+# support both layouts during a multi-host CI migration.
+file(GLOB _GLIB_INC_DIRS LIST_DIRECTORIES true
+    "${CONAN_HOME}/p/b/glib*/p/include/glib-2.0"
+    "${CONAN_HOME}/p/glib*/p/include/glib-2.0")
+file(GLOB _GLIB_CFG_DIRS LIST_DIRECTORIES true
+    "${CONAN_HOME}/p/b/glib*/p/lib/glib-2.0/include"
+    "${CONAN_HOME}/p/glib*/p/lib/glib-2.0/include")
 file(GLOB _LIBGSF_INC_DIRS LIST_DIRECTORIES true
-    "${CONAN_HOME}/p/b/gsf*/p/include/libgsf-1")
+    "${CONAN_HOME}/p/b/gsf*/p/include/libgsf-1"
+    "${CONAN_HOME}/p/gsf*/p/include/libgsf-1")
 
 # Only use the first match per dep (semver-conflict safety).
 foreach(_DEPS IN ITEMS _GLIB_INC_DIRS _GLIB_CFG_DIRS _LIBGSF_INC_DIRS)
