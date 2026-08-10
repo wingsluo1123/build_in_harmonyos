@@ -14,10 +14,11 @@ sha256 `dffdd0915ceb028541fe3bed77d63ba35e78514591c043736b450d62634eeb31`），
 （`PATH` 前插 `/data/service/hnp/bin`，`NINJA=/data/service/hnp/bin/ninja`、
 `CC`/`CXX` 指向 clang 绝对路径、`AR`/`RANLIB`/`NM` 指向 llvm-* 绝对路径、
 `LD_LIBRARY_PATH` 前插 SDK `llvm/lib` 以加载正确的 libxml2.so.16），
-确保测试子进程定位 clang/ninja/llvm-ar/lld——CI worker 的 conan 进程 PATH
-不含该目录，仅靠 `env="conanbuild"` 注入 profile buildenv 仍会报
-`No such file or directory: 'clang'/'ninja'/'llvm-ar'` 或
-`Error relocating lld: xmlFreeDoc: symbol not found`（本地 shell PATH
+并设置 `PYTEST_ADDOPTS=--basetemp=<build>/pytest-basetemp` 与
+`TMPDIR=<build>/test-tmp`（pytest-xdist 默认 basetemp 位于 $HOME/tmp/
+pytest-of-<user>，CI worker 上目录属主与进程 UID 不匹配会 INTERNALERROR
+崩溃，改指 build_folder 下可写目录）——确保测试子进程定位
+clang/ninja/llvm-ar/lld 并正常并行运行 unittests（本地 shell PATH
 恰好包含故本地通过，PR CI 失败即由此；已按此修复）。
 
 ## 依赖（仅测试用）

@@ -120,6 +120,16 @@ class MesonConan(ConanFile):
         test_env.prepend_path("PKG_CONFIG_PATH", pkgconfig_dir)
         test_env.prepend_path("CMAKE_PREFIX_PATH", test_deps)
         test_env.define_path("ZLIB_ROOT", zlib_prefix)
+        # pytest-xdist 的默认 basetemp 位于 $HOME/tmp/pytest-of-<user>，CI worker
+        # 上该目录属主与 conan 进程 UID 不匹配 → INTERNALERROR（OSError: The
+        # temporary directory ... is not owned by the current user），unittests
+        # 直接崩溃。把 basetemp/TMPDIR 指到 build_folder 下（本进程可写）。
+        _pytest_basetemp = os.path.join(self.build_folder, "pytest-basetemp")
+        _tmpdir = os.path.join(self.build_folder, "test-tmp")
+        os.makedirs(_pytest_basetemp, exist_ok=True)
+        os.makedirs(_tmpdir, exist_ok=True)
+        test_env.define("PYTEST_ADDOPTS", "--basetemp={}".format(_pytest_basetemp))
+        test_env.define_path("TMPDIR", _tmpdir)
         with test_env.vars(self).apply():
             # CI worker 的 python3 未装 pytest-xdist：run_unittests.py 只能单线程
             # 运行 647 项用例（约 3600s），超过 CI 的 3600s 超时上限导致
