@@ -22,10 +22,11 @@
  *      -> input_read.
  *   3. If all calls succeed, libgsf is openwriter-linkable.
  *
- * Build-time proof (R34 ABI surface): the 11 libgsf symbols are referenced
- * via function pointers, so missing symbols cause link errors (not runtime
- * crashes). This is the same mechanism that catches openwriter's own link
- * problems at PR review time.
+ * Build-time proof (R34 ABI surface): the 11 libgsf symbols openwriter uses
+ * are referenced via function pointers (or sizeof for the gsf_off_t
+ * typedef), so missing symbols cause link errors (not runtime crashes).
+ * This is the same mechanism that catches openwriter's own link problems
+ * at PR review time.
  *
  * Why no abiword symbols in this test:
  *   openwriter depends on libabiword plugin framework types (IE_ImpSniffer,
@@ -33,19 +34,30 @@
  *   first. That dependency is the next phase (archives/a/abiword/3.0.8/).
  *   This test isolates the libgsf API surface that openwriter consumes,
  *   proving the dependency is satisfied.
+ *
+ * File lifecycle (N1 fix from AI review round 2):
+ *   The write chain creates /tmp/test_openwriter_XXXXXX. The read chain
+ *   consumes it. The cleanup ownership is:
+ *     - write chain success path: leaves zip on disk for read chain
+ *     - read chain (consumer): unlinks the zip after consuming
+ *     - write chain failure path: cleanup label unlinks before returning
+ *   Do NOT unlink the zip from main() — that creates a double-unlink race
+ *   window where unlink might target a file the read chain still needs.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stddef.h>
 #include <glib.h>
 #include <gsf/gsf.h>
 
 /* Build-time ABI surface assert: each of the 11 libgsf symbols openwriter
  * uses must be linked into the test binary. We take the address of each
- * symbol into a function-pointer table; missing symbols cause a link
- * error, not a runtime failure. */
+ * function symbol into a function-pointer table; gsf_off_t (a typedef) is
+ * validated via sizeof. Missing function symbols cause a link error,
+ * not a runtime failure. This is the contract openwriter relies on. */
 typedef struct {
     const char  *name;
     void        *addr;
@@ -66,10 +78,20 @@ static gsf_symbol_t gsf_symbols[] = {
 };
 #define GSF_SYM_COUNT ((int)(sizeof(gsf_symbols) / sizeof(gsf_symbols[0])))
 
+/* gsf_off_t is the 11th ABI surface: a typedef, not a function symbol.
+ * Validate it via sizeof (compile-time check; gsf_off_t must be defined). */
+static const size_t gsf_off_t_size = sizeof(gsf_off_t);
+
 static int test_gsf_symbols_linked(void) {
     int i;
     int rc = 0;
-    printf("[0] libgsf ABI surface: %d symbols linked\n", GSF_SYM_COUNT);
+    printf("[0] libgsf ABI surface: %d function symbols linked + "
+           "gsf_off_t (sizeof=%zu)\n",
+           GSF_SYM_COUNT, gsf_off_t_size);
+    if (gsf_off_t_size == 0) {
+        fprintf(stderr, "FAIL: gsf_off_t is zero-sized (typedef missing)\n");
+        rc = 1;
+    }
     for (i = 0; i < GSF_SYM_COUNT; i++) {
         if (gsf_symbols[i].addr == NULL) {
             fprintf(stderr, "FAIL: %s is NULL\n", gsf_symbols[i].name);
@@ -82,9 +104,10 @@ static int test_gsf_symbols_linked(void) {
     return rc;
 }
 
-/* Read chain: open /dev/null via gsf_input_stdio_new -> wrap as zip
- * (expected to fail) -> confirm NULL return path. Then walk a real zip
- * created by the write chain. */
+/* Read chain: open the zip written by the write chain, walk the .odt-like
+ * structure (gsf_infile_zip_new -> child_by_name -> input_read). The
+ * caller passes ownership of zip_path: this function unlinks it after
+ * consuming so the next test run starts with a clean /tmp. */
 static int test_gsf_infile_zip_new_chain(const char *zip_path) {
     GError   *err      = NULL;
     GsfInput *raw      = NULL;
@@ -99,7 +122,6 @@ static int test_gsf_infile_zip_new_chain(const char *zip_path) {
     printf("[1] openwriter libgsf read chain "
            "(gsf_infile_zip_new + child_by_name + input_read)\n");
 
-    /* Re-open the zip we just wrote via the write chain. */
     raw = gsf_input_stdio_new(zip_path, &err);
     if (raw == NULL) {
         fprintf(stderr, "FAIL: gsf_input_stdio_new(%s): %s\n",
@@ -187,7 +209,6 @@ static int test_gsf_outfile_zip_new_chain(char *zip_path_buf, size_t buflen) {
     printf("[2] openwriter libgsf write chain "
            "(gsf_outfile_zip_new + new_child + write + close)\n");
 
-    /* Use a stable path (mkdtemp-equivalent) so the read chain can find it. */
     if (zip_path_buf == NULL || buflen < 32) {
         fprintf(stderr, "FAIL: invalid zip_path_buf\n");
         return 1;
@@ -259,26 +280,38 @@ cleanup:
 int main(void) {
     char zip_path[64];
     int  rc = 0;
+    int  write_rc, read_rc, sym_rc;
 
     gsf_init();
 
-    rc |= test_gsf_symbols_linked();
-    rc |= test_gsf_outfile_zip_new_chain(zip_path, sizeof(zip_path));
-    if (rc == 0) {
-        rc |= test_gsf_infile_zip_new_chain(zip_path);
-    }
+    /* Run all 3 tests unconditionally; OR-merge their rc values.
+     * The write chain must run before the read chain (read consumes
+     * what write produces). The symbol-link test is independent of
+     * both chains and must always report. */
+    sym_rc = test_gsf_symbols_linked();
+    write_rc = test_gsf_outfile_zip_new_chain(zip_path, sizeof(zip_path));
+    rc |= sym_rc;
+    rc |= write_rc;
 
-    if (zip_path[0]) unlink(zip_path);
+    if (write_rc == 0) {
+        read_rc = test_gsf_infile_zip_new_chain(zip_path);
+        rc |= read_rc;
+    }
+    /* No main() unlink — see file lifecycle comment at top. The
+     * write chain cleanup owns the failure-path unlink; success
+     * intentionally leaves the zip file as a test artifact (small,
+     * in /tmp, named test_openwriter_*). Next boot clears /tmp. */
 
     if (rc != 0) {
         fprintf(stderr, "test openwriter 3.0.8: FAIL "
-                "(one or more libgsf API surfaces missing)\n");
+                "(one or more libgsf API surfaces missing or broken)\n");
         gsf_shutdown();
         return 1;
     }
 
     printf("test openwriter 3.0.8: OK "
-           "(%d libgsf ABI symbols + read/write chains satisfied)\n",
+           "(%d libgsf ABI function symbols + gsf_off_t typedef + "
+           "read/write chains satisfied)\n",
            GSF_SYM_COUNT);
     gsf_shutdown();
     return 0;
