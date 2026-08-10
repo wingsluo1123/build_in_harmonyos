@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 # test_package/test.sh — Verify perl-xml-parser package (R34 compliant)
 #
 # Verifies XML::Parser XS module by:
@@ -33,14 +34,16 @@ echo "Found .so: $SO_FILE"
 
 # 3. R34: Attempt actual module load + API call
 echo "Testing XML::Parser module load..."
+set +e
 perl -I"$LIB_DIR" -MXML::Parser -e '
     my $p = XML::Parser->new();
     die "XML::Parser->new failed" unless $p;
     print "XML::Parser module loaded and API verified\n";
 ' 2>&1
 EXIT_CODE=$?
+set -e
 
-if [ $EXIT_CODE -eq 0 ]; then
+if [ "$EXIT_CODE" -eq 0 ]; then
     echo "TEST PASSED: XML::Parser module loaded and API verified"
     exit 0
 fi

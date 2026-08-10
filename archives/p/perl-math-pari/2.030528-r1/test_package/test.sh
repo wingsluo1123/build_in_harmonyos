@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 # test_package/test.sh — Verify perl-math-pari package (R34 compliant)
 #
 # Verifies Math::Pari XS module by:
@@ -33,14 +34,16 @@ echo "Found .so: $SO_FILE"
 
 # 3. R34: Attempt actual module load + API call
 echo "Testing Math::Pari module load..."
+set +e
 perl -I"$LIB_DIR" -MMath::Pari -e '
     my $v = Math::Pari::PARI_VERSION;
     die "PARI_VERSION not defined" unless defined $v;
     print "Math::Pari module loaded, PARI_VERSION=$v\n";
 ' 2>&1
 EXIT_CODE=$?
+set -e
 
-if [ $EXIT_CODE -eq 0 ]; then
+if [ "$EXIT_CODE" -eq 0 ]; then
     echo "TEST PASSED: Math::Pari module loaded and API verified"
     exit 0
 fi
