@@ -1,0 +1,153 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -13,21 +13,21 @@
+ 	string(TIMESTAMP BUILD_YEAR "%Y")
+ endif()
+ 
+ # Set the default install path to /usr
+ if (NOT APPLE AND NOT WIN32 AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+ 	set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "default install path" FORCE)
+ endif()
+ 
+ set(CMAKE_INSTALL_DOCDIR "" CACHE PATH "documentation root (DATAROOTDIR/doc/${PROJECT_NAME}${LIBIIO_VERSION_MAJOR}-doc)")
+ include(GNUInstallDirs)
+-if(ENABLE_SHARED AND ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
++if(ENABLE_SHARED AND ${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS")
+ 	set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
+ 	set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+ endif()
+ set(CMAKE_INSTALL_DOCDIR "${CMAKE_INSTALL_DATAROOTDIR}/doc/${PROJECT_NAME}${LIBIIO_VERSION_MAJOR}-doc")
+ 
+ set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+ 	CACHE PATH "Installation directory for pkgconfig (.pc) files")
+ mark_as_advanced(INSTALL_PKGCONFIG_DIR)
+ 
+ if (NOT CMAKE_BUILD_TYPE)
+@@ -197,21 +197,21 @@
+ 	endif()
+ 	if(COMPILE_WARNING_AS_ERROR)
+ 		message(STATUS "Setting -Werror")
+ 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+ 	endif()
+ else()
+ 	message(STATUS "Unknown compiler ${CMAKE_C_COMPILER_ID}")
+ 	message(STATUS "GCC ${CMAKE_COMPILER_IS_GNUCC}")
+ endif()
+ 
+-IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
++IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS")
+ 	option(WITH_IIOD "Build the IIO Daemon" ON)
+ 	option(WITH_LOCAL_BACKEND "Enable the local backend" ON)
+ 
+ 	if (WITH_IIOD AND NOT WITH_LOCAL_BACKEND)
+ 		message(SEND_ERROR "IIOD can only be enabled if the local backend is enabled")
+ 	endif()
+ 	if (WITH_IIOD)
+ 		set(NEED_THREADS 1)
+ 	endif()
+ endif()
+@@ -323,21 +323,21 @@
+ 	include_directories(${LIBZSTD_INCLUDE_DIR})
+ endif (WITH_ZSTD)
+ 
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+ 
+ if(WITH_NETWORK_BACKEND)
+ 	if (WIN32)
+ 		list(APPEND LIBS_TO_LINK wsock32 iphlpapi ws2_32)
+ 	endif()
+ 
+-	if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
++	if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS")
+ 		include(CheckCSourceCompiles)
+ 
+ 		option(WITH_NETWORK_GET_BUFFER "Enable experimental zero-copy transfers" OFF)
+ 		if (WITH_NETWORK_GET_BUFFER)
+ 			check_c_source_compiles("#define _GNU_SOURCE=1\n#include <fcntl.h>\nint main(void) { return O_TMPFILE; }"
+ 				HAS_O_TMPFILE)
+ 
+ 			if (NOT HAS_O_TMPFILE)
+ 				message(SEND_ERROR "Zero-copy requires the O_TMPFILE flag, which is not available on the system.")
+ 			endif()
+@@ -425,29 +425,32 @@
+ 
+ 	include_directories(${LIBXML2_INCLUDE_DIR})
+ 	list(APPEND LIBS_TO_LINK ${LIBXML2_LIBRARIES})
+ elseif(NEED_LIBXML2)
+ 	message(SEND_ERROR "Enabled backends require the XML backend to be enabled as well.\n"
+ 		"If you want to enable the XML backend, set WITH_XML_BACKEND=ON.")
+ endif()
+ 
+ option(NO_THREADS "Disable multi-threading support" OFF)
+ if (NEED_THREADS)
+-	if (NOT NO_THREADS AND NOT WIN32 AND NOT ANDROID)
++	if (NOT NO_THREADS AND NOT WIN32 AND NOT (ANDROID OR ${CMAKE_SYSTEM_NAME} MATCHES "HarmonyOS"))
+ 		find_library(PTHREAD_LIBRARIES pthread)
+ 
+ 		if (NOT PTHREAD_LIBRARIES)
+ 			message(SEND_ERROR "Unable to find pthread dependency.\n"
+ 				"If you want to disable multi-threading support, set NO_THREADS=ON.")
+ 		endif()
+ 
+ 		list(APPEND LIBS_TO_LINK ${PTHREAD_LIBRARIES})
++	else()
++		# On Android/HarmonyOS, pthread is part of libc
++		set(PTHREAD_LIBRARIES "")
+ 	endif()
+ 
+ 	list(APPEND LIBIIO_CFILES lock.c)
+ endif()
+ 
+ if (IIOD_CLIENT)
+ 	list(APPEND LIBIIO_CFILES iiod-client.c)
+ endif()
+ 
+ if (WIN32)
+@@ -622,44 +625,44 @@
+ if(WITH_IIOD)
+ 	option(WITH_SYSTEMD "Enable installation of systemd service file for iiod" OFF)
+ 	set(SYSTEMD_UNIT_INSTALL_DIR /lib/systemd/system CACHE PATH "default install path for systemd unit files")
+ 
+ 	option(WITH_SYSVINIT "Enable installation of SysVinit script for iiod" OFF)
+ 	set(SYSVINIT_INSTALL_DIR /etc/init.d CACHE PATH "default install path for SysVinit scripts")
+ 
+ 	option(WITH_UPSTART "Enable installation of upstart config file for iiod" OFF)
+ 	set(UPSTART_CONF_INSTALL_DIR /etc/init CACHE PATH "default install path for upstart conf files")
+ 
+-	if (NOT PTHREAD_LIBRARIES)
++	if (NOT PTHREAD_LIBRARIES AND NOT (ANDROID OR ${CMAKE_SYSTEM_NAME} MATCHES "HarmonyOS"))
+ 		message(SEND_ERROR "IIOD requires pthread support\n."
+ 			"If you want to disable IIOD, set WITH_IIOD=OFF.")
+ 	else()
+ 		add_subdirectory(iiod)
+ 	endif()
+ endif()
+ 
+ if (NOT OSX_PACKAGE)
+ 	# Support creating some basic binpkgs via `make package`.
+ 	# Disabled if OSX_PACKAGE is enabled, as tarballs would end up empty otherwise.
+ 	option(ENABLE_PACKAGING "Create .deb/.rpm or .tar.gz packages via 'make package'" OFF)
+ 
+ 	if(ENABLE_PACKAGING)
+ 		if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 			include(cmake/DarwinPackaging.cmake)
+ 		endif()
+-		if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
++		if(${CMAKE_SYSTEM_NAME} MATCHES "Linux|HarmonyOS")
+ 			include(cmake/LinuxPackaging.cmake)
+ 		endif()
+ 	endif()
+ endif()
+ 
+-if (WITH_USB_BACKEND AND CMAKE_SYSTEM_NAME MATCHES "^Linux")
++if (WITH_USB_BACKEND AND CMAKE_SYSTEM_NAME MATCHES "^Linux|^HarmonyOS")
+ 	option(INSTALL_UDEV_RULE "Install a udev rule for detection of USB devices" ON)
+ 
+ 	if (INSTALL_UDEV_RULE)
+ 		set(UDEV_RULES_INSTALL_DIR /lib/udev/rules.d CACHE PATH "default install path for udev rules")
+ 
+ 		configure_file(libiio.rules.cmakein ${CMAKE_CURRENT_BINARY_DIR}/90-libiio.rules @ONLY)
+ 		install(FILES ${CMAKE_CURRENT_BINARY_DIR}/90-libiio.rules DESTINATION ${UDEV_RULES_INSTALL_DIR})
+ 	endif()
+ endif()
+ 

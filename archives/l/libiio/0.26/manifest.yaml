@@ -15,7 +15,7 @@ version: "0.26"
 status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-04-29"
+build_date: "2026-08-10"
 
 # ============================================================
 # 源码信息
@@ -43,23 +43,25 @@ build:
 
   # 配置选项列表
   configure_options:
-    - "-DWITH_TESTS=OFF"
-    - "-DWITH_USB_BACKEND=OFF"
-    - "-DWITH_XML_BACKEND=OFF"
+    - "-DWITH_USB_BACKEND=ON"
+    - "-DWITH_XML_BACKEND=ON"
+    - "-DWITH_NETWORK_BACKEND=ON"
+    - "-DWITH_LOCAL_BACKEND=ON"
+    - "-DWITH_IIOD=ON"
+    - "-DWITH_TESTS=ON"
+    - "-DHAVE_DNS_SD=OFF"
+    - "-DWITH_AIO=OFF"
+    - "-DWITH_IIOD_USBD=OFF"
     - "-DWITH_SERIAL_BACKEND=OFF"
-    - "-DWITH_NETWORK_BACKEND=OFF"
-    - "-DWITH_LOCAL_BACKEND=OFF"
-    - "-DWITH_IIOD=OFF"
     - "-DWITH_MAN=OFF"
     - "-DWITH_DOC=OFF"
     - "-DINSTALL_UDEV_RULE=OFF"
     - "-DCMAKE_BUILD_TYPE=Release"
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
+  dependencies:
+    - libusb/1.0.27
+    - libxml2/2.15.3
   # 例如:
   # - openssl/1.1.1w
   # - curl/8.19.0
@@ -73,7 +75,8 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+  - "0001-harmonyos-platform-support.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -82,7 +85,25 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+  - "HarmonyOS 平台 CMAKE_SYSTEM_NAME 为 HarmonyOS，需 patch CMakeLists.txt MATCHES Linux 为 Linux|HarmonyOS"
+  - "HarmonyOS 中 pthread 在 libc 中（类似 Android），需跳过 find_library(PTHREAD_LIBRARIES pthread)"
+  - "avahi、libaio、functionfs.h 是平台级基础设施缺失，非功能裁剪"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libiio-0.26.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libiio-0.26.work
+  source_orig_hash: 9988caf38076e1b7
+  source_work_hash: f2c2faeb1312874f
+  generated_at: '2026-08-11T00:37:28'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
