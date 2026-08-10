@@ -26,5 +26,9 @@ class LibfastjsonTestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        # Run CTest (catches assertion failures in test.c)
         cmake = CMake(self)
         cmake.test()
+        # Also run the binary directly (CI L0e requires self.run())
+        bin_path = os.path.join(self.cpp.build.bindirs[0], "test_libfastjson")
+        self.run(bin_path, env="conanrun")
