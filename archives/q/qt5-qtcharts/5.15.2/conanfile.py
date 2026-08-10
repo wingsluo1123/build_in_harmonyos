@@ -27,7 +27,7 @@ class Qt5QtchartsConan(ConanFile):
     def requirements(self):
         # 依赖 qt5-qtbase/5.15.2.1：Qt5 addon 模块需要 qt5-qtbase
         # 提供的 qmake 工具与 Qt5 基础库
-        self.requires("qt5-qtbase/5.15.2")
+        self.requires("qt5-qtbase/5.15.2.2")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
