@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-test_aioredis.py — validates the packaged aioredis Python source files.
+test_aioredis.py — R34 smoke test for the packaged aioredis library.
 
 Usage:
     python3 test_aioredis.py <package_folder>
 
-Exercises real aioredis API per R34: checks file existence AND content
-(class definitions, version declarations, asyncio content). Exit 0 on
-success, non-zero on failure with a clear error message.
+Imports aioredis.errors and exercises RedisError / ReplyError (no Redis server
+or optional deps required). Exit 0 on success.
 """
+import importlib
 import os
 import sys
 
@@ -38,6 +38,7 @@ def _check_contains(content, needle, label, file_label):
         _fail(f"{label}: '{needle}' not found in {file_label}")
 
 
+<<<<<<< HEAD
 def _stub_optional_runtime_deps():
     """Stub pip-only deps so import aioredis works without Redis server/pip install.
 
@@ -72,12 +73,46 @@ def _stub_optional_runtime_deps():
             sys.modules["typing_extensions"] = types.ModuleType("typing_extensions")
 
 
+def exercise_errors_api(lib_dir):
+    """Import aioredis.errors and call real exception APIs (R34)."""
+    if lib_dir not in sys.path:
+        sys.path.insert(0, lib_dir)
+
+    try:
+        errors = importlib.import_module("aioredis.errors")
+    except Exception as exc:
+        _fail(f"import aioredis.errors raised: {exc}")
+
+    if not issubclass(errors.RedisError, Exception):
+        _fail("aioredis.errors.RedisError is not an Exception subclass")
+
+    try:
+        raise errors.RedisError("r34-smoke")
+    except errors.RedisError as exc:
+        if "r34-smoke" not in str(exc):
+            _fail(f"RedisError message mismatch: {exc!r}")
+
+    # ReplyError.__new__ remaps known replies to MaxClientsError
+    remapped = errors.ReplyError("ERR max number of clients reached")
+    if not isinstance(remapped, errors.MaxClientsError):
+        _fail(
+            "ReplyError did not remap max-clients reply to MaxClientsError; "
+            f"got {type(remapped).__name__}"
+        )
+
+    print(
+        "OK: imported aioredis.errors and exercised RedisError/"
+        "ReplyError->MaxClientsError"
+    )
+
+
 def main():
     if len(sys.argv) < 2:
         _fail("Usage: python3 test_aioredis.py <package_folder>")
 
     pkg_folder = sys.argv[1]
-    pkg_aioredis = os.path.join(pkg_folder, "lib", "aioredis")
+    lib_dir = os.path.join(pkg_folder, "lib")
+    pkg_aioredis = os.path.join(lib_dir, "aioredis")
 
     if not os.path.isdir(pkg_aioredis):
         _fail(f"aioredis package directory not found: {pkg_aioredis}")
@@ -113,7 +148,9 @@ def main():
     _check_contains(pool_content, "class ConnectionsPool", "pool.py class", "pool.py")
 
     # 5. commands/__init__.py exists and contains 'class Redis'
-    cmds_content = _check_file(pkg_aioredis, os.path.join("commands", "__init__.py"), "aioredis/commands/__init__.py")
+    cmds_content = _check_file(
+        pkg_aioredis, os.path.join("commands", "__init__.py"), "aioredis/commands/__init__.py"
+    )
     _check_contains(cmds_content, "class Redis", "commands/__init__.py class", "commands/__init__.py")
 
     # 6. locks.py exists and contains 'class Lock'
@@ -121,7 +158,9 @@ def main():
     _check_contains(locks_content, "class Lock", "locks.py class", "locks.py")
 
     # 7. sentinel/__init__.py exists and contains 'RedisSentinel'
-    sentinel_content = _check_file(pkg_aioredis, os.path.join("sentinel", "__init__.py"), "aioredis/sentinel/__init__.py")
+    sentinel_content = _check_file(
+        pkg_aioredis, os.path.join("sentinel", "__init__.py"), "aioredis/sentinel/__init__.py"
+    )
     _check_contains(sentinel_content, "RedisSentinel", "sentinel/__init__.py class", "sentinel/__init__.py")
 
     # 8. pubsub.py exists and contains 'Channel'
@@ -157,9 +196,14 @@ def main():
             if "async" in content or "asyncio" in content:
                 async_found = True
                 break
+        if async_found:
+            break
     if not async_found:
         _fail("no asyncio-related content (async/asyncio) found in any .py file")
     print("OK: asyncio-related content found in .py files")
+
+    # 13. R34 — real import + API use
+    exercise_errors_api(lib_dir)
 
     print("SUCCESS: all aioredis package validations passed")
     sys.exit(0)
