@@ -54,7 +54,10 @@ class FizmoConan(ConanFile):
         # fizmo 的 config.guess 可能无法识别 HarmonyOS，指定 --build/--host 三元组
         machine = self._machine(self.settings.arch)
         triplet = f"{machine}-unknown-linux-gnu"
-        tc.configure_args.extend([f"--build={triplet}", f"--host={triplet}"])
+        # --disable-x11：fizmo configure 用 --enable-x11 选项（configure 2384 行），
+        # 只构建 ncursesw 终端前端，禁用 X11 前端（CI #17368 报 No package 'x11' found）
+        tc.configure_args.extend(
+            [f"--build={triplet}", f"--host={triplet}", "--disable-x11"])
         # fizmo configure 硬编码路径检测 libxml/tree.h（/usr/include/libxml2 等），
         # 需传 --with-libxml2-includedir 指向 libxml2 包 include
         tc.configure_args.append(
