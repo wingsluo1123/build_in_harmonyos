@@ -32,5 +32,11 @@ class MurexTestConan(ConanFile):
             return
 
         script = os.path.join(self.source_folder, "test_murex.py")
-        self.run(f'"{sys.executable}" "{script}" "{exe}"', env="conanrun")
+        result = self.run(
+            f'"{sys.executable}" "{script}" "{exe}"',
+            env="conanrun",
+            ignore_errors=True,
+        )
+        if result != 0:
+            raise AssertionError(f"murex smoke test failed with exit code {result}")
 

@@ -3,6 +3,7 @@
 
 import os
 import platform
+import shlex
 import shutil
 import stat
 import subprocess
@@ -38,10 +39,12 @@ class MurexConan(ConanFile):
     def build(self):
         go = self._go_executable()
         env = self._go_environment(go)
+        self._run_upstream_tests(go, env)
         binary = self.conan_data["build"]["binary"]
         output_dir = os.path.join(self.build_folder, "bin")
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, binary)
+        link_output_path = self._go_link_output_path(binary)
         ldflags = self.conan_data["build"].get("ldflags", "-s -w")
         command = [
             go,
@@ -50,13 +53,49 @@ class MurexConan(ConanFile):
             "-ldflags",
             ldflags,
             "-o",
-            output_path,
+            link_output_path,
             self.conan_data["build"].get("main", "."),
         ]
         subprocess.run(command, cwd=self.source_folder, env=env, check=True)
+        shutil.copy2(link_output_path, output_path)
         os.chmod(output_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
                  stat.S_IRGRP | stat.S_IXGRP |
                  stat.S_IROTH | stat.S_IXOTH)
+        self._sign_ohos_executable(output_path)
+
+    def _run_upstream_tests(self, go, env):
+        command = [go, "test"]
+        if self.settings.os == "OHOS":
+            command.append(f"-exec={self._go_test_exec_wrapper(env)}")
+        command.append("./...")
+        subprocess.run(command, cwd=self.source_folder, env=env, check=True)
+
+    def _go_test_exec_wrapper(self, env):
+        signer = self._find_binary_sign_tool()
+        if not signer:
+            raise ConanInvalidConfiguration(
+                "binary-sign-tool is required to execute Go tests on OHOS"
+            )
+        wrapper = os.path.join(self._go_work_root(), "go-test-exec.sh")
+        with open(wrapper, "w", encoding="utf-8", newline="\n") as script:
+            script.write(
+                "#!/bin/sh\n"
+                "set -eu\n"
+                "test_binary=\"$1\"\n"
+                "shift\n"
+                "\"$OHOS_GO_TEST_SIGNER\" sign "
+                "-inFile \"$test_binary\" -outFile \"$test_binary\" "
+                "-selfSign 1\n"
+                "exec \"$test_binary\" \"$@\"\n"
+            )
+        os.chmod(
+            wrapper,
+            stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
+            stat.S_IRGRP | stat.S_IXGRP |
+            stat.S_IROTH | stat.S_IXOTH,
+        )
+        env["OHOS_GO_TEST_SIGNER"] = signer
+        return wrapper
 
     def package(self):
         binary = self.conan_data["build"]["binary"]
@@ -77,7 +116,7 @@ class MurexConan(ConanFile):
 
     def _go_environment(self, go):
         env = os.environ.copy()
-        cache_root = os.path.join(self.build_folder, "go-cache")
+        cache_root = os.path.join(self._go_work_root(), "cache")
         go_root = os.path.dirname(os.path.dirname(os.path.abspath(go)))
         env.update({
             "CGO_ENABLED": "0",
@@ -90,11 +129,62 @@ class MurexConan(ConanFile):
             "GOROOT": go_root,
             "GOTOOLCHAIN": "local",
             "PATH": os.path.dirname(go) + os.pathsep + env.get("PATH", ""),
-            "TMPDIR": os.path.join(self.build_folder, "tmp"),
+            "TMPDIR": os.path.join(cache_root, "tmp"),
+            "GOTMPDIR": os.path.join(cache_root, "gotmp"),
         })
-        for path in ("GOCACHE", "GOMODCACHE", "GOPATH", "TMPDIR"):
+        if self.settings.os == "OHOS":
+            # Upstream uses this switch for build environments that do not
+            # provide optional external commands. The only affected test on
+            # the official OHOS worker is the PATH-only aspell presence check;
+            # all Go test packages are still compiled and executed.
+            env["MUREX_TEST_NO_EXEC_DEPS"] = "1"
+        for path in ("GOCACHE", "GOMODCACHE", "GOPATH", "TMPDIR", "GOTMPDIR"):
             os.makedirs(env[path], exist_ok=True)
         return env
+
+    def _go_link_output_path(self, binary):
+        output_dir = os.path.join(self._go_work_root(), "out")
+        os.makedirs(output_dir, exist_ok=True)
+        return os.path.join(output_dir, binary)
+
+    def _go_work_root(self):
+        if self.settings.os == "OHOS":
+            candidates = [
+                os.environ.get("OHOS_GO_BUILD_ROOT"),
+                "/data/storage/el2/base/cache",
+                "/data/storage/el2/base/haps/entry/files",
+                os.environ.get("TMPDIR"),
+            ]
+        else:
+            candidates = [
+                os.environ.get("MUREX_GO_BUILD_ROOT"),
+                os.path.join(os.path.dirname(os.path.abspath(self.source_folder)),
+                             "go-work"),
+                os.environ.get("TMPDIR"),
+            ]
+        for candidate in candidates:
+            if not candidate:
+                continue
+            root = os.path.join(candidate, "conan-go-build",
+                                f"{self.name}-{self.version}")
+            if self._is_under_source_tree(root):
+                continue
+            try:
+                os.makedirs(root, exist_ok=True)
+                return root
+            except OSError:
+                continue
+        raise ConanInvalidConfiguration(
+            "No writable Go build root is available for linker output"
+        )
+
+    def _is_under_source_tree(self, path):
+        try:
+            source = os.path.abspath(self.source_folder)
+            target = os.path.abspath(path)
+            return os.path.commonpath([source, target]) == source
+        except (OSError, ValueError):
+            return False
 
     def _goarch(self):
         arch = str(self.settings.arch)
@@ -125,14 +215,24 @@ class MurexConan(ConanFile):
         go_toolchain = self.conan_data["go_toolchain"]
         host_key = f"linux-{self._host_goarch()}"
         package = go_toolchain[host_key]
-        tools_dir = os.path.join(self.build_folder, "go-toolchain")
+        # Keep the fallback Go distribution outside the murex module tree.
+        # Otherwise `go test ./...` sees go/test/*.go from the toolchain
+        # itself and fails on Go's intentionally non-module test fixtures.
+        tools_dir = os.path.join(self._go_work_root(), "go-toolchain")
         archive = os.path.join(tools_dir, package["filename"])
         go_root = os.path.join(tools_dir, "go")
         go = os.path.join(go_root, "bin", "go")
         if not os.path.isfile(go):
             os.makedirs(tools_dir, exist_ok=True)
             download(self, package["url"], archive, sha256=package["sha256"])
-            self.run(f'tar xzf "{archive}" -C "{tools_dir}"')
+            result = self.run(
+                f'tar xzf "{archive}" -C "{tools_dir}"',
+                ignore_errors=True,
+            )
+            if result != 0:
+                raise ConanInvalidConfiguration(
+                    f"Failed to extract bootstrapped Go toolchain archive: {archive}"
+                )
         self._ensure_go_toolchain_permissions(tools_dir, go_root)
         if not os.access(go, os.X_OK):
             raise ConanInvalidConfiguration(
@@ -163,6 +263,8 @@ class MurexConan(ConanFile):
                     if os.path.isdir(root)
                 )
                 self._chmod_read_exec(path, executable=executable)
+                if executable:
+                    self._sign_ohos_executable(path)
 
     def _chmod_read_exec(self, path, is_dir=False, executable=False):
         mode = os.stat(path).st_mode
@@ -173,16 +275,42 @@ class MurexConan(ConanFile):
             mode |= stat.S_IWUSR
         if not is_dir:
             mode |= stat.S_IWUSR
-        try:
-            os.chmod(path, mode | read_exec)
-        except PermissionError:
-            # HMDFS: chmod on non-owned files fails even when we only add bits.
-            # If the file is already executable (or readable for non-exec), skip.
-            if not (executable or is_dir):
-                raise
-            if os.access(path, os.X_OK):
-                return
-            raise
+        os.chmod(path, mode | read_exec)
+
+    def _sign_ohos_executable(self, path):
+        if self.settings.os != "OHOS" or not os.path.isfile(path):
+            return
+        signer = self._find_binary_sign_tool()
+        if not signer:
+            self.output.warning(
+                "binary-sign-tool not found; OHOS may reject executable: "
+                f"{path}"
+            )
+            return
+        result = self.run(
+            f"{shlex.quote(signer)} sign "
+            f"-inFile {shlex.quote(path)} "
+            f"-outFile {shlex.quote(path)} -selfSign 1",
+            ignore_errors=True,
+            quiet=True,
+        )
+        if result != 0:
+            raise ConanInvalidConfiguration(
+                f"binary-sign-tool failed with exit code {result}: {path}"
+            )
+
+    def _find_binary_sign_tool(self):
+        candidates = [
+            os.environ.get("OHOS_BINARY_SIGN_TOOL"),
+            os.environ.get("BINARY_SIGN_TOOL"),
+            "/data/service/hnp/bin/binary-sign-tool",
+            "/storage/Users/currentUser/usr/local/bin/binary-sign-tool",
+            shutil.which("binary-sign-tool"),
+        ]
+        for candidate in candidates:
+            if candidate and os.path.isfile(candidate):
+                return candidate
+        return None
 
     def _host_goarch(self):
         machine = platform.machine().lower()
