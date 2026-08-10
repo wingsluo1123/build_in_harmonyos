@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml — karabo-bridge 0.6.2
+#
+# 上游测试入口 (karabo_bridge/tests/): pytest 框架, 使用 ZeroMQ IPC transport.
+# 上游测试需 pyzmq, msgpack, msgpack-numpy, numpy, h5py, pytest 等 Python 依赖,
+# 且依赖 ZeroMQ C 库的 IPC (ipc://) transport — 在 OHOS R32 平台上 IPC 语义
+# 可能受限, 故 upstream_test_in_build=false, 由 test_package 做消费者 smoke test.
+#
+# test_package smoke tests (5 assertions):
+#   1. import karabo_bridge — 模块导入
+#   2. __version__ == "0.6.2" — 版本断言
+#   3. Client class 可导入且为 class — Client 类存在
+#   4. ServerInThread class 可导入且为 class — Server/Sender 类存在
+#   5. serialize/deserialize round-trip — 模拟桥接管道数据接收验证
+
+package: karabo-bridge/0.6.2
+homepage: "https://github.com/European-XFEL/karabo-bridge-py"
+
+upstream_check_command: "python3 -m pytest karabo_bridge/tests/"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: karabo_bridge/tests/test_serialize.py
+    source: "karabo_bridge-0.6.2/karabo_bridge/tests/test_serialize.py"
+    description: "serialize/deserialize round-trip (pytest, needs msgpack+numpy+zmq)"
+    command: "python3 -m pytest karabo_bridge/tests/test_serialize.py"
+    result: unrunnable
+  - file: karabo_bridge/tests/test_server.py
+    source: "karabo_bridge-0.6.2/karabo_bridge/tests/test_server.py"
+    description: "ServerInThread REQ/REP + PUSH (pytest, needs zmq IPC transport)"
+    command: "python3 -m pytest karabo_bridge/tests/test_server.py"
+    result: unrunnable
+  - file: karabo_bridge/tests/test_client.py
+    source: "karabo_bridge-0.6.2/karabo_bridge/tests/test_client.py"
+    description: "Client next() REQ/REP (pytest, needs zmq IPC transport)"
+    command: "python3 -m pytest karabo_bridge/tests/test_client.py"
+    result: unrunnable
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者 smoke test: 模块导入 + 版本断言 + Client/Sender 类 + serialize round-trip"
+    command: "bash test.sh"
+
+# 测试断言总数
+assertion_count: 5
