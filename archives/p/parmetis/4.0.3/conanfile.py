@@ -9,7 +9,7 @@ R32: settings.os check uses `in ("Linux", "OHOS")`
 R33: build() does not depend on undefined shell environment variables
 """
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import copy, get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 import os
 
@@ -72,9 +72,17 @@ class ParmetisConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        # ParMETIS's CMake goes directly into metis/libmetis without going
+        # through metis/CMakeLists.txt, so metis.h and libmetis.a are never
+        # installed. Copy them manually from the build/source trees.
+        copy(self, "metis.h",
+             src=os.path.join(self.source_folder, "metis", "include"),
+             dst=os.path.join(self.package_folder, "include"))
+        copy(self, "libmetis.a",
+             src=os.path.join(self.build_folder, "libmetis"),
+             dst=os.path.join(self.package_folder, "lib"))
 
     def package_info(self):
         self.cpp_info.libs = ["parmetis", "metis"]
-        # parmetis.h includes <metis.h> — metis headers are installed alongside
         self.cpp_info.includedirs = ["include"]
-        # Programs (ptest, pometis, parmetis, etc.) declared in commands.json
+
