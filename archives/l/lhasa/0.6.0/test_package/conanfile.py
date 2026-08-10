@@ -25,4 +25,4 @@ class LhasaTestConan(ConanFile):
         cmake = CMake(self)
         cmake.test()
         lha_bin = os.path.join(self.dependencies["lhasa"].package_folder, "bin", "lha")
-        self.run(f'"{lha_bin}" || test $? -eq 255', env="conanrun")
+        self.run(f'"{lha_bin}" 2>/dev/null; test $? -eq 255', env="conanrun")

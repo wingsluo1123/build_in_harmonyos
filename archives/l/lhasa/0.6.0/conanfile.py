@@ -43,6 +43,7 @@ class LhasaConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
+        # config.guess cannot identify HarmonyOS, so pass the build triplet explicitly
         tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
         tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         if self.options.shared:
