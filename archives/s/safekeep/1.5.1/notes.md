@@ -60,11 +60,11 @@ runner:
 - keeps the repository under the test temp root and restores through
   `rdiff-backup restore --at now` with a relative repository path, avoiding
   OHOS parent-directory permission checks under `/storage/Users`.
-- relocates the `rdiff-backup/2.2.6` package tree into the test `TMPDIR`,
-  prepends that copy to `PATH` and `PYTHONPATH`, and marks copied Python
-  extension modules executable. This avoids OHOS HNP Python rejecting `dlopen`
-  from Conan package-cache paths while still running the real `rdiff-backup`
-  entry point and Python modules.
+- relocates the `rdiff-backup/2.2.6` package tree into an OHOS app-cache/TMPDIR
+  workdir, prepends that copy to `PATH` and `PYTHONPATH`, and marks copied
+  Python extension modules executable. This avoids OHOS HNP Python rejecting
+  `dlopen` from Conan package-cache paths while still running the real
+  `rdiff-backup` entry point and Python modules.
 
 The OHOS upstream local flow now passes. The remote flow is still identified but
 not executed because it requires SSH, root setup, package deployment, and
