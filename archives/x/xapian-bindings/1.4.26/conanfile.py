@@ -47,13 +47,6 @@ class XapianBindingsConan(ConanFile):
         apply_conandata_patches(self)
         python_exe = sys.executable
 
-        # E011: HMDFS umask 077 → 022 (configure/config.status 临时目录权限)
-        for f in ("configure", "config.status"):
-            p = os.path.join(self.source_folder, f)
-            if os.path.isfile(p):
-                replace_in_file(self, p, "umask 077", "umask 022")
-                self.output.info(f"E011 umask fix applied to {f}")
-
         # xapian-core 依赖路径（头文件 + libxapian.so + xapian-config）
         xc_folder = self.dependencies["xapian-core"].package_folder
         xc_bin = os.path.join(xc_folder, "bin", "xapian-config")

@@ -6,7 +6,6 @@ Verifies that:
 2. A WritableDatabase can be created and a document added (functional test)
 """
 import os
-import shutil
 import sys
 
 failures = []
