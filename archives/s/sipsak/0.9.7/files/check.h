@@ -29,7 +29,7 @@ typedef void (*TFun)(int);
     do {                                                             \
         if (!(condition)) {                                          \
             printf("FAIL: %s:%d: ", __FILE__, __LINE__);             \
-            printf(__VA_ARGS__);                                     \
+            printf("" __VA_ARGS__);                                     \
             printf("\n");                                            \
             check_shim_record_failure();                             \
         }                                                            \
