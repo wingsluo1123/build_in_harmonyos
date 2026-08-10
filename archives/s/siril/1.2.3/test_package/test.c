@@ -25,7 +25,6 @@ int main(void) {
     FILE *fp;
     char buf[256];
     int found_version = 0;
-    int ret = 0;
 
     /* Check 1: Verify siril binary exists */
     if (stat(SIRIL_BIN_PATH, &st) != 0) {

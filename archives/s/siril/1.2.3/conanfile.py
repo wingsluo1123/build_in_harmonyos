@@ -16,7 +16,7 @@ Key adaptations:
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, rmdir, save, load
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, rmdir, save, load
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.env import Environment
 from conan.tools.layout import basic_layout
@@ -38,8 +38,6 @@ class SirilConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
-        # Also export the po/Makefile.am file (new file not in original tarball)
-        copy(self, "po-Makefile.am", self.recipe_folder, self.export_sources_folder + "/patches")
 
     def requirements(self):
         # 8 dependencies compiled in this session
