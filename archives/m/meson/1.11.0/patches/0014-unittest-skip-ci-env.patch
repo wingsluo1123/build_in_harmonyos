@@ -16,15 +16,7 @@
          '''
          Test that unencodable xml chars are replaced with their
          printable representation
-@@ -1377,6 +1379,7 @@
-         self.assertListEqual(meson_exe_dat1, meson_exe_dat2)
- 
-     def test_noop_changes_cause_no_rebuilds(self):
-+        raise SkipTest('OHOS filesystem timestamp granularity makes no-op rebuild detection unreliable.')
-         '''
-         Test that no-op changes to the build files such as mtime do not cause
-         a rebuild of anything.
-@@ -1536,6 +1539,7 @@
+@@ -1537,6 +1539,7 @@
  
      @skipIfNoExecutable('git')
      def test_dist_git(self):
@@ -32,7 +24,7 @@
          if self.backend is not Backend.ninja:
              raise SkipTest('Dist is only supported with Ninja')
  
-@@ -1586,6 +1590,7 @@
+@@ -1587,6 +1590,7 @@
  
      @skipIfNoExecutable('git')
      def test_dist_git_script(self):
@@ -40,17 +32,7 @@
          if self.backend is not Backend.ninja:
              raise SkipTest('Dist is only supported with Ninja')
  
-@@ -2502,6 +2507,9 @@
-         langs = []
-         env = get_fake_env()
-         for l in ['c', 'cpp', 'cs', 'cuda', 'd', 'fortran', 'java', 'objc', 'objcpp', 'rust', 'vala']:
-+            if l == 'objcpp' and mesonbuild.environment.detect_machine_info().system == 'harmonyos':
-+                # OHOS clang++ cannot link Objective-C++ (missing libobjc __gnu_objc_personality_v0).
-+                continue
-             try:
-                 comp = detect_compiler_for(env, l, MachineChoice.HOST, True, '')
-                 with tempfile.TemporaryDirectory() as d:
-@@ -3088,6 +3096,7 @@
+@@ -3092,6 +3096,7 @@
      @skipIf(is_osx(), 'Not implemented for Darwin yet')
      @skipIf(is_windows(), 'POSIX only')
      def test_python_build_config_extensions(self):
@@ -58,15 +40,7 @@
          testdir = os.path.join(self.unit_test_dir,
                                 '126 python extension')
  
-@@ -3227,6 +3236,7 @@
-             pickle.dump(obj, f)
- 
-     def test_reconfigure(self):
-+        raise SkipTest('OHOS cannot chmod stale build files during --wipe (chmod EPERM/SELinux).')
-         testdir = os.path.join(self.unit_test_dir, '47 reconfigure')
-         self.init(testdir, extra_args=['-Dopt1=val1', '-Dsub1:werror=true'])
-         self.setconf('-Dopt2=val2')
-@@ -3472,6 +3482,7 @@
+@@ -3477,6 +3482,7 @@
                           Path(fixedfile).read_text(encoding='utf-8'))
  
      def test_identity_cross(self):
@@ -86,47 +60,7 @@
              mesonfile = dirobj / 'meson.build'
 --- a/unittests/linuxliketests.py
 +++ b/unittests/linuxliketests.py
-@@ -619,6 +619,7 @@
-         self.build()
- 
-     def test_installed_modes(self):
-+        raise SkipTest('OHOS install step cannot reproduce Linux default file modes (chmod/SELinux limitation).')
-         '''
-         Test that files installed by these tests have the correct permissions.
-         Can't be an ordinary test because our installed_files.txt is very basic.
-@@ -672,6 +673,7 @@
-             self.assertEqual(0, statf.st_uid)
- 
-     def test_installed_modes_extended(self):
-+        raise SkipTest('OHOS install step cannot apply setgid/sticky install_mode bits (chmod/SELinux limitation).')
-         '''
-         Test that files are installed with correct permissions using install_mode.
-         '''
-@@ -708,6 +710,7 @@
-         self.introspect('--installed')
- 
-     def test_install_umask(self):
-+        raise SkipTest('OHOS install step does not apply the Linux umask semantics to installed file modes.')
-         '''
-         Test that files are installed with correct permissions using default
-         install umask of 022, regardless of the umask at time the worktree
-@@ -801,6 +804,7 @@
-         self.assertNotIn('-Werror', c98_comp)
- 
-     def test_run_installed(self):
-+        raise SkipTest('OHOS requires signed ELF binaries; an unsigned installed executable cannot run.')
-         if is_cygwin() or is_osx():
-             raise SkipTest('LD_LIBRARY_PATH and RPATH not applicable')
- 
-@@ -1049,6 +1053,7 @@
-             self.assertIn("-fsanitize=address", i["command"])
- 
-     def test_cross_find_program(self):
-+        raise SkipTest('OHOS toolchain provides no cc/gcc cross compiler alias; cross tests cannot run.')
-         testdir = os.path.join(self.unit_test_dir, '11 cross prog')
-         crossfile = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8')
-         print(os.path.join(testdir, 'some_cross_tool.py'))
-@@ -1405,6 +1410,7 @@
+@@ -1410,6 +1410,7 @@
  
      @skipIfNoPkgconfig
      def test_link_arg_fullname(self):
@@ -134,7 +68,7 @@
          '''
          Test for  support of -l:libfullname.a
          see: https://github.com/mesonbuild/meson/issues/9000
-@@ -1572,6 +1578,7 @@
+@@ -1577,6 +1578,7 @@
          self.build()
  
      def test_identity_cross(self):
@@ -142,7 +76,7 @@
          testdir = os.path.join(self.unit_test_dir, '60 identity cross')
  
          constantsfile = tempfile.NamedTemporaryFile(mode='w', encoding='utf-8')
-@@ -1601,6 +1608,7 @@
+@@ -1606,6 +1608,7 @@
          self.init(testdir)
  
      def test_identity_cross_env(self):
@@ -152,32 +86,7 @@
              'CC_FOR_BUILD': '"' + os.path.join(testdir, 'build_wrapper.py') + '"',
 --- a/unittests/machinefiletests.py
 +++ b/unittests/machinefiletests.py
-@@ -197,6 +197,7 @@
-     # This test hangs on cygwin.
-     @skipIf(os.name != 'posix' or is_cygwin(), 'Uses fifos, which are not available on non Unix OSes.')
-     def test_native_file_is_pipe(self):
-+        raise SkipTest('OHOS filesystem does not permit creating fifos (mkfifo EPERM).')
-         fifo = os.path.join(self.builddir, 'native.file')
-         os.mkfifo(fifo)
-         with tempfile.TemporaryDirectory() as d:
-@@ -239,6 +240,7 @@
-         # Do the skip at this level to avoid screwing up the cache
-         if mesonbuild.envconfig.detect_msys2_arch():
-             raise SkipTest('Skipped due to problems with LLVM on MSYS2')
-+        raise SkipTest('OHOS SDK LLVM development files are incomplete (llvm-config reports missing libraries).')
-         self._simple_test('config_dep', 'llvm-config')
- 
-     def test_python3_module(self):
-@@ -711,6 +713,8 @@
-                               exe_wrapper: T.Optional[T.List[str]] = None) -> str:
-         if is_windows():
-             raise SkipTest('Cannot run this test on non-mingw/non-cygwin windows')
-+        if shutil.which('cc') is None and shutil.which('gcc') is None:
-+            raise SkipTest('OHOS toolchain provides no cc/gcc alias; cross-file tests cannot run.')
- 
-         return textwrap.dedent(f"""\
-             [binaries]
-@@ -926,6 +930,7 @@
+@@ -930,6 +930,7 @@
              self.fail('No c++ standard set?')
  
      def test_builtin_options_per_machine(self):
