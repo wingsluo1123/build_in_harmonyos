@@ -13,18 +13,23 @@ class ParmetisTestConan(ConanFile):
     def build(self):
         parmetis = self.dependencies["parmetis"]
         openmpi = self.dependencies["open-mpi"]
-        mpi_bin = os.path.join(openmpi.package_folder, "bin")
-        mpicc = os.path.join(mpi_bin, "mpicc")
+        cc = self.conf.get("tools.build:compiler_executables", default={}).get("c", "clang")
+        mpi_root = openmpi.package_folder
+        mpi_include = os.path.join(mpi_root, "include")
+        mpi_lib = os.path.join(mpi_root, "lib")
         include_flags = " ".join(f'-I"{p}"' for p in parmetis.cpp_info.includedirs)
         lib_flags = " ".join(f'-L"{p}"' for p in parmetis.cpp_info.libdirs)
         libs = " ".join(f"-l{l}" for l in parmetis.cpp_info.libs)
+        # Use clang directly with explicit MPI paths (mpicc wrapper needs
+        # OPAL_PREFIX which is only in runenv, not buildenv)
         self.run(
-            f'{mpicc} test_parmetis.c -o test_parmetis '
-            f'{include_flags} {lib_flags} {libs}'
+            f'{cc} -I"{mpi_include}" test_parmetis.c -o test_parmetis '
+            f'{include_flags} {lib_flags} {libs} -L"{mpi_lib}" -lmpi'
         )
 
     def test(self):
         # OHOS sandbox blocks mpirun process-management syscalls.
         # Run in MPI singleton mode (single rank, no mpirun needed),
         # same pattern as open-mpi test_package.
+        # env="conanrun" activates open-mpi's runenv_info (OPAL_PREFIX, PATH).
         self.run("bash -c './test_parmetis'", env="conanrun")

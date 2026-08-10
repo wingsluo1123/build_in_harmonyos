@@ -43,16 +43,21 @@ class ParmetisConan(ConanFile):
     def generate(self):
         tc = CMakeToolchain(self)
         openmpi = self.dependencies["open-mpi"]
-        mpi_bin = os.path.join(openmpi.package_folder, "bin")
-        # Use mpicc from open-mpi as compiler (upstream design:
-        # CMakeLists.txt has FindMPI commented out, relies on mpicc
-        # wrapper to inject MPI include/lib flags automatically)
-        tc.cache_variables["CMAKE_C_COMPILER"] = os.path.join(mpi_bin, "mpicc")
+        mpi_root = openmpi.package_folder
         tc.cache_variables["GKLIB_PATH"] = os.path.join(self.source_folder, "metis", "GKlib")
         tc.cache_variables["METIS_PATH"] = os.path.join(self.source_folder, "metis")
         # CMake 2.8 compatibility with modern CMake
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.cache_variables["SHARED"] = self.options.shared
+        # MPI: don't use mpicc wrapper — it needs OPAL_PREFIX which open-mpi
+        # only sets in runenv_info (not buildenv_info). Instead, use the
+        # default clang compiler and pass MPI paths via cache variables that
+        # the upstream CMakeLists.txt already respects:
+        #   include_directories(${MPI_INCLUDE_PATH})     — root CMakeLists.txt
+        #   target_link_libraries(... ${MPI_LIBRARIES})  — libparmetis/CMakeLists.txt
+        tc.cache_variables["MPI_INCLUDE_PATH"] = os.path.join(mpi_root, "include")
+        tc.cache_variables["MPI_LIBRARIES"] = os.path.join(mpi_root, "lib", "libmpi.a")
+        tc.cache_variables["MPI_LINK_FLAGS"] = ""
         tc.generate()
 
     def build(self):
