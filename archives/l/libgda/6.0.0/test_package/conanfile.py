@@ -2,7 +2,7 @@
 """Conan test_package for libgda 6.0.0.
 
 Verifies that the libgda library can be linked and its API called.
-Uses CMake to build the test program.
+Uses CMake to build the test program, then runs it directly.
 """
 import os
 
@@ -26,5 +26,6 @@ class LibgdaTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test binary directly to verify the library works
+        test_binary = os.path.join(self.cpp.build.bindirs[0], "test_libgda")
+        self.run(test_binary, env="conanrun")
