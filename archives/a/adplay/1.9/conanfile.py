@@ -29,7 +29,18 @@ class AdplayConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # 上游使用 autotools（configure/make）。
-        # OHOS CI Worker 网络受限且交叉环境无 autoconf 缓存，直接运行自带脚本。
+        # GitHub archive tarball 从不含 configure（只是 git tree 快照），
+        # 源码树只有 configure.ac，必须先 autoreconf 自举生成 configure。
+        import os as _os
+
+        if not _os.path.isfile(_os.path.join(self.source_folder, "configure")):
+            self.output.info(
+                "源码树无 configure（GitHub archive 常见），先 autoreconf 自举"
+            )
+            self.run(
+                f'cd "{self.source_folder}" && autoreconf -fi',
+                env="conanbuild",
+            )
         self.run(
             f'cd "{self.source_folder}" && ./configure --prefix="{self.package_folder}" '
             "--host=aarch64-unknown-linux-ohos --disable-shared --enable-static",
