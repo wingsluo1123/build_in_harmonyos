@@ -18,7 +18,7 @@ class LdnsConan(ConanFile):
     description = "ldns is a DNS library with support for DNSSEC operations"
     license = "BSD-3-Clause"
     homepage = "https://www.nlnetlabs.nl/projects/ldns/"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -70,11 +70,12 @@ class LdnsConan(ConanFile):
         tc.generate()
 
     def build(self):
+        # Apply patches: config.guess + config.sub HarmonyOS support
         apply_conandata_patches(self)
 
-        # Fix config.status temp directory creation on HarmonyOS (E002-like issue)
+        # Fix config.status temp directory creation on HarmonyOS
         # mktemp -d with umask 077 creates directories that HarmonyOS SELinux
-        # denies file creation within. Replace with mkdir -p + umask 000.
+        # denies file creation within. Use mkdir -p with umask 000 instead.
         configure_path = os.path.join(self.source_folder, "configure")
         replace_in_file(
             self, configure_path,
@@ -89,29 +90,12 @@ class LdnsConan(ConanFile):
 
         autotools = Autotools(self)
         autotools.configure()
-
-        # Patch Makefile to skip manpages installation
-        # (470 man3 pages installed one-by-one via install-sh causes timeout on HarmonyOS)
-        makefile_path = os.path.join(self.source_folder, "Makefile")
-        if os.path.exists(makefile_path):
-            replace_in_file(
-                self, makefile_path,
-                "install-manpages: manpages  install-config-manpage",
-                "install-manpages:\n\t@echo 'Skipping manpages installation'",
-            )
-
         autotools.make(args=["-j2"])
 
     def package(self):
         autotools = Autotools(self)
-        # Run specific install targets, NOT the full 'install' target
-        # to skip install-manpages (470 man3 pages cause timeout on HarmonyOS)
-        autotools.make(
-            target="install-h install-lib install-pc install-config install-drill install-examples",
-            args=[f"DESTDIR={self.package_folder}"],
-        )
+        autotools.install()
 
     def package_info(self):
         self.cpp_info.libs = ["ldns"]
-        # OpenSSL is a dependency
         self.cpp_info.requires = ["openssl::openssl"]
