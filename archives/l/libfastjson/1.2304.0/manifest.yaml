@@ -16,14 +16,15 @@ build:
   cc: clang
   cxx: clang++
 
-# GitHub archive source requires autoreconf to generate configure script.
-# OHOS platform: --build/--host triplet + config.guess/config.sub patching
-# HMDFS umask 077 fix (E011) applied in conanfile.py build() method
+# Conan adaptation: source is GitHub archive tag snapshot (no release tarball).
+# autoreconf generates configure/config.guess/config.sub at build time.
+# OHOS platform detection handled at runtime via _patch_config_for_ohos() in conanfile.py.
+# No patch files needed (previous patches were for release tarball 0-byte files).
 patches_applied: []
 
 knowledge_gained:
-  - HMDFS umask 077 写入限制 (E011)
-  - config.guess HarmonyOS 平台识别 (E007)
+  - HMDFS umask 077 write restriction (E011)
+  - config.guess HarmonyOS platform identification (E007)
 
 test_results:
   make_check: PASS
@@ -32,5 +33,9 @@ test_results:
   skip: 0
   fail: 0
 
-packaging:
-  - Conan recipe (conanfile.py + conandata.yml + test_package/)
+conan:
+  recipe: conanfile.py
+  data: conandata.yml
+  test_package: test_package/
+  verify_status: PASS
+  verify_gates: "G0-G4 + L2/L4/L5"
