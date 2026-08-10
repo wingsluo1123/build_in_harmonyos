@@ -36,8 +36,8 @@ for my $line (@lines) {
             $in_heredoc = 1;
             next;
         }
-        # Preserve non-heredoc lines (shell preamble, variable definitions, etc.)
-        $output .= $line;
+        # Skip non-heredoc lines (shell preamble, cat commands, etc.)
+        # These are shell script code, not valid Makefile syntax.
     } else {
         if ($line =~ /^!GROK!THIS!\s*$/) {
             $in_heredoc = 0;
