@@ -47,6 +47,13 @@ class XapianBindingsConan(ConanFile):
         apply_conandata_patches(self)
         python_exe = sys.executable
 
+        # sphinx: xapian-bindings configure 硬性检查 python3 sphinx 模块
+        # (仅构建期文档工具；CI 干净环境没有，必须先安装)
+        self.run(
+            f'{python_exe} -m pip install --break-system-packages "sphinx"',
+            env="conanrun",
+        )
+
         # xapian-core 依赖路径（头文件 + libxapian.so + xapian-config）
         xc_folder = self.dependencies["xapian-core"].package_folder
         xc_bin = os.path.join(xc_folder, "bin", "xapian-config")
