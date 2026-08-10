@@ -19,10 +19,6 @@ int main(void) {
     const char *so_path = TARGET_SO;
     /* TARGET_SO 是 CMake 传入的字面量字符串,编译期已确定非空,
      * 无需 runtime 检查 so_path[0] == '\0' (字面量空串检查是死代码)。 */
-    if (!so_path) {
-        fprintf(stderr, "FAIL: TARGET_SO not defined at compile time\n");
-        return 2;
-    }
 
     /* AbiWord 插件 .so 引用主程序符号(IE_Imp::registerImporter 等,NEEDED 仅
      * libc.so),插件必须由 AbiWord 主进程 dlopen(主程序提供符号表)。独立
@@ -39,7 +35,8 @@ int main(void) {
             printf("  dlopen error: %s\n", err);
             return 0;  /* PASS: 独立加载失败是预期行为 */
         }
-        fprintf(stderr, "FAIL: dlopen(%s) failed: %s\n", so_path, err);
+        fprintf(stderr, "FAIL: dlopen(%s) failed: %s\n", so_path,
+                err ? err : "(unknown error)");
         return 1;
     }
     printf("[ok] dlopen(%s) succeeded\n", so_path);
