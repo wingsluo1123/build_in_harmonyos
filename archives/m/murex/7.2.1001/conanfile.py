@@ -173,7 +173,16 @@ class MurexConan(ConanFile):
             mode |= stat.S_IWUSR
         if not is_dir:
             mode |= stat.S_IWUSR
-        os.chmod(path, mode | read_exec)
+        try:
+            os.chmod(path, mode | read_exec)
+        except PermissionError:
+            # HMDFS: chmod on non-owned files fails even when we only add bits.
+            # If the file is already executable (or readable for non-exec), skip.
+            if not (executable or is_dir):
+                raise
+            if os.access(path, os.X_OK):
+                return
+            raise
 
     def _host_goarch(self):
         machine = platform.machine().lower()
