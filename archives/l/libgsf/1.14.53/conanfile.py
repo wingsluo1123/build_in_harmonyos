@@ -124,11 +124,18 @@ class LibgsfConan(ConanFile):
         # 是 R26 static 包(仅 .a),但 CI 从 registry 下载的二进制包(tgz 解压)
         # 目录结构不同,libgobject-2.0.a/.so 探测会漏匹配(CI 实测报
         # "No package 'gobject-2.0' found",即使 PKG_CONFIG_PATH 已注入)。
-        # 改为从 PkgConfigDeps 生成的 glib-2.0.pc 派生: 复用其 prefix/
+        # 改为从 PkgConfigDeps 生成的 glib-2.0.pc 派生: 复用绝对 prefix/
         # includedir/Cflags,仅改 Name/Libs(→ -lgobject-2.0 / -lgio-2.0)。
         _glib_pc_src = os.path.join(self.generators_folder, "glib-2.0.pc")
         _glib_pc_cflags = "-I${includedir} -I${includedir1}"
-        _glib_pc_prefix = "${pcfiledir}/../.."
+        # 从 self.dependencies["glib"] 拿真实 package_folder 作为绝对路径 prefix,
+        # 而非 ${pcfiledir}/../.. (后者在 generators_folder 路径下解析错误,导致
+        # "No such file or directory" cc1 错误 -Werror=missing-include-dirs).
+        _glib_pc_prefix = ""
+        try:
+            _glib_pc_prefix = self.dependencies["glib"].package_folder
+        except Exception:
+            pass
         if os.path.exists(_glib_pc_src):
             with open(_glib_pc_src, "r", encoding="utf-8", errors="ignore") as _f:
                 _glib_pc_text = _f.read()
@@ -170,8 +177,10 @@ class LibgsfConan(ConanFile):
         # 临时文件(Permission denied: .../tmp/cgEcJAnf/dummy.c)→ 显式传
         # --build/--host 跳过 config.guess(CI Worker 干净环境无本机 hack,
         # 必须写入配方,否则 configure 报 "cannot guess build type")。
-        tc.configure_args.append("--build=aarch64-linux")
-        tc.configure_args.append("--host=aarch64-linux")
+        # 鸿蒙适配版 conan 已注册 OHOS, config.sub 已 patch 接受 linux-ohos,
+        # 因此用完整 4 段三元组 aarch64-unknown-linux-ohos。
+        tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+        tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         # PkgConfigDeps 生成的 .pc 在 generators_folder,但 conanbuild env 未自动
         # 注入 PKG_CONFIG_PATH → 显式注入指向 generators_folder(含 libgsf-1.pc/
         # glib-2.0.pc/gobject-2.0.pc/gio-2.0.pc),否则 configure 的
@@ -182,6 +191,23 @@ class LibgsfConan(ConanFile):
     def build(self):
         # Patch config.guess/config.sub for OHOS (R15)
         self._patch_config_for_ohos()
+
+        # patch-autotools-ohos.pl 2.3 步误判跳过 linux-ohos kernel-os
+        # 校验补充 (R15/E122 修复)。同 libxau 1.0.12 / libgsf 1.14.51
+        # 模式：在 config.sub 内核-OS 校验表手动补 "| linux-ohos*-"。
+        cs_path = os.path.join(self.source_folder, "config.sub")
+        if os.path.exists(cs_path):
+            with open(cs_path, "r", encoding="utf-8", errors="replace") as _f:
+                _cs = _f.read()
+            if "linux-ohos*" not in _cs:
+                _old = "| linux-uclibc* )"
+                _new = "| linux-uclibc* | linux-ohos* )"
+                if _old in _cs:
+                    _cs = _cs.replace(_old, _new)
+                    with open(cs_path, "w", encoding="utf-8") as _f:
+                        _f.write(_cs)
+                    self.output.info(
+                        "  [ok] Added | linux-ohos* to config.sub kernel-os whitelist")
 
         apply_conandata_patches(self)
 
@@ -244,10 +270,16 @@ class LibgsfConan(ConanFile):
             script = os.path.join(skill_root, "scripts", "patch-autotools-ohos.pl")
             if os.path.exists(script):
                 self.output.info("Patching config.guess/config.sub with skill script")
-                for f in ("config.guess", "config.sub"):
-                    path = os.path.join(self.source_folder, f)
-                    if os.path.exists(path):
-                        subprocess.run(["perl", script, path], check=True)
+                cg_path = os.path.join(self.source_folder, "config.guess")
+                cs_path = os.path.join(self.source_folder, "config.sub")
+                # patch-autotools-ohos.pl requires BOTH arguments together;
+                # the upstream recipe had a bug where each iteration only
+                # passed one argument, causing perl to die with
+                # "Usage: ... <config.guess> <config.sub>".
+                subprocess.run(
+                    ["perl", script, cg_path, cs_path],
+                    check=True,
+                )
                 return
         self.output.info("OHC_SKILL_ROOT not set or script not found, skipping autotools patch")
 
