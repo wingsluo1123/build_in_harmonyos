@@ -97,8 +97,7 @@ class XapianBindingsConan(ConanFile):
 
         configure_args = self._load_configure_args()
         configure_args += (
-            f' --build=aarch64-linux-gnu --host=aarch64-linux-gnu '
-            f'--with-python3 --prefix={os.path.dirname(python_exe)}/.. '
+            f' --with-python3 --prefix={os.path.dirname(python_exe)}/.. '
             f'XAPIAN_CONFIG="{xc_bin}" '
             f'CPPFLAGS="-I{xc_include}" '
             f'CXXFLAGS="-stdlib=libc++ -I{xc_include} -I{py_include}" '
