@@ -3,6 +3,8 @@
 
 Build system: autotools (configure + make)
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
@@ -44,6 +46,10 @@ class Libieee1284Conan(ConanFile):
         # Disable python bindings (not needed for C library)
         tc.configure_args.append("--without-python")
         tc.generate()
+        # E002: Ensure TMPDIR is set (HarmonyOS /tmp is read-only)
+        if not os.environ.get("TMPDIR"):
+            os.environ["TMPDIR"] = os.path.join(os.path.expanduser("~"), "tmp")
+            os.makedirs(os.environ["TMPDIR"], exist_ok=True)
 
     def build(self):
         apply_conandata_patches(self)
