@@ -7,4 +7,13 @@ sources:
   # 子目录路径（在解压后的 AbiWord 源码包内）
   subpath: "plugins/openwriter"
 
+# patches 列表为空的原因（参考 PR #4119 abiword-plugin-clarisworks 模式）：
+#   openwriter 对上游源码没有任何修改——它已经是 AbiWord 主树的完整子目录，
+#   不需要 patch 任何 .cpp/.h/.am 文件就能编译（autotools 在 abiword 主
+#   configure 阶段被传入正确的 CFLAGS/LIBS 后，Makefile.am 直接可用）。
+#
+#   唯一需要的运行时修补是 umask 077→022（HMDFS EACCES fix），
+#   但 configure 脚本由 autoreconf 重新生成，无法做成稳定 patch 文件——
+#   该修补在 conanfile.py build() 内以 `replace_in_file` 形式运行时应用，
+#   见 conanfile.py L266-285 的 _drop_umask_077 块（R-NEW 注释）。
 patches: []

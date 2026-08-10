@@ -14,7 +14,7 @@ plugin .so's path via cpp_info.libdirs.
 
 Direct deps (per upstream plugin.m4 L1: `openwriter_pkgs="$gsf_req"` and
 configure.ac L79 `gsf_req='libgsf-1 >= 1.14.18'`):
-    - libgsf 1.14.18+ (we ship 1.14.58)
+    - libgsf 1.14.18+ (we ship 1.14.53)
     - glib (for GObject — gsf_off_t etc)
 
 Indirect deps (via libgsf conanfile.py):
@@ -94,7 +94,13 @@ class AbiwordPluginOpenwriterConan(ConanFile):
 
     def requirements(self):
         # Direct dep per upstream plugin.m4 + configure.ac gsf_req
-        self.requires("gsf/1.14.58")
+        # Why 1.14.53 instead of 1.14.58/1.14.51: among the three
+        # libgsf branches on upstream (1.14.51/1.14.53/1.14.58),
+        # 1.14.53 has accumulated the most post-review fixes (43
+        # commits vs 13/8), has passed L0 gate with test_package 5/5,
+        # and is therefore the lowest-risk to depend on for OHOS cross
+        # compile. See notes.md "libgsf 版本选择说明" for full rationale.
+        self.requires("libgsf/1.14.53")
         # glib is implicit via libgsf's pkg-config, but the plugin
         # .cpp files include <glib.h> directly and use GObject types
         # (GsfInput*, gsf_off_t, etc.) — declare explicitly so that
@@ -374,10 +380,10 @@ class AbiwordPluginOpenwriterConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "openwriter")
         self.cpp_info.set_property("cmake_target_name", "openwriter::plugin")
         self.cpp_info.set_property("pkg_config_name", "openwriter-plugin")
-        # Forward gsf + glib so consumers don't need to redeclare
+        # Forward libgsf + glib so consumers don't need to redeclare
         # (mirroring libgsf's requires=[] forwarding pattern).
         self.cpp_info.requires = [
-            "gsf::gsf",
+            "libgsf::libgsf",
             "glib::glib",
         ]
         self.cpp_info.system_libs = ["m", "pthread", "rt", "dl"]

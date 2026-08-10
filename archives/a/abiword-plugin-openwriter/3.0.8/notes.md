@@ -15,13 +15,13 @@ abiword-plugin-openwriter 在 Alpine Linux、NetBSD pkgsrc 等发行版中是独
 
 ## 待办
 
-- [ ] 获取 AbiWord 3.0.8 release tarball，验证 sha256
-- [ ] 解压后提取 `plugins/openwriter/` 子目录作为单独归档输入
-- [ ] 调研 openwriter 的运行时依赖（abiword/glib/libxml2/pango/fribidi/libgsf/...）
-- [ ] 写 conanfile.py（autotools 配方）
-- [ ] 写 test_package（CMake 消费者测试，验证 openwriter 关键 API）
-- [ ] OHOS HNP worker 交叉编译验证
-- [ ] qemu-aarch64-static 烟雾测试
+- [x] 获取 AbiWord 3.0.8 release tarball，验证 sha256
+- [x] 解压后提取 `plugins/openwriter/` 子目录作为单独归档输入
+- [x] 调研 openwriter 的运行时依赖（abiword/glib/libxml2/pango/fribidi/libgsf/...）
+- [x] 写 conanfile.py（autotools 配方）
+- [x] 写 test_package（CMake 消费者测试，验证 openwriter 关键 API）
+- [x] OHOS HNP worker 交叉编译验证
+- [x] qemu-aarch64-static 烟雾测试
 - [ ] 真机回归测试（需要远程协作 — 见团队方案）
 - [ ] 提 PR
 
@@ -52,12 +52,31 @@ abiword-plugin-openwriter 在 Alpine Linux、NetBSD pkgsrc 等发行版中是独
 | reports/test-report.md | ✅ | L0-L4 测试金字塔 |
 | PR_DESCRIPTION.md | ✅ | R-NEW 真机 L2 沙箱决策 |
 
-### 拉 libgsf 1.14.58 (强依赖)
+### 拉 libgsf 1.14.53 (强依赖) — **2026-08-10 更新**
 
-- URL: `https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.58.tar.xz`
-- sha256: `06e07ea12b7a52b9e316faddfecb640b1717a4875c59f0efb3b0cec1e2ccf35a`
-- 大小: 703 KB
-- 真实依赖 (configure.ac L86-90): `glib-2.0` + `gobject-2.0` + `gio-2.0` + `libxml-2.0` + **zlib (强制必需)**
+- **选定版本**：**libgsf 1.14.53**（不是 1.14.51/1.14.58）
+- URL: `https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.53.tar.xz`
+- 大小: ~680 KB
+
+#### libgsf 版本选择说明
+
+| 版本 | upstream 分支 | commit 数 | 状态 | 选择理由 |
+|------|--------------|----------|------|---------|
+| 1.14.51 | `feat/libgsf-1.14.51` | 13 | ❌ 未合并 main | 早期版本，AI review 后修复量最大 |
+| **1.14.53** | `feat/libgsf-1.14.53` | **43** | ❌ 未合并 main | **✅ 选定** — 最多 post-review 修复、L0 gate PASS、test_package 5/5 |
+| 1.14.58 | `feat/libgsf-1.14.58` | 8 | ❌ 未合并 main | 最新版本但 review/fix 数量最少，融合风险最高 |
+
+**为什么 1.14.53 是最优选择：**
+
+1. **post-review 修复迭代最充分**：43 个 commit 中包括 `fix(libgsf): AI review P0/P2/P3`、`fix(libgsf): PR #1790 review comments`、`fix(libgsf): L0 gate (test sources, self.run, MANIFEST)` 等多个 AI 评审驱动修复，是三个版本中**质量打磨最成熟**的
+2. **测试覆盖完整**：`test_package 5/5 PASS` + L0 门禁通过 + audit-result.json 完整
+3. **满足 openwriter 最低版本要求**：configure.ac L79 要求 `libgsf-1 >= 1.14.18`，1.14.53 完全覆盖
+4. **避免脆弱 PR 依赖风险**：1.14.58 commit 数最少，未经过多轮 review 验证，与 openwriter 强耦合风险高
+5. **可降级**：如果 1.14.53 PR 仍未合并，openwriter PR 可独立提交（依赖由 conan 集中解析，无需与 libgsf PR 同步骤合并）
+
+#### 真实依赖 (configure.ac L86-90)
+
+`glib-2.0` + `gobject-2.0` + `gio-2.0` + `libxml-2.0` + **zlib (强制必需)**
 
 ### 探索编译结果
 
