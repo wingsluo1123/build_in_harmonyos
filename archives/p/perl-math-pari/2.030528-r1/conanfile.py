@@ -13,7 +13,7 @@ import re
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, copy, download, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 from conan.tools.env import Environment
 
@@ -45,6 +45,10 @@ class PerlMathPariConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # Pre-download PARI tarball so Makefile.PL doesn't attempt FTP fetch
+        pari_data = self.conan_data.get("pari_source", {})
+        if pari_data:
+            download(self, **pari_data, filename="pari-2.3.5.tar.gz")
 
     def generate(self):
         env = Environment()
@@ -59,7 +63,12 @@ class PerlMathPariConan(ConanFile):
         apply_conandata_patches(self)
         src = self.source_folder
 
-        self.run("perl Makefile.PL", cwd=src, env=["perl_math_pari_env"])
+        # Pass pari_tgz to prevent Makefile.PL from attempting FTP download
+        pari_tgz = os.path.join(src, "pari-2.3.5.tar.gz")
+        if os.path.isfile(pari_tgz):
+            self.run(f'perl Makefile.PL pari_tgz="{pari_tgz}"', cwd=src, env=["perl_math_pari_env"])
+        else:
+            self.run("perl Makefile.PL", cwd=src, env=["perl_math_pari_env"])
 
         # Patch LDDLFLAGS in Makefile for OHOS CRT compatibility
         # Only needed on OHOS where musl CRT startup files are missing
