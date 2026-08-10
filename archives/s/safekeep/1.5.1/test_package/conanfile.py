@@ -20,5 +20,7 @@ class SafekeepTestConan(ConanFile):
         script = os.path.join(self.recipe_folder, "test_safekeep_package.py")
         args = [f'"{sys.executable}"', f'"{script}"', f'"{package_folder}"']
         if str(self.settings.os) == "OHOS":
+            rdiff_dep = self.dependencies["rdiff-backup"]
             args.append("--run-upstream-local")
+            args.extend(["--rdiff-backup-package", f'"{rdiff_dep.package_folder}"'])
         self.run(" ".join(args), env="conanrun")
