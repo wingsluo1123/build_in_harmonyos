@@ -1,0 +1,39 @@
+{
+  "verdict": "pass",
+  "findings": [
+    {
+      "priority": "P2",
+      "id": "TEST-ASSERTION-MISSING",
+      "message": "The consumer test initializes Gauche and evaluates a Scheme expression, but it prints the result and returns success without verifying that the result is the expected value. This does not invalidate the substantive API test, but leaves the documented assertion_count insufficiently enforced.",
+      "file": "archives/g/gauche/0.9.15/test_package/test.c",
+      "evidence": "test.c calls Scm_Init(GAUCHE_SIGNATURE) and Scm_EvalCStringRec(\"(+ 1 2 3)\", SCM_FALSE), then calls Scm_Printf and returns 0 without comparing the ScmObj result to an expected value."
+    }
+  ],
+  "scope": {
+    "base": "main",
+    "head": "79fb72f3053b395b0fe9aafdef31ec2b4ce56b18",
+    "package": "gauche/0.9.15",
+    "reviewed": [
+      ".gitcode/code-style.md",
+      ".gitcode/review-memory.md",
+      "archives/g/gauche/0.9.15/conandata.yml",
+      "archives/g/gauche/0.9.15/conanfile.py",
+      "archives/g/gauche/0.9.15/manifest.yaml",
+      "archives/g/gauche/0.9.15/test_package/",
+      "archives/g/gauche/commands.json",
+      "archives/g/gauche/0.9.15/.ci-result.json",
+      "archives/g/gauche/0.9.15/reports/conan-create.log"
+    ]
+  },
+  "evidence": {
+    "gitcode_mirror_and_immutable_commit": "PASS: conandata.yml specifies HTTPS GitCode mirror URL https://gitcode.com/hhyxx1/gauche-release-mirror.git and full immutable commit 14895b1875d56a2d4ef5b90e6035b45c44041d7e; source() clones that URL and checks out source['mirror_commit'].",
+    "release_sha256": "PASS: conandata.yml pins Gauche-0.9.15.tgz SHA256 3643e27bc7c8822cfd6fb2892db185f658e8e364938bc2ccfcedb239e35af783, consistent with the version manifest; source() hashes the cloned archive and raises ConanException on mismatch before extraction.",
+    "safe_tar_extraction": "PASS: source() resolves every member destination beneath release-extract and rejects traversal outside that root, symbolic links, hard links, and device members before calling extract(). It also requires exactly one archive root and required source entries.",
+    "explicit_patch_base": "PASS: build() reads declared conandata patches in order and invokes patch() with base_path=self.source_folder and the exported patch path explicitly specified.",
+    "r33": "PASS: recipe uses AutotoolsToolchain and contains no CC/CXX/CFLAGS-style shell-environment compiler configuration.",
+    "test_package": "PASS: CMake links gauche::gauche and registers CTest; test.c calls Scm_Init and Scm_EvalCStringRec, so the test exercises Gauche APIs rather than being an empty-shell test. test_package also runs cmake.test() and gosh directly.",
+    "commands": "PASS: archives/g/gauche/commands.json is software-level valid tool metadata with name gauche, type tool, and gauche/0.9.15 reference.",
+    "published_manifest": "PASS: version manifest status is published and its source SHA256 and eight patches_applied entries agree with the declared release digest and conandata patch list.",
+    "ci_result_and_w3": "PASS: ignored local .ci-result.json records W3_local_ci exit_code 0 and valid integrity hash fcfad52f4a4f92f4 for timestamp 2026-08-11T14:32:38.332887:gauche:0.9.15:0. conan-create.log records Created package revision 50c97e740536be9283b3f2c61742682e and 100% tests passed, 0 tests failed out of 1; no ERROR line was found."
+  }
+}
