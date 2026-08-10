@@ -40,6 +40,7 @@ sha256 `dffdd0915ceb028541fe3bed77d63ba35e78514591c043736b450d62634eeb31`），
 | `0008-unittest-skip-wrapdb-network.patch` | `unittests/platformagnostictests.py` 的 `test_update_wrapdb` 在 OHOS 上 `SkipTest` | 崩溃点：`wrapdb.mesonbuild.com` 连接 `read operation timed out`（构建环境无法访问外部 WrapDB 服务）；测试核心逻辑是拉取 WrapDB 元数据做 wrap 更新验证，依赖外部网络服务，构建环境不可达 → 不可行。 |
 | `0009-project-tests-ninja-env.patch` | `run_project_tests.py` 的 `detect_tools()` 尊重 `$NINJA` 环境变量 | 崩溃点：`get_version()` 用裸 `ninja` 经 `shutil.which`/`Popen` 走 PATH，CI worker 的 PATH 不含工具链目录 → `FileNotFoundError: 'ninja'`（该函数不读 run_tests.py 已导出的 `$NINJA`）；改为 ninja 工具直接使用 `os.environ['NINJA']` 的解析绝对路径执行。 |
 | `0010-test-static-linker-ar-env.patch` | 4 个 project test 的辅助脚本（`common/{208,209,210}` 的 generate/custom_stlib 脚本、`common/95 manygen`）优先使用 `$AR` 环境变量 | 崩溃点：脚本用 `shutil.which('ar')`/硬编码 `'ar'` 裸名走 PATH（E012：OHOS SDK 只有 LLVM 工具链，CI worker PATH 无 GNU ar）→ `FileNotFoundError: 'ar'`（b18381：5 个 project test 失败，522/5/124）；改为 `os.environ.get('AR')`（配方注入的 llvm-ar 绝对路径）优先。 |
+| `0011-pathtester-env-fallback.patch` | `common/41 test args` 的 `pathtester.py` 用 `shutil.which('env') or '/usr/bin/env'` 解析 `env` 命令 | 崩溃点：脚本 `subprocess.run(['env'])` 裸名走 PATH，CI worker PATH 无 `env`（toybox）→ `FileNotFoundError: 'env'`（b18421：common 41 失败，527/1/123）；改为 PATH 解析后回退绝对路径 `/usr/bin/env`。 |
 
 > 注：参考先例 `codex/meson-1.11.0-validate` 分支的 0003/0004 补丁存在 fuzzy 匹配
 > 问题（harmonyos 映射被追加到文件末尾导致语法错误、skip 块被放到文件末尾），
