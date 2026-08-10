@@ -17,7 +17,9 @@ import subprocess
 import sys
 
 from conan import ConanFile
+from conan.tools.build import load_toolchain_args
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file
+from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 
 
 class XapianBindingsConan(ConanFile):
@@ -43,6 +45,18 @@ class XapianBindingsConan(ConanFile):
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
+    def generate(self):
+        AutotoolsDeps(self).generate()
+        PkgConfigDeps(self).generate()
+
+        tc = AutotoolsToolchain(self)
+        tc.configure_args.append("--disable-documentation")
+        tc.configure_args.append("--disable-dependency-tracking")
+        tc.generate()
+
+    def _load_configure_args(self):
+        return load_toolchain_args(self.generators_folder).get("configure_args")
+
     def build(self):
         apply_conandata_patches(self)
         python_exe = sys.executable
@@ -66,18 +80,24 @@ class XapianBindingsConan(ConanFile):
              "import sysconfig; print(sysconfig.get_paths()['include'])"],
             capture_output=True, text=True).stdout.strip()
 
-        # 完整工具链（CI 干净 PATH 无 ar/ranlib/nm/ld，参照 xapian-core 配方）
+        # 完整工具链（CI 干净 PATH 无 ar/ranlib/nm/ld，参照 xapian-core 配方）。
+        # 关键：CC/CXX 用 bash 包裹（"{config_shell} {cc}"），与 xapian-core
+        # 一致 —— OHOS 上直接执行 clang 链接测试程序会失败
+        # (C compiler cannot create executables)，bash 包裹后可用。
         cc = self.conf.get("tools.build:compiler_executables", default={})
         cc_cmd = cc.get("c", "clang")
         cxx_cmd = cc.get("cpp", cc_cmd + "++")
         config_shell = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/system/bin/sh"
+        cc_cmd = f"{config_shell} {cc_cmd}"
+        cxx_cmd = f"{config_shell} {cxx_cmd}"
         ar = shutil.which("llvm-ar") or shutil.which("ar") or "ar"
         ranlib = shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib"
         nm = shutil.which("llvm-nm") or shutil.which("nm") or "nm"
         ld = shutil.which("ld.lld") or shutil.which("ld") or "ld"
 
-        configure_args = (
-            f'--build=aarch64-linux-gnu --host=aarch64-linux-gnu '
+        configure_args = self._load_configure_args()
+        configure_args += (
+            f' --build=aarch64-linux-gnu --host=aarch64-linux-gnu '
             f'--with-python3 --prefix={os.path.dirname(python_exe)}/.. '
             f'XAPIAN_CONFIG="{xc_bin}" '
             f'CPPFLAGS="-I{xc_include}" '
