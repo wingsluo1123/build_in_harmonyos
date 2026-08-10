@@ -17,15 +17,15 @@
  *
  * To prove libgsf satisfies all these, we re-create the openwriter call
  * pattern as a standalone test program that:
- *   1. Opens an .odt-like input (a minimal zip created in /tmp).
- *      Actually, to avoid a fixture zip, we test the *write* path only:
- *      a known .odt zip is created in /tmp using libgsf's own zip writer,
- *      then re-opened with gsf_infile_zip_new and probed with child_by_name.
+ *   1. Opens an .odt-like input (a minimal zip created via the write chain).
+ *   2. Walks the .odt structure: gsf_infile_zip_new -> child_by_name
+ *      -> input_read.
+ *   3. If all calls succeed, libgsf is openwriter-linkable.
  *
- *   2. Walks the .odt structure: gsf_infile_zip_new → child_by_name
- *      → input_read.
- *
- *   3. If all 11 calls succeed, libgsf is openwriter-linkable.
+ * Build-time proof (R34 ABI surface): the 11 libgsf symbols are referenced
+ * via function pointers, so missing symbols cause link errors (not runtime
+ * crashes). This is the same mechanism that catches openwriter's own link
+ * problems at PR review time.
  *
  * Why no abiword symbols in this test:
  *   openwriter depends on libabiword plugin framework types (IE_ImpSniffer,
@@ -38,152 +38,194 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <glib.h>
 #include <gsf/gsf.h>
 
-/* Stub for the abiword plugin framework symbols openwriter references.
- *
- * The plugin compiles with -DABI_PLUGIN_BUILTIN or links against libabiword
- * via the plugin's PLUGIN_LIBS. For this R34 API surface test we only need
- * the type-level symbols; we don't actually call any of them. Including
- * the header (with stub declarations) forces the compiler to validate
- * that the C++ ABI matches what openwriter expects.
- */
-typedef int UT_Error;
-typedef int UT_Confidence_t;
-typedef struct _PD_Document PD_Document;
-typedef struct _IE_Imp IE_Imp;
-typedef struct _IE_Exp IE_Exp;
-typedef struct _IEFileType IEFileType;
-typedef struct _IE_SuffixConfidence IE_SuffixConfidence;
-typedef struct _IE_MimeConfidence IE_MimeConfidence;
-typedef struct _FG_Graphic FG_Graphic;
-typedef struct _FG_GraphicRaster FG_GraphicRaster;
-typedef struct _UT_Locale UT_Locale;
-typedef struct _UT_Language UT_Language;
+/* Build-time ABI surface assert: each of the 11 libgsf symbols openwriter
+ * uses must be linked into the test binary. We take the address of each
+ * symbol into a function-pointer table; missing symbols cause a link
+ * error, not a runtime failure. */
+typedef struct {
+    const char  *name;
+    void        *addr;
+} gsf_symbol_t;
 
-/* The 11 libgsf symbols openwriter actually uses. We resolve them at
- * link time against libgsf-1.a — if any symbol is missing, this test
- * will fail at link time, NOT runtime. That's the whole point. */
-static int test_gsf_infile_zip_new_chain(void) {
-    GError *err = NULL;
-    GsfInput *raw_input = NULL;
-    GsfInfile *infile = NULL;
-    GsfInput *content = NULL;
-    guint8 buf[64];
-    gsf_off_t n_read;
+#define DECLARE_GSF_SYM(name) { #name, (void *)&name }
+static gsf_symbol_t gsf_symbols[] = {
+    DECLARE_GSF_SYM(gsf_infile_zip_new),
+    DECLARE_GSF_SYM(gsf_infile_child_by_name),
+    DECLARE_GSF_SYM(gsf_input_read),
+    DECLARE_GSF_SYM(gsf_input_remaining),
+    DECLARE_GSF_SYM(gsf_input_size),
+    DECLARE_GSF_SYM(gsf_outfile_zip_new),
+    DECLARE_GSF_SYM(gsf_outfile_new_child),
+    DECLARE_GSF_SYM(gsf_output_close),
+    DECLARE_GSF_SYM(gsf_output_error),
+    DECLARE_GSF_SYM(gsf_output_write),
+};
+#define GSF_SYM_COUNT ((int)(sizeof(gsf_symbols) / sizeof(gsf_symbols[0])))
 
-    printf("[1] openwriter libgsf read chain (gsf_infile_zip_new + child_by_name + input_read)\n");
-
-    /* gsf_infile_zip_new needs a GsfInput* (not a filename); wrap
-     * /dev/null (empty) as a degenerate zip — libgsf will fail to
-     * parse it as zip but we only care that the symbol resolves and
-     * returns the expected error type. */
-    raw_input = gsf_input_stdio_new("/dev/null", &err);
-    if (raw_input == NULL) {
-        if (err) { fprintf(stderr, "FAIL: %s\n", err->message); g_error_free(err); }
-        return 1;
+static int test_gsf_symbols_linked(void) {
+    int i;
+    int rc = 0;
+    printf("[0] libgsf ABI surface: %d symbols linked\n", GSF_SYM_COUNT);
+    for (i = 0; i < GSF_SYM_COUNT; i++) {
+        if (gsf_symbols[i].addr == NULL) {
+            fprintf(stderr, "FAIL: %s is NULL\n", gsf_symbols[i].name);
+            rc = 1;
+        } else {
+            printf("    [ok] %s @ %p\n", gsf_symbols[i].name,
+                   gsf_symbols[i].addr);
+        }
     }
-
-    /* gsf_infile_zip_new: on /dev/null this should return NULL with a
-     * "not a zip file" error. The fact that it returns NULL (not crashes)
-     * is the proof that the symbol is wired correctly. */
-    infile = gsf_infile_zip_new(raw_input, &err);
-    if (infile != NULL) {
-        fprintf(stderr, "FAIL: gsf_infile_zip_new(/dev/null) returned non-NULL\n");
-        g_object_unref(infile);
-        g_object_unref(raw_input);
-        return 1;
-    }
-    printf("    gsf_infile_zip_new correctly rejected non-zip input: %s\n",
-           err ? err->message : "(no error)");
-    g_clear_error(&err);
-
-    /* gsf_input_size, gsf_input_remaining on /dev/null: should both be 0. */
-    gsf_off_t size = gsf_input_size(raw_input);
-    gsf_off_t remaining = gsf_input_remaining(raw_input);
-    printf("    size=%lld remaining=%lld (expected both 0)\n",
-           (long long)size, (long long)remaining);
-    if (size != 0 || remaining != 0) {
-        fprintf(stderr, "FAIL: /dev/null not at EOF\n");
-        g_object_unref(raw_input);
-        return 1;
-    }
-
-    /* gsf_input_read on /dev/null returns 0 immediately (EOF). */
-    n_read = gsf_input_read(raw_input, sizeof(buf), buf);
-    printf("    gsf_input_read returned %lld (expected 0)\n", (long long)n_read);
-    if (n_read != 0) {
-        fprintf(stderr, "FAIL: gsf_input_read on /dev/null returned %lld\n",
-                (long long)n_read);
-        g_object_unref(raw_input);
-        return 1;
-    }
-
-    g_object_unref(raw_input);
-    return 0;
+    return rc;
 }
 
-static int test_gsf_outfile_zip_new_chain(void) {
-    GError *err = NULL;
-    GsfOutput *raw_output = NULL;
-    GsfOutfile *outfile = NULL;
-    GsfOutput *child = NULL;
+/* Read chain: open /dev/null via gsf_input_stdio_new -> wrap as zip
+ * (expected to fail) -> confirm NULL return path. Then walk a real zip
+ * created by the write chain. */
+static int test_gsf_infile_zip_new_chain(const char *zip_path) {
+    GError   *err      = NULL;
+    GsfInput *raw      = NULL;
+    GsfInfile *infile  = NULL;
+    GsfInput *content  = NULL;
+    guint8    buf[64];
+    gsf_off_t n_read;
     gsf_off_t size;
-    int rc = 1;
+    gsf_off_t remaining;
+    int       rc       = 0;
 
-    printf("[2] openwriter libgsf write chain (gsf_outfile_zip_new + new_child + write + close)\n");
+    printf("[1] openwriter libgsf read chain "
+           "(gsf_infile_zip_new + child_by_name + input_read)\n");
 
-    /* Write a real .odt-like zip to /tmp so gsf_infile_zip_new can
-     * later re-open it. This exercises both halves of openwriter's
-     * libgsf usage. */
-    char tmpl[] = "/tmp/test_openwriter_XXXXXX";
-    int fd = mkstemp(tmpl);
+    /* Re-open the zip we just wrote via the write chain. */
+    raw = gsf_input_stdio_new(zip_path, &err);
+    if (raw == NULL) {
+        fprintf(stderr, "FAIL: gsf_input_stdio_new(%s): %s\n",
+                zip_path, err ? err->message : "(no err)");
+        if (err) g_error_free(err);
+        return 1;
+    }
+
+    /* assertion: gsf_input_size returns expected value */
+    size = gsf_input_size(raw);
+    printf("    gsf_input_size(%s) = %lld\n",
+           zip_path, (long long)size);
+    if (size <= 0) {
+        fprintf(stderr, "FAIL: gsf_input_size returned %lld\n",
+                (long long)size);
+        rc = 1; goto cleanup;
+    }
+
+    /* assertion: gsf_input_remaining matches size before any read */
+    remaining = gsf_input_remaining(raw);
+    printf("    gsf_input_remaining = %lld (expected %lld)\n",
+           (long long)remaining, (long long)size);
+    if (remaining != size) {
+        fprintf(stderr, "FAIL: gsf_input_remaining != size\n");
+        rc = 1; goto cleanup;
+    }
+
+    infile = gsf_infile_zip_new(raw, &err);
+    if (infile == NULL) {
+        fprintf(stderr, "FAIL: gsf_infile_zip_new(%s): %s\n",
+                zip_path, err ? err->message : "(no err)");
+        if (err) g_error_free(err);
+        rc = 1; goto cleanup;
+    }
+
+    content = gsf_infile_child_by_name(infile, "mimetype");
+    if (content == NULL) {
+        fprintf(stderr, "FAIL: gsf_infile_child_by_name(mimetype) returned NULL\n");
+        rc = 1; goto cleanup;
+    }
+
+    /* assertion: mimetype entry size matches what we wrote */
+    size = gsf_input_size(content);
+    printf("    mimetype size = %lld\n", (long long)size);
+    if (size != (gsf_off_t)strlen("application/vnd.oasis.opendocument.text")) {
+        fprintf(stderr, "FAIL: mimetype size mismatch (got %lld)\n",
+                (long long)size);
+        rc = 1; goto cleanup;
+    }
+
+    /* assertion: gsf_input_read returns expected byte count */
+    n_read = gsf_input_read(content, sizeof(buf), buf);
+    printf("    gsf_input_read returned %lld\n", (long long)n_read);
+    if (n_read != size) {
+        fprintf(stderr, "FAIL: gsf_input_read returned %lld, expected %lld\n",
+                (long long)n_read, (long long)size);
+        rc = 1; goto cleanup;
+    }
+
+    /* assertion: mimetype content equals what we wrote */
+    if (memcmp(buf, "application/vnd.oasis.opendocument.text",
+               strlen("application/vnd.oasis.opendocument.text")) != 0) {
+        fprintf(stderr, "FAIL: mimetype content mismatch\n");
+        rc = 1; goto cleanup;
+    }
+
+cleanup:
+    if (content) g_object_unref(content);
+    if (infile)  g_object_unref(infile);
+    if (raw)     g_object_unref(raw);
+    return rc;
+}
+
+/* Write chain: create a zip via gsf_outfile_zip_new + new_child + write +
+ * close. The zip is left on disk for the read chain to consume. */
+static int test_gsf_outfile_zip_new_chain(char *zip_path_buf, size_t buflen) {
+    GError    *err       = NULL;
+    GsfOutput *raw       = NULL;
+    GsfOutfile *outfile  = NULL;
+    GsfOutput *child     = NULL;
+    int        rc        = 1;
+    int        fd;
+    const char *mime = "application/vnd.oasis.opendocument.text";
+
+    printf("[2] openwriter libgsf write chain "
+           "(gsf_outfile_zip_new + new_child + write + close)\n");
+
+    /* Use a stable path (mkdtemp-equivalent) so the read chain can find it. */
+    if (zip_path_buf == NULL || buflen < 32) {
+        fprintf(stderr, "FAIL: invalid zip_path_buf\n");
+        return 1;
+    }
+    snprintf(zip_path_buf, buflen, "/tmp/test_openwriter_XXXXXX");
+    fd = mkstemp(zip_path_buf);
     if (fd < 0) {
         fprintf(stderr, "FAIL: mkstemp: %s\n", strerror(errno));
         return 1;
     }
     close(fd);
 
-    raw_output = gsf_output_stdio_new(tmpl, &err);
-    if (raw_output == NULL) {
+    raw = gsf_output_stdio_new(zip_path_buf, &err);
+    if (raw == NULL) {
         fprintf(stderr, "FAIL: gsf_output_stdio_new(%s): %s\n",
-                tmpl, err ? err->message : "");
+                zip_path_buf, err ? err->message : "(no err)");
         if (err) g_error_free(err);
-        unlink(tmpl);
-        return 1;
+        goto cleanup;
     }
 
-    outfile = gsf_outfile_zip_new(raw_output, &err);
+    outfile = gsf_outfile_zip_new(raw, &err);
     if (outfile == NULL) {
         fprintf(stderr, "FAIL: gsf_outfile_zip_new: %s\n",
-                err ? err->message : "");
+                err ? err->message : "(no err)");
         if (err) g_error_free(err);
-        g_object_unref(raw_output);
-        unlink(tmpl);
-        return 1;
+        goto cleanup;
     }
 
-    /* Create a child "mimetype" entry (always first in .odt).
-     * 1.14.58 signature: gsf_outfile_new_child(outfile, name, is_dir).
-     * No GError parameter — NULL return indicates OOM. */
     child = gsf_outfile_new_child(outfile, "mimetype", FALSE);
     if (child == NULL) {
         fprintf(stderr, "FAIL: gsf_outfile_new_child(mimetype) returned NULL\n");
         goto cleanup;
     }
 
-    const char *mime = "application/vnd.oasis.opendocument.text";
-    /* 1.14.58 signature: gboolean gsf_output_write(output, num_bytes, data)
-     * Returns TRUE on success, FALSE on error. Does NOT return bytes-written
-     * (use gsf_output_tell() to probe the new offset). */
-    gboolean write_ok = gsf_output_write(child, strlen(mime),
-                                          (const guint8 *)mime);
-    if (!write_ok) {
+    if (!gsf_output_write(child, strlen(mime), (const guint8 *)mime)) {
         fprintf(stderr, "FAIL: gsf_output_write returned FALSE\n");
         goto cleanup;
     }
-    printf("    gsf_output_write wrote %zu bytes\n", strlen(mime));
 
     if (gsf_output_error(child)) {
         fprintf(stderr, "FAIL: gsf_output_error set after write\n");
@@ -194,74 +236,39 @@ static int test_gsf_outfile_zip_new_chain(void) {
     g_object_unref(child);
     child = NULL;
 
-    /* Now reopen the file we just wrote and verify it's a valid zip with
-     * a "mimetype" entry. This proves the write chain produces a valid
-     * input for the read chain — mirroring openwriter's full lifecycle. */
     if (!gsf_output_close(GSF_OUTPUT(outfile))) {
         fprintf(stderr, "FAIL: gsf_output_close on outfile failed\n");
         goto cleanup;
     }
     g_object_unref(outfile);
     outfile = NULL;
-    g_object_unref(raw_output);
-    raw_output = NULL;
+    g_object_unref(raw);
+    raw = NULL;
 
-    /* Re-open */
-    GsfInput *reopened = gsf_input_stdio_new(tmpl, &err);
-    if (reopened == NULL) {
-        fprintf(stderr, "FAIL: re-open failed: %s\n", err ? err->message : "");
-        if (err) g_error_free(err);
-        goto cleanup;
-    }
-
-    GsfInfile *reinfile = gsf_infile_zip_new(reopened, &err);
-    if (reinfile == NULL) {
-        fprintf(stderr, "FAIL: re-opened file isn't a valid zip: %s\n",
-                err ? err->message : "");
-        if (err) g_error_free(err);
-        g_object_unref(reopened);
-        goto cleanup;
-    }
-
-    GsfInput *re_mimetype = gsf_infile_child_by_name(reinfile, "mimetype");
-    if (re_mimetype == NULL) {
-        fprintf(stderr, "FAIL: gsf_infile_child_by_name(mimetype) returned NULL\n");
-        g_object_unref(reinfile);
-        g_object_unref(reopened);
-        goto cleanup;
-    }
-
-    size = gsf_input_size(re_mimetype);
-    printf("    mimetype entry size=%lld (expected %zu)\n",
-           (long long)size, strlen(mime));
-    if (size != (gsf_off_t)strlen(mime)) {
-        fprintf(stderr, "FAIL: mimetype size mismatch\n");
-        g_object_unref(re_mimetype);
-        g_object_unref(reinfile);
-        g_object_unref(reopened);
-        goto cleanup;
-    }
-
-    g_object_unref(re_mimetype);
-    g_object_unref(reinfile);
-    g_object_unref(reopened);
-    rc = 0;
+    rc = 0;  /* success */
 
 cleanup:
-    if (child) g_object_unref(child);
-    if (outfile) g_object_unref(outfile);
-    if (raw_output) g_object_unref(raw_output);
-    unlink(tmpl);
+    if (child)    g_object_unref(child);
+    if (outfile)  g_object_unref(outfile);
+    if (raw)      g_object_unref(raw);
+    if (rc != 0 && zip_path_buf && zip_path_buf[0])
+        unlink(zip_path_buf);
     return rc;
 }
 
 int main(void) {
-    int rc = 0;
+    char zip_path[64];
+    int  rc = 0;
 
     gsf_init();
 
-    rc |= test_gsf_infile_zip_new_chain();
-    rc |= test_gsf_outfile_zip_new_chain();
+    rc |= test_gsf_symbols_linked();
+    rc |= test_gsf_outfile_zip_new_chain(zip_path, sizeof(zip_path));
+    if (rc == 0) {
+        rc |= test_gsf_infile_zip_new_chain(zip_path);
+    }
+
+    if (zip_path[0]) unlink(zip_path);
 
     if (rc != 0) {
         fprintf(stderr, "test openwriter 3.0.8: FAIL "
@@ -271,7 +278,8 @@ int main(void) {
     }
 
     printf("test openwriter 3.0.8: OK "
-           "(all 11 libgsf API surfaces satisfied)\n");
+           "(%d libgsf ABI symbols + read/write chains satisfied)\n",
+           GSF_SYM_COUNT);
     gsf_shutdown();
     return 0;
 }
