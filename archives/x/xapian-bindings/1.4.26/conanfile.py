@@ -7,8 +7,12 @@ xapian-core. It is a SWIG-generated C++ extension module
 xapian-bindings source tarball (xapian_wrap.cc is pre-generated, so
 no swig is required at build time).
 
-The binding is installed into the python user site-packages so that
-consumers can `import xapian`.
+构建方式完全对齐 CI 已验证通过的 xapian-core 配方：
+- settings/options/layout 与 xapian-core 一致
+- AutotoolsToolchain 生成 configure_args（--disable-documentation 等）
+- OHOS 分支：bash 包裹工具链 + 完整 AR/RANLIB/NM/LD + config.guess/sub
+  补丁识别 OHOS 三元组（native 编译）
+- 不传 --build/--host（E064: 非真交叉编译场景禁止用 --host 绕过 conftest）
 """
 import glob
 import os
@@ -20,6 +24,7 @@ from conan import ConanFile
 from conan.tools.build import load_toolchain_args
 from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
+from conan.tools.layout import basic_layout
 
 
 class XapianBindingsConan(ConanFile):
@@ -28,19 +33,28 @@ class XapianBindingsConan(ConanFile):
     description = "Python bindings for the Xapian search engine library"
     license = "GPL-2.0-or-later"
     homepage = "https://xapian.org/"
-    url = ""
+    url = "https://xapian.org/"
 
-    # Provides a Python extension module (site-packages).
-    # 注意：不声明 package_type="python-require" —— conan 的类型规则限制
-    # python-require 不能依赖 shared-library 的 xapian-core；保持默认类型
-    # （参照 internetarchive 等 Python 包配方）。
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": True, "fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
 
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
+
     def requirements(self):
         self.requires("xapian-core/1.4.26")
+
+    def layout(self):
+        basic_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -80,36 +94,37 @@ class XapianBindingsConan(ConanFile):
              "import sysconfig; print(sysconfig.get_paths()['include'])"],
             capture_output=True, text=True).stdout.strip()
 
-        # 完整工具链（参照 CI 已验证通过的 xapian-core 配方）。
-        # 关键 1: CC/CXX 用 bash 包裹（"{config_shell} {cc}"）——OHOS 上
-        # clang 是 shell 脚本，直接作为 CC 会失败。
-        # 关键 2: 不传 --build/--host —— config.guess/sub 补丁已让 configure
-        # 自动识别 OHOS 为 aarch64-unknown-linux-ohos（native 编译）。
+        configure = os.path.join(self.source_folder, "configure")
+        if os.path.isfile(configure):
+            os.chmod(configure, 0o755)
+
+        configure_args = self._load_configure_args()
+
+        # OHOS 分支：完全对齐 xapian-core（CI 已验证通过）——
+        # bash 包裹工具链 + 完整 AR/RANLIB/NM/LD + config.guess/sub 补丁
+        # 识别 OHOS 三元组；不传 --build/--host（E064 forbid_1）。
         config_shell = shutil.which("bash") or "/system/bin/sh"
-        cc_cmd = config_shell
-        cxx_cmd = config_shell
-        cc = self.conf.get("tools.build:compiler_executables", default={})
-        cc_bin = cc.get("c", "clang")
-        cxx_bin = cc.get("cpp", cc_bin + "++")
+        cc = shutil.which("clang") or os.environ.get("CC", "clang")
+        cxx = shutil.which("clang++") or os.environ.get("CXX", "clang++")
+        cc_cmd = f"{config_shell} {cc}"
+        cxx_cmd = f"{config_shell} {cxx}"
         ar = shutil.which("llvm-ar") or shutil.which("ar") or "ar"
         ranlib = shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib"
         nm = shutil.which("llvm-nm") or shutil.which("nm") or "nm"
         ld = shutil.which("ld.lld") or shutil.which("ld") or "ld"
 
-        configure_args = self._load_configure_args()
+        # xapian-bindings 特有配置（必需，不影响 host/build 判定）
         configure_args += (
-            f' --host=aarch64-unknown-linux-gnu '
-            f'--with-python3 --prefix={os.path.dirname(python_exe)}/.. '
+            f' --with-python3 --prefix={os.path.dirname(python_exe)}/.. '
             f'XAPIAN_CONFIG="{xc_bin}" '
             f'CPPFLAGS="-I{xc_include}" '
             f'CXXFLAGS="-stdlib=libc++ -I{xc_include} -I{py_include}" '
             f'LDFLAGS="-L{xc_lib}"'
         )
         self.run(
-            f'CC="{cc_cmd} {cc_bin}" CXX="{cxx_cmd} {cxx_bin}" '
-            f'AR="{ar}" RANLIB="{ranlib}" NM="{nm}" LD="{ld}" '
-            f'CONFIG_SHELL="{config_shell}" '
-            f'"{config_shell}" ./configure {configure_args}',
+            f'CC="{cc_cmd}" CXX="{cxx_cmd}" AR="{ar}" RANLIB="{ranlib}" NM="{nm}" '
+            f'LD="{ld}" CONFIG_SHELL="{config_shell}" '
+            f'"{config_shell}" "{configure}" {configure_args}',
             cwd=self.source_folder,
         )
 
