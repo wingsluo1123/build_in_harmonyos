@@ -1,4 +1,4 @@
-# pyparsing 3.1.4 适配笔记
+# pyparsing 3.1.4.1 适配笔记
 
 ## 编译环境
 - 构建系统: setuptools（纯 Python 包）
@@ -10,7 +10,7 @@
 
 ### 1. 初始化
 ```bash
-python3 $SKILL_ROOT/scripts/ohc-run.py init-build pyparsing 3.1.4 \
+python3 $SKILL_ROOT/scripts/ohc-run.py init-build pyparsing 3.1.4.1 \
   --url=https://github.com/pyparsing/pyparsing/archive/refs/tags/3.1.4.tar.gz
 ```
 
@@ -99,7 +99,7 @@ print('Node:', result[0])
 - 覆盖 test_unit / test_examples / test_simple_unit / test_diagram / json_parser_tests 全部上游用例
 - 依赖：railroad-diagrams（diagram 测试所需，按 pyproject.toml 声明安装）
 
-本地 CI 模拟验证（`CI_PACKAGES=archives/p/pyparsing/3.1.4`）：
+本地 CI 模拟验证（`CI_PACKAGES=archives/p/pyparsing/3.1.4.1`）：
 - L0 质量门禁：7/7 通过（结构/MANIFEST/R33/R36/R37/R38/R40）
 - L1 conan create：✅ 通过
 - L1 smoke test：5/5（100%）
@@ -120,11 +120,11 @@ print('Node:', result[0])
 |------|------|
 | archives/p/pyparsing/manifest.yaml | 软件级元数据 |
 | archives/p/pyparsing/README.md | 软件描述 |
-| archives/p/pyparsing/3.1.4/manifest.yaml | 版本级元数据 |
-| archives/p/pyparsing/3.1.4/conandata.yml | 源码声明 |
-| archives/p/pyparsing/3.1.4/conanfile.py | Conan 配方 |
-| archives/p/pyparsing/3.1.4/test_package/ | L1 测试 |
-| archives/p/pyparsing/3.1.4/notes.md | 适配笔记 |
+| archives/p/pyparsing/3.1.4.1/manifest.yaml | 版本级元数据 |
+| archives/p/pyparsing/3.1.4.1/conandata.yml | 源码声明 |
+| archives/p/pyparsing/3.1.4.1/conanfile.py | Conan 配方 |
+| archives/p/pyparsing/3.1.4.1/test_package/ | L1 测试 |
+| archives/p/pyparsing/3.1.4.1/notes.md | 适配笔记 |
 
 ## 注意事项
 
@@ -165,6 +165,6 @@ print('Node:', result[0])
 - **W3 conan create**: 本地编译验证通过 ✅
 - **R38**: pyparsing 是 library 类型，不需要 commands.json ✅
 - **状态**: built（待 CI merge + upload 后标记 published）
-- **published_as**: pyparsing/3.1.4@ohpcd/stable
+- **published_as**: pyparsing/3.1.4.1@ohpcd/stable
 
 **最终状态**: built

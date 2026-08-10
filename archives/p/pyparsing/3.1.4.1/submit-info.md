@@ -1,7 +1,8 @@
-# 【积分赛事】适配 pyparsing 3.1.4 — Python 解析库
+# 【积分赛事】适配 pyparsing 3.1.4.1 — Python 解析库
 
 - **三方库名称**：pyparsing
 - **上游版本**：v3.1.4
+- **适配版本**：3.1.4.1（R37 递增：制品仓已有 3.1.4 且配方有修改）
 - **上游仓库地址**：https://github.com/pyparsing/pyparsing
 - **适配路径**：路径 A（基础适配）
 - **使用知识库**：openharmony-compile-agent
@@ -48,7 +49,7 @@
 
 ### 变更摘要
 
-新增 pyparsing 3.1.4 完整适配 — Python 解析库（纯 Python，无 C 扩展）。
+新增 pyparsing 3.1.4.1 完整适配 — Python 解析库（纯 Python，无 C 扩展）。
 
 ### 适配内容
 

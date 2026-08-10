@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Conan recipe — pyparsing 3.1.4 (setuptools).
+"""Conan recipe — pyparsing 3.1.4.1 (setuptools).
 
 Pure Python parsing library; no C extensions. Uses setuptools install.
 R32: settings.os 判断使用 in ("Linux", "OHOS").
 R34: test_package 实质性测试（模块导入 + 基本解析功能）.
+R37: 版本递增 3.1.4 → 3.1.4.1（制品仓已有 3.1.4 且配方有修改）。
 """
 import os
 import sys
@@ -16,7 +17,7 @@ from conan.tools.layout import basic_layout
 
 class PyparsingConan(ConanFile):
     name = "pyparsing"
-    version = "3.1.4"
+    version = "3.1.4.1"
     description = "Python parsing library for DOT syntax and more (pure Python)"
     license = "MIT"
     homepage = "https://github.com/pyparsing/pyparsing"

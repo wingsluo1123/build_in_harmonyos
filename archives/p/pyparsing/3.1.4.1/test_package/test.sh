@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# pyparsing 3.1.4 test script
+# pyparsing 3.1.4.1 test script
 # Verifies module import, version, and basic parsing functionality (R34)
 
 set -euo pipefail
 
-echo "=== pyparsing 3.1.4 L1 Smoke Test ==="
+echo "=== pyparsing 3.1.4.1 L1 Smoke Test ==="
 
 # Test 1: Module import and version
 echo "--- Test 1: Module import ---"
