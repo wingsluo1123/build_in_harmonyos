@@ -93,6 +93,17 @@ pkg-config --modversion libfastjson  # → 1.2304.0
 - E099: config.guess HarmonyOS 平台识别
 - E101: ELF 签名执行限制
 
+## 七、Conan 适配 (2026-08-10)
+
+### Conan 配方
+- conanfile.py: autoreconf + --build/--host + _patch_config_for_ohos() + _fix_config_status()
+- conandata.yml: GitHub archive tag URL (no release tarball available)
+- test_package/: real API test (json_tokener_parse, json_object_object_get, etc.)
+- tool_requires: automake/1.18, libtool/2.5.4 (for autoreconf)
+- All conan-verify gates pass (G0-G4 + L2/L4/L5)
+
+### 状态变更: published → built (conan adaptation)
+
 ---
-**编译结束**: 2026-06-03
-**最终状态**: published
+**编译结束**: 2026-08-10
+**最终状态**: built
