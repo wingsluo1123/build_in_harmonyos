@@ -54,11 +54,16 @@ class ParmetisConan(ConanFile):
         tc.cache_variables["CMAKE_POLICY_VERSION_MINIMUM"] = "3.5"
         tc.cache_variables["SHARED"] = self.options.shared
         tc.generate()
+        # mpicc needs OPAL_PREFIX to find mpi.h and libmpi. open-mpi only
+        # appends this to runenv_info, not buildenv_info, so conanbuild.sh
+        # lacks it. Inject it directly into the generated build env script.
+        buildenv = os.path.join(self.generators_folder, "conanbuild.sh")
+        with open(buildenv, "a") as f:
+            f.write(f'\nexport OPAL_PREFIX="{mpi_root}"\n')
 
     def build(self):
         apply_conandata_patches(self)
-        # mpicc needs OPAL_PREFIX to locate MPI headers and libraries.
-        # open-mpi only sets this in runenv_info, not buildenv_info.
+        # Belt and suspenders: also set in current process for cmake/make
         openmpi = self.dependencies["open-mpi"]
         os.environ["OPAL_PREFIX"] = openmpi.package_folder
         cmake = CMake(self)
