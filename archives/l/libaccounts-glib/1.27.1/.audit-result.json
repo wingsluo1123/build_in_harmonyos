@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R9",
+      "file": "archives/l/libaccounts-glib/1.27/test_package/MANIFEST.yml",
+      "line": 12,
+      "description": "MANIFEST.yml declares 'upstream_test_in_build: true' with comment 'Upstream tests are run in the build() method', but conanfile.py build() (lines 73-77) only calls meson.build() without meson.test(). The upstream tests are declared as running during build() but the Conan recipe's build() method does not execute them. The CI script (build_and_test.sh) may run 'meson test' separately, but the comment is misleading and could cause confusion about whether upstream tests are actually executed.",
+      "fix_suggestion": "Either add meson.test() to the build() method to run upstream tests in-build, or update the MANIFEST.yml comment from 'Upstream tests are run in the build() method' to 'Upstream tests are run by CI (build_and_test.sh) after the build phase' to accurately reflect the execution flow."
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS2",
+      "file": "archives/l/libaccounts-glib/1.27/conanfile.py",
+      "line": 34,
+      "description": "settings tuple order is 'os', 'arch', 'compiler', 'build_type' instead of the code style standard order 'os', 'compiler', 'build_type', 'arch' (code style rule §2). The test_package/conanfile.py correctly uses the standard order on line 16.",
+      "fix_suggestion": "Reorder to match the standard: settings = \"os\", \"compiler\", \"build_type\", \"arch\""
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/l/libaccounts-glib/1.27/conanfile.py",
+      "line": 212,
+      "description": "_build_python_wrapper() hardcodes the shebang path '#!/data/service/hnp/bin/bash' for the generated wrapper script. While this path may be correct for HarmonyOS PC targets, it reduces portability for cross-compilation or development on other platforms where bash is at a different location.",
+      "fix_suggestion": "Consider using shutil.which('bash') to dynamically resolve the bash path at wrapper generation time, or use '#!/usr/bin/env bash' for maximum portability across platforms."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R9",
+      "file": "archives/l/libaccounts-glib/1.27/test_package/conanfile.py",
+      "line": 34,
+      "description": "test() method executes the test binary twice: once via cmake.test() (through CTest) and again via self.run() with env='conanrun'. While the second run may serve a purpose (validating runtime environment with Conan's env), it is potentially redundant since cmake.test() already executes the test binary via CTest.",
+      "fix_suggestion": "If the second run is intentional (e.g., to validate the runtime environment via conanrun), add an explanatory comment clarifying the distinction. Otherwise, consider removing the redundant self.run() call to simplify the test flow."
+    }
+  ],
+  "summary": "Audit of libaccounts-glib 1.27 Conan recipe PASSED with no P0 (deception) or P1 (correctness) issues. P0 deception checks: (1) R34 empty shell test — PASS: test.c calls real library APIs (AG_TYPE_MANAGER, AG_TYPE_ACCOUNT, g_type_parent, G_TYPE_OBJECT) with 4 meaningful assertions, not a stub; (2) R9 skip/fake test — PASS: test_package/conanfile.py test() calls cmake.test() and runs the binary, no 'def test(self): pass' or 'os.system(\"exit 0\")'; (3) Fake sha256 — PASS: 'a8407a5897a2e425ea1aa955ecf88485dd417919de275b27c781a5d0637a5' is a valid 64-char hex hash, not all-zeros or all-f; (4) Fake status — PASS: no manifest.yaml status field in changed files; (5) R8 #ifdef __OHOS__ stub — PASS: no #ifdef __OHOS__ found; (6) R19 manual packaging — PASS: no pre-compiled binaries; (7) R40 deep adaptation — PASS: libaccounts-glib is a data management library (not graphics/UI/multimedia/peripheral), patches are build-system adaptations. P1 correctness checks: R37 version 1.27 is upstream — PASS; R32 OHOS platform compatibility 'in (\"Linux\", \"OHOS\")' — PASS; R33 no bare env vars, uses self.conf.get() — PASS; R39 official GitLab source URL — PASS; R6 patches modify source meson.build only — PASS; Conan 2.x API correct — PASS; check/0.15.2 via self.test_requires() in build_requirements() — correctly NOT flagged per task note. Four minor issues found: P2 — MANIFEST.yml comment claims upstream tests run in build() but build() lacks meson.test(); P2 — settings tuple order deviates from code style standard; P3 — hardcoded bash shebang path in wrapper script; P3 — potentially redundant test binary execution in test_package."
+}
