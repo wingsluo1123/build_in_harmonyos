@@ -72,6 +72,27 @@ def _require_executable(exe, env):
         raise SystemExit(f"missing test executable: {exe}")
 
 
+def _usable_tmp_base():
+    candidates = [
+        os.environ.get("SAFEKEEP_TEST_TMPDIR"),
+        "/data/storage/el2/base/cache",
+        os.environ.get("TMPDIR"),
+        str(Path.cwd() / "tmp"),
+    ]
+    for raw_path in candidates:
+        if not raw_path:
+            continue
+        path = Path(raw_path)
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="safekeep-probe-", dir=str(path)):
+                pass
+        except OSError:
+            continue
+        return path
+    raise SystemExit("no writable temporary directory available for safekeep upstream test")
+
+
 args = _parse_args()
 package_folder = args.package_folder
 script = package_folder / "bin" / "safekeep"
@@ -117,11 +138,11 @@ for marker in [
 print("safekeep command, support files, and upstream safekeep-test are packaged")
 
 if args.run_upstream_local:
-    tmp_base = Path(os.environ.get("TMPDIR") or Path.cwd() / "tmp")
-    tmp_base.mkdir(parents=True, exist_ok=True)
+    tmp_base = _usable_tmp_base()
     workdir = Path(tempfile.mkdtemp(prefix="safekeep-upstream-", dir=str(tmp_base)))
     env = os.environ.copy()
     _prepare_rdiff_backup_runtime(args.rdiff_backup_package, workdir, env)
+    print(f"safekeep upstream local workdir: {workdir}")
     for exe in ("safekeep", "rdiff-backup", "find", "xargs", "md5sum", "diff"):
         _require_executable(exe, env)
 
