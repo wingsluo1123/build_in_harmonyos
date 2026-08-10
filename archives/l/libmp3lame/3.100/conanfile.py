@@ -19,7 +19,7 @@ class Libmp3LameConan(ConanFile):
     description = "LAME MP3 encoder library"
     license = "LGPL"
     homepage = "https://lame.sourceforge.io/"
-    url = ""  # CI fills this
+    url = "https://gitee.com/opendesktop/ohpcd-recipes"  # CI overrides if needed
 
     package_type = "library"
 

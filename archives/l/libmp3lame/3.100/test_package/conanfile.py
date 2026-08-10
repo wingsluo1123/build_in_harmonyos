@@ -6,8 +6,6 @@ CI runs this automatically via `conan create` (which invokes test_package).
 
 File location: archives/{letter}/libmp3lame/{version}/test_package/conanfile.py
 """
-import os
-
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
