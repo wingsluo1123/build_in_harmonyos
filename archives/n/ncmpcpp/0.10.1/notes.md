@@ -4,7 +4,7 @@
 - Name: ncmpcpp
 - Version: 0.10.1
 - Description: Featureful ncurses-based MPD clien
-- Source: https://gitcode.com/ncmpcpp/ncmpcpp.git (tag 0.10.1, commit 3e6d992b938de9ba3019302027bd64dbcab6f8c6)
+- Source: https://github.com/arybczak/ncmpcpp (tag 0.10.1, commit 3e6d992b938de9ba3019302027bd64dbcab6f8c6)
 
 ## Build system
 - Autotools. The upstream release tarball has no configure; running ./bootstrap

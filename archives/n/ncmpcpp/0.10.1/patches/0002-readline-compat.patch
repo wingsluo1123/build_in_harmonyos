@@ -127,7 +127,7 @@ index 0000000..5732796
 +bool active = false;
 +bool ended_with_eof = false;
 +
-+void ensureCapacity(size_t needed)
++bool ensureCapacity(size_t needed)
 +{
 +	if (needed + 1 <= line_buffer_capacity)
 +		return;
@@ -136,10 +136,11 @@ index 0000000..5732796
 +		new_capacity *= 2;
 +	char *new_buffer = static_cast<char *>(std::realloc(line_buffer, new_capacity));
 +	if (new_buffer == nullptr)
-+		return; // keep the old buffer; the edit will be dropped
++		return false;
 +	line_buffer = new_buffer;
 +	line_buffer_capacity = new_capacity;
 +	rl_line_buffer = line_buffer;
++	return true;
 +}
 +
 +void redisplay()
@@ -196,7 +197,8 @@ index 0000000..5732796
 +	if (text == nullptr || !active)
 +		return 0;
 +	const size_t len = std::strlen(text);
-+	ensureCapacity(rl_end + len);
++	if (!ensureCapacity(rl_end + len))
++		return 0;
 +	std::memmove(line_buffer + rl_point + len, line_buffer + rl_point,
 +	             rl_end - rl_point + 1);
 +	std::memcpy(line_buffer + rl_point, text, len);
@@ -213,7 +215,11 @@ index 0000000..5732796
 +		return nullptr;
 +	active = true;
 +	ended_with_eof = false;
-+	ensureCapacity(0);
++	if (!ensureCapacity(0))
++	{
++		active = false;
++		return nullptr;
++	}
 +	rl_point = 0;
 +	rl_end = 0;
 +	rl_done = 0;
@@ -287,7 +293,8 @@ index 0000000..5732796
 +			default:
 +				if (key >= 0x20 && key <= 0x7e)
 +				{
-+					ensureCapacity(rl_end + 1);
++					if (!ensureCapacity(rl_end + 1))
++						break;
 +					std::memmove(line_buffer + rl_point + 1, line_buffer + rl_point,
 +					             rl_end - rl_point + 1);
 +					line_buffer[rl_point] = static_cast<char>(key);

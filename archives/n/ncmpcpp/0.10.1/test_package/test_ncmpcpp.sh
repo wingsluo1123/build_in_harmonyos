@@ -1,7 +1,7 @@
 #!/data/service/hnp/bin/bash
 # test_package/test_ncmpcpp.sh - smoke test for ncmpcpp executable
 # Runs in the conanrun env (PATH includes the installed bin/)
-set -eu
+set -euo pipefail
 
 echo "[test] ncmpcpp --version"
 ncmpcpp --version && echo "OK: --version ran" || {
