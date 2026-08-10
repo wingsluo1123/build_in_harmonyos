@@ -57,6 +57,22 @@ from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
 
+def _drop_umask_077_in_place(path):
+    """E114: HMDFS forces setgid on directories; `umask 077 && mktemp -d`
+    creates a drwx--S--- temp dir that is not writable even by its owner.
+    Same helper as PR #4119 abiword-plugin-clarisworks L60-71 — but ours
+    is a module-level function so it can be called from build() after
+    autoreconf regenerates configure."""
+    with open(path, "r", encoding="utf-8") as f:
+        data = f.read()
+    data = data.replace(
+        'tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null`',
+        'tmp=`mktemp -d "./confXXXXXX" 2>/dev/null`')
+    data = data.replace('(umask 077 && mkdir "$tmp")', 'mkdir "$tmp"')
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(data)
+
+
 class AbiwordPluginOpenwriterConan(ConanFile):
     name = "abiword-plugin-openwriter"
     version = "3.0.8"
@@ -92,6 +108,16 @@ class AbiwordPluginOpenwriterConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
+    def _drop_umask_077(self):
+        """E114 (HMDFS): drop `umask 077` from the generated configure
+        so mktemp -d creates a writable group-readable temp dir."""
+        cfg_path = os.path.join(self.source_folder, "configure")
+        if os.path.exists(cfg_path):
+            _drop_umask_077_in_place(cfg_path)
+            self.output.info(
+                f"R-NEW: patched {cfg_path} umask 077 removed (HMDFS E114)"
+            )
+
     def requirements(self):
         # Direct dep per upstream plugin.m4 + configure.ac gsf_req
         # Why 1.14.53 instead of 1.14.58/1.14.51: among the three
@@ -108,6 +134,17 @@ class AbiwordPluginOpenwriterConan(ConanFile):
         # if libgsf's transitive glib is hidden by our pkg_config_name
         # forwarding.
         self.requires("glib/2.84.0")
+
+    def build_requirements(self):
+        # Mirror PR #4119 abiword-plugin-clarisworks L113-115 + argp-standalone.
+        # The build host (CI sandbox / minimal OHOS HNP image) only has
+        # the autoconf suite under /data/service/hnp/bin, no automake /
+        # aclocal / libtoolize. build() runs `autoreconf -fi` which
+        # requires those, so pull them in as tool_requires (same approach
+        # as argp-standalone). tool_requires are resolved with the build
+        # profile, so both -pr:h and -pr:b must be passed to conan create.
+        self.tool_requires("automake/1.18")
+        self.tool_requires("libtool/2.5.4")
 
     def layout(self):
         basic_layout(self)
@@ -152,16 +189,20 @@ class AbiwordPluginOpenwriterConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # Mirror pidgin's R-NEW 2026-08-04 OHOS --build override.
-        # See archives/g/gsf/1.14.58/conanfile.py L130-148 for full
-        # rationale (config.guess 2018 doesn't recognize OHOS).
+        # Mirror PR #4119 abiword-plugin-clarisworks L140-145 + libgsf R-NEW
+        # 2026-08-04. config.guess 2018 doesn't recognize OHOS (uname -s =
+        # "HarmonyOS", kernel "HongMeng Kernel"), so pass the triplet
+        # explicitly. config.sub supports *-linux-ohos (NOT *-linux-gnu —
+        # that would route through the GNU path and miss OHOS headers).
         from conan.tools.build import cross_building
         if self.settings.os == "OHOS" and not cross_building(self):
-            tc.configure_args.append("--build=aarch64-unknown-linux-gnu")
+            tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+            tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
 
-        # We don't pass --host because the upstream plugin.m4 expects
-        # to be configured by abiword's parent configure, not stand-alone.
-        # Instead we manually invoke the build sequence in build().
+        # We DO pass --host (above) because openwriter is built stand-alone
+        # in this conan recipe, not as a sub-configure of abiword's parent.
+        # The upstream plugin.m4 integration is replaced by explicit
+        # OPENWRITER_CFLAGS / OPENWRITER_LIBS env vars in build() below.
 
         # R-NEW 2026-08-10 (libgsf mirror): set explicit --prefix paths
         # so libtool .la files have correct libdir=/lib etc.
@@ -268,27 +309,10 @@ class AbiwordPluginOpenwriterConan(ConanFile):
 
         apply_conandata_patches(self)
 
-        # R-NEW (mirroring libgsf): patch umask 077 → 022 in upstream
-        # configure scripts to avoid HMDFS EACCES during tempdir creation.
-        from conan.tools.files import replace_in_file
-        for _cfg_path in (
-            os.path.join(self.source_folder, "configure"),
-            os.path.join(self.build_folder, "configure"),
-        ):
-            if not os.path.exists(_cfg_path):
-                continue
-            try:
-                replace_in_file(
-                    self, _cfg_path,
-                    "umask 077", "umask 022",
-                )
-                self.output.info(
-                    f"R-NEW: patched {_cfg_path} umask 077→022 (HMDFS fix)"
-                )
-            except Exception as _exc:
-                self.output.warning(
-                    f"R-NEW: failed to patch {_cfg_path}: {_exc!r}"
-                )
+        # Note: actual umask 077 → 022 patch is applied later in build()
+        # after autoreconf -fi regenerates configure (the configure
+        # script doesn't exist when apply_conandata_patches runs).
+        # See _drop_umask_077() helper.
 
         # The plugin uses a non-standard build flow: no ./configure at the
         # plugin level (plugin.m4 is meant to be sourced by abiword's parent
@@ -316,6 +340,16 @@ class AbiwordPluginOpenwriterConan(ConanFile):
         env_vars = env.vars(self)
         with env_vars.apply():
             autotools = Autotools(self)
+            # The plugin subdir doesn't ship a `configure` script (the
+            # upstream plugin.m4 is meant to be sourced by abiword's
+            # parent configure.ac). Run autoreconf -fi to bootstrap one
+            # from the included Makefile.am. Same approach as PR #4119
+            # abiword-plugin-clarisworks L155.
+            self.run("autoreconf -fi", cwd=self.source_folder, env="conanbuild")
+            # E114: drop umask 077 from the generated configure (HMDFS)
+            # matches the runtime patch block below — apply to source_folder
+            # before configure() reads it.
+            self._drop_umask_077()
             # Standalone configure isn't strictly needed since the plugin
             # Makefile.am doesn't reference autoconf-generated vars. But
             # autotools.configure() will run autoreconf first which is
@@ -336,8 +370,13 @@ class AbiwordPluginOpenwriterConan(ConanFile):
                 )
 
             # Manual build of xp/libxp.la
-            jobs = self.conf.get("tools.build:jobs",
-                                 default=os.cpu_count() or 2)
+            # E074 (HMDFS): parallel make hits jobserver fifo EPERM.
+            # PR #4119 abiword-plugin-clarisworks L151 uses -j1 for the
+            # same reason. We keep the override knob for native Linux
+            # builds (-o tools.build:jobs=N) but default to -j1 on OHOS.
+            jobs = self.conf.get("tools.build:jobs", default=1)
+            if self.settings.os == "OHOS":
+                jobs = 1  # E074: HMDFS jobserver fifo EPERM
             self.run(
                 f"make -C xp -j{jobs} libxp.la",
                 env=env_vars
@@ -349,11 +388,17 @@ class AbiwordPluginOpenwriterConan(ConanFile):
             )
 
     def package(self):
-        # Copy the .la + .so (or .a if static) into package_folder.
+        # Copy the .la + .so (or .a if static) + .deps/ into package_folder.
         # We DON'T do `make install` because that requires libabiword
         # headers (plugin framework headers are installed by abiword's
         # own recipe). Instead, we copy the built artifacts and a
         # minimal ABI surface.
+        #
+        # IMPORTANT: also copy .deps/ (libtool dependency stubs). libtool
+        # records transitive dependency paths in .la files via relative
+        # refs to .deps/*.Plo files. Without .deps/ the downstream
+        # consumer's libtool relink fails with "cannot find dependency".
+        # Same rationale as PR #4119 abiword-plugin-clarisworks L163.
         copy(self, "*.la",
              src=self.build_folder,
              dst=os.path.join(self.package_folder, "lib"),
@@ -365,6 +410,13 @@ class AbiwordPluginOpenwriterConan(ConanFile):
         copy(self, "*.a",
              src=self.build_folder,
              dst=os.path.join(self.package_folder, "lib"),
+             keep_path=False)
+        # .deps/ lives alongside the .la/.so under the build folder
+        # (libtool default). We mirror the layout so relative refs like
+        # `dependency_libs=' ... .deps/libxp.Plo'` resolve correctly.
+        copy(self, "*",
+             src=os.path.join(self.build_folder, ".deps"),
+             dst=os.path.join(self.package_folder, "lib", ".deps"),
              keep_path=False)
         # Copy xp/ headers if any (none currently, but future-proof)
         copy(self, "*.h",
