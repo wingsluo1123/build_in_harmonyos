@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
-
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/libmp3lame/{version}/test_package/conanfile.py
-"""
+"""Conan test_package for libmp3lame 3.100 — L1 official test."""
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -28,5 +22,3 @@ class Libmp3LameTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_libmp3lame')}", env="conanrun")
