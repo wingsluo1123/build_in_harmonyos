@@ -27,6 +27,10 @@ try:
           f"got {xapian.version_string()}")
 except Exception as e:
     check("xapian import", False, str(e))
+    # import 失败时 xapian 未绑定到命名空间，后续功能测试必然 NameError
+    # 级联误报，立即退出避免淹没真实根因（AI 检视意见）
+    print(f"\n{len(failures)} test(s) FAILED: {', '.join(failures)}")
+    sys.exit(1)
 
 print("[test] functional: in-memory database + document")
 try:
