@@ -103,27 +103,37 @@ void srunner_run_all(SRunner *runner, int print_mode)
         return;
     }
     suite = runner->suite;
-    printf("Running suite: %s\n", suite->name ? suite->name : "(unnamed)");
+    if (print_mode != CK_SILENT) {
+        printf("Running suite: %s\n", suite->name ? suite->name : "(unnamed)");
+    }
     for (i = 0; i < suite->count; ++i) {
         TCase *tc = suite->tcases[i];
         int j;
         if (!tc) {
             continue;
         }
-        printf("  %s:\n", tc->name ? tc->name : "(unnamed)");
+        if (print_mode != CK_SILENT) {
+            printf("  %s:\n", tc->name ? tc->name : "(unnamed)");
+        }
         for (j = 0; j < tc->count; ++j) {
             int before = s_failures;
             tc->tests[j](0);
             runner->tests_run++;
             if (s_failures > before) {
                 runner->tests_failed++;
-                printf("    [FAILED]\n");
+                if (print_mode != CK_SILENT) {
+                    printf("    [FAILED]\n");
+                }
             } else {
-                printf("    [OK]\n");
+                if (print_mode == CK_VERBOSE) {
+                    printf("    [OK]\n");
+                }
             }
         }
     }
-    printf("%d tests run, %d failed\n", runner->tests_run, runner->tests_failed);
+    if (print_mode != CK_SILENT) {
+        printf("%d tests run, %d failed\n", runner->tests_run, runner->tests_failed);
+    }
 }
 
 int srunner_ntests_failed(SRunner *runner)
