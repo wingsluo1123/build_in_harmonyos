@@ -134,10 +134,15 @@ class PerlobjectpadConan(ConanFile):
     def _get_local_perl_lib(self):
         """Get local Perl lib paths for deps installed during build().
 
-        These paths are added to PERL5LIB in generate() so that
-        dependencies installed in build()'s _ensure_perl_deps() are
-        found by perl Build.PL and ./Build.
+        Install to $HOME/usr/local/ (not Conan build cache) because OHOS
+        SELinux/HMDFS blocks dlopen() of .so files from the Conan cache
+        directory (~/.conan2/p/b/...).  The $HOME/usr/local/ path is on
+        a filesystem that permits code loading (confirmed on dev machines).
         """
+        home = os.environ.get("HOME", "")
+        if not home:
+            return []
+
         perl_path = self._resolve_perl_path()
         if not perl_path:
             return []
@@ -150,7 +155,7 @@ class PerlobjectpadConan(ConanFile):
         except Exception:
             archname = "aarch64-linux"
 
-        local_base = os.path.join(self.build_folder, "perl5lib", "lib", "perl5")
+        local_base = os.path.join(home, "usr", "local", "lib", "perl5")
         return [local_base, os.path.join(local_base, archname)]
 
     def _ensure_perl_deps(self):
@@ -160,12 +165,18 @@ class PerlobjectpadConan(ConanFile):
         pre-installed at $HOME/usr/local/lib/perl5/. On CI workers (clean
         environment), they are missing, causing 'Can't locate Module/Build.pm'
         at perl Build.PL time. This method detects the absence and installs
-        all required deps to a local Perl lib directory within the build folder.
+        all required deps to $HOME/usr/local/ — NOT the Conan build cache,
+        because OHOS SELinux/HMDFS blocks dlopen() of .so files from
+        ~/.conan2/p/b/... (Permission denied).
         """
-        # Compute inc_flags for all perl commands (build() and package())
-        # Even when deps are pre-installed, the -I paths simply don't exist
-        # and Perl ignores them, so it's safe to always include them.
-        local_lib = os.path.join(self.build_folder, "perl5lib")
+        # Install to $HOME/usr/local/ so .so files are on a filesystem
+        # that permits code loading (same path used by dev machines).
+        home = os.environ.get("HOME", "")
+        if not home:
+            raise ConanInvalidConfiguration(
+                "HOME environment variable not set — required for Perl deps"
+            )
+        local_lib = os.path.join(home, "usr", "local")
         perl_path = self._resolve_perl_path()
         try:
             archname = subprocess.check_output(
@@ -351,10 +362,11 @@ class PerlobjectpadConan(ConanFile):
 
         # Copy XS::Parse::Keyword and XS::Parse::Sublike runtime modules
         # These are runtime dependencies of Object::Pad. They are installed
-        # to perl5lib during build() by _ensure_perl_deps(). Without packaging
-        # them, the Perl API test in test_package cannot load Object::Pad.
+        # to $HOME/usr/local during build() by _ensure_perl_deps(). Without
+        # packaging them, the Perl API test in test_package cannot load Object::Pad.
         perl5lib_arch = os.path.join(
-            self.build_folder, "perl5lib", "lib", "perl5", archname)
+            os.environ.get("HOME", ""), "usr", "local", "lib",
+            "perl5", archname)
         if os.path.isdir(perl5lib_arch):
             # Copy XS .pm modules (XS/Parse/Keyword.pm, Sublike.pm, etc.)
             xs_src = os.path.join(perl5lib_arch, "XS")
