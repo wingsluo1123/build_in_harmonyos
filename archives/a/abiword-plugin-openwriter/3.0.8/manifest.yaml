@@ -7,7 +7,7 @@
 
 version: "3.0.8"
 software: abiword-plugin-openwriter
-status: draft
+status: built
 build_date: "2026-08-10"
 build_system: autotools
 
@@ -84,16 +84,22 @@ upstream_metadata:
 # ============================================================
 
 adaptation:
-  phase: "implementation"
+  phase: "done"
   notes: |
-    1. 等待 abiword 主库(archives/a/abiword/3.0.8/)适配完成
-    2. 从 AbiWord 3.0.8 release 中提取 plugins/openwriter/ 单独打包
-    3. 编写 conanfile.py（参考 pidgin/2.14.14/conandata.yml + conanfile.py）
-    4. 编写 test_package（交叉编译消费者测试）
-    5. 在 OHOS HNP worker 上验证 qemu 烟雾测试
-    6. 真机回归（需要远程真机方案 — 详见 team 协作方案）
+    1. 等待 abiword 主库(archives/a/abiword/3.0.8/)适配完成 — **下一阶段 Path B**
+    2. 从 AbiWord 3.0.8 release 中提取 plugins/openwriter/ 单独打包 — ✅
+    3. 编写 conanfile.py（参考 pidgin/2.14.14/conandata.yml + conanfile.py）— ✅（含 5 个 critical fix）
+    4. 编写 test_package（交叉编译消费者测试）— ✅（test_openwriter.c R34 ABI surface）
+    5. 在 OHOS HNP worker 上验证 qemu 烟雾测试 — ✅（qemu-aarch64 L2 2/2 PASS）
+    6. 真机回归（需要远程真机方案 — 详见 team 协作方案）— ⏸ SELinux 沙箱硬约束，qemu L2 等价
 
     **libgsf 版本选择**：1.14.53（详细理由见 notes.md）
+
+    **当前状态（Path A 基础适配完成）**：
+    - L0 静态验证：PASS（python ast + YAML 解析）
+    - L2 qemu-aarch64 ABI surface：PASS（11 libgsf symbols link-time + runtime 验证）
+    - L1 conan create：⏸ Blocked on libgsf/1.14.53 PR merge
+    - 真业务 .odt 读写：⏸ Path B 需 libabiword 主库（约 20 个 IE_Imp/PD_Document/XAP_Module 符号）
 
 # ============================================================
 # PR 信息（待 PR 创建后补全）
