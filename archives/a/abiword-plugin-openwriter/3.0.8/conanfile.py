@@ -120,13 +120,15 @@ class AbiwordPluginOpenwriterConan(ConanFile):
 
     def requirements(self):
         # Direct dep per upstream plugin.m4 + configure.ac gsf_req
-        # Why 1.14.53 instead of 1.14.58/1.14.51: among the three
-        # libgsf branches on upstream (1.14.51/1.14.53/1.14.58),
-        # 1.14.53 has accumulated the most post-review fixes (43
-        # commits vs 13/8), has passed L0 gate with test_package 5/5,
-        # and is therefore the lowest-risk to depend on for OHOS cross
-        # compile. See notes.md "libgsf 版本选择说明" for full rationale.
-        self.requires("libgsf/1.14.53")
+        # Why 1.14.53.1 instead of 1.14.53: CI 2026-08-11 R37 reported
+        # a version_collision on libgsf 1.14.53 — the artifact repo
+        # already has a published 1.14.53 binary with a different recipe
+        # revision, and cnb.cool doesn't allow same-version multi-revision
+        # coexistence. The orchestrator instructed us to bump the version
+        # suffix: 1.14.53 → 1.14.53.1. The upstream ABI is unchanged —
+        # 1.14.53.1 is our packaging iteration. Once the team registry
+        # clears the stale 1.14.53 binary we can collapse back to 1.14.53.
+        self.requires("libgsf/1.14.53.1")
         # glib is implicit via libgsf's pkg-config, but the plugin
         # .cpp files include <glib.h> directly and use GObject types
         # (GsfInput*, gsf_off_t, etc.) — declare explicitly so that
@@ -157,35 +159,53 @@ class AbiwordPluginOpenwriterConan(ConanFile):
         # openwriter subdir — it's the full AbiWord source tarball).
         # get() with strip_root=True strips the leading
         # AbiWord-release-3.0.8/ prefix.
-        get(self, **self.conan_data["sources"], strip_root=True)
+        #
+        # E1 (CI 2026-08-11): conan.tools.files.get() does NOT accept
+        # `subpath` — that kwarg belongs to extract()/unzip() for
+        # limiting extraction to a subdirectory of an archive. Our
+        # conandata.yml sources dict carries `subpath: "plugins/openwriter"`
+        # as a *plugin-specific* hint (openwriter is a subdir of the
+        # full AbiWord source tarball), not as a get() argument. Pop
+        # it out before forwarding the rest of the dict to get().
+        sources = dict(self.conan_data["sources"])
+        subpath = sources.pop("subpath", None)
+        get(self, **sources, strip_root=True)
         # Now self.source_folder contains plugins/openwriter/ as a
-        # subdirectory. Move it to the build root so Makefile.am is
-        # visible to autotools.
-        src_plugin = os.path.join(self.source_folder, "plugins", "openwriter")
+        # subdirectory. `subpath` is the relative path *within* the
+        # extracted tarball that we want to promote to the build root.
+        if subpath is None:
+            subpath = "plugins/openwriter"  # upstream default
+        src_plugin = os.path.join(self.source_folder, subpath)
         if not os.path.isdir(src_plugin):
             raise ConanException(
                 f"Expected {src_plugin} after extracting upstream tarball; "
-                f"upstream structure may have changed."
+                f"upstream structure may have changed (subpath={subpath!r})."
             )
-        # Move all entries from plugins/openwriter/* up to source_folder/
+        # Move all entries from src_plugin/* up to source_folder/
         for entry in os.listdir(src_plugin):
             src = os.path.join(src_plugin, entry)
             dst = os.path.join(self.source_folder, entry)
             os.rename(src, dst)
-        os.rmdir(os.path.join(self.source_folder, "plugins", "openwriter"))
+        os.rmdir(src_plugin)
         # Best-effort cleanup of the rest of AbiWord source (saves ~100MB)
-        for entry in os.listdir(os.path.join(self.source_folder, "plugins")):
-            if entry == "openwriter":
-                continue
-            full = os.path.join(self.source_folder, "plugins", entry)
-            if os.path.isdir(full):
-                import shutil
-                shutil.rmtree(full, ignore_errors=True)
-            else:
-                try:
-                    os.remove(full)
-                except OSError:
-                    pass
+        leftover_plugins = os.path.join(self.source_folder, "plugins")
+        if os.path.isdir(leftover_plugins):
+            for entry in os.listdir(leftover_plugins):
+                if entry == "openwriter":
+                    continue
+                full = os.path.join(leftover_plugins, entry)
+                if os.path.isdir(full):
+                    import shutil
+                    shutil.rmtree(full, ignore_errors=True)
+                else:
+                    try:
+                        os.remove(full)
+                    except OSError:
+                        pass
+            try:
+                os.rmdir(leftover_plugins)
+            except OSError:
+                pass
 
     def generate(self):
         tc = AutotoolsToolchain(self)

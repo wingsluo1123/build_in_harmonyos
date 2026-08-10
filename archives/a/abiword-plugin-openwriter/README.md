@@ -18,7 +18,7 @@ OpenDocument 格式国际标准（ISO/IEC 26300）。
 ## OHOS 适配
 
 - **基础信息**：上游 AbiWord 3.0.8 release-3.0.8（2026-02-18 发布），源码位于 `plugins/openwriter/` 子目录，非独立仓库
-- **依赖策略**：通过 conan `requires("libgsf/1.14.53")` 声明强依赖，libgsf 是 openwriter 读/写 .odt zip 容器 + 文档元数据必需
+- **依赖策略**：通过 conan `requires("libgsf/1.14.53.1")` 声明强依赖，libgsf 是 openwriter 读/写 .odt zip 容器 + 文档元数据必需（1.14.53.1 是 CI 2026-08-11 R37 制品仓版本冲突后的 packaging iteration，upstream ABI 仍是 1.14.53）
 - **辅助依赖**：`requires("glib/2.84.0")`（GObject 类型 gsf_off_t / GsfInput* 显式声明，便于下游 abiword 消费者解析）
 - **构建路径**：source-recipe（`conanfile.source()` 抽 `plugins/openwriter/` 子目录到 build root），手动 `make -C xp libxp.la` + `make openwriter.la` 跳过 abiword parent configure
 - **OHOS 关键决策**：
@@ -32,7 +32,7 @@ OpenDocument 格式国际标准（ISO/IEC 26300）。
 
 ## 依赖
 
-- `libgsf/1.14.53` — 强依赖（upstream `feat/libgsf-1.14.53` 分支，未合并 main）
+- `libgsf/1.14.53.1` — 强依赖（CI 2026-08-11 R37 version_collision 升级版本号后缀，原上游版本 1.14.53）
 - `glib/2.84.0` — GObject 类型强依赖
 - (间接通过 libgsf) `libxml2` / `zlib` / `glib`
 
@@ -42,7 +42,7 @@ OpenDocument 格式国际标准（ISO/IEC 26300）。
 # L0 静态验证（无依赖）
 python -c "import ast; ast.parse(open('archives/a/abiword-plugin-openwriter/3.0.8/conanfile.py').read())"
 
-# L1 conan create（依赖 libgsf/1.14.53 合并到 main 后）
+# L1 conan create（依赖 libgsf/1.14.53.1 合并到 main 后）
 conan create archives/a/abiword-plugin-openwriter/3.0.8 \
     -pr:h=ci/conan/profiles/ohos-aarch64 \
     -pr:b=ci/conan/profiles/ohos-aarch64 \

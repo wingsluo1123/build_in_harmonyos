@@ -1,9 +1,9 @@
-# libgsf 1.14.53 适配 notes
+# libgsf 1.14.53.1 适配 notes
 
 ## PR 描述（按积分赛事PR模板）
 
 - **三方库名称**：libgsf
-- **上游版本**：1.14.53
+- **上游版本**：1.14.53（适配版本 1.14.53.1 — CI 2026-08-11 R37 制品仓版本冲突，按"递增版本号后缀"规则升级）
 - **上游仓库地址**：https://gitlab.gnome.org/GNOME/libgsf
 - **适配路径**：路径 A（基础适配）
 - **使用知识库**：openharmony-compile-agent
@@ -52,7 +52,7 @@
 ### 补充说明
 
 - **依赖前置（R36）**：glib/2.84.0、libxml2/2.15.3、zlib/1.3.1 已在鸿蒙制品仓发布（conan download 验证可用），CI 无需 `--build=missing` 从源码编译依赖链。三库为 GNOME/Freedesktop 基础设施，无 OHOS 特殊适配需求，常规 Conan 配方即可构建。
-- **下游依赖**：abiword-plugin-docbook #4055、abiword-plugin-epub #4056 均依赖 libgsf/1.14.53，本 PR 合入发布后下游可解依赖前置。
+- **下游依赖**：abiword-plugin-docbook #4055、abiword-plugin-epub #4056 均依赖 libgsf/1.14.53.1
 - **license**：LGPL-2.1-or-later（与上游一致）
 - **已知限制**：L2 冒烟测试（gsf --version/--help）失败为非阻塞警告（CLI 工具在鸿蒙无 /bin/sh 环境直接运行受限），不影响库构建与测试。
 

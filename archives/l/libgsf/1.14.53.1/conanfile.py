@@ -18,7 +18,7 @@ from conan.tools.layout import basic_layout
 
 class LibgsfConan(ConanFile):
     name = "libgsf"
-    version = "1.14.53"
+    version = "1.14.53.1"  # E2 (CI 2026-08-11): R37 version_collision — 制品仓已存在 1.14.53
     description = "GNOME Structured File Library (OLE2/ZIP/tar)"
     license = "LGPL-2.1-or-later"
     homepage = "https://gitlab.gnome.org/GNOME/libgsf"
