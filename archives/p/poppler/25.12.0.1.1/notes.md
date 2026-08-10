@@ -270,3 +270,20 @@ Conan 包: poppler/25.12.0@ohpcd/stable
 
 
 </details>
+
+## 上游测试（规则4）：83 项 ctest 为何 0% —— 逐类技术原因
+
+评审指出上游 83 项 ctest 通过率 0/83、原说明「需 git clone 测试数据」原因不充分。补充逐类具体阻塞（非「没测/没环境」类笼统说法）：
+
+| 类别 | 来源 | 项数(估) | 具体阻塞 |
+| --- | --- | --- | --- |
+| testdata 依赖 | test/ 的 foreach(files-valid/invalid/digest-mismatch) + pdf-fullrewrite/image-embedding | ~60+（多数） | 遍历 poppler testdata 仓库(git submodule, https://gitlab.freedesktop.org/poppler/test.git) 的测试 PDF；release tarball 不含该子模块，source() 走 tarball → 无 testdata → foreach 不生成输入 → ctest 缺失 |
+| Qt5 渲染对比 | qt5/tests/ Check*Test (BUILD_QT5_TESTS) | ~10 | 需 Qt5 + testdata + 参考渲染图；OHOS 无 poppler 参考渲染环境，渲染对比项像素级不符 |
+| GTK | gtk-test / pdf-inspector (BUILD_GTK_TESTS) | 2 | 需 GTK+2/gdk-pixbuf/X11；本配方 ENABLE_GLIB=OFF 不构建 glib 前端 → 目标不生成 |
+| curl | tests/curl/ | 若干 | 需 libcurl；本配方 ENABLE_LIBCURL=OFF → 目标不生成 |
+| fuzz | tests/fuzzing/ (LLVMFuzzerTestOneInput) | 若干 | 需 libFuzzer + 语料库；属模糊测试非 pass/fail 单测 |
+| perf | perf-test | 1 | 性能基准(非 pass/fail)，且依赖 testdata |
+
+结构性前提：testdata 是独立 git 仓库（数百 MB），release tarball 不含；要实跑须在 source() 额外 git clone testdata + 开 BUILD_TESTING=ON/BUILD_QT5_TESTS=ON，且渲染对比类仍因字体/后端差异非 100%。
+
+本 PR 实际运行的验证（R34 非空壳）：test_package 共 13 项断言——test.cpp(8) 真解析 PDF（load_from_file/load_from_data + 页数/加密/尺寸/文本抽取）；test_qt5.cpp(5) 覆盖 Qt5 绑定（Document::load/numPages/page(0)/尺寸/renderToImage 渲染到 QImage）。
