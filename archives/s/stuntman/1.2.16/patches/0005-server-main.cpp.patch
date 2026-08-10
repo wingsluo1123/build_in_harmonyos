@@ -1,0 +1,100 @@
+--- a/server/main.cpp
++++ b/server/main.cpp
+@@ -16,8 +16,6 @@
+ 
+ #include "commonincludes.hpp"
+ 
+-#include <boost/property_tree/ptree.hpp>
+-#include <boost/property_tree/json_parser.hpp>
+ 
+ #include "stuncore.h"
+ #include "server.h"
+@@ -38,7 +36,6 @@
+ #include "resolvehostname.h"
+ 
+ 
+-using namespace boost::property_tree;
+ 
+ 
+ void PrintUsage(bool fSummaryUsage)
+@@ -551,76 +548,10 @@
+ 
+ HRESULT LoadConfigsFromFile(const std::string& filename, std::vector<StartupArgs>& configurations)
+ {
+-    ptree tree;
+-    bool error = false;
+-    std::string errorMessage;
+-    
+-    /* EXAMPLE configuration file
+-     {
+-      "configurations": [
+-        {
+-          "description" : "UDP Full Mode listening on default ports",
+-          "mode": "full",
+-          "family": "4",
+-          "protocol": "udp",
+-          "ddp": "1"
+-        },
+-        {
+-          "description" : "TCP Full Mode listening on default port",
+-          "mode": "full",
+-          "family": "6",
+-          "protocol": "tcp",
+-          "ddp": "1"
+-        }
+-      ]
+-    }
+-    */
+-    
+-    try
+-    {
+-        read_json(filename, tree);
+-        ptree root = tree.get_child("configurations");
+-        
+-        for (ptree::iterator itor = root.begin(); itor != root.end(); itor++)
+-        {
+-            const ptree& child = itor->second;
+-            StartupArgs args;
+-
+-            args.strMode = child.get("mode", "");
+-            args.strPrimaryInterface = child.get("primaryinterface", "");
+-            args.strAltInterface = child.get("altinterface", "");
+-            args.strPrimaryAdvertised = child.get("primaryadvertised", "");
+-            args.strAlternateAdvertised = child.get("altadvertised", "");
+-            args.strPrimaryPort = child.get("primaryport", "");
+-            args.strAltPort = child.get("altport", "");
+-            args.strFamily = child.get("family", "");
+-            args.strProtocol = child.get("protocol", "");
+-            args.strMaxConnections = child.get("maxconn", "");
+-            args.strDosProtect = child.get("ddp", "");
+-            args.strReuseAddr = child.get("reuseaddr", "");
+-            
+-            configurations.push_back(args);
+-        }
+-    }
+-    catch(ptree_error& ex1)
+-    {
+-        Logging::LogMsg(LL_ALWAYS, "Error processing configuration file: %s", ex1.what());
+-        error = true;
+-    }
+-    
+-    if (!error && configurations.size() == 0)
+-    {
+-        Logging::LogMsg(LL_ALWAYS, "File is valid json, but no configurations found");
+-        error = true;
+-    }
+-    
+-    if (error)
+-    {
+-        configurations.clear();
+-        return E_FAIL;
+-    }
+-    
+-    return S_OK;
++    // Config file parsing disabled (boost::property_tree not available on OHOS)
++    Logging::LogMsg(LL_ALWAYS, "Config file parsing not supported. Use command-line arguments instead.");
++    configurations.clear();
++    return E_FAIL;
+ }
+     
+ HRESULT BlockSignal(int sig)
