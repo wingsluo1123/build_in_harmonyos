@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml — oarc-dsc-datatool 1.4.2
+#
+# 上游测试入口 (tests/): test.sh (shell 集成测试) + test_main.py / test_objects.py (pytest).
+# 上游测试依赖 dsc-datatool 命令行工具运行 + maxminddb / influxdb 等 Python 依赖,
+# 且 test.sh 依赖 dsc-datatool 二进制在 PATH 中 + InfluxDB output 插件 —
+# 在 OHOS R32 平台上 maxminddb / influxdb-client 可能受限,
+# 故 upstream_test_in_build=false, 由 test_package 做消费者 smoke test.
+#
+# test_package smoke tests (7 assertions):
+#   1. import dsc_datatool — 模块导入
+#   2. __version__ == "1.4.2" — 版本断言
+#   3. Dataset class 可导入且为 class — Dataset 类存在
+#   4. Dimension class 可导入且为 class — Dimension 类存在
+#   5. Input/Output/Generator/Transformer 基类存在 — 核心 plugin 基类
+#   6. Dataset() repr 匹配预期格式 — Dataset 功能验证
+#   7. Dimension('test') repr 匹配预期格式 — Dimension 功能验证
+
+package: oarc-dsc-datatool/1.4.2
+homepage: "https://github.com/DNS-OARC/dsc-datatool"
+
+upstream_check_command: "python3 -m pytest tests/test_objects.py tests/test_main.py"
+upstream_test_in_build: false
+upstream_test_command: "cd tests && bash test.sh && python3 -m pytest test_main.py test_objects.py"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/test_objects.py
+    source: "dsc-datatool-1.4.2/tests/test_objects.py"
+    description: "Dataset/Dimension/Input/Output/Generator/Transformer object tests (pytest)"
+    command: "python3 -m pytest tests/test_objects.py"
+    result: unrunnable
+  - file: tests/test_main.py
+    source: "dsc-datatool-1.4.2/tests/test_main.py"
+    description: "main() entry point test (pytest)"
+    command: "python3 -m pytest tests/test_main.py"
+    result: unrunnable
+  - file: tests/test.sh
+    source: "dsc-datatool-1.4.2/tests/test.sh"
+    description: "Integration test: dsc-datatool CLI with XML input + transforms + InfluxDB output"
+    command: "cd tests && bash test.sh"
+    result: unrunnable
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者 smoke test: 模块导入 + 版本断言 + 核心 Dataset/Dimension/Input/Output/Generator/Transformer 类 + 功能 repr 验证"
+    command: "bash test.sh"
+
+# 测试断言总数
+assertion_count: 7
