@@ -56,8 +56,8 @@ class ParmetisConan(ConanFile):
         #   include_directories(${MPI_INCLUDE_PATH})     — root CMakeLists.txt
         #   target_link_libraries(... ${MPI_LIBRARIES})  — libparmetis/CMakeLists.txt
         tc.cache_variables["MPI_INCLUDE_PATH"] = os.path.join(mpi_root, "include")
-        tc.cache_variables["MPI_LIBRARIES"] = os.path.join(mpi_root, "lib", "libmpi.a")
-        tc.cache_variables["MPI_LINK_FLAGS"] = ""
+        tc.cache_variables["MPI_LIBRARIES"] = "mpi"
+        tc.cache_variables["MPI_LINK_FLAGS"] = f'-L{os.path.join(mpi_root, "lib")}'
         tc.generate()
 
     def build(self):
