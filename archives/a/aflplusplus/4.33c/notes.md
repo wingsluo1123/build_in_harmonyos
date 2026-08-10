@@ -16,6 +16,7 @@
 | 自定义 package() 而非 make install | make install 尝试安装 afl-cc（需 LLVM 构建），文件不存在会失败 |
 | 跳过 make tests | test-all.sh 需要 LLVM/GCC/QEMU/Frida/UniCorn——CI 均无 |
 | 不补丁 GNUmakefile | 所有平台差异通过 make 命令行变量覆盖（SYS/PREFIX/NO_PYTHON） |
+| 补丁 forkserver.h + sharedmem.h | OHOS libc 不隐式传递 POSIX 类型（uid_t/pid_t/mode_t），需显式 `#include <sys/types.h>` |
 
 ## 上游测试状态
 
