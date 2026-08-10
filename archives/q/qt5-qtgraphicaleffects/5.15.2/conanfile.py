@@ -23,7 +23,7 @@ class Qt5QtgraphicaleffectsConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
-        self.requires("qt5-qtbase/5.15.2.1")
+        self.requires("qt5-qtbase/5.15.2.2")
         self.requires("qt5-qtdeclarative/5.15.2")
 
     def layout(self):
