@@ -29,8 +29,12 @@ int main(int argc, char *argv[]) {
             n = fread(buf, 1, sizeof(buf) - 1, fp);
             buf[n] = '\0';
             pclose(fp);
-            if (strstr(buf, "Usage") != NULL || strstr(buf, "fizmo") != NULL
-                || strstr(buf, "usage") != NULL) {
+            /* 只用 "Usage"/"usage" 关键字（strstr 大小写敏感，双查）：
+             * 不用 "fizmo"——二进制缺共享库（如 ncursesw）时动态链接
+             * 错误消息（fizmo-ncursesw: error while loading shared
+             * libraries: ...）含 "fizmo" 子串，会导致假阳性误报 PASS
+             * （drill/opensp 同类问题先例，AI review P2） */
+            if (strstr(buf, "Usage") != NULL || strstr(buf, "usage") != NULL) {
                 printf("  ✓ %s --help printed usage info\n", fizmo);
                 passed++;
             } else {
