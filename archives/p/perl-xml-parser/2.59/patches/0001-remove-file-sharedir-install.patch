@@ -6,18 +6,18 @@
  use Devel::CheckLib;
 -use File::ShareDir::Install;
 -install_share dist => 'share';
- 
+
  use Config;
  use File::Spec;
 @@ -156,8 +154,7 @@
- 
+
  sub MY::postamble {
      my $self = shift;
 -    my @ret  = File::ShareDir::Install::postamble($self);
 -    return join "\n", @ret;
 +    return '';
  }
- 
+
  my $dist_version = MM->parse_version('Parser.pm');
 @@ -224,10 +221,8 @@
      VERSION_FROM => 'Parser.pm',
@@ -32,14 +32,17 @@
      ? (
 --- a/Expat/Expat.pm
 +++ b/Expat/Expat.pm
-@@ -13,7 +13,6 @@
+@@ -13,12 +13,11 @@
  our ( %Encoding_Table, @Encoding_Path );
- 
+
  use File::Spec ();
 -use File::ShareDir ();
- 
+
  %Encoding_Table = ();
-@@ -20,2 +19,1 @@
+
  my $_share_dir;
 -eval { $_share_dir = File::ShareDir::dist_dir('XML-Parser') };
 +$_share_dir = undef;
+
+ @Encoding_Path = (
+     ( defined $_share_dir && -d $_share_dir ? ($_share_dir) : () ),
