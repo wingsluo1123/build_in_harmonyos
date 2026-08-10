@@ -1,0 +1,49 @@
+--- a/tools/tools-common.c
++++ b/tools/tools-common.c
+@@ -11,20 +11,46 @@
+ #include <inttypes.h>
+ #include <limits.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/stat.h>
+ #include <time.h>
+ 
+ #include "tools-common.h"
++
++/* HarmonyOS/musl libc compatibility: provide program_invocation_name */
++#ifdef __OHOS__
++static char __ohos_prog_name[256] = "unknown";
++static char __ohos_prog_short_name[256] = "unknown";
++
++static void __attribute__((constructor)) __ohos_init_prog_name(void)
++{
++	FILE *f = fopen("/proc/self/cmdline", "r");
++	if (f) {
++		if (fgets(__ohos_prog_name, sizeof(__ohos_prog_name), f)) {
++			char *base = strrchr(__ohos_prog_name, '/');
++			if (base)
++				base++;
++			else
++				base = __ohos_prog_name;
++			snprintf(__ohos_prog_short_name,
++				 sizeof(__ohos_prog_short_name), "%s", base);
++		}
++		fclose(f);
++	}
++}
++
++#define program_invocation_name __ohos_prog_name
++#define program_invocation_short_name __ohos_prog_short_name
++#endif /* __OHOS__ */
+ 
+ const char *get_progname(void)
+ {
+ 	return program_invocation_name;
+ }
+ 
+ void print_error(const char *fmt, ...)
+ {
+ 	va_list va;
+ 

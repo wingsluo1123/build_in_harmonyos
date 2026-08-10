@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style_4",
+      "file": "archives/l/libgpiod/2.0/conanfile.py",
+      "line": 49,
+      "description": "package_info() sets cpp_info.libs but does not set cpp_info.bindirs. The recipe enables --enable-tools (building gpiodetect, gpioget, gpioinfo, gpiomon, gpionotify, gpioset) and notes.md lists these as deliverables, but consumers will not discover the CLI binaries without bindirs=['bin']. The library functionality itself is unaffected.",
+      "fix_suggestion": "Add self.cpp_info.bindirs = ['bin'] in package_info() if the CLI tools are intended to be consumable, or document that tools are built but not exposed via cpp_info (e.g. for debugging only)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_14",
+      "file": "archives/l/libgpiod/2.0/manifest.yaml",
+      "line": 10,
+      "description": "manifest.yaml uses a nested 'build:' structure (build.system: autotools) instead of the flat top-level 'build_system:' field specified in code_style rule 14. All required fields (name, version, status, build_system info) are present, but the nesting deviates from the documented format.",
+      "fix_suggestion": "Use the flat format: build_system: autotools at the top level, or confirm that the project has adopted the nested format as a new standard."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style_15",
+      "file": "archives/l/libgpiod/commands.json",
+      "line": 4,
+      "description": "commands.json description says 'Linux GPIO device interaction library with command-line tools' and type is 'library'. While this is consistent with package_type='library' in conanfile.py, the description mentioning 'command-line tools' with type 'library' is a minor inconsistency. Since cpp_info.bindirs is not set and package_type is 'library', R38 does not strictly require commands.json, so this is informational only.",
+      "fix_suggestion": "Either remove 'with command-line tools' from the description, or if tools are meant to be exposed, set type to 'tool' and add cpp_info.bindirs in conanfile.py."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "MANIFEST_test_desc",
+      "file": "archives/l/libgpiod/2.0/test_package/MANIFEST.yml",
+      "line": 30,
+      "description": "test_package_tests entry for test.c has description 'Verify gpiod_api_version() returns valid version string' but test.c actually tests 4 things: API version, line_settings (new/set_direction/get_direction), is_gpiochip_device, and chip_open. The description is incomplete. Additionally assertion_count is 3 but test.c contains 4 test blocks.",
+      "fix_suggestion": "Update description to 'Verify libgpiod C API: version, line settings, device detection, and chip open' and set assertion_count to 4."
+    }
+  ],
+  "summary": "AUDIT PASSED. All 13 changed files audited against code_style and review_memory rules.\n\nP0 Deception checks — ALL PASSED:\n- R34 (stub test): test_package/test.c calls 8+ real libgpiod API functions (gpiod_api_version, gpiod_line_settings_new, gpiod_line_settings_set_direction, gpiod_line_settings_get_direction, gpiod_is_gpiochip_device, gpiod_chip_open, gpiod_chip_close). Not a stub.\n- R9 (skip test): test_package/conanfile.py test() runs cmake.test() AND self.run() to execute the binary. Not skipped.\n- Forged status: manifest.yaml status='built' is consistent with notes.md verification results.\n- Forged sha256: VERIFIED. sha256 'e02400fcd4acc21eca021e7e5d184f828d1a5fd458a156234d3b861becea7f92' matches the official PGP-signed sha256sums.asc from https://mirrors.edge.kernel.org/pub/software/libs/libgpiod/sha256sums.asc.\n- R8 (#ifdef __OHOS__ real logic): Patch 0004 has #ifdef __OHOS__ with substantial logic — reads /proc/self/cmdline, extracts program name via strrchr, defines program_invocation_name and program_invocation_short_name macros. Not an empty stub.\n- R19 (manual packaging): No pre-compiled .so/.a/.o binaries in the PR.\n\nP1 Correctness checks — ALL PASSED:\n- R32 (settings.os): No '== Linux' comparison in conanfile.py. Uses AutotoolsToolchain which handles OS detection.\n- R33 (shell env vars): build() uses Autotools(self) properly, no os.environ access.\n- R37 (version): Version '2.0' matches upstream release for first-time adaptation.\n- R39 (official URL): URL points to official kernel.org mirror (https://mirrors.edge.kernel.org/pub/software/libs/libgpiod/libgpiod-2.0.tar.gz).\n- R40 (deep adaptation for hardware lib): libgpiod is a GPIO hardware library. Patches contain real platform adaptation (config.guess HarmonyOS detection, config.sub ohos target, configure umask fix, musl program_invocation_name compat). test_package covers version, line settings, device detection, and chip open — beyond just version().\n- R34 (test calls API): Confirmed — multiple real API calls.\n- Patch a/b convention: All 4 patches use --- a/ and +++ b/ convention.\n- Patch file paths match: conandata.yml patch_file entries match actual changed files. manifest.yaml patches_applied names match patch filenames.\n- Conan 2.x API: Uses 'from conan import ConanFile', conan.tools.gnu, conan.tools.cmake, conan.tools.files.\n- Method order: export_sources → requirements → layout → source → generate → build → package → package_info (correct).\n- No template placeholders (TODO/FIXME/XXX) in any file.\n\n4 non-blocking issues found (0 P0, 0 P1, 1 P2, 3 P3):\n- P2: Missing cpp_info.bindirs for CLI tools built with --enable-tools\n- P3: manifest.yaml uses nested build: structure instead of flat build_system:\n- P3: commands.json description mentions tools but type is library\n- P3: test_package/MANIFEST.yml test description incomplete and assertion_count mismatch"
+}

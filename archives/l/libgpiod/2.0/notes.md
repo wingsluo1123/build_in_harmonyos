@@ -1,77 +1,50 @@
-# libgpiod 2.0 — 编译进度
+# libgpiod 2.0 适配笔记
 
-> 档案创建时间: 2026-04-27 00:00:00
-> 最后更新: 2026-04-27 (当前状态)
-> 当前会话 ID: (可选，用于多轮对话追踪)
+## 编译环境
+- 构建系统: autotools
+- 编译日期: 2026-08-10
+- 编译器: clang/clang++
+- 状态: built
 
-## 一、基本信息
-| 项目 | 值 |
-|------|-----|
-| 软件 | libgpiod |
-| 版本 | 2.0 |
-| 状态 | 🔵 进行中 / ✅ success / ⚠️ partial / ❌ failed |
-| 构建系统 | autotools/cmake/meson/... |
-| 源码路径 | URL |
+## 编译步骤
 
-## 二、编译阶段（checkbox 实时更新）
+1. 下载源码: https://mirrors.edge.kernel.org/pub/software/libs/libgpiod/libgpiod-2.0.tar.gz
+2. 应用 4 个补丁 (config.guess, config.sub, configure umask, program_invocation_name compat)
+3. configure --prefix=$DEFAULT_PREFIX --enable-tools --enable-bindings-cxx
+4. make -j2
+5. make install DESTDIR=$TEST_PREFIX
+6. make check (通过)
 
-### Phase 1: 环境准备
-- [ ] ohc-run.py init-build 完成 / 源码下载解压
+## 遇到的问题与解决方案
 
-### Phase 2: 编译（configure + make + make install）
-- [ ] configure 完成（记录参数和耗时）
-- [ ] make 编译完成（记录错误和修复）
-- [ ] make install 完成
+| # | 问题 | 根因 | 解决方案 |
+|---|------|------|----------|
+| 1 | config.guess 不识别 HarmonyOS | E007 | 添加 HarmonyOS 检测分支到 config.guess |
+| 2 | config.sub 不支持 ohos 目标 | E007 | 添加 ohos-linux 和 linux-ohos 到 config.sub |
+| 3 | configure 临时文件权限错误 | E011 | umask 077 → 022 |
+| 4 | program_invocation_name 未定义 | musl libc 缺少 glibc 扩展 | 在 tools-common.c 添加 __OHOS__ 兼容实现 |
 
-### Phase 2.5: 独立目录安装验证（⭐ 必须做）
-- [ ] 干净源码 + 补丁应用
-- [ ] 独立 TEST_PREFIX configure + make install
-- [ ] 功能回归测试结果
+## 源码修改
 
-### Phase 3: 测试验证
-- [ ] make check / make test 结果
-- [ ] 安全弹窗触发确认
+- autostuff/config.guess: 添加 HarmonyOS 平台检测
+- autostuff/config.sub: 添加 ohos 目标支持
+- configure: 修复 umask 077 → 022
+- tools/tools-common.c: 添加 program_invocation_name musl 兼容代码
 
-### Phase 4: 预编译包制作（⭐ verify PASS 后必须）
-- [ ] Step 1-10 打包流程（见 packaging.md）
+## 验证结果
 
-### Phase 5: 归档收尾
-- [ ] 补丁生成（ohc-run.py refresh-patch --auto）
-- [ ] manifest.yaml / README.md / PROGRESS.md 更新
-- [ ] ohc-run.py verify-build 质量门禁
+- Conan verify: G1-G4 PASS
+- W3 本地 CI 模拟: PASS
+- 测试: gpiod_api_version(), line_settings, is_gpiochip_device, chip_open 均通过
 
-## 三、对话记录（⭐ 断点续传核心）
+## 交付物
 
-> **每轮对话结束时必须更新此节。新 AI 会从这里恢复上下文。**
+- libgpiod.so.3.0.0 + libgpiod.a
+- libgpiodcxx.so.2.0.0 + libgpiodcxx.a
+- 工具: gpiodetect, gpioget, gpioinfo, gpiomon, gpionotify, gpioset
+- 头文件: gpiod.h, gpiod.hpp, gpiodcxx/
+- pkgconfig: libgpiod.pc, libgpiodcxx.pc
 
-### 对话 #N — 2026-04-27 HH:MM
-**操作**: （做了什么，如"执行 configure"、"修复 xxx bug"、"制作预编译包"）
-**结果**: （成功/失败/部分成功，附关键输出摘要）
-**发现的问题**: （遇到的坑、错误信息、根因分析）
-**当前状态**: （精确到哪个步骤，下一步该做什么）
-**遗留问题**: （未解决的、需要下轮继续的）
-
----
-
-### 对话 #1 — 2026-04-27 00:00
-**操作**: 执行 ./configure --prefix=$DEFAULT_PREFIX
-**结果**: （待填写）
-**发现的问题**: （待填写）
-**当前状态**: Phase 2 configure 进行中
-**遗留问题**: 无
-
-（后续每轮对话追加...）
-
-## 四、源码修改清单
-| 文件 | 原因 | 方式 | 补丁状态 |
-|------|------|------|---------|
-| ... | ... | ... | ... |
-
-## 五、预编译包交付物
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| ... | ... | ... |
-
-## 六、结束记录
-- **最终状态**: ...
-- **结束时间**: ...
+## 结束记录
+- **最终状态**: built (conan verify PASS, W3 CI PASS)
+- **编译结束**: 2026-08-10
