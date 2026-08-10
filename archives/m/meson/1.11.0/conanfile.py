@@ -109,6 +109,11 @@ class MesonConan(ConanFile):
         test_env.define("AR", "/data/service/hnp/bin/llvm-ar")
         test_env.define("RANLIB", "/data/service/hnp/bin/llvm-ranlib")
         test_env.define("NM", "/data/service/hnp/bin/llvm-nm")
+        # unittests 中 PKG_CONFIG = os.environ.get('PKG_CONFIG', 'pkg-config')，
+        # 默认裸名走 PATH；CI worker PATH 无工具链目录时报
+        # FileNotFoundError: 'pkg-config'（b18903：8 个 pkg-config 相关用例失败）。
+        # 显式注入绝对路径，与 NINJA/CC/AR 同机制。
+        test_env.define("PKG_CONFIG", "/data/service/hnp/bin/pkg-config")
         # OHOS SDK 的 lld 动态依赖 libxml2.so.16（llvm/lib 下）；CI worker 上
         # lld 报 "Error relocating lld: xmlFreeDoc: symbol not found"（加载到
         # 了版本不匹配的 libxml2）。显式注入 SDK llvm/lib 到 LD_LIBRARY_PATH，
