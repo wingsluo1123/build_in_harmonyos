@@ -59,9 +59,12 @@ class FizmoConan(ConanFile):
         # --disable-jpeg：fizmo configure 支持 --disable-jpeg（configure 1495 行），
         # 禁用 JPEG 图像支持（文本 Z-machine 解释器不需要；CI #17480 报
         # Could not find libjpeg.h）
+        # --disable-png：fizmo configure 支持 --disable-png（configure 1496 行），
+        # 禁用 PNG 图像支持（文本 Z-machine 解释器不需要；CI #17945 报
+        # No package 'libpng' found）
         tc.configure_args.extend(
             [f"--build={triplet}", f"--host={triplet}",
-             "--disable-x11", "--disable-jpeg"])
+             "--disable-x11", "--disable-jpeg", "--disable-png"])
         # fizmo configure 硬编码路径检测 libxml/tree.h（/usr/include/libxml2 等），
         # 需传 --with-libxml2-includedir 指向 libxml2 包 include
         tc.configure_args.append(
