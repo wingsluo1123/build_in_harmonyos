@@ -1,0 +1,19 @@
+import os
+
+from conan import ConanFile
+
+
+class TestPackageConan(ConanFile):
+    settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualBuildEnv"
+
+    def test(self):
+        # sherlock.lv2 是 LV2 插件 bundle（库型）：编译运行 test_sherlock.c，
+        # 验证插件 bundle（manifest.ttl 含插件声明 + sherlock.so 存在）
+        bundle = os.path.join(self.dependencies["sherlock.lv2"].package_folder,
+                              "lib", "lv2", "sherlock.lv2")
+        src = os.path.join(self.source_folder, "src", "test_sherlock.c")
+        test_bin = os.path.join(self.build_folder, "test_sherlock")
+        self.run(f"${{CC:-clang}} ${{CFLAGS}} -o \"{test_bin}\" \"{src}\"",
+                 env="conanbuild")
+        self.run(f"\"{test_bin}\" \"{bundle}\"", env="conanrun")
