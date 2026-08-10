@@ -16,6 +16,11 @@ class SherlockLv2Conan(ConanFile):
     url = "https://git.ventosus.ch/sherlock.lv2"
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
+    # library 类型必须声明 shared 选项（conan 2 校验，否则报
+    # "Package type is 'library', but no 'shared' option declared"——
+    # cattle 同款问题先例）；LV2 插件为共享模块（.so），默认静态偏好
+    options = {"shared": [True, False]}
+    default_options = {"shared": False}
     # 导出 patches/ 目录（apply_conandata_patches 需要；multitail 教训）
     exports_sources = "patches/*"
 
