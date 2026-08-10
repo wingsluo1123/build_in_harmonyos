@@ -3,9 +3,13 @@
 
 L1 official test: verifies the alex binary is packaged and functional.
 The test script checks:
-  - alex --version contains the expected version
-  - alex --help exits 0
-  - alex actually generates a lexer from a minimal .x spec (functional)
+  - alex binary exists
+  - alex --version reports 3.5.4.2
+  - alex generates a lexer from a minimal .x spec (functional, --template
+    pointing at the packaged templates)
+
+Note: alex --help is NOT asserted — on OHOS the GHC RTS intermittently
+hangs in sigsuspend when alex prints the help text and exits.
 """
 import os
 from pathlib import Path
