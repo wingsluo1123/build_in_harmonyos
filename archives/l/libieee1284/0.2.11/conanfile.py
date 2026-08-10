@@ -45,6 +45,14 @@ class Libieee1284Conan(ConanFile):
             tc.configure_args.append("--disable-shared")
         # Disable python bindings (not needed for C library)
         tc.configure_args.append("--without-python")
+        # Cache compiler test results for old autoconf 2.59 on CI workers
+        # where the compiler test may fail due to environment differences
+        # (the compiler works, but the test environment has issues)
+        tc.configure_args.append("ac_cv_exeext=")
+        tc.configure_args.append("ac_cv_objext=o")
+        tc.configure_args.append("ac_cv_c_compiler_gnu=yes")
+        tc.configure_args.append("ac_cv_prog_cc_g=yes")
+        tc.configure_args.append("ac_cv_prog_cc_c_o=yes")
         tc.generate()
         # E002: Ensure TMPDIR is set (HarmonyOS /tmp is read-only)
         if not os.environ.get("TMPDIR"):
