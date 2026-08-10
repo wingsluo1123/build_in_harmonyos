@@ -14,10 +14,10 @@ if [ ! -x "${BIN}" ]; then
 fi
 
 echo "✅ adplay binary exists and is executable"
-# --help 应成功退出（不依赖音频设备）
+# --help 是纯命令行参数解析，不依赖音频设备；失败即真实运行时问题（R9 禁止伪造通过）
 if "${BIN}" --help > /dev/null 2>&1; then
     echo "✅ adplay --help OK"
 else
-    echo "⚠️  adplay --help 未输出（OHOS 无音频设备，可能直接退出）；二进制本身可执行"
+    echo "❌ adplay --help failed (exit $?) — binary has a real runtime problem"
+    exit 1
 fi
-exit 0
