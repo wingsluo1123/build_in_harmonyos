@@ -19,7 +19,7 @@ class TreesitterConan(ConanFile):
     description = "An incremental parsing system for programming tools"
     license = "MIT"
     homepage = "https://tree-sitter.github.io/tree-sitter/"
-    url = ""  # CI fills this
+    url = "https://github.com/tree-sitter/tree-sitter"
 
     package_type = "library"
 
