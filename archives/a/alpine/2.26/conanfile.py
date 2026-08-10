@@ -21,9 +21,9 @@ class AlpineConan(ConanFile):
     exports_sources = "patches/*"
 
     def requirements(self):
-        # alpine 终端界面依赖 wide-char ncurses（ncursesw）；
+        # alpine 终端界面依赖 wide-char ncurses（ncursesw，6.5 已合入 registry）；
         # 邮件加密/SSL 依赖 openssl（官方要求 OpenSSL 1.0.0c+）
-        self.requires("ncurses/6.4")
+        self.requires("ncurses/6.5")
         self.requires("openssl/1.1.1w")
 
     def layout(self):
