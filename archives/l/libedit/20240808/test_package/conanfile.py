@@ -22,6 +22,18 @@ class LibeditTestConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
+    def generate(self):
+        # HarmonyOS: create libtinfo.so symlink for test_package linking
+        if self.settings.os in ("Linux", "OHOS"):
+            lib_dir = os.path.join(self.build_folder, "lib")
+            os.makedirs(lib_dir, exist_ok=True)
+            tinfo_link = os.path.join(lib_dir, "libtinfo.so")
+            if not os.path.exists(tinfo_link):
+                try:
+                    os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
+                except OSError:
+                    pass
+
     def build(self):
         cmake = CMake(self)
         cmake.configure()

@@ -32,21 +32,6 @@ class LibeditConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # HarmonyOS: create libtinfo.so symlink (only .so.6 exists)
-        if self.settings.os in ("Linux", "OHOS"):
-            persistent_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
-            os.makedirs(persistent_lib, exist_ok=True)
-            tinfo_persistent = os.path.join(persistent_lib, "libtinfo.so")
-            if not os.path.exists(tinfo_persistent):
-                try:
-                    os.symlink("/usr/lib/libtinfo.so.6", tinfo_persistent)
-                except OSError:
-                    pass
-            current_ld = os.environ.get("LD_LIBRARY_PATH", "")
-            if persistent_lib not in current_ld:
-                os.environ["LD_LIBRARY_PATH"] = (
-                    f"{persistent_lib}:{current_ld}" if current_ld else persistent_lib
-                )
         tc.generate()
 
     def build(self):
@@ -57,8 +42,18 @@ class LibeditConan(ConanFile):
             path = os.path.join(self.source_folder, f)
             if os.path.exists(path):
                 os.utime(path, None)
-        # Create libtinfo.so symlink BEFORE configure (needed for -ltinfo check)
+        # Create libtinfo.so symlink (HarmonyOS only has libtinfo.so.6)
         if self.settings.os in ("Linux", "OHOS"):
+            # Persistent location for test_package linking
+            persistent_lib = os.path.join(os.path.expanduser("~"), "usr", "local", "lib")
+            os.makedirs(persistent_lib, exist_ok=True)
+            tinfo_persistent = os.path.join(persistent_lib, "libtinfo.so")
+            if not os.path.exists(tinfo_persistent):
+                try:
+                    os.symlink("/usr/lib/libtinfo.so.6", tinfo_persistent)
+                except OSError:
+                    pass
+            # Build folder for main build -L flag
             lib_dir = os.path.join(self.build_folder, "lib")
             os.makedirs(lib_dir, exist_ok=True)
             tinfo_link = os.path.join(lib_dir, "libtinfo.so")
