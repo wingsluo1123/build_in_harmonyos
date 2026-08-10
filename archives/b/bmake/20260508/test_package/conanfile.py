@@ -16,4 +16,5 @@ class BmakeTestConan(ConanFile):
         bmake_dep = self.dependencies["bmake"]
         bmake_bin_dir = bmake_dep.cpp_info.bindirs[0]
         bmake_bin = os.path.join(bmake_bin_dir, "bmake")
-        self.run(f"{bmake_bin} -r -V MAKE_VERSION")
+        ret = self.run(f"{bmake_bin} -r -V MAKE_VERSION")
+        assert ret == 0, f"bmake exited with code {ret}"

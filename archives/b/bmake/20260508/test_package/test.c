@@ -17,7 +17,11 @@ int main(void) {
         pclose(fp);
         return 1;
     }
-    pclose(fp);
+    int rc = pclose(fp);
+    if (rc != 0) {
+        fprintf(stderr, "FAIL: bmake exited with status %d\n", rc);
+        return 1;
+    }
 
     /* Check that the version string is non-empty and matches expected pattern */
     size_t len = strlen(buf);
