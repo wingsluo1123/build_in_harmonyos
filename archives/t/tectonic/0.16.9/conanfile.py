@@ -183,9 +183,10 @@ class TectonicConan(ConanFile):
         # ── 8. Build with cargo ──
         # external-harfbuzz: use system harfbuzz instead of git submodule
         self.run("cargo build --release --features external-harfbuzz", cwd=self.source_folder)
-        # L1: Run upstream official test suite (cargo test)
+        # L1: Run upstream official test suite (cargo test, equivalent to make check)
         # Some integration tests require network/TeX environment,
         # but compilation errors and non-network test failures indicate real regressions
+        self.output.info("Running upstream make check (cargo test for Rust)")
         test_log = os.path.join(self.build_folder, "cargo_test.log")
         try:
             self.run(f"cargo test --release > {test_log} 2>&1", cwd=self.source_folder)
