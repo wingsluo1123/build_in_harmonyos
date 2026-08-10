@@ -203,7 +203,7 @@ class Gtk4Conan(ConanFile):
         npm_global_bin = os.path.join(os.path.expanduser("~"), ".opendesk", "interpreters", "npm-global", "bin")
         sass_bin = os.path.join(npm_global_bin, "sass")
         if not os.path.isfile(sass_bin):
-            self.run("%s install -g sass 2>/dev/null || true" % npm, ignore_in_log=True)
+            self.run("%s install -g sass 2>/dev/null || true" % npm)
         if not os.path.isfile(sass_bin):
             return
         # Create sassc wrapper that translates sassc options to dart-sass
