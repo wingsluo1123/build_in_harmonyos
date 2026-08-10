@@ -27,7 +27,7 @@ class LibngfQtConan(ConanFile):
     def requirements(self):
         # 依赖 qt5-qtbase/5.15.2.1：Qt5 库需要 qt5-qtbase
         # 提供的 Qt5 基础库与 qmake 工具
-        self.requires("qt5-qtbase/5.15.2.1")
+        self.requires("qt5-qtbase/5.15.2.2")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
