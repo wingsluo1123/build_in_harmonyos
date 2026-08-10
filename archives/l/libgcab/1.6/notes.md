@@ -59,5 +59,5 @@ PASS: GCAB_IS_CABINET check passed
 - patches/: 2 个补丁文件
 ---
 
-**编译结束**: 2026-08-10 06:17
-**最终状态**: built
+**编译结束**: 2026-08-11 00:10
+**最终状态**: published
