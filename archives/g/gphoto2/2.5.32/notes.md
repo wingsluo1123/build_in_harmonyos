@@ -57,5 +57,5 @@ gphoto2 --version → gphoto2 2.5.32
 - G0 clean-verify 需要PKG_CONFIG_PATH设置（依赖未在默认路径）
 ---
 
-**编译结束**: 2026-06-04 03:42
+**编译结束**: 2026-08-11 02:53
 **最终状态**: built
