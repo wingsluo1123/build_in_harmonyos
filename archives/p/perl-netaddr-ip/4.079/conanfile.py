@@ -20,8 +20,17 @@ class PerlNetaddrIp(ConanFile):
 
         src = self.source_folder
         self.run("perl Makefile.PL", cwd=src)
-        # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
+        # HarmonyOS: generate config.h for NetAddr::IP::Util (configure script unavailable)
         if self.settings.os == "OHOS":
+            util_dir = os.path.join(src, "Lite", "Util")
+            config_h_in = os.path.join(util_dir, "config.h.in")
+            config_h = os.path.join(util_dir, "config.h")
+            if os.path.exists(config_h_in) and not os.path.exists(config_h):
+                shutil.copy2(config_h_in, config_h)
+            localperl_h = os.path.join(util_dir, "localperl.h")
+            if not os.path.exists(localperl_h):
+                with open(localperl_h, "w") as f:
+                    f.write("/* Auto-generated for OHOS */\n")
             makefile = os.path.join(src, "Makefile")
             if os.path.exists(makefile):
                 with open(makefile, "r") as mf:

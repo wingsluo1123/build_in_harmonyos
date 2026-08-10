@@ -2,7 +2,7 @@
 """Conan recipe — perl-json-xs 4.04 (auto-generated for Perl 5.42.2 rebuild)"""
 import os, shutil
 from conan import ConanFile
-from conan.tools.files import get
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 class PerlJsonXs(ConanFile):
     name = "perl-json-xs"
@@ -11,7 +11,9 @@ class PerlJsonXs(ConanFile):
     license = "Artistic-2.0"
     homepage = "https://metacpan.org/pod/json::xs"
     settings = "os", "compiler", "build_type", "arch"
-    exports_sources = "conandata.yml"
+
+    def export_sources(self):
+        export_conandata_patches(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -19,6 +21,7 @@ class PerlJsonXs(ConanFile):
     def build(self):
 
         src = self.source_folder
+        apply_conandata_patches(self)
         self.run("perl Makefile.PL", cwd=src)
         # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
         if self.settings.os == "OHOS":

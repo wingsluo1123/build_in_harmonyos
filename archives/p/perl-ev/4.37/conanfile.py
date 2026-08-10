@@ -21,6 +21,8 @@ class PerlEv(ConanFile):
 
         src = self.source_folder
         apply_conandata_patches(self)
+        os.environ["PERL_MM_USE_DEFAULT"] = "1"
+        os.environ["AUTOMATED_TESTING"] = "1"
         self.run("perl Makefile.PL", cwd=src)
         # HarmonyOS: patch Makefile for CRT linker flags (R32: OHOS-only)
         if self.settings.os == "OHOS":
