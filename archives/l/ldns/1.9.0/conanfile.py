@@ -93,8 +93,12 @@ class LdnsConan(ConanFile):
         autotools.make(args=["-j2"])
 
     def package(self):
+        # Run specific install targets, skip install-manpages (470+ man3 pages cause timeout)
         autotools = Autotools(self)
-        autotools.install()
+        autotools.make(
+            target="install-h install-lib install-pc install-config install-drill install-examples",
+            args=[f"DESTDIR={self.package_folder}"],
+        )
 
     def package_info(self):
         self.cpp_info.libs = ["ldns"]
