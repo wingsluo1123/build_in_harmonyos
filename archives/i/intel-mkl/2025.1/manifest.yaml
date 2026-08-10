@@ -1,0 +1,65 @@
+# 版本级 manifest — intel-mkl 2025.1
+# 遵循 ARCHIVE-SPEC v3.0（failed 归档规范，参考 prefixsuffix 先例）
+
+software: intel-mkl
+version: "2025.1"
+adaptation_path: "路径 B（贡献创新）— 无法适配分析（PATH_B_ANALYSIS.md）"
+
+# 编译状态：failed（闭源二进制产品，无源码可编译、无 aarch64/OHOS 交付）
+status: failed
+
+build_date: "2026-08-10"
+build_system: n/a
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # intel-mkl 无公开源码 tarball。Intel 产品页为纯信息页，init-build 实测下载失败（HTTP 403 Forbidden）。
+  url: "https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html"
+  sha256: ""
+  tar_format: n/a
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: n/a
+  configure_options: []
+  dependencies:
+    required:
+      - "Intel Simplified Software License（闭源，无源码可分发）"
+    missing:
+      - "Intel oneMKL aarch64/OHOS 预编译二进制（Intel 从未发布）"
+      - "Intel oneMKL 源码（Intel 从不提供）"
+      - "oneMath 替代路径所需 SYCL/DPC++ 工具链（OHOS 无）"
+  cc: "aarch64-unknown-linux-ohos-clang 15.0.4（工具链可用，但无源码可编译）"
+  cxx: "aarch64-unknown-linux-ohos-clang++ 15.0.4"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "intel-mkl（oneMKL）是 Intel 闭源商业数学库，许可证为 Intel Simplified Software License，Intel 从不发布源码"
+  - "Intel 仅发布 x86_64 (Intel 64) 与 Intel GPU 的预编译二进制；无 ARM/aarch64 版本，无 HarmonyOS/OHOS 版本"
+  - "init-build 实测：intel-mkl 2025.1 用 Intel 官方产品页 URL 下载失败（HTTP 403 Forbidden），上游不存在可下载源码包——该失败本身即关键证据"
+  - "ohpcd 制品仓查询：conan list '*mkl*' / 'intel*' 均为 0 条；conan list 'intel-mkl/2025.1' 报 Recipe not found"
+  - "conan-center-index（社区最大 recipe 集，1000 目录）中无 intel-mkl recipe，仅有 intel-ipsec-mb / intel-neon2sse / clblast——全球开源打包体系中不存在 intel-mkl 源码包"
+  - "即使获得 x86_64 二进制也无法运行于 OHOS：x86_64 ELF 与 aarch64-unknown-linux-ohos 目标架构不匹配"
+  - "开源 oneMath（uxlfoundation/oneMath，Apache-2.0，原 oneMKL Interfaces）仅是 SYCL 接口/分发层（selector），默认后端就是闭源 Intel oneMKL；aarch64 CPU 后端仅商用 ArmPL 或 NETLIB/OpenBLAS（仅 BLAS/LAPACK 子集），且其构建强制要求 SYCL/DPC++ 编译器，OHOS 无此工具链"
+  - "oneMath host API 基于 sycl::queue 的 C++ 模板接口，不是经典 BLAS Fortran/C ABI，无法作为 intel-mkl 的 drop-in 替代"
+  - "赛事先例：#1990 nccl（OHOS 无 NVIDIA CUDA 无法适配）、#1906 intel-oneapi-dpcpp（Intel 工具链高难度）——intel-mkl 属同类闭源+无平台交付，判定无法适配"
+
+test_results:
+  type: skipped
+  total: 0
+  passed: 0
+  failed: 0
+  note: "无源码、无 OHOS/aarch64 二进制，init-build 在下载阶段即失败（HTTP 403），无任何产物可测试"
+
+failure_reason: "intel-mkl 为 Intel 闭源商业二进制产品（Intel Simplified Software License），无公开源码；Intel 仅发布 x86_64/Intel GPU 预编译二进制，无 aarch64/OHOS 交付；开源 oneMath 接口层依赖 SYCL/DPC++ 且默认后端即闭源 Intel oneMKL，无法替代 intel-mkl 产品本身"
