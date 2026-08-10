@@ -4,6 +4,8 @@
 Compiles test.cpp against the argagg header-only library and runs it.
 Uses Conan's CMakeToolchain for proper cross-compilation support.
 """
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
@@ -24,5 +26,5 @@ class ArgaggTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        test_bin = os.path.join(self.test_build_folder, "test_argagg")
+        self.run(test_bin, env="conanrun")
