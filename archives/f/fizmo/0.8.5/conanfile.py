@@ -32,6 +32,9 @@ class FizmoConan(ConanFile):
     def requirements(self):
         # fizmo-ncursesw 前端依赖 wide-char ncurses（ncursesw）
         self.requires("ncurses/6.5")
+        # fizmo configure 检测 libxml-2.0（pkg-config）+ libxml/tree.h，缺依赖
+        # 则报 "Could not find libxml/tree.h"（CI #17356）
+        self.requires("libxml2/2.15.3")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -52,7 +55,20 @@ class FizmoConan(ConanFile):
         machine = self._machine(self.settings.arch)
         triplet = f"{machine}-unknown-linux-gnu"
         tc.configure_args.extend([f"--build={triplet}", f"--host={triplet}"])
+        # fizmo configure 硬编码路径检测 libxml/tree.h（/usr/include/libxml2 等），
+        # 需传 --with-libxml2-includedir 指向 libxml2 包 include
+        tc.configure_args.append(
+            "--with-libxml2-includedir="
+            f"{os.path.join(self.dependencies['libxml2'].package_folder, 'include', 'libxml2')}")
         tc.generate()
+        # libxml2 的 pkg-config（libxml-2.0）加入 PKG_CONFIG_PATH
+        from conan.tools.env import Environment
+        env = Environment()
+        env.append_path(
+            "PKG_CONFIG_PATH",
+            os.path.join(self.dependencies["libxml2"].package_folder, "lib", "pkgconfig"),
+        )
+        env.vars(self).save_script("conanbuild_pkgconfig")
 
     def build(self):
         autotools = Autotools(self)
