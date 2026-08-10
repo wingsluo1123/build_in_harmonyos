@@ -56,6 +56,9 @@ int main(void) {
     fp = popen(SIRIL_BIN_PATH " --version 2>&1", "r");
     if (fp) {
         while (fgets(buf, sizeof(buf), fp) != NULL) {
+            /* Skip shell/loader error lines that may contain matched substrings */
+            if (strncmp(buf, "/bin/sh:", 8) == 0 || strncmp(buf, "error", 5) == 0)
+                continue;
             /* Look for version string in output */
             if (strstr(buf, "1.2") != NULL || strstr(buf, "siril") != NULL) {
                 found_version = 1;
@@ -63,7 +66,8 @@ int main(void) {
                 break;
             }
         }
-        pclose(fp);
+        if (pclose(fp) == -1)
+            fprintf(stderr, "NOTE: pclose failed for siril --version pipe\n");
     }
 
     if (!found_version) {
