@@ -14,6 +14,8 @@ class TestPackageConan(ConanFile):
                               "lib", "lv2", "sherlock.lv2")
         src = os.path.join(self.source_folder, "src", "test_sherlock.c")
         test_bin = os.path.join(self.build_folder, "test_sherlock")
-        self.run(f"${{CC:-clang}} ${{CFLAGS}} -o \"{test_bin}\" \"{src}\"",
+        # -ldl：test_sherlock.c 用 dlopen/dlsym 加载 sherlock.so 并调用
+        # lv2_descriptor()（R34 非空壳——需链接 libdl）
+        self.run(f"${{CC:-clang}} ${{CFLAGS}} -o \"{test_bin}\" \"{src}\" -ldl",
                  env="conanbuild")
         self.run(f"\"{test_bin}\" \"{bundle}\"", env="conanrun")
