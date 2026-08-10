@@ -1,0 +1,37 @@
+--- a/src/detect.c
++++ b/src/detect.c
+@@ -163,32 +163,32 @@
+   free(iomap);
+   #elif defined(HAVE_FBSD_I386)
+   int fd;
+   if ((fd = open("/dev/io", O_RDONLY)) >= 0) {
+     capabilities |= IO_CAPABLE;
+     debugprintf("We can use /dev/io\n");
+     close(fd);
+     return 1;
+   }
+   #elif defined(HAVE_LINUX)
+-  #ifdef HAVE_SYS_IO_H
++  #if defined(HAVE_SYS_IO_H) && (defined(__x86_64__) || defined(__i386__))
+   if (ioperm (0x378 /* say */, 3, 1) == 0) {
+     ioperm (0x378, 3, 0);
+     capabilities |= IO_CAPABLE;
+     debugprintf ("We can use ioperm()\n");
+     return 1;
+   }
+   #else
+   debugprintf ("We cannot use ioperm() : not supported\n");
+   return 0;
+   #endif /* HAVE_SYS_IO_H */
+-  
++
+   #elif defined(HAVE_SOLARIS)
+   int fd;
+   if (fd=open("/devices/pseudo/iop@0:iop", O_RDWR) > 0) {
+     capabilities |= IO_CAPABLE;
+     debugprintf ("We can use iop\n");
+     return 1;
+   }
+   debugprintf ("We can't use IOP, nothing will work\n");
+   #elif defined(HAVE_CYGWIN_9X)
+   /* note: 95 allows apps direct IO access */
