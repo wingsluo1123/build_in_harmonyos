@@ -19,6 +19,8 @@ class AdqlConan(ConanFile):
     homepage = "https://github.com/Caltech-IPAC/libadql"
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
+    options = {"shared": [True, False]}
+    default_options = {"shared": True}
 
     def export_sources(self):
         export_conandata_patches(self)
