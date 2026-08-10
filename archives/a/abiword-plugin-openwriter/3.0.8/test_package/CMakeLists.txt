@@ -53,6 +53,14 @@ set(_INCLUDE_DIRS_FIXED "")
 # C2 fix from AI review round 4: conan 2.1+ stores packages under p/<name>*
 # (recipe-name keyed) AND legacy 2.0.x used p/b/<pkgid>*. Match both to
 # support both layouts during a multi-host CI migration.
+#
+# S2 fix from AI review round 5: the previous logic checked the WRONG
+# condition — it added the conan-cache fallback dirs only if the conan
+# target *already* had INTERFACE_INCLUDE_DIRECTORIES exposed, which is
+# exactly the case where the fallback is NOT needed. Inverted the gate
+# to: only add fallback when the conan target is missing include dirs.
+# Also renamed the probe variable to reflect what it actually checks
+# (libgsf target include-dir presence, not "glib").
 file(GLOB _GLIB_INC_DIRS LIST_DIRECTORIES true
     "${CONAN_HOME}/p/b/glib*/p/include/glib-2.0"
     "${CONAN_HOME}/p/glib*/p/include/glib-2.0")
@@ -74,16 +82,19 @@ foreach(_DEPS IN ITEMS _GLIB_INC_DIRS _GLIB_CFG_DIRS _LIBGSF_INC_DIRS)
     endif()
 endforeach()
 
-# After target_link_libraries so INTERFACE_INCLUDE_DIRECTORIES are
-# applied via the link transitive. The fallback dirs are added only
-# if the target's own include dirs don't already contain the headers.
-get_target_property(_HAS_GLIB libgsf::libgsf-1 INTERFACE_INCLUDE_DIRECTORIES)
-if(_HAS_GLIB)
+# Probe the libgsf CMakeDeps target for its own include dirs.
+# If absent, apply the conan-cache fallback. If present, the link
+# transitive already provides includes and the fallback would be
+# redundant (and could shadow the right version with a stale one).
+get_target_property(_LIBGSF_HAS_INC libgsf::libgsf-1 INTERFACE_INCLUDE_DIRECTORIES)
+if(_LIBGSF_HAS_INC STREQUAL "libgsf::libgsf-1-NOTFOUND" OR
+   _LIBGSF_HAS_INC STREQUAL "")
     target_include_directories(test_openwriter PRIVATE
         ${_GLIB_INC_DIRS}
         ${_GLIB_CFG_DIRS}
         ${_LIBGSF_INC_DIRS})
-    message(STATUS "test_openwriter: applied conan-cache include-dir fallback")
+    message(STATUS "test_openwriter: applied conan-cache include-dir fallback "
+            "(CMakeDeps target did not expose INTERFACE_INCLUDE_DIRECTORIES)")
 endif()
 
 enable_testing()

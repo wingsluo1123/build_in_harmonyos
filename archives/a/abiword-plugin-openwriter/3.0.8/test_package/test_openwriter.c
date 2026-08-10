@@ -114,7 +114,6 @@ static int test_gsf_infile_zip_new_chain(const char *zip_path) {
     GsfInfile *infile  = NULL;
     GsfInput *content  = NULL;
     guint8    buf[64];
-    gsf_off_t n_read;
     gsf_off_t size;
     gsf_off_t remaining;
     int       rc       = 0;
@@ -172,23 +171,35 @@ static int test_gsf_infile_zip_new_chain(const char *zip_path) {
         rc = 1; goto cleanup;
     }
 
-    /* assertion: gsf_input_read returns expected byte count.
-     * libgsf 1.14.53 signature: gsf_off_t gsf_input_read(GsfInput *,
-     *   size_t num_bytes, guint8 *buffer). The 2nd arg is the REQUESTED
-     *   byte count, not the buffer size. Passing sizeof(buf)=64 against
-     *   a 39-byte mimetype entry causes gsf_input_read to return 39
-     *   (capped at entry size) but our previous `if (n_read != size)`
-     *   check would then always fail because size=39 == n_read=39 is OK,
-     *   actually -- the real failure mode is that an under-sized request
-     *   is the contract violation. Use size (entry length) as the request
-     *   to mirror openwriter's read pattern in xp/*.cpp. */
-    n_read = gsf_input_read(content, size, buf);
-    printf("    gsf_input_read returned %lld (requested %lld)\n",
-           (long long)n_read, (long long)size);
-    if (n_read != size) {
-        fprintf(stderr, "FAIL: gsf_input_read returned %lld, expected %lld\n",
-                (long long)n_read, (long long)size);
-        rc = 1; goto cleanup;
+    /* assertion: gsf_input_read returns the buffer pointer on success
+     * (or NULL on error). libgsf 1.14.53 signature:
+     *   guint8 const *gsf_input_read(GsfInput *, size_t num_bytes,
+     *                                 guint8 *optional_buffer);
+     * Returns: pointer to the buffer (== optional_buffer if non-NULL)
+     *          or NULL if an error / 0 bytes requested.
+     * Contract: "Will only read if the entire amount can be read" — we
+     * must request the exact size we previously probed via
+     * gsf_input_size(). The number of bytes actually transferred is the
+     * size argument (no under-read). We verify (a) the return pointer
+     * is non-NULL and (b) buf got the mimetype payload. */
+    {
+        const guint8 *read_ptr;
+        size_t        requested = (size_t)size;
+
+        read_ptr = gsf_input_read(content, requested, buf);
+        printf("    gsf_input_read returned %p (requested %zu bytes)\n",
+               (const void *)read_ptr, requested);
+        if (read_ptr == NULL) {
+            fprintf(stderr, "FAIL: gsf_input_read returned NULL\n");
+            rc = 1; goto cleanup;
+        }
+        /* read_ptr == buf because we passed buf as optional_buffer */
+        if (read_ptr != buf) {
+            fprintf(stderr, "FAIL: gsf_input_read returned %p, "
+                    "expected %p\n", (const void *)read_ptr,
+                    (const void *)buf);
+            rc = 1; goto cleanup;
+        }
     }
 
     /* assertion: mimetype content equals what we wrote */
