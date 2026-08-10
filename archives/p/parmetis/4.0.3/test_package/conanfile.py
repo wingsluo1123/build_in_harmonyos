@@ -13,16 +13,14 @@ class ParmetisTestConan(ConanFile):
     def build(self):
         parmetis = self.dependencies["parmetis"]
         openmpi = self.dependencies["open-mpi"]
+        cc = self.conf.get("tools.build:compiler_executables", default={}).get("c", "clang")
         mpi_root = openmpi.package_folder
-        mpicc = os.path.join(mpi_root, "bin", "mpicc")
-        # OPAL_PREFIX tells mpicc where to find mpi.h and libmpi
-        os.environ["OPAL_PREFIX"] = mpi_root
         include_flags = " ".join(f'-I"{p}"' for p in parmetis.cpp_info.includedirs)
         lib_flags = " ".join(f'-L"{p}"' for p in parmetis.cpp_info.libdirs)
         libs = " ".join(f"-l{l}" for l in parmetis.cpp_info.libs)
         self.run(
-            f'{mpicc} test_parmetis.c -o test_parmetis '
-            f'{include_flags} {lib_flags} {libs}'
+            f'{cc} -I"{mpi_root}/include" test_parmetis.c -o test_parmetis '
+            f'{include_flags} {lib_flags} {libs} -L"{mpi_root}/lib" -lmpi'
         )
 
     def test(self):
