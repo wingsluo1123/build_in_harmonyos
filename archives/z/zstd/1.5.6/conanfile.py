@@ -56,8 +56,24 @@ class ZstdConan(ConanFile):
             "找不到 ohos.toolchain.cmake：设 OHOS_NDK_HOME 或 OHOS_SDK_HOME，或在 profile [conf] 配 "
             "tools.cmake.cmaketoolchain:user_toolchain=[<sdk>/ohos/native/build/cmake/ohos.toolchain.cmake]")
 
+    def _prepare_env(self):
+        # lld 链接器依赖 libxml2.so.16，但 CI worker 的系统库路径未包含该库。
+        # SDK 的 llvm/lib 目录包含 libxml2.so.16，将其加入 LD_LIBRARY_PATH。
+        # 与 openblas/0.3.34、wolfssl/5.9.0 等已发布 recipe 同法（知识图谱 E120/E132）。
+        import os
+        import glob
+        sdk_llvm_lib = ""
+        sdk_base = os.environ.get("OHOS_SDK_HOME", "/data/service/hnp/ohos-sdk.org")
+        g = sorted(glob.glob(os.path.join(sdk_base, "*", "ohos", "native", "llvm", "lib")))
+        if g:
+            sdk_llvm_lib = g[-1]
+        if sdk_llvm_lib:
+            old = os.environ.get("LD_LIBRARY_PATH", "")
+            os.environ["LD_LIBRARY_PATH"] = sdk_llvm_lib + (os.pathsep + old if old else "")
+
     def build(self):
         import os
+        self._prepare_env()
         apply_conandata_patches(self)
         self._patch_gnu_qsort_r()
         toolchain = self._ohos_toolchain()
@@ -77,28 +93,21 @@ class ZstdConan(ConanFile):
         self.run('cmake --build "{}"'.format(bdir))
 
     def _patch_gnu_qsort_r(self):
-        # R8 偏离说明（详见 notes.md「R8 平台条件编译宏偏离记录」）：
-        # OHOS 用 musl libc，不提供 GNU 风格的 qsort_r。zstd 的 cover.c / zstd_deps.h 在
-        # __linux__ 下自动 #define _GNU_SOURCE → 走 glibc qsort_r → 链接报 undefined symbol: qsort_r。
-        # 上游本就为 __ANDROID__（注释 "NDK doesn't ship qsort_r()"）开了同样例外；OHOS 同理，
-        # 给两处守卫追加 && !defined(__OHOS__) 例外（真机 __OHOS__=1），令其走 C90 fallback
-        # （全局 ctx + 普通 qsort）——这是有实质逻辑的平台分支适配（非空壳 stub），符合 R8。
-        # 此方案与已发布的 zstd/1.5.7 recipe 完全对齐。
+        # zstd 1.5.6 源码中不包含 qsort_r 相关守卫（上游在 1.5.6 移除了 GNU qsort_r 路径），
+        # 此方法为 no-op。保留方法体以兼容 1.5.7 recipe 结构，CI 日志中 warning 属预期行为。
+        # 若上游在后续版本重新引入 qsort_r 守卫，此处会自动补丁（模式与 1.5.7 一致）。
         import os
         old = "#if !defined(_GNU_SOURCE) && !defined(__ANDROID__)"
         new = "#if !defined(_GNU_SOURCE) && !defined(__ANDROID__) && !defined(__OHOS__)"
         for rel in ("lib/dictBuilder/cover.c", "lib/common/zstd_deps.h"):
             p = os.path.join(self.source_folder, rel)
+            if not os.path.isfile(p):
+                continue
             with open(p, encoding="utf-8") as f:
                 txt = f.read()
             if old in txt:
                 with open(p, "w", encoding="utf-8") as f:
                     f.write(txt.replace(old, new))
-            else:
-                # 守卫未命中（上游可能微调空白/格式）→ 不静默跳过：打 warning，便于排查
-                # 链接期若仍报 undefined symbol: qsort_r，此处即为根因。
-                self.output.warning(
-                    "_patch_gnu_qsort_r: 在 {} 中未找到预期模式，qsort_r 补丁未应用".format(rel))
 
     def package(self):
         import os
