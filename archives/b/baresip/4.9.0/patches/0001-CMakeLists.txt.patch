@@ -1,0 +1,47 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -105,20 +105,21 @@
+   VER_MINOR=${PROJECT_VERSION_MINOR}
+   VER_PATCH=${PROJECT_VERSION_PATCH}
+   _GNU_SOURCE
+ )
+ 
+ add_compile_definitions(${RE_DEFINITIONS})
+ 
+ include_directories(
+   include
+   src
++  ${re_INCLUDE_DIRS}/re
+   ${RE_INCLUDE_DIRS}
+   ${OPENSSL_INCLUDE_DIR}
+ )
+ 
+ if(MOD_PATH)
+   add_definitions(-DMOD_PATH="${MOD_PATH}")
+ elseif(CMAKE_INSTALL_FULL_LIBDIR)
+   add_definitions(-DMOD_PATH="${CMAKE_INSTALL_FULL_LIBDIR}/baresip/modules")
+ endif()
+ 
+@@ -255,21 +256,21 @@
+     endif()
+   endforeach()
+ endif()
+ 
+ 
+ ##############################################################################
+ #
+ # Main target library
+ #
+ 
+-set(LINKLIBS ${RE_LIBRARIES} ${RE_LIBS})
++set(LINKLIBS ${RE_LIBRARIES} ${RE_LIBS} re::re)
+ 
+ if(WIN32)
+   list(APPEND LINKLIBS winmm gdi32 crypt32 strmiids ole32 oleaut32)
+ endif()
+ 
+ if(STATIC)
+   add_library(baresip STATIC ${SRCS} ${HEADERS})
+   target_link_libraries(baresip PUBLIC ${LINKLIBS} ${MODULES_DETECTED})
+   target_include_directories(baresip PUBLIC include)
+ else()
