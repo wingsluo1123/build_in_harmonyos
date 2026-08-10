@@ -2,18 +2,27 @@ import os
 import glob
 
 from conan import ConanFile
+from conan.tools.cmake import CMake, cmake_layout
 
 
 class HwinfoTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
+    generators = "CMakeDeps", "CMakeToolchain"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
+    def layout(self):
+        cmake_layout(self)
+
+    def build(self):
+        cmake = CMake(self)
+        cmake.configure()
+        cmake.build()
+
     def test(self):
         # R34: Test must actually exercise the package
-        # hwinfo is a command-line tool; run it to verify the package works
-        # Set up LD_LIBRARY_PATH for both libhd (from package) and libuuid (system)
+        # Run the hwinfo binary from the installed package
         pkg = self.dependencies["hwinfo"].package_folder
         lib_dir = os.path.join(pkg, "lib")
         bin_dir = os.path.join(pkg, "bin")
