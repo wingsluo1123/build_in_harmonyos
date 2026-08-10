@@ -5,7 +5,6 @@ Verifies that:
 1. The `xapian` Python package imports (the C++ extension loads)
 2. A WritableDatabase can be created and a document added (functional test)
 """
-import os
 import sys
 
 failures = []
