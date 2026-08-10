@@ -13,7 +13,7 @@ from conan.tools.files import (
 
 class AdqlConan(ConanFile):
     name = "adql"
-    version = "2"
+    version = "2.0"
     description = "libadql — C++ parser for IVOA ADQL 2.0 queries"
     license = "GPL-2.0"
     homepage = "https://github.com/Caltech-IPAC/libadql"
