@@ -67,6 +67,32 @@ class LibfmExtraConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
+
+        # Fix broken .la files in conan cache: pcre2 package ships .la files
+        # with libdir='//lib' and dependency_libs referencing '//lib/...' paths
+        # which libtool cannot resolve. Fix the paths to point to the actual
+        # package directory.
+        import glob
+        for _, dep in self.dependencies.items():
+            lib_dir = os.path.join(dep.package_folder, "lib")
+            for la_file in glob.glob(os.path.join(lib_dir, "*.la")):
+                try:
+                    with open(la_file, "r") as f:
+                        content = f.read()
+                    changed = False
+                    if "libdir='//lib'" in content:
+                        content = content.replace(
+                            "libdir='//lib'", f"libdir='{lib_dir}'")
+                        changed = True
+                    if "//lib/" in content:
+                        content = content.replace("//lib/", f"{lib_dir}/")
+                        changed = True
+                    if changed:
+                        with open(la_file, "w") as f:
+                            f.write(content)
+                except Exception:
+                    pass
+
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
