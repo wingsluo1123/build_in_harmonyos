@@ -49,6 +49,8 @@ def main():
                 idx = full_path.rfind("/" + module_rel)
                 perl5lib = full_path[:idx]
                 break
+        if pm_path:
+            break
     # Also check if .pm is directly in a directory (e.g., DBI.pm)
     if not pm_path:
         for root, dirs, files in os.walk(pkg_folder):
@@ -75,12 +77,17 @@ def main():
         # Actually load the Perl module (R34: not just file existence check)
         env = dict(os.environ)
         env["PERL5LIB"] = perl5lib
-        result = subprocess.run(
-            ["perl", "-e", "use " + MODULE + "; print 'loaded'"],
-            capture_output=True, text=True, env=env, timeout=10
-        )
-        if result.returncode != 0:
-            errors.append(f"Failed to load Perl module {MODULE}: {result.stderr.strip()}")
+        try:
+            result = subprocess.run(
+                ["perl", "-e", "use " + MODULE + "; print 'loaded'"],
+                capture_output=True, text=True, env=env, timeout=10
+            )
+            if result.returncode != 0:
+                errors.append(f"Failed to load Perl module {MODULE}: {result.stderr.strip()}")
+        except subprocess.TimeoutExpired:
+            errors.append(f"Perl module {MODULE} load timed out (10s)")
+        except FileNotFoundError:
+            errors.append("perl not found in PATH")
     else:
         errors.append(f"Found .pm file but could not determine PERL5LIB: {pm_path}")
 

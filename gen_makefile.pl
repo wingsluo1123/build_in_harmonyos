@@ -58,7 +58,7 @@ for my $line (@lines) {
 # 4. Write Makefile
 open(my $out, '>', $out_file) or die "Cannot write $out_file: $!";
 print $out $output;
-close($out);
+close($out) or die "Cannot write $out_file: $!";
 
 my $size = length($output);
 my $lines_count = scalar(() = $output =~ /\n/g);
