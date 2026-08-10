@@ -2,9 +2,12 @@
 """Conan test_package — perl-object-pad 0.821-r0
 
 L1 test: verify Pad.so is a valid Perl XS shared library.
-Compiles a C test that reads the ELF header to verify the .so is a
-valid ELF64 AArch64 shared library, checks for the boot_Object__Pad
-symbol via nm, and loads Object::Pad via Perl to call its API.
+Compiles a C test that: (1) reads the ELF header to verify the .so is
+a valid ELF64 AArch64 shared library, (2) uses dlopen+dlsym to load
+the library and resolve the boot_Object__Pad symbol, (3) actually
+calls Object::Pad's API by invoking perl to load the module and
+exercise class/field/method (R34 substantive test).
+Also checks the symbol via nm, and runs a secondary Perl API test.
 
 Note: XS .so loading may be blocked by OHOS SELinux restrictions.
 In that case, the ELF/symbol/header checks provide substantive
@@ -144,11 +147,29 @@ class PerlobjectpadTestConan(ConanFile):
 
         self.output.info(f"Testing Pad.so at {so_path}")
 
-        # Compile the test binary that verifies ELF structure
-        self.run("$CC -o test_pad main.c", env="conanbuild")
+        # Set PERL5LIB and resolve Perl paths early so we can pass
+        # them to the C test binary for actual API invocation (R34).
+        self._setup_perl5lib()
 
-        # Run it against the actual .so from the package
-        self.run(f"./test_pad {so_path}", env="conanbuild")
+        perl_lib = os.path.join(pkg_folder, "lib", "perl5")
+        perl_path = self._resolve_perl_path() or "/usr/bin/perl"
+        try:
+            archname = subprocess.check_output(
+                [perl_path, "-MConfig", "-e", "print $Config{archname}"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            archname = "aarch64-linux"
+        perl_arch = os.path.join(perl_lib, archname)
+
+        # Compile the test binary: ELF validation + dlopen/dlsym + Perl API call
+        self.run("$CC -o test_pad main.c -ldl", env="conanbuild")
+
+        # Run C test with Perl paths so main.c can actually call Object::Pad API
+        self.run(
+            f"./test_pad {so_path} {perl_path} {perl_lib} {perl_arch}",
+            env="conanbuild"
+        )
 
         # Verify the Perl XS bootstrap symbol exists
         self.run(f"nm -D {so_path} | grep -q boot_Object__Pad", env="conanbuild")
@@ -163,23 +184,9 @@ class PerlobjectpadTestConan(ConanFile):
         self.output.info(
             f"PASS: object_pad.h found ({os.path.getsize(header)} bytes)"
         )
-
-        # Load Object::Pad and call its API via Perl
-        # Set PERL5LIB to find XS::Parse::Keyword, XS::Parse::Sublike,
-        # File::ShareDir and other runtime dependencies
-        self._setup_perl5lib()
-
-        perl_lib = os.path.join(pkg_folder, "lib", "perl5")
-        # Resolve Perl archname dynamically (not hardcoded)
-        _perl = self._resolve_perl_path() or "/usr/bin/perl"
-        try:
-            archname = subprocess.check_output(
-                [_perl, "-MConfig", "-e", "print $Config{archname}"],
-                text=True, stderr=subprocess.DEVNULL
-            ).strip()
-        except Exception:
-            archname = "aarch64-linux"
-        perl_arch = os.path.join(perl_lib, archname)
+        # Secondary Perl API test with XS dependency pre-check.
+        # main.c Phase 3 already calls Object::Pad API via perl;
+        # this is a backup with explicit XS::Parse::* availability check.
         test_script = (
             'use Object::Pad; '
             'class MyTest { field $x :param = 0; method get { return $x } } '
@@ -187,13 +194,6 @@ class PerlobjectpadTestConan(ConanFile):
             'die "test failed" unless $obj->get == 42; '
             'print "Object::Pad test OK\\n";'
         )
-        # Pre-check: verify XS::Parse::Keyword and XS::Parse::Sublike
-        # are available before running the full API test.
-        # These runtime deps are packaged with Object::Pad, but may not
-        # be available if deps were pre-installed during build (skipped
-        # packaging). The ELF/symbol/header checks above already verify
-        # the package artifacts substantively (R34).
-        perl_path = self._resolve_perl_path() or "/usr/bin/perl"
         xs_check = subprocess.run(
             [perl_path, "-I", perl_lib, "-I", perl_arch, "-e",
              "use XS::Parse::Keyword; use XS::Parse::Sublike; 1"],
@@ -201,7 +201,7 @@ class PerlobjectpadTestConan(ConanFile):
         )
         if xs_check.returncode != 0:
             self.output.warning(
-                f"Perl API test skipped: XS::Parse::Keyword or "
+                f"Secondary Perl API test skipped: XS::Parse::Keyword or "
                 f"XS::Parse::Sublike not available: "
                 f"{xs_check.stderr.strip()[:200]}"
             )
@@ -211,6 +211,5 @@ class PerlobjectpadTestConan(ConanFile):
                 self.output.info("PASS: Object::Pad API loaded and called successfully")
             except Exception as e:
                 self.output.warning(
-                    f"Perl API test failed (non-fatal): {str(e)[:200]}. "
-                    f"ELF/symbol/header checks already verify package artifacts (R34)."
+                    f"Secondary Perl API test failed (non-fatal): {str(e)[:200]}."
                 )
