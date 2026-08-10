@@ -1,0 +1,59 @@
+--- a/configure
++++ b/configure
+@@ -8547,20 +8547,24 @@
+ if test x$VGCONF_PLATFORM_PRI_CAPS = xX86_SOLARIS \
+      -o x$VGCONF_PLATFORM_PRI_CAPS = xAMD64_SOLARIS; then
+     GLIBC_VERSION="solaris"
+ fi
+ 
+ # GLIBC_VERSION is empty if a musl libc is used, so use the toolchain tuple
+ # in this case.
+ if test x$GLIBC_VERSION = x; then
+     if $CC -dumpmachine | grep -q musl; then
+         GLIBC_VERSION=musl
++    # OHOS (HarmonyOS PC): 用户态 libc 为 musl 变体，三元组 aarch64-linux-ohos，
++    # configure 需走 musl 分支，否则报 "requires glibc 2.2 or later" 而失败
++    elif $CC -dumpmachine | grep -q ohos; then
++        GLIBC_VERSION=musl
+     fi
+ fi
+ 
+ # If this is glibc then figure out the generic (in file) libc.so and
+ # libpthread.so file paths to use in suppressions. Before 2.34 libpthread
+ # was a separate library, afterwards it was merged into libc.so and
+ # the library is called libc.so.6 (before it was libc-2.[0-9]+.so).
+ # Use this fact to set GLIBC_LIBC_PATH and GLIBC_LIBPTHREAD_PATH.
+ case ${GLIBC_VERSION} in
+ 2*)
+@@ -21530,28 +21534,25 @@
+ $debug ||
+ {
+   tmp= ac_tmp=
+   trap 'exit_status=$?
+   : "${ac_tmp:=$tmp}"
+   { test ! -d "$ac_tmp" || rm -fr "$ac_tmp"; } && exit $exit_status
+ ' 0
+   trap 'as_fn_exit 1' 1 2 13 15
+ }
+ # Create a (secure) tmp directory for tmp files.
+-
+-{
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+-  test -d "$tmp"
+-}  ||
++# E114 (HMDFS): mktemp -d / umask 077 创建的 2700 目录 owner 与进程 uid 不一致，
++# group 无写权限，不可写；直接用 mkdir（继承父目录 setgid，group 可写）。
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+ # Set up the scripts for CONFIG_FILES section.
+ # No need to generate them if there are no CONFIG_FILES.
+ # This happens for instance with `./config.status config.h'.
+ if test -n "$CONFIG_FILES"; then
+ 
+ 
+ ac_cr=`echo X | tr X '\015'`

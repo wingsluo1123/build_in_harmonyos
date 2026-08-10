@@ -1,0 +1,44 @@
+--- a/glibc-2.X-drd.supp
++++ b/glibc-2.X-drd.supp
+@@ -17,39 +17,39 @@
+ 
+ # Suppress all data races where the topmost frame is inside libc.so. Although
+ # this could hide some real data races, unfortunately this is the only way to
+ # not report any false positives on stdio functions. The glibc functions
+ # manipulating FILE objects use locking primitives that cannot be intercepted
+ # easily. See also the definitions of _IO_lock_lock() etc. in the file
+ # nptl/sysdeps/pthread/bits/stdio-lock.h in the glibc source tree.
+ {
+    drd-libc-stdio
+    drd:ConflictingAccess
+-   obj:*/lib*/libc.so.6
++   obj:
+ }
+ {
+    drd-libc-thread-cancellation-test
+    drd:ConflictingAccess
+    fun:write
+ }
+ {
+    drd-libc-random
+    drd:ConflictingAccess
+    fun:random_r
+    fun:random
+ }
+ {
+    drd-glibc-io-xsputn-mempcpy
+    drd:ConflictingAccess
+    fun:__GI_mempcpy
+    fun:_IO_*xsputn*
+-   obj:*/lib*/libc.so.6 
++   obj: 
+ }
+ 
+ #
+ # Suppression patterns for libstdc++, the implementation of the standard C++
+ # library included with the gcc compiler.
+ #
+ # Note: several versions of the libstdc++ library (4.2.2, 4.3.2, 4.4.0, 4.5.0
+ # and their predecessors) contain an implementation of the std::string class
+ # that triggers conflicting memory accesses. See also
+ # http://gcc.gnu.org/bugzilla/show_bug.cgi?id=40518

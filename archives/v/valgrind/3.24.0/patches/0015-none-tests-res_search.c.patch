@@ -1,0 +1,43 @@
+--- a/none/tests/res_search.c
++++ b/none/tests/res_search.c
+@@ -17,20 +17,25 @@
+     }
+     else
+     {
+         printf("Success!\n");
+     }
+     return 0;
+ }
+ 
+ int main(int argc, char** argv)
+ {
++#if defined(__OHOS__)
++    /* OHOS: libc 为 musl 变体，无全局 _res / res_search / res_init 符号 */
++    (void)argc; (void)argv;
++    return 0;
++#else
+     pthread_t pid;
+     if(2 != argc)
+     {
+         printf("Usage: %s <domain>\n", argv[0]);
+         return 1;
+     }
+ 
+     _res.options |= RES_DEBUG;
+     if(0 != res_init())
+     {
+@@ -54,13 +59,14 @@
+     {
+         printf("Error: res_search()\n");
+     }
+     else
+     {
+         printf("Success!\n");
+     }
+     }
+ #endif
+     return 0;
++#endif
+ }
+ 
+ 

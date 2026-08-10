@@ -1,0 +1,32 @@
+--- a/coregrind/vgdb.c
++++ b/coregrind/vgdb.c
+@@ -777,25 +777,27 @@
+    } else if (signum == SIGHUP) {
+       shutting_down = True;
+       sighup++;
+    } else if (signum == SIGPIPE) {
+       sigpipe++;
+    } else if (signum == SIGALRM) {
+       sigalrm++;
+ #if defined(VGPV_arm_linux_android) \
+     || defined(VGPV_x86_linux_android) \
+     || defined(VGPV_mips32_linux_android) \
+-    || defined(VGPV_arm64_linux_android)
++    || defined(VGPV_arm64_linux_android) \
++    || defined(__OHOS__)
+       /* Android has no pthread_cancel. As it also does not have
+          an invoker implementation, there is no need for cleanup action.
+          So, we just do nothing. */
+-      DEBUG(1, "sigalrm received, no action on android\n");
++      /* OHOS: libc 为 musl 变体，无 pthread_cancel 符号，同 Android 处理 */
++      DEBUG(1, "sigalrm received, no action on android/ohos\n");
+ #else
+       /* Note: we cannot directly invoke restore_and_detach : this must
+          be done by the thread that has attached.
+          We have in this thread pushed a cleanup handler that will
+          cleanup what is needed. */
+       DEBUG(1, "pthread_cancel invoke_gdbserver_in_valgrind_thread\n");
+       pthread_cancel(invoke_gdbserver_in_valgrind_thread);
+ #endif
+    } else {
+       ERROR(0, "unexpected signal %d\n", signum);

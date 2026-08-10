@@ -1,0 +1,29 @@
+--- a/helgrind/tests/bar_bad.c
++++ b/helgrind/tests/bar_bad.c
+@@ -82,21 +82,26 @@
+      and we will get an extra warning about the barrier being already
+      destroyed. */
+   pthread_create(&slp2, NULL, sleep1, (void*)bar4);
+   /* create a thread, whose only purpose is to block on the barrier */
+   pthread_create(&thr2, NULL, child1, (void*)bar4);
+   /* guarantee that it gets there first */
+   sleep(1);
+   /* and now destroy */
+   pthread_barrier_destroy(bar4);
+ 
++#if defined(__OHOS__)
++  /* OHOS: libc 为 musl 变体，无 pthread_cancel 符号，跳过取消 */
++  fprintf(stderr, "pthread_cancel skipped on OHOS\n");
++#else
+   pthread_cancel(slp2);
++#endif
+ 
+   /* destroy a barrier that was never initialised.  This is a bit
+      tricky, in that we have to fill the barrier with bytes which
+      ensure that the pthread_barrier_destroy call doesn't crash for
+      some reason.  One-fill seems to work ok on amd64-linux (glibc
+      2.8). */
+   fprintf(stderr, "\ndestroy a barrier that was never initialised\n");
+   /* Create a thread that just exits the process after some sleep.
+      We are really done at this point, even if we hang. */
+   pthread_create(&ext1, NULL, exit1, NULL);

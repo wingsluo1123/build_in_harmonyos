@@ -1,0 +1,24 @@
+--- a/none/tests/resolv.c
++++ b/none/tests/resolv.c
+@@ -1,15 +1,21 @@
+ 
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+ #include <resolv.h>
+ #include <stdio.h>
+ 
+ int main(int argc, char *argv[])
+ {
++#if defined(__OHOS__)
++   /* OHOS: libc 为 musl 变体，无全局 _res / res_init 符号 */
++   (void)argc; (void)argv;
++   return 0;
++#else
+    printf("PRE _res.nscount = %d\n", _res.nscount);
+    fflush(stdout);
+    res_init();
+    printf("POST _res.nscount = %d\n", ( int ) _res.nscount > 0 );
+    fflush(stdout);
+    return 0;
++#endif
+ }

@@ -1,0 +1,28 @@
+--- a/drd/tests/tsan_unittest.cpp
++++ b/drd/tests/tsan_unittest.cpp
+@@ -78,20 +78,25 @@
+ #include <string>
+ #include <map>
+ #include <queue>
+ #include <algorithm>
+ #include <cstring>      // strlen(), index(), rindex()
+ #include <ctime>
+ #include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
++
++// OHOS: libc 为 musl 变体，无 glibc 遗留函数 rindex，等价映射为 strrchr
++#if defined(__OHOS__) && !defined(rindex)
++#define rindex strrchr
++#endif
+ #include <sys/mman.h>  // mmap
+ #include <errno.h>
+ #include <stdint.h>    // uintptr_t
+ #include <stdlib.h>
+ #include <dirent.h>
+ 
+ #ifndef VGO_darwin
+ #include <malloc.h>
+ #endif
+ 

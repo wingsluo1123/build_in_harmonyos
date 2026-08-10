@@ -1,0 +1,32 @@
+--- a/drd/tests/pth_cancel_locked.c
++++ b/drd/tests/pth_cancel_locked.c
+@@ -33,22 +33,29 @@
+ 
+   /* Create thread. */
+   pthread_mutex_lock(&s_mutex1);
+   pthread_create(&tid, 0, &thread, 0);
+ 
+   /* Wait until the created thread has locked s_mutex2. */
+   pthread_cond_wait(&s_cond, &s_mutex1);
+   pthread_mutex_unlock(&s_mutex1);
+ 
+   /* Cancel the created thread. */
++#if defined(__OHOS__)
++  /* OHOS: libc 为 musl 变体，无 pthread_cancel 符号，跳过取消 */
++  fprintf(stderr, "pthread_cancel skipped on OHOS\n");
++#else
+   pthread_cancel(tid);
++#endif
+ 
+   /* Join the created thread. */
+   pthread_join(tid, 0);
+ 
++#if !defined(__OHOS__)
+   /* Invoke pthread_cancel() with an invalid thread ID. */
+   pthread_cancel(tid);
++#endif
+ 
+   fprintf(stderr, "Test finished.\n");
+ 
+   return 0;
+ }
