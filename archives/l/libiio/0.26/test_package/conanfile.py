@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+"""Test package for libiio 0.26"""
+import os
+
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-import os
 
 
 class TestPackageConan(ConanFile):
@@ -24,5 +27,5 @@ class TestPackageConan(ConanFile):
         cmake.build()
 
     def test(self):
-        test_bin = os.path.join(self.build_path, "test_iio")
+        test_bin = os.path.join(self.build_folder, "test_iio")
         self.run(test_bin, env="conanrun")

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — libiio 0.26 (CMake)"""
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
@@ -9,7 +11,6 @@ class LibiioConan(ConanFile):
     description = "Library for interfacing with Linux IIO (Industrial I/O) devices"
     license = "LGPL-2.1-or-later"
     homepage = "https://github.com/analogdevicesinc/libiio"
-    url = ""
 
     package_type = "library"
 

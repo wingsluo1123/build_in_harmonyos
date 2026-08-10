@@ -9,7 +9,7 @@
 ## 编译步骤
 
 1. 下载源码: https://github.com/analogdevicesinc/libiio/archive/refs/tags/v0.26.tar.gz
-2. 应用补丁: 0001-harmonyos-platform-support.patch
+2. 应用补丁: 0001-CMakeLists.txt.patch
 3. 安装 conan 依赖: libusb/1.0.27, libxml2/2.15.3
 4. CMake 配置:
    ```
@@ -35,7 +35,7 @@
 
 ## 源码修改
 
-补丁文件: patches/0001-harmonyos-platform-support.patch
+补丁文件: patches/0001-CMakeLists.txt.patch
 - 修改 CMakeLists.txt 中 5 处 MATCHES "Linux" 为 "Linux|HarmonyOS"
 - 修改 pthread 查找逻辑，添加 HarmonyOS 到跳过列表（同 Android）
 - 修改 IIOD pthread 检查，允许 HarmonyOS 跳过
