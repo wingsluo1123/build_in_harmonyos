@@ -73,20 +73,24 @@ class AlexConan(ConanFile):
         self.run(f"cd {self.source_folder} && runghc Setup.hs build", env="conanbuild")
 
     def package(self):
-        # Copy build products (usr/bin/alex) into the package folder.
-        self.run(
-            f"cd {self.source_folder} && runghc Setup.hs copy --destdir={self.package_folder}",
-            env="conanbuild",
+        # Copy the UNSTRIPPED built binary straight from the GHC dist dir.
+        # `runghc Setup.hs copy` strips the executable, and stripped GHC ELFs
+        # cannot exec on OHOS (EPERM / Permission denied); the unstripped
+        # dist binary runs fine (verified: --version/--help/.x all pass).
+        import glob
+
+        found = glob.glob(
+            os.path.join(self.build_folder, "**", "dist", "build", "alex", "alex"),
+            recursive=True,
         )
-        # Normalize /usr-prefixed layout to the standard Conan layout.
-        usr = os.path.join(self.package_folder, "usr")
-        if os.path.isdir(usr):
-            for entry in os.listdir(usr):
-                src = os.path.join(usr, entry)
-                dst = os.path.join(self.package_folder, entry)
-                if not os.path.lexists(dst):
-                    os.rename(src, dst)
-            shutil.rmtree(usr, ignore_errors=True)
+        if not found:
+            found = glob.glob(
+                os.path.join(self.source_folder, "**", "dist", "build", "alex", "alex"),
+                recursive=True,
+            )
+        assert found, "alex binary not found under build/source folders"
+        copy(self, "alex", os.path.dirname(found[0]),
+             os.path.join(self.package_folder, "bin"))
         # alex needs its runtime templates (AlexTemplate.hs/AlexWrappers.hs);
         # by default it looks at a build-time baked absolute datadir, so ship
         # them relocatably under share/ and let consumers pass --template=DIR
