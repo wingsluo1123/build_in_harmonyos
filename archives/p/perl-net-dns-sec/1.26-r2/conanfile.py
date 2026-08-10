@@ -65,9 +65,11 @@ class PerlnetdnssecConan(ConanFile):
             content = f.read()
 
         sysroot_inc = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr/include"
+        # OpenSSL headers not in sysroot; use Node.js bundled OpenSSL
+        openssl_inc = "/data/service/hnp/node.org/node_v24.13.0/include/node"
         content = re.sub(
             r"^(CCFLAGS = -D_GNU_SOURCE)",
-            rf"CCFLAGS = -isystem {sysroot_inc} -D_GNU_SOURCE",
+            rf"CCFLAGS = -isystem {sysroot_inc} -isystem {openssl_inc} -D_GNU_SOURCE",
             content,
             flags=re.MULTILINE,
         )

@@ -26,6 +26,13 @@ class PerlCryptOpensslDsa(ConanFile):
             if os.path.exists(makefile):
                 with open(makefile, "r") as mf:
                     content = mf.read()
+                # OpenSSL headers not in sysroot; use Node.js bundled OpenSSL
+                openssl_inc = "/data/service/hnp/node.org/node_v24.13.0/include/node"
+                if "CCFLAGS =" in content and openssl_inc not in content:
+                    content = content.replace(
+                        "CCFLAGS = -D_GNU_SOURCE",
+                        f"CCFLAGS = -isystem {openssl_inc} -D_GNU_SOURCE"
+                    )
                 if "-nostartfiles" not in content:
                     content = content.replace("LDDLFLAGS =", "LDDLFLAGS = -nostartfiles -nodefaultlibs -L/system/lib64 -lc")
                 with open(makefile, "w") as mf:

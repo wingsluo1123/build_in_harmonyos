@@ -2,15 +2,15 @@
 +++ b/Makefile.PL
 @@ -33,20 +33,34 @@
  $flags =~ s/([^A-Za-z0-9 -_])/\\$1/g; # escape shell-metachars
-
+ 
  $|=1; # to see output immediately
  $^W=1;
-
+ 
  my %define;
  my @libs;
  my $Package_Version = '1.20';  # keep this consistent with Tty.pm
  my $Is_Beta = ($Package_Version =~ m/_/);
-
+ 
 +## OpenHarmony: Hardcode configuration for musl libc (configure checks fail due to CRT missing)
 +$define{'-DHAVE_GRANTPT'} = undef;
 +$define{'-DHAVE_OPENPTY'} = undef;
@@ -26,33 +26,33 @@
 +$define{'-DHAVE_UNLOCKPT'} = undef;
 +
  open(SUB, ">xssubs.c") or die "open: $!";
-
+ 
  warn "WARNING: perl versions prior to 5.8 are untested and may have problems.\n"
    if $] < 5.008;
-
+ 
  # improve backward-compatibility
  @define{qw(-DPL_sv_undef=sv_undef -DPL_dowarn=dowarn)} = (undef, undef)
    if $] < 5.004_05;
-
+ 
  print <<_EOT_;
 @@ -68,21 +82,21 @@
    if (-c '/dev/ptym/clone');
-
+ 
  $define{'-DHAVE_DEV_PTC'} = undef
    if (-c "/dev/ptc");
-
+ 
  $define{'-DHAVE_DEV_PTMX_BSD'} = undef
    if (-c "/dev/ptmx_bsd");
-
+ 
  if (-d "/dev/ptym" and -d "/dev/pty") {
    $define{'-DHAVE_DEV_PTYM'} = undef;
 -
 +
  }
-
-
-
-
+ 
+ 
+ 
+ 
  # config tests go to a separate dir
  unless( mkdir 'conf', 0777 ) {
    my $e = $!;
@@ -62,19 +62,19 @@
  use Cwd qw(getcwd);
  my $dir = getcwd;
  chdir('conf') or die "chdir: $!";
-
+ 
  open(TST,">compilerok.c") or die "open: $!";
  print TST <<'ESQ';
  int main () { return 0; }
  ESQ
  close(TST);
-
+ 
 -if (system("$cfg{'cc'} $flags compilerok.c > compilerok.log 2>&1")) {
 +## OpenHarmony: Skip linking check (CRT files missing)
 +## Use -c to only compile, not link
 +if (system("$cfg{'cc'} $flags -c compilerok.c > compilerok.log 2>&1")) {
    die <<"__EOT__";
-
+ 
  ERROR: cannot run the configured compiler '$cfg{'cc'}'
  (see conf/compilerok.log). Suggestions:
  1) The compiler '$cfg{'cc'}' is not in your PATH. Add it
@@ -92,7 +92,7 @@
  	     ptsname      => "",
  	     ptsname_r    => "",
  	    );
-
+ 
  foreach my $f (sort keys %funcs) {
 +  ## OpenHarmony: Skip detection if already hardcoded
 +  my $defkey = "-DHAVE_\U$f";
@@ -113,13 +113,13 @@
  #endif
  /* We use char because int might match the return type of a gcc2
 @@ -186,20 +210,28 @@
-
+ 
  # find various headerfiles
-
+ 
  my @headers = qw(termios.h termio.h libutil.h util.h pty.h
                   sys/stropts.h sys/ptyio.h sys/pty.h);
  my %headers;
-
+ 
  foreach my $h (sort @headers) {
    my $def = $h;
    $def =~ s/\W/_/g;
@@ -144,14 +144,14 @@
 @@ -279,62 +311,28 @@
  	    VSUSP VSWTCH VT0 VT1 VTDLY VTIME VWERASE WRAP XCASE XCLUDE
  	    XMT1EN XTABS);
-
+ 
  print <<_EOT_;
  Checking which symbols compile OK...
  (sorry for the tedious check, but some systems have not too clean
   header files, to say the least;  '+' means OK, '-' means not defined
   and '*' has compile problems...)
  _EOT_
-
+ 
 +## OpenHarmony: Skip symbol check entirely (CRT files missing, detection will fail)
 +print "Skipping symbol check (OpenHarmony: CRT files missing).\n\n";
  my %badsyms;
@@ -200,13 +200,13 @@
 +  print "+$s ";
 +  print SUB qq{newCONSTSUB(stash, "$s", newSViv($s));\n};
  }
-
+ 
  close(SUB);
  print "\n\n";
-
+ 
  # now back to Makefile dir
  chdir($dir) or die "chdir: $!";
-
+ 
  my $all_ok = 1;
  foreach my $check
 @@ -465,26 +463,29 @@
@@ -230,12 +230,12 @@
 +    ## Use -nostartfiles -nodefaultlibs to skip CRT, -lc for libc
 +    dynamic_lib    => { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -lc' },
  );
-
+ 
  sub MY::postamble {
-
+ 
    return '' unless $] >= 5.00503;
-
+ 
  <<'ESQ';
-
+ 
  dist : ppd
-
+ 
