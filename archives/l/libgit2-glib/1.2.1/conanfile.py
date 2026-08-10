@@ -135,3 +135,4 @@ class Libgit2GlibConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = ["git2-glib-1.0"]
         self.cpp_info.includedirs = ["include/libgit2-glib-1.0"]
+        self.cpp_info.requires = ["glib::glib", "libgit2::libgit2"]
