@@ -27,7 +27,7 @@ class Qt5Qt3dConan(ConanFile):
         basic_layout(self)
 
     def requirements(self):
-        self.requires("qt5-qtbase/5.15.2")
+        self.requires("qt5-qtbase/5.15.2.2")
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
