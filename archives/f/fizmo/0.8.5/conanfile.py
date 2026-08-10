@@ -56,8 +56,12 @@ class FizmoConan(ConanFile):
         triplet = f"{machine}-unknown-linux-gnu"
         # --disable-x11：fizmo configure 用 --enable-x11 选项（configure 2384 行），
         # 只构建 ncursesw 终端前端，禁用 X11 前端（CI #17368 报 No package 'x11' found）
+        # --disable-jpeg：fizmo configure 支持 --disable-jpeg（configure 1495 行），
+        # 禁用 JPEG 图像支持（文本 Z-machine 解释器不需要；CI #17480 报
+        # Could not find libjpeg.h）
         tc.configure_args.extend(
-            [f"--build={triplet}", f"--host={triplet}", "--disable-x11"])
+            [f"--build={triplet}", f"--host={triplet}",
+             "--disable-x11", "--disable-jpeg"])
         # fizmo configure 硬编码路径检测 libxml/tree.h（/usr/include/libxml2 等），
         # 需传 --with-libxml2-includedir 指向 libxml2 包 include
         tc.configure_args.append(
