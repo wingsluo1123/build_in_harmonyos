@@ -26,6 +26,10 @@ class PopplerTestConan(ConanFile):
 
     def requirements(self):
         self.requires(self.tested_reference_str)
+        # test_qt5.cpp 的 Qt5 绑定测试需要 Qt5 头/库；直接声明 qt5-qtbase
+        # 让 CMakeDeps 为本 test_package 生成 Qt5Config.cmake（与 qt5-qtbase
+        # 自身 test_package 的 find_package(Qt5)+Qt5::Core 用法一致）。
+        self.requires("qt5-qtbase/5.15.2.1")
 
     def layout(self):
         cmake_layout(self)
@@ -40,6 +44,18 @@ class PopplerTestConan(ConanFile):
                 tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = f"{existing} -Wl,-rpath,{lib_dir}"
             else:
                 tc.cache_variables["CMAKE_EXE_LINKER_FLAGS"] = f"-Wl,-rpath,{lib_dir}"
+        # test_qt5.cpp 经 poppler-qt5.h -> poppler-annotation.h 间接 include
+        # <QtCore/QDateTime> 等 Qt5 头。qt5-qtbase 经 poppler 传递进图，但
+        # CMakeDeps 聚合 Qt5Config.cmake 在消费侧未把 Qt5::Core 的 include 目录
+        # 透传给 test_poppler_qt5（CI 实测报 'QtCore/QDateTime' file not found）。
+        # 直接把 qt5-qtbase 的 Qt5 模块头目录加到 CMAKE_CXX_FLAGS 保证编译期
+        # 可见；链接仍走 find_package(Qt5)+Qt5::Core 目标。
+        qt5 = self.dependencies["qt5-qtbase"]
+        qt5_inc = os.path.join(qt5.package_folder, "include")
+        qt5_inc_flags = " ".join("-I" + os.path.join(qt5_inc, m) for m in
+                                 ("", "QtCore", "QtGui", "QtXml", "QtWidgets"))
+        existing_cxx = tc.cache_variables.get("CMAKE_CXX_FLAGS", "")
+        tc.cache_variables["CMAKE_CXX_FLAGS"] = (existing_cxx + " " + qt5_inc_flags).strip()
         tc.generate()
 
     def build(self):
