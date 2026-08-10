@@ -2,20 +2,56 @@ software: hwinfo
 version: 25.2
 status: built
 build_system: makefile
-url: https://api.opensuse.org/public/source/openSUSE:Factory/hwinfo/hwinfo-25.2.tar.xz
+url: https://api.opensuse.org/public/source/openSUSE:Factory/hwinfo/hwinfo-25.2.tar.xz?rev=201
+sha256: 3cca7025a6de7de5b609275414026395f19de4b2db422b994da26809fcec2f8f
 dependencies: []
 configure_options: []
 compiler: clang
 platform: aarch64
 kernel_version: 5.10.0
-last_updated: 2026-04-29
+last_updated: 2026-08-11
 
 compilation_notes:
-  - "手动生成 version.h 文件以解决 HD_VERSION_STRING 未定义错误"
-  - "系统缺少 install 命令，手动复制文件到 staging 目录"
+  - "Conan 配方适配: version.h 和 uuid/uuid.h 在 build() 方法中生成"
+  - "flex 用于生成 lex.yy.c (Makefile 期望 lex 命令)"
+  - "libuuid 从 HNP 包获取 (colrm.org/colrm_1.1/lib)"
+  - "HWINFO_VERSION=25.2 跳过 git2log (需要 .git 目录)"
+  - "sockaddr_storage 重定义修复 (net.c/pppoe.c/wlan.c)"
 
 issues_fixed:
+  - issue: "sockaddr_storage redefinition"
+    root_cause: "OHOS SDK 的 sys/socket.h 和 linux/socket.h 都定义了 sockaddr_storage"
+    solution: "定义 _UAPI_LINUX_SOCKET_H 宏跳过 linux/socket.h，手动 typedef __kernel_sa_family_t"
+    knowledge_ref: "E119"
   - issue: "HD_VERSION_STRING 未定义"
-    root_cause: "Makefile 应自动生成 version.h 但未生成"
-    solution: "手动执行 echo '#define HD_VERSION_STRING \"25.2\"' > src/hd/version.h"
-    knowledge_ref: "新建知识条目 E-git2log-permission"
+    root_cause: "Makefile 的 git2log 脚本需要 .git 目录但源码包没有"
+    solution: "conanfile.py build() 方法中创建 version.h"
+  - issue: "uuid/uuid.h 缺失"
+    root_cause: "系统有 libuuid 库但缺少 uuid/uuid.h 头文件"
+    solution: "conanfile.py build() 方法中创建标准 uuid/uuid.h 头文件"
+  - issue: "lex 命令不存在"
+    root_cause: "OpenHarmony 没有 lex 命令，只有 flex"
+    solution: "conanfile.py build() 方法中用 flex 生成 lex.yy.c"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/hwinfo-25.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/hwinfo-25.2.work
+  source_orig_hash: 51771fb2fcc9e601
+  source_work_hash: 7420060604b25b0c
+  generated_at: '2026-08-11T01:45:37'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-src-hd-net.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-hd-pppoe.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-hd-wlan.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
