@@ -80,16 +80,17 @@ class XapianBindingsConan(ConanFile):
              "import sysconfig; print(sysconfig.get_paths()['include'])"],
             capture_output=True, text=True).stdout.strip()
 
-        # 完整工具链（CI 干净 PATH 无 ar/ranlib/nm/ld，参照 xapian-core 配方）。
-        # 关键：CC/CXX 用 bash 包裹（"{config_shell} {cc}"），与 xapian-core
-        # 一致 —— OHOS 上直接执行 clang 链接测试程序会失败
-        # (C compiler cannot create executables)，bash 包裹后可用。
+        # 完整工具链（参照 CI 已验证通过的 xapian-core 配方）。
+        # 关键 1: CC/CXX 用 bash 包裹（"{config_shell} {cc}"）——OHOS 上
+        # clang 是 shell 脚本，直接作为 CC 会失败。
+        # 关键 2: 不传 --build/--host —— config.guess/sub 补丁已让 configure
+        # 自动识别 OHOS 为 aarch64-unknown-linux-ohos（native 编译）。
+        config_shell = shutil.which("bash") or "/system/bin/sh"
+        cc_cmd = config_shell
+        cxx_cmd = config_shell
         cc = self.conf.get("tools.build:compiler_executables", default={})
-        cc_cmd = cc.get("c", "clang")
-        cxx_cmd = cc.get("cpp", cc_cmd + "++")
-        config_shell = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/system/bin/sh"
-        cc_cmd = f"{config_shell} {cc_cmd}"
-        cxx_cmd = f"{config_shell} {cxx_cmd}"
+        cc_bin = cc.get("c", "clang")
+        cxx_bin = cc.get("cpp", cc_bin + "++")
         ar = shutil.which("llvm-ar") or shutil.which("ar") or "ar"
         ranlib = shutil.which("llvm-ranlib") or shutil.which("ranlib") or "ranlib"
         nm = shutil.which("llvm-nm") or shutil.which("nm") or "nm"
@@ -104,9 +105,10 @@ class XapianBindingsConan(ConanFile):
             f'LDFLAGS="-L{xc_lib}"'
         )
         self.run(
-            f'CC="{cc_cmd}" CXX="{cxx_cmd}" AR="{ar}" RANLIB="{ranlib}" '
-            f'NM="{nm}" LD="{ld}" CONFIG_SHELL="{config_shell}" '
-            f'{config_shell} ./configure {configure_args}',
+            f'CC="{cc_cmd} {cc_bin}" CXX="{cxx_cmd} {cxx_bin}" '
+            f'AR="{ar}" RANLIB="{ranlib}" NM="{nm}" LD="{ld}" '
+            f'CONFIG_SHELL="{config_shell}" '
+            f'"{config_shell}" ./configure {configure_args}',
             cwd=self.source_folder,
         )
 
