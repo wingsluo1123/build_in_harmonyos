@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan consumer test for murex 7.2.1001."""
+"""Conan consumer test for murex 7.2.1001.1."""
 
 import os
 import sys

@@ -30,6 +30,7 @@ def main():
         raise RuntimeError(f"Unexpected murex command output: {echo_output!r}")
 
     version_output = run([str(exe), "-version"])
+    # murex upstream reports full version like "7.2.1001" — accept point suffix
     if "7.2.1001" not in version_output:
         raise RuntimeError(f"murex version output does not contain 7.2.1001: {version_output!r}")
 

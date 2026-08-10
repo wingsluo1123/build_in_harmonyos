@@ -15,8 +15,8 @@
 ### 2.1 Building from source（日志第 91 行）
 
 ```
-murex/7.2.1001: Building from source
-murex/7.2.1001: Building your package in /storage/Users/currentUser/.conan2/p/b/murex61652286e3057/b
+murex/7.2.1001.1: Building from source
+murex/7.2.1001.1: Building your package in /storage/Users/currentUser/.conan2/p/b/murex61652286e3057/b
 ```
 
 ### 2.2 上游 go test ./...（日志第 102-228 行）
@@ -52,7 +52,7 @@ ok  	github.com/lmorg/murex/builtins/core/processes	7.652s
 | exit code | 0 |
 | Recipe revision | `73b8bb2e05cecfabfcc14d8e8d03d02e` |
 | Package ID | `6b129b068851896169fae42d399fa922d239ce8a` |
-| conan 缓存 | `conan list "murex/*"` → Local Cache 中有 `murex/7.2.1001` |
+| conan 缓存 | `conan list "murex/*"` → Local Cache 中有 `murex/7.2.1001.1` |
 
 ---
 
@@ -119,6 +119,6 @@ except PermissionError:
 | 1. 本地构建 | `conan create ... --build=missing -nr` | exit 0，15MB ELF arm64 二进制 |
 | 2. 上游测试 | `go test ./...`（build() 内） | 109 ok / 0 FAIL |
 | 3. test_package | `conan test test_package ...` | 3/3 断言通过 |
-| 4. 缓存确认 | `conan list "murex/*"` | murex/7.2.1001 in Local Cache |
+| 4. 缓存确认 | `conan list "murex/*"` | murex/7.2.1001.1 in Local Cache |
 
 完整日志路径：`/storage/Users/currentUser/Desktop/build_in_harmonyos/.murex-verify.log`

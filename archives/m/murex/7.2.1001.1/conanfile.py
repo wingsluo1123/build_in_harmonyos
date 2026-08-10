@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for murex 7.2.1001."""
+"""Conan recipe for murex 7.2.1001.1."""
 
 import os
 import platform
@@ -16,7 +16,7 @@ from conan.tools.layout import basic_layout
 
 class MurexConan(ConanFile):
     name = "murex"
-    version = "7.2.1001"
+    version = "7.2.1001.1"
     description = "Bash-like shell designed for greater command-line productivity and safer scripts"
     license = "GPL-2.0-only"
     homepage = "https://github.com/lmorg/murex"
@@ -275,7 +275,27 @@ class MurexConan(ConanFile):
             mode |= stat.S_IWUSR
         if not is_dir:
             mode |= stat.S_IWUSR
-        os.chmod(path, mode | read_exec)
+        try:
+            os.chmod(path, mode | read_exec)
+        except PermissionError:
+            # HMDFS: chmod on non-owned files fails even when we only add bits.
+            # If the file is already executable (or readable for non-exec), skip.
+            if not (executable or is_dir):
+                raise
+            if os.access(path, os.X_OK):
+                return
+            # HMDFS tar extraction can drop the executable bit entirely; the
+            # chmod above failed because we are not the owner. Fall back to a
+            # copy-then-replace in the Conan build folder (which we own), so we
+            # can chmod the new inode and swap it back atomically-ish.
+            if executable and not is_dir:
+                tmp = path + ".chmodtmp"
+                shutil.copy2(path, tmp)
+                os.chmod(tmp, mode | read_exec)
+                os.replace(tmp, path)
+                if os.access(path, os.X_OK):
+                    return
+            raise
 
     def _sign_ohos_executable(self, path):
         if self.settings.os != "OHOS" or not os.path.isfile(path):

@@ -1,4 +1,4 @@
-# murex 7.2.1001 HarmonyOS PC notes
+# murex 7.2.1001.1 HarmonyOS PC notes
 
 ## Adaptation summary
 
