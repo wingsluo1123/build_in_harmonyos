@@ -12,9 +12,9 @@ typedef struct {} ENGINE;
 typedef struct {} EVP_ENCODE_CTX;
 #define EVP_MAX_MD_SIZE 64
 
-static inline const EVP_MD *EVP_sha256(void) { return (const EVP_MD *)1; }
-static inline const EVP_MD *EVP_sha512(void) { return (const EVP_MD *)1; }
-static inline const EVP_MD *EVP_md5(void) { return (const EVP_MD *)1; }
+static inline const EVP_MD *EVP_sha256(void) { return NULL; }
+static inline const EVP_MD *EVP_sha512(void) { return NULL; }
+static inline const EVP_MD *EVP_md5(void) { return NULL; }
 static inline EVP_MD_CTX *EVP_MD_CTX_new(void) { return NULL; }
 static inline void EVP_MD_CTX_free(EVP_MD_CTX *ctx) { (void)ctx; }
 static inline EVP_MD_CTX *EVP_MD_CTX_create(void) { return NULL; }
@@ -25,7 +25,7 @@ static inline int EVP_DigestUpdate(EVP_MD_CTX *ctx, const void *d, size_t n) { (
 static inline int EVP_DigestFinal_ex(EVP_MD_CTX *ctx, unsigned char *md, unsigned int *s) { (void)ctx;(void)md;(void)s; return 1; }
 static inline int EVP_DigestVerify(EVP_MD_CTX *ctx, const unsigned char *sig, size_t slen, const unsigned char *data, size_t dlen) { (void)ctx;(void)sig;(void)slen;(void)data;(void)dlen; return 1; }
 static inline int EVP_DigestVerifyInit(EVP_MD_CTX *ctx, EVP_PKEY_CTX **ppctx, const EVP_MD *type, ENGINE *e, EVP_PKEY *pkey) { (void)ctx;(void)ppctx;(void)type;(void)e;(void)pkey; return 1; }
-static inline const EVP_MD *EVP_get_digestbyname(const char *n) { (void)n; return (const EVP_MD *)1; }
+static inline const EVP_MD *EVP_get_digestbyname(const char *n) { (void)n; return NULL; }
 static inline int EVP_MD_size(const EVP_MD *md) { (void)md; return 32; }
 static inline int EVP_PKEY_id(const EVP_PKEY *pk) { (void)pk; return 0; }
 static inline int EVP_PKEY_base_id(const EVP_PKEY *pk) { (void)pk; return 0; }

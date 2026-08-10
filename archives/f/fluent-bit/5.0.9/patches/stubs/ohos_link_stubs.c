@@ -97,5 +97,9 @@ int pthread_cancel(void *thread) { return 0; }
 #endif
 
 /* --- pthread cancel state/type stubs (musl lacks them on OHOS) --- */
-int pthread_setcancelstate(int state, int *oldstate) { if (oldstate) *oldstate = 0; return 0; }
-int pthread_setcanceltype(int type, int *oldtype) { if (oldtype) *oldtype = 0; return 0; }
+#ifndef HAVE_PTHREAD_SETCANCELSTATE
+int pthread_setcancelstate(int state, int *oldstate) { (void)state; if (oldstate) *oldstate = 0; return 0; }
+#endif
+#ifndef HAVE_PTHREAD_SETCANCELTYPE
+int pthread_setcanceltype(int type, int *oldtype) { (void)type; if (oldtype) *oldtype = 0; return 0; }
+#endif
