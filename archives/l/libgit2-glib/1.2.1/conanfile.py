@@ -17,7 +17,7 @@ class Libgit2GlibConan(ConanFile):
     description = "GLib wrapper for libgit2, providing Git repository access via GObject"
     license = "LGPL-2.1-or-later"
     homepage = "https://gitlab.gnome.org/GNOME/libgit2-glib"
-    url = ""  # CI fills this
+    url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -63,13 +63,17 @@ class Libgit2GlibConan(ConanFile):
         tc.generate()
 
         # Fix: add ar/strip to meson native file (MesonToolchain doesn't set these)
+        # Use environment variables for portability across local and CI environments
+        ar_bin = os.environ.get("AR", "llvm-ar")
+        strip_bin = os.environ.get("STRIP", "llvm-strip")
+        ld_bin = os.environ.get("LD", "ld.lld")
         native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
         if os.path.exists(native_file):
             content = load(self, native_file)
             if "ar = " not in content:
                 content = content.replace(
                     "[binaries]\n",
-                    "[binaries]\nar = '/data/service/hnp/bin/llvm-ar'\nstrip = '/data/service/hnp/bin/llvm-strip'\nld = '/data/service/hnp/bin/ld.lld'\n",
+                    f"[binaries]\nar = '{ar_bin}'\nstrip = '{strip_bin}'\nld = '{ld_bin}'\n",
                 )
                 save(self, native_file, content)
 
@@ -90,9 +94,6 @@ class Libgit2GlibConan(ConanFile):
         # but meson needs gobject-2.0.pc and gio-2.0.pc separately
         glib_pkg = self.dependencies["glib"]
         glib_prefix = glib_pkg.package_folder
-        glib_libdir = f"{glib_prefix}/lib"
-        glib_inc = f"{glib_prefix}/include/glib-2.0"
-        glib_inc1 = f"{glib_prefix}/lib/glib-2.0/include"
 
         gobject_pc = os.path.join(self.generators_folder, "gobject-2.0.pc")
         if not os.path.exists(gobject_pc):
