@@ -33,6 +33,9 @@ class LibeditTestConan(ConanFile):
                     os.symlink("/usr/lib/libtinfo.so.6", tinfo_link)
                 except OSError:
                     pass
+            # Add to LDFLAGS so CMakeToolchain/CMake can find libtinfo.so
+            current = os.environ.get("LDFLAGS", "")
+            os.environ["LDFLAGS"] = f"-L{lib_dir} {current}".strip()
 
     def build(self):
         cmake = CMake(self)
