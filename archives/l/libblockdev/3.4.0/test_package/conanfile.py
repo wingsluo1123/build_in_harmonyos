@@ -50,7 +50,9 @@ class LibblockdevTestConan(ConanFile):
         cflags = " ".join(sorted(inc_dirs))
         ldflags = " ".join(sorted(lib_dirs)) + " " + " ".join(libs)
 
-        compiler = "clang"
+        # Get compiler from Conan conf (R33)
+        compiler_executables = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict)
+        compiler = compiler_executables.get("c", "clang")
         self.run(f"{compiler} {cflags} -o test_libblockdev test.c {ldflags} -ldl -lpthread -lm",
                  env="conanbuild")
 
