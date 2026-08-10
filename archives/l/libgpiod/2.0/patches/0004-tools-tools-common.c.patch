@@ -1,19 +1,11 @@
---- a/tools/tools-common.c
-+++ b/tools/tools-common.c
-@@ -11,20 +11,46 @@
- #include <inttypes.h>
- #include <limits.h>
- #include <stdarg.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
- #include <sys/stat.h>
- #include <time.h>
+--- a/tools/tools-common.c	2023-02-26 04:30:03.000000000 +0800
++++ b/tools/tools-common.c	2026-08-11 00:36:24.467791406 +0800
+@@ -19,6 +19,32 @@
  
  #include "tools-common.h"
-+
-+/* HarmonyOS/musl libc compatibility: provide program_invocation_name */
-+#ifdef __OHOS__
+ 
++/* musl libc compatibility: provide program_invocation_name (glibc extension) */
++#ifndef __GLIBC__
 +static char __ohos_prog_name[256] = "unknown";
 +static char __ohos_prog_short_name[256] = "unknown";
 +
@@ -36,14 +28,8 @@
 +
 +#define program_invocation_name __ohos_prog_name
 +#define program_invocation_short_name __ohos_prog_short_name
-+#endif /* __OHOS__ */
- 
++#endif /* !__GLIBC__ */
++
  const char *get_progname(void)
  {
  	return program_invocation_name;
- }
- 
- void print_error(const char *fmt, ...)
- {
- 	va_list va;
- 
