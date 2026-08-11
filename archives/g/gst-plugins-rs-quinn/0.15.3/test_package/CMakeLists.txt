@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 project(test_gst-plugins-rs-quinn C)
 
-# dlopen test: verify the packaged plugin .so exports its entry points.
-# No gstreamer headers needed at compile time (pure dlopen/dlsym test),
-# so we only link against libdl.
+# ELF symbol table verification test: parses the packaged .so ELF structure
+# directly (Elf64 header / section headers / .dynsym / .dynstr), no
+# dlopen/dlsym needed due to OHOS ldso namespace limitation (E186).
 add_executable(test_gst-plugins-rs-quinn test.c)
 target_link_libraries(test_gst-plugins-rs-quinn ${CMAKE_DL_LIBS})
 
