@@ -30,15 +30,17 @@ class AdqlConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # 上游使用 waf 构建系统（自带 waf 脚本）。
-        # OHOS CI Worker 网络受限且 waf 需 python2 兼容，改用显式 python 调用。
+        # 上游使用 waf 构建系统。libadql 源码树中的 waf 脚本文件名是
+        # waf-1.7.9 / waf-2.0.23（不带版本号的可执行文件并不存在），
+        # 直接用 `waf` 调用会得到 Error 127 (command not found)。
+        # 选用较新的 waf-2.0.23，并用 python 显式调用（CI 的 python 兼容）。
         python = "python"
         self.run(
-            f'"{python}" waf configure --prefix="{self.package_folder}"',
+            f'"{python}" waf-2.0.23 configure --prefix="{self.package_folder}"',
             cwd=self.source_folder,
         )
-        self.run(f'"{python}" waf build', cwd=self.source_folder)
-        self.run(f'"{python}" waf install', cwd=self.source_folder)
+        self.run(f'"{python}" waf-2.0.23 build', cwd=self.source_folder)
+        self.run(f'"{python}" waf-2.0.23 install', cwd=self.source_folder)
 
     def package_info(self):
         self.cpp_info.libs = ["adql"]
