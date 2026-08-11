@@ -69,6 +69,7 @@ Dependency status:
 - Retained the previous OHOS patch file names for review traceability while keeping Conan's active patch set reproducible:
   - Applied by `conandata.yml`: `0001-support-linux-ohos-config-triplet.patch` and `0002-use-mkdir-for-config-status-tempdirs-on-ohos.patch`.
   - Retained/audited but not applied by `conandata.yml`: `0001-bin-autoconf.patch`, `0002-build-aux-config.guess.patch`, `0003-build-aux-config.sub.patch`, `0004-lib-version.m4.patch`, `0005-tests-atconfig.patch`, and `0006-tests-atlocal.patch`. The current active triplet patch already covers the portable `config.guess`/`config.sub` parts. The previous generated-file patches embedded fixed device paths. Applying source-template replacements for those generated-file names on the release tarball marks man page dependencies stale and makes `make` require missing maintainer tools such as `help2man`; Conan instead lets `configure` generate those files and the recipe wraps installed commands to provide relocatable Perl/macro paths.
+- The active and audit `config.guess` patches use the shell-visible `uname -s` value `HarmonyOS` observed on the OHOS device on 2026-08-11; they do not add OHOS-specific preprocessor branches.
 - Added wrapper scripts after install so `share/autoconf` paths are derived from the package prefix instead of baked absolute paths.
 - The `autom4te` wrapper prepends the current package `share/autoconf` directory on every invocation. This compensates for upstream `autom4te.cfg` being configured with `//share/autoconf` when Conan installs with `DESTDIR`.
 
