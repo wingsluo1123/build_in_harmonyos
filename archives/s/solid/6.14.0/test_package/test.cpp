@@ -9,7 +9,9 @@ int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     const QList<Solid::Device> devices =
         Solid::Device::listFromType(Solid::DeviceInterface::Block);
-    std::printf("PASS: Solid::Device::listFromType OK (count=%d)\n",
-                devices.count());
+    // devices.count() returns qsizetype (long long in Qt6); cast to a
+    // matching width before printf (P3: avoid %d/qsizetype mismatch).
+    std::printf("PASS: Solid::Device::listFromType OK (count=%lld)\n",
+                static_cast<long long>(devices.count()));
     return 0;
 }
