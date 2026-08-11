@@ -56,7 +56,7 @@ PAR_GLOBAL_TEMP="$TMPDIR/par_test_temp"
 mkdir -p "$PAR_GLOBAL_TEMP"
 export PAR_GLOBAL_TEMP
 
-LOAD_RESULT=$(PERL5LIB="$PERL_LIB" perl -MPAR::Packer -e 'print $PAR::Packer::VERSION' 2>&1) || true
+LOAD_RESULT=$(PERL5LIB="$PERL_LIB" perl -MPAR::Packer -e 'print $PAR::Packer::VERSION' 2>&1)
 if echo "$LOAD_RESULT" | grep -qE '^[0-9]+\.'; then
     echo "OK: PAR::Packer loaded, version: $LOAD_RESULT"
 else
