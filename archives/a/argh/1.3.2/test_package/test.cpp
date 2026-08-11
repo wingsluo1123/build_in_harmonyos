@@ -22,7 +22,9 @@ int main() {
         argh::parser parser(5, argv);
         assert(parser("--output").str() == "file.txt");  // param value
         assert(parser("--count").str() == "42");         // param value
-        assert(parser("--missing").str() == "");          // missing param → empty
+        assert(parser("--output") == "file.txt");  // param value
+        assert(parser("--count") == "42");         // param value
+        assert(parser("--missing") == "");          // missing param → empty
     }
 
     // ---- Test 3: Positional arguments ----
