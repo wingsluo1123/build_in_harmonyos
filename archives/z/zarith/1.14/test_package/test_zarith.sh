@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # test_zarith.sh — Verify ZArith library is installed and functional
 # Usage: sh test_zarith.sh <zarith_package_folder>
 # Called by test_package/conanfile.py test() method (env=conanbuild, ocaml toolchain in PATH)
