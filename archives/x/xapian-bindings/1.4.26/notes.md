@@ -48,3 +48,6 @@ import xapian → PASS (1.4.26)
 - tarball 预生成 xapian_wrap.cc，构建无需 swig
 - 产物: _xapian.cpython-312-aarch64-linux-ohos.so + xapian/ 纯 Python 包
 - package_info 设置 PYTHONPATH（runenv）供消费者 `import xapian`
+
+## 结束
+编译结束，状态: closed（built）
