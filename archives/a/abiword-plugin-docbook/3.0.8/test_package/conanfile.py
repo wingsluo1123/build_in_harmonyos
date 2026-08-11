@@ -14,7 +14,10 @@ from conan.tools.cmake import CMake, CMakeToolchain
 
 class AbiwordPluginDocbookTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeToolchain", "CMakeDeps"
+    # 注意: CMakeToolchain 在 test() 中手动实例化(为设置 TARGET_SO variable),
+    # 不能同时出现在 generators 属性,否则 conan 报 "declared in the generators
+    # attribute, but was instantiated in the generate() method too"。
+    generators = "CMakeDeps"
     test_type = "explicit"
 
     def requirements(self):
@@ -47,7 +50,10 @@ class AbiwordPluginDocbookTestConan(ConanFile):
         self.output.info(f"DocBook plugin found: {so_path}")
 
         # Build the test executable via CMake, passing the .so path as TARGET_SO
-        tc = CMakeToolchain(self, variables={"TARGET_SO": so_path})
+        # (conan 2.x: CMakeToolchain 不接受 __init__ 的 variables 关键字,
+        # 必须用 tc.variables[...] 设置, 否则 TypeError)
+        tc = CMakeToolchain(self)
+        tc.variables["TARGET_SO"] = so_path
         tc.generate()
         cmake = CMake(self)
         cmake.configure()

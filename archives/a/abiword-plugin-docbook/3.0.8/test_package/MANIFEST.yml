@@ -1,26 +1,34 @@
 # test_package/MANIFEST.yml — abiword-plugin-docbook 3.0.8
 # 上游测试声明（CI L0e 门禁要求）
+# ⚠️ 如实声明测试来源：上游 AbiWord 3.0.8 docbook 插件【无任何官方测试】
+# （plugins/docbook/ 下仅 Makefile.am + plugin.m4 + xp/，全树无 tests 目录，
+# 与 clarisworks 插件同型）。本包测试均为 OHOS 适配自研（见 adapted_tests /
+# test_package_tests）。
 
-package: abiword-plugin-docbook
-version: "3.0.8"
+package: abiword-plugin-docbook/3.0.8
+homepage: "https://gitlab.gnome.org/World/AbiWord"
 
-upstream_test:
-  has_upstream_suite: false
-  upstream_url: https://gitlab.gnome.org/World/AbiWord/-/tree/release-3.0.8/plugins/docbook
-  upstream_notes: "AbiWord docbook 插件无独立上游测试套件。本 test_package 按 R34 补全,用 C 税dlopen 加载插件 .so 并验证 ABI 符号(abi_plugin_register/unregister/supports_version)。"
+# 上游官方测试：无（已核实：上游纯净树 plugins/docbook 无 tests 目录）
+upstream_official_tests: []
 
-adapted_test:
-  description: "dlopen 加载 docbook.so + 验证 abi_plugin_supports_version(3,0,0)=1 + register/unregister 符号存在"
-  command: "cmake configure + build test_docbook + ./test_docbook"
-  source_files:
-    - test.c
-    - CMakeLists.txt
-    - conanfile.py
+# 上游检查命令：AbiWord autotools 的 make check（上游无实际测试程序，
+# 本包 build() 亦不执行上游测试）
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
 
-# 测试断言总数（近似值，用于质量评估）
-# 1. dlopen 成功
-# 2. abi_plugin_supports_version 存在
-# 3. abi_plugin_supports_version(3,0,0) == 1
-# 4. abi_plugin_register 存在
-# 5. abi_plugin_unregister 存在
+# 适配补全测试（自研，非上游）：dlopen 加载插件 .so 并验证 ABI 符号
+adapted_tests:
+  - file: test_package/test.c
+    origin: ohos-adaptation (self-authored, based on plugin ABI xap_Module.h)
+    description: "dlopen 加载 docbook.so + 验证 abi_plugin_supports_version(3,0,0)=1 + abi_plugin_register/abi_plugin_unregister 符号存在 (5 项断言)"
+    command: "cmake configure + build test_docbook + ./test_docbook"
+
+# test_package 中自带的测试 (消费者视角验证，同为适配自研)
+test_package_tests:
+  - file: test.c
+    description: "dlopen 安装的插件 .so，校验 abi_plugin_supports_version(3,0,0)==1 与 register/unregister 符号"
+    command: "./test_docbook"
+
+# 测试断言总数 (近似值，用于质量评估)
 assertion_count: 5
