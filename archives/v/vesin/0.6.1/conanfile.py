@@ -37,6 +37,16 @@ class VesinConan(ConanFile):
         download(self, self.conan_data["gpulite"]["url"],
                  os.path.join(ext, "gpulite.tar.gz"),
                  sha256=self.conan_data["gpulite"]["sha256"])
+        # 把 Catch2 的 tarball 解压到 external/Catch2-3.5.3：上游 tests/CMakeLists.txt
+        # 用 FetchContent 拉 Catch2（GIT_TAG v3.5.3），configure 时
+        # -DFETCHCONTENT_SOURCE_DIR_CATCH2 指到这里即可离线构建并运行上游单元测试。
+        import tarfile
+        catch2_tgz = os.path.join(ext, "Catch2.tar.gz")
+        download(self, self.conan_data["catch2"]["url"], catch2_tgz,
+                 sha256=self.conan_data["catch2"]["sha256"])
+        with tarfile.open(catch2_tgz, "r:gz") as tf:
+            tf.extractall(ext)
+        os.unlink(catch2_tgz)
 
     def requirements(self):
         pass
@@ -120,6 +130,31 @@ class VesinConan(ConanFile):
         _pre = self._find_deps_preload()
         if _pre:
             defs.append('-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES="{}"'.format(_pre))
+        # 上游单元测试：VESIN_BUILD_TESTS=ON + 本地 Catch2（source() 已解压到
+        # vesin/external/Catch2-3.5.3），configure 期 FETCHCONTENT 直接用它，
+        # 不依赖网络；build 后跑 ctest 验证真实通过率。
+        # 注意：共享库 CXX_VISIBILITY_PRESET=hidden，测试可执行文件链接
+        # libvesin.so 时找不到内部符号（verlet.cpp 引用的 cpu::VerletList 等），
+        # 因此测试构建用静态库（BUILD_SHARED_LIBS=OFF），交付构建仍用共享库。
+        catch2_dir = os.path.join(
+            self.source_folder, "vesin", "external", "Catch2-3.5.3")
+        tdir = os.path.join(self.build_folder, "build-tests")
+        tdefs = [
+            '-DCMAKE_TOOLCHAIN_FILE="{}"'.format(toolchain),
+            "-DOHOS_ARCH=arm64-v8a",
+            "-DCMAKE_BUILD_TYPE={}".format(self.settings.build_type),
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DVESIN_BUILD_TESTS=ON",
+            '-DFETCHCONTENT_SOURCE_DIR_CATCH2="{}"'.format(catch2_dir),
+        ]
+        _rl = self._llvm_ranlib(toolchain)
+        if _rl:
+            tdefs.append('-DCMAKE_RANLIB="{}"'.format(_rl))
+        self.run('cmake -B "{}" -S "{}" {}'.format(tdir, src, " ".join(tdefs)))
+        self.run('cmake --build "{}" -j1'.format(tdir))
+        # 运行上游单元测试（neighbors/verlet/memory/cuda），失败即终止构建。
+        self.run('ctest --test-dir "{}/vesin/tests" --output-on-failure'
+                 .format(tdir))
         # 依赖接线（find_package/find_library/pkg-config）须按需在此手工补 -D（见 SKILL「cmake 库依赖库」）：
         #   find_package(X CONFIG) → -DX_DIR=self.dependencies["x"].package_folder+"/lib/cmake/x"
         #   find_library/find_path → 预设目标库的 find 缓存变量为依赖真实路径（绕交叉链 FIND_ROOT_PATH=ONLY）

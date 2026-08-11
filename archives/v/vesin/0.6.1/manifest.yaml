@@ -5,4 +5,21 @@ status: built
 source:
   url: "https://github.com/Luthaf/vesin/archive/refs/tags/v0.6.1.tar.gz"
   sha256: "2846f238c61109791e4315acc145c740d338f4f994bfd0e04ab2bfceb82077a0"
-knowledge_gained: []
+
+tests:
+  upstream:
+    framework: "Catch2 v3.5.3 (离线携带，FetchContent_SOURCE_DIR)"
+    total: 4
+    passed: 4
+    pass_rate: "100% (4/4)"
+    detail:
+      - neighbors: "5 test cases / 158 assertions PASS"
+      - verlet: "2 test cases / 10 assertions PASS"
+      - memory: "1 test case / 28 assertions PASS"
+      - cuda: "1 passed (无 CUDA 设备跳过 CUDA 路径)"
+  consumer:
+    test_package: "cutoff=1.5→6 对、cutoff=1.2→4 对，4/4 断言通过"
+
+knowledge_gained:
+  - "上游共享库 CXX_VISIBILITY_PRESET=hidden 时，测试可执行文件链接 .so 找不到内部符号 → 测试构建须用静态库（BUILD_SHARED_LIBS=OFF），交付仍用共享库"
+  - "FetchContent 依赖（Catch2/gpulite）可离线携带：预取 tarball + FETCHCONTENT_SOURCE_DIR_<NAME> 指本地，构建不依赖网络"
