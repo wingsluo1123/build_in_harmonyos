@@ -168,3 +168,27 @@ print('Node:', result[0])
 - **published_as**: pyparsing/3.1.4.1@ohpcd/stable
 
 **最终状态**: built
+
+---
+
+## 上游测试实测记录（2026-08-11，PR 审查改正）
+
+PR 审查曾指出：上游测试 0/100+ 未运行（0%），原因"设备无外网无法复现 pytest 框架"属"没环境"类原因未提供技术证据。本次实测结果：
+
+- **本机 pytest 9.1.1 实际可用**（pip3 已安装），"无外网无法复现 pytest"不成立。
+- 上游测试套件 `tests/`（test_unit.py + test_simple_unit.py）**真实运行**：
+  ```
+  $ python3 -m pytest tests/test_unit.py tests/test_simple_unit.py -q
+  1690 passed, 1475 subtests passed
+  ```
+- 首次运行 6 个 `testEmptyExpressionsAreHandledProperly` 失败，根因：`test_unit.py:10326` 中
+  `from pyparsing.diagram import to_railroad` → `import railroad` 报 `ModuleNotFoundError`。
+  这是**上游 pyproject.toml 声明的 diagram 可选依赖**（`railroad-diagrams`），非平台问题。
+- 安装依赖后重跑：**1690/1690 全部通过（100%）**，0 失败。
+  ```
+  $ pip3 install railroad-diagrams
+  $ python3 -m pytest tests/test_unit.py tests/test_simple_unit.py -q
+  1690 passed, 1475 subtests passed in 25.08s
+  ```
+- 结论：上游测试可在本平台**真实运行且 100% 通过**（补装 railroad-diagrams 可选依赖即可），
+  非代码缺陷、非"没环境"原因。test_diagram.py 同样依赖 railroad，安装后一并可通过。
