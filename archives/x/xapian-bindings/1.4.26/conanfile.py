@@ -11,8 +11,7 @@ no swig is required at build time).
 - settings/options/layout 与 xapian-core 一致
 - AutotoolsToolchain 生成 configure_args（--disable-documentation 等）
 - OHOS 分支：bash 包裹工具链 + 完整 AR/RANLIB/NM/LD + config.guess/sub
-  补丁识别 OHOS 三元组；CI 无法执行未签名 conftest 时显式传入 --host
-  以启用 Autotools 交叉编译检测路径。
+  补丁识别 OHOS 三元组；本机与 CI 均为 OHOS 原生构建，不传 --host。
 """
 import glob
 import os
@@ -100,9 +99,8 @@ class XapianBindingsConan(ConanFile):
 
         configure_args = self._load_configure_args()
 
-        # OHOS CI 不能执行未签名的 configure conftest ELF；显式声明目标
-        # 三元组使 Autotools 采用交叉编译检测路径，避免在 configure 阶段运行 conftest。
-        # config.guess/sub 补丁仍负责让 linux-ohos 三元组通过验证。
+        # 本机与 CI 均在 OHOS 上原生构建；让 config.guess/sub 识别 linux-ohos
+        # 并保留 configure 的原生运行时探测。
         config_shell = shutil.which("bash") or "/system/bin/sh"
         cc = shutil.which("clang") or os.environ.get("CC", "clang")
         cxx = shutil.which("clang++") or os.environ.get("CXX", "clang++")
@@ -115,8 +113,7 @@ class XapianBindingsConan(ConanFile):
 
         # xapian-bindings 特有配置（必需，不影响 host/build 判定）
         configure_args += (
-            f' --host=aarch64-unknown-linux-ohos '
-            f'--with-python3 --prefix={os.path.dirname(python_exe)}/.. '
+            f' --with-python3 --prefix={os.path.dirname(python_exe)}/.. '
             f'XAPIAN_CONFIG="{xc_bin}" '
             f'CPPFLAGS="-I{xc_include}" '
             f'CXXFLAGS="-stdlib=libc++ -I{xc_include} -I{py_include}" '
