@@ -149,7 +149,13 @@ class VConan(ConanFile):
             "tools.build:compiler_executables", default={}, check_type=dict
         ) or {}
         cc = compilers.get("c", "clang")
-        make_program = self.conf.get("tools.gnu:make_program", default="make")
+        make_program = self.conf.get("tools.gnu:make_program", default=None)
+        if not make_program:
+            make_program = (
+                self._ohos_tool_path("make")
+                if str(self.settings.os) == "OHOS"
+                else "make"
+            )
         is_windows = str(self.settings.os) == "Windows"
         vc_file = "v_win.c" if is_windows else "v.c"
         exe_ext = ".exe" if is_windows else ""
