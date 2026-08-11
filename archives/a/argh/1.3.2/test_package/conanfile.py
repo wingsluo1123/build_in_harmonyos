@@ -26,5 +26,5 @@ class ArghTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        test_bin = os.path.join(self.test_build_folder, "test_argh")
+        test_bin = os.path.join(self.build_folder, "test_argh")
         self.run(test_bin, env="conanrun")
