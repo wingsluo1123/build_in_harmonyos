@@ -26,7 +26,7 @@ class TofuenvConan(ConanFile):
     description = "OpenTofu version manager inspired by tfenv"
     license = "MIT"
     homepage = "https://github.com/tofuutils/tofuenv"
-    url = ""  # CI fills this
+    url = "https://cnb.cool/OpenHarmonyPCDeveloper/build_in_harmonyos/-/tree/main/archives/t/tofuenv"
 
     package_type = "application"
 
