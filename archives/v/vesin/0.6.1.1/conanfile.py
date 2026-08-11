@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — vesin 0.6.1 (cmake)"""
+"""Conan recipe — vesin 0.6.1.1 (cmake)"""
 from conan import ConanFile
 from conan.tools.files import collect_libs, get
 import os
@@ -10,7 +10,7 @@ from conan.tools.files import apply_conandata_patches
 
 class VesinConan(ConanFile):
     name = "vesin"
-    version = "0.6.1"
+    version = "0.6.1.1"
     package_type = "library"
     settings = "os", "arch", "compiler", "build_type"
     options = {"shared": [True, False], "fPIC": [True, False]}
