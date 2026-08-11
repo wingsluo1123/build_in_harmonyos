@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # test_package/test.sh -- Dune 3.17.0 consumer test
 # Verifies dune binary is functional
 set -euo pipefail
