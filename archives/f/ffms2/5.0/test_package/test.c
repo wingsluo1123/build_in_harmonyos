@@ -5,8 +5,13 @@
 #include <ffms.h>
 
 int main(void) {
-    /* FFMS_Init: initialise the library (both args 0 for current ABI) */
-    FFMS_Init(0, 0);
+    /* FFMS_Init: initialise the library (both args 0 for current ABI).
+     * Check the return value — if init fails, subsequent API calls
+     * would operate on an uninitialised library (P2 fix). */
+    if (FFMS_Init(0, 0) != FFMS_ERROR_SUCCESS) {
+        fprintf(stderr, "FAIL: FFMS_Init failed\n");
+        return 1;
+    }
 
     /* FFMS_GetVersion: verify the library is loaded and returns 5.0.x */
     int ver = FFMS_GetVersion();
