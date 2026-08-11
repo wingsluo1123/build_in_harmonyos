@@ -168,6 +168,7 @@ class GstPluginsRsQuinnConan(ConanFile):
         if not os.path.exists(objcopy) or not os.path.exists(signer):
             self.output.warning("sign tools not found; skipping re-sign")
             return
+        # objcopy 移除 .codesign 节：无节时返回非零，|| true 容忍（首次签名前无此节）
         self.run(f'{objcopy} --remove-section .codesign "{path}" 2>/dev/null || true')
         self.run(f'{signer} sign -inFile "{path}" -outFile "{path}" -selfSign 1')
 

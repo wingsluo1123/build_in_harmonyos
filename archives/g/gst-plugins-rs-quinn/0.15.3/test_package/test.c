@@ -11,7 +11,7 @@
  * This test instead verifies the plugin's ABI surface directly from the
  * packaged ELF: it must be a 64-bit aarch64 shared object that exports
  * the GStreamer plugin entry points (gst_plugin_quinn_get_desc /
- * gst_plugin_quinn_init) in its dynamic symbol table. That is exactly
+ * gst_plugin_quinn_register) in its dynamic symbol table. That is exactly
  * the surface gstreamer needs to load and register the plugin at
  * runtime, so the check exercises the real package contract without
  * depending on the loader namespace.
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
 
     if (!found[0] || !found[1]) {
         fprintf(stderr,
-                "FAIL: plugin entry symbols missing (get_desc=%d init=%d)\n",
+                "FAIL: plugin entry symbols missing (get_desc=%d register=%d)\n",
                 found[0], found[1]);
         return 1;
     }

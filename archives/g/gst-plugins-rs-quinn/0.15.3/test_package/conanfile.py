@@ -5,7 +5,7 @@ R34: the L1 test must actually exercise the packaged artifact. dlopen()
 is unusable on OHOS for plugins whose transitive C deps (gstreamer) live
 outside the musl ldso namespace (E186), so test.c parses the packaged
 libgstquinn.so ELF directly and asserts its GStreamer plugin entry points
-(gst_plugin_quinn_get_desc / gst_plugin_quinn_init) are exported.
+(gst_plugin_quinn_get_desc / gst_plugin_quinn_register) are exported.
 
 E225: use cmake_layout(build_folder="$TMP") + user_presets_path=False so
 Conan manages a unique temporary out-of-source build dir and no
