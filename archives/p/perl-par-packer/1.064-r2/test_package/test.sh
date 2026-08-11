@@ -56,23 +56,24 @@ PAR_GLOBAL_TEMP="$TMPDIR/par_test_temp"
 mkdir -p "$PAR_GLOBAL_TEMP"
 export PAR_GLOBAL_TEMP
 
-set +e
-LOAD_RESULT=$(PERL5LIB="$PERL_LIB" perl -MPAR::Packer -e 'print $PAR::Packer::VERSION' 2>&1)
-LOAD_RC=$?
-set -e
-
-if [ "$LOAD_RC" -eq 0 ] && echo "$LOAD_RESULT" | grep -qE '^[0-9]+\.'; then
-    echo "OK: PAR::Packer loaded, version: $LOAD_RESULT"
-elif echo "$LOAD_RESULT" | grep -q "Can't locate"; then
-    # Missing external Perl dependency (e.g. Archive::Zip, PAR)
-    # Not a packaging defect — file checks already verified integrity
-    echo "WARN: PAR::Packer module load failed due to missing dependency (exit code $LOAD_RC)"
-    echo "INFO: Module load failure is acceptable if PAR dependency is not installed"
-    echo "INFO: $LOAD_RESULT"
+# PAR::Packer depends on Archive::Zip, PAR, IPC::Run3, Module::ScanDeps, etc.
+# These are Perl module dependencies installed via CPAN, not Conan packages.
+# Check the key dependency (Archive::Zip) before attempting to load PAR::Packer.
+if ! PERL5LIB="$PERL_LIB" perl -MArchive::Zip -e '1' 2>/dev/null; then
+    echo "WARN: Archive::Zip not available — module load test skipped"
+    echo "INFO: PAR::Packer depends on Archive::Zip, PAR, IPC::Run3, Module::ScanDeps"
+    echo "INFO: These Perl module deps are installed via CPAN, not Conan packages"
+    echo "INFO: File existence + syntax checks already validated package integrity"
 else
-    echo "FAIL: PAR::Packer module load failed with unexpected error (exit code $LOAD_RC)"
-    echo "$LOAD_RESULT"
-    exit 1
+    # Dependencies available — try loading PAR::Packer
+    # Use if/else pattern (exempt from set -e in all POSIX shells)
+    if LOAD_RESULT=$(PERL5LIB="$PERL_LIB" perl -MPAR::Packer -e 'print $PAR::Packer::VERSION' 2>&1); then
+        echo "OK: PAR::Packer loaded, version: $LOAD_RESULT"
+    else
+        echo "FAIL: PAR::Packer module load failed (exit code $?)"
+        echo "$LOAD_RESULT"
+        exit 1
+    fi
 fi
 
 # 4. Check for parl/parldyn binaries
