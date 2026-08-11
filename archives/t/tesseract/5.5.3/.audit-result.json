@@ -1,0 +1,62 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "CS-05",
+      "file": "archives/t/tesseract/5.5.3/conanfile.py",
+      "line": 18,
+      "description": "conanfile.py 中 url 属性为空字符串 (url = \"\")。code_style 规则 5 禁止残留模板占位符，url 应填写制品仓地址或配方仓库地址。",
+      "fix_suggestion": "将 url 设置为制品仓或配方仓库的 HTTPS 地址，例如 url = \"https://cnb.cool/xxx/tesseract\"，或如项目惯例可省略该行。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-05",
+      "file": "archives/t/tesseract/5.5.3/notes.md",
+      "line": 6,
+      "description": "notes.md 大量模板占位符未填充：'{cmake|autotools|makefile|meson|custom}'、'{2026-08-10}'、'{published|built|failed}'、'{用文字描述实际编译步骤...}'、'{按需添加行}'、'{列出本次编译依赖的具体软件版本}'、'{验证命令和结果}' 等。code_style 规则 5 禁止残留模板占位符。",
+      "fix_suggestion": "将所有花括号占位符替换为实际内容。构建系统应填 cmake，编译日期填 2026-08-10，状态填 published，补充实际编译步骤描述、问题表格、依赖版本、验证命令等。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "CS-14",
+      "file": "archives/t/tesseract/5.5.3/manifest.yaml",
+      "line": 24,
+      "description": "manifest.yaml 中 patches_applied 引用的补丁文件名 'patches/0001-simddetect.patch' 与实际文件名 '0001-src-arch-simddetect.cpp.patch' 不一致。patches_description 中的键名 '0001-simddetect.patch' 同样不匹配。而 conandata.yml 和 patch_classification 中正确引用了 '0001-src-arch-simddetect.cpp.patch'。",
+      "fix_suggestion": "将 patches_applied 中的 'patches/0001-simddetect.patch' 改为 'patches/0001-src-arch-simddetect.cpp.patch'，将 patches_description 的键名改为 '0001-src-arch-simddetect.cpp.patch'，确保与 conandata.yml 和实际文件名一致。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-02",
+      "file": "archives/t/tesseract/5.5.3/conanfile.py",
+      "line": 12,
+      "description": "conanfile.py 未声明 package_type 属性。tesseract 既生成库 (libtesseract) 又生成可执行文件 (tesseract binary)，commands.json 中 type 声明为 'tool'。虽然 Conan 2.x 默认为 'library'，建议显式声明以避免歧义。",
+      "fix_suggestion": "如以库为主产物，添加 package_type = \"library\"；如以工具为主产物，添加 package_type = \"application\"。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "CS-12",
+      "file": "archives/t/tesseract/5.5.3/conandata.yml",
+      "line": 8,
+      "description": "patch_description 使用完整句子描述而非 code_style 规则 12 推荐的短关键词格式（如 '0001 build aux config.guess'）。当前描述以 'Fix aarch64...' 开头，未以序号 0001 开头。",
+      "fix_suggestion": "可改为更简洁的格式如 '0001 fix aarch64 NEON SIMD detection'，或保留当前描述（仅为建议，不阻塞）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3",
+      "file": "archives/t/tesseract/5.5.3/manifest.yaml",
+      "line": 49,
+      "description": "patch_generation.method 字段值为 'per-file-difflib'，review_memory 规则 R3 要求补丁通过 'refresh-patch --auto' 生成。需确认 per-file-difflib 是否为 refresh-patch --auto 的底层实现。",
+      "fix_suggestion": "确认 patch_generation.method 与 refresh-patch --auto 工具链一致；如不一致，更新方法描述。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R8",
+      "file": "archives/t/tesseract/5.5.3/manifest.yaml",
+      "line": 55,
+      "description": "patch_classification[0].guard 字段值为 'pending'，表示平台守卫状态尚未确认。当前补丁使用 #if defined(HAVE_NEON) 而非 #ifdef __OHOS__，guard 状态应更新为确认值。",
+      "fix_suggestion": "将 guard 字段从 'pending' 更新为实际状态，如 'none'（不使用 __OHOS__ 守卫）或相应确认值。"
+    }
+  ],
+  "summary": "tesseract 5.5.3 Conan 配方审计完成。共审计 11 个变更文件。\n\n【P0 欺骗检测 — 全部通过】\n- R34 空壳测试：test_package/test.cpp 调用真实 API TessVersion()，非空壳 ✅\n- R9 跳过测试/伪造通过：test_package/conanfile.py 的 test() 执行 cmake.test() 并运行二进制 ✅\n- 伪造状态：manifest.yaml status=published，无矛盾证据 ✅\n- 伪造 sha256：conandata.yml sha256 为 64 位有效十六进制，非全零/全f ✅\n- R8 空壳 stub：补丁有实质性平台适配逻辑（SIMD 检测条件编译修改）✅\n- R19 预编译二进制：PR 中无 .so/.a/二进制文件 ✅\n- R40 深度适配：补丁有真实 aarch64 平台适配代码 ✅\n\n【P1 配方正确性 — 全部通过】\n- R26 系统同名库静态链接：tesseract 非系统同名库，N/A ✅\n- R32 settings.os 判断：使用 in (\"Linux\", \"OHOS\") ✅\n- R33 裸 shell 变量：build() 无裸环境变量，使用 CMakeToolchain ✅\n- R34 test_package 实质依赖：调用 TessVersion() ✅\n- R38 commands.json：存在且包含 5.5.3 版本，type=\"tool\" ✅\n- R39 源码 URL：指向官方 GitHub tesseract-ocr/tesseract ✅\n\n【P2 代码规范 — 3 项警告（不阻塞）】\n1. conanfile.py url=\"\" 空字段（模板占位符残留）\n2. notes.md 大量未填充模板占位符\n3. manifest.yaml 补丁文件名引用不一致（patches_applied/patches_description 与实际文件名不符）\n\n【P3 建议性 — 4 项提示】\n1. package_type 未显式声明\n2. patch_description 格式建议\n3. patch_generation.method 合规确认\n4. patch_classification guard 状态待更新\n\n结论：无 P0/P1 问题，审计通过。建议合入前修复 P2 问题（尤其是 manifest.yaml 补丁文件名不一致和 notes.md 模板占位符），P3 项为改进建议。"
+}
