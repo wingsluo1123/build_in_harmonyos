@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe — libzim 9.7.0.1 (meson)"""
 import os
 import shutil
 
