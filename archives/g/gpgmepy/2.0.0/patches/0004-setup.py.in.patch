@@ -1,0 +1,34 @@
+--- a/setup.py.in
++++ b/setup.py.in
+@@ -69,24 +69,29 @@
+         if item.startswith('-I'):
+             include_dirs.append(item[2:])
+         elif item.startswith('-D'):
+             defitem = item[2:].split('=', 1)
+             if len(defitem) == 2:
+                 define_macros.append((defitem[0], defitem[1]))
+             else:
+                 define_macros.append((defitem[0], None))
+ 
+ # Adjust include and library locations in case of win32
+-uname_s = os.popen('uname -s').read()
++def _popen_out(cmd):
++    try:
++        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode('utf-8', 'replace')
++    except Exception:
++        return ''
++uname_s = _popen_out(['uname', '-s'])
+ if uname_s.startswith('MINGW32'):
+     mnts = [
+-        x.split()[0:3:2] for x in os.popen('mount').read().split('\n') if x
++        x.split()[0:3:2] for x in _popen_out(['mount']).split('\n') if x
+     ]
+     tmplist = sorted([(len(x[1]), x[1], x[0]) for x in mnts])
+     tmplist.reverse()
+     extra_dirs = []
+     for item in include_dirs:
+         for ln, mnt, tgt in tmplist:
+             if item.startswith(mnt):
+                 item = os.path.normpath(item[ln:])
+                 while item[0] == os.path.sep:
+                     item = item[1:]

@@ -1,0 +1,65 @@
+# 版本级 manifest — gpgmepy 2.0.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.0.0"
+status: built
+build_date: "2026-08-11"
+conan_ref: "gpgmepy/2.0.0"
+
+source:
+  url: "https://www.gnupg.org/ftp/gcrypt/gpgmepy/gpgmepy-2.0.0.tar.bz2"
+  sha256: "07e1265648ff51da238c9af7a18b3f1dc7b0c66b4f21a72f27c74b396cd3336d"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--disable-gpg-test"
+  dependencies:
+    - gpgme/1.24.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-setup.py.in.patch"
+
+knowledge_gained:
+  - "E007: config.guess/sub 需加 linux-ohos 支持（config.sub 还需手工补内核-OS 列表 linux-ohos*）"
+  - "E011: configure umask 077 -> 022 修复 HMDFS 临时目录权限"
+  - "新坑: gpgmepy 打包的 gpgme-config 过滤掉 -I/include 且不含自身 include 目录，需自建 gpgme-config/gpg-error-config 包装（config-overrides）"
+  - "新坑: gpgmepy 的 setup.py.in 用 os.popen('uname -s').read()，在 HarmonyOS Python 3.12 下返回二进制流崩溃，需改 subprocess.check_output"
+  - "E074: make -j1（OHOS SELinux 禁止 FIFO jobserver）"
+  - "上游 Makefile copystamp 在 in-tree 构建下 cp 同文件失败，必须 VPATH 构建"
+  - "gpgrt-config 挂起坑（继承 gpgme 经验）：通过不把 gpgrt-config 放入 PATH 并自建 gpg-error-config 包装绕开"
+  - "测试: 上游 28/28 全部阻塞（缺 GnuPG 运行时，GPG_ERR_INV_ENGINE），test_package R34 实质测试 4/4 通过"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/gpgmepy-2.0.0.orig
+  source_work_dir: /storage/Users/currentUser/builds/gpgmepy-2.0.0.work
+  source_orig_hash: 9d609ea0378b19f0
+  source_work_hash: a0f83f6758b153d2
+  generated_at: '2026-08-11T10:19:54'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-build-aux-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-build-aux-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-setup.py.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

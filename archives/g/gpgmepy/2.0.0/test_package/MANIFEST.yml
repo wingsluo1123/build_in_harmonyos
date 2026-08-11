@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: gpgmepy/2.0.0
+homepage: "https://gnupg.org/software/gpgme/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# gpgmepy 上游测试 = tests/initial.py + tests/t-*.py (26) + tests/final.py
+# 共 28 项，全部需要真实 GnuPG 运行时 (gpg/gpg-agent 二进制)。
+# OHOS PC 上 gnupg 未发布且设备未安装 gpg 二进制，28/28 全部阻塞。
+# 崩溃点 (所有测试相同):
+#   tests/support.py:60 assert_gpg_version -> support.py:33 `with gpg.Context() as c`
+#   -> src/core.py:233 __init__ -> core.py:182 __setattr__ -> core.py:1140
+#   errorcheck(gpgme.gpgme_engine_check_version(value))
+#   -> gpg/errors.py:129 raise GPGMEError: GPGME: Invalid crypto engine
+#   (gpgme_engine_check_version 返回 GPG_ERR_INV_ENGINE，因系统无 gpg 引擎)
+upstream_tests:
+  - file: tests/run-tests.py
+    source: gpgmepy-2.0.0/tests/run-tests.py
+    description: "上游测试驱动: initial.py + 26 个 t-*.py + final.py (共 28 项)"
+    command: "python3 tests/run-tests.py initial.py <t-*.py> final.py --srcdir=tests --python-libdir=build-lib"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: smoke.py
+    description: "R34 实质测试: import gpg + gpg.version.versionstr + gpg.version.gpgme_versionstr + gpg.Data()（无需 GnuPG 引擎）"
+    command: "python3 smoke.py"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4

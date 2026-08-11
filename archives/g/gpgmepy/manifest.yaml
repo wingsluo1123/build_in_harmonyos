@@ -1,0 +1,28 @@
+software: gpgmepy
+display: "gpgmepy (GPGME Python bindings)"
+description: "GPGME 的 Python 绑定（PyPI 包名 gpg），提供 GnuPG 加密操作的 Python 接口"
+category: crypto
+homepage: "https://gnupg.org/software/gpgme/"
+license: LGPL-2.1-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "E007: config.guess/config.sub 需添加 linux-ohos 支持（config.sub 还需内核-OS 列表 linux-ohos*）"
+    - "E011: configure umask 077 -> 022 修复 HMDFS 临时目录权限"
+    - "打包的 gpgme-config 过滤 -I/include 且不含自身 include，gpg-error 包无 gpg-error-config（gpgrt-config 在 mksh 下挂起）→ 需自建 gpgme-config/gpg-error-config 包装（config-overrides，PATH 顺序关键）"
+    - "setup.py.in 的 os.popen('uname -s').read() 在 HarmonyOS Python 3.12 崩溃 → 改 subprocess.check_output"
+    - "上游 Makefile copystamp in-tree cp 同文件失败 → 必须 VPATH 构建"
+    - "E074: make -j1（OHOS SELinux 禁止 FIFO jobserver）"
+    - "上游测试需 GnuPG 运行时（gpg 二进制），OHOS 未发布 gnupg → 28/28 阻塞；test_package R34 实质测试（import gpg + version + Data()）通过"
+  common_dependencies:
+    - gpgme
+    - libgpg-error
+    - libassuan
+
+versions:
+  "2.0.0":
+    status: built
+    build_date: "2026-08-11"
+    conan_ref: "gpgmepy/2.0.0"
+    notes: "SWIG + setuptools 构建的 gpg Python 绑定，含 _gpgme...so 扩展；本地 conan create + test_package 通过"
