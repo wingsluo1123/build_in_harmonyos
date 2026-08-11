@@ -7,7 +7,7 @@
 | 版本 | 0.3.112.1 (修复 io_pgetevents SIGSYS 崩溃) |
 | 构建系统 | plain Makefile (non-autotools) |
 | 源码 | https://releases.pagure.org/libaio/libaio-0.3.112.tar.gz |
-| 状态 | published |
+| 状态 | built |
 
 ## 编译要点
 - libaio 使用纯 Makefile 构建，非 autotools/cmake

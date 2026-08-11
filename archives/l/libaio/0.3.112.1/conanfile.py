@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for libaio 0.3.112 — Linux-native asynchronous I/O library.
+"""Conan recipe for libaio 0.3.112.1 — Linux-native asynchronous I/O library.
 
 Build system: plain Makefile (not autotools/cmake).
 The Makefile delegates to src/Makefile for actual compilation.

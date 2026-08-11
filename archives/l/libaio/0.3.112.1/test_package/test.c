@@ -26,6 +26,7 @@ int main(void) {
         printf("io_pgetevents correctly returns -ENOSYS (stub)\n");
     } else {
         printf("io_pgetevents returned %d (expected -38)\n", ret);
+        return 1;
     }
 
     printf("test libaio 0.3.112.1: PASSED\n");
