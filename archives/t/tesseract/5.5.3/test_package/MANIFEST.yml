@@ -2,34 +2,67 @@
 # 上游官方测试声明文件
 # CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
 # 详见: docs/TEST_QUALITY_SPEC.md
-#
-# 填写方法:
-#   1. 解压上游源码包
-#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
-#   3. 把实际运行的测试记录到下方
 
 package: tesseract/5.5.3
 homepage: "https://github.com/tesseract-ocr/tesseract"
 
 # 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
-upstream_check_command: "make check"
+upstream_check_command: "ctest"
 
 # conanfile.py build() 方法中是否已集成上游测试
+# 上游测试套件 (62 个 googletest 测试) 需要 ICU 库 (libicuuc/libicui18n)
+# OHOS 平台 ICU 不可用，unicharset_training 库无法构建，所有测试无法链接
+# 尝试步骤: 1) 下载 googletest v1.15.2 子模块 2) 下载 test 数据子模块
+#           3) cmake -DBUILD_TESTS=ON -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
+#           4) 编译失败: unicharset_training 库依赖 ICU，被 if(ICU_FOUND) 条件包裹
 upstream_test_in_build: false
-upstream_test_command: ""
+upstream_test_command: "ctest (blocked: ICU dependency)"
 
-# 上游实际运行的测试程序
+# 上游实际运行的测试程序 (62 个 googletest 测试)
 upstream_tests:
-  - file: test_package/test.cpp
-    source: tesseract-5.5.3/test_package/test.cpp
-    description: "Consumer smoke test: verify tesseract API link and version string"
-    command: "./test_tesseract"
+  - file: unittest/apiexample_test.cc
+    source: tesseract-5.5.3/unittest/apiexample_test.cc
+    description: "API example test"
+    command: "ctest -R apiexample_test"
+    status: "blocked"
+    reason: "Requires libunicharset_training (ICU dependency)"
+  - file: unittest/baseapi_test.cc
+    source: tesseract-5.5.3/unittest/baseapi_test.cc
+    description: "Base API test"
+    command: "ctest -R baseapi_test"
+    status: "blocked"
+    reason: "Requires libunicharset_training (ICU dependency)"
+  - file: unittest/bitvector_test.cc
+    source: tesseract-5.5.3/unittest/bitvector_test.cc
+    description: "Bit vector test"
+    command: "ctest -R bitvector_test"
+    status: "blocked"
+    reason: "Requires libunicharset_training (ICU dependency)"
+  - file: unittest/capiexample_test.cc
+    source: tesseract-5.5.3/unittest/capiexample_test.cc
+    description: "C API example test"
+    command: "ctest -R capiexample_test"
+    status: "blocked"
+    reason: "Requires libunicharset_training (ICU dependency)"
+  - file: unittest/cleanapi_test.cc
+    source: tesseract-5.5.3/unittest/cleanapi_test.cc
+    description: "Clean API test"
+    command: "ctest -R cleanapi_test"
+    status: "blocked"
+    reason: "Requires libunicharset_training (ICU dependency)"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.cpp
     description: "消费者测试: 验证 tesseract 库链接和 TessVersion API"
     command: "./test_tesseract"
+    status: "passed"
 
-# 测试断言总数 (近似值, 用于质量评估)
+# 测试断言总数
+# 上游 62 个测试全部被阻塞 (ICU 依赖)
+# test_package 1 个测试通过
 assertion_count: 2
+upstream_test_count: 62
+upstream_test_passed: 0
+upstream_test_blocked: 62
+upstream_block_reason: "ICU library (libicuuc/libicui18n) not available on OHOS platform. All 62 googletest tests link against unicharset_training library which is guarded by if(ICU_FOUND) in src/training/CMakeLists.txt."
