@@ -3,7 +3,7 @@
 #
 # Contract: https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos_ci/blob/main/docs/CI_SCRIPT_SPEC.md
 # Exit code: 0=all passed, non-0=any failed
-# Timeout: 60 minutes
+# Timeout: 45 minutes by default; reviewed package overrides are capped at 180 minutes
 #
 # ⚠️ This script runs on CI execution machines. NO AI tools, NO ohc-run.py,
 #    NO knowledge graph, NO Python SKILL environment. Pure zsh + conan only.
@@ -35,11 +35,60 @@ PROFILE_FILE="$REPO_ROOT/ci/conan/profiles/$PROFILE"
 CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-ohpcd}"
 SCAN_ROOT="${PKG_SCAN_ROOT:-archives}"
 NO_TEST_FILE="$REPO_ROOT/ci/config/no_official_test.txt"
+BUILD_TIMEOUT_CONFIG="$REPO_ROOT/ci/config/build_timeouts.txt"
+DEFAULT_BUILD_TIMEOUT=3600
+MAX_BUILD_TIMEOUT=14400
+TIMEOUT_CLOCK_TOLERANCE=1
+
+validate_build_timeout_config() {
+    awk -v min="$DEFAULT_BUILD_TIMEOUT" -v max="$MAX_BUILD_TIMEOUT" '
+        function fail(message) {
+            print "[fail] Invalid build timeout config at line " NR ": " message > "/dev/stderr"
+            invalid = 1
+            exit 1
+        }
+
+        /^[[:space:]]*(#.*)?$/ { next }
+        NF != 2 { fail("expected: name/version seconds") }
+        $1 !~ /^[A-Za-z0-9_.+-]+\/[A-Za-z0-9_.+-]+$/ { fail("invalid package reference: " $1) }
+        $2 !~ /^[0-9]+$/ { fail("timeout must be an integer: " $2) }
+        seen[$1]++ { fail("duplicate package reference: " $1) }
+        ($2 + 0) < min || ($2 + 0) > max {
+            fail("timeout for " $1 " must be between " min " and " max " seconds")
+        }
+
+        END { exit invalid ? 1 : 0 }
+    ' "$BUILD_TIMEOUT_CONFIG"
+}
+
+build_timeout_for() {
+    local package_ref="$1"
+    local configured
+
+    configured=$(awk -v ref="$package_ref" '$1 == ref { print $2; exit }' "$BUILD_TIMEOUT_CONFIG")
+    echo "${configured:-$DEFAULT_BUILD_TIMEOUT}"
+}
+
+is_build_timeout_result() {
+    local result="$1"
+    local elapsed="$2"
+    local limit="$3"
+
+    { [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; } && \
+        [ $((elapsed + TIMEOUT_CLOCK_TOLERANCE)) -ge "$limit" ]
+}
 
 echo "[step] Conan build + test pipeline (CI, no AI)"
 echo "[step]   scan_root: $SCAN_ROOT"
 echo "[step]   profile: $PROFILE"
 echo "[step]   channel: (no channel — plain name/version)"
+
+if [ ! -f "$BUILD_TIMEOUT_CONFIG" ]; then
+    echo "[fail] Missing build timeout config: $BUILD_TIMEOUT_CONFIG"
+    exit 1
+fi
+echo "[step] Validating package build timeout overrides..."
+validate_build_timeout_config
 
 # ── 1. Discover packages (BUG-9: respect CI_PACKAGES) ──
 # CI_PACKAGES 可通过环境变量或位置参数传入（位置参数在部分鸿蒙 worker
@@ -49,6 +98,30 @@ if [ -z "${CI_PACKAGES:-}" ] && [ $# -gt 0 ]; then
 fi
 PACKAGES=()
 MISSING_CONANFILE=()
+
+# The PR orchestrator always defines CI_PACKAGES. An explicitly empty value
+# means that the PR changed no Conan archive package. Keep the unset,
+# release, and explicit CI_BUILD_ALL cases for full-repository validation.
+if (( ${+CI_PACKAGES} )) \
+    && [ -z "$CI_PACKAGES" ] \
+    && [ "${CI_TASK_TYPE:-}" != "release" ] \
+    && [ "${CI_BUILD_ALL:-0}" != "1" ]; then
+    echo "[step] CI_PACKAGES is explicitly empty; no Conan packages changed"
+    echo "L0_RESULT=pass: no applicable Conan packages"
+    echo "L1_RESULT=pass: no applicable Conan packages"
+    echo "L2_RESULT=skip: no applicable Conan packages"
+    echo "L4_RESULT=skip: no applicable Conan packages"
+    echo "L5_RESULT=skip: no applicable Conan packages"
+    echo ""
+    echo "━━━ Build Summary ━━━"
+    echo "  Total:   0"
+    echo "  Success: 0"
+    echo "  Failed:  0"
+    echo "  Pass rate: N/A (0 packages)"
+    echo "[step] No Conan packages to build"
+    exit 0
+fi
+
 if [ -n "${CI_PACKAGES:-}" ]; then
     # CI 传入了定向包列表（空格分隔的相对路径，如 "archives/b/bash/5.3"）
     echo "[step] CI_PACKAGES received: $CI_PACKAGES"
@@ -260,23 +333,34 @@ for pkg_dir in "${PACKAGES[@]}"; do
     # 从 conanfile.py 中提取 requires/requirements 声明的依赖, 验证是否已发布
     # R36: 依赖必须先发布到制品仓
     if [ -f "$CONANFILE" ]; then
-        # 提取所有依赖引用
-        DEP_REFS=$(python3 - "$CONANFILE" 2>/dev/null <<'PYEOF'
-import re, sys
+        # 提取所有依赖引用（使用 AST 解析，避免误匹配 docstring 中的文本）
+        DEP_REFS=$(python3 - "$CONANFILE" "${pkg_name:-}" "${pkg_ver:-}" 2>/dev/null <<'PYEOF'
+import ast, sys
 src = open(sys.argv[1]).read()
+self_name = sys.argv[2] if len(sys.argv) > 2 else ""
+self_ver = sys.argv[3] if len(sys.argv) > 3 else ""
+self_ref = f"{self_name}/{self_ver}" if self_name and self_ver else ""
 refs = set()
-for m in re.finditer(r'(?:self\.)?requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]  # 兼容性: 去掉可能的 @user/channel 后缀
-    refs.add(ref)
-for m in re.finditer(r'tool_requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]
-    refs.add(ref)
+tree = ast.parse(src)
+for node in ast.walk(tree):
+    # 匹配 requires("dep/version") 和 tool_requires("dep/version") 调用
+    if isinstance(node, ast.Call):
+        func_name = ""
+        if isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        if func_name in ("requires", "tool_requires", "build_requires"):
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    ref = arg.value.strip()
+                    if "/" not in ref:
+                        continue
+                    ref = ref.split("@")[0]
+                    # 排除包自身引用
+                    if self_ref and ref == self_ref:
+                        continue
+                    refs.add(ref)
 for r in sorted(refs):
     print(r)
 PYEOF
@@ -300,7 +384,7 @@ PYEOF
                     echo "[fail] L0i: Dependencies not published to registry (R36):${UNPUBLISHED_DEPS}"
                     echo "       These packages must be published FIRST (via release pipeline)."
                     echo "[hint] 依赖未发布到制品仓 (R36)。请先发布以下依赖包:"
-                    for d in $UNPUBLISHED_DEPS; do
+                    for d in ${=UNPUBLISHED_DEPS}; do  # zsh: ${=} forces word-splitting
                         echo "         - $d"
                     done
                     L0_FAILED=true
@@ -320,7 +404,7 @@ PYEOF
     # recipes from the local archives/ directory so --build=missing can compile
     # them from source during conan create.
     if [ -n "${UNPUBLISHED_DEPS:-}" ]; then
-        for dep_ref in $UNPUBLISHED_DEPS; do
+        for dep_ref in ${=UNPUBLISHED_DEPS}; do  # zsh: ${=} forces word-splitting (BUG-9 style)
             dep_name=$(echo "$dep_ref" | cut -d'/' -f1)
             dep_ver=$(echo "$dep_ref" | cut -d'/' -f2)
             local_recipe=$(find "$REPO_ROOT/archives" -path "*/${dep_name}/${dep_ver}/conanfile.py" -not -path "*/test_package/*" -print -quit 2>/dev/null)
@@ -535,9 +619,11 @@ PYEOF
     # 将 conandata.yml 中已知域名的 url 从单值改为列表, 自动加上镜像源 fallback
     # Conan 2.x 的 get() 支持 url 列表, 会逐个尝试直到成功
     # 支持: github.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
-    # 支持: archives.boost.io, github.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
+    # 支持: archives.boost.io, download.gnome.org, gitlab.gnome.org, cdn.kernel.org
+    # 支持: files.pythonhosted.org, release-assets.githubusercontent.com
+    # 支持: sourceforge.net, bbuseruploads.s3.amazonaws.com, curl.se
     if [ -f "$CONANDATA" ]; then
-        if grep -qE 'url:.*https://(archives\.boost\.io|github\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org)/' "$CONANDATA" 2>/dev/null; then
+        if grep -qE 'url:.*https://(archives\.boost\.io|github\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org|download\.gnome\.org|gitlab\.gnome\.org|cdn\.kernel\.org|files\.pythonhosted\.org|release-assets\.githubusercontent\.com|[a-z0-9.-]+\.dl\.sourceforge\.net|sourceforge\.net|bbuseruploads\.s3\.amazonaws\.com|curl\.se|ftp\.jaist\.ac\.jp)/' "$CONANDATA" 2>/dev/null; then
             echo "[step] Mirror fallback: rewriting source URLs in conandata.yml..."
             cp "$CONANDATA" "${CONANDATA}.orig" 2>/dev/null
 
@@ -558,14 +644,11 @@ def get_mirrors(url):
         sf = f'https://downloads.sourceforge.net/project/boost/boost/{ver}/{fn}'
         return [sf, url]
     # ── GitHub ──
+    # 实测（2026-08-06）：仅 gh-proxy.com 可用（412KB/s），其余全部失效
+    # github.com 直连可用但极慢（19KB/s），作为最后兜底
     if re.match(r'^https?://github\.com/', url):
         return [
             'https://gh-proxy.com/' + url,
-            'https://mirror.ghproxy.com/' + url,
-            'https://ghproxy.com/' + url,
-            'https://gitclone.com/' + url[len('https://'):],
-            'https://moeyy.cn/gh-proxy/' + url,
-            url.replace('https://github.com', 'https://kkgithub.com'),
             url,
         ]
     # ── GNU (ftpmirror.gnu.org) ──
@@ -594,6 +677,53 @@ def get_mirrors(url):
             'https://mirrors.tuna.tsinghua.edu.cn/savannah/' + p,
             url,
         ]
+    # ── GNOME (download.gnome.org) ──
+    if re.match(r'^https?://download\.gnome\.org/', url):
+        p = re.sub(r'^https?://download\.gnome\.org/', '', url)
+        return [
+            'https://mirrors.ustc.edu.cn/gnome/' + p,
+            'https://mirrors.tuna.tsinghua.edu.cn/gnome/' + p,
+            'https://mirror.nju.edu.cn/gnome/' + p,
+            url,
+        ]
+    # ── GNOME GitLab (gitlab.gnome.org) — GitHub proxy 兼容 ──
+    if re.match(r'^https?://gitlab\.gnome\.org/', url):
+        return [
+            url,
+        ]
+    # ── kernel.org CDN (cdn.kernel.org / cdn.kernel.org/pub/linux/kernel/) ──
+    if re.match(r'^https?://cdn\.kernel\.org/', url):
+        p = re.sub(r'^https?://cdn\.kernel\.org/', '', url)
+        return [
+            'https://mirrors.ustc.edu.cn/kernel.org/' + p,
+            'https://mirrors.tuna.tsinghua.edu.cn/' + p,
+            'https://mirror.nju.edu.cn/' + p,
+            url,
+        ]
+    # ── Python packages (files.pythonhosted.org) ──
+    # conandata.yml 不太可能引用这里, 但以防万一
+    if re.match(r'^https?://files\.pythonhosted\.org/', url):
+        return [
+            url,
+        ]
+    # ── GitHub release assets (release-assets.githubusercontent.com) ──
+    if re.match(r'^https?://[^/]*release-assets\.githubusercontent\.com/', url):
+        return [
+            'https://gh-proxy.com/' + url,
+            'https://mirror.ghproxy.com/' + url,
+            url,
+        ]
+    # ── SourceForge ──
+    if re.match(r'^https?://(downloads\.|[^/]*\.dl\.)?sourceforge\.net/', url):
+        # SourceForge 国内有镜像但 URL 结构不同, 保留原始 URL + 加一个 downloads URL
+        return [
+            url,
+        ]
+    # ── curl.se (原 haxx.se) ──
+    if re.match(r'^https?://curl\.se/', url):
+        return [
+            url,
+        ]
     # ── 无匹配镜像 ──
     return [url]
 
@@ -618,6 +748,125 @@ PYEOF
 
             echo "        [ok] Source URLs rewritten with mirror fallback"
         fi
+    fi
+
+    # ── Pre-download source archives with retry ──
+    # Conan get() 对每个 URL 只试一次。如果 gh-proxy.com 和 github.com 同时不可达,
+    # 构建直接失败。这里在 conan build 之前先提取所有源码 URL,
+    # 用 curl --retry 下载到本地, 然后把 conandata.yml 改为 file:// 路径。
+    if [ -f "$CONANDATA" ]; then
+        echo "[step] Pre-download: extracting source URLs from conandata.yml..."
+
+        # 创建预下载缓存目录
+        BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/.build-cache}"
+        PREDL_DIR="${BUILD_DIR}/predl_cache"
+        mkdir -p "$PREDL_DIR"
+
+        python3 - "$CONANDATA" "$PREDL_DIR" <<'PYEOF'
+import re, sys, os, hashlib, subprocess
+
+conandata_path = sys.argv[1]
+predl_dir = sys.argv[2]
+
+with open(conandata_path, 'r') as f:
+    raw = f.read()
+
+# 解析所有 URL（包括已改写为列表的）
+# 匹配: url: https://... 或 - https://...
+url_pattern = r'(?:^|\s)(?:url:?\s*)?["\']?-?\s*(https?://[^\s"\'-]+)'
+urls = re.findall(url_pattern, raw, re.MULTILINE)
+# 去重
+urls = list(dict.fromkeys(urls))
+
+if not urls:
+    print("  no URLs found in conandata.yml")
+    sys.exit(0)
+
+print(f"  found {len(urls)} source URL(s)")
+
+def get_mirror_list(url):
+    """返回镜像列表（和 build_and_test.sh get_mirrors 一致）。"""
+    mirrors = []
+    if re.match(r'^https?://github\.com/', url):
+        mirrors = ['https://gh-proxy.com/' + url, url]
+    elif re.match(r'^https?://[^/]*release-assets\.githubusercontent\.com/', url):
+        mirrors = ['https://gh-proxy.com/' + url, url]
+    elif re.match(r'^https?://ftpmirror\.gnu\.org/', url):
+        p = re.sub(r'^https?://ftpmirror\.gnu\.org/', '', url)
+        mirrors = [f'https://mirrors.tuna.tsinghua.edu.cn/{p}',
+                   f'https://mirrors.ustc.edu.cn/{p}',
+                   f'https://mirrors.aliyun.com/{p}', url]
+    elif re.match(r'^https?://download\.gnome\.org/', url):
+        p = re.sub(r'^https?://download\.gnome\.org/', '', url)
+        mirrors = [f'https://mirrors.ustc.edu.cn/gnome/{p}',
+                   f'https://mirrors.tuna.tsinghua.edu.cn/gnome/{p}',
+                   f'https://mirror.nju.edu.cn/gnome/{p}', url]
+    elif re.match(r'^https?://cdn\.kernel\.org/', url):
+        p = re.sub(r'^https?://cdn\.kernel\.org/', '', url)
+        mirrors = [f'https://mirrors.ustc.edu.cn/kernel.org/{p}',
+                   f'https://mirrors.tuna.tsinghua.edu.cn/{p}', url]
+    else:
+        mirrors = [url]
+    return mirrors
+
+downloaded = {}
+for url in urls:
+    # 文件名用 URL 的 hash 防冲突
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    filename = url.split('/')[-1] or f'source_{url_hash}'
+    if '?' in filename:
+        filename = filename.split('?')[0]
+    dest = os.path.join(predl_dir, f'{url_hash}_{filename}')
+
+    if os.path.exists(dest) and os.path.getsize(dest) > 100:
+        print(f"  [cached] {filename} ({os.path.getsize(dest)//1024}KB)")
+        downloaded[url] = dest
+        continue
+
+    mirrors = get_mirror_list(url)
+    success = False
+    for i, mirror_url in enumerate(mirrors):
+        # 每个镜像试 3 次
+        for attempt in range(1, 4):
+            print(f"  [try {i+1}/{len(mirrors)}.{attempt}/3] {filename} ← {mirror_url[:80]}...")
+            try:
+                result = subprocess.run(
+                    ['curl', '-sL', '--retry', '3', '--retry-delay', '10',
+                     '--connect-timeout', '30', '--max-time', '300',
+                     '-o', dest, '-w', '%{http_code}:%{size_download}',
+                     mirror_url],
+                    capture_output=True, text=True, timeout=360
+                )
+                size = os.path.getsize(dest) if os.path.exists(dest) else 0
+                if size > 100:
+                    print(f"  [ok] {filename} ({size//1024}KB) via mirror {i+1}")
+                    downloaded[url] = dest
+                    success = True
+                    break
+                else:
+                    print(f"  [fail] size={size}, http={result.stdout[-3:]}")
+            except Exception as e:
+                print(f"  [fail] {str(e)[:60]}")
+        if success:
+            break
+
+    if not success:
+        print(f"  [WARN] Failed to pre-download {filename}, will rely on conan's download")
+
+if downloaded:
+    # 把 conandata.yml 里的远程 URL 替换为 file:// 本地路径
+    with open(conandata_path, 'r') as f:
+        content = f.read()
+
+    for url, local_path in downloaded.items():
+        content = content.replace(url, f'file://{local_path}')
+
+    with open(conandata_path, 'w') as f:
+        f.write(content)
+    print(f"  [done] Pre-downloaded {len(downloaded)} files, conandata.yml updated to file:// URLs")
+else:
+    print("  [done] No files pre-downloaded")
+PYEOF
     fi
 
     # ── Conf compatibility patch (conan 2.29.1 兼容层) ──
@@ -671,17 +920,38 @@ PYEOF
     # CI 必须始终重新构建目标包, 确保运行 make check + test_package
     # --build=missing: 依赖包用缓存
     # --build="${pkg_name}/*": 目标包强制重建
-    # timeout: 45 分钟硬超时, 防止交互式测试 (如 bash run-execscript) 卡住 worker
-    #   exit code 124 = timeout triggered
-    BUILD_TIMEOUT=2700
+    # Default to 45 minutes. Centrally reviewed high-cost packages may use a
+    # bounded override from ci/config/build_timeouts.txt.
+    BUILD_TIMEOUT=$(build_timeout_for "${pkg_name}/${pkg_ver}")
+    if [ "$BUILD_TIMEOUT" -ne "$DEFAULT_BUILD_TIMEOUT" ]; then
+        echo "[step] Extended build timeout for ${pkg_name}/${pkg_ver}: ${BUILD_TIMEOUT}s"
+    fi
+    BUILD_STARTED_AT=$(date +%s)
     # Disable set -e around conan create — we need to capture the exit code
     # and continue to the next package on failure (BUG: set -e caused premature exit)
     set +e
-    timeout --signal=KILL $BUILD_TIMEOUT conan create "$pkg_dir" "${CONAN_CREATE_ARGS[@]}" --build="${pkg_name}/*" 2>&1 | tee "$BUILD_LOG"
-    CONAN_RC=${PIPESTATUS[0]:-$?}
+    timeout --signal=KILL "$BUILD_TIMEOUT" conan create "$pkg_dir" "${CONAN_CREATE_ARGS[@]}" --build="${pkg_name}/*" 2>&1 | tee "$BUILD_LOG"
+    PIPE_STATUSES=("${pipestatus[@]}")
+    CONAN_RC=${PIPE_STATUSES[1]:-1}
+    TEE_RC=${PIPE_STATUSES[2]:-1}
+    BUILD_ELAPSED=$(( $(date +%s) - BUILD_STARTED_AT ))
     set -e
 
-    if [ $CONAN_RC -eq 124 ]; then
+    if [ "$TEE_RC" -ne 0 ]; then
+        echo "[fail] ${pkg_name}/${pkg_ver} — unable to write complete conan build log (tee rc=${TEE_RC})"
+        echo "L0_RESULT=${L0_RESULT}: ${L0_DETAIL}"
+        echo "L1_RESULT=fail: conan build log is incomplete"
+        echo "L2_RESULT=skip: not run"
+        echo "L4_RESULT=skip: not run"
+        echo "L5_RESULT=skip: not run"
+        FAILED=$((FAILED + 1))
+        FAILED_PKGS+=("${pkg_name}/${pkg_ver} (build log)")
+        continue
+    fi
+
+    # GNU timeout may return 124 or 137. Either code is a timeout only when
+    # the configured bound was actually reached; a child may return it early.
+    if is_build_timeout_result "$CONAN_RC" "$BUILD_ELAPSED" "$BUILD_TIMEOUT"; then
         echo "[fail] ${pkg_name}/${pkg_ver} — conan create TIMED OUT after ${BUILD_TIMEOUT}s"
         echo "[hint] 构建超时 (${BUILD_TIMEOUT} 秒限制)"
         echo "       常见原因: 1) 源码包过大 2) 交互式测试卡住 3) 编译死循环"
@@ -1041,6 +1311,13 @@ echo "━━━ Build Summary ━━━"
 echo "  Total:   ${#PACKAGES[@]}"
 echo "  Success: ${SUCCESS}"
 echo "  Failed:  ${FAILED}"
+# 通过率：Success / Total，明确标注（Total=0 时显示 N/A，避免除零）
+if [ "${#PACKAGES[@]}" -gt 0 ]; then
+    pass_rate=$(awk -v s="$SUCCESS" -v t="${#PACKAGES[@]}" 'BEGIN { printf "%.1f%%", s * 100 / t }')
+    echo "  Pass rate: ${pass_rate} (${SUCCESS}/${#PACKAGES[@]})"
+else
+    echo "  Pass rate: N/A (0 packages)"
+fi
 
 if [ $FAILED -gt 0 ]; then
     echo "  Failed packages:"
