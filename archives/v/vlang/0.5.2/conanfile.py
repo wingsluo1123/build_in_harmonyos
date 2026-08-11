@@ -233,10 +233,21 @@ class VConan(ConanFile):
             wrapper = os.path.join(bin_dir, "v")
             shell_path = "/system/bin/sh" if str(self.settings.os) == "OHOS" else "/bin/sh"
             gc_args = " -gc none" if str(self.settings.os) == "OHOS" else ""
+            ohos_tmp_setup = ""
+            if str(self.settings.os) == "OHOS":
+                ohos_tmp_setup = (
+                    'if [ -z "${TMPDIR:-}" ] && [ -z "${TMP:-}" ] && [ -z "${TEMP:-}" ]; then\n'
+                    '  tmpdir="${HOME:-$bindir}/.cache/v"\n'
+                    '  if mkdir -p "$tmpdir"; then\n'
+                    '    export TMPDIR="$tmpdir" TMP="$tmpdir" TEMP="$tmpdir"\n'
+                    "  fi\n"
+                    "fi\n"
+                )
             with open(wrapper, "w", encoding="utf-8", newline="\n") as f:
                 f.write(
                     f"#!{shell_path}\n"
                     "bindir=$(CDPATH= cd \"$(dirname \"$0\")\" && pwd)\n"
+                    f"{ohos_tmp_setup}"
                     f"exec \"$bindir/../share/v/v\"{gc_args} \"$@\"\n"
                 )
             os.chmod(wrapper, 0o755)
