@@ -261,6 +261,38 @@ class AbiwordPluginEmlConan(ConanFile):
 
         apply_conandata_patches(self)
 
+        if self.settings.os == "OHOS":
+            # 记忆坑①/ E114 (同 libgsf 配方): 鸿蒙安全框架拦脚本子进程在新目录
+            # 写文件。autoconf 的 config.status 默认用 AS_TMPDIR 在 build 目录建
+            # ./confXXXXXX 临时目录,子进程写 subs1.awk 被拦; 且 configure 编译
+            # conftest 时 clang 写 TMPDIR 临时文件也被拦(Permission denied)——
+            # CI 实测 configure 报 "C compiler cannot create executables"。
+            # 修法: 配方(主进程) os.makedirs 预建可写目录, 设置 TMPDIR 指向它,
+            # 并把 configure 内嵌 config.status 模板 ac_tmp 改指该目录。
+            import tempfile
+            fixed_tmp = os.path.join(tempfile.gettempdir(), "eml-ac-tmp")
+            os.makedirs(fixed_tmp, exist_ok=True)
+            os.environ["TMPDIR"] = fixed_tmp
+            _cfg_path = os.path.join(self.source_folder, "configure")
+            if os.path.exists(_cfg_path):
+                with open(_cfg_path, "r", encoding="utf-8") as _f:
+                    _cfg = _f.read()
+                if "ac_tmp=$tmp" not in _cfg:
+                    raise ConanException(
+                        "E114: ac_tmp=$tmp pattern not found in configure; "
+                        "autoconf may have changed the template")
+                _cfg = _cfg.replace("ac_tmp=$tmp", "ac_tmp={}".format(fixed_tmp))
+                # config.status 的 trap 在退出时 rm -fr "$ac_tmp" 会删掉预建目录,
+                # 后续轮次就找不到目录。把 trap 改为只透传退出码,不再删除。
+                _old_trap = '{ test ! -d "$ac_tmp" || rm -fr "$ac_tmp"; } && exit $exit_status'
+                _new_trap = 'exit $exit_status'
+                if _old_trap in _cfg:
+                    _cfg = _cfg.replace(_old_trap, _new_trap)
+                with open(_cfg_path, "w", encoding="utf-8") as _f:
+                    _f.write(_cfg)
+                os.chmod(_cfg_path, 0o755)
+                self.output.info("  [ok] Patched configure: ac_tmp -> {} + TMPDIR (HMDFS)".format(fixed_tmp))
+
         autotools = Autotools(self)
         autotools.configure()
         # Build the plugin subdirectory only
