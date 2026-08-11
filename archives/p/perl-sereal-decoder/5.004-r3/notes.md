@@ -10,7 +10,7 @@
 
 1. 源码下载: `curl -L https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-Decoder-5.004.tar.gz`
 2. 生成 Conan 配方: `ohc-run.py conan-init perl-sereal-decoder 5.004-r3`
-3. 构建命令: `perl Makefile.PL INSTALLDIRS=site` → `make -j2`
+3. 构建命令: `perl Makefile.PL INSTALLDIRS=site` → `make -j1`
 4. 安装到 package: `make install DESTDIR=$PACKAGE_FOLDER`
 5. ELF 签名: `llvm-objcopy --remove-section .codesign` + `binary-sign-tool sign -selfSign 1`
 6. 产物复制: 签名后的 .so 复制到 lib/ 供 G4 检查

@@ -90,7 +90,7 @@ class PerlSerealDecoderConan(ConanFile):
             try:
                 result = subprocess.run(
                     ["llvm-readelf", "-S", so_file],
-                    capture_output=True, text=True
+                    capture_output=True, text=True, check=True
                 )
                 has_codesign = ".codesign" in result.stdout
             except (FileNotFoundError, subprocess.CalledProcessError):
