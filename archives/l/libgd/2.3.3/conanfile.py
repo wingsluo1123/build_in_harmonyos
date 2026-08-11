@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from conan import ConanFile
-from conan.tools.autotools import Autotools, AutotoolsToolchain
+from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.env import Environment
 from conan.tools.files import apply_conandata_patches
 from conan.tools.layout import basic_layout
