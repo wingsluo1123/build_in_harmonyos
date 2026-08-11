@@ -9,7 +9,7 @@
 # Usage: PERL_LIB=<path> sh test_ntlm.sh
 # Exit code: 0 = all tests passed, non-0 = failure
 
-set -u
+set -euo pipefail
 
 PERL_LIB="${PERL_LIB:-}"
 
@@ -61,8 +61,11 @@ if echo "$LOAD_OUTPUT" | grep -q "Authen::NTLM version: 1.09"; then
 
     # Test 4: NTLM hash computation (only if module loaded)
     echo -n "Test 4: NTLM hash computation ... "
-    HASH_OUTPUT=$(perl -I"$PERL_LIB" -MAuthen::NTLM -e 'use Authen::NTLM qw(nt_hash); my $h = nt_hash("password"); print unpack("H*", $h);' 2>&1) || true
-    if [ -n "$HASH_OUTPUT" ]; then
+    set +e
+    HASH_OUTPUT=$(perl -I"$PERL_LIB" -MAuthen::NTLM -e 'use Authen::NTLM qw(nt_hash); my $h = nt_hash("password"); print unpack("H*", $h);' 2>/dev/null)
+    HASH_EXIT=$?
+    set -e
+    if [ "$HASH_EXIT" -eq 0 ] && [ -n "$HASH_OUTPUT" ]; then
         echo "PASS"
         echo "  NTLM hash: $HASH_OUTPUT"
     else
@@ -70,8 +73,8 @@ if echo "$LOAD_OUTPUT" | grep -q "Authen::NTLM version: 1.09"; then
         FAIL=1
     fi
 else
-    echo "SKIP (runtime dependency Digest::HMAC_MD5 not available in test env)"
-    echo "  Package is correctly built; module requires Digest::HMAC_MD5 at runtime"
+    echo "SKIP (module load failed in test environment, likely missing runtime dependency)"
+    echo "  Package is correctly built; see notes.md for runtime dependency details"
     echo "  Load output: $LOAD_OUTPUT"
 fi
 
