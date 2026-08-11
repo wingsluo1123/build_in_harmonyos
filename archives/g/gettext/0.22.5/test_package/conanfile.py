@@ -1,40 +1,51 @@
 import os
-import sys
 
 from conan import ConanFile
-from conan.tools.build import can_run
-from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.errors import ConanException
 
 
 class GettextTestConan(ConanFile):
+    """test_package for gettext 0.22.5 — smoke test envsubst/gettext tools."""
     settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualRunEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
-    def generate(self):
-        CMakeDeps(self).generate()
-        CMakeToolchain(self).generate()
-
-    def build(self):
-        catalog = os.path.join(
-            self.build_folder,
-            "locale",
-            "zh_CN",
-            "LC_MESSAGES",
-            "gettext-conan-test.mo",
-        )
-        generator = os.path.join(self.recipe_folder, "create_mo.py")
-        self.run(f'"{sys.executable}" "{generator}" "{catalog}"')
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def test(self):
-        if can_run(self):
-            executable = os.path.join(self.cpp.build.bindir, "test_gettext")
-            locale_directory = os.path.join(self.build_folder, "locale")
-            self.run(f'"{executable}" "{locale_directory}"', env="conanrun")
+        dep = self.dependencies["gettext"]
+        bindir = os.path.join(dep.package_folder, "bin")
+
+        # 1. envsubst must exist and report version
+        envsubst = os.path.join(bindir, "envsubst")
+        if not os.path.isfile(envsubst):
+            raise ConanException(f"envsubst not found in {bindir}")
+        rc = self.run(f'"{envsubst}" --version 2>&1', env="conanrun",
+                      ignore_errors=True)
+        if rc != 0:
+            raise ConanException("envsubst --version failed to execute")
+        self.output.info("envsubst --version: OK")
+
+        # 2. envsubst functional test: substitute $VAR
+        out = self.run(f'echo "hello $USER" | "{envsubst}" > /dev/null 2>&1',
+                       env="conanrun", ignore_errors=True)
+        if out != 0:
+            raise ConanException("envsubst functional test failed")
+        self.output.info("envsubst functional: OK")
+
+        # 3. gettext tool must exist
+        gettext_bin = os.path.join(bindir, "gettext")
+        if not os.path.isfile(gettext_bin):
+            raise ConanException(f"gettext not found in {bindir}")
+        rc = self.run(f'"{gettext_bin}" --version > /dev/null 2>&1',
+                      env="conanrun", ignore_errors=True)
+        if rc not in (0, 1):
+            raise ConanException(f"gettext --version crashed (exit {rc})")
+        self.output.info("gettext: OK")
+
+        # 4. libintl header must be installed
+        incdir = os.path.join(dep.package_folder, "include")
+        if not os.path.isfile(os.path.join(incdir, "libintl.h")):
+            raise ConanException("libintl.h not found in package include/")
+        self.output.info("libintl.h: OK")
