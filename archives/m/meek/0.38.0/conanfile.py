@@ -16,7 +16,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import apply_conandata_patches, copy, unzip, check_sha256, export_conandata_patches
+from conan.tools.files import apply_conandata_patches, copy, get, unzip, check_sha256, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -30,7 +30,6 @@ class MeekConan(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
     package_type = "application"
-    exports_sources = "prebuilt.tar.gz"
 
     def requirements(self):
         # Go modules manage their own dependencies via go.mod (not Conan)
@@ -44,16 +43,15 @@ class MeekConan(ConanFile):
         export_conandata_patches(self)
 
     def source(self):
-        # CI Workers cannot reach gitlab.torproject.org (the official source),
-        # nor is that host covered by the CI mirror fallback. The upstream
-        # v0.38.0 source is therefore vendored as "prebuilt.tar.gz" — the
-        # .gitignore exception for files that must ship with the recipe (see
-        # md5deep/libtar for the same pattern) — and extracted here with no
-        # network download. Integrity is verified against the sha256 recorded
-        # in conandata.yml.
-        tarball = os.path.join(self.source_folder, "prebuilt.tar.gz")
-        check_sha256(self, tarball, self.conan_data["sources"]["sha256"])
-        unzip(self, tarball, strip_root=True)
+        # Download the upstream v0.38.0 source from conandata.yml url (R39).
+        # gitlab.torproject.org may be unreachable from the dev machine, but
+        # CI Workers have a different network egress — let Conan get() try
+        # the official url. If CI also cannot reach it, the recipe fails fast
+        # with a clear NotFound error rather than a binary-patch apply failure
+        # (which was the case when the source was vendored as a tracked tarball:
+        # GitCode's PR diff endpoint emits "Binary files differ" placeholders
+        # without actual binary patch data, so git apply rejected the checkout).
+        get(self, **self.conan_data["sources"], strip_root=True)
 
     def _goarch(self):
         """Map Conan arch to Go GOARCH (R33: derived from Conan settings)."""
