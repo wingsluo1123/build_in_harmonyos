@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml — json-glib 1.6.6
+# 上游官方测试声明（CI L0e 强制要求）
+
+package: json-glib/1.6.6
+homepage: https://gnome.pages.gitlab.gnome.org/json-glib/
+
+# 上游测试情况：meson -Dtests=false 关闭上游测试套件（需 glib test utils +
+# 额外构建开销），以最小化鸿蒙 PC 构建。test_package 自带消费者级测试覆盖
+# 核心 API。
+upstream_test_in_build: false
+upstream_tests: []
+
+# test_package 自带测试（消费者视角：编译+链接头闭包 + 运行期 JSON parse/build 往返）
+test_package_tests:
+  - file: test.c
+    description: >
+      编译 #include <json-glib/json-glib.h> 头闭包 + 链接 json-glib-1.0，
+      运行期 json_parser_load_from_data 解析 JSON 对象并 json_object_get_string_member
+      /get_int_member 读回值，再用 json_builder/json_generator 构造并序列化对象。
+      非交叉构建时运行；交叉构建时仅验证编译+链接。
+    command: "./test_json_glib"
+
+# 测试断言总数（parse name/version 3 + build ok/count 2 + run success 1）
+assertion_count: 6
