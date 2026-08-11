@@ -181,8 +181,13 @@ class VConan(ConanFile):
         # Run only the local bootstrap target. The default target tries to clone
         # or pull vlang/vc; source() has already supplied vc/v.c deterministically.
         os.makedirs(os.path.join(self.build_folder, "vmodules"), exist_ok=True)
+        tmp_dir = os.path.join(self.build_folder, "tmp")
+        os.makedirs(tmp_dir, exist_ok=True)
         env = Environment()
         env.define("VMODULES", os.path.join(self.build_folder, "vmodules"))
+        env.define("TMPDIR", tmp_dir)
+        env.define("TMP", tmp_dir)
+        env.define("TEMP", tmp_dir)
         if posix_tools_dir:
             env.prepend_path("PATH", posix_tools_dir)
         with env.vars(self).apply():
@@ -227,11 +232,12 @@ class VConan(ConanFile):
         else:
             wrapper = os.path.join(bin_dir, "v")
             shell_path = "/system/bin/sh" if str(self.settings.os) == "OHOS" else "/bin/sh"
+            gc_args = " -gc none" if str(self.settings.os) == "OHOS" else ""
             with open(wrapper, "w", encoding="utf-8", newline="\n") as f:
                 f.write(
                     f"#!{shell_path}\n"
                     "bindir=$(CDPATH= cd \"$(dirname \"$0\")\" && pwd)\n"
-                    "exec \"$bindir/../share/v/v\" \"$@\"\n"
+                    f"exec \"$bindir/../share/v/v\"{gc_args} \"$@\"\n"
                 )
             os.chmod(wrapper, 0o755)
             os.chmod(real_v, 0o755)
