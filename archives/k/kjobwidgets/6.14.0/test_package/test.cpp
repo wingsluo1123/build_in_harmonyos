@@ -7,7 +7,9 @@
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
-    KStatusBarJobTracker tracker(nullptr, true);
+    // Parent widget only; omit the second (bool button) argument to avoid
+    // any ambiguity flagged by review.
+    KStatusBarJobTracker tracker(nullptr);
     std::printf("PASS: KStatusBarJobTracker constructed OK\n");
     return 0;
 }
