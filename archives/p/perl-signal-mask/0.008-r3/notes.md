@@ -4,7 +4,7 @@
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
 - 编译日期: 2026-06-29
 - 编译器: clang/clang++
-- 状态: published
+- 状态: built
 
 ## 编译步骤
 
@@ -34,7 +34,7 @@
 ## 依赖版本
 
 ### 运行时依赖
-- IPC::Signal: 系统 Perl 自带 (/data/service/hnp/perl.org/perl_5.42.0/lib/site_perl/5.42.0)
+- IPC::Signal: 打包到 conan 包内 (lib/perl5/IPC/Signal.pm)，从 CPAN 下载源码并 bundle
 
 ### 编译依赖
 - perl 5.42.0 (系统自带)
@@ -77,4 +77,4 @@ T9: 上游测试套件 (18/18 通过) ✅
 ---
 
 **编译结束**: 2026-06-29 20:20
-**最终状态**: published (conan-verify 通过)
+**最终状态**: built (conan-verify 通过，待 PR 合并后 upload 更新为 published)
