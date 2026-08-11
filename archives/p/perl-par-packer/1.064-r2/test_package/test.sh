@@ -5,7 +5,8 @@
 # and that the Perl module can be loaded (with PAR_GLOBAL_TEMP workaround).
 #
 # Usage: sh test.sh <package_folder>
-set -e
+set -eu
+set -o pipefail
 
 PKG_DIR="${1:?Usage: sh test.sh <package_folder>}"
 PERL_LIB="$PKG_DIR/lib/perl5"
@@ -35,13 +36,18 @@ for rel_path in $REQUIRED_FILES; do
 done
 
 # 2. Syntax-check key module files with perl -c
+SYNTAX_FAIL=0
 for rel_path in $REQUIRED_FILES; do
     full_path="$PERL_LIB/$rel_path"
     echo "Checking syntax: $rel_path"
-    PERL5LIB="$PERL_LIB" perl -c "$full_path" 2>&1 || {
+    if ! PERL5LIB="$PERL_LIB" perl -c "$full_path" 2>&1; then
         echo "WARN: Syntax check failed for $rel_path (may have external deps)"
-    }
+        SYNTAX_FAIL=$((SYNTAX_FAIL + 1))
+    fi
 done
+if [ "$SYNTAX_FAIL" -gt 0 ]; then
+    echo "WARN: $SYNTAX_FAIL file(s) failed syntax check (may be due to missing deps)"
+fi
 
 # 3. Try loading PAR::Packer with PAR_GLOBAL_TEMP set (bypasses HMDFS restriction)
 echo "Attempting module load with PAR_GLOBAL_TEMP..."

@@ -217,7 +217,7 @@ par.pl hello.par  →  Hello from PAR::Packer!
 | sysroot 指定 | --sysroot | ✅ 相同方案 |
 | ldd 命令缺失 | - | ✅ readelf wrapper |
 | HMDFS 临时目录限制 | SELinux 限制 .so 加载 | ✅ PAR_GLOBAL_TEMP 绕过 |
-| 签名问题 | .so 需签名 | parl 签名失效（不可修复） |
+| 签名问题 | .so 需签名 | ✅ ELF section 嵌入 + 重新签名 |
 | HNP 安装包 | ✅ 已准备 | 可准备（需管理员安装） |
 
 ---

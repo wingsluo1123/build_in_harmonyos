@@ -43,7 +43,10 @@ class PerlParPackerConan(ConanFile):
 
         # OHOS: set OHOS_SYSROOT for patches that use $ENV{OHOS_SYSROOT}
         if self.settings.os == "OHOS":
-            os.environ["OHOS_SYSROOT"] = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot"
+            if not os.environ.get("OHOS_SYSROOT"):
+                hnp_home = os.environ.get("HNP_PUBLIC_HOME", "/data/service/hnp")
+                os.environ["OHOS_SYSROOT"] = os.path.join(
+                    hnp_home, "ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot")
 
         # OHOS: create ldd wrapper if ldd is not available
         ldd_path = os.path.join(tmpdir, "ldd")
@@ -111,8 +114,9 @@ class PerlParPackerConan(ConanFile):
             # OHOS: Sign parl/parldyn to fix signature invalidation
             # parl = boot + appended PAR data; appending data invalidates .codesign
             # Solution: embed PAR data as .pardata ELF section, then re-sign
-            sign_tool = "/data/service/hnp/bin/binary-sign-tool"
-            objcopy_tool = shutil.which("objcopy") or "/data/service/hnp/bin/objcopy"
+            hnp_home = os.environ.get("HNP_PUBLIC_HOME", "/data/service/hnp")
+            sign_tool = os.path.join(hnp_home, "bin/binary-sign-tool")
+            objcopy_tool = shutil.which("objcopy") or os.path.join(hnp_home, "bin/objcopy")
 
             for exe, base in [("parl", "boot"), ("parldyn", "par")]:
                 exe_path = os.path.join(myldr, exe)
