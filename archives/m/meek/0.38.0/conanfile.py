@@ -39,7 +39,7 @@ class MeekConan(ConanFile):
         basic_layout(self)
 
     def export_sources(self):
-        # G1完整性: exports_sources 声明的 vendored tarball 需此方法显式导出
+        # G1完整性: conandata.yml 声明的源/补丁需此方法显式导出
         export_conandata_patches(self)
 
     def source(self):
