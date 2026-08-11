@@ -54,3 +54,8 @@ W3 本地 CI 模拟 (setup.sh + build_and_test.sh): 通过
 - 本包是 GStreamer 插件（dlopen 加载），不是链接库：package_info() 中 cpp_info.libs 为空是预期行为
 - OHOS 上 dlopen 依赖解析受 namespace 限制（E186），插件 .so 需带 RUNPATH 指向 gstreamer 库目录并重新签名
 - 集成测试需要真实 QUIC 网络，CI 中不可运行
+
+---
+
+**编译结束**: 2026-08-11 16:00
+**最终状态**: built
