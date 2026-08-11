@@ -74,6 +74,5 @@ uSockets 的功能通过上层 uWebSockets 示例间接验证（uSockets 是 uWe
 - sni_tree.o 使用 C++ 编译 (sni_tree.cpp)，其余使用 C 编译
 ---
 
-**编译结束**: 2026-06-24 14:53
-**功能测试**: 2026-06-24 通过 (通过 uWebSockets 上层验证)
-**最终状态**: built (功能验证通过)
+**编译结束**: 2026-08-11 10:53
+**最终状态**: built
