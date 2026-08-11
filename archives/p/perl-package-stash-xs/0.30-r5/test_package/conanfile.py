@@ -32,10 +32,11 @@ class PerlPackageStashXsTestConan(ConanFile):
         # Derive PERL5LIB: go up 3 levels from XS.pm (.../Package/Stash/XS.pm → .../)
         perl_lib_dir = os.path.dirname(os.path.dirname(os.path.dirname(pm_files[0])))
 
-        # Run the test script with PERL5LIB set via env parameter (not string interpolation)
+        # Run the test script with PERL5LIB set to the package's Perl lib dir
         test_script = os.path.join(self.source_folder, "test_xs.sh")
+        os.environ["PERL5LIB"] = perl_lib_dir
         try:
-            self.run(f'sh "{test_script}"', env={"PERL5LIB": perl_lib_dir})
+            self.run(f'sh "{test_script}"')
         except Exception as e:
             # Exit code 77 = SKIP: SELinux HMDFS blocks .so loading (known platform limitation)
             if "77" in str(e):
