@@ -28,3 +28,4 @@ knowledge_gained:
   - "上游测试需 ZeroMQ IPC transport，在 OHOS 上可能受限，test_package 用 serialize round-trip 做消费者验证"
   - "PR 审查 P1 改正：test.sh 原为 find_spec/AST 结构检查（R34 空壳测试），已改为实际调用 API（import + __version__ + Client/ServerInThread/Sender 类 + serialize/deserialize 真实往返），本机实测 5/5 PASS"
   - "CI 构建修复：test.sh 真实 import 在 CI 沙箱报 ModuleNotFoundError: No module named 'zmq'（缺 pyzmq）→ 测试 Python 代码先向 sys.modules 注入 mock zmq（Frame 类），再真实 import + 真实 API 往返，CI 与本地均 5/5 PASS"
+  - "CI 构建修复（续）：CI 沙箱还缺 msgpack_numpy/numpy → mock 前缀统一注入 zmq + msgpack_numpy（恒等 encode/decode）+ numpy（最小占位桩），标量+metadata 往返仍真实 msgpack 编解码；numpy 数组往返仅真实 numpy 可用时执行（_MOCK 标记跳过，不阻塞）"
