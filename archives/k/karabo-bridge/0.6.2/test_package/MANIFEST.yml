@@ -5,12 +5,13 @@
 # 且依赖 ZeroMQ C 库的 IPC (ipc://) transport — 在 OHOS R32 平台上 IPC 语义
 # 可能受限, 故 upstream_test_in_build=false, 由 test_package 做消费者 smoke test.
 #
-# test_package smoke tests (5 assertions):
-#   1. import karabo_bridge — 模块导入
-#   2. __version__ == "0.6.2" — 版本断言
-#   3. Client class 可导入且为 class — Client 类存在
-#   4. ServerInThread class 可导入且为 class — Server/Sender 类存在
-#   5. serialize/deserialize round-trip — 模拟桥接管道数据接收验证
+# test_package smoke tests (5 assertions, R34 实质测试 — 实际调用 API):
+#   1. import karabo_bridge — 模块导入 + __version__ == "0.6.2"
+#   2. Client class 可导入且为 class — Client 类存在
+#   3. ServerInThread + Sender class 可导入且为 class — Server/Sender 类存在
+#   4. serialize() 真实调用 — 真实数据 → 消息列表
+#   5. serialize/deserialize 真实往返 — 标量 + numpy 数组 round-trip 一致
+# （PR 审查 P1 改正：原测试仅 find_spec/AST 检查未调用 API，现为真实 API 调用。）
 
 package: karabo-bridge/0.6.2
 homepage: "https://github.com/European-XFEL/karabo-bridge-py"
@@ -40,8 +41,9 @@ upstream_tests:
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.sh
-    description: "消费者 smoke test: 模块导入 + 版本断言 + Client/Sender 类 + serialize round-trip"
+    description: "消费者 smoke test（R34 实质测试）: import + 版本 + Client/ServerInThread/Sender 类 + serialize/deserialize 真实往返"
     command: "bash test.sh"
+    result: "5/5 PASS（实测：本机 python3 具备 msgpack/msgpack-numpy/numpy，zmq 27.1.0 可用；serialize/deserialize 无需真实 IPC 连接即可往返）"
 
 # 测试断言总数
 assertion_count: 5

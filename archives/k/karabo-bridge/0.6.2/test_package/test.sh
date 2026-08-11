@@ -1,110 +1,74 @@
 #!/usr/bin/env bash
 # karabo-bridge 0.6.2 test_package smoke test
-# Verifies module layout, version, Client/Sender classes, and serialize
-# round-trip API surface (R34) — WITHOUT importing karabo_bridge live,
-# because karabo_bridge/__init__.py does `from .server import *` which
-# triggers `import zmq` (pyzmq). The CI sandbox lacks pyzmq, so a live
-# import raises ModuleNotFoundError: No module named 'zmq'. We instead
-# inspect the installed source via importlib.util.find_spec + AST, which
-# validates the package was correctly built and installed.
+# R34 实质测试：实际 import karabo_bridge 并调用其公开 API
+# （__version__、Client/ServerInThread 类、serialize/deserialize 真实往返），
+# 而非 AST/文件存在性检查（PR 审查 P1 改正）。
 #
-# 5 smoke test assertions:
-#   1. karabo_bridge package installed (find_spec) — package install
-#   2. __version__ == "0.6.2" — version assertion (read from source)
-#   3. Client class defined in client.py — Client class presence
-#   4. ServerInThread + Sender classes defined — Sender/Server class presence
-#   5. serialize + deserialize functions defined in serializer.py — API surface
+# 说明：serialize/deserialize 无需真实 ZMQ IPC 连接即可验证（serializer.py
+# 自带 Frame 哑对象，deserialize 接受 bytes 列表）；本机 Python 环境提供
+# msgpack/msgpack_numpy/numpy 依赖。若目标环境缺 pyzmq 导致 import 失败，
+# 本脚本会明确报错而非静默通过。
 
 set -euo pipefail
 
 echo "=== karabo-bridge 0.6.2 Smoke Test ==="
 
-# Test 1: Package installed (find_spec, no live import to avoid zmq)
-echo "--- Test 1: Package installed ---"
+# Test 1: 实际 import + 版本断言
+echo "--- Test 1: import + version ---"
 python3 -c "
-import importlib.util
-spec = importlib.util.find_spec('karabo_bridge')
-assert spec is not None, 'karabo_bridge package not installed (find_spec returned None)'
-assert spec.origin is not None, 'karabo_bridge has no __init__.py (namespace package?)'
-print('karabo_bridge package installed at:', spec.origin)
+import karabo_bridge
+print('karabo_bridge imported from:', karabo_bridge.__file__)
+assert karabo_bridge.__version__ == '0.6.2', \
+    f'Expected 0.6.2, got {karabo_bridge.__version__!r}'
+print('Version assertion: PASS (', karabo_bridge.__version__, ')')
 "
 
-# Test 2: Version assertion (read from source, no live import)
-echo "--- Test 2: Version assertion ---"
+# Test 2: Client 类实际可用（导入并检查可实例化所需的类定义）
+echo "--- Test 2: Client class ---"
 python3 -c "
-import ast, importlib.util
-spec = importlib.util.find_spec('karabo_bridge')
-assert spec is not None, 'karabo_bridge package not installed'
-with open(spec.origin, 'r', encoding='utf-8') as f:
-    tree = ast.parse(f.read())
-# Walk __init__.py for __version__ assignment
-version_val = None
-for node in ast.walk(tree):
-    if isinstance(node, ast.Assign):
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == '__version__':
-                version_val = ast.literal_eval(node.value)
-assert version_val == '0.6.2', f'Expected 0.6.2, got {version_val!r}'
-print('Version assertion: PASS (', version_val, ')')
+from karabo_bridge import Client
+print('Client class:', Client)
+assert Client is not None and isinstance(Client, type)
+print('Client class assertion: PASS')
 "
 
-# Test 3: Client class defined in client.py
-echo "--- Test 3: Client class defined ---"
+# Test 3: ServerInThread + Sender 类实际可用
+echo "--- Test 3: ServerInThread + Sender classes ---"
 python3 -c "
-import ast, importlib.util, os
-spec = importlib.util.find_spec('karabo_bridge')
-assert spec is not None, 'karabo_bridge package not installed'
-pkg_dir = os.path.dirname(spec.origin)
-client_py = os.path.join(pkg_dir, 'client.py')
-assert os.path.isfile(client_py), f'client.py missing: {client_py}'
-with open(client_py, 'r', encoding='utf-8') as f:
-    tree = ast.parse(f.read())
-class_names = [n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
-assert 'Client' in class_names, f'Client class not defined in client.py, found: {class_names}'
-print('Client class defined: PASS')
+from karabo_bridge import ServerInThread
+from karabo_bridge.server import Sender
+print('ServerInThread:', ServerInThread)
+print('Sender:', Sender)
+assert isinstance(ServerInThread, type) and isinstance(Sender, type)
+print('ServerInThread/Sender assertion: PASS')
 "
 
-# Test 4: ServerInThread + Sender classes defined
-echo "--- Test 4: ServerInThread + Sender classes defined ---"
+# Test 4: serialize 实际调用（真实数据 → 消息）
+echo "--- Test 4: serialize() real call ---"
 python3 -c "
-import ast, importlib.util, os
-spec = importlib.util.find_spec('karabo_bridge')
-assert spec is not None, 'karabo_bridge package not installed'
-pkg_dir = os.path.dirname(spec.origin)
-# ServerInThread in __init__.py (re-exported) or server.py
-init_py = spec.origin
-with open(init_py, 'r', encoding='utf-8') as f:
-    init_tree = ast.parse(f.read())
-init_classes = [n.name for n in ast.walk(init_tree) if isinstance(n, ast.ClassDef)]
-# Sender in server.py
-server_py = os.path.join(pkg_dir, 'server.py')
-assert os.path.isfile(server_py), f'server.py missing: {server_py}'
-with open(server_py, 'r', encoding='utf-8') as f:
-    server_tree = ast.parse(f.read())
-server_classes = [n.name for n in ast.walk(server_tree) if isinstance(n, ast.ClassDef)]
-assert 'Sender' in server_classes, f'Sender class not defined in server.py, found: {server_classes}'
-# ServerInThread: check __init__ imports or server.py defines it
-all_classes = set(init_classes) | set(server_classes)
-assert 'ServerInThread' in all_classes, f'ServerInThread not found in __init__ or server, found: {all_classes}'
-print('ServerInThread/Sender classes defined: PASS')
+from karabo_bridge import serialize
+data = {'SRC': {'value': 42}}
+meta = {'SRC': {'timestamp.tid': 123, 'timestamp.sec': '123'}}
+msg = serialize(data, metadata=meta)
+assert isinstance(msg, list) and len(msg) == 2, f'unexpected msg: {msg!r}'
+assert len(msg[0]) > 0 and len(msg[1]) > 0
+print('serialize() real call: PASS (', len(msg), 'parts )')
 "
 
-# Test 5: serialize + deserialize functions defined in serializer.py (API surface)
-echo "--- Test 5: serialize + deserialize API surface ---"
+# Test 5: serialize/deserialize 真实往返（标量 + numpy 数组）
+echo "--- Test 5: serialize/deserialize round-trip ---"
 python3 -c "
-import ast, importlib.util, os
-spec = importlib.util.find_spec('karabo_bridge')
-assert spec is not None, 'karabo_bridge package not installed'
-pkg_dir = os.path.dirname(spec.origin)
-serializer_py = os.path.join(pkg_dir, 'serializer.py')
-assert os.path.isfile(serializer_py), f'serializer.py missing: {serializer_py}'
-with open(serializer_py, 'r', encoding='utf-8') as f:
-    tree = ast.parse(f.read())
-func_names = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
-assert 'serialize' in func_names, f'serialize() not defined in serializer.py, found: {func_names}'
-assert 'deserialize' in func_names, f'deserialize() not defined in serializer.py, found: {func_names}'
-print('serialize/deserialize API surface defined: PASS')
+import numpy as np
+from karabo_bridge import serialize, deserialize
+data = {'SRC': {'value': 42, 'arr': np.array([1.0, 2.0, 3.0])}}
+meta = {'SRC': {'timestamp.tid': 123, 'timestamp.sec': '123'}}
+msg = serialize(data, metadata=meta)
+back, back_meta = deserialize(msg)
+assert back['SRC']['value'] == 42, f'value roundtrip failed: {back!r}'
+assert np.allclose(back['SRC']['arr'], [1.0, 2.0, 3.0]), 'array roundtrip failed'
+assert back_meta['SRC']['timestamp.tid'] == 123, 'metadata roundtrip failed'
+print('serialize/deserialize round-trip: PASS (scalar + numpy array)')
 "
 
 echo ""
-echo "=== All 5 smoke tests PASSED ==="
+echo "=== All 5 smoke tests PASSED (real API calls) ==="
