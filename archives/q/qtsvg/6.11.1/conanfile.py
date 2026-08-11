@@ -92,7 +92,10 @@ class QtsvgConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
+        # Platform guard: apply OHOS-specific patches only on OHOS so
+        # non-OHOS platforms (e.g. BSD) are not affected.
+        if self.settings.os == "OHOS":
+            apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
