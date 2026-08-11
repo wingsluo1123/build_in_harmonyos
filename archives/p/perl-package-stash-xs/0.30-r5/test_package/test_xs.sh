@@ -1,4 +1,5 @@
 #!/bin/sh
+set -euo pipefail 2>/dev/null || set -eu
 # test_package/test_xs.sh — Package::Stash::XS module API test
 # Called by test_package/conanfile.py with PERL5LIB set
 # Tests actual API: new(), name(), add_symbol(), has_symbol(), get_symbol()
