@@ -25,9 +25,11 @@
 (unless (fboundp 'org-link-set-parameters)
   (error "org-link-set-parameters is not defined"))
 
-(let ((params (cdr (assoc "https" org-link-parameters))))
-  (unless (listp params)
-    (error "https org-link parameters are not available: %S" params)))
+(let ((entry (assoc "https" org-link-parameters)))
+  (unless entry
+    (error "https org-link type is not registered in org-link-parameters"))
+  (unless (listp (cdr entry))
+    (error "https org-link parameters are not a list: %S" (cdr entry))))
 
 (message "org consumer load validation OK")
 
