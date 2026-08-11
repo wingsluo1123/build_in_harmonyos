@@ -56,14 +56,23 @@ PAR_GLOBAL_TEMP="$TMPDIR/par_test_temp"
 mkdir -p "$PAR_GLOBAL_TEMP"
 export PAR_GLOBAL_TEMP
 
+set +e
 LOAD_RESULT=$(PERL5LIB="$PERL_LIB" perl -MPAR::Packer -e 'print $PAR::Packer::VERSION' 2>&1)
-if echo "$LOAD_RESULT" | grep -qE '^[0-9]+\.'; then
+LOAD_RC=$?
+set -e
+
+if [ "$LOAD_RC" -eq 0 ] && echo "$LOAD_RESULT" | grep -qE '^[0-9]+\.'; then
     echo "OK: PAR::Packer loaded, version: $LOAD_RESULT"
-else
-    echo "WARN: PAR::Packer module load returned: $LOAD_RESULT"
-    # Module load may fail if PAR dependency is not installed in test env
-    # File existence + syntax check already validated package integrity
+elif echo "$LOAD_RESULT" | grep -q "Can't locate"; then
+    # Missing external Perl dependency (e.g. Archive::Zip, PAR)
+    # Not a packaging defect — file checks already verified integrity
+    echo "WARN: PAR::Packer module load failed due to missing dependency (exit code $LOAD_RC)"
     echo "INFO: Module load failure is acceptable if PAR dependency is not installed"
+    echo "INFO: $LOAD_RESULT"
+else
+    echo "FAIL: PAR::Packer module load failed with unexpected error (exit code $LOAD_RC)"
+    echo "$LOAD_RESULT"
+    exit 1
 fi
 
 # 4. Check for parl/parldyn binaries
