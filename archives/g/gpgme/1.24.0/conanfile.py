@@ -166,6 +166,16 @@ class GpgmeConan(ConanFile):
         env.define("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         env.define("TMPDIR", self.build_folder)
         env.prepend_path("PATH", os.path.join(co, "bin"))
+        # R33 + E001: 显式指定 CC/CXX（从 Conan toolchain 获取，避免 configure
+        # 在 PATH 中探测到 gcc→clang 时链接失败——CI 环境实测
+        # "checking for gcc... clang" 后 "C compiler cannot create executables"）。
+        tools = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        )
+        if tools.get("c"):
+            env.define("CC", tools["c"])
+        if tools.get("cpp"):
+            env.define("CXX", tools["cpp"])
         env.define(
             "CPPFLAGS",
             "-I{} -I{}".format(os.path.join(lgp, "include"), os.path.join(las, "include")),
