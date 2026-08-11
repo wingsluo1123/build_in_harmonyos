@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: gtk/3.24.38
+homepage: "https://www.gtk.org/"
+
+# 上游测试命令 (meson test --list 分析)
+upstream_check_command: "meson test -C builddir"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（GTK+ 3 测试套件需要图形显示服务器；
+# HarmonyOS 无 X11/Wayland，broadway 后端需 broadwayd 服务，本机无显示环境，
+# 故未在 build() 内跑 meson test，作为平台限制记录）
+upstream_tests:
+  - file: testsuite/gtk/gtk-*.c
+    source: gtk+-3.24.38/testsuite
+    description: "GTK+ 单元/回归测试套件（需显示服务器，headless 无法运行）"
+    command: "meson test -C builddir --timeout-multiplier=16"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：链接 libgtk-3 并调用 gtk_get_*_version / gtk_init_check / gtk_label_new"
+    command: "./test_gtk"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
