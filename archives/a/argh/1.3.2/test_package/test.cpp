@@ -41,7 +41,7 @@ int main() {
         const char* argv[] = {"prog", "pos1", "--flag", "pos2", "--opt=val"};
         argh::parser parser(5, argv);
         assert(parser["--flag"] == true);     // flag detected
-        assert(parser("--opt").str() == "val"); // param with = sign
+        assert(parser("--opt") == "val"); // param with = sign
         assert(parser[0] == "pos1");          // first positional
         assert(parser[1] == "pos2");           // second positional
     }
