@@ -48,6 +48,17 @@ class AbiwordPluginDocbookConan(ConanFile):
     def requirements(self):
         # docbook plugin needs libgsf-1 (gsf_req) per upstream plugin.m4
         self.requires("libgsf/1.14.53")
+        # AbiWord 主 configure 强依赖 png.h/jpeglib.h + 链接 -ljpeg/-lpng
+        # (AC_MSG_ERROR, CI 实测 'png.h not found')——必须显式声明 libpng/libjpeg,
+        # 依赖图才有这两个包, generate() 的 glob 才能注入 include/lib 路径。
+        # 制品仓已发布 libpng/1.6.58 与 libjpeg/10 (armv8/clang15/OHOS 二进制)。
+        self.requires("libpng/1.6.58")
+        self.requires("libjpeg/10")
+        # libpng/1.6.58 配方 requires zlib/1.3.1.1, 与 libgsf 传递链的 zlib/1.3.1
+        # 冲突(CI 实测 "Version conflict between zlib/1.3.1.1 and zlib/1.3.1")。
+        # consumer 用 override=True 强制统一为 zlib/1.3.1(补丁版本 ABI 兼容,
+        # libgsf/glib/libxml2 链已用 1.3.1; libpng 也会用 1.3.1 编译)。
+        self.requires("zlib/1.3.1", override=True)
 
     def build_requirements(self):
         # AbiWord 的 git archive tarball 不带 configure/aclocal.m4/Makefile.in，
