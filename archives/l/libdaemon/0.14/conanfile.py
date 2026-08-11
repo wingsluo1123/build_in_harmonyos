@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
+"""Conan recipe for libdaemon 0.14 — Lightweight C library for writing UNIX daemons.
 
-Usage: Replace Libdaemon, libdaemon, 0.14, Lightweight C library for writing UNIX daemons, LGPL-2.1, https://0pointer.de/lennart/projects/libdaemon/
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for system-name libraries.
+Autotools (configure + make). R26: 默认静态编译。
 """
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
@@ -18,7 +15,7 @@ class LibdaemonConan(ConanFile):
     description = "Lightweight C library for writing UNIX daemons"
     license = "LGPL-2.1"
     homepage = "https://0pointer.de/lennart/projects/libdaemon/"
-    url = ""  # CI fills this
+    url = "http://0pointer.de/lennart/projects/libdaemon/"
 
     package_type = "library"
 
@@ -40,12 +37,10 @@ class LibdaemonConan(ConanFile):
 
     def generate(self):
         tc = AutotoolsToolchain(self)
-        # R26: System-name libraries default to static
+        # R26: 静态编译，避免污染系统库路径
         if not self.options.shared:
             tc.configure_args.append("--enable-static")
             tc.configure_args.append("--disable-shared")
-        # Add project-specific configure args here:
-        # tc.configure_args.append("--without-bash-malloc")
         tc.generate()
 
     def build(self):
