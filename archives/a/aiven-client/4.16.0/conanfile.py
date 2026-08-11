@@ -63,12 +63,13 @@ class AivenClientConan(ConanFile):
         # R33: 不依赖 shell 环境变量，使用 Conan 管理的 python
         python = sys.executable
         # pip install . builds from source (pyproject.toml + hatchling).
-        # --no-deps: aiven-client runtime deps (requests/requests-toolbelt/certifi)
-        # 由设备端 pip 环境提供，不通过 Conan 管理（纯 Python 库惯例）.
+        # 带运行时依赖（requests/requests-toolbelt/certifi）由 pip 从配置的
+        # pypi.cnb.cool 镜像自动解析安装，确保 test_package 运行时导入链可用
+        # （aiven.client.__init__ → client.py → requests_toolbelt）。
         # 不带 --no-build-isolation: 让 pip 自动创建隔离环境并从配置的
         # pypi.cnb.cool 源下载构建依赖 (hatchling/hatch-vcs，同 pluggy 方案).
         self.run(
-            f"{python} -m pip install . --prefix={prefix} --no-deps",
+            f"{python} -m pip install . --prefix={prefix}",
             cwd=self.source_folder,
         )
 
