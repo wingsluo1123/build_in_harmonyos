@@ -1,4 +1,4 @@
-# gst-plugins-rs-quinn 0.15.3 适配笔记
+# gst-plugins-rs-quinn 0.15.3 适配笔记 (v2 - CI 重新触发)
 
 ## 编译环境
 - 构建系统: cargo (Rust) — gst-plugins-rs workspace 的 net/quinn crate
