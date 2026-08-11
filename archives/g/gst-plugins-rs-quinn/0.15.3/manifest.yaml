@@ -1,0 +1,85 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.15.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.15.3"
+
+# 软件名
+software: "{software}"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-11"
+build_system: "{BUILD_SYSTEM}"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs/-/archive/0.15.3/gst-plugins-rs-0.15.3.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Rust/cargo 项目 init-build 会误判构建系统为 autotools，需手工改写为 cargo 配方"
+  - "OHOS musl ldso 用 namespace 机制解析 dlopen 依赖（E186），test_package 的 dlopen 验证不可行，改用 ELF 动态符号表校验插件入口符号"
+  - "cmd-pkgs 预编译 gstreamer 包缺 .so 开发符号链接，需 rm -f && ln -s 补齐才能链接"
+  - "gitlab.freedesktop.org 的 Anubis 反爬对 curl 返回 HTML 挑战页，改用 GStreamer 官方 GitHub 镜像源（sha256 一致）"
+  - "build_and_test.sh 的 predl 步骤 URL 正则 [^\\s\"'-]+ 会截断含连字符的 URL，导致 W3 本地 CI 预下载改写坏 conandata.yml；预置 predl_cache 正确文件可走 [cached] 分支规避"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

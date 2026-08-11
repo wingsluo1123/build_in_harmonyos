@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: gst-plugins-rs-quinn/0.15.3
+homepage: "https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs"
+
+# 上游测试命令: Rust 集成测试 (cargo test -p gst-plugin-quinn)
+upstream_check_command: "cargo test -p gst-plugin-quinn --release"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 集成测试需要真实 QUIC 网络 (quinnquic.rs / quinnwebtransport.rs)，平台限制跳过
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (cargo 集成测试，需网络)
+upstream_tests:
+  - file: net/quinn/tests/quinnquic.rs
+    source: gst-plugins-rs-0.15.3/net/quinn/tests/quinnquic.rs
+    description: "QUIC stream/datagram 传输集成测试 (quinnquicsrc/sink, quicmux/demux, roqmux/demux)"
+    command: "cargo test -p gst-plugin-quinn --test quinnquic"
+  - file: net/quinn/tests/quinnwebtransport.rs
+    source: gst-plugins-rs-0.15.3/net/quinn/tests/quinnwebtransport.rs
+    description: "WebTransport over QUIC 集成测试 (quinnsrc/quinnsink, wtserversink/wtclientsrc)"
+    command: "cargo test -p gst-plugin-quinn --test quinnwebtransport"
+
+# test_package 中自带的测试 (消费者视角验证, 解析插件 ELF 导出符号)
+test_package_tests:
+  - file: test.c
+    description: "ELF 校验 libgstquinn.so 为 aarch64 .so 且导出 gst_plugin_quinn_get_desc / gst_plugin_quinn_register (OHOS dlopen 受限 E186, 改用符号表校验)"
+    command: "./test_gst-plugins-rs-quinn <libgstquinn.so>"
+
+# 测试断言总数 (2 个符号断言 + 单元测试 0)
+assertion_count: 2
