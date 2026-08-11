@@ -32,7 +32,7 @@ class DuneConan(ConanFile):
 
     def requirements(self):
         # OCaml 4.14.1.1 已在制品仓（PR #3767 合入），dune 自举需要 ocaml 编译器
-        self.tool_requires("ocaml/4.14.1.1.1")
+        self.tool_requires("ocaml/4.14.1.1.2")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
