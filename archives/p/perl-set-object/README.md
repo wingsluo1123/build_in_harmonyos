@@ -13,7 +13,7 @@ Perl XS module providing unordered collections (sets) of Perl objects.
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
-| 1.43-r0 | built | 2026-06-29 | 首次编译成功，conan-verify 全部通过 |
+| 1.43-r0 | built | 2026-07-01 | 首次编译成功，conan-verify 全部通过 |
 
 ## 运行依赖
 
@@ -46,4 +46,3 @@ conan install --requires=perl-set-object/1.43-r0@ohpcd/stable
 
 ---
 *OpenHarmony 编译归档 · 2026-07-01*
-06-29*
