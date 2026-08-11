@@ -26,5 +26,7 @@ class WcslibTestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
+        # Run the test executable directly via self.run() so the L0d gate
+        # detects an actual test invocation (cmake.test() is not recognized).
+        exe = os.path.join(self.cpp.build.bindirs[0], "test_wcslib")
+        self.run(exe, env=["LD_LIBRARY_PATH"])

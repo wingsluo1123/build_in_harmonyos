@@ -45,6 +45,7 @@ int main(void)
     status = prjset(&prj);
     if (status != 0) {
         fprintf(stderr, "prjset failed with status %d\n", status);
+        prjfree(&prj);
         return 1;
     }
 
@@ -58,10 +59,12 @@ int main(void)
     status = prjx2s(&prj, 1, 1, 1, 1, x, y, phi, theta, stat);
     if (status != 0) {
         fprintf(stderr, "prjx2s failed with status %d\n", status);
+        prjfree(&prj);
         return 1;
     }
     if (stat[0] != 0) {
         fprintf(stderr, "prjx2s reported invalid (x,y), stat=%d\n", stat[0]);
+        prjfree(&prj);
         return 1;
     }
 
@@ -70,10 +73,12 @@ int main(void)
     status = prjs2x(&prj, 1, 1, 1, 1, phi, theta, xr, yr, stat);
     if (status != 0) {
         fprintf(stderr, "prjs2x failed with status %d\n", status);
+        prjfree(&prj);
         return 1;
     }
     if (stat[0] != 0) {
         fprintf(stderr, "prjs2x reported invalid (phi,theta), stat=%d\n", stat[0]);
+        prjfree(&prj);
         return 1;
     }
 
@@ -81,6 +86,7 @@ int main(void)
     resid = fabs(x[0] - xr[0]) + fabs(y[0] - yr[0]);
     if (resid > 1.0e-10) {
         fprintf(stderr, "Round-trip closure failed: residual = %.1e\n", resid);
+        prjfree(&prj);
         return 1;
     }
 
