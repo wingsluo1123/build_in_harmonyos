@@ -70,6 +70,13 @@ class FizmoConan(ConanFile):
         tc.configure_args.append(
             "--with-libxml2-includedir="
             f"{os.path.join(self.dependencies['libxml2'].package_folder, 'include', 'libxml2')}")
+        # ncursesw 前端检查（configure 硬编码路径 /usr/include 等找不到
+        # ncurses.h——CI #20171 报 Could not find ncurses.h）——CPPFLAGS
+        # 指向 ncurses 包 include（覆盖 include/ 顶层 + include/ncursesw/
+        # 两种布局——multitail 教训）
+        ncurses_inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
+        tc.extra_cppflags.append(f"-I{ncurses_inc}")
+        tc.extra_cppflags.append(f"-I{os.path.join(ncurses_inc, 'ncursesw')}")
         tc.generate()
         # libxml2 的 pkg-config（libxml-2.0）加入 PKG_CONFIG_PATH
         from conan.tools.env import Environment
