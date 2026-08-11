@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
     Elf64_Shdr *shdrs = calloc(eh.e_shnum, sizeof(Elf64_Shdr));
     if (!shdrs || read_at(f, (long)eh.e_shoff, shdrs, sizeof(Elf64_Shdr) * eh.e_shnum) != 0) {
         fprintf(stderr, "cannot read section headers\n");
+        free(shdrs);
         fclose(f);
         return 1;
     }
@@ -143,6 +144,9 @@ int main(int argc, char **argv) {
 
     if (!dynsym || !dynstr || dynsym_count == 0) {
         fprintf(stderr, ".dynsym/.dynstr not found in %s\n", path);
+        free(dynsym);
+        free((void *)dynstr);
+        free(shdrs);
         fclose(f);
         return 1;
     }
@@ -163,6 +167,7 @@ int main(int argc, char **argv) {
     }
     free(dynsym);
     free((void *)dynstr);
+    free(shdrs);
     fclose(f);
 
     if (!found[0] || !found[1]) {
