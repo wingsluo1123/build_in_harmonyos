@@ -68,7 +68,6 @@ int main(void) {
         fprintf(stderr, "generator output unexpected: %s\n", out ? out : "(null)");
         g_free(out);
         g_object_unref(gen);
-        json_node_free(bn);
         g_object_unref(b);
         return 6;
     }
@@ -77,7 +76,6 @@ int main(void) {
     g_free(out);
     g_free(name_copy);
     g_object_unref(gen);
-    json_node_free(bn);
     g_object_unref(b);
     return 0;
 }
