@@ -57,22 +57,30 @@ fi
 
 # 5. Verify Encoder.so is a valid ELF file (binary format check)
 TOTAL=$((TOTAL + 1))
-ENCODER_MAGIC=$(od -A n -t x1 -N 4 "$ENCODER_SO" 2>/dev/null | tr -d ' \n')
-if [ "$ENCODER_MAGIC" = "7f454c46" ]; then
-    PASS=$((PASS + 1))
-    echo "OK: Encoder.so is valid ELF"
+if [ -n "$ENCODER_SO" ]; then
+    ENCODER_MAGIC=$(od -A n -t x1 -N 4 "$ENCODER_SO" 2>/dev/null | tr -d ' \n')
+    if [ "$ENCODER_MAGIC" = "7f454c46" ]; then
+        PASS=$((PASS + 1))
+        echo "OK: Encoder.so is valid ELF"
+    else
+        echo "FAIL: Encoder.so is not a valid ELF file"
+    fi
 else
-    echo "FAIL: Encoder.so is not a valid ELF file"
+    echo "FAIL: Encoder.so not found, cannot check ELF"
 fi
 
 # 6. Verify Decoder.so is a valid ELF file
 TOTAL=$((TOTAL + 1))
-DECODER_MAGIC=$(od -A n -t x1 -N 4 "$DECODER_SO" 2>/dev/null | tr -d ' \n')
-if [ "$DECODER_MAGIC" = "7f454c46" ]; then
-    PASS=$((PASS + 1))
-    echo "OK: Decoder.so is valid ELF"
+if [ -n "$DECODER_SO" ]; then
+    DECODER_MAGIC=$(od -A n -t x1 -N 4 "$DECODER_SO" 2>/dev/null | tr -d ' \n')
+    if [ "$DECODER_MAGIC" = "7f454c46" ]; then
+        PASS=$((PASS + 1))
+        echo "OK: Decoder.so is valid ELF"
+    else
+        echo "FAIL: Decoder.so is not a valid ELF file"
+    fi
 else
-    echo "FAIL: Decoder.so is not a valid ELF file"
+    echo "FAIL: Decoder.so not found, cannot check ELF"
 fi
 
 echo "test perl-sereal 5.004-r1: $PASS/$TOTAL OK"
