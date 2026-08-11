@@ -87,7 +87,7 @@ def main():
         except subprocess.TimeoutExpired:
             errors.append(f"Perl module {MODULE} load timed out (10s)")
         except FileNotFoundError:
-            print("WARN: perl not found in PATH, skipping module load test")
+            errors.append("perl not found in PATH, cannot verify module load")
     else:
         errors.append(f"Found .pm file but could not determine PERL5LIB: {pm_path}")
 
