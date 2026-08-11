@@ -16,7 +16,7 @@ import os
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import copy, unzip, check_sha256
+from conan.tools.files import apply_conandata_patches, copy, unzip, check_sha256, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -38,6 +38,10 @@ class MeekConan(ConanFile):
 
     def layout(self):
         basic_layout(self)
+
+    def export_sources(self):
+        # G1完整性: exports_sources 声明的 vendored tarball 需此方法显式导出
+        export_conandata_patches(self)
 
     def source(self):
         # CI Workers cannot reach gitlab.torproject.org (the official source),
@@ -79,6 +83,10 @@ class MeekConan(ConanFile):
         # reachable goproxy.cn mirror for Go module downloads. setdefault lets an
         # explicit GOPROXY env override this if needed.
         os.environ.setdefault("GOPROXY", "https://goproxy.cn,direct")
+        # Conan sandbox strips PATH, so harmonybrew's Go toolchain is unreachable.
+        # Inject ~/.harmonybrew/bin into PATH so `go build` finds the `go` binary.
+        go_bin = os.path.expanduser("~/.harmonybrew/bin")
+        os.environ["PATH"] = go_bin + ":" + os.environ.get("PATH", "")
 
         # Build meek-client (cwd=source_folder: go.mod lives in source dir)
         self.run('go build -trimpath -ldflags "-s -w" -o meek-client ./meek-client',
