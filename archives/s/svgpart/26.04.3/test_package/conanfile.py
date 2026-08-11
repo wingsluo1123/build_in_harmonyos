@@ -87,18 +87,21 @@ class SvgpartTestConan(ConanFile):
 
     def test(self):
         # KF6 libraries record build-tree-relative DT_NEEDED entries; mirror
-        # the expected layout under test_package/bin by symlinking every KF6
-        # shared library there.
+        # the expected layout under test_package/bin and test_package/lib by
+        # symlinking every KF6/Qt6 shared library there.
         tp_bin = os.path.join(self.build_folder, "..", "..", "bin")
+        tp_lib = os.path.join(self.build_folder, "..", "..", "lib")
         os.makedirs(tp_bin, exist_ok=True)
+        os.makedirs(tp_lib, exist_ok=True)
         for dep in self.dependencies.values():
             libdir = os.path.join(dep.package_folder, "lib") if dep.package_folder else None
             if libdir and os.path.isdir(libdir):
                 for name in os.listdir(libdir):
-                    if name.startswith("libKF6") and name.endswith(".so"):
-                        link = os.path.join(tp_bin, name)
-                        if not os.path.lexists(link):
-                            os.symlink(os.path.join(libdir, name), link)
+                    if name.endswith(".so"):
+                        for d in (tp_bin, tp_lib):
+                            link = os.path.join(d, name)
+                            if not os.path.lexists(link):
+                                os.symlink(os.path.join(libdir, name), link)
 
         env = Environment()
         env.append("LD_LIBRARY_PATH", [
@@ -106,8 +109,18 @@ class SvgpartTestConan(ConanFile):
             for p in self.dependencies.values()
             if p.package_folder
         ])
-        # svgpart is a KPart plugin; run headless (xcb is not available).
+        # svgpart is a KPart plugin; run headless (xcb is not available) and
+        # point test.cpp at the packaged plugin artifact (R34: real API).
         env.define("QT_QPA_PLATFORM", "offscreen")
+        pkg = self.dependencies.get(
+            self.tested_reference_str.split("/")[0]
+        )
+        if pkg:
+            plugin = os.path.join(
+                pkg.package_folder, "lib", "plugins", "kf6", "parts",
+                "svgpart.so"
+            )
+            env.define("SVGPART_PLUGIN_PATH", plugin)
         with env.vars(self).apply():
             cmake = CMake(self)
             cmake.test()

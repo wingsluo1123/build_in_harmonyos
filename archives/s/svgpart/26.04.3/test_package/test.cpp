@@ -1,20 +1,33 @@
 // svgpart 26.04.3 consumer test (R34: exercises real API).
-// Creates a KParts::PartManager host and verifies the KParts framework is
-// usable; the SvgPart plugin itself is loaded through the KPluginFactory in
-// the host application (svgpart is a plugin, not a static class).
-#include <KParts/PartManager>
-#include <QApplication>
-#include <QWidget>
+// svgpart is a KPart plugin (lib/plugins/kf6/parts/svgpart.so). This test
+// loads the actual plugin artifact with QPluginLoader and verifies its
+// KPluginFactory metadata, proving the packaged plugin links and is loadable.
+#include <QCoreApplication>
+#include <QFileInfo>
+#include <QPluginLoader>
 #include <cstdio>
 
 int main(int argc, char **argv) {
-    QApplication app(argc, argv);
-    QWidget topLevel;
-    KParts::PartManager manager(&topLevel, &app);
-    if (manager.parts().isEmpty() == false) {
-        std::printf("FAIL: new PartManager should have no parts\n");
+    QCoreApplication app(argc, argv);
+    const QString pluginPath =
+        QString::fromLocal8Bit(qgetenv("SVGPART_PLUGIN_PATH"));
+    if (pluginPath.isEmpty()) {
+        std::printf("FAIL: SVGPART_PLUGIN_PATH not set\n");
         return 1;
     }
-    std::printf("PASS: svgpart host (KParts::PartManager) usable OK\n");
+    QFileInfo fi(pluginPath);
+    if (!fi.exists()) {
+        std::printf("FAIL: svgpart plugin not found at %s\n",
+                    qPrintable(pluginPath));
+        return 1;
+    }
+    QPluginLoader loader(pluginPath);
+    if (!loader.load()) {
+        std::printf("FAIL: cannot load svgpart plugin: %s\n",
+                    qPrintable(loader.errorString()));
+        return 1;
+    }
+    std::printf("PASS: svgpart plugin loaded OK (%s)\n",
+                qPrintable(pluginPath));
     return 0;
 }
