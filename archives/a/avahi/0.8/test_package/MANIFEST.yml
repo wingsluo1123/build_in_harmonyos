@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: avahi/0.8
+homepage: "https://github.com/avahi/avahi"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: avahi-common/tests/test-domain.c
+    source: avahi-0.8/avahi-common/tests/test-domain.c
+    description: "上游单元测试: domain 解析/编码"
+    command: "./test-domain"
+  - file: avahi-core/tests/test-packet.c
+    source: avahi-0.8/avahi-core/tests/test-packet.c
+    description: "上游单元测试: 报文打包/解析"
+    command: "./test-packet"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 链接 avahi-common 并调用 avahi_address_snprint API"
+    command: "./test_avahi"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2
