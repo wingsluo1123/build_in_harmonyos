@@ -1,13 +1,6 @@
---- a/none/tests/pth_cancel1.c
-+++ b/none/tests/pth_cancel1.c
-@@ -8,31 +8,34 @@
-   printf("cleaning up 0x%lx\n", (long)arg);
- 
-   return;
- }
- 
- static void *thread_main(void *arg)
- {
+--- a/none/tests/pth_cancel1.c	2024-11-01 13:07:00.000000000 +0800
++++ b/none/tests/pth_cancel1.c	2026-08-09 18:31:24.021877969 +0800
+@@ -15,6 +15,8 @@
    pthread_cleanup_push(thread_cleanup, (void *)0x1234);
    pthread_cleanup_push(thread_cleanup, (void *)0x5678);
  
@@ -16,11 +9,7 @@
    if (pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL) != 0)
      {
        perror("pthread_setcanceltype");
-       return NULL;
-     }
-   
-   if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-     {
+@@ -26,6 +28,7 @@
        perror("pthread_setcancelstate");
        return NULL;
      }
@@ -28,21 +17,7 @@
  
    pause();
  
-   pthread_cleanup_pop(0);
-   pthread_cleanup_pop(0);
- 
-   return NULL;
- }
- 
- int main(int argc, char **argv)
-@@ -41,25 +44,31 @@
-   void *result;
-   
-   if (pthread_create(&tid, NULL, thread_main, NULL) != 0)
-     {
-       perror("pthread_create");
-       exit(1);
-     }
+@@ -48,6 +51,11 @@
  
    sleep(1);
  
@@ -54,16 +29,10 @@
    if (pthread_cancel(tid) != 0)
      {
        perror("pthread_cancel");
+@@ -54,5 +62,6 @@
        exit(1);
      }
 +#endif
  
    if (pthread_join(tid, &result) != 0)
      {
-       perror("pthread_join");
-       exit(1);
-     }
- 
-   printf("result is %s\n", result == PTHREAD_CANCELED ? "correct" : "incorrect");
-   
-   exit(0);
