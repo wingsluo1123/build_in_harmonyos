@@ -1,0 +1,18 @@
+--- a/src/syscall.h	2018-10-23 03:59:34.000000000 +0800
++++ b/src/syscall.h	2026-08-11 17:41:33.435040936 +0800
+@@ -33,6 +33,15 @@
+ #warning "using system call numbers from sys/syscall.h"
+ #endif
+ 
++/* OHOS: io_pgetevents (syscall 292) is not implemented in the OHOS kernel.
++ * Unlike Linux which returns -ENOSYS, OHOS triggers SIGSYS (signal 31)
++ * causing process termination. Undefine __NR_io_pgetevents so that
++ * io_pgetevents.c falls through to the -ENOSYS stub path.
++ */
++#if defined(__OHOS__) && defined(__NR_io_pgetevents)
++#undef __NR_io_pgetevents
++#endif
++
+ #define _body_io_syscall(sname, args...)	\
+ {						\
+ 	int ret, saved_errno;			\
