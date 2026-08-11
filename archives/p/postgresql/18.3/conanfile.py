@@ -4,11 +4,19 @@
 PostgreSQL provides both client libraries (libpq, libecpg) and command-line
 tools (pg_dump, psql, pg_config, initdb, etc.).
 
-Key OHOS adaptations applied in build():
-  1. postgresql_harmony.patch — SysV IPC skip, hmdfs permission, getpwuid fallback,
-     Unix socket disable, mkdir permission fix
-  2. config.guess/config.sub — HarmonyOS platform detection (inline patch)
-  3. umask 077 → 022 — fix hmdfs temporary directory permissions
+OHOS adaptations applied via 13 patches:
+  1. config.guess/config.sub — HarmonyOS platform detection
+  2. configure — umask 077 → 022 for hmdfs permission (OHOS only)
+  3. sysv_shmem.c — mmap when shmget broken (HAVE_BROKEN_SHMGET)
+  4. miscinit.c — relaxed ownership/permission checks (HAVE_BROKEN_UMASK)
+  5. initdb.c — mmap DSM + chmod after mkdir (HAVE_BROKEN_SHM_OPEN/UMASK)
+  6. file_perm.c — disable mode mask (HAVE_BROKEN_UMASK)
+  7. username.c — getpwuid fallback (HAVE_BROKEN_GETPWUID)
+  8. pg_config_manual.h — disable Unix sockets (HAVE_NO_UNIX_SOCKETS)
+  9. dsm_impl.h — mmap DSM when shm_open broken (HAVE_BROKEN_SHM_OPEN)
+  10. fe-auth.c — getpwuid fallback (HAVE_BROKEN_GETPWUID)
+  11. pgmkdirp.c — mkdir permission fix (HAVE_BROKEN_UMASK)
+  12. pg_regress.c — TCP/IP when no Unix sockets (HAVE_NO_UNIX_SOCKETS)
 """
 
 import os
@@ -91,8 +99,10 @@ class PostgresqlConan(ConanFile):
         os.makedirs(tmpdir, exist_ok=True)
         os.environ["TMPDIR"] = tmpdir
 
-        # Apply conandata patches (all OHOS adaptations including
-        # config.guess, config.sub, umask, and source-level changes)
+        # Apply conandata patches (all OHOS adaptations)
+        # Note: 0003-configure.patch changes umask 077→022; on Linux this
+        # makes configure's temp files group/other readable (minor security
+        # regression, acceptable since temp files are in private build dir)
         apply_conandata_patches(self)
 
         autotools = Autotools(self)

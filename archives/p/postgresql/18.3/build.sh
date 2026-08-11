@@ -3,7 +3,7 @@
 pkgname=postgresql
 pkgver=18.3
 buildsystem="autotools"
-depends=("icu" "tzdb")
+depends=()
 makedepends=()
 source="https://ftp.postgresql.org/pub/source/v18.3/postgresql-18.3.tar.bz2"
 builddir=$pkgname-$pkgver
@@ -29,8 +29,10 @@ download_and_extract() {
 prepare() {
     download_and_extract
 
-    # 应用鸿蒙适配补丁
-    patch -d $builddir -p1 < postgresql_harmony.patch
+    # 应用鸿蒙适配补丁 (13 个独立补丁, 详见 patches/ 目录)
+    for p in patches/*.patch; do
+        patch -d $builddir -p1 < "$p"
+    done
 
     # 优先考虑外部目录构建，不支持时才考虑原地构建
     mkdir -p $builddir/$ARCH-build

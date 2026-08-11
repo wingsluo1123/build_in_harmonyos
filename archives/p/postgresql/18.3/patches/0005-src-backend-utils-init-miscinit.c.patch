@@ -1,12 +1,13 @@
 --- a/src/backend/utils/init/miscinit.c
 +++ b/src/backend/utils/init/miscinit.c
-@@ -381,12 +381,41 @@
+@@ -381,12 +381,42 @@
  	 * XXX can we safely enable this check on Windows?
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
 +#ifdef HAVE_BROKEN_UMASK
 +	/*
-+	 * 	 * due to how the filesystem handles permissions. Instead, check if the
++	 * On hmdfs filesystem, the directory owner may not match our UID
++	 * due to how the filesystem handles permissions. Instead, check if the
 +	 * directory's group matches any of our groups (relaxed ownership check).
 +	 */
 +	if (stat_buf.st_uid != geteuid())
@@ -42,13 +43,14 @@
  #endif
  
  	/*
-@@ -401,12 +430,26 @@
+@@ -401,12 +431,27 @@
  	 * reasonable check to apply on Windows.
  	 */
  #if !defined(WIN32) && !defined(__CYGWIN__)
 +#ifdef HAVE_BROKEN_UMASK
 +	/*
-+	 * 	 * S-bit issues and abnormal group permissions. Relax the permission check -
++	 * hmdfs filesystem doesn't handle permissions properly, causing
++	 * S-bit issues and abnormal group permissions. Relax the permission check -
 +	 * only verify that the user has full rwx access. The S-bit and extra
 +	 * group/other permissions imposed by hmdfs are harmless for our use case.
 +	 */

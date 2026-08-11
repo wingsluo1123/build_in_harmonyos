@@ -30,7 +30,7 @@
 ## 修改记录
 
 ### 补丁文件
-- postgresql_harmony.patch (11个源文件修改)
+- patches/0001-0013 (13 个独立补丁, 覆盖 11 个源文件)
 
 ### 核心修改
 1. **SysV 共享内存跳过**: src/backend/port/sysv_shmem.c
