@@ -1,26 +1,133 @@
 software: lua
-version: 5.3.6
-status: built
-build_system: custom
-configure_options: []
-build_options:
-  - make generic
-compiler: clang
-dependencies: []
-install_prefix: /storage/Users/currentUser/usr/local
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/5.3.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "5.3.6"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-11"
+
+# Conan 引用（发布到本地 cache 后）
+conan_ref: "lua/5.3.6@ohpcd/stable"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "http://www.lua.org/ftp/lua-5.3.6.tar.gz"
+
+  # 源码校验和
+  sha256: "fc5fd69bb8736323f026672b1b7235da613d7177e72558893a0bdcd320466d60"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+# 构建系统（质量门禁兼容字段）
+build_system: makefile
+
+  # 配置选项列表（Lua 使用 make 参数，不是 configure）
+  configure_options:
+    - "generic"
+    - "CC=clang"
+    - "MYCFLAGS=-I/storage/Users/currentUser/usr/local/include"
+    - "MYLDFLAGS=-L/storage/Users/currentUser/usr/local/lib -Wl,-rpath,/storage/Users/currentUser/usr/local/lib"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# Conan 配方信息
+# ============================================================
+
+conan:
+  # Conan 配方路径
+  recipe_path: "archives/l/lua/5.3.6/conanfile.py"
+
+  # Conan data 文件
+  conandata_path: "archives/l/lua/5.3.6/conandata.yml"
+
+  # 包类型
+  package_type: "static-library"
+
+  # pkg-config 名称
+  pkg_config_name: "lua-5.3"
+
+  # cmake target 名称
+  cmake_target_name: "lua::lua"
+
+  # 发布通道
+  user: "ohpcd"
+  channel: "stable"
+
+  # 构建用 profile
+  profile_host: "ci/conan/profiles/ohos-aarch64"
+  profile_build: "ci/conan/profiles/ohos-aarch64"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-install-path.patch"
+  - "0002-clang-compiler.patch"
+
+# ============================================================
+# 产物信息
+# ============================================================
+
 binaries:
   - lua
   - luac
+
 libraries:
   - liblua.a
+
 headers:
   - lua.h
   - luaconf.h
   - lualib.h
   - lauxlib.h
   - lua.hpp
-url: http://www.lua.org/ftp/lua-5.3.6.tar.gz
-tarball_checksum: ""
+
+install_prefix: /storage/Users/currentUser/usr/local
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "Lua 使用自定义 Makefile，不使用 autotools"
+  - "由于系统缺少 gcc 和 readline 库，使用 clang 编译器和 generic 平台"
+  - "系统缺少 install 命令，手动复制文件完成安装"
+  - "Lua 5.3 的 make test 同 5.4 一样执行 freshly built interpreter"
 notes: |
   Lua 使用自定义 Makefile，不使用 autotools。
   由于系统缺少 gcc 和 readline 库，使用 clang 编译器和 generic 平台。

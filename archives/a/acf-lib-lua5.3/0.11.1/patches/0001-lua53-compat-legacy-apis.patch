@@ -1,0 +1,18 @@
+diff --git a/format.lua b/format.lua
+index 36e73fa..d499fa7 100644
+--- a/format.lua
++++ b/format.lua
+@@ -213,8 +213,11 @@ end
+ -- ex: a="foo"; print(expand_bash_syntax_vars("a=${a}) - > "a=foo"
+ mymodule.expand_bash_syntax_vars = function (str)
+ 	local deref = function (f)
+-		local v = getfenv(3) -- get the upstream global env
+-		for w in string.gfind(f, "[%w_]+") do
++		-- Lua 5.2+ removed getfenv(); use debug.getinfo to fetch the caller function
++		-- and deref from _ENV (Lua 5.2+). On Lua 5.1 getfenv(3) still works.
++		local info = debug.getinfo(3, "f")
++		local v = info and info.func and info.func and _ENV or _G
++		for w in string.gmatch(f, "[%w_]+") do
+ 			if v then v = v[w] end
+ 		end
+ 		return v
