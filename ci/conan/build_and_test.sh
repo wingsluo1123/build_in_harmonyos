@@ -1012,7 +1012,7 @@ PYEOF
         # L1c: 如果 conanfile.py 的 build() 方法中有 make check/ctest，
         # 验证日志中有执行痕迹
         if [ "$L1_RESULT" != "fail" ]; then
-            if grep -qiE "make.*check|ctest|meson test|pytest|cargo test" "$BUILD_LOG" 2>/dev/null; then
+            if grep -qiE "make.*check|ctest|meson test|pytest" "$BUILD_LOG" 2>/dev/null; then
                 echo "[ok] L1c: Upstream official tests (make check/ctest) executed in build phase"
                 L1_DETAIL="upstream tests + test_package executed"
             else
