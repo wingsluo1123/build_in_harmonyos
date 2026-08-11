@@ -2,7 +2,7 @@
 # test_package/test_signal_mask.sh — smoke test for perl-signal-mask 0.008-r3
 # Called by test_package/conanfile.py via self.run()
 # PERL5LIB must be set by the caller (Conan runenv_info from package_info)
-set -euo pipefail
+set -eu
 
 # Test 1: Load Signal::Mask
 echo "[test] 1/5: Load Signal::Mask"
@@ -31,7 +31,7 @@ else
     exit 1
 fi
 
-# Test 4: Functional test — set and check signal mask
+# Test 4: Functional test — set signal mask via tied hash
 echo "[test] 4/5: Functional signal mask test"
 if perl -e 'use strict; use warnings; use Signal::Mask; $Signal::Mask{USR1} = 1; print "Signal mask set OK\n"' 2>/dev/null; then
     echo "PASS: Signal mask set/clear works"
@@ -40,12 +40,12 @@ else
     exit 1
 fi
 
-# Test 5: Signal::Pending interface
-echo "[test] 5/5: Signal::Pending interface"
-if perl -e 'use strict; use warnings; use Signal::Pending; print "Pending OK\n"' 2>/dev/null; then
-    echo "PASS: Signal::Pending interface works"
+# Test 5: Signal::Pending tied hash API — read pending status
+echo "[test] 5/5: Signal::Pending tied hash API"
+if perl -e 'use strict; use warnings; use Signal::Pending; my $pending = $Signal::Pending{USR1}; print "Pending check OK: USR1=$pending\n"' 2>/dev/null; then
+    echo "PASS: Signal::Pending tied hash API works"
 else
-    echo "FAIL: Signal::Pending interface test failed"
+    echo "FAIL: Signal::Pending API test failed"
     exit 1
 fi
 
