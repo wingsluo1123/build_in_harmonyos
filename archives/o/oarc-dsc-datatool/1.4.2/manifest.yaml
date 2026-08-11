@@ -25,5 +25,17 @@ patches_applied: []
 knowledge_gained:
   - "纯 Python 包，setuptools 构建，pip install . --no-deps 安装到 staging prefix"
   - "上游 GitHub 已 ARCHIVED，但 tag v1.4.2 存在；源码 tarball 从 GitHub archive 下载"
-  - "上游测试依赖 dsc-datatool CLI 二进制 + maxminddb / influxdb 等运行时依赖，在 OHOS 上受限，test_package 用核心类 repr 做消费者验证"
   - "License: BSD-3-Clause (Copyright (c) 2016-2024 OARC, Inc.)"
+  - "PR 审查规则 4 改正：上游真实 8 用例（test_main 1 + test_objects 6 + test.sh 集成 1），原 PR 声明 3 个属少报；实测（2026-08-11）pytest test_objects 6/6 通过、test_main 1 FAIL（CLI argparse 收到 pytest 参数 SystemExit，测试装置问题）、test.sh 报 dsc-datatool: command not found（缺 CLI 二进制，确认证据非'可能受限'推测）"
+
+tests:
+  upstream:
+    total: 8
+    framework: "pytest + shell 集成"
+    detail:
+      - "test_objects.py: 6 用例，实测 6/6 PASS（2026-08-11）"
+      - "test_main.py: 1 用例，实测 FAIL（CLI argparse 收到 pytest 参数 SystemExit: 2，测试装置问题，非依赖缺失）"
+      - "test.sh: 1 集成用例，阻塞（实测 dsc-datatool: command not found，需 CLI 二进制 + InfluxDB 输出插件）"
+    pass_rate: "6/8 可执行通过（test_objects 全过）；test.sh 因缺 CLI 二进制阻塞（确认证据）"
+  consumer:
+    test_package: "7 断言 smoke test 通过（import/version/类/repr 功能）"

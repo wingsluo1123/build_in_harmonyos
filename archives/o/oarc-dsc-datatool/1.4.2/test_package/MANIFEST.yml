@@ -1,9 +1,16 @@
 # test_package/MANIFEST.yml — oarc-dsc-datatool 1.4.2
 #
-# 上游测试入口 (tests/): test.sh (shell 集成测试) + test_main.py / test_objects.py (pytest).
-# 上游测试依赖 dsc-datatool 命令行工具运行 + maxminddb / influxdb 等 Python 依赖,
-# 且 test.sh 依赖 dsc-datatool 二进制在 PATH 中 + InfluxDB output 插件 —
-# 在 OHOS R32 平台上 maxminddb / influxdb-client 可能受限,
+# 上游测试入口 (tests/): test_main.py (1 用例) + test_objects.py (6 用例) =
+# 7 个 pytest 用例 + test.sh (1 个 shell 集成测试) = 共 8 个上游用例。
+# 实测结果（2026-08-11，本机复现，非推测）：
+#   - pytest: test_objects.py 6/6 通过；test_main.py 1 个失败
+#     （test_main 内 dsc-datatool CLI argparse 收到 pytest 参数 → SystemExit: 2，
+#     属测试装置问题，非 maxminddb/influxdb 依赖）
+#   - test.sh 集成测试: 实测报 `dsc-datatool: command not found`
+#     （需 dsc-datatool CLI 二进制在 PATH + InfluxDB 输出插件 + XML 输入，本平台
+#     未安装 CLI，属确认的实测报错而非"可能受限"推测）
+# 结论: 上游测试非 0/8 全阻塞——7 个 pytest 中 6 个实测可通过；test.sh 因缺
+# dsc-datatool CLI 二进制报 command not found（确认证据，见 notes.md）。
 # 故 upstream_test_in_build=false, 由 test_package 做消费者 smoke test.
 #
 # test_package smoke tests (7 assertions):
@@ -22,23 +29,26 @@ upstream_check_command: "python3 -m pytest tests/test_objects.py tests/test_main
 upstream_test_in_build: false
 upstream_test_command: "cd tests && bash test.sh && python3 -m pytest test_main.py test_objects.py"
 
-# 上游实际运行的测试程序
+# 上游实际运行的测试程序（共 8 用例）
 upstream_tests:
   - file: tests/test_objects.py
     source: "dsc-datatool-1.4.2/tests/test_objects.py"
-    description: "Dataset/Dimension/Input/Output/Generator/Transformer object tests (pytest)"
+    description: "Dataset/Dimension/Input/Output/Generator/Transformer object tests (pytest, 6 用例)"
     command: "python3 -m pytest tests/test_objects.py"
-    result: unrunnable
+    ran: true
+    result: "6/6 PASS（实测 2026-08-11）"
   - file: tests/test_main.py
     source: "dsc-datatool-1.4.2/tests/test_main.py"
-    description: "main() entry point test (pytest)"
+    description: "main() entry point test (pytest, 1 用例)"
     command: "python3 -m pytest tests/test_main.py"
-    result: unrunnable
+    ran: true
+    result: "1 FAIL（实测：CLI argparse 收到 pytest 参数 SystemExit: 2，测试装置问题，非依赖缺失）"
   - file: tests/test.sh
     source: "dsc-datatool-1.4.2/tests/test.sh"
-    description: "Integration test: dsc-datatool CLI with XML input + transforms + InfluxDB output"
+    description: "Integration test: dsc-datatool CLI with XML input + transforms + InfluxDB output (1 用例)"
     command: "cd tests && bash test.sh"
-    result: unrunnable
+    ran: true
+    result: "阻塞（实测：dsc-datatool: command not found，需 CLI 二进制 + InfluxDB 输出插件）"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
