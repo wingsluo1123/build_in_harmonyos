@@ -25,20 +25,23 @@ class NasmTestConan(ConanFile):
         flat_output = os.path.join(self.build_folder, "test16.bin")
         elf_output = os.path.join(self.build_folder, "test64.o")
         disassembly = os.path.join(self.build_folder, "test16.dis")
+        script = os.path.join(self.source_folder, "test.sh")
 
-        self._run_native(f"{shlex.quote(nasm)} --version")
-        self._run_native(f"{shlex.quote(ndisasm)} -v")
         self._run_native(
-            f"{shlex.quote(nasm)} -f bin {shlex.quote(flat_input)} "
-            f"-o {shlex.quote(flat_output)}"
-        )
-        self._run_native(
-            f"{shlex.quote(ndisasm)} -b 16 {shlex.quote(flat_output)} "
-            f"> {shlex.quote(disassembly)}"
-        )
-        self._run_native(
-            f"{shlex.quote(nasm)} -f elf64 {shlex.quote(elf_input)} "
-            f"-o {shlex.quote(elf_output)}"
+            " ".join(
+                shlex.quote(arg)
+                for arg in (
+                    self._config_shell(),
+                    script,
+                    nasm,
+                    ndisasm,
+                    flat_input,
+                    flat_output,
+                    disassembly,
+                    elf_input,
+                    elf_output,
+                )
+            )
         )
 
         with open(flat_output, "rb") as handle:
