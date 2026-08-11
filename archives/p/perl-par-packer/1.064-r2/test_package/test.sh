@@ -100,4 +100,7 @@ else
     echo "INFO: No .so XS modules in package"
 fi
 
+# Cleanup temp directory
+rm -rf "$PAR_GLOBAL_TEMP" 2>/dev/null || true
+
 echo "All package content verified successfully"

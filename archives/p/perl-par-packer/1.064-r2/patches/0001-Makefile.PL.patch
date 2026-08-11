@@ -1,39 +1,21 @@
-diff -ruN a/Makefile.PL b/Makefile.PL
+diff --git a/Makefile.PL b/Makefile.PL
+index f9df052..ba14cb2 100644
 --- a/Makefile.PL
 +++ b/Makefile.PL
-@@ -10,21 +10,23 @@
-     # 5.10.0 breaks how PAR intercepts loading of shared libraries
-     warn <<'...';
- *** Perl version 5.10.0 is not supported.
-     Please upgrade to 5.10.1 or better.
- ...
-     exit 0;
- }
-
+@@ -17,7 +17,11 @@ if ($] == 5.010000) {
+ 
  sub for_win32 { return ($^O eq 'MSWin32') ? @_ : (); }
-
+ 
 -my $have_cc = ExtUtils::CBuilder->new->have_compiler;
 +# OHOS: force have_compiler = 1 since clang is available but CBuilder test fails
 +# due to CRT file issues (crti.o, crtn.o, etc.) on this platform
 +my $have_cc = 1;
++# OHOS: ensure sysroot is set for compiler/linker flags
++$ENV{OHOS_SYSROOT} or die "OHOS_SYSROOT environment variable must be set";
  warn "No compiler found, won't generate 'script/parl$Config{_exe}!\n"
      unless $have_cc;
-
- WriteMakefile1(
-
-     NAME                      => 'PAR::Packer',
-     VERSION_FROM              => 'lib/PAR/Packer.pm',
-     ABSTRACT_FROM             => 'lib/PAR/Packer.pm',
-     LICENSE                   => 'perl_5',
-     AUTHOR                    => [ 'Audrey Tang <cpan@audreyt.org>' ],
-@@ -67,23 +69,23 @@
-       'script/pp'             => 'blib/man1/pp.1',
-       'script/tkpp'           => 'blib/man1/tkpp.1',
-       $have_cc ? (
-         'script/parl.pod'     => 'blib/man1/parl.1' ) : (),
-     },
-     EXE_FILES => [
-         'script/par.pl',
+ 
+@@ -74,9 +78,9 @@ WriteMakefile1(
          'script/pp',
          'script/tkpp',
      ],
@@ -45,22 +27,8 @@ diff -ruN a/Makefile.PL b/Makefile.PL
 +        $have_cc ? 'myldr' : ()
      ],
      clean => { FILES => 't/data/blib' },
-
-     META_MERGE      => {
-       'meta-spec'             => { version => 2 },
-       prereqs => {
-         runtime => {
-           recommends => {
-             # for digital signature support
-             'Digest'          => 0,
-@@ -104,20 +106,24 @@
-           url  => 'git://github.com/rschupp/PAR-Packer.git',
-           web  => 'https://github.com/rschupp/PAR-Packer',
-         },
-         MailingList => 'mailto:par@perl.org',
-         bugtracker => { web => 'https://github.com/rschupp/PAR-Packer/issues' },
-       },
-       no_index => {
+ 
+@@ -111,6 +115,10 @@ WriteMakefile1(
          directory => [ 'contrib' ],
        },
      },
@@ -69,28 +37,14 @@ diff -ruN a/Makefile.PL b/Makefile.PL
 +    LDFLAGS    => "--sysroot=$ENV{OHOS_SYSROOT}",
 +    LDDLFLAGS  => "--sysroot=$ENV{OHOS_SYSROOT} -shared -nostartfiles -nodefaultlibs -lc",
  );
-
+ 
  # inhibit parallel make as modules must be installed into blib *before*
- # recursing into myldr (i.e. target pm_to_blib must have finished
- # before subdirs is started)
- sub MY::postamble
- {
-     return <<'...'
- # GNU make and others
- .NOTPARALLEL:
-@@ -144,13 +150,15 @@
-         #EUMM 6.5502 has problems with BUILD_REQUIRES
-         $params{PREREQ_PM}={ %{$params{PREREQ_PM} || {}} , %{$params{BUILD_REQUIRES}} };
-         delete $params{BUILD_REQUIRES};
-     }
-     delete $params{CONFIGURE_REQUIRES} if $eumm_version < 6.52;
-     delete $params{MIN_PERL_VERSION} if $eumm_version < 6.48;
-     delete $params{META_MERGE} if $eumm_version < 6.46;
+@@ -151,6 +159,8 @@ sub WriteMakefile1 {  #Compatibility code for old versions of EU::MM. Written by
      delete $params{META_ADD} if $eumm_version < 6.46;
      delete $params{LICENSE} if $eumm_version < 6.31;
-
+ 
 +    # OHOS: add linker flags to avoid missing CRT files (crti.o, crtn.o, crtbeginS.o, crtendS.o)
 +    $params{dynamic_lib} = { OTHERLDFLAGS => '-nostartfiles -nodefaultlibs -lc' };
      WriteMakefile(%params);
  }
-
+ 
