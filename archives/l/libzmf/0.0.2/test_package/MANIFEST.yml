@@ -13,12 +13,18 @@ upstream_check_command: "make check"
 upstream_test_in_build: false
 upstream_test_command: ""
 
-# 上游实际运行的测试程序
+# 上游实际运行的测试程序（make check，cppunit）
+# 实测：在 OHOS 真机（host==target）原生执行 make check，2/2 全部通过
+# （test、detection 两个测试程序，PASS 2 / FAIL 0；运行时需注入 boost 共享库路径）
 upstream_tests:
-  - file: src/conv/raw/zmf2raw.cpp
-    source: libzmf-0.0.2/src/conv/raw/zmf2raw.cpp
-    description: "zmf2raw 命令行工具 — 将 ZMF 文档转换为 raw 格式"
-    command: "./zmf2raw"
+  - file: src/test/test.cpp
+    source: libzmf-0.0.2/src/test/test.cpp
+    description: "make check 测试程序 test（cppunit，含 ZMFDocumentTest/ZMFTypesTest）— 实测 OHOS 原生执行通过"
+    command: "make check"
+  - file: src/test/detection
+    source: libzmf-0.0.2/src/test/detection
+    description: "make check 测试程序 detection — 实测 OHOS 原生执行通过"
+    command: "make check"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
@@ -27,4 +33,5 @@ test_package_tests:
     command: "./test_libzmf"
 
 # 测试断言总数 (近似值, 用于质量评估)
+# test_package 2 断言 + 上游 make check 2 个测试程序（5 cppunit 用例）实测通过
 assertion_count: 2
