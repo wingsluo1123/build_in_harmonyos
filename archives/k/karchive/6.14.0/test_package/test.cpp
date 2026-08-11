@@ -19,14 +19,24 @@ int main() {
         std::printf("FAIL: cannot write zip entry\n");
         return 1;
     }
-    zip.close();
+    // close() returns false if data could not be fully flushed; without
+    // this check the subsequent read may see truncated data.
+    if (!zip.close()) {
+        std::printf("FAIL: cannot close zip for writing\n");
+        return 1;
+    }
 
     KZip read(tmp.fileName());
     if (!read.open(QIODevice::ReadOnly)) {
         std::printf("FAIL: cannot reopen zip\n");
         return 1;
     }
-    const KArchiveEntry *e = read.directory()->entry("hello.txt");
+    const KArchiveDirectory *dir = read.directory();
+    if (!dir) {
+        std::printf("FAIL: read.directory() returned null\n");
+        return 1;
+    }
+    const KArchiveEntry *e = dir->entry("hello.txt");
     if (!e || !e->isFile()) {
         std::printf("FAIL: entry hello.txt not found\n");
         return 1;
