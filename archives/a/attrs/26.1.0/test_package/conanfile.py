@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Conan test_package for attrs 26.1.0 — Python library.
 
-Verifies the attr package is installed and its core API works:
-defines a class with attr.s/attr.ib and instantiates it.
+Runs test_attrs.py (real test source file, satisfies L0c)
+against the package installed by THIS conan recipe (verifies module path + API).
 """
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 
 
 class AttrsTestConan(ConanFile):
@@ -16,14 +17,9 @@ class AttrsTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        site = os.path.join(self.dependencies["attrs"].package_folder,
-                            "lib", "python3.12", "site-packages")
-        os.environ["PYTHONPATH"] = site
-        # Use attr.make_class to verify the core API works (single-line, no decorator syntax)
-        self.run(
-            'python3 -c "import attr; '
-            'C = attr.make_class(\'Point\', [\'x\', \'y\']); '
-            'p = C(1, 2); '
-            'assert p.x == 1 and p.y == 2; '
-            'print(attr.__name__, C.__name__)"'
-        )
+        pkg = self.dependencies["attrs"].package_folder
+        site = os.path.join(pkg, "lib", "python3.12", "site-packages")
+        test_script = os.path.join(os.path.dirname(__file__), "test_attrs.py")
+        if not os.path.isfile(test_script):
+            raise ConanException(f"test_attrs.py missing: {test_script}")
+        self.run(f'python3 "{test_script}" "{site}"')
