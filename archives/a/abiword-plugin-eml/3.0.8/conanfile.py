@@ -37,6 +37,17 @@ class AbiwordPluginEmlConan(ConanFile):
         # eml 插件亦需 libgsf 处理 MIME/OLE 附件,必须声明依赖
         self.requires("libgsf/1.14.53")
 
+    def build_requirements(self):
+        # AbiWord 的 git archive tarball 不带 configure/aclocal.m4/Makefile.in，
+        # build() 必须跑 aclocal/autoconf/autoheader/automake 自举。
+        # CI 沙箱(USER=100)对 $HOME/.local 手工安装的 automake 不可见(ENOENT)，
+        # /data/service/hnp/bin 只有 autoconf 家族(777)没有 automake/libtool，
+        # 故将 automake + libtool 作为 tool_requires 拉入(制品仓已发布 1.18/2.5.4，
+        # 同 abiword-plugin-clarisworks / abiword-plugin-epub 先例)。
+        # tool_requires 按 *build* profile 解析，conan create 需同时传 -pr:h 与 -pr:b。
+        self.tool_requires("automake/1.18")
+        self.tool_requires("libtool/2.5.4")
+
     def layout(self):
         basic_layout(self)
 
@@ -237,36 +248,42 @@ class AbiwordPluginEmlConan(ConanFile):
         import shutil
 
         self.output.info("Running autogen-common.sh to generate plugin configuration...")
-        subprocess.run(
-            ["bash", "autogen-common.sh"],
+        # 用 self.run(env="conanbuild") 而非裸 subprocess.run: tool_requires
+        # (automake/libtool) 注入的 PATH/ACLOCAL_PATH/PERL5LIB 只对 conan build
+        # 环境生效, CI 沙箱原始 PATH 找不到 aclocal(ENOENT)。
+        self.run(
+            "bash autogen-common.sh",
             cwd=self.source_folder,
-            check=True,
+            env="conanbuild",
         )
 
         # 先跑 aclocal 生成 aclocal.m4(提供 AM_* 宏)
         self.output.info("Running aclocal to generate aclocal.m4...")
-        subprocess.run(
-            ["aclocal", "--force"],
+        self.run(
+            "aclocal --force",
             cwd=self.source_folder,
-            check=False,  # aclocal 有 warning 不影响
+            env="conanbuild",
+            ignore_errors=True,  # aclocal 有 warning 不影响
         )
 
         # autoconf 直接编译 configure.ac → configure(绕 autoreconf 链冲突)
         self.output.info("Running autoconf to generate configure...")
-        subprocess.run(
-            ["autoconf", "-o", "configure", "configure.ac"],
+        self.run(
+            "autoconf -o configure configure.ac",
             cwd=self.source_folder,
-            check=False,  # AC_DEFINE 等 warning 非硬错,configure 仍生成
+            env="conanbuild",
+            ignore_errors=True,  # AC_DEFINE 等 warning 非硬错,configure 仍生成
         )
         if not os.path.exists(os.path.join(self.source_folder, "configure")):
             raise ConanException("autoconf failed to generate configure")
 
         # autoheader 生成 config.h.in
         self.output.info("Running autoheader to generate config.h.in...")
-        subprocess.run(
-            ["autoheader"],
+        self.run(
+            "autoheader",
             cwd=self.source_folder,
-            check=False,
+            env="conanbuild",
+            ignore_errors=True,
         )
         _cfg_h_in = os.path.join(self.source_folder, "config.h.in")
         if not os.path.exists(_cfg_h_in):
@@ -278,20 +295,35 @@ class AbiwordPluginEmlConan(ConanFile):
         # "required file './ltmain.sh' not found" 而不生成 Makefile.in
         _ltmain = os.path.join(self.source_folder, "ltmain.sh")
         if not os.path.exists(_ltmain):
-            _libtool_aux = os.path.join(
-                os.path.dirname(shutil.which("libtool") or ""),
-                "..", "share", "libtool", "build-aux", "ltmain.sh"
-            )
-            if os.path.exists(_libtool_aux):
-                shutil.copy(_libtool_aux, _ltmain)
+            # 优先从 tool_requires 的 libtool 包取 build-aux/ltmain.sh
+            # (CI 沙箱 PATH 无 libtool, shutil.which 会 miss)
+            _lt_src = ""
+            try:
+                _lt_pkg = self.dependencies["libtool"].package_folder
+                if _lt_pkg:
+                    _cand = os.path.join(_lt_pkg, "share", "libtool", "build-aux", "ltmain.sh")
+                    if os.path.exists(_cand):
+                        _lt_src = _cand
+            except Exception:
+                pass
+            if not _lt_src:
+                _libtool_aux = os.path.join(
+                    os.path.dirname(shutil.which("libtool") or ""),
+                    "..", "share", "libtool", "build-aux", "ltmain.sh"
+                )
+                if os.path.exists(_libtool_aux):
+                    _lt_src = _libtool_aux
+            if _lt_src:
+                shutil.copy(_lt_src, _ltmain)
                 self.output.info("  [ok] Copied ltmain.sh from libtool build-aux")
             else:
                 self.output.warning("  [warn] ltmain.sh not found, libtool macros may fail")
         self.output.info("Running automake to generate Makefile.in...")
-        subprocess.run(
-            ["automake", "--add-missing", "--copy", "--no-force"],
+        self.run(
+            "automake --add-missing --copy --no-force",
             cwd=self.source_folder,
-            check=False,  # 部分 Makefile.am 有 GNU make 扩展 warning
+            env="conanbuild",
+            ignore_errors=True,  # 部分 Makefile.am 有 GNU make 扩展 warning
         )
 
     def _patch_config_for_ohos(self):
