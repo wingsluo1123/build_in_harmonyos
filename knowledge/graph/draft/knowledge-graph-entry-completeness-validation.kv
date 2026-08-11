@@ -1,0 +1,97 @@
+#====================================================================
+# knowledge-graph-entry-completeness — 知识图谱条目完整性验证方法
+# 关联问题: E219/E253/E305 root_cause/rec_approach 被判定为空
+# 关联库: linux-firmware-brcm 20260622（PR #3639 适配过程中发现）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     knowledge-graph-entry-completeness
+trigger_tool:           graph-validate|finish|check-knowledge-completeness
+phase:                  knowledge|verification
+error_signature:        root_cause.*为空|rec_approach.*为空|字段缺失|approach mismatch|unknown principle|non-standard fields|doc.*配套.*缺失
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               knowledge-graph-entry-completeness
+match_keywords:         root_cause, rec_approach, 字段缺失, graph validate, E219, E253, E305, 多行字段, 块标量, knowledge graph, 知识图谱完整性
+title:                  知识图谱条目完整性验证方法 — 识别 E 条目字段缺失/多行块标量解析兼容性问题，并隔离到独立维护流程
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             已有 E 知识条目字段不完整（root_cause/rec_approach/doc 对应关系缺失），
+                        或校验器对 `key: |` 多行块标量只读取首行 "|" 而判定为空（解析兼容性问题）。
+                        典型实例: E219/E253/E305 的 root_cause 均为 `|` 块标量，E305 的 rec_approach
+                        也为 `|` 块标量，workflow_checks.py 逐行正则 ^(\w+):\s*(.*) 读取首行得到 "|"，
+                        命中 val == "|" 判定为空。条目文件内实际含完整多行文本，并非内容缺失。
+affected_scope:         所有新增/维护的知识图谱 E 条目和知识库 draft；所有运行 finish/graph validate 的适配流程
+verification_cmd:       # 复现校验器误判:
+                        #   读取 E219.kv 中 root_cause 字段，若为 `root_cause: |` 且后续有缩进多行内容，
+                        #   则 graph validate / finish step5b 会误报 "root_cause 为空"
+                        # 确认条目真实内容:
+                        #   grep -A5 '^root_cause:' knowledge/graph/E219.kv   # 应显示多行实际文本
+                        # 确认校验器判定:
+                        #   python3 scripts/ohc-run.py graph validate
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           2
+rec_approach:           admin-independent-kv-maintenance
+rec_description:        由管理员通过独立知识库维护 PR 修复官方 E 条目（补全 root_cause/rec_approach 字段，
+                        或统一字段为校验器可解析的格式）；当前库 PR 不直接修改旧 E 条目，也不混入其修复。
+                        若需本地临时补全 E219/E253/E305 验证假设，必须先记录逐文件 diff、验证后完整回滚，
+                        临时改动不得进入当前 PR。
+rec_command:            # 管理员侧修复方向:
+                        #   1) 将 `key: |` 块标量改为单行值，或升级解析器支持多行块标量
+                        #   2) 补全缺失的 root_cause/rec_approach 字段
+                        #   3) 校验 doc/E###.md ↔ graph/E###.kv 对应关系
+                        # 执行端隔离方式（本 PR）:
+                        #   git add 仅当前库归档 + 当前 draft kv/md，不 add knowledge/graph/E*.kv
+rec_auto_fix:           false
+rec_impl:               knowledge-graph-entry-completeness-validation
+
+# 回退方案
+fallback_priority:      3
+fallback_approach:      record-and-escalate
+fallback_description:   执行端记录真实错误、退出码、日志路径并回报分析端；不伪造 finish 通过，不修改 validator
+fallback_command:       # 如实记录:
+                        #   python3 scripts/ohc-run.py finish <库> <版本> built   # 记录退出码
+                        #   cat <归档>/.handoff.json                             # 记录 step/exit_reason
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       knowledge/graph/E(219|253|305)\.kv
+forbid_1_reason:        禁止修改/覆盖/重编号官方 E 条目（E219/E253/E305 或其他官方 E 条目）
+forbid_1_consequence:   修改旧 E 条目会破坏全局知识库原子性，混入与当前库无关的修复
+
+forbid_2_pattern:       graph\.py|workflow_checks\.py|validator
+forbid_2_reason:        禁止修改 graph validator（graph.py / workflow_checks.py 等校验逻辑）
+forbid_2_consequence:   修改校验器属于框架变更，必须单独 PR，混入配方 PR 违反 W2 原子性
+
+forbid_3_pattern:       finish.*exit.*1.*伪造|提交.*伪造.*通过
+forbid_3_reason:        禁止将 finish exit 1 伪造为通过（如手动改 .ci-result.json 或篡改日志哈希）
+forbid_3_consequence:   伪造门禁结果违反 W3 铁律，会被 CI 审计识别并判定流程缺陷
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R11, R12, W2, W5
+
+# ═══ 关系图 (Relations) ═══
+causes:                 [firmware-resource-package-brcm]
+caused_by:              []
+similar_to:             [E219, E253, E305]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 固定数据 (检测到的实例) ═══
+instance_affected_entries:  E219, E253, E305
+instance_parser:            workflow_checks.py 逐行正则 ^(\w+):\s*(.*)
+instance_parse_failure:     `key: |` 块标量首行被读作 "|"，val == "|" 判定为空
+instance_w4_check:          check_knowledge_completeness → _REQUIRED_KV_FIELDS = [error_signature, root_cause, rec_approach]
+instance_graph_validate:    E305 approach mismatch（C8 warning）等 8 errors/15 warnings（全库既有）
+instance_detected_in:       linux-firmware-brcm 20260622 finish step5b（PR #3639）
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/graph/draft/knowledge-graph-entry-completeness-validation.md
+last_updated:           2026-08-11
+source_event:           linux-firmware-brcm 20260622 finish 报 E219/E253/E305 字段缺失
+
+draft: true
+contributor_id: probe
