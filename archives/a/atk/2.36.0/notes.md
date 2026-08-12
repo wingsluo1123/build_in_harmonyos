@@ -108,8 +108,8 @@ ninja -C builddir test
 本库适配过程中引用了 3 个通用问题知识条目（均为已入知识图谱的正式条目）：
 - E090：Meson 平台检测通用问题
 - E107：glib 静态库与 libintl 符号不匹配通用问题
-- E321：GNOME 生态 glib 静态链接 + meson host_machine 综合条目（E318 已被 main 占用，编号经流程分配）（intl-wrapper + Meson host_system 检测 + pkg-config 传播，本 PR 新增）
-  - 知识图谱正式条目：knowledge/doc/E321.md + knowledge/graph/E321.kv
+- E318-draft-A7F3：GNOME 生态 glib 静态链接 + meson host_machine 综合条目草稿（intl-wrapper + Meson host_system 检测 + pkg-config 传播，本 PR 新增，正式编号由主编合并时分配）
+  - 知识图谱草稿：knowledge/drafts/E318-draft-A7F3.md + knowledge/drafts/E318-draft-A7F3.kv（正式条目由主编合并 PR 时自动生成）
 
 ---
 
