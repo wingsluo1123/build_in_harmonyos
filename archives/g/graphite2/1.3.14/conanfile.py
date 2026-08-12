@@ -6,6 +6,7 @@ handling the complexities of lesser-known languages of the world.
 
 This recipe enforces R5/R26: static linking by default.
 """
+import os
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
