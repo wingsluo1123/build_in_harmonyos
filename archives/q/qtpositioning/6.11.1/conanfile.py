@@ -2,7 +2,6 @@
 """Conan recipe for Qt Positioning 6.11.1 on HarmonyOS PC (arm64)."""
 
 import os
-import shlex
 import shutil
 import stat
 import subprocess
@@ -11,8 +10,10 @@ import textwrap
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.cmake.toolchain.blocks import Block
+from conan.tools.env import Environment
 from conan.tools.files import (
     apply_conandata_patches,
     export_conandata_patches,
@@ -23,7 +24,7 @@ from conan.tools.files import (
 class QtpositioningConan(ConanFile):
     name = "qtpositioning"
     version = "6.11.1"
-    description = "Qt Positioning module for HarmonyOS PC"
+    description = "Qt Positioning module (positioning data sources and geo types) for HarmonyOS PC"
     license = "BSD-3-Clause AND LGPL-3.0-only AND GPL-3.0-only"
     homepage = "https://doc.qt.io/qt-6/qtpositioning-index.html"
     package_type = "library"
@@ -36,6 +37,9 @@ class QtpositioningConan(ConanFile):
 
     def requirements(self):
         self.requires("qtbase/6.11.1")
+        # PositioningQuick (the QtPositioning QML module) needs QtQuick, which
+        # lives in qtdeclarative; without it qtlocation's assertTargets fails.
+        self.requires("qtdeclarative/6.11.1")
 
     def validate(self):
         if self.settings.os != "OHOS":
@@ -54,10 +58,9 @@ class QtpositioningConan(ConanFile):
 
         # CMake has no Platform/HarmonyOS.cmake. On a HarmonyOS host it therefore
         # auto-detects CMAKE_SYSTEM_NAME=HarmonyOS and fails to set up the
-        # shared-library SONAME/versioning rules, which produces unversioned
-        # .so files and broken `lib/libQt6Positioning.so` NEEDED entries.
-        # Presenting the platform as Linux enables the standard platform rules;
-        # the OHOS clang driver still targets aarch64-unknown-linux-ohos.
+        # shared-library SONAME/versioning rules. Presenting the platform as
+        # Linux enables the standard platform rules; the OHOS clang driver
+        # still targets aarch64-unknown-linux-ohos.
         class OhosLinuxPlatformBlock(Block):
             template = textwrap.dedent(
                 """\
@@ -78,9 +81,12 @@ class QtpositioningConan(ConanFile):
 
         # Let find_package(Qt6) locate qtbase's own Qt6Config.cmake package.
         qtbase_pkg = self.dependencies["qtbase"].package_folder
+        declarative_pkg = self.dependencies["qtdeclarative"].package_folder
         tc.cache_variables.update(
             {
                 "CMAKE_PREFIX_PATH": qtbase_pkg,
+                # PositioningQuick needs QtQuick (from qtdeclarative).
+                "QT_ADDITIONAL_PACKAGES_PREFIX_PATH": declarative_pkg,
                 "QT_QMAKE_TARGET_MKSPEC": "harmonyos-clang",
                 "BUILD_SHARED_LIBS": "ON" if self.options.shared else "OFF",
                 "QT_BUILD_TESTS": "OFF",
@@ -89,6 +95,13 @@ class QtpositioningConan(ConanFile):
             }
         )
         tc.generate()
+
+        # Build-time host tools (from qtdeclarative) need its lib dir on
+        # LD_LIBRARY_PATH.
+        env = Environment()
+        env.prepend_path("LD_LIBRARY_PATH", os.path.join(qtbase_pkg, "lib"))
+        env.prepend_path("LD_LIBRARY_PATH", os.path.join(declarative_pkg, "lib"))
+        env.vars(self).save_script("conanbuild_qt_libs")
 
     def build(self):
         apply_conandata_patches(self)
@@ -99,8 +112,25 @@ class QtpositioningConan(ConanFile):
     def package(self):
         cmake = CMake(self)
         cmake.install()
+        self._ensure_soname_symlinks()
         if str(self.settings.os) == "OHOS":
             self._sign_installed_elfs()
+
+    def _ensure_soname_symlinks(self):
+        """Ensure libQt6Positioning.so and .so.6 links exist (E215: HMDFS breaks
+        relative symlinks during install)."""
+        libdir = os.path.join(self.package_folder, "lib")
+        if not os.path.isdir(libdir):
+            return
+        for root, _, filenames in os.walk(libdir):
+            for filename in filenames:
+                if not filename.startswith("libQt6Positioning.so.6.11.1"):
+                    continue
+                real = os.path.join(root, filename)
+                for link_name in ("libQt6Positioning.so.6", "libQt6Positioning.so"):
+                    link = os.path.join(root, link_name)
+                    if not os.path.lexists(link):
+                        os.symlink(filename, link)
 
     def _sign_installed_elfs(self):
         """Re-sign installed OHOS ELF executables and shared objects."""
@@ -224,3 +254,18 @@ class QtpositioningConan(ConanFile):
         # Prevent CMakeDeps from shadowing them with an incomplete generated config.
         self.cpp_info.set_property("cmake_find_mode", "none")
         self.cpp_info.builddirs = [os.path.join("lib", "cmake")]
+
+        positioning = self.cpp_info.components["positioning"]
+        positioning.libs = ["Qt6Positioning"]
+        positioning.requires = ["qtbase::core"]
+        positioning.set_property("cmake_target_name", "Qt6::Positioning")
+
+        # PositioningQuick is the QtPositioning QML module (needs QtQuick).
+        positioningquick = self.cpp_info.components["positioningquick"]
+        positioningquick.libs = ["Qt6PositioningQuick"]
+        positioningquick.requires = [
+            "qtbase::core",
+            "qtdeclarative::qml",
+            "qtdeclarative::quick",
+        ]
+        positioningquick.set_property("cmake_target_name", "Qt6::PositioningQuick")

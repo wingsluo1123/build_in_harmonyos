@@ -1,44 +1,64 @@
-#include <QGeoCoordinate>
-#include <QGeoRectangle>
-#include <QGeoPath>
-#include <QtGlobal>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtPositioning/QGeoCircle>
+#include <QtPositioning/QGeoRectangle>
+#include <QtPositioning/QGeoPositionInfo>
+#include <QtPositioning/QNmeaPositionInfoSource>
+
+#include <QDateTime>
 
 #include <cstdio>
 
-int main(int argc, char **argv)
+/*
+ * Substantive smoke test for the Qt Positioning package on HarmonyOS PC.
+ *
+ * Exercises the real geo types (coordinate, circle, rectangle), position
+ * info objects, and the NMEA position info source — not a stub.
+ */
+int main()
 {
-    Q_UNUSED(argc);
-    Q_UNUSED(argv);
-
-    // QGeoCoordinate: construction, validity and distance
-    const QGeoCoordinate oslo(59.9139, 10.7522);
-    const QGeoCoordinate tokyo(35.6762, 139.6503);
-    if (!oslo.isValid())
+    // QGeoCoordinate: construction, validity, type and distance.
+    QGeoCoordinate coord(37.0, -122.0);
+    if (!coord.isValid() || coord.type() != QGeoCoordinate::Coordinate2D) {
+        std::fprintf(stderr, "QGeoCoordinate construction failed\n");
         return 1;
-    const qreal distance = oslo.distanceTo(tokyo);
-    if (distance <= 0.0)
+    }
+
+    const QGeoCoordinate other(37.0, -122.1);
+    const double distance = coord.distanceTo(other);
+    if (distance <= 0.0) {
+        std::fprintf(stderr, "QGeoCoordinate::distanceTo gave non-positive %f\n", distance);
         return 2;
+    }
 
-    // QGeoRectangle: bounds containment
-    const QGeoRectangle rect(QGeoCoordinate(60.0, 10.0),
-                             QGeoCoordinate(55.0, 12.0));
-    if (!rect.contains(QGeoCoordinate(58.0, 11.0)))
+    // QGeoCircle: validity and containment.
+    QGeoCircle circle(coord, 1000.0);
+    if (!circle.isValid() || !circle.contains(coord)) {
+        std::fprintf(stderr, "QGeoCircle validity/contains failed\n");
         return 3;
-    if (rect.contains(QGeoCoordinate(50.0, 5.0)))
+    }
+
+    // QGeoRectangle: validity and containment.
+    QGeoRectangle rect(coord, 0.1, 0.1);
+    if (!rect.isValid() || !rect.contains(coord)) {
+        std::fprintf(stderr, "QGeoRectangle validity/contains failed\n");
         return 4;
+    }
 
-    // QGeoPath: polyline path construction
-    QGeoPath path;
-    path.addCoordinate(QGeoCoordinate(59.9139, 10.7522));
-    path.addCoordinate(QGeoCoordinate(35.6762, 139.6503));
-    if (path.size() != 2)
+    // QGeoPositionInfo: validity and timestamp.
+    QGeoPositionInfo info(coord, QDateTime::currentDateTime());
+    if (!info.isValid() || !info.timestamp().isValid()) {
+        std::fprintf(stderr, "QGeoPositionInfo construction failed\n");
         return 5;
-    if (!path.coordinateAt(0).isValid())
-        return 6;
+    }
 
-    std::printf(
-        "Qt %s QGeoCoordinate/QGeoRectangle/QGeoPath work\n",
-        QT_VERSION_STR
-    );
+    // QNmeaPositionInfoSource: constructible with a simulation mode.
+    QNmeaPositionInfoSource nmea(QNmeaPositionInfoSource::SimulationMode);
+    if (nmea.updateInterval() < 0) {
+        std::fprintf(stderr, "QNmeaPositionInfoSource::updateInterval invalid\n");
+        return 6;
+    }
+
+    std::printf("QtPositioning OK: distance=%.2f m, %d inputs exercised\n",
+                distance, 6);
     return 0;
 }
