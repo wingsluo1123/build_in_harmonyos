@@ -12,15 +12,26 @@ upstream_test_in_build: false
 upstream_test_command: ""
 
 # 上游实际运行的测试程序
+# 注: 2026-08-12 修正 — 上游源码中测试文件为 domain-test.c 而非 test-domain.c；
+# avahi-core 不存在 test-packet.c，实际测试为 dns-test/dns-spin-test/hashmap-test 等
+# （详见 reports/test-report.md 上游测试执行章节）
 upstream_tests:
-  - file: avahi-common/tests/test-domain.c
-    source: avahi-0.8/avahi-common/tests/test-domain.c
+  - file: avahi-common/domain-test.c
+    source: avahi-0.8/avahi-common/domain-test.c
     description: "上游单元测试: domain 解析/编码"
-    command: "./test-domain"
-  - file: avahi-core/tests/test-packet.c
-    source: avahi-0.8/avahi-core/tests/test-packet.c
-    description: "上游单元测试: 报文打包/解析"
-    command: "./test-packet"
+    command: "./domain-test"
+  - file: avahi-core/dns-test.c
+    source: avahi-0.8/avahi-core/dns-test.c
+    description: "上游单元测试: DNS 报文打包/解析"
+    command: "./dns-test"
+  - file: avahi-core/dns-spin-test.c
+    source: avahi-0.8/avahi-core/dns-spin-test.c
+    description: "上游单元测试: DNS 循环 (TESTS 成员)"
+    command: "./dns-spin-test"
+  - file: avahi-core/hashmap-test.c
+    source: avahi-0.8/avahi-core/hashmap-test.c
+    description: "上游单元测试: 哈希表 (TESTS 成员)"
+    command: "./hashmap-test"
 
 # test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
