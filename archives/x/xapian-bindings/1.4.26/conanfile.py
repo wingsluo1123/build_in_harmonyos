@@ -96,6 +96,15 @@ class XapianBindingsConan(ConanFile):
         configure = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure):
             os.chmod(configure, 0o755)
+            # E009/E064: 在 CI 的 SELinux 域中，直接执行 conftest 会被拦截。
+            # 管道使子进程进入可执行 SDK/临时 ELF 的上下文；保留 bash 的
+            # PIPESTATUS 校验，避免把真实探测失败误报为成功。
+            replace_in_file(
+                self,
+                configure,
+                "ac_try='./conftest$ac_cv_exeext'",
+                "ac_try='./conftest$ac_cv_exeext | cat; test ${PIPESTATUS[0]} -eq 0'",
+            )
 
         configure_args = self._load_configure_args()
 

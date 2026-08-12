@@ -27,6 +27,7 @@
 | 5 | make 内 import _xapian Permission denied | CI HNP python 沙箱限制 conan build 目录 | 跳过 pycache 验证目标，安装到 site-packages 后由 test_package 验证 |
 | 6 | HMDFS 覆盖 site-packages 文件 Operation not permitted | HMDFS 覆盖限制 | 安装前 rm -rf 目标目录 |
 | 7 | conan G2 报 python-require 不能依赖 shared-library | conan 类型规则 | 移除 package_type="python-require"（参照 internetarchive） |
+| 8 | configure 原生 conftest 执行失败 | OHOS SELinux 域限制直接执行临时 ELF（E009/E064） | configure 探测命令通过 `| cat` 运行，并检查 `PIPESTATUS[0]` 保留真实失败码 |
 
 ## 源码修改
 - 补丁 0001-configure.patch: configure 中 umask 077 → 022（E011, HMDFS 权限）
@@ -51,3 +52,7 @@ import xapian → PASS (1.4.26)
 
 ## 结束
 编译结束，状态: closed（built）
+---
+
+**编译结束**: 2026-08-12 09:02
+**最终状态**: built
