@@ -7,7 +7,7 @@
 set -euo pipefail
 
 PERL_LIB="$1"
-SHELL_QUOTE_BIN="$2"
+SHELL_QUOTE_BIN="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
