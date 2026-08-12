@@ -66,7 +66,10 @@ int main(void) {
   return (major == 1 && minor == 6 && micro == 3) ? 0 : 1;
 }
 EOF
-if gcc -I"$PKG_ROOT/include" "$WORKDIR/test_libtecla.c" "$PKG_ROOT/lib/libtecla.a" \
+# Use the toolchain C compiler passed by test_package/conanfile.py (CC),
+# falling back to gcc for local runs; gcc does not exist on OHOS.
+CC="${CC:-gcc}"
+if "$CC" -I"$PKG_ROOT/include" "$WORKDIR/test_libtecla.c" "$PKG_ROOT/lib/libtecla.a" \
        -o "$WORKDIR/test_libtecla" 2>"$WORKDIR/cc.err"; then
     OUT=$("$WORKDIR/test_libtecla" 2>&1)
     RC=$?

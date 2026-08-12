@@ -23,6 +23,14 @@ class LibteclaTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
+        # Resolve the C compiler from the toolchain conf (OHOS clang) and
+        # export it as CC for the test script; gcc is not available on OHOS.
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = compilers.get("c") or "clang"
+        os.environ["CC"] = cc
+
         # Locate the libtecla package root via Conan 2 dependencies API.
         pkg_root = None
         try:
