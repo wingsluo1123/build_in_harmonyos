@@ -1,0 +1,54 @@
+version: "5.0.9"
+software: "fluent-bit"
+status: success
+build_date: "2026-08-12"
+build_system: "cmake"
+
+source:
+  url: "https://github.com/fluent/fluent-bit/archive/refs/tags/v5.0.9.tar.gz"
+  sha256: "158e86d5fbf605e5aeced06ee94ce41a224b34311627f8f4083d722d1f6d7967"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DFLB_DEBUG=Off -DFLB_RELEASE=On -DFLB_MINIMAL=On -DFLB_EXAMPLES=Off"
+    - "-DFLB_TESTS_INTERNAL=Off -DFLB_TESTS_RUNTIME=Off -DFLB_TESTS_OSSFUZZ=Off"
+    - "-DFLB_TLS=On -DFLB_HTTP_SERVER=On -DFLB_SQLDB=On -DFLB_SIGNV4=Off"
+    - "-DFLB_CONFIG_YAML=On"
+    - "-DOPENSSL_ROOT_DIR=<conan openssl package> -DOPENSSL_INCLUDE_DIR=<conan openssl include>"
+    - "-DFLB_AWS=Off -DFLB_AWS_ERROR_REPORTER=Off -DFLB_KAFKA=Off -DFLB_LUAJIT=Off"
+    - "-DFLB_WASM=Off -DFLB_AVRO_ENCODER=Off -DFLB_ARROW=Off"
+    - "-DFLB_PARSER=On -DFLB_RECORD_ACCESSOR=Off -DFLB_STREAM_PROCESSOR=Off"
+    - "-DFLB_REGEX=On -DFLB_UTF8_ENCODER=Off -DFLB_UNICODE_ENCODER=Off"
+    - "-DFLB_JEMALLOC=Off -DFLB_VALGRIND=Off -DFLB_SHARED_LIB=Off -DFLB_BINARY=On"
+    - "-DFLB_IN_HTTP=On -DFLB_OUT_HTTP=On"
+    - "-DFLB_PROCESSOR_SQL=Off and other processor plugins Off"
+  dependencies:
+    - "openssl/3.5.6.1"
+    - "sqlite3/3.49.1"
+    - "libyaml/0.2.5"
+    - "musl-fts/1.2.7"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-real-deps-source-patches.patch"
+
+validation:
+  current_stage: "HarmonyOS device build passed"
+  conan_export: "passed locally with isolated CONAN_HOME on 2026-08-12"
+  patch_apply_check: "passed against unpacked v5.0.9 source on 2026-08-12"
+  conan_create_ohos: "passed on device on 2026-08-12; test_package ran --version, --help, and CTest"
+  upstream_tests_ohos: pending
+
+test_plan:
+  - "Package smoke: fluent-bit --version and --help from test_package."
+  - "Upstream audit pass 1: internal tests for crypto/hmac/tls, sqldb/sqlite, config yaml, chunkio/storage, and http server."
+  - "Upstream audit pass 2: runtime tests for in_http/out_http and core filesystem/storage flows."
+  - "Every failed or not-run upstream test must be listed with test name, log, root cause, and whether it is fixable."
+
+notes:
+  - "This is a new route based on real dependencies. Do not reuse the historical zero-dependency stub exemption text."
+  - "test_package is package smoke only and must not be counted as upstream test pass."
+  - "Registry API confirmed openssl/3.5.6.1, sqlite3/3.49.1, libyaml/0.2.5, and musl-fts/1.2.7 exist before device build."
