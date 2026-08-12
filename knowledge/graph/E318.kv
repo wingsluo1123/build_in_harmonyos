@@ -6,7 +6,7 @@
 id:                     E318
 trigger_tool:           meson|linker
 phase:                  configure,linking
-error_signature:        g_libintl_.*|undefined symbol.*g_libintl|host_system.*harmonyos|implicit declaration.*dgettext
+error_signature:        g_libintl_.*|undefined symbol.*g_libintl|host_machine.*harmonyos|implicit declaration.*dgettext
 
 # ═══ Layer 1: 识别层 ═══
 severity:               3
@@ -30,7 +30,7 @@ rec_description:        创建 intl-wrapper.c 将 g_libintl_* 符号映射到返
                         并注入 -Ddgettext(a,b)=((char*)(b)) 避 int 转换；
                         同时 meson.build 的 host_system == 'linux' 改为
                         in ['linux', 'harmonyos'] 使 Linux 特有链接器选项生效。
-rec_command:            sed -i "s/if host_system == 'linux'/if host_system in ['linux', 'harmonyos']/g" meson.build && echo 'char *g_libintl_gettext(const char *m){return (char*)(m);}' > intl-wrapper.c
+rec_command:            sed -i "s/if host_machine.system() == 'linux'/if host_machine.system() in ['linux', 'harmonyos']/g" meson.build && echo 'char *g_libintl_gettext(const char *m){return (char*)(m);}' > intl-wrapper.c
 rec_auto_fix:           false
 rec_impl:               source-shim
 
