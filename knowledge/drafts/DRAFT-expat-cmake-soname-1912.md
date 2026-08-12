@@ -1,4 +1,4 @@
-# E255 draft - Disable CMake versioned shared-library symlinks on OHOS paths
+# DRAFT-expat-cmake-soname-1912 - Disable CMake versioned shared-library symlinks on OHOS paths
 
 > **Contributor**: xuguowei | **Status**: VERIFIED DRAFT | **Updated**: 2026-08-11
 > **Severity**: medium | **Category**: cmake / shared-library / OHOS filesystem

@@ -68,3 +68,12 @@ avoiding the previous no-SONAME downstream `DT_NEEDED` path contamination.
 The CI registry check reported that `expat/2.8.2.1` has already been published,
 so this follow-up fix is carried as the incremented package version
 `expat/2.8.2.1.1`.
+
+## Upstream tests
+
+The recipe enables upstream CMake option `EXPAT_BUILD_TESTS=ON`. After building,
+it signs and directly runs `build-ohos/tests/runtests` on runnable OHOS targets.
+This is Expat's complete bundled C unit/regression runner, using its internal
+minicheck implementation and no downloaded test framework. Any non-zero test
+exit status fails `conan create`; the final check count and pass rate are taken
+from the runner output rather than estimated from source declarations.

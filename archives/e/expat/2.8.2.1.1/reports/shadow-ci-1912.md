@@ -78,3 +78,13 @@ Additional checks:
 ```text
 0x000000000000000e (SONAME) Library soname: [libexpat.so]
 ```
+
+## Upstream test follow-up
+
+The recipe now builds Expat's bundled `tests/runtests` target with
+`EXPAT_BUILD_TESTS=ON`, signs that OHOS test ELF, and executes it before
+packaging. The runner covers the upstream basic, namespace, miscellaneous,
+allocation-failure, namespace-allocation, and amplification-accounting suites
+across all built-in chunk-size and reparse-deferral combinations. A fresh
+shadow CI run is required to record the runner's authoritative `Checks` and
+`Failed` totals.
