@@ -25,7 +25,8 @@ class AcfDnsmasqConan(ConanFile):
     url = ""
     package_type = "application"
 
-    settings = "os", "arch"
+    # L0p 门禁: OHOS profile 需要 settings 全四项(os/compiler/build_type/arch)
+    settings = "os", "compiler", "build_type", "arch"
 
     def validate(self):
         if str(self.settings.os) not in ("Linux", "OHOS"):
