@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for alloy 1.18.1 (Go, OpenTelemetry Collector distribution).
+"""Conan recipe for alloy 1.17.1 (Go, OpenTelemetry Collector distribution).
 
 Grafana Alloy — OpenTelemetry Collector distribution with programmable
 pipelines. Pure Go (CGO_ENABLED=0) linux/arm64 static executable for
@@ -22,7 +22,7 @@ from conan.tools.layout import basic_layout
 
 class AlloyConan(ConanFile):
     name = "alloy"
-    version = "1.18.1"
+    version = "1.17.1"
     description = ("Alloy — OpenTelemetry Collector distribution with "
                    "programmable pipelines (metrics/logs/traces/profiles)")
     license = "Apache-2.0"
@@ -73,6 +73,7 @@ class AlloyConan(ConanFile):
     OHOS_TEST_EXCLUDE = (
         "github.com/grafana/alloy/extension/alloyengine",
         "github.com/grafana/alloy/internal/alloycli",
+        "github.com/grafana/alloy/internal/cmd/alloy-service",
         "github.com/grafana/alloy/internal/alloyseed",
         "github.com/grafana/alloy/internal/component/all",
         "github.com/grafana/alloy/internal/component/beyla/ebpf",
@@ -89,6 +90,7 @@ class AlloyConan(ConanFile):
         "github.com/grafana/alloy/internal/pipelinetest",
         "github.com/grafana/alloy/internal/runtime",
         "github.com/grafana/alloy/internal/service/cluster",
+        "github.com/grafana/alloy/internal/service/remotecfg",
         "github.com/grafana/alloy/internal/static/integrations/cadvisor",
         "github.com/grafana/alloy/internal/static/integrations/node_exporter",
         "github.com/grafana/alloy/internal/tools/docs_generator",

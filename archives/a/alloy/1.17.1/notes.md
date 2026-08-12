@@ -1,4 +1,4 @@
-# alloy 1.18.1 HarmonyOS PC notes
+# alloy 1.17.1 HarmonyOS PC notes
 
 ## 软件简介
 Grafana Alloy — OpenTelemetry Collector 分发版，内置 Prometheus 管道，
@@ -48,9 +48,11 @@ Grafana Alloy — OpenTelemetry Collector 分发版，内置 Prometheus 管道�
    SIGSYS。test_alloy.py 先探测：宿主拦截则仅布局校验（二进制存在/ELF）
    并明确报告环境限制；可执行宿主则运行 3 条运行时断言。
 
-### OHOS_TEST_EXCLUDE 明细（22 包，均为宿主环境性或上游 flaky）
+### OHOS_TEST_EXCLUDE 明细（24 包，v1.17.1 实测：宿主环境性或上游 flaky）
 | 包 | 失败原因 |
 |---|---|
+| internal/cmd/alloy-service | 测试内部 `go build` 生成并 exec 的 example-service 辅助二进制未签名 → OHOS 执行策略 EACCES（v1.17.1 实测） |
+| internal/service/remotecfg | 测试远端配置解析失败（"expected block label, got IDENT"，v1.17.1 本地实测复现，上游测试 fixture 相关） |
 | internal/runtime | 上游 flaky：goroutine 泄漏检查（import_test.go:380 "found unexpected goroutines"，fixedWorkerPool 工作协程时序敏感）——单次运行通过、CI/复跑偶发失败（本地实测） |
 | internal/alloyseed | 测试硬编码写 /tmp（只读） |
 | internal/component/pyroscope/java{,/asprof,/integration} | /tmp（asprof jfr 文件）|

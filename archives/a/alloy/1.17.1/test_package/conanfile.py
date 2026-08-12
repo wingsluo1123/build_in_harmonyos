@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan consumer test for alloy 1.18.1."""
+"""Conan consumer test for alloy 1.17.1."""
 
 import os
 import sys

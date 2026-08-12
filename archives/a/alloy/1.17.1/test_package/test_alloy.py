@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""alloy 1.18.1 consumer smoke test (R34).
+"""alloy 1.17.1 consumer smoke test (R34).
 
 On hosts that block the bpf syscall (seccomp -> SIGSYS at alloy startup,
 e.g. the OHOS build worker), the binary cannot execute at all; the script
@@ -61,16 +61,16 @@ if probe.returncode != 0:
     print(probe_out[-500:])
     sys.exit(1)
 
-# Test 1: --version 输出含 v1.18.1
+# Test 1: --version 输出含 v1.17.1
 r = run(["--version"])
-ok = r.returncode == 0 and "1.18.1" in (r.stdout + r.stderr)
+ok = r.returncode == 0 and "1.17.1" in (r.stdout + r.stderr)
 passed &= ok
 print(("PASS" if ok else "FAIL") +
       f": alloy --version -> {(r.stdout + r.stderr).strip()[:60]}")
 
 # Test 2: -version 等价（cobra 版本旗标）
 r = run(["-version"])
-ok = r.returncode == 0 and "1.18.1" in (r.stdout + r.stderr)
+ok = r.returncode == 0 and "1.17.1" in (r.stdout + r.stderr)
 passed &= ok
 print(("PASS" if ok else "FAIL") + ": alloy -version -> version string")
 
