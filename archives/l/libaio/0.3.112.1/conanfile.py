@@ -52,6 +52,12 @@ class LibaioConan(ConanFile):
         # polluting /lib, /lib64 with shared libraries.
         enable_shared = "1" if self.options.shared else "0"
 
+        # OHOS kernel triggers SIGSYS for io_pgetevents (syscall 292) instead
+        # of returning -ENOSYS. Pass -DLIBAIO_NO_IO_PGETEVENTS to make the
+        # patch undef __NR_io_pgetevents, falling through to the -ENOSYS stub.
+        if self.settings.os == "OHOS":
+            os.environ["CFLAGS"] = "-DLIBAIO_NO_IO_PGETEVENTS"
+
         # R9: Always use -j1.
         # The top-level Makefile delegates to src/Makefile via `make -C src`.
         # Command-line make variables (CC, AR, RANLIB, ENABLE_SHARED) are

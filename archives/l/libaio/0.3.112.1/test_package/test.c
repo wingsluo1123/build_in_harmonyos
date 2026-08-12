@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <errno.h>
 #include <libaio.h>
 
 int main(void) {
@@ -15,17 +16,19 @@ int main(void) {
         printf("io_queue_init succeeded\n");
     }
 
-    /* Always call release to verify the symbol resolves at link time */
-    io_queue_release(ctx);
+    /* Release context only if init succeeded */
+    if (ret >= 0) {
+        io_queue_release(ctx);
+    }
 
     /* Verify io_pgetevents returns -ENOSYS (stub) instead of crashing
      * with SIGSYS on OHOS. This is the key fix in 0.3.112.1. */
     struct io_event events[1];
     ret = io_pgetevents(ctx, 0, 1, events, NULL, NULL);
-    if (ret == -38 /* -ENOSYS */) {
+    if (ret == -ENOSYS) {
         printf("io_pgetevents correctly returns -ENOSYS (stub)\n");
     } else {
-        printf("io_pgetevents returned %d (expected -38)\n", ret);
+        printf("io_pgetevents returned %d (expected -ENOSYS=%d)\n", ret, -ENOSYS);
         return 1;
     }
 
