@@ -3,10 +3,11 @@
 
 Kalign is a fast and accurate multiple sequence alignment tool.
 """
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, rmdir
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
-import os
 
 
 class KalignConan(ConanFile):
