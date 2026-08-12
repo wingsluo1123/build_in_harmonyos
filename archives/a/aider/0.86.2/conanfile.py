@@ -26,7 +26,8 @@ class AiderConan(ConanFile):
     package_type = "application"
 
     # Pure Python noarch: no C/C++ compile (PEP 517 build needs clang for sdists)
-    settings = "os", "arch"
+    # settings 含 os/arch/compiler/build_type 四项（W3 L0p gate 要求，防 profile 不兼容）
+    settings = "os", "arch", "compiler", "build_type"
 
     def export_sources(self):
         export_conandata_patches(self)
