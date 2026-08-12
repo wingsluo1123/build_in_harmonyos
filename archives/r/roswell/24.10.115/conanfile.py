@@ -33,7 +33,7 @@ class RoswellConan(ConanFile):
     description = "roswell: a Lisp implementation installer/manager and environment for Common Lisp"
     license = "MIT"
     homepage = "https://github.com/roswell/roswell"
-    url = ""  # CI fills this
+    url = "https://github.com/roswell/roswell"
 
     package_type = "application"
 

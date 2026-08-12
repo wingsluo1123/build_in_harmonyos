@@ -4,7 +4,7 @@
 - 构建系统: autotools
 - 编译日期: 2026-08-12
 - 编译器: clang 15.0.4
-- 状态: built
+- 状态: published
 
 ## 编译步骤
 

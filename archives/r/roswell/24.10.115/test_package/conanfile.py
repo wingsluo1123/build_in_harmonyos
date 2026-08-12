@@ -13,9 +13,7 @@ class RoswellTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        # 鸿蒙 getpwuid() 无条目导致 homedir() 为 NULL，ros 需要 ROSWELL_HOME
-        env = os.environ.copy()
-        env.setdefault("ROSWELL_HOME", os.path.join(os.path.expanduser("~"), ".roswell-test"))
-        # OHOS: 用 bash 包装二进制执行（/system/bin/sh 可能无法可靠执行 ELF）
+        # OHOS: 用 bash 包装二进制执行（/system/bin/sh 可能无法可靠执行 ELF）。
+        # ROSWELL_HOME 由 test.sh 内部设置（鸿蒙 getpwuid() 无条目需绝对路径）。
         bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
         self.run(f"{bash} test.sh", env="conanrun")

@@ -1,27 +1,25 @@
-# E256 — [简短错误描述]
+# E256 — OHOS getpwuid() 返回 NULL 导致 homedir() 为 NULL，程序启动 SIGSEGV
 
 ## 错误特征
-[描述触发此错误模式的典型日志输出或症状]
+```
+Signal 11 (core dumped)
+ros --version: SIGSEGV
+```
 
 ## 触发条件
-- 构建系统: [autotools/cmake/meson/...]
-- 阶段: [configure/make/install/...]
+- 构建系统: autotools（任意构建系统均可能）
+- 阶段: runtime（程序启动时解析用户主目录）
 
 ## 根因分析
-[详细解释错误的根本原因]
+OHOS 系统无 /etc/passwd 条目，`getpwuid()`/`getpwnam()` 返回 NULL。
+依赖 `homedir()` 的软件（如 roswell 的 configdir()）在返回 NULL 后对 NULL 做
+字符串拼接，直接 SIGSEGV（Signal 11）。非 E051 的 SIGSYS 问题。
 
 ## 解决方案
 
 ### 推荐方案
-[描述修复步骤]
+运行时设置软件官方支持的环境变量（如 `ROSWELL_HOME`）注入绝对路径；
+或在源码中用 `#ifdef __OHOS__` 守卫在 homedir() 为 NULL 时回退到固定路径。
 
 ### 禁止做法
-- ❌ [描述不应采取的操作]
-
-## 验证
-```bash
-[验证修复的命令]
-```
-
-## 关联条目
-- 相关: [E???]
+- ❌ 依赖 /etc/passwd 或 getpwuid 返回值非空（OHOS 上恒为 NULL）
