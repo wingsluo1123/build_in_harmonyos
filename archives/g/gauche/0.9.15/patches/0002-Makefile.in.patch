@@ -1,26 +1,37 @@
 diff -ruN a/Makefile.in b/Makefile.in
 --- a/Makefile.in
 +++ b/Makefile.in
-@@ -9,21 +9,21 @@
- SHELL       = @SHELL@
- prefix      = @prefix@
- exec_prefix = @exec_prefix@
- bindir      = @bindir@
- libdir      = @libdir@
- srcdir      = @srcdir@
- datadir     = @datadir@
+@@ -16,7 +16,7 @@
  datarootdir = @datarootdir@
  top_srcdir  = @top_srcdir@
  
 -SUBDIRS = gc src lib ext doc examples tools
-+SUBDIRS = gc src lib doc examples tools
++SUBDIRS = gc src lib examples tools
  SRIDBUS = tools examples doc ext lib src gc
  LIBATOMICDIR = gc/libatomic_ops
  MKINSTDIR    = $(top_srcdir)/mkinstalldirs
- INSTALL      = @INSTALL@
- INSTALL_DATA = @INSTALL_DATA@
- GAUCHE_VERSION  = @GAUCHE_VERSION@
- GAUCHE_DATA_DIR = $(datadir)/gauche-@GAUCHE_ABI_VERSION@
- GAUCHE_ARCH_DIR = $(libdir)/gauche-@GAUCHE_ABI_VERSION@
- GAUCHE_ACLOCAL_DIR = $(GAUCHE_DATA_DIR)/$(GAUCHE_VERSION)/
- BUILD_GOSH = @BUILD_GOSH@
+@@ -45,7 +45,7 @@
+ all: pre-package.stamp
+ 	if [ $(srcdir) != "." ]; then $(srcdir)/wirebuildlibs "$(srcdir)" "$(LN_S)"; fi
+ 	for d in $(SUBDIRS); do (cd $$d; $(MAKE) all) || exit 1; done
+-	cd src; $(MAKE) -s static
++	@echo "static lib skipped (ext unavailable on OHOS)"
+ 	@@CYGWIN_FIXDLL@
+ 
+ test : check
+@@ -86,13 +86,13 @@
+ 	cd lib; $(MAKE) slibcat
+ 
+ install-doc:
+-	cd doc; $(MAKE) install
++	@echo "doc build skipped (ext charconv unavailable on OHOS)"
+ 
+ # it is important to install lib and ext _before_ src, since they
+ # depend on gosh's rpath to point a valid version of libgauche.so.
+ install-pkg:
+ 	cd lib; $(MAKE) install
+-	cd ext; $(MAKE) install
++
+ 	cd src; $(MAKE) install
+ 	$(INSTALL_DATA) "$(srcdir)/m4/gauche.m4" "$(DESTDIR)$(GAUCHE_ACLOCAL_DIR)/aclocal.m4"
+ 	$(MKINSTDIR) "$(DESTDIR)$(datadir)/aclocal"
