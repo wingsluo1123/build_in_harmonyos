@@ -17,6 +17,16 @@ class ProgressConan(ConanFile):
     def layout(self):
         basic_layout(self)
 
+    def source(self):
+        # 显式下载解压并剥离顶层目录（get strip_root=True——GitHub archive
+        # 的顶层目录 progress-0.17/ 被剥离——源码文件【Makefile 等】直接到
+        # source_folder 顶层——避免源码布局不确定【CI #21519 报 No targets/
+        # makefile found——同 abduco #21461/#21555】
+        from conan.tools.files import get
+        get(self, self.conan_data["sources"][self.version]["url"],
+            sha256=self.conan_data["sources"][self.version]["sha256"],
+            strip_root=True)
+
     def generate(self):
         # progress 的 Makefile 用 pkg-config ncursesw 检测——PKG_CONFIG_PATH
         # 指向 ncurses 包 pkgconfig（alpine/fizmo 的 ncurses 处理先例）
