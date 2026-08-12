@@ -1,3 +1,4 @@
+#====================================================================
 # E318.kv — ATK OHOS 适配 (intl-wrapper + Meson host_system 检测)
 #====================================================================
 
@@ -12,23 +13,64 @@ severity:               3
 category:               linking|platform_detection
 match_keywords:         atk, accessibility, g_libintl, libintl, gettext, meson, host_system, harmonyos, glib, intl-wrapper
 
-# ═══ Layer 2: 根因层 ═══
-root_cause:             glib libintl.h 将 gettext 宏定义为 g_libintl_*，OHOS musl libintl.so 只导出 libintl_*；meson 报 host_system=harmonyos 不匹配 'linux' 条件分支
-triggers:               meson configure, glib 静态库链接, dgettext 隐式声明
-preconditions:          OHOS 平台 + glib 依赖 + meson 构建
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             glib libintl.h 将 gettext 宏定义为 g_libintl_*，OHOS musl
+                        libintl.so 只导出 libintl_* 符号，glib 静态库引用 g_libintl_*
+                        无定义 → 链接 undefined symbol；meson 报 host_system=harmonyos
+                        不匹配 'linux' 条件分支，Linux 特有链接器选项被跳过。
+affected_scope:         所有依赖 glib 且用 meson 构建的 GNOME 库
+                        （atk 2.36.0 已验证；gtk+、pango 等预期同样受影响）。
+verification_cmd:       pkg-config --modversion atk
 
-# ═══ Layer 3: 解决层 ═══
-fix_1_name:             intl-wrapper
-fix_1_type:             source_shim
-fix_1_cmd:              intl-wrapper.c 将 g_libintl_* 符号映射到 libintl_* 符号（与 E107 方案一致）；OHOS musl libintl 无 g_libintl_* 导出时退化为返回 msgid 的兜底实现 + -Ddgettext(a,b)=((char*)(b))
-fix_2_name:             meson-host_system
-fix_2_type:             source_patch
-fix_2_cmd:              sed "s/if host_machine.system() == 'linux'/if host_machine.system() in ['linux', 'harmonyos']/g"
-fix_3_name:             pkg-config-propagation
-fix_3_type:             recipe
-fix_3_cmd:              PkgConfigDeps + package_info().cpp_info.requires=["glib::glib"] + 复制 glib 子模块 .pc
+# ═══ Layer 3: 方案层 ★ ═══
+rec_priority:           1
+rec_approach:           intl-wrapper
+rec_description:        创建 intl-wrapper.c 将 g_libintl_* 符号映射到返回 msgid 的
+                        兜底实现（OHOS musl 单域），加入 meson.build 源文件列表，
+                        并注入 -Ddgettext(a,b)=((char*)(b)) 避 int 转换；
+                        同时 meson.build 的 host_system == 'linux' 改为
+                        in ['linux', 'harmonyos'] 使 Linux 特有链接器选项生效。
+rec_command:            sed -i "s/if host_system == 'linux'/if host_system in ['linux', 'harmonyos']/g" meson.build && echo 'char *g_libintl_gettext(const char *m){return (char*)(m);}' > intl-wrapper.c
+rec_auto_fix:           false
+rec_impl:               source-shim
 
-# ═══ Layer 4: 验证层 ═══
-verify_1:               pkg-config --modversion atk → 2.36.0
-verify_2:               meson test -C builddir → 5/5 passed
-related_ids:            E090, E107, E046
+fallback_priority:      2
+fallback_approach:      pkg-config-propagation
+fallback_description:   PkgConfigDeps 让 configure 通过 pkg-config 找到 glib，
+                        package_info() 声明 cpp_info.requires=["glib::glib"]，
+                        复制 glib 包子模块 .pc（gobject/gio/gmodule）。
+fallback_command:       
+fallback_auto_fix:      false
+fallback_impl:          recipe
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       -Ddgettext=.*libintl_dgettext
+forbid_1_reason:        不要直接链接 libintl_dgettext（OHOS musl 无该导出），
+                        应走 g_libintl_* 兜底映射或返回 msgid
+forbid_1_consequence:   链接期 undefined symbol，需额外 wrapper
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             
+
+# ═══ 关系图 ═══
+causes:               
+caused_by:               
+similar_to:             E090, E107
+conflicts_with:               
+prerequisite_of:        
+
+# ═══ 元数据 ═══
+doc_file:               doc/E318.md
+last_updated:           2026-08-12
+source_event:           atk 2.36.0 编译
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
