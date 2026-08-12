@@ -154,6 +154,13 @@ class GstPluginsRsQuinnConan(ConanFile):
         # Keep cargo artifacts inside the conan build folder
         os.environ["CARGO_TARGET_DIR"] = os.path.join(self.build_folder, "target")
 
+        # Cargo's default linker is `cc`, which CI worker PATH lacks.
+        # Point cargo at the conan-provided clang (signal-tlsd precedent).
+        cc = (self.conf.get("tools.build:compiler_executables", {}) or {}).get("c") \
+            or shutil.which("clang") or shutil.which("cc") or "clang"
+        os.environ.setdefault("CC", cc)
+        os.environ.setdefault("CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER", cc)
+
         self.run(
             f"{cargo} build -p gst-plugin-quinn --release",
             env="conanbuild",
