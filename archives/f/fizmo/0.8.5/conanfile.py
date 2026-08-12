@@ -62,9 +62,13 @@ class FizmoConan(ConanFile):
         # --disable-png：fizmo configure 支持 --disable-png（configure 1496 行），
         # 禁用 PNG 图像支持（文本 Z-machine 解释器不需要；CI #17945 报
         # No package 'libpng' found）
+        # --disable-sdl：fizmo configure 支持 --disable-sdl（configure 1491 行），
+        # 禁用 SDL 前端（只构建 ncursesw 终端前端；CI #21333 报
+        # No package 'sdl2' found）
         tc.configure_args.extend(
             [f"--build={triplet}", f"--host={triplet}",
-             "--disable-x11", "--disable-jpeg", "--disable-png"])
+             "--disable-x11", "--disable-jpeg", "--disable-png",
+             "--disable-sdl"])
         # fizmo configure 硬编码路径检测 libxml/tree.h（/usr/include/libxml2 等），
         # 需传 --with-libxml2-includedir 指向 libxml2 包 include
         tc.configure_args.append(
