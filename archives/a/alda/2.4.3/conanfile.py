@@ -22,7 +22,7 @@ class AldaConan(ConanFile):
     url = "https://github.com/alda-lang/alda"
 
     package_type = "application"
-    settings = "os", "arch", "build_type"
+    settings = "os", "compiler", "build_type", "arch"
 
     # Go toolchain location (harmonybrew). The Conan build sandbox strips
     # PATH, so we must inject the Go binary directory explicitly.
