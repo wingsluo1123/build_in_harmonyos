@@ -86,27 +86,31 @@ tag tarball 中包含。
 | 指标 | 数值 |
 |------|------|
 | doctest 用例总数（wsl_transform_path_uri） | 129 |
-| 鸿蒙适用并通过（passed） | 52 |
-| WSL 环境专属项（N/A/unrunnable，维护者批准） | 77 |
+| passed | 52 |
+| WSL/Linux 宿主环境专属不可执行（unrunnable） | 77 |
 | errors / timeout | 0 / 0 |
 
-> 维护者裁定：77 项 WSL 专属 doctest 在非 WSL 的鸿蒙 PC 环境按
-> N/A/unrunnable 如实处理。**该裁定只解决测试统计口径，不代表这些用例通过；
-> 不得写成 skipped、passed 或 129/129。** 77 项不属于 passed/skipped，
-> 不进入适用测试分母；适用测试通过率 = 52/52（100%）。
+上游真实通过率：**52/129（40.31%）**。77 项为 WSL/Linux 宿主环境专属
+不可执行（unrunnable），**不属于 passed，也不属于上游条件性 skipped**
+（上游没有 skip 条件）。77 项不可执行的原因均为上游 doctest 期望值依赖
+WSL/Linux 宿主环境事实，本真机（HarmonyOS，非 WSL，is_wsl=False）无法构造：
+`wslpath` 命令、`/mnt/c` Windows 盘挂载、`\\wsl.localhost` 或 `wsl$` 宿主 UNC、
+`/etc/fstab`、`/home` 用户目录布局、特定 UID/passwd 数据库、Windows 路径转换
+和文件存在性（例如 `r.win_path if r.exists else ...` 分支、
+`file://.../.../home/...` 期望值、`pwd.getpwuid(os.getuid())`）。
+逐例证据表见 evidence 分析（示例位置、依赖条件、原生结果、功能影响）。
 
-77 项 WSL 专属项均为上游 doctest 期望值依赖 WSL/Linux 宿主环境事实：
-`wslpath` 命令、`/mnt/c` Windows 盘挂载、`\\wsl.localhost` 宿主、`/etc/fstab`、
-`/home` 用户目录布局、特定 UID/passwd 等（例如 `r.win_path if r.exists else ...`
-分支、`file://.../.../home/...` 期望值、`pwd.getpwuid(os.getuid())`）。本真机为
-HarmonyOS（非 WSL，is_wsl=False），这些宿主环境事实不存在且无法在真机上合法构造。
-逐例证据表见 evidence 分析（示例位置、依赖条件、原生结果、功能影响），
-`wsl_transform_path_uri` 仅在 `if is_wsl:` 分支被调用，不影响普通鸿蒙功能。
+这些测试集中在 `wsl_transform_path_uri`；该函数仅在 `showinfm.py` 的
+`if is_wsl:` 分支被调用（is_wsl=False 时完全不经过），鸿蒙普通运行流程
+不会进入 WSL 分支，不影响普通 show-in-file-manager 功能（import、API、CLI、
+URI 工具由 test_package 验证）。
 
 诊断驱动（platform 映射 + 临时 wslpath wrapper + 临时 HOME/文件树）曾得到
-81 passed / 48 failed，**该结果仅用于根因分析，不代表鸿蒙真机通过率**，不写入 PR。
+81 passed / 48 failed，**该结果仅用于根因分析，不代表鸿蒙真机通过率**，
+不写入 PR 通过率。
 
 未修改任何上游测试文件、断言、数据、用例选择、skip 条件或预期结果。
+
 
 
 `rundoctest.py` 本身用 `doctest.run_docstring_examples` 运行且不设退出码
@@ -130,5 +134,5 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify show-in-file-manager 1.1.4
 2 个平台适配补丁（见上），均为 unified diff，`patch --dry-run -p1` 可复现。
 ---
 
-**编译结束**: 2026-08-12 19:56
+**编译结束**: 2026-08-12 21:08
 **最终状态**: built
