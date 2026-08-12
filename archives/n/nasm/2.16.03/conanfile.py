@@ -72,7 +72,7 @@ class NasmConan(ConanFile):
         self._smoke_test_build_output()
 
     def package(self):
-        Autotools(self).install()
+        Autotools(self).install(args=["-j1"])
         copy(
             self,
             "LICENSE",
