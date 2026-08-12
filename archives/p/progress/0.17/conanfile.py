@@ -38,9 +38,15 @@ class ProgressConan(ConanFile):
     def build(self):
         # progress 无 configure（纯 Makefile 项目——notes.md 确认）；
         # CC=clang：Makefile 默认 CC=cc 但 OHOS 仅有 clang（multitail 先例）；
-        # -j1：OHOS 沙箱不支持 mkfifo（jobserver），并行编译失败（opensp 先例）
-        self.run("make -j1 CC=clang", cwd=self.source_folder,
-                 env="conanbuild")
+        # -j1：OHOS 沙箱不支持 mkfifo（jobserver），并行编译失败（opensp 先例）。
+        # CFLAGS -I：progress.c 的 #include <curses.h>（CI #21954 报
+        # curses.h file not found）——指向 ncurses 包 include 顶层 +
+        # include/ncursesw（两种布局——multitail 教训）
+        ncurses_inc = os.path.join(
+            self.dependencies["ncurses"].package_folder, "include")
+        cflags = f"-I{ncurses_inc} -I{os.path.join(ncurses_inc, 'ncursesw')}"
+        self.run(f"make -j1 CC=clang CFLAGS=\"{cflags}\"",
+                 cwd=self.source_folder, env="conanbuild")
 
     def package(self):
         # Makefile install 支持 DESTDIR+PREFIX（第 33 行 install 目标——
