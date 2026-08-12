@@ -1,6 +1,7 @@
 from conan import ConanFile
 from conan.tools.files import collect_libs, get
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanException, ConanInvalidConfiguration
+from conan.tools.build import can_run
 from conan.tools.cmake import cmake_layout
 from conan.tools.files import apply_conandata_patches
 
@@ -70,7 +71,7 @@ class ExpatConan(ConanFile):
             "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,",
             "-DEXPAT_BUILD_TOOLS=OFF",
             "-DEXPAT_BUILD_EXAMPLES=OFF",
-            "-DEXPAT_BUILD_TESTS=OFF",
+            "-DEXPAT_BUILD_TESTS=ON",
             "-DEXPAT_BUILD_DOCS=OFF",
             "-DEXPAT_SHARED_LIBS=ON",
             "-DEXPAT_BUILD_PKGCONFIG=ON",
@@ -81,6 +82,10 @@ class ExpatConan(ConanFile):
         ]
         self.run('cmake -B "{}" -S "{}" {}'.format(bdir, src, " ".join(defs)))
         self.run('cmake --build "{}"'.format(bdir))
+        if can_run(self):
+            self._run_upstream_tests(bdir)
+        else:
+            self.output.info("Cross-building: skip the target Expat test runner")
 
     def package(self):
         import os
@@ -118,7 +123,31 @@ class ExpatConan(ConanFile):
             self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
             self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
 
+    def _run_upstream_tests(self, build_dir):
+        import os
+        test_binary = os.path.join(build_dir, "tests", "runtests")
+        if not os.path.isfile(test_binary):
+            raise ConanException("Missing Expat upstream test runner: {}".format(test_binary))
 
+        objcopy = os.environ.get("LLVM_OBJCOPY", "/data/service/hnp/bin/llvm-objcopy")
+        signer = os.environ.get("BINARY_SIGN_TOOL", "/data/service/hnp/bin/binary-sign-tool")
+        for tool in (objcopy, signer):
+            if not os.path.isfile(tool):
+                raise ConanException("Required OHOS signing tool is missing: {}".format(tool))
+
+        os.chmod(test_binary, 0o755)
+        self.run(
+            '{oc} --remove-section .codesign "{binary}" 2>/dev/null || true'.format(
+                oc=objcopy, binary=test_binary
+            )
+        )
+        self.run(
+            '{signer} sign -inFile "{binary}" -outFile "{binary}" -selfSign 1'.format(
+                signer=signer, binary=test_binary
+            )
+        )
+        self.output.info("Running the complete Expat upstream C unit test runner")
+        self.run('"{}"'.format(test_binary))
 
     def package_info(self):
         explicit_libs = ['expat']
