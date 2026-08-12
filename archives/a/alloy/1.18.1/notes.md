@@ -48,9 +48,10 @@ Grafana Alloy — OpenTelemetry Collector 分发版，内置 Prometheus 管道�
    SIGSYS。test_alloy.py 先探测：宿主拦截则仅布局校验（二进制存在/ELF）
    并明确报告环境限制；可执行宿主则运行 3 条运行时断言。
 
-### OHOS_TEST_EXCLUDE 明细（21 包，均为宿主环境性）
+### OHOS_TEST_EXCLUDE 明细（22 包，均为宿主环境性或上游 flaky）
 | 包 | 失败原因 |
 |---|---|
+| internal/runtime | 上游 flaky：goroutine 泄漏检查（import_test.go:380 "found unexpected goroutines"，fixedWorkerPool 工作协程时序敏感）——单次运行通过、CI/复跑偶发失败（本地实测） |
 | internal/alloyseed | 测试硬编码写 /tmp（只读） |
 | internal/component/pyroscope/java{,/asprof,/integration} | /tmp（asprof jfr 文件）|
 | internal/component/pyroscope/ebpf、beyla/ebpf | 内核版本上报 0.0.0（要求 ≥5.5）|

@@ -87,6 +87,7 @@ class AlloyConan(ConanFile):
         "github.com/grafana/alloy/internal/converter/internal/staticconvert",
         "github.com/grafana/alloy/internal/converter/internal/staticconvert/internal/build",
         "github.com/grafana/alloy/internal/pipelinetest",
+        "github.com/grafana/alloy/internal/runtime",
         "github.com/grafana/alloy/internal/service/cluster",
         "github.com/grafana/alloy/internal/static/integrations/cadvisor",
         "github.com/grafana/alloy/internal/static/integrations/node_exporter",
