@@ -42,18 +42,17 @@ class AldaConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         client_dir = os.path.join(self.source_folder, "client")
-        # CGO_ENABLED=0 → pure static binary (no libc dependency).
-        # GOPROXY uses China mirror for reliable module downloads.
-        # PATH injection: Conan sandbox strips PATH, Go toolchain unreachable.
-        env_prefix = (
-            f'CGO_ENABLED=0 '
-            f'GOPROXY=https://goproxy.cn,direct '
-            f'PATH={self._go_bin}:$PATH '
-        )
+        # Inject Go toolchain into the *process* environment so that
+        # Conan's self.run (which re-execs via env) inherits it. Shell-string
+        # `PATH=...:$PATH` doesn't work because Conan's run sandbox strips
+        # PATH before the shell expands $PATH.
+        os.environ["PATH"] = self._go_bin + ":" + os.environ.get("PATH", "")
+        os.environ["CGO_ENABLED"] = "0"
+        os.environ.setdefault("GOPROXY", "https://goproxy.cn,direct")
         # Run go generate to produce generated/version.go.
-        self.run(env_prefix + 'go generate ./...', cwd=client_dir)
+        self.run("go generate ./...", cwd=client_dir)
         # Build the static CLI binary.
-        self.run(env_prefix + 'go build -ldflags="-s -w" -o alda .', cwd=client_dir)
+        self.run('go build -ldflags="-s -w" -o alda .', cwd=client_dir)
 
     def package(self):
         # Install the binary into bin/.
