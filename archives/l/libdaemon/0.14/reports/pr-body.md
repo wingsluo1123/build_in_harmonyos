@@ -1,15 +1,13 @@
-## PR 信息
 - **三方库名称**：libdaemon
 - **上游版本**：0.14
 - **上游仓库地址**：http://0pointer.de/lennart/projects/libdaemon/libdaemon-0.14.tar.gz
 - **适配路径**：路径 A（基础适配）
 - **使用知识库**：无
 
----
-
 ## 测试用例对比
 
 ### 上游库测试用例统计
+
 | 测试类型 | 上游用例数 | 说明 |
 |----------|-----------|------|
 | 单元测试 | 0 | 上游无测试套件（has_tests: false） |
@@ -18,14 +16,13 @@
 | **合计** | **0** | |
 
 ### 适配后测试用例统计
+
 | 测试类型 | 适配后用例数 | 与上游对比 | 说明 |
 |----------|-------------|-----------|------|
 | 单元测试 | 0 | 不变 | - |
 | 集成测试 | 0 | 不变 | - |
 | 鸿蒙特有测试 | 1 | +1（新增） | 新增 test_package 消费者测试 test_libdaemon（实测 1/1 Passed） |
 | **合计** | **1** | **+1** | |
-
----
 
 ## 上游测试用例修改说明
 
@@ -65,38 +62,19 @@
 - 上游测试用例通过率：0/0（上游无测试用例，不适用）
 - 新增测试用例通过率：1/1（100%）
 
-### 编译验证
-- 编译器: clang (aarch64-unknown-linux-ohos)
-- 编译状态: 成功
-- 构建系统: autotools
-- 配置选项: `默认配置`
+## 补充说明
 
-### 产物验证
-| 编译无错误 | PASS | 构建系统: autotools, 状态: published |
-| 产物存在性 | PASS | conan create 验证通过 |
-| ELF 格式 | PASS | aarch64-unknown-linux-ohos |
-| 运行测试 | 通过 | 通过: 1, 失败: 0, 跳过: 0 |
-| 动态依赖 | PASS | 依赖: 无 |
-
-### 补丁说明
-- `0001-config.guess.patch`: 添加 HarmonyOS/OHOS 平台识别
-- `0002-config.sub.patch`: 添加 linux-ohos 目标支持
-- `0003-configure.patch`: 移除 `umask 077`（OHOS SELinux 不支持）
-- `0004-examples-testd.c.patch`: 修复 `sys/unistd.h` → `unistd.h`
-
-### 依赖
-无（纯静态库，无外部依赖）
-
-### 测试结论
-- 总体评价: 通过
-- 已知限制: 无
-
-### 遇到的问题与解决方案
-- cmakedeps 静态库 find_library 前缀问题：HarmonyOS 为 CMake 未知平台，
-  `cpp_info.libs` 需写去前缀库名 `daemon`，否则查找 `liblibdaemon.a` 失败
-  （已在 conanfile.py 注释说明）
+- **产物**：libdaemon.a（静态，R26 默认）+ libdaemon.so.0.5.0（动态）+ 7 个头文件 + pkgconfig，仅依赖 libc
+- **补丁清单**（构建适配，非测试用例）：
+  - `0001-config.guess.patch`：添加 HarmonyOS/OHOS 平台识别
+  - `0002-config.sub.patch`：添加 linux-ohos 目标支持
+  - `0003-configure.patch`：移除 `umask 077`（OHOS SELinux 不支持）
+  - `0004-examples-testd.c.patch`：修复 `sys/unistd.h` → `unistd.h`
+- **已知限制**：cmakedeps 静态库 find_library 前缀问题——HarmonyOS 为 CMake 未知平台，
+  `cpp_info.libs` 需写去前缀库名 `daemon`，否则查找 `liblibdaemon.a` 失败（已在 conanfile.py 注释说明）
 
 ### 验证命令
+
 ```
 conan create archives/l/libdaemon/0.14 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
 → 构建成功，test_package 链接 libdaemon::libdaemon 并调用 daemon_log API
