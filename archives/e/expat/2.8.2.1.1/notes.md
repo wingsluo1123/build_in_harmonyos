@@ -77,3 +77,15 @@ This is Expat's complete bundled C unit/regression runner, using its internal
 minicheck implementation and no downloaded test framework. Any non-zero test
 exit status fails `conan create`; the final check count and pass rate are taken
 from the runner output rather than estimated from source declarations.
+
+Official shadow CI #21766 executed all 402 registered `START_TEST` functions
+through the runner's 6 chunk-size configurations and 2 reparse-deferral modes:
+
+```text
+Expat version: expat_2.8.2
+100%: Checks: 4824, Failed: 0
+```
+
+The upstream test pass rate is therefore **4824/4824 (100%)**. No upstream test
+source was changed or excluded. The Conan `test_package` API check and the R34
+destructive negative check also passed, for an additional **2/2 (100%)**.

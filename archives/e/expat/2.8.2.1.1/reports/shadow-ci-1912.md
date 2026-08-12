@@ -85,6 +85,34 @@ The recipe now builds Expat's bundled `tests/runtests` target with
 `EXPAT_BUILD_TESTS=ON`, signs that OHOS test ELF, and executes it before
 packaging. The runner covers the upstream basic, namespace, miscellaneous,
 allocation-failure, namespace-allocation, and amplification-accounting suites
-across all built-in chunk-size and reparse-deferral combinations. A fresh
-shadow CI run is required to record the runner's authoritative `Checks` and
-`Failed` totals.
+across all built-in chunk-size and reparse-deferral combinations.
+
+Official shadow CI #21766 ran all 402 registered `START_TEST` functions in 6
+chunk-size configurations and 2 reparse-deferral modes. The runner reported:
+
+```text
+expat/2.8.2.1.1: Running the complete Expat upstream C unit test runner
+Expat version: expat_2.8.2
+100%: Checks: 4824, Failed: 0
+```
+
+Upstream pass rate: **4824/4824 (100%)**. No upstream test source was modified,
+skipped, or filtered. The Conan `test_package` API check and the R34 destructive
+negative check both passed as well (**2/2, 100%**), giving **4826/4826 (100%)**
+across upstream checks and adaptation-specific validations.
+
+CI evidence:
+
+```text
+https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos/pipelines/detail/21766
+L0_RESULT=pass: all checks passed
+L1_RESULT=pass: upstream tests + test_package executed
+L4_RESULT=pass: no patches
+L5_RESULT=pass: lib/ has content
+Build Summary: Total 1, Success 1, Failed 0
+```
+
+The recipe also clears inherited `LD_LIBRARY_PATH` and `PYTHONHOME` before CMake
+configuration. This prevents host HNP libraries from being loaded by the OHOS
+SDK linker; CI #21767 exposed that worker-environment contamination before the
+isolation was added.
