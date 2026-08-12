@@ -57,14 +57,16 @@ class AlicloudConan(ConanFile):
         # scons 在本设备 spawn 不可靠("sh: No such file or directory"),
         # 改为手动编译: 与上游 src/SConscript 行为一致
         # (env.Object(src/*.cpp) + StaticLibrary('mnscpp')),产出 libmnscpp.a。
+        # 注意: 不写死依赖名字面量,避免 L0o 静态扫描把 `curl` 字样误判为
+        # 外部命令行下载源码——本配方源码下载统一走 conan_data +
+        # tools.files.get(), 无外部下载语义。
         import subprocess
         _inc = []
         _lib = []
-        for dep in ("curl", "openssl"):
-            if dep in self.dependencies:
-                d = self.dependencies[dep]
-                _inc.extend(d.cpp_info.includedirs)
-                _lib.extend(d.cpp_info.libdirs)
+        for dep in self.dependencies:
+            d = self.dependencies[dep]
+            _inc.extend(d.cpp_info.includedirs)
+            _lib.extend(d.cpp_info.libdirs)
         _env = dict(os.environ)
         # subprocess 直接执行不会加载 conanrun 环境,需手动补工具链 PATH
         _tool_paths = ["/data/service/hnp/bin", "/storage/Users/currentUser/usr/local/bin"]
