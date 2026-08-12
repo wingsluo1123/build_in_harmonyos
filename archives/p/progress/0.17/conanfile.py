@@ -46,14 +46,13 @@ class ProgressConan(ConanFile):
         ncurses_inc = os.path.join(ncurses.package_folder, "include")
         ncurses_lib = os.path.join(ncurses.package_folder, "lib")
         cflags = f"-I{ncurses_inc} -I{os.path.join(ncurses_inc, 'ncursesw')}"
-        # LDFLAGS -L + LDLIBS -lncursesw：链接 ncurses 符号（CI #22025 报
-        # undefined symbol: vw_printw/printw/stdscr 等——Makefile 的
-        # pkg-config ncursesw 检测失败【PKG_CONFIG_PATH 未传给 make——
-        # env="conanbuild" 未激活 conanbuild_pkgconfig——multitail 教训】——
-        # 直接传库链接【libncursesw.a 在 ncurses 包 lib】）
-        ldflags = f"-L{ncurses_lib}"
+        # LDFLAGS -L + -lncursesw：链接 ncurses 符号（CI #22098 实测
+        # LDLIBS 未生效【progress 的 Makefile 链接规则不引用 LDLIBS——
+        # 只有 LDFLAGS 生效】——-lncursesw 加进 LDFLAGS【链接命令
+        # $(LDFLAGS) 生效——libncursesw.a 在 ncurses 包 lib】）
+        ldflags = f"-L{ncurses_lib} -lncursesw"
         self.run(f"make -j1 CC=clang CFLAGS=\"{cflags}\" "
-                 f"LDFLAGS=\"{ldflags}\" LDLIBS=\"-lncursesw\"",
+                 f"LDFLAGS=\"{ldflags}\"",
                  cwd=self.source_folder, env="conanbuild")
 
     def package(self):
