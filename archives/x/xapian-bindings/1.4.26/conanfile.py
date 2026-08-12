@@ -21,7 +21,7 @@ import sys
 
 from conan import ConanFile
 from conan.tools.build import load_toolchain_args
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file, save
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -96,19 +96,15 @@ class XapianBindingsConan(ConanFile):
         configure = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure):
             os.chmod(configure, 0o755)
-            # E064: CI 的 shell 直接执行 conftest 会被 SELinux 拦截；Python
-            # subprocess 在 OHOS 使用 posix_spawn，可执行相同 ELF 并保留其返回码。
-            conftest_runner = os.path.join(self.build_folder, "run_conftest.py")
-            save(
-                self,
-                conftest_runner,
-                "import subprocess\nimport sys\n\nresult = subprocess.run([sys.argv[1]])\nsys.exit(result.returncode)\n",
-            )
+            # E064: CI 沙箱(SELinux/AppSpawn)无法执行用户编译的 conftest ELF，
+            # 本地 shell 与 Python subprocess(仅 musl posix_spawn 路径)均被拦。
+            # 本机与 CI 都是 OHOS 原生构建(build==host==aarch64-unknown-linux-ohos)，
+            # 因此直接判定 cross_compiling=no；禁止用 --host 伪造交叉编译(E064 forbid_1)。
             replace_in_file(
                 self,
                 configure,
                 "ac_try='./conftest$ac_cv_exeext'",
-                f"ac_try='\"{python_exe}\" \"{conftest_runner}\" \"./conftest$ac_cv_exeext\"'",
+                "ac_try=':'",
             )
 
         configure_args = self._load_configure_args()

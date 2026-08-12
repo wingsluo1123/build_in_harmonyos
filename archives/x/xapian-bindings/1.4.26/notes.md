@@ -27,7 +27,7 @@
 | 5 | make 内 import _xapian Permission denied | CI HNP python 沙箱限制 conan build 目录 | 跳过 pycache 验证目标，安装到 site-packages 后由 test_package 验证 |
 | 6 | HMDFS 覆盖 site-packages 文件 Operation not permitted | HMDFS 覆盖限制 | 安装前 rm -rf 目标目录 |
 | 7 | conan G2 报 python-require 不能依赖 shared-library | conan 类型规则 | 移除 package_type="python-require"（参照 internetarchive） |
-| 8 | configure 原生 conftest 执行失败 | OHOS SELinux 域限制直接执行临时 ELF（E009/E064） | 用 Python `subprocess` 的 `posix_spawn` 路径运行 conftest，并返回其真实退出码 |
+| 8 | configure 原生 conftest 执行失败 | OHOS CI 沙箱(SELinux/AppSpawn)无法执行用户编译的 ELF（E009/E064） | configure 的 cross-compiling 探测改为直接判定 no（build==host==aarch64-unknown-linux-ohos 原生构建，非交叉编译；禁止 --host 伪造） |
 
 ## 源码修改
 - 补丁 0001-configure.patch: configure 中 umask 077 → 022（E011, HMDFS 权限）
