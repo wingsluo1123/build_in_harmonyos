@@ -76,7 +76,7 @@ for my $name (@types) {
 section("3. Type validation - accept valid values");
 
 # Prepare test files and directories
-my $tmpdir = $ENV{TMPDIR} || $ENV{HOME} . '/tmp';
+my $tmpdir = $ENV{TMPDIR} || ($ENV{HOME} ? "$ENV{HOME}/tmp" : '.');
 mkdir $tmpdir unless -d $tmpdir;
 my $test_base = Path::Tiny->new("$tmpdir/func_test_$>");
 $test_base->remove_tree if -d $test_base;

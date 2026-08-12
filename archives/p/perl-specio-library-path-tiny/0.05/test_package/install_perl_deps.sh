@@ -22,7 +22,7 @@ if [ -f "${LOCAL_PERL5}/Specio.pm" ] && [ -f "${LOCAL_PERL5}/Path/Tiny.pm" ]; th
 fi
 
 mkdir -p "${PERL_LIB}"
-WORK_DIR="${TMPDIR:-/tmp}/perl-cpan-build"
+WORK_DIR="${TMPDIR:-${HOME}/.tmp}/perl-cpan-build"
 mkdir -p "${WORK_DIR}"
 
 # Modules in dependency order (CPAN tarball URL|extracted dirname)
@@ -53,16 +53,16 @@ for entry in "${MODULES[@]}"; do
         cd "${src_dir}"
     else
         echo "Downloading ${dirname}..." >&2
-        wget -O "${tarball}" "${url}" >&2 2>&1
+        wget -O "${tarball}" "${url}" >&2
         cd "${WORK_DIR}"
         tar xzf "${tarball}"
         cd "${src_dir}"
     fi
 
     echo "Building ${dirname}..." >&2
-    PERL5LIB="${LOCAL_PERL5}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" >&2 2>&1
-    make -j1 >&2 2>&1
-    make install >&2 2>&1
+    PERL5LIB="${LOCAL_PERL5}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" >&2
+    make -j1 >&2
+    make install >&2
 done
 
 # ONLY this line goes to stdout — the PERL5LIB paths

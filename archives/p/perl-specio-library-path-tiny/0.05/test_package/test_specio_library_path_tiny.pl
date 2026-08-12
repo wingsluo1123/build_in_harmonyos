@@ -99,7 +99,7 @@ ok_test(!$@ && defined $real_dir_type, "t('RealDir') returns a type object");
 use Path::Tiny qw(path);
 
 # Create a test file and dir (E002: /tmp is read-only on OHOS, use $TMPDIR or $HOME)
-my $tmpdir = $ENV{TMPDIR} || $ENV{HOME} . '/tmp' || '/tmp';
+my $tmpdir = $ENV{TMPDIR} || ($ENV{HOME} ? "$ENV{HOME}/tmp" : '.');
 mkdir $tmpdir unless -d $tmpdir;
 my $test_file = path("$tmpdir/specio_test_file_$$");
 my $test_dir = path("$tmpdir/specio_test_dir_$$");
