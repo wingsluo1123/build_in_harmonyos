@@ -104,7 +104,7 @@ $ conan-verify: ALL GATES PASSED
 2. LICENSE 为 artistic_2，非 MIT
 3. R27: requirements() 引用 perl-package-stash/0.40-r1@ohpcd/stable
 4. package_info() 使用 runenv_info.append_path("PERL5LIB", ...) 而非 cpp_info.libs
-5. settings 只需 "os", "arch"，不需要 compiler/build_type
+5. settings 需包含 "os", "compiler", "build_type", "arch" 四项（CI L0p 门禁要求）
 ---
 
 **编译结束**: 2026-07-02 15:14

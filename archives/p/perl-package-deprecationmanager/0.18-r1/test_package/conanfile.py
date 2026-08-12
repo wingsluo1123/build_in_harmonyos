@@ -9,7 +9,7 @@ from conan import ConanFile
 
 
 class PerlPackageDeprecationManagerTestConan(ConanFile):
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
     generators = "VirtualRunEnv"
 
     def requirements(self):
