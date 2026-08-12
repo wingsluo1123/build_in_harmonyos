@@ -80,6 +80,11 @@ class FizmoConan(ConanFile):
         # extra_cflags 指向 libxml2 包 include/libxml2【libxml/parser.h 所在】）
         tc.extra_cflags.append(
             f"-I{os.path.join(self.dependencies['libxml2'].package_folder, 'include', 'libxml2')}")
+        # fizmo-ncursesw 链接 -lxml2（CI #22091 报 unable to find library
+        # -lxml2——链接 -L 未指向 libxml2 包 lib——extra_ldflags 补 -L——
+        # 参考 ncurses 的 extra_ldflags 方式）
+        tc.extra_ldflags.append(
+            f"-L{os.path.join(self.dependencies['libxml2'].package_folder, 'lib')}")
         # ncursesw 前端检查（configure 硬编码路径 /usr/include 等找不到
         # ncurses.h——CI #20171 报 Could not find ncurses.h）——CFLAGS
         # 指向 ncurses 包 include（覆盖 include/ 顶层 + include/ncursesw/
