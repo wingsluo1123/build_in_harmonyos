@@ -8,7 +8,10 @@
 
 ## 编译步骤
 
-1. 源码下载: `curl -L https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-Decoder-5.004.tar.gz`
+1. 源码下载: `curl -L https://github.com/Sereal/Sereal/archive/refs/tags/Sereal-Decoder-5.004.tar.gz`
+   - CPAN URL (cpan.metacpan.org) 在部分 CI Worker 上不可达，改用 GitHub 归档
+   - GitHub 归档目录结构: Perl/Decoder/ (构建) + Perl/shared/ (头文件和构建工具)
+   - conanfile.py build() 中将 Perl/shared/ 文件复制到 Perl/Decoder/ (模拟 link_files)
 2. 生成 Conan 配方: `ohc-run.py conan-init perl-sereal-decoder 5.004-r3`
 3. 构建命令: `perl Makefile.PL INSTALLDIRS=site` → `make -j1`
 4. 安装到 package: `make install DESTDIR=$PACKAGE_FOLDER`

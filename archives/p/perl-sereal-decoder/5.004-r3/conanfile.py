@@ -53,6 +53,21 @@ class PerlSerealDecoderConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
 
+        # GitHub archive structure: Perl/Decoder/ (build) + Perl/shared/ (headers/tools)
+        # Makefile.PL requires inc/Sereal/BuildTools.pm which lives in Perl/shared/inc/
+        # Copy shared files into Decoder dir (simulates link_files() for in-repo builds,
+        # but uses copy instead of symlink for OHOS HMDFS compatibility)
+        decoder_dir = os.path.join(self.source_folder, "Perl", "Decoder")
+        shared_dir = os.path.join(self.source_folder, "Perl", "shared")
+        for item in os.listdir(shared_dir):
+            src = os.path.join(shared_dir, item)
+            dst = os.path.join(decoder_dir, item)
+            if not os.path.exists(dst):
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+
         # XS module build: perl Makefile.PL → xsubpp → clang → .so
         # Env vars to skip interactive prompts and use bundled libs:
         #   USE_UNALIGNED=1 - enable unaligned loads for performance
@@ -64,14 +79,16 @@ class PerlSerealDecoderConan(ConanFile):
         os.environ["CPAN_COMPAT"] = "1"
         os.environ["SEREAL_USE_BUNDLED_LIBS"] = "1"
 
-        self.run("perl Makefile.PL INSTALLDIRS=site", cwd=self.source_folder)
+        self.run("perl Makefile.PL INSTALLDIRS=site", cwd=decoder_dir)
         # E074: HarmonyOS SELinux forbids FIFO, use -j1
-        self.run("make -j1", cwd=self.source_folder)
+        self.run("make -j1", cwd=decoder_dir)
 
     def package(self):
+        decoder_dir = os.path.join(self.source_folder, "Perl", "Decoder")
+
         # Install to package folder directly via DESTDIR
         self.run(f'make install DESTDIR="{self.package_folder}"',
-                 cwd=self.source_folder)
+                 cwd=decoder_dir)
 
         # Create lib/ with signed .so copy for G4 artifact check + consumers
         lib_out = os.path.join(self.package_folder, "lib")
@@ -97,11 +114,11 @@ class PerlSerealDecoderConan(ConanFile):
                 self.output.warning(f"llvm-readelf failed for {so_file}, skipping codesign check")
             if has_codesign:
                 self.run(f'llvm-objcopy --remove-section .codesign "{so_file}"',
-                         cwd=self.source_folder)
+                         cwd=decoder_dir)
             # Self-sign the .so for HarmonyOS
             self.run(f'binary-sign-tool sign -inFile "{so_file}" '
                      f'-outFile "{so_file}" -selfSign 1',
-                     cwd=self.source_folder)
+                     cwd=decoder_dir)
             # Copy signed .so to lib/ for standard artifact discovery
             shutil.copy2(so_file, os.path.join(lib_out, os.path.basename(so_file)))
 
