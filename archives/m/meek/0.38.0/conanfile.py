@@ -13,6 +13,7 @@ R26: Go binaries are statically linked by default (CGO_ENABLED=0).
 R33: GOOS/GOARCH derived from Conan settings, not hardcoded shell vars.
 """
 import os
+import shutil
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -45,11 +46,34 @@ class MeekConan(ConanFile):
     def source(self):
         # The official source (gitlab.torproject.org) is unreachable from both
         # the dev machine and CI workers, and the host is not covered by the
-        # CI mirror fallback. conandata.yml therefore lists the official URL
-        # first and a file:// fallback to the tarball pre-cached under the
-        # shared HOME (see audit/4.1.2 for the same pattern); Conan get()
-        # tries each URL in order until one succeeds.
+        # CI mirror fallback. conandata.yml therefore lists the reachable
+        # goproxy.cn module zip first and a file:// fallback to the same zip
+        # pre-cached under the shared HOME; Conan get() tries each URL in
+        # order until one succeeds (all entries share the same sha256).
         get(self, **self.conan_data["sources"], strip_root=True)
+        # Go module zips nest the source under "<module>@<version>/" (a
+        # multi-level top dir), so strip_root leaves the tree nested; flatten
+        # it so go.mod sits at the source root for `go build ./meek-client`.
+        nested = None
+        for root, _, files in os.walk(self.source_folder):
+            if "go.mod" in files:
+                nested = root
+                break
+        if nested and nested != self.source_folder:
+            for entry in os.listdir(nested):
+                shutil.move(os.path.join(nested, entry), self.source_folder)
+            # Remove the emptied "<module>@<version>" chain (best effort):
+            # deepest first, then its (now empty) ancestors.
+            dirs = [nested]
+            parent = os.path.dirname(nested)
+            while parent and parent.startswith(self.source_folder) and parent != self.source_folder:
+                dirs.append(parent)
+                parent = os.path.dirname(parent)
+            for d in dirs:
+                try:
+                    os.rmdir(d)
+                except OSError:
+                    pass
 
     def _goarch(self):
         """Map Conan arch to Go GOARCH (R33: derived from Conan settings)."""
