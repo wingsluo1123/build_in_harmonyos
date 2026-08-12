@@ -71,6 +71,10 @@ class JsonglibConan(ConanFile):
         # and hard-fails without it. Patch the generated .pc to restore them.
         self._restore_glib_tool_vars()
         tc = MesonToolchain(self)
+        # OHOS SDK's lld depends on libxml2.so.16 which is absent on CI
+        # workers, causing meson's linker probe (clang -Wl,--version) to
+        # crash. Use GNU ld (binutils) instead — it has no such dependency.
+        tc.extra_ldflags.append("-fuse-ld=/data/service/hnp/bin/ld")
         # Only pass --prefix (R1); let meson/conan drive the rest.
         tc.project_options["wrap_mode"] = "nodownload"
         tc.project_options["default_library"] = "shared" if self.options.shared else "static"
