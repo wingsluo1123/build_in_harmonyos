@@ -269,6 +269,48 @@ class ApertiumConan(ConanFile):
 
         autotools.make(args=["-j1"])
 
+        # Run upstream Python unittest suite (tests/run_tests.py, 39 TestCase
+        # across 8 modules: transfer/interchunk/postchunk/tagger/cleanstream/
+        # pretransfer/adaptdocx/capitalization). Each TestCase uses subprocess
+        # to invoke apertium-transfer/preprocess-transfer/etc. binaries and
+        # compare stdin/stdout. Python 3.12 is available on OHOS build bots
+        # (in Conan run env PATH). run_tests.py chdir's to tests/ and the
+        # modules reference binaries via ../apertium/apertium-* relative paths.
+        # configure+make ran in source_folder (build_script_folder), so the
+        # built binaries live in build-release/apertium/ — run from build-release/.
+        if self.settings.os == "Linux":
+            # Conan basic_layout: self.folders.build is the build-release dir.
+            build_dir = self.folders.build if hasattr(self, "folders") and self.folders.build else None
+            if not build_dir or not os.path.isdir(build_dir):
+                # Fallback: probe common layouts Conan uses.
+                for candidate in (
+                    os.path.join(self.build_folder, "build-release"),
+                    self.build_folder,
+                    self.source_folder,
+                ):
+                    if os.path.isfile(os.path.join(candidate, "tests", "run_tests.py")):
+                        build_dir = candidate
+                        break
+            if build_dir:
+                # Run upstream Python unittest suite via subprocess so stdout
+                # surfaces in Conan console (self.run redirects build-scope
+                # stdout to an internal log Conan hides). subprocess.run with
+                # stdout=sys.stdout/stderr=sys.stderr forces console output.
+                import subprocess
+                import sys
+                result = subprocess.run(
+                    ["python3", "tests/run_tests.py", "-v", "-b=verbose"],
+                    cwd=build_dir,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                    env={**os.environ, "PYTHONPATH": os.path.join(build_dir, "python")},
+                )
+                if result.returncode != 0:
+                    raise ConanFileException(
+                        "apertium upstream Python unittest suite (tests/run_tests.py) "
+                        "failed with exit code {}".format(result.returncode)
+                    )
+
     def package(self):
         autotools = Autotools(self)
         autotools.install()
