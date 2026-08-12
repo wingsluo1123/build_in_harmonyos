@@ -9,7 +9,6 @@ runtime assertions below run in full.
 """
 
 import os
-import signal
 import subprocess
 import sys
 import tempfile
@@ -17,10 +16,18 @@ import tempfile
 exe = sys.argv[1]
 passed = True
 
+# Clean failure when the packaged binary is missing (avoid a traceback
+# from subprocess.run / open() on a non-existent path).
+if not os.path.isfile(exe):
+    print(f"FAIL: alloy executable not found: {exe}")
+    sys.exit(1)
+
 
 def layout_checks():
     ok = os.path.isfile(exe)
     print(("PASS" if ok else "FAIL") + f": binary exists ({exe})")
+    if not ok:
+        return False
     with open(exe, "rb") as f:
         elf_ok = f.read(4) == b"\x7fELF"
     print(("PASS" if elf_ok else "FAIL") + ": binary is ELF")
