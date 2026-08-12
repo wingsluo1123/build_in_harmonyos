@@ -55,6 +55,14 @@ class AllelecountConan(ConanFile):
         _env = dict(os.environ)
         _tool_paths = ["/data/service/hnp/bin", "/storage/Users/currentUser/usr/local/bin"]
         _env["PATH"] = ":".join(_tool_paths) + ":" + _env.get("PATH", "")
+        # CI worker 沙箱 loader 对 lld 的 $ORIGIN RUNPATH 解析失败, 导致
+        # lld 启动时加载 libxml2.so.16 失败 (Error loading shared library
+        # libxml2.so.16: needed by .../llvm/bin/lld)。显式把 SDK llvm/lib
+        # (含正确版本 libxml2.so.16) 加入 LD_LIBRARY_PATH 供 lld 加载。
+        _clang_real = os.path.realpath("/data/service/hnp/bin/clang")
+        _llvm_lib = os.path.join(os.path.dirname(os.path.dirname(_clang_real)), "lib")
+        if os.path.isdir(_llvm_lib):
+            _env["LD_LIBRARY_PATH"] = _llvm_lib + ":" + _env.get("LD_LIBRARY_PATH", "")
         hts = self.dependencies["htslib"]
         _hts_pkg = hts.package_folder
         _cc = "clang" if self.settings.compiler == "clang" else "gcc"
