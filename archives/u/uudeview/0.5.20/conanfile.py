@@ -21,6 +21,7 @@ class UudeviewConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = {"shared": False}
+    # uudeview's uulib only produces libuu.a; shared=True will still build static
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -39,15 +40,17 @@ class UudeviewConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # E165: Fix shebang for OHOS
-        if self.settings.os == "OHOS":
+        if self.settings.os in ("Linux", "OHOS"):
             self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' configure", cwd=self.source_folder)
             self.run("sed -i '1s|#!/bin/bash|#!/data/service/hnp/bin/bash|' configure", cwd=self.source_folder)
             self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' install-sh", cwd=self.source_folder)
         # uudeview's Makefile uses cd subdir; make, which breaks with
         # Conan's Autotools build-folder separation. Use self.run() directly.
-        self.run("./configure --prefix={} --disable-minews".format(
-            self.package_folder), cwd=self.source_folder)
-        self.run("make -j1", cwd=self.source_folder)
+        # Source conanbuild.sh to apply AutotoolsToolchain env (CFLAGS, --host, etc.)
+        build_info = os.path.join(self.generators_folder, "conanbuild.sh")
+        self.run(f". {build_info} && ./configure --prefix={self.package_folder} --disable-minews",
+                 cwd=self.source_folder)
+        self.run(f". {build_info} && make -j1", cwd=self.source_folder)
 
     def package(self):
         self.run("make install", cwd=self.source_folder)
