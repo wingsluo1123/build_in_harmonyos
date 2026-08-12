@@ -45,7 +45,8 @@ class AttrsConan(ConanFile):
         if not os.path.isdir(os.path.join(self.source_folder, "src", "attr")):
             raise ConanException("attr package directory not found in source")
         # Run upstream pytest subset (hypothesis-independent files) to report
-        # real pass rate (manager review: upstream attrs has ~48 pytest tests).
+        # real pass rate (manager review: upstream attrs has 547 pytest tests
+        # collected from 25 test_*.py files; hypothesis 无关子集 177 个用例).
         self._run_upstream_tests()
 
     def _run_upstream_tests(self):
