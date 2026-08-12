@@ -83,8 +83,16 @@ class FizmoConan(ConanFile):
         # --with-ncurses-includedir（configure 官方选项——错误消息明确
         # 提示 Try setting the location using --with-ncurses-includedir——
         # 与 --with-libxml2-includedir 一致的模式）
-        ncurses_inc = os.path.join(self.dependencies["ncurses"].package_folder, "include")
+        ncurses = self.dependencies["ncurses"]
+        ncurses_inc = os.path.join(ncurses.package_folder, "include")
+        ncurses_lib = os.path.join(ncurses.package_folder, "lib")
         tc.configure_args.append(f"--with-ncurses-includedir={ncurses_inc}")
+        # ncursesw 库检查（configure 硬编码路径 /usr/lib 等找不到
+        # libncursesw——CI #21052 报 Couldn't find libncursesw——
+        # --with-ncursesw-libdir 指向 ncurses 包 lib（错误消息明确提示
+        # You can set the location manually using --with-ncurses-libdir
+        # or --with-ncursesw-libdir）
+        tc.configure_args.append(f"--with-ncursesw-libdir={ncurses_lib}")
         # extra_cflags 保留（编译时用——覆盖 include/ 顶层 + include/ncursesw/
         # 两种布局——multitail 教训）
         tc.extra_cflags.append(f"-I{ncurses_inc}")
