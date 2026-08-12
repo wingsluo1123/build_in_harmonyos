@@ -61,7 +61,7 @@ class NasmConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        os.chmod(os.path.join(self.build_folder, "configure"), 0o755)
+        os.chmod(os.path.join(self.source_folder, "configure"), 0o755)
         autotools = Autotools(self)
         autotools.configure()
         autotools.make(args=["-j1"])
