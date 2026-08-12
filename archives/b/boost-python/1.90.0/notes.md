@@ -80,7 +80,20 @@
   普通头（Boost::headers）。eigenpy 侧可通过 CMAKE_PROJECT_INCLUDE 注入一行实现，不改上游源码。
 - 已实测：eigenpy 3.13.0 真实 CMake 配置（注入 find_package(boost_python)）+ 完整构建通过，
   libeigenpy.so NEEDED 含 libboost_python312.so。
+## OHOS ELF 签名（PR #5100 CI 修复，2026-08-12）
+
+- OHOS dlopen 强制要求 ELF code signature：未签名的 `test_ext.so` 在 test_package 的
+  Python import 阶段报 `ImportError: ... Permission denied`（CI 真实证据），本地 display-sign
+  与签名后 import 实验证实根因。
+- 修复：复用 boost/1.90.0.3 已验证的 OHOS 原子签名模式
+  （`llvm-objcopy --remove-section .codesign` + `binary-sign-tool sign -selfSign 1`，
+  临时副本 → 签名 → 恢复原权限 → 原子替换 → 清理）：
+  - 包内共享库：主 conanfile.py `package()` 完成所有文件复制后，对 `libboost_python312.so` 签名；
+  - 消费者扩展：test_package `test()` 在 `self.run()` 导入前，对 CMake 实际生成的
+    `test_ext.so` 签名。
+- 签名失败将导致 OHOS 构建/测试明确失败（`ConanInvalidConfiguration`），不静默忽略。
+- 测试断言数量保持不变（add(2,3)==5、add(-1,1)==0、greet() 字符串，共 3 项）。
 ---
 
-**编译结束**: 2026-08-12 08:51
+**编译结束**: 2026-08-12 11:58
 **最终状态**: built

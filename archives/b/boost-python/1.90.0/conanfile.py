@@ -256,6 +256,56 @@ class BoostPythonConan(ConanFile):
             src=py_inc,
             dst=os.path.join(self.package_folder, "include", "boost"),
         )
+        # OHOS dlopen 要求 ELF code signature：所有文件复制完成后，对包内共享库签名
+        self._sign_shared_libraries()
+
+    def _sign_shared_libraries(self):
+        if str(self.settings.os) != "OHOS" or not self.options.shared:
+            return
+
+        objcopy = self._find_ohos_tool("llvm-objcopy")
+        signer = self._find_ohos_tool("binary-sign-tool")
+        if not objcopy or not signer:
+            raise ConanInvalidConfiguration(
+                "OHOS package requires llvm-objcopy and binary-sign-tool "
+                "to sign shared libraries (dlopen enforces ELF code signature)."
+            )
+
+        libraries = glob.glob(
+            os.path.join(self.package_folder, "lib", "**", "*.so*"), recursive=True
+        )
+        for library in libraries:
+            if os.path.islink(library):
+                continue
+            self._sign_elf_atomically(library, objcopy, signer)
+
+    def _sign_elf_atomically(self, path, objcopy, signer):
+        original_mode = os.stat(path).st_mode
+        temporary = f"{path}.signing"
+        try:
+            shutil.copy2(path, temporary)
+            self.run(f'"{objcopy}" --remove-section .codesign "{temporary}"')
+            self.run(
+                f'"{signer}" sign -inFile "{temporary}" '
+                f'-outFile "{temporary}" -selfSign 1'
+            )
+            os.chmod(temporary, original_mode)
+            os.replace(temporary, path)
+        finally:
+            if os.path.exists(temporary):
+                os.remove(temporary)
+
+    def _find_ohos_tool(self, name):
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler_dir = os.path.dirname(compilers.get("cpp", ""))
+        candidates = [
+            os.path.join(compiler_dir, name) if compiler_dir else "",
+            os.path.join("/data/service/hnp/bin", name),
+            shutil.which(name) or "",
+        ]
+        return next((path for path in candidates if os.path.isfile(path)), "")
 
     def package_info(self):
         # 独立 cmake_file_name="boost_python"（实测：与 boost/1.90.0.3 共享
