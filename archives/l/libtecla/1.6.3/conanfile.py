@@ -50,27 +50,27 @@ class LibteclaConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # The upstream tarball's entries carry a "./" prefix, so conan's
+        # strip_root only strips "." and the sources land under
+        # <source_folder>/libtecla/. Flatten that nested dir so
+        # apply_conandata_patches() (base_path=source_folder) can find
+        # config.sub/config.guess at the source root.
+        nested_source = os.path.join(self.source_folder, "libtecla")
+        if os.path.exists(os.path.join(nested_source, "configure")):
+            for entry in os.listdir(nested_source):
+                shutil.move(os.path.join(nested_source, entry), self.source_folder)
+            os.rmdir(nested_source)
 
     def build(self):
         apply_conandata_patches(self)
         # The upstream tarball's entries carry a "./" prefix, so conan's
         # strip_root only strips "." and the sources land under
-        # <source_folder>/libtecla/. Resolve the real source root (the dir
-        # containing configure) and build there.
+        # <source_folder>/libtecla/. Flattening in source() moves them to the
+        # source root, so src resolves to source_folder itself. The bundled
+        # 2003-era config.guess/config.sub are patched (0001) to recognize
+        # the aarch64-linux-ohos triplet, and the triplets are pinned below
+        # so no build-type guess runs.
         src = self._src_root()
-        # libtecla bundles 2003-era config.guess/config.sub: they cannot
-        # recognize OHOS, and the old config.guess hits the OHOS temp-file
-        # quirk when probing the build type. Replace them with the modern
-        # automake scripts and pin the triplets so no build-type guess runs.
-        for f in ("config.guess", "config.sub"):
-            candidates = glob.glob(
-                "/storage/Users/currentUser/usr/local/share/automake-*/" + f
-            ) + glob.glob(
-                "/storage/Users/currentUser/usr/local/share/libtool/build-aux/" + f
-            )
-            if candidates:
-                shutil.copy(candidates[0], os.path.join(src, f))
-                os.chmod(os.path.join(src, f), 0o755)
         # umask 022: HMDFS rejects 700-mode temp dirs created by the build.
         # Regenerate configure with the modern autoconf: the bundled 2003-era
         # configure emits a config.status whose conf-dir machinery fails on
