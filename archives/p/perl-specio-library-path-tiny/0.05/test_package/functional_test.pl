@@ -10,6 +10,7 @@ use warnings;
 use utf8;
 binmode(STDOUT, ':utf8');
 binmode(STDERR, ':utf8');
+BEGIN { $ENV{SPECIO_IMPLEMENTATION} = 'PP' unless $ENV{SPECIO_IMPLEMENTATION}; }
 use Specio::Library::Path::Tiny;
 use Path::Tiny qw(path);
 use Scalar::Util qw(blessed);
@@ -78,7 +79,7 @@ section("3. Type validation - accept valid values");
 # Prepare test files and directories
 my $tmpdir = $ENV{TMPDIR} || ($ENV{HOME} ? "$ENV{HOME}/tmp" : '.');
 mkdir $tmpdir unless -d $tmpdir;
-my $test_base = Path::Tiny->new("$tmpdir/func_test_$>");
+my $test_base = Path::Tiny->new("$tmpdir/func_test_$$");
 $test_base->remove_tree if -d $test_base;
 $test_base->mkpath;
 

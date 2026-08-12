@@ -60,7 +60,7 @@ for entry in "${MODULES[@]}"; do
     fi
 
     echo "Building ${dirname}..." >&2
-    PERL5LIB="${LOCAL_PERL5}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" >&2
+    PERL5LIB="${LOCAL_PERL5}:${LOCAL_ARCH}" perl Makefile.PL INSTALL_BASE="${PERL_LIB}" >&2
     make -j1 >&2
     make install >&2
 done
