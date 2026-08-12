@@ -21,7 +21,7 @@ import sys
 
 from conan import ConanFile
 from conan.tools.build import load_toolchain_args
-from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get, replace_in_file, save
 from conan.tools.gnu import Autotools, AutotoolsDeps, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
 
@@ -96,14 +96,19 @@ class XapianBindingsConan(ConanFile):
         configure = os.path.join(self.source_folder, "configure")
         if os.path.isfile(configure):
             os.chmod(configure, 0o755)
-            # E009/E064: 在 CI 的 SELinux 域中，直接执行 conftest 会被拦截。
-            # 管道使子进程进入可执行 SDK/临时 ELF 的上下文；保留 bash 的
-            # PIPESTATUS 校验，避免把真实探测失败误报为成功。
+            # E064: CI 的 shell 直接执行 conftest 会被 SELinux 拦截；Python
+            # subprocess 在 OHOS 使用 posix_spawn，可执行相同 ELF 并保留其返回码。
+            conftest_runner = os.path.join(self.build_folder, "run_conftest.py")
+            save(
+                self,
+                conftest_runner,
+                "import subprocess\nimport sys\n\nresult = subprocess.run([sys.argv[1]])\nsys.exit(result.returncode)\n",
+            )
             replace_in_file(
                 self,
                 configure,
                 "ac_try='./conftest$ac_cv_exeext'",
-                "ac_try='./conftest$ac_cv_exeext | cat; test ${PIPESTATUS[0]} -eq 0'",
+                f"ac_try='\"{python_exe}\" \"{conftest_runner}\" \"./conftest$ac_cv_exeext\"'",
             )
 
         configure_args = self._load_configure_args()
@@ -176,6 +181,8 @@ class XapianBindingsConan(ConanFile):
         self.run("make -C python3 _xapian.la", cwd=self.source_folder)
         # 生成 xapian/__init__.py（BUILT_SOURCES 产物）
         self.run("make -C python3 xapian/__init__.py", cwd=self.source_folder)
+        # 上游 Python 绑定测试：smoketest.py + pythontest.py。
+        self.run("make -C python3 check", cwd=self.source_folder)
 
     def package(self):
         # 将绑定安装到 package_folder 下的 python site-packages
