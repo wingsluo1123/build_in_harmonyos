@@ -7,6 +7,11 @@ class ProgressTestConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     test_type = "explicit"
 
+    def requirements(self):
+        # conan 2 的 test_package 需声明被测试的包（CI #22130 报
+        # doesn't declare any requirement——use self.tested_reference_str）
+        self.requires(self.tested_reference_str)
+
     def test(self):
         pr = self.dependencies["progress"]
         # progress 安装到 usr/bin（make install PREFIX=/usr）
