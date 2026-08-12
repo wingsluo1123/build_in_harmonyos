@@ -1,0 +1,112 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E256.kv，填写各字段
+# 对应的人类文档: doc/E256.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id: E256
+trigger_tool: python|pytest|git
+phase: testing|runtime
+error_signature: fatal: detected dubious ownership in repository at|dubious ownership|The temporary directory.*not owned by the current user|pytest-of-.*not owned|FileNotFoundError.*No such file or directory.*git
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签 (自由文本, 用于分组过滤)
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity: 2
+category: ohos|uid-mapping|test-driver|git|pytest
+match_keywords: dubious ownership, safe.directory, basetemp, uid mapping, 挂载层, pytest 临时目录, st_uid, euid, wrapper
+title: OpenHarmony 挂载层 UID 映射导致 Git dubious ownership 与 pytest 临时目录所有权失败（测试驱动合规恢复）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: OpenHarmony 真机挂载层 UID 映射导致文件系统 st_uid（20001006）与测试进程 euid（20020084）不一致；Git 2.45.2 的 safe.directory 安全检查拒绝 dubious ownership 仓库（仅接受精确路径或 *，不支持 glob/前缀）；pytest tmpdir 工厂校验 st_uid!=euid 报临时目录所有权错误；OHOS Python posix_spawn 对相对路径命令不执行 PATH 查找
+affected_scope: OpenHarmony 挂载目录上所有生成临时 Git 仓库的 Python/pytest 测试套件；使用 tmp_path/tmpdir fixture 的测试；其他存在相同 UID 映射问题的 CI/真机环境
+verification_cmd: GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1 PATH=<wrapper>/bin:$PATH pytest <targets> --basetemp=<固定受控目录> -p no:cacheprovider
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: scoped-safe-directory-wrapper-plus-basetemp
+rec_description: 仓库外测试驱动层合规恢复：(1) 临时 git wrapper 解析 cwd/-C/--git-dir 得到实际仓库绝对路径，仅注入精确 safe.directory（禁 safe.directory=*、不写全局配置、不信任整个文件系统）；(2) 显式固定受控 --basetemp 规避 pytest tmpdir 所有权检查；(3) 隔离 HOME/XDG（不修改 TMPDIR/cwd）；(4) OHOS posix_spawn 不查 PATH 时用受控 sitecustomize 回退 fork+execvp。仅测试进程生效，测试后清理。
+rec_command: export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1; export PATH="$HOME/<wrapper>/bin:$PATH"; export HOME="$HOME/<iso-home>"; pytest <targets> --basetemp="$HOME/<basetemp>" -p no:cacheprovider
+rec_auto_fix: false
+rec_impl: manual
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern: safe\.directory\s*=\s*\*
+forbid_1_reason: 使用 safe.directory=* 信任整个文件系统，违反安全边界
+forbid_1_consequence: 削弱 Git 仓库所有权保护，审核拒绝
+forbid_2_pattern: git config --global (add|--add) safe\.directory
+forbid_2_reason: 修改全局 Git 配置，污染执行机环境
+forbid_2_consequence: 影响其他项目与用户，审核拒绝
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes:                 []
+caused_by:              []
+similar_to:             ["E101"]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file: doc/E256.md
+last_updated: 2026-08-12
+source_event:           # 触发此条目创建的编译事件(如有)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: E16F

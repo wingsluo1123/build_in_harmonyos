@@ -1,0 +1,93 @@
+# 版本级 manifest — aider 0.86.2
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.86.2"
+software: "aider"
+
+# 编译状态
+# published | built | failed | archived
+# status 语义说明（提交前纠偏审计）：
+# - built 仅表示 Conan 构建/验证结果（conan-verify 本轮 PASS、test_package 31/31），与既有样例 portaudio=built 一致；
+# - finish 未执行（.finish-state.json 缺失），本 status 不作为 finish 成功证据；
+# - 默认核心测试 test_voice 5 个仍失败（portaudio/libsndfile 制品不可安装）；
+# - 不得视为正式适配完成；仅当 finish 成功后才可由 finish 流程改写状态。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-11"
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitHub tag tarball）
+  url: "https://github.com/Aider-AI/aider/archive/refs/tags/v0.86.2.tar.gz"
+
+  # 源码校验和（2026-08-11 实测下载核对）
+  sha256: "1c5ccaac6778482b4f44bb8f105103e47c2b862e37fe5c092d3433344c648a24"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: custom
+
+  configure_options: []
+
+  # Conan 编译依赖列表（Python 依赖经 PyPI 社区源安装，非 Conan 制品）
+  dependencies: []
+
+  # 编译器（纯 Python，无 C/C++ 编译；PEP 517 构建需 clang）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-requirements-ohos-rebase.patch：requirements.txt 与 requirements/requirements-help.txt 共 16 项依赖 pin 重基（aiohttp 3.13.3→3.14.0 等），scipy 1.18.0 违反上游 scipy<1.16 显式约束"
+
+# ============================================================
+# 测试结果（上游测试与 test_package 分开统计）
+# ============================================================
+
+test_results:
+  # 上游测试（最终统一驱动：精确 safe.directory wrapper + 固定 --basetemp + 隔离 HOME/XDG + sitecustomize）
+  upstream:
+    collected: 489
+    passed: 482
+    failed: 4
+    skipped: 1
+    errors: 0
+    timeout: 2
+    # failed 组成：scrape 4（playwright 社区源无包，optional-extra）
+    # timeout 组成：help 1（test_ask_without_mock，help extra numpy<2 与重基 numpy 2.5.1 冲突，optional-extra）+ scrape 1（install_playwright 挂起，optional-extra）
+    # 备注：Git dubious ownership 43 + pytest 临时目录 6 已由测试驱动层修复（知识条目 E256 draft）
+    # 备注：test_voice 5 个默认核心测试已通过（portaudio 19.7.0 经 cmd-pkgs 预编译包安装至测试前缀；libsndfile 由 soundfile wheel 内置）
+  test_package:
+    total: 31
+    passed: 31
+    failed: 0
+    # 含 16 项依赖重基 0 mismatch 断言 + 离线核心工作流（--version/--list-models gpt-4/--help）+ 资源归属
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "PEP 517 构建子进程需显式 PATH 与 CC（clang），否则报 No such file or directory: 'clang'"
+  - "社区源 pypi.cnb.cool 缺少上游锁定精确版本（16 个 pin），采用 OHOS 依赖重基（requirements-ohos.txt 配方输入）"
+  - "tree-sitter==0.25.2 与 tree-sitter-language-pack==0.13.0 可从社区源 sdist 显式 clang 构建"
+  - "OHOS 挂载层 UID 映射导致 git dubious ownership 与 pytest 临时目录所有权失败，测试驱动层精确 wrapper+--basetemp 合规修复（E217）"

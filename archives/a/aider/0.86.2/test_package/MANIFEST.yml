@@ -1,0 +1,25 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: aider/0.86.2
+homepage: "https://github.com/Aider-AI/aider"
+
+# 上游默认 pytest 入口（pytest.ini testpaths = tests/basic, tests/help, tests/browser, tests/scrape）。
+upstream_check_command: "pytest --collect-only"
+upstream_test_in_build: false
+upstream_test_command: "pytest"
+
+# 上游测试统计（最终统一驱动，见 notes.md）：489 = 477 passed + 9 failed + 1 skipped + 0 errors + 2 timeout
+# failed: test_voice 5（音频外部依赖）+ scrape 4（playwright 缺失）；timeout: help 1 + scrape 1（optional-extra 依赖安装挂起）
+
+# 消费者测试：真实断言 31 项（含 16 项依赖重基 0 mismatch 断言 + 离线核心工作流）
+supplementary_tests:
+  - file: test_package/test_aider.py
+    count: 31
+    description: >-
+      1) aider 包可导入且版本匹配 0.86.2；
+      2) CLI 入口（bin/aider 存在）与 --version；
+      3) 离线核心工作流 --list-models gpt-4 / --help（无 LLM 密钥/公网）；
+      4) 安装后入口与资源文件来自被测包（site-packages 中 aider/ 与子包存在）；
+      5) 依赖元数据一致性：16 项 OHOS 重基依赖 declared==installed（0 mismatch）。
