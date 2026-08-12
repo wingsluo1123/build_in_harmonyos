@@ -1,5 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe — kalign 3.5.1 (CMake).
+
+Kalign is a fast and accurate multiple sequence alignment tool.
+"""
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy, rmdir
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, rmdir
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 import os
 
@@ -27,11 +32,11 @@ class KalignConan(ConanFile):
     def export_sources(self):
         export_conandata_patches(self)
 
-    def layout(self):
-        cmake_layout(self)
-
     def requirements(self):
         pass
+
+    def layout(self):
+        cmake_layout(self)
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
