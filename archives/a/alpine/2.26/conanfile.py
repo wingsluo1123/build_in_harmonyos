@@ -40,10 +40,12 @@ class AlpineConan(ConanFile):
              f"--build={triplet}", f"--host={triplet}"])
         # configure 的 terminfo 检查（setupterm in -lncurses 等 -l 链接测试）
         # 需要 -L ncurses 包 lib 路径（CI #17674 报 Terminfo/termcap not found）——
-        # LDFLAGS/CPPFLAGS 指向 ncurses 包（configure 链接测试继承）
+        # LDFLAGS/CFLAGS 指向 ncurses 包（configure 链接测试继承）。
+        # 注意：AutotoolsToolchain 无 extra_cppflags 属性（CI #21036 实测
+        # AttributeError——与 fizmo #20735 相同），改用 extra_cflags
         ncurses = self.dependencies["ncurses"]
         tc.extra_ldflags.append(f"-L{os.path.join(ncurses.package_folder, 'lib')}")
-        tc.extra_cppflags.append(f"-I{os.path.join(ncurses.package_folder, 'include')}")
+        tc.extra_cflags.append(f"-I{os.path.join(ncurses.package_folder, 'include')}")
         tc.generate()
         # 依赖包（ncurses/openssl）的 pkg-config 路径
         from conan.tools.env import Environment
