@@ -74,8 +74,8 @@ pre-main 生命周期、HarmonyOS 目标端 ELF 签名和完整上游 CMocka 套
 - 复用 E077：ELF 修改后移除旧 `.codesign` 并重新签名。
 - 复用 E200：在 HarmonyOS/musl 上以真实 consumer 验证 `LD_PRELOAD`。
 - 复用 E223 draft：将 Conan 精确依赖路径桥接给上游 CMake legacy 查找。
-- 新增 `knowledge/graph/draft/DRAFT-pam-wrapper-ctest-elf-runtime-closure.{kv,md}`。
-- 新增 `knowledge/graph/draft/DRAFT-pam-wrapper-preload-startup-context.{kv,md}`。
+- 新增 `knowledge/drafts/DRAFT-pam-wrapper-ctest-elf-runtime-closure.{kv,md}`。
+- 新增 `knowledge/drafts/DRAFT-pam-wrapper-preload-startup-context.{kv,md}`。
 
 两个新增草稿分别记录 CTest 前构建树完整 ELF 加载闭包的签名边界，以及 preload
 库在 `main()` 前捕获配置时必须由 launcher 预创建夹具、在 `exec` 环境一次性

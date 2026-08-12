@@ -36,8 +36,8 @@ CONAN_REMOTE_NAME="${CONAN_REMOTE_NAME:-ohpcd}"
 SCAN_ROOT="${PKG_SCAN_ROOT:-archives}"
 NO_TEST_FILE="$REPO_ROOT/ci/config/no_official_test.txt"
 BUILD_TIMEOUT_CONFIG="$REPO_ROOT/ci/config/build_timeouts.txt"
-DEFAULT_BUILD_TIMEOUT=2700
-MAX_BUILD_TIMEOUT=10800
+DEFAULT_BUILD_TIMEOUT=3600
+MAX_BUILD_TIMEOUT=14400
 TIMEOUT_CLOCK_TOLERANCE=1
 
 validate_build_timeout_config() {
@@ -117,6 +117,7 @@ if (( ${+CI_PACKAGES} )) \
     echo "  Total:   0"
     echo "  Success: 0"
     echo "  Failed:  0"
+    echo "  Pass rate: N/A (0 packages)"
     echo "[step] No Conan packages to build"
     exit 0
 fi
@@ -332,23 +333,34 @@ for pkg_dir in "${PACKAGES[@]}"; do
     # 从 conanfile.py 中提取 requires/requirements 声明的依赖, 验证是否已发布
     # R36: 依赖必须先发布到制品仓
     if [ -f "$CONANFILE" ]; then
-        # 提取所有依赖引用
-        DEP_REFS=$(python3 - "$CONANFILE" 2>/dev/null <<'PYEOF'
-import re, sys
+        # 提取所有依赖引用（使用 AST 解析，避免误匹配 docstring 中的文本）
+        DEP_REFS=$(python3 - "$CONANFILE" "${pkg_name:-}" "${pkg_ver:-}" 2>/dev/null <<'PYEOF'
+import ast, sys
 src = open(sys.argv[1]).read()
+self_name = sys.argv[2] if len(sys.argv) > 2 else ""
+self_ver = sys.argv[3] if len(sys.argv) > 3 else ""
+self_ref = f"{self_name}/{self_ver}" if self_name and self_ver else ""
 refs = set()
-for m in re.finditer(r'(?:self\.)?requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]  # 兼容性: 去掉可能的 @user/channel 后缀
-    refs.add(ref)
-for m in re.finditer(r'tool_requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]
-    refs.add(ref)
+tree = ast.parse(src)
+for node in ast.walk(tree):
+    # 匹配 requires("dep/version") 和 tool_requires("dep/version") 调用
+    if isinstance(node, ast.Call):
+        func_name = ""
+        if isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        if func_name in ("requires", "tool_requires", "build_requires"):
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    ref = arg.value.strip()
+                    if "/" not in ref:
+                        continue
+                    ref = ref.split("@")[0]
+                    # 排除包自身引用
+                    if self_ref and ref == self_ref:
+                        continue
+                    refs.add(ref)
 for r in sorted(refs):
     print(r)
 PYEOF
@@ -567,21 +579,86 @@ PYEOF
     # PR 分支名必须包含 {pkg_name}-{pkg_ver}（如 feat/jsmn-1.1.0 包含 jsmn-1.1.0）
     # 不做分支名分割，直接拼接已知值做包含检查，避免包名含 '-' 导致歧义
     # REL 构建或 main/master/server 分支自动跳过
-    # ⚠️ 当前为提示模式（warn-only），2026-07-29 后改为强制失败
+    # PR > 5200: 强制失败（报错）; PR <= 5200: 仅告警（历史 PR 宽容）
     if [ -n "${CI_BRANCH:-}" ] && [ "${CI_BRANCH}" != "main" ] \
        && [ "${CI_BRANCH}" != "master" ] && [ "${CI_BRANCH}" != "server" ]; then
         echo "[step] L0n: Checking branch name matches package (R40)..."
         EXPECTED_TAG="${pkg_name}-${pkg_ver}"
-        if echo "${CI_BRANCH}" | grep -q -- "${EXPECTED_TAG}"; then
+        # 归一化：将 + 替换为 - 后比较（Debian 风格版本后缀如 1.4+dfsg.1 → 1.4-dfsg.1）
+        EXPECTED_TAG_NORM=$(echo "${EXPECTED_TAG}" | tr '+' '-')
+        BRANCH_NORM=$(echo "${CI_BRANCH}" | tr '+' '-')
+        if echo "${BRANCH_NORM}" | grep -q -- "${EXPECTED_TAG_NORM}"; then
             echo "        [ok] L0n: branch '${CI_BRANCH}' contains '${EXPECTED_TAG}'"
         else
-            echo "[warn] L0n: branch name mismatch (R40) — 当前仅提示，不阻断构建"
-            echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
-            echo "[hint] 分支名应包含 包名-版本号，例如："
-            echo "         feat/${pkg_name}-${pkg_ver}"
-            echo "         fix/${pkg_name}-${pkg_ver}"
-            echo "         ${pkg_name}-${pkg_ver}"
-            echo "[hint] ⚠️ 2026-07-29 起此检查将升级为强制失败，请尽快修改分支名"
+            # PR > 5200 强制失败, PR <= 5200 仅告警
+            _pr_num="${CI_PR_NUMBER:-0}"
+            if [ "${_pr_num}" -gt 5200 ] 2>/dev/null; then
+                echo "[error] L0n: branch name mismatch (R40) — 分支名不包含 包名-版本号"
+                echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
+                echo "[hint] 分支名应包含 包名-版本号，例如："
+                echo "         feat/${pkg_name}-${pkg_ver}"
+                echo "         fix/${pkg_name}-${pkg_ver}"
+                echo "         ${pkg_name}-${pkg_ver}"
+                L0_FAILED=true
+                L0_ERRORS="${L0_ERRORS} branch_name_r40"
+            else
+                echo "[warn] L0n: branch name mismatch (R40) — PR #${_pr_num} <= 5200, 仅告警不拦截"
+                echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
+                echo "[hint] 分支名应包含 包名-版本号，例如："
+                echo "         feat/${pkg_name}-${pkg_ver}"
+            fi
+        fi
+    fi
+
+    # L0o: 禁止使用外部网络命令下载源码 (防 uses_external_curl)
+    # conanfile.py 的 build() 方法禁止调用 curl/wget 下载
+    if [ -f "$CONANFILE" ]; then
+        EXT_CURL=$(grep -nE '(subprocess|os\.system).*?(curl|wget)|"curl"|"wget"|'"'"'curl'"'"'|'"'"'wget'"'"'' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.\|conan_data\|self\.run\|#.*curl\|#.*wget' || true)
+        if [ -n "$EXT_CURL" ]; then
+            echo "[fail] L0o: conanfile.py 使用外部命令 (curl/wget) 下载源码 — CI 环境可能无 curl"
+            echo "       ${EXT_CURL%%$'\n'*}"
+            echo "[hint] 必须用 self.conan_data 或 tools.files.get() 下载源码"
+            L0_FAILED=true
+            L0_ERRORS="${L0_ERRORS} uses_external_curl"
+        fi
+    fi
+
+    # L0p: settings 必须包含 os/compiler/build_type/arch 四项 (防 profile 不兼容)
+    if [ -f "$CONANFILE" ]; then
+        SETTINGS_LINE=$(grep -E '^\s*settings\s*=' "$CONANFILE" 2>/dev/null | head -1 || true)
+        if [ -n "$SETTINGS_LINE" ]; then
+            for req in "os" "compiler" "build_type" "arch"; do
+                if ! echo "$SETTINGS_LINE" | grep -q "\"$req\"\|'$req'\|\b${req}\b"; then
+                    echo "[fail] L0p: settings 缺少 '$req' — OHOS profile 需要全部四项"
+                    echo "       当前: ${SETTINGS_LINE}"
+                    echo "[hint] settings = \"os\", \"compiler\", \"build_type\", \"arch\""
+                    L0_FAILED=true
+                    L0_ERRORS="${L0_ERRORS} missing_setting_${req}"
+                fi
+            done
+        fi
+    fi
+
+    # L0q: exports_sources 必须包含 conanfile.py 和 patches/ (防 recipe_not_exported)
+    if [ -f "$CONANFILE" ]; then
+        # 只在 conanfile.py 引用了 patches 时检查
+        if grep -q 'patches/' "$CONANFILE" 2>/dev/null || [ -d "$pkg_dir/patches" ]; then
+            ES_LINE=$(grep -E '^\s*exports_sources\s*=' "$CONANFILE" 2>/dev/null | head -1 || true)
+            if [ -n "$ES_LINE" ]; then
+                # 检查是否包含通配符 *（涵盖 patches/）
+                if ! echo "$ES_LINE" | grep -q '\*' 2>/dev/null; then
+                    # 没有通配符，检查是否显式包含 patches
+                    if [ -d "$pkg_dir/patches" ]; then
+                        PATCH_COUNT=$(find "$pkg_dir/patches" -name '*.patch' -o -name '*.diff' 2>/dev/null | wc -l)
+                        if [ "$PATCH_COUNT" -gt 0 ] && ! echo "$ES_LINE" | grep -qi 'patch' 2>/dev/null; then
+                            echo "[warn] L0q: exports_sources 可能未包含 patches/ — conan create 导出时可能丢失补丁"
+                            echo "       exports_sources: ${ES_LINE}"
+                            echo "       patches/ 目录有 ${PATCH_COUNT} 个补丁文件"
+                            echo "[hint] exports_sources 应包含补丁文件，或使用通配符"
+                        fi
+                    fi
+                fi
+            fi
         fi
     fi
 
@@ -603,13 +680,60 @@ PYEOF
     L0_RESULT="pass"
     L0_DETAIL="all checks passed"
 
+    # ── Knowledge graph quality check (KC) ──
+    # 运行知识库质量门禁（纯 shell，CI-safe）
+    # 检查草稿泄漏、模板占位符、auto_fix 格式、非标准字段、index 一致性
+    if [ -f "${REPO_ROOT}/ci/scripts/knowledge_check.sh" ]; then
+        echo ""
+        echo "[step] KC: Knowledge graph quality check..."
+        if bash "${REPO_ROOT}/ci/scripts/knowledge_check.sh" "${REPO_ROOT}" 2>&1; then
+            echo "        [ok] KC: knowledge check passed"
+        else
+            echo "[fail] KC: knowledge check failed — blocking build"
+            L0_RESULT="fail"
+            L0_DETAIL="knowledge_check failed"
+            echo "L0_RESULT=${L0_RESULT}: ${L0_DETAIL}"
+            echo "L1_RESULT=skip: blocked_by_KC"
+            echo "L2_RESULT=skip: blocked_by_KC"
+            echo "L4_RESULT=skip: blocked_by_KC"
+            echo "L5_RESULT=skip: blocked_by_KC"
+            FAILED=$((FAILED + 1))
+            FAILED_PKGS+=("${pkg_name}/${pkg_ver} (KC gate)")
+            continue
+        fi
+    fi
+
+    # ── Junk file check (JC) ──
+    # 拦截运行时状态文件、二进制产物、源码 tarball、临时构建产物
+    if [ -f "${REPO_ROOT}/ci/scripts/junk_check.sh" ]; then
+        echo ""
+        echo "[step] JC: Junk file check..."
+        if bash "${REPO_ROOT}/ci/scripts/junk_check.sh" "${REPO_ROOT}" 2>&1; then
+            echo "        [ok] JC: no junk files detected"
+        else
+            echo "[fail] JC: junk files detected — blocking build"
+            L0_RESULT="fail"
+            L0_DETAIL="junk_check failed"
+            echo "L0_RESULT=${L0_RESULT}: ${L0_DETAIL}"
+            echo "L1_RESULT=skip: blocked_by_JC"
+            echo "L2_RESULT=skip: blocked_by_JC"
+            echo "L4_RESULT=skip: blocked_by_JC"
+            echo "L5_RESULT=skip: blocked_by_JC"
+            FAILED=$((FAILED + 1))
+            FAILED_PKGS+=("${pkg_name}/${pkg_ver} (JC gate)")
+            continue
+        fi
+    fi
+
     # ── Mirror fallback (通用镜像映射) ──
     # 将 conandata.yml 中已知域名的 url 从单值改为列表, 自动加上镜像源 fallback
     # Conan 2.x 的 get() 支持 url 列表, 会逐个尝试直到成功
     # 支持: github.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
-    # 支持: archives.boost.io, github.com, ftpmirror.gnu.org, ftp.gnu.org, download.savannah.gnu.org
+    # 支持: archives.boost.io, download.gnome.org, gitlab.gnome.org, cdn.kernel.org
+    # 支持: files.pythonhosted.org, release-assets.githubusercontent.com
+    # 支持: sourceforge.net, bbuseruploads.s3.amazonaws.com, curl.se
     if [ -f "$CONANDATA" ]; then
-        if grep -qE 'url:.*https://(archives\.boost\.io|github\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org)/' "$CONANDATA" 2>/dev/null; then
+        if grep -qE 'url:.*https://(archives\.boost\.io|github\.com|ftpmirror\.gnu\.org|ftp\.gnu\.org|download\.savannah\.gnu\.org|download\.gnome\.org|gitlab\.gnome\.org|cdn\.kernel\.org|files\.pythonhosted\.org|release-assets\.githubusercontent\.com|[a-z0-9.-]+\.dl\.sourceforge\.net|sourceforge\.net|bbuseruploads\.s3\.amazonaws\.com|curl\.se|ftp\.jaist\.ac\.jp)/' "$CONANDATA" 2>/dev/null; then
             echo "[step] Mirror fallback: rewriting source URLs in conandata.yml..."
             cp "$CONANDATA" "${CONANDATA}.orig" 2>/dev/null
 
@@ -630,14 +754,11 @@ def get_mirrors(url):
         sf = f'https://downloads.sourceforge.net/project/boost/boost/{ver}/{fn}'
         return [sf, url]
     # ── GitHub ──
+    # 实测（2026-08-06）：仅 gh-proxy.com 可用（412KB/s），其余全部失效
+    # github.com 直连可用但极慢（19KB/s），作为最后兜底
     if re.match(r'^https?://github\.com/', url):
         return [
             'https://gh-proxy.com/' + url,
-            'https://mirror.ghproxy.com/' + url,
-            'https://ghproxy.com/' + url,
-            'https://gitclone.com/' + url[len('https://'):],
-            'https://moeyy.cn/gh-proxy/' + url,
-            url.replace('https://github.com', 'https://kkgithub.com'),
             url,
         ]
     # ── GNU (ftpmirror.gnu.org) ──
@@ -666,6 +787,53 @@ def get_mirrors(url):
             'https://mirrors.tuna.tsinghua.edu.cn/savannah/' + p,
             url,
         ]
+    # ── GNOME (download.gnome.org) ──
+    if re.match(r'^https?://download\.gnome\.org/', url):
+        p = re.sub(r'^https?://download\.gnome\.org/', '', url)
+        return [
+            'https://mirrors.ustc.edu.cn/gnome/' + p,
+            'https://mirrors.tuna.tsinghua.edu.cn/gnome/' + p,
+            'https://mirror.nju.edu.cn/gnome/' + p,
+            url,
+        ]
+    # ── GNOME GitLab (gitlab.gnome.org) — GitHub proxy 兼容 ──
+    if re.match(r'^https?://gitlab\.gnome\.org/', url):
+        return [
+            url,
+        ]
+    # ── kernel.org CDN (cdn.kernel.org / cdn.kernel.org/pub/linux/kernel/) ──
+    if re.match(r'^https?://cdn\.kernel\.org/', url):
+        p = re.sub(r'^https?://cdn\.kernel\.org/', '', url)
+        return [
+            'https://mirrors.ustc.edu.cn/kernel.org/' + p,
+            'https://mirrors.tuna.tsinghua.edu.cn/' + p,
+            'https://mirror.nju.edu.cn/' + p,
+            url,
+        ]
+    # ── Python packages (files.pythonhosted.org) ──
+    # conandata.yml 不太可能引用这里, 但以防万一
+    if re.match(r'^https?://files\.pythonhosted\.org/', url):
+        return [
+            url,
+        ]
+    # ── GitHub release assets (release-assets.githubusercontent.com) ──
+    if re.match(r'^https?://[^/]*release-assets\.githubusercontent\.com/', url):
+        return [
+            'https://gh-proxy.com/' + url,
+            'https://mirror.ghproxy.com/' + url,
+            url,
+        ]
+    # ── SourceForge ──
+    if re.match(r'^https?://(downloads\.|[^/]*\.dl\.)?sourceforge\.net/', url):
+        # SourceForge 国内有镜像但 URL 结构不同, 保留原始 URL + 加一个 downloads URL
+        return [
+            url,
+        ]
+    # ── curl.se (原 haxx.se) ──
+    if re.match(r'^https?://curl\.se/', url):
+        return [
+            url,
+        ]
     # ── 无匹配镜像 ──
     return [url]
 
@@ -690,6 +858,125 @@ PYEOF
 
             echo "        [ok] Source URLs rewritten with mirror fallback"
         fi
+    fi
+
+    # ── Pre-download source archives with retry ──
+    # Conan get() 对每个 URL 只试一次。如果 gh-proxy.com 和 github.com 同时不可达,
+    # 构建直接失败。这里在 conan build 之前先提取所有源码 URL,
+    # 用 curl --retry 下载到本地, 然后把 conandata.yml 改为 file:// 路径。
+    if [ -f "$CONANDATA" ]; then
+        echo "[step] Pre-download: extracting source URLs from conandata.yml..."
+
+        # 创建预下载缓存目录
+        BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/.build-cache}"
+        PREDL_DIR="${BUILD_DIR}/predl_cache"
+        mkdir -p "$PREDL_DIR"
+
+        python3 - "$CONANDATA" "$PREDL_DIR" <<'PYEOF'
+import re, sys, os, hashlib, subprocess
+
+conandata_path = sys.argv[1]
+predl_dir = sys.argv[2]
+
+with open(conandata_path, 'r') as f:
+    raw = f.read()
+
+# 解析所有 URL（包括已改写为列表的）
+# 匹配: url: https://... 或 - https://...
+url_pattern = r'(?:^|\s)(?:url:?\s*)?["\']?-?\s*(https?://[^\s"\'-]+)'
+urls = re.findall(url_pattern, raw, re.MULTILINE)
+# 去重
+urls = list(dict.fromkeys(urls))
+
+if not urls:
+    print("  no URLs found in conandata.yml")
+    sys.exit(0)
+
+print(f"  found {len(urls)} source URL(s)")
+
+def get_mirror_list(url):
+    """返回镜像列表（和 build_and_test.sh get_mirrors 一致）。"""
+    mirrors = []
+    if re.match(r'^https?://github\.com/', url):
+        mirrors = ['https://gh-proxy.com/' + url, url]
+    elif re.match(r'^https?://[^/]*release-assets\.githubusercontent\.com/', url):
+        mirrors = ['https://gh-proxy.com/' + url, url]
+    elif re.match(r'^https?://ftpmirror\.gnu\.org/', url):
+        p = re.sub(r'^https?://ftpmirror\.gnu\.org/', '', url)
+        mirrors = [f'https://mirrors.tuna.tsinghua.edu.cn/{p}',
+                   f'https://mirrors.ustc.edu.cn/{p}',
+                   f'https://mirrors.aliyun.com/{p}', url]
+    elif re.match(r'^https?://download\.gnome\.org/', url):
+        p = re.sub(r'^https?://download\.gnome\.org/', '', url)
+        mirrors = [f'https://mirrors.ustc.edu.cn/gnome/{p}',
+                   f'https://mirrors.tuna.tsinghua.edu.cn/gnome/{p}',
+                   f'https://mirror.nju.edu.cn/gnome/{p}', url]
+    elif re.match(r'^https?://cdn\.kernel\.org/', url):
+        p = re.sub(r'^https?://cdn\.kernel\.org/', '', url)
+        mirrors = [f'https://mirrors.ustc.edu.cn/kernel.org/{p}',
+                   f'https://mirrors.tuna.tsinghua.edu.cn/{p}', url]
+    else:
+        mirrors = [url]
+    return mirrors
+
+downloaded = {}
+for url in urls:
+    # 文件名用 URL 的 hash 防冲突
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+    filename = url.split('/')[-1] or f'source_{url_hash}'
+    if '?' in filename:
+        filename = filename.split('?')[0]
+    dest = os.path.join(predl_dir, f'{url_hash}_{filename}')
+
+    if os.path.exists(dest) and os.path.getsize(dest) > 100:
+        print(f"  [cached] {filename} ({os.path.getsize(dest)//1024}KB)")
+        downloaded[url] = dest
+        continue
+
+    mirrors = get_mirror_list(url)
+    success = False
+    for i, mirror_url in enumerate(mirrors):
+        # 每个镜像试 3 次
+        for attempt in range(1, 4):
+            print(f"  [try {i+1}/{len(mirrors)}.{attempt}/3] {filename} ← {mirror_url[:80]}...")
+            try:
+                result = subprocess.run(
+                    ['curl', '-sL', '--retry', '3', '--retry-delay', '10',
+                     '--connect-timeout', '30', '--max-time', '300',
+                     '-o', dest, '-w', '%{http_code}:%{size_download}',
+                     mirror_url],
+                    capture_output=True, text=True, timeout=360
+                )
+                size = os.path.getsize(dest) if os.path.exists(dest) else 0
+                if size > 100:
+                    print(f"  [ok] {filename} ({size//1024}KB) via mirror {i+1}")
+                    downloaded[url] = dest
+                    success = True
+                    break
+                else:
+                    print(f"  [fail] size={size}, http={result.stdout[-3:]}")
+            except Exception as e:
+                print(f"  [fail] {str(e)[:60]}")
+        if success:
+            break
+
+    if not success:
+        print(f"  [WARN] Failed to pre-download {filename}, will rely on conan's download")
+
+if downloaded:
+    # 把 conandata.yml 里的远程 URL 替换为 file:// 本地路径
+    with open(conandata_path, 'r') as f:
+        content = f.read()
+
+    for url, local_path in downloaded.items():
+        content = content.replace(url, f'file://{local_path}')
+
+    with open(conandata_path, 'w') as f:
+        f.write(content)
+    print(f"  [done] Pre-downloaded {len(downloaded)} files, conandata.yml updated to file:// URLs")
+else:
+    print("  [done] No files pre-downloaded")
+PYEOF
     fi
 
     # ── Conf compatibility patch (conan 2.29.1 兼容层) ──
@@ -931,6 +1218,69 @@ PYEOF
             done
         fi
 
+        # ── L5: SONAME 质量门禁 (防 IMPORTED_NO_SONAME + DT_SONAME 缺失) ──
+        # 三条规则（基于 SONAME 存量扫描报告，覆盖 23 个已知缺陷）：
+        # L5a: 可链接共享库必须有 DT_SONAME 且为相对路径
+        # L5b: DT_NEEDED 条目禁止绝对路径或 ../ 开头
+        # L5c: 包内 *.cmake 禁止 IMPORTED_NO_SONAME.*TRUE
+        if [ -n "$PKG_CACHE" ] && [ -d "$PKG_CACHE" ]; then
+            L5_SONAME_ERRS=0
+
+            # L5a+L5b: ELF 扫描（仅 lib/ 一级目录，排除插件子目录）
+            if [ -n "$LIBS" ] && [ -d "$LIBS" ]; then
+                for so_file in "$LIBS"/lib*.so(N); do
+                    [ -f "$so_file" ] || continue
+                    # 排除插件：在 lib/ 子目录中（lib/plugins/, lib/modules/ 等）的不检查
+                    so_dir="${so_file:h}"
+                    if [ "$so_dir" != "$LIBS" ]; then
+                        continue
+                    fi
+
+                    so_basename="${so_file:t}"
+                    # 跳过 INTERFACE 库的空 stub .so（极少数情况）
+                    [ ! -s "$so_file" ] && continue
+
+                    # readelf -d 提取 SONAME 和 NEEDED
+                    ELF_INFO=$(readelf -d "$so_file" 2>/dev/null || true)
+
+                    # L5a: 检查 DT_SONAME
+                    SONAME_VAL=$(echo "$ELF_INFO" | grep '(SONAME)' | sed 's/.*\[\(.*\)\].*/\1/' || true)
+                    if [ -z "$SONAME_VAL" ]; then
+                        echo "[fail] L5a: ${so_basename} 缺少 DT_SONAME — 下游链接器无法按 SONAME 寻址"
+                        echo "       文件: ${so_file#${PKG_CACHE}}"
+                        echo "[hint]  在 CMakeLists.txt 中设置 set_target_properties(... PROPERTIES SOVERSION x.y)"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    elif echo "$SONAME_VAL" | grep -q '^/' 2>/dev/null; then
+                        echo "[fail] L5a: ${so_basename} 的 DT_SONAME 是绝对路径: ${SONAME_VAL}"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    fi
+
+                    # L5b: 检查 DT_NEEDED 禁止绝对路径或 ../
+                    BAD_NEEDED=$(echo "$ELF_INFO" | grep '(NEEDED)' | sed 's/.*\[\(.*\)\].*/\1/' | grep -E '^/|^\.\./' || true)
+                    if [ -n "$BAD_NEEDED" ]; then
+                        echo "[fail] L5b: ${so_basename} 的 DT_NEEDED 含绝对/相对路径: ${BAD_NEEDED}"
+                        echo "       文件: ${so_file#${PKG_CACHE}}"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    fi
+                done
+            fi
+
+            # L5c: cmake 文件禁止 IMPORTED_NO_SONAME TRUE
+            CMAKE_BAD=$(grep -rl 'IMPORTED_NO_SONAME.*TRUE\|IMPORTED_NO_SONAME.*True\|IMPORTED_NO_SONAME.*true' "${PKG_CACHE}" --include='*.cmake' 2>/dev/null || true)
+            if [ -n "$CMAKE_BAD" ]; then
+                CMAKE_COUNT=$(echo "$CMAKE_BAD" | wc -l)
+                echo "[fail] L5c: ${CMAKE_COUNT} 个 .cmake 文件含 IMPORTED_NO_SONAME TRUE — 下游必须按完整路径链接"
+                echo "$CMAKE_BAD" | head -5 | sed "s|^|       |"
+                L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+            fi
+
+            if [ "$L5_SONAME_ERRS" -gt 0 ]; then
+                echo "[fail] L5: SONAME quality gate failed (${L5_SONAME_ERRS} errors)"
+                L5_RESULT="fail"
+                L5_DETAIL="soname_gate_failed"
+            fi
+        fi
+
         # ── L1e: 破坏性反向验证 (R34: test 必须实质依赖被测包) ──
         # 原理: 将被测包产物替换为损坏版本，重新 conan test (重新编译+链接+运行)
         #   仍 PASS = 假测试 (test 不依赖被测包)
@@ -1134,6 +1484,13 @@ echo "━━━ Build Summary ━━━"
 echo "  Total:   ${#PACKAGES[@]}"
 echo "  Success: ${SUCCESS}"
 echo "  Failed:  ${FAILED}"
+# 通过率：Success / Total，明确标注（Total=0 时显示 N/A，避免除零）
+if [ "${#PACKAGES[@]}" -gt 0 ]; then
+    pass_rate=$(awk -v s="$SUCCESS" -v t="${#PACKAGES[@]}" 'BEGIN { printf "%.1f%%", s * 100 / t }')
+    echo "  Pass rate: ${pass_rate} (${SUCCESS}/${#PACKAGES[@]})"
+else
+    echo "  Pass rate: N/A (0 packages)"
+fi
 
 if [ $FAILED -gt 0 ]; then
     echo "  Failed packages:"
