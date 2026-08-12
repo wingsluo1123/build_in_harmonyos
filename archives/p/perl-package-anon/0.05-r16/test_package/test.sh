@@ -1,14 +1,15 @@
 #!/bin/bash
+set -euo pipefail
 # test_package/test.sh — Perl XS module functional test wrapper
 # Runs test.pl which exercises Package::Anon API (new, add_method, bless, get_answer)
 # On OHOS, .so loading on HMDFS is blocked by SELinux (E046)
 # Exit 0: test passed or skipped due to SELinux
 # Exit 1: unexpected failure (ABI mismatch, missing symbols, etc.)
 
-PERL_OUT=$(perl test.pl 2>&1)
-PERL_RC=$?
+PERL_RC=0
+PERL_OUT=$(perl test.pl 2>&1) || PERL_RC=$?
 
-if [ $PERL_RC -eq 0 ]; then
+if [ "$PERL_RC" -eq 0 ]; then
     echo "$PERL_OUT"
     exit 0
 fi
