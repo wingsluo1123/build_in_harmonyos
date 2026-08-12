@@ -36,17 +36,17 @@ title:
 # affected_scope:   影响范围
 # verification_cmd: 验证诊断是否正确的命令
 root_cause: lld 15 的 --gc-sections 会裁剪 __start_/__stop_ 封装符号, 导致引用这些符号的代码链接失败
-affected_scope:
-verification_cmd:
+affected_scope: 使用 lld 15 链接且开启 --gc-sections 的 autotools/cmake 项目 (bluez 5.79 等)
+verification_cmd: grep -rn "gc-sections" Makefile | head -1; ld.lld --version
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 # 推荐方案 (priority 越小越优先, 从 1 开始)
-rec_priority:
+rec_priority: 1
 rec_approach: LDFLAGS 增加 -Wl,-z,nostart-stop-gc
-rec_description:        一句话描述这个推荐方案
-rec_command:            可选: 具体命令模板(${VAR}变量引用)
-rec_auto_fix:           true|false                  # 引擎能否自动执行
-rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+rec_description: 在链接参数中增加 -z nostart-stop-gc, 保留 __start_/__stop_ 封装符号
+rec_command: make LDFLAGS="-Wl,--gc-sections -Wl,-z,nostart-stop-gc"
+rec_auto_fix:           true                  # 引擎能否自动执行
+rec_impl:               source-patch                   # 内置实现名 (见 DESIGN §5)
 
 # 回退方案 (当推荐方案不可用时尝试)
 fallback_priority:      2
