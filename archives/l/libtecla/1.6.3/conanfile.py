@@ -79,9 +79,14 @@ class LibteclaConan(ConanFile):
         # configure and build.
         self.run(f"cd {src} && autoconf", env="conanbuild")
         self.run(f"cd {src} && sed -i 's/umask 077/umask 022/g' configure", env="conanbuild")
+        # Pin the triplets and force the curses/ncurses/termcap probes to fail:
+        # OHOS has no curses.h (getline.c only includes it under
+        # USE_TERMINFO/USE_TERMCAP, and falls back to VT100 sequences).
         self.run(
             f"cd {src} && chmod +x configure && umask 022 && "
-            "./configure --prefix=/usr --build=aarch64-linux-ohos --host=aarch64-linux-ohos",
+            "./configure --prefix=/usr --build=aarch64-linux-ohos --host=aarch64-linux-ohos "
+            "ac_cv_lib_curses_tigetstr=no ac_cv_lib_ncurses_tigetstr=no "
+            "ac_cv_lib_curses_tgetstr=no ac_cv_header_curses_h=no ac_cv_header_term_h=no",
             env="conanbuild",
         )
         # The shared-library link invokes ld.lld directly (configure bakes
@@ -95,7 +100,12 @@ class LibteclaConan(ConanFile):
                 f"cd {src} && sed -i 's| -lc | -L{sysroot_libs[0]} -lc |g' Makefile",
                 env="conanbuild",
             )
-        self.run(f"cd {src} && make -j2", env="conanbuild")
+        # Build both the normal and reentrant static libraries, skipping the
+        # interactive demo programs (they are examples, not packaged).
+        self.run(
+            f"cd {src} && make -j2 DEMOS= PROGRAMS= PROGRAMS_R=",
+            env="conanbuild",
+        )
 
     def package(self):
         # Static libraries + header (the demo programs are examples only).
