@@ -81,5 +81,5 @@ staging 冒烟: bluetoothctl/btmon/btattach/hex2hcd --version 均输出 5.79
 - conan 配方中 glib 依赖用制品仓 glib/2.84.0.1（含 OHOS binary）
 ---
 
-**编译结束**: 2026-08-12 22:30
+**编译结束**: 2026-08-13 00:16
 **最终状态**: published
