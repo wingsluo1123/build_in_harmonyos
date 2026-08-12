@@ -21,7 +21,7 @@ class UudeviewConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     options = {"shared": [True, False]}
     default_options = {"shared": False}
-    # uudeview's uulib only produces libuu.a; shared=True will still build static
+    # uudeview's uulib only produces libuu.a; shared=True is not supported by upstream
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -35,6 +35,8 @@ class UudeviewConan(ConanFile):
     def generate(self):
         tc = AutotoolsToolchain(self)
         tc.configure_args.append("--disable-minews")
+        if not self.options.shared:
+            tc.configure_args.append("--disable-shared")
         tc.generate()
 
     def build(self):
