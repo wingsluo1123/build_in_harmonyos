@@ -60,6 +60,10 @@ class AlpineConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # 显式应用 0001-configure-ncursesw.patch（multitail 教训：必须显式
+        # 调用 apply_conandata_patches——否则补丁不会被应用）
+        from conan.tools.files import apply_conandata_patches
+        apply_conandata_patches(self)
 
     def build(self):
         # OHOS 沙箱 umask 077 创建的 0700 目录不可写（config.status 等），
