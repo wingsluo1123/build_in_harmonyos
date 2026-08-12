@@ -74,6 +74,12 @@ class FizmoConan(ConanFile):
         tc.configure_args.append(
             "--with-libxml2-includedir="
             f"{os.path.join(self.dependencies['libxml2'].package_folder, 'include', 'libxml2')}")
+        # babel.c 的 #include <libxml/parser.h>（CI #21981 报 libxml/parser.h
+        # file not found——编译 -I 是默认 /usr/local/include/libxml2——
+        # --with-libxml2-includedir 只影响 configure 检查——编译 -I 需
+        # extra_cflags 指向 libxml2 包 include/libxml2【libxml/parser.h 所在】）
+        tc.extra_cflags.append(
+            f"-I{os.path.join(self.dependencies['libxml2'].package_folder, 'include', 'libxml2')}")
         # ncursesw 前端检查（configure 硬编码路径 /usr/include 等找不到
         # ncurses.h——CI #20171 报 Could not find ncurses.h）——CFLAGS
         # 指向 ncurses 包 include（覆盖 include/ 顶层 + include/ncursesw/
