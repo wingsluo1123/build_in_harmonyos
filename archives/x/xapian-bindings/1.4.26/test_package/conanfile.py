@@ -64,11 +64,25 @@ class XapianBindingsTestConan(ConanFile):
         except ConanException as exc:
             # ConanException is usually only "Error N while executing" without the
             # child stderr. Re-probe with subprocess to classify E212 vs a real
-            # import/functional failure.
+            # import/functional failure. The probe must replicate the conanrun
+            # environment: PYTHONPATH must point at the package's site-packages,
+            # otherwise import fails with "No module named 'xapian'" instead of
+            # the E212 "Permission denied" we need to detect.
+            pkg = self.dependencies[self.tested_reference_str].package_folder
+            site_packages = os.path.join(
+                pkg, "lib",
+                f"python{sys.version_info.major}.{sys.version_info.minor}",
+                "site-packages")
+            probe_env = os.environ.copy()
+            existing = probe_env.get("PYTHONPATH", "")
+            probe_env["PYTHONPATH"] = (
+                site_packages + (os.pathsep + existing if existing else "")
+            )
             probe = subprocess.run(
                 [python_exe, test_script],
                 capture_output=True,
                 text=True,
+                env=probe_env,
             )
             err = (probe.stderr or "") + (probe.stdout or "") + str(exc)
             e212 = (
@@ -78,11 +92,7 @@ class XapianBindingsTestConan(ConanFile):
                 or "Operation not permitted" in err
             )
             if str(self.settings.os) == "OHOS" and e212:
-                pkg = self.dependencies[self.tested_reference_str].package_folder
-                so_path = os.path.join(
-                    pkg, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}",
-                    "site-packages", "xapian",
-                )
+                so_path = os.path.join(site_packages, "xapian")
                 so = next(
                     (os.path.join(so_path, n) for n in os.listdir(so_path) if n.startswith("_xapian") and n.endswith(".so")),
                     None,
