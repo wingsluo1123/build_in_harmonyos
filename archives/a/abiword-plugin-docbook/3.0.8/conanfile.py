@@ -56,9 +56,14 @@ class AbiwordPluginDocbookConan(ConanFile):
         self.requires("libjpeg/10")
         # libpng/1.6.58 配方 requires zlib/1.3.1.1, 与 libgsf 传递链的 zlib/1.3.1
         # 冲突(CI 实测 "Version conflict between zlib/1.3.1.1 and zlib/1.3.1")。
-        # consumer 用 override=True 强制统一为 zlib/1.3.1(补丁版本 ABI 兼容,
-        # libgsf/glib/libxml2 链已用 1.3.1; libpng 也会用 1.3.1 编译)。
-        self.requires("zlib/1.3.1", override=True)
+        # consumer 用 override=True 统一。注意: 必须统一到 **1.3.1.1** 而非
+        # 1.3.1——制品仓 libpng/1.6.58 二进制基于 zlib/1.3.1.1 构建, 若 override
+        # 到 1.3.1 则 libpng 二进制不匹配 → --build=missing 从源码构建 → libpng
+        # 配方无 E114 ac_tmp 修复 → CI 沙箱 configure conftest 失败("C compiler
+        # cannot create executables", CI 实测)。统一到 1.3.1.1 后 libpng 直接
+        # 用制品仓二进制; libgsf 需从源码构建但其配方含 E114 修复可成功;
+        # libxml2 配方 LIBXML2_WITH_ZLIB=OFF 不依赖 zlib 不受影响。
+        self.requires("zlib/1.3.1.1", override=True)
 
     def build_requirements(self):
         # AbiWord 的 git archive tarball 不带 configure/aclocal.m4/Makefile.in，
