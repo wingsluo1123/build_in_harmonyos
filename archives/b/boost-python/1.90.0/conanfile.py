@@ -217,6 +217,11 @@ class BoostPythonConan(ConanFile):
             "-DNDEBUG",
             "-DBOOST_PYTHON_DYN_LINK",
         ]
+        # OHOS SDK 默认 ld.lld 依赖 libxml2.so.16（CI 沙箱缺失导致链接失败，见 notes.md）；
+        # 本包链接显式使用结构化解析的 ld.bfd（binutils 2.45，仅依赖 libc.so）。
+        if str(self.settings.os) == "OHOS":
+            linker = self._find_ld_bfd()
+            cmd += ["-fuse-ld={}".format(linker)]
         for i in inc:
             cmd += ["-I", i]
         for s in self.CORE_SOURCES:
@@ -228,6 +233,30 @@ class BoostPythonConan(ConanFile):
             os.path.join(self.build_folder, "libboost_python312.so"),
         ]
         self.run(" ".join(cmd))
+
+    def _find_ld_bfd(self):
+        """结构化解析 OHOS ld.bfd：compiler 目录 → PATH → 标准 HNP 工具目录。
+
+        找不到时抛出 ConanInvalidConfiguration，不静默回退到已知损坏的默认 lld。
+        """
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler_dir = os.path.dirname(compilers.get("cpp", ""))
+        candidates = [
+            os.path.join(compiler_dir, "ld.bfd") if compiler_dir else "",
+            shutil.which("ld.bfd") or "",
+            os.path.join("/data/service/hnp/bin", "ld.bfd"),
+            "/data/service/hnp/binutils.org/binutils_2.45/bin/ld.bfd",
+        ]
+        for path in candidates:
+            if path and os.path.isfile(path):
+                return path
+        raise ConanInvalidConfiguration(
+            "OHOS build requires ld.bfd (default SDK ld.lld depends on libxml2.so.16 "
+            "which is unavailable in the CI sandbox). Set tools.build:compiler_executables "
+            "or ensure ld.bfd is on PATH."
+        )
 
     def package(self):
         copy(

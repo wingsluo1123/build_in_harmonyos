@@ -93,7 +93,26 @@
     `test_ext.so` 签名。
 - 签名失败将导致 OHOS 构建/测试明确失败（`ConanInvalidConfiguration`），不静默忽略。
 - 测试断言数量保持不变（add(2,3)==5、add(-1,1)==0、greet() 字符串，共 3 项）。
+## 链接器适配（PR #5100 二次 CI 修复，2026-08-12）
+
+- 根因：OHOS SDK 默认链接器 `ld.lld`（LLD 15.0.4）的 NEEDED 含 `libxml2.so.16`；
+  CI 沙箱缺失该库，链接阶段报 `Error loading shared library libxml2.so.16: needed by lld`
+  → `clang: linker command failed` → conan create exit=1（package()/签名/test 均未执行）。
+- 对照实验：`ld.bfd`（binutils 2.45，`/data/service/hnp/bin/ld.bfd`）NEEDED 仅 `libc.so`，
+  干净环境（env -i）下 `--version` 与最小 OHOS AArch64 共享库链接均成功；LD_LIBRARY_PATH 无污染。
+- 修复：本包链接显式使用结构化解析的 `ld.bfd`：
+  - 主配方 `build()`：clang++ 增加 `-fuse-ld=<解析到的 ld.bfd>`（仅本包构建，不写入
+    cpp_info.sharedlinkflags，不传播下游）；
+  - test_package `generate()`：CMakeToolchain 设置 `CMAKE_MODULE_LINKER_FLAGS` 与
+    `CMAKE_SHARED_LINKER_FLAGS` = `-fuse-ld=<ld.bfd>`（test_ext.so 为 MODULE target，
+    MODULE linker flag 真实生效）；
+  - 解析顺序：compiler executable 目录 → `shutil.which("ld.bfd")` → `/data/service/hnp/bin`
+    → binutils 2.45 目录；找不到抛 `ConanInvalidConfiguration`，不静默回退损坏的 lld。
+- 签名修复保留：package() 最后签名 `libboost_python312.so`；test() 导入前签名 test_ext.so；
+  签名后恢复权限；断言数量不变（3 项）。
+- 边界：bfd 路径仅作为构建期 `-fuse-ld` 参数，不进入下游公开链接参数；未修改 ci/、scripts/、
+  profile；未复制 libxml2 入包；未设置全局 LD_LIBRARY_PATH。
 ---
 
-**编译结束**: 2026-08-12 11:58
+**编译结束**: 2026-08-12 16:54
 **最终状态**: built

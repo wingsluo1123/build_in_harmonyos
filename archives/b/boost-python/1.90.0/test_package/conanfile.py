@@ -14,12 +14,12 @@ import shutil
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.build import cross_building
-from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 
 
 class BoostPythonTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
@@ -29,6 +29,21 @@ class BoostPythonTestConan(ConanFile):
 
     def layout(self):
         cmake_layout(self)
+
+    def generate(self):
+        # CMakeToolchain 只在 generate() 中实例化（不在 generators 声明，避免重复）。
+        # OHOS SDK 默认 ld.lld 依赖 libxml2.so.16（CI 沙箱缺失导致链接失败）；
+        # test_ext.so 是 MODULE target，须通过 CMakeToolchain 注入 ld.bfd 链接器。
+        tc = CMakeToolchain(self)
+        if str(self.settings.os) == "OHOS":
+            linker = self._find_ld_bfd()
+            tc.cache_variables["CMAKE_MODULE_LINKER_FLAGS"] = (
+                "-fuse-ld={}".format(linker)
+            )
+            tc.cache_variables["CMAKE_SHARED_LINKER_FLAGS"] = (
+                "-fuse-ld={}".format(linker)
+            )
+        tc.generate()
 
     def build(self):
         cmake = CMake(self)
@@ -68,6 +83,30 @@ class BoostPythonTestConan(ConanFile):
             if os.path.isfile(path):
                 return path
         return ""
+
+    def _find_ld_bfd(self):
+        """结构化解析 OHOS ld.bfd：compiler 目录 → PATH → 标准 HNP 工具目录。
+
+        与主配方一致；找不到时抛 ConanInvalidConfiguration，不静默回退到
+        已知损坏的默认 lld（依赖 libxml2.so.16，CI 沙箱缺失）。
+        """
+        compilers = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler_dir = os.path.dirname(compilers.get("cpp", ""))
+        candidates = [
+            os.path.join(compiler_dir, "ld.bfd") if compiler_dir else "",
+            shutil.which("ld.bfd") or "",
+            os.path.join("/data/service/hnp/bin", "ld.bfd"),
+            "/data/service/hnp/binutils.org/binutils_2.45/bin/ld.bfd",
+        ]
+        for path in candidates:
+            if path and os.path.isfile(path):
+                return path
+        raise ConanInvalidConfiguration(
+            "OHOS consumer link requires ld.bfd (default SDK ld.lld depends on "
+            "libxml2.so.16 which is unavailable in the CI sandbox)."
+        )
 
     def _sign_elf_atomically(self, path, objcopy, signer):
         if not objcopy or not signer:
