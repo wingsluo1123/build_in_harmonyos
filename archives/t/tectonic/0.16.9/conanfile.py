@@ -96,13 +96,21 @@ class TectonicConan(ConanFile):
         if os.path.isdir(rustup_home):
             os.environ["RUSTUP_HOME"] = rustup_home
 
-        # ── 1b. Rust toolchain check ──
-        # CI workers must have Rust pre-installed; build() should not install tools
+        # ── 1b. Rust toolchain check + auto-install ──
+        # CI setup.sh does not install Rust; install via harmonybrew if missing.
         if shutil.which("cargo") is None:
-            raise RuntimeError(
-                "Rust toolchain (cargo) not found. "
-                "Install via 'harmonybrew install rust' or rustup."
-            )
+            brew = shutil.which("brew") or os.path.expanduser("~/.harmonybrew/bin/brew")
+            if os.path.isfile(brew):
+                self.output.info("cargo not found, installing Rust via harmonybrew...")
+                self.run(f'"{brew}" install rust')
+                # Add harmonybrew bin to PATH
+                brew_bin = os.path.expanduser("~/.harmonybrew/bin")
+                os.environ["PATH"] = brew_bin + ":" + os.environ.get("PATH", "")
+            if shutil.which("cargo") is None:
+                raise RuntimeError(
+                    "Rust toolchain (cargo) not found even after harmonybrew install. "
+                    "Install via 'harmonybrew install rust' or rustup."
+                )
 
         # Shell (R33: find bash dynamically)
         bash_path = shutil.which("bash") or "/data/service/hnp/bin/bash"
