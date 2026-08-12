@@ -117,6 +117,7 @@ if (( ${+CI_PACKAGES} )) \
     echo "  Total:   0"
     echo "  Success: 0"
     echo "  Failed:  0"
+    echo "  Pass rate: N/A (0 packages)"
     echo "[step] No Conan packages to build"
     exit 0
 fi
@@ -332,23 +333,34 @@ for pkg_dir in "${PACKAGES[@]}"; do
     # 从 conanfile.py 中提取 requires/requirements 声明的依赖, 验证是否已发布
     # R36: 依赖必须先发布到制品仓
     if [ -f "$CONANFILE" ]; then
-        # 提取所有依赖引用
-        DEP_REFS=$(python3 - "$CONANFILE" 2>/dev/null <<'PYEOF'
-import re, sys
+        # 提取所有依赖引用（使用 AST 解析，避免误匹配 docstring 中的文本）
+        DEP_REFS=$(python3 - "$CONANFILE" "${pkg_name:-}" "${pkg_ver:-}" 2>/dev/null <<'PYEOF'
+import ast, sys
 src = open(sys.argv[1]).read()
+self_name = sys.argv[2] if len(sys.argv) > 2 else ""
+self_ver = sys.argv[3] if len(sys.argv) > 3 else ""
+self_ref = f"{self_name}/{self_ver}" if self_name and self_ver else ""
 refs = set()
-for m in re.finditer(r'(?:self\.)?requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]  # 兼容性: 去掉可能的 @user/channel 后缀
-    refs.add(ref)
-for m in re.finditer(r'tool_requires?\s*\(\s*["\']([^"\']+)["\']', src):
-    ref = m.group(1).strip()
-    if '/' not in ref:
-        continue
-    ref = ref.split('@')[0]
-    refs.add(ref)
+tree = ast.parse(src)
+for node in ast.walk(tree):
+    # 匹配 requires("dep/version") 和 tool_requires("dep/version") 调用
+    if isinstance(node, ast.Call):
+        func_name = ""
+        if isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
+        elif isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        if func_name in ("requires", "tool_requires", "build_requires"):
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    ref = arg.value.strip()
+                    if "/" not in ref:
+                        continue
+                    ref = ref.split("@")[0]
+                    # 排除包自身引用
+                    if self_ref and ref == self_ref:
+                        continue
+                    refs.add(ref)
 for r in sorted(refs):
     print(r)
 PYEOF
@@ -567,21 +579,86 @@ PYEOF
     # PR 分支名必须包含 {pkg_name}-{pkg_ver}（如 feat/jsmn-1.1.0 包含 jsmn-1.1.0）
     # 不做分支名分割，直接拼接已知值做包含检查，避免包名含 '-' 导致歧义
     # REL 构建或 main/master/server 分支自动跳过
-    # ⚠️ 当前为提示模式（warn-only），2026-07-29 后改为强制失败
+    # PR > 5200: 强制失败（报错）; PR <= 5200: 仅告警（历史 PR 宽容）
     if [ -n "${CI_BRANCH:-}" ] && [ "${CI_BRANCH}" != "main" ] \
        && [ "${CI_BRANCH}" != "master" ] && [ "${CI_BRANCH}" != "server" ]; then
         echo "[step] L0n: Checking branch name matches package (R40)..."
         EXPECTED_TAG="${pkg_name}-${pkg_ver}"
-        if echo "${CI_BRANCH}" | grep -q -- "${EXPECTED_TAG}"; then
+        # 归一化：将 + 替换为 - 后比较（Debian 风格版本后缀如 1.4+dfsg.1 → 1.4-dfsg.1）
+        EXPECTED_TAG_NORM=$(echo "${EXPECTED_TAG}" | tr '+' '-')
+        BRANCH_NORM=$(echo "${CI_BRANCH}" | tr '+' '-')
+        if echo "${BRANCH_NORM}" | grep -q -- "${EXPECTED_TAG_NORM}"; then
             echo "        [ok] L0n: branch '${CI_BRANCH}' contains '${EXPECTED_TAG}'"
         else
-            echo "[warn] L0n: branch name mismatch (R40) — 当前仅提示，不阻断构建"
-            echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
-            echo "[hint] 分支名应包含 包名-版本号，例如："
-            echo "         feat/${pkg_name}-${pkg_ver}"
-            echo "         fix/${pkg_name}-${pkg_ver}"
-            echo "         ${pkg_name}-${pkg_ver}"
-            echo "[hint] ⚠️ 2026-07-29 起此检查将升级为强制失败，请尽快修改分支名"
+            # PR > 5200 强制失败, PR <= 5200 仅告警
+            _pr_num="${CI_PR_NUMBER:-0}"
+            if [ "${_pr_num}" -gt 5200 ] 2>/dev/null; then
+                echo "[error] L0n: branch name mismatch (R40) — 分支名不包含 包名-版本号"
+                echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
+                echo "[hint] 分支名应包含 包名-版本号，例如："
+                echo "         feat/${pkg_name}-${pkg_ver}"
+                echo "         fix/${pkg_name}-${pkg_ver}"
+                echo "         ${pkg_name}-${pkg_ver}"
+                L0_FAILED=true
+                L0_ERRORS="${L0_ERRORS} branch_name_r40"
+            else
+                echo "[warn] L0n: branch name mismatch (R40) — PR #${_pr_num} <= 5200, 仅告警不拦截"
+                echo "       分支 '${CI_BRANCH}' 不包含 '${EXPECTED_TAG}'"
+                echo "[hint] 分支名应包含 包名-版本号，例如："
+                echo "         feat/${pkg_name}-${pkg_ver}"
+            fi
+        fi
+    fi
+
+    # L0o: 禁止使用外部网络命令下载源码 (防 uses_external_curl)
+    # conanfile.py 的 build() 方法禁止调用 curl/wget 下载
+    if [ -f "$CONANFILE" ]; then
+        EXT_CURL=$(grep -nE '(subprocess|os\.system).*?(curl|wget)|"curl"|"wget"|'"'"'curl'"'"'|'"'"'wget'"'"'' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.\|conan_data\|self\.run\|#.*curl\|#.*wget' || true)
+        if [ -n "$EXT_CURL" ]; then
+            echo "[fail] L0o: conanfile.py 使用外部命令 (curl/wget) 下载源码 — CI 环境可能无 curl"
+            echo "       ${EXT_CURL%%$'\n'*}"
+            echo "[hint] 必须用 self.conan_data 或 tools.files.get() 下载源码"
+            L0_FAILED=true
+            L0_ERRORS="${L0_ERRORS} uses_external_curl"
+        fi
+    fi
+
+    # L0p: settings 必须包含 os/compiler/build_type/arch 四项 (防 profile 不兼容)
+    if [ -f "$CONANFILE" ]; then
+        SETTINGS_LINE=$(grep -E '^\s*settings\s*=' "$CONANFILE" 2>/dev/null | head -1 || true)
+        if [ -n "$SETTINGS_LINE" ]; then
+            for req in "os" "compiler" "build_type" "arch"; do
+                if ! echo "$SETTINGS_LINE" | grep -q "\"$req\"\|'$req'\|\b${req}\b"; then
+                    echo "[fail] L0p: settings 缺少 '$req' — OHOS profile 需要全部四项"
+                    echo "       当前: ${SETTINGS_LINE}"
+                    echo "[hint] settings = \"os\", \"compiler\", \"build_type\", \"arch\""
+                    L0_FAILED=true
+                    L0_ERRORS="${L0_ERRORS} missing_setting_${req}"
+                fi
+            done
+        fi
+    fi
+
+    # L0q: exports_sources 必须包含 conanfile.py 和 patches/ (防 recipe_not_exported)
+    if [ -f "$CONANFILE" ]; then
+        # 只在 conanfile.py 引用了 patches 时检查
+        if grep -q 'patches/' "$CONANFILE" 2>/dev/null || [ -d "$pkg_dir/patches" ]; then
+            ES_LINE=$(grep -E '^\s*exports_sources\s*=' "$CONANFILE" 2>/dev/null | head -1 || true)
+            if [ -n "$ES_LINE" ]; then
+                # 检查是否包含通配符 *（涵盖 patches/）
+                if ! echo "$ES_LINE" | grep -q '\*' 2>/dev/null; then
+                    # 没有通配符，检查是否显式包含 patches
+                    if [ -d "$pkg_dir/patches" ]; then
+                        PATCH_COUNT=$(find "$pkg_dir/patches" -name '*.patch' -o -name '*.diff' 2>/dev/null | wc -l)
+                        if [ "$PATCH_COUNT" -gt 0 ] && ! echo "$ES_LINE" | grep -qi 'patch' 2>/dev/null; then
+                            echo "[warn] L0q: exports_sources 可能未包含 patches/ — conan create 导出时可能丢失补丁"
+                            echo "       exports_sources: ${ES_LINE}"
+                            echo "       patches/ 目录有 ${PATCH_COUNT} 个补丁文件"
+                            echo "[hint] exports_sources 应包含补丁文件，或使用通配符"
+                        fi
+                    fi
+                fi
+            fi
         fi
     fi
 
@@ -602,6 +679,51 @@ PYEOF
     echo "[ok] L0: All quality gate checks passed"
     L0_RESULT="pass"
     L0_DETAIL="all checks passed"
+
+    # ── Knowledge graph quality check (KC) ──
+    # 运行知识库质量门禁（纯 shell，CI-safe）
+    # 检查草稿泄漏、模板占位符、auto_fix 格式、非标准字段、index 一致性
+    if [ -f "${REPO_ROOT}/ci/scripts/knowledge_check.sh" ]; then
+        echo ""
+        echo "[step] KC: Knowledge graph quality check..."
+        if bash "${REPO_ROOT}/ci/scripts/knowledge_check.sh" "${REPO_ROOT}" 2>&1; then
+            echo "        [ok] KC: knowledge check passed"
+        else
+            echo "[fail] KC: knowledge check failed — blocking build"
+            L0_RESULT="fail"
+            L0_DETAIL="knowledge_check failed"
+            echo "L0_RESULT=${L0_RESULT}: ${L0_DETAIL}"
+            echo "L1_RESULT=skip: blocked_by_KC"
+            echo "L2_RESULT=skip: blocked_by_KC"
+            echo "L4_RESULT=skip: blocked_by_KC"
+            echo "L5_RESULT=skip: blocked_by_KC"
+            FAILED=$((FAILED + 1))
+            FAILED_PKGS+=("${pkg_name}/${pkg_ver} (KC gate)")
+            continue
+        fi
+    fi
+
+    # ── Junk file check (JC) ──
+    # 拦截运行时状态文件、二进制产物、源码 tarball、临时构建产物
+    if [ -f "${REPO_ROOT}/ci/scripts/junk_check.sh" ]; then
+        echo ""
+        echo "[step] JC: Junk file check..."
+        if bash "${REPO_ROOT}/ci/scripts/junk_check.sh" "${REPO_ROOT}" 2>&1; then
+            echo "        [ok] JC: no junk files detected"
+        else
+            echo "[fail] JC: junk files detected — blocking build"
+            L0_RESULT="fail"
+            L0_DETAIL="junk_check failed"
+            echo "L0_RESULT=${L0_RESULT}: ${L0_DETAIL}"
+            echo "L1_RESULT=skip: blocked_by_JC"
+            echo "L2_RESULT=skip: blocked_by_JC"
+            echo "L4_RESULT=skip: blocked_by_JC"
+            echo "L5_RESULT=skip: blocked_by_JC"
+            FAILED=$((FAILED + 1))
+            FAILED_PKGS+=("${pkg_name}/${pkg_ver} (JC gate)")
+            continue
+        fi
+    fi
 
     # ── Mirror fallback (通用镜像映射) ──
     # 将 conandata.yml 中已知域名的 url 从单值改为列表, 自动加上镜像源 fallback
@@ -746,7 +868,8 @@ PYEOF
         echo "[step] Pre-download: extracting source URLs from conandata.yml..."
 
         # 创建预下载缓存目录
-        PREDL_DIR="${TMPDIR:-$REPO_ROOT/.ci_tmp}/conan-predownload/${pkg_name}/${pkg_ver}"
+        BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/.build-cache}"
+        PREDL_DIR="${BUILD_DIR}/predl_cache"
         mkdir -p "$PREDL_DIR"
         python3 "$SCRIPT_DIR/predownload_sources.py" "$CONANDATA" "$PREDL_DIR"
     fi
@@ -990,6 +1113,69 @@ PYEOF
             done
         fi
 
+        # ── L5: SONAME 质量门禁 (防 IMPORTED_NO_SONAME + DT_SONAME 缺失) ──
+        # 三条规则（基于 SONAME 存量扫描报告，覆盖 23 个已知缺陷）：
+        # L5a: 可链接共享库必须有 DT_SONAME 且为相对路径
+        # L5b: DT_NEEDED 条目禁止绝对路径或 ../ 开头
+        # L5c: 包内 *.cmake 禁止 IMPORTED_NO_SONAME.*TRUE
+        if [ -n "$PKG_CACHE" ] && [ -d "$PKG_CACHE" ]; then
+            L5_SONAME_ERRS=0
+
+            # L5a+L5b: ELF 扫描（仅 lib/ 一级目录，排除插件子目录）
+            if [ -n "$LIBS" ] && [ -d "$LIBS" ]; then
+                for so_file in "$LIBS"/lib*.so(N); do
+                    [ -f "$so_file" ] || continue
+                    # 排除插件：在 lib/ 子目录中（lib/plugins/, lib/modules/ 等）的不检查
+                    so_dir="${so_file:h}"
+                    if [ "$so_dir" != "$LIBS" ]; then
+                        continue
+                    fi
+
+                    so_basename="${so_file:t}"
+                    # 跳过 INTERFACE 库的空 stub .so（极少数情况）
+                    [ ! -s "$so_file" ] && continue
+
+                    # readelf -d 提取 SONAME 和 NEEDED
+                    ELF_INFO=$(readelf -d "$so_file" 2>/dev/null || true)
+
+                    # L5a: 检查 DT_SONAME
+                    SONAME_VAL=$(echo "$ELF_INFO" | grep '(SONAME)' | sed 's/.*\[\(.*\)\].*/\1/' || true)
+                    if [ -z "$SONAME_VAL" ]; then
+                        echo "[fail] L5a: ${so_basename} 缺少 DT_SONAME — 下游链接器无法按 SONAME 寻址"
+                        echo "       文件: ${so_file#${PKG_CACHE}}"
+                        echo "[hint]  在 CMakeLists.txt 中设置 set_target_properties(... PROPERTIES SOVERSION x.y)"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    elif echo "$SONAME_VAL" | grep -q '^/' 2>/dev/null; then
+                        echo "[fail] L5a: ${so_basename} 的 DT_SONAME 是绝对路径: ${SONAME_VAL}"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    fi
+
+                    # L5b: 检查 DT_NEEDED 禁止绝对路径或 ../
+                    BAD_NEEDED=$(echo "$ELF_INFO" | grep '(NEEDED)' | sed 's/.*\[\(.*\)\].*/\1/' | grep -E '^/|^\.\./' || true)
+                    if [ -n "$BAD_NEEDED" ]; then
+                        echo "[fail] L5b: ${so_basename} 的 DT_NEEDED 含绝对/相对路径: ${BAD_NEEDED}"
+                        echo "       文件: ${so_file#${PKG_CACHE}}"
+                        L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+                    fi
+                done
+            fi
+
+            # L5c: cmake 文件禁止 IMPORTED_NO_SONAME TRUE
+            CMAKE_BAD=$(grep -rl 'IMPORTED_NO_SONAME.*TRUE\|IMPORTED_NO_SONAME.*True\|IMPORTED_NO_SONAME.*true' "${PKG_CACHE}" --include='*.cmake' 2>/dev/null || true)
+            if [ -n "$CMAKE_BAD" ]; then
+                CMAKE_COUNT=$(echo "$CMAKE_BAD" | wc -l)
+                echo "[fail] L5c: ${CMAKE_COUNT} 个 .cmake 文件含 IMPORTED_NO_SONAME TRUE — 下游必须按完整路径链接"
+                echo "$CMAKE_BAD" | head -5 | sed "s|^|       |"
+                L5_SONAME_ERRS=$((L5_SONAME_ERRS + 1))
+            fi
+
+            if [ "$L5_SONAME_ERRS" -gt 0 ]; then
+                echo "[fail] L5: SONAME quality gate failed (${L5_SONAME_ERRS} errors)"
+                L5_RESULT="fail"
+                L5_DETAIL="soname_gate_failed"
+            fi
+        fi
+
         # ── L1e: 破坏性反向验证 (R34: test 必须实质依赖被测包) ──
         # 原理: 将被测包产物替换为损坏版本，重新 conan test (重新编译+链接+运行)
         #   仍 PASS = 假测试 (test 不依赖被测包)
@@ -1193,6 +1379,13 @@ echo "━━━ Build Summary ━━━"
 echo "  Total:   ${#PACKAGES[@]}"
 echo "  Success: ${SUCCESS}"
 echo "  Failed:  ${FAILED}"
+# 通过率：Success / Total，明确标注（Total=0 时显示 N/A，避免除零）
+if [ "${#PACKAGES[@]}" -gt 0 ]; then
+    pass_rate=$(awk -v s="$SUCCESS" -v t="${#PACKAGES[@]}" 'BEGIN { printf "%.1f%%", s * 100 / t }')
+    echo "  Pass rate: ${pass_rate} (${SUCCESS}/${#PACKAGES[@]})"
+else
+    echo "  Pass rate: N/A (0 packages)"
+fi
 
 if [ $FAILED -gt 0 ]; then
     echo "  Failed packages:"
