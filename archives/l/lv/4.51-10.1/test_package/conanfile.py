@@ -1,29 +1,27 @@
 #!/usr/bin/env python3
-"""Conan test_package — lv 4.51-10.1"""
+"""Conan test_package — lv 4.51-10.1.
+
+Runs test.sh (bash) which sets LD_LIBRARY_PATH to the OHOS SDK system
+ncurses/tinfo directory before invoking lv (binary dynamically links
+libncurses.so.6 which is not on the default loader path).
+"""
+import os
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout
 
 
 class LvTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    """test_package for lv executable — runs test.sh which invokes the binary."""
+    settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualRunEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def test(self):
-        self.run("which lv", env="conanrun")
-        # 用 lv --help 验证二进制可执行（非交互式，不会挂起）
-        self.run("lv --help", env="conanrun")
-        # 运行 CTest 执行 test.c 的编译验证
-        cmake = CMake(self)
-        cmake.test()
+        # OHOS: /system/bin/sh (mksh) cannot execute ELF binaries.
+        # Use bash to wrap binary execution; test.sh sets LD_LIBRARY_PATH
+        # to the system ncurses/tinfo dir (libncurses.so.6 not on default path).
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} test.sh", env="conanrun")
