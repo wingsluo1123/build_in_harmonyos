@@ -28,5 +28,7 @@ class WcslibTestConan(ConanFile):
     def test(self):
         # Run the test executable directly via self.run() so the L0d gate
         # detects an actual test invocation (cmake.test() is not recognized).
+        # env="conanrun" uses Conan's generated runtime environment (standard
+        # for Conan 2); the library is static so no LD_LIBRARY_PATH is needed.
         exe = os.path.join(self.cpp.build.bindirs[0], "test_wcslib")
-        self.run(exe, env=["LD_LIBRARY_PATH"])
+        self.run(exe, env="conanrun")
