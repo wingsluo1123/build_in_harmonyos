@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: gnu-which/2.25
+homepage: "https://savannah.gnu.org/projects/which/"
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序
+# gnu-which 的 make check 运行 testsuite，但无独立测试二进制
+upstream_tests:
+  - file: "testsuite"
+    source: "gnu-which-2.25/testsuite"
+    description: "GNU which 上游测试套件 (make check)"
+    command: "make check"
+
+# test_package 中自带的测试 (消费者视角验证)
+# CLI 工具，通过 bash 直接执行 which --version 验证
+test_package_tests:
+  - file: "test_which.sh"
+    description: "通过 bash 执行 which --version 验证二进制功能"
+    command: 'bash test_which.sh <which_bin>'
+
+# 测试断言总数 (近似值)
+assertion_count: 1

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "toolchain_go",
+    "pattern": "go (compiler|toolchain).*not found|go:.*not found",
+    "hint": "鸿蒙 PC 原生环境不含 Go 工具链, 暂不支持 Go 包构建\n       如需支持需要在 worker 上安装 Go 工具链 (当前不在 CI 范围内)"
+  },
+  {
+    "id": "toolchain_rust",
+    "pattern": "cargo.*not found|rustc.*not found",
+    "hint": "鸿蒙 PC 原生环境不含 Rust 工具链, 暂不支持 Rust 包构建"
+  },
+  {
+    "id": "toolchain_ndk",
+    "pattern": "OHOS NDK.*not found|clang.*not found|OHOS_NDK_ROOT",
+    "hint": "OHOS NDK/SDK 缺失, worker 环境异常\n       请联系 CI 管理员检查 worker 上的 OHOS SDK 安装"
+  },
+  {
+    "id": "github_timeout",
+    "pattern": "github\\.com.*(timed.?out|ConnectTimeout|Max retries|Connection.*refused|Connection.*reset)",
+    "hint": "GitHub 源码下载失败 (worker 网络无法直连 github.com)\n       CI 已自动配置镜像源 fallback (gh-proxy/mirror.ghproxy/ghproxy/gitclone/moeyy/kkgithub/direct), 如仍失败:\n       请在 conandata.yml 中将 github.com URL 改为 gitcode.com 镜像 URL"
+  },
+  {
+    "id": "http_429",
+    "pattern": "429|rate.?limit|Too Many Requests",
+    "hint": "源码服务器返回 429 (请求过多/限流)\n       请稍后重试, 或在 conandata.yml 中使用镜像源 URL"
+  },
+  {
+    "id": "network_other",
+    "pattern": "HTTPSConnectionPool|Connection.*reset|download.*failed",
+    "hint": "源码下载失败, 请检查 conandata.yml 中 URL 是否可访问"
+  },
+  {
+    "id": "depchain_missing",
+    "pattern": "not found in (local cache|remotes)|Unable to find.*remotes|not resolved|Unable to find package",
+    "hint": "依赖包未构建, 请先提交依赖包的 PR 并等待 CI 通过\n       请检查 conanfile.py 的 requirements() 是否正确声明了所有依赖",
+    "extract": { "dep": "(?:not found|Unable to find).*['\"]([a-z0-9_-]+/[0-9][^'\"]*)['\"]" }
+  },
+  {
+    "id": "recipe_syntax",
+    "pattern": "SyntaxError|unterminated string|unexpected EOF",
+    "hint": "conanfile.py Python 语法错误 (如未闭合的引号/括号)\n       请检查引号/括号是否闭合, 缩进是否正确",
+    "extract": { "detail": "(SyntaxError|unterminated|string.*)" }
+  },
+  {
+    "id": "recipe_sha256",
+    "pattern": "REPLACE_WITH|sha256.*placeholder|Provided hash.*REPLACE",
+    "hint": "conandata.yml 中 sha256 仍是占位符\n       请下载源码包后计算实际 sha256: sha256sum xxx.tar.gz\n       并替换 conandata.yml 中的 REPLACE_WITH 实际值"
+  },
+  {
+    "id": "recipe_patch",
+    "pattern": "patch.*(does not exist|Failed to apply|Failed to parse)|source.*file does not exist",
+    "hint": "patch 文件路径或格式错误\n       请检查 conandata.yml 中 patch_file 路径与 patches/ 目录下文件是否一致"
+  },
+  {
+    "id": "recipe_import",
+    "pattern": "Unable to load conanfile|Error loading conanfile|import.*failed",
+    "hint": "conanfile.py 加载失败\n       请检查 import 语句是否正确, Conan 2.x 的 import 路径是否匹配"
+  },
+  {
+    "id": "recipe_api",
+    "pattern": "takes 1 positional argument|env argument.*should be a list|AssertionError.*env",
+    "hint": "Conan API 调用方式有误 (Conan 2.x 与 1.x API 差异)\n       请参考 SKILL.md 中的模板和 Conan 2.x 官方文档"
+  },
+  {
+    "id": "compile_linker",
+    "pattern": "undefined reference|cannot find -l|ld returned|ld\\.lld: error|unable to find library",
+    "hint": "链接错误: 找不到符号或库\n       请在 conanfile.py 的 requirements() 中声明提供该符号的依赖包",
+    "extract": { "symbol": "undefined reference to (\\S+)" }
+  },
+  {
+    "id": "compile_header",
+    "pattern": "fatal error.*\\.h.*No such file|Cannot find.*\\.h",
+    "hint": "缺少头文件\n       请在 conanfile.py 的 requirements() 中声明提供该头文件的依赖包",
+    "extract": { "header": "([a-z_][a-z0-9_/]*\\.h)" }
+  },
+  {
+    "id": "compile_configure",
+    "pattern": "configure.*[Ee]rror|configure.*failed|config\\.status.*error",
+    "hint": "configure 脚本执行失败\n       请检查: 1) 系统依赖是否满足 2) configure 参数是否正确\n       可参考 SKILL.md 中 Autotools 模板的 configure 选项配置"
+  },
+  {
+    "id": "compile_make",
+    "pattern": "(make|cc|clang|gcc).*[Ee]rror [0-9]|^.*error:|ConanException: Error [0-9]|BEGIN failed|compilation aborted",
+    "hint": "编译失败\n       请检查源码在鸿蒙 PC (clang/ohos) 上的兼容性\n       常见原因: 1) 编译器差异(gcc→clang) 2) 平台宏未覆盖 3) 缺少系统头文件",
+    "extract": { "detail": "((?:error:|Error [0-9]|BEGIN failed|compilation aborted)[^\\n]*)" }
+  },
+  {
+    "id": "conanfile_missing",
+    "pattern": "has no conanfile|Path.*no conanfile",
+    "hint": "conanfile.py 完全缺失\n       请确保 archives/字母/包名/版本/conanfile.py 文件存在"
+  },
+  {
+    "id": "checkout_failed",
+    "pattern": "rc=128|checkout.*fail|fetch.*failed",
+    "hint": "代码检出失败\n       可能是分支已删除或 SHA 不可达, 请检查 PR 分支状态"
+  },
+  {
+    "id": "checkout_ssl_cert_fail",
+    "pattern": "exit code 60|curl.*60|SSL_CERT|certificate.*verify|Peer certificate.*ERR",
+    "hint": "checkout-pr 阶段 curl 拉 PR diff 时 SSL 证书验证失败 (不是 PR 代码问题)\n       CI Worker 的 curl 缺系统 CA 证书包, checkout-pr 是 CI 自带脚本不在仓库内无法直接修\n       建议: 稍后重试 CI 会自动重试; 若持续失败请联系 CI 管理员在 Worker 镜像里预装 ca-certificates\n       或设 SSL_CERT_FILE=/etc/ssl/certs/cacert.pem 环境变量 (之前 siril/imgp 也遇过同问题)"
+  },
+  {
+    "id": "worker_pip_dep_resolution",
+    "pattern": "Could not find a version that satisfies the requirement|No matching distribution found|pip.*resolution.*failed|ERROR: Could not find",
+    "hint": "worker Python 环境依赖解析失败 (不是 PR 代码问题)\n       worker 上 pip 安装 conan 时 requests 等依赖版本冲突, 多因 worker 镜像过期或 PyPI 镜像未同步\n       建议: 稍后重试; 若持续失败请联系 CI 管理员刷新 worker Python 基础镜像"
+  },
+  {
+    "id": "system_pkg_config_missing",
+    "pattern": "must be available through pkg-config|pkg-config.*not found|GTK_PREFIX|DEFAULT_PREFIX|Package .* was not found in the pkg-config search path|perhaps you should add the directory containing `.*\\.pc'",
+    "hint": "缺少系统级 pkg-config 依赖 (如 pango/cairo/gtk 等)\n       worker 环境未预装该系统库或 .pc 文件\n       建议: 1) 在 conanfile.py requirements 中改用 conan 依赖(如 'pango/1.x', 'cairo/1.x')替代系统库 2) 如该库已在 OHPCD 仓内被其他包提供, 先提交其 PR 3) 联系 CI 管理员确认 worker 是否预装该系统包"
+  },
+  {
+    "id": "worker_conan_install",
+    "pattern": "Failed to install conan|Conan not found.*broken|Conan environment setup.*fail",
+    "hint": "worker 上的 conan 工具链安装/初始化失败 (不是 PR 代码问题)\n       worker Python 环境异常或 PyPI 镜像不可达\n       建议: 稍后重试; 若持续失败请联系 CI 管理员"
+  },
+  {
+    "id": "worker_git_missing",
+    "pattern": "git: (command )?not found|127: command not found.*git|fatal: 'git'.*not found|'git' is not (recognized|found)|which: no git",
+    "hint": "worker 环境缺少 git 命令 (不是 PR 代码问题)\n       worker 镜像损坏或 PATH 未正确配置\n       建议: 该 worker 需要运维修复, 请联系 CI 管理员 (附上 worker 名称)\n       CI 会将该 worker 标记为不可用"
+  },
+  {
+    "id": "worker_checkout_residual",
+    "pattern": "error: Your local changes.*would be overwritten|patch does not apply|The following paths.*already exist|error: (checkout|merge).*would be overwritten|CONFLICT \\(content\\): Merge conflict",
+    "hint": "worker 工作目录残留上次构建的文件 (不是 PR 代码问题)\n       连续两次构建改了同一文件, checkout-pr 前未清理干净\n       建议: 稍后重试; 若持续失败请联系 CI 管理员\n       CI 已在 checkout-pr step 加入 git checkout . && git clean -fdx 清理残留"
+  },
+  {
+    "id": "recipe_conanfile_missing_targeted",
+    "pattern": "No packages to build|has no conanfile\\.py|Path in CI_PACKAGES has no conanfile",
+    "hint": "PR 改了 archives/ 下的文件但缺少 conanfile.py\n       CI_PACKAGES 指向的目录里没有 conanfile.py (构建脚本)\n       常见原因: 贡献者只上传了 conandata.yml (源码下载元数据) 但没上传 conanfile.py\n       请在该目录创建 conanfile.py (参考 templates/ 目录下的模板):\n         archives/字母/包名/版本/conanfile.py"
+  }
+]
