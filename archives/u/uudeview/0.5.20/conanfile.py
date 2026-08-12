@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+"""Conan recipe — uudeview 0.5.20 (autotools)"""
+
+import os
+
 from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
 from conan.tools.layout import basic_layout
-import os
 
 
 class UudeviewConan(ConanFile):
@@ -10,7 +14,6 @@ class UudeviewConan(ConanFile):
     description = "UUDeview is a program that helps you transmit and receive binary files over the Internet, using email or newsgroups."
     license = "GPL-2.0-or-later"
     homepage = "http://www.fpx.de/fp/Software/UUDeview/"
-    url = ""
 
     package_type = "library"
 
@@ -33,10 +36,11 @@ class UudeviewConan(ConanFile):
     def build(self):
         apply_conandata_patches(self)
         # E165: Fix shebang for OHOS
-        self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' configure", cwd=self.source_folder)
-        self.run("sed -i '1s|#!/bin/bash|#!/data/service/hnp/bin/bash|' configure", cwd=self.source_folder)
-        self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' install-sh", cwd=self.source_folder)
-        self.run("CC=clang CXX=clang++ ./configure --prefix={} --disable-minews".format(
+        if self.settings.os == "OHOS":
+            self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' configure", cwd=self.source_folder)
+            self.run("sed -i '1s|#!/bin/bash|#!/data/service/hnp/bin/bash|' configure", cwd=self.source_folder)
+            self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' install-sh", cwd=self.source_folder)
+        self.run("./configure --prefix={} --disable-minews".format(
             self.package_folder), cwd=self.source_folder)
         self.run("make -j1", cwd=self.source_folder)
 
