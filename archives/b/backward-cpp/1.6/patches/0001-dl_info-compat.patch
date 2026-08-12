@@ -1,0 +1,21 @@
+--- a/backward.hpp
++++ b/backward.hpp
+@@ -254,7 +254,18 @@
+ #undef _GNU_SOURCE
+ #else
+ #include <dlfcn.h>
++
++#endif
+ #endif
++
++// OHOS 兼容：dlfcn.h 精简版不含 Dl_info 类型（dladdr 相关）——补充标准定义
++#if (defined(__OHOS__) || defined(__HarmonyOS__)) && !defined(_Dl_info_defined)
++typedef struct {
++    const char *dli_fname;
++    void *dli_fbase;
++    const char *dli_sname;
++    void *dli_saddr;
++} Dl_info;
+ #endif
+ 
+ #if (BACKWARD_HAS_BACKTRACE == 1) || (BACKWARD_HAS_BACKTRACE_SYMBOL == 1)

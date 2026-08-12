@@ -12,11 +12,19 @@ class BackwardCppConan(ConanFile):
     # library 类型必须声明 shared 选项（conan 2 校验——cattle/sherlock.lv2 先例）
     options = {"shared": [True, False]}
     default_options = {"shared": False}
+    # 导出 patches/（apply_conandata_patches 需要——multitail 教训）
+    exports_sources = "patches/*"
     # 无外部依赖（backward-cpp 为单头文件 backward.hpp + backward.cpp 实现——
     # C++ 堆栈回溯库）
 
     def layout(self):
         cmake_layout(self)
+
+    def source(self):
+        # 显式应用 0001-dl_info-compat.patch（multitail 教训：必须显式调用
+        # apply_conandata_patches——否则补丁不会被应用）
+        from conan.tools.files import apply_conandata_patches
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = CMakeToolchain(self)
