@@ -13,7 +13,9 @@ for base in /data/service/hnp/ohos-sdk.org /data/service/hnp; do
     fi
 done
 if [ -n "$LIBDIR" ]; then
-    export LD_LIBRARY_PATH="$LIBDIR:${LD_LIBRARY_PATH:-}"
+    # 避免尾随冒号：LD_LIBRARY_PATH 未设置时展开为 "$LIBDIR"，不产生空路径分量
+    # （空分量会被 ld.so 解析为当前工作目录，存在共享库劫持风险）
+    export LD_LIBRARY_PATH="${LIBDIR}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
 echo "[test] lv -V (version check)"
