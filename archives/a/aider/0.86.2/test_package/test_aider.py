@@ -158,7 +158,7 @@ def main():
             os.environ.get("XDG_CONFIG_HOME", "") != os.path.join(tmp, ".config")
         )
         # 本进程运行环境未受控时跳过（conanrun 环境下 HOME 为系统值，属正常）
-        check("受控隔离环境配置生效", True, f"tmp={tmp}")
+        check("受控隔离环境配置生效", isolated, f"tmp={tmp}")
     except Exception as e:
         check("受控隔离环境配置生效", False, f"err={e!r}")
 

@@ -3,7 +3,7 @@
 ## 状态语义（提交前纠偏审计）
 - status: built 仅表示 Conan 构建/验证结果：conan-verify 本轮 PASS（补丁更新后新结果）、test_package 31/31 passed；
 - **finish 未执行**（.finish-state.json 缺失），built 不作为 finish 成功证据，不得视为正式适配完成；
-- 默认核心测试 test_voice 5 个仍失败（portaudio/libsndfile 制品不可安装）；
+- 默认核心测试 test_voice 8 个用例全部通过（portaudio 19.7.0 经 cmd-pkgs 预编译包安装至测试前缀；libsndfile 由 soundfile wheel 内置）；
 - 仅当全部硬门禁闭合且 finish 成功后才可视为 built 完成态。
 
 ## 编译环境
