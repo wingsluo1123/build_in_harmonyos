@@ -58,6 +58,16 @@ class ExpatConan(ConanFile):
     def build(self):
         import os
         apply_conandata_patches(self)
+        removed = [
+            name
+            for name in ("LD_LIBRARY_PATH", "PYTHONHOME")
+            if os.environ.pop(name, None) is not None
+        ]
+        if removed:
+            self.output.info(
+                "Cleared inherited runtime variables before CMake configure: "
+                + ", ".join(removed)
+            )
         toolchain = self._ohos_toolchain()
         # git 归档源码树里 CMakeLists 在子目录 expat/（顶层是仓库根，非 expat 项目根）。
         src = os.path.join(self.source_folder, "expat")
