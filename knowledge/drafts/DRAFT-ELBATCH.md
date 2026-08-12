@@ -1,5 +1,7 @@
 # DRAFT-ELBATCH - 纯 Emacs Lisp 包需要可复用的 emacs --batch 上游验证链路
 
+> 正式编号未分配；合并/提升时由知识库维护流程分配下一个可用 E###。
+
 ## 错误特征
 
 纯 Emacs Lisp 包在 OHOS Conan 环境中经常只有文件完整性、source-load 或 `test_package` marker 验证。上游真正定义的 batch 检查没有执行，日志中可能出现：
