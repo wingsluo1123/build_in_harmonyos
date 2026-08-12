@@ -69,6 +69,16 @@ class BluezConan(ConanFile):
         # -lncursesw: bluez 硬编码 -lreadline 不带出 termcap 符号 (tputs/tgetent),
         # readline 静态库需 ncursesw 提供
         env.define("LDFLAGS", (" ".join(dep_ldflags) + " " + orig_ldflags + " -lncursesw").strip())
+        # configure 的 AC_CHECK_HEADERS (readline/readline.h 等) 不通过 pkg-config,
+        # 需将依赖 include 目录注入 CPPFLAGS (CI worker 无系统 readline 头文件)
+        dep_cppflags = []
+        for dep in self.dependencies.values():
+            if dep.package_folder:
+                inc = os.path.join(dep.package_folder, "include")
+                if os.path.isdir(inc):
+                    dep_cppflags.append("-I" + inc)
+        orig_cppflags = os.environ.get("CPPFLAGS", "")
+        env.define("CPPFLAGS", (" ".join(dep_cppflags) + " " + orig_cppflags).strip())
         env.vars(self).save_script("ldflags_env")
         # 生成所有依赖 (含传递依赖) 的 .pc 文件到 generators 目录,
         # AutotoolsToolchain 已把该目录注入 PKG_CONFIG_PATH,
