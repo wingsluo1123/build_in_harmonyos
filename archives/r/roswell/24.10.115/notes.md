@@ -57,6 +57,15 @@ $ make -j1 check   # tsv_sbcl 链接通过
   未设置时 main() 中 s_cat(NULL,...) 直接 SIGSEGV；这是官方支持的环境变量，非 hack
 - 产物类型：命令行工具（bin/ros），需在软件级目录创建 commands.json（R38）
 - libcurl 为运行时依赖：RUNPATH 已写入 conan 缓存路径，conan 打包后由 Conan RPATH 管理
+
+## CI worker 环境问题（已记录，非配方缺陷）
+
+- PR 校验阶段 CI 构建 #22358 首次失败于 `configure: C compiler cannot create executables`
+- 根因：CI worker 环境异常——`id` 命令报 `bad uid`（worker passwd 无当前 uid 条目），
+  且 checkout-pr 阶段 curl SSL 证书验证失败（worker 缺 CA 证书，CI hint 明确标注"不是 PR 代码问题"）
+- 佐证：同一时段其他 PR（tty-clock #5166、alloy #5165）同样 FAILED；本地
+  `conan create`（G2 PASS）与 W3 完整 CI 模拟（setup.sh + build_and_test.sh, exit_code=0）均通过
+- 处理：等 CI worker 环境恢复后重新触发构建（bluez #5162 于 01:35 PASSED 证明环境已恢复）
 ---
 
 **编译结束**: 2026-08-12 23:15
