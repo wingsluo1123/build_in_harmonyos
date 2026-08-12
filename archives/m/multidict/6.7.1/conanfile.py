@@ -44,6 +44,40 @@ class MultidictConan(ConanFile):
         apply_conandata_patches(self)
         if not os.path.isdir(os.path.join(self.source_folder, "multidict")):
             raise ConanException("multidict package directory not found in source")
+        # Run upstream pytest subset to report real pass rate
+        # (manager review: upstream has tests/ suite, PR must not under-report)
+        self._run_upstream_tests()
+
+    def _run_upstream_tests(self):
+        tests_dir = os.path.join(self.source_folder, "tests")
+        if not os.path.isdir(tests_dir):
+            self.output.warning("upstream tests/ not found, skipping pytest")
+            return
+        try:
+            import subprocess
+            res = subprocess.run(["python3", "-m", "pytest", "--version"],
+                                 capture_output=True, timeout=30)
+            if res.returncode != 0:
+                self.output.warning("pytest unavailable, upstream tests skipped")
+                return
+        except Exception as e:
+            self.output.warning(f"pytest unavailable, upstream tests skipped: {e}")
+            return
+        subset = ["test_multidict.py", "test_updatable.py", "test_abc.py"]
+        env = dict(os.environ)
+        env["PYTHONPATH"] = self.source_folder
+        try:
+            res = subprocess.run(
+                ["python3", "-m", "pytest", *subset, "-q", "--no-header",
+                 "--tb=no", "--confcutdir", tests_dir],
+                cwd=tests_dir, env=env, capture_output=True, timeout=180,
+            )
+            out = res.stdout.decode(errors="ignore").strip()
+            self.output.info(f"upstream pytest subset: {out.splitlines()[-1] if out else 'n/a'}")
+            if res.returncode != 0:
+                self.output.warning("upstream pytest subset failed")
+        except Exception as e:
+            self.output.warning(f"upstream pytest run failed: {e}")
 
     def package(self):
         pkg_dir = os.path.join(self.package_folder, "lib", "python3.12", "site-packages", "multidict")
