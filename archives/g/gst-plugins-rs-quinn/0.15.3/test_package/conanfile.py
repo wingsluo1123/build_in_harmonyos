@@ -30,8 +30,10 @@ class GstPluginsRsQuinnTestConan(ConanFile):
         cc = self.conf.get("tools.build:compiler_executables", {}).get("c") \
             or shutil.which("clang") or shutil.which("cc") or "clang"
         test_c = os.path.join(self.source_folder, "test.c")
-        out_bin = os.path.join(self.build_folder, "test_gst-plugins-rs-quinn")
-        self.run(f'{cc} -O2 -o {out_bin} {test_c} -ldl', env="conanbuild")
+        # Write the test binary to the build folder (cpp.build.bindirs is
+        # empty because we bypass CMake; test() uses this fixed path).
+        self._test_bin = os.path.join(self.build_folder, "test_gst-plugins-rs-quinn")
+        self.run(f'{cc} -O2 -o {self._test_bin} {test_c} -ldl', env="conanbuild")
 
     def test(self):
         dep = self.dependencies["gst-plugins-rs-quinn"]
@@ -43,5 +45,5 @@ class GstPluginsRsQuinnTestConan(ConanFile):
             self.output.warning("packaged plugin not found (build skipped on toolchain-less worker); test passed gracefully")
             return
 
-        bin_path = os.path.join(self.cpp.build.bindirs[0], "test_gst-plugins-rs-quinn")
+        bin_path = getattr(self, "_test_bin", None) or os.path.join(self.build_folder, "test_gst-plugins-rs-quinn")
         self.run(f"{bin_path} {plugin}")
