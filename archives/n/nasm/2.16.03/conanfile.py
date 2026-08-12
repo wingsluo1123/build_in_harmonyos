@@ -7,6 +7,7 @@ import shutil
 
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
+from conan.tools.build import load_toolchain_args
 from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import (
     apply_conandata_patches,
@@ -63,7 +64,10 @@ class NasmConan(ConanFile):
         apply_conandata_patches(self)
         os.chmod(os.path.join(self.source_folder, "configure"), 0o755)
         autotools = Autotools(self)
-        autotools.configure()
+        if str(self.settings.os) == "OHOS":
+            self._configure_with_shell()
+        else:
+            autotools.configure()
         autotools.make(args=["-j1"])
         self._smoke_test_build_output()
 
@@ -119,6 +123,25 @@ class NasmConan(ConanFile):
             f"{shlex.quote(shell)} -c {shlex.quote(command)}",
             env="conanautotoolstoolchain",
         )
+
+    def _configure_with_shell(self):
+        configure_args = load_toolchain_args(self.generators_folder).get(
+            "configure_args", ""
+        )
+        shell = self._config_shell()
+        configure = os.path.join(self.source_folder, "configure")
+        command = " ".join(
+            part
+            for part in (
+                f"CONFIG_SHELL={shlex.quote(shell)}",
+                f"SHELL={shlex.quote(shell)}",
+                shlex.quote(shell),
+                shlex.quote(configure),
+                configure_args,
+            )
+            if part
+        )
+        self.run(command, cwd=self.build_folder, env="conanbuild")
 
     @staticmethod
     def _config_shell():
