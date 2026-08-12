@@ -39,15 +39,11 @@ Gauche 的内嵌 Boehm GC 需要生成 `libgc_pic.a`（PIC 归档）供 libgauch
 `--disable-shared` 会使 `libgc_pic.a` 为空，导致 GC_* 符号未定义。
 因此 `generate()` 中不加 `--disable-shared`，保持默认动态构建。
 
-### ext/doc/static 跳过（补丁 0002/0044/0046）
-- **ext 跳过**: ext 目录扩展模块依赖动态链接，OHOS 上编译失败。
-  补丁 0002 修改 Makefile.in 的 SUBDIRS 跳过 ext。
-- **doc 跳过**: doc 目录需要构建 gosh 后生成 man page，跳过以简化构建。
-  补丁 0002 中和 install-doc 目标。
-- **static 跳过**: 静态库构建依赖 ext（需要 gauche.uvector 等），跳过。
-  补丁 0046 从 src/Makefile.in 的 INSTALL_LIBS 中移除 libgauche-static-0.98.a。
-- **pre-package check 跳过**: 补丁 0044 跳过 make install 前的版本检查
-  （BUILD_GOSH 在干净构建中不可用）。
+### ext/doc/static 跳过
+- **ext 跳过**: ext 目录扩展模块依赖动态链接，OHOS 上编译失败；recipe 在构建阶段调整生成的 Makefile.in，跳过 ext。
+- **doc 跳过**: doc 目录需要构建 gosh 后生成 man page；recipe 在构建阶段跳过文档安装。
+- **static 跳过**: 静态库构建依赖 ext（需要 gauche.uvector 等）；recipe 在构建阶段从安装列表移除静态库。
+- **pre-package check 跳过**: recipe 在构建阶段跳过 make install 前的版本检查（BUILD_GOSH 在干净构建中不可用）。
 
 ### copy-port 替换（补丁 0045）
 ext 目录跳过后，`util.scm` 的 `do-copy` 依赖 `gauche.uvector`（来自跳过的 ext）。
