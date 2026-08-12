@@ -112,7 +112,46 @@
   签名后恢复权限；断言数量不变（3 项）。
 - 边界：bfd 路径仅作为构建期 `-fuse-ld` 参数，不进入下游公开链接参数；未修改 ci/、scripts/、
   profile；未复制 libxml2 入包；未设置全局 LD_LIBRARY_PATH。
+## OHOS dlopen 权限根因与 0755 策略（PR #5100 终审，2026-08-12）
+
+- 根因：签名前/后 test_ext.so 与 libboost_python312.so 权限为 0770（owner/group 可读写执行，
+  other 无任何权限）。CI 运行用户与文件 owner/group 不同时，dlopen 走 other 路径 → EACCES
+  （`ImportError: ... Permission denied`）。
+- 实测（本机 HMDFS）：HMDFS/SELinux 忽略 POSIX chmod（chmod 600→660、644→660、755→770、
+  777→770，E046），且文件 owner 被映射为 20001006 与运行用户不同；本机运行用户属于
+  group 1006（文件 gid），故本机 group 位可访问而 CI 用户不可。
+- 修复：对最终可加载的 OHOS ELF 共享库统一使用确定性权限 **0o755**（不再采用
+  `original_mode | 0o111`，该写法在 0770 下结果为 0771 且无法覆盖 other 位）。
+  签名流程（copy2 → 删 .codesign → selfSign → chmod 0o755 → os.replace → chmod 0o755 →
+  stat 验证严格等于 0755，否则抛 ConanInvalidConfiguration 失败）中，签名是最后一个
+  ELF 内容变更步骤，chmod 不改变 ELF 内容。
+- 两个文件（主配方 libboost_python312.so、test_package test_ext.so）应用相同规则；
+  EXE/SHARED/MODULE 三处 ld.bfd 修复保留。
+- 边界：本机 HMDFS 无法达成 0755（E046 平台限制）；远端 CI 路径同样位于
+  /storage/Users/currentUser，不能假设 CI 中 chmod 会生效——0755 仅为 best-effort
+  请求，签名有效性以 .codesign 段 + display-sign 为准，不因 HMDFS 返回 0770 判定失败。
+## HMDFS 跨身份真实加载：TMPDIR 暂存方案（PR #5100 修复终版，2026-08-12）
+
+- E046 已真实确认：HMDFS/SELinux 忽略 POSIX chmod（chmod 600→660、644→660、755→770、
+  777→770），且文件 owner 被映射为 20001006 与运行用户不同；远端 CI 路径同样位于
+  /storage/Users/currentUser，不能假设 CI 中 chmod 会生效。
+- 结论：0755 仅为 best-effort 请求，不因 HMDFS 返回 0770 判定失败；签名有效性以
+  .codesign 段 + display-sign self-sign 为准（不再做"最终 mode 必须等于 0755"的硬失败检查）。
+- 真实运行方案：test_package test() 将当前产物暂存到本轮 TMPDIR 独立运行目录：
+  1. tempfile.mkdtemp(dir=os.environ["TMPDIR"]) 创建 boostpy-run-* 目录（进程自己拥有）；
+  2. 系统 cp 复制 test_ext.so、libboost_python312.so（取自 package_folder/lib）、
+     consumer_test.py（不使用 shutil.copy2，其依赖 E046 下无效的 chmod）；
+  3. 复制后逐项验证：ELF magic、SHA256 一致、.codesign 存在、display-sign self-sign、
+     os.R_OK/os.X_OK；若 cp 后签名失效则按原子流程重新签名并再次 display-sign；
+  4. PYTHONPATH / LD_LIBRARY_PATH 首位为运行目录（保留 conanrun 其余环境）；
+  5. 从运行目录执行 consumer_test.py，输出 test_ext.__file__ 必须解析到 TMPDIR 运行目录；
+  6. 真实执行 add(2,3)==5、add(-1,1)==0、greet() 3 项断言；
+  7. finally 中清理运行目录。
+- 验证结果（本机 conan create exit=0）：test_ext.__file__ =
+  /storage/Users/currentUser/boostpy-run-mrorcq25/test_ext.so；3 断言全部通过；
+  包内 libboost_python312.so：aarch64 ELF、NEEDED 仅 libpython3.12/libc++_shared/libc、
+  .codesign 存在、display-sign self-sign。
 ---
 
-**编译结束**: 2026-08-12 17:54
+**编译结束**: 2026-08-12 21:52
 **最终状态**: built

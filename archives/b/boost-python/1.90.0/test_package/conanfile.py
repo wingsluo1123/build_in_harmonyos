@@ -10,6 +10,7 @@
 """
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
@@ -59,26 +60,206 @@ class BoostPythonTestConan(ConanFile):
     def test(self):
         if cross_building(self):
             return
-        # 运行时需能找到 libboost_python312.so（conanrun 环境）、libc++_shared.so（OHOS SDK）
+        # 运行时需能找到 libc++_shared.so（OHOS SDK）
         sdk_lib = (
             "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/"
             "ohos/native/llvm/lib/aarch64-linux-ohos/c++"
         )
-        if os.path.isdir(sdk_lib):
-            os.environ["LD_LIBRARY_PATH"] = (
-                sdk_lib + os.pathsep + os.environ.get("LD_LIBRARY_PATH", "")
-            )
-        # OHOS dlopen 要求 ELF code signature：import 前签名 CMake 实际生成的扩展模块
-        if str(self.settings.os) == "OHOS":
-            extension = self._find_extension()
-            if extension:
+        run_dir = None
+        try:
+            if str(self.settings.os) == "OHOS":
+                extension = self._find_extension()
+                if not extension:
+                    raise ConanInvalidConfiguration(
+                        "test_ext.so not found after build"
+                    )
+                # OHOS dlopen 要求 ELF code signature：import 前签名 CMake 生成的扩展模块
                 self._sign_elf_atomically(
                     extension,
                     self._find_ohos_tool("llvm-objcopy"),
                     self._find_ohos_tool("binary-sign-tool"),
                 )
-        script = os.path.join(self.source_folder, "consumer_test.py")
-        self.run("python3 " + script, cwd=self.build_folder, env="conanrun")
+                # HMDFS 将 chmod 0755 映射为 0770（E046），且运行用户可能与文件
+                # owner/group 不同（跨身份 EACCES）。真实运行前把产物暂存到本轮
+                # TMPDIR 独立运行目录（系统 cp 创建，进程自己拥有），再从该目录
+                # 动态加载 test_ext.so 与 libboost_python312.so。
+                run_dir = self._stage_run_dir(extension)
+                # PYTHONPATH / LD_LIBRARY_PATH 首位为运行目录（保留 conanrun 其他环境）
+                os.environ["PYTHONPATH"] = (
+                    run_dir + os.pathsep + os.environ.get("PYTHONPATH", "")
+                )
+                os.environ["LD_LIBRARY_PATH"] = (
+                    run_dir
+                    + os.pathsep
+                    + (sdk_lib if os.path.isdir(sdk_lib) else "")
+                    + os.pathsep
+                    + os.environ.get("LD_LIBRARY_PATH", "")
+                )
+            script = os.path.join(self.source_folder, "consumer_test.py")
+            self.run(
+                "python3 " + script,
+                cwd=run_dir or self.build_folder,
+                env="conanrun",
+            )
+        finally:
+            if run_dir and os.path.isdir(run_dir):
+                # 防越界清理：只删除本轮创建、位于 TMPDIR 下且前缀为 boostpy-run- 的目录
+                base = os.path.realpath(os.environ.get("TMPDIR") or "")
+                real = os.path.realpath(run_dir)
+                name = os.path.basename(real)
+                if (
+                    base
+                    and real.startswith(base)
+                    and name.startswith("boostpy-run-")
+                    and real != "/"
+                ):
+                    shutil.rmtree(real, ignore_errors=True)
+
+    def _stage_run_dir(self, extension):
+        """在 TMPDIR 下创建本轮独立运行目录并暂存产物（结构化、防越界）。
+
+        - TMPDIR 必须为有效环境变量并解析为绝对路径；禁止 /tmp、仓库目录、
+          Conan package_folder 或硬编码用户路径作为运行目录基座；
+        - mkdtemp(prefix="boostpy-run-", dir=base)；
+        - 结构化复制（Python 文件复制，不使用 shell 拼接 cp/rm）；
+        - 复制后逐项验证：ELF magic、SHA256、.codesign、display-sign self-sign、
+          os.R_OK/os.X_OK。
+        """
+        import tempfile
+
+        base = os.environ.get("TMPDIR") or ""
+        base = os.path.realpath(base) if base else ""
+        forbidden = ("/tmp", self.source_folder, self.build_folder)
+        if (
+            not base
+            or not os.path.isabs(base)
+            or not os.path.isdir(base)
+            or any(
+                os.path.realpath(base).startswith(os.path.realpath(p))
+                for p in forbidden
+            )
+        ):
+            raise ConanInvalidConfiguration(
+                "TMPDIR must be an absolute, existing directory outside /tmp, "
+                "the repo and the package folders; got: " + repr(base)
+            )
+        run_dir = tempfile.mkdtemp(prefix="boostpy-run-", dir=base)
+        pkg_lib = os.path.join(
+            self.dependencies[self.tested_reference_str].package_folder,
+            "lib",
+            "libboost_python312.so",
+        )
+        sources = {
+            "test_ext.so": extension,
+            "libboost_python312.so": pkg_lib,
+        }
+        if not os.path.isfile(pkg_lib):
+            raise ConanInvalidConfiguration(
+                "libboost_python312.so not found in package: " + pkg_lib
+            )
+        # 结构化复制（Python shutil.copyfile：只复制内容，不保留权限——不依赖
+        # E046 下无效的 chmod；不使用 shell 拼接 cp/rm）
+        import shutil as _shutil
+
+        for dst, src in sources.items():
+            target = os.path.join(run_dir, dst)
+            _shutil.copyfile(src, target)
+            # copyfile 按 umask 创建（HMDFS 映射 660 无执行位），dlopen 需要执行位：
+            # best-effort chmod 0o755（HMDFS 映射 770，进程所属 group 可访问）
+            os.chmod(target, 0o755)
+        consumer = os.path.join(run_dir, "consumer_test.py")
+        _shutil.copyfile(
+            os.path.join(self.source_folder, "consumer_test.py"),
+            consumer,
+        )
+        os.chmod(consumer, 0o644)
+
+        objcopy = self._find_ohos_tool("llvm-objcopy")
+        signer = self._find_ohos_tool("binary-sign-tool")
+        for name in ("test_ext.so", "libboost_python312.so"):
+            staged = os.path.join(run_dir, name)
+            src = sources[name]
+            self._verify_staged_elf(src, staged)
+            if name == "libboost_python312.so":
+                # 包内库责任在 package()：这里只验证，绝不重新签名。
+                # 复制动作不得改变 ELF 内容（SHA256 已在 _verify_staged_elf 校验一致）。
+                if not self._elf_signed_ok(staged):
+                    raise ConanInvalidConfiguration(
+                        "package libboost_python312.so is not validly signed "
+                        "(must be signed in package()); refusing to re-sign in test"
+                    )
+            else:
+                # test_ext.so 由 test_package 本轮构建，可在 test() 中签名
+                if not self._elf_signed_ok(staged):
+                    self._sign_elf_atomically(staged, objcopy, signer)
+                    if not self._elf_signed_ok(staged):
+                        raise ConanInvalidConfiguration(
+                            "staged {name} not validly signed".format(name=name)
+                        )
+            # 当前进程必须对暂存文件可读且可执行（dlopen 前提）
+            st = os.stat(staged)
+            if not (
+                os.access(staged, os.R_OK) and os.access(staged, os.X_OK)
+            ):
+                raise ConanInvalidConfiguration(
+                    "staged {name} lacks R_OK/X_OK for the test process".format(
+                        name=name
+                    )
+                )
+        return run_dir
+
+    def _sha256(self, path):
+        import hashlib
+
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _elf_signed_ok(self, path):
+        """以 .codesign 段存在且 display-sign 显示 self-sign 作为签名有效判据。
+
+        用 subprocess 捕获输出（self.run(quiet=True) 的返回值在部分 Conan
+        版本不可靠），以真实工具输出为准。
+        """
+        if not os.path.isfile(path):
+            return False
+        readelf = self._find_ohos_tool("llvm-readelf")
+        if not readelf:
+            return False
+        out = subprocess.run(
+            [readelf, "-S", path], capture_output=True, text=True
+        ).stdout
+        if ".codesign" not in out:
+            return False
+        signer = self._find_ohos_tool("binary-sign-tool")
+        if not signer:
+            return False
+        res = subprocess.run(
+            [signer, "display-sign", "-inFile", path],
+            capture_output=True,
+            text=True,
+        )
+        out = (res.stdout or "") + (res.stderr or "")
+        return "self-sign" in out
+
+    def _verify_staged_elf(self, src, staged):
+        """ELF magic、SHA256、.codesign 与源文件一致。"""
+        if not os.path.isfile(staged):
+            raise ConanInvalidConfiguration("staged missing: " + staged)
+        with open(src, "rb") as f:
+            src_magic = f.read(4)
+        with open(staged, "rb") as f:
+            staged_magic = f.read(4)
+        if src_magic != b"\x7fELF" or staged_magic != b"\x7fELF":
+            raise ConanInvalidConfiguration(
+                "ELF magic mismatch for " + staged
+            )
+        if self._sha256(src) != self._sha256(staged):
+            raise ConanInvalidConfiguration(
+                "SHA256 mismatch after staging: " + staged
+            )
 
     def _find_extension(self):
         matches = [
@@ -120,7 +301,9 @@ class BoostPythonTestConan(ConanFile):
                 "OHOS consumer import requires llvm-objcopy and binary-sign-tool "
                 "to sign the extension module (dlopen enforces ELF code signature)."
             )
-        original_mode = os.stat(path).st_mode
+        # OHOS dlopen 强制要求 ELF code signature；HMDFS/SELinux 会忽略 POSIX chmod
+        # （E046：chmod 0755 被映射为 0770），因此权限仅作 best-effort 请求，不因
+        # HMDFS 返回 0770 判定失败；签名有效性以 .codesign 段 + display-sign 为准。
         temporary = f"{path}.signing"
         try:
             shutil.copy2(path, temporary)
@@ -129,8 +312,10 @@ class BoostPythonTestConan(ConanFile):
                 f'"{signer}" sign -inFile "{temporary}" '
                 f'-outFile "{temporary}" -selfSign 1'
             )
-            os.chmod(temporary, original_mode)
+            # 签名是最后一个 ELF 内容变更步骤；随后只调整权限（best-effort）并原子替换
+            os.chmod(temporary, 0o755)
             os.replace(temporary, path)
+            os.chmod(path, 0o755)
         finally:
             if os.path.exists(temporary):
                 os.remove(temporary)

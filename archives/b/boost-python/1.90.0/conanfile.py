@@ -309,7 +309,9 @@ class BoostPythonConan(ConanFile):
             self._sign_elf_atomically(library, objcopy, signer)
 
     def _sign_elf_atomically(self, path, objcopy, signer):
-        original_mode = os.stat(path).st_mode
+        # OHOS dlopen 强制要求 ELF code signature；HMDFS/SELinux 会忽略 POSIX chmod
+        # （E046：chmod 0755 被映射为 0770），因此权限仅作 best-effort 请求，不因
+        # HMDFS 返回 0770 判定失败；签名有效性以 .codesign 段 + display-sign 为准。
         temporary = f"{path}.signing"
         try:
             shutil.copy2(path, temporary)
@@ -318,8 +320,10 @@ class BoostPythonConan(ConanFile):
                 f'"{signer}" sign -inFile "{temporary}" '
                 f'-outFile "{temporary}" -selfSign 1'
             )
-            os.chmod(temporary, original_mode)
+            # 签名是最后一个 ELF 内容变更步骤；随后只调整权限（best-effort）并原子替换
+            os.chmod(temporary, 0o755)
             os.replace(temporary, path)
+            os.chmod(path, 0o755)
         finally:
             if os.path.exists(temporary):
                 os.remove(temporary)
