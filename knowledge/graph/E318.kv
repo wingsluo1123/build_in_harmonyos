@@ -1,0 +1,69 @@
+#====================================================================
+# E318 — Source-only bootstrap for self-hosted compiler packages
+#====================================================================
+
+# ═══ Layer 0: Error Surface ═══
+id:                     E318
+trigger_tool:           make|conan|git
+phase:                  source|build
+error_signature:        git clone bootstrap|git pull bootstrap|vc/v.c missing|bootstrap compiler source missing|network clone during build
+
+# ═══ Layer 1: Recognition ═══
+severity:               3
+category:               bootstrap|self_hosted_compiler|reproducibility
+match_keywords:         self-hosted, bootstrap, stage1, stage2, vc/v.c, compiler.c, git clone, offline build, source tarball
+title:                  Source-only bootstrap for self-hosted compiler packages
+
+# ═══ Layer 2: Diagnosis ═══
+root_cause: The upstream release tarball contains the compiler source but expects a separate bootstrap repository to be cloned or updated during build. This makes CI non-deterministic and violates package-source reproducibility.
+affected_scope: Self-hosted compilers and language toolchains whose first build stage is generated into a separate bootstrap repository.
+verification_cmd: grep -R "git clone\\|git pull\\|curl\\|wget" build.log
+
+# ═══ Layer 3: Solution Space ★ ═══
+rec_priority:           1
+rec_approach:           deterministic-bootstrap-source
+rec_description:        Add the bootstrap source archive to conandata.yml, extract it in source(), copy the exact bootstrap file into the upstream-expected location, and invoke only the local bootstrap build target.
+rec_command:            conan create archives/v/vlang/0.5.2 --build=missing
+rec_auto_fix:           false
+rec_impl:               recipe-source-step
+
+fallback_priority:      2
+fallback_approach:      vendored-bootstrap-patch
+fallback_description:   If upstream only supports a clone-refresh default target, patch or bypass the default target and call the stage build commands directly.
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       git clone.*bootstrap|git pull.*bootstrap
+forbid_1_reason:        Network access during build is non-deterministic and can fail under OHOS CI/network policy.
+forbid_1_consequence:   CI flakes or consumes an unpinned bootstrap source that does not match the reviewed package.
+
+# ═══ Layer 4: Principles ═══
+principles:             R28,R33,W3
+
+# ═══ Relations ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ Metadata ═══
+software:               vlang/0.5.2
+symptom:                upstream Makefile tries to fetch vlang/vc during build
+solution:               download v and vc tarballs in source(), inject vc/v.c, and run the local bootstrap target
+pattern:                self-hosted compiler bootstrap repository -> deterministic source() injection
+doc_file:               doc/E318.md
+last_updated:           2026-07-23
+source_event:           vlang 0.5.2 adaptation
+
+# ═══ Authorship & Provenance ═══
+authors:                asp1r1n1
+source_pr:
+source_commit:
+
+# ═══ Quality Metrics ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
