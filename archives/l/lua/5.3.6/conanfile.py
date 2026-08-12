@@ -73,6 +73,14 @@ class LuaConan(ConanFile):
             src=src,
             dst=os.path.join(self.package_folder, "lib"),
         )
+        # 打包解释器 CLI（test_package 的 lua -v / luac -v 与 L2 smoke 需要 bin/）。
+        bin_dir = os.path.join(self.package_folder, "bin")
+        copy(self, "lua", src=src, dst=bin_dir)
+        copy(self, "luac", src=src, dst=bin_dir)
+        for command in ("lua", "luac"):
+            path = os.path.join(bin_dir, command)
+            if os.path.exists(path):
+                os.chmod(path, 0o755)
 
     def package_info(self):
         self.cpp_info.libs = ["lua"]
@@ -80,5 +88,5 @@ class LuaConan(ConanFile):
         self.cpp_info.defines = ["LUA_USE_POSIX", "LUA_USE_DLOPEN"]
         self.cpp_info.set_property("cmake_file_name", "lua")
         self.cpp_info.set_property("cmake_target_name", "lua::lua")
-        # acf-lib-lua5.3 probes lua-5.3 through pkg-config.
         self.cpp_info.set_property("pkg_config_name", "lua-5.3")
+        self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
