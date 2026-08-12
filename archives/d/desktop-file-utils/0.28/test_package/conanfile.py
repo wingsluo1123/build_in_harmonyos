@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""test_package for desktop-file-utils 0.28 — 验证 CLI 可执行且版本输出正确。"""
+"""test_package for desktop-file-utils 0.28 — 编译运行 test.c 验证 CLI 可执行。"""
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import can_run
-from conan.tools.env import VirtualRunEnv
 
 
 class DesktopFileUtilsTestConan(ConanFile):
@@ -13,15 +13,16 @@ class DesktopFileUtilsTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def generate(self):
-        VirtualRunEnv(self).generate()
+    def build(self):
+        self.run("clang test.c -o test_desktop_file_utils")
 
     def test(self):
         if not can_run(self):
             self.output.warning("无法运行测试（交叉编译环境）")
             return
-        bin_path = os.path.join(
-            self.dependencies["desktop-file-utils"].package_folder, "bin", "desktop-file-validate"
-        )
-        self.output.info(f"desktop-file-validate 二进制: {bin_path}")
-        self.run(f"{bin_path} --version", ignore_errors=False)
+        pkg = self.dependencies["desktop-file-utils"].package_folder
+        bin_path = os.path.join(pkg, "bin", "desktop-file-validate")
+        if not os.path.isfile(bin_path):
+            raise ConanException(f"desktop-file-validate binary missing: {bin_path}")
+        self.run(f'"{bin_path}" --version')
+        self.run(f'./test_desktop_file_utils "{bin_path}"')
