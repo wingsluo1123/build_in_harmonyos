@@ -9,6 +9,7 @@ import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.env import VirtualBuildEnv
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
@@ -30,6 +31,19 @@ class AbiwordPluginEpubConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # autoconf-archive/libgcrypt 宏(ax_cxx_compile_stdcxx_11.m4 等)随配方
+        # 导出——CI 沙箱(USER=100)看不到 $HOME/.local/share/aclocal 的手工宏,
+        # AbiWord configure.ac 的 AM_PATH_LIBGCRYPT/AX_CXX_COMPILE_STDCXX_11
+        # 若无宏定义, configure 生成后报 syntax error(CI 实测)。导出后由
+        # generate() 注入 ACLOCAL_PATH, aclocal 即可展开这些宏。
+        # 用 shutil.copytree 直接复制(conan copy 的 src/dst 路径语义在
+        # export_sources 下有坑, CI 实测 es/ 为空)。
+        import shutil
+        _src_m4 = os.path.join(self.recipe_folder, "m4")
+        _dst_m4 = os.path.join(self.export_sources_folder, "m4")
+        if os.path.isdir(_src_m4) and not os.path.exists(_dst_m4):
+            shutil.copytree(_src_m4, _dst_m4)
+            self.output.info(f"  [ok] exported m4 macros to {_dst_m4}")
 
     def requirements(self):
         # epub plugin needs libgsf-1 (gsf_req) per upstream plugin.m4
@@ -56,6 +70,20 @@ class AbiwordPluginEpubConan(ConanFile):
         # PkgConfigDeps: AbiWord 主 configure 用 PKG_CHECK_MODULES 发现
         # libgsf-1(epub plugin 依赖),必须生成依赖的 .pc 文件并注入 PKG_CONFIG_PATH
         PkgConfigDeps(self).generate()
+        # 注入 ACLOCAL_PATH 指向配方自带 m4 宏(export_sources 导出的
+        # autoconf-archive/libgcrypt 宏)——CI 沙箱看不到 $HOME/.local/share/
+        # aclocal, 缺 ax_*.m4 则 AM_PATH_LIBGCRYPT 未定义, configure 生成
+        # 后 syntax error(CI 实测)。source_folder/m4 由 conan 自动合并。
+        # 注意: 必须**先** append buildenv_info **再** VirtualBuildEnv.generate(),
+        # 否则环境文件已生成, ACLOCAL_PATH 注入不生效。
+        _m4_dir = os.path.join(self.source_folder, "m4")
+        if os.path.isdir(_m4_dir):
+            self.buildenv_info.append_path("ACLOCAL_PATH", _m4_dir)
+        # VirtualBuildEnv: 把 tool_requires(automake/libtool) 的 bin 目录注入
+        # conanbuild 环境的 PATH——CI 沙箱(USER=100)看不到 $HOME/.local 的
+        # 手工工具, aclocal/automake 只存在于 tool_requires 包内, 不注入 PATH
+        # 则 self.run(env="conanbuild") 报 "aclocal: not found"(CI 实测)。
+        VirtualBuildEnv(self).generate()
         tc = AutotoolsToolchain(self)
         # Enable only the epub plugin, disable all others
         tc.configure_args.append("--enable-plugins=epub")
@@ -296,9 +324,19 @@ class AbiwordPluginEpubConan(ConanFile):
         )
 
         # 先跑 aclocal 生成 aclocal.m4(提供 AM_* 宏)
+        # 配方自带 m4 宏(ax_*.m4/libgcrypt.m4)已由 export_sources 导出到
+        # source_folder/m4。在 aclocal 命令内联注入 ACLOCAL_PATH(CI 实测
+        # buildenv_info.append_path 在 VirtualBuildEnv 里不生效, aclocal 找不到
+        # AM_PATH_LIBGCRYPT → configure 生成后 syntax error)。
+        # automake/libtool 包的 package_info 用 buildenv_info.define_path 注入
+        # $ACLOCAL/$AUTOMAKE/$LIBTOOLIZE 环境变量(conanbuildenv 已 export, 实测
+        # conanbuildenv-release-armv8.sh 含 export ACLOCAL=/.../bin/aclocal),
+        # 但不注入 PATH——CI 干净 PATH 下裸 `aclocal` 找不到, 用 $ACLOCAL 环境
+        # 变量(在 self.run(env="conanbuild") 子 shell 中展开)而非裸命令。
+        _m4_dir = os.path.join(self.source_folder, "m4")
         self.output.info("Running aclocal to generate aclocal.m4...")
         self.run(
-            "aclocal --force",
+            f'ACLOCAL_PATH="{_m4_dir}:$ACLOCAL_PATH" "${{ACLOCAL:-aclocal}}" --force',
             cwd=self.source_folder,
             env="conanbuild",
             ignore_errors=True,  # aclocal 有 warning 不影响
@@ -332,34 +370,49 @@ class AbiwordPluginEpubConan(ConanFile):
         # "required file './ltmain.sh' not found" 而不生成 Makefile.in
         _ltmain = os.path.join(self.source_folder, "ltmain.sh")
         if not os.path.exists(_ltmain):
-            # 优先从 tool_requires 的 libtool 包取 build-aux/ltmain.sh
-            # (CI 沙箱 PATH 无 libtool, shutil.which 会 miss)
-            _lt_src = ""
-            try:
-                _lt_pkg = self.dependencies["libtool"].package_folder
-                if _lt_pkg:
-                    _cand = os.path.join(_lt_pkg, "share", "libtool", "build-aux", "ltmain.sh")
-                    if os.path.exists(_cand):
-                        _lt_src = _cand
-            except Exception:
-                pass
-            if not _lt_src:
+            # $LIBTOOLIZE 由 libtool 包 buildenv_info.define_path 注入 conanbuild
+            # 环境(子 shell 有效), 在 self.run(env="conanbuild") 内用 shell 展开
+            # 复制 ltmain.sh——Python 进程 os.environ 取不到该变量(CI 实测
+            # ltmain.sh not found)。$LIBTOOLIZE 在 <pkg>/bin/libtoolize,
+            # ltmain.sh 在 <pkg>/share/libtool/build-aux/。
+            self.run(
+                'lt="$LIBTOOLIZE"; '
+                'if [ -n "$lt" ] && [ -f "$lt" ]; then '
+                '  srcdir="$(cd "$(dirname "$(dirname "$lt")")" && pwd)"; '
+                '  src="$srcdir/share/libtool/build-aux/ltmain.sh"; '
+                '  [ -f "$src" ] && cp "$src" ltmain.sh && echo "  [ok] Copied ltmain.sh via LIBTOOLIZE env"; '
+                'fi',
+                cwd=self.source_folder,
+                env="conanbuild",
+                ignore_errors=True,
+            )
+            # fallback 1: self.dependencies (tool_requires 的 package_folder)
+            if not os.path.exists(_ltmain):
+                try:
+                    _lt_pkg = self.dependencies["libtool"].package_folder
+                    if _lt_pkg:
+                        _cand = os.path.join(_lt_pkg, "share", "libtool", "build-aux", "ltmain.sh")
+                        if os.path.exists(_cand):
+                            shutil.copy(_cand, _ltmain)
+                            self.output.info("  [ok] Copied ltmain.sh from tool_requires libtool")
+                except Exception:
+                    pass
+            # fallback 2: shutil.which (本机有手工工具时)
+            if not os.path.exists(_ltmain):
                 _libtool_aux = os.path.join(
                     os.path.dirname(shutil.which("libtool") or ""),
                     "..", "share", "libtool", "build-aux", "ltmain.sh"
                 )
                 if os.path.exists(_libtool_aux):
-                    _lt_src = _libtool_aux
-            if _lt_src:
-                shutil.copy(_lt_src, _ltmain)
-                self.output.info("  [ok] Copied ltmain.sh from libtool build-aux")
-            else:
+                    shutil.copy(_libtool_aux, _ltmain)
+                    self.output.info("  [ok] Copied ltmain.sh from PATH libtool")
+            if not os.path.exists(_ltmain):
                 self.output.warning("  [warn] ltmain.sh not found, libtool macros may fail")
 
         # automake 补 Makefile.in + install-sh 等(--add-missing)
         self.output.info("Running automake to generate Makefile.in...")
         self.run(
-            "automake --add-missing --copy --no-force",
+            '"${AUTOMAKE:-automake}" --add-missing --copy --no-force',
             cwd=self.source_folder,
             env="conanbuild",
             ignore_errors=True,  # 部分 Makefile.am 有 GNU make 扩展 warning
