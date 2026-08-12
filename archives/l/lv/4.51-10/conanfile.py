@@ -73,17 +73,24 @@ class LvConan(ConanFile):
         libdir = os.path.join(self.build_folder, ".termlib")
         prefix = self.package_folder
 
+        # R33: 从 Conan conf 取编译器（OHOS clang 不在 PATH 的 gcc/cc 名下）
+        ce = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        cc = ce.get("c", "clang")
+
         # LIBS=-ltinfo makes configure's link test find tgetstr:
         # AC_CHECK_LIB(ncurses, tgetstr) tests -lncurses $LIBS,
         # and tgetstr is in libtinfo, not libncurses on OHOS.
         self.run(
             f'cd {src_dir} && '
+            f'CC="{cc}" '
             f'LIBS="-ltinfo" '
             f'LDFLAGS="-L{libdir}" '
             f'LIBRARY_PATH="{libdir}:$LIBRARY_PATH" '
             f'./configure --prefix={prefix}'
         )
-        self.run(f'cd {src_dir} && make -j1')
+        self.run(f'cd {src_dir} && make -j1 CC="{cc}"')
 
     def package(self):
         src_dir = os.path.join(self.source_folder, "src")
