@@ -30,7 +30,7 @@ class AlloyConan(ConanFile):
     url = "https://github.com/grafana/alloy"
     package_type = "application"
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def validate(self):
         if self.settings.os not in ("Linux", "OHOS"):
