@@ -25,6 +25,7 @@
 | 3 | test_package 仅检查文件结构 | 初始 test_package 无功能测试 | 增强 test_package：添加 ELF 静态分析 + 运行时功能测试（best-effort） |
 | 4 | sys/types.h 找不到 | Perl MakeMaker 不使用 Conan Toolchain，clang 找不到 OHOS SDK sysroot 头文件 | Makefile CCFLAGS patch: -isystem 添加 sysroot/usr/include + aarch64-linux-ohos 子目录 |
 | 5 | libunwind.a 链接失败 | -fstack-protector-strong ldflags 导致链接器需要 libunwind.a | Makefile LDDLFLAGS patch: -nostartfiles -nodefaultlibs -lc (E137 CRT workaround) |
+| 6 | lld 链接器找不到 libxml2.so.16 | CI worker 的 LD_LIBRARY_PATH 未包含 OHOS SDK llvm/lib 目录 | build() 中设置 LD_LIBRARY_PATH 包含 sdk_root/llvm/lib |
 
 ## 与 perl-dbd-pg 编译经验对比
 

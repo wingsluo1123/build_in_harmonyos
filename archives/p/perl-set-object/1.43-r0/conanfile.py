@@ -12,6 +12,7 @@ References:
   - E046: SELinux HMDFS restricts .so loading from user space
   - E137: Makefile patch for OHOS sysroot + CRT workaround
     (-isystem for sys/types.h, -nostartfiles -nodefaultlibs -lc for linking)
+  - LD_LIBRARY_PATH: ensure lld linker can find libxml2.so.16 on CI workers
 """
 import os
 import re
@@ -59,9 +60,17 @@ class PerlSetObjectConan(ConanFile):
         #   a) Add -isystem for OHOS SDK sysroot headers (sys/types.h etc.)
         #   b) Add CRT workaround: -nostartfiles -nodefaultlibs -lc
         #      Avoids libunwind.a dependency from -fstack-protector-strong
-        sysroot_inc = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr/include"
+        sdk_root = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native"
+        sysroot_inc = f"{sdk_root}/sysroot/usr/include"
         arch_inc = sysroot_inc + "/aarch64-linux-ohos"
-        sysroot_lib = "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/sysroot/usr/lib/aarch64-linux-ohos"
+        sysroot_lib = f"{sdk_root}/sysroot/usr/lib/aarch64-linux-ohos"
+
+        # Ensure lld linker can find its runtime deps (libxml2.so.16)
+        # CI workers may not have LD_LIBRARY_PATH set for the OHOS SDK
+        llvm_lib = f"{sdk_root}/llvm/lib"
+        _old_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        if llvm_lib not in _old_ld:
+            os.environ["LD_LIBRARY_PATH"] = f"{llvm_lib}:{_old_ld}" if _old_ld else llvm_lib
         makefile_path = os.path.join(self.source_folder, "Makefile")
         with open(makefile_path, "r") as f:
             content = f.read()
