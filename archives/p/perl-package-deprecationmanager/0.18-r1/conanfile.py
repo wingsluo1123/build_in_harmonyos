@@ -5,10 +5,12 @@ This is a pure-Perl module built with ExtUtils::MakeMaker (Makefile.PL).
 Build steps: perl Makefile.PL -> make -> make install
 
 Dependencies: Package::Stash, Params::Util, Sub::Install, Sub::Util, List::Util, Carp
-Note: Package::Stash is vendored (built from source) because the conan recipe
-      for perl-package-stash is not yet published to the remote registry.
-      When it is published, restore the requirements() method and remove the
-      vendored build block.
+Note: Package::Stash is vendored (R36 temporary exception). The recipe for
+      perl-package-stash/0.40-r1 is ready on branch feat/perl-package-stash-0.40-r1
+      but not yet merged/published to the ohpcd remote.
+      Removal: once published, delete stash_sources in conandata.yml, restore
+      self.requires("perl-package-stash/0.40-r1"), and remove the vendored
+      build block in build() and source().
 """
 import os
 
