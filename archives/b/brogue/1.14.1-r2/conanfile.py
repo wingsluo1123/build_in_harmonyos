@@ -68,6 +68,15 @@ class BrogueConan(ConanFile):
             raise RuntimeError(f"bundled ncurses headers missing: {bundled_inc}")
         if not os.path.isdir(bundled_lib):
             raise RuntimeError(f"bundled ncurses libs missing: {bundled_lib}")
+        # 静态库以 base64 文本（.b64）入库（GitCode .diff 端点不支持二进制 patch，
+        # 参照 Crypt-OpenSSL-RSA/unshield 先例），构建时解码回 .a
+        for _f in os.listdir(bundled_lib):
+            if _f.endswith(".b64"):
+                _b64p = os.path.join(bundled_lib, _f)
+                _binp = os.path.join(bundled_lib, _f[:-4])
+                with open(_b64p, "r") as _b64f, open(_binp, "wb") as _binf:
+                    import base64 as _b64
+                    _binf.write(_b64.b64decode(_b64f.read()))
 
         # 上游 Makefile 在源根目录（非 src/）
         # -I{bundled_inc} 让 term.c #include <ncurses.h> 找到自带头文件；
