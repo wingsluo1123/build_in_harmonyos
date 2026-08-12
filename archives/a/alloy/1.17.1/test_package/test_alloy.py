@@ -52,10 +52,15 @@ bpf_blocked = probe.returncode != 0 and (
     or probe.returncode == 159
 )
 if bpf_blocked:
-    print("ENV: binary blocked by host seccomp (SIGSYS on bpf syscall at "
+    print("SKIP: binary blocked by host seccomp (SIGSYS on bpf syscall at "
           "startup, cilium/ebpf memcg detection); runtime assertions "
           "require a bpf-capable target/CI. Verifying package layout only.")
-    sys.exit(0 if layout_checks() else 1)
+    if not layout_checks():
+        sys.exit(1)  # layout broken -> real failure
+    # Explicit SKIP semantics (autoconf-style exit 77): the environment
+    # blocks execution, so this is NOT a pass — the consumer runtime
+    # assertions must be exercised on a bpf-capable host.
+    sys.exit(77)
 if probe.returncode != 0:
     # Unexpected failure (not the known environment limitation) -> fail
     print(probe_out[-500:])
