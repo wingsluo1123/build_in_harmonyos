@@ -28,6 +28,7 @@
 | 6 | HMDFS 覆盖 site-packages 文件 Operation not permitted | HMDFS 覆盖限制 | 安装前 rm -rf 目标目录 |
 | 7 | conan G2 报 python-require 不能依赖 shared-library | conan 类型规则 | 移除 package_type="python-require"（参照 internetarchive） |
 | 8 | configure 原生 conftest 执行失败 | OHOS CI 沙箱(SELinux/AppSpawn)无法执行用户编译的 ELF（E009/E064） | configure 的 cross-compiling 探测改为直接判定 no（build==host==aarch64-unknown-linux-ohos 原生构建，非交叉编译；禁止 --host 伪造） |
+| 9 | test_package import xapian 报 Error loading shared library ... Permission denied | CI musl 动态链接器加载 .so 校验 .codesign 签名（E077/P-SIGN-001），未签名 .so 被拒 | package() 中对 _xapian.so 执行 llvm-objcopy 移除旧签名 + binary-sign-tool -selfSign 1（参照 ffmpeg _sign_binaries，CI 已验证） |
 
 ## 源码修改
 - 补丁 0001-configure.patch: configure 中 umask 077 → 022（E011, HMDFS 权限）

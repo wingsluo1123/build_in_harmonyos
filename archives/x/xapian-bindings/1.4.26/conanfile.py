@@ -200,6 +200,18 @@ class XapianBindingsConan(ConanFile):
             shutil.copy2(so, dest_pkg)
             self.output.info(f"  copied {os.path.basename(so)}")
 
+        # E077/P-SIGN-001: 鸿蒙 musl 动态链接器加载 .so 时校验 .codesign 签名，
+        # 未签名/签名失效的 .so 报 "Error loading shared library ... Permission denied"
+        # （CI test_package 实测）。对打包的 _xapian.so 自签名，参照 ffmpeg/7.1.5
+        # _sign_binaries()（CI 已验证）。签名后无需 chmod（.so 加载仅需读权限）。
+        _hnp_bin = "/data/service/hnp/bin"
+        objcopy = os.path.join(_hnp_bin, "llvm-objcopy")
+        signer = os.path.join(_hnp_bin, "binary-sign-tool")
+        for f in glob.glob(os.path.join(dest_pkg, "_xapian*.so")):
+            self.run('{oc} --remove-section .codesign "{f}" 2>/dev/null || true'.format(oc=objcopy, f=f))
+            self.run('{sg} sign -inFile "{f}" -outFile "{f}" -selfSign 1'.format(sg=signer, f=f))
+            self.output.info(f"  signed {os.path.basename(f)}")
+
     def package_info(self):
         py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
         site_packages = os.path.join("lib", py_ver, "site-packages")
