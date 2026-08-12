@@ -25,15 +25,21 @@ fi
 echo "  [ok] plugin .so found: $SO"
 
 # readelf: verify ELF + exported ABI symbols (hnp toolchain readelf preferred)
+# 注意: 裸名称候选不能用 [ -x "readelf" ]——那只检查当前目录, 不搜索 $PATH。
+# 先试 HNP 工具链绝对路径([ -x ] 合适), 再 fallback 到 command -v 搜索 PATH
+# (系统 /usr/bin/readelf 等), 否则 HNP 无 readelf 时即使系统可用也会误报。
 READELF=""
-for cand in /data/service/hnp/bin/readelf /data/service/hnp/bin/llvm-readelf readelf; do
+for cand in /data/service/hnp/bin/readelf /data/service/hnp/bin/llvm-readelf; do
     if [ -x "$cand" ]; then
         READELF="$cand"
         break
     fi
 done
+if [ -z "$READELF" ] && command -v readelf >/dev/null 2>&1; then
+    READELF="$(command -v readelf)"
+fi
 if [ -z "$READELF" ]; then
-    echo "ERROR: readelf not found"
+    echo "ERROR: readelf not found (HNP toolchain or PATH)"
     exit 1
 fi
 echo "  [ok] readelf: $READELF"
