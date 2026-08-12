@@ -4,6 +4,7 @@ import os
 from conan import ConanFile
 from conan.tools.files import get, copy
 from conan.tools.gnu import Autotools, AutotoolsToolchain
+from conan.tools.env import Environment
 from conan.tools.layout import basic_layout
 
 
@@ -38,6 +39,12 @@ class AlpineConan(ConanFile):
         tc.configure_args.extend(
             ["--disable-shared", "--enable-static",
              f"--build={triplet}", f"--host={triplet}"])
+        # configure 的 dlopen 检查（AC_SEARCH_LIBS dlopen——CI #21996 报
+        # No library containing dlopen found）——LIBS=-ldl 让检查找到
+        # libdl.so（OHOS 的 dlopen 在 libdl——bionic）
+        env = Environment()
+        env.append("LIBS", "-ldl")
+        env.vars(self).save_script("conanbuild_ldl")
         # configure 的 terminfo 检查（setupterm in -lncurses 等 -l 链接测试）
         # 需要 -L ncurses 包 lib 路径（CI #17674 报 Terminfo/termcap not found）——
         # LDFLAGS/CFLAGS 指向 ncurses 包（configure 链接测试继承）。
