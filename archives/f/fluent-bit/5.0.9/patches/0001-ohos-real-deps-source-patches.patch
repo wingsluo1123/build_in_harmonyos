@@ -1,0 +1,199 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,6 +1,16 @@
+ cmake_minimum_required(VERSION 3.12)
+ project(fluent-bit C)
+
++# HarmonyOS adaptation: ensure generated monkey headers are resolvable via
++# angle-bracket includes used throughout lib/monkey (e.g. <monkey/mk_info.h>
++# in mk_scheduler.h and <mk_core/mk_core_info.h> in mk_getopt.h).
++include_directories(BEFORE "${CMAKE_BINARY_DIR}/include/")
++include_directories(BEFORE "${CMAKE_BINARY_DIR}/include/monkey/")
++
++if(FTS_INCLUDE_DIR)
++  include_directories(BEFORE "${FTS_INCLUDE_DIR}")
++endif()
++
+ include(CheckCCompilerFlag)
+
+ # CMP0069 ensures that LTO is enabled for all compilers
+@@ -874,5 +884,16 @@ if(FLB_TLS)
+   # find OpenSSL (our preferred choice now)
+   find_package(OpenSSL)
++  if(OpenSSL_FOUND AND NOT OPENSSL_FOUND)
++    set(OPENSSL_FOUND ${OpenSSL_FOUND})
++  endif()
++  if(OpenSSL_INCLUDE_DIRS)
++    include_directories(${OpenSSL_INCLUDE_DIRS})
++  elseif(OPENSSL_INCLUDE_DIRS)
++    include_directories(${OPENSSL_INCLUDE_DIRS})
++  elseif(OPENSSL_INCLUDE_DIR)
++    include_directories(${OPENSSL_INCLUDE_DIR})
++  endif()
++
+   if(OPENSSL_FOUND)
+     FLB_DEFINITION(FLB_HAVE_OPENSSL)
+   endif()
+--- a/lib/chunkio/src/CMakeLists.txt
++++ b/lib/chunkio/src/CMakeLists.txt
+@@ -35,5 +35,11 @@ if(CIO_LIB_STATIC)
+   add_library(chunkio-static STATIC ${src})
+   target_link_libraries(chunkio-static ${libs})
++  if(FTS_LIBRARY_DIR)
++    target_link_directories(chunkio-static PRIVATE "${FTS_LIBRARY_DIR}")
++  endif()
++  if(FTS_LIBRARY)
++    target_link_libraries(chunkio-static "${FTS_LIBRARY}")
++  endif()
+   if(CIO_SANITIZE_ADDRESS)
+     add_sanitizers(chunkio-static)
+   endif()
+--- a/lib/monkey/mk_core/CMakeLists.txt
++++ b/lib/monkey/mk_core/CMakeLists.txt
+@@ -10,6 +10,7 @@ set(src
+
+ # Headers
+ include_directories(../include/monkey/)
++include_directories(${PROJECT_BINARY_DIR}/include/monkey/)
+
+ # It set's a definition and register into the mk_core_info.h file */
+ macro(MK_DEFINITION var)
+--- a/src/record_accessor/flb_ra_parser.c
++++ b/src/record_accessor/flb_ra_parser.c
+@@ -24,8 +24,6 @@
+ #include <fluent-bit/flb_log.h>
+ #include <fluent-bit/record_accessor/flb_ra_parser.h>
+
+-#include "ra_parser.h"
+-#include "ra_lex.h"
+
+ int flb_ra_parser_subkey_count(struct flb_ra_parser *rp)
+ {
+@@ -296,50 +294,21 @@
+ struct flb_ra_parser *flb_ra_parser_meta_create(char *str, int len)
+ {
+-    int ret;
+-    yyscan_t scanner;
+-    YY_BUFFER_STATE buf;
+-    flb_sds_t s;
+     struct flb_ra_parser *rp;
+-    struct flb_ra_key *key;
+
+     rp = flb_ra_parser_create();
+     if (!rp) {
+         flb_error("[record accessor] could not create meta context");
+         return NULL;
+     }
+
+-    /* Temporal buffer of string with fixed length */
+-    s = flb_sds_create_len(str, len);
+-    if (!s) {
+-        flb_errno();
+-        flb_ra_parser_destroy(rp);
+-        return NULL;
+-    }
+-
+-    /* Flex/Bison work */
+-    flb_ra_lex_init(&scanner);
+-    buf = flb_ra__scan_string(s, scanner);
+-
+-    ret = flb_ra_parse(rp, s, scanner);
+-
+-    /* release resources */
+-    flb_sds_destroy(s);
+-    flb_ra__delete_buffer(buf, scanner);
+-    flb_ra_lex_destroy(scanner);
+-
+-    /* Finish structure mapping */
+-    if (rp->type == FLB_RA_PARSER_KEYMAP) {
+-        if (rp->key) {
+-            key = rp->key;
+-            key->subkeys = rp->slist;
+-            rp->slist = NULL;
+-        }
+-    }
+-
+-    if (ret != 0) {
++    rp->type = FLB_RA_PARSER_KEYMAP;
++    rp->key = flb_ra_parser_string_add(rp, str + 1, len - 1);
++    if (!rp->key) {
+         flb_ra_parser_destroy(rp);
+         return NULL;
+     }
++    rp->key->subkeys = rp->slist;
++    rp->slist = NULL;
+
+     return rp;
+ }
+--- a/src/flb_blob_db.c
++++ b/src/flb_blob_db.c
+@@ -1399,6 +1399,13 @@ int flb_blob_db_file_part_get_next(struct flb_blob_db *context,
+
+ #else
+
++#include <stdint.h>
++#include <stddef.h>
++#include <sys/types.h>
++#include <cfl/cfl_sds.h>
++#include <fluent-bit/flb_config.h>
++#include <fluent-bit/flb_blob_db.h>
++
+ int flb_blob_db_open(struct flb_blob_db *context,
+                      struct flb_config *config,
+                      char *path)
+@@ -1512,7 +1519,8 @@ int flb_blob_db_file_part_get_next(struct flb_blob_db *context,
+                                    cfl_sds_t *file_path,
+                                    cfl_sds_t *destination,
+                                    cfl_sds_t *remote_file_id,
+-                                   cfl_sds_t *tag)
++                                   cfl_sds_t *tag,
++                                   int *part_count)
+ {
+     return FLB_BLOB_DB_ERROR_NO_BACKEND_AVAILABLE;
+ }
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -249,6 +249,9 @@
+   set(src
+     ${src}
+     "flb_regex.c"
++    "flb_record_accessor.c"
++    "flb_ra_key.c"
++    "record_accessor/flb_ra_parser.c"
+     )
+ endif()
+
+@@ -438,7 +438,15 @@
+ if(OPENSSL_FOUND)
+   set(FLB_DEPS
+     ${FLB_DEPS}
+     OpenSSL::SSL
+     )
+ endif()
++
++if(OPENSSL_SSL_LIBRARY AND OPENSSL_CRYPTO_LIBRARY)
++  set(FLB_DEPS
++    ${FLB_DEPS}
++    "${OPENSSL_SSL_LIBRARY}"
++    "${OPENSSL_CRYPTO_LIBRARY}"
++    )
++endif()
+
+@@ -602,2 +602,6 @@ if(FLB_BINARY)
+   target_link_libraries(fluent-bit-bin fluent-bit-static ${CMAKE_THREAD_LIBS_INIT})
++
++  if(FTS_LIBRARY)
++    target_link_libraries(fluent-bit-bin "${FTS_LIBRARY}")
++  endif()
+
+--- a/src/flb_http_client.c
++++ b/src/flb_http_client.c
+@@ -55,6 +55,8 @@
+ #include <fluent-bit/tls/flb_tls.h>
+ #include <time.h>
+ #include <fluent-bit/flb_signv4_ng.h>
++#include <fluent-bit/flb_upstream_ha.h>
++#include <fluent-bit/flb_upstream_node.h>
+
+ void flb_http_client_debug(struct flb_http_client *c,
+                            struct flb_callback *cb_ctx)
