@@ -151,6 +151,16 @@ class GstPluginsRsQuinnConan(ConanFile):
         old_pc = os.environ.get("PKG_CONFIG_PATH", "")
         os.environ["PKG_CONFIG_PATH"] = ":".join(pc_paths + ([old_pc] if old_pc else []))
 
+        # lld must find -lgstbase-1.0 / -lgstreamer-1.0 at link time.
+        # cargo's build scripts use pkg-config for -L flags, but the final
+        # link of libgstquinn.so by lld searches LIBRARY_PATH (not PKG_CONFIG_PATH).
+        # Inject ~/usr/local/lib where cmd-pkgs installed the gstreamer .so files.
+        gst_lib = os.path.expanduser("~/usr/local/lib")
+        old_lp = os.environ.get("LIBRARY_PATH", "")
+        os.environ["LIBRARY_PATH"] = gst_lib + (":" + old_lp if old_lp else "")
+        old_ld = os.environ.get("LD_LIBRARY_PATH", "")
+        os.environ["LD_LIBRARY_PATH"] = gst_lib + (":" + old_ld if old_ld else "")
+
         # Keep cargo artifacts inside the conan build folder
         os.environ["CARGO_TARGET_DIR"] = os.path.join(self.build_folder, "target")
 
