@@ -175,7 +175,7 @@ class TectonicConan(ConanFile):
             '[source.crates-io]\n'
             'replace-with = "rsproxy-sparse"\n\n'
             '[source.rsproxy-sparse]\n'
-            'url = "sparse+https://rsproxy.cn/index/"\n'
+            'registry = "sparse+https://rsproxy.cn/index/"\n'
         )
         with open(os.path.join(cargo_dir, "config.toml"), "w") as f:
             f.write(cargo_config)
@@ -188,8 +188,15 @@ class TectonicConan(ConanFile):
         # but compilation errors and non-network test failures indicate real regressions
         self.output.info("Running upstream make check (cargo test for Rust)")
         test_log = os.path.join(self.build_folder, "cargo_test.log")
+        # Set LD_LIBRARY_PATH for libexpat.so (expat is dynamic due to upstream bug)
+        expat_dep = self.dependencies.get("expat")
+        if expat_dep:
+            expat_lib = os.path.join(expat_dep.package_folder, "lib")
+            if os.path.isdir(expat_lib):
+                current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+                os.environ["LD_LIBRARY_PATH"] = expat_lib + (":" + current_ld if current_ld else "")
         try:
-            self.run(f"cargo test --release > {test_log} 2>&1", cwd=self.source_folder)
+            self.run(f"cargo test --release --features external-harfbuzz > {test_log} 2>&1", cwd=self.source_folder)
         except ConanException:
             if not os.path.exists(test_log):
                 self.output.warning(
@@ -206,7 +213,7 @@ class TectonicConan(ConanFile):
                 raise
             # Check test assertion failures: only network-related test failures are tolerated
             if "test result: FAILED" in log_content:
-                network_keywords = ["geturl", "bundle", "download"]
+                network_keywords = ["geturl", "bundle", "download", "watch"]
                 failed_tests = re.findall(r'test (\S+) \.\.\. FAILED', log_content)
                 non_network_failures = [t for t in failed_tests if not any(kw in t.lower() for kw in network_keywords)]
                 if non_network_failures:

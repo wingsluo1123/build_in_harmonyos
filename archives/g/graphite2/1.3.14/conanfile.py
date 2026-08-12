@@ -39,10 +39,9 @@ class Graphite2Conan(ConanFile):
         tc = CMakeToolchain(self)
         # R5/R26: build static by default
         tc.variables["BUILD_SHARED_LIBS"] = self.options.shared
-        # Disable file face support (no freetype dependency)
-        tc.variables["GRAPHITE2_NFILEFACE"] = True
-        # Disable tracing for release builds
-        tc.variables["GRAPHITE2_NTRACING"] = True
+        # Fix: ensure C++ vtable/typeinfo symbols are exported for static lib
+        tc.variables["CMAKE_CXX_VISIBILITY_PRESET"] = "default"
+        tc.variables["CMAKE_VISIBILITY_INLINES_HIDDEN"] = False
         tc.generate()
 
     def build(self):
@@ -65,3 +64,6 @@ class Graphite2Conan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["graphite2"]
+        # graphite2 is C++ — requires libc++ runtime when linked from C code
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["c++"]
