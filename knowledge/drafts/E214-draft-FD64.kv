@@ -19,7 +19,7 @@
 id:                     E214
 trigger_tool:           configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime
 phase:                  configuration|compilation|linking|installation|testing|runtime
-error_signature: undefined symbol: __start___debug|__stop___debug.*gc-sections
+error_signature: undefined symbol: __start___debug|undefined symbol: __stop___debug|__start___debug.*gc-sections
 
 # ═══ Layer 1: 识别层 (Recognition) ═══
 # severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
@@ -27,10 +27,9 @@ error_signature: undefined symbol: __start___debug|__stop___debug.*gc-sections
 # match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
 # title:         简短标题(一句话描述错误模式)
 severity:               2
-category:               category-name
-match_keywords:         keyword1, keyword2, keyword3
-title:
-
+category:               linking|lld|gc-sections
+match_keywords:         __start___debug, __stop___debug, gc-sections, nostart-stop-gc, undefined symbol
+title: lld --gc-sections 裁剪 __start_/__stop_ 封装符号导致链接失败
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
 # root_cause:       一句话根因描述(逗号可分行)
 # affected_scope:   影响范围
