@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Conan test_package for attrs 26.1.0 — Python library.
 
-Runs test_attrs.py (real test source file, satisfies L0c)
-against the package installed by THIS conan recipe (verifies module path + API).
+Runs test_attrs.py (real test source file, satisfies L0c) against the package
+installed by THIS conan recipe. Upstream pytest subset runs in build().
 """
 import os
 
