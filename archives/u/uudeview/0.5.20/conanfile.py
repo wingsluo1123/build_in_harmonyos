@@ -36,8 +36,8 @@ class UudeviewConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # E165: Fix shebang for OHOS
-        if self.settings.os in ("Linux", "OHOS"):
+        # E165: Fix shebang for OHOS only
+        if self.settings.os == "OHOS":
             self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' configure", cwd=self.source_folder)
             self.run("sed -i '1s|#!/bin/bash|#!/data/service/hnp/bin/bash|' configure", cwd=self.source_folder)
             self.run("sed -i '1s|#!/bin/sh|#!/system/bin/sh|' install-sh", cwd=self.source_folder)
