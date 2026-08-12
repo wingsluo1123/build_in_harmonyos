@@ -1,0 +1,145 @@
+--- a/configure
++++ b/configure
+@@ -14337,21 +14337,98 @@
+ fi
+ 
+ 
+ 
+ #
+ # Checks for libraries and functions.
+ #
+ #   We test for pthread_cancel because in glibc 2.34, libc includes
+ #   pthread_create and pthread_detach, but not pthread_cancel.
+ if test "$have_w32_system" = no; then
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_cancel" >&5
++  case "${host}" in
++    *-*-linux-ohos*)
++      # HarmonyOS/musl: pthread_cancel not available, test for pthread_create
++      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
++printf %s "checking for library containing pthread_create... " >&6; }
++if test ${ac_cv_search_pthread_create+y}
++then :
++  printf %s "(cached) " >&6
++else $as_nop
++  ac_func_search_save_LIBS=$LIBS
++cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++/* Override any GCC internal prototype to avoid an error.
++   Use char because int might match the return type of a GCC
++   builtin and then its argument prototype would still apply.  */
++char pthread_create ();
++int
++main (void)
++{
++return pthread_create ();
++  ;
++  return 0;
++}
++_ACEOF
++for ac_lib in '' pthread
++do
++  if test -z "$ac_lib"; then
++    ac_res="none required"
++  else
++    ac_res=-l$ac_lib
++    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
++  fi
++  if ac_fn_c_try_link "$LINENO"
++then :
++  ac_cv_search_pthread_create=$ac_res
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.beam \
++    conftest$ac_exeext
++  if test ${ac_cv_search_pthread_create+y}
++then :
++  break
++fi
++done
++if test ${ac_cv_search_pthread_create+y}
++then :
++
++else $as_nop
++  ac_cv_search_pthread_create=no
++fi
++rm conftest.$ac_ext
++LIBS=$ac_func_search_save_LIBS
++fi
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_pthread_create" >&5
++printf "%s\n" "$ac_cv_search_pthread_create" >&6; }
++ac_res=$ac_cv_search_pthread_create
++if test "$ac_res" != no
++then :
++  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
++
++fi
++
++      case "x$ac_cv_search_pthread_create" in
++        xno)
++          have_pthread=no
++          ;;
++        xnone\ required)
++          have_pthread=yes
++          ;;
++        *)
++          have_pthread=yes
++          config_libs="$config_libs $ac_cv_search_pthread_create"
++          ;;
++      esac
++      ;;
++    *)
++      # Other systems: test for pthread_cancel as usual
++      { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_cancel" >&5
+ printf %s "checking for library containing pthread_cancel... " >&6; }
+ if test ${ac_cv_search_pthread_cancel+y}
+ then :
+   printf %s "(cached) " >&6
+ else $as_nop
+   ac_func_search_save_LIBS=$LIBS
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+ /* Override any GCC internal prototype to avoid an error.
+@@ -14396,30 +14473,32 @@
+ fi
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_pthread_cancel" >&5
+ printf "%s\n" "$ac_cv_search_pthread_cancel" >&6; }
+ ac_res=$ac_cv_search_pthread_cancel
+ if test "$ac_res" != no
+ then :
+   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+ 
+ fi
+ 
+-  case "x$ac_cv_search_pthread_cancel" in
+-    xno)
+-      have_pthread=no
+-      ;;
+-    xnone\ required)
+-      have_pthread=yes
+-      ;;
+-    *)
+-      have_pthread=yes
+-      config_libs="$config_libs $ac_cv_search_pthread_cancel"
++      case "x$ac_cv_search_pthread_cancel" in
++        xno)
++          have_pthread=no
++          ;;
++        xnone\ required)
++          have_pthread=yes
++          ;;
++        *)
++          have_pthread=yes
++          config_libs="$config_libs $ac_cv_search_pthread_cancel"
++          ;;
++      esac
+       ;;
+   esac
+   if test "$have_pthread" != no; then
+ 
+ printf "%s\n" "#define HAVE_PTHREAD 1" >>confdefs.h
+ 
+     ac_fn_c_check_type "$LINENO" "pthread_rwlock_t" "ac_cv_type_pthread_rwlock_t" "$ac_includes_default"
+ if test "x$ac_cv_type_pthread_rwlock_t" = xyes
+ then :
+ 

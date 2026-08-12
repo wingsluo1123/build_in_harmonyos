@@ -1,6 +1,6 @@
 software: npth
 version: 1.8
-status: partial
+status: built
 build_system: autotools
 homepage: https://gnupg.org/
 license: LGPL-2.1-or-later
@@ -13,16 +13,20 @@ configure_options:
 
 # 补丁信息
 patches_applied:
-  - name: 0001-config.guess-harmonyos.patch
+  - name: 0001-build-aux-config.guess.patch
     description: "添加 HarmonyOS 系统识别支持"
     category: platform_detection
     kb_ref: E007, E072
-  - name: 0002-config.sub-harmonyos.patch
+  - name: 0002-build-aux-config.sub.patch
     description: "添加 ohos-linux 三元组和内核组合验证"
     category: platform_detection
     kb_ref: E007, E072
-  - name: 0003-configure-ac-musl-compat.patch
-    description: "musl libc pthread_cancel 兼容性修复（使用 pthread_create 检查）"
+  - name: 0003-configure.patch
+    description: "musl libc pthread_cancel 兼容性修复 + HMDFS tmpdir 修复"
+    category: musl_compat
+    kb_ref: PSCAN-MUSL-001
+  - name: 0004-configure.ac.patch
+    description: "musl libc pthread_cancel 兼容性修复（configure.ac 源文件）"
     category: musl_compat
     kb_ref: PSCAN-MUSL-001
 
@@ -74,13 +78,13 @@ known_issues:
     description: "HMDFS 不允许 config.status 创建临时子目录"
     severity: critical
     solution: "手动生成配置文件，绕过 config.status"
-    status: partial
+    status: built
   - id: MUSL-PTHREAD_CANCEL-001
     description: "musl libc 不支持 pthread_cancel"
     severity: critical
     solution: "修改 configure.ac 使用 pthread_create 检查"
     kb_ref: PSCAN-MUSL-001
-    status: partial
+    status: built
 
 # 知识库贡献
 knowledge_gained:
@@ -107,3 +111,29 @@ dependencies:
     - name: pthread
       provided_by: musl-libc
       available: true
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/npth-1.8.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/npth-1.8.work
+  source_orig_hash: 5ce382309913f1ab
+  source_work_hash: ab04df7528d6cf1f
+  generated_at: '2026-08-12T11:15:21'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-build-aux-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-build-aux-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

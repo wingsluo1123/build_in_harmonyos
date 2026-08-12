@@ -1,11 +1,15 @@
---- /storage/Users/currentUser/tmp/builds/npth-1.8.orig/configure.ac	2024-11-12 18:52:54.000000000 +0800
-+++ configure.ac	2026-04-20 15:09:17.968737344 +0800
-@@ -362,18 +362,41 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -356,31 +356,52 @@
+ AC_TYPE_SIZE_T
+ AC_TYPE_SSIZE_T
+ 
+ 
+ #
+ # Checks for libraries and functions.
  #
  #   We test for pthread_cancel because in glibc 2.34, libc includes
  #   pthread_create and pthread_detach, but not pthread_cancel.
-+#   However, on musl/HarmonyOS, pthread_cancel is not available.
-+#   So we test for pthread_create instead on HarmonyOS.
  if test "$have_w32_system" = no; then
 -  AC_SEARCH_LIBS([pthread_cancel],[pthread])
 -  case "x$ac_cv_search_pthread_cancel" in
@@ -51,3 +55,10 @@
        ;;
    esac
    if test "$have_pthread" != no; then
+     AC_DEFINE(HAVE_PTHREAD,1,[Define if we have pthread.])
+     AC_CHECK_TYPE([pthread_rwlock_t])
+     AC_CHECK_FUNCS([pthread_tryjoin_np pthread_setname_np pthread_getname_np])
+     AC_CHECK_FUNCS([pthread_mutex_timedlock])
+     AC_CHECK_FUNCS([pthread_rwlock_rdlock pthread_rwlock_wrlock])
+     AC_CHECK_FUNCS([pthread_rwlock_timedrdlock pthread_rwlock_timedwrlock])
+     AC_CHECK_FUNCS([pthread_rwlock_tryrdlock pthread_rwlock_trywrlock])
