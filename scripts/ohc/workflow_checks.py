@@ -181,11 +181,25 @@ def run_local_ci(software: str, version: str, pdir: str | None = None) -> int:
     # Run build_and_test.sh
     log_info(f"  [2/2] build_and_test.sh {software}/{version}...")
     pkg_spec = f"archives/{software[0]}/{software}/{version}"
+    # apertium and other large autotools packages need >10min for conan create;
+    # use a generous timeout matching ci/config/build_timeouts.txt overrides.
+    ci_timeout = 10800
+    try:
+        import yaml as _yaml  # noqa: F401
+        with open(project / "ci" / "config" / "build_timeouts.txt",
+                  "r", encoding="utf-8") as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) >= 2 and parts[0] == f"{software}/{version}":
+                    ci_timeout = int(parts[1])
+                    break
+    except (OSError, ValueError):
+        pass
     rc, out = _run(
         ["zsh", str(build_sh), pkg_spec],
         cwd=str(project),
         env_extra={"CI_PACKAGES": pkg_spec, "CI_REPO_ROOT": str(project)},
-        timeout=600,
+        timeout=ci_timeout,
     )
     if rc != 0:
         log_fail(f"  ❌ build_and_test.sh 失败 (RC={rc})")

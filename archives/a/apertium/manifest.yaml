@@ -1,0 +1,27 @@
+software: apertium
+display: "Apertium core engine"
+description: "Apertium rule-based machine translation core engine — transfer, tagger, formatters, validators"
+category: library
+homepage: "https://github.com/apertium/apertium"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "autotools build with autoreconf -fi (release tarball has no pre-generated configure)"
+    - "Generate apertium_config.h.in from apertium_config.h.cmake_in (cmakedefine→undef, ${VAR}→@VAR@)"
+    - "Patch getopt_long.h to skip conflicting extern int getopt() declaration on OHOS sysroot"
+    - "Patch string_view.h / filesystem.h to use C++17 standard headers (clang 15 libc++ removed experimental/*)"
+    - "Copy *.xsl / *-format*.xml / *.l / *.sh / README-MODES / apertium.m4 from source to build folder (basic_layout separates them)"
+    - "Link ICU libicuio.a + libicutu.a explicitly in test_package (icu4c Conan package omits them)"
+  common_dependencies:
+    - lttoolbox/3.7.6
+    - libxml2/2.15.3.1
+    - icu4c/77
+    - utf8cpp/4.1.1
+
+versions:
+  "3.9.12":
+    status: built
+    build_date: "2026-08-12"
+    conan_ref: "apertium/3.9.12"
