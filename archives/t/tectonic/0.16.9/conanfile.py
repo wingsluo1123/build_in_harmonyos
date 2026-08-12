@@ -87,6 +87,17 @@ class TectonicConan(ConanFile):
                 current_path = p + ":" + current_path
         os.environ["PATH"] = current_path
 
+        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm/lib directory
+        ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        cc_path = ce.get("c") or ""
+        if cc_path and os.path.sep in cc_path:
+            cc_real = os.path.realpath(cc_path)
+            llvm_dir = os.path.dirname(os.path.dirname(cc_real))
+            llvm_lib = os.path.join(llvm_dir, "lib")
+            if os.path.isdir(llvm_lib):
+                current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+                os.environ["LD_LIBRARY_PATH"] = llvm_lib + (":" + current_ld if current_ld else "")
+
         # Rust environment (R33: use env or known path, not shell vars)
         home = os.path.expanduser("~")
         cargo_home = os.environ.get("CARGO_HOME", os.path.join(home, ".cargo"))

@@ -55,6 +55,16 @@ class Icu4cConan(ConanFile):
         os.rmdir(source_dir)
 
     def generate(self):
+        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm/lib directory
+        ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        cc = ce.get("c") or ""
+        if cc and os.path.sep in cc:
+            cc_real = os.path.realpath(cc)
+            llvm_dir = os.path.dirname(os.path.dirname(cc_real))
+            llvm_lib = os.path.join(llvm_dir, "lib")
+            if os.path.isdir(llvm_lib):
+                current = os.environ.get("LD_LIBRARY_PATH", "")
+                os.environ["LD_LIBRARY_PATH"] = llvm_lib + (":" + current if current else "")
         # R33: Clear system CPPFLAGS/LDFLAGS to prevent system ICU (different
         # version, e.g. CharString* vs Locale members, _77 vs _78 symbol suffix)
         # from overriding the source tree's own headers and freshly-built libs.

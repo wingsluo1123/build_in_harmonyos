@@ -165,6 +165,16 @@ class HarfbuzzConan(ConanFile):
             self.output.info("injected {} into glib-2.0.pc Libs for static glib".format(intl_a))
 
     def generate(self):
+        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm/lib directory
+        ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
+        cc = ce.get("c") or ""
+        if cc and os.path.sep in cc:
+            cc_real = os.path.realpath(cc)
+            llvm_dir = os.path.dirname(os.path.dirname(cc_real))
+            llvm_lib = os.path.join(llvm_dir, "lib")
+            if os.path.isdir(llvm_lib):
+                current = os.environ.get("LD_LIBRARY_PATH", "")
+                os.environ["LD_LIBRARY_PATH"] = llvm_lib + (":" + current if current else "")
         PkgConfigDeps(self).generate()
         self._inject_static_glib_intl()
         env = Environment()
