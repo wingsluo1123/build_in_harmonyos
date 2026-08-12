@@ -10,7 +10,7 @@ class KalignConan(ConanFile):
     description = "Kalign is a fast and accurate multiple sequence alignment tool"
     license = "Apache-2.0"
     homepage = "https://github.com/TimoLassmann/kalign"
-    url = ""  # CI fills this
+    url = "https://github.com/TimoLassmann/kalign"
 
     package_type = "library"
 

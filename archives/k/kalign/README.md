@@ -3,7 +3,7 @@
 **kalign** — Fast and accurate multiple sequence alignment tool.
 
 - Homepage: https://github.com/TimoLassmann/kalign
-- License: MIT
+- License: Apache-2.0
 - Build system: CMake
 - Type: library + CLI tool
 
@@ -11,4 +11,4 @@
 
 | Version | Status |
 |---------|--------|
-| 3.5.1   | published |
+| 3.5.1   | built |
