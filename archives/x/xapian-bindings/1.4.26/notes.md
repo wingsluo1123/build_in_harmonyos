@@ -24,7 +24,7 @@
 | 2 | configure C compiler 测试失败 | CI 干净 PATH 无 ar/ranlib/nm/ld | 显式传 AR/RANLIB/NM/LD（参照 xapian-core 配方） |
 | 3 | 链接 `-lstdc++` not found | OHOS SDK 无 libstdc++ | Makefile `-lstdc++` → `-lc++` + `-stdlib=libc++` |
 | 4 | 链接 `-lpython3.12` 找不到 | CI HNP python 的 sysconfig LIBDIR 指向不存在路径 | 从 include 推导 prefix/lib 多候选探测 |
-| 5 | make 内 import _xapian Permission denied | CI HNP python 沙箱限制 conan build 目录 | 跳过 pycache 验证目标，安装到 site-packages 后由 test_package 验证 |
+| 5 | make 内 import _xapian Permission denied | CI HNP python 沙箱限制 conan build 目录 | 跳过 pycache 验证目标，安装到 site-packages 后由 test_package 验证；上游 make check 不在 build() 内执行（CI 报 ImportError: Permission denied） |
 | 6 | HMDFS 覆盖 site-packages 文件 Operation not permitted | HMDFS 覆盖限制 | 安装前 rm -rf 目标目录 |
 | 7 | conan G2 报 python-require 不能依赖 shared-library | conan 类型规则 | 移除 package_type="python-require"（参照 internetarchive） |
 | 8 | configure 原生 conftest 执行失败 | OHOS CI 沙箱(SELinux/AppSpawn)无法执行用户编译的 ELF（E009/E064） | configure 的 cross-compiling 探测改为直接判定 no（build==host==aarch64-unknown-linux-ohos 原生构建，非交叉编译；禁止 --host 伪造） |
