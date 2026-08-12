@@ -130,7 +130,11 @@ class GstPluginsRsQuinnConan(ConanFile):
 
         cargo, rustc = self._locate_rust_toolchain()
         if not cargo:
-            return
+            from conan.errors import ConanInvalidConfiguration
+            raise ConanInvalidConfiguration(
+                'Rust toolchain (cargo/rustc) not found on CI worker. '
+                'Install via harmonybrew: brew install rust'
+            )
 
         self._ensure_system_deps()
 

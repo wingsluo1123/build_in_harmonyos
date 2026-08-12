@@ -7,14 +7,15 @@ outside the musl ldso namespace (E186), so test.c parses the packaged
 libgstquinn.so ELF directly and asserts its GStreamer plugin entry points
 (gst_plugin_quinn_get_desc / gst_plugin_quinn_register) are exported.
 
-E225: use cmake_layout(build_folder="$TMP") + user_presets_path=False so
-Conan manages a unique temporary out-of-source build dir and no
-CMakeUserPresets.json is written back into test_package/ source.
+CI worker caveat (2026-08-11): CMake configure fails because the worker's
+lld linker cannot load libxml2.so.16 (broken indirect dep). We bypass
+CMake entirely and compile test.c with the conan-provided compiler env,
+linking only against libdl (no linker involvement beyond -ldl).
 """
 import os
+import shutil
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout, CMakeToolchain
 
 
 class GstPluginsRsQuinnTestConan(ConanFile):
@@ -23,21 +24,16 @@ class GstPluginsRsQuinnTestConan(ConanFile):
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self, build_folder="$TMP")
-
-    def generate(self):
-        tc = CMakeToolchain(self)
-        tc.user_presets_path = False  # E225: never write presets back to source
-        tc.generate()
-
     def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
+        # Compile test.c directly with the conan compiler env, bypassing
+        # CMake (CI worker's lld is broken: missing libxml2.so.16).
+        cc = self.conf.get("tools.build:compiler_executables", {}).get("c") \
+            or shutil.which("clang") or shutil.which("cc") or "clang"
+        test_c = os.path.join(self.source_folder, "test.c")
+        out_bin = os.path.join(self.build_folder, "test_gst-plugins-rs-quinn")
+        self.run(f'{cc} -O2 -o {out_bin} {test_c} -ldl', env="conanbuild")
 
     def test(self):
-        # Locate the packaged plugin .so inside the dependency package
         dep = self.dependencies["gst-plugins-rs-quinn"]
         pkg_root = dep.package_folder
         plugin = os.path.join(pkg_root, "lib", "gstreamer-1.0", "libgstquinn.so")
