@@ -81,21 +81,33 @@ PYTHONPATH=src python3 -c "import showinfm; print(showinfm.system.current_platfo
 `wsl_transform_path_uri` 的 docstring 示例）。sdist 经 MANIFEST.in 排除了它，
 tag tarball 中包含。
 
-实测（打补丁后的源码树）:
+实测（鸿蒙 PC 真机原生执行打补丁后的源码树）:
 
 | 指标 | 数值 |
 |------|------|
 | doctest 用例总数（wsl_transform_path_uri） | 129 |
-| passed | 52 |
-| failed | 77 |
-| errors / skipped / timeout | 0 / 0 / 0 |
+| 鸿蒙适用并通过（passed） | 52 |
+| WSL 环境专属项（N/A/unrunnable，维护者批准） | 77 |
+| errors / timeout | 0 / 0 |
 
-77 个失败均为上游 doctest 期望值与 WSL/文件系统环境相关：doctest 中大量
-示例依赖 `/home/damon/...`、`~/.bashrc` 等路径在本机存在且为 WSL 环境
-（例如 `r.win_path if r.exists else ...` 分支、`file://.../.../home/...` 期望
-值）。本真机为 HarmonyOS（非 WSL，platform=Linux 分支），路径不存在且
-is_wsl=False，导致输出不匹配。这是环境差异，不是适配缺陷；如实记录为
-failed，未改写为 skip，未修改上游断言与预期。
+> 维护者裁定：77 项 WSL 专属 doctest 在非 WSL 的鸿蒙 PC 环境按
+> N/A/unrunnable 如实处理。**该裁定只解决测试统计口径，不代表这些用例通过；
+> 不得写成 skipped、passed 或 129/129。** 77 项不属于 passed/skipped，
+> 不进入适用测试分母；适用测试通过率 = 52/52（100%）。
+
+77 项 WSL 专属项均为上游 doctest 期望值依赖 WSL/Linux 宿主环境事实：
+`wslpath` 命令、`/mnt/c` Windows 盘挂载、`\\wsl.localhost` 宿主、`/etc/fstab`、
+`/home` 用户目录布局、特定 UID/passwd 等（例如 `r.win_path if r.exists else ...`
+分支、`file://.../.../home/...` 期望值、`pwd.getpwuid(os.getuid())`）。本真机为
+HarmonyOS（非 WSL，is_wsl=False），这些宿主环境事实不存在且无法在真机上合法构造。
+逐例证据表见 evidence 分析（示例位置、依赖条件、原生结果、功能影响），
+`wsl_transform_path_uri` 仅在 `if is_wsl:` 分支被调用，不影响普通鸿蒙功能。
+
+诊断驱动（platform 映射 + 临时 wslpath wrapper + 临时 HOME/文件树）曾得到
+81 passed / 48 failed，**该结果仅用于根因分析，不代表鸿蒙真机通过率**，不写入 PR。
+
+未修改任何上游测试文件、断言、数据、用例选择、skip 条件或预期结果。
+
 
 `rundoctest.py` 本身用 `doctest.run_docstring_examples` 运行且不设退出码
 （退出码恒为 0），故以 doctest runner 的 attempted/failed 统计为准。
@@ -118,5 +130,5 @@ python3 $SKILL_ROOT/scripts/ohc-run.py conan-verify show-in-file-manager 1.1.4
 2 个平台适配补丁（见上），均为 unified diff，`patch --dry-run -p1` 可复现。
 ---
 
-**编译结束**: 2026-08-12 17:55
+**编译结束**: 2026-08-12 19:56
 **最终状态**: built

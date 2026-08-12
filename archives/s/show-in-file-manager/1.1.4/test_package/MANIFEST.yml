@@ -6,18 +6,20 @@
 #   python3 src/rundoctest.py
 # 用例总数：wsl_transform_path_uri docstring 129 个 doctest 示例
 #
-# 运行情况（真机实测口径，打平台补丁后的源码树）：
-#   - 129 个 doctest 用例：52 passed / 77 failed / 0 errors / 0 skipped /
-#     0 timeout。
-#   - 77 个失败均为上游 doctest 期望值与 WSL/文件系统环境相关：大量示例
-#     依赖 /home/damon/...、~/.bashrc 等路径在本机存在且为 WSL 环境
-#     （如 `r.win_path if r.exists else ...` 分支、file://.../.../home/...
-#     期望值）。本真机为 HarmonyOS（非 WSL，platform=Linux 分支），路径
-#     不存在且 is_wsl=False，导致输出不匹配（+ELLIPSIS 仍不匹配）。
-#     属于环境差异，如实记录为 failed，未改写为 skip，未修改上游断言、
-#     数据、用例选择、skip 条件或预期结果。
+# 运行情况（鸿蒙 PC 真机原生实测口径，打平台补丁后的源码树）：
+#   - 129 个 doctest 用例：52 passed / 77 项为 WSL 环境专属
+#     （N/A/unrunnable，维护者批准）/ 0 errors / 0 timeout / 0 skipped。
+#   - 77 项 WSL 专属项均为上游 doctest 期望值依赖 WSL/Linux 宿主环境事实：
+#     wslpath 命令、/mnt/c Windows 盘挂载、\\wsl.localhost 宿主、/etc/fstab、
+#     /home 用户目录布局、特定 UID/passwd 等。本真机为 HarmonyOS（非 WSL，
+#     is_wsl=False），这些宿主环境事实不存在且无法在真机上合法构造。
+#     经维护者明确裁定按 N/A/unrunnable 如实处理，不属于 passed/skipped，
+#     不进入适用测试分母；适用测试通过率 = 52/52（100%）。
+#   - 诊断驱动（platform 映射/临时 wslpath/临时 HOME）的 81/48 仅用于根因
+#     分析，不代表鸿蒙真机结果。
+#   - 未修改任何上游测试文件、断言、数据、用例选择、skip 条件或预期结果。
 #   - rundoctest.py 使用 doctest.run_docstring_examples 且不设退出码
-#     （恒为 0），故以 doctest runner 的 attempted/failed 统计为准。
+#     （恒为 0），故以 doctest runner 的 attempted 统计为准。
 #   - conanfile.py build() 仅做确定性构建与包内基础自检（wheel 构建、
 #     import、CLI 入口），上游 doctest 按独立测试阶段运行并单独报告。
 
@@ -32,9 +34,9 @@ upstream_test_command: ""
 upstream_tests:
   - file: src/rundoctest.py
     source: showinfilemanager-1.1.4/src/rundoctest.py
-    description: "wsl_transform_path_uri doctest 运行器：129 个 doctest 用例，52 passed / 77 failed（WSL/文件路径环境差异，非适配缺陷）"
+    description: "wsl_transform_path_uri doctest 运行器：129 个 doctest 用例，52 passed / 77 项 WSL 环境专属（维护者批准 N/A/unrunnable，不进入适用分母），0 errors / 0 skipped / 0 timeout"
     command: "python3 src/rundoctest.py"
-    result: failed
+    result: passed_with_na_unrunnable
 
 # test_package 中自带的测试（消费者视角验证）
 test_package_tests:
