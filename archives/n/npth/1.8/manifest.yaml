@@ -1,15 +1,24 @@
-software: npth
-version: 1.8
-status: built
-build_system: autotools
-homepage: https://gnupg.org/
-license: LGPL-2.1-or-later
-source_url: https://gnupg.org/ftp/gcrypt/npth/npth-1.8.tar.bz2
-source_format: tar.bz2
+# 版本级 manifest — npth 1.8
+# 文件位置: archives/n/npth/1.8/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
 
-# 构建参数
-configure_options:
-  - "--prefix=/storage/Users/currentUser/tmp/test-install-npth-1.8"
+software: npth
+version: "1.8"
+status: built
+build_date: "2026-08-12"
+build_system: autotools
+
+# 源码信息
+source:
+  url: "https://gnupg.org/ftp/gcrypt/npth/npth-1.8.tar.bz2"
+  sha256: "8bd24b4f23a3065d6e5b26e98aba9ce783ea4fd781069c1b35d149694e90ca3e"
+  tar_format: tar.bz2
+
+# 构建配置
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/storage/Users/currentUser/tmp/test-install-npth-1.8"
 
 # 补丁信息
 patches_applied:
@@ -38,29 +47,22 @@ build_env:
   libc: musl
   thread_model: pthread
 
-# 编译时间
-build_timestamp: 2026-04-20T15:24+0800
-
 # 测试结果
 test_result:
   total_tests: 4
   passed_tests: 4
   failed_tests: 0
-  test_cases_count: 30+
-  test_coverage:
-    - "互斥锁初始化/锁定/解锁"
-    - "线程创建/join/detach"
-    - "线程命名 (pthread_setname_np)"
-    - "条件变量初始化/等待/信号/广播"
-    - "fork后npth_init"
-    - "多线程互斥锁协作"
+  test_cases:
+    - "t-mutex: PASS"
+    - "t-thread: PASS"
+    - "t-stdthreads: PASS"
+    - "t-stack: PASS"
   test_report: reports/test-report.md
 
 # 生成产物
 artifacts:
   libraries:
     - name: libnpth.so.0.3.0
-      size: "310KB"
       type: shared_library
     - name: libnpth.so.0
       type: symlink
@@ -75,35 +77,16 @@ artifacts:
 # 遇到的问题和解决方案
 known_issues:
   - id: HMDFS-TMPDIR-001
-    description: "HMDFS 不允许 config.status 创建临时子目录"
+    description: "HMDFS 不允许 config.status 创建临时子目录，且进程 UID 与文件所有者 UID 不一致导致 umask 077 创建的目录无法写入"
     severity: critical
-    solution: "手动生成配置文件，绕过 config.status"
-    status: built
+    solution: "conanfile.py 中 _fix_hmdfs_tmpdir 方法将 mktemp 路径改为 TMPDIR 并移除 umask 077"
+    status: resolved
   - id: MUSL-PTHREAD_CANCEL-001
     description: "musl libc 不支持 pthread_cancel"
     severity: critical
-    solution: "修改 configure.ac 使用 pthread_create 检查"
+    solution: "修改 configure.ac/configure 使用 pthread_create 检查替代"
     kb_ref: PSCAN-MUSL-001
-    status: built
-
-# 知识库贡献
-knowledge_gained:
-  - topic: autotools-musl-compat
-    pattern: "autotools 项目在 musl 上检查 pthread_cancel 会失败"
-    solution: "使用 pthread_create 或 pthread_detach 替代"
-    applicability: "所有 autotools 项目"
-  - topic: hmdfs-tempdir-restriction
-    pattern: "HMDFS 不允许创建临时子目录 ./confXXXXXX"
-    solution: "手动生成配置文件或使用 $TMPDIR"
-    applicability: "所有在 HMDFS 上构建的项目"
-
-# 构建质量评估
-build_cleanliness:
-  parameter_minimal: true
-  no_manual_compilation: true
-  no_manual_file_ops: true
-  platform_guards_used: true
-  notes: "因 HMDFS 限制手动生成配置文件，但修改逻辑清晰可复现"
+    status: resolved
 
 # 依赖信息
 dependencies:
@@ -111,6 +94,8 @@ dependencies:
     - name: pthread
       provided_by: musl-libc
       available: true
+
+# 补丁生成信息
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/npth-1.8.orig
@@ -123,17 +108,17 @@ patch_generation:
 patch_classification:
   - file: 0001-build-aux-config.guess.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: pending
   - file: 0002-build-aux-config.sub.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: pending
   - file: 0003-configure.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: pending
   - file: 0004-configure.ac.patch
     type: auto
-    platform_only: True
-    guard: 'pending'
+    platform_only: true
+    guard: pending
