@@ -29,7 +29,7 @@ make install DESTDIR=$TEST_PREFIX
 |---|------|------|----------|
 | 1 | CMake check_c_source_runs 失败 | 鸿蒙交叉编译环境无法运行 test 二进制 | 禁用 ENABLE_SSE/AVX/AVX2 |
 | 2 | OpenMP 检测失败 | 鸿蒙 clang 无 libomp | USE_OPENMP=OFF |
-| 3 | ctest 2/15 失败 (C++Lib, DSSIM) | 测试可执行文件 RPATH 加载 ../lib/libkalign.so 路径问题 | 非核心功能，不影响库和 kalign 可执行文件 |
+| 3 | 共享库配置下 ctest 的 C++Lib/DSSIM 失败 | 测试二进制 NEEDED 为相对路径 `../lib/libkalign.so`，ctest 工作目录(源码 tests/)下解析不到共享库 | 使用与配方一致的静态构建（BUILD_SHARED_LIBS=OFF），15/15 全部通过 |
 
 ## 验证结果
 
@@ -38,7 +38,7 @@ $ kalign --version
 kalign 3.5.1
 
 $ ctest
-87% tests passed, 2 tests failed out of 15
+100% tests passed, 0 tests failed out of 15
 ```
 
 ## 依赖
