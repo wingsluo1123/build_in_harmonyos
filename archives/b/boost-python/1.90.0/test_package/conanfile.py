@@ -33,16 +33,22 @@ class BoostPythonTestConan(ConanFile):
     def generate(self):
         # CMakeToolchain 只在 generate() 中实例化（不在 generators 声明，避免重复）。
         # OHOS SDK 默认 ld.lld 依赖 libxml2.so.16（CI 沙箱缺失导致链接失败）；
-        # test_ext.so 是 MODULE target，须通过 CMakeToolchain 注入 ld.bfd 链接器。
+        # 仿照 poppler 模式对三类链接统一追加 ld.bfd：
+        #   - CMAKE_EXE_LINKER_FLAGS：CMake try_compile 探测可执行文件链接必需（否则
+        #     探测仍调损坏的 lld 而失败）；
+        #   - CMAKE_SHARED_LINKER_FLAGS / CMAKE_MODULE_LINKER_FLAGS：test_ext.so 链接。
+        # 追加而非覆盖，保留已有 flags。
         tc = CMakeToolchain(self)
         if str(self.settings.os) == "OHOS":
             linker = self._find_ld_bfd()
-            tc.cache_variables["CMAKE_MODULE_LINKER_FLAGS"] = (
-                "-fuse-ld={}".format(linker)
-            )
-            tc.cache_variables["CMAKE_SHARED_LINKER_FLAGS"] = (
-                "-fuse-ld={}".format(linker)
-            )
+            fuse = "-fuse-ld={}".format(linker)
+            for flag in (
+                "CMAKE_EXE_LINKER_FLAGS",
+                "CMAKE_SHARED_LINKER_FLAGS",
+                "CMAKE_MODULE_LINKER_FLAGS",
+            ):
+                old = tc.variables.get(flag, "")
+                tc.variables[flag] = (str(old) + " " + fuse).strip()
         tc.generate()
 
     def build(self):
