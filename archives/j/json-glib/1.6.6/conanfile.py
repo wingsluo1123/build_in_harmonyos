@@ -208,6 +208,7 @@ class JsonglibConan(ConanFile):
                     _f.write(_c)
 
     def build(self):
+        os.umask(0o022)  # HMDFS setgid requires group-execute on executables
         apply_conandata_patches(self)
         meson = Meson(self)
         meson.configure()
