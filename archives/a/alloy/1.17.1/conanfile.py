@@ -171,7 +171,9 @@ class AlloyConan(ConanFile):
             "GOCACHE": os.path.join(cache_root, "cache", "build"),
             "GOMODCACHE": os.path.join(cache_root, "cache", "mod"),
             "GOPATH": os.path.join(cache_root, "cache", "gopath"),
-            "GOPROXY": env.get("GOPROXY", "https://goproxy.cn,direct"),
+            "GOPROXY": env.get(
+                "GOPROXY",
+                "https://goproxy.cn,https://goproxy.io,https://proxy.golang.org,direct"),
             "GOROOT": go_root,
             "GOTOOLCHAIN": "local",
             "PATH": os.path.dirname(go) + os.pathsep + env.get("PATH", ""),
