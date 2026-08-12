@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import os
 from conan import ConanFile
-from conan.tools.autotools import Autotools, AutotoolsToolchain
+# 必须用 conan.tools.gnu（非 conan.tools.autotools）——CI conan 环境无
+# conan.tools.autotools 模块（libgd #19569 实测 ModuleNotFoundError；alpine 用 gnu 正常）
+from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.files import apply_conandata_patches
 from conan.tools.layout import basic_layout
 
