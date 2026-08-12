@@ -78,7 +78,10 @@ class AlpineConan(ConanFile):
         old = os.umask(0o022)
         try:
             autotools = Autotools(self)
-            autotools.configure()
+            # env 显式激活 conanbuild_ldl（LIBS=-ldl——dlopen 检查——
+            # CI #21996 重复失败：save_script 的独立脚本需 env 列表显式
+            # 激活——multitail 教训）
+            autotools.configure(env=["conanbuild", "conanbuild_ldl"])
             # -j1：OHOS 沙箱不支持 mkfifo（jobserver），并行编译失败（opensp 先例）
             autotools.make(args=["-j1"])
         finally:
