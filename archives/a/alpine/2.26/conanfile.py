@@ -55,7 +55,6 @@ class AlpineConan(ConanFile):
         tc.extra_cflags.append(f"-I{os.path.join(ncurses.package_folder, 'include')}")
         tc.generate()
         # 依赖包（ncurses/openssl）的 pkg-config 路径
-        from conan.tools.env import Environment
         env = Environment()
         for dep in ("ncurses", "openssl"):
             if dep in self.dependencies:
