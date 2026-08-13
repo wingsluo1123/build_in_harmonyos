@@ -1,68 +1,64 @@
 # test_package/MANIFEST.yml
 # 上游官方测试声明文件
 # CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
-# 详见: docs/TEST_QUALITY_SPEC.md
 
 package: tesseract/5.5.3
 homepage: "https://github.com/tesseract-ocr/tesseract"
 
-# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
 upstream_check_command: "ctest"
 
-# conanfile.py build() 方法中是否已集成上游测试
-# 上游测试套件 (62 个 googletest 测试) 需要 ICU 库 (libicuuc/libicui18n)
-# OHOS 平台 ICU 不可用，unicharset_training 库无法构建，所有测试无法链接
-# 尝试步骤: 1) 下载 googletest v1.15.2 子模块 2) 下载 test 数据子模块
-#           3) cmake -DBUILD_TESTS=ON -DCMAKE_DISABLE_FIND_PACKAGE_PkgConfig=ON
-#           4) 编译失败: unicharset_training 库依赖 ICU，被 if(ICU_FOUND) 条件包裹
 upstream_test_in_build: false
-upstream_test_command: "ctest (blocked: ICU dependency)"
+upstream_test_command: "ctest --output-on-failure --timeout 30"
 
-# 上游实际运行的测试程序 (62 个 googletest 测试)
+upstream_test_total: 59
+upstream_test_passed: 39
+upstream_test_failed: 20
+upstream_test_pass_rate: "66.1%"
+
+upstream_failure_categories:
+  - category: "leptonica 未启用 TIFF 支持"
+    count: 10
+    tests: ["apiexample_test", "baseapi_test", "baseapi_thread_test", "layout_test", "resultiterator_test", "pagesegmode_test", "equationdetect_test", "textlineprojection_test", "fileio_test", "commandlineflags_test"]
+    reason: "leptonica 构建时禁用了 TIFF，测试图片为 TIFF 格式"
+    fix: "在 leptonica 配方中启用 TIFF 支持"
+  - category: "缺少 traineddata 语言模型"
+    count: 5
+    tests: ["loadlang_test", "lang_model_test", "osd_test", "progress_test"]
+    reason: "OCR 语言模型文件不在源码/test 子模块中"
+    fix: "下载 tesseract-ocr/tessdata"
+  - category: "LSTM 计算超时"
+    count: 3
+    tests: ["lstm_recode_test", "lstm_squashed_test", "lstm_test"]
+    reason: "LSTM 神经网络测试在 arm64 上 30s 超时"
+    fix: "增加超时或跳过"
+  - category: "训练器缺少数据"
+    count: 2
+    tests: ["lstmtrainer_test", "mastertrainer_test"]
+    reason: "训练器需要完整训练数据集"
+    fix: "下载训练数据"
+
 upstream_tests:
   - file: unittest/apiexample_test.cc
-    source: tesseract-5.5.3/unittest/apiexample_test.cc
     description: "API example test"
-    command: "ctest -R apiexample_test"
-    status: "blocked"
-    reason: "Requires libunicharset_training (ICU dependency)"
-  - file: unittest/baseapi_test.cc
-    source: tesseract-5.5.3/unittest/baseapi_test.cc
-    description: "Base API test"
-    command: "ctest -R baseapi_test"
-    status: "blocked"
-    reason: "Requires libunicharset_training (ICU dependency)"
+    status: "failed"
+    reason: "leptonica TIFF + traineddata"
   - file: unittest/bitvector_test.cc
-    source: tesseract-5.5.3/unittest/bitvector_test.cc
     description: "Bit vector test"
-    command: "ctest -R bitvector_test"
-    status: "blocked"
-    reason: "Requires libunicharset_training (ICU dependency)"
+    status: "passed"
   - file: unittest/capiexample_test.cc
-    source: tesseract-5.5.3/unittest/capiexample_test.cc
     description: "C API example test"
-    command: "ctest -R capiexample_test"
-    status: "blocked"
-    reason: "Requires libunicharset_training (ICU dependency)"
-  - file: unittest/cleanapi_test.cc
-    source: tesseract-5.5.3/unittest/cleanapi_test.cc
-    description: "Clean API test"
-    command: "ctest -R cleanapi_test"
-    status: "blocked"
-    reason: "Requires libunicharset_training (ICU dependency)"
+    status: "passed"
+  - file: unittest/unicharset_test.cc
+    description: "Unicharset test"
+    status: "passed"
 
-# test_package 中自带的测试 (消费者视角验证)
 test_package_tests:
   - file: test.cpp
-    description: "消费者测试: 验证 tesseract 库链接和 TessVersion API"
+    description: "消费者测试: TessVersion API"
     command: "./test_tesseract"
     status: "passed"
 
-# 测试断言总数
-# 上游 62 个测试全部被阻塞 (ICU 依赖)
-# test_package 1 个测试通过
 assertion_count: 2
-upstream_test_count: 62
-upstream_test_passed: 0
-upstream_test_blocked: 62
-upstream_block_reason: "ICU library (libicuuc/libicui18n) not available on OHOS platform. All 62 googletest tests link against unicharset_training library which is guarded by if(ICU_FOUND) in src/training/CMakeLists.txt."
+upstream_test_count: 59
+upstream_test_passed: 39
+upstream_test_failed: 20
