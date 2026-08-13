@@ -52,8 +52,18 @@ class LibsodiumConan(ConanFile):
     def package(self):
         autotools = Autotools(self)
         autotools.install()
-        self.copy("sodium.h", dst="include", src="include")
-        self.copy("*.h", dst="include/sodium", src="include/sodium")
+        # conan 2 无 self.copy（AttributeError——CI #23065 实测）——
+        # 用 conan.tools.files 的 copy 函数（make install 已装大部分
+        # 头文件——sodium.h 补充复制）
+        from conan.tools.files import copy
+        copy(self, "sodium.h",
+             src=os.path.join(self.source_folder, "include"),
+             dst=os.path.join(self.package_folder, "include"),
+             keep_path=False)
+        copy(self, "*.h",
+             src=os.path.join(self.source_folder, "include", "sodium"),
+             dst=os.path.join(self.package_folder, "include", "sodium"),
+             keep_path=False)
 
     def package_info(self):
         self.cpp_info.libs = ["sodium"]
