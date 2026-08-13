@@ -13,10 +13,9 @@ OHOS adaptations:
 import glob
 import os
 import shutil
-import subprocess
 
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.errors import ConanInvalidConfiguration, ConanException
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
