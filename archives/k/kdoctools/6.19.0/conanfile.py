@@ -35,6 +35,8 @@ class KDocToolsConan(ConanFile):
     def requirements(self):
         self.requires("extra-cmake-modules/6.19.0")
         self.requires("qtbase/6.11.1")
+        # karchive/6.19.0 已合入（PR #4636）——meinproc cache 选项完整可用
+        self.requires("karchive/6.19.0")
         # libxml2 用 2.15.3：与 libxslt/1.1.45.1 的依赖版本一致，避免版本冲突
         self.requires("libxml2/2.15.3")
         self.requires("libxslt/1.1.45.1")
@@ -62,9 +64,8 @@ class KDocToolsConan(ConanFile):
         self.conf.define("tools.cmake.cmaketoolchain:user_toolchain", [toolchain_file])
 
         tc = CMakeToolchain(self)
-        # karchive 未合入且无 Conan 配方，采用 KDE 官方 MEINPROC_NO_KARCHIVE
-        # 降级（meinproc cache 选项不可用，DocBook 转换核心功能正常）
-        tc.variables["MEINPROC_NO_KARCHIVE"] = "ON"
+        # karchive/6.19.0 已合入（PR #4636）——移除 MEINPROC_NO_KARCHIVE
+        # 降级——meinproc cache 选项完整可用
         # ECM 的 KDEMetaInfoPlatformCheck 不认 HarmonyOS 平台（仅支持
         # Linux/FreeBSD/Windows/macOS），KDE 官方提供 KF_IGNORE_PLATFORM_CHECK
         # 变量绕过平台检查
