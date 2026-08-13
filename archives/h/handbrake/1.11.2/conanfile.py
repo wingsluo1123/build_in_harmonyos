@@ -27,12 +27,11 @@ import shlex
 import hashlib
 import subprocess
 import sys
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from conan import ConanFile
 from conan.tools.files import (
-    copy, unzip, apply_conandata_patches, export_conandata_patches,
+    copy, unzip, apply_conandata_patches, export_conandata_patches, download,
 )
 from conan.tools.layout import basic_layout
 
@@ -94,9 +93,9 @@ class HandbrakeConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # Curl + per-mirror max-time (via _download_one), then unzip.
-        # Plain Conan get() on a hung gh-proxy burns the CI budget before
-        # falling through other mirrors (CI #13313).
+        # Download the official release source asset through Conan's downloader
+        # so CI L0 does not reject shell-level external downloaders.  Mirrors are
+        # still tried first by _download_one().
         src = self.conan_data["sources"]
         url = src.get("url")
         urls = list(url) if isinstance(url, (list, tuple)) else [url]
@@ -119,8 +118,7 @@ class HandbrakeConan(ConanFile):
         try:
             self._download_one(
                 "HandBrake-1.11.2-source.tar.bz2", bases, sha256, tarball,
-                methods=("curl",), curl_max_time=300,
-                curl_speed_time=30, curl_speed_limit=2048,
+                file_timeout=300,
             )
             unzip(self, tarball, destination=self.source_folder, strip_root=True)
             try:
@@ -575,9 +573,8 @@ class HandbrakeConan(ConanFile):
 
     def _download_one(
         self, basename, urls, sha256, dst, *,
-        include_direct=True, curl_max_time=300, urllib_timeout=180,
-        methods=("curl", "urllib"), max_candidates=None,
-        curl_speed_time=None, curl_speed_limit=None,
+        include_direct=True, file_timeout=300,
+        max_candidates=None,
         prefer_non_github=False,
     ):
         """Download one source/contrib distfile and verify its digest."""
@@ -623,68 +620,29 @@ class HandbrakeConan(ConanFile):
             ordered = ordered[:max_candidates]
 
         tmp = dst + ".tmp"
-        last_err = "no downloader attempted"
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        last_err = "no download attempted"
         for cand in ordered:
-            for method in methods:
-                curl = shutil.which("curl") if method == "curl" else None
-                if method == "curl" and not curl:
-                    continue
-                try:
-                    if os.path.exists(tmp):
+            try:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+                download(self, cand, tmp, verify=True, retry=1)
+                if sha256:
+                    digest = hashlib.sha256(open(tmp, "rb").read()).hexdigest()
+                    if digest != sha256:
                         os.unlink(tmp)
-                    if curl:
-                        cmd = [
-                            curl, "-fsSL", "--connect-timeout", "10",
-                            "--max-time", str(curl_max_time), "-o", tmp, cand,
-                        ]
-                        if curl_speed_time and curl_speed_limit:
-                            cmd[1:1] = [
-                                "--speed-time", str(curl_speed_time),
-                                "--speed-limit", str(curl_speed_limit),
-                            ]
-                        # connect fails fast; 300s body budget covers ffmpeg (~50MB+)
-                        # on the CI mirror. Dead mirrors exit quickly via -f.
-                        subprocess.check_call(
-                            cmd,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            timeout=curl_max_time + 30,
-                        )
-                    else:
-                        with urllib.request.urlopen(cand, timeout=urllib_timeout) as resp, \
-                                open(tmp, "wb") as fh:
-                            shutil.copyfileobj(resp, fh)
-                    if sha256:
-                        digest = hashlib.sha256(open(tmp, "rb").read()).hexdigest()
-                        if digest != sha256:
-                            os.unlink(tmp)
-                            last_err = f"{method}: sha256 mismatch ({digest})"
-                            continue
-                    os.replace(tmp, dst)
-                    return cand
-                except subprocess.CalledProcessError as exc:
-                    last_err = f"{method}: exit {exc.returncode} for {cand}"
-                    if os.path.exists(tmp):
-                        try:
-                            os.unlink(tmp)
-                        except OSError:
-                            pass
-                    continue
-                except subprocess.TimeoutExpired:
-                    last_err = f"{method}: timed out for {cand}"
-                    if os.path.exists(tmp):
-                        try:
-                            os.unlink(tmp)
-                        except OSError:
-                            pass
-                    continue
-                except Exception as exc:
-                    last_err = f"{method}: {exc}"
-                    if os.path.exists(tmp):
-                        try:
-                            os.unlink(tmp)
-                        except OSError:
-                            pass
-                    continue
+                        last_err = f"sha256 mismatch ({digest}) for {cand}"
+                        continue
+                os.replace(tmp, dst)
+                return cand
+            except Exception as exc:
+                last_err = f"{exc} for {cand}"
+                if os.path.exists(tmp):
+                    try:
+                        os.unlink(tmp)
+                    except OSError:
+                        pass
+                continue
         raise RuntimeError(f"{basename}: {last_err}")
 
     def _prefetch_contribs(self):
@@ -693,7 +651,7 @@ class HandbrakeConan(ConanFile):
         CI #13144: 串行 urllib 对大包 120s 超时把 45min 预算耗尽在 prefetch 阶段。
         改进：
           1) 先改写 module.defs，使 make 自身也走镜像（不止依赖 prefetch）
-          2) 并行预取（最多 4 路），curl + 有界超时，失败镜像快速跳过
+          2) 并行预取（最多 4 路），失败镜像快速跳过
           3) 对实际构建依赖，预取失败即停止；不能让 make 回退到
              HandBrake 的 urllib 下载器（新端口证书/超时失败不可控）。
         """
@@ -758,9 +716,7 @@ class HandbrakeConan(ConanFile):
             futs = {
                 pool.submit(
                     self._download_one, b, u, s, d,
-                    include_direct=False, curl_max_time=300, urllib_timeout=300,
-                    methods=("curl",), max_candidates=5,
-                    curl_speed_time=30, curl_speed_limit=2048,
+                    include_direct=False, file_timeout=300, max_candidates=5,
                     prefer_non_github=True,
                 ): b
                 for b, u, s, d in jobs
@@ -867,17 +823,9 @@ class HandbrakeConan(ConanFile):
             tarball = os.path.join(work, base)
             try:
                 self.output.info(f"fetch host GNU patch <- {url}")
-                with urllib.request.urlopen(url, timeout=120) as resp, \
-                        open(tarball, "wb") as fh:
-                    shutil.copyfileobj(resp, fh)
+                self._download_one(base, [url], expect_sha, tarball, file_timeout=120)
             except Exception as exc:
                 self.output.warning(f"fetch {base} failed: {exc}")
-                continue
-            digest = hashlib.sha256(open(tarball, "rb").read()).hexdigest()
-            if digest != expect_sha:
-                self.output.warning(
-                    f"sha256 mismatch for {base}: got {digest}, want {expect_sha}"
-                )
                 continue
             extract_dir = os.path.join(work, base + ".d")
             if os.path.isdir(extract_dir):
