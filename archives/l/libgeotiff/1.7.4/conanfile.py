@@ -42,7 +42,7 @@ class LibgeotiffConan(ConanFile):
 
     def requirements(self):
         self.requires("libtiff/4.7.2")
-        self.requires("proj/9.3.1")
+        self.requires("proj/9.3.1.1")
         self.requires("zlib/1.3.1.1")
         self.requires("libjpeg-turbo/3.2.0")
 

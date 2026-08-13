@@ -34,7 +34,7 @@ libgeotiff 使用 find_package(PROJ) 和 find_package(TIFF)，通过预设 cmake
 | 依赖 | 版本 | 说明 |
 |------|------|------|
 | libtiff | 4.7.2 | 共享库 libtiff.so |
-| proj | 9.3.1 | 静态库 libproj.a (禁用 curl) |
+| proj | 9.3.1.1 | 静态库 libproj.a (禁用 curl, 制品仓已发布) |
 | zlib | 1.3.1.1 | 压缩库 |
 | libjpeg-turbo | 3.2.0 | JPEG 库 |
 
