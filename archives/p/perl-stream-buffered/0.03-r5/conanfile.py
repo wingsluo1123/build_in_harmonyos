@@ -17,8 +17,8 @@ class PerlStreamBufferedConan(ConanFile):
     homepage = "https://metacpan.org/dist/Stream-Buffered"
     url = ""
 
-    # Pure Perl module — only os and arch matter
-    settings = "os", "arch"
+    # L0p: OHOS profile requires all four settings
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)

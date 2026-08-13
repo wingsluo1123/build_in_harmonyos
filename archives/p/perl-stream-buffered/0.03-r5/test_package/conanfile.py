@@ -10,7 +10,8 @@ from conan import ConanFile
 
 
 class PerlStreamBufferedTestConan(ConanFile):
-    settings = "os", "arch"
+    # L0p: OHOS profile requires all four settings
+    settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
