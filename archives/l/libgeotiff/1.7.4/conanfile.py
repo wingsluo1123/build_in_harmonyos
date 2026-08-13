@@ -62,6 +62,12 @@ class LibgeotiffConan(ConanFile):
             _tc = os.path.join(_sdk, "ohos/native/build/cmake/ohos.toolchain.cmake")
             if os.path.isfile(_tc):
                 return _tc
+        # Fallback: discover from HNP_PUBLIC_HOME (CI standard env var)
+        _hnp = os.environ.get("HNP_PUBLIC_HOME", "")
+        if _hnp:
+            _g = sorted(glob.glob(os.path.join(_hnp, "ohos-sdk.org/*/ohos/native/build/cmake/ohos.toolchain.cmake")))
+            if _g:
+                return _g[-1]
         raise ConanInvalidConfiguration(
             "Cannot find ohos.toolchain.cmake: set OHOS_NDK_HOME or OHOS_SDK_HOME or profile [conf] user_toolchain")
 
