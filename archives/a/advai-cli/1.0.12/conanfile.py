@@ -44,9 +44,14 @@ class AdvaiCliConan(ConanFile):
 
         # Runtime deps from the community pip index (pypi.cnb.cool), into
         # ~/usr/local (executable fs; ~/.local is noexec on OHOS). Same
-        # --force-reinstall + --prefix pattern as imgp.
+        # --prefix pattern as imgp.
+        # 注意: 不能用 --force-reinstall——它会让 pip 先卸载已装的同名依赖,
+        # 而 CI 沙箱中 typing_extensions 等已存在于 /data/service/hnp 的只读
+        # site-packages, 卸载时报 Permission denied (CI 实测)。改用
+        # --ignore-installed: 忽略已安装的包, 直接把目标版本装到指定 prefix,
+        # 不尝试卸载系统包。
         prefix = os.path.expanduser("~/usr/local")
-        self.run(f"{python} -m pip install --force-reinstall --prefix='{prefix}' aiohttp click", env="conanrun")
+        self.run(f"{python} -m pip install --ignore-installed --prefix='{prefix}' aiohttp click", env="conanrun")
 
         # HMDFS 上 pip 安装的 .so (aiohttp C 扩展) 缺少 other 执行/读权限
         # (770, chmod 不生效 E046) → 运行时 dlopen Permission denied。
