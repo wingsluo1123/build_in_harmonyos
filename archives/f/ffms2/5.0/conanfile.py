@@ -85,12 +85,6 @@ class Ffms2Conan(ConanFile):
         for dep in self.dependencies.values():
             for libdir in dep.cpp_info.libdirs:
                 env.prepend_path("LD_LIBRARY_PATH", libdir)
-        # On this OHOS build host, /usr/local/bin/aclocal and automake are
-        # version 1.17 but only the 1.16 Automake perl modules are installed,
-        # causing "Can't locate Automake/Config.pm" during autoreconf.
-        # Pin ACLOCAL/AUTOMAKE to the working 1.16 binaries.
-        env.define("ACLOCAL", "aclocal-1.16")
-        env.define("AUTOMAKE", "automake-1.16")
         # Ensure aclocal finds pkg.m4 and other system macros
         env.prepend_path("ACLOCAL_PATH", "/storage/Users/currentUser/usr/local/share/aclocal")
         # PkgConfigDeps generates .pc files with Version: 7.1.5 (the conan
