@@ -49,19 +49,12 @@ class KDocToolsConan(ConanFile):
         apply_conandata_patches(self)
 
     def generate(self):
-        # qtbase 预构建产物无 Qt6Config.cmake（cmake_find_mode=none），
-        # ECM 的 ECMQueryQt.cmake 依赖 Qt6::qtpaths target 查询 Qt 安装前缀，
-        # 缺失即 FATAL_ERROR。生成 qtpaths_target.cmake 并通过 conf
-        # tools.cmake.cmaketoolchain:user_toolchain 注入（CMakeToolchain 生成时读取）。
+        # CI #23910：qtpaths_target.cmake 预定义 Qt6::qtpaths 与 Qt6CoreTools
+        # 的 export set 冲突（Some but not all targets already defined——
+        # syncqt/moc/rcc 等未定义）——qtbase 包的 Qt6CoreTools 已提供
+        # Qt6::qtpaths（Qt6CoreToolsTargets.cmake）——移除预定义注入，
+        # 让 Qt6CoreTools 完整定义（ECMQueryQt 的 Qt6::qtpaths 由 qtbase 提供）
         qtbase_pkg = self.dependencies["qtbase"].package_folder
-        qtpaths = os.path.join(qtbase_pkg, "bin", "qtpaths")
-        toolchain_file = os.path.join(self.generators_folder, "qtpaths_target.cmake")
-        with open(toolchain_file, "w") as f:
-            f.write("if(NOT TARGET Qt6::qtpaths)\n")
-            f.write(f"    add_executable(Qt6::qtpaths IMPORTED)\n")
-            f.write(f"    set_target_properties(Qt6::qtpaths PROPERTIES IMPORTED_LOCATION \"{qtpaths}\")\n")
-            f.write("endif()\n")
-        self.conf.define("tools.cmake.cmaketoolchain:user_toolchain", [toolchain_file])
 
         tc = CMakeToolchain(self)
         # karchive/6.19.0 已合入（PR #4636）——移除 MEINPROC_NO_KARCHIVE
