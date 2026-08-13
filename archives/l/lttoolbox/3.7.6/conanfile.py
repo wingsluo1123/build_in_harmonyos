@@ -23,7 +23,7 @@ R32: Supports both Linux and OHOS platforms.
 import os
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, replace_in_file
+from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches, replace_in_file
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -45,6 +45,27 @@ class LttoolboxConan(ConanFile):
 
     def export_sources(self):
         export_conandata_patches(self)
+        # patches/autotools/ contains pre-generated autoreconf products
+        # (configure, aclocal.m4, Makefile.in, m4/*.m4, ltmain.sh,
+        # config.guess/sub, INSTALL, compile, depcomp, install-sh, missing).
+        # The CI Worker has no aclocal (automake not installed), so build()
+        # copies these into the source folder instead of invoking autoreconf.
+        # export_conandata_patches only copies patches listed in conandata.yml
+        # patches:; autotools/ is a vendored build input not a patch, so we
+        # copy it ourselves here (same pattern address-standardizer uses for
+        # pg_mem_stubs.c). At build time export_sources_folder becomes
+        # self.source_folder, so build() resolves them via
+        # self.source_folder/patches/autotools/.
+        autotools_src = os.path.join(self.recipe_folder, "patches", "autotools")
+        if os.path.isdir(autotools_src):
+            autotools_dst = os.path.join(self.export_sources_folder,
+                                         "patches", "autotools")
+            for root, _, files in os.walk(autotools_src):
+                rel = os.path.relpath(root, autotools_src)
+                dst = os.path.join(autotools_dst, rel) if rel != "." else autotools_dst
+                os.makedirs(dst, exist_ok=True)
+                for f in files:
+                    copy(self, f, root, dst)
 
     def requirements(self):
         self.requires("libxml2/2.15.3.1", transitive_headers=True)
@@ -59,6 +80,28 @@ class LttoolboxConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        # Copy pre-generated autotools files (configure, aclocal.m4,
+        # Makefile.in, m4/*.m4, ltmain.sh, config.guess/sub, INSTALL,
+        # compile, depcomp, install-sh, missing) into the freshly-extracted
+        # source tree RIGHT HERE in source() — before Conan caches the source
+        # folder. Doing this in build() failed because Conan's source folder
+        # management overwrote the top-level configure back to a stale
+        # 21936-line cache residue (with raw PKG_CHECK_MODULES macros not
+        # expanded) between configure() and make(), causing syntax errors.
+        # source() runs once right after get() extracts the tarball; copying
+        # here bakes the correct 22272-line expanded configure into the
+        # cached source so build() sees it without any Conan mechanism able
+        # to overwrite it back.
+        autotools_src = os.path.join(self.recipe_folder, "patches", "autotools")
+        if os.path.isdir(autotools_src):
+            import shutil
+            for root, _, files in os.walk(autotools_src):
+                rel = os.path.relpath(root, autotools_src)
+                dest = os.path.join(self.source_folder, rel) if rel != "." else self.source_folder
+                os.makedirs(dest, exist_ok=True)
+                for f in files:
+                    shutil.copy2(os.path.join(root, f), os.path.join(dest, f))
+            self.output.info("Copied pre-generated autotools files from patches/autotools/ in source()")
 
     def generate(self):
         tc = AutotoolsToolchain(self)
@@ -98,9 +141,16 @@ class LttoolboxConan(ConanFile):
                     pkgconfig_dirs.append(pc_dir)
 
         if cppflags:
-            tc.configure_args.append("CPPFLAGS={}".format(" ".join(cppflags)))
+            # Inject as env vars (not configure argv) so configure's AC_CHECK_HEADER
+            # probes find utf8cpp/utf8.h via CPPFLAGS. Setting via tc.configure_args
+            # passed CPPFLAGS=... as a configure argv which configure ignores.
+            os.environ["CPPFLAGS"] = (
+                " ".join(cppflags) + " " + os.environ.get("CPPFLAGS", "")
+            )
         if ldflags:
-            tc.configure_args.append("LDFLAGS={}".format(" ".join(ldflags)))
+            os.environ["LDFLAGS"] = (
+                " ".join(ldflags) + " " + os.environ.get("LDFLAGS", "")
+            )
 
         # Set PKG_CONFIG_PATH so configure's PKG_CHECK_MODULES finds .pc files
         if pkgconfig_dirs:
@@ -115,53 +165,42 @@ class LttoolboxConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        # The release tarball has no pre-generated configure — generate it.
-        # We must set ACLOCAL_PATH so autoreconf finds pkg.m4 (PKG_CHECK_MODULES)
-        # and the source m4/ dir has ax_pthread.m4 / ax_check_compile_flag.m4.
         # The upstream release tarball ships NO pre-generated configure script
         # (only configure.ac + Makefile.am). autoreconf -fi would generate it,
         # but the CI Worker has no aclocal (automake not installed, only
         # autoconf 2.72 at /data/service/hnp/autoconf.org/autoconf_2.72/).
-        # Pre-generate the autotools files locally and ship them under
-        # patches/autotools/, then copy them into the source folder here —
-        # same approach addrwatch uses (patches/0002-aclocal.m4 + 0003-configure).
+        # Pre-generated autotools files (configure, aclocal.m4, Makefile.in,
+        # m4/*.m4, ltmain.sh, config.guess/sub, INSTALL, compile, depcomp,
+        # install-sh, missing) are copied in source() right after get()
+        # extracts the tarball, baking the correct 22272-line expanded
+        # configure (PKG_CHECK_MODULES macros expanded) into the cached source
+        # so build() sees it without Conan mechanism able to overwrite it back.
+        # Fallback for local builds with automake installed: run autoreconf.
         if not os.path.isfile(os.path.join(self.source_folder, "configure")):
-            autotools_src = os.path.join(self.recipe_folder, "patches", "autotools")
-            if os.path.isdir(autotools_src):
-                import shutil
-                for root, _, files in os.walk(autotools_src):
-                    rel = os.path.relpath(root, autotools_src)
-                    dest = os.path.join(self.source_folder, rel) if rel != "." else self.source_folder
-                    os.makedirs(dest, exist_ok=True)
-                    for f in files:
-                        shutil.copy2(os.path.join(root, f), os.path.join(dest, f))
-                self.output.info("Copied pre-generated autotools files from patches/autotools/")
-            else:
-                # Fallback for local builds with automake installed: run autoreconf.
-                for candidate in [
-                    "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
-                    "/usr/share/aclocal",
-                    "/usr/local/share/aclocal",
-                ]:
-                    if os.path.isfile(os.path.join(candidate, "pkg.m4")):
-                        existing = os.environ.get("ACLOCAL_PATH", "")
-                        os.environ["ACLOCAL_PATH"] = (
-                            candidate + (":" + existing if existing else "")
-                        )
-                        break
-                self.run("autoreconf -fi", cwd=self.source_folder)
+            for candidate in [
+                "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
+                "/usr/share/aclocal",
+                "/usr/local/share/aclocal",
+            ]:
+                if os.path.isfile(os.path.join(candidate, "pkg.m4")):
+                    existing = os.environ.get("ACLOCAL_PATH", "")
+                    os.environ["ACLOCAL_PATH"] = (
+                        candidate + (":" + existing if existing else "")
+                    )
+                    break
+            self.run("autoreconf -fi", cwd=self.source_folder)
 
         # E011: autotools-generated configure/Makefile.in use umask 077 for
         # temporary directories, which causes Permission denied on HMDFS.
         # Patch umask 077 → umask 022 in the generated files (same fix as
-        # libiconv E011).
+        # libiconv E011). The pre-generated configure already uses umask 022.
         for fname in ["configure", "Makefile.in", "lttoolbox/Makefile.in"]:
             fpath = os.path.join(self.source_folder, fname)
             if os.path.isfile(fpath):
                 with open(fpath, "r") as f:
                     content = f.read()
-                if "umask 077" in content:
-                    replace_in_file(self, fpath, "umask 077", "umask 022")
+                    if "umask 077" in content:
+                        replace_in_file(self, fpath, "umask 077", "umask 022")
 
         autotools = Autotools(self)
         autotools.configure()
