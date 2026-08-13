@@ -42,7 +42,7 @@
 
 ## 源码修改
 
-补丁：`patches/0001-qbootctl.c.patch`
+补丁：`patches/0001-meson.build.patch` + `patches/0002-qbootctl.c.patch`
 - `qbootctl.c`：mock backend 整体包入 `#ifdef QBOOTCTL_TESTING`；生产构建不定义宏，不含任何 mock 代码、无运行时开关（无 getenv），main() 与上游完全一致（geteuid 检查最先，-h/--help 非 root 同样被拒）。
 - 测试专用构建（`-DQBOOTCTL_TESTING`）在 main() 中直接 `impl = &mock_bootctl`（编译期绑定，无环境变量开关），并跳过 root 检查；mock 状态跨进程镜像到当前目录普通文件 `.qbootctl-mock.state`（仅测试专用构建，生产二进制无此代码）。
 - `meson.build`：新增独立可执行目标 `qbootctl-test`（c_args: `-DQBOOTCTL_TESTING`，`install: false`），生产目标 `qbootctl` 不定义宏、`install: true`。

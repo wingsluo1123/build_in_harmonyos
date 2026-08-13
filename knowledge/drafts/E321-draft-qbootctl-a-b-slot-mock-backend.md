@@ -35,7 +35,7 @@ Unable to open '/dev/bsg/ufs-bsg0'
 
 ## 解决方案（rec_approach: injectable-backend-env-gate）
 
-最小补丁（archives/q/qbootctl/0.2.2/patches/0001-qbootctl.c.patch）：
+最小补丁（archives/q/qbootctl/0.2.2/patches/0001-meson.build.patch + 0002-qbootctl.c.patch）：
 
 1. **编译期宏隔离**：mock backend 整体包入 `#ifdef QBOOTCTL_TESTING`，仅 meson
    独立测试目标 `qbootctl-test`（`-DQBOOTCTL_TESTING`）编译；生产目标 `qbootctl`
