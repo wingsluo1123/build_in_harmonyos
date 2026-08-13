@@ -128,6 +128,8 @@ if conan remote list 2>/dev/null | grep -q "^${CONAN_REMOTE_NAME}:"; then
     echo "[step] remote 已就绪: ${CONAN_REMOTE_NAME}"
 else
     echo "[step] remote '${CONAN_REMOTE_NAME}' 不存在, 自动添加 (匿名读取)"
+    # --force 确保重复运行不会失败（幂等）
+    conan remote add --force "${CONAN_REMOTE_NAME}" "${CONAN_REMOTE_URL}" 2>/dev/null || \
     conan remote add "${CONAN_REMOTE_NAME}" "${CONAN_REMOTE_URL}" || {
         echo "[error] 无法添加 remote '${CONAN_REMOTE_NAME}'"
         exit 1
