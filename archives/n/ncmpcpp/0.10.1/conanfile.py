@@ -2,7 +2,7 @@
 """Conan recipe for ncmpcpp 0.10.1 on HarmonyOS PC (aarch64).
 
 Build system: autotools. configure is pre-generated from configure.ac and
-shipped as files/autotools-generated.tar.gz (extracted at build time) so CI does not need aclocal/automake.
+shipped as plain files under files/autotools-generated/ (copied at build time) so CI does not need aclocal/automake.
 
 Adaptation notes:
 - OHOS package repository has no GNU readline; ncmpcpp integrates it deeply,
@@ -11,8 +11,8 @@ Adaptation notes:
 - OHOS boost/1.90.0.1 ships no libboost_regex/libboost_locale, so patches
   0003/0004 move regex to std::regex and locale to a built-in UTF-8 codec.
 - OHOS boost/1.90.0.1 also omits the header-only boost/format library, so the
-  missing headers (Boost 1.84, BSL-1.0) are vendored as files/boost-format.tar.gz
-  and added to CPPFLAGS via vendor-boost/.
+  missing headers (Boost 1.84, BSL-1.0) are vendored as files/vendor-boost/
+  and added to CPPFLAGS via -I vendor-boost.
 - HMDFS: config.status uses umask 077; replace with 022 before running
   configure.
 - Adjust timestamps so make does not re-run aclocal/automake/autoconf.
@@ -21,7 +21,6 @@ Adaptation notes:
 """
 
 import os
-import tarfile
 import shutil
 import time
 
@@ -123,24 +122,29 @@ class NcmpcppConan(ConanFile):
     def _copy_vendored_boost_format(self):
         # OHOS boost/1.90.0.1 omits the header-only boost/format library,
         # which ncmpcpp needs for boost::format. Ship the missing headers
-        # (from Boost 1.84, BSL-1.0, see files/boost-format/LICENSE_1_0.txt)
+        # (from Boost 1.84, BSL-1.0, see files/vendor-boost/LICENSE_1_0.txt)
         # and add them to the include search path so configure and make can
         # find them alongside the registry boost package.
-        self._extract_tar(
-            "boost-format.tar.gz",
+        copy(
+            self,
+            "*",
+            os.path.join(self.export_sources_folder, "files", "vendor-boost"),
             os.path.join(self.source_folder, "vendor-boost"),
+            keep_path=True,
         )
 
     def _copy_autotools_generated_files(self):
-        # The generated Autotools output (~58k lines) is archived so the
-        # PR diff stays reviewable; content is identical to the expanded
-        # files previously committed alongside the recipe.
-        self._extract_tar("autotools-generated.tar.gz", self.source_folder)
+        # The generated Autotools output (~58k lines) is committed as plain
+        # text files so the PR diff applies cleanly on CI (binary files in
+        # PR diffs cannot be applied by the checkout-pr git apply step).
+        copy(
+            self,
+            "*",
+            os.path.join(self.export_sources_folder, "files", "autotools-generated"),
+            self.source_folder,
+            keep_path=True,
+        )
 
-    def _extract_tar(self, archive_name, destination):
-        archive = os.path.join(self.export_sources_folder, "files", archive_name)
-        with tarfile.open(archive, "r:gz") as handle:
-            handle.extractall(destination)
 
     def generate(self):
         # configure uses PKG_CHECK_MODULES for libmpdclient.pc / ncursesw.pc /

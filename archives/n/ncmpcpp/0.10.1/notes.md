@@ -10,8 +10,7 @@
 - Autotools. The upstream release tarball has no configure; running ./bootstrap
   requires aclocal/automake, which the OHOS CI does not provide.
 - Therefore the Autotools output was pre-generated in WSL and shipped with the
-  recipe as files/autotools-generated.tar.gz (expanded in source();
-  archived so the PR diff stays reviewable).
+  recipe as plain files under files/autotools-generated/ (copied in source()).
 
 ## Dependencies (all from the ohpcd package repository)
 - boost/1.90.0.1 (shared; filesystem/program_options/date_time/thread/atomic/chrono
@@ -58,7 +57,7 @@
 ## Vendored boost/forma
 - OHOS boost/1.90.0.1 is built from a reduced BOOST_INCLUDE_LIBRARIES set and
   does not ship boost/format.hpp (the header-only boost::format library).
-- files/boost-format.tar.gz carries the missing headers, taken from Boost 1.84
+- files/vendor-boost/ carries the missing headers, taken from Boost 1.84
   (BSL-1.0; LICENSE_1_0.txt is included).
 - source() copies them to vendor-boost/ and generate() appends
   -I<src>/vendor-boost to CPPFLAGS: configure's boost.m4 check and make both
@@ -72,7 +71,7 @@
   make never re-runs autotools
 - Explicit --build/--host=aarch64-unknown-linux-ohos to avoid config.guess
   failing on HMDFS
-- files/autotools-generated.tar.gz includes config.h.in (required by configure)
+- files/autotools-generated/ includes config.h.in (required by configure)
 - autoconf 2.72/pkgconf pkg.m4 expansion emitted one stray "fi" after the
   libmpdclient PKG_CHECK_MODULES block; it was removed from the generated
   configure (bash -n clean; all other pkg blocks already balanced)
