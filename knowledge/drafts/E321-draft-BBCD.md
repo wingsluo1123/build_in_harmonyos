@@ -1,27 +1,48 @@
-# E321 — [简短错误描述]
+# E321 — Qt 模块需 qtshadertools 的 Qt6ShaderTools_DIR
 
 ## 错误特征
-[描述触发此错误模式的典型日志输出或症状]
+
+```
+CMake Error at src/multimedia/CMakeLists.txt:XX (qt_internal_add_shaders):
+  Unknown CMake command "qt_internal_add_shaders".
+```
 
 ## 触发条件
-- 构建系统: [autotools/cmake/meson/...]
-- 阶段: [configure/make/install/...]
+
+- 构建系统: cmake
+- 阶段: configuration
+- 适用: 使用 `qt_internal_add_shaders` 预编译 shader 的 Qt 6 子模块
+  （qtmultimedia、qtquick3d、qt3d 等）
 
 ## 根因分析
-[详细解释错误的根本原因]
+
+Qt 6 子模块的 `qt_internal_add_shaders` CMake 宏由 **qtshadertools** 包提供，
+必须通过 `Qt6ShaderTools_DIR` 让 CMake 找到该宏，否则 configure 阶段直接
+报 `Unknown CMake command`。qtshadertools 包内 `lib/cmake/Qt6ShaderTools`
+即为该宏的定义位置。
 
 ## 解决方案
 
 ### 推荐方案
-[描述修复步骤]
 
-### 禁止做法
-- ❌ [描述不应采取的操作]
+`CMakeToolchain`（conan 配方 generate()）显式设置：
 
-## 验证
-```bash
-[验证修复的命令]
+```
+-DQt6ShaderTools_DIR=<qtshadertools 包>/lib/cmake/Qt6ShaderTools
 ```
 
-## 关联条目
-- 相关: [E???]
+同时将 qtshadertools 加入 requirements，并把其 package_folder 写入
+CMAKE_PREFIX_PATH，保证 `Qt6ShaderToolsConfig.cmake` 可被发现。
+
+### 禁止做法
+
+- ❌ 仅把 qtshadertools 加进 requirements 而不设置 `Qt6ShaderTools_DIR`
+  （find_package 不搜索子包内嵌的宏目录，configure 仍失败）
+- ❌ 手工拷贝 `qt_internal_add_shaders` 宏到本包（破坏依赖原子性）
+
+## 验证
+
+```bash
+grep -rE "Unknown CMake command.*qt_internal_add_shaders" build/log
+# 空输出即已修复
+```

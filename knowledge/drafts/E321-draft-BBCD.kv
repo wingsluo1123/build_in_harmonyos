@@ -19,7 +19,7 @@
 id:                     E321
 trigger_tool:           configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime
 phase:                  configuration|compilation|linking|installation|testing|runtime
-error_signature: qt_internal_add_shaders Unknown CMake command
+error_signature: Unknown CMake command "qt_internal_add_shaders"
 
 # ═══ Layer 1: 识别层 (Recognition) ═══
 # severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
@@ -27,8 +27,8 @@ error_signature: qt_internal_add_shaders Unknown CMake command
 # match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
 # title:         简短标题(一句话描述错误模式)
 severity:               2
-category:               category-name
-match_keywords:         keyword1, keyword2, keyword3
+category:               qt6-module-adapt
+match_keywords:         qt_internal_add_shaders, Qt6ShaderTools_DIR, qtshadertools
 title: qtmultimedia 需 qtshadertools 的 Qt6ShaderTools_DIR
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
@@ -37,16 +37,15 @@ title: qtmultimedia 需 qtshadertools 的 Qt6ShaderTools_DIR
 # verification_cmd: 验证诊断是否正确的命令
 root_cause: qtmultimedia 的 src/multimedia 用 qt_internal_add_shaders 预编译 shader，需 qtshadertools 包提供的 CMake 宏
 affected_scope: Qt 6.11 子模块适配
-verification_cmd:
+verification_cmd: grep -rE "Unknown CMake command.*qt_internal_add_shaders" build/log
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 # 推荐方案 (priority 越小越优先, 从 1 开始)
-rec_priority:
+rec_priority:           1
 rec_approach: CMakeToolchain 显式设 Qt6ShaderTools_DIR=<qtshadertools 包>/lib/cmake/Qt6ShaderTools + CMAKE_PREFIX_PATH
-rec_description:        一句话描述这个推荐方案
-rec_command:            可选: 具体命令模板(${VAR}变量引用)
-rec_auto_fix:           true|false                  # 引擎能否自动执行
-rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+rec_description:        CMakeToolchain 设置 Qt6ShaderTools_DIR 指向 qtshadertools 包 lib/cmake/Qt6ShaderTools，使 qt_internal_add_shaders 宏可用
+rec_command:            -DQt6ShaderTools_DIR=<qtshadertools>/lib/cmake/Qt6ShaderTools
+rec_auto_fix:           true
 
 # 回退方案 (当推荐方案不可用时尝试)
 fallback_priority:      2

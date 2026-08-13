@@ -70,14 +70,21 @@ int main(int argc, char **argv)
               == QStringLiteral("openharmony-probe"),
           "QMediaMetaData insert/value");
 
-    // 4. Signal-slot plumbing (errorOccurred).
+    // 4. Signal-slot plumbing (errorOccurred): assert the connection is
+    //    established (connect() returning true). On OHOS there is no media
+    //    backend, so QMediaPlayer never processes the invalid source and
+    //    errorOccurred cannot fire; the observed count is reported as
+    //    diagnostics with the reason, instead of faking a firing assertion.
     MediaProbe probe;
-    QObject::connect(&player, &QMediaPlayer::errorOccurred, &probe,
-                     &MediaProbe::onError);
+    const bool connected = QObject::connect(&player, &QMediaPlayer::errorOccurred,
+                                            &probe, &MediaProbe::onError);
+    CHECK(connected, "errorOccurred connection established");
     player.setSource(QUrl(QStringLiteral("file:///nonexistent-probe.wav")));
-    QTimer::singleShot(200, &app, &QCoreApplication::quit);
+    QTimer::singleShot(500, &app, &QCoreApplication::quit);
     app.exec();
-    CHECK(probe.errorSignals >= 0, "errorOccurred signal connected");
+    std::printf("[INFO] errorOccurred signals observed: %d "
+                "(0 expected: no media backend on OHOS)\n",
+                probe.errorSignals);
 
     std::printf("qtmultimedia consumer test: %s\n",
                 failures == 0 ? "ALL PASSED" : "FAILED");

@@ -27,8 +27,8 @@ error_signature: ctest integration 测试大量失败
 # match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
 # title:         简短标题(一句话描述错误模式)
 severity:               2
-category:               category-name
-match_keywords:         keyword1, keyword2, keyword3
+category:               qt6-module-adapt
+match_keywords:         ctest, integration, media backend, No backend
 title: OHOS 无媒体后端时 integration 测试排除
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
@@ -37,16 +37,15 @@ title: OHOS 无媒体后端时 integration 测试排除
 # verification_cmd: 验证诊断是否正确的命令
 root_cause: OHOS 无音频/视频媒体后端，integration/backend 测试需真实设备
 affected_scope: qtmultimedia 适配
-verification_cmd:
+verification_cmd: ctest -N | grep -cE "integration|backend" # 无后端时应仅 unit 子集可运行
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 # 推荐方案 (priority 越小越优先, 从 1 开始)
-rec_priority:
+rec_priority:           1
 rec_approach: MANIFEST.yml 声明 excluded_upstream_tests，build() 用 ctest -R 只运行 unit 测试子集
-rec_description:        一句话描述这个推荐方案
-rec_command:            可选: 具体命令模板(${VAR}变量引用)
-rec_auto_fix:           true|false                  # 引擎能否自动执行
-rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+rec_description:        MANIFEST.yml 声明排除项 + ctest -R 指定可运行的 unit 测试正则
+rec_command:            ctest -R 'tst_qmediametadata|tst_qmediaplayer|module_includes' --output-on-failure
+rec_auto_fix:           true
 
 # 回退方案 (当推荐方案不可用时尝试)
 fallback_priority:      2

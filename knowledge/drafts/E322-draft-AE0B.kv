@@ -27,8 +27,8 @@ error_signature: qsb: Error relocating symbol not found
 # match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
 # title:         简短标题(一句话描述错误模式)
 severity:               2
-category:               category-name
-match_keywords:         keyword1, keyword2, keyword3
+category:               qt6-module-adapt
+match_keywords:         qsb, Error relocating, LD_LIBRARY_PATH, libQt6ShaderTools
 title: qsb 宿主工具需 LD_LIBRARY_PATH
 
 # ═══ Layer 2: 诊断层 (Diagnosis) ═══
@@ -37,16 +37,15 @@ title: qsb 宿主工具需 LD_LIBRARY_PATH
 # verification_cmd: 验证诊断是否正确的命令
 root_cause: Qt Shader Baker（qsb）构建期运行加载 libQt6ShaderTools/libQt6Core 需依赖包 lib 路径
 affected_scope: Qt 6.11 子模块适配
-verification_cmd:
+verification_cmd: qsb --version 2>&1 | grep -q "Error relocating" && echo "缺 LD_LIBRARY_PATH"
 
 # ═══ Layer 3: 方案层 (Solution Space) ★ ═══
 # 推荐方案 (priority 越小越优先, 从 1 开始)
-rec_priority:
+rec_priority:           1
 rec_approach: build() 中用 cmake -E env LD_LIBRARY_PATH=<qtbase lib>:<qtshadertools lib> cmake --build
-rec_description:        一句话描述这个推荐方案
-rec_command:            可选: 具体命令模板(${VAR}变量引用)
-rec_auto_fix:           true|false                  # 引擎能否自动执行
-rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+rec_description:        cmake -E env 注入 qtbase/qtshadertools 的 lib 到 LD_LIBRARY_PATH 后执行 cmake --build
+rec_command:            cmake -E env LD_LIBRARY_PATH=$LD_LIBRARY_PATH cmake --build <build_dir>
+rec_auto_fix:           true
 
 # 回退方案 (当推荐方案不可用时尝试)
 fallback_priority:      2
