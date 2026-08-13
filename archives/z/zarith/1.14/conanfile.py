@@ -51,6 +51,15 @@ class ZarithConan(ConanFile):
         ocaml_dep = self.dependencies.build["ocaml"]
         ocaml_bin = os.path.join(ocaml_dep.package_folder, "bin")
         os.environ["PATH"] = ocaml_bin + os.pathsep + os.environ.get("PATH", "")
+        # 制品仓 ocaml 包可能缺 ocaml toplevel/ocamlrun（CI 构建环境差异），
+        # checkcc 用 ocamlc 编译字节码后需 ocamlrun 运行 tmp.out；缺失时
+        # 改用 ocamlc.opt + -custom（原生可执行，不依赖 ocamlrun 运行）
+        ocamlrun_exists = os.path.isfile(os.path.join(ocaml_bin, "ocamlrun"))
+        ocamlc_opt = os.path.join(ocaml_bin, "ocamlc.opt")
+        if not ocamlrun_exists and os.path.isfile(ocamlc_opt):
+            os.environ["OCAMLC"] = ocamlc_opt
+            os.environ["OCAMLCFLAGS"] = os.environ.get("OCAMLCFLAGS", "") + " -custom"
+            self.output.info(f"ocamlrun 缺失，checkcc 改用 ocamlc.opt -custom（原生可执行）")
         # ZArith uses a custom configure script (not standard autotools)
         # The configure script takes -installdir, not --prefix
         install_dir = os.path.join(self.package_folder, "lib", "ocaml")
