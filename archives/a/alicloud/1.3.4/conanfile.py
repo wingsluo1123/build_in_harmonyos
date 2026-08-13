@@ -60,13 +60,16 @@ class AlicloudConan(ConanFile):
         # 注意: 不写死依赖名字面量,避免 L0o 静态扫描把 `curl` 字样误判为
         # 外部命令行下载源码——本配方源码下载统一走 conan_data +
         # tools.files.get(), 无外部下载语义。
+        # 用 conan 2 标准 self.dependencies.items() 遍历依赖(requirement,
+        # dependency)对收集 include/lib——不能用 `for dep in self.dependencies`
+        # 再 self.dependencies[dep] 索引(遍历产生 Requirement 对象, build()
+        # 中索引会 TypeError: argument of type 'int' is not iterable, CI 实测)。
         import subprocess
         _inc = []
         _lib = []
-        for dep in self.dependencies:
-            d = self.dependencies[dep]
-            _inc.extend(d.cpp_info.includedirs)
-            _lib.extend(d.cpp_info.libdirs)
+        for _dep_name, _dep in self.dependencies.items():
+            _inc.extend(_dep.cpp_info.includedirs)
+            _lib.extend(_dep.cpp_info.libdirs)
         _env = dict(os.environ)
         # subprocess 直接执行不会加载 conanrun 环境,需手动补工具链 PATH
         _tool_paths = ["/data/service/hnp/bin", "/storage/Users/currentUser/usr/local/bin"]
