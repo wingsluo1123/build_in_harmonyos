@@ -74,8 +74,8 @@ class Ffms2Conan(ConanFile):
         deps.generate()
         tc = AutotoolsToolchain(self)
         # OHOS: GNU ld (ld.bfd) produces ELF binaries rejected by exec MAC policy.
-        # Force lld linker so configure's compiler test can create executables.
-        tc.extra_ldflags.append("-fuse-ld=lld")
+        # Force lld so configure's compiler test can create executables.
+        tc.ldflags.append("-fuse-ld=lld")
         # R26: system-name libraries should use static; ffms2 is not a
         # system-name library, so default shared is fine.  But honour the
         # conan option.
