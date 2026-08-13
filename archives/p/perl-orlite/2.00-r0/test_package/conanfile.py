@@ -19,6 +19,6 @@ class PerlorliteTestConan(ConanFile):
         pass  # Pure Perl module — no compilation needed
 
     def test(self):
-        # L1+L2 smoke test: run test_orlite.sh which verifies
-        # ORLite.pm presence and API via static analysis
+        # L1+L2 smoke test: run test_orlite.sh which loads ORLite
+        # with mock DBD::SQLite and calls 9 core API methods (R34)
         self.run("sh test_orlite.sh", env="conanrun")

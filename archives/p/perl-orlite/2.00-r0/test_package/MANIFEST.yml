@@ -25,17 +25,15 @@ upstream_tests:
     command: "perl -Iblib/lib t/02_basics.t"
 
 # test_package 中自带的测试 (消费者视角验证)
-# 使用静态分析验证 ORLite.pm，避免依赖 Params::Util/DBI 等 CI Worker 上可能缺失的 Perl 模块
+# 使用 mock DBD::SQLite 注入 %INC，实际 use ORLite 并调用 API 方法 (R34)
 test_package_tests:
   - file: test_orlite.sh
     description: "ORLite.pm 文件存在性验证"
     command: "perl -e 'grep { -f \"$_/ORLite.pm\" } @INC'"
   - file: test_orlite.sh
-    description: "ORLite 版本号验证 (静态解析 \$VERSION)"
-    command: "perl -e 'open my \$f,\"<\",\"ORLite.pm\"; my \$c=do{local \$/;<\$f>}; my(\$v)=\$c=~/VERSION.*=.*[\"'']([^\"'']+)/; die unless \$v eq \"2.00\"'"
-  - file: test_orlite.sh
-    description: "ORLite 9 个核心 API 方法定义验证 (静态解析 sub 定义)"
-    command: "perl -e 'grep /^sub (connect|prepare|do|selectall_arrayref|dbh|begin|commit|rollback|iterate)\\b/m, split /\\n/, \$content'"
+    description: "ORLite API 调用验证 (mock DBD::SQLite + use ORLite + 9 核心方法 can() 检查)"
+    command: "sh test_orlite.sh"
 
 # 测试断言总数 (近似值, 用于质量评估)
-assertion_count: 11
+# 文件存在(1) + 版本(1) + TestDB生成(1) + 9方法can()(9) = 12
+assertion_count: 12
