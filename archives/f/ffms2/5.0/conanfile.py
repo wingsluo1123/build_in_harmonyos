@@ -43,6 +43,13 @@ class Ffms2Conan(ConanFile):
     def requirements(self):
         self.requires("ffmpeg/7.1.5")
         self.requires("zlib/1.3.1.1")
+    
+        def build_requirements(self):
+            # GitHub archive lacks pre-generated configure; autoreconf -fi needs
+            # automake/libtool. CI worker PATH has no aclocal (only autoconf/m4
+            # from HNP), so pull these tool packages from ohpcd.
+            self.tool_requires("automake/1.18")
+            self.tool_requires("libtool/2.5.4")
 
     def validate(self):
         # R32: settings.os must check in ("Linux", "OHOS")
