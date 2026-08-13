@@ -23,7 +23,7 @@ class PyparsingConan(ConanFile):
     homepage = "https://github.com/pyparsing/pyparsing"
     url = "https://github.com/pyparsing/pyparsing"
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
     package_type = "library"
     # Conan 2.x 要求 library 类型必须声明 shared option（纯 Python 包，固定 False）
     options = {"shared": [True, False]}
