@@ -45,9 +45,14 @@ make check   # 全部通过（Success）
 
 ```bash
 make check
-# testbed/testcms：profile decoding / sRGB space / multiprofile transforms /
-# devicelink / ink limiting / named colors / CGATS parser 全部 pass，最终输出 "Success."
-# 退出码 0
+# testbed/testcms：main() 实际调用 26 个测试函数（CheckEndianess/CheckSwab/CheckQuickFloor/
+# TestFixedPoint/TestFixedScaling/TestJointCurves/TestReversingOfCurves/
+# TestLinearInterpolation/TestReverseLinearInterpolation/Test3D/TestMatrixCreation/GetInfoTest/
+# Test_sRGB/RealProfilesTest/TestInducedError/TestPreview/TestMultiprofile/
+# TestLinearizationDevicelink/TestDeviceLinkGeneration/TestLinearizationDevicelink2/
+# TestInkLimiting/TestSaveToMem/TestNamedColor/TestIT8/TestPostScript/TestColorantTableTag）
+# 全部通过，最终输出 "Success."，退出码 0
+# 通过率: 26/26 (100%)
 ```
 
 ## 交付物
