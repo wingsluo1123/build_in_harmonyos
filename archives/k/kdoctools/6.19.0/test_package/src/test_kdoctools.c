@@ -29,8 +29,11 @@ int main(int argc, char *argv[]) {
             n = fread(buf, 1, sizeof(buf) - 1, fp);
             buf[n] = '\0';
             pclose(fp);
-            if (strstr(buf, "Usage") != NULL || strstr(buf, "meinproc") != NULL
-                || strstr(buf, "usage") != NULL) {
+            /* AI review P2：删除 "meinproc" 关键字（命令未找到/加载失败
+             * 的错误消息含 "meinproc"——假阳性误报 PASS——与 fizmo/drill/
+             * opensp P2 教训相同）——仅 "Usage"/"usage" + 输出非空检查 */
+            if (n > 0 &&
+                (strstr(buf, "Usage") != NULL || strstr(buf, "usage") != NULL)) {
                 printf("  ✓ %s --help printed usage info\n", meinproc);
                 passed++;
             } else {
