@@ -38,7 +38,6 @@ def _check_contains(content, needle, label, file_label):
         _fail(f"{label}: '{needle}' not found in {file_label}")
 
 
-<<<<<<< HEAD
 def _stub_optional_runtime_deps():
     """Stub pip-only deps so import aioredis works without Redis server/pip install.
 
