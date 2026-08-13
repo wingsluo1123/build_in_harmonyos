@@ -68,7 +68,14 @@ class DuneConan(ConanFile):
         self.output.info(f"ocaml bin 注入 PATH: {ocaml_bin}")
         # Step 1: Bootstrap - build _boot/dune.exe
         # env="conanbuild" 注入 tool_requires（ocaml）的 bin 到 PATH，bootstrap 才能找到 ocaml
-        self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
+        # 制品仓 ocaml 包可能缺 `ocaml` toplevel 命令（CI 构建环境差异），
+        # 缺失时改用 ocamlc 编译 bootstrap.ml 为字节码 + ocamlrun 运行（不依赖 toplevel）
+        if os.path.isfile(os.path.join(ocaml_bin, "ocaml")):
+            self.run("ocaml boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
+        else:
+            self.output.info("ocaml toplevel 缺失，改用 ocamlc 编译 bootstrap + ocamlrun 运行")
+            self.run("ocamlc -o boot/bootstrap.exe boot/bootstrap.ml", cwd=self.source_folder, env="conanbuild")
+            self.run("ocamlrun boot/bootstrap.exe", cwd=self.source_folder, env="conanbuild")
         # Step 2: Release build
         self.run("make release", cwd=self.source_folder, env="conanbuild")
 
