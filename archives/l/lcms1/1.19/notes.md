@@ -4,7 +4,7 @@
 - 构建系统: autotools
 - 编译日期: 2026-08-13
 - 编译器: clang 15.0.4 / clang++
-- 状态: built（待 conan-verify 后确认）
+- 状态: built（conan-verify 8 道门禁已通过，未 upload）
 
 ## 编译步骤
 
