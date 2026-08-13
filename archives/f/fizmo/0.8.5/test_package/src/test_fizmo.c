@@ -13,10 +13,12 @@ int main(int argc, char *argv[]) {
     printf("fizmo Test Suite (binary: %s)\n", fizmo);
     printf("================================\n\n");
 
-    /* Test 1: fizmo-ncursesw binary --help outputs usage info.
-     * 不依赖退出码（上游可能非零），用 popen 捕获输出并检查关键字。 */
-    printf("Test 1: %s --help (output check)\n", fizmo);
-    int cmd_len = snprintf(cmd, sizeof(cmd), "%s --help 2>&1", fizmo);
+    /* Test 1: fizmo-ncursesw binary --version prints version info.
+     * fizmo-ncursesw 不支持 --help（源码无 --help 参数处理——CI #22792
+     * 实测 --help 无输出）——改用 --version 并检查版本号 "0.8.5"
+     * （共享库缺失错误消息不含版本号——P2 假阳性规避）。 */
+    printf("Test 1: %s --version (output check)\n", fizmo);
+    int cmd_len = snprintf(cmd, sizeof(cmd), "%s --version 2>&1", fizmo);
     if (cmd_len < 0 || (size_t)cmd_len >= sizeof(cmd)) {
         printf("  ✗ command line too long (need %d, have %zu)\n", cmd_len, sizeof(cmd));
         failed++;
@@ -29,16 +31,13 @@ int main(int argc, char *argv[]) {
             n = fread(buf, 1, sizeof(buf) - 1, fp);
             buf[n] = '\0';
             pclose(fp);
-            /* 只用 "Usage"/"usage" 关键字（strstr 大小写敏感，双查）：
-             * 不用 "fizmo"——二进制缺共享库（如 ncursesw）时动态链接
-             * 错误消息（fizmo-ncursesw: error while loading shared
-             * libraries: ...）含 "fizmo" 子串，会导致假阳性误报 PASS
-             * （drill/opensp 同类问题先例，AI review P2） */
-            if (strstr(buf, "Usage") != NULL || strstr(buf, "usage") != NULL) {
-                printf("  ✓ %s --help printed usage info\n", fizmo);
+            /* 检查版本号 "0.8.5"（PACKAGE_VERSION——fizmo-ncursesw 无
+             * --help——共享库缺失错误消息不含版本号——P2 假阳性规避） */
+            if (strstr(buf, "0.8.5") != NULL) {
+                printf("  ✓ %s --version printed version info\n", fizmo);
                 passed++;
             } else {
-                printf("  ✗ %s --help output missing usage info\n", fizmo);
+                printf("  ✗ %s --version output missing version info\n", fizmo);
                 failed++;
             }
         }
