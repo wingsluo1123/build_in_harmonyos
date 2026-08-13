@@ -64,6 +64,29 @@ class TectonicConan(ConanFile):
         pkg.generate()
         env = VirtualBuildEnv(self)
         env.generate()
+        # Patch freetype conandata.yml in conan cache: download.savannah.gnu.org
+        # is unreliable (502). Add SourceForge mirror as fallback URL list.
+        import glob
+        for cd in glob.glob(os.path.expanduser("~/.conan2/p/freet*/e/conandata.yml")):
+            try:
+                with open(cd) as f:
+                    content = f.read()
+                if "download.savannah.gnu.org" in content and "sourceforge" not in content.lower():
+                    import re
+                    m = re.search(r'url:\s*"(https://download\.savannah\.gnu\.org/releases/freetype/freetype-[^"]+)"', content)
+                    if m:
+                        orig_url = m.group(1)
+                        fn = orig_url.split("/")[-1]
+                        sf_url = f"https://downloads.sourceforge.net/project/freetype/freetype2/2.14.3/{fn}"
+                        content = content.replace(
+                            f'url: "{orig_url}"',
+                            f'url:\n    - "{sf_url}"\n    - "{orig_url}"'
+                        )
+                        with open(cd, "w") as f:
+                            f.write(content)
+                        self.output.info(f"Patched freetype conandata.yml with SourceForge mirror")
+            except Exception:
+                pass
 
     def build(self):
         apply_conandata_patches(self)
