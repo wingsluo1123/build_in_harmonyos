@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Conan test_package for perl-sereal-encoder 5.004 (Perl XS module).
 
-L1 test: verify the Perl module files are present and valid.
-Full verification: file existence + Perl syntax + ELF format + .codesign
-signature + symbol table + module metadata.
+L1 test (R34): verify the Perl module files are present and call actual
+Sereal::Encoder API (new + encode) to validate functionality.
 
-Note: .so loading is restricted on HarmonyOS due to file permission model
-(perl runs as UID 20020101, conan-built .so owned by UID 20001006, chmod
-ineffective per E046). File-based verification is used instead.
+Test script (test_encoder.py) performs:
+  - Static checks: .pm existence/syntax, .so ELF/codesign/symbol/version
+  - Runtime test: loads Sereal::Encoder and calls encode()
+  - If "Permission denied" (HMDFS SELinux E046): tolerated, platform limitation
+  - Any other load failure: test FAILS (real error, not silently swallowed)
 """
 import os
 

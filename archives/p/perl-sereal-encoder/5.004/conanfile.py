@@ -8,7 +8,7 @@ Bundled libraries: miniz, csnappy, zstd (compiled statically into .so).
 OHOS adaptations:
 - ELF signing: llvm-objcopy + binary-sign-tool (required for .so dlopen)
 - .so runtime loading in conan cache blocked by file permission model (E046)
-- test_package uses file verification + perl -c syntax check
+- test_package: static checks + runtime Sereal::Encoder API call (R34, E046 tolerated)
 """
 import glob
 import os
