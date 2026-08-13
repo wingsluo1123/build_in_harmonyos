@@ -1,0 +1,18 @@
+software: armci-mpi
+display: "ARMCI-MPI"
+description: "ARMCI (Aggregate Remote Memory Copy Interface) 的 MPI 实现，使用 MPI 单边通信 (RMA)"
+category: parallel
+homepage: "https://github.com/pmodels/armci-mpi"
+license: MIT
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "Autotools 构建，GitHub tag tarball 不含预生成 configure，需先运行 autogen.sh"
+    - "HMDFS 内核无法执行 /storage/ 下脚本的 shebang (E217)，需通过 perl/bash 显式调用"
+    - "configure.ac 中 MPICC 会覆盖 CC，不要传递 MPICC 参数"
+    - "mpicc wrapper 无法从 /storage/ 执行，改用 CC=clang + CFLAGS/LDFLAGS 传递 MPI 路径"
+    - "umask 077 导致 config.status 权限错误，需修补为 umask 022"
+    - "18 个补丁修复 autotools 生成文件的平台兼容性"
+  common_dependencies:
+    - "mpich/5.0.1"

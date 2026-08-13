@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: armci-mpi/0.4
+homepage: "https://github.com/pmodels/armci-mpi"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "mpiexec -n 2 ./tests/test_onesided"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/test_onesided.c
+    source: armci-mpi-0.4/tests/test_onesided.c
+    description: "ARMCI one-sided communication test (Put/Get/Barrier)"
+    command: "mpiexec -n 2 ./tests/test_onesided"
+  - file: tests/test_mutex.c
+    source: armci-mpi-0.4/tests/test_mutex.c
+    description: "ARMCI mutex test"
+    command: "mpiexec -n 2 ./tests/test_mutex"
+  - file: tests/test_malloc.c
+    source: armci-mpi-0.4/tests/test_malloc.c
+    description: "ARMCI malloc test"
+    command: "mpiexec -n 2 ./tests/test_malloc"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "ARMCI API consumer test (Init/Malloc/Put/Get/Barrier/Free/Finalize)"
+    command: "mpiexec -n 2 ./test_armci_mpi"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 30
