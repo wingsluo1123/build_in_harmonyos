@@ -56,7 +56,8 @@ if [ -z "$PERL_LIB" ] || [ -z "$PERL_ARCH_LIB" ]; then
 fi
 
 # R34: Call the encryption API — Blowfish encrypt/decrypt round-trip
-PERL5LIB="${PERL_LIB}:${PERL_ARCH_LIB}" perl -e '
+# R9: Do not blindly swallow API failures — distinguish platform limitations from real bugs
+API_OUTPUT=$(PERL5LIB="${PERL_LIB}:${PERL_ARCH_LIB}" perl -e '
 use strict;
 use warnings;
 use Crypt::Eksblowfish::Blowfish;
@@ -76,9 +77,18 @@ my $decrypted = $cipher->decrypt($ciphertext);
 die "round-trip mismatch" unless $plaintext eq $decrypted;
 
 print "PASS: Blowfish encrypt/decrypt round-trip OK\n";
-' 2>&1 || {
-    # SELinux on OHOS may block dlopen from HMDFS — known platform limitation
-    echo "WARN: API call failed (likely SELinux/dlopen restriction on OHOS)"
-}
+' 2>&1) && API_RC=0 || API_RC=$?
+
+if [ "$API_RC" -eq 0 ]; then
+    echo "$API_OUTPUT"
+elif echo "$API_OUTPUT" | grep -qiE "dlopen|SELinux|permission denied|cannot (open|load|shared object|stat)"; then
+    # Known OHOS platform limitation: SELinux blocks dlopen from HMDFS context
+    echo "WARN: API call failed — known platform limitation (SELinux/dlopen restriction on OHOS)"
+    echo "      Output: $API_OUTPUT"
+else
+    echo "FAIL: API call failed — not a platform limitation (possible real bug)"
+    echo "      Output: $API_OUTPUT"
+    exit 1
+fi
 
 echo "All checks completed"
