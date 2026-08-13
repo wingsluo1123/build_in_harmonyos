@@ -8,7 +8,6 @@ from conan import ConanFile
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
-from conan.tools.env import Environment
 
 
 class ImageMagickConan(ConanFile):
@@ -77,12 +76,6 @@ class ImageMagickConan(ConanFile):
         if not self.options.with_magick_plus_plus:
             tc.configure_args.append("--without-magick-plus-plus")
         tc.generate()
-
-        # Fix umask 077 issue on HMDFS (E011)
-        env = Environment()
-        env.define("CONFIG_SHELL", "/bin/sh")
-        envvars = env.vars(self)
-        envvars.save_script("conanbuildenv")
 
     def build(self):
         apply_conandata_patches(self)
