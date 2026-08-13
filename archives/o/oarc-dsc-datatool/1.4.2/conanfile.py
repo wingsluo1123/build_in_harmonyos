@@ -30,7 +30,7 @@ class OarcDscDatatoolConan(ConanFile):
 
     package_type = "library"
     # 纯 Python 包：只需 os/arch 标识平台，无编译器依赖
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     # Conan 2.x: library 类型必须声明 shared option（纯 Python 包固定 False）
     options = {"shared": [True, False]}
