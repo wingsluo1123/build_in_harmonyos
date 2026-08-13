@@ -19,7 +19,7 @@ class ArnoIptablesFirewallConan(ConanFile):
     description = "Single- & multi-homed firewall script with DSL/ADSL support"
     license = "GPL-2.0-or-later"
     homepage = "https://rocky.eld.leidenuniv.nl/"
-    url = ""
+    url = "https://github.com/arno-iptables-firewall/aif"
     package_type = "application"
 
     settings = "os", "compiler", "build_type", "arch"

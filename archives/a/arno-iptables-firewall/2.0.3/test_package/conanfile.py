@@ -19,7 +19,7 @@ class ArnoIptablesFirewallTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
-        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "/data/service/hnp/bin/bash"
+        bash = os.environ.get("CONFIG_SHELL") or shutil.which("bash") or "bash"
         pkg_folder = self.dependencies[self.tested_reference_str].package_folder
         script = os.path.join(self.source_folder, "test_arno_iptables_firewall.sh")
         self.run(
