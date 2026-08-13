@@ -25,8 +25,8 @@ class ArduinomkConan(ConanFile):
     # R38: This is a command-line tool package (scripts), not a library
     package_type = "application"
 
-    # Script-only package: only need os setting (R32: must include "OHOS")
-    settings = "os"
+    # OHOS profile requires all four settings
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
