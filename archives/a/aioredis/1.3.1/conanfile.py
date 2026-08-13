@@ -23,7 +23,7 @@ class AioredisRecipe(ConanFile):
     url = "https://github.com/aio-libs-abandoned/aioredis-py"
     topics = ("redis", "asyncio", "async", "python", "client")
     package_type = "header-library"
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
     exports_sources = "conandata.yml"
 
     def export_sources(self):

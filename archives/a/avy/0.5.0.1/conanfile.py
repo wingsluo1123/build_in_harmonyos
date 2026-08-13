@@ -22,7 +22,7 @@ class AvyConan(ConanFile):
     # 纯 Elisp 内容包，无需 shared 选项
     package_type = "header-library"
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
