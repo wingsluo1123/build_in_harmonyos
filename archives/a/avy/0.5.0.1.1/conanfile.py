@@ -13,7 +13,7 @@ from conan.tools.layout import basic_layout
 
 class AvyConan(ConanFile):
     name = "avy"
-    version = "0.5.0.1"
+    version = "0.5.0.1.1"
     description = "GNU Emacs Lisp package for jumping to tree-based visual selections"
     license = "GPL-3.0-or-later"
     homepage = "https://github.com/abo-abo/avy"
@@ -36,7 +36,7 @@ class AvyConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        get(self, **self.conan_data["source"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def build(self):
         apply_conandata_patches(self)
