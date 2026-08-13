@@ -5,7 +5,6 @@ Perl-based functional test: verifies String::RewritePrefix works correctly
 on OHOS by running test.pl which exercises the core rewrite API.
 """
 import os
-import tempfile
 
 from conan import ConanFile
 
@@ -25,12 +24,18 @@ class PerlStringRewriteprefixTestConan(ConanFile):
         # Run the Perl-based functional test
         test_script = os.path.join(self.source_folder, "test.pl")
 
-        # Build PERL5LIB: system deps + conan package path
+        # Bundled pure-Perl dependencies (Sub::Exporter chain) shipped in deps/
+        bundled_lib = os.path.join(self.source_folder, "deps")
+
+        # Build PERL5LIB: bundled deps + system paths + conan package path
         perl5lib = (
             "/storage/Users/currentUser/usr/local/perl5/lib/perl5:"
             "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0/aarch64-linux:"
             "/storage/Users/currentUser/usr/local/lib/site_perl/5.42.0"
         )
+
+        # Prepend bundled lib so it takes priority over system paths
+        perl5lib = bundled_lib + ":" + perl5lib
 
         # Add the conan package's Perl lib path (Conan 2 API)
         try:
@@ -46,12 +51,6 @@ class PerlStringRewriteprefixTestConan(ConanFile):
         except (KeyError, AttributeError):
             pass  # Package not yet resolved — fall back to system Perl paths
 
-        # Ensure Sub::Exporter dependency chain is available.
-        # CI workers may not have these pure-Perl modules pre-installed.
-        dep_dir = self._ensure_perl_deps(perl5lib)
-        if dep_dir:
-            perl5lib = dep_dir + ":" + perl5lib
-
         # Use shell inline env vars (Conan 2 env=list doesn't always work)
         cmd = (
             'PERL_PARAMS_UTIL_PP=1 '
@@ -60,59 +59,3 @@ class PerlStringRewriteprefixTestConan(ConanFile):
         ).format(perl5lib, test_script)
 
         self.run(cmd)
-
-    def _ensure_perl_deps(self, perl5lib):
-        """Download and install Sub::Exporter pure-Perl dependency chain if not available."""
-        # Check if Sub::Exporter is already available
-        check_cmd = 'PERL_PARAMS_UTIL_PP=1 PERL5LIB="{}" perl -e "use Sub::Exporter;" 2>/dev/null'.format(perl5lib)
-        try:
-            self.run(check_cmd)
-            return None  # Already available
-        except Exception:
-            pass  # Need to install
-
-        dep_dir = tempfile.mkdtemp(prefix="perl_deps_")
-        extract_dir = os.path.join(dep_dir, "_extract")
-        os.makedirs(extract_dir, exist_ok=True)
-
-        # Download and install all 4 pure-Perl modules using Python urllib.
-        # Dependency chain: Sub::Exporter → Data::OptList, Params::Util
-        #                   Data::OptList → Sub::Install
-        dep_urls = [
-            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Install-0.928.tar.gz",
-            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Data-OptList-0.110.tar.gz",
-            "https://cpan.metacpan.org/authors/id/R/RE/REHSACK/Params-Util-1.102.tar.gz",
-            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Exporter-0.988.tar.gz",
-        ]
-
-        try:
-            import urllib.request
-            import tarfile
-            import io
-            import shutil
-
-            for url in dep_urls:
-                with urllib.request.urlopen(url, timeout=60) as resp:
-                    with tarfile.open(fileobj=io.BytesIO(resp.read()), mode="r:gz") as tar:
-                        tar.extractall(path=extract_dir)
-
-            # Copy */lib/* contents to dep_dir (preserving subdirectory structure)
-            for entry in os.listdir(extract_dir):
-                lib_path = os.path.join(extract_dir, entry, "lib")
-                if os.path.isdir(lib_path):
-                    for item in os.listdir(lib_path):
-                        src = os.path.join(lib_path, item)
-                        dst = os.path.join(dep_dir, item)
-                        if os.path.exists(dst):
-                            if os.path.isdir(dst):
-                                shutil.rmtree(dst)
-                            else:
-                                os.remove(dst)
-                        shutil.move(src, dst)
-
-            shutil.rmtree(extract_dir, ignore_errors=True)
-        except Exception as e:
-            self.output.warn(f"Could not download Perl deps: {e}")
-            return None  # Fall back, test may still pass if deps are in system Perl
-
-        return dep_dir
