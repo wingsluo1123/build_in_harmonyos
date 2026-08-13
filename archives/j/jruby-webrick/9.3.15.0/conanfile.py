@@ -45,7 +45,7 @@ class JrubyWebrickConan(ConanFile):
 
     def source(self):
         # Download the webrick gem v1.7.0 source (bundled with JRuby 9.3.15.0)
-        get(self, **self.conan_data["sources"], strip_root=True)
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
 
     def build(self):
         # Pure Ruby library — no compilation needed
