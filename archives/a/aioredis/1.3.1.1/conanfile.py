@@ -16,7 +16,7 @@ from conan.tools.layout import basic_layout
 
 class AioredisRecipe(ConanFile):
     name = "aioredis"
-    version = "1.3.1"
+    version = "1.3.1.1"
     description = "asyncio (PEP 3156) Redis client — Python library for async Redis access"
     license = "MIT"
     homepage = "https://github.com/aio-libs-abandoned/aioredis-py"
