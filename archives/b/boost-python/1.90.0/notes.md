@@ -153,5 +153,26 @@
   .codesign 存在、display-sign self-sign。
 ---
 
-**编译结束**: 2026-08-12 21:52
+**编译结束**: 2026-08-13 09:21
 **最终状态**: built
+
+## 原生（非 HMDFS）运行暂存目录选择（PR #5100 修复，2026-08-13）
+
+- 偏离根因：CI 进程中 conan 运行环境会把 TMPDIR 覆盖为 $HOME/tmp（HMDFS，决定性证据：
+  CI 日志 `make: jobserver mkfifo: /storage/Users/currentUser/tmp/...`），而进程原生 TMPDIR
+  （CI 环境变量 `TMPDIR=/data/storage/el2/base/cache`，ext2 分区）才是非 HMDFS 目录。
+  旧实现直接信任 `os.environ["TMPDIR"]`，导致 ELF 暂存落在 HMDFS，跨身份 dlopen EACCES
+  （ctypes.CDLL(libboost_python312.so) Permission denied）。
+- 修复：`_pick_native_base()` 按候选顺序探测真实可写/可读/可执行且非 HMDFS 的基座：
+  1. `OHPC_NATIVE_TMPDIR` 环境变量（可选显式指定）；
+  2. `/data/storage/el2/base/cache`（nuclei 使用的 ext2 cache）；
+  3. `/data/storage/el2/base/haps/entry/files`（argo/kubo 使用的 ext2）；
+  4. 当前 TMPDIR，仅当其真实路径不以 /storage/Users 开头。
+  每候选执行真实探针：创建任务专属子目录 → 写读探针文件 → chmod 0755 →
+  R_OK/X_OK 验证；第一个通过者即最终基座；全部失败则报 blocked，不回退 $HOME/tmp。
+- 实测：本机与 CI 均命中 `/data/storage/el2/base/cache`；run_dir =
+  /data/storage/el2/base/cache/boostpy-run-*；test_ext.__file__ 与 /proc/self/maps
+  证明两个 ELF 均从该原生目录动态加载；3 项消费者断言全部通过。
+- 边界：包内 libboost_python312.so 在 test_package 中只验证（ELF magic/.codesign/
+  display-sign/SHA256），绝不重签；test_ext.so 由 test_package 签名；主 conanfile.py
+  的构建与签名逻辑未改动。

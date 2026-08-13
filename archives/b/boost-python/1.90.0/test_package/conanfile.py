@@ -103,23 +103,103 @@ class BoostPythonTestConan(ConanFile):
             )
         finally:
             if run_dir and os.path.isdir(run_dir):
-                # 防越界清理：只删除本轮创建、位于 TMPDIR 下且前缀为 boostpy-run- 的目录
-                base = os.path.realpath(os.environ.get("TMPDIR") or "")
+                # 防越界清理：只删除本轮创建、位于探测所得原生基座下且前缀为
+                # boostpy-run- 的目录（容忍 /data/storage/el2/base/... 原生路径）
                 real = os.path.realpath(run_dir)
                 name = os.path.basename(real)
+                native_bases = (
+                    "/data/storage/el2/base/cache",
+                    "/data/storage/el2/base/haps/entry/files",
+                )
                 if (
-                    base
-                    and real.startswith(base)
+                    real
                     and name.startswith("boostpy-run-")
                     and real != "/"
+                    and (
+                        real.startswith(native_bases)
+                        or real.startswith(
+                            os.path.realpath(
+                                os.environ.get("OHPC_NATIVE_TMPDIR") or ""
+                            )
+                        )
+                    )
                 ):
                     shutil.rmtree(real, ignore_errors=True)
 
-    def _stage_run_dir(self, extension):
-        """在 TMPDIR 下创建本轮独立运行目录并暂存产物（结构化、防越界）。
+    def _pick_native_base(self):
+        """探测真实可写、可读、可执行且不属于 HMDFS 的原生运行目录基座。
 
-        - TMPDIR 必须为有效环境变量并解析为绝对路径；禁止 /tmp、仓库目录、
-          Conan package_folder 或硬编码用户路径作为运行目录基座；
+        CI 进程中 conan 运行环境可能把 TMPDIR 覆盖为 $HOME/tmp（HMDFS，
+        证据：CI 日志 'make: jobserver mkfifo: /storage/Users/currentUser/tmp/...'），
+        而进程原生 TMPDIR（如 /data/storage/el2/base/cache）才是非 HMDFS 的
+        ext2 分区。候选顺序：
+          1. OHPC_NATIVE_TMPDIR 环境变量（可选显式指定）；
+          2. /data/storage/el2/base/cache（nuclei 使用的 ext2 cache）；
+          3. /data/storage/el2/base/haps/entry/files（argo/kubo 使用的 ext2）；
+          4. 当前 TMPDIR，仅当其真实路径不属于 HMDFS（不在 /storage/Users
+             下且不以 /storage/Users 开头）。
+        对每个候选执行真实探针：创建任务专属子目录 → 写读探针文件 →
+        chmod 0755 → 验证当前进程 R_OK/X_OK → 记录文件系统类型/拒绝原因。
+        返回第一个通过的目录；若全部失败返回 ""（调用方报告 blocked）。
+        """
+        import tempfile as _tf
+
+        env_tmp = os.environ.get("TMPDIR") or ""
+        env_tmp_real = os.path.realpath(env_tmp) if env_tmp else ""
+        hmdns_markers = ("/storage/Users",)
+        candidates = []
+        native_env = os.environ.get("OHPC_NATIVE_TMPDIR") or ""
+        if native_env:
+            candidates.append(("OHPC_NATIVE_TMPDIR", os.path.realpath(native_env)))
+        candidates.append(("/data/storage/el2/base/cache", "/data/storage/el2/base/cache"))
+        candidates.append(
+            (
+                "/data/storage/el2/base/haps/entry/files",
+                "/data/storage/el2/base/haps/entry/files",
+            )
+        )
+        if env_tmp_real and not env_tmp_real.startswith(hmdns_markers):
+            candidates.append(("TMPDIR(non-HMDFS)", env_tmp_real))
+
+        for label, cand in candidates:
+            if not cand or not os.path.isdir(cand):
+                self.output.warning(
+                    "native-base probe %s: missing dir %r" % (label, cand)
+                )
+                continue
+            try:
+                sub = _tf.mkdtemp(prefix="boostpy-probe-", dir=cand)
+            except Exception as e:
+                self.output.warning(
+                    "native-base probe %s: mkdtemp failed: %s" % (label, str(e)[:80])
+                )
+                continue
+            try:
+                probe_file = os.path.join(sub, "probe.txt")
+                with open(probe_file, "w") as fh:
+                    fh.write("ok")
+                with open(probe_file) as fh:
+                    content = fh.read()
+                os.chmod(sub, 0o755)
+                ok_perm = os.access(sub, os.R_OK) and os.access(sub, os.X_OK)
+                self.output.info(
+                    "native-base probe %s: write/read ok (%r), chmod 0755, "
+                    "R_OK/X_OK=%s" % (label, content, ok_perm)
+                )
+                if content == "ok" and ok_perm:
+                    return cand
+                self.output.warning(
+                    "native-base probe %s: probe content or perms failed" % label
+                )
+            finally:
+                shutil.rmtree(sub, ignore_errors=True)
+        return ""
+
+    def _stage_run_dir(self, extension):
+        """在原生（非 HMDFS）目录下创建本轮独立运行目录并暂存产物。
+
+        - 通过 _pick_native_base() 探测原生基座（OHPC_NATIVE_TMPDIR →
+          /data/storage/el2/base/cache → haps/entry/files → 非 HMDFS 的 TMPDIR）；
         - mkdtemp(prefix="boostpy-run-", dir=base)；
         - 结构化复制（Python 文件复制，不使用 shell 拼接 cp/rm）；
         - 复制后逐项验证：ELF magic、SHA256、.codesign、display-sign self-sign、
@@ -127,21 +207,11 @@ class BoostPythonTestConan(ConanFile):
         """
         import tempfile
 
-        base = os.environ.get("TMPDIR") or ""
-        base = os.path.realpath(base) if base else ""
-        forbidden = ("/tmp", self.source_folder, self.build_folder)
-        if (
-            not base
-            or not os.path.isabs(base)
-            or not os.path.isdir(base)
-            or any(
-                os.path.realpath(base).startswith(os.path.realpath(p))
-                for p in forbidden
-            )
-        ):
+        base = self._pick_native_base()
+        if not base:
             raise ConanInvalidConfiguration(
-                "TMPDIR must be an absolute, existing directory outside /tmp, "
-                "the repo and the package folders; got: " + repr(base)
+                "no writable native (non-HMDFS) staging base found; refusing to "
+                "fall back to $HOME/tmp (HMDFS) for ELF dlopen staging — blocked"
             )
         run_dir = tempfile.mkdtemp(prefix="boostpy-run-", dir=base)
         pkg_lib = os.path.join(
