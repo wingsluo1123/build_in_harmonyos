@@ -43,7 +43,7 @@ class AreloConan(ConanFile):
     url = "https://github.com/makiuchi-d/arelo"
     topics = ("live-reload", "file-watcher", "cli-tool", "go")
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
