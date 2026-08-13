@@ -72,7 +72,7 @@ HOME=$HOME/<隔离HOME> XDG_CONFIG_HOME=.../.config XDG_CACHE_HOME=.../.cache
 | Git dubious ownership（43 个） | 43 failed | **test_repo.py 16 failed/5 passed → 21 passed；test_repomap 2 failed → 45 passed；test_commands git 用例 3 passed**（wrapper 对 cwd/-C/--git-dir 全部生效） |
 | 原 6 个 errors（pytest/Git） | 6 errors | **6 passed**（--basetemp + wrapper） |
 | test_main_with_empty_git_dir_new_subdir_file | FileNotFoundError 'git' | **1 passed**（sitecustomize 修复 posix_spawn） |
-| 最终上游统计（489） | 476 passed/10 failed/1 skipped/0 errors/2 timeout（第 10 轮） | **477 passed/9 failed/1 skipped/0 errors/2 timeout = 489 ✓**（第 11 轮：test_main 修复后 6→5 failed，467 passed） |
+| 最终上游统计（489） | 476 passed/10 failed/1 skipped/0 errors/2 timeout（第 10 轮） | **482 passed/4 failed/1 skipped/0 errors/2 timeout = 489 ✓**（第 16 轮最终统一统计；test_main 修复后 6→5 failed→0，test_voice 8/8 通过后 failed 降为 scrape 4） |
 
 实际命令（最终统一驱动）：
 ```bash
