@@ -13,6 +13,7 @@ from conan.tools.cmake import CMake, cmake_layout
 class ArgaggTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
+    tool_requires = "libxml2/2.15.3.1"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
