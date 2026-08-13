@@ -82,6 +82,15 @@ class KDocToolsConan(ConanFile):
         if os.path.isdir(os.path.join(qtbase_core, "Qt6Core")):
             qtbase_core = os.path.join(qtbase_core, "Qt6Core")
         tc.cache_variables["Qt6Core_DIR"] = qtbase_core
+        # karchive 提供 KF6ArchiveConfig.cmake（CI #24016 报 KF6Archive
+        # 找不到——CMakeLists.txt:49 find_package(KF6Archive 6.19.0)——
+        # kdoctools 未设置 KF6Archive_DIR）——指向 karchive 包的配置目录
+        karchive_cmake = os.path.join(
+            self.dependencies["karchive"].package_folder, "lib", "cmake"
+        )
+        if os.path.isdir(os.path.join(karchive_cmake, "KF6Archive")):
+            karchive_cmake = os.path.join(karchive_cmake, "KF6Archive")
+        tc.cache_variables["KF6Archive_DIR"] = karchive_cmake
         # ECM 打包产物缺 ecm_uninstall.cmake.in，ECMUninstallTarget 的
         # configure_file 会失败；用 KDE 官方 KDE_SKIP_UNINSTALL_TARGET
         # 跳过 uninstall target 生成
