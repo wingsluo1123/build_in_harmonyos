@@ -361,8 +361,20 @@ class HandbrakeConan(ConanFile):
         # HandBrake's top-level configure is a POSIX sh launcher that relies on
         # IFS splitting to find python on PATH; zsh does not emulate that here.
         shell = self._posix_shell()
+        env_keys = (
+            "PATH", "AUTOCONF", "AUTOHEADER", "AUTOMAKE", "ACLOCAL",
+            "AUTOM4TE", "AUTORECONF", "AUTOUPDATE", "AUTOSCAN", "IFNAMES",
+            "PERL", "M4", "PERL5LIB", "ACLOCAL_PATH", "autom4te_perllibdir",
+            "AC_MACRODIR", "trailer_m4", "autom4te_buildauxdir",
+            "CONFIG_SHELL", "SHELL",
+        )
+        env_prefix = " ".join(
+            f"{key}={shlex.quote(os.environ[key])}"
+            for key in env_keys
+            if os.environ.get(key)
+        )
         cfg = (
-            f'"{shell}" "{os.path.join(self.source_folder, "configure")}" --force '
+            f'{env_prefix} "{shell}" "{os.path.join(self.source_folder, "configure")}" --force '
             "--prefix=/usr/local "
             "--disable-gtk --disable-numa "
             "--disable-nvenc --disable-nvdec --disable-qsv --disable-vce "
