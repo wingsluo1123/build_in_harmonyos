@@ -42,9 +42,12 @@ class AlpineConan(ConanFile):
         # configure 的 dlopen 检查（AC_SEARCH_LIBS dlopen——CI #21996 报
         # No library containing dlopen found）——LIBS=-ldl 让检查找到
         # libdl.so（OHOS 的 dlopen 在 libdl——bionic）
-        env = Environment()
-        env.append("LIBS", "-ldl")
-        env.vars(self).save_script("conanbuild_ldl")
+        # configure 的 dlopen 检查（AC_SEARCH_LIBS dlopen——CI #21996 报
+        # No library containing dlopen found）——LIBS=-ldl 让检查找到
+        # libdl.so（OHOS 的 dlopen 在 libdl——bionic）；用 self.buildenv
+        # （Autotools configure 自动激活——CI #22181 实测 save_script
+        # 独立脚本 + env 参数均不可行【Autotools.configure() 无 env】）
+        self.buildenv.append("LIBS", "-ldl")
         # configure 的 terminfo 检查（setupterm in -lncurses 等 -l 链接测试）
         # 需要 -L ncurses 包 lib 路径（CI #17674 报 Terminfo/termcap not found）——
         # LDFLAGS/CFLAGS 指向 ncurses 包（configure 链接测试继承）。
@@ -77,10 +80,10 @@ class AlpineConan(ConanFile):
         old = os.umask(0o022)
         try:
             autotools = Autotools(self)
-            # env 显式激活 conanbuild_ldl（LIBS=-ldl——dlopen 检查——
-            # CI #21996 重复失败：save_script 的独立脚本需 env 列表显式
-            # 激活——multitail 教训）
-            autotools.configure(env=["conanbuild", "conanbuild_ldl"])
+            # LIBS=-ldl 已通过 self.buildenv 设置（generate()）——Autotools
+            # configure 自动激活 buildenv——dlopen 检查通过（CI #21996 修复）；
+            # 注意：Autotools.configure() 无 env 参数（CI #22181 实测 TypeError）
+            autotools.configure()
             # -j1：OHOS 沙箱不支持 mkfifo（jobserver），并行编译失败（opensp 先例）
             autotools.make(args=["-j1"])
         finally:
