@@ -21,8 +21,9 @@ class PydlConan(ConanFile):
     homepage = "https://github.com/weaverba137/pydl"
     url = ""
 
-    # Pure Python noarch: no compiler needed (same pattern as alabaster/acronym)
-    settings = "os", "arch"
+    # Pure Python noarch: compiler/build_type declared to satisfy OHOS
+    # profile requirements (L0p needs all four: os/arch/compiler/build_type)
+    settings = "os", "arch", "compiler", "build_type"
 
     def export_sources(self):
         export_conandata_patches(self)
