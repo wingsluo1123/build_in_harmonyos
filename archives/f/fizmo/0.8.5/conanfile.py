@@ -134,9 +134,14 @@ class FizmoConan(ConanFile):
             os.umask(old_umask)
 
     def package(self):
-        # fizmo-ncursesw 前端二进制在源码构建产物中，复制到 bin/
+        # fizmo-ncursesw/fizmo-console 前端二进制在构建产物子目录中
+        # （b/fizmo-ncursesw/src/fizmo-ncursesw/ 等——CI 实测：原 copy 源
+        # 路径 b/fizmo-ncursesw 不存在【No files in this package】——
+        # 递归从 build_folder 找二进制复制到 bin/）
         from conan.tools.files import copy
-        copy(self, "fizmo-ncursesw", os.path.join(self.build_folder, "fizmo-ncursesw"),
+        copy(self, "fizmo-ncursesw", self.build_folder,
+             os.path.join(self.package_folder, "bin"), keep_path=False)
+        copy(self, "fizmo-console", self.build_folder,
              os.path.join(self.package_folder, "bin"), keep_path=False)
 
     def package_info(self):
