@@ -63,8 +63,7 @@ class PostgresqlConan(ConanFile):
         basic_layout(self)
 
     def source(self):
-        # Check for local source cache to avoid slow remote downloads
-        import os
+        # Support offline/air-gapped builds: check local cache first
         local_src = os.path.join(os.path.expanduser("~"),
                                  ".opendesk/apps/skills/resources/openharmony-compile-agent/sources",
                                  "postgresql-18.3.tar.bz2")

@@ -33,7 +33,15 @@ patches_applied:
   - patches/0011-src-interfaces-libpq-fe-auth.c.patch
   - patches/0012-src-port-pgmkdirp.c.patch
   - patches/0013-src-test-regress-pg_regress.c.patch
-knowledge_gained: []
+knowledge_gained:
+  - 'E001: OHOS SysV IPC (shmget/shmat/shmdt/shmctl) returns SIGSYS — use mmap-based DSM'
+  - 'E002: OHOS /tmp is read-only — set TMPDIR to build folder'
+  - 'E003: hmdfs filesystem imposes abnormal S-bit on mkdir — chmod after mkdir'
+  - 'E004: hmdfs umask 077 causes temp dir permission issues — relax to 022'
+  - 'E005: getpwuid fails for users not in /etc/passwd — fallback to numeric UID'
+  - 'E006: OHOS does not support Unix-domain sockets (bind EPERM) — use TCP/IP'
+  - 'E007: config.guess/config.sub lack HarmonyOS detection — add __OHOS__ branch'
+  - 'E008: shm_open configure-detects OK but runtime SIGSYS — force DSM_IMPL_MMAP'
 
 patch_generation:
   method: per-file-difflib
@@ -48,52 +56,52 @@ patch_classification:
   - file: 0001-config-config.guess.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: '__OHOS__'
   - file: 0002-config-config.sub.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'none'
   - file: 0003-configure.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'none'
   - file: 0004-src-backend-port-sysv_shmem.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_SHMGET'
   - file: 0005-src-backend-utils-init-miscinit.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_UMASK'
   - file: 0006-src-bin-initdb-initdb.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_SHM_OPEN+HAVE_BROKEN_UMASK'
   - file: 0007-src-common-file_perm.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_UMASK'
   - file: 0008-src-common-username.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_GETPWUID'
   - file: 0009-src-include-pg_config_manual.h.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_NO_UNIX_SOCKETS'
   - file: 0010-src-include-storage-dsm_impl.h.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_SHM_OPEN'
   - file: 0011-src-interfaces-libpq-fe-auth.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_GETPWUID'
   - file: 0012-src-port-pgmkdirp.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_BROKEN_UMASK'
   - file: 0013-src-test-regress-pg_regress.c.patch
     type: auto
     platform_only: True
-    guard: 'pending'
+    guard: 'HAVE_NO_UNIX_SOCKETS'
