@@ -417,6 +417,133 @@ class TclConan(ConanFile):
         autotools.install(target="install-binaries")
         autotools.install(target="install-libraries")
         autotools.install(target="install-headers")
+        # OHOS consumer fix: package private headers + relocate tclConfig.sh
+        self._ohos_package_private_headers()
+        self._ohos_relocate_tclconfig()
+
+    def _ohos_package_private_headers(self):
+        """Copy Tcl private headers into include/generic, include/unix and
+        include/compat.
+
+        Expect's configure sources tclConfig.sh, derives TCL_SRC_DIR, then
+        requires ${TCL_SRC_DIR}/generic/tclInt.h to exist and compiles with
+        -I${TCL_SRC_DIR}/generic -I${TCL_SRC_DIR}/unix.  Copying the full
+        private header set (not only tclInt.h) keeps transitive includes
+        (tclPort.h -> tclUnixPort.h, tclIntDecls.h, ...) resolvable.  The
+        compat/ headers are required because tclUnixPort.h includes
+        ../compat/unistd.h (and dirent.h/dirent2.h/fake-rfc2553.h) relative
+        to the unix/ layout.
+        """
+        import shutil
+        inc_root = os.path.join(self.package_folder, "include")
+        for sub in ("generic", "unix", "compat"):
+            src_dir = os.path.join(self.source_folder, sub)
+            dst_dir = os.path.join(inc_root, sub)
+            if not os.path.isdir(src_dir):
+                raise ConanException(
+                    f"private header source dir missing: {src_dir}"
+                )
+            os.makedirs(dst_dir, exist_ok=True)
+            n = 0
+            for f in sorted(os.listdir(src_dir)):
+                if f.endswith(".h"):
+                    shutil.copy2(os.path.join(src_dir, f), os.path.join(dst_dir, f))
+                    n += 1
+            self.output.info(
+                f"OHOS private headers: copied {n} headers from {sub}/ to include/{sub}/"
+            )
+
+    def _ohos_relocate_tclconfig(self):
+        """Rewrite installed lib/tclConfig.sh to be consumer-relocatable.
+
+        Removes build-machine .conan2/p/b/... paths and the invalid '//'
+        placeholders (from TCL_PREFIX='/'), and derives every path from
+        TCL_BIN_DIR (set by Tcl-extension consumers such as Expect before
+        sourcing tclConfig.sh), pointing TCL_SRC_DIR into the package.
+        """
+        import re
+        tcs = os.path.join(self.package_folder, "lib", "tclConfig.sh")
+        if not os.path.isfile(tcs):
+            raise ConanException(f"tclConfig.sh not found at {tcs}")
+        with open(tcs) as fh:
+            text = fh.read()
+
+        guard = (
+            "# --- OHOS relocatable guard ---\n"
+            "if test -z \"${TCL_BIN_DIR:-}\"; then\n"
+            "    TCL_BIN_DIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\n"
+            "fi\n"
+        )
+        text = guard + text
+
+        pfx = 'TCL_PREFIX="${TCL_BIN_DIR}/.."'
+        text = re.sub(
+            r"^TCL_PREFIX=.*$", pfx, text, count=1, flags=re.M
+        )
+        text = re.sub(
+            r"^TCL_EXEC_PREFIX=.*$", 'TCL_EXEC_PREFIX="${TCL_BIN_DIR}/.."',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_SRC_DIR=.*$", 'TCL_SRC_DIR="${TCL_PREFIX}/include"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_INCLUDE_SPEC=.*$", 'TCL_INCLUDE_SPEC="-I${TCL_PREFIX}/include"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_LIB_SPEC=.*$", 'TCL_LIB_SPEC="-L${TCL_PREFIX}/lib -ltcl8.6"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_BUILD_LIB_SPEC=.*$", 'TCL_BUILD_LIB_SPEC="-L${TCL_PREFIX}/lib -ltcl8.6"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_STUB_LIB_SPEC=.*$", 'TCL_STUB_LIB_SPEC="-L${TCL_PREFIX}/lib -ltclstub8.6"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_BUILD_STUB_LIB_SPEC=.*$", 'TCL_BUILD_STUB_LIB_SPEC="-L${TCL_PREFIX}/lib -ltclstub8.6"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_BUILD_STUB_LIB_PATH=.*$",
+            'TCL_BUILD_STUB_LIB_PATH="${TCL_PREFIX}/lib/libtclstub8.6.a"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_STUB_LIB_PATH=.*$",
+            'TCL_STUB_LIB_PATH="${TCL_PREFIX}/lib/libtclstub8.6.a"',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_PACKAGE_PATH=.*$", 'TCL_PACKAGE_PATH="{${TCL_PREFIX}/lib} "',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"^TCL_LD_FLAGS=.*$", 'TCL_LD_FLAGS="-L${TCL_PREFIX}/lib "',
+            text, count=1, flags=re.M,
+        )
+        text = re.sub(
+            r"-I/storage/Users/currentUser/usr/local/include",
+            "-I${TCL_PREFIX}/include", text,
+        )
+        text = re.sub(
+            r"-L/storage/Users/currentUser/usr/local/lib",
+            "-L${TCL_PREFIX}/lib", text,
+        )
+        # Builder-specific compiler absolute path -> resolve via PATH.
+        text = re.sub(
+            r"^TCL_CC=.*$", "TCL_CC='clang'", text, count=1, flags=re.M
+        )
+
+        with open(tcs, "w") as fh:
+            fh.write(text)
+        self.output.info(
+            "OHOS tclConfig.sh relocated: no .conan2/build paths, no '//'"
+        )
 
     def package_info(self):
         self.cpp_info.bindirs = ["bin"]

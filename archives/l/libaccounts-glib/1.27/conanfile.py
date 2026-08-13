@@ -1,177 +1,212 @@
 #!/usr/bin/env python3
-"""Conan recipe — libaccounts-glib 1.27 (Meson)"""
+"""Conan recipe — libaccounts-glib 1.27 (Meson).
+
+libaccounts-glib is the GLib-based core of the accounts-sso (Single Sign-On)
+project. It provides a C API for managing online account information via
+GLib/GObject, with SQLite-backed storage and libxml2 for XML parsing.
+
+Adapted to HarmonyOS PC (aarch64). All features (library + tools) are built
+without trimming. See notes.md for platform adaptation details.
+"""
 import os
+import re
 import shutil
+import sys
 
 from conan import ConanFile
-from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
-from conan.tools.meson import Meson, MesonToolchain
+from conan.errors import ConanInvalidConfiguration
+from conan.tools.files import apply_conandata_patches, export_conandata_patches, get
 from conan.tools.gnu import PkgConfigDeps
+from conan.tools.layout import basic_layout
+from conan.tools.meson import Meson, MesonToolchain
 
 
-class LibaccountsGlibConan(ConanFile):
+class LibAccountsGlibConan(ConanFile):
     name = "libaccounts-glib"
     version = "1.27"
-    description = "GLib-based library for the online accounts framework"
+    description = "GLib-based library for managing online account information (accounts-sso project)"
     license = "LGPL-2.1"
     homepage = "https://gitlab.com/accounts-sso/libaccounts-glib"
     url = "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
-
-    settings = "os", "compiler", "build_type", "arch"
-    options = {
-        "shared": [True, False],
-    }
-    default_options = {
-        "shared": False,
-    }
+    settings = "os", "arch", "compiler", "build_type"
+    options = {"shared": [True, False], "fPIC": [True, False]}
+    default_options = {"shared": False, "fPIC": True}
 
     def export_sources(self):
         export_conandata_patches(self)
 
-    def build_requirements(self):
-        # ninja 从 ohpcd 制品仓以 tool 形式提供（本机/CI 无系统 ninja）
-        self.tool_requires("ninja-build/1.13.2")
+    def config_options(self):
+        if self.settings.os == "Windows":
+            self.options.rm_safe("fPIC")
+
+    def configure(self):
+        if self.options.shared:
+            self.options.rm_safe("fPIC")
 
     def requirements(self):
-        self.requires("glib/2.84.0.1")
-        self.requires("libxml2/2.15.3")
-        self.requires("sqlite3/3.49.1")
+        self.requires("glib2/2.88.0", transitive_headers=True, transitive_libs=True)
+        self.requires("libxml2/2.15.3", transitive_headers=True, transitive_libs=True)
+        self.requires("sqlite3/3.49.1", transitive_headers=True, transitive_libs=True)
+
+    def build_requirements(self):
+        # check is only needed to build the upstream test suite (tests/meson.build)
+        self.test_requires("check/0.15.2")
 
     def layout(self):
-        self.folders.source = "."
-        self.folders.build = "build"
-        self.folders.generators = "build"
+        basic_layout(self, src_folder=".")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
+        PkgConfigDeps(self).generate()
+        self._create_glib_pkg_config_aliases()
+
         tc = MesonToolchain(self)
-        # libaccounts-glib 的 meson_options.txt 仅含 install-py-overrides/
-        # py-overrides-dir，无 documentation/tests/introspection 选项；
-        # docs/gir/pygobject/tools/tests 的禁用均由补丁处理。
-        ar_path = shutil.which("llvm-ar") or shutil.which("ar")
-        if ar_path:
-            tc.ar = ar_path
-        strip_path = shutil.which("llvm-strip") or shutil.which("strip")
-        if strip_path:
-            tc.strip = strip_path
-
-        # 依赖 pkg-config 路径（glib/libxml2/sqlite3 的 .pc）
-        for dep_name in ("glib", "libxml2", "sqlite3"):
-            dep = self.dependencies[dep_name]
-            pc_dir = os.path.join(dep.package_folder, "lib", "pkgconfig")
-            if os.path.isdir(pc_dir):
-                tc.pkg_config_path = tc.pkg_config_path + ":" + pc_dir
-
+        tc.project_options["default_library"] = "shared" if self.options.shared else "static"
         tc.generate()
-
-        pc = PkgConfigDeps(self)
-        pc.generate()
-        # gnome.genmarshal() 需从 glib-2.0.pc 读 glib_genmarshal 变量，
-        # conan 生成的 .pc 缺工具变量 → 补上（同 libsignon-glib 配方做法）。
-        # OHOS HMDFS 对已存在文件 chmod 不生效，故先把 glib 工具复制为
-        # build 目录新文件并置 0o755，.pc 变量指向复制品。
-        tool_map = self._install_glib_tools()
-        self._patch_pc_files(tool_map)
-
-    def _install_glib_tools(self):
-        """复制 glib 包内工具到 build 目录新文件并置执行位（绕开 HMDFS chmod 限制）。"""
-        glib_root = self.dependencies["glib"].package_folder
-        tool_map = {}
-        if not glib_root:
-            return tool_map
-        tools_dir = os.path.join(self.build_folder, "conan_tools")
-        os.makedirs(tools_dir, exist_ok=True)
-        for tool in ("glib-genmarshal", "glib-mkenums", "gdbus-codegen"):
-            src = os.path.join(glib_root, "bin", tool)
-            if not os.path.isfile(src):
-                self.output.info(f"glib tool not found: {src}")
-                continue
-            dst = os.path.join(tools_dir, tool)
-            shutil.copyfile(src, dst)
-            os.chmod(dst, 0o755)
-            tool_map[tool] = dst
-        return tool_map
-
-    def _patch_pc_files(self, tool_map=None):
-        """Add missing glib tool variables to conan-generated pkg-config files."""
-        tool_map = tool_map or {}
-        glib_info = self.dependencies["glib"]
-        glib_root = glib_info.package_folder
-        if not glib_root:
-            return
-
-        bindir = os.path.join(glib_root, "bin")
-        gen_folder = self.generators_folder
-
-        def _tool_path(name):
-            return tool_map.get(name, os.path.join(bindir, name))
-
-        pc_patches = {
-            "gio-2.0.pc": {"gdbus_codegen": _tool_path("gdbus-codegen")},
-            "glib-2.0.pc": {
-                "glib_mkenums": _tool_path("glib-mkenums"),
-                "glib_genmarshal": _tool_path("glib-genmarshal"),
-            },
-        }
-
-        for pc_file, variables in pc_patches.items():
-            pc_path = os.path.join(gen_folder, pc_file)
-            if not os.path.exists(pc_path):
-                self.output.info(f"PkgConfigDeps file not found: {pc_path}")
-                continue
-            with open(pc_path, "r") as f:
-                content = f.read()
-            additions = []
-            for var_name, var_value in variables.items():
-                if var_name + "=" not in content:
-                    additions.append(f"{var_name}={var_value}")
-            if additions:
-                addition_text = "\n".join(additions) + "\n"
-                if "Name:" in content:
-                    content = content.replace("Name:", addition_text + "Name:", 1)
-                else:
-                    content = addition_text + content
-                with open(pc_path, "w") as f:
-                    f.write(content)
-                self.output.info(f"Patched {pc_file} with: {', '.join(additions)}")
+        self._inject_archive_tools()
 
     def build(self):
         apply_conandata_patches(self)
-        # OHOS HMDFS 对文件 chmod 不生效（复制新文件置 0o755 仍 Permission denied），
-        # 而 glib-genmarshal 是 Python 脚本：用 python3 解释器直接执行（无需执行位），
-        # 预生成 ag-marshal.h/c，由 0005 补丁让 meson 跳过 gnome.genmarshal()。
-        self._pregen_marshal()
         meson = Meson(self)
         meson.configure()
         meson.build()
 
-    def _pregen_marshal(self):
-        """用 python3 执行 glib-genmarshal 脚本，预生成 ag-marshal.h / ag-marshal.c。"""
-        glib_root = self.dependencies["glib"].package_folder
-        if not glib_root:
-            return
-        gm = os.path.join(glib_root, "bin", "glib-genmarshal")
-        marshal_dir = os.path.join(self.source_folder, "libaccounts-glib")
-        marshal_list = os.path.join(marshal_dir, "ag-marshal.list")
-        if not os.path.isfile(gm) or not os.path.isfile(marshal_list):
-            self.output.warning(f"glib-genmarshal or ag-marshal.list not found; skip pregen "
-                                f"(gm={gm}, list={marshal_list})")
-            return
-        for kind, out_name in (("--header", "ag-marshal.h"), ("--body", "ag-marshal.c")):
-            out = os.path.join(marshal_dir, out_name)
-            self.run(
-                f'python3 "{gm}" {kind} --prefix ag_marshal '
-                f'--output "{out}" "{marshal_list}"'
-            )
-
     def package(self):
-        meson = Meson(self)
-        meson.install()
+        Meson(self).install()
 
     def package_info(self):
         self.cpp_info.libs = ["accounts-glib"]
+        self.cpp_info.requires = ["glib2::glib2", "libxml2::libxml2", "sqlite3::sqlite3"]
+        self.cpp_info.includedirs = ["include", "include/libaccounts-glib"]
         self.cpp_info.set_property("pkg_config_name", "libaccounts-glib")
+        if self.settings.os in ("Linux", "OHOS"):
+            self.cpp_info.system_libs = ["m", "pthread"]
+
+    # ── glib2 pkg-config alias helpers (adapted from vips recipe) ──
+
+    def _create_glib_pkg_config_aliases(self):
+        """Create gio-2.0.pc, gobject-2.0.pc, gio-unix-2.0.pc aliases from
+        the single glib-2.0.pc that PkgConfigDeps generates for glib2, and
+        inject glib_genmarshal / gdbus_codegen variables pointing to staged
+        copies of the glib tools."""
+        glib_pc = os.path.join(self.generators_folder, "glib-2.0.pc")
+        if not os.path.isfile(glib_pc):
+            return
+        with open(glib_pc, encoding="utf-8") as source:
+            content = source.read()
+
+        # Inject missing tool variables
+        for variable, executable in {
+            "glib_genmarshal": "glib-genmarshal",
+            "glib_mkenums": "glib-mkenums",
+            "gdbus_codegen": "gdbus-codegen",
+        }.items():
+            if not re.search(rf"^{variable}=", content, flags=re.M):
+                tool = self._stage_glib_tool(content, executable)
+                content = content.replace(
+                    "\nName:",
+                    f"\n{variable}={tool}\nName:",
+                    1,
+                )
+
+        with open(glib_pc, "w", encoding="utf-8") as target:
+            target.write(content)
+
+        # Create alias .pc files for gio-2.0, gobject-2.0
+        for filename, name in {
+            "gio-2.0.pc": "gio-2.0",
+            "gobject-2.0.pc": "gobject-2.0",
+        }.items():
+            alias = re.sub(r"^Name:.*$", f"Name: {name}", content, flags=re.M)
+            with open(os.path.join(self.generators_folder, filename), "w", encoding="utf-8") as target:
+                target.write(alias)
+
+        # Create gio-unix-2.0.pc with correct Cflags for gio-unix-2.0 includes
+        prefix_match = re.search(r"^prefix=(.+)$", content, flags=re.M)
+        prefix = prefix_match.group(1).strip() if prefix_match else "${pcfiledir}"
+        gio_unix_pc = os.path.join(self.generators_folder, "gio-unix-2.0.pc")
+        with open(gio_unix_pc, "w", encoding="utf-8") as target:
+            target.write(
+                f"prefix={prefix}\n"
+                f"includedir=${{prefix}}/include\n\n"
+                f"Name: gio-unix-2.0\n"
+                f"Description: unix specific headers for glib I/O library\n"
+                f"Version: 2.88.0\n"
+                f"Requires: gobject-2.0 gio-2.0\n"
+                f"Cflags: -I${{includedir}}/gio-unix-2.0\n"
+            )
+
+    def _inject_archive_tools(self):
+        """Inject ar/ranlib paths into meson native.ini to fix 'Unknown
+        linker(s)' error when AR env var points to llvm-ar not on PATH."""
+        executables = self.conf.get(
+            "tools.build:compiler_executables", default={}, check_type=dict
+        ) or {}
+        compiler = executables.get("c", "")
+        bindir = os.path.dirname(compiler) if os.path.sep in compiler else ""
+        ar = executables.get("ar") or (os.path.join(bindir, "ar") if bindir else "")
+        ranlib = executables.get("ranlib") or (os.path.join(bindir, "llvm-ranlib") if bindir else "")
+        native_file = os.path.join(self.generators_folder, "conan_meson_native.ini")
+        if not os.path.isfile(native_file):
+            return
+        if not ar:
+            ar = shutil.which("ar") or shutil.which("llvm-ar")
+        if not ar:
+            raise ConanInvalidConfiguration("Meson needs ar for libaccounts-glib")
+        with open(native_file, encoding="utf-8") as native:
+            content = native.read()
+        if "\nar =" in content or "[binaries]" not in content:
+            return
+        tools = f"[binaries]\nar = '{ar}'\n"
+        if ranlib and os.path.isfile(ranlib):
+            tools += f"ranlib = '{ranlib}'\n"
+        with open(native_file, "w", encoding="utf-8") as native:
+            native.write(content.replace("[binaries]\n", tools, 1))
+
+    def _stage_glib_tool(self, pc_content, executable):
+        """Copy a glib tool (glib-genmarshal, gdbus-codegen) from the glib2
+        conan package to the generators folder and return its path.
+
+        For Python-based tools (gdbus-codegen, glib-mkenums), create a shell
+        wrapper that sets PYTHONPATH to find the glib codegen module."""
+        prefix_match = re.search(r"^prefix=(.+)$", pc_content, flags=re.M)
+        if not prefix_match:
+            return f"${{bindir}}/{executable}"
+        prefix = prefix_match.group(1).strip()
+        source = os.path.join(prefix, "bin", executable)
+        if not os.path.isfile(source):
+            return f"${{bindir}}/{executable}"
+
+        # Check if it's a Python script
+        is_python = False
+        with open(source, encoding="utf-8", errors="ignore") as f:
+            first_line = f.readline()
+            if "python" in first_line:
+                is_python = True
+
+        if is_python:
+            return self._build_python_wrapper(executable, prefix, source)
+        else:
+            target = os.path.join(self.generators_folder, executable)
+            shutil.copyfile(source, target)
+            os.chmod(target, 0o755)
+            return target
+
+    def _build_python_wrapper(self, executable, glib_prefix, script_path):
+        """Create a shell wrapper for a Python-based glib tool that sets
+        PYTHONPATH to include the glib codegen module directory."""
+        codegen_dir = os.path.join(glib_prefix, "share", "glib-2.0")
+        wrapper = os.path.join(self.generators_folder, executable)
+        python = shutil.which("python3") or sys.executable
+        with open(wrapper, "w", encoding="utf-8") as w:
+            w.write(
+                "#!/data/service/hnp/bin/bash\n"
+                f"export PYTHONPATH={codegen_dir}:$PYTHONPATH\n"
+                f'exec {python} "{script_path}" "$@"\n'
+            )
+        os.chmod(wrapper, 0o755)
+        return wrapper
