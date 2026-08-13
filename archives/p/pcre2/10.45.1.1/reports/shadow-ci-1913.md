@@ -42,7 +42,7 @@ Result:
 
 ```text
 L0_RESULT=pass: all checks passed
-L1_RESULT=pass: test_package executed
+L1_RESULT=pass: upstream tests + test_package executed
 L2_RESULT=pass: pcre2-config version/help failed, pcre2grep --version OK, pcre2test --version OK
 L4_RESULT=pass: patches clean
 L5_RESULT=pass: bin/ has content
@@ -59,6 +59,9 @@ Additional checks:
   failure.
 - Static libraries `libpcre2-8.a`, `libpcre2-16.a`, `libpcre2-32.a`, and
   `libpcre2-posix.a` were packaged.
-- `test_package` built and executed successfully.
+- Upstream `make -j1 check` ran the three enabled top-level suites:
+  `pcre2posix_test`, `RunTest`, and `RunGrepTest` (3/3, 100%). `RunTest`
+  internally covers the 29 distributed `testinput*` data sets.
+- `test_package` built and executed successfully (1/1, 100%).
 - Negative test moved `bin/`, `lib/`, and `include/` away and confirmed the
   test package genuinely depends on pcre2.

@@ -1,6 +1,6 @@
-# E254 draft - Restore Autotools helper execute bits before configure
+# PCRE2 draft - Restore Autotools helper execute bits before configure
 
-> **Contributor**: xuguowei | **Status**: VERIFIED DRAFT | **Updated**: 2026-08-11
+> **Contributor**: xuguowei | **Status**: VERIFIED DRAFT | **Updated**: 2026-08-13
 > **Severity**: medium | **Category**: autotools / conan / OHOS filesystem
 
 ## Usage
@@ -89,6 +89,7 @@ autotools.make(args=["-j1", "check"])
 
 PCRE2 10.45.1.1 restores execute bits for the Autotools helper scripts before
 running configure. The recipe then builds the static 8/16/32-bit libraries and
-executes upstream `make -j1 check` in the build stage. AtomGit CI build #20031
-and #20032 passed for `archives/p/pcre2/10.45.1.1` after the check target was
-enabled, and the OHOS `test_package` pass rate is 1/1 (100%).
+executes upstream `make -j1 check` in the build stage. The enabled top-level
+suites are `pcre2posix_test`, `RunTest`, and `RunGrepTest`; CI builds #20031,
+#20032, #20179, and #20322 passed all three suites (3/3, 100%) and the OHOS
+`test_package` consumer (1/1, 100%).

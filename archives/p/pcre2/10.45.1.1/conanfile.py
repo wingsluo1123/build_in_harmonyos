@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe template — Autotools projects (configure + make).
-
-Usage: Replace Pcre2, pcre2, 10.45, Perl Compatible Regular Expressions library (version 2, current), BSD-3-Clause, https://www.pcre.org/
-       Fill in requires(), configure_args, and cpp_info.libs as needed.
-
-This template enforces R26: static linking for terminal tools.
-"""
+"""Conan recipe for PCRE2 10.45 on HarmonyOS PC."""
 
 from conan import ConanFile
 from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches

@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
+"""Conan consumer test for pcre2."""
 
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/pcre2/{version}/test_package/conanfile.py
-"""
+import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
@@ -27,7 +23,5 @@ class Pcre2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_pcre2')}", env="conanrun")
+        executable = os.path.join(self.cpp.build.bindirs[0], "test_pcre2")
+        self.run(executable, env="conanrun")
