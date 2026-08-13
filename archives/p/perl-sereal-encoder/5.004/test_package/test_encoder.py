@@ -130,6 +130,8 @@ def main():
     # E046/E073: HMDFS/SELinux blocks .so dlopen — known platform limitation
     e046_keywords = ["permission denied", "dlopen", "can't load",
                      "cannot load", "load failed", "operation not permitted"]
+    e046_keywords = ["permission denied", "operation not permitted",
+                     "failed to map segment", "selinux"]
     is_e046 = any(kw in combined.lower() for kw in e046_keywords)
 
     if is_e046:
