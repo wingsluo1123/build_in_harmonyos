@@ -9,6 +9,7 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
+from conan.tools.build import cross_building
 
 
 class Ffms2TestConan(ConanFile):
@@ -27,7 +28,13 @@ class Ffms2TestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        if cross_building(self):
+            self.output.info("cross-building：只验编译+链接")
+            return
         # Run the test executable directly via self.run() so the L0d gate
         # detects an actual test invocation (cmake.test() is not recognized).
+        # env="conanrun" loads conanrunenv script which sets LD_LIBRARY_PATH
+        # to include the ffms2 and all transitive dependency lib dirs.
         exe = os.path.join(self.cpp.build.bindirs[0], "test_ffms2")
-        self.run(exe, env=["LD_LIBRARY_PATH"])
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} -c '{exe}'", env="conanrun")

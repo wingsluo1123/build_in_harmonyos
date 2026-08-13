@@ -73,6 +73,11 @@ class Ffms2Conan(ConanFile):
         deps = AutotoolsDeps(self)
         deps.generate()
         tc = AutotoolsToolchain(self)
+        # E007: config.guess (2024-07-27) cannot identify HarmonyOS
+        # (uname -s = "HarmonyOS"); force build/host triplets so configure
+        # never runs the config.guess probe. config.sub supports *-linux-ohos.
+        tc.configure_args.append("--build=aarch64-unknown-linux-ohos")
+        tc.configure_args.append("--host=aarch64-unknown-linux-ohos")
         # OHOS: GNU ld (ld.bfd) produces ELF binaries rejected by exec MAC policy.
         # Force lld so configure's compiler test can create executables.
         tc.ldflags.append("-fuse-ld=lld")
