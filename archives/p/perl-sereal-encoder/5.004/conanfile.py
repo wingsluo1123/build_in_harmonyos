@@ -13,10 +13,11 @@ OHOS adaptations:
 import glob
 import os
 import shutil
+import subprocess
 
 from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 
 
 class PerlSerealEncoderConan(ConanFile):
@@ -82,12 +83,13 @@ class PerlSerealEncoderConan(ConanFile):
         # Sign ELF .so files for HarmonyOS (P-SIGN-001)
         # musl dynamic linker checks .codesign section; unsigned .so = Permission denied
         for so_file in so_files:
-            # Remove old .codesign section if present (non-fatal if absent)
+            # Remove old .codesign section if present (fresh builds have no signature yet)
+            # ConanException expected when section doesn't exist — not a real error
             try:
                 self.run(f'llvm-objcopy --remove-section .codesign "{so_file}"',
                          cwd=self.source_folder)
-            except Exception:
-                pass
+            except ConanException:
+                pass  # .codesign section absent on fresh builds
             # Self-sign the .so for HarmonyOS
             self.run(f'binary-sign-tool sign -inFile "{so_file}" '
                      f'-outFile "{so_file}" -selfSign 1',

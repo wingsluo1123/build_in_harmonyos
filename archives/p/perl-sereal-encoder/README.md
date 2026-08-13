@@ -42,4 +42,4 @@ perl -e 'use Sereal::Encoder; my $enc = Sereal::Encoder->new(); my $out = $enc->
 ## Notes
 
 - See `5.004/notes.md` for detailed adaptation notes
-- See `5.004/reports/test-report.md` for functional test results
+- Functional test results are documented in `5.004/notes.md`

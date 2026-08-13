@@ -15,7 +15,7 @@
 
 ## 编译步骤
 
-1. 源码下载: `curl -kL https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-Encoder-5.004.tar.gz`
+1. 源码下载: `curl -L https://cpan.metacpan.org/authors/id/Y/YV/YVES/Sereal-Encoder-5.004.tar.gz`
 2. 生成 Conan 配方: `ohc-run.py conan-init perl-sereal-encoder 5.004`
 3. 构建命令: `perl Makefile.PL INSTALLDIRS=site` → `make -j2`
 4. 安装到 package: `make install DESTDIR=$PACKAGE_FOLDER`
@@ -77,7 +77,7 @@ Conan 包引用:   1/1 PASS
 运行时加载:     0/1 KNOWN_LIMITATION (E046 HMDFS/SELinux)
 ```
 
-详见 `reports/test-report.md`
+详细功能测试结果见上方"功能测试"章节
 
 ## 产物
 
@@ -106,7 +106,7 @@ Conan 包引用:   1/1 PASS
 4. **test_package/conanfile.py**: 增强验证——添加.codesign签名验证、boot_Sereal__Encoder符号检查、模块版本验证
 5. **test_package/conanfile.py**: 使用subprocess.run()替代self.run()避免Conan env参数问题
 6. **test_package/MANIFEST.yml**: 新建, 声明上游测试套件和test_package测试(CI L0e门禁)
-7. **reports/test-report.md**: 新建详细功能测试报告(23/24 PASS)
+7. notes.md: 补充详细功能测试结果(23/24 PASS)
 
 ## 注意事项
 
