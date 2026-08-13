@@ -168,7 +168,7 @@ class NcmpcppConan(ConanFile):
         tc.generate()
 
         # configure conftest needs to find the shared dependencies at runtime
-        # (boost/libmpdclient/curl are all shared packages).
+        # (all are shared packages).
         env = Environment()
         vendor_include = os.path.join(self.source_folder, "vendor-boost")
         if os.path.isdir(vendor_include):
@@ -176,10 +176,10 @@ class NcmpcppConan(ConanFile):
             # registry boost package lacks boost/format.hpp, so the search
             # falls through to the vendored copy.
             env.append("CPPFLAGS", "-I{}".format(vendor_include))
-        for dep in ("boost", "libmpdclient", "curl"):
+        for dep in self.dependencies.values():
             env.append_path(
                 "LD_LIBRARY_PATH",
-                os.path.join(self.dependencies[dep].package_folder, "lib"),
+                os.path.join(dep.package_folder, "lib"),
             )
         env.vars(self, scope="build").save_script("conanbuild_runpath")
 
