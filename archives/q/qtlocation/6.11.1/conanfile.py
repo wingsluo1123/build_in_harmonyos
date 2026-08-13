@@ -36,7 +36,7 @@ class QtlocationConan(ConanFile):
 
     def requirements(self):
         self.requires("qtbase/6.11.1")
-        self.requires("qtpositioning/6.11.1")
+        self.requires("qtpositioning/6.11.1.1")
         self.requires("qtdeclarative/6.11.1")
 
     def validate(self):
