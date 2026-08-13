@@ -24,19 +24,25 @@ qbootctl 运行期依赖以下 Linux 平台接口，鸿蒙 PC 均已由 OHOS SDK
 ## 无损测试方案
 
 上游无自动化测试；真实槽位操作（`-s/-m/-u/-i`）被赛事安全边界禁止。本归档通过补丁
-`patches/0001-qbootctl.c.patch` 提供：
+`patches/0001-meson.build.patch` + `patches/0002-qbootctl.c.patch` 提供：
 
-- 环境变量 `QBOOTCTL_BACKEND=mock` 注入**纯内存 backend**（不访问任何设备），
-  可安全测试 CLI 只读路径（`-c/-a/-b/-n/-x`、dump、参数解析、非法槽位拒绝）；
-- 默认（未设置环境变量）行为与上游完全一致，生产 backend 保留真实设备语义；
-- `-h/--help` 在 root 检查前放行（帮助文本不访问设备），供非 root 环境 smoke test。
+- 测试专用构建 `qbootctl-test`（`QBOOTCTL_TESTING` 编译宏）：mock backend 整体包入
+  `#ifdef QBOOTCTL_TESTING`，仅独立测试目标编译，使用**纯内存 backend**（不访问任何
+  设备），可安全测试查询（`-c/-a/-b/-n/-x`、dump）、写状态转换、参数解析、非法槽位拒绝；
+- **生产 `qbootctl` 不定义测试宏**：不含任何 mock 代码、无运行时开关（无 getenv），
+  语义与上游完全一致（非 root 下 `-h/--help` 同样被拒）；
+- `qbootctl-test` 作为包内测试辅助产物位于 `test/`，不进入 `bin/`、不暴露于
+  `cpp_info.bindirs`，仅供 test_package 消费。
 
 ## 使用示例
 
 ```bash
-qbootctl -h            # 帮助（非 root 可用）
-QBOOTCTL_BACKEND=mock qbootctl -c   # mock 模式查询当前槽（无设备、无 root）
+qbootctl -h            # 生产二进制（非 root 被拒，与上游一致）
 qbootctl -c            # 真实设备查询（需 root + A/B 设备）
+# 测试专用构建（QBOOTCTL_TESTING 宏，纯内存 mock，无设备、无 root）：
+qbootctl-test -c       # 查询当前槽（_a）
+qbootctl-test -s b     # 内存写状态转换
+qbootctl-test -n c     # 非法槽位拒绝（exit 1）
 ```
 
 ## 参考
