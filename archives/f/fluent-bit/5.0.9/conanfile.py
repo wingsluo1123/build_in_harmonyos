@@ -11,10 +11,12 @@ import os
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.env import Environment
 from conan.tools.files import (
     apply_conandata_patches,
     export_conandata_patches,
     get,
+    mkdir,
     unzip,
 )
 from conan.tools.gnu import PkgConfigDeps
@@ -36,11 +38,15 @@ class FluentBitConan(ConanFile):
         "shared": [True, False],
         "debug": [True, False],
         "with_tests": [True, False],
+        "with_internal_tests": [True, False],
+        "with_runtime_tests": [True, False],
     }
     default_options = {
         "shared": False,
         "debug": False,
         "with_tests": False,
+        "with_internal_tests": True,
+        "with_runtime_tests": True,
     }
 
     def export_sources(self):
@@ -139,8 +145,12 @@ class FluentBitConan(ConanFile):
             "FLB_RELEASE": "Off" if self.options.debug else "On",
             "FLB_MINIMAL": "On",
             "FLB_EXAMPLES": "Off",
-            "FLB_TESTS_INTERNAL": "On" if self.options.with_tests else "Off",
-            "FLB_TESTS_RUNTIME": "On" if self.options.with_tests else "Off",
+            "FLB_TESTS_INTERNAL": "On"
+            if self.options.with_tests and self.options.with_internal_tests
+            else "Off",
+            "FLB_TESTS_RUNTIME": "On"
+            if self.options.with_tests and self.options.with_runtime_tests
+            else "Off",
             "FLB_TESTS_OSSFUZZ": "Off",
             "FLB_TLS": "On",
             "FLB_HTTP_SERVER": "On",
@@ -163,9 +173,12 @@ class FluentBitConan(ConanFile):
             "FLB_UNICODE_ENCODER": "Off",
             "FLB_JEMALLOC": "Off",
             "FLB_VALGRIND": "Off",
+            "FLB_CUSTOM_CALYPTIA": "Off",
+            "FLB_PROXY_GO": "Off",
             "FLB_SHARED_LIB": "Off",
             "FLB_BINARY": "On",
             "FLB_IN_HTTP": "On",
+            "FLB_IN_LIB": "On" if self.options.with_tests else "Off",
             "FLB_IN_ELASTICSEARCH": "Off",
             "FLB_IN_OPENTELEMETRY": "Off",
             "FLB_IN_SPLUNK": "Off",
@@ -181,6 +194,8 @@ class FluentBitConan(ConanFile):
             "FLB_IN_KUBERNETES_EVENTS": "Off",
             "FLB_IN_BLOB": "Off",
             "FLB_OUT_HTTP": "On",
+            "FLB_OUT_LIB": "On" if self.options.with_tests else "Off",
+            "FLB_OUT_NULL": "On" if self.options.with_tests else "Off",
             "FLB_OUT_TD": "Off",
             "FLB_OUT_KAFKA": "Off",
             "FLB_OUT_KAFKA_REST": "Off",
@@ -227,6 +242,9 @@ class FluentBitConan(ConanFile):
             "FLB_PROCESSOR_TDA": "Off",
             "FLB_PROCESSOR_TEMPLATE": "Off",
         }
+        if self.options.with_tests:
+            for test_name in self._ohos_first_stage_test_exclusions():
+                opts[f"FLB_WITHOUT_{test_name}"] = "On"
         for key, value in opts.items():
             tc.cache_variables[key] = value
         tc.generate()
@@ -236,6 +254,8 @@ class FluentBitConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+        if self.options.with_tests:
+            self._run_upstream_tests()
 
     def package(self):
         cmake = CMake(self)
@@ -244,3 +264,49 @@ class FluentBitConan(ConanFile):
     def package_info(self):
         self.cpp_info.libs = []
         self.cpp_info.bindirs = ["bin"]
+
+    def _run_upstream_tests(self):
+        test_tmp = os.path.join(self.build_folder, "fluent-bit-test-tmp")
+        mkdir(self, test_tmp)
+
+        env = Environment()
+        env.define("TMPDIR", test_tmp)
+        env.define("TMP", test_tmp)
+        env.define("TEMP", test_tmp)
+        test_env = env.vars(self)
+        with test_env.apply():
+            self.run(
+                'ctest -N --test-dir "{}"'.format(self.build_folder),
+                env="conanrun",
+            )
+            self.run(
+                'ctest --test-dir "{}" --output-on-failure --timeout 180 -j1 '
+                '--no-tests=error -L "internal|runtime"'.format(self.build_folder),
+                env="conanrun",
+            )
+
+    @staticmethod
+    def _ohos_first_stage_test_exclusions():
+        return (
+            "flb-rt-core-timeout",
+            "flb-rt-core_chunk_trace",
+            "flb-rt-in_http",
+            "flb-rt-core_routes",
+            "flb-rt-out_lib",
+            "flb-it-pack",
+            "flb-it-sds",
+            "flb-it-router_config",
+            "flb-it-utils",
+            "flb-it-mp",
+            "flb-it-input_chunk",
+            "flb-it-input_chunk_routes",
+            "flb-it-processor",
+            "flb-it-conditionals",
+            "flb-it-strptime",
+            "flb-it-storage_inherit",
+            "flb-it-opentelemetry",
+            "flb-it-storage_dlq",
+            "flb-it-fstore",
+            "flb-it-reload",
+            "flb-it-cumulative_to_delta",
+        )

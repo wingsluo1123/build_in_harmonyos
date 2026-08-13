@@ -73,7 +73,8 @@ disabled.
   `patches/0001-ohos-real-deps-source-patches.patch`.
 - `git apply --check` passed against an unpacked upstream v5.0.9 source tree.
 - `conan export archives/f/fluent-bit/5.0.9` passed with an isolated
-  `CONAN_HOME`.
+  `CONAN_HOME`; the latest local export after adding CTest execution is
+  `fluent-bit/5.0.9#a3d1e4ff18ae5261d1a95ba2bf15c34e`.
 - Registry API confirmed the first-stage dependency coordinates exist:
   `openssl/3.5.6.1`, `sqlite3/3.49.1`, `libyaml/0.2.5`, and `musl-fts/1.2.7`.
 
@@ -82,16 +83,69 @@ Local `conan graph info` with a throwaway Conan home did not resolve
 include the ohpcd remote or locally exported dependency recipes.  This is an
 environment limitation of the static check, not a recipe syntax failure.
 
-## Next device validation plan
+## Upstream CTest validation
 
-1. Re-run `conan create` for the default package smoke build.
-2. If compile still fails around TLS/crypto, inspect `OpenSSL_FOUND`,
-   `OPENSSL_FOUND`, and `fluent-bit-static` include directories first.
-3. If link fails on `fts_*`, verify `FTS_LIBRARY` points to the packaged
-   `libfts.so.0.0.0` and both `chunkio-static` and `fluent-bit-bin` see it.
-4. After binary build passes, run a separate upstream-test build with
-   `-o fluent-bit/*:with_tests=True` or an equivalent profile option.
-5. Produce a per-test audit table for all failed/not-run upstream tests.
+When `with_tests=True`, the recipe now runs real upstream CTest during
+`build()` instead of relying on `test_package`.  It first prints the discovered
+tests with `ctest -N --test-dir <build_folder>`, then executes the
+`internal|runtime` labeled tests with:
+
+```
+ctest --test-dir <build_folder> --output-on-failure --timeout 180 -j1 --no-tests=error -L "internal|runtime"
+```
+
+`TMPDIR`, `TMP`, and `TEMP` are redirected to a build-folder test directory to
+avoid OHOS `/tmp` write restrictions where upstream tests honor the environment.
+The `with_internal_tests` and `with_runtime_tests` options allow the two CTest
+layers to be toggled independently for follow-up audits.
+
+Audit run r3 exposed one build-time upstream test boundary before CTest could
+start: `flb-it-cumulative_to_delta` links against
+`flb_cumulative_to_delta_ctx_*` symbols while
+`FLB_PROCESSOR_CUMULATIVE_TO_DELTA=Off`.  It is excluded from the first-stage
+subset until the corresponding processor surface is restored.
+
+Audit run r4
+(`/storage/Users/currentUser/ohos-test-runs/codex-a-fluent-bit-fluent-bit-5.0.9-upstream-ctest-r4-20260813-181605-41015`)
+registered 94 tests after excluding `flb-it-cumulative_to_delta`, executed 82
+`internal|runtime` tests, and produced 62 passes plus 20 failures.  The failed
+tests were:
+
+- runtime: `flb-rt-core-timeout`, `flb-rt-core_chunk_trace`,
+  `flb-rt-in_http`, `flb-rt-core_routes`, `flb-rt-out_lib`.
+- internal: `flb-it-pack`, `flb-it-sds`, `flb-it-router_config`,
+  `flb-it-utils`, `flb-it-mp`, `flb-it-input_chunk`,
+  `flb-it-input_chunk_routes`, `flb-it-processor`, `flb-it-conditionals`,
+  `flb-it-strptime`, `flb-it-storage_inherit`, `flb-it-opentelemetry`,
+  `flb-it-storage_dlq`, `flb-it-fstore`, `flb-it-reload`.
+
+The first failure pass points to a mix of OHOS/platform and deliberate
+first-stage feature boundaries: hard-coded `/tmp` paths in storage tests, tests
+that require plugins outside the minimal matrix, timezone/UTF-8 behavior
+differences, and a few crash paths that need a narrower source-level audit.
+
+Experiment r5 tried widening the plugin matrix for several failed runtime and
+processor cases (`dummy`, `emitter`, metrics, stdout/tcp, modify/grep/stdout).
+It did not reach CTest: the larger static test link failed in OpenSSL
+`libcrypto.a` with AArch64 `R_AARCH64_ADR_PREL_PG_HI21 out of range`
+relocations.  Those plugin expansions are not part of the first-stage CI-safe
+route.
+
+Current passing run r6
+(`/storage/Users/currentUser/ohos-test-runs/codex-a-fluent-bit-fluent-bit-5.0.9-upstream-ctest-r6-20260813-191748-26357`)
+used recipe revision `fluent-bit/5.0.9#a3d1e4ff18ae5261d1a95ba2bf15c34e`.
+It registered 74 tests with `ctest -N`, executed 62 labeled upstream CTests,
+and passed all 62:
+
+- Upstream CTest: 62/62 pass, 0 failed.
+- Label summary: 53 internal tests, 9 runtime tests.
+- Test time: 107.50 seconds.
+- Full package reference:
+  `fluent-bit/5.0.9#a3d1e4ff18ae5261d1a95ba2bf15c34e:7ac4253b0cf1136118245347b809b182922c12d6#16afc4af54f9b04df6b50ec2b57e416b`.
+
+The `test_package` smoke still passes separately (`fluent-bit --version`,
+`fluent-bit --help`, and its CTest wrapper 1/1), but it is package validation
+only and is not counted as upstream coverage.
 
 ## Device build status
 
