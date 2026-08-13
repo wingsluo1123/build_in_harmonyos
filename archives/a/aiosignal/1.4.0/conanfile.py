@@ -53,9 +53,15 @@ class AiosignalConan(ConanFile):
         if not os.path.isdir(tests_dir):
             self.output.warning("upstream tests/ not found, skipping pytest")
             return
+        import subprocess
+        # CI worker 的 PATH 可能不含 python3，用绝对路径定位（本机
+        # python3 位于 /storage/Users/currentUser/usr/local/bin/python3）
+        python = self._find_python()
+        if not python:
+            self.output.warning("python3 not found, upstream tests skipped")
+            return
         try:
-            import subprocess
-            res = subprocess.run(["python3", "-m", "pytest", "--version"],
+            res = subprocess.run([python, "-m", "pytest", "--version"],
                                  capture_output=True, timeout=30)
             if res.returncode != 0:
                 self.output.warning("pytest unavailable, upstream tests skipped")
@@ -69,13 +75,14 @@ class AiosignalConan(ConanFile):
             fl_site = os.path.join(
                 self.dependencies["frozenlist"].package_folder,
                 "lib", "python3.12", "site-packages")
-            paths.append(fl_site)
+            if os.path.isdir(fl_site):
+                paths.append(fl_site)
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(paths)
         subset = ["test_signals.py"]
         try:
             res = subprocess.run(
-                ["python3", "-m", "pytest", *subset, "-q", "--no-header",
+                [python, "-m", "pytest", *subset, "-q", "--no-header",
                  "--tb=no", "-o", "addopts=", "--confcutdir", tests_dir],
                 cwd=tests_dir, env=env, capture_output=True, timeout=180,
             )
@@ -85,6 +92,16 @@ class AiosignalConan(ConanFile):
                 self.output.warning("upstream pytest subset failed")
         except Exception as e:
             self.output.warning(f"upstream pytest run failed: {e}")
+
+    def _find_python(self):
+        import shutil
+        candidates = [
+            "/storage/Users/currentUser/usr/local/bin/python3",
+            "/usr/bin/python3",
+            "/system/bin/python3",
+            shutil.which("python3") or "",
+        ]
+        return next((p for p in candidates if p and os.path.isfile(p)), "")
 
     def package(self):
         pkg_dir = os.path.join(self.package_folder, "lib", "python3.12", "site-packages", "aiosignal")
