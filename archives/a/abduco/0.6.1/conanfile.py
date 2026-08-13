@@ -6,7 +6,7 @@ from conan.tools.layout import basic_layout
 
 class AbducoConan(ConanFile):
     name = "abduco"
-    version = "0.6"
+    version = "0.6.1"
     package_type = "application"
     settings = "os", "arch", "compiler", "build_type"
     # 无外部依赖（abduco 为纯 C 终端会话管理工具——Makefile 构建）
