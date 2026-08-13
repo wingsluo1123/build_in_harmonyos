@@ -50,7 +50,7 @@ class AlgoliaConan(ConanFile):
     homepage = "https://github.com/algolia/cli"
     url = ""  # CI fills this
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
