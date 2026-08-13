@@ -4,7 +4,7 @@ from conan import ConanFile
 # 必须用 conan.tools.gnu（非 conan.tools.autotools）——CI conan 环境无
 # conan.tools.autotools 模块（libgd #19569 实测 ModuleNotFoundError；alpine 用 gnu 正常）
 from conan.tools.gnu import Autotools, AutotoolsToolchain
-from conan.tools.files import apply_conandata_patches
+from conan.tools.files import apply_conandata_patches, get
 from conan.tools.layout import basic_layout
 
 
@@ -35,6 +35,10 @@ class LibsodiumConan(ConanFile):
         tc.generate()
 
     def source(self):
+        # 下载源码 + 剥离顶层目录（GitHub archive 解压带 libsodium-1.0.22/
+        # 顶层——configure 在子目录——patch 目标 a/configure 不存在【CI
+        # #23019 实测】——strip_root 到 source_folder 顶层——abduco 教训）
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         # 显式应用 0001-configure-umask.patch（multitail 教训：必须显式调用
         # apply_conandata_patches——否则补丁不会被应用）
         apply_conandata_patches(self)
