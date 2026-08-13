@@ -96,6 +96,12 @@ class PerlCryptEksblowfishConan(ConanFile):
         lib_path = os.path.join(sysroot, "usr", "lib", "aarch64-linux-ohos")
         self.buildenv_info.define("LIBRARY_PATH", lib_path)
 
+        # LD_LIBRARY_PATH: OHOS SDK llvm/lib — lld linker depends on libxml2.so.16
+        sdk_native = os.path.dirname(os.path.normpath(sysroot))
+        llvm_lib = os.path.join(sdk_native, "llvm", "lib")
+        if os.path.isdir(llvm_lib):
+            self.buildenv_info.define("LD_LIBRARY_PATH", llvm_lib)
+
         # PERL5LIB: Perl module path
         if perl_lib:
             self.buildenv_info.define("PERL5LIB", perl_lib)
