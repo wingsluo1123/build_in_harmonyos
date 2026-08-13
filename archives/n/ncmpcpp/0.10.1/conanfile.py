@@ -177,10 +177,14 @@ class NcmpcppConan(ConanFile):
             # falls through to the vendored copy.
             env.append("CPPFLAGS", "-I{}".format(vendor_include))
         for dep in self.dependencies.values():
-            env.append_path(
-                "LD_LIBRARY_PATH",
-                os.path.join(dep.package_folder, "lib"),
-            )
+            # Only direct runtime dependencies have an installed binary
+            # package at generate() time; transitive toolchain deps such as
+            # openssl/zlib may only have recipes (package_folder is None).
+            if dep.package_folder:
+                env.append_path(
+                    "LD_LIBRARY_PATH",
+                    os.path.join(dep.package_folder, "lib"),
+                )
         env.vars(self, scope="build").save_script("conanbuild_runpath")
 
     def build(self):
