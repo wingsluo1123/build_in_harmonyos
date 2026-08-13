@@ -5,7 +5,7 @@ from conan.errors import ConanException
 
 
 class GettextTestConan(ConanFile):
-    """test_package for gettext 0.22.5 — smoke test envsubst/gettext tools."""
+    """test_package for gettext 0.22.5.1 — smoke test envsubst/gettext tools."""
     settings = "os", "arch", "compiler", "build_type"
     generators = "VirtualRunEnv"
     test_type = "explicit"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for gettext 0.22.5 — GNU internationalization tools.
+"""Conan recipe for gettext 0.22.5.1 — GNU internationalization tools.
 
 gettext provides the envsubst command (required by abuild rootbld) plus the
 GNU gettext toolchain (msgfmt, xgettext, gettext, ...) and the libintl
@@ -28,7 +28,7 @@ from conan.tools.layout import basic_layout
 
 class GettextConan(ConanFile):
     name = "gettext"
-    version = "0.22.5"
+    version = "0.22.5.1"
     description = "GNU internationalization tools (gettext, envsubst, msgfmt, ...)"
     license = "GPL-3.0-or-later"
     homepage = "https://www.gnu.org/software/gettext/"
