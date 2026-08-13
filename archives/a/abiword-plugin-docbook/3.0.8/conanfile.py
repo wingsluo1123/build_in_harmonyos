@@ -112,22 +112,19 @@ class AbiwordPluginDocbookConan(ConanFile):
         tc.configure_args.append("--host=aarch64-linux")
         # AbiWord 主 configure 强依赖 png.h/jpeglib.h/链接 -ljpeg/-lpng(AC_MSG_ERROR),
         # libpng/libjpeg 未在制品仓发布时 CI 用 --build=missing 从源编译,
-        # 注入 include+lib 路径供头检查与链接检查
-        import glob as _glob
+        # 注入 include+lib 路径供头检查与链接检查。
+        # 注意: 用 self.dependencies[...].cpp_info 而非 glob 硬编码 conan 缓存
+        # 路径(/storage/Users/currentUser/.conan2/p/b/libjp*/p/include)——CI 上
+        # 包目录 hash 与本地不同, glob 会漏匹配 → configure 报 "jpeglib.h not
+        # found"(CI #23085 实测)。cpp_info 是 conan 标准依赖路径接口, 与
+        # 缓存目录名无关(同 eml 配方修复模式)。
         _cpps = []
         _lds = []
-        _png_incs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libpn*/p/include")
-        if _png_incs:
-            _cpps.append(_png_incs[0])
-        _png_libs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libpn*/p/lib")
-        if _png_libs:
-            _lds.append(_png_libs[0])
-        _jpeg_incs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libjp*/p/include")
-        if _jpeg_incs:
-            _cpps.append(_jpeg_incs[0])
-        _jpeg_libs = _glob.glob("/storage/Users/currentUser/.conan2/p/b/libjp*/p/lib")
-        if _jpeg_libs:
-            _lds.append(_jpeg_libs[0])
+        for _dep_name in ("libpng", "libjpeg"):
+            if _dep_name in self.dependencies:
+                _dep = self.dependencies[_dep_name]
+                _cpps.extend(_dep.cpp_info.includedirs)
+                _lds.extend(_dep.cpp_info.libdirs)
         if _cpps:
             tc.configure_args.append("CPPFLAGS={}".format(
                 " ".join("-I{}".format(i) for i in _cpps)))
