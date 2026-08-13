@@ -40,7 +40,19 @@ default FIFO jobserver implementation.
 
 ## Upstream Test Scope
 
-`make check` is not integrated into the final recipe. The skipped `ext`
-directory means the complete upstream suite cannot run: standard modules such
-as `gauche/uvector` and `gauche/unicode` are not packaged. This limitation must
-remain explicit in any future PR description.
+The complete upstream suite was separately executed with `make -j1 check` in a
+full Gauche build tree. Its recorded summary was `39,319` tests: `39,309`
+passed, `10` failed, and `2` aborted (99.9746% passed).
+
+The remaining failures are host-environment limitations, not hidden or patched
+out: Unix-domain socket bind/connect is denied on HMDFS; copied file modes do
+not match POSIX expectations; `tcdrain` and `tcflow` are denied on the PTY; and
+script tests require executable-file behavior unavailable in this filesystem.
+No upstream test or Gauche runtime behavior was modified to turn those results
+into passes.
+
+`make check` is not integrated into the final recipe. The published package
+intentionally excludes `ext/`, including modules such as `gauche/uvector` and
+`gauche/unicode`, because OHOS cannot load those optional extensions correctly.
+The separately run full suite exercises that broader upstream build tree, not
+the published core-only package.

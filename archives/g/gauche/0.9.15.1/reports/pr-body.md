@@ -52,20 +52,20 @@
 
 - 编译状态：通过。`finish` 于 2026-08-13 11:31 自动完成 W3 本地 CI 验证，生成 `.ci-result.json`，退出码为 0。
 - 上游测试用例通过率：39,309/39,319（99.9746%）；10 失败，2 中止。
-- 新增测试用例：1 个 Conan consumer test，断言 C API 求值结果为 `6`，并运行包内 `gosh` 验证解释器、头文件和库。
+- 新增测试用例通过率：1/1（100%）。该 Conan consumer test 断言 C API 求值结果为 `6`，并运行包内 `gosh`。
 
-已执行的上游验证命令：
+已执行的完整上游验证命令：
 
 ```text
 make -j1 check
 ```
 
-上游测试失败或中止均发生在当前 HMDFS 测试环境的系统能力边界：
+完整套件实际执行后未全量通过。剩余 10 个失败和 2 个中止来自当前 HMDFS 测试环境的系统能力边界，未修改上游测试或 Gauche 运行时逻辑来掩盖它们：
 
-- 账户数据库：`sys-getpwuid` 返回 `#f`，影响 `system.scm`。
-- Unix-domain socket：socket 创建返回 `#f`，影响 `net.scm`。
-- 终端控制：`tcdrain`、`tcflow` 和 `tcflush` 在 pty 上返回 `Permission denied`。
-- 文件权限/执行语义：HMDFS 的 chmod、可执行复制和 `gauche-install` 测试不满足上游 POSIX 断言。
+- Unix-domain socket：`bind` 返回 `Operation not permitted`，后续 client `connect` 失败，影响 `net.scm` 的本地 socket 测试。
+- 文件权限语义：HMDFS 对复制文件的 mode 处理与 POSIX 断言不同，影响 `ext/file` 的 `copy-file` 权限测试。
+- 终端控制：PTY 上 `tcdrain` 与 `tcflow` 返回 `Permission denied`，影响 `ext/termios` 测试。
+- 脚本执行语义：上游 `scripts.scm` 的解释器名称、file-to-file、files-to-directory 和 `-T` 场景依赖 HMDFS 不提供的可执行文件与权限行为。
 
 ## 补充说明
 
