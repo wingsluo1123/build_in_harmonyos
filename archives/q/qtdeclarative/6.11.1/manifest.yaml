@@ -1,0 +1,39 @@
+# manifest.yaml — qtdeclarative 6.11.1
+
+version: "6.11.1"
+software: qtdeclarative
+status: built
+build_date: "2026-08-08"
+build_system: cmake
+
+source:
+  url:
+    - "https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+    - "https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+    - "https://mirrors.cloud.tencent.com/qt/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+    - "https://mirrors.aliyun.com/qt/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+    - "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+  sha256: "52e670f670b0304f534b24f98c47ceb8a41bb710464414ebc9527ec71cc86aa4"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_SYSTEM_NAME=Linux（OhosLinuxPlatformBlock：OHOS clang 驱动目标 aarch64-unknown-linux-ohos，启用标准共享库 SONAME 规则）"
+    - "QT_QMAKE_TARGET_MKSPEC=harmonyos-clang"
+    - "CMAKE_PREFIX_PATH=<qtbase 包>"
+    - "QT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtshadertools 包>"
+    - "LD_LIBRARY_PATH 注入 qtbase/qtshadertools lib（qsb 宿主工具构建期运行）"
+  dependencies:
+    - qtbase/6.11.1
+    - qtshadertools/6.11.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "CMake 无 Platform/HarmonyOS.cmake：OHOS host 自动检测 CMAKE_SYSTEM_NAME=HarmonyOS 后共享库 SONAME/版本规则失败，CMakeToolchain 自定义 Block 映射为 Linux（clang 驱动仍目标 aarch64-unknown-linux-ohos）"
+  - "QtQuick 构建期调用 qtshadertools 包的 qsb 宿主工具预烘焙 shader，qsb RUNPATH 仅覆盖自身包 lib，需 LD_LIBRARY_PATH 注入 qtbase lib（libQt6Core/libQt6Gui）"
+  - "HMDFS 破坏 install 相对符号链接（E215）：package() 需重建 libQt6Qml.so/.so.6 等 SONAME 链接"
+  - "OHOS 可执行 ELF（ET_EXEC/ET_DYN）需 binary-sign-tool 重签（.codesign 段校验）"
