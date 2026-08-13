@@ -474,8 +474,12 @@ UT_uint32 IE_Exp_Text::_writeBytes (const UT_Byte * pBytes, UT_uint32 length)
 	 * bytes; the default base implementation just forwards to getFp(). */
 	if (!pBytes || !length)
 		return 0;
-	if (getFp ())
-		gsf_output_write (getFp (), length, pBytes);
+	GsfOutput * fp = getFp ();
+	if (!fp)
+		return 0;   /* no output stream attached: report failure instead of faking success */
+	gsf_off_t written = gsf_output_write (fp, length, pBytes);
+	if (written != (gsf_off_t)length)
+		return 0;   /* short write / realloc failure: propagate so _writeDocument() can fail */
 	return length;
 }
 

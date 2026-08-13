@@ -26,6 +26,7 @@
 #include "ut_assert.h"
 #include "ie_imp.h"
 #include "ie_exp.h"
+#include "ie_exp_Text.h"
 #include "pd_Document.h"
 #include "xap_Module.h"
 #include "gsf/gsf-input.h"
@@ -252,6 +253,41 @@ int main (void)
 			gsf_output_free (out);
 		}
 		delete exp;
+	}
+
+	/* ---- 8b. failure contract: base IE_Exp_Text must not fake success
+	 *      (regression for review: _writeBytes used to return length even
+	 *      with no output stream / failed write, so writeDocument()
+	 *      silently succeeded with empty output) ---- */
+	{
+		static const UT_UCSChar TXT[] = { 'H','i','\r' };
+		PD_Document bdoc;
+		bdoc.appendStrux (PTX_Section, NULL);
+		bdoc.appendStrux (PTX_Block, NULL);
+		bdoc.appendSpan (TXT, 3);
+
+		/* no output stream attached (setOutput never called) */
+		IE_Exp_Text * baseExp = new IE_Exp_Text (&bdoc);
+		UT_uint32 n = baseExp->_writeBytes (reinterpret_cast<const UT_Byte *> ("abc"), 3);
+		CHECK (n == 0, "base _writeBytes() without output stream returns 0");
+		UT_Error bwerr = baseExp->writeDocument ();
+		CHECK (bwerr == UT_IE_IMPORTERROR, "base writeDocument() without output stream == UT_IE_IMPORTERROR");
+		delete baseExp;
+
+		/* with an output stream attached, the same path writes and reports length */
+		GsfOutput * bout = gsf_output_new_from_memory ();
+		CHECK (bout != 0, "base contract GsfOutput wrap ok");
+		if (bout) {
+			IE_Exp_Text * okExp = new IE_Exp_Text (&bdoc);
+			okExp->setOutput (bout, "contract.txt");
+			UT_uint32 n2 = okExp->_writeBytes (reinterpret_cast<const UT_Byte *> ("xyz"), 3);
+			CHECK (n2 == 3, "base _writeBytes() with output stream returns length");
+			UT_Error owerr = okExp->writeDocument ();
+			CHECK (owerr == UT_OK, "base writeDocument() with output stream == UT_OK");
+			CHECK (gsf_output_get_size (bout) >= 3, "base writeDocument() actually wrote bytes");
+			delete okExp;
+			gsf_output_free (bout);
+		}
 	}
 
 	/* ---- 9. unregister / unload ---- */
