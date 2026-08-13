@@ -1,6 +1,6 @@
 # E318: GNOME 生态 glib 静态链接 g_libintl_* 符号缺失 + meson host_machine.system() 平台判断
 
-> **结构化数据**: [graph/E318.kv](../graph/E318.kv)
+> **结构化数据**: [drafts/E318-draft-A7F3.kv](../drafts/E318-draft-A7F3.kv)
 > **严重度**: 🔴 blocking | **分类**: linking|platform_detection | **自动修复**: ❌ manual
 
 ---
