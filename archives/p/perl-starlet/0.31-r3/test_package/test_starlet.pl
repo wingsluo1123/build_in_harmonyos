@@ -28,7 +28,7 @@ if ($@) {
 # Missing runtime dependency → SKIP; any other error → FAIL (real regression).
 eval { require Starlet::Server };
 if ($@) {
-    if ($@ =~ /Can't locate [\w/:]+\.pm in \@INC/) {
+    if ($@ =~ m{Can't locate [\w/:]+\.pm in \@INC}) {
         print "SKIP: Starlet::Server not loadable (runtime dependencies not installed)\n";
         $skip++;
     } else {
@@ -42,7 +42,7 @@ if ($@) {
 # Test 4: Plack::Handler::Starlet loads (core handler module)
 eval { require Plack::Handler::Starlet };
 if ($@) {
-    if ($@ =~ /Can't locate [\w/:]+\.pm in \@INC/) {
+    if ($@ =~ m{Can't locate [\w/:]+\.pm in \@INC}) {
         print "SKIP: Plack::Handler::Starlet not loadable (runtime dependencies not installed)\n";
         $skip++;
     } else {
