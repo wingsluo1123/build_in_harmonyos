@@ -1,0 +1,85 @@
+# 版本级 manifest
+# 文件位置: archives/a/accounts-qml-module/0.7.1-git20231028.05e79eb/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.7.1-git20231028.05e79eb"
+
+# 软件名
+software: "accounts-qml-module"
+
+# 编译状态
+# published | built | failed | archived
+# archived：经评估暂时无法完成适配（依赖链断裂），归档留档避免重复投入
+status: archived
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-08-13"
+build_system: "qmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://gitlab.com/accounts-sso/accounts-qml-module/-/archive/05e79ebbbf3784a87f72b7be571070125c10dfe3/accounts-qml-module-05e79ebbbf3784a87f72b7be571070125c10dfe3.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: qmake
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  # R36 阻塞：以下依赖未发布到 ohpcd 制品仓
+  dependencies:
+    - "libaccounts-qt/1.13 (未发布 ❌)"
+    - "libsignon-qt/8.61 (未发布 ❌)"
+    - "qt5-qtbase/5.15.2 (已发布，但缺 QtXml ⚠️)"
+    - "qt5-qtdeclarative/5.15.2 (未发布 ❌)"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "R36 依赖必须先发布再构建下游：accounts-qml-module 的 4 个直接依赖中 3 个未发布（libaccounts-qt/libsignon-qt/qt5-qtdeclarative），conan list -r=ohpcd 权威验证 0 recipe"
+  - "qt5-qtbase/5.15.2 以 -no-feature-xml 构建，QtXml 头/库缺失（qtxml-config.h 未生成），不满足 libaccounts-qt service.h 的 QDomDocument 依赖"
+  - "qt5-qtbase 包内 qmake 的 QMAKE_MKSPECS 固化指向构建期 build 目录（打包缺陷），消费者无法用其 qmake 模块系统；可改用手动 moc + clang++ 构建绕过"
+  - "OHOS HMDFS 拒绝 ln -s 软链接且 chmod 不生效；Qt5 全量构建在本地环境遇软链接/并行链接平台问题，需 CI 完整构建机"
+  - "libaccounts-glib 1.27 本地构建成功（meson，含 4 个平台补丁）；libaccounts-qt 1.13 手动编译已推进到仅缺 QtXml"
