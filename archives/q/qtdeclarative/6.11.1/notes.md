@@ -56,5 +56,5 @@ qtdeclarative consumer test: ALL PASSED
 - 无显示环境：QML 测试需 QT_QPA_PLATFORM=offscreen（如适用）。
 ---
 
-**编译结束**: 2026-08-13 13:08
-**最终状态**: built
+**编译结束**: 2026-08-13 14:20
+**最终状态**: published
