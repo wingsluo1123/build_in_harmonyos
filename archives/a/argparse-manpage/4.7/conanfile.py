@@ -22,8 +22,7 @@ class ArgparseManpageConan(ConanFile):
 
     package_type = "application"
 
-    # Minimal settings — pure Python, no compiler needed
-    settings = "os", "arch"
+    settings = "os", "arch", "compiler", "build_type"
 
     def export_sources(self):
         export_conandata_patches(self)
