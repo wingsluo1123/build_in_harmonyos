@@ -72,6 +72,9 @@ class GaucheConan(ConanFile):
         # 其 Boehm GC 需要生成 libgc_pic.a（PIC 归档）供 libgauche 链接，
         # --disable-shared 会使 libgc_pic.a 为空导致 GC_* 符号未定义。
         # 依赖链由 Conan 管理，gosh 可执行文件自带 RPATH。
+        # OHOS libc does not provide pthread cancellation. Boehm GC already
+        # supports disabling that optional feature with this capability macro.
+        tc.extra_cflags.append("-DGC_NO_PTHREAD_CANCEL")
         tc.generate()
 
     def build(self):

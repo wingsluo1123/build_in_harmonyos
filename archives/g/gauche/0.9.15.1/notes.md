@@ -25,7 +25,7 @@ aarch64-unknown-linux-ohos
 ### 3. pthread_cancel 和 pthread_setcancelstate 缺失
 - **症状**: `undefined reference to pthread_cancel, pthread_setcancelstate`
 - **根因**: HarmonyOS musl libc 不实现 pthread 线程取消功能
-- **解决方案**: GC 补丁 0033/0034 禁用 pthread_cancel 相关宏（GC_NO_PTHREAD_CANCEL）
+- **解决方案**: Conan 工具链注入 Boehm GC 上游已有的 `GC_NO_PTHREAD_CANCEL` 功能宏，禁用可选的 pthread-cancellation 路径，不在源码补丁中硬编码平台宏。
 
 ### 4. GC Warning: PT_GNU_RELRO segment
 - **症状**: Boehm GC 警告 `Failed to find PT_GNU_RELRO segment inside PT_LOAD region`
@@ -46,8 +46,8 @@ Gauche 的内嵌 Boehm GC 需要生成 `libgc_pic.a`（PIC 归档）供 libgauch
 - **安装方式**: 上游 install 目标会在 HMDFS 构建路径运行新生成的 gosh；recipe 使用 Conan 文件 API 复制已完成的核心产物，避免该路径的动态加载限制。
 
 ### copy-port 替换（补丁 0045）
-ext 目录跳过后，`util.scm` 的 `do-copy` 依赖 `gauche.uvector`（来自跳过的 ext）。
-补丁 0045 将 `do-copy` 改为字符级拷贝，绕过 `make-u8vector` 依赖。
+`ext` 目录跳过后，`util.scm` 的 `do-copy` 不能依赖来自扩展目录的 `gauche.uvector`。
+补丁 0045 改用核心运行时提供的 `read-byte`/`write-byte` 逐字节复制，保持任意文件内容的二进制完整性。
 
 ### package_info 头文件路径
 Gauche 的头文件安装在 `lib/gauche-0.98/0.9.15/include/`（autotools
