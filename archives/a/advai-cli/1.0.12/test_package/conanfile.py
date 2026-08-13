@@ -22,6 +22,9 @@ class AdvaiCliTestConan(ConanFile):
         user_site = os.path.expanduser(f"~/usr/local/lib/{py_ver}/site-packages")
         pkg_folder = self.dependencies["advai-cli"].package_folder
         pkg_site = os.path.join(pkg_folder, "lib", py_ver, "site-packages")
+        # 包内 bin 目录(含 advai CLI 脚本)——test.py 用它做绝对路径调用,
+        # 避免 CI 沙箱中裸命令 "advai" 找不到(pip 装到 ~/.local/bin 不可访问)。
+        pkg_bin = os.path.join(pkg_folder, "bin")
         paths = []
         if os.path.isdir(pkg_site):
             paths.append(pkg_site)
@@ -31,6 +34,7 @@ class AdvaiCliTestConan(ConanFile):
             self.run(
                 f"ADVAI_PKG_SITE={pkg_site} "
                 f"ADVAI_DEPS_SITE={user_site} "
+                f"ADVAI_PKG_BIN={pkg_bin} "
                 f"PYTHONPATH={':'.join(paths)}:$PYTHONPATH python3 test.py",
                 env="conanrun",
             )

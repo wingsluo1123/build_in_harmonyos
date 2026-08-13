@@ -40,7 +40,21 @@ def test_import():
 
 
 def test_cli():
-    """Test 2: advai CLI --help works."""
+    """Test 2: advai CLI --help works.
+
+    用包内 bin/advai 绝对路径调用(ADVAI_PKG_BIN 由 test_package/conanfile.py
+    注入)——CI 沙箱中 pip 把 advai 脚本装到 ~/.local/bin(USER=100 不可访问
+    且不在 PATH), 裸命令 "advai" 报 "inaccessible or not found"(CI 实测)。
+    本机 PATH 有 advai 时作为 fallback 保留裸命令。
+    """
+    bin_dir = os.environ.get("ADVAI_PKG_BIN", "")
+    if bin_dir and os.path.isdir(bin_dir):
+        exe = os.path.join(bin_dir, "advai")
+        if os.path.exists(exe):
+            rc = os.system(f'"{exe}" --help')
+            assert rc == 0, "advai --help failed"
+            print(f"✅ advai CLI --help OK (pkg bin: {exe})")
+            return
     rc = os.system("advai --help")
     assert rc == 0, "advai --help failed"
     print("✅ advai CLI --help OK")
