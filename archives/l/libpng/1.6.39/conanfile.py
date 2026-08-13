@@ -27,7 +27,11 @@ class LibpngConan(ConanFile):
         # 剥离顶层目录（sourceforge tarball 解压带 libpng-1.6.39/ 顶层——
         # configure 在子目录——strip_root 到 source_folder 顶层——
         # abduco/progress 教训）
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # 取当前版本的 url/sha256（conandata 的 sources 带版本键——
+        # self.conan_data["sources"] 是 {"1.6.39": {...}}——直接解包
+        # 会把版本键当关键字参数【CI #22760 实测 TypeError】——
+        # 需 [self.version] 取当前版本条目）
+        get(self, **self.conan_data["sources"][self.version], strip_root=True)
         apply_conandata_patches(self)
 
     def generate(self):
