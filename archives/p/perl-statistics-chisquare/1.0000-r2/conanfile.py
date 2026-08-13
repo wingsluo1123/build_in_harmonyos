@@ -9,7 +9,7 @@ import glob
 import shutil
 
 from conan import ConanFile
-from conan.tools.files import get, copy, apply_conandata_patches, export_conandata_patches
+from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.layout import basic_layout
 
 
@@ -21,8 +21,8 @@ class PerlstatisticschisquareConan(ConanFile):
     homepage = "https://github.com/DrHyde/perl-modules-Statistics-ChiSquare"
     url = ""  # CI fills this
 
-    # Pure Perl module — no compiler/build_type needed
-    settings = "os", "arch"
+    # Pure Perl module — no compiler/build_type needed, but CI L0p requires all four
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
