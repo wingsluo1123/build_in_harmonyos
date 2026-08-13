@@ -20,6 +20,7 @@
 #    → PKG_CONFIG_PATH/CPPFLAGS/LDFLAGS 指向 conan 依赖，重新 configure + make
 # 6. configure --prefix=$DEFAULT_PREFIX
 # 7. make -j2 && make install DESTDIR=$TEST_PREFIX
+#    注: conanfile.py build() 使用 -j1（HMDFS jobserver fifo EPERM，R9）
 # 8. make check（test_fork.rb 段错误，其余通过）
 ```
 

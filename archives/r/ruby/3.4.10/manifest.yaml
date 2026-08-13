@@ -1,4 +1,4 @@
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/3.4.10/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -10,7 +10,7 @@
 version: "3.4.10"
 
 # 软件名
-software: "{software}"
+software: "ruby"
 
 # 编译状态
 # published | built | failed | archived
@@ -18,7 +18,7 @@ status: built
 
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-08-13"
-build_system: "{BUILD_SYSTEM}"
+build_system: "autotools"
 
 # ============================================================
 # 源码信息
@@ -29,7 +29,7 @@ source:
   url: "https://cache.ruby-lang.org/pub/ruby/3.4/ruby-3.4.10.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "ecee2d072a14f2d14347dd56dfd8fe5c3130abf5117bfaacbda0f4ef9cc429ec"
 
   # 压缩格式
   # tar.gz | tar.xz | tar.bz2 | zip
@@ -45,13 +45,17 @@ build:
   system: autotools
 
   # 配置选项列表
-  configure_options: []
+  configure_options:
+  - "--prefix=/"
   # 例如:
   # - "-DCMAKE_BUILD_TYPE=Release"
   # - "-DCMAKE_SYSTEM_NAME=OHOS"
 
   # 编译依赖列表（格式: name/version）
-  dependencies: []
+  dependencies:
+  - libffi/3.5.2
+  - openssl/3.5.6.1.1
+  - libyaml/0.2.5
   # 例如:
   # - openssl/1.1.1w
   # - curl/8.19.0
@@ -65,7 +69,10 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
+patches_applied:
+- "0001-configure.patch"
+- "0002-tool-config.guess.patch"
+- "0003-tool-config.sub.patch"
 # 例如:
 # - "0001-bootstrap-ohos-toolchain.patch"
 
@@ -74,7 +81,11 @@ patches_applied: []
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
+knowledge_gained:
+- "config.guess/config.sub 需打 E007/E205/E268 补丁识别 ohos-linux 三元组"
+- "config.status 临时目录 umask 077→022（HMDFS setgid 目录不可写，E011/E114 模式）"
+- "ruby 扩展 fiddle/openssl/psych 依赖 libffi/openssl/libyaml，需在 requirements 声明（R36）"
+- "configure --prefix=/ 后 $LOAD_PATH 指向 //lib/ruby，需 package_info 导出 RUBYLIB"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"

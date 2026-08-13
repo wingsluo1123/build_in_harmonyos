@@ -2,7 +2,7 @@
 # ruby 3.4.10 L1 smoke test (R34: real dependency on the tested package).
 # Runs the installed ruby binary and exercises the extensions that require
 # the recipe's declared dependencies (openssl/libyaml/libffi).
-set -eu
+set -euo pipefail
 
 RUBY_BIN="${RUBY_BIN:-ruby}"
 
