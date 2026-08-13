@@ -110,7 +110,7 @@ class TectonicConan(ConanFile):
                 current_path = p + ":" + current_path
         os.environ["PATH"] = current_path
 
-        # Fix: lld linker needs libxml2.so.16 from OHOS SDK llvm/lib directory
+        # Fix: lld linker needs libxml2.so.16 and system libs from OHOS SDK
         ce = self.conf.get("tools.build:compiler_executables", default={}, check_type=dict) or {}
         cc_path = ce.get("c") or ""
         if cc_path and os.path.sep in cc_path:
@@ -120,6 +120,22 @@ class TectonicConan(ConanFile):
             if os.path.isdir(llvm_lib):
                 current_ld = os.environ.get("LD_LIBRARY_PATH", "")
                 os.environ["LD_LIBRARY_PATH"] = llvm_lib + (":" + current_ld if current_ld else "")
+            # Fix: lld can't find -lunwind and -lc because Rust uses -nodefaultlibs.
+            # Set LIBRARY_PATH so clang finds these during ALL link invocations
+            # (including cargo build scripts which don't use .cargo/config.toml rustflags).
+            native_dir = os.path.dirname(llvm_dir)
+            _arch_lp = str(self.settings.arch)
+            if _arch_lp == "armv8":
+                _arch_lp = "aarch64"
+            _os_lp = str(self.settings.os).lower()
+            sdk_target = f"{_arch_lp}-linux-ohos" if _os_lp == "ohos" else f"{_arch_lp}-{_os_lp}"
+            for lib_subdir in [
+                os.path.join(llvm_dir, "lib", sdk_target),
+                os.path.join(native_dir, "sysroot", "usr", "lib", sdk_target),
+            ]:
+                if os.path.isdir(lib_subdir):
+                    current_lp = os.environ.get("LIBRARY_PATH", "")
+                    os.environ["LIBRARY_PATH"] = lib_subdir + (":" + current_lp if current_lp else "")
 
         # Rust environment (R33: use env or known path, not shell vars)
         home = os.path.expanduser("~")
@@ -207,12 +223,35 @@ class TectonicConan(ConanFile):
             target_triple = f"{_arch}-unknown-linux-ohos"
         else:
             target_triple = f"{_arch}-unknown-{_os}"
+
+        # Fix: lld linker needs -lunwind and -lc from OHOS SDK sysroot.
+        # Rust's -nodefaultlibs prevents lld from finding system libraries,
+        # so we must add -L flags pointing to the SDK library directories.
+        sdk_lib_dirs = []
+        if cc_path and os.path.sep in cc_path:
+            cc_real_sdk = os.path.realpath(cc_path)
+            llvm_dir_sdk = os.path.dirname(os.path.dirname(cc_real_sdk))
+            native_dir_sdk = os.path.dirname(llvm_dir_sdk)
+            sdk_target = target_triple.replace("-unknown-", "-")
+            # SDK target lib dir (contains libunwind.a)
+            llvm_target_lib = os.path.join(llvm_dir_sdk, "lib", sdk_target)
+            if os.path.isdir(llvm_target_lib):
+                sdk_lib_dirs.append(llvm_target_lib)
+            # Sysroot lib dir (contains libc.a, libc.so)
+            sysroot_lib = os.path.join(native_dir_sdk, "sysroot", "usr", "lib", sdk_target)
+            if os.path.isdir(sysroot_lib):
+                sdk_lib_dirs.append(sysroot_lib)
+
         cargo_dir = os.path.join(self.source_folder, ".cargo")
         os.makedirs(cargo_dir, exist_ok=True)
+        rustflags = ['-C', 'link-arg=-fuse-ld=lld', '-C', 'link-arg=-Wl,-rpath,$ORIGIN/../lib']
+        for lib_dir in sdk_lib_dirs:
+            rustflags += ['-C', f'link-arg=-L{lib_dir}']
+        rustflags_str = ', '.join(f'"{flag}"' for flag in rustflags)
         cargo_config = (
             f'[target.{target_triple}]\n'
             f'linker = "{cc}"\n'
-            'rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "link-arg=-Wl,-rpath,$ORIGIN/../lib"]\n\n'
+            f'rustflags = [{rustflags_str}]\n\n'
             '[env]\n'
             f'CC = "{cc}"\n'
             f'CXX = "{cxx}"\n\n'
