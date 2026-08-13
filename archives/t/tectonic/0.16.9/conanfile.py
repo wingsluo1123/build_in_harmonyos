@@ -199,6 +199,9 @@ class TectonicConan(ConanFile):
         cxx = shutil.which("clang++") or "clang++"
         # R33: Construct Rust target triple from Conan settings (not hardcoded)
         _arch = str(self.settings.arch)
+        # Conan uses "armv8" but Rust uses "aarch64" for the same architecture
+        if _arch == "armv8":
+            _arch = "aarch64"
         _os = str(self.settings.os).lower()
         if _os == "ohos":
             target_triple = f"{_arch}-unknown-linux-ohos"
