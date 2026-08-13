@@ -23,20 +23,32 @@ if ($@) {
     $fail += 2;
 }
 
-# Test 3: Starlet::Server loads (requires Plack, Parallel::Prefork etc.)
+# Test 3: Starlet::Server loads (core server module)
+# Starlet::Server is part of the Starlet package but requires Plack, Parallel::Prefork etc.
+# Missing runtime dependency → SKIP; any other error → FAIL (real regression).
 eval { require Starlet::Server };
 if ($@) {
-    print "SKIP: Starlet::Server not loadable (runtime dependencies not installed)\n";
-    $skip++;
+    if ($@ =~ /Can't locate [\w:]+\.pm in \@INC/) {
+        print "SKIP: Starlet::Server not loadable (runtime dependencies not installed)\n";
+        $skip++;
+    } else {
+        print "FAIL: Starlet::Server load error: $@\n";
+        $fail++;
+    }
 } else {
     $pass++;
 }
 
-# Test 4: Plack::Handler::Starlet loads (requires Parallel::Prefork etc.)
+# Test 4: Plack::Handler::Starlet loads (core handler module)
 eval { require Plack::Handler::Starlet };
 if ($@) {
-    print "SKIP: Plack::Handler::Starlet not loadable (runtime dependencies not installed)\n";
-    $skip++;
+    if ($@ =~ /Can't locate [\w:]+\.pm in \@INC/) {
+        print "SKIP: Plack::Handler::Starlet not loadable (runtime dependencies not installed)\n";
+        $skip++;
+    } else {
+        print "FAIL: Plack::Handler::Starlet load error: $@\n";
+        $fail++;
+    }
 } else {
     $pass++;
 }

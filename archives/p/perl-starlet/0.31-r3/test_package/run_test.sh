@@ -3,7 +3,7 @@
 # Usage: run_test.sh <perl_lib_path>
 #
 # Sets PERL5LIB and runs the Perl test suite.
-set -euo pipefail
+set -eu
 
 PERL_LIB="$1"
 

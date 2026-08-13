@@ -9,7 +9,7 @@ from conan import ConanFile
 
 
 class PerlStarletTestConan(ConanFile):
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def requirements(self):
         self.requires(self.tested_reference_str)

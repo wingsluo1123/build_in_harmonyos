@@ -18,7 +18,7 @@ class PerlStarletConan(ConanFile):
     homepage = "https://metacpan.org/dist/Starlet"
     url = ""  # CI fills this
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
