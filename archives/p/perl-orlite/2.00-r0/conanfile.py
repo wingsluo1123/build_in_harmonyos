@@ -19,7 +19,8 @@ class PerlorliteConan(ConanFile):
     url = ""  # CI fills this
 
     # R32: settings.os must include OHOS
-    settings = "os", "arch"
+    # L0p: OHOS profile requires all four settings
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)

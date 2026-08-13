@@ -11,7 +11,7 @@ from conan import ConanFile
 
 
 class PerlorliteTestConan(ConanFile):
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
     generators = "VirtualRunEnv"
 
     def requirements(self):
