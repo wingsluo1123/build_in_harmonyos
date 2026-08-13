@@ -1,0 +1,95 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E215.kv，填写各字段
+# 对应的人类文档: doc/E215.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+#====================================================================
+# E215 — 配置工具 --cflags 指向已删除 staging 目录（死路径），头文件发现失败
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E215
+trigger_tool:           configure|clang|conan
+phase:                  configuration
+error_signature:        file not found|fatal error:.*\.h|ncursesw6-config|--cflags|no such file or directory
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               tool-compat|config-tool|staging
+match_keywords:         ncursesw6-config, --cflags, --includedir, 死路径, staging, test-install, file not found, header not found, config tool, 配置工具, include path
+title:                  配置工具(--cflags)指向已删除 staging 目录，导致头文件发现失败
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: 编译配置文件工具（如 ncursesw6-config）生成于构建时，其 --cflags/--includedir/--prefix
+            指向当时的 staging 前缀（如 $HOME/tmp/test-install-<name>-<ver>）。staging 目录随后被清理，
+            但 config 工具保留死路径；--libs 可能仍指向有效安装目录（如 $HOME/usr/local/lib）。
+            配方盲信 --cflags 输出时，configure 头文件检查报 fatal error: '.../xxx.h' file not found。
+            现象特征：配置工具存在（which 命中）≠ 其返回路径可用，必须验证返回路径实际存在。
+affected_scope: 所有通过 *-config 工具（ncursesw6-config/pkg-config 等）获取 include/lib 路径的
+                Autotools 配方；staging 与最终安装前缀分离的 OHOS 本地构建
+verification_cmd: ncursesw6-config --cflags; ls -d $(ncursesw6-config --cflags | sed 's/.*-I//') 2>/dev/null; echo $?
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           validate-config-tool-paths
+rec_description:        使用配置工具输出前，逐项校验其 -I/-L 路径存在性：过滤不存在的 -I 目录（保留
+                        -D 宏），若过滤后无有效 -I，则从有效 --libs 的 -L libdir 推导同级 ../include
+                        并验证其中头文件真实存在后再使用。禁止盲信配置工具原始输出。
+rec_command:            for tok in $(ncursesw6-config --cflags); do case "$tok" in -I*) [ -d "${tok#-I}" ] && keep="$keep $tok";; *) keep="$keep $tok";; esac; done
+rec_auto_fix:           false
+rec_impl:               manual-hint
+
+fallback_priority:      2
+fallback_approach:       derive-include-from-libdir
+fallback_description:   --cflags 全失效时，从有效 --libs 的 -L<libdir> 推导 <libdir>/../include，
+                        校验 ncursesw/ncurses.h（或对应头）存在后作为 -I 使用；头与库来自同一安装树
+fallback_command:       libdir=$(ncursesw6-config --libs | sed -n 's/.*-L\([^ ]*\).*/\1/p'); test -f "$libdir/../include/ncursesw/ncurses.h" && echo "-I$libdir/../include"
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       硬编码已删除的临时目录路径|-I.*tmp/test-install
+forbid_1_reason:        临时 staging 路径不可复现，CI/其他机器不存在
+forbid_1_consequence:   构建在其他环境必然失败，且无法通过知识库修复
+forbid_2_pattern:       复制系统头文件|伪造 header|ln -s 绕过头文件检查
+forbid_2_reason:        违反配方自包含与可复现原则
+forbid_2_consequence:   产物依赖本机非标准路径，CI 校验失败
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P014
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E075,E158
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E215.md
+last_updated: 2026-08-13
+source_event:           gnu-typist 2.10.1 PR #2965 conan create configure 阶段
+                        fatal error: 'ncursesw/ncurses.h' file not found
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                junshi_liu <liujsh2023@lzu.edu.cn>
+source_pr:              2965
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-08-13

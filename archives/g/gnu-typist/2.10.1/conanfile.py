@@ -61,6 +61,28 @@ class GnutypistConan(ConanFile):
                 _ncurses_libs = _sp.check_output(
                     [_ncursesw6, "--libs"], text=True
                 ).strip()
+                # A stale ncursesw6-config may emit an -I path pointing at a
+                # deleted staging prefix while --libs stays valid.  Keep only
+                # include paths that actually exist (and the -D defines).
+                _ncurses_keep = []
+                for _tok in _ncurses_cflags.split():
+                    if _tok.startswith("-I") and not os.path.isdir(_tok[2:]):
+                        continue
+                    _ncurses_keep.append(_tok)
+                # If no include path survived, derive one from --libs' -L libdir
+                # (same ncurses install tree: libdir/../include).
+                if not any(_t.startswith("-I") for _t in _ncurses_keep):
+                    for _tok in _ncurses_libs.split():
+                        if _tok.startswith("-L"):
+                            _inc_guess = os.path.normpath(
+                                os.path.join(_tok[2:], "..", "include")
+                            )
+                            if os.path.isfile(
+                                os.path.join(_inc_guess, "ncursesw", "ncurses.h")
+                            ):
+                                _ncurses_keep.append("-I" + _inc_guess)
+                            break
+                _ncurses_cflags = " ".join(_ncurses_keep)
                 # CPPFLAGS for configure header checks (AC_CHECK_HEADERS uses CPPFLAGS)
                 tc.configure_args.append("CPPFLAGS=" + _ncurses_cflags)
                 # CFLAGS for compilation
