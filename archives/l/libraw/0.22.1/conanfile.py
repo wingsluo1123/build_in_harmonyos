@@ -101,7 +101,7 @@ class LibrawConan(ConanFile):
         cmake = CMake(self)
         cmake.configure()
         # R9: -j1 — parallel make hits HMDFS jobserver fifo EPERM (E074).
-        cmake.build(cli_args=["--", "-j2"])
+        cmake.build(cli_args=["--parallel", "1"])
 
     def package(self):
         cmake = CMake(self)

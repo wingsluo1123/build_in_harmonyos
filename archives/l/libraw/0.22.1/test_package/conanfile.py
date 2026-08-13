@@ -26,7 +26,7 @@ class LibrawTestConan(ConanFile):
     def build(self):
         cmake = CMake(self)
         cmake.configure()
-        cmake.build()
+        cmake.build(cli_args=["--parallel", "1"])
 
     def test(self):
         # Run the test executable directly via self.run() so the L0d gate
