@@ -151,11 +151,6 @@
   /storage/Users/currentUser/boostpy-run-mrorcq25/test_ext.so；3 断言全部通过；
   包内 libboost_python312.so：aarch64 ELF、NEEDED 仅 libpython3.12/libc++_shared/libc、
   .codesign 存在、display-sign self-sign。
----
-
-**编译结束**: 2026-08-13 09:21
-**最终状态**: built
-
 ## 原生（非 HMDFS）运行暂存目录选择（PR #5100 修复，2026-08-13）
 
 - 偏离根因：CI 进程中 conan 运行环境会把 TMPDIR 覆盖为 $HOME/tmp（HMDFS，决定性证据：
@@ -176,3 +171,24 @@
 - 边界：包内 libboost_python312.so 在 test_package 中只验证（ELF magic/.codesign/
   display-sign/SHA256），绝不重签；test_ext.so 由 test_package 签名；主 conanfile.py
   的构建与签名逻辑未改动。
+---
+
+**编译结束**: 2026-08-13 11:03
+**最终状态**: built
+
+## Python 解释器安全域（E212）与用户域解释器选择（PR #5100 修复，2026-08-13）
+
+- E212 实证：HNP Python（/data/service/hnp/bin/python3.12）运行于 hnp_file 安全域，
+  不能加载 /data/storage/el2/base 下 hishell_hap_data_file 标签的用户生成 .so——
+  CI 中 ctypes.CDLL(libboost_python312.so) 报 Permission denied（与 Unix 权限、
+  TMPDIR、.codesign 均无关；普通 chmod/TMPDIR 方案不能修复 HMMAC 标签拒绝）。
+- 对照实验（本机，同一组已签名 .so、相同 native run_dir /data/storage/el2/base/cache）：
+  - 用户域 Python（$HOME/usr/local/bin/python3，3.12.9，安全域 u:r:hishell_hap:s0）：
+    ctypes.CDLL + import test_ext + 3 项断言全部通过（exit=0）；
+  - HNP Python 本机不可用（仅 CI 环境），由 E212 知识条目与远端 CI 证据确认其限制。
+- 修复：test_package 选择用户域 Python 3.12（_pick_test_python）：
+  1. OHPC_TEST_PYTHON 环境变量显式覆盖；
+  2. $HOME/usr/local/bin/python3 默认；
+  校验存在/可执行/版本 3.12；禁止静默回退 /data/service/hnp/bin/python3.12。
+  CMake Python3_EXECUTABLE 与 consumer_test 执行使用同一解释器；consumer_test.py
+  输出 sys.executable 供 CI 审计；包内库仍只验证不重签。

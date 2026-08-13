@@ -12,6 +12,8 @@ import ctypes
 import os
 import sys
 
+print("sys.executable =", sys.executable)
+
 # test() 的 cwd 为 TMPDIR 运行目录，PYTHONPATH 首位亦为运行目录
 sys.path.insert(0, os.getcwd())
 run_dir = os.path.realpath(os.getcwd())

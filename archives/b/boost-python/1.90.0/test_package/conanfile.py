@@ -50,12 +50,68 @@ class BoostPythonTestConan(ConanFile):
             ):
                 old = tc.variables.get(flag, "")
                 tc.variables[flag] = (str(old) + " " + fuse).strip()
+            # CMake FindPython3 与 consumer_test 执行必须使用同一用户域
+            # Python 3.12（E212：HNP python 的 hnp_file 域无法 dlopen 用户 .so）
+            test_python = self._pick_test_python()
+            tc.variables["Python3_EXECUTABLE"] = test_python
         tc.generate()
 
     def build(self):
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
+
+    def _pick_test_python(self):
+        """选择用户域 Python 3.12 解释器（E212：HNP python 的 hnp_file 安全域
+        不能加载 hishell_hap_data_file 标签的用户生成 .so，CI 实测 Permission
+        denied）。选择顺序：
+          1. OHPC_TEST_PYTHON 环境变量显式覆盖；
+          2. $HOME/usr/local/bin/python3（用户域默认）；
+        校验：存在、可执行、版本为 Python 3.12。禁止静默回退到
+        /data/service/hnp/bin/python3.12（hnp_file 域，无法加载暂存 .so）。
+        """
+        import subprocess as _sp
+
+        candidates = []
+        override = os.environ.get("OHPC_TEST_PYTHON") or ""
+        if override:
+            candidates.append(("OHPC_TEST_PYTHON", os.path.realpath(override)))
+        candidates.append(
+            (
+                "user-local-python3",
+                os.path.join(os.path.expanduser("~"), "usr", "local", "bin", "python3"),
+            )
+        )
+        for label, cand in candidates:
+            if not cand or not os.path.isfile(cand) or not os.access(cand, os.X_OK):
+                self.output.warning(
+                    "test-python probe %s: missing/not executable: %r" % (label, cand)
+                )
+                continue
+            try:
+                res = _sp.run(
+                    [cand, "-c", "import sys; print(sys.version.split()[0])"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                ver = (res.stdout or "").strip()
+            except Exception as e:
+                self.output.warning(
+                    "test-python probe %s: version check failed: %s" % (label, str(e)[:60])
+                )
+                continue
+            if ver.startswith("3.12"):
+                self.output.info("test-python selected: %s (%s %s)" % (label, cand, ver))
+                return cand
+            self.output.warning(
+                "test-python probe %s: version %r is not Python 3.12" % (label, ver)
+            )
+        raise ConanInvalidConfiguration(
+            "no user-domain Python 3.12 found for consumer test; refusing to "
+            "fall back to /data/service/hnp/bin/python3.12 (hnp_file security "
+            "domain cannot dlopen user-generated .so — E212)"
+        )
 
     def test(self):
         if cross_building(self):
@@ -96,8 +152,11 @@ class BoostPythonTestConan(ConanFile):
                     + os.environ.get("LD_LIBRARY_PATH", "")
                 )
             script = os.path.join(self.source_folder, "consumer_test.py")
+            # 使用用户域 Python 3.12 显式执行 consumer_test（E212：HNP python
+            # 的 hnp_file 域无法 dlopen 用户生成 .so；不得回退 python3）
+            test_python = self._pick_test_python()
             self.run(
-                "python3 " + script,
+                '"{py}" "{script}"'.format(py=test_python, script=script),
                 cwd=run_dir or self.build_folder,
                 env="conanrun",
             )
