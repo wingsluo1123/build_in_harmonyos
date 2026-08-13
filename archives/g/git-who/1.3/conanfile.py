@@ -26,8 +26,9 @@ class GitWhoConan(ConanFile):
     package_type = "application"
 
     # CGO_ENABLED=0 的 Go 构建不用 C 编译器，Go 也无 build_type 概念，
-    # 仅保留影响交叉编译目标的 os/arch（同项目 git-flow 等无编译包同实践）
-    settings = "os", "arch"
+    # 但 L0p 门禁要求 OHOS profile 的 settings 包含全部四项（防 profile 不兼容）
+    # → 补全 compiler/build_type（CI #23797 失败：missing_setting_compiler missing_setting_build_type）
+    settings = "os", "compiler", "build_type", "arch"
     # 接入 Conan 2.x 交叉编译工具链机制（VirtualBuildEnv + env=conanbuild）
     # 避依赖 CI 环境 PATH 巧合性正确（同 klystrack/kakoune 配方项目惯例）
     generators = "VirtualBuildEnv"
