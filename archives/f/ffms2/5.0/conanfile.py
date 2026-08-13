@@ -20,7 +20,9 @@ from conan.tools.env import Environment
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches
 from conan.tools.gnu import Autotools, AutotoolsToolchain, AutotoolsDeps, PkgConfigDeps
 from conan.tools.layout import basic_layout
+import glob
 import os
+import shutil
 
 
 class Ffms2Conan(ConanFile):
@@ -29,7 +31,7 @@ class Ffms2Conan(ConanFile):
     description = "FFmpegSource wrapper library for frame-accurate media access"
     license = "MIT"
     homepage = "https://github.com/FFMS/ffms2"
-    url = ""  # CI fills this
+    url = "https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos"
 
     package_type = "library"
 
@@ -100,8 +102,11 @@ class Ffms2Conan(ConanFile):
         for dep in self.dependencies.values():
             for libdir in dep.cpp_info.libdirs:
                 env.prepend_path("LD_LIBRARY_PATH", libdir)
-        # Ensure aclocal finds pkg.m4 and other system macros
-        env.prepend_path("ACLOCAL_PATH", "/storage/Users/currentUser/usr/local/share/aclocal")
+        # Dynamically discover aclocal macro dirs (pkg.m4 etc.) under HNP
+        # — no hardcoded user paths (R33: self-discovery, not hardcoded).
+        for _d in sorted(glob.glob("/data/service/hnp/*/*/share/aclocal")):
+            if os.path.isdir(_d):
+                env.append_path("ACLOCAL_PATH", _d)
         # PkgConfigDeps generates .pc files with Version: 7.1.5 (the conan
         # package version) instead of the actual library version (e.g.
         # 61.7.103 for libavformat). ffms2's configure checks
@@ -130,15 +135,18 @@ class Ffms2Conan(ConanFile):
         # Create src/config dir (autoheader needs it, but it's not in the tarball)
         config_dir = os.path.join(self.source_folder, "src", "config")
         os.makedirs(config_dir, exist_ok=True)
-        # Copy pkg.m4 into m4/ if missing (needed by PKG_PROG_PKG_CONFIG macro)
+        # Copy pkg.m4 into m4/ if missing (needed by PKG_PROG_PKG_CONFIG macro).
+        # Dynamically locate it via ACLOCAL_PATH or HNP glob (R33: no hardcoded paths).
         m4_dir = os.path.join(self.source_folder, "m4")
         pkg_m4 = os.path.join(m4_dir, "pkg.m4")
         if not os.path.isfile(pkg_m4):
-            import shutil
-            system_pkg_m4 = "/storage/Users/currentUser/usr/local/share/aclocal/pkg.m4"
-            if os.path.isfile(system_pkg_m4):
-                shutil.copy2(system_pkg_m4, pkg_m4)
-                self.output.info("Copied pkg.m4 into m4/ directory")
+            for _d in [d for p in os.environ.get("ACLOCAL_PATH", "").split(":") if p for d in [p]] + \
+                       sorted(glob.glob("/data/service/hnp/*/*/share/aclocal")):
+                candidate = os.path.join(_d, "pkg.m4")
+                if os.path.isfile(candidate):
+                    shutil.copy2(candidate, pkg_m4)
+                    self.output.info(f"Copied pkg.m4 from {_d} into m4/ directory")
+                    break
         autotools = Autotools(self)
         # autoreconf is needed: source tarball ships configure.ac but no configure
         autotools.autoreconf()
