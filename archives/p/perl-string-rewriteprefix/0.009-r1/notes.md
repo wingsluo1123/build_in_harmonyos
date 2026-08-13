@@ -2,7 +2,7 @@
 
 ## 编译环境
 - 构建系统: Perl ExtUtils::MakeMaker (Makefile.PL)
-- 编译日期: 2026-07-03
+- 编译日期: 2026-07-06
 - 编译器: clang/clang++
 - 状态: built
 

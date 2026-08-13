@@ -72,27 +72,47 @@ class PerlStringRewriteprefixTestConan(ConanFile):
             pass  # Need to install
 
         dep_dir = tempfile.mkdtemp(prefix="perl_deps_")
+        extract_dir = os.path.join(dep_dir, "_extract")
+        os.makedirs(extract_dir, exist_ok=True)
 
-        # Download and install all 4 pure-Perl modules in one shell command.
+        # Download and install all 4 pure-Perl modules using Python urllib.
         # Dependency chain: Sub::Exporter → Data::OptList, Params::Util
         #                   Data::OptList → Sub::Install
-        install_cmd = (
-            'set -e; '
-            'mkdir -p "{dir}/_extract"; '
-            'cd "{dir}/_extract"; '
-            'for mod_url in '
-            '"https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Install-0.928.tar.gz" '
-            '"https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Data-OptList-0.110.tar.gz" '
-            '"https://cpan.metacpan.org/authors/id/R/RE/REHSACK/Params-Util-1.102.tar.gz" '
-            '"https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Exporter-0.988.tar.gz"; do '
-            'curl -sL "$mod_url" -o tmp.tar.gz; '
-            'tar xzf tmp.tar.gz; '
-            'rm -f tmp.tar.gz; '
-            'done; '
-            'cp -r */lib/* "{dir}/"; '
-            'cd "{dir}"; '
-            'rm -rf _extract'
-        ).format(dir=dep_dir)
+        dep_urls = [
+            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Install-0.928.tar.gz",
+            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Data-OptList-0.110.tar.gz",
+            "https://cpan.metacpan.org/authors/id/R/RE/REHSACK/Params-Util-1.102.tar.gz",
+            "https://cpan.metacpan.org/authors/id/R/RJ/RJBS/Sub-Exporter-0.988.tar.gz",
+        ]
 
-        self.run(install_cmd)
+        try:
+            import urllib.request
+            import tarfile
+            import io
+            import shutil
+
+            for url in dep_urls:
+                with urllib.request.urlopen(url, timeout=60) as resp:
+                    with tarfile.open(fileobj=io.BytesIO(resp.read()), mode="r:gz") as tar:
+                        tar.extractall(path=extract_dir)
+
+            # Copy */lib/* contents to dep_dir (preserving subdirectory structure)
+            for entry in os.listdir(extract_dir):
+                lib_path = os.path.join(extract_dir, entry, "lib")
+                if os.path.isdir(lib_path):
+                    for item in os.listdir(lib_path):
+                        src = os.path.join(lib_path, item)
+                        dst = os.path.join(dep_dir, item)
+                        if os.path.exists(dst):
+                            if os.path.isdir(dst):
+                                shutil.rmtree(dst)
+                            else:
+                                os.remove(dst)
+                        shutil.move(src, dst)
+
+            shutil.rmtree(extract_dir, ignore_errors=True)
+        except Exception as e:
+            self.output.warn(f"Could not download Perl deps: {e}")
+            return None  # Fall back, test may still pass if deps are in system Perl
+
         return dep_dir
