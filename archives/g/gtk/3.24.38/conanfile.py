@@ -73,7 +73,7 @@ class GtkConan(ConanFile):
         # GTK3 依赖链全部通过 conan 解析（R36：均已在 ohpcd 发布）。
         # broadway 后端不需要 x11/wayland/xkbcommon/pangoft2/harfbuzz。
         self.requires("glib/2.84.0.1", transitive_headers=True, transitive_libs=True)
-        self.requires("atk/2.38.0", transitive_headers=True, transitive_libs=True)
+        self.requires("atk/2.38.0.1", transitive_headers=True, transitive_libs=True)
         self.requires("cairo/1.18.4", transitive_headers=True, transitive_libs=True)
         self.requires("gdk-pixbuf/2.44.6", transitive_headers=True, transitive_libs=True)
         self.requires("pango/1.50.14.1", transitive_headers=True, transitive_libs=True)
