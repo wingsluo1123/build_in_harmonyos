@@ -34,10 +34,8 @@
 
 ## 源码修改
 
-18 个补丁文件（patches/0001-0018）由 finish 的 refresh-patch --auto 自动生成，
-修改 autotools 生成文件（Makefile.in, ltmain.sh, aclocal.m4, libtool.m4,
-config.guess, config.sub 等）以支持 OHOS 平台。build() 通过 autogen
-重新生成这些文件，补丁作为变更记录保留。
+无补丁。build() 通过 autogen（aclocal/libtoolize/autoconf/automake）重新生成
+所有 autotools 文件，自动适配 OHOS 平台。
 
 ## 依赖版本
 

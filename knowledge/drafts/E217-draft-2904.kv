@@ -1,0 +1,16 @@
+error_signature: bad interpreter: Permission denied|Can't exec "aclocal": Permission denied|posix_spawn.*Permission denied|mpicc.*bad interpreter
+match_keywords: HMDFS,shebang,execve,permission denied,bad interpreter,aclocal,automake,libtoolize,mpicc,storage,perl script
+error_excerpt: /data/service/hnp/bin/bash: /storage/.../aclocal: /data/.../perl: bad interpreter: Permission denied
+root_cause: HarmonyOS HMDFS kernel cannot execve() scripts with shebang lines from /storage/ filesystem. Perl-based autotools tools (aclocal, automake) and shell scripts (libtoolize, mpicc) located in /storage/ cannot be executed directly by the kernel, even with correct shebang pointing to /data/service/hnp/ binaries. Python's posix_spawn() and Perl's exec() also fail for scripts in /storage/. Symlinks from /storage/ to /data/ cannot be resolved by the kernel for execution purposes.
+rec_description: Invoke perl-based tools explicitly through perl binary, shell scripts through bash. Set AUTOM4TE/AUTOCONF/PERL5LIB env vars to /data/service/hnp/ paths. For mpicc, use CC=clang directly with -I/-L flags from mpich dependency.
+rec_command: perl /path/to/aclocal --force -I m4; bash /path/to/libtoolize --copy --force
+affected_scope: All autotools projects using perl-based tools (aclocal, automake) on HarmonyOS where tools are installed in /storage/
+verification_cmd: python3 -c "import subprocess; r=subprocess.run(['/data/service/hnp/bin/bash','-c','/data/service/hnp/bin/perl /storage/.../aclocal --version'],capture_output=True); print(r.stdout.split(chr(10))[0])"
+rec_priority: blocking
+category: platform
+severity: 3
+trigger_tool: configure, autoreconf, make
+phase: configuration
+last_updated: 2026-08-13
+draft: true
+contributor_id: 2904
