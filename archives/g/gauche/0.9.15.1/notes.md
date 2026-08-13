@@ -20,7 +20,7 @@ aarch64-unknown-linux-ohos
 ### 2. config.status 临时目录创建失败
 - **症状**: `can't create ./confXXXXXX/subs1.awk: Permission denied`
 - **根因**: HMDFS 文件系统对临时目录创建有特殊限制，umask 077 导致权限问题
-- **解决方案**: 修改 configure 中 umask 077→002（补丁 0042/0043）
+- **解决方案**: 修改 `configure.ac` 源码输入中的 Autoconf 临时目录宏为 umask 002，并重新生成 configure（补丁 0046/0047）。
 
 ### 3. pthread_cancel 和 pthread_setcancelstate 缺失
 - **症状**: `undefined reference to pthread_cancel, pthread_setcancelstate`
@@ -40,10 +40,10 @@ Gauche 的内嵌 Boehm GC 需要生成 `libgc_pic.a`（PIC 归档）供 libgauch
 因此 `generate()` 中不加 `--disable-shared`，保持默认动态构建。
 
 ### ext/doc/static 跳过
-- **ext 跳过**: ext 目录扩展模块依赖动态链接，OHOS 上编译失败；recipe 在构建阶段调整生成的 Makefile.in，跳过 ext。
-- **doc 跳过**: doc 目录需要构建 gosh 后生成 man page；recipe 在构建阶段跳过文档安装。
-- **static 跳过**: 静态库构建依赖 ext（需要 gauche.uvector 等）；recipe 在构建阶段从安装列表移除静态库。
-- **pre-package check 跳过**: recipe 在构建阶段跳过 make install 前的版本检查（BUILD_GOSH 在干净构建中不可用）。
+- **ext 跳过**: ext 目录扩展模块在 OHOS 上无法正确加载 Gauche `Scm_*` 符号；recipe 只调用上游 gc/src/lib 核心子目录目标。
+- **doc 跳过**: 文档依赖完整扩展树；核心发布不构建或安装文档。
+- **static 跳过**: 静态库构建依赖 ext（需要 gauche.uvector 等）；核心发布仅打包共享 `libgauche`。
+- **安装方式**: 上游 install 目标会在 HMDFS 构建路径运行新生成的 gosh；recipe 使用 Conan 文件 API 复制已完成的核心产物，避免该路径的动态加载限制。
 
 ### copy-port 替换（补丁 0045）
 ext 目录跳过后，`util.scm` 的 `do-copy` 依赖 `gauche.uvector`（来自跳过的 ext）。
@@ -89,17 +89,22 @@ Conan 2.29 的 test_package 阶段，`requires` 默认 `headers=False, libs=Fals
 - 0042-0043: src/gauche-config_threads.h, gauche-priv-configP.h（configure 生成）
 
 **保留的源文件补丁（27 个）**：
-- 核心源文件修改（config.guess, config.sub, gc_priv.h 等）
-- Makefile.in（跳过 ext 目录）
+- 核心源文件修改（config.guess, config.sub, configure.ac, gc/configure.ac, gc_priv.h 等）
 - C 源文件（.c, .h）
 - Scheme 源文件（.scm）
-- 脚本文件（gauche-cesconv, gauche-install, gauche-package, genconfig, makeverslink）
+- 脚本源文件（gc/configure.gnu-gauche）
 
 ---
 
-**Conan 配方验证完成**: 2026-08-09
-**最终状态**: built (全门禁通过 G0-G4+L2/L4/L5)
+**Conan 配方验证完成**: 2026-08-13
+**最终状态**: built
+
+- `finish` 的 W3 本地 CI 验证于 2026-08-13 11:31 成功，自动生成
+  `.ci-result.json`（exit code 0）。
+- GNU Make 在 HMDFS 上需使用 `--jobserver-style=pipe`，以避免默认 FIFO
+  jobserver 创建被拒绝后退化为串行构建。
+- `package_info()` 为已打包的 Scheme 标准库提供 `GAUCHE_LOAD_PATH`。
 ---
 
-**编译结束**: 2026-08-11 14:25
-**最终状态**: published
+**编译结束**: 2026-08-13 11:31
+**最终状态**: built

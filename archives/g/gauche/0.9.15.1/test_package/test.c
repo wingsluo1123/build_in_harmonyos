@@ -12,6 +12,12 @@ int main(void) {
     /* Evaluate a simple Scheme expression: (+ 1 2 3) */
     ScmObj result = Scm_EvalCStringRec("(+ 1 2 3)", SCM_FALSE);
 
+    if (!SCM_INTP(result) || SCM_INT_VALUE(result) != 6) {
+        fprintf(stderr, "unexpected result from Gauche: %ld\n",
+                SCM_INTP(result) ? (long)SCM_INT_VALUE(result) : -1L);
+        return 1;
+    }
+
     /* Print the result using Gauche's writer */
     Scm_Printf(SCM_PORT(Scm_Stdout()), "test gauche 0.9.15: (+ 1 2 3) = %S\n", result);
 

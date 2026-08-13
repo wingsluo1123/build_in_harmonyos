@@ -9,6 +9,7 @@ File location: archives/g/gauche/0.9.15.1/test_package/conanfile.py
 import os
 
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.cmake import CMake, cmake_layout
 
 
@@ -38,8 +39,12 @@ class GaucheTestConan(ConanFile):
         cmake = CMake(self)
         cmake.test()
 
-        # Also run gosh directly to verify the interpreter works
-        bin_dir = os.path.join(self.cpp.build.bindirs[0])
-        gosh_path = os.path.join(bin_dir, "gosh")
-        if os.path.isfile(gosh_path):
-            self.run(f'"{gosh_path}" -e "(display (+ 1 2 3))(newline)"', env="conanrun")
+        # Also run gosh directly to verify the packaged interpreter works.
+        package = self.dependencies[self.tested_reference_str.split("/")[0]]
+        gosh_path = os.path.join(package.package_folder, "bin", "gosh")
+        if not os.path.isfile(gosh_path):
+            raise ConanException(f"Packaged gosh not found: {gosh_path}")
+        self.run(
+            f'GAUCHE_NO_READ_EDIT=1 "{gosh_path}" -e "(display (+ 1 2 3))(newline)"',
+            env="conanrun",
+        )
