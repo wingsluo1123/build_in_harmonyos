@@ -139,9 +139,12 @@ class FizmoConan(ConanFile):
         # 路径 b/fizmo-ncursesw 不存在【No files in this package】——
         # 递归从 build_folder 找二进制复制到 bin/）
         from conan.tools.files import copy
-        copy(self, "fizmo-ncursesw", self.build_folder,
+        # CI #22561 实测：pattern "fizmo-ncursesw" 匹配的是顶层目录
+        # （b/fizmo-ncursesw/）——二进制在 src/ 子目录不递归【No files】——
+        # 用通配符 "**/fizmo-ncursesw" 递归匹配二进制
+        copy(self, "**/fizmo-ncursesw", self.build_folder,
              os.path.join(self.package_folder, "bin"), keep_path=False)
-        copy(self, "fizmo-console", self.build_folder,
+        copy(self, "**/fizmo-console", self.build_folder,
              os.path.join(self.package_folder, "bin"), keep_path=False)
 
     def package_info(self):
