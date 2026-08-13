@@ -21,7 +21,7 @@ class PerlServerStarterConan(ConanFile):
     homepage = "https://github.com/kazuho/p5-Server-Starter"
     url = ""  # CI fills this
 
-    settings = "os", "arch"
+    settings = "os", "compiler", "build_type", "arch"
 
     def export_sources(self):
         export_conandata_patches(self)
@@ -131,9 +131,14 @@ class PerlServerStarterConan(ConanFile):
     def package_info(self):
         # Pure Perl module: no C libraries (R27)
         self.cpp_info.libdirs = ["lib/perl5"]
+        self.cpp_info.bindirs = ["bin"]
         self.cpp_info.libs = []
         self.cpp_info.includedirs = []
         # Set PERL5LIB to the package's site_perl path (R28, R29)
         self.runenv_info.append_path("PERL5LIB",
                                      os.path.join(self.package_folder,
                                                   "lib", "perl5"))
+        # Add bin/ to PATH so start_server is callable from test_package
+        # prepend to ensure package's start_server takes precedence over any system-installed one
+        self.runenv_info.prepend_path("PATH",
+                                      os.path.join(self.package_folder, "bin"))
