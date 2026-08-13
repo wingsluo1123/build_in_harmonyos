@@ -3,7 +3,9 @@
 
 Consumer-level test (R34): verifies the installed owamp CLI tools are
 present in the package and that the shipped binaries actually run on the
-target platform (owping -h prints usage; owtvec runs its self-check).
+target platform.  The test source is test_owamp.sh (L0c): it checks the
+7 installed tools and runs the upstream test entry owtvec (exit 0 =
+OWAMP spec Appendix B exponential-deviate self-check).
 """
 import os
 
@@ -18,13 +20,6 @@ class TestPackageConan(ConanFile):
 
     def test(self):
         dep = self.dependencies["owamp"]
-        bindir = os.path.join(dep.package_folder, "bin")
-        for tool in ("owping", "owampd", "powstream", "owtvec"):
-            path = os.path.join(bindir, tool)
-            if not os.path.exists(path):
-                self.output.error("missing installed tool: " + path)
-                raise SystemExit(1)
-        # owtvec is the upstream test entry — run it; non-zero exit fails the
-        # test (Appendix B exponential-deviate self-check)
-        owtvec = os.path.join(bindir, "owtvec")
-        self.run(owtvec, env="conanrun")
+        # run the test source script against the package prefix
+        script = os.path.join(self.source_folder, "test_owamp.sh")
+        self.run(f"{script} {dep.package_folder}", env="conanrun")
