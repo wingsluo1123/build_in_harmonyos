@@ -118,19 +118,38 @@ class LttoolboxConan(ConanFile):
         # The release tarball has no pre-generated configure — generate it.
         # We must set ACLOCAL_PATH so autoreconf finds pkg.m4 (PKG_CHECK_MODULES)
         # and the source m4/ dir has ax_pthread.m4 / ax_check_compile_flag.m4.
+        # The upstream release tarball ships NO pre-generated configure script
+        # (only configure.ac + Makefile.am). autoreconf -fi would generate it,
+        # but the CI Worker has no aclocal (automake not installed, only
+        # autoconf 2.72 at /data/service/hnp/autoconf.org/autoconf_2.72/).
+        # Pre-generate the autotools files locally and ship them under
+        # patches/autotools/, then copy them into the source folder here —
+        # same approach addrwatch uses (patches/0002-aclocal.m4 + 0003-configure).
         if not os.path.isfile(os.path.join(self.source_folder, "configure")):
-            for candidate in [
-                "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
-                "/usr/share/aclocal",
-                "/usr/local/share/aclocal",
-            ]:
-                if os.path.isfile(os.path.join(candidate, "pkg.m4")):
-                    existing = os.environ.get("ACLOCAL_PATH", "")
-                    os.environ["ACLOCAL_PATH"] = (
-                        candidate + (":" + existing if existing else "")
-                    )
-                    break
-            self.run("autoreconf -fi", cwd=self.source_folder)
+            autotools_src = os.path.join(self.recipe_folder, "patches", "autotools")
+            if os.path.isdir(autotools_src):
+                import shutil
+                for root, _, files in os.walk(autotools_src):
+                    rel = os.path.relpath(root, autotools_src)
+                    dest = os.path.join(self.source_folder, rel) if rel != "." else self.source_folder
+                    os.makedirs(dest, exist_ok=True)
+                    for f in files:
+                        shutil.copy2(os.path.join(root, f), os.path.join(dest, f))
+                self.output.info("Copied pre-generated autotools files from patches/autotools/")
+            else:
+                # Fallback for local builds with automake installed: run autoreconf.
+                for candidate in [
+                    "/data/service/hnp/pkg-config.org/pkg-config_0.29.2/share/aclocal",
+                    "/usr/share/aclocal",
+                    "/usr/local/share/aclocal",
+                ]:
+                    if os.path.isfile(os.path.join(candidate, "pkg.m4")):
+                        existing = os.environ.get("ACLOCAL_PATH", "")
+                        os.environ["ACLOCAL_PATH"] = (
+                            candidate + (":" + existing if existing else "")
+                        )
+                        break
+                self.run("autoreconf -fi", cwd=self.source_folder)
 
         # E011: autotools-generated configure/Makefile.in use umask 077 for
         # temporary directories, which causes Permission denied on HMDFS.
