@@ -73,7 +73,15 @@ class KDocToolsConan(ConanFile):
         if os.path.isdir(os.path.join(qtbase_cmake, "Qt6")):
             qtbase_cmake = os.path.join(qtbase_cmake, "Qt6")
         tc.cache_variables["Qt6_DIR"] = qtbase_cmake
-        tc.cache_variables["Qt6Core_DIR"] = qtbase_cmake
+        # Qt6CoreConfig.cmake 在独立的 Qt6Core 子目录（CI #24015 报
+        # Qt6Core 找不到——Qt6Core_DIR 指向 lib/cmake/Qt6 错误）——
+        # Qt6Core_DIR 单独检测 Qt6Core 子目录（兼容标准/扁平布局）
+        qtbase_core = os.path.join(
+            self.dependencies["qtbase"].package_folder, "lib", "cmake"
+        )
+        if os.path.isdir(os.path.join(qtbase_core, "Qt6Core")):
+            qtbase_core = os.path.join(qtbase_core, "Qt6Core")
+        tc.cache_variables["Qt6Core_DIR"] = qtbase_core
         # ECM 打包产物缺 ecm_uninstall.cmake.in，ECMUninstallTarget 的
         # configure_file 会失败；用 KDE 官方 KDE_SKIP_UNINSTALL_TARGET
         # 跳过 uninstall target 生成
