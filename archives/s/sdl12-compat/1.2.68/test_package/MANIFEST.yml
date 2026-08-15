@@ -1,0 +1,33 @@
+package: sdl12-compat/1.2.68
+homepage: "https://github.com/libsdl-org/sdl12-compat"
+
+upstream_check_command: "SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy <build>/testver && <build>/testplatform && <build>/testerror && <build>/testiconv"
+upstream_test_in_build: true
+upstream_test_command: "Run the four non-interactive upstream test executables after the CMake build"
+upstream_case_count: 4
+upstream_test_note: "The release has no CTest registration. Most other programs under test/ are interactive, require media files or physical video/audio/input devices, so the recipe executes all deterministic non-interactive smoke tests suitable for unattended HarmonyOS CI."
+
+upstream_tests:
+  - file: test/testver.c
+    source: sdl12-compat-release-1.2.68/test/testver.c
+    description: "Report compile-time and linked SDL 1.2 compatibility versions"
+    command: "./testver"
+  - file: test/testplatform.c
+    source: sdl12-compat-release-1.2.68/test/testplatform.c
+    description: "Validate platform and byte-order compatibility APIs"
+    command: "./testplatform"
+  - file: test/testerror.c
+    source: sdl12-compat-release-1.2.68/test/testerror.c
+    description: "Exercise SDL error set/get/clear behavior"
+    command: "./testerror"
+  - file: test/testiconv.c
+    source: sdl12-compat-release-1.2.68/test/testiconv.c
+    description: "Exercise SDL iconv conversion paths"
+    command: "./testiconv"
+
+test_package_tests:
+  - file: test_sdl12_compat.c
+    description: "Link the packaged SDL 1.2 API, match the bundled SDL2 runtime through its Conan-cache relative path in /proc/self/maps, and test versioning, dummy video surface drawing, event round trip and timer behavior"
+    command: "./test_sdl12_compat"
+
+assertion_count: 12
