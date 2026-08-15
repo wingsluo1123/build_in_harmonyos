@@ -7,7 +7,7 @@
 static int package_sdl2_is_loaded(void)
 {
     const char *expected = getenv("EXPECTED_SDL2_PATH");
-    const char *cache_relative;
+    const char *package_relative;
     struct stat expected_stat;
     FILE *maps;
     char line[2048];
@@ -15,8 +15,8 @@ static int package_sdl2_is_loaded(void)
     if (expected == NULL || expected[0] != '/' || stat(expected, &expected_stat) != 0) {
         return 0;
     }
-    cache_relative = strstr(expected, "/.conan2/");
-    if (cache_relative == NULL) {
+    package_relative = strstr(expected, "/p/b/");
+    if (package_relative == NULL) {
         return 0;
     }
     maps = fopen("/proc/self/maps", "r");
@@ -28,11 +28,11 @@ static int package_sdl2_is_loaded(void)
 
         if (sscanf(line, "%*s %*s %*s %*s %*s %2047s", mapped_path) == 1) {
             size_t mapped_length = strlen(mapped_path);
-            size_t expected_length = strlen(cache_relative);
+            size_t expected_length = strlen(package_relative);
 
             if (mapped_length >= expected_length &&
                     strcmp(mapped_path + mapped_length - expected_length,
-                           cache_relative) == 0) {
+                           package_relative) == 0) {
                 fclose(maps);
                 return 1;
             }

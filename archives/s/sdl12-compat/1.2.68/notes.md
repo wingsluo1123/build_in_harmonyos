@@ -22,7 +22,7 @@ sdl12-compat 将 SDL 1.2 ABI/API 转换到 SDL2。上游构建只需要 SDL2 头
 
 1. 构建全部上游测试程序；
 2. 自动执行 `testver`、`testplatform`、`testerror`、`testiconv` 四个确定性非交互测试；
-3. 通过独立 Conan 消费者测试真实链接 `SDL::SDL`，将 Conan 解析出的包内 SDL2 路径传入测试，并以 `.conan2` 缓存相对路径后缀对照 `/proc/self/maps`，兼容 HarmonyOS HMDFS 对绝对路径的别名映射；随后在 dummy video/audio 后端验证版本、surface 绘制、事件队列与 timer API；
+3. 通过独立 Conan 消费者测试真实链接 `SDL::SDL`，将 Conan 解析出的包内 SDL2 路径传入测试，并以 Conan 包目录 `/p/b/.../p/lib/libSDL2-2.0.so.0` 后缀对照 `/proc/self/maps`，兼容不同 Conan home 及 HarmonyOS HMDFS 对绝对路径的别名映射；随后在 dummy video/audio 后端验证版本、surface 绘制、事件队列与 timer API；
 4. L5 检查共享库 ELF 架构、相对 SONAME、无绝对 RUNPATH/NEEDED 和 `.codesign` section。
 
 ## 已知边界

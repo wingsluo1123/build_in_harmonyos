@@ -63,4 +63,4 @@ sdl12-compat/1.2.68@ohpcd/stable (test package): RUN: ./test_sdl12_compat
 sdl12-compat consumer test passed
 ```
 
-The consumer receives the exact Conan package path in `EXPECTED_SDL2_PATH`. HarmonyOS exposes loaded files under an HMDFS alias, so the test matches the unchanged `.conan2/.../lib/libSDL2-2.0.so.0` relative suffix in `/proc/self/maps` rather than claiming inode identity across aliases.
+The consumer receives the exact Conan package path in `EXPECTED_SDL2_PATH`. HarmonyOS exposes loaded files under an HMDFS alias, so the test matches the unchanged Conan package-directory suffix `/p/b/.../p/lib/libSDL2-2.0.so.0` in `/proc/self/maps` rather than depending on the Conan home name or claiming inode identity across aliases.
