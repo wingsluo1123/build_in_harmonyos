@@ -87,6 +87,7 @@ int main(void)
 
     pushed.type = SDL_USEREVENT;
     pushed.user.code = 0x1268;
+    /* SDL 1.2 returns 0 on success here, unlike SDL2. */
     if (SDL_PushEvent(&pushed) != 0) {
         return fail("SDL_PushEvent");
     }
