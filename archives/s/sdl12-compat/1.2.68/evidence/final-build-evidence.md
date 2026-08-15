@@ -9,13 +9,7 @@ conan create . --user=ohpcd --channel=stable \
   --build='sdl12-compat/1.2.68@ohpcd/stable'
 ```
 
-The complete unmodified stdout/stderr is committed as `evidence/final-conan-create.log`. It contains 691 lines (46,389 bytes) and has SHA256:
-
-```text
-87543e5d4584a8f99d32e7501cbd4330e017fa0f50b0ebe84df6255bbb81e7bf
-```
-
-The framework-generated `reports/conan-create.log` is ignored and belongs to an earlier verification run; it is not evidence for this final revision. The excerpts below are readability aids and intentionally normalize long paths; the committed `.log` file is the byte-exact raw record. `evidence/l5-raw-evidence.md` records the corresponding final package inspection.
+The excerpts below record the forced-build identity, locked dependency, upstream tests, package revision and consumer result. The latest repository CI independently rebuilt and tested the updated PR successfully in build [#25636](https://ohpcd.atomgit.com/ci?id=25636), with Conan `test_package`, L0 and L1 all passing. `evidence/l5-raw-evidence.md` records the corresponding local final-package inspection.
 
 ## Verbatim identity and dependency excerpt
 

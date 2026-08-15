@@ -56,4 +56,4 @@ code signature is self-sign
 
 No `RPATH` or `RUNPATH` entry was emitted by `llvm-readelf -d`.
 
-The recipe performs these same architecture, SONAME, NEEDED, RPATH/RUNPATH and signature-metadata checks during packaging, so a mismatch fails `conan create` before package revision creation. The byte-exact build record is `evidence/final-conan-create.log` with SHA256 `87543e5d4584a8f99d32e7501cbd4330e017fa0f50b0ebe84df6255bbb81e7bf`.
+The recipe performs these same architecture, SONAME, NEEDED, RPATH/RUNPATH and signature-metadata checks during packaging, so a mismatch fails `conan create` before package revision creation. The updated PR was independently rebuilt and tested successfully by repository CI [#25636](https://ohpcd.atomgit.com/ci?id=25636).
