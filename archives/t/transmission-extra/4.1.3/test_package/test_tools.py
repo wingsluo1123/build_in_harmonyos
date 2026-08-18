@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Integration tests for installed Transmission 4.1.3 command-line utilities."""
 
 import os
 import subprocess
