@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Conan test package for installed Transmission 4.1.3 CMake utilities."""
 
 import os
 

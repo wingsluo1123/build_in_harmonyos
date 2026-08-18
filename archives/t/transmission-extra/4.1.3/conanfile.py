@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe for the Transmission 4.1.3 create/edit/show utilities."""
+"""Conan recipe for Transmission 4.1.3 utilities built with CMake."""
 
 import glob
 import os
@@ -15,7 +15,7 @@ class TransmissionExtraConan(ConanFile):
     name = "transmission-extra"
     version = "4.1.3"
     description = "Transmission torrent create, edit, and show command-line utilities"
-    license = "GPL-2.0-or-later AND GPL-3.0-only"
+    license = "GPL-2.0-only OR GPL-3.0-only"
     homepage = "https://transmissionbt.com/"
     url = "https://github.com/transmission/transmission"
     package_type = "application"
@@ -135,7 +135,7 @@ class TransmissionExtraConan(ConanFile):
         for binary in glob.glob(os.path.join(self.package_folder, "bin", "transmission-*")):
             if not os.path.isfile(binary):
                 continue
-            self.run(f'"{objcopy}" --remove-section .codesign "{binary}" 2>/dev/null || true')
+            self.run(f'"{objcopy}" --remove-section .codesign "{binary}"')
             self.run(f'"{signer}" sign -inFile "{binary}" -outFile "{binary}" -selfSign 1')
 
     def package_info(self):
