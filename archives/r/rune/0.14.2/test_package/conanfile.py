@@ -21,7 +21,7 @@ class RuneTestConan(ConanFile):
 
         if can_run(self):
             script = os.path.join(self.recipe_folder, "test.sh")
-            self.run(f'bash "{script}" "{executable}"', env="conanrun")
+            self.run(f'zsh "{script}" "{executable}"', env="conanrun")
         else:
             with open(executable, "rb") as binary:
                 assert binary.read(4) == b"\x7fELF", "rune is not an ELF binary"

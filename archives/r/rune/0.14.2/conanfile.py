@@ -34,6 +34,8 @@ class RuneConan(ConanFile):
             )
         if str(self.settings.arch) != "armv8" and str(self.settings.os) == "OHOS":
             raise ConanInvalidConfiguration("rune for OHOS currently supports armv8 only")
+        if str(self.settings.build_type) != "Release":
+            raise ConanInvalidConfiguration("rune currently supports Release builds only")
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
@@ -49,9 +51,17 @@ class RuneConan(ConanFile):
                 'registry = "sparse+https://rsproxy.cn/index/"\n'
             )
             if str(self.settings.os) == "OHOS":
+                compilers = self.conf.get(
+                    "tools.build:compiler_executables", default={}, check_type=dict
+                )
+                linker = compilers.get("c") if compilers else None
+                if not linker:
+                    raise ConanInvalidConfiguration(
+                        "OHOS builds require tools.build:compiler_executables[c]"
+                    )
                 config.write(
                     '\n[target.aarch64-unknown-linux-ohos]\n'
-                    'linker = "clang"\n'
+                    f'linker = "{linker}"\n'
                 )
 
     def build(self):

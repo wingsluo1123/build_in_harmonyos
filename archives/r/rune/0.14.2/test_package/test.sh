@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
+# test_package/test.sh — 验证 Rune CLI 的参数解析、语法检查与脚本执行。
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -34,4 +35,4 @@ if "$rune_bin" check "$tmpdir/invalid.rn" >/dev/null 2>&1; then
     exit 1
 fi
 
-printf '[ok] Rune version, help, syntax check, and script execution tests passed.\n'
+printf '        [ok] Rune version, help, syntax check, and script execution tests passed.\n'
