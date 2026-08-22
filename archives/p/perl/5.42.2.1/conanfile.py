@@ -261,6 +261,9 @@ exec "$cp_cmd" "$@"
             if os.path.exists(path):
                 os.chmod(path, 0o755)
 
+        if self.settings.os == "OHOS":
+            self._verify_signed_package()
+
     def _sign_elf_artifacts(self, search_root):
         sign_tool = "/data/service/hnp/bin/binary-sign-tool"
         objcopy = "/data/service/hnp/bin/llvm-objcopy"
@@ -328,6 +331,43 @@ exec "$cp_cmd" "$@"
             raise RuntimeError("ELF signing failed:\n" + "\n".join(failures))
         if signed == 0:
             raise RuntimeError(f"No ELF artifacts found for signing under {search_root}")
+
+    def _verify_signed_package(self):
+        readelf = "/data/service/hnp/bin/llvm-readelf"
+        if not os.path.isfile(readelf):
+            raise ConanInvalidConfiguration(
+                "OHOS llvm-readelf is required to verify packaged Perl ELF signatures"
+            )
+
+        checked = 0
+        unsigned = []
+        for root, _, files in os.walk(self.package_folder):
+            for filename in files:
+                if not (filename in ("perl", f"perl{self.upstream_version}") or filename.endswith(".so")):
+                    continue
+                path = os.path.join(root, filename)
+                try:
+                    with open(path, "rb") as handle:
+                        if handle.read(4) != b"\x7fELF":
+                            continue
+                except OSError:
+                    continue
+                checked += 1
+                result = subprocess.run(
+                    [readelf, "-S", path],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0 or ".codesign" not in result.stdout:
+                    unsigned.append(path)
+
+        if checked == 0:
+            raise RuntimeError("No packaged Perl ELF artifacts found for signature verification")
+        if unsigned:
+            raise RuntimeError(
+                "Packaged Perl ELF artifacts lack .codesign:\n" + "\n".join(unsigned)
+            )
 
     def _perl5lib_dirs(self):
         root = os.path.join(self.package_folder, "lib", "perl5")
