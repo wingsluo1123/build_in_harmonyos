@@ -20,9 +20,5 @@ class PerlTestConan(ConanFile):
             return
 
         script = os.path.join(self.source_folder, "test_perl.sh")
-        shell = os.environ.get("CONFIG_SHELL")
-        if shell and os.path.isfile(shell) and os.access(shell, os.X_OK):
-            runner = shell
-        else:
-            runner = shutil.which("bash") or shutil.which("sh") or "/system/bin/sh"
+        runner = shutil.which("zsh") or "/system/bin/zsh"
         self.run(f"{shlex.quote(runner)} {shlex.quote(script)}", env="conanbuild")
