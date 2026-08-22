@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Conan consumer test for the Perl runtime and native XS modules."""
+
 import os
 import shlex
 import shutil
