@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Conan recipe for whereami cci.20220112 using CMake."""
 import os
 
 from conan import ConanFile
@@ -45,6 +47,7 @@ class WhereamiConan(ConanFile):
 
     def source(self):
         get(self, **self.conan_data["sources"], strip_root=True)
+        apply_conandata_patches(self)
 
     def generate(self):
         tc = CMakeToolchain(self)
@@ -53,7 +56,6 @@ class WhereamiConan(ConanFile):
         tc.generate()
 
     def build(self):
-        apply_conandata_patches(self)
         cmake = CMake(self)
         cmake.configure(build_script_folder=self.export_sources_folder)
         cmake.build()

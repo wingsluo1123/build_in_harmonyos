@@ -12,8 +12,8 @@ The package is a library only and does not install command-line tools, so `comma
 
 ## Tests
 
-The pinned upstream snapshot contains examples but no automated tests or test target. The Conan consumer test calls both public APIs, checks the length-query contract, retrieves each path, and validates absolute paths and directory offsets.
+The pinned upstream snapshot contains examples but no automated tests or test target. The Conan consumer test loads a real shared module linked with whereami, calls both public APIs through that module, and validates length-query contracts, absolute paths, directory offsets, and expected executable/module file names.
 ---
 
-**编译结束**: 2026-08-26 23:52
+**编译结束**: 2026-08-27 00:04
 **最终状态**: built
