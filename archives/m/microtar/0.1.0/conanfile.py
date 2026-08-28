@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""Conan recipe — microtar 0.1.0 (custom clang build).
+
+Two-file ANSI C tar library (src/microtar.c + src/microtar.h) with no
+upstream build system; compiled directly with clang and archived with
+llvm-ar. Static by default (R26).
+"""
 import os
 
 from conan import ConanFile
