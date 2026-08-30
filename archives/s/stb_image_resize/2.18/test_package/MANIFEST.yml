@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: stb_image_resize/2.18
+homepage: "https://github.com/nothings/stb"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "无 (header-only 库)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/resample_test.cpp
+    source: stb-master/tests/resample_test.cpp
+    description: "完整的 resize 测试套件 (test_suite 函数，包含多种格式/边缘模式/滤波器测试)"
+    command: "需要编译 resample_test.cpp 并提供测试图片"
+  - file: tests/resample_test_c.c
+    source: stb-master/tests/resample_test_c.c
+    description: "C 语言兼容性测试"
+    command: "需要编译 resample_test_c.c"
+  - file: stb_image_resize_test/stbirtest.c
+    source: stb-master/stb_image_resize_test/stbirtest.c
+    description: "性能和正确性测试 (包含多种缩放倍数测试)"
+    command: "需要编译 stbirtest.c"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "基本的 resize 功能测试 (4x4 -> 2x2 downsampling，验证 API 可用性)"
+    command: "./test_stb_image_resize"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 100+
+notes: |
+  上游测试较为复杂，需要图片文件和复杂的编译设置。
+  test_package 提供基本的 API 验证，确保 header-only 库可正常包含和使用。
+  上游测试主要验证各种缩放模式、边缘处理、颜色空间和 SIMD 优化的正确性。
