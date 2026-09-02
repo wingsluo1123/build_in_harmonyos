@@ -23,3 +23,4 @@ class NngTestConan(ConanFile):
     def test(self):
         cmake = CMake(self)
         cmake.test()
+        self.run("nngcat --version", env="conanrun")

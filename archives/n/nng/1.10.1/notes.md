@@ -40,7 +40,7 @@ ctest -j 4 --output-on-failure
 
 - 编译：通过
 - 上游测试：87 项执行，84 项通过，3 项因 HarmonyOS IPC 权限限制失败，通过率 96.55%
-- 消费者测试：调用 `nng_pair0_open`、`nng_close` 和 `nng_version`，通过
+- 消费者测试：调用 `nng_pair0_open`、`nng_close` 和 `nng_version`，并执行 `nngcat --version`，通过
 - Conan 配方构建将 `NNG_TESTS=OFF`，上游完整测试在独立的源码构建中执行；Conan `test_package` 负责消费者视角 API 验证
 - 安装产物：静态 `libnng.a`、头文件、CMake package config 和 `nngcat`
 
