@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
-
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/nng/{version}/test_package/conanfile.py
-"""
-import os
+"""Conan consumer test for nng 1.10.1 using CMake."""
 
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
