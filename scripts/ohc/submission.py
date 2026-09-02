@@ -194,14 +194,12 @@ def _check_patches_valid(ver_dir: Path) -> bool:
 
 
 def _check_packaging_present(ver_dir: Path, status: str) -> bool:
-    """Check that packaging/ has tar.gz for success/partial builds."""
-    if status not in ("published", "built"):
-        return True  # Not required for failed builds
-    packaging_dir = ver_dir / "packaging"
-    if not packaging_dir.is_dir():
-        return False
-    tars = list(packaging_dir.glob("*.tar.gz"))
-    return len(tars) > 0
+    """Keep deprecated manual packaging optional for Conan recipes.
+
+    Conan packages are built from conanfile.py and must not commit tarballs.
+    The caller still reports the absence as a warning in the audit checklist.
+    """
+    return True
 
 
 def _check_no_temp_files(ver_dir: Path) -> bool:
