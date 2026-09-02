@@ -1,4 +1,5 @@
 #include <nng/nng.h>
+#include <nng/protocol/pair0/pair.h>
 #include <stdio.h>
 
 int main(void)
