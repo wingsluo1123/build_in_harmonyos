@@ -8,8 +8,8 @@ conan-verify / verify-build / finish(W2+W3) / 功能用例 16 项全通过。
 
 - 上游源码不变：仍是 tag `v3.0.1`（commit `2d9ee72c`），`sha256 7240dafe…09ea61`。
 - 制品仓已存在 `nsnake/3.0.1` 且配方内容一致，同版本不可并存 → 按 §1.2 版本号策略与 R37，适配修复递增为 **3.0.1.1**。
-- 本版本的变化集中在 `package()` / `package_info()`（构建路径 `source()`/`build()`/`requirements()`
-与补丁逐字节不变）：3.0.1 只打包 `bin/nsnake`，丢掉了上游 `make install` 会安装的
+- 本版本的变化集中在 `package()` / `package_info()` 与 `build()` 的日期传参
+（`source()`/`requirements()`/`layout()` 与补丁逐字节不变）：3.0.1 只打包 `bin/nsnake`，丢掉了上游 `make install` 会安装的
   31 个关卡、`man6` 手册、16/32 图标、`xpm` 与 `desktop` 入口。
 
 ## 为什么必须在配方里做，而不是 `make install`
@@ -57,7 +57,7 @@ pty 真实交互复核：播种后主菜单 → Level Select 屏幕出现 `arena
 ```
 bin/nsnake                                   555520 B   PIE + FULL RELRO(BIND_NOW) + GNU_STACK=RW
 share/games/nsnake/levels/*.nsnake           31 个
-share/man/man6/nsnake.6                      VERSION→3.0.0、DATE→July 2014 已替换
+share/man/man6/nsnake.6                      VERSION→3.0.0、DATE→Jul2014 已替换（与 -DDATE 同源）
 share/icons/hicolor/16x16/apps/nsnake.png    上游 nsnake16.png 重命名
 share/icons/hicolor/32x32/apps/nsnake.png    上游 nsnake32.png 重命名
 share/pixmaps/nsnake.xpm
@@ -65,13 +65,17 @@ share/applications/nsnake.desktop            Exec=nsnake / Icon=nsnake（与重�
 ```
 共 39 个文件（含 conaninfo/conanmanifest），包内 `.so` 数 = 0（R26 无系统同名库污染）。
 
-确定性说明（精确口径）：本版本只让 **man6 的占位符**确定化——`DATE` 固定为 `July 2014`
-（上游 v3.0.x 发布月，经 `ChangeLog` 首行 `07-28-2014 v3.0.0` 佐证），`VERSION` 从上游
-Makefile 的 `VERSION`（=3.0.0）解析。**二进制本身仍不可复现**：上游 `Makefile:42`
-`DATE = $(shell date "+%b%Y")` 会编进 `-DDATE="Sep2026"`，`nsnake --version` 也随之变化；
-本轮按"不改 conanfile"的范围约束未在 `build()` 追加 `DATE=` 传参，故 L5 对 `bin/` 的
-哈希基线跨月会漂移。彻底修复留待后续版本（`build()` 命令行加 `DATE='July 2014'`，
-GNU Make 命令行覆盖优先于 Makefile 赋值）。
+确定性说明（本轮已彻底修复）：上游 `Makefile:42 DATE = $(shell date "+%b%Y")` 会把构建
+月份编进二进制（`-DDATE=...`，`nsnake --version` 随之变化）并写进手册，两者都不可复现。
+本版本引入单一常量 `_BUILD_DATE = "Jul2014"`（上游 v3.0.x 发布月的 `%b%Y` 形态，经
+`ChangeLog` 首行 `07-28-2014 v3.0.0` 佐证），同时用于两处：
+① `build()` 的 make 命令行 `DATE='Jul2014'`（GNU Make 命令行赋值优先于 Makefile 赋值）；
+② man6 的 `DATE` 占位符替换（`VERSION` 仍从上游 `Makefile:41` 解析，=3.0.0）。
+因此 `bin/nsnake` 与 `nsnake.6` 在多次独立重建（不同 build folder → 同一 package folder，
+bin sha256 前缀 `5d9b59bc721408c4`，39 文件 `conanmanifest` 仅首行时间戳不同）下一致，
+L5 产物基线可复现；`--version` 现输出
+`nsnake v3.0.0 (Jul2014)`，并由 `test_package` 新增断言（`--version | grep -q Jul2014`）
+纳入 CI 门禁防回归。
 
 `package()` 内置完整性自检：任一资产缺失/为空、或关卡数 ≠ 31 → 直接 `ConanException`，
 防止再次退化成"只发一个二进制"。
@@ -136,11 +140,12 @@ $ ctest -N     → Test project …/staging-src   Total Tests: 0          exit=0
 | T14 | 播种到 `~/.local/share/nsnake/levels/` 后 pty 进入 Level Select | 关卡名可见、无 "no levels" 对话框 | PASS | `audit/A20…A21-…log` |
 
 **适配层功能用例合计 16 项（T01–T12 + T13/T13b/T13c/T14），16/16 通过。**
-下段 test_package 的 16 项断言在 `conan create` 内执行，与本表口径不同，不可混计。
+下段 test_package 的 17 项断言在 `conan create` 内执行，与本表口径不同，不可混计。
 
-test_package（3.0.1.1）16 项断言：真实执行 `nsnake --version` 并管道 `grep -q 'nsnake v'`
-+ bin 存在 + 5 个数据文件存在且非空 + 关卡数 31 + 手册无占位符 + `.TH nsnake 6` 头，
-`conan create` 输出 `OK: binary executed, 31 levels + 5 data files verified`。
+test_package（3.0.1.1）17 项断言：真实执行 `nsnake --version` + 管道 `grep -q 'nsnake v'`
++ 管道 `grep -q 'Jul2014'`（构建日期可复现）+ bin 存在 + 5 个数据文件存在且非空
++ 关卡数 31 + 手册无占位符 + `.TH nsnake 6` 头；`test_package/test.sh` 为其 shell 子集
+（10 项，含修复后的显式 `if grep -qE ...; then exit 1; fi`，不再被 errexit 豁免）。
 
 ## 验证结果
 
@@ -152,10 +157,14 @@ python3 scripts/ohc-run.py finish nsnake 3.0.1.1 built                          
 
 - 交付包：`packaging/nsnake-3.0.1.1-ohos-aarch64.tar.gz`（684667 B）+ `-debug.tar.gz`（160299 B）
   由 `verify-build` 通过后经 `package_builder` 生成（该目录被 gitignore，非 PR 内容；
-  正式制品仍按 R20 走 conan 流水线，不手工上传）。
+  正式制品仍按 R20 走 conan 流水线，不手工上传）。已在 DATE 传参修复后重新生成
+  （2026-09-12 17:05），解包实测内嵌日期为 `Jul2014`、man6 为
+  `.TH nsnake 6 "Jul2014" v3.0.0`；注意 `package_builder` 会 strip 二进制，
+  故交付包内 bin 的 sha256（`b746fee2faa6421d…`）≠ 未 strip 的 conan 包 bin
+  （`5d9b59bc721408c4…`），属预期差异。
 - 关卡仍需用户复制到 `~/.local/share/nsnake/levels/`（上游设计）。若要在 OHOS 上免手动，
   需要给上游加"包内相对路径回退"补丁，属行为变更，本版本未做，留待评审决定。
 ---
 
-**编译结束**: 2026-09-12 00:40
+**编译结束**: 2026-09-12 17:08
 **最终状态**: built

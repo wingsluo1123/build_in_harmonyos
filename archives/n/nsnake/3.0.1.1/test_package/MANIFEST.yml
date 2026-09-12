@@ -19,12 +19,13 @@ upstream_tests: []
 # test_package：真实执行被测包 + 3.0.1.1 新增的打包完整性回归断言
 test_package_tests:
   - file: conanfile.py
-    description: "执行包内 nsnake --version（含 grep 断言），并校验 31 个关卡、man6（占位符已替换）、16/32 图标、xpm、desktop 全部入包且非空"
+    description: "执行包内 nsnake --version（含 grep 断言 + 构建日期 Jul2014 可复现断言），并校验 31 个关卡、man6（占位符已替换）、16/32 图标、xpm、desktop 全部入包且非空"
     command: "conan create test_package"
   - file: test.sh
-    description: "同一组断言的 shell 版，供设备侧手工冒烟复跑"
+    description: "上述断言的 shell 子集（10 项），供设备侧手工冒烟复跑；与 conanfile.py 不同源，不计入 assertion_count"
     command: "bash test.sh <package_folder>"
 
-# 断言数：1 执行 rc + 1 --version 内容 + 1 bin 存在 + 5×2 数据文件存在/非空
-#          + 1 关卡计数 + 1 man 占位符 + 1 man .TH 头 = 16
-assertion_count: 16
+# assertion_count 只统计 test_package/conanfile.py 的 test()：
+# 1 执行 rc + 1 --version 内容 + 1 构建日期 + 1 bin 存在 + 5×2 数据文件存在/非空
+# + 1 关卡计数 + 1 man 占位符 + 1 man .TH 头 = 17
+assertion_count: 17

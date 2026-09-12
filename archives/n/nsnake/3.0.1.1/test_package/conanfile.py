@@ -37,6 +37,8 @@ class NsnakeTestConan(ConanFile):
         self.run(f"{bin_path} --version", env="conanrun")
         # shell=True（Conan 2 的 self.run 默认），管道退出码即断言结果
         self.run(f"{bin_path} --version | grep -q 'nsnake v'", env="conanrun")
+        # 构建日期必须固定（配方向 make 传 DATE=Jul2014），否则产物不可复现
+        self.run(f"{bin_path} --version | grep -q 'Jul2014'", env="conanrun")
 
         # ── 2. 打包完整性回归断言 ──
         if not os.path.isfile(bin_path):

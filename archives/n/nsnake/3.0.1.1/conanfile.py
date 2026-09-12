@@ -4,10 +4,13 @@
 nsnake 是终端 ncurses 贪吃蛇游戏，上游用纯 Makefile（非 autotools），
 ncurses 由 Conan 依赖提供。
 
-3.0.1.1 是 3.0.1 的**适配修复版**（R37 版本号后缀递增），二进制构建方式完全
-不变，唯一变化在 `package()`：上游 `make install` 除可执行文件外还会安装
-31 个关卡、man6 手册、两种尺寸的图标、xpm 与 desktop 入口，而 3.0.1 只打包了
-`bin/nsnake`，导致这些上游资产在制品中丢失。OHOS 上没有 `install(1)`（也没有
+3.0.1.1 是 3.0.1 的**适配修复版**（R37 版本号后缀递增），实质变化在
+`package()` / `package_info()` 与 `build()` 的日期传参：
+① 上游 `make install` 除可执行文件外还会安装 31 个关卡、man6 手册、两种尺寸的
+图标、xpm 与 desktop 入口，而 3.0.1 只打包了 `bin/nsnake`，这些资产在制品中丢失；
+② 上游 `Makefile:42 DATE = $(shell date "+%b%Y")` 使二进制内嵌构建月份、产物不可
+复现，本版本向 make 传 `DATE='Jul2014'` 固定（GNU Make 命令行赋值优先）。
+编译/链接参数、依赖、补丁与 `source()` 逻辑均沿用 3.0.1。OHOS 上没有 `install(1)`（也没有
 E108 方案要求的 `ginstall`），所以这里用 Conan 的 copy()/save() 复现同一套 FHS
 数据布局，而不是调 `make install`。
 """
@@ -28,9 +31,11 @@ from conan.tools.layout import basic_layout
 
 # 上游 levels/*.nsnake 的数量，作为打包回归基线（v3.0.1 实测 31 个）
 _LEVEL_COUNT = 31
-# 上游 Makefile 用 `date "+%b%Y"` 生成手册日期，构建不可复现；这里固定为
-# 上游 v3.0.x 的发布日期，保证 L5 产物基线稳定。
-_MAN_DATE = "July 2014"
+# 上游 `Makefile:42 DATE = $(shell date "+%b%Y")` 会把构建月份编进二进制
+# （`-DDATE=...`，见 `nsnake --version`）并写进手册，两者都不可复现。这里把日期
+# 固定为上游 v3.0.x 发布月的 `%b%Y` 形态（July 2014 -> `Jul2014`），同时供
+# `build()` 的 make 命令行与 man6 占位符替换共用，使 L5 产物基线可复现。
+_BUILD_DATE = "Jul2014"
 
 
 class NsnakeConan(ConanFile):
@@ -80,15 +85,19 @@ class NsnakeConan(ConanFile):
         # -lncurses, but the wide-character build produces libncursesw.a).
         ldflags = f"-L{ncurses_lib} {ncurses_libs}"
 
-        # Build with the Makefile
+        # Build with the Makefile.
+        # `clean` 在首次构建时必然因无产物而失败（源码目录每次新建），属预期，忽略。
         self.run(
             f"make -C {src} clean", ignore_errors=True
         )
+        # GNU Make 的命令行赋值优先于 Makefile 内的 `DATE = $(shell date ...)`，
+        # 传 DATE= 才能让 -DDATE 与 --version 输出可复现。
         self.run(
             f"make -C {src} -j1 V=1 CC={cc} CXX={cxx} "
             f"CXXFLAGS='{cxxflags}' "
             f"CFLAGS_PLATFORM='-I{ncurses_inc}' "
             f"LDFLAGS='{ldflags}' "
+            f"DATE='{_BUILD_DATE}' "
             f"PREFIX=/usr"
         )
 
@@ -135,7 +144,7 @@ class NsnakeConan(ConanFile):
         template = os.path.join(src, "doc", "man", "nsnake.6")
         text = load(self, template)
         upstream_ver = self._upstream_makefile_version(src)
-        rendered = text.replace("VERSION", upstream_ver).replace("DATE", _MAN_DATE)
+        rendered = text.replace("VERSION", upstream_ver).replace("DATE", _BUILD_DATE)
         if re.search(r"\b(VERSION|DATE)\b", rendered):
             raise ConanException(
                 f"man 模板占位符未替换干净: {os.path.basename(template)}")

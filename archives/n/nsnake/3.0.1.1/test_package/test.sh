@@ -11,7 +11,9 @@ BIN="${BIN:-nsnake}"
 echo "[ok] nsnake --version"
 
 if [ -n "$PKG" ]; then
-    levels=$(find "$PKG/share/games/nsnake/levels" -name '*.nsnake' 2>/dev/null | wc -l)
+    LV="$PKG/share/games/nsnake/levels"
+    [ -d "$LV" ] || { echo "[fail] 关卡目录缺失: $LV"; exit 1; }
+    levels=$(find "$LV" -name '*.nsnake' | wc -l)
     [ "$levels" -eq 31 ] || { echo "[fail] 关卡数 $levels != 31"; exit 1; }
     echo "[ok] 31 个关卡已入包"
 
@@ -23,7 +25,11 @@ if [ -n "$PKG" ]; then
     done
     echo "[ok] man6 / pixmaps / desktop / icons 均已入包且非空"
 
-    ! grep -qE '\b(VERSION|DATE)\b' "$PKG/share/man/man6/nsnake.6"
+    # 注意：不能用 `! grep ...`——bash 的 errexit 显式豁免被 `!` 反转的命令，
+    # 那样占位符残留时脚本仍会以 0 退出。必须写成显式 if 分支才能被 CI 捕获。
+    if grep -qE '\b(VERSION|DATE)\b' "$PKG/share/man/man6/nsnake.6"; then
+        echo "[fail] man6 仍含 VERSION/DATE 占位符"; exit 1
+    fi
     echo "[ok] man6 占位符已替换"
 fi
 
