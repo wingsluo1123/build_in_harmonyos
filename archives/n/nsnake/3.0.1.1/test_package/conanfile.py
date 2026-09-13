@@ -29,6 +29,13 @@ class NsnakeTestConan(ConanFile):
         self.requires(self.tested_reference_str)
 
     def test(self):
+        # HarmonyOS PC platform consumer test: reject a non-OHOS/non-arm64 run.
+        if str(self.settings.os) != "OHOS":
+            raise ConanException(f"expected OHOS test host, got {self.settings.os}")
+        if str(self.settings.arch) != "armv8":
+            raise ConanException(f"expected OHOS arm64 test host, got {self.settings.arch}")
+        self.output.info("HarmonyOS PC aarch64 platform test: PASS")
+
         pkg = self.dependencies["nsnake"].package_folder
         bin_path = os.path.join(pkg, "bin", "nsnake")
 
