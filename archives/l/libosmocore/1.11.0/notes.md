@@ -56,17 +56,29 @@ make -j2 && make check && make install DESTDIR=<staging>
 | 61 socket | musl `getaddrinfo` 对 SCTP 协议提示返回 `EAI_SERVICE`(-8)，重试逻辑过宽 | `src/core/socket.c`：重试收窄到仅 `EAI_SERVICE`（补丁 0008） |
 | 86 / 其余 | 随上述修复一并通过 | — |
 
+## 适配阻塞：talloc 需 shared 变体（依赖优先，R36）
+
+- **结论**：本包源码与补丁已可编译（构建阶段全绿），但上游测试套件在**制品仓 talloc 二进制**下 40/88 失败；根因不在本包代码，需先在依赖侧补 shared 变体。
+- **证据链**：
+  1. 上游设计要求 shared talloc：以本机 shared talloc 构建时 `readelf -d src/core/.libs/libosmocore.so.22.1.0` → `NEEDED libtalloc.so.2`，测试 **88/88 通过**；
+  2. 制品仓 `talloc/2.4.4` 仅含 `libtalloc.a`，且符号为 LOCAL：`nm libtalloc.a` → `0000000000004e9c t _tc_free_internal`（小写 `t`）；
+  3. 未发布 shared 二进制：`conan install --requires=talloc/2.4.4 -o "talloc/*:shared=True" -r=ohpcd --build=never` → `RC=6 There are invalid packages`；
+  4. 后果：每个链接 talloc 的 DSO 各自静态嵌入一份**私有** talloc 实例；libosmocore 在上游设计上跨 DSO 传递 talloc 上下文，释放时进入 `_tc_free_internal` → `abort()`（Signal 6，37 例 `Aborted`）；
+  5. 链接层不可修复（已实测）：archive 内符号为 LOCAL，`-Wl,--export-dynamic-symbol=_talloc_*` 重链接后导出的 talloc 符号数 **= 0**；`-O2`/`-O3`、whole-archive 烘焙均不影响结论。
+- **待依赖侧动作**：为 talloc 发布 shared（或至少 default-visibility）变体后，本包可直接回落验证（配方无需再改）。
+
 ## 源码修改
 
-全部改动以补丁形式交付（`patches/`，共 16 个，由 `ohc-run.py refresh-patch --auto` 生成）：
+全部改动以补丁形式交付（`patches/`，共 18 个，由 `ohc-run.py refresh-patch --auto` 生成）：
 
 - `0001-config.guess.patch`、`0002-config.sub.patch` — 平台识别（linux-ohos）
 - `0003-configure.patch` — 生成物同步（随 0001/0002 重生成）
 - `0004-include-osmocom-core-hash.h.patch` — `__always_inline` 平台中立写法
-- `0005-src-core-mnl.c.patch`、`0006-src-core-netdev.c.patch`、`0009-src-core-stats_tcp.c.patch`、`0011-src-gb-gprs_ns2_fr.c.patch` — `sockaddr_storage` 守卫（E091）
-- `0007-src-core-sockaddr_str.c.patch`、`0008-src-core-socket.c.patch`、`0010-src-core-utils.c.patch` — 上游测试 69/61/47
-- `0012-src-gsm-kdf-crypto.h.patch` — 补齐上游漏打包头文件
-- `0013-tests-gb-gprs_bssgp_test.c.patch`、`0014-tests-lapd-lapd_test.c.patch`、`0015-tests-osmo_io-osmo_io_test.c.patch`、`0016-tests-use_count-use_count_test.c.patch` — 测试侧适配
+- `0005-src-core-mnl.c.patch`、`0006-src-core-netdev.c.patch`、`0011-src-core-stats_tcp.c.patch`、`0013-src-gb-gprs_ns2_fr.c.patch` — `sockaddr_storage` 守卫（E091）
+- `0007-src-core-osmo_io_internal.h.patch`、`0008-src-core-osmo_io_uring.c.patch` — SCTP include 平台守卫（CI 首个失败：无 SCTP 头环境下 `netinet/sctp.h` 缺失；沿用上游 `socket.c` 的守卫风格）
+- `0009-src-core-sockaddr_str.c.patch`、`0010-src-core-socket.c.patch`、`0012-src-core-utils.c.patch` — 上游测试 69/61/47
+- `0014-src-gsm-kdf-crypto.h.patch` — 补齐上游漏打包头文件
+- `0015-tests-gb-gprs_bssgp_test.c.patch`、`0016-tests-lapd-lapd_test.c.patch`、`0017-tests-osmo_io-osmo_io_test.c.patch`、`0018-tests-use_count-use_count_test.c.patch` — 测试侧适配
 
 约定：补丁不含 `__OHOS__` 平台宏（R8），全部为平台中立改法；`conandata.yml` 的 patches 条目**不写 `strip`**（conan 使用 patch_ng，`a/` `b/` 前缀自动剥离，`strip=0` 即正确——实测显式 `strip: 1` 会把新增文件写到上一层目录）。
 
@@ -84,9 +96,10 @@ make -j2 && make check && make install DESTDIR=<staging>
 ## 验证结果
 
 - 编译：`conan create` 成功（configure/make/make check/make install 全部通过，0 error）
-- 上游测试（`make check`，automake testsuite）：**88 passed / 2 skipped / 0 failed（共 90 项）**
+- 上游测试（`make check`，automake testsuite）：**结果取决于 talloc 二进制形态**（详见上节「适配阻塞」）
+  - 生产者环境（shared talloc，即本机 `libtalloc.so.2`）：**88 passed / 2 skipped / 0 failed（共 90 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
+  - 制品仓 talloc（static-only、符号 LOCAL，即 CI 等价环境）：**48 passed / 40 failed**，失败集中于 37 例 `Aborted (Signal 6)`，abort 点位于 `_tc_free_internal`
   - 跳过项：`61 socket_sctp`（平台无 SCTP）、`87 osmo_io (uring)`（平台 uring 被 seccomp 拦截，配方向上游开关关闭）
-  - 日志证据：`88 tests were successful.` / `2 tests were skipped.`
 - 包内测试（`test_package`）：
   - `test.c`：冒烟（`osmo_hexdump` / `osmo_str_tolower` / `osmo_bcd2str` / `osmo_sockaddr_str_from_str` / `osmo_ctx_init` / `osmo_cbsp_errstr` / `osmo_amr_s_to_d`）
   - `test_ohos_tls.c`：鸿蒙专项——跨 DSO 访问库内 TLS（`osmo_ctx`）验证原生 TLS 语义（emutls 下该程序链接/运行均失败，作为反向证据）
@@ -94,7 +107,7 @@ make -j2 && make check && make install DESTDIR=<staging>
 
 ## 交付物
 
-- `conanfile.py` / `conandata.yml` / `patches/`（16 个）/ `test_package/`（含 `test.c`、`test_ohos_tls.c`、`MANIFEST.yml`）
+- `conanfile.py` / `conandata.yml` / `patches/`（18 个）/ `test_package/`（含 `test.c`、`test_ohos_tls.c`、`MANIFEST.yml`）
 - `reports/test-report.md`（上游测试与包内测试明细）
 - 版本索引：`archives/l/libosmocore/manifest.yaml`
 
@@ -115,4 +128,4 @@ make -j2 && make check && make install DESTDIR=<staging>
 ---
 
 **编译结束**: 2026-09-14 03:33
-**最终状态**: published
+**最终状态**: dependency_missing（阻塞：制品仓 `talloc/2.4.4` 为 static-only 且符号 LOCAL，需先发布 shared/default-visibility 变体；本包构建阶段已全绿）

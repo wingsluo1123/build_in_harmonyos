@@ -108,6 +108,7 @@ knowledge_gained:
   - "libtool 版本脚本 + clang lld 下 DSO 符号不能被可执行文件 interpose，测试桩须在测试侧接线（ref: E175）"
   - "上游发布 tarball 可能漏打包 git 中存在的头文件（1.11.0 缺 src/gsm/kdf/crypto.h），用上游 tag 原文补齐并以 /dev/null 新增补丁交付（ref: E254、DRAFT-release-tarball-missing-cmake-submodule）"
   - "Conan 对 package_type=static-library 的依赖默认不传递 headers/libs：配方 cpp_info.components 里的 talloc::talloc 引用会被 CMakeDeps 静默剔除（生成物中 FIND_DEPENDENCY_NAMES 与 DEPENDENCIES_RELEASE 为空），下游 test_package 编译期 'talloc.h' file not found（ref: E567、DRAFT-conan2-cmakedeps-transitive-include-strip）"
+  - "制品仓 talloc/2.4.4 为 static-only 且符号为 LOCAL（nm 显示小写 t，如 _tc_free_internal）：多 DSO 消费者（libosmocore）会各自静态嵌入私有 talloc 实例，跨 DSO 传递 talloc 上下文后释放触发 abort（Signal 6，40/88 用例失败）；LOCAL 符号无法用链接旗标（--export-dynamic-symbol）导出，须由依赖侧先发布 shared/default-visibility 变体（ref: E568）"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"
