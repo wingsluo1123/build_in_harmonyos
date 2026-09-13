@@ -44,13 +44,16 @@ build:
   # cmake | autotools | makefile | meson | custom
   system: autotools
 
-  # 配置选项列表
+  # 配置选项列表（clean-verify 会逐条作为 configure 参数执行，此处仅可写可执行参数）
   configure_options:
-  - "--enable-shared --disable-static  # 默认 shared=True（动态库）；仅系统同名库场景才传 shared=False 静态"
-  - "extra_cflags/extra_cxxflags 追加 -fno-emulated-tls  # 原生 TLS，见 notes.md 问题 1"
-  - "--disable-gnutls --disable-libsctp --disable-uring  # 平台能力/依赖缺失（见 notes.md）"
-  - "--disable-libmnl/--disable-libusb/--disable-pcsc  # 仅当 with_* 选项关闭时传入，默认自动探测依赖"
-  - "PkgConfigDeps 注入 talloc/libmnl/libusb-1.0/libpcsclite 的 .pc"
+  - "--enable-shared --disable-static"
+  - "--disable-gnutls --disable-libsctp --disable-uring"
+  # 说明：
+  # - shared=True 为默认（动态库）；仅系统同名库场景才传 shared=False 静态
+  # - extra_cflags/extra_cxxflags 追加 -fno-emulated-tls（原生 TLS，见 notes.md 问题 1）
+  # - --disable-libmnl/--disable-libusb/--disable-pcsc 仅在对应 with_* 选项关闭时传入，
+  #   默认自动探测制品仓依赖
+  # - PkgConfigDeps 注入 talloc/libmnl/libusb-1.0/libpcsclite 的 .pc
   # 例如:
   # - "-DCMAKE_BUILD_TYPE=Release"
   # - "-DCMAKE_SYSTEM_NAME=OHOS"
@@ -114,9 +117,9 @@ patch_generation:
   source_orig_dir: /storage/Users/currentUser/builds/libosmocore-1.11.0.orig
   source_work_dir: /storage/Users/currentUser/builds/libosmocore-1.11.0.work
   source_orig_hash: 65cd201ce2ee3076
-  source_work_hash: d047da61206980ad
-  generated_at: '2026-09-14T01:46:22'
-  patches_count: 16
+  source_work_hash: 95123a1f6649760e
+  generated_at: '2026-09-14T03:33:07'
+  patches_count: 18
 
 patch_classification:
   - file: 0001-config.guess.patch
@@ -143,43 +146,51 @@ patch_classification:
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0007-src-core-sockaddr_str.c.patch
+  - file: 0007-src-core-osmo_io_internal.h.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0008-src-core-socket.c.patch
+  - file: 0008-src-core-osmo_io_uring.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0009-src-core-stats_tcp.c.patch
+  - file: 0009-src-core-sockaddr_str.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0010-src-core-utils.c.patch
+  - file: 0010-src-core-socket.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0011-src-gb-gprs_ns2_fr.c.patch
+  - file: 0011-src-core-stats_tcp.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0012-src-gsm-kdf-crypto.h.patch
+  - file: 0012-src-core-utils.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0013-tests-gb-gprs_bssgp_test.c.patch
+  - file: 0013-src-gb-gprs_ns2_fr.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0014-tests-lapd-lapd_test.c.patch
+  - file: 0014-src-gsm-kdf-crypto.h.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0015-tests-osmo_io-osmo_io_test.c.patch
+  - file: 0015-tests-gb-gprs_bssgp_test.c.patch
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0016-tests-use_count-use_count_test.c.patch
+  - file: 0016-tests-lapd-lapd_test.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0017-tests-osmo_io-osmo_io_test.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0018-tests-use_count-use_count_test.c.patch
     type: auto
     platform_only: True
     guard: 'pending'

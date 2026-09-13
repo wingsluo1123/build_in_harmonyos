@@ -104,11 +104,6 @@ make -j2 && make check && make install DESTDIR=<staging>
 - PCSC/USB/MNL 依赖在配置期为自动探测；配方已通过 `PkgConfigDeps` 注入 `.pc`，无需手工设置 `PKG_CONFIG_PATH`。
 - 本地探索阶段曾遇到 `.la` 级联报错（`libmnl.so` 开发软链缺失）与 `pkg-config` 搜索路径问题，均为本机环境因素，**不属于交付内容**（配方通过 conan 依赖注入解决）。
 - musl 与 glibc 的文案/errno/`getaddrinfo` 差异集中在测试期望适配（补丁 0014/0016/0008），不影响库语义。
----
-
-**编译结束**: 2026-09-14 01:46
-**最终状态**: published
-
 ## W4 独立审计（Pre-PR）
 
 - 审计结论：`pass`（P0=0 / P1=0；P2=3、P3=3 均为非阻塞建议），报告见 `reports/audit-result.json`。
@@ -117,3 +112,7 @@ make -j2 && make check && make install DESTDIR=<staging>
   2. `conandata.yml` 中 4 个补丁的 `patch_type` 由 `"bugfix"` 统一为 `"portability"`（§12：`patch_type` 仅为元数据，不参与补丁应用）。
   3. 元数据一致性：版本 `manifest.yaml` 的 `source.tar_format` 由 `tar.gz` 修正为 `tar.bz2`（与 `conandata.yml` 源一致）、`configure_options` 注释修正为 shared 默认动态；软件级 `manifest.yaml` 依赖清单移除未被 `requires` 的 `liburing`；`README.md` 库清单修正为实际产出的 10 个库。
 - 第 1/2 项属 CI 输入文件（`conanfile.py` / `conandata.yml`）的行为中立改动，W3 与 CI 均以当前文件重新构建验证。
+---
+
+**编译结束**: 2026-09-14 03:33
+**最终状态**: published
