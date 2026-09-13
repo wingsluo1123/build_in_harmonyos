@@ -1,0 +1,66 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule": "code_style §12 / R3 (patch_type should be fixed to \"portability\")",
+      "rule_id": "code_style §12 / R3",
+      "file": "archives/l/libosmocore/1.11.0/conandata.yml",
+      "line": 28,
+      "description": "Non-blocking style deviation: several patch entries use patch_type \"bugfix\" (lines 28, 31, 37, 43 — patches 0007/0008/0010/0012) and \"test\" (lines 46, 49, 52, 55 — patches 0013/0014/0015/0016). The project code-style rule §12 fixes patch_type to \"portability\". review_memory item 12 only requires the patch to be declared in the patches field and present on disk, so this is a code-style warning, not a blocker (consistent with prior audit treatment).",
+      "suggestion": "Set all patch_type values to \"portability\" for repo-wide consistency with code_style §12, or explicitly document why semantic sub-typing (bugfix/test) is preferred.",
+      "fix_suggestion": "Set all patch_type values to \"portability\" for repo-wide consistency with code_style §12, or explicitly document why semantic sub-typing (bugfix/test) is preferred."
+    },
+    {
+      "severity": "P2",
+      "rule": "code_style §3 (method order)",
+      "rule_id": "code_style §3",
+      "file": "archives/l/libosmocore/1.11.0/conanfile.py",
+      "line": 107,
+      "description": "Method ordering deviates from the mandated lifecycle order: `layout()` (line 104) is defined before `requirements()` (line 107), whereas code_style §3 mandates `export_sources → requirements → layout → source → generate → build → package → package_info`. Purely stylistic; the recipe is functionally correct.",
+      "suggestion": "Move requirements() above layout() to match the standard method order.",
+      "fix_suggestion": "Move requirements() above layout() to match the standard method order."
+    },
+    {
+      "severity": "P2",
+      "rule": "R34/PF3 (test coverage) — observation, non-blocking",
+      "rule_id": "R34/PF3",
+      "file": "archives/l/libosmocore/1.11.0/ci-metadata.json",
+      "line": 0,
+      "description": "The package advertises CLI tools (README, commands.json type=tool), but test_package only covers the libraries; it does not run any executable. Local CI evidence (ci-metadata.json test_report.L2 = skip; reports/w3-local-ci.log `[warn] L2: osmo-aka-verify/osmo-arfcn/osmo-auc-gen/osmo-config-merge/osmo-gsmtap-logsend/osmo-release.sh --version/--help failed (non-blocking)`) shows every advertised tool fails the L2 version/help smoke. This is classified non-blocking by the CI harness (most plausibly a runtime-library search-path limitation of the smoke runner, since L0/L1/L1e/L5 all pass and test_package runs green), so it does not block the PR, but the tools are effectively unverified. NOTE: the referenced reports/ and ci-metadata.json artifacts are .gitignore'd and are NOT part of the PR diff.",
+      "suggestion": "Where feasible, extend the smoke harness (or test_package) to invoke one CLI tool with its library path set, so the advertised tools are actually exercised; otherwise record the L2 skip as an accepted limitation in notes.md.",
+      "fix_suggestion": "Where feasible, extend the smoke harness (or test_package) to invoke one CLI tool with its library path set, so the advertised tools are actually exercised; otherwise record the L2 skip as an accepted limitation in notes.md."
+    },
+    {
+      "severity": "P3",
+      "rule": "code_style §4 (package_info cpp_info.libs)",
+      "rule_id": "code_style §4",
+      "file": "archives/l/libosmocore/1.11.0/conanfile.py",
+      "line": 166,
+      "description": "package_info() sets per-component libs (cpp.libs = [name]) but never sets the top-level self.cpp_info.libs. For a component-based recipe this is intentional and correct Conan practice, so this is only a literal-rule observation, not a defect.",
+      "suggestion": "No change required; optionally add a comment clarifying that libs are intentionally declared per component.",
+      "fix_suggestion": "No change required; optionally add a comment clarifying that libs are intentionally declared per component."
+    },
+    {
+      "severity": "P3",
+      "rule": "documentation consistency (README vs conandata/conanfile)",
+      "rule_id": "docs-consistency",
+      "file": "archives/l/libosmocore/README.md",
+      "line": 21,
+      "description": "The README dependency list mentions `liburing`, but the recipe explicitly builds with `--disable-uring` and never requires liburing (conanfile.generate appends --disable-uring; requirements() has no liburing). Minor documentation inconsistency.",
+      "suggestion": "Remove liburing from the README dependency list (or note it is a disabled optional backend) to match the recipe.",
+      "fix_suggestion": "Remove liburing from the README dependency list (or note it is a disabled optional backend) to match the recipe."
+    },
+    {
+      "severity": "P3",
+      "rule": "L4 scan warn (dangerous functions in patches) — non-blocking",
+      "rule_id": "L4",
+      "file": "archives/l/libosmocore/1.11.0/ci-metadata.json",
+      "line": 0,
+      "description": "Local CI L4 security scan reports `warn: dangerous functions in patches` (L4_RESULT=warn). Per the audit gate table this class is non-blocking when the danger is already declared/known; the patches here are upstream test-tempfile plumbing (mkstemp/fdopen in 0015) and config.guess/configure mktemp changes, consistent with the declared intent.",
+      "suggestion": "No action required; keep the declaration in notes.md.",
+      "fix_suggestion": "No action required; keep the declaration in notes.md."
+    }
+  ],
+  "summary": "W4 Pre-PR independent audit of libosmocore 1.11.0 OHOS adaptation (branch feat/libosmocore-1.11.0 vs main; 30 changed files, all additions — brand-new package under archives/l/libosmocore/ plus 2 knowledge/drafts files). VERDICT: PASS (P0=0, P1=0; P2=3, P3=3, all non-blocking).\n\nDeception checks (category 1) all CLEAN: (R34/PF3) test_package/test.c really calls and asserts real APIs across libosmocore/libosmogsm/libosmocodec (osmo_hexdump, osmo_str_tolower/toupper, osmo_bcd2str, osmo_sockaddr_str_from_str, osmo_ctx_init/osmo_ctx, osmo_mcc_from_str/osmo_mnc_from_str, osmo_amr_s_to_d/d_to_s) and test_ohos_tls.c genuinely exercises the cross-DSO TLS variables (osmo_ctx/osmo_cbsp_errstr) with a pthread isolation assertion — no print-only shells; test_package/conanfile.py actually builds and runs both executables via subprocess and raises ConanException on non-zero rc (no `def test: pass`, cmake.build() not disabled). (R9) no forced-pass. (sha256) real 64-hex official hash 8e8dbf5e…c6dc, not all-zero/all-f. (R8/PF5) EXPLICITLY VERIFIED: `grep -rE '__OHOS__|__MUSL__|__BIONIC__'` over patches/*.patch returns NOTHING — no platform macro in any of the 16 patches; they use POSIX-neutral fixes (config.guess/config.sub linux-ohos triple, platform-neutral sockaddr_storage macro-rename guard, `__inline__ __attribute__((always_inline))`). (R49/PF6) EXPLICITLY VERIFIED: the recipe injects dependencies via PkgConfigDeps + CMakeDeps and cpp_info components; there is NO reference to shared /usr/local in conanfile.py/conandata.yml/test_package (the only /usr/local hits are inside the .gitignore'd build/ artifact dir, not in the PR). (R19) no pre-compiled .so/.a/.o in the diff. (R40) adaptation is substantive (TLS model fix, netlink/sockaddr guards, getaddrinfo/SCTP handling) not stubs.\n\nRecipe quality (category 2): R37 first-time upstream version 1.11.0 (no suffix needed); R39 source URL is the official osmocom downloads site (HTTPS, no mirror prefix); R38 commands.json present at software level (type=tool); R32 no Linux-only os settings that miss OHOS; R33 no bare CC/env shell vars (uses AutotoolsToolchain); R6 not triggered — although 0003 patches the generated `configure`, patching configure/config.guess/config.sub is the repo-wide accepted pattern (586+ such patches under archives/) and matches R6's 'handle via patches/' clause. Package structure complete (conanfile.py/conandata.yml/test_package/patches/ + version manifest + notes). Patch 0012 is a legitimate /dev/null → src/gsm/kdf/crypto.h new-file addition (470 lines) for the header the upstream release tarball omits. W2 atomicity fine; diff touches only archives/ + knowledge/drafts/, no ci//scripts//templates//references//SUMMARY.md; no forbidden *.log/*.o/*.a/*.so/__pycache__/test-report files in the diff. Upstream test corroboration: MANIFEST.yml declares 90 tests (88 'pass' + 2 'skip: platform capability unavailable'), consistent with reports/test-report.md (88 passed / 2 skipped: no kernel SCTP; io_uring blocked by seccomp).\n\nNon-blocking findings only: P2 conandata patch_type not fixed to 'portability' (code_style §12); P2 conanfile method order (requirements after layout, code_style §3); P2 observation that the advertised CLI tools are not exercised by test_package and the CI L2 version/help smoke skips (non-blocking per the CI harness; reports/ evidence is gitignored, not in the PR); P3 package_info top-level cpp_info.libs not set (component-based, intentional); P3 README lists liburing though the recipe disables uring; P3 L4 dangerous-functions warn (declared, non-blocking). Local-path fields in the version manifest (patch_generation source_orig_dir/source_work_dir) and guard: 'pending' in patch_classification are repo-wide tooling conventions (1297 / 5510 occurrences) and were therefore NOT flagged. Verdict pass; P0=0 and P1=0, so the package may proceed to PR."
+}
