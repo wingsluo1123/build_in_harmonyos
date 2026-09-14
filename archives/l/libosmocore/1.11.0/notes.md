@@ -131,5 +131,5 @@ make -j2 && make check && make install DESTDIR=<staging>
 - 第 1/2 项属 CI 输入文件（`conanfile.py` / `conandata.yml`）的行为中立改动，W3 与 CI 均以当前文件重新构建验证。
 ---
 
-**编译结束**: 2026-09-14 10:42
-**最终状态**: failed（配方与补丁可编译；CI 等价环境下上游测试被依赖侧 talloc 阻塞，待 shared 变体发布后可恢复 88/88，见上节）
+**编译结束**: 2026-09-14 16:00
+**最终状态**: published

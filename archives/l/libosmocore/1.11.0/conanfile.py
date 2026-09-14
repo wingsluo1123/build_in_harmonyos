@@ -37,6 +37,7 @@ from conan.tools.files import (apply_conandata_patches, copy, export_conandata_p
                                get, rm, rmdir)
 from conan.tools.gnu import Autotools, AutotoolsToolchain, PkgConfigDeps
 from conan.tools.layout import basic_layout
+from conan.tools.env import VirtualRunEnv
 
 required_conan_version = ">=2.0"
 
@@ -146,11 +147,16 @@ class LibosmocoreConan(ConanFile):
 
     def build(self):
         apply_conandata_patches(self)
-        autotools = Autotools(self)
-        autotools.configure()
-        autotools.make()
-        # 上游完整测试套件（CI L1.1 上游测试执行验证依赖此步骤）
-        autotools.make(target="check")
+        # Expose the runtime library paths of the host dependencies to the in-tree
+        # programs: the sim test loads libpcsclite.so.1 at runtime, which is not on
+        # any global library search path in the build container.
+        env = VirtualRunEnv(self).environment().vars(self, scope="run")
+        with env.apply():
+            autotools = Autotools(self)
+            autotools.configure()
+            autotools.make()
+            # 上游完整测试套件（CI L1.1 上游测试执行验证依赖此步骤）
+            autotools.make(target="check")
 
     def package(self):
         autotools = Autotools(self)

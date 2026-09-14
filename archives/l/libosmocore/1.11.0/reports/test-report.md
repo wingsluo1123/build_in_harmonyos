@@ -4,12 +4,12 @@
 
 | 项 | 结果 |
 |----|------|
-| conan create（profile `ci/conan/profiles/ohos-aarch64`，默认 shared） | ✅ PASS |
+| conan create（profile `ci/conan/profiles/ohos-aarch64`，默认 shared；最终运行 RC=0） | ✅ PASS |
 | 上游测试（`make check`，conanfile.py `build()` 内执行） | ✅ 88 passed / 2 skipped / 0 failed（共 90 项） |
 | 包内测试（`test_package`：`test.c` + `test_ohos_tls.c`） | ✅ 全部编译并运行通过 |
 | 日志证据 | `88 tests were successful.` / `2 tests were skipped.` |
 
-## 平台补丁（16 个，`patches/`）
+## 平台补丁（24 个，`patches/`）
 
 由 `ohc-run.py refresh-patch --auto` 生成，全部为平台中立改法（补丁内容不含 `__OHOS__` 平台宏）：
 
@@ -19,15 +19,16 @@
 | 0002-config.sub | 注册 linux-ohos 内核↔OS 组合（E007） |
 | 0003-configure | 生成物随 0001/0002 同步重生成 |
 | 0004-include-osmocom-core-hash.h | `__always_inline` 平台中立改写（musl 无此宏） |
-| 0005-src-core-mnl.c / 0006-src-core-netdev.c / 0009-src-core-stats_tcp.c / 0011-src-gb-gprs_ns2_fr.c | `sockaddr_storage` 重定义守卫（E091） |
-| 0007-src-core-sockaddr_str.c | 上游测试 69 修复 |
-| 0008-src-core-socket.c | 上游测试 61 修复 |
-| 0010-src-core-utils.c | 上游测试 47 修复 |
-| 0012-src-gsm-kdf-crypto.h | 补上游发布包漏打包的头文件（取自 1.11.0 tag 原文，校验 blob 一致） |
-| 0013-tests-gb-gprs_bssgp_test.c | 上游测试 43 修复 |
-| 0014-tests-lapd-lapd_test.c | 上游测试 23 修复 |
-| 0015-tests-osmo_io-osmo_io_test.c | osmo_io 测试临时文件改可写路径 |
-| 0016-tests-use_count-use_count_test.c | use_count 测试 libc 文案宏 |
+| 0005-src-coding-libosmocoding.map / 0006-src-core-libosmocore.map / 0015-src-ctrl-libosmoctrl.map / 0017-src-gb-libosmogb.map / 0019-src-gsm-libosmogsm.map / 0020-src-isdn-libosmoisdn.map | talloc 符号导出，避免 static-only 依赖形成跨 DSO 双实例（E568） |
+| 0007-src-core-mnl.c / 0008-src-core-netdev.c / 0013-src-core-stats_tcp.c / 0016-src-gb-gprs_ns2_fr.c | `sockaddr_storage` 重定义守卫（E091） |
+| 0011-src-core-sockaddr_str.c | 上游测试 69 修复 |
+| 0012-src-core-socket.c | 上游测试 61 修复 |
+| 0014-src-core-utils.c | 上游测试 47 修复 |
+| 0018-src-gsm-kdf-crypto.h | 补上游发布包漏打包的头文件（取自 1.11.0 tag 原文，校验 blob 一致） |
+| 0021-tests-gb-gprs_bssgp_test.c | 上游测试 43 修复 |
+| 0022-tests-lapd-lapd_test.c | 上游测试 23 修复 |
+| 0023-tests-osmo_io-osmo_io_test.c | osmo_io 测试临时文件改可写路径 |
+| 0024-tests-use_count-use_count_test.c | use_count 测试 libc 文案宏 |
 
 ## 平台修复（上游测试 8 例失败 → 全绿）
 
