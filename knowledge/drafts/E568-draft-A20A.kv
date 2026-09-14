@@ -1,116 +1,62 @@
 #====================================================================
-# _template.kv — 知识图谱条目模板
-# 用法: 复制此文件为 E568.kv，填写各字段
-# 对应的人类文档: doc/E568.md
-#
-# 格式规则:
-#   - key: value（冒号后一个空格，value 到行尾）
-#   - 多行值: 下一行以空格开头 = 续行
-#   - 列表值: 逗号分隔
-#   - 正则值: | 分隔多个模式
-#   - 以 # 开头的行为注释
-#   - 空行忽略
+# E568 — 共享库静态烘入 static-only 依赖（talloc）形成双实例 → 跨 DSO 释放 abort
+# 出处: libosmocore/1.11.0 适配（PR #9889）；初版草稿 2026-09-14
 #====================================================================
 
-# ═══ Layer 0: 错误面 (Error Surface) ═══
-# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
-# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
-# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
 id:                     E568
-trigger_tool: conan create
-phase:                  configuration|compilation|linking|installation|testing|runtime
-error_signature: conan create: upstream testsuite 88 tests, 40 failed, mostly Aborted (Signal 6); abort occurs inside talloc _tc_free_internal
+trigger_tool:           conan create
+phase:                  testing|runtime
+error_signature:        88 tests were run, 40 failed|41 failed|Aborted \(Signal 6\)|Bad talloc magic value|_tc_free_internal|libtalloc\.a
 
-# ═══ Layer 1: 识别层 (Recognition) ═══
-# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
-# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
-# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
-#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
-# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
-# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
-# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
-# title:         简短标题(一句话描述错误模式)
 severity: high
-category:               category-name
-match_keywords:         keyword1, keyword2, keyword3
-title:
+category:               linking, static-linking, dependency-library, static-library
+match_keywords:         Aborted, Signal 6, core dumped, talloc, libtalloc.a, Bad talloc magic value, _tc_free_internal, static-only, LOCAL symbol, two instances
+title:                  共享库静态烘入 static-only 依赖（如 talloc）形成双实例：跨 DSO 释放 abort（Signal 6）
 
-# ═══ Layer 2: 诊断层 (Diagnosis) ═══
-# root_cause:       一句话根因描述(逗号可分行)
-# affected_scope:   影响范围
-# verification_cmd: 验证诊断是否正确的命令
-root_cause: Registry talloc/2.4.4 ships only libtalloc.a and its archive symbols are LOCAL (nm shows lowercase t for _tc_free_internal). Every libosmocore DSO that links it statically embeds its own private talloc instance; libosmocore passes talloc contexts across DSO boundaries so cross-DSO frees abort. LOCAL symbols cannot be exported, hence no link flag (e.g. -Wl,--export-dynamic-symbol) can fix it.
-affected_scope:
-verification_cmd:
+root_cause:             制品仓依赖只有静态变体（如 talloc/2.4.4 仅 libtalloc.a，无 shared 选项），消费者构建共享库时把该静态库私有烘入（libtool 生成版本脚本 + -Wl,--exclude-libs 使其不被导出，实测 nm -D 中 talloc 符号数 = 0）；而调用方二进制（测试程序 / 应用）又各自链接同一份静态库。当该依赖内部带「按实例随机化的状态」时，进程内出现两份实例即崩溃：talloc 的 chunk magic 由 talloc_test_get_magic 按每实例随机生成，错配时报 "Bad talloc magic value - unknown value" 后 abort()。若静态库符号为 LOCAL（nm 显示小写 t，如 _tc_free_internal），任何链接期手段都无法导出以去重（-Wl,--export-dynamic-symbol 实测导出 0 个）。
+affected_scope:         多 DSO 结构 + 依赖只发静态变体 + 依赖内部有按实例随机化/全局状态（talloc、部分分配器、openssl 类全局初始化）的组合；共享库把静态依赖烘入且依赖符号被版本脚本隐藏时必然触发
+verification_cmd:       nm -D --defined-only src/core/.libs/libosmocore.so.22.1.0 | grep -c talloc   # =0 表示依赖被静态烘入且未导出; readelf -d ./tests/abis/abis_test | grep NEEDED   # 无 libtalloc.so.2 = 各自静态烘入
 
-# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
-# 推荐方案 (priority 越小越优先, 从 1 开始)
-rec_priority:
-rec_approach: For multi-DSO consumers require a SHARED or at least default-visibility talloc; publish the talloc shared variant before the consumer (R36 dependency-first). Pre-checks: readelf -d lib.so | grep libtalloc should show NEEDED libtalloc.so.2; nm libtalloc.a | grep _tc_free_internal must be an uppercase T (global), lowercase t means LOCAL and is unusable.
-rec_description:        一句话描述这个推荐方案
-rec_command:            可选: 具体命令模板(${VAR}变量引用)
-rec_auto_fix:           true|false                  # 引擎能否自动执行
-rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+rec_priority:           1
+rec_approach:           正确修法在依赖侧（R36 顺序：依赖先发布，消费者再 requires）：给依赖配方增加 shared 选项并发布 shared 变体（或至少发布 default-visibility 的静态变体），消费者 requires 该变体 → 恢复上游默认的「共享依赖」语义。注意：消费者侧「改静态交付」规避已被实测证伪——静态归档不会拉入没有未定义符号引用的成员，依赖里 constructor（on_dso_load 类）注册的插件/算法表会静默缺失（本包实测 gea_test 输出 GEA3 support: 0、8 项能力类用例失败）；加 -Wl,--whole-archive 强制拉入后，上游测试里靠符号 interpose 打桩的用例反被库内定义抢占（失败 8→13 项），且上游源码无 whole-archive 方案可参照。故正确动作是如实上报 dependency_missing、保留上游默认共享交付。
+rec_description:        正确修法：依赖侧发布 shared（或 default-visibility）变体；消费者侧改静态交付的规避已证伪
+rec_command:            依赖侧：给 talloc 配方加 options={"shared":[True,False]} + 按 shared 产出 libtalloc.so 后发布（R37 版本号递增，如 talloc/2.4.4.1）；消费者侧：self.requires("talloc/2.4.4.1") + default_options={"talloc/*:shared": True}，保持 --enable-shared --disable-static
+rec_auto_fix:           false
+rec_impl:
 
-# 回退方案 (当推荐方案不可用时尝试)
 fallback_priority:      2
-fallback_approach:
-fallback_description:
-fallback_command:
+fallback_approach:      若必须共享交付：先由依赖侧发布 shared（或至少 default-visibility）变体（R36 依赖优先：依赖先发布再构建下游），再让消费者 requires 该变体回落共享交付；此路径跨包，需依赖包作者配合，且 registry 必须允许同版本新增 shared 变体。
+fallback_description:   依赖侧先发 shared/default-visibility 变体（跨包阻塞，需上游配合）
+fallback_command:       conan create talloc/2.4.4 -o talloc/*:shared=True   # 前提：依赖配方本身含 shared 选项
 fallback_auto_fix:      false
-fallback_impl:
 
-# ★ 禁止策略 (与推荐方案同等重要) ★
-# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
-# forbid_N_reason:      为什么禁止
-# forbid_N_consequence: 违反后的后果
-forbid_1_pattern:
-forbid_1_reason:
-forbid_1_consequence:
-# forbid_2_pattern:
-# forbid_2_reason:
-# forbid_2_consequence:
+forbid_1_pattern:       conan create.*--build=missing|--enable-shared.*--disable-static
+forbid_1_reason:        依赖只有静态变体且依赖内部状态按实例随机化时，共享消费者库必然形成双实例
+forbid_1_consequence:   运行时 abort（Signal 6）：实测上游测试 88 项中本地 40 项 / CI 41 项失败，且任何下游消费者二进制同样会崩
+forbid_2_pattern:       package_type\s*=\s*"static-library".*规避|--disable-shared\s+--enable-static
+forbid_2_reason:        消费者侧改静态交付规避：静态归档不拉入没有未定义符号引用的成员 → 依赖的 constructor 式注册（on_dso_load）不执行；用 --whole-archive 补救又使测试的符号 interpose 打桩失效
+forbid_2_consequence:   能力静默缺失（gea_test 输出 GEA3 support: 0，期望 1）+ 失败用例由 8 项升至 13 项；交付形态不等价于上游语义，正确动作是上报 dependency_missing 并保持共享交付
 
-# ═══ Layer 4: 原则引用 ═══
-# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
 principles:
 
-# ═══ 关系图 (Relations) ═══
-# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
-# caused_by:       本模式的根因是这些模式 (应先修它们)
-# similar_to:      特征相似可能混淆的模式
-# conflicts_with:  解决方案互相冲突的模式
-# prerequisite_of: 本模式是修复这些模式的前置条件
 causes:                 []
 caused_by:              []
 similar_to:             []
 conflicts_with:         []
 prerequisite_of:        []
 
-# ═══ 元数据 ═══
 doc_file:               doc/E568.md
-last_updated: 2026-09-14
-source_event:           # 触发此条目创建的编译事件(如有)
+last_updated:           2026-09-14
+source_event:           libosmocore/1.11.0 conan create: 88 tests, 40/41 failed (37 例 Aborted/Signal 6); abort 点 _tc_free_internal
 
-# ═══ 知识协作 (Authorship & Provenance) ═══
-# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
-#          草稿生成时自动从 git config 填入；主编合入时保留原作者
-#          合并到已有条目时追加为第二/第三作者
-# source_pr:            添加该条目的 PR 编号
-# source_commit:        添加时的 commit SHA (短)
 authors:
-source_pr:
+source_pr:              9889
 source_commit:
 
-# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
-# metrics_success_count: 该修复方案成功次数
-# metrics_fail_count:    该修复方案失败次数
-# metrics_confidence:    置信度 = success / (success + fail)
-# metrics_last_used:     最后使用时间
-metrics_success_count:  0
+metrics_success_count:  1
 metrics_fail_count:     0
-metrics_confidence:     0.0
-metrics_last_used:
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-14
 
 draft: true
 contributor_id: A20A

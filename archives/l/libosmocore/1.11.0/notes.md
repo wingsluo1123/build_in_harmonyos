@@ -24,7 +24,7 @@
 
 ```sh
 ./configure --prefix=<prefix> --disable-gnutls --disable-libsctp --disable-uring \
-    --enable-static --disable-shared \
+    --enable-shared --disable-static \
     CFLAGS="-fPIC -O2 -std=gnu11 -DBUILDING_LIBOSMOCORE -fno-emulated-tls"
 make -j2 && make check && make install DESTDIR=<staging>
 ```
@@ -56,16 +56,19 @@ make -j2 && make check && make install DESTDIR=<staging>
 | 61 socket | musl `getaddrinfo` 对 SCTP 协议提示返回 `EAI_SERVICE`(-8)，重试逻辑过宽 | `src/core/socket.c`：重试收窄到仅 `EAI_SERVICE`（补丁 0008） |
 | 86 / 其余 | 随上述修复一并通过 | — |
 
-## 适配阻塞：talloc 需 shared 变体（依赖优先，R36）
+## talloc 双实例根因（阻塞项：依赖侧需提供 shared 变体）
 
-- **结论**：本包源码与补丁已可编译（构建阶段全绿），但上游测试套件在**制品仓 talloc 二进制**下 40/88 失败；根因不在本包代码，需先在依赖侧补 shared 变体。
+- **结论**：本包源码与补丁可编译（构建阶段全绿）；上游测试套件在**制品仓静态 talloc** 下 40/88 失败，根因不在本包代码，而在「共享 libosmocore + 静态 talloc」这一组合必然形成两个 talloc 实例。
+- **机制（决定性）**：talloc 的 chunk magic 按「每个 talloc 实例」随机生成（上游自带 `talloc_test_get_magic`，错配时报 `Bad talloc magic value - unknown value` 后 `abort()`）。`libosmocore.so` 把 `libtalloc.a` 私有烘入（libtool 版本脚本 + `--exclude-libs` 使其不导出，`nm -D` 中 talloc 符号数 = **0**），调用方二进制又各自链接一份 `libtalloc.a` → 两实例、两套 magic → 跨实例释放即 abort。
+- **静态交付方案（已实验，证伪）**：改用静态交付（`package_type = "static-library"`、`--disable-shared --enable-static`）确实消除了 talloc 双实例，但上游有 25 处 `on_dso_load(...)` 构造函数注册（cipher/auth/KDF 等插件表）依赖「DSO 加载即执行」；静态归档成员若没有可达的未定义符号引用，链接器不会拉入 → 构造函数不执行、能力静默缺失（实测 `gea_test` 输出 `GEA3 support: 0`、期望 1；`auth`/`comp128`/`gea`/`oap_client` 等 8 项用例失败）。改用 `-Wl,--whole-archive` 强制拉入后，上游测试里靠符号 interpose 打桩的用例反被库内定义抢占（stub 失效），失败数由 8 项升至 13 项；上游源码中不存在任何 `whole-archive` 方案可参照（源码全文 `grep -rn whole-archive` 无命中）→ 静态交付不等价于上游语义，已放弃。
+- **当前状态（阻塞项）**：本包按**上游默认共享交付**提交；制品仓 `talloc/2.4.4` 缺 shared 变体，故 CI 等价环境（scrubbed）下 `make check` 必现失败（本地 40 项 / CI 41 项，均为 `Aborted (Signal 6)`）。**解除条件**：talloc 配方增加 `shared` 选项并发布 shared 变体（或发布 default-visibility 的静态变体），届时本包改 `requires` 其 shared 变体即可恢复 88/88。
 - **证据链**：
   1. 上游设计要求 shared talloc：以本机 shared talloc 构建时 `readelf -d src/core/.libs/libosmocore.so.22.1.0` → `NEEDED libtalloc.so.2`，测试 **88/88 通过**；
   2. 制品仓 `talloc/2.4.4` 仅含 `libtalloc.a`，且符号为 LOCAL：`nm libtalloc.a` → `0000000000004e9c t _tc_free_internal`（小写 `t`）；
   3. 未发布 shared 二进制：`conan install --requires=talloc/2.4.4 -o "talloc/*:shared=True" -r=ohpcd --build=never` → `RC=6 There are invalid packages`；
   4. 后果：每个链接 talloc 的 DSO 各自静态嵌入一份**私有** talloc 实例；libosmocore 在上游设计上跨 DSO 传递 talloc 上下文，释放时进入 `_tc_free_internal` → `abort()`（Signal 6，37 例 `Aborted`）；
   5. 链接层不可修复（已实测）：archive 内符号为 LOCAL，`-Wl,--export-dynamic-symbol=_talloc_*` 重链接后导出的 talloc 符号数 **= 0**；`-O2`/`-O3`、whole-archive 烘焙均不影响结论。
-- **待依赖侧动作**：为 talloc 发布 shared（或至少 default-visibility）变体后，本包可直接回落验证（配方无需再改）。
+- **回归约束**：本包保持共享交付（`--enable-shared --disable-static`），不得为规避该阻塞改回静态交付（构造函数注册语义不可用）；依赖侧发布 shared talloc 变体后，把 `requires` 指向该变体并复跑 W3，确认 88/88。
 
 ## 源码修改
 
@@ -96,9 +99,10 @@ make -j2 && make check && make install DESTDIR=<staging>
 ## 验证结果
 
 - 编译：`conan create` 成功（configure/make/make check/make install 全部通过，0 error）
-- 上游测试（`make check`，automake testsuite）：**结果取决于 talloc 二进制形态**（详见上节「适配阻塞」）
+- 上游测试（`make check`，automake testsuite）：**结果取决于 talloc 变体**（详见上节「talloc 双实例根因」）
   - 生产者环境（shared talloc，即本机 `libtalloc.so.2`）：**88 passed / 2 skipped / 0 failed（共 90 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
-  - 制品仓 talloc（static-only、符号 LOCAL，即 CI 等价环境）：**48 passed / 40 failed**，失败集中于 37 例 `Aborted (Signal 6)`，abort 点位于 `_tc_free_internal`
+  - 制品仓 talloc（static-only、符号 LOCAL，即 CI 等价环境）：**本地 48 passed / 40 failed；CI 41 failed**，失败集中于 `Aborted (Signal 6)`，abort 点位于 `_tc_free_internal`
+  - 静态交付对照实验（已证伪）：构造函数注册丢失 → 8 项能力类用例失败 + 2 项链接冲突；再叠加 `-Wl,--whole-archive` 后 stub 类用例被库内定义抢占 → 13 项失败
   - 跳过项：`61 socket_sctp`（平台无 SCTP）、`87 osmo_io (uring)`（平台 uring 被 seccomp 拦截，配方向上游开关关闭）
 - 包内测试（`test_package`）：
   - `test.c`：冒烟（`osmo_hexdump` / `osmo_str_tolower` / `osmo_bcd2str` / `osmo_sockaddr_str_from_str` / `osmo_ctx_init` / `osmo_cbsp_errstr` / `osmo_amr_s_to_d`）
@@ -127,5 +131,5 @@ make -j2 && make check && make install DESTDIR=<staging>
 - 第 1/2 项属 CI 输入文件（`conanfile.py` / `conandata.yml`）的行为中立改动，W3 与 CI 均以当前文件重新构建验证。
 ---
 
-**编译结束**: 2026-09-14 03:33
-**最终状态**: dependency_missing（阻塞：制品仓 `talloc/2.4.4` 为 static-only 且符号 LOCAL，需先发布 shared/default-visibility 变体；本包构建阶段已全绿）
+**编译结束**: 2026-09-14 10:42
+**最终状态**: failed（配方与补丁可编译；CI 等价环境下上游测试被依赖侧 talloc 阻塞，待 shared 变体发布后可恢复 88/88，见上节）

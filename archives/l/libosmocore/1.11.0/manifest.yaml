@@ -14,7 +14,8 @@ software: "libosmocore"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+# failed：配方与补丁可编译，但 CI 等价环境下上游测试必现失败（依赖侧 talloc 无 shared 变体，见 notes.md 与 E568）
+status: failed
 
 # 编译日期（YYYY-MM-DD）
 build_date: "2026-09-13"
@@ -45,11 +46,19 @@ build:
   system: autotools
 
   # 配置选项列表（clean-verify 会逐条作为 configure 参数执行，此处仅可写可执行参数）
+  # G0 干净构建只消费首条：clean_verify.py 把该串整体以 shlex.quote 作单个参数传入，
+  # 一条里写多个开关会被 configure 当成一个参数（invalid feature name）→ 每条只放一个开关
   configure_options:
-  - "--enable-shared --disable-static"
-  - "--disable-gnutls --disable-libsctp --disable-uring"
+  - "--enable-shared"
+  - "--disable-static"
+  - "--disable-gnutls"
+  - "--disable-libsctp"
+  - "--disable-uring"
   # 说明：
-  # - shared=True 为默认（动态库）；仅系统同名库场景才传 shared=False 静态
+  # - 交付形态：共享库（上游默认）。制品仓 talloc/2.4.4 仅静态变体且 chunk magic 按实例随机，
+  #   共享 libosmocore 会私有烘入 libtalloc.a 并与调用方二进制形成两个 talloc 实例，跨实例
+  #   操作触发 abort（CI 实测 41/88 失败）→ 该阻塞须依赖侧修复；静态交付已实验证伪
+  #   （上游 25 处 on_dso_load 构造函数注册在静态归档下不被拉入，详见 notes.md 与 E568）
   # - extra_cflags/extra_cxxflags 追加 -fno-emulated-tls（原生 TLS，见 notes.md 问题 1）
   # - --disable-libmnl/--disable-libusb/--disable-pcsc 仅在对应 with_* 选项关闭时传入，
   #   默认自动探测制品仓依赖
@@ -108,7 +117,7 @@ knowledge_gained:
   - "libtool 版本脚本 + clang lld 下 DSO 符号不能被可执行文件 interpose，测试桩须在测试侧接线（ref: E175）"
   - "上游发布 tarball 可能漏打包 git 中存在的头文件（1.11.0 缺 src/gsm/kdf/crypto.h），用上游 tag 原文补齐并以 /dev/null 新增补丁交付（ref: E254、DRAFT-release-tarball-missing-cmake-submodule）"
   - "Conan 对 package_type=static-library 的依赖默认不传递 headers/libs：配方 cpp_info.components 里的 talloc::talloc 引用会被 CMakeDeps 静默剔除（生成物中 FIND_DEPENDENCY_NAMES 与 DEPENDENCIES_RELEASE 为空），下游 test_package 编译期 'talloc.h' file not found（ref: E567、DRAFT-conan2-cmakedeps-transitive-include-strip）"
-  - "制品仓 talloc/2.4.4 为 static-only 且符号为 LOCAL（nm 显示小写 t，如 _tc_free_internal）：多 DSO 消费者（libosmocore）会各自静态嵌入私有 talloc 实例，跨 DSO 传递 talloc 上下文后释放触发 abort（Signal 6，40/88 用例失败）；LOCAL 符号无法用链接旗标（--export-dynamic-symbol）导出，须由依赖侧先发布 shared/default-visibility 变体（ref: E568）"
+  - "talloc 的 chunk magic 按「每个 talloc 实例」随机生成（上游 talloc_test_get_magic；错配时报 'Bad talloc magic value - unknown value' 后 abort）：制品仓 talloc/2.4.4 只有静态变体，共享库 libosmocore.so 会把 libtalloc.a 私有烘入（libtool 版本脚本 + --exclude-libs 使其不导出，nm -D 中 talloc 符号数为 0），与调用方二进制里的 talloc 形成双实例 → 跨实例释放 abort（实测 Signal 6，88 项上游测试 41 项失败）；链接旗标无解（LOCAL 符号，--export-dynamic-symbol 导出 0 个）→ 静态交付试验同样证伪（上游 25 处 on_dso_load 构造函数注册在静态归档下不被拉入，实现能力静默缺失；用 --whole-archive 强制拉入又使测试的符号 interpose 打桩失效，失败数 8→13）→ 本包保持上游默认共享交付，解除条件 = 依赖侧发布 shared talloc 变体（ref: E568）"
 # 例如:
 # - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
 # - "内嵌 libuv 需要禁用，使用系统 libuv"
@@ -118,8 +127,8 @@ patch_generation:
   source_orig_dir: /storage/Users/currentUser/builds/libosmocore-1.11.0.orig
   source_work_dir: /storage/Users/currentUser/builds/libosmocore-1.11.0.work
   source_orig_hash: 65cd201ce2ee3076
-  source_work_hash: 95123a1f6649760e
-  generated_at: '2026-09-14T03:33:07'
+  source_work_hash: 1802e0f96530486c
+  generated_at: '2026-09-14T10:42:18'
   patches_count: 18
 
 patch_classification:
