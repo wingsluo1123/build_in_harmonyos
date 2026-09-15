@@ -18,11 +18,12 @@ libosmoctrl、libosmocodec、libosmocoding、libosmoisdn 共 10 个库，
 
 ## 依赖
 
-- talloc / liburing / libmnl / pcsc-lite / libusb（均为制品仓预编译包）
+- talloc / libmnl / pcsc-lite / libusb（均为制品仓预编译包）
+- `liburing` 不引入：平台 seccomp 拦截 io_uring，配方以 `--disable-uring` 关闭该可选后端
 
 ## 功能验证
 
-- 上游测试：90 项全部执行，通过 88 项，跳过 2 项（SCTP 内核不支持、io_uring 测试主动禁用）
+- 上游测试：90 项中执行 88 项、通过 88 项、0 失败，2 项跳过（SCTP 内核不支持、io_uring 被 seccomp 拦截；均由上游 `AT_SKIP_IF` 条件跳过）
 - 鸿蒙专有测试：`test_package/test_ohos_tls.c`，验证 `osmo_ctx` 上下文经原生 TLS 跨 DSO 可正常访问
 
 ## 参考

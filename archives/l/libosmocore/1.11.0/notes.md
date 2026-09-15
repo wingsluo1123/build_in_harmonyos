@@ -56,32 +56,34 @@ make -j2 && make check && make install DESTDIR=<staging>
 | 61 socket | musl `getaddrinfo` 对 SCTP 协议提示返回 `EAI_SERVICE`(-8)，重试逻辑过宽 | `src/core/socket.c`：重试收窄到仅 `EAI_SERVICE`（补丁 0008） |
 | 86 / 其余 | 随上述修复一并通过 | — |
 
-## talloc 双实例根因（阻塞项：依赖侧需提供 shared 变体）
+## talloc 双实例问题（已在本包内解决：唯一宿主符号导出）
 
-- **结论**：本包源码与补丁可编译（构建阶段全绿）；上游测试套件在**制品仓静态 talloc** 下 40/88 失败，根因不在本包代码，而在「共享 libosmocore + 静态 talloc」这一组合必然形成两个 talloc 实例。
+- **结论**：本包源码与补丁可编译（构建阶段全绿）；上游测试套件在**制品仓静态 talloc** 下曾 40~41 项失败，根因不在本包代码，而在「共享 libosmocore + 静态 talloc」这一组合形成两个 talloc 实例。**该问题已在本包内解决**（见下方「解决方案」，无需依赖侧改动）；当前本地 `conan create` 与官方 CI #47971 均为 **88 通过 / 2 跳过 / 0 失败**。
 - **机制（决定性）**：talloc 的 chunk magic 按「每个 talloc 实例」随机生成（上游自带 `talloc_test_get_magic`，错配时报 `Bad talloc magic value - unknown value` 后 `abort()`）。`libosmocore.so` 把 `libtalloc.a` 私有烘入（libtool 版本脚本 + `--exclude-libs` 使其不导出，`nm -D` 中 talloc 符号数 = **0**），调用方二进制又各自链接一份 `libtalloc.a` → 两实例、两套 magic → 跨实例释放即 abort。
 - **静态交付方案（已实验，证伪）**：改用静态交付（`package_type = "static-library"`、`--disable-shared --enable-static`）确实消除了 talloc 双实例，但上游有 25 处 `on_dso_load(...)` 构造函数注册（cipher/auth/KDF 等插件表）依赖「DSO 加载即执行」；静态归档成员若没有可达的未定义符号引用，链接器不会拉入 → 构造函数不执行、能力静默缺失（实测 `gea_test` 输出 `GEA3 support: 0`、期望 1；`auth`/`comp128`/`gea`/`oap_client` 等 8 项用例失败）。改用 `-Wl,--whole-archive` 强制拉入后，上游测试里靠符号 interpose 打桩的用例反被库内定义抢占（stub 失效），失败数由 8 项升至 13 项；上游源码中不存在任何 `whole-archive` 方案可参照（源码全文 `grep -rn whole-archive` 无命中）→ 静态交付不等价于上游语义，已放弃。
-- **当前状态（阻塞项）**：本包按**上游默认共享交付**提交；制品仓 `talloc/2.4.4` 缺 shared 变体，故 CI 等价环境（scrubbed）下 `make check` 必现失败（本地 40 项 / CI 41 项，均为 `Aborted (Signal 6)`）。**解除条件**：talloc 配方增加 `shared` 选项并发布 shared 变体（或发布 default-visibility 的静态变体），届时本包改 `requires` 其 shared 变体即可恢复 88/88。
+- **解决方案（本包内落地，无需依赖侧改动）**：在宿主 DSO `libosmocore.so` 的版本脚本（`*.map`）的 `global:` 段导出 talloc 公开符号，使 `libosmocore.so` 成为 **talloc 唯一宿主**；兄弟共享库改为引用其导出（实测 `libosmocore.so` 导出 71 个 talloc 符号，`libosmogsm` 等由「静态烘入」变为「未定义引用」）。**效果：40~41 项失败 → 0 失败**，官方 CI #47971 与本地 `conan create`（scrubbed 环境）均通过。涉及补丁：`0005`/`0006`/`0015`/`0017`/`0019`/`0020`（各库 `.map`）。
 - **证据链**：
   1. 上游设计要求 shared talloc：以本机 shared talloc 构建时 `readelf -d src/core/.libs/libosmocore.so.22.1.0` → `NEEDED libtalloc.so.2`，测试 **88/88 通过**；
   2. 制品仓 `talloc/2.4.4` 仅含 `libtalloc.a`，且符号为 LOCAL：`nm libtalloc.a` → `0000000000004e9c t _tc_free_internal`（小写 `t`）；
   3. 未发布 shared 二进制：`conan install --requires=talloc/2.4.4 -o "talloc/*:shared=True" -r=ohpcd --build=never` → `RC=6 There are invalid packages`；
   4. 后果：每个链接 talloc 的 DSO 各自静态嵌入一份**私有** talloc 实例；libosmocore 在上游设计上跨 DSO 传递 talloc 上下文，释放时进入 `_tc_free_internal` → `abort()`（Signal 6，37 例 `Aborted`）；
   5. 链接层不可修复（已实测）：archive 内符号为 LOCAL，`-Wl,--export-dynamic-symbol=_talloc_*` 重链接后导出的 talloc 符号数 **= 0**；`-O2`/`-O3`、whole-archive 烘焙均不影响结论。
-- **回归约束**：本包保持共享交付（`--enable-shared --disable-static`），不得为规避该阻塞改回静态交付（构造函数注册语义不可用）；依赖侧发布 shared talloc 变体后，把 `requires` 指向该变体并复跑 W3，确认 88/88。
+- **回归约束**：本包保持共享交付（`--enable-shared --disable-static`），不得改回静态交付（构造函数注册语义不可用）；6 个 `.map` 补丁（`0005`/`0006`/`0015`/`0017`/`0019`/`0020`）不得移除，否则跨 DSO 双实例 abort 会回归。
 
 ## 源码修改
 
-全部改动以补丁形式交付（`patches/`，共 18 个，由 `ohc-run.py refresh-patch --auto` 生成）：
+全部改动以补丁形式交付（`patches/`，共 25 个，由 `ohc-run.py refresh-patch --auto` 生成）：
 
 - `0001-config.guess.patch`、`0002-config.sub.patch` — 平台识别（linux-ohos）
 - `0003-configure.patch` — 生成物同步（随 0001/0002 重生成）
 - `0004-include-osmocom-core-hash.h.patch` — `__always_inline` 平台中立写法
-- `0005-src-core-mnl.c.patch`、`0006-src-core-netdev.c.patch`、`0011-src-core-stats_tcp.c.patch`、`0013-src-gb-gprs_ns2_fr.c.patch` — `sockaddr_storage` 守卫（E091）
-- `0007-src-core-osmo_io_internal.h.patch`、`0008-src-core-osmo_io_uring.c.patch` — SCTP include 平台守卫（CI 首个失败：无 SCTP 头环境下 `netinet/sctp.h` 缺失；沿用上游 `socket.c` 的守卫风格）
-- `0009-src-core-sockaddr_str.c.patch`、`0010-src-core-socket.c.patch`、`0012-src-core-utils.c.patch` — 上游测试 69/61/47
-- `0014-src-gsm-kdf-crypto.h.patch` — 补齐上游漏打包头文件
-- `0015-tests-gb-gprs_bssgp_test.c.patch`、`0016-tests-lapd-lapd_test.c.patch`、`0017-tests-osmo_io-osmo_io_test.c.patch`、`0018-tests-use_count-use_count_test.c.patch` — 测试侧适配
+- `0005-src-coding-libosmocoding.map.patch`、`0006-src-core-libosmocore.map.patch`、`0015-src-ctrl-libosmoctrl.map.patch`、`0017-src-gb-libosmogb.map.patch`、`0019-src-gsm-libosmogsm.map.patch`、`0020-src-isdn-libosmoisdn.map.patch` — talloc 符号唯一宿主导出（E568）
+- `0007-src-core-mnl.c.patch`、`0008-src-core-netdev.c.patch`、`0013-src-core-stats_tcp.c.patch`、`0016-src-gb-gprs_ns2_fr.c.patch` — `sockaddr_storage` 守卫（E091）
+- `0009-src-core-osmo_io_internal.h.patch`、`0010-src-core-osmo_io_uring.c.patch` — SCTP include 平台守卫（CI 首个失败：无 SCTP 头环境下 `netinet/sctp.h` 缺失；沿用上游 `socket.c` 的守卫风格）
+- `0011-src-core-sockaddr_str.c.patch`、`0012-src-core-socket.c.patch`、`0014-src-core-utils.c.patch` — 上游测试 69/61/47
+- `0018-src-gsm-kdf-crypto.h.patch` — 补齐上游漏打包头文件（`--- /dev/null` 新增文件补丁；必须保持该头，若 refresh 后被改回 `--- a/...` 需先删除 `.orig` 侧残留的 0 字节同名文件再重生成）
+- `0021-tests-exec-exec_test.c.patch` — 上游测试 72：改用 POSIX shell 内建 `printf` 输出被传递的环境变量，不再依赖 worker 外部 `env`/`grep`
+- `0022-tests-gb-gprs_bssgp_test.c.patch`、`0023-tests-lapd-lapd_test.c.patch`、`0024-tests-osmo_io-osmo_io_test.c.patch`、`0025-tests-use_count-use_count_test.c.patch` — 测试侧适配
 
 约定：补丁不含 `__OHOS__` 平台宏（R8），全部为平台中立改法；`conandata.yml` 的 patches 条目**不写 `strip`**（conan 使用 patch_ng，`a/` `b/` 前缀自动剥离，`strip=0` 即正确——实测显式 `strip: 1` 会把新增文件写到上一层目录）。
 
@@ -99,11 +101,11 @@ make -j2 && make check && make install DESTDIR=<staging>
 ## 验证结果
 
 - 编译：`conan create` 成功（configure/make/make check/make install 全部通过，0 error）
-- 上游测试（`make check`，automake testsuite）：**结果取决于 talloc 变体**（详见上节「talloc 双实例根因」）
-  - 生产者环境（shared talloc，即本机 `libtalloc.so.2`）：**88 passed / 2 skipped / 0 failed（共 90 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
-  - 制品仓 talloc（static-only、符号 LOCAL，即 CI 等价环境）：**本地 48 passed / 40 failed；CI 41 failed**，失败集中于 `Aborted (Signal 6)`，abort 点位于 `_tc_free_internal`
-  - 静态交付对照实验（已证伪）：构造函数注册丢失 → 8 项能力类用例失败 + 2 项链接冲突；再叠加 `-Wl,--whole-archive` 后 stub 类用例被库内定义抢占 → 13 项失败
-  - 跳过项：`61 socket_sctp`（平台无 SCTP）、`87 osmo_io (uring)`（平台 uring 被 seccomp 拦截，配方向上游开关关闭）
+- 上游测试（`make check`，automake testsuite）：**88 passed / 2 skipped / 0 failed（共 90 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
+  - 历史失败（已解决）：制品仓 talloc 为 static-only 且符号 LOCAL，曾在 CI 等价环境造成 40~41 项 `Aborted (Signal 6)`（abort 点 `_tc_free_internal`）；根因与解法见上节「talloc 双实例问题」，现已在本包内通过唯一宿主导出修复。
+  - 静态交付对照实验（已证伪，勿再尝试）：构造函数注册丢失 → 8 项能力类用例失败 + 2 项链接冲突；再叠加 `-Wl,--whole-archive` 后 stub 类用例被库内定义抢占 → 13 项失败。
+  - 跳过项：`61 socket_sctp`（平台无 SCTP）、`87 osmo_io (uring)`（平台 uring 被 seccomp 拦截，配方向上游开关关闭）；两项均由上游自带 `AT_SKIP_IF` 条件产生。
+- 官方 CI：#47971（2026-09-15）**校验通过** —— `conan-build-test` ✅、L0 门禁 ✅、L1 门禁 ✅、`Conan test_package` ✅。
 - 包内测试（`test_package`）：
   - `test.c`：冒烟（`osmo_hexdump` / `osmo_str_tolower` / `osmo_bcd2str` / `osmo_sockaddr_str_from_str` / `osmo_ctx_init` / `osmo_cbsp_errstr` / `osmo_amr_s_to_d`）
   - `test_ohos_tls.c`：鸿蒙专项——跨 DSO 访问库内 TLS（`osmo_ctx`）验证原生 TLS 语义（emutls 下该程序链接/运行均失败，作为反向证据）
@@ -111,7 +113,7 @@ make -j2 && make check && make install DESTDIR=<staging>
 
 ## 交付物
 
-- `conanfile.py` / `conandata.yml` / `patches/`（18 个）/ `test_package/`（含 `test.c`、`test_ohos_tls.c`、`MANIFEST.yml`）
+- `conanfile.py` / `conandata.yml` / `patches/`（25 个）/ `test_package/`（含 `test.c`、`test_ohos_tls.c`、`MANIFEST.yml`）
 - `reports/test-report.md`（上游测试与包内测试明细）
 - 版本索引：`archives/l/libosmocore/manifest.yaml`
 
@@ -120,10 +122,10 @@ make -j2 && make check && make install DESTDIR=<staging>
 - `--disable-gnutls/--disable-libsctp/--disable-uring` 为平台能力/依赖所限的默认关闭项；依赖具备后可改用 `with_*` 选项打开（libmnl/libusb/pcsc 已默认打开）。
 - PCSC/USB/MNL 依赖在配置期为自动探测；配方已通过 `PkgConfigDeps` 注入 `.pc`，无需手工设置 `PKG_CONFIG_PATH`。
 - 本地探索阶段曾遇到 `.la` 级联报错（`libmnl.so` 开发软链缺失）与 `pkg-config` 搜索路径问题，均为本机环境因素，**不属于交付内容**（配方通过 conan 依赖注入解决）。
-- musl 与 glibc 的文案/errno/`getaddrinfo` 差异集中在测试期望适配（补丁 0014/0016/0008），不影响库语义。
+- musl 与 glibc 的文案/errno/`getaddrinfo` 差异集中在测试期望适配（补丁 0023/0025/0012），不影响库语义。
 ## W4 独立审计（Pre-PR）
 
-- 审计结论：`pass`（P0=0 / P1=0；P2=3、P3=3 均为非阻塞建议），报告见 `reports/audit-result.json`。
+- 审计结论：`pass`（P0=0 / P1=0；P2=1、P3=2 均为非阻塞建议），报告见 `reports/audit-result.json`。首次审计的 P2 三项（`patch_type` 未统一、`conanfile.py` 方法顺序、README 依赖清单含未使用的 liburing）已全部整改；末次「唯一宿主导出 + `exec` 测试修复」后的复检同样为 pass。
 - 审计后按仓库规范（`.gitcode/code-style.md`）落地 3 处行为中立的整改，未重新触发 W3 编译：
   1. `conanfile.py` 方法顺序调整为 `export_sources → requirements → layout → source → generate → build`（§3：`layout()` 与 `requirements()` 对调；Conan 按方法名调用，运行时行为不变）。
   2. `conandata.yml` 中 4 个补丁的 `patch_type` 由 `"bugfix"` 统一为 `"portability"`（§12：`patch_type` 仅为元数据，不参与补丁应用）。

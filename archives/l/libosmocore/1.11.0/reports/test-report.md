@@ -9,7 +9,7 @@
 | 包内测试（`test_package`：`test.c` + `test_ohos_tls.c`） | ✅ 全部编译并运行通过 |
 | 日志证据 | `88 tests were successful.` / `2 tests were skipped.` |
 
-## 平台补丁（24 个，`patches/`）
+## 平台补丁（25 个，`patches/`）
 
 由 `ohc-run.py refresh-patch --auto` 生成，全部为平台中立改法（补丁内容不含 `__OHOS__` 平台宏）：
 
@@ -21,16 +21,18 @@
 | 0004-include-osmocom-core-hash.h | `__always_inline` 平台中立改写（musl 无此宏） |
 | 0005-src-coding-libosmocoding.map / 0006-src-core-libosmocore.map / 0015-src-ctrl-libosmoctrl.map / 0017-src-gb-libosmogb.map / 0019-src-gsm-libosmogsm.map / 0020-src-isdn-libosmoisdn.map | talloc 符号导出，避免 static-only 依赖形成跨 DSO 双实例（E568） |
 | 0007-src-core-mnl.c / 0008-src-core-netdev.c / 0013-src-core-stats_tcp.c / 0016-src-gb-gprs_ns2_fr.c | `sockaddr_storage` 重定义守卫（E091） |
+| 0009-src-core-osmo_io_internal.h / 0010-src-core-osmo_io_uring.c | `<netinet/sctp.h>` 无条件包含，未装 libsctp 头文件的环境编译失败；按上游 `socket.c` 既有写法加条件守卫 |
 | 0011-src-core-sockaddr_str.c | 上游测试 69 修复 |
 | 0012-src-core-socket.c | 上游测试 61 修复 |
 | 0014-src-core-utils.c | 上游测试 47 修复 |
-| 0018-src-gsm-kdf-crypto.h | 补上游发布包漏打包的头文件（取自 1.11.0 tag 原文，校验 blob 一致） |
-| 0021-tests-gb-gprs_bssgp_test.c | 上游测试 43 修复 |
-| 0022-tests-lapd-lapd_test.c | 上游测试 23 修复 |
-| 0023-tests-osmo_io-osmo_io_test.c | osmo_io 测试临时文件改可写路径 |
-| 0024-tests-use_count-use_count_test.c | use_count 测试 libc 文案宏 |
+| 0018-src-gsm-kdf-crypto.h | 补上游发布包漏打包的头文件（取自 1.11.0 tag 原文，校验 blob 一致；`--- /dev/null` 新增文件补丁） |
+| 0021-tests-exec-exec_test.c | 上游测试 72：改用 POSIX shell 内建 `printf` 输出被传递的环境变量，不再依赖 worker 上的外部 `env`/`grep` |
+| 0022-tests-gb-gprs_bssgp_test.c | 上游测试 43 修复 |
+| 0023-tests-lapd-lapd_test.c | 上游测试 23 修复 |
+| 0024-tests-osmo_io-osmo_io_test.c | osmo_io 测试临时文件改可写路径 |
+| 0025-tests-use_count-use_count_test.c | use_count 测试 libc 文案宏 |
 
-## 平台修复（上游测试 8 例失败 → 全绿）
+## 平台修复（上游测试失败 → 全绿）
 
 | 用例 | 根因 | 修法 |
 |------|------|------|
@@ -40,6 +42,7 @@
 | 23 lapd | `strerror(0)` 文案与 glibc 不同（musl） | 测试期望按实际文案 |
 | use_count | 同上（libc 文案宏） | 测试侧文案宏调整 |
 | osmo_io | 固定临时路径不可写 | 改可写路径 |
+| 72 exec | 用例经外部 `env`/`grep` 校验子进程环境传递，依赖 worker 外部工具路径 | 改用 POSIX shell 内建 `printf` 输出该变量，断言不变 |
 | 61 socket | musl `getaddrinfo` 对 SCTP 协议提示返回 `EAI_SERVICE`(-8)，重试逻辑过宽 | 源码重试收窄至仅 `EAI_SERVICE` |
 | 86 等 | 随上述修复一并通过 | — |
 
