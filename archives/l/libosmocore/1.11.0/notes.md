@@ -17,7 +17,7 @@
 
 1. `conan create . -pr:a=ci/conan/profiles/ohos-aarch64 --build=missing`
    （配方内部：`apply_conandata_patches` → `configure` → `make` → `make check` → `make install`）
-2. 上游测试：`make check`（automake testsuite，90 项）
+2. 上游测试：`make check`（automake testsuite，Autotest 套件 90 个 case；上游测试实体共 95 项 = 94 个 `check_PROGRAMS` + 1 个集成脚本）
 3. 包级测试：`test_package`（`test.c` 冒烟 + `test_ohos_tls.c` 鸿蒙 TLS 专项）
 
 探索阶段的手动等价命令（用于定位问题，结果与 conan 一致）：
@@ -101,7 +101,7 @@ make -j2 && make check && make install DESTDIR=<staging>
 ## 验证结果
 
 - 编译：`conan create` 成功（configure/make/make check/make install 全部通过，0 error）
-- 上游测试（`make check`，automake testsuite）：**88 passed / 2 skipped / 0 failed（共 90 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
+- 上游测试（`make check`，automake testsuite）：**88 passed / 2 skipped / 0 failed（Autotest 套件共 90 个 case；上游测试实体共 95 项）**，日志证据 `88 tests were successful.` / `2 tests were skipped.`
   - 历史失败（已解决）：制品仓 talloc 为 static-only 且符号 LOCAL，曾在 CI 等价环境造成 40~41 项 `Aborted (Signal 6)`（abort 点 `_tc_free_internal`）；根因与解法见上节「talloc 双实例问题」，现已在本包内通过唯一宿主导出修复。
   - 静态交付对照实验（已证伪，勿再尝试）：构造函数注册丢失 → 8 项能力类用例失败 + 2 项链接冲突；再叠加 `-Wl,--whole-archive` 后 stub 类用例被库内定义抢占 → 13 项失败。
   - 跳过项：`61 socket_sctp`（平台无 SCTP）、`87 osmo_io (uring)`（平台 uring 被 seccomp 拦截，配方向上游开关关闭）；两项均由上游自带 `AT_SKIP_IF` 条件产生。

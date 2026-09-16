@@ -5,7 +5,7 @@
 | 项 | 结果 |
 |----|------|
 | conan create（profile `ci/conan/profiles/ohos-aarch64`，默认 shared；最终运行 RC=0） | ✅ PASS |
-| 上游测试（`make check`，conanfile.py `build()` 内执行） | ✅ 88 passed / 2 skipped / 0 failed（共 90 项） |
+| 上游测试（`make check`，conanfile.py `build()` 内执行） | ✅ 88 passed / 2 skipped / 0 failed（Autotest 套件 90 个 case；上游测试实体共 95 项 = 94 个 `check_PROGRAMS` + 1 个集成脚本，零删减） |
 | 包内测试（`test_package`：`test.c` + `test_ohos_tls.c`） | ✅ 全部编译并运行通过 |
 | 日志证据 | `88 tests were successful.` / `2 tests were skipped.` |
 
@@ -48,7 +48,9 @@
 
 编译期问题（详见 notes.md）：emulated TLS 跨 DSO 段错误（改用原生 TLS `-fno-emulated-tls`，库与 test_package 双向验证）、上游 tarball 缺 `src/gsm/kdf/crypto.h`、`sockaddr_storage` 重定义、`__always_inline` 缺失、config.guess/config.sub 平台识别。
 
-## 上游测试全量结果（90 项，`make check`）
+## 上游测试全量结果（Autotest 套件 90 个 case，`make check`；上游测试实体共 95 项）
+
+> 下表为本机 `make check`（`tests/testsuite.at`）实际执行的 90 个 case 逐条结果，对应上游测试实体 95 项中被套件直接驱动的部分（另 7 个 `check_PROGRAMS` 按上游默认配置仅构建，见 §验证结果 与 `test_package/MANIFEST.yml`）。
 
 | # | 用例 | 结果 | 备注 |
 |---|------|------|------|
