@@ -27,6 +27,7 @@ class TguiConan(ConanFile):
         export_conandata_patches(self)
 
     def requirements(self):
+        self.requires("sdl2/2.30.10")
         self.requires("sdl2_ttf/2.24.0")
         self.requires("freetype/2.14.3.1")
 
@@ -45,6 +46,9 @@ class TguiConan(ConanFile):
         tc.variables["TGUI_BUILD_TESTS"] = "OFF"  # Disable upstream tests in package build
         tc.variables["TGUI_BUILD_EXAMPLES"] = "OFF"
         tc.variables["TGUI_BUILD_GUI_BUILDER"] = "OFF"
+        if str(self.settings.os) == "OHOS":
+            tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+            tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 
     def build(self):
@@ -62,6 +66,7 @@ class TguiConan(ConanFile):
         component = self.cpp_info.components["tgui"]
         component.libs = ["tgui"]
         component.requires = [
+            "sdl2::sdl2",
             "sdl2_ttf::sdl2_ttf",
             "freetype::freetype",
         ]
