@@ -1,0 +1,70 @@
+software: tgui
+version: "1.13.0"
+status: built
+build_date: "2026-09-26"
+
+source:
+  url: "https://github.com/texus/TGUI/archive/refs/tags/v1.13.0.tar.gz"
+  sha256: "6e6000b5b130d6ddf73d593ff62cdd6f5c2045a1f8ffacb10262aedcb7ea7465"
+  tar_format: tar.gz
+
+build:
+  build_system: cmake
+  system: cmake
+  configure_options:
+    - "-DTGUI_BACKEND=SDL_RENDERER"
+    - "-DTGUI_USE_X11=OFF"
+    - "-DTGUI_BUILD_TESTS=OFF"
+    - "-DTGUI_BUILD_EXAMPLES=OFF"
+    - "-DTGUI_BUILD_GUI_BUILDER=OFF"
+  dependencies:
+    - name: sdl2
+      version: "2.30.10"
+    - name: sdl2_ttf
+      version: "2.24.0"
+  cc: clang
+  cxx: clang++
+
+backend_info:
+  selected: SDL_RENDERER
+  reason: "SFML_GRAPHICS backend unavailable (sfml package is partial: System+Network only, missing Graphics/Window modules)"
+  alternatives_considered:
+    - name: SFML_GRAPHICS
+      status: built
+      reason: "制品仓 sfml/2.6.1.1 为 partial 配方，缺少 Graphics/Window 模块"
+    - name: SDL_RENDERER
+      status: built
+      reason: "SDL2 和 SDL2_ttf 均有完整 armv8 预编译包"
+
+patches_applied:
+  - "0001-cmake-Config-HarmonyOS.patch"
+
+knowledge_gained:
+  - "TGUI 1.13.0 can be built on HarmonyOS using SDL_RENDERER backend with X11 disabled."
+  - "SDL_RENDERER backend requires sdl2 and sdl2_ttf dependencies, both available in the package repository."
+  - "X11 support can be disabled via -DTGUI_USE_X11=OFF with only minor impact on mouse cursor rendering."
+  - "SFML_GRAPHICS backend is incompatible with partial SFML packages that lack Graphics/Window modules."
+  - "Upstream tests require display device initialization, unsuitable for headless CI environments."
+
+test_package:
+  framework: cmake
+  tests:
+    - "Compile and link a consumer executable against TGUI::TGUI"
+    - "Verify core API availability (Widget creation, basic operations)"
+  assertion_count: 1
+  note: "Full upstream test suite requires display device (headless environment limitation)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/tgui-1.13.0.orig
+  source_work_dir: /storage/Users/currentUser/builds/tgui-1.13.0.work
+  source_orig_hash: 3ca379a67dba8dd3
+  source_work_hash: a7c472141d6c35b9
+  generated_at: '2026-09-26T19:32:01'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-cmake-Config.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
