@@ -47,6 +47,8 @@ check (int number, int condition, const char *what)
 int
 main (void)
 {
+	/* Unbuffered so a crash leaves the exact check number in the log. */
+	setvbuf (stdout, NULL, _IONBF, 0);
 	/* 1. Version contract of the package. */
 	{
 		unsigned int major = 0, minor = 0, micro = 0;
