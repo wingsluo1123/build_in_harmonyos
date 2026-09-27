@@ -320,12 +320,12 @@ class ZvbiConan(ConanFile):
     def _resolve_shell(self):
         for candidate in OHOS_SHELL_CANDIDATES:
             if os.path.sep in candidate:
-                if os.path.isfile(candidate) and os.path.access(candidate, os.X_OK):
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
                     return candidate
                 continue
             for directory in os.environ.get("PATH", "").split(os.pathsep):
                 path = os.path.join(directory, candidate)
-                if os.path.isfile(path) and os.path.access(path, os.X_OK):
+                if os.path.isfile(path) and os.access(path, os.X_OK):
                     return path
         raise ConanInvalidConfiguration(
             "no suitable shell found on OHOS (need the hnp bash or zsh; "
