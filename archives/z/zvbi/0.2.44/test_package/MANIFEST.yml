@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 与 conan-verify G1 强制要求）
+package: zvbi/0.2.44
+homepage: "https://github.com/zapping-vbi/zvbi"
+
+# 上游测试面（test/Makefile.am，R51 实数实测，非 Windows 口径共 11 个 TESTS）：
+# - compile_tests: ctest / cpptest（+ GCC 支持度决定的 ctest-c89/gnu89/c94/
+#   c99/gnu99、cpptest-cxx98/gnuxx98 变体，OHOS clang 下数量不定，故按基数 2 申报）
+# - only_linux: test-pdc（需 Linux VBI 设备与 timezone 转换，TODO 标注上游未修）
+# - scripts: exoptest / test-unicode（导出后端脚本）
+# - 固定 6 个：test-dvb_demux / test-dvb_mux / test-hamm / test-packet-830 /
+#   test-raw_decoder / test-vps
+# 本包构建不执行该套件（conanfile 传 --disable-tests）：硬件条目需要 VBI 采集
+# 设备（本配方 --disable-v4l/dvb/bktr/proxy 且平台无此硬件），编译条目携带
+# GCC-only pedantic 组合（-pedantic-errors -std=c89/c99/...），与 OHOS clang
+# 工具链不兼容。等价覆盖由下面的消费者测试承担：ham 编解码 / 原始解码 /
+# 导出三层与上游 test-hamm、test-raw_decoder、exoptest 覆盖同一 API 面，
+# 且断言 oracle 取自同一上游源码表（见 test_zvbi.c 头注释行号证据）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - "ctest / cpptest（编译型冒烟，2 基数 + 编译器决定的 c89/c94/c99/cxx98 变体）"
+  - "test-pdc（only_linux，需 VBI 设备）"
+  - "exoptest / test-unicode（导出脚本）"
+  - "test-dvb_demux / test-dvb_mux（需 DVB 硬件/流）"
+  - "test-hamm / test-packet-830 / test-raw_decoder / test-vps（解码算法）"
+
+# test_package 中自带的测试（消费者视角验证交付产物本身）
+test_package_tests:
+  - file: test_package/test_zvbi.c
+    description: >-
+      消费者功能测试（库级）：vbi_version 三段版本号断言 0/2/44；
+      vbi_ham8 编码断言（0→0x15、5→0x73）；vbi_unham8 解码断言
+      （0x15→0 干净、0x14→0 单比特纠错、0x16→-1 双比特错误）；
+      vbi_rev8 自反、vbi_rev16 双字节反转断言；vbi_raw_decoder
+      v1 全链（parameters/add_services 覆盖 TELETEXT_B、无 run-in
+      平场行解码 0 行）；vbi_export text 后端创建/枚举/销毁
+      （覆盖 iconv 字符集层链接）。共 12 项断言，失败即非零退出。
+    command: "./test_zvbi"
+
+# 测试断言总数（近似值，用于质量评估）：库级 12 项
+assertion_count: 12
