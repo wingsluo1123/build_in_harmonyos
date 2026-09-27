@@ -62,7 +62,8 @@ from pathlib import Path
 from conan import ConanFile
 from conan.errors import ConanException, ConanInvalidConfiguration
 from conan.tools.env import Environment
-from conan.tools.files import (apply_conandata_patches, copy, unzip)
+from conan.tools.files import (apply_conandata_patches, copy,
+                                 export_conandata_patches, unzip)
 from conan.tools.gnu import Autotools, AutotoolsToolchain
 from conan.tools.layout import basic_layout
 
@@ -228,17 +229,12 @@ class ZvbiConan(ConanFile):
         if about_nls and os.path.isfile(about_nls):
             copy(self, "ABOUT-NLS", src=os.path.dirname(about_nls),
                  dst=self.source_folder)
-        environment = dict(os.environ)
-        environment["AUTOPOINT"] = "true"
-        completed = subprocess.run(
-            "autoreconf -fi < /dev/null", shell=True, env=environment,
-            cwd=self.source_folder, stdin=subprocess.DEVNULL,
-        )
-        if completed.returncode != 0:
-            raise ConanException(
-                f"autoreconf bootstrap failed "
-                f"(rc={completed.returncode}) in {self.source_folder}"
-            )
+        # NOTE: must go through self.run(env="conanbuild") rather than raw
+        # subprocess: only conan's aggregate env carries the tool_requires
+        # bin dirs (automake's aclocal, libtoolize, gettext) on PATH.
+        # Device-verified: raw subprocess fails with `Can't exec "aclocal"`.
+        self.run("AUTOPOINT=true autoreconf -fi < /dev/null",
+                 cwd=self.source_folder, env="conanbuild")
         if not os.path.isfile(os.path.join(self.source_folder, "configure")):
             raise ConanException(
                 "autoreconf finished but produced no configure script"
