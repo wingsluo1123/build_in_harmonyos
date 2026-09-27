@@ -80,15 +80,19 @@ main (void)
 	       "vbi_rev16() reverses both bytes with byte swap");
 
 	/* 9-11. Raw decoder v1 API: stack-allocated decoder, parameters for
-	 * 625-line TELETEXT_B, then decode one flat-grey line.  A line with
-	 * no clock run-in must produce zero sliced lines. */
+	 * 625-line TELETEXT_B, then decode a flat-grey image.  Per the
+	 * vbi_raw_decode() contract (decoder.c) the raw image must hold
+	 * rd->count[0] + rd->count[1] scan lines of rd->bytes_per_line
+	 * bytes, and out must hold that many vbi_sliced records.  A field
+	 * with no clock run-in must produce zero sliced lines. */
 	{
 		vbi_raw_decoder rd;
 		unsigned int covered;
 		unsigned int added;
 		int max_rate = 0;
-		uint8_t raw_line[4096];
-		vbi_sliced sliced[4];
+		static uint8_t raw_image[64 * 2048];
+		static vbi_sliced sliced[64];
+		unsigned int n_alloc_lines;
 		int n_lines;
 
 		vbi_raw_decoder_init (&rd);
@@ -105,15 +109,17 @@ main (void)
 		check (10, (added & VBI_SLICED_TELETEXT_B) != 0,
 		       "vbi_raw_decoder_add_services() slices TELETEXT_B");
 
-		memset (raw_line, 128, sizeof (raw_line));
+		n_alloc_lines = rd.count[0] + rd.count[1];
+		memset (raw_image, 128, sizeof (raw_image));
 		memset (sliced, 0, sizeof (sliced));
 		n_lines = -1;
 		if (rd.bytes_per_line > 0 &&
-		    rd.bytes_per_line <= (int) sizeof (raw_line)) {
-			n_lines = vbi_raw_decode (&rd, raw_line, sliced);
+		    rd.bytes_per_line <= 2048 &&
+		    n_alloc_lines > 0 && n_alloc_lines <= 64) {
+			n_lines = vbi_raw_decode (&rd, raw_image, sliced);
 		}
 		check (11, n_lines == 0,
-		       "vbi_raw_decode() rejects a line without run-in");
+		       "vbi_raw_decode() rejects an image without run-in");
 
 		vbi_raw_decoder_destroy (&rd);
 	}
