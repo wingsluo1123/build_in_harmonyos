@@ -74,7 +74,7 @@ main (void)
 	check (7, vbi_rev8 (vbi_rev8 (0xA5)) == 0xA5,
 	       "vbi_rev8() is an involution");
 	check (8, vbi_rev16 (0x1234) ==
-	       ((unsigned int) vbi_rev8 (0x34) << 8) | vbi_rev8 (0x12),
+	       (((unsigned int) vbi_rev8 (0x34) << 8) | vbi_rev8 (0x12)),
 	       "vbi_rev16() reverses both bytes with byte swap");
 
 	/* 9-11. Raw decoder v1 API: stack-allocated decoder, parameters for
