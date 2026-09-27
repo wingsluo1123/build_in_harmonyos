@@ -1,0 +1,50 @@
+#====================================================================
+# DRAFT-ohos-musl-no-error-h
+# musl 无 <error.h>，glibc error()/error_at_line() 上游代码编译失败
+# 触发事件: libdebuginfod/0.195 HarmonyOS PC 适配 (PR #12349)
+#====================================================================
+
+id:                     DRAFT-ohos-musl-no-error-h
+trigger_tool:           clang|configure|make|conan|test
+phase:                  compilation
+error_signature:        error.h: No such file or directory|'error.h' file not found|undefined reference to 'error'|undefined reference to 'error_at_line'
+
+severity:               2
+category:               compat, portability, libc, musl, header
+match_keywords:         musl, error.h, error(), error_at_line, error_message_count, glibc, glibcism, shim header, fatal error, No such file
+title:                  musl lacks glibc <error.h>; inject a compatible error.h shim with -I front-inserted in generate(), or excise affected test programs with per-item attribution
+
+root_cause:             <error.h> 与 error()/error_at_line()/error_message_count/error_status 是 glibc 扩展，POSIX 未定义，musl 不提供。上游工具/测试源码按 glibc 惯例直接 include，在 OHOS(musl) 上编译失败；若走 autotools 条件探测则程序被静默剔除，上游测试面缩水并连锁触发审核 rule2/3。
+
+rec_approach:           shim-header-injection
+rec_description:         配方 generate() 生成 shim 目录写 error.h（stdarg 实现 glibc 兼容 error/error_at_line：vfprintf 到 stderr、status 非零 exit、维护 error_message_count），并把 -I<shimdir> 前置到编译 flags 使上游 include 命中 shim。回退：patch 剔除使用 error.h 的非核心测试程序并逐条归因，核心业务面必须保留真实执行。
+rec_command:            generate(): shimdir=os.path.join(self.build_folder,"shim"); os.makedirs(shimdir,exist_ok=True); write error.h; self.build_context_info.cpp_flags=f"-I{shimdir} "+existing_flags
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+forbid_1_pattern:        平台不支持|musl 不支持（未附 shim 或逐条归因即砍测试）
+forbid_1_reason:         笼统平台理由不满足审核 rule2/3 豁免口径，error.h 缺失有明确 shim 解法
+forbid_1_consequence:    上游测试面无谓缩水，rule2/3 FAIL；或测试空壳触发 R34/CI 硬拦截
+
+doc_file:                 knowledge/drafts/DRAFT-ohos-musl-no-error-h.md
+last_updated:             2026-09-27
+source_event:             libdebuginfod/0.195 HarmonyOS PC adaptation, PR #12349
+draft:                    true
+contributor_id:           Ember5843
+source_pr:                12349
+patches_referenced:       archives/e/elfutils/0.195/test_package（shim 经 generate() 动态生成，无静态补丁文件）
+
+verification_cmd:         conan create . --user=ohpcd --channel=stable -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+verification_exit:        0
+verification_log:         PR #12349 CI 绿 + 真机测试记录（2026-09 合入）
+verification_evidence:    上游测试程序全部编译执行；PR #12349 已合入 main
+valeus_scope:             OHOS 上移植依赖 glibc error.h 便利设施的上游库（elfutils 族、调试/诊断类工具常见）；凡源码 include <error.h> 或 configure 探测 ac_cv_header_error_h 的配方均适用
+
+limits:                   仅覆盖 error.h 族；pthread_cancel 语义差异见 DRAFT-rjj666-libmysofa-musl-pthread-cancel-flag-join；单符号 glibcism（program_invocation_short_name 等）见 DRAFT-ohos-musl-glibc-specific-symbols；多库重复需要时可升级为共享 bridge 包（argp 模式）
+
+similar_to:             DRAFT-ohos-musl-glibc-specific-symbols, DRAFT-argp-musl-gap-bridge, DRAFT-rjj666-libmysofa-musl-pthread-cancel-flag-join
+
+metrics_success_count:    1
+metrics_fail_count:       0
+metrics_confidence:       0.9
+metrics_last_used:        2026-09-27
