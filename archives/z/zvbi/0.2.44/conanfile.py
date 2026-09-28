@@ -396,18 +396,20 @@ class ZvbiConan(ConanFile):
     def _fetch(self, url, destination, sha256, attempts=3):
         destination = Path(destination)
         staging = destination.with_name(destination.name + ".part")
-        if url.startswith("file:"):
+        # CI 会把 conandata 的 url 改写成 [镜像, 官方] 列表形态（§5）——归一化再判定。
+        candidates = list(url) if isinstance(url, list) else [url]
+        if candidates and candidates[0].startswith("file:"):
             from urllib.parse import urlparse
             from urllib.request import url2pathname
             import shutil
-            shutil.copyfile(url2pathname(urlparse(url).path), staging)
+            shutil.copyfile(url2pathname(urlparse(candidates[0]).path), staging)
         else:
             context = ssl.create_default_context(cafile=self._ca_bundle())
             last = None
             for attempt in range(1, attempts + 1):
                 try:
                     request = urllib.request.Request(
-                        url, headers={"User-Agent": "conan"})
+                        candidates[0], headers={"User-Agent": "conan"})
                     with urllib.request.urlopen(request, timeout=120,
                                                 context=context) as response:
                         payload = response.read()
@@ -415,7 +417,7 @@ class ZvbiConan(ConanFile):
                     staging.write_bytes(payload)
                     self.output.info(
                         f"downloaded {len(payload)} bytes (HTTP {status}) "
-                        f"from {url}")
+                        f"from {candidates[0]}")
                     break
                 except Exception as error:  # noqa: BLE001 - reported verbatim
                     last = error
