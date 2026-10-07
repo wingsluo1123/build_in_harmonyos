@@ -3,6 +3,13 @@
 
 TGUI is a cross-platform C++ GUI library. This package uses the SDL_RENDERER
 backend with X11 disabled (only affects mouse cursor rendering).
+
+OpenHarmony platform handling: TGUI's cmake/Config.cmake only recognises
+Windows/Android/Linux/BSD/macOS and aborts with "Unsupported CMAKE_SYSTEM_NAME
+value" for anything else. CMAKE_SYSTEM_NAME is therefore left to the toolchain
+(which reports the real target system, "HarmonyOS", for os=OHOS), and
+patches/0001 adds the missing HarmonyOS branch mapping it onto TGUI's existing
+Linux/BSD code path (TGUI_OS_LINUX) - the same ABI layer HarmonyOS implements.
 """
 import os
 from conan import ConanFile
@@ -47,7 +54,11 @@ class TguiConan(ConanFile):
         tc.variables["TGUI_BUILD_EXAMPLES"] = "OFF"
         tc.variables["TGUI_BUILD_GUI_BUILDER"] = "OFF"
         if str(self.settings.os) == "OHOS":
-            tc.variables["CMAKE_SYSTEM_NAME"] = "Linux"
+            # CMAKE_SYSTEM_NAME is intentionally not overridden: patches/0001
+            # keys on it to enable TGUI's HarmonyOS support, and forcing
+            # "Linux" here made that branch unreachable (the toolchain reports
+            # the real system name of the target). CMake cannot infer the
+            # processor of a HarmonyOS target, so only that one is pinned.
             tc.variables["CMAKE_SYSTEM_PROCESSOR"] = "aarch64"
         tc.generate()
 
