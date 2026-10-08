@@ -44,10 +44,14 @@ each item re-probed against this tarball first):
   yields `drwxr-s--x` (device-verified on ncrack, libcaca, libabw).
 * **In-tree build**: the bootstrapped source tree is copied into the
   build folder before configuring, as in the other recipes in this archive.
-* **`make check` is not run in build()**: the upstream suite's hardware
-  entries need VBI capture devices and its compile entries carry GCC-only
-  pedantic flags; see test_package/MANIFEST.yml for the R51 accounting.
-  Consumers get the verification through test_package/ instead.
+* **`make check` is not run in build()**: kept for CI time-budget
+  stability only.  Note the earlier rationale recorded in the first
+  revision of this file (hardware entries / GCC-only pedantic flags) was
+  *wrong*: on 2026-10-08 the full upstream suite was run on the device
+  with this recipe's configure arguments except `--disable-tests`, and
+  all 18 binaries/scripts (all 11 TESTS entries) PASS — the suites are
+  data-driven and OHOS clang accepts every `-std=` variant.  See
+  test_package/MANIFEST.yml for the R51 accounting and the evidence.
 """
 
 import hashlib

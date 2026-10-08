@@ -18,7 +18,14 @@
 - V4L/V4L2/DVB/bktr/proxy/X11 后端全部禁用（平台无 VBI 采集硬件；各有干净 off 开关）
 - libpng/zlib 不引入（PNG 页面导出功能缺失，configure 自动 HAVE_PNG=no 降级）
 - NLS 自动关闭（平台无 gettext，`AM_GNU_GETTEXT([external])` 探测后 USE_NLS=no）
-- 上游测试 11 TESTS 未在构建内执行（R51 如实申报，见 test_package/MANIFEST.yml）；验证由 12 项断言的消费者测试承担
+- 上游测试 11 TESTS 未在**构建内**执行（conan build() 传 --disable-tests，R51 如实申报，见 test_package/MANIFEST.yml）；2026-10-08 已在**设备侧**按同口径实跑全过（见下），另由 12 项断言的消费者测试承担构建内验证
+
+## 上游测试套件实跑（2026-10-08，设备真机，rule4 证据）
+
+- 方法（§6.2 设备侧等价验证）：conan 缓存 bootstrap 树（含上游 autoreconf 产物）按本配方同款 configure 参数重新 configure，**唯一差异是不加 `--disable-tests`**，随后 `make -j1` + `make -C test check`
+- 结果：**18 PASS / 0 FAIL / 0 SKIP**（automake 汇总 TOTAL=18），覆盖全部 11 个 TESTS 条目：ctest、cpptest、ctest-c89/gnu89/c94/c99/gnu99、cpptest-cxx98/gnuxx98、test-pdc、exoptest、test-unicode、test-dvb_demux、test-dvb_mux、test-hamm、test-packet-830、test-raw_decoder、test-vps
+- **归因更正**：早前"test-pdc/test-dvb_* 需采集硬件、编译变体与 clang 不兼容"的预判**不成立**——这些用例均为数据文件驱动，OHOS clang 亦支持全部 -std 变体，实测全过；test/Makefile.am 的 11 条目在 OHOS 上可 100% 运行
+- 构建内仍 `--disable-tests`：不改 CI 行为与时限；MANIFEST.yml 已同步更正归因并记录实跑命令
 
 ## 构建要点
 
