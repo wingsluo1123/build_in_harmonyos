@@ -237,3 +237,36 @@ translated lookup, upstream registration count, the seven display-independent
 upstream tests) plus the two Conan consumer probes. Rendering and interaction
 remain uncovered because Broadway has no browser output client on the device.
 
+## Source-fetch resilience
+
+`conandata.yml` keeps the upstream URL list (`repo.huaweicloud.com` first,
+`download.gnome.org` as fallback). `source()` no longer hands the whole list to a
+single `get()` call: it iterates the URLs explicitly, warns per failed URL, and only
+raises after every entry failed (the error names all attempted URLs). This keeps the
+fallback independent of Conan's internal handling of a list-valued `url`, and makes a
+restricted-network CI log say *which* URL failed instead of only "download timed out".
+
+Verification (on device, no CI needed): prepend an intentionally unreachable entry
+(`https://127.0.0.1:9/gtk+-3.24.38.tar.xz`) to the `url:` list in `conandata.yml`, run
+`conan source .`, and expect `source URL #1 failed (...)` followed by a successful
+fetch. Restore `conandata.yml` afterwards.
+
+Observed during that verification (2026-10-01): Conan retried the unreachable URL twice
+with `Waiting 5 seconds to retry...` **before** the recipe-level fallback took over, so
+the per-URL cost is Conan's retry budget (`tools.files.download:retry` / `retry_wait`,
+exposed in the CI environment as `CONAN_RETRY=10` / `CONAN_RETRY_WAIT=30`). With those CI
+values an unreachable first URL costs minutes before the next source is even attempted —
+source **order** therefore matters more than source **count**. This revision does not
+change the inherited order (huaweicloud first, exactly as in the merged 3.24.38).
+
+CI-side fallbacks (documented here, deliberately not implemented in the recipe):
+
+- Pre-seeding Conan's **download cache** (`tools.files.download:download_cache`,
+  exposed as `DOWNLOAD_CACHE=/data/cache` in the CI environment) is safe: it is keyed
+  per file and does **not** skip `source()`.
+- Pre-filling the recipe **source folder** (`~/.conan2/p/b/<rev>/s`) is **not**
+  recommended: Conan skips `source()` when that folder is non-empty, which also skips
+  the `export_sources` copy, so `patches/0001|0002` would be missing from the source
+  tree and `apply_conandata_patches()` would fail.
+
+

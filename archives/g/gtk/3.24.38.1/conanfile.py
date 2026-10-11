@@ -78,7 +78,30 @@ class Gtk3Conan(ConanFile):
         basic_layout(self, src_folder=".")
 
     def source(self):
-        get(self, **self.conan_data["sources"], strip_root=True)
+        # 多源兜底（本修订新增）：conandata 的 url 为列表（华为云首位 + download.gnome.org 兜底）。
+        # 这里显式逐源尝试，而不再把整个列表一次性交给 get()：
+        #   1) 不依赖 Conan 内部对「列表 url」的处理语义，行为可控；
+        #   2) 某个源在受限网络下不可达时，能确实回落到下一个源；
+        #   3) 每个失败源打 warning，全部失败才抛错，错误信息带齐所有尝试过的 URL
+        #      （CI 日志里可直接看出是哪一条源失败，而不只是一句“下载超时”）。
+        # 本地验证方式见 notes.md 的「Source-fetch resilience」。
+        sources = dict(self.conan_data["sources"])
+        urls = sources.pop("url")
+        if isinstance(urls, str):
+            urls = [urls]
+        last_error = None
+        for index, url in enumerate(urls, start=1):
+            try:
+                get(self, url=url, **sources, strip_root=True)
+                if index > 1:
+                    self.output.info(f"source fetched from fallback URL #{index}: {url}")
+                return
+            except Exception as exc:  # 逐源兜底：单个源失败不应中断整条链
+                last_error = exc
+                self.output.warning(f"source URL #{index} failed ({url}): {exc}")
+        raise ConanException(
+            "all source URLs failed, tried: " + ", ".join(urls) + f"; last error: {last_error}"
+        )
 
     def generate(self):
         PkgConfigDeps(self).generate()
