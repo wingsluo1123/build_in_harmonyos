@@ -7,6 +7,7 @@ TGUI 是跨平台的现代 C++ GUI 库。本次适配使用 **SDL_RENDERER** 后
 ## 构建方式
 
 - **构建系统**：CMake
+- **生成器**：Ninja（`-G Ninja`）。OHOS 沙盒拒绝 make 的硬编码 `SHELL=/bin/sh`，Makefiles 生成器会在 CMake 配置阶段的编译器 try_compile 处报 `Check for working CXX compiler ... broken`（E346）；Ninja 直接 exec 编译器，配置与编译均通过。
 - **后端**：SDL_RENDERER（SDL2 窗口 + SDL2_ttf 字体）
 - **主要依赖**：
   - sdl2/2.30.10

@@ -12,6 +12,7 @@ patches/0001 adds the missing HarmonyOS branch mapping it onto TGUI's existing
 Linux/BSD code path (TGUI_OS_LINUX) - the same ABI layer HarmonyOS implements.
 """
 import os
+import shutil
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import get, apply_conandata_patches, export_conandata_patches, copy
@@ -45,7 +46,20 @@ class TguiConan(ConanFile):
         get(self, **self.conan_data["sources"], strip_root=True)
 
     def generate(self):
-        tc = CMakeToolchain(self)
+        # The OHOS sandbox denies make's hardcoded SHELL=/bin/sh, so a clean
+        # Makefiles build dies inside CMake's configure-stage try_compile
+        # ("Check for working CXX compiler: ... - broken"). Ninja execs the
+        # compiler directly, keeping configure and build working on every
+        # worker (E346).
+        generator = "Ninja" if str(self.settings.os) == "OHOS" else None
+        tc = CMakeToolchain(self, generator=generator)
+        if generator == "Ninja":
+            # The Ninja generator probes `ninja --version` through PATH, where a
+            # user-path shim is denied by the sandbox; pin the system ninja.
+            ninja = "/data/service/hnp/bin/ninja"
+            tc.variables["CMAKE_MAKE_PROGRAM"] = (
+                ninja if os.path.isfile(ninja) else (shutil.which("ninja") or "ninja")
+            )
         tc.variables["CMAKE_BUILD_TYPE"] = str(self.settings.build_type)
         tc.variables["BUILD_SHARED_LIBS"] = "ON" if self.options.shared else "OFF"
         tc.variables["TGUI_BACKEND"] = "SDL_RENDERER"
