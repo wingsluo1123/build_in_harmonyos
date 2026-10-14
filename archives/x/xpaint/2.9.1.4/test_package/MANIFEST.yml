@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: xpaint/2.9.1.4
+homepage: "http://xpaint.sourceforge.net/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 清点证据：xpaint 2.9.1.4 tarball 无 tests/ 目录；Imakefile 无 check/test
+# 目标（Imake 体系无测试设施）；rw/ 子目录仅格式读写器源码，无测试程序。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_xpaint.sh
+    description: "鸿蒙 PC 特有 headless 消费者用例（端到端，非纯断言）：①包布局可消费（bin/xpaint + share/xpaint/XPaint.ad）②aarch64 ELF 目标架构校验③经 OHOS 加载器真实执行（全部共享库加载+重定位，headless 下 Xt 到达 display 初始化即通过）④usage 横幅身份/版本解析（有显示环境）⑤XPaint.ad 声明 XPaint 应用类。GUI 程序无法开画布，exit 1 / Can't open display 为上游设计行为"
+    command: "sh test_xpaint.sh <bindir>/xpaint <pkgroot>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
