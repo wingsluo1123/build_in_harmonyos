@@ -1,0 +1,39 @@
+# 版本级 manifest — osdclock 0.5（遵循 ARCHIVE-SPEC v2.0）
+version: "0.5"
+software: "osdclock"
+status: built
+build_date: "2026-10-13"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/o/osdclock/osdclock_0.5.orig.tar.gz"
+  sha256: "752d08f6bb258e271ef8d015fcdc84f9957ecd5152b057a66eeb085db6bba2c8"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libxosd/2.2.14
+    - libxcb/1.16
+    - libxau/1.0.11
+    - libxdmcp/1.1.5
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-port-to-libxosd-2.2.14.patch"
+  - "0002-getopt-return-type-aarch64.patch"
+
+build_cleanliness:
+  native_build: true
+  build_flag: ""
+  notes: >-
+    未使用 --build/--host/--target 等 native 编译禁用参数；无 config.guess/sub
+    替换（项目无 autotools 引导，直接 make）。
+
+knowledge_gained:
+  # W5 口径：每条 bullet 必须自带知识引用（knowledge_ref / ref: / reference:）
+  - "aarch64 上 char 默认无符号：`char c` 承接 getopt_long() 返回值会让 `(c = getopt_long(...)) != -1` 恒真（-1 → 255），选项循环永不退出、程序在 xosd_init() 之前空转挂死；承接 getopt 返回值必须用 int（ref: EKN-OSDCLOCK-GETOPT-CHAR）。"
+  - "老 XOSD 客户端（osd_clock 0.5 针对 xosd 0.7.0）对 libxosd 2.2.14 存在源级 API 漂移：xosd_init() 由 6 参变 7 参（新增 number_lines），且 xosd_display() 要求 0 <= line < number_lines，因此仅补第 7 参不够、还要保证行号在界内（本配方取 number_lines=2 保留原 line 1 绘制）（ref: EKN-OSDCLOCK-XOSD-API）。"
+  - "上游源码 URL 消亡时的合规取证链：作者站 leftorium.net（403）、旧 Savannah 目录（404）、SourceForge（无此项目）、GitHub（仅 0.6 tag）逐一实测不可用后，取 Debian pool 的 orig 包并逐文件核对为 2001 年原版发布（仅顶层目录改名），照 libxosd/2.2.14 同族先例登记（reference: archives/l/libxosd/2.2.14/conandata.yml）。"

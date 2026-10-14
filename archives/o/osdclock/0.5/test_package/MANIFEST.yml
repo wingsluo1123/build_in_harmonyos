@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（详见 docs/TEST_QUALITY_SPEC.md 与 R51 上游测试三步法）
+
+package: osdclock/0.5
+homepage: "http://leftorium.net/software.phtml"
+
+# ── 上游源码审计（R51 第一步：先清点） ────────────────────────────
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Makefile"
+    reason: >-
+      只有 all / osd_clock / %.o / %.o.pic / tar / install / clean 七条规则与 .PHONY
+      声明（all tar clean install）；无 check/test/check-local 目标，无 TESTS
+      或 check_PROGRAMS 变量，make check 无任何用例可跑。
+  - source: "osd_clock.c"
+    reason: >-
+      行首锚定 grep -cE '^[[:space:]]*assert\(' = 0，源码无运行时断言；
+      目录内无 test_*/*_test 源文件，无 tests/ 或 test/ 子目录。
+  - source: "发布包文件清单"
+    reason: >-
+      tar tzf osdclock_0.5.orig.tar.gz 仅 AUTHORS / COPYING / ChangeLog /
+      Makefile / NEWS / README / osd_clock.1 / osd_clock.c 八个文件，无测试
+      夹具、无 CI 配置、无 .github 工作流。
+  - conclusion: >-
+      上游 osdclock 0.5（2001）未提供任何自动化测试套件；按 R51 第二步由
+      test_package 在可运行环境下真实执行被测二进制（5 条用例 / 9 条断言）。
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ── 适配后测试（R51 第三步：真实执行并如实回填） ──────────────────
+test_package_tests:
+  - file: test_osdclock.sh
+    description: >-
+      真实执行安装后的 osd_clock 二进制，5 条用例全部不依赖 X server 与输入
+      文件，对真机显示状态零副作用：(1) -h、(2) --help 走 osd_clock.c 第
+      96-107 行 usage 分支（getopt 解析后立即 return EXIT_SUCCESS，早于
+      xosd_init()）；(3) -c red 与 (4) -f fixed -o 5 -t -d 2 在无可达 display
+      时走 libxosd 2.2.14 src/libxosd/xosd.c:715-719 XOpenDisplay() 失败 →
+      xosd_init() 返回 NULL → 打印 "Error initializing osd" 且 exit 1
+      （osd_clock.c 第 112-117 行）——用例 (3) 同时是 patches/0002 的回归探针：
+      aarch64 上 char 无符号会使 (c = getopt_long(...)) != -1 恒真、程序在
+      xosd_init() 前空转挂死，timeout 60 兜底判 FAIL（打补丁前实测挂死）；
+      (5) readelf -d 断言 NEEDED 含 libxosd.so.2，证明链接的是被测包本体而非
+      环境里别的 XOSD。
+    command: "$SHELL test_osdclock.sh <package>/bin/osd_clock"
+
+test_package_test_count: 5
+upstream_test_count: 0
+# 9 = 4 条 CLI 用例各 2 条断言（退出码 + 输出串）+ 1 条 DT_NEEDED 断言
+assertion_count: 9
+
+# 内存占用：单进程 CLI，打印 usage / 初始化失败即退出，未驻留大缓冲；
+# 本机 --probe 实测峰值 < 8MB（无输入文件，规模恒定）。
+max_rss_mb: 8
