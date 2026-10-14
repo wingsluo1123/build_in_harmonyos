@@ -1,0 +1,104 @@
+diff --git a/meson.build b/meson.build
+index a6fe2b6..757d595 100644
+--- a/meson.build
++++ b/meson.build
+@@ -59,7 +59,14 @@ compiler = meson.get_compiler('c')
+-http_lib = []
+-if compiler.has_header('llhttp.h', args: '-I/usr/local/include')
+-  http_lib = 'llhttp'
+-  add_project_arguments('-DUSE_LLHTTP', language: 'c')
+-else
+-  if not compiler.has_header('http_parser.h', args: '-I/usr/local/include')
+-    error('neither llhttp nor http-parser devel files found.')
++# Conan's PkgConfigDeps exposes http-parser outside the system include paths.
++# Prefer that dependency when available and retain the upstream system lookup
++# for non-Conan builds.
++http_parser = dependency('http-parser', required: false)
++if not http_parser.found()
++  http_lib = []
++  if compiler.has_header('llhttp.h', args: '-I/usr/local/include')
++    http_lib = 'llhttp'
++    add_project_arguments('-DUSE_LLHTTP', language: 'c')
++  else
++    if not compiler.has_header('http_parser.h', args: '-I/usr/local/include')
++      error('neither llhttp nor http-parser devel files found.')
++    endif
++    http_lib = 'http_parser'
+@@ -67,2 +73,0 @@ else
+-  http_lib = 'http_parser'
+-endif
+@@ -70,4 +75,5 @@ endif
+-if host_machine.system() == 'freebsd'
+-  http_parser = compiler.find_library(http_lib, dirs : '/usr/local/lib')
+-else
+-  http_parser = compiler.find_library(http_lib)
++  if host_machine.system() == 'freebsd'
++    http_parser = compiler.find_library(http_lib, dirs : '/usr/local/lib')
++  else
++    http_parser = compiler.find_library(http_lib)
++  endif
+diff --git a/tests/helpers b/tests/helpers
+index 5ce3daf..a9a514c 100755
+--- a/tests/helpers
++++ b/tests/helpers
+@@ -33,3 +33,6 @@ random_port() {
+-        if test -f /dev/urandom;
+-        then
+-            shuf -i 1024-65535 -n 1 --random-file=/dev/urandom
++        if command -v shuf >/dev/null 2>&1; then
++            if test -f /dev/urandom; then
++                shuf -i 1024-65535 -n 1 --random-file=/dev/urandom
++            else
++                shuf -i 1024-65535 -n 1
++            fi
+@@ -37 +40 @@ random_port() {
+-            shuf -i 1024-65535 -n 1
++            python3 -c 'import secrets; print(1024 + secrets.randbelow(64512))'
+@@ -46,2 +49,13 @@ check_if_port_listening() {
+-
+-        ss -anl|grep "[\:\.]${1}"|grep LISTEN >/dev/null 2>&1
++        if command -v ss >/dev/null 2>&1; then
++            ss -anl|grep "[\:\.]${1}"|grep LISTEN >/dev/null 2>&1
++        else
++            python3 - "${1}" <<'PY'
++import socket
++import sys
++try:
++    with socket.create_connection(("127.0.0.1", int(sys.argv[1])), timeout=1):
++        pass
++except OSError:
++    sys.exit(1)
++PY
++        fi
+diff --git a/tests/meson.build b/tests/meson.build
+index e2e9924..0470b47 100644
+--- a/tests/meson.build
++++ b/tests/meson.build
+@@ -26,1 +26,2 @@
+ env = environment()
++env.set('TMPDIR', meson.build_root())
+diff --git a/tests/test-util.c b/tests/test-util.c
+index bc1299b..7909f72 100644
+--- a/tests/test-util.c
++++ b/tests/test-util.c
+@@ -65,3 +65,17 @@ create_tempdir(void)
+-    char template[] = "/tmp/tang.test.XXXXXX";
+-    char *tmpdir = mkdtemp(template);
+-    return strdup(tmpdir);
++    const char *tmp_root = getenv("TMPDIR");
++    size_t template_len;
++    char *template;
++
++    if (tmp_root == NULL || tmp_root[0] == '\0')
++        tmp_root = "/tmp";
++
++    template_len = strlen(tmp_root) + sizeof("/tang.test.XXXXXX");
++    template = malloc(template_len);
++    if (template == NULL)
++        return NULL;
++    snprintf(template, template_len, "%s/tang.test.XXXXXX", tmp_root);
++    if (mkdtemp(template) == NULL) {
++        free(template);
++        return NULL;
++    }
++    return template;
