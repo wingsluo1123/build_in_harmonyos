@@ -1,0 +1,33 @@
+--- a/source/myport/posix/mycore/thread.c
++++ b/source/myport/posix/mycore/thread.c
+@@ -45,23 +45,29 @@
+ mystatus_t mythread_thread_join(mythread_t *mythread, void* thread)
+ {
+     if(pthread_join(*((pthread_t*)thread), NULL) == 0)
+         return MyCORE_STATUS_OK;
+     
+     return MyCORE_STATUS_ERROR;
+ }
+ 
+ mystatus_t mythread_thread_cancel(mythread_t *mythread, void* thread)
+ {
++#ifdef __GLIBC__
+     if(pthread_cancel(*((pthread_t*)thread)) == 0)
+         return MyCORE_STATUS_OK;
+-    
++#else
++    /* pthread_cancel is a glibc extension; musl/OHOS libc do not provide it.
++       Thread cancellation is unsupported on those libcs. */
++    (void) mythread;
++    (void) thread;
++#endif
+     return MyCORE_STATUS_ERROR;
+ }
+ 
+ mystatus_t mythread_thread_destroy(mythread_t *mythread, void* thread)
+ {
+     mycore_free(thread);
+     return MyCORE_STATUS_OK;
+ }
+ 
+ void * mythread_thread_attr_init(mythread_t *mythread)
