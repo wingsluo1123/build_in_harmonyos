@@ -1,0 +1,63 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在；详见 docs/TEST_QUALITY_SPEC.md）
+#
+# libdmapsharing 3.9.14 上游测试为 Check（libcheck）单元测试框架。测试用例以
+# START_TEST 宏内联在 libdmapsharing/dmap-*.c 主源文件中；libdmapsharing/
+# libdmapsharing/Makefile.am 的 BUILT_SOURCES=unit-test.stamp 在构建时运行
+# ./generate-test-suites 生成 *-suite.c/h 与 ../tests/unit-test.c，tests/ 目录
+# 的 unit-test 可执行程序聚合 6 套 suite 并跑全部用例（srunner_run_all）。
+# 配方 build() 构建库与 tests/ 后直接运行 tests/unit-test.
+
+package: libdmapsharing/3.9.14
+homepage: "https://www.flyn.org/projects/libdmapsharing/"
+
+# 上游测试命令（官方 make check 会额外做 gcov 覆盖率重建，OHOS 无意义；
+# 配方实际执行聚合全部 6 套 Check suite 的 unit-test 二进制）
+upstream_check_command: "make -C tests && ./tests/.libs/unit-test"
+
+# conanfile.py build() 中已集成上游测试（OHOS 真机运行）
+upstream_test_in_build: true
+upstream_test_command: "./tests/.libs/unit-test"
+
+# 官方统计口径：Autotools 项目，测试经 automake 注册（check-local 运行
+# ../tests/unit-test）。unit-test 聚合 6 套 Check（libcheck）suite，框架最终报告
+# "Checks: 45"，即 45 个 START_TEST 用例。总数来自源码内联 START_TEST 宏计数，
+# 与官方同版本一致（非本次可运行子集）。口径用 autotools_tests（automake 注册、
+# check 框架运行时报告的 Checks 总数）。
+upstream_test_total: 45
+upstream_test_count_method: autotools_tests
+
+# 代表性上游测试（完整逐文件计数见 notes.md）
+upstream_tests:
+  - file: libdmapsharing/dmap-md5.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-md5.c
+    description: "DMAP/DAAP access-code MD5 生成与流式哈希单元测试（2 用例）"
+    command: "./tests/.libs/unit-test"
+  - file: libdmapsharing/dmap-utils.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-utils.c
+    description: "mime->format 映射单元测试（5 用例）"
+    command: "./tests/.libs/unit-test"
+  - file: libdmapsharing/dmap-av-connection.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-av-connection.c
+    description: "DAAP AV 连接内容码解析/新连接/协议版本单元测试（5 用例）"
+    command: "./tests/.libs/unit-test"
+  - file: libdmapsharing/dmap-av-record.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-av-record.c
+    description: "DAAP AV record 读取/兼容/排序单元测试（5 用例）"
+    command: "./tests/.libs/unit-test"
+  - file: libdmapsharing/dmap-av-share.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-av-share.c
+    description: "DAAP AV share 元数据/转码决策/serve/publish 单元测试（24 用例）"
+    command: "./tests/.libs/unit-test"
+  - file: libdmapsharing/dmap-connection.c
+    source: libdmapsharing-3.9.14.tar.gz/libdmapsharing/dmap-connection.c
+    description: "HTTP 响应处理器单元测试（4 用例）"
+    command: "./tests/.libs/unit-test"
+
+test_package_tests:
+  - file: test_dmapsharing.c
+    description: "md5 已知向量/流式哈希 + mime 映射 + GObject 类型注册 真实 API 冒烟"
+    command: "./test_dmapsharing"
+
+# 新增 test_package 用例数（test_dmapsharing.c 内 4 个独立断言组）
+assertion_count: 4
