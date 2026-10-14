@@ -1,0 +1,84 @@
+package: libao/1.2.0
+homepage: "https://xiph.org/ao/"
+
+# ── R51 upstream-test census ────────────────────────────────────────────────
+# libao 1.2.0 ships NO upstream test suite.  Evidence below is file-level,
+# collected from the exact source archive used by this recipe
+# (sha256 03ad231ad1f9d64b52474392d63c31197b0bc7bd416e58b1c10a329a5ed89caf).
+upstream_tests_exist: false
+upstream_test_census:
+  - source: "libao-1.2.0.tar.gz (full 134-entry file list)"
+    reason: "The archive has no tests/ or test/ directory; the only entry matching 'test' is doc/ao_plugin_test.html, a documentation example page for plugin authors, not a runnable test."
+  - source: "Makefile.am, src/Makefile.am, src/plugins/*/Makefile.am, include/Makefile.am, include/ao/Makefile.am, doc/Makefile.am"
+    reason: "A recursive grep for TESTS / check_PROGRAMS over every Makefile.am returns zero matches: no automake test harness is declared anywhere in the project."
+  - source: "actual `make check` run on the OHOS PC (build tree, exploration stage)"
+    reason: "make check completes with rc=0 and only prints 'Nothing to be done for check' / 'Nothing to be done for check-am' in every subdirectory — it genuinely executes zero test programs."
+  - source: "configure.ac / src sources inventory (20 .c files)"
+    reason: "No assertion-based self-test entry point, no test hooks: the sources are the library, the optional plugins and the doc."
+  - conclusion: "libao 1.2.0 provides 0 tests / 0 test files / 0 test targets. There is no upstream suite to run: N=0, N'=0."
+upstream_test_count: 0
+upstream_test_execution: "N/A — upstream provides no test suite (see upstream_test_census). Nothing was skipped for environmental reasons: there is genuinely no upstream test to execute."
+upstream_check_command: "make check (exists, but runs zero tests)"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# ── test_package entries ────────────────────────────────────────────────────
+consumer_test_count: 1
+ohos_specific_test_count: 1
+
+test_package_tests:
+  - file: test.c
+    name: consumer-generic
+    description: "Consumer test that genuinely calls the packaged API (R34): ao_initialize(), ao_driver_id(\"wav\")/ao_driver_id(\"null\"), ao_open_file() through the wav driver writing a 1-second 440 Hz 16-bit mono sine wave, ao_play()/ao_close() on both the wav and the null driver, then re-reads the produced file and asserts the RIFF/WAVE magic, the WAVE_FORMAT_EXTENSIBLE fmt chunk (40 bytes, tag 0xFFFE, 1 channel, 44100 Hz, 16 bit, PCM sub-format GUID), the data chunk size and the exact file size 68 + 2*samples."
+    command: "./test_libao <workdir>/consumer-out.wav"
+
+ohos_specific_tests:
+  - file: ohos_specific_test.py
+    name: ohos-specific
+    description: "Single HarmonyOS-specific entry (independent Python suite, fail closed: any failure aborts, no silent skips). Run on the OHOS PC over the packaged libao.so.4.1.0 and the consumer binary built by this test_package."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+
+ohos_specific_checkpoints:
+  - file: ohos_specific_test.py
+    name: ohos-elf-identity-lib
+    description: "Direct ELF header parse (no readelf dependency) of the packaged libao.so.4.1.0: EI_CLASS=ELFCLASS64, EI_DATA=ELFDATA2LSB (little-endian), e_machine=EM_AARCH64 (183)."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-soname
+    description: "readelf -d on the packaged library: DT_SONAME == libao.so.4 (the versioned soname downstream consumers record in DT_NEEDED)."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-needed-libc
+    description: "DT_NEEDED of the packaged library is a subset of {libc.so, libm.so} — the library only uses the system C runtime (no stray host-path dependency)."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-codesign
+    description: "readelf -S on the packaged library: a .codesign section is present (OHOS signed-ELF marker); absence would make the OHOS loader refuse the library at dlopen time."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-no-rpath
+    description: "readelf -d on the packaged library: no RPATH/RUNPATH dynamic entries (no build-host absolute paths baked into the shipping artifact)."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-musl-interpreter
+    description: "PT_INTERP segment parsed from the consumer binary program headers: interpreter is exactly /lib/ld-musl-aarch64.so.1 — OHOS musl libc, not glibc."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-consumer-links-libao
+    description: "readelf -d on the consumer binary: DT_NEEDED includes libao.so.4 — the test binary is genuinely linked against the packaged library (R34, also the L1e destructive-check guarantee)."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+  - file: ohos_specific_test.py
+    name: ohos-consumer-api-symbols
+    description: "nm -D -u on the consumer binary: the six libao API symbols it calls (ao_initialize/ao_driver_id/ao_open_file/ao_play/ao_close/ao_shutdown) are undefined references resolved through the packaged library."
+    command: "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <build>/test_libao"
+
+test_scenario_count: 1
+assertion_count: 34
+assertion_count_basis:
+  consumer_test_c: 25
+  ohos_specific_checks: 9
+hardware_playback_required: false
+hardware_playback_note: "libao is exercised entirely through its file-writing wav/raw/au writers and the null sink; no audio device, session bus or live back end is required. The on-device functional test writes and verifies a real RIFF/WAVE file, so the platform adaptation is verified without hardware."
+ohos_checkpoint_count: 8
