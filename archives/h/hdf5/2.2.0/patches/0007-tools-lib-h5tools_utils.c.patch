@@ -1,0 +1,82 @@
+--- a/tools/lib/h5tools_utils.c
++++ b/tools/lib/h5tools_utils.c
+@@ -17,20 +17,56 @@
+ 
+ #include "h5tools.h"
+ #include "h5tools_utils.h"
+ #include "H5private.h"
+ #include "h5trav.h"
+ 
+ #ifdef H5_HAVE_ROS3_VFD
+ #include "H5FDros3.h"
+ #endif
+ 
++/* POSIX tmpfile() need not honor TMPDIR. Use the same task-root contract
++ * on every POSIX build; an explicitly invalid root must not fall back. */
++static FILE *
++h5tools_task_tmpfile(void)
++{
++    const char *directory = getenv("TMPDIR");
++    const char *suffix = "/h5tools-overflow-XXXXXX";
++    char *name;
++    int fd;
++    FILE *stream;
++    if (!directory || !directory[0])
++        return tmpfile();
++    if (directory[0] != '/')
++        return NULL;
++    name = malloc(strlen(directory) + strlen(suffix) + 1);
++    if (!name)
++        return NULL;
++    strcpy(name, directory);
++    strcat(name, suffix);
++    fd = mkstemp(name);
++    if (fd < 0) {
++        free(name);
++        return NULL;
++    }
++    if (unlink(name) != 0) {
++        close(fd);
++        free(name);
++        return NULL;
++    }
++    free(name);
++    stream = fdopen(fd, "w+");
++    if (!stream)
++        close(fd);
++    return stream;
++}
++
+ /* Global variables */
+ unsigned           h5tools_nCols    = 80;
+ static int         h5tools_d_status = 0;
+ static const char *h5tools_progname = "h5tools";
+ 
+ /*
+  * The output functions need a temporary buffer to hold a piece of the
+  * dataset while it's being printed. This constant sets the limit on the
+  * size of that temporary buffer in bytes. For efficiency's sake, choose the
+  * largest value suitable for your machine (for testing use a small value).
+@@ -72,21 +108,21 @@
+     else {
+         if (overflow_file == NULL) /*no overflow has occurred yet */ {
+             bytes_written = vsnprintf(outBuff + outBuffOffset, OUTBUFF_SIZE - outBuffOffset, format, ap);
+             va_end(ap);
+             va_start(ap, format);
+ 
+             if ((bytes_written < 0) || ((unsigned)bytes_written >= (OUTBUFF_SIZE - outBuffOffset))) {
+                 /* Terminate the outbuff at the end of the previous output */
+                 outBuff[outBuffOffset] = '\0';
+ 
+-                overflow_file = tmpfile();
++                overflow_file = h5tools_task_tmpfile();
+                 if (overflow_file == NULL)
+                     fprintf(rawerrorstream,
+                             "warning: could not create overflow file.  Output may be truncated.\n");
+                 else
+                     bytes_written = vfprintf(overflow_file, format, ap);
+             }
+             else
+                 outBuffOffset += (unsigned)bytes_written;
+         }
+         else

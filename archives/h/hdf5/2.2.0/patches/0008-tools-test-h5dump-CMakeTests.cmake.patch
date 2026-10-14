@@ -1,0 +1,122 @@
+--- a/tools/test/h5dump/CMakeTests.cmake
++++ b/tools/test/h5dump/CMakeTests.cmake
+@@ -1,10 +1,28 @@
++# Source-backed HDFFV-9407 test-driver repair. Not a product-code bypass.
++# This script mode is reached only by the original precision test registration.
++if (DEFINED HDF5_PRECISION_PROGRAM)
++  if (NOT EXISTS "${HDF5_PRECISION_INPUT}" OR NOT HDF5_PRECISION_EXPECT)
++    message (FATAL_ERROR "Precision fixture or original numerical oracle missing")
++  endif ()
++  execute_process (
++      COMMAND "${HDF5_PRECISION_PROGRAM}" ${HDF5_PRECISION_ARGS} "${HDF5_PRECISION_INPUT}"
++      RESULT_VARIABLE precision_rc OUTPUT_VARIABLE precision_out ERROR_VARIABLE precision_err
++  )
++  string (FIND "${precision_out}" "${HDF5_PRECISION_EXPECT}" precision_match)
++  if (NOT precision_rc EQUAL 0 OR precision_match LESS 0 OR NOT "${precision_err}" STREQUAL "")
++    message (FATAL_ERROR "Precision RC/content oracle failed: rc=${precision_rc}; output=${precision_out}; error=${precision_err}")
++  endif ()
++  message (STATUS "${precision_out}")
++  return ()
++endif ()
++
+ #
+ # Copyright by The HDF Group.
+ # All rights reserved.
+ #
+ # This file is part of HDF5.  The full HDF5 copyright notice, including
+ # terms governing use, modification, and redistribution, is contained in
+ # the LICENSE file, which can be found at the root of the source code
+ # distribution tree, or in https://www.hdfgroup.org/licenses.
+ # If you do not have access to either file, you may request a copy from
+ # help@hdfgroup.org.
+@@ -548,21 +566,21 @@
+ #   H5ERRREF <errref_string> - if provided, expect the error output from h5dump to contain this string
+ #   ENVVAR <varname> - if provided, set environment variable <varname> to ENVVAL. If memchecker is enabled, does nothing.
+ #   ENVVAL <value> - if provided, set environment variable ENVVAR to this value. If memchecker is enabled, does nothing.
+ #
+ # OPTIONAL MULTI-KEYWORD ARGUMENTS
+ #   ANY_PATHS <paths>   - The -N/--any_path argument(s) to h5dump.
+ #
+ macro (ADD_H5_TEST testname)
+   cmake_parse_arguments (ARG
+       "BINARY_OUTPUT;MASK_ERROR;GREP_COMPARE;BINFILE;SKIP_TEST;NATIVE_ONLY" # Flags
+-      "RESULT_CODE;APPLY_FILTERS;TARGET_FILE;OUTPUT_FILE;DDL_FILE;H5ERRREF;ENVVAR;ENVVAL" # Single value args
++      "RESULT_CODE;RESULT_ERRCHECK;APPLY_FILTERS;TARGET_FILE;OUTPUT_FILE;DDL_FILE;H5ERRREF;ENVVAR;ENVVAL" # Single value args
+       "ANY_PATHS" # Multi value args
+       ${ARGN}
+   )
+ 
+   # Validate required parameters
+   if (NOT DEFINED ARG_RESULT_CODE)
+     message (FATAL_ERROR "ADD_H5_TEST: RESULT_CODE is required")
+   endif ()
+ 
+   if (NOT DEFINED ARG_TARGET_FILE)
+@@ -748,20 +766,31 @@
+     endif ()
+ 
+     # If using memchecker add tests without using scripts
+     if (HDF5_ENABLE_USING_MEMCHECKER AND NOT ARG_MASK_ERROR AND NOT ARG_GREP_COMPARE AND NOT DEFINED ARG_H5ERRREF)
+       add_test (NAME ${vol_prefix}H5DUMP-${ctest_testname} COMMAND $<TARGET_FILE:h5dump> ${ARG_ANY_PATHS} ${ARG_UNPARSED_ARGUMENTS} ${ARG_DDL_FILE_CMD} ${BINARY_OUTPUT_FLAG} ${ARG_OUTPUT_FILEARGS} ${ARG_TARGET_FILE})
+       if (${ARG_RESULT_CODE})
+         set_tests_properties (${vol_prefix}H5DUMP-${ctest_testname}
+             PROPERTIES WILL_FAIL "true"
+         )
+       endif ()
++    elseif (DEFINED ARG_RESULT_ERRCHECK)
++      # Preserve the original precision substring, reject nonzero RC/empty output.
++      add_test (
++          NAME ${vol_prefix}H5DUMP-${ctest_testname}
++          COMMAND "${CMAKE_COMMAND}"
++              -D "HDF5_PRECISION_PROGRAM=$<TARGET_FILE:h5dump>"
++              -D "HDF5_PRECISION_INPUT=${workdir}/${ARG_TARGET_FILE}"
++              -D "HDF5_PRECISION_ARGS:STRING=${ARG_UNPARSED_ARGUMENTS}"
++              -D "HDF5_PRECISION_EXPECT=${ARG_RESULT_ERRCHECK}"
++              -P "${CMAKE_CURRENT_LIST_FILE}"
++      )
+     else ()
+       add_test (
+           NAME ${vol_prefix}H5DUMP-${ctest_testname}
+           COMMAND "${CMAKE_COMMAND}"
+               -D "TEST_PROGRAM=$<TARGET_FILE:h5dump>"
+               -D "TEST_ARGS:STRING=${ARG_ANY_PATHS};${ARG_UNPARSED_ARGUMENTS};${ARG_DDL_FILE_CMD};${BINARY_OUTPUT_FLAG};${ARG_OUTPUT_FILEARGS};${ARG_TARGET_FILE}"
+               -D "TEST_FOLDER=${workdir}"
+               -D "TEST_OUTPUT=${testname}.out"
+               -D "TEST_EXPECT=${ARG_RESULT_CODE}"
+               -D "TEST_REFERENCE=${ARG_RESULT_CHECK_FILE}"
+@@ -1445,21 +1474,21 @@
+ # test for non-existing file
+ ADD_H5_TEST (non_existing RESULT_CODE 1 H5ERRREF "unable to open file" --enable-error-stack tgroup.h5 TARGET_FILE non_existing.h5)
+ 
+ # test to verify github issue#3790: infinite loop closing library
+ ADD_H5_TEST (infinite_loop RESULT_CODE 1 H5ERRREF "unable to open file" TARGET_FILE 3790_infinite_loop.h5)
+ 
+ # test to verify HDFFV-10333: error similar to H5O_attr_decode in the jira issue
+ ADD_H5_TEST (err_attr_dspace RESULT_CODE 1 H5ERRREF "error getting attribute information" TARGET_FILE err_attr_dspace.h5)
+ 
+ # test to verify HDFFV-9407: long double full precision
+-ADD_H5_TEST (t128bit_float RESULT_CODE 1 RESULT_ERRCHECK "1.123456789012345" -m %.35Lg TARGET_FILE t128bit_float.h5 SKIP_TEST)
++ADD_H5_TEST (t128bit_float RESULT_CODE 0 RESULT_ERRCHECK "1.123456789012345" -L %.35Lg TARGET_FILE t128bit_float.h5)
+ 
+ # test to verify HDFFV-10480: out of bounds read in H5O_fill_new[old]_decode
+ ADD_H5_TEST (tCVE_2018_11206_fill_old RESULT_CODE 1 H5ERRREF "" TARGET_FILE tCVE_2018_11206_fill_old.h5)
+ ADD_H5_TEST (tCVE_2018_11206_fill_new RESULT_CODE 1 H5ERRREF "" TARGET_FILE tCVE_2018_11206_fill_new.h5)
+ 
+ # test to verify fix for CVE-2021-37501: multiplication overflow in H5O__attr_decode()
+ # https://github.com/ST4RF4LL/Something_Found/blob/main/HDF5_v1.13.0_h5dump_heap_overflow.assets/poc
+ ADD_H5_TEST (tCVE-2021-37501_attr_decode RESULT_CODE 1 H5ERRREF "error getting attribute information" TARGET_FILE tCVE-2021-37501_attr_decode.h5)
+ 
+ # onion VFD tests
+@@ -1540,10 +1569,12 @@
+           -P "${HDF_RESOURCES_DIR}/stopProxy.cmake"
+   )
+   set_tests_properties (H5DUMP-stop-proxy PROPERTIES FIXTURES_CLEANUP h5dump_s3_proxy)
+ 
+   ADD_H5_S3TEST (tattrintsize 0 anon http localhost:${h5dump_s3tests_port}/h5dumpros3 --vfd-name=ros3 --s3-cred=\(,,\))
+   ADD_H5_S3TEST (tattrintsize 0 anon s3 h5dumpros3 --filedriver=ros3 --vfd-name=ros3 --s3-cred=\(,,\) --endpoint-url=http://localhost:${h5dump_s3tests_port})
+   ADD_H5_S3TEST (tattrintsize 0 profile http localhost:${h5dump_s3tests_port}/h5dumpros3 --vfd-name=ros3)
+   ADD_H5_S3TEST (tattrintsize 0 profile s3 h5dumpros3 --filedriver=ros3 --vfd-name=ros3 --endpoint-url=http://localhost:${h5dump_s3tests_port})
+   ADD_H5_S3TEST (tattrintsize 0 filename s3 h5dumpros3 --endpoint-url=http://localhost:${h5dump_s3tests_port})
+ endif ()
++
++

@@ -1,0 +1,2 @@
+add_executable(harmony_overflow overflow_stream.c)
+target_link_libraries(harmony_overflow PRIVATE hdf5_tools-static)

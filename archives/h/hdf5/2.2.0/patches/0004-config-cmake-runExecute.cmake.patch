@@ -1,0 +1,66 @@
+--- a/config/cmake/runExecute.cmake
++++ b/config/cmake/runExecute.cmake
+@@ -39,22 +39,35 @@
+   set(${strings_out} ${${stream}})
+   # Escaping must be performed twice due to POP_BACK
+   string(REPLACE ";" "\;" ${strings_out} "${${strings_out}}")
+   string(REPLACE ";" "\;" ${strings_out} "${${strings_out}}")
+   # break the string into lines at newlines
+   string(REPLACE "\n" ";" ${strings_out} "${${strings_out}}")
+   # Remove last entry
+   list(POP_BACK ${strings_out})
+ endmacro()
+ 
+-macro (EXECUTE_TEST)
+-  cmake_parse_arguments (TEST "" "NOERRDISPLAY;EXPECT;JAVA;CLASSPATH;PROGRAM;FOLDER;OUTPUT;LIBRARY_DIRECTORY;INPUT;ENV_VAR;ENV_VALUE;KEYSTORE_DIR;EMULATOR;ARGS" "TEST_" ${ARGN})
++function (EXECUTE_TEST)
++  # PARSE_ARGV preserves literal ${ORIGIN}, backslashes and list arguments.
++  # PROGRAM includes the original MPI launcher and its options.
++  set (_h5_execute_keys NOERRDISPLAY EXPECT JAVA CLASSPATH FOLDER OUTPUT LIBRARY_DIRECTORY INPUT ENV_VAR ENV_VALUE KEYSTORE_DIR)
++  set (_h5_execute_one_value)
++  foreach (_h5_key IN LISTS _h5_execute_keys)
++    list (APPEND _h5_execute_one_value "TEST_${_h5_key}")
++  endforeach ()
++  cmake_parse_arguments (PARSE_ARGV 0 H5_EXECUTE "" "${_h5_execute_one_value}" "TEST_ARGS;TEST_PROGRAM;TEST_EMULATOR")
++  foreach (_h5_key IN LISTS _h5_execute_keys)
++    set (TEST_${_h5_key} "${H5_EXECUTE_TEST_${_h5_key}}")
++  endforeach ()
++  set (TEST_ARGS "${H5_EXECUTE_TEST_ARGS}")
++  set (TEST_PROGRAM "${H5_EXECUTE_TEST_PROGRAM}")
++  set (TEST_EMULATOR "${H5_EXECUTE_TEST_EMULATOR}")
+ if (NOT TEST_PROGRAM)
+   message (FATAL_ERROR "Require TEST_PROGRAM to be defined")
+ endif ()
+ if (NOT TEST_FOLDER)
+   message (FATAL_ERROR "Require TEST_FOLDER to be defined")
+ endif ()
+ if (NOT TEST_OUTPUT)
+   message (FATAL_ERROR "Require TEST_OUTPUT to be defined")
+ endif ()
+ if (NOT TEST_EXPECT)
+@@ -181,21 +194,24 @@
+   if (NOT TEST_NOERRDISPLAY)
+     if (NOT "${TEST_OUTPUT_FILTERED_STREAM}" STREQUAL "")
+       message (STATUS "Output :\n${TEST_OUTPUT_FILTERED_STREAM}")
+     endif ()
+     if (NOT "${TEST_ERR_FILTERED_STREAM}" STREQUAL "")
+       message (STATUS "Error Output :\n${TEST_ERR_FILTERED_STREAM}")
+     endif ()
+   endif ()
+   message (FATAL_ERROR "Failed: Test program ${TEST_PROGRAM} exited != ${TEST_EXPECT}.\n${TEST_ERROR}")
+ endif ()
+-endmacro ()
++foreach (_h5_result TEST_OUT TEST_ERROR TEST_RESULT TEST_OUTPUT_FILTERED_STREAM TEST_REFERENCE_FILTERED_STREAM TEST_ERR_FILTERED_STREAM TEST_ERRREF_FILTERED_STREAM)
++  set (${_h5_result} "${${_h5_result}}" PARENT_SCOPE)
++endforeach ()
++endfunction ()
+ 
+ #############################################
+ # Begin of file filtering
+ #############################################
+ macro (FILTER_TEST)
+ cmake_parse_arguments (TEST "" "MASK_ERROR;MASK_STORE;ERRREF;FOLDER;OUTPUT;REFERENCE;REGEX;MATCH;MASK;FILTER;REF_FILTER;FILTER_REPLACE;MASK_MOD;ARGS" "TEST_" ${ARGN})
+ if (TEST_REGEX)
+   # TEST_REGEX and TEST_MATCH should always be checked
+   if (NOT "${TEST_OUTPUT_FILTERED_STREAM}" STREQUAL "")
+     string (REGEX MATCH "${TEST_REGEX}" REGEX_MATCH ${TEST_OUTPUT_FILTERED_STREAM})

@@ -1,0 +1,35 @@
+--- a/config/HDF5UseLibaec.cmake
++++ b/config/HDF5UseLibaec.cmake
+@@ -54,20 +54,32 @@
+   # For "szip", use CMake's standard MODULE find mode followed by a CONFIG find
+   # mode.
+   find_package (${LIBAEC_PACKAGE_NAME} OPTIONAL_COMPONENTS ${LIBAEC_SEARCH_TYPE})
+ 
+   if (${${LIBAEC_PACKAGE_NAME}_FOUND})
+     set (H5_SZIP_INCLUDE_DIR_GEN ${SZIP_INCLUDE_DIR} PARENT_SCOPE)
+     set (H5_SZIP_INCLUDE_DIRS ${H5_SZIP_INCLUDE_DIRS} ${SZIP_INCLUDE_DIR} PARENT_SCOPE)
+ 
+     if (LIBAEC_PACKAGE_NAME MATCHES "libaec")
+       # When using libaec to replace SZIP, we require that the libsz compatibility library is available
++      # A Conan config can export the real sz target without upstream's
++      # SZIP_FOUND/libsz_FOUND variables. Verify the compatibility API through
++      # that target, rather than disabling compression or assuming capability.
++      if (NOT libsz_FOUND AND TARGET libaec::sz)
++        include (CMakePushCheckState)
++        include (CheckSymbolExists)
++        cmake_push_check_state (RESET)
++        set (CMAKE_REQUIRED_LIBRARIES libaec::sz)
++        check_symbol_exists (SZ_BufftoBuffCompress "szlib.h" HDF5_HAVE_CONFIG_LIBSZ_API)
++        cmake_pop_check_state ()
++        set (libsz_FOUND ${HDF5_HAVE_CONFIG_LIBSZ_API})
++      endif ()
+       if (NOT libsz_FOUND)
+         message (FATAL_ERROR "Libaec support in HDF5 was enabled and libaec was found, but no libsz compatibility library was found")
+       endif ()
+ 
+       set (LINK_COMP_LIBS ${LINK_COMP_LIBS} libaec::sz libaec::aec PARENT_SCOPE)
+     else ()
+       set (LINK_COMP_LIBS ${LINK_COMP_LIBS} ${SZIP_LIBRARIES} PARENT_SCOPE)
+     endif ()
+ 
+     set (H5_SZIP_FOUND TRUE PARENT_SCOPE)
