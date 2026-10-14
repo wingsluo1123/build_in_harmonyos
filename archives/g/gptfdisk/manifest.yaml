@@ -1,0 +1,24 @@
+# 软件级 manifest — gptfdisk
+software: gptfdisk
+display: "GPT fdisk"
+description: "GPT/MBR 磁盘分区命令行工具集（gdisk / cgdisk / sgdisk / fixparts）"
+category: system
+homepage: "https://www.rodsbooks.com/gdisk/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 Makefile 按 uname -s 选平台配置；HarmonyOS 下用上游支持的 TARGET=linux 选 Linux 配置（原生交叉开关，零源码补丁）"
+    - "依赖 libuuid/popt/ncurses 均取制品仓静态包（R26 系统同名库静态）；ncursesw 头在私有 build_folder 内做 <ncursesw/ncurses.h> shim"
+    - "CXX 来自 tools.build:compiler_executables（R33），不使用未定义的 shell 变量"
+    - "上游测试 gdisk_test.sh 在 build() 内 can_run 时实跑（rc!=0 / FAILED>0 即失败），并输出 HMBS_UPSTREAM_TEST_RESULT 标记"
+  common_dependencies:
+    - libuuid
+    - popt
+    - ncurses
+
+versions:
+  "1.0.10":
+    status: built
+    build_date: "2026-10-01"

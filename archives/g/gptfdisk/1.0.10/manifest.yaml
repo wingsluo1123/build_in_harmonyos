@@ -1,0 +1,49 @@
+version: "1.0.10"
+software: gptfdisk
+status: built
+build_date: "2026-10-01"
+build_system: makefile
+
+source:
+  url: "https://sourceforge.net/projects/gptfdisk/files/gptfdisk/1.0.10/gptfdisk-1.0.10.tar.gz/download"
+  sha256: "2abed61bc6d2b9ec498973c0440b8b804b7a72d7144069b5a9209b2ad693a282"
+  tar_format: tar.gz
+
+build:
+  system: "raw Makefile（上游 consolidated Makefile；无 configure/CMake）"
+  configure_options:
+    - "TARGET=linux（上游文档化平台开关；HarmonyOS 的 uname -s 不命中任何分支）"
+    - "CXX=<conf tools.build:compiler_executables.cpp>（R33，不使用 shell 变量）"
+    - "CXXFLAGS=-O2 -Wall -D_FILE_OFFSET_BITS=64 + <依赖 include>（复述上游 Linux 默认，命令行覆盖语义）"
+    - "LDFLAGS=-L<依赖 lib>；LDLIBS=-luuid；SGDISK_LDLIBS=-lpopt；CGDISK_LDLIBS=-lncursesw"
+    - "私有 build_folder shim：ncursesw/ncurses.h -> <curses.h>（conan ncurses 平铺头兼容）"
+  dependencies:
+    - libuuid/2.42.2
+    - popt/1.16
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_passed: 21
+test_failed: 0
+
+test_results:
+  upstream_registered: 21
+  upstream_executed: 21
+  upstream_passed: 21
+  upstream_failed: 0
+  upstream_skipped: 0
+  test_package_registered: 52
+  test_package_executed: 52
+  test_package_passed: 52
+  test_package_failed: 0
+  assertion_count: 52
+
+knowledge_gained:
+  - "gptfdisk 的 Makefile 用 uname -s 选平台；HarmonyOS 下用上游支持的 TARGET=linux 即恢复 Linux 默认链接参数，无需任何补丁。（knowledge_ref: E545-draft-BA2E.kv）"
+  - "conan ncurses(6.6) 头文件平铺安装（include/curses.h），不提供系统式 include/ncursesw/ 目录；<ncursesw/ncurses.h> 需私有 shim 头。（knowledge_ref: E546-draft-8845.kv）"
+  - "GNU make -jN（N>1）在 HMDFS 上创建 jobserver FIFO 失败（Operation not permitted），会打印告警并退化；直接 -j1 更干净。（knowledge_ref: E547-draft-9DFE.kv）"
+  - "对普通文件（非块设备）做 BLKSSZGET 失败打印的 'Error 13 ... Setting sector size to 512' 是预期噪音，不影响 GPT 读写。（knowledge_ref: E548-draft-0712.kv）"
+  - "gdisk_test.sh 的 '改磁盘 GUID' 检查因上游脚本把命令替换写成赋值而恒真（21 条中 2 条），其余 19 条为真实断言。（knowledge_ref: E549-draft-3EF2.kv）"
