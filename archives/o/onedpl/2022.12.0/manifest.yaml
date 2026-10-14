@@ -1,0 +1,22 @@
+version: "2022.12.0"
+software: onedpl
+status: built
+build_date: "2026-09-28"
+build_system: cmake
+source:
+  url: "https://github.com/uxlfoundation/oneDPL/archive/refs/tags/oneDPL-release-2022.12.0.tar.gz"
+  sha256: "8df403b6a66b2fde36a882427e52e48252b926d4ac9d592bd0bf75f4f418adc1"
+  tar_format: tar.gz
+build:
+  system: cmake
+  configure_options:
+    - "-DONEDPL_BACKEND=serial"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+patches_applied: []
+knowledge_gained:
+  - "oneDPL 2022.12.0 是 header-only 库（CMake INTERFACE target oneDPL），serial 后端零依赖"
+  - "上游 856 个 .pass.cpp 中 570 个需 DPC++ 后端；serial 配置注册 292 个 ctest 条目（286 + 5 COAL 重复 + 1 reduce_by_segment 变体）"
+  - "上游测试可执行文件全部 EXCLUDE_FROM_ALL，配方必须显式构建 build-onedpl-tests 目标再跑 ctest"
+  - "test/kt 内核模板测试默认不启用（ONEDPL_TEST_ENABLE_KT_SYCL/ESIMD 均为 OFF），OHOS 无 SYCL，保持关闭"
