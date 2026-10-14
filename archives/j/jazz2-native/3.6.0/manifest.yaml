@@ -1,0 +1,97 @@
+# 版本级 manifest — jazz2-native 3.6.0
+# 文件位置: archives/j/jazz2-native/3.6.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.6.0"
+software: "jazz2-native"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+build_date: "2026-10-07"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/deathkiller/jazz2-native/archive/refs/tags/3.6.0.tar.gz"
+  sha256: "3df80d28d1e4495af832b854e87bdd3098dbc2d1d8227b72d052a9bdf8c2721e"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DNCINE_DOWNLOAD_DEPENDENCIES=OFF"
+    - "-DNCINE_PREFERRED_BACKEND=SDL2"
+    - "-DNCINE_WITH_OPENGLES=ON"
+    - "-DNCINE_WITH_GLEW=OFF"
+    - "-DNCINE_WITH_BACKWARD=OFF"
+    - "-DNCINE_WITH_OPENMPT=OFF"
+    - "-DNCINE_VERSION_FROM_GIT=OFF"
+    - "-DNCINE_CREATE_CONTENT_SYMLINK=OFF"
+    - "-DNCINE_LINKTIME_OPTIMIZATION=OFF"
+    - "-DNCINE_LINUX_PACKAGE=jazz2"
+    - "-DDEATH_CPU_USE_IFUNC=OFF"
+    - "-DOPENGLES2_LIBRARY=<sysroot>/libGLESv3.so"
+    - "-DEGL_LIBRARY=<sysroot>/libEGL.so"
+
+  dependencies:
+    - sdl2/2.30.10
+    - openal-soft/1.25.2
+    - libvorbis/1.3.7
+    - libcurl/8.5.0
+    - zlib/1.3.1.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Sources-nCine-Threading-Thread.cpp.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS musl 不支持 IRELATIVE 重定位 → nCine 默认 DEATH_CPU_USE_IFUNC=ON 的二进制启动即崩；关开关后正常（readelf -r IRELATIVE 计数 0）"
+  - "nCine ES 渲染路径调用 ES 3.0 入口点（glBlitFramebuffer/glInvalidateFramebuffer 等），sysroot libGLESv2.so 不导出 → 必须用 libGLESv3.so，否则链接期 22 个未定义符号"
+  - "GLES/EGL 四个 CMake 查找变量（OPENGLES2_LIBRARY/EGL_LIBRARY/OPENGLES2_INCLUDE_DIR/EGL_INCLUDE_DIR）需显式指向 OHOS sysroot；库目录用 clang -print-file-name=libm.a 反查最稳"
+  - "E211：OHOS musl 缺 pthread_setaffinity_np/pthread_getaffinity_np/pthread_cancel → 改 sched_setaffinity/sched_getaffinity，取消语义按不支持返回"
+  - "ohpcd sdl2 头装在 include/SDL2/，nCine 在 CMAKE_BUILD 下直接 #include <SDL.h> → 把 include/SDL2 加入包含路径即可，无需上游补丁"
+  - "application 包的运行时依赖在消费者/测试图里被标 Skipped binaries（cpp_info 只剩相对 libdirs、package_folder 为空）→ 测试包需显式 require 对应依赖才能拼出完整 LD_LIBRARY_PATH"
+  - "conan run env 列表在本环境不生效（同仓库 acsccid 先例）→ test_package 改为命令行内联 LD_LIBRARY_PATH"
+  - "libcurl 在非 Windows 平台是硬依赖（WebRequest.cpp 无条件 include <curl/curl.h>）；zlib 需钉 1.3.1.1 与 libcurl 传递依赖对齐"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/jazz2-native-3.6.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/jazz2-native-3.6.0.work
+  source_orig_hash: c6da2f600249252a
+  source_work_hash: 090e531c9c3259e4
+  generated_at: '2026-10-07T18:10:20'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Sources-nCine-Threading-Thread.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

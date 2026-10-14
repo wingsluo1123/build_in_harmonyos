@@ -1,0 +1,43 @@
+# 软件级 manifest — jazz2-native
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: jazz2-native
+display: "Jazz² Resurrection"
+description: "Jazz² Resurrection — 爵士兔 2（Jazz Jackrabbit 2）开源重制版，SDL2 + OpenGL ES 2 游戏引擎（C++17，GPL-3.0）"
+category: game
+homepage: "https://github.com/deathkiller/jazz2-native"
+license: GPL-3.0
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "上游自带嵌入式 nCine 引擎（Sources/nCine）+ 主程序 Sources/Shared；顶层与 nCine 各一份 CMakeLists，交叉编译直接走 CMakeToolchain，无需 autotools/config.guess"
+    - "E092：CMAKE_SYSTEM_NAME=Linux + CMAKE_SYSTEM_PROCESSOR=aarch64（OHOS sysroot 由 profile 的 tools.build:compiler_executables 提供）；CMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "NICE 关键开关：-DNCINE_DOWNLOAD_DEPENDENCIES=OFF（禁联网拉 SDL2/OpenAL 源码）+ NCINE_PREFERRED_BACKEND=SDL2 + NCINE_WITH_OPENGLES=ON + NCINE_WITH_GLEW/BACKWARD/OPENMPT=OFF + NCINE_VERSION_FROM_GIT=OFF + NCINE_CREATE_CONTENT_SYMLINK=OFF"
+    - "ES3 链接坑：nCine 的 ES 渲染路径调用 ES 3.0 入口点（glBlitFramebuffer/glInvalidateFramebuffer 等），sysroot 的 libGLESv2.so 不导出 → 用同目录 libGLESv3.so；GLES/EGL 的 LIBRARY/INCLUDE_DIR 四个查找变量按 sysroot 库目录反查（clang -print-file-name=libm.a）后显式传入"
+    - "ifunc/musl 坑：nCine 默认 DEATH_CPU_USE_IFUNC=ON 生成 IRELATIVE 重定位，OHOS musl 不支持 → 二进制启动即崩，配方关该开关（详见知识草稿）"
+    - "pthread 三符号（E211）：pthread_setaffinity_np / pthread_getaffinity_np / pthread_cancel 在 OHOS musl 缺失 → 补丁 0001 改 sched_setaffinity/sched_getaffinity，取消语义返回不支持"
+    - "SDL2 头布局：ohpcd sdl2 装 include/SDL2/SDL.h，而 nCine 的 SdlGfxDevice.h 在 CMAKE_BUILD 下直接 #include <SDL.h> → 配方把 include/SDL2 加入包含路径（免打上游补丁）"
+    - "libcurl 是硬依赖：Sources/Shared/IO/WebRequest.cpp 非 Windows 平台无条件 include <curl/curl.h>（上游无开关）；zlib 需钉 1.3.1.1 与 libcurl 传递依赖对齐"
+    - "test_package 运行环境：conan run env 列表在本环境不生效（同仓库 acsccid 先例）→ 命令行内联 LD_LIBRARY_PATH；且 application 包的运行时依赖在消费者图里被标 Skipped binaries（cpp_info 只剩相对 libdirs、package_folder 为空）→ 测试包显式 require openal-soft 才能拼出完整运行库路径"
+    - "上游零自动化测试（2 个 CMakeLists、0 处 enable_testing/add_test、无 Catch2/gtest/doctest）→ headless 冒烟用上游 main() 自带的 --version 早退路径（Sources/Main.cpp:2243，先于 SDL/GL 初始化）"
+  common_dependencies:
+    - sdl2
+    - openal-soft
+    - libvorbis
+    - libcurl
+    - zlib
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "3.6.0":
+    status: published
+    build_date: "2026-10-07"
+    conan_ref: "jazz2-native/3.6.0"

@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jazz2-native/3.6.0
+homepage: "https://github.com/deathkiller/jazz2-native"
+
+# 上游测试命令
+# jazz2-native（nCine 引擎）上游无任何自动化测试：cmake/ 下无 enable_testing /
+# add_test，仓库无 tests/ 目录，无 CI 测试作业。如实记录 upstream official tests = 0。
+# 证据：`grep -rn 'enable_testing|add_test' cmake/*.cmake CMakeLists.txt` → 0 命中
+#      `ls Sources/nCine/Tests` → 目录不存在
+upstream_check_command: "(none - no upstream tests)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "(none)"
+
+# 上游实际运行的测试程序（无）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+# jazz2-native 是 SDL2/OpenGL ES 2 图形游戏，常规启动需要显示设备与 GL 上下文。
+# 上游 main() 原生支持 `--version` 早退（Sources/Main.cpp:2243，先于任何 SDL/GL
+# 初始化）→ headless CI 可直接验证二进制可加载 + 动态依赖可解析 + ELF 已自签，
+# 无需打补丁（区别于 chromono 需要新增 --version 入口）。
+test_package_tests:
+  - file: test_jazz2_native.sh
+    description: "jazz2 --version → rc==0 且输出含 '3.6.0'（二进制可加载 + 动态依赖 OpenAL/vorbisfile/ogg/libcurl 可解析 + ELF 已自签；SDL2、zlib 由配方静态链接不走动态解析）"
+
+# 测试断言总数
+# 断言：二进制存在且可执行（1）、--version 退出码 0（1）、输出含 "3.6.0"（1）
+assertion_count: 3
