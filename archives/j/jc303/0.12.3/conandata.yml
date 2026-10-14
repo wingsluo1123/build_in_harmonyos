@@ -1,0 +1,43 @@
+sources:
+  url: "https://github.com/midilab/jc303/archive/refs/tags/v0.12.3.tar.gz"
+  sha256: "1ad2e4c769f23872320a6b3f213d17ad6ea76e7b03bb65fa7d7e81761fd129ed"
+
+# OHOS 适配：上游根 CMakeLists / guitarml CMakeLists 全部经 FetchContent 从
+# GitHub 构建期拉取（无网络环境不可行）。除 JUCE 改为消费已发布的 conan 包
+# （find_package(JUCE)）外，其余五个 FetchContent 源在 recipe source() 期由
+# 下列固定 URL+SHA256 下载解包，经 FETCHCONTENT_SOURCE_DIR_* 注入（E292 先例：
+# knowledge/graph/E292.kv L25 "必要时使用 no-links 预解包并通过
+# FETCHCONTENT_SOURCE_DIR_* 注入"）。锁定 commit 与上游 CMakeLists 声明一致：
+#   根 CMakeLists LIB_CLAP_TAG / LIB_CHOWDSP_UTILS_TAG
+#   guitarml CMakeLists LIB_RTNEURAL_TAG / LIB_CHOWDSP_MATH_APPROX_TAG / LIB_VARIANT_TAG
+# RTNeural-xsimd 是 RTNeural@04cb333 的 .gitmodules 二跳 submodule
+# （modules/xsimd → xtensor-stack/xsimd，gitlink a00c81f…，RTNEURAL_XSIMD=ON 必需；
+#  RTNeural 归档内 modules/Eigen 与 modules/json 为普通 vendored 目录已自带）。
+# clap / clap-helpers 是 clap-juce-extensions@a3227c5 的 .gitmodules 二跳
+# submodule（clap-libs/clap → free-audio/clap gitlink df8f16c…；
+# clap-libs/clap-helpers → free-audio/clap-helpers gitlink 7b53a68…）。
+fetchcontent:
+  clap-juce-extensions:
+    url: "https://github.com/free-audio/clap-juce-extensions/archive/a3227c52fa082d2df33f4377ed1e050dd8a52595.tar.gz"
+    sha256: "0799bf39e582d5f173d4c9a476cc26a9b798b3b92f6322c47c8607da5c85405e"
+  clap:
+    url: "https://github.com/free-audio/clap/archive/df8f16c69ba1c1a15fb105f0c5a2e5b9ac6be742.tar.gz"
+    sha256: "8d683a56092447b3be59e794e693dee61e2965fb4fbbeb2f97888389a6454818"
+  clap-helpers:
+    url: "https://github.com/free-audio/clap-helpers/archive/7b53a685e11465154b4ccba3065224dbcbf8a893.tar.gz"
+    sha256: "eaf5869b2b40dcfc71a1e3f73167a2255c2fc2d53f553f813b6c051e54df1374"
+  chowdsp_utils:
+    url: "https://github.com/Chowdhury-DSP/chowdsp_utils/archive/ffc70ba399f9afaeefb996eb14e55a1d487270b8.tar.gz"
+    sha256: "7becbc43cd140a3fd8794e9dd630066fb9446e742fefb1b4b963755527db5177"
+  math_approx:
+    url: "https://github.com/Chowdhury-DSP/math_approx/archive/0c68d4d17242d707ba07fa7f1901692b7ed72d58.tar.gz"
+    sha256: "bfa00c6208780c8b2b5ef5abe4791b1ef080202dbceef7c298d64d14a2035824"
+  ea_variant:
+    url: "https://github.com/eyalamirmusic/Variant/archive/3fce49cfca50ba3b05026d41ffc4911a8e653378.tar.gz"
+    sha256: "95749de852b5ecf5fb797a93d61c18fb640d28b62e2b9658b43ed579271d9888"
+  RTNeural:
+    url: "https://github.com/jatinchowdhury18/RTNeural/archive/04cb333bc4b174760958a77c7ce076eae38fe8e4.tar.gz"
+    sha256: "6edb89306b4ee4613f582519a484972981db0e4d2d17f1f81572410f0dca5cdf"
+  RTNeural-xsimd:
+    url: "https://github.com/xtensor-stack/xsimd/archive/a00c81f7b9e808a42aedcf7da2fbb1f9a636da34.tar.gz"
+    sha256: "f1c485107ae0b29069a88bf9619d2d93eaed8321ae03a83d7fc437da85d5b9fd"

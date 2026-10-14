@@ -1,0 +1,31 @@
+software: jc303
+display: "JC303"
+description: "JUCE 框架的 Roland TB-303 巴斯线合成器插件（VST3/LV2/CLAP），内嵌 Open303 DSP 与 GuitarML 神经放大器模型"
+category: multimedia
+homepage: "https://github.com/midilab/jc303"
+license: "GPL-3.0-only"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "构建期网络去除：上游经 FetchContent 从 GitHub 拉 JUCE/clap-juce-extensions/chowdsp_utils/RTNeural/math_approx/ea_variant；JUCE 改为消费已发布 conan 包 juce/8.0.5（find_package(JUCE) 官方 JUCEConfig + 预构建 juceaide/lv2/vst3 helper IMPORTED），其余五个源由 conandata fetchcontent 段固定 URL+SHA256 预解包并经 FETCHCONTENT_SOURCE_DIR_* 注入（E292 先例），RTNeural 的 xsimd 二跳 submodule（RTNEURAL_XSIMD=ON 必需，gitlink a00c81f…）一并解包就位"
+    - "多格式插件目标：juce_add_plugin(FORMATS AU VST3 LV2) 在 Linux/OHOS 实际编译 VST3+LV2（AU 仅 macOS 分支自动关），另经 clap_juce_extensions_plugin 产出 CLAP；VST3 bundle Contents/<arch>/ 布局、LV2 .ttl 由包内预构建 juce_lv2_helper 在真机构建期生成"
+    - "E505 运行期闭包：插件 .so 链接 freetype/fontconfig(+libxml2)/alsa 共享库，generate() 注入 --disable-new-dtags 的 $ORIGIN 多级 rpath（覆盖 CLAP/LV2/VST3 三种 bundle 深度），package() 将依赖 .so 实体化进包内 lib/jc303-runtime/ 并逐文件 binary-sign-tool selfSign（含插件 ELF），再以 llvm-readelf 断言 NEEDED 闭包与 $ORIGIN rpath 真实落地"
+    - "去除 juce::juce_recommended_lto_flags（3 处）：全量 -flto 多格式链接在 OHOS clang-15/lld 上未验证且按格式倍增链接成本；juce_recommended_config_flags/warning_flags 保留"
+    - "上游已置 JUCE_WEB_BROWSER=0 / JUCE_USE_CURL=0（根 CMakeLists），无 webkit/curl 依赖面；JUCE 平台分支由 juce 包补丁（HarmonyOS 并入 Linux 族）部分解锁——包内补丁只覆盖 JUCEModuleSupport.cmake 的模块分支，消费侧 JUCEUtils.cmake 分支（VST3 bundle 布局）仍直判 Linux，故消费方工具链强制 CMAKE_SYSTEM_NAME=Linux（E092；不强制则 VST3 退化为单文件 .vst3 且 POST_BUILD moduleinfo 失配）"
+    - "功能边界：OGG Vorbis 解码裁剪（JUCE_USE_OGGVORBIS=0）——已发布 juce/8.0.5 包 oggvorbis/libvorbis-1.3.7/lib 源码子树缺失（juce 包缺陷，已报 juce run 修复），本插件不解码 OGG 资产、不影响合成器本体功能；FLAC 侧包内 flac/ 树完整（libFLAC 全部 .c 在位），JUCE_USE_FLAC 保持上游默认 1 不裁剪"
+    - "aarch64 SIMD：guitarml RuntimeSIMDLib 对 -mavx/-mfma 做 CHECK_CXX_COMPILER_FLAG 探测、aarch64 自动跳过；dsp_accelerated_sse_or_arm 走 xsimd NEON 路径（__ARM_NEON__ 原生可用）"
+    - "上游零测试面：归档全树 grep enable_testing/add_test(/catch2/gtest/doctest/ctest/unittest 0 命中、无 tests/ 目录、Dockerfile 仅构建发布环境；按 NO_UPSTREAM_TESTS 处理，验证主路径为 test_package 消费式 dlopen/dlsym 探针"
+  common_dependencies:
+    - "juce/8.0.5"
+    - "freetype/2.14.3（经 juce 传递）"
+    - "fontconfig/2.18.3（经 juce 传递）"
+    - "alsa-lib/1.2.16.1（经 juce 传递）"
+
+versions:
+  "0.12.3":
+    status: built
+    build_date: "2026-10-13"
+    source_url: "https://github.com/midilab/jc303/archive/refs/tags/v0.12.3.tar.gz"
+    source_sha256: "1ad2e4c769f23872320a6b3f213d17ad6ea76e7b03bb65fa7d7e81761fd129ed"
+    formats: "VST3 / LV2 / CLAP（AU 仅 macOS 不适用）"
