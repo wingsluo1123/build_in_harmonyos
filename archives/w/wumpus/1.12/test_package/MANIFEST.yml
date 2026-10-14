@@ -1,0 +1,23 @@
+package: wumpus/1.12
+homepage: "https://www.catb.org/~esr/wumpus/"
+
+# The upstream Makefile has no check/test target or registered test suite.
+upstream_check_command: "make -n check"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package/conanfile.py requires self.tested_reference_str and runs
+# test.sh under env="conanrun". The package recipe exports bindirs=["bin"],
+# which VirtualRunEnv adds to PATH; command -v therefore resolves the two
+# executables from the tested Conan package, not the source/build directory.
+test_package_tests:
+  - file: "test.sh"
+    description: "Reads each fixed-seed game's actual room and listed exits, tries only those legal destinations until one reaches the requested room, repeats that move, and checks the state change, stable stdout/stderr, empty stderr, and EOF status. Each invocation stores raw files in a unique child directory under the runner-provided evidence root."
+    command: "${CONFIG_SHELL:-/data/service/hnp/bin/bash} test.sh"
+
+# Seventeen checks per executable: EOF probe, stderr, banner, parsed topology,
+# every attempted neighbor's exit/stderr/invalid notice/starting topology,
+# selected legal destination and post-move state, selected/repeat EOF and
+# stderr, byte-identical stdout/stderr, and repeated start/end state.
+assertion_count: 34
