@@ -1,0 +1,30 @@
+software: xhost
+version: "1.0.10"
+status: built
+build_date: "2026-10-13"
+conan_ref: "xhost/1.0.10"
+
+source:
+  url: "https://xorg.freedesktop.org/archive/individual/app/xhost-1.0.10.tar.xz"
+  sha256: "a8afd70059479c712948b895e41c35a4a8bfcede3ba2d5a4b855c88bbb725be1"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies:
+    - libxmu/1.3.1.1
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure-hmdfs.patch"
+
+knowledge_gained:
+  - "The release tarball includes configure and Makefile.in, so no autoreconf/bootstrap tools are needed."
+  - "The configure.ac pkg-config checks use libxmu (xmuu), libx11/libxau transitively, and direct xorgproto (xproto); both dependency pkgconfig directories are searched."
+  - "libxmu's xmuu.pc uses /usr/local prefixes, so the build adds the resolved Conan CppInfo include/lib directories to CPPFLAGS/LDFLAGS."
+  - "Applied existing E205 HarmonyOS triplet detection and E011/E114 HMDFS configure fixes; no new knowledge gap was found."

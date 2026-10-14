@@ -1,0 +1,25 @@
+# Upstream audit and consumer-test declaration for xhost 1.0.10.
+package: xhost/1.0.10
+homepage: "https://gitlab.freedesktop.org/xorg/app/xhost"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Official X.Org xhost-1.0.10.tar.xz source tree"
+    reason: "The release has no test/ or tests/ directory and no upstream test source files."
+  - source: "Makefile.am and man/Makefile.am"
+    reason: "The Makefiles only declare the xhost program and manual page; there are no TESTS, check_PROGRAMS, or check_SCRIPTS declarations."
+  - source: "configure.ac"
+    reason: "The configure checks are compiler, pkg-config, transport, and function probes; no automated test suite is registered."
+  - conclusion: "Upstream ships no automated test suite: upstream total 0. The Conan build invokes make check to record the empty Automake suite; test_package executes the installed xhost binary with real assertions."
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check (empty upstream suite; 0 test cases)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xhost.py
+    description: "Runs the installed binary and asserts file/executable state, -help status and usage output, and no-display failure status and diagnostic."
+    command: "python3 test_xhost.py <package-folder>/bin/xhost"
+
+assertion_count: 6
