@@ -1,0 +1,91 @@
+# 版本级 manifest — libgdm 50.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "50.1"
+software: libgdm
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 测试结果（上游测试 m-common 1/1 + test_package 冒烟 1/1）
+test_passed: 2
+test_failed: 0
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-02"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GNOME gdm release tarball，download.gnome.org + NJU 镜像，R39）
+  url:
+    - "https://mirror.nju.edu.cn/gnome/sources/gdm/50/gdm-50.1.tar.xz"
+    - "https://download.gnome.org/sources/gdm/50/gdm-50.1.tar.xz"
+  sha256: "770159373512192410f412b5d0c4678ec1573f1ae4b39c81fe75861fe8890174"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+
+  configure_options:
+  - "-Dintrospection=disabled"
+  - "-Dplymouth=disabled"
+  - "-Dselinux=disabled"
+  - "-Dsystemd-journal=false"
+  - "-Dsystemdsystemunitdir=no"
+  - "-Dsystemduserunitdir=no"
+  - "-Dx11-support=false"
+  - "-Dlibaudit=enabled"
+  - "-Dlogind-provider=systemd"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - glib/2.84.0.1
+  - systemd/261.1
+  - json-glib/1.10.6.1
+  - accountsservice/26.27.3
+  - polkit/127
+  - libaudit/2.7.4
+  - libgudev/238
+  - linux-pam/1.7.2
+  - check/0.15.2
+  - dconf/0.40.0.1
+
+  compiler: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "patches/0001-introspection-meson-option.patch"
+- "patches/0002-gir-conditional.patch"
+- "patches/0003-lckpwdf-compat-source.patch"
+- "patches/0004-gdm-lckpwdf-compat.c.patch"
+- "patches/0005-docs-itstool-optional.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "gdm 是 meson 构建（非 autotools）：libgdm/meson.build 的 gnome.generate_gir 无 GIR 扫描器会失败，需新增 introspection 选项并条件编译（patch 0001/0002）。"
+- "OHOS musl libc.so 不导出 lckpwdf/ulckpwdf 且 SDK sysroot 的 libcrypt.a 为空 → gdm daemon 链接失败；用 flock(2) 提供等价实现（patch 0003/0004）。"
+- "glib conan 配方只有 gio-2.0 组件、无 gio-unix-2.0 → meson dependency('gio-unix-2.0') 需要合成 gio-unix-2.0.pc（从 gio-2.0.pc 复制改名）。"
+- "systemd/261.1 配方只生成 systemd.pc 且包内无 libsystemd.pc → 需在 generate() 合成 libsystemd.pc。"
+- "polkit/127 配方无 cpp_info 组件，PkgConfigDeps 不生成 polkit-gobject-1.pc → 从 polkit 包内 .pc 复制并把裸 prefix=/ 改写为真实包目录。"
+- "OHOS sysroot 无 libpam，meson cc.find_library('pam') 需把 linux-pam conan 包 lib 目录注入 c_link_args。"
+- "data/dconf/meson.build 的 custom_target 在构建期执行 dconf compile → 需把 dconf 包 bin 目录注入 PATH。"
+- "OHOS 上 conan 缓存中 glib 的 C 工具（glib-compile-schemas 等）.codesign 无效 → 执行报 Operation not permitted；需复制到 build 目录重新 binary-sign-tool 签名。"

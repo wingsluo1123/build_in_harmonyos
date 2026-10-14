@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml
+package: libgdm/50.1
+homepage: "https://gitlab.gnome.org/GNOME/gdm"
+
+# 上游测试：tests/meson.build 仅注册 1 个可构建用例 m-common（check 框架）。
+# s-common.c/h 是被 m-common 引用的公共辅助，不是独立测试。
+# conanfile.py build() 在非 cross 构建时执行 meson test（含 m-common）。
+upstream_check_command: "meson test"
+
+upstream_test_in_build: true
+upstream_test_command: "meson test -v"
+
+upstream_tests:
+  - file: gdm-50.1/tests/m-common.c
+    source: gdm-50.1/tests/m-common.c
+    description: "GdmCommon 单元测试（check 框架；1 个 check：100% Checks: 1, Failures: 0）"
+    command: "meson test"
+
+test_package_tests:
+  - file: test.c
+    description: "gdm_client_new() / g_object_unref() — 真实链接 libgdm（libgdm.so.1）并执行"
+    command: "./test_probe"
+
+assertion_count: 2
