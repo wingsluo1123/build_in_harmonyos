@@ -1,0 +1,23 @@
+--- a/sacc.c
++++ b/sacc.c
+@@ -1084,11 +1084,14 @@ setup(void)
+ 	setlocale(LC_CTYPE, "");
+ 	setenv("PAGER", "more", 0);
+ 	atexit(cleanup);
+-	/* reopen stdin in case we're reading from a pipe */
+-	if ((fd = open("/dev/tty", O_RDONLY)) == -1)
+-		die("open: /dev/tty: %s", strerror(errno));
+-	if (dup2(fd, 0) == -1)
+-		die("dup2: /dev/tty, stdin: %s", strerror(errno));
+-	close(fd);
++	/* Keep noninteractive output usable without a controlling terminal. */
++	if ((fd = open("/dev/tty", O_RDONLY)) == -1) {
++		if (isatty(1))
++			die("open: /dev/tty: %s", strerror(errno));
++	} else {
++		if (dup2(fd, 0) == -1)
++			die("dup2: /dev/tty, stdin: %s", strerror(errno));
++		close(fd);
++	}
+ 	if ((devnullfd = open("/dev/null", O_WRONLY)) == -1)
+ 		die("open: /dev/null: %s", strerror(errno));
