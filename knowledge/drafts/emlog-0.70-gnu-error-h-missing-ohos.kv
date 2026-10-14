@@ -1,0 +1,62 @@
+# ═══ Draft knowledge entry — GNU error.h / error() missing in OHOS musl sysroot
+# Software: emlog 0.70
+# Gate: conan create (ohos-aarch64, clang 15) + test_package consumer + test_ohos T6 + finish(W3)
+# Status: DRAFT
+
+id: emlog-0.70-gnu-error-h-missing-ohos
+severity: 2
+category: compat|libc|musl|headers
+trigger_tool: cc|clang|ld
+phase: compilation|linking
+
+keywords: error.h, error(), GNU extension, musl, sysroot, undefined symbol, implicit declaration, fprintf, exit
+error_signature: call to undeclared function 'error'|undefined symbol: error|error\.h.*No such file|did you mean: ferror
+match_keywords: error.h, error(, GNU extension, musl, OHOS, sysroot, undefined symbol, implicit function declaration
+
+root_cause: |
+  The GNU libc extension header <error.h> (which declares error(), error_at_line(),
+  error_message_count, error_one_per_line) is not shipped in the OHOS musl sysroot
+  (only linux/can/error.h exists under the SDK sysroot). C programs that call error()
+  compile with implicit-declaration warnings and then fail at link time with
+  "undefined symbol: error" (ld.lld suggests "did you mean: ferror").
+
+rec_approach: source-patch
+rec_description: |
+  Do NOT try to make <error.h> appear: it is a glibc extension and musl deliberately
+  omits it. Provide a minimal portable equivalent inside the affected .c file:
+    - replace `#include <error.h>` with `#include <stdarg.h>` + `#include <string.h>`
+    - add a small static void error(int status, int errnum, const char *fmt, ...)
+      that prints "program: " + vfprintf(stderr, fmt, ap), appends ": " + strerror(errnum)
+      when errnum is nonzero, then calls exit(status) when status is nonzero.
+  This preserves the semantics used by upstream callers (error(1, errno, "..."),
+  error(1, 0, "usage: ...")) and keeps the patch minimal and platform-only.
+  Verify with clang --target=aarch64-linux-ohos --sysroot=<SDK sysroot> so both
+  compile and link are proven before shipping the patch.
+
+rec_commands:
+  - "clang --sysroot=<OHOS_SDK>/sysroot -target aarch64-linux-ohos -O2 -Wall -o mkemlog mkemlog.c"
+  - "conan create archives/e/emlog/0.70 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64"
+
+verification: |
+  mkemlog.c compiled and linked cleanly for aarch64-linux-ohos (no warnings, no
+  undefined symbols); conan create EXIT=0; test_ohos T6 confirmed the patched
+  error() path prints the expected message and exits non-zero when the emlog
+  kernel module is not loaded.
+
+related:
+  - knowledge/graph/E093.kv (getpass — another GNU libc extension missing on musl, same source-patch family)
+  - knowledge/graph/E213.md (l64a() missing in OHOS libc (musl))
+  - knowledge/graph/E534 (gethostid/strverscmp/sigisemptyset/getusershell GNU extensions missing on musl)
+
+similar_to: E093, E213, E534
+caused_by: []
+prerequisite_of: []
+conflicts_with: []
+
+applicable_boundary: |
+  Applies to any C project adapting to OHOS that calls the glibc-only error()
+  helper. Counter-example: if the project only needs strerror() or fprintf(stderr),
+  no patch is required. Projects that bundle gnulib already provide their own
+  error replacement and must NOT be double-patched.
+
+last_updated: 2026-09-26
