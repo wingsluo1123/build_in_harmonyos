@@ -1,0 +1,23 @@
+package: wurlitzer/3.1.1
+homepage: https://github.com/minrk/wurlitzer
+upstream_check_command: python3 -m pytest --collect-only -q test.py
+upstream_test_in_build: true
+upstream_test_command: python3 -m pytest -v test.py
+source_declared_total: 16
+upstream_tests:
+  - file: test.py
+    source: wurlitzer-3.1.1/test.py
+    description: 完整上游套件，覆盖原生输出捕获、转发、缓冲区、文件及描述符恢复
+    command: python3 -m pytest -v test.py
+    total: 16
+    result: partial
+    passed: 15
+    failed: 0
+    skipped: 1
+    skip_reason: "上游 test_bufsize 要求 Linux 管道大小接口，HarmonyOS 的 _get_max_pipe_size 返回 None，上游原有 skipif 自动跳过"
+test_package_tests:
+  - file: test_wurlitzer.py
+    description: 安装路径、原生 Unicode 捕获、字节捕获、转发与线程退出，共 4 个消费者测试
+    command: python3 test_wurlitzer.py <installed-module-dir>
+    total: 4
+assertion_count: 9
