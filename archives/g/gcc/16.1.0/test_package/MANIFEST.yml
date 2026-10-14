@@ -1,0 +1,22 @@
+package: gcc/16.1.0
+homepage: "https://gcc.gnu.org/"
+
+# 上游 gcc testsuite（gcc.dg 42381 / c-torture 28772 / g++.dg 163458 / libitm 25 /
+# libstdc++-v3 18761，合计 253397）在真机 3XB0124808000643 以 dejagnu 单独全量实跑
+# （不随 conan create 执行，因为 conan create 有 2700s timeout 且 testsuite 需自建
+# tcl/expect/dejagnu 框架）。conan create 内只跑下方 test_package 消费者测试。
+upstream_check_command: "dejagnu runtest --tool gcc/g++/libstdc++（真机全量实跑，结果见 notes.md 第五节）"
+
+upstream_test_in_build: false
+
+test_package_tests:
+  - file: test_tm.c
+    description: "C 消费者测试: gcc -fgnu-tm 编译 __transaction_atomic 事务代码, 验证顺序事务 x==2(对应上游 simple-1.c) + 事务内 malloc+cancel 回滚(对应上游 alloc-1.c), 输出 C TM ALL PASSED"
+    command: "gcc -fgnu-tm test_tm.c && ./test_tm_c"
+  - file: test_tm.cpp
+    description: "C++ 消费者测试: g++ -fgnu-tm 编译事务代码 + C++ 异常穿透事务边界(对应上游 eh-1.C), 验证 g==2, 输出 C++ TM ALL PASSED"
+    command: "g++ -fgnu-tm test_tm.cpp && ./test_tm_cpp"
+
+# 鸿蒙特有测试（消费者测试）：覆盖本包平台补丁核心能力（cc1/cc1plus/libitm/libstdc++
+# 全链路 -fgnu-tm 编译+链接），与上游 testsuite 口径分开，不与之合并计数。
+assertion_count: 2
