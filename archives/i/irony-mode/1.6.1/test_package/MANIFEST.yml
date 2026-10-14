@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: irony-mode/1.6.1
+homepage: "https://github.com/Sarcasm/irony-mode"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# 上游 .travis.yml: mkdir build && cmake ../server && make && make check
+# server/test/CMakeLists.txt: check 目标 = ctest --output-on-failure
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 上游 server/ 只有 elisp ERT 测试（3 个，经 add_ert_test 注册进 ctest），
+# 测试对象是 Emacs Lisp 前端；C++ 组件 irony-server 本身无任何单元/集成测试。
+# 设备无 emacs：test/elisp/CMakeLists.txt find_program(EMACS_EXECUTABLE)
+# 失败后 WARNING "elisp tests will be skipped!" 并 return()，ctest 剩空测试集。
+upstream_tests:
+  - file: server/test/elisp/irony.el
+    source: irony-mode-1.6.1/server/test/elisp/irony.el
+    description: "ERT 测试 irony.el（Emacs Lisp 前端；需 emacs，设备不可用，上游声明跳过）"
+    command: "ctest check-irony-el"
+  - file: server/test/elisp/irony-iotask.el
+    source: irony-mode-1.6.1/server/test/elisp/irony-iotask.el
+    description: "ERT 测试 irony-iotask.el（Emacs Lisp 前端；需 emacs，设备不可用，上游声明跳过）"
+    command: "ctest check-irony-iotask-el"
+  - file: server/test/elisp/irony-cdb-json.el
+    source: irony-mode-1.6.1/server/test/elisp/irony-cdb-json.el
+    description: "ERT 测试 irony-cdb-json.el（Emacs Lisp 前端；需 emacs，设备不可用，上游声明跳过）"
+    command: "ctest check-irony-cdb-json-el"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "smoke test：① irony-server --version 首行含包版本（CMake 从 ../irony.el 提取，验证 tarball 布局），次行含运行期 libclang clang 版本（验证系统 SDK libclang 链接与 LD_LIBRARY_PATH）；② TU 解析冒烟：经 irony-server 行协议真实解析两个翻译单元（含 <stddef.h>），负例（未声明符号）必须产出 error 诊断（防空转假通过），正例必须零诊断——clang builtin 头（resource dir）运行期可用的直接证据"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4

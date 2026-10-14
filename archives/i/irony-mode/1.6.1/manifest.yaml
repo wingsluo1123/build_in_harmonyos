@@ -1,0 +1,41 @@
+# 版本级 manifest
+# 文件位置: archives/i/irony-mode/1.6.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.6.1"
+software: "irony-mode"
+status: built
+build_date: "2026-10-09"
+conan_ref: "irony-mode/1.6.1"
+build_system: "cmake"
+
+source:
+  url: "https://github.com/Sarcasm/irony-mode/archive/refs/tags/v1.6.1.tar.gz"
+  sha256: "efcaad5e92024bb25103d143b1e154f75e32a0f1cab3b7ee621242d439c2eecb"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_SHARED_LIBS=OFF (R26)"
+    - "CMAKE_POLICY_VERSION_MINIMUM=3.5 (CMake 4.x 兼容, cache 变量)"
+    - "CMAKE_DISABLE_FIND_PACKAGE_Clang=TRUE (SDK config 包引用缺失静态归档)"
+    - "LIBCLANG_INCLUDE_DIR/LIBCLANG_LIBRARY=llvm-config 动态查询 (R33)"
+    - "CLANG_RESOURCE_DIR=<llvm-prefix>/bin/clang -print-resource-dir 动态查询, 结构兜底 <prefix>/lib/clang/<ver>"
+    - "cmake.configure(build_script_folder=server)"
+  dependencies: []
+  # libclang 由系统 SDK 提供 (LLVM/Clang 15.0.4, llvm-config 动态发现)，非 Conan 包
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "CMakeLists 只在 server/ 子目录：configure 用 build_script_folder=server，保留 tarball 布局让 ../irony.el 可达（版本号来源）"
+  - "CMAKE_POLICY_VERSION_MINIMUM 必须是 cache 变量（cmake_minimum_required 先于 project()/toolchain 变量生效）"
+  - "系统 SDK 的 find_package(Clang) config 模式不可用：LLVMExports/ClangTargets 导出的静态库 imported target（libLLVMDemangle.a 等）在 SDK 中不存在，include 时即报错；须 CMAKE_DISABLE_FIND_PACKAGE_Clang=TRUE 走上游 fallback FindLibClang.cmake 并显式注入 LIBCLANG_INCLUDE_DIR/LIBCLANG_LIBRARY"
+  - "CLANG_RESOURCE_DIR 必须 generate 期显式注入且 clang 取自 llvm-config --prefix 推导（裸 PATH 查 clang 实测不可靠）；缺它时 TU 解析报 'stddef.h' file not found；--version 冒烟掩盖该缺陷，TU 解析冒烟（正/负例）才是有效验证"
+  - "设备无 emacs 时上游 ctest 空集优雅跳过；irony-server 无 C++ 上游测试，test_package 冒烟为替代验证"
+  - "application 包 + 系统 SDK libclang：package_info 用 llvm-config --libdir 设 runenv LD_LIBRARY_PATH（对齐 emacs-clang-complete-async 先例）"
+
+patch_classification: []
