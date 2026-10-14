@@ -1,0 +1,120 @@
+# test_package/MANIFEST.yml — uefitool 0.28.0-a73
+# 位置: archives/u/uefitool/0.28.0-a73/test_package/MANIFEST.yml
+# 用途: 声明上游测试来源与数量口径（L0e 门禁要求本文件存在）
+
+package: uefitool/0.28.0-a73
+homepage: "https://github.com/LongSoft/UEFITool"
+
+# ── 上游测试：本包**没有** ───────────────────────────────────────────
+# 源码级审计（tag A73 官方 tarball，2400878 bytes，
+# sha256 81d9944d75e27d4afbc8559d9ba913552006fd21ce9cadf357a4a0f58e59507e）：
+#   * 全树 7 个 meson.build（根 / UEFIExtract / UEFIFind / UEFITool / common /
+#     fuzzing / UEFITool/QHexView）中 **零处** `test(` 调用，也没有
+#     `installed_tests` / `test_sources` 之类声明；
+#   * 全树 **零处** `enable_testing()` / `add_test(` —— 没有任何 CMake CTest 条目；
+#   * 没有 tests/ 或 test/ 目录；
+#   * 唯一沾"测试"的是 fuzzing/ffsparser_fuzzer.cpp（libFuzzer/AFL 入口
+#     `LLVMFuzzerTestOneInput`，最小 16 字节 / 最大 128 MiB 入参），
+#     它不是一个可执行的测试套件，fuzzing/ 目录下也不带种子语料。
+# ⇒ 上游独立测试条目数 = 0。本包**不伪造**上游测试通过率。
+#
+# 本包仍在 build() 里跑 cmake.test()（即 ctest），但注册的 3 条用例是
+# **适配侧新增的构建自检**（见 cmake/CMakeLists.txt），不是上游测试；
+# 它们只断言两个 CLI 自身的退出码。全部功能证据来自 test_package。
+
+upstream_check_command: "ctest"
+upstream_test_in_build: true
+upstream_test_command: "ctest"
+
+# 上游测试条目为空列表（不是"漏填"，是上游确实没有）。
+upstream_tests: []
+
+# ── 本包自带的消费者用例 ─────────────────────────────────────────────
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者测试，三层共 28 条检查（末尾带 EXPECTED_CHECKS 计数自校验：
+      全绿时若条数漂移则直接 Bail out，使"用了多少条"可被日志机械复核）：
+      A. CLI 契约层（17 条）—— 两个工具的 -v / --help / 无参数 / 缺文件 的退出码，
+         --help 的用法条目逐条 grep，期望值全部取自上游 main() 的字面返回
+         （uefiextract 无参数=1、缺文件=5；uefifind 无参数=0、缺文件=5 ——
+         两个工具在"无参数"上刻意不对称，本用例把该契约钉住）。
+         17 = 版本 2 + uefiextract --help(rc) 1 + 用法条目 6 + uefifind --help(rc) 1
+              + 用法条目 3 + 无参数 2 + 缺文件 2。
+      B. 真实解析层（8 条）—— 用 make_fixture.py 现造一张 4096 字节的最小合法
+         FFS2 固件卷，且**解析期零告警**（校验和严格按上游算法计算）：
+         EFI_FIRMWARE_FILE_SYSTEM2_GUID 卷头（含 16 位字和校验和 + BlockMap 终止项）、
+         一个 FREEFORM 探测文件（名字 A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D，
+         内含一个 RAW 段，段体是 EF BE AD DE 魔数 + 32 字节 ASCII 标记）、
+         以及一个 Volume Top File（必须有：缺了它上游会跳过整遍第二道解析并告警）。
+         然后让两个工具真的走一遍 镜像 → 卷 → 文件 → 段：
+           · uefiextract <img> report 生成文本报告，报告里必须出现该文件 GUID
+           · uefifind <img> body count/list <魔数> 必须命中并在 list 里报出该 GUID
+           · uefifind 查一个不可能出现的模式必须返回 U_ITEM_NOT_FOUND(8)
+           · uefiextract <img> dump 必须落出非空的 GUID 目录树
+      C. GUID 名表（guids.csv）生效性（3 条）—— 本包最有分量的一条证据链，
+         做**双向**验证：
+           · 无名表方向：CWD 无 guids.csv 时，fixture 卷头的 FileSystemGuid
+             必须以裸格式 8C8CE578-8A3D-4F1C-9935-896185C32DD3 出现在报告里
+           · 有名表方向：把随包安装的 guids.csv 放进 CWD 后重跑，同一个卷必须
+             变成可读名 EfiFirmwareFileSystem2Guid
+           · guids 子模式：uefiextract <img> guids 必须 rc=0 且产出非空的
+             <img>.guids.csv，其中含 VTF 的 GUID 1BA0062E-C779-4582-8566-336AE8F78F09
+         上游事实：该映射表（12042 行）**只**通过 GUI 的 Qt 资源
+         （UEFITool/uefitool.qrc）打包，INSTALL() 里没有它；而
+         UEFIExtract/uefiextract_main.cpp 在 main() 首行就
+         initGuidDatabase("guids.csv")（相对路径 ⇒ 按 CWD 解析），
+         common/guiddatabase.cpp 读失败时**静默**返回空名表 ⇒ 退出码与报告结构
+         都不变，只有可读名悄悄消失。C 层就是为了让这种沉默失败无法藏身。
+         第三条同时钉住另一个上游行为：guidDatabaseFromTreeRecursive() 按
+         model->text(index) 而非 model->name(index) 筛选，普通文件 text 恒空 ⇒
+         镜像里没有 VTF 时 GUID 库必为空，而 guids 分支在空库时没有终结 return，
+         会落穿到 print_usage() + return 1（详见 knowledge/drafts 对应条目）。
+    command: "bash test.sh <package>/share/uefitool/guids.csv"
+
+# ── 数量口径 ─────────────────────────────────────────────────────────
+# 上游无测试套件，注册条目数为 0；不与消费者用例相加。
+upstream_test_total: 0
+upstream_test_count_method: "manual"
+upstream_test_audit: >-
+  源码级审计（tag A73 tarball）：grep 全树 meson.build 得 `test(` 出现 0 次；
+  grep 全树 `enable_testing` / `add_test(` 得 0 次；无 tests/ 目录；
+  fuzzing/ 下只有 libFuzzer harness 且无种子语料。故上游独立测试条目数 = 0。
+
+test_counting:
+  # 上游独立的测试条目数
+  upstream_independent_total: 0
+  # 消费者用例：每条检查自带且仅带一条断言，检查数 == 断言数，
+  # 使"通过率"的分母无歧义
+  integration_independent_total: 28
+  shared_static_counted_once: true
+  counting_note: >-
+    test.sh 用 pass()/fail() 计数器，每条检查只走其中一个分支、只计一次。
+    注意两个 `for` 循环会把同一个断言展开成多条检查（uefiextract --help 的
+    6 个用法条目、uefifind --help 的 3 个用法条目），所以 A 层是 17 而不是 16。
+    28 = A. CLI 契约层 17 条（版本 2 + uefiextract --help 的 rc 1 与 6 个
+    用法条目 + uefifind --help 的 rc 1 与 3 个用法条目 + 无参数 2 + 缺文件 2）
+    + B. 真实解析层 8 条（fixture 生成 1 + report rc 1 + report 非空 1
+    + report 含探测 GUID 1 + find body count 1 + find body list 1
+    + find 不命中 1 + dump 1）
+    + C. GUID 名表双向验证 3 条（无名表裸 GUID 1 + 有名表可读名 1 + guids 子模式 1）。
+    全绿路径下条数恒为 28；唯一的递减路径是 report 文件缺失，那会把 B 段的
+    "report 非空"与"report 含探测 GUID"两条压成一条 ⇒ 27。
+    因此脚本末尾带 EXPECTED_CHECKS=28 的计数自校验（只在全绿时生效，漂移即
+    Bail out），让条数可被运行日志机械复核，而不是 PR 正文里的一个手写数字。
+
+test_case_count: 28
+assertion_count: 28
+
+# ── 构建树自检（适配侧新增，非上游测试）─────────────────────────────
+build_selftests:
+  registered_by: "cmake/CMakeLists.txt"
+  reason: >-
+    上游零测试套件 ⇒ ctest 默认会因"找不到任何测试"返回非 0，
+    既让 conan create 失败、日志里又只有一句 "No tests were found"，
+    既不是证据也不是有效的失败原因。故注册 3 条只依赖两个 CLI 自身
+    退出码的冒烟用例，让 ctest 成为一条真实、确定、与机器负载无关的证据链。
+  cases:
+    - "uefitool-cli-version-extract: uefiextract -v 退出码 0"
+    - "uefitool-cli-version-find: uefifind -v 退出码 0"
+    - "uefitool-cli-usage-extract: uefiextract 无参数退出码 1（WILL_FAIL 反转）"

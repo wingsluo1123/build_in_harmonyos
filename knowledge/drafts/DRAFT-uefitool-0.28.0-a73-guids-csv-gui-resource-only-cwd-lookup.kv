@@ -1,0 +1,46 @@
+#====================================================================
+# DRAFT-uefitool-0.28.0-a73-guids-csv-gui-resource-only-cwd-lookup
+# 数据文件只进 GUI 的 Qt 资源、CLI 侧按 CWD 相对路径查找、读失败静默降级
+# ——退出码与输出结构全都不变，只有"可读名"悄悄消失
+#====================================================================
+
+id:                     DRAFT-uefitool-0.28.0-a73-guids-csv-gui-resource-only-cwd-lookup
+trigger_tool:           runtime|install|conan
+phase:                  runtime
+error_signature:        （无错误输出 —— 这正是本条目的核心）裸 GUID 串出现在本应显示可读名之处：\b[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\b
+severity:               2
+category:               packaging, runtime, conan, platform, detection
+match_keywords:         guids.csv, GUID database, initGuidDatabase, guidDatabaseLookup, guidToUString, Qt resource, qrc, alias, resource path, relative path, current working directory, CWD, silent failure, install rule, share directory, readable name, hex fallback
+title:                  数据文件只打进 GUI 的 Qt 资源、CLI 侧却按当前工作目录用相对路径查找 —— 读失败静默降级成裸 GUID，退出码与输出结构全不变
+root_cause:             上游把 GUID→可读名映射表（12042 行 CSV）**只**通过 GUI 的 Qt 资源清单引用（qrc 的 <file alias="guids.csv">），两个 CLI 子工程的 install 规则里没有它；而 CLI 在 main() 的**第一行**就 initGuidDatabase("guids.csv") —— **相对路径 ⇒ 按当前工作目录解析**。读文件失败的路径在实现里是静默的：读函数返回空串、库里填充 0 条、不报错、不中止、不改退出码；查表函数查不到就回退成 usprintf 的裸十六进制格式。于是「剥离 GUI 后数据文件不再随包安装」这件事**没有任何可观察信号**，只有依赖它的字段值悄悄退化。
+affected_scope:         把数据文件（映射表/词典/规则表/时区库/证书库）只挂在 GUI 侧资源里、而命令行侧用相对路径或当前目录查找的所有上游；尤其是"先剥离 GUI 再交付 CLI"的适配场景 —— 上游从未在有 GUI 的环境里暴露过这个问题
+verification_cmd:       grep -rn "guids.csv" <src>/ 2>/dev/null | grep -v Binary; grep -rn "\.qrc" -e "<file" <src>/ | head; 运行 CLI 的 report 子模式并对同一镜像跑两次（CWD 有/无该数据文件），diff 两份输出
+rec_priority:           P1
+rec_approach:           安装期把数据文件装到包的 share/<pkg>/ 下；消费侧在使用前把它放到工作目录（或显式传绝对路径）。并在消费者测试里用「有/无该文件」**双向**断言，把沉默失败变成可见失败。
+rec_command:            copy(self, "guids.csv", src=os.path.join(self.source_folder, "common"), dst=os.path.join(self.package_folder, "share", "uefitool"))
+problem:                适配后两个 CLI 都能正常运行、退出码为 0、报告与其他产物照样生成，但报告里所有固件条目的名称都变成了裸十六进制 GUID 串（原本应是 AMI_NVRAM、EfiFirmwareFileSystem2Guid 这类可读名）。没有任何错误信息、警告或非零退出码提示这件事。
+diagnosis_steps:        1) 在两个工具里分别 grep 是否调用了数据文件加载函数 —— 本例只有 UEFIExtract 调，另一个根本不调（所以"两个工具表现不一致"本身是线索）；2) 定位调用位置：本例在 main() 的**第一行**，早于 argc 检查 ⇒ 连 `-h`/`-v` 都会先去 CWD 找该文件；3) 看路径字面量是不是相对路径（本例就是裸 "guids.csv"）；4) 读加载函数的失败分支，确认是否静默（本例：读失败返回空串、库 clear 后填 0 条，无 return、无 throw、无输出）；5) 追查该文件的 install 归属 —— 本例只出现在 GUI 的 qrc 里，install 规则中完全没有；6) 找到最终消费该数据的格式化函数，确认失败时的回退形态（本例回退成大写带连字符的裸 GUID）。
+fix_pattern:            package() 里把数据文件从源码目录装到 share/<pkg>/；消费者测试把该文件路径作为参数传入，并用同一份输入跑两遍：CWD 无该文件时断言**裸格式**出现、CWD 有该文件时断言**可读名**出现。两条断言缺一不可 —— 只测"有文件时能读出名字"无法区分"该功能生效"与"名字恰好来自别处"。适用边界：不要试图把数据文件编进二进制（那是上游没有做的构建期代码生成）；也不要因为"工具本身能跑"就把这一步跳过。
+verification:           UEFITool A73 + 一张自造的最小合法 FFS2 固件卷（卷头 FileSystemGuid = EfiFirmwareFileSystem2Guid）：CWD 无 guids.csv 时报告里出现 8C8CE578-8A3D-4F1C-9935-896185C32DD3（裸格式）；把随包的 share/uefitool/guids.csv 放进 CWD 后重跑，同一个卷显示为 EfiFirmwareFileSystem2Guid。两条断言在同一份输入上互为对照。
+avoid_1_pattern:        把 (guids|.*)\.csv 直接编进二进制，或在上游源码里加 #include 嵌入字符串
+avoid_1_reason:         上游选择的是"外部数据文件"这一设计（GUI 侧用 Qt 资源、CLI 侧用文件路径）；在适配层改变数据装载方式会引入上游没有的构建期代码生成步骤，且让此后上游数据更新与适配层不同步。
+avoid_1_consequence:     适配层与上游在数据装载方式上分叉，后续上游更新数据文件时需要同步改适配层；同时把"文件没装对"这个真问题掩盖成"我们另外做了嵌入"。
+avoid_2_pattern:        在 CLI 的 CWD 或源码树里直接 mv/cp 一份 guids\.csv 来"让它能跑"
+avoid_2_reason:         这只解决了构建机上的现象，装出来的包里依然没有该文件，消费者环境照样退化；而且它把一个"包内容缺陷"伪装成"构建环境布置"。
+avoid_2_consequence:     消费者拿到的包功能不完整，且因为失败是静默的，问题会一路带到下游才被发现，定位成本极高。
+principles:             P013
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-uefitool-0.28.0-a73-guids-csv-gui-resource-only-cwd-lookup.md
+last_updated:           2026-10-04
+source_event:           uefitool 0.28.0-a73 适配：剥离 Qt6 GUI 后发现 GUID 可读名全部退化为裸十六进制串，追查到 guids.csv 只挂在 GUI 的 Qt 资源里且 CLI 按 CWD 相对路径查找
+authors:                uefitool-adapter
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
