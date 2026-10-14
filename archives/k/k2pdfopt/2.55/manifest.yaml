@@ -1,0 +1,37 @@
+# 版本级 manifest — k2pdfopt 2.55
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.55"
+software: "k2pdfopt"
+status: built
+build_date: "2026-10-13"
+build_system: "makefile"
+
+source:
+  url: "https://www.willus.com/k2pdfopt/src/k2pdfopt_v2.55_src.zip"
+  sha256: "3e78b4c7dd6227fde12138fd2468dd13c0c45b5251592a4f0aac67fd139ab953"
+  tar_format: zip
+
+build:
+  system: makefile
+  configure_options:
+    - "-O2 -w -DNDEBUG -DHAVE_MUPDF -DHAVE_MUPDF_LIB（配方内置，无上游 configure）"
+  dependencies:
+    - mupdf/1.25.1
+    - libpng/1.6.58
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-willus-h-disable-djvu-ocr.patch"
+  - "0002-k2ocr-no-tesseract-fix.patch"
+  - "0003-mupdf-stext-device-willus-mod.patch"
+
+knowledge_gained:
+  - "k2pdfopt 上游 CMakeLists.txt 基本被注释掉且依赖系统 pkg-config mupdf，不可直接用；按 readme_k2src.txt 的编译模型（willuslib + k2pdfoptlib + k2pdfopt.c）自写 Makefile 驱动"
+  - "上游钉死 mupdf 1.23.7；适配到制品仓 mupdf/1.25.1 只需两处：mupdf_mod/font-win32.c（1.23.7 文件可原样对 1.25.1 头文件编译，提供非 Windows 平台 pdf_install_load_system_font_funcs 空实现）和 stext-device.c 重打 willus mod（else dev->flags=0;）"
+  - "k2pdfopt 的 include_mod/ 自带 jpeg/png/zlib 兼容头；JPEG 符号由 libmupdf-third.a 静态内置，PNG/ZLIB 从 Conan 包链接，无需 libjpeg-turbo 依赖"
+  - "OCR 栈（GOCR/Leptonica/Tesseract）与 DjVuLibre 制品仓均无对应包，按 willus.h 默认宏禁用，PDF/文本转换功能完整"
+  - "k2pdfopt 源码为 CRLF 行尾，写补丁时 diff 输出需保留 \\r\\n；k2ocr.c 的 k2ocr_tess_status 需移出 HAVE_TESSERACT_LIB 条件块，k2ocr_multithreaded_ocr 内 ocrwords_multithreaded_ocr 调用需 #ifdef HAVE_TESSERACT_LIB 包裹"
+  - "静态归档链接顺序：k2 目标文件 -> libmupdf -> libmupdf-third -> libmupdf-threads -> libpng16 -> libz -> -lm"
