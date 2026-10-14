@@ -1,0 +1,49 @@
+package: physlock/13
+homepage: https://github.com/xyb3rt/physlock
+
+upstream_check_command: "make -j1"
+upstream_test_in_build: false
+upstream_test_command: "none (upstream has no automated test target)"
+upstream_tests: []
+
+upstream_test_evidence:
+  - "源码 tarball 顶层无 tests/ 目录（仅 Makefile、5 个 .c、physlock.h、config.def.h、physlock.1、physlock.pam、README.md、LICENSE、.gitignore）"
+  - "Makefile 无 check/test/test-all 目标（grep -nE '^check|^test|check:|test:' Makefile -> 无命中）"
+  - "README.md 仅文档化 `make` / `make install` 与命令行参数，无测试章节"
+
+build_checks:
+  - name: "production build"
+    command: "make CC=<ohos-clang> CFLAGS='-fPIC -O2' CPPFLAGS='-I<linux-pam-inc> -I<systemd-inc>' LDFLAGS='-L<linux-pam-lib> -L<systemd-lib>' -j1"
+
+test_package_tests:
+  - file: test_physlock.py
+    description: "physlock 可执行文件已安装 (OHOS-01)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "ELF 目标架构为 AArch64/OHOS PC (OHOS-02, 鸿蒙特有)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "OHOS musl 动态解释器 /lib/ld-musl-aarch64.so.1 (OHOS-03, 鸿蒙特有)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "存在 OHOS .codesign 签名段 (OHOS-04, 鸿蒙特有)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "`physlock -v` 输出版本 13 (CLI-01)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "`physlock -h` 输出 usage 且退出码 0 (CLI-02)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "非法选项输出 usage 且退出码非 0 (CLI-03)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "渲染后的 man page 已安装 (PKG-01)"
+    command: "test_physlock.py <package> 1"
+  - file: test_physlock.py
+    description: "man page 中 VERSION 占位符已替换为本版本 (PKG-02)"
+    command: "test_physlock.py <package> 1"
+
+test_package_assertion_count: 9
+ohos_specific_test_count: 4
+note: "test_package 为消费者验证，不能替代上游测试统计；上游确无自动化测试（见 reports/upstream-test-entry.md）"

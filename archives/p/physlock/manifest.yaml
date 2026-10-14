@@ -1,0 +1,44 @@
+# 软件级 manifest — physlock
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: physlock
+description: 用 PAM 认证的轻量级 Linux 控制台锁屏工具（等价 `vlock -an`），锁定全部虚拟终端并只允许前台会话用户或 root 解锁
+category: system
+license: GPL-2.0-or-later
+homepage: https://github.com/xyb3rt/physlock
+repository: "https://github.com/xyb3rt/physlock (已归档; tag v13 -> commit d4091fe3396f6c63e42ea165797062f6032779eb, 2019-01-29)"
+keywords:
+  - console-lock
+  - screen-lock
+  - pam
+  - vlock
+  - setuid
+  - tty
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "physlock 是单一 C 可执行文件 + 上游手写 GNU Makefile（非 autotools/cmake/meson），无 configure 阶段"
+    - "OHOS 无 cc/gcc（`cc: not found`），Makefile 的 $(CC) 默认 cc → 必须显式 CC=clang（从 tools.build:compiler_executables 取，R33）"
+    - "第三方依赖与上游默认构型一致：linux-pam/1.7.2（-lpam -lpam_misc，<security/pam_appl.h>、<security/pam_misc.h>）与 systemd/261（-lsystemd，libsystemd 客户端库）"
+    - "Makefile 的 HAVE_SYSTEMD 是 make 变量、从不 -D 传入编译器 → session.c 的 #if HAVE_SYSTEMD 代码路径不编译（编译 #else stub），二进制零 sd_* 符号；-lsystemd 只在链接行"
+    - "OHOS lld 未默认 --as-needed，-lsystemd 被记为运行时 DT_NEEDED（libsystemd.so.0）；保持上游默认行为，由 Conan 依赖链提供该库"
+    - "上游 install 目标硬编码 `install -m 4755 -o root -g root`（README 注明 install 需 root）→ 配方只 make，打包期手工落 bin/ 与共享 man1，零源码补丁"
+    - "OHOS clang 驱动默认为可执行文件加 .codesign 段（自签名），无需额外 binary-sign-tool"
+    - "physlock 的手写 Makefile 不是 VPATH-clean（srcdir=.），配方在源码目录内 in-source 构建即可"
+  common_dependencies:
+    - linux-pam/1.7.2
+    - systemd/261
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  13:
+    status: built
+    build_date: "2026-10-13"
+    patches: 0
