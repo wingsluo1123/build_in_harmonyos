@@ -1,0 +1,87 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求）
+# libzeep 8.4.1 上游测试：Catch2 v3.4.0 测试集（test/*.cpp），ctest 注册 13 个可执行。
+# 已在 OHOS 真机全量运行：13/13 通过（ctest_rc=0），完整日志 reports/upstream-ctest.log，
+# 台账 reports/test-ledger.md（source_declared_total=310, configured=13 exe/308 用例,
+# executed_passed=308; daemon/rsrc_webapp 因 HTTP_HAS_UNIX_DAEMON=0 / USE_RSRC=0 未实例化）。
+
+package: libzeep/8.4.1
+homepage: "https://github.com/mhekkel/libzeep"
+
+# 上游测试命令（用于 make -n check / ctest -N / meson test --list 分析）
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "ctest --output-on-failure -j13（OHOS 真机, 2026-10-04, 13/13 通过）"
+
+# 上游实际运行的测试程序（ctest 13 个可执行，308 个独立用例全部通过）
+upstream_tests:
+  - file: test/crypto-test.cpp
+    source: libzeep-8.4.1/test/crypto-test.cpp
+    description: "crypto 测试（19 用例）"
+    result: "PASS (Test #1)"
+  - file: test/el-test.cpp
+    source: libzeep-8.4.1/test/el-test.cpp
+    description: "el 表达式引擎测试（26 用例；date 库 MANUAL_TZ_DB 需 tzdata+TZ=UTC 环境）"
+    result: "PASS (Test #2)"
+  - file: test/fuzz-parser-test.cpp
+    source: libzeep-8.4.1/test/fuzz-parser-test.cpp
+    description: "fuzz parser 测试（64 用例）"
+    result: "PASS (Test #3)"
+  - file: test/fuzz-el-test.cpp
+    source: libzeep-8.4.1/test/fuzz-el-test.cpp
+    description: "fuzz el 测试（21 用例）"
+    result: "PASS (Test #4)"
+  - file: test/fuzz-json-test.cpp
+    source: libzeep-8.4.1/test/fuzz-json-test.cpp
+    description: "fuzz json 测试（28 用例）"
+    result: "PASS (Test #5)"
+  - file: test/fuzz-request-multipart-test.cpp
+    source: libzeep-8.4.1/test/fuzz-request-multipart-test.cpp
+    description: "fuzz multipart 测试（43 用例）"
+    result: "PASS (Test #6)"
+  - file: test/http-test.cpp
+    source: libzeep-8.4.1/test/http-test.cpp
+    description: "HTTP server/security/CSRF 测试（12 用例；依赖 zeem HTML 序列化修复）"
+    result: "PASS (Test #7)"
+  - file: test/processor-test.cpp
+    source: libzeep-8.4.1/test/processor-test.cpp
+    description: "processor 测试（50 用例）"
+    result: "PASS (Test #8)"
+  - file: test/webapp-test.cpp
+    source: libzeep-8.4.1/test/webapp-test.cpp
+    description: "webapp 测试（5 用例）"
+    result: "PASS (Test #9)"
+  - file: test/soap-test.cpp
+    source: libzeep-8.4.1/test/soap-test.cpp
+    description: "SOAP 测试（5 用例）"
+    result: "PASS (Test #10)"
+  - file: test/rest-test.cpp
+    source: libzeep-8.4.1/test/rest-test.cpp
+    description: "REST 测试（9 用例）"
+    result: "PASS (Test #11)"
+  - file: test/security-test.cpp
+    source: libzeep-8.4.1/test/security-test.cpp
+    description: "security 测试（8 用例）"
+    result: "PASS (Test #12)"
+  - file: test/uri-test.cpp
+    source: libzeep-8.4.1/test/uri-test.cpp
+    description: "uri 测试（18 用例）"
+    result: "PASS (Test #13)"
+
+# 未实例化测试（互斥分支，不计入可执行集）
+uninstantiated_tests:
+  - file: test/daemon-test.cpp
+    description: "daemon 测试（1 用例）—— HTTP_HAS_UNIX_DAEMON=0（OHOS 交叉工具链未命中 unistd.h）"
+  - file: test/rsrc_webapp-test.cpp
+    description: "rsrc_webapp 测试（1 用例）—— USE_RSRC=0（未找到 mrc 资源编译器）"
+
+# test_package 中自带的测试（消费者视角验证, 调用已安装库公开 API）
+test_package_tests:
+  - file: test_package.cpp
+    description: "zeep::uri + zeep::el JSON smoke（随 conan create 运行）"
+  - file: ohos_test.cpp
+    description: "鸿蒙专项测试：URI/JSON 往返 + 本机 HTTP daemon 真实往返"
+  - file: consumer_app.cpp
+    description: "消费者用例：el 客户记录数组 / http request 表单参数 / stock_reply / 业务端点 URI"

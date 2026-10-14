@@ -1,0 +1,34 @@
+version: "8.4.1"
+software: "libzeep"
+
+status: built
+build_date: "2026-10-04"
+build_system: cmake
+
+source:
+  url: "https://github.com/mhekkel/libzeep/archive/refs/tags/v8.4.1.tar.gz"
+  sha256: "7abadd9ac6911f116cdbcf73855d9bd95616de086b87fbc1196d8874aa418a08"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options: []
+  dependencies:
+    - openssl/3.5.8.1
+    - date/3.0.3
+    - fmt/11.1.3
+    - fast_float/8.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "conanfile source()/build() 内联补丁（CPM 本地化 + fmt 替换 + libc++15 兼容），非独立 .patch 文件"
+
+knowledge_gained:
+  - "libc++15 无 std::format/std::println/<print> 符号：std::format→fmt::format（libcifpp 同款）"
+  - "libc++15 无 std::string/std::vector/std::map <=>：显式 compare()/lexicographical_compare 三路比较"
+  - "libc++15 实验性 ranges 的 std::ranges::binary_search 误判（'html' 不在空元素表内返回 true）→ std::binary_search"
+  - "libc++15 无 std::ranges::contains（C++23 P2302）→ std::find 等价"
+  - "libc++15 无 <source_location> 头：移除未使用 include"
+  - "date 库 MANUAL_TZ_DB（date/3.0.3 -DINSTALL=.）运行时需 ./tzdata + TZ 环境"
+  - "clang15 无 -std=c++23，CMake 4.1 cxx_std_23 自动映射 -std=c++2b 可编译"
