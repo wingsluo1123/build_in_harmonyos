@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (CI build_and_test.sh L0e 强制要求存在)
+package: tubeup/2026.5.8
+homepage: "https://github.com/bibanon/tubeup"
+
+# 上游测试入口：pytest（tests/test_main.py + tests/test_tubeup.py +
+# tests/test_utils.py，共 27 个用例）。CI 的纯 conan 流程内不重跑上游
+# 全量 pytest（test_package 只从 PyPI sdist 打包——sdist 虽含 3 个
+# test_*.py，但缺 tests/constants.py 与 tests/test_tubeup_files/ 测试
+# 数据，且流程不引入 pytest/requests_mock/yt-dlp 测试依赖）——上游全量
+# 用例由适配阶段在 OHOS aarch64 运行时上以完整 GitHub tag 源码运行：
+# 27 passed（见版本目录 notes.md「验证结果」，补丁应用后重跑同样 27 passed）。
+upstream_check_command: "python3 -m pytest tests -q"
+upstream_test_in_build: false
+upstream_test_command: "python3 -m pytest tests -q"
+
+upstream_tests:
+  - name: tests/test_main.py（docopt CLI 解析）
+    count: "2"
+    description: "上游 docopt 短选项解析用例（-x/--proxy、-p/--password），OHOS 全部通过"
+  - name: tests/test_tubeup.py（TubeUp 核心）
+    count: "20"
+    description: "TubeUp 目录处理、logger、collection 判定、yt-dlp 选项生成、archive.org 元数据构造、upload_ia/archive_urls（requests_mock 打桩），OHOS 全部通过"
+  - name: tests/test_utils.py（工具函数）
+    count: "5"
+    description: "sanitize_identifier / check_is_file_empty，OHOS 全部通过"
+
+test_package_tests:
+  - file: test_tubeup.py
+    description: "R34 真实消费者测试：通过打包产物的 PYTHONPATH 导入 tubeup，校验版本、internetarchive 依赖可用、docopt 解析真实 CLI docstring、yt-dlp 选项生成、archive.org 元数据构造、标识符/文件工具函数"
+    command: "python3 test_tubeup.py <pythonpath> <package_folder>"
+  - file: test_tubeup_ohos.py
+    description: "鸿蒙特有测试：校验 OHOS aarch64 POSIX 运行时、sandbox HOME 下创建可写下载目录树、HMDFS 安全的 restrictfilenames 选项、DirError 守卫、可选 yt-dlp 的受控报错、打包 bin/tubeup 入口脚本"
+    command: "python3 test_tubeup_ohos.py <pythonpath> <package_folder>"
+
+assertion_count: 37
