@@ -1,0 +1,25 @@
+software: retro-gtk
+display: "retro-gtk"
+description: "基于 GObject/GTK3 的 Libretro 前端库（GNOME Games 的模拟器内核宿主），含 libexec/retro-runner 独立运行进程"
+category: multimedia
+homepage: "https://gitlab.gnome.org/GNOME/retro-gtk"
+license: GPL-3.0-or-later
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "Meson 工程；依赖全部来自制品仓：glib/2.84.0.1 + gtk/3.24.43 + libepoxy/1.5.10"
+    - "glib 构建期工具 staging：python 工具（glib-mkenums/glib-genmarshal/gdbus-codegen）套显式解释器 wrapper，ELF 工具剥旧 .codesign 后重签（包内旧签名在本机 execve 直接 EPERM）"
+    - "pkg-config 缺口补齐：PkgConfigDeps 生成的 glib-2.0.pc 需补 -lintl（glib 用 proxy-libintl，符号在包内）与工具变量（glib_mkenums/gdbus_codegen/…）；glib 未声明 gio-unix-2.0 组件，用 gio-2.0.pc 克隆出 gio-unix-2.0.pc（meson 显式 dependency('gio-unix-2.0')）"
+    - "libepoxy 制品仓以 egl=no 构建、无 epoxy/egl.h → compat/epoxy/egl.h 暴露平台 EGL API + 链接 sysroot libEGL（运行期 /system/lib64/libEGL.so）"
+    - "pulseaudio 后端与 gtk 栈版本互斥（glib 2.88 vs 2.84、expat 2.8.2 vs 2.8.2.1）→ -Dpulseaudio=disabled（与 bluez --disable-obex 同款取舍）"
+    - "introspection/vapi/gtk-doc 关闭；demos=false，只交付库 + libexec/retro-runner"
+    - "上游 2 项 meson 测试在 build() 内实跑并通过（RetroCore test + /retro-dummy reftest）；reftest 因无显示器改用 g_test_init（补丁 0003，断言未删）"
+    - "产物 ELF 重新签名（meson install 改写 rpath 会破坏链接期 .codesign）"
+  common_dependencies: []
+
+versions:
+  "1.0.2":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "retro-gtk/1.0.2"

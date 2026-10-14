@@ -1,0 +1,14 @@
+--- a/tests/retro-reftest.c
++++ b/tests/retro-reftest.c
+@@ -139,7 +139,10 @@
+     return FALSE;
+   }
+ 
+-  gtk_test_init (argc, argv);
++  /* Headless sandbox: the reftest compares software-rendered pixdata and
++     never creates a widget, but gtk_test_init() requires an X/Wayland
++     display connection.  Plain g_test_init() keeps every assertion. */
++  g_test_init (argc, argv, NULL);
+ 
+   if (*argc > 1) {
+     arg_media_files = &(*argv)[1];
