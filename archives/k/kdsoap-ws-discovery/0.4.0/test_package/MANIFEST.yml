@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml — kdsoap-ws-discovery 0.4.0
+# Upstream official test declaration (required by the CI L0e quality gate).
+
+package: kdsoap-ws-discovery/0.4.0
+homepage: "https://invent.kde.org/libraries/kdsoap-ws-discovery-client"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  source_tarball: "kdsoap-ws-discovery-client-v0.4.0.tar.gz (invent.kde.org tag v0.4.0, 37626 bytes)"
+  source_sha256: "d0fe9d51a1b641b760f3d837c94b94276ced7a91d4912559cde6bf1df6d4aafa"
+  build_system: "cmake (C++17, Qt6, KDE ECM)"
+  test_definition: "autotests/CMakeLists.txt uses ecm_add_tests() to register exactly 1 ctest entry, test_wsdiscoveryclient, built from the single QTest program autotests/test_wsdiscoveryclient.cpp which declares 4 Q_SLOTS: testSendProbe, testSendResolve, testReceiveProbeMatch, testReceiveResolveMatch"
+  dependency: "Qt6::Network, Qt6::Test (qtbase/6.11.1) and KDSoap::WSDiscoveryClient"
+  portability_changes: []
+  counting_unit: "ctest 注册条目 (ctest_entries) = 1; 逐条 QTest slot = 4"
+  verification: "ctest -N 实测发现 1 个条目；ctest 运行时该条目的 4 个 QTest slot 逐条报告（含原始日志）"
+
+upstream_test_total: 1
+upstream_test_count_method: ctest_entries
+
+# Upstream test command (used with ctest -N analysis)
+upstream_check_command: "ctest --test-dir <build> -N"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir {build_folder} --output-on-failure --no-tests=error --timeout 120"
+
+upstream_tests:
+  - file: autotests/test_wsdiscoveryclient.cpp
+    source: upstream
+    description: "QTest 程序，4 个 slot：testSendProbe、testSendResolve（组播发送并比对 XML）、testReceiveProbeMatch、testReceiveResolveMatch（注入 datagram 并校验解析）"
+    command: "ctest -R test_wsdiscoveryclient"
+    included: true
+
+test_package_tests:
+  - file: test_package/test_kdsoapwsdiscovery.cpp
+    description: "14 个真实断言：WSDiscoveryTargetService 的 endpointReference/typeList/scopeList/xAddrList/lastSeen 与 isMatchingType/isMatchingScope；WSDiscoveryServiceAggregator 的 serviceUpdated 信号与同一 endpoint 复用 QSharedPointer；WSDiscoveryProbeJob 的 interval/addType/addScope；安装版本头 WSDISCOVERY_VERSION_STRING"
+    command: "./test_kdsoap_ws_discovery"
+
+# test_package assertion total (matches HMBS_TEST_PACKAGE_RESULT discovered=14)
+assertion_count: 14

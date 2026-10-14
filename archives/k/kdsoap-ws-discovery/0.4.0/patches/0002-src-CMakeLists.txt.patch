@@ -1,0 +1,48 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -28,26 +28,45 @@
+ )
+ 
+ add_library(KDSoapWSDiscoveryClient ${KDSoapWSDiscoveryClient_SRCS} ${KDSoapWSDiscoveryClient_WSDL})
+ generate_export_header(KDSoapWSDiscoveryClient BASE_NAME WSDiscoveryClient)
+ add_library(KDSoap::WSDiscoveryClient ALIAS KDSoapWSDiscoveryClient)
+ 
+ target_include_directories(KDSoapWSDiscoveryClient
+     INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/KDSoapWSDiscoveryClient>"
+ )
+ 
++# OHOS relocatable linkage (knowledge E537): the published kdsoap shared
++# library has no DT_SONAME, so linking KDSoap::kdsoap by its absolute Conan
++# cache path makes the linker record that machine-private path in DT_NEEDED
++# (non-consumable under another cache layout, and rejected by the packaging
++# SONAME gate). Link it by its SONAME-style basename instead, and propagate the
++# relocatable imported target KDSoap::kdsoap to consumers through the interface.
++target_link_directories(KDSoapWSDiscoveryClient PRIVATE ${KDSOAP_DEP_LIB_DIRS})
+ target_link_libraries(KDSoapWSDiscoveryClient
+     PUBLIC
+         Qt${QT_MAJOR_VERSION}::Core
++    INTERFACE
+         KDSoap::kdsoap
+     PRIVATE
++        Qt${QT_MAJOR_VERSION}::Network
++        -l:libkdsoap-qt6.so
+ )
++
++# kdsoap headers are required to build this library; add them privately so the
++# producer's absolute cache paths never reach the exported targets.
++if (TARGET KDSoap::kdsoap)
++    get_target_property(_kdsoap_includes KDSoap::kdsoap INTERFACE_INCLUDE_DIRECTORIES)
++    if (_kdsoap_includes)
++        target_include_directories(KDSoapWSDiscoveryClient SYSTEM PRIVATE ${_kdsoap_includes})
++    endif()
++endif()
+ 
+ set_target_properties(KDSoapWSDiscoveryClient PROPERTIES
+     VERSION     ${WSDISCOVERY_VERSION_STRING}
+     SOVERSION   ${WSDISCOVERY_SOVERSION}
+     EXPORT_NAME "WSDiscoveryClient"
+ )
+ 
+ ecm_generate_headers(KDSoapWSDiscoveryClient_HEADERS
+     HEADER_NAMES
+     WSDiscoveryClient

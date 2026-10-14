@@ -1,0 +1,48 @@
+# Version-level manifest — kdsoap-ws-discovery 0.4.0
+# File location: archives/k/kdsoap-ws-discovery/0.4.0/manifest.yaml
+
+version: "0.4.0"
+software: "kdsoap-ws-discovery"
+status: built
+build_date: "2026-10-14"
+build_system: cmake
+
+source:
+  url: "https://invent.kde.org/libraries/kdsoap-ws-discovery-client/-/archive/v0.4.0/kdsoap-ws-discovery-client-v0.4.0.tar.gz"
+  sha256: "d0fe9d51a1b641b760f3d837c94b94276ced7a91d4912559cde6bf1df6d4aafa"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DQT_MAJOR_VERSION=6"
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_QCH=OFF"
+  dependencies:
+    - kdsoap/2.3.0
+    - qtbase/6.11.1
+  tool_dependencies:
+    - extra-cmake-modules/6.26.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-KDSoapWSDiscoveryClientConfig.cmake.in.patch (include CMakeFindDependencyMacro before find_dependency() in the generated package config)"
+  - "patches/0002-src-CMakeLists.txt.patch (link KDSoap::kdsoap by SONAME-style basename on OHOS; add kdsoap headers privately)"
+
+knowledge_gained:
+  - "The published kdsoap/2.3.0 shared library (libkdsoap-qt6.so) has no DT_SONAME, so linking KDSoap::kdsoap by its absolute Conan cache path records a machine-private path in DT_NEEDED (CI L5b rejects it). Fix: link it by `-L<dir> -l:libkdsoap-qt6.so` with KDSoap::kdsoap moved to INTERFACE, and re-add its INTERFACE_INCLUDE_DIRECTORIES (plus Qt6::Network) privately for the producer. Knowledge E537 (link-time SONAME basename)."
+  - "HarmonyOS has no CMake platform module, so CMAKE_SHARED_LIBRARY_SONAME_<LANG>_FLAG is empty and CMake emits no -soname even when SOVERSION is set; the produced .so ships without DT_SONAME and the exported targets get IMPORTED_NO_SONAME TRUE (CI L5a/L5c). Fix: set CMAKE_SHARED_LIBRARY_SONAME_C_FLAG/CXX_FLAG=-Wl,-soname, (+ CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE) in the recipe. Knowledge E207/E537, libharu/mtxclient precedent."
+  - "Upstream KDSoapWSDiscoveryClientConfig.cmake.in calls find_dependency() without include(CMakeFindDependencyMacro); consumers that have not preloaded the macro fail with 'Unknown CMake command find_dependency'. Fix: include the module in the template."
+  - "KDECMakeSettings sets CMAKE_LIBRARY_OUTPUT_DIRECTORY to <build>/bin, so the in-tree shared library (and the upstream autotests that link it with no build RPATH) need <build>/bin on LD_LIBRARY_PATH."
+
+verification:
+  target: HarmonyOS PC aarch64
+  conan_create: pass
+  upstream_ctest: 1/1
+  upstream_qtest_slots: 4/4
+  installed_consumer: 14/14
+  pr_ci: pending
+
+# 上游测试清点（R51 申报）见 test_package/MANIFEST.yml：
+#   upstream_test_total: 1 (ctest_entries)，含 4 个 QTest slot，全部可执行。
