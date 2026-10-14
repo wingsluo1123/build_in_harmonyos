@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: tinyprog/1.0.23
+homepage: "https://github.com/tinyfpga/TinyFPGA-Bootloader"
+
+# 上游测试命令 —— 实测：上游**没有可运行的 Python 测试套件**
+#   * programmer/README.md 原文："Tests have been removed for now pending
+#     refactoring of test methodology"
+#   * programmer/setup.py 未声明 test_suite / tests_require
+# 仓库 tests/ 下只有 Verilog RTL testbench（仿真的 bootloader 固件，非本包）
+upstream_check_command: "(none — upstream ships no Python test suite; see census below)"
+
+# conanfile.py build() 中是否已集成上游测试
+# false 的含义是"上游无可运行的 Python 套件"，不是"跳过不跑"：
+# _run_upstream_tests() 会打印精确 census（Python 测试文件数 / RTL 数 / 模拟器可达性）
+upstream_test_in_build: false
+upstream_test_command: "(none)"
+
+# 上游实际存在的测试资产 —— 如实申报，含"不可运行"及其原因
+upstream_tests:
+  - file: tests/*.v
+    source: TinyFPGA-Bootloader-tinyprog-1.0.23/tests/
+    description: >-
+      24 个 Verilog RTL testbench，仿真的是 bootloader **固件**（ice40 上运行的
+      USB/SPI 状态机），不驱动本 Python 包；需要 icarus-verilog 模拟器
+      驱动。本 OHOS CI 镜像未提供 `iverilog`（shutil.which 实测为空）
+      → 记为环境能力缺口（W0b），不是包本身的失败。
+    command: "(requires iverilog — not present in the OHOS CI image)"
+
+# test_package 中自带的测试 (消费者视角验证，含鸿蒙特有断言)
+# 设计依据：上游无套件 → 适配自行提供测试证据（R34：测试必须实质依赖被测包，
+# 禁止只打印字符串的空壳）。全部 12 个用例都 import 产出包内的模块、
+# 或执行安装后的 bin/tinyprog，或用私有 FakeSerial 驱动真实协议实现。
+test_package_tests:
+  - file: test_tinyprog.py
+    description: >-
+      12 个消费者用例 / 57 处断言（另有 1 处 subTest 参数化循环，
+      展开后额外覆盖 7 个依赖模块的 import 检查）。覆盖：①包布局 ②从包内 import
+      ③发行版元数据版本 ④console_scripts 入口点解析 ⑤7 个上游依赖的
+      来源路由（pyserial/six 走 conan 依赖、其余在包内，证明 run=True 生效）
+      ⑥CLI --help ⑦CLI -l 真实串口枚举路径 ⑧SPI 字节级命令帧 +
+      ISSI/Adesto security-page 分支 ⑨元数据整合（三页 jsonmerge 合并、
+      @addr+len 指针解引用、地址区间、uuid）⑩bit-reverse 表在全部 256 值上
+      的对合性 ⑪ HarmonyOS 平台指纹 ⑫ 随包 sitecustomize shim 生效
+      且 HarmonyOS 上的 pyserial 枚举可用。
+      鸿蒙特有断言 = 宿主平台固有事实（非可移植的包装断言）：
+        * H1 布局：pip --target 平铺载荷 + bin/ 控制台脚本 + licenses/
+        * H2 依赖路由：pyserial/six 必须来自 conan 依赖（断言其 __file__
+          不在包内），避免"改回 vendored 也能过"的假绿
+        * H3 平台指纹：os.uname().sysname == "HarmonyOS" 且 machine == aarch64，
+          而上游另有 platform.system() == "Darwin" 特判分支 —— 断言 HarmonyOS
+          下**不**命中 Darwin 分支，否则端口发现会静默偏离 pyserial 路径
+    command: "python3 test_tinyprog.py <package_folder> 1.0.23"
+
+# 测试断言总数：57 处 self.assert* 调用（精确计数，非近似）。
+# 另有 1 处 subTest 参数化循环，展开后额外覆盖 7 个依赖模块的 import 检查，
+# 不单独计入 assertion_count。
+assertion_count: 57
