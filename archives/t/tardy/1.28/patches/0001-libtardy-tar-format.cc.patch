@@ -1,0 +1,138 @@
+--- a/libtardy/tar/format.cc
++++ b/libtardy/tar/format.cc
+@@ -52,20 +52,43 @@
+         }
+ 
+         value = (value << 3) + (*buf++ & 7);
+         --len;
+     }
+     errno = 0;
+     return value;
+ }
+ 
+ 
++//
++// Some tar implementations store numeric header fields that do not fit in
++// the fixed-width octal representation using the GNU "base-256" extension:
++// the high bit of the first byte is set and the value is a big-endian
++// binary number in the remaining bytes.  GNU tar emits this for uids/gids
++// above 2097151, and this platform's tar (toybox) does the same because the
++// build user's uid is 20001006.  Without this, tardy refuses such archives
++// with "corrupted uid field".
++//
++static long
++numeric(const char *buf, long len)
++{
++    if (len > 0 && (static_cast<unsigned char>(buf[0]) & 0x80))
++    {
++        long value = static_cast<unsigned char>(buf[0]) & 0x7F;
++        for (long j = 1; j < len; ++j)
++            value = (value << 8) | static_cast<unsigned char>(buf[j]);
++        return value;
++    }
++    return octal(buf, len);
++}
++
++
+ static void
+ padded_octal(char pad, char *buf, long len, long n)
+ {
+     assert(len >= 2);
+     --len;
+     buf[len] = 0;
+     memset(buf, pad, len);
+     while (len > 0)
+     {
+         buf[--len] = '0' + (n & 7);
+@@ -151,21 +174,21 @@
+ header_ty::mode_set_z(long n)
+ {
+     zero_padded_octal(mode, sizeof(mode), n);
+ }
+ 
+ 
+ long
+ header_ty::uid_get(void)
+     const
+ {
+-    return octal(uid, sizeof(uid));
++    return numeric(uid, sizeof(uid));
+ }
+ 
+ 
+ void
+ header_ty::uid_set(long n)
+ {
+     space_padded_octal(uid, sizeof(uid), n);
+ }
+ 
+ 
+@@ -173,21 +196,21 @@
+ header_ty::uid_set_z(long n)
+ {
+     zero_padded_octal(uid, sizeof(uid), n);
+ }
+ 
+ 
+ long
+ header_ty::gid_get(void)
+     const
+ {
+-    return octal(gid, sizeof(gid));
++    return numeric(gid, sizeof(gid));
+ }
+ 
+ 
+ void
+ header_ty::gid_set(long n)
+ {
+     space_padded_octal(gid, sizeof(gid), n);
+ }
+ 
+ 
+@@ -195,21 +218,21 @@
+ header_ty::gid_set_z(long n)
+ {
+     zero_padded_octal(gid, sizeof(gid), n);
+ }
+ 
+ 
+ long
+ header_ty::size_get(void)
+     const
+ {
+-    return octal(size, sizeof(size));
++    return numeric(size, sizeof(size));
+ }
+ 
+ 
+ void
+ header_ty::size_set(long n)
+ {
+     space_padded_octal(size, sizeof(size), n);
+ }
+ 
+ 
+@@ -217,21 +240,21 @@
+ header_ty::size_set_z(long n)
+ {
+     zero_padded_octal(size, sizeof(size), n);
+ }
+ 
+ 
+ long
+ header_ty::mtime_get(void)
+     const
+ {
+-    return octal(mtime, sizeof(mtime));
++    return numeric(mtime, sizeof(mtime));
+ }
+ 
+ 
+ void
+ header_ty::mtime_set(long n)
+ {
+     space_padded_octal(mtime, sizeof(mtime), n);
+ }
+ 
+ 

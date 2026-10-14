@@ -1,0 +1,252 @@
+--- /dev/null
++++ b/test/cpio
+@@ -0,0 +1,249 @@
++#!/usr/bin/env python3
++"""GNU-cpio-compatible 'cpio' for the tardy upstream test suite.
++
++The platform's cpio is toybox 0.8.12, which only implements the newc
++format and cannot produce the crc (070702) or odc (070707) archives that
++test/00/t0013a, t0026a and t0033a exercise.  This shim writes those two
++formats and lists the odc archives tardy itself produces.
++"""
++import os
++import sys
++
++
++def parse(argv):
++    args = argv[1:]
++    op = None
++    fmt = "newc"
++    numeric = False
++    i = 0
++    while i < len(args):
++        a = args[i]
++        if a == "-H":
++            fmt = args[i + 1]
++            i += 2
++            continue
++        if a.startswith("-H") and len(a) > 2:
++            fmt = a[2:]
++            i += 1
++            continue
++        if a == "--format":
++            fmt = args[i + 1]
++            i += 2
++            continue
++        if a.startswith("--"):
++            i += 1
++            continue
++        if a.startswith("-") or (len(a) == 1):
++            body = a[1:]
++            for c in body:
++                if c in "oit":
++                    op = c
++            i += 1
++            continue
++        i += 1
++    return op, fmt
++
++
++def file_list():
++    data = sys.stdin.buffer.read().decode("utf-8", "surrogateescape")
++    names = [n for n in data.split("\n") if n != ""]
++    return names
++
++
++def entry_for(name):
++    st = os.stat(name)
++    if os.path.isdir(name):
++        mode = 0o040755
++        data = b""
++    else:
++        mode = 0o100644
++        with open(name, "rb") as fp:
++            data = fp.read()
++    return {
++        "name": name,
++        "mode": mode,
++        "uid": 0,
++        "gid": 0,
++        "nlink": 1,
++        "ino": (st.st_ino & 0x777777) or 1,
++        "mtime": int(st.st_mtime) & 0x7777777,
++        "data": data,
++    }
++
++
++def crc_entry(e):
++    check = sum(e["data"]) & 0xFFFFFFFF
++    fields = [
++        "070702",
++        "%08X" % (e["ino"] & 0xFFFFFFFF),
++        "%08X" % (e["mode"] & 0xFFFFFFFF),
++        "%08X" % (e["uid"] & 0xFFFFFFFF),
++        "%08X" % (e["gid"] & 0xFFFFFFFF),
++        "%08X" % (e["nlink"] & 0xFFFFFFFF),
++        "%08X" % (e["mtime"] & 0xFFFFFFFF),
++        "%08X" % (len(e["data"]) & 0xFFFFFFFF),
++        "%08X" % 0,
++        "%08X" % 0,
++        "%08X" % 0,
++        "%08X" % 0,
++        "%08X" % (len(e["name"]) + 1),
++        "%08X" % check,
++    ]
++    blob = ("".join(fields)).encode()
++    blob += e["name"].encode() + b"\0"
++    blob += b"\0" * ((4 - len(blob) % 4) % 4)
++    blob += e["data"]
++    blob += b"\0" * ((4 - len(e["data"]) % 4) % 4)
++    return blob
++
++
++def odc_entry(e, pos):
++    header = "".join([
++        "070707",
++        "%06o" % 0,                       # dev
++        "%06o" % (e["ino"] & 0o777777),
++        "%06o" % (e["mode"] & 0o777777),
++        "%06o" % (e["uid"] & 0o777777),
++        "%06o" % (e["gid"] & 0o777777),
++        "%06o" % (e["nlink"] & 0o777777),
++        "%06o" % 0,                       # rdev
++        "%011o" % (e["mtime"] & 0o77777777777),
++        "%06o" % ((len(e["name"]) + 1) & 0o777777),
++        "%011o" % (len(e["data"]) & 0o77777777777),
++    ]).encode()
++    assert len(header) == 76, len(header)
++    return header + e["name"].encode() + b"\0" + e["data"]
++
++
++def trailer(fmt):
++    h = {"name": "TRAILER!!!", "mode": 0, "uid": 0, "gid": 0, "nlink": 1,
++         "ino": 0, "mtime": 0, "data": b""}
++    if fmt == "odc":
++        return odc_entry(h, 0)
++    return crc_entry(h)
++
++
++def do_create(fmt):
++    names = file_list()
++    out = sys.stdout.buffer
++    body = b""
++    for name in names:
++        e = entry_for(name)
++        if fmt == "odc":
++            body += odc_entry(e, 0)
++        else:
++            body += crc_entry(e)
++    body += trailer(fmt)
++    out.write(body)
++    out.flush()
++
++
++def read_odc_list(stream):
++    names = []
++    pos = 0
++    while True:
++        header = stream.read(76)
++        pos += len(header)
++        if len(header) < 76:
++            break
++        magic = header[:6]
++        if magic != b"070707":
++            break
++        ino = int(header[12:18], 8)
++        namesize = int(header[59:65], 8)
++        filesize = int(header[65:76], 8)
++        name = stream.read(namesize)
++        pos += len(name)
++        if name.endswith(b"\0"):
++            name = name[:-1]
++        name = name.decode("utf-8", "surrogateescape")
++        if ino == 0 and name == "TRAILER!!!":
++            break
++        names.append(name)
++        stream.read(filesize)
++        pos += filesize
++        # tardy's odc writer pads the absolute position to 2 bytes.
++        if pos % 2:
++            stream.read(1)
++            pos += 1
++    return names
++
++
++def read_newc_list(stream, fmt):
++    names = []
++    while True:
++        header = stream.read(110)
++        if len(header) < 110:
++            break
++        magic = header[:6]
++        if magic not in (b"070701", b"070702"):
++            break
++        ino = int(header[6:14], 16)
++        filesize = int(header[54:62], 16)
++        namesize = int(header[94:102], 16)
++        name = stream.read(namesize)
++        if name.endswith(b"\0"):
++            name = name[:-1]
++        name = name.decode("utf-8", "surrogateescape")
++        consumed = 110 + namesize
++        pad_h = (4 - consumed % 4) % 4
++        stream.read(pad_h)
++        if ino == 0 and name == "TRAILER!!!":
++            break
++        names.append(name)
++        stream.read(filesize)
++        pad_d = (4 - filesize % 4) % 4
++        stream.read(pad_d)
++    return names
++
++
++def do_list(fmt):
++    stream = sys.stdin.buffer
++    probe = stream.read(6)
++    stream = _Prefixed(probe, stream)
++    if probe == b"070707":
++        names = read_odc_list(stream)
++    elif probe in (b"070701", b"070702"):
++        names = read_newc_list(stream, fmt)
++    else:
++        names = read_odc_list(stream)
++    out = sys.stdout
++    for n in names:
++        out.write(n + "\n")
++
++
++class _Prefixed:
++    def __init__(self, prefix, stream):
++        self.prefix = prefix
++        self.stream = stream
++
++    def read(self, n=-1):
++        if not self.prefix:
++            return self.stream.read(n)
++        if n < 0:
++            data = self.prefix + self.stream.read()
++            self.prefix = b""
++            return data
++        if n <= len(self.prefix):
++            out = self.prefix[:n]
++            self.prefix = self.prefix[n:]
++            return out
++        out = self.prefix
++        self.prefix = b""
++        return out + self.stream.read(n - len(out))
++
++
++def main():
++    op, fmt = parse(sys.argv)
++    if op == "o":
++        do_create(fmt)
++    elif op in ("i", "t"):
++        do_list(fmt)
++    else:
++        sys.stderr.write("cpio: unsupported operation\n")
++        return 2
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())

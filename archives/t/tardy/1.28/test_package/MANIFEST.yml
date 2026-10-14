@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 与 conan-verify G1 强制要求）
+package: tardy/1.28
+homepage: "https://tardy.sourceforge.net/"
+
+# 上游测试面：test/00/*.sh 共 56 个 shell 用例（R51 实数实测，见 notes.md），
+# 聚合入口为 Makefile 的 `sure` 目标（aegis 风格 harness，每条用例以
+# TEST_SUBJECT 命名被测行为，跑内置 bin/tardy 处理 tar/cpio fixture）。
+#
+# 设备实测（2026-10-13）：56/56 全部执行并通过。构建内真实执行：build()
+# 的 OHOS 路径在 make bin/tardy 之后运行 `make -o all check`
+# （-o all 跳过需 ps2pdf 的 PDF 手册目标），跑刚构建出的 bin/tardy。
+# 平台 toybox tar/cpio 缺 GNU 语义，配方携带 GNU 兼容前端 test/tar + test/cpio
+# （补丁 0004/0005）并置于 PATH 前部；hmdfs 忽略 chmod，夹具模式由该前端合成。
+# 另有源码补丁 0002（gzip 临时文件走 $TMPDIR）与 0003（harness testdir 走 $TMPDIR，
+# 二者真实触达，/tmp 只读）以及防御性补丁 0001（GNU base-256 数字字段，当前套件
+# 不触达，详见 notes.md/manifest.yaml）。
+upstream_check_command: "make -o all check"
+upstream_test_in_build: true
+upstream_test_command: "make -o all check"
+
+upstream_tests:
+  - name: "test/00/*.sh"
+    file: "Makefile.in"
+    source: "tardy-1.28.D001/test/00"
+    count: 56
+    description: >-
+      上游 aegis shell 用例，`make sure` 聚合（test_files 变量列 56 个目标）。
+      R51 实测 N = 56（源码清点：test/00 下 56 个 t*.sh，逐条名见 notes.md）。
+      设备实测：PASS 56 / FAIL 0 / SKIP 0 / NOT_RUN 0。
+    command: "make -o all check"
+
+# test_package 中自带的测试（消费者视角验证交付产物本身）
+test_package_tests:
+  - file: test_package/test_tardy.sh
+    description: >-
+      消费者功能测试（工具级）：tardy -version 报 1.28；
+      tardy -help 零退出；prefix roundtrip（GNU_FORMAT tar fixture →
+      tardy -prefix 加前缀 → 成员名变更断言）。
+      共 3 项断言，失败即非零退出。
+    command: "sh test_tardy.sh"
+
+# 测试断言总数（近似值，用于质量评估）：上游 56 项 + 工具级 3 项
+assertion_count: 59
