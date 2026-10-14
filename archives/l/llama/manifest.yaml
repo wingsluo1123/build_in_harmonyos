@@ -1,0 +1,21 @@
+software: llama
+display: "llama.cpp"
+description: "llama.cpp 大语言模型推理引擎,含 ggml 张量后端与 llama-cli/llama-server 等工具"
+category: library
+homepage: "https://github.com/ggml-org/llama.cpp"
+license: MIT
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "GGML_NATIVE 必须关闭:-mcpu=native 探测把构建机 CPU 特性烧进产物,用 GGML_CPU_ARM_ARCH 指定或留编译器基线"
+    - "产物 .so 无 DT_SONAME,package() 内 patchelf 补 SONAME 后必须重签名(XPM 拒绝未签名 dlopen)"
+    - "WebUI 预编译资产默认从 HuggingFace 下载,离线构建用 LLAMA_USE_PREBUILT_UI=OFF,上游优雅降级为空 UI"
+    - "第三方依赖全部 vendor 在源码树内,OpenSSL 关闭后零外部依赖"
+  common_dependencies: []
+
+versions:
+  "cpp-b10068":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "llama/cpp-b10068"

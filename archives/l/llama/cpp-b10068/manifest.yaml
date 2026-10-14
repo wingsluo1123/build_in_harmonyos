@@ -1,0 +1,31 @@
+version: "cpp-b10068"
+status: built                    # MateBook conan verify 通过后确认
+build_date: "2026-10-12"         # 真机验证当天填写 YYYY-MM-DD(须在 finish/审计之前定稿)
+conan_ref: "llama/cpp-b10068"
+
+source:
+  url: "https://github.com/ggml-org/llama.cpp/archive/refs/tags/b10068.tar.gz"
+  sha256: "192819ca7117147532f2c8d8938ab2fe9b25e872ea671a56be549ec30ea4f743"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DGGML_NATIVE=OFF"
+    - "-DLLAMA_BUILD_EXAMPLES=OFF"
+    - "-DLLAMA_OPENSSL=OFF"
+    - "-DLLAMA_USE_PREBUILT_UI=OFF"
+    - "-DLLAMA_BUILD_TESTS=ON"
+    - "-DLLAMA_BUILD_TOOLS=ON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "GGML_NATIVE=OFF:上游 -mcpu=native 探测把构建机 CPU 特性烧进产物,须用 GGML_CPU_ARM_ARCH 指定或留编译器基线"
+  - "WebUI 预编译资产走 HuggingFace 下载,离线构建用 LLAMA_USE_PREBUILT_UI=OFF,上游优雅降级为内嵌空 UI(仅 WARNING)"
+  - "全部第三方依赖 vendor 在源码树内(cpp-httplib/miniaudio/nlohmann/stb),OpenSSL 关闭后零外部依赖"
+  - "产物 .so 无 DT_SONAME,package() 内 patchelf 补 SONAME 后须重签名(XPM 拒绝未签名 dlopen)"
+  - "tokenizer 等上游测试所需的 ggml-vocab-*.gguf 模型文件已提交在源码树 models/ 内,测试可完全离线"
