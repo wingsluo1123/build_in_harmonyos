@@ -1,0 +1,26 @@
+--- a/tests/data/generate_flat_build.sh
++++ b/tests/data/generate_flat_build.sh
+@@ -34,7 +34,19 @@
+ 	cp "$SCRIPT_PATH"/flashmap.json "$OUTDIR"/
+ fi
+ 
+-(cd $OUTDIR ; zip flashmap.zip prog_firehose_ddr.elf efi.bin gpt_backup0.bin \
+-		  gpt_backup1.bin gpt_main0.bin gpt_main1.bin rootfs.img \
+-		  xbl_config.elf xbl.elf rawprogram0.xml rawprogram1.xml \
+-		  patch0.xml patch1.xml flashmap.json)
++# HarmonyOS PC: a process started from a user-writable location runs in the
++# adhoc_bin HMMAC domain, which is denied read access to /usr/bin, so the
++# Info-ZIP CLI installed there is unreachable.  Fall back to the Python
++# standard library, which builds an equivalent archive for the tests.
++ZIP_FILES="prog_firehose_ddr.elf efi.bin gpt_backup0.bin gpt_backup1.bin \
++	   gpt_main0.bin gpt_main1.bin rootfs.img xbl_config.elf xbl.elf \
++	   rawprogram0.xml rawprogram1.xml patch0.xml patch1.xml flashmap.json"
++
++if command -v zip >/dev/null 2>&1; then
++	(cd $OUTDIR ; zip flashmap.zip $ZIP_FILES)
++elif command -v python3 >/dev/null 2>&1; then
++	(cd $OUTDIR ; python3 -m zipfile -c flashmap.zip $ZIP_FILES)
++else
++	echo "generate_flat_build.sh: neither 'zip' nor 'python3' is available" >&2
++	exit 1
++fi

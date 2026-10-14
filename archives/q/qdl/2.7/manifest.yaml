@@ -1,0 +1,77 @@
+# 版本级 manifest
+# 文件位置: archives/q/qdl/2.7/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "2.7"
+
+# 软件名
+software: "qdl"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-04"
+build_system: "meson"
+conan_ref: "qdl/2.7"
+
+# 源码信息
+source:
+  # 源码下载 URL（官方源；完整三源列表见 conandata.yml）
+  url: "https://github.com/linux-msm/qdl/archive/refs/tags/v2.7.tar.gz"
+
+  # 源码校验和
+  sha256: "0eee137badceb8dfc6b2bc43af7223e5770d48be5eeab5c808c08cf1beb1de9a"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表（对应 conanfile.py generate() 里写入 conan_meson_native.ini 的值）
+  configure_options:
+    - "-DVERSION=2.7"
+    - "-Dwrap_mode=nodownload"
+    - "-Db_ndebug=false"
+
+  # 编译依赖列表（格式: name/version；制品仓为裸 ref，无 @user/channel）
+  dependencies:
+    - libusb/1.0.27
+    - libxml2/2.15.3.1
+    - libzip/1.11.4
+
+  # 测试依赖（只在构建本包时激活，不进包）
+  test_dependencies:
+    - cmocka/2.0.2
+
+  # 构建工具
+  build_tools:
+    - meson/1.11.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-tests-accept-harmonyos-uname.patch"
+  - "patches/0002-tests-portable-zip-fallback.patch"
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS 上 `uname -s` 返回 'HarmonyOS'（不是 'Linux'）。上游 tests/test_vip_generation.sh 与 tests/test_flashmap.sh 用它挑可执行文件名（Linux*|Darwin* → qdl，CYGWIN*|MINGW*|MSYS* → qdl.exe），其余平台一律 `*) exit 1` ⇒ 两条集成测试在 HarmonyOS 上必然以退出码 1 失败，而 meson.test() 有一条失败就让 conan create 整体失败。修法是在 case 里补 HarmonyOS*（可移植性修复，不碰产物代码）"
+  - "纯工具包（没有库、没有公共头）在 conan 里应取 package_type='application'，cpp_info 只设 bindirs；这类包按 L0k 需要在**软件级**目录提供 commands.json（verify_archive.py 的 has_cmds 检查 version 目录或其父目录）。仓库内先例 archives/2/2048.c/1.0.3"
+  - "上游 meson.build 用 run_command('git','describe',...,check:false) 推版本：tarball 解包后没有 .git，git describe 非 0 退出 ⇒ git_v 为空 ⇒ 版本退化成 'unknown-version'，version.h 里 #define VERSION \"unknown-version\"。上游 meson.options 提供了 VERSION 选项且 meson.build 里 env_v 优先于 git_v，故配方写 tc.project_options['VERSION']='2.7' 即可让 `qdl --version` 打出真版本"
+  - "meson.build 里 find_program('bash') 是**必需**的（无 required:false），测试用 bash 跑集成测试；真机上 bash 在 /data/service/hnp/bin/bash（5.3.0），在 PATH 上 ⇒ 不需要额外处理。help2man 反而是 required:false，真机没有 ⇒ man 页 custom_target 整段跳过"
+  - "集成测试的固定装置依赖 dd（status=none 可用，/usr/bin/dd 与 /system/bin/dd 均有）、zip、sha256sum 或 shasum（真机解析到 /system/bin/sha256sum）、mktemp（跟随 TMPDIR）。真机 /tmp 存在但**只读**（Read-only file system），TMPDIR 指向 /storage/Users/currentUser/tmp；tests/common.c 里 test_make_temp_dir() 硬编码 /tmp，但该函数是**死代码**（全仓无调用点），所以不影响测试结果"
+  - "★ HarmonyOS PC 的 HMMAC 强制访问控制会按**进程域**决定能否读 /usr/bin：宿主交互 shell 的域是 u:r:hishell_hap:s0（可读），而任何从**用户可写目录**启动的可执行文件都会切到 u:r:adhoc_bin:s0（读 /usr/bin → EACCES）。conan 自身是 /storage/Users/currentUser/usr/local/bin/python3，所以 `conan create` 之后的整棵子进程树都被锁在 adhoc_bin 域里：/usr/bin/zip 明明装着（179 个条目、-rwxr-xr-x）却 `Permission denied`，而 /system/bin、/data/service/hnp、/storage 全部正常。⇒ 依赖 /usr/bin 下工具的上游测试必须给出回退路径，不能指望 PATH 里写着 /usr/bin 就能用"
+  - "VIP 摘要表 DigestsToSign.bin 是纯二进制：每项 32 字节 SHA-256 依次 fwrite（vip.c），不含文件名、不含 XML 原文 ⇒ 它的 sha256 与 XML 的行尾风格无关，只取决于被摘要的镜像集合与顺序。因此消费者用例可以用随包的 4 个上游 XML + 同样的 9 个稀疏零字节镜像，逐字节重现上游 EXPECTED_DIGEST"
+  - "上游 tests/data/*.xml 本身就是 CRLF 行尾（patch0.xml 6247 B / 32 个 CR）—— 复制固定装置时必须**逐字节照搬**，不要做行尾归一化"
+  - "★ meson 的 `install` 会重写产物的 RPATH：构建树里 b/build-release/qdl 能正常执行（rc=0、DT_RUNPATH 完整），而 `meson install --destdir` 装进包之后的 p/bin/qdl 执行时报 `Operation not permitted`（rc=126）。两份文件大小相同（149952 B）但 sha256 不同，差异只有 288 字节 / 57 处：第 0 段 [6073,6258) 正是 DT_RUNPATH 字符串被整段替换成 'XXXX…'（185 B），其余集中在 .dynamic 段且该段少了 16 字节 ⇒ ELF 结构被写坏，内核拒绝加载（知识库 E077 的机制：改写 RPATH/RUNPATH 会使 ELF 的 .codesign 签名段失效）。对照实验：把构建树那份按字节按原路径 copy2 覆盖回去 → rc=0（三个二进制全通过），证明与权限位/路径/域无关（该 HMDFS 上 chmod 本身是 no-op，E046）。⇒ 处置是在 package() 末尾用 os.walk 找到构建树的链接器产物再 shutil.copy2 装回 bin/，**绕开 RPATH 重写**，而不是走「去签名 → 改 ELF → 重新签名」四步"

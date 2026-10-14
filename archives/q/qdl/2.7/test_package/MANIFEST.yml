@@ -1,0 +1,126 @@
+# test_package/MANIFEST.yml — qdl 2.7
+# 位置: archives/q/qdl/2.7/test_package/MANIFEST.yml
+# 用途: 声明上游测试来源与数量口径（L0e 门禁要求本文件存在）
+
+package: qdl/2.7
+homepage: "https://github.com/linux-msm/qdl"
+
+# ── 上游测试 ─────────────────────────────────────────────────────────
+# 上游 meson.build 注册 6 条 test()：
+#   顶层 2 条（bash 集成测试，始终注册）
+#     test('VIP table generation', ...)   tests/test_vip_generation.sh
+#     test('Flashmap dry-run', ...)       tests/test_flashmap.sh      protocol: tap
+#   cmocka 可用时 4 条（单元测试，`get_option('tests')` 默认 auto ⇒ 自动启用）
+#     test('program_load_xml path resolution', ...)  tests/test_program_load_xml.c
+#     test('pathbuf dirname behavior', ...)          tests/test_pathbuf.c
+#     test('contents selector resolution', ...)      tests/test_contents_selectors.c
+#     test('contents XML parsing', ...)              tests/test_contents_xml.c
+# 本配方在 build() 内以 meson.test()（等价 `meson test -v -C <build>`）真实执行，
+# 除 conandata.yml 里那一处 `uname -s` 平台判据补丁外不做任何裁剪。
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v"
+
+upstream_tests:
+  - file: tests/test_vip_generation.sh
+    source: qdl-2.7/tests/test_vip_generation.sh
+    description: >-
+      集成测试（suite: integration）：用 tests/data/generate_flat_build.sh 造出一份
+      flat build（稀疏零字节镜像 + rawprogram/patch XML），跑
+      `qdl --dry-run --create-digests=<dir> prog_firehose_ddr.elf rawprogram*.xml patch*.xml`，
+      再对生成的 vip/DigestsToSign.bin 取 sha256 与硬编码的
+      EXPECTED_DIGEST 比对。这是对 VIP 摘要表生成链路的端到端校验，
+      不需要真实 EDL 设备（--dry-run 已把 backend 钉到 SIM）。
+      依赖：bash、sha256sum|shasum、dd、zip（造 fixture 时用）。
+    command: "meson test -v 'VIP table generation'"
+  - file: tests/test_flashmap.sh
+    source: qdl-2.7/tests/test_flashmap.sh
+    description: >-
+      集成测试（protocol: tap）：造 fixture 后用
+      `qdl --dry-run flash flashmap.json` 与 `qdl --dry-run flash flashmap.zip`
+      各跑一次，走的是 flashmap 解析 + libzip 读取 zip 的路径（TAP 输出 1..2）。
+      依赖：bash、zip、mktemp。
+    command: "meson test -v 'Flashmap dry-run'"
+  - file: tests/test_program_load_xml.c
+    source: qdl-2.7/tests/test_program_load_xml.c
+    description: >-
+      cmocka 单元测试（6 个用例，3 处 assert_*）：program.c 的 XML 加载路径解析。
+      编译期以 `-Daccess=mock_access` 把 access() 换成 mock，从而校验"文件存在性
+      判断"的分支。链接 tests/common.c。
+    command: "meson test -v 'program_load_xml path resolution'"
+  - file: tests/test_pathbuf.c
+    source: qdl-2.7/tests/test_pathbuf.c
+    description: >-
+      cmocka 单元测试（9 个用例，52 处 assert_*）：pathbuf 的 dirname/basename
+      与选择器解析语义（含 Windows/POSIX 两套分支）。
+    command: "meson test -v 'pathbuf dirname behavior'"
+  - file: tests/test_contents_selectors.c
+    source: qdl-2.7/tests/test_contents_selectors.c
+    description: >-
+      cmocka 单元测试（14 个用例，30 处 assert_*）：contents 选择器
+      （<name>::<specifier> 形式）的解析与错误路径。
+    command: "meson test -v 'contents selector resolution'"
+  - file: tests/test_contents_xml.c
+    source: qdl-2.7/tests/test_contents_xml.c
+    description: >-
+      cmocka 单元测试（8 个用例，46 处 assert_*）：contents XML 解析
+      （mock 掉真实文件系统访问）。链接 tests/common.c。
+    command: "meson test -v 'contents XML parsing'"
+
+# ── 本包自带的消费者用例 ─────────────────────────────────────────────
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者测试（工具包语义：没有库可链接，消费者就是"用这些可执行文件的人"）：
+      ① `qdl --version` 必须报 2.7 —— 钉住配方 VERSION 选项的注入（上游用
+         git describe 推版本，tarball 里没有 .git，不钉就是 unknown-version）；
+      ② `qdl --help` 必须列出 --dry-run / --create-digests / --backend / --serial；
+      ③ `qdl-ramdump --help` 与 `qdl-ks --help` 都能起来并打印用法；
+      ④ **真实业务**：用随包 fixtures/ 的 4 个上游 XML + 与上游
+         tests/data/generate_flat_build.sh 完全一致的 9 个稀疏零字节镜像，
+         复现上游 test_vip_generation.sh 的同一命令行
+         （`qdl --dry-run --create-digests=<dir> prog_firehose_ddr.elf rawprogram*.xml patch*.xml`），
+         然后把生成的 vip/DigestsToSign.bin 取 sha256 与上游硬编码的
+         EXPECTED_DIGEST（3ca3c745…bf15）逐字节比对 —— 即本包产物必须能重现
+         上游参考实现的结果，而不只是"能打印版本号"。
+      失败时以非 0 退出码上报，能被 self.run() 的返回值捕获。
+    command: "bash test.sh"
+
+# ── 数量口径 ─────────────────────────────────────────────────────────
+# 以上游 meson 注册的 test() 条目为口径：6 条（4 单元 + 2 集成）。
+upstream_test_total: 6
+upstream_test_count_method: "auto"
+upstream_test_audit: >-
+  源码级审计（v2.7 tarball）：meson.build 内 `test(` 出现 6 次 —— 顶层 2 次
+  （VIP table generation / Flashmap dry-run），`if cmocka_dep.found()` 分支内 4 次
+  （program_load_xml / pathbuf / contents_selectors / contents_xml）。
+  cmocka 由 test_requires("cmocka/2.0.2") 提供且 meson.options 的 tests 选项默认
+  为 auto ⇒ 4 条单元测试实际注册并执行，故口径为 6 而不是 2。
+
+test_counting:
+  # 上游 meson 注册的独立测试条目数
+  upstream_independent_total: 6
+  # 上游 4 个 cmocka 二进制里 cmocka_unit_test[_setup_teardown] 的注册次数。
+  # 源码里共出现 37 次，但 test_pathbuf.c 的 test_dirname_windows_drive /
+  # test_dirname_windows_unc 两个注册在 `#ifdef _WIN32` 内，POSIX（含 OHOS）不参与
+  # ⇒ 真机实际注册并执行的是 35 个（实测 meson 报 6/8/14/7 subtests passed = 35）。
+  upstream_unit_case_total: 35
+  upstream_unit_case_registrations_in_source: 37
+  # 上游单元测试源码里 assert_* 的出现次数（含 5 个文件内自定义断言辅助宏的使用点）
+  upstream_unit_assertion_occurrences: 131
+  # 消费者用例：test.sh 里的显式检查点
+  integration_independent_total: 11
+  integration_runtime_assertions: 11
+  shared_static_counted_once: true
+  counting_note: >-
+    meson 只把 test() 条目当成"测试"，一个 cmocka 二进制内部的 35 个用例、131 处
+    assert_* 不再单独计入 upstream_independent_total，避免重复计数；它们作为
+    补充口径单独列出（upstream_unit_case_total / upstream_unit_assertion_occurrences）。
+    消费者用例的 11 个检查点全部是运行时真实执行的（无循环、无互斥分支），
+    失败即 set FAILED=1 并以非 0 退出码上报。
+
+# 静态检查点数（CI 的静态 grep 口径，必须与源码一致）
+test_case_count: 11
+assertion_count: 11
+# 运行时断言次数（真机实测口径，供 PR 正文的"通过率分母"引用）
+runtime_assertion_count: 11
