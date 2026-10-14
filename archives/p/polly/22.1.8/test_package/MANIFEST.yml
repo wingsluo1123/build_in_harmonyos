@@ -1,0 +1,40 @@
+package: polly/22.1.8
+homepage: "https://polly.llvm.org/"
+
+upstream_check_command: "cmake --build build --target check-polly"
+upstream_test_in_build: true
+upstream_test_command: "cmake.build(target=check-polly)"
+
+upstream_tests:
+  - file: "polly/test"
+    source: "llvm-project-22.1.8.src/polly/test"
+    description: "Complete upstream Polly lit regression suite (1245 files: 1092 .ll + 89 .jscop + 49 .transformed + aux)"
+    command: "check-polly-tests"
+  - file: "polly/unittests"
+    source: "llvm-project-22.1.8.src/polly/unittests"
+    description: "Upstream Polly gtest unit tests (5 .cpp: DeLICM/Flatten/Isl/ScheduleOptimizer/Support)"
+    command: "PollyUnitTests"
+
+upstream_test_exemptions:
+  - file: "CodeGen/*"
+    status: "pending"
+    reason: "AArch64 codegen 子目录，部分用例生成可执行/JIT 运行，依赖 glibc 语义、/proc、动态链接器（musl 系差异，E004/E088），真机 check-polly 实测后按需 LIT_XFAIL 精确豁免"
+  - file: "create_ll.sh / update_check.py"
+    status: "pending"
+    reason: "依赖 bash/Python 外部命令；OHOS 无 bash（toybox ash），真机确认后豁免"
+  - file: "*chmod/symlink/hardlink*"
+    status: "pending"
+    reason: "HMDFS 文件系统语义限制（E046/E050/E079），真机确认后按 lld 先例精确 LIT_XFAIL"
+
+test_package_tests:
+  - file: "conanfile.py"
+    description: "Delegate to test_polly.py with the packaged folder path"
+    command: "conan test"
+  - file: "test_polly.py"
+    description: "Load packaged LLVMPolly.so via packaged opt, run print<polly-scops>; assert plugin loads (no undefined symbol) and a SCoP is detected"
+    command: "python3 test_polly.py <package_folder>"
+  - file: "test_polly.ll"
+    description: "Single affine loop (for i<n: A[i]=i) — a canonical Polly-detectable SCoP"
+    command: "opt -load-pass-plugin=LLVMPolly.so -passes=print<polly-scops> -disable-output test_polly.ll"
+
+assertion_count: 5

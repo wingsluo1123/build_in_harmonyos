@@ -1,0 +1,66 @@
+software: polly
+version: "22.1.8"
+status: built
+build_system: cmake
+compile_date: "2026-09-26"
+source:
+  url: "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz"
+  sha256: "922f1817a0df7b1489272d18134ee0087a8b068828f87ac63b9861b1a9965888"
+dependencies:
+  required: []
+  optional: []
+patches_applied:
+  - "polly/lib/CMakeLists.txt: LLVMPolly 显式链接 LLVM（OHOS musl BIND_NOW 插件加载符号解析）"
+  - "polly/unittests/Isl/IslTest.cpp: 删 Isl.Quota 5 个 EXPECT_DEATH，等价功能断言（OHOS /tmp 只读 E002）"
+  - "polly/lib/External/isl/isl_test.c: get_filename 运行时读 $srcdir（polly-isl-test 跨机找 test_inputs）"
+  - "llvm/cmake/modules/AddLLVM.cmake: 去 SOVERSION/VERSION（HMDFS 无 symlink E050/E079）"
+  - "llvm/cmake/config.guess: stub 输出 aarch64-unknown-linux-ohos（设备 uname=HarmonyOS）"
+test_results:
+  type: passed
+  total: 1
+  passed: 1
+  failed: 0
+  note: "test_package 用包内 opt 加载 LLVMPolly.so 跑 -passes=polly-custom<detect> -polly-print-detect，成功检测 SCoP（插件加载 + 核心多面体能力）"
+upstream_test_results:
+  type: passed
+  suite: "check-polly = polly/test lit regression + PollyUnitTests (gtest) + polly-isl-test"
+  upstream_test_files: 1245
+  upstream_ll_files: 1092
+  upstream_jscop_files: 89
+  upstream_transformed_files: 49
+  upstream_unittest_cpp: 5
+  regression_lit_total: 1092
+  regression_lit_passed: 1070
+  regression_lit_expectedly_failed: 22
+  regression_lit_unsupported: 0
+  regression_lit_unexpected_failed: 0
+  gtest_suites: 5
+  gtest_cases_passed: 26
+  isl_test_cases_passed: 80
+  test_entries_total: 1098
+  test_head: "46df86dec1"
+  link_closure_evidence: "llvm-readelf -d LLVMPolly.so → NEEDED libLLVM.so + libc++_shared.so + libc.so（补丁 P1 显式 DT_NEEDED 生效）"
+  load_failure_evidence: "上游原版 dlopen(LLVMPolly.so) 真机实测报 symbol not found _ZN4llvm2cl18getGeneralCategoryEv"
+  ci_evidence: "CI 构建 #63286 校验通过（ohpcd-robot PR 评论为证）"
+  xfail_list: "22 项 XFAIL:* 逐项清单见 PR #12962 描述（CodeGen 5 + IstAstInfo 2 + ScopDetect 2 + ScopDetectionDiagnostics 1 + ScopInfo 12）"
+  note: "LLVM_ENABLE_ASSERTIONS=ON 构建下全量通过：1092 回归 lit = 1070 PASS + 22 XFAIL(上游 XFAIL:* 预期失败) + 0 UNSUPPORTED + 0 意外失败；gtest 5 套 26 用例全过（Isl.Quota 等价重写）；polly-isl-test 80 用例 RC=0。39 个 REQUIRES: asserts 的测试在断言构建下全部 PASS（Release 构建会 UNSUPPORTED，属构建配置差异非平台限制）。XFAIL 非普通 PASS：上游 XFAIL:* 标记的预期结果，单列不计入通过分子"
+knowledge_ref:
+  - E007
+  - E092
+  - E077
+  - E050
+  - E002
+  - E004
+  - E079
+  - E088
+knowledge_gained:
+  - "polly 22.1.8 = llvm-project 单仓 polly/ 子项目（多面体优化器），须 -DLLVM_ENABLE_PROJECTS=polly 从 llvm/ 目录同树构建（LLVM 本体 + polly）"
+  - "LLVMPolly.so 是 loadable module（add_polly_loadable_module 设 PREFIX 空，产物无 lib 前缀），且仅当 LLVM_ENABLE_PIC=ON 才生成，否则落入 dummy target 分支"
+  - "isl 用 bundled 版本（POLLY_BUNDLED_ISL=ON，polly/lib/External/isl），生成 libPollyISL.a，无外部 Conan 依赖"
+  - "check-polly 目标 = polly regression lit + PollyUnitTests(gtest) + polly-isl-test；lit 用构建树 opt 加载 LLVMPolly.so，in-tree 时 POLLY_GTEST_AVAIL=1"
+  - "LLVMPolly.so 只链 isl、不链 LLVM 组件（LLVM 符号由宿主 opt 的 libLLVM.so 提供），OHOS musl BIND_NOW/namespace（E004/E088）是加载期风险点"
+  - "OHOS musl BIND_NOW + RTLD_LOCAL 下 opt 加载 LLVMPolly.so 报 undefined symbol（_ZN4llvm2cl18getGeneralCategoryEv），须 target_link_libraries(LLVMPolly PUBLIC ${ISL_TARGET} LLVM) 显式链 libLLVM.so"
+  - "gtest EXPECT_DEATH（death test）需可写 /tmp（fork+写 gtest_captured_stream），OHOS /tmp 只读（E002）→ Isl.Quota 的 5 个 EXPECT_DEATH 用等价功能断言替换（is_error/is_false/is_true + isl_ctx_last_error==isl_error_quota）"
+  - "polly-isl-test 运行时读 test_inputs/*.polylib|*.omega；srcdir 是编译期路径，跨机运行时不存在 → get_filename 改读 getenv(\"srcdir\")，Release(NDEBUG) 下 assert(input) 被编译掉致 fopen(NULL) 段错误"
+  - "polly/test 1092 回归 lit 中 39 个 REQUIRES: asserts（依赖断言/debug 输出），Release 构建(NDEBUG)标记 UNSUPPORTED；改 LLVM_ENABLE_ASSERTIONS=ON 后全部 PASS，22 个 XFAIL:* 是上游 Polly 已知 bug 预期失败（任何平台均 XFAIL）"
+  - "本地交叉编译路线：DevEco SDK clang --target=aarch64-linux-ohos + 官方 clang+llvm-22.1.8 的 llvm-tblgen.exe（host），GetHostTriple.cmake Windows 返回 x86_64-pc-windows-msvc，OHOS_ALLOW_UNDEFINED_SYMBOLS=ON，产物 ELF 签名后传真机跑测试"
