@@ -1,0 +1,25 @@
+version: "1.28.0"
+software: crosstool
+status: built
+build_date: "2026-09-26"
+build_system: autotools
+
+source:
+  url: "https://github.com/crosstool-ng/crosstool-ng/releases/download/crosstool-ng-1.28.0/crosstool-ng-1.28.0.tar.xz"
+  sha256: "5750e29a2bda5cd8d67900592576b1670a1987a4dcd5e4f6beae09138a1f5699"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu (仅 OHOS，用于绕过随包 config.guess 对 OHOS 三元组的识别缺失)"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游 1.28.0 真实测试套件是 testing/upgrade/run.sh（options-set 全局检查 + 7 个 samples/*.config 升级回归 = 8 用例），不挂接 make check；test_package 用包内 bin/ct-ng 完整重放（固件逐字节 vendor），options-set 因上游缺 kconfig-list/4（CT_CONFIG_VERSION_CURRENT=4，tag 下 404）在任何平台都失败，非 OHOS 问题"
+  - "ct-ng 是 make 驱动脚本（shebang 为 make -rf），version/help/list-steps/clean 均不依赖 .config，可直接用于二进制冒烟验证"
+  - "工具包形态只交付 bin/ct-ng，无开发库；package_info 只声明 bindirs"
