@@ -1,0 +1,124 @@
+--- a/src/lib/fcitx-utils/standardpaths_p_unix.cpp
++++ b/src/lib/fcitx-utils/standardpaths_p_unix.cpp
+@@ -2,20 +2,21 @@
+  * SPDX-FileCopyrightText: 2025-2025 CSSlayer <wengxt@gmail.com>
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  *
+  */
+ #include <algorithm>
+ #include <cassert>
+ #include <filesystem>
+ #include <iterator>
+ #include <optional>
++#include <set>
+ #include <stdexcept>
+ #include <string>
+ #include <string_view>
+ #include <system_error>
+ #include <unordered_map>
+ #include <unordered_set>
+ #include <utility>
+ #include <vector>
+ #include <ranges>
+ #include "config.h"
+@@ -61,26 +62,27 @@
+         homeDir = homeFallback;
+     }
+     homeDir = homeDir.lexically_normal();
+ 
+     std::vector<std::filesystem::path> dirs;
+     dirs.push_back(std::move(homeDir));
+ 
+     if (!options.test(StandardPathsOption::SkipSystemPath)) {
+         if (const auto dir = getEnvironmentNull(systemEnv)) {
+             const auto rawDirs = stringutils::split(*dir, ":");
+-            std::ranges::transform(
+-                rawDirs, std::back_inserter(dirs), [](const auto &s) {
++            std::transform(
++                rawDirs.begin(), rawDirs.end(), std::back_inserter(dirs), [](const auto &s) {
+                     return std::filesystem::path(s).lexically_normal();
+                 });
+         } else {
+-            std::ranges::copy(systemFallback, std::back_inserter(dirs));
++            std::copy(systemFallback.begin(), systemFallback.end(),
++                      std::back_inserter(dirs));
+         }
+     }
+ 
+     if (builtInPathType &&
+         !options.test(StandardPathsOption::SkipBuiltInPath)) {
+         std::vector<std::filesystem::path> builtInPaths;
+         if (const auto *value = findValue(builtInPathMap, builtInPathType)) {
+             builtInPaths = *value;
+         } else {
+             if (std::string_view(builtInPathType).starts_with("pkg") &&
+@@ -96,21 +98,21 @@
+         }
+     }
+ 
+     for (auto &dir : dirs) {
+         // Remove trailing slash, if present.
+         if (!dir.has_filename()) {
+             dir = dir.parent_path();
+         }
+     }
+ 
+-    std::unordered_set<std::filesystem::path> seen;
++    std::set<std::filesystem::path> seen;
+     std::erase_if(dirs, [&seen](const auto &dir) {
+         if (seen.contains(dir)) {
+             return true;
+         }
+         seen.insert(dir);
+         return false;
+     });
+ 
+     return dirs;
+ }
+@@ -124,39 +126,35 @@
+     StandardPathsOptions options)
+     : options_(options) {
+     bool isFcitx = (packageName == "fcitx5");
+     std::filesystem::path packagePath =
+         std::u8string(packageName.begin(), packageName.end());
+     // initialize user directory
+     configDirs_ = defaultPaths(options_, isFcitx, "XDG_CONFIG_HOME", ".config",
+                                "XDG_CONFIG_DIRS", {"/etc/xdg"}, "configdir",
+                                builtInPathMap);
+     std::vector<std::filesystem::path> pkgconfigDirFallback;
+-    std::ranges::copy(
+-        configDirs_ | std::views::drop(1) |
+-            std::views::transform(
+-                [&packagePath](const auto &dir) { return dir / packagePath; }),
+-        std::back_inserter(pkgconfigDirFallback));
++    for (auto it = std::next(configDirs_.begin()); it != configDirs_.end(); ++it) {
++        pkgconfigDirFallback.push_back(*it / packagePath);
++    }
+     pkgconfigDirs_ = defaultPaths(
+         options_, isFcitx, (isFcitx ? "FCITX_CONFIG_HOME" : nullptr),
+         configDirs_[0] / packagePath, (isFcitx ? "FCITX_CONFIG_DIRS" : nullptr),
+         pkgconfigDirFallback, "pkgconfigdir", builtInPathMap);
+ 
+     dataDirs_ = defaultPaths(
+         options_, isFcitx, "XDG_DATA_HOME", ".local/share", "XDG_DATA_DIRS",
+         {"/usr/local/share", "/usr/share"}, "datadir", builtInPathMap);
+     std::vector<std::filesystem::path> pkgdataDirFallback;
+-    std::ranges::copy(
+-        dataDirs_ | std::views::drop(1) |
+-            std::views::transform(
+-                [&packagePath](const auto &dir) { return dir / packagePath; }),
+-        std::back_inserter(pkgdataDirFallback));
++    for (auto it = std::next(dataDirs_.begin()); it != dataDirs_.end(); ++it) {
++        pkgdataDirFallback.push_back(*it / packagePath);
++    }
+     pkgdataDirs_ = defaultPaths(
+         options_, isFcitx, (isFcitx ? "FCITX_DATA_HOME" : nullptr),
+         dataDirs_[0] / packagePath, (isFcitx ? "FCITX_DATA_DIRS" : nullptr),
+         pkgdataDirFallback, "pkgdatadir", builtInPathMap);
+     cacheDir_ = defaultPaths(options_, isFcitx, "XDG_CACHE_HOME", ".cache");
+     assert(cacheDir_.size() == 1);
+     std::error_code ec;
+     auto tmpdir = std::filesystem::temp_directory_path(ec);
+     runtimeDir_ =
+         defaultPaths(options_, isFcitx, "XDG_RUNTIME_DIR",

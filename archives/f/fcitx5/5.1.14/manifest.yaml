@@ -1,0 +1,107 @@
+software: fcitx5
+version: "5.1.14"
+status: built
+build_date: "2026-10-04"
+build_system: cmake
+
+source:
+  url: "https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.14.tar.gz"
+  tar_format: tar.gz
+  sha256: "c81bbf0156d083e4c7e7817e658122c33a8c1e585962467f251bc9614bdfee47"
+
+build:
+  system: cmake
+  configure_options: "-DENABLE_X11=Off -DENABLE_WAYLAND=Off -DENABLE_DBUS=Off -DENABLE_ENCHANT=Off -DENABLE_EMOJI=Off -DENABLE_KEYBOARD=Off -DENABLE_LIBUUID=Off -DENABLE_SERVER=Off -DUSE_SYSTEMD=Off -DEVENT_LOOP_BACKEND=libuv -DBUILD_SPELL_DICT=Off -DENABLE_TEST=Off -DENABLE_TESTING_ADDONS=Off"
+  dependencies:
+    - extra-cmake-modules/6.29.0
+    - libuv/1.52.1
+    - gettext/0.22.5.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-lib-fcitx-utils-eventloopinterface.cpp.patch"
+  - "0002-src-lib-fcitx-utils-i18n.h.patch"
+  - "0003-src-lib-fcitx-utils-log.cpp.patch"
+  - "0004-src-lib-fcitx-utils-misc.cpp.patch"
+  - "0005-src-lib-fcitx-utils-semver.cpp.patch"
+  - "0006-src-lib-fcitx-utils-standardpaths_p_unix.cpp.patch"
+  - "0007-src-lib-fcitx-utils-testing.cpp.patch"
+  - "0008-src-lib-fcitx-icontheme.cpp.patch"
+  - "0009-src-modules-spell-CMakeLists.txt.patch"
+  - "0010-src-modules-spell-spell-custom-dict.cpp.patch"
+  - "0011-src-modules-unicode-charselectdata.cpp.patch"
+  - "0012-src-modules-unicode-unicode.cpp.patch"
+  - "0013-test-teststandardpaths_unix.cpp.patch"
+
+knowledge_gained:
+  - "fcitx5 是输入法框架核心库（Fcitx5Core/Fcitx5Config/Fcitx5Utils + addon 模块），上游 CMake 顶层直接构建，顶层依赖 X11/Wayland/DBus/Enchant/Emoji/Keyboard 子系统，OHOS PC 无对应系统服务，需全部禁用得到最小核心闭包"
+  - "OHOS 裁剪 libc++15 缺 <format>（__cpp_lib_format 未定义）、std::ranges 算法（transform/copy/equal/lower_bound）、std::views、std::hash<std::filesystem::path>；逐一等价改写（i18n.h 兼容实现 / ostringstream / 标准算法 + 显式循环 / std::set 去重），先例见 fcitx5-utils 5.1.13 / ada-url / bitcoin"
+  - "OHOS sysroot 的 libintl.h 是空壳（无 gettext/bindtextdomain 声明），必须依赖 gettext 包真实 libintl；po/ 翻译 .mo 生成需系统 msgfmt（hnp bin）并注入 GETTEXTDATADIR 定位 ITS 规则"
+  - "EVENT_LOOP_BACKEND=libuv：event_none 后端 createDefaultEventLoop 返回 nullptr，核心测试抛 'No available event loop implementation'；sysroot/制品仓 libuv 提供真实事件循环"
+  - "OHOS 加载器拒绝加载 RUNPATH 指向 conan 缓存目录的库（dlopen 报 Permission denied）；库保持 conan 默认 CMAKE_SKIP_RPATH=1 不带 RUNPATH，消费者通过 conanrun 环境（LD_LIBRARY_PATH）解析运行库"
+  - "ecm_setup_version 需 ECM 的 ECMSetupVersion 模块；fcitx5 顶层 include(ECMUninstallTarget) 需要 ecm_uninstall.cmake.in，extra-cmake-modules 6.29.0 已发布可作 tool_requires（6.19.0 缺该文件）"
+  - "spell 模块 add_custom_command 用 ALIAS 目标 Fcitx5::comp-spell-dict 在 CMake 4.1 不展开为可执行路径，须用 $<TARGET_FILE:comp-spell-dict>；BUILD_SPELL_DICT 需 Off（en_dict 数据下载源超时）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/fcitx5-5.1.14.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/fcitx5-5.1.14.work
+  source_orig_hash: 7e5df7f0736a6105
+  source_work_hash: 9bf8ff4dca3e741a
+  generated_at: '2026-10-05T03:16:04'
+  patches_count: 13
+
+patch_classification:
+  - file: 0001-src-lib-fcitx-utils-eventloopinterface.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0002-src-lib-fcitx-utils-i18n.h.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0003-src-lib-fcitx-utils-log.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0004-src-lib-fcitx-utils-misc.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0005-src-lib-fcitx-utils-semver.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0006-src-lib-fcitx-utils-standardpaths_p_unix.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-ranges-views-hash'
+  - file: 0007-src-lib-fcitx-utils-testing.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-views'
+  - file: 0008-src-lib-fcitx-icontheme.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-views'
+  - file: 0009-src-modules-spell-CMakeLists.txt.patch
+    type: build-fix
+    platform_only: False
+    guard: 'cmake-alias-target'
+  - file: 0010-src-modules-spell-spell-custom-dict.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0011-src-modules-unicode-charselectdata.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format-ranges'
+  - file: 0012-src-modules-unicode-unicode.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-format'
+  - file: 0013-test-teststandardpaths_unix.cpp.patch
+    type: compat
+    platform_only: True
+    guard: 'ohos-libcpp-no-ranges-equal'

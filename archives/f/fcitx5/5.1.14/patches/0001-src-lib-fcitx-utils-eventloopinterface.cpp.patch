@@ -1,0 +1,40 @@
+--- a/src/lib/fcitx-utils/eventloopinterface.cpp
++++ b/src/lib/fcitx-utils/eventloopinterface.cpp
+@@ -2,35 +2,36 @@
+  * SPDX-FileCopyrightText: 2015-2024 CSSlayer <wengxt@gmail.com>
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  *
+  */
+ #include "eventloopinterface.h"
+ #include <cstdint>
+ #include <cstring>
+ #include <ctime>
+ #include <stdexcept>
++#include <string>
+ #include <format>
+ 
+ namespace fcitx {
+ 
+ namespace {
+ 
+ constexpr uint64_t USEC_INFINITY = static_cast<uint64_t>(-1);
+ constexpr uint64_t USEC_PER_SEC = 1000000ULL;
+ constexpr uint64_t NSEC_PER_USEC = 1000ULL;
+ 
+ std::string getErrorMessage(int error) {
+     if (error < 0) {
+         error = -error;
+     }
+-    return std::format("EventLoopException: {0}", std::strerror(error));
++    return std::string("EventLoopException: ") + std::strerror(error);
+ }
+ 
+ } // namespace
+ 
+ // From systemd :)
+ uint64_t timespec_load(const struct timespec *ts) {
+     if (ts->tv_sec == (time_t)-1 && ts->tv_nsec == (long)-1) {
+         return USEC_INFINITY;
+     }
+ 

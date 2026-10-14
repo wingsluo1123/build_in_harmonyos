@@ -1,0 +1,86 @@
+--- a/src/modules/unicode/charselectdata.cpp
++++ b/src/modules/unicode/charselectdata.cpp
+@@ -14,25 +14,26 @@
+ 
+ #include "charselectdata.h"
+ #include <fcntl.h>
+ #include <strings.h>
+ #include <sys/stat.h>
+ #include <algorithm>
+ #include <cstddef>
+ #include <cstdint>
+ #include <cstring>
+ #include <exception>
++#include <iomanip>
+ #include <set>
++#include <sstream>
+ #include <string>
+ #include <utility>
+ #include <vector>
+-#include <format>
+ #include "fcitx-utils/charutils.h"
+ #include "fcitx-utils/fs.h"
+ #include "fcitx-utils/i18n.h"
+ #include "fcitx-utils/macros.h"
+ #include "fcitx-utils/misc_p.h"
+ #include "fcitx-utils/standardpaths.h"
+ #include "fcitx-utils/stringutils.h"
+ 
+ using namespace fcitx;
+ 
+@@ -375,26 +376,25 @@
+         result.erase(c);
+     }
+ 
+     returnRes.reserve(returnRes.size() + result.size());
+     std::copy(result.begin(), result.end(), std::back_inserter(returnRes));
+     return returnRes;
+ }
+ 
+ std::set<uint32_t> CharSelectData::matchingChars(const std::string &s) const {
+     std::set<uint32_t> result;
+-    auto iter = std::ranges::lower_bound(
+-        indexList_, s,
++    auto iter = std::lower_bound(
++        indexList_.begin(), indexList_.end(), s,
+         [](const auto &lhs, const auto &rhs) {
+-            return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
+-        },
+-        [](const auto &value) -> const std::string & { return value->first; });
++            return strcasecmp(lhs->first.c_str(), rhs.c_str()) < 0;
++        });
+ 
+     while (iter != indexList_.end() &&
+            strncasecmp(s.c_str(), (*iter)->first.c_str(), s.size()) == 0) {
+         for (auto c : (*iter)->second) {
+             result.insert(c);
+         }
+         iter++;
+     }
+ 
+     return result;
+@@ -454,21 +454,23 @@
+ std::vector<std::string> CharSelectData::equivalents(uint32_t unicode) const {
+     return findStringResult(unicode, 23, 19);
+ }
+ 
+ std::vector<std::string>
+ CharSelectData::approximateEquivalents(uint32_t unicode) const {
+     return findStringResult(unicode, 18, 14);
+ }
+ 
+ std::string FormatCode(uint32_t code, int length, const char *prefix) {
+-    return std::format("{0}{1:0{2}x}", prefix, code, length);
++    std::ostringstream os;
++    os << prefix << std::hex << std::setw(length) << std::setfill('0') << code;
++    return os.str();
+ }
+ 
+ void CharSelectData::appendToIndex(uint32_t unicode, const std::string &str) {
+     auto strings = stringutils::split(str, FCITX_WHITESPACE);
+     for (auto &s : strings) {
+         auto iter = index_.find(s);
+         if (iter == index_.end()) {
+             iter = index_.emplace(s, std::vector<uint32_t>()).first;
+         }
+         iter->second.push_back(unicode);

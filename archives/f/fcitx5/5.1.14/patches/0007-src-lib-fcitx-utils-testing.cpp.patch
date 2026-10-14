@@ -1,0 +1,60 @@
+--- a/src/lib/fcitx-utils/testing.cpp
++++ b/src/lib/fcitx-utils/testing.cpp
+@@ -64,37 +64,47 @@
+     // Include the three testing only addons.
+     fullDataDirs.push_back(StandardPaths::fcitxPath("pkgdatadir", "testing"));
+ 
+ #ifndef _WIN32
+     // Skip resolution with fcitxPath
+     setEnvironment("SKIP_FCITX_PATH", "1");
+     setEnvironment("SKIP_FCITX_USER_PATH", "1");
+ 
+     setEnvironment(
+         "FCITX_ADDON_DIRS",
+-        stringutils::join(fullAddonDirs |
+-                              std::views::transform([](const auto &path) {
+-                                  return path.string();
+-                              }),
+-                          ":")
++        stringutils::join(
++            [&]() {
++                std::vector<std::string> strs;
++                strs.reserve(fullAddonDirs.size());
++                for (const auto &path : fullAddonDirs) {
++                    strs.push_back(path.string());
++                }
++                return strs;
++            }(),
++            ":")
+             .data());
+     // Make sure we don't write to user data.
+     setEnvironment("FCITX_DATA_HOME", "/Invalid/Path");
+     // Make sure we don't write to user data.
+     setEnvironment("FCITX_CONFIG_HOME", "/Invalid/Path");
+     setEnvironment(
+         "FCITX_DATA_DIRS",
+-        stringutils::join(fullDataDirs |
+-                              std::views::transform([](const auto &path) {
+-                                  return path.string();
+-                              }),
+-                          ":")
++        stringutils::join(
++            [&]() {
++                std::vector<std::string> strs;
++                strs.reserve(fullDataDirs.size());
++                for (const auto &path : fullDataDirs) {
++                    strs.push_back(path.string());
++                }
++                return strs;
++            }(),
++            ":")
+             .data());
+ #endif
+ 
+     StandardPathsPrivate::setGlobal(std::make_unique<StandardPaths>(
+         "fcitx5",
+         std::unordered_map<std::string, std::vector<std::filesystem::path>>{
+             {"pkgdatadir", fullDataDirs},
+             {"addondir", fullAddonDirs},
+         },
+         StandardPathsOptions{

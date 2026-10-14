@@ -1,0 +1,32 @@
+id: DRAFT-fcitx5-ohos-skip-rpath-conanrun
+title: OHOS 加载器拒绝 RUNPATH 指向 conan 缓存目录的共享库（dlopen Permission denied）→ CMAKE_SKIP_RPATH=ON + conanrun 运行
+category: ohos, conan, cmake, shared-library, runtime, rpath
+severity: 2
+error_signature: "Error loading shared library lib*.so.*: (needed by <binary>); dlopen ... Permission denied"
+match_keywords: RUNPATH, RPATH, conan cache, CMAKE_SKIP_RPATH, LD_LIBRARY_PATH, conanrun, Permission denied, Error loading shared library, needed by, dlopen
+error_excerpt: >
+  Error loading shared library libFcitx5Core.so.7: (needed by ./test_fcitx5)
+  Error relocating ./test_fcitx5: _ZN5fcitx15SemanticVersion5parse...: symbol not found
+  （库自带 RUNPATH=/storage/.../.conan2/p/.../p/lib 时 dlopen 报 Permission denied）
+root_cause: >
+  conan 2.29 CMakeToolchain 的 SkipRPath block 默认 skip_rpath=False（不设置
+  CMAKE_SKIP_RPATH），CMake 在 install 阶段给共享库写入 DT_RUNPATH 指向
+  包缓存目录（<conan cache>/p/lib）。OHOS 加载器（bionic/musl 式）实测拒绝
+  加载 RUNPATH 指向 user 可写缓存目录的库：dlopen 报 "Permission denied"，
+  消费者运行全部失败。与「无 SONAME → DT_NEEDED 记录绝对缓存路径」是
+  不同机制（DRAFT-13577）：本场景库有正确 SONAME，仅 RUNPATH 指向缓存被拒。
+rec_approach: >
+  配方 generate() 显式 tc.cache_variables["CMAKE_SKIP_RPATH"] = "ON"（库不带
+  RUNPATH），并配合 CMAKE_SYSTEM_NAME=OHOS 使 SONAME 正常；消费者/test_package
+  用 conanrun 环境（LD_LIBRARY_PATH 含被测包与依赖 lib 目录）运行
+  （self.run(..., env="conanrun")）。验证：无 RUNPATH 库 + LD_LIBRARY_PATH 可
+  正常 dlopen/运行；带缓存 RUNPATH 一律 Permission denied。
+verification: >
+  conan create exit=0；test_package 消费者与鸿蒙专项测试均在 OHOS 真机运行
+  PASSED（fcitx5/5.1.14，本工作区实测）。
+boundary: >
+  OHOS（HarmonyOS PC, aarch64）+ conan 2.29 + CMake 共享库配方。适用于任何
+  通过 conan create 安装共享库并在 OHOS 上运行消费者的库。与 DRAFT-13577
+  （DT_NEEDED 绝对路径）互为补充：前者保 SONAME+无 RUNPATH，后者修历史包
+  的 DT_NEEDED 绝对路径。
+related: DRAFT-13577-ohos-stale-absolute-dt-needed-cache-path, DRAFT-cmake-harmonyos-system-name-soname, E073, E077

@@ -1,0 +1,25 @@
+--- a/src/lib/fcitx-utils/misc.cpp
++++ b/src/lib/fcitx-utils/misc.cpp
+@@ -137,21 +137,21 @@
+ 
+     if (proc_name(pid, result.data(), 2 * MAXCOMLEN)) {
+         return {};
+     }
+     return result;
+ #endif
+ #elif defined(_WIN32)
+     FCITX_UNUSED(pid);
+     return {};
+ #else
+-    auto path = std::format("/proc/{}/exe", pid);
++    auto path = "/proc/" + std::to_string(pid) + "/exe";
+     if (auto link = fs::readlink(path)) {
+         return fs::baseName(*link);
+     }
+     return {};
+ #endif
+ }
+ 
+ #ifndef _WIN32
+ 
+ ssize_t getline(UniqueCPtr<char> &lineptr, size_t *n, std::FILE *stream) {

@@ -1,0 +1,48 @@
+--- a/src/modules/spell/spell-custom-dict.cpp
++++ b/src/modules/spell/spell-custom-dict.cpp
+@@ -222,21 +222,21 @@
+ #if 0
+ static inline uint16_t
+ load_le16(const void* p)
+ {
+     return le16toh(*(uint16_t*)p);
+ }
+ #endif
+ 
+ void SpellCustomDict::loadDict(const std::string &lang) {
+     auto fd = StandardPaths::global().open(
+-        StandardPathsType::PkgData, std::format("spell/{}_dict.fscd", lang),
++        StandardPathsType::PkgData, "spell/" + lang + "_dict.fscd",
+         StandardPathsMode::System);
+ 
+     if (!fd.isValid()) {
+         throw std::runtime_error("failed to open dict file");
+     }
+ 
+     do {
+         struct stat stat_buf;
+         size_t total_len;
+         char magic_buff[sizeof(DICT_BIN_MAGIC) - 1];
+@@ -286,21 +286,21 @@
+ SpellCustomDict *SpellCustomDict::requestDict(const std::string &lang) {
+     if (checkLang(lang, "en")) {
+         return new SpellCustomDictEn;
+     }
+     return nullptr;
+ }
+ 
+ bool SpellCustomDict::checkDict(const std::string &lang) {
+     return !StandardPaths::global()
+                 .locate(StandardPathsType::PkgData,
+-                        std::format("spell/{}_dict.fscd", lang),
++                        "spell/" + lang + "_dict.fscd",
+                         StandardPathsMode::System)
+                 .empty();
+ }
+ 
+ int SpellCustomDict::getDistance(const char *word, int utf8Len,
+                                  const char *dict) {
+ #define REPLACE_WEIGHT 3
+ #define INSERT_WEIGHT 3
+ #define REMOVE_WEIGHT 3
+ #define END_WEIGHT 1

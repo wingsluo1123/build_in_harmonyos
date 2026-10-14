@@ -1,0 +1,75 @@
+--- a/src/lib/fcitx/icontheme.cpp
++++ b/src/lib/fcitx/icontheme.cpp
+@@ -43,20 +43,22 @@
+ #include <sys/mman.h>
+ #endif
+ 
+ namespace {
+ 
+ // helper type for the visitor
+ template <class... Ts>
+ struct VariantOverload : Ts... {
+     using Ts::operator()...;
+ };
++template <class... Ts>
++VariantOverload(Ts...) -> VariantOverload<Ts...>;
+ } // namespace
+ 
+ namespace fcitx {
+ 
+ std::string pathToRoot(const RawConfig &config) {
+     std::string path;
+     const auto *pConfig = &config;
+     size_t length = 0;
+     while (pConfig) {
+         if (pConfig->parent() && length) {
+@@ -738,22 +740,22 @@
+ IconTheme::IconTheme(const std::string &name, IconTheme *parent,
+                      const StandardPath &standardPath)
+     : IconTheme(standardPath) {
+     FCITX_D();
+     auto files = standardPath.openAll(
+         StandardPath::Type::Data,
+         (std::filesystem::path("icons") / name / "index.theme").string(),
+         O_RDONLY);
+ 
+     RawConfig config;
+-    for (auto &file : files | std::views::reverse) {
+-        readFromIni(config, file.fd());
++    for (auto it = files.rbegin(); it != files.rend(); ++it) {
++        readFromIni(config, it->fd());
+     }
+     auto path = d->home_ / ".icons" / name / "index.theme";
+     auto fd = StandardPaths::openPath(path);
+     if (fd.fd() >= 0) {
+         readFromIni(config, fd.fd());
+     }
+ 
+     d->parse(config, parent);
+     d->internalName_ = name;
+     d->prepare();
+@@ -767,22 +769,22 @@
+ 
+ IconTheme::IconTheme(const std::string &name, IconTheme *parent,
+                      const StandardPaths &standardPath)
+     : IconTheme(standardPath) {
+     FCITX_D();
+     auto files = standardPath.openAll(StandardPathsType::Data,
+                                       std::filesystem::path("icons") / name /
+                                           "index.theme");
+ 
+     RawConfig config;
+-    for (auto &file : files | std::views::reverse) {
+-        readFromIni(config, file.fd());
++    for (auto it = files.rbegin(); it != files.rend(); ++it) {
++        readFromIni(config, it->fd());
+     }
+     auto path = d->home_ / ".icons" / name / "index.theme";
+     auto fd = StandardPaths::openPath(path);
+     if (fd.isValid()) {
+         readFromIni(config, fd.fd());
+     }
+ 
+     d->parse(config, parent);
+     d->internalName_ = name;
+     d->prepare();

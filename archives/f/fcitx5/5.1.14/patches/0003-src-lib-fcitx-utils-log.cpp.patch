@@ -1,0 +1,77 @@
+--- a/src/lib/fcitx-utils/log.cpp
++++ b/src/lib/fcitx-utils/log.cpp
+@@ -2,32 +2,32 @@
+  * SPDX-FileCopyrightText: 2017-2017 CSSlayer <wengxt@gmail.com>
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  *
+  */
+ 
+ #include "log.h"
+ #include <charconv>
+ #include <chrono>
+ #include <cstdlib>
++#include <ctime>
+ #include <exception>
+ #include <iostream>
+ #include <memory>
+ #include <mutex>
+ #include <ostream>
+ #include <string>
+ #include <system_error>
+ #include <type_traits>
+ #include <unordered_set>
+ #include <utility>
+ #include <vector>
+-#include <format>
+ #include "macros.h"
+ #include "stringutils.h"
+ 
+ namespace fcitx {
+ 
+ namespace {
+ 
+ FCITX_DEFINE_LOG_CATEGORY(defaultCategory, "default");
+ 
+ using LogRule = std::pair<std::string, LogLevel>;
+@@ -208,30 +208,29 @@
+         break;
+     case LogLevel::Error:
+         out_ << "E";
+         break;
+     default:
+         break;
+     }
+ 
+     if (globalLogConfig.showTimeDate) {
+         try {
+-            auto now = std::chrono::time_point_cast<std::chrono::microseconds>(
+-                std::chrono::system_clock::now());
+-#if __cpp_lib_chrono >= 201907L
+-            auto current_zone = std::chrono::current_zone();
+-            std::chrono::zoned_time zoned_time{current_zone, now};
+-
+-            auto timeString = std::format("{:%F %T}", zoned_time);
+-#else
+-            auto timeString = std::format("{:%F %T}", now);
+-#endif
+-            out_ << timeString << " ";
++            auto now = std::chrono::system_clock::now();
++            // OHOS libc++ 无 std::format 与 chrono 格式化，用 strftime 等价输出 %F %T
++            std::time_t timeT = std::chrono::system_clock::to_time_t(now);
++            std::tm timeTm{};
++            localtime_r(&timeT, &timeTm);
++            char timeBuf[64];
++            if (std::strftime(timeBuf, sizeof(timeBuf), "%F %T", &timeTm) == 0) {
++                timeBuf[0] = '\0';
++            }
++            out_ << timeBuf << " ";
+         } catch (...) {
+         }
+     }
+ 
+     out_ << filename << ":" << lineNumber << "] ";
+ }
+ 
+ LogMessageBuilder::~LogMessageBuilder() { out_ << std::endl; }
+ } // namespace fcitx

@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml — fcitx5 5.1.14
+# 上游官方测试声明 + test_package 消费者/鸿蒙专项测试声明
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: fcitx5/5.1.14
+homepage: https://github.com/fcitx/fcitx5
+
+# 上游测试：fcitx5 顶层 test/ 目录 38 个注册可执行（ctest -N 全量枚举），
+# 已在 Step2 实机全部编译并实际运行通过（38/38，双口径台账见 notes.md）。
+# 本文件列出代表性样例；完整逐项映射见 notes.md 上游测试台账。
+upstream_check_command: "ctest -N"
+upstream_test_in_build: true
+upstream_test_command: "cd build && LD_LIBRARY_PATH=<build>/bin:<deps> ctest -j1 --output-on-failure"
+
+upstream_tests:
+  - file: fcitx5-5.1.14/test/testflags.cpp
+    source: fcitx5-5.1.14/test/testflags.cpp
+    description: "flags/KeyStates 位运算（Fcitx5Utils）"
+    command: "./testflags"
+  - file: fcitx5-5.1.14/test/teststringutils.cpp
+    source: fcitx5-5.1.14/test/teststringutils.cpp
+    description: "stringutils 字符串工具"
+    command: "./teststringutils"
+  - file: fcitx5-5.1.14/test/testkey.cpp
+    source: fcitx5-5.1.14/test/testkey.cpp
+    description: "Key 解析/toString"
+    command: "./testkey"
+  - file: fcitx5-5.1.14/test/teststandardpaths_unix.cpp
+    source: fcitx5-5.1.14/test/teststandardpaths_unix.cpp
+    description: "StandardPaths unix/OHOS 路径（含 OHOS 兼容补丁验证）"
+    command: "./teststandardpaths_unix"
+  - file: fcitx5-5.1.14/test/testinstance.cpp
+    source: fcitx5-5.1.14/test/testinstance.cpp
+    description: "Instance 核心实例（libuv 事件循环）"
+    command: "./testinstance"
+
+# test_package 自带测试（消费者视角 + 鸿蒙专项）
+# R34: 实质调用被测包 API — find_package + 链接 + 真实运行
+test_package_tests:
+  - file: test_package/test_fcitx5.cpp
+    description: "消费者验证：find_package(fcitx5) + 链接 Fcitx5::Core/Utils + 调用 SemanticVersion/Key/stringutils 公开 API 并断言（鸿蒙 aarch64 真机运行）"
+    command: "cmake --build . --target test_fcitx5 && ./test_fcitx5"
+  - file: test_package/test_fcitx5_ohos.cpp
+    description: "鸿蒙专项测试：StandardPaths OHOS 路径查询 + environ 往返 + 公开 API 断言（standardpaths_p_unix.cpp 适配验证）"
+    command: "cmake --build . --target test_fcitx5_ohos && ./test_fcitx5_ohos"
+
+# 测试断言总数（消费者 3 + 鸿蒙专项 4 + 上游 38 用例实际运行全部通过）
+assertion_count: 38

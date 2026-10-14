@@ -1,0 +1,180 @@
+--- a/src/lib/fcitx-utils/i18n.h
++++ b/src/lib/fcitx-utils/i18n.h
+@@ -1,22 +1,26 @@
+ /*
+  * SPDX-FileCopyrightText: 2017-2017 CSSlayer <wengxt@gmail.com>
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  *
+  */
+ #ifndef _FCITX_UTILS_I18N_H_
+ #define _FCITX_UTILS_I18N_H_
+ 
+ #include <filesystem>
++#include <sstream>
+ #include <string>
+ #include <type_traits>
++#include <utility>
++#include <vector>
++#include <cstdlib>
+ #include <fcitx-utils/fcitxutils_export.h>
+ #if __cplusplus >= 202002L
+ #include <format>
+ #endif
+ 
+ namespace fcitx {
+ 
+ FCITXUTILS_EXPORT std::string translate(const std::string &s);
+ FCITXUTILS_EXPORT const char *translate(const char *s);
+ FCITXUTILS_EXPORT std::string translateCtx(const char *ctx,
+@@ -29,20 +33,21 @@
+                                               const char *s);
+ FCITXUTILS_EXPORT std::string
+ translateDomainCtx(const char *domain, const char *ctx, const std::string &s);
+ 
+ FCITXUTILS_EXPORT const char *
+ translateDomainCtx(const char *domain, const char *ctx, const char *s);
+ FCITXUTILS_EXPORT void registerDomain(const char *domain,
+                                       const std::filesystem::path &dir);
+ 
+ #if __cplusplus >= 202002L
++#if defined(__cpp_lib_format)
+ template <typename... Args>
+ auto translate(std::format_string<Args...> s, Args &&...args)
+     -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
+     return std::vformat(translate(std::string(s.get())),
+                         std::make_format_args(args...));
+ }
+ 
+ template <typename... Args>
+ auto translateCtx(const char *ctx, std::format_string<Args...> s,
+                   Args &&...args)
+@@ -59,20 +64,128 @@
+                         std::make_format_args(args...));
+ }
+ 
+ template <typename... Args>
+ auto translateDomainCtx(const char *domain, const char *ctx,
+                         std::format_string<Args...> s, Args &&...args)
+     -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
+     return std::vformat(translateDomainCtx(domain, ctx, std::string(s.get())),
+                         std::make_format_args(args...));
+ }
++#else
++namespace compat_detail {
++template <typename T>
++std::string argToString(const T &v) {
++    if constexpr (std::is_same_v<T, std::string>) {
++        return v;
++    } else if constexpr (std::is_same_v<T, const char *>) {
++        return v ? std::string(v) : std::string();
++    } else if constexpr (std::is_same_v<T, char>) {
++        return std::string(1, v);
++    } else if constexpr (std::is_same_v<T, bool>) {
++        return std::string(v ? "true" : "false");
++    } else if constexpr (std::is_same_v<T, std::filesystem::path>) {
++        return v.string();
++    } else if constexpr (std::is_arithmetic_v<T>) {
++        return std::to_string(v);
++    } else {
++        // Fallback: stream insertion
++        std::ostringstream os;
++        os << v;
++        return os.str();
++    }
++}
++
++template <typename... Args>
++std::string vformatCompat(const std::string &fmt, Args &&...args) {
++    std::string out;
++    out.reserve(fmt.size() + 16);
++    auto strs = {argToString(Args(std::forward<Args>(args)))...};
++    std::vector<std::string> argVec;
++    argVec.reserve(strs.size());
++    for (const auto &s : strs)
++        argVec.push_back(s);
++    size_t autoIndex = 0;
++    for (size_t i = 0; i < fmt.size(); ++i) {
++        if (fmt[i] == '{') {
++            size_t close = fmt.find('}', i + 1);
++            if (close == std::string::npos) {
++                out.push_back(fmt[i]);
++                continue;
++            }
++            std::string spec = fmt.substr(i + 1, close - i - 1);
++            std::string numPart = spec;
++            std::string fmtPart;
++            auto colon = spec.find(':');
++            if (colon != std::string::npos) {
++                numPart = spec.substr(0, colon);
++                fmtPart = spec.substr(colon + 1);
++            }
++            size_t idx = autoIndex;
++            if (!numPart.empty()) {
++                idx = static_cast<size_t>(std::strtoul(numPart.c_str(), nullptr, 10));
++                autoIndex = idx + 1;
++            } else {
++                ++autoIndex;
++            }
++            if (idx < argVec.size()) {
++                if (fmtPart == "X" || fmtPart == "x") {
++                    unsigned long long val =
++                        static_cast<unsigned long long>(
++                            std::strtoull(argVec[idx].c_str(), nullptr, 10));
++                    std::ostringstream os;
++                    if (fmtPart == "X")
++                        os << std::uppercase << std::hex << val;
++                    else
++                        os << std::hex << val;
++                    out += os.str();
++                } else {
++                    out += argVec[idx];
++                }
++            }
++            i = close;
++        } else {
++            out.push_back(fmt[i]);
++        }
++    }
++    return out;
++}
++} // namespace compat_detail
++
++template <typename... Args>
++auto translate(Args &&...args)
++    -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
++    return compat_detail::vformatCompat(translate(""),
++                                        std::forward<Args>(args)...);
++}
++
++template <typename... Args>
++auto translateCtx(const char *ctx, Args &&...args)
++    -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
++    return compat_detail::vformatCompat(translateCtx(ctx, ""),
++                                        std::forward<Args>(args)...);
++}
++
++template <typename... Args>
++auto translateDomain(const char *domain, Args &&...args)
++    -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
++    return compat_detail::vformatCompat(translateDomain(domain, ""),
++                                        std::forward<Args>(args)...);
++}
++
++template <typename... Args>
++auto translateDomainCtx(const char *domain, const char *ctx, Args &&...args)
++    -> std::enable_if_t<(sizeof...(Args) >= 1), std::string> {
++    return compat_detail::vformatCompat(
++        translateDomainCtx(domain, ctx, ""), std::forward<Args>(args)...);
++}
++#endif
+ #endif
+ 
+ } // namespace fcitx
+ 
+ #ifndef FCITX_NO_I18N_MACRO
+ 
+ #ifdef FCITX_GETTEXT_DOMAIN
+ #define _(...) ::fcitx::translateDomain(FCITX_GETTEXT_DOMAIN, __VA_ARGS__)
+ #define C_(c, ...)                                                             \
+     ::fcitx::translateDomainCtx(FCITX_GETTEXT_DOMAIN, c, __VA_ARGS__)
