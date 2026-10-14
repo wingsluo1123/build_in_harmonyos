@@ -1,0 +1,61 @@
+software: sxiv
+version: "26"
+status: built
+build_date: "2026-10-13"
+build_system: makefile
+conan_ref: "sxiv/26"
+
+source:
+  url: "https://github.com/muennich/sxiv/archive/refs/tags/v26.tar.gz"
+  sha256: "a382ad57734243818e828ba161fc0357b48d8f3a7f8c29cac183492b46b58949"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "HAVE_GIFLIB=1"
+    - "HAVE_LIBEXIF=1"
+    - "AUTORELOAD=nop"
+  dependencies:
+    - libx11/1.8.13
+    - libxft/2.3.9
+    - fontconfig/2.18.3
+    - imlib2/1.9.1
+    - giflib/6.1.3
+    - libexif/0.6.26.1
+    - freetype/2.14.3.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+artifacts:
+  - "bin/sxiv"
+  - "bin/image-info"
+  - "bin/key-handler"
+  - "share/man/man1/sxiv.1"
+
+tests:
+  upstream_static: 0
+  upstream_registered: 0
+  upstream_executed: 0
+  consumer_tests: 1
+  consumer_assertions: 4
+  unexecuted_reasons: []
+
+test_results:
+  type: consumer
+  total: 1
+  passed: 1
+  failed: 0
+
+knowledge_ref: []
+
+knowledge_gained:
+  - "OHPCD imlib2/1.9.1 is built with --without-x and has no imlib display/drawable symbols."
+  - "sxiv can keep the imlib2 image pipeline and provide its seven missing X11 drawable symbols with a libX11 compatibility object."
+  - "The compatibility object uses XCreateImage/XPutImage and blends imlib2 RGBA pixels against the destination drawable."
+  - "The sxiv Makefile can be built without source patches by overriding objs, CPPFLAGS, CFLAGS and LDLIBS from the Conan recipe."
+patch_generation:
+  method: none
+  patches_count: 0
