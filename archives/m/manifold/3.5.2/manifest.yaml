@@ -1,0 +1,52 @@
+version: "3.5.2"
+software: manifold
+status: built
+build_date: "2026-09-29"
+build_system: cmake
+
+source:
+  url: "https://github.com/elalish/manifold/releases/download/v3.5.2/manifold-3.5.2.tar.gz"
+  sha256: "ce5f4d87877daca99a910d0af73c028f2a36b9288dd2bf3cd1cecf8faff9f7c8"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DMANIFOLD_TEST=ON"
+    - "-DMANIFOLD_CROSS_SECTION=ON"
+    - "-DMANIFOLD_CBIND=ON"
+    - "-DMANIFOLD_PAR=OFF"
+    - "-DMANIFOLD_DOWNLOADS=OFF"
+    - "-DMANIFOLD_PYBIND=OFF"
+    - "-DMANIFOLD_JSBIND=OFF"
+    - "-DMANIFOLD_FUZZ=OFF"
+    - "-DTRACY_ENABLE=OFF"
+    - "-DASSIMP_ENABLE=OFF"
+  dependencies:
+    - clipper2/2.0.1
+    - gtest/1.17.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_summary:
+  upstream_framework: "CTest (gtest_discover_tests 注册 427 个唯一 gtest 用例)"
+  upstream_static: "427/427 passed, 0 failed, 0 skipped"
+  upstream_shared: "427/427 passed, 0 failed, 0 skipped"
+  upstream_total_executed: "854/854 passed (static 427 + shared 427; 同一套 427 个上游测试在两种构建形态下分别完整执行, 不代表上游有 854 个唯一测试定义)"
+  upstream_modified: 0
+  upstream_skipped: 0
+  functional_test_package: "17/17 CHECK 断言 PASS (static 与 shared 各执行一次: 构造/布尔/变换/CrossSection/Simplify/版本宏; 计数口径 = test_manifold.cpp 预处理后实际输出的 PASS 行, static 与 shared 均为 17)"
+  ohos_abi_check: "static 2/2 (M0 归档格式 × libmanifold.a+libmanifoldc.a), shared 20/20 (M1/M2/M4-M9 × 2 库 + M10 SONAME 链 × 4 链接); 11 个检查类别 M0-M10, 实际断言数按 libdir 下真实 ELF 实体数展开; 由 test_package test() 内嵌执行, 不与上游 ctest 重复计数"
+  total_assertions_executed: 910
+
+knowledge_gained:
+  - "上游对 GTest/Clipper2/TBB 均先 find_package(QUIET) 再 FetchContent, 设置 FETCHCONTENT_SOURCE_DIR_* 或提供 CMakeDeps 生成文件即可零补丁接入 Conan 依赖"
+  - "manifold 测试数据 (test/models, test/polygons) 通过 __FILE__ 相对路径定位, out-of-source 构建无需复制数据"
+  - "上游 manifoldc (C 绑定) 与 manifold 同装到 lib/, 头文件都放 include/manifold/"
+  - "OHOS musl 下 libm 折叠进 libc, gtest 链接期 -lm 不产生额外 DT_NEEDED"
+  - "OHOS hmdfs 启用 hmmac=use_task 后 .so 一经落盘, 任何字节级改写 (cmake install 的 file(RPATH_CHANGE) 重写 RUNPATH) 都会使动态链接器拒载 (Error loading ... Permission denied), 且 cp 原字节副本可加载 — 修改后内容不可加载。规避: CMAKE_SKIP_RPATH=ON 让链接输出即最终字节"
+  - "cmake 4.1 中 CMAKE_BUILD_RPATH/BUILD_RPATH 不再自动注入链接命令, rpath 仅由 install(RPATH_CHANGE) 事后写入; 构建期运行 (gtest_discover_tests POST_BUILD/ctest) 靠 LD_LIBRARY_PATH 更可靠"
+  - "conan 2 的 run() 仅 source generators/ 下 env 文件; build() 里改 os.environ 或 generate() 里 append buildenv_info 都不传导到 cmake 子进程, 需写自定义 env sh 文件并以 env=[...] 传给 CMake._build/test"
