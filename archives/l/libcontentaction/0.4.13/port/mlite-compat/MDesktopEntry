@@ -1,0 +1,44 @@
+/*
+ * MDesktopEntry —— mlite 兼容层（libcontentaction 0.4.13 OHOS 适配）
+ *
+ * 上游 libcontentaction 通过 mlite（nemomobile）提供的 MDesktopEntry 读取
+ * .desktop 文件。制品仓无 mlite 且一库一 PR 不允许捎带引入新库，故在配方内
+ * 提供语义等价的最小实现：按 freedesktop Desktop Entry 规范解析 [Desktop Entry]
+ * 组，键名沿用 mlite 的 "Desktop Entry/<Key>" 形式（上游所有调用点均如此传参）。
+ *
+ * 与 mlite 的差异（均不影响上游调用点语义）：
+ *   - 不接 MeeGo 翻译目录（X-MeeGo-Translation-Catalog），name() 走
+ *     Name[<locale>] / Name 兜底；
+ *   - value() 返回解码后的字符串（\s \n \t \\ 转义）。
+ */
+#ifndef LCA_MLITE_COMPAT_MDESKTOPENTRY
+#define LCA_MLITE_COMPAT_MDESKTOPENTRY
+
+#include <QHash>
+#include <QString>
+
+class MDesktopEntry
+{
+public:
+    explicit MDesktopEntry(const QString &fileName);
+
+    QString fileName() const { return m_fileName; }
+    bool isValid() const { return m_valid; }
+
+    bool contains(const QString &key) const;
+    QString value(const QString &key) const;
+
+    // mlite 便捷访问器（libcontentaction 使用的子集）
+    QString name() const;
+    QString icon() const;
+    QString type() const;
+    QString url() const;
+    bool terminal() const;
+
+private:
+    QString m_fileName;
+    bool m_valid;
+    QHash<QString, QString> m_entries; // "Desktop Entry/Key" -> value
+};
+
+#endif

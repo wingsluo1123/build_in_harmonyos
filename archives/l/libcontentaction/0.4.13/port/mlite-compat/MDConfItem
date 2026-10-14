@@ -1,0 +1,28 @@
+/*
+ * MDConfItem —— mlite/dconf 兼容层（libcontentaction 0.4.13 OHOS 适配）
+ *
+ * 上游 contentaction.cpp 用 MDConfItem("/desktop/sailfish/application_desktop_paths")
+ * 读取 dconf 键决定“应用 .desktop 文件合法目录白名单”。OHOS 无 dconf，兼容层
+ * 改为读取 $MD_CONF_FILE 指定的 ini 文件（[<组>] key=value，键为完整配置路径，
+ * 多值以 ';' 分隔）。未配置该环境变量或键不存在时返回无效 QVariant —— 与上游
+ * “dconf 键未设置”行为一致（applicationDesktopPaths() 得到空表后放行所有路径）。
+ */
+#ifndef LCA_MLITE_COMPAT_MDCONFITEM
+#define LCA_MLITE_COMPAT_MDCONFITEM
+
+#include <QString>
+#include <QVariant>
+
+class MDConfItem
+{
+public:
+    explicit MDConfItem(const QString &key);
+
+    QString key() const { return m_key; }
+    QVariant value() const;
+
+private:
+    QString m_key;
+};
+
+#endif

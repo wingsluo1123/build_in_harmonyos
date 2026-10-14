@@ -1,0 +1,37 @@
+/*
+ * MRemoteAction —— mlite 兼容层（libcontentaction 0.4.13 OHOS 适配）
+ *
+ * 上游 dbus.cpp 用 MRemoteAction 把 (busName, objectPath, iface, method,
+ * arguments) 序列化后经 mapplauncherd/DBus 触发远端动作。OHOS 无 mapplauncherd，
+ * 兼容层直接经 QtDBus 会话总线发起同名方法调用：
+ *   trigger()        -> asyncCall（非阻塞，对应上游 trigger()）
+ *   triggerAndWait() -> call     （阻塞，对应上游 triggerAndWait()）
+ * 语义等价于 mlite 中 MRemoteAction 的 DBus 路径实现。
+ */
+#ifndef LCA_MLITE_COMPAT_MREMOTEACTION
+#define LCA_MLITE_COMPAT_MREMOTEACTION
+
+#include <QString>
+#include <QVariantList>
+
+class MRemoteAction
+{
+public:
+    MRemoteAction(const QString &service,
+                  const QString &path,
+                  const QString &interface,
+                  const QString &method,
+                  const QVariantList &arguments);
+
+    void trigger() const;
+    void triggerAndWait() const;
+
+private:
+    QString m_service;
+    QString m_path;
+    QString m_interface;
+    QString m_method;
+    QVariantList m_arguments;
+};
+
+#endif

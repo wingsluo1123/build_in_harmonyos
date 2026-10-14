@@ -1,0 +1,50 @@
+package: libcontentaction/0.4.13
+homepage: "https://github.com/sailfishos/libcontentaction"
+
+upstream_check_command: "ctest (upstream tests.xml.in suite, executed through upstream lca-cita-test wrapper)"
+upstream_test_in_build: true
+upstream_test_command: "14 upstream cases from tests/tests.xml.in (8 QTest functions + 4 sh/py CLI suites + 100-assertion test-highlight.sh + gen-regexps regex suite + meta case)"
+
+# 上游 tests/tests.xml.in 定义的完整用例清单（14 项）。
+# 执行口径见 reports/test-report.md：逐 case 记录 PASS / SKIP(77, 环境预检)。
+upstream_tests:
+  - file: tests/tests.xml.in#lca-cita-test-fail
+    description: "meta negative control: lca-cita-test false must exit non-zero"
+  - file: tests/test-defaults.py
+    description: "lca-tool --setmimedefault/--mimedefault/--actionsformime mime default workflow"
+  - file: tests/test-mimes.py
+    description: "actions for files and trigger() of X-Maemo-Service / X-Osso-Service / Exec actions (5 methods; 2 methods need the dbus-python uberprogram.py fixture)"
+  - file: tests/test-desktop-launching.py
+    description: "desktop file launching: --print / --triggerdefault / --triggerdesktop with Exec trace verification"
+  - file: tests/test-fixed-params.py
+    description: "X-Maemo-Fixed-Args merging through DBus action (needs dbus-python gallery.py fixture)"
+  - file: tests/test-schemes.sh
+    description: "x-scheme-handler lookup via lca-tool --scheme --print (gallery.py fixture is a dbus-python service)"
+  - file: tests/test-special-chars.py
+    description: "file names with special characters (#) through --print (needs dbus-python gallery.py fixture)"
+  - file: tests/test-regexps.py
+    description: "highlight regexp specialization semantics via lca-tool --string --printmimes"
+  - file: tests/test-info.cpp
+    description: "ContentInfo for mime/file/data (3 QTest functions)"
+  - file: tests/test-findhighlights.cpp
+    description: "Action::findHighlights / findNextHighlight regexp matching and non-overlap (3 QTest functions)"
+  - file: tests/test-action.cpp
+    description: "defaultActionForFile mime guessing consistency (1 QTest function)"
+  - file: tests/test-mimedefaults.cpp
+    description: "setMimeDefault/defaultActionForMime roundtrip through the C++ API (1 QTest function)"
+  - file: tests/test-highlight.sh
+    description: "lca-tool --highlight over hlinput.txt: ~100 regex assertions (phone/uri/url/email)"
+  - file: data/gen-regexps
+    description: "generated-regex-testsuite: every rx_test spec piped through lca-tool --highlight (SystemRegexTest)"
+
+test_package_tests:
+  - file: lca_consumer_case.cpp
+    description: "完整消费者端到端用例：配置落盘 -> ContentInfo -> Action 查询 -> 默认动作写读回环 -> 方案动作 -> 高亮检索 -> trigger() 触发并校验执行痕迹"
+    command: "./test_lca_consumer"
+
+# 消费者端到端断言数（两阶段，各自独立进程/独立 RESULT 行）。
+# 阶段1 含 n 个**条件断言**（仅在对应夹具/回退路径存在时执行），故随构建机环境浮动；
+# 阶段2 恒为 3（无分支）。以下为实测值：
+#   - 本地 ohos-aarch64-run（有 shared-mime-info 库）：阶段1 26 + 阶段2 3 = 29
+#   - DAYU200 真机（无 mime 库）：              阶段1 23 + 阶段2 3 = 26
+assertion_count: 29   # 取本地 profile 实测值；真机口径见 reports/device-e2e-evidence.md
