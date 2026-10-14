@@ -1,0 +1,57 @@
+#====================================================================
+# DRAFT — OHOS 上编译到 wasm32-wasi 目标：全系编译器无 WebAssembly 后端，
+# 须自举静态交叉工具链（zig cc 编译 + SDK 驱动链接 + LLD19 wasm-ld shim）
+# 触发事件: wasi-libc 0.0-git20260129.ec0effd（任务 11808）路径 C 适配，
+#           真机 conan create rc=0、上游套件 152/167（91%）、消费者 CONSUMER_PASS
+# 日期: 2026-10-08
+#
+# 与既有条目的关系（增量边界）:
+#   DRAFT-odiff-4.5.0-zig-ohos-libc-probe-... = zig 以 OHOS "原生"目标编译时
+#       宿主 libc 探测注入不完备 sysroot（-Dtarget=aarch64-linux-musl 绕过）；
+#       本条 = zig 以 "wasm32-wasi 交叉"目标编译时其自带 wasi/musl 头
+#       遮蔽在建 sysroot（须剪枝/隔离），方向相反、手段不同。
+#   DRAFT-below-ohos-unsigned-rust-toolchain / E318 = ELF 自签名族（子项重叠，
+#       本条仅引用 binary-sign-tool 作为自举前置步骤）。
+#   wasi / wasm-ld / heap_end 在 graph+doc 全量 0 命中（E400 为 Bun 运行时
+#       测试条目，非 wasm 编译族）——本族为真缺口。
+#====================================================================
+id:                     DRAFT-ohos-wasm32-wasi-crosscompile-bootstrap
+draft:                  true
+contributor_id:         frj__
+trigger_tool:           clang|ld|cmake|make
+phase:                  configuration|compilation|linking
+error_signature:        No available targets are compatible with triple "wasm32|__heap_end.*undefined symbol|unable to parse target query.*UnknownOperatingSystem|relocation R_WASM_MEMORY_ADDR_SLEB.*__heap_end|entry symbol not defined.*_start|ld-linux-aarch64.so.1.*No such file|unsupported linker arg: --allow-undefined-file
+
+severity:               3
+category:               toolchain, ohos, portability, build-system, libc
+match_keywords:         wasm32-wasip1, wasm32-wasi, wasm-ld, __heap_end, zig cc, WebAssembly backend, wasi-sdk, wasi-libc, mexec-model, allow-undefined-file, sysroot
+title:                  OHOS 无任何带 WebAssembly 后端的编译器：自举静态 Zig 为 wasm32-wasip1 交叉工具链，双面包装器分派编译（zig cc）与链接（SDK clang 驱动 + LLD19 wasm-ld shim）
+
+root_cause:             harmonybrew clang 23.1.1 与 OHOS SDK clang 15.0.4 均未编入 WebAssembly 后端（--print-targets 无 wasm）；官方 wasi-sdk arm64-linux 为 glibc 动态链接（/lib/ld-linux-aarch64.so.1）在 OHOS musl 用户态不可执行；SDK 自带 LLD 15.0.4 缺 __heap_end 链接器伪符号（需 >=15.0.7）；LLVM 15 驱动对 -shared 用 command crt，把静态 dlmalloc 拖进共享库，其 __heap_end 数据引用无法成为 wasm import
+affected_scope:         任何需在 OHOS 上编译/链接到 wasm32-wasi(p1) 目标的库或工具链（wasi-libc、wasi-sdk、wasm 运行时自举、wasm 交叉消费者）
+verification_cmd:       conan create rc=0；上游 ctest（Node.js WASI preview1 引擎替代 wasmtime）>=90% 且失败项均有引擎缺口分类；test_package 消费者编译为 wasm 并执行输出 CONSUMER_PASS
+
+rec_priority:           1
+rec_approach:           dual-face-wrapper-toolchain-bootstrap
+rec_description:        下载官方静态 Zig 0.14（内嵌 clang+LLVM 19 全目标），binary-sign-tool 自签名后可执行；写双面 clang 包装器：编译作业（-c/-E/-S）走 zig cc——--target=wasm32-wasip1 译为 -target wasm32-wasi -D__wasip1__（zig 的 target 查询只认 wasi；LLVM19 将其映射为同一 triple，宏须补回），剪除 zig 自带 wasm-wasi-musl/generic-musl 等 libc 头目录（zig 注入的 isystem 先于用户 -isystem，会遮蔽目标 sysroot），-mllvm -wasm-enable-sjlj 附加 -mexception-handling（__builtin_wasm_throw 需该特性），argv 用计数 shift/append 队列逐字保留（带空格的 -D 定义不得拆分）；链接作业走 OHOS SDK clang 驱动 + -B 目录提供 wasm-ld shim（exec zig wasm-ld，LLD 19），-shared 链接加 -mexec-model=reactor 对齐 LLVM19 驱动行为，应答 --print-libgcc-file-name/-print-resource-dir 时给一致的绝对路径对使 compiler-rt builtins 拷贝落位
+rec_command:            配方内生成包装器（见 archives/w/wasi-libc/0.0-git20260129.ec0effd/conanfile.py 的 WRAPPER_CLANG/WRAPPER_WASM_LD）；cmake 传 -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY、-DBUILTINS_LIB=<wasi-sdk-25 官方 builtins>、-DFETCHCONTENT_SOURCE_DIR_LIBC-TEST=<预取>、-DENGINE="node;<wasi-run.mjs>"（Node WASI 引擎替换 wasmtime，兼容 --dir HOST::GUEST/--env CLI）
+rec_auto_fix:           true
+rec_impl:               conan-recipe
+fallback_priority:      2
+fallback_approach:      prebuilt-sysroot-packaging
+fallback_description:   无法自举编译器时退回打包官方预构建 wasi-sysroot 资产并做结构校验（先例 wasi-runtimes 25.0.0），但放弃从源码构建与上游套件全量执行，通常只满足路径 A
+fallback_auto_fix:      false
+
+forbid_1_pattern:       -Wl,--allow-undefined
+forbid_1_reason:        禁止用全局 --allow-undefined 吞掉 __heap_end 等链接器伪符号缺失——它掩盖 LLD 版本缺口并让真实未解析符号静默通过；正确做法是升级 wasm-ld 到 >=15.0.7（本条用 zig wasm-ld=LLD19）
+forbid_1_consequence:   libc.so/测试可执行文件带未解析导入仍"链接成功"，运行期才炸，且 __heap_end 根因被隐藏
+forbid_2_pattern:       sed.*s/^-isystem/-I/|isystem.*-I.*promote
+forbid_2_reason:        禁止把 -isystem 提升为 -I 来赢头文件搜索顺序——系统头的警告抑制被取消，dlmalloc 与 sysroot __errno_values.h 的合法上游交互（ENOMEM 宏双重定义）会被 -Werror 打爆；必须用剪枝/隔离注入源的方式
+forbid_2_consequence:   wasi-libc 构建在 dlmalloc.c 处宏重定义失败，误判为源码缺陷
+
+principles:             P005, P013
+doc_file:               knowledge/drafts/DRAFT-ohos-wasm32-wasi-crosscompile-bootstrap.md
+last_updated:           2026-10-08
+source_event:           wasi-libc 0.0-git20260129.ec0effd 路径 C 适配（任务 11808，PR #15084）
+authors:                frj__
+source_pr:              15084
