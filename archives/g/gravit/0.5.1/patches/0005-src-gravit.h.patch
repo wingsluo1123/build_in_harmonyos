@@ -1,0 +1,67 @@
+--- a/src/gravit.h
++++ b/src/gravit.h
+@@ -123,21 +123,26 @@
+ #else
+ 
+     #include <stdarg.h>
+     #include <stdlib.h>
+     #include <string.h>
+     #include <errno.h>
+     #include <termios.h>
+     #include <sys/time.h>
+     #include <sys/types.h>
+     #include <unistd.h>
++    /* sys/timeb.h (and the ftime() it declares) is a System V/BSD leftover
++       that not every libc ships: musl, which HarmonyOS PC uses, has no such
++       header.  configure probes for it, so honour the result. */
++    #ifdef HAVE_SYS_TIMEB_H
+     #include <sys/timeb.h>
++    #endif
+     #include <pthread.h>
+     #include <dirent.h>
+     #include <sys/stat.h>
+     #include "dirent.h"
+ 
+     // used for the opengl extensions
+     #ifndef APIENTRY
+         #define APIENTRY
+     #endif
+ 
+@@ -660,37 +665,25 @@
+ 
+     float *min;
+     float *max;
+     particle_t *gp;
+     float m;
+     float *cm;
+ 
+ } pib_t;
+ 
+ // main.c
+-#ifdef WIN32
+-
+ #ifndef NO_GUI
+ extern video_t video;
+ #endif
+ extern state_t state;
+ extern view_t view;
+-
+-#else
+-
+-#ifndef NO_GUI
+-video_t video;
+-#endif
+-state_t state;
+-view_t view;
+-
+-#endif
+ 
+ void cleanMemory();
+ void runVideo();
+ void runInput();
+ void viewInit();
+ void spawnDefaults();
+ void stateInit();
+ int commandLineRead(int argc, char *argv[]);
+ 
+ // tool.c

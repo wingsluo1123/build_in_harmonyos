@@ -1,0 +1,126 @@
+# 版本级 manifest — gravit 0.5.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.5.1"
+software: "gravit"
+upstream_version: "0.5.1"
+status: built
+build_date: "2026-10-12"
+build_system: "autotools"
+conan_ref: "gravit/0.5.1"
+
+source:
+  url: "https://github.com/gak/gravit/archive/refs/tags/0.5.1.tar.gz"
+  sha256: "f6af123e101f86594f74406c8fa973686bf3e7a73132c118d33ff5c9885531af"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--without-agar"
+    - "CPPFLAGS=-DOSMESA_RENDER"
+    - "PKG_CONFIG_PATH=<generators>  (PkgConfigDeps + 配方补的 gl.pc)"
+    - "SDL_CONFIG=<生成的 sdl-config 外壳>"
+    - "autogen: aclocal/.aclocal-real → autoheader → .automake-real → autoconf（清除 conan perl/autoconf 环境变量）"
+  dependencies:
+    - sdl12-compat/1.2.68
+    - sdl-image/1.2.12
+    - sdl_ttf/2.0.11
+    - lua/5.2.4
+    - libpng/1.6.58
+    - glu/9.0.3
+    - mesa/24.3.4.1
+  cc: clang
+  cxx: clang++
+  outputs:
+    - "bin/gravit"
+    - "etc/gravit/gravit.cfg"
+    - "etc/gravit/screensaver.cfg"
+    - "share/gravit/data/（字体、贴图、天空盒）"
+    - "share/gravit/spawn/（.gravitspawn 与 Lua 脚本）"
+    - "licenses/COPYING"
+    - "licenses/README"
+
+# 上游测试清点（R51）：上游零用例，但 check 目标在 build() 中被驱动以留痕
+upstream_tests:
+  command: "make check (driven from conanfile.py build())"
+  test_count: 0
+  notes: >
+    gravit 0.5.1 不附带任何测试套件，四处清点一致：①tar 内 0 个含 test 的路径；
+    ②Makefile.am 中 TESTS/check_PROGRAMS 命中 0 处；③源码树里没有任何名字含
+    test 的文件或目录；④make check 可执行但不注册任何用例（conan create 日志中
+    `make check` 之后直接是 "Package built"）。故上游用例数为 0，无用例需要豁免
+    或跳过；conanfile.py 仍在 build() 中执行 make check，使日志保留上游测试入口
+    的执行痕迹（L1c）。
+
+# 适配后补全的测试（上游无用例，按交付要求自行补全）
+# 申报口径（rule12）：鸿蒙特有测试 = 具名端到端消费者用例数，不是断言数。
+test_package:
+  file: "test_package/test_cli.py, test_package/test_headless_render.py, test_package/test_gl_stack.c"
+  harmony_consumer_case_count: 11
+  description: >
+    上游无测试，故补全三组**具名端到端消费者用例**，全部真实依赖被测产物（R34），
+    每条用例按四段式组织：构造输入 → 真实执行 → 产出结果 → 校验内容：
+    ①test_cli.py（CLI-1..CLI-5，5 例）— 真实子进程运行已安装的 bin/gravit，
+    逐用例与独立来源的参考输出逐字节比对（版本/版权屏、帮助屏、长短写法等价、
+    quit 的空输出、未知命令 + 无视频驱动时的提示）；
+    ②test_headless_render.py（HD-1..HD-3，3 例，鸿蒙特有）— dummy 驱动下真实无头
+    运行 320x240 约 11 秒，由内置定时器截图并自行退出；随后用自带的独立 PNG
+    解码器解码截图并统计帧内容；
+    ③test_gl_stack.c（GS-1..GS-3，3 例，鸿蒙特有）— 以用例给定的像素常量驱动
+    OSMesa 离屏上下文 + GLU 固定管线渲染 + glReadPixels 回读，再按
+    gfxOffscreenSwap() 的方式整帧拷贝到无窗口 SDL 32bpp 软件表面，并做 libpng
+    写读往返。
+  verified_result: "test_cli: 5 consumer cases, 5 passed, 0 failed; test_headless_render: 3 consumer cases, 3 passed, 0 failed; test_gl_stack: 3 consumer cases, 3 passed, 0 failed"
+
+patches_applied:
+  - "0001-configure.in.patch"
+  - "0002-src-command.c.patch"
+  - "0003-src-gfx.c.patch"
+  - "0004-src-tool.c.patch"
+  - "0005-src-gravit.h.patch"
+
+knowledge_gained:
+  - "★ 鸿蒙 PC 无窗口系统（X11/Wayland/EGL）也无窗口 GL；制品仓 mesa 是 OSMesa-only（只导出 libOSMesa.so，无 libGL/libEGL）→ 桌面 OpenGL 固定管线程序须把窗口 GL 上下文替换为 OSMesa 离屏上下文，并把渲出的帧拷贝到 SDL 软件表面（SDL_VIDEODRIVER=dummy 即可），而不是 stub 掉 GL 调用（同 achilles/3 正例）"
+  - "configure 用 PKG_CHECK_EXISTS([gl])/[glu] 决定是否走 pkg-config 取 OpenGL；mesa 未设 pkg_config_name，PkgConfigDeps 只生成 mesa.pc/glu.pc，没有 gl.pc → 会退到 -lGL -lGLU 分支而链接失败。配方在 generators 目录补一份指向 OSMesa 的 gl.pc 即可（glu.pc 由 Conan 生成，Requires: mesa 自动带出 -lOSMesa）"
+  - "★ 0.5.1 发行包只有 configure.in/Makefile.am（无 configure），须先重建 autotools。conan 的 automake/perl 工具包在本机不可直接用：automake 脚本 shebang 指向构建者 perl（5.42.0），而 perl 工具包导出的 PERL5LIB 指向 5.42.2 的 XS 模块 → 『Error relocating .../auto/Cwd/Cwd.so: Perl_my_cxt_init: symbol not found』；conan autoconf 包迁移后 .autom4te-real 的 @INC 也是坏的（Can't locate strict.pm in @INC //lib/perl5/...）。做法：清掉工具包导出的 perl/autoconf 变量（env -u），再用『perl -I <automake share> <pkg>/bin/.aclocal-real|.automake-real』驱动 automake，autoconf/autoheader/m4 走环境自带工具链（同 abx/0.1 正例；知识库 E116/E071/E178 同族）"
+  - "autoconf 内嵌的 config.status 模板以 umask 077 创建 ./confXXXXXX 临时目录；setgid hmdfs 上目录属主非构建 UID，0700 连创建者都不可写（can't create ./confXXXXXX/subs1.awk: Permission denied）。configure 是构建期生成的，无法用补丁解决，只能在 autoconf 之后重写模板（umask 077 && mktemp/mkdir → 按环境 umask），并在模板变化时显式失败（同 abx/0.1、achilles/3 的 0002 补丁）"
+  - "上游 CMake/autotools 未定义、以『编译期绝对路径』(//share/gravit、/etc/gravit) 直接 fopen 或 findFile 的数据目录，在包安装于任意前缀时必然失配。findFile() 增加『可执行文件所在前缀（/proc/self/exe 的 ../）』与『去掉前导 / 后的当前目录相对路径』两条查找即可，同时必须把绕过 findFile 直接 fopen(MISCDIR ...) 的点（command.c 的 commandhelp.txt）改为走 findFile——否则表面能启动但帮助文本缺失"
+  - "AX_EXT_SSE 是 x86 CPUID 探针，在 aarch64 上 ac_cv_gcc_x86_cpuid_* 返回 unknown，宏内 shell 算术 `$((0x$edx>>23&0x01))` 令 configure 以 bad number '0xunknown' 中止 → 用 case \"$host_cpu\" 限定只在 x86 执行（不影响 HAVE_SSE 语义，源码 SSE 代码本就由 HAVE_SSE 守卫）"
+  - "SDL 1.2 程序在鸿蒙应统一用 sdl12-compat（sdl-image/sdl_ttf 链接它）；若同时链接 sdl/1.2.15 的静态 libSDL.a，会出现两份 SDL 实现"
+  - "gravit 的 -v/-h 输出经内置控制台，只有先执行 echo 命令打开 stdout 模式（view.useStdout）才会打印到标准输出；测试须用 `gravit \"echo 1\" -v` 形式，这是上游行为而非缺陷"
+  - "命令行 COMMAND 在视频初始化前执行，需要『运行中』执行的命令要用内置定时器 timeradd <name> <sec> <reps> <cmd> 调度——这给了无头自动化一条无需改源码的驱动途径（本项目鸿蒙测试即用 screenshot + quit 定时器）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/gravit-0.5.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/gravit-0.5.1.work
+  source_orig_hash: 54785943e6bd7c1f
+  source_work_hash: 4ec25cf586324e44
+  generated_at: '2026-10-12T14:00:41'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-configure.in.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0002-src-command.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0003-src-gfx.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0004-src-tool.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0005-src-gravit.h.patch
+    type: portability
+    platform_only: false
+    guard: none

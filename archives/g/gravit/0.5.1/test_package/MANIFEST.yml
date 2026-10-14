@@ -1,0 +1,116 @@
+package: gravit/0.5.1
+homepage: "https://github.com/gak/gravit"
+
+# Upstream test entry point.  The generated Makefile does provide automake's
+# `check` target, but this tree registers no test program at all, so the target
+# runs zero cases; conanfile.py still drives it so the conan/CI log carries the
+# execution trace of the upstream entry point (L1c) instead of silently
+# skipping it.
+upstream_check_command: "make check (driven from conanfile.py build())"
+upstream_test_in_build: true
+upstream_test_command: "make check (executed from conanfile.py build() via self.run)"
+
+# Gravit 0.5.1 ships NO upstream test suite.  Counting method (all agree):
+#   1. tar tzf gravit-0.5.1.tar.gz | grep -ic test          -> 0 paths
+#   2. grep -cE '^TESTS|check_PROGRAMS' Makefile.am         -> 0 hits
+#   3. find <source tree> -iname '*test*'                   -> 0 files, 0 dirs
+#   4. make check                                           -> runs, no case
+#      executed (conan create log: the `make check` line is immediately
+#      followed by "Package built")
+# There is consequently no upstream case to exclude or skip.
+upstream_tests: []
+
+# ---------------------------------------------------------------------------
+# 鸿蒙特有测试（rule12）—— 申报口径 = 具名端到端消费者用例数，不是断言数。
+# 上游无任何测试，故这些消费者用例承担全部验证；每个用例都是完整消费者流程：
+#   构造输入（真实命令行 / 已知像素常量 / 请求的离屏模式）
+#   → 真实执行（运行已安装产物或驱动其离屏 GL 栈）
+#   → 产出结果（退出码+stdout 字节 / 截图 PNG / SDL 表面 / 回读帧）
+#   → 校验内容（与独立来源的参考输出/参考值比对，失败即 test_package 失败）
+# ---------------------------------------------------------------------------
+harmony_consumer_case_count: 11
+harmony_consumer_cases:
+  - id: CLI-1
+    name: "version-banner"
+    command: 'bin/gravit "echo 1" -v'
+    check: "退出码 0，stdout 与上游 command.c 的版本/版权字面量逐字节一致"
+    ref: "上游 src/command.c 版本/版权字面量（独立来源，非程序自输出回填）"
+  - id: CLI-2
+    name: "help-screen"
+    command: 'bin/gravit "echo 1" -h'
+    check: "退出码 0，4 行 usage/选项/COMMAND 说明与上游帮助文本逐字节一致"
+    ref: "上游 data/commandhelp.txt + src/command.c（本包未改动其文本）"
+  - id: CLI-3
+    name: "long-option-aliases"
+    command: 'bin/gravit "echo 1" --version / --help'
+    check: "两种长写法的输出与短写法参考输出逐字节相同"
+    ref: "同 CLI-1/CLI-2 的参考输出"
+  - id: CLI-4
+    name: "quit-command"
+    command: "bin/gravit quit"
+    check: "退出码 0 且 stdout 为空（视频子系统未启动即可工作）"
+    ref: "上游 console 的 quit 语义（无输出）"
+  - id: CLI-5
+    name: "unknown-command"
+    command: 'bin/gravit -n "echo 1" not-a-command (SDL_VIDEODRIVER=no_such_driver)'
+    check: "退出码 0；输出 = 回显行 + 'not-a-command: Command not found' + 无驱动起动提示"
+    ref: "上游 src/command.c / src/gfx.c 的提示文本"
+  - id: HD-1
+    name: "offscreen-run-and-self-quit"
+    command: 'bin/gravit -n "videowidth 320" "videoheight 240" "echo 1" "timeradd shot 8 1 screenshot" "timeradd bye 11 1 quit"'
+    check: "真实无头运行约 11 秒后自行退出（退出码 0），日志含 7 项离屏路径证据行且无数据/字体缺失"
+    ref: "被测源码离屏路径与 console 定时器的打印点"
+  - id: HD-2
+    name: "screenshot-png-structure"
+    command: "自带独立解码器解码 HD-1 的截图"
+    check: "PNG 签名 + IHDR=(320,240,8bit,truecolour,无隔行) + 全部 chunk CRC 自洽 + 解压/像素长度自洽"
+    ref: "我们请求的离屏模式 320x240x32 与 PNG 规范（非程序自报）"
+  - id: HD-3
+    name: "frame-content-real-scene"
+    command: "对 HD-2 解码出的 76800 像素做统计"
+    check: "非黑像素过半（某次运行 75894/76800）且颜色数 > 1000（某次运行 12930）——真实三维场景而非空缓冲"
+    ref: "与请求的离屏模式绑定的帧内容判据"
+  - id: GS-1
+    name: "offscreen-frame-render"
+    command: "./test_gl_stack (OSMesa client buffer + GLU 固定管线 + glReadPixels)"
+    check: "背景像素 = 用例给定清屏色 (17,34,51)，中心像素 = 给定四边形色 (238,68,34)，非黑覆盖 4096/4096"
+    ref: "用例自己给定的像素常量（非渲染器自报）"
+  - id: GS-2
+    name: "windowless-sdl-blit"
+    command: "./test_gl_stack (无窗口 SDL 32bpp 软件表面 + gfxOffscreenSwap() 式整帧拷贝)"
+    check: "表面为 32bpp，拷贝后中心像素 = 四边形色，且拷贝未引入 SDL 错误"
+    ref: "GS-1 渲染帧的给定常量"
+  - id: GS-3
+    name: "png-roundtrip"
+    command: "./test_gl_stack (libpng 写出 PNG 再读回)"
+    check: "读回为 64x64 RGB 且中心像素 = 四边形色"
+    ref: "GS-1 渲染帧的给定常量"
+
+# Layer-2 consumer validation (executed by conan create's test_package step).
+# 上游无测试，故三个测试文件即为补全的消费者用例集；逐个文件说明：
+test_package_tests:
+  - file: test_cli.py
+    description: >
+      CLI 消费者用例 CLI-1..CLI-5：用真实子进程运行已安装的 bin/gravit，
+      逐用例按「构造输入 → 真实执行 → 产出结果 → 校验内容」组织，并将 stdout
+      与独立来源的参考输出逐字节比对（版本/版权屏、帮助屏、长短写法等价、
+      quit 的空输出、未知命令 + 无视频驱动时的提示）。
+    command: "python3 test_cli.py <package>/bin/gravit"
+  - file: test_headless_render.py
+    description: >
+      无头渲染消费者用例 HD-1..HD-3（鸿蒙特有）：dummy 驱动下真实运行 320x240
+      约 11 秒，由内置定时器自行截图并退出；随后用自带的独立 PNG 解码器
+      （zlib + 手写反滤波 + 逐 chunk CRC 自校验）解码截图并统计帧内容。
+    command: "python3 test_headless_render.py <package>/bin/gravit <package>"
+  - file: test_gl_stack.c
+    description: >
+      离屏 GL 栈消费者用例 GS-1..GS-3（鸿蒙特有）：以用例给定的像素常量驱动
+      OSMesa 离屏上下文 + GLU 固定管线渲染 + glReadPixels 回读，再按
+      gfxOffscreenSwap() 的方式整帧拷贝到无窗口 SDL 32bpp 软件表面，并做
+      libpng 写读往返。
+    command: "./test_gl_stack"
+
+# 次要口径（仅供追溯，不作为 rule12 申报单位）：用例内部逐项内容比对的条数，
+# 即 退出码/输出字节/证据行/像素/CRC/chunk 等具体比较执行的次数
+# （test_cli 12 + test_headless_render 16 + test_gl_stack 8 = 36）。
+assertion_count: 36
