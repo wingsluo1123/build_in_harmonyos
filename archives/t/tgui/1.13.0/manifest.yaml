@@ -1,0 +1,86 @@
+software: tgui
+version: "1.13.0"
+status: built
+build_date: "2026-10-07"
+
+source:
+  url: "https://github.com/texus/TGUI/archive/refs/tags/v1.13.0.tar.gz"
+  sha256: "6e6000b5b130d6ddf73d593ff62cdd6f5c2045a1f8ffacb10262aedcb7ea7465"
+  tar_format: tar.gz
+
+build:
+  build_system: cmake
+  system: cmake
+  configure_options:
+    - "-DTGUI_BACKEND=SDL_RENDERER"
+    - "-DTGUI_USE_X11=OFF"
+    - "-DTGUI_BUILD_TESTS=OFF"
+    - "-DTGUI_BUILD_EXAMPLES=OFF"
+    - "-DTGUI_BUILD_GUI_BUILDER=OFF"
+  dependencies:
+    - name: sdl2
+      version: "2.30.10"
+    - name: sdl2_ttf
+      version: "2.24.0"
+    - name: freetype
+      version: "2.14.3.1"
+  cc: clang
+  cxx: clang++
+
+backend_info:
+  selected: SDL_RENDERER
+  reason: "SFML_GRAPHICS backend unavailable (sfml package is partial: System+Network only, missing Graphics/Window modules)"
+  alternatives_considered:
+    - name: SFML_GRAPHICS
+      status: rejected
+      reason: "制品仓 sfml/2.6.1.1 为 partial 配方，缺少 Graphics/Window 模块"
+    - name: SDL_RENDERER
+      status: built
+      reason: "SDL2 和 SDL2_ttf 均有完整 armv8 预编译包"
+
+patches_applied:
+  - "patches/0001-cmake-Config.cmake.patch (ref: tgui-1.13.0-notes)"
+
+knowledge_gained:
+  - "HarmonyOS 上 CMake 的 CMAKE_SYSTEM_NAME 为 HarmonyOS（无 Platform/HarmonyOS.cmake），上游 CMake 工程里 CMAKE_SYSTEM_NAME STREQUAL \"Linux\" 的平台判定不会命中，需要为工程补 HarmonyOS 分支（映射到 Linux 兼容层代码路径），而不要用 -DCMAKE_SYSTEM_NAME=Linux 覆盖去绕过。 (ref: tgui-1.13.0-notes)"
+  - "TGUI 1.13.0 可用 SDL_RENDERER 后端（-DTGUI_BACKEND=SDL_RENDERER -DTGUI_USE_X11=OFF）在 HarmonyOS aarch64 上构建，消费者通过组件 TGUI::TGUI 使用。 (ref: tgui-1.13.0-notes)"
+  - "sdl2/sdl2_ttf 在本平台被静态链入 libtgui.so：readelf -d 显示 DT_NEEDED 仅 libc++_shared.so 与 libc.so，消费端断言不得要求 SDL2/SDL2_ttf 出现在 /proc/self/maps，否则误判失败。 (ref: tgui-1.13.0-notes)"
+  - "freetype/2.14.3.1 的 cpp_info.libs 为空，生成的 freetype::freetype 目标不带 -lfreetype，消费者链接 libtgui.so 会因 OHOS 链接器默认 --no-allow-shlib-undefined 报 FT_* 未定义；消费端改用 CMake 内置 FindFreetype(MODULE) 的 Freetype::Freetype 即可解析到制品仓中的库。 (ref: tgui-1.13.0-notes)"
+  - "SFML_GRAPHICS 后端不可用：制品仓 sfml/2.6.1.1 为 partial 配方，只有 System/Network，缺少 Graphics/Window 模块。 (ref: tgui-1.13.0-notes)"
+  - "TGUI 上游测试需要真实显示设备（SDL renderer/window/texture），headless worker 上 82 个注册用例只有 37 个通过；应如实记录而不是跳过用例或改断言。 (ref: tgui-1.13.0-notes)"
+  - "OHOS 沙盒拒绝 make 的硬编码 SHELL=/bin/sh，使用 Makefiles 生成器的 CMake 工程会在配置阶段的编译器 try_compile 处报 'Check for working CXX compiler ... broken'；改用 Ninja generator（-G Ninja，直接 exec 编译器）后配置与编译均通过（E346）。 (ref: tgui-1.13.0-notes)"
+
+test_package:
+  framework: cmake
+  cases:
+    - "编译期后端选择（TGUI_HAS_BACKEND_SDL_RENDERER / SDL window / SDL_ttf font，TGUI_USE_SDL3=0）"
+    - "平台宏 TGUI_SYSTEM_LINUX（HarmonyOS 经 Linux ABI 层命中）"
+    - "tgui::String"
+    - "tgui::Layout"
+    - "tgui::Color"
+    - "运行期链接（libtgui.so / libc++_shared.so / FreeType 已映射）"
+  case_count: 6
+  assertion_count: 13
+  result: "6/6 cases passed (13/13 assertions)"
+  upstream_source_count: 83
+  upstream_case_count_declared: 87
+  upstream_case_count_registered: 82
+  upstream_runtime_result: "executed 82 cases: 37 passed / 45 failed; assertions 10178/10314 (headless worker: SDL renderer/window creation unavailable)"
+  note: "上游 83 个测试源（root 30 / Loading 6 / Widgets 47）均已编译；运行期执行了 SDL_RENDERER 后端实际注册的 82 个用例（框架宏声明 87 个，5 个按后端条件编译排除），失败集中在需要真实 renderer/window/texture 的图形用例，未跳过任何用例、未修改任何断言。"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/tgui-1.13.0.orig
+  source_work_dir: /storage/Users/currentUser/builds/tgui-1.13.0.work
+  source_orig_hash: 3ca379a67dba8dd3
+  source_work_hash: 41b0a5bd2f748454
+  generated_at: '2026-10-07T14:57:53'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-cmake-Config.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS"'
+    reachable: True
+    evidence: "本机 CMAKE_HOST_SYSTEM_NAME/CMAKE_SYSTEM_NAME 均为 HarmonyOS（见 .build-context 与 reports/conan-create.log），配方不再覆盖 CMAKE_SYSTEM_NAME，补丁分支在本平台真实命中并置 TGUI_OS_LINUX"
