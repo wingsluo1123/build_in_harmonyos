@@ -1,0 +1,23 @@
+package: laptop-mode-tools/1.74
+homepage: "https://github.com/rickysarraf/laptop-mode-tools"
+
+# 上游测试命令（laptop-mode-tools 为纯 POSIX sh 脚本集合，上游无 make check/
+# CTest/CI 测试套件；Makefile 仅 default/clean/version/install 四个 target，
+# install 仅执行 ./install.sh。可验证自检 = bash -n 语法检查 + laptop_mode
+# --version/--help 冒烟 + 安装清单核对，见下方 test_package_tests）
+upstream_check_command: "bash -n <scripts> && laptop_mode --version"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游无任何测试套件，如实声明，见 notes.md discovery）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，R34 实质自检）
+test_package_tests:
+  - file: test_laptop_mode_tools.py
+    description: "校验 bin/laptop_mode 存在/可执行/shebang、--version 与 --help 真实执行、全部脚本 bash -n、模块(33)/helper/conf.d(31) 安装清单完整、OHOS 不适用组件(systemd/udev/init.d/pm-utils/polkit/GUI)未安装"
+    command: "python3 test_laptop_mode_tools.py <pkg_root>"
+
+assertion_count: 11

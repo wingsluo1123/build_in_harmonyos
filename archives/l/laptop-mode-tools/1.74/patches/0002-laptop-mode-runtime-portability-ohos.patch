@@ -1,0 +1,95 @@
+--- a/usr/sbin/laptop_mode	2020-07-18 21:49:46.000000000 +0800
++++ b/usr/sbin/laptop_mode	2026-09-26 19:18:23.330686874 +0800
+@@ -237,9 +237,22 @@
+ # We don't want to discard all the remaining 4 events, but at least honor 1 so that we can act to the changes
+ # that occured in the last 7 seconds.
+ # So, Event-2 acquire LMT_REQ_LOCK and waits to acquire LMT_INVOC_LOCK (which is acquire by Event-1)
+-LMT_REQ_LOCK="/var/lock/lmt-req.lock"
+-LMT_INVOC_LOCK="/var/lock/lmt-invoc.lock"
+-LMT_BATTPOLL_LOCK="/var/lock/lmt-battpoll.lock"
++LMT_LOCK_DIR="${LMT_LOCK_DIR:-/var/lock}"
++LMT_RUN_DIR="${LMT_RUN_DIR:-/var/run/laptop-mode-tools}"
++# OHOS: if the lock directory is not writable (e.g. read-only rootfs),
++# fall back to a writable location instead of failing on exec redirection.
++if ! ( : > "$LMT_LOCK_DIR/.lmt-lock-probe" ) 2>/dev/null; then
++	for _lmt_lock_fb in /tmp/laptop-mode-tools-locks "$HOME/.lmt-locks"; do
++		if mkdir -p "$_lmt_lock_fb" 2>/dev/null && ( : > "$_lmt_lock_fb/.lmt-lock-probe" ) 2>/dev/null; then
++			LMT_LOCK_DIR="$_lmt_lock_fb"
++			break
++		fi
++	done
++fi
++rm -f "$LMT_LOCK_DIR/.lmt-lock-probe" 2>/dev/null
++LMT_REQ_LOCK="$LMT_LOCK_DIR/lmt-req.lock"
++LMT_INVOC_LOCK="$LMT_LOCK_DIR/lmt-invoc.lock"
++LMT_BATTPOLL_LOCK="$LMT_LOCK_DIR/lmt-battpoll.lock"
+ if checkCmd "flock"; then
+     FLOCK=`which flock`;
+ else
+@@ -283,6 +296,10 @@
+ 
+ 	if [ -r /etc/laptop-mode/laptop-mode.conf ] ; then
+ 		. /etc/laptop-mode/laptop-mode.conf
++	elif [ "$1" = "version" -o "$1" = "--version" -o "$1" = "-v" -o "$1" = "help" -o "$1" = "--help" -o "$1" = "-h" ]; then
++		# OHOS: version/help must work without an installed configuration file.
++		DEBUG=0
++		VERBOSE_OUTPUT=0
+ 	else
+ 		log "ERR" "$0: Configuration file /etc/laptop-mode/laptop-mode.conf not present or not readable."
+ 		exit 1
+@@ -612,7 +629,7 @@
+ 		done
+ 
+ 		log "STATUS" " "
+-		if [ -e /var/run/laptop-mode-tools/enabled ] ; then
++		if [ -e "$LMT_RUN_DIR/enabled" ] ; then
+ 			log "STATUS" "Laptop Mode Tools is allowed to run: /var/run/laptop-mode-tools/enabled exists."
+ 		else
+ 			log "STATUS" "Laptop Mode Tools is NOT allowed to run: /var/run/laptop-mode-tools/enabled does not exist."
+@@ -1036,7 +1053,7 @@
+ lmt_main_function ()
+ {
+ 
+-	mkdir -p /var/run/laptop-mode-tools
++	mkdir -p "$LMT_RUN_DIR" 2>/dev/null
+ 
+ 	# Used to display laptop mode state later on. This is the enabled/disabled
+ 	# state for laptop mode processing, it tells us nothing about whether laptop
+@@ -1043,7 +1060,7 @@
+ 	# mode is actually _active_.
+ 	STATE=disabled
+ 	if [ x$ENABLE_LAPTOP_MODE_TOOLS = x1 ]; then
+-		touch /var/run/laptop-mode-tools/enabled
++		touch "$LMT_RUN_DIR/enabled" 2>/dev/null
+ 		STATE=enabled
+ 	fi
+ 
+@@ -1096,7 +1113,7 @@
+ 
+ 	# If the init script has not been run or has been run with the "stop"
+ 	# argument, then we should never start laptop mode.
+-	if [ ! -f /var/run/laptop-mode-tools/enabled -o x$INITSCRIPT_STOP = x1 ] ; then
++	if [ ! -f "$LMT_RUN_DIR/enabled" -o x$INITSCRIPT_STOP = x1 ] ; then
+ 		log "VERBOSE" "Laptop mode disabled because /var/run/laptop-mode-tools/enabled is missing."
+ 		STATE=disabled
+ 	fi
+@@ -1165,8 +1182,8 @@
+ 	# we know that laptop mode wasn't active before.
+ 	WAS_ACTIVE=0
+ 	log "VERBOSE" "Checking if desired state is different from current state."
+-	if [ -f /var/run/laptop-mode-tools/state ] ; then
+-		read WAS_ACTIVE WAS_ON_AC WAS_ACTIVATE_WITH_POSSIBLE_DATA_LOSS WAS_STATE < /var/run/laptop-mode-tools/state
++	if [ -f "$LMT_RUN_DIR/state" ] ; then
++		read WAS_ACTIVE WAS_ON_AC WAS_ACTIVATE_WITH_POSSIBLE_DATA_LOSS WAS_STATE < "$LMT_RUN_DIR/state"
+ 		if [ "$WAS_STATE" != "" ] ; then
+ 			if [ "$WAS_ACTIVE" -eq "$ACTIVATE" -a "$WAS_ON_AC" -eq "$ON_AC" -a "$WAS_ACTIVATE_WITH_POSSIBLE_DATA_LOSS" -eq "$ACTIVATE_WITH_POSSIBLE_DATA_LOSS" -a "$WAS_STATE" = "$STATE" -a "$FORCE" -eq 0 ] ; then
+ 				if [ "$WAS_ACTIVE" -eq 1 ] ; then
+@@ -1183,7 +1200,7 @@
+ 	else
+ 		log "VERBOSE" "/var/run/laptop-mode-tools/state does not exist, no previous state."
+ 	fi
+-	echo "$ACTIVATE $ON_AC $ACTIVATE_WITH_POSSIBLE_DATA_LOSS $STATE" > /var/run/laptop-mode-tools/state
++	echo "$ACTIVATE $ON_AC $ACTIVATE_WITH_POSSIBLE_DATA_LOSS $STATE" > "$LMT_RUN_DIR/state" 2>/dev/null
+ 
+ 	if [ "$ACTIVATE" -eq 1 ] ; then
+ 		log "MSG" "$STATE, active"

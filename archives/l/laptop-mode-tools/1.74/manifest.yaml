@@ -1,0 +1,46 @@
+version: "1.74"
+status: built
+build_date: "2026-09-26"
+
+source:
+  url: "https://github.com/rickysarraf/laptop-mode-tools/releases/download/1.74/laptop-mode-tools_1.74.tar.gz"
+  sha256: "a1c53b82c7660b1feff9f7e42525c91f8d991e5388d6260df52d9b55b471cc4a"
+  tar_format: tar.gz
+  source_identity: "laptop-mode-tools 1.74 official GitHub release asset (upstream RPM spec Source naming)"
+
+build:
+  system: none
+  configure_options:
+    - "upstream install.sh in DESTDIR staging mode: INIT_D=none MAN_D=/usr/share/man SYSTEMD=no ACPI/APM/PMU=disabled INSTALL_GUI/INSTALL_UDEV/INSTALL_PM_UTILS=no"
+    - "INSTALL driven by busybox install (no coreutils install on OHOS worker); non-root safe with DESTDIR"
+  dependencies: []
+  cc: none
+  cxx: none
+
+patches_applied:
+  - "0001: install.sh gains INSTALL_GUI/INSTALL_UDEV/INSTALL_PM_UTILS env gates (upstream defaults unchanged) so udev/pm-utils/polkit/GUI integration can be skipped"
+  - "0002: laptop_mode runtime portability — version/help work without installed /etc/laptop-mode config; LMT_LOCK_DIR/LMT_RUN_DIR env overrides with writable lock-dir fallback (OHOS /var/lock and /var/run absent, /tmp read-only); non-fatal state-dir writes"
+  - "0003: conf.d defaults — disable modules whose helper tools are absent on OHOS (hdparm/udevadm, udevadm runtime-pm, xset, setterm, iw/iwconfig, HAL)"
+
+knowledge_gained:
+  - "laptop_mode requires flock and locks under /var/lock; OHOS lacks /var/lock, /var/run and a writable /tmp — lock/state directories must fall back or be overridden via LMT_LOCK_DIR/LMT_RUN_DIR."
+  - "Command dispatch (status/help/version) lives inside lmt_load_config AFTER config sourcing, so upstream laptop_mode --version exits 1 without /etc/laptop-mode/laptop-mode.conf; patched to allow version/help config-free."
+  - "OHOS worker has no coreutils install and no whoami; busybox install (supports -d/-m) drives install.sh via INSTALL env with DESTDIR set (skips root check)."
+
+upstream_tests:
+  exists: false
+  test_count: 0
+  command: "N/A: upstream has no test suite (no test target, no CI workflow)"
+  notes: "Makefile targets: default/clean/version/install only; .github/ contains only an issue template. See notes.md discovery."
+
+test_package:
+  assertion_count: 11
+  description: "Consumer test verifies bin/laptop_mode smoke (--version/--help), bash -n over all shipped scripts, install inventory (33 modules / helpers / 31 conf.d), and absence of systemd/udev/init.d/pm-utils/polkit/GUI components."
+
+quality_gates:
+  W0_dependencies: "No external Conan dependencies; runtime deps are POSIX sh + toybox/busybox tools, all optional tools degrade gracefully."
+  W1_source: "Pure POSIX sh script collection; no compiled components; upstream Makefile install target driven via install.sh."
+  W4_local: "Executed natively on the OHOS PC device (aarch64) via conan create with profile ohos-aarch64; scripts run under /bin/sh (toybox)."
+  W5_shadow_ci: "Authoritative CI ci/conan/build_and_test.sh on device, isolated CONAN_HOME."
+
+blockers: []
