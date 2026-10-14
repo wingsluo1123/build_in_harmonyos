@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（CI L0e 强制要求）
+package: zathura/2026.07.18
+homepage: https://pwmt.org/projects/zathura
+
+# 上游测试情况：tests/meson.build 无条件注册 3 个 headless 测试目标
+# （document / types / utils）；当 xvfb-run 可用（tests-x11）时再注册 3 个
+# session / config / setting，当 weston 可用（tests-wayland）时把同一批源码
+# 再注册 3 个；另有 1 个条件注册的 weston_sandbox。即上游全部测试目标为
+# 9（+1 sandbox），其中同一批 session/config/setting 源码在 X11 与 Wayland
+# 下各注册一次。
+# 交叉编译环境无显示服务器，故本配方以 -Dtests-x11=disabled
+# -Dtests-wayland=disabled 关闭全部显示服务器测试，只执行 3 个 headless
+# 目标；这 3 个目标内部共 5 个用例（document 1 + types 2 + utils 2），已在
+# qemu（OHOS musl 运行根）下完整执行，结果 5/5 通过。下方 total/passed 均指
+# 该 headless 可执行子集，不是上游全部测试数。
+upstream_test_in_build: false
+upstream_tests:
+  - name: document
+    source: tests/test_document.c
+    cases: 1
+    note: "headless；在 qemu + OHOS musl 运行根下实测 1/1 通过"
+  - name: types
+    source: tests/test_types.c
+    cases: 2
+    note: "headless；实测 2/2 通过"
+  - name: utils
+    source: tests/test_utils.c
+    cases: 2
+    note: "headless；实测 2/2 通过"
+  - name: session
+    source: tests/test_session.c
+    cases: 0
+    note: "需要 xvfb-run(X11) 或 weston(Wayland)；交叉环境无显示服务器，-Dtests-x11/wayland=disabled 关闭"
+  - name: config
+    source: tests/test_config.c
+    cases: 0
+    note: "同上，需要显示服务器"
+  - name: setting
+    source: tests/test_setting.c
+    cases: 0
+    note: "同上，需要显示服务器"
+
+# test_package 自带测试（消费者视角端到端）
+# 扮演真实第三方插件：用已安装头文件 + 上游注册宏生成 zathura_plugin_<api>_<abi>
+# 定义结构，dlopen 已安装的 zathura 宿主可执行文件并解析其导出的插件 API 符号，
+# 再经宿主符号表执行 image buffer 真实回环。
+test_package_tests:
+  - file: test.c
+    description: >
+      消费者端到端：编译期使用已安装的 <zathura/plugin-api.h> 与上游
+      ZATHURA_PLUGIN_REGISTER_WITH_FUNCTIONS() 宏生成插件定义结构；运行期
+      dlopen 已安装的 zathura 宿主并校验 zathura_image_buffer_create/free
+      符号导出，执行整页 image buffer 写入-回读回环与溢出保护断言。
+    command: "./test_probe <prefix>/bin/zathura"
+    runtime: native-only
+# assertion_count 是探针源码里 CHECK(...) 调用的条数（`grep -c` 会把 #define CHECK
+# 那一行也算进去，故需排除宏定义行；准确值为 14）。另有 1 个 dlopen 成功的裸 TAP 点，
+# 故运行时 TAP 测试点为 15。注意执行口径：交叉构建下 `conan create` 只编译并链接
+# 该探针（OHOS 目标无法在构建机上直接运行），14 条断言的实际执行发生在 qemu
+# （OHOS musl 运行根）与真机 DAYU200 上，本文件与 notes.md 记录的 14/14 出自那里。
+#
+# 宿主加载方式（2026-10-10，修复 CI #80089）：探针先用 RTLD_LAZY 打开
+# bin/zathura，失败才回退 RTLD_NOW。zathura 是完整 GTK4 应用，RTLD_NOW 会强制
+# 解析其约 30 个库的 DT_NEEDED 闭包；插件宿主只需导出插件 API 符号，惰性绑定足够。
+# 两者都失败时探针仍以非零码退出并打印 "not ok"（不退化为 skip）。
+#
+# 计数变更说明：原先为 15 条 CHECK / 16 个 TAP 点，其中一条
+# "rejects w*h overflow (trips the w*h ckd_mul branch)" 已删除 —— 参数为
+# unsigned int 而目标 size_t 为 64 位时，width*height <= (2^32-1)^2 = 2^64-2^33+1
+# < SIZE_MAX，第一次 ckd_mul(width, height) 不可能溢出，该分支不可达；且
+# (unsigned int)(SIZE_MAX/2) 会截断为 UINT_MAX，实际只申请约 25.8 GB 而不溢出，
+# 断言通过仅因巨量 malloc 失败，属假阳性且可能 flaky（详见 test.c 内注释）。
+assertion_count: 14
