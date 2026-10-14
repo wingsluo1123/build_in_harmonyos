@@ -1,0 +1,82 @@
+# 版本级 manifest
+# 文件位置: archives/x/xnnpack/0.0-git20241108.4ea82e5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "0.0-git20241108.4ea82e5"
+
+# 软件名
+software: "xnnpack"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-06"
+build_system: "cmake"
+conan_ref: "xnnpack/0.0-git20241108.4ea82e5"
+
+# 源码信息
+source:
+  # 源码下载 URL（与 conandata.yml 的官方 URL 一致；conandata 里额外带镜像列表）
+  url: "https://github.com/google/XNNPACK/archive/4ea82e595b36106653175dcb04b2aa532660d0d8.tar.gz"
+
+  # 源码校验和
+  sha256: "3ef066f2f9b8ac474cd3fd606c601a30bbab59a56406c69019610339f02b6032"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（与 conanfile.py 的 generate() 一致；<recipe>/<src> 为 conan 布局下的绝对路径）
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"
+    - "-DXNNPACK_LIBRARY_TYPE=static"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DXNNPACK_USE_SYSTEM_LIBS=ON"
+    - "-DXNNPACK_BUILD_LIBRARY=ON"
+    - "-DXNNPACK_BUILD_TESTS=ON"
+    - "-DXNNPACK_BUILD_BENCHMARKS=OFF"
+    - "-DXNNPACK_BUILD_ALL_MICROKERNELS=ON"
+    - "-DXNNPACK_ENABLE_KLEIDIAI=OFF"
+    - "-DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON"
+    - "-DCMAKE_WINDOWS_EXPORT_ALL_SYMBOLS=ON"
+    - "-DCMAKE_PROJECT_XNNPACK_INCLUDE=<recipe>/xnnpack_project_include.cmake"
+    - "-DXNNPACK_PTHREADPOOL_SOURCE_DIR=<src>/third_party_src/pthreadpool"
+    - "-DXNNPACK_GOOGLETEST_SOURCE_DIR=<src>/third_party_src/googletest"
+    - "-DXNNPACK_OHOS_VENDOR_GTEST=ON"
+    - "-DXNNPACK_FXDIV_SOURCE_DIR=<fxdiv 包目录>"
+    - "-DCPUINFO_SOURCE_DIR=<cpuinfo 包目录>"
+    - "-DPython_EXECUTABLE=<sys.executable>"
+
+  # 编译依赖列表（格式: name/version；制品仓为裸 ref，不带 @user/channel）
+  dependencies:
+    - "cpuinfo/0.0-git20250905.877328f"
+    - "fxdiv/0.0-git63058eff77"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# 应用的补丁列表（本包对上游源码树逐字节未改，patches/ 为空）
+patches_applied: []
+
+# 编译中学到的知识
+knowledge_gained:
+  - "XNNPACK 的依赖判定统一写成 IF(NOT TARGET <dep>)，且顶部那块 ExternalProject 配置期下载由 XNNPACK_USE_SYSTEM_LIBS 控制：在 project() 结束前用 CMAKE_PROJECT_XNNPACK_INCLUDE 注入同名 target 即可让 cpuinfo/pthreadpool/FXdiv/KleidiAI/GoogleTest 五段下载全部跳过，实现全离线 configure"
+  - "conan 的 build 目录哈希含 recipe revision：任何对 conanfile.py/conandata.yml/exports 的改动都会换 p/b/<hash> 目录，已编译的 .o 全部作废（本任务实测三次 conan create 得到三个不同 build 目录）；只有 recipe 逐字节不变时重跑才是增量续建"
+  - "并行度不能靠 -c tools.build:jobs 覆盖：build() 里 self.conf.define('tools.build:jobs', ...) 会无条件覆盖调用方传入的 conf 值（Conan 2.29 的 Conf.define 直接写 _values），要压并行度只能用 taskset 限制 affinity，让配方的 min(sched_getaffinity, N) 落到更小值"
+  - "include/xnnpack.h 直接 #include \"pthreadpool.h\" 且 CMake 对 XNNPACK 目标做 TARGET_LINK_LIBRARIES(XNNPACK PUBLIC pthreadpool)：pthreadpool 是硬依赖；制品仓无配方时只能 vendor 上游 cmake/DownloadPThreadPool.cmake 钉住的同一 revision（4fe0e1e1…），并把 pthreadpool.h 随包安装"
+  - "XNNPACK_ENABLE_KLEIDIAI 在 arm64 上默认 ON，但源码只从 gitlab.arm.com 取（CI 镜像链只覆盖 github.com）：关掉它不影响 XNNPACK 自带的 NEON/NEONV8/NEONFMA/NEONFP16ARITH/NEONDOT/NEONI8MM 微内核与运行期 CPU 分派"
+  - "googletest 必须用上游 cmake/DownloadGoogleTest.cmake 钉的同一 revision（df1544bcee0c… = 1.15.2，cmake_minimum_required 3.13，CMake 4.x 可 configure），不要换成仓库里 cpuinfo/ruy 用的 v1.14.0：1.14.0 的 DoubleNearPredFormat 缺同号无穷短路分支，ASSERT_NEAR(-inf,-inf,tol) 会算成 NaN 判失败，而 XNNPACK 的 f16/f32 微内核测试在饱和输入上正会产出同号 ±inf（实测 594 条断言假失败、5 个 ctest 二进制变红）；且 BUILD_GMOCK 必须保持 ON——XNNPACK 的 *-test 目标显式链接 GTest::gmock，照搬 ruy 的 BUILD_GMOCK=OFF 会在 configure 期报 'links to: GTest::gmock but the target was not found'"
+  - "aarch64 上必须关掉 FP 收缩（对 C/CXX 加 -ffp-contract=off）：XNNPACK 标量 f32 路径把 FMA 写成 (a*b)+c，且 f32-scalar.h 不定义 XNN_SIMD_HAS_NATIVE_FMA ⇒ 标量有理微内核按未启用 FMA 的常数标定（vmax_abs_x=5.1158981323，该值是插值恰好返回 ±1.0f 的第一个浮点数）；clang 默认 -ffp-contract=on 会把它收缩成 fmadd，算术与标定不一致，clamp 点残余 ~3.6e-7 被 0.5*|x| 放大后超出 GELU 的 10*FLT_EPSILON 容差（f32-vgelu-test 73 条断言失败）。x86/SSE2 基线无 FMA 指令不会收缩，故上游 CI 看不到；关闭收缩后同一二进制 66/66 全过，NEON 等真 FMA intrinsic 不受影响"
+  - "上游 find_package(Python) 失败分支写的是 SET(PYTHON_EXECUTABLE \"python3\")（少一个 n），而随后 EXECUTE_PROCESS 用的是 ${Python_EXECUTABLE} ⇒ 空命令 ⇒ FATAL_ERROR 'Failed to generate microkernels.cmake'；必须显式钉 -DPython_EXECUTABLE=<sys.executable>"

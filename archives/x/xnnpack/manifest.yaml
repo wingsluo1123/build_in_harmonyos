@@ -1,0 +1,26 @@
+software: xnnpack
+display: "XNNPACK"
+description: "Highly optimized low-precision neural-network inference operators (aarch64/ARM NEON, x86, WASM)"
+category: math
+homepage: "https://github.com/google/XNNPACK"
+license: BSD-3-Clause
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "Configure-time ExternalProject downloads (cpuinfo/pthreadpool/FXdiv/KleidiAI/GoogleTest) suppressed: XNNPACK_USE_SYSTEM_LIBS=ON plus pre-defined dependency targets injected via CMAKE_PROJECT_XNNPACK_INCLUDE"
+    - "pthreadpool has no recipe in the ohpcd repository (conan list -r=ohpcd pthreadpool/* = 0 hits): vendored at the exact revision pinned by upstream cmake/DownloadPThreadPool.cmake and built in-tree as a static library"
+    - "googletest vendored at the exact revision pinned by upstream cmake/DownloadGoogleTest.cmake (df1544bcee0c = 1.15.2, cmake_minimum_required 3.13 so CMake 4.x accepts it); the older v1.14.0 must NOT be used because its ASSERT_NEAR/EXPECT_NEAR lacks the same-signed-infinity short circuit, which turns the +/-inf cases that XNNPACK's saturated f16/f32 microkernel tests legitimately produce into NaN assertion failures (594 false failures measured); BUILD_GMOCK must stay ON because XNNPACK test targets link GTest::gmock"
+    - "FP contraction disabled for C/CXX (-ffp-contract=off): XNNPACK's scalar f32 path implements xnn_fmadd_f32 as (a*b)+c while f32-scalar.h does not define XNN_SIMD_HAS_NATIVE_FMA, so scalar rational microkernels are calibrated for non-FMA arithmetic (vmax_abs_x=5.1158981323); clang's default -ffp-contract=on on aarch64 contracts that expression into a real fmadd, breaking the calibration (73 f32-vgelu assertions failed; 66/66 pass after disabling contraction). x86/SSE2 baselines have no FMA instruction so upstream CI does not see this"
+    - "XNNPACK_ENABLE_KLEIDIAI=OFF: upstream default ON for arm64 but the source is only fetchable from gitlab.arm.com, which the CI mirror chain does not cover; XNNPACK's own NEON/NEONDOT/NEONI8MM/NEONFP16ARITH microkernels and runtime CPU dispatch are unaffected"
+    - "CMAKE_SYSTEM_NAME forced to Linux (upstream whitelist rejects HarmonyOS) so XNNPACK_TARGET_PROCESSOR resolves to arm64 and the aarch64 microkernel branches are selected"
+    - "cmake_layout build_folder=build_dir (HMDFS is case-insensitive)"
+    - "build/ctest step output bound to log files (clang silently exits when the conan build child inherits the recipe stdout)"
+  common_dependencies:
+    - "cpuinfo/0.0-git20250905.877328f"
+    - "fxdiv/0.0-git63058eff77"
+
+versions:
+  "0.0-git20241108.4ea82e5":
+    status: built
+    build_date: "2026-10-06"
