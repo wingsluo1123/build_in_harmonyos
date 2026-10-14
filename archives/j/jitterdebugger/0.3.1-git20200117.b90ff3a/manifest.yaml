@@ -1,0 +1,30 @@
+software: jitterdebugger
+version: "0.3.1-git20200117.b90ff3a"
+status: built
+build_date: "2026-09-29"
+
+source:
+  url: "https://github.com/igaw/jitterdebugger/archive/b90ff3a30e2a0694fd2c61f7f0d2591152f2c2a2.tar.gz"
+  sha256: "f1d3a39891e8f0b7a5edeb4dc17906415b426ade638c164a9ee7569a216ba808"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-use-sched-setaffinity.patch"
+
+knowledge_gained:
+  - "上游 Travis 只验证 make 构建，没有 make check 测试目标"
+  - "OHOS 需要 _GNU_SOURCE 才暴露 cpu_set_t；libc 缺少 pthread_attr_setaffinity_np，改用 sched_setaffinity"
+  - "jittersamples 可以独立解码上游 samples.raw 格式，适合做安装后消费者验证"
+  - "实时线程和 mlockall 权限属于运行环境能力，设备测试只验证构建与样本解码路径，不伪称实时调度已通过"
+
+verification:
+  upstream_test: "Travis: make"
+  test_package: "test_package/test.sh"
+  result: "pending CI verification"

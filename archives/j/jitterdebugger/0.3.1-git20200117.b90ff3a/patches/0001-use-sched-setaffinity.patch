@@ -1,0 +1,105 @@
+diff --git a/Makefile b/Makefile
+index 6e7e0c2..12a4f11 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: MIT
+ 
+-CFLAGS += -pthread -Wall -Wstrict-aliasing=1 -Wno-unused-result \
++CFLAGS += -D_GNU_SOURCE -pthread -Wall -Wstrict-aliasing=1 -Wno-unused-result \
+ 	  -Wsign-compare -Wtype-limits -Wmissing-prototypes \
+ 	  -Wstrict-prototypes
+ LDFLAGS += -pthread
+diff --git a/jd_samples_hdf5.c b/jd_samples_hdf5.c
+index e5dcaef..e651cb2 100644
+--- a/jd_samples_hdf5.c
++++ b/jd_samples_hdf5.c
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MIT
+ 
++#ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
++#endif
+ 
+ #include <errno.h>
+ #include <string.h>
+diff --git a/jd_sysinfo.c b/jd_sysinfo.c
+index da56f26..a9d5833 100644
+--- a/jd_sysinfo.c
++++ b/jd_sysinfo.c
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MIT
+ 
++#ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
++#endif
+ 
+ #include <stdlib.h>
+ #include <string.h>
+diff --git a/jd_utils.c b/jd_utils.c
+index 882e218..0d437a8 100644
+--- a/jd_utils.c
++++ b/jd_utils.c
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MIT
+ 
++#ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
++#endif
+ 
+ #include <errno.h>
+ #include <stdio.h>
+diff --git a/jitterdebugger.c b/jitterdebugger.c
+index bc4a0c9..d7c8cf3 100644
+--- a/jitterdebugger.c
++++ b/jitterdebugger.c
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MIT
+ 
++#ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
++#endif
+ 
+ #include <stdio.h>
+ #include <unistd.h>
+@@ -334,10 +336,16 @@ static void *worker(void *arg)
+ {
+ 	struct stats *s = arg;
+ 	struct timespec now, next, interval;
++	cpu_set_t cpuset;
+ 	sigset_t mask;
+ 	uint64_t diff;
+ 	int err;
+ 
++	CPU_ZERO(&cpuset);
++	CPU_SET(s->affinity, &cpuset);
++	if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
++		err_handler(errno, "sched_setaffinity()");
++
+ 	/* Don't handle any signals */
+ 	sigfillset(&mask);
+ 	if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+@@ -431,10 +439,6 @@ static void start_measuring(struct stats *s, struct record_data *rec)
+ 				err_handler(ENOMEM, "ringbuffer_create()");
+ 		}
+ 
+-		err = pthread_attr_setaffinity_np(&attr, sizeof(mask), &mask);
+-		if (err)
+-			err_handler(err, "pthread_attr_setaffinity_np()");
+-
+ 		err = pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+ 		if (err)
+ 			err_handler(err, "pthread_attr_setschedpolicy()");
+diff --git a/jittersamples.c b/jittersamples.c
+index f4bed90..5c5b526 100644
+--- a/jittersamples.c
++++ b/jittersamples.c
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: MIT
+ 
++#ifndef _GNU_SOURCE
+ #define _GNU_SOURCE
++#endif
+ 
+ #include <getopt.h>
+ #include <stdlib.h>
