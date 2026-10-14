@@ -1,45 +1,56 @@
-# libqb 2.0.10 编译清单
-# 创建于 2026-06-11
+# 版本级 manifest
+# 文件位置: archives/l/libqb/2.0.10/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
 
-software:
-  name: libqb
-  version: 2.0.10
-  category: library
-  description: Library providing high performance client server reusable components
-  license: LGPL-2.1
-  homepage: https://github.com/ClusterLabs/libqb
+version: "2.0.10"
+software: "libqb"
+package: libqb
+status: published
+build_date: "2026-10-04"
+build_system: autotools
+homepage: "https://github.com/ClusterLabs/libqb"
+license: LGPL-2.1-or-later
+
+source:
+  url: "https://github.com/ClusterLabs/libqb/releases/download/v2.0.10/libqb-2.0.10.tar.xz"
+  tar_format: tar.xz
 
 build:
   system: autotools
   configure_options:
-    - --prefix=/storage/Users/currentUser/usr/local
-    - --disable-man
-    - --disable-examples
+    - "--disable-man"
+    - "--enable-slow-tests"
   dependencies:
-    - name: glib
-      version: ">=2.0"
-    - name: systemd
-      optional: true
-  patches: []
+    - "glib/2.84.0.1"
+    - "libxml2/2.15.3.1"
+    - "check/0.15.2"
 
-status: built
-quality:
-  g0_clean_build: pending
-  g1_binary_integrity: passed
-  g2_functionality: warning
-  g3_portability: passed
-  g4_archive_integrity: passed
+patches_applied:
+  - "0001-build-aux-config.guess.patch: config.guess 识别 HarmonyOS（uname -s 返回 HarmonyOS），产出 aarch64-unknown-linux-ohos"
+  - "0002-build-aux-config.sub.patch: config.sub 接受 *-linux-ohos 三元组"
+  - "0003-configure.patch: config.status 临时目录 umask 077 -> 022（HMDFS 下 077 使组不可写）"
 
-artifacts:
-  tarball: libqb-2.0.10.tar.xz
-  package: libqb-2.0.10-ohos-aarch64.tar.gz
+patch_generation:
+  method: refresh-patch --auto
+  source_work_dir: builds/libqb-2.0.10.work
+  patches_count: 3
+  generated_at: '2026-10-04'
+
+upstream_tests:
+  command: "make check"
+  test_count: 12
+  passed: 3
+  failed: 9
+  skipped: 0
+  notes: "TESTS 11 个 + --enable-slow-tests 的 util.test，共 12 个用例全部执行；9 个失败源于 CI 沙箱限制（libcheck IPC 临时文件硬编码 /tmp 只读；start.test 需写 /var/run），非 libqb 缺陷。"
+
+test_package:
+  assertion_count: 8
+  description: "以消费者身份链接 libqb 并调用 qb_rb_open/qb_rb_chunk_write/qb_rb_chunk_read（共享内存 ring buffer 往返）、qb_rb_shared_user_data_get、qb_rb_refcount_get、qb_log_init/qb_log_ctl/qb_log，共 8 处真实 API 断言。"
 
 knowledge_gained:
-  - config.guess 平台适配: HarmonyOS 系统需要修改 config.guess/config.sub
-  - umask + setgid 目录权限问题: 使用 umask 077 在 setgid 目录下创建子目录会导致权限问题
-patches:
-  - 0001-config.guess-harmonyos.patch
-  - 0002-config.sub-harmonyos.patch
-configure_options:
-  - --prefix=/storage/Users/currentUser/usr/local
-  - --disable-man
+  - "config.guess 平台适配：HarmonyOS 的 uname -s 返回 \"HarmonyOS\" 而非 \"Linux\"，需用 scripts/patch-autotools-ohos.pl 生成 config.guess/config.sub 增量补丁，否则 configure 无法识别 aarch64-linux-ohos" # ref: knowledge/graph/E007
+  - "umask + setgid 目录权限：configure 用 umask 077 && mktemp -d 建 config.status 临时目录，鸿蒙 HMDFS 上 077 建出的目录组无写权限，写 subs1.awk 报 Permission denied，须改为 umask 022" # ref: knowledge/graph/E010
+  - "autotools 脚本可执行位：源 tarball 不带 .orig stub，且用 cp（非 cp -p）恢复会丢 config.guess/config.sub 的可执行位，configure 直接 exec 时报 RC=127" # ref: knowledge/graph/E490
+  - "conan 配方依赖必须直接声明：经传递依赖拿到的 package_folder 为 None 时 PkgConfigDeps 生成裸 -Iinclude，configure 报 No package 'glib-2.0' found" # ref: archives/a/abiword-plugin-docbook/3.0.8/conanfile.py
+  - "上游 make check 在 CI 沙箱需要显式 LD_LIBRARY_PATH 指向依赖 libdir，否则 libcheck.so 加载失败 exit 127" # ref: knowledge/graph/E540

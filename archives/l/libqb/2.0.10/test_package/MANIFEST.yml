@@ -1,0 +1,87 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求此文件存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 数据来源: libqb-2.0.10/tests/Makefile.am
+#   TESTS（第 108 行，默认 11 个）
+#   if HAVE_SLOW_TESTS -> TESTS += util.test（第 118 行，configure --enable-slow-tests）
+# 断言数: tests/check_*.c 中 ck_assert* 宏出现次数合计（见每项 assertions）
+
+package: libqb/2.0.10
+homepage: "https://github.com/ClusterLabs/libqb"
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 中已集成上游测试（autotools.make(target="check")）
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序（tests/Makefile.am TESTS 变量，共 12 个）
+upstream_tests:
+  - file: start.test
+    source: libqb-2.0.10/tests/start.test
+    description: "启动/基础自检 shell 用例（test.conf 驱动）"
+    command: "./start.test"
+  - file: array.test
+    source: libqb-2.0.10/tests/check_array.c
+    description: "qb_array 动态数组 API"
+    command: "./array.test"
+    assertions: 19
+  - file: map.test
+    source: libqb-2.0.10/tests/check_map.c
+    description: "qb_map 哈希表 API"
+    command: "./map.test"
+    assertions: 107
+  - file: rb.test
+    source: libqb-2.0.10/tests/check_rb.c
+    description: "共享内存 ring buffer（qb_rb_*）"
+    command: "./rb.test"
+    assertions: 19
+  - file: list.test
+    source: libqb-2.0.10/tests/check_list.c
+    description: "qb_list 侵入式链表 API"
+    command: "./list.test"
+    assertions: 5
+  - file: log.test
+    source: libqb-2.0.10/tests/check_log.c
+    description: "qb_log 日志子系统"
+    command: "./log.test"
+    assertions: 150
+  - file: loop.test
+    source: libqb-2.0.10/tests/check_loop.c
+    description: "qb_loop 事件循环"
+    command: "./loop.test"
+    assertions: 112
+  - file: ipc.test
+    source: libqb-2.0.10/tests/check_ipc.c
+    description: "IPC 服务/客户端（含 socket 与共享内存传输）"
+    command: "./ipc.test"
+    assertions: 115
+  - file: sock_ipc_wrapper.test
+    source: libqb-2.0.10/tests/sock_ipc_wrapper.test
+    description: "socket IPC 封装 shell 用例"
+    command: "./sock_ipc_wrapper.test"
+  - file: resources.test
+    source: libqb-2.0.10/tests/resources.test
+    description: "资源/文件句柄检查 shell 用例"
+    command: "./resources.test"
+  - file: blackbox-segfault.sh
+    source: libqb-2.0.10/tests/blackbox-segfault.sh
+    description: "黑盒：段错误处理路径"
+    command: "./blackbox-segfault.sh"
+  - file: util.test
+    source: libqb-2.0.10/tests/check_util.c
+    description: "qb_util 工具函数（慢测，需 --enable-slow-tests）"
+    command: "./util.test"
+    assertions: 7
+
+# test_package 中自带的测试（消费者视角验证，鸿蒙 PC 特有）
+test_package_tests:
+  - file: test.c
+    description: "鸿蒙 PC 消费者测试：共享内存 ring buffer 往返 + 共享用户数据 + 引用计数 + qb_log"
+    command: "./test_libqb"
+
+# 测试断言总数（上游 ck_assert* 合计 = 19+107+19+5+150+112+115+7 = 534，
+# 另有 start/sock_ipc_wrapper/resources/blackbox 4 个 shell 用例为脚本断言）
+assertion_count: 534
