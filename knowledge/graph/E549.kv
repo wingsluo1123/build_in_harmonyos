@@ -1,0 +1,57 @@
+#====================================================================
+# 来源事件: colord 1.4.8 HarmonyOS 适配（archives/c/colord/1.4.8，已发布制品仓）
+#====================================================================
+
+id:                     E549
+trigger_tool:           meson|conan
+phase:                  configuration|build|package
+error_signature:        daemon=false.*colord|colord.*client.*subdir|colormgr|cd-iccdump
+severity:               2
+category:               build-system, packaging, portability
+match_keywords:         colord, daemon=false, client subdir, colormgr, cd-iccdump, cd-fix-profile, commands.json, R38, meson, bindirs
+
+title:                  colord 混合打包：daemon=false 禁用 daemon 但保留 client CLI（colormgr/cd-iccdump 等），产物含 bin/ 须声明 commands.json（type=tool）
+
+root_cause:             colord 上游同一仓库产出 daemon（src/，依赖 polkit/libudev/libsystemd，OHOS 均无）、客户端 CLI 工具（client/：colormgr、cd-iccdump、cd-fix-profile 等）与客户端库 libcolord/libcolordprivate。OHOS 适配以 -Ddaemon=false 禁用 daemon，但保留 client/ 子目录：CLI 工具无 D-Bus 运行时依赖，PC 端色彩管理可直接使用。产物含 bin/ 可执行文件，按 R38 必须在软件级目录（archives/c/colord/）声明 commands.json（type=tool），conanfile 的 package_info 同步暴露 bindirs。
+
+affected_scope:         colord 家族，及同类『daemon + CLI + 库混合』上游仓库在 OHOS 的适配（daemon 系统依赖不可用、CLI 可独立运行的场景）
+verification_cmd:       test -f archives/c/colord/commands.json && grep -n 'bindirs' archives/c/colord/1.4.8/conanfile.py && grep -n "daemon.*false" archives/c/colord/1.4.8/conanfile.py
+
+rec_priority:           1
+rec_approach:           daemon-off-keep-client-cli
+rec_description:        daemon 依赖 polkit/udev/systemd 等 OHOS 缺失能力时 -Ddaemon=false 禁用 daemon，保留 client CLI 工具并声明 commands.json（type=tool）；CLI 无 D-Bus 依赖可独立使用
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+
+forbid_1_pattern:
+forbid_1_reason:
+forbid_1_consequence:
+
+principles:             
+
+causes:                 []
+caused_by:              []
+similar_to:             [E545]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E549.md
+last_updated:           2026-10-05
+source_event:           colord-1.4.8-ohos-adaptation
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:               AtomCode
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
