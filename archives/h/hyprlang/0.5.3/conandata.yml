@@ -1,0 +1,13 @@
+sources:
+  url: "https://github.com/hyprwm/hyprlang/archive/refs/tags/v0.5.3.tar.gz"
+  sha256: "9715311d6b31c18f1e83da999269c71a61c0862645795d2666fa1d7b20d5d0f6"
+patches:
+  - patch_file: "patches/0001-expected-to-local-struct.patch"
+    patch_description: "config.cpp：configStringToInt/parseHex 的 std::expected<int64_t,std::string> 返回类型改为本地最小等价结构 CExpectedInt——OHOS libc++ 15（clang 15 工具链）无 <expected> 头；错误消息语义与调用点行为保持等价"
+    patch_type: "portability"
+  - patch_file: "patches/0002-replace-std-format.patch"
+    patch_description: "config.cpp：8 处 std::format 错误消息拼接改为字符串连接/std::to_string 等价实现，并去掉 <format> include——OHOS libc++ 15 无 <format> 头（clang 15 工具链限制）；消息内容不变"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ohos-relocatable-dep-linkage.patch"
+    patch_description: "CMakeLists.txt：libhyprutils.so 无 DT_SONAME，链接 PkgConfig::deps 会让 ld 把 conan 缓存绝对路径写进 DT_NEEDED（换机不可消费，E537/R05 同款问题）；改为按 .pc 声明的 -L/-l 基名链接并保留 include 目录"
+    patch_type: "portability"

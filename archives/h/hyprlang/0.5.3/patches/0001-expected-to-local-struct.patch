@@ -1,0 +1,143 @@
+--- a/src/config.cpp	2025-05-19 00:00:00.000000000 +0000
++++ b/src/config.cpp	2026-09-26 00:00:00.000000000 +0000
+@@ -7,7 +7,6 @@
+ #include <format>
+ #include <algorithm>
+ #include <cmath>
+-#include <expected>
+ #include <sstream>
+ #include <cstring>
+ #include <hyprutils/string/VarList.hpp>
+@@ -161,15 +160,33 @@
+     }
+ }
+ 
+-static std::expected<int64_t, std::string> configStringToInt(const std::string& VALUE) {
+-    auto parseHex = [](const std::string& value) -> std::expected<int64_t, std::string> {
++// OHOS libc++ 15 lacks <expected>: minimal local equivalent of
++// std::expected<int64_t, std::string> (success carries a value, failure a
++// message). Semantics of configStringToInt() are unchanged.
++struct CExpectedInt {
++    int64_t     value = 0;
++    bool        ok    = false;
++    std::string error;
++
++    CExpectedInt() = default;
++    CExpectedInt(int64_t v) : value(v), ok(true) {} // wrap success
++
++    static CExpectedInt unexpected(const std::string& err) {
++        CExpectedInt r;
++        r.error = err;
++        return r;
++    }
++};
++
++static CExpectedInt configStringToInt(const std::string& VALUE) {
++    auto parseHex = [](const std::string& value) -> CExpectedInt {
+         try {
+             size_t position;
+             auto   result = stoll(value, &position, 16);
+             if (position == value.size())
+                 return result;
+         } catch (const std::exception&) {}
+-        return std::unexpected("invalid hex " + value);
++        return CExpectedInt::unexpected("invalid hex " + value);
+     };
+     if (VALUE.starts_with("0x")) {
+         // Values with 0x are hex
+@@ -190,23 +207,23 @@
+             uint8_t a           = 0;
+             try {
+                 a = std::round(std::stof(trim(rolling.substr(0, rolling.find(',')))) * 255.f);
+-            } catch (std::exception& e) { return std::unexpected("failed parsing " + VALUEWITHOUTFUNC); }
+-
+-            if (!r.has_value() || !g.has_value() || !b.has_value())
+-                return std::unexpected("failed parsing " + VALUEWITHOUTFUNC);
+-
+-            return a * (Hyprlang::INT)0x1000000 + r.value() * (Hyprlang::INT)0x10000 + g.value() * (Hyprlang::INT)0x100 + b.value();
++            } catch (std::exception& e) { return CExpectedInt::unexpected("failed parsing " + VALUEWITHOUTFUNC); }
++
++            if (!r.ok || !g.ok || !b.ok)
++                return CExpectedInt::unexpected("failed parsing " + VALUEWITHOUTFUNC);
++
++            return a * (Hyprlang::INT)0x1000000 + r.value * (Hyprlang::INT)0x10000 + g.value * (Hyprlang::INT)0x100 + b.value;
+         } else if (VALUEWITHOUTFUNC.length() == 8) {
+             const auto RGBA = parseHex(VALUEWITHOUTFUNC);
+ 
+-            if (!RGBA.has_value())
++            if (!RGBA.ok)
+                 return RGBA;
+ 
+             // now we need to RGBA -> ARGB. The config holds ARGB only.
+-            return (RGBA.value() >> 8) + 0x1000000 * (RGBA.value() & 0xFF);
+-        }
+-
+-        return std::unexpected("rgba() expects length of 8 characters (4 bytes) or 4 comma separated values");
++            return (RGBA.value >> 8) + 0x1000000 * (RGBA.value & 0xFF);
++        }
++
++        return CExpectedInt::unexpected("rgba() expects length of 8 characters (4 bytes) or 4 comma separated values");
+ 
+     } else if (VALUE.starts_with("rgb(") && VALUE.ends_with(')')) {
+         const auto VALUEWITHOUTFUNC = trim(VALUE.substr(4, VALUE.length() - 5));
+@@ -221,20 +238,20 @@
+             rolling             = rolling.substr(rolling.find(',') + 1);
+             auto b              = configStringToInt(trim(rolling.substr(0, rolling.find(','))));
+ 
+-            if (!r.has_value() || !g.has_value() || !b.has_value())
+-                return std::unexpected("failed parsing " + VALUEWITHOUTFUNC);
+-
+-            return (Hyprlang::INT)0xFF000000 + r.value() * (Hyprlang::INT)0x10000 + g.value() * (Hyprlang::INT)0x100 + b.value();
++            if (!r.ok || !g.ok || !b.ok)
++                return CExpectedInt::unexpected("failed parsing " + VALUEWITHOUTFUNC);
++
++            return (Hyprlang::INT)0xFF000000 + r.value * (Hyprlang::INT)0x10000 + g.value * (Hyprlang::INT)0x100 + b.value;
+         } else if (VALUEWITHOUTFUNC.length() == 6) {
+             const auto RGB = parseHex(VALUEWITHOUTFUNC);
+ 
+-            if (!RGB.has_value())
++            if (!RGB.ok)
+                 return RGB;
+ 
+-            return RGB.value() + 0xFF000000;
+-        }
+-
+-        return std::unexpected("rgb() expects length of 6 characters (3 bytes) or 3 comma separated values");
++            return RGB.value + 0xFF000000;
++        }
++
++        return CExpectedInt::unexpected("rgb() expects length of 6 characters (3 bytes) or 3 comma separated values");
+     } else if (VALUE.starts_with("true") || VALUE.starts_with("on") || VALUE.starts_with("yes")) {
+         return 1;
+     } else if (VALUE.starts_with("false") || VALUE.starts_with("off") || VALUE.starts_with("no")) {
+@@ -242,12 +259,12 @@
+     }
+ 
+     if (VALUE.empty() || !isNumber(VALUE, false))
+-        return std::unexpected("cannot parse \"" + VALUE + "\" as an int.");
++        return CExpectedInt::unexpected("cannot parse \"" + VALUE + "\" as an int.");
+ 
+     try {
+         const auto RES = std::stoll(VALUE);
+         return RES;
+-    } catch (std::exception& e) { return std::unexpected(std::string{"stoll threw: "} + e.what()); }
++    } catch (std::exception& e) { return CExpectedInt::unexpected(std::string{"stoll threw: "} + e.what()); }
+ 
+     return 0;
+ }
+@@ -388,12 +405,12 @@
+         case CConfigValue::eDataType::CONFIGDATATYPE_INT: {
+ 
+             const auto INT = configStringToInt(value);
+-            if (!INT.has_value()) {
+-                result.setError(INT.error());
++            if (!INT.ok) {
++                result.setError(INT.error);
+                 return result;
+             }
+ 
+-            VALUEIT->second.setFrom(INT.value());
++            VALUEIT->second.setFrom(INT.value);
+ 
+             break;
+         }
