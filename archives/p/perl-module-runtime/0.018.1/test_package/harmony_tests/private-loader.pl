@@ -1,0 +1,30 @@
+BEGIN {
+    @INC = split /:/, $ENV{PERL5LIB};
+    my @roots = split /:/, $ENV{BINDING_ROOTS};
+    die "unbound include" if grep { my $p = $_; !grep { index($p, "$_/") == 0 } @roots } @INC;
+}
+use strict;
+use warnings;
+use File::Temp qw(tempdir);
+use File::Spec;
+use Digest::SHA qw(sha256_hex);
+use Module::Runtime qw(use_module);
+my $system = `/system/bin/uname -s`;
+die "actual HarmonyOS system required" unless $? == 0 && $system eq "HarmonyOS\n";
+my $root = tempdir('module-loader-XXXXXX', DIR => $ENV{TMPDIR}, CLEANUP => 1);
+die "actual process-owned POSIX root required" if -l $root || (lstat $root)[4] != $<;
+my $file = File::Spec->catfile($root, 'HarmonyLoaderFixture.pm');
+my $source = "package HarmonyLoaderFixture; sub value { 27 } 1;\n";
+open my $out, '>:raw', $file or die "create owned fixture: $!";
+print {$out} $source or die "write owned fixture: $!";
+close $out or die "close owned fixture: $!";
+local @INC = ($root, @INC);
+my $module = use_module('HarmonyLoaderFixture');
+die "genuine loader flow failed" unless $module eq 'HarmonyLoaderFixture' && HarmonyLoaderFixture::value() == 27;
+die "foreign loader path" unless $INC{'HarmonyLoaderFixture.pm'} eq $file && !-l $file && (lstat $file)[4] == $<;
+open my $in, '<:raw', $file or die "read actual fixture: $!";
+local $/;
+my $actual = <$in>;
+close $in or die "close actual fixture: $!";
+die "fixture bytes drifted" unless sha256_hex($actual) eq sha256_hex($source);
+print "HARMONY_TEST_PASS=1/1\nactual OHOS owned-root dynamic loader and byte readback\n";
