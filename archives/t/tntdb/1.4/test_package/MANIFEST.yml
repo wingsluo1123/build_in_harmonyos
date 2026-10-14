@@ -1,0 +1,86 @@
+# test_package/MANIFEST.yml — tntdb 1.4 verification manifest
+#
+# Upstream test suite. The official maekitalo/tntdb V1.4 project carries a
+# cxxtools-unit test suite: 8 suites compiled into a single
+# test/tntdb-test runner (test/Makefile.am builds it as noinst_PROGRAMS;
+# automake defines no TESTS, so `make check` only builds it and the recipe
+# runs test/tntdb-test -s explicitly against a sqlite fixture created from
+# test/sqlite-test.sql). Method counts below are audited from
+# registerMethod calls in the V1.4 tag sources.
+package: tntdb/1.4
+software: tntdb
+version: "1.4"
+homepage: "https://github.com/maekitalo/tntdb"
+
+upstream_tests_exist: true
+upstream_test_audit: >
+  Source audit of the V1.4 tag (https://github.com/maekitalo/tntdb/tree/V1.4/test):
+  test/Makefile.am compiles base-test.cpp, colname-test.cpp, decimal-test.cpp,
+  sqlbuilder-test.cpp, statement-test.cpp, test-main.cpp, timespan-test.cpp,
+  types-test.cpp and value-test.cpp into one test/tntdb-test binary driven by
+  cxxtools::unit::testmain (-s prints success/errors/skipped, exit code is
+  app.errors()). registerMethod counts: base 15, colname 1, decimal 6,
+  sqlbuilder 4, statement 3, timespan 1, types 26, value 2 = 58 methods.
+  test/test.cpp and test/tntdb-locktest.cpp are not in SOURCES (manual tools,
+  not registered). Method auto: single cxxtools-unit framework aggregate;
+  the -s summary line is the counting source.
+
+upstream_check_command: "test/tntdb-test -s"
+upstream_test_in_build: true
+upstream_test_command: "make -j1 check SHELL=/bin/sh && test/tntdb-test -s with TNTDBURL=sqlite:test.db fixture"
+
+upstream_tests:
+  - name: base
+    file: test/base-test.cpp
+    description: "DB round-trip suite via TNTDBURL (default sqlite:test.db): select value/row/result, placeholders, cursors, transactions, limit (15 methods)"
+    command: "test/tntdb-test -s"
+  - name: colname
+    file: test/colname-test.cpp
+    description: "Column-name lookup suite (1 method)"
+    command: "test/tntdb-test -s"
+  - name: decimal
+    file: test/decimal-test.cpp
+    description: "Decimal parsing/arithmetic suite (6 methods)"
+    command: "test/tntdb-test -s"
+  - name: sqlbuilder
+    file: test/sqlbuilder-test.cpp
+    description: "SqlBuilder placeholder-expansion suite (4 methods)"
+    command: "test/tntdb-test -s"
+  - name: statement
+    file: test/statement-test.cpp
+    description: "Statement mock-binding suite (3 methods)"
+    command: "test/tntdb-test -s"
+  - name: timespan
+    file: test/timespan-test.cpp
+    description: "Timespan conversion suite (1 method)"
+    command: "test/tntdb-test -s"
+  - name: types
+    file: test/types-test.cpp
+    description: "Value type-mapping suite incl. DB-backed reads (26 methods)"
+    command: "test/tntdb-test -s"
+  - name: value
+    file: test/value-test.cpp
+    description: "Value get/set conversion suite (2 methods)"
+    command: "test/tntdb-test -s"
+
+upstream_discovered: 58
+upstream_test_total: 58
+upstream_test_count_method: auto
+# auto: single cxxtools-unit aggregate runner; functional count is the
+# registerMethod method total (58), verified at runtime by the -s summary
+# (success+errors+skipped must equal 58).
+
+test_type: installed-package
+test_package_tests:
+  - file: test_tntdb.cpp
+    name: test_tntdb
+    description: "Consumer contract against the packaged headers + library + sqlite driver: connect, create/insert, selectValue max, selectRow fields, cursor count, placeholder binding, transaction rollback, Value/Decimal/SqlBuilder checks (10 CHECKs)"
+    command: "./test_tntdb"
+
+executables:
+  - name: test_tntdb
+    purpose: "installed-package API verification (link and run against the packaged libtntdb + sqlite driver)"
+
+cases: 1
+assertions: 10
+upstream_cases: 58
