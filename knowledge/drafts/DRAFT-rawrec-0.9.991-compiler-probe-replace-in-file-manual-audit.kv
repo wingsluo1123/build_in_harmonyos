@@ -1,0 +1,30 @@
+id: DRAFT-rawrec-0.9.991-compiler-probe-replace-in-file-manual-audit
+trigger_tool: conan|make|sh
+phase: patching|build|testing
+error_signature: No such file or directory.*Error 127|Failed to apply patch.*src/Makefile|invalid hunk.*audio_init\.c
+severity: 3
+category: build-system, portability, testing, ohos
+match_keywords: compiler_path_probe, replace_in_file, manual_audit, Error 127, invalid hunk
+title: 手写Makefile绝对路径先探测回退且漂移补丁改用配方内精确替换
+root_cause: 配方盲信tools.build compiler_executables绝对CC与硬编码make和shell路径且无存在性校验在真机失效报Error 127；手写Makefile统一补丁上下文随注释空行漂移无法应用且0002补丁hunk计数虚标被Conan拒收；src/test_dsp_params.c被误判为测试导致evidence门禁no_tests零证据拒绝
+affected_scope: 手写Makefile、无configure与cmake且经绝对路径传入CC和make和shell的C类库
+verification_cmd: 真机日志保留解析后CC与make编译行无Error 127且补丁干净应用；MANIFEST.yml保留manual_audit空check命令与test_dsp_params.c生产代码审计，真机evidence放行
+rec_priority: 1
+rec_approach: probe-absolute-paths-plus-replace-in-file
+rec_description: 绝对CC和make和shell先做isfile加X_OK校验再回退PATH兄弟与HMBS_MAKE；删除漂移Makefile统一补丁改用replace_in_file三处精确替换并修正hunk计数；指名test_dsp_params.c为经OBJS通配链接的生产代码并切manual_audit空命令
+rec_command: conanfile.py新增_resolve_cc和_resolve_make加replace_in_file三处精确替换；test_package/conanfile.py新增_resolve_shell加test.sh改POSIX sh；MANIFEST.yml改manual_audit空命令；conandata.yml修正补丁列表与镜像排序
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: pin-hmbs-build-tools-path
+fallback_description: 若PATH回退仍无可用编译器则直接固定HMBS_BUILD_TOOLS中可用make和clang路径并记录warn，保留失败审计不伪造证据
+fallback_auto_fix: false
+forbid_1_pattern: /data/service/hnp/bin/clang.*No such file or directory
+forbid_1_reason: 禁止不经isfile加X_OK校验直接使用绝对CC和make和shell路径；真机绝对路径易失效
+forbid_1_consequence: 真机make报No such file or directory加Error 127，compile门禁失败退回修复循环
+similar_to: []
+doc_file: knowledge/drafts/DRAFT-rawrec-0.9.991-compiler-probe-replace-in-file-manual-audit.md
+last_updated: 2026-10-13
+source_event: rawrec/0.9.991真机预检Error127与补丁漂移及evidence审计修复
+authors: hmbs-executor
+source_pr: 15694
