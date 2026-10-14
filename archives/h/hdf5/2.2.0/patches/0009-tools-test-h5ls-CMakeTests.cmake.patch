@@ -1,0 +1,135 @@
+--- a/tools/test/h5ls/CMakeTests.cmake
++++ b/tools/test/h5ls/CMakeTests.cmake
+@@ -1,10 +1,23 @@
++# Expand only the two original shell-glob cases, then use the unchanged upstream
++# RC/output comparison driver and source-derived reference files.
++if (DEFINED HDF5_H5LS_GLOB)
++  file (GLOB h5ls_glob_files RELATIVE "${TEST_FOLDER}" "${TEST_FOLDER}/${HDF5_H5LS_GLOB}")
++  list (SORT h5ls_glob_files)
++  if (NOT h5ls_glob_files)
++    message (FATAL_ERROR "Original wildcard fixture set is empty")
++  endif ()
++  list (APPEND TEST_ARGS ${h5ls_glob_files})
++  include ("${HDF5_H5LS_RUN_TEST}")
++  return ()
++endif ()
++
+ #
+ # Copyright by The HDF Group.
+ # All rights reserved.
+ #
+ # This file is part of HDF5.  The full HDF5 copyright notice, including
+ # terms governing use, modification, and redistribution, is contained in
+ # the LICENSE file, which can be found at the root of the source code
+ # distribution tree, or in https://www.hdfgroup.org/licenses.
+ # If you do not have access to either file, you may request a copy from
+ # help@hdfgroup.org.
+@@ -57,20 +70,22 @@
+     tsoftlinks.h5
+     tstr.h5
+     tudfilter.h5
+     tudlink.h5
+     tvldtypes1.h5
+ )
+ set (LIST_HDF5_END_TEST_FILES
+     tall.h5
+ )
+ set (LIST_OTHER_TEST_FILES
++    tstarfile.ls
++    tqmarkfile.ls
+     help-1.ls
+     help-2.ls
+     help-3.ls
+     nosuchfile.ls
+     tall-1.ls
+     tall-2.ls
+     tarray1.ls
+     tattr2.ls
+     tattrreg_le.ls
+     tattrreg_be.ls
+@@ -247,21 +262,21 @@
+ #                            Ignored if memchecker is enabled.
+ #
+ # OPTIONAL FLAGS:
+ # WILL_FAIL - indicates that the test is expected to fail. Defaults to false
+ # NATIVE_ONLY - only run this test with the native VOL connector
+ # SKIP_TEST - Skip this test.
+ #
+ macro (ADD_H5_TEST testname)
+   cmake_parse_arguments (ARG
+       "WILL_FAIL;SKIP_TEST;NATIVE_ONLY" # flags
+-      "RESULT_CODE;RESULT_ERRCHECK" # one-value args
++      "RESULT_CODE;RESULT_ERRCHECK;GLOB_INPUT" # one-value args
+       "" # multi-value args
+       ${ARGN}
+   )
+ 
+   # Validate required parameters
+   if (NOT DEFINED ARG_RESULT_CODE)
+     message (FATAL_ERROR "ADD_H5_TEST: RESULT_CODE parameter required")
+   endif ()
+ 
+   if (${ARG_NATIVE_ONLY})
+@@ -286,20 +301,34 @@
+       HDF5_GET_VOL_TGT_INFO (${ext_vol_tgt} vol vol_env)
+ 
+       set (vol_prefix "HDF5_VOL_${vol}-")
+       set (vol_workdir "${PROJECT_BINARY_DIR}/${vol}/testfiles")
+     endif ()
+ 
+ 
+     # If using memchecker add tests without using scripts
+     if (HDF5_ENABLE_USING_MEMCHECKER)
+       add_test (NAME ${vol_prefix}H5LS-${testname} COMMAND $<TARGET_FILE:h5ls> ${ARG_UNPARSED_ARGUMENTS})
++    elseif (DEFINED ARG_GLOB_INPUT)
++      add_test (
++          NAME ${vol_prefix}H5LS-${testname}
++          COMMAND "${CMAKE_COMMAND}"
++              -D "TEST_PROGRAM=$<TARGET_FILE:h5ls>"
++              -D "TEST_ARGS=${ARG_UNPARSED_ARGUMENTS}"
++              -D "TEST_FOLDER=${vol_workdir}"
++              -D "TEST_OUTPUT=${testname}.out"
++              -D "TEST_EXPECT=${ARG_RESULT_CODE}"
++              -D "TEST_REFERENCE=${testname}.ls"
++              -D "HDF5_H5LS_GLOB=${ARG_GLOB_INPUT}"
++              -D "HDF5_H5LS_RUN_TEST=${HDF_RESOURCES_DIR}/runTest.cmake"
++              -P "${CMAKE_CURRENT_LIST_FILE}"
++      )
+     else ()
+       # Remove any output file left over from previous test run
+       add_test (
+           NAME ${vol_prefix}H5LS-${testname}
+           COMMAND "${CMAKE_COMMAND}"
+               -D "TEST_PROGRAM=$<TARGET_FILE:h5ls>"
+               -D "TEST_ARGS=${ARG_UNPARSED_ARGUMENTS}"
+               -D "TEST_FOLDER=${PROJECT_BINARY_DIR}/testfiles"
+               -D "TEST_OUTPUT=${testname}.out"
+               -D "TEST_EXPECT=${ARG_RESULT_CODE}"
+@@ -544,23 +573,24 @@
+ 
+   if (H5_WORDS_BIGENDIAN)
+     ADD_H5_TEST (tcomplex_nosupport RESULT_CODE 0 -w80 -v tcomplex.h5 WILL_FAIL)
+     ADD_H5_TEST (tcomplex_be_nosupport RESULT_CODE 0 -w80 -v tcomplex_be.h5)
+   else ()
+     ADD_H5_TEST (tcomplex_nosupport RESULT_CODE 0 -w80 -v tcomplex.h5)
+     ADD_H5_TEST (tcomplex_be_nosupport RESULT_CODE 0 -w80 -v tcomplex_be.h5 WILL_FAIL)
+   endif ()
+ endif ()
+ 
+-# test for wildcards in filename (does not work with cmake)
+-ADD_H5_TEST (tstarfile RESULT_CODE 0 -w80 t*link.h5 SKIP_TEST)
+-ADD_H5_TEST (tqmarkfile RESULT_CODE 0 -w80 t?link.h5 SKIP_TEST)
++# Original wildcard identities and patterns, with deterministic shell-equivalent
++# expansion instead of passing literal wildcards to execute_process.
++ADD_H5_TEST (tstarfile RESULT_CODE 0 -w80 GLOB_INPUT t*link.h5)
++ADD_H5_TEST (tqmarkfile RESULT_CODE 0 -w80 GLOB_INPUT t?link.h5)
+ ADD_H5_TEST (tmultifile RESULT_CODE 0 -w80 thlink.h5 tslink.h5)
+ 
+ # tests for hard links
+ ADD_H5_TEST (thlink-1 RESULT_CODE 0 -w80 thlink.h5)
+ 
+ # tests for compound data types
+ ADD_H5_TEST (tcomp-1 RESULT_CODE 0 -w80 -r -d tcompound.h5)
+ 
+ #test for the nested compound type
+ ADD_H5_TEST (tnestcomp-1 RESULT_CODE 0 -w80 -r -d tnestedcomp.h5)

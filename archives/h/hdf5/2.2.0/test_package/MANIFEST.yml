@@ -1,0 +1,17 @@
+package: hdf5/2.2.0
+homepage: https://www.hdfgroup.org/
+upstream_test_in_build: true
+upstream_test_command: "ctest --parallel 1 --output-on-failure --no-tests=error"
+upstream_inventory: "original CTest --show-only=json-v1; exact names/count and zero failures/errors/skips"
+test_package_tests:
+  - file: main.c
+    description: "Actual two-rank parallel HDF5 file create/write/read and creator removal"
+    command: "mpiexec -n 2 real_parallel"
+assertion_count: 20
+harmony_specific_tests:
+  - file: harmony_tests/overflow_stream.c
+    description: "Actual installed production tools library OHOS immediate-unlink overflow stream under private TMPDIR"
+    command: "TMPDIR=<owned-test-root> harmony_tests/harmony_overflow"
+    expected_marker: "HARMONY_PRIVATE_PRODUCTION_OVERFLOW_PASS=1/1"
+harmony_specific_execution_pending: true
+previous_harmony_specific_evidence_run: "fenics-hdf5-disabled-diagnostic-20261009-r030"
