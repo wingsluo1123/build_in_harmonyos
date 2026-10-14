@@ -1,0 +1,47 @@
+package: libchewing/0.13.1
+homepage: "https://chewing.im/"
+
+upstream_tests_exist: true
+
+upstream_test_audit:
+  source_tarball: "libchewing v0.13.1 git-archive (github.com/chewing @ e928d7b8) + libchewing-data (github.com/fcitx-contrib @ 7bd07548)"
+  source_sha256: "94cbd60a7e89f4680e46d1326b4943dbb79b6274e154cf83bc4de1b38978ea45"
+  data_sha256: "4c491740811586445c3cda5a244751968571fe126dba059dc3dd895265f379b0"
+  top_level_files:
+    - CMakeLists.txt
+    - capi/include/chewing.h
+    - tests/test-bopomofo.c
+    - tests/CMakeLists.txt
+    - data (submodule libchewing-data at bfba418, via github.com/fcitx-contrib mirror 7bd07548)
+    - Cargo.toml
+  scanned_for:
+    - "add_test entries in tests/CMakeLists.txt"
+    - "cargo test entries (cargo-test-lib/capi/cli)"
+    - "CTest include in top CMakeLists.txt"
+    - "BUILD_TESTING option"
+  scan_result: "Top CMakeLists.txt includes CTest with BUILD_TESTING ON and add_subdirectory(tests). tests/CMakeLists.txt defines 14 C testcases via add_test plus 3 cargo tests, total 17 ctest entries. Test tools are built but not registered. Valgrind duplicates only when valgrind found. Curses genkeystroke only when Curses found."
+  reason: "libchewing C API plus Rust core via Corrosion; upstream suite is ctest-driven, built with -DBUILD_TESTING=ON in conanfile build() and executed as ctest --output-on-failure."
+
+upstream_test_total: 17
+upstream_test_count_method: ctest_entries
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+upstream_tests:
+  - file: tests/test-bopomofo.c etc (14 cases)
+    source: libchewing-v0.13.1/tests
+    description: "Upstream C testcases (bopomofo/config/easy-symbol/error-handling/fullshape/keyboard/keyboardless/logger/regression/reset/special-symbol/struct-size/symbol/userphrase)"
+    command: "ctest --output-on-failure"
+  - file: Cargo tests (lib/capi/cli)
+    source: libchewing-v0.13.1/Cargo workspace
+    description: "Rust cargo tests exposed as ctest entries cargo-test-lib/capi/cli"
+    command: "ctest --output-on-failure"
+
+test_package_tests:
+  - file: test_chewing.c
+    description: "Consumer checks: version/context/KB/mode/candPerPage/key-handle/reset lifecycle (6 checks)"
+    command: "ctest --output-on-failure"
+
+assertion_count: 6
