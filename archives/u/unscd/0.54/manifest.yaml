@@ -1,0 +1,40 @@
+version: "0.54"
+software: "unscd"
+status: built
+build_date: "2026-10-13"
+build_system: "makefile"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/u/unscd/unscd_0.54.orig.tar.gz"
+  sha256: "823430b97de9349c73f12a33e4c28a9425b3166a77f7e9e03aeccb4964aaee53"
+  tar_format: tar.gz
+
+build:
+  system: "makefile"
+  configure_options: []
+  dependencies: []
+  cc: "clang"
+  cxx: "clang++"
+
+patches_applied: []
+
+knowledge_gained:
+  - "Upstream is a single nscd-0.54.c file plus a 223-byte Makefile (all/clean only); no configure step"
+  - "Upstream Makefile default CFLAGS carry GNU-ld-only flags; override CFLAGS on the make command line for clang/lld"
+  - "Upstream binary is named nscd; package ships both bin/unscd and bin/nscd as real copies (no symlinks on HMDFS)"
+  - "Upstream has no automated test suite; validation is test_package binary smoke plus an NSS consumer check"
+
+homepage: "https://busybox.net/~vda/unscd/"
+license: "GPL-2.0-only"
+
+tests:
+  upstream:
+    command: "make check"
+    cases: 0
+    passed: 0
+    note: "No upstream test suite; Makefile has no check target"
+  adapted:
+    command: "test_package/test.sh"
+    cases: 4
+    passed: 4
+    pass_rate: "4/4 (100%)"
