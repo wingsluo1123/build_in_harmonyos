@@ -1,0 +1,69 @@
+# test_package/MANIFEST.yml — lcm 1.3.11
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在；hmbs 真机门禁据此核对
+# 上游测试总数口径与 test_package 新增用例计数。
+
+package: lcm/1.3.11
+homepage: "https://lcm-proj.github.io/"
+
+# ── 上游测试：已在包构建中真实编译并执行（build() 内 _run_upstream_tests）──
+# lcm 的 C/C++ 单测在独立 test/ 树（未接入 automake make check），依赖
+# vendored gtest（test/gtest）并链 liblcm。配方 build() 手动编译全部 6 个 gtest
+# 二进制（test/c/memq_test、test/c/eventlog_test、test/c/udpm_test、
+# test/c/client.cpp→c_client、test/cpp/memq_test、test/cpp/client.cpp→cpp_client）
+# 并运行，产出 HMBS_UPSTREAM_TEST_RESULT 并持久化到 package
+# res/upstream_test_result.json（test_package 每次复用复发，缓存命中轮也有上游证据）。
+# 真机实测（上一轮真机日志）：discovered=24 executed=9 passed=9 failed=0 skipped=15
+# ohos_feature gap 15：
+#   - eventlog_test 3 用例写设备只读 /tmp(erofs)：make_tmpnam()=tmpnam(NULL) 返回
+#     硬编码 /tmp 路径，lcm_eventlog_create() fopen 失败返回 NULL，首用例对 NULL 调
+#     lcm_eventlog_destroy 段错误(rc=139)，未完成执行。
+#   - C client.cpp 6 例 / C++ client.cpp 6 例 client-server 用例需经默认 UDP
+#     multicast 提供方由 test/c/server 应答；真机该组 net 能力缺失/组播不可达时
+#     client 收不到回复，rc=127/1 未完成执行。
+# memq/udpm/cppmemq 四个单进程提供者用例实测通过 9（4+1+4），真实 [ FAILED ]=0。
+upstream_check_command: "cd test/c test/cpp && {memq,eventlog,udpm}_test   # build() 内直接执行"
+upstream_test_in_build: true
+upstream_test_command: "（build() 内 _run_upstream_tests 手动编译运行 6 个 gtest 二进制）"
+
+# ── 分母（与官方保持一致）────────────────────────────────────────────
+# 上游注册用例总数 = 24，取自上游 .cpp 源码中的 TEST() 宏（gtest_macros 口径，
+# 与 pc-pr-review 实测 N=24 一致）：
+#   test/c/memq_test.cpp       → 4  (MemqConstructDestroy/MemqSimple/MemqBuffered/MemqTimeout)
+#   test/c/eventlog_test.cpp   → 3  (EventLogBasic/EventLogWriteRead/EventLogCorrupt)
+#   test/c/udpm_test.cpp       → 1  (InvalidCreation)
+#   test/c/client.cpp          → 6  (EchoTest/primitives_t/primitives_list_t/node_t/multidim_array_t/cross_package)
+#   test/cpp/memq_test.cpp     → 4  (MemqConstructDestroy/MemqSimple/MemqBuffered/MemqTimeout)
+#   test/cpp/client.cpp        → 6  (Echo/primitives_t/primitives_list_t/node_t/multidim_array_t/cross_package_t)
+upstream_test_total: 24
+upstream_test_count_method: gtest_macros
+
+# 逐套件用例数（分母构成；真实编译执行，环境受限者如实核算为 ohos_feature gap）
+upstream_tests:
+  - suite: C memq
+    cases: 4
+    source: "test/c/memq_test.cpp (TEST(LCM_C, ...) 4 个)"
+  - suite: C eventlog
+    cases: 3
+    source: "test/c/eventlog_test.cpp (TEST(LCM_C, ...) 3 个) — 设备只读 /tmp(erofs) 段错误，ohos_feature gap"
+  - suite: C udpm
+    cases: 1
+    source: "test/c/udpm_test.cpp (TEST(LCM_C, InvalidCreation))"
+  - suite: C client-server
+    cases: 6
+    source: "test/c/client.cpp (TEST(LCM_TEST_HOST, ...) 6 个) — 需 UDP multicast 由 test/c/server 应答，真机组播不可达，ohos_feature gap"
+  - suite: C++ memq
+    cases: 4
+    source: "test/cpp/memq_test.cpp (TEST(LCM_CPP, ...) 4 个)"
+  - suite: C++ client-server
+    cases: 6
+    source: "test/cpp/client.cpp (TEST(LCM_CPP, ...) 6 个) — 需 UDP multicast 由 test/c/server 应答，真机组播不可达，ohos_feature gap"
+
+# test_package 中自带的消费者测试（同一 conan create 内执行；HMBS_TEST_PACKAGE_RESULT
+# discovered=6，来自 test_lcm.c 的 6 条真实 CHECK-OK 断言）
+test_package_tests:
+  - file: test_lcm.c
+    description: "C 消费者链接安装后的 liblcm（CMakeDeps 自动解析 lcm::lcm → glib 传递闭包），走真实 memq 提供者做 6 项生命周期校验：memq 创建/订阅/发布+handle 往返（10 次 1024 字节随机负载比对）/handle_timeout 空队列立即超时/handle_timeout 带消息返回>0 且回调收到 ping/销毁。每项通过打印一行 CHECK-OK。"
+    command: "./test_lcm"
+
+# 测试断言总数（test_package 自带消费者测试；与 conanfile.py CONSUMER_CHECK_COUNT 一致）
+assertion_count: 6
