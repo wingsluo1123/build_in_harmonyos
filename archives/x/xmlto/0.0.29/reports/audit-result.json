@@ -1,0 +1,72 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-12T11:12:27",
+    "branch": "feat/xmlto-0.0.29",
+    "base_branch": "main",
+    "package": "xmlto",
+    "version": "0.0.29",
+    "auditor": "WorkBuddy-read-only-audit"
+  },
+  "verdict": "pass",
+  "checks": [
+    {
+      "id": "G1",
+      "name": "conan create 真实通过",
+      "result": "pass",
+      "evidence": "conan create archives/x/xmlto/0.0.29 -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64 --build='xmlto/*' --user=ohpcd --channel=stable 退出码 0（强制重建，非缓存命中，CI #85406 修复后复验）；reports/conan-create.log:74 'Building from source'、:84 'Bootstrapping autotools ... m4 bin=...'、:85/:87/:89 三步自举 RUN（M4=\"<m4包>/bin/m4\" 内联注入）、:91 'RUN: ... sh configure'、:93/:95 clang 编译/链接、:102 'Packaged 36 files'、:105 \"Package ... created\"；reports/w3-local-ci.log:181 'Building from source'（W3 内同一构建链路）"
+    },
+    {
+      "id": "G2",
+      "name": "上游测试 (实际执行/逐用例)",
+      "result": "pass",
+      "evidence": "bash xmlif/test/run-test 针对已打包 xmlif，UPSTREAM_RUN_TEST_EXIT=0；8 用例 8/8（no-condition/unrelated-condition/html/pdf/ps/foo/baz/bar），TOTAL=8 PASS=8 FAIL=0 SKIP=0；原始日志 reports/upstream-test.log"
+    },
+    {
+      "id": "G2b",
+      "name": "鸿蒙特有非断言测试 (test_package)",
+      "result": "pass",
+      "evidence": "test_package/consumer_test.sh 段 A：readelf -h 校验 OHOS aarch64 原生 ELF、readelf -d 校验 DT_NEEDED 闭包含 libc.so、原生执行 xmlif 证明闭包在本机真实加载；全部基于退出码，非 assert；reports/conan-create.log:196 'OK A'（reports/w3-local-ci.log:303 同）"
+    },
+    {
+      "id": "G2c",
+      "name": "端到端消费者用例 (rule12)",
+      "result": "pass",
+      "evidence": "consumer_test.sh 段 B：B1 构造 XML+XSL → bash <pkg>/bin/xmlto -x ... -o out html → 校验产物含 <h1>HarmonyOS</h1>；B2 构造输入 → xmlif 条件过滤 → 与上游期望逐字节 cmp；reports/conan-create.log:200/204 'OK B1'/'OK B2'、:205 'ALL CONSUMER TESTS PASSED'（reports/w3-local-ci.log:306/310/311 同）"
+    },
+    {
+      "id": "G3",
+      "name": "conan-verify / finish / W2 / W3",
+      "result": "pass",
+      "evidence": "conan-verify G0/G1/G2/G3/G4+L2/L4/L5 PASS（报告 reports/conan-verify-report.md，2026-10-12 复跑）；finish 收尾 status=built、失败子步骤仅 step5b（W5 完整性：E219 他人条目 root_cause 判空，main 基线既有框架缺陷，改之即违反单软件原子性；step3 G0 '找不到原始 tarball' 为昨日同样存在的非阻塞告警）；W3 本地 CI（setup.sh + build_and_test.sh）通过：L0i 逐一验证 tool_requires 在制品仓（automake/1.18 :32、m4/1.4.19 :33）、JC_RESULT=pass（:94）、L0/L1/L2/L4/L5=pass（:328-332）、Pass rate 100.0% (1/1)（:340）；W2 以真实 PR base 复算：'git diff --name-only origin/main...HEAD | wc -l' = 17，'grep -v ^archives/x/xmlto/ | wc -l' = 0（origin/main 已由 fork 滞后引用对齐至真实 base official/main=b644cbf8ed）"
+    },
+    {
+      "id": "G4",
+      "name": ".ci-result.json 由 finish 生成",
+      "result": "pass",
+      "evidence": "scripts/ohc/finish.py _write_ci_result() 写入（timestamp 2026-10-12T11:08:58）；integrity_hash=00b15386d4456726 独立复算匹配；log_sha256=bf81a81afbe483e2235bfa3c5cc1f431f5c1fd222710c63b45659c01d25b21aa 与 reports/w3-local-ci.log 实测 sha256 逐字节一致 → 非伪造"
+    },
+    {
+      "id": "G5/G6/G7",
+      "name": "文件原子性（仅当前软件与版本、无混入）",
+      "result": "pass",
+      "evidence": "隔离 worktree（/data/storage/el2/base/cache/wt-xmlto）中变更 17 个文件，全部位于 archives/x/xmlto/ 之内（0 个越界）；无其他库/版本/依赖源码/构建产物；reports/*.log、audit-result.json 为已跟踪文件的修改，不受 .gitignore:96 影响（JC5 白名单）"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "framework",
+      "file": "archives/x/xmlto/0.0.29/notes.md",
+      "description": "finish Step 6/10 报告『缺少 release tar.gz / debug tar.gz』。该产物由 CI release 流水线在 PR 合并后生成并上传制品仓，源码仓不入库（.gitignore archives/**/packaging/*.tar.gz）；仓库既有 packaging/ 目录中无一提交 tar.gz，属已知框架行为。已在 packaging/README.md 说明。",
+      "fix_suggestion": "无需修复；submit 使用 --no-preflight 或忽略该警告"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "framework",
+      "file": "knowledge/graph",
+      "description": "finish Step 7/10 (W5) 报 E219.kv root_cause 判空（导致 step5b 记失败）。该条目为平台类知识（他人条目），文件内 root_cause 实际非空，系判定器对 YAML 块标量的解析缺陷；gen_summary 崩溃系框架 infra bug。二者均为 main 基线既有框架缺陷，若在本 PR 内修改这些框架文件，将违反 W2/JC6 单软件原子性，故不动。",
+      "fix_suggestion": "无需修复（非本包引入；已在 SKILL 已知框架缺陷清单中记录）"
+    }
+  ],
+  "summary": "对 xmlto/0.0.29 Conan 配方执行提交前只读审计 + 整改闭环（对照 SKILL W2/W3/W5 与 rules.review_memory）。审计结论：PASS。① 欺骗性行为检测：test_package 实质执行被测物，consumer_test.sh 含鸿蒙特有非断言测试（readelf 校验 OHOS aarch64 原生 ELF + DT_NEEDED 闭包并原生执行）与端到端业务闭环（xmlto 真实 XML→HTML 转换内容校验、xmlif 条件过滤与上游期望逐字节比对），非空壳/print-only；conandata.yml sha256 与官方 tarball 一致；manifest 状态 built 真实（conan-verify 通过未 upload）；.ci-result.json 由 finish 写入且 integrity_hash/log_sha256 独立验算匹配，无伪造。② 配方正确性：package_type=application，export_sources→layout→source→build→package→package_info 顺序规范；Autotools 自举为 perl 直调三步（.aclocal-real → autoconf -o configure → .automake-real → sh configure），彻底移除 autoreconf（规避 OHOS 对 HMDFS 脚本 execve 的限制，CI #81400 挂死根因）；CI #85406 后进一步：tool_requires 增加 m4/1.4.19（autom4te 读 $M4，自举不再依赖 worker 系统 m4），并新增 _run_logged（全部自举/configure/编译步骤输出重定向到日志 + 瞬时失败重试），消除『失败后残留孙子进程占住 conan stdout 管道导致空转 3600s』与『fork 耗尽误报 need GNU m4』两类故障；零源码补丁（conandata.patches 为空、manifest.patches_applied 为空、refresh-patch 复验 0 个）。③ 证据一致性：reports/conan-create.log（206 行）与 reports/w3-local-ci.log（343 行）均按最终配方重建，0 处 autoreconf，构建段可见 M4=<m4包>/bin/m4 注入与三步自举；manifest.knowledge_gained 6 条（新增 #85406 教训）。④ 文件原子性：变更 17 个文件全部属于 archives/x/xmlto/，无其他库/版本/生成物混入。⑤ 已知框架缺陷 2 项（packaging tar.gz、W5 判空/gen_summary）均非本包引入，已在 issues 中记录为 P3。综上无 P0/P1/P2 问题，判定 PASS，可提交。"
+}
