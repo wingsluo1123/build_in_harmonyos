@@ -1,0 +1,71 @@
+# 版本级 manifest — typeshare 1.13.4
+
+version: "1.13.4"
+software: "typeshare"
+
+# 编译状态
+# built：HarmonyOS PC (aarch64) 本地交叉编译 + 上游测试（cargo test）+
+# 上游确定性样例 + test_package 通过；Rust 工具链由制品仓基础设施包
+# rust-toolchain/1.97.1 提供（tool_requires），不依赖系统 cargo、
+# 不使用 rustup 引导（rustup 无法识别 HarmonyOS 宿主，E105/E154）。
+status: built
+
+build_date: "2026-10-13"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39；上游 GitHub tag 归档，内含 Cargo.lock）
+  url: "https://github.com/1Password/typeshare/archive/refs/tags/v1.13.4.tar.gz"
+  sha256: "7a929012e1f2a4e07616dd769e049adbb5aebae9faf0776f6268a0673281dd78"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型（Rust cargo workspace，配方内自管 cargo 命令）
+  system: custom
+  configure_options: []
+  # 编译依赖列表（纯 Rust 项目：110 个 crate 全部由 cargo 依 Cargo.lock 拉取，
+  # 无 C/C++ 目标依赖包）
+  dependencies: []
+  # 构建期工具依赖（tool_requires）
+  build_tools:
+    - "rust-toolchain/1.97.1"
+  # 编译器（链接器为 OHOS SDK aarch64-unknown-linux-ohos-clang）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（无：上游源码零修改）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "纯 Rust CLI 在 OHOS 的通用配方形态：tool_requires rust-toolchain/1.97.1 + 自签名工具链（cargo/rustc/librustc_driver）+ harmonybrew cargo 运行库（openssl@3-3.6.5 + zlib-ng-compat-2.3.3_2）+ rsproxy 源 + 可写 TMPDIR"
+  - "cargo 1.97.1 的 DT_NEEDED 为 libssl.so / libcrypto.so / libz.so；实测 libz 由 OS 镜像 /usr/lib/libz.so.1 满足（不提供外部 libz 时 cargo 仍可运行），只有 OpenSSL 必须由 bottle 提供（系统 OpenSSL 缺 SSL_get0_group_name；注册表 openssl/3.5.8.1 为 static-only，无 .so）"
+  - "第三方 CDN bottle 不可作为硬依赖：harmonybrew zlib-ng-compat-2.3.3_2 在 CI worker 上报 NotFoundException（同一 URL 本机 HTTP 200 —— CDN 复制不均/版本轮换：2.3.3_1 与 2.3.3 均已 404），已从 RUST_RUNTIME_BOTTLES 移除；仅保留必需的 openssl bottle 且失败时给出明确报因"
+  - "harmonybrew bottle 版本会轮换：openssl@3-3.6.4_1 / 3.6.4 / 3.6.3 已 404，须实测探活 3.6.5 后再固化 URL+sha256"
+  - "上游 CI 用 `cargo test --all-features`；适配侧以 --all-features 复核覆盖（含实验性 Go/Python 生成器），而交付二进制保持 cargo 默认 features（与 cargo install / cargo-dist 一致）"
+  - "tests/justfile 的确定性子样可脱离 just/sd 用 POSIX 工具逐步重放（sed -E 代替 sd），作为独立上游样例纳入 build()"
+
+# ============================================================
+# 交付物
+# ============================================================
+
+artifacts:
+  - "bin/typeshare"
+  - "licenses/LICENSE-APACHE"
+  - "licenses/LICENSE-MIT"
+  - "res/README.md"

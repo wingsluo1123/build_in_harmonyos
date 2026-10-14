@@ -1,0 +1,84 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+
+package: typeshare/1.13.4
+homepage: "https://github.com/1Password/typeshare"
+
+# 上游测试命令（cargo 项目）。上游 CI 测试门 = `.github/workflows/ci.yml` 的
+# Test job `cargo test --all-features`；另有 shell 驱动的确定性样例
+# `.github/workflows/ci.yml` 的 check-deterministic job
+# `just --justfile tests/justfile determinism`。
+# 本平台 rust-toolchain/1.97.1 基础设施包不含 rustdoc / just / sd（sed、diff 亦不在
+# 构建 PATH），故：cargo 测试入口用等价的 `--workspace --all-features --tests`
+# （排除 doc-test）；确定性样例用 Python 标准库逐步重放 tests/justfile 的同名 recipe。
+upstream_check_command: "cargo test --all-features   # .github/workflows/ci.yml Test job"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+
+# 实际命令（build() 内执行）
+upstream_test_command: >-
+  cargo test --release --locked --target aarch64-unknown-linux-ohos
+  --workspace --all-features --tests --no-fail-fast
+
+# 上游 shell 驱动样例（tests/justfile: `just determinism`）的等价重放
+upstream_sample_command: >-
+  由 tests/data/determinism-base.rs 生成 100 份输入（全局正则
+  "(struct )(\w+)" -> "\1\2<N>"，等价 sd）；cargo run --locked -p typeshare-cli --
+  -l typescript -o out/output{1,2}.ts input（两次）；产物逐字节比对（等价 diff -q）
+
+# 上游测试用例清点（静态 `#[test]` 77 个字面量 + snapshot_tests.rs `tests!` 宏
+# 展开 309 = 386，与实测 386 完全一致，无漏测）。逐项清单见
+# reports/upstream-test-cases.md；统计见 reports/test-report.md。
+upstream_tests:
+  - file: "core/tests/agnostic_tests.rs"
+    description: "解析拒绝类集成测试：7 个 blocklisted 类型 + 4 个 serde 属性拒绝。实测 11 通过 / 0 失败 / 0 跳过"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos --test agnostic_tests"
+  - file: "core/tests/snapshot_tests.rs"
+    description: "快照集成测试：`tests!` 宏按 (用例目录 × 目标语言) 展开，覆盖 core/data/tests/ 下 65 个样例目录。实测 309 通过 / 0 失败 / 0 跳过"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos --test snapshot_tests"
+  - file: "cli/src/config.rs"
+    description: "typeshare-cli 内联单元测试（配置序列化/反序列化）。实测 8 通过"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos -p typeshare-cli --bins"
+  - file: "core/src/**/*.rs"
+    description: "typeshare-core 内联单元测试（parser / rename / target_os_check / topsort / visitors / language）。实测 33 通过"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos -p typeshare-core --lib"
+  - file: "lib/src/**/*.rs"
+    description: "typeshare lib crate 内联单元测试（integer / json_date）。实测 25 通过"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos -p typeshare --lib"
+  - file: "annotation/src/**/*.rs"
+    description: "typeshare-annotation（proc-macro crate）无 `#[test]`，实测 0 用例；其 harness 正常执行即 libstd 动态链接修复生效的证据"
+    command: "cargo test --release --locked --target aarch64-unknown-linux-ohos -p typeshare-annotation --lib"
+  - file: "tests/justfile"
+    description: "确定性样例（CI job check-deterministic）：100 份生成输入、两次运行产物必须逐字节一致。实测通过（32,722 B 逐字节一致）"
+    command: "just --justfile tests/justfile determinism（本配方用 Python 标准库等价重放）"
+
+# 上游真实测试入口证据
+upstream_entry_points:
+  - file: ".github/workflows/ci.yml"
+    detail: "Test job: `cargo test --all-features`（:41）；check-deterministic job: `just --justfile tests/justfile determinism`（:63）；另有 Check/fmt/clippy 三个非测试门"
+  - file: "core/tests/snapshot_tests.rs"
+    detail: "`tests!` 宏为每个 (用例, 语言) 组合生成一个 #[test]，期望值经 `expect_test::expect_file!` 与 core/data/tests/**/output.* 比对"
+  - file: "tests/justfile"
+    detail: "determinism_qty := '100'；generate-determinism-files → cargo run -p typeshare-cli 两次 → diff -q out/*.ts"
+  - file: "Cargo.toml"
+    detail: "workspace members = annotation/core/lib/cli；cli/Cargo.toml [[bin]] name = \"typeshare\"，features go/python 为实验性 opt-in"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_typeshare.py
+    description: "消费者冒烟+功能 7 项：--version(1.13.4) / --help 语言列表 / TypeScript·Swift·Kotlin·Scala 代码生成 / --generate-config 配置模板"
+    command: "python3 test_typeshare.py"
+
+# 鸿蒙特有测试 (HarmonyOS-specific)
+harmonyos_specific_tests:
+  - file: test_typeshare.py
+    description: "鸿蒙特有测试 4 项：AArch64 ELF / OHOS musl loader(ld-musl-aarch64.so.1) / OHOS code signature(.codesign) / 产物完整性"
+    command: "PACKAGE_FOLDER=<pkg> python3 test_typeshare.py"
+    assertion_count: 4
+
+# 依赖测试：typeshare 为纯 Rust 产物，依赖闭包无 C/C++ 目标依赖包消费面，故无 dependency_tests。
+dependency_tests: []
+
+# 测试断言总数（上游 386 + test_package 11）
+assertion_count: 397
