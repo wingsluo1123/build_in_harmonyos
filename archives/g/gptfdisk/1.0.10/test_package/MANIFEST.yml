@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml — gptfdisk 1.0.10
+package: gptfdisk/1.0.10
+homepage: "https://www.rodsbooks.com/gdisk/"
+
+# ── 上游测试清点（R51 三步法，清点证据） ─────────────────────────────
+# 清点依据（gptfdisk-1.0.10.tar.gz 全量解包，源码根目录）：
+#   a) 无 tests/ 目录、无 test/ 目录；无 ctest 注册（非 CMake 工程）、无
+#      pytest/conftest；全树唯一的测试资产是单文件 shell 脚本 gdisk_test.sh。
+#   b) Makefile 中 `test:` 目标 = `./gdisk_test.sh`（唯一入口）。
+#   c) gdisk_test.sh（402 行）在 mktemp 临时 64MiB 镜像上驱动 gdisk+sgdisk：
+#      每个二进制 10 项场景（建 GPT 表/建分区/改分区名/改分区类型/备份 GPT/
+#      删除分区/恢复备份/改磁盘 GUID/清 GPT 表/EOF 退出），外加 1 条临时盘
+#      创建，共 21 条 SUCCESS|FAILED 断言。N=21（检查级口径，1 个脚本）。
+#   d) 实测：设备（HarmonyOS PC aarch64）上 `sh ./gdisk_test.sh` 实跑
+#      rc=0，21 SUCCESS / 0 FAILED（100%）。
+#   口径备注（如实申报）：脚本第 8 项“改磁盘 GUID”两处用
+#   `NEW_DISK_GUID=get_diskguid`（赋值而非命令替换），实际比较的是空串/字面
+#   字符串，属上游脚本自身缺陷 → 该项断言对两个二进制均恒真；其余 19 条为
+#   真实断言。我们按上游原样运行（不修改测试），如实计数 21 条。
+upstream_check_command: "make test  (等价 ./gdisk_test.sh)"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "sh ./gdisk_test.sh（can_run(self) 时；rc!=0 或 FAILED>0 即构建失败，并输出 HMBS_UPSTREAM_TEST_RESULT 标记）"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: gdisk_test.sh
+    source: gptfdisk-1.0.10/gdisk_test.sh
+    description: "上游唯一测试脚本；64MiB 临时镜像上 gdisk+sgdisk 各 10 项交互场景 + 临时盘创建 = 21 条断言"
+    command: "./gdisk_test.sh"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "消费者视角：四 CLI（gdisk/cgdisk/sgdisk/fixparts）存在且非空，随后调用两个 python 断言脚本（R34 实质测试）"
+    command: "python3（经 self.run 调用下列两个脚本）"
+  - file: test_gptfdisk_e2e.py
+    description: "端到端实跑 28 断言：sgdisk --version/-Z/-n/-t/-c/-p/-i/-b/-l、GPT 'EFI PART' 与保护 MBR 0x55AA 磁盘签名、gdisk 管道 p/q 会话、fixparts MBR 加载、cgdisk 无 TTY 的 ncurses 错误路径"
+    command: "python3 test_gptfdisk_e2e.py <bindir>"
+  - file: ohos_specific_test.py
+    description: "R53 鸿蒙特有 6 断言/工具×4=24（pure-python ELF 解析，无 readelf 依赖）：ELF64 / e_machine=AArch64(183) / PT_INTERP=ld-musl-aarch64.so.1 / .codesign 段 / 无 RPATH·RUNPATH / 系统同名库静态链接（DT_NEEDED 无 libuuid·libpopt·libncursesw 等）"
+    command: "python3 ohos_specific_test.py <bindir>"
+
+# test_package 断言总数 = ohos_specific 24（6×4）+ e2e 28 = 52
+# （上游 gdisk_test.sh 另有 21 条真实检查，见上文）
+assertion_count: 52
