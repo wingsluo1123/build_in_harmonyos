@@ -1,0 +1,38 @@
+software: uniutils
+version: "2.28"
+status: built
+build_date: "2026-09-29"
+
+source:
+  url: "https://billposer.org/Software/Downloads/uniutils-2.28.tar.gz"
+  sha256: "41c14c0223376f2d96c80c2ba1b1494fc74cd8982d561630e688e2245aaf3364"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-uniname-include-ctype.patch"
+  - "0002-configure-ohos-mktemp.patch"
+  - "0003-runtime-gettext-check.patch"
+  - "0004-strict-c99-void-functions.patch"
+  - "0005-unireverse-unsigned-char.patch"
+
+knowledge_gained:
+  - "uniutils 的旧 C 源码依赖隐式 isspace() 声明，严格 C99 编译器需要显式 <ctype.h>"
+  - "OpenDesk 真机的 mktemp 目录权限异常，configure 需要回退到 umask 022 的普通 mkdir"
+  - "OHOS SDK 提供 libintl.h，但 libc 不提供 gettext 相关符号，必须先做函数链接探测再启用 NLS"
+  - "旧式 K&R 隐式 int 函数在严格 C99 下遇到无值 return 会直接编译失败，需要显式声明 void"
+  - "OHOS sysroot 不提供 BSD 专有的 u_int32_t，可移植写法是用 stdint.h 的 uint32_t"
+  - "OHOS 的 char 为无符号类型，unireverse 必须用 unsigned char 判断 UTF-8 高位，并用 int 接收 getc 以正确识别 EOF"
+  - "上游包含 7 个可执行程序和一个 utf8lookup 脚本，二进制安装到 bin/"
+  - "OpenDesk 的 HMDFS 会让 configure 生成的 install-sh 丢失可执行位，需要在 build() 中显式恢复 0755"
+
+verification:
+  upstream_test: "无正式上游测试套件"
+  test_package: "test_package/test.sh"
+  result: "pending CI verification"

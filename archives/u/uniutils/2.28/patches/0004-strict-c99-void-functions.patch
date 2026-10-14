@@ -1,0 +1,129 @@
+diff --git a/putu8.c b/putu8.c
+index 212f623..aed82cb 100644
+--- a/putu8.c
++++ b/putu8.c
+@@ -3,6 +3,8 @@
+  * Based on  Roman Czyborra:  http://czyborra.com/utf/
+  */
+ 
++#include <stdio.h>
++
+ void
+ putu8(unsigned long c)
+ {
+@@ -25,4 +27,3 @@ putu8(unsigned long c)
+     putchar (0x80 | c & 0x3F);
+   }
+ }
+-
+diff --git a/unifuzz.c b/unifuzz.c
+index 37dedc0..8244b10 100644
+--- a/unifuzz.c
++++ b/unifuzz.c
+@@ -31,6 +31,7 @@
+ #endif
+ #include <unistd.h>
+ #include <fcntl.h>
++#include <time.h>
+ #include "unicode.h"
+ #include "unirange.h"
+ 
+@@ -68,13 +69,15 @@ ShowUsage(void){
+   putc('\n',stderr);
+ }
+ 
++void
+ EmitLineOfX (unsigned long len, int c) {
+   unsigned long i;
+   for (i = 0; i < len; i++) putchar(c);
+   putchar('\n');
+ }
+ 
+-EmitEmbeddedNull() {
++void
++EmitEmbeddedNull(void) {
+   putchar('a');
+   putchar('b');
+   putchar(0x00);
+@@ -83,7 +86,8 @@ EmitEmbeddedNull() {
+   putchar('\n');
+ }
+ 
+-EmitBadUTF8 () {
++void
++EmitBadUTF8(void) {
+   /* invalid first byte */
+   putchar(0x80);
+   putchar(0x80);
+@@ -97,6 +101,7 @@ EmitBadUTF8 () {
+ }
+ 
+ /* Emit the middle character from each range */
++void
+ EmitAllRanges(short AboveBMPP) {
+   int i;
+   UTF32 scp;
+@@ -112,7 +117,8 @@ EmitAllRanges(short AboveBMPP) {
+   }
+ }
+ 
+-EmitRandomCharacters(unsigned long n,short AboveBMPP) {
++void
++EmitRandomCharacters(unsigned long n, short AboveBMPP) {
+   UTF32 c;
+   unsigned long k = 0;
+   extern void putu8(UTF32);
+@@ -131,6 +137,7 @@ EmitRandomCharacters(unsigned long n,short AboveBMPP) {
+ }
+ 
+ 
++void
+ EmitSpecificStrings(short AboveBMPP) {
+   extern void putu8(UTF32);
+ 
+@@ -254,7 +261,7 @@ int main (int ac, char *av[])
+   if (ScanRangesP) EmitAllRanges(AboveBMPP);
+   if(RandomCharactersToEmit) {
+     srandom(Seed);
+-    if(VerboseP) fprintf(stderr,"Generating %d random characters.\n",RandomCharactersToEmit);
++    if(VerboseP) fprintf(stderr,"Generating %ld random characters.\n",RandomCharactersToEmit);
+     printf("Seed = %u\n",Seed);
+     EmitRandomCharacters(RandomCharactersToEmit,AboveBMPP);
+   }
+@@ -267,4 +274,3 @@ int main (int ac, char *av[])
+   exit(0);
+ }
+ 
+-
+diff --git a/unisurrogate.c b/unisurrogate.c
+index 544d2e7..2708ac8 100644
+--- a/unisurrogate.c
++++ b/unisurrogate.c
+@@ -1,6 +1,7 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <errno.h>
++#include <stdint.h>
+ #include "config.h"
+ 
+ char compdate[]="Compiled " __DATE__ " " __TIME__ ;
+@@ -26,8 +27,9 @@ ShowUsage(void){
+   putc('\n',stderr);
+ }
+ 
++int
+ main(int ac, char **av) {
+-  u_int32_t cp, cpi, high, low;
++  uint32_t cp, cpi, high, low;
+   char *istr;
+   char *endptr;
+ 
+@@ -47,7 +49,7 @@ main(int ac, char **av) {
+   istr = av[1];
+   if( (istr[0] == 'U') && (istr[1] == '+')) istr = istr+2;
+   errno=0;
+-  cp = (u_int32_t) strtoull(istr,&endptr,16);
++  cp = (uint32_t) strtoull(istr,&endptr,16);
+   if( (errno != 0) || (*endptr != '\0')){
+     fprintf(stderr,"%s is not a valid codepoint.\n",istr);
+     exit(2);

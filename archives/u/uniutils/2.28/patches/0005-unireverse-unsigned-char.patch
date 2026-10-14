@@ -1,0 +1,33 @@
+--- a/unireverse.c
++++ b/unireverse.c
+@@ -108,11 +108,11 @@
+     optr = obuf;
+     PreviousLeadByte = len;
+     for (i = len-1; i >= 0; i--) {
+-      if (ibuf[i] >= 0) {
++      if ((unsigned char) ibuf[i] < 0x80) {
+ 	*optr++ = ibuf[i]; /* ASCII character */
+ 	PreviousLeadByte = i;
+       }
+-      else if (ibuf[i] & 0x40)  {
++      else if (((unsigned char) ibuf[i] & 0x40) != 0)  {
+ 	BytesInChar = 1 + (int) TrailingBytes[(unsigned char) ibuf[i]];
+ 	if (i + BytesInChar > PreviousLeadByte) {
+ 	  fprintf(stderr,"Truncated UTF-8 sequence at byte %d of line %lu\n",i+1,LineCnt);
+@@ -151,7 +151,7 @@
+ 
+ char * GetLine(FILE *fp, int *LineLength)
+ {
+-  char c;
++  int c;
+   int Available;
+   int CharsRead;
+   char *Line;
+@@ -182,6 +182,6 @@
+       Line = (char *) realloc( (void *) Line, (size_t) (Available * sizeof (char)));
+       if(Line == (char *) 0) return(Line);
+     }
+-    Line[CharsRead++]=c;
++    Line[CharsRead++]=(char) c;
+   }
+ }

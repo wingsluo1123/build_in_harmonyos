@@ -1,0 +1,18 @@
+--- a/configure
++++ b/configure
+@@ -5595,11 +5595,10 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+-  test -d "$tmp"
+-}  ||
+-{
++  # OHOS mktemp may create a directory whose mode cannot be written by
++  # the current user. A private fixed-name directory with umask 022 works
++  # on OHOS and preserves the original cleanup behaviour.
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
