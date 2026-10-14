@@ -1,0 +1,36 @@
+# 源地址为有序镜像列表：CI 构建机出网无法直连 github.com（2026-10-10 连续三次真实构建
+# 均死于 source() 下载 libdaq，ConnectTimeoutError），conan 按序尝试直至成功。
+# 列表仅保留字节透明镜像：gh-proxy.com / ghproxy.net 是 GitHub 代理前缀，与官方
+# tarball 字节一致（sha256 与下方相同；gh-proxy 条目在构建 #79948@CI-008 实证下载
+# 成功）。gitee.com/mirrors/snort3 曾列首位但已移除——gitee 按需重新生成 archive，
+# 字节与官方 tarball 不一致（#79948 实测 "sha256 hash failed"）；ghfast.top 已移除
+# （2026-10-10 实测域名不可达）。官方 GitHub URL 保留于列表末位兜底（R39）。
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/snort3/snort3/archive/refs/tags/3.12.2.0.tar.gz"
+    - "https://ghproxy.net/https://github.com/snort3/snort3/archive/refs/tags/3.12.2.0.tar.gz"
+    - "https://github.com/snort3/snort3/archive/refs/tags/3.12.2.0.tar.gz"
+  sha256: 43000d6b0e0307bc1a735874d00deb61e8b6a96d074f8cc9b2fe2cde0058720b
+
+# libdaq 上游在 gitee 无镜像（gitee.com/mirrors/libdaq 404），走 GitHub 代理前缀；
+# 官方 GitHub URL 保留于列表末位兜底。
+libdaq:
+  url:
+    - "https://gh-proxy.com/https://github.com/snort3/libdaq/archive/refs/tags/v3.0.27.tar.gz"
+    - "https://ghproxy.net/https://github.com/snort3/libdaq/archive/refs/tags/v3.0.27.tar.gz"
+    - "https://github.com/snort3/libdaq/archive/refs/tags/v3.0.27.tar.gz"
+  sha256: 03fac3da27e3230a7d26262f2480cd65a409cee3596c6758a7f9eacb7f24601c
+
+patches:
+  - patch_file: "patches/0001-cmake-optional-libs-ohos.patch"
+    patch_description: "0001 portability: gate the lzma probe on LIBLZMA_FOUND, propagate lzma include dirs, and keep the RPC program number database optional on HarmonyOS/OHOS (the upstream probe hard-fails with SEND_ERROR when both the glibc and libtirpc routes fail; on HarmonyOS/OHOS the recipe defines SNORT_NO_RPC_DB, and service_rpc.cc enumerates only when that macro is unset), plus run the build helper scripts through an interpreter (HMDFS cannot execve scripts)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-ohos-tmpfile-fallback.patch"
+    patch_description: "0002 tests: fall back to a TMPDIR-backed scratch file when tmpfile() is unusable (OHOS /tmp is read-only, TMPDIR has no effect), so the CSV/JSON/text perf formatter tests still execute their assertions on HarmonyOS"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ohos-rpath.patch"
+    patch_description: "0003 portability: keep rpath enabled on HarmonyOS/OHOS (upstream disables it unconditionally; the OHOS package layout keeps dependencies outside this package and the official smoke gate runs the installed binary with an empty environment, so bin/snort needs a RUNPATH to locate the dependency libraries), all other platforms keep upstream behaviour"
+    patch_type: "portability"
+  - patch_file: "patches/0004-ohos-test-clock-tick-wait.patch"
+    patch_description: "0004 tests: wait for one SnortClock tick at the end of both copies of the profiler test helper avoid_optimization() (rule_profiler.cc and time_profiler.cc, bounded spin), so the timing checks of the Catch2 tests 'rule profiler time context' (elapsed > 0) and 'time context exclude' (elapsed < hr_duration::max()) are not racy on platforms whose clock is coarse (probed on HarmonyOS PC: back-to-back reads return the same value ~70% of the time, and the 1024-iteration loop can be optimized away entirely); the helper is test-only code that compiles on all platforms, so non-test builds are unaffected and other platforms are behaviour-equivalent"
+    patch_type: "portability"

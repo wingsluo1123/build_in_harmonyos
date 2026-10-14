@@ -1,0 +1,60 @@
+#====================================================================
+# DRAFT-snort-3.12.2.0-ohos-no-rpc-program-db-configure-gate-static-fallback
+# — OHOS musl 无 RPC program number database：上游以其为 configure 硬门
+#   （check_function_exists(getrpcent) → SEND_ERROR），需平台分支降级 +
+#   消费端枚举编译排除（静态端口模式保留）
+# 触发事件: snort 3.12.2.0 适配（cmake 配置期 RPC 数据库硬失败；
+#           service_rpc.cc 的 getrpcent() 枚举无源码保护）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     DRAFT-snort-3.12.2.0-ohos-no-rpc-program-db-configure-gate-static-fallback
+trigger_tool:           cmake|conan|cxx|clang
+phase:                  configuration|build|runtime
+error_signature: "Couldn't find an RPC program number database|rpc/netdb.h.*file not found|getrpcent|getrpcbyname|getrpcbynumber|undefined reference.*getrpcent"
+title:                  OHOS musl 无 RPC program number database：上游以其为 configure 硬门（SEND_ERROR）时需平台分支降级 + 消费端枚举编译排除（静态端口模式保留）
+root_cause: >-
+  HarmonyOS 的 musl 系 libc 不提供 glibc 的 RPC program number database：
+  <rpc/netdb.h> 头文件不存在（真机探针：clang 15.0.4 `#include <rpc/netdb.h>`
+  → "fatal error: 'rpc/netdb.h' file not found"），libc 亦无 getrpcent 符号
+  （真机探针：cmake 4.1.2 check_function_exists(getrpcent) → 空/FALSE），
+  且本平台无 /etc/rpc 数据库文件（真机探针：ls /etc/rpc → No such file or
+  directory）——系统层 API 与数据双缺（libtirpc/1.3.7 制品仓可得【2026-10-04
+  -r=ohpcd 复测】，本适配选择不引入，见 affected_scope）。上游若把该数据库当作 configure 硬门
+  （snort：HAVE_TIRPC_GETRPCENT 为假且非 HarmonyOS 分支时
+  message(SEND_ERROR "Couldn't find an RPC program number database
+  implementation!")）即配置期直接中止；即使绕过硬门，消费端若直接枚举
+  （snort service_rpc.cc 的 getrpcent() 循环，上游无源码级保护）在该平台上
+  也无法编译/链接。数据链：本平台既无 /etc/rpc 数据库文件也无对应 API，
+  任何依赖"运行期枚举 RPC 程序号"的功能只能降级为静态映射。
+affected_scope: >-
+  在 HarmonyOS/OHOS（musl 系 libc）上用 autoconf/cmake 适配、且把 RPC
+  program number database 当 configure 硬门（check_function_exists(getrpcent)
+  类探测）或直接调用其 API 的 C/C++ 项目（snort 3.12.2.0 实测全链路）；
+  任何依赖运行期 getrpcent()/getrpcbyname() 枚举做 程序号→服务 映射的消费
+  模块（该平台链接期即无该符号，无运行期容错空间）。平台三探针（头文件缺失/
+  链接期符号缺失/无 /etc/rpc 数据库）与具体库无关；libtirpc 可得性单列
+  （ohpcd 有 libtirpc/1.3.7，需动态枚举的消费方可显式引入，本适配不引入）。
+  同族差异定位见 md 草稿「差异化定位与查重」节。
+verification_cmd: >-
+  ① clang 编译 `#include <rpc/netdb.h>` → fatal error: file not found；
+  ② CMake check_function_exists(getrpcent) → FALSE（HAVE_GETRPCENT=[]）；
+  ③ 数据库文件与 libtirpc 可得性：ls /etc/rpc → No such file or directory；
+  conan list 'libtirpc/*' -r=ohpcd → libtirpc/1.3.7（可得；勿省略 -r，
+  否则只查本地缓存）；
+  ④ 验收：configure 日志出现 STATUS 降级消息、无 SEND_ERROR、service_rpc
+  插件加载正常（静态端口模式生效）。
+rec_approach: >-
+  CMake 配置侧加 HarmonyOS/OHOS 平台分支：不发 SEND_ERROR，改
+  add_definitions(-DSNORT_NO_RPC_DB)（把平台决策传播给源码）+ STATUS 消息
+  如实记录降级（"RPC program number database missing on HarmonyOS/OHOS -
+  RPC name enumeration disabled"）；源码侧以该宏守卫枚举块
+  （#if !defined(SNORT_NO_RPC_DB) 包裹 getrpcent 循环），保留其后本就存在的
+  静态端口模式表——检测器语义降级但功能不丢；非 OHOS 平台保持上游行为逐字
+  不变。判定与验收：configure 日志出现 STATUS 降级消息、无 SEND_ERROR、
+  service_rpc 插件加载正常（SNORT_NO_RPC_DB 下静态模式生效）。
+match_keywords: ["RPC program number database", "getrpcent", "getrpcbyname", "rpc/netdb.h", "libtirpc", "SEND_ERROR", "check_function_exists", "HarmonyOS", "musl", "静态端口模式", "service_rpc"]
+error_excerpt: "configure 期：CMake Error at cmake/sanity_checks.cmake:51 (message): Couldn't find an RPC program number database implementation!（check_function_exists(getrpcent) 在 OHOS 恒 FALSE；探针输出 HAVE_GETRPCENT=[]）；头文件探针：rpcprobe.c:1:10: fatal error: 'rpc/netdb.h' file not found；ls /etc/rpc → No such file or directory"
+severity: 2
+category: cmake, portability, libc, ohos, network
+last_updated: 2026-10-04
