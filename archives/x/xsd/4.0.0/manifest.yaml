@@ -1,0 +1,59 @@
+# 版本级 manifest
+# 文件位置: archives/x/xsd/4.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "4.0.0"
+software: "xsd"
+
+# 编译状态
+# published | built | failed | archived
+# 未合并且 release upload 未确认前一律 built（AGENTS §1 O5）
+status: built
+
+build_date: "2026-10-06"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # Code Synthesis 官方下载目录（该软件无 Git 上游）。sha256 四路互证：
+  # CCI recipes/xsd/conandata、官方 .sha1、Debian PGP 签名 dsc、Yocto bb（见 conandata.yml 头注）
+  url: "https://codesynthesis.com/download/xsd/4.0/xsd-4.0.0+dep.tar.bz2"
+  sha256: "eca52a9c8f52cdbe2ae4e364e4a909503493a0d51ea388fc6c9734565a859817"
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 不是 autotools：根 makefile + 自带 build-0.3 make 体系，
+  # configuration-dynamic.make 已随 +dep 包预生成（非交互）。
+  system: "makefile"
+  configure_options: []
+  # CXXFLAGS 由 conanfile generate() 钉死为 -O3 -pipe -DNDEBUG + -std=c++11（R33）
+  dependencies:
+    - "xerces-c/3.2.5"
+  cc: "clang"
+  cxx: "clang++"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-libcxx-version-header-collision.patch"
+  - "patches/0002-missing-include.patch"
+  - "patches/0003-xerces-c3.2-test-expectations.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained: []

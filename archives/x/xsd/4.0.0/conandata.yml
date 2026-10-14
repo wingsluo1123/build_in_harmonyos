@@ -1,0 +1,40 @@
+# conandata.yml — xsd 4.0.0 源码与补丁声明
+#
+# 源：Code Synthesis 官方下载目录（该软件无 Git 上游，官方 tarball 是唯一权威发布物）。
+#
+# sha256 四路互证（2026-10-06 实测，字节数 1642625、sha1 ad3de699eb140e747a0a214462d95fc81a21b494、
+# md5 ae64d7fcd258addc9b045fe3f96208bb 四路同值）：
+#   ① conan-center-index `recipes/xsd/all/conandata.yml`（CCI 4.0.0 精确命中，本配方同源）
+#   ② 官方目录随附校验文件
+#      https://codesynthesis.com/download/xsd/4.0/xsd-4.0.0+dep.tar.bz2.sha1
+#      → ad3de699eb140e747a0a214462d95fc81a21b494（与本地下载文件 sha1sum 一致）
+#   ③ Debian `xsdcxx` 源包 PGP 签名 dsc
+#      https://deb.debian.org/debian/pool/main/x/xsd/xsd_4.0.0-10.dsc
+#      → Checksums-Sha256/Sha1/Files(md5) 三段同值（其 orig tar 即本文件同一 tarball 改名）
+#   ④ Yocto meta-redhawk-sdr `recipes-deps/xsd/xsd_4.0.0.bb`
+#      → 同 URL + 同 sha256sum + 同 md5sum
+#
+# 不用镜像域名、不用 http：PF7 只放行 https 官方源。
+sources:
+  "4.0.0":
+    url: "https://codesynthesis.com/download/xsd/4.0/xsd-4.0.0+dep.tar.bz2"
+    sha256: "eca52a9c8f52cdbe2ae4e364e4a909503493a0d51ea388fc6c9734565a859817"
+
+# 三个补丁全部是**可移植性**补丁：无 `__OHOS__`、无平台宏、无镜像/回退 URL（PF5/PF7/H4 均不咬）。
+# 统一 `strip: 0`：patch_ng 的 `decode_clean()` 已经无条件剥掉 `--- a/`、`+++ b/` 的一级前缀，
+# 再叠 `strip: 1` 会把 `libcutl/version` 剥成 `version`（实测 FileNotFoundError: <src>/version）。
+# 系统 `patch -p1` 走的是 -p1 剥前缀，与此不冲突——两面对同一目标文件。
+patches:
+  "4.0.0":
+    - patch_file: "patches/0001-libcxx-version-header-collision.patch"
+      patch_description: "libc++ 的 <cstddef> 无条件 #include <version>（OHOS NDK libc++ 在 c++11/14/17/20 四档实测均如此），而上游把 libcutl/version、libxsd-frontend/version 两个纯文本版本标记文件放在被 -I 的目录里，标准库 <version> 被同名文件遮蔽，报 version:1:1: error: expected unqualified-id。两文件改名为 version.txt 并同步 libcutl 的两处 dist 引用（仅 dist 目标消费，本包不构建 dist）。libstdc++ 不从 <cstddef> 拉 <version>，故 Linux/CCI 构建碰不到。"
+      patch_type: "portability"
+      strip: 0
+    - patch_file: "patches/0002-missing-include.patch"
+      patch_description: "libxsd-frontend 的 semantic-graph/elements.cxx 缺 #include <iostream>：operator<<(std::wostream&, Path const&) 定义处 basic_ostream 尚不完整，成员 operator<<(const void*) 不可见 → invalid operands to binary expression。与上游提交 5029f8665190879285787a9dcdaf5f997cadd2e2 及 CCI 0002-missing-include.patch 逐字同源。"
+      patch_type: "portability"
+      strip: 0
+    - patch_file: "patches/0003-xerces-c3.2-test-expectations.patch"
+      patch_description: "Xerces-C++ 3.2 起不再支持超出 BMP 的字符引用，上游 encoding/char/{iso-8859-1,utf-8} 与 encoding/wchar 三组用例的期望值随之过期（Debian bug #881108）；本包依赖 xerces-c/3.2.5，不打此补丁这三组用例必失败。与上游提交 400651ba7fd2f80155348ed39fc02e2aa9892fb9 及 CCI 0110-xerces-c3.2.patch 同源。属**上游测试期望值**修改，PR 正文「上游测试用例修改说明」已勾选「是」并逐条列出。"
+      patch_type: "portability"
+      strip: 0

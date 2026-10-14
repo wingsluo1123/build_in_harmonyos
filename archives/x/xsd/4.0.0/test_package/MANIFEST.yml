@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# xsd 4.0.0 — Code Synthesis XSD（W3C XML Schema → C++ 代码生成编译器）
+#
+# 上游有真实测试套件：根 makefile 的 `test` 目标 → xsd/tests/makefile →
+# xsd/tests/cxx/makefile → {tree,parser}/makefile，由 Code Synthesis 自带的
+# build-0.3 make 体系驱动；每个用例的规则形如
+#   $(call message,test …, $(driver) <test.xml> | diff -u <期望输出> -)
+# 即**逐字节比对**（不是"跑通即过"）。配方 build() 里直接
+# `autotools.make(target="test")` 在真机跑全量且不吞 rc。
+
+package: xsd/4.0.0
+homepage: "https://codesynthesis.com/projects/xsd/"
+
+upstream_tests_exist: true
+upstream_test_audit: >
+  入口 = 根 makefile 的 test 目标 → xsd/tests/makefile（只 import cxx/makefile）→
+  cxx/makefile → {tree,parser}/makefile。注册树内叶子测试目录 61 个
+  （tree 32 + parser 29）；其中 7 个 parser/validation 叶子按多份 test-*.xml 展开
+  （all 4 / choice 5 / restriction 6 / sequence 7 / any 1 / attribute 1 /
+  built-in/any-type 1 = 25 次），另有 parser/generated-impl/test-driver 1 次，
+  故驱动执行次数 N = 79（tree 32 + parser 47）。
+  tree/binary/{cdr,polymorphic,xdr} 三组由上游 `ifeq ($(xsd_with_ace),y)` 条件注册，
+  +dep 发行包预生成 xsd/build/configuration-dynamic.make 的 `xsd_with_ace := n`，
+  默认不进 make test（需 ACE 库），不计入 N。
+  xsd/tests/{schema,morphing,processing,code,clash,failed} 与
+  xsd/tests/schema/list/driver.cxx 均不在注册树内，不计入。
+  assertion 口径（全 tests/cxx 驱动 `return 1` 计数 = 127）是另一单位
+  （一条用例含多条断言），按"四种口径不得混用"不作 N。
+upstream_test_count: 79
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+upstream_tests:
+  - file: xsd/tests/cxx/tree/**
+    source: xsd-4.0.0+dep/xsd/tests/cxx/tree
+    description: "C++/Tree（常驻内存映射）用例组：32 个叶子目录 → 32 次驱动调用，每次把驱动输出与 output/ 或 test.std 做 diff"
+    command: "make test（tree 组 32 次驱动调用）"
+  - file: xsd/tests/cxx/parser/**
+    source: xsd-4.0.0+dep/xsd/tests/cxx/parser
+    description: "C++/Parser（事件流式映射）用例组：29 个叶子目录，其中 7 个 validation 叶子按 test-*.xml 展开为 25 次调用，本组共 47 次驱动调用"
+    command: "make test（parser 组 47 次驱动调用）"
+
+test_package_tests:
+  - file: test.sh
+    description: >
+      消费者视角（顶层断言 26 条 + tree-driver 子断言 18 条 = 44 条）：对**已安装**
+      bin/xsd 与包内 include/xsd/** 做 tree/map 双模式闭环——生成 schema.hxx/.cxx
+      （cxx-tree）与 schema-pskel/-pimpl（cxx-parser），真编译成 tree-driver /
+      parser-driver 并执行；含序列化回写→再解析结构等价、非法实例被拒、
+      枚举/属性读出、编译器错误面（类型错 schema、不存在的输入）等反向用例。
+    command: "conan create archives/x/xsd/4.0.0（test_package.test() 内 sh test.sh）"
+  - file: tree-driver.cxx
+    description: "C++/Tree 消费者驱动，18 条 CHECK 子断言，汇总行 TREE_CHECKS=18 TREE_FAILED=0"
+    command: "tree-driver instance.xml invalid.xml schema.xsd"
+
+assertion_count: 44

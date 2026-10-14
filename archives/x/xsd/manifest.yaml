@@ -1,0 +1,44 @@
+# 软件级 manifest
+# 文件位置: archives/x/xsd/manifest.yaml
+# 遵循 ARCHIVE-SPEC
+
+software: xsd
+display: "Code Synthesis XSD"
+description: "W3C XML Schema → C++ 代码生成编译器：把 .xsd 编译成静态类型 C++ 绑定（C++/Tree 常驻内存映射 / C++/Parser 事件流式映射），生成代码运行期依赖 Xerces-C++"
+category: build-tool
+
+homepage: "https://codesynthesis.com/projects/xsd/"
+license: GPL-2.0-only
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 常用构建系统（可被版本级覆盖）
+# 上游不是 autotools：+dep 发行包用自带的 build-0.3 make 体系 + 预生成
+# configuration-dynamic.make 把交互式 configure 短路掉。
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "libc++ 的 <cstddef> 无条件 #include <version>（OHOS NDK libc++ c++11/14/17/20 四档实测），而上游把 libcutl/version、libxsd-frontend/version 两个纯文本版本标记文件放在被 -I 的目录里 ⇒ 标准库 <version> 被同名文件遮蔽，报 version:1:1: error: expected unqualified-id；libstdc++ 不从 <cstddef> 拉 <version>，故 Linux/CCI 构建碰不到"
+    - "libstdc++ 的传递包含会带出 <ostream>，libc++ 不会：libxsd-frontend 的 semantic-graph/elements.cxx 定义 operator<<(std::wostream&, Path const&) 时 basic_ostream 尚不完整 ⇒ 成员 operator<<(const void*) 不可见、invalid operands to binary expression（上游 5029f866 已补 #include <iostream>）"
+    - "build-0.3 的 build-0.3/system/configure 走 2009 版 config.guess，设备上直接 rc=1（HarmonyOS 不识别 + $TMPDIR 下 dummy.c 不可写）；+dep 发行包恰好不需要 system 配置（build-0.3/system.make 无人 include），此路径本包不触发"
+    - "AutotoolsToolchain 的 -std 只在 extra_cxxflags 里追加：profile 的 compiler.cppstd=17 会先产出 -std=c++17，必须让 -std=c++11 排在其后才生效"
+    - "依赖注入面靠 conanbuild.sh 聚合的 conanautotoolstoolchain.sh / conanautotoolsdeps.sh（CC/CXX/CPPFLAGS/CXXFLAGS/LDFLAGS/LIBS），上游 README 明写就吃这组环境变量"
+  common_dependencies:
+    - xerces-c
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "4.0.0":
+    status: built
+    build_date: "2026-10-06"
+    conan_ref: "xsd/4.0.0"
