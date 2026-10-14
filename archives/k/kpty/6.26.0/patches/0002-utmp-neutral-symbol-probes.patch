@@ -1,0 +1,52 @@
+--- a/src/ConfigureChecks.cmake
++++ b/src/ConfigureChecks.cmake
+@@ -79,6 +79,11 @@
+     check_function_exists(revoke     HAVE_REVOKE)
+     check_function_exists(_getpty    HAVE__GETPTY)
+     check_function_exists(getpt      HAVE_GETPT)
++  # Some libcs ship <utmp.h> with the struct and constants but implement none
++  # of the legacy utmp accounting calls: probe the symbols so the code below
++  # can fall back instead of failing to compile.
++  check_function_exists(updwtmp    HAVE_UPDWTMP)
++  check_function_exists(getutline  HAVE_GETUTLINE)
+     check_function_exists(grantpt    HAVE_GRANTPT)
+     check_function_exists(unlockpt   HAVE_UNLOCKPT)
+     check_function_exists(posix_openpt HAVE_POSIX_OPENPT)
+--- a/src/config-pty.h.cmake
++++ b/src/config-pty.h.cmake
+@@ -24,6 +24,8 @@
+ #cmakedefine01 HAVE_UTEMPTER
+ #cmakedefine01 HAVE_LOGIN
+ #cmakedefine01 HAVE_UTMPX
++#cmakedefine01 HAVE_UPDWTMP
++#cmakedefine01 HAVE_GETUTLINE
+ #cmakedefine01 HAVE_LOGINX
+ #cmakedefine01 HAVE_STRUCT_UTMP_UT_TYPE
+ #cmakedefine01 HAVE_STRUCT_UTMP_UT_PID
+--- a/src/kpty.cpp
++++ b/src/kpty.cpp
+@@ -77,6 +77,24 @@
+ #if HAVE_UTMPX
+ #include <utmpx.h>
+ #endif
++#if !HAVE_UPDWTMP
++/* Some libcs ship <utmp.h> with the struct and constants but implement none
++ * of the legacy utmp accounting calls (e.g. the musl-based OpenHarmony
++ * libc): fall back to a no-op that skips wtmp accounting. */
++static void updwtmp(const char *, const struct utmp *)
++{
++}
++#endif
++
++#if !HAVE_GETUTLINE
++/* Same situation for the utmp lookup: report "no entry" so callers skip the
++ * utmp cleanup path. */
++static struct utmp *getutline(struct utmp *)
++{
++    return nullptr;
++}
++#endif
++
+ #if !defined(_PATH_UTMPX) && defined(_UTMPX_FILE)
+ #define _PATH_UTMPX _UTMPX_FILE
+ #endif
