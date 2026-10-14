@@ -1,0 +1,27 @@
+# 软件级 manifest — osdclock（遵循 ARCHIVE-SPEC v2.0）
+software: osdclock
+display: "osdclock"
+description: "X On-Screen Display 时钟：以 strftime(3) 格式把当前时间画在 X 根窗口上（经 libxosd）"
+category: utility
+homepage: "http://leftorium.net/software.phtml"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "手写 Makefile 工程（无 configure/CMake）：Makefile 硬赋值 CC/CFLAGS/LDFLAGS/XOSDLIBS/INSTALL，环境变量无法到达，配方必须把覆盖项放在 make 命令行（编译器取自 tools.build:compiler_executables，R33）"
+    - "补丁 0001（libxosd 2.2.14 API 漂移）：osd_clock 0.5 针对 xosd 0.7.0，xosd_init() 需补第 7 参 number_lines=2（xosd_display 要求 0 <= line < number_lines，程序在 line 1 绘制），并把 xosd_uninit() 换成 xosd_destroy()"
+    - "补丁 0002（aarch64 平台修复）：getopt_long() 返回值必须用 int——aarch64 上 char 默认无符号，`char c` 使 (c = getopt_long(...)) != -1 恒真、选项循环永不退出（改前实测挂死 rc=124，改后 rc=1）"
+    - "HMDFS 依赖 .so symlink 条目不可读（EACCES）→ lld 报 unable to find library -lX11、loader 报 Error loading shared library libXau.so.6；配方 generate() 把依赖 .so 按 soname 别名实体化到 build_folder/deplibs 并前置 -L，test_package 同样实体化到 realdep_libs 并前置 LD_LIBRARY_PATH"
+    - "上游无测试套件（Makefile 只有 all/install/clean/tar）→ test_package 真实执行被测二进制 5 条用例 / 9 条断言（无需 X server，含 aarch64 getopt 修复的回归探针）"
+  common_dependencies:
+    - libxosd
+    - libxcb
+    - libxau
+    - libxdmcp
+
+versions:
+  "0.5":
+    status: built
+    build_date: "2026-10-13"
+    source_url: "https://deb.debian.org/debian/pool/main/o/osdclock/osdclock_0.5.orig.tar.gz"

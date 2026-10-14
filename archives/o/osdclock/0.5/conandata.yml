@@ -1,0 +1,33 @@
+# conandata.yml — osdclock 0.5
+#
+# 上游（Jon Beckham，2001）的原始主页 http://leftorium.net/software.phtml 与
+# 旧 Savannah 下载区（download.savannah.nongnu.org/releases/osdclock/）均已
+# 404（2026-10-13 实测：leftorium.net 全站 403/站点已停，Savannah 该目录不存在，
+# SourceForge 无此项目，GitHub 仅 fhackenberger/osd_clock 且只到 0.6 tag，
+# 无 0.5）。Debian pool 的 orig 包是唯一存活、且内容为 2001 年原版发布的副本
+# （README/NEWS/ChangeLog/COPYING/Makefile/osd_clock.c/osd_clock.1 与上游一致，
+# 仅顶层目录被 Debian 改名为 osd_clock-0.5.orig），故照 libxosd/2.2.14 同一
+# 上游家族的先例直链 Debian pool（该写法已在 main 合并，PR #15161 系列）。
+# 说明：此 URL 会命中 create-pr 的 PF7 源 URL 闸（deb.debian.org 域名在
+# 黑名单内），属"官方源已消失"的既定例外，建 PR 时按先例用 --no-preflight
+# 并在 PR 正文"补充说明"中披露（其余 PF1–PF6、PF8 实测通过；PF9 另因软件级 README/manifest/commands.json 命中，一并在 PR 说明中披露）。
+sources:
+  url: "https://deb.debian.org/debian/pool/main/o/osdclock/osdclock_0.5.orig.tar.gz"
+  sha256: "752d08f6bb258e271ef8d015fcdc84f9957ecd5152b057a66eeb085db6bba2c8"
+
+patches:
+  - patch_file: "patches/0001-port-to-libxosd-2.2.14.patch"
+    patch_description: >-
+      适配唯一在发行的 libxosd 2.2.14 API：xosd_init() 补第 7 个参数
+      number_lines=2（osd_clock 在 line 1 上绘制，2.2.14 的 xosd_display
+      要求 0 <= line < number_lines），并用非 deprecated 的 xosd_destroy()
+      取代 xosd_uninit()。osd_clock 0.5 针对 xosd 0.7.0 编写，
+      不加此补丁直接编译失败（too few arguments to function call）。
+    patch_type: "portability"
+  - patch_file: "patches/0002-getopt-return-type-aarch64.patch"
+    patch_description: >-
+      getopt_long() 返回值必须用 int 承接：aarch64 上 char 默认无符号，
+      `char c` 使 `(c = getopt_long(...)) != -1` 恒真（-1 变 255），选项循环
+      永不退出、程序在 xosd_init() 之前空转挂死。x86 上 char 有符号故上游与
+      Debian 补丁集都不需要该修复。
+    patch_type: "portability"
