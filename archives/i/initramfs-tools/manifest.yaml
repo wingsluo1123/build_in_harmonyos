@@ -1,0 +1,25 @@
+# 软件级 manifest — initramfs-tools
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: initramfs-tools
+display: "initramfs-tools"
+description: "Debian initramfs 构建工具集：mkinitramfs / update-initramfs / lsinitramfs / unmkinitramfs（含 1 个 C 程序）+ hooks/scripts 框架与配置"
+category: application
+homepage: "https://salsa.debian.org/kernel-team/initramfs-tools"
+license: GPL-2.0-or-later
+build_system: make
+
+ohos_adaptation:
+  key_points:
+    - "Debian native 包（无独立上游仓库）：不跑 dh，按 debian/initramfs-tools*.install 的映射直接安装（与同族 installation-report / init-system-helpers 同一做法）"
+    - "唯一编译产物是 unmkinitramfs（Makefile 的 all 目标，隐式规则 + $(CC)，工具链环境由 AutotoolsToolchain 提供）"
+    - "模板化脚本处理：mkinitramfs 带 @VERSION@ / @BUSYBOX_PACKAGES@ 占位符，须照 Debian override_dh_install 做替换（配方内含断言）"
+    - "无 Conan requires：Build-Depends 里的 shunit2 是 `<!nocheck>` 测试框架（仓库/制品仓都没有）→ 按'缺环境就下'在 build() 内取真实 tarball（钉 sha256）仅用于跑上游 tests/functions_test，不进产物"
+    - "上游测试 N=16（R51 口径）：tests/functions_test 的 6 个 shunit2 单测在 build() 内真跑 6/6；debian/tests/control 注册的 10 个 Debian autopkgtest（copy-file + unmkinitramfs + 8 个 qemu-*）需 Debian 测试床（linux-image-generic + qemu + root），OHOS 架构上不可满足 → 逐项按平台级系统性阻塞披露"
+  common_dependencies: []
+
+versions:
+  "0.151":
+    status: built
+    build_date: "2026-10-08"
+    conan_ref: "initramfs-tools/0.151"

@@ -1,0 +1,41 @@
+# conandata.yml — initramfs-tools 0.151
+#
+# 上游是 Debian **native** 包（无独立上游仓库）：源码 = Makefile + shell 工具 + kernels/hooks/scripts
+# + 一个 C 程序（unmkinitramfs.c）+ debian/。0.151 在 Debian pool 里可直接取到：
+#   https://deb.debian.org/debian/pool/main/i/initramfs-tools/initramfs-tools_0.151.tar.xz
+#
+# 依赖：**无 Conan requires**。
+#   debian/control 的 Build-Depends 是 `debhelper-compat (= 13), bash-completion, shunit2 <!nocheck>`：
+#   * debhelper-compat 只是 dh 版本声明（本适配不跑 dh）；
+#   * bash-completion 仅用于把 bash_completion.d/ 的补全脚本装到系统目录，源码里已自带该文件；
+#   * **shunit2 是 `<!nocheck>` 的测试框架**（纯 shell，非运行期依赖），仓库与制品仓都没有
+#     → 按"缺环境就下"在 build() 里从 Debian pool 取来仅用于跑上游测试，**不进包产物**。
+#   Depends 是 initramfs-tools-core 等**同源子包**，不存在外部运行期库依赖。
+#
+# 上游测试（N=16，R51 口径 = tests/ 目录数 + 测试注册数）：
+#   ① `tests/functions_test`（POSIX sh + shunit2，6 个 test_*；`oneTimeSetUp` 里 source
+#      `scripts/functions`，末尾 `. shunit2` → 需把 shunit2 放到 PATH 上）—— build() 内真跑 6/6。
+#   ② `debian/tests/control` 注册的 10 个 Debian autopkgtest 用例（copy-file、unmkinitramfs、
+#      qemu-klibc/-busybox/-ata-only/-virtio-only/-separate-usr/-panic-shell/-net/-net-iscsi）
+#      —— 需 Debian 测试床（linux-image-generic + qemu-system-native + root），OHOS 架构上不可满足，
+#         按平台级系统性阻塞在 manifest.yaml 的 blocked_cases 里逐项披露。
+#   （更正：此前把②的 10 个误记成"构建期取入的 shunit2 框架自带 example"——那是错的。）
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/initramfs-tools/initramfs-tools_0.151.tar.xz"
+  sha256: "41e59498503f0588d23142630e533c70985399475e027a6ee746cc1c3e387c20"
+  filename: "initramfs-tools_0.151.tar.xz"
+
+# 测试框架（仅 build 期使用，不进产物）：取 shunit2 的 Debian orig tarball（纯 shell）
+test_framework:
+  name: "shunit2"
+  version: "2.1.8"
+  url: "https://deb.debian.org/debian/pool/main/s/shunit2/shunit2_2.1.8.orig.tar.gz"
+  sha256: "b2fed28ba7282e4878640395284e43f08a029a6c27632df73267c8043c71b60c"
+  strip_root: true
+  note: >-
+    解包后 shunit2 脚本位于顶层（`shunit2-2.1.8/shunit2`），strip_root 后即 `<dir>/shunit2`；
+    build() 把它所在目录加进 PATH 供 `tests/functions_test` 里的 `. shunit2` 解析。
+    仅供测试，**不进包产物**。
+
+patches: []
