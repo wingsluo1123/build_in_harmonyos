@@ -1,0 +1,21 @@
+package: gem5/25.1.0.1
+homepage: https://www.gem5.org/
+
+upstream_check_command: "none (upstream suite needs external gem5 resources; the runnable pyunit subset is executed on the worker, see reports/test-report.md)"
+upstream_test_in_build: false
+upstream_test_command: "none in build(); tests/pyunit executed separately via build/ARM/gem5.opt tests/run_pyunit.py"
+upstream_tests:
+  - "tests/pyunit (12 modules / 127 test functions, executed on OHOS aarch64)"
+
+test_package_tests:
+  - file: test.sh
+    description: "Compile a freestanding AArch64 guest and run it on the packaged gem5.opt in SE mode; assert exit status 0, 'Hello world!', no non-zero simulated exit code and a produced stats.txt"
+    command: "bash test.sh"
+  - file: hello.c
+    description: "Freestanding AArch64 guest source (write/exit syscalls only), compiled with the worker clang at test time"
+    command: "clang -static -nostdlib -fno-stack-protector -Wl,--build-id=none -O1 -o hello hello.c"
+  - file: se_hello.py
+    description: "Minimal gem5 SE configuration (ArmAtomicSimpleCPU, 512MiB DDR3)"
+    command: "gem5.opt -d m5out se_hello.py hello"
+
+assertion_count: 4
