@@ -1,0 +1,66 @@
+# 版本级 manifest — archives/x/xeus/5.0.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "5.0.0"
+
+# 软件名
+software: "xeus"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-09"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 tag tarball，禁止 file:// / 镜像代理，R39/PF7）
+  url: "https://github.com/jupyter-xeus/xeus/archive/refs/tags/5.0.0.tar.gz"
+  # 源码校验和（本轮实际下载官方归档核验）
+  sha256: "eabe5dc274ad31a972e1249b070af609e6ad1adfa4c954fb120bcdc556dd6fc4"
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options: []
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - nlohmann_json/3.12.0
+  - uuid/2.40.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（见 reports/test-ledger.md 与知识候选台账）
+knowledge_gained:
+- "xeus 5.0.0 为 CMake/C++17 纯 Jupyter 内核协议库，OHOS 上 CMAKE_SYSTEM_NAME 需归一化为 Linux（CMake 无 HarmonyOS 平台模块）"
+- "test_package 消费者若 include xeus 公开头（xjson.hpp/xhelper.hpp）必须显式持有 nlohmann_json 与 uuid 依赖（cpp_info.requires 传递）"
+- "xeusConfig 导出的 CMake 目标为 xeus/xeus-static（无命名空间），conan CMakeDeps 生成 xeus::xeus，测试需两者兼容"
