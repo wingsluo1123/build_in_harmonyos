@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "review-R16 (Conan 2.x API)",
+      "file": "archives/p/ppx_derivers/1.2.1/conanfile.py",
+      "line": 156,
+      "description": "package_info() uses the Conan 1.x `self.env_info.OCAMLPATH.append(...)` API. In Conan 2.x this attribute is a MockInfoProperty (conan/internal/model/cpp_info.py; verified present in develop2 and released v2.33.0) whose __getattr__ returns an ephemeral [] and only records a 'Usage of deprecated Conan 1.X features' warning, so the OCAMLPATH export is a silent no-op and the comment at conanfile.py:155 ('OCaml consumers (dune/ocamlc) locate the library via OCAMLPATH') does not hold. test.sh:12 masks this by exporting OCAMLPATH itself, so the claimed passing tests are not fake, but downstream consumers get no environment propagation.",
+      "fix_suggestion": "Replace with the Conan 2.x mechanism, e.g. `self.runenv_info.define_path(\"OCAMLPATH\", os.path.join(self.package_folder, \"lib\", \"ocaml\"))` (and/or self.buildenv_info), per the 'Conan 2.x API' rule."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-3 (method order)",
+      "file": "archives/p/ppx_derivers/1.2.1/conanfile.py",
+      "line": 59,
+      "description": "Method order deviates from the mandated sequence export_sources -> requirements -> layout -> source -> generate -> build -> package -> package_info: `requirements()` (line 48) and `layout()` (line 55) precede `export_sources()` (line 59).",
+      "fix_suggestion": "Move `def export_sources(self)` above `def requirements(self)`."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-7 (shell safety mode)",
+      "file": "archives/p/ppx_derivers/1.2.1/test_package/test.sh",
+      "line": 3,
+      "description": "Script opens with `set -eu` instead of the mandatory `set -euo pipefail` required by shell-script rule 7. No pipelines are used in the script, so the practical impact is nil, but the convention is not followed.",
+      "fix_suggestion": "Change line 3 to `set -euo pipefail`."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R51 (upstream-test evidence wording)",
+      "file": "archives/p/ppx_derivers/1.2.1/test_package/MANIFEST.yml",
+      "line": 7,
+      "description": "The R51 evidence text says the v1.2.1 tarball 'contains only src/ (ppx_derivers.ml/.mli), pkg/pkg.ml (topkg) and dune metadata'. The upstream 1.2.1 tree (verified via the GitHub tag tree) additionally contains Makefile (300 B), ppx_derivers.opam, CHANGES.md, LICENSE.md, README.md and .gitignore. notes.md:30 repeats the same 'only' enumeration while notes.md:15 (R47 section) itself refers to the top-level Makefile. The material R51 claim (no test/ directory, N=0 discovered/passed) is true and independently confirmed, so this is a wording inaccuracy only.",
+      "fix_suggestion": "Reword to match the actual listing, e.g. 'no test/ directory; tarball contains src/ (ppx_derivers.ml/.mli), pkg/pkg.ml, Makefile, ppx_derivers.opam and dune metadata'."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "docs-truthfulness",
+      "file": "archives/p/ppx_derivers/1.2.1/reports/test-report.md",
+      "line": 5,
+      "description": "Line 5 states '结果: 见文末本轮实测（.ci-result.json exit_code 为准）', but the file contains no measured-results section (it ends at the 门禁 list, line 27), and .ci-result.json must not be committed (code style rule 24), so the promised evidence does not exist in the archive.",
+      "fix_suggestion": "Inline the actual measured result/output in the report or cite committed evidence (e.g. test_package output) instead of the uncommitted .ci-result.json."
+    }
+  ],
+  "summary": "Independent audit of archives/p/ppx_derivers/1.2.1 against the W4 gate table finds P0=0 and P1=0, so the verdict is pass; there are 5 non-blocking findings (1xP2, 4xP3). Deception checks all pass: test_package genuinely consumes the library (test_pd.ml extends the exported extensible `deriver` type and calls register/lookup/derivers with the two claimed negative controls - unknown lookup returns None, duplicate register raises - and test_ohos_e2e.ml performs real file I/O, serializing the registry to a file and re-verifying after read-back, with test.sh asserting 6/6 artifacts and matching the success banners); the sha256 b6595ee1...73b95 was independently confirmed against opam-repository metadata for the official GitHub archive; the upstream v1.2.1 tree has no test/ directory, so the R51 N=0 claim is truthful; there is no #ifdef __OHOS__/-D__OHOS__, no committed binaries, no file:// URL, the source URL is the official github.com repo, manifest status 'built' is consistent with notes.md, and MANIFEST.yml assertion_count=7 matches the 4 check() + 3 fail() assertions in the .ml files. The only substantive recipe defect is the Conan-1.x `env_info` call in package_info() (P2, silent no-op under Conan 2), with the remaining P3s being style/documentation nits (method ordering, missing pipefail, R51 wording, dangling result reference in test-report.md)."
+}
