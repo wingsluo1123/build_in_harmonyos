@@ -1,0 +1,85 @@
+# ============================================================
+# libao 1.2.0 — 版本级 manifest（ARCHIVE-SPEC v2.0）
+# ============================================================
+
+# 版本号
+version: "1.2.0"
+
+# 软件名
+software: "libao"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-09"
+
+# 构建系统类型
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://downloads.xiph.org/releases/ao/libao-1.2.0.tar.gz"
+  sha256: "03ad231ad1f9d64b52474392d63c31197b0bc7bd416e58b1c10a329a5ed89caf"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # configure 参数（R1 最小化：官方 tarball 自带 configure；live 后端由
+  # configure 探测自动关闭，无需手工 --disable-*）
+  configure_options: []
+
+  # 编译依赖：无（仅系统 libc；readelf DT_NEEDED = libc.so）
+  dependencies: []
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libao 1.2.0 官方 release tarball 自带预生成 configure，无需 autoreconf（区别于 1.2.2 gitlab archive）"
+  - "config.guess(2012-12-29) 不识别 HarmonyOS：增加 `*:HarmonyOS:*:*` 分支输出 aarch64-unknown-linux-ohos（不使用 __OHOS__ 宏，PF5 合规）；config.sub 需接受 linux-ohos 三元组（E007）"
+  - "HMDFS UID 映射使 configure 的 `(umask 077 && mktemp -d ./confXXXXXX)` 在 config.status 生成阶段 Permission denied → umask 000（E011）"
+  - "libao wav 驱动输出 WAVE_FORMAT_EXTENSIBLE（68 字节头：RIFF+fmt40+data8），测试断言尺寸 = 68 + 2*bytes"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libao-1.2.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libao-1.2.0.work
+  source_orig_hash: a5de33430d87c17c
+  source_work_hash: 5f326e15718e7a10
+  generated_at: '2026-10-09T01:00:27'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

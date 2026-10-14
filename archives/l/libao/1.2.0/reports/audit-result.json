@@ -1,0 +1,133 @@
+{
+  "verdict": "pass",
+  "audited_revision": "36f9fbc2bb14bec9ca4baab6730ffe462a97f201",
+  "audited_branch": "feat/libao-1.2.0",
+  "base_revision": "a5bda0fd27",
+  "audit_input": "/storage/Users/currentUser/tmp/audit-input-feat-libao-1.2.0.json",
+  "audit_input_crosscheck": "audit-input 61,764 B，12 个 file_contents 与远端 git 工作树逐文件 sha256 全部一致（无输入篡改）",
+  "auditor": "W4 独立审计 subagent（一次性借调，独立复算/复跑，不采信执行者自审）",
+  "audit_scope": "git diff a5bda0fd27..HEAD = 12 tracked files / +880 / -0，全部位于 archives/l/libao/1.2.0/**（W2 原子）；PR #15087",
+  "artifacts_sha256": {
+    "archives/l/libao/1.2.0/conandata.yml": "90f59ed829380dc7dc82f12de98dd6629801ad3f3b524f8f13d50f9c4affeb63",
+    "archives/l/libao/1.2.0/conanfile.py": "c4344cfabf01aec186f80d1b5dcfb8e53237b73bed92f547cce1f53e5c94f6b4",
+    "archives/l/libao/1.2.0/manifest.yaml": "e87002983d06f44abdb6fe5f611a166c040b096220e447d01137a4c5e526ef80",
+    "archives/l/libao/1.2.0/notes.md": "1cefb4e8a8af31547964e46c69f1a90818cd7e6d1daa102bd029aa75ad5557b0",
+    "archives/l/libao/1.2.0/patches/0001-config.guess.patch": "baa7797e5cee7f5d66ec5dd60be3a4333bc971c91b4593c91f9501fa99110165",
+    "archives/l/libao/1.2.0/patches/0002-config.sub.patch": "2a9b3a0e06a8502fe768e4f542d346378238c2aa69d9989d2c25e7a0d3479ed3",
+    "archives/l/libao/1.2.0/patches/0003-configure.patch": "d3c8591149df58128d1a254d9ae46ea6564865af23e1d402ab9b5fd96600782e",
+    "archives/l/libao/1.2.0/test_package/CMakeLists.txt": "319f359a5f5860421cfc932833ce40b8bd6bdb3258a18595624ac51fc07093e4",
+    "archives/l/libao/1.2.0/test_package/MANIFEST.yml": "d36f2d27fddcab9a63545df00a25dd853cfde1a281933cd3a0cb62ca986a273d",
+    "archives/l/libao/1.2.0/test_package/conanfile.py": "6e5ad1bc0596a373a6f436166c48ee9ba0fc2ba624f35dbf95765cf570edb0cc",
+    "archives/l/libao/1.2.0/test_package/ohos_specific_test.py": "4ab05f592d351500516ec9c3421ae55b0b128e47095daa1d014e710f8dc16221",
+    "archives/l/libao/1.2.0/test_package/test.c": "f6a291dda4732f105add41b2bdaab068372bd01da32f98eca3043076fcc4c08c"
+  },
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "R8/R6/E011",
+      "file": "archives/l/libao/1.2.0/patches/0003-configure.patch",
+      "line": 14,
+      "description": "0003 修改的是预生成 configure（autoconf 2.69 产物），仅 2 行：config.status 临时目录 umask 077→000。独立核验：① configure.ac 无 umask 逻辑（无法从 configure.ac 层面消除，patch 生成文件属 R6 允许的 patches/ 层级，②次选合规）；② 对官方 tarball 新鲜解包后 git apply --check 与 patch --dry-run 均通过，diff 范围仅 config.guess/config.sub/configure 3 文件；③ E011 根因（HMDFS UID 映射）在 notes.md 问题表与 manifest 知识项均有记录，acl/abook 先例一致。R8 透明性边界：fallback 分支（mktemp 不可用时 `mkdir`）在非鸿蒙平台也会变为 0777 权限，存在理论弱化；但 mktemp -d 本身恒为 0700、该分支极罕见，且属既有已通过审计的 E011 规范修复模式。非阻断。",
+      "fix_suggestion": "维持现状可合入；长期建议在知识库 E011 中登记更小透明性方案（如 fallback 改为 `mkdir -m 700`），无需本 PR 修改。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style#12",
+      "file": "archives/l/libao/1.2.0/conandata.yml",
+      "line": 10,
+      "description": "patch_description 为叙述句（'HarmonyOS system recognition in config.guess (E007): emit ...'），未采用 code-style §12 的「0001 空格分隔短描述」示例形式。信息完整、与仓库既有风格一致（leave/1.12 同款），纯风格项。",
+      "fix_suggestion": "可选：前缀加「0001 config.guess」等短标识；不阻断。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34/R53",
+      "file": "archives/l/libao/1.2.0/test_package/ohos_specific_test.py",
+      "line": 128,
+      "description": "独立复跑发现：消费者二进制实际引用 7 个 libao 未定义符号（含 ao_open_live），而本脚本 api 列表校验 6 个（ao_open_live 未列入）。非欺骗（多验不会漏检，输出 checks=9 与申报一致），仅完整性小缺口。",
+      "fix_suggestion": "可选：把 ao_open_live 加入 api 列表；不阻断。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "housekeeping",
+      "file": "archives/l/libao/1.2.0/patches/.patch-backup-20261009010027/",
+      "line": 0,
+      "description": "工作树残留本地 refresh-patch 备份目录（gitignored，.gitignore:183，未入 PR：git ls-files patches/ 仅 3 个补丁）。W3 L4 危险函数扫描会递归扫到备份副本，日志中同一文件出现两条记录，属扫描噪声，对 PR 与产物零影响。",
+      "fix_suggestion": "可选：本地删除该目录以消除 L4 重复记录；不阻断。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L4",
+      "file": "archives/l/libao/1.2.0/patches/0003-configure.patch",
+      "line": 7,
+      "description": "W3 L4 warn 'dangerous functions in patches'（非阻断，已声明）：命中模式为上游 autoconf 生成代码的上下文/既有行（`rm -fr \"$ac_tmp\"` 为上下文行；`mktemp` 同时出现在 -/+ 两侧但仅 umask 变更）。3 个补丁均未引入新的执行/求值逻辑。",
+      "fix_suggestion": "无需处理（声明性 warn，按门禁表非阻断）。"
+    }
+  ],
+  "evidence": {
+    "W2_atomicity": {
+      "command": "git diff --name-only a5bda0fd27..HEAD; git status --porcelain archives/l/libao/; git ls-files -s archives/l/libao/1.2.0/",
+      "result": "12 文件全部在 archives/l/libao/1.2.0/**，+880/-0；status 输出 0 行（干净）；无框架/他包挟带；tracked 模式全部 100644"
+    },
+    "ci_result": {
+      "file": "archives/l/libao/1.2.0/.ci-result.json (gitignored 状态文件)",
+      "exit_code": 0,
+      "log_sha256_declared": "e2444dd7056a5ae9d97980d54c6de0f85d8d9a27f391e441b44f04c3850f3ee4",
+      "log_sha256_recomputed": "sha256sum reports/w3-local-ci.log = e2444dd7056a5ae9d97980d54c6de0f85d8d9a27f391e441b44f04c3850f3ee4 (逐字节一致)",
+      "integrity_hash_declared": "ec71f512348f3012",
+      "integrity_hash_recomputed": "sha256('2026-10-09T01:04:48.879283:libao:1.2.0:0')[:16] = ec71f512348f3012（算法取自 scripts/ohc/finish.py 与 submission.py Gate2/4）",
+      "gate2_4_verdict": "按 submission.py 算法复算一致，非伪造"
+    },
+    "source_authenticity_R39": {
+      "conandata_url": "https://downloads.xiph.org/releases/ao/libao-1.2.0.tar.gz",
+      "sha256_declared": "03ad231ad1f9d64b52474392d63c31197b0bc7bd416e58b1c10a329a5ed89caf",
+      "fresh_download_sha256": "03ad231ad1f9d64b52474392d63c31197b0bc7bd416e58b1c10a329a5ed89caf（审计端从 downloads.xiph.org 重新下载 464596 B 实算）",
+      "predl_cache_sha256": "03ad231a...（远端 .build-cache/predl_cache/2e0fcece_libao-1.2.0.tar.gz，464596 B）",
+      "scheme_scan": "conandata.yml 无 file:// / 无镜像前缀 / 无 http://；官方 Xiph 源。ci-metadata.json 的 file:// 仅是本地预下载缓存轨迹（gitignored 状态文件，非配方）"
+    },
+    "patches_R8_PF5": {
+      "apply_check": "对官方 tarball 新鲜解包：3 个补丁 git apply --check 全部 OK；patch -p1 --dry-run 全部 rc=0",
+      "applied_scope": "全部应用后与原始树对比：仅 config.guess / config.sub / configure 3 文件差异",
+      "ohos_macro": "3 个补丁 __OHOS__ 出现次数 = 0（PF5 清洁）；tracked 文件中出现的 __OHOS__ 仅为文档性描述文字（'不使用 __OHOS__ 宏'）",
+      "patch_0003_detail": "diff 仅 2 行 umask 077→000（configure:15241/15246）；configure.ac 无 umask（该代码由 autoconf 2.69 m4 生成，configure.ac 层不可修）",
+      "r8_four_no": "0001 新增 *:HarmonyOS:*:* 分支（纯追加，其他平台不命中）；0002 在候选列表追加 linux-ohos（纯追加）；0003 见 issues P3/R8 透明性分析。无删除/反转既有分支，风格与上游一致"
+    },
+    "recipe_quality": {
+      "R26": "系统无同名 libao（远端 /lib*/ /usr/lib*/ /system/lib* 均无 libao）；conaninfo.txt options shared=True，默认动态正确，未静态化；未发布 .a",
+      "R32": "仅 config_options 中 == Windows 判断（OHOS 不受影响）；AutotoolsToolchain 自动处理平台",
+      "R33": "build() 无裸 $CC/$CFLAGS；configure_args 来自 load_toolchain_args；自定 configure 调用显式 /bin/sh 常量，无未定义 shell 变量依赖",
+      "R49": "conanfile.py 无 SYS_PREFIX / /usr/local / 共享 prefix 注入",
+      "R38": "package_type=library；无 bin/ 产物（包内仅 include/lib/share）；无 commands.json 正确（W3 L0k: library package, commands.json not required）",
+      "declared_patches": "conandata.yml 声明 3 补丁 ↔ patches/ 实际 3 文件一致；L0j 版本首次发布（registry 无 libao/1.2.0）",
+      "MANIFEST": "test_package/MANIFEST.yml 存在且含 R51 清点申报；manifest.yaml status=published 与 .build-closed/.conan-verified(verified_at 2026-10-09T01:00:50) 一致"
+    },
+    "R34_R53_reproduction": {
+      "independent_build": "审计端直接编译（不经 conan/cmake）：/data/service/hnp/bin/clang -O3 -DNDEBUG -isystem <pkg>/include test.c -o /storage/Users/currentUser/tmp/w4-libao-audit/run/test_libao_w4 -L<pkg>/lib -lm <pkg>/lib/libao.so，compile_rc=0",
+      "consumer_run": "LD_LIBRARY_PATH=<pkg>/lib ./test_libao_w4 consumer-w4.wav → rc=0；输出 LIBAO_CONSUMER_OK checks=25 file=... size=88268 wav_drv=1 null_drv=0",
+      "wav_verified": "88268 B = 68 + 2*44100；RIFF/WAVE/fmt(40)/tag=0xFFFE/1ch/44100/16bit/PCM GUID/data=88200 逐项复核",
+      "ohos_specific": "python3 ohos_specific_test.py --lib <pkg>/lib/libao.so.4.1.0 --bin <W4 自建二进制> → 9/9 OK，OHOS_SPECIFIC_OK checks=9",
+      "elf_independent_readelf": "libao.so.4.1.0: ELF64 LE AArch64(DYN), SONAME=libao.so.4，NEEDED=[libc.so]，无 RPATH/RUNPATH，.codesign 节存在；消费者: NEEDED=[libao.so.4, libc.so]，未定义 ao_* 符号 7 个（6 个 API + ao_open_live）",
+      "plugin": "lib/ao/plugins-4/liboss.so NEEDED=[libc.so]（上游 configure 探测产物，与 1.2.2 归档一致）"
+    },
+    "R51_census": {
+      "tar_entries": 134,
+      "test_dir": "无 tests/ 或 test/ 目录；唯一含 test 的条目 = doc/ao_plugin_test.html（文档页）",
+      "automake_tests": "全部 Makefile.am 中 TESTS=/check_PROGRAMS/check_SCRIPTS 零命中",
+      "c_sources": "20 个 .c（库 + 可选插件 + doc 示例），无自检入口",
+      "make_check_live": "在 W3 实际 VPATH 构建树 make check rc=0，'Nothing to be done' 17 处；独立复建的新树（configure rc=0）make check rc=0/15 处 no-op",
+      "conclusion": "N=0 / N′=0 申报与独立清点一致，无被漏计的可运行上游测试"
+    },
+    "config_shell_mechanism": {
+      "profile": "~/.conan2/profiles/ohos-aarch64 [buildenv] CONFIG_SHELL=/data/service/hnp/bin/bash",
+      "failure_reproduced": "审计端独立复现：env CONFIG_SHELL=/data/service/hnp/bin/bash /bin/sh configure → rc=1，getcwd 风暴 + 'configure: error: working directory cannot be determined'（与 notes.md 记录一致）",
+      "workaround_verified": "unset CONFIG_SHELL; CONFIG_SHELL=/bin/sh SHELL=/bin/sh /bin/sh configure（CC=clang）→ rc=0，config.status/Makefile 生成；配方 build() 中实现与此一致（显式常量，非伪造/非过度 hack，classads/cdck 先例）",
+      "artifact_evidence": "W3 构建树 config.log 显示 stock autoconf 2.69 正常完成，无 getcwd 错误；RUN 行含同样 unset+pin 命令"
+    },
+    "hygiene": {
+      "junk_files": "archives/l/libao 下 *.orig/*.rej/*.bak/*~ = 0",
+      "line_endings": "tracked 文件 CRLF = 0；末尾换行缺失 = 0",
+      "placeholders": "tracked 文件 TODO/FIXME/(请填写) = 0；reports/pr-body.md 无 (请填写) 残留",
+      "backup_dir": ".patch-backup-20261009010027 与 test_package/build/、reports/、状态文件均 gitignored，未入 PR"
+    }
+  },
+  "summary": "独立审计通过：verdict=pass，P0=0，P1=0（5 条 P3 均非阻断）。所有关键结论均由审计端独立复算/复跑取得，未采信执行者自审：① W2 原子性——HEAD 36f9fbc2bb 相对 a5bda0fd27 恰为 12 文件 +880/-0，全在 archives/l/libao/1.2.0/**，工作树干净；② CI 回执——.ci-result.json exit_code=0，log_sha256 与 w3-local-ci.log 实算逐字节一致（e2444dd7...），integrity_hash 按 finish.py/submission.py 算法复算一致（ec71f512348f3012）；③ 源真实性——审计端重新从 downloads.xiph.org 下载官方 tarball，sha256=03ad231a... 与 conandata 申报及 predl 缓存三方一致，配方无 file:///镜像残留；④ 补丁——3 个补丁对官方 tarball 干净应用（git apply --check + dry-run 全过），零 __OHOS__，非鸿蒙平台透明性除 0003 的 E011 规范修复外无影响（configure.ac 无 umask，patch 生成文件属 R6 允许层级并有 acl/abook 先例）；⑤ 配方质量——R26（系统无同名 libao，默认动态正确）/R32/R33/R49/R38 全过，补丁声明与文件一致；⑥ R34/R53——审计端绕过 conan 直接用 clang 编译 test.c 并运行：LIBAO_CONSUMER_OK checks=25、88268 B WAV 逐字段核验，ohos_specific_test.py 对自建二进制 9/9 通过，独立 readelf 确认 ELF64/LE/AArch64、SONAME libao.so.4、NEEDED=[libc.so]、.codesign、无 RPATH/RUNPATH；⑦ R51——独立清点 134 条目零 tests/、零 TESTS/check_PROGRAMS、20 个 .c，实跑 make check rc=0 全 no-op，N=0 申报属实；⑧ 卫生——无 JC 残留、无 CRLF、无占位符；⑨ CONFIG_SHELL 修复——独立复现原始 getcwd 失败并验证配方 unset+pin 方案 rc=0，实现真实且合规。已知非阻断项：L4 warn 系上游 autoconf 上下文行；.patch-backup 为 gitignored 本地残留。审计基准冻结于 36f9fbc2bb14bec9ca4baab6730ffe462a97f201，全部 12 工件 sha256 已登记。"
+}
