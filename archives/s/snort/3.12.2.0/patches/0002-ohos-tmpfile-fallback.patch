@@ -1,0 +1,127 @@
+--- a/src/network_inspectors/perf_monitor/csv_formatter.cc
++++ b/src/network_inspectors/perf_monitor/csv_formatter.cc
+@@ -98,6 +98,8 @@
+ #ifdef CATCH_TEST_BUILD
+ 
+ #include <cstring>
++#include <stdlib.h>
++#include <unistd.h>
+ 
+ #include "catch/catch.hpp"
+ 
+@@ -113,6 +115,30 @@
+         "2145678903,0,0,0,,0\n";
+ 
+     FILE* fh = tmpfile();
++    if ( !fh )
++    {
++        // tmpfile() is hardcoded to /tmp; on OHOS /tmp is read-only and the
++        // call fails with EACCES.  Fall back to a TMPDIR-backed scratch
++        // file (unlinked at once, so it still behaves like tmpfile()).
++        const char* dir = getenv("TMPDIR");
++        std::string tmpl = std::string(dir ? dir : ".") + "/snort_csv_fmt.XXXXXX";
++        std::vector<char> path(tmpl.begin(), tmpl.end());
++        path.push_back('\0');
++        int fd = mkstemp(path.data());
++        if ( fd >= 0 )
++        {
++            unlink(path.data());
++            FILE* tmp = fdopen(fd, "w+");
++            if ( tmp )
++            {
++                fh = tmp;
++            }
++            else
++            {
++                close(fd);
++            }
++        }
++    }
+     CSVFormatter f("csv_formatter");
+ 
+     f.register_section("name");
+--- a/src/network_inspectors/perf_monitor/json_formatter.cc
++++ b/src/network_inspectors/perf_monitor/json_formatter.cc
+@@ -135,6 +135,9 @@
+ 
+ #ifdef CATCH_TEST_BUILD
+ 
++#include <stdlib.h>
++#include <unistd.h>
++
+ #include "catch/catch.hpp"
+ 
+ std::string cooked = R"g([{"timestamp":1234567890,"name":{"one":1},"str":{"five":"hellothere"},)g"
+@@ -147,6 +150,30 @@
+     std::vector<PegCount> kvp;
+ 
+     FILE* fh = tmpfile();
++    if ( !fh )
++    {
++        // tmpfile() is hardcoded to /tmp; on OHOS /tmp is read-only and the
++        // call fails with EACCES.  Fall back to a TMPDIR-backed scratch
++        // file (unlinked at once, so it still behaves like tmpfile()).
++        const char* dir = getenv("TMPDIR");
++        std::string tmpl = std::string(dir ? dir : ".") + "/snort_json_fmt.XXXXXX";
++        std::vector<char> path(tmpl.begin(), tmpl.end());
++        path.push_back('\0');
++        int fd = mkstemp(path.data());
++        if ( fd >= 0 )
++        {
++            unlink(path.data());
++            FILE* tmp = fdopen(fd, "w+");
++            if ( tmp )
++            {
++                fh = tmp;
++            }
++            else
++            {
++                close(fd);
++            }
++        }
++    }
+     JSONFormatter f("test");
+ 
+     f.register_section("name");
+--- a/src/network_inspectors/perf_monitor/text_formatter.cc
++++ b/src/network_inspectors/perf_monitor/text_formatter.cc
+@@ -31,6 +31,8 @@
+ #ifdef UNIT_TEST
+ #include <cstdio>
+ #include <cstring>
++#include <stdlib.h>
++#include <unistd.h>
+ 
+ #include "catch/snort_catch.h"
+ #include "utils/util.h"
+@@ -116,6 +118,30 @@
+         "                 vector.2: 70\n";
+ 
+     FILE* fh = tmpfile();
++    if ( !fh )
++    {
++        // tmpfile() is hardcoded to /tmp; on OHOS /tmp is read-only and the
++        // call fails with EACCES.  Fall back to a TMPDIR-backed scratch
++        // file (unlinked at once, so it still behaves like tmpfile()).
++        const char* dir = getenv("TMPDIR");
++        std::string tmpl = std::string(dir ? dir : ".") + "/snort_text_fmt.XXXXXX";
++        std::vector<char> path(tmpl.begin(), tmpl.end());
++        path.push_back('\0');
++        int fd = mkstemp(path.data());
++        if ( fd >= 0 )
++        {
++            unlink(path.data());
++            FILE* tmp = fdopen(fd, "w+");
++            if ( tmp )
++            {
++                fh = tmp;
++            }
++            else
++            {
++                close(fd);
++            }
++        }
++    }
+     TextFormatter f("text_formatter");
+ 
+     f.register_section("name");

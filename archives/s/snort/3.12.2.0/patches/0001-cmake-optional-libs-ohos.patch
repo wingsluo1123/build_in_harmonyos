@@ -1,0 +1,107 @@
+--- a/cmake/sanity_checks.cmake
++++ b/cmake/sanity_checks.cmake
+@@ -47,6 +47,14 @@
+     check_function_exists(getrpcent HAVE_TIRPC_GETRPCENT)
+     if (HAVE_TIRPC_GETRPCENT)
+         set(USE_TIRPC TRUE)
++    elseif (CMAKE_SYSTEM_NAME MATCHES "HarmonyOS|OHOS")
++        # The HarmonyOS/OHOS libc exposes no RPC program number database;
++        # libtirpc is available in the registry but intentionally not used
++        # here (see notes.md).  Propagate that decision to the one consumer
++        # (service_rpc.cc): when SNORT_NO_RPC_DB is defined its getrpcent()
++        # enumeration is compiled out, keeping the static port patterns only.
++        add_definitions(-DSNORT_NO_RPC_DB)
++        message(STATUS "RPC program number database missing on HarmonyOS/OHOS - RPC name enumeration disabled")
+     else()
+         message(SEND_ERROR "Couldn't find an RPC program number database implementation!")
+     endif()
+@@ -141,7 +149,11 @@
+     endif()
+ endif()
+ 
+-if (DEFINED LIBLZMA_LIBRARIES)
++# LIBLZMA_LIBRARIES is always defined by modern FindLibLZMA - it mirrors
++# LIBLZMA_LIBRARY and holds "LIBLZMA_LIBRARY-NOTFOUND" on a miss, so the
++# old DEFINED test made check_library_exists hard-error instead of being
++# skipped; LIBLZMA_FOUND is the intended gate.
++if (LIBLZMA_FOUND)
+     check_library_exists (${LIBLZMA_LIBRARIES} lzma_code "" HAVE_LZMA)
+ endif()
+ 
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -50,6 +50,7 @@
+ 
+ if ( HAVE_LZMA )
+     LIST(APPEND EXTERNAL_LIBRARIES ${LIBLZMA_LIBRARIES})
++    LIST(APPEND EXTERNAL_INCLUDES ${LIBLZMA_INCLUDE_DIRS})
+ endif()
+ 
+ if ( HAVE_NUMA )
+--- a/src/network_inspectors/appid/service_plugins/service_rpc.cc
++++ b/src/network_inspectors/appid/service_plugins/service_rpc.cc
+@@ -215,6 +215,9 @@
+     proto = IpProtocol::TCP;
+     detectorType = DETECTOR_TYPE_DECODER;
+ 
++#if !defined(SNORT_NO_RPC_DB)
++    // SNORT_NO_RPC_DB: the platform (HarmonyOS) ships no RPC program number
++    // database; skip the enumeration and keep the static port patterns below.
+     struct rpcent* rpc;
+     RPCProgram* prog;
+ 
+@@ -234,6 +237,7 @@
+         }
+         endrpcent();
+     }
++#endif
+ 
+     tcp_patterns =
+     {
+--- a/src/main/CMakeLists.txt
++++ b/src/main/CMakeLists.txt
+@@ -62,13 +62,13 @@
+ 
+ add_custom_command (
+     OUTPUT lua_bootstrap.h
+-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} bootstrap > lua_bootstrap.h
++    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} bootstrap > lua_bootstrap.h
+     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/bootstrap.lua
+ )
+ 
+ add_custom_command (
+     OUTPUT lua_finalize.h
+-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} finalize > lua_finalize.h
++    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} finalize > lua_finalize.h
+     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/finalize.lua
+ )
+ 
+--- a/src/managers/CMakeLists.txt
++++ b/src/managers/CMakeLists.txt
+@@ -47,13 +47,13 @@
+ 
+ add_custom_command (
+     OUTPUT plugffi.lua snort_plugin.lua
+-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ffi_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR}/lua_plugin_defs.h > plugffi.lua
++    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/ffi_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR}/lua_plugin_defs.h > plugffi.lua
+     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/plugffi.lua ${CMAKE_CURRENT_BINARY_DIR}/snort_plugin.lua
+ )
+ 
+ add_custom_command (
+     OUTPUT lua_coreinit.h
+-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} coreinit > lua_coreinit.h
++    COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/../lua_wrap.sh ${CMAKE_CURRENT_SOURCE_DIR} coreinit > lua_coreinit.h
+     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/coreinit.lua
+ )
+ 
+--- a/src/framework/CMakeLists.txt
++++ b/src/framework/CMakeLists.txt
+@@ -80,7 +80,7 @@
+     OUTPUT
+         ${CMAKE_CURRENT_BINARY_DIR}/snort_api.h
+     COMMAND
+-        ${CMAKE_CURRENT_SOURCE_DIR}/plug_gen.sh ${CMAKE_CXX_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR} ${INC_DIRS} > ${CMAKE_CURRENT_BINARY_DIR}/snort_api.h
++        sh ${CMAKE_CURRENT_SOURCE_DIR}/plug_gen.sh ${CMAKE_CXX_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR} ${INC_DIRS} > ${CMAKE_CURRENT_BINARY_DIR}/snort_api.h
+     DEPENDS
+         ${CMAKE_CURRENT_SOURCE_DIR}/plug_gen.sh
+         ${CMAKE_CURRENT_SOURCE_DIR}/plugins.h

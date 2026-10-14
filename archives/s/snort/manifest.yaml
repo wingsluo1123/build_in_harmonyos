@@ -1,0 +1,34 @@
+software: snort
+display: "snort"
+description: "Snort 3 — 轻量级网络入侵检测与防御系统 (NIDS/NIPS)：实时流量与 pcap 回放检测、Lua 配置、规则引擎"
+category: security
+homepage: "https://www.snort.org"
+license: GPL-2.0-only
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "libdaq>=3.0.27 无发行包且不在 Conan 源 → 作为第二源码内置，autoreconf 自举（zbar 同款 tool_requires 链），--disable-shared 规避 OHOS 符号链接限制"
+    - "静态 DAQ 模块的 .pc 上游仅在共享模块构建时安装 → 配方 make install 后手工补装，snort FindDAQ 经 pkg-config --list-all 发现模块"
+    - "CMake 直接驱动（等价 configure_cmake.sh 的全部 -D 缓存项）：依赖经 PCAP_/LUAJIT_/PCRE2_/DNET_/DAQ_/FLEX_ 各 *_HINT 变量 + PKG_CONFIG_PATH 定位"
+    - "ENABLE_UNIT_TESTS=ON 保留在发行包中：Catch2 套件内嵌 snort 二进制（snort --catch-test all），CppUTest 可执行文件经 CTest 全量构建执行"
+    - "OHOS /tmp 只读 → 构建全程 TMPDIR 指向 build 目录内"
+  common_dependencies:
+    - libpcap
+    - pcre2
+    - hwloc
+    - libdnet
+    - luajit-openresty
+    - openssl
+    - zlib
+    - liblzma
+    - cpputest
+  status: built
+
+versions:
+  "3.12.2.0":
+    status: built
+    build_date: "2026-10-03"
+    build_system: cmake
+    compiler: clang
+    notes: "libdaq 3.0.27 vendored + ENABLE_UNIT_TESTS=ON；真机验证数据见 notes.md"

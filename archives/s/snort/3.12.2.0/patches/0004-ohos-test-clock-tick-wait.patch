@@ -1,0 +1,46 @@
+--- a/src/profiler/rule_profiler.cc
++++ b/src/profiler/rule_profiler.cc
+@@ -302,7 +302,19 @@
+ }
+ 
+ static void avoid_optimization()
+-{ for ( int i = 0; i < 1024; ++i ); }
++{
++    for ( int i = 0; i < 1024; ++i );
++
++    // The SnortClock is coarse on some platforms (probed on HarmonyOS PC:
++    // back-to-back reads return the same value ~70% of the time) and this
++    // loop can be optimized away entirely, so the window measured around
++    // this helper may contain zero clock ticks and the profiler time checks
++    // ("rule profiler time context", "time context exclude") become racy.
++    // Spin past one clock tick so those checks always observe a genuine
++    // advance.  Bounded so a stalled clock cannot hang the suite.
++    auto t0 = SnortClock::now();
++    for ( unsigned i = 0; i < 1000000 && SnortClock::now() == t0; ++i );
++}
+ 
+ TEST_CASE( "otn state", "[profiler][rule_profiler]" )
+ {
+--- a/src/profiler/time_profiler.cc
++++ b/src/profiler/time_profiler.cc
+@@ -235,7 +235,19 @@
+ }
+ 
+ static void avoid_optimization()
+-{ for ( int i = 0; i < 1024; ++i ) ; }
++{
++    for ( int i = 0; i < 1024; ++i ) ;
++
++    // The SnortClock is coarse on some platforms (probed on HarmonyOS PC:
++    // back-to-back reads return the same value ~70% of the time) and this
++    // loop can be optimized away entirely, so the window measured around
++    // this helper may contain zero clock ticks and the profiler time checks
++    // ("rule profiler time context", "time context exclude") become racy.
++    // Spin past one clock tick so those checks always observe a genuine
++    // advance.  Bounded so a stalled clock cannot hang the suite.
++    auto t0 = SnortClock::now();
++    for ( unsigned i = 0; i < 1000000 && SnortClock::now() == t0; ++i );
++}
+ 
+ TEST_CASE( "profiler tree builder", "[profiler][profiler_tree_builder]" )
+ {

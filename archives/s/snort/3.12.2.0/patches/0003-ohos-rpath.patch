@@ -1,0 +1,18 @@
+--- a/cmake/platforms.cmake
++++ b/cmake/platforms.cmake
+@@ -9,7 +9,14 @@
+     set(CMAKE_MACOSX_RPATH OFF)
+ endif()
+ 
+-set (CMAKE_SKIP_RPATH ON)
++# Upstream disables rpath for every target unconditionally.  The OHOS
++# package layout keeps the dependencies outside this package, and the
++# official verification runs the installed binary with an empty
++# environment, so the installed snort must carry a RUNPATH to find
++# libhwloc et al.  Keep upstream's behaviour on all other platforms.
++if (NOT CMAKE_SYSTEM_NAME MATCHES "HarmonyOS|OHOS")
++    set (CMAKE_SKIP_RPATH ON)
++endif()
+ 
+ # the Clang compiler on MacOS X may need the c++ library explicitly specified
+ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
