@@ -1,0 +1,118 @@
+---
+software: sdl3
+version: 3.4.18
+build_date: "2026-10-10"
+build_system: cmake
+status: built
+compiler: clang
+platform: ohos-aarch64
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DSDL_SHARED=ON"
+    - "-DSDL_STATIC=OFF"
+    - "-DSDL_PTHREADS=ON"
+    - "-DSDL_TRAY=OFF"
+    - "-DSDL_TESTS=ON"
+    - "-DSDL_X11=OFF"
+    - "-DSDL_WAYLAND=ON"
+    - "-DSDL_KMSDRM=OFF"
+    - "-DSDL_RPI=OFF"
+    - "-DSDL_ROCKCHIP=OFF"
+    - "-DSDL_FRIBIDI=OFF"
+    - "-DSDL_LIBTHAI=OFF"
+    - "-DSDL_ALSA=OFF"
+    - "-DSDL_JACK=OFF"
+    - "-DSDL_PIPEWIRE=OFF"
+    - "-DSDL_PULSEAUDIO=OFF"
+    - "-DSDL_SNDIO=OFF"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+  dependencies: [wayland/1.24.0, libxkbcommon/1.13.1, libffi/3.4.4, libxml2/2.15.3]
+  cc: clang
+  cxx: clang++
+
+archive:
+  source_url: https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+  source_hash: 9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3
+  source_size: 15651004
+  artifact_sha256: 8feb9f7179623cc359e303e332be71d8f16dc2d1b499d1a149e1ed9a35892cfc
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-include-SDL3-SDL_platform_defines.h.patch"
+  - "0003-src-SDL.c.patch"
+  - "0004-src-thread-pthread-SDL_systhread.c.patch"
+  - "0005-CMakeLists-soname.patch"
+  - "0006-CMakeLists-ohos-unix-sources.patch"
+  - "0007-wayland-wl-fixes-v2-guard.patch"
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: platform_detection
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0002-include-SDL3-SDL_platform_defines.h.patch
+    type: platform_detection
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0003-src-SDL.c.patch
+    type: platform_exclusion
+    platform_only: true
+    guard: 'SDL_PLATFORM_OHOS'
+  - file: 0004-src-thread-pthread-SDL_systhread.c.patch
+    type: libc_probe
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0005-CMakeLists-soname.patch
+    type: build_fix
+    platform_only: true
+    guard: 'OHOS (CMake variable set by patch 0001)'
+  - file: 0006-CMakeLists-ohos-unix-sources.patch
+    type: platform_detection
+    platform_only: true
+    guard: 'OHOS (CMake variable set by patch 0001)'
+  - file: 0007-wayland-wl-fixes-v2-guard.patch
+    type: upstream_fix
+    platform_only: false
+    guard: 'SDL_WL_FIXES_VERSION >= 2'
+    note: >-
+      Upstream SDL 3.4.18 gates wl_fixes on the wayland major version
+      (1.24 -> SDL_WL_FIXES_VERSION 1) but then calls the wl_fixes v2-only API
+      wl_fixes_ack_global_remove()/WL_FIXES_ACK_GLOBAL_REMOVE_SINCE_VERSION
+      unconditionally. wayland 1.24/1.25 headers declare only the v1 surface
+      (interface + destroy + destroy_registry), so the build fails on any
+      platform pinned to wayland 1.24/1.25. Not HarmonyOS-specific.
+
+knowledge_gained:
+  - "HarmonyOS 需要 cmake 检测 OHOS 平台：set(OHOS true) + add_definitions(-D__OHOS__)"
+  - "SDL3 需要定义 SDL_PLATFORM_OHOS 并取消 SDL_PLATFORM_LINUX（避免错误识别为 Linux）"
+  - "HarmonyOS pthread 实现不完整：禁用 pthread_setcanceltype（线程取消功能）"
+  - "HarmonyOS 无 Gtk 支持：禁用 SDL_TRAY 并排除 SDL_Gtk_Quit 调用"
+  - "CMake 不识别 HarmonyOS 平台时 CMAKE_SHARED_LIBRARY_SONAME_C_FLAG 为空，共享库无 SONAME/版本号；配方注入 -Wl,-soname, 修复（sdl2-compat 依赖 dlopen libSDL3.so.0）"
+  - "CMake 对 HarmonyOS 判定 UNIX 为假：if(UNIX) 门控下的 src/core/unix/*（SDL_poll.c/SDL_appid.c）与 src/dialog/unix/SDL_zenitymessagebox.c 整批漏编；Wayland 后端引用其中 SDL_IOReady/SDL_GetAppID/SDL_Zenity_ShowMessageBox，静态库不报、shared 链接直接 undefined symbol"
+  - "OHOS musl pthread_rwlock 无写者排队公平性：testrwlock 饱和读锁模式下 writer 永久饥饿（glibc/macOS/Windows 均有写者救济）；SDL_RWLock API 不承诺写者优先，ctest 排除并记录技术原因"
+  - "SDL 3.4.18 的 wl_fixes 版本门控与调用条件不一致：按 wayland 主版本（1,24,0）选择协议版本 1，却无条件调用 wl_fixes 协议 v2 的 ack_global_remove；wayland 1.24/1.25 头文件只声明 v1 接口，故编译失败。正确门控是 SDL_WL_FIXES_VERSION >= 2（补丁 0007）"
+  - "SDL_RenderReadPixels 的回读像素格式由后端决定（dummy 上为 SDL_PIXELFORMAT_XRGB8888），消费者不应假定 RGBA/ARGB 打包序；用 SDL_GetPixelFormatDetails + SDL_GetRGB 解析"
+  - "SDL_OpenAudioDevice 的 spec 允许 NULL/零值表示用默认值，且 OpenPhysicalAudioDevice 会把 format/channels/freq 向上钳到最低质量门限 —— '非法音频格式被拒绝' 是错误断言前提"
+  - "QEMU 下 jemalloc 会向子进程 stderr 打印 MADV_DONTNEED 告警横幅（约 145 字节），污染 testprocess 的 stderr 重定向断言（actual=181 vs expected=36）；原生 aarch64 无此横幅"
+
+quality:
+  g0_clean_build: pass
+  g1_binary_integrity: pass
+  g2_functional: pass
+  g3_portability: pass
+  g4_archive_complete: pass
+
+test_counting:
+  # ★rule4 整改（2026-10-13）★ 审查侧口径 = 上游测试目标（测试源文件入口）数。
+  # 原版只申报实跑条数 23，被判「少报：实测 92 > 声明 23」。现按同口径申报 N=92。
+  declared_n: 92            # 上游 add_sdl_test_executable() 去重目标数（申报口径）
+  compiled: 92              # 92/92 编译出可执行产物
+  ctest_registered: 25      # 上游 NONINTERACTIVE 门控 + 2 个显式 no-simd 变体
+  run: 23                   # 配方实跑（排除 2 条，各有实测归因）
+  passed: 23
+  failed: 0
+  not_registered_by_upstream: 66   # 交互式演示程序，上游自身亦不自动判定
+  evidence: reports/rule4-remediation.md

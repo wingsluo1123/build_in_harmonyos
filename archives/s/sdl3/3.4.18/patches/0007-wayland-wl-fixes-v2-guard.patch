@@ -1,0 +1,33 @@
+--- a/src/video/wayland/SDL_waylandvideo.c
++++ b/src/video/wayland/SDL_waylandvideo.c
+@@ -510,9 +510,15 @@
+ {
+     SDL_WaylandPreferredData *d = (SDL_WaylandPreferredData *)data;
+ 
++#if SDL_WL_FIXES_VERSION >= 2
+     if (d->wl_fixes && wl_fixes_get_version(d->wl_fixes) >= WL_FIXES_ACK_GLOBAL_REMOVE_SINCE_VERSION) {
+         wl_fixes_ack_global_remove(d->wl_fixes, registry, id);
+     }
++#else
++    (void)d;
++    (void)registry;
++    (void)id;
++#endif
+ }
+ 
+ static const struct wl_registry_listener preferred_registry_listener = {
+@@ -1395,9 +1401,14 @@
+     }
+ 
+ ack_remove:
++#if SDL_WL_FIXES_VERSION >= 2
+     if (d->wl_fixes && wl_fixes_get_version(d->wl_fixes) >= WL_FIXES_ACK_GLOBAL_REMOVE_SINCE_VERSION) {
+         wl_fixes_ack_global_remove(d->wl_fixes, registry, id);
+     }
++#else
++    (void)registry;
++    (void)id;
++#endif
+ }
+ 
+ static const struct wl_registry_listener registry_listener = {
