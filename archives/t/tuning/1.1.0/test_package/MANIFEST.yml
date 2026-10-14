@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试入口取证：源码包 tuning-library-release_1.1.0 的 CMakeLists.txt:16-20
+#   add_executable(tuning-library-tests) / target_sources(tests/alltests.cpp)
+#   CMakeLists.txt:34-43 自定义 target run-all-tests（cwd=${CMAKE_SOURCE_DIR}，
+#   Linux 分支额外以 LANG=es_ES / fr_FR / zh_CN / 空 各跑一遍）
+# 无 enable_testing()/add_test()：上游不注册 CTest，测试以自定义 target 直接运行可执行文件。
+
+package: tuning/1.1.0
+homepage: "https://github.com/surge-synthesizer/tuning-library"
+
+# 上游测试命令（上游为自定义 target，无 make check / ctest 注册）
+upstream_check_command: "cmake --build build --target run-all-tests"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake --build build && ./tuning-library-tests (cwd=源码根)"
+
+# 上游实际运行的测试程序（Catch2 2.9.2 单头文件，随源码包 libs/catch2/catch2.hpp 自带）
+upstream_tests:
+  - file: tests/alltests.cpp
+    source: tuning-library-release_1.1.0/tests/alltests.cpp
+    description: "上游 Catch2 主测试套件：18 个 TEST_CASE / 62 个 SECTION / 160 处 REQUIRE，
+                  样本 tests/data（28 个 .scl/.kbm 正常样本 + 10 个 bad/ 坏样本）"
+    command: "./tuning-library-tests  （另以 LANG=es_ES / fr_FR / zh_CN / 空 各跑一遍，同上游 run-all-tests）"
+  - file: tests/symbolcheck1.cpp + tests/symbolcheck2.cpp
+    source: tuning-library-release_1.1.0/tests/symbolcheck1.cpp
+    description: "上游链接期重复符号检测：两个 TU 同时 include Tunings.h 后链接"
+    command: "./tuning-library-symbolcheck"
+  - file: commands/parsecheck.cpp
+    source: tuning-library-release_1.1.0/commands/parsecheck.cpp
+    description: "上游 CLI 样例：批量解析 .scl/.kbm（含 bad/ 坏样本，坏样本期望 FAILED）"
+    command: "./parsecheck tests/data/*.scl tests/data/*.kbm tests/data/bad/*"
+  - file: commands/showmapping.cpp
+    source: tuning-library-release_1.1.0/commands/showmapping.cpp
+    description: "上游 CLI 样例：打印 0..127 MIDI 映射表（SCL 单独 / SCL+KBM 两种用法）"
+    command: "./showmapping tests/data/12-intune.scl [tests/data/mapping-whitekeys-a440.kbm]"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/test_tuning.cpp
+    description: "消费者 API 测试：SCL/KBM 解析、A4=440Hz、logScaled、tuneNoteTo、
+                  白键映射语义、跳过键插值单调、readSCLFile 往返、TuningError 错误路径（共 28 项断言）"
+    command: "ctest -R test_tuning"
+  - file: test_package/test_tuning_harmonyos.cpp
+    description: "**鸿蒙特有测试**：OHOS aarch64 平台断言 + OHOS libc（sysconf/getuid）+
+                  OHOS 文件系统（TMPDIR 落盘 .scl 往返）+ locale 无关性（目标机无 es_ES/fr_FR）
+                  + 全 MIDI 范围恒等式（共 9 项断言）"
+    command: "ctest -R test_tuning_harmonyos"
+
+# 新增/鸿蒙特有测试
+ohos_specific_tests:
+  - file: test_package/test_tuning_harmonyos.cpp
+    count: 1
+    description: "OHOS 平台专项（9 项断言），覆盖上游测试不涉及的 OHOS 运行时集成场景"
+
+# 测试断言总数（上游 242371 处断言 + test_package 28 + 9 项断言）
+assertion_count: 242408
