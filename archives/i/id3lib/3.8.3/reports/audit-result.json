@@ -1,0 +1,88 @@
+{
+  "verdict": "pass",
+  "reconciliation": [
+    {
+      "item": "基线/增量",
+      "result": "PASS",
+      "detail": "新 HEAD d19e1538ce0e79a6cf843fec53f9943b997ddb5a 与 origin/feat/id3lib-3.8.3 一致；delta a47f7246..d19e1538ce 仅 5 文件（conandata.yml、conanfile.py、manifest.yaml、notes.md、commands.json），无框架/他包挟带；feedback/SKILL_FEEDBACK_31a41b80.md 为 R45 既有产物（非本 delta）；git status --porcelain archives/i/id3lib/ 干净；相对 main 26 文件=25 配方文件+1 feedback。5 个 delta 文件 CR/NUL 全 0。"
+    },
+    {
+      "item": "P1-1 R38 commands.json",
+      "result": "RESOLVED（独立复核）",
+      "detail": "新增 archives/i/id3lib/commands.json：JSON 合法，type=tool、name=id3lib、versions.3.8.3.ref=id3lib/3.8.3、binary=false；conanfile.py package_info() 已加 self.cpp_info.bindirs=[\"bin\"]。独立运行 detect_bindirs.py → 1；独立调用 preflight.check_recipe_static（PF8）→ NONE (pass)（不再触发『纯库包不应有 commands.json』/『CLI 缺 commands.json』任一分支）；新 W3 L0k 实测『[ok] commands.json valid (type=tool)』；新包 p/bin 含 4 个 CLI。"
+    },
+    {
+      "item": "P1-2 R26 静态 zlib",
+      "result": "RESOLVED（独立复核，未采信日志）",
+      "detail": "对重建产物 /storage/Users/currentUser/.conan2/p/b/id3li2bf0ecac02923/p 独立 llvm-readelf -d：4 个 bin NEEDED 仅 libc++_shared.so/libc.so，无 libz.so；readelf --dyn-syms 中 uncompress/inflate/zlibVersion/crc32 等动态导入=0；体积 322,048/342,528 B（原 252–276KB，静态嵌入 libz.a）。构建日志显示 -I/-L 指向 conan 私有 prefix /storage/Users/currentUser/.conan2/p/zlib56af09fbb4346/p（非 /usr/local，R49 合规）；notes/manifest 已同步修正表述。"
+    },
+    {
+      "item": "P2-4 R51 口径",
+      "result": "RESOLVED",
+      "detail": "pr-body.md 已改为：上游 check_PROGRAMS 9（编译 9/9、执行 0，N/N′=9/0）+ test_package 10 断言（明确标注 ≠ 上游单元测试）+ ad-hoc 7；与 manifest.yaml（upstream_registered=9/executed=0）及独立清点一致。"
+    },
+    {
+      "item": "W3 R2 证据",
+      "result": "PASS",
+      "detail": "exit_code=0；reports/w3-local-ci.log 实算 sha256=4b8665b6a5ce3a884235452bf2096395cd9c0b1f66ce6b161f829b54a5bcf851＝申报；integrity_hash 复算 sha256(ts:soft:ver:0)[:16]=086e482a533e534a＝申报（ts 2026-10-09T10:50:21.797570）；审计输入 r2（85,000 B，sha256 bed451ef4d224cbddd493f772818ed6d9c4d87cb40766df8e8b87a9d7022a86c）26/26 file_contents 与磁盘逐字节一致。"
+    },
+    {
+      "item": "R34/R53 独立重跑",
+      "result": "PASS",
+      "detail": "scratch 拷贝 test_package 对重建包独立 conan test → rc=0；7 API 断言 7/7；ELF 断言（ELF64/AArch64、/lib/ld-musl-aarch64.so.1、无 RPATH/RUNPATH）通过；新消费者二进制 NEEDED 仅 libc++_shared/libc。"
+    },
+    {
+      "item": "R52-libid3.a 哈希",
+      "result": "PASS（含 P3 措辞项）",
+      "detail": "packaging/id3lib-3.8.3-ohos-aarch64.tar.gz 成员 ./lib/libid3.a 实算 28dc0942965717d25c1ba992916d9061c4e54530355e144e179aca3b57254080（624,854 B）＝notes 申报。跨构建因 ar mtime 不同：W3 缓存件 id3li2bf0ecac02923/p（10:48）=34c27486…，故 notes 括号『与同次 W3 重建件一致』不精确（见 P3）。"
+    },
+    {
+      "item": "R39 先例引用（原 P3-7）",
+      "result": "CLOSED",
+      "detail": "gptfdisk/1.0.10 先例现可复核：origin/feat/gptfdisk-1.0.10（203ea7cf）conandata.yml 确认『edge hosts 前置 + 显式 filename + balancer 兜底』同款写法；id3lib 源 sha256 2749cc3c…79 未变（本轮 conandata 仅注释改动，URL/sha256 逐字不变）。"
+    }
+  ],
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "manifest-yaml",
+      "file": "archives/i/id3lib/3.8.3/manifest.yaml",
+      "line": 26,
+      "description": "文件非法 YAML：第 26 行 `  - \"R38：…\"` 游离列表项落在 `build:` 块映射内（PyYAML ParserError：line 19 block mapping / line 26 found '-'），自 2aa0ee2216 引入并保留至 HEAD；该 R38 知识条目因此未进入 knowledge_gained 统计。判定 P2 非阻断的依据：①框架侧全部消费者（check_knowledge_gap.py/clean_verify.py/close_archive.py/conan_recipe.py）均为行/正则容错解析，实测 W3、PF8 无影响；②仓库现状统计 version-level manifest 9481 个中已存在 124 个非法 YAML（1.3%，已合入存量），software-level 4772 中 14 个，同类问题属项目既有非阻断形态。",
+      "fix_suggestion": "将该行从 build: 块移至 knowledge_gained: 列表（内容本就属知识条目），或直接删除；单行编辑、无需重建。建议合入前顺手修复。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R6",
+      "file": "archives/i/id3lib/3.8.3/patches/0003-configure.patch",
+      "line": 1,
+      "description": "R6 观察（维持，无新增变化）：0003/0013 修改生成文件 configure / zlib/configure（iomanip 致命检查移除、E011 umask 077→022）。理由链：configure 由 autoconf 2.13 生成、无法等价重生成；configure.in 已同步修复（0004）；a52dec/0.7.4 0002-configure-umask-022.patch 直接先例。本轮 13 补丁未变（delta 不含 patches/）。",
+      "fix_suggestion": "无需修改；保持现状与 notes 记录。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/i/id3lib/3.8.3/notes.md",
+      "line": 99,
+      "description": "哈希说明括号『（当前 28dc0942…254080，与同次 W3 重建件一致）』不精确：W3 conan create 的缓存产物为 id3li2bf0ecac02923/p（10:48）=34c27486…；28dc0942… 对应同日另一次 R2 构建 id3li5ecbbc4088a3b/p（10:51，finish 打包来源）。tarball 成员哈希本身正确，仅『同次』对照句失实。",
+      "fix_suggestion": "改为『以 packaging 成员为准；同日多次重建因 ar mtime 亦不可互比』或删去括号对照句。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L4",
+      "file": "archives/i/id3lib/3.8.3/patches/0001-config.guess.patch",
+      "line": 1,
+      "description": "CI L4 扫描 warn 持续命中（0001-config.guess.patch，内容为新增 HarmonyOS 主机分支，无实际风险）；按分级表 L4 warn 非阻断。",
+      "fix_suggestion": "无需处理（保持如实标记）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "PF9-framework",
+      "file": "archives/i/id3lib/commands.json",
+      "line": 1,
+      "description": "框架侧观察（非 id3lib 缺陷）：preflight check_branch_and_paths 实测将软件级路径 archives/i/id3lib/{README.md,manifest.yaml,commands.json} 报『变更路径缺版本目录层』——PF9 未豁免软件级文件，属已知框架误报（PR #15090 已存在即证明未实际阻断）。",
+      "fix_suggestion": "框架侧将 commands.json/manifest.yaml/README.md 等软件级白名单文件排除出 PF9 的 bad 集合；配方侧无需动作。"
+    }
+  ],
+  "summary": "W4 独立增量复审（R2，不采信自述）：verdict=pass，P0=0，P1=0，P2=2（manifest YAML 语法项 + R6 维持观察），P3=3。两个 P1 均独立复核为真修复：①R38——commands.json 字段合法 + detect_bindirs=1 + PF8 独立运行 NONE + L0k 实测 valid，状态机闭环；②R26——对重建产物独立 llvm-readelf -d：4 个 bin NEEDED 仅 libc++_shared/libc，无 libz.so，zlib 动态符号 0，-I/-L 指向 conan 私有 prefix（R49），体积增至 322–342KB，静态 libz.a 确证。P2-4 R51 口径已按 9/0+10 断言改正；W3 新证据（exit 0、log_sha256 4b8665b6…851、integrity 086e482a533e534a）复算全中；审计输入 r2 与磁盘 26/26 一致；独立 conan test rc=0（7/7 + ELF 断言）；delta 仅 5 文件无挟带、status 干净、无 CRLF/NUL。新发现唯一实质缺陷为 3.8.3/manifest.yaml 非法 YAML（游离 R38 条目），因框架消费者全为容错解析且仓库存量同类 124 例（1.3%）判 P2 非阻断，建议合入前一行修复。另 notes 哈希对照句『同次 W3 一致』不精确（P3），L4 warn 与 PF9 软件级误报（框架侧）为既有非阻断项。"
+}
