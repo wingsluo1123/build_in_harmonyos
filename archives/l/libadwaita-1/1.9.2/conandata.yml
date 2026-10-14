@@ -1,0 +1,25 @@
+sources:
+  url:
+    - "https://download.gnome.org/sources/libadwaita/1.9/libadwaita-1.9.2.tar.xz"
+    - "https://mirror.nju.edu.cn/gnome/sources/libadwaita/1.9/libadwaita-1.9.2.tar.xz"
+  sha256: "6920f813a76c4856591ca56ee842e94efbbe736e8ca2f445c9e9fc3b4e7076f0"
+
+patches:
+  - patch_file: "patches/0001-meson.build.patch"
+    patch_description: "Make AppStream an optional meson feature (appstream, default auto). Since r05 the recipe passes -Dappstream=enabled with appstream/1.2.0 (published on ohpcd 2026-09-26) as a conan require, so the appdata-parse code is compiled in under HAVE_APPSTREAM."
+    patch_type: "source_fix"
+  - patch_file: "patches/0002-meson_options.txt.patch"
+    patch_description: "Add the 'appstream' meson feature option declaration."
+    patch_type: "source_fix"
+  - patch_file: "patches/0003-src-adw-about-dialog.c.patch"
+    patch_description: "Guard <appstream.h> include, get_release_for_version, populate_from_appdata and its constructed() call with HAVE_APPSTREAM (config.h). With AppStream enabled (r05) the guard is active and the real code compiles in; disabled builds keep compiling without the library."
+    patch_type: "source_fix"
+  - patch_file: "patches/0004-src-adw-about-window.c.patch"
+    patch_description: "Guard <appstream.h> include, get_release_for_version, and the deprecated adw_about_window_new_from_appdata / adw_show_about_window_from_appdata with HAVE_APPSTREAM; without AppStream support they return NULL / no-op with g_warning. With AppStream enabled (r05) the real implementations compile in."
+    patch_type: "source_fix"
+  - patch_file: "patches/0005-src-meson.build.patch"
+    patch_description: "Add HAVE_APPSTREAM to config.h and only add appstream_dep to libadwaita_deps when found."
+    patch_type: "source_fix"
+  - patch_file: "patches/0006-src-appstream-release-notes-newline.patch"
+    patch_description: "Restore the trailing newline of AppStream release-notes markup in adw-about-dialog.c / adw-about-window.c populate_from_appdata. AppStream >= 1.2.0 normalizes description whitespace (AsDescTextCtx drops the trailing newline; upstream libadwaita 1.9.2 tests assert \"<p>Testing Build</p>\\n\"); re-append when missing so get_release_notes() matches the upstream contract across AppStream versions."
+    patch_type: "source_fix"

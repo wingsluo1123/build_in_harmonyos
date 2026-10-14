@@ -1,0 +1,123 @@
+--- a/src/adw-about-dialog.c
++++ b/src/adw-about-dialog.c
+@@ -1,20 +1,22 @@
+ /*
+  * Copyright (C) 2021-2022 Purism SPC
+  * Copyright (C) 2024 GNOME Foundation Inc.
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  */
+ 
+ #include "config.h"
+ #include <glib/gi18n-lib.h>
++#ifdef HAVE_APPSTREAM
+ #include <appstream.h>
++#endif
+ 
+ #include "adw-about-dialog.h"
+ 
+ #include "adw-action-row.h"
+ #include "adw-header-bar.h"
+ #include "adw-link-row-private.h"
+ #include "adw-marshalers.h"
+ #include "adw-alert-dialog.h"
+ #include "adw-navigation-view.h"
+ #include "adw-preferences-group.h"
+@@ -430,26 +432,28 @@
+ 
+ static void
+ legal_showing_cb (AdwAboutDialog *self)
+ {
+   self->legal_showing_idle_id =
+     g_idle_add_once ((GSourceOnceFunc) legal_showing_idle_cb, self);
+ 
+   self->legal_showing_idle_id = 0;
+ }
+ 
++#ifdef HAVE_APPSTREAM
+ static gboolean
+ get_release_for_version (AsRelease  *rel,
+                          const char *version)
+ {
+   return !g_strcmp0 (as_release_get_version (rel), version);
+ }
++#endif
+ 
+ static void
+ update_credits_legal_group (AdwAboutDialog *self)
+ {
+   gtk_widget_set_visible (self->credits_legal_group,
+                           gtk_widget_get_visible (self->credits_box) ||
+                           gtk_widget_get_visible (self->legal_box) ||
+                           gtk_widget_get_visible (self->acknowledgements_box));
+ }
+ 
+@@ -1067,20 +1071,21 @@
+   gboolean has_issue_url = self->issue_url && *self->issue_url;
+   gboolean has_debug_info = self->debug_info && *self->debug_info;
+ 
+   gtk_widget_set_visible (self->support_row, has_support_url);
+   gtk_widget_set_visible (self->issue_row, has_issue_url);
+   gtk_widget_set_visible (self->troubleshooting_row, has_debug_info);
+   gtk_widget_set_visible (self->support_group,
+                           has_support_url || has_issue_url || has_debug_info);
+ }
+ 
++#ifdef HAVE_APPSTREAM
+ static void
+ populate_from_appdata (AdwAboutDialog *self)
+ {
+   GFile *appdata_file;
+   char *appdata_uri;
+   AsMetadata *metadata;
+   GPtrArray *releases;
+   AsComponent *component;
+   char *application_id;
+   const char *name, *developer_name, *project_license;
+@@ -1205,20 +1210,21 @@
+     adw_about_dialog_set_support_url (self, support_url);
+ 
+   if (website_url)
+     adw_about_dialog_set_website (self, website_url);
+ 
+   g_object_unref (appdata_file);
+   g_object_unref (metadata);
+   g_free (application_id);
+   g_free (appdata_uri);
+ }
++#endif /* HAVE_APPSTREAM */
+ 
+ static void
+ adw_about_dialog_get_property (GObject    *object,
+                                guint       prop_id,
+                                GValue     *value,
+                                GParamSpec *pspec)
+ {
+   AdwAboutDialog *self = ADW_ABOUT_DIALOG (object);
+ 
+   switch (prop_id) {
+@@ -1367,22 +1373,24 @@
+   }
+ }
+ 
+ static void
+ adw_about_dialog_constructed (GObject *object)
+ {
+   AdwAboutDialog *self = ADW_ABOUT_DIALOG (object);
+ 
+   G_OBJECT_CLASS (adw_about_dialog_parent_class)->constructed (object);
+ 
++#ifdef HAVE_APPSTREAM
+   if (self->appdata_resource_path)
+     populate_from_appdata (self);
++#endif
+ }
+ 
+ static void
+ adw_about_dialog_dispose (GObject *object)
+ {
+   AdwAboutDialog *self = ADW_ABOUT_DIALOG (object);
+ 
+   g_clear_handle_id (&self->legal_showing_idle_id, g_source_remove);
+ 
+   G_OBJECT_CLASS (adw_about_dialog_parent_class)->dispose (object);

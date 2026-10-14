@@ -1,0 +1,43 @@
+--- a/src/adw-about-dialog.c
++++ b/src/adw-about-dialog.c
+@@ -1146,8 +1146,18 @@
+       AsRelease *release = g_ptr_array_index (releases, release_index);
+       const char *release_notes = as_release_get_description (release);
+ 
+-      if (release_notes)
+-        adw_about_dialog_set_release_notes (self, release_notes);
++      if (release_notes) {
++        /* AppStream >= 1.2.0 normalizes description markup and drops the
++         * trailing newline that upstream release-notes markup ends with
++         * (upstream tests assert "<p>Testing Build</p>\n"). Restore the
++         * trailing newline so adw_about_dialog_get_release_notes() matches
++         * the upstream contract regardless of the AppStream version. */
++        g_autofree char *notes =
++          g_str_has_suffix (release_notes, "\n") ?
++            g_strdup (release_notes) :
++            g_strdup_printf ("%s\n", release_notes);
++        adw_about_dialog_set_release_notes (self, notes);
++      }
+     } else {
+       g_critical ("No valid release found for version %s", self->release_notes_version);
+     }
+--- a/src/adw-about-window.c
++++ b/src/adw-about-window.c
+@@ -2074,7 +2074,16 @@
+       version = as_release_get_version (notes_release);
+ 
+       if (release_notes && version) {
+-        adw_about_window_set_release_notes (self, release_notes);
++        /* AppStream >= 1.2.0 normalizes description markup and drops the
++         * trailing newline that upstream release-notes markup ends with
++         * (upstream tests assert "<p>Testing Build</p>\n"). Restore the
++         * trailing newline so adw_about_window_get_release_notes() matches
++         * the upstream contract regardless of the AppStream version. */
++        g_autofree char *notes =
++          g_str_has_suffix (release_notes, "\n") ?
++            g_strdup (release_notes) :
++            g_strdup_printf ("%s\n", release_notes);
++        adw_about_window_set_release_notes (self, notes);
+         adw_about_window_set_release_notes_version (self, version);
+       }
+     } else {

@@ -1,0 +1,137 @@
+--- a/src/adw-about-window.c
++++ b/src/adw-about-window.c
+@@ -1,19 +1,21 @@
+ /*
+  * Copyright (C) 2021-2022 Purism SPC
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  */
+ 
+ #include "config.h"
+ #include <glib/gi18n-lib.h>
++#ifdef HAVE_APPSTREAM
+ #include <appstream.h>
++#endif
+ 
+ #include "adw-about-window.h"
+ 
+ #include "adw-action-row.h"
+ #include "adw-header-bar.h"
+ #include "adw-link-row-private.h"
+ #include "adw-marshalers.h"
+ #include "adw-message-dialog.h"
+ #include "adw-navigation-view.h"
+ #include "adw-preferences-group.h"
+@@ -420,26 +422,28 @@
+   self->legal_showing_idle_id = 0;
+ }
+ 
+ static void
+ legal_showing_cb (AdwAboutWindow *self)
+ {
+   self->legal_showing_idle_id =
+     g_idle_add_once ((GSourceOnceFunc) legal_showing_idle_cb, self);
+ }
+ 
++#ifdef HAVE_APPSTREAM
+ static gboolean
+ get_release_for_version (AsRelease  *rel,
+                          const char *version)
+ {
+   return !g_strcmp0 (as_release_get_version (rel), version);
+ }
++#endif
+ 
+ static void
+ update_credits_legal_group (AdwAboutWindow *self)
+ {
+   gtk_widget_set_visible (self->credits_legal_group,
+                           gtk_widget_get_visible (self->credits_box) ||
+                           gtk_widget_get_visible (self->legal_box) ||
+                           gtk_widget_get_visible (self->acknowledgements_box));
+ }
+ 
+@@ -1990,20 +1994,21 @@
+  *
+  * Returns: the newly created `AdwAboutWindow`
+  *
+  * Since: 1.4
+  * Deprecated: 1.6: Use [class@AboutDialog].
+  */
+ GtkWidget *
+ adw_about_window_new_from_appdata (const char *resource_path,
+                                    const char *release_notes_version)
+ {
++#ifdef HAVE_APPSTREAM
+   AdwAboutWindow *self;
+   GFile *appdata_file;
+   char *appdata_uri;
+   AsMetadata *metadata;
+   GPtrArray *releases;
+   AsComponent *component;
+   char *application_id;
+   const char *name, *developer_name, *project_license;
+   const char *issue_url, *support_url, *website_url;
+   GError *error = NULL;
+@@ -2135,20 +2140,27 @@
+ 
+   if (website_url)
+     adw_about_window_set_website (self, website_url);
+ 
+   g_object_unref (appdata_file);
+   g_object_unref (metadata);
+   g_free (application_id);
+   g_free (appdata_uri);
+ 
+   return GTK_WIDGET (self);
++#else
++  /* AppStream metadata parsing is unavailable when libadwaita is built
++   * without AppStream support (OHOS). This deprecated constructor cannot
++   * populate the About window from an appdata resource in that case. */
++  g_warning ("adw_about_window_new_from_appdata: built without AppStream support");
++  return NULL;
++#endif
+ }
+ 
+ /**
+  * adw_about_window_get_application_icon:
+  * @self: an about window
+  *
+  * Gets the name of the application icon for @self.
+  *
+  * Returns: the application icon name
+  *
+@@ -3504,25 +3516,32 @@
+  * Since: 1.4
+  * Deprecated: 1.6: Use [func@show_about_dialog_from_appdata].
+  */
+ void
+ adw_show_about_window_from_appdata (GtkWindow  *parent,
+                                     const char *resource_path,
+                                     const char *release_notes_version,
+                                     const char *first_property_name,
+                                     ...)
+ {
++#ifdef HAVE_APPSTREAM
+   GtkWidget *window;
+   va_list var_args;
+ 
+   window = adw_about_window_new_from_appdata (resource_path,
+                                               release_notes_version);
+ 
+   va_start (var_args, first_property_name);
+   g_object_set_valist (G_OBJECT (window), first_property_name, var_args);
+   va_end (var_args);
+ 
+   if (parent)
+     gtk_window_set_transient_for (GTK_WINDOW (window), parent);
+ 
+   gtk_window_present (GTK_WINDOW (window));
+-}
++#else
++  /* AppStream support is unavailable on this platform (OHOS); the
++   * deprecated show-from-appdata helper cannot operate without it. */
++  g_warning ("adw_show_about_window_from_appdata: built without AppStream support");
++  return;
++#endif
++}
