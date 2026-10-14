@@ -1,0 +1,19 @@
+sources:
+  # 【换源 2026-10-14】CI Worker 网络受限，ftp.debian.org 不可达（CI 诊断：源码下载超时）；
+  # 改用 Cloudflare 的 Debian 归档快照端点（与 mplayer/1.5-svn38681 同 host，其 CI 已通过 → 证明该 host 对 Worker 可达）。
+  # 文件字节一致：本机实测 sha256 = 93f7860bdafa26f21d60a4d0ce2a8e55a0573841116aade79d90b64651b2b664（与下方记录相同）。
+  # 沙箱内 sourceforge.net 不可达（实测 connection refused），此处使用 Debian 归档的
+  # pristine orig tarball（内容等同上游发布物，解包目录名 libcddb-1.3.2/ 与上游一致）。
+  url: "https://snapshot-cloudflare.debian.org/archive/debian/20251226T022612Z/pool/main/libc/libcddb/libcddb_1.3.2.orig.tar.gz"
+  sha256: "93f7860bdafa26f21d60a4d0ce2a8e55a0573841116aade79d90b64651b2b664"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "config.guess 识别 HarmonyOS/OHOS 平台"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "config.sub 识别 aarch64-unknown-linux-ohos 三元组"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "configure 的 umask 077 改为 022（HMDFS 下 0700 临时目录不可写，config.status 报 could not setup config files machinery）"
+    patch_type: "portability"

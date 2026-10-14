@@ -1,0 +1,29 @@
+package: libcddb/1.3.2
+homepage: "http://libcddb.sourceforge.net/"
+
+upstream_check_command: "grep -n 'TESTS' tests/Makefile.am"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_note: >-
+  libcddb 1.3.2 ships a shell-based tests/ suite (`TESTS = $(check_SCRIPTS)`,
+  5 scripts: check_cache / check_charset / check_discid / check_parse / check_server).
+  check_server 需外网连真实 CDDB 服务器、check_cache/discid 需光驱或缓存夹具，
+  在本沙箱（sourceforge/外网 CDDB 不可达、无光驱）无法离线复现，故不在 build() 内执行；
+  平台能力由本包 test_package 的离线消费者测试覆盖。
+upstream_tests:
+  - file: tests/check_server.sh
+    description: "连真实 CDDB 服务器的集成脚本（需外网与服务端）——离线环境不可执行"
+    command: "(不执行)"
+  - file: tests/check_parse.sh
+    description: "解析夹具校验（依赖 tests/ 下夹具目录）——离线环境不可执行"
+    command: "(不执行)"
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      离线消费者测试（OHOS 上真实执行）：① CDDB_VERSION 自报 1.3.2（头文件与库配套）；
+      ② cddb_new()/cddb_destroy() 生命周期；③ 新建连接的 cddb_errno() 初值为 0
+    command: "./test_libcddb"
+
+logical_test_count: 3
+assertion_count: 3
