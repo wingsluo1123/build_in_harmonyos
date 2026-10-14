@@ -1,0 +1,80 @@
+--- a/Sources/nCine/Threading/Thread.cpp
++++ b/Sources/nCine/Threading/Thread.cpp
+@@ -497,22 +497,25 @@
+ #endif
+ 	}
+ 
+ 	bool Thread::Abort()
+ 	{
+ #if defined(DEATH_TARGET_ANDROID) || defined(DEATH_TARGET_WINDOWS_RT)
+ 		// TerminateThread() is not supported on WinRT and Android doesn't have any similar function
+ 		return false;
+ #elif defined(DEATH_TARGET_WINDOWS)
+ 		return (_sharedBlock != nullptr && ::TerminateThread(_sharedBlock->_handle, 1));
+-#else
++#elif defined(__GLIBC__)
+ 		return (_sharedBlock != nullptr && _sharedBlock->_handle != 0 && pthread_cancel(_sharedBlock->_handle) == 0);
++#else
++		// musl（OHOS）未实现 pthread_cancel，与 Android/WinRT 分支一致：报告未支持
++		return false;
+ #endif
+ 	}
+ 
+ #if !defined(DEATH_TARGET_ANDROID) && !defined(DEATH_TARGET_EMSCRIPTEN) && !defined(DEATH_TARGET_SWITCH)
+ 	ThreadAffinityMask Thread::GetAffinityMask() const
+ 	{
+ 		ThreadAffinityMask affinityMask;
+ 
+ 		if (_sharedBlock == nullptr || _sharedBlock->_handle == 0) {
+ 			LOGW("Can't get the affinity for a thread that has not been created yet");
+@@ -522,42 +525,48 @@
+ #	if defined(DEATH_TARGET_WINDOWS)
+ 		affinityMask.affinityMask_ = ::SetThreadAffinityMask(_sharedBlock->_handle, ~0);
+ 		::SetThreadAffinityMask(_sharedBlock->_handle, affinityMask.affinityMask_);
+ #	elif defined(DEATH_TARGET_APPLE)
+ 		thread_affinity_policy_data_t threadAffinityPolicy;
+ 		thread_port_t threadPort = pthread_mach_thread_np(_sharedBlock->_handle);
+ 		mach_msg_type_number_t policyCount = THREAD_AFFINITY_POLICY_COUNT;
+ 		boolean_t getDefault = FALSE;
+ 		thread_policy_get(threadPort, THREAD_AFFINITY_POLICY, reinterpret_cast<thread_policy_t>(&threadAffinityPolicy), &policyCount, &getDefault);
+ 		affinityMask.affinityTag_ = threadAffinityPolicy.affinity_tag;
+-#	else
++#	elif defined(__GLIBC__)
+ 		pthread_getaffinity_np(_sharedBlock->_handle, sizeof(cpu_set_t), &affinityMask.cpuSet_);
++#	else
++		// musl（OHOS）无 pthread_getaffinity_np：改用标准 POSIX sched_*（pid=0 即当前线程）
++		sched_getaffinity(0, sizeof(cpu_set_t), &affinityMask.cpuSet_);
+ #	endif
+ 
+ 		return affinityMask;
+ 	}
+ 
+ 	void Thread::SetAffinityMask(ThreadAffinityMask affinityMask)
+ 	{
+ 		if (_sharedBlock == nullptr || _sharedBlock->_handle == 0) {
+ 			LOGW("Can't set the affinity mask for a not yet created thread");
+ 			return;
+ 		}
+ 
+ #	if defined(DEATH_TARGET_WINDOWS)
+ 		::SetThreadAffinityMask(_sharedBlock->_handle, affinityMask.affinityMask_);
+ #	elif defined(DEATH_TARGET_APPLE)
+ 		thread_affinity_policy_data_t threadAffinityPolicy = { affinityMask.affinityTag_ };
+ 		thread_port_t threadPort = pthread_mach_thread_np(_sharedBlock->_handle);
+ 		thread_policy_set(threadPort, THREAD_AFFINITY_POLICY, reinterpret_cast<thread_policy_t>(&threadAffinityPolicy), THREAD_AFFINITY_POLICY_COUNT);
+-#	else
++#	elif defined(__GLIBC__)
+ 		pthread_setaffinity_np(_sharedBlock->_handle, sizeof(cpu_set_t), &affinityMask.cpuSet_);
++#	else
++		// musl（OHOS）无 pthread_setaffinity_np：改用标准 POSIX sched_*（pid=0 即当前线程）
++		sched_setaffinity(0, sizeof(cpu_set_t), &affinityMask.cpuSet_);
+ #	endif
+ 	}
+ #endif
+ 
+ #if defined(DEATH_TARGET_WINDOWS)
+ 	unsigned int Thread::Process(void* arg)
+ #else
+ 	void* Thread::Process(void* arg)
+ #endif
+ 	{
