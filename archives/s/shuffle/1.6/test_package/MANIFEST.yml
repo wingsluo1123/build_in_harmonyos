@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml - shuffle 1.6
+# Upstream is a single C source file (shuffle.c, $Id: shuffle.c,v 1.6) with no
+# test suite, no tests/ directory, no build system and no `make check`.
+
+package: "shuffle/1.6"
+homepage: "https://www.w3.org/People/Bos/Shuffle/"
+
+upstream_check_command: "none (single C file, no build system, no registered tests)"
+upstream_test_in_build: false
+upstream_tests: []
+upstream_test_note: "The exact upstream release is the single file shuffle.c; it ships no test harness or registered test cases."
+
+test_package_tests:
+  - file: test_shuffle_consumer.c
+    description: >
+      Consumer program: runs the packaged bin/shuffle on a 1000-line file
+      (mmap path), on redirected stdin, and on a 240 KB pipe (read()/realloc()
+      path), and checks that the output holds every input line exactly once
+      in a different order; single-line input; error contract (missing input
+      file, no trailing newline, too many arguments -> exit 1 and diagnostic).
+    cases: 5
+    command: "./test_shuffle_consumer <package>/bin/shuffle <scratch-dir>"
+  - file: test_shuffle_ohos.c
+    harmonyos_specific: true
+    description: >
+      HarmonyOS-specific consumer program for patches/0001: the OHOS musl libc
+      reads the mode of open(O_CREAT) with va_arg(), so upstream's
+      open(out, O_WRONLY|O_CREAT) created the output file with indeterminate
+      permission bits (0155 under qemu-aarch64).  Runs the packaged tool with a
+      new output file under umask 022 (expects 0644) and umask 077 (expects
+      0600) and reads the file back as its owner.
+    cases: 2
+    command: "./test_shuffle_ohos <package>/bin/shuffle <scratch-dir>"
+  - file: conanfile.py
+    description: "Builds both consumer programs with the OHOS toolchain via CMake and runs them (aarch64 builder)."
+
+test_case_count: 7
+harmonyos_specific_test_count: 2
+assertion_count: 42

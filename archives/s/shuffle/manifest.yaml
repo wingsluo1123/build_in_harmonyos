@@ -1,0 +1,22 @@
+software: shuffle
+display: "shuffle"
+description: "Shuffle the lines of a file or stdin in random order (W3C, Bert Bos; single C file)"
+category: utility
+homepage: "https://www.w3.org/People/Bos/Shuffle/"
+license: "W3C"
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "上游只有单个 shuffle.c, 无压缩包/构建系统/测试: 配方下载固定 sha256 的单文件, 随包 CMakeLists.txt 经 Conan 工具链编译"
+    - "open(outfile, O_WRONLY|O_CREAT) 缺 mode 参数: musl 用 va_arg 读 mode, 输出文件权限位不确定(qemu 实测 0155/0055/0000), 补丁 0001 传入 0666"
+    - "SDK 链接器写入的 .codesign 不被加载器认可, package() 对 bin/shuffle 重新自签"
+    - "上游无测试, 由 test_package 补全 7 个消费者用例(42 条断言, 含 2 个鸿蒙特有用例)"
+    - "命令行工具, 已声明 commands.json (R38)"
+  common_dependencies: []
+
+versions:
+  "1.6":
+    status: built
+    build_date: "2026-10-07"
+    source_url: "https://www.w3.org/People/Bos/Shuffle/shuffle.c"
