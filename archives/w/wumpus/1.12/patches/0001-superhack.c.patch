@@ -1,0 +1,49 @@
+--- a/superhack.c
++++ b/superhack.c
+@@ -54,22 +54,21 @@
+     {9, 11, 18},  {2, 10, 12}, {11, 13, 19}, {3, 12, 14},  {5, 13, 15},
+     {14, 16, 19}, {6, 15, 17}, {8, 16, 18},  {10, 17, 19}, {12, 15, 18},
+ };
+ 
+ #define FNA() (rand() % 20)
+ 
+ #define FNB() (rand() % 3)
+ 
+ #define FNC() (rand() % 4)
+ 
+-int getlet(prompt)
+-char *prompt;
++int getlet(const char *prompt)
+ {
+ 	(void)printf("%s? ", prompt);
+ 	if (fgets(inp, sizeof(inp), stdin)) {
+ 		return (tolower((unsigned char)inp[0]));
+ 	} else {
+ 		fputs("\n", stdout);
+ 		exit(1);
+ 	}
+ }
+ 
+@@ -137,21 +136,21 @@
+ 	PM("  ?            --- print long instructions.");
+ 	PM("  m <number>   --- move to room with given number.");
+ 	PM("  t <numbers>  --- throw through given rooms.");
+ #ifdef DEBUG
+ 	PM("  d            --- dump hazard locations.");
+ #endif /* DEBUG */
+ 	PM("\nThe list of room numbers after t must be space-separated. Anything");
+ 	PM("other than one of these commands displays a short help message.");
+ }
+ 
+-void move_hazard(where) int where;
++void move_hazard(int where)
+ {
+ 	int newloc;
+ 
+ retry:
+ 	newloc = FNA();
+ 	for (j = 0; j < LOCS; j++) {
+ 		if (loc[j] == newloc) {
+ 			goto retry;
+ 		}
+ 	}
