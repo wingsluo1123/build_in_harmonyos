@@ -1,0 +1,31 @@
+package: czmq/4.2.1
+homepage: "https://github.com/zeromq/czmq"
+
+upstream_check_command: "cmake -S . -B build && cmake --build build --target czmq_selftest zmakecert"
+upstream_test_in_build: false
+upstream_test_command: "ctest --test-dir build --output-on-failure -j1"
+
+upstream_tests:
+  - file: src/czmq_selftest.c
+    source: czmq-4.2.1/src/
+    description: "Upstream zproject selftest: 30 stable classes registered as CTest tests (11 draft classes excluded in Release). Run per class with czmq_selftest --continue --verbose --test <CLASS> from the build/src directory."
+    command: "ctest --test-dir build --output-on-failure -j1"
+    result: "Run per class on OHOS device; TCP loopback classes (zauth/zmonitor/zproxy/zgossip) use tcp://127.0.0.1, zbeacon skips gracefully when UDP broadcasting is unavailable."
+
+test_package_tests:
+  - file: test_czmq.c
+    description: "Consumer test: verify CZMQ 4.2.1 version macros, zsock PAIR inproc roundtrip, zframe payload, zmsg assembly."
+    command: "./test_czmq"
+  - file: test_ohos_flow.c
+    description: "End-to-end consumer flow program: zconfig tree saved to and reloaded from a real file under the work dir, ZMQ_REP bound on tcp://127.0.0.1 ephemeral port with ZMQ_REQ request/reply over TCP loopback (zstr exchange), and a 3-frame zmsg roundtrip with echo verification."
+    command: "bash test_ohos.sh <lib_dir> test_ohos_flow <work_dir>"
+
+# 新增/鸿蒙特有测试 (rule12)
+added_tests:
+  - name: "harmonyos-specific-consumer-flow"
+    source: test_package/test_ohos.sh
+    description: "鸿蒙特有端到端消费者用例（非纯断言）：运行时探测 OpenHarmony 平台（param get const.ohos.fullname）；readelf 断言 libczmq.so 与消费者二进制为 ELF64/AArch64 且 SONAME=libczmq.so（house E330：OHOS 无版本化 soname）；消费者 DT_NEEDED 在 conanrun 环境全闭合（ldd 或路径扫描）；随后真实跑通功能流——zconfig 配置树落盘 flow.conf 并重载校验（真实文件产物），REQ/REP 环回 TCP 上 zstr 请求-应答与 3 帧 zmsg 回环，最后校验 flow.conf 确实产出到磁盘。说明：包依赖 zeromq 以 ENABLE_CURVE=OFF 构建，zcert/zmakecert 证书流不在本包能力面内，故选用稳定功能面组成完整消费者用例。"
+    command: "bash test_ohos.sh <lib_dir> test_ohos_flow <work_dir>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 30
