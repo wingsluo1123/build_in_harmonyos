@@ -1,0 +1,44 @@
+software: libdmapsharing
+version: "3.9.14"
+status: built
+build_date: "2026-09-25"
+build_system: autotools
+conan_ref: "libdmapsharing/3.9.14@ohpcd/stable"
+
+source:
+  url: "https://www.flyn.org/projects/libdmapsharing/libdmapsharing-3.9.14.tar.gz"
+  sha256: "4ad60d9423434bca5f7aede10a0477668e852ea66091bb5c1fd2ef22afd01a40"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-tests --with-mdns=avahi"
+    - "--disable-gtk-doc --disable-introspection"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "运行时文本补丁生成的 configure AS_TMPDIR（HMFS umask 077 移除，非归档补丁）"
+
+dependencies:
+  - "glib/2.84.0.1.1"
+  - "libsoup3/3.6.5-r3"
+  - "avahi-glib/0.9_rc5"
+  - "check/0.11.0"
+
+test_results:
+  validation_round: 1
+  upstream_framework: "check (libcheck unit-test)"
+  upstream_check_total: 45
+  consumer_assertions: 4
+  test_environment: "HarmonyOS aarch64（与官方 CI 同源真机）"
+
+knowledge_gained:
+  - "libdmapsharing 3.9 改用 libsoup-3.0（非 libsoup2），configure.ac 硬性 PKG_CHECK_MODULE libsoup-3.0"
+  - "libtool 静态归档链接依赖库时，对静态（无 .so）依赖会校验/读取其 .la；avahi-glib 包只装 .a 不装 .la，导致 `libavahi-client.la is not a valid libtool archive`。解法：配方内为 avahi-client/common/glib/gobject 生成 .la shim，并把 `-L staging` bake 进 configure 时 LDFLAGS"
+  - "mDNS 为硬依赖：configure.ac 要求 avahi-client>=0.6 + avahi-glib>=0.6（或 dns_sd），OHOS 用 avahi-glib"
+  - "单 GObject 拷贝：全链共享 glib/2.84.0.1.1（shared）+ libsoup3-r3，avahi-glib 的 glib/2.84.0.1 用 override 对齐"
+  - "avahi-glib 单合并 cpp_info 只产 avahi-glib.pc，libdmapsharing configure 需 avahi-client.pc，配方手写 shim"
+  - "上游 6 套 Check suite 45 用例：dmap-{av-connection:5,av-record:5,av-share:24,connection:4,md5:2,utils:5}"
+  - "official make check 会 gcov 覆盖率重建（OHOS 无意义），配方直接运行聚合全部 suite 的 tests/unit-test"
