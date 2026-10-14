@@ -1,0 +1,21 @@
+--- a/CMakeLists.txt	2025-05-19 00:00:00.000000000 +0000
++++ b/CMakeLists.txt	2026-09-26 00:00:00.000000000 +0000
+@@ -45,7 +45,17 @@
+              SOVERSION 2
+              PUBLIC_HEADER include/hyprlang.hpp)
+ 
+-target_link_libraries(hyprlang PkgConfig::deps)
++# OHOS relocatable linkage: libhyprutils.so is published without a
++# DT_SONAME, so linking PkgConfig::deps makes CMake resolve its absolute
++# Conan cache path (IMPORTED_LOCATION) and the linker records that
++# machine-private path in DT_NEEDED — the artifact is non-consumable on a
++# different cache layout. Link by basename instead (same -L dirs and
++# -l lib that the .pc declares) and keep the imported target's include
++# dirs; the public header hyprlang.hpp needs no hyprutils headers, so
++# PRIVATE is enough.
++target_include_directories(hyprlang SYSTEM PRIVATE ${deps_INCLUDE_DIRS})
++target_link_directories(hyprlang PRIVATE ${deps_LIBRARY_DIRS})
++target_link_libraries(hyprlang PRIVATE ${deps_LIBRARIES})
+ 
+ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+   # for std::expected. probably evil. Arch's clang is very outdated tho...

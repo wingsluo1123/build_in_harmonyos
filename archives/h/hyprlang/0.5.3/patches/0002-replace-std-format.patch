@@ -1,0 +1,82 @@
+--- a/src/config.cpp	2025-05-19 00:00:00.000000000 +0000
++++ b/src/config.cpp	2026-09-26 00:00:00.000000000 +0000
+@@ -4,7 +4,6 @@
+ #include <fstream>
+ #include <stdexcept>
+ #include <string>
+-#include <format>
+ #include <algorithm>
+ #include <cmath>
+ #include <sstream>
+@@ -385,7 +384,7 @@
+                     PCAT->anonymousID       = biggest;
+                 } else {
+                     if (VALUEIT == PCAT->values.end() || VALUEIT->first != sc->key) {
+-                        result.setError(std::format("special category's first value must be the key. Key for <{}> is <{}>", PCAT->name, PCAT->key));
++                        result.setError("special category's first value must be the key. Key for <" + PCAT->name + "> is <" + PCAT->key + ">");
+                         return result;
+                     }
+                     impl->currentSpecialKey = value;
+@@ -396,7 +395,7 @@
+         }
+ 
+         if (!found) {
+-            result.setError(std::format("config option <{}> does not exist.", valueName));
++            result.setError("config option <" + valueName + "> does not exist.");
+             return result;
+         }
+     }
+@@ -418,7 +417,7 @@
+             try {
+                 VALUEIT->second.setFrom(std::stof(value));
+             } catch (std::exception& e) {
+-                result.setError(std::format("failed parsing a float: {}", e.what()));
++                result.setError(std::string{"failed parsing a float: "} + e.what());
+                 return result;
+             }
+             break;
+@@ -436,7 +435,7 @@
+ 
+                 VALUEIT->second.setFrom(SVector2D{std::stof(LHS), std::stof(RHS)});
+             } catch (std::exception& e) {
+-                result.setError(std::format("failed parsing a vec2: {}", e.what()));
++                result.setError(std::string{"failed parsing a vec2: "} + e.what());
+                 return result;
+             }
+             break;
+@@ -723,7 +722,7 @@
+         if (RET.error && (impl->parseError.empty() || impl->configOptions.throwAllErrors)) {
+             if (!impl->parseError.empty())
+                 impl->parseError += "\n";
+-            impl->parseError += std::format("Config error at line {}: {}", linenum, RET.errorStdString);
++            impl->parseError += std::string{"Config error at line "} + std::to_string(linenum) + ": " + RET.errorStdString;
+             result.setError(impl->parseError);
+         }
+ 
+@@ -734,7 +733,7 @@
+         if (impl->parseError.empty() || impl->configOptions.throwAllErrors) {
+             if (!impl->parseError.empty())
+                 impl->parseError += "\n";
+-            impl->parseError += std::format("Config error: Unclosed category at EOF");
++            impl->parseError += "Config error: Unclosed category at EOF";
+             result.setError(impl->parseError);
+         }
+ 
+@@ -763,7 +762,7 @@
+         if (!impl->currentFlags.noError && RET.error && (impl->parseError.empty() || impl->configOptions.throwAllErrors)) {
+             if (!impl->parseError.empty())
+                 impl->parseError += "\n";
+-            impl->parseError += std::format("Config error in file {} at line {}: {}", file, linenum, RET.errorStdString);
++            impl->parseError += std::string{"Config error in file "} + file + " at line " + std::to_string(linenum) + ": " + RET.errorStdString;
+             result.setError(impl->parseError);
+         }
+ 
+@@ -776,7 +775,7 @@
+         if (impl->parseError.empty() || impl->configOptions.throwAllErrors) {
+             if (!impl->parseError.empty())
+                 impl->parseError += "\n";
+-            impl->parseError += std::format("Config error in file {}: Unclosed category at EOF", file);
++            impl->parseError += std::string{"Config error in file "} + file + ": Unclosed category at EOF";
+             result.setError(impl->parseError);
+         }
+ 

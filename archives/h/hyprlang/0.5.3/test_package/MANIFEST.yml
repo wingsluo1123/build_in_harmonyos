@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: hyprlang/0.5.3
+homepage: "https://github.com/hyprwm/hyprlang"
+
+# 上游测试命令：ctest（include(CTest) + add_test 2 个用例）
+upstream_check_command: "ctest"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试程序（ctest 自动发现）
+upstream_tests:
+  - file: tests/parse/main.cpp
+    description: "解析器端到端单元测试（hyprlang_test Parsing：config.conf 值/变量/handler/special category/source/colors + error.conf + invalid-numbers.conf 断言）"
+    command: "ctest -R Parsing"
+  - file: tests/fuzz/main.cpp
+    description: "模糊鲁棒性测试（hyprlang_fuzz Fuzz：1337 轮随机输入 parseDynamic 无崩溃）"
+    command: "ctest -R Fuzz"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: src/test_hyprlang.sh
+    description: "验证 hyprlang 头文件/libhyprlang.so/hyprlang.pc 存在（3 个断言）"
+    command: "bash test_hyprlang.sh <pkg_dir>"
+  - file: conanfile.py
+    description: "验证 include/hyprlang.hpp 头文件存在（1 个断言）"
+    command: "conan test"
+
+# 测试断言总数：上游 2 个 ctest 用例 + test_package 4 个断言
+assertion_count: 2
