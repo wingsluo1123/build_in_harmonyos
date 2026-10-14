@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml — tm-align 20190822
+package: tm-align/20190822
+homepage: "https://zhanggroup.org/TM-align/"
+
+# 上游无任何测试（源码包仅 TMalign.cpp / TMalign.f / TMscore.cpp / TMscore.f，无 tests/、无构建系统、无 check/test 目标）
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角：CMake 编译 C++ 驱动程序 → 生成合成 PDB → 运行被测包安装的 TMalign / TMscore → 校验数值结果）
+test_package_tests:
+  - file: test_tmalign.cpp
+    description: "TMalign -v 打印 Version 20190822"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMalign 比对 α 螺旋与其刚体变换副本：解析 60 个残基、比对长度 60、RMSD≈0、双归一化 TM-score≈1"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMalign -m 写出旋转矩阵文件，反解出构造的平移 (10,-5,3) 与绕 Y 轴 40° 旋转"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMalign 对螺旋 vs 伸展链给出低 TM-score（<0.5）"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMalign -fast -u 60 在完美匹配上仍给出 TM-score≈1"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMscore 固定对应关系评分：公共残基 60、TM-score≈1、GDT-HA≈1"
+    command: "test_tmalign <TMalign> <TMscore>"
+  - file: test_tmalign.cpp
+    description: "TMscore 对螺旋 vs 伸展链给出低 TM-score（<0.5）"
+    command: "test_tmalign <TMalign> <TMscore>"
+
+assertion_count: 17
