@@ -1,0 +1,80 @@
+version: "g20201011"
+software: "vban"
+status: built
+build_date: "2026-10-11"
+build_system: "cmake"
+
+source:
+  url: "https://github.com/quiniouben/vban/archive/4f69e5a6cd02627a891f2b15c2cf01bf4c87d23d.tar.gz"
+  sha256: "50e2d45b9e1cbf50f35b9f7edc5bc5e0960b9fbd8cfca107288ed7a6d63b4e7a"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DWITH_ALSA=ON"
+    - "-DWITH_PULSEAUDIO=ON"
+    - "-DWITH_JACK=ON"
+  dependencies:
+    - alsa-lib/1.2.16.1
+    - pulseaudio/17.0.1
+    - jack/1.9.22
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-src-CMakeLists.txt.patch"
+  - "0003-src-common-packet.c.patch"
+  - "0004-src-common-backend-pipe_backend.c.patch"
+  - "0005-src-emitter-main.c.patch"
+  - "0006-src-receptor-main.c.patch"
+  - "0007-src-sendtext-main.c.patch"
+  - "0008-src-vban-vban.h.patch"
+
+knowledge_gained:
+  - "流到数据报桥接必须区分读取错误、正常 EOF 和有效载荷，并以精确包数验证尾部边界"
+  - "网络协议头应以字节模式定义，并用独立黄金数据报回归校验线格式"
+  - "无真实声卡时可用文件和命名管道后端复用同一 UDP 数据面测试"
+  - "HarmonyOS PC 的临时文件必须尊重 TMPDIR，不能写死 /tmp"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: 13d09e8a799e9209
+  source_work_hash: a5d3a8cf6df17622
+  generated_at: '2026-10-11T09:37:50'
+  patches_count: 8
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: buildsystem
+    platform_only: false
+    guard: 'not_required: prefer Conan targets when present and preserve upstream discovery fallback'
+  - file: 0002-src-CMakeLists.txt.patch
+    type: buildsystem
+    platform_only: false
+    guard: 'not_required: imported targets are portable and the original link variables remain fallback inputs'
+  - file: 0003-src-common-packet.c.patch
+    type: bugfix
+    platform_only: false
+    guard: 'not_required: validates packet length before reading a byte-defined protocol header'
+  - file: 0004-src-common-backend-pipe_backend.c.patch
+    type: portability
+    platform_only: false
+    guard: 'not_required: TMPDIR is the portable temporary-directory contract'
+  - file: 0005-src-emitter-main.c.patch
+    type: bugfix
+    platform_only: false
+    guard: 'not_required: read errors and EOF require portable tri-state handling'
+  - file: 0006-src-receptor-main.c.patch
+    type: feature
+    platform_only: false
+    guard: 'not_required: side-effect-free version probing is portable'
+  - file: 0007-src-sendtext-main.c.patch
+    type: bugfix
+    platform_only: false
+    guard: 'not_required: successful datagram transmission must produce a conventional zero process status'
+  - file: 0008-src-vban-vban.h.patch
+    type: portability
+    platform_only: false
+    guard: 'not_required: explicit byte layout and little-endian helpers define the protocol on every architecture'

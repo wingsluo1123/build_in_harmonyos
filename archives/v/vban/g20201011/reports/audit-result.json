@@ -1,0 +1,59 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "PF9-TOOL-FALSE-POSITIVE",
+      "file": "scripts/ohc/preflight.py",
+      "line": 566,
+      "description": "PF9 将归档规范要求的软件级 README.md、commands.json 和 manifest.yaml 误报为缺少版本目录层；该告警不来自 vban 实现或交付内容。",
+      "fix_suggestion": "本 PR 必须保留三个软件级元数据文件；PF9 应在框架侧按归档规范放行软件级路径。"
+    }
+  ],
+  "summary": "W4 增量审计通过：P0=0、P1=0、P2=0、P3=1（仅 PF9 已知假阳性）。本次针对 CI #85558 暴露的跨 Worker 临时路径差异复核最终提交 be840cc104c419bc2ff8e07a1a2a60bd67bed35e。此前独立 W4 已审计的配方、8 个补丁和知识正文内容未变且哈希继续匹配；本次变化限定为 test_vban.py、test-report.md 和知识 KV 元数据。失败根因是上游 CLI 用固定 64 字节字段保存设备名，较长的 Worker 绝对临时路径被截断并导致 file_open ENOENT。修复仅向 CLI 传递固定短文件名，并以 subprocess cwd 将四类真实文件后端测试约束在 TemporaryDirectory 中；未跳过测试、未放宽断言、未改被测包。正常 EOF、读取错误、黄金解码和 4096 字节 UDP 文件回环均采用相同约束。修正版在 HarmonyOS 真机对最终包复跑得到 vban consumer tests passed: 35 assertions。新的 W3 回执为 2026-10-12T03:56:45.948428，exit_code=0，晚于测试脚本修改，日志 SHA-256 复核一致。官方源码、补丁、配方、包内绝对命令绑定、B 类知识边界及无个人绝对路径等原审计结论保持有效。",
+  "counts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "P3": 1
+  },
+  "audit_evidence": {
+    "branch": "feat/vban-g20201011",
+    "base_ref": "origin/main",
+    "base_sha": "b644cbf8ed30f647dff8a29240c8b7738edd5e65",
+    "merge_base_sha": "b644cbf8ed30f647dff8a29240c8b7738edd5e65",
+    "head_sha": "be840cc104c419bc2ff8e07a1a2a60bd67bed35e",
+    "audit_input_sha256": "c7666b814524c5375715bfdc93d20ca8fd85355eebe24d0a5309c6a241df9ac4",
+    "official_source_sha256": "50e2d45b9e1cbf50f35b9f7edc5bc5e0960b9fbd8cfca107288ed7a6d63b4e7a",
+    "patches_applied_with_fuzz_zero": 8,
+    "w3_timestamp": "2026-10-12T03:56:45.948428",
+    "w3_exit_code": 0,
+    "w3_log_sha256": "c3bd601d692f604d438ebcaf5a43a35f00035ff9449cea049510d03d091c2089",
+    "device_test_script_sha256": "b439cedb1198607646e6cb09e1fb99b168423cf5b32728f537fa1c39aba1f629",
+    "device_assertions": "35/35 PASS",
+    "graph_validate": "pass with pre-existing warnings only",
+    "changed_files_sha256": {
+      "archives/v/vban/README.md": "5cf7e58da058f78b3fcb225e9023e5d868080ac6796536a14bc1e5da87b3ee93",
+      "archives/v/vban/commands.json": "c91efb1ccaccc4fed86e95bdffe93ae1dd33f659756e2d8758f4d761ac823eed",
+      "archives/v/vban/g20201011/conandata.yml": "13387ac6ae942250542beba3ccd09890aaa75b8159ed41d3f367cf4874ae4495",
+      "archives/v/vban/g20201011/conanfile.py": "ba0578d3cef2636e52a5e0bcb9ecd941152a2ba2c6bdde537a5f79396061158b",
+      "archives/v/vban/g20201011/manifest.yaml": "4d2baa4bda8509df2cf657824792b8253e0fb19b93044cce7d9617ddacb96c36",
+      "archives/v/vban/g20201011/notes.md": "cf6327250977c43bcde667718c9efab7ffb14cad2e1c5ffc865add4c771f0d3c",
+      "archives/v/vban/g20201011/patches/0001-CMakeLists.txt.patch": "aab807991d9254a49f9da8f55f33964c26efb237c741a697f3ea408a5bbbd728",
+      "archives/v/vban/g20201011/patches/0002-src-CMakeLists.txt.patch": "79eeaac45ee725cf9ac0390145faff80a2107a838952f84b5e68a3450baefe1e",
+      "archives/v/vban/g20201011/patches/0003-src-common-packet.c.patch": "969db15757af629a16bfa50b59e6eda56c59243df71e7bb46afafcb7155b0a27",
+      "archives/v/vban/g20201011/patches/0004-src-common-backend-pipe_backend.c.patch": "836b0fcfff9e1ab82568d62b04bad9e3815ce49ba30e680fb9d3a2600c8c2ef0",
+      "archives/v/vban/g20201011/patches/0005-src-emitter-main.c.patch": "fb9ac91934fc12f29e1501cbe8986a1fbeb7918c4196e83cb033f7a16a646683",
+      "archives/v/vban/g20201011/patches/0006-src-receptor-main.c.patch": "fd804fc4bea179c3b7c9b36ee919ddc1ca12fd92f0fb76e994a14994c976b73e",
+      "archives/v/vban/g20201011/patches/0007-src-sendtext-main.c.patch": "9f78ac53c063738368d43be383dc2178e477a1442810dc47f0e5f8e36dee7c87",
+      "archives/v/vban/g20201011/patches/0008-src-vban-vban.h.patch": "021b6dba4aad74325e94520094aa7f0744a78486d9c414242c259dde2bf4891e",
+      "archives/v/vban/g20201011/reports/test-report.md": "bca14fddae638e3afe91c8ffc1d7467131bf47b3a22961f8ce37b2080e0038cc",
+      "archives/v/vban/g20201011/test_package/MANIFEST.yml": "a6ac81f16365260792373982f00217c0ee5f196f03f0655cc0bea2d4f27aa282",
+      "archives/v/vban/g20201011/test_package/conanfile.py": "bfc47555cdd99e9e22d073fd90459d15d01fe7d37a215e40091edb1056bfe3b7",
+      "archives/v/vban/g20201011/test_package/test_vban.py": "b439cedb1198607646e6cb09e1fb99b168423cf5b32728f537fa1c39aba1f629",
+      "archives/v/vban/manifest.yaml": "5471b8350dd8ebff49ae2a74452907efb0b23afd1df9dc35755aec9e43128048",
+      "knowledge/drafts/E429-draft-7015.kv": "ebf8ed7c4b7596cb5cefb97bc225d8465ae6bda9ef0cb4d02739934cfb710b67",
+      "knowledge/drafts/E429-draft-7015.md": "d2c277cabf04c62d36276aa170c47e72eb34a098746582b0498f9768d89e882c"
+    }
+  }
+}

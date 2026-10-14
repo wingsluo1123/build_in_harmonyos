@@ -1,0 +1,24 @@
+software: vban
+display: "VBAN"
+description: "Command-line VBAN audio and text stream sender and receiver"
+category: multimedia
+homepage: "https://github.com/quiniouben/vban"
+license: GPL-3.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "将线协议头改为显式字节字段及小端读写函数，避免多字符常量、主机字节序和未对齐整数访问进入网络协议"
+    - "CMake 优先消费 Conan 提供的 ALSA、PulseAudio、JACK imported targets，完整保留上游默认后端"
+    - "命名管道默认落入 TMPDIR，并记录真实路径用于清理，适配 HarmonyOS PC 可写临时目录"
+    - "文件输入到达 EOF 时正常结束，避免零长度读导致报文长度下溢"
+    - "以黄金 UDP 数据报、文件回环和 TMPDIR 命名管道测试复用同一套无声卡验证路径"
+  common_dependencies:
+    - "alsa-lib/1.2.16.1"
+    - "pulseaudio/17.0.1"
+    - "jack/1.9.22"
+
+versions:
+  "g20201011":
+    status: built
+    build_date: "2026-10-11"
