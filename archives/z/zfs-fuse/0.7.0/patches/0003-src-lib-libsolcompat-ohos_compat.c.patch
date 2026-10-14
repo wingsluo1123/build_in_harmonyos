@@ -1,0 +1,87 @@
+--- /dev/null
++++ b/src/lib/libsolcompat/ohos_compat.c
+@@ -0,0 +1,84 @@
++/*
++ * OHOS (musl) port support.
++ * musl ships libintl.h as an empty stub and lacks gethostid()/__assert(),
++ * pthread_cancel()/pthread_yield() and (for user builds) the major()/minor()
++ * device-number helpers, which the 2011-era zfs-fuse code assumes.
++ * Provide minimal equivalents here.
++ */
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <pthread.h>
++#include <sched.h>
++#include <sys/types.h>
++
++char *dgettext(const char *domainname, const char *msgid)
++{
++	(void) domainname;
++	return (char *)msgid;
++}
++
++char *gettext(const char *msgid)
++{
++	return (char *)msgid;
++}
++
++char *textdomain(const char *domainname)
++{
++	return (char *)domainname;
++}
++
++char *bindtextdomain(const char *domainname, const char *dirname)
++{
++	(void) dirname;
++	return (char *)domainname;
++}
++
++long gethostid(void)
++{
++	return 0x1275e1dL;	/* fake, like unistd_aux.h fake_gethostid() */
++}
++
++/* legacy (non-POSIX) assert hook, used by some Solaris-derived code */
++void __assert(const char *expression, const char *file, int line)
++{
++	fprintf(stderr, "Assertion failed: (%s), file %s, line %d.\n",
++	    expression, file, line);
++	abort();
++}
++
++/* OHOS musl does not export pthread_cancel/pthread_yield */
++int pthread_cancel(pthread_t thread)
++{
++	(void) thread;
++	return 0;	/* stub: cooperative cancellation only */
++}
++
++int pthread_setcancelstate(int state, int *oldstate)
++{
++	if (oldstate)
++		*oldstate = 0;
++	(void) state;
++	return 0;
++}
++
++int pthread_yield(void)
++{
++	return sched_yield();
++}
++
++/* user-build device-number helpers (kernel builds get macros from
++ * solcompat sys/sysmacros.h) */
++#ifndef major
++unsigned int major(unsigned int dev)
++{
++	return (unsigned int)(((dev >> 8) & 0xfff) | ((dev >> 32) & ~0xfffU));
++}
++#endif
++
++#ifndef minor
++unsigned int minor(unsigned int dev)
++{
++	return (unsigned int)((dev & 0xff) | ((dev >> 12) & ~0xffU));
++}
++#endif

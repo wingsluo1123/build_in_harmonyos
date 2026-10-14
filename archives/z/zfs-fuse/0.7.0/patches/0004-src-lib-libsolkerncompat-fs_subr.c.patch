@@ -1,0 +1,31 @@
+--- a/src/lib/libsolkerncompat/fs_subr.c
++++ b/src/lib/libsolkerncompat/fs_subr.c
+@@ -32,20 +32,28 @@
+ #include <sys/vnode.h>
+ #include <sys/flock.h>
+ #include <sys/statvfs.h>
+ #include <sys/unistd.h>
+ #include <sys/param.h>
+ #include <sys/cmn_err.h>
+ #include <vm/page.h>
+ #include <stdlib.h>
+ #include <strings.h>
+ 
++/* OHOS/musl limits.h lacks MAX_CANON/MAX_INPUT (pathconf limits) */
++#ifndef MAX_CANON
++#define MAX_CANON 255
++#endif
++#ifndef MAX_INPUT
++#define MAX_INPUT 255
++#endif
++
+ /*
+  * The associated operation is not supported by the file system.
+  */
+ int
+ fs_nosys()
+ {
+ 	return (ENOSYS);
+ }
+ 
+ /*

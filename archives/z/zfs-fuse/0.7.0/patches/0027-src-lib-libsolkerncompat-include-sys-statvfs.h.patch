@@ -1,0 +1,46 @@
+--- a/src/lib/libsolkerncompat/include/sys/statvfs.h
++++ b/src/lib/libsolkerncompat/include/sys/statvfs.h
+@@ -30,38 +30,41 @@
+ 
+ #ifndef _SYS_STATVFS_H
+ #define	_SYS_STATVFS_H
+ 
+ /* #pragma ident	"%Z%%M%	%I%	%E% SMI"	 SVr4.0 1.10 */
+ 
+ #include <sys/feature_tests.h>
+ #include <sys/types.h>
+ 
+ /* Get the system-specific definition of `struct statfs'.  */
+-#include <bits/statvfs.h>
++/* OHOS/musl: struct statvfs64 block below is guarded by
++   _LARGEFILE64_SOURCE which is not defined; consumers use struct statvfs */
+ 
+ #ifdef	__cplusplus
+ extern "C" {
+ #endif
+ 
+ /*
+  * Structure returned by statvfs(2).
+  */
+ 
+ #define	_FSTYPSZ	16
+ #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+ #ifndef FSTYPSZ
+ #define	FSTYPSZ	_FSTYPSZ
+ #endif
+ #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
+ 
+-#if 1
++/* OHOS port: use the full statvfs/statvfs64 definitions below; the
++   previous branch only had an opaque statvfs64_t typedef */
++#if 0
+ typedef struct statvfs64_32 {
+ 	uint32_t	f_bsize;	/* preferred file system block size */
+ 	uint32_t	f_frsize;	/* fundamental file system block size */
+ 	fsblkcnt64_t	f_blocks;	/* total blocks of f_frsize */
+ 	fsblkcnt64_t	f_bfree;	/* total free blocks of f_frsize */
+ 	fsblkcnt64_t	f_bavail;	/* free blocks avail to non-superuser */
+ 	fsfilcnt64_t	f_files;	/* total # of file nodes (inodes) */
+ 	fsfilcnt64_t	f_ffree;	/* total # of free file nodes */
+ 	fsfilcnt64_t	f_favail;	/* free nodes avail to non-superuser */
+ 	uint32_t	f_fsid;		/* file system id (dev for now) */

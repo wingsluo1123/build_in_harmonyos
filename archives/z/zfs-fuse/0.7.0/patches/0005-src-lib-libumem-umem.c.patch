@@ -1,0 +1,25 @@
+--- a/src/lib/libumem/umem.c
++++ b/src/lib/libumem/umem.c
+@@ -517,21 +517,21 @@
+ umem_log_header_t *umem_content_log;
+ umem_log_header_t *umem_failure_log;
+ umem_log_header_t *umem_slab_log;
+ 
+ extern thread_t _thr_self(void);
+ #if defined(__MACH__) || defined(__FreeBSD__)
+ # define CPUHINT()	((int)(_thr_self()))
+ #endif
+ 
+ #ifndef CPUHINT
+-#define	CPUHINT()		(_thr_self())
++#define	CPUHINT()		((int)(uintptr_t)_thr_self())
+ #endif
+ 
+ #define	CPUHINT_MAX()		INT_MAX
+ 
+ #define	CPU(mask)		(umem_cpus + (CPUHINT() & (mask)))
+ static umem_cpu_t umem_startup_cpu = {	/* initial, single, cpu */
+ 	UMEM_CACHE_SIZE(0),
+ 	0
+ };
+ 

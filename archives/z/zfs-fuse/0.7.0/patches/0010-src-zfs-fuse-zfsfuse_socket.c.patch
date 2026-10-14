@@ -1,0 +1,42 @@
+--- a/src/zfs-fuse/zfsfuse_socket.c
++++ b/src/zfs-fuse/zfsfuse_socket.c
+@@ -79,30 +79,35 @@
+ 
+ 	/* Create the socket. */
+ 	sock = socket(PF_LOCAL, SOCK_STREAM, 0);
+ 	if(sock == -1) {
+ 		int err = errno;
+ 		cmn_err(CE_WARN, "Error creating UNIX socket: %s.", strerror(err));
+ 		return -1;
+ 	}
+ 
+ 	/* Try to create the directory, ignore errors */
+-	mkdir(ZPOOL_CACHE_DIR, 0700);
++	mkdir(zfs_get_cache_dir(), 0700);
+ 	mkdir(ZFS_SOCK_DIR, 0700);
+ 
+-	/* Bind a name to the socket. */
++	/*
++	 * OHOS port: filesystem-backed UNIX socket binds are not permitted in
++	 * the HarmonyOS sandbox (bind() returns EPERM). Use the abstract
++	 * namespace instead, on both the daemon and the client side.
++	 */
+ 	name.sun_family = AF_LOCAL;
+-	strncpy(name.sun_path, ZFS_SOCK_NAME, sizeof(name.sun_path));
++	name.sun_path[0] = '\0';
++	strncpy(name.sun_path + 1, ZFS_SOCK_NAME, sizeof(name.sun_path) - 1);
+ 
+ 	name.sun_path[sizeof(name.sun_path) - 1] = '\0';
+ 
+-	size = SUN_LEN(&name);
++	size = sizeof(name.sun_family) + 1 + strlen(ZFS_SOCK_NAME);
+ 
+ 	unlink(ZFS_SOCK_NAME);
+ 
+ 	if(bind(sock, &name, size) != 0) {
+ 		int err = errno;
+ 		cmn_err(CE_WARN, "Error binding UNIX socket to %s: %s.", ZFS_SOCK_NAME, strerror(err));
+ 		return -1;
+ 	}
+ 
+ 	if(listen(sock, 5) != 0) {

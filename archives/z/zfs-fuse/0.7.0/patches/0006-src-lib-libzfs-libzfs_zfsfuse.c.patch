@@ -1,0 +1,38 @@
+--- a/src/lib/libzfs/libzfs_zfsfuse.c
++++ b/src/lib/libzfs/libzfs_zfsfuse.c
+@@ -46,27 +46,32 @@
+ 	int sock;
+ 	size_t size;
+ 
+ 	/* Create the socket. */
+ 	sock = socket(PF_LOCAL, SOCK_STREAM, 0);
+ 	if(sock == -1) {
+ 		perror("socket");
+ 		return -1;
+ 	}
+ 
+-	/* Bind a name to the socket. */
++	/*
++	 * OHOS port: match the daemon's abstract-namespace socket (see
++	 * zfsfuse_socket.c); filesystem-backed binds are not permitted on
++	 * HarmonyOS.
++	 */
+ 	name.sun_family = AF_LOCAL;
+-	strncpy(name.sun_path, pathname, sizeof(name.sun_path));
++	name.sun_path[0] = '\0';
++	strncpy(name.sun_path + 1, pathname, sizeof(name.sun_path) - 1);
+ 
+ 	name.sun_path[sizeof(name.sun_path) - 1] = '\0';
+ 
+-	size = SUN_LEN(&name);
++	size = sizeof(name.sun_family) + 1 + strlen(pathname);
+ 
+ 	if(connect(sock, (struct sockaddr *) &name, size) == -1) {
+ 		int error = errno;
+ 		perror("connect");
+ 		if(error == ENOENT || error == ECONNREFUSED)
+ 			fprintf(stderr, "Please make sure that the zfs-fuse daemon is running.\n");
+ 		return -1;
+ 	}
+ 
+ 	return sock;

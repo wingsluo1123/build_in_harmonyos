@@ -1,0 +1,642 @@
+--- a/src/lib/libsolcompat/include/rpc/xdr.h
++++ b/src/lib/libsolcompat/include/rpc/xdr.h
+@@ -1,51 +1,537 @@
+ /*
+  * CDDL HEADER START
+  *
+- * The contents of this file are subject to the terms of the
+- * Common Development and Distribution License, Version 1.0 only
+- * (the "License").  You may not use this file except in compliance
+- * with the License.
++ * OHOS/musl port shim: musl does not ship SunRPC headers or the XDR
++ * runtime.  This file provides a complete, self-contained, header-only
++ * xdrmem implementation of the standard Sun XDR API subset used by
++ * libnvpair (equivalent to the historical glibc <rpc/xdr.h> surface:
++ * XDR handle, xdrmem_create, xdr_int/u_int/short/u_short/char/
++ * longlong_t/u_longlong_t/string/opaque/bytes/array/double/destroy,
++ * plus RNDUP/BYTES_PER_XDR_UNIT helpers).
+  *
+- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+- * or http://www.opensolaris.org/os/licensing.
+- * See the License for the specific language governing permissions
+- * and limitations under the License.
+- *
+- * When distributing Covered Code, include this CDDL HEADER in each
+- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+- * If applicable, add the following below this CDDL HEADER, with the
+- * fields enclosed by brackets "[]" replaced with your own identifying
+- * information: Portions Copyright [yyyy] [name of copyright owner]
+- *
+- * CDDL HEADER END
++ * Derived from the public-domain Sun Microsystems XDR implementation.
+  */
++#ifndef	_SOL_RPC_XDR_H_
++#define	_SOL_RPC_XDR_H_
++
++#include <sys/types.h>
++#include <string.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include <arpa/inet.h>
++
++#define	BYTES_PER_XDR_UNIT	4
++#ifndef	RNDUP
++#define	RNDUP(x)  ((((x) + BYTES_PER_XDR_UNIT - 1) / BYTES_PER_XDR_UNIT) \
++		    * BYTES_PER_XDR_UNIT)
++#endif
++#ifndef	RNDUPNEG
++#define	RNDUPNEG(x) -(((unsigned)(x)) & ~((BYTES_PER_XDR_UNIT - 1)))
++#endif
++
++enum xdr_op {
++	XDR_FREE = 0,
++	XDR_ENCODE = 1,
++	XDR_DECODE = 2
++};
++
++typedef struct XDR XDR;
++
++typedef bool_t (*xdrproc_t)(XDR *, void *, unsigned int);
++
++struct xdr_ops {
++	bool_t	(*x_getlong)(XDR *__xdrs, long *__lp);
++	bool_t	(*x_putlong)(XDR *__xdrs, const long *__lp);
++	bool_t	(*x_getbytes)(XDR *__xdrs, char *__addr, unsigned int __len);
++	bool_t	(*x_putbytes)(XDR *__xdrs, const char *__addr, unsigned int __len);
++	unsigned int	(*x_getpostn)(XDR *__xdrs);
++	bool_t	(*x_setpostn)(XDR *__xdrs, unsigned int __pos);
++	long *	(*x_inline)(XDR *__xdrs, int __len);
++	void	(*x_destroy)(XDR *__xdrs);
++	bool_t	(*x_control)(XDR *__xdrs, int __request, void *__info);
++};
++
++struct XDR {
++	enum xdr_op	x_op;
++	struct xdr_ops	*x_ops;
++	char		*x_public;
++	char		*x_private;
++	char		*x_base;
++	int		x_handy;
++};
++
++/* ------------------------------------------------------------------ */
++/* xdrmem implementation                                              */
++/* ------------------------------------------------------------------ */
++
++static bool_t
++xdrmem_getlong(XDR *xdrs, long *lp)
++{
++	if ((xdrs->x_handy -= 4) < 0)
++		return (FALSE);
++	*lp = (long)ntohl((uint32_t)(*((int32_t *)(void *)xdrs->x_private)));
++	xdrs->x_private += 4;
++	return (TRUE);
++}
++
++static bool_t
++xdrmem_putlong(XDR *xdrs, const long *lp)
++{
++	if ((xdrs->x_handy -= 4) < 0)
++		return (FALSE);
++	*(int32_t *)(void *)xdrs->x_private =
++	    (int32_t)htonl((uint32_t)*lp);
++	xdrs->x_private += 4;
++	return (TRUE);
++}
++
++static bool_t
++xdrmem_getbytes(XDR *xdrs, char *addr, unsigned int len)
++{
++	if ((xdrs->x_handy -= (int)len) < 0)
++		return (FALSE);
++	(void) memcpy(addr, xdrs->x_private, len);
++	xdrs->x_private += len;
++	return (TRUE);
++}
++
++static bool_t
++xdrmem_putbytes(XDR *xdrs, const char *addr, unsigned int len)
++{
++	if ((xdrs->x_handy -= (int)len) < 0)
++		return (FALSE);
++	(void) memcpy(xdrs->x_private, addr, len);
++	xdrs->x_private += len;
++	return (TRUE);
++}
++
++static unsigned int
++xdrmem_getpostn(XDR *xdrs)
++{
++	return ((unsigned int)(xdrs->x_private - xdrs->x_base));
++}
++
++static bool_t
++xdrmem_setpostn(XDR *xdrs, unsigned int pos)
++{
++	char *newaddr = xdrs->x_base + pos;
++	if (newaddr > xdrs->x_private)
++		return (FALSE);
++	xdrs->x_handy += (int)(xdrs->x_private - newaddr);
++	xdrs->x_private = newaddr;
++	return (TRUE);
++}
++
++static long *
++xdrmem_inline(XDR *xdrs, int len)
++{
++	if (xdrs->x_handy < len)
++		return (NULL);
++	xdrs->x_handy -= len;
++	return ((long *)(void *)xdrs->x_private);
++}
++
++static void
++xdrmem_destroy(XDR *xdrs)
++{
++	(void) xdrs;
++}
++
++static const struct xdr_ops xdrmem_ops = {
++	xdrmem_getlong,
++	xdrmem_putlong,
++	xdrmem_getbytes,
++	xdrmem_putbytes,
++	xdrmem_getpostn,
++	xdrmem_setpostn,
++	xdrmem_inline,
++	xdrmem_destroy,
++	NULL	/* xdrmem_control() is provided below via xdr_control */
++};
++
++static void
++xdrmem_create(XDR *xdrs, char *addr, unsigned int size, enum xdr_op op)
++{
++	xdrs->x_op = op;
++	xdrs->x_ops = (struct xdr_ops *)(void *)&xdrmem_ops;
++	xdrs->x_private = xdrs->x_base = addr;
++	xdrs->x_handy = (int)size;
++	xdrs->x_public = NULL;
++}
++
++static void
++xdr_destroy(XDR *xdrs)
++{
++	if (xdrs->x_ops->x_destroy != NULL)
++		xdrs->x_ops->x_destroy(xdrs);
++}
++
++static unsigned int
++xdr_getpos(XDR *xdrs)
++{
++	return (xdrs->x_ops->x_getpostn(xdrs));
++}
++
++static bool_t
++xdr_setpos(XDR *xdrs, unsigned int pos)
++{
++	return (xdrs->x_ops->x_setpostn(xdrs, pos));
++}
++
++/* ------------------------------------------------------------------ */
++/* primitive / aggregate encoders                                     */
++/* ------------------------------------------------------------------ */
++
++static bool_t
++xdr_int(XDR *xdrs, int *ip)
++{
++	long l;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		l = (long)*ip;
++		return (xdrs->x_ops->x_putlong(xdrs, &l));
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getlong(xdrs, &l))
++			return (FALSE);
++		*ip = (int)l;
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_u_int(XDR *xdrs, unsigned int *up)
++{
++	long l;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		l = (long)(unsigned long)*up;
++		return (xdrs->x_ops->x_putlong(xdrs, &l));
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getlong(xdrs, &l))
++			return (FALSE);
++		*up = (unsigned int)(unsigned long)l;
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_short(XDR *xdrs, short *sp)
++{
++	long l;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		l = (long)*sp;
++		return (xdrs->x_ops->x_putlong(xdrs, &l));
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getlong(xdrs, &l))
++			return (FALSE);
++		*sp = (short)l;
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_u_short(XDR *xdrs, unsigned short *usp)
++{
++	long l;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		l = (long)(unsigned long)*usp;
++		return (xdrs->x_ops->x_putlong(xdrs, &l));
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getlong(xdrs, &l))
++			return (FALSE);
++		*usp = (unsigned short)l;
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_char(XDR *xdrs, char *cp)
++{
++	int i;
++	unsigned int u;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		i = *cp;
++		u = (unsigned int)i;
++		return (xdr_u_int(xdrs, &u));
++	case XDR_DECODE:
++		if (!xdr_u_int(xdrs, &u))
++			return (FALSE);
++		*cp = (char)u;
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_longlong_t(XDR *xdrs, long long *llp)
++{
++	long l1, l2;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE: {
++		unsigned long long ull = (unsigned long long)*llp;
++		l1 = (long)(ull >> 32);
++		l2 = (long)(ull & 0xffffffffUL);
++		return (xdrs->x_ops->x_putlong(xdrs, &l1) &&
++		    xdrs->x_ops->x_putlong(xdrs, &l2));
++	}
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getlong(xdrs, &l1) ||
++		    !xdrs->x_ops->x_getlong(xdrs, &l2))
++			return (FALSE);
++		*llp = (long long)(((unsigned long long)(unsigned long)l1 << 32) |
++		    (unsigned long long)(unsigned long)l2);
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_u_longlong_t(XDR *xdrs, unsigned long long *ullp)
++{
++	return (xdr_longlong_t(xdrs, (long long *)ullp));
++}
++
++static bool_t
++xdr_opaque(XDR *xdrs, char *cp, unsigned int cnt)
++{
++	unsigned int rndup;
++	static char crud[BYTES_PER_XDR_UNIT];
++
++	if (cnt == 0)
++		return (TRUE);
++
++	switch (xdrs->x_op) {
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getbytes(xdrs, cp, cnt))
++			return (FALSE);
++		rndup = RNDUP(cnt) - cnt;
++		if (rndup == 0)
++			return (TRUE);
++		return (xdrs->x_ops->x_getbytes(xdrs, crud, rndup));
++	case XDR_ENCODE:
++		if (!xdrs->x_ops->x_putbytes(xdrs, cp, cnt))
++			return (FALSE);
++		rndup = RNDUP(cnt) - cnt;
++		if (rndup == 0)
++			return (TRUE);
++		return (xdrs->x_ops->x_putbytes(xdrs, crud, rndup));
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
++static bool_t
++xdr_string(XDR *xdrs, char **sp, unsigned int maxsize)
++{
++	unsigned int size = 0;
++	char *sptr = *sp;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		sptr = *sp;
++		size = (sptr == NULL) ? 0 : (unsigned int)strlen(sptr);
++		break;
++	case XDR_DECODE:
++		break;
++	case XDR_FREE:
++		if (sptr == NULL)
++			return (TRUE);
++		free(sptr);
++		*sp = NULL;
++		return (TRUE);
++	}
++
++	if (!xdr_u_int(xdrs, &size))
++		return (FALSE);
++	if (size > maxsize)
++		return (FALSE);
++
++	switch (xdrs->x_op) {
++	case XDR_DECODE:
++		if (size == 0) {
++			if (*sp != NULL)
++				(*sp)[0] = '\0';
++			else
++				*sp = (char *)"";
++			return (TRUE);
++		}
++		if (*sp != NULL) {
++			/* decode into the caller-provided buffer, like the
++			 * reference XDR implementation does */
++			sptr = *sp;
++			memcpy(sptr, xdrs->x_private, size);
++			sptr[size] = '\0';
++			xdrs->x_private += RNDUP(size);
++			xdrs->x_handy -= (int)RNDUP(size);
++			if (xdrs->x_handy < 0)
++				return (FALSE);
++			return (TRUE);
++		}
++		sptr = (char *)malloc(size + 1);
++		if (sptr == NULL)
++			return (FALSE);
++		sptr[size] = 0;
++		*sp = sptr;
++		break;
++	case XDR_ENCODE:
++		break;
++	default:
++		break;
++	}
++
++	if (size == 0)
++		return (TRUE);
++	if (!xdr_opaque(xdrs, *sp, size))
++		return (FALSE);
++	return (TRUE);
++}
++
++static bool_t
++xdr_bytes(XDR *xdrs, char **bpp, unsigned int *sizep, unsigned int maxsize)
++{
++	if (xdrs->x_op == XDR_FREE) {
++		if (*bpp != NULL) {
++			free(*bpp);
++			*bpp = NULL;
++		}
++		*sizep = 0;
++		return (TRUE);
++	}
++	return (xdr_string(xdrs, bpp, maxsize));
++}
++
++static bool_t
++xdr_vector(XDR *xdrs, char *basep, unsigned int nelem,
++    unsigned int elemsize, xdrproc_t elemproc)
++{
++	unsigned int i;
++
++	for (i = 0; i < nelem; i++) {
++		if (!elemproc(xdrs, basep + (i * elemsize), elemsize))
++			return (FALSE);
++	}
++	return (TRUE);
++}
++
++static bool_t
++xdr_array(XDR *xdrs, char **addrp, unsigned int *sizep,
++    unsigned int maxsize, unsigned int elemsize, xdrproc_t elemproc)
++{
++	unsigned int nodesize;
++
++	switch (xdrs->x_op) {
++	case XDR_DECODE:
++		if (!xdr_u_int(xdrs, sizep))
++			return (FALSE);
++		if (*sizep > maxsize)
++			return (FALSE);
++		nodesize = *sizep * elemsize;
++		if (nodesize == 0) {
++			*addrp = NULL;
++			return (TRUE);
++		}
++		*addrp = (char *)malloc(nodesize);
++		if (*addrp == NULL)
++			return (FALSE);
++		(void) memset(*addrp, 0, nodesize);
++		break;
++	case XDR_ENCODE:
++		nodesize = *sizep * elemsize;
++		break;
++	case XDR_FREE:
++		if (*addrp != NULL && *sizep > 0 && *sizep <= maxsize) {
++			nodesize = *sizep * elemsize;
++			{
++				unsigned int i;
++				char *p = *addrp;
++				for (i = 0; i < *sizep; i++) {
++					if (!elemproc(xdrs, p, elemsize))
++						return (FALSE);
++					p += elemsize;
++				}
++			}
++			free(*addrp);
++			*addrp = NULL;
++		}
++		return (TRUE);
++	}
++
++	{
++		unsigned int i;
++		char *p = *addrp;
++		for (i = 0; i < *sizep; i++) {
++			if (!elemproc(xdrs, p, elemsize))
++				return (FALSE);
++			p += elemsize;
++		}
++	}
++	return (TRUE);
++}
++
++static bool_t
++xdr_double(XDR *xdrs, double *dp)
++{
++	/* XDR doubles are IEEE 754 big-endian 64-bit */
++	uint64_t tmp;
++	unsigned char buf[8];
++	unsigned char *src, *dst;
++	int i;
++
++	switch (xdrs->x_op) {
++	case XDR_ENCODE:
++		(void) memcpy(&tmp, dp, sizeof (tmp));
++		for (i = 0; i < 8; i++)
++			buf[i] = (unsigned char)(tmp >> (56 - 8 * i));
++		return (xdrs->x_ops->x_putbytes(xdrs, (char *)buf, 8));
++	case XDR_DECODE:
++		if (!xdrs->x_ops->x_getbytes(xdrs, (char *)buf, 8))
++			return (FALSE);
++		tmp = 0;
++		for (i = 0; i < 8; i++)
++			tmp = (tmp << 8) | buf[i];
++		(void) memcpy(dp, &tmp, sizeof (tmp));
++		return (TRUE);
++	case XDR_FREE:
++		return (TRUE);
++	}
++	return (FALSE);
++}
++
+ /*
+- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+- * Use is subject to license terms.
+- */
+-
+-/*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
+-/*	  All Rights Reserved  	*/
+-
+-/*
+- * Portions of this source code were derived from Berkeley 4.3 BSD
+- * under license from the Regents of the University of California.
+- */
+-
+-#ifndef _SOL_RPC_XDR_H_
+-#define _SOL_RPC_XDR_H_
+-
+-#include_next <rpc/xdr.h>
+-
+-/*
+- * Strangely, my glibc version (2.3.6) doesn't have xdr_control(), so
++ * Strangely, glibc (2.3.6) doesn't have xdr_control(), so
+  * we have to hack it in here (source taken from OpenSolaris).
+  * By the way, it is assumed the xdrmem implementation is used.
+  */
+ 
+ #define xdr_control(a,b,c) xdrmem_control(a,b,c)
+ 
+ /*
+  * These are XDR control operators
+  */
+ 
+@@ -56,63 +542,58 @@
+ 	size_t xc_num_avail;
+ };
+ 
+ typedef struct xdr_bytesrec xdr_bytesrec;
+ 
+ /*
+  * These are the request arguments to XDR_CONTROL.
+  *
+  * XDR_PEEK - returns the contents of the next XDR unit on the XDR stream.
+  * XDR_SKIPBYTES - skips the next N bytes in the XDR stream.
+- * XDR_RDMAGET - for xdr implementation over RDMA, gets private flags from
+- *		 the XDR stream being moved over RDMA
+- * XDR_RDMANOCHUNK - for xdr implementaion over RDMA, sets private flags in
+- *                   the XDR stream moving over RDMA.
+  */
+ #define XDR_PEEK      2
+ #define XDR_SKIPBYTES 3
+ #define XDR_RDMAGET   4
+ #define XDR_RDMASET   5
+ 
+-/* FIXME: probably doesn't work */
+ static bool_t
+ xdrmem_control(XDR *xdrs, int request, void *info)
+ {
+ 	xdr_bytesrec *xptr;
+ 	int32_t *int32p;
+ 	int len;
+ 
+ 	switch (request) {
+ 
+ 	case XDR_GET_BYTES_AVAIL:
+ 		xptr = (xdr_bytesrec *)info;
+ 		xptr->xc_is_last_record = TRUE;
+ 		xptr->xc_num_avail = xdrs->x_handy;
+ 		return (TRUE);
+ 
+ 	case XDR_PEEK:
+ 		/*
+ 		 * Return the next 4 byte unit in the XDR stream.
+ 		 */
+-		if (xdrs->x_handy < sizeof (int32_t))
++		if (xdrs->x_handy < (int)sizeof (int32_t))
+ 			return (FALSE);
+ 		int32p = (int32_t *)info;
+ 		*int32p = (int32_t)ntohl((uint32_t)
+-		    (*((int32_t *)(xdrs->x_private))));
++		    (*((int32_t *)(void *)xdrs->x_private)));
+ 		return (TRUE);
+ 
+ 	case XDR_SKIPBYTES:
+ 		/*
+ 		 * Skip the next N bytes in the XDR stream.
+ 		 */
+ 		int32p = (int32_t *)info;
+ 		len = RNDUP((int)(*int32p));
+ 		if ((xdrs->x_handy -= len) < 0)
+ 			return (FALSE);
+ 		xdrs->x_private += len;
+ 		return (TRUE);
+ 
+ 	}
+ 	return (FALSE);
+ }
+ 
+-#endif
++#endif	/* _SOL_RPC_XDR_H_ */

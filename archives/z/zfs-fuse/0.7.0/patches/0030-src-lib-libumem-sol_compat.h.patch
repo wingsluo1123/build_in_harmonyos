@@ -1,0 +1,29 @@
+--- a/src/lib/libumem/sol_compat.h
++++ b/src/lib/libumem/sol_compat.h
+@@ -169,20 +169,26 @@
+ # elif (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+ static INLINE uint_t ec_atomic_cas(uint_t *mem, uint_t with, uint_t cmp)
+ {
+   uint_t prev;
+   asm volatile ("lock; cmpxchgl %1, %2"
+         : "=a" (prev)
+         : "r"    (with), "m" (*(mem)), "0" (cmp)
+         : "memory");
+   return prev;
+ }
++# elif defined(__GNUC__)
++/* OHOS/aarch64 (and any other GCC platform): use the generic builtin */
++static INLINE uint_t ec_atomic_cas(uint_t *mem, uint_t with, uint_t cmp)
++{
++  return __sync_val_compare_and_swap(mem, cmp, with);
++}
+ # endif
+ 
+ # ifndef ec_atomic_inc
+ static INLINE uint_t ec_atomic_inc(uint_t *mem)
+ {
+   register uint_t last;
+   do {
+     last = *mem;
+   } while (ec_atomic_cas(mem, last+1, last) != last);
+   return ++last;

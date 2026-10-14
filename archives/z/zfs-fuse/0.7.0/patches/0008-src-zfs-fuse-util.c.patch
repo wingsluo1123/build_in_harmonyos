@@ -1,0 +1,62 @@
+--- a/src/zfs-fuse/util.c
++++ b/src/zfs-fuse/util.c
+@@ -42,22 +42,34 @@
+ #include "cmd_listener.h"
+ #include "fuse_listener.h"
+ 
+ #include "fuse.h"
+ #include "zfs_operations.h"
+ #include "util.h"
+ 
+ static int ioctl_fd = -1;
+ static int lock_fd = -1;
+ 
+-#define LOCKDIR "/var/lock/zfs"
+-#define LOCKFILE LOCKDIR "/zfs_lock"
++/* OHOS port: /var is not writable on HarmonyOS; ZFS_LOCK_DIR relocates it */
++static const char *zfs_get_lock_dir(void)
++{
++	const char *d = getenv("ZFS_LOCK_DIR");
++	return (d != NULL && d[0] != '\0') ? d : "/var/lock/zfs";
++}
++static const char *zfs_get_lock_file(void)
++{
++	static char path[256];
++	(void) snprintf(path, sizeof (path), "%s/zfs_lock", zfs_get_lock_dir());
++	return path;
++}
++#define LOCKDIR zfs_get_lock_dir()
++#define LOCKFILE zfs_get_lock_file()
+ 
+ boolean_t listener_thread_started = B_FALSE;
+ pthread_t listener_thread;
+ 
+ int num_filesystems;
+ 
+ char * fuse_mount_options = NULL;
+ 
+ extern vfsops_t *zfs_vfsops;
+ extern int zfs_vfsinit(int fstype, char *name);
+@@ -206,21 +218,21 @@
+ 			exit(1);
+ 		}
+ 	}
+ }
+ 
+ extern size_t stack_size;
+ 
+ int do_init_fusesocket()
+ {
+ 	if(zfsfuse_do_locking(0) != 0) {
+-		cmn_err(CE_WARN, "Error locking " LOCKFILE ". Make sure there isn't another zfs-fuse process running and that you have appropriate permissions.");
++		cmn_err(CE_WARN, "Error locking %s. Make sure there isn't another zfs-fuse process running and that you have appropriate permissions.", LOCKFILE);
+ 		return -1;
+ 	}
+ 
+ 	ioctl_fd = zfsfuse_socket_create();
+ 	if(ioctl_fd == -1)
+ 		return -1;
+     return 0;
+ }
+ 
+ int do_init()

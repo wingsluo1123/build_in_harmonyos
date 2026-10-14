@@ -1,0 +1,28 @@
+--- a/src/lib/libnvpair/SConscript
++++ b/src/lib/libnvpair/SConscript
+@@ -1,17 +1,18 @@
+ Import('env')
+ 
+-BuildDir('build-user', '.', duplicate = 0)
+-BuildDir('build-kernel', '.', duplicate = 0)
+-
+ objects = Split('libnvpair.c nvpair.c nvpair_alloc_fixed.c nvpair_alloc_system.c')
+-
+-objects_user = ['build-user/' + o for o in objects]
+-objects_kernel = ['build-kernel/' + o for o in objects]
+ 
+ cpppath_user = Split('./include #lib/libsolcompat/include')
+ cpppath_kernel = Split('./include #lib/libumem/include #lib/libnvpair/include1 #lib/libsolcompat/include')
+ 
+ ccflags_kernel = ['-D_KERNEL']
+ 
++envu = env.Clone()
++envu.Append(CPPPATH = cpppath_user)
++envk = env.Clone()
++envk.Append(CPPPATH = cpppath_kernel, CCFLAGS = ccflags_kernel)
++objects_user = [envu.Object('build-user/' + o[:-2] + '.o', o) for o in objects]
++objects_kernel = [envk.Object('build-kernel/' + o[:-2] + '.o', o) for o in objects]
++
+ env.StaticLibrary('libnvpair-user', objects_user, CPPPATH = env['CPPPATH'] + cpppath_user)
+-env.StaticLibrary('libnvpair-kernel', objects_kernel, CPPPATH = env['CPPPATH'] + cpppath_kernel, CCFLAGS = env['CCFLAGS'] + ccflags_kernel)
++env.StaticLibrary('libnvpair-kernel', objects_kernel, CPPPATH = env['CPPPATH'] + cpppath_kernel)

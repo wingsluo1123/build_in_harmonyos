@@ -1,0 +1,34 @@
+--- a/src/lib/libsolcompat/include/unistd_aux.h
++++ b/src/lib/libsolcompat/include/unistd_aux.h
+@@ -20,22 +20,30 @@
+  * CDDL HEADER END
+  */
+ /*
+  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+  * Use is subject to license terms.
+  */
+ 
+ #ifndef _SOL_UNISTD_AUX_H
+ #define _SOL_UNISTD_AUX_H
+ 
++/* OHOS/musl: no gethostid(); real implementation in ohos_compat.c */
++long gethostid(void);
++
+ #include <unistd.h>
++
++/* OHOS/musl: libintl.h is an empty stub; declare the glibc-compatible
++ * dgettext() used by the ZFS i18n code paths. */
++char *dgettext(const char *__domainname, const char *__msgid);
++char *gettext(const char *__msgid);
+ 
+ /* It seems Solaris only returns positive host ids */
+ static inline long fake_gethostid()
+ {
+ 	long id = gethostid();
+ 	return id >= 0 ? id : -id;
+ }
+ 
+-#define gethostid() fake_gethostid()
++/* OHOS/musl: real gethostid() is provided by libsolcompat ohos_compat.c */
+ 
+ #endif
