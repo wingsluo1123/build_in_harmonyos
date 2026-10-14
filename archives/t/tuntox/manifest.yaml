@@ -1,0 +1,23 @@
+# 软件级 manifest — tuntox
+software: tuntox
+display: "tuntox"
+description: "基于 Tox 协议的 TCP 端口转发工具（tuntox 服务端/客户端）"
+category: network
+homepage: "https://github.com/gjedeer/tuntox"
+license: MIT
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "tuntox 为纯 Makefile 应用，仅链接 c-toxcore（pkg-config toxcore + <tox/tox.h>）"
+    - "c-toxcore 未单独适配，配方内 source() 内联下载、build() 用 CMakeToolchain 静态构建其核心（BUILD_TOXAV=OFF）再链接"
+    - "Makefile 用命令行覆盖 CC/CFLAGS/DSO_LDFLAGS；构建 tuntox_nostatic（OHOS musl 无静态 libc）"
+    - "tox_bootstrap.h 已随发布包自带，避免触发联网的 generate_tox_bootstrap.py"
+  common_dependencies:
+    - libsodium
+    - c-toxcore (vendor 内联)
+
+versions:
+  "0.0.10.1":
+    status: building
+    build_date: "2026-10-12"

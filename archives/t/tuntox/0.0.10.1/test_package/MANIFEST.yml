@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: tuntox/0.0.10.1
+homepage: "https://github.com/gjedeer/tuntox"
+
+# 上游测试聚集口径：tuntox 0.0.10.1 经审计确认没有任何自动化测试，注册总数为 0。
+# 声明总和 = 审计确认的真实测试总数（0 表示"无测试"，非"无法确定"）。
+upstream_test_total: 0
+upstream_test_count_method: "audit_no_tests"
+
+# 上游不存在任何测试目标，故无独立 check 命令可声明（审计见 upstream_test_audit）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试套件审计结论:
+# tuntox 0.0.10.1（官方 tag 归档）确无任何自动化测试：
+#   - Makefile 仅含 all/FORCE/tuntox/tuntox_nostatic/cscope.out/clean/install
+#     目标，无 check/test/TESTS/check_PROGRAMS 目标（grep 确认）
+#   - 源码树无 tests/、test/ 目录，无 GTest/CMocka/单元测试框架接入
+#   - .travis.yml 的 `make check` 指 libsodium 的测试（在 tuntox 仓库的
+#     before_script 里 clone libsodium 后执行），并非 tuntox 自身测试；
+#     tuntox 的 CI 仅 `make tuntox_nostatic`
+#   - tox_bootstrap.h / gitversion.h 为构建期生成数据（bootstrap 节点表 /
+#     git 版本号），非测试代码
+# 结论：上游确实没有任何自动化测试，status=no_tests 如实上报。功能行为由
+# test_package 消费者视角对安装产物 tuntox 做实质运行验证覆盖。
+upstream_tests_exist: false
+upstream_test_audit:
+  - path: "Makefile"
+    finding: "上游 Makefile 仅含 all / FORCE / tuntox / tuntox_nostatic / cscope.out / clean / install 目标；grep 确认无 check、test、TESTS、check_PROGRAMS、check-local 等测试目标。"
+  - path: "Makefile.mac"
+    finding: "Mac 专用 Makefile，同样无任何 check/test 测试目标。"
+  - path: "源码树"
+    finding: "发布包无 tests/、test/ 目录，无 *_test.c 源文件，无 GTest/CMocka/TAP 等测试框架配置。"
+  - path: ".travis.yml"
+    finding: "CI 中 `make check` 出现在 before_script 内 clone libsodium 后的步骤（验证 libsodium），tuntox 本体 script 仅 `make tuntox_nostatic`，无 tuntox 测试接入。"
+  - conclusion: "tuntox 0.0.10.1 上游未提供任何自动化测试；由 test_package 以真实运行 tuntox 二进制做消费者视角验证。"
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "运行真实 tuntox 二进制 `-h`：触发 print_version()（内部调用 toxcore 的 tox_version_major/minor/patch —— 真实 toxcore API）与 help() 帮助输出（含 'tuntox - Forward ports over the Tox protocol' 与 'Options:'），验证二进制可运行、toxcore/libsodium 正确链接；另校验 ELF e_machine=aarch64。脚本经 HMBS 注入的 SHELL=/bin/sh 执行（不硬编码 HNP bash，规避 HMFS/HMDFS getcwd 失败）。"
+    command: "bash test.sh <path-to-tuntox-binary>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3

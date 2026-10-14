@@ -1,0 +1,53 @@
+# conandata.yml — tuntox 0.0.10.1
+#
+# 主源码：tuntox 0.0.10.1（官方 tag 归档）
+# 内联依赖：c-toxcore v0.2.19（官方 tag 归档）
+#
+# tuntox 是构建在 c-toxcore 之上的独立应用（`#include <tox/tox.h>` +
+# pkg-config toxcore），c-toxcore 不在 build_in_harmonyos 仓库中单独适配
+# （当前仓库仅提供其依赖 libsodium/1.0.22、libevent/2.1.13）。为满足
+# R36/R27 且避免 missing_dependency 门禁，本配方在 source() 内联下载并在
+# build() 先构建 c-toxcore（BUILD_TOXAV=OFF 静态核），再把 tuntox 链接其上。
+#
+# c-toxcore 版本选择：与 tuntox 0.0.10.1（2022-06）同期稳定版 v0.2.19
+# （2022-05 发布），提供 tox_version_major/minor/patch 等 tuntox 所用 API。
+
+# 源码下载地址：worker 网络无法直连 github.com（连接超时）。按仓库
+# build_and_test.sh 维护的 GitHub 镜像映射，改写为有序 URL 列表：gh-proxy.com
+# 镜像排前，官方 github.com 保留末尾作回退。镜像提供与官方完全相同的归档，
+# sha256 校验不变（各镜像同一归档）。Conan get() 对 url 列表按序尝试。
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/gjedeer/tuntox/archive/refs/tags/0.0.10.1.tar.gz"
+    - "https://github.com/gjedeer/tuntox/archive/refs/tags/0.0.10.1.tar.gz"
+  sha256: "7f04ccf7789467ff5308ababbf24d44c300ca54f4035137f35f8e6cb2d779b12"
+
+toxcore:
+  url:
+    - "https://gh-proxy.com/https://github.com/TokTok/c-toxcore/archive/refs/tags/v0.2.19.tar.gz"
+    - "https://github.com/TokTok/c-toxcore/archive/refs/tags/v0.2.19.tar.gz"
+  sha256: "b770206a5ce59734279ac79f533bebcc8c8ff1d452cdd6628289a49b9200f428"
+
+# c-toxcore v0.2.19 的 git 子模块 third_party/cmp（github.com/camgunz/cmp，
+# TOKTOK 在 v0.2.19 锁定提交 643e6a62）：GitHub 源码 tarball 不打包子模块，
+# 而 c-toxcore 的 CMakeLists 把 third_party/cmp/cmp.c/.h 列入 toxcore_SOURCES，
+# 缺失会导致 configure 阶段 "Cannot find source file: third_party/cmp/cmp.c"。
+# 故按锁定提交单独内联下载并解包到 third_party/cmp（E大头）。
+cmp:
+  url:
+    - "https://gh-proxy.com/https://github.com/camgunz/cmp/archive/643e6a62d4eb0ec2277de269cda33da02cba2756.tar.gz"
+    - "https://github.com/camgunz/cmp/archive/643e6a62d4eb0ec2277de269cda33da02cba2756.tar.gz"
+  sha256: "80d4ff97cbf958d0457ccfd6a98710ae079f3029cc04a5de0b0b82c8d9187364"
+
+patches:
+  # c-toxcore 0.2.19 LAN_discovery.c 在含 <sys/socket.h> 的情况下再 include
+  # <linux/if.h>，后者经 <linux/socket.h> 重复定义 sockaddr_storage（musl 的
+  # <sys/socket.h> 已定义），在 OHOS 编译 LAN_discovery.c 时报 redefinition。
+  # 改为使用 POSIX 的 <net/if.h>（仍提供 ifreq/ifconf/SIOCGIFCONF/SIOCGIFBRDADDR），
+  # 不再拉入内核的 <linux/socket.h>。该改动对标准 glibc/musl Linux 同样正确，非
+  # OHOS 专属宏。
+  - patch_file: "patches/toxcore-lan-discovery-net-if.patch"
+    base_path: "third_party/toxcore"
+    strip: 1
+    patch_type: "portability"
+    patch_description: "replace <linux/if.h> with <net/if.h> in c-toxcore LAN_discovery.c (sockaddr_storage redefinition on musl/OHOS headers)"
