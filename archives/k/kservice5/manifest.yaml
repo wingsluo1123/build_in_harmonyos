@@ -1,0 +1,30 @@
+software: kservice5
+display: "kservice5"
+description: "KDE Frameworks 5 服务/插件元数据与应用程序数据库（Qt5，含 kbuildsycoca5）"
+category: system
+homepage: "https://invent.kde.org/frameworks/kservice"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF5/Qt5 模块；CMakeDeps 以 cmake_file_name=Qt5 重建聚合 Qt5Config（qt5-qtbase 只发每模块 config）"
+    - "发布版 KF5 5.116.0 分布在两条 Qt5 基线上，需 force=True 统一到 qt5-qtbase/5.15.2.2（kjobwidgets5/5.116.0 已记录同一冲突与同一处置）"
+    - "Trader 解析器由 flex/bison 在构建期生成，二者为上游 REQUIRED；在本机原生构建的农场里按宿主依赖声明，经 CMAKE_PROGRAM_PATH 供 find_program 定位"
+    - "ki18n5 的 KF5I18nConfig.cmake 会 find_package(Gettext)，FindGettext 只查 PATH，需显式传入 GETTEXT_MSGFMT/MSGMERGE_EXECUTABLE"
+    - "mmap / posix_madvise 的 CMake 探测在本平台全部失败，需以 cache 变量直接给出经 sysroot 核实的结果"
+    - "上游 ctest 套件经 Conan 的 conanrun 运行环境执行"
+  common_dependencies:
+    - "qt5-qtbase/5.15.2.2"
+    - "kconfig5/5.116.0"
+    - "kcoreaddons5/5.116.0.1"
+    - "kdbusaddons5/5.116.0"
+    - "ki18n5/5.116.0"
+    - "flex/2.6.4.2"
+    - "bison/3.8.2"
+    - "m4/1.4.19"
+    - "ecm/6.26.0"
+
+versions:
+  "5.116.0":
+    status: adapting

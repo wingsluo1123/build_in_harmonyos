@@ -1,0 +1,17 @@
+--- a/src/sycoca/kbuildsycoca.cpp
++++ b/src/sycoca/kbuildsycoca.cpp
+@@ -469,9 +469,14 @@
+         qCDebug(SYCOCA) << "Database is up to date";
+     }
+ 
++#ifndef QT_NO_SHAREDMEMORY
++    // KMemFile only exists when Qt was built with the sharedmemory feature;
++    // kmemfile_p.h guards the whole class with this same macro, and the
++    // sibling use in ksycoca.cpp is guarded the same way.
+     if (d->m_sycocaStrategy == KSycocaPrivate::StrategyMemFile) {
+         KMemFile::fileContentsChanged(path);
+     }
++#endif
+ 
+     delete m_ctimeDict;
+     delete m_allEntries;

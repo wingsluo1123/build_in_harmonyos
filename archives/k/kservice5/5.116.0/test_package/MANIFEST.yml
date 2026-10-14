@@ -1,0 +1,100 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# kservice5 5.116.0 上游测试：autotests/ 下 11 个 ecm_add_test 注册的 QTest 类，
+# 合计 78 个用例（private Q_SLOTS，已排除 initTestCase/cleanupTestCase/init/cleanup
+# 与 *_data 数据提供函数）。全部已并入 conanfile build() 的 `ctest` 调用。
+
+package: kservice5/5.116.0
+homepage: "https://invent.kde.org/frameworks/kservice"
+
+# 上游测试命令
+upstream_check_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# 上游实际运行的测试用例。
+# 注册方式：autotests/CMakeLists.txt 的 KSERVICE_UNIT_TESTS 宏与
+# kmimeassociationstest 的 ecm_add_test；tests/pluginlocator 另注册一个。
+# count/count_unit 为该测试类的 QTest 用例数。
+upstream_tests:
+  - file: autotests/kservicetest.h
+    source: kservice-5.116.0/autotests/
+    count: 34
+    count_unit: cases
+    description: "KServiceTest — KService 构造/属性/trader/DBus 启动/线程等 34 个用例（RUN_SERIAL）"
+    command: "ctest -R kservicetest"
+  - file: autotests/ksycocatest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 9
+    count_unit: cases
+    description: "KSycocaTest — ksycoca 缓存有效性/重建/资源目录 9 个用例（RUN_SERIAL）"
+    command: "ctest -R ksycocatest"
+  - file: autotests/kmimeassociationstest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 8
+    count_unit: cases
+    description: "KMimeAssociationsTest — mime 关联继承/移除 8 个用例"
+    command: "ctest -R kmimeassociationstest"
+  - file: autotests/kautostarttest.h
+    source: kservice-5.116.0/autotests/
+    count: 7
+    count_unit: cases
+    description: "KAutostartTest — 自启动检测/注册/移除 7 个用例"
+    command: "ctest -R kautostarttest"
+  - file: autotests/kapplicationtradertest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 5
+    count_unit: cases
+    description: "KApplicationTraderTest — 应用 trader 约束/MIME 查询/线程 5 个用例（RUN_SERIAL）"
+    command: "ctest -R kapplicationtradertest"
+  - file: autotests/ktoolinvocation_x11test.cpp
+    source: kservice-5.116.0/autotests/
+    count: 4
+    count_unit: cases
+    description: "KToolInvocationTest — 终端条目解析 4 个用例（UNIX）"
+    command: "ctest -R ktoolinvocation_x11test"
+  - file: autotests/kplugininfotest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 3
+    count_unit: cases
+    description: "KPluginInfoTest — desktop 加载与 KPluginMetaData 互转 3 个用例"
+    command: "ctest -R kplugininfotest"
+  - file: autotests/kplugintradertest.h
+    source: kservice-5.116.0/autotests/
+    count: 3
+    count_unit: cases
+    description: "KPluginTraderTest — 插件查找/加载 3 个用例"
+    command: "ctest -R kplugintradertest"
+  - file: autotests/ksycocathreadtest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 3
+    count_unit: cases
+    description: "KSycocaThreadTest — 多线程下服务创建/删除 3 个用例"
+    command: "ctest -R ksycocathreadtest"
+  - file: autotests/ksycoca_xdgdirstest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 1
+    count_unit: cases
+    description: "KSycocaXdgDirsTest — 非默认 XDG 目录下的 sycoca 1 个用例"
+    command: "ctest -R ksycoca_xdgdirstest"
+  - file: autotests/ksycocadicttest.cpp
+    source: kservice-5.116.0/autotests/
+    count: 1
+    count_unit: cases
+    description: "KSycocaDictTest — sycoca 字典 1 个用例"
+    command: "ctest -R ksycocadicttest"
+
+# test_package 中自带的测试（消费者视角验证，调用已安装库）
+test_package_tests:
+  - file: test_kservice5.cpp
+    count: 7
+    count_unit: cases
+    description: >-
+      消费者测试 — 用公开的 KService(name, exec, icon) 构造临时服务，校验
+      isApplication/name/exec/icon 往返、第二个实例不污染第一个、拷贝构造保持字段。
+    command: "./test_kservice5"
+
+# 上游测试用例总数（= 78；见上方各类 count 之和 34+9+8+7+5+4+3+3+3+1+1）
+assertion_count: 78
