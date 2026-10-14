@@ -1,0 +1,93 @@
+From: PAPPL OHOS port
+Subject: [PATCH] Guard pthread cancellation call sites with feature macros
+
+OHOS bionic libc does not provide pthread_cancel() or
+pthread_setcancelstate(). Detect both functions via AC_CHECK_FUNCS and
+compile the four call sites in the USB printer gadget code out when they
+are absent. The IPP-USB gadget worker threads already terminate on their
+own when the printer is deleted or the system shuts down, so skipping the
+cancellation keeps the same observable behavior on platforms without
+thread cancellation.
+
+---
+--- a/configure.ac
++++ b/configure.ac
+@@ -207,6 +207,9 @@
+ done
+ 
+ 
++
++dnl Check for pthread cancellation functions (absent on Android/OHOS bionic libc)...
++AC_CHECK_FUNCS([pthread_cancel pthread_setcancelstate])
+ dnl DNS-SD support...
+ AC_ARG_WITH([dnssd], AS_HELP_STRING([--with-dnssd=LIBRARY], [set DNS-SD library (auto, avahi, mdnsresponder)]))
+ PKGCONFIG_AVAHI=""
+
+--- a/config.h.in
++++ b/config.h.in
+@@ -63,6 +63,11 @@
+ #undef HAVE_PAM_PAM_APPL_H
+ 
+ 
++// Thread cancellation (absent on Android/OHOS bionic libc)
++#undef HAVE_PTHREAD_CANCEL
++#undef HAVE_PTHREAD_SETCANCELSTATE
++
++
+ // String functions
+ #undef HAVE_STRLCPY
+ 
+
+--- a/pappl/printer-usb.c
++++ b/pappl/printer-usb.c
+@@ -777,13 +777,17 @@
+ 
+   if (iface->host_thread)
+   {
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_cancel(iface->host_thread);
++#endif // HAVE_PTHREAD_CANCEL
+     iface->host_thread = 0;
+   }
+ 
+   if (iface->device_thread)
+   {
++#ifdef HAVE_PTHREAD_CANCEL
+     pthread_cancel(iface->device_thread);
++#endif // HAVE_PTHREAD_CANCEL
+     iface->device_thread = 0;
+   }
+ 
+@@ -1191,7 +1195,9 @@
+   const char	*hostptr;		// Pointer into buffer
+   size_t	hostlen;		// Number of bytes in host buffer
+   ssize_t	bytes;			// Bytes read
++#ifdef HAVE_PTHREAD_CANCEL
+   int		cstate;			// Thread cancellation state
++#endif // HAVE_PTHREAD_CANCEL
+ 
+ 
+   papplLogPrinter(iface->printer, PAPPL_LOGLEVEL_INFO, "IPP-USB%d: Starting.", iface->number);
+@@ -1202,7 +1208,9 @@
+     if ((bytes = read(iface->ipp_to_device, hostbuf, sizeof(hostbuf))) > 0)
+     {
+       // Pause thread cancellation...
++#ifdef HAVE_PTHREAD_SETCANCELSTATE
+       pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cstate);
++#endif // HAVE_PTHREAD_SETCANCELSTATE
+ 
+       // Got data from the host, send it to the local socket...
+       if (iface->ipp_sock < 0)
+@@ -1301,8 +1309,11 @@
+ 
+       // Resume cancellation...
+       resume:
+-
++      ;				// Statement so the label is valid when cancellation is compiled out
++
++#ifdef HAVE_PTHREAD_SETCANCELSTATE
+       pthread_setcancelstate(cstate, NULL);
++#endif // HAVE_PTHREAD_SETCANCELSTATE
+     }
+     else
+     {

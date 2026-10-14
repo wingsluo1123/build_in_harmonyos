@@ -1,0 +1,40 @@
+From: PAPPL OHOS port
+Subject: [PATCH] testsuite: fall back to loopback when the system hostname is unresolvable
+
+papplSystemSetHostName(system, NULL) qualifies the auto-detected hostname
+with the ".local" mDNS domain ("localhost.local"). On hosts without an
+mDNS responder (such as OHOS) that name cannot be resolved, so the remote
+connection path used by the jpeg/png image tests always failed with
+"Name does not resolve". Retry against the loopback name before giving
+up so the client tests still exercise the full print path.
+
+---
+--- a/testsuite/testpappl.c
++++ b/testsuite/testpappl.c
+@@ -860,6 +860,7 @@
+     size_t         urisize)		// I - Size of URI buffer
+ {
+   char	host[1024];			// Hostname
++  http_t	*http;			// Connection
+ 
+ 
+   if (remote)
+@@ -869,7 +870,17 @@
+ 
+   httpAssembleURI(HTTP_URI_CODING_ALL, uri, (cups_len_t)urisize, "ipp", NULL, host, papplSystemGetHostPort(system), "/ipp/print");
+ 
+-  return (httpConnect(host, papplSystemGetHostPort(system), NULL, AF_UNSPEC, HTTP_ENCRYPTION_IF_REQUESTED, 1, 30000, NULL));
++  if ((http = httpConnect(host, papplSystemGetHostPort(system), NULL, AF_UNSPEC, HTTP_ENCRYPTION_IF_REQUESTED, 1, 30000, NULL)) == NULL && strcmp(host, "localhost"))
++  {
++    // The auto-detected system hostname is an mDNS-style name
++    // ("<hostname>.local") that cannot be resolved on hosts without an
++    // mDNS responder - fall back to the loopback name for client tests...
++    papplCopyString(host, "localhost", sizeof(host));
++    httpAssembleURI(HTTP_URI_CODING_ALL, uri, (cups_len_t)urisize, "ipp", NULL, host, papplSystemGetHostPort(system), "/ipp/print");
++    http = httpConnect(host, papplSystemGetHostPort(system), NULL, AF_UNSPEC, HTTP_ENCRYPTION_IF_REQUESTED, 1, 30000, NULL);
++  }
++
++  return (http);
+ }
+ 
+ 
