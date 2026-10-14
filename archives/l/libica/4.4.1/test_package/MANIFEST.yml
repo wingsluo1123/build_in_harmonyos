@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libica/4.4.1
+homepage: "https://github.com/opencryptoki/libica"
+
+# 上游测试命令
+# libica 使用 autotools + 自带 test/ 目录（48 个 .c 用例），
+# 但全部用例无一可在 aarch64 执行：库本体依赖 s390 内联汇编、
+# s390 专属内核头 <asm/zcrypt.h> 与大型机密码卡 /dev/zcrypt，
+# 在 aarch64 上既无法构建、也无对应硬件。
+# 详见 reports/unadaptable-assessment.md §3.3 与 reports/raw-logs/。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：aarch64 上可执行数为 0
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+# 作用域说明：本包是「失败适配记录包」，故 test_package 校验的是
+# *记录本身*（完整性、真实性、证据一致、计数可从原始日志重算），
+# 而非 libica 库的功能 —— 该库在 aarch64 上不可能构建。
+test_package_tests:
+  - file: test_failed_adaptation_record.py
+    description: >-
+      消费者端到端校验失败适配记录包：记录文件齐全、status: failed 与
+      failure.class 真实、manifest 引用的每个证据路径可在包内解析、
+      失败计数从包内原始日志重新计算(39/51/24)并与证据摘要一致、
+      测试账目真实(0/48)、三类架构级根因有文档、且未夹带伪造的
+      lib/include 产物。
+    command: "python3 test_failed_adaptation_record.py <package_folder>"
+
+# 测试断言数：test_package 20 项 + 上游 0 项 = 20。
+#
+# 口径说明（务必按此复核，否则会数错）：
+#   源码静态 [ok] 打印点 **18 处**（grep -c 'print(.*\[ok\]' 得 18）；
+#   其中仅 1 处（"present: {name}"）位于循环内、按记录文件列表展开为 3 行，
+#   其余 17 处各 1 行：3 + 17 = 20。
+#   注意：证据引用校验只打印**一条聚合行**（"all N cited evidence paths…"），
+#   故增删 manifest 的 evidence/raw_logs 字段**不会**改变本计数。
+# 机械复核须对**运行时输出**计数，不要对源码 grep：
+#   python3 test_failed_adaptation_record.py <pkg> | grep -c '\[ok\]'   -> 20
+assertion_count: 20

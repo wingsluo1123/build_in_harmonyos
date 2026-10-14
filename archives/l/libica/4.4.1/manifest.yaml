@@ -1,0 +1,89 @@
+software: libica
+version: "4.4.1"
+status: failed
+build_date: "2026-10-04"
+build_system: autotools
+
+source:
+  url: "https://github.com/opencryptoki/libica/archive/refs/tags/v4.4.1.tar.gz"
+  sha256: "edc755494797331427c5f7900c7eecd8b5ecd3e69b7502313bf764f490b8e87a"
+  tar_format: tar.gz
+
+target:
+  os: OpenHarmony
+  arch: aarch64
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# 仓库通用测试账目字段（与既有 status: failed 记录口径一致，便于下游聚合）。
+# 数值闭合：passed + failed + skipped = total = 48。
+test_results:
+  # 口径说明：passed/failed/skipped 描述的是【用例执行】结果，不是构建结果。
+  #   failed: 0  ≠  构建成功。构建期 39 处编译错误属另一维度，见下方 failure
+  #   段与 reports/raw-logs/ica_makeF.log；此处 48 个用例全部「未获执行机会」
+  #   （库本体构建失败，无二进制可跑），故计 skipped 而非 failed，避免把
+  #   "无法执行"误报成"执行后失败"。
+  total: 48
+  passed: 0
+  failed: 0
+  skipped: 48
+  skipped_reason: >-
+    aarch64 上 0/48 可执行：库本体依赖 s390 内联汇编、s390 专属内核头
+    <asm/zcrypt.h> 与大型机密码卡 /dev/zcrypt，既无法构建亦无对应硬件。
+    48 与 5 的枚举过程见 reports/raw-logs/ica_test_enum.log。
+    可机械复核：grep -c 'error:' reports/raw-logs/ica_makeF.log -> 39
+
+# 详细账目（本记录特有：区分"上游用例总数"与"aarch64 上可执行数"）
+tests:
+  upstream_total: 48
+  upstream_executable_on_aarch64: 0
+  # 48 的枚举凭据：见 failure.raw_logs 目录下的 ica_test_enum.log
+  upstream_no_hw_reference: 5
+  upstream_hw_bound: 43
+
+failure_reason: >-
+  libica 是 IBM Z (s390x) 大型机专用硬件密码库，其实现绑定 s390 通用寄存器
+  内联汇编、s390 专属内核头 <asm/zcrypt.h> 与大型机密码卡设备 /dev/zcrypt；
+  上游不提供任何架构中立或软件后端，故在 aarch64 上不存在可适配路径。
+
+# 构建环境（可复现性锚点）
+# ⚠️ 证据强度分级，勿一概而论：
+#   host_triplet  —— 强证据：ica_confF.log 第 74 行 "checking host system type..."
+#                    直接给出该值，可逐字复核。该行内容由 test_package 机械断言
+#                    （见下方 host_triplet_evidence 的裸键声明）。
+#   sdk / cc_version —— **弱证据（未随包日志佐证）**：这两项来自构建机
+#                    OpenHarmony SDK 环境，原始日志只记录了编译器**路径**
+#                    （.../llvm/bin/aarch64-unknown-linux-ohos-clang），
+#                    **不含**版本串（实测 "15.0.x" 在该日志中出现 0 次）。
+#                    故此处为**环境描述**而非可复算证据，标注为未核实来源，
+#                    以免与 reports/ 中的可复算计数混为一谈。
+build_env:
+  sdk: "OpenHarmony 6.0.0.47"
+  sdk_evidence: "none-in-package (build-host SDK env; not reproduced by the shipped logs)"
+  cc_version: "clang 15.0.4"
+  cc_version_evidence: "none-in-package (log records the compiler path only, no version string)"
+  host_triplet: "aarch64-unknown-linux-ohos"
+  # NOTE: prefixed keys such as the *_evidence ones here are NOT consumed by
+  # EVIDENCE_REF_RE -- they are documentation only.  Anything that must be
+  # mechanically validated is therefore declared under a BARE key, which is why
+  # the host-triplet provenance below is repeated as `evidence` + the
+  # explicitly-checked `host_triplet_line` / `host_triplet_line_text` pair.
+  host_triplet_evidence: "reports/raw-logs/ica_confF.log line 74: 'checking host system type... aarch64-unknown-linux-ohos'"
+  host_triplet_line: 74
+  host_triplet_line_text: "checking host system type... aarch64-unknown-linux-ohos"
+  evidence: "reports/raw-logs/ica_confF.log"
+
+# 失败性质：结构性不可适配（架构绑定），非工具链/配置问题
+failure:
+  class: env_unsupported
+  reason: >-
+    libica 是 IBM Z (s390x) 大型机专用硬件密码库，其实现绑定 s390 通用寄存器
+    内联汇编、s390 专属内核头 <asm/zcrypt.h> 与大型机密码卡设备 /dev/zcrypt；
+    上游不提供任何架构中立或软件后端，故在 aarch64 上不存在可适配路径。
+  evidence: "reports/unadaptable-assessment.md"
+  raw_logs: "reports/raw-logs/"

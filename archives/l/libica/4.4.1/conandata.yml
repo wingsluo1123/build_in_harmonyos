@@ -1,0 +1,29 @@
+# ============================================================================
+# 注意：本文件是【记录性元数据】，不是 Conan 的构建输入。
+#
+# 本配方没有 source() 方法，不读 self.conan_data，也不调用
+# apply_conandata_patches()/patch()；下面的 sources/patches 字段无任何代码
+# 消费，仅用于如实说明"这次评估用的是哪个上游、对它做过什么"。
+#
+# 特别说明 patches：libica 源码本身**未做任何改动**，唯一的改动是对
+# autotools 自带三元组脚本的兼容性补丁，且**由手工构建流程完成**，
+# 记录在 reports/raw-build-failure.txt 与 unadaptable-assessment.md §6.3。
+# 请勿误以为 Conan 会自动应用它。
+# ============================================================================
+sources:
+  url: "https://github.com/opencryptoki/libica/archive/refs/tags/v4.4.1.tar.gz"
+  sha256: "edc755494797331427c5f7900c7eecd8b5ecd3e69b7502313bf764f490b8e87a"
+patches:
+  # 记录性字段（无代码消费）——详见本文件顶部说明。
+  # 目的：让 configure 接受 OHOS 三元组 aarch64-unknown-linux-ohos，
+  # 从而把"编译失败"可归因于 libica 自身源码，而非本机 config.sub 太旧。
+  # 与之对应：configure 打补丁后 exit=0（成功识别 host），
+  # 随后 make 仍在 libica 源码处失败。
+  config_sub_triplet_compat:
+    files:
+      - "config.sub"
+      - "config.guess"
+    reason: "使 configure 接受 aarch64-unknown-linux-ohos 三元组"
+    affects_upstream_source: false
+    applied_by: "manual build procedure (see reports/unadaptable-assessment.md 6.3)"
+
