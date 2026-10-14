@@ -1,0 +1,104 @@
+# 版本级 manifest — oed 7.4
+# 文件位置: archives/o/oed/7.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "7.4"
+
+# 软件名
+software: "oed"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-12"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游 GitHub Releases 官方发布资产）
+  url: "https://github.com/ibara/oed/releases/download/oed-7.4/oed-7.4.tar.gz"
+
+  # 源码校验和
+  sha256: "31662ce90797a7de13f6b409d562ce32a4da291d304e9a4b0a6dc70d45953d16"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  # 上游自带手写 POSIX sh configure（非 autoconf），生成纯 Makefile
+  system: custom
+
+  # 上游手写 configure 接受 --prefix/--mandir/--cc/--cflags/--ldflags/
+  # --program-name/--enable-lto/--enable-static。--prefix 由 conan 注入，
+  # --cc 取自 tools.build:compiler_executables.c（默认 clang），
+  # --program-name 为产物名防漂移（见 patch/知识条目 E9122）。
+  configure_options:
+    - "--program-name=ed"
+
+  # 编译依赖列表（格式: name/version）
+  # oed 仅依赖系统 libc，无外部依赖
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-buf.c.patch"
+  - "0002-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "HarmonyOS PC 的 /tmp 是 erofs 只读挂载（/var/tmp、/dev/shm、/data/local/tmp 同样不可写），硬编码 /tmp 作为 scratch 目录的程序在鸿蒙上完全不可用（knowledge_ref: E9121）"
+  - "通用解法：scratch 目录按 $TMPDIR → 内置目录 → $HOME 的候选链回退，/tmp 可写平台行为不变（无平台宏，knowledge_ref: E9121）"
+  - "上游 configure 用 command -v ed 决定安装名（ed/oed），非确定性，需 --program-name 固定（knowledge_ref: E9122）"
+
+# 关联知识条目（仓内风格：独立顶层键）
+knowledge_ref:
+  - "E9121"
+  - "E9122"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/oed-7.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/oed-7.4.work
+  source_orig_hash: 87d1e0e0862576aa
+  source_work_hash: 1aeac2510ee3a15c
+  generated_at: '2026-10-12T16:21:25'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-buf.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

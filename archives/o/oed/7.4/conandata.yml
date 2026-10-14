@@ -1,0 +1,20 @@
+# conandata.yml — oed 7.4
+# 上游官方发布源（GitHub Releases，R39 权威源）
+sources:
+  url: "https://github.com/ibara/oed/releases/download/oed-7.4/oed-7.4.tar.gz"
+  sha256: "31662ce90797a7de13f6b409d562ce32a4da291d304e9a4b0a6dc70d45953d16"
+
+patches:
+  - patch_file: "patches/0001-buf.c.patch"
+    patch_description: >-
+      scratch 文件目录可移植化：open_sbuf() 依次尝试 $TMPDIR、编译期内置目录、
+      $HOME。HarmonyOS PC 的 /tmp 是 erofs 只读挂载，上游硬编码的
+      /tmp/ed.XXXXXXXXXX 无法创建，导致 ed 每次启动即 "cannot open temp file"。
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure.patch"
+    patch_description: >-
+      configure 用 -I. 取代 -I$(pwd)：getcwd() 失败的环境下 $(pwd) 展开为空，
+      -I 变成无参数被编译器探测丢弃，树内 regex.h（其 #include "config.h" 带来
+      configure 写入的 extern reallocarray 声明）不再被 <regex.h> 命中，
+      clang 16+ 对 glbl.c 报隐式声明导致的 int 转指针错误。
+    patch_type: "portability"

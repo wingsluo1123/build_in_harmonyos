@@ -1,0 +1,70 @@
+--- a/buf.c
++++ b/buf.c
+@@ -191,35 +191,62 @@
+ 		}
+ 	}
+ 	SPL0();
+ 	return lp;
+ }
+ 
+ 
+ extern int newline_added;
+ 
+ #ifdef __TERMUX__
+-#define SCRATCH_TEMPLATE      "/data/data/com.termux/files/usr/tmp/ed.XXXXXXXXXX"
++#define SCRATCH_DIR           "/data/data/com.termux/files/usr/tmp"
+ #else
+-#define SCRATCH_TEMPLATE      "/tmp/ed.XXXXXXXXXX"
++#define SCRATCH_DIR           "/tmp"
+ #endif
+-static char sfn[sizeof(SCRATCH_TEMPLATE)+1] = "";	/* scratch file name */
++#define SCRATCH_NAME          "ed.XXXXXXXXXX"
++#define SCRATCH_TEMPLATE      SCRATCH_DIR "/" SCRATCH_NAME
++static char sfn[PATH_MAX] = "";		/* scratch file name */
+ 
+ /* open_sbuf: open scratch file */
+ int
+ open_sbuf(void)
+ {
+ 	int fd = -1;
++	size_t i, ndirs = 0;
++	const char *dirs[3];
++	const char *tmpdir, *home;
+ 
+ 	isbinary = newline_added = 0;
+-	strlcpy(sfn, SCRATCH_TEMPLATE, sizeof sfn);
+-	if ((fd = mkstemp(sfn)) == -1 ||
++	/*
++	 * Some systems mount /tmp read-only (e.g. HarmonyOS), where the
++	 * compiled-in template is not writable.  Try $TMPDIR, then the
++	 * compiled-in directory, then $HOME so that ed stays usable there.
++	 * On systems with a writable /tmp the first attempt succeeds and
++	 * behaviour is unchanged.
++	 */
++	tmpdir = getenv("TMPDIR");
++	home = getenv("HOME");
++	if (tmpdir != NULL && *tmpdir != '\0')
++		dirs[ndirs++] = tmpdir;
++	dirs[ndirs++] = SCRATCH_DIR;
++	if (home != NULL && *home != '\0')
++		dirs[ndirs++] = home;
++	for (i = 0; i < ndirs; i++) {
++		if (strlen(dirs[i]) + 1 + strlen(SCRATCH_NAME) >= sizeof sfn)
++			continue;
++		snprintf(sfn, sizeof sfn, "%s/%s", dirs[i], SCRATCH_NAME);
++		if ((fd = mkstemp(sfn)) != -1)
++			break;
++	}
++	if (fd == -1)
++		strlcpy(sfn, SCRATCH_TEMPLATE, sizeof sfn);
++	if (fd == -1 ||
+ 	    (sfp = fdopen(fd, "w+")) == NULL) {
+ 		if (fd != -1)
+ 			close(fd);
+ 		perror(sfn);
+ 		seterrmsg("cannot open temp file");
+ 		return ERR;
+ 	}
+ 	return 0;
+ }
+ 
