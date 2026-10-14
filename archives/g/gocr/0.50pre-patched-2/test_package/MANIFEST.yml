@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: gocr/0.50pre-patched-2
+homepage: "https://sourceforge.net/projects/osra/files/gocr-patched/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# gocr 没有 autotools/cmake 测试套件；上游用 shell 脚本 bin/gocr_chk.sh
+# 对比 examples/ 中的样例图与同名 .txt 期望输出（脚本本身依赖 netpbm 的
+# pngtopnm/djpeg 做 png/jpg 解码，本镜像不含，故按 R51 用等价方式逐样例运行）。
+upstream_check_command: "bin/gocr_chk.sh examples/"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（examples/ 共 7 组 图+期望文本，本镜像可跑 6 组 PNG；
+# handwrt1.jpg 需 JPEG 解码器，未运行）
+upstream_tests:
+  - file: examples/4x6.txt
+    source: gocr-0.50pre-patched-2/examples/4x6.txt
+    description: "OCR-A 4x6 font sample (expected recognition output)"
+    command: "gocr -i examples/4x6.pgm"
+  - file: examples/5x7.png.txt
+    source: gocr-0.50pre-patched-2/examples/5x7.png.txt
+    description: "OCR-A 5x7 font sample (expected recognition output)"
+    command: "gocr -i examples/5x7.pgm"
+  - file: examples/5x8.png.txt
+    source: gocr-0.50pre-patched-2/examples/5x8.png.txt
+    description: "OCR-A 5x8 font sample (expected recognition output)"
+    command: "gocr -i examples/5x8.pgm"
+  - file: examples/ocr-a.txt
+    source: gocr-0.50pre-patched-2/examples/ocr-a.txt
+    description: "OCR-A font full alphabet sample (expected recognition output)"
+    command: "gocr -i examples/ocr-a.pgm"
+  - file: examples/ocr-a-subset.png.txt
+    source: gocr-0.50pre-patched-2/examples/ocr-a-subset.png.txt
+    description: "OCR-A font subset sample (expected recognition output)"
+    command: "gocr -i examples/ocr-a-subset.pgm"
+  - file: examples/ocr-b.png.txt
+    source: gocr-0.50pre-patched-2/examples/ocr-b.png.txt
+    description: "OCR-B font sample incl. german umlauts (expected recognition output)"
+    command: "gocr -i examples/ocr-b.pgm"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_gocr.cpp
+    description: "Consumer test: link libPgm2asc and run the OSRA API sequence (job_init/job_init_image/pgm2asc/getTextLine/decode/free_textlines)"
+    command: "./test_gocr <pattern.pgm>"
+  - file: test_gocr.cpp
+    description: "End-to-end CLI check: the packaged gocr binary reads the PGM pattern written by the test"
+    command: "gocr -i <pattern.pgm>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8

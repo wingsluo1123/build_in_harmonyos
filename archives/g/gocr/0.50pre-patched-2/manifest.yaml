@@ -1,0 +1,68 @@
+# manifest.yaml — gocr 0.50pre-patched-2 (版本级)
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.50pre-patched-2"
+software: gocr
+status: built
+build_date: "2026-10-13"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # OSRA 项目发布的 patched GOCR 快照（上游官方分发点）
+  url: "https://downloads.sourceforge.net/project/osra/gocr-patched/gocr-0.50pre-patched-2.tgz"
+  sha256: "3ff73f03845878a4f08585b25d1e2b690e3f2d03bb4df1bbebb2ae2ead25287a"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--without-netpbm"
+    - "ac_cv_func_setvbuf_reversed=no"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS/HMDFS: autoconf 的 config.status 用 `umask 077 && mktemp -d ./confstatXXXXXX` 建临时目录，在本机文件系统上该 0700 目录对写入进程不可写，configure 会静默产出半截 Makefile/config.h；把 configure 中两处 umask 077 改为 022 即可（knowledge_ref: E011）"
+  - "gocr 的 `make` 只编译 gocr CLI，OSRA 需要的库必须显式 `make libs`（产出 libPgm2asc.a）；因此 conanfile 的 build() 要额外跑一次 make target=libs（reference: https://sourceforge.net/projects/osra/files/gocr-patched/ README）"
+  - "gocr 的手写 Makefile.in 不支持 VPATH/out-of-source（规则里 `Makefile: Makefile.in configure` 是相对构建目录的），conan 必须 in-source 构建：`basic_layout(self, build_folder=\".\")`，否则 make 报 `No rule to make target 'Makefile.in'`（reference: gocr-0.50pre-patched-2/Makefile.in）"
+  - "gocr 只认 PNM/PCX；PNG/JPEG 输入依赖外部 netpbm 转换器（pngtopnm/djpeg）。OSRA 是用库 API（pgm2asc）喂自己的位图，所以 --without-netpbm 不影响 OSRA，也免除 netpbm 依赖（reference: gocr-0.50pre-patched-2/src/pnm.c）"
+  - "libPgm2asc 的消费者约定：头文件需平铺在 include/（OSRA 用 <pgm2asc.h>/<gocr.h>），C++ 侧要自己 extern \"C\" 包裹；job_free_image() 会 free() 掉 job.src.p.p，所以调用方必须用 malloc 分配位图（reference: gocr-0.50pre-patched-2/src/job.c）"
+
+# ============================================================
+# 补丁生成 / 分类（refresh-patch --auto 写入）
+# ============================================================
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/gocr-0.50pre-patched-2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/gocr-0.50pre-patched-2.work
+  source_orig_hash: 322265984184ae27
+  source_work_hash: af717e2a040e4cbb
+  generated_at: '2026-10-13T17:55:36'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: platform
+    platform_only: true
+    guard: none
