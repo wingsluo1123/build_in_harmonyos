@@ -1,0 +1,56 @@
+package: 4ti2/1.6.10.1
+homepage: "https://4ti2.de/"
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: "make check -k -j1 (OHOS real device, 2026-10-04)"
+upstream_tests:
+  - file: test/check.template.in
+    source: 4ti2-1.6.10/test/check.template.in
+    description: "Main CLI test driver (configure generates check.template). 185 physical .chk files expand, via 30 check.template invocations across 23 test dirs, to 253 check.template tool calls; plus 3 ppi check-ppi calls = 256 total CLI tool calls."
+    result: "256/256 passed (100.0%), 0 failed. Baseline when GMP C++ is unavailable is 235 calls (the 21 calls in groebner/gmp, markov/gmp, qsolve/gmp are gated by HAVE_GMP_WITH_CXX); 1.6.10 reached 231/235 there."
+  - file: test/walk/Makefile.am
+    source: 4ti2-1.6.10/test/walk/Makefile.am
+    description: "walk -p arb CLI cases (344, cuww1, grin, prob20) — unconditional check-arb line; in 1.6.10 they ran but failed at runtime (4ti2gmp missing)"
+    result: "4/4 passed: walk -p arb -q {344,cuww1,grin,prob20} ... passed"
+  - file: test/qsolve/api/qsolve_main.cpp
+    source: 4ti2-1.6.10/test/qsolve/api/qsolve_main.cpp
+    description: "qsolve C API reference test (INT_64, verifies 4x3 qhom matrix)"
+    result: "PASS (automake TESTS, test-suite.log # PASS: 3)"
+  - file: test/qsolve/api/rays_main.cpp
+    source: 4ti2-1.6.10/test/qsolve/api/rays_main.cpp
+    description: "rays C API test"
+    result: "PASS (automake TESTS)"
+  - file: test/qsolve/api/circuits_main.cpp
+    source: 4ti2-1.6.10/test/qsolve/api/circuits_main.cpp
+    description: "circuits C API test"
+    result: "PASS (automake TESTS)"
+  - file: test/qsolve/api/test_input_conversion_64.cpp
+    source: 4ti2-1.6.10/test/qsolve/api/test_input_conversion_64.cpp
+    description: "test_input_conversion_64_to_gmp: int64 -> GMP arbitrary-precision conversion API test (links lib4ti2gmp; built but not registered in automake TESTS, run via upstream .sh wrapper)"
+    result: "BUILT and PASS (./test_input_conversion_64_to_gmp 0 mat 17; 0 mat 1234567890123456 -> rc 0). NOT BUILT in 1.6.10 (no gmpxx.h)."
+  - file: test/qsolve/api/test_input_conversion_gmp.cpp
+    source: 4ti2-1.6.10/test/qsolve/api/test_input_conversion_gmp.cpp
+    description: "test_input_conversion_gmp_to_64: GMP -> int64 conversion API test (same .sh wrapper mechanism)"
+    result: "BUILT and PASS (0 mat 17; 0 mat 1234567890123456 -> rc 0). NOT BUILT in 1.6.10."
+  - file: test/zsolve/api/test_zsolve_api.cpp
+    source: 4ti2-1.6.10/test/zsolve/api/test_zsolve_api.cpp
+    description: "zsolve C API test (automake TESTS)"
+    result: "PASS (test_zsolve_api.trs :test-result: PASS, exit 0)"
+test_package_tests:
+  - file: test.c
+    description: "qsolve C API test mirroring upstream test/qsolve/api/qsolve_main.cpp: builds mat/rel/sign matrices, computes, verifies 4x3 qhom matrix (rows/cols + 12 entries)"
+    command: "./test_probe"
+  - file: conanfile.py
+    description: "Compiles test.c with clang, links with clang++ (-l4ti2int64 -l4ti2gmp -l4ti2common -l4ti2util -lgmpxx -lgmp -lglpk -lm); test() verifies bin/4ti2gmp + lib/lib4ti2gmp.a exist, runs 4ti2gmp --version, runs test_probe, then runs packaged gensymm CLI"
+    commands:
+      - "4ti2gmp --version"
+      - "./test_probe"
+      - "gensymm 3 3 3 1 333"
+assertion_count: 24
+# 计数口径（无占位符，全部真机实测 2026-10-04）：
+#   test.c 内部 20：8 个结构性失败分支（create_state NULL、create mat/rel/sign
+#     失败、compute 失败、get qhom NULL、rows、cols = 8）+ 12 个矩阵元素逐一比较
+#   任意精度后端产物存在性 2：bin/4ti2gmp 与 lib/lib4ti2gmp.a（缺失即 AssertionError）
+#   4ti2gmp --version 真实执行 1（验证可加载 libgmpxx/libgmp）
+#   gensymm CLI 执行 1
+#   合计 20 + 2 + 1 + 1 = 24
