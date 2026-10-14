@@ -1,0 +1,35 @@
+--- a/config/config.guess
++++ b/config/config.guess
+@@ -103,9 +103,9 @@
+     test "$tmp" && return 0
+     : "${TMPDIR=/tmp}"
+     # shellcheck disable=SC2039
+-    { tmp=$( (umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null) && test -n "$tmp" && test -d "$tmp" ; } ||
+-	{ test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir "$tmp" 2>/dev/null) ; } ||
+-	{ tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir "$tmp" 2>/dev/null) && echo "Warning: creating insecure temp directory" >&2 ; } ||
++    { tmp=$( (umask 022 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null) && test -n "$tmp" && test -d "$tmp" ; } ||
++	{ test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 022 && mkdir "$tmp" 2>/dev/null) ; } ||
++	{ tmp=$TMPDIR/cg-$$ && (umask 022 && mkdir "$tmp" 2>/dev/null) && echo "Warning: creating insecure temp directory" >&2 ; } ||
+ 	{ echo "$me: cannot create a temporary directory in $TMPDIR" >&2 ; exit 1 ; }
+     dummy=$tmp/dummy
+     case ${CC_FOR_BUILD-},${HOST_CC-},${CC-} in
+@@ -928,6 +928,19 @@
+     *:Minix:*:*)
+ 	echo "$UNAME_MACHINE"-unknown-minix
+ 	exit ;;
++    *:HarmonyOS:*:*)
++	case "$UNAME_MACHINE" in
++	    aarch64|arm64)
++		echo aarch64-unknown-linux-ohos
++		;;
++	    armv7*|armv8*)
++		echo arm-unknown-linux-ohos
++		;;
++	    *)
++		echo "$UNAME_MACHINE"-unknown-linux-ohos
++		;;
++	esac
++	exit ;;
+     aarch64:Linux:*:*)
+ 	echo "$UNAME_MACHINE"-unknown-linux-"$LIBC"
+ 	exit ;;

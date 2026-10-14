@@ -1,0 +1,77 @@
+# 版本级 manifest — prrte 3.0.13
+# 文件位置: archives/p/prrte/3.0.13/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "3.0.13"
+
+# 软件名
+software: "prrte"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-28"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游 release 发行包，含预生成 configure 与 config/oac 子模块）
+  url: "https://github.com/openpmix/prrte/releases/download/v3.0.13/prrte-3.0.13.tar.gz"
+
+  # 源码校验和（本地实测）
+  sha256: "81c27025182a26e90b0bb6aa67929a9313186fbd43964fc6d8734ce5cecd00ae"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--with-libevent=<libevent package_folder>"
+    # 注: pmix/hwloc 由 PkgConfigDeps 重生成的 prefix 正确 .pc 经
+    # PKG_CONFIG_PATH 解析，不传 --with-pmix/--with-hwloc（传了会迫使
+    # OAC_CHECK_PACKAGE 读取包内 prefix=/ 的 relocatable .pc 导致头文件找不到）
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - pmix/5.0.11
+    - hwloc/2.14.0
+    - libevent/2.1.12
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained: []
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
