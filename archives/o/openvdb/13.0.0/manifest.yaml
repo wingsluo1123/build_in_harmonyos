@@ -1,0 +1,48 @@
+# manifest.yaml — openvdb 13.0.0 版本级编译元数据
+software: openvdb
+version: 13.0.0
+status: built
+build_date: "2026-09-21"
+build_system: cmake
+source_url: "https://codeload.github.com/AcademySoftwareFoundation/openvdb/tar.gz/refs/tags/v13.0.0"
+source_sha256: "4d6a91df5f347017496fe8d22c3dbb7c4b5d7289499d4eb4d53dd2c75bb454e1"
+license: "MPL-2.0"
+
+adaptation:
+  configure_flags:
+    - "-DUSE_BLOSC=OFF（制品仓无 blosc；变量名为 USE_BLOSC）"
+    - "-DOPENVDB_BUILD_PYTHON_MODULE=OFF"
+    - "-DOPENVDB_BUILD_DOCS=OFF"
+    - "-DOPENVDB_BUILD_HOUDINI_PLUGIN=OFF"
+    - "-DOPENVDB_BUILD_MAYA_PLUGIN=OFF"
+    - "-DOPENVDB_BUILD_AX=OFF"
+    - "-DOPENVDB_BUILD_UNITTESTS=OFF（见 test_package/MANIFEST.yml 的原因声明）"
+    - "-DOPENVDB_BUILD_BINARIES=OFF"
+    - "-DOPENVDB_CORE_SHARED=OFF（只建静态库，加速）"
+    - "-DOPENVDB_USE_DELAYED_LOADING=OFF（避免 find_package(Boost) 找 CMake config）"
+  source_edits:
+    - file: "openvdb/openvdb/thread/Threading.h"
+      change: "在 #include <tbb/blocked_range.h> 前显式插入 #include <tbb/version.h>"
+      reason: >-
+        oneTBB 的 blocked_range.h 不再间接包含 version.h，导致
+        TBB_INTERFACE_VERSION 未定义，走 #else 分支调用已被 oneTBB 移除的
+        tbb::task::self() 而编译失败。上游 13.0.0 的文件注释与 include 行
+        与 12.1.1 相同，故沿用同一处理（构建期在源码树内改，非补丁文件）。
+  build_workaround:
+    - "make -j1：OHOS 禁 mkfifo jobserver，CMake.build() 的并行封装会卡死"
+  cpp_standard: "c++17（上游 cxx_std_17；profile compiler.cppstd=17）"
+  cmake_minimum: "3.24（本机 3.28.3）"
+
+test_report:
+  upstream_suite: "openvdb/openvdb/unittest（gtest，单一巨型二进制 openvdb_test）"
+  upstream_cases: 738
+  upstream_cases_counted_by: "grep 119 个 .cc 的 TEST/TEST_F 宏"
+  upstream_run_in_archive_build: false
+  upstream_skip_reason: "OHOS 须 make -j1，单测构建成本超 CI 预算；见 test_package/MANIFEST.yml"
+  consumer_tests: "test_openvdb.py 7 项（含真实执行）+ consumer.cpp 6 项断言 → 13/13"
+  consumer_tests_result: "以本地实测为准（见 notes.md 第五节）"
+
+notes: >-
+  平台任务 #6637（openvdb 13.0.0，认领人 Zmaomao，分支 feat/openvdb-13.0.0）。
+  配方以 archives/o/openvdb/12.1.1 为基底演进，仅改版本号、源码 URL/sha256，
+  并把消费者测试从"只编译"提升为"编译+真实执行+鸿蒙平台断言"。
