@@ -1,0 +1,36 @@
+software: zathura
+name: zathura
+description: "A highly customizable and functional document viewer with a minimalistic interface"
+category: document
+license: Zlib
+homepage: "https://pwmt.org/projects/zathura"
+url: "https://github.com/pwmt/zathura"
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "2026.07.x 起 GTK 层重写为 girara-gtk/ 并改用 GTK4（meson dependency('gtk4', version: '>=4.12')），GTK3 配方在该版本无法 configure"
+    - "girara/2026.07.07 钉精确 glib/2.84.0，pango(GTK4 栈) 钉 glib/2.84.0.1 → 消费方必须 override 统一版本并重建 girara"
+    - "C 标准：clang 15 无 c23 模式（仅 c2x 草案）且缺 C23 <stdckdint.h>；补丁 0001 用 __builtin_mul_overflow 兜底"
+    - "clang 15 拒绝 switch case 内的块作用域静态断言；补丁 0002 将 `_Static_assert` 移到文件作用域，保持编译期语义（明确不用 g_assert，否则 -DG_DISABLE_ASSERT 会把它整体裁掉）"
+    - "上游无 tests 选项（仅 tests-x11/tests-wayland），headless 用例 document/types/utils 已在 qemu 与真机执行"
+    - "libzathura 为 static_library 仅链入 CLI；CLI 以 export_dynamic 导出插件 API 符号，插件构建只需头文件 + pkg-config"
+  common_dependencies:
+    - girara
+    - gtk4
+    - glib
+    - cairo
+    - json-glib
+    - libmagic
+    - sqlite3
+    - xxhash
+
+versions:
+  "2026.07.18":
+    status: pending
+    build_date: ""
+    notes: |
+      - 文档查看器主程序（CLI）+ 插件 API 头文件 + pkg-config
+      - 本版本改用 GTK4，新增 libmagic / xxhash 运行时依赖
+      - 上游 headless 测试 5/5 通过（qemu + OHOS musl 运行根）
+      - 消费者端到端测试 14/14 CHECK 断言通过（15 个 TAP 测试点）；真机 DAYU200 11/11 通过

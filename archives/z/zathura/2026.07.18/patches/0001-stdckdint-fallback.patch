@@ -1,0 +1,39 @@
+Provide a stdckdint.h fallback for toolchains whose C library does not ship the
+C23 checked-integer header (clang 15 / OHOS 6.0 sysroot).
+
+zathura 2026.07.18 includes <stdckdint.h> and calls ckd_mul() in
+zathura/types.c.  The OHOS SDK is clang 15, which predates the finalised C23
+header, so the include fails with "'stdckdint.h' file not found".  Map the
+checked multiplication onto the compiler builtin, which has been available in
+clang for far longer and implements exactly the semantics the C23 macro
+requires: the result is the wrapped value on overflow and the call returns true
+when the operation overflowed.
+
+Upstream-Status: Inappropriate [portability shim for an older toolchain]
+--- a/zathura/types.c	2026-09-30 01:46:10.847782413 +0800
++++ b/zathura/types.c	2026-09-30 01:46:11.082452104 +0800
+@@ -3,7 +3,23 @@
+ #include "types.h"
+ 
+ #include <stdlib.h>
+-#include <stdckdint.h>
++#if defined(__has_include)
++#  if __has_include(<stdckdint.h>)
++#    include <stdckdint.h>
++#  else
++#    define ZATHURA_NEEDS_STDCKDINT_FALLBACK 1
++#  endif
++#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
++#  include <stdckdint.h>
++#else
++#  define ZATHURA_NEEDS_STDCKDINT_FALLBACK 1
++#endif
++
++#ifdef ZATHURA_NEEDS_STDCKDINT_FALLBACK
++/* C23 <stdckdint.h> is not provided by this toolchain (clang 15 / OHOS).
++ * Reimplement the subset zathura uses on top of the compiler builtins. */
++#  define ckd_mul(result, a, b) __builtin_mul_overflow((a), (b), (result))
++#endif
+ #include <girara/datastructures.h>
+ #include <glib.h>
+ 

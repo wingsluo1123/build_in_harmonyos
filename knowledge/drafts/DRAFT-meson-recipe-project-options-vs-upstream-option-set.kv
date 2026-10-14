@@ -1,0 +1,83 @@
+#====================================================================
+# DRAFT-meson-recipe-project-options-vs-upstream-option-set
+#   Meson 配方 project_options 与目标版本上游选项集不一致
+#   → meson setup 致命失败（ERROR: Unknown option）
+#   完整叙事与边界见同目录 .md
+#====================================================================
+
+id:                     DRAFT-meson-recipe-project-options-vs-upstream-option-set
+trigger_tool:           meson|conan
+phase:                  configure
+error_signature:        ERROR: Unknown option: "[^"]+"|Error [0-9]+ while executing meson\.configure\(\)|Unknown option
+severity:               3
+category:               meson, build-system, configure, version, portability
+match_keywords:         meson, project_options, meson_options.txt, meson.options, Unknown option, MesonToolchain, 版本迁移, 骨架配方复用, meson setup, hotdoc, orc
+
+title:                  Meson 配方 project_options 与目标版本上游选项集不一致时 meson setup 致命失败（Unknown option）——版本迁移必须按目标版本的 meson_options.txt / meson.options 裁剪选项
+
+root_cause:             ① meson 对未知选项是致命错误而非警告：向 meson setup 传一个上游未声明的 -D<opt>=... 会立刻中止配置
+                        （ERROR: Unknown option），因此“配方写死的选项名”与“上游声明的选项集”必须严格一致。
+                        ② 选项集合定义在上游源码里，位置随 meson 版本演进：旧版 meson_options.txt、新版 meson.options，
+                        部分版本两者并存（两者并存本身还有另一类坑，见 E258）；选项的增删发生在上游各版本之间，配方无法假定其稳定。
+                        ③ 以既有档案为骨架做版本迁移（同一份配方换上游版本）时，配方里的 project_options 不会自动跟着变：
+                        本仓库 archives/**/conanfile.py 中 project_options[ 命中 319 处，说明“按名写死选项”是主流写法，风险是系统性的。
+                        ④ 该问题只在真实 configure（G2）暴露，静态检查（G1 配方完整性）看不出来；报错位置指向 meson.build:1:0（选项校验阶段），
+                        容易被误判为“上游构建脚本损坏”或“meson 版本太新/太旧”，从而在错误方向上浪费整轮排查。
+affected_scope:         所有使用 MesonToolchain 或 Meson 且设置 project_options 的 Conan 配方，尤其是“以既有版本配方为骨架迁移到另一上游版本”的场景
+                        （实测 orc 0.4.42 配方用在 0.4.41 源码上失败：hotdoc 选项 0.4.42 才引入）；同样适用于上游删除或改名选项的升级方向。
+verification_cmd:       # 1) 列出目标版本的真实选项集
+                        curl -sL <source.tar.xz> | tar tJf - | grep -E 'meson_options\.txt|meson\.options'
+                        grep -oE "^option\('[^']+'" <src>/meson_options.txt      # 新版文件名为 meson.options
+                        # 2) 与配方选项表逐一比对差集（配方传了但上游没有的，就是失败项）
+                        grep -n 'project_options\[' archives/<letter>/<pkg>/<version>/conanfile.py
+                        # 3) 修复后重跑门禁：必须看到 G2 PASS（meson setup 成功进入编译）
+                        ohc conan-verify <pkg> <version>
+
+rec_priority:           1
+rec_approach:           reconcile-project-options-with-target-upstream-option-set
+rec_description:        迁移上游版本时按目标版本的选项集裁剪、补齐 project_options：删除上游已移除的选项，命名变更的改用新名，不要盲目保留骨架配方的整份选项表。
+                        删除前必须先确认该项在目标版本确实不存在（必要时换成目标版本中的等价选项），因为删掉一个原本生效的选项可能改变构建行为（文档/测试/后端等子项会回到上游默认开关）。
+                        修完必须重跑 G2 门禁：配置通过不代表后续成功，仍要看到 G2 PASS。
+rec_command:            # orc 0.4.42 配方用于 0.4.41 源码：0.4.41 尚无 hotdoc 选项，必须移除该行
+                        #   tc.project_options["hotdoc"] = "disabled"     <- 删除
+                        # 核对目标版本选项集后再重跑
+                        #   grep -oE "^option\('[^']+'" <src>/meson_options.txt
+                        #   ohc conan-verify <pkg> <version>          # 期望 G2 PASS
+rec_auto_fix:           false
+rec_impl:               manual-conan-recipe
+
+fallback_priority:      2
+fallback_approach:      pin-recipe-scope-and-declare-gap
+fallback_description:   若迁移窗口内无法完成“配方选项表 vs 目标版本上游选项表”的完整核对，就把配方作用域显式限定回已实测的上游版本
+                        （在 manifest/notes 中声明支持范围与尚未核对的版本），不要发布“看起来能配置”的版本；待核对完成后再放开。
+                        诚实权衡：短期内少了版本覆盖，但避免把未核对的配置当成可用配置交付给下游。
+fallback_command:       在 manifest / notes 中限定上游版本范围并注明未核对项
+fallback_auto_fix:      false
+fallback_impl:          manual-scope-declaration
+
+forbid_1_pattern:       except.*(ConanException|Exception).*(meson|configure)|Unknown option.*(忽略|ignore)|try.*meson\.configure
+forbid_1_reason:        把致命配置错误降级为“可忽略”，等于用错误的选项集继续构建；产物与被声明的配置不一致且无人发现。
+forbid_1_consequence:   meson 实际未接受该配置（对应 target 可能根本没生成），后续编译/链接失败或静默缺功能。
+forbid_2_pattern:       project_options\.pop\(|del .*project_options\[|project_options\.clear\(\)
+forbid_2_reason:        只删除报错项而不核对目标版本选项集：命名变更的选项会被误判为“已移除”而删掉，等价功能被静默关闭或打开，构建行为漂移。
+forbid_2_consequence:   例如把文档/测试/后端选项误删后回到上游默认值，产物能力与预期不一致，而现有测试不会报警。
+
+principles:             P-BUILD-001
+causes:                 []
+caused_by:              []
+similar_to:             [E258, E296]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-meson-recipe-project-options-vs-upstream-option-set.md
+last_updated:           2026-09-30
+source_event:           orc 0.4.42 配方迁移到 0.4.41 源码：meson setup 报 ERROR: Unknown option: "hotdoc"（本机 G2 门禁真实失败），
+                        按目标版本上游选项集裁剪后修复
+authors:                Quas
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/13914
+source_commit:          47709dfc786c1c260cc08bac946b8ff49fc27db1
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:      2026-09-30

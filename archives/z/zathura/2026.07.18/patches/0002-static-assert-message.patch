@@ -1,0 +1,56 @@
+Keep the settings.c integer-range assertion at compile time by moving it from
+block scope inside a switch case to file scope.
+
+zathura 2026.07.18 asserts, inside a switch case, that gint64 can represent
+every unsigned int value before storing an unsigned setting as a signed JSON
+integer.  Two limitations of the OHOS SDK toolchain (clang 15,
+__STDC_VERSION__ 202000L) make that placement unusable:
+
+  * upstream uses the C23 single-argument static_assert, while the sysroot's
+    <assert.h> only maps static_assert to _Static_assert for pre-C23 modes;
+  * more fundamentally, clang 15 rejects a static assertion at block scope
+    inside a switch case outright ("expected expression"), whether it is
+    spelled static_assert or _Static_assert.
+
+Both conditions are compile-time constants, so they do not need block scope at
+all: asserting them at file scope preserves the compile-time guarantee on every
+supported toolchain.  Deliberately NOT a g_assert(): a release build with
+-DG_DISABLE_ASSERT compiles a runtime check away entirely, silently losing the
+very invariant the original static_assert enforced.
+
+Upstream-Status: Inappropriate [portability fix for pre-C23 toolchain]
+--- a/girara-gtk/settings.c	2026-10-02 16:54:55.318405492 +0800
++++ b/girara-gtk/settings.c	2026-10-02 16:54:55.335617082 +0800
+@@ -12,6 +12,24 @@
+ #include <girara/utils.h>
+ 
+ #include "completion.h"
++
++/* gint64 must be able to represent every unsigned int value before an
++ * unsigned setting is stored as a signed JSON integer (see the UINT case
++ * in settings_set_value / the JSON writer below).  Upstream asserts this
++ * at block scope inside a switch case; clang 15 (the OHOS SDK toolchain)
++ * rejects that placement outright ("expected expression") and its
++ * <assert.h> does not provide the C23 single-argument static_assert
++ * either.  Both conditions are compile-time constants, so asserting them
++ * at file scope keeps the check a compile-time guarantee instead of
++ * downgrading it to a runtime one.
++ *
++ * Deliberately NOT g_assert(): -DG_DISABLE_ASSERT would compile that away
++ * in release builds, silently dropping the invariant this assertion
++ * exists to enforce. */
++_Static_assert(sizeof(gint64) >= sizeof(unsigned int),
++               "gint64 must be able to represent every unsigned int value");
++_Static_assert(G_MAXINT64 >= UINT_MAX,
++               "G_MAXINT64 must be at least UINT_MAX");
+ #include "session.h"
+ #include "internal.h"
+ 
+@@ -230,7 +248,6 @@
+     type = "int";
+     break;
+   case UINT:
+-    static_assert(sizeof(gint64) >= sizeof(unsigned int) && G_MAXINT64 >= UINT_MAX);
+     json_builder_add_int_value(builder, g_value_get_uint(&setting->value));
+     type = "uint";
+     break;
