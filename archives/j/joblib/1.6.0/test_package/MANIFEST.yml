@@ -1,0 +1,59 @@
+test_files:
+  - path: "test_package/test_joblib.py"
+    test_type: "R34"
+    assertion_count: 6
+    description: "joblib 可从包 site-packages 导入 + 真实 Memory.cache 磁盘缓存（断言函数体只被调用 1 次、缓存目录落地）+ 真实 Parallel(n_jobs=2) loky 进程池计算（非仅导入）"
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest joblib/test -q --no-header -p no:cacheprovider --assert=plain（PYTHONPATH 含源码树 + cloudpickle + 构建期装到隔离目录的 threadpoolctl/memory_profiler）"
+# 跳过用例归因（**分环境口径，请勿混用**）——实测：
+#
+# 环境 A（配方环境，仅 cloudpickle，等同 CI）：
+#   采集 1432 例（另有 test_dask.py 2 个模块级导入错误，缺 distributed）；
+#   **单次完整运行**（--ignore=test_dask.py）
+#   1328 passed / 101 skipped / 3 xpassed / 0 failed
+#   （三项相加 1328+101+3 = 1432 = 采集数，算术自洽）。
+#   跳过 101 例构成：Test requires numpy 82（common.py:38 ×80、
+#   test_hashing.py:139/:150 各 ×1）、Not picklable with pickle 12、
+#   Need OpenMP helper compiled 2、Only without multiprocessing 1、
+#   Require fork start method 1、test_memory.py:762 hmdfs atime 1、
+#   test_numpy_pickle.py:1202 lz4 1、data/create_numpy_pickle.py doctests 1。
+#   ⚠️ 主因是**缺 numpy（82/101）**；threadpoolctl/memory_profiler 在配方环境
+#   不产生任何跳过（相关用例先被 @with_numpy 门控）。
+#
+# 环境 B（全依赖参考环境，本机含 numpy/dask/distributed/lz4/pandas）：
+#   **已完整跑完一次全量运行**（后台单次，无分批/无截断）：
+#   采集 1572 = 1512 passed + 33 failed + 21 skipped + 2 xfailed + 4 xpassed
+#   + 0 errors（算术自洽），耗时 927.65s。
+#   33 例失败逐条归因（均非上游交付代码缺陷）：
+#     * 29 例 OSError [Errno 24] Too many open files（fd 耗尽）——**环境性**，
+#       全在 test_parallel.py；干净环境单跑同一批测试类复现为 64 passed /
+#       0 个 Errno 24，证明是长会话累积 fd 耗尽；
+#     * 2 例 Failed: Timeout(>180.0s)——本机 --timeout=180 脚手架；
+#     * 2 例 /dev/shm 路径断言——三种 TMPDIR 设置均复现，未进一步归因。
+#   这 33 例均需 numpy → 配方（CI）环境为 skip，不会出现。
+#   ⚠️ 教训：跑本套件**不可**设 OMP_NUM_THREADS 等 MAX_NUM_THREADS_VARS 变量
+#   （joblib conftest.py:100 会逐例断言它们不存在，曾致 1561 例 teardown ERROR）；
+#   且 pytest-timeout 本平台默认 thread 方式会 os._exit() 杀掉会话，应用
+#   --timeout-method=signal。
+#   本环境下已实测：补装 threadpoolctl + memory_profiler 消除 17 例跳过——
+#   threadpoolctl 16 例（test_parallel.py:2002）+ memory_profiler 1 例
+#   （common.py:67）——以 pip install --target 装进构建目录隔离目录并入
+#   PYTHONPATH。A/B 实测：无 deps `12 passed, 16 skipped` → 有 deps `28 passed`；
+#   `129 passed, 2 skipped` → `131 passed, 1 skipped`。
+#   收益边界：该改动在**配方（CI）环境不改变执行量**（已被 @with_numpy 门控）；
+#   若要在 CI 上实质提升需把 numpy 一并纳入测试依赖——**本次未做**（aarch64-ohos
+#   上 numpy 的 pip 可用性未验证，且增加构建时间/联网依赖），不虚报收益。
+#
+# 两个环境一致的不可达项：
+#   * 未做 2 例：test_parallel.py:1914 "Need OpenMP helper compiled"——
+#     PyPI sdist 不含 parallel_sum.pyx（GitHub tag 才有）。实测该 .pyx 可编译
+#     （clang -fopenmp → .so，编译后 2 passed），但 **CI 上 cython 不可得**
+#     （conan search cython/* -r=ohpcd → Found 0），配方内无法编译，切源仍会跳过
+#     → 决定不切源（且两源 joblib/ 源码逐文件 sha256 一致）。
+#   * 无法跑 4 例：上游刻意测"未安装某依赖"的行为，装了反而跳过
+#     （test_parallel.py:1931 dask ×2、:827 multiprocessing ×1、
+#      test_numpy_pickle.py:1226 lz4 ×1）——需另建互斥环境。
+#   * 平台受限：Not picklable with pickle ×12、Require fork start method ×1、
+#     hmdfs 无细粒度 atime ×1、Windows-only PermissionError ×1。
+upstream_test_skips: "★ 分环境口径（两种口径不可混用）：环境 A（配方/CI，仅 cloudpickle，单次完整运行）= 1328 passed / 101 skipped / 3 xpassed / 0 failed（采集 1432，三项相加自洽），跳过主因为缺 numpy（82/101）；环境 B（全依赖参考，本机，**已完整跑完全量**）= 采集 1572 = 1512 passed + 33 failed + 21 skipped + 2 xfailed + 4 xpassed + 0 errors（算术自洽，927.65s），33 例失败均需 numpy（29 例 fd 耗尽属环境性 + 2 例本机超时脚手架 + 2 例 /dev/shm 断言），配方/CI 环境为 skip 不会出现；本次改动在该环境消除 17 例跳过。详细逐条归因见 notes.md「跳过用例的实测归因」"
+upstream_test_result: "采集数与计数均**随可选依赖变化**，故分环境给出，两种口径不可混用：**环境 A（配方/CI，仅 cloudpickle）单次完整运行 = 1328 passed / 101 skipped / 3 xpassed / 0 failed（采集 1432，算术自洽）**——构建期 marker（res/upstream_test_result.json）反映的即此环境实跑，**以它为准**；**环境 B（全依赖参考，本机）已完整跑完全量：采集 1572 = 1512 passed + 33 failed + 21 skipped + 2 xfailed + 4 xpassed + 0 errors，耗时 927.65s**。33 例失败逐条归因（均非上游交付代码缺陷、且均需 numpy → 配方/CI 为 skip）：29 例 OSError Errno 24（长会话 fd 耗尽，干净环境单跑同批测试类为 64 passed / 0 个 Errno 24，属环境性）、2 例本机 --timeout=180 超时脚手架、2 例 /dev/shm 路径断言（三种 TMPDIR 均复现，未进一步归因）。⚠️ 跑本套件不可设 OMP_NUM_THREADS 等 MAX_NUM_THREADS_VARS 变量（joblib conftest.py:100 逐例断言其不存在，曾致 1561 例 teardown ERROR）；pytest-timeout 本平台默认 thread 方式会 os._exit() 杀掉会话，应用 --timeout-method=signal。2 项 test_memory.py 的 jupyter 用例失败已定位：真因是**路径中的「点」**（非初版所记的「空格」）——无空格的含点路径下仍复现，CI worker 路径含 .cache 点目录会同型复现；从无点 cwd 运行即通过（四组对照实验见 notes.md）。未列入允许清单。"
