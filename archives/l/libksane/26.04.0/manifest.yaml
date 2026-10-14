@@ -1,0 +1,86 @@
+# 版本级 manifest — libksane 26.04.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.0"
+software: libksane
+status: built
+build_date: "2026-10-04"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/libksane-26.04.0.tar.xz"
+  sha256: "b2d4db16d41efc6dd502986e14a02277e02b94600ae042c26c6367a5cf301d77"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,"
+    - "-DKSANE_DEP_LIB_DIRS=<各 KF6 依赖的 lib 目录（配方 generate() 注入，E537 可重定位链接）>"
+  dependencies:
+    - qtbase/6.11.1
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - ktextwidgets/6.18.0
+    - kwallet/6.18.0
+    - ksanecore/26.04.0
+    - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  # 完全复用 E537：Conan cache 绝对路径泄漏进 DT_NEEDED → relocatable SONAME 链接
+  - "KF6 依赖（ki18n/kwidgetsaddons/ktextwidgets/kwallet）产物无 DT_SONAME，按 IMPORTED_LOCATION 绝对路径链接会把 Conan cache 路径写进 DT_NEEDED；修复=对导入目标打 IMPORTED_SONAME/清 IMPORTED_NO_SONAME + 用 basename(-l)链接（完全复用 knowledge_ref: E537）"
+  # 完全复用 E657：/system/lib64 libc++ 前置
+  - "configure 期宿主工具（qtpaths）与测试程序需前置 LD_LIBRARY_PATH=/system/lib64，避免沙箱内不兼容 libc++_shared.so 遮蔽（完全复用 knowledge_ref: E657）"
+  # 本包新发现，已出草稿
+  - "sane-backends/1.2.1 制品把后端搜索路径固化为 /lib/sane（OHOS 不存在）→ dll 加载器无法枚举任何设备，消费者（libksane/ksanecore）都打不开设备；测试期可用 LD_PRELOAD 官方后端规避（新知识 knowledge_ref: knowledge/drafts/E429-draft-C8F7.kv）"
+  # L3 版本级笔记
+  - "KF6 版本线：制品仓 ktextwidgets/kwallet 仅有 6.18.0（无 6.26.0），ksanecore/26.04.0 的 ki18n/6.26.0 需 override 降到 6.18.0 并由 --build=missing 重建（L3 版本笔记 knowledge_ref: notes.md 依赖版本选择）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libksane-26.04.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libksane-26.04.0.work
+  source_orig_hash: 0d60a0b34cdda017
+  source_work_hash: 4b8a2568bcf4ffa2
+  generated_at: '2026-10-11T18:31:20'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

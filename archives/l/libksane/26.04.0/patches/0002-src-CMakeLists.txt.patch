@@ -1,0 +1,72 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -4,21 +4,23 @@
+     VERSION     ${KSANE_VERSION}
+     SOVERSION   ${KSANE_SOVERSION}
+     EXPORT_NAME ${TARGET_EXPORT_NAME}
+     OUTPUT_NAME ${LIBRARYFILE_NAME}
+ )
+ 
+ target_compile_definitions(KSaneWidgets PRIVATE -DTRANSLATION_DOMAIN=\"libksane\")
+ 
+ if (KF6Wallet_FOUND)
+     target_compile_definitions(KSaneWidgets PRIVATE -DHAVE_KWALLET)
+-    target_link_libraries(KSaneWidgets PRIVATE KF6::Wallet)
++    target_link_libraries(KSaneWidgets PRIVATE -lKF6Wallet)
++    target_include_directories(KSaneWidgets SYSTEM PRIVATE
++        "$<TARGET_PROPERTY:KF6::Wallet,INTERFACE_INCLUDE_DIRECTORIES>")
+ endif()
+ 
+ target_sources(KSaneWidgets PRIVATE
+     widgets/gammadisp.cpp
+     widgets/labeledgamma.cpp
+     widgets/labeledcheckbox.cpp
+     widgets/labeledentry.cpp
+     widgets/labeledcombo.cpp
+     widgets/labeledfslider.cpp
+     widgets/labeledslider.cpp
+@@ -48,29 +50,41 @@
+     ${_generate_export_header_version_args}
+ )
+ 
+ target_include_directories(KSaneWidgets
+     INTERFACE
+         "$<INSTALL_INTERFACE:${KSANEWIDGETS_INSTALL_INCLUDEDIR}>"
+     PRIVATE
+         ${CMAKE_CURRENT_SOURCE_DIR}/widgets
+ )
+ 
++# OHOS adaptation: link the soname-less KF6 dependencies by basename with a
++# PRIVATE -L (KSANE_DEP_LIB_DIRS is provided by the recipe) so ld records
++# `libKF6<Name>.so` in DT_NEEDED instead of the machine-private package path.
++# Their include directories are pulled in as SYSTEM PRIVATE so those paths are
++# used for compilation only and never exported to consumers.
++target_link_directories(KSaneWidgets PRIVATE ${KSANE_DEP_LIB_DIRS})
++target_include_directories(KSaneWidgets SYSTEM PRIVATE
++    "$<TARGET_PROPERTY:KF6::I18n,INTERFACE_INCLUDE_DIRECTORIES>"
++    "$<TARGET_PROPERTY:KF6::WidgetsAddons,INTERFACE_INCLUDE_DIRECTORIES>"
++    "$<TARGET_PROPERTY:KF6::TextWidgets,INTERFACE_INCLUDE_DIRECTORIES>"
++)
++
+ target_link_libraries(KSaneWidgets
+     PUBLIC
+         Qt6::Core
+         Qt6::Gui
+         Qt6::Widgets
+     PRIVATE
+-        KF6::I18n
+-        KF6::WidgetsAddons
+-        KF6::TextWidgets
++        -lKF6I18n
++        -lKF6WidgetsAddons
++        -lKF6TextWidgets
+         ${KSANECORE_TARGET}
+ )
+ 
+ ecm_generate_headers(KSane_HEADERS
+     HEADER_NAMES
+         KSaneWidget
+     REQUIRED_HEADERS KSane_HEADERS
+     RELATIVE "../src/"
+ )
+ 

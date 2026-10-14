@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libksane/26.04.0
+homepage: "https://invent.kde.org/graphics/libksane"
+
+# 上游测试命令 (用于 ctest -N 清点 / 运行)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir . --output-on-failure"
+
+# 上游实际注册的测试
+# libksane 26.04.0 的 autotests/CMakeLists.txt 只定义了 ksane_tests() 宏，
+# 宏调用被注释掉（#ksane_tests(ksanetest)），仓库内也没有 ksanetest.cpp，
+# 因此上游 CTest 注册数为 0。tests/CMakeLists.txt 的 viewertest 目标默认关闭
+# （COMPILE_VIEWER_TESTAPP=OFF），且其 target_link_libraries 引用的
+# `KSaneWidget` 目标在上游并不存在（实际目标名是 KSaneWidgets），无法启用。
+# 结论：上游无正式测试用例，功能断言由 test_package 承担（场景三）。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "无设备时公共 API 断言：offscreen 构造 KSaneWidget，校验设备信息/扫描区域/选项读写/关闭设备的文档化行为"
+    command: "./test_libksane"
+  - file: test_scan_flow.cpp
+    description: "端到端消费者用例（鸿蒙消费者用例）：宿主应用打开 SANE 虚拟扫描仪 test 后端 -> 读取设备真实选项集 -> 写入分辨率 -> 选择扫描区域 -> 执行完整扫描 -> 接收并落盘扫描图像 -> 关闭设备"
+    command: "./test_scan_flow"
+
+# 测试断言总数 (实测: test_libksane 14 + test_scan_flow 13 = 27)
+assertion_count: 27
