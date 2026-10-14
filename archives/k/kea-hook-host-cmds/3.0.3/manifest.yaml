@@ -1,0 +1,97 @@
+# 版本级 manifest
+# 文件位置: archives/k/kea-hook-host-cmds/3.0.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "3.0.3"
+software: "kea-hook-host-cmds"
+status: built
+build_date: "2026-09-28"
+build_system: "meson"
+
+source:
+  url: "https://ftp.isc.org/isc/kea/3.0.3/kea-3.0.3.tar.xz"
+  sha256: "09702ddb078b637e85de9236cbedd3fb9d7af7c6e797026c538b45748ad4d631"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dtests=enabled"
+    - "-Dcrypto=openssl"
+    - "-Dmysql=disabled"
+    - "-Dpostgresql=disabled"
+    - "-Dnetconf=disabled"
+    - "-Dkrb5=disabled"
+    - "-DBOOST_SP_NO_PTHREAD_SETCANCELSTATE (extra_cxxflags)"
+    - "tc.binaries ar/ranlib = <compiler dir>/llvm-ar|llvm-ranlib (MesonToolchain)"
+    - "LD_LIBRARY_PATH += host 依赖 libdirs（配置期 cpp.run() 探针）"
+  dependencies:
+    - boost/1.85.0
+    - log4cplus/2.2.0.1
+    - openssl/3.5.8.1
+    - gtest/1.17.0.1   # test_requires
+    - meson/1.11.0     # tool_requires
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson.build.patch"
+  - "0002-src-lib-dhcp-iface_mgr_linux.cc.patch"
+
+# ============================================================
+# 上游测试（conan create 的 build() 内真实执行，2 个 Meson 套件）
+# ============================================================
+
+upstream_tests:
+  - suite: dhcp-host-cmds-tests
+    cases: 125
+    result: "125/125 passed"
+  - suite: dhcp-host-cmds-libloadtests
+    cases: 3
+    result: "3/3 passed"
+  total_cases: 128
+  pending: 0
+  failed: 0
+
+# ============================================================
+# 鸿蒙特有测试（test_package，1 个用例）
+# ============================================================
+
+ohos_specific_tests:
+  count: 1
+  entries:
+    - "test_package/test_ohos_platform.c → test_ohos_platform"
+  command: "./test_ohos_platform <package>/lib/kea/hooks/libdhcp_host_cmds.so"
+  checks:
+    - "ELFCLASS64 + e_machine == EM_AARCH64（OHOS PC aarch64 目标机）"
+    - "DT_NEEDED 链接 OHOS musl libc（libc.so），且不含 glibc 命名（libc.so.6）"
+    - "DT_NEEDED 链接 OHOS libc++ 运行库（libc++_shared.so）"
+    - "OHOS 加载器 dlopen(RTLD_NOW|RTLD_LOCAL) 可解析插件及其 20 个 Kea 运行库"
+    - "host_cmds hook callout（reservation-* 命令族）与 hook ABI 30003 可经 OHOS 加载器解析"
+  cases_run: 1
+  cases_passed: 1
+  cases_failed: 0
+
+knowledge_gained:
+  - "Meson 在 OHOS 报 system=harmonyos，Kea 平台白名单不含 → 顶层归一化为 linux（命中 E090）"
+  - "OHOS sysroot linux/socket.h 定义 sockaddr_storage 与 musl sys/socket.h 冲突 → define-guard 重命名（命中 E091/E119，用 __linux__ && !__GLIBC__ 守卫而非平台宏）"
+  - "musl pthread.h 无 pthread_setcancelstate → boost BOOST_SP_NO_PTHREAD_SETCANCELSTATE（命中 E085/E127/E507）"
+  - "meson clang 默认归档器裸名 llvm-ar 探测失败 → MesonToolchain tc.binaries 注入绝对路径（命中 E481）"
+  - "meson 配置期 compile-and-run 探针（log4cplus）需 LD_LIBRARY_PATH 含 host 共享依赖 libdirs（同族包已在 knowledge/drafts/E429-* 起草，本包沿用同一对策）"
+  - "Kea hook 家族（lease-cmds/pgsql/stat-cmds/host-cmds 等）共享同一上游树与同一陷阱集：NEEDED 闭包为 20 个 libkea-*，逐包用 ELF 解析核对与声明一致"
+  - "上游 libload 套件名与产物目录名不一致（目录 libloadtests/ 产物 dhcp-host-cmds-libload-tests，meson 注册名 dhcp-host-cmds-libloadtests），需以 meson test --list 为准"
+
+patch_generation:
+  method: inherited-identical
+  provenance: "与 archives/k/kea-hook-lease-cmds/3.0.3/patches/、archives/k/kea-hook-pgsql/3.0.3/patches/ 的 0001/0002 逐字节一致（同一上游源码树 kea-3.0.3、同一平台问题集）；上游补丁由 per-file-difflib 于 2026-09-17 生成。本包以 -Dpostgresql=disabled 全量构建（1432/1432 目标）+ 128 项上游用例验证补丁完整适用"
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'none'
+  - file: 0002-src-lib-dhcp-iface_mgr_linux.cc.patch
+    type: auto
+    platform_only: True
+    guard: '__linux__ && !__GLIBC__ (libc 鉴别宏，非平台宏)'
