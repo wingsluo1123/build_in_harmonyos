@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.15)
+project(snappy_consumer LANGUAGES CXX)
+find_package(Snappy CONFIG REQUIRED)
+add_executable(consumer consumer.cpp)
+target_compile_features(consumer PRIVATE cxx_std_17)
+target_link_libraries(consumer PRIVATE Snappy::snappy)
+set_target_properties(consumer PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

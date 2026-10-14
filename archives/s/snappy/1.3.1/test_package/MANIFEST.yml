@@ -1,0 +1,19 @@
+package: snappy/1.3.1
+homepage: https://github.com/google/snappy
+upstream_check_command: "ctest --output-on-failure -V --no-tests=error"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure -V --no-tests=error"
+upstream_test_count: 25
+upstream_test_inventory: "26 source TEST sites, 25 enabled by upstream; one originally DISABLED_MoreThan4GB outside the default suite, never counted as passed"
+upstream_originally_disabled:
+  - "Snappy.DISABLED_MoreThan4GB: upstream default disabled due CI constraints; builds an input of 2^32-1 bytes and multiple Verify buffers"
+upstream_tests:
+  - file: snappy_unittest.cc
+    source: snappy-1.3.1/snappy_unittest.cc
+    description: "Every upstream default-enabled case, unmodified assertions and bundled corpus, native GTest framework from ohpcd"
+    command: "ctest --output-on-failure -V --no-tests=error"
+test_package_tests:
+  - file: consumer.cpp
+    description: "Installed C/C++ compression/decompression, binary/UTF-8 data, corrupt headers, too-small output and OHOS private compressed-file decode"
+    command: "./bin/consumer"
+assertion_count: 19
