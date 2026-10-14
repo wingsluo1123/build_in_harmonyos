@@ -1,0 +1,29 @@
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -120,21 +120,25 @@
+ 	cd $(OBJDIR); $(CC) $(OFILES) -o $(EXEC) $(LDFLAGS) $(RPATH) $(EXECLIBS)
+ #
+ $(OBJDIR):
+ 	-mkdir $(OBJDIR)
+ #
+ $(CONFIG_H) : $(SRCDIR)/sysconf.h
+ 	/bin/cp $(SRCDIR)/sysconf.h $(CONFIG_H)
+ 	touch $(CONFIG_H)
+ #
+ slangversion: $(OBJDIR)/chkslang
+-	$(OBJDIR)/chkslang $(EXEC) 20203
++	if [ "$(SKIP_CHKSLANG)" = "1" ]; then \
++	  echo "skip chkslang run: cross compiling (slang >= 2.2.3 enforced by dependency pin)"; \
++	else \
++	  $(OBJDIR)/chkslang $(EXEC) 20203; \
++	fi
+ #
+ $(OBJDIR)/chkslang: $(OBJDIR)/chkslang.o
+ 	$(CC) $(OBJDIR)/chkslang.o $(LDFLAGS) -o $(OBJDIR)/chkslang $(RPATH) $(EXECLIBS)
+ version.h: $(SRCDIR)/../changes.txt
+ 	if [ -x $(UPDATE_VERSION_SCRIPT) ]; then \
+ 	  $(UPDATE_VERSION_SCRIPT) $(SRCDIR)/../changes.txt $(SRCDIR)/version.h; \
+ 	fi
+ #
+ uudecode: decode.c $(UUDECODE_OBJS)
+ 	$(CC) $(ALL_CFLAGS) -DSTANDALONE $(LDFLAGS) -o uudecode decode.c $(UUDECODE_OBJS) $(EXECLIBS)
