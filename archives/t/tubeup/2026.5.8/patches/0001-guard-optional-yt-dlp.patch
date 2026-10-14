@@ -1,0 +1,30 @@
+--- a/tubeup/TubeUp.py
++++ b/tubeup/TubeUp.py
+@@ -9,7 +9,10 @@
+ 
+ from internetarchive.config import parse_config_file
+ from datetime import datetime
+-from yt_dlp import YoutubeDL
++try:
++    from yt_dlp import YoutubeDL
++except ImportError:  # yt-dlp is an optional runtime dependency in this port
++    YoutubeDL = None
+ from .utils import (get_itemname, check_is_file_empty,
+                     EMPTY_ANNOTATION_FILE)
+ from logging import getLogger
+@@ -204,6 +207,15 @@
+                                              ydl_username, ydl_password,
+                                              use_download_archive)
+ 
++        if YoutubeDL is None:
++            raise RuntimeError(
++                'yt-dlp is required to download videos but is not '
++                'available. The yt-dlp Conan package has not been '
++                'published to the ohpcd remote yet; install yt-dlp '
++                "separately (e.g. 'python3 -m pip install yt-dlp') "
++                'to enable downloading.'
++            )
++
+         with YoutubeDL(ydl_opts) as ydl:
+             for url in urls:
+                 if not ignore_existing_item:

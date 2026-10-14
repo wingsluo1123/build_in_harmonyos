@@ -1,0 +1,45 @@
+# 版本级 manifest — tubeup 2026.5.8
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2026.5.8"
+software: tubeup
+status: built
+build_date: "2026-10-13"
+build_system: python
+
+source:
+  url: "https://files.pythonhosted.org/packages/source/t/tubeup/tubeup-2026.5.8.tar.gz"
+  sha256: "4c75423a429493bddaf78ede0031947938b3eb35435847ee6597b49a4be76ad7"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - "internetarchive/5.10.1"
+    - "docopt/0.6.2"
+    - "tqdm/4.70.1"
+  python: "3.12 (OHOS build/test runtime; package layout is lib/python3.12/site-packages)"
+
+patches_applied:
+  - "patches/0001-guard-optional-yt-dlp.patch"
+
+knowledge_gained:
+  - category: L1
+    content: "纯 Python 应用使用 python-require 配方：直接复制上游包目录到 lib/python3.12/site-packages，并按 [project.scripts] 生成 bin/ 入口脚本，无需 pip/wheel 构建后端。"
+    reason: "上游 setuptools 后端在 CI 环境不可用（无 pip/wheel），copytree 打包零网络、可复现。"
+  - category: L2
+    content: "上游硬依赖的 Python 包若未发布到制品仓（本包 yt-dlp），不可声明为 Conan requires（R36/L0i/PF4 会拦截）；用守护补丁把顶层 import 降级为可选，可保持 CLI/元数据/工具函数可用，并在真正需要该依赖的路径给出受控报错。"
+    reason: "awscli 对 awscrt/distro 的同类处理为本仓库既有先例；声明未发布依赖会直接导致 CI L0i 失败。"
+  - category: L1
+    content: "纯 Python 依赖注入用 runenv_info.append_path('PYTHONPATH', ...) + cpp_info.bindirs；test_package 通过依赖的 package_folder 拼接 PYTHONPATH 后 self.run 真实调用。"
+    reason: "打印路径不足以让消费者导入（aiohttp lesson），必须声明到 runenv_info。"
+
+test_results:
+  upstream:
+    command: "PYTHONPATH=<deps>:<src> python3 -m pytest tests -q"
+    result: "27 passed"
+    environment: "OHOS aarch64 (HarmonyOS), Python 3.12.8"
+  test_package:
+    - "test_tubeup.py: consumer API test — PASS"
+    - "test_tubeup_ohos.py: HarmonyOS-specific consumer test — PASS"
