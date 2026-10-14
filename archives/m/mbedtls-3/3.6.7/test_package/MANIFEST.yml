@@ -1,0 +1,28 @@
+# 数字来自 2026-10-08 真机 conan create 日志，不是估数。
+package: mbedtls-3/3.6.7
+homepage: https://github.com/Mbed-TLS/mbedtls
+
+upstream_check_command: "ctest -j1 --verbose && tests/ssl-opt.sh && tests/compat.sh"
+upstream_test_in_build: true
+upstream_test_command: "ctest -j1 ; bash tests/ssl-opt.sh ; bash tests/compat.sh"
+
+upstream_tests:
+  - file: tests/suites/test_suite_*.data
+    source: mbedtls-3.6.7.tar.bz2
+    description: "140 个 ctest 套件。-j1 汇总 43989/43989，失败 0，depends_on 跳过 11726。-j4 时 4 个 PSA ITS 套件竞态失败。"
+    command: "ctest -j1 --verbose"
+  - file: tests/ssl-opt.sh
+    source: mbedtls-3.6.7.tar.bz2
+    description: "2083 项。跳过 746，失败 17，实际执行通过 1320。失败为 TLS1.0/1.1 日志、deflate、重协商分片，不是库算错。"
+    command: "OPENSSL_CONF=openssl-legacy.cnf bash tests/ssl-opt.sh"
+  - file: tests/compat.sh
+    source: mbedtls-3.6.7.tar.bz2
+    description: "1256 项。跳过 48，失败 108（全部为 m->G Camellia），实际执行通过 1100。m->O Camellia 通过。"
+    command: "bash tests/compat.sh"
+
+test_package_tests:
+  - file: test.c
+    description: "版本、AES-128-ECB NIST、解密回环、SHA-256(abc)、aesce_has_support_result==1，共 6 项"
+    command: "./test_mbedtls"
+
+assertion_count: 6

@@ -1,0 +1,92 @@
+--- a/tests/compat.sh	2026-10-11 04:19:52.695621400 +0800
++++ b/tests/compat.sh	2026-10-11 04:57:15.318437100 +0800
+@@ -793,15 +793,27 @@
+         else
+             proto=TCP
+         fi
+-        while ! lsof -a -n -b -i "$proto:$1" -p "$2" >/dev/null 2>/dev/null; do
+-              if [ $(( $(date +%s) - $START_TIME )) -gt $DOG_DELAY ]; then
+-                  echo "SERVERSTART TIMEOUT"
+-                  echo "SERVERSTART TIMEOUT" >> $SRV_OUT
+-                  break
+-              fi
+-              # Linux and *BSD support decimal arguments to sleep. On other
+-              # OSes this may be a tight loop.
+-              sleep 0.1 2>/dev/null || true
++        # Toybox lsof supports PID filtering but may expose socket inodes only.
++        # Match the PID socket, preferring an exact endpoint when lsof exposes one.
++        lsof_has_server_socket() {
++            lsof -p "$1" 2>/dev/null | grep -F "$3 " | grep -F ":$2->" >/dev/null ||
++                lsof -p "$1" 2>/dev/null | grep -E 'socket:\[[0-9]+\]| (TCP|UDP) ' >/dev/null
++        }
++        while true; do
++            if lsof_has_server_socket "$2" "$1" "$proto"; then
++                sleep 0.1 2>/dev/null || true
++                if lsof_has_server_socket "$2" "$1" "$proto"; then
++                    break
++                fi
++            fi
++            if [ $(( $(date +%s) - $START_TIME )) -gt $DOG_DELAY ]; then
++                echo "SERVERSTART TIMEOUT"
++                echo "SERVERSTART TIMEOUT" >> $SRV_OUT
++                break
++            fi
++            # Linux and *BSD support decimal arguments to sleep. On other
++            # OSes this may be a tight loop.
++            sleep 0.1 2>/dev/null || true
+         done
+     }
+ else
+--- a/tests/ssl-opt.sh	2026-10-11 04:19:51.940911100 +0800
++++ b/tests/ssl-opt.sh	2026-10-11 04:57:15.318437100 +0800
+@@ -1160,30 +1160,33 @@
+ # Wait for process $2 named $3 to be listening on port $1. Print error to $4.
+ if type lsof >/dev/null 2>/dev/null; then
+     wait_app_start() {
+-        newline='
+-'
+         START_TIME=$(date +%s)
+         if [ "$DTLS" -eq 1 ]; then
+             proto=UDP
+         else
+             proto=TCP
+         fi
+-        # Make a tight loop, server normally takes less than 1s to start.
++        # Toybox lsof supports PID filtering but may expose socket inodes only.
++        # Match the PID socket, preferring an exact endpoint when lsof exposes one.
++        lsof_has_server_socket() {
++            lsof -p "$1" 2>/dev/null | grep -F "$3 " | grep -F ":$2->" >/dev/null ||
++                lsof -p "$1" 2>/dev/null | grep -E 'socket:\[[0-9]+\]| (TCP|UDP) ' >/dev/null
++        }
+         while true; do
+-              SERVER_PIDS=$(lsof -a -n -b -i "$proto:$1" -t)
+-              # When we use a proxy, it will be listening on the same port we
+-              # are checking for as well as the server and lsof will list both.
+-             case ${newline}${SERVER_PIDS}${newline} in
+-                  *${newline}${2}${newline}*) break;;
+-              esac
+-              if [ $(( $(date +%s) - $START_TIME )) -gt $DOG_DELAY ]; then
+-                  echo "$3 START TIMEOUT"
+-                  echo "$3 START TIMEOUT" >> $4
+-                  break
+-              fi
+-              # Linux and *BSD support decimal arguments to sleep. On other
+-              # OSes this may be a tight loop.
+-              sleep 0.1 2>/dev/null || true
++            if lsof_has_server_socket "$2" "$1" "$proto"; then
++                sleep 0.1 2>/dev/null || true
++                if lsof_has_server_socket "$2" "$1" "$proto"; then
++                    break
++                fi
++            fi
++            if [ $(( $(date +%s) - $START_TIME )) -gt $DOG_DELAY ]; then
++                echo "$3 START TIMEOUT"
++                echo "$3 START TIMEOUT" >> $4
++                break
++            fi
++            # Linux and *BSD support decimal arguments to sleep. On other
++            # OSes this may be a tight loop.
++            sleep 0.1 2>/dev/null || true
+         done
+     }
+ else
