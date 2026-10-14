@@ -1,0 +1,13 @@
+sources:
+  "1.2.0.1":
+    url: "https://deb.debian.org/debian/pool/main/libk/libkylin-ai-system-private/libkylin-ai-system-private_1.2.0.1.orig.tar.gz"
+    sha256: "f76dab05c377fde2342506ec61158ea016269b45ad4d218bfeadb1a55dfc8f90"
+
+patches:
+  "1.2.0.1":
+    - patch_file: "patches/0001-ai-proto-install-prefix.patch"
+      description: "ai-proto 顶层 CMakeLists：install(DIRECTORY protocols/usr/ DESTINATION /usr) 绝对路径写 /usr 越权，改为 DESTINATION ${CMAKE_INSTALL_PREFIX}（改动内容与 1.2.0.0 补丁一致；@@ 头已按 1.2.0.1 实际行号重锚 40→38——Conan 2 patch_ng 按 hunk 头行号精确匹配不做偏移搜索，见经验仓 libjpeg9-9f-conan2-hunk-exact-line-match）"
+    - patch_file: "patches/0002-gdbus-functions-paths.patch"
+      description: "KylinAiProtoFunctions.cmake：硬编码 /usr/bin/gdbus-codegen 与 /usr/share/kylin-ai/protocols/gdbus/ 改为 ${KYLAI_GDBUS_CODEGEN} / ${KYLAI_GDBUS_PROTOCOL_DIR} 变量（1.2.0.1 该文件与 1.2.0.0 逐字节一致，补丁原样复用）"
+    - patch_file: "patches/0003-grpc-generate-paths.patch"
+      description: "KylinAiProtoGenerate.cmake：硬编码 /usr/share/kylin-ai/protocols/grpc/ 改为 ${KYLAI_GRPC_PROTOCOL_DIR} 变量（1.2.0.1 该文件与 1.2.0.0 逐字节一致，补丁原样复用）"
