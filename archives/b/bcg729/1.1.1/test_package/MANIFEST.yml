@@ -1,0 +1,24 @@
+# MANIFEST.yml — libbcg729 1.1.1 test_package
+# Declares the upstream test provenance for this L1 test (ARCHIVE-SPEC §2.2).
+
+package: libbcg729/1.1.1
+test_type: conan-l1
+test_origin: custom
+upstream_test: false
+description: >
+  Custom smoke test exercising the public bcg729 encoder/decoder API round-trip
+  (initBcg729EncoderChannel -> bcg729Encoder -> initBcg729DecoderChannel ->
+  bcg729Decoder -> close) on a silence frame, plus two concurrent independent
+  encoder channel contexts (bcg729's headline concurrent-channels feature in
+  the 1.1.1 API surface). Upstream's ENABLE_TESTS suite (27 registered test
+  executables driven by the testCampaign harness over the external
+  bcg729-patterns-v1.1.0.zip vector archive) was executed natively
+  out-of-band during adaptation — 158/173 pattern cases pass; the 15
+  mismatches trace to the upstream 1.1.0 overflow fix in LP2LSPConversion
+  (SATURATE/SSHL added), confirmed by replaying the same vectors against
+  upstream 1.0.4 which passes 173/173 — see notes.md. The cross-compile L1
+  keeps a public-ABI consumer test as required.
+test_sources:
+  - test.c
+build_system: cmake
+runs_on_target: true
