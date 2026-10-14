@@ -1,0 +1,67 @@
+software: pinentry-mac
+version: "1.3.1.1"
+status: built
+build_date: "2026-10-05"
+build_system: autotools
+
+source:
+  # 上游单一官方 URL（R39：无手写镜像前缀）
+  # GPGTools/pinentry 的 v1.3.1.1 tag；与 gnupg.org 的 pinentry 同源同构建系统
+  url: "https://github.com/GPGTools/pinentry/archive/refs/tags/v1.3.1.1.tar.gz"
+  # 实测下载 767631 字节，sha256 由 curl + sha256sum 实测（见 conandata.yml）
+  sha256: "ba929dd1c57b102fbfca12bc2d784be441498e7c82ee97a1231cbe03dcda7ae9"
+  tar_format: tar.gz
+  # 该 tarball 不含预生成的 configure（只有 configure.ac）→ source() 必须先跑 autoreconf -fi
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-pinentry-curses"
+    - "--enable-pinentry-tty"
+    - "--disable-pinentry-gtk2"
+    - "--disable-pinentry-gnome3"
+    - "--disable-pinentry-efl"
+    - "--disable-pinentry-qt"
+    - "--disable-pinentry-qt4"
+    - "--disable-pinentry-qt5"
+    - "--disable-pinentry-tqt"
+    - "--disable-doc"
+    - "--disable-inside-emacs"
+    - "--disable-fallback-curses"
+  dependencies:
+    - "libgpg-error/1.55"
+    - "libassuan/3.0.2"
+    - "ncurses/6.6"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+
+test_status: passed
+
+test_note: >-
+  **上游没有可跑的自动化测试套件**：本 tarball 不含 tests/ 目录 —— 实测
+  `tar tzf v1.3.1.1.tar.gz | grep -ci test` = 0、顶层 SUBDIRS（Makefile.am:120）
+  不含 tests、全树无 TESTS=/check_PROGRAMS 定义，故 `make check` 是 no-op。
+  为此改为驱动**上游真实对外接口**（gpg-agent 与 pinentry 之间使用的 Assuan 协议）：
+  test_package/run_upstream_tests.py 共 16 项断言（握手 / GETINFO version+pid /
+  未知命令 ERR / 参数错误 ERR / GETPIN 返回所输入 PIN / CONFIRM / MESSAGE），
+  覆盖 pinentry-tty 与 pinentry-curses 两个前端。在本机 aarch64 模拟运行下
+  **实测 16/16 通过、0 失败、0 跳过**（TERM=xterm-256color + 可读 terminfo）。
+  另 test_pinentry.c（clang 现场编译的消费者探针）真实执行两个前端的 --version
+  并断言 1.3.1.1（R34 反空壳）。
+
+knowledge_gained:
+  - "**平台专属前端包名 ≠ 整包不可适配**：GPGTools/pinentry 用同一棵源码树交付多个平台前端（curses/ tty/ qt/ gtk+-2/ gnome3/ efl/ emacs/ w32/ macosx/），顶层 `SUBDIRS`（Makefile.am:120）是**变量拼接** —— `SUBDIRS = m4 secmem pinentry ${pinentry_curses} ${pinentry_tty} ...`。macosx/ 由 `AM_CONDITIONAL(BUILD_PINENTRY_MACOSX)` 门控（configure.ac:826），而该变量只在 host 匹配 `*-apple-darwin*`（configure.ac:127）时为 yes。故在 aarch64-linux-ohos 上 `pinentry_macosx=no`、`macosx/Makefile` 不生成 —— 这**只排除一个子目录**，curses/ 与 tty/ 两个纯 C 前端照常构建。仅凭该 host 闸门判「结构性不可适配」是错的。"
+  - "判定「同源多前端包」是否可适配的四步勘察法：① 列 tarball 顶层前端目录并统计语言构成（`find <dir> -maxdepth 1 -name '*.c'` vs `-name '*.m'`）—— 存在含 .c 的前端即可适配；② 读 `Makefile.am` 的 `SUBDIRS` 汇总行，确认候选前端是变量拼接还是被硬编码排除；③ 用 `--enable-<可移植前端> --disable-<其余>` 实测 configure，以 `CONFIGURE_RC=0` 且 Default Pinentry 指向该前端为准；④ 仅当**所有**前端都依赖目标平台没有的能力时才判 env_unsupported。"
+  - "**`autoreconf -fi` 会覆盖已打的 config.sub 补丁**：本 tarball 不含 configure，必须先 autoreconf；但 autoreconf 会重新生成 `build-aux/config.sub`，把 HarmonyOS patch 冲掉。正确顺序是 source() 里先 `autoreconf -fi`、再在 build() 里 `apply_conandata_patches`。（同类：config.cache / configure 被重新生成时，任何对生成物的补丁都要后置。）"
+  - "OHOS 上 `/bin/sh` 不可用 → 依赖包内的 `gpgrt-config` / `libassuan-config` 脚本 shebang 须改为 `/data/service/hnp/bin/bash`，并设 `CONFIG_SHELL`/`SHELL`；否则 configure 探测阶段脚本无法执行。libgpg-error 1.56+ 只剩 `gpgrt-config`，除加入 PATH 外还须显式导出 `GPGRT_CONFIG` / `LIBASSUAN_CONFIG` 让 configure 直接命中。"
+  - "**依赖自带的 `*-config` 脚本不可信**：实测 `libassuan-config --libs` 无视 `--prefix` 返回 `-L/lib -lassuan`。配方须用包目录实测拼出 `GPG_ERROR_LIBS` / `LIBASSUAN_LIBS` / `NCURSES_LIBS` 等变量显式覆盖 configure 的探测结果。（同类：pkg-config 的 `.pc` 也可能指回宿主路径。）"
+  - "**OHOS 的 ncurses 制品只有静态 `libncursesw.a`、没有 libtinfo**，但 configure 会探测出 `-lncursesw -ltinfo` → 链接报 `unable to find library -ltinfo`。须显式覆盖 `NCURSES_LIBS=-L<dep>/lib -lncursesw`。"
+  - "OHOS SDK 的 clang 默认 target 是 `x86_64-unknown-linux-gnu`，交叉编译必须显式 `--target=aarch64-linux-ohos`；只给 `--sysroot` 不够 —— crt 与 libc 位于 `<sysroot>/usr/lib/aarch64-linux-ohos`，还需补 `-L<sysroot>/usr/lib/aarch64-linux-ohos`，否则链接调用宿主 `/usr/bin/ld` 并报 `cannot find Scrt1.o / crti.o / -lc`。"
+  - "pinentry 1.3.1.1 的依赖最低版本未被抬升：只要求 `NEED_GPG_ERROR_VERSION=1.16`（configure.ac:247）与 `NEED_LIBASSUAN_VERSION=2.1.0`（:267）→ ohpcd 现存的 libgpg-error/1.55 与 libassuan/3.0.2 均满足。**gpg-error 系各库最低要求差异极大**（gnupg 要 1.56、libksba 要 1.28、pinentry 要 1.16），必须逐库从 configure.ac 读取，不可按同族推断。"
+  - "驱动 pinentry 的 Assuan 接口做自动化测试有两个时序陷阱（都会造成**假失败**）：① curses 前端须等界面渲染完再写入，并用 `\\r` 确认（`\\n` 在 curses 下不生效）；② 不可把 `BYE` 与 `GETPIN` 同批发出 —— 连接会在用户输入前关闭，使 GETPIN 永远返回空（实测同批→False、不同批→True）。"
+  - "**断言不能只看输出含 `OK`**：Assuan 握手首行本身就是 `OK Pleased to meet you`，会产生假阳性。须断言**数据行**（如 `D 1234`）或错误行（`ERR`），并显式检查 `cannot initialize terminal type` 是否出现。"
+  - "**交叉编译产物在构建机上跑不出结果时，先怀疑运行环境而不是配方**：本包 aarch64 产物在 x86_64 宿主上直接执行会得到 `ok_lines=0` 的全量失败（动态加载器/库路径不匹配），容易被误判为配方缺陷；正确做法是经 qemu（binfmt_misc 注册 `qemu-aarch64` 或 `qemu-aarch64-static -L <runroot>`）并设好 `LD_LIBRARY_PATH` 后再测。实测同一产物在正确运行环境下 16/16 全通过。"
