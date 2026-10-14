@@ -1,0 +1,44 @@
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -325,36 +325,40 @@
+ libadwaita_public_headers += files(src_headers)
+ libadwaita_public_sources += files(src_sources)
+ 
+ install_headers(src_headers, subdir: libadwaita_header_subdir)
+ 
+ libadwaita_deps = [
+   glib_dep,
+   fribidi_dep,
+   gio_dep,
+   gtk_dep,
+-  appstream_dep,
+   cc.find_library('m', required: false),
+ ]
++
++if appstream_dep.found()
++  libadwaita_deps += appstream_dep
++endif
+ 
+ libadwaita_public_deps = [
+   gio_dep,
+   gtk_dep,
+ ]
+ 
+ libadwaita_c_args = [
+   '-DG_LOG_DOMAIN="Adwaita"',
+ ]
+ 
+ config_h = configuration_data()
+ config_h.set_quoted('GETTEXT_PACKAGE', 'libadwaita')
+ config_h.set_quoted('LOCALEDIR', get_option('prefix') / get_option('localedir'))
++config_h.set('HAVE_APPSTREAM', appstream_dep.found())
+ 
+ # Symbol visibility
+ if target_system == 'windows'
+   config_h.set('DLL_EXPORT', true)
+   config_h.set('_ADW_EXTERN', '__declspec(dllexport) extern')
+ else
+   config_h.set('_ADW_EXTERN', '__attribute__((visibility("default"))) extern')
+ endif
+ 
+ if target_system == 'darwin'
