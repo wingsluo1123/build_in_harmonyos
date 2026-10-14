@@ -1,0 +1,32 @@
+--- a/config.guess
++++ b/config.guess
+@@ -119,3 +119,3 @@
+-    { tmp=`(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
+-	{ test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 077 && mkdir "$tmp" 2>/dev/null) ; } ||
+-	{ tmp=$TMPDIR/cg-$$ && (umask 077 && mkdir "$tmp" 2>/dev/null) && echo "Warning: creating insecure temp directory" >&2 ; } ||
++    { tmp=`(umask 022 && mktemp -d "$TMPDIR/cgXXXXXX") 2>/dev/null` && test -n "$tmp" && test -d "$tmp" ; } ||
++	{ test -n "$RANDOM" && tmp=$TMPDIR/cg$$-$RANDOM && (umask 022 && mkdir "$tmp" 2>/dev/null) ; } ||
++	{ tmp=$TMPDIR/cg-$$ && (umask 022 && mkdir "$tmp" 2>/dev/null) && echo "Warning: creating insecure temp directory" >&2 ; } ||
+@@ -158,3 +158,5 @@
+-	#if defined(__ANDROID__)
+-	LIBC=android
+-	#else
++	#if defined(__ANDROID__)
++	LIBC=android
++#elif defined(__OHOS__)
++    LIBC=ohos
++	#else
+@@ -200,1 +200,12 @@
+-    *:NetBSD:*:*)
++    *:HarmonyOS:*:*)
++	case "$UNAME_MACHINE" in
++	    aarch64|arm64) MACHINE=aarch64 ;;
++	    armv7*|armv8*) MACHINE=arm ;;
++	    x86_64|amd64)  MACHINE=x86_64 ;;
++	    i?86)         MACHINE=i686 ;;
++	    *)            MACHINE="$UNAME_MACHINE" ;;
++	esac
++	GUESS=${MACHINE}-unknown-linux-ohos
++	;;
++
++    *:NetBSD:*:*)
