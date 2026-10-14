@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml -- mps 0.20.16
+
+package: mps/0.20.16
+homepage: "https://github.com/np1/mps"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "mps-0.20.16.tar.gz file list (PyPI sdist, sha256 ad4b01cb4c9eafeae0573632829a4e6cb6bfcf11c974214e40480f9d8f6aaf64)"
+    reason: "Archive holds 14 entries only: PKG-INFO, setup.py, setup.cfg, README.rst, mps.egg-info/*, mps_pkg/__init__.py, mps_pkg/main.py; no tests/, test/, t/ or spec/ directory exists."
+  - source: "mps.egg-info/SOURCES.txt"
+    reason: "Lists 10 files (README.rst, setup.cfg, setup.py, egg-info metadata, mps_pkg/__init__.py, mps_pkg/main.py); zero test source entries."
+  - source: "setup.py + setup.cfg"
+    reason: "setup() declares packages=['mps_pkg'] with no tests_require, no test_suite, no pytest/unittest/ctest registration; setup.cfg holds only [bdist_wheel] universal and [egg_info] tags."
+  - source: "mps_pkg/main.py (62 KB) grep"
+    reason: "No 'def test_' / 'unittest' / 'pytest' / 'assert' test harness; module defines CLI helpers (Config, Memo, search/playback/download commands) plus optional colorama import only."
+  - conclusion: "Upstream 0.20.16 provides no automated tests; test_package validates the installed console script and library helpers as consumer checks and claims no upstream coverage."
+
+upstream_test_total: 0
+upstream_test_count_method: python_def
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_mps.py
+    description: "Consumer checks calling real mps_pkg.main API: version metadata, package import, Config defaults, filename sanitizer, zlib/pickle roundtrip, utf8 helpers"
+    command: "python3 test_mps.py"
+
+assertion_count: 6
