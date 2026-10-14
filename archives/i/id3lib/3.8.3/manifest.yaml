@@ -1,18 +1,25 @@
-software: id3lib
+# 版本级 manifest — id3lib 3.8.3
 version: "3.8.3"
-status: published
-build_date: "2026-05-26"
+software: id3lib
+status: built
+build_date: "2026-10-09"
+build_system: autotools
+upstream_url: "https://sourceforge.net/projects/id3lib/"
+knowledge_ref:
+  - "E007"
+  - "E011"
+  - "E386"
 
 source:
-  url: "https://sourceforge.net/projects/id3lib/files/id3lib/3.8.3/id3lib-3.8.3.tar.gz"
-  sha256: ""
+  url: "https://downloads.sourceforge.net/project/id3lib/id3lib/3.8.3/id3lib-3.8.3.tar.gz"
+  sha256: "2749cc3c0cd7280b299518b1ddf5a5bcfe2d1100614519b68702230e26c7d079"
   tar_format: tar.gz
 
 build:
   system: autotools
-  configure_options:
-    - "--prefix=/storage/Users/currentUser/usr/local"
-  dependencies: []
+  configure_options: []
+  dependencies:
+    - zlib/1.3.1
   cc: clang
   cxx: clang++
 
@@ -25,20 +32,37 @@ patches_applied:
   - "0006-examples-demo_copy.cpp.patch"
   - "0007-examples-demo_info.cpp.patch"
   - "0008-examples-demo_tag.cpp.patch"
-  - "0009-include-id3-id3lib_bitset.patch"
+  - "0009-examples-findeng.cpp.patch"
+  - "0010-examples-findstr.cpp.patch"
+  - "0011-examples-test_io.cpp.patch"
+  - "0012-include-id3-id3lib_bitset.patch"
+  - "0013-zlib-configure.patch"
+
+test_results:
+  upstream_registered: 9
+  upstream_executed: 0
+  upstream_passed: 0
+  upstream_failed: 0
+  upstream_skipped: 0
+  note: "上游无 TESTS=（make check 仅编译 9 个 check_PROGRAMS，不执行测试）；9/9 编译通过，另行实跑 7 个程序 rc=0（证据见 reports/test-report.md）"
 
 knowledge_gained:
-  - "E007: config.guess 不识别 HarmonyOS，使用 echo+exit 0 模式修复"
-  - "E072: config.sub 添加 ohos 三元组支持"
-  - "C++ 兼容性: iomanip.h/iostream.h/unsigned int argc 修复"
+  - "OHOS profile [buildenv] 的 SHELL/CONFIG_SHELL=hnp bash 会让 autoconf 2.13 configure 的自身重 exec 陷入坏 cwd（getcwd 失败）→ conftest 相对路径写坏（confdefs.h not found）→ \"C preprocessor fails sanity check\"；build() 以 CONFIG_SHELL=/bin/sh + 显式 CPP/CXXCPP 前缀运行 configure（E386 类；cdo 2.6.3/idutils 4.6/id3v2 0.1.12 先例）"
+  - "E007: config.guess 不识别 HarmonyOS（uname -s=HarmonyOS）→ 追加 *:HarmonyOS:*:* 分支输出 aarch64-unknown-linux-ohos"
+  - "E011: HMDFS 上 config.status 用 mktemp -d 且 umask 077 会 Permission denied → configure 内 umask 077→022（a52dec 先例）"
+  - "id3lib 的 configure 对 iomanip.h 做致命 AC_CHECK_HEADERS；现代 libc++ 已无此头 → 移除该检查（代码仅用标准 <iomanip>）"
+  - "libz 不可链接时 id3lib 回退编译内嵌 zlib；声明 zlib/1.3.1 后仍需从 self.dependencies 显式注入 -I/-L（AutotoolsToolchain 不注入依赖路径），否则 -lz 命中 SDK sysroot libz.so（审计 R26）；注入后 4 个 CLI NEEDED 无 libz.so"
+  - "findeng.cpp/findstr.cpp 第 5 行为混合 CRLF：refresh-patch 文本模式 difflib 无法表达 CRLF 上下文，需 build() 先 sed 归一化再打补丁（mp3val/0.1.8 先例）"
+  - "R38：库类型包若安装 bin_PROGRAMS（4 个 CLI），需软件级 commands.json + cpp_info.bindirs=[\"bin\"]，否则 L0k 静态检测盲区（审计判定）"
+
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/id3lib-3.8.3.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/id3lib-3.8.3.work
-  source_orig_hash: 5a2e419e7417c575
-  source_work_hash: 886b30e60b2fac50
-  generated_at: '2026-05-26T16:44:28'
-  patches_count: 9
+  source_orig_hash: b4b1ca56510d49d8
+  source_work_hash: f222ce030494fed5
+  generated_at: '2026-10-09T10:42:20'
+  patches_count: 13
 
 patch_classification:
   - file: 0001-config.guess.patch
@@ -73,7 +97,23 @@ patch_classification:
     type: auto
     platform_only: True
     guard: 'pending'
-  - file: 0009-include-id3-id3lib_bitset.patch
+  - file: 0009-examples-findeng.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-examples-findstr.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-examples-test_io.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-include-id3-id3lib_bitset.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-zlib-configure.patch
     type: auto
     platform_only: True
     guard: 'pending'

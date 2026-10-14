@@ -1,0 +1,23 @@
+# 软件级 manifest — id3lib
+software: id3lib
+display: "id3lib"
+description: "ID3v1/ID3v2 标签读写 C++ 库（含 id3info/id3tag/id3convert/id3cp 命令行工具）"
+category: library
+homepage: "https://sourceforge.net/projects/id3lib/"
+license: LGPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "2003 年 autotools 工程：config.guess/config.sub 补 HarmonyOS(ohos) 三元组（E007/E072）；移除 modern C++ 已不存在的 iomanip.h 致命头检查"
+    - "老旧 C++ 语法适配：main(unsigned int argc)/main(unsigned argc) → int argc；<iostream.h> → <iostream>；test_io.cpp 补 using std::cin/hex/dec"
+    - "HMDFS 上 config.status 的 mktemp -d 带 umask 077 会 Permission denied（E011）→ configure/zlib/configure 内 umask 077→022"
+    - "依赖制品仓静态 zlib/1.3.1（R18/R26）：configure 探测到 libz 后走 HAVE_ZLIB 路径，不再回退编译内嵌 zlib"
+    - "findeng/findstr 第 5 行为混合 CRLF：build() 先 sed 归一化再应用补丁（mp3val/0.1.8 先例）"
+  common_dependencies:
+    - zlib
+
+versions:
+  "3.8.3":
+    status: built
+    build_date: "2026-10-09"
