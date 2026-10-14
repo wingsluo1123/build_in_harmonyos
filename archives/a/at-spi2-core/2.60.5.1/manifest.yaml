@@ -1,0 +1,78 @@
+# 版本级 manifest
+# 文件位置: archives/a/at-spi2-core/2.60.5.1/manifest.yaml
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.60.5.1"
+software: at-spi2-core
+status: built
+build_date: "2026-10-04"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.gnome.org/sources/at-spi2-core/2.60/at-spi2-core-2.60.5.tar.xz"
+  sha256: "6059a77d507438ff6c8d6d06025f8f9f5774fa0f8eabe9c9b059b1cc41e1bbc0"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+  - "-Ddefault_library=static"
+  - "-Dintrospection=disabled"
+  - "-Dx11=disabled"
+  - "-Duse_systemd=false"
+  - "-Ddefault_bus=dbus-daemon"
+  - "-Ddbus_glib=disabled"
+  - "-Ddocs=false"
+  - "-Dgtk2_atk_adaptor=false"
+  dependencies:
+  - glib/2.84.0.2
+  - dbus/1.14.10
+  - libxml2/2.15.3.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  type: official
+  upstream_command: "meson test -C build-release"
+  total: 9
+  passed: 5
+  failed: 4
+  consumer_total: 1
+  consumer_passed: 1
+  note: "全部 9 项上游用例均已实际执行（2026-10-04，日志 ~/tmp/atspi-meson-test.log）：5 通过（testdocument/testrole/testrelation/teststateset/testvalue）。4 项失败均因平台无 D-Bus 会话总线/accessibility bus：dbind-test 断言 bus != NULL（dbind/dbtest.c:386，SIGABRT）、droute-test libdbus 断言 connection != NULL（dbus-connection.c:6144，SIGABRT）、memory 'AT-SPI: Couldn't connect to accessibility bus'（SIGTRAP）、atk-test 'Could not initialize atspi, code 2'（SIGTRAP）。平台确无 dbus-daemon——制品仓 dbus/1.14.10 配方 L87-89 明确只构建客户端库 dbus-1（daemon 目标在 OHOS 交叉编译下链 expat 失败），且本机 .conan2 缓存、/system/bin、/usr/bin 均无该二进制。逐项原因见 notes.md。消费者测试 test_package/test_atk.c 1/1 通过（atk 角色 API 真实调用 + atspi/atk-bridge 链接级验证）"
+test_passed: 5
+test_failed: 4
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "OHOS 无 dbus-daemon 会话总线：atspi 相关 meson 测试（dbind/droute/memory/atk-test）无法运行，纯 ATK 测试通过；配方 build() 不跑 meson test，改由 test_package 验证"
+- "Conan 2 静态库包不向消费者传播传递依赖 headers：中间静态库配方需对公共头会被下游 include 的依赖显式 transitive_headers=True，否则消费方 CMakeDeps 的 INCLUDE_DIRS 为空（'glib.h' file not found）"
+- "静态库包交付 CLI/守护进程时 VirtualRunEnv 不会把 cpp_info.bindirs 加入 PATH，需 runenv_info.prepend_path('PATH', ...) 显式暴露"
+- "zlib/1.3.1 为非-PIC 静态库：本包 default_library=static 整体静态交付规避 R_AARCH64 relocation"
+- "libintl/dgettext：OHOS sysroot 无 gettext，依赖 glib 的 proxy-libintl 代理头（补写 glib-2.0.pc Cflags -I${prefix}/include）"
+- "谱系变体 2.60.5.1：glib 与 glib2 是两个并列包，各生成一份 glib-2.0.pc 且钉不同 zlib（1.3.1 vs 1.3.1.1），不可同图混用；gtk 3.24.43 栈（pango/atk/cairo/gdk-pixbuf）构建在 glib 谱系上，而 gtk X11 后端硬性需要本包的 atk-bridge-2.0 → 本变体把依赖谱系由 glib2/2.88.0 切为 glib/2.84（上游源码与版本号不动，R37 适配后缀）；组件 requires 相应改为 glib::glib-2.0/gobject-2.0/gio-2.0；test_package 增加 atk-bridge 链接级验证"
+- "glib 取 2.84.0.2 而非 2.84.0.1：后者 proxy-libintl subproject 装成独立 libintl.so(.8) 且只导出 g_libintl_*（无 bindtextdomain/dgettext 等真实符号）→ 消费者（atk/atspi 经 gi18n 使用 libintl.h）链接期 undefined reference；2.84.0.2 改为 static 链接，代理实现并入 libglib-2.0.so（实测 9 个 g_libintl_* 定义、无 libintl.so NEEDED），消费者仅需 -lglib-2.0 即自洽"

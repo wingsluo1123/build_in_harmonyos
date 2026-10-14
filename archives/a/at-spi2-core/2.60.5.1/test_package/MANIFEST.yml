@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: at-spi2-core/2.60.5.1
+homepage: "https://gitlab.gnome.org/GNOME/at-spi2-core"
+
+# 上游测试命令
+upstream_check_command: "meson test -C build-release"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游全部测试（meson test --list 共 9 项；2026-10-04 逐项实际执行）
+# 判定口径：FAIL 均为"需 D-Bus 会话总线"的平台约束，非配方缺陷（详见 notes.md）
+upstream_tests:
+  - file: tests/atk/testdocument.c
+    source: at-spi2-core-2.60.5/tests/atk/testdocument.c
+    description: "ATK document interface test"
+    command: "testdocument"
+    result: PASS
+  - file: tests/atk/testrole.c
+    source: at-spi2-core-2.60.5/tests/atk/testrole.c
+    description: "ATK role API test"
+    command: "testrole"
+    result: PASS
+  - file: tests/atk/testrelation.c
+    source: at-spi2-core-2.60.5/tests/atk/testrelation.c
+    description: "ATK relation API test"
+    command: "testrelation"
+    result: PASS
+  - file: tests/atk/teststateset.c
+    source: at-spi2-core-2.60.5/tests/atk/teststateset.c
+    description: "ATK state-set API test"
+    command: "teststateset"
+    result: PASS
+  - file: tests/atk/testvalue.c
+    source: at-spi2-core-2.60.5/tests/atk/testvalue.c
+    description: "ATK value API test"
+    command: "testvalue"
+    result: PASS
+  - file: dbind/dbtest.c
+    source: at-spi2-core-2.60.5/dbind/dbtest.c
+    description: "D-Bus 绑定层 dbind 单元测试"
+    command: "dbind-test"
+    result: FAIL
+    reason: "断言 bus != NULL（dbtest.c:386，SIGABRT）——需可用 D-Bus 会话总线；平台无 dbus-daemon（dbus/1.14.10 配方 L87-89 仅构建客户端库 dbus-1）"
+  - file: droute/droute-test.c
+    source: at-spi2-core-2.60.5/droute/droute-test.c
+    description: "D-Bus 路由层 droute 单元测试"
+    command: "droute-test"
+    result: FAIL
+    reason: "SIGABRT：libdbus dbus_connection_get_data() 断言 connection != NULL 失败（dbus-connection.c:6144）——需 D-Bus 会话总线"
+  - file: tests/atspi/memory.c
+    source: at-spi2-core-2.60.5/tests/atspi/memory.c
+    description: "atspi 内存/引用测试（经会话总线访问 registry）"
+    command: "memory"
+    result: FAIL
+    reason: "SIGTRAP：dbind-ERROR **: AT-SPI: Couldn't connect to accessibility bus. Is at-spi-bus-launcher running?——需 accessibility 总线"
+  - file: tests/at-spi2-atk/atk_test_*.c
+    source: at-spi2-core-2.60.5/tests/at-spi2-atk/
+    description: "ATK→atspi 桥接套件（atk_suite，经 accessibility bus 驱动 atk_test_* 全量）"
+    command: "atk-test"
+    result: FAIL
+    reason: "SIGTRAP：Bail out! FATAL-ERROR: Could not initialize atspi, code 2——需 accessibility bus（at-spi-bus-launcher）+ gsettings-desktop-schemas，OHOS 均缺"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_atk.c
+    description: "消费者测试：AtkObject 创建 + 角色设置/查询 + atk_role_get_name 真实调用，atspi/atk-bridge 链接级验证（atk_bridge_adaptor_init 即 gtk X11 后端消费点）；另冒烟 at-spi2-registryd --help 与 at-spi-bus-launcher 产物校验"
+    command: "./test_atk"
+
+# 测试断言总数 (近似值)
+assertion_count: 6
