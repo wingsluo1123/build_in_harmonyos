@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(libwmf_consumer C)
+find_package(libwmf CONFIG REQUIRED)
+add_executable(libwmf_consumer consumer.c)
+target_link_libraries(libwmf_consumer PRIVATE libwmf::libwmf)
