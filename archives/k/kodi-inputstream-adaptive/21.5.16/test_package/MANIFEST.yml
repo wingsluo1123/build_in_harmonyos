@@ -1,0 +1,91 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration file (required by CI build_and_test.sh L0e)
+
+package: kodi-inputstream-adaptive/21.5.16
+homepage: "https://github.com/xbmc/inputstream.adaptive"
+
+# Upstream 21.5.16-Omega ships a real gtest suite (src/test), registered as
+# the single ctest test "manifest_tests" (src/test/CMakeLists.txt:
+# add_test(NAME manifest_tests COMMAND inputstream.adaptive_test
+# "${TEST_DATA_DIR}")). The suite compiles the production sources with
+# -DINPUTSTREAM_TEST_BUILD (every Kodi include routes to src/test/KodiStubs.h
+# stubs), needs no Kodi host, and runs offline over the local manifest
+# fixtures (src/test/manifests: mpd/ 30+, hls/ 17, ism/ 4 sample files).
+# Upstream CI runs it via "make CTEST_OUTPUT_ON_FAILURE=1 test"
+# (.github/workflows/build.yml, "Run tests" step).
+# Case census (grep 'TEST(' over the four gtest translation units):
+# TestDASHTree.cpp 30, TestHLSTree.cpp 16, TestSmoothTree.cpp 3,
+# TestUtils.cpp 9 -> 58 cases.
+upstream_check_command: "ctest -V -R manifest_tests (wired in recipe build() via cmake.test)"
+upstream_test_in_build: true
+upstream_test_command: "inputstream.adaptive_test <src>/src/test/manifests"
+upstream_tests:
+  - file: "src/test/ (TestDASHTree/TestHLSTree/TestSmoothTree/TestHelper/TestUtils/TestMain)"
+    description: |
+      Upstream gtest manifest_tests suite: 58 cases
+      (DASH 30 / HLS 16 / Smooth 3 / Utils 9), offline local fixtures.
+    command: "inputstream.adaptive_test <src>/src/test/manifests (via ctest -V)"
+
+# Consumer-side tests (test_package)
+test_package_tests:
+  - file: test_inputstream_adaptive.cpp
+    description: |
+      Part 1 (6 assertions): links the built inputstream.adaptive shared
+      module and executes the ADDONCREATOR-exported C entry points
+      ADDON_GetTypeVersion/ADDON_GetTypeMinVersion (pure functions, no Kodi
+      host needed): asserts inputstream instance API 3.3.0/3.3.0, general API
+      1.0.5/1.0.4, main API 2.0.2/2.0.0, proving the vendored kodi-dev-kit
+      headers compiled in.
+      Part 2 (13 assertions, full-consumer flow over the stable C ABI):
+      dlopen()s the packaged module by its relative DT_SONAME (the test
+      binary links it, so dlopen by soname attaches to the loaded module —
+      the standard way a binary-add-on host obtains the module handle),
+      dlsym()s the ADDONCREATOR factory export ADDON_Create, and drives a
+      real host-stub declaration: ADDON_Create instantiates the real
+      CMyAddon and the add-on wires its KodiToAddonFuncTable_Addon;
+      create_instance(ADDON_INSTANCE_INPUTSTREAM) constructs the real
+      CInputStreamAdaptive and wires open/close/get_capabilities;
+      GetCapabilities must report exactly the upstream mask
+      IDEMUX|IPOSTIME|IDISPLAYTIME|SEEK|PAUSE|ICHAPTER (0x5F);
+      get_time/get_total_time return 0 without an open session (upstream
+      null-session guards); destroy_instance/destroy/dlclose tear down
+      cleanly. Every failure exits non-zero.
+      Part 3 (7 assertions, OHOS-specific adaptation points — mandatory new
+      cases for this port): (a) module re-opens by relative DT_SONAME after
+      dlclose; (b) dladdr maps the module to a real libinputstream.adaptive
+      file on the OHOS filesystem (runtime mapping proof); (c)
+      RTLD_NOLOAD by the relative SONAME returns the loaded module
+      (soname registered with the loader — CI L5a complement); (d)
+      dlopen(RTLD_NOW) full-closure resolution on OHOS musl (every undefined
+      symbol resolves in its own DT_NEEDED closure at load — the module is
+      self-contained: static PIC bento4/mpegts/webm_parser/cdm/pugixml baked
+      in); (e-g) musl libc semantics the production code relies on:
+      timegm (oscompat _mkgmtime substitute) converts 2024-01-02T03:04:05Z to
+      1704164645, gmtime(0) inverts the epoch, strcasecmp is
+      case-insensitive, snprintf+PRIu64 formats UINT64_MAX.
+    command: "./test_inputstream_adaptive"
+    assertion_count: 26
+
+assertion_count: 26
+
+notes: |
+  上游测试真实执行：recipe build() 内 ctest -V 跑 inputstream.adaptive_test
+  （add_test(manifest_tests)，58 个 gtest 用例，本地 fixtures 离线），
+  对应上游 CI 的 "make CTEST_OUTPUT_ON_FAILURE=1 test"。
+  消费者测试为真实执行，分三部分（26 项断言）：
+  - Part 1（6）：ADDONCREATOR 导出的 ADDON_GetTypeVersion/MinVersion 断言
+    inputstream=3.3.0/3.3.0、general=1.0.5/1.0.4、main=2.0.2/2.0.0；
+  - Part 2（13）：dlopen(SONAME) + dlsym ADDON_Create 工厂导出，以最小
+    Kodi 宿主桩走真实实例声明：ADDON_Create 实例化真实 CMyAddon；
+    create_instance 构造真实 CInputStreamAdaptive 并布线 open/close/
+    get_capabilities；GetCapabilities 精确断言上游掩码
+    IDEMUX|IPOSTIME|IDISPLAYTIME|SEEK|PAUSE|ICHAPTER=0x5F；无会话时
+    get_time/get_total_time 返回 0；destroy_instance/destroy/dlclose
+    无崩溃收尾；
+  - Part 3（7，本移植 OHOS 适配点新增用例）：dlclose 后按相对 SONAME 重开；
+    dladdr 命中真实 libinputstream.adaptive 文件（设备运行时映射）；
+    RTLD_NOLOAD 按相对 SONAME 命中已加载模块（与 CI L5a 互补）；
+    OHOS musl dlopen 全闭包解析（模块自含：静态 PIC
+    bento4/mpegts/webm_parser/cdm/pugixml 编入）；musl timegm 语义
+    （oscompat _mkgmtime 替代路径）、gmtime 逆变换、strcasecmp、
+    PRIu64 格式化。

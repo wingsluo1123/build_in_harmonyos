@@ -1,0 +1,53 @@
+version: "21.5.16"
+status: built
+build_date: "2026-10-02"
+conan_ref: "kodi-inputstream-adaptive/21.5.16"
+
+source:
+  url: "https://github.com/xbmc/inputstream.adaptive/archive/refs/tags/21.5.16-Omega.tar.gz"
+  sha256: "da61399c2aa3f1f67b4e3f293952b0fa16c90a7e1effa606f99676ff8144d25e"
+  tar_format: tar.gz
+  # 版本映射：产品版本 21.5.16 对应上游 tag 21.5.16-Omega
+  # （tag commit 0b4dbaeffd175c4cddd32f7fd61cf81f12bda27d）
+  kodi_dev_kit_headers:
+    # 内嵌于版本目录 kodi-dev-kit/kodi（= xbmc/addons/kodi-dev-kit/include/kodi 原样内容；
+    # 归一化掉 include/ 路径段，避开仓库 .gitignore 的 archives/**/include/ 规则）
+    origin_tarball: "https://github.com/xbmc/xbmc/archive/refs/tags/21.3-Omega.tar.gz"
+    origin_tarball_sha256: "a60afcb556e4a00cb19fc35b7e77758107c9a8096c6ce9b66af5f92396be31aa"
+    vendored_subpath: "xbmc/addons/kodi-dev-kit/include/kodi -> kodi-dev-kit/kodi"
+  bento4_vendored:
+    # 上游 depends/common/bento4/bento4.txt pin 的 xbmc fork（FindBento4
+    # ENABLE_INTERNAL_BENTO4 路径显式 -fPIC）；registry 的 bento4/1.6.0-641
+    # 是 axiomatic-systems 官方上游（版本族不同），故按 E277 vendored 模式
+    # 随 conandata 固定 URL/SHA256、source() 抽取、recipe-cmake 内编静态 PIC 库
+    url: "https://github.com/xbmc/Bento4/archive/refs/tags/1.6.0-641-3-Omega.tar.gz"
+    sha256: "a9b231b63159b3a4d9e47c5328b476308852bf092ccb9ce98f7cf46a386465ce"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON（插件为 Kodi dlopen 模块，shared=True 默认）"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON（链入共享模块的静态库必须 PIC）"
+    - "-Wl,-soname,libinputstream.adaptive.so（OHOS 平台 CMake 不发 soname，CI L5a 门禁）"
+  dependencies:
+    - pugixml/1.16（静态 PIC，编入模块）
+    - rapidjson/1.1.0.1（header-only）
+    - gtest/1.17.0（仅上游 gtest 测试链接；上游 FindGtest 门槛 >=1.10，
+      上游 depends pin 的是 googletest 1.14.0，未发布到 registry——registry
+      实际发布的是独立包 gtest/1.17.0，也是 registry rapidjson/1.1.0.1
+      recipe 的传递依赖，图内保持单一 gtest 包）
+    - bento4：xbmc fork 1.6.0-641-3-Omega 内编静态 PIC 库（E277 vendored 模式）
+    - lib/mpegts、lib/webm_parser、lib/cdm：上游树内静态库（上游 CMakeLists 原样消费）
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游 CMakeLists 的 find_package(Kodi)/build_addon() 在 registry 无 Kodi 构建系统时不可用；仿 kodi-inputstream-rtmp/21.1.2 用 recipe-cmake/ 自备构建入口，且可直接 include 上游 Helpers.cmake 复用 add_dir_sources 宏——上游 src/ 子目录 CMakeLists 只向 GLOBAL property 声明文件清单，新增 SHARED 目标消费 GlobalSourceList 即可零复制上游源列表"
+  - "registry 的 googletest 包无 1.14.0/1.15.2（仅 1.12.1/1.17.0/1.18.0）；上游 FindGtest 门槛 gtest>=1.10，选 registry 独立包 gtest/1.17.0（cmake_file_name=gtest，target=gtest::gtest，TestMain 自带 main 不链 gtest_main；也是 registry rapidjson/1.1.0.1 recipe 的传递依赖包）"
+  - "上游 gtest 套件不需要 Kodi 宿主：生产源码用 #ifdef INPUTSTREAM_TEST_BUILD #include \"test/KodiStubs.h\" 条件路由（相对 include 经 -I<src> 解析到 src/test/KodiStubs.h），42+ 个编译单元带 -DINPUTSTREAM_TEST_BUILD 编译，add_test 传 manifests 目录为 DATADIR，离线可跑"
+  - "上游测试的 .cpp 列表（src/test/CMakeLists.txt）与模块源列表（src/ 子目录声明）不同：测试只编 44 个单元（无 main.cpp/demuxers/samplereader/codechandler/widevine），不能直接复用模块目标"
+  - "上游 pin 的 bento4 是 xbmc fork 1.6.0-641-3-Omega（depends/common/bento4），registry bento4/1.6.0-641 是 axiomatic-systems 官方上游、版本族不同；按 FindBento4 ENABLE_INTERNAL_BENTO4 语义内编 fork 静态 PIC 库（ap4），include 布局用 staging 目录提供 <bento4/Ap4.h> 风格（E277 vendored 模式）"
+  - "standalone 构建无 CORE_SYSTEM_NAME 时上游 decrypters/CMakeLists 走 add_subdirectory(widevine)（编入 widevine+lib/cdm，纯 C++ 可编译）；cdm_aarch64_loader 仅在 CMAKE_SYSTEM_NAME=Linux 注册，HarmonyOS 与上游行为一致跳过"
+  - "kodi-dev-kit 头的 kodi/platform/android/System.h 是自含桩（无 jni.h 依赖，仅函数指针表+inline 方法），生产源码 src/Session.h 未加守卫地包含它也能在非 Android 平台编译"
