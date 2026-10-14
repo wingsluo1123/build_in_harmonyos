@@ -1,0 +1,23 @@
+package: port-for/1.0.0
+homepage: "https://github.com/fizyk/port-for"
+upstream_check_command: "python -m pytest tests --collect-only -q"
+upstream_test_in_build: true
+upstream_test_command: "python -m pytest tests -ra"
+upstream_tests:
+  - file: tests/test_cases.py
+    source: port_for-1.0.0/tests/test_cases.py
+    description: "15 upstream pytest items plus one added unordered-set regression; original assertions retained"
+    command: "python -m pytest tests/test_cases.py"
+  - file: tests/test_select_port.py
+    source: port_for-1.0.0/tests/test_select_port.py
+    description: "2 upstream pytest items; 100 repeated checks inside one item are not 100 cases"
+    command: "python -m pytest tests/test_select_port.py"
+  - file: tests/test_store.py
+    source: port_for-1.0.0/tests/test_store.py
+    description: "5 upstream pytest items"
+    command: "python -m pytest tests/test_store.py"
+test_package_tests:
+  - file: consumer.py
+    description: "1 installed-package flow, 11 functional checks, 2 identity assertions"
+    command: "python consumer.py --package-folder <Conan-package-folder>"
+assertion_count: 13
