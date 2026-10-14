@@ -1,0 +1,21 @@
+Fix shared-library creation on OHOS/Linux with clang.
+
+Upstream's clang branch replaces CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS with the
+(C++) flags plus the macOS-only "-undefined dynamic_lookup".  On the OHOS
+toolchain CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS is empty, so the resulting link
+line lacks "-shared" and clang tries to link an executable, failing with
+"undefined symbol: main" plus all Pd API symbols.  Use the plain Linux shared
+flag instead.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -88,8 +88,8 @@
+   set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/package" CACHE PATH "Package destination folder" FORCE)
+ endif()
+ 
+ if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang$")
+-  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "${CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS} -undefined dynamic_lookup")
++  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-shared")
+ endif()
+ 
+ # Get git info
