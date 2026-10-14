@@ -1,0 +1,37 @@
+version: "1.6.10.1"
+software: "4ti2"
+status: built
+build_date: "2026-10-04"
+build_system: "autotools"
+source:
+  url: "https://github.com/4ti2/4ti2/releases/download/Release_1_6_10/4ti2-1.6.10.tar.gz"
+  sha256: "f7c191beb14246b643e4fd5b18b53d9966693b9e6d3a569441a0e3ca14b1a86b"
+  tar_format: tar.gz
+build:
+  system: autotools
+  configure_options:
+    - "--with-gmp=<gmp_pkg>"
+    - "--with-glpk=<glpk_pkg>"
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+  dependencies:
+    - glpk/5.0
+    - gmp/6.3.0.1
+  cc: clang
+  cxx: clang++
+patches_applied: []
+# patches_applied 为空：所有 OHOS 适配均在 conanfile.py build() 内联完成（configure
+# 的 mktemp→mkdir、test/*.in 模板 shebang），不使用 patches/*.patch 文件；因此
+# R8/PF5 平台宏闸天然无风险——配方与内联修改均未引入 __OHOS__ 宏。
+knowledge_gained:
+  - "OHOS: config.guess cannot recognize OHOS, pass --build/--host=aarch64-unknown-linux-musl"
+  - "OHOS: config.status mktemp -d with umask 077 creates setgid dirs without group-execute. Inline-patch configure to use mkdir."
+  - "OHOS: test scripts use #!/bin/bash but bash is at /data/service/hnp/bin/bash. Inline-patch test/*.in templates BEFORE configure (configure generates the runnable scripts)."
+  - "OHOS: CONFIG_SHELL must be set to /data/service/hnp/bin/bash"
+  - "4ti2 arbitrary-precision backend requires a GMP built with --enable-cxx (gmpxx.h/libgmpxx). Switching gmp/6.3.0 -> gmp/6.3.0.1 turns on HAVE_GMP_WITH_CXX: lib4ti2gmp.a + 4ti2gmp build, and the gmp/ test subdirs (groebner/markov/qsolve) activate, adding 21 CLI calls (235 -> 256)."
+  - "Conan version conflict: glpk/5.0 requires gmp/6.3.0 while this package needs gmp/6.3.0.1. force=True unifies the graph; verified safe because libglpk.so has no DT_NEEDED on libgmp and both share SONAME libgmp.so.10. force changes glpk package_id, so the published glpk binary was re-registered locally to the new id with conan cache save/restore (no rebuild)."
+  - "Conan 2.29 API: use self.output.warning(...) (self.output.warn was removed)."
+  - "Test runner note: run make check -j1 (not -j2): the jobserver mkfifo fails on HMDFS ('Operation not permitted') and parallel sub-makes produced incomplete/garbled runs."
+upstream_test_results:
+  cli_tool_calls: "256/256 passed (100.0%), 0 failed"
+  api_programs: "6/6 passed (qsolve_main, rays_main, circuits_main, test_input_conversion_64_to_gmp, test_input_conversion_gmp_to_64, test_zsolve_api)"

@@ -23,3 +23,4 @@ Autotools (configure + make)
 
 ## Versions
 - 1.6.10 — built 2026-09-17 (R34 real API test + upstream make check 231/235 + API 4/4 on device)
+- 1.6.10.1 — built 2026-10-04 (gmp/6.3.0.1 C++ backend; upstream make check 256/256 CLI calls + API 6/6 on device, 0 failed)
