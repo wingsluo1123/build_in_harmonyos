@@ -1,0 +1,25 @@
+# 软件级 manifest — synscan
+software: synscan
+display: "synscan"
+description: "Synscan — 高性能 SYN 端口扫描工具（synscan 发送 SYN 包，sslog 监听 SYN/ACK 回应），实现为两个命令行程序"
+category: network
+homepage: "https://digit-labs.org/files/tools/synscan/"
+license: GPL-2.0
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "synscan 是纯工具（synscan + sslog 两个二进制），其核心扫描依赖原始套接字(SOCK_RAW)+libpcap，运行时要求 root 且需原始套接字能力；在 OHOS 上编译可行、运行扫描需要相应系统权限，消费者测试聚焦无权限需求的核心解析逻辑 + 二进制 -V/-h 冒烟。"
+    - "configure 硬性要求 libpcap，配方通过 self.requires(\"libpcap/1.10.6\") 拉取发布的 libpcap，并把其 include/pcap/pcap.h 与 lib/libpcap.a 暂存到 --with-libpcap=<stage> 目录供 configure 探测与链接。"
+    - "该 2011 年老 autoconf configure 只定义 ac_config_guess/ac_config_sub 从不执行，故无需 config.guess/config.sub 也能在 OHOS 上 configure；仅在明确 CC 下用 AC_PROG_CC 检查编译器。"
+    - "配方把 net.c/common.c/obuf.c（纯解析逻辑，不依赖 libpcap）归档为 libsynscan.a 并随包发布，test_package 链接该库真实调用 net_parse_portlist/net_parse_iplistv4/迭代器/net_ipv4_parse_flags 等接口，作为无 root 环境下的诚实功能验证。"
+    - "二进制安装不走 make install（其 install 目标会 strip 且用 @INSTALL_PROGRAM@），配方在 package() 手动 copy 两个二进制与静态库/头文件，规避 OHOS 上 strip/install 兼容问题。"
+
+  common_dependencies:
+    - "libpcap"
+
+versions:
+  "5.02":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "synscan/5.02"

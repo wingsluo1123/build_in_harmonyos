@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml — synscan 5.02
+# 上游官方测试声明文件（CI 强制要求存在；详见 docs/TEST_QUALITY_SPEC.md）
+#
+# 结论：上游 synscan 5.02 发布 tarball 没有可注册的自动化测试
+# （upstream_tests_exist: false），按 no_tests 如实上报
+# （status=no_tests, discovered=0, executed=0）。
+
+package: synscan/5.02
+homepage: "https://digit-labs.org/files/tools/synscan/"
+
+# ── 上游测试套件存在性（经审计官方 5.02 发布 tarball 确认）──────────────
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+
+upstream_test_audit:
+  - source: "synscan-5.02/Makefile.in"
+    finding: "顶层 Makefile.in 只定义 default / freebsd / linux / macos / netbsd / openbsd / solaris-sparc-gcc 构建目标与 synscan/sslog/install/clean/distclean；没有任何 check / TESTS / check_PROGRAMS / check-local / XFAIL_TESTS 自动化测试目标。grep -rnE '(^|[^A-Za-z_])TESTS|check_PROGRAMS|check-local|check_SCRIPTS' Makefile.in configure.in 无命中。"
+  - source: "synscan-5.02/configure.in"
+    finding: "configure.in 只含 AC_INIT/AC_CONFIG_SRCDIR/AC_CONFIG_HEADER/AC_PROG_CC/AC_PROG_INSTALL/AC_HEADER_STDC/AC_CHECK_HEADERS/AC_CHECK_FUNCS、libpcap 探测（AC_CHECK / --with-libpcap）、getopt_long 探测与 AC_CONFIG_FILES；没有任何测试宏（无 AC_CONFIG_TESTDIR、无 test 相关 AC_ARG_ENABLE）。make check 无注册用例。"
+  - source: "synscan-5.02 发布包目录布局"
+    finding: "包内只有 11 个源/配置文件（synscan.c sslog.c net.c common.c obuf.c 及对应 .h、Makefile.in、configure、configure.in、config.h.in、README、LICENSE、AUTHORS、install-sh），无 t/ tests/ test/ 目录，无任何测试源码、测试脚本或测试框架文件。"
+  - source: "synscan-5.02/README"
+    finding: "README 仅说明工具用途（synscan 发 SYN 包、sslog 监听回应）与 GPL 声明，未提及任何测试或 make check。"
+  - source: "conclusion"
+    finding: "上游 synscan 5.02 没有任何可注册/可执行的自动化测试；按 no_tests 如实上报（status=no_tests, discovered=0, executed=0）。功能/解析逻辑/二进制冒烟的消费者视角验证由 test_package 在真机实跑（20 项 parse-API 断言 + synscan/sslog -V）。"
+
+upstream_tests: []
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# ── test_package 自带的消费者视角测试（上游无测试，适配后补全，真机实跑）──
+test_package_tests:
+  - file: test.sh
+    description: >-
+      3 个独立消费者用例（test.sh 确定性计数 SYNSCAN_TEST_*，discovered=3）：
+      (A) bin/synscan -V → 打印版本 + 退出码 0（在参数解析阶段提前退出，早于
+          root/raw-socket 路径）；
+      (B) bin/sslog -V → 打印版本 + 退出码 0（同上）；
+      (C) ./test_synscan_api → CMake 编译的消费者程序，链接随包发布的
+          libsynscan.a，真实调用 net_parse_portlist / net_parse_iplistv4 /
+          net_portlist_sum / net_iplistv4_sum / 端口与 IP 迭代器 /
+          net_ipv4_parse_flags 共 20 项断言，全部通过则退出码 0。
+    command: 'bash test.sh <package_folder> <test_bin>（由 test_package/conanfile.py 经 bash 实跑，解析 SYNSCAN_TEST_* 生成 HMBS_TEST_PACKAGE_RESULT）'
+    assertion_count: 22
+
+# 测试断言总数（消费者视角）：3 个用例 + 20 项 API 断言 = 23；其中 20 项
+# API 断言收拢在用例 C 内部（用例级计 3，断言级计 22 = 20 API + 2 个 -V 退出码）
+assertion_count: 22
+test_package_test_count: 3

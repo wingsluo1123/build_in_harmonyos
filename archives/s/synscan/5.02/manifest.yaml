@@ -1,0 +1,61 @@
+# 版本级 manifest — synscan 5.02
+# 文件位置: archives/s/synscan/5.02/manifest.yaml
+
+version: "5.02"
+software: "synscan"
+
+# 编译状态: published | built | failed
+status: built
+
+build_date: "2026-10-12"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://digit-labs.org/files/tools/synscan/releases/synscan-5.02.tar.gz"
+  sha256: "c4e6bbcc6a7a9f1ea66f6d3540e605a79e38080530886a50186eaa848c26591e"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  configure_options:
+    - "--with-libpcap=<libpcap 暂存目录>"
+    - "--prefix=/"
+  dependencies:
+    - "libpcap/1.10.6"
+  cc: clang
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "synscan 5.02 是 2011 年老 autotools 纯工具（Makefile.in + configure），产物为 synscan 与 sslog 两个二进制；configure 硬性要求 libpcap（AC_ERROR），而 synscan 二进制本身并不用 pcap（只有 sslog 用），但构建仍需满足 configure 探测。"
+  - "配方把已发布的 libpcap/1.10.6 的 include/pcap/pcap.h 与 lib/libpcap.a 暂存到 build 私有 stage 目录，configure 传 --with-libpcap=<stage>；该老 configure 对 --with-libpcap 只需 -f $withval/pcap.h -a -f $withval/libpcap.a 文件存在，不做链接测试，随后设 CFLAGS -I/-L/-lpcap。"
+  - "该老 autoconf（2011, ~2.59）只定义 ac_config_guess/ac_config_sub 字符串从不执行，因此不需要 config.guess/config.sub，也无需 --build/--host 三元组；仅在明确 CC 下用 AC_PROG_CC，OHOS 上可直接 configure。"
+  - "net.c/common.c/obuf.c（纯解析逻辑，零 libpcap 依赖）归档为 libsynscan.a 随包发布：net_parse_portlist/net_parse_iplistv4/迭代器/net_iplistv4_sum/net_portlist_sum/net_ipv4_parse_flags 等是无可 raw socket/root 依赖、真机可跑的核心逻辑，test_package 链接 libsynscan.a 以 20 项断言覆盖。"
+  - "synscan/sslog -V 在 parse_args 阶段即 exit(EXIT_SUCCESS)，早于 root 检查与 raw socket/pcap 打开；-h 打印用法并 exit(1)。真机消费者测试用 -V/-h 做二进制冒烟，不触碰需要 root 的扫描路径。"
+  - "二进制安装不走 make install（其 install 目标 strip + @INSTALL_PROGRAM@，在 OHOS 上可能有意外的 strip/install 兼容问题），package() 手动 copy 两个二进制 + 静态库 + 5 个公共头文件。"
+  - "net_parse_portlist 用 strtok/strchr 原地改写入参，必须传可变缓冲区（字符串字面量会段错误）；net_portlist_add 头插法导致迭代顺序与解析顺序相反；net_parse_portlist_item 对端口号无上界校验（70000 被截断为 4464 仍接受）；net_ipv4_parse_flags 对未知标志只 warning 不返回错误。这些上游真实行为在测试断言里如实反映（证伪后按实际行为断言）。"
+
+# ============================================================
+# 上游测试审计
+# ============================================================
+# 结论：上游 synscan 5.02 发布 tarball 无任何自动化测试（无 make check / TESTS /
+# check_PROGRAMS / 测试目录），按 no_tests 如实上报。
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+upstream_test_audit: "审计 synscan-5.02 发布 tarball：makefile 仅定义 default/freebsd/linux/macos/netbsd/openbsd/solaris-sparc-gcc/install/clean/distclean 目标，无 check/TESTS/check_PROGRAMS；无 tests/ t/ 测试目录；configure.in 只含 AC_PROG_CC/AC_HEADER_STDC/AC_CHECK_HEADERS/AC_CHECK_FUNCS/libpcap 探测，无任何测试宏；README 仅说明用途。上游自动化测试用例数为 0。"
+reason: "synscan 5.02 上游无任何自动化测试套件（no_tests，discovered=0, executed=0）；消费者视角验证由 test_package 在真机实跑：链接 libsynscan.a 调用 20 项解析 API 断言 + synscan/sslog -V 二进制冒烟。"
+test_package_test_count: 3
+assertion_count: 22
