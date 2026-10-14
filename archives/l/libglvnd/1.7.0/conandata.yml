@@ -1,0 +1,19 @@
+sources:
+  # Official upstream GitLab archive is unreachable from some CI workers and the
+  # CI pre-download helper has no mirror fallback for gitlab.freedesktop.org, so
+  # pin the GitHub mirror instead: CI appends a gh-proxy fallback for github.com
+  # URLs automatically (R39). Content verified identical to the upstream
+  # v1.7.0 GitLab archive (same sources, same tests, both patches apply cleanly).
+  url:
+    - "https://gh-proxy.com/https://github.com/NVIDIA/libglvnd/archive/refs/tags/v1.7.0.tar.gz"
+    - "https://github.com/NVIDIA/libglvnd/archive/refs/tags/v1.7.0.tar.gz"
+  sha256: "073e7292788d4d3eeb45ea6c7bdcce9bfdb3b3eef8d7dbd47f2f30dce046ef98"
+  filename: "libglvnd-1.7.0.tar.gz"
+
+patches:
+  - patch_file: "patches/0001-egl-build-libegl-as-static.patch"
+    patch_description: "Build libEGL as a static archive so the package does not shadow the system /system/lib64/libEGL.so (iron rule R26)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-symbols-check-recognise-harmonyos.patch"
+    patch_description: "Teach the upstream symbols check that platform.system() returns HarmonyOS and allow the musl/CRT bookkeeping symbols it ignores on Linux"
+    patch_type: "portability"
