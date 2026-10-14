@@ -1,0 +1,54 @@
+package: libskk
+version: "1.1.1"
+homepage: "https://github.com/ueno/libskk"
+license: GPL-3.0-or-later
+status: built
+build_system: autotools
+build_date: "2026-10-12"
+
+source:
+  url: "https://github.com/ueno/libskk/releases/download/1.1.1/libskk-1.1.1.tar.xz"
+  sha256: "2d4c15976d459ef0004ce1c0e47506c7859d0b6f4fb104ed837f3326d235bb56"
+
+build:
+  system: autotools
+  shared: false
+  shared_mode_reason: "The available libgee shared artifact statically embeds GLib, so a shared libskk would load a second GType registry on HarmonyOS."
+  configure_options:
+    - "--disable-fep"
+    - "--disable-docs"
+    - "--disable-introspection"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies:
+    - "glib/2.84.0"
+    - "libgee/0.20.8.2"
+    - "json-glib/1.6.6"
+    - "libxkbcommon/1.6.0"
+    - "libintl/0.26.1 (target runtime library for external gettext/NLS)"
+    - "vala/0.56.18 (build tool)"
+    - "gettext/0.22.5.1 (build tool: msgfmt for NLS catalog compilation)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0002-use-abs-srcdir-symbol-list.patch: points libtool at the release archive export list through abs_srcdir"
+
+upstream_tests:
+  command: "make check"
+  test_count: 35
+  targets: 8
+  result: "35 passed, 0 failed across 8 executables; Automake summary: TOTAL 8, PASS 8, SKIP 0, FAIL 0, ERROR 0."
+  notes: "The 35 case count was read from the eight per-executable GLib TAP logs. GObject Introspection is optional and disabled with --disable-introspection; required core dependencies are available from the platform registry."
+
+build_notes:
+  - "The platform Conan packages include libtool .la files staged with prefix=/ and stale dependency paths. The recipe creates build-local wrappers and symlinks or copies their referenced libraries into the overlay, puts that directory first in LDFLAGS, and keeps transitive link flags from Conan. Cached dependency files are left unchanged."
+  - "The upstream out-of-tree tools target searches the source tree for skk-1.0.vapi, although the library generates it in the build tree; the recipe adds build/libskk and the tools target's direct gee-0.8 dependency to VALAFLAGS."
+  - "The available HarmonyOS libgee shared artifact has no GLib DT_NEEDED entry and exports GLib symbols from a static copy. libskk is therefore built static to prevent a second GLib copy in a shared libskk object."
+  - "The official libskk 1.1.1 release archive includes generated configure, aclocal.m4, and Makefile.in files. The recipe invokes configure directly and does not use autoreconf, autopoint, aclocal, or automake. gettext/0.22.5.1 is a build-only requirement for msgfmt; libintl/0.26.1 supplies the target runtime for external gettext. The ja.po catalog and NLS build targets remain enabled and are compiled/installed."
+  - "The upstream default rule lookup uses a fixed configure-time data path; the Conan package sets LIBSKK_DATA_PATH to its installed rules directory through runenv_info."
+
+test_package:
+  assertion_count: 5
+  description: "Create a SkkContext, convert romaji to hiragana, and verify output and preedit."
+  result: "5 assertions passed on the HarmonyOS device."
