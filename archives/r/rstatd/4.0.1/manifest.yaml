@@ -1,0 +1,166 @@
+software: rstatd
+# 版本级 manifest
+# 文件位置: archives/r/rstatd/4.0.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+version: "4.0.1"
+build_system: autotools
+status: built
+build_date: "2026-10-03"
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://downloads.sourceforge.net/project/rstatd/rstatd/4.0.1/rpc.rstatd-4.0.1.tar.gz"
+  sha256: "b1ff2da2fb8516335c8e430a479779630fce4955ad564156da381864bb301843"
+  # 与 Debian/Ubuntu 重打包的 rstatd_4.0.1.orig.tar.gz 同一个 md5，证明是未经改动的上游发布件
+  md5: "116d9a8a35656e76f16c679d0596519a"
+  tar_format: tar.gz
+  size_bytes: 86883
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  # 2005 年的 autoconf 2.59 configure + Makefile（in-tree 构建，srcdir = .）
+  # 实际执行的 configure 行（取自 conan create 日志的 `RUN: .../configure` 行）：
+  #   --prefix=/ --bindir=${prefix}/bin --sbindir=${prefix}/bin --libdir=${prefix}/lib
+  #   --includedir=${prefix}/include --oldincludedir=${prefix}/include
+  #   --build=aarch64-unknown-linux-ohos --host=aarch64-unknown-linux-ohos
+  #   CPPFLAGS=-I<libtirpc>/include/tirpc -I<libtirpc>/include
+  #   LDFLAGS=-L<libtirpc>/lib  LIBS=-ltirpc
+  # 后三项由配方 _tirpc_flags() 注入：libtirpc/1.3.7 已发布的二进制 conaninfo.txt
+  # 里没有任何 cpp_info，消费者拿不到 include 路径也拿不到 -ltirpc。
+  configure_options:
+  - "--prefix=/"
+  - "--bindir=${prefix}/bin"
+  - "--sbindir=${prefix}/bin"
+  - "--libdir=${prefix}/lib"
+  - "--includedir=${prefix}/include"
+  - "--oldincludedir=${prefix}/include"
+  - "--build=aarch64-unknown-linux-ohos"
+  - "--host=aarch64-unknown-linux-ohos"
+  - "CPPFLAGS=-I<libtirpc pkg>/include/tirpc -I<libtirpc pkg>/include"
+  - "LDFLAGS=-L<libtirpc pkg>/lib"
+  - "LIBS=-ltirpc"
+  dependencies:
+  - "libtirpc/1.3.7"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+- patches/0001-rstat_proc.c-portability.patch
+- patches/0002-clients-strrchr-int-getopt.patch
+- patches/0003-getdata.c-modern-kernel-procfs.patch
+- patches/0004-rstat_main.c-portability.patch
+- patches/0005-procfs-collector-data-integrity.patch
+- patches/0006-clients-drop-redundant-kr-decls.patch
+- patches/0007-vendor-generated-rstat.h.patch
+- patches/0008-rstat_main.c-netconfig-free-inetd-transport.patch
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+- "OHOS 无 SunRPC：<rpc/rpc.h> / <rpc/clnt.h> / <rpc/pmap_clnt.h> 与 xdr_*/svc_*/clnt_* 全部由 libtirpc/1.3.7 提供（与 archives/l/libnsl/2.0.1 同一选择）"
+- "libtirpc/1.3.7 已发布的二进制 conaninfo.txt 里完全没有 cpp_info（只有 [settings]/[options]），消费者拿不到 include 路径也拿不到 -ltirpc，表现为 fatal error: 'rpc/rpc.h' file not found；必须在配方里按 package_folder 显式注入 CPPFLAGS/LDFLAGS/LIBS"
+- "rstat_main.c 独立模式把 proto=IPPROTO_UDP 传给 svc_register()，而 TI-RPC 的 svc_register() 会直接返回 pmap_set() 的结果，所以没有 portmapper 时 rpc.rstatd 拒绝启动（exit 1）；inetd 模式下 proto=0，不碰 portmapper"
+- "rstat_service 是 rstat_main.c 注册的手写分发器，对任何版本的 RSTATPROC_STATS 都固定用 xdr_statsusers 序列化（恒 108 字节结果），rstat.x 里 rpcgen 生成的 rstatprog_N 实际未被使用"
+- "rstat_main.c 只注册版本 5/3/2/1，RSTATVERS_VAR(4) 未注册，请求版本 4 会得到 PROG_UNAVAIL"
+- "上游 getdata_setup() 用 strncmp 前缀匹配 uname().release 的 2.2/2.4/2.6 来选 /proc 采集器，比 2.6 新的内核（含鸿蒙 PC）会保留 get_disk() 占位函数，收到第一个 STATS 请求即 exit(EXIT_FAILURE)"
+- "OHOS clang 默认 -fno-signed-char，`char c; (c = getopt(...)) != EOF` 是恒真死循环"
+- "musl 不提供 rindex()（已被 POSIX 移除），用 strrchr() 代替"
+- "musl 无 <sys/cdefs.h>，原型括号宏 __P() 不存在；rstat_proc.c 依赖 glibc 的定义"
+- "glibc-only 头文件 <nlist.h> 的死包含（struct nlist 全树未使用）会让 musl/OHOS 编译失败"
+- "Makefile.am 把 rstat.h 放进 BUILT_SOURCES 用 rpcgen 生成，但发布 tarball 只带另外三个生成文件；OHOS 无 rpcgen 且制品仓无任何包提供它"
+- "rpcgen -h -o rstat.h rstat.x 的输出即内嵌的 rstat.h；rpcgen -c 生成的 rstat_xdr.c 与 tarball 自带的逐字节一致（972 行），证明生成器与上游一致"
+- "in-tree autotools 包（Makefile 里 srcdir = .）不能把 build_folder 与 source_folder 分开"
+- "autoconf configure 里的 `umask 077` 在 HMDFS 上会让 config.status 建不了临时目录（与 sysstat/libnsl 同因）"
+
+# ============================================================
+# 已安装产物（真实数据，取自 conan create 的 package folder）
+# ============================================================
+installed_binaries:
+- name: rpc.rstatd
+  path: bin/rpc.rstatd
+  size_bytes: 157024
+  type: "ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked, interpreter /lib/ld-linux-aarch64.so.1"
+- name: rup
+  path: bin/rup
+  size_bytes: 146776
+  type: "ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked, interpreter /lib/ld-linux-aarch64.so.1"
+- name: rsysinfo
+  path: bin/rsysinfo
+  size_bytes: 145112
+  type: "ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked, interpreter /lib/ld-linux-aarch64.so.1"
+
+installed_data:
+- path: licenses/COPYING
+  size_bytes: 17992
+- path: share/man/man1/rup.1
+  size_bytes: 1734
+- path: share/man/man1/rsysinfo.1
+  size_bytes: 1611
+- path: share/man/man8/rpc.rstatd.8
+  size_bytes: 18
+- path: share/man/man8/rstatd.8
+  size_bytes: 1155
+
+# ============================================================
+# 测试
+# ============================================================
+tests:
+  upstream_tests: 0
+  upstream_test_command: ""
+  upstream_no_tests_reason: >-
+    Makefile.am 没有 TESTS / check_PROGRAMS，automake 生成的 check 目标是空的，
+    发布 tarball 也没有 test/ 目录，make check 无内容可跑。
+  test_package_assertions: 41
+  test_package_result: "41 passed / 0 failed"
+
+# ============================================================
+# 平台注意事项
+# ============================================================
+platform_notes:
+- "OHOS 无 SunRPC，RPC 能力来自 libtirpc/1.3.7；libtirpc 的 svcudp_create() 硬依赖 /etc/netconfig（TI-RPC 把该路径编译进二进制，无 env 可重定向），而鸿蒙 PC 不带此文件 —— 补丁 0008 让 inetd 路径改用 svc_dg_create() 彻底摆脱该依赖（真机 CI #69263 暴露）"
+- "rpc.rstatd 独立模式需要运行中的 portmapper（pmap_set 失败即 exit 1）；inetd 模式不需要，测试走 inetd 模式"
+- "OHOS clang 默认 -fno-signed-char，任何 `char c; while ((c = getopt(...)) != EOF)` 都要改成 int"
+- "musl 不提供 rindex()"
+- "musl 无 <sys/cdefs.h>，无 __P() 宏"
+- "HMDFS: configure/config.status 的 `umask 077` 需放宽为 022"
+
+# ============================================================
+# 2026-10-14 修复（CI 构建 #87224 的真实失败）
+# ============================================================
+fixes:
+  - date: "2026-10-14"
+    ci_build: "87224"
+    symptom: >-
+      test() 第 102 行失败（ConanException: Error 2）；CI 日志里守护进程的
+      syslog 被 LD_PRELOAD 的 syslog shim 透出为
+      '[rstatd-syslog prio=2] cannot parse kernel release "HongMeng Kernel 1.13.0"'，
+      与 notes.md 里 exit(1) 来源表 #1 完全对应。
+    root_cause: >-
+      patches/0003 第一版把 uname().release 整串交给 sscanf("%d.%d")，解析不到
+      就直接 exit(EXIT_FAILURE)。OHOS 的 release 串是 "HongMeng Kernel 1.13.0"，
+      不是 "<major>.<minor>..." 形态 —— 于是「比 2.6 新得多的内核」被判成解析失败，
+      守护进程起不来。这不是内核版本挑剔，而是解析器假定了发行版命名习惯。
+    fix: >-
+      patches/0003 改为先跳到 release 串里第一个数字序列再按 major.minor 解析；
+      仍保留 2.2/2.4 两个上游分支，其余（含 2.10/3.x/1.13）一律选 2.6+ 的
+      /proc/diskstats + /proc/vmstat 采集器；只有「整串没有任何数字」才保留硬失败。
+      patches/0005 的 getdata.c hunk 因 0003 加长 24 行而失效，按 0003 之后的真实
+      源码树重新生成（@@ -326,13 +326,13 @@），其余两项（getdata22.c/getdata26.c 补
+      string.h）原样保留。
+    evidence:
+      - "A/B 对照（logs/kver_check 源码 kver_check.c）：'HongMeng Kernel 1.13.0' 在旧判据下 EXIT(1)、新判据下 get_disk26+get_vm26；2.2/2.4/2.6/3.x/5.x/WSL 串两版判定一致；空串两版都硬失败"
+      - "补丁按序套用（0001..0008）在真实上游源码树上 dry-run 与实套全部 rc=0"
+      - "本机 conan create（profile ohos-aarch64-wsl）：test_rstatd == 41 checks, 0 failed == / RESULT: PASS"

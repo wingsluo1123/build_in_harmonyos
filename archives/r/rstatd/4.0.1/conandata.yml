@@ -1,0 +1,86 @@
+# conandata.yml - rstatd 4.0.1
+# Official upstream source: the rstatd SourceForge project (http://rstatd.sourceforge.net/),
+# release file rpc.rstatd-4.0.1.tar.gz.  The md5 of this tarball
+# (116d9a8a35656e76f16c679d0596519a) is identical to the `rstatd_4.0.1.orig.tar.gz`
+# that Debian (rstatd 4.0.1-3..-12) and Ubuntu (rstatd 4.0.1-11) repackage, which
+# confirms the file is the unmodified upstream release.
+# SHA-256 verified by download on 2026-10-03 (86883 bytes, tarball root directory
+# `rpc.rstatd-4.0.1`, stripped by get(strip_root=True)).
+sources:
+  url: "https://downloads.sourceforge.net/project/rstatd/rstatd/4.0.1/rpc.rstatd-4.0.1.tar.gz"
+  sha256: "b1ff2da2fb8516335c8e430a479779630fce4955ad564156da381864bb301843"
+
+patches:
+  - patch_file: "patches/0001-rstat_proc.c-portability.patch"
+    patch_description: >-
+      OHOS 兼容：删除 `#ifndef __GLIBC__ #include <nlist.h> #endif` 死代码包含（struct nlist
+      在整个源码树中从未被引用，musl/OHOS 也没有该头文件），并在缺少 glibc <sys/cdefs.h>
+      的情况下按 glibc 自身的定义补上原型括号宏 __P()。两个改动都不引入平台宏。
+    patch_type: "portability"
+
+  - patch_file: "patches/0002-clients-strrchr-int-getopt.patch"
+    patch_description: >-
+      OHOS 兼容：rup.c / rsysinfo.c 用已被 POSIX 移除、musl 从未提供的 rindex() 提取
+      argv[0] 的基名，改用语义完全相同的标准函数 strrchr()；同时把 `char c` 改成
+      `int c`。OHOS clang 默认 -fno-signed-char，`(c = getopt(...)) != EOF` 永远为真，
+      两个客户端的参数循环会死循环。补丁不含平台宏。
+    patch_type: "portability"
+
+  - patch_file: "patches/0003-getdata.c-modern-kernel-procfs.patch"
+    patch_description: >-
+      功能适配（R40）：getdata_setup() 原本用 strncmp 把 uname().release 与 "2.2"/"2.4"/
+      "2.6" 做字面前缀比较来选择 /proc 采集器。任何比 2.6 新的内核（3.x/4.x/5.x/6.x，
+      包含鸿蒙 PC 的 Linux 内核）三个分支都不匹配，getdata.disk 会保留初值 get_disk()，
+      即那个 syslog "dummy function, should never be called!" 并 exit(EXIT_FAILURE) 的
+      占位函数——守护进程收到第一个 STATS 请求就会死。改为按数值比较主次版本号：2.2/2.4
+      的赋值原样保留，2.5 及以上一律走 2.6 引入的 /proc/diskstats + /proc/vmstat 采集器。
+    patch_type: "portability"
+
+  - patch_file: "patches/0004-rstat_main.c-portability.patch"
+    patch_description: >-
+      OHOS 兼容：补 <string.h>（strcmp 之前是隐式声明）、删除与 rstat_proc.h 真实原型冲突的
+      `extern void rstat_service();` 空参数重声明、并把 getsockname() 的 fromlen 从未初始化
+      变量改为 `socklen_t fromlen = sizeof(struct sockaddr_in)`。补丁不含平台宏。
+    patch_type: "portability"
+
+  - patch_file: "patches/0005-procfs-collector-data-integrity.patch"
+    patch_description: >-
+      正确性：getdata.c 三处 memset() 的参数顺序颠倒（memset(p, sizeof(T), 0) 实际写入 0
+      字节），导致 getdata_collect() 根本没有清空回复结构体，上一次 RPC 调用残留的值会混进
+      下一次应答（磁盘/负载/网络字段）；getdata22.c 与 getdata26.c 调用 strncmp 却没包含
+      <string.h>。均为与平台无关的上游缺陷修复。
+    patch_type: "correctness"
+
+  - patch_file: "patches/0006-clients-drop-redundant-kr-decls.patch"
+    patch_description: >-
+      清理：0002 补的 <string.h> 已经提供了 bzero()/bcopy() 的真实原型，rup.c / rsysinfo.c
+      里的 K&R 空参数重声明 `void bzero(); void bcopy();` 变成冗余且与原型冲突，删除之。
+    patch_type: "cleanup"
+
+  - patch_file: "patches/0007-vendor-generated-rstat.h.patch"
+    patch_description: >-
+      构建必需：Makefile.am 把 rstat.h 列入 BUILT_SOURCES 并用 `rpcgen -h -o rstat.h rstat.x`
+      生成，发布 tarball 只带了另外三个生成文件（rstat_svc.c / rstat_clnt.c / rstat_xdr.c），
+      而 OHOS 没有 rpcgen，制品仓也没有任何包提供它（conan download 逐个探测，见 notes.md）。
+      本补丁带入 rpcgen 对未修改的 rstat.x 生成的 rstat.h。该文件是 rpcgen 对未修改的 rstat.x 的确定性输出，可逐字复核：
+      `rpcgen -h -o rstat.h rstat.x`  -> 与本补丁逐字节相同；
+      `rpcgen -c -o rstat_xdr.c rstat.x`  -> 与 tarball 自带的 rstat_xdr.c 逐字节相同
+      （972 行，sha256 一致），证明所用生成器与上游一致。
+    patch_type: "build"
+
+  - patch_file: "patches/0008-rstat_main.c-netconfig-free-inetd-transport.patch"
+    patch_description: >-
+      功能适配（CI #69263 真机暴露的阻塞缺陷）：TI-RPC 的 svcudp_create(fd) 等价于
+      svc_com_create(fd, UDPMSGSIZE, UDPMSGSIZE, "udp")，而 svc_com_create() 的第一件事就是
+      __rpc_getconfip("udp")——解析 /etc/netconfig，解析不到就直接返回 NULL。该路径被编译进
+      二进制（tirpc/netconfig.h 里 NETCONFIG 就是 "/etc/netconfig"），src/getnetconfig.c
+      里也没有任何 getenv()，无法重定向。鸿蒙 PC 不带 /etc/netconfig，于是 svcudp_create()
+      返回 NULL，守护进程在 "cannot create udp service." 处 exit(1)，一个请求都答不上。
+      这次 netconfig 查询只用于解析 nettype、以及在调用方传 RPC_ANYSOCK 时创建套接字；
+      inetd 模式下套接字本来就已在我们的描述符上且已 connect，因此改用 svc_dg_create()——
+      它只调用 __rpc_fd2sockinfo() 和 __rpc_get_t_size()，从不查 netconfig 数据库，构造出的
+      正是同一个数据报 transport（且不像 svc_vc_create() 那样要求 getpeername()、也不会把
+      数据报套接字切到流式 XDR 分帧）。独立模式仍保留 svcudp_create()（那里需要 TI-RPC 自己
+      创建并连接套接字），因此独立模式仍需要 /etc/netconfig，已在 notes.md 记录为运行前提。
+      补丁不含平台宏。
+    patch_type: "portability"

@@ -1,0 +1,37 @@
+--- a/rstat_main.c
++++ b/rstat_main.c
+@@ -117,7 +117,33 @@
+ 	}
+ 	(void)signal(SIGALRM, test_connect);
+ 
+-	transp = svcudp_create(sock);
++	/*
++	 * TI-RPC's svcudp_create() is svc_com_create(fd, UDPMSGSIZE,
++	 * UDPMSGSIZE, "udp"), and svc_com_create() begins with
++	 * __rpc_getconfip("udp"), which parses /etc/netconfig and returns NULL
++	 * when the file is missing.  TI-RPC bakes that path in (tirpc/netconfig.h
++	 * defines NETCONFIG as "/etc/netconfig") and src/getnetconfig.c contains
++	 * no getenv(), so it cannot be pointed elsewhere.  HarmonyOS PC ships no
++	 * /etc/netconfig, so svcudp_create() returns NULL here and the daemon died
++	 * with "cannot create udp service." before answering anything.
++	 *
++	 * That lookup only resolves the nettype and, when the caller passed
++	 * RPC_ANYSOCK, creates and connects the socket.  Under inetd the socket is
++	 * already open on our descriptor and connected, so svc_dg_create() builds
++	 * the very same datagram transport directly - it only calls
++	 * __rpc_fd2sockinfo() and __rpc_get_t_size(), never the netconfig database -
++	 * and, unlike svc_vc_create(), does not require getpeername() and does not
++	 * switch to stream XDR framing that a datagram socket cannot satisfy.
++	 *
++	 * Standalone mode still uses svcudp_create(): there TI-RPC has to create
++	 * and connect the socket itself, and that path still needs
++	 * /etc/netconfig (recorded as a runtime prerequisite in notes.md).
++	 */
++	if (inetd_connect) {
++		transp = svc_dg_create(sock, UDPMSGSIZE, UDPMSGSIZE);
++	} else {
++		transp = svcudp_create(sock);
++	}
+ 	if (transp == NULL) {
+ 		syslog(LOG_ERR, "cannot create udp service.");
+ 		exit(1);
