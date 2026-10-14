@@ -1,0 +1,76 @@
+# 版本级 manifest
+# 文件位置: archives/s/souffle/2.5/manifest.yaml
+
+version: "2.5"
+
+software: souffle
+
+# published | built | failed | archived
+# 真机 rule4 门禁通过前不伪造状态; 待真机验证完成后由 HMBS 更新
+status: built
+
+build_date: "2026-10-10"
+build_system: cmake
+
+conan_ref: "souffle/2.5"
+
+source:
+  url:
+    - "https://gh-proxy.com/https://github.com/souffle-lang/souffle/archive/refs/tags/2.5.tar.gz"
+    - "https://github.com/souffle-lang/souffle/archive/refs/tags/2.5.tar.gz"
+  sha256: "5d009ad6c74ccec10207d865c059716afac625759bff7c8070e529bd80385067"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "SOUFFLE_GIT=OFF"
+    - "SOUFFLE_USE_ZLIB=OFF"
+    - "SOUFFLE_USE_SQLITE=OFF"
+    - "SOUFFLE_USE_LIBFFI=OFF"
+    - "SOUFFLE_USE_CURSES=OFF"
+    - "SOUFFLE_USE_OPENMP=OFF"
+    - "SOUFFLE_ENABLE_TESTING=ON"
+    - "SOUFFLE_TEST_EVALUATION=OFF"
+    - "SOUFFLE_TEST_EXAMPLES=OFF"
+  dependencies:
+    - "tool: flex/2.6.4"
+    - "tool: bison/3.8.2"
+    - "runtime: mcpp/2.7.2"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "souffle 2.5 采用 CMake 构建；源码归档非 git checkout，configure 时 find_package(Git)+git describe 会失败，需 SOUFFLE_GIT=OFF"
+  - "可选功能 zlib/sqlite3/libffi/ncurses/OpenMP 均由 SOUFFLE_USE_* 宏守卫，关闭后仍可完整编译编译器引擎，仅损失对应 IO/显示特性；唯一硬性构建期依赖是 Flex+Bison（词法/语法生成器），以 conan tool_requires 提供"
+  - "上游测试由 CTest 驱动：自包含 C++ 单元测试二进制（label unit_test，共 36 个）可在 OHOS 直接运行；Datalog 功能套件（semantic/syntactic/provenance/profile/scheduler/link/interface 等）compiled 变体需运行时调用 C++ 编译器现场编译生成程序，部分 helper 依赖 gzip/sqlite3，作为 ohos_feature 缺口如实上报"
+  - "安装产物包含 bin/souffle、bin/souffleprof、bin/souffle-compile.py 与 lib/libsouffle.a 及 include/souffle 头，属 application 包，需声明 commands.json"
+
+# ── 上游测试审计（计数口径：ctest_entries，数值以真机 evidence 轮 ctest -N 实测为准）──
+upstream_tests_exist: true
+upstream_test_total: 2468
+upstream_test_count_method: ctest_entries
+upstream_test_audit: >-
+  审计 souffle-2.5 源码：include(CTest) + SOUFFLE_ENABLE_TESTING 注册的
+  上游测试全部由 add_test 产生（口径 ctest_entries）。已核 36 个
+  souffle_add_binary_test（src/tests、src/ast/tests、src/ram/tests、
+  src/interpreter/tests、tests/libsouffle_interface，各对应一个 add_test，
+  标签 unit_test），外加 tests/{semantic,syntactic,provenance,profile,
+  scheduler,link,interface} 的 Datalog 功能套件（每个测试经 SOUFFLE_RUN_TEST*
+  展开为 setup/run/compare 多条 add_test，interpreted+compiled 变体）。
+  注册总数以真机 `ctest -N` 实测为准并在配方的 HMBS_UPSTREAM_TEST_RESULT
+  中以 discovered 上报并回填本字段。基础适配只实际执行自包含 unit_test
+  二进制集（36 项全量），其余功能 ctest 项以 ohos_feature 缺口（count =
+  discovered - executed）如实上报，不伪造通过。
+reason: >-
+  上游具备正式 CTest 测试套件。基础适配（路径 A）在 conanfile build() 中
+  开启 SOUFFLE_ENABLE_TESTING 并执行自包含单元测试二进制（label
+  unit_test），运行后由配方输出 HMBS_UPSTREAM_TEST_RESULT 机器证据
+  （discovered=ctest -N 实测注册总数，executed/passed=unit_test 实际运行）。
+  功能测试 compiled 变体需运行时 C++ 编译器、部分脚本依赖 gzip/sqlite3，
+  记为 ohos_feature 缺口（count=discovered-executed）。真机 evidence 轮以
+  ctest -N 与 unit_test 实测结果回填通过率。
+harmonyos_specific_test_count: 2
+test_package_test_count: 2
