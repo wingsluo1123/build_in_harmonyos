@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conan recipe — dbustest (dbus-test-runner) 19.04.0 (Autotools).
+"""Conan recipe — dbustest (dbus-test-runner) 19.04.0.1 (Autotools).
 
 dbus-test-runner 是 Ubuntu 上隔离运行 D-Bus 测试的库（libdbustest）+ 运行器
 （dbus-test-runner）。官方 release tarball 自带预生成 configure（无需
@@ -24,7 +24,7 @@ from conan.tools.files import copy
 
 class DbustestConan(ConanFile):
     name = "dbustest"
-    version = "19.04.0"
+    version = "19.04.0.1"
     description = "dbus-test-runner — 隔离运行 D-Bus 测试的库与运行器"
     license = "GPL-3.0-or-later"
     homepage = "https://launchpad.net/dbus-test-runner"
@@ -53,11 +53,17 @@ class DbustestConan(ConanFile):
 
     def requirements(self):
         # PKG_CHECK_MODULES(DBUS_TEST_RUNNER, glib-2.0 gio-2.0 gio-unix-2.0
-        # dbus-glib-1)——dbus-glib/0.114 已发布（main 已有适配）。
-        # glib 用 2.88.0（与 dbus-glib/0.114 的依赖版本对齐，避免 2.88.0.1
-        # 冲突）。
-        self.requires("glib/2.88.0", transitive_headers=True, transitive_libs=True)
-        self.requires("dbus-glib/0.114", transitive_headers=True, transitive_libs=True)
+        # dbus-glib-1)——dbus-glib/0.114.1 已发布（main 已有适配：对齐
+        # glib/2.84.0.1 与 expat/2.8.2.1 override，与 gtk3 链可同图）。
+        # glib 用 2.84.0.1（与 dbus-glib/0.114.1 的依赖版本对齐，避免冲突）。
+        self.requires("glib/2.84.0.1", transitive_headers=True, transitive_libs=True)
+        self.requires("dbus-glib/0.114.1", transitive_headers=True, transitive_libs=True)
+        # dbus/1.14.10.1：提供 dbus-daemon 可执行文件（dbus/1.14.10 为
+        # 库-only 发布，无 daemon，dbus-test-runner 自启隔离会话总线需要它；
+        # 1.14.10.1 仅依赖 expat、无 glib，与 gtk3 链不冲突）。dbus-glib/
+        # 0.114.1 对 dbus 声明 1.14.Z 范围（minor mode，package_id 不随
+        # patch 变化），override 到 1.14.10.1 不触发 dbus-glib 重建。
+        self.requires("dbus/1.14.10.1", override=True)
 
     def layout(self):
         basic_layout(self)
@@ -308,6 +314,127 @@ our $VERSION = '2.44';
                      env="conanbuild")
         else:
             self.run("cd {} && make -j1".format(self.source_folder), env="conanbuild")
+        # rule4: 上游 make check 真实执行（此前缺 dbus-daemon 声明 0/5 被审查
+        # 要求补测）。dbus/1.14.10.1 已作为 override 提供 dbus-daemon 可执行
+        # 文件；OHOS 沙箱无 /etc/passwd 记录（getpwuid 失败）且禁 AF_UNIX
+        # bind，需 fakepw LD_PRELOAD shim + TCP session.conf（ANONYMOUS
+        # auth）。测试失败容忍（ignore_errors），真实通过率由 PR 描述申报。
+        self._run_upstream_tests()
+
+    def _run_upstream_tests(self):
+        """rule4: 真实执行上游 make check（dbus-test-runner 编排）。
+
+        dbus-test-runner 自启隔离 dbus-daemon（service.c 从 PATH 找
+        "dbus-daemon"），dbus/1.14.10.1 提供该可执行文件。OHOS 沙箱：
+        - 运行 UID 无 /etc/passwd 记录 → dbus-daemon getpwuid 失败，需
+          LD_PRELOAD fakepw shim（getpwuid/getpwuid_r 返回固定项）；
+        - 禁 AF_UNIX bind + /tmp 只读 → 上游 data/session.conf 的
+          unix:tmpdir=/tmp 无法监听，需 TCP 等价配置 + ANONYMOUS auth
+          （TCP 下 EXTERNAL 认证不可用，client 连接被直接关闭）。
+        测试失败不阻断构建（dee 先例），真实结果由 PR 描述申报。
+        """
+        try:
+            dbus_pkg = self.dependencies["dbus"].package_folder
+        except Exception as exc:
+            self.output.warning(
+                f"dbus dependency unavailable ({exc}); skip make check"
+            )
+            return
+        dbus_daemon = os.path.join(dbus_pkg, "bin", "dbus-daemon")
+        if not os.path.isfile(dbus_daemon):
+            self.output.warning(
+                f"dbus-daemon not found in {dbus_pkg}; skip make check"
+            )
+            return
+        shim_dir = os.path.join(self.build_folder, "test-shim")
+        os.makedirs(shim_dir, exist_ok=True)
+        # ① fakepw getpwuid shim（OHOS 沙箱 UID 无 /etc/passwd 记录）
+        fakepw_c = os.path.join(shim_dir, "fakepw_shim.c")
+        with open(fakepw_c, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(
+                "/* LD_PRELOAD shim: fake getpwuid/getpwuid_r for sandbox UIDs\n"
+                " * that have no /etc/passwd entry (OHOS build workers run as\n"
+                " * uid 20001006/20020101 etc., absent from /etc/passwd). */\n"
+                "#define _GNU_SOURCE\n"
+                "#include <errno.h>\n"
+                "#include <pwd.h>\n"
+                "#include <stdlib.h>\n"
+                "#include <string.h>\n"
+                "static struct passwd fake = {\n"
+                "    .pw_name = \"ohosbuild\", .pw_passwd = \"x\",\n"
+                "    .pw_uid = 0, .pw_gid = 0, .pw_gecos = \"OHOS build\",\n"
+                "    .pw_dir = \"/tmp\", .pw_shell = \"/bin/sh\",\n"
+                "};\n"
+                "struct passwd *getpwuid(uid_t uid) {\n"
+                "    fake.pw_uid = uid; fake.pw_gid = 0; return &fake;\n"
+                "}\n"
+                "int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf,\n"
+                "               size_t buflen, struct passwd **result) {\n"
+                "    if (buflen < 64) { *result = NULL; return ERANGE; }\n"
+                "    fake.pw_uid = uid; fake.pw_gid = 0;\n"
+                "    strncpy(buf, \"ohosbuild\", buflen - 1);\n"
+                "    buf[buflen - 1] = '\\0'; fake.pw_name = buf;\n"
+                "    *pwd = fake; *result = pwd; return 0;\n"
+                "}\n"
+                "struct passwd *getpwnam(const char *name) { (void)name; return NULL; }\n"
+                "int getpwnam_r(const char *name, struct passwd *pwd, char *buf,\n"
+                "               size_t buflen, struct passwd **result) {\n"
+                "    (void)name; (void)pwd; (void)buf; (void)buflen;\n"
+                "    *result = NULL; return 0;\n"
+                "}\n"
+            )
+        fakepw_so = os.path.join(shim_dir, "libfakepw.so")
+        clang = self.conf.get("tools.build:compiler_executables",
+                              default={}, check_type=dict).get("c") or "clang"
+        self.run(f'"{clang}" -shared -fPIC -o "{fakepw_so}" "{fakepw_c}"',
+                 env="conanbuild")
+        # ② dbus-daemon wrapper：LD_PRELOAD + TMPDIR 后再 exec 真 daemon
+        # （dbus-test-runner fork/exec 不继承外部 LD_PRELOAD 环境）
+        daemon_wrapper = os.path.join(shim_dir, "dbus-daemon")
+        with open(daemon_wrapper, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(
+                "#!/bin/sh\n"
+                f"export LD_PRELOAD=\"{fakepw_so}\"\n"
+                f"export TMPDIR=\"{self.build_folder}\"\n"
+                f"exec '{dbus_daemon}' \"$@\"\n"
+            )
+        os.chmod(daemon_wrapper, 0o755)
+        # ③ TCP session.conf（OHOS 禁 AF_UNIX bind）覆盖上游 data/session.conf
+        #    ——tests/Makefile 的 DBUS_RUNNER 写死 --dbus-config
+        #    $(srcdir)/../data/session.conf，故就地覆写源码 data 下的配置。
+        tcp_conf = os.path.join(self.source_folder, "data", "session.conf")
+        with open(tcp_conf, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(
+                "<!DOCTYPE busconfig PUBLIC \"-//freedesktop//DTD D-Bus "
+                "Bus Configuration 1.0//EN\"\n"
+                " \"http://www.freedesktop.org/standards/dbus/1.0/"
+                "busconfig.dtd\">\n"
+                "<busconfig>\n"
+                "  <keep_umask/>\n"
+                "  <type>session</type>\n"
+                "  <listen>tcp:host=127.0.0.1,port=0</listen>\n"
+                "  <auth>ANONYMOUS</auth>\n"
+                "  <allow_anonymous/>\n"
+                "  <policy context=\"default\">\n"
+                "    <allow send_destination=\"*\" eavesdrop=\"true\"/>\n"
+                "    <allow eavesdrop=\"true\"/>\n"
+                "    <allow own=\"*\"/>\n"
+                "  </policy>\n"
+                "</busconfig>\n"
+            )
+        # ④ make check：在 source_folder 内执行（本配方就地构建，非
+        #    out-of-source；顶层 Makefile 的 check-recursive 才会进入
+        #    tests/）。PATH 前置 wrapper 目录（dbus-daemon）+ dbus bin，
+        #    LD_PRELOAD fakepw + TMPDIR。ignore_errors：失败不阻断构建。
+        self.run(
+            f'cd "{self.source_folder}" && '
+            f'export PATH="{shim_dir}:{os.path.join(dbus_pkg, "bin")}:$PATH"; '
+            f'export LD_PRELOAD="{fakepw_so}"; '
+            f'export TMPDIR="{self.build_folder}"; '
+            "make check",
+            env="conanbuild",
+            ignore_errors=True,
+        )
 
     def package(self):
         self.run("cd {} && make install DESTDIR={}".format(self.source_folder, self.package_folder),
