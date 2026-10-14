@@ -1,0 +1,26 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,16 +20,13 @@
+ set (EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
+ 
+ # 设置 CMAKE_INSTALL_LIBDIR 变量  
+-if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "armv8l")
+-        set(CMAKE_INSTALL_LIBDIR "/usr/lib/arm-linux-gnueabihf/")
+-elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "mips64")
+-        set(CMAKE_INSTALL_LIBDIR "/usr/lib/mips64el-linux-gnuabi64/")
+-elseif(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "i686")
+-        set(CMAKE_INSTALL_LIBDIR "/usr/lib/i386-linux-gnu/")
+-else()
+-        set(CMAKE_INSTALL_LIBDIR "/usr/lib/${CMAKE_HOST_SYSTEM_PROCESSOR}-linux-gnu/")
+-endif()
++# 库目录：上游按 CMAKE_HOST_SYSTEM_PROCESSOR 把 CMAKE_INSTALL_LIBDIR 硬编码成
++# /usr/lib/<triplet>/ 绝对路径，打包/交叉编译时会被装进宿主系统目录，
++# 无法重定位。收敛为保持外部（conan toolchain）传入的值。
++set (CMAKE_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+ 
+-set (CMAKE_INSTALL_HEADER_DIR /usr/include/kysdk/kysdk-base)
++# 头文件安装目录改为 prefix 相对路径：原值 /usr/include/... 为绝对路径，
++# 打包/交叉编译时会被装进宿主系统目录（污染 /usr/include），无法重定位。
++set (CMAKE_INSTALL_HEADER_DIR ${CMAKE_INSTALL_INCLUDEDIR}/kysdk/kysdk-base)
+ 
+ add_subdirectory(src)
