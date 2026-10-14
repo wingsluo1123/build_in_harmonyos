@@ -1,0 +1,36 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -70,20 +70,33 @@
+     find_package(${KSANECORE_NAME} "${RELEASE_SERVICE_VERSION_MAJOR}.${RELEASE_SERVICE_VERSION_MINOR}" REQUIRED)
+     add_subdirectory(src)
+     if (BUILD_TESTING)
+         add_subdirectory(autotests)
+         add_subdirectory(tests)
+     endif()
+ else ()
+     add_subdirectory(ksanetwain)
+ endif()
+ 
++# OHOS adaptation: the published KF6 dependency libraries carry no DT_SONAME, so
++# handing their absolute package paths to the linker would record those
++# machine-private paths in DT_NEEDED. Stamp an IMPORTED_SONAME on the KF6
++# imported targets (and clear IMPORTED_NO_SONAME) so the linker is invoked with
++# the library name and ld records only the basename.
++foreach(_ksane_kf6_dep I18n WidgetsAddons TextWidgets Wallet)
++    if(TARGET KF6::${_ksane_kf6_dep})
++        set_property(TARGET KF6::${_ksane_kf6_dep} PROPERTY IMPORTED_NO_SONAME FALSE)
++        set_property(TARGET KF6::${_ksane_kf6_dep} PROPERTY IMPORTED_NO_SONAME_RELEASE FALSE)
++        set_property(TARGET KF6::${_ksane_kf6_dep} PROPERTY IMPORTED_SONAME "libKF6${_ksane_kf6_dep}.so")
++    endif()
++endforeach()
++
+ add_definitions(
+     -DQT_NO_CAST_TO_ASCII
+     -DQT_NO_CAST_FROM_ASCII
+     -DQT_NO_URL_CAST_FROM_STRING
+     -DQT_NO_CAST_FROM_BYTEARRAY
+     -DQT_NO_KEYWORDS
+     -DQT_USE_QSTRINGBUILDER
+     -DQT_NO_NARROWING_CONVERSIONS_IN_CONNECT
+     -DQT_STRICT_ITERATORS
+ )
