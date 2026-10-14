@@ -1,0 +1,67 @@
+--- a/getdata.c
++++ b/getdata.c
+@@ -274,18 +274,53 @@
+ 	getdata.users = get_users;
+ 	getdata.vm = get_vm;
+ 
+-	/* find out about the current kernel version */
+-	memset(&u, sizeof(u), 0);
++	/* find out about the current kernel version.
++	 *
++	 * Upstream picked the /proc collector set with a literal prefix match on
++	 * uname().release against "2.2", "2.4" and "2.6".  A kernel newer than
++	 * 2.6 (3.x, 4.x, 5.x, 6.x -- which includes the Linux kernel behind
++	 * HarmonyOS PC) matches none of the three branches, so getdata.disk kept
++	 * its initial value get_disk(), the placeholder that syslogs "dummy
++	 * function, should never be called!" and calls exit(EXIT_FAILURE).  The
++	 * daemon therefore died on the very first STATS request.  Compare the
++	 * major/minor numbers numerically instead: the original 2.2 and 2.4
++	 * assignments stay untouched and everything from 2.5 upwards goes to the
++	 * /proc/diskstats + /proc/vmstat collectors introduced in 2.6.
++	 *
++	 * 2026-10-14 (CI build #87224): the first revision of this patch fed
++	 * u.release straight to sscanf("%d.%d") and bailed out with
++	 * exit(EXIT_FAILURE) when that returned 0.  On the OHOS worker that is
++	 * exactly what happened:
++	 *   cannot parse kernel release "HongMeng Kernel 1.13.0"
++	 * -- the HarmonyOS kernel release string is not "<major>.<minor>...", so
++	 * the strictly numeric parse rejected a kernel that is in fact far newer
++	 * than 2.6, and the daemon still died before serving anything.  The
++	 * release may carry a vendor prefix, so skip to the FIRST digit sequence
++	 * and parse from there; only a release with no number at all stays a
++	 * hard error.  Every other outcome selects the 2.6+ collectors, which is
++	 * the correct choice for any release whose numbering does not match the
++	 * legacy 2.2 / 2.4 branches (2.10, 3.x, 1.13, ...). */
++	memset(&u, 0, sizeof(u));
+ 	uname(&u);
+-	if (0 == strncmp(u.release, "2.2", 3)) {
+-		getdata.disk = get_disk22;
+-	}
+-	if (0 == strncmp(u.release, "2.4", 3)) {
+-		getdata.disk = get_disk24;
+-	}
+-	if (0 == strncmp(u.release, "2.6", 3)) {
+-		getdata.disk = get_disk26;
+-		getdata.vm = get_vm26;
++	{
++		int	kver_major = 0, kver_minor = 0;
++		const char *p = u.release;
++
++		while ((*p != '\0') && ((*p < '0') || (*p > '9')))
++			p++;
++		if (1 > sscanf(p, "%d.%d", &kver_major, &kver_minor)) {
++			syslog(LOG_CRIT, "cannot parse kernel release \"%s\"",
++				u.release);
++			exit(EXIT_FAILURE);
++		}
++		if ((2 == kver_major) && (2 == kver_minor)) {
++			getdata.disk = get_disk22;
++		} else if ((2 == kver_major) && (4 == kver_minor)) {
++			getdata.disk = get_disk24;
++		} else {
++			getdata.disk = get_disk26;
++			getdata.vm = get_vm26;
++		}
+ 	}
+ 
+ 	/* prepare the disk patterns */

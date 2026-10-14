@@ -1,0 +1,26 @@
+--- a/rstat_proc.c
++++ b/rstat_proc.c
+@@ -38,9 +38,6 @@
+ #include <limits.h>
+ #include <rpc/rpc.h>
+ #include <sys/socket.h>
+-#ifndef __GLIBC__
+-#include <nlist.h>
+-#endif
+ #include <syslog.h>
+ #include <sys/errno.h>
+ #include <sys/param.h>
+@@ -49,6 +46,13 @@
+ #include "rstat_proc.h"
+ #include "getdata.h"
+ 
++/* glibc exports the prototype-parenthesis macro __P() from <sys/cdefs.h>;
++ * musl (and therefore OHOS) has neither <sys/cdefs.h> nor __P. Fall back
++ * to glibc's own definition, which is a no-op for a C99 compiler. */
++#ifndef __P
++# define __P(args) args
++#endif
++
+ #define BUFLEN 2048
+ 
+ int	debug = 0;
