@@ -1,0 +1,28 @@
+--- a/src/greenlet/tests/__init__.py
++++ b/src/greenlet/tests/__init__.py
+@@ -14,7 +14,15 @@
+ from time import sleep
+ from time import time
+ 
+-import psutil
++try:
++    import psutil
++except ImportError:  # pragma: no cover
++    # psutil is an optional test-time dependency (it is not a runtime
++    # requirement of greenlet). Upstream only uses it for USS-based
++    # leak measurements, and already treats "uss not supported" as a
++    # SkipTest; make the import itself optional so the rest of the suite
++    # remains collectable when psutil is unavailable.
++    psutil = None
+ 
+ from greenlet import greenlet as RawGreenlet
+ from greenlet import getcurrent
+@@ -208,6 +216,8 @@
+         If this is not supported by ``psutil``, this raises the
+         :exc:`unittest.SkipTest` exception.
+         """
++        if psutil is None:
++            raise unittest.SkipTest("psutil not available")
+         try:
+             return psutil.Process().memory_full_info().uss
+         except AttributeError as e:
