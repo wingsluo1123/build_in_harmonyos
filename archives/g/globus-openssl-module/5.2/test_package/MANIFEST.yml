@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 测试声明文件（L0e 强制要求存在）
+# 上游 globus-openssl-module 5.2 无自带测试套件（NO_UPSTREAM_TESTS），
+# discovery 核对清单（基准 = conandata.yml 所列 orig tarball，逐项实核）：
+#   - 顶层 Makefile.am：SUBDIRS = library（无 test 目录，无 check 目标）
+#   - configure.ac AC_OUTPUT 列表：仅 Makefile / version.h /
+#     globus-openssl-module.pc / globus-openssl-module-uninstalled.pc /
+#     library/Makefile / library/Doxyfile（不含任何 test Makefile）
+#   - 全源码树无 test*/ 目录、无 TESTS / check_PROGRAMS 变量
+# 结论：L1 覆盖由 test_package 承担（下述消费者测试）。
+
+package: globus-openssl-module/5.2
+homepage: "https://github.com/gridcf/gct"
+
+# 上游官方测试：无（discovery 见文件头说明）
+upstream_official_tests: []
+upstream_check_command: "N/A（官方无上游测试）"
+upstream_test_in_build: false
+upstream_test_command: "N/A"
+
+# 适配补全测试（自研，非上游）：无
+adapted_tests: []
+
+# test_package 中自带的测试 (消费者视角验证，同样为适配自研)
+test_package_tests:
+  - file: test_package.c
+    origin: ohos-adaptation (self-authored)
+    description: "消费者测试：include globus_openssl.h + proxycertinfo.h 并链接 libglobus_openssl；globus_module_activate(GLOBUS_OPENSSL_MODULE) → 断言 activate 注册的 PROXYCERTINFO OID（OBJ_txt2nid + OBJ_txt2obj/OBJ_obj2txt 文本往返，OpenSSL 3.x 内置对象短名不参与断言）、OLD PROXYCERTINFO OID 及其 X509V3 扩展方法（X509V3_EXT_get_nid，OpenSSL 无该 old OID 内置方法，只能来自本库 activate）、四个代理策略 OID → deactivate → re-activate 循环后断言 OID 与扩展方法全部恢复 → 最终 deactivate"
+    command: "./test_globus_openssl_module"
+
+# 测试断言总数 (test_package 实际统计：12 项 FAIL 出口——activate/
+# PROXYCERTINFO OID/OBJ_txt2obj/OID 文本往返/OLD OID/OLD 扩展方法/四个
+# 策略 OID/首次 deactivate/re-activate/循环后 OID/循环后 OLD OID+扩展
+# 方法/最终 deactivate。注：OpenSSL 3.x 已内置 proxyCertInfo 对象，短名
+# 来自内置表，故用 OID 文本往返断言而非 OBJ_nid2sn 注册名比对)
+assertion_count: 12
