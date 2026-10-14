@@ -48,8 +48,11 @@
     内容含 `Workspace` 与 `[Database]`（db/user/password/host/port，password 留空无真实
     凭据），写入 `lib/python3.12/data/`（dev 启发式命中位，`get_config_file` 先查
     `/etc/laniakea/` 再查此处）与 `share/laniakea/`（/usr 前缀兜底分支）——
-    lk-admin/lk-archive 的 `ensure_laniakea_master_user → LocalConfig()` 在 `--version`
-    处理前就要读配置，无此生成文件则无参构造直接 raise（第三次复验实测暴露）。
+    **lk-archive** 的 `run()` 在 click 解析前调用 `ensure_laniakea_master_user → LocalConfig()`
+    读取配置，无此生成文件则无参构造直接 raise（第三次复验实测暴露）；lk-admin
+    的 `--version` 在 click 回调中先 exit(0)（早于 LocalConfig，admincli/cli.py:29-33），
+    但 lk-admin 其它子命令路径仍会走到配置发现，生成该文件对 lk-archive --version
+    及无 `--config` 的调用均必要。
   - `COPYING` → `licenses/`。
 - `requires("python/3.12.9")`（ohpcd 制品仓已发布）；其余 Python 运行依赖
   （sqlalchemy/cryptography/pyzmq/python-debian/tomlkit/click/rich/PyNaCl/PyYAML/pebble/
@@ -206,3 +209,15 @@ laniakea-spark 同款），对 .so 补执行位（OHOS 加载器要求），复�
   `.scratch/laniakea-subtask/upstream-tests/main-agent-empirical.md` 与本文 R51 第三步；
   未修改任何上游测试（patches_applied=[]），不编造通过率；OHOS 不可运行能力的等价
   断言已由 test_package 消费者测试在 CI conan create 阶段实跑覆盖（47 断言全绿）。
+
+## 最终状态
+
+- **status: closed** —— laniakea 0.1.1 适配完成（路径 A 基础适配）。
+- 编译状态：通过（`conan export` 解析通过；本地 `conan create`（OHOS armv8 profile）完整实跑，
+  test_package 47 断言全绿，5 个 CLI `--version` 均输出 0.1.1；CI 端正式复验见 W3）。
+- 上游测试：39 例全部实测，通过率 24/39（61.5%），3 失败 / 12 环境阻塞原因逐项记录（R51 第三步），
+  未修改任何上游测试。
+- 新增鸿蒙特有测试：test_package 47 断言，通过率 47/47（100%）。
+- R47 覆盖决策：任务标记 cpp、实测 python，按用户明确指示走完整适配 + PR 流程，
+  同生态 laniakea-spark/0.1.1 已合入 main（PR #3636）为先例，覆盖记录见 manifest.yaml r47_override。
+- 待办：CI 正式 conan create 复验 → status=built 升级 published（R29）→ 提交赛事 PR。

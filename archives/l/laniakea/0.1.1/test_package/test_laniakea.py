@@ -72,7 +72,9 @@ def main():
     assert os.path.isfile(os.path.join(pkg, "licenses", "COPYING")), "missing licenses/COPYING"
     for name in ("lk-admin", "lk-archive", "lk-keytool", "rubicon", "synchrotron"):
         exe = os.path.join(bindir, name)
-        assert os.path.isfile(exe), f"missing packaged command: bin/{name}"
+        assert os.path.isfile(exe) and os.access(exe, os.X_OK), (
+            f"missing or not executable packaged command: bin/{name}"
+        )
 
     # ── 2. import laniakea + 版本 ──────────────────────────────────
     import laniakea  # noqa: E402  （触发完整导入链：db/sqlalchemy/marshmallow + apt_pkg 桩）

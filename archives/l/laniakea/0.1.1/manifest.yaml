@@ -9,8 +9,14 @@ software: laniakea
 status: built
 
 # 编译日期（YYYY-MM-DD）
-build_date: "2026-10-07"
+build_date: "2026-10-14"
 build_system: python
+
+# 测试结果（上游 39 例主编实测 24/39 61.5%；新增鸿蒙特有 test_package 47 断言 100%）
+# 上游 3 失败 / 12 环境阻塞原因逐项见 notes.md R51 第三步（不编造通过率）
+test_passed: 24
+test_failed: 15
+test_total: 39
 
 # ============================================================
 # 源码信息
@@ -57,7 +63,7 @@ patches_applied: []
 knowledge_gained:
   - "纯 Python Debian 发行版管理套件（Meson 构建但强依赖 Debian 专属工具链）以无构建/打包族配方交付：全部 src/ 顶层包 → lib/python3.12/site-packages + bin/ 5 个 CLI 启动器包装 + data 双份（share/laniakea 标准位 + lib/python3.12/data 匹配上游 get_data_file 非 /usr 开发目录启发式，使 LocalConfig()/LintianConfig() 可发现默认配置）+ 软件级 commands.json（R38）"
   - "laniakea 核心 `import laniakea` 即触发 laniakea.db → db/archive.py 顶层 `import apt_pkg`（Debian 专属 C 绑定）：OHOS 测试环境须提供仅满足 import 期符号的 apt_pkg 桩（Hashes/TagFile/TagSection/version_compare），不伪造真实解析能力"
-  - "CLI --version 前置链：lk-admin/lk-archive 的 run() 在 click 解析前调用 ensure_laniakea_master_user → LocalConfig()，因此包内必须自带 base-config.toml（lib/python3.12/data/ 镜像）才能让 --version 在无 /etc/laniakea 环境下跑通；rubicon/synchrotron/lk-keytool 在 user 检查前先 check_print_version，无此要求"
+  - "CLI --version 前置链：**lk-archive** 的 run() 在 click 解析前调用 ensure_laniakea_master_user → LocalConfig()，因此包内必须自带 base-config.toml（lib/python3.12/data/ 镜像）才能让 --version 在无 /etc/laniakea 环境下跑通；lk-admin 的 --version 在 click 回调先 exit（早于 LocalConfig，admincli/cli.py:29-33）；rubicon/synchrotron/lk-keytool 在 user 检查前先 check_print_version，无此要求"
   - "上游 39 个 pytest 用例主编全部实测（可运行环境 + 最小 apt_pkg 桩，不改测试逻辑）：24 通过 / 3 失败（test_parse_changes 与 test_reporeader_local 为环境 GPG 无 status 输出行为差异，test_flatpak_init_repo 为 OHOS 无 flatpak 工具链）/ 12 环境阻塞（conftest postgresql_container fixture 依赖 podman + postgres:16 容器，OHOS 无），通过率 24/39（61.5%）；未修改任何上游测试（patches_applied=[]）；详见 notes.md R51 第三步与 .scratch/laniakea-subtask/upstream-tests/main-agent-empirical.md"
 
 # ============================================================
