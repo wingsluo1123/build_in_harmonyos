@@ -1,0 +1,38 @@
+package: poke-elf/1.0
+homepage: "https://www.jemarch.net/poke-elf"
+
+# Upstream tests run inside conanfile.py build() via `make check`
+# (automake parallel-tests TAP harness, TESTS = test-elf.pk).
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# Official registered TESTS with default configure flags.
+# Method: count of TESTS entries in the upstream Makefile.am.
+upstream_test_total: 1
+upstream_test_count_method: "autotools_tests"
+upstream_tests_exist: true
+upstream_tests:
+  - file: test-elf.pk.in
+    source: poke-elf-1.0/test-elf.pk.in
+    description: "TAP test loading the elf pickle (1 pktest: load elf pickle)"
+    command: "make check"
+
+test_package_tests:
+  - file: test.sh
+    description: "T1 poke --version"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "T2 load elf pickle via poke -L"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "T3 ELF file-type constants ET_EXEC=2 ET_DYN=3"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "T4 ELF class constants CLASS32=1 CLASS64=2"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "T5 AArch64 machine constant EM_AARCH64=183"
+    command: "bash test.sh"
+
+test_package_test_count: 5
+assertion_count: 7
