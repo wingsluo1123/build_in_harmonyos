@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml
+# sag 0.3.0 upstream test declaration (Go project, `go test ./...`)
+
+package: sag/0.3.0
+homepage: "https://github.com/steipete/sag"
+
+upstream_check_command: "go test -v -count=1 ./..."
+upstream_test_in_build: true
+upstream_test_command: "go test -v -count=1 ./..."
+
+# Total registered upstream test functions (same version, counted from
+# `func Test*` in all *_test.go; deterministic source for HMBS markers).
+upstream_test_total: 74
+upstream_test_count_method: auto
+
+upstream_tests_exist: true
+
+upstream_tests:
+  - file: cmd/api_key_test.go
+    source: sag-0.3.0/cmd/api_key_test.go
+    description: "API key resolution unit tests (5 funcs: CLI/file/env precedence)"
+    command: "go test -v -count=1 ./cmd/ -run TestEnsureAPIKey"
+  - file: cmd/prompting_test.go
+    source: sag-0.3.0/cmd/prompting_test.go
+    description: "prompting guide output test (1 func)"
+    command: "go test -v -count=1 ./cmd/ -run TestPromptingCommandOutputsGuide"
+  - file: cmd/root_test.go
+    source: sag-0.3.0/cmd/root_test.go
+    description: "root routing/help/piped-stdin tests (8 funcs)"
+    command: "go test -v -count=1 ./cmd/ -run TestMaybeDefaultToSpeak"
+  - file: cmd/sag/main_test.go
+    source: sag-0.3.0/cmd/sag/main_test.go
+    description: "main entry help test (1 func)"
+    command: "go test -v -count=1 ./cmd/sag/ -run TestMainHelp"
+  - file: cmd/speak_integration_test.go
+    source: sag-0.3.0/cmd/speak_integration_test.go
+    description: "speak flags-to-request integration test (1 func, mock-based)"
+    command: "go test -v -count=1 ./cmd/ -run TestSpeakCommand_FlagsBuildRequestAndMetrics"
+  - file: cmd/speak_request_test.go
+    source: sag-0.3.0/cmd/speak_request_test.go
+    description: "TTS request building and compat-flag tests (18 funcs)"
+    command: "go test -v -count=1 ./cmd/ -run TestBuildTTSRequest"
+  - file: cmd/speak_test.go
+    source: sag-0.3.0/cmd/speak_test.go
+    description: "format/voice/stdin resolution tests (23 funcs)"
+    command: "go test -v -count=1 ./cmd/ -run TestInferFormatFromExt"
+  - file: cmd/voices_test.go
+    source: sag-0.3.0/cmd/voices_test.go
+    description: "voices listing/filter/rank tests (6 funcs)"
+    command: "go test -v -count=1 ./cmd/ -run TestVoicesCommand"
+  - file: internal/audio/player_test.go
+    source: sag-0.3.0/internal/audio/player_test.go
+    description: "oto bad-MP3 decode test (1 func, no speaker needed)"
+    command: "go test -v -count=1 ./internal/audio/"
+  - file: internal/elevenlabs/client_test.go
+    source: sag-0.3.0/internal/elevenlabs/client_test.go
+    description: "elevenlabs client tests with httptest mocks (10 funcs)"
+    command: "go test -v -count=1 ./internal/elevenlabs/"
+
+test_package_tests:
+  - file: test.sh
+    description: "Consumer test 1: sag -V returns 0.3.0"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "Consumer test 2: sag --help succeeds offline"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "Consumer test 3: sag prompting prints offline guide"
+    command: "bash test.sh"
+
+assertion_count: 3

@@ -1,0 +1,26 @@
+version: "0.3.0"
+software: "sag"
+status: built
+build_date: "2026-10-13"
+build_system: custom
+source:
+  url: "https://github.com/steipete/sag/archive/refs/tags/v0.3.0.tar.gz"
+  sha256: "acb6f2d626ce47640dc71c927dae27c6c104bab727dfa4f5bb14ebea80c11a63"
+  tar_format: tar.gz
+build:
+  system: custom
+  configure_options:
+    - "go build -trimpath -ldflags=-s -w -o sag ./cmd/sag"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "GOTOOLCHAIN=local"
+    - "CGO_ENABLED=0"
+    - "GOOS=linux GOARCH=arm64"
+  dependencies:
+    - go/1.25.0
+  cc: go
+  cxx: ""
+patches_applied: []
+knowledge_gained:
+  - "Go 1.25.0 bootstrap with signed SDK, GOROOT and GOTMPDIR redirected off HMDFS"
+  - "Go linker output to link-out dir to avoid HMDFS mmap failure"
+  - "go test .test ELF signed via -exec wrapper before execution"
