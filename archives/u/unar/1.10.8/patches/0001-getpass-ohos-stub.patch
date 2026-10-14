@@ -1,0 +1,44 @@
+--- a/XADMaster-1.10.8/CommandLineCommon.m
++++ b/XADMaster-1.10.8/CommandLineCommon.m
+@@ -384,6 +384,32 @@
+ 	return c;
+ }
+ 
++// Portable fallback for getpass(): the getpass() API is not portable
++// (removed from POSIX, absent from some libc implementations). Reads the
++// password from stdin into a static buffer, matching the lifetime semantics
++// of glibc's getpass() (the caller must not free the returned pointer).
++// Note: the input is not echo-suppressed on all platforms.
++static char *XADPortableGetPass(const char *prompt)
++{
++	static char pass[1024];
++	if(prompt != NULL)
++	{
++		fprintf(stderr, "%s", prompt);
++		fflush(stderr);
++	}
++	if(fgets(pass, sizeof(pass), stdin) == NULL)
++		return NULL;
++	size_t length = strlen(pass);
++	if(length > 0 && pass[length-1] == '\n')
++	{
++		pass[length-1] = 0;
++		length--;
++		if(length > 0 && pass[length-1] == '\r')
++			pass[length-1] = 0;
++	}
++	return pass;
++}
++
+ NSString *AskForPassword(NSString *prompt)
+ {
+ 	[prompt print];
+@@ -406,7 +432,7 @@
+ 
+ 	#else
+ 
+-	char *pass=getpass("Password (will not be shown): ");
++	char *pass=XADPortableGetPass("Password (will not be shown): ");
+ 	if(!pass) return nil;
+ 
+ 	#endif

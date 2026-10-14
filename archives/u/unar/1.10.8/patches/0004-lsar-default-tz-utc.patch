@@ -1,0 +1,31 @@
+--- a/XADMaster-1.10.8/lsar.m
++++ b/XADMaster-1.10.8/lsar.m
+@@ -25,6 +25,9 @@
+ #import "CSJSONPrinter.h"
+ #import "CommandLineCommon.h"
+ 
++#include <stdlib.h>
++#include <unistd.h>
++
+ #define VERSION_STRING @"v1.10.7"
+ 
+ #define EntryDoesNotNeedTestingResult 0
+@@ -52,6 +55,18 @@
+ 
+ int main(int argc,const char **argv)
+ {
++	#ifdef GNUSTEP
++	// GNUstep's date and calendar APIs resolve the default time zone from
++	// the TZ environment variable or the system zone files. On systems
++	// that provide neither, they raise an exception instead of falling
++	// back to UTC (the missing zone data results in a NULL string).
++	// Default to UTC when no usable time zone source is present.
++	if(!getenv("TZ")
++	&&access("/etc/localtime",F_OK)!=0
++	&&access("/usr/lib/zoneinfo",F_OK)!=0)
++		setenv("TZ","UTC",0);
++	#endif
++
+ 	NSAutoreleasePool *pool=[NSAutoreleasePool new];
+ 
+ 	CSCommandLineParser *cmdline=[[CSCommandLineParser new] autorelease];
