@@ -1,0 +1,25 @@
+# conandata.yml — tardy 1.28
+# 官方源：Peter Miller tardy 项目 SourceForge 发布页
+# （https://sourceforge.net/projects/tardy/files/1.28/），构件名
+# tardy-1.28.D001.tar.gz（D001 为上游 Debian 打包修订后缀，非下游重打包）。
+# sha256 实测自该官方构件（curl + shasum -a 256）。
+sources:
+  url: "https://downloads.sourceforge.net/project/tardy/1.28/tardy-1.28.D001.tar.gz"
+  sha256: "79b4652a1d90745e131efcfc8512f4427b1388695036718938ec79fa5bc6c26f"
+patches:
+  "1.28":
+    - patch_file: "patches/0001-libtardy-tar-format.cc.patch"
+      patch_description: "防御性：tardy 读取 tar 头部数字字段时支持 GNU base-256 扩展（uid/gid/size/mtime）。本平台 uid 20001006 > 2097151，平台 toybox tar 以 0x80 前缀编码 uid，tardy 的 octal() 报 corrupted uid field。注意：当前 56 用例经 GNU 兼容前端（uid/gid 写 0）不触达该路径，实测还原本补丁后套件仍 56/56；此为面向真实平台 tar 的健壮性修复"
+      patch_type: "portability"
+    - patch_file: "patches/0002-libtardy-tar-output-filter-gzip.cc.patch"
+      patch_description: "gzip 过滤器临时文件改用 $TMPDIR（回退 /tmp）——本平台 /tmp 是只读 erofs 挂载，硬编码 /tmp/tardy-XXXXXX 的 mkstemp 报 EROFS"
+      patch_type: "portability"
+    - patch_file: "patches/0003-script-test_prelude.sh.in.patch"
+      patch_description: "上游测试 harness 的临时目录 testdir 由硬编码 /tmp/icomp-$$ 改为 ${TMPDIR:-/tmp}/icomp-$$（同上 /tmp 只读）"
+      patch_type: "portability"
+    - patch_file: "patches/0004-test-cpio.patch"
+      patch_description: "新增 GNU 兼容测试用 cpio 前端（test/cpio）——平台 toybox cpio 仅实现 newc，缺上游用例所需的 crc/odc 读写；仅测试环境使用，不改上游用例"
+      patch_type: "portability"
+    - patch_file: "patches/0005-test-tar.patch"
+      patch_description: "新增 GNU 兼容测试用 tar 前端（test/tar）——平台 toybox tar 无 append、tvf 时间列多一空格，且 hmdfs 忽略 chmod 导致夹具模式异常；仅测试环境使用，不改上游用例"
+      patch_type: "portability"

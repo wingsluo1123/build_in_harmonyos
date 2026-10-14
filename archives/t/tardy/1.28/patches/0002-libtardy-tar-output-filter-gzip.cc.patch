@@ -1,0 +1,36 @@
+--- a/libtardy/tar/output/filter/gzip.cc
++++ b/libtardy/tar/output/filter/gzip.cc
+@@ -95,23 +95,30 @@
+         return;
+     }
+     pass_through = false;
+ 
+     //
+     // Remember the header for later use.
+     //
+     hdr = arg;
+ 
+     //
+-    // Open a temporary file to hold the compressed file.
+-    //
+-    static char filename_template[] = "/tmp/tardy-XXXXXX";
++    // Open a temporary file to hold the compressed file.  /tmp is not
++    // always writable (this platform mounts it read-only), so honour
++    // $TMPDIR and fall back to /tmp for compatibility.
++    //
++    const char *tardy_tmpdir = getenv("TMPDIR");
++    if (!tardy_tmpdir || !*tardy_tmpdir)
++        tardy_tmpdir = "/tmp";
++    static char filename_template[1024];
++    snprintf(filename_template, sizeof(filename_template), "%s/tardy-XXXXXX",
++        tardy_tmpdir);
+     char tfn[sizeof(filename_template)];
+     memcpy(tfn, filename_template, sizeof(tfn));
+     int fd = explain_mkstemp_or_die(tfn);
+     temp_filename = tfn;
+     FILE *fp = fdopen(fd, "w+b");
+     temp_fp = fp;
+ 
+     //
+     // Initialize the compression engine.
+     //

@@ -1,0 +1,51 @@
+software: tardy
+version: "1.28"
+build_system: autotools
+status: built
+source:
+  url: "https://downloads.sourceforge.net/project/tardy/1.28/tardy-1.28.D001.tar.gz"
+  sha256: "79b4652a1d90745e131efcfc8512f4427b1388695036718938ec79fa5bc6c26f"
+
+patches_applied:
+  - "0001-libtardy-tar-format.cc.patch"
+  - "0002-libtardy-tar-output-filter-gzip.cc.patch"
+  - "0003-script-test_prelude.sh.in.patch"
+  - "0004-test-cpio.patch"
+  - "0005-test-tar.patch"
+
+knowledge_gained:
+  - "平台 uid 20001006 > 2097151，平台 toybox tar 以 GNU base-256 扩展（首字节 0x80）编码 uid/gid；tardy 的 octal() 遇 0x80 返回 -1 → fatal corrupted uid field {tar-posix}。补丁 0001 让 uid/gid/size/mtime 读取支持 base-256。该补丁为防御性/健壮性修复：当前 56 用例（经 test/tar+test/cpio 前端把 uid/gid 写 0、复现上游 root 环境）不触达此路径——实测还原 0001 后套件仍 56/56。触发证据见 notes.md R4 节（平台 toybox tar 生成真实 uid 的 tar 后 tardy 报 corrupted uid field）"
+  - "设备 /tmp 为只读 erofs 挂载，tardy gzip 过滤器硬编码 /tmp/tardy-XXXXXX mkstemp 失败：补丁 0002 改为优先 $TMPDIR；上游测试 harness test_prelude.sh 硬编码 /tmp/icomp-$$ 同理（补丁 0003）"
+  - "平台 tar/cpio 为 toybox，缺 GNU 语义（tar 无 append、tvf 时间列多一个空格；cpio 只支持 newc，无 crc/odc），上游 test/00 套件无法直接用：补丁 0004/0005 提供 GNU 兼容的 tar/cpio 测试用前端（Python 实现，仅测试环境）"
+  - "hmdfs (hmmac=use_task) 下 chmod 是 no-op，目录模式固定 2771、文件模式 0660&~umask，测试夹具的 mode 由测试用 tar 前端合成（目录 0755/文件 0644，即 umask 022 下的标准创建模式）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/tardy-r4-20261013-1/patchgen/tardy-1.28.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/tardy-r4-20261013-1/patchgen/tardy-1.28.work
+  source_orig_hash: 2f3e25f2b97a135d
+  source_work_hash: 82eac907f9889d12
+  generated_at: '2026-10-13T21:45:37'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-libtardy-tar-format.cc.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-libtardy-tar-output-filter-gzip.cc.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-script-test_prelude.sh.in.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0004-test-cpio.patch
+    type: platform_adaptation
+    platform_only: True
+    guard: 'none'
+  - file: 0005-test-tar.patch
+    type: platform_adaptation
+    platform_only: True
+    guard: 'none'

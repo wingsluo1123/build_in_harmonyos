@@ -1,0 +1,206 @@
+--- /dev/null
++++ b/test/tar
+@@ -0,0 +1,203 @@
++#!/usr/bin/env python3
++"""GNU-tar-compatible 'tar' for the tardy upstream test suite.
++
++The platform's tar is toybox 0.8.12, which (a) has no append ('r') mode,
++(b) writes numeric uid/gid in the GNU base-256 extension because this
++user's uid (20001006) does not fit 7 octal digits, and (c) formats
++`tvf` differently from GNU tar.  This shim covers exactly the subset of
++GNU tar behaviour the tardy test/00 suite relies on, implemented on top
++of Python's tarfile with GNU_FORMAT (full path names, no ustar prefix
++splitting) so that the fixtures look like the ones upstream was written
++against.
++"""
++import os
++import sys
++import tarfile
++import time
++import gzip
++import bz2
++import lzma
++
++
++def fail(message):
++    sys.stderr.write("tar: %s\n" % message)
++    sys.exit(2)
++
++
++def parse(argv):
++    """Return (op, compress, verbose, archive, files, chdir)."""
++    if len(argv) < 2:
++        fail("no options")
++    args = list(argv[1:])
++    chdir = None
++    if "-C" in args:
++        i = args.index("-C")
++        chdir = args[i + 1]
++        del args[i:i + 2]
++    flags = args.pop(0)
++    if flags.startswith("-"):
++        flags = flags[1:]
++    op = None
++    for c in flags:
++        if c in "crtx":
++            op = c
++            break
++    if op is None:
++        fail("no operation (c/r/t/x) in '%s'" % flags)
++    compress = None
++    if "z" in flags:
++        compress = "gz"
++    elif "J" in flags:
++        compress = "xz"
++    elif "j" in flags:
++        compress = "bz2"
++    verbose = "v" in flags
++    archive = None
++    if "f" in flags:
++        if not args:
++            fail("-f needs a file")
++        archive = args.pop(0)
++    files = args
++    return op, compress, verbose, archive, files, chdir
++
++
++def add_one(tf, path, arcname):
++    info = tf.gettarinfo(path, arcname=arcname)
++    if info.isdir():
++        info.mode = 0o755
++    elif info.isreg():
++        info.mode = 0o755 if (os.stat(path).st_mode & 0o111) else 0o644
++    info.uid = 0
++    info.gid = 0
++    info.uname = "root"
++    info.gname = "root"
++    if info.isreg():
++        with open(path, "rb") as fp:
++            tf.addfile(info, fp)
++    else:
++        tf.addfile(info)
++
++
++def add_path(tf, path, arcname):
++    add_one(tf, path, arcname)
++    if os.path.isdir(path) and not os.path.islink(path):
++        for child in sorted(os.listdir(path)):
++            add_path(tf, os.path.join(path, child),
++                     os.path.join(arcname, child))
++
++
++def do_create(archive, compress, files, append):
++    tf = open_write(archive, compress, append)
++    try:
++        for name in files:
++            add_path(tf, name, name)
++    finally:
++        tf.close()
++
++
++def open_write(archive, compress, append):
++    mode = "a" if append else "w"
++    if compress:
++        mode += ":" + compress
++    if archive in (None, "-"):
++        return tarfile.open(fileobj=sys.stdout.buffer, mode=mode,
++                            format=tarfile.GNU_FORMAT)
++    return tarfile.open(name=archive, mode=mode, format=tarfile.GNU_FORMAT)
++
++
++def do_list(archive, compress, verbose, files):
++    kwargs = {}
++    if archive in (None, "-"):
++        kwargs["fileobj"] = sys.stdin.buffer
++    else:
++        kwargs["name"] = archive
++    with tarfile.open(mode="r:*", **kwargs) as tf:
++        wanted = set(files)
++        for m in tf:
++            if wanted and m.name not in wanted:
++                continue
++            if not verbose:
++                name = m.name
++                if m.isdir() and not name.endswith("/"):
++                    name += "/"
++                print(name)
++                continue
++            print(format_verbose(m))
++
++
++def format_verbose(m):
++    typechar = "-"
++    if m.isdir():
++        typechar = "d"
++    elif m.issym():
++        typechar = "l"
++    elif m.islnk():
++        typechar = "h"
++    elif m.ischr():
++        typechar = "c"
++    elif m.isblk():
++        typechar = "b"
++    elif m.isfifo():
++        typechar = "p"
++    perm = m.mode & 0o7777
++    bits = ""
++    for shift, ch in ((8, "r"), (7, "w"), (6, "x"),
++                      (5, "r"), (4, "w"), (3, "x"),
++                      (2, "r"), (1, "w"), (0, "x")):
++        bits += ch if perm & (1 << shift) else "-"
++    setid = ""
++    if perm & 0o4000:
++        setid += "s" if bits[2] != "-" else "S"
++    if setid:
++        bits = bits[:2] + setid + bits[3:]
++    uname = m.uname or str(m.uid)
++    gname = m.gname or str(m.gid)
++    owner = "%s/%s" % (uname, gname)
++    when = time.strftime("%Y-%m-%d %H:%M", time.localtime(m.mtime))
++    if m.issym() or m.islnk():
++        tail = "%s -> %s" % (m.name, m.linkname)
++    else:
++        tail = m.name
++        if m.isdir() and not tail.endswith("/"):
++            tail += "/"
++    return "%s%s %s%s %s %s" % (typechar, bits, owner,
++                                str(m.size).rjust(10), when, tail)
++
++
++def do_extract(archive, compress, files, chdir):
++    if chdir:
++        os.chdir(chdir)
++    kwargs = {}
++    if archive in (None, "-"):
++        kwargs["fileobj"] = sys.stdin.buffer
++    else:
++        kwargs["name"] = archive
++    with tarfile.open(mode="r:*", **kwargs) as tf:
++        wanted = set(files) if files else None
++        members = [m for m in tf.getmembers()
++                   if wanted is None or m.name in wanted
++                   or any(m.name.startswith(w.rstrip("/") + "/")
++                          for w in wanted)]
++        tf.extractall(members=members, filter="fully_trusted")
++
++
++def main():
++    op, compress, verbose, archive, files, chdir = parse(sys.argv)
++    if archive not in (None, "-"):
++        archive = os.path.abspath(archive)
++    if op in ("c", "r") and chdir:
++        os.chdir(chdir)
++        chdir = None
++    if op == "c":
++        do_create(archive, compress, files, append=False)
++    elif op == "r":
++        do_create(archive, compress, files, append=True)
++    elif op == "t":
++        do_list(archive, compress, verbose, files)
++    elif op == "x":
++        do_extract(archive, compress, files, chdir)
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
