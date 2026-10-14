@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 L0e 强制要求存在）
+package: ocp/3.3.1
+homepage: "https://github.com/mywave82/opencubicplayer"
+
+# 上游没有 make check / ctest 注册目标：测试是 10 个独立测试程序，
+# 由各自的 Makefile 规则构建（filesel/Makefile、stuff/Makefile）。
+upstream_check_command: "(no check target; 10 standalone test programs in filesel/ and stuff/)"
+upstream_test_in_build: false
+upstream_test_command: "make adbmeta-test dirdb-test filesystem-bzip2-test filesystem-filehandle-cache-test filesystem-gzip-test filesystem-tar-test filesystem-textfile-test mdb-test compat-test utf-16-test"
+
+# 上游实际运行的测试程序（在 HarmonyOS aarch64 构建树内实测）
+# 测量口径: 10 个上游测试程序中 9 个可构建并运行 -> 9/9 通过（100%）；
+# mdb-test 上游规则只链接单个目标文件，链接期缺 utf8_encode/utf8_encoded_length/
+# Console/cpiKeyHelp*/framelock 等符号，属上游测试目标自身缺陷（非平台问题）。
+upstream_tests:
+  - file: filesel/adbmeta-test.c
+    source: ocp-3.3.1/filesel/adbmeta-test.c
+    description: "ADB metadata 读写/增删改查（补丁 0003 后写入构建树相对数据目录）"
+    command: "./filesel/adbmeta-test"
+  - file: filesel/dirdb-test.c
+    source: ocp-3.3.1/filesel/dirdb-test.c
+    description: "目录数据库解析/引用/回收（补丁 0003 后写入构建树相对数据目录）"
+    command: "./filesel/dirdb-test"
+  - file: filesel/filesystem-bzip2-test.c
+    source: ocp-3.3.1/filesel/filesystem-bzip2-test.c
+    description: "bzip2 抽象文件系统层读写与解压"
+    command: "./filesel/filesystem-bzip2-test"
+  - file: filesel/filesystem-filehandle-cache-test.c
+    source: ocp-3.3.1/filesel/filesystem-filehandle-cache-test.c
+    description: "文件句柄缓存（LRU）行为"
+    command: "./filesel/filesystem-filehandle-cache-test"
+  - file: filesel/filesystem-gzip-test.c
+    source: ocp-3.3.1/filesel/filesystem-gzip-test.c
+    description: "gzip 抽象文件系统层读写与解压"
+    command: "./filesel/filesystem-gzip-test"
+  - file: filesel/filesystem-tar-test.c
+    source: ocp-3.3.1/filesel/filesystem-tar-test.c
+    description: "tar 归档抽象文件系统层遍历"
+    command: "./filesel/filesystem-tar-test"
+  - file: filesel/filesystem-textfile-test.c
+    source: ocp-3.3.1/filesel/filesystem-textfile-test.c
+    description: "纯文本文件抽象层读取"
+    command: "./filesel/filesystem-textfile-test"
+  - file: filesel/mdb-test.c
+    source: ocp-3.3.1/filesel/mdb-test.c
+    description: "模块数据库解析（上游链接规则缺陷，无法构建，见说明）"
+    command: "(upstream link rule is broken; not buildable)"
+  - file: stuff/compat-test.c
+    source: ocp-3.3.1/stuff/compat-test.c
+    description: "路径合并/拆分（splitpath）边界条件"
+    command: "./stuff/compat-test"
+  - file: stuff/utf-16-test.c
+    source: ocp-3.3.1/stuff/utf-16-test.c
+    description: "UTF-16 与 UTF-8 互转"
+    command: "./stuff/utf-16-test"
+
+# test_package 中自带的测试（消费者视角验证：实跑安装后的 ocp 前端）
+test_package_tests:
+  - file: test.c
+    description: "执行安装后的 ocp 二进制，断言前端启动并输出自身配置诊断（交叉编译宿主回退为 ELF 架构校验）"
+    command: "./test_ocp <package>/bin/ocp"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 6

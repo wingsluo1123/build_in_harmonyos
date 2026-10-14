@@ -1,0 +1,14 @@
+--- a/configure	2026-10-02 10:10:57.477042812 +0800
++++ b/configure	2026-10-02 10:11:01.945040312 +0800
+@@ -22524,7 +22524,10 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  # HarmonyOS: 'mktemp -d' creates a directory the builder cannot write into
++  # (drwx--S---), which aborts the config files machinery with "Permission
++  # denied" on subs1.awk.  Force the portable mkdir based fallback below.
++  tmp=mktemp-is-not-writable-on-ohos
+   test -d "$tmp"
+ }  ||
+ {
