@@ -1,0 +1,37 @@
+software: xkill
+version: "1.0.7"
+status: built
+build_date: "2026-10-13"
+conan_ref: "xkill/1.0.7"
+
+source:
+  url: "https://xorg.freedesktop.org/releases/individual/app/xkill-1.0.7.tar.xz"
+  sha256: "5ff264bc4eebc0459255a92036dc8dc84b6d48caef8509f88a783beaadea750b"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos"
+    - "PKG_CONFIG_PATH includes Conan-generated and dependency pkgconfig directories"
+    - "Build-time xmuu.pc alias maps Conan's libxmuu component name to the upstream xmuu module"
+    - "HarmonyOS configure uses an ACL-compatible config.status temporary directory and reads UID/GID from /proc/self/status because id(1) is unavailable"
+  dependencies:
+    - "libx11/1.8.13"
+    - "libxmu/1.3.1.1"
+    - "xorgproto/2025.1"
+    - "libxcb/1.17.0 (runtime)"
+    - "libxau/1.0.11 (runtime)"
+    - "libxdmcp/1.1.5 (runtime)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-harmonyos-config-status-tempdir.patch: use the inherited device shared-storage ACL for config.status temporary files and avoid unavailable id(1)."
+
+knowledge_gained:
+  - "The official xkill 1.0.7 release tarball ships both configure/Makefile.in and meson.build; the Conan recipe uses the shipped Autotools files, so autoreconf is unnecessary."
+  - "Upstream configure.ac requests the pkg-config module xmuu, while the published Conan libxmu component is named libxmuu; a generated pkg-config alias resolves the module name without patching upstream source."
+  - "On the device, mktemp -d creates a 0700 directory owned by file_manager, which masks the build UID's inherited shared-storage ACL; the HarmonyOS-only config.status path uses mkdir with the inherited ACL instead."
+  - "The HarmonyOS shell does not provide id(1); the generated configure script reads numeric IDs from /proc/self/status for Automake's optional ustar check."
+  - "The release has no automated tests; make check is executed and contains zero registered tests, so test_package runs the installed xkill CLI directly."

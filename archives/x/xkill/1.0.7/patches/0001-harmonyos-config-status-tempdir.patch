@@ -1,0 +1,47 @@
+--- a/configure
++++ b/configure
+@@ -3259,8 +3259,14 @@
+       # to the POSIX-mandated id(1) utility.  Errors in the 'id' calls
+       # below are definitely unexpected, so allow the users to see them
+       # (that is, avoid stderr redirection).
+-      am_uid=`id -u || echo unknown`
+-      am_gid=`id -g || echo unknown`
++      if test "x${XKILL_HMOS_SHARED_FS-}" = x1; then
++        # The HarmonyOS shell does not provide id(1); procfs exposes these IDs.
++        am_uid=`awk '/^Uid:/ { print $2; exit }' /proc/self/status`
++        am_gid=`awk '/^Gid:/ { print $2; exit }' /proc/self/status`
++      else
++        am_uid=`id -u || echo unknown`
++        am_gid=`id -g || echo unknown`
++      fi
+       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether UID '$am_uid' is supported by ustar format" >&5
+ printf %s "checking whether UID '$am_uid' is supported by ustar format... " >&6; }
+       if test x$am_uid = xunknown; then
+@@ -12424,14 +12430,20 @@
+ }
+ # Create a (secure) tmp directory for tmp files.
+ 
+-{
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+-  test -d "$tmp"
+-}  ||
+-{
++if test "x${XKILL_HMOS_SHARED_FS-}" = x1; then
++  # mktemp's 0700 directory masks the device UID's inherited storage ACL.
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
+-} || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
++  (umask 000 && mkdir "$tmp") || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
++else
++  {
++    tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++    test -d "$tmp"
++  }  ||
++  {
++    tmp=./conf$$-$RANDOM
++    (umask 077 && mkdir "$tmp")
++  } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
++fi
+ ac_tmp=$tmp
+ 
+ # Set up the scripts for CONFIG_FILES section.
