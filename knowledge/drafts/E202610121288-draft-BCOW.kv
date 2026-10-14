@@ -1,0 +1,29 @@
+id: E202610121288
+trigger_tool: perl|make|conan
+phase: installation|runtime-validation
+error_signature: Files found in blib/arch|installing files in blib/lib into architecture dependent library tree|INSTALLED_MODULE_DIFFERS
+severity: 2
+category: perl, packaging, runtime
+match_keywords: XS, architecture-dependent installation, blib arch, SITEARCH, dynamic loader, interpreter ABI, installed module path, exact package reference
+title: 原生语言扩展触发架构安装根提升时的制品身份绑定
+root_cause: MakeMaker检测到blib/arch中的原生扩展后，会把同包的Perl模块也安装到架构目录。纯Perl安装根的惯例不能迁移到XS包；未绑定真实安装路径的收尾检查会在真实构建/API成功后错误失败，也可能让消费者加载别处同名模块或旧ABI扩展。 本轮实际CI进一步表明：消费者仍沿用构建目录身份门禁时，生产侧修复不足以闭环；配置投影和消费者分别使用真实UID所有的0700实例临时根，保留原加载、API和inode断言。
+affected_scope: 使用MakeMaker的Perl XS模块与其Conan提供者、安装消费者和制品校验；不限某库或版本。
+verification_cmd: 保留原make install路径记录，对实际Conan ref/RREV/PID/PREV查询包根，逐项检查pm及已加载XS路径，核对官方源字节及实际公开API、完整原TAP与独立目标回执。
+rec_priority: 1
+rec_approach: installed-architecture-root-and-actual-xs-binding
+rec_description: 按真实安装结果区分通用模块根和架构根，消费者保留解释器核心/架构路径且绑定本包XS加载路径。源模块与官方成员比较，原生扩展以当前解释器真实编译/API证明ABI，不拿同名文件或SONAME替代。只修精确校验入口错误，不搬移官方安装布局或重解释已失败事务。 本轮实际CI进一步表明：消费者仍沿用构建目录身份门禁时，生产侧修复不足以闭环；配置投影和消费者分别使用真实UID所有的0700实例临时根，保留原加载、API和inode断言。
+rec_command: conan cache path <actual-ref#RREV:PID#PREV>; <actual-private-perl> <original-import-and-public-api-probe>
+rec_auto_fix: false
+rec_impl: actual-install-log-and-loaded-extension-binding
+forbid_1_pattern: pure.*module.*path.*XS
+forbid_1_reason: 纯Perl根路径不证明原生扩展包的实际安装布局及当前解释器ABI。
+forbid_1_consequence: 正常安装被误报缺失，或消费者回退到错误同名模块/旧ABI二进制。
+similar_to: E155
+doc_file: knowledge/drafts/E202610121288-draft-BCOW.md
+last_updated: 2026-10-13
+source_event: r1270真实ConanVerifier、原3程序22断言、C1/H1通过后，冻结入口因期待纯模块路径失败；实际install把COW.pm和COW.so同时提升到架构树。只纠正入口后fresh r1276真实Conan/Finish step35、原22/C1/H1、15回执30WAL及原收尾通过。旧事务仍FAIL，不宣称Clone/钱包或远端发布通过。 本轮当前CI缺陷修复在新事务b-cow-0.007-official-20261013-submit132r003实际规范ConanVerifier/Finish step35通过，原3程序/22断言零跳过、消费者1流程和鸿蒙1场景均完成，15回执30WAL/own0/release/postrelease核验；原日志SHA cf3981abadc9850f120466c04b993d11efa8540945868510c2007d837aa900a5。平台新HEAD CI/Review仍待实际结果，未发布。
+authors: 2301_80739235
+source_pr:
+source_commit:
+draft: true
+contributor_id: BCOW
