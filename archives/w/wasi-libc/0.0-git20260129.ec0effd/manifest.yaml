@@ -1,0 +1,32 @@
+name: wasi-libc
+version: 0.0-git20260129.ec0effd
+upstream: https://github.com/WebAssembly/wasi-libc
+upstream_commit: ec0effd
+license: Apache-2.0 WITH LLVM-exception, MIT
+adapted_by: frj__
+task: contrib-11808
+path: C (高难度挑战 · 候选)
+
+description: |
+  wasm32-wasip1 sysroot built from source: headers + libc.a/libc.so +
+  crt objects + auxiliary archives. Hosted as a Conan package for
+  downstream wasm toolchains/runtimes on OpenHarmony PC.
+
+build:
+  compiler: zig cc 0.14.0 (static; embeds clang+LLVM with WebAssembly target)
+  host_toolchain_gap: |
+    harmonybrew clang 23.1.1 and OHOS SDK clang 15.0.4 both ship without
+    the WebAssembly backend (no wasm in `clang --print-targets`); the
+    official wasi-sdk arm64-linux build is glibc-linked and cannot execute
+    on OHOS musl userland.
+  cmake: TARGET_TRIPLE=wasm32-wasip1, BUILTINS_LIB=wasi-sdk-25 official archive
+
+tests:
+  upstream:
+    suite: test/CMakeLists.txt (libc-test functional + wasi-libc custom)
+    engine: Node.js built-in WASI (preview1) via test_package/wasi-run.mjs
+    total: 93
+    passed: TBD_ON_DEVICE
+  consumer:
+    entry: test_package/test_consumer.c
+    checks: TBD
