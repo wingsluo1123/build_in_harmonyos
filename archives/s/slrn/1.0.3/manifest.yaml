@@ -1,0 +1,73 @@
+# slrn 1.0.3 版本级 manifest
+version: "1.0.3"
+software: "slrn"
+status: built
+build_date: "2026-10-01"
+build_system: autotools
+
+source:
+  url: "https://www.jedsoft.org/releases/slrn/slrn-1.0.3a.tar.bz2"
+  sha256: "3ba8a4d549201640f2b82d53fb1bec1250f908052a7983f0061c983c634c2dac"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-slang=<conan slang package folder>"
+    - "--with-ssl=<conan openssl package folder>"
+    - "--build=aarch64-linux-ohos"
+    - "--host=aarch64-linux-ohos"
+    - "slrn_cv_va_copy=yes"
+    - "slrn_cv___va_copy=yes"
+    - "slrn_cv_va_val_copy=no"
+  dependencies:
+    - slang/2.3.3
+    - openssl/3.0.16
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-autoconf-config.sub.patch"
+  - "0003-src-Makefile.in.patch"
+  - "0002-configure.patch"
+
+knowledge_gained:
+  - "slrn src/Makefile.in 构建期运行目标端 chkslang 校验 slang 版本，交叉编译需 SKIP_CHKSLANG=1 守卫（OHOS CI 原生构建仍执行）（ref: DRAFT-slrn-1.0.3-build-time-target-tool-run-guard）"
+  - "configure 三个 AC_TRY_RUN（slrn_cv_va_copy/slrn_cv___va_copy/slrn_cv_va_val_copy）交叉编译必须预置（ref: E543）"
+  - "config.status 临时目录 umask 077 在 HMDFS 不可写（ref: E011），改 022"
+  - "conan --prefix=/ 固化 //share/slrn/slang 导致 S-Lang 脚本库运行时找不到，用上游官方 SLRN_SLANG_DIR 经 runenv_info.define 覆盖（ref: DRAFT-slrn-1.0.3-runenv-override-prefix-root-resource-dir，E317 同族）"
+
+# 测试计数口径（统一）：独立检查项数量
+# 上游测试：0（无 check/test 目标，无 tests/ 目录，`make check` 报无规则）
+# 适配后新增：消费者 CLI 契约 5 项 + 鸿蒙特有 3 项 = 8 项
+tests:
+  counting_unit: "独立检查项数量"
+  upstream_total: 0
+  consumer_total: 5
+  ohos_specific_total: 3
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/slrn-1.0.3.orig
+  source_work_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/slrn-1.0.3.work
+  source_orig_hash: 33fe6b50d108bf4d
+  source_work_hash: 984d883a0dcee4e3
+  generated_at: '2026-10-01T02:32:14'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-autoconf-config.sub.patch
+    type: portability
+    platform_only: false
+    guard: none
+    reason: "config.sub 增加 linux-ohos OS token；无平台宏，纯可移植性修复"
+  - file: 0002-configure.patch
+    type: portability
+    platform_only: false
+    guard: none
+    reason: "config.status 临时目录 umask 077->022（HMDFS 属主映射，知识 E011）；无平台宏"
+  - file: 0003-src-Makefile.in.patch
+    type: portability
+    platform_only: false
+    guard: none
+    reason: "构建期工具 chkslang 交叉编译不可运行，SKIP_CHKSLANG 守卫；无平台宏"

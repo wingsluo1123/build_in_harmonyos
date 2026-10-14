@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml - slrn 1.0.3
+# 上游官方测试声明文件 (L0e)
+#
+# 计数口径（全仓统一，见 notes.md「测试计数口径」）：
+#   独立检查项数量：每个检查项单独执行、单独判定成败（退出码/输出断言）。
+#   上游无测试套件：src/Makefile.in 与顶层 Makefile 均无 check/test 目标
+#   （`make check` -> "No rule to make target `check'"），无 tests/ 目录，
+#   上游测试数 = 0。适配后测试全部为新增消费者测试。
+
+package: slrn/1.0.3
+homepage: "https://www.jedsoft.org/slrn/"
+
+# 上游测试入口：无（`make check` 目标不存在）
+upstream_check_command: "(upstream Makefile has no check/test target)"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 消费者测试（真实执行安装产物 bin/slrn）
+test_package_tests:
+  - file: test_slrn.sh
+    description: "CLI 契约测试（5 项检查）：--help 用法输出；--version 退出码；版本串 slrn 1.0.3；编译特性 +nntp；编译特性 +ssl（OpenSSL 集成）"
+    command: "sh test_slrn.sh <bindir> <tmpdir>"
+
+# 鸿蒙特有测试（OHOS aarch64 运行时实跑，命令与日志见 notes.md）
+ohos_specific_tests:
+  - file: test_package/ohos_slrn_test.sh
+    description: "鸿蒙专项测试（3 项检查）：①二进制在 HarmonyOS PC 运行并经 uname 报告 OpenHarmony/HarmonyOS（验证 aarch64-linux-ohos 三元组适配链）；②运行时 S-Lang 版本字符串来自 libslang.so.2（验证 OHOS musl 动态链接 conan 依赖链）；③$TMPDIR（HMDFS）中的 init 文件被内嵌 S-Lang 配置引擎读取并在 --show-config 中生效（验证 HMDFS 文件系统上的配置管线）"
+    command: "sh ohos_slrn_test.sh <bindir> <tmpdir>"
+
+# 断言总数（消费者 5 项 + 鸿蒙专项 3 项，均为实际执行并单独判定的检查项）
+assertion_count: 8
