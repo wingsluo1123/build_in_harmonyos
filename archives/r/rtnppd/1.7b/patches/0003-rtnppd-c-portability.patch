@@ -1,0 +1,50 @@
+--- a/rtnppd.c
++++ b/rtnppd.c
+@@ -8,7 +8,7 @@
+ #include <unistd.h>
+ #include <sys/socket.h>
+ #include <sys/ioctl.h>
+-#include <sys/fcntl.h>
++#include <fcntl.h>
+ #include <sys/stat.h>
+ #include <termios.h>
+ #include <netinet/in.h>
+@@ -162,6 +162,7 @@
+ 				      * log packet (if need)
+ 				      * Return 1, if was translated */
+ int encrypt_packet(tnpp_packet *pack, tnpp_device *dev); /* Encrypt packet */
++int decrypt_packet(unsigned char *data, tnpp_device *dev);
+ void send_page(tnpp_device *dev, int message);
+ 
+ /* Put packet into file */
+@@ -430,7 +431,7 @@
+   int len, lencr;
+   unsigned char buf[MAX_PACKET_SIZE];
+   unsigned char bufcrc[5];
+-  u_int64_t init;
++  uint64_t init;
+   int i, j;
+   unsigned char c;
+ 
+@@ -449,8 +450,8 @@
+       pack->bytes[i] = random() & 0xff;
+   }
+   /* Encrypt packet and create subheader */
+-  bf_encrypt_data(pack->bytes + 1, lencr, ((u_int64_t) 0xA5A5A5A5 << 32)
+-		  + (u_int64_t) 0x5A5A5A5A, &dev->bf->skeys);
++  bf_encrypt_data(pack->bytes + 1, lencr, ((uint64_t) 0xA5A5A5A5 << 32)
++		  + (uint64_t) 0x5A5A5A5A, &dev->bf->skeys);
+   buf[0] = pack->bytes[0];
+   snprintf(buf + 1, 5, "%04X", len);
+   j = 5;
+@@ -561,8 +562,8 @@
+   lencr = j - 1;
+   if ((len > lencr) || (len < (lencr - 7)))
+     return 0;
+-  bf_decrypt_data(buf + 1, lencr, ((u_int64_t) 0xA5A5A5A5 << 32)
+-		  + (u_int64_t) 0x5A5A5A5A, &dev->bf->skeys);
++  bf_decrypt_data(buf + 1, lencr, ((uint64_t) 0xA5A5A5A5 << 32)
++		  + (uint64_t) 0x5A5A5A5A, &dev->bf->skeys);
+   if (dev->transparentcrc)
+     lencrc = 5;
+   else
