@@ -1,0 +1,35 @@
+software: ecm
+version: "6.28.0"
+status: built
+build_date: "2026-10-03"
+build_system: cmake
+conan_ref: "ecm/6.28.0"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/extra-cmake-modules-6.28.0.tar.xz"
+  sha256: "a32e24b267e8528d0253bc8df18bdc00e676560a43b796533e1b1406f4eef4db"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - ref: E092
+    text: "ECM是纯CMake模块库，不编译任何二进制代码"
+  - ref: E092
+    text: "仅安装CMake模块文件到share/ECM目录"
+  - ref: R29
+    text: "package_id()中使用self.info.clear()以避免编译器/构建类型导致不必要的包ID变化"
+  - ref: R38
+    text: "不需要commands.json，因为ECM不提供可执行文件"
+  - ref: E540
+    text: "OHOS SDK lld 与 HNP cmake 二进制依赖 llvm/lib 下 libc++_shared.so（aarch64-linux-ohos 子目录），配方 generate() 中须将 SDK lib 目录前置到 LD_LIBRARY_PATH（save_script 覆盖 build+package+test 全阶段）"
+  - ref: E002
+    text: "上游测试 10/87 例失败：ECM 测试默认走 Qt5 路径（KDEInstallDirs5.cmake 需 Qt5 qmake、ecm_add_tests 需 Qt5Core cmake 配置），制品仓 qt5/5.15.19 的 Qt5CoreConfig.cmake 在 OHOS 上 mkspecs 路径缺陷（p/../b//mkspecs/linux-clang 不存在），注入后仍无法配置通过——非'OHOS 无 Qt'，属依赖包 cmake 配置限制，不阻塞"

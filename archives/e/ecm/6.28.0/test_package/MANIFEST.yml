@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: ecm/6.28.0
+homepage: "https://kde.org/products/frameworks/"
+
+# 上游测试命令 (CMake 项目, ctest 驱动)
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (核心模块测试 77/87 通过)
+# 其余 10 例失败的真实技术原因（2026-10-03 逐例实测核实）：
+# 1) ExecuteKDEModules / KDEFetchTranslations / KDEInstallDirsTest.vars_in_sync_*
+#    —— 走 Qt5 路径（KDEInstallDirs5.cmake → ECMQueryQt.cmake）需要 Qt5 qmake
+#    可执行文件（No Qt5 qmake executable found）。
+# 2) ecm_add_tests-single_tests / ecm_add_tests_did_run-single_tests /
+#    ecm_add_tests-multi_tests / ecm_add_tests_did_run-multi_tests
+#    —— 测试子项目 find_package(Qt5Core) 需要 Qt5Core cmake 配置。
+# 3) 制品仓已发布 qt5/5.15.19 与 qtbase/6.11.1（Qt6），但：
+#    - ECM 测试默认 QT_MAJOR_VERSION=5（走 Qt5 路径），注入 Qt6 无法满足；
+#    - 注入 qt5/5.15.19 后，其 Qt5CoreConfig.cmake 引用的 mkspecs 路径
+#      (p/../b//mkspecs/linux-clang) 在 OHOS 上不存在，配置仍失败。
+# 结论：非"OHOS 无 Qt 环境"，而是 ECM 测试默认 Qt5 路径 + qt5 包 cmake
+# 配置在 OHOS 上的路径缺陷；属环境/依赖包配置限制，与 ECM 模块安装物无关。
+upstream_tests:
+  - file: "tests/ECMGenerateHeadersTest"
+    source: "ecm-6.28.0/tests/ECMGenerateHeadersTest"
+    description: "ECMGenerateHeaders 模块生成头文件功能测试"
+    command: "ctest --build-and-test"
+  - file: "tests/ECMGenerateExportHeaderTest"
+    source: "ecm-6.28.0/tests/ECMGenerateExportHeaderTest"
+    description: "ECMGenerateExportHeader 导出宏/弃用声明测试"
+    command: "ctest --build-and-test"
+  - file: "tests/ECMSetupVersionTest"
+    source: "ecm-6.28.0/tests/ECMSetupVersionTest"
+    description: "ECMSetupVersion 版本信息生成测试"
+    command: "ctest --build-and-test"
+  - file: "tests/ECMGeneratePkgConfigFile"
+    source: "ecm-6.28.0/tests/ECMGeneratePkgConfigFile"
+    description: "ECMGeneratePkgConfigFile pkg-config 文件生成测试"
+    command: "ctest --build-and-test"
+  - file: "tests/ECMAddTests"
+    source: "ecm-6.28.0/tests/ECMAddTests"
+    description: "ECMAddTests 测试注册宏测试（Qt5Core 路径子用例因 qt5 包 cmake 配置缺陷失败）"
+    command: "ctest --build-and-test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_ecm.cpp
+    description: "消费者测试: find_package(ECM 6.28.0 EXACT) + include(ECMFindModuleHelpers) 宏调用 + 版本/模块目录断言"
+    command: "./test_ecm"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 7
