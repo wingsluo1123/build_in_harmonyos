@@ -1,0 +1,75 @@
+# 版本级 manifest - t-coffee 13.45.0.484626413.41.0.28bdc39
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "13.45.0.484626413.41.0.28bdc39"
+software: "t-coffee"
+status: built
+build_date: "2026-10-04"
+build_system: makefile
+
+source:
+  url: "https://s3.eu-central-1.amazonaws.com/tcoffee-packages/Archives/T-COFFEE_distribution_Version_13.45.0.4846264.tar.gz"
+  sha256: "c8e5ba17de11ddf07cf2ed37f077d81c1432d55b77761f115f9374de6f8d0d03"
+  tar_format: tar.gz
+  upstream_homepage: "https://www.tcoffee.org"
+  upstream_release: "13.45.0.4846264"
+  upstream_note: >-
+    平台任务池给的版本串 13.45.0.484626413.41.0.28bdc39 是上游发布号
+    13.45.0.4846264 与 Debian 源码包版本 13.45.0.4846264+really13.41.0.28bdc39
+    首尾相接（去掉 "+really" 与 "+dfsg-1"）的产物，二者指向同一份代码。
+    取源用上游官网 www.tcoffee.org 的 DOWNLOAD 区（index.html#DOWNLOAD ->
+    Archives）所指的官方 S3 桶 tcoffee-packages 里的发行归档，非镜像站、
+    非 Debian +dfsg 重打包（非 dfsg 版删掉了非自由参考库）。
+
+build:
+  system: makefile
+  configure_options: []
+  configure_note: >-
+    上游无 configure 步骤，唯一构建入口是 t_coffee_source/makefile（23 行）：
+    SOURCES := $(shell find . -type f -name *.c) 逐个 .c 编译，链接 $(CC) $^ -o
+    t_coffee -lm。命令行变量覆盖上游的 CC=g++ / CFLAGS=-O3 -Wno-write-strings。
+  dependencies: []
+  cc: "CFLAGS 里的 -x c++ 强制 C++ 语言；CC 用 profile tools.build:compiler_executables 的 cpp（R33）"
+  cflags: "-x c++ -O0 -fsigned-char -Wno-write-strings"
+  cflags_note: >-
+    -x c++ 必需：上游 CC=g++ 即把 .c 当 C++ 编，而两个 clang driver 都按扩展名
+    把 .c 当 C；按 C 编直接编译失败（io_structures.h:299 用 struct Alignment
+    的注入类名，aln2prf / seq2msa 两处不同签名声明只合法于 C++ 重载）。
+    -O0 与 -fsigned-char 与 Debian debian/rules 对同一份源码的取值一致
+    （-O0 "to avoid crash in test suite"、-fsigned-char "for architectures such
+    as arm"），本次独立复验：-O1 及以上在 proba_pair 库里 SIGSEGV（g++ -O3 在
+    x86_64 上同样复现，属上游对优化器敏感的缺陷而非平台问题），OHOS clang 默认
+    -fno-signed-char 而上游 x86_64 gcc 是 signed-char。
+
+patches_applied:
+  - "patches/0001-missing-return-in-non-void-functions.patch"
+
+patch_classification:
+  - patch: "patches/0001-missing-return-in-non-void-functions.patch"
+    type: portability
+    hunks: 30
+    rationale: >-
+      30 个 non-void 函数走到函数尾不返回值（C++ UB）。clang 降成 llvm
+      unreachable，AArch64 后端降成 brk #1（SIGTRAP），未打补丁的产物在
+      batch_main 打印参数表阶段调 set_nproc() 即死。gcc 在同一处发普通
+      epilogue，故上游 x86_64 产物无感。补丁只追加 return 零值，不改算法。
+
+knowledge_gained:
+  - "T-COFFEE 的 .c 源码必须按 C++ 编译（上游 makefile 的 CC=g++）。clang/clang++ 都按扩展名把 .c 当 C，按 C 编有 3 处硬错误：io_structures.h:299 用了 struct Alignment 的注入类名（typedef 在其后才出现）、aln2prf 与 seq2msa 各有两份不同签名的声明（仅 C++ 重载合法）。必须显式 -x c++。"
+  - "clang 把 C++ 的『控制流到达非 void 函数末尾』UB 降成 llvm unreachable，AArch64 后端降成 brk #1 指令（SIGTRAP）；gcc 只发普通 epilogue。这是 OHOS aarch64 上首次踩到该类陷阱：-O0 产物里有 31 处 brk #1，set_nproc() 就中招，程序在 batch_main 打印参数表时死。判据可用 llvm-objdump -d | grep -c brk。"
+  - "T-COFFEE 对优化等级极其敏感：Debian debian/rules 强制 DEB_CFLAGS_MAINT_APPEND+=-O0（注释：to avoid crash in test suite）。本次独立复现：-O1/-O2/-O3 一律在 proba_pair 库阶段 COREDUMP(SIGSEGV)，-O0 正常；g++ -O3 在 x86_64 上同样 SIGSEGV，说明是上游对优化器敏感的缺陷，不是 OHOS 平台问题。"
+  - "OHOS clang 默认 -fno-signed-char（NDK），上游 x86_64 gcc 是 signed-char；T-COFFEE 大量用 char 做残基运算，无符号化后行为改变。Debian 同样显式加 -fsigned-char（注释：for architectures such as arm）。"
+  - "T-COFFEE 运行期会在 HOME_4_TCOFFEE / DIR_4_TCOFFEE 下自建 tco/ mcoffee/ methods/ plugins/ 目录，默认写 $HOME/.t_coffee；无参运行与正常比对都会交互式提问（如 Identify Master Sequences [no]:），CI/测试必须喂 </dev/null 并把 HOME_4_TCOFFEE 指到临时目录。"
+  - "上游发行归档自带一份 x86_64 预编译 bin/linux/t_coffee（4.6 MB）作为『参考实现』，可在 Linux 上直接跑通同一输入，用于校验交叉编译产物输出是否一致；配方只装本次交叉编译的产物。"
+  - "T-COFFEE 只有一个 make target 需要编译（t_coffee）。TMalign 是 Fortran 程序，依赖 makefile 里未定义的 $(FCC)，需 gfortran，OHOS NDK 不提供，故不在本包范围内。"
+
+revision_history:
+  - version: "13.45.0.484626413.41.0.28bdc39"
+    date: "2026-10-04"
+    reason: "首次适配 HarmonyOS PC（积分赛任务 #10997）"
+    changes:
+      - "取上游官方 S3 桶发行归档，sha256 c8e5ba17…0d03，HTTP 200 实测"
+      - "CFLAGS 固定 -x c++ -O0 -fsigned-char -Wno-write-strings，理由逐条记录（见 build.cflags_note）"
+      - "1 个 portability 补丁补齐 30 处 non-void 函数落空返回，消除 clang 在 AArch64 上生成的 brk #1（SIGTRAP）"
+      - "test_package 补全 29 断言消费者测试（上游测试数 N=0，附清点证据）；含 4 条鸿蒙特有断言"
+      - "断言口径 PASS/SKIP 三态，断言计数与环境无关恒为 29"

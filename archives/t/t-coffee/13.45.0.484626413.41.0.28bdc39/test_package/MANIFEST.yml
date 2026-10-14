@@ -1,0 +1,87 @@
+package: t-coffee/13.45.0.484626413.41.0.28bdc39
+homepage: "https://www.tcoffee.org"
+
+# ── 上游测试清点（R51 第一步：适配前清点，如实申报，不允许"没环境"当理由）──
+# 官方发行归档（S3 桶 tcoffee-packages 的 Archives/T-COFFEE_distribution_Version_
+# 13.45.0.4846264.tar.gz，sha256 c8e5ba17…0d03）解压后的顶层内容：
+#   README  license.txt  install(perl 脚本)  t_clinkdb.txt
+#   bin/{linux/t_coffee, macosx/(空)}  doc/{html,misc}  example/(372 个样本)
+#   mcoffee/(27 个 .pl + 参考库数据)  reference_test/(空目录)
+#   t_coffee_source/{makefile, 58 个 .c, 各级 *.h, matrices.h, TMalign.f}
+# 上游构建入口：
+#   * ./install 是半交互式 Perl 安装器（还会去装 SOAP::Lite、下载并编译
+#     expresso/3dcoffee/mcoffee/rcoffee 等伴生包），不是可用的 CI 入口；
+#   * 真正可用的构建入口只有 t_coffee_source/makefile，全部 target 为
+#     t_coffee / all / TMalign / clean —— 没有 check、没有 test，
+#     无 ctest/ctest/pytest 注册，无 .travis.yml/.github/ 之类 CI 配置；
+#   * reference_test/ 是空目录（0 个文件）。
+# 结论：上游 13.45.0.4846264 确无自动化测试（N = 0），证据如上。
+# 因此全部验证由本包 test_package 补齐，且全部真实执行产物。
+upstream_check_command: ""
+upstream_test_command: ""
+upstream_test_in_build: false
+upstream_tests: []
+upstream_test_inventory:
+  tarball_top_level: 9
+  reference_test_dir: true
+  reference_test_files: 0
+  install_script: "install (perl, 半交互，不适合 CI)"
+  makefile_targets: ["t_coffee", "all", "TMalign", "clean"]
+  makefile_test_target: false
+  ctest_or_pytest_registration: false
+
+# ── 补全测试用例（本包新增，全部真实执行本包产出的 bin/t_coffee）──────────
+test_package_tests:
+  - file: test_t_coffee.sh
+    description: >-
+      t-coffee 消费者测试（29 断言，五组）：
+      T1 产物完整性取证 6（bin 可执行 / ELF magic / e_machine=183 aarch64 /
+      e_type=ET_DYN PIE / licenses/license.txt / 解释器为
+      /lib/ld-linux-aarch64.so.1 即 OHOS 加载器而非宿主 glibc）；
+      T2 版本自证 3（-version rc=0、报出上游版本串 Version_13.45.0.4846264、
+      带 BUILD_INFO Revision 5becd5d——证明跑的是上游本体而非同名壳）；
+      T3 真实蛋白多序列比对 10（rc=0、CLUSTAL W 头部、3 条序列行、三行等长、
+      三行去 gap 后与输入逐字节一致、保守位含 '*'、'*' 数与实际全同列数一致、
+      比对长度 >= 输入最长序列）；
+      T4 DNA 比对与 fasta 往返 6（DNA rc=0、两行等长、去 gap 还原、
+      -output fasta rc=0、记录数=2、往返无损——T-Coffee 的 fasta 输出用 '-'
+      表示比对缺口，故比较时连 '-' 一并去掉，期望串由输入 fasta 现算）；
+      T5 鸿蒙特有 4（NEEDED 仅 libc.so、包内无 .so/.a、bin/ 不含上游自带的
+      x86_64 预编译产物、T-Coffee 把 tco/ 缓存建在 HOME_4_TCOFFEE 下而安装
+      目录零落盘——对应 OHOS 只读安装目录）。
+    command: "bash test_t_coffee.sh <package_folder>/bin/t_coffee"
+    assertion_count: 29
+    ohos_specific_assertions: 4
+
+# ── 鸿蒙特有测试（rule12：N >= 1）────────────────────────────────────────
+ohos_specific_tests:
+  - id: T5-1
+    name: "动态依赖仅 libc.so"
+    detail: "readelf -d 断言 NEEDED 集合无宿主第三方 .so；libm 在 OHOS 已并入 libc"
+  - id: T5-2
+    name: "包内无 .so/.a"
+    detail: "不污染 /lib、/lib64（R26 口径），纯 CLI 交付物"
+  - id: T5-3
+    name: "bin/ 不含上游 x86_64 预编译产物"
+    detail: >-
+      上游发行包里带一份 bin/linux/t_coffee（x86_64 ELF）；配方只装本次
+      交叉编译的 t_coffee，测试断言 bin/ 里没有那份外架构二进制
+  - id: T5-4
+    name: "只读安装目录零落盘"
+    detail: >-
+      T-Coffee 运行期会建 tco/ mcoffee/ methods/ plugins/ 缓存目录；断言它们
+      建在 HOME_4_TCOFFEE 指定的目录，且安装目录文件清单在运行前后完全一致
+      （OHOS 应用安装目录只读）
+
+# ── 断言口径（三态分类，不掩盖）──────────────────────────────────────────
+# PASS : 真实执行/真实取证且符合契约
+# SKIP : 该环境既非 aarch64 又无 qemu-aarch64，无法执行 aarch64 产物
+#        （每条独立记账，不合并，否则断言计数会随环境漂移）
+assertion_policy:
+  total: 29
+  fail_on: "FAIL > 0 或 断言计数与本文件声明不一致 或 零 PASS"
+  vacuous_pass_guards:
+    - "T1 ELF 取证：用 dd+od 读原始字节，读不出 magic/e_machine/e_type 即判 FAIL，不接受'读不到就跳过'"
+    - "T5-1：readelf -d 解析不出任何 NEEDED 项时判 FAIL，而非空过"
+    - "T3 三条去 gap 还原：期望串直接由输入 fasta 现算，不写死长度常量"
+    - "T4 fasta 往返：期望串由输入 fasta 现算后拼接，写死常量会把输入改动悄悄放过；T-Coffee fasta 输出用 '-' 表示比对缺口（上游行为，官方 x86_64 产物逐字节相同），比较时连 '-' 一并去掉"
