@@ -1,0 +1,23 @@
+diff --git a/docs/meson.build b/docs/meson.build
+--- a/docs/meson.build
++++ b/docs/meson.build
+@@ -1,6 +1,12 @@
+-gnome.yelp(meson.project_name(),
+-  sources: [
+-    'index.docbook',
+-    'legal.xml',
+-  ],
+-)
++# docs are translated docbook help pages; yelp requires itstool which is
++# not always present in the OHOS build environment — build them only when the
++# tool is available (the pages are not needed for the libgdm library).
++itstool_prog = find_program('itstool', required: false)
++if itstool_prog.found()
++  gnome.yelp(meson.project_name(),
++    sources: [
++      'index.docbook',
++      'legal.xml',
++    ],
++  )
++endif
+
