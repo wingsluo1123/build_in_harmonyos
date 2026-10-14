@@ -1,0 +1,121 @@
+# 版本级 manifest — asterisk-ldap 22.10.1
+# 遵循 ARCHIVE-SPEC
+
+# 版本号
+version: "22.10.1"
+
+# 软件名
+software: asterisk-ldap
+
+# 编译状态
+# published | built | failed | archived
+# built = conan create / conan-verify 通过，尚未 conan upload 到制品仓
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-10"
+
+# 构建系统
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（GitHub codeload tag；downloads.asterisk.org 在 OHOS 沙箱 404）
+  url: "https://codeload.github.com/asterisk/asterisk/tar.gz/refs/tags/22.10.1"
+
+  # 源码校验和（sha256，实测）
+  sha256: "373c98f4d4a1b923b42def0aee03f4e36aca9d1c244a8eeda646da8a97f89663"
+
+  # 压缩格式
+  compression: tar.gz
+
+  # 压缩包内源码目录名（strip_root 前）
+  archive_root: "asterisk-22.10.1"
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  required:
+    - "openldap/2.6.7"
+    - "libedit/20240808"
+    - "libxml2/2.15.3"
+    - "ncurses/6.6"
+    - "e2fsprogs/1.47.4"
+    - "jansson/2.15.1.1"
+    - "sqlite3/3.49.1"
+  optional: []
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  options: []
+  notes: "package_type=shared-library；Asterisk 全量 autotools 构建，只编译 LDAP 模块 res_config_ldap.so；依赖注入私有 prefix + --with-ldap；makeopts 补全 LDAP_INCLUDE/LDAP_LIB（含 -llber）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-configure.patch"
+  - "0003-include-asterisk-astmm.h.patch"
+  - "0004-include-asterisk-utils.h.patch"
+  - "0005-menuselect-config.guess.patch"
+  - "0006-menuselect-config.sub.patch"
+  - "0007-menuselect-configure.patch"
+  - "0008-include-asterisk-utils-raii_var-no-auto.patch"
+  - "0009-include-asterisk-utils-raii_var-no-blocks.patch"
+
+# ============================================================
+# 兼容性
+# ============================================================
+
+compatibility:
+  level: medium
+  issues: []
+  notes: "沿用 asterisk-speex/pgsql/curl 的 OHOS 移植补丁（config.guess/configure/menuselect/astmm/utils），另加 0009（clang 无 -fblocks 时的可移植 RAII_VAR）；只编译 LDAP 模块，不依赖 asterisk 主程序"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  type: conan create + conan-verify + 消费者测试
+  passed: 13
+  failed: 0
+  note: |
+    上游测试：Asterisk 的 in-tree 单元测试以 AST_TEST_DEFINE(...) 注册，
+    **全树共 707 个用例**（源码清点口径：
+    `grep -rh "^AST_TEST_DEFINE(" --include="*.c" . | wc -l` = 707；
+    其中 tests/*.c = 633 个 / 95 个文件，其余 74 个分布在 res/ main/ funcs/
+    bridges/ apps/ 等 25 个 .c 文件）。入口为
+    tests/CI/buildAsterisk.sh + tests/CI/runUnittests.sh
+    （`asterisk -rx "test execute all"`）；res_config_ldap **无专属上游用例**
+    （707 个注册中无一涉及 LDAP；grep 取证见 reports/upstream-tests.md），
+    且套件需完整核心（-o *_/with_test_framework=True）与运行中的 PBX —— 本模块包
+    不构建核心，故 707 个上游用例未运行（如实声明，非跳过、不计入通过率）。
+    适配后：test_package 13 项检查全部通过（8 静态 ELF 校验 + 5 动态加载检查）。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Asterisk 模块的 ABI 是『构造函数自注册』：AST_MODULE_INFO() 生成 static struct ast_module_info __mod_info + __attribute__((constructor)) __reg_module() 调用 ast_module_register(&__mod_info)；加载器只需 dlopen，.so 不导出任何符号（导出为空是正确形态）"
+  - "clang 不支持 GCC 风格嵌套函数定义，而 Asterisk utils.h 的 RAII_VAR 在 __GNUC__ 分支里正是嵌套函数 —— 未启用 -fblocks 时（kernel 关闭 blocks 分支）会编译失败（function definition is not allowed here）；需为 clang 增加 __attribute__((cleanup)) 版分支（patch 0009）"
+  - "Asterisk configure 的 LDAP 检查只产出 -lldap，而 res_config_ldap.c 直接调用 liblber 的 ber_free；lld 默认 --no-copy-dt-needed-entries 不从传递库解析符号 → 必须在 makeopts 的 LDAP_LIB 里显式补 -llber（并给 LIBS 加 -llber 让 configure 检查通过）"
+  - "openldap/2.6.7 直接提供 include/ldap.h + lib/libldap.so + lib/liblber.so + pkgconfig/{ldap,lber}.pc，注入私有 prefix 即可；configure 用 --with-ldap=<prefix> 探测 AST_EXT_LIB_CHECK([LDAP], [ldap], [ldap_initialize], [ldap.h])"
+  - "OHOS libc（musl 分支）提供 __strlen_chk/__strchr_chk 等 FORTIFY 符号，因此 clang 生成的引用在设备上可解析（可用 dlopen 加载测试实证）"
+
+references:
+  - https://www.asterisk.org/
+  - https://github.com/asterisk/asterisk/tree/22.10.1/res
+  - https://github.com/asterisk/asterisk/tree/22.10.1/tests

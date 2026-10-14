@@ -1,0 +1,32 @@
+--- a/include/asterisk/utils.h
++++ b/include/asterisk/utils.h
+@@ -976,6 +976,29 @@
+     _raii_cleanup_block_t _raii_cleanup_ ## varname __attribute__((cleanup(_raii_cleanup_block),unused)) =     \
+         ^{ {(void)dtor(varname);} };
+ 
++#elif defined(__clang__)
++
++/* clang 未启用 -fblocks 时不能使用上面的 blocks 分支；clang 也不接受 __GNUC__
++ * 分支里的嵌套函数定义（function definition is not allowed here）。此处提供
++ * 基于 __attribute__((cleanup)) 的可移植实现：cleanup 回调对变量的**最终值**
++ * 调用 dtor，与上游两种实现语义一致（无 blocks 运行时依赖）。 */
++struct _raii_cleanup_s {
++	void *addr;
++	void (*dtor)(void *);
++};
++
++static inline void _raii_cleanup_run(struct _raii_cleanup_s *s)
++{
++	if (NULL != s->dtor)
++		s->dtor(*(void **)s->addr);
++}
++
++#define RAII_VAR(vartype, varname, initval, dtor)                              \
++	vartype varname = (initval);                                               \
++	struct _raii_cleanup_s _raii_h_ ## varname                                 \
++		__attribute__((cleanup(_raii_cleanup_run), unused)) = {                \
++			(void *)&(varname), (void (*)(void *))(dtor) }
++
+ #elif defined(__GNUC__)
+ 
+ #define RAII_VAR(vartype, varname, initval, dtor)                              \
