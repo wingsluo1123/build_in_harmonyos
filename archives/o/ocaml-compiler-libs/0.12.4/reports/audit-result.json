@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "review-§16 (Conan 2.x API)",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/conanfile.py",
+      "line": 164,
+      "description": "package_info() uses the Conan 1.x 'env_info' API: 'self.env_info.OCAMLPATH.append(os.path.join(self.package_folder, \"lib\", \"ocaml\"))'. In Conan 2.x 'env_info' is only a compatibility mock (verified with Conan 2.33.0: 'self.env_info = MockInfoProperty(\"env_info\")', and 'env_info' is not in dir(ConanFile)); attribute access returns a throwaway list, so the append has no effect, Conan only prints 'Usage of deprecated Conan 1.X features that will be removed in Conan 2.X', and OCAMLPATH is never exported to consumers (a probe consumer's generated conanrunenv/conanbuildenv contained no OCAMLPATH). The code comment 'OCaml consumers (dune/ocamlc) locate the library via OCAMLPATH' is therefore not achieved.",
+      "fix_suggestion": "Replace with the Conan 2 environment API, e.g. 'self.buildenv_info.append_path(\"OCAMLPATH\", os.path.join(self.package_folder, \"lib\", \"ocaml\"))' and/or 'self.runenv_info.append_path(...)' as appropriate for build/run consumers."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-§7 / review-§25",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/test_package/test.sh",
+      "line": 3,
+      "description": "The script does not follow the project shell standard: line 3 uses 'set -eu' instead of the mandated 'set -euo pipefail' (code-style §7; review §25); the header is '#!/bin/bash' while §6 documents '#!/usr/bin/zsh'; output uses '===' headers plus OK/ERROR wording instead of the §9 '[step]'/'[ok]'/'[fail]' markers. Functionally the script is sound (all variables quoted, no '|| true', 'set -e' aborts on failures).",
+      "fix_suggestion": "Start with 'set -euo pipefail' and align the shebang header and step/success/failure markers with the project shell convention."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "MANIFEST-assertion_count",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/test_package/MANIFEST.yml",
+      "line": 5,
+      "description": "assertion_count: 7 does not match the runnable assertion sites in the sources: test_ocl.ml has 4 'check' calls (lines 22, 25, 32, 33) and test_ohos_e2e.ml has 4 'fail' guards (lines 22, 28, 31, 38) = 8 total, while notes.md:58, test-report.md:23 and MANIFEST.yml:26 all state '4 + 3 = 7' (the e2e case is counted as 3 assertions although it has 4 failure conditions). Minor documentation/count inconsistency, not a test-deception issue (the tests are real and OHOS-executed).",
+      "fix_suggestion": "Either set assertion_count: 8 by counting all four e2e guard checks, or document the counting rule consistently (e.g. that the two file-I/O guards are preconditions, not assertions)."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "test-sh-env (OCAMLPATH)",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/test_package/test.sh",
+      "line": 12,
+      "description": "OCAMLPATH=\"$(dirname \"$(dirname \"$LIB_DIR\")\")\" resolves to '<pkg>/lib' for LIB_DIR='<pkg>/lib/ocaml/ocaml-compiler-libs', but the installed META lives one level deeper at '<pkg>/lib/ocaml/ocaml-compiler-libs/META', so findlib/dune consumers would search '<pkg>/lib/ocaml-compiler-libs/META' and not find the package. The value should be '<pkg>/lib/ocaml' (as intended by conanfile.py:164-165). Latent in this test, because the ocamlc/ocamlopt invocations use explicit -I flags and never consult OCAMLPATH, so the test result is unaffected.",
+      "fix_suggestion": "Use a single dirname, e.g. 'OCAMLPATH=\"$(dirname \"$LIB_DIR\")\"', so OCAMLPATH points at the directory containing the ocaml-compiler-libs package directory."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-§3 / §2",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/conanfile.py",
+      "line": 62,
+      "description": "Method order deviates from code-style §3 (export_sources -> requirements -> layout -> source -> generate -> build -> package -> package_info): 'export_sources' (line 62) is placed after 'requirements' (line 51) and 'layout' (line 58). Additionally the class is named 'OclConan' (line 35) rather than the documented '{software-name}Conan' form (e.g. 'OcamlCompilerLibsConan'). Style only; the recipe loads and behaves correctly.",
+      "fix_suggestion": "Move export_sources() above requirements() and rename the class to follow the '{软件名}Conan' convention."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34 (test quality)",
+      "file": "archives/o/ocaml-compiler-libs/0.12.4/test_package/test_ocl.ml",
+      "line": 33,
+      "description": "'check \"Location.none\" (Location.none = Location.none)' is a tautology that can never fail and verifies no library behaviour; it only pads the documented assertion count. The other three checks (Pprintast.expression, Parse.implementation, Longident.last) and the e2e case genuinely consume the packaged Ocaml_common API, so the R34 requirement is still met.",
+      "fix_suggestion": "Replace with an observable check (e.g. parse source and assert the resulting location, or that a constructed location round-trips through the library) or drop the check and adjust assertion_count."
+    }
+  ],
+  "summary": "Verdict pass: no P0/P1 findings. Audited solely from the input file, with key claims independently re-verified: (a) test_package genuinely consumes the packaged repackaged compiler libraries - test_ocl.ml builds a Parsetree node via Ocaml_common.Ast_helper, prints with Pprintast, parses with Parse.implementation and checks Longident, and test_ohos_e2e.ml performs real file I/O plus a Parse/Pprintast round-trip; test.sh compiles and runs both consumers with no forced pass; (b) the sha256 was verified against the actual upstream v0.12.4 tarball downloaded for this audit (the 5435-byte archive hashes to f4c37daf975b67c1f645a5d0294ec8ca686b982da410d9f915ccd93548c6e2f1), matching conandata.yml:4 and manifest.yaml:13 exactly; (c) the R51 'upstream has no test suite' claim was verified against the real tarball listing (only src/ including the gen generator; no test/ directory), and MANIFEST/notes/conanfile are consistent about it; (d) source URL is the official Jane Street GitHub tag (no file:// or mirror), MIT license matches upstream LICENSE.md/opam, dependencies are registry packages, commands.json is correctly omitted (dune installs only libraries; gen is a build-time tool), and there are no __OHOS__ macros, prebuilt binaries, or forbidden files. Non-blocking findings only: one P2 (package_info uses the deprecated Conan 1.x env_info mock, so the intended OCAMLPATH export is a silent no-op under Conan 2.x) and five P3s (test.sh shell-style deviations, a latent off-by-one OCAMLPATH value in test.sh, MANIFEST assertion_count 7 vs 8 runnable guard sites, conanfile method-order/class-name style deviations, and a tautological Location.none assertion)."
+}

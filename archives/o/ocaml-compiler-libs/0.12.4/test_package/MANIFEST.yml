@@ -1,0 +1,26 @@
+manifest_version: "1.0"
+package: ocaml-compiler-libs
+version: "0.12.4"
+test_type: smoke
+assertion_count: 7
+upstream_tests:
+  source: "upstream has no test suite: the v0.12.4 tarball contains only src/ (ocaml_common/ocaml_bytecomp/ocaml_optcomp/ocaml_toplevel/ocaml_shadow/read_cma) and the gen generator; no test/ directory"
+  mechanism: "N/A (N=0). Per R51 the absence is recorded with the tarball listing as evidence; the alias modules are generated at build time by gen.exe scanning the installed compiler-libs, so the build itself verifies the repackaging against the OCaml 4.14.1 toolchain. Adaptation regression coverage comes from test_package (parse/print/register round-trips)."
+  discovered: 0
+  passed: 0
+  modified_reason: "no source modification; upstream ships no tests."
+
+# 鸿蒙特有测试（rule12：至少一个完整消费者用例）
+harmony_specific_test_count: 1
+harmony_specific_tests:
+  - file: test_package/test_ohos_e2e.ml
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      End-to-end consumer case on the real OHOS filesystem: writes an OCaml
+      source file, reads it back, parses it with the packaged compiler
+      libraries (Parse.implementation), pretty-prints the parsed structure
+      (Pprintast.structure) and verifies the round-trip text.
+    command: "bash test.sh <lib_dir> <ocaml_lib> <ocaml_bin>  # third section"
+    executed: true
+    result: "ALL OHOS E2E PASSED (3 assertions)"
