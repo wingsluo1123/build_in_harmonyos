@@ -1,0 +1,62 @@
+# 版本级 manifest — libusbauth-configparser 1.0.5
+# 遵循 ARCHIVE-SPEC v2.0（4.2 版本级字段）
+#
+# 上游为 monorepo kochstefan/usbauth-all：仓库里每个组件各占一个子目录，
+# 顶层无独立 tag。本配方钉定 v1.0.5 commit，只构建 libusbauth-configparser/
+# 子目录（usbauth 主程序、YaST 模块等其余组件不在本包范围）。
+
+version: "1.0.5"
+software: libusbauth-configparser
+display: "libusbauth-configparser"
+upstream_name: usbauth-all
+upstream_version: "1.0.5"
+conan_ref: "libusbauth-configparser/1.0.5"
+
+status: built
+build_date: "2026-10-08"
+build_system: autotools
+target_platform: aarch64-unknown-linux-ohos
+issue: TBD
+
+source:
+  url: "https://codeload.github.com/kochstefan/usbauth-all/tar.gz/d40b9790f776e698bd84b42ea5555c29ed3fbfee"
+  sha256: "7dc6aa9323ea6de56f0add4c06a72b1efebdc4d49461604c2d6f17e79ddc2ce8"
+  tar_format: tar.gz
+  version_mapping: "Conan libusbauth-configparser/1.0.5 maps to the libusbauth-configparser/ subdirectory of kochstefan/usbauth-all at commit d40b9790f776e698bd84b42ea5555c29ed3fbfee (configure.ac AC_INIT version 1.0.5). The delivered SONAME is libusbauth-configparser.so.1 (-version-info 1:0:0)."
+
+build:
+  system: autotools
+  configure_options:
+    - "--host=aarch64-linux-ohos"
+    - "--build=aarch64-linux-ohos"
+    - "--disable-static"
+  bootstrap: "autoreconf -fi (git snapshot ships no configure; automake/1.18 + libtool/2.5.4 via tool_requires)"
+  dependencies:
+    - "eudev/3.2.14"
+  tool_requires:
+    - "automake/1.18"
+    - "libtool/2.5.4"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-config-file-path-env-override.patch"
+
+validation:
+  local:
+    - "Python AST syntax check passed for conanfile.py and test_package/conanfile.py"
+    - "YAML parsing passed for conandata.yml, manifest.yaml and test_package/MANIFEST.yml"
+    - "official source sha256 verified locally against codeload.github.com/kochstefan/usbauth-all @ d40b9790 (7dc6aa93…dc2ce8)"
+    - "patch 0001 applied cleanly (patch -p1 --dry-run) on the flattened subdirectory; validated with patch_ng (1 file-diff, 3 hunks)"
+    - "upstream fact-check: SUBDIRS = src data, no test/ directory, no TESTS/check_PROGRAMS → 0 upstream test cases"
+  remote:
+    - "OHOS single-package CI: CI_PACKAGES=archives/l/libusbauth-configparser/1.0.5 zsh ci/conan/build_and_test.sh"
+  pending:
+    - "PR validation"
+    - "REL upload (post-merge) publishes libusbauth-configparser/1.0.5 to ohpcd"
+
+knowledge_gained:
+  - "上游为 monorepo（usbauth-all）且顶层无 tag：钉定 commit 后须在 source() 里把包子目录 libusbauth-configparser/ 上提为源根，autotools 才自洽；打补丁的路径因此是 src/usbauth-configparser.c（相对源根），而非 monorepo 的完整子路径。"
+  - "该库的 configure.ac 用 PKG_CHECK_MODULES([UDEV],[libudev]) 做硬检查，且 -version-info 产出 SONAME libusbauth-configparser.so.1；eudev/3.2.14 的 pkg_config_name=libudev 生成的 libudev.pc 正好满足，另把 UDEV_CFLAGS/UDEV_LIBS precious 变量直传 configure 作双保险。"
+  - "源码把配置路径写死为 #define CONFIG_FILE \"/etc/usbauth.conf\"；HarmonyOS 的 /etc 是只读 HMFS 挂载，故以 patch 0001 引入 $USBAUTH_CONFIG 覆盖（默认值不变，chkboot 同型先例），使消费者可把解析器指向可写位置。"
+  - "src/Makefile.am 的 install-exec-hook 用 bash 专用的 `*.{la,a}` 花括号通配删除 libtool 归档；/bin/sh 下不展开会静默留下 .la/.a，故 package() 内无条件按后缀清理。"

@@ -1,0 +1,37 @@
+--- a/src/usbauth-configparser.c	2026-10-08 08:53:12.399893400 +0800
++++ b/src/usbauth-configparser.c	2026-10-08 08:53:19.978856400 +0800
+@@ -33,6 +33,16 @@
+ 
+ #define CONFIG_FILE "/etc/usbauth.conf"
+ 
++/* Portable config-path override: the compiled-in default points at
++ * /etc/usbauth.conf, but some environments cannot write there (HarmonyOS
++ * mounts /etc as a read-only HMFS image).  Honour the USBAUTH_CONFIG
++ * environment variable when it is set to a non-empty value; the default is
++ * unchanged. */
++static const char *usbauth_config_file(void) {
++	const char *env = getenv("USBAUTH_CONFIG");
++	return (env && *env) ? env : CONFIG_FILE;
++}
++
+ unsigned gen_length;
+ struct Auth *gen_auths;
+ 
+@@ -240,7 +250,7 @@
+ }
+ 
+ int usbauth_config_read() {
+-	usbauth_yyin = fopen(CONFIG_FILE, "r");
++	usbauth_yyin = fopen(usbauth_config_file(), "r");
+ 
+ 	if(!usbauth_yyin)
+ 		return -1;
+@@ -255,7 +265,7 @@
+ }
+ 
+ int usbauth_config_write() {
+-	FILE* fout = fopen(CONFIG_FILE, "w");
++	FILE* fout = fopen(usbauth_config_file(), "w");
+ 
+ 	if(!fout)
+ 		return -1;
