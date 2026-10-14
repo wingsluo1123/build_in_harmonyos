@@ -1,0 +1,95 @@
+# ═══ Draft knowledge entry — conan build() 内跑 pytest 的 Python 扩展：子进程 env 缺 LD_LIBRARY_PATH ═══
+# Timestamp: 2026-10-02
+# Software: greenlet 3.5.6（PR #10408，CI 第 3 轮红）
+# Gate: CI conan-build-test → conan create → build() → _run_upstream_tests() 收集期
+# Status: DRAFT — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the evidence below（尤其"证据强度"一节：本条为环境不对称推断，本机未能复现）
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+
+id:                     DRAFT-python-ext-pytest-child-missing-ld-library-path
+trigger_tool:           conan|pytest|clang++
+phase:                  testing
+error_signature:        Interrupted: \d+ errors during collection|
+                         upstream tests are not collectable \(rc=\d+\)|
+                         Error loading shared library libpython3\.12\.so\.1\.0|
+                         Error loading shared library libc\+\+_shared\.so
+severity:               3
+category:               python-extension, conan-env, runtime-linker, testing
+match_keywords:         LD_LIBRARY_PATH, os.environ, buildenv, subprocess, pytest, collect-only,
+                         errors during collection, cpython extension, NEEDED, RUNPATH, libpython3.12,
+                         libc++_shared, env_prefix, _ld_path, 收集期整片失败
+title:                  conan build() 内跑 pytest 时，pytest 子进程 env 若取自 dict(os.environ) 就
+                        不含编译期那份 LD_LIBRARY_PATH；而扩展带 NEEDED libpython3.12.so.1.0 /
+                        libc++_shared.so 且无 RUNPATH，于是收集期**所有**测试文件 import 失败
+
+root_cause:             配方用 `-L<py_lib> -lpython3.12 -fuse-ld=bfd` 直接编译 CPython 扩展
+                        （绕开 setuptools），产物实测带
+                          NEEDED libpython3.12.so.1.0 / libc++_shared.so / libc.so
+                        且**没有 RUNPATH**（llvm-readelf -d 无 RPATH/RUNPATH 条目）。
+                        编译步骤（env_prefix）显式设了 LD_LIBRARY_PATH，但真正跑测试的那一步
+                        `_run_upstream_tests()` 用 `env = dict(os.environ)` 构造子进程环境——
+                        配方自身此时 os.environ 里**没有** LD_LIBRARY_PATH（实测为 unset；
+                        conan profile 的 [buildenv] 只作用于 self.run() 的子进程，不进 os.environ）。
+                        两者叠加：pytest 子进程加载扩展时动态加载器找不到 libpython3.12.so.1.0，
+                        **每一个** import 扩展的测试文件都失败 → "15 errors / 0 collected"，
+                        且 0.24s 即结束（符合"导入阶段就挂"而非"用例真跑失败"的特征）。
+                        关键辨识点：症状是**全体**测试文件同时 ERROR，而不是个别用例 FAILED。
+affected_scope:         所有在 conan build() 里跑上游 pytest、且被测包含 CPython 原生扩展的配方；
+                        扩展依赖 conan `python` 制品（或 SDK）提供的 libpython / libc++，且产物
+                        无 RUNPATH 时必现。纯 Python 包不受影响。设备端因默认搜索路径可解析
+                        而掩盖，CI worker 上暴露。
+verification_cmd:       llvm-readelf -d <ext>.so | grep -E "NEEDED|RPATH|RUNPATH"
+                        （应看到 NEEDED libpython3.12.so.1.0 且无 RUNPATH；
+                        对照配方里 pytest 子进程 env 是否设置了 LD_LIBRARY_PATH）
+rec_priority:           1
+rec_approach:           inject-library-path-into-test-child-env
+rec_description:        build() 编译期算出的 lib 目录集合（python 制品的 lib + 各依赖的 lib）
+                        存到 self._ld_path，在跑 pytest/ctest 前把它**前置拼接**进子进程的
+                        env["LD_LIBRARY_PATH"]（不能覆盖已有值，应先新后旧 join）。
+                        注意 env 来源必须是"编译期那份路径"——os.environ 与 profile buildenv
+                        都不是；buildenv 只影响 self.run()，os.environ 里通常没有该变量。
+rec_command:            env["LD_LIBRARY_PATH"] = os.pathsep.join([ld_path] + [p for p in (os.environ.get("LD_LIBRARY_PATH",""),) if p])
+rec_auto_fix:           true
+rec_impl:               recipe-pattern
+
+fallback_priority:      2
+fallback_approach:      link-with-rpath-instead
+fallback_description:   编译时给扩展加 `-Wl,-rpath,<py_lib>`，让产物自带 RUNPATH，从而不依赖
+                        运行期 LD_LIBRARY_PATH。仅适用于"rpath 可用"的链接器组合；musl/OHOS
+                        下 rpath 支持需先验证（E736 记录过 CMAKE_BUILD_RPATH 静默无效的先例），
+                        故列为备选而非首选。
+fallback_command:       clang++ ... -Wl,-rpath,<py_lib> -Wl,-rpath,<dep_lib> -o <ext>.so
+fallback_auto_fix:      false
+fallback_impl:          recipe-pattern
+
+forbid_1_pattern:       靠 `import <pkg>` 能过就断定扩展可加载|只看 pytest 尾部汇总就断定"用例失败"
+forbid_1_reason:        顶层包能 import ≠ 其原生扩展能被 dlopen；NEEDED 解析失败发生在扩展
+                        加载期，顶层 __init__ 可能根本走不到那一步。而把"收集期整片 ERROR"
+                        当成"用例失败"，会去改测试/改用例，方向完全错。
+forbid_1_consequence:   误判为包缺陷或上游测试缺陷，连续多轮修错地方（本条实测白跑数轮 CI）
+forbid_2_pattern:       用 profile [buildenv] 的 LD_LIBRARY_PATH 指望它作用于 pytest 子进程
+forbid_2_reason:        buildenv 只对 self.run() 的子进程生效，不写入配方进程的 os.environ，
+                        而 `dict(os.environ)` 取不到它
+forbid_2_consequence:   环境变量"看起来设了"但测试子进程实际没有，症状照旧
+
+principles:             P0xx（待补：跨进程环境不继承——"设了"≠"子进程拿到"）
+similar_to:             E736（ctest 缺 LD_LIBRARY_PATH → 注入）、
+                        DRAFT-pyjson5-0.15.0-test-package-python-libdirs-ld-library-path（显式调用
+                        conan python 二进制时须注入 libdirs，同"运行期补 LD_LIBRARY_PATH"家族，
+                        但那条是 test_package 显式调 python 二进制，本条是 pytest 子进程 dlopen 扩展）
+conflicts_with:
+prerequisite_of:
+doc_file:               knowledge/drafts/DRAFT-python-ext-pytest-child-missing-ld-library-path.md
+last_updated:           2026-10-02
+source_event:           archives/g/greenlet/3.5.6（PR #10408 第 3 轮 CI：15 errors / 0 collected）
+authors:                AtomCode <noreply@atomgit.com>
+source_pr:              10408
+source_commit:          8248c523e
+metrics_success_count:  0
+metrics_fail_count:     1
+metrics_confidence:     0.5
+
+draft:                  true

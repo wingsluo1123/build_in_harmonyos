@@ -1,0 +1,64 @@
+--- a/src/greenlet/tests/leakcheck.py
++++ b/src/greenlet/tests/leakcheck.py
+@@ -29,7 +29,14 @@
+ import unittest
+ 
+ 
+-import objgraph
++try:
++    import objgraph
++except ImportError:  # pragma: no cover
++    # objgraph is an optional test-time dependency (greenlet does not
++    # require it at runtime). Upstream uses it only to measure object
++    # growth for the leak checks; with it unavailable those checks are
++    # skipped (see _growth) rather than blocking collection of the suite.
++    objgraph = None
+ 
+ # graphviz 0.18 (Nov 7 2021), available only on Python 3.6 and newer,
+ # has added type hints (sigh). It wants to use ``typing.Literal`` for
+@@ -121,7 +128,7 @@
+ class LeakCheckError(AssertionError):
+     pass
+ 
+-if hasattr(sys, 'getobjects'):
++if hasattr(sys, 'getobjects') and objgraph is not None:
+     # In a Python build with ``--with-trace-refs``, make objgraph
+     # trace *all* the objects, not just those that are tracked by the
+     # GC
+@@ -223,6 +230,8 @@
+         return True
+ 
+     def _growth(self):
++        if objgraph is None:
++            raise unittest.SkipTest("objgraph not available")
+         return objgraph.growth(limit=None, peak_stats=self.peak_stats,
+                                filter=self._include_object_p)
+ 
+--- a/src/greenlet/tests/test_cpp.py
++++ b/src/greenlet/tests/test_cpp.py
+@@ -3,7 +3,14 @@
+ import unittest
+ 
+ import greenlet
+-import objgraph
++try:
++    import objgraph
++except ImportError:  # pragma: no cover
++    # objgraph is an optional test-time dependency (not a runtime
++    # requirement of greenlet) and is not available here. The single
++    # test that needs it is skipped below instead of preventing this
++    # whole module from being collected.
++    objgraph = None
+ 
+ from . import WIN
+ from . import TestCase
+@@ -71,6 +78,9 @@
+ 
+ 
+     def test_leak_test_exception_switch_and_do_in_g2(self):
++        if objgraph is None:
++            raise unittest.SkipTest("objgraph not available")
++
+         def raiser():
+             raise ValueError("boom")
+ 

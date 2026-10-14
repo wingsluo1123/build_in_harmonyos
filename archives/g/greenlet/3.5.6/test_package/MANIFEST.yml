@@ -1,0 +1,93 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: greenlet/3.5.6
+homepage: "https://greenlet.readthedocs.io/"
+
+# 上游测试命令 — pytest（src/greenlet/tests/）
+# 测试期可选依赖 objgraph / psutil（上游 pyproject.toml
+# [project.optional-dependencies].test 声明）现由配方的 build_requirements()
+# 以 tool_requires 声明，并从 ohpcd 制品取出 site-packages 前置到 PYTHONPATH。
+# 改用 conan 制品是为了可复现/可审计（版本锁进依赖图，R36），
+# 而非签名问题——实测平台镜像的 psutil wheel 本身已带 .codesign 段、可直接 import。
+# 依赖不可用时相关用例退回 SkipTest，计数会如实反映。
+# 注：原先设 GREENLET_SKIP_LEAKCHECKS=1 以规避「3 passed / 168 skipped」的无效
+# 验证（objgraph 缺失使 wrap_refcount 跳过整套）；引入 objgraph 后该规避不再需要，
+# 已移除——leak 检查本身即有效检测路径。
+upstream_check_command: "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest src/greenlet/tests -q"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "pytest src/greenlet/tests -q（含 --collect-only 预检；实测收集 172 项、166 passed / 6 skipped / 0 failed）"
+
+# 上游测试为**硬门禁**，非仅告警：
+#   · 收集失败（--collect-only 非 0）或收集到 0 项 → build() raise，拒绝出包；
+#   · pytest 返回非 0（出现 failed/error）→ build() raise，拒绝出包。
+# 理由：否则此处记录的「0 failed」会在上游回归时静默变成假陈述。
+# 与同仓 biopython / saunafs 的硬失败契约一致（R51 如实申报）。
+upstream_test_gate: "hard-fail（收集失败 / 收集 0 项 / pytest 非 0 均 raise ConanException）"
+
+# 上游测试**已可收集并真实运行**（3 处阻塞已逐一修复）：
+#   ① tests/__init__.py:17 裸 `import psutil`（当时 psutil 未发布到 ohpcd）
+#      → patches/0001-tests-psutil-optional.patch
+#   ② objgraph 的**三处**裸导入（tests/leakcheck.py:32、tests/test_cpp.py:6，
+#      以及 leakcheck 被 __init__ 导入的链路）
+#      → patches/0002-tests-objgraph-optional.patch
+#      （只修 ① 会继续失败，收集错误转为 objgraph——必须一次性扫全依赖面）
+#   ③ 构建期三个扩展模块未签名 → HMDFS 拒 dlopen（Permission denied），
+#      build() 现于 pytest 前签名 greenlet + 两个 C/C++ 测试扩展
+# 两份补丁现**作为降级路径保留**（依赖已发布，正常运行时不走该分支）；
+# 均沿用上游既有语义（SkipTest，不伪造内存/增长数据）。
+upstream_test_note: >-
+  上游测试已可收集（172 项）并真实运行：166 passed / 6 skipped / 0 failed。
+  上游通过率：**100%（166/166，规范口径 passed/(passed+failed+errors)，skipped 不计入分母）**；
+  全量口径 **96.5%（166/172）**。
+  6 个 skip **全部为上游版本/平台闸**，与依赖无关、非本适配可消除
+  （free-threaded builds×3：test_gc.py:88/99 与 test_greenlet.py:1471；
+   3.15+ only×2：test_gc.py:109/124；
+   3.13+ 需 sys._is_gil_enabled×1：test_greenlet.py:1487）。
+  原先另有 4 个「缺依赖」skip（objgraph×1：test_cpp.py:81；
+  psutil×3：test_leaks.py L326/473/479），现已**通过引入依赖消除**：
+  build_requirements() 以 tool_requires 声明上游测试期可选依赖
+  objgraph/3.6.2 + psutil/7.2.2（改用 conan 制品是为可复现/可审计与 R36 合规，
+  非签名问题——实测平台镜像的 psutil wheel 本身已带 .codesign 段、可直接 import）。
+  同时**移除**原先的 GREENLET_SKIP_LEAKCHECKS=1——该 env 原用于规避
+  「3 passed / 168 skipped」的无效验证（objgraph 缺失使 wrap_refcount 跳过整套）；
+  引入 objgraph 后 leak 检查能真跑，覆盖它反而削弱证据强度，故不再设置。
+  另：原先的 1 个 failed（test_version.py::VersionTests::test_version 报
+  `os.popen` TypeError: can't concat str to bytes）**已修复**：根因是 python/3.12.9
+  补丁 0014 生成的 `_harmonyos_compat.py` 把 os.popen 包装成 subprocess 时，
+  既传 `text=True` 又对已是文本的 `proc.stdout` 再套一层 `io.TextIOWrapper`，
+  双重解码使 `read()` 必抛 TypeError（平台缺陷，与 greenlet 及任何依赖无关）。
+  修法：配方在 pytest 前经 PYTHONPATH 注入 `sitecustomize.py` 就地纠正该包装
+  （不改任何上游测试文件）；平台侧根治见 PR #10882（python/3.12.9.1，
+  该版本**已发布到 ohpcd**，后续可移除本 shim）。
+  （原结论「因 psutil 不可收集」只对了一半：实际有 psutil/objgraph/未签名三处阻塞。）
+
+upstream_tests:
+  - file: src/greenlet/tests/
+    source: greenlet-3.5.6/src/greenlet/tests/
+    description: "上游 pytest 套件（test_greenlet / test_gc / test_contextvars / test_extension_interface / test_cpp 等，172 项）；需 2 份补丁（使 psutil/objgraph 导入可选，作为依赖安装失败时的降级路径）+ 构建期签名三个扩展模块 + build() 内安装 objgraph/psutil 测试依赖"
+    command: "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest src/greenlet/tests -q"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_greenlet.py
+    description: >-
+      消费者测试：真实 API（R34），9 组断言——①版本与 __all__ 导出面；
+      ②编译期特性开关（GREENLET_USE_CONTEXT_VARS / GREENLET_USE_GC == 1）
+      与 _C_API capsule 存在；③**协程切换顺序**（a1→b1→a2→b2 交错）；
+      ④greenlet 惰性执行（构造时不运行，switch 才跑）；⑤getcurrent() 语义；
+      ⑥parent 链与 dead/truthiness 状态；⑦未捕获异常向调用者传播；
+      ⑧GreenletExit 作为协作终止信号（switch 返回该实例而非抛出）；
+      ⑨throw() 向挂起 greenlet 注入异常 + 可哈希。
+      注：本包是编译型扩展，**仅 import 成功即证明 _Py_IsFinalizing 链接问题已解决**。
+    command: "python3 test_greenlet.py <site-packages-dir>"
+
+# 测试断言总数（实测计数，非近似估计）
+#   test_greenlet.py 共 21 条 `assert` 语句 + 1 条 `raise SystemExit` 守卫
+#   （L89「异常未传播」） = 22 个硬失败点，任一失败即非 0 退出。
+#   9 组语义分组见上方 test_package_tests.description。
+assertion_count: 22

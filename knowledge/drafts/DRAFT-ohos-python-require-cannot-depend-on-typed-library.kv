@@ -1,0 +1,137 @@
+#====================================================================
+# DRAFT-ohos-python-require-cannot-depend-on-typed-library —— package_type
+#   "python-require" 不允许依赖带类型的库，编译型 Python 扩展须用 "library"
+# 对应文档: knowledge/drafts/DRAFT-ohos-python-require-cannot-depend-on-typed-library.md
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。正式编号由 graph promote 分配。
+#====================================================================
+
+id:                     DRAFT-ohos-python-require-cannot-depend-on-typed-library
+trigger_tool:           conan|conan create|python
+phase:                  dependency-resolution|configuration
+error_signature:        Package '.*' with type 'python-require' cannot have a '.*' dependency to '.*'|
+                         Package type is 'library', but no 'shared' option declared
+
+severity:               3
+category:               conan, package_type, python, packaging, c-extension
+match_keywords:         python-require, package_type, static-library, library,
+                         shared option, C extension, Python C API, python/3.12,
+                         libffi, cannot have a dependency, greenlet, pillow,
+                         lxml, 编译型 Python 包, 类型约束
+title:                  Conan 的 `python-require` 类型**不允许依赖带类型的库** ——
+                        编译型 Python 扩展（需 python/3.12 头与 libpython）必须
+                        改用 `package_type = "library"` 并声明 `shared` 选项
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:            Conan 2 对 ``package_type`` 施加**类型兼容约束**：
+                        ``python-require`` 被定义为"纯 Python 运行时依赖"，
+                        **不允许**依赖任何带自身类型的库（library / static-library /
+                        shared-library …）。当配方需要 ``requires("python/3.12.9")``
+                        来编译 C 扩展时，python 包会**传递带入** ``libffi``
+                        （``static-library``），于是 conan 直接拒绝：
+                          ``ERROR: Package 'greenlet/3.5.6' with type
+                            'python-require' cannot have a 'static-library'
+                            dependency to 'libffi/3.5.2'``
+                        这是**类型契约冲突**，不是依赖版本问题——改版本号无法解决。
+                        正确类型是 ``library``（产物本质是共享对象 ``.so``）。
+                        但切到 ``library`` 会**连带触发第二条约束**：
+                          ``ERROR: greenlet/3.5.6: Package type is 'library',
+                            but no 'shared' option declared``
+                        —— ``library`` 类型要求标准 ``shared`` 选项（用于决定包 ID
+                        与链接类型），必须补 ``options`` / ``default_options``。
+                        两条错误是**同一处修改的连锁后果**，只修第一条会在下一步
+                        再次失败（实测即如此）。
+affected_scope:        所有**编译型** Python 包（含 C/C++ 扩展的 Python 库，如
+                        greenlet / lxml / pillow / cppy / numpy / astlib）；
+                        纯 Python 包不受影响（它们无需 python 依赖，用
+                        ``python-require`` 正确）。
+                        相反方向也成立：给纯 Python 包错标 ``library`` 会要求
+                        ``shared`` 选项，语义上也不对（没有共享对象）。
+                        与 E283（``library`` 缺 shared 选项的**契约**本身）互补：
+                        E283 讲"library 必须有 shared 选项"这条规则，本条讲
+                        "**何时该从 python-require 切到 library**"以及两条错误的
+                        连锁关系。
+verification_cmd:       ① 复现类型冲突（编译型 Python 包误用 python-require）：
+                          conan create <recipe> -pr:h=<prof> -pr:b=<prof>
+                          # Package '...' with type 'python-require' cannot have a
+                          # 'static-library' dependency to 'libffi/...'
+                        # ② 确认该包是否真是编译型（有无 C/C++ 源与扩展产物）：
+                        ls <src>/**/*.c <src>/**/*.cpp <src>/**/*.so 2>/dev/null | head
+                        # ③ 确认依赖链里带了带类型的库：
+                        conan graph info <recipe> -pr:h=<prof> | grep -E "library|libffi"
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           use-library-type-with-shared-option
+rec_description:        给编译型 Python 扩展包同时上**两处**声明（一次到位，避免
+                        连锁第二次失败）：
+                        ```python
+                        package_type = "library"
+                        options = {"shared": [True, False]}
+                        default_options = {"shared": True}
+                        ```
+                        理由：产物是共享对象（``.so`` 扩展模块），语义对应
+                        ``library`` + ``shared=True``；``requires("python/3.12.9")``
+                        提供 ``Python.h`` 与 ``libpython3.12.so``。
+                        与本仓既有先例一致：``lxml`` 6.1.1 与 ``pillow`` 10.4.0
+                        均为 ``package_type = "library"`` + ``requires("python/...")``。
+                        反过来，**纯 Python 包**（markupsafe / itsdangerous /
+                        pycparser 等）应保持 ``python-require``，不要为了"统一"
+                        而改成 library。
+rec_command:            # conanfile.py：
+                        #   package_type = "library"
+                        #   options = {"shared": [True, False]}
+                        #   default_options = {"shared": True}
+                        #   def requirements(self): self.requires("python/3.12.9")
+rec_auto_fix:           false
+rec_impl:               use-library-type-with-shared-option
+
+fallback_priority:      2
+fallback_approach:      avoid-python-dependency
+fallback_description:   若确实希望该包维持 ``python-require``（例如它同时还有纯
+                        Python 用法），可尝试**不声明 python 依赖**、改用构建机
+                        解释器的头文件与 libpython（如本仓 setuptools bootstrap
+                        的做法）。代价是绑定构建机环境、可复现性下降，且
+                        CI Worker 的解释器路径与本地不同——**仅作兜底**。
+fallback_command:       # 不 requires python，改为探测 sysconfig.get_path('include')
+fallback_auto_fix:      false
+fallback_impl:          avoid-python-dependency
+
+forbid_1_pattern:       只改 package_type.*(library|python-require).*(不|未).*(声明|加).*shared|
+                        遇到 cannot have a.*dependency.*(就|只).*改 package_type.*(未|不).*shared
+forbid_1_reason:        改包类型会连锁触发 ``Package type is 'library', but no
+                        'shared' option declared`` —— 两条修改属**同一动作**，
+                        分开做只会多跑一轮失败（实测踩过）。
+forbid_1_consequence:   多轮无效构建，误以为"改类型没用"。
+
+forbid_2_pattern:       为(编译型|含 C 扩展).*Python.*包.*(保持|沿用).*python-require.*(并|同时).*requires.*python|
+                        认为.*python-require.*可.*依赖.*python/3\.12
+forbid_2_reason:        python-require 的类型契约禁止依赖带类型的库，而
+                        python/3.12 会带入 libffi（static-library）——
+                        在 conan 层面直接报错，无法绕过。
+forbid_2_consequence:   依赖解析阶段即失败，配方无法落地。
+
+principles:             measure-not-assume, upstream-compat-evidence
+
+causes:                 []
+caused_by:              []
+similar_to:             [E283]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-ohos-python-require-cannot-depend-on-typed-library.md
+last_updated:           2026-09-16
+source_event:           greenlet 3.5.6 适配（python-require 无法依赖 python/3.12.9
+                        带入的 static-library libffi；改 library 后连锁报 shared 缺失）
+
+authors:                AtomCode (deepseek-flash) <noreply@atomgit.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  2
+metrics_fail_count:     2
+metrics_confidence:     0.95
+metrics_last_used:      2026-09-16
+
+draft:                  true
+contributor_id:        9C6E
