@@ -1,0 +1,19 @@
+# conandata.yml — lsm 1.0.21
+# Official upstream release tarball (R39).
+# Homepage: https://lsm.foobar.fi/ ; download index: https://lsm.foobar.fi/download/
+# Two portability patches (both platform-macro-free, POSIX-scoped):
+# 0001 sockaddr_storage rename guard for the OpenHarmony sysroot
+#   (musl libc <sys/socket.h> vs kernel <linux/socket.h>).
+# 0002 WAIT_ANY -> -1 (BSD/glibc extension missing on musl/OHOS).
+
+sources:
+  url: "https://lsm.foobar.fi/download/foolsm-1.0.21.tar.gz"
+  sha256: "527d9c363aa62b9fc511b42c5a06f774a8767c4b5330db4d959c10b46b0dede7"
+
+patches:
+  - patch_file: "patches/0001-ohos-sockaddr-storage-guard.patch"
+    patch_description: "Scoped sockaddr_storage rename around linux/if.h and linux/if_arp.h for OpenHarmony sysroot (E091/E119)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-wait-any-portable.patch"
+    patch_description: "Replace BSD/glibc-only WAIT_ANY with POSIX waitpid(-1) in forkexec.c sigchld handler"
+    patch_type: "portability"

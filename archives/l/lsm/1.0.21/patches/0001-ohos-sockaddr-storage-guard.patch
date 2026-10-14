@@ -1,0 +1,37 @@
+--- a/foolsm.c
++++ b/foolsm.c
+@@ -33,7 +33,17 @@ License: GPLv2
+ #include <fcntl.h>
+ 
+ #include <sys/ioctl.h>
++/* OpenHarmony/HongMeng sysroot defines struct sockaddr_storage in both
++ * <sys/socket.h> (libc) and <linux/socket.h> (kernel UAPI, pulled in by
++ * <linux/if.h>). Rename the kernel copy for the duration of this single
++ * include so the two definitions do not clash. The rename is strictly
++ * scoped (define/undef around one include) and platform-neutral: on glibc
++ * the kernel header already cooperates via <linux/libc-compat.h>, so the
++ * scoped rename is a no-op there. Knowledge E091/E119.
++ */
++#define sockaddr_storage __foolsm_linux_sockaddr_storage
+ #include <linux/if.h>
++#undef sockaddr_storage
+ #include <sys/uio.h>
+ 
+ #include "icmp_t.h"
+--- a/foolsm.h
++++ b/foolsm.h
+@@ -10,7 +10,14 @@ License: GPLv2
+ #define __FOOLSM_H__
+ 
+ #include <netinet/in.h> /* for struct sockaddr_in */
++/* Same sockaddr_storage guard as in foolsm.c: <linux/if_arp.h> pulls in
++ * <linux/socket.h>, which clashes with <sys/socket.h> on the OpenHarmony
++ * sysroot. Scoped rename, no platform macro, harmless on glibc
++ * (knowledge E091/E119).
++ */
++#define sockaddr_storage __foolsm_linux_sockaddr_storage
+ #include <linux/if_arp.h> /* for struct sockadd_ll */
++#undef sockaddr_storage
+ #include <netinet/icmp6.h> /* for struct icmp6_filter */
+ 
+ #include "defs.h"
