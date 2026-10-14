@@ -1,0 +1,42 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1,35 +1,35 @@
+ # PatMaN DNA pattern matcher
+ # (C) 2007 Kay Pruefer, Udo Stenzel
+ #
+ # This program is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+ # the Free Software Foundation; either version 2 of the License, or (at
+ # your option) any later version.  See the LICENSE file for details.
+ 
+ prefix := ${HOME}
+-version := 1.2
++version := 1.2.2
+ 
+ TARGETS := patman
+ OBJS := prefix_tree.o fasta.o main.o
+ CPPFLAGS += -Wall 
+-CPPFLAGS += -O3 -funroll-loops -DNDEBUG -march=k8
++CPPFLAGS += -O3 -funroll-loops -DNDEBUG
+ # CPPFLAGS += -ggdb
+ LDLIBS += -lpopt
+ 
+ all: $(TARGETS)
+ 
+ patman:	$(OBJS)
+-	g++ $(CPPFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
++	$(CXX) $(CPPFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+ 
+ %.o:	%.cpp
+-	g++ -DVERSION="\"$(version)\"" $(CPPFLAGS) -c -o $@ $<
++	$(CXX) -DVERSION="\"$(version)\"" $(CPPFLAGS) -c -o $@ $<
+ 
+ install: $(TARGETS)
+ 	install -d ${prefix}/bin
+ 	install -d ${prefix}/share/man/man1
+ 	install -s -m755 $^ ${prefix}/bin
+ 	install -m644 patman.1 ${prefix}/share/man/man1
+ 	
+ fasta.o: fasta.h 
+ prefix_tree.o: prefix_tree.h global.h
+ main.o: fasta.h prefix_tree.h global.h
