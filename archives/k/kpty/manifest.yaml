@@ -1,0 +1,29 @@
+software: kpty
+display: "KPty"
+description: "KDE Frameworks 6 pty abstraction (KPty, KPtyDevice, KPtyProcess)"
+category: library
+homepage: "https://invent.kde.org/frameworks/kpty"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS not listed)"
+    - "UTEMPTER is optional upstream and absent from the OHOS sysroot; the utmp bookkeeping path then falls back to the utmp/utmpx calls OHOS libc does not implement, handled by patches/0002-utmp-neutral-symbol-probes.patch"
+    - "pty device comes from the OHOS libc: pty.h present and openpty/forkpty exported by libc.so"
+    - "CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG injected for os=OHOS (Generic platform module has no soname rule; E330/kcodecs precedent)"
+    - "ECM_MODULE_PATH set manually (CMakeDeps-generated ECMConfig.cmake does not propagate it)"
+    - "conan_cmakedeps_paths.cmake generated manually (qtbase uses cmake_find_mode=none)"
+    - "/system/lib64 prepended to LD_LIBRARY_PATH for configure and test runs (sandbox libc++_shared.so shadowing)"
+    - "Upstream KPtyProcessTest (autotests/kptyprocesstest.cpp) built and executed through ctest inside build()"
+  common_dependencies:
+    - qtbase
+    - kcoreaddons
+    - ki18n
+    - ecm
+
+versions:
+  "6.26.0":
+    status: built
+    build_date: "2026-10-11"
+    conan_ref: "kpty/6.26.0"

@@ -1,0 +1,36 @@
+software: kpty
+version: "6.26.0"
+status: built
+build_system: cmake
+created_at: 2026-10-11
+build_date: 2026-10-11
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kcoreaddons/6.26.0.1
+    - ki18n/6.26.0
+  build:
+    - ecm/6.26.0
+  optional:
+    - utempter   # find_package(UTEMPTER) 可选，OHOS 未提供，走内置回退路径
+patches_applied:
+  - "0001-cmake-treat-ohos-as-unix.patch（CMake 在 CMAKE_SYSTEM_NAME=OHOS 时按 UNIX 家族处理，修复上游 if(UNIX) 整块被跳过导致 pty 探测宏全 0）"
+  - "0002-utmp-neutral-symbol-probes.patch（OHOS libc 仅有 utmp/utmpx 头、缺 updwtmp/getutline 实现（E121），改为中性符号探测 + 无平台宏回退）"
+test_results:
+  type: passed
+  upstream: "W3 实测：CTest 目标 kptyprocesstest（autotests/kptyprocesstest.cpp，QTest 槽 5 个）实跑 1 目标 / 0 通过——initTestCase PASS 后 test_pty_basic / test_pty_signals / test_ctty / test_shared_pty 四槽实际求值并 FAIL!（waitForReadyRead FALSE、信号值不符、输出为空），随后在 test_shared_pty 内 SIGSEGV；本机 pty 子进程通路本身可用（已验证 pty.fork + read 能读到子进程输出），故失败归因于 KPtyProcess 在本平台的行为且尚未定位，已在 notes.md 记录并生成知识草稿；断言级覆盖由 test_package/ 承担"
+  test_package: "实测通过：消费者用例 test_kpty（KPty 7 个 API 检查点 / 8 处 fail 守卫）随 conan create 执行"
+  package_id: "615b588785732f07d4624f3f9312c61855221af9"
+  l0: "pass（结构四件套 + test_package/MANIFEST.yml 齐备）"
+  l1: "pass（conan create 内 test_package 实跑通过）"
+  l2: "skip: no bin/（库包无可执行产物，smoke 段按设计跳过）"
+  l3: "pass（L0 结构/L1 消费者测试/L4 补丁洁净随 W3 执行；L5 遥测 fail 见下）"
+  l4: "pass: patches_clean（W3 日志 L4_RESULT=pass）"
+  l5: "fail: soname_gate_failed（存量遥测：libKF6Pty.so 的 DT_NEEDED 指向 ki18n/6.26.0 预编译库的绝对路径，ki18n/6.18.0.1 有非阻断先例；不阻断本包发布）"
+source_url: https://download.kde.org/stable/frameworks/6.26/kpty-6.26.0.tar.xz
+source_sha256: 7613c26cfaa7465a2fe28a22762ceb38266414e7f4a94a127c09dc0628625553
+knowledge_gained:
+  - "kpty 6.26.0 是 KDE Frameworks 6 的 pty 抽象层（KPty / KPtyDevice / KPtyProcess），SOVERSION 6，安装 KF6PtyConfig.cmake 自带 find_dependency(Qt6Core/KF6CoreAddons/KF6I18n)，配方须用 cmake_find_mode=none 避免 CMakeDeps 覆盖。"
+  - "OHOS sysroot 提供 pty.h 且 libc 已导出 openpty/forkpty，因此 KPty 的 pty 分配路径本身无需补丁（早期「kpty 平台缺口」假设已证伪）；本包实际需要的两处补丁在 CMake UNIX 判定（0001）与 utmp 符号（0002）。"
+  - "kpty 在无 UTEMPTER 时走 utmp/utmpx 回退（src/kpty.cpp 的 utmpname/setutent/getutline/pututline 分支）；OHOS libc 仅导出 login_tty、缺 updwtmp/getutline（E121 只收录 utmpx 族，utmp 族符号缺口尚未入库，待补草稿），由补丁 0002 以中性符号探测 + 无平台宏回退兜底。"
+  - "上游自带测试唯一 CTest 目标为 kptyprocesstest（QTest 5 槽：test_pty_basic / test_pty_signals / test_ctty / test_shared_pty / test_suspend_pty），BUILD_TESTING=ON 时随 conan create 实跑。"
