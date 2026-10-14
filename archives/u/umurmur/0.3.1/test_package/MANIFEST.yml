@@ -1,0 +1,54 @@
+package: umurmur/0.3.1
+homepage: "https://github.com/umurmur/umurmur"
+
+upstream_check_command: "none"
+upstream_test_in_build: false
+upstream_test_command: "none"
+upstream_tests_skip_reason: >-
+  The official v0.3.1 source tree contains no automated test directory,
+  CTest registration, Make check target, or executable test runner
+  (N_static = 0 and N_runtime = 0).
+upstream_tests: []
+
+test_package_tests:
+  - file: test_umurmur.py
+    description: "Require exactly one .codesign section on the final installed OHOS executable"
+    command: "readelf -SW <package>/sbin/umurmurd"
+  - file: test_umurmur.py
+    description: "Run the packaged executable and verify its version/help output"
+    command: "umurmurd -h"
+  - file: test_umurmur.py
+    description: "Reject RPATH/RUNPATH and Conan, build-host or package-folder strings in the final signed ELF"
+    command: "readelf -d <package>/sbin/umurmurd; python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "Relocate execution to an unrelated working directory and parse the executable-relative default configuration without -c"
+    command: "cd <temporary-directory> && <package>/sbin/umurmurd -t"
+  - file: test_umurmur.py
+    description: "Parse and accept the packaged example configuration"
+    command: "umurmurd -t -c <package>/etc/umurmur/umurmur.conf"
+  - file: test_umurmur.py
+    description: "Reject malformed libconfig input with a diagnostic and non-zero status"
+    command: "umurmurd -t -c broken.conf"
+  - file: test_umurmur.py
+    description: "Complete a real TLS handshake and require the server-first Version frame before any client application data"
+    command: "python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "Send a minimal legal Protobuf-C Authenticate frame and require CryptSetup plus ServerSync"
+    command: "python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "Use CryptSetup key/nonces to send an OCB-authenticated UDP ping for the same TLS session and require an authenticated echo"
+    command: "python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "Also exercise public UDP status on the same port and verify version, token, user-count and bandwidth fields"
+    command: "python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "Reject raw non-TLS bytes and an oversized frame while keeping the daemon available"
+    command: "python3 test_umurmur.py <package>"
+  - file: test_umurmur.py
+    description: "HarmonyOS-specific daemon lifecycle: fork/setsid, PID-file creation and SIGTERM cleanup on a writable target path"
+    command: "python3 test_umurmur.py <package>"
+
+scenario_count: 12
+external_assertion_count: 31
+ohos_target_specific_scenarios: 4
+max_rss_mb: 64

@@ -1,0 +1,33 @@
+version: "0.3.1"
+software: "umurmur"
+status: built
+build_date: "2026-10-12"
+build_system: cmake
+conan_ref: "umurmur/0.3.1"
+
+source:
+  url: "https://github.com/umurmur/umurmur/archive/refs/tags/v0.3.1.tar.gz"
+  sha256: "8327dd0b2c5bd187a38d098295e896a6b85d698c9268205bcb27f6244f760a73"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DSSL=openssl"
+    - "-DUSE_SHAREDMEMORY_API=OFF"
+    - "-DBUILD_UMURMUR_MONITOR=OFF"
+    - "-DBUILD_NUMURMON=OFF"
+  dependencies:
+    - "libconfig/1.8"
+    - "protobuf-c/1.5.1"
+    - "openssl/3.5.8.1"
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0001-modern-cmake-dependency-targets.patch"
+  - "0002-report-release-version.patch"
+  - "0003-flush-first-frame-after-tls-handshake.patch"
+  - "0004-relocatable-config-and-rpath.patch"
+knowledge_gained:
+  - "非阻塞 TLS 握手完成后必须显式重新评估并排空握手前应用层发送队列；不可在握手前仅凭队列非空持续订阅 POLLOUT。"  # knowledge_ref: E429 draft

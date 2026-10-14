@@ -1,0 +1,65 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ce12242..4dfe697 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -5 +5 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH true)
++set(CMAKE_INSTALL_RPATH_USE_LINK_PATH false)
+diff --git a/src/conf.c b/src/conf.c
+index e645364..1bda129 100644
+--- a/src/conf.c
++++ b/src/conf.c
+@@ -32,0 +33 @@
++#include <limits.h>
+@@ -35,0 +37 @@
++#include <unistd.h>
+@@ -51 +53,22 @@ static config_t configuration;
+-const char defaultconfig[] = DEFAULT_CONFIG;
++const char *Conf_getDefaultPath(void)
++{
++	static char resolved[PATH_MAX];
++	char executable[PATH_MAX];
++	char *separator;
++	ssize_t length;
++	int written;
++
++	length = readlink("/proc/self/exe", executable, sizeof(executable) - 1);
++	if (length <= 0 || (size_t)length >= sizeof(executable))
++		return DEFAULT_CONFIG;
++	executable[length] = '\0';
++	separator = strrchr(executable, '/');
++	if (separator == NULL)
++		return DEFAULT_CONFIG;
++	*separator = '\0';
++	written = snprintf(resolved, sizeof(resolved),
++		"%s/../etc/umurmur/umurmur.conf", executable);
++	if (written < 0 || (size_t)written >= sizeof(resolved))
++		return DEFAULT_CONFIG;
++	return resolved;
++}
+@@ -57 +80 @@ void Conf_init(const char *conffile)
+-		conffile = defaultconfig;
++		conffile = Conf_getDefaultPath();
+@@ -69 +92 @@ bool_t Conf_ok(const char *conffile)
+-		conffile = defaultconfig;
++		conffile = Conf_getDefaultPath();
+diff --git a/src/conf.h b/src/conf.h
+index a078d2e..6ca6c5e 100644
+--- a/src/conf.h
++++ b/src/conf.h
+@@ -79,0 +80 @@ bool_t Conf_ok(const char *conffile);
++const char *Conf_getDefaultPath(void);
+diff --git a/src/config.h.in b/src/config.h.in
+index 980e705..d09e582 100644
+--- a/src/config.h.in
++++ b/src/config.h.in
+@@ -11 +11 @@
+-#define DEFAULT_CONFIG "${CMAKE_INSTALL_FULL_SYSCONFDIR}/umurmur/umurmur.conf"
++#define DEFAULT_CONFIG "/etc/umurmur/umurmur.conf"
+diff --git a/src/main.c b/src/main.c
+index e5cb76a..037bb87 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -250 +250 @@ void printhelp(void)
+-	printf("       -c <conf file> - Specify configuration file (default %s)\n", DEFAULT_CONFIG);
++	printf("       -c <conf file> - Specify configuration file (default %s)\n", Conf_getDefaultPath());
