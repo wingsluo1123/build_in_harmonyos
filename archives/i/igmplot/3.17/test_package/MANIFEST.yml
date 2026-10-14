@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游没有 make check / ctest，但随包提供 35 组官方样例
+# (samples/01_example .. samples/24_example) 与官方运行脚本
+# source/scripts/IGMPLOT_test_samples.py。
+#
+# 运行脚本是串行的，其中 15 组为分钟~小时级网格计算（x86-64 基线实测：
+# test08/09/10/16 ≈ 88s、test23 ≈ 100s，test11/12/14/17/20/21/22/24/34/35
+# > 120s，test11 单样例约 1 小时），无法纳入 CI `conan create` 的 3600s 预算，
+# 且协作者 PR 不得修改 ci/config/build_timeouts.txt（审查规则 21）。
+# 因此 build() 运行 20 组秒级样例并断言精确数量，其余 15 组的实测数据在 PR
+# 描述中逐条说明；samples/ 下的输入文件保持上游原样。
+
+package: igmplot/3.17
+homepage: "http://igmplot.univ-reims.fr/"
+
+# 上游测试命令 (无 make check target)
+upstream_check_command: "python3 source/scripts/IGMPLOT_test_samples.py source/IGMPLOT samples-ci"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 source/scripts/IGMPLOT_test_samples.py source/IGMPLOT samples-ci"
+
+# 上游实际运行的测试程序（官方脚本与样例输入均未修改）
+upstream_tests:
+  - file: source/scripts/IGMPLOT_test_samples.py
+    source: IGMPlot-3.17/source/scripts/IGMPLOT_test_samples.py
+    description: "上游官方样例运行脚本（未修改），逐目录执行 IGMPLOT param.igm 并输出 <目录> OK / KO see"
+    command: "python3 source/scripts/IGMPLOT_test_samples.py source/IGMPLOT samples-ci"
+  - file: samples
+    source: IGMPlot-3.17/samples
+    description: "上游 35 组官方样例输入（XYZ/WFN/WFX/RKF 与各关键字），CI 档覆盖其中 20 组"
+    command: "IGMPLOT param.igm (在每个样例目录内执行)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "对安装后的 bin/IGMPLOT 运行官方水二聚体样例，校验 Done 日志与 4 类输出产物"
+    command: "sh test.sh"
+    assertions:
+      - "安装后的 IGMPLOT 是可执行文件"
+      - "官方水二聚体样例输出包含 Done"
+      - "igm.vmd、mol-dgInter.cube、mol-dgIntra.cube、mol-igm.dat 均非空"
+
+# 上游 CI 档覆盖 20 组秒级样例，完整上游样例集仍为 35 组。
+upstream_test_total: 35
+upstream_ci_covered: 20
+# assertion_count 只统计 test_package 的消费者断言，不混入上游样例数。
+test_package_assertion_count: 3
+assertion_count: 3
