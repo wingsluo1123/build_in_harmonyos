@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# loudgain 0.6.8
+#
+# loudgain's upstream source tarball ships no test suite at all: there is no
+# tests/ or test/ directory and CMakeLists.txt registers no enable_testing()/
+# add_test() targets (inventory: src/, docs/, bin/, cmake/, debian/ only —
+# see notes.md).  Adaptation verification therefore relies entirely on the
+# consumer end-to-end test below, which drives the installed loudgain binary
+# through the full pipeline: shell-generated noise WAV -> FFmpeg decode ->
+# libebur128 EBU R128 analysis -> TagLib ReplayGain tag write -> byte-level
+# verification of the written frames.
+
+package: loudgain/0.6.8
+homepage: https://github.com/Moonbase59/loudgain
+
+upstream_tests_exist: false
+upstream_test_audit: "上游 tarball 无测试套件: 无 tests/test 目录, CMakeLists.txt 无 enable_testing()/add_test() (清点: src/docs/bin/cmake/debian 之外无测试文件)"
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_count: 0
+upstream_passed: 0
+upstream_failed: 0
+
+test_package_tests:
+  - file: test_loudgain.sh
+    description: "6-assertion end-to-end consumer workflow: version banner (0.6.8), ReplayGain help banner, pure-shell noise WAV generation, loudgain -s i scan+write (FFmpeg decode + libebur128 analysis + TagLib write, rc=0 and no 'Couldn't write' in output), structural file-growth check for the ID3 chunk, NUL-stripped byte-level assertion of REPLAYGAIN_TRACK_GAIN in the WAV (toybox grep skips binary files even with -a), and a second run over pre-existing tags"
+    command: "LOUDGAIN_BINDIR=<pkg>/bin sh test_loudgain.sh"
+
+test_files:
+  - path: "test_package/test_loudgain.sh"
+    test_type: "OHOS consumer end-to-end"
+    assertion_count: 6

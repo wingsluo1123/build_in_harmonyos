@@ -1,0 +1,54 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style-7",
+      "file": "archives/l/loudgain/0.6.8/test_package/test_loudgain.sh",
+      "line": 11,
+      "description": "脚本安全模式仅 `set -e`，未按 code_style 规则 7 使用 `set -euo pipefail`（至少缺 `set -u`；脚本为 POSIX /bin/sh，pipefail 不可移植可豁免并注释说明）",
+      "fix_suggestion": "改为 `set -eu` 并加注释说明 pipefail 因 POSIX sh 兼容性豁免；或切换到 bash shebang 后补全 `set -euo pipefail`"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "assertion-count-consistency",
+      "file": "archives/l/loudgain/0.6.8/test_package/test_loudgain.sh",
+      "line": 73,
+      "description": "断言计数口径不一致：脚本实际有 6 个独立通过/失败检查点（version/help/WAV 生成/scan+write/字节断言/二次运行），但 MANIFEST.yml、test-report.md 与脚本自身申报为 5 项（将第 5、6 项合并为一条）；且脚本第 55 行注释编号（assertion 3 = scan+write）与 test-report.md 编号（scan+write = 4）相互矛盾。全部检查点均真实执行，非欺骗，仅计数与编号应统一",
+      "fix_suggestion": "统一为 6 项断言（或明确声明合并口径），修正脚本内注释编号与 MANIFEST.yml assertion_count、test-report.md 表格三处一致"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "doc-accuracy",
+      "file": "archives/l/loudgain/0.6.8/test_package/conanfile.py",
+      "line": 9,
+      "description": "docstring 声称测试包含 \"tag deletion\"（标签删除），但 test_loudgain.sh 中并无删除标签步骤",
+      "fix_suggestion": "删除 docstring 中 \"and tag deletion\" 或补充对应测试步骤"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "portability-hardcoded-path",
+      "file": "archives/l/loudgain/0.6.8/test_package/conanfile.py",
+      "line": 31,
+      "description": "_bash() 硬编码宿主特定路径 /storage/Users/currentUser/.harmonybrew/bin/bash（含真实用户名）入库；已有 CONFIG_SHELL 环境变量覆盖与 /data/service/hnp、/bin/bash 回退链，不影响功能，但可移植性与隐私欠佳",
+      "fix_suggestion": "移除该用户特定路径，优先依赖 CONFIG_SHELL / PATH 查找（如 shutil.which('bash')）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "doc-accuracy",
+      "file": "archives/l/loudgain/0.6.8/notes.md",
+      "line": 37,
+      "description": "notes.md 称依赖 include/lib 路径\"用 cpp_info.aggregated_components() 聚合\"，但 conanfile.py generate()（conanfile.py:91-108）实际是手动遍历 cpp_info.components.values() 并回退顶层 cpp_info，文档与实现不符",
+      "fix_suggestion": "修正 notes.md 描述为实际实现（手动遍历 components + 顶层回退）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "workspace-hygiene",
+      "file": "archives/l/loudgain/0.6.8/conandata.yml.ghfast-bak",
+      "line": 1,
+      "description": "工作区残留 conandata.yml.ghfast-bak（ghfast 镜像备份），以及 ci-metadata.json、test_package/conan 生成脚本等运行时文件；均已确认被 .gitignore 覆盖、未进入 git 追踪与 changed_files，不影响 PR，但建议本地清理避免后续误提交",
+      "fix_suggestion": "删除本地 conandata.yml.ghfast-bak 残留文件；保持 .gitignore 现有覆盖"
+    }
+  ],
+  "summary": "审计通过：R34 空壳测试未命中（test_loudgain.sh 真实执行安装后的 loudgain 二进制，走完 version/help/WAV 生成/FFmpeg 解码+libebur128 分析+TagLib 写标签/字节级断言/二次运行全链路）；R8/R9/R19/R40 未命中（补丁无平台宏、无强制通过、无预编译产物、多媒体依赖有实质 find_path/find_library 适配）；R26/R32/R33/R37/R38/R39 全部合规（validate() os in (\"Linux\",\"OHOS\")、build() 无裸 shell 变量、commands.json 齐全、conandata URL 为官方 GitHub 且 sha256 经真机下载核对一致 1137c193…aeaee、无 gh-proxy/file:// 残留）；R51 上游测试申报 upstream_tests_exist=false 与真实清点一致（上游 tarball 无 tests/ 目录、CMakeLists 无 enable_testing/add_test）；W2 原子性合规（changed_files 仅 archives/l/loudgain/** 共 11 个文件，无框架文件、无 .staging-verified/tarball 等禁止入库文件，ghfast-bak 等残留均被 gitignore 拦截未入库）；归档结构完整（conandata.yml/conanfile.py/test_package/MANIFEST.yml/manifest.yaml/notes.md/patch 命名与 patch_description/patch_type 均合规）。仅存 1 项 P2 脚本安全模式缺 set -u 及 5 项 P3 文档/计数/可移植性建议，均不阻塞合入。"
+}
