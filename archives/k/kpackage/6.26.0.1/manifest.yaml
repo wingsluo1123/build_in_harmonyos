@@ -1,0 +1,43 @@
+software: kpackage
+version: "6.26.0.1"
+status: built
+build_system: cmake
+build_date: 2026-09-30
+created_at: 2026-09-30
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - karchive/6.26.0
+    - kcoreaddons/6.26.0
+    - ki18n/6.26.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+  build:
+    - ecm/6.26.0
+  optional:
+    - qttools
+    - kf6doctools
+    - qtdbus
+patches_applied:
+  - "0001-lower-ecm-and-kf-dep-version.patch"
+  - "0002-ohos-plugin-path-and-xdg-data-locations.patch"
+  - "0003-ohos-archive-root-unsupported-fallback.patch"
+  - "0004-ohos-targz-gzip-mime.patch"
+  - "0005-ohos-relocatable-soname-link.patch"
+test_results:
+  type: passed
+  upstream: "passed: 8/8 executed upstream CTest tests (fallbackpackagetest, packagestructuretest, querytest, 5x appstream); plasmoidpackagetest excluded (-E) because it hangs on the OHOS runner (R01 baseline)"
+  ohos_test: "passed: test_ohos_adaptation exercises KPackage::PackageLoader + Package + PackageJob::install (KArchive extraction) + KPluginMetaData on OHOS"
+notes: >-
+  6.26.0.1 fix release: karchive pin moved 6.19.0 -> 6.26.0 (the ohpcd cap
+  lifted; 6.26.0 is published as shared) so graphs containing both kpackage
+  and kiconthemes/6.26.0 (exact karchive/6.26.0 pin) resolve without a
+  version conflict - required by kwin 6.7.2 and kscreenlocker 6.7.2.
+  zstd/1.5.7 is now a direct require: under the old static karchive/6.19.0
+  pairing zstd entered the dependency closure transitively, and the
+  generate() link-flag/pkg-config lookups fail without it under 6.26.0.
+  KF_DEP_VERSION lowering via 0001 is kept (harmless against 6.26.0).
+  ECM 6.26 KDEInstallDirs6 runs the qtbase qtpaths host tool during configure;
+  /system/lib64 is prepended to LD_LIBRARY_PATH in the build and test
+  environments so the compatible libc++_shared.so is resolved (kconfig 6.26.0
+  / bluez-qt 6.28.0 precedent).
