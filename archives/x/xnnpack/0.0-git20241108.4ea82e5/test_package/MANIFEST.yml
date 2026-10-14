@@ -1,0 +1,93 @@
+# test_package/MANIFEST.yml — xnnpack 0.0-git20241108.4ea82e5
+# 位置: archives/x/xnnpack/0.0-git20241108.4ea82e5/test_package/MANIFEST.yml
+# 用途: 声明上游测试来源与数量口径（L0e 门禁要求本文件存在）
+
+package: xnnpack/0.0-git20241108.4ea82e5
+homepage: "https://github.com/google/XNNPACK"
+
+# ── 上游测试 ─────────────────────────────────────────────────────────
+# 上游顶层 CMakeLists.txt 有 XNNPACK_BUILD_TESTS（默认 ON）与
+# XNNPACK_BUILD_BENCHMARKS（默认 ON）；本配方显式设
+# XNNPACK_BUILD_TESTS=ON / XNNPACK_BUILD_BENCHMARKS=OFF。
+# XNNPACK 的测试全部是 gtest 驱动的 ctest 条目（test/*.cc，364 个 TU），
+# 微内核测试还会按 ADD_SHARDED_TEST 分片成多个 ctest 条目。
+#
+# 数量口径：**框架注册数（gtest 用例粒度）**。
+#   N  = 对所有已注册的 gtest 可执行文件跑 `--gtest_list_tests` 得到的用例数之和
+#        （由编好的二进制自己报告，自动带上 #if 守卫与 TEST_P 实例化结果，
+#        与本次是否运行无关）；
+#   N' = 本次 `ctest -V` 实际执行的用例数（各分片之和）；
+#   NOT_RUN = N - N'（未注册到 ctest / 因崩溃未执行的部分）。
+# 四个分项满足 TOTAL = PASS + FAIL + SKIP + NOT_RUN，由配方内
+# _run_upstream_tests() 复算并在 HMBS_UPSTREAM_TEST_RESULT 标记里自证。
+upstream_check_command: "ctest"
+upstream_test_in_build: true
+upstream_test_command: "ctest -V"
+
+upstream_tests:
+  - file: test/*-microkernel-*.cc
+    source: XNNPACK-4ea82e5/test/
+    description: >-
+      微内核级测试（每个算子/数据类型组合一个 TU，gtest 驱动，经
+      ADD_SHARDED_TEST 分片）。在 aarch64 上覆盖 NEON / NEONFP16 /
+      NEONFMA / NEONV8 / NEONFP16ARITH / NEONDOT / NEONDOTFP16ARITH /
+      NEONI8MM 以及 AARCH64 汇编（318 个 .S）微内核。
+    command: "ctest -V"
+  - file: test/*-operator-*.cc
+    source: XNNPACK-4ea82e5/test/
+    description: >-
+      算子级端到端测试：以子图/算子 API 构造真实算子，与 XNNPACK 自带的
+      参考实现对拍（convolution / fully-connected / pooling / unary /
+      binary / reduce / transpose …）。
+    command: "ctest -V"
+  - file: test/build-identifier.cc
+    source: XNNPACK-4ea82e5/test/build-identifier.cc
+    description: "构建标识一致性（用于确认 kernel 列表与实际编译集一致）。"
+    command: "ctest -V"
+
+# ── 本包自带的消费者用例 ─────────────────────────────────────────────
+test_package_tests:
+  - file: test_xnnpack.cpp
+    description: >-
+      消费者测试：以库的使用者身份只经 <xnnpack.h> 构造 subgraph/runtime，
+      ① xnn_initialize/deinitialize；
+      ② Fully Connected batch=5,in=48,out=17 逐元素对拍；
+      ③ Fully Connected batch=16,in=256,out=33（GEMM 路径）对拍；
+      ④ Fully Connected batch=1,in=1,out=1（退化/GEMV 路径）对拍；
+      ⑤ 2D Convolution [1,9,9,3]×3x3→8ch（aarch64 NEON 卷积微内核）对拍；
+      ⑥ 同一 runtime 重复 invoke 结果一致（权重打包缓存复用）。
+      不使用 assert()：CMake Release 会定义 NDEBUG 把 assert 预处理成空语句，
+      测试会退化成必然通过的假测试。改用自研 CHECK 宏累计失败数并以非零
+      退出码上报，程序自报 checks/failures 计数。
+    command: "./test_xnnpack"
+
+# ── 数量口径 ─────────────────────────────────────────────────────────
+# 上游以 gtest 用例为口径（见上方说明），实测值由配方在 `build()` 内打印的
+# HMBS_UPSTREAM_TEST_RESULT 标记给出（conan create 日志内可 grep 到）。
+upstream_test_total: 62121             # 设备实测：255 个 gtest 二进制 --gtest_list_tests 求和
+upstream_test_count_method: "framework_registration_gtest_cases"
+upstream_test_audit: >-
+  清点方式：`ctest --show-only=json-v1` 取出全部已注册 ctest 条目的真实命令行，
+  对其中每个 gtest 可执行文件执行 `--gtest_list_tests`，统计缩进的用例行数量，
+  再按可执行文件去重求和。该口径与运行无关，且分片条目不会重复计数。
+  设备实测（2026-10-06，conan create 内嵌 ctest -V）：
+  N=62121、N'=62118、PASS=59822、FAIL=0、SKIP=2296、NOT_RUN=3，
+  满足 TOTAL = PASS + FAIL + SKIP + NOT_RUN = 62121；
+  差额 3 = 上游自带 DISABLED_ 用例
+  DISABLED_FULLY_CONNECTED_NC_QP8_F32_QC4W.{unit_batch_transpose_weights,
+  small_batch_transpose_weights,weights_cache_unit_batch_transpose_weights}
+  （gtest 列出但不执行）；SKIP 2296 全部来自上游 test/ 下的 GTEST_SKIP() 能力守卫。
+
+test_counting:
+  upstream_independent_total: 62121    # 同上（框架注册数，实测）
+  integration_independent_total: 1676  # test_package 程序自报 checks=1676
+  shared_static_counted_once: true
+  counting_note: >-
+    upstream 口径与 test_package 口径分栏统计，不混用；
+    test_package 的 checks 计数由程序自己打印（checks=1676 failures=0），
+    该数含循环展开的逐元素对拍（T2 5×17=85、T3 16×33=528、T4 1×1=1、
+    T5 7×7×8=392 逐元素 CHECK_NEAR + 重复 invoke 一致性 CHECK_TRUE），
+    因此是**运行时执行次数**而非静态调用点数（静态 CHECK 调用点 60 处）。
+
+test_case_count: 1676
+assertion_count: 1676

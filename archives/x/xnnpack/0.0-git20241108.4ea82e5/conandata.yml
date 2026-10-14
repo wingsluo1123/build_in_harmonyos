@@ -1,0 +1,66 @@
+# conandata.yml — xnnpack 0.0-git20241108.4ea82e5
+# 位置: archives/x/xnnpack/0.0-git20241108.4ea82e5/conandata.yml
+# 本文件是源码 URL + SHA256 的唯一权威来源；conanfile.py 通过
+# self.conan_data["sources"] / ["pthreadpool"] / ["googletest"] 读取。
+#
+# 版本号 git20241108.4ea82e5 与上游 commit 精确对应：
+#   4ea82e595b36106653175dcb04b2aa532660d0d8  dated 2024-11-08T14:56:11-08:00
+# 短 hash（4ea82e5）与全 hash 两种取法得到的 tarball sha256 一致、顶层目录名
+# 均为全 hash（本机实测两次下载字节相同），故下面直接用全 hash 形式。
+#
+# URL 硬规则（R39/PF7，v12.20 口径；本地 pre_push_check 的 H4 为 A 类硬拦）：
+#   1) 本文件**只写上游官方源 URL**——镜像回退由 CI / 构建工具自动注入；
+#   2) 因此**不要**在 url 值里写 ghfast.top / gh-proxy.com 等镜像代理域名：
+#      H4 命中即硬失败，官方 PF7 也明确「conandata 只写上游官方源 URL，
+#      镜像回退由 CI 自动处理」；
+#   3) 本地采信轮的 E017 会先探测官方 URL、必要时注入镜像（首屏打印
+#      `[E017] 注入/未注入`），故提交面留官方源不影响受限网络下的构建。
+#   注：本仓部分已合入包（如 archives/r/ruy）在 url 值里带了镜像项，属存量偏差，
+#       不构成本包照做的依据——判据以闸为准。
+
+sources:
+  url: "https://github.com/google/XNNPACK/archive/4ea82e595b36106653175dcb04b2aa532660d0d8.tar.gz"
+  sha256: "3ef066f2f9b8ac474cd3fd606c601a30bbab59a56406c69019610339f02b6032"
+
+# ── pthreadpool（上游 CMake 的强制依赖，制品仓无对应配方）──────────────────
+# XNNPACK 的 include/xnnpack.h 直接 `#include "pthreadpool.h"`，且
+# CMakeLists.txt 对 XNNPACK 目标做 `TARGET_LINK_LIBRARIES(XNNPACK PUBLIC
+# pthreadpool ...)`，因此 pthreadpool 是**硬依赖**：
+#   * 制品仓（ohpcd）`conan list pthreadpool/*` 实测 0 命中；
+#   * archives/ 全树也没有 pthreadpool 包目录（平台任务列表同样无此任务）。
+# 按派发任务书 W0「捆绑依赖的 tarball 优先」，这里把 pthreadpool 源码
+# vendor 进本配方，在 configure 期以 add_subdirectory 构建成静态库链接进
+# libXNNPACK（见 xnnpack_project_include.cmake）。
+#
+# 版本不是自选：XNNPACK 自己的 cmake/DownloadPThreadPool.cmake 就钉在
+#   4fe0e1e183925bf8cfa6aae24237e724a96479b8
+#   URL_HASH SHA256=a4cf06de57bfdf8d7b537c61f1c3071bce74e57524fe053e0bbd2332feca7f95
+# 下面的 URL/sha256 与该文件逐字节一致（本机下载复核过 sha256）。
+pthreadpool:
+  url: "https://github.com/Maratyszcza/pthreadpool/archive/4fe0e1e183925bf8cfa6aae24237e724a96479b8.zip"
+  sha256: "a4cf06de57bfdf8d7b537c61f1c3071bce74e57524fe053e0bbd2332feca7f95"
+
+# ── googletest（XNNPACK_BUILD_TESTS 的测试框架，vendor 以避免配置期下载）──
+# 用**上游自己钉的同一个 revision**：XNNPACK 的 cmake/DownloadGoogleTest.cmake
+# 就是 df1544bcee0c7ce35cd5ea0b3eb8cc81855a4140（= googletest 1.15.2，
+# URL_HASH SHA256=4f45c2213c1ad4de211b15721db4b05c31dc54e244ab26f397345631da327624，
+# 本机下载复核逐字节一致），因此测试框架与上游 CI 完全同源。
+#
+# 该 revision 在 CMake 4.1.2 上可 configure：顶层/googletest/googlemock 三个
+# CMakeLists 都声明 cmake_minimum_required(VERSION 3.13)（CMake 4.x 只拒绝
+# < 3.5），实测 configure 通过。
+#
+# **不要退回 v1.14.0**（archives/c/cpuinfo、archives/r/ruy 用的是它）：1.14.0 的
+# DoubleNearPredFormat 没有同号无穷的短路分支，`ASSERT_NEAR(-inf, -inf, tol)`
+# 会算成 fabs(-inf - -inf) = NaN ⇒ 判失败；XNNPACK 的 f16/f32 微内核测试在
+# 饱和输入上正会产出同号 ±inf（本机实测 594 条断言因此假失败、5 个 ctest 二进制
+# 变红）。1.15.2 的 gtest.cc 有
+#   if (std::isinf(val1) && std::isinf(val2) &&
+#       (std::signbit(val1) == std::signbit(val2) || (abs_error > 0 && std::isinf(abs_error))))
+#     return AssertionSuccess();
+# 这一段，切回上游钉的 revision 后同类断言全部通过。
+googletest:
+  url: "https://github.com/google/googletest/archive/df1544bcee0c7ce35cd5ea0b3eb8cc81855a4140.zip"
+  sha256: "4f45c2213c1ad4de211b15721db4b05c31dc54e244ab26f397345631da327624"
+
+patches: {}
