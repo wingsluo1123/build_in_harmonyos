@@ -1,0 +1,62 @@
+# ============================================================
+# 版本级 manifest
+# 文件位置: archives/x/xcape/1.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+# ============================================================
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.2"
+software: "xcape"
+
+# 编译状态: published | built | failed | archived
+status: built
+build_date: "2026-10-14"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游作者仓库 https://github.com/alols/xcape 在核验日（2026-10-14）返回 404
+  # （原账号已注销）；此处为上游 1.2 的保真镜像，5 个源文件与上游 1.2 正式发布
+  # 版逐字节相同（对照 Debian xcape_1.2.orig.tar.gz，全 SAME）。证据见 conandata.yml。
+  url: "https://github.com/fulalas/xcape/archive/refs/tags/1.2.tar.gz"
+  sha256: "31c8397287710ea9b5eb7aa4b3ae320a40b27eb992018bc7f80aa86fcffac275"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options:
+    - "单文件直编，绕开上游 Makefile 的 host pkg-config（OHOS 无 xtst/x11 的 .pc）"
+    - "编译式: $CC $CPPFLAGS $CFLAGS -Wall <dep -I> xcape.c -o xcape <dep -L> -lXtst -lX11 -pthread"
+    - "include/lib 路径来自 conan 依赖包私有目录（R49，不注入共享前缀）"
+    - "产物 E549 binary-sign-tool 自签名后打包"
+  dependencies:
+    - libxtst/6.1.0
+    - libx11/6.4.0
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 上游 xcape.c 对打包的 X11 头文件零改动编译通过，无需源码补丁
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "xcape.c 的 XRecord* 与 XTestFakeKeyEvent 同属 libXtst；libxtst/6.1.0 与 libx11/6.4.0 同线，可整图解析"
+  - "上游 Makefile 仅用 host pkg-config 定位 xtst/x11，OHOS 设备无宿主 X11 dev 树，必须改为直接对 conan 依赖包编译"

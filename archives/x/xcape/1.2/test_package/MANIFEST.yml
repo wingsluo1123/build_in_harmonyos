@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+
+package: xcape/1.2
+homepage: "https://github.com/alols/xcape"
+
+# 上游测试入口分析：上游 Makefile 仅注册 all / install / clean 三个目标，
+# 无 check/test 目标，无测试脚本。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游无测试套件。tag 1.2 全树仅 5 个文件（LICENSE Makefile README.md xcape.1
+# xcape.c），0 命中证据（大小写不敏感，逐口径实测于解包源码根，日志见
+# reports/upstream-tests.log）：
+#   find . -type d -iname "test*"                  -> 0
+#   find . -iname "*test*"                         -> 0
+#   grep -ric "TEST(" / "TEST_F("                  -> 0 / 0
+#   grep -ric "ASSERT_" / "EXPECT_"                -> 0 / 0
+#   grep -ric "assert(" / "ck_assert" / "tcase"    -> 0 / 0 / 0
+#   find . -type d -iname res                      -> 0
+#   find . -iname "*runtest*"                      -> 0
+#   Makefile 目标：all / install / clean（无 test:/check:）
+upstream_tests: []
+
+# test_package 中的测试（消费者视角，逐项真实执行）
+test_package_tests:
+  - file: test_ohos.sh
+    description: |
+      鸿蒙特有测试（执行式，非断言宏）：在设备上真实运行打包产物并观测
+      (a) ELF 形态 AArch64/ELF64，
+      (b) readelf -S 命中 E549 自签名 .codesign 段，
+      (c) DT_NEEDED 记录 libXtst.so.6 / libX11.so.6，
+      (d) 无 DISPLAY 运行 `xcape -d` 观测到上游确定性诊断
+          "Unable to connect to X11 display" 且退出码 = 1。
+    command: 'test_ohos.sh "$(<pkg>/bin/xcape)"'
+  - file: conanfile.py (test())
+    description: |
+      打包完整性：bin/xcape 与 share/man/man1/xcape.1 均存在于被测包
+      （与 conanfile.py package() 一一对应）。
+    command: "os.path.isfile(<pkg>/bin/xcape) and <pkg>/share/man/man1/xcape.1"
+
+# 未覆盖项（如实声明，不计入通过）：
+#   xcape 的实际功能（把 Ctrl 单击合成为 Escape、XTEST 合成按键、XRecord 拦截
+#   设备事件）在 HarmonyOS PC 上不可执行——平台无 X server，也无 XTEST/XRecord
+#   扩展事件源；且映射表达式解析依赖 XStringToKeysym/XkbKeycodeToKeysym 需要
+#   已连接的 X server。
+not_covered:
+  - "运行时按键映射（Control_L=Escape 等映射表达式生效）——需 X server"
+  - "XTEST 合成按键（XTestFakeKeyEvent）——需 XTEST 扩展"
+  - "XRecord 事件拦截 + XKB 键码查询——需 X server 与 XKB 扩展"
+
+# 可判定校验点计数口径（对应 test_ohos.sh 的观测比对点 + conanfile.py 打包检查）：
+#   1 ELF=ELF64  2 Machine=AArch64  3 .codesign 段存在  4 NEEDED libXtst.so.6
+#   5 NEEDED libX11.so.6  6 退出码=1  7 no-X 诊断文案  8 manpage 落位 = 8
+# 说明：本测试为执行式观测比对，脚本内不使用任何 assert()/ASSERT_* 断言宏，
+# 也不使用 C 单元测试框架；退出码由真实运行结果驱动（见 test_ohos.sh 头注释）。
+assertion_count: 8

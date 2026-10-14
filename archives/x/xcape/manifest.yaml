@@ -1,0 +1,26 @@
+software: xcape
+display: "xcape"
+description: "把修饰键（如左 Ctrl）单独按下并释放时映射为另一个键（默认 Escape）的 X11 工具"
+category: system
+homepage: "https://github.com/alols/xcape"
+license: GPL-3.0-or-later
+build_system: makefile
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "上游 Makefile 用 host pkg-config 定位 xtst/x11，OHOS 设备无宿主 X11 dev 树与 .pc，须直接对 conan X11 依赖包编译"
+    - "xcape.c 依赖 libXtst（XTestFakeKeyEvent + XRecord*）与 libx11（XKB/Xlib），走 libx11/6.4.0 版本线"
+    - "产物为 ELF 可执行文件，须 E549 binary-sign-tool 自签名后打包"
+    - "运行时功能需 X server 与 XTEST/XRecord 扩展；HarmonyOS PC 无 X server，测试只覆盖设备可证的加载/链接/无 X 路径"
+  common_dependencies:
+    - libxtst
+    - libx11
+    - xorgproto
+
+versions:
+  "1.2":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "xcape/1.2"
+    note: "首次适配；上游 github.com/alols/xcape 已失效，源码取自上游 1.2 的保真镜像（逐文件校验一致）"
