@@ -5,19 +5,22 @@
 1. 布局断言：bin/ 5 个启动器、site-packages、share/laniakea、licenses 存在；
 2. 以 conan python（sys.executable，laniakea-spark 同款）运行 test_laniakea.py：
    - 临时目录 pip 安装运行依赖（sqlalchemy/tomlkit/python-debian/requests/
-     marshmallow/pyzmq/PyYAML/Pebble/click/rich/firehose/six），
+     marshmallow/PyYAML/Pebble/click/rich/firehose/six），
      对 .so 补执行位（OHOS 加载器要求，laniakea-spark 同款）；
    - 复制系统绑定桩（test_package/stubs/：apt_pkg.py + gi/ + cryptography/
-     + nacl/）进依赖目录——laniakea 核心 `import laniakea` 即触发
+     + nacl/ + zmq/）进依赖目录——laniakea 核心 `import laniakea` 即触发
      laniakea.db → apt_pkg（Debian 专属 C 绑定，OHOS 无）；lk-archive
      全子命令注册链触发 laniakea.archive.appstream → gi/PyGObject
      （AppStream 系统绑定，OHOS 无）；laniakea.utils.traceback 顶层 import
      cryptography（AES 混淆 traceback，CLI --version 链不调用）；
      laniakea.msgstream.signing 顶层 import nacl（ed25519 签名，test_package
-     signedjson 断言用 mock 键、不调用真实签名）。OHOS 社区源 cryptography/
-     PyNaCl wheel 的 Rust/C 扩展（_rust.abi3.so/_sodium.abi3.so）在 OHOS
-     真机加载被拒（CI #91056/#91660 实测 Permission denied）。
-     桩仅满足 import 期符号，真实解析/加解密/签名能力被调用即抛
+     signedjson 断言用 mock 键、不调用真实签名）；laniakea.msgstream.event_msg
+     顶层 import zmq（ZeroMQ 消息流，签名注解求值需 Context/Socket 符号，
+     5 个 CLI --version 链与 mock 键断言不创建真实 socket）。OHOS 社区源
+     cryptography/PyNaCl/pyzmq wheel 的 Rust/C 扩展
+     （_rust.abi3.so/_sodium.abi3.so/libzmq）在 OHOS 真机加载被拒
+     （CI #91056/#91660/#91763 实测 Permission denied）。
+     桩仅满足 import 期符号，真实解析/加解密/签名/socket 能力被调用即抛
      NotImplementedError（不伪造）；
    - 脚本内：import laniakea + __version__、LocalConfig（含缺 Workspace 故障路径）、
      laniakea.utils（base64/is_remote_url/listify）、deb822 Changes.add_file、
@@ -71,7 +74,7 @@ class LaniakeaTestConan(ConanFile):
                 f'"{sys.executable}" -m pip install --disable-pip-version-check '
                 f"--no-cache-dir --no-compile --prefer-binary --timeout 180 "
                 f'--target "{pydeps}" '
-                '"tomlkit==0.15.1" "pyzmq==27.1.0" "python-debian==1.1.1" '
+                '"tomlkit==0.15.1" "python-debian==1.1.1" '
                 '"firehose==0.5" "six==1.17.0" '
                 '"sqlalchemy>=2.0" "requests>=2.32" '
                 '"marshmallow>=3.18" "PyYAML>=5.3" '
@@ -93,11 +96,12 @@ class LaniakeaTestConan(ConanFile):
                             | stat.S_IXOTH,
                         )
 
-            # 系统绑定桩（apt_pkg.py + gi/ + cryptography/ + nacl/）复制进
-            # pydeps：Debian/AppStream 专属 C 绑定与 cryptography/PyNaCl 的
-            # Rust/C 扩展 OHOS 无（后者真机加载 Permission denied，CI
-            # #91056/#91660），桩仅满足 import 期符号，真实能力被调用即抛
-            # NotImplementedError（不伪造）。见 stubs/ 下各文件 docstring。
+            # 系统绑定桩（apt_pkg.py + gi/ + cryptography/ + nacl/ + zmq/）
+            # 复制进 pydeps：Debian/AppStream 专属 C 绑定与
+            # cryptography/PyNaCl/pyzmq 的 Rust/C 扩展 OHOS 无（后者真机加载
+            # Permission denied，CI #91056/#91660/#91763），桩仅满足 import 期
+            # 符号，真实能力被调用即抛 NotImplementedError（不伪造）。
+            # 见 stubs/ 下各文件 docstring。
             copy(
                 self,
                 "*",

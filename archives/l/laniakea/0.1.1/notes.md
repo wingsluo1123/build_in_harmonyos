@@ -95,6 +95,18 @@
     **test_package 不 pip 安装 PyNaCl**，由桩提供 `SigningKey`/`VerifyKey`
     import 期符号（真实签名/验签被调用即 NotImplementedError，不伪造）；
     真实 PyNaCl 由消费环境按需提供。
+  - **pyzmq/zmq（libzmq C 扩展）**：`laniakea.msgstream.event_msg` 顶层
+    `import zmq`（ZeroMQ 消息流，`event_msg.py:12`），`import laniakea` 链经
+    msgstream 触发；函数签名注解 `zmq_context: zmq.Context` / `-> zmq.Socket`
+    在 import 期即求值，需 `Context`/`Socket` 类符号。test_package 的
+    signedjson（mock 键）与 5 个 CLI --version 链均不创建真实 ZeroMQ socket；
+    keytool.py 顶层 `import zmq.auth`（lk-keytool --version 链，不调用
+    `load_certificate`）。OHOS 社区源 pyzmq wheel（27.1.0）的 libzmq C 扩展
+    在 OHOS 真机加载器上同样被拒（CI #91763 实测 `Permission denied`）→
+    **test_package 不 pip 安装 pyzmq**，由桩提供 `Context`/`Socket` 类、
+    `DEALER`/`SUB`/`SUBSCRIBE` 常量、`curve_keypair`/`auth.load_certificate`
+    import 期符号（真实 socket 能力被调用即 NotImplementedError，不伪造）；
+    真实 pyzmq 由消费环境按需提供。
   - 其余 Debian/系统绑定**排查无需桩**（见下"系统绑定排查清单"）。
 
 ### 系统绑定排查清单（5 个 CLI --version 全链，主编要求系统性枚举）
