@@ -1,0 +1,94 @@
+--- a/ufi_detect.c
++++ b/ufi_detect.c
+@@ -26,12 +26,88 @@
+ #  include "config.h"
+ #endif
+ #include <sys/types.h>
+-#include <sys/param.h>
++#if defined(__has_include)
++#  if __has_include(<sys/param.h>)
++#    include <sys/param.h>
++#  endif
++#else
++#  include <sys/param.h>
++#endif
++#include <limits.h>
+ #include <sys/stat.h>
+ #include <sys/sysmacros.h>
+-#include <linux/major.h>
++#if defined(__has_include)
++#  if __has_include(<linux/major.h>)
++#    include <linux/major.h>
++#  endif
++#else
++#  include <linux/major.h>
++#endif
+ #include <fcntl.h>
+-#include <scsi/scsi.h>
++#if defined(__has_include)
++#  if __has_include(<scsi/scsi.h>)
++#    include <scsi/scsi.h>
++#  endif
++#else
++#  include <scsi/scsi.h>
++#endif
++/* Portable fallbacks for libcs without glibc <scsi/scsi.h> (e.g. musl).
++   Values are stable Linux ABI numbers; each is skipped when a system
++   header already defined it, so glibc builds are byte-identical. */
++#ifndef SCSI_DISK0_MAJOR
++#define SCSI_DISK0_MAJOR 8
++#endif
++#ifndef SCSI_DISK1_MAJOR
++#define SCSI_DISK1_MAJOR 65
++#endif
++#ifndef SCSI_DISK2_MAJOR
++#define SCSI_DISK2_MAJOR 66
++#endif
++#ifndef SCSI_DISK3_MAJOR
++#define SCSI_DISK3_MAJOR 67
++#endif
++#ifndef SCSI_DISK4_MAJOR
++#define SCSI_DISK4_MAJOR 68
++#endif
++#ifndef SCSI_DISK5_MAJOR
++#define SCSI_DISK5_MAJOR 69
++#endif
++#ifndef SCSI_DISK6_MAJOR
++#define SCSI_DISK6_MAJOR 70
++#endif
++#ifndef SCSI_DISK7_MAJOR
++#define SCSI_DISK7_MAJOR 71
++#endif
++#ifndef SCSI_DISK8_MAJOR
++#define SCSI_DISK8_MAJOR 128
++#endif
++#ifndef SCSI_DISK9_MAJOR
++#define SCSI_DISK9_MAJOR 129
++#endif
++#ifndef SCSI_DISK10_MAJOR
++#define SCSI_DISK10_MAJOR 130
++#endif
++#ifndef SCSI_DISK11_MAJOR
++#define SCSI_DISK11_MAJOR 131
++#endif
++#ifndef SCSI_DISK12_MAJOR
++#define SCSI_DISK12_MAJOR 132
++#endif
++#ifndef SCSI_DISK13_MAJOR
++#define SCSI_DISK13_MAJOR 133
++#endif
++#ifndef SCSI_DISK14_MAJOR
++#define SCSI_DISK14_MAJOR 134
++#endif
++#ifndef SCSI_DISK15_MAJOR
++#define SCSI_DISK15_MAJOR 135
++#endif
++#ifndef SCSI_GENERIC_MAJOR
++#define SCSI_GENERIC_MAJOR 21
++#endif
++#ifndef SCSI_IOCTL_GET_IDLUN
++#define SCSI_IOCTL_GET_IDLUN 0x5382
++#endif
+ #include <sys/ioctl.h>
+ #include <unistd.h>
+ #include <string.h>

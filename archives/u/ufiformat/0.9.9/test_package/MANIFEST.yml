@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml — ufiformat 0.9.9
+# 上游无测试套件：显式审计（upstream_tests_exist: false + 非空 upstream_test_audit）
+
+package: ufiformat/0.9.9
+homepage: "https://github.com/tedigh/ufiformat"
+
+# 上游测试套件存在性（实拉官方 tag 归档逐项审计确认，见下方）
+upstream_tests_exist: false
+
+# 上游测试审计（源码：tedigh/ufiformat tag v0.9.9，
+# sha256 e2f795bee9c0015d68d15ee1fc454c8dda6abac8465a84b34d7345f4b1313709）
+# 归档共 24 个条目：AUTHORS/COPYING/ChangeLog/INSTALL/Makefile.am/Makefile.in/
+# NEWS/README/aclocal.m4/config.h.in/configure/configure.in/depcomp/install-sh/
+# missing/mkinstalldirs/ufi_command.c/ufi_command.h/ufi_detect.c/ufi_detect.h/
+# ufi_format.c/ufiformat.man/ufiformat.spec
+upstream_test_audit:
+  - path: "v0.9.9 tag 归档顶层（24 条目）"
+    finding: "无 tests/、test/、t/、spec/ 目录；无 *test*、*check* 文件；仅构建文件与 3 个实现源"
+  - path: "Makefile.am"
+    finding: "全文仅 bin_PROGRAMS = ufiformat + SOURCES + man8_MANS + EXTRA_DIST；无 TESTS、check_PROGRAMS、check-local"
+  - path: "configure.in"
+    finding: "仅编译器/库/头文件/类型/函数探测宏（AC_PROG_CC、AC_CHECK_LIB ext2fs 等）；无 enable_testing、add_test，无 gtest/ctest/pytest 注册"
+  - path: "ufi_format.c / ufi_command.c / ufi_detect.c"
+    finding: "纯 CLI 实现源，无 TEST()/TEST_F()/def test_ 包裹，无独立测试入口"
+  - path: "上游 README 与 Debian 打包（salsa.debian.org/debian/ufiformat）"
+    finding: "仅描述构建与格式化用法；debian/rules 仅执行构建安装，未运行任何上游测试，佐证无可接入的测试套件"
+
+# 上游测试总数（口径 autotools_tests：Makefile.am 中 TESTS 条目数 = 0）
+upstream_test_total: 0
+upstream_test_count_method: "autotools_tests"
+
+# 上游测试命令：无测试套件，check 命令不适用（bwm/0.6.3 范例：exist:false 的库一律空命令）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（upstream_tests_exist: false，见上方审计）
+upstream_tests: []
+
+# test_package 自带消费者功能测试（同一 conan create 内执行；结果待真机预检回填）
+test_package_tests:
+  - file: test_ufiformat.sh
+    description: "用例1：--help 退出 0 且 stdout 含 Usage: 与 -i, --inquire（非空输出校验）"
+    command: "ufiformat --help"
+  - file: test_ufiformat.sh
+    description: "用例2：-h 退出 0 且输出非空"
+    command: "ufiformat -h"
+  - file: test_ufiformat.sh
+    description: "用例3：无参数退出 1 且含 no device specified"
+    command: "ufiformat"
+  - file: test_ufiformat.sh
+    description: "用例4：-f abc 退出 1 且含 format parameter should be numeric"
+    command: "ufiformat -f abc /dev/null"
+  - file: test_ufiformat.sh
+    description: "用例5：-f 与 -i 同用退出 1 且含 both inquire and format"
+    command: "ufiformat -f 1440 -i /dev/null"
+  - file: test_ufiformat.sh
+    description: "用例6：-i 无设备参数退出 0（枚举空集，stdout 含表头 disk）"
+    command: "ufiformat -i"
+  - file: test_ufiformat.sh
+    description: "用例7：-i 普通文件退出非 0 且含 device is not usb fdd"
+    command: "ufiformat -i <regular-file>"
+
+# 断言数 = 脚本 [ok]/[FAIL] 台账行数；唯一计数源为脚本尾部 RESULT 行
+assertion_count: 7
+assertion_count_source: "self-reported by test_ufiformat.sh; ledger length == number of [ok]/[FAIL] lines"
