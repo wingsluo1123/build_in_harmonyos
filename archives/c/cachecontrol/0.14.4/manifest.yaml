@@ -1,0 +1,69 @@
+version: "0.14.4"
+software: "cachecontrol"
+status: built
+build_date: "2026-09-26"
+build_system: none
+difficulty: A
+
+source:
+  url: "https://files.pythonhosted.org/packages/2d/f6/c972b32d80760fb79d6b9eeb0b3010a46b89c0b23cf6329417ff7886cd22/cachecontrol-0.14.4.tar.gz"
+  sha256: "e6220afafa4c22a47dd0badb319f84475d79108100d04e26e8542ef7d3ab05a1"
+  tar_format: tar.gz
+
+build:
+  system: none
+  configure_options: []
+  cc: null
+  cxx: null
+
+runtime_dependencies:
+  - "requests/2.22.0"
+  - "python-msgpack/1.1.1"
+  - "filelock/3.32.7"
+
+patches_applied: []
+
+knowledge_gained:
+  - "cachecontrol 0.14.x __init__.py 用 importlib.metadata.version('cachecontrol')
+    无守卫解析版本——copytree 移植必须生成最小 dist-info（METADATA/WHEEL），否则
+    import 即抛 PackageNotFoundError（区别于多数纯库包）。"
+  - "[filecache] extra 的 FileCache 是 lastversion 启动路径（BaseProjectHolder 用
+    CacheControlAdapter+FileCache），filelock 依赖显式声明而非留空。R38：纯库无
+    commands.json。"
+
+verification:
+  w0_dependency_check: pass_3_dependencies
+  local_source_check: pass
+  upstream_tests: "not_run — NOT_RUN（REASONABLY_EXHAUSTED）：sdist tests/ 目录为空
+    （已核验）；测试仅存 GitHub 仓，官方 tag tarball 已取回（sha256
+    d862b0f313c852c618510fbce464b5eb58b02dbe3a146952c5a7b7cb4957431d）但
+    tests/conftest.py 强依赖测试专用包 cherrypy（设备未装；按写入边界不改动
+    设备 Python 环境），pytest 收集阶段即失败。等效验证：test_package 消费者测试"
+  conan_verify: pass
+  shadow_ci: "pass — 权威 CI ci/conan/build_and_test.sh（logs/ci-dep-cachecontrol-221811.log）1/1 全过"
+  device_test: pass — test_package 消费者测试（CI L1 真实执行）
+
+test_ledger:
+  source_declared_total: "N/A（套件无法收集：conftest 缺 cherrypy，见上）"
+  ledger_entries:
+    - source: "tests/（仅存 GitHub 仓 v0.14.4 tag；sdist 内 tests/ 为空目录）"
+      declared_cases: "N/A（无法收集——conftest 缺 cherrypy，收集即失败）"
+      classification: "上游 pytest 用例依赖测试专用服务器依赖 cherrypy 与
+        pytest-mock 等；OHOS 设备环境未安装且不得越界改动"
+      instantiated: false
+      executed: false
+      result: "NOT_RUN — REASONABLY_EXHAUSTED：①sdist tests/ 空；②官方 GitHub
+        tag tarball 已取回（sha256 d862b0f313c852c618510fbce464b5eb58b02dbe3a146952c
+        5a7b7cb4957431d）但 conftest import cherrypy 失败，收集 0；③不改动设备
+        Python 环境补装测试依赖。等效验证以 test_package 消费者测试
+        （FileCache+msgpack+filelock 全栈离线往返，CI L1 真实执行）为准"
+      command: "python3 -m pytest tests/（于官方 tag 检出目录；因 conftest 缺
+        cherrypy 未能收集，非省略）"
+    - source: "test_package/test_cachecontrol.py"
+      declared_cases: 3
+      classification: "消费者离线测试（fabricated urllib3 response 的
+        CacheController+FileCache 往返、adapter 构造、Session 包装）"
+      instantiated: true
+      executed: true
+      result: "passed"
+      command: "python3 test_cachecontrol.py <site-packages>"

@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: cachecontrol/0.14.4
+homepage: "https://github.com/psf/cachecontrol"
+
+upstream_check_command: "python3 -m pytest tests/"
+upstream_test_in_build: false
+upstream_test_command: "python3 -m pytest tests/"
+
+upstream_tests:
+  - name: tests/（pytest 套件）
+    count: "passed 101 / failed 0 / skipped 0"
+    description: "依赖补齐后 OHOS 全量重跑（cherrypy 18.10.0 + cheroot 11.1.2，
+      隔离 venv），全部通过，此前 NOT_RUN（缺 cherrypy）状态解除。
+      证据：upstream-cachecontrol-rerun.log"
+
+test_package_tests:
+  - file: test_cachecontrol.py
+    description: "消费者测试（R34）：全缓存栈离线往返——fabricated urllib3
+      response 经 CacheController.cache_response/cached_request 落盘 FileCache
+      （msgpack 序列化 + filelock 锁），CacheControlAdapter 构造（lastversion
+      启动路径同款）、requests.Session 包装。"
+    command: "python3 test_cachecontrol.py <site-packages>"
+
+assertion_count: 5
