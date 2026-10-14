@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+#
+# tigervnc 1.15.0 上游测试来自 tests/unit（CMake 注册，无 ctest add_test，
+# 因此 recipe 的 build() 直接执行二进制而不是 ctest 目标）。
+# 其中 8 个用例里有 2 个需要 X11/FLTK/gettext 侧源码，OHOS 上不构建：
+#   - gesturehandler 需要 vncviewer/GestureHandler.cxx
+#   - emulatemb      需要 vncviewer/i18n.h + gettext
+# 其余 6 个只依赖 rfb 库与标准头文件，在 OHOS 上原样编译执行。
+
+package: tigervnc/1.15.0
+homepage: "https://tigervnc.org/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "cmake --build . && ./tests/unit/<name>"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake --build . --target configargs conv convertlf hostport pixelformat unicode && ./tests/unit/<name>"
+
+# 上游实际运行的测试程序（tests/unit/*.cxx，每个文件一个可执行文件）
+upstream_tests:
+  - file: configargs.cxx
+    source: tigervnc-1.15.0/tests/unit/configargs.cxx
+    description: "Configuration 参数解析/别名/默认值"
+    command: "./tests/unit/configargs"
+  - file: conv.cxx
+    source: tigervnc-1.15.0/tests/unit/conv.cxx
+    description: "PixelFormat 像素转换正确性（rgb888/bgr888/rgb565/rgb232 双向、端序、非对齐缓冲）"
+    command: "./tests/unit/conv"
+  - file: convertlf.cxx
+    source: tigervnc-1.15.0/tests/unit/convertlf.cxx
+    description: "rfb::convertLF 换行归一化"
+    command: "./tests/unit/convertlf"
+  - file: hostport.cxx
+    source: tigervnc-1.15.0/tests/unit/hostport.cxx
+    description: "rfb::parseHostAndPort 主机/端口解析（IPv4、IPv6 方括号、服务名）"
+    command: "./tests/unit/hostport"
+  - file: pixelformat.cxx
+    source: tigervnc-1.15.0/tests/unit/pixelformat.cxx
+    description: "PixelFormat 合法/非法参数校验与 is888() 判定"
+    command: "./tests/unit/pixelformat"
+  - file: unicode.cxx
+    source: tigervnc-1.15.0/tests/unit/unicode.cxx
+    description: "UTF-8 / UTF-16 / UCS-4 互转与合法性校验"
+    command: "./tests/unit/unicode"
+
+# test_package 中自带的测试 (消费者视角验证已安装包)
+test_package_tests:
+  - file: test_tigervnc.cxx
+    description: >-
+      消费者测试：链接已安装头文件与 tigervnc::rfb 目标，断言 hex 编解码往返、
+      Rect 面积/平移、PixelFormat 解析与校验、rgb888 精确往返与 rgb888→rgb565
+      降位转换、VncAuth DES 加解密往返与密钥区分度
+    command: "./test_tigervnc"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 上游 6 个用例内部断言合计约 150 条；消费者测试 26 条 CHECK 断言。
+assertion_count: 176

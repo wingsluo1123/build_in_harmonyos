@@ -1,0 +1,23 @@
+--- a/unix/CMakeLists.txt
++++ b/unix/CMakeLists.txt
+@@ -2,9 +2,15 @@
+   message(FATAL_ERROR "cmake must be invoked with the top level directory")
+ endif()
+ 
+-add_subdirectory(tx)
++# The X11 based tools (tx, vncconfig, x0vncserver, and vncpasswd which links
++# tx) as well as the PAM based vncserver/vncsession cannot be built on
++# OpenHarmony, which provides neither X11 nor PAM. unix/common is platform
++# neutral and is always built.
+ add_subdirectory(common)
+-add_subdirectory(vncconfig)
+-add_subdirectory(vncpasswd)
+-add_subdirectory(vncserver)
+-add_subdirectory(x0vncserver)
++if(ENABLE_X11_TOOLS)
++  add_subdirectory(tx)
++  add_subdirectory(vncconfig)
++  add_subdirectory(vncpasswd)
++  add_subdirectory(vncserver)
++  add_subdirectory(x0vncserver)
++endif()

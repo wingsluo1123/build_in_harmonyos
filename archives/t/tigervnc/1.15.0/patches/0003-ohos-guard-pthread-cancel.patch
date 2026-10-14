@@ -1,0 +1,16 @@
+--- a/common/os/Thread.cxx
++++ b/common/os/Thread.cxx
+@@ -51,8 +51,13 @@
+ #ifdef WIN32
+   delete (HANDLE*)threadId;
+ #else
++  // pthread_cancel() is optional (absent on musl/OpenHarmony). Where it is
++  // missing, a still-running thread is simply not cancelled here; callers are
++  // expected to stop() and wait() (as DecodeManager does).
++#ifdef HAVE_PTHREAD_CANCEL
+   if (isRunning())
+     pthread_cancel(*(pthread_t*)threadId);
++#endif
+   delete (pthread_t*)threadId;
+ #endif
+ 

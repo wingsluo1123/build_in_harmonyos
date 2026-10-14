@@ -1,0 +1,89 @@
+software: tigervnc
+version: "1.15.0"
+status: built
+build_date: "2026-10-02"
+build_system: cmake
+
+source:
+  url: "https://github.com/TigerVNC/tigervnc/archive/refs/tags/v1.15.0.tar.gz"
+  sha256: "7f231906801e89f09a212e86701f3df1722e36767d6055a4e619390570548537"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_VIEWER=OFF"
+    - "-DBUILD_SERVER=OFF"
+    - "-DBUILD_JAVA=OFF"
+    - "-DENABLE_NLS=OFF"
+    - "-DENABLE_PAM=OFF"
+    - "-DENABLE_GNUTLS=OFF"
+    - "-DENABLE_NETTLE=OFF"
+    - "-DENABLE_H264=OFF"
+    - "-DENABLE_PWQUALITY=OFF"
+    - "-DINSTALL_SYSTEMD_UNITS=OFF"
+    - "-DBUILD_TIMESTAMP=2026-01-01 00:00"
+  dependencies:
+    required:
+      - "zlib/1.3.2.1"
+      - "libjpeg-turbo/3.2.0"
+      - "pixman/0.46.4.3"
+    optional:
+      - "gnutls/3.8.10 (ENABLE_GNUTLS，默认关闭)"
+      - "nettle/3.10.2.1 (ENABLE_NETTLE，默认关闭)"
+    unavailable:
+      - "X11 / libX11 / libXext / libXdamage / libXfixes / libXrandr / libXtst (OHOS 无 X11，仓库内亦无可用配方)"
+      - "FLTK 1.3.x (vncviewer 必需，OHOS 无)"
+      - "PAM / libpam (security/pam_appl.h 与 libpam 均缺失，OHOS 无)"
+      - "Xorg server 源码树 (Xvnc/libvnc.so 必需，OHOS 无)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-make-x11-pam-optional.patch"
+  - "0002-ohos-gate-x11-unix-tools.patch"
+
+test_results:
+  total: 261
+  passed: 261
+  failed: 0
+  skipped: "tests/perf 的 4 个基准测试（非单元测试、上游未注册 ctest）按 ENABLE_PERF_TESTS=OFF 关闭"
+  verified_on_device: true
+  device: "HarmonyOS HongMeng Kernel 1.12.0 aarch64, clang 15.0.4 (aarch64-unknown-linux-ohos)"
+  evidence:
+    - "conan create 全流程 EXIT=0（create20）"
+    - "上游单测 8/8 全部执行：220 条 OK，0 条 FAIL"
+    - "消费者测试：41/41 断言通过，RESULT: PASSED"
+    - "产物：librfb.a 1419970B、librdr.a 108316B、libnetwork.a 77972B、libos.a 21370B；头文件 126 个 .h + 1 个 .inl"
+  upstream_unit_tests:
+    configargs: "5 OK"
+    conv: "64 OK"
+    convertlf: "30 OK"
+    gesturehandler: "32 OK"
+    hostport: "33 OK"
+    pixelformat: "40 OK"
+    unicode: "1 OK（该用例整体输出单个 OK）"
+    emulatemb: "15 OK"
+
+adaptation_scope:
+  packaged: "RFB 协议核心库（common/os、common/rdr、common/network、common/rfb）静态库 + 头文件"
+  not_packaged:
+    - "vncviewer — 需 FLTK 1.3.x + X11 (Xlib/XKBlib/XInput2/Xrender/XShm)"
+    - "Xvnc / libvnc.so — 需 Xorg server 源码树 + X11 开发库"
+    - "vncconfig / x0vncserver — 需 X11 客户端库"
+    - "vncpasswd / vncsession — 经 unix/tx (X11) 与 PAM"
+
+knowledge_gained:
+  - "TigerVNC 顶层 CMakeLists 对 UNIX 平台硬性要求 X11 (find_package(X11 REQUIRED))，并对缺失 PAM 直接 FATAL_ERROR，与平台能力无关的目标也会被挡住"
+  - "unix/CMakeLists.txt 无条件进入 tx/vncconfig/x0vncserver/vncpasswd（X11）与 vncserver/vncsession（PAM），需额外的工具子树开关"
+  - "common/{os,rdr,network,rfb} 核心层完全不依赖 X11/FLTK/PAM，可在 OHOS aarch64/musl 上编译运行"
+  - "关闭 ENABLE_GNUTLS/ENABLE_NETTLE 后，SSecurityPlain.cxx 与 SSecurityRSAAES.cxx 不参与编译，rfb/UnixPasswordValidator.cxx 与 rfb/pam.c 即无任何目标引用，因此无需 PAM 也能构建完整核心库"
+  - "OHOS 适配版 conan 把 settings.os=OHOS 映射为 CMAKE_SYSTEM_NAME=HarmonyOS，而设备侧 CMake 只带 Modules/Platform/OHOS.cmake，需用 tools.cmake.cmaketoolchain:system_name=OHOS 钉住"
+  - "CMAKE_SYSTEM_NAME=OHOS 不会定义可用的 OHOS 普通变量：CMake 4.1 的 Platform/OHOS.cmake 仅 include(Platform/Linux)，故 if(OHOS)/if(NOT OHOS) 判平台无效，应改用显式 option()"
+  - "本仓 pixman 配方的 CMake 包名是 pixman（小写）而上游调用 find_package(Pixman)，需在 CMakeDeps 侧 set_property 补别名"
+  - "仅补 pixman 别名不够：其配方不安装 .pc 文件、OHOS 侧也未必有 pkg-config，FindPixman 解析不出 pixman.h，须预置 PIXMAN_INCLUDE_DIRS/PIXMAN_LIBRARIES 缓存变量（并把裸库名解析为真实文件路径）"
+  - "本仓 libjpeg-turbo 未导出 JPEG 包名，但上游只读 JPEG_INCLUDE_DIR/JPEG_LIBRARIES，CMake 内置 FindJPEG 能直接从 Conan 的 CMAKE_PREFIX_PATH 解析出 libjpeg.so"
+  - "OHOS PC 无 X server，vncviewer 这类 X11 客户端即使编译通过也没有可连接的显示服务，属结构性不可适配而非仅缺依赖"
+  - "apply_conandata_patches 对部分 hunk 匹配失败不会中断流程，真机迭代必须把 conanfile.py 与 patches/* 一起同步并核对 sha256，否则会把「补丁没生效」误判为逻辑错误"
+
+failure_reason: ""
