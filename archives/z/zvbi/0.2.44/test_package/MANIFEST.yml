@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 与 conan-verify G1 强制要求）
+package: zvbi/0.2.44
+homepage: "https://github.com/zapping-vbi/zvbi"
+
+# 上游测试面（test/Makefile.am，R51 实数实测，非 Windows 口径 11 个 TESTS 条目）：
+# - compile_tests: ctest / cpptest（+ 编译器支持时的 ctest-c89/gnu89/c94/c99/gnu99、
+#   cpptest-cxx98/gnuxx98 变体；OHOS clang 全部支持，实跑展开为 9 个二进制）
+# - only_linux: test-pdc
+# - scripts: exoptest / test-unicode
+# - 固定 6 个：test-dvb_demux / test-dvb_mux / test-hamm / test-packet-830 /
+#   test-raw_decoder / test-vps
+#
+# 实跑记录（2026-10-08，设备真机，rule4 证据）：conan 缓存 bootstrap 树按本配方
+# 同款 configure 参数（仅不加 --disable-tests）configure 后 make + `make -C test
+# check`，18 个可执行用例全部 PASS（含上述全部 11 个 TESTS 条目），FAIL=0。
+# 即：test-pdc / test-dvb_demux / test-dvb_mux 并不需要采集硬件（用数据文件驱动），
+# 早前"硬件依赖"归因不成立，已按实测更正。构建内（conan build()）仍传
+# --disable-tests 不变：CI 时限与配方稳定性考虑，上游套件由本声明的设备侧
+# 等价实跑（§6.2）覆盖，证据文件见 PR 描述与卡片评论。
+upstream_check_command: "make -C test check（设备侧，tests 启用配置，2026-10-08 实跑）"
+upstream_test_in_build: false
+upstream_test_command: "make -C test check"
+
+upstream_tests:
+  - "ctest / cpptest（+ clang 支持的 c89/gnu89/c94/c99/gnu99/cxx98/gnuxx98 变体，共 9 个，全 PASS）"
+  - "test-pdc（only_linux，实跑 PASS，数据驱动无需 VBI 设备）"
+  - "exoptest / test-unicode（导出脚本，实跑 PASS）"
+  - "test-dvb_demux / test-dvb_mux（实跑 PASS，无需 DVB 硬件）"
+  - "test-hamm / test-packet-830 / test-raw_decoder / test-vps（解码算法，实跑 PASS）"
+# 实跑合计：18 PASS / 0 FAIL（TESTS 条目口径 11/11 全过）
+
+# test_package 中自带的测试（消费者视角验证交付产物本身）
+test_package_tests:
+  - file: test_package/test_zvbi.c
+    description: >-
+      消费者功能测试（库级）：vbi_version 三段版本号断言 0/2/44；
+      vbi_ham8 编码断言（0→0x15、5→0x73）；vbi_unham8 解码断言
+      （0x15→0 干净、0x14→0 单比特纠错、0x16→-1 双比特错误）；vbi_rev8 自反、
+      vbi_rev16 双字节反转断言；vbi_raw_decoder v1 全链（parameters/add_services
+      覆盖 TELETEXT_B、无 run-in 平场行解码 0 行）；vbi_export text 后端
+      创建/枚举/销毁（覆盖 iconv 字符集层链接）。共 12 项断言，失败即非零退出。
+    command: "./test_zvbi"
+
+# 测试断言总数（近似值，用于质量评估）：库级 12 项
+assertion_count: 12
