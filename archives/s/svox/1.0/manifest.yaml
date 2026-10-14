@@ -1,0 +1,37 @@
+# manifest.yaml — svox 1.0（版本级）
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.0"
+
+# 编译状态：published | built | failed | archived
+# 首轮工作树状态（待 HMBS 真机预检验证后由后端更新）。
+status: built
+
+build_date: "2026-10-13"
+
+conan_ref: "svox/1.0"
+
+source:
+  url: "https://deb.debian.org/debian/pool/non-free/s/svox/svox_1.0+git20130326.orig.tar.gz"
+  sha256: "337b25e6ccb3764f0df1e176470b883c90e40e98840d4133340fcc89eb3cea0c"
+  tar_format: tar.gz
+
+build:
+  system: custom-direct-cc
+  configure_options: []
+  dependencies:
+    - popt/1.16
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+upstream_tests:
+  exist: false
+  test_count: 0
+  audit: "Audited pico/**/Makefile.am (no TESTS/check_PROGRAMS/check-local targets) and pico/tests/ (data fixtures only, no test programs); Debian/OpenWrt packaging runs no test suite (straight make to make install). See test_package/MANIFEST.yml."
+
+knowledge_gained:
+  - "Debian orig 包无 autotools 文件（pico/ 只有 Android.mk/compat/lang/lib/res/src/tests/tts）；autotools 由 debian.tar.xz patches 添加，orig 不可 autoreconf"
+  - "直接按 pico/lib/Android.mk 用 CC -c + ar rcs 构建 libttspico，CC 经 tools.build:compiler_executables 解析"
+  - "pico2wave 静态链接 vendored popt（-I/-L 显式传入，CC 经命令行传入 popt configure）"

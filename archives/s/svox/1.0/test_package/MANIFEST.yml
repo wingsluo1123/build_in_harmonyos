@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: svox/1.0
+homepage: "https://android.googlesource.com/platform/external/svox/"
+
+# ---- 上游测试审计 (hmbs 硬门禁) -------------------------------------------
+# svox 1.0 (Debian 快照 svox_1.0+git20130326) 无任何自动化测试：
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "pico/**/Makefile.am (automake 测试声明)"
+    reason: "无 TESTS/check_PROGRAMS/check_SCRIPTS/check-local 目标；配方 build() 用纯 Python walk 对真实源码树执行审计并输出 UPSTREAM_TEST_AUDIT 行到 conan create 日志。"
+  - source: "pico/tests/ (上游测试目录)"
+    reason: "只含 data/ 夹具子目录而无测试程序 (与 AOSP 同期 pico/ 树一致，无可运行测试)。"
+  - source: "configure.ac 与发行版打包"
+    reason: "无测试相关宏；Debian (dpkg-buildpackage) 与 OpenWrt (sound/svox, autotools-package 无 test 步骤) 打包均从 make 直达 make install，不跑任何测试套件。"
+  - conclusion: "上游未提供自动化测试套件；由 test_package 执行消费者视角的真实 libttspico 系统生命周期验证。"
+
+# rule4 强制字段：upstream_test_total 必须显式声明。
+# 上游经审计确认确实没有任何自动化测试，官方注册总数即 0，
+# 口径为 autotools_tests (automake 无测试注册；cvechecker 4 同款先例)。
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- test_package 自带消费者测试 (HarmonyOS aarch64 上真实执行) ------------
+test_package_tests:
+  - file: test_svox.c
+    description: >-
+      消费者测试 13 条断言。真实调用 libttspico 系统层 API
+      (无需 lingware 语音数据)：pico_initialize 建系统句柄、
+      pico_getNrSystemWarnings 零警告、pico_getSystemStatusMessage 状态文本、
+      pico_createVoiceDefinition 建语音定义、重复建定义被拒绝
+      (阴性对照，证明 harness 能观测真实失败)、
+      pico_releaseVoiceDefinition 释放、pico_terminate 终止、
+      终止后按文档重新初始化再终止 (init/terminate 多轮循环)。
+    command: "./test_svox"
+
+assertion_count: 13
