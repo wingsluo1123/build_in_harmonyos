@@ -1,0 +1,31 @@
+--- a/k2pdfoptlib/k2ocr.c
++++ b/k2pdfoptlib/k2ocr.c
+@@ -33,6 +33,8 @@
+ static void **ocrtess_api;
+ static void *otinit(void *data);
+ static int k2ocr_tess_inited=0;
++#endif
++/* No Tesseract; keep status for showlog */
+ static int k2ocr_tess_status=0;
+ typedef struct
+     {
+@@ -41,7 +43,6 @@
+     int ni;
+     char initstr[256];
+     } OCRTESSINITINFO;
+-#endif
+ static void k2ocr_show_envvar(char *buf,char *color,char *var);
+ static void k2ocr_status_line(char *buf,char *color,char *label,char *string);
+ static void k2ocr_tesslang_init(char *lang,int assume_yes);
+@@ -724,9 +725,11 @@
+ void k2ocr_multithreaded_ocr(OCRWORDS *words,K2PDFOPT_SETTINGS *k2settings)
+ 
+     {
++#ifdef HAVE_TESSERACT_LIB
+     ocr_cpu_time_secs += ocrwords_multithreaded_ocr(words,ocrtess_api,maxthreads,
+                                                     k2settings->dst_ocr,
+                                                     k2settings->ocr_dpi);
++#endif
+     }
+ 
+ 
