@@ -1,0 +1,67 @@
+# 版本级 manifest — tracexec 0.17.0
+# 文件位置: archives/t/tracexec/0.17.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC
+
+version: "0.17.0"
+software: "tracexec"
+
+# 编译状态（published | built | failed | archived）
+status: built
+
+build_date: "2026-10-12"
+build_system: cargo
+
+source:
+  url: "https://github.com/kxxt/tracexec/archive/refs/tags/v0.17.0.tar.gz"
+  sha256: "c3481cf1f23ad9fa33247c5294ab204fa5a5b9a39e1ca9b24ffa631211a55c75"
+  tar_format: tar.gz
+
+build:
+  system: cargo
+  configure_options:
+    - "--no-default-features  # eBPF 后端关闭（鸿蒙内核无 BPF syscall）"
+    - "--target aarch64-unknown-linux-ohos"
+    - "--locked"
+  dependencies:
+    - libseccomp/2.6.1        # ptrace 后端 -lseccomp（共享包）
+    - rust-toolchain/1.97.1   # 构建工具链（tool_requires）
+    - "openssl bottle 3.6.5   # 构建期 cargo 运行库（Harmonybrew，不入包）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-crates-tracexec-backend-ptrace-src-ptrace-guards.rs.patch"
+  - "0002-crates-tracexec-backend-ptrace-src-ptrace-tracer.rs.patch"
+  - "0003-src-main.rs.patch"
+
+knowledge_gained:
+  - "OHOS 无特权 ptrace 返回 EPERM（PTRACE_TRACEME/ATTACH/SEIZE/process_vm_readv 实测矩阵）——ptrace 类工具需如实声明运行限制（与 DRAFT-10103 同源）"
+  - "鸿蒙内核无 BPF syscall：eBPF 后端应在构建期关闭（--no-default-features，上游 CI 已覆盖该变体）"
+  - "libc 的 musl 系 OHOS target_env 缺 PTRACE_GET_SYSCALL_INFO/ptrace_syscall_info（仅 gnu 模块提供）；内核 ABI 无架构差异，可用局部 shim 补齐"
+  - "OHOS pthread_t = *mut c_void（musl 定义），既非 Send 亦非 Sync——跨线程传递 tid 需中转 usize"
+  - "OHOS uname -r 为 'HongMeng Kernel 1.12.0'，不以 Linux 式版本号开头：依赖 uname 版本解析的工具会启动即失败，需按'不满足最低内核'的告警路径降级"
+  - "Harmonybrew bottle URL 会被 CDN 轮换移除（多版本实测 404）；用 brew fetch <formula> 探测当前版本并以实测 sha256 锁定；CI 预下载对含百分号编码 URL 的重写与 conan file:// 解码不一致——bottle 固定在配方常量可绕开"
+  - "Cargo 工程根目录无 configure/CMakeLists/Makefile/meson.build 标记时，init-build 嵌套源码检测会误提升演示子目录（F068 误报，需人工修复 .orig/.work）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/tracexec-0.17.0.orig
+  source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/tracexec-0.17.0.work
+  source_orig_hash: 8f95d8e32eccb475
+  source_work_hash: 4b52c68fa2cf834e
+  generated_at: '2026-10-12T19:03:44'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-crates-tracexec-backend-ptrace-src-ptrace-guards.rs.patch
+    type: portability
+    platform_only: true
+    guard: 'cfg(target_env = "ohos") shim（uapi 精确布局）'
+  - file: 0002-crates-tracexec-backend-ptrace-src-ptrace-tracer.rs.patch
+    type: portability
+    platform_only: true
+    guard: 'usize 中转 + pthread_kill 处 cast（全平台等价，无宏）'
+  - file: 0003-src-main.rs.patch
+    type: portability
+    platform_only: true
+    guard: '解析失败按"不满足最低内核"走既有告警路径（无宏）'
