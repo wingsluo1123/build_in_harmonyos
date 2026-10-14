@@ -1,0 +1,48 @@
+# 软件级 manifest
+# 文件位置: archives/q/qdl/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 软件名称（小写，与目录名一致）
+software: qdl
+
+# 显示名
+display: "qdl"
+
+# 一句话描述
+description: "qdl — Qualcomm Download: talks to Qualcomm EDL USB devices (VID 05c6 / PID 9008, 900e, 901d), uploads a flash loader and flashes images described by rawprogram/patch XML"
+
+# 分类标签
+category: tool
+
+# 官网 URL
+homepage: "https://github.com/linux-msm/qdl"
+
+# 开源许可证（SPDX 标识）
+license: BSD-3-Clause
+
+# 常用构建系统（可被版本级覆盖）
+# cmake | autotools | makefile | meson | custom
+build_system: meson
+
+# OHOS 适配知识（跨版本通用）
+ohos_adaptation:
+  key_points:
+    - "纯工具包：上游只 install bin/qdl、bin/qdl-ramdump、bin/qdl-ks；内部 static_library('qdl_common', ...) 没有 install 规则，也不 install 任何头文件 ⇒ package_type = application，按 L0k 在软件级提供 commands.json，cpp_info 只设 bindirs"
+    - "三个外部依赖经 pkg-config 提供：libusb-1.0（EDL USB 传输）、libxml-2.0（rawprogram/patch XML 解析）、libzip（flashmap.zip 与镜像打包）；上游测试另需 cmocka，用 test_requires 声明，不进包、不传给消费者"
+    - "构建工具 meson 缺失：真机 command -v meson 为空、python3 无 mesonbuild 模块 ⇒ tool_requires('meson/1.11.0')"
+    - "tool_requires 的 meson 是可执行位异常的 /bin/sh 包装脚本，OHOS 上 conan 的 Python run() 无法 execve 带 shebang 的沙箱内脚本（EACCES）⇒ 必须在 generate() 里去掉 shebang（幂等改写），否则 meson.configure() 报 Error 126"
+    - "conan MesonToolchain 不把 tools.build:compiler_executables 的 ar/ranlib 写进 native file，meson 按裸名探测会失败（OHOS 上是 /data/service/hnp/bin/llvm-ar、llvm-ranlib）⇒ 需从 c 编译器同目录推导绝对路径注入 tc.binaries"
+    - "--version 必须由配方钉住：上游用 git describe 推版本，tarball 内没有 .git ⇒ 会退化成 'unknown-version'，需显式写 meson 的 VERSION 选项（上游 meson.options 已提供该选项）"
+    - "唯一的上游改动在 tests/：两个 bash 集成测试用 uname -s 选可执行名，只认 Linux*/Darwin*/CYGWIN*/MINGW*/MSYS*，HarmonyOS 落在 `*) exit 1` ⇒ 补一个 HarmonyOS* 分支（可移植性修复，见 patches）"
+    - "help2man 是可选依赖（required: false），真机没有 help2man ⇒ man 页 custom_target 整段跳过，构建期不会去运行刚编出来的可执行文件"
+  common_dependencies:
+    - libusb
+    - libxml2
+    - libzip
+
+# 版本索引
+versions:
+  "2.7":
+    conan_ref: "qdl/2.7"
+    status: built
+    build_date: "2026-10-04"
