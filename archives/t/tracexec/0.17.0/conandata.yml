@@ -1,0 +1,50 @@
+# conandata.yml — tracexec 0.17.0
+# 官方源（R39）：上游 GitHub 官方 tag 归档（kxxt/tracexec v0.17.0），
+# 内含 Cargo.lock，支持 `cargo --locked` 可复现构建。
+
+sources:
+  url: "https://github.com/kxxt/tracexec/archive/refs/tags/v0.17.0.tar.gz"
+  sha256: "c3481cf1f23ad9fa33247c5294ab204fa5a5b9a39e1ca9b24ffa631211a55c75"
+  # 显式声明文件名，确保 conan get() 走 tar.gz 解包分支
+  filename: "tracexec-0.17.0.tar.gz"
+
+# cargo 运行期共享库（openssl bottle 3.6.5，构建期专用、不入包）的 URL+sha256
+# 固定在 conanfile.py 的 CARGO_RUNTIME_BOTTLES 常量中：CI 预下载步骤会把
+# conandata 中的每个 URL 改写为 file:// 本地缓存路径，但其缓存文件名保留了
+# 百分号编码（%403），与 conan file:// 的解码（@）不一致，会令该文件找不到。
+# 放在配方内可绕开该重写（rumdl/0.2.39 同款；详见 notes.md 问题表）。
+
+patches:
+  - patch_file: "patches/0001-crates-tracexec-backend-ptrace-src-ptrace-guards.rs.patch"
+    patch_description: >-
+      OHOS portability: libc's musl-derived target_env="ohos" target does not
+      provide the PTRACE_GET_SYSCALL_INFO machinery (the request constant and
+      the ptrace_syscall_info struct live in the linux/gnu module only), so
+      the use of nix::libc::PTRACE_GET_SYSCALL_INFO / ptrace_syscall_info does
+      not compile. The kernel uapi (linux/ptrace.h) is architecture
+      independent, so the exact layout is replicated in a
+      cfg(target_env="ohos") shim; every other target keeps the original libc
+      import unchanged. No tracexec logic changes.
+    patch_type: "portability"
+  - patch_file: "patches/0002-crates-tracexec-backend-ptrace-src-ptrace-tracer.rs.patch"
+    patch_description: >-
+      OHOS portability: on the musl-derived OHOS target libc::pthread_t is
+      *mut c_void (neither Send nor Sync). The tracer thread id is therefore
+      carried across the thread channel and stored in RunningTracer as usize
+      (cast back to pthread_t only at the pthread_kill site). This keeps the
+      channel error Send and keeps RunningTracer Send, so the tokio::spawn in
+      src/main.rs compiles (it captures RunningTracer). The casts are
+      equivalent on every target (pthread_t is c_ulong or *mut c_void). No
+      tracexec logic changes.
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-main.rs.patch"
+    patch_description: >-
+      OHOS portability: HarmonyOS reports its kernel release as "HongMeng
+      Kernel 1.12.0", which does not start with a Linux-style version, so the
+      PTRACE_GET_SYSCALL_INFO support probe errored out (through `?`) before
+      command dispatch and every subcommand failed at startup. Treating an
+      unparseable release as "not >= min_support" routes into the warning path
+      the code already has for old kernels, so non-tracing commands
+      (generate-completions) work and tracing proceeds to the platform limits
+      (unprivileged ptrace denial). No tracexec logic changes.
+    patch_type: "portability"

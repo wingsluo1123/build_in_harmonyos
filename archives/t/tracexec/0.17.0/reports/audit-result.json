@@ -1,0 +1,14 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/t/tracexec/0.17.0/reports/test-report.md",
+      "line": 15,
+      "description": "§0 摘要中“耗时见 §3”为悬空交叉引用：§3（复现步骤）不含任何构建耗时数据。仅文档一致性问题（suggestion，无规则条款出处），不阻塞。",
+      "fix_suggestion": "在 §3 补记 conan create 的实测耗时，或删除 §0 中的“耗时见 §3”字样。"
+    }
+  ],
+  "summary": "P0=0，P1=0，P2=0，P3=1 → verdict=pass。两项 P2 修复均已落地并经独立复核：(a) conandata.yml 的 sources.url 为官方 https://github.com/kxxt/tracexec/archive/refs/tags/v0.17.0.tar.gz（HTTPS + 64 位 sha256 c3481cf1...，与 manifest.yaml / reports/test-report.md / notes.md 中 sha256 完全一致）；对 14 个变更文件全文扫描未发现任何 gh-proxy/ghproxy/ghfast/gitclone/moeyy/kkgithub 镜像前缀，conandata.yml 内无任何镜像字符串（notes.md 问题表 #9 仅以文字记述 conan-verify 工具的 ghfast.top 注入行为，非 url: 字段）。(b) test_package/MANIFEST.yml 计数注释已算术自洽：静态清点 172（=crates 171 + tests/smoke.rs 1），实测注册 173 = 通过 164（tracexec-core 147 + tracexec-tui 17）+ 平台边界过滤 9（失败 0），与 reports/test-report.md §1.1（静态 172 / 注册 173）及 §1.2（164 + 9）完全一致，亦与 conanfile.py 的 UPSTREAM_EXPECTED_PASSED=164 硬闸、assertion_count 174（=164+10）一致。最强证据复核：3 个补丁均为合法 unified diff（逐 hunk 复算 0001 +72/-7、0002 +6/-4、0003 +8/-1，与 notes.md §6 申报一致），无 __OHOS__/-D__OHOS__ 注入（仅 Rust cfg(target_env=\"ohos\") 实质 shim 与语义保持改动）；patch 0002 中 pthread_kill 确为上游既有调用、仅参数表达式加 cast（与申报一致）；无 TODO/FIXME/“请填写”占位符、无密钥、无预编译二进制、无 .ci-result.json 等状态文件、全部 LF + 末尾换行；commands.json（R38，软件级，type=tool，name 匹配）存在；R32 validate 含 OHOS、R33 构建环境自足、R37 首版本 0.17.0、R39 官方源、R49 无共享前缀写入（仅写 build/source/package 目录）；9 项平台跳过在 conanfile/MANIFEST/test-report 三处逐项一致；test_package 真实运行打包二进制（10 项断言，无空壳测试）。已接受事项重申：ci/config/build_timeouts.txt 新增 tracexec/0.17.0 7200（唯一、在 3600..57600 内；R21 灰区，约 29 条同类先例，需在 PR 描述中声明）。P3：test-report §0 一处悬空交叉引用“耗时见 §3”（§3 无耗时数据），建议后续迭代修正，不阻塞。"
+}

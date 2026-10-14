@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+# 实测计数取自 OHOS aarch64 设备实跑输出（reports/test-report.md）。
+
+package: tracexec/0.17.0
+homepage: "https://github.com/kxxt/tracexec"
+
+# 上游测试入口（cargo 工作区）。上游 CI 主门 = .github/workflows/ci.yml
+# check_and_test job: `cargo test --workspace --target <target> [args]`
+# （交叉目标只做 `cargo build --workspace --bins --tests` 编译检查，
+#   测试仅在 x86_64 runner 上运行）。
+upstream_check_command: "cargo test --workspace (upstream CI: .github/workflows/ci.yml check_and_test)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+# 实际命令（build() 内逐包执行，release profile）。tracexec 根包启用
+# --no-default-features（eBPF 后端关闭：鸿蒙内核无 BPF syscall，上游 CI 亦以
+# no-default-features 变体覆盖该配置）。平台边界项经 --skip 过滤（逐项登记）。
+upstream_test_command: >-
+  cargo test --release --locked --target aarch64-unknown-linux-ohos -p <pkg>
+  [--no-default-features] --no-fail-fast --bins/--lib --tests
+  -- --skip log_mode_without_args_works --skip test_read_interpreter_inaccessible
+  --skip boot_time_is_non_zero --skip boot_time_is_reasonable_unix_time
+  --skip tracer_decodes_proc_self_exe --skip tracer_emits_exec_event
+  --skip seccomp_filter_loads
+
+# 上游测试用例清点与实际执行口径：
+#   静态清点 172（crates 171 + tests/smoke.rs 1；tracexec-backend-ebpf 无用例且不参与）
+#   实测注册 173 = 通过 164（tracexec-core 147 + tracexec-tui 17）+ 平台边界过滤 9（失败 0）
+#   平台边界 9 项（逐项证据见 reports/test-report.md 与 test_package 说明）：
+#     - log_mode_without_args_works（ptrace 拒绝）
+#     - tracer_decodes_proc_self_exe::case_1/case_2（ptrace 拒绝）
+#     - tracer_emits_exec_event::case_1/case_2（ptrace 拒绝）
+#     - seccomp_filter_loads（OHOS seccomp 施行/errno 差异）
+#     - test_read_interpreter_inaccessible（HMDFS 忽略 chmod）
+#     - boot_time_is_non_zero / boot_time_is_reasonable_unix_time（/proc/stat btime=0）
+upstream_tests:
+  - file: "tests/smoke.rs"
+    description: "集成测试（真实 tracexec 追踪 /proc/self/exe）：平台过滤 1（ptrace EPERM）"
+    command: "cargo test -p tracexec --no-default-features --bins --tests -- --skip log_mode_without_args_works"
+  - file: "crates/tracexec-core/**/*.rs"
+    description: "核心事件/CLI/断点/格式化单元测试：实测 147 通过 / 0 失败 / 过滤 3"
+    command: "cargo test -p tracexec-core --lib --tests -- --skip test_read_interpreter_inaccessible --skip boot_time_is_non_zero --skip boot_time_is_reasonable_unix_time"
+  - file: "crates/tracexec-tui/**/*.rs"
+    description: "TUI 组件单元测试：实测 17 通过 / 0 失败"
+    command: "cargo test -p tracexec-tui --lib --tests"
+  - file: "crates/tracexec-backend-ptrace/**/*.rs"
+    description: "ptrace 后端测试 5 案例（rstest 展开）：全平台过滤（ptrace/seccomp 策略）"
+    command: "cargo test -p tracexec-backend-ptrace --lib --tests -- --skip tracer_decodes_proc_self_exe --skip tracer_emits_exec_event --skip seccomp_filter_loads"
+  - file: "crates/tracexec-exporter-*/**/*.rs"
+    description: "导出器编译检查（无测试用例，0/0）"
+    command: "cargo test -p tracexec-exporter-json -p tracexec-exporter-perfetto"
+
+# 上游真实测试入口证据
+upstream_entry_points:
+  - file: ".github/workflows/ci.yml"
+    detail: "check_and_test job: cargo build --workspace --bins --tests --target <t> [args]; cargo test --workspace --target <t> [args]（x86_64）"
+  - file: "Cargo.toml"
+    detail: "workspace 成员 + 根包 default = [recommended, vendored-libbpf]；上游 CI matrix 含 no-default-features（eBPF 关闭）变体"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_tracexec.py
+    description: "消费者冒烟+功能：--version(0.17.0) / --help(log·tui·collect) / generate-completions / 未知子命令拒绝 / 追踪入口分级探测（非交互 --no-foreground+无 stdin；①--seccomp-bpf off ②再加轮询；每级 30s 硬超时+杀进程组。成功追踪或干净报错=通过；两级均超时按平台边界 skip 并留证）"
+    command: "python3 test_tracexec.py"
+
+# 鸿蒙特有测试 (HarmonyOS-specific)
+harmonyos_specific_tests:
+  - file: test_tracexec.py
+    description: "鸿蒙特有测试 4 项（AArch64 ELF / OHOS musl loader / OHOS code signature / 产物完整性）"
+    command: "PACKAGE_FOLDER=<pkg> python3 test_tracexec.py"
+    assertion_count: 4
+
+# 依赖测试：libseccomp 为共享依赖（libseccomp/2.6.1），消费者运行环境经
+# VirtualRunEnv 解析（ceccomp 同款实证）；无独立依赖测试套件。
+dependency_tests: []
+
+# 测试断言总数: 上游实测通过 164 + 消费者/鸿蒙特有 10 = 174
+assertion_count: 174

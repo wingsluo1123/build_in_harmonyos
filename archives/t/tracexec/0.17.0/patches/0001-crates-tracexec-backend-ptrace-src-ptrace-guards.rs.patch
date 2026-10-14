@@ -1,0 +1,104 @@
+--- a/crates/tracexec-backend-ptrace/src/ptrace/guards.rs
++++ b/crates/tracexec-backend-ptrace/src/ptrace/guards.rs
+@@ -5,29 +5,94 @@
+ //! `nix`'s ptrace have problem about RT signals: https://github.com/nix-rust/nix/issues/495
+ #![allow(unused)]
+ 
+ use std::{
+   ffi::c_int,
+   mem::MaybeUninit,
+ };
+ 
+ use cfg_if::cfg_if;
+ use either::Either;
++#[cfg(not(target_env = "ohos"))]
++use nix::libc::{
++  PTRACE_GET_SYSCALL_INFO,
++  PTRACE_SYSCALL_INFO_ENTRY,
++  PTRACE_SYSCALL_INFO_EXIT,
++  PTRACE_SYSCALL_INFO_SECCOMP,
++  ptrace_syscall_info,
++};
++
++// OHOS portability shim: in libc, the PTRACE_GET_SYSCALL_INFO request and the
++// ptrace_syscall_info struct live in the linux/gnu module only, while the
++// musl-derived `target_env = "ohos"` target does not provide them.  The
++// kernel ABI (linux/ptrace.h) is architecture-independent, so the exact
++// layout is replicated here and the rest of this file stays unchanged.
++#[cfg(target_env = "ohos")]
++mod ohos_ptrace_syscall_info {
++  pub const PTRACE_GET_SYSCALL_INFO: nix::libc::c_int = 0x420e;
++  pub const PTRACE_SYSCALL_INFO_ENTRY: u8 = 1;
++  pub const PTRACE_SYSCALL_INFO_EXIT: u8 = 2;
++  pub const PTRACE_SYSCALL_INFO_SECCOMP: u8 = 3;
++
++  #[repr(C)]
++  #[derive(Clone, Copy)]
++  pub struct ptrace_syscall_info_entry {
++    pub nr: u64,
++    pub args: [u64; 6],
++  }
++
++  #[repr(C)]
++  #[derive(Clone, Copy)]
++  pub struct ptrace_syscall_info_exit {
++    pub sval: i64,
++    pub is_error: u8,
++  }
++
++  #[repr(C)]
++  #[derive(Clone, Copy)]
++  pub struct ptrace_syscall_info_seccomp {
++    pub nr: u64,
++    pub args: [u64; 6],
++    pub ret_data: u32,
++  }
++
++  #[repr(C)]
++  #[derive(Clone, Copy)]
++  pub union ptrace_syscall_info_data {
++    pub entry: ptrace_syscall_info_entry,
++    pub exit: ptrace_syscall_info_exit,
++    pub seccomp: ptrace_syscall_info_seccomp,
++  }
++
++  #[repr(C)]
++  #[derive(Clone, Copy)]
++  pub struct ptrace_syscall_info {
++    pub op: u8,
++    pub pad: [u8; 3],
++    pub arch: u32,
++    pub instruction_pointer: u64,
++    pub stack_pointer: u64,
++    pub u: ptrace_syscall_info_data,
++  }
++}
++
++#[cfg(target_env = "ohos")]
++use ohos_ptrace_syscall_info::{
++  PTRACE_GET_SYSCALL_INFO,
++  PTRACE_SYSCALL_INFO_ENTRY,
++  PTRACE_SYSCALL_INFO_EXIT,
++  PTRACE_SYSCALL_INFO_SECCOMP,
++  ptrace_syscall_info,
++};
++
+ use nix::{
+   errno::Errno,
+-  libc::{
+-    PTRACE_GET_SYSCALL_INFO,
+-    PTRACE_SYSCALL_INFO_ENTRY,
+-    PTRACE_SYSCALL_INFO_EXIT,
+-    PTRACE_SYSCALL_INFO_SECCOMP,
+-    ptrace_syscall_info,
+-  },
+   sys::ptrace::AddressType,
+   unistd::Pid,
+ };
+ use tracexec_core::tracer::Signal;
+ use tracing::{
+   info,
+   trace,
+ };
+ 
+ use super::{

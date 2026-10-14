@@ -1,0 +1,78 @@
+--- a/crates/tracexec-backend-ptrace/src/ptrace/tracer.rs
++++ b/crates/tracexec-backend-ptrace/src/ptrace/tracer.rs
+@@ -82,21 +82,23 @@
+   baseline: Arc<BaselineInfo>,
+   seccomp_bpf: SeccompBpf,
+   msg_tx: UnboundedSender<TracerMessage>,
+   user: Option<User>,
+   req_tx: UnboundedSender<PendingRequest>,
+   polling_interval: Option<Duration>,
+ }
+ 
+ #[derive(Debug, Clone)]
+ pub struct RunningTracer {
+-  tid: pthread_t,
++  // OHOS: pthread_t is *mut c_void (not Send/Sync); the id is stored as
++  // usize and cast back at the pthread_kill site (same value on all targets).
++  tid: usize,
+   breakpoints: Arc<RwLock<BTreeMap<u32, BreakPoint>>>,
+   req_tx: UnboundedSender<PendingRequest>,
+   seccomp_bpf: SeccompBpf,
+   blocking: bool,
+ }
+ 
+ pub struct SpawnToken {
+   req_rx: UnboundedReceiver<PendingRequest>,
+   /// The tx part is only used to check if this token belongs
+   /// to the same [`Tracer`] where it comes from.
+@@ -208,25 +210,25 @@
+     if !self.req_tx.same_channel(&token.req_tx) {
+       panic!("The spawn token used does not match the tracer")
+     }
+     drop(token.req_tx);
+     let breakpoints = Arc::new(RwLock::new(BTreeMap::new()));
+     let breakpoints_clone = breakpoints.clone();
+     let seccomp_bpf = self.seccomp_bpf;
+     let req_tx = self.req_tx.clone();
+     let blocking = self.blocking();
+     let tx = self.msg_tx.clone();
+-    let (tid_tx, tid_rx) = std::sync::mpsc::sync_channel(1);
++    let (tid_tx, tid_rx) = std::sync::mpsc::sync_channel::<usize>(1);
+     let tracer_thread = tokio::task::spawn_blocking({
+       move || {
+         let current_thread = unsafe { pthread_self() };
+-        tid_tx.send(current_thread)?;
++        tid_tx.send(current_thread as usize)?;
+         unsafe {
+           pthread_setname_np(current_thread, c"tracer".as_ptr());
+         }
+         if self.blocking() {
+           // setup empty signal handler for breaking out of waitpid
+           // we do not set SA_RESTART so interrupted syscalls are not restarted.
+           unsafe {
+             let _ = sigaction(
+               nix::sys::signal::SIGUSR1,
+               &SigAction::new(
+@@ -300,21 +302,21 @@
+ 
+   pub fn remove_breakpoint(&self, index: u32) {
+     self.breakpoints.write().unwrap().remove(&index);
+   }
+ 
+   pub fn clear_breakpoints(&self) {
+     self.breakpoints.write().unwrap().clear();
+   }
+ 
+   fn blocking_mode_notify_tracer(&self) -> Result<(), Errno> {
+-    let r = unsafe { pthread_kill(self.tid, nix::sys::signal::SIGUSR1 as c_int) };
++    let r = unsafe { pthread_kill(self.tid as pthread_t, nix::sys::signal::SIGUSR1 as c_int) };
+     if r != 0 {
+       return Err(nix::errno::Errno::from_raw(r));
+     }
+     Ok(())
+   }
+ 
+   pub fn request_process_detach(
+     &self,
+     hit: BreakPointHit,
+     signal: Option<Signal>,

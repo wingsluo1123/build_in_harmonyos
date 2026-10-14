@@ -1,0 +1,32 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -100,21 +100,28 @@
+   let user = if let Some(user) = cli.user.as_deref() {
+     if !Uid::effective().is_root() {
+       bail!("--user option is only available when running tracexec as root!");
+     }
+     Some(User::from_name(user)?.ok_or_eyre("Failed to get user info")?)
+   } else {
+     None
+   };
+   // PTRACE_GET_SYSCALL_INFO requires at least linux 5.3.
+   let min_support_kver = (5, 3);
+-  if !is_current_kernel_ge(min_support_kver)? {
++  // OHOS portability: HarmonyOS kernels report release strings that do not
++  // begin with a Linux-style version ("HongMeng Kernel 1.12.0"), which makes
++  // the version parser fail.  Treat an unparseable release as "not >=
++  // min_support" (the warning path this code already has for older kernels)
++  // instead of aborting before command dispatch, so non-tracing commands
++  // (e.g. generate-completions) keep working; the warning still tells the
++  // user the kernel is not a supported Linux one.
++  if !is_current_kernel_ge(min_support_kver).unwrap_or(false) {
+     log::warn!(
+       "Current kernel version is not supported! Minimum supported kernel version is {}.{}.",
+       min_support_kver.0,
+       min_support_kver.1
+     );
+     eprintln!(
+       "Current kernel version is not supported! Minimum supported kernel version is {}.{}.",
+       min_support_kver.0, min_support_kver.1
+     );
+   }
