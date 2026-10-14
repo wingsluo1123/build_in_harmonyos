@@ -1,0 +1,39 @@
+software: atkmm
+# 版本级 manifest
+# 文件位置: archives/a/atkmm/2.28.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.28.4"
+status: built
+build_system: meson
+build_date: "2026-10-03"
+
+# Conan 引用
+conan_ref: "atkmm/2.28.4@ohpcd/stable"
+
+source:
+  url: "https://download.gnome.org/sources/atkmm/2.28/atkmm-2.28.4.tar.xz"
+  sha256: "0a142a8128f83c001efb8014ee463e9a766054ef84686af953135e04d28fdab3"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  cc: clang
+  cxx: clang++
+  configure_options:
+    - "default_library=shared"
+    - "maintainer-mode=false"
+    - "build-documentation=false"
+    - "wrap_mode=nodownload"
+  dependencies:
+    - "glibmm/2.66.9 (glibmm-2.4/giomm-2.4 ABI, sigc++-2.0; glibmm-2.4 >= 2.46.2)"
+    - "atk/2.38.0.1.1 (atk >= 2.12.0; 依赖 glib/2.84.0.1，与 gtk/3.24.43 同版本)"
+  # 产物 ABI：atkmm-1.6（libatkmm-1.6.so），与 atkmm/2.36.4（atkmm-2.36）并存不冲突
+  conan_ref_alias: "atkmm-1.6"
+
+patches_applied: []
+
+knowledge_gained:
+  - "codegen/extradefs/meson.build L7 用 cpp_compiler.find_library('glibmm_generate_extra_defs-2.4')，该库不在编译器默认搜索路径；需在 generate() 中把 glibmm libdir 经 tools.build:sharedlinkflags/exelinkflags 注入 -L"
+  - "meson.build L122 在 maintainer-mode=false 下仍无条件 get_variable(pkgconfig:'gmmprocdir')，glibmm/2.66.9 的 glibmm-2.4.pc 未定义该变量，需在 generate() 中补写 gmmprocdir=${libdir}/glibmm-2.4/proc"
+  - "atkmm 2.28.x（atkmm-1.6）与 2.36.x（atkmm-2.36）ABI 不兼容、pkg-config 名不同，作为不同 conan 版本并存；gtkmm 3.24.x 要求前者"
