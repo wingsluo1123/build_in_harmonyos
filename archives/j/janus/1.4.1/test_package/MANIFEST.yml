@@ -1,0 +1,43 @@
+package: janus/1.4.1
+homepage: https://janus.conf.meetecho.com/
+
+upstream_check_command: "HNP Bash fuzzers/build.sh and fuzzers/run.sh on the rtcp, rtp, and sdp seed corpora"
+upstream_test_in_build: true
+upstream_test_command: "HNP Bash -eu with the Conan build/runtime environments; pass each RTCP/RTP/SDP seed-corpus file as an individual fuzzer input"
+upstream_fuzzer_target_count: 3
+upstream_test_count: 189
+upstream_tests:
+  - file: fuzzers/rtcp_fuzzer.c
+    source: janus-gateway-1.4.1/fuzzers/rtcp_fuzzer.c
+    description: "RTCP packet parser; 88 upstream seed input files"
+    command: "bash -eu ./fuzzers/run.sh rtcp_fuzzer out/rtcp_fuzzer_seed_corpus"
+    cases: 88
+  - file: fuzzers/rtp_fuzzer.c
+    source: janus-gateway-1.4.1/fuzzers/rtp_fuzzer.c
+    description: "RTP packet parser; 32 upstream seed input files"
+    command: "bash -eu ./fuzzers/run.sh rtp_fuzzer out/rtp_fuzzer_seed_corpus"
+    cases: 32
+  - file: fuzzers/sdp_fuzzer.c
+    source: janus-gateway-1.4.1/fuzzers/sdp_fuzzer.c
+    description: "SDP parser; 69 upstream seed input files"
+    command: "bash -eu ./fuzzers/run.sh sdp_fuzzer out/sdp_fuzzer_seed_corpus"
+    cases: 69
+
+test_package_tests:
+  - file: conanfile.py
+    description: "Validate executable presence, ELF header, ELF64 class, little-endian encoding, AArch64 machine, and successful janus --version; invoke the native HarmonyOS REST/WebSocket integration checks"
+    command: "conan create"
+    assertion_count: 6
+
+supplemental_ohos_tests:
+  - name: rest_session_and_plugin_lifecycle
+    file: test_janus_harmonyos.py
+    command: "Native Conan test_package for os=OHOS arch=armv8, or run with JANUS_HDC_TARGET for an attached device"
+    description: "On a HarmonyOS device, start the packaged Janus server, query live module info, and exercise REST session creation plus EchoTest attach/detach and session destruction"
+  - name: websocket_transport_handshake
+    file: test_janus_harmonyos.py
+    command: "Native Conan test_package for os=OHOS arch=armv8, or run with JANUS_HDC_TARGET for an attached device"
+    description: "On a HarmonyOS device, negotiate RFC 6455 masking and the Janus WebSocket subprotocol, then request live server info over the enabled transport"
+
+supplemental_ohos_assertion_count: 18
+assertion_count: 24
