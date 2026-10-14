@@ -1,0 +1,20 @@
+software: libfiu
+display: "libfiu"
+description: "用户态故障注入 C 库（fault injection）：核心 API 标记失败点，控制 API 启用/禁用失败，附带 POSIX 预加载与 fiu-run/fiu-ctrl 工具"
+category: library
+homepage: "https://blitiri.com.ar/p/libfiu/"
+license: LicenseRef-Public-Domain
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "纯 Makefile 项目（无 configure），编译器/归档器从 Conan conf 获取后经 make 命令行传入（R33），全程 -j1（R9）"
+    - "PREFIX 即安装前缀：make PREFIX=<package_folder> install 直装，无 DESTDIR 语义"
+    - "上游测试入口为 make test（C 单测 + Python 套件 + generated/collisions/utils 子目录），build() 真实运行并输出 HMBS_UPSTREAM_TEST_RESULT"
+    - "backtrace 不可用时上游 Makefile 自动回退 dummy 实现；preload/posix 的 libc soname 探测在缺 ldd 时回退 libc.so（补丁），tests 预加载库链接用 ln -sf（真机无硬链接）"
+  common_dependencies: []
+
+versions:
+  "1.2":
+    status: built
+    build_date: "2026-09-17"

@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libfiu/1.2
+homepage: https://blitiri.com.ar/p/libfiu/
+
+# 上游测试命令 (顶层 Makefile 的 test 目标)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+# `make test` 实际运行的 5 组测试（审计自 1.2 源码包，见 notes.md 第二节）
+upstream_tests:
+  - file: tests/test-parallel.c
+    source: libfiu-1.2/tests/test-parallel.c
+    description: "C 测试 5 单元之一：并行故障注入（另有 test-ferror.c、test-enable_stack.c、test-enable_stack_by_name.c、test-parallel-wildcard.c）"
+    command: "make test（c-run-*，LD_PRELOAD 双预加载模块运行）"
+  - file: tests/test-basic.py
+    source: libfiu-1.2/tests/test-basic.py
+    description: "Python 测试 9 单元之一（另有 cache_invalidation、failinfo_refcount、fiu_ctrl、manyfps、onetime、set_prng_seed、set_prng_seed-env、wildcards），经 wrap-python 运行"
+    command: "make test（py-run-*）"
+  - file: tests/generated/tests/malloc.conf
+    source: libfiu-1.2/tests/generated/tests/malloc.conf
+    description: "生成测试 11 单元之一（fopen、fprintf、fread、kill、malloc、mmap、open、open64、pread、pread64、strdup），generate-test 生成 C 后编译运行"
+    command: "make test（generated 子目录）"
+  - file: tests/utils/test-basic_run.sh
+    source: libfiu-1.2/tests/utils/test-basic_run.sh
+    description: "工具测试 2 单元之一（另有 test-basic_ctrl.py），实测 fiu-run / fiu-ctrl"
+    command: "make test（utils 子目录）"
+  - file: tests/collisions/binary.c
+    source: libfiu-1.2/tests/collisions/binary.c
+    description: "碰撞测试 1 单元：libcoltest 共享库符号碰撞"
+    command: "make test（collisions 子目录）"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_core.c
+    description: "核心 API：init/enable(failnum+failinfo)/fail/disable/ONETIME/return_on 宏，共 14 处检查"
+    command: "./test_core"
+  - file: test_control.c
+    description: "控制 API：set_prng_seed/enable_random(1.0 与 0.0)/enable_external 双回调/第二失败点循环，共 17 处检查"
+    command: "./test_control"
+
+# 测试断言总数 (test_core 14 + test_control 17)
+assertion_count: 31
+
+# 上游测试总数与统计口径（HMBS 门禁要求）：
+# 总数 28 = C 测试 5 + Python 测试 9 + 生成测试 11 + 工具测试 2 + 碰撞测试 1，
+# 与顶层 `make test` 的 RUN/PY 证据行一致，审计见 ../../notes.md 第二节与
+# conanfile.py _audit_upstream_tests（glob 计数，非可执行子集）。
+# 口径 auto：单一入口 `make test`，RUN/PY 行可解析。
+upstream_test_total: 28
+upstream_test_count_method: auto
