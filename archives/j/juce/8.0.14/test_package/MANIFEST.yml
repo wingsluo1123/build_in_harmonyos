@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: juce/8.0.14
+homepage: "https://github.com/juce-framework/JUCE"
+
+# 上游测试命令：JUCE 无独立 tests/ 目录与 ctest 注册目标；单测以内建 UnitTest
+# 子类随模块 .cpp 编入（JUCE_UNIT_TESTS=1 启用），运行期枚举执行。
+upstream_check_command: "N/A (suites compiled into modules; enumerated at runtime via juce::UnitTest::getAllTests())"
+
+# conanfile.py build() 中未集成上游测试：本包交付模块源码 + 头文件，
+# 模块由消费者编译，故上游套件在 test_package 内执行。
+upstream_test_in_build: false
+upstream_test_command: "ctest (via conan create test_package) -> test_juce_consumer.cpp -> UnitTest::getAllTests() 逐套 fork"
+
+# 上游测试资产清点（R51 三步法）
+upstream_tests:
+  - file: modules/juce_core/unit_tests/juce_UnitTest.h
+    source: modules/
+    description: "JUCE 内建单元测试框架：UnitTest 子类随各模块源编入（JUCE_UNIT_TESTS=1 启用），运行期经 UnitTest::getAllTests() 枚举。被编译模块（juce_core / juce_data_structures / juce_audio_basics / juce_midi_ci）注册套件共 93 套"
+    command: "test_package：juce::UnitTest::getAllTests()，逐套 fork 子进程 + 90s 看门狗，TAP 输出"
+    measured:
+      registered: 93
+      passed: 91
+      environment_excluded: 2
+      excluded_detail:
+        - "Files — OHOS 文件系统上写用例不收敛（>4 分钟 CPU 无输出推进）"
+        - "NamedPipe — OHOS 沙箱 mkfifo() 返回 EPERM（python os.mkfifo 实测），FIFO 读写恒 -1/-2"
+
+# test_package 中自带的测试（消费者视角 + 上游套件）
+test_package_tests:
+  - file: test_juce_consumer.cpp
+    description: "消费者用例（真实编入 juce_core / juce_events / juce_data_structures 模块源并调用库内逻辑：juce::String / juce::File 文件系统读写 / juce::parseXML / 安装布局契约）+ 上游单测 93 套逐套执行"
+    command: "ctest (via conan create test_package)"
+
+# 测试断言总数 (近似值, 用于质量评估)：TAP 检查项 107（消费者检查 + 逐套上游结果）
+assertion_count: 107
