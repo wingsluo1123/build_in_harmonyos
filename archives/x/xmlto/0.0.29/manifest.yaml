@@ -1,0 +1,92 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.0.29/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.0.29"
+
+# 软件名
+software: "xmlto"
+
+# 编译状态
+# published | built | failed | archived
+# built = verify 通过但未上传制品仓（本包未上传，故用 built；SKILL §598）
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-09"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://releases.pagure.org/xmlto/xmlto-0.0.29.tar.gz"
+
+  # 源码校验和
+  sha256: "40504db68718385a4eaa9154a28f59e51e59d006d1aa14f5bc9d6fded1d6017a"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained: ["OHOS 禁止在 HMDFS（conan 构建树 ~/.conan2/p/...）上对脚本 execve：健康 worker 报 EACCES/exit 13，楔死 worker 上表现为不可中断挂起（D 状态，SIGKILL 无效）；autoreconf 链（execve $ACLOCAL，且包内 bin/aclocal 还是 sh 包装脚本）不可用，须改用 perl 直调 .aclocal-real/.automake-real 并显式传 --automake-acdir/--system-acdir/--libdir 复刻 wrapper 语义，knowledge_ref: conanfile.py _bootstrap_configure 与 notes.md 对话 #3", "生成的 configure 也须以 sh 显式解释执行（sh <src>/configure ...），直接 execve 脚本同样被拒；configure 运行需内联 PATH=/data/service/hnp/bin:/system/bin:/bin:$PATH 与 SHELL=CONFIG_SHELL=/bin/sh，knowledge_ref: conanfile.py _ohos_env_prefix() 与 notes.md 对话 #3", "CI 沙箱（USER=100）只有 autoconf 家族，无 automake/aclocal/libtoolize，且不可见 $HOME/.local 手工安装（ENOENT）：须以 build_requirements() 的 tool_requires(automake/1.18) 从制品仓解析；tool_requires 走 build profile，conan create 必须同时传 -pr:h 与 -pr:b，knowledge_ref: notes.md 对话 #2", "上游 tarball 仅含 configure.ac/Makefile.am 而无 configure/Makefile.in：自举须三步齐全 aclocal.m4（perl .aclocal-real）→ configure（autoconf -o configure configure.ac）→ Makefile.in 与 aux 脚本（perl .automake-real --add-missing --copy --foreign）；configure.ac 无 LT_INIT 时无需 libtool，knowledge_ref: notes.md 对话 #3", "WorkBuddy 沙箱 safe-bin rm shim（#!/bin/bash 在 OHOS 不存在）会打断 config.status/make 与 conan 内部清理（E540 家族），本地验证须剔除该 shim 或改为 clang 直编 + Python 拷贝装包；CI 无 safe-bin，标准 autotools 流程即可，knowledge_ref: notes.md 问题表 #3/#4", "autom4te 优先读 $M4 环境变量（autom4te.in: my $m4 = $ENV{\"M4\"} || 'm4'），autotools 自举不应依赖 worker 系统 m4：tool_requires(m4/1.4.19)（制品仓已发布，其 buildenv 自带 M4=<pkg>/bin/m4 注入）；且每个自举/configure/编译步骤都须把输出重定向到日志文件并对瞬时失败重试——失败步骤残留的孙子进程会占住 conan 的 stdout 管道，使 conan create 空转到 CI 3600s 超时（CI #85406：fork 耗尽 worker 上 autom4te 跑不了 m4 被误报 need GNU m4，随后空转 1 小时），knowledge_ref: conanfile.py _run_logged 与 notes.md 对话 #5", "E011：config.status 用 (umask 077 && mktemp -d \"./confXXXXXX\") 建 scratch 目录再写 subs1.awk，HMDFS uid 域映射下该目录对创建进程自身不可写（mktemp 强制 0700 与 umask 无关），CI #88833 报 can't create ./confXXXXXX/subs1.awk: Permission denied；对自举生成 configure 的配方须在 autoconf 之后、configure 之前注入加固块：umask 077→002 + ac_tmp=$tmp 后插探针（以失败同款操作 ： >\"$ac_tmp/.wr-probe\" 验证可写）→ chmod 0777 重试 → 回退 conan build folder 专用目录（禁用 . ：退出 trap 会 rm -fr）；只改 configure 一处即两文件生效，knowledge_ref: conanfile.py _SCRATCH_HARDEN_TMPL/_harden_scratch_machinery 与 notes.md 问题表 #9（同款先例 uim 1.9.6，CI #87163）"]
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/cache/builds/xmlto-0.0.29.orig
+  source_work_dir: /data/storage/el2/base/cache/builds/xmlto-0.0.29.work
+  source_orig_hash: 49c006cec703c2fd
+  source_work_hash: 76f719448629e54d
+  generated_at: '2026-10-09T14:53:40'
+  patches_count: 0
+
+patch_classification: []

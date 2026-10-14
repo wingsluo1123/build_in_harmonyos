@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: xmlto/0.0.29
+homepage: https://pagure.io/xmlto
+
+upstream_check_command: "make check"
+
+upstream_test_in_build: false
+upstream_test_command: "bash xmlif/test/run-test"
+
+upstream_tests:
+  - file: xmlif/test/run-test
+    source: xmlto-0.0.29/xmlif/test/run-test
+    description: "xmlif scanner 条件处理测试（8项：no-condition, unrelated-condition, html, pdf, ps, foo, baz, bar）"
+    command: "bash xmlif/test/run-test"
+
+test_package_tests:
+  - file: consumer_test.sh
+    description: "消费者端到端用例：A) 鸿蒙特有非断言测试（xmlif 原生 aarch64 ELF + DT_NEEDED 闭包真实加载）；B) 业务闭环（xmlto XML->HTML 真实转换内容校验 + xmlif 条件过滤与上游期望逐字节比对），每步退出码校验"
+    command: "sh consumer_test.sh <bindir>"
+
+assertion_count: 8
