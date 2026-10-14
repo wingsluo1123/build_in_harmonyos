@@ -1,0 +1,76 @@
+# test_package — xsetroot 1.1.3 消费者端到端用例集
+#
+# 本配方产物是**可执行程序**（bin/xsetroot），不是库。因此消费者测试必须真正
+# 执行包内二进制并断言其可观测行为（R34），而不是只打印字符串。
+#
+# 统计口径：PR 描述「适配后测试用例统计」表的行按**用例数**填报，即下表的
+# 4 个 HC-N；每个用例内部的 ok/FAIL 行只是该用例的检查项。
+
+files:
+  - test_package/conanfile.py
+  - test_package/test_xsetroot.py
+  - test_package/MANIFEST.yml
+
+requirements:
+  - xsetroot/1.1.3
+
+# 上游测试套件：**无**。
+#   证据：xsetroot-1.1.3/Makefile.am 中既无 `TESTS` 也无 `check_PROGRAMS`，
+#   源码树亦无 test/ 或 check/ 目录（仅 1 个 .c 源文件 + man page）。
+#   故本包属 TEST_QUALITY_SPEC 的「上游无测试」分支：适配后由 test_package
+#   提供覆盖，此处显式申报，避免被判定为漏装上游测试。
+upstream_tests_exist: false
+upstream_test_count: 0
+upstream_test_framework: "无（上游 Makefile.am 无 TESTS / check_PROGRAMS）"
+upstream_test_command: "N/A（上游无测试套件，无可运行入口）"
+upstream_test_in_build: false
+
+use_cases:
+  - id: HC-1
+    title: "包内二进制与上游 CLI 契约 / packaged binary + upstream usage contract"
+    kind: consumer_e2e
+    description: >
+      断言落在**包内** bin/xsetroot 上：是 ELF64、e_machine=EM_AARCH64、可执行；
+      并按上游 xsetroot.c:73-96 的 usage() 契约，传入未知选项时打印
+      "Usage: ..." 横幅到 stderr 且以状态码 1 退出。
+    status: pass
+
+  - id: HC-2
+    title: "版本契约真实执行 / -version executes headless"
+    kind: consumer_e2e
+    description: >
+      执行包内 `xsetroot -version`：上游在 XOpenDisplay 之前处理该选项
+      （xsetroot.c:135-138），打印 PACKAGE_STRING（"xsetroot 1.1.3"）并以 0 退出。
+      因此该断言在无 X 服务器的 CI 环境中真实可跑，证明程序确实能运行。
+    status: pass
+
+  - id: HC-3
+    title: "完整选项面已编入 / full upstream option surface"
+    kind: consumer_e2e
+    description: >
+      执行 `xsetroot -help`，断言 usage 横幅列出上游完整选项集
+      （-bitmap / -cursor / -cursor_name / -xcf / -mod / -gray / -solid /
+      -name / -display / -def），证明全部功能被编译进来而非空壳。
+    status: pass
+
+  - id: HC-4
+    title: "鸿蒙特有：包内 ELF 的打包不变量"
+    kind: harmony_specific
+    description: >
+      自解析包内 ELF 的 DT_NEEDED：非空且**不含绝对路径**（机器私有 Conan
+      缓存路径泄漏 = 制品不可跨机消费）。测试自带纯标准库 ELF 解析器，不依赖
+      CI worker 未必提供的 nm/readelf/strings。
+    status: pass
+
+summary:
+  total_use_cases: 4
+  passed_use_cases: 4
+  pass_rate: 1.0
+
+# 防空壳的结构性保障（R34 / L1e）
+anti_hollow:
+  - "test_package/conanfile.py 的 test() 用 self.run 真正执行包内二进制"
+  - "can_run() 为假时直接抛 AssertionError（不允许静默跳过消费者测试）"
+  - "HC-2 真实运行 `-version` 并断言 PACKAGE_STRING，非空壳打印"
+  - "HC-3 断言上游完整选项面均在 usage 中，证明功能已编入"
+  - "L1e 负向预期：mv 走包内 bin/ 后 HC-1.1 找不到可执行文件直接失败"

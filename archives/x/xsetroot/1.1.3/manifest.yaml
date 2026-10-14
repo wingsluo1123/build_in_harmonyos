@@ -1,0 +1,50 @@
+# 版本级 manifest — xsetroot 1.1.3
+# 上游: X.Org individual release (/app/xsetroot)
+
+version: "1.1.3"
+software: xsetroot
+status: built
+build_date: "2026-10-12"
+build_system: autotools
+package_type: application
+
+source:
+  url: "https://www.x.org/releases/individual/app/xsetroot-1.1.3.tar.xz"
+  sha256: "6081b45a9eb4426e045d259d1e144b32417fb635e5b96aa90647365ac96638d1"
+  tar_format: tar.xz
+  upstream_homepage: "https://gitlab.freedesktop.org/xorg/app/xsetroot"
+  upstream_license: "MIT (COPYING)"
+
+build:
+  system: autotools
+  configure_options:
+    - "--host=aarch64-linux-ohos"
+    - "--disable-docs"
+    - "CPPFLAGS += -I<exports>/files   (X11/bitmaps/gray 数据文件 shim)"
+  dependencies:
+    - libx11/6.4.0
+    - libxmu/1.3.1.1
+    - libxcursor/1.2.3
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+artifacts:
+  - bin/xsetroot
+  - share/man/man1/xsetroot.1
+  - licenses/COPYING
+
+# 本次适配未做任何源码补丁：上游 xsetroot.c 零修改。
+# xbitmaps 缺口以**配方内置数据文件**（files/X11/bitmaps/gray）解决，
+# 属构建输入而非补丁，故 patches 为空。
+patches_applied: []
+
+# 上游测试套件：无（Makefile.am 无 TESTS / check_PROGRAMS）
+upstream_tests_exist: false
+
+knowledge_gained:
+  - "X.Org app 类（xsetroot 1.1.3）以 --host=aarch64-linux-ohos 交叉编译模式可绕过 OHOS 沙箱无法运行 conftest 的问题（与 libxcursor/libxmu 同款）"
+  - "上游 configure 的 `umask 077` 在 OHOS worker 上使辅助目录对后续 make 不可读 → 构建目录内副本改 umask 022 后执行"
+  - "xbitmaps 未在 OHOS 制品仓发布，但 X.Org app 只需其 <X11/bitmaps/gray>（#include 而非链接库）→ 配方内置 87 字节 canonical 数据文件 + CPPFLAGS -I（motif/2.3.8 已合并的同一方案）"
+  - "xsetroot 上游无测试套件（Makefile.am 无 TESTS/check_PROGRAMS）→ 走 TEST_QUALITY_SPEC「上游无测试」分支，由 test_package 提供覆盖并在 MANIFEST.yml 显式申报"
+  - "-version 在 XOpenDisplay 之前处理，可作无 X 服务器的真实行为断言（headless CI 可用）"
