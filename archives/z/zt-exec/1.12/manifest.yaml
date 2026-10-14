@@ -1,0 +1,43 @@
+version: "1.12"
+software: "zt-exec"
+status: built
+build_date: "2026-09-30"
+conan_ref: "zt-exec/1.12"
+
+source:
+  url: "https://github.com/zeroturnaround/zt-exec/archive/refs/tags/zt-exec-1.12.tar.gz"
+  sha256: "59e89dfe0134a39e7380df4103f33cacfc9d8953a92e3059db545a460a4ed4de"
+  tar_format: tar.gz
+
+build:
+  system: maven
+  configure_options:
+    - "clean package -B -DskipTests=false -Dmaven.javadoc.skip=true"
+  dependencies:
+    - "BiSheng JDK 17.0.13 (JAVA_HOME → ~/bishengjdk17 → PATH → cmd-pkgs install-jdk.sh)"
+    - "Maven 3.9.11 (recipe self-fetched from repo1.maven.org, sha256 pinned, cached at ~/apache-maven-3.9.11)"
+    - "slf4j-api 1.7.2 / junit 4.11 / logback-classic 1.1.2 / commons-lang3 3.5 / commons-io 2.5 (resolved from Maven Central at build time)"
+  cc: ""
+  cxx: ""
+
+patches_applied:
+  - "0001-pom-compiler-source-target-1.8-for-jdk17.patch: maven-compiler-plugin source/target 1.6 → 1.8（JDK 17 javac 拒绝 source 6）"
+  - "0002-listener-throw-test-openjdk-version-string.patch: ProcessListenerThrowTest 版本串匹配扩展 'openjdk version'（BiSheng JDK 输出 openjdk version，Oracle JDK 字面量导致预期异常未触发；测试意图不变）"
+
+upstream_tests:
+  framework: "JUnit 4.11 via Maven Surefire（Maven 3.9.11 默认生命周期版本）"
+  test_files: 35
+  test_classes: 21
+  test_methods: 96
+  test_command: "mvn -B clean package -DskipTests=false -Dmaven.javadoc.skip=true"
+  run_in_build: true
+
+knowledge_gained:
+  - "源码编译方式：GitHub tarball + 配方自取 Maven 3.9.11（repo1.maven.org，sha256 钉死，~/apache-maven-3.9.11 缓存复用）；设备实测 repo.maven.apache.org（Maven central）同样可达"
+  - "上游测试：21 个测试类 96 个 @Test（JUnit 4.11），surefire 真实 spawn 子 JVM（java -cp target/test-classes ...）；外部命令依赖仅 java / sleep / /bin/true，OHOS 设备全部满足"
+  - "build() 中 mvn package 的 test 阶段执行上游测试（R34/L1c）；-Dmaven.javadoc.skip=true 跳过 attach 在 package 阶段的 maven-javadoc-plugin 3.0.1（产物不需要 javadoc jar）"
+  - "pom 2013 年代的 source/target 1.6 在 JDK 17 javac 直接拒绝（Source option 6 is no longer supported），补丁就地上调 1.8"
+  - "上游 ProcessListenerThrowTest 写死 Oracle JDK 'java version' 版本串；BiSheng JDK 输出 'openjdk version'，预期异常未触发 → 2 个 @Test 失败，测试可移植性补丁扩展匹配（意图不变）"
+  - "os.name 在 BiSheng JDK/OHOS 上为 HarmonyOS（非 Linux）：InputRedirectTest 被上游 Assume 平台守卫跳过（1 skipped，属设计行为）；TimeoutTest 走 sleep 分支正常"
+  - "slf4j-api 1.7.2 是强制运行时依赖（ProcessExecutor 类初始化即触 SLF4J），打包时从 ~/.m2 收集进 libexec（leakcanary-shark 收集 kotlin-stdlib 同范式）"
+  - "HMDFS 禁 shebang exec：mvn 用 sh 显式调用（jakarta-cdi 同坑）"
