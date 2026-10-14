@@ -1,0 +1,47 @@
+version: "1.1.2"
+software: "tabixpp"
+status: built
+build_date: "2026-09-26"
+build_system: makefile
+
+source:
+  url: "https://github.com/vcflib/tabixpp/archive/refs/tags/v1.1.2.tar.gz"
+  sha256: "c850299c3c495221818a85c9205c60185c8ed9468d5ec2ed034470bb852229dc"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "raw Makefile only entry: `make all` builds tabix++ CLI + libtabix.a + libtabix.so.1"
+    - "HTS_HEADERS/HTS_LIB submodule prerequisites cleared, INCLUDES/LIBPATH pointed at Conan htslib/1.24-r0 (tarball ships empty htslib/ dir)"
+    - "link line patched: drop -lcurl/-lbz2 (htslib disables them), add -ldeflate for static libhts.a"
+    - "CC/CXX/AR taken from profile tools.build:compiler_executables (hnp clang 15)"
+  dependencies:
+    - "htslib/1.24-r0"
+  cc: clang
+  cxx: clang++
+  parallelism: 1
+
+patches_applied:
+  - "patches/0001-tabixpp-link-external-htslib.patch"
+
+knowledge_gained:
+  - "tabixpp release tarball excludes the htslib submodule content (empty htslib/ dir); recipe must use external Conan htslib via INCLUDES/LIBPATH overrides"
+
+validation:
+  upstream_tests:
+    command: "./tabix++ test/vcf_file.vcf.gz"
+    statistical_unit: "one make-test command execution over bundled VCF fixture"
+    total: 1
+    result: pending-true-machine-evidence
+  conan_create:
+    command: >-
+      conan create archives/t/tabixpp/1.1.2
+      -pr:h=ci/conan/profiles/ohos-aarch64
+      -pr:b=ci/conan/profiles/ohos-aarch64
+      --build=missing --user=ohpcd --channel=stable
+    result: pending-true-machine-evidence
+  test_package:
+    command: "./test_tabixpp"
+    assertions: 8
+    result: pending-true-machine-evidence

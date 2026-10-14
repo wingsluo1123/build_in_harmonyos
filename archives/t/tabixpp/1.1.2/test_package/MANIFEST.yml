@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml — tabixpp 1.1.2
+# Upstream and consumer test declaration required by CI L0e.
+
+package: tabixpp/1.1.2
+homepage: "https://github.com/vcflib/tabixpp"
+
+upstream_tests_exist: true
+upstream_test_audit: "Audited the v1.1.2 release tarball (vcflib/tabixpp v1.1.2, sha256 c850299c3c495221818a85c9205c60185c8ed9468d5ec2ed034470bb852229dc): raw Makefile is the only build system (no configure/CMake/meson); the sole test entry is the `test:` target running `./tabix++ test/vcf_file.vcf.gz` over the bundled fixtures test/vcf_file.vcf.gz + .tbi + .gzi; no gtest/ctest/pythondefs exist, so the counting unit is one make-test command execution."
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "./tabix++ test/vcf_file.vcf.gz (invoked by conanfile.py build())"
+
+# Counting unit: one `make test` command execution (single custom harness, no
+# framework registry to enumerate). Single parseable target, so
+# upstream_test_count_method is auto. The recipe asserts non-empty stdout with
+# at least one data line before emitting HMBS_UPSTREAM_TEST_RESULT.
+upstream_tests:
+  - file: test/vcf_file.vcf.gz
+    source: "tabixpp-1.1.2/test/vcf_file.vcf.gz (+ .tbi index)"
+    description: "Bundled integration check: tabix++ dumps all records of the bgzf-compressed test VCF"
+    command: "./tabix++ test/vcf_file.vcf.gz"
+
+upstream_test_total: 1
+upstream_test_count_method: auto
+
+test_package_tests:
+  - file: test_tabixpp.cpp
+    description: "Consumer API test: BGZF-write + tbx_index_build a 3-record VCF at test time (no bgzip/tabix CLI needed), then assert Tabix chrom registry, non-empty header with #CHROM, region 1:100-200 records rs123/rs456, and full iteration count of 3"
+    command: "./test_tabixpp"
+
+assertion_count: 8
