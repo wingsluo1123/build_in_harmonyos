@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml — oed 7.4
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+
+package: oed/7.4
+homepage: "https://github.com/ibara/oed"
+
+# 上游测试入口：configure 生成的 Makefile 里只有一个占位 target，实测输出 "No tests"
+upstream_check_command: "make test"
+
+# conanfile.py build() 中是否已集成上游测试（上游无任何测试用例，无可集成）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试清点结论：0 个用例
+#   * `make test` → `@echo "No tests"`（configure:406 写入 Makefile 的 test target）
+#   * 发布包内无 tests/ 目录，无 ctest/meson/pytest 注册
+#   * GitHub API tree(oed-7.4) 共 32 项，全部为源码/构建设施，无任何测试文件
+#   * .travis.yml 仅做编译矩阵，不运行测试
+# 依据：R51 第一步清点。上游确无测试 → 走路径 B，在 test_package 中补全消费者测试。
+upstream_tests: []
+
+# test_package 中自带的消费者测试（真实调用安装出的 ed 可执行文件）
+test_package_tests:
+  - file: test.sh
+    description: >-
+      A 组（18 项断言）上游功能等价：新建文件写入、1,$p/2p/$p 寻址、正则替换、
+      全局替换、删除行、撤销、g/re/d 全局命令、r 读入拼接、就地编辑既有文件、
+      非法命令脚本安全契约（? 诊断 + 非零退出 + 不落盘）、500 行长缓冲落盘；
+      B 组（7 项断言）鸿蒙特有：TMPDIR 可写/不可写/不存在/未设置四种情形下
+      scratch 文件目录回退链均可用，且退出后无 ed.* 残留（/tmp 在鸿蒙为 erofs 只读挂载）
+    command: "bash test.sh"
+    executed_by: "test_package/conanfile.py test() 通过 self.run 执行（L0d）"
+
+# 测试断言总数（上游 0 项；test_package 25 项消费者断言，实测 PASS=25 FAIL=0）
+assertion_count: 25
