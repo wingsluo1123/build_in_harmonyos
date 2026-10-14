@@ -1,0 +1,106 @@
+--- a/test/loopback.c
++++ b/test/loopback.c
+@@ -193,24 +193,30 @@
+   f->saved_runtime_dir = g_strdup (g_getenv ("XDG_RUNTIME_DIR"));
+   g_unsetenv ("XDG_RUNTIME_DIR");
+ 
+   setup (f, addr);
+ 
+   if (f->skip)
+     return;
+ 
+   listening_at = dbus_server_get_address (f->server);
+   g_test_message ("listening at %s", listening_at);
+-  /* we have fallen back to something in /tmp, either abstract or not */
++  /* We have fallen back to the configured temporary socket root. */
+   g_assert (g_str_has_prefix (listening_at, "unix:"));
+ #ifdef DBUS_UNIX
+-  g_assert (strstr (listening_at, "=/tmp" DBUS_DIR_SEPARATOR_S) != NULL);
++  {
++    char *tmp = dbus_address_escape_value (DBUS_TEST_SOCKET_DIR);
++    char *prefix = g_strdup_printf ("=%s" DBUS_DIR_SEPARATOR_S, tmp);
++    g_assert (strstr (listening_at, prefix) != NULL);
++    g_free (prefix);
++    dbus_free (tmp);
++  }
+ #endif
+ 
+   dbus_free (listening_at);
+ }
+ 
+ static void
+ test_connect (Fixture *f,
+     gconstpointer addr)
+ {
+   const char *listening_address = addr;
+@@ -260,44 +266,44 @@
+     }
+   else if (g_str_has_prefix (listening_address, "unix:tmpdir="))
+     {
+       g_assert_cmpstr (dbus_address_entry_get_method (entries[0]), ==, "unix");
+ 
+       if (dbus_address_entry_get_value (entries[0], "abstract") != NULL)
+         {
+           const char *abstract = dbus_address_entry_get_value (entries[0],
+                                                                "abstract");
+ 
+-          g_assert_true (g_str_has_prefix (abstract, "/tmp" DBUS_DIR_SEPARATOR_S "dbus-"));
++          g_assert_true (g_str_has_prefix (abstract, DBUS_TEST_SOCKET_DIR DBUS_DIR_SEPARATOR_S "dbus-"));
+           g_assert_cmpstr (dbus_address_entry_get_value (entries[0], "path"),
+                                                          ==, NULL);
+         }
+       else
+         {
+           const char *path = dbus_address_entry_get_value (entries[0],
+                                                            "path");
+ 
+           g_assert_nonnull (path);
+ #ifdef DBUS_UNIX
+-          g_assert_true (g_str_has_prefix (path, "/tmp" DBUS_DIR_SEPARATOR_S "dbus-"));
++          g_assert_true (g_str_has_prefix (path, DBUS_TEST_SOCKET_DIR DBUS_DIR_SEPARATOR_S "dbus-"));
+ #endif
+         }
+     }
+   else if (g_str_has_prefix (listening_address, "unix:dir="))
+     {
+       const char *path = dbus_address_entry_get_value (entries[0],
+                                                        "path");
+ 
+       g_assert_cmpstr (dbus_address_entry_get_method (entries[0]), ==, "unix");
+       g_assert_nonnull (path);
+ #ifdef DBUS_UNIX
+-      g_assert_true (g_str_has_prefix (path, "/tmp" DBUS_DIR_SEPARATOR_S "dbus-"));
++      g_assert_true (g_str_has_prefix (path, DBUS_TEST_SOCKET_DIR DBUS_DIR_SEPARATOR_S "dbus-"));
+ #endif
+     }
+   else if (g_str_has_prefix (listening_address,
+                              "unix:runtime=yes;unix:tmpdir="))
+     {
+       g_assert_cmpstr (dbus_address_entry_get_method (entries[0]), ==, "unix");
+       /* No particular statement about the path here: for that see
+        * setup_runtime() and setup_no_runtime() */
+     }
+   else
+@@ -570,21 +576,21 @@
+   g_free (f->saved_runtime_dir);
+   g_free (f->tmp_runtime_dir);
+ }
+ 
+ int
+ main (int argc,
+     char **argv)
+ {
+   int ret;
+ #ifdef DBUS_UNIX
+-  char *tmp = _dbus_strdup ("/tmp");
++  char *tmp = dbus_address_escape_value (DBUS_TEST_SOCKET_DIR);
+ #else
+   char *tmp = dbus_address_escape_value (g_get_tmp_dir ());
+ #endif
+   gchar *unix_tmpdir = g_strdup_printf ("unix:tmpdir=%s", tmp);
+   gchar *unix_dir = g_strdup_printf ("unix:dir=%s", tmp);
+   gchar *unix_runtime_or_fallback = g_strdup_printf ("unix:runtime=yes;%s", unix_tmpdir);
+ 
+   test_init (&argc, &argv);
+ 
+   g_test_add ("/connect/tcp", Fixture, "tcp:host=127.0.0.1", setup,

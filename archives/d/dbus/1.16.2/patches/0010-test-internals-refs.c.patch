@@ -1,0 +1,31 @@
+--- a/test/internals/refs.c
++++ b/test/internals/refs.c
+@@ -225,21 +225,27 @@
+       f->n_refs = 1000;
+       g_info ("reducing number of threads/refs to %d/%d", f->n_threads, f->n_refs);
+     }
+ #endif
+   f->loop = _dbus_loop_new ();
+   g_assert (f->loop != NULL);
+ 
+   dbus_error_init (&f->e);
+ 
+ #ifdef DBUS_UNIX
+-  f->server = dbus_server_listen ("unix:tmpdir=/tmp", &f->e);
++  {
++    char *tmp = dbus_address_escape_value (DBUS_TEST_SOCKET_DIR);
++    char *address = g_strdup_printf ("unix:tmpdir=%s", tmp);
++    f->server = dbus_server_listen (address, &f->e);
++    g_free (address);
++    dbus_free (tmp);
++  }
+ #else
+   f->server = dbus_server_listen ("tcp:host=127.0.0.1", &f->e);
+ #endif
+ 
+   assert_no_error (&f->e);
+   g_assert (f->server != NULL);
+ 
+   if (!dbus_connection_allocate_data_slot (&connection_slot))
+     g_error ("OOM");
+ 
