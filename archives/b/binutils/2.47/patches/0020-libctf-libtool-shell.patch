@@ -1,0 +1,41 @@
+--- a/libctf/Makefile.am
++++ b/libctf/Makefile.am
+@@ -96,7 +96,7 @@
+ 	srcroot=`cd $(srcdir) && pwd`; export srcroot; \
+ 	r=`pwd`; export r; \
+ 	LC_ALL=C; export LC_ALL; \
+-	EXPECT=$(EXPECT); export EXPECT; \
++	EXPECT=$(EXPECT) CONFIG_SHELL=$(SHELL); export EXPECT CONFIG_SHELL; \
+ 	if [ "@host@" = "@target@" ] ; then \
+ 	  TEST_CROSS=no; \
+ 	else \
+--- a/libctf/Makefile.in
++++ b/libctf/Makefile.in
+@@ -1816,7 +1816,7 @@
+ 	srcroot=`cd $(srcdir) && pwd`; export srcroot; \
+ 	r=`pwd`; export r; \
+ 	LC_ALL=C; export LC_ALL; \
+-	EXPECT=$(EXPECT); export EXPECT; \
++	EXPECT=$(EXPECT) CONFIG_SHELL=$(SHELL); export EXPECT CONFIG_SHELL; \
+ 	if [ "@host@" = "@target@" ] ; then \
+ 	  TEST_CROSS=no; \
+ 	else \
+--- a/libctf/testsuite/lib/ctf-lib.exp
++++ b/libctf/testsuite/lib/ctf-lib.exp
+@@ -93,10 +93,14 @@
+ 
+ # Compile and link a C source file for execution on the host.
+ proc compile_link_one_host_cc { src output additional_args } {
+-    global CC
++    global CC env
++    set shell sh
++    if {[info exists env(CONFIG_SHELL)]} {
++        set shell $env(CONFIG_SHELL)
++    }
+     global CFLAGS
+ 
+-    return [run_native_host_cmd "./libtool --quiet --tag=CC --mode=link $CC $CFLAGS $src -o $output $additional_args" ]
++    return [run_native_host_cmd "\"$shell\" ./libtool --quiet --tag=CC --mode=link $CC $CFLAGS $src -o $output $additional_args" ]
+ }
+ 
+ # run_lookup_test FILE

@@ -1,0 +1,226 @@
+software: binutils
+version: "2.47"
+status: built
+build_date: "2026-10-10"
+build_system: autotools
+description: "GNU binary utilities for native HarmonyOS PC development"
+license: GPL-3.0-or-later
+homepage: "https://www.gnu.org/software/binutils/"
+
+source:
+  repository: "https://sourceware.org/git/binutils-gdb.git"
+  tag: "binutils-2_47"
+  url: "https://ftp.gnu.org/gnu/binutils/binutils-2.47.tar.xz"
+  sha256: "154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff"
+  tar_format: tar.xz
+  archive_size_bytes: 29034716
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-gprofng"
+    - "--disable-gdb"
+    - "--disable-gdbserver"
+    - "--disable-sim"
+    - "--disable-nls"
+    - "--disable-werror"
+    - "--disable-shared"
+    - "--enable-static"
+    - "--without-zstd"
+  dependencies:
+    required: []
+    test:
+      - "dejagnu/1.6.3.1"
+      - "expect/5.45.4"
+      - "tcl/8.6.14"
+    transitive_test:
+      - "zlib/1.3.1"
+  cc: clang
+  cxx: clang++
+
+commands:
+  - addr2line
+  - ar
+  - as
+  - c++filt
+  - elfedit
+  - gprof
+  - ld
+  - nm
+  - objcopy
+  - objdump
+  - ranlib
+  - readelf
+  - size
+  - strings
+  - strip
+
+patches_applied:
+  - "0001-bfd-configure.patch"
+  - "0002-binutils-configure.patch"
+  - "0003-config.guess.patch"
+  - "0004-configure.patch"
+  - "0005-etc-configure.patch"
+  - "0006-gas-configure.patch"
+  - "0007-gprof-configure.patch"
+  - "0008-gprofng-configure.patch"
+  - "0009-gprofng-libcollector-configure.patch"
+  - "0010-ld-configure.patch"
+  - "0011-libctf-configure.patch"
+  - "0012-libiberty-configure.patch"
+  - "0013-libsframe-configure.patch"
+  - "0014-opcodes-configure.patch"
+  - "0015-zlib-configure.patch"
+  - "0016-gprof-ohos-shell.patch"
+  - "0017-binutils-ohos-shell.patch"
+  - "0018-missing-shell.patch"
+  - "0019-gas-output-channel.patch"
+  - "0020-libctf-libtool-shell.patch"
+  - "0021-sframe-fixture-copy.patch"
+  - "0022-ld-log-result.patch"
+  - "0023-ld-replace-loaded-fixture.patch"
+  - "0024-libctf-clang-linker.patch"
+  - "0025-ld-clang-external-as.patch"
+
+compatibility:
+  level: built
+  notes: >-
+    Targets native HarmonyOS PC aarch64. 24 of the 25 portability patches carry
+    over unchanged from the 2.46.0 recipe; 0016 is regenerated because 2.47 adds
+    a third gprof shell test script (tst-gmon-gprof-l2.sh) and passes a $(target)
+    argument. gprofng is excluded because its collector uses Linux-specific
+    runtime facilities. Generated configure scripts use a relaxed
+    temporary-directory umask for HMDFS.
+  technical_debt: >-
+    Remove the scoped Clang unused-option suppression when the OHOS profile no
+    longer forwards linker-only flags into Autoconf preprocessor probes; rerun
+    configure and the complete test matrix after removal.
+
+knowledge_gained:
+  - "config.sub already accepts linux-ohos in 2.47; only config.guess needs a HarmonyOS uname branch."
+  - "Fourteen configure scripts create config.status directories with umask 077; HMDFS requires umask 022."
+  - "Native OHOS HMDFS rejects direct shell-script execution from the Conan cache; generated Makefiles and gprof shell test rules use explicit shell execution, RUNTESTFLAGS supplies the target triplet, and make/install use -j1 to avoid restricted mkfifo jobserver paths."
+  - "Clang-generated assembler in the upstream ld suite needs -fno-addrsig when consumed by GNU as."
+  - "OHOS Clang must use the candidate GNU as inside compressed-debug linker tests; the flag is restored before later drivers."
+  - "Native GNU ld outputs and literal-dlopen fixtures require scoped platform signing before execution."
+  - "2.47 ships 387 DejaGNU .exp files; ld grew from 187 to 188 files, adding one driver (184 -> 185)."
+knowledge_references:
+  - E007
+  - E011
+  - E272
+  - E386
+  - E490
+  - "E547-draft-61BA"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_label: "official 2.47 archive (dual-track audit workspace not committed)"
+  source_work_label: "patched worktree (dual-track audit workspace not committed)"
+  patches_count: 25
+  update_note: >-
+    Patches 0001-0025 are ported from the 2.46.0 recipe. Replay audit against
+    pristine 2.47: 24 applied unchanged, 0016 regenerated against the new
+    gprof/testsuite Makefile.am/Makefile.in. Final in-order replay is 25/25.
+
+patch_classification:
+  - file: 0001-bfd-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0002-binutils-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0003-config.guess.patch
+    type: portability
+    platform_only: true
+    guard: uname
+  - file: 0004-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0005-etc-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0006-gas-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0007-gprof-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0008-gprofng-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0009-gprofng-libcollector-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0010-ld-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0011-libctf-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0012-libiberty-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0013-libsframe-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0014-opcodes-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0015-zlib-configure.patch
+    type: portability
+    platform_only: true
+    guard: umask
+  - file: 0016-gprof-ohos-shell.patch
+    type: portability
+    platform_only: false
+    guard: configured-shell
+    note: "Regenerated for 2.47: covers tst-gmon-gprof.sh, -l.sh and the new -l2.sh."
+  - file: 0017-binutils-ohos-shell.patch
+    type: portability
+    platform_only: false
+    guard: configured-shell
+  - file: 0018-missing-shell.patch
+    type: portability
+    platform_only: false
+    guard: configured-shell
+  - file: 0019-gas-output-channel.patch
+    type: portability
+    platform_only: false
+    guard: test-output-file
+  - file: 0020-libctf-libtool-shell.patch
+    type: portability
+    platform_only: false
+    guard: configured-shell
+  - file: 0021-sframe-fixture-copy.patch
+    type: portability
+    platform_only: false
+    guard: test-data
+  - file: 0022-ld-log-result.patch
+    type: portability
+    platform_only: false
+    guard: log-option-delimiter
+  - file: 0023-ld-replace-loaded-fixture.patch
+    type: portability
+    platform_only: false
+    guard: force-test-fixture-copy
+  - file: 0024-libctf-clang-linker.patch
+    type: portability
+    platform_only: false
+    guard: clang-linker-selection
+  - file: 0025-ld-clang-external-as.patch
+    type: portability
+    platform_only: true
+    guard: ohos-clang-compressed-debug-assembler

@@ -1,0 +1,47 @@
+id: E547
+trigger_tool: conan|patch|automake|make|configure
+phase: packaging|patch
+error_signature: hunk no\.\d+ doesn't match source file|source file is different - b'.*'|Failed to apply patch
+severity: 2
+category: toolchain, build-system, portability, packaging
+match_keywords: patch_ng, apply_conandata_patches, autotools, generated configure, hunk offset, version upgrade, fuzz, patch replay
+title: Generated Autotools files break strict patch replay across upstream versions
+root_cause: Autotools projects ship generated files (configure, Makefile.in, aclocal.m4) whose line numbering and surrounding text depend on the autoconf/automake that generated them. When a recipe's portability patch was authored against release N and is replayed against release N+1, the semantic target of the hunk is unchanged but its byte offsets have shifted. GNU patch tolerates this with fuzz, whereas patch_ng (used by Conan apply_conandata_patches) matches at exact offsets and aborts the whole build.
+affected_scope: Any Conan recipe that ports patches across upstream versions of an Autotools or generated-file project, and any grader or CI that applies patches with a strict engine rather than GNU patch.
+verification_cmd: P=patches/0001.patch; rm -rf /tmp/o /tmp/w; cp -a src-orig /tmp/o; cp -a src-orig /tmp/w; ( cd /tmp/o && patch -p1 --dry-run --forward < "$P" ); ( cd /tmp/w && patch -p1 --forward < "$P" ); diff -u --label "a/$P" --label "b/$P" /tmp/o/FILE /tmp/w/FILE > regenerated.patch
+rec_priority: 1
+rec_approach: regenerate-patches-as-exact-offset-diffs
+rec_description: Re-derive every ported patch from the real difference between the pristine new-version tree and a patched tree, so each hunk header matches the target file exactly and applies with zero fuzz under either patch engine. Replaying a fuzzy patch successfully is not sufficient evidence, because success under GNU patch does not imply success under patch_ng.
+rec_command: AS_IS="patch -p1 --forward --silent"; MISSES=0; for p in patches/*.patch; do rm -rf /tmp/t; cp -a src-pristine /tmp/t; ( cd /tmp/t && $AS_IS < "$p" ) || { echo "REGEN-NEEDED $p"; MISSES=$((MISSES+1)); }; done; echo "misses=$MISSES"
+rec_auto_fix: false
+rec_impl: patch-regeneration
+fallback_priority: 2
+fallback_approach: reduce-context-and-retarget-hunk-headers
+fallback_description: When full regeneration is impractical for a huge generated file, shrink each hunk to the unique changed line with one or two context lines and recompute the @@ start lines against the new file, so the hunk binds by content rather than by offset.
+fallback_command: grep -n "umask 077" new/configure | head
+fallback_auto_fix: false
+fallback_impl: patch-edit
+forbid_1_pattern: patch.*--fuzz=99|ignore.*patch.*fail|skip.*apply_conandata_patches|2>/dev/null.*\|\|.*true.*patch
+forbid_1_reason: Silently tolerating a failed patch means the target tree is built without the portability fix, so the resulting package looks green while carrying none of the adaptation.
+forbid_1_consequence: Upstream test results are reported for a tree that never received the patch, and the failure appears much later as an unrelated runtime or test error.
+forbid_2_pattern: assert.*patch.*applied.*||.*pass
+forbid_2_reason: Treating a patch as optional lets a stale patch silently become a no-op after an upstream version bump.
+forbid_2_consequence: The recipe keeps shipping a patch file that changes nothing, so reviewers cannot tell which adaptations are actually active.
+principles: P006
+causes: []
+caused_by: []
+similar_to: []
+conflicts_with: []
+prerequisite_of: []
+doc_file: drafts/E547-draft-binutils-247-generated-file-patch-drift.md
+last_updated: 2026-10-10
+source_event: binutils 2.46.0 -> 2.47 port: 24 of 25 patches replayed under GNU patch but patch_ng rejected 0001 because bfd/configure hunk offsets shifted from 18622 to 18641 while the changed text was identical; regenerating all 25 as exact-offset diffs gave 25/25 strict application.
+authors: lkyz <lkyz@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-10
+draft: true
+contributor_id: 61BA

@@ -1,0 +1,65 @@
+--- a/gprof/testsuite/Makefile.am
++++ b/gprof/testsuite/Makefile.am
+@@ -21,6 +21,7 @@
+ MOSTLYCLEANFILES =
+ 
+ TESTS = $(check_SCRIPTS)
++LOG_COMPILER = $(SHELL)
+ 
+ if NATIVE
+ 
+@@ -33,12 +34,12 @@
+ tst-gmon: tst-gmon.$(OBJEXT)
+ 	$(LINK) tst-gmon.$(OBJEXT)
+ tst-gmon-gprof.out: tst-gmon$(EXEEXT) $(GPROF)
+-	$(srcdir)/tst-gmon-gprof.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
++	$(SHELL) $(srcdir)/tst-gmon-gprof.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
+ 
+ check_SCRIPTS += tst-gmon-gprof-l.sh
+ check_DATA += tst-gmon-gprof-l.out
+ tst-gmon-gprof-l.out: tst-gmon$(EXEEXT) $(GPROF)
+-	$(srcdir)/tst-gmon-gprof-l.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
++	$(SHELL) $(srcdir)/tst-gmon-gprof-l.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
+ 
+ # Create a separated-debuginfo version of the initial binary 
+ check_SCRIPTS += tst-gmon-gprof-l2.sh
+@@ -49,7 +50,7 @@
+ 	objcopy --add-gnu-debuglink=tst-gmon2.debug tst-gmon2$(EXEEXT)
+ 
+ tst-gmon-gprof-l2.out: tst-gmon2$(EXEEXT) tst-gmon2.debug $(GPROF)
+-	$(srcdir)/tst-gmon-gprof-l2.sh $(GPROF) tst-gmon2$(EXEEXT) $(target)
++	$(SHELL) $(srcdir)/tst-gmon-gprof-l2.sh $(GPROF) tst-gmon2$(EXEEXT) $(target)
+ check_DATA += tst-gmon-gprof-l2.out
+ MOSTLYCLEANFILES += tst-gmon2$(EXEEXT) tst-gmon2.debug
+ 
+--- a/gprof/testsuite/Makefile.in
++++ b/gprof/testsuite/Makefile.in
+@@ -517,6 +517,7 @@
+ check_DATA = $(am__append_2)
+ MOSTLYCLEANFILES = $(am__append_3)
+ TESTS = $(check_SCRIPTS)
++LOG_COMPILER = $(SHELL)
+ all: all-am
+ 
+ .SUFFIXES:
+@@ -898,9 +899,9 @@
+ @NATIVE_TRUE@tst-gmon: tst-gmon.$(OBJEXT)
+ @NATIVE_TRUE@	$(LINK) tst-gmon.$(OBJEXT)
+ @NATIVE_TRUE@tst-gmon-gprof.out: tst-gmon$(EXEEXT) $(GPROF)
+-@NATIVE_TRUE@	$(srcdir)/tst-gmon-gprof.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
++@NATIVE_TRUE@	$(SHELL) $(srcdir)/tst-gmon-gprof.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
+ @NATIVE_TRUE@tst-gmon-gprof-l.out: tst-gmon$(EXEEXT) $(GPROF)
+-@NATIVE_TRUE@	$(srcdir)/tst-gmon-gprof-l.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
++@NATIVE_TRUE@	$(SHELL) $(srcdir)/tst-gmon-gprof-l.sh $(GPROF) tst-gmon$(EXEEXT) $(target)
+ @NATIVE_TRUE@tst-gmon2$(EXEEXT) tst-gmon2.debug: tst-gmon$(EXEEXT)
+ @NATIVE_TRUE@	cp -p tst-gmon$(EXEEXT) tst-gmon2$(EXEEXT)
+ @NATIVE_TRUE@	objcopy --only-keep-debug tst-gmon2$(EXEEXT) tst-gmon2.debug
+@@ -908,7 +909,7 @@
+ @NATIVE_TRUE@	objcopy --add-gnu-debuglink=tst-gmon2.debug tst-gmon2$(EXEEXT)
+ 
+ @NATIVE_TRUE@tst-gmon-gprof-l2.out: tst-gmon2$(EXEEXT) tst-gmon2.debug $(GPROF)
+-@NATIVE_TRUE@	$(srcdir)/tst-gmon-gprof-l2.sh $(GPROF) tst-gmon2$(EXEEXT) $(target)
++@NATIVE_TRUE@	$(SHELL) $(srcdir)/tst-gmon-gprof-l2.sh $(GPROF) tst-gmon2$(EXEEXT) $(target)
+ 
+ # Run all tests in series, so they don't fight over the gmon.out file
+ @NATIVE_TRUE@.NOTPARALLEL:
