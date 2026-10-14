@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (CI L0e 强制)
+#
+# nbdkit 1.48.0 上游测试为 automake TESTS 体系：
+#   source_declared_total = 521（递归 Makefile.am 中 TESTS/LIBNBD_TESTS/LIBGUESTFS_TESTS
+#   的条件注册项合计：tests/Makefile.am 497 项，其他子目录 24 项）
+#   R07 在 OpenDesk 真机完成最终全量复跑：实例化 97 项（57 通过、40 未通过），
+#   其余 424 项因 requires 前置组件缺失未执行
+#   （未通过项含 AF_UNIX/插件运行时/HMDFS 平台限制导致的 fail/crash/timeout）；
+#   详细证据见 notes.md 的 R01-R07 台账。
+
+package: nbdkit/1.48.0
+homepage: "https://libguestfs.org/nbdkit/"
+
+# 上游测试命令 (用于 make -n check / ctest -N 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (代表性条目，完整台账见 notes.md)
+upstream_tests:
+  - file: tests/test-binary.sh
+    source: nbdkit-1.48.0/tests/test-binary.sh
+    description: "二进制产物冒烟 (通过)"
+    command: "./test-binary.sh"
+  - file: tests/test-help.sh
+    source: nbdkit-1.48.0/tests/test-help.sh
+    description: "--help 输出 (通过)"
+    command: "./test-help.sh"
+  - file: tests/test-version.sh
+    source: nbdkit-1.48.0/tests/test-version.sh
+    description: "--version 输出 (通过)"
+    command: "./test-version.sh"
+  - file: tests/test-dump-config.sh
+    source: nbdkit-1.48.0/tests/test-dump-config.sh
+    description: "--dump-config 输出 (通过)"
+    command: "./test-dump-config.sh"
+  - file: tests/test-short-options.sh
+    source: nbdkit-1.48.0/tests/test-short-options.sh
+    description: "短选项解析 (通过)"
+    command: "./test-short-options.sh"
+  - file: tests/test-long-options.sh
+    source: nbdkit-1.48.0/tests/test-long-options.sh
+    description: "长选项解析 (通过)"
+    command: "./test-long-options.sh"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: >
+      消费者模拟 libnbd 上层组件：断言安装的 nbdkit 存在，校验
+      --version、--dump-config 和 --help 的真实输出，检查公开插件产物
+      存在并编译运行 C dlopen 消费者（Python 10 项断言）
+    command: "conan test test_package nbdkit/1.48.0"
+  - file: test.c
+    description: >
+      dlopen 安装的 example1 插件，断言 plugin_init 返回结构有效、
+      name 非空且等于 example1（C harness 4 项断言）
+    command: "./test_nbdkit_consumer <plugin.so>"
+
+# 测试断言总数：Python 消费者 10 项 + C dlopen harness 4 项。
+test_package_assertion_count: 14
+assertion_count: 14

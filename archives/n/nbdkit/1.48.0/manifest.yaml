@@ -1,0 +1,111 @@
+# 版本级 manifest — nbdkit 1.48.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.48.0"
+
+# 软件名
+software: "nbdkit"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-17"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 libguestfs 发布源）
+  url: "https://download.libguestfs.org/nbdkit/1.48-stable/nbdkit-1.48.0.tar.gz"
+
+  # 源码校验和（下载后实测 sha256sum）
+  sha256: "5b90ed8277c514889e54e2b703ccf85086015d7174bbf10dd16e16f5e35d9cef"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+  - "--without-gnutls"
+  - "--without-curl"
+  - "--without-ssh"
+  - "--without-nfs"
+  - "--without-libvirt"
+  - "--without-bzip2"
+  - "--without-zlib"
+  - "--without-libnbd"
+  - "--without-liblzma"
+  - "--without-libzstd"
+  - "--without-libguestfs"
+  - "--without-ext2"
+  - "--without-libtorrent"
+
+  # 编译依赖列表（无外部 conan 依赖；可选插件依赖由 configure 自动禁用）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "0001-config.guess.patch"
+- "0002-config.sub.patch"
+- "0003-configure.patch"
+- "0004-tmpdir.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "config.guess/config.sub 无 HarmonyOS/ohos 分支时 configure 首阶段中断，按 E007/E072 打补丁输出 aarch64-unknown-linux-ohos"
+- "config.status 在 HMDFS 上因 umask 077 创建的 0700 临时目录权限位不生效导致 Permission denied，按 E129 改 umask 022"
+- "OHOS libc 无 pthread_cancel 符号，common 层 test-once 无法链接（E051 平台 API 缺失）"
+- "服务端加载插件后的 --help/--version/--dump-plugin 路径在 OHOS 上 SIGSEGV/SIGTRAP（平台运行时缺陷，见 knowledge 候选台账）"
+- "AF_UNIX socket 绑定在本机被安全策略拒绝（EPERM），socket 类测试无法运行（平台限制）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/nbdkit-1.48.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/nbdkit-1.48.0.work
+  source_orig_hash: b864ff2062f35796
+  source_work_hash: 7482ca8de00aaadb
+  generated_at: '2026-09-17T20:26:15'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-tmpdir.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

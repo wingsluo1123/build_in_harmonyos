@@ -1,0 +1,41 @@
+--- a/common/utils/utils.c
++++ b/common/utils/utils.c
+@@ -192,13 +192,34 @@
+ {
+   /* NB: Callers assume this path will not need to be quoted, eg.  for
+    * running shell scripts etc.
++   *
++   * Prefer $TMPDIR when set and writable (OHOS /tmp may be a read-only
++   * erofs mount); fall back to /tmp.
+    */
+-  char template[] = "/tmp/nbdkitXXXXXX";
++  const char *envtmp = getenv ("TMPDIR");
++  if (envtmp && *envtmp) {
++    size_t len = strlen (envtmp);
++    char *template;
+ 
+-  if (mkdtemp (template) == NULL)
+-    return NULL;
++    /* strip trailing slashes, keep a single separator */
++    while (len > 1 && envtmp[len-1] == '/')
++      len--;
++    template = malloc (len + sizeof ("/nbdkitXXXXXX"));
++    if (template) {
++      memcpy (template, envtmp, len);
++      strcpy (template + len, "/nbdkitXXXXXX");
++      if (mkdtemp (template) != NULL)
++        return template;
++      free (template);
++    }
++  }
+ 
+-  return strdup (template);
++  {
++    char template[] = "/tmp/nbdkitXXXXXX";
++    if (mkdtemp (template) == NULL)
++      return NULL;
++    return strdup (template);
++  }
+ }
+ 
+ #else /* WIN32 */
