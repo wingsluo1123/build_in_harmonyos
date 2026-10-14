@@ -1,0 +1,26 @@
+# 库级 manifest — jaraco.stream
+software: jaraco.stream
+display: "jaraco.stream streaming utilities"
+description: "jaraco 生态的流式数据处理库：行缓冲（LineBuffer 系列）与 gzip 流解压工具"
+category: python
+homepage: "https://github.com/jaraco/jaraco.stream"
+license: MIT
+build_system: setuptools
+
+ohos_adaptation:
+  key_points:
+    - "纯 Python 包，无 C 扩展，无需编译；适配 = 源码 → site-packages 布局 + PYTHONPATH 暴露"
+    - "运行期依赖 more-itertools（gzip.py 导入期即 from more_itertools.more import peekable），配方 requires more-itertools/11.1.0"
+    - "⚠ more-itertools/11.1.0 的配方未在 package_info() 导出 PYTHONPATH；本包在 package_info() 里补挂其 site-packages，否则消费者 import jaraco.stream.gzip 即 ModuleNotFoundError"
+    - "源码取 PyPI 官方 sdist（files.pythonhosted.org）：哈希不可变、含上游测试、PKG-INFO 已烘焙版本号（上游用 setuptools_scm，GitHub tag 归档缺 git 元数据需另注入版本）"
+    - "上游测试两批（pytest 用例 2 项 + buffer.py 内嵌 doctest 3 项）已在真机实际运行，5/5 通过"
+  common_dependencies:
+    - python3
+    - more-itertools/11.1.0
+
+versions:
+  "3.0.4":
+    status: built
+    build_date: "2026-10-09"
+    conan_ref: "jaraco.stream/3.0.4"
+    note: "纯 Python 适配；交付 buffer/gzip/__init__ 三个模块，上游测试与消费者测试均通过"
