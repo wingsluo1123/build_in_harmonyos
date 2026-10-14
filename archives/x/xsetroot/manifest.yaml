@@ -1,0 +1,32 @@
+software: xsetroot
+display: "X.Org root-window utility"
+description: "X.Org 工具：设置 X 显示根窗口属性（背景、光标、名称）"
+category: x11
+homepage: "https://gitlab.freedesktop.org/xorg/app/xsetroot"
+license: MIT
+build_system: autotools
+package_type: application
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "上游 tarball 自带预生成 configure（Autoconf 2.71），无需 autoconf/xorg-macros 引导"
+    - "X.Org app 类必须用 --host=aarch64-linux-ohos 交叉编译模式：原生 --build == --host 会尝试运行 conftest，OHOS 沙箱无法执行（libxcursor/libxmu 同款）"
+    - "上游 configure 以 umask 077 创建辅助目录，OHOS worker 上导致 make 不可读 → 经构建目录副本改为 umask 022 再执行"
+    - "xbitmaps 未在 OHOS 制品仓发布；xsetroot 仅需其 <X11/bitmaps/gray>（#include，非链接库）→ 配方内置 87 字节 canonical 数据文件 shim + CPPFLAGS -I（与 motif/2.3.8 同一做法，字节与上游逐字节一致）"
+    - "X11 依赖走制品仓 6.4.0 track（libx11/6.4.0 + libxmu/1.3.1.1 + libxcursor/1.2.3 + xorgproto/2025.1）"
+    - "产物是命令行程序 → 软件级 commands.json 必须存在（R38/L0k）"
+    - "上游无测试套件（Makefile.am 无 TESTS/check_PROGRAMS）→ 按 TEST_QUALITY_SPEC「上游无测试」分支，由 test_package 提供覆盖并在 MANIFEST 申报"
+  common_dependencies:
+    - "libx11/6.4.0"
+    - "libxmu/1.3.1.1"
+    - "libxcursor/1.2.3"
+    - "xorgproto/2025.1"
+
+# 版本索引
+versions:
+  "1.1.3":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "xsetroot/1.1.3"
+    upstream_source: "https://www.x.org/releases/individual/app/xsetroot-1.1.3.tar.xz"
