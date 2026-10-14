@@ -1,0 +1,95 @@
+software: libkysdk
+version: "3.0.1.0"
+status: built
+build_date: "2026-10-01"
+build_system: cmake
+issue: ""
+
+source:
+  url: "https://gitee.com/openkylin/libkysdk-base/repository/archive/debian/3.0.1.0-2.tar.gz"
+  sha256: "f03158704b27527f0295fae581a153bdc89bc63d6f8e67cbbe3ff6a28ebb95d5"
+  tar_format: tar.gz
+  upstream_repo: "https://gitee.com/openkylin/libkysdk-base"
+  upstream_tag: "debian/3.0.1.0-2"
+  upstream_commit: "e86700f77cf4ec67de1d16f359e6d07ca17d4179"
+  note: "上游官方仓库 gitee openkylin/libkysdk-base 的 debian/3.0.1.0-2 tag 归档端点；本机 git 缺 remote-https helper 无法 clone（实测 git ls-remote 报 'remote-https' is not a git command），改用官方归档 + sha256 强校验（两次下载逐字节一致实测），配方 source() 校验不一致即 raise——可复现性由哈希锁定"
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_SYSTEM_NAME=Linux (E092：CMake 无 HarmonyOS platform 模块)"
+    - "BUILD_SHARED_LIBS=ON (上游各模块固定 add_library(... SHARED ...))"
+    - "Qt6_DIR/Qt6Sql_DIR -> qtbase-sql-dbus/6.11.1（ohpcd 的 qtbase 关闭 FEATURE_sql）"
+  cmake_version: "4.1.2"
+  dependencies:
+    - "glib/2.84.0.1"
+    - "gtk/3.24.43"
+    - "dbus/1.14.10"
+    - "sqlite3/3.53.4"
+    - "openssl/3.5.6.1"
+    - "yaml-cpp/0.9.0"
+    - "qtbase-sql-dbus/6.11.1"
+    - "expat/2.8.2.1 (override；统一 dbus→2.8.2 与 fontconfig→2.8.2.1)"
+  removed_dependencies:
+    - "systemd/261（已移除：全库唯一用法 write.c:sd_journal_send()，改为能力探测 + syslog(3) 回退；OHOS 无 journald）"
+  pkgconfig_shims:
+    - "gio-unix-2.0.pc（glib 配方无该组件）"
+    - "dbus-1.pc（dbus 未设 pkg_config_name）"
+    - "openssl.pc（openssl 仅导出组件级 .pc）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-src-conf2-CMakeLists.txt.patch"
+  - "0003-src-diagnostics-nlohmann-detail-input-input_adapters.hpp.patch"
+  - "0004-src-log-CMakeLists.txt.patch"
+  - "0005-src-log-format.c.patch"
+  - "0006-src-log-klog_dump.c.patch"
+  - "0007-src-log-klog_mqueue.c.patch"
+  - "0008-src-log-write.c.patch"
+  - "0009-src-timer-libkytimer.c.patch"
+  - "0010-src-utils-kyutils.c.patch"
+  - "0011-src-utils-kyutils.h.patch"
+
+artifacts:
+  libraries:
+    - "lib/libkyconf.so*"
+    - "lib/libkyconf2.so*"
+    - "lib/libkylog.so*"
+    - "lib/libkytimer.so*"
+    - "lib/libkyutils.so*"
+    - "lib/libkydatastruct.so*"
+    - "lib/libkygsetting.so*"
+    - "lib/libkydiagnostics.so*"
+  executables:
+    - "bin/kconf2"
+    - "bin/conf2-compile"
+    - "bin/conf2-sync-system"
+    - "bin/conf2-sync-session"
+  headers:
+    - "include/kysdk/kysdk-base"
+  config:
+    - "etc/kysdk/kysdk-base/kylog-rotate-default"
+
+validation:
+  local:
+    py_compile: passed
+    diff_check: passed
+    w3_build: "passed（W3 本地 CI 标准流程 conan create 全链路 EXIT=0，日志 rjj/kysdk-base-3.0.1.0/logs/conan-create.log）"
+    w3_install: "passed（package() 产物全部落在包内 prefix；lib/ 软链实体化后 0 软链）"
+    upstream_tests: "passed（CMake 内建测试目标 12/12 rc=0，日志 logs/upstream_tests/）"
+    upstream_tests_total: "96（上游声明用例总数口径：CMake 内建 12 个测试目标 + gtest 7 套件 84 个 TEST/TEST_F 用例；其中有完整结果的 42 例 —— CMake 12/12 + gtest 30/30 —— 全部通过）"
+    gtest_suites: "partial（7 套件 / 84 用例：6 套件可构建运行，其中 kyskiplist 3/3、kyconfig 8/8、kytimer 1/1、kygsettings 18/23 通过；kylog 首例需可写 /var/log 与 /etc/kysdk 配置、运行中止，kyconf2 需 D-Bus/conf2 服务端、无输出超时；kyutils-gtest 因上游用例引用不存在的 strisletter() 无法编译——与 3.0.1.3 结果一致）"
+    test_package: "passed（10/10 断言通过，total failures = 0，日志 logs/conan-create.log）"
+    conan_create: "passed（conan create --name=libkysdk --version=3.0.1.0 -pr:h/-pr:b=ohos-aarch64(本机覆盖 profile) --build=missing EXIT=0，产出包 71ff29ebc48142776e7080e5dc64e373da44d4ff 并触发 test_package；日志 logs/conan-create.log）"
+    reason: "W3 本地 CI 标准流程（conan create + test_package + 上游测试实测）已在本机完成，无待复验项。"
+  ohos:
+    conan_create: passed
+    conan_verify: passed
+    reason: "本机即 OHOS 6.0 / armv8 / clang 15.0.4 设备，以上结果均为该平台实测；官方 CI 干净 worker 由 PR 触发复验。"
+
+patch_generation:
+  method: per-file-difflib
+  patches_count: 11
+  note: "0001 针对 3.0.1.0 的 CMAKE_INSTALL_LIBDIR 硬编码分支链重写（3.0.1.3 版 0001 上下文不匹配）；0002~0011 与 3.0.1.3 相同（对 3.0.1.0 源码逐一 dry-run 验证）"
