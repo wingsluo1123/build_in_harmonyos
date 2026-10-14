@@ -1,0 +1,108 @@
+--- a/bus/policy.c
++++ b/bus/policy.c
+@@ -341,35 +341,38 @@
+           list = _dbus_hash_table_lookup_uintptr (policy->rules_by_uid,
+                                                 uid);
+           
+           if (list != NULL)
+             {
+               if (!add_list_to_client (list, client))
+                 goto nomem;
+             }
+         }
+ 
+-      /* Add console rules */
+-      at_console = _dbus_unix_user_is_at_console (uid, error);
+-      
+-      if (at_console)
+-        {
+-          if (!add_list_to_client (&policy->at_console_true_rules, client))
+-            goto nomem;
+-        }
+-      else if (dbus_error_is_set (error) == TRUE)
+-        {
+-          goto failed;
+-        }
+-      else if (!add_list_to_client (&policy->at_console_false_rules, client))
+-        {
+-          goto nomem;
++      /* Console membership is required only by actual console policies. */
++      if (policy->at_console_true_rules != NULL ||
++          policy->at_console_false_rules != NULL)
++        {
++          at_console = _dbus_unix_user_is_at_console (uid, error);
++          if (at_console)
++            {
++              if (!add_list_to_client (&policy->at_console_true_rules, client))
++                goto nomem;
++            }
++          else if (dbus_error_is_set (error))
++            {
++              goto failed;
++            }
++          else if (!add_list_to_client (&policy->at_console_false_rules, client))
++            {
++              goto nomem;
++            }
+         }
+     }
+ 
+   if (!add_list_to_client (&policy->mandatory_rules,
+                            client))
+     goto nomem;
+ 
+   bus_client_policy_optimize (client);
+   
+   return client;
+@@ -436,30 +439,48 @@
+         }
+       else
+         continue;
+ 
+       allowed = rule->allow;
+     }
+   
+   return allowed;
+ }
+ 
++/* Group rules still fail closed if their real membership lookup fails. */
++static dbus_bool_t
++list_requires_unix_groups (DBusList **list)
++{
++  DBusList *link;
++  for (link = _dbus_list_get_first_link (list);
++       link != NULL;
++       link = _dbus_list_get_next_link (list, link))
++    {
++      BusPolicyRule *rule = link->data;
++      if (rule->type == BUS_POLICY_RULE_GROUP)
++        return TRUE;
++    }
++  return FALSE;
++}
++
+ dbus_bool_t
+ bus_policy_allow_unix_user (BusPolicy        *policy,
+                             unsigned long     uid)
+ {
+   dbus_bool_t allowed;
+-  unsigned long *group_ids;
+-  int n_group_ids;
++  unsigned long *group_ids = NULL;
++  int n_group_ids = 0;
+ 
+   /* On OOM or error we always reject the user */
+-  if (!_dbus_unix_groups_from_uid (uid, &group_ids, &n_group_ids, NULL))
++  if ((list_requires_unix_groups (&policy->default_rules) ||
++       list_requires_unix_groups (&policy->mandatory_rules)) &&
++      !_dbus_unix_groups_from_uid (uid, &group_ids, &n_group_ids, NULL))
+     {
+       _dbus_verbose ("Did not get any groups for UID %lu\n",
+                      uid);
+       return FALSE;
+     }
+ 
+   /* Default to "user owning bus" can connect */
+   allowed = _dbus_unix_user_is_process_owner (uid);
+ 
+   allowed = list_allows_user (allowed,

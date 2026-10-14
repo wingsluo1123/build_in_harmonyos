@@ -1,0 +1,28 @@
+--- a/meson.build
++++ b/meson.build
+@@ -696,20 +696,25 @@
+     macro = 'HAVE_' + function.underscorify().to_upper()
+     config.set(
+         macro,
+         cc.has_function(
+             function,
+             args: compile_args_c,
+             dependencies: network_libs,
+         ) ? 1 : false,
+     )
+ endforeach
++
++# Headers and libc symbol probes do not prove that the process may execute
++# the raw syscall fallback. A disabled fast path retains the complete portable
++# descriptor cleanup implementation; other configurations retain upstream auto.
++config.set('DBUS_DISABLE_CLOSE_RANGE', get_option('close_range').disabled())
+ 
+ # keep CMakeLists.txt in sync
+ check_headers = [
+     'afunix.h',
+     'alloca.h',
+     'byteswap.h',
+     'crt_externs.h',
+     'dirent.h',
+     'errno.h',
+     'inttypes.h',

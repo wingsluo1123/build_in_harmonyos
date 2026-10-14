@@ -1,0 +1,213 @@
+--- a/dbus/dbus-userdb.c
++++ b/dbus/dbus-userdb.c
+@@ -24,20 +24,23 @@
+  */
+ #include <config.h>
+ #define DBUS_USERDB_INCLUDES_PRIVATE 1
+ #include "dbus-userdb.h"
+ #include "dbus-hash.h"
+ #include "dbus-test.h"
+ #include "dbus-internals.h"
+ #include "dbus-protocol.h"
+ #include "dbus-credentials.h"
+ #include <string.h>
++#ifdef DBUS_ENABLE_EMBEDDED_TESTS
++#include <stdio.h>
++#endif
+ 
+ /* It isn't obvious from its name, but this file is part of the Unix
+  * system-dependent part of libdbus. Windows has a parallel
+  * implementation of some of it in dbus-sysdeps-win.c. */
+ #if defined(DBUS_WIN) || !defined(DBUS_UNIX)
+ #error "This file only makes sense on Unix OSs"
+ #endif
+ 
+ /**
+  * @addtogroup DBusInternalsUtils
+@@ -259,100 +262,109 @@
+        * hash tables */
+       return info;
+     }
+ }
+ 
+ /* Protected by _DBUS_LOCK_system_users */
+ static dbus_bool_t database_locked = FALSE;
+ static DBusUserDatabase *system_db = NULL;
+ static DBusString process_username;
+ static DBusString process_homedir;
++static dbus_bool_t process_info_initialized = FALSE;
+       
+ static void
+ shutdown_system_db (void *data)
+ {
+   if (system_db != NULL)
+     _dbus_user_database_unref (system_db);
+   system_db = NULL;
++  process_info_initialized = FALSE;
+   _dbus_string_free (&process_username);
+   _dbus_string_free (&process_homedir);
+ }
+ 
+ static dbus_bool_t
+ init_system_db (void)
+ {
+   _dbus_assert (database_locked);
+     
+   if (system_db == NULL)
+     {
+-      DBusError error = DBUS_ERROR_INIT;
+-      const DBusUserInfo *info;
+-      
+       system_db = _dbus_user_database_new ();
+       if (system_db == NULL)
+         return FALSE;
+-
+-      if (!_dbus_user_database_get_uid (system_db,
+-                                        _dbus_getuid (),
+-                                        &info,
+-                                        &error))
+-        {
+-          _dbus_user_database_unref (system_db);
+-          system_db = NULL;
+-          
+-          if (dbus_error_has_name (&error, DBUS_ERROR_NO_MEMORY))
+-            {
+-              dbus_error_free (&error);
+-              return FALSE;
+-            }
+-          else
+-            {
+-              /* This really should not happen. */
+-              _dbus_warn ("Could not get password database information for UID of current process: %s",
+-                          error.message);
+-              dbus_error_free (&error);
+-              return FALSE;
+-            }
+-        }
+ 
+       if (!_dbus_string_init (&process_username))
+         {
+           _dbus_user_database_unref (system_db);
+           system_db = NULL;
+           return FALSE;
+         }
+ 
+       if (!_dbus_string_init (&process_homedir))
+         {
+           _dbus_string_free (&process_username);
+           _dbus_user_database_unref (system_db);
+           system_db = NULL;
+           return FALSE;
+         }
+ 
+-      if (!_dbus_string_append (&process_username,
+-                                info->username) ||
+-          !_dbus_string_append (&process_homedir,
+-                                info->homedir) ||
+-          !_dbus_register_shutdown_func (shutdown_system_db, NULL))
++      if (!_dbus_register_shutdown_func (shutdown_system_db, NULL))
+         {
+           _dbus_string_free (&process_username);
+           _dbus_string_free (&process_homedir);
+           _dbus_user_database_unref (system_db);
+           system_db = NULL;
+           return FALSE;
+         }
+     }
+ 
+   return TRUE;
+ }
+ 
++/* A lookup cache does not require the current caller to have a named
++ * account. Resolve process name/home only for callers requesting them;
++ * missing NSS data still fails without inventing either value. */
++static dbus_bool_t
++init_process_info (void)
++{
++  DBusError error = DBUS_ERROR_INIT;
++  const DBusUserInfo *info;
++
++  if (!init_system_db ())
++    return FALSE;
++  if (process_info_initialized)
++    return TRUE;
++  if (!_dbus_user_database_get_uid (system_db, _dbus_getuid (), &info, &error))
++    {
++#ifdef DBUS_ENABLE_EMBEDDED_TESTS
++      /* Preserve the actual failure before freeing it. The auth-script
++       * caller's generic warning must not disguise NSS as allocation. */
++      fprintf (stderr, "DBUS_USERNAME_UID_LOOKUP_FAILED uid=" DBUS_UID_FORMAT
++               " error=%s message=%s\n", _dbus_getuid (),
++               error.name ? error.name : "(unset)",
++               error.message ? error.message : "(unset)");
++#endif
++      dbus_error_free (&error);
++      return FALSE;
++    }
++  if (!_dbus_string_append (&process_username, info->username) ||
++      !_dbus_string_append (&process_homedir, info->homedir))
++    {
++      _dbus_string_set_length (&process_username, 0);
++      _dbus_string_set_length (&process_homedir, 0);
++      return FALSE;
++    }
++  process_info_initialized = TRUE;
++  return TRUE;
++}
++
+ /**
+  * Locks global system user database.
+  */
+ dbus_bool_t
+ _dbus_user_database_lock_system (void)
+ {
+   if (_DBUS_LOCK (system_users))
+     {
+       database_locked = TRUE;
+       return TRUE;
+@@ -413,21 +425,21 @@
+  *
+  * @param username place to store pointer to username
+  * @returns #FALSE if no memory
+  */
+ dbus_bool_t
+ _dbus_username_from_current_process (const DBusString **username)
+ {
+   if (!_dbus_user_database_lock_system ())
+     return FALSE;
+ 
+-  if (!init_system_db ())
++  if (!init_process_info ())
+     {
+       _dbus_user_database_unlock_system ();
+       return FALSE;
+     }
+   *username = &process_username;
+   _dbus_user_database_unlock_system ();  
+ 
+   return TRUE;
+ }
+ 
+@@ -437,21 +449,21 @@
+  *
+  * @param homedir place to store pointer to homedir
+  * @returns #FALSE if no memory
+  */
+ dbus_bool_t
+ _dbus_homedir_from_current_process (const DBusString  **homedir)
+ {
+   if (!_dbus_user_database_lock_system ())
+     return FALSE;
+ 
+-  if (!init_system_db ())
++  if (!init_process_info ())
+     {
+       _dbus_user_database_unlock_system ();
+       return FALSE;
+     }
+   *homedir = &process_homedir;
+   _dbus_user_database_unlock_system ();
+ 
+   return TRUE;
+ }
+ 

@@ -1,0 +1,106 @@
+--- a/test/fdpass.c
++++ b/test/fdpass.c
+@@ -282,21 +282,27 @@
+ {
+   setup_common (f, "tcp:host=127.0.0.1");
+ }
+ 
+ static void
+ setup (Fixture *f,
+     gconstpointer data G_GNUC_UNUSED)
+ {
+ #ifdef HAVE_UNIX_FD_PASSING
+   /* We assume that anything with fd-passing supports the unix: transport */
+-  setup_common (f, "unix:tmpdir=/tmp");
++  {
++    char *tmp = dbus_address_escape_value (DBUS_TEST_SOCKET_DIR);
++    char *address = g_strdup_printf ("unix:tmpdir=%s", tmp);
++    setup_common (f, address);
++    g_free (address);
++    dbus_free (tmp);
++  }
+ 
+   f->fd_before = open ("/dev/null", O_RDONLY);
+ 
+   /* this should succeed on any reasonable Unix */
+   if (f->fd_before < 0)
+     g_error ("cannot open /dev/null for reading: %s", g_strerror (errno));
+ 
+   _dbus_fd_set_close_on_exec (f->fd_before);
+ #endif
+ }
+@@ -602,50 +608,44 @@
+   /* This is blatant cheating, and the API documentation specifically
+    * tells you not use this function in this way. Never do this
+    * in application code. */
+   if (!dbus_connection_get_socket (f->left_client_conn,
+                                    &left_client_socket.fd))
+     g_error ("'unix:' DBusConnection should have had a socket");
+ 
+   /* Just to be sure that we're at a message boundary. */
+   dbus_connection_flush (f->left_client_conn);
+ 
+-  /* We have too many fds for one sendmsg(), so send the first half
+-   * (rounding down if odd) with the first byte... */
+-  done = _dbus_write_socket_with_unix_fds (left_client_socket, &buffer, 0, 1,
+-        &fds[0], TOO_MANY_FDS / 2);
+-
+-  if (done < 0)
+-    g_error ("could not send first byte and first batch of fds: %s",
+-        g_strerror (errno));
+-
+-  /* ... and the second half (rounding up if odd) with the rest of
+-   * the message */
+-  done = _dbus_write_socket_with_unix_fds (left_client_socket, &buffer, 1,
+-        payload_len - 1, &fds[TOO_MANY_FDS / 2],
+-        TOO_MANY_FDS - (TOO_MANY_FDS / 2));
+-
+-  if (done < 0)
+-    {
+-      g_error ("could not send rest of message and rest of fds: %s",
+-          g_strerror (errno));
+-    }
+-  else if (done < payload_len - 1)
+-    {
+-      /* For simplicity, assume the socket buffer is big enough for the
+-       * whole message, which should be < 2 KiB. If this fails on some
+-       * OS, redo this test code to use a proper loop like the real
+-       * libdbus does. */
+-      g_error ("short write in sendmsg(), fix this test: %d/%d",
+-          done, payload_len - 1);
+-    }
+-
++  /* Test the aggregate malicious stream, not an OS-specific per-sendmsg limit.
++   * Keep all 255 descriptors and the original victim/isolation oracles. */
++  {
++    int offset = 0;
++    int fd_offset = 0;
++
++    while (fd_offset < TOO_MANY_FDS)
++      {
++        int count = MIN (32, TOO_MANY_FDS - fd_offset);
++        int bytes = fd_offset + count == TOO_MANY_FDS ? payload_len - offset : 1;
++
++        g_assert_cmpint (bytes, >, 0);
++        done = _dbus_write_socket_with_unix_fds (left_client_socket,
++            &buffer, offset, bytes, &fds[fd_offset], count);
++        if (done < 0)
++          g_error ("could not send fd batch: %s", g_strerror (errno));
++        if (done != bytes)
++          g_error ("short write in fd batch: %d/%d", done, bytes);
++        offset += done;
++        fd_offset += count;
++      }
++    g_assert_cmpint (offset, ==, payload_len);
++    g_assert_cmpint (fd_offset, ==, TOO_MANY_FDS);
++  }
+   dbus_free (payload);
+ 
+   for (i = 0; i < TOO_MANY_FDS; i++)
+     close (fds[i]);
+ 
+   dbus_message_unref (outgoing);
+ 
+   /* The sender is unceremoniously disconnected. */
+   while (dbus_connection_get_is_connected (f->left_client_conn) ||
+       dbus_connection_get_is_connected (f->left_server_conn))

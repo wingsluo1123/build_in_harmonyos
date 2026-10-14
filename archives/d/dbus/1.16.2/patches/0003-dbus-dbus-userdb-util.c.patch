@@ -1,0 +1,35 @@
+--- a/dbus/dbus-userdb-util.c
++++ b/dbus/dbus-userdb-util.c
+@@ -124,20 +124,32 @@
+  * Gets user ID given username
+  *
+  * @param username the username
+  * @param uid return location for UID
+  * @returns #TRUE if username existed and we got the UID
+  */
+ dbus_bool_t
+ _dbus_get_user_id (const DBusString  *username,
+                    dbus_uid_t        *uid)
+ {
++  unsigned long numeric_uid;
++
++  /* A numeric UID is a policy identity, not a synthesized passwd record.
++   * Named identities and primary groups retain their real NSS lookup. */
++  if (_dbus_is_a_number (username, &numeric_uid) &&
++      numeric_uid != DBUS_UID_UNSET)
++    {
++      _DBUS_STATIC_ASSERT (sizeof (numeric_uid) == sizeof (dbus_uid_t));
++      *uid = numeric_uid;
++      return TRUE;
++    }
++
+   return _dbus_get_user_id_and_primary_group (username, uid, NULL);
+ }
+ 
+ /**
+  * Gets group ID given groupname
+  *
+  * @param groupname the groupname
+  * @param gid return location for GID
+  * @returns #TRUE if group name existed and we got the GID
+  */
