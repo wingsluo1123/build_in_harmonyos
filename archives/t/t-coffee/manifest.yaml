@@ -1,0 +1,22 @@
+software: t-coffee
+display: "T-COFFEE"
+description: "T-COFFEE：基于树一致目标函数（tree-based consistency objective function）的渐进式多序列比对工具，CRG Barcelona（Cedric Notredame），GPL-3.0-or-later"
+category: science
+homepage: "https://www.tcoffee.org"
+license: GPL-3.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 58 个 .c 文件必须按 C++ 编译（其 makefile 写的是 CC=g++）。clang 与 clang++ 都按扩展名把 .c 当 C，按 C 编直接编译失败——io_structures.h:299 用了 struct Alignment 的注入类名（typedef 在其后），aln2prf / seq2msa 各有两份不同签名声明（仅 C++ 重载合法）。配方用 CFLAGS 里的 -x c++ 强制语言"
+    - "-O0 -fsigned-char 与 Debian debian/rules 对同一份源码的取值一致，且本次独立复验为必需：-O1 及以上在 proba_pair 库 SIGSEGV（g++ -O3 在 x86_64 上同样复现，属上游缺陷而非平台问题）；OHOS clang 默认 -fno-signed-char，与上游 x86_64 gcc 的 signed-char 相反，会改变残基运算行为"
+    - "唯一必需的补丁补齐 30 处 non-void 函数落空返回（C++ UB）。clang 降成 llvm unreachable，AArch64 后端降成 brk #1（SIGTRAP），未打补丁的产物在 batch_main 打印参数表阶段调 set_nproc() 即死；gcc 发普通 epilogue 所以上游无感。补后 brk #1 由 31 处降到 1 处（libc++abi 桩，运行期不可达）"
+    - "运行期会在 HOME_4_TCOFFEE / DIR_4_TCOFFEE 下自建 tco/ mcoffee/ methods/ plugins/ 目录（默认 $HOME/.t_coffee），且无参运行与比对过程都会交互式提问；OHOS 上安装目录只读，测试把 HOME_4_TCOFFEE 指到临时目录并断言安装目录零落盘"
+    - "上游发行归档自带一份 x86_64 预编译 bin/linux/t_coffee 作参考实现，配方不打进包内（测试 T5-3 断言 bin/ 只有本次交叉编译产物）；交叉编译产物只依赖 libc.so"
+  common_dependencies: []
+
+versions:
+  "13.45.0.484626413.41.0.28bdc39":
+    status: built
+    build_date: "2026-10-04"
+    conan_ref: "t-coffee/13.45.0.484626413.41.0.28bdc39"

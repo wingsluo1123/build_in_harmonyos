@@ -1,0 +1,26 @@
+Honour LDFLAGS on the t_coffee link line
+
+The 23-line hand-written makefile links with
+
+    $(CC) $^ -o t_coffee -lm
+
+and never expands LDFLAGS, so a recipe has no way to pass link-only flags
+without editing that line.  Inserting $(LDFLAGS) leaves the command otherwise
+byte-identical, and an empty LDFLAGS reproduces upstream exactly.
+
+Needed on OHOS: clang++ links libc++ dynamically by default, which puts
+libc++_shared.so into DT_NEEDED; the package must not depend on a shared C++
+runtime that is not part of the platform (R26), so the recipe passes
+LDFLAGS=-static-libstdc++.
+
+--- a/t_coffee_source/makefile	2026-10-12 08:10:51.054487270 +0800
++++ b/t_coffee_source/makefile	2026-10-12 08:10:51.115828254 +0800
+@@ -5,7 +5,7 @@
+ DEPS := $(OBJECTS:.o=.deps)
+  
+ t_coffee: $(OBJECTS)
+-	@echo " Linking..."; $(CC) $^ -o t_coffee -lm
++	@echo " Linking..."; $(CC) $(LDFLAGS) $^ -o t_coffee -lm
+  
+ %.o: %.c
+ 	@echo " CC $<"; $(CC) $(CFLAGS) -I. -MD -MF $(@:.o=.deps) -c -o $@ $<

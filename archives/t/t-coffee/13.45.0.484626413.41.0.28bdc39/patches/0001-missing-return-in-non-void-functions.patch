@@ -1,0 +1,374 @@
+Fix SIGTRAP traps in 30 non-void T-Coffee functions that fall off the end
+
+clang lowers the C++ undefined behaviour "control reaches end of non-void
+function" to the llvm `unreachable` intrinsic, and the AArch64 backend lowers
+`unreachable` to the `brk #1` instruction.  On OHOS aarch64 the process
+therefore dies with SIGTRAP the first time any of these functions is called
+-- for example set_nproc() in util.c, which batch_main() invokes while still
+printing its parameter dump.  gcc emits an ordinary epilogue in the same
+situation, which is why the x86_64 binaries shipped and built upstream work.
+
+All 30 functions are non-void and every call site discards the result, so
+returning a zero value preserves upstream behaviour exactly while removing
+the trap.  Verified against the OHOS aarch64 sysroot: the `-O0` build drops
+from 31 `brk #1` sites to 1 (the libc++abi `__shim_type_info` stub, which is
+unreachable at run time) and emits CLUSTAL W output byte-identical to a g++
+`-O0 -fsigned-char` x86_64 reference build.
+
+diff -urN a/t_coffee_source/io_lib/io_func.c b/t_coffee_source/io_lib/io_func.c
+--- a/t_coffee_source/io_lib/io_func.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/io_lib/io_func.c	2026-10-04 18:12:07.183857213 +0800
+@@ -2074,6 +2074,10 @@
+       fps=print_ps_line (-1, NULL, fps);
+     }
+   vfclose_ps (fps);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ int aln2compressed_pdf    ( Alignment *A,char *name)
+       {
+diff -urN a/t_coffee_source/io_lib/tree_util.c b/t_coffee_source/io_lib/tree_util.c
+--- a/t_coffee_source/io_lib/tree_util.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/io_lib/tree_util.c	2026-10-04 18:12:09.573446210 +0800
+@@ -1403,6 +1403,10 @@
+   if (free_rt)free_tree (RT);
+   
+   myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+@@ -2385,6 +2389,10 @@
+       stack=stack->bot;
+       free_tree_node (tofree);
+     }
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+   
+ 
+@@ -5789,6 +5797,10 @@
+   for (a=0; a<nseq; a++)
+     fprintf ( stdout, ">%s %d %d\n", S->name[array[a][0]], array[a][1], array[a][2]);
+   myexit (EXIT_SUCCESS);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ NT_node tree2root ( NT_node R)
+@@ -6122,6 +6134,10 @@
+     }
+ 
+   myexit (0);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ int count_tree_groups( Sequence *LIST, char *group_file)
+ {
+@@ -6225,6 +6241,10 @@
+ 	}
+     }
+   myexit (0);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ Split * print_split ( int n, int **list, Sequence *LIST, Sequence *S, char *buf, char *file);
+ 
+@@ -6603,6 +6623,10 @@
+ 
+ 
+   myexit (0);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ int treelist2splits_old ( Sequence *S, Sequence *TS)
+@@ -6687,6 +6711,10 @@
+ 
+ 
+   myexit (0);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ NT_node *treelist2prune_treelist (Sequence *S, Sequence *TS, FILE *out)
+@@ -6760,6 +6788,10 @@
+       free_sequence (temp,-1);
+     }
+   myexit (EXIT_SUCCESS);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ int** treelist2lti2 ( Sequence *S, Sequence *TS, int ngb, FILE *out)
+ {
+@@ -9540,6 +9572,10 @@
+ 	if ((b->l)->r!=b){HERE ("pb4: %s", txt); exit (0);}
+       b=b->r;
+     }
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+   
+ int check_node_integrity (ALN_node n, char *txt)
+diff -urN a/t_coffee_source/t_coffee_lib/t_coffee.c b/t_coffee_source/t_coffee_lib/t_coffee.c
+--- a/t_coffee_source/t_coffee_lib/t_coffee.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/t_coffee_lib/t_coffee.c	2026-10-04 18:12:10.005280795 +0800
+@@ -6257,6 +6257,10 @@
+     {
+       return my_system_cl (argc, argv);
+     }
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ FILE * t_coffee_tip (FILE *fp,char *mode)
+@@ -6685,6 +6689,10 @@
+ 	      myexit(fprintf_error (stderr,"Please specify km_mode (topdown/bottomup/km_fast/updown)!\n"));
+ 	  }
+ 	myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ Alignment* kmir (Alignment *A)
+@@ -6924,6 +6932,10 @@
+ 	  return main_read_aln (aln, NULL);
+ 	}
+     }
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ Alignment *km_align_seq_slow_withTC (Alignment *A, int argc, char **argv, int nit,int round)
+ {
+diff -urN a/t_coffee_source/util_lib/aln_convertion_util.c b/t_coffee_source/util_lib/aln_convertion_util.c
+--- a/t_coffee_source/util_lib/aln_convertion_util.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/aln_convertion_util.c	2026-10-04 18:12:07.125284417 +0800
+@@ -4924,6 +4924,10 @@
+     }
+   fprintf ( stdout, "#average conservation: %.2f", tot);
+   myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+@@ -8263,6 +8267,10 @@
+       fprintf ( stdout, ">%s Alignment Replicate #%d\n",fname, a+1);
+     }
+   myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ FILE *aln2replicate (Alignment *A, FILE *fp)
+ {
+diff -urN a/t_coffee_source/util_lib/reformat.c b/t_coffee_source/util_lib/reformat.c
+--- a/t_coffee_source/util_lib/reformat.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/reformat.c	2026-10-04 18:12:08.153335702 +0800
+@@ -2853,6 +2853,10 @@
+ 			return 4;
+ 		return 3;
+ 	}
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+@@ -7267,6 +7271,10 @@
+     }
+   vfclose (fp);
+   myexit (EXIT_SUCCESS);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ void output_mfasta_aln (char *fname, Alignment *A )
+ {
+@@ -14355,6 +14363,10 @@
+     }
+   fprintf ( fp, "}");
+   vfclose (fp);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ int output_mat (int **mat, char *fname, char *alp, int offset)
+ {
+diff -urN a/t_coffee_source/util_lib/util.c b/t_coffee_source/util_lib/util.c
+--- a/t_coffee_source/util_lib/util.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/util.c	2026-10-04 18:12:09.901456151 +0800
+@@ -1011,6 +1011,10 @@
+       fprintf (stdout,"%10s %6.3f %6.3f\n",table[i][1],list[a][0], list[a][1]);
+     }
+   
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ float* list2rr2_simple (float **list, int n, float **lines, int nl, int np, int nrep, float *rr2, float *stdev)
+@@ -2429,6 +2433,10 @@
+     return csprintf (name, "%s", cwd);
+   else
+     perror("getcwd() error");
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+@@ -4514,6 +4522,10 @@
+       vfree (buf);
+       return r;
+     }
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ int dump_nfc (char *file, char *container)
+ {
+@@ -4523,6 +4535,10 @@
+   else fprintf ( fp, "process.container = '%s'\n", container);
+   vfclose (fp);
+   
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+@@ -5597,6 +5613,10 @@
+ 
+   //set to 0 if to be reset by environement
+   nproc=np;
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ int get_nproc ()
+@@ -7072,6 +7092,10 @@
+   char *file=(char *)vcalloc (((s)?strlen (s):0)+((ext)?strlen (ext):0)+1, sizeof (char));
+   sprintf (file, "%s%s", s, ext);
+   vremove (file);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ char *vremove (char *s)
+ {
+@@ -8496,6 +8520,10 @@
+   else if ( mode==IS_NOT_FATAL)return internet;
+   else proxy_msg(stderr);
+   myexit (EXIT_FAILURE);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ char *pg2path (char *pg)
+ {
+@@ -10503,6 +10531,10 @@
+     km_make_kmeans (data, n, dim,k,t,NULL, mode);
+ 
+   km_output_data (data,n, dim,len,infile,outfile);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ void km_display_data (double **d, int n, int dim)
+diff -urN a/t_coffee_source/util_lib/util_aln_analyze.c b/t_coffee_source/util_lib/util_aln_analyze.c
+--- a/t_coffee_source/util_lib/util_aln_analyze.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/util_aln_analyze.c	2026-10-04 18:12:08.887319715 +0800
+@@ -710,6 +710,10 @@
+ 
+ 
+   myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ float display_prediction (int ***count, Alignment *S, int c, int n)
+ {
+@@ -4477,6 +4481,10 @@
+     }
+ 
+   myexit (EXIT_SUCCESS);
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ 
+ 
+diff -urN a/t_coffee_source/util_lib/util_constraints_list.c b/t_coffee_source/util_lib/util_constraints_list.c
+--- a/t_coffee_source/util_lib/util_constraints_list.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/util_constraints_list.c	2026-10-04 18:12:07.920913460 +0800
+@@ -1309,6 +1309,10 @@
+ {
+ 	free_int (CL->freeze, -1);
+ 	CL->freeze=NULL;
++  return NULL; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ Constraint_list *  freeze_constraint_list (Constraint_list *CL)
+ {
+diff -urN a/t_coffee_source/util_lib/util_make_tree.c b/t_coffee_source/util_lib/util_make_tree.c
+--- a/t_coffee_source/util_lib/util_make_tree.c	2020-10-16 01:52:30.000000000 +0800
++++ b/t_coffee_source/util_lib/util_make_tree.c	2026-10-04 18:12:09.751209021 +0800
+@@ -282,6 +282,10 @@
+   Rredundate (T, S, seq);
+   
+   print_newick_tree (T,tree);
++  return 0; /* non-void function falls off the end here (C++ UB): clang
++               * lowers it to llvm `unreachable`, which the AArch64 backend
++               * turns into `brk #1` (SIGTRAP) instead of a plain epilogue.
++               * Every caller ignores the return value. */
+ }
+ NT_node Rredundate (NT_node T, Sequence* S, char *seq)
+ {

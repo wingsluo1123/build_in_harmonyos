@@ -1,0 +1,41 @@
+# conandata.yml — t-coffee 13.45.0.484626413.41.0.28bdc39
+#
+# 版本号说明（平台任务 #10997 给的串）：
+#   上游发布号是 13.45.0.4846264；Debian 源码包把它记作
+#   13.45.0.4846264+really13.41.0.28bdc39（"really" 表示 Debian 借用了
+#   13.41.0.28bdc39 的打包规则去修 13.45.0）。平台任务池把两段版本直接首尾
+#   相接，去掉了 "+really" 与 "+dfsg-1"，得到
+#   13.45.0.484626413.41.0.28bdc39。本目录/配方/分支名一律用任务池给定的串，
+#   但源码取的是上游官方归档 13.45.0.4846264（两者同一份代码）。
+#
+# 取源口径（R39）：
+#   上游官网 www.tcoffee.org 的 DOWNLOAD 区（index.html#DOWNLOAD）把发行包放在
+#   官方 S3 桶 tcoffee-packages 的 Archives/ 前缀下；下面是该桶的直链，HTTP 200，
+#   非个人 fork / 非第三方镜像 / 非下游重打包（Debian 的 +dfsg orig 包是删掉了
+#   非自由参考库的 repack，故不取）。
+sources:
+  "13.45.0.484626413.41.0.28bdc39":
+    url: "https://s3.eu-central-1.amazonaws.com/tcoffee-packages/Archives/T-COFFEE_distribution_Version_13.45.0.4846264.tar.gz"
+    sha256: "c8e5ba17de11ddf07cf2ed37f077d81c1432d55b77761f115f9374de6f8d0d03"
+    filename: "T-COFFEE_distribution_Version_13.45.0.4846264.tar.gz"
+
+patches:
+  - patch_file: "patches/0001-missing-return-in-non-void-functions.patch"
+    patch_description: >-
+      30 个 non-void 函数走到函数尾不返回值（C++ UB）。clang 把它降成 llvm
+      unreachable，AArch64 后端降成 brk #1（SIGTRAP），产物在 OHOS aarch64 上一
+      调用到就死（例如 batch_main 打印参数表时调的 set_nproc）。gcc 在同一位置
+      只发普通 epilogue，所以上游 x86_64 产物没事。补丁只补一句 return 零值，
+      不改任何算法逻辑；补后 -O0 产物的 brk #1 由 31 处降到 1 处（仅 libc++abi
+      的 __shim_type_info 桩，运行期不可达），且 CLUSTAL W 输出与 g++ -O0
+      -fsigned-char 的 x86_64 参考构建逐字节一致。
+    patch_type: portability
+  - patch_file: "patches/0002-makefile-honour-LDFLAGS.patch"
+    patch_description: >-
+      上游那份 23 行手写 makefile 的链接行是 `$(CC) $^ -o t_coffee -lm`，从不展开
+      LDFLAGS，配方无法只给链接阶段传参。补丁只在链接行插入 `$(LDFLAGS)`
+      （LDFLAGS 为空时与上游逐字节等价）。OHOS 上必须传
+      `LDFLAGS=-static-libstdc++`：clang++ 默认动态链接 libc++，会把
+      libc++_shared.so 写进 DT_NEEDED，而该 shared C++ 运行时不属平台组成部分
+      （R26），静态链接后产物 DT_NEEDED 只剩 libc.so。
+    patch_type: portability
