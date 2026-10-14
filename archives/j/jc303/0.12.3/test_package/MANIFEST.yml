@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (CI 强制要求)
+package: jc303/0.12.3
+homepage: https://github.com/midilab/jc303
+
+# 上游无任何测试套件：v0.12.3 归档全树 grep enable_testing / add_test( /
+# catch2 / gtest / doctest / ctest / unittest 均 0 命中；无 tests/ 目录、
+# 无 CTest；Dockerfile 仅 Debian 构建发布产物的环境描述（无测试步骤）。
+# 按 NO_UPSTREAM_TESTS 处理（discovery.status=EVIDENCE_COMPLETE，证据见
+# conandata.yml 固定归档 + builder 报告 grep 记录）。
+upstream_check_command: "N/A — upstream ships no test suite"
+upstream_test_in_build: false
+
+upstream_tests:
+  - file: "(全树 grep 记录，无测试入口)"
+    source: "jc303-0.12.3/（归档根：CMakeLists.txt Dockerfile LICENSE README.md img src）"
+    description: >
+      上游零测试面：无 enable_testing/add_test/ctest 钩子、无 tests/ 目录、
+      无 catch2/gtest/doctest 依赖声明、无上游 CI 测试 workflow；
+      Dockerfile 仅描述 Debian 11 构建发布产物的环境。
+    command: "N/A"
+
+# test_package 中自带的测试（消费者视角验证；OHOS 特有适配点）
+test_package_tests:
+  - file: clap_probe.c
+    description: >
+      OHOS 特有消费式探针（新增测试用例，非上游用例）：对安装后三格式插件
+      产物（VST3/LV2/CLAP）做 bundle 布局断言（VST3 Contents/<arch> 唯一
+      .so、LV2 唯一 .so + ≥2 .ttl——.ttl 由包内预构建 juce_lv2_helper 在
+      真机构建期生成、CLAP 目录 bundle JC303.clap/JC303.clap 内层二进制）
+      + dlopen/dlsym 符号探针（VST3 GetPluginFactory /
+      LV2 lv2_descriptor / CLAP clap_entry）。覆盖 OHOS 适配点：__OHOS__
+      编译期卫兵、E505 binary-sign-tool selfSign（用户存储 .so 未签名
+      dlopen 即 EACCES）、$ORIGIN 多级 rpath 依赖闭包（freetype/fontconfig/
+      libxml2/alsa 实体化视图，musl 加载器语义）、dlclose 析构路径。
+      共 10 项检查（dlclose 独立计数）；不带 GUI 运行、不做音频设备初始化（无显示/音频后端，
+      E285 同域先例）。
+    command: "ctest --output-on-failure -R jc303_bundle_probe"
+
+# 测试断言总数（test_package 运行时 10 项，dlclose 独立计数 + configure 期 4 组布局卫 +
+# __OHOS__ 编译期卫）
+assertion_count: 10
