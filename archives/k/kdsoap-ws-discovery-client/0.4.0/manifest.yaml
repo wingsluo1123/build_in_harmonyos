@@ -1,0 +1,55 @@
+version: "0.4.0"
+software: kdsoap-ws-discovery-client
+status: built
+build_date: "2026-10-11"
+build_system: cmake
+conan_ref: "kdsoap-ws-discovery-client/0.4.0"
+
+source:
+  url: "https://download.kde.org/Attic/kdsoap-ws-discovery-client/kdsoap-ws-discovery-client-0.4.0.tar.xz"
+  sha256: "2cd247c013e75f410659bac372aff93d22d71c5a54c059e137b9444af8b3427a"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DQT_MAJOR_VERSION=6"
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_QCH=OFF"
+    - "-DCMAKE_SYSTEM_NAME=Linux (native OHOS aarch64 profile)"
+    - "-DCMAKE_SKIP_RPATH=ON"
+  dependencies:
+    - qtbase/6.11.1
+    - kdsoap/2.3.0
+    - extra-cmake-modules/6.29.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-exported-config-include-find-dependency-macro.patch"
+  - "0002-out-of-line-copy-assignment.patch"
+knowledge_gained:
+  - "Use CMAKE_SYSTEM_NAME=Linux while retaining the OHOS aarch64 Conan profile for available CMake platform modules. # knowledge_ref: E092"
+  - "KDE ECM places the build-tree library under build/Release/bin; CTest runtime environment must include build_folder/bin. # knowledge_ref: E545"
+  - "The installed CMake config must include CMakeFindDependencyMacro before find_dependency. # knowledge_ref: E546"
+  - "A public QSharedDataPointer value type with forward-declared data needs copy assignment defined out of line. # knowledge_ref: E547"
+
+upstream_tests:
+  file: "autotests/test_wsdiscoveryclient.cpp"
+  cases: 4
+  ctest_targets_passed: 1
+  ctest_targets_failed: 0
+
+consumer_tests:
+  ctest_targets_passed: 2
+  ctest_targets_failed: 0
+  harmonyos_behavior_test: "IPv4 loopback UDP SOAP ProbeMatches receive and parse"
+
+verification:
+  device: "HarmonyOS PC 6.0 aarch64"
+  compiler: "clang 15.0.4"
+  conan: "2.29.1"
+  local_ci: "W3 pass; see reports/w3-local-ci.log and .ci-result.json"
+  conan_create_log_sha256: "238ec3a0ab429434d1e33462a892ae3fe643d2489e511d38c403a602719c3f01"
+  w3_local_ci_log_sha256: "e79e0d8fe661d162848de78444a25a58c36ce93d5d2541db093efe7c0474e174"

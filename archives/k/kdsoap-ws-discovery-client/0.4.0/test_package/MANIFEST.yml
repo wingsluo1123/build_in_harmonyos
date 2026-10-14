@@ -1,0 +1,26 @@
+package: kdsoap-ws-discovery-client/0.4.0
+homepage: https://invent.kde.org/libraries/kdsoap-ws-discovery-client
+
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure --no-tests=error --timeout 60 -j1"
+upstream_tests:
+  - file: autotests/test_wsdiscoveryclient.cpp
+    cases: 4
+    description: "上游 QtTest 覆盖 Probe/Resolve 发送与 ProbeMatch/ResolveMatch SOAP 响应处理。"
+
+test_package_tests:
+  - file: test_consumer_api.cpp
+    command: "ctest --output-on-failure --no-tests=error"
+    description: "从已安装包查找 KDSoap::WSDiscoveryClient，并验证 WSDiscoveryTargetService 的类型/作用域匹配 API。"
+  - file: test_ohos_loopback_probe.cpp
+    command: "ctest --output-on-failure --no-tests=error"
+    description: "HarmonyOS 真机上经 IPv4 loopback UDP 向 WSDiscoveryClient 发送 SOAP ProbeMatches，验证信号、EndpointReference 和 XAddr 实际解析。"
+
+ohos_specific_tests:
+  files:
+    - test_ohos_loopback_probe.cpp
+  check_count: 1
+  run_command: "ctest --output-on-failure --no-tests=error"
+  behavior: "实际 UDP datagram 到达客户端 socket 后由 KDSoap 解码 SOAP Header/Body 并触发 probeMatchReceived，测试核对解析后的 service endpoint 和 XAddr。"
+
+assertion_count: 9
