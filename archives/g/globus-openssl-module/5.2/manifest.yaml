@@ -1,0 +1,28 @@
+name: globus-openssl-module
+version: "5.2"
+status: in_progress
+source:
+  url: "https://deb.debian.org/debian/pool/main/g/globus-openssl-module/globus-openssl-module_5.2.orig.tar.gz"
+  sha256: "6dfcbe4af7a23d16745946131da938181cee3adfe08504df4bb4ab3160c23467"
+license: Apache-2.0
+build:
+  system: autotools
+  dependencies:
+    - "globus-common/18.15"
+    - "globus-gsi-openssl-error/4.4"
+    - "globus-gsi-proxy-ssl/6.6"
+    - "openssl/3.5.6"
+  patches:
+    - "0001-config.sub-ohos.patch（2013-04-24 版 config.sub 增加 ohos OS 识别，--host=aarch64-unknown-linux-ohos 必需；三 hunk 添加型，同 globus-callout 4.3 / globus-gsi-openssl-error 4.4 先例）"
+tests:
+  upstream: "N/A（官方无上游测试：源码树无 test/ 目录，顶层 SUBDIRS=library，无 TESTS/check_PROGRAMS；discovery 核对见 test_package/MANIFEST.yml）"
+  test_package: "passed on OHOS aarch64（activate→OID/X509V3 扩展方法断言→deactivate→re-activate 循环，12 断言出口）"
+  ohos_aarch64: "package and test_package compiled and linked（本地 conan create 验证通过；权威 CI 待依赖发布后由 Coordinator 补跑）"
+  emulator: "not run（本 run 未覆盖模拟器步骤）"
+notes:
+  - "单 flavor（无 thr/nothr 变体），configure.ac 依赖闭包：globus-common >= 14 + globus-gsi-proxy-ssl >= 4 + globus-gsi-openssl-error >= 2 + openssl >= 1.0（源码 include globus_error_openssl.h 与 proxycertinfo.h，与闭包一致）"
+  - "libtool .la 陷阱按 callout/openssl-error 先例扩展：library/Makefile 中 -lglobus_common / -lglobus_proxy_ssl / -lglobus_openssl_error 三个 globus token 全部替换为对应包内 .so 绝对路径（-lglobus_openssl_error 含 -lglobus_openssl 前缀，按完整 token 逐一替换互不污染；openssl 无 .la，-lssl/-lcrypto 不动）"
+  - "5.2 为最新 GCT v6.2.20260123 发布版所含组件版本；GCT master 的 5.3 尚未发布"
+  - "config.sub 为 2013 系（2013-04-24），补丁为三 hunk 添加型（区别于 globus-gsi-proxy-ssl 6.6 的 2018 系替换对形状）"
+  - "OpenSSL 3.x 已内置 proxyCertInfo 对象（1.3.6.1.5.5.7.1.14，短名 proxyCertInfo + 内置 X509V3 方法）；OLD OID 1.3.6.1.4.1.3536.1.222 无内置对象，其 X509V3 扩展方法断言精确归因本库 activate"
+  - "本工具链 libtool 丢弃 .so 形式 deplibs，GSI 链各库产物均不带兄弟库 DT_NEEDED；消费者按 cpp_info.requires 闭包链接（test_package 同），与既有 GSI 链产物一致"
