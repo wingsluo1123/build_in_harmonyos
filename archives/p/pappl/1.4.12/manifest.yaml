@@ -1,0 +1,74 @@
+software: pappl
+version: "1.4.12"
+status: built
+build_system: autotools
+build_date: "2026-10-08"
+conan_ref: "pappl/1.4.12"
+
+source:
+  url: "https://github.com/michaelrsweet/pappl/releases/download/v1.4.12/pappl-1.4.12.tar.gz"
+  mirror_url: "https://codeload.github.com/michaelrsweet/pappl/tar.gz/refs/tags/v1.4.12"
+  sha256: "1684c4e06446e9f7d93a39729fa0ba56f07a4007560080fdad7d0e2076a3615f"
+  mirror_sha256: "5bc53039312c6867ee3a06b4573bdadc1b0fa042548ce2c23ea7c2cab5cb7f1d"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-tls=openssl"
+    - "--disable-shared"
+    - "--enable-static"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies:
+    - cups/2.4.19
+    - openssl/3.5.6
+    - avahi-compat-libdns_sd/0.9_rc5
+    - libjpeg-turbo/3.2.0
+    - libpng1.6/1.6.58
+    - libusb/1.0.27
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-guard-pthread-cancel-with-feature-macros.patch"
+  - "0002-drop-redundant-pthread-detach-on-detached-threads.patch"
+  - "0003-testsuite-loopback-fallback-for-mdns-hostname.patch"
+
+knowledge_gained:
+  - "E127: compile out unavailable pthread cancellation paths through feature detection (AC_CHECK_FUNCS + config.h.in templates; regenerate configure with the upstream-sanctioned autoconf -f)"
+  - "OHOS musl segfaults when pthread_detach() is called on a thread that was created PTHREAD_CREATE_DETACHED - drop the redundant second detach (glibc returns EINVAL)"
+  - "E011/E129: autoconf's (umask 077 && mktemp -d ./confXXXXXX) scratch breaks config.status on HMDFS setgid directories; sed the generated configure to umask 022 after autoconf -f"
+  - "papplSystemSetHostName(NULL) qualifies bare hostnames with the .local mDNS domain; without an mDNS responder the name is unresolvable and remote-path client tests fail - testsuite falls back to loopback"
+  - "avahi-compat-libdns_sd ships avahi-client/avahi-common under its own pc name; pappl's HAVE_AVAHI path probes the avahi-client pkg-config module, so consumer recipes generate an avahi-client.pc shim"
+  - "conan packages named libpng1.6/libusb answer to the upstream module names libpng16/libusb-1.0; pappl's configure only probes the upstream names, requiring pkg-config name shims"
+  - "configure-time conftest binaries link shared conan dependencies (libexpat.so.1, libpng16.so, libusb-1.0.so); expose every host dependency libdir through LD_LIBRARY_PATH for the whole build or cannot-run-C-programs aborts configuration"
+
+patch_classification:
+  - file: 0001-guard-pthread-cancel-with-feature-macros.patch
+    type: portability
+    platform_only: false
+    guard: "HAVE_PTHREAD_CANCEL / HAVE_PTHREAD_SETCANCELSTATE"
+  - file: 0002-drop-redundant-pthread-detach-on-detached-threads.patch
+    type: portability
+    platform_only: false
+    guard: "threads created PTHREAD_CREATE_DETACHED; musl double-detach segfault"
+  - file: 0003-testsuite-loopback-fallback-for-mdns-hostname.patch
+    type: portability
+    platform_only: false
+    guard: "unresolvable mDNS .local hostname; loopback fallback in testsuite only"
+
+upstream_tests:
+  - program: testsuite/testhttpmon
+    description: "HTTP connection monitor unit test program (part of make test)"
+    command: "make -C testsuite -j1 test"
+  - program: testsuite/testpappl
+    description: "Main unit test driver; upstream make test runs -t api,client,pwg-raster; full sweep adds jpeg, png and client-10x1000 via -t all"
+    command: "make -C testsuite -j1 test"
+  - program: testsuite/testmainloop
+    description: "papplMainloop CLI smoke test"
+    command: "./testsuite/testmainloop --version"
+
+runtime_notes:
+  - "DNS-SD (mDNS/DNS-SD advertising) degrades to logged errors when no avahi/D-Bus daemon is present; registration APIs stay callable"
+  - "USB printer gadget and printer-class device paths compile against the OHOS kernel UAPI headers (linux/usb/functionfs.h, linux/usb/g_printer.h); exercising them requires a USB device controller, which the build host does not have"

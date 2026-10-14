@@ -1,0 +1,37 @@
+package: pappl/1.4.12
+homepage: "https://www.msweet.org/pappl/"
+
+upstream_check_command: "make -C testsuite -j1 test"
+upstream_test_in_build: true
+upstream_test_command: "make -C testsuite -j1 test && ./testsuite/testmainloop --version"
+
+# Upstream test programs (testsuite/Makefile "test" target plus the "-t all"
+# category sweep that adds the jpeg/png image tests and the client-10x1000
+# stress category).
+upstream_tests:
+  - file: testsuite/Makefile
+    source: pappl-1.4.12/testsuite/Makefile
+    description: "Canonical upstream test target: testhttpmon plus testpappl with -t api,client,pwg-raster"
+    command: "make -C testsuite -j1 test"
+  - file: testsuite/testhttpmon.c
+    source: pappl-1.4.12/testsuite/testhttpmon.c
+    description: "HTTP connection monitor unit test program"
+    command: "make -C testsuite -j1 test"
+  - file: testsuite/testpappl.c
+    source: pappl-1.4.12/testsuite/testpappl.c
+    description: "Main unit test driver (testBegin/testEnd assertions across api, client, jpeg, png, pwg-raster and client-10x1000 categories)"
+    command: "make -C testsuite -j1 test"
+  - file: testsuite/testmainloop.c
+    source: pappl-1.4.12/testsuite/testmainloop.c
+    description: "papplMainloop CLI smoke test"
+    command: "./testsuite/testmainloop --version"
+
+test_package_tests:
+  - file: test_pappl.c
+    description: "Fifteen public PAPPL API contract assertions (system accessors, localization, device backends incl. libusb-backed usb:// scheme, IEEE-1284 device ID parsing)"
+    command: "./test_pappl"
+  - file: test_pappl_ohos.sh
+    description: "Fifteen OHOS packaging and backend assertions (headers, static archive symbols for DNS-SD/USB gadget/TLS, pkg-config metadata, web resources)"
+    command: "/system/bin/sh test_pappl_ohos.sh <package_folder>"
+
+assertion_count: 30
