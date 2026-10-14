@@ -1,0 +1,303 @@
+--- a/src/csrfilt/csrfilt.sh
++++ b/src/csrfilt/csrfilt.sh
+@@ -70,21 +70,21 @@
+ #       JGF Added the data purpose field so that the filtering can be contolled 
+ #           based on if the texts are references ot hyps
+ #  Version 1.16 Apr 30, 2009
+ #       JGF Redesigned the code to no upcase everything, instead just the transcript
+ #       JGF Fixed bug with delete hypthens on opt del words
+ #  Version 1.17 Sep 15, 2010
+ #       JGF - Fixed the trn preprocessor to pass through comment lines without filtering
+ 
+ version="1.17"
+ 
+-trap "/bin/rm -f /tmp/hs_filt.*.$$ ; exit 1" 1 2 3 15
++trap "/bin/rm -f ${TMPDIR:-$HOME/tmp}/hs_filt.*.$$ ; exit 1" 1 2 3 15
+ 
+ # Change to the installation directory in order to execute from 
+ # any where other than the installation directory.
+ DeleteHyphens=false
+ UpCase=true;
+ ExtASCII=false;
+ 
+ Usage="Usage: csrfilt.sh [ -dh -s -e ] -i [ stm | ctm | trn | txt | rttm ] global-map-file [ utterance-map-file ] < infile > outfile
+ Version: $version
+ Desc: csrfilt.sh applies a set of text transformation rules contained in
+@@ -278,21 +278,21 @@
+     propUnitTestSub 1 " ( she is ok ) yes no ( she is ok ) yes no "  " ( she ) ( is ) ( ok ) yes no ( she ) ( is ) ( ok ) yes no " 
+     propUnitTestSub 1 " she ( is ok yes ) no she ( is ok yes ) no "  " she ( is ) ( ok ) ( yes ) no she ( is ) ( ok ) ( yes ) no " 
+ 
+ }
+ 
+ 
+  ###################################################################################################
+ #propUnitTest; exit
+ 
+ #########################  HERE document to convert expanded CTMs to alternations  #################
+-cat > /tmp/hs_filt.ctm.$$ << EOF
++cat > ${TMPDIR:-$HOME/tmp}/hs_filt.ctm.$$ << EOF
+   while (<>){
+     if (\$_ =~ /^;;/) {print} 
+     else {
+ 	s/^\s+//;
+ 	s/([{}])/ \1 /g;
+ 	@l = split;
+ 	if (\$#l == 4) {print}
+ 	else {
+ 	    if (\$l[\$#l] =~ /^[0-9\.-]*\$/) {\$limit=\$#l-1;\$conf=\$l[\$#l]} 
+ 	    else {                         \$limit=\$#l;\$conf=""} ; 
+@@ -325,226 +325,226 @@
+   }
+ EOF
+ 
+ 
+ ################################################################################
+ #############   Beginnning of Main Program       ###############################
+ 
+ # capture and clean up the input
+ perl -pe 'if ($_ !~ /^;;/) {
+   	     s/^/ /; s/$/ /; s/[ \t]+/ /g; 
+-           }' > /tmp/hs_filt.orig.$$
++           }' > ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$
+ 
+ #########################################################################
+ ####   Step 1: separate out the text from the other data in the file ####
+ 
+ # automatically modify the global mapping file to only include regions
+ # which apply to the input type.
+ 
+ cat $glob_map | perl -e '
+ 	($type="'$inputtype'") =~ tr/A-Z/a-z/;
+ 	($dataPurpose="'$dataPurpose'") =~ tr/A-Z/a-z/;
+ 	$applies = 1;
+ 	while (<>){
+ 		if ($_ =~ /^;;\s+INPUT_DEPENDENT_APPLICATION\s*=\s*\"([^\"]*)\"/){
+ 			($exp = $1) =~ tr/A-Z/a-z/;
+ 			$applies = 0;
+ 			if ($type =~ /$exp/){ $applies = 1; }
+ 			if ($dataPurpose =~ /$exp/){ $applies = 1; }
+ 		}
+ 		if ($applies == 1){	print;		}
+-	} ' >  /tmp/hs_filt.glm.$$
++	} ' >  ${TMPDIR:-$HOME/tmp}/hs_filt.glm.$$
+ 
+ # perform the filter on the utterance specific rules
+ if test "$inputtype" = "ctm" ; then
+-    cat /tmp/hs_filt.orig.$$ | \
+-	perl -e '$out1 = "'/tmp/hs_filt.outext.$$'";  $out2 = "'/tmp/hs_filt.out.$$'"; 
++    cat ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ | \
++	perl -e '$out1 = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";  $out2 = "'${TMPDIR:-$HOME/tmp}/hs_filt.out.$$'"; 
+ 		 open(IN,"<-") || die("Error: failed to open input stm file");
+ 		 open(OUT1,">$out1") || die("Error: failed to open output \"$out1\" of the stm file");
+ 		 open(OUT2,">$out2") || die("Error: failed to open output \"$out2\" of the stm file");
+ 		 while(<IN>){
+ 			 if ($_ =~ /^;;/) { 
+ 				 print OUT1 $_; 
+ 				 print OUT2 "\n";
+ 			 } else {
+ 				 @a = split(/\s+/, $_);
+ 				 print OUT2 splice(@a,5,1)."\n";
+ 				 print OUT1 join(" ",@a)."\n";
+ 			 }
+ 		 }
+ 		 close IN; close OUT1; close OUT2;'
+ elif test "$inputtype" = "rttm" ; then
+-    cat /tmp/hs_filt.orig.$$ | \
+-	perl -e '$out1 = "'/tmp/hs_filt.outext.$$'";  $out2 = "'/tmp/hs_filt.out.$$'"; 
++    cat ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ | \
++	perl -e '$out1 = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";  $out2 = "'${TMPDIR:-$HOME/tmp}/hs_filt.out.$$'"; 
+ 		 open(IN,"<-") || die("Error: failed to open input stm file");
+ 		 open(OUT1,">$out1") || die("Error: failed to open output \"$out1\" of the stm file");
+ 		 open(OUT2,">$out2") || die("Error: failed to open output \"$out2\" of the stm file");
+ 		 while(<IN>){
+ 			 if ($_ !~ /^ LEXEME.* (lex|fp|un-lex|for-lex|alpha|acronym|interjection|propernoun|other) /) { 
+ 				 print OUT1 $_; 
+ 				 print OUT2 "\n";
+ 			 } else {
+ 				 @a = split(/\s+/, $_);
+ 				 print OUT2 splice(@a,6,1)."\n";
+ 				 print OUT1 join(" ",@a)."\n";
+ 			 }
+ 		 }
+ 		 close IN; close OUT1; close OUT2;'
+ elif test "$inputtype" = "stm" ; then
+-	cat /tmp/hs_filt.orig.$$ | \
+-	perl -e '$out1 = "'/tmp/hs_filt.outext.$$'";  $out2 = "'/tmp/hs_filt.out.$$'"; 
++	cat ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ | \
++	perl -e '$out1 = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";  $out2 = "'${TMPDIR:-$HOME/tmp}/hs_filt.out.$$'"; 
+ 		 open(IN,"<-") || die("Error: failed to open input stm file");
+ 		 open(OUT1,">$out1") || die("Error: failed to open output \"$out1\" of the stm file");
+ 		 open(OUT2,">$out2") || die("Error: failed to open output \"$out2\" of the stm file");
+ 		 while(<IN>){
+ 			 if ($_ =~ /^;;/) { 
+ 				 print OUT1 $_; 
+ 				 print OUT2 "\n";
+ 			 } elsif ($_ =~ /^(\s*\S+\s*\S+\s*\S+\s*\S+\s*\S+\s*<\S+>)(.*)$/){
+ 				 print OUT1 $1."\n";
+ 				 print OUT2 $2."\n";
+ 			 } elsif ($_ =~ /^(\s*\S+\s*\S+\s*\S+\s*\S+\s*\S+)(.*)$/){
+ 				 print OUT1 $1."\n";
+ 				 print OUT2 $2."\n";		
+ 			 } else {
+ 				 die("Error: Parse of stm line failed");
+ 			 }
+ 		 }
+ 		 close IN; close OUT1; close OUT2;'
+ elif test "$inputtype" = "trn" ; then
+-         cat /tmp/hs_filt.orig.$$ | \
+-	 perl -e '$out1 = "'/tmp/hs_filt.outext.$$'";  $out2 = "'/tmp/hs_filt.out.$$'"; 
++         cat ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ | \
++	 perl -e '$out1 = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";  $out2 = "'${TMPDIR:-$HOME/tmp}/hs_filt.out.$$'"; 
+ 		 open(IN,"<-") || die("Error: failed to open input stm file");
+ 		 open(OUT1,">$out1") || die("Error: failed to open output \"$out1\" of the stm file");
+ 		 open(OUT2,">$out2") || die("Error: failed to open output \"$out2\" of the stm file");
+ 		 while(<IN>){
+ 			 if ($_ =~ /^;;/) { 
+ 				 print OUT1 $_; 
+ 				 print OUT2 "\n";
+ 			 } elsif ($_ =~ /^(.*)(\(.*\))\s*$/){
+ 				 print OUT2 $1."\n";
+ 				 print OUT1 $2."\n";
+ 			} else {
+ 				die("Error: Parse of trn line failed");
+ 			}
+ 		}
+ 		close IN; close OUT1; close OUT2; '
+-		# echo "outext "; cat /tmp/hs_filt.outext.$$
+-		# echo "out"; 	cat /tmp/hs_filt.out.$$
++		# echo "outext "; cat ${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$
++		# echo "out"; 	cat ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$
+ elif test "$inputtype" = "txt" ; then
+-	 cat /tmp/hs_filt.orig.$$ | \
+-	 perl -e '$out1 = "'/tmp/hs_filt.outext.$$'";  $out2 = "'/tmp/hs_filt.out.$$'"; 
++	 cat ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ | \
++	 perl -e '$out1 = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";  $out2 = "'${TMPDIR:-$HOME/tmp}/hs_filt.out.$$'"; 
+ 		 open(IN,"<-") || die("Error: failed to open input stm file");
+ 		 open(OUT1,">$out1") || die("Error: failed to open output \"$out1\" of the stm file");
+ 		 open(OUT2,">$out2") || die("Error: failed to open output \"$out2\" of the stm file");
+ 		 while(<IN>){
+ 			 if ($_ =~ /^;;/) { 
+ 				 print OUT1 $_; 
+ 				 print OUT2 "\n";
+ 			 } else {
+ 				 print OUT1 "\n";
+ 				 print OUT2 $_;
+  			 }
+ 		}
+ 		close IN; close OUT1; close OUT2; '
+-		# echo "outext "; cat /tmp/hs_filt.outext.$$
+-		# echo "out"; 	cat /tmp/hs_filt.out.$$
++		# echo "outext "; cat ${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$
++		# echo "out"; 	cat ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$
+ else 
+ 	if test ! "$utt_map" = "" ; then
+-	        ut_rfilt.pl $utt_map /tmp/hs_filt.orig.$$ \
+-			/tmp/hs_filt.out.$$
++	        ut_rfilt.pl $utt_map ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ \
++			${TMPDIR:-$HOME/tmp}/hs_filt.out.$$
+ 	else 
+-		cp /tmp/hs_filt.orig.$$ /tmp/hs_filt.out.$$
++		cp ${TMPDIR:-$HOME/tmp}/hs_filt.orig.$$ ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$
+ 	fi
+ fi
+ 
+ ############################################################################################
+ ####   Step 2: Check the optionally deletable tags.  The code relies on them being valid
+ 
+-ret="`cat /tmp/hs_filt.out.$$ | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | validateOptDelTags`"
++ret="`cat ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$ | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | validateOptDelTags`"
+ if [ $ret = "error" ] ; then
+     echo "Error: Can not filter text with illegally formatted optional deletion tags.  Look for:"
+-    cat /tmp/hs_filt.out.$$ | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | getInvalidOptDelTags
++    cat ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$ | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | getInvalidOptDelTags
+     exit 1
+ fi
+ 
+ 
+ 
+ #########################################################################
+ ####   Step 3: Build the filter command
+ 
+-filt_com="cat /tmp/hs_filt.out.$$ | toUpper | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | rfilter1 /tmp/hs_filt.glm.$$ | deleteHyphens | propogateOptDel | perl -pe 's/^ //; s/ $//' | perl -pe 's/\(\s+/(/g; s/\s+\)/)/g;' | tee /tmp/hs_filt.filtout."$$" "
++filt_com="cat ${TMPDIR:-$HOME/tmp}/hs_filt.out.$$ | toUpper | perl -pe 's/\(/( /g; s/\)/ )/g; s/^/ /; s/$/ /;' | rfilter1 ${TMPDIR:-$HOME/tmp}/hs_filt.glm.$$ | deleteHyphens | propogateOptDel | perl -pe 's/^ //; s/ $//' | perl -pe 's/\(\s+/(/g; s/\s+\)/)/g;' | tee ${TMPDIR:-$HOME/tmp}/hs_filt.filtout."$$" "
+ 
+ #########################################################################################
+ ####   Step 4: execute the filter command putting back together the text and other data
+ 
+ if test "$inputtype" = "ctm" ; then
+ 	eval $filt_com | \
+-	    perl -e '$inext = "'/tmp/hs_filt.outext.$$'";
++	    perl -e '$inext = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";
+ 		open(IN,"<$inext") || die("Error: failed to open input \"$out1\" of the stm file");
+ 		while (! eof(STDIN)){
+ 			$text = <STDIN>;
+ 			chomp($text);
+ 			$ext = <IN>;
+ 			if ($text ne ""){
+ 				@a = split(/\s+/,$ext);
+ 				splice(@a, 5, 0, $text);
+ 				$ext = join(" ",@a)."\n";
+ 			}
+ 			print $ext;
+ 		}
+ 		close IN' | \
+-	    perl /tmp/hs_filt.ctm.$$ | \
++	    perl ${TMPDIR:-$HOME/tmp}/hs_filt.ctm.$$ | \
+ 	    perl -pe 'if ($_ !~ /^;/) {s/^[ \t]+//; s/[ \t]+$//; s/[ \t]+/ /g}'
+ elif test "$inputtype" = "rttm" ; then
+     # the first perl command handles converting alternations and duel words to underscore notation
+ 	eval $filt_com | \
+ 	    perl -pe 'chomp; if ($_ =~ /\s/){s/([\{\}\/\@])/ $1 /g; s/\s+/ /g; s/^\s//; s/\s$//; s/\s/_/g; } $_ .= "\n"' | \
+-	    perl -e '$inext = "'/tmp/hs_filt.outext.$$'";
++	    perl -e '$inext = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";
+ 		open(IN,"<$inext") || die("Error: failed to open input \"$out1\" of the stm file");
+ 		while (! eof(STDIN)){
+ 			$text = <STDIN>;
+ 			chomp($text);
+ 			$ext = <IN>;
+ 			if ($text ne ""){
+ 				@a = split(/\s+/,$ext);
+ 				splice(@a, 6, 0, $text);
+ 				$ext = join(" ",@a)."\n";
+ 			}
+ 			print $ext;
+ 		}
+ 		close IN' | \
+ 	    perl -pe 'if ($_ !~ /^;/) {s/^[ \t]+//; s/[ \t]+$//; s/[ \t]+/ /g}'
+ elif test "$inputtype" = "stm" ; then
+ 	eval $filt_com | \
+-	perl -e '$inext = "'/tmp/hs_filt.outext.$$'";
++	perl -e '$inext = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";
+ 		open(IN,"<$inext") || die("Error: failed to open input \"$out1\" of the stm file");
+ 		while (! eof(STDIN)){
+ 			$text = <STDIN>;
+ 			$ext = <IN>;
+ 			chop($ext);
+ 			print "$ext$text";
+ 		}
+ 		close IN' | \
+ 	perl -pe 'if ($_ !~ /^;/) {s/^[ \t]+//; s/[ \t]+$//; s/[ \t]+/ /g}'
+ elif test "$inputtype" = "trn" ; then
+ 	eval $filt_com | \
+-	perl -e '$inext = "'/tmp/hs_filt.outext.$$'";
++	perl -e '$inext = "'${TMPDIR:-$HOME/tmp}/hs_filt.outext.$$'";
+ 		open(IN,"<$inext") || die("Error: failed to open input \"$out1\" of the trn file");
+ 		while (! eof(STDIN)){
+ 			$text = <STDIN>;
+ 			$ext = <IN>;
+ 			chomp($text);
+ 			print "$text$ext";
+ 		}
+ 		close IN' | \
+ 	perl -pe 'if ($_ !~ /^;/) {s/^[ \t]+//; s/[ \t]+$//; s/[ \t]+/ /g}'
+ else
+ 	eval $filt_com | \
+ 	perl -pe 'if ($_ !~ /^;/) {s/^[ \t]+//; s/[ \t]+$//; s/[ \t]+/ /g}'
+ fi
+ 
+ 
+ # clean up
+-/bin/rm -f /tmp/hs_filt.*.$$
++/bin/rm -f ${TMPDIR:-$HOME/tmp}/hs_filt.*.$$
+ 
+ exit 0
