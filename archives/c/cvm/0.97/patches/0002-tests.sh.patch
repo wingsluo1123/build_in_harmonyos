@@ -1,0 +1,25 @@
+diff --git a/tests.sh b/tests.sh
+index 689b6f1..a4e6cfa 100755
+--- a/tests.sh
++++ b/tests.sh
+@@ -2,2 +2,2 @@
+-src=`pwd`
+-tmp=$src/tests-tmp
++src=${CVM_TEST_SOURCE:-`pwd`}
++tmp=${CVM_TEST_TMPDIR:-$src/tests-tmp}
+@@ -6 +6 @@ mkdir -p $tmp
+-PATH="$src:/bin:/usr/bin:/usr/local/bin"
++PATH="${CVM_TEST_TOOLS_PATH:+$CVM_TEST_TOOLS_PATH:}$src:/bin:/usr/bin:/usr/local/bin"
+@@ -9,2 +9,2 @@ tests_count=0
+-_UID=`id -u`
+-_GID=`id -g`
++_UID=${CVM_TEST_UID:-`id -u`}
++_GID=${CVM_TEST_GID:-`id -g`}
+@@ -89,2 +89,2 @@ mkdir $tmp/users
+-  uid=`id -u`
+-  gid=`id -g`
++  uid=$_UID
++  gid=$_GID
+@@ -649 +649 @@ runtest() {
+-cdbget virt <$home/passwd.cdb | xxd
++cdbget virt <$home/passwd.cdb | xxd | sed -E 's/^[0-9a-f]([0-9a-f]{7}:)/\1/'
