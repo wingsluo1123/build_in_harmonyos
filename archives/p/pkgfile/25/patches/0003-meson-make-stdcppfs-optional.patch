@@ -1,0 +1,18 @@
+diff --git a/meson.build b/meson.build
+index 5fdcff6..7380d5a 100644
+--- a/meson.build
++++ b/meson.build
+@@ -33,7 +33,12 @@ libarchive = dependency('libarchive', version: '>= 3.2.0')
+ libcurl = dependency('libcurl')
+ libsystemd = dependency('libsystemd', required: get_option('daemon'))
+ pthreads = dependency('threads')
+-stdcppfs = cpp.find_library('stdc++fs')
++stdcppfs = cpp.find_library('stdc++fs', required: false)
++if not stdcppfs.found()
++    # libc++ (OHOS) ships std::filesystem inside libc++ itself: there is no
++    # separate libstdc++fs to link, and find_library() defaults to required.
++    stdcppfs = declare_dependency()
++endif
+ gtest = dependency('gtest', required: false)
+ gmock = dependency('gmock', required: false)
+ 

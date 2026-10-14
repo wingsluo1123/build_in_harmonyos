@@ -1,0 +1,35 @@
+diff --git a/src/db.cc b/src/db.cc
+index a51381b..5065b7f 100644
+--- a/src/db.cc
++++ b/src/db.cc
+@@ -84,7 +84,10 @@ std::unique_ptr<Database> Database::Open(std::string_view dbpath,
+       continue;
+     }
+ 
+-    repos.emplace_back(pathname.stem().stem().string(), pathname);
++    // OHOS (clang 15): C++20 parenthesized aggregate initialization (P0960)
++    // is not implemented, so emplace_back(args...) cannot build an aggregate
++    // Entry. Use explicit brace initialization instead (same values).
++    repos.push_back(Entry{pathname.stem().stem().string(), pathname.string()});
+   }
+ 
+   if (ec.value() != 0) {
+diff --git a/src/db.hh b/src/db.hh
+index bafb815..10b79df 100644
+--- a/src/db.hh
++++ b/src/db.hh
+@@ -45,7 +45,13 @@ class Database {
+     std::string reponame;
+     std::string filename;
+ 
+-    auto operator<=>(const Entry&) const = default;
++    // OHOS (clang 15 + libc++ 15): std::string has no operator<=>, so the
++    // defaulted three-way comparison is implicitly deleted and std::sort()
++    // cannot be instantiated. Spell out the same lexicographic ordering.
++    bool operator<(const Entry& other) const {
++      return reponame < other.reponame ||
++             (reponame == other.reponame && filename < other.filename);
++    }
+   };
+ 
+   using RepoChunks = std::span<const Entry>;
