@@ -1,0 +1,17 @@
+--- a/src/gbm/backends/dri/meson.build
++++ b/src/gbm/backends/dri/meson.build
+@@ -8,6 +8,14 @@
+   incs_gbm_dri += inc_wayland_drm
+ endif
+ 
++# r38 (24.3.4.1.1.1): with_platform_x11 makes HAVE_X11_PLATFORM, so
++# loader_dri_helper.h pulls in xcb/xcb.h, xcb/dri3.h, xcb/present.h;
++# gbm_dri.c (via loader_dri_helper.h) therefore needs the xcb include
++# dir to reach libdri-style targets. Add dep_xcb here as well.
++if with_platform_x11
++  deps_gbm_dri += dep_xcb
++endif
++
+ libgbm_dri = shared_library(
+   'dri_gbm',
+   files('gbm_dri.c', 'gbm_driint.h'),
