@@ -1,0 +1,26 @@
+# 软件级 manifest — levee
+# 文件位置: archives/l/levee/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0（人读索引 + 交叉校验，CI 不依赖）
+
+software: levee
+display: "levee"
+description: "David L Parsons 编写的小型 vi 克隆编辑器，支持可视模式与 exec 模式"
+category: editor
+homepage: "https://github.com/Orc/levee"
+license: LicenseRef-levee
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "构建系统是 configure.sh + configure.inc（shell 版 autoconf 模拟器），会在构建机上执行自己编译的 config.sed/mkversio；CC 驱动为 '<cc> -static-pie'，x86 runner 经 qemu 与设备原生都能执行（草稿 E588）"
+    - "终端层走 Conan ncurses/6.6 静态 libncursesw 的 termcap 接口；levee 自定义的 LINES/COLS/UP/refresh/scroll/overwrite 与 curses 同名，用宏改名避免 duplicate symbol（草稿 E587）"
+    - "撤销溢出、大块 yank、! 过滤的临时文件由写死 /tmp 改为跟随 $TMPDIR（HarmonyOS PC /tmp 只读）"
+    - "补 --version/--help 以通过 L2 冒烟（E503 先例）"
+  common_dependencies:
+    - ncurses
+
+versions:
+  "4.0":
+    status: built
+    build_date: "2026-09-27"
+    conan_ref: "levee/4.0"

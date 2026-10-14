@@ -1,0 +1,74 @@
+/*
+ * levee test_package: consumer program TEMPLATE.
+ *
+ * test.sh never compiles this file as shipped.  It copies it, edits the copy
+ * with the packaged levee (scripted keystrokes, $TMPDIR = a private writable
+ * directory), compiles the edited copy with the OHOS compiler of the Conan
+ * profile and runs it.  Every check in main() only passes if levee performed
+ * the corresponding edit:
+ *
+ *   1. the stamp placeholder is replaced by an ex substitute over 1,$
+ *   2. the four fruit lines are sorted by the "!" filter (4!!sort): levee
+ *      writes them to a scratch file under $TMPDIR, runs sort on it through
+ *      /bin/sh and reads the output back
+ *   3. the 128 ROW() lines are read with ":r rows.inc", yanked with 128yy
+ *      (6 KiB, more than levee's 4 KiB in-core yank buffer, so the yank spills
+ *      to a file under $TMPDIR) and put back once with p: 256 rows
+ *
+ * On HarmonyOS PC /tmp is read-only; without patch 0003 (os_mktemp() follows
+ * $TMPDIR) steps 2 and 3 cannot create their temporary files.
+ */
+#include <stdio.h>
+#include <string.h>
+
+#define ROW(n) (n)
+
+static const char stamp[] = "@STAMP@";
+
+static const char *const fruit[] = {
+/* @FRUIT@ */
+    "pear",
+    "banana",
+    "fig",
+    "apple",
+};
+
+static const int rows[] = {
+/* @ROWS@ */
+    0   /* sentinel, not counted */
+};
+
+int
+main(void)
+{
+    const int nfruit = (int)(sizeof fruit / sizeof fruit[0]);
+    const int nrows = (int)(sizeof rows / sizeof rows[0]) - 1;
+    long sum = 0;
+    int i;
+
+    if (strcmp(stamp, "edited by levee 4.0") != 0) {
+        printf("consumer: stamp was not substituted: \"%s\"\n", stamp);
+        return 1;
+    }
+    for (i = 1; i < nfruit; i++) {
+        if (strcmp(fruit[i - 1], fruit[i]) >= 0) {
+            printf("consumer: fruit table not sorted at %d (%s, %s)\n",
+                   i, fruit[i - 1], fruit[i]);
+            return 2;
+        }
+    }
+    if (nrows != 256) {
+        printf("consumer: expected 256 rows after the yank/put, got %d\n", nrows);
+        return 3;
+    }
+    for (i = 0; i < nrows; i++) {
+        if (rows[i] != i % 128 + 1) {
+            printf("consumer: row %d is %d, expected %d\n", i, rows[i], i % 128 + 1);
+            return 4;
+        }
+        sum += rows[i];
+    }
+    printf("consumer ok: stamp=\"%s\" fruit=%s,%s,%s,%s rows=%d sum=%ld\n",
+           stamp, fruit[0], fruit[1], fruit[2], fruit[3], nrows, sum);
+    return 0;
+}
