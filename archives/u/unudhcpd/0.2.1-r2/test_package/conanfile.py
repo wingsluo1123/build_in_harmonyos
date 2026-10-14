@@ -1,34 +1,24 @@
 #!/usr/bin/env python3
-"""Conan test_package template — Conan L1 official test.
+"""test_package — 消费者视角验证已安装的 unudhcpd 二进制（层2）
 
-This is the L1 test in the five-level test system.
-CI runs this automatically via `conan create` (which invokes test_package).
-
-File location: archives/{letter}/unudhcpd/{version}/test_package/conanfile.py
+unudhcpd 的产物是可执行文件，消费者验证方式 = 以真实用户的方式调用它：
+执行 test.sh，断言 -v / 无参数 / 服务启动路径三条可观测行为。
 """
 import os
 
 from conan import ConanFile
-from conan.tools.cmake import CMake, cmake_layout
 
 
 class UnudhcpdTestConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    settings = "os", "arch", "compiler", "build_type"
+    generators = "VirtualRunEnv"
+    test_type = "explicit"
 
     def requirements(self):
         self.requires(self.tested_reference_str)
 
-    def layout(self):
-        cmake_layout(self)
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
     def test(self):
-        cmake = CMake(self)
-        cmake.test()
-        # Alternatively, run the binary directly:
-        # self.run(f"{os.path.join(self.cpp.build.bindirs[0], 'test_unudhcpd')}", env="conanrun")
+        # OHOS: /bin/sh 为 Toybox shell，执行 ELF 二进制受限；
+        # 与 2048.c / account-utils 同先例，用 bash 包裹执行。
+        bash = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
+        self.run(f"{bash} test.sh", env="conanrun")

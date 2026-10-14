@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 数据来源：本机 OHOS aarch64 真机实测（2026-10-12）。
+#   - 构建系统: meson（meson.build / tests/meson.build）
+#   - 测试注册: tests/meson.build 用 test() 注册 3 个用例，
+#     经 `meson test -C _b --list` 实测列出：
+#       unudhcpd:Test mac_to_str
+#       unudhcpd:Test dhcp_is_invalid_request
+#       unudhcpd:Test dhcp_get_request_type
+#   - 实测结果: 3/3 OK（Fail: 0）
+#   - tests/get_request_type_options_fuzzer.c 未用 test() 注册，不计入用例数
+
+package: unudhcpd/0.2.1-r2
+homepage: "https://gitlab.postmarketos.org/postMarketOS/unudhcpd"
+
+# 上游测试入口（Meson 工程；无 autotools 的 make check）
+upstream_check_command: "meson test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "meson test"
+
+# 上游实际运行的测试程序（3 个 meson 注册用例，合计 24 条断言）
+upstream_tests:
+  - file: tests/test_mac_to_str.c
+    source: unudhcpd-0.2.1/tests/test_mac_to_str.c
+    description: "mac_to_str()：48 位 MAC 转 xx:xx:xx:xx:xx:xx 字符串（3 条用例）"
+    command: "meson test 'Test mac_to_str'"
+  - file: tests/test_dhcp_is_invalid_request.c
+    source: unudhcpd-0.2.1/tests/test_dhcp_is_invalid_request.c
+    description: "dhcp_is_invalid_request()：硬件类型/op/magic cookie/报文长度校验（15 条用例）"
+    command: "meson test 'Test dhcp_is_invalid_request'"
+  - file: tests/test_dhcp_get_request_type.c
+    source: unudhcpd-0.2.1/tests/test_dhcp_get_request_type.c
+    description: "dhcp_get_request_type()：DHCP option 遍历与 DISCOVER/REQUEST 识别（6 条用例）"
+    command: "meson test 'Test dhcp_get_request_type'"
+
+# test_package 中自带的测试（消费者视角验证，调用已安装二进制）
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 执行已安装 unudhcpd：-v 版本输出、无参数 usage、-i/-s/-c/-p 启动路径"
+    command: "bash test.sh"
+
+# 上游测试断言（用例）总数：3 + 15 + 6
+assertion_count: 24
