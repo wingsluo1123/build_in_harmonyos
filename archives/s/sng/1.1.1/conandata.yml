@@ -1,0 +1,18 @@
+# conandata.yml — sng 1.1.1
+# 源码: sng 官方 SourceForge 项目的发布文件（与 Debian *.orig.tar.xz、catb.org 上的文件字节完全一致，
+#       三处 sha256 均为 c9bdfb80…ece61e；sha256 为下载后 sha256sum 实测值）。
+#       不使用 Debian 重打包源；gitlab.com/esr/sng 对非浏览器客户端返回 403，catb.org 仅 http 且证书不可用。
+sources:
+  "1.1.1":
+    url:
+      - "https://downloads.sourceforge.net/project/sng/sng-1.1.1.tar.xz"
+    sha256: "c9bdfb80f5a17db1aab9337baed64a8ebea5c0ddf82915c6887b8cfb87ece61e"
+
+# 持久补丁：仅改上游回归脚本 sng_regress（不安装、不影响 sng 本体）
+#   - /tmp 只读（E002）→ 改用 $TMPDIR
+#   - OHOS 的 toybox diff 不支持 -c → 改 POSIX diff -u
+patches:
+  "1.1.1":
+    - patch_file: "patches/0001-sng_regress.patch"
+      patch_description: "sng_regress: honour TMPDIR (/tmp read-only on OHOS) and use POSIX diff -u (toybox diff lacks -c)"
+      patch_type: "portability"

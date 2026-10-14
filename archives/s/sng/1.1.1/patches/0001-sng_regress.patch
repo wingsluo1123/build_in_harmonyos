@@ -1,0 +1,80 @@
+--- a/sng_regress
++++ b/sng_regress
+@@ -9,63 +9,65 @@
+ #
+ viewer=display
+ 
+ check() {
+     if [ "$?" != 0 ]
+     then  
+         echo "$1 failed";
+     fi
+ }
+ 
+-trap 'rm -f /tmp/*$$.[ps]ng' EXIT HUP INT QUIT TERM
++# Honour TMPDIR: /tmp is read-only on OpenHarmony PC.
++tmp=${TMPDIR:-/tmp}
++trap 'rm -f "$tmp"/*$$.[ps]ng' EXIT HUP INT QUIT TERM
+ 
+ SNG=./sng
+ eyeball_test=0
+ # shellcheck disable=SC2068
+ for file in $@
+ do
+     case $file in
+     -e)			# Test that decompilation/compilation gives same image
+ 	eyeball_test=1
+     ;;
+     *.png)
+ 	if [ "$eyeball_test" = "1" ]
+ 	then
+ 	    echo "${file}"
+-	    $SNG <"${file}" | $SNG >/tmp/recompiled$$.png && "${viewer}" "$file" /tmp/recompiled$$.png
++	    $SNG <"${file}" | $SNG >"$tmp"/recompiled$$.png && "${viewer}" "$file" "$tmp"/recompiled$$.png
+ 	else
+ 	    # echo "Regression-testing against PNG file \`$file'"
+-	    $SNG <"${file}" >/tmp/decompiled$$.sng
++	    $SNG <"${file}" >"$tmp"/decompiled$$.sng
+ 	    check "$file: decompilation of the test PNG"
+-	    $SNG </tmp/decompiled$$.sng >/tmp/decompiled$$.png
++	    $SNG <"$tmp"/decompiled$$.sng >"$tmp"/decompiled$$.png
+ 	    check "$file: recompilation of the decompiled form"
+-	    $SNG </tmp/decompiled$$.png >/tmp/canonicalized$$.sng
++	    $SNG <"$tmp"/decompiled$$.png >"$tmp"/canonicalized$$.sng
+ 	    check "$file: generation of the canonicalized form"
+-	    $SNG </tmp/canonicalized$$.sng >/tmp/canonicalized$$.png
++	    $SNG <"$tmp"/canonicalized$$.sng >"$tmp"/canonicalized$$.png
+ 	    check "$file: recompilation of the canonicalized form"
+-	    cmp -s /tmp/decompiled$$.png /tmp/canonicalized$$.png
++	    cmp -s "$tmp"/decompiled$$.png "$tmp"/canonicalized$$.png
+ 	    check "$file: decompiled and canonicalized version comparison"
+ 	fi
+     ;;
+     *.sng)
+         # echo "Regression-testing against SNG file \`$file'"
+         # Make a canonicalized version of the test file
+         # Regenerate canonicalized version from its PNG
+         # Diff the two.
+-        $SNG <"${file}" >/tmp/test$$.png
++        $SNG <"${file}" >"$tmp"/test$$.png
+         check "$file: compilation of the test SNG"
+-        $SNG </tmp/test$$.png >/tmp/canonicalized$$.sng
++        $SNG <"$tmp"/test$$.png >"$tmp"/canonicalized$$.sng
+         check "$file: generation of the canonicalized form"
+-        $SNG </tmp/canonicalized$$.sng >/tmp/canonicalized$$.png
++        $SNG <"$tmp"/canonicalized$$.sng >"$tmp"/canonicalized$$.png
+         check "$file: recompilation of the canonicalized form"
+-        $SNG </tmp/canonicalized$$.png >/tmp/decompiled$$.sng
++        $SNG <"$tmp"/canonicalized$$.png >"$tmp"/decompiled$$.sng
+         check "$file: decompilation of the canonicalized form"
+-        diff -c /tmp/canonicalized$$.sng /tmp/decompiled$$.sng
++        diff -u "$tmp"/canonicalized$$.sng "$tmp"/decompiled$$.sng
+         check "$file: decompiled and canonicalized versions comparison"
+     ;;
+     *)
+         echo "Non-PNG, non-SNG file \`$file' ignored"
+     ;;
+     esac
+ done
+ 
+ # sng_regress ends here

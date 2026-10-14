@@ -1,0 +1,24 @@
+software: sng
+display: "sng"
+description: "PNG 与可编辑文本（SNG 语言）互转的命令行工具：sng < x.png 反编译，sng < x.sng 编译回 PNG"
+category: gfx
+homepage: "https://gitlab.com/esr/sng"
+license: BSD-2-Clause
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "手写 GNU Makefile（无 configure），只构建 sng 目标；默认 all 还会调 asciidoctor 生成文档，构建机没有，改装包内预渲染的 sng.1"
+    - "Makefile 写死 LDFLAGS=-lpng 会丢掉 Conan 依赖的 -L：把 AutotoolsToolchain/AutotoolsDeps 生成的 LDFLAGS 放到 make 命令行；不用 make -e，因为 -e 会让 Makefile 自己的 CPPFLAGS += -DRGBTXT=... 全部失效（实测 use of undeclared identifier 'RGBTXT'）"
+    - "RGBTXT 是编译期写死的 X11 颜色表路径，缺文件时 sng 直接 fatal：依赖已发布的 rgb/1.1.1，把其 share/X11/rgb.txt 复制进本包并让 RGBTXT 指向包内副本；build() 中的上游回归先于 package() 运行，所以 build() 也要先放一份"
+    - "上游回归 sng_regress 硬编码 /tmp（OHOS 只读）和 diff -c（toybox diff 无 -c）：补丁改为 ${TMPDIR:-/tmp} 与 diff -u；脚本失败只 echo 且退出码恒为 0，配方捕获 stdout 断言为空（知识草稿 E700）"
+    - "OHOS 内核拒绝未签名 ELF：build() 之后立即对 sng 自签，让上游回归与最终包里是同一个已签名二进制"
+  common_dependencies:
+    - "libpng/1.6.58.3"
+    - "rgb/1.1.1"
+
+versions:
+  "1.1.1":
+    status: built
+    build_date: "2026-10-07"
+    source_url: "https://downloads.sourceforge.net/project/sng/sng-1.1.1.tar.xz"
