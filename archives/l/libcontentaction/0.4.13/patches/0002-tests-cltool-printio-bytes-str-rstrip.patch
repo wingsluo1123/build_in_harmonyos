@@ -1,0 +1,17 @@
+--- a/tests/cltool.py
++++ b/tests/cltool.py
+@@ -197,6 +197,14 @@
+         print('-' * 72)
+         with self.iolock:
+             for ts, fno, line in self.io:
++                # OHOS/Python3 portability: the io log stores raw bytes (see
++                # _last_output(), which does l.decode('utf-8')), so stripping
++                # with a *str* argument raises
++                #   TypeError: a bytes-like object is required, not 'str'
++                # on the failure path, masking the real assertion error.
++                # Normalize to str first, then strip.
++                if isinstance(line, (bytes, bytearray)):
++                    line = line.decode('utf-8', 'replace')
+                 line = line.rstrip("\r\n")
+                 t = "%s.%03d" % (time.strftime("%H:%M:%S", time.localtime(ts)),
+                                  math.modf(ts)[0] * 1000)

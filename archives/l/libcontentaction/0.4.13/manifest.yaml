@@ -1,0 +1,74 @@
+software: libcontentaction
+# 版本级 manifest
+# 文件位置: archives/l/libcontentaction/0.4.13/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.4.13"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-29"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游官方 tag 归档（sailfishos/libcontentaction）
+  url: "https://github.com/sailfishos/libcontentaction/archive/refs/tags/0.4.13.tar.gz"
+
+  # 源码校验和（官方归档实测，62592 字节）
+  sha256: "24d25797a8b9ee681ff5431f5cd3036887b824f07b531a204a2fdacc6d9e7a65"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 上游为 qmake6 工程；本配方提供等价 CMake 移植（同一批上游源文件与测试源文件）
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DLCA_BUILD_TESTS=ON"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "qtbase/6.11.1.1"
+    - "glib/2.84.0.2"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-test-highlight-respect-contentaction-actions-env.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "上游依赖 mlite（MDesktopEntry/MDConfItem/MRemoteAction），制品仓无该库且一库一 PR 不允许捎带引入，采用配方内兼容层 port/mlite-compat/ 实现上游实际调用的 API 子集并保持语义等价"
+  - "qtbase 的 Conan 包以 cmake_find_mode=none 发布，消费者需手工把 qtbase 包目录注入 CMAKE_PREFIX_PATH 才能 find_package(Qt6)"
+  - "上游测试入口是 tests/lca-cita-test.in 生成的环境包装（PATH/XDG_DATA_HOME/XDG_DATA_DIRS/CONTENTACTION_ACTIONS），用例通过 PATH 查找 lca-tool；目标二进制经 run-guest.sh（qemu-user + OHOS musl 运行根 / aarch64 原生直跑）执行后，14 个上游用例均可按原样驱动"
+  - "test-highlight.sh 与 gen-regexps test 的上游语义是验证部署区配置（/usr/share/contentaction 下仅 highlight1.xml），而 lca-cita-test 环境指向测试数据区（含 hl-examples.xml 会覆盖同名正则），两者须分开落点"
+  - "上游夹具 gallery.py/uberprogram.py 是 python-dbus 服务，触发型夹具 Exec=python3 -c 写 /tmp/<marker>；执行环境缺 python3-dbus/可写 /tmp 时用例按 SKIP(77) 记录而非伪通过"

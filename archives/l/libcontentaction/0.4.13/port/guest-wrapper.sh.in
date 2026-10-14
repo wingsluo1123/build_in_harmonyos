@@ -1,0 +1,23 @@
+#!/bin/sh
+# 测试床 bin/ 下的目标二进制包装：上游 lca-cita-test 通过 PATH 查找 lca-tool 等
+# 目标二进制，包装负责经 run-guest.sh（原生直跑 / qemu+OHOS 运行根）执行。
+#
+# 路径全部由本脚本自身位置推导，避免把配置期的绝对构建目录写死
+# （CI worker 上 conan 的构建目录与配置期不同，写死会导致找不到库/二进制）：
+#   <build>/testbed/bin/<t>  ->  run-guest.sh 在 <build>/，目标在 <build>/bin/
+_self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)     # <build>/testbed/bin
+_testbed=$(CDPATH= cd -- "$_self_dir/.." && pwd)           # <build>/testbed
+_build=$(CDPATH= cd -- "$_testbed/.." && pwd)              # <build>
+
+_run_guest="$_build/run-guest.sh"
+_target="$_build/bin/@LCA_WRAP_GUEST_NAME@"
+
+if [ ! -x "$_run_guest" ]; then
+    echo "guest-wrapper: run-guest.sh not found at $_run_guest" >&2
+    exit 127
+fi
+if [ ! -x "$_target" ]; then
+    echo "guest-wrapper: target binary not found at $_target" >&2
+    exit 127
+fi
+exec "$_run_guest" "$_target" "$@"

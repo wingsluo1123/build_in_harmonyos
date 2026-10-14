@@ -1,0 +1,64 @@
+# libcontentaction 0.4.13 — 本地 qemu 消费者两阶段实测输出（当前 HEAD）
+# 生成时间: 2026-10-04 23:56:59   HEAD: e78583a10abd084ea3361032a08743f4498e0b11
+# profile : ohos-aarch64-run（含 mime 库，故阶段 1 为 26 项）
+# 原始日志: /root/ohpc/scratch/local-validate-libcontentaction-0.4.13.log
+#
+# 本文件用它替换原先的过期真机日志；真机日志待设备可用后另行重跑覆盖。
+
+================ 阶段 1（主流程）================
+be able to find it until you set them. The
+directories currently searched are:
+
+- /root/.local/share
+- /usr/local/share/
+- /usr/share/
+
+
+libcontentaction/0.4.13 (test package): RUN: "/root/ohpc/sdk/qemu/usr/bin/qemu-aarch64-static" "./test_lca_consumer" "/root/ohpc/scratch/local-validate/libcontentaction-0.4.13/test_package/build/clang-15-armv8-17-release/lca-consumer-work" "/root/ohpc/scratch/local-validate/libcontentaction-0.4.13/test_package/build/clang-15-armv8-17-release/mime-fixture-db"
+ok  : write consumer-viewer.desktop
+ok  : write consumer-mailer.desktop
+ok  : write mimeinfo.cache
+ok  : write consumer highlight rules
+ok  : write note.txt
+ok  : ContentInfo::forMime(text/plain).isValid()
+ok  : ContentInfo::forMime().mimeType() == text/plain
+INFO: typeDescription(text/plain) = 'Plain text document'
+ok  : ContentInfo::forMime(text/plain).typeDescription() via mime DB
+ok  : ContentInfo::forFile(note.txt).mimeType() == text/plain
+ok  : defaultActionForFile(note.txt) is valid
+ok  : defaultActionForFile(note.txt).name() == consumer-viewer
+ok  : Action::icon() from Desktop Entry
+ok  : actionsForFile(note.txt) non-empty
+ok  : setMimeDefault -> defaultActionForMime roundtrip == consumer-mailer
+ok  : mimeapps.list is readable after resetMimeDefault (no silent pass)
+ok  : resetMimeDefault removes the mapping from mimeapps.list
+ok  : defaultActionForScheme(mailto:) == consumer-mailer
+INFO: findHighlights spans=1
+INFO:   span 0: start=8 len=21
+ok  : findHighlights() finds exactly one email span
+ok  : findHighlights() span covers the e-mail address
+ok  : findNextHighlight() returns the same span
+ok  : highlight() yields Match with applicable actions
+ok  : highlight() match maps to consumer-mailer action
+ok  : trigger action resolved before trigger()
+<jemalloc>: MADV_DONTNEED does not work (memset will be used instead)
+<jemalloc>: (This is the expected behaviour if you are running under QEMU)
+ok  : trigger() executed the Desktop Entry Exec (marker file created)
+ok  : trigger marker file is readable
+ok  : trigger marker carries the expected payload
+RESULT: 26 checks, 0 failures
+
+================ 阶段 2（新进程 check-default）================
+ok  : trigger action resolved before trigger()
+<jemalloc>: MADV_DONTNEED does not work (memset will be used instead)
+<jemalloc>: (This is the expected behaviour if you are running under QEMU)
+ok  : trigger() executed the Desktop Entry Exec (marker file created)
+ok  : trigger marker file is readable
+ok  : trigger marker carries the expected payload
+RESULT: 26 checks, 0 failures
+
+libcontentaction/0.4.13 (test package): RUN: "/root/ohpc/sdk/qemu/usr/bin/qemu-aarch64-static" "./test_lca_consumer" "/root/ohpc/scratch/local-validate/libcontentaction-0.4.13/test_package/build/clang-15-armv8-17-release/lca-consumer-work" "/root/ohpc/scratch/local-validate/libcontentaction-0.4.13/test_package/build/clang-15-armv8-17-release/mime-fixture-db" check-default
+ok  : fresh process: defaultActionForMime(text/plain) has no user default
+ok  : fresh process: defaultActionForFile falls back to mimeinfo.cache
+ok  : fresh process: defaultActionForScheme(mailto:) == consumer-mailer
+RESULT: 3 checks, 0 failures

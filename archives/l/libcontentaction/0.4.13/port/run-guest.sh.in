@@ -1,0 +1,53 @@
+#!/bin/sh
+# run-guest.sh.in —— 目标（OHOS aarch64）二进制执行器
+#
+# 由 CMake 配置生成 build/run-guest.sh：
+#   * aarch64 原生环境（HarmonyOS PC / OHOS 设备）：直接执行；
+#   * x86_64 交叉环境：经 qemu-user（OHOS_QEMU / qemu-aarch64-static）+ OHOS
+#     musl 运行根（OHOS_RUNROOT）执行。
+#
+# 用法: run-guest.sh <guest-binary> [args...]
+#
+# 依赖库搜索路径：
+#   * 本构建树的 lib/ —— 由脚本自身位置推导（`../lib`），因此构建目录被整体
+#     搬迁/重定位后仍然有效（CI worker 上 conan 的构建目录与配置期不同）；
+#   * Conan 依赖包目录 —— 由 CMake 在配置期写入（依赖包在构建机上是稳定的）。
+REAL="${1:-}"
+if [ -z "$REAL" ]; then
+    echo "usage: run-guest.sh <guest-binary> [args...]" >&2
+    exit 2
+fi
+shift
+
+_self_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+_own_lib="$_self_dir/lib"
+
+GUEST_LIB_DIRS="@LCA_GUEST_LIB_DIRS@"
+if [ -d "$_own_lib" ]; then
+    GUEST_LIB_DIRS="${_own_lib}${GUEST_LIB_DIRS:+:$GUEST_LIB_DIRS}"
+fi
+export LD_LIBRARY_PATH="${GUEST_LIB_DIRS}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+if [ "$(uname -m)" = "aarch64" ]; then
+    exec "$REAL" "$@"
+fi
+
+EMU="${LCA_EMULATOR:-}"
+if [ -z "$EMU" ]; then
+    if [ -n "${OHOS_QEMU:-}" ]; then
+        EMU="$OHOS_QEMU"
+    elif command -v qemu-aarch64-static >/dev/null 2>&1; then
+        EMU="qemu-aarch64-static"
+    fi
+fi
+if [ -z "$EMU" ]; then
+    echo "run-guest.sh: no emulator found (set LCA_EMULATOR or OHOS_QEMU)" >&2
+    exit 127
+fi
+
+# 不把 PREFIX 拼成字符串再由 shell 词分割：OHOS_RUNROOT 含空格时会被拆开，
+# 导致 exec ENOENT（用例由 SKIP 退化为硬 FAIL）。改为显式条件 + 引号传参。
+if [ -n "${OHOS_RUNROOT:-}" ]; then
+    exec "$EMU" -L "$OHOS_RUNROOT" "$REAL" "$@"
+fi
+exec "$EMU" "$REAL" "$@"
