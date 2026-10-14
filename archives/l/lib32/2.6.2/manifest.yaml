@@ -1,0 +1,84 @@
+# lib32 2.6.2 版本级 manifest
+# 遵循 ARCHIVE-SPEC v2.0
+#
+# 【名号与上游不一致 — 必须显式记录】
+# 包名/版本 "lib32/2.6.2" 沿用任务命名（不可更改），实际上游为 GNU libtool 2.6.2
+# （2026-07-16 稳定发布，libltdl 2.6.2 运行库）。本包只打包 libltdl 库 + 头文件，
+# 不含 libtoolize/libtool 工具（工具型见 archives/l/libtool/2.5.4.1 历史归档）。
+# 先例：archives/l/lib32-gcc/16.1.1（任务名与上游版本/源不对齐时的处理范式）。
+# 裁定：用户已确认（2026-10-06），见 notes.md §0。
+
+version: "2.6.2"
+
+software: lib32
+task_library: "lib32@2.6.2"
+conan_ref: "lib32/2.6.2"
+upstream_identity: "GNU libtool 2.6.2 (libltdl 2.6.2 runtime library); task name 'lib32' is NOT an upstream project name"
+upstream_project: "https://www.gnu.org/software/libtool/"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-06"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（GNU 官方发布归档，R39 合法；稳定版发布于 2026-07-16）
+  url: "https://ftp.gnu.org/gnu/libtool/libtool-2.6.2.tar.xz"
+
+  # 源码校验和（本地 sha256sum 实测；mirrorservice.org 与
+  # mirrors.tuna.tsinghua.edu.cn 两个独立镜像逐字节交叉验证一致）
+  sha256: "2ef1067c16c97db930fd740cc9bc3d3ba9a583804ae5ac42cc3e8719e49e191e"
+
+  # 压缩格式
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: autotools
+
+  # 配置选项列表（显式三元组跳 config.guess 对 HarmonyOS 的探测，
+  # 与历史 libtool 2.5.4.1 / libltdl 2.6.0 同法；--disable-shared 由配方按 R26 注入）
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+
+  # 编译依赖列表（无外部 conan 依赖，dlopen 由系统 libc 提供）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 无补丁：发布 tarball 自带 configure，无需自举；R8 无平台宏改动。
+# 适配修复（E011 umask、三元组、MAKEINFO）全部在 conanfile.py 构建阶段完成
+# （与 libltdl/2.6.0 完全同法）。
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libtool 2.6.2 为 2026-07-16 稳定发布（ftp.gnu.org 官方源），自带 configure 无需 autoreconf；源码树结构与 2.6.0 alpha 同构（libltdl/ 子目录、tests/ 自带生成好的 testsuite）"
+  - "本包 = GNU libtool 2.6.2 源码树中的 libltdl 运行库（lib + 头文件）；包名 lib32 为任务命名，与上游不一致，参照 lib32-gcc/16.1.1 先例在 manifest/conandata/notes 显式标注"
+  - "2.6.2 上游 testsuite 共 187 个测试组（2.6.0 为 185），组 187 cmdline_wrap 为低 max_cmd_len 内层重跑包装"
+  - "2.6.2 configure 仍含 config.status 的 `umask 077` 临时目录（E011 HMDFS 不可写），构建期放宽为 umask 002"
+  - "libtool-next-version.in 的 uname -s OS 白名单硬限制在 2.6.2 仍在（HarmonyOS 落 *) 分支报 unknown OS）"
+  - "R26 系统同名库：默认 shared=False 静态打包，避免同名动态库污染系统路径"
+  - "设备/CI 无 texinfo：make install 需带 MAKEINFO=true 跳过 doc/libtool.info"
+  - "无外部 conan 依赖：libltdl 的 dlopen 由系统 libc 提供，libltdl.la dependency_libs 为空"
