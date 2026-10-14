@@ -1,0 +1,75 @@
+--- a/unixcall.c
++++ b/unixcall.c
+@@ -234,35 +234,42 @@
+ 
+ int
+ os_mktemp(char *dest, int size, const char *template)
+ {
+ #if USING_MKTEMP
+     static char Xes[] = ".XXXXXX";
+ #define SZuniq sizeof(Xes)			/* uniqueifier is mktemp */
+ #else
+ #define SZuniq 10				/* uniqueifier is getpid() */
+ #endif
+-    static char tmp[] = "/tmp/";
+-
+-    /* assert |dest| > |/tmp/|+|template|+|XXXXXX| */
+-    unless (size > sizeof(tmp) + SZuniq + strlen(template)) {
++    /* honor $TMPDIR: /tmp is not writable everywhere (read-only on
++     * HarmonyOS PC), fall back to /tmp when it is unset or empty.
++     */
++    const char *tmp = getenv("TMPDIR");
++
++    if ( tmp == 0 || *tmp == 0 )
++	tmp = "/tmp";
++
++    /* assert |dest| > |tmpdir/|+|template|+|XXXXXX| */
++    unless (size > strlen(tmp) + 2 + SZuniq + strlen(template)) {
+ 	errno = E2BIG;
+ 	return 0;
+     }
+ 
+ #if USING_MKTEMP
+-    sprintf(dest, "%s%s%s", tmp, template, Xes);
++    sprintf(dest, "%s/%s%s", tmp, template, Xes);
+     strcpy(dest, template);
+ 
+     return mktemp(dest) != 0;
+ #else
+     strcpy(dest, tmp);
++    strcat(dest, "/");
+     strcat(dest, template);
+     strcat(dest, ntoa(getpid()));
+ 
+     return 1;
+ #endif
+ }
+ 
+ 
+ /*
+  * implement the glob() command (with GLOB_NOSORT always set)
+@@ -297,22 +304,22 @@
+ 	    unless (result->gl_flags & GLOB_NOCHECK)
+ 		return GLOB_NOMATCH;
+ 	}
+ 	else
+ 	    result->gl_flags &= ~GLOB_MAGCHAR;
+     }
+ 
+ 
+     if ( count >= result->gl_pathalloc ) {
+ 	result->gl_pathalloc += 50;
+-	logit("os_glob: expanding gl_pathv (old pathv=%p, count=%d, pathc=%d)",
+-		    result->gl_pathv, count, result->gl_pathc);
++	logit(("os_glob: expanding gl_pathv (old pathv=%p, count=%d, pathc=%d)",
++		    result->gl_pathv, count, result->gl_pathc));
+ 	if ( result->gl_pathv )
+ 	    newlist = realloc(result->gl_pathv,
+ 			      result->gl_pathalloc * sizeof result->gl_pathv[0]);
+ 	else
+ 	    newlist = calloc(result->gl_pathalloc, sizeof result->gl_pathv[0]);
+ 
+ 	unless (newlist)
+ 	    return GLOB_NOSPACE;
+ 
+ 	result->gl_pathv = newlist;

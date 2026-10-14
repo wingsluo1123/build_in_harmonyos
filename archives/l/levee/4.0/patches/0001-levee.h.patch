@@ -1,0 +1,37 @@
+--- a/levee.h
++++ b/levee.h
+@@ -28,20 +28,34 @@
+  *			Jim Bolland,
+  *			John Plocher,
+  *			John Tainter
+  */
+ #ifndef LEVEE_D
+ 
+ #define LEVEE_D
+ 
+ #include "config.h"
+ #include <stdio.h>
++
++/* levee's own globals share names with curses/terminfo symbols.  With a
++ * shared curses library the executable's definitions silently interpose;
++ * with a static curses library (termcap entry points pulling in the rest
++ * of libncursesw.a) the link fails on duplicate symbols.  Keep levee's
++ * names private.  <termcap.h> is included after this header, so its
++ * "extern char *UP" follows the rename and stays consistent.
++ */
++#define LINES		levee_LINES
++#define COLS		levee_COLS
++#define UP		levee_UP
++#define refresh		levee_refresh
++#define scroll		levee_scroll
++#define overwrite	levee_overwrite
+ 
+ 
+ #if LOGGING
+ extern void logger(char *, ...);
+ #define logit(x) logger x
+ #else
+ #define logit(x) 1
+ #endif
+ 
+ #ifndef TRUE

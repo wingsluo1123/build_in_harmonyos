@@ -1,0 +1,67 @@
+# 版本级 manifest — levee 4.0
+# 文件位置: archives/l/levee/4.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0（交叉校验元数据，CI 只读 conanfile.py/conandata.yml/test_package/patches/）
+
+version: "4.0"
+software: "levee"
+status: built
+build_date: "2026-09-27"
+build_system: "makefile"
+conan_ref: "levee/4.0"
+
+# ============================================================
+# 源码信息（与 conandata.yml 同源）
+# ============================================================
+
+source:
+  url: "https://github.com/Orc/levee/archive/refs/tags/v4.0.tar.gz"
+  sha256: "3a625efa3d852008eb821f52b30667e16101ca36099711ff513767ceeb527f79"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置（与 conanfile.py 同源）
+# ============================================================
+
+build:
+  # configure.sh + configure.inc（作者自写的 shell 版 autoconf 模拟器）生成 Makefile
+  system: makefile
+  configure_options:
+    - "--partial-install"
+  dependencies:
+    - ncurses/6.6
+  cc: "clang -static-pie"
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-levee.h.patch"
+  - "0002-main.c.patch"
+  - "0003-unixcall.c.patch"
+
+patch_classification:
+  - file: 0001-levee.h.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0002-main.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0003-unixcall.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "termcap 时代程序自定义 LINES/COLS/UP/refresh 等 curses 同名全局，链接 R26 静态 libncursesw.a 报 duplicate symbol；在中心头文件用宏改名（草稿 E587）"
+  - "Orc configure.sh/configure.inc 在构建机执行 config.sed/mkversio，x86 runner 上动态 OHOS 产物无法执行导致 Makefile 残留 @CC@；CC 驱动为 '<cc> -static-pie'（草稿 E588）"
+  - "本仓 ncurses/6.6 在 uid 0 下忽略 TERMINFO，root runner 的 test_package 经 unshare 用户命名空间 + root 自有 terminfo 副本运行（草稿 E590）"
+  - "运行期临时文件写死 /tmp 且无视 TMPDIR：HarmonyOS PC /tmp 只读，补丁让 os_mktemp() 跟随 $TMPDIR（E002 同族，openvi 7.9.33 先例）"
+  - "CLI 无 --version/--help 时 conan-verify L2 冒烟失败，补 GNU 长选项（E503 先例）"
