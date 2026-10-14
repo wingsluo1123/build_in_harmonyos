@@ -1,0 +1,59 @@
+software: ufiformat
+version: "0.9.9"
+status: built
+build_date: "2026-10-13"
+build_system: autotools
+
+source:
+  url: "https://github.com/tedigh/ufiformat/archive/refs/tags/v0.9.9.tar.gz"
+  sha256: "e2f795bee9c0015d68d15ee1fc454c8dda6abac8465a84b34d7345f4b1313709"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "CPPFLAGS=-I<e2fsprogs>/include"
+    - "LDFLAGS=-L<e2fsprogs>/lib"
+    - "LIBS=-lext2fs -lcom_err -luuid"
+    - "dynamic link, no -static (zerofree precedent; -static broke configure sanity link Error 77)"
+  dependencies:
+    - e2fsprogs/1.47.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ufi_detect-c-scsi-headers-fallback.patch"
+  - "0002-ufi_command-c-sg-headers-fallback.patch"
+  - "0003-ufi_format-c-limits-h.patch"
+
+knowledge_gained:
+  - "2011-era configure 无 AC_CANONICAL_BUILD/HOST，不做 triplet 规范化，无需 --build/--host 与 config.sub 改造（原生构建，R1 合规）"
+  - "OHOS sysroot 自带 scsi/sg.h 与 scsi/scsi.h（lakai/libpktriggercord/ddrutility 先例），补丁仅做 __has_include 探测 + 常量回退，两侧均可编译"
+  - "e2fsprogs 默认静态发布，libext2fs.a 需 -lcom_err -luuid 闭合（zerofree/1.1.1 同因）；同一 LIBS 让 configure 期 AC_CHECK_LIB 探针通过"
+  - "终端工具动态链接（zerofree/1.1.1 先例；曾用 -static 全静态导致 configure 首次 sanity 链接即 Error 77，已移除），libext2fs 仍为静态，产物 bin/ufiformat 需 OHOS 自签名否则 HongMeng 内核 SIGKILL"
+
+patch_generation:
+  method: manual
+  patches_count: 3
+
+patch_classification:
+  - file: "0001-ufi_detect-c-scsi-headers-fallback.patch"
+    type: portability
+    platform_only: false
+    guard: "none"
+  - file: "0002-ufi_command-c-sg-headers-fallback.patch"
+    type: portability
+    platform_only: false
+    guard: "none"
+  - file: "0003-ufi_format-c-limits-h.patch"
+    type: portability
+    platform_only: false
+    guard: "none"
+
+test_results:
+  type: "none"
+  total: 0
+  passed: 0
+  failed: 0
+knowledge_ref:
+  - "E007 (config.guess/sub OHOS: evaluated, not needed — no canonicalization in this configure)"

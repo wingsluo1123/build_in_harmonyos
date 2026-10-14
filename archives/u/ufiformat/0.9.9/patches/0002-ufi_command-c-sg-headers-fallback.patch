@@ -1,0 +1,64 @@
+--- a/ufi_command.c
++++ b/ufi_command.c
+@@ -29,8 +29,59 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/ioctl.h>
+-#include <scsi/scsi.h>
+-#include <scsi/sg.h>
++#if defined(__has_include)
++#  if __has_include(<scsi/scsi.h>)
++#    include <scsi/scsi.h>
++#  endif
++#  if __has_include(<scsi/sg.h>)
++#    include <scsi/sg.h>
++#  endif
++#else
++#  include <scsi/scsi.h>
++#  include <scsi/sg.h>
++#endif
++/* Portable fallbacks for libcs without glibc SCSI headers (e.g. musl).
++   The sg_io_hdr layout and ioctl numbers are the stable Linux SG v3 ABI;
++   everything is skipped when a system header already defined it. */
++#ifndef GOOD
++#define GOOD 0x00
++#endif
++#ifndef CHECK_CONDITION
++#define CHECK_CONDITION 0x02
++#endif
++#ifndef SG_IO
++#define SG_DXFER_TO_DEV (-2)
++#define SG_DXFER_FROM_DEV (-3)
++#define SG_IO 0x2285
++#define SG_SCSI_RESET 0x2284
++typedef struct sg_io_hdr {
++    int interface_id;
++    int dxfer_direction;
++    unsigned char cmd_len;
++    unsigned char mx_sb_len;
++    unsigned short iovec_count;
++    unsigned int dxfer_len;
++    void *dxferp;
++    unsigned char *cmdp;
++    unsigned char *sbp;
++    unsigned int timeout;
++    unsigned int flags;
++    int pack_id;
++    void *usr_ptr;
++    unsigned char status;
++    unsigned char masked_status;
++    unsigned char msg_status;
++    unsigned char sb_len_wr;
++    unsigned short host_status;
++    unsigned short driver_status;
++    int resid;
++    unsigned int duration;
++    unsigned int info;
++} sg_io_hdr_t;
++#endif
++#ifndef SG_SCSI_RESET_BUS
++#define SG_SCSI_RESET_BUS 2
++#endif
+ #include <errno.h>
+ #include "ufi_command.h"
+ 
