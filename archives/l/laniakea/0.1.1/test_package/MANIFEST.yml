@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml
+# test_package consumer-side test declaration
+# CI script (build_and_test.sh L0e) requires this file
+
+package: laniakea/0.1.1
+homepage: "https://laniakea-hq.readthedocs.io/"
+
+# Upstream test command（如实申报：meson 注册 pytest -x，见 tests/meson.build）
+upstream_check_command: "pytest -x（meson test('pytest', python, args: ['-m','pytest','-x'], suite: integration, timeout: 6720)，需 podman PostgreSQL 容器 + apt_pkg C 绑定 + flatpak/bwrap/lintian/dose 工具链"
+
+# Upstream test suite（双口径：7 文件 39 用例；主编实测 24/39，逐例实证见
+# .scratch/laniakea-subtask/upstream-tests/main-agent-empirical.md 与 notes.md R51 第三步）
+upstream_tests_total: 39
+upstream_tests_passed: 24
+upstream_tests_skipped_reason: "上游 39 例主编全部实测（可运行环境 + 最小 apt_pkg 桩，不改测试逻辑）：24 通过（61.5%）/ 3 失败（test_parse_changes 与 test_reporeader_local 为环境 GPG 无 status 输出行为差异，test_flatpak_init_repo 为 OHOS 无 flatpak 工具链）/ 12 环境阻塞（conftest postgresql_container fixture 依赖 podman + postgres:16 容器，OHOS 无）。未修改任何上游测试（patches_applied=[]）；OHOS 不可运行能力的等价断言已由 test_package 消费者测试在 CI conan create 阶段实跑覆盖（47 断言全绿）。"
+
+# Upstream tests run inside conan build
+upstream_test_in_build: false
+upstream_test_in_build_reason: "纯 Python 无编译包，build() 仅 compileall 语法检查（不跑 Meson：meson.build 强依赖 systemd/apt-ftparchive/bubblewrap，OHOS 无）；上游 pytest 套件依赖 Debian/Postgres 基础设施不可在 OHOS 构建内运行；test_package 对已安装制品做实质执行验证（R34）"
+
+# test_package consumer-side tests（R34 实质执行；assertion_count 47 与
+# test_laniakea.py 内 assert 语句逐条对应）
+test_package_tests:
+  - file: test_laniakea.py
+    description: "包布局断言：site-packages/laniakea+keytool.py+admincli、share/laniakea、licenses/COPYING、bin/ 5 启动器存在"
+  - file: test_laniakea.py
+    description: "import laniakea（完整导入链：db/sqlalchemy/marshmallow + apt_pkg 桩）+ __version__ == 0.1.1"
+  - file: test_laniakea.py
+    description: "LocalConfig 显式配置加载（Workspace/database_url）+ 缺 Workspace 故障路径"
+  - file: test_laniakea.py
+    description: "laniakea.utils：base64 urlsafe 编解码 / is_remote_url / listify"
+  - file: test_laniakea.py
+    description: "deb822 Changes.add_file（python-debian）：md5/sha1/sha256 + size 记账"
+  - file: test_laniakea.py
+    description: "msgstream.signedjson：sign_json/signature_ids（mock 签名键，纯 Python）"
+  - file: test_laniakea.py
+    description: "lk-keytool --version 实跑（pyzmq + laniakea 导入链）stdout == 0.1.1"
+  - file: test_laniakea.py
+    description: "lk-admin --version 实跑（click/rich + 全子命令注册链 + 配置发现）stdout == 0.1.1"
+  - file: test_laniakea.py
+    description: "lk-archive --version 实跑（pebble + apt_pkg/gi 桩）stdout == 0.1.1"
+  - file: test_laniakea.py
+    description: "rubicon --version 实跑（firehose + msgstream 链）stdout == 0.1.1"
+  - file: test_laniakea.py
+    description: "synchrotron --version 实跑（pebble + syncengine 链）stdout == 0.1.1"
+  - file: test_laniakea.py
+    description: "数据文件断言：archive-sections.json 解析 + words/ 4 词表 + lintian.toml/3rd-party.toml + base-config.toml 双份生成（share 与 lib/python3.12/data）"
+
+test_package_test_count: 12
+assertion_count: 47
