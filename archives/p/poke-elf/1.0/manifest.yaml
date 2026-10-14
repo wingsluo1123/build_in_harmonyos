@@ -1,0 +1,39 @@
+version: "1.0"
+software: "poke-elf"
+status: built
+build_date: "2026-10-13"
+build_system: autotools
+
+source:
+  url: "https://ftp.gnu.org/gnu/poke/poke-elf-1.0.tar.gz"
+  sha256: "0ab767dafc435454cc98b245fe45aa2178c7c85d7b16308a23434a7d60847a74"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+  dependencies:
+    - poke/5.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure-umask-022.patch"
+
+knowledge_gained:
+  - "E011/HMDFS: configure uses `(umask 077 && mktemp -d ./confXXXXXX)`; relax to 022 (poke precedent)"
+  - "makeinfo missing on OHOS: pin prebuilt poke-elf.info timestamps + MAKEINFO=true (poke precedent)"
+  - "Upstream tests need poke>=4.0 with pktest.pk: requires poke/5.0 and PATH injection for configure and make check"
+
+patch_generation:
+  method: manual-curated
+  note: >
+    Clean tarball inspection shows two umask 077 sites in configure;
+    patch verified by string match against the shipped configure.
+patch_classification:
+  - file: 0001-configure-umask-022.patch
+    type: manual
+    platform_only: true
+    guard: none
+    covers: [configure]
