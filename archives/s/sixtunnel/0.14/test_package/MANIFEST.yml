@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml — sixtunnel (6tunnel) 0.14
+# 上游官方测试声明 + 消费者 test_package 声明。
+# 上游测试由主配方 conanfile.py build() 内的 `make check` 真实执行
+# （automake TESTS = ./test.py，24 个 python_def 场景），并产出
+# HMBS_UPSTREAM_TEST_RESULT；此处 test_package 做消费者级验证。
+
+package: sixtunnel/0.14
+homepage: "https://toxygen.net/6tunnel/"
+
+# 上游测试命令 (make -n check / 审计用)
+upstream_check_command: "make check"
+
+# conanfile.py build() 中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游确实存在测试（tesT.py，24 个 python_def 场景）
+upstream_tests_exist: true
+
+# 上游注册总数（rule4 强制非负整数）——以官方同版本口径统计：
+# 统计单位 = source/test.py 中的顶层 `test(` 场景调用（python_def），
+# 逐行盘点 = 24（与主配方 _count_test_cases() 同口径，已在真机对数）。
+upstream_test_total: 24
+upstream_test_count_method: python_def
+
+upstream_test_audit: "Audited sixtunnel 0.14 source 6tunnel-0.14.tar.gz sha256:6945312793079408f1ab40071cee68e70158a23560145f1d424a3eb16227f235. Makefile.am registers TESTS = ./test.py (automake harness); test.py contains 24 top-level `test(` scenario calls (python_def methodology) covering IPv4/IPv6 endpoint combinations, the -4/-6/-l/-s binding options, and the -I/-i IRC password options. Verified by grep -c '^test(' test.py -> 24, matching conanfile.py _count_test_cases() and the real `make check` (24/24 passed) on HarmonyOS aarch64. test.py runs sequentially and aborts on first failure, so make check exit 0 guarantees all 24 genuinely executed and passed."
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test.py
+    source: 6tunnel-0.14/test.py
+    description: "24 python_def scenarios: IPv4/IPv6 bind/connect combos, -4/-6/-l/-s options, -I/-i IRC password. Runs via automake `make check`; first failure aborts."
+    command: "./test.py"
+
+# test_package 中的消费者测试（真实执行打包出的 bin/6tunnel）
+test_package_tests:
+  - file: test.sh
+    description: "Run packaged 6tunnel -V; assert it executes and prints version '6tunnel 0.14'"
+    command: "./test.sh"
+
+# 消费者冒烟测试断言数（6tunnel -V 单一真实用例）
+assertion_count: 1
