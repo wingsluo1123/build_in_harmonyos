@@ -1,0 +1,25 @@
+--- a/src/xml.h
++++ b/src/xml.h
+@@ -151,21 +151,21 @@
+ 
+ /// Gets the last XML error converted from the library error codes.
+ ///
+ /// @tparam T  The SCRAM error type to convert XML error into.
+ ///
+ /// @param[in] xml_error  The error to translate.
+ ///                       nullptr to retrieve the latest error in the library.
+ ///
+ /// @returns The exception object to be thrown.
+ template <typename T>
+-T GetError(xmlErrorPtr xml_error = nullptr) {
++T GetError(const xmlError *xml_error = nullptr) {
+   if (!xml_error)
+     xml_error = xmlGetLastError();
+   assert(xml_error && "No XML error is available.");
+   T throw_error(xml_error->message);
+   if (xml_error->file)
+     throw_error << boost::errinfo_file_name(xml_error->file);
+   if (xml_error->line)
+     throw_error << boost::errinfo_at_line(xml_error->line);
+   return throw_error;
+ }

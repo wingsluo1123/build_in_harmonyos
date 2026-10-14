@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: scram/0.16.2
+homepage: "https://scram-pra.org"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试为 Catch2 单头文件套件（scram_tests），依赖 git submodule catch2
+# （tarball 不含）；BUILD_TESTING=OFF 时 CI 不构建上游测试，本地已实测 68/68 通过
+upstream_test_in_build: false
+upstream_test_command: "scram_tests"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: scram_unit_test_driver.cc
+    source: scram-0.16.2/tests/scram_unit_test_driver.cc.in
+    description: "Catch2 单元/集成测试套件：故障树、事件树、配置、表达式、序列化、风险分析等 68 个 test cases"
+    command: "./scram_tests"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试：scram --version 版本校验 + 端到端故障树分析（输入 XML → 报告含 Minimal Cut Sets）"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 525

@@ -1,0 +1,30 @@
+--- a/src/initializer.cc
++++ b/src/initializer.cc
+@@ -616,24 +616,25 @@
+       try {
+         DefineExternFunction(node);
+       } catch (ValidityError& err) {
+         err << boost::errinfo_file_name(root.filename());
+         throw;
+       }
+     }
+   }
+ 
+   for (const auto & [ tbd_element, xml_element ] : tbd_) {
++    const xml::Element& xml_element_ref = xml_element;
+     try {
+       std::visit(
+-          [this, &xml_element](auto* tbd_construct) {
+-            this->Define(xml_element, tbd_construct);
++          [this, &xml_element_ref](auto* tbd_construct) {
++            this->Define(xml_element_ref, tbd_construct);
+           },
+           tbd_element);
+     } catch (ValidityError& err) {
+       err << boost::errinfo_file_name(xml_element.filename());
+       throw;
+     }
+   }
+ }
+ 
+ void Initializer::DefineEventTree(const xml::Element& et_node) {

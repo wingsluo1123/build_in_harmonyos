@@ -1,0 +1,25 @@
+--- a/src/xml.cc
++++ b/src/xml.cc
+@@ -21,21 +21,21 @@
+ #include "xml.h"
+ 
+ #include <libxml/xinclude.h>
+ 
+ namespace scram::xml {
+ 
+ Document::Document(const std::string& file_path, Validator* validator)
+     : doc_(nullptr, &xmlFreeDoc) {
+   xmlResetLastError();
+   doc_.reset(xmlReadFile(file_path.c_str(), nullptr, kParserOptions));
+-  xmlErrorPtr xml_error = xmlGetLastError();
++  const xmlError *xml_error = xmlGetLastError();
+   if (xml_error) {
+     if (xml_error->domain == xmlErrorDomain::XML_FROM_IO) {
+       SCRAM_THROW(IOError(xml_error->message))
+           << boost::errinfo_file_name(file_path) << boost::errinfo_errno(errno)
+           << boost::errinfo_file_open_mode("r");
+     }
+     SCRAM_THROW(detail::GetError<ParseError>(xml_error));
+   }
+   assert(doc_ && "Internal XML library failure.");
+   if (xmlXIncludeProcessFlags(get(), kParserOptions) < 0 || xmlGetLastError())
