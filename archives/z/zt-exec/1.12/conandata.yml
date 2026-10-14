@@ -1,0 +1,19 @@
+# conandata.yml — zt-exec 1.12
+# 源码 tarball 从 GitHub 下载（含完整源码 + 测试代码 + pom.xml + .mvn wrapper）
+# SHA256: 59e89dfe0134a39e7380df4103f33cacfc9d8953a92e3059db545a460a4ed4de
+# （双通道各独立下载校验一致；tag zt-exec-1.12 对应上游 commit
+#   763497ed4a4e60cc2847d87da2a0773e8ea6eb66）
+# CI 侧 build_and_test.sh 的 mirror-fallback 会自动为 github.com URL 加
+# gh-proxy.com 回退列表；conan get() 对 url 列表原生逐源尝试。
+
+sources:
+  url: "https://github.com/zeroturnaround/zt-exec/archive/refs/tags/zt-exec-1.12.tar.gz"
+  sha256: "59e89dfe0134a39e7380df4103f33cacfc9d8953a92e3059db545a460a4ed4de"
+
+patches:
+  - patch_file: "patches/0001-pom-compiler-source-target-1.8-for-jdk17.patch"
+    patch_description: "Bump maven-compiler-plugin source/target from 1.6 to 1.8. The 2013-era pom requests Java 6 bytecode, which javac in JDK 17 (bishengjdk 17.0.13) refuses with 'Source option 6 is no longer supported. Use 7 or later.'; 1.8 is the oldest level JDK 17 accepts cleanly and matches the bytecode level OHOS Java consumers run."
+    patch_type: "portability"
+  - patch_file: "patches/0002-listener-throw-test-openjdk-version-string.patch"
+    patch_description: "Broaden the version-string match in ProcessListenerThrowTest. The test's afterFinish listener is expected to throw InvalidOutputException when the captured `java -version` output contains 'java version' — an Oracle JDK marker. BiSheng JDK (OpenJDK family, mandatory on OHOS) prints 'openjdk version', so the expected exception never fired and both @Test methods failed on the real device. The patch extends the check with 'openjdk version'; the tested behavior (exceptions thrown from a ProcessListener propagate as InvalidOutputException) is unchanged on every JDK vendor."
+    patch_type: "portability"

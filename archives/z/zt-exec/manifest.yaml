@@ -1,0 +1,24 @@
+software: zt-exec
+display: "ZT Process Executor"
+description: "ZeroTurnaround 的轻量级 Java 外部进程执行库（同步/异步执行、流式重定向、超时销毁与 shutdown-hook 进程清理）"
+category: foundation
+homepage: "https://github.com/zeroturnaround/zt-exec"
+license: "Apache-2.0"
+build_system: maven
+
+ohos_adaptation:
+  key_points:
+    - "JDK17 javac 拒绝 source/target 1.6，portability 补丁就地上调 1.8"
+    - "JDK 探测链 JAVA_HOME → ~/bishengjdk17 → PATH → cmd-pkgs install-jdk.sh，构建与测试子进程共用"
+    - "弃上游 mvnw（钉 Maven 3.5.4），配方自取 Maven 3.9.11（repo1.maven.org，SHA256 钉死，~/ 缓存复用）"
+    - "HMDFS 禁 shebang exec：mvn 以 sh 显式调用"
+    - "bisheng JDK user.home 回退 '?'：显式 HOME + -Dmaven.repo.local 绝对路径钉死本地仓库"
+    - "上游测试厂商中性补丁（java version || openjdk version）；os.name=HarmonyOS 下 Assume 守卫用例设计内跳过"
+    - "slf4j-api 1.7.2 为强制运行时依赖，随包收入 libexec/"
+  common_dependencies: []
+
+versions:
+  "1.12":
+    status: built
+    build_date: "2026-09-30"
+    conan_ref: "zt-exec/1.12"

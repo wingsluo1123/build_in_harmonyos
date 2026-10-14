@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: zt-exec/1.12
+homepage: "https://github.com/zeroturnaround/zt-exec"
+
+# 上游测试通过 Maven Surefire 运行（mvn clean package，test 阶段先于 package 执行）
+# 上游测试框架：JUnit 4.11（surefire 由构建所用 Maven 3.9.11 的默认生命周期提供）
+# Maven 由配方自取（repo1.maven.org，sha256 钉死），故命令以 mvn 表示
+upstream_check_command: "mvn -B clean package -DskipTests=false -Dmaven.javadoc.skip=true"
+upstream_test_in_build: true
+upstream_test_command: "mvn -B clean package -DskipTests=false -Dmaven.javadoc.skip=true"
+
+# 上游 JUnit 测试用例（在 build() 中运行）
+# 统计来源：src/test/java/org/zeroturnaround/exec/ 目录
+# 35 个测试源文件（21 个测试类，CI 实测 Compiling 35 source files），96 个 @Test 方法
+upstream_tests:
+  - file: src/test/java/org/zeroturnaround/exec/
+    source: zt-exec-1.12.tar.gz/src/test/java/org/zeroturnaround/exec/
+    description: "上游 JUnit 4 测试套件（21 个测试类，96 个 @Test 方法）。surefire 真实 spawn 子 JVM 进程（java -cp target/test-classes HelloWorld/PrintArguments/Loop/BigOutput/WriterLoop 等），覆盖输出重定向、输入流重定向（/bin/true）、超时销毁（sleep 3）、shutdown-hook 进程销毁等场景；外部命令依赖仅 java/sleep//bin/true，OHOS 设备均满足"
+    command: "mvn -B clean package -DskipTests=false -Dmaven.javadoc.skip=true"
+
+# test_package 中自带的测试 (消费者视角验证，在鸿蒙真机运行)
+test_package_tests:
+  - file: test.sh
+    description: "编译并运行 Java 消费者程序，经 ProcessExecutor 真实 spawn 子 JVM 验证输出重定向/exitValues/异步 start+Future/超时销毁 API (R34 实质性验证)"
+    command: "bash test.sh"
+
+# 测试断言总数
+# 上游：96 个 @Test 方法（在 build() 中通过 mvn package 的 test 阶段执行）
+# test_package：9 个断言（2 JAR 存在 + 1 编译 + 5 ProcessExecutor API 断言 + 1 PASS）
+assertion_count: 105
