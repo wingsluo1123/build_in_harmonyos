@@ -1,0 +1,83 @@
+############################################################
+# libica 4.4.1 - upstream test enumeration evidence
+# generated : 2026-10-04T07:35:59Z
+# source     : upstream tarball v4.4.1
+# 用途：使 manifest.yaml / notes.md 中的 48 / 0 / 5 / 43 可被复算
+############################################################
+
+=== 1) 上游测试用例总数（test/*.c） ===
+$ ls test/*.c | wc -l
+48
+
+=== 2) 完整用例清单 ===
+adapter_handle_test.c
+aes_cbc_test.c
+aes_cfb_test.c
+aes_ctr_test.c
+aes_ecb_test.c
+aes_gcm_kma_test.c
+aes_gcm_test.c
+aes_ofb_test.c
+aes_xts_test.c
+cbccs_test.c
+ccm_test.c
+cmac_test.c
+des_cbc_test.c
+des_cfb_test.c
+des_ctr_test.c
+des_ecb_test.c
+des_ofb_test.c
+drbg_birthdays_test.c
+drbg_test.c
+ec_keygen_test.c
+ecdh_test.c
+ecdsa_test.c
+eddsa_test.c
+fips_test.c
+get_functionlist_cex_test.c
+get_functionlist_test.c
+get_version_test.c
+mp_test.c
+rng_test.c
+rsa_key_check_test.c
+rsa_keygen_test.c
+rsa_test.c
+rsa_test_x.c
+sha1_test.c
+sha256_test.c
+sha3_224_test.c
+sha3_256_test.c
+sha3_384_test.c
+sha3_512_test.c
+sha_test.c
+shake_128_test.c
+shake_256_test.c
+tdes_cbc_test.c
+tdes_cfb_test.c
+tdes_ctr_test.c
+tdes_ecb_test.c
+tdes_ofb_test.c
+x_test.c
+
+=== 3) 含硬件引用的用例数 ===
+$ grep -lE 'ica_open_adapter|CPACF|CEX|ICA_FLAG' test/*.c | wc -l
+43
+
+=== 4) 不含硬件字面引用的用例及其 libica 符号调用数 ===
+说明：这几个虽不直接字面引用硬件，但其断言全部依赖 libica 自身
+      符号，而库本体在 aarch64 上无法构建，故同样不可执行。
+  fips_test.c                  ica_* calls = 42
+  get_functionlist_test.c      ica_* calls = 16
+  get_version_test.c           ica_* calls = 9
+  mp_test.c                    ica_* calls = 103
+  rsa_key_check_test.c         ica_* calls = 7
+
+=== 5) aarch64 上可执行用例数 ===
+0   —— 库本体在 aarch64 上无法构建（见 ica_makeF.log：39 处 error，
+      仅 2 个 .o），且功能语义绑定 s390 硬件，故无一用例可执行。
+
+=== 6) 上游 CI 目标架构 ===
+$ grep -n 'arch:' .travis.yml
+10:          arch: s390x
+15:          arch: s390x
+20:          arch: s390x

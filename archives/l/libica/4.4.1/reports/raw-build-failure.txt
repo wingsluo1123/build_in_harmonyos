@@ -1,0 +1,103 @@
+############################################################
+# libica 4.4.1 - build failure evidence
+#
+# 性质声明：本文件是【从原始日志机械提取】的证据汇编，不是摘要、
+#   不是转述。每个数字都由下方命令从留存的原始日志实时计算，
+#   原始日志同时入库于本目录 raw-logs/ 下，可逐字比对。
+#
+# generated : 2026-10-04T07:27:24Z
+# toolchain : aarch64-unknown-linux-ohos-clang (OHOS 15.0.4, target aarch64-unknown-linux-ohos)
+# 原始日志   : raw-logs/ica_confF.log, ica_makeF.log,
+#              ica_mps_aarch64.log, ica_mps_host.log
+############################################################
+
+==================================================================
+SECTION A - full-library cross build
+==================================================================
+config.sub/config.guess 已打补丁以接受 'aarch64-unknown-linux-ohos' 三元组，
+目的是排除 autotools 版本落后这一层噪声，使下述失败可归因于
+libica 自身的源码（而非本机工具链）。
+
+--- configure 结果（原文见 raw-logs/ica_confF.log） ---
+checking host system type... aarch64-unknown-linux-ohos
+configure 实际退出码 = 0 —— 该值已由 reports/raw-logs/ica_confF.log 末尾的机械标记行 '=== configure exit code: 0 ===' 自证，
+  并可由该日志内的旁证交叉复核：'config.status: creating' 出现 5 次、配置阶段无报错行。
+
+--- make -j4 结果（原文见 raw-logs/ica_makeF.log） ---
+make 实际退出码 = 2
+
+--- fatal error 行数 = 2 ---
+71:/root/ohpc/scratch/ica_patched/src/include/s390_ecc.h:19:10: fatal error: 'asm/zcrypt.h' file not found
+81:/root/ohpc/scratch/ica_patched/src/include/s390_rsa.h:18:10: fatal error: 'asm/zcrypt.h' file not found
+
+--- error: 总行数 = 39 （按日志行计数，非去重签名） ---
+--- 错误签名直方图（机械统计） ---
+口径：fatal error 行含 'error:' 子串，会被 grep -c 'error:' 计入；
+      故下方【非 fatal 行】与【fatal 行】互斥，两者相加即 39。
+  -- 非 fatal 的 error: 行 --
+     22 error: invalid output constraint '+a' in asm
+      8 error: invalid output constraint '+d' in asm
+      4 error: invalid input constraint 'a' in asm
+      2 error: invalid output constraint '=d' in asm
+      1 error: use of undeclared identifier 'program_invocation_name'
+  -- fatal error 行 --
+      2 fatal error: 'asm/zcrypt.h' file not found
+  -- 校核：非 fatal 37 + fatal 2 = 39 （应等于 39） --
+
+  【重要】不含 fatal 的错误行中有 36 行是「约束错误」，但它们是
+  **跨编译单元的重复行**：共享头 src/include/s390_crypto.h 同时被
+  icainfo.c 与 init.c 包含，每个出错站点被编译两次，故每站点占 2 行。
+  按日志行 = 36；去重后 = 18 个实际出错站点。两者都列出，避免夸大：
+    约束错误 —— 按日志行 = 36
+    约束错误 —— 去重站点 = 18  (唯一 s390_crypto.h 行号)
+
+--- 产物统计 ---
+目标文件(.o)数量 = 2
+实际路径（find 命令实时结果，可自行复跑）：
+/root/ohpc/scratch/ica_final_build/src/.libs/libica_la-icastats_shared.o
+/root/ohpc/scratch/ica_final_build/src/libica_la-icastats_shared.o
+
+复跑命令：find /root/ohpc/scratch/ica_final_build -name '*.o' | wc -l
+
+--- 样例原文（s390 寄存器类内联汇编） ---
+15-In file included from /root/ohpc/scratch/ica_patched/src/icainfo.c:34:
+16:/root/ohpc/scratch/ica_patched/src/include/s390_crypto.h:265:10: error: invalid output constraint '=d' in asm
+17-                : [cc] "=d" (cc)
+18-                       ^
+19:/root/ohpc/scratch/ica_patched/src/include/s390_crypto.h:296:5: error: invalid output constraint '+a' in asm
+20-                : "+a"(__src), "+d"(__src_len)
+21-                  ^
+22:/root/ohpc/scratch/ica_patched/src/include/s390_crypto.h:332:5: error: invalid output constraint '+a' in asm
+23-                : "+a" (__src), "+d" (__src_len), "+a" (__dest), "+a" (__aad), "+d" (__aad_len)
+24-                  ^
+25:/root/ohpc/scratch/ica_patched/src/include/s390_crypto.h:366:5: error: invalid output constraint '+a' in asm
+26-                : "+a" (__src), "+d" (__src_len), "+a" (__dest), "+a" (__ctr)
+
+==================================================================
+SECTION B - src/mp.S（必需的 s390 汇编单元）
+==================================================================
+mp.S 列于 SOURCES_common（src/Makefile.am:26），由 src/mp.pl +
+src/perlasm/s390x.pm 生成（perlasm 下唯一后端）。
+它与 SECTION A 是【不同编译单元】的独立失败。
+
+--- (B1) aarch64-unknown-linux-ohos-clang -c mp.S ---
+error: 总行数 = 51
+其中 'unrecognized instruction mnemonic' = 2
+其余为寄存器/操作数不匹配。
+--- 前 6 条原文 ---
+1:/root/ohpc/scratch/mp_probe.S:6:7: error: unknown token in expression
+4:/root/ohpc/scratch/mp_probe.S:6:7: error: invalid operand
+7:/root/ohpc/scratch/mp_probe.S:7:5: error: unknown token in expression
+10:/root/ohpc/scratch/mp_probe.S:7:5: error: invalid operand
+13:/root/ohpc/scratch/mp_probe.S:8:7: error: unknown token in expression
+16:/root/ohpc/scratch/mp_probe.S:8:7: error: invalid operand
+
+--- (B2) 宿主 x86_64 gcc -c mp.S（同一文件） ---
+Error 行数 = 24
+证明 mp.S 是架构专用汇编，而非交叉工具链配置问题：
+原生 x86_64 汇编器同样拒绝该文件。
+/root/ohpc/scratch/mp_probe.S:6: Error: bad register name `%r1'
+/root/ohpc/scratch/mp_probe.S:11: Error: bad register name `%f4'
+/root/ohpc/scratch/mp_probe.S:12: Error: bad register name `%f6'
+
+（宿主 x86_64 的完整输出见 raw-logs/ica_mps_host.log）
