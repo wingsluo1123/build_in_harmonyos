@@ -1,0 +1,38 @@
+# 版本级 manifest — archives/l/loudgain/0.6.8/manifest.yaml
+
+version: "0.6.8"
+software: loudgain
+status: published
+build_date: "2026-10-09"
+build_system: cmake
+conan_ref: "loudgain/0.6.8"
+
+source:
+  url: "https://github.com/Moonbase59/loudgain/archive/refs/tags/v0.6.8.tar.gz"
+  sha256: "1137c193ad941b366e87c5d84ccc95a7aa8571affc060db0bd1cf72c489aeaee"
+  tar_format: tar.gz
+
+build:
+  system: cmake (系统 cmake 4.1.2, CMAKE_POLICY_VERSION_MINIMUM=3.5)
+  dependencies:
+    - "libebur128/1.2.6 (conan requires)"
+    - "taglib/1.13.1 (conan requires, 1.x 兼容上游 -std=gnu++11)"
+    - "ffmpeg/4.4.8 (conan requires, 5+ 移除 av_register_all)"
+  parallelism: 默认
+
+test_results:
+  target: "OpenHarmony aarch64"
+  upstream_framework: "无 (上游无测试套件: 无 tests/ 目录, CMakeLists 无 enable_testing/add_test)"
+  upstream_passed: 0
+  upstream_failed: 0
+  upstream_notes: "上游 tarball 清点无测试 (src/docs/bin/cmake/debian 之外无测试目录), 上游测试=0; 适配验证由 test_package 端到端消费者用例承担"
+  test_package_passed: 5
+  test_package_failed: 0
+  test_package_assertions: 5
+  execution: "conan create rc=0; test_loudgain.sh 5/5 断言通过 (version/help/scan+write/REPLAYGAIN_TRACK_GAIN 字节断言/二次运行)"
+
+test_passed: 5
+test_failed: 0
+
+patches_applied:
+  - "patches/0001-cmakelists-deps.patch (pkg-config 依赖改 conan 注入的 CMAKE_INCLUDE_PATH/CMAKE_LIBRARY_PATH find_path/find_library; CMAKE_C/CXX_FLAGS 改追加保留工具链标志)"

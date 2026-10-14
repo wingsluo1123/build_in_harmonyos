@@ -1,0 +1,72 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,11 +24,26 @@
+ ENDIF (APPLE)
+ 
+ 
+-PKG_CHECK_MODULES(LAVC libavcodec REQUIRED)
+-PKG_CHECK_MODULES(LAVF libavformat REQUIRED)
+-PKG_CHECK_MODULES(LAVR libswresample REQUIRED)
+-PKG_CHECK_MODULES(LAVU libavutil REQUIRED)
+-PKG_CHECK_MODULES(LTAG taglib REQUIRED)
++# OHOS: dependencies are resolved through Conan.  pkg-config is not
++# available on this host, so every library is located with plain
++# find_path/find_library calls, which search the CMAKE_INCLUDE_PATH /
++# CMAKE_LIBRARY_PATH cache variables injected by the conan recipe.
++# The taglib headers live in <prefix>/include/taglib while the sources
++# include them flat (<taglib.h>), hence PATH_SUFFIXES taglib.
++find_path(LAVC_INCLUDE_DIR libavcodec/avcodec.h REQUIRED)
++find_library(LAVC_LIBRARIES avcodec REQUIRED)
++find_path(LAVF_INCLUDE_DIR libavformat/avformat.h REQUIRED)
++find_library(LAVF_LIBRARIES avformat REQUIRED)
++find_path(LAVR_INCLUDE_DIR libswresample/swresample.h REQUIRED)
++find_library(LAVR_LIBRARIES swresample REQUIRED)
++find_path(LAVU_INCLUDE_DIR libavutil/avutil.h REQUIRED)
++find_library(LAVU_LIBRARIES avutil REQUIRED)
++find_path(LTAG_INCLUDE_DIR taglib.h REQUIRED PATH_SUFFIXES taglib)
++find_library(LTAG_LIBRARIES tag REQUIRED)
++# The ohpcd taglib package is static (libtag.a) and its own zlib
++# (used by ID3v2 frame decompression) must be linked by the final
++# executable.
++find_library(LZ_LIBRARIES z REQUIRED)
+ 
+ FIND_PACKAGE(EBUR128)
+ 
+@@ -43,11 +58,11 @@
+ INCLUDE_DIRECTORIES(
+   ${CMAKE_CURRENT_SOURCE_DIR}/src
+   ${EBUR128_INCLUDE_DIR}
+-  ${LAVC_INCLUDE_DIRS}
+-  ${LAVF_INCLUDE_DIRS}
+-  ${LAVR_INCLUDE_DIRS}
+-  ${LAVU_INCLUDE_DIRS}
+-  ${LTAG_INCLUDE_DIRS}
++  ${LAVC_INCLUDE_DIR}
++  ${LAVF_INCLUDE_DIR}
++  ${LAVR_INCLUDE_DIR}
++  ${LAVU_INCLUDE_DIR}
++  ${LTAG_INCLUDE_DIR}
+   ${CMAKE_CURRENT_BINARY_DIR}
+ )
+ 
+@@ -66,15 +81,18 @@
+   ${LAVR_LIBRARIES}
+   ${LAVU_LIBRARIES}
+   ${LTAG_LIBRARIES}
++  ${LZ_LIBRARIES}
+ )
+ 
+ SET_TARGET_PROPERTIES(loudgain PROPERTIES
+   COMPILE_FLAGS "-Wall -pedantic -g"
+ )
+ 
+-SET(CMAKE_C_FLAGS "-std=gnu99 -D_GNU_SOURCE")
++# Append (instead of overwrite) so flags from the Conan toolchain
++# (optimization, sysroot, ...) are preserved on OHOS.
++SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -D_GNU_SOURCE")
+ 
+-SET(CMAKE_CXX_FLAGS "-std=gnu++11 -D_GNU_SOURCE")
++SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -D_GNU_SOURCE")
+ 
+ INSTALL(TARGETS loudgain DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+ 
