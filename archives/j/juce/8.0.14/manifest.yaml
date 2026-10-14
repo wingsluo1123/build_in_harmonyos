@@ -1,0 +1,68 @@
+# 版本级 manifest — juce 8.0.14
+# 文件位置: archives/j/juce/8.0.14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "8.0.14"
+
+software: "juce"
+
+# published | built | failed | archived
+status: published
+
+build_date: "2026-10-02"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 GitHub release/tag tarball（conandata.yml 中列首位）
+  url: "https://github.com/juce-framework/JUCE/archive/refs/tags/8.0.14.tar.gz"
+
+  # 与 conandata.yml 一致（对应 gitee mirrors_juce-framework 镜像 tag tarball）
+  sha256: "ceb18e4ac9ab5ea71f3f20240d5852707767a1789ab43d06656a296da9e62f3e"
+
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（profile 驱动，无需额外 -D 注入）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "alsa-lib/1.2.16.1"
+    - "fontconfig/2.18.1"
+    - "expat/2.8.2"
+    - "mesa/24.3.4.1.1"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 沙箱 mkfifo() 返回 EPERM → JUCE NamedPipe（POSIX FIFO）不可用，上游 NamedPipe 单测在该平台恒失败（实测 python os.mkfifo → PermissionError[EPERM]）"
+  - "OHOS 文件系统上上游 Files 单测（大量小文件写/删/属性校验）不收敛：>4 分钟 CPU 无输出推进，需在 test_package 侧隔离"
+  - "JUCE 单测随模块源码编译（JUCE_UNIT_TESTS=1），可在源码+头文件型消费包里用 UnitTest::getAllTests() 运行时枚举并逐套 fork 执行（本包实测 93 套 / 91 通过 / 2 套环境排除）"
