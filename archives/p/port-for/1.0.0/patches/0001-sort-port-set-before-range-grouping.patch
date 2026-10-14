@@ -1,0 +1,23 @@
+--- a/port_for/api.py
++++ b/port_for/api.py
+@@ -81,7 +81,7 @@
+     min_range_len += border * 2
+     if ports is None:
+         ports = available_ports()
+-    ranges = utils.to_ranges(list(ports))
++    ranges = utils.to_ranges(sorted(ports))
+     lenghts = sorted([(r[1] - r[0], r) for r in ranges], reverse=True)
+     long_ranges = [length[1] for length in lenghts if length[0] >= min_range_len]
+     without_borders = [(low + border, high - border) for low, high in long_ranges]
+--- a/tests/test_cases.py
++++ b/tests/test_cases.py
+@@ -117,3 +117,9 @@
+         4003,
+     }
+     assert get_port(sets_and_ranges) in want_set
++
++
++def test_good_port_ranges_unordered_set() -> None:
++    """Keep a continuous interval even when set iteration wraps."""
++    ports = set(range(1000, 1040))
++    assert port_for.good_port_ranges(ports, 20, 3) == [(1003, 1036)]
