@@ -1,0 +1,54 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: prrte/3.0.13
+homepage: "https://github.com/openpmix/prrte"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "clang -I<src>/test-src ... 编译上游 test/Makefile TESTS 18 个有源码用例（chkfs 上游无 .c 源码）"
+
+# 上游实际运行的测试程序
+# 上游 git 仓库 v3.0.13 的 test/ 目录（test/Makefile TESTS）注册 19 个用例：
+# double-get、get-nofence、get-immediate、attachtest/app、attachtest/tool、abort、
+# simple_spawn、hello、connect、loop_child、loop_spawn、reinit、cmspawn、qspawn、
+# iostress、filegen、clichk、chkfs、spawn_timeout。
+# release tarball 不含 test/ 目录，已从上游 git 仓库 v3.0.13 获取源码纳入配方
+# （conanfile.py build() 真实编译 18 个有源码用例；chkfs 上游无 .c 源码）。
+upstream_tests:
+  - file: test-src/hello.c
+    source: prrte-3.0.13/test/hello.c
+    description: "上游 PMIx client 初始化与进程信息查询（test/Makefile TESTS）"
+    command: "./hello"
+  - file: test-src/clichk.c
+    source: prrte-3.0.13/test/clichk.c
+    description: "上游命令行参数处理校验（test/Makefile TESTS）"
+    command: "./clichk"
+  - file: test-src/simple_spawn.c
+    source: prrte-3.0.13/test/simple_spawn.c
+    description: "上游进程 spawn 测试（test/Makefile TESTS）"
+    command: "./simple_spawn"
+  - file: test-src/connect.c
+    source: prrte-3.0.13/test/connect.c
+    description: "上游 PMIx 连接测试（test/Makefile TESTS）"
+    command: "./connect"
+  - file: test-src/abort.c
+    source: prrte-3.0.13/test/abort.c
+    description: "上游 abort 行为测试（test/Makefile TESTS）"
+    command: "./abort"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：断言打包 prte_version.h 的版本宏（PRTE_VERSION_MAJOR/MINOR/RELEASE/NUMERIC_VERSION），端到端验证 include+链接（4 项 C 断言）"
+    command: "./test_prrte"
+  - file: conanfile.py
+    description: "鸿蒙特有消费者用例：运行打包的 prte_info --all，真实执行 PRRTE 运行时（初始化 PMIx 后端 + 加载 MCA 框架），断言进程 rc=0、PRTE: 3.0.13、PMIx: 行、MCA prte: 行（4 项端到端断言）；另断言包布局 include/prte.h、include/prte_version.h、lib/libprrte.so、bin/prte_info（4 项）"
+    command: "prte_info --all"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 9
