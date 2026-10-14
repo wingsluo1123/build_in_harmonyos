@@ -1,0 +1,29 @@
+id: E2026101202
+trigger_tool: conan
+phase: runtime-validation
+error_signature: Can't locate .* in @INC|ModuleNotFoundError|Cannot find module
+severity: 2
+category: dependency, runtime, packaging
+match_keywords: declared graph, runtime import, transitive module, upstream requires, isolated interpreter, missing recipe, metadata only, no-build fallback
+title: 包图解析成功不能代替语言运行时强依赖闭包
+root_cause: 二进制包的配方可能遗漏上游语言元数据中的强依赖，图节点 Download 且 info_invalid 为空仍只证明声明的包图；实际解释器导入时会暴露未声明模块。主线仅有 published 元数据而无可执行配方时也不能视为实际提供者。另一个真实平台差异是HMDFS构建目录投影UID并非进程UID，不能把安全临时根的真实所有权条件误施于整个Conan构建树。 本轮实际CI进一步表明：消费者仍沿用构建目录身份门禁时，生产侧修复不足以闭环；配置投影和消费者分别使用真实UID所有的0700实例临时根，保留原加载、API和inode断言。
+affected_scope: 解释器模块、插件和跨语言绑定的隔离部署；通用于 Perl/Python/Node 等运行时闭包，不以某库或版本为条件。
+verification_cmd: 对比上游 runtime requires 与真实禁构建回退包图；在隔离目标解释器实际逐模块加载、执行真实公开API并回读模块路径与哈希；完整原测试和官方Conan/Finish分别核验。
+rec_priority: 1
+rec_approach: source-requires-graph-and-real-import-closure
+rec_description: 区分强运行依赖、核心模块、作者测试与可选后端；每个非核心强依赖绑定真实可执行配方和已发布身份。遇到实际缺模块先沿原错误链补最底层，禁止假aggregate、共享site目录回退或伪造缓存。遇到构建目录UID误判时，仅对实际非链接可写POSIX父根创建每实例独有TemporaryDirectory，子根0700和进程UID严格核验，保留原测试与解释器ABI；只改变TMPDIR，不改系统账户、缓存所有权或认证保护。原生单项成功不能迁移为全父包或发布通过。 本轮实际CI进一步表明：消费者仍沿用构建目录身份门禁时，生产侧修复不足以闭环；配置投影和消费者分别使用真实UID所有的0700实例临时根，保留原加载、API和inode断言。
+rec_command: conan install --requires=<real-provider/version> --build=never; <actual-private-interpreter> <original-import-and-public-api-probe>
+rec_auto_fix: false
+rec_impl: exact-source-runtime-requirements-and-isolated-probe
+forbid_1_pattern: published.*metadata.*only
+forbid_1_reason: 元数据标签和目录存在不能证明可执行配方、包图或语言运行时闭包。
+forbid_1_consequence: 父包实际导入失败，但可能被错误记为已发布或仅剩CI。
+similar_to: E155
+doc_file: knowledge/drafts/E2026101202-draft-MRUNTIME.md
+last_updated: 2026-10-13
+source_event: 发布SQL解析器及Perl同图真实Download后，目标分别因Params::Util与Module::Runtime缺失RC2；原r1239完整验证保留。本次worker037真实HMDFS目录UID误判已修；新鲜r1356实际官方ConanVerifier及Finish step35原11程序365点、消费者2流程、鸿蒙1场景零skip通过，15回执30WAL及release/postrelease独立核验；日志57c65f710049daf8dd89a65474f2807b3cfd27010e6796de8e45026227cecd0f。原worker平台CI仍需新HEAD验证；Clone和父SQL运行闭包仍未完成，不宣称父包或远端发布通过。 本轮当前CI缺陷修复在新事务module-runtime-0.018.1-official-20261013-consumer132r001实际规范ConanVerifier/Finish step35通过，原11程序/365断言零跳过、消费者2流程和鸿蒙1场景均完成，15回执30WAL/own0/release/postrelease核验；原日志SHA 5e4f8c983b2cce2d4276fb2bd0b717b3acf9d135ecf9dcfc4cb4bc193cc8e301。平台新HEAD CI/Review仍待实际结果，未发布。
+authors: 2301_80739235
+source_pr:
+source_commit:
+draft: true
+contributor_id: MRUNTIME

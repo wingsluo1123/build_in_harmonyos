@@ -5,7 +5,7 @@
 Module::Runtime - Perl 运行时模块处理工具
 
 提供在运行时加载和管理 Perl 模块的函数，包括：
-- `use_module()` - 加载模块并调用 import
+- `use_module()` - 加载模块、按需校验版本并返回模块名；不自动调用 import
 - `require_module()` - 加载模块（不调用 import）
 - `use_package_optimistically()` - 乐观加载模块
 - `is_module_name()` / `check_module_name()` - 模块名验证
@@ -15,7 +15,11 @@ Module::Runtime - Perl 运行时模块处理工具
 
 | 版本 | 状态 | 编译日期 | 说明 |
 |------|------|---------|------|
+| 0.018.1 | candidate | 2026-10-12 | 恢复实际缺失配方；原11程序/365断言、消费者及OHOS专项已由正式Conan/Finish执行，尚未平台CI或发布 |
 | 0.018 | published | 2026-06-18 | 纯 Perl 模块，365 测试全部通过 |
+
+历史0.018的published为旧归档元数据，不能替代当前远端发布证明；本次
+权威主线读取未见其可执行配方，精确 --build=never 也未解析到该版本。
 
 ## 使用说明
 
