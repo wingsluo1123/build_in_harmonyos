@@ -1,0 +1,64 @@
+diff --git a/cmake/version.cmake b/cmake/version.cmake
+index 859fd0e..2618fc7 100644
+--- a/cmake/version.cmake
++++ b/cmake/version.cmake
+@@ -108,8 +108,21 @@ function(generate_version _var )
+     set(${_var} "${KTX_VERSION}" PARENT_SCOPE)
+ endfunction()
+ 
+-# Get latest tag
+-git_describe_raw(KTX_VERSION_FULL --abbrev=0 --match v[0-9]*)
++# Get latest tag.
++#
++# OHOS adaptation: the released tarball carries no .git, so `git describe`
++# always fails and the version silently degrades to 0.0.0-noversion.
++# Honour an explicit KTX_GIT_VERSION_FULL override -- the same mechanism
++# upstream added in 4.4.2 (see cmake/version.cmake there).  The recipe
++# passes -DKTX_GIT_VERSION_FULL=v<version> on the cmake command line and
++# NOT through the toolchain file: this file is include()d at CMakeLists
++# line 13, before project(), and cmake only reads the toolchain at
++# project() -- a toolchain variable is still empty here.
++if(NOT KTX_GIT_VERSION_FULL)
++    git_describe_raw(KTX_VERSION_FULL --abbrev=0 --match v[0-9]*)
++else()
++    set(KTX_VERSION_FULL ${KTX_GIT_VERSION_FULL})
++endif()
+ #message("KTX full version: ${KTX_VERSION_FULL}")
+ 
+ # generate_version(TOKTX_VERSION tools/toktx)
+@@ -182,7 +195,16 @@ function( create_version_header dest_path target )
+     else()
+         add_custom_command(
+             OUTPUT ${version_h_output}
+-            COMMAND ./mkversion -o version.h ${dest_path}
++            # OHOS adaptation: a script that lives in the build tree cannot be
++            # exec'ed on HarmonyOS PC.  The conan -> cmake -> make chain runs
++            # in the restricted `adhoc_bin` domain, which refuses to execute
++            # files outside the preinstalled hnp paths, so the build dies with
++            #   /bin/sh: ./mkversion: Permission denied     (make Error 126)
++            # Running the interpreter and letting IT read the script removes
++            # that dependency -- the same reason the Windows branch above goes
++            # through a shell.  BASH_EXECUTABLE is guaranteed to be set by
++            # find_package(Bash REQUIRED) at the top of CMakeLists.txt.
++            COMMAND ${BASH_EXECUTABLE} ./mkversion -o version.h ${dest_path}
+             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+             COMMENT "Generate ${version_h_output}"
+             VERBATIM
+diff --git a/mkversion b/mkversion
+old mode 100755
+new mode 100755
+index a3224c1..777f352 100755
+--- a/mkversion
++++ b/mkversion
+@@ -52,7 +52,10 @@ function genversion() {
+         VN="$VN-dirty" ;;
+     esac
+   else
+-      VN="$DEF_VER"
++      # OHOS adaptation: no .git in the released tarball.  Upstream 4.4.2
++      # passes the real version in via `mkversion -v`; 4.3.2 has no such
++      # option, and would otherwise stamp version.h with the v4.0 default.
++      VN="v4.3.2"
+   fi
+ }
+ 

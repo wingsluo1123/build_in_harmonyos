@@ -1,0 +1,29 @@
+# conandata.yml — ktx 4.3.2
+#
+# 源码 = 任务池官方源（task 14729 的 url 字段）指向的仓库
+# https://github.com/KhronosGroup/KTX-Software 的 v4.3.2 tag 归档，
+# 与已合入的 archives/k/ktx-software/4.4.2 采用同一种 URL 形式
+# （archive/refs/tags/<tag>.tar.gz），便于对照。
+#
+# sha256 实测：252429885 B，gzip 流完整性校验通过（`gzip -t`）。
+sources:
+  url: "https://github.com/KhronosGroup/KTX-Software/archive/refs/tags/v4.3.2.tar.gz"
+  sha256: "74a114f465442832152e955a2094274b446c7b2427c77b1964c85c173a52ea1f"
+
+# ★ 键必须是「版本号」，不能是文件名 —— 写成文件名会让补丁静默失效。
+#
+# ★ 只放一个补丁文件，且这个补丁自带 mode 行，两处都是踩过坑之后定的：
+#   1) conan 2.x 用纯 python 的 patch_ng 打补丁（不调用 patch 命令）。patch_ng
+#      对行偏移不敏感：同一个补丁文件内所有 hunk 的行号都相对原始文件，安全；
+#      但「第二个补丁文件去改已被前一个补丁改过的文件」时，前一个补丁插入的
+#      行会把后一个补丁的锚点顶掉，于是 apply() 返回 False（实测：独立的
+#      0001/0002 各自都能应用，堆叠就失败；git apply 因为会自己找偏移而看不
+#      出来）。所以本次适配只用一个补丁文件。
+#   2) patch_ng 打补丁时会把原文件 shutil.move 成 <file>.orig 再写一个全新
+#      文件，只有在补丁头部读到 `new file mode N` 或 `old mode N`+`new mode N`
+#      时才 chmod 回去（它不看 index 行的 mode）。mkversion 上游是 0775，所以
+#      本补丁给它的段落显式写了 old/new mode 100755，否则解包后的 mkversion
+#      变成 0644，构建立刻以 `/bin/sh: ./mkversion: Permission denied` 失败。
+patches:
+  "4.3.2":
+    - patch_file: "patches/0001-ohos-version-header.patch"
