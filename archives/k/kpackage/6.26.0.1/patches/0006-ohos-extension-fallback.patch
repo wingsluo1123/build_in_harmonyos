@@ -1,0 +1,21 @@
+--- src/kpackage/private/packagejobthread.cpp
++++ src/kpackage/private/packagejobthread.cpp
+@@ -277,6 +277,18 @@
+                    mimetype.inherits(QStringLiteral("application/gzip")) || //
+                    false) {
+             archive = new KTar(src);
++        } else if (src.endsWith(QLatin1String(".tar.gz")) || src.endsWith(QLatin1String(".tgz")) || //
++                   src.endsWith(QLatin1String(".tar")) || src.endsWith(QLatin1String(".tar.bz2")) || //
++                   src.endsWith(QLatin1String(".tbz2")) || src.endsWith(QLatin1String(".tar.xz")) || //
++                   src.endsWith(QLatin1String(".txz"))) {
++            // OHOS images may ship no shared-mime-info database at all, in
++            // which case mimeTypeForFile() returns an empty type and every
++            // inherits() check above fails even for valid archives. Fall back
++            // to the filename extension for the formats PackageJob supports
++            // (KTar detects the tar compression layer itself).
++            archive = new KTar(src);
++        } else if (src.endsWith(QLatin1String(".zip"))) {
++            archive = new KZip(src);
+         } else {
+             // qCWarning(KPACKAGE_LOG) << "Could not open package file, unsupported archive format:" << src << mimetype.name();
+             d->errorMessage = i18n("Could not open package file, unsupported archive format: %1 %2", src, mimetype.name());
