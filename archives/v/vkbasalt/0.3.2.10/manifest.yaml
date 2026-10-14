@@ -1,0 +1,59 @@
+# 版本级 manifest — vkbasalt 0.3.2.10
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.3.2.10"
+software: "vkbasalt"
+
+# 编译状态: published（conan-verify 全绿，已标记）
+status: published
+build_date: "2026-10-13"
+build_system: "meson"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/DadSchoorse/vkBasalt/archive/refs/tags/v0.3.2.10.tar.gz"
+  sha256: "22f0d44518361b12cf51f30fc9931423977af32a396e746ebf6d726c05788de6"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options: []
+  # 依赖均为制品仓已发布包，无源码适配依赖
+  dependencies:
+    - vulkan-headers/vulkan-sdk-1.4.357.0
+    - spirv-headers/vulkan-sdk-1.3.290.0
+    - libx11/1.8.13.1
+    - xorgproto/2025.1
+  # tool_requires
+  build_dependencies:
+    - meson/1.11.0
+    - ninja/1.12.1
+    - glslang/vulkan-sdk-1.3.290.0
+    - pkgconf/3.0.5
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 无源码补丁：vulkan/spirv/x11 头文件 include 路径在配方 generate() 注入
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "vkBasalt 的 src/meson.build 不通过 dependency('vulkan') 获取头文件，而是裸 include vulkan/vk_layer.h + spirv/unified1/spirv.hpp，需在 MesonToolchain 的 c_args/cpp_args 注入 vulkan-headers/spirv-headers include"
+  - "keyboard_input_x11.cpp 的 static_library 不挂 x11_dep（dependency 只挂在 shared_library），OHOS 需从 libx11+xorgproto 注入 include，否则 X11/Xlib.h 与 X11/X.h 找不到"
+  - "OHOS ELF 代码签名陷阱：.codesign 段零填充的 .so 在 dlopen 时报 Permission denied（非文件权限问题），必须在 package() 用 binary-sign-tool self-sign；工具路径 CI 在 /data/service/hnp/bin、本地在 usr/local/bin，需双路径探测"
+  - "vkBasalt 是 Vulkan implicit layer，导出 vkBasalt_GetInstanceProcAddr/vkBasalt_GetDeviceProcAddr（带前缀），非标准 vkGetInstanceProcAddr"
+  - "构建 worker umask 027 会使 meson.install 产物权限为 750，非 owner 的 test 进程无法加载，package() 需 chmod 755"
