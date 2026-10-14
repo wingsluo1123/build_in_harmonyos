@@ -1,0 +1,29 @@
+# 软件级 manifest
+# 文件位置: archives/i/irony-mode/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: irony-mode
+display: "irony-mode"
+description: "Emacs C/C++ 代码补全与语法检查前端；本包交付其 C++ 后端 irony-server（封装 libclang，行协议服务）"
+category: utility
+homepage: "https://github.com/Sarcasm/irony-mode"
+license: GPL-3.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "CMake 仅在 server/ 子目录，包版本号由 CMake 从 ../irony.el 读取，构建必须保留 tarball 目录布局"
+    - "cmake_minimum_required(3.0.2...3.27) 需 CMAKE_POLICY_VERSION_MINIMUM=3.5（设备 CMake 4.x）"
+    - "libclang 由系统 SDK 提供（Conan llvm 包无 libclang）；SDK 的 find_package(Clang) config 包引用缺失静态归档不可用，需 CMAKE_DISABLE_FIND_PACKAGE_Clang=TRUE 走上游 fallback FindLibClang，并用 llvm-config 动态注入 LIBCLANG_INCLUDE_DIR/LIBCLANG_LIBRARY"
+    - "CLANG_RESOURCE_DIR 由 llvm-config --prefix 推导的 SDK clang -print-resource-dir 动态注入（libclang 运行期 builtin 头；裸 PATH 查 clang 不可靠，上游 try_run 探测覆盖不了 LLVM 15）；test_package 以 TU 解析冒烟（正/负例）做运行期验证"
+    - "运行期需 LD_LIBRARY_PATH 指向系统 SDK llvm libdir 加载 libclang.so（package_info runenv 动态查询）"
+    - "二进制需 binary-sign-tool 自签才能在 OHOS 上执行"
+    - "上游测试仅 elisp ERT（测试 Emacs Lisp 前端，需 emacs）；irony-server 本身无 C++ 测试，设备无 emacs 时上游声明优雅跳过"
+  common_dependencies: []
+  # libclang/llvm-config 由系统 SDK 提供，非 Conan 包（对齐 emacs-clang-complete-async 先例）
+
+versions:
+  "1.6.1":
+    status: built
+    build_date: "2026-10-09"
+    conan_ref: "irony-mode/1.6.1"
