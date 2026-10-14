@@ -1,0 +1,29 @@
+package: emlog/0.70
+homepage: "http://www.circlemud.org/~jelson/software/emlog"
+
+upstream_check_command: "bash test.sh"
+upstream_test_in_build: false
+upstream_test_command: "bash test.sh"
+
+upstream_tests:
+  - name: test.sh
+    command: "bash test.sh"
+    expected: "blocked: needs insmod/rmmod on a Linux kernel with emlog.ko; kernel module cannot be built on OHOS userland"
+
+test_package_tests:
+  - file: test.sh
+    description: "Run eight consumer checks against the installed nbcat and mkemlog binaries: file/empty/binary/large copies, missing-input diagnostics, CLI usage paths, and the mkemlog kernel-module boundary"
+    command: "/data/service/hnp/bin/bash test.sh"
+
+test_package_assertions:
+  - "nbcat copies a small regular file byte-for-byte"
+  - "nbcat preserves empty input"
+  - "nbcat preserves binary data including NUL bytes"
+  - "nbcat drains input larger than its 4096-byte buffer"
+  - "nbcat rejects a missing input with a diagnostic"
+  - "nbcat without arguments prints usage and fails"
+  - "mkemlog without arguments prints usage and fails"
+  - "mkemlog creates a device node or reports the missing emlog module"
+
+test_package_assertion_count: 8
+assertion_count: 8

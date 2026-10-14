@@ -1,0 +1,30 @@
+--- a/mkemlog.c	2026-09-26 01:56:07.699855000 +0800
++++ b/mkemlog.c	2026-09-26 01:56:15.363854844 +0800
+@@ -21,9 +21,26 @@
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <stdlib.h>
+-#include <error.h>
++#include <stdarg.h>
++#include <string.h>
+ #include <errno.h>
+ 
++
++/* OHOS musl sysroot 无 GNU error.h：最小等价实现（打印信息后按 status 退出） */
++static void error(int status, int errnum, const char *fmt, ...)
++{
++    va_list ap;
++    va_start(ap, fmt);
++    fprintf(stderr, "mkemlog: ");
++    vfprintf(stderr, fmt, ap);
++    va_end(ap);
++    if (errnum)
++        fprintf(stderr, ": %s", strerror(errnum));
++    fprintf(stderr, "\n");
++    if (status)
++        exit(status);
++}
++
+ #define EMLOG_DEVICE "/dev/emlog"
+ 
+ #define USAGE "usage: mkemlog <logdevname> [size_in_kilobytes] [mode] [uid]"
