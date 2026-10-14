@@ -77,6 +77,15 @@
     webswview 视图顶层 `import gi` / `gi.require_version('AppStream','1.0')` /
     `from gi.repository import AppStream` → 桩提供 `require_version()` no-op +
     `gi.repository.AppStream` 占位命名空间（属性访问即 NotImplementedError）。
+  - **cryptography（Rust 扩展）**：`laniakea.utils.traceback` 顶层
+    `from cryptography.hazmat...`（AES-CBC 混淆 traceback，CLI --version 链
+    不调用，仅在 `format_encrypted_traceback`/`decrypt_traceback_string`
+    中真实使用）。OHOS 社区源 cryptography wheel 的 Rust 扩展
+    `_rust.abi3.so` 在 OHOS 真机加载器（ld-musl）上被拒（CI #91056 实测
+    `Permission denied`，本机 x86_64 沙箱无法暴露）→ **test_package 不
+    pip 安装 cryptography**，由桩提供 `default_backend`/`PKCS7`/`Cipher`/
+    `AES`/`CBC` import 期符号（真实加解密能力被调用即 NotImplementedError，
+    不伪造）；真实 cryptography 由消费环境按需提供。
   - 其余 Debian/系统绑定**排查无需桩**（见下"系统绑定排查清单"）。
 
 ### 系统绑定排查清单（5 个 CLI --version 全链，主编要求系统性枚举）
