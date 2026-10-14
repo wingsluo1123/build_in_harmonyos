@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(test_qxp CXX)
+find_package(libqxp REQUIRED CONFIG)
+add_executable(test_qxp test_qxp.cpp)
+target_link_libraries(test_qxp PRIVATE libqxp::libqxp)
