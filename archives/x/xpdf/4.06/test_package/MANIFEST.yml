@@ -1,0 +1,85 @@
+# xpdf 4.06 test_package manifest
+#
+# 上游测试面清点（R51）
+# ------------------------
+# xpdf 4.06 源码树内**没有 tests/ 目录，也没有任何 test 注册机制**
+# （实测：`find xpdf-4.06 -type d -name 'test*'` 返回空；无 ctest/pytest 配置，
+#   上游 INSTALL/ANNOUNCE 也不要求运行测试套件）。xpdf 是 Glyph & Cog 商业授权的
+#   发布产物，其测试套件不随源码 tarball 分发。
+# 因此：
+#   * 上游自带测试用例数 = **0**（附清点证据，不估算）
+#   * 声明的测试全部是**消费者用例**，即本包新增的 test_package 用例
+#   * 没有"未运行"项：上游无测试可跑，不存在 R51 的"能跑必须全跑"缺口
+#
+# 消费者用例清点（test_xpdf.sh，逐条对应断言）
+# ----------------------------------------------
+# 共 17 项断言，覆盖 5 个安装后 CLI 产物 + 1 个错误路径。
+# **已在真实 xpdf 4.06 构建产物上实跑通过 17/17**（Mac 侧同版本源码 cmake 构建，
+#  仅用于验证断言口径，非交付构建；交付构建在设备侧）：
+#   1. fixture 生成非空，且 gen_fixture.py 回传的三元组（页面文本/附件名/附件载荷）均非空
+#      （gen_fixture.py 现算，xref 偏移由代码计算，不提交二进制）
+#   2. pdftotext -v 输出含 xpdf 版本串
+#   3. pdftotext 对造的 PDF 产出非空 .txt（副作用断言，非退出码）
+#   4. 抽取文本包含夹具编码的原文（功能性 roundtrip）
+#   5. 抽取文本不含未出现的哨兵串（负向对照）
+#   6. pdfinfo 报 Pages: 1
+#   7. pdfinfo 报 MediaBox 612 x 792
+#   8. pdffonts 列出夹具声明的 Helvetica
+#   9. pdfimages 为内嵌 XObject 写出图像文件
+#  10. 抽出图像带二进制 PPM(P6) 头
+#  11. 抽出图像尺寸等于声明的 2x2
+#  12. 抽出图像像素载荷非空
+#  13. pdfimages -listonly 报出 DeviceRGB 图像
+#  14. pdfdetach -list 产出**非空**报告（`-n PDFDETACH` 守卫 + `-s`，stdout/stderr 分流）
+#  15. pdfdetach -list 报出 `1 embedded files` 并列出夹具附件名 ohos-attach.txt
+#  16. pdfdetach -save 抽出的附件载荷与夹具嵌入字节逐串一致（真实 detach roundtrip）
+#  17. 截断输入不产生伪造文本（错误路径可区分，实测 rc=1）
+#
+# 断言口径：全部落在**产物副作用**（文件内容/落盘字节/抽取文本），
+# 不以退出码作为唯一判据。
+#
+# ⚠️ 起草期被真实构建纠正的两处错误假设（保留记录，避免复用踩坑）：
+#   ① `pdfimages -png` 在 xpdf 里**不存在** —— 打印 usage 并以 rc=99 退出；
+#      xpdf 的 pdfimages 默认写 PPM（poppler 才有 -png）。
+#   ② 无图像页面 `pdfimages` **rc=0 但一个文件都不写** —— 空跑即"成功"。
+#      故夹具改为内嵌真实 2x2 DeviceRGB 图像 XObject，才使该断言有意义。
+#
+# ⚠️ 第三处（2026-10-08 AI 检视 f43c32aa 抓出，2026-10-09 修复）：
+#   ③ 早期 pdfdetach 断言写成 `if [ -f "$WORK/detach.txt" ]` —— shell 在执行命令
+#      **之前**就因 `>` 重定向创建/截断该文件（O_WRONLY|O_CREAT|O_TRUNC），所以该
+#      判断**恒真**：pdfdetach 没装（rc=127）、崩溃、零输出都会 PASS。
+#      实测对照：旧断言在 PATH 无 pdfdetach 时仍 15/15 PASS（rc=0），新断言同环境
+#      14/17、3 项 FAIL（rc=1）。修法 = `-n "$PDFDETACH"` 守卫 + stdout/stderr 分流 +
+#      `-s` 非空 + grep 上游确定串（pdfdetach.cc:146-148 的 `<n> embedded files` /
+#      `N: <name>`），并给夹具内嵌 1 个真实附件以支撑 detach roundtrip 断言。
+
+upstream:
+  test_dir_present: false
+  upstream_test_count: 0
+  evidence: >-
+    find xpdf-4.06 -type d -name 'test*' -> empty;
+    no ctest/pytest/gtest registration anywhere in the tree;
+    xpdf is a Glyph & Cog commercial release tarball and ships no test suite.
+  not_run_reason: >-
+    上游测试套件不随源码 tarball 分发（源码树内无 tests/ 目录），
+    不存在"可运行但未运行"的上游测试。不适用项，不作为减少测试的理由。
+
+consumer:
+  kind: explicit CLI roundtrip
+  driver: test_xpdf.sh
+  fixture: gen_fixture.py (generated at test time; no binary committed — CI applies diffs with git apply)
+  binaries_exercised:
+    - pdftotext
+    - pdfinfo
+    - pdffonts
+    - pdfimages
+    - pdfdetach
+  assertions: 17
+  pass_rate_target: 100%
+  measured_pass_rate: >-
+    17/17 (100%) — 设备侧实测（OHOS aarch64, conan 2.29.1, profile ohos-aarch64,
+    2026-10-09）：CI 同源脚本 ci/conan/build_and_test.sh 全绿（G0/L0/L1/L4/L5 pass、
+    L2 为非阻塞性 skip——xpdf 系工具无 --version/--help 长选项，-v 已在断言 2 覆盖；
+    Pass rate 100.0%，conan create RC=0，BUILD_AND_TEST_RC=0）。Mac 侧同版本 4.06
+    源码 cmake 构建亦 17/17（仅校准口径，非交付构建）。2026-10-08 首轮设备实测
+    15/15，对应 pdfdetach 断言改写前的 15 项口径。
