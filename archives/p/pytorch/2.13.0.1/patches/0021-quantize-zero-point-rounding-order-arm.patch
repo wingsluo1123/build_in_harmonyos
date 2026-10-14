@@ -1,0 +1,44 @@
+--- a/aten/src/ATen/native/quantized/AffineQuantizerBase.cpp
++++ b/aten/src/ATen/native/quantized/AffineQuantizerBase.cpp
+@@ -33,6 +33,23 @@
+ } // anonymous namespace
+ 
+ #ifdef USE_FBGEMM
++// Order of the zero_point addition relative to the rounding step. The
++// documented definition is qx = clamp(zero_point + round(x / scale)); ATen's
++// own ARM kernels follow it (see quantize_val_arm below: it rounds first and
++// adds zero_point to the *integer* result), and so do fbgemm's AVX2
++// specializations that serve the x86 build. fbgemm's generic instantiation --
++// the one an aarch64 build selects -- defaults to LEGACY=true, i.e.
++// nearbyint(zero_point + x / scale), which differs in exactly-halfway cases
++// (x = -4.5, zero_point = 5: rounding 0.5 ties-to-even yields 0 instead of 1).
++// Select the documented order on ARM so quantize_val, quantize_vec and the
++// quantize_per_tensor kernel all agree there; other targets keep fbgemm's
++// default so nothing changes for x86.
++#if defined(__ARM_NEON__) || defined(__aarch64__)
++constexpr bool quantize_legacy_order_arm = false;
++#else
++constexpr bool quantize_legacy_order_arm = true;
++#endif
++
+ // Note: quantize_val is only explicitly used in test outside of this file
+ template <typename T>
+ T quantize_val(double scale, int64_t zero_point, float value) {
+@@ -45,7 +62,7 @@
+   // example in x86 using _mm512_cvtps_epi32 or mm512_round_ps with
+   // _MM_FROUND_CUR_DIRECTION option that also follow the current rounding mode.
+   // NOLINTNEXTLINE(bugprone-signed-char-misuse)
+-  auto qvalue = fbgemm::Quantize<typename T::underlying>(
++  auto qvalue = fbgemm::Quantize<typename T::underlying, quantize_legacy_order_arm>(
+       value,
+       static_cast<int32_t>(zero_point),
+       static_cast<float>(scale),
+@@ -60,7 +77,7 @@
+     const float* src,
+     T* dst,
+     size_t count) {
+-  fbgemm::Quantize<typename T::underlying>(
++  fbgemm::Quantize<typename T::underlying, quantize_legacy_order_arm>(
+       src,
+       (typename T::underlying*)dst,
+       count,

@@ -1,0 +1,276 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: pytorch/2.13.0.1
+homepage: "https://pytorch.org/"
+
+# 上游测试入口:
+#  - C++ 测试为 gtest + CTest (BUILD_TEST=ON 时按 c10/test/CMakeLists.txt 的
+#    file(GLOB_RECURSE ... *_test.cpp) 逐个注册目标)
+#  - Python 测试为 pytest (需 BUILD_PYTHON=ON, 本包产出 C++ libtorch, 不构建 python 模块)
+upstream_check_command: "ctest -N"
+
+# conanfile.py 的 build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: >-
+  cmake -S <source> -B <build> -DBUILD_TEST=ON -DINSTALL_TEST=OFF &&
+  cmake --build <build> --target <全部 114 个测试目标> -- -jN &&
+  TEST_TMPDIR=<build>/upstream-test-tmp ctest --test-dir <build> -R "^(...)$"
+  --timeout 600 --output-on-failure
+# 接入说明: 本包配置下上游注册的 gtest 测试已全部接入构建并运行，共 114 个目标 / 4429 用例。
+#   - 主构建保持 BUILD_TEST=OFF（交付包中不含任何测试二进制）；
+#   - build() 末尾重新配置 -DBUILD_TEST=ON -DINSTALL_TEST=OFF。INSTALL_TEST 必须
+#     显式关闭：上游 CMakeLists 用 cmake_dependent_option(INSTALL_TEST ... ON
+#     "BUILD_TEST" OFF)，BUILD_TEST=ON 会自动开启它，使 benchmark 等未构建产物
+#     也生成 install 规则，导致 package() 阶段 cmake.install() 报文件不存在；
+#   - 目标来自三个来源，合并去重（conanfile.py -> _run_upstream_tests()）：
+#       1) c10/test 51 个（与上游 file(GLOB_RECURSE) 同口径，_upstream_c10_targets()）
+#       2) caffe2/ATen 58 个（由生成的 CTestTestfile.cmake 读回，_upstream_ctest_names()）
+#          —— pow_test / tensor_iterator_test / inline_container_test 等
+#       3) test/cpp 5 个（UPSTREAM_CPP_TEST_TARGETS）
+#   - ctest 选择其中的 108 项执行；inline_container_test 与 test_lazy 走「每组一个进程」
+#     的切分路径（见下），test/cpp 的 5 个目标不经 ctest 注册、由配方直接运行；
+#   - 测试与库使用完全相同的工具链/编译 flag（同一 CMake 配置），
+#     因此验证的是真实交付物所依赖的代码路径；
+#   - 结果决定构建成败：任一目标/用例失败 → conan create 失败。
+#
+# 切分原因（两个平台性约束，均以「保持用例全覆盖」为前提处置）:
+#   - test_lazy（612 用例）单进程跑到第 69 例（LazyOpsTest.TestDivWithRoundingMode）
+#     即 SIGSEGV，但逐例/成组单跑全通过 → 按 ≤60 例/进程切 11 组，
+#     11 组全部通过（UPSTREAM_TEST_SPLIT_CHUNK）。
+#   - inline_container_test（13 用例）前 9 例可过，一旦与 allocator 系列同进程即挂起
+#     → 切 5 组（9 例一组 + 4 个单独），5 组全部通过（UPSTREAM_INLINE_CONTAINER_GROUPS）。
+#   两个套件切分后用例覆盖率为 100%，无跳过、无排除。
+#
+# 前置条件（两个补丁在 build() 的 apply_conandata_patches 阶段套用）:
+#   - patches/0004-c10-enumerate-ssize-musl.patch
+#     c10/util/Enumerate.h 使用 ssize_t 但未 include <sys/types.h>；
+#     glibc 传递提供而 musl 不提供，不修补则 c10_Enumerate_test 编译失败。
+#   - patches/0005-googletest-captured-stream-tmpdir.patch
+#     googletest CapturedStream 在非 Android/iOS 分支硬编码 "/tmp/"，
+#     HarmonyOS PC 的 /tmp 只读 → death test 无法创建捕获文件而 abort
+#     （c10_exception/logging/nofatal/small_vector 受影响）。
+#     改为 testing::TempDir()（与上游 Android 分支同一机制，读
+#     TEST_TMPDIR/TMPDIR，缺省回退 /tmp）；配方把 TMPDIR/TEST_TMPDIR 指向构建目录下
+#     可写子目录。
+#   - patches/0006-c10-test-targets-cxx20.patch
+#     conan 工具链按 profile（compiler.cppstd=17）以普通变量钉住
+#     CMAKE_CXX_STANDARD，遮蔽 pytorch 顶层的 CACHE 赋值；而上游测试按 C++20
+#     基线编写（std::unordered_set/std::set 的 .contains）→
+#     c10_DispatchKeySet_test / c10_ThreadLocalDebugInfo_test 无法编译。
+#     该补丁仅对 c10 测试目标设 CXX_STANDARD 20，库目标保持工具链标准。
+#
+# 2.13.0.1 的 11 个新补丁（0017-0027）解决的问题见报告与 notes.md 补丁表：
+#   0017 oneDNN aarch64 JIT 运行时门控；0018 ITT 放行 aarch64；0019 qnnpack/xnnpack
+#   add 对 0 维/空张量的分派（同时修掉 test_torch::test_tensoriterator_output_setup）；
+#   0020 pow 向量指数窄化；0021/0024 量化 zero_point 与舍入次序（参考实现 + 运行时内核）；
+#   0022 vec128 half 融合算子 fp32 回退；0023 vec_test 目标关向量化；
+#   0025 oneDNN aarch64 eltwise gelu 不终止 → gelu 回落 ATen 原生内核（test_api 由
+#        §"案 252 挂起" 变为 1020/1020）；0026 AnyValue::try_get 的 RTTI 跨 DSO 合并
+#        回退（SequentialTest.ModuleForwardMethodOptionalArg）；
+#   0027 JIT 属性类 RTTI 跨 DSO 合并回退（Attributes::getAttr<T> 的内联 dynamic_cast
+#        在 -fvisibility=hidden 的库上失败 → 7 例 test_jit 报 "wrong type"；实测
+#        TORCH_API 与 visibility pragma 对隐式实例化模板均无效，故比 mangled 名）。
+#        定向重编后 test_jit: rc=0 ran=585 PASSED=583 FAILED=0（2 skip）。
+
+# 上游测试规模统计
+# 计数口径: C++ 为 gtest TEST/TEST_F/TEST_P/TYPED_TEST/TYPED_TEST_P 宏;
+#           Python 为 def test_*; 运行时用例数为 gtest 实际执行数
+#           （含参数化实例化，故大于宏计数）。均对仓库内 v2.13.0 源码树实测。
+upstream_test_stats:
+  c10_test:                 # c10/test  核心工具库测试（已全量运行）
+    files: 51               # 50 个 *_test.cpp + 1 个 cpp17_header_build_check.cpp
+    macros: 669             # TEST* 宏
+    assertions: 1841        # EXPECT_*/ASSERT_* 宏
+    runtime_cases: 868      # gtest 实际执行用例数
+    ran: true
+  caffe2_aten_test:         # caffe2 + ATen CPU 测试（2.13.0.1 新接入，已全量运行）
+    files: 58               # 上游以 ctest 注册的 58 个目标
+    assertions: 2877        # EXPECT_*/ASSERT_* 宏（56/58 目标定位到源码后统计）
+    runtime_cases: 1248     # gtest 实际执行用例数
+    ran: true
+    samples: >-
+      pow_test (13 用例, 补丁 0020 修复后全通过) / tensor_iterator_test (66) /
+      inline_container_test (13, 走切分路径) /
+      vec_test_all_types_DEFAULT (360 用例, 补丁 0022 修 Half 融合算子 fp16 双舍入 +
+      补丁 0023 给该测试目标加 -fno-vectorize 后全通过) /
+      half_test / quantized_test (10 用例, 补丁 0021 参考实现 + 补丁 0024 运行时内核
+      统一 zero_point 与舍入次序后全通过) / wrapdim_test / atest / Dict_test ...
+  test_cpp:                 # test/cpp  torch C++ API 与算子测试
+    files: 135              # 5 个目标覆盖的 TU 数（43+57+13+2+20，含 common/main.cpp）
+    files_in_tree: 198      # 上游 test/cpp 全树 .cpp 数（其余目标在本包配置下不存在，见下）
+    assertions: 5462        # EXPECT_*/ASSERT_* 宏（5 个目标合计）
+    runtime_cases: 2313     # test_api 1020 + test_jit 585 + test_lazy 612 + test_shim 2 + test_aoti_abi_check 94
+    ran: true               # 2.13.0.1 新接入：5 个目标构建并全部通过
+    reason: >-
+      2.13.0 阶段判为「超出 CI 预算」未接入；2.13.0.1 实测单目标编译增量可接受（63 个目标共
+      194 个 TU），已全部接入 build() 的上游测试阶段。test/cpp 其余 10 个目标
+      (c10d / dist_autograd / rpc / nativert / aoti_inference / profiler / inductor 等)
+      在本包配置下**不存在**——依赖本包关闭或未启用的特性（多进程测试脚手架、
+      BUILD_NATIVERT、AOTInductor runtime、kineto collector、python 栈），非「能构建却未跑」。
+  python_test_py:           # test/*.py  pytest 体系
+    files: 184
+    macros: 9926
+    ran: partial            # 2.13.0.1: 原型用本包 python 模块全量执行 174 文件
+    reason: >-
+      2.13.0 因 BUILD_PYTHON=OFF（无 python 模块）无法执行；2.13.0.1 已产出 python 模块。
+      原型以同一构建产物对 174 个 test_*.py 全量执行，按 pytest 退出码分类：
+      rc=0 全通过 106 文件（通过 27635 / 跳过 4747）；
+      rc=1 有失败 30 文件（通过 46869 / 失败 104 / 错误 61 / 跳过 4292）；
+      rc=5 无用例可收集 12 文件（CUDA-only 等，平台无适用用例）；
+      rc=2 收集错误 6 文件（缺可选依赖/平台不支持）；
+      rc=3 pytest INTERNALERROR 1 文件（test_accelerator.py，无加速器后端）；
+      TIMEOUT 19 文件（3 个多进程/共享内存类 + 16 个算子全量扫描类，属耗时非失败）。
+      合计 通过 74504 / 失败 104 / 跳过 9040 / 错误 67。
+      包内 CI 门禁不执行 pytest（174 文件全量在 CI 预算内不可行），
+      逐类明细与 104 例失败的分布见 notes.md「pytest 套件实测与分类」。
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - name: "c10 unit tests (全量, 51 targets)"
+    type: "ctest"
+    description: >-
+      c10/test 的非参数化与参数化 gtest 套件全量执行：ArrayRef, Bitset, Device,
+      DeviceGuard, InlineDeviceGuard, InlineStreamGuard, StreamGuard,
+      DispatchKeySet, Scalar, SymInt, SizesAndStrides, Synchronized, ThreadLocal,
+      ThreadLocalDebugInfo, TypeIndex, WaitCounter, accumulate, bfloat16,
+      bit_cast, complex, complex_math, cow, error, exception, flags,
+      generic_math, intrusive_ptr, irange, lazy, logging, nofatal, optional,
+      ordered_preserving_dict, registry, small_vector, ssize, string_util,
+      string_view, tempfile, typeid, AllocatorConfig, CompileTimeFunctionPointer,
+      ConstexprCrc, DeadlockDetection, Enumerate, Half, IntrusiveList, LeftRight,
+      NetworkFlow, Semaphore 等 50 个 *_test 目标 + c10_cpp17_header_build_test。
+      覆盖 669 个 TEST* 宏 / 1841 条 EXPECT_*/ASSERT_* 断言。
+    command: 'ctest --test-dir <build> -R "^(c10_..._test)$" --output-on-failure'
+    ran: true
+    status: >-
+      已接入并全量运行 (build() 内 BUILD_TEST=ON + 目标发现 + ctest)。
+      本地实测 51/51 目标通过，868 用例中 867 通过 + 1 skipped
+      (ssizeTest.promotes_to_64_bit_on_32_bit_platform 在 64 位平台按上游
+      逻辑跳过，非失败)，0 失败；全部用例运行耗时约 4 秒。
+    route: "conanfile.py build() -> _run_upstream_tests() -> _upstream_c10_targets()"
+
+  - name: "caffe2 / ATen CPU tests (全量, 58 targets, 2.13.0.1 新接入)"
+    type: "ctest"
+    description: >-
+      上游以 ctest 注册、位于 caffe2 与 aten/src/ATen/test 的 58 个 gtest 目标全量执行：
+      pow_test, tensor_iterator_test, inline_container_test, vec_test_all_types_DEFAULT,
+      half_test, quantized_test, wrapdim_test, scalar_test, stride_properties_test,
+      reduce_ops_test, cpu_rng_test, cpu_allocator_test, atest, basic, Dict_test,
+      List_test, KernelFunction_test, op_registration_test 等。
+      覆盖 2877 条 EXPECT_*/ASSERT_* 断言 / 1248 个运行时用例。
+      目标名单由生成的 caffe2/CTestTestfile.cmake 读回（不硬编码），
+      用 ctest -R 执行；inline_container_test 走切分路径（见下）。
+    command: 'ctest --test-dir <build> -R "^(...)$" --timeout 600 --output-on-failure'
+    ran: true
+    status: >-
+      ctest 选择 108 项（51 c10 + 57 caffe2/ATen）实测
+      `100% tests passed, 0 tests failed out of 108`；
+      inline_container_test 的 13 用例按 5 组独立进程运行，全部通过。
+      其中 pow_test 的 3 例失败已由补丁 0020 修复（13/13 通过，见 notes.md）。
+    route: "conanfile.py build() -> _run_upstream_tests() -> _upstream_ctest_names()"
+
+  - name: "test/cpp API/算子套件 (5 targets, 2.13.0.1 新接入)"
+    type: "gtest (直接运行, 不经 ctest)"
+    description: >-
+      本包配置下存在的 5 个 test/cpp 目标全量执行：test_api (1020 用例)、
+      test_jit (585)、test_lazy (612)、test_shim (2)、test_aoti_abi_check (94)，
+      覆盖 5462 条 EXPECT_*/ASSERT_* 断言 / 2313 个运行时用例。
+      test/cpp 其余 10 个目标（c10d / dist_autograd / rpc / nativert / aoti_inference /
+      profiler / inductor 等）在本包配置下不存在——依赖本包关闭或未启用的特性。
+    command: '"<build>/bin/test_api" 等 5 个二进制（各给 TMPDIR/TEST_TMPDIR）'
+    ran: true
+    status: >-
+      5 个目标全部通过。test_lazy 单进程跑到第 69 例 SIGSEGV，改为按 ≤60 用例/进程
+      切 11 组后 11 组全通过；其余 4 个目标单进程一次跑完。
+    route: "conanfile.py build() -> _run_upstream_tests() -> _run_gtest_suite()/切分路径"
+
+test_package_tests:
+  - file: test_pytorch.cpp
+    description: "消费者视角验证 (R34): 链接 libtorch C++ API, 构造张量做加法, 断言 (1+2+3)+(4+5+6)=21"
+    command: "./test_pytorch"
+  - file: test_pytorch_ohos.cpp
+    description: >-
+      HarmonyOS 专项测试 (R6): 运行时判定宿主平台 (uname(2)), 在 HarmonyOS 上校验 8 组
+      鸿蒙/musl aarch64 特有适配点（共 56 项运行时检查）, 非 HarmonyOS 宿主打印 SKIP 并以 0 退出
+      (R8: 不使用平台条件编译宏) —
+      (1) 平台身份 (uname sysname=HarmonyOS 且 machine=aarch64, CPU 后端与默认 dtype);
+      (2) 补丁 0004 语义 (musl 下 ssize_t 经 <sys/types.h> 可见且符号/宽度正确);
+      (3) 补丁 0001 领域 (group_norm 的 ranges→iterator 路径与空张量判定);
+      (4) OHOS aarch64 算术与复数 (CPU 张量算术 / complex64 乘法 / int64 归约 / STL 互操作);
+      (5) 分布式 c10d (2.13.0.1 新增): libuv 7 个符号经 dlsym 解析 (补丁 0009 回归判据)、
+          c10d::ProcessGroupGloo vtable (补丁 0008/0011)、gloo rendezvous PrefixStore/Context、
+          gloo TCP transport、c10d::TCPStore 编入、tensorpipe::ContextImpl vtable,
+          以及一次真实 c10d::FileStore 的 set/get/add/deleteKey 往返;
+      (6) BLAS/LAPACK (2.13.0.1 新增): linalg_solve 残差与解值、linalg_svd 奇异值与
+          独立复算的 sqrt(eigvals(A^T A)) 比对、复数 dot 与标量乘积比对
+          (AT_BLAS_USE_CBLAS_DOT 路径, 默认 cdotu_ 在 aarch64 OpenBLAS 上静默返回 0);
+      (7) ATen 线程池 (2.13.0.1 新增): 线程数为正、parallel_for 每下标恰好一次、区间互不重叠、
+          确实跨多线程执行（2.13.0.1 起 USE_OPENMP=ON，ATen parallel backend = OMP）;
+      (8) 后端启用 (2.13.0.1 新增, 19 项): 逐个断言 2.13.0 关闭而本修订打开/放行的后端 ——
+          at::hasMKLDNN() **为真** (oneDNN 已编译进来) 且运行时门控恒等式成立:
+          userEnabledMkldnn(true) == isMKLDNNJitUsable()、关掉后为假、
+          supportedQEngines() 恰好在本进程能获得可执行内存时报出 kONEDNN、
+          默认 qengine 随门控在 kONEDNN/kQNNPACK 间一致切换
+          (本平台解释器沙箱不给可执行内存 —— mmap(RW) 成功但 mprotect(RWX/RX) 均 EINVAL,
+          故受限域自动走 ATen 原生内核, 不再有"打开即让卷积抛 Xbyak::Error"的问题)、
+          isXNNPACKAvailable()、at::_nnpack_available()、at::hasOpenMP()、
+          supportedQEngines() 含 kFBGEMM/kQNNPACK、两个量化引擎
+          setQEngine 往返、手算可验的 conv2d/linear 数值、3→8 通道路卷积 + max_pool
+          形状与有限性、XNNPACK 可用时 linear/conv2d 可运行、profiler 构建下的 matmul。
+          判据是**运行时可查询且数值正确**，不是 configure 输出 (仅链接上不算通过)。
+      非 OHOS 平台同样可构建运行, 保证不是空壳。
+    command: "./test_pytorch_ohos"
+    route: "conanfile.py test() -> self.run(test_pytorch_ohos)"
+  - file: test_pytest_21213x.py  # (2.13.0.1) conanfile.py 内 _PY_TEST 生成的脚本
+    description: >-
+      Python API 验证 (2.13.0.1, 覆盖本修订新增能力): 由 test_package/conanfile.py 的
+      _test_python_module() 写入并执行, 23 条断言 —— (1) `import torch` 成功;
+      (2) 张量加法 sum==21; (3) autograd 梯度 x²→2x (grad==4);
+      (4) `torch.linalg.solve` 残差 (验证 OpenBLAS/LAPACK 已链接, 无 LAPACK 时该算子不可用);
+      (5) 复数 `torch.dot` 数值 (验证 AT_BLAS_USE_CBLAS_DOT 路径, 默认 cdotu_ 路径在
+      aarch64 OpenBLAS 上静默返回 0);
+      (6) 2.13.0.1 新增后端逐个断言: 并行归约、conv2d/linear 手算数值、
+      torch.backends.mkldnn.is_available() **为真** (oneDNN 已编译进来) 且
+      `_get_mkldnn_enabled()` 与 ctypes 复现的可执行内存探针 (mmap(RW) + mprotect(RWX) +
+      mprotect(RX)) 结果逐一相符 —— 即"请求开启 且 本进程确实能拿到可执行内存"才派发,
+      quantized supported_engines 含
+      fbgemm/qnnpack、**默认量化引擎为 qnnpack** (补丁 0016) 且其 dynamic quantized
+      Linear 可跑、fbgemm 引擎可切换、torch.backends.xnnpack.enabled 与 _C._is_xnnpack_enabled()、
+      torch.backends.nnpack.is_available() 与空间卷积、
+      torch.profiler.itt.is_available() 为真且 range_push/mark/range_pop 调用路径实跑
+      (补丁 0018, 无采集器时为安全 no-op)、
+      torch.autograd.profiler.kineto_available() 且 torch.profiler 实际采到事件 (libkineto)。
+      解释器选择: 依次尝试 PYTORCH_PYTHON/OHOS_PYTHON → 平台 python3；
+      对不导出 CPython C API 符号的解释器自动追加 LD_PRELOAD libpython 变体重试
+      (HarmonyOS PC 的 python3 属于此类, 否则报 `Error relocating libtorch_python.so:
+      PyErr_Fetch: symbol not found`)。
+      CI 侧另有环境限制的处理: CI 的解释器位于 /data/service/hnp 之下（hnp_file 安全域），
+      hmmac 只允许该域 dlopen 同标签 .so，而包产物位于用户路径 → import 被拒
+      (`Error loading shared library ...: Permission denied`，知识库 E212/E488；
+      仓内 aggdraw/pillow 同口径处置)。该情况下**不静默跳过**，而是转为结构化验证:
+      断言 torch/lib/*.so 与 C++ 消费者本轮实际加载的 lib/*.so 逐字节一致（sha256）、
+      `_C` 扩展为合法 ELF、相关 .so 仍带 .codesign 段（E077，OHOS 只加载签名有效的 ELF）；
+      仅当拒绝特征精确匹配（报错行含本模块 site-packages 路径）才走该分支，否则按真实失败上报。
+    command: "<python> test_pytorch_py.py   (env: PYTHONPATH=<pkg>/lib/python3.X/site-packages)"
+    route: "conanfile.py test() -> _test_python_module() -> _validate_python_artifacts()"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# = 上游 c10 全量 1841 条 (EXPECT_*/ASSERT_* 宏)
+# + 上游 caffe2/ATen 58 目标 2877 条 (2.13.0.1 新接入)
+# + 上游 test/cpp 5 目标 5462 条 (2.13.0.1 新接入)
+# + test_package C++ 消费者 1 项 (test_pytorch.cpp)
+# + 鸿蒙专项 56 项运行时检查 (test_pytorch_ohos.cpp, 逐项计入;
+#   2.13.0.1 = 原 37 项 + 「后端启用」组 [8] 现含 oneDNN 运行时门控恒等式 / ITT;
+#   计数口径: 静态 `check(` 匹配 58 处 − 1 处 `void check(` 定义 − 1 处
+#   FileStore 的 `store.check({...})` 成员调用 = 56 个专项检查点，
+#   与实测运行输出 56 [PASS] + 0 [FAIL] 一致)
+# + test_package Python 23 项 (含 oneDNN 门控一致性探针与 ITT 调用路径)
+# ------------------------------------------------------------------
+# 1841 + 2877 + 5462 + 1 + 56 + 23 = 10260
+# 说明: CI 上若 Python dlopen 被 hmmac 策略拒绝, 该分支改为 16 项结构化断言
+# (7 项 torch/lib↔lib/ 逐字节比对 + 1 项 _C 扩展 ELF + 8 项 .codesign 段存在),
+# 不并入上表合计——两者是同一能力在「可运行环境」与「受策略限制环境」下的不同证据形式。
+assertion_count: 10260

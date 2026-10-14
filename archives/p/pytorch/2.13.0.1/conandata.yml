@@ -1,0 +1,261 @@
+# conandata.yml — pytorch 2.13.0
+# Official PyTorch source tarball. GitHub release tarballs do NOT bundle the
+# third_party git submodules; the recipe's build() populates the required
+# submodules from their official per-commit codeload archives (see conanfile).
+
+sources:
+  url: "https://github.com/pytorch/pytorch/archive/refs/tags/v2.13.0.tar.gz"
+  sha256: "b36fbbc96f89185666047c44167e7f8ebc9cadaf7a3e7ef75c85d25b1285c0b4"
+
+patches:
+  - patch_file: "patches/0001-pytorch-ohos-adapt.patch"
+  - patch_file: "patches/0002-cpuinfo-ohos.patch"
+  - patch_file: "patches/0003-sleef-ohos-aarch64.patch"
+  # c10/util/Enumerate.h uses ssize_t without including <sys/types.h>; musl does
+  # not provide it transitively (glibc does), so c10_Enumerate_test fails to
+  # compile. Test-infrastructure fix, no behaviour change.
+  - patch_file: "patches/0004-c10-enumerate-ssize-musl.patch"
+  # googletest CapturedStream hardcodes /tmp, which is read-only on HarmonyOS
+  # PC, so every death test aborts (c10_exception/logging/nofatal/small_vector).
+  # Use testing::TempDir() so TEST_TMPDIR/TMPDIR is honored, as on Android.
+  - patch_file: "patches/0005-googletest-captured-stream-tmpdir.patch"
+  # The Conan toolchain pins CMAKE_CXX_STANDARD to the profile value (17) and
+  # pytorch's project-wide CACHE assignment cannot override it, while the
+  # upstream tests are written for the C++20 baseline (std::unordered_set and
+  # std::set .contains) -> c10_DispatchKeySet_test / c10_ThreadLocalDebugInfo_test
+  # fail to compile. Request C++20 for the c10 test targets only; the library
+  # targets keep the toolchain standard.
+  - patch_file: "patches/0006-c10-test-targets-cxx20.patch"
+  # Two build-layer fixes required by BUILD_PYTHON=ON (the torch Python module),
+  # which the 2.13.0 adaptation did not build:
+  #   1) torch/lib/libshm/CMakeLists.txt: `torch_shm_manager` calls std::erase_if
+  #      (C++20) but, unlike its sibling `shm` target, never asked for C++20; the
+  #      conan toolchain pins the standard to the profile value (17) so it failed
+  #      with "no member named 'erase_if' in namespace 'std'".
+  #   2) CMAKE_MODULE_LINKER_FLAGS was empty, so Python extension modules -- the
+  #      `_C` target is a MODULE library -- were linked without the OHOS target
+  #      triple and the SDK lib dir, and lld failed with
+  #      "unable to find library -l:libunwind.a".
+  - patch_file: "patches/0007-shm-manager-cxx20.patch"
+  # Distributed (c10d + Gloo). Gloo is vendored by pytorch, not an external
+  # requirement: cmake/Dependencies.cmake builds third_party/gloo statically
+  # (GLOO_INSTALL=OFF). Its TCP transport is gated on CMAKE_SYSTEM_NAME being
+  # exactly "Linux", while this build uses OHOS -- the transport then compiles
+  # out and torch/csrc/distributed/c10d/GlooDeviceFactory.cpp fails because the
+  # aarch64-linux-ohos triple defines __linux__, tripping its
+  # "Expected the tcp transport to be available on Linux." check. The OHOS
+  # sysroot provides epoll(2), so the transport is usable.
+  - patch_file: "patches/0008-gloo-tcp-transport-ohos.patch"
+  # libuv (TensorPipe's event-loop dependency, vendored) has the same Linux-only
+  # gating: src/unix/linux.c -- which defines uv__io_poll, uv__statx,
+  # uv__kernel_version, uv__get_constrained_cpu, uv__iou_fs_*, ... -- plus
+  # proctitle.c are only added for CMAKE_SYSTEM_NAME "Linux"/"Android". With the
+  # OHOS triple the event-loop backends are not compiled at all, so the shared
+  # library is built with 25 unresolved uv__* symbols and every consumer fails to
+  # load it ("Error relocating libtorch_cpu.so: uv__io_poll: symbol not found").
+  # Both files compile unmodified against the OHOS sysroot (verified), so the
+  # gating is extended instead of stubbing anything out.
+  - patch_file: "patches/0009-libuv-linux-gating-ohos.patch"
+  # gloo/common/linux.cc (device/interface enumeration used by the TCP transport's
+  # device.cc) uses two glibc-isms that this musl sysroot does not provide:
+  #   1) __caddr_t -- a glibc-only alias for the ifreq::ifr_data type; musl
+  #      declares that member as plain `char*` and defines no such alias.
+  #   2) ethtool_cmd_speed() -- an inline helper from glibc's <linux/ethtool.h>;
+  #      this sysroot's copy declares struct ethtool_cmd but not the helper, whose
+  #      definition is simply (speed_hi << 16) | speed.
+  # Both are replaced with the equivalent portable expression; no behaviour change.
+  - patch_file: "patches/0010-gloo-linux-cc-musl.patch"
+  # Patch 0008 only flips gloo's GLOO_HAVE_TRANSPORT_TCP switch; the sources
+  # behind it are gated a second time. gloo/transport/tcp/CMakeLists.txt wraps
+  # its whole source list in `if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")`, and
+  # gloo/common/CMakeLists.txt adds linux.cc (device/interface enumeration that
+  # tcp/device.cc includes via gloo/common/linux.h) under `STREQUAL "Linux"`.
+  # With neither widened, libgloo.a is still built without the transport and
+  # consumers fail at load time:
+  #   "Error relocating libtorch_cpu.so: _ZN4gloo9transport3tcp16CreateLazyDevice..."
+  - patch_file: "patches/0011-gloo-tcp-sources-ohos.patch"
+  # NNPACK and family (QNNPACK / PYTORCH_QNNPACK / XNNPACK) are CPU inference and
+  # quantized-int8 kernels. Every one of them gates on CMAKE_SYSTEM_NAME being
+  # Android/Linux/Darwin/Windows, and this build says OHOS, so simply turning the
+  # options on was not enough:
+  #   * cmake/Dependencies.cmake turns DISABLE_NNPACK_AND_FAMILY on and the
+  #     options are silently forced back OFF (warning only, no build error);
+  #   * cmake/External/nnpack.cmake returns early, so third_party/NNPACK is never
+  #     added, and the same for its deps (pthreadpool/FP16/FXdiv/psimd);
+  #   * third_party/XNNPACK, third_party/NNPACK and aten's vendored qnnpack all
+  #     raise FATAL_ERROR("Unrecognized CMAKE_SYSTEM_NAME") once reached.
+  # The OHOS sysroot is Linux-like here (pthreads, epoll, /proc, getauxval), which
+  # is why the Linux paths are the right ones to select: widening each check is
+  # equivalent to what the Android branch already does. cpuinfo -- the shared
+  # dependency of the family -- is already taught about OHOS by patch 0002.
+  - patch_file: "patches/0012-nnpack-family-ohos-platform-gating.patch"
+  # oneDNN's bundled AArch64 JIT (third_party/ideep/mkl-dnn/third_party/
+  # xbyak_aarch64) queries the cache hierarchy through
+  # sysconf(_SC_LEVEL{1_ICACHE,1_DCACHE,2,3}_CACHE_SIZE) when /sys reports no
+  # cache info. Those names are glibc extensions -- musl does not define them,
+  # so the file does not compile against the OHOS sysroot at all. Directly
+  # relevant here: this device exposes no cache directories under
+  # /sys/devices/system/cpu, so the fallback branch is the one that runs.
+  # The sysconf calls are kept behind #ifdef so the glibc path still compiles
+  # elsewhere; the musl path uses conservative sizes instead of 0.
+  # The branch also never set `type`/`sharingCores` (they stayed NoCache/0 from
+  # init()), and cpu/platform.cpp::get_per_core_cache_size() divides
+  # getDataCacheSize() by getCoresSharingDataCache() -- with NoCache both are 0,
+  # i.e. an integer 0/0 that raises SIGFPE the first time a convolution asks for
+  # the per-core cache size. Both fields are now populated alongside the sizes.
+  # NOTE: USE_MKLDNN is OFF in this revision (see the rationale in
+  # conanfile.py: the platform sandbox gives the Python interpreter no way to
+  # obtain executable memory, and oneDNN's aarch64 kernels are JIT-generated).
+  # This patch is kept as the compile-side prerequisite, so that enabling
+  # oneDNN later is a one-line change rather than a re-diagnosis.
+  - patch_file: "patches/0013-xbyak-aarch64-musl-cache-sysconf.patch"
+  # libkineto uses C++20 ranges algorithms (std::ranges::sort / find / replace /
+  # all_of). The OHOS SDK ships libc++ 15.0.4, whose <__config> defines
+  # _LIBCPP_HAS_NO_INCOMPLETE_RANGES, so those algorithms do not exist even
+  # though libkineto asks for CXX_STANDARD 20 -- the build fails with
+  # "no type named 'sort' in namespace 'std::ranges'" and kineto would otherwise
+  # drop out of libtorch_cpu.so (torch.profiler reports "Kineto is not
+  # available"). The four call sites are rewritten to the equivalent iterator-pair
+  # algorithms from <algorithm>, which libc++ 15 does provide; semantics are
+  # identical (default comparator/predicate, same container types). Only the
+  # three sources in get_libkineto_cpu_only_srcs() are touched -- the CUDA-only
+  # CuptiCallbackApi.cpp is not compiled in this CPU-only build.
+  - patch_file: "patches/0014-kineto-ranges-libcxx15.patch"
+  # Which quantized engine a Context picks when the user did not choose one.
+  # Upstream's guard is `fbgemmSupportedCPU()`, and FBGEMM answers true on
+  # aarch64 too (it carries partial ARM support), so enabling USE_FBGEMM made
+  # at::kX86 the default engine there -- while the kernels kX86 dispatches to are
+  # avx2/avx512-only and throw "unknown architecure" for any real work, e.g.
+  # torch.ao.nn.quantized.dynamic.Linear. This restricts kX86 to x86 (which is
+  # what the upstream comment right above it already states) and, on non-x86,
+  # falls back to QNNPACK -- the project's own ARM quantized kernel family, and
+  # the only engine that actually computes here.
+  - patch_file: "patches/0016-context-default-qengine-aarch64.patch"
+  # oneDNN (USE_MKLDNN=ON) is compiled in, but its aarch64 kernels are generated
+  # at run time by the bundled xbyak_aarch64 JIT and therefore need executable
+  # memory. Some OHOS launch domains forbid every route to it -- measured inside
+  # the shipped interpreter process: anonymous mmap(PROT_EXEC) and
+  # mmap(PROT_WRITE|PROT_EXEC) fail with EINVAL, mmap(RW)+mprotect(PROT_EXEC)
+  # with EINVAL, memfd/file-backed executable mappings and the dual
+  # (RW+shared)/(RX+shared) pair with EACCES -- while native binaries on the same
+  # device can do all of it (a native JIT stub executes and returns its value).
+  # Without a guard, the first convolution in such a process aborts with
+  # Xbyak::Error "can't protect", so this patch probes for executable memory once
+  # per process (at::isMKLDNNJitUsable) and gates the three dispatch decisions
+  # that would otherwise route work into oneDNN: userEnabledMkldnn(), the default
+  # quantized engine, and supportedQEngines(). Where the probe succeeds (native
+  # binaries) oneDNN is used normally; where it fails the call falls back to
+  # ATen's native kernels instead of aborting. hasMKLDNN()/_has_mkldnn keep
+  # reflecting the build (oneDNN compiled in), which is a build-time fact.
+  - patch_file: "patches/0017-context-mkldnn-jit-runtime-gate.patch"
+  # USE_ITT was unreachable off x86 because upstream expresses it as
+  # cmake_dependent_option(... ON "CPU_INTEL" OFF), which forces the option to
+  # OFF on aarch64 no matter what -DUSE_ITT=ON says. The ITT API itself is
+  # portable C -- third_party/ittapi configures and builds for aarch64 with the
+  # OHOS toolchain (libittnotify.a) -- and the annotations are no-ops unless a
+  # collector attaches, so this patch turns the hard gate into an opt-in for
+  # CPU_AARCH64/CPU_POWER/CPU_RISCV while keeping x86's ON-by-default behaviour
+  # and leaving other architectures forced OFF. Verified with the exact gate
+  # logic: -DUSE_ITT=ON resolves ON on aarch64/x86_64/ppc64le/riscv64 and OFF
+  # on an unknown processor.
+  - patch_file: "patches/0018-itt-enable-aarch64.patch"
+  # With QNNPACK as the default quantized engine, element-wise access to a
+  # quantized tensor (e.g. torch.ops.quantized.add(qx[n][c][h][w], ...) in the
+  # TensorIterator output-setup tests) began routing 0-dim quantized tensors
+  # into qnnpack_add()/xnnp_add(), which require ndimension() > 0 and throw
+  # "Got empty input tensor" -- a regression against the previous package,
+  # where no engine was selected and such inputs took the generic path. This
+  # restores that behaviour: the QNNPACK/XNNPACK fast paths are used only for
+  # tensors that can actually be laid out as batches, everything else falls
+  # through to the generic implementation (which handles any dimensionality),
+  # and the empty-output short circuit additionally covers shapes whose
+  # leading dimension is non-zero but which hold no elements -- those used to
+  # reach QNNPACK with a channel count of 0 and be rejected as invalid.
+  - patch_file: "patches/0019-qnnpack-add-scalar-and-empty.patch"
+  # pow() kept the vectorized kernel when the exponent does not survive a
+  # round trip through the element type, so one call returned two different
+  # answers: the vector body received a float-rounded exponent while the
+  # scalar tail used the exact double one. Measured on a 15-element float
+  # tensor, base -1, exponent -2147483647 (odd, rounds to the even -2^31):
+  # lanes 0-7 returned +1, lanes 8-14 returned -1, and the double reference
+  # (which the test compares against element-wise) is -1 for every element.
+  # The exponent is only used in the generic branch of
+  # pow_tensor_scalar_optimized_kernel, so when cast_scalar_t is wider than
+  # scalar_t and the round trip loses information, the whole tensor now takes
+  # the scalar path and both halves agree with pow(double).
+  - patch_file: "patches/0020-pow-vector-exponent-narrowing.patch"
+  # This revision turns USE_FBGEMM on for aarch64, which made
+  # quantize_per_tensor take fbgemm's generic instantiation. That one defaults
+  # to LEGACY=true, i.e. nearbyint(zero_point + x / scale), while ATen's own
+  # ARM kernels (and the quantized_test reference) round first and then add
+  # zero_point. The two disagree on exactly-halfway values: with scale 1,
+  # zero_point 5 and x = -4.5 the legacy order rounds 0.5 (ties-to-even -> 0)
+  # and yields 0, the documented order adds to the rounded -4 and yields 1.
+  # RoundingMode and a handful of TestQTensor cases failed on that -- only on
+  # aarch64, since x86 selects an AVX2 specialization that already rounds
+  # first. select the documented order on ARM and leave other targets on
+  # fbgemm's default, so the x86 packages keep byte-identical behaviour.
+  - patch_file: "patches/0021-quantize-zero-point-rounding-order-arm.patch"
+  # This revision builds for plain aarch64 (no -march), so the toolchain does
+  # not define __ARM_FEATURE_FP16_VECTOR_ARITHMETIC. vec128_half_neon.h's fused
+  # helpers then fall back to `a * b + c` evaluated in fp16 -- the product is
+  # rounded to half *before* the add, i.e. double rounding. ATen's own convention
+  # is to do FP16/BF16 arithmetic in fp32 (OpMathType<Half> = float), and the
+  # same file's operator+ already implements exactly that via
+  # binary_operator_via_float; only the fmadd family was left in fp16. The
+  # upstream vec_test BitwiseFloatsAdditional cases compare against
+  # local_fmadd/local_fmsub, which accumulate in float (tolerance 0 for Half),
+  # so the fallback result must be bit-faithful: acc. in fp32, round once.
+  - patch_file: "patches/0022-half-fmadd-fp32-fallback.patch"
+  # The remaining four vec_test cases are a clang-22 codegen problem in the
+  # test's own byte-copy scaffolding (complex<float> / qint8 / quint8 / qint32
+  # UnAlignedLoadStore): they fail at -O2/-O3 but pass at -O0/-O1, pass with one
+  # diagnostic print, and pass as soon as the loop vectorizer is off, while the
+  # library's loadu/store round trip is byte-exact (a standalone repro with the
+  # same flags passes at -O3). Scoped to the vec_test target only, mirroring how
+  # 0006 already sets a per-target property for upstream tests; the library and
+  # the packaged contents are untouched.
+  - patch_file: "patches/0023-vec-test-clang-no-vectorize-ohos.patch"
+  # The quantize fix above covers ATen's reference implementation; the runtime
+  # kernel kept calling fbgemm::Quantize<T> with its default LEGACY=true, so on
+  # aarch64 (scalar legacy loop) quantize_per_tensor disagreed with both the
+  # documented order and the reference -- quantized_test's RoundingMode expects
+  # plus-round (its own comment: "If the zero_point is added before rounding,
+  # the result will be wrong") and the qint32 case diverges in float precision.
+  # x86 never saw this because the AVX2 fast path rounds first regardless of
+  # LEGACY. Align the kernel with the reference on ARM only.
+  - patch_file: "patches/0024-quantize-kernel-zero-point-order-arm.patch"
+  # oneDNN's aarch64 eltwise gelu path does not terminate on this platform: with
+  # USE_MKLDNN=ON a plain at::gelu(float32, 100 elements) spins forever in the
+  # run-time generated (xbyak_aarch64) kernel while the same call returns in
+  # milliseconds with oneDNN disabled at run time or in the build without
+  # MKLDNN. Other oneDNN ops (relu/conv2d/linear/matmul/softmax) are fine, the
+  # oneDNN ISA cap and OMP_NUM_THREADS change nothing, and the patch-0017
+  # liveness probe passes here so it cannot gate this. Scope the workaround to
+  # the gelu ops: they skip the oneDNN dispatch on OHOS and use ATen's own
+  # vectorized/scalar kernels (upstream test_api's FunctionalTest.GELU covers it).
+  - patch_file: "patches/0025-ohos-gelu-skip-onednn-eltwise.patch"
+  # AnyValue::try_get() compared typeid hashes only. That assumes one merged
+  # copy of each type's RTTI in the program, and libc++ here is built with the
+  # "Unique" type_info implementation (hash derived from the type-name pointer).
+  # The packaged library emits a *local* (non-exported) copy of some
+  # header-instantiated typeinfos -- e.g. optional<c10::ArrayRef<long>> appears
+  # as `d _ZTI...` in the static table and is absent from .dynsym -- so test_api
+  # emits its own copy, the linker cannot merge them, and try_get rejected a
+  # value whose mangled name is identical (SequentialTest.
+  # ModuleForwardMethodOptionalArg). Fall back to comparing the mangled names,
+  # which is the semantics libc++ uses where RTTI merging is not guaranteed.
+  - patch_file: "patches/0026-anyvalue-typeinfo-name-fallback.patch"
+  # Attributes::getAttr<T>() (torch/csrc/jit/ir/ir.h) is an inline template, so
+  # consumer TUs dynamic_cast an AttributeValue created inside libtorch_cpu.so.
+  # The library is built with -fvisibility=hidden (cmake/ProtoBuf.cmake adds it
+  # to CMAKE_CXX_FLAGS, cmake/public/utils.cmake adds it per target), and the
+  # attribute classes carry no export annotation, so their typeinfo comes out
+  # local (absent from .dynsym) and libc++'s "Unique" typeinfo comparison --
+  # it compares the name pointer -- rejects the cast: 7 upstream test_jit cases
+  # failed with "required keyword attribute 'X' has the wrong type". Annotating
+  # the templates with TORCH_API and/or a visibility pragma was measured not to
+  # lift the hidden typeinfo of an implicit instantiation on this toolchain, so
+  # getAttr falls back to comparing mangled names (the same approach as 0026)
+  # before reporting the error; a real type mismatch still throws.
+  - patch_file: "patches/0027-jit-attribute-rtti-cross-dso.patch"

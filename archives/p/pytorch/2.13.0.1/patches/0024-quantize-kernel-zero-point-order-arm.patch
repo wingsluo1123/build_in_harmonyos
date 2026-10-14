@@ -1,0 +1,32 @@
+--- a/aten/src/ATen/native/quantized/cpu/kernels/QuantizedOpKernels.cpp
++++ b/aten/src/ATen/native/quantized/cpu/kernels/QuantizedOpKernels.cpp
+@@ -3472,6 +3472,20 @@
+ }
+ 
+ #ifdef USE_FBGEMM
++// Order of the zero_point addition relative to the rounding step; see the note
++// in aten/src/ATen/native/quantized/AffineQuantizerBase.cpp. The documented
++// definition is qx = clamp(zero_point + round(x / scale)): ATen's ARM kernels
++// follow it and so does the AVX2 fast path that serves the x86 build. fbgemm's
++// generic instantiation -- the one an aarch64 build selects -- defaults to
++// LEGACY = true, i.e. nearbyint(zero_point + x / scale), which differs on
++// halfway values and on large-magnitude zero_points. Keep this kernel in step
++// with the reference implementation on ARM; other targets keep the default.
++#if defined(__ARM_NEON__) || defined(__aarch64__)
++constexpr bool quantize_kernel_legacy_order_arm = false;
++#else
++constexpr bool quantize_kernel_legacy_order_arm = true;
++#endif
++
+ void quantize_tensor_per_tensor_affine_cpu(
+     const Tensor& rtensor,
+     Tensor& qtensor,
+@@ -3489,7 +3503,7 @@
+         int num_tasks = at::get_num_threads();
+         at::parallel_for(0, num_tasks, 1, [&](int64_t begin, int64_t end) {
+           for (const auto task_id : c10::irange(begin, end)) {
+-            fbgemm::Quantize<underlying_t>(
++            fbgemm::Quantize<underlying_t, quantize_kernel_legacy_order_arm>(
+                 rd, /*src=*/
+                 qd, /*dst=*/
+                 rtensor.numel(), /*len*/

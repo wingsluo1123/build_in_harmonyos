@@ -1,0 +1,36 @@
+--- a/torch/csrc/api/include/torch/nn/modules/container/any_value.h
++++ b/torch/csrc/api/include/torch/nn/modules/container/any_value.h
+@@ -2,6 +2,7 @@
+ 
+ #include <torch/types.h>
+ 
++#include <cstring>
+ #include <memory>
+ #include <type_traits>
+ #include <typeinfo>
+@@ -53,6 +54,25 @@
+     if (typeid(T).hash_code() == type_info().hash_code()) {
+       return &static_cast<Holder<T>&>(*content_).value;
+     }
++    // [ohos-fix] RTTI duplication across shared objects.
++    // The hash comparison above assumes one merged copy of each type's RTTI in
++    // the program (libc++ built with _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION 1
++    // compares the name pointer). Here the typeinfo for a header-instantiated type
++    // can be emitted with local binding by the library (a symbol that is absent
++    // from .dynsym) while the consumer emits its own default-visibility copy; the
++    // dynamic linker cannot merge local symbols, so the two hashes disagree even
++    // though both copies describe the same type. Reproduced outside pytorch: two
++    // DSOs built with and without -fvisibility=hidden give one identical mangled
++    // name with two different hashes.
++    // Compare the mangled names as the fallback. This is the semantics libc++
++    // itself uses when it is built for platforms where RTTI is not guaranteed to
++    // be merged, and it stays strict: distinct types have distinct mangled names.
++    // Deliberately not #ifdef'd to OHOS: the duplication is a property of how the
++    // library was built (hidden RTTI + dynamically loaded consumer), not of the
++    // caller's platform.
++    if (std::strcmp(typeid(T).name(), type_info().name()) == 0) {
++      return &static_cast<Holder<T>&>(*content_).value;
++    }
+     return nullptr;
+   }
+ 

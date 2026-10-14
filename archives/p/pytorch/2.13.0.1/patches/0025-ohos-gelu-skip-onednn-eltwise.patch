@@ -1,0 +1,57 @@
+--- a/aten/src/ATen/native/Activation.cpp
++++ b/aten/src/ATen/native/Activation.cpp
+@@ -388,6 +388,29 @@
+     ((input.scalar_type() == kHalf) && mkldnn_fp16_device_check()) ||
+     (input.scalar_type() == kFloat))); // input is dense layout and bfloat16/float16/float32
+ }
++
++
++// [ohos-fix] Whether the gelu ops may dispatch to oneDNN on this platform.
++// oneDNN's aarch64 eltwise gelu path does not terminate here: with USE_MKLDNN=ON a
++// plain at::gelu(float32, 100 elements) spins forever in the run-time generated
++// (xbyak_aarch64) kernel -- the process stays runnable and burns CPU -- while the
++// same call returns in milliseconds with oneDNN disabled at run time
++// (setUserEnabledMkldnn(false)) and in the pre-adaptation build (USE_MKLDNN=OFF).
++// The liveness probe of patch 0017 cannot gate this: mmap+mprotect succeed, the
++// generated kernel still loops. Other oneDNN ops on this build are unaffected
++// (relu / conv2d / linear / matmul / softmax complete normally), and neither the
++// oneDNN ISA cap (ASIMD/ASIMDHP/DEFAULT) nor OMP_NUM_THREADS changes the outcome,
++// so the workaround is scoped to gelu: it falls back to ATen's own vectorized and
++// scalar kernels, which keep the operator fully functional.
++#if defined(__OHOS__)
++constexpr bool gelu_oneDNN_usable_here() {
++  return false;
++}
++#else
++constexpr bool gelu_oneDNN_usable_here() {
++  return true;
++}
++#endif
+ #endif
+ 
+ TORCH_IMPL_FUNC(gelu_out_cpu) (
+@@ -395,13 +418,13 @@
+ ) {
+ auto approximate_type = get_gelutype_enum(approximate);
+ #if AT_MKLDNN_ENABLED()
+-  if (use_mkldnn(self) && (approximate_type == GeluType::None)) {
++  if (gelu_oneDNN_usable_here() && use_mkldnn(self) && (approximate_type == GeluType::None)) {
+     const ideep::tensor& x = itensor_from_tensor(self, /*from_const_data_ptr*/true);
+     ideep::tensor y = itensor_from_tensor(result);
+     ideep::eltwise_forward::compute(
+       x, y, ideep::algorithm::eltwise_gelu_erf, ideep::prop_kind::forward_training, /*alpha*/ 0.0);
+ #ifdef __aarch64__
+-  } else if (use_mkldnn(self) && (approximate_type == GeluType::Tanh)) {
++  } else if (gelu_oneDNN_usable_here() && use_mkldnn(self) && (approximate_type == GeluType::Tanh)) {
+     const ideep::tensor& x = itensor_from_tensor(self, /*from_const_data_ptr*/true);
+     ideep::tensor y = itensor_from_tensor(result);
+     ideep::eltwise_forward::compute(
+@@ -420,7 +443,7 @@
+ ) {
+ auto approximate_type = get_gelutype_enum(approximate);
+ #if AT_MKLDNN_ENABLED()
+-  if (use_mkldnn(self) && (approximate_type == GeluType::None)) {
++  if (gelu_oneDNN_usable_here() && use_mkldnn(self) && (approximate_type == GeluType::None)) {
+     const ideep::tensor& x = itensor_from_tensor(self, /*from_const_data_ptr*/true);
+     ideep::tensor grady = itensor_from_tensor(grad, /*from_const_data_ptr*/true);
+     ideep::tensor gradx = itensor_from_tensor(grad_input);

@@ -1,0 +1,49 @@
+--- a/torch/csrc/jit/ir/attributes.h
++++ b/torch/csrc/jit/ir/attributes.h
+@@ -53,7 +53,13 @@
+   return names[int(kind)];
+ }
+ 
+-struct AttributeValue {
++// [ohos-fix] getAttr<T>()/setAttr<T>() in ir.h are inline templates that
++// dynamic_cast across the library boundary. This library is built with
++// -fvisibility=hidden, so a class without an export annotation gets a hidden
++// typeinfo that cannot be unified with the consumer's copy; the cast then
++// fails with "required keyword attribute '...' has the wrong type".
++// GraphAttr/GraphsAttr below already carry TORCH_API for the same reason.
++struct TORCH_API AttributeValue {
+   AttributeValue(Symbol name) : name(name) {}
+   using Ptr = std::unique_ptr<AttributeValue>;
+   Symbol name;
+--- a/torch/csrc/jit/ir/ir.h
++++ b/torch/csrc/jit/ir/ir.h
+@@ -22,8 +22,10 @@
+ #include <c10/util/Exception.h>
+ #include <optional>
+ 
++#include <cstring>
+ #include <functional>
+ #include <iosfwd>
++#include <typeinfo>
+ #include <unordered_set>
+ #include <vector>
+ 
+@@ -961,7 +963,17 @@
+     auto it = findAttr(name, true);
+     auto* child = dynamic_cast<T*>(it->get());
+     if (child == nullptr) {
+-      throw IRAttributeError(name, true);
++      // [ohos-fix] Instance typeinfos of these attribute classes are hidden in
++      // the library (-fvisibility=hidden) and libc++ assumes a single RTTI copy
++      // per process ("unique" typeinfo comparison compares the name pointer),
++      // so the cast above can fail for an object that really has type T. The
++      // mangled names are deterministic, so fall back to comparing them: an
++      // exact match proves the types are the same, and a genuine mismatch
++      // still reports the error below.
++      if (std::strcmp(typeid(*it->get()).name(), typeid(T).name()) != 0) {
++        throw IRAttributeError(name, true);
++      }
++      child = static_cast<T*>(it->get());
+     }
+     return child->value();
+   }
