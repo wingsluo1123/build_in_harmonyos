@@ -1,0 +1,103 @@
+# Test manifest — japa/0.9.4
+package: japa/0.9.4
+upstream_version: 0.9.4
+source_tarball_sha256: b7dc2566bfa9139bbac93a404d60d0b1e0bfadfe1315bb46d17f6d9d376407c2
+
+upstream_test_in_build: false
+upstream_tests: []
+upstream_zero_evidence: >-
+  Zero upstream automated tests, established by three independent counts on
+  the verified 0.9.4 tarball (sha256 b7dc2566bfa9139bbac93a404d60d0b1e0bfadfe1315bb46d17f6d9d376407c2).
+  (1) There is no test directory: the tarball ships exactly AUTHORS, COPYING,
+  README and source/, and `test -d tests` fails. (2) There is no check target:
+  `make -n check` aborts with "make: *** No rule to make target 'check'. Stop."
+  and `make -n test` likewise; source/Makefile defines only japa, install,
+  uninstall and clean. (3) There is no test source file: the source/ file list
+  is analyser.cc analyser.h audio.cc audio.h global.h gobjects.cc gobjects.h
+  japa.cc mainwin.cc mainwin.h messages.h rngen.cc rngen.h styles.cc styles.h
+  and Makefile — seven .cc translation units, none of them a test, no
+  gtest/CUnit/check/ctest harness anywhere. This is not an environment
+  limitation; the upstream release simply ships no tests. The packaged
+  consumer smoke test below exercises the built binary instead.
+
+test_package_tests:
+  # ---- ARTIFACT layer: asserted in test_package/conanfile.py -------------
+  - file: conanfile.py
+    name: artifact-elf-architecture
+    outcome: passed
+    description: >-
+      llvm-readelf -h on the packaged bin/japa must report "Machine: AArch64".
+    command: "readelf -h <pkg>/bin/japa"
+  - file: conanfile.py
+    name: artifact-codesign-section
+    outcome: passed
+    description: >-
+      The packaged binary carries exactly one .codesign section after OHOS
+      self-signing (0 means it cannot be exec'd, >1 means a botched re-sign).
+    command: "readelf -SW <pkg>/bin/japa"
+  - file: conanfile.py
+    name: artifact-needed-basenames
+    outcome: passed
+    description: >-
+      Every DT_NEEDED entry is a bare soname. Expected set mirrors the jaaa
+      0.9.2 closure: libzita-alsa-pcmi.so.0, libclthreads.so.2,
+      libclxclient.so.3, libasound.so, libfftw3f.so.3, libjack.so.0,
+      libXft.so.2, libX11.so.6, libc++_shared.so, libc.so — none may contain
+      a slash, which would mean an absolute path was baked in.
+    command: "readelf -d <pkg>/bin/japa"
+  - file: conanfile.py
+    name: artifact-no-host-prefix-leak
+    outcome: passed
+    description: >-
+      The raw bytes of bin/japa contain no "/usr/local", i.e. the staged
+      PREFIX=/ override kept the host installation prefix out of the artifact
+      (upstream's -DPREFIX macro is defined but never referenced by any
+      translation unit, and the staged BINDIR is <destdir>/bin).
+    command: "grep -c /usr/local in bin/japa byte scan"
+  # ---- LOADER / PROCESS layer: asserted by test_japa.sh ------------------
+  - file: test_japa.sh
+    name: loader-version-banner
+    outcome: passed
+    description: >-
+      `japa -h` prints the upstream banner "Japa-0.9.4". help() runs before
+      any X11 or JACK call, so the banner proves the dynamic loader accepted
+      the ELF and resolved the entire dependency closure; upstream then
+      exit(1)s, which is the expected code.
+    command: "japa -h"
+  - file: test_japa.sh
+    name: loader-expected-exit-code
+    outcome: passed
+    description: >-
+      The banner run exits with exactly 1 (upstream's own help() exit), not
+      126/127 (loader failure) and not a signal.
+    command: "japa -h; echo $?"
+  - file: test_japa.sh
+    name: process-x-display-signature
+    outcome: passed
+    description: >-
+      A bare `japa` run must reach the X display open and fail there with the
+      upstream "Can't open display" signature — explicitly not exit 126/127,
+      which would mean the loader, not the missing display, is what broke.
+    command: "japa 2>&1"
+  # ---- CAPABILITY-DEPENDENT cases: honest SKIPs --------------------------
+  - file: test_japa.sh
+    name: skip-jack-client-connect
+    outcome: skipped
+    description: >-
+      `japa -J` needs an X display and a JACK server before the audio path is
+      entered; unreachable on the headless device, declared SKIP with reason.
+    command: "japa -J"
+  - file: test_japa.sh
+    name: skip-alsa-capture-open
+    outcome: skipped
+    description: >-
+      `japa -A` needs an X display and an ALSA capture device; unreachable on
+      the headless device, declared SKIP with reason.
+    command: "japa -A"
+  - file: test_japa.sh
+    name: skip-gui-render
+    outcome: skipped
+    description: >-
+      The main window cannot be rendered headless (no X server); declared
+      SKIP with reason, not counted as a pass.
+    command: "japa"
