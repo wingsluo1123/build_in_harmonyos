@@ -1,100 +1,32 @@
-# czmq 4.2.1 for HarmonyOS
+# czmq
 
-## 概述
+CZMQ 是 ZeroMQ 的高层 C 封装（纯 C）：在 libzmq 之上提供便利类、zactor 服务与通用数据结构，
+附带证书命令行工具 zmakecert。
 
-czmq 在 HarmonyOS/OpenHarmony (aarch64) 上的编译指南和测试记录。
+## 功能概述
 
-## 软件信息
+- 消息层封装：zsock / zframe / zmsg / zstr / zpoller
+- zactor 服务类：zauth / zbeacon / zgossip / zmonitor / zproxy
+- 数据结构与工具：zhashx / zlistx / ztrie / zuuid / zclock / zarmour / zchunk / zdigest / zrex / zsys / ziflist / zfile / zdir
+- 证书：zcert / zcertstore，命令行 zmakecert
 
-| 项目 | 值 |
-|------|-----|
-| 名称 | czmq |
-| 版本 | 4.2.1 |
-| 下载地址 | https://github.com/zeromq/czmq/releases/download/v4.2.1/czmq-4.2.1.tar.gz |
-| 官方文档 | {文档链接} |
+## OHOS 适配要点
 
-## 鸿蒙环境
+- CMake 构建：上游 cmake_minimum_required(2.8.12) 与 CMake 4.x 不兼容，需提升至 3.5...3.27（见 4.2.1 补丁）
+- zproject 生成的 Findlibzmq.cmake 走 MODULE 模式（pkg-config + 裸 find_path/find_library），
+  Conan 只把 generators 目录放入 CMAKE_PREFIX_PATH，配方需经 CMAKE_INCLUDE_PATH/CMAKE_LIBRARY_PATH 注入 zeromq 包路径
+- 产物 libczmq.so 与 bin/zmakecert 需 OHOS ELF 自签名（llvm-objcopy + binary-sign-tool）
+- 可选依赖 uuid/systemd/lz4/libcurl/nss/libmicrohttpd 在 generate() 中显式关闭，避免随探测环境漂移
+- ENABLE_DRAFTS Release 默认 OFF；draft 类（zproc/zargs/ztrie/zhttp_* 等）不编译
 
-| 项目 | 值 |
-|------|-----|
-| 系统版本 | HarmonyOS HongMeng Kernel 1.11.0 |
-| 架构 | aarch64 |
-| 编译器 | clang (LLVM) |
-| 构建系统 | autotools |
+## 依赖关系
 
-## 编译步骤
-
-```bash
-# 1. 下载源码
-wget https://github.com/zeromq/czmq/releases/download/v4.2.1/czmq-4.2.1.tar.gz
-tar -xzf {源码包}
-cd {源码目录}
-
-# 2. 应用补丁（如有）
-patch -p1 < patches/0001-xxx.patch
-
-# 3. 配置
-./configure --prefix=$HOME/usr/local {其他选项}
-
-# 4. 编译
-make -j$(nproc)
-
-# 5. 安装
-make install
-```
-
-## 补丁说明
-
-### 0001-xxx.patch
-
-**目的**: {补丁用途说明}
-
-**修改文件**:
-- `config.guess`: 添加 HarmonyOS 系统检测
-- `config.sub`: 添加 ohos 操作系统支持
-
-**关键修改详解**:
-
-```diff
-# 关键代码片段
-```
-
-## 遇到的问题
-
-### 问题1: {问题描述}
-
-**现象**: {错误信息}
-
-**原因**: {根因分析}
-
-**解决**: {解决方案}
-
-## 测试结果
-
-详见 [test-report.md](./reports/test-report.md)
-
-| 测试项 | 结果 |
-|--------|------|
-| {功能1} | ✅ |
-| {功能2} | ✅ |
-| {功能3} | ⚠️ 部分功能受限 |
-
-## 验证安装
-
-```bash
-# 检查安装
-ls -la $HOME/usr/local/lib/libxxx*
-
-# 检查功能
-{验证命令}
-```
-
-## 经验总结
-
-1. {经验1}
-2. {经验2}
+- 必选：zeromq (libzmq) 4.3.5
+- 可选（本配方全部关闭）：uuid / systemd / lz4 / libcurl / nss / libmicrohttpd
+- 下游消费者：zyre 2.0.1 经 find_package(czmq REQUIRED) + Findczmq.cmake 消费
+  （pkg-config 名固定为 libczmq，CMake config 包名 czmq，导出目标 czmq / czmq-static）
 
 ## 参考资料
 
-- {参考链接1}
-- {参考链接2}
+- https://github.com/zeromq/czmq
+- https://zeromq.org

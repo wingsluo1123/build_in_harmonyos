@@ -1,9 +1,41 @@
 software: czmq
-version: 4.2.1
-status: partial
-build_system: autotools
-created_at: 2026-04-28
-knowledge_gained: []
-patches_applied: []
-build_log: logs/build.log
-source_url: https://github.com/zeromq/czmq/releases/download/v4.2.1/czmq-4.2.1.tar.gz
+version: "4.2.1"
+status: built
+build_date: "2026-10-09"
+build_system: cmake
+conan_ref: "czmq/4.2.1"
+
+source:
+  url: "https://github.com/zeromq/czmq/releases/download/v4.2.1/czmq-4.2.1.tar.gz"
+  sha256: "5d720a204c2a58645d6f7643af15d563a712dad98c9d32c1ed913377daa6ac39"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCZMQ_BUILD_SHARED=ON"
+    - "-DCZMQ_BUILD_STATIC=OFF"
+    - "-DENABLE_DRAFTS=OFF"
+    - "-DCZMQ_WITH_UUID=OFF"
+    - "-DCZMQ_WITH_SYSTEMD=OFF"
+    - "-DCZMQ_WITH_LZ4=OFF"
+    - "-DCZMQ_WITH_LIBCURL=OFF"
+    - "-DCZMQ_WITH_NSS=OFF"
+    - "-DCZMQ_WITH_LIBMICROHTTPD=OFF"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+  dependencies:
+    - "zeromq/4.3.5"
+  cc: clang
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "CMake 4.x 移除 <3.5 兼容：cmake_minimum_required(2.8.12) 需提升至 3.5...3.27"
+  - "zproject 的 Findlibzmq.cmake 走 MODULE 模式（pkg-config + find_path/find_library），需经 CMAKE_INCLUDE_PATH/CMAKE_LIBRARY_PATH 注入 zeromq 包 include/lib 目录"
+  - "CMAKE_SYSTEM_NAME=HarmonyOS 是 CMake 未知平台，SONAME 标志缺失：按 E330 用 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON + CMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname, 保住 SONAME（产物单文件 libczmq.so，无版本化软链）"
+  - "发布版 zeromq/libzmq.so 无 SONAME，依赖方须以 -L/-l 形式链接（Findlibzmq 的 LIBZMQ_LIBRARIES 预置）才能得到相对 DT_NEEDED"
+  - "Conan CMakeDeps 对二阶传递依赖剥离 include/libs 数据：头文件透传型依赖（czmq.h 包含 zmq.h）的 test_package 需显式 requires 顶层依赖"
+  - "宿主契约：pkg_config_name 必须为 libczmq（zyre 2.0.1 Findczmq.cmake/configure.ac 依赖）；bin/zmakecert 触发 R38，软件级 commands.json 必备"
+  - "ENABLE_DRAFTS Release 默认 OFF；6 个可选依赖显式关闭保证特性集确定"
