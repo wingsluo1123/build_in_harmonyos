@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libmtd/2.3.1-3
+homepage: "https://git.infradead.org/mtd-utils.git"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试资产总数 N=70（tests/ 全量口径：44 个 .c 测试源文件 + 18 个 .sh
+# 测试脚本 + 7 个 Makemodule.am 测试模块定义 + unittests sysfs_mock 运行器
+# 基础设施 1 项；check_PROGRAMS/test_PROGRAMS 注册 40 个测试程序）
+upstream_tests_total: 70
+# 实测执行：unittests cmocka 用例 33 项（17+16，全 PASSED，证据见 reports/test-report.md）
+upstream_tests_executed: 33
+# 未执行 37 项：checkfs/fs-tests/jittertest/mtd-tests/ubi-tests/ubifs_tools-tests
+# 的测试程序与脚本 + 支撑源，均需真实 MTD/UBI 内核设备（mtdram/nandsim 模拟），
+# HarmonyOS PC 无 /dev/mtd* / /dev/ubi*（UFS/NVMe 启动），物理不可执行。
+upstream_tests_not_executed: 37
+
+# 上游实际运行的测试程序（cmocka 单测，-Wl,--wrap=open/ioctl/read/lseek(/write)
+# mock 设备访问，无需真实 MTD/UBI 设备；cmocka 取自制品仓 cmocka/2.0.2）
+upstream_tests:
+  - file: tests/unittests/libmtd_test.c
+    source: mtd-utils-2.3.1/tests/unittests/libmtd_test.c
+    description: "libmtd 库 cmocka 单测（mock ioctl，17 项：mtd_open/mtd_get_info/mtd_get_dev_info 等）"
+    command: "./mtdlib_test  # 17/17 PASSED"
+  - file: tests/unittests/libubi_test.c
+    source: mtd-utils-2.3.1/tests/unittests/libubi_test.c
+    description: "libubi 库 cmocka 单测（mock ioctl，16 项：ubi_attach/detach/mkvol/rsvol 等）"
+    command: "./ubilib_test  # 16/16 PASSED"
+  # 上游其余测试目录（checkfs/fs-tests/jittertest/mtd-tests/ubi-tests/
+  # ubifs_tools-tests）均需真实 MTD/UBI 内核设备（mtdram/nandsim 模拟），
+  # HarmonyOS PC 无 /dev/mtd* / /dev/ubi*（UFS/NVMe 启动），不可运行。
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者端到端用例：编译期真实 API（libmtd.h/libubi.h/libubigen.h + mtd UAPI 头），运行期断言 libmtd_open/libubi_open 设备感知行为 + libubigen 纯函数几何派生与 EC 头生成（magic/BE 序），共 14 项断言"
+    command: "./test_libmtd  # 14/14 PASSED"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 14
