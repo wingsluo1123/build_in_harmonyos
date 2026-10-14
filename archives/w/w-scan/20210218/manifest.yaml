@@ -1,0 +1,58 @@
+version: "20210218"
+status: pending_ci
+build_date: "2026-10-10"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/w/w-scan/w-scan_20210218.orig.tar.bz2"
+  sha256: "75d7447ebeddfb9ce251f32a93f23190ed46dca44f5b701f2af11e1787b9eb08"
+  tar_format: tar.bz2
+
+build:
+  system: custom
+  method: "direct clang build of the 20 C translation units in Makefile.am with errno and time_t header adjustments"
+  sources:
+    - "atsc_psip_section.c"
+    - "countries.c"
+    - "descriptors.c"
+    - "diseqc.c"
+    - "dump-dvbscan.c"
+    - "dump-vdr.c"
+    - "dump-xine.c"
+    - "dump-mplayer.c"
+    - "dump-vlc-m3u.c"
+    - "dump-xml.c"
+    - "dvbscan.c"
+    - "emulate.c"
+    - "iconv_codes.c"
+    - "char-coding.c"
+    - "lnb.c"
+    - "parse-dvbscan.c"
+    - "satellites.c"
+    - "scan.c"
+    - "section.c"
+    - "tools.c"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+source_adjustments:
+  - "conanfile.py replaces <sys/errno.h> with the standard <errno.h> while preserving the upstream CRLF line endings"
+  - "conanfile.py adds <time.h> to descriptors.h because OHOS clang does not provide time_t transitively"
+
+knowledge_gained:
+  - "The Debian source archive contains generated configure and Makefile files, but direct compilation is smaller and avoids the upstream version target's source-tree writes."
+  - "emulate.c uses CRLF line endings, so a normal LF patch does not apply; the CRLF-preserving replacement is performed in the recipe."
+  - "The OHOS sysroot provides the Linux DVB UAPI headers used by w_scan."
+  - "OHOS libc provides iconv and clock_gettime, so the application needs no Conan runtime dependencies."
+  - "A real scan requires a DVB frontend; CI coverage is intentionally limited to deterministic CLI behavior."
+
+test_results:
+  type: smoke
+  upstream_total: 0
+  total: 6
+  passed: 0
+  failed: 0
+  status: pending_ci
+  note: "Local Linux Clang 18 preflight compiled the direct source set and exercised the CLI checks; OHOS result is pending GitCode CI."
+
+knowledge_ref: []

@@ -1,0 +1,44 @@
+package: w-scan/20210218
+homepage: "https://wirbel.htpc-forum.de/w_scan/index2.html"
+
+# The upstream 20210218 archive has no tests directory, no check target, and
+# no test driver. Normal operation also requires a DVB frontend device, so the
+# deterministic consumer checks exercise only hardware-independent CLI paths.
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "w_scan-20210218 source tree"
+    reason: "No tests directory, test driver, or check target is present in the release archive."
+  - source: "w_scan-20210218 Makefile.am / Makefile.in"
+    reason: "The generated build files define compilation and installation targets only; no test target is registered."
+  - conclusion: "Upstream test inventory is empty; the consumer package performs eight deterministic CLI checks without claiming a real DVB scan."
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+upstream_test_total: 0
+
+test_package_tests:
+  - file: test_w_scan.sh
+    description: "The resolved installed binary is executable and reports version 20210218"
+    command: "command -v w_scan && w_scan -V"
+  - file: test_w_scan.sh
+    description: "Basic help prints the w_scan usage text"
+    command: "w_scan --help"
+  - file: test_w_scan.sh
+    description: "The -h alias prints the same w_scan usage text"
+    command: "w_scan -h"
+  - file: test_w_scan.sh
+    description: "Extended help is available"
+    command: "w_scan --extended-help"
+  - file: test_w_scan.sh
+    description: "Country discovery lists country entries"
+    command: "w_scan --country ?"
+  - file: test_w_scan.sh
+    description: "Satellite discovery lists satellite entries"
+    command: "w_scan --satellite ?"
+  - file: test_w_scan.sh
+    description: "An unknown option is rejected with usage output"
+    command: "w_scan --definitely-invalid"
+
+assertion_count: 8
