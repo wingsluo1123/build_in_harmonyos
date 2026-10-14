@@ -1,0 +1,86 @@
+--- a/test/teststandardpaths_unix.cpp
++++ b/test/teststandardpaths_unix.cpp
+@@ -31,29 +31,32 @@
+     StandardPaths standardPaths("fcitx5", {},
+                                 StandardPathsOption::SkipBuiltInPath);
+ 
+     FCITX_ASSERT(standardPaths.userDirectory(StandardPathsType::Config) ==
+                  "/TEST/PATH");
+     FCITX_ASSERT(standardPaths.userDirectory(StandardPathsType::Runtime) ==
+                  "/RUNTIME/PATH");
+     FCITX_ASSERT(standardPaths.userDirectory(StandardPathsType::Cache) ==
+                  "/CACHE/PATH");
+     // The order to the path should be kept for their first appearance.
+-    FCITX_ASSERT(
+-        std::ranges::equal(standardPaths.directories(StandardPathsType::Config),
+-                           std::vector<std::filesystem::path>(
+-                               {"/TEST/PATH", "/TEST/PATH1", "/TEST/PATH2"})));
+-    FCITX_ASSERT(std::ranges::equal(
+-        standardPaths.directories(StandardPathsType::PkgData),
+-        std::vector<std::filesystem::path>(
+-            {"/TEST/PATH/fcitx5",
+-             std::filesystem::path(TEST_ADDON_DIR) / "fcitx5"})))
++    auto configDirs = standardPaths.directories(StandardPathsType::Config);
++    std::vector<std::filesystem::path> expectedConfigDirs{
++        "/TEST/PATH", "/TEST/PATH1", "/TEST/PATH2"};
++    FCITX_ASSERT(std::equal(configDirs.begin(), configDirs.end(),
++                            expectedConfigDirs.begin(),
++                            expectedConfigDirs.end()));
++    auto pkgDataDirs = standardPaths.directories(StandardPathsType::PkgData);
++    std::vector<std::filesystem::path> expectedPkgDataDirs{
++        "/TEST/PATH/fcitx5", std::filesystem::path(TEST_ADDON_DIR) / "fcitx5"};
++    FCITX_ASSERT(std::equal(pkgDataDirs.begin(), pkgDataDirs.end(),
++                            expectedPkgDataDirs.begin(),
++                            expectedPkgDataDirs.end()))
+         << standardPaths.directories(StandardPathsType::PkgData);
+ 
+     {
+         auto result = standardPaths.locate(StandardPathsType::PkgData, "addon",
+                                            pathfilter::extension(".conf"));
+         std::set<std::filesystem::path> names;
+         std::set<std::filesystem::path> expect_names = {"testim.conf",
+                                                         "testfrontend.conf"};
+         for (auto &p : result) {
+             names.insert(p.first);
+@@ -137,28 +140,33 @@
+     FCITX_ASSERT(file2.fd() == -1);
+ }
+ 
+ void test_custom() {
+     setEnvironment("XDG_CONFIG_HOME", "/TEST/PATH");
+     setEnvironment("XDG_CONFIG_DIRS", "/TEST/PATH1:/TEST/PATH2");
+     setEnvironment("XDG_DATA_HOME", "/TEST//PATH");
+     setEnvironment("XDG_DATA_DIRS", TEST_ADDON_DIR);
+     StandardPaths path("mypackage", {{"datadir", {"/TEST/PATH3"}}},
+                        StandardPathsOption::SkipBuiltInPath);
+-    FCITX_ASSERT(std::ranges::equal(
+-        path.directories(fcitx::StandardPathsType::PkgConfig),
+-        std::vector<std::filesystem::path>{"/TEST/PATH/mypackage",
+-                                           "/TEST/PATH1/mypackage",
+-                                           "/TEST/PATH2/mypackage"}))
++    auto pkgConfigDirs =
++        path.directories(fcitx::StandardPathsType::PkgConfig);
++    std::vector<std::filesystem::path> expectedPkgConfigDirs{
++        "/TEST/PATH/mypackage", "/TEST/PATH1/mypackage",
++        "/TEST/PATH2/mypackage"};
++    FCITX_ASSERT(std::equal(pkgConfigDirs.begin(), pkgConfigDirs.end(),
++                            expectedPkgConfigDirs.begin(),
++                            expectedPkgConfigDirs.end()))
+         << path.directories(fcitx::StandardPathsType::PkgConfig);
+-    FCITX_ASSERT(std::ranges::equal(
+-        path.directories(fcitx::StandardPathsType::Data),
+-        std::vector<std::filesystem::path>{"/TEST/PATH", TEST_ADDON_DIR}))
++    auto dataDirs = path.directories(fcitx::StandardPathsType::Data);
++    std::vector<std::filesystem::path> expectedDataDirs{"/TEST/PATH",
++                                                        TEST_ADDON_DIR};
++    FCITX_ASSERT(std::equal(dataDirs.begin(), dataDirs.end(),
++                            expectedDataDirs.begin(), expectedDataDirs.end()))
+         << path.directories(fcitx::StandardPathsType::Data);
+ }
+ 
+ int main() {
+     test_basic();
+     test_nouser();
+     test_custom();
+     return 0;
+ }

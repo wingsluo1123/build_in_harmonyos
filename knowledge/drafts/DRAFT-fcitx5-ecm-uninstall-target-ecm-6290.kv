@@ -1,0 +1,26 @@
+id: DRAFT-fcitx5-ecm-uninstall-target-ecm-6290
+title: include(ECMUninstallTarget) 需 ecm_uninstall.cmake.in → extra-cmake-modules 须 6.29.0+（6.19.0 缺文件）
+category: cmake, ecm, extra-cmake-modules, tool-requires, build-failure
+severity: 2
+error_signature: "CMake Error: File <ECM>/modules/ecm_uninstall.cmake.in does not exist; configure_file Problem configuring file"
+match_keywords: ECMUninstallTarget, ecm_uninstall.cmake.in, extra-cmake-modules, ECM, configure_file, CMakeLists include
+error_excerpt: >
+  CMake Error: File /storage/.../extra-cmake-modules/.../share/ECM/modules/ecm_uninstall.cmake.in does not exist.
+  CMake Error at .../ECMUninstallTarget.cmake:39 (configure_file): configure_file Problem configuring file
+root_cause: >
+  上游顶层 CMakeLists include(ECMUninstallTarget) 时，ECMUninstallTarget.cmake
+  会 configure_file 引用同目录 ecm_uninstall.cmake.in。extra-cmake-modules
+  6.19.0 的 conan 包未包含 ecm_uninstall.cmake.in（只有 .cmake 模块），
+  6.29.0 含该文件。fcitx5-utils 5.1.13 的 wrapper CMakeLists 未 include
+  ECMUninstallTarget 故 6.19.0 可用；fcitx5 顶层直接 include 时必须 6.29.0+。
+rec_approach: >
+  配方 tool_requires("extra-cmake-modules/6.29.0")（或含 ecm_uninstall.cmake.in
+  的更新版本）。任何 include(ECMUninstallTarget) 的 CMake 库在 OHOS conan
+  构建需同样处理。
+verification: >
+  conan create + W3 build_and_test 全 pass（fcitx5/5.1.14 实测：6.19.0 报
+  ecm_uninstall.cmake.in 缺失，切 6.29.0 后通过）。
+boundary: >
+  所有顶层 include(ECMUninstallTarget) 的 KDE/ECM 系 CMake 库，且以 conan
+  extra-cmake-modules 为 tool_requires 的场景。
+related: DRAFT-13796-qqc2-breeze-style-6.7.5-kf6-ecm-cmakedeps-bridge

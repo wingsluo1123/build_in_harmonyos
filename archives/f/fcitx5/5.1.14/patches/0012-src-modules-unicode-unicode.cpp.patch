@@ -1,0 +1,64 @@
+--- a/src/modules/unicode/unicode.cpp
++++ b/src/modules/unicode/unicode.cpp
+@@ -1,26 +1,27 @@
+ /*
+  * SPDX-FileCopyrightText: 2012-2017 CSSlayer <wengxt@gmail.com>
+  *
+  * SPDX-License-Identifier: LGPL-2.1-or-later
+  *
+  */
+ #include "unicode.h"
+ #include <algorithm>
+ #include <cctype>
+ #include <cstdint>
++#include <iomanip>
+ #include <memory>
++#include <sstream>
+ #include <string>
+ #include <unordered_set>
+ #include <utility>
+ #include <vector>
+-#include <format>
+ #include "fcitx-utils/capabilityflags.h"
+ #include "fcitx-utils/charutils.h"
+ #include "fcitx-utils/i18n.h"
+ #include "fcitx-utils/inputbuffer.h"
+ #include "fcitx-utils/key.h"
+ #include "fcitx-utils/keysym.h"
+ #include "fcitx-utils/stringutils.h"
+ #include "fcitx-utils/textformatflags.h"
+ #include "fcitx-utils/utf8.h"
+ #include "fcitx/addonfactory.h"
+@@ -450,27 +451,27 @@
+                 }
+                 // Hard limit to prevent do too much lookup.
+                 constexpr int limit = 20;
+                 int counter = 0;
+                 for (auto chr : utf8::MakeUTF8CharRange(str)) {
+                     if (!seenChar.insert(chr).second) {
+                         continue;
+                     }
+                     auto name = data_.name(chr);
+                     std::string display;
++                    std::ostringstream os;
++                    os << utf8::UCS4ToUTF8(chr) << " U+" << std::uppercase
++                       << std::hex << std::setw(4) << std::setfill('0') << chr;
+                     if (!name.empty()) {
+-                        display = std::format("{0} U+{1:04X} {2}",
+-                                              utf8::UCS4ToUTF8(chr), chr, name);
+-                    } else {
+-                        display = std::format("{0} U+{1:04X}",
+-                                              utf8::UCS4ToUTF8(chr), chr);
++                        os << " " << name;
+                     }
++                    display = os.str();
+                     candidateList->append<DisplayOnlyCandidateWord>(
+                         Text(std::move(display)));
+                     if (counter >= limit) {
+                         break;
+                     }
+                     counter += 1;
+                 }
+             }
+             candidateList->setSelectionKey(KeyList(10));
+             candidateList->setPageSize(

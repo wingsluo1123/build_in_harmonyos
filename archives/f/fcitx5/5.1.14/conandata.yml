@@ -1,0 +1,67 @@
+# conandata.yml — fcitx5 5.1.14
+# 官方 tag 源码：https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.14.tar.gz
+# SHA-256 由执行端实际下载核验（c81bbf01…）
+# 补丁由 finish refresh-patch --auto 按文件拆分生成（每文件一个补丁），
+# 内容等价于 Step2 实际验证的 OHOS libc++15 兼容改写。
+
+sources:
+  url:
+    - "https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.14.tar.gz"
+  sha256: "c81bbf0156d083e4c7e7817e658122c33a8c1e585962467f251bc9614bdfee47"
+
+patches:
+  - patch_file: "patches/0001-src-lib-fcitx-utils-eventloopinterface.cpp.patch"
+    description: >
+      OHOS 裁剪 libc++15 缺 <format>（__cpp_lib_format 未定义）：
+      eventloopinterface.cpp 的 std::format("EventLoopException: {0}") →
+      字符串拼接，语义等价。
+  - patch_file: "patches/0002-src-lib-fcitx-utils-i18n.h.patch"
+    description: >
+      i18n.h 多参数 translate/translateCtx/translateDomain/translateDomainCtx
+      模板在无 __cpp_lib_format 时提供兼容实现（vformatCompat 支持 {N}、
+      {N:X}、{} 占位符；完整平台仍用 std::format），修复核心库多参数
+      _("Group {0}: {1}", ...) 等 12 处调用编译。
+  - patch_file: "patches/0003-src-lib-fcitx-utils-log.cpp.patch"
+    description: >
+      log.cpp 的 std::format 日志时间 → strftime（%F %T 等价输出）。
+  - patch_file: "patches/0004-src-lib-fcitx-utils-misc.cpp.patch"
+    description: >
+      misc.cpp 的 std::format("/proc/{pid}/exe") → std::to_string 拼接。
+  - patch_file: "patches/0005-src-lib-fcitx-utils-semver.cpp.patch"
+    description: >
+      semver.cpp 的 std::format 版本串 → std::to_string 拼接。
+  - patch_file: "patches/0006-src-lib-fcitx-utils-standardpaths_p_unix.cpp.patch"
+    description: >
+      standardpaths_p_unix.cpp：std::ranges::transform/copy + std::views →
+      标准 std::transform/std::copy + 显式循环；std::unordered_set<fs::path>
+      （依赖缺失的 hash<fs::path>）→ std::set（operator< 去重，语义等价）。
+  - patch_file: "patches/0007-src-lib-fcitx-utils-testing.cpp.patch"
+    description: >
+      testing.cpp 的 std::views::transform 拼接 → 显式循环 vector<string>。
+  - patch_file: "patches/0008-src-lib-fcitx-icontheme.cpp.patch"
+    description: >
+      icontheme.cpp：VariantOverload 增加显式推导指引（CTAD）；
+      files | std::views::reverse → rbegin/rend 循环（2 处）。
+  - patch_file: "patches/0009-src-modules-spell-CMakeLists.txt.patch"
+    description: >
+      spell 模块 add_custom_command 的 COMMAND 用 ALIAS 目标
+      Fcitx5::comp-spell-dict（CMake 4.1 不展开为可执行路径）。改用真实
+      目标生成器表达式 "$<TARGET_FILE:comp-spell-dict>"，DEPENDS 用真实
+      目标名，语义不变。
+  - patch_file: "patches/0010-src-modules-spell-spell-custom-dict.cpp.patch"
+    description: >
+      spell-custom-dict.cpp 的 std::format("spell/{}_dict.fscd") → 字符串拼接。
+  - patch_file: "patches/0011-src-modules-unicode-charselectdata.cpp.patch"
+    description: >
+      charselectdata.cpp：std::format({0}{1:0{2}x}) → ostringstream 宽度十六
+      进制等价；std::ranges::lower_bound → std::lower_bound（投影手动应用）。
+  - patch_file: "patches/0012-src-modules-unicode-unicode.cpp.patch"
+    description: >
+      unicode.cpp 的 std::format({0} U+{1:04X}) → ostringstream 宽度十六
+      进制等价输出。
+  - patch_file: "patches/0013-test-teststandardpaths_unix.cpp.patch"
+    description: >
+      test/teststandardpaths_unix.cpp 使用 std::ranges::equal（OHOS 裁剪
+      libc++ 缺失）。改写为标准 std::equal（四迭代器版本），并绑定实际
+      directories() 结果为本地变量（避免对临时对象取迭代器），断言语义
+      与期望值完全一致，不改动任何被测代码。
