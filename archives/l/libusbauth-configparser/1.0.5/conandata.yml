@@ -1,0 +1,21 @@
+# conandata.yml — libusbauth-configparser 1.0.5
+# 上游为 monorepo kochstefan/usbauth-all，包在子目录 libusbauth-configparser/，
+# 顶层无独立 tag。此处钉定 commit d40b9790（v1.0.5，AC_INIT 版本 1.0.5），
+# 从官方 codeload 端口取归档；SHA-256 已本地核验。
+# 注意：仓库处于"git 快照、无 configure"状态，conanfile 的 build() 会用
+# autoreconf -fi 引导生成 configure（automake/libtool 经 tool_requires 提供）。
+
+sources:
+  "1.0.5":
+    url: "https://codeload.github.com/kochstefan/usbauth-all/tar.gz/d40b9790f776e698bd84b42ea5555c29ed3fbfee"
+    # codeload URL basename is the bare commit sha (no extension); give an explicit
+    # .tar.gz name so conan picks the tar extractor instead of failing with BadZipFile.
+    filename: "usbauth-all-1.0.5.tar.gz"
+    sha256: "7dc6aa9323ea6de56f0add4c06a72b1efebdc4d49461604c2d6f17e79ddc2ce8"
+
+patches:
+  "1.0.5":
+    - patch_file: "patches/0001-ohos-config-file-path-env-override.patch"
+      patch_description: "Allow the compiled-in /etc/usbauth.conf path to be overridden via $USBAUTH_CONFIG (HarmonyOS /etc is a read-only HMFS mount); default unchanged."
+      patch_type: "portability"
+      base_path: "."

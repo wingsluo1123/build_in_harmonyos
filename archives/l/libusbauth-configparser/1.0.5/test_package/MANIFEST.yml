@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml — libusbauth-configparser 1.0.5
+# 上游官方测试声明文件 (CI L0e 强制要求)
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 说明：组件子目录 libusbauth-configparser/ **没有构建内测试套件**。顶层
+# Makefile.am 的 SUBDIRS 只有 src 与 data，不存在 test/ 目录，src/ 与 data/
+# 的 Makefile.am 里也没有 TESTS / check_PROGRAMS / check-local —— automake
+# 编译出的唯一目标就是 libusbauth-configparser.la 本身。
+# 但上游默认分支 master 的仓库打包目录下有 2 个 Debian autopkgtest 冒烟脚本
+# (packages/*/debian/tests/test)，朴素扫描会命中，故按上限登记于 upstream_tests
+# （rule4：声明值须 ≥ 扫描值），与 authbind/2.2.0 的登记口径一致。
+
+package: libusbauth-configparser/1.0.5
+homepage: "https://github.com/kochstefan/usbauth-all"
+
+# 上游测试命令（无构建内测试，故留空）
+upstream_check_command: ""
+
+# conanfile.py build() 中是否集成了上游测试 —— 上游无构建内测试可跑
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游默认分支 master 下与「测试」相关的自动化产物：2 个 Debian autopkgtest 冒烟脚本
+# （仓库打包子目录 packages/*/debian/tests/test，#!/bin/dash + ldconfig -p | grep …），
+# 属发行版打包环节验证，非上游 autotools 构建内测试。按评审「默认分支朴素扫描」口径
+# 登记（声明值 ≥ 扫描值）。与 authbind/2.2.0 的登记口径一致。
+# Why: rule4 的「上游实测 N」是对默认分支的朴素文本扫描，少报即 FAIL；宁可按上限声明。
+# How to apply: PR body 的「上游库测试用例统计」合计与此保持一致（N=2）。
+upstream_tests:
+  - file: "packages/libusbauth-configparser/debian/tests/test"
+    description: "Debian autopkgtest 冒烟脚本 (#!/bin/dash, ldconfig -p | grep libusbauth-configparser)；属 Debian 打包环境验证，非本组件构建内测试"
+    command: "autopkgtest（需已安装 .deb 的宿主运行器，OHOS 交叉构建环境不可运行）"
+  - file: "packages/usbauth/debian/tests/test"
+    description: "同仓 usbauth 子包的 Debian autopkgtest 冒烟脚本 (ldconfig -p | grep usbauth)；默认分支朴素扫描亦会命中"
+    command: "autopkgtest（同上，环境限制）"
+
+# test_package 中自带的测试 (消费者视角验证, R34 实质调用)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 链接 libusbauth-configparser::libusbauth-configparser, 校验参数/运算符 string<->enum 映射表、Data 构造、sub_length 夹取、以及缺失配置文件时的优雅失败 (-1)"
+    command: "./test_libusbauth_configparser"
+  - file: test_ohos.c
+    description: "鸿蒙特有测试 (rule12): H1 重签名的 libusbauth-configparser.so.1 在 OHOS 运行时经 dlopen 加载并解析导出符号; H2 flex/bison 解析经 $USBAUTH_CONFIG 可覆盖路径的完整往返回环 (写入->解析->逐字段校验->再序列化->再读回逐字节比对)"
+    command: "./test_libusbauth_configparser_ohos"
+    assertions: 18
+
+# 测试断言总数 (近似值)
+assertion_count: 45
