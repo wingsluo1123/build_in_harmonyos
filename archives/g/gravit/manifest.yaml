@@ -1,0 +1,30 @@
+software: gravit
+display: "Gravit"
+description: "重力模拟器：可视化 N 体引力仿真，支持 Lua 脚本生成星系/尘埃/星云等初始条件"
+category: science
+homepage: "https://github.com/gak/gravit"
+license: GPL-2.0-or-later
+build_system: autotools
+ohos_adaptation:
+  key_points:
+    - "鸿蒙 PC 无窗口系统也无窗口 GL：SDL_SetVideoMode(SDL_OPENGL) 的窗口 GL 上下文替换为 OSMesa 离屏上下文，渲染完成的帧拷贝到 SDL 软件表面（SDL_VIDEODRIVER=dummy 即可）"
+    - "制品仓 mesa 为 OSMesa-only（无 libGL/libEGL），故 configure 的 gl/glu pkg-config 探针需由配方补一份指向 OSMesa 的 gl.pc"
+    - "0.5.1 发行包只有 configure.in/Makefile.am，须先重建 autotools；automake 来自 conan 工具包，其脚本 shebang 指向设备 perl 而工具包又导出另一版本的 PERL5LIB，必须清除工具包 perl/autoconf 环境后用同一解释器驱动"
+    - "configure 内嵌的 config.status 模板以 umask 077 建临时目录，setgid hmdfs 上 0700 目录连创建者都不可写，须改为按环境 umask 创建"
+    - "数据/配置目录为编译期绝对路径（//share/gravit、/etc/gravit），包安装在任意前缀下会找不到字体与贴图，findFile() 增加可执行文件相对查找"
+    - "SDL 1.2 由 sdl12-compat 提供（sdl-image/sdl_ttf 也链接它），避免进程内出现两份 SDL 实现"
+    - "AX_EXT_SSE 的 x86 CPUID 探针在 aarch64 上会让 configure 报 bad number '0xunknown'，须只在 x86 上执行"
+  common_dependencies:
+    - sdl12-compat
+    - sdl-image
+    - sdl_ttf
+    - lua
+    - libpng
+    - glu
+    - mesa
+versions:
+  "0.5.1":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "gravit/0.5.1"
+    upstream_version: "0.5.1"

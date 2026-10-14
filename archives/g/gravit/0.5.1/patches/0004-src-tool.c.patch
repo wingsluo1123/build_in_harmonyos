@@ -1,0 +1,95 @@
+--- a/src/tool.c
++++ b/src/tool.c
+@@ -388,20 +388,54 @@
+ int fileExists(char *path) {
+ 
+     FILE *fp;
+     fp = fopen(path, "rb");
+     if (!fp) return 0;
+     fclose(fp);
+     return 1;
+ 
+ }
+ 
++#ifndef WIN32
++// Returns "<directory holding the running executable>/..", i.e. the install
++// prefix a relocatable package was unpacked into, or NULL when it cannot be
++// determined.
++static char *executablePrefixRoot() {
++
++    static char root[4096];
++    static int cached = 0;
++    char exe[4096];
++    char *slash;
++    ssize_t len;
++
++    if (cached)
++        return root[0] ? root : 0;
++
++    cached = 1;
++
++    len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
++    if (len <= 0)
++        return 0;
++
++    exe[len] = 0;
++    slash = strrchr(exe, '/');
++    if (!slash)
++        return 0;
++
++    *slash = 0;
++    snprintf(root, sizeof(root), "%s/..", exe);
++
++    return root;
++
++}
++#endif
++
+ // finds a file in gravit's search paths
+ char *findFile(char *file) {
+ 
+ #ifndef WIN32
+     char *homeDir;
+ #endif
+     char *tmp;
+ 
+     // first assume no path, so someone could load "/tmp/script" or "currentdirectory.cfg"
+     if (fileExists(file))
+@@ -415,20 +449,37 @@
+ #if __MACH__
+     
+     NSBundle *mainBundle = [NSBundle mainBundle];
+     tmp = va("%s/../%s", [[mainBundle pathForResource:@"" ofType:@""] UTF8String], file);
+     if (fileExists(tmp))
+         return tmp;
+ 
+ #endif
+     
+ #ifndef WIN32
++    // HarmonyOS PC: this package is installed under an arbitrary prefix (the
++    // Conan package folder), so the absolute DATA_DIR/SYSCONFDIR roots baked
++    // in at configure time do not exist on the device.  Resolve them relative
++    // to the running executable, and (for installs that still carry the
++    // layout) relative to the current directory.
++    tmp = va("%s/%s", executablePrefixRoot(), file[0] == '/' ? file + 1 : file);
++    if (fileExists(tmp)) {
++        return tmp;
++    }
++
++    if (file[0] == '/') {
++        tmp = va("%s", file + 1);
++        if (fileExists(tmp)) {
++            return tmp;
++        }
++    }
++
+     // now look in the users gravit directory (only in UNIX) - /home/user/.gravit/file
+     homeDir = getenv("HOME");
+     if (homeDir) {
+         tmp = va("%s/.gravit/%s", homeDir, file);
+         if (fileExists(tmp)) {
+             return tmp;
+         }
+     }
+ #endif
+ 

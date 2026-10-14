@@ -1,0 +1,260 @@
+--- a/src/gfx.c
++++ b/src/gfx.c
+@@ -140,57 +140,205 @@
+         loadSkyBoxTexture(va("%s%s", skyFile, "right.png"), skyBoxTextureIDs + 3);
+         loadSkyBoxTexture(va("%s%s", skyFile, "top.png"),   skyBoxTextureIDs + 4);
+         loadSkyBoxTexture(va("%s%s", skyFile, "bottom.png"),skyBoxTextureIDs + 5);
+     } else {        
+         // use one texture for all box surfaces
+         simpleSkyBox = 1;
+         loadSkyBoxTexture(skyFile, &skyBoxTextureID);
+     }
+ }
+ 
++#ifdef OSMESA_RENDER
++
++#include <GL/osmesa.h>
++
++/* Offscreen GL backend: HarmonyOS PC has no window system (X11/Wayland/EGL)
++   and therefore no window-system OpenGL, so the SDL surface is a plain
++   software surface and the GL context is created by Mesa's OSMesa offscreen
++   software renderer.  Every frame is rendered into a private buffer and
++   published by copying it onto the SDL surface in gfxOffscreenSwap(), which
++   replaces SDL_GL_SwapBuffers().  The macro names the capability that is
++   needed, not the platform, and is defined by the recipe. */
++
++#define GRAVIT_OFFSCREEN_WIDTH 800
++#define GRAVIT_OFFSCREEN_HEIGHT 600
++
++#define GRAVIT_GL_GET_PROC_ADDRESS(name) OSMesaGetProcAddress(name)
++
++static OSMesaContext gfxOffscreenContext = NULL;
++static unsigned char *gfxOffscreenBuffer = NULL;
++static int gfxOffscreenWidth = 0;
++static int gfxOffscreenHeight = 0;
++
++static void gfxOffscreenFree() {
++
++    if (gfxOffscreenContext) {
++        OSMesaDestroyContext(gfxOffscreenContext);
++        gfxOffscreenContext = NULL;
++    }
++
++    if (gfxOffscreenBuffer) {
++        free(gfxOffscreenBuffer);
++        gfxOffscreenBuffer = NULL;
++    }
++
++    gfxOffscreenWidth = 0;
++    gfxOffscreenHeight = 0;
++
++}
++
++static int gfxOffscreenInit(int width, int height) {
++
++    gfxOffscreenFree();
++
++    gfxOffscreenBuffer = (unsigned char *) malloc((size_t) width * height * 4);
++    if (!gfxOffscreenBuffer) {
++        conAdd(LERR, "Could not allocate a %ix%i offscreen render buffer", width, height);
++        return 0;
++    }
++    memset(gfxOffscreenBuffer, 0, (size_t) width * height * 4);
++
++    /* 16 bit depth, no stencil/accumulator: what the fixed function pipeline
++       used below and the glReadPixels() screenshot path need. */
++    gfxOffscreenContext = OSMesaCreateContextExt(OSMESA_RGBA, 16, 0, 0, NULL);
++    if (!gfxOffscreenContext) {
++        conAdd(LERR, "Could not create an offscreen GL context");
++        gfxOffscreenFree();
++        return 0;
++    }
++
++    if (!OSMesaMakeCurrent(gfxOffscreenContext, gfxOffscreenBuffer, GL_UNSIGNED_BYTE, width, height)) {
++        conAdd(LERR, "Could not make the offscreen GL context current");
++        gfxOffscreenFree();
++        return 0;
++    }
++
++    gfxOffscreenWidth = width;
++    gfxOffscreenHeight = height;
++
++    /* Rows of the OSMesa buffer run top to bottom, matching both the SDL
++       surface layout and the upside-down trick the screenshot code uses. */
++    OSMesaPixelStore(OSMESA_Y_UP, 0);
++
++    conAdd(LNORM, "Offscreen GL context: %s", (char *) glGetString(GL_VERSION));
++
++    return 1;
++
++}
++
++/* There is no front/back buffer to swap on an offscreen context: publish the
++   finished frame by copying it onto the SDL software surface. */
++static void gfxOffscreenSwap() {
++
++    int x, y;
++    SDL_Surface *surface = video.sdlScreen;
++    unsigned char *destination;
++
++    glFinish();
++
++    if (!surface)
++        return;
++
++    if (SDL_MUSTLOCK(surface) && SDL_LockSurface(surface) < 0)
++        return;
++
++    destination = (unsigned char *) surface->pixels;
++
++    for (y = 0; y < gfxOffscreenHeight; y++) {
++
++        Uint32 *dst = (Uint32 *) (destination + (size_t) y * surface->pitch);
++        const unsigned char *src = gfxOffscreenBuffer + (size_t) y * gfxOffscreenWidth * 4;
++
++        for (x = 0; x < gfxOffscreenWidth; x++) {
++            dst[x] = SDL_MapRGBA(surface->format, src[0], src[1], src[2], src[3]);
++            src += 4;
++        }
++
++    }
++
++    if (SDL_MUSTLOCK(surface))
++        SDL_UnlockSurface(surface);
++
++    SDL_UpdateRect(surface, 0, 0, 0, 0);
++
++}
++
++#else
++
++#define GRAVIT_GL_GET_PROC_ADDRESS(name) SDL_GL_GetProcAddress(name)
++
++#endif
++
+ int gfxSetResolution() {
+     SDL_VideoInfo* videoInfo;
+ 
+     video.screenW = video.screenWtoApply;
+     video.screenH = video.screenHtoApply;
+ 
++#ifdef OSMESA_RENDER
++    /* No window-system GL here: SDL only supplies a software surface, the
++       GL context is created by gfxOffscreenInit() below. */
++    video.flags = SDL_SWSURFACE | SDL_RESIZABLE;
++#else
+     if (video.screenAA) {
+ 
+         SDL_GL_SetAttribute( SDL_GL_MULTISAMPLEBUFFERS, 1);
+         SDL_GL_SetAttribute( SDL_GL_MULTISAMPLESAMPLES, 4);
+ 
+     } else {
+         SDL_GL_SetAttribute( SDL_GL_MULTISAMPLEBUFFERS, 0);
+         SDL_GL_SetAttribute( SDL_GL_MULTISAMPLESAMPLES, 0);
+     }
+ 
+     video.flags = SDL_OPENGL;
+ 
+     if (video.screenFS)
+         video.flags |= SDL_FULLSCREEN;
+     else
+         video.flags |= SDL_RESIZABLE;
++#endif
+     
+     videoInfo = (SDL_VideoInfo*) SDL_GetVideoInfo();
+     
++#ifdef OSMESA_RENDER
++    /* A windowless video driver reports no desktop mode at all. */
++    video.screenFS = 0;
++    if (videoInfo && (!video.screenW || !video.screenH)) {
++        video.screenW = videoInfo->current_w;
++        video.screenH = videoInfo->current_h;
++    }
++#else
+     if (!video.screenW || !video.screenH || video.screenFS) {
+         video.screenW = videoInfo->current_w;
+         video.screenH = videoInfo->current_h;
+     }
+-
++#endif
++
++#ifdef OSMESA_RENDER
++    /* The offscreen frame is published through a 32 bit surface. */
++    if (!video.screenW) video.screenW = GRAVIT_OFFSCREEN_WIDTH;
++    if (!video.screenH) video.screenH = GRAVIT_OFFSCREEN_HEIGHT;
++    video.screenBPP = 32;
++#else
+     SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1);
++#endif
+     
+     video.sdlScreen = SDL_SetVideoMode(video.screenW, video.screenH, video.screenBPP, video.flags );
+     if (!video.sdlScreen) {
+         conAdd(LERR, "SDL_SetVideoMode failed: %s", SDL_GetError()); SDL_ClearError();
+         return 1;
+     }
++
++#ifdef OSMESA_RENDER
++    if (!gfxOffscreenInit(video.screenW, video.screenH))
++        return 1;
++#endif
+ 
+     glEnable(GL_TEXTURE_2D);
+ 
+     // need to (re)load textures
+     if (!loadFonts())
+         return 2;
+ 
+     if (!loadParticleTexture())
+         return 3;
+ 
+@@ -1326,21 +1474,25 @@
+     
+ #ifndef WITHOUT_AGAR
+     drawAgar();
+ #else
+     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+ #endif
+ 
+     if (view.screenshotLoop)
+         cmdScreenshot(NULL);
+ 
++#ifdef OSMESA_RENDER
++    gfxOffscreenSwap();
++#else
+     SDL_GL_SwapBuffers();
++#endif
+     sdlCheck();
+     glCheck();
+ }
+ 
+ void drawCube() {
+ 
+     glBegin(GL_QUADS);
+ 
+     glVertex3i(1,1,1);
+     glVertex3i(1,-1,1);
+@@ -1384,22 +1536,22 @@
+     char *extList;
+ 
+     video.supportPointParameters = 0;
+ 
+     extList = (char *)glGetString(GL_EXTENSIONS);
+ 
+     if (strstr(extList, "GL_ARB_point_parameters") == 0) {
+         return;
+     }
+ 
+-    glPointParameterfARB_ptr = (FPglPointParameterfARB) SDL_GL_GetProcAddress("glPointParameterfARB");
+-    glPointParameterfvARB_ptr = (FPglPointParameterfvARB) SDL_GL_GetProcAddress("glPointParameterfvARB");
++    glPointParameterfARB_ptr = (FPglPointParameterfARB) GRAVIT_GL_GET_PROC_ADDRESS("glPointParameterfARB");
++    glPointParameterfvARB_ptr = (FPglPointParameterfvARB) GRAVIT_GL_GET_PROC_ADDRESS("glPointParameterfvARB");
+ 
+     if (!glPointParameterfARB_ptr || !glPointParameterfvARB_ptr)
+         return;
+ 
+     video.supportPointParameters = 1;
+ 
+ }
+ 
+ void checkPointSprite() {
+ 

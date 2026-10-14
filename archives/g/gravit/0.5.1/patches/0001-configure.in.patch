@@ -1,0 +1,66 @@
+--- a/configure.in
++++ b/configure.in
+@@ -59,23 +59,31 @@
+ #AX_OPENMP
+ AC_OPENMP
+ AC_CHECK_HEADERS([omp.h],[
+ 	CFLAGS="$CFLAGS $OPENMP_CFLAGS"
+ 	CPPFLAGS="$CPPFLAGS $OPENMP_CFLAGS"
+ 	LDFLAGS="$LDFLAGS $OPENMP_CFLAGS"
+      ])
+ 
+ # check for supported SIMD extensions (gcc specific)
+ # if SSE is supported, HAVE_SSE will be set
+-AX_EXT_SSE
+-CFLAGS="$CFLAGS $SIMD_FLAGS -I/usr/local/include"
+-LDFLAGS="$SIMD_FLAGS $LDFLAGS -L/usr/local/lib"
++# AX_EXT_SSE probes the x86 CPUID instruction: on any other architecture the
++# probe yields "unknown" and the macro's shell arithmetic aborts configure
++# ("bad number '0xunknown'").  MMX/SSE only exist on x86, and every use of
++# them in this tree is guarded by HAVE_SSE.
++case "$host_cpu" in
++  i?86|x86_64|amd64)
++    AX_EXT_SSE
++    ;;
++esac
++CFLAGS="$CFLAGS $SIMD_FLAGS"
++LDFLAGS="$SIMD_FLAGS $LDFLAGS"
+ 
+ # windows gcc needs -mstackrealign (to avoid crash on XP)
+ if test x"$ax_cv_c_compiler_vendor" = x"gnu" ; then
+     if test x"$host" = x"i686-pc-mingw32" ; then
+         CFLAGS="$CFLAGS -mstackrealign"
+         LDFLAGS="$LDFLAGS -mstackrealign"
+     fi
+ fi
+ 
+ # try to add compiler-specific optimization flags
+@@ -118,22 +126,26 @@
+ dnl get X11 default libs
+ AC_PATH_XTRA
+ CPPFLAGS="$CPPFLAGS $X_CFLAGS"
+ LIBS="$X_PRE_LIBS $LIBS $X_LIBS $X_EXTRA_LIBS"
+ 
+ #check if we need to link with -lm
+ AC_CHECK_LIB([m], [pow])
+ 
+ # Checks for library functions.
+ AC_FUNC_CLOSEDIR_VOID
+-AC_FUNC_MALLOC
+-AC_FUNC_REALLOC
++dnl AC_FUNC_MALLOC / AC_FUNC_REALLOC are deliberately not used here: where
++dnl malloc(0)/realloc(p,0) do not behave the way gnulib expects they rewrite
++dnl malloc/realloc to rpl_malloc/rpl_realloc, and this tree ships no gnulib
++dnl replacement module, so linking fails with "undefined reference to
++dnl `rpl_realloc'".  Upstream dropped both again on the develop branch for
++dnl exactly this reason.
+ AC_FUNC_SELECT_ARGTYPES
+ AC_FUNC_STAT
+ AC_FUNC_VPRINTF
+ AC_CHECK_FUNCS([atexit floor ftime memset mkdir pow select sqrt strchr strdup strerror strstr])
+ 
+ # check for functions to do aligned malloc
+ AC_CHECK_HEADERS([intrin.h x86intrin.h xmmintrin.h malloc.h memory.h])
+ AC_CHECK_FUNCS([memalign _mm_malloc _mm_free _aligned_malloc __mingw_aligned_malloc])
+ # AC_CHECK_FUNCS([posix_memalign])
+ AX_FUNC_POSIX_MEMALIGN

@@ -1,0 +1,31 @@
+--- a/src/command.c
++++ b/src/command.c
+@@ -159,22 +159,26 @@
+ 
+ #endif
+     ,{ NULL,						NULL,					NULL,						NULL,								NULL }
+ 
+ };
+ 
+ void commandInit() {
+ 
+     FILE *fp;
+     char buffer[FILE_CHUNK_SIZE_SMALL];
+-
+-    fp = fopen(MISCDIR "/commandhelp.txt", "rb");
++    char *helpFile;
++
++    /* MISCDIR is an install-time absolute path that does not exist on
++       HarmonyOS PC; findFile() knows the package-relative locations. */
++    helpFile = findFile(MISCDIR "/commandhelp.txt");
++    fp = helpFile ? fopen(helpFile, "rb") : NULL;
+     if (!fp) {
+         conAdd(LERR, "Could not open " MISCDIR "/commandhelp.txt");
+         return;
+     }
+ 
+     while (fgets(buffer, FILE_CHUNK_SIZE_SMALL, fp)) {
+ 
+         char *ptrCmd,*ptrDesc;
+         int c;
+ 

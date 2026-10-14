@@ -1,0 +1,59 @@
+# conandata.yml — gravit 0.5.1
+# R39: only the official source (GitHub release archive of the upstream repo).
+sources:
+  url: "https://github.com/gak/gravit/archive/refs/tags/0.5.1.tar.gz"
+  sha256: "f6af123e101f86594f74406c8fa973686bf3e7a73132c118d33ff5c9885531af"
+
+patches:
+  "0.5.1":
+    - patch_file: "patches/0001-configure.in.patch"
+      patch_description: >-
+        configure.in: drop the hardcoded /usr/local include and library paths
+        (meaningless in a package build), stop using AC_FUNC_MALLOC /
+        AC_FUNC_REALLOC, and only run the x86 CPUID based SIMD probe on x86.
+        Where malloc(0)/realloc(p,0) do not behave the way gnulib expects those
+        two macros rewrite malloc/realloc to rpl_malloc/rpl_realloc while this
+        tree ships no gnulib replacement module, so the link fails with
+        "undefined reference to `rpl_realloc'" (upstream removed both again on
+        the develop branch for exactly this reason); AX_EXT_SSE's CPUID probe
+        makes configure abort with "bad number '0xunknown'" on any other
+        architecture.
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-command.c.patch"
+      patch_description: >-
+        src/command.c: commandInit() fopen()s MISCDIR/commandhelp.txt directly
+        instead of going through findFile(), so the install-time absolute path
+        never resolves on HarmonyOS PC and the console starts without its help
+        text. Uses findFile() like every other data file lookup in the tree.
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-gfx.c.patch"
+      patch_description: >-
+        src/gfx.c: add an offscreen GL backend (OSMESA_RENDER, defined by this
+        recipe) — HarmonyOS PC has no window system and no window-system GL, so
+        the SDL surface becomes a plain software surface and the GL context
+        comes from Mesa's OSMesa offscreen software renderer; the finished frame
+        is copied onto that surface in place of SDL_GL_SwapBuffers(), and GL
+        entry points are resolved through OSMesaGetProcAddress(). A windowless
+        video driver reports no desktop mode, so the offscreen size falls back
+        to a usable default. The macro is named after the capability, not the
+        platform (R8).
+      patch_type: "portability"
+    - patch_file: "patches/0004-src-tool.c.patch"
+      patch_description: >-
+        src/tool.c: findFile() resolves the compile-time absolute DATA_DIR /
+        SYSCONFDIR roots relative to the running executable (and to the current
+        directory) as well. On HarmonyOS PC the package lives under an arbitrary
+        prefix, so the baked-in //share/gravit and /etc/gravit paths do not
+        exist and the fonts/textures/spawn scripts would never be found.
+      patch_type: "portability"
+    - patch_file: "patches/0005-src-gravit.h.patch"
+      patch_description: >-
+        src/gravit.h: only include sys/timeb.h when configure found it — the
+        header (and its ftime()) does not exist in musl, which HarmonyOS PC
+        uses, and gravit.h included it unconditionally. The same file also loses
+        the tentative definitions of video/state/view: since GCC 10 and current
+        clang the default is -fno-common, so defining them in the header turns
+        into a "duplicate symbol" link failure and only main.c may define them
+        (upstream made exactly this change on its develop branch, commit 0f84883
+        "gravit: fix build on gcc-10 (-fno-common)").
+      patch_type: "portability"
