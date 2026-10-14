@@ -1,0 +1,113 @@
+--- a/src/clReflectTest/CMakeLists.txt
++++ b/src/clReflectTest/CMakeLists.txt
+@@ -16,62 +16,72 @@
+   )
+ 
+ add_clreflect_executable(clReflectTest ${CL_REFLECT_TEST_SOURCES})
+ 
+ target_link_libraries(clReflectTest
+   clReflectCpp
+   clReflectUtil
+   ${CMAKE_DL_LIBS}
+   )
+ 
++# OHOS: GetLoadAddress() (dlopen(0)+dlsym "_start") returns 0 at runtime, so
++# RebaseFunctions keeps map-file addresses unchanged. Link the test executable
++# non-PIE (with PIC objects) so lld map VMA == runtime absolute address and
++# reflected function addresses resolve correctly.
++set_target_properties(clReflectTest PROPERTIES
++  COMPILE_FLAGS "-fPIC"
++  LINK_FLAGS "-no-pie")
++
+ # Map file handling
+ option(CL_REFLECT_GENERATE_MAP_FILE_FOR_TEST "Generate map file for test" ON)
+ if(CL_REFLECT_GENERATE_MAP_FILE_FOR_TEST)
+-  get_property(CL_REFLECT_TEST_EXECUTABLE TARGET clReflectTest PROPERTY LOCATION)
++  set(CL_REFLECT_TEST_MAP "${CMAKE_CURRENT_BINARY_DIR}/clReflectTest.map")
+ 
+-  # generates map file
+   if (MSVC)
+-    # Generates path for map file
+-    string(REPLACE ".exe" ".map" CL_REFLECT_TEST_MAP ${CL_REFLECT_TEST_EXECUTABLE})
+-
+-    # From what I see, currently cmake can set the map link flags,
+-    # but cmake does not support appending customized map file name(I may
+-    # be wrong on this). Luckily, by using default options of MSVC
+-    # we can generate a map file with same name and same path as exe file.
+-    # We will simply use this map file.
++    # generates map file (default MSVC linker flag produces .map alongside the exe)
+     set_target_properties(clReflectTest PROPERTIES LINK_FLAGS
+       /MAP)
+   endif()
+ 
+   if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+-    # On Linux/Mac, executables have no extensions
+-    set(CL_REFLECT_TEST_MAP "${CL_REFLECT_TEST_EXECUTABLE}.map")
+-
+     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+       set(CL_REFLECT_TEST_MAP_CMD_ARGUMENT "-Wl,-map,${CL_REFLECT_TEST_MAP}")
+     else ()
+       set(CL_REFLECT_TEST_MAP_CMD_ARGUMENT "-Wl,-Map,${CL_REFLECT_TEST_MAP}")
+     endif()
+ 
++    # -no-pie is merged here (not above) so it survives alongside the map flag
+     set_target_properties(clReflectTest PROPERTIES LINK_FLAGS
+-      "${CL_REFLECT_TEST_MAP_CMD_ARGUMENT}")
++      "-no-pie ${CL_REFLECT_TEST_MAP_CMD_ARGUMENT}")
+   endif (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+ 
+   # uses map file during exporting
+   set(GEN_MAP_ARGUMENTS -map ${CL_REFLECT_TEST_MAP})
+ endif()
+ 
+ # add project include path
+ get_property(inc_dirs DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
+ foreach(inc ${inc_dirs})
+-  set(GEN_CPPBIN_INCLUDE_PATH ${GEN_CPPBIN_INCLUDE_PATH} -i ${inc})
++  set(GEN_CPPBIN_INCLUDE_PATH ${GEN_CPPBIN_INCLUDE_PATH} -I ${inc})
+ endforeach(inc)
++
++# OHOS SDK system include paths for the clang-based scanner (ClangTool does not
++# inherit the driver default sysroot when run in-process; must pass explicitly).
++# `__clcpp_parse__` is the clReflect scanning marker that expands clcpp_reflect
++# macros into annotate attributes the scanner's ReflectionSpecs::Gather reads.
++set(LLVM_ROOT "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm")
++set(GEN_CPPBIN_INCLUDE_PATH ${GEN_CPPBIN_INCLUDE_PATH}
++  --target=aarch64-linux-ohos
++  -D__clcpp_parse__
++  -isystem ${LLVM_ROOT}/include/libcxx-ohos/include/c++/v1
++  -isystem ${LLVM_ROOT}/bin/../../sysroot/usr/include/aarch64-linux-ohos
++  -isystem ${LLVM_ROOT}/bin/../../sysroot/usr/include)
+ 
+ # add system include path
+ if (MSVC)
+   set(MSVC_INSTALL_PATH $ENV{VS80COMNTOOLS}../..
+     CACHE PATH "Installation path for MSVC")
+   if (${MSVC_INSTALL_PATH} STREQUAL "")
+     message(FATAL_ERROR "Cannot MSVC instal path")
+   else()
+     set(sys_inc_dirs ${sys_inc_dirs} ${MSVC_INSTALL_PATH}/VC/include)
+   endif()
+@@ -96,21 +106,21 @@
+   string(REPLACE ".cpp" "_astlog.txt" astlog_file ${src_file})
+   string(REPLACE ".cpp" "_speclog.txt" speclog_file ${src_file})
+ 
+   # calling clscan
+   add_custom_command(
+     OUTPUT ${CL_REFLECT_GEN_DIRECTORY}/${csv_file}
+     COMMAND clReflectScan ${CMAKE_CURRENT_SOURCE_DIR}/${src_file}
+     -output ${CL_REFLECT_GEN_DIRECTORY}/${csv_file}
+     -ast_log ${CL_REFLECT_GEN_DIRECTORY}/${astlog_file}
+     -spec_log ${CL_REFLECT_GEN_DIRECTORY}/${speclog_file}
+-    ${GEN_CPPBIN_INCLUDE_PATH}
++    -- ${GEN_CPPBIN_INCLUDE_PATH}
+     DEPENDS clReflectScan ${src_file})
+ 
+   # adds to gen file list
+   set(GEN_FILE_LIST ${GEN_FILE_LIST} ${CL_REFLECT_GEN_DIRECTORY}/${csv_file})
+ endforeach(src_file)
+ 
+ set(GEN_MERGED_CSV_FILE ${CL_REFLECT_GEN_DIRECTORY}/clReflectTest.csv)
+ set(GEN_CPPBIN_FILE ${CL_REFLECT_BIN_DIRECTORY}/clReflectTest.cppbin)
+ 
+ # merges all gen file into single csv file
