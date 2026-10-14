@@ -1,0 +1,90 @@
+software: gem5
+version: "25.1.0.1"
+status: built
+build_system: scons
+build_date: "2026-10-08"
+source:
+  url: "https://github.com/gem5/gem5/archive/refs/tags/v25.1.0.1.tar.gz"
+  sha256: "86bf3123e68c953db3d5358017e1649419a2c02944cf8b4c390911c06aa119b9"
+  upstream_version: "25.1.0.1"
+build:
+  system: scons
+  target: "build/ARM/gem5.opt"
+  configure_options:
+    - "scons bootstrap: python3 -m pip install --target=<build>/_scons_env scons==4.11.1"
+    - "PYTHON_CONFIG=<generated python3-config shim>"
+    - "CCFLAGS_EXTRA=-I<compat> -I<zlib>/include"
+    - "LINKFLAGS_EXTRA=/system/lib64/libc.so -L<zlib>/lib -Wl,-rpath,<python>/lib"
+  dependencies:
+    - "zlib/1.3.1"
+    - "python/3.12.9 (build-time CPython, tool_requires, E543)"
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-src-arch-arm-freebsd-se_workload.cc.patch"
+  - "0002-src-cpu-kvm-timer.cc.patch"
+  - "0003-src-kern-linux-linux.cc.patch"
+  - "0004-src-base-circular_queue.hh.patch"
+  - "0005-src-sim-fd_entry.hh.patch"
+knowledge_gained:
+  - "gem5 SCons ignores command-line variable assignments; compiler/flags must be injected through the process environment (CC/CXX/PYTHON_CONFIG from site_scons/gem5_scons/defaults.py and CCFLAGS_EXTRA/LINKFLAGS_EXTRA from SConstruct:987)."
+  - "OHOS ships no python3-config and gem5 requires one; a shim generated from the actual CPython (discovered paths) unblocks configure."
+  - "zlib is a hard dependency; inject the static conan zlib via -I/-L and never add -L/system/lib64 to the link flags (it hijacks libc++ resolution)."
+  - "OHOS stdio.h defines stdin/stdout/stderr as parenthesized macros, breaking C++ qualified/member uses in generated SimObject params; a private stdio.h shim undefines them."
+  - "ucontext functions (getcontext/makecontext/swapcontext) are only in the OHOS runtime libc; link /system/lib64/libc.so by absolute path."
+  - "The embedded CPython needs PYTHONHOME=<site python prefix> at run time; embedding an rpath for the CPython lib dir removes the LD_LIBRARY_PATH requirement."
+  - "The stage-2 AArch32 hello guest exit code 13 was an AArch32 SE loader artifact; an AArch64 SE guest exits with code 0."
+  - "SCons 4.x hardcodes env['SHELL'] = 'sh' in SCons/Platform/posix.py and resolves that bare name against the spawned child PATH. In CI appspawn sandboxes the lookup fails, so every Configure probe reports no with the detail only in config.log. Pinning '/system/bin/sh' in the installed copy fixes it (godot 4.7.2 / gpsd 3.26 / serf 1.3.10 / vixl 5.1.0 precedent)."
+  - "A self-contained build-time CPython (tool_requires python/3.12.9, ohpcd binary with Python.h + libpython3.12.so) must be bound end to end: python3-config shim, PYTHONHOME, linker rpath, LD_LIBRARY_PATH append and SCons invoked through that interpreter; additionally its stdlib + lib-dynload must be on PYTHONPATH because SCons strips PYTHONHOME from child environments and embedded tools (gem5py) would otherwise fail with ModuleNotFoundError zlib. Candidates are asserted on Python.h + libpython3.12.so* with an explicit self.fail."
+knowledge_ref:
+  - "archives/g/gem5/25.1.0.1/notes.md"
+  - "archives/g/gem5/25.1.0.1/reports/test-report.md"
+
+test_passed: 100
+test_failed: 10
+
+test_results:
+  type: passed_with_external_limitation
+  total: 110
+  passed: 100
+  failed: 10
+  test_passed: 100
+  test_failed: 10
+  note: "pyunit 110 executed / 100 passed（90.9%）；10 项未通过全部为 tests/pyunit/stdlib/resources 外部 HTTP 429 限流；C++ 单测抽样 13/13；鸿蒙特有 test_package 4/4"
+  test_package: "passed: packaged bin/gem5.opt ran a freestanding AArch64 SE guest end-to-end, 4/4 assertions (2 runs: full build + verify cache hit)"
+  upstream: "pyunit 110 executed / 100 passed (9.2s); 10 failures are gem5 resources API HTTP 429 rate limiting (external service); C++ sample build/ARM/base/bitunion.test.opt 13/13 passed; testlib suite and full unittests.opt not run (external resources / build budget, see reports/test-report.md)"
+  conan_verify: "PASS rc=0 (G0-G4/L2/L4/L5); G4 package-id lookup warning skipped L2/L4/L5 in the tool, manual equivalents passed (--help rc=0; PIE/NX/BIND_NOW/RUNPATH)"
+  package_id: "d19813127f0ec2ca84c0b48cbd85080965097448"
+  binary_sha256: "7b2ead5c582c36bc93b1e92a91bbd9fd13a75321374ba7089ed400a2a32c7013"
+  verified_at: "2026-10-08T18:58:00"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/gem5-25.1.0.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/gem5-25.1.0.1.work
+  source_orig_hash: 6a4837120bf14c4e
+  source_work_hash: 84e7e5ab86523b29
+  generated_at: '2026-09-26T18:26:45'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-src-arch-arm-freebsd-se_workload.cc.patch
+    type: portability
+    platform_only: true
+    guard: "__FreeBSD__ || __APPLE__ (no __OHOS__ macro in source)"
+  - file: 0002-src-cpu-kvm-timer.cc.patch
+    type: portability
+    platform_only: true
+    guard: "__GLIBC__ (no __OHOS__ macro in source)"
+  - file: 0003-src-kern-linux-linux.cc.patch
+    type: portability
+    platform_only: false
+    guard: "none (TMPDIR runtime fallback, applies everywhere)"
+  - file: 0004-src-base-circular_queue.hh.patch
+    type: portability
+    platform_only: false
+    guard: "none (missing <sys/types.h> include)"
+  - file: 0005-src-sim-fd_entry.hh.patch
+    type: portability
+    platform_only: false
+    guard: "none (missing <sys/types.h> include)"
