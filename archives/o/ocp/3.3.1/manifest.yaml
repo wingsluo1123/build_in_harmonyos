@@ -1,0 +1,106 @@
+# 版本级 manifest
+# 文件位置: archives/o/ocp/3.3.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.3.1"
+software: "ocp"
+status: published
+
+build_date: "2026-10-02"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # release 资产：自带 vendored 解码子模块（codeload 的纯 tag 归档缺子模块，
+  # configure 会硬失败）
+  url: "https://github.com/mywave82/opencubicplayer/releases/download/v3.3.1/ocp-3.3.1.tar.gz"
+  sha256: "975a615ad4ef98c4ee03df7238db51199df976e9f9147d73fc971163d57e6a10"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  # 说明: in-source build（folders.build = "."）——configure 以相对路径校验 vendored 子模块
+  # 说明: make -j1（R9）
+  configure_options:
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--with-x11=no"
+    - "--without-info"
+    - "--without-desktop_file_install"
+    - "--without-update-mime-database"
+    - "--without-update-desktop-database"
+
+  dependencies:
+    - ncurses/6.6
+    - zlib/1.3.2
+    - bzip2/1.0.8.2
+    - mad/0.16.4
+    - libogg/1.3.6
+    - libvorbis/1.3.7
+    - flac/1.5.0
+    - libpng/1.6.58.3
+    - libjpeg-turbo/3.2.0
+    - game-music-emu/0.6.5
+    - alsa-lib/1.2.16.1
+    - libdiscid/0.6.5
+    - cjson/1.7.19
+    - ancient/2.3.0
+    - tool_requires xa/2.4.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-autotools-ohos-triplet.patch"
+  - "0002-configure-ohos-config-status-tmpdir.patch"
+  - "0003-ocp-tests-writable-scratch-dir.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E007：仓库自带 config.guess/config.sub 不识别 HarmonyOS，须补 aarch64-unknown-linux-ohos 三元组；禁用 --build/--host 伪造手段"
+  - "E002：HarmonyOS /tmp 只读——上游测试把 scratch 写死在 /tmp/ 会失败（rc=255/SIGSEGV），须改为构建树内相对目录"
+  - "mktemp -d 在 HarmonyOS 产出 drwx--S--- 目录，令依赖临时目录可写性的 configure 快路径失败（subs1.awk: Permission denied）"
+  - "内置 Makefile 规则可能用 $(CC) 配 C++ 标志编 .c（playopl/adplug）：配方侧 rm_safe(compiler.cppstd/libcxx) 可消除该标志泄漏"
+  - "部分 Makefile 规则不带 -I/-L，须同时注入 CPATH/LIBRARY_PATH（不只 CPPFLAGS/LDFLAGS）"
+  - "依赖自带 .pc 的 prefix/includedir 可能失效（ancient prefix=/、cjson 指向已消失的构建暂存目录），须归一化暂存并置于 PKG_CONFIG_PATH 首位"
+  - "上游 filesel/mdb-test 链接规则只链 mdb-test.c，缺 stuff/utf-8.c 等对象，属上游缺陷，不做绕过式修补"
+
+# ============================================================
+# 测试
+# ============================================================
+
+tests:
+  upstream_programs: 10
+  upstream_runnable: 9
+  upstream_passed: 9
+  upstream_pass_rate: "9/9 (100%)"
+  upstream_not_buildable: "filesel/mdb-test（上游链接规则缺陷）"
+  test_package: "1/1 (CTest: test_ocp，实跑安装后的 bin/ocp)"
+  report: "reports/test-report.md"
+
+# ============================================================
+# 验证
+# ============================================================
+
+verification:
+  conan_create: "rc=0（干净源码 + 配方，ohos-aarch64 profile）"
+  conan_verify: "G0-G4 + L2/L4/L5 通过"
+  w3_local_ci: ".ci-result.json"

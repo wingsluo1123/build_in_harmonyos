@@ -1,0 +1,39 @@
+# 软件级 manifest — ocp
+# 遵循 ARCHIVE-SPEC v2.0（文件位置: archives/{letter}/{name}/manifest.yaml）
+
+software: ocp
+display: "Open Cubic Player"
+description: "模块音乐/Tracker/Adlib/SID 播放器（curses 界面 + 多解码器后端）"
+category: utility
+homepage: "https://github.com/mywave82/opencubicplayer"
+license: GPL-2.0-or-later
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "config.guess/config.sub 需识别 aarch64-unknown-linux-ohos 三元组（补丁 0001；不使用 --build/--host 绕过，E007）"
+    - "configure 的 mktemp -d 分支在 HMDFS 上产生的目录（drwx--S---）构建器不可写，需回落 mkdir 路径（补丁 0002）"
+    - "上游测试硬编码 /tmp，HarmonyOS 的 /tmp 为只读挂载（E002），改为构建树内 scratch 目录（补丁 0003）"
+    - "源码必须取 GitHub release 资产：只有它内含 vendored 解码器子模块（playtimidity/playqoa/playsid），codeload 的 git tag 归档会缺失目录导致 configure 失败"
+    - "上游 adbmeta-test/dirdb-test 在只读 /tmp 下失败（rc 255 / SIGSEGV），修复后转绿；mdb-test 残留属上游 Makefile 链接缺陷"
+  common_dependencies:
+    - ncurses
+    - zlib
+    - bzip2
+    - mad
+    - libogg
+    - libvorbis
+    - flac
+    - libpng
+    - libjpeg-turbo
+    - game-music-emu
+    - alsa-lib
+    - libdiscid
+    - cjson
+    - ancient
+
+versions:
+  "3.3.1":
+    status: built
+    build_date: "2026-10-02"

@@ -1,0 +1,23 @@
+# conandata.yml — ocp 3.3.1
+#
+# NOTE: the upstream GitHub *release* asset is used instead of the plain git tag
+# archive (codeload), because only the release asset ships the vendored decoder
+# submodules (playtimidity/timidity-git, playqoa/qoa-git, playsid/libsidplayfp-git,
+# ...).  configure hard-fails without them:
+#   configure: error: playtimidity/timidity-git is missing - please execute
+#   'git submodule update --init --recursive'
+sources:
+  # 仅官方源（R39/PF7）：镜像回退由 CI 侧自动添加，配方内不得内联任何镜像前缀
+  url: "https://github.com/mywave82/opencubicplayer/releases/download/v3.3.1/ocp-3.3.1.tar.gz"
+  sha256: "975a615ad4ef98c4ee03df7238db51199df976e9f9147d73fc971163d57e6a10"
+
+patches:
+  - patch_file: "patches/0001-autotools-ohos-triplet.patch"
+    patch_description: "Teach the bundled config.guess/config.sub the HarmonyOS aarch64-unknown-linux-ohos triplet"
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-ohos-config-status-tmpdir.patch"
+    patch_description: "Force the mkdir based temporary directory in the configure/config.status machinery: 'mktemp -d' yields a directory (drwx--S---) the builder cannot write into, aborting with 'Permission denied' on subs1.awk"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ocp-tests-writable-scratch-dir.patch"
+    patch_description: "Let the bundled test programs write their scratch data below the build tree instead of the hardcoded /tmp: HarmonyOS mounts /tmp read-only, which made adbmeta-test (rc 255) and dirdb-test (SIGSEGV) fail while the code under test was fine (knowledge entry E002)"
+    patch_type: "portability"
