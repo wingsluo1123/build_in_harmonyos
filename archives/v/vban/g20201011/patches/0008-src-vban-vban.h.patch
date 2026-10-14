@@ -1,0 +1,114 @@
+--- a/src/vban/vban.h
++++ b/src/vban/vban.h
+@@ -15,37 +15,72 @@
+  *  You should have received a copy of the GNU General Public License
+  *  along with vban.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #ifndef __VBAN_H__
+ #define __VBAN_H__
+ 
+ #include <inttypes.h>
+ 
+ #define VBAN_HEADER_SIZE            (4 + 4 + 16 + 4)
+-#define VBAN_HEADER_FOURC           'NABV'
++#define VBAN_HEADER_MAGIC_0         'V'
++#define VBAN_HEADER_MAGIC_1         'B'
++#define VBAN_HEADER_MAGIC_2         'A'
++#define VBAN_HEADER_MAGIC_3         'N'
+ #define VBAN_STREAM_NAME_SIZE       16
+ #define VBAN_PROTOCOL_MAX_SIZE      1464
+ #define VBAN_DATA_MAX_SIZE          (VBAN_PROTOCOL_MAX_SIZE - VBAN_HEADER_SIZE)
+ #define VBAN_CHANNELS_MAX_NB        256
+ #define VBAN_SAMPLES_MAX_NB         256
+ 
+ struct VBanHeader
+ {
+-    uint32_t    vban;                               /* contains 'V' 'B', 'A', 'N' */
++    uint8_t     vban[4];                            /* contains 'V' 'B', 'A', 'N' */
+     uint8_t     format_SR;                          /* SR index (see SRList above) */
+     uint8_t     format_nbs;                         /* nb sample per frame (1 to 256) */
+     uint8_t     format_nbc;                         /* nb channel (1 to 256) */
+     uint8_t     format_bit;                         /* mask = 0x07 (nb Byte integer from 1 to 4) */
+     char        streamname[VBAN_STREAM_NAME_SIZE];  /* stream name */
+-    uint32_t    nuFrame;                            /* growing frame number. */
+-} __attribute__((packed));
++    uint8_t     nuFrame[4];                         /* little-endian growing frame number */
++};
++
++static inline int vban_header_has_magic(struct VBanHeader const* header)
++{
++    return (header->vban[0] == VBAN_HEADER_MAGIC_0)
++        && (header->vban[1] == VBAN_HEADER_MAGIC_1)
++        && (header->vban[2] == VBAN_HEADER_MAGIC_2)
++        && (header->vban[3] == VBAN_HEADER_MAGIC_3);
++}
++
++static inline void vban_header_set_magic(struct VBanHeader* header)
++{
++    header->vban[0] = VBAN_HEADER_MAGIC_0;
++    header->vban[1] = VBAN_HEADER_MAGIC_1;
++    header->vban[2] = VBAN_HEADER_MAGIC_2;
++    header->vban[3] = VBAN_HEADER_MAGIC_3;
++}
++
++static inline uint32_t vban_header_get_frame(struct VBanHeader const* header)
++{
++    return (uint32_t)header->nuFrame[0]
++        | ((uint32_t)header->nuFrame[1] << 8)
++        | ((uint32_t)header->nuFrame[2] << 16)
++        | ((uint32_t)header->nuFrame[3] << 24);
++}
++
++static inline void vban_header_set_frame(struct VBanHeader* header, uint32_t frame)
++{
++    header->nuFrame[0] = (uint8_t)(frame & 0xff);
++    header->nuFrame[1] = (uint8_t)((frame >> 8) & 0xff);
++    header->nuFrame[2] = (uint8_t)((frame >> 16) & 0xff);
++    header->nuFrame[3] = (uint8_t)((frame >> 24) & 0xff);
++}
+ 
+ 
+ #define VBAN_SR_MASK                0x1F
+ #define VBAN_SR_MAXNUMBER           21
+ static long const VBanSRList[VBAN_SR_MAXNUMBER]=
+ {
+     6000, 12000, 24000, 48000, 96000, 192000, 384000,
+     8000, 16000, 32000, 64000, 128000, 256000, 512000,
+     11025, 22050, 44100, 88200, 176400, 352800, 705600
+ };
+@@ -71,21 +106,21 @@
+     VBAN_BITFMT_32_INT,
+     VBAN_BITFMT_32_FLOAT,
+     VBAN_BITFMT_64_FLOAT,
+     VBAN_BITFMT_12_INT,
+     VBAN_BITFMT_10_INT,
+     VBAN_BIT_RESOLUTION_MAX
+ };
+ 
+ static int const VBanBitResolutionSize[VBAN_BIT_RESOLUTION_MAX] =
+ {
+-    1, 2, 3, 4, 4, 8, 
++    1, 2, 3, 4, 4, 8,
+ };
+ 
+ #define VBAN_RESERVED_MASK          0x08
+ 
+ #define VBAN_CODEC_MASK             0xF0
+ enum VBanCodec
+ {
+     VBAN_CODEC_PCM              =   0x00,
+     VBAN_CODEC_VBCA             =   0x10,
+     VBAN_CODEC_VBCV             =   0x20,
+@@ -142,11 +177,10 @@
+     VBAN_TXT_UNDEFINED_9    =   0x90,
+     VBAN_TXT_UNDEFINED_10   =   0xA0,
+     VBAN_TXT_UNDEFINED_11   =   0xB0,
+     VBAN_TXT_UNDEFINED_12   =   0xC0,
+     VBAN_TXT_UNDEFINED_13   =   0xD0,
+     VBAN_TXT_UNDEFINED_14   =   0xE0,
+     VBAN_TXT_USER           =   0xF0
+ };
+ 
+ #endif /*__VBAN_H__*/
+-
