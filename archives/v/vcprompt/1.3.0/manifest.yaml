@@ -1,0 +1,125 @@
+software: vcprompt
+version: 1.3.0
+status: published
+conan_ref: "vcprompt/1.3.0"
+pr: "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/14356"
+branch: "feat/vcprompt-1.3.0"
+contrib_task: "11629"
+ci_platform_verdict: "PASS — platform build #90180 on worker CI-006 (2026-10-13T22:43): Conan test_package 通过, L0 门禁 通过, L1 门禁 通过; all seven steps (worker_preparation, worker-prep, git-clone, checkout-pr, conan-setup, conan-build-test, cleanup) green"
+build_system: autotools
+compile_date: "2026-10-02"
+license: GPL-2.0-or-later
+homepage: "https://github.com/powerman/vcprompt"
+source:
+  url: "https://github.com/powerman/vcprompt/archive/refs/tags/v1.3.0.tar.gz"
+  sha256: "3db5ebad2e333d43b464b665c8d43b35156b0f144052f10c340a5c5007a6874d"
+  fallback_url: "https://codeload.github.com/powerman/vcprompt/tar.gz/refs/tags/v1.3.0 (used by source() only if every mirrored URL fails; verified byte-identical)"
+  note: "primary URL uses the form the CI mirror step rewrites (github.com/...); codeload.github.com is not rewritten by that step"
+dependencies:
+  required: []
+  required_tools:
+    - "autoconf/2.72 (tool_requires; missing from the OHOS device image, prebuilt on ohpcd)"
+    - "m4/1.4.19 (tool_requires; autoconf backend, prebuilt on ohpcd)"
+  optional:
+    - "sqlite3 (svn >= 1.7 working copies) — deliberately disabled with --with-sqlite3=no"
+exported_sources:
+  - "autotools/config.guess (OHOS-aware; the generated configure refuses to run without it)"
+  - "autotools/config.sub"
+patches_applied:
+  - "patches/0001-tests-common.sh-honour-TMPDIR.patch"
+build:
+  type: autotools
+  targets:
+    - "autoconf (tarball ships configure.ac only; config.guess/config.sub supplied by the recipe)"
+    - "./configure --with-sqlite3=no"
+    - "make -j1 on OHOS (mkfifo/jobserver is denied on hmdfs), make -j<N> elsewhere"
+    - "make check-simple"
+  outputs:
+    binaries:
+      - "bin/vcprompt"
+    libraries: []
+  notes:
+    - "package_type=application; R38 satisfied by the software-level commands.json"
+    - "vcprompt detects VCS state from on-disk metadata; no external VCS binary is needed for the default and %n/%b/%r/%p formats"
+    - "The Perl wrapper vcprompt-hgst from the tarball is deliberately not packaged"
+    - "OHOS: the generated configure script is patched from `umask 077` to `umask 022` (HMDFS/E129/E136 config.status temp dirs); reproduced on the device as \"can't create ./conf49901-963/subs1.awk: Permission denied\", fixed by the patch"
+    - "OHOS: packaged bin/vcprompt is signed with binary-sign-tool when available (ML-0043)"
+test_results:
+  type: official+consumer
+  total: 54
+  passed: 54
+  failed: 0
+  status: "PASSED — single-package CI on the device: Total 1 / Success 1, L0 pass, L1 pass, L4 pass, L5 pass, L2 skip (expected, see known_issues)"
+  upstream_breakdown:
+    check-simple: "46 assertions, pass (no external tool needed)"
+    check-git: "8 assertions, pass (real git working copy; git 2.45.2 from the image)"
+    check-hg: "not executed — Mercurial is absent from the image and not published on ohpcd"
+    check-svn: "not executed — Subversion is absent from the image and not published on ohpcd"
+    check-fossil: "not executed — Fossil is absent from the image and not published on ohpcd"
+ci_verification:
+  date: "2026-10-02"
+  device: "HarmonyOS HongMeng Kernel 1.12.0 aarch64, conan 2.31.1"
+  command: "CI_PACKAGES=\"archives/v/vcprompt/1.3.0\" zsh ci/conan/build_and_test.sh"
+  platform_ci:
+    - "PASS — build #90180 (worker CI-006, 2026-10-13T22:43): '## CI 校验通过' with Conan test_package / L0 门禁 / L1 门禁 all 通过, and every step green (worker_preparation, worker-prep, git-clone, checkout-pr, conan-setup, conan-build-test, cleanup). This is the official platform verdict for the merged recipe state"
+    - "build #67833 (worker CI-034): reached conan-build-test; failed on the test_package no-VCS assertion ('expected no output outside any working copy, got git:main') because the CI checkout is itself a git repository — fixed by moving the fixtures to tempfile.mkdtemp(); see notes.md"
+    - "builds #67871/#67872/#67883/#68787 (CI-023/002/023/023): failed before the build; worker network restriction"
+    - "builds #75791/#77093 (CI-014): reached the pipeline flow, then '源码下载超时' (worker cannot reach the source hosts) — addressed by switching the primary source URL to the mirror-rewritable github.com form"
+    - "builds #87328..#87931 (10 builds, CI-041): git-clone fails with 'FileNotFoundError: [Errno 2] No such file or directory: b'/system/xbin/git'' — worker 041 runs a different image/build root and has no git; conan-build-test never starts and cleanup then fails with 127. Platform-side; every build after 2026-10-12T23:52 was scheduled on this worker"
+    - "build #88844 (CI-016): every gate passed (L0/KC/JC) and the pipeline reached the source pre-download, which failed only because that worker image has no curl; conan's own download then could not reach the source host"
+    - "build #88854 (CI-030) and #89215 (CI-030): all steps ran; conan-build-test failed with 'configure: fork: retry: Resource temporarily unavailable' -> 'C compiler cannot create executables' (Error 77). Worker process-slot exhaustion, not a recipe defect"
+    - "build #89505 (CI-016): same resource limit, hit earlier — 'autoconf[2]: can't fork - try again' (Error 1). Device probe while idle: pid_max 65536, max_map_count 65535, load ≈ 20, 40/40 forks OK"
+  shadow_ci:
+    date: "2026-10-12"
+    runner: "~/validation/run-ohos-shadow-ci-local.sh archives/v/vcprompt/1.3.0"
+    run_dir: "~/ohpc-ci-shadow/runs/e16637aea23f-20261012T113249Z-42666"
+    result: "rc=0 in 53s — L0 pass, L1 pass, L2 skip, L4 pass, L5 pass; Total 1 / Success 1 / Failed 0"
+    upstream_suites: "make check-simple and make check-git both 'all tests passed' inside conan create"
+    profile: "ci/conan/profiles/ohos-local generated by the runner (clang 15 sysroot wrapper, real bash as CONFIG_SHELL/SHELL)"
+    commit: "e16637aea23f (temporary commit of this recipe in a device worktree; no commit left behind on the device)"
+  ci_layout_reproduction: "on the device the CI worker layout was reproduced exactly (recipe inside a git checkout, TMPDIR=/data/storage/el2/base/cache as in the platform log) and `conan create archives/v/vcprompt/1.3.0 -pr:h=... -pr:b=... --build=missing` passed all four consumer assertions, including 'no working copy -> empty output'"
+  log: "device ~/logs/vcprompt-ci-20261002-213500.log (final run, check-simple + check-git); earlier runs: ...-212720.log, ...-212344.log, ...-211857.log"
+  upstream_suites_run: "check-simple, check-git (54 upstream assertions, 0 failures)"
+  gates:
+    L0: "pass: all checks passed"
+    L1: "pass: upstream tests + test_package executed (L1e negative test confirmed)"
+    L2: "skip: vcprompt version/help failed (non-blocking, expected)"
+    L4: "pass: patches clean"
+    L5: "pass: bin/ has content"
+  summary: "Total 1, Success 1, Failed 0"
+  notes:
+    - "run used a device-local corrected copy of ci/conan/profiles/ohos-aarch64 (CONFIG_SHELL and compiler_executables pointed at paths missing on this image); repository files were not modified"
+    - "`make check-simple` ran inside conan create and reported 'all tests passed' (46 upstream assertions)"
+    - "bin/vcprompt was signed with binary-sign-tool during package()"
+local_verification:
+  - "source tarball sha256 recomputed locally: 3db5ebad2e333d43b464b665c8d43b35156b0f144052f10c340a5c5007a6874d — matches conandata.yml"
+  - "python -B -m py_compile conanfile.py test_package/conanfile.py: pass"
+  - "YAML/JSON metadata parse (conandata.yml, MANIFEST.yml, manifest.yaml x2, commands.json): pass"
+  - "conan export + conan source in isolated CONAN_HOME: pass (source downloaded, strip_root, no build attempted)"
+  - "patch applies strictly to the pristine tarball via git apply --check and via Conan's own patch_ng patcher: pass"
+device_verification:
+  device: "HarmonyOS HongMeng Kernel 1.12.0 aarch64, conan 2.31.1, make 4.4.1, clang 15"
+  date: "2026-10-02"
+  results:
+    - "tarball sha256 recomputed on the device: matches"
+    - "autoconf/m4/perl MISSING on the device image; installed from ohpcd prebuilt binaries via tool_requires (m4/1.4.19, autoconf/2.72, perl/5.42.2)"
+    - "autoconf generated configure (5705 lines) from the pristine tarball"
+    - "configure failed without config.guess/config.sub, and failed with E129 subs1.awk Permission denied; after the umask patch: config.status created Makefile and config.h"
+    - "make succeeded: 8 clang compile steps + link, produced ./vcprompt"
+    - "smoke: ./vcprompt -F => cvs hg git fossil svn-1.3..1.6; fake .git working copy => git:ohos-vcprompt-test; no working copy => empty output"
+    - "make check-simple => './test-simple: all tests passed' (46 assertions, rc=0)"
+    - "make -j2 jobserver mkfifo warning reproduced (mkfifo denied on hmdfs); the recipe builds serially on OHOS"
+    - "out-of-source build fails with \"No rule to make target 'Makefile.in'\" because upstream generates its Makefile into the source tree; the recipe builds in-source (folders.build = src)"
+  not_run:
+    - "release/upload pipeline (conan upload) — PR validation only, upload happens after merge"
+known_issues:
+  - "L2 smoke probe is skip/warn by design: upstream vcprompt exits 1 for --version/--help (only -h, -F, -f, -d, -t exist); CLI evidence comes from make check-simple and test_package instead"
+  - "check-git/check-hg/check-svn/check-fossil are not executed because they require git/hg/svn/fossil binaries on the build machine"
+  - "svn >= 1.7 working copies are not detected: the recipe builds with --with-sqlite3=no and declares no sqlite3 dependency"
+  - "make -jN logs a jobserver mkfifo error on OHOS hmdfs (non-fatal); the recipe builds serially on OHOS"
+  - "ci/conan/profiles/ohos-aarch64 points CONFIG_SHELL/SHELL at /data/service/hnp/bin/bash and tools.build:compiler_executables at /data/service/hnp/bin/clang[++]; neither exists on this device image (bash/clang 15 live in ~/usr/local/bin), so the CI run used a corrected device-local profile copy — infrastructure follow-up, see notes.md"
+knowledge_ref:
+  - "E011"
+  - "E052"
+  - "E129"
+  - "E136"

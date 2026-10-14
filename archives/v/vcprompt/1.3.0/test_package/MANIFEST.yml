@@ -1,0 +1,20 @@
+upstream_test_source: "tests/ directory of vcprompt v1.3.0 (`make check` = check-simple + check-hg + check-git + check-svn + check-fossil)"
+upstream_test_command: "make check-simple && make check-git"
+upstream_test_result: "Recipe build() runs `make check-simple` and `make check-git`; together they report 54 assertions with 0 failures on the OHOS device. test-simple covers directories without any VCS, CVS, git, fossil, hg (branch/bookmarks/MQ/revlog), svn (entries and XML) and the -h exit status using hand-written metadata; test-git covers %b/%m/%u against a real git working copy built by tests/setup-git"
+upstream_test_scope:
+  executed:
+    - "check-simple (tests/test-simple, 46 assertions, no external VCS binary required)"
+    - "check-git (tests/test-git, 8 assertions, needs a real git binary and the git-repo.tar fixture)"
+  not_executed:
+    - "check-hg / check-svn / check-fossil need Mercurial, Subversion and Fossil; none of the three is installed on the OHOS device image and none is published on ohpcd, so those suites cannot run (documented in notes.md)"
+    - "grind (valgrind) is not part of `make check`"
+
+our_test_command: "conan test_package test(): run the packaged bin/vcprompt with -f %n:%b, with the default format, with -F, and inside a directory tree without VCS metadata"
+our_test_description: "Consumer test executes the packaged vcprompt executable (no compiler needed) against hand-written .git/HEAD metadata: it asserts the exact 'git:<branch>' rendering, the default '[%n:%b] ' format, the built-in feature list (svn-1.7/1.8 absent because the recipe builds --with-sqlite3=no) and empty output outside any working copy"
+
+assertion_count: 4
+manual_reproduction: "sh test_package/test.sh <packaged bin dir> replays the same four assertions outside Conan; it is a debugging aid, CI executes the Conan test_package"
+
+test_modifications:
+  - "tests/common.sh now uses ${TMPDIR:-/tmp} instead of a hardcoded /tmp (patches/0001) so the upstream suite also runs where /tmp is not writable; no assertion was weakened or removed"
+  - "test_package does not require git/hg/svn to be installed: it builds the fake working-copy metadata by hand, the same technique tests/test-simple uses"
