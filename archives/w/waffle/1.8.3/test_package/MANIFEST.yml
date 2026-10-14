@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml — waffle 1.8.3
+# 上游官方测试声明（CI build_and_test.sh L0e 强制要求存在）。
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: waffle/1.8.3
+homepage: "https://waffle.freedesktop.org/"
+
+# 上游测试入口（conanfile.py build() 内执行）
+upstream_check_command: "vendored meson test + run 3 wcore_*_unittest binaries (cmocka)"
+upstream_test_in_build: true
+upstream_test_command: "cd build/src/waffle && ./wcore_attrib_list_unittest && ./wcore_config_attrs_unittest && ./wcore_error_unittest (cmocka, parse summary)"
+upstream_tests_exist: true
+upstream_test_framework: "cmocka (meson 注册 3 个 core 套件可执行文件；GL 功能测试 gl_basic 因后端禁用不注册)"
+
+# 计数口径: gtest_macros（cmocka_unit_test / cmocka_unit_test_setup_teardown
+# 宏注册的单元测试用例数，与 gtest 的宏注册口径同类）
+upstream_test_count: 86
+upstream_test_total: 86
+upstream_test_count_method: "gtest_macros (3 个 core unit test 可执行文件经 cmocka 宏注册的用例: wcore_attrib_list_unittest=18 + wcore_config_attrs_unittest=57 + wcore_error_unittest=11, 来源 src/waffle/core/*_unittest.c 的 struct CMUnitTest 注册数组; config_attrs 数组为 57 个 cmocka_unit_test_setup_teardown, 勿把 #define unit_test_make 行误计)"
+
+# 上游测试审计（源码: waffle-1.8.3.tar.xz）
+# 上游测试 = 核心单元测试（与平台无关, OHOS 全构建全通过, 86/86）+ GL 后端功能
+# 测试（gl_basic per platform: glx/wayland/x11_egl/gbm/surfaceless_egl）。后者
+# 依赖 Linux 图形栈（gl/egl/gbm/libdrm/x11-xcb/wayland-*），HarmonyOS PC 不提供
+# 这些窗口/图形子系统，meson 以 auto 探测全部后端均 disabled，
+# tests/functional/meson.build 的 test('gl_basic …') 只在 build_glx/build_wayland/
+# build_x11_egl/build_gbm/build_surfaceless 为真时才注册（en: "if build_glx" 等），
+# 故在 OHOS 配置下这些功能测试根本不注册、不参与总数。属 ohos_feature 平台限制，
+# 非缺失可安装依赖。
+upstream_test_audit: >-
+  OHOS PC (aarch64) 真机实测 conan create: 3 个 core unit test 可执行文件
+  (wcore_attrib_list_unittest / wcore_config_attrs_unittest / wcore_error_unittest)
+  共 86 个 cmocka test case 全部通过（cmocka 汇总行 [==========] 86 test(s)
+  run. / [  PASSED  ] 86 test(s).）；gtest_macros 口径 upstream_test_total=86。
+  源注册数组位于 src/waffle/core/{wcore_attrib_list,wcore_config_attrs,
+  wcore_error}_unittest.c（struct CMUnitTest tests[]）。GL 功能测试 gl_basic
+  在 tests/functional/meson.build 中按后端条件注册（build_glx / build_wayland /
+  build_x11_egl / build_gbm / build_surfaceless）；OHOS 无 gl/egl/gbm/libdrm/
+  x11-xcb/wayland 开发包与后端（HarmonyOS PC 不提供这些图形/窗口子系统），
+  meson auto 探测全部 disabled，故这些功能测试不注册，不纳入总数（ohos_feature
+  平台限制, 非 missing_dependency）。未修改任何上游测试源码。
+
+upstream_tests:
+  - file: src/waffle/core/wcore_attrib_list_unittest.c
+    source: waffle-1.8.3/src/waffle/core/wcore_attrib_list_unittest.c
+    description: "cmocka 属性列表核心逻辑 (18 用例: length/get/get_with_default/update 的 NULL/空/尾部/更新等边界)"
+    command: "./wcore_attrib_list_unittest"
+  - file: src/waffle/core/wcore_config_attrs_unittest.c
+    source: waffle-1.8.3/src/waffle/core/wcore_config_attrs_unittest.c
+    description: "cmocka 配置属性解析与校验 (57 用例: GL/GLES 各版本 profile/forward-compat/debug/负数边界)"
+    command: "./wcore_config_attrs_unittest"
+  - file: src/waffle/core/wcore_error_unittest.c
+    source: waffle-1.8.3/src/waffle/core/wcore_error_unittest.c
+    description: "cmocka 错误处理 (11 用例: 错误码/message 优先级/disable 状态)"
+    command: "./wcore_error_unittest"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/test.c
+    description: "真实调用 waffle 公共 API：waffle_error_to_string/waffle_enum_to_string/waffle_attrib_list_length|get|get_with_default|update 共 11 条断言"
+    command: "./test_waffle"
+
+# 测试断言总数（上游 86 + test_package 11）
+assertion_count: 98
