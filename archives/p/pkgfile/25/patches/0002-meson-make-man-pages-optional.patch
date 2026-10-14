@@ -1,0 +1,100 @@
+diff --git a/meson.build b/meson.build
+index e31902d..5fdcff6 100644
+--- a/meson.build
++++ b/meson.build
+@@ -37,7 +37,7 @@ stdcppfs = cpp.find_library('stdc++fs')
+ gtest = dependency('gtest', required: false)
+ gmock = dependency('gmock', required: false)
+ 
+-pod2man = find_program('pod2man')
++pod2man = find_program('pod2man', required: get_option('man_pages'))
+ pkgconfig = find_program('pkg-config')
+ mkdir_p = 'mkdir -p $DESTDIR/@0@'
+ 
+@@ -89,39 +89,41 @@ if get_option('daemon')
+     )
+ endif
+ 
+-custom_target(
+-    'pkgfile.1',
+-    output: 'pkgfile.1',
+-    input: 'man/pkgfile.pod',
+-    command: [
+-        pod2man,
+-        '--section=1',
+-        '--center=pkgfile Manual',
+-        '--name=PKGFILE',
+-        '--release=pkgfile @0@'.format(meson.project_version()),
+-        '@INPUT@',
+-        '@OUTPUT@',
+-    ],
+-    install: true,
+-    install_dir: join_paths(get_option('mandir'), 'man1'),
+-)
++if get_option('man_pages')
++    custom_target(
++        'pkgfile.1',
++        output: 'pkgfile.1',
++        input: 'man/pkgfile.pod',
++        command: [
++            pod2man,
++            '--section=1',
++            '--center=pkgfile Manual',
++            '--name=PKGFILE',
++            '--release=pkgfile @0@'.format(meson.project_version()),
++            '@INPUT@',
++            '@OUTPUT@',
++        ],
++        install: true,
++        install_dir: join_paths(get_option('mandir'), 'man1'),
++    )
+ 
+-custom_target(
+-    'pkgfiled.1',
+-    output: 'pkgfiled.1',
+-    input: 'man/pkgfiled.pod',
+-    command: [
+-        pod2man,
+-        '--section=1',
+-        '--center=pkgfiled Manual',
+-        '--name=PKGFILED',
+-        '--release=pkgfiled @0@'.format(meson.project_version()),
+-        '@INPUT@',
+-        '@OUTPUT@',
+-    ],
+-    install: true,
+-    install_dir: join_paths(get_option('mandir'), 'man1'),
+-)
++    custom_target(
++        'pkgfiled.1',
++        output: 'pkgfiled.1',
++        input: 'man/pkgfiled.pod',
++        command: [
++            pod2man,
++            '--section=1',
++            '--center=pkgfiled Manual',
++            '--name=PKGFILED',
++            '--release=pkgfiled @0@'.format(meson.project_version()),
++            '@INPUT@',
++            '@OUTPUT@',
++        ],
++        install: true,
++        install_dir: join_paths(get_option('mandir'), 'man1'),
++    )
++endif
+ 
+ if get_option('systemd_units') and get_option('daemon')
+     systemd = dependency(
+diff --git a/meson_options.txt b/meson_options.txt
+index acde026..1e97928 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -12,3 +12,8 @@ option('daemon',
+        type : 'boolean',
+        value : true,
+        description : 'build pkgfiled, the systemd socket-activated daemon')
++
++option('man_pages',
++       type : 'boolean',
++       value : true,
++       description : 'build and install man pages (requires pod2man)')

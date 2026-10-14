@@ -1,0 +1,123 @@
+# 版本级 manifest —— pkgfile 25
+# 遵循 ARCHIVE-SPEC
+
+version: "25"
+software: pkgfile
+
+# 真机（HarmonyOS aarch64）shadow CI 单包验证通过：L0/L1/L2/L4/L5 全 pass，
+# Build Summary 1/1 100%。发布（conan upload）由平台 release 流水线在 PR 合入后执行。
+status: built
+
+build_date: "2026-10-14"
+build_system: meson
+
+# 真机验证运行信息
+verification:
+  runner: "ohos-test-runner.sh --user pkgfile --lib pkgfile --task shadow-ci-final --mode heavy --try-lock"
+  entry: "validation/run-ohos-shadow-ci-local.sh archives/p/pkgfile/25"
+  device_run_dir: "~/ohpc-ci-shadow/runs/915734921aee-20261014T044650Z-21173"
+  commit: "915734921aee0c7055b044a45f7b4e8227cffb36"
+  device: "HarmonyOS aarch64 / HongMeng Kernel 1.12.0"
+  compiler: "clang 15.0.4 + libc++ 15.0.4 (libcxx-ohos), musl, /bin/sh=mksh, /tmp 只读"
+  gates:
+    G0: pass
+    KC: pass
+    JC: pass
+    L0: "pass: all checks passed"
+    L1: "pass: upstream tests + test_package executed"
+    L2: "pass: pkgfile --version OK"
+    L4: "pass: patches clean"
+    L5: "pass: bin/ has content"
+  build_summary: "Total: 1 / Success: 1 / Failed: 0 / Pass rate: 100.0%"
+  upstream_unit_tests: "meson test（全目标）-> 5/5 targets OK, Ok: 5, Fail: 0"
+  upstream_tests_detail: "unit_tests 11 例（gtest）+ database 3 + list 8 + search 8 + update 8 = 38/38 全部实跑通过"
+  consumer_test: "test_package/test_pkgfile.sh 离线端到端 16 项断言全通过"
+  artifact:
+    path: "bin/pkgfile"
+    size: 338432
+    sha256: "a32f83b24425b22624caeb025844e032720557add09b060db2caf60ae327ab14"
+    kind: "ELF 64-bit LSB arm64, dynamic (musl)"
+    needed: ["libarchive.so.13", "libcurl.so", "libc++_shared.so", "libc.so"]
+  package_ref: "pkgfile/25#09b455870f8dbe37819bbf639e6e8376:cd547c6b82d4467c15dacde1fb660e88f36a9d92#17acdc1facf005bf65a6536d60d3f703"
+  dependency_binaries: "全部命中 ohpcd 预编译包，无依赖源码重建"
+  note: >-
+    本机 shadow runner 的 settings.yml 只含 os: OHOS/Linux，会让 curl/pkgconf/gtest/gmock
+    等配方在 `self.settings.os == \"Windows\"` 处抛 Invalid setting；真实 CI 用 conan 默认
+    枚举表（含 Windows）不受影响。本次以「conan 默认 settings.yml + 注入 OHOS 枚举」
+    （19 个 os 值）复现真实 CI 行为，除该文件内容外与共享 runner 完全一致。
+
+source:
+  url: "https://github.com/falconindy/pkgfile/archive/refs/tags/v25.tar.gz"
+  sha256: "dc18d7fcb03844bfd9857cb7b05b666d8a3469a38c73d3182da05fd4f8dd6403"
+  tar_format: tar.gz
+  version_note: "上游 tag 即 v25，无适配后缀（首次适配，R37）"
+  network_note: >-
+    真机直连 github.com 超时（ConnectTimeoutError），gh-proxy.com 可达；
+    配方保持官方源 URL（R39），由 CI 的 Mirror fallback 步骤改写为镜像。
+
+build:
+  system: meson
+  meson_options:
+    - "cpp_std=c++20（configure() 覆盖 CI profile 的 compiler.cppstd=17）"
+    - "-Ddaemon=false（补丁 0001 新增；OHOS 无 systemd/libsystemd）"
+    - "-Dman_pages=false（补丁 0002 新增；OHOS 无 perl/pod2man）"
+    - "default_options 中 prefix=/usr 由 Conan MesonToolchain 的 --prefix 覆盖为包目录"
+    - "为全部 host 依赖补 -I（configure 期 get_define 头宏探测）"
+    - "为全部 host 依赖补 -L/-Wl,-rpath,<libdir>（MesonToolchain 只写链接期 -rpath-link）"
+    - "tc.binaries ar/as/strip/nm/ranlib 与 tc.pkgconfig 固定为绝对路径（OHOS 无系统 pkg-config 且 posix_spawn 不搜索 PATH）"
+  dependencies:
+    - "pcre/8.45（上游 dependency('libpcre') >= 8.30；静态；消费侧经 PkgConfigDeps.set_property 改写 .pc 名）"
+    - "libarchive/3.8.7（上游 dependency('libarchive') >= 3.2.0；shared，libarchive.so.13）"
+    - "curl/8.15.0.1（上游 dependency('libcurl')；shared；curl 配方已声明 pkg_config_name=libcurl）"
+    - "zlib/1.3.1.1、xz/5.6.2、openssl/3.5.6.1（传递依赖）"
+    - "threads（meson 内建，无需 conan 包）"
+  build_requirements:
+    - "meson/1.11.0、ninja/1.12.1（meson 配方 requirements() 为 pass，不代管 ninja）"
+    - "pkgconf/3.0.5（上游 meson.build 把 pkg-config 作为 find_program 硬要求；包内只提供 bin/pkgconf）"
+    - "gmock/1.17.0（test_requires；传递 gtest/1.17.0，仅用于上游单元测试）"
+  cpp_defines:
+    - "_LIBCPP_ENABLE_EXPERIMENTAL（OHOS；libc++ 15004 默认不暴露 std::format）"
+  link_flags:
+    - "-lc++experimental（OHOS；std::format 运行时符号）"
+  disabled_features:
+    - "pkgfiled 守护进程（依赖 libsystemd sd-event；OHOS 无 systemd 生态）"
+    - "man 页生成与安装（依赖 pod2man/perl）"
+    - "systemd unit 安装（随守护进程一并关闭）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson-make-systemd-daemon-optional.patch：libsystemd 依赖、pkgfiled 目标与 systemd unit 安装块改为 meson 选项 daemon（默认 true）门控"
+  - "0002-meson-make-man-pages-optional.patch：pod2man find_program 与两个 man 页 custom_target 改为 meson 选项 man_pages（默认 true）门控"
+  - "0003-meson-make-stdcppfs-optional.patch：cpp.find_library('stdc++fs') 改 required: false，未找到时退化为空 declare_dependency()（libc++ 无 libstdc++fs）"
+  - "0004-src-db-clang15-libcxx15-portability.patch：db.hh 显式字典序 operator<（libc++15 的 std::string 无 <=>，默认化 <=> 被删除导致 std::sort 无法实例化）；db.cc 花括号聚合初始化（clang 15 未实现 C++20 P0960）"
+  - "0005-tests-forward-tmpdir-to-child.patch：tests/pkgfile_test.py 把运行环境的 TMPDIR/TMPPREFIX 透传给被测子进程（OHOS /tmp 只读；夹具原固定最小环境不含 TMPDIR，导致 11 个 -u 用例 rc=255）。断言与期望值零改动，/tmp 可写主机上为 no-op"
+
+# W0 依赖发布检查（本机 conan download 实证 + 真机构建实测）
+w0_dependency_check:
+  verified_by: "conan download <ref> -r=ohpcd --only-recipe"
+  published:
+    - "pcre/8.45"
+    - "libarchive/3.8.7"
+    - "libarchive/3.7.7"
+    - "curl/8.15.0.1"
+    - "meson/1.11.0"
+    - "ninja/1.12.1"
+    - "pkgconf/3.0.5"
+    - "gtest/1.17.0、gtest/1.17.0.1、gtest/1.17.0.2"
+    - "gmock/1.17.0"
+  missing:
+    - "libsystemd/*：ohpcd 0 命中（recipe 级 conan list）→ 已由补丁 0001 关闭该功能，不引入新依赖库 PR"
+
+knowledge_gained:
+  - "OHOS SDK clang 15 + libc++ 15004 的 <format> 头存在但 std::format 默认不暴露：需 -D_LIBCPP_ENABLE_EXPERIMENTAL 且链接 libc++experimental.a（asyncpp 0.2.4 / libpqxx 8.0.1 同口径）；pkgfile 6 文件 44 处 std::format 真机编译链接全通过"
+  - "MesonToolchain 用 compiler.cppstd 生成 machine file 的 cpp_std，其优先级高于上游 meson.build 的 default_options，因此上游写死 cpp_std=c++20 的项目在 cppstd=17 的 CI profile 下会被静默降级为 C++17，必须在 configure() 里抬到 20"
+  - "OHOS 上 posix_spawn 不搜索 PATH：meson 探测静态归档器时对 llvm-ar-15/llvm-ar/ar/gar 裸名 exec 全部 ENOENT（即使 ar 在 PATH 中），凡含 static_library 的 meson 项目必须把 ar 等 binutils 以绝对路径写入 tc.binaries"
+  - "上游用 compiler.get_define(..., args:['-include','x.h']) 做 configure 期头宏探测时不会带上 dependency() 的 include 路径；依赖是 conan 包时必须把其 includedirs 补进 extra_cxxflags，否则 get_define 直接报 Could not get define"
+  - "ohpcd 的 pkgconf/3.0.5 包内只落了 bin/pkgconf（pkg-config 别名未生成），OHOS 又无系统 pkg-config；凡上游把 find_program('pkg-config') 当硬要求的项目都要把 tc.pkgconfig 指向包内绝对路径"
+  - "meson 的 compiler.find_library() 默认 required: true；GCC 的 libstdc++fs 在 libc++ 上不存在，上游依赖它的项目在 OHOS 会配置期失败，须降级为 required: false + declare_dependency() 兜底"
+  - "clang 15 未实现 C++20 P0960（括号聚合初始化）：对聚合类型 emplace_back(a,b) 会报 no matching function for call to 'construct_at'；libc++ 15 的 std::string 没有 operator<=>，含 std::string 成员的默认化 <=> 会被隐式删除，std::sort 随之无法实例化。两者都需源码级等价改写"
+  - "OHOS 的 /bin/sh 是 mksh：它在启动时读取并缓存 TMPDIR，脚本内部 export TMPDIR 对 here-doc 等内部临时文件无效；且 mktemp -d（无模板）固定落只读的 /tmp。测试脚本应避免 here-doc 与无模板 mktemp，并在启动前由 test_package 注入可写 TMPDIR"
+  - "Conan 的 MesonToolchain 只注入 -Wl,-rpath-link（链接期），不写运行期 rpath；CI 的 L2 smoke test 是裸执行 bin/<tool> --version（不加载 conanrun），凡产物含可执行文件且依赖里有 shared 库的 meson 配方都必须自行补 -Wl,-rpath"
+  - "上游测试夹具常给被测进程构造固定最小环境（pkgfile 的 tests/pkgfile_test.py 只有 LC_TIME/LC_COLLATE/TZ/PATH）。OHOS 的 /tmp 只读时，凡是依赖 TMPDIR 的被测代码（如 pkgfile -u 的下载中转文件）都会失败；排查时应先把 TMPDIR 透传进夹具再判断是否为平台结构性不可运行。本次实测也纠正了两个误判：OHOS 上 multiprocessing(fork)/dev/shm/loopback 均可用，夹具里的 Architecture=x86_64 只是 URL 路径片段、与宿主架构无关"
+  - "OHOS 上跨进程传 TMPDIR 要注意两层缓存：mksh 在启动时读取并缓存 TMPDIR（脚本内 export 对 here-doc 无效），而 GNU/Toybox 的 mktemp -d（无模板）根本不用 TMPDIR、固定落 /tmp；可移植写法是自己挑可写基目录 + mkdir"

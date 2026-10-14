@@ -1,0 +1,58 @@
+diff --git a/meson.build b/meson.build
+index 575d309..e31902d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -31,7 +31,7 @@ add_project_arguments(
+ libpcre = dependency('libpcre', version: '>= 8.30')
+ libarchive = dependency('libarchive', version: '>= 3.2.0')
+ libcurl = dependency('libcurl')
+-libsystemd = dependency('libsystemd')
++libsystemd = dependency('libsystemd', required: get_option('daemon'))
+ pthreads = dependency('threads')
+ stdcppfs = cpp.find_library('stdc++fs')
+ gtest = dependency('gtest', required: false)
+@@ -79,13 +79,15 @@ executable(
+     install: true,
+ )
+ 
+-executable(
+-    'pkgfiled',
+-    'src/pkgfiled.cc',
+-    link_with: [libcommon],
+-    dependencies: [libsystemd, stdcppfs],
+-    install: true,
+-)
++if get_option('daemon')
++    executable(
++        'pkgfiled',
++        'src/pkgfiled.cc',
++        link_with: [libcommon],
++        dependencies: [libsystemd, stdcppfs],
++        install: true,
++    )
++endif
+ 
+ custom_target(
+     'pkgfile.1',
+@@ -121,7 +123,7 @@ custom_target(
+     install_dir: join_paths(get_option('mandir'), 'man1'),
+ )
+ 
+-if get_option('systemd_units')
++if get_option('systemd_units') and get_option('daemon')
+     systemd = dependency(
+         'systemd',
+         not_found_message: 'systemd not found but systemd_units=true',
+diff --git a/meson_options.txt b/meson_options.txt
+index 4575bd8..acde026 100644
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -7,3 +7,8 @@ option('systemd_units',
+        type : 'boolean',
+        value : true,
+        description : 'install systemd units to system unit directory')
++
++option('daemon',
++       type : 'boolean',
++       value : true,
++       description : 'build pkgfiled, the systemd socket-activated daemon')

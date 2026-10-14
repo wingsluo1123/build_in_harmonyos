@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# test_package 消费者测试声明（CI build_and_test.sh L0e 强制要求）
+package: pkgfile/25
+homepage: "https://github.com/falconindy/pkgfile"
+
+# 上游测试入口：meson test（meson.build:180-229 注册 unit_tests 与 4 个集成测试）。
+# 配方 build() 内执行完整套件 `meson test -C <build> --print-errorlogs`；
+# 真机实证 5/5 测试目标全 OK（Ok: 5, Fail: 0）。
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test -C <builddir> --print-errorlogs"
+
+# ── 上游测试清单（38/38 全部在真机实跑通过）─────────────────────────────────
+# unit_tests：gtest 协议，11 例（filter_test 10 + repo_test 1）
+# 集成套件：tests/*.py，27 例（database 3 + list 8 + search 8 + update 8）
+upstream_tests:
+  - file: src/filter_test.cc
+    source: pkgfile-25/src/filter_test.cc
+    description: "过滤器单元测试 10 例（Directory/Bin/Not/Regex/And/Exact/Basename，含大小写敏感与非敏感路径）"
+    command: "meson test -C <builddir> unit_tests"
+  - file: src/repo_test.cc
+    source: pkgfile-25/src/repo_test.cc
+    description: "Repo::FilenameHasRepoSuffix 单元测试 1 例（缓存分片命名规则 .files.NNN）"
+    command: "meson test -C <builddir> unit_tests"
+  - file: tests/database.py
+    source: pkgfile-25/tests/database.py
+    description: "集成测试 3 例（.db_version 写入 / 版本不符拒绝 / 版本文件缺失拒绝）"
+    command: "meson test -C <builddir> pkgfile_database_integration_test"
+  - file: tests/list.py
+    source: pkgfile-25/tests/list.py
+    description: "集成测试 8 例（-l 精确/regex/binaries/quiet/repo/路径/raw/未命中）"
+    command: "meson test -C <builddir> pkgfile_list_integration_test"
+  - file: tests/search.py
+    source: pkgfile-25/tests/search.py
+    description: "集成测试 8 例（-s basename/exact/verbose/glob/directories/ignorecase 等）"
+    command: "meson test -C <builddir> pkgfile_search_integration_test"
+  - file: tests/update.py
+    source: pkgfile-25/tests/update.py
+    description: "集成测试 8 例（-u 下载/压缩/仓库选择/缓存整理/失败处理）"
+    command: "meson test -C <builddir> pkgfile_update_integration_test"
+
+# 上游用例总数 11 + 27 = 38，真机全部实跑通过
+# （meson: Ok 5 targets / Fail 0；集成套件逐个 "Ran 3/8/8/8 tests ... OK"）。
+upstream_tests_total: 38
+upstream_tests_passed: 38
+upstream_tests_skipped_reason: >-
+  无跳过。首次真机运行时有 11 个基于 `pkgfile -u` 的集成用例失败（rc=255），
+  根因唯一：测试夹具 tests/pkgfile_test.py 的 Pkgfile() 给被测进程构造固定最小环境
+  （只有 LC_TIME/LC_COLLATE/TZ/PATH），不含 TMPDIR，而 OHOS 的 /tmp 只读，
+  于是所有 `-u` 用例落到 /tmp 报 "failed to create temporary file for download:
+  Read-only file system"。按 patches/0005-tests-forward-tmpdir-to-child.patch
+  把 TMPDIR/TMPPREFIX 透传给子进程（/tmp 可写主机为 no-op，断言与期望值零改动）后，
+  38 例全部通过。
+
+# ── test_package 消费者测试 ────────────────────────────────────────────────
+test_package_tests:
+  - file: test_pkgfile.sh
+    description: >-
+      testdata/alpm（纯文本成员）由 tar 现场组装成最小 alpm .files 归档，经 file:// 由 libcurl 载入，
+      `pkgfile -u` 转换成本地缓存后断言 -s/-l/-v 真实输出；另含 --version/--help
+      与空缓存目录错误路径。真机实测全部通过。
+
+# 断言数：脚本内 fail() 调用点计数
+# （--version 1 + --help 3 + 空缓存 2 + -u 产物 2 + 4a 1 + 4b 1 + 4c 1 + 4d 3 +
+#   4e 1 + 4f 1 = 16；脚本开头的可执行文件/可写目录检查属环境守卫，不计入断言）
+assertion_count: 16

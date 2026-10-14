@@ -1,0 +1,57 @@
+sources:
+  url: "https://github.com/falconindy/pkgfile/archive/refs/tags/v25.tar.gz"
+  sha256: "dc18d7fcb03844bfd9857cb7b05b666d8a3469a38c73d3182da05fd4f8dd6403"
+
+# 六个补丁都只是「把上游写死的 Arch/systemd/GCC 专属能力改为可关闭或可选，
+# 或修正上游/夹具在特定路径或平台形态下才暴露的缺陷」，不含任何 OHOS 专有代码分支与空壳实现：
+# Linux 上 0001/0002 按默认值（daemon=true / man_pages=true）行为不变；
+# 0003 只在找不到 libstdc++fs 时生效（libc++ 即属此类）；
+# 0004/0005 是取值与断言完全等价的兼容性改写（/tmp 可写主机上 0005 为 no-op）。
+patches:
+  - patch_file: "patches/0001-meson-make-systemd-daemon-optional.patch"
+    patch_description: >-
+      libsystemd 与 pkgfiled 守护进程改为 meson 选项 daemon（默认 true）可关闭：
+      OHOS 无 systemd，且 ohpcd 制品仓无 libsystemd（W0 实测 0 命中），
+      构建时以 -Ddaemon=false 只产出 pkgfile CLI。
+    patch_type: "portability"
+  - patch_file: "patches/0002-meson-make-man-pages-optional.patch"
+    patch_description: >-
+      man 页生成/安装改为 meson 选项 man_pages（默认 true）可关闭：
+      上游把 pod2man 作为 find_program 硬要求，OHOS 无 perl/pod2man，
+      构建时以 -Dman_pages=false 跳过。
+    patch_type: "portability"
+  - patch_file: "patches/0003-meson-make-stdcppfs-optional.patch"
+    patch_description: >-
+      cpp.find_library('stdc++fs') 改为 required: false，未找到时退化为空
+      declare_dependency()：该库是 GCC libstdc++ 的 <filesystem> 支撑库，
+      OHOS 的 libc++ 把 std::filesystem 内建其中、没有独立 libstdc++fs，
+      而 meson 的 find_library 默认 required: true → 配置期直接失败。
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-db-clang15-libcxx15-portability.patch"
+    patch_description: >-
+      src/db.hh + src/db.cc 两处 clang 15 / libc++ 15 兼容性改写：
+      (1) Entry 的默认化 operator<=> 因 libc++ 15 的 std::string 没有 <=>
+      而被隐式删除，std::sort 无法实例化 → 改为等价的显式字典序 operator<；
+      (2) clang 15 未实现 C++20 P0960（括号聚合初始化），
+      repos.emplace_back(a, b) 对聚合类型 Entry 无法编译 →
+      改为显式花括号聚合初始化 push_back(Entry{...})。
+      两处取值与语义完全不变（上游用例与断言零改动）。
+    patch_type: "portability"
+  - patch_file: "patches/0005-tests-forward-tmpdir-to-child.patch"
+    patch_description: >-
+      tests/pkgfile_test.py 的 Pkgfile() 给被测进程构造的是固定最小环境
+      （只有 LC_TIME/LC_COLLATE/TZ/PATH），不含 TMPDIR；OHOS 的 /tmp 只读，
+      于是所有基于 `pkgfile -u` 的用例都因 "failed to create temporary file
+      for download: Read-only file system" 失败（真机实测 rc=255，
+      27 个集成用例里 11 个受影响）。补丁把运行环境的 TMPDIR/TMPPREFIX
+      透传给子进程；/tmp 可写的主机上该改动是 no-op，不改变任何断言与期望值。
+    patch_type: "portability"
+  - patch_file: "patches/0006-repo-cache-suffix-filename-only.patch"
+    patch_description: >-
+      FilenameHasRepoSuffix（db.cc 与 repo.cc 各一份）原来对**整条路径**数点号
+      （std::count(path.begin(), path.end(), '.') != 2 即判无效），只要父目录里
+      出现一个点，所有 `<repo>.files.NNN` 缓存分片都会被过滤掉，缓存被当成空、
+      pkgfile 以 "No repo files found" 退出 1。CI 的 conan 缓存路径
+      `~/.cache/conan2/...` 正含两个点，导致 27 个集成用例中 13 个失败；
+      改为只在最后一个路径分量上判断（真机已按「父目录带点」复现并验证修复）。
+    patch_type: "portability"

@@ -1,0 +1,22 @@
+diff --git a/tests/pkgfile_test.py b/tests/pkgfile_test.py
+index 9a6c421..9bb35a5 100644
+--- a/tests/pkgfile_test.py
++++ b/tests/pkgfile_test.py
+@@ -88,6 +88,17 @@ class TestCase(unittest.TestCase):
+             'PATH': '/bin:/usr/bin',
+         }
+ 
++        # OHOS: /tmp is read-only, and pkgfile writes its download scratch file
++        # under TMPDIR (src/update.cc OpenTmpfile) with /tmp only as a fallback.
++        # The harness above builds a fixed minimal environment, so without this
++        # the child falls back to the unwritable /tmp and every `pkgfile -u`
++        # based case fails with "failed to create temporary file for download:
++        # Read-only file system". Forward the runner's TMPDIR/TMPPREFIX; on
++        # hosts whose /tmp is writable this is a no-op.
++        for _tmpvar in ('TMPDIR', 'TMPPREFIX'):
++            if os.environ.get(_tmpvar):
++                env[_tmpvar] = os.environ[_tmpvar]
++
+         cmdline = [
+             os.path.join(self.build_dir, 'pkgfile'),
+             '--config={}/pacman.conf'.format(self.tempdir),

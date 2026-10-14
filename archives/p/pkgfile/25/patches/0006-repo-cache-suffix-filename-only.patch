@@ -1,0 +1,76 @@
+diff --git a/src/db.cc b/src/db.cc
+index 5065b7f..5392b80 100644
+--- a/src/db.cc
++++ b/src/db.cc
+@@ -27,19 +27,28 @@ std::string DatabaseError::message(int condition) const {
+ }
+ 
+ bool Database::FilenameHasRepoSuffix(std::string_view path) {
+-  const auto ndots = std::count(path.begin(), path.end(), '.');
++  // Only the last path component carries the ".files.NNN" suffix. Upstream
++  // counts the dots of the whole path, so a single dot anywhere in a parent
++  // directory (e.g. a Conan cache under ~/.cache/conan2/..., whose directory
++  // iterator hands out absolute paths) makes every cache chunk look invalid:
++  // the cache appears empty and pkgfile exits 1 with "No repo files found".
++  const auto slash = path.rfind('/');
++  const std::string_view name =
++      slash == path.npos ? path : path.substr(slash + 1);
++
++  const auto ndots = std::count(name.begin(), name.end(), '.');
+   if (ndots != 2) {
+     return false;
+   }
+ 
+-  auto pos = path.rfind('.');
+-  if (!path.substr(0, pos).ends_with(".files")) {
++  auto pos = name.rfind('.');
++  if (!name.substr(0, pos).ends_with(".files")) {
+     return false;
+   }
+ 
+   int ndigits = 0;
+-  for (++pos; pos < path.size(); ++pos) {
+-    if (!isdigit(path[pos])) {
++  for (++pos; pos < name.size(); ++pos) {
++    if (!isdigit(name[pos])) {
+       return false;
+     }
+     ++ndigits;
+diff --git a/src/repo.cc b/src/repo.cc
+index 08903cf..6164d90 100644
+--- a/src/repo.cc
++++ b/src/repo.cc
+@@ -167,19 +167,28 @@ Repo::~Repo() {
+ }
+ 
+ bool FilenameHasRepoSuffix(std::string_view path) {
+-  const auto ndots = std::count(path.begin(), path.end(), '.');
++  // Only the last path component carries the ".files.NNN" suffix. Upstream
++  // counts the dots of the whole path, so a single dot anywhere in a parent
++  // directory (e.g. a Conan cache under ~/.cache/conan2/..., whose directory
++  // iterator hands out absolute paths) makes every cache chunk look invalid:
++  // the cache appears empty and pkgfile exits 1 with "No repo files found".
++  const auto slash = path.rfind('/');
++  const std::string_view name =
++      slash == path.npos ? path : path.substr(slash + 1);
++
++  const auto ndots = std::count(name.begin(), name.end(), '.');
+   if (ndots != 2) {
+     return false;
+   }
+ 
+-  auto pos = path.rfind('.');
+-  if (!path.substr(0, pos).ends_with(".files")) {
++  auto pos = name.rfind('.');
++  if (!name.substr(0, pos).ends_with(".files")) {
+     return false;
+   }
+ 
+   int ndigits = 0;
+-  for (++pos; pos < path.size(); ++pos) {
+-    if (!isdigit(path[pos])) {
++  for (++pos; pos < name.size(); ++pos) {
++    if (!isdigit(name[pos])) {
+       return false;
+     }
+     ++ndigits;
