@@ -1,0 +1,33 @@
+# conandata.yml — retro-gtk 1.0.2
+
+sources:
+  "1.0.2":
+    # R39: 官方源 = 上游自托管的官方 tag 归档
+    #   gitlab.gnome.org/GNOME/retro-gtk/-/archive/1.0.2/retro-gtk-1.0.2.tar.gz
+    #   （sha256 2969d9f4…cd79f7 / 176491 B，本机实测）。上游规范发布点
+    #   download.gnome.org/sources/retro-gtk/ 无 1.0.2 发布物（GNOME 镜像站亦 404），
+    #   故官方归档只在 gitlab.gnome.org。
+    # 但 gitlab.gnome.org 在 CI 沙箱不可达（/-/archive/ 持续 HTTP 503），且不在
+    # ci/conan/build_and_test.sh 的镜像回退白名单内（get_mirrors 对 gitlab.gnome.org
+    # 只返回原 URL → 不改写），于是 conan source() 直接失败（PR #15550 / CI #88913 实测：
+    # ERROR: Error in source() method → conan create failed）。
+    # 处置：改用**字节一致镜像**——只换 host，文件名与 sha256 均不变，R37/L0j 口径下
+    # 源身份未变更；镜像托管在 CI 可达平台（atomgit，见
+    # knowledge/drafts/DRAFT-ohos-conan-source-host-unreachable-byte-identical-mirror.md
+    # 与 siril/1.2.3 先例），并**以固定 commit 锚定**（不用滚动分支），内容不会漂移。
+    url: "https://atomgit.com/api/v5/repos/Rz114514/build_in_harmonyos/raw/mirror%2Fretro-gtk%2F1.0.2%2Fretro-gtk-1.0.2.tar.gz?ref=031c21d2194be33caba09affe3a2f6ed122ef9c6"
+    # 镜像 URL 含 ?ref= 查询串与 %2F 编码路径，conan 无法推断文件名 → 显式 filename
+    filename: "retro-gtk-1.0.2.tar.gz"
+    sha256: "2969d9f424c21c64f815b17efd77cbfbe7577fe90022d98466204b942ecd79f7"
+
+patches:
+  "1.0.2":
+    - patch_file: "patches/0001-retro-runner-process-env-path.patch"
+      patch_description: "retro-runner 路径允许由 RETRO_RUNNER_PATH 环境变量覆盖（编译期常量仅在库部署于 configure 前缀时成立；构建树内跑上游测试与非 root 重定位部署都需要该覆盖口）"
+      patch_type: "portability"
+    - patch_file: "patches/0002-retro-gtk-meson-pkgconfig-drop-gi-kwargs.patch"
+      patch_description: "pkgconfig.generate() 不接受 GI 专用的 namespace/export_packages 关键字（现代 meson 直接报 unknown keyword 使 configure 失败）；删除这两个对 .pc 输出无影响的关键字"
+      patch_type: "portability"
+    - patch_file: "patches/0003-retro-reftest-headless-init.patch"
+      patch_description: "上游 reftest 用 gtk_test_init()（需要 X/Wayland display，上游 CI 也是 xvfb-run 包裹）；该 reftest 只比较软件渲染的 pixdata、不创建任何 widget，改用 g_test_init() 以便在无显示器的沙箱内实跑（断言一条未删）"
+      patch_type: "test"

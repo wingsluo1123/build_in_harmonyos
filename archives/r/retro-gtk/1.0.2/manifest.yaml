@@ -1,0 +1,51 @@
+version: "1.0.2"
+status: built
+build_date: "2026-10-12"
+conan_ref: "retro-gtk/1.0.2"
+
+source:
+  # 官方源：上游自托管 tag 归档 https://gitlab.gnome.org/GNOME/retro-gtk/-/archive/1.0.2/retro-gtk-1.0.2.tar.gz
+  # （download.gnome.org 无 1.0.2 发布物）；该 host 在 CI 沙箱不可达（503）且不在
+  # ci/conan/build_and_test.sh 的镜像回退白名单内 → 改用字节一致镜像（只换 host，
+  # 文件名与 sha256 不变，R37/L0j 源身份未变更），以固定 commit 锚定防漂移。
+  url: "https://atomgit.com/api/v5/repos/Rz114514/build_in_harmonyos/raw/mirror%2Fretro-gtk%2F1.0.2%2Fretro-gtk-1.0.2.tar.gz?ref=031c21d2194be33caba09affe3a2f6ed122ef9c6"
+  sha256: "2969d9f424c21c64f815b17efd77cbfbe7577fe90022d98466204b942ecd79f7"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "prefix=/（Conan MesonToolchain 默认；包内布局 relocatable）"
+    - "libexecdir=libexec（Conan 默认会把 libexecdir 归并到 bin/，显式还原上游 libexec/retro-runner 布局）"
+    - "-Dpulseaudio=disabled（制品仓 pulseaudio 与 gtk 栈版本互斥，见 notes.md）"
+    - "-Dintrospection=false -Dvapi=false -Dbuild-doc=false -Dinstall-doc=false（OHOS 无 g-i/vala/gtk-doc 工具链）"
+    - "-Ddemos=false（只交付库 + libexec helper）"
+    - "-Dbuild-tests=true -Dinstall-tests=false（构建期跑上游 meson 测试，测试二进制不入包）"
+    - "-Dwrap_mode=nodownload"
+  dependencies:
+    - "glib/2.84.0.1"
+    - "gtk/3.24.43"
+    - "libepoxy/1.5.10"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-retro-runner-process-env-path.patch"
+  - "0002-retro-gtk-meson-pkgconfig-drop-gi-kwargs.patch"
+  - "0003-retro-reftest-headless-init.patch"
+
+knowledge_gained:
+  - "glib/2.84.0.1 包内的构建期工具在 HMFS 上不可直接执行：python 脚本（glib-mkenums/glib-genmarshal/gdbus-codegen）需套一层显式解释器 wrapper，ELF 工具（glib-compile-resources 等）必须剥掉包内旧 .codesign 后用本机 signer 重签，否则 execve 直接 EPERM（rc=126）——与 gtk/3.24.43 的既有做法一致"
+  - "Staging 出来的 ELF 工具（glib-compile-resources）自身无 RUNPATH，按 soname 动态链接 glib 包内的 libgio-2.0.so.0 → 构建环境需把 glib 的 lib 目录加入 LD_LIBRARY_PATH"
+  - "Conan MesonToolchain 默认把 bindir/sbindir/libexecdir 全部归并到 bin/；上游把 retro-runner 设计为 libexec 下的内部 helper（RETRO_RUNNER_PATH 常量取自 libexecdir），需显式 -Dlibexecdir=libexec 还原"
+  - "制品仓 libepoxy/1.5.10 以 -Dglx=no -Degl=no -Dx11=false 构建（OHOS 无窗口系统），包里没有 epoxy/egl.h；retro-runner 需要它建离屏 GL 上下文 → compat/epoxy/egl.h 直接暴露平台 EGL API 并链接 sysroot libEGL（运行期 /system/lib64/libEGL.so），与 blur/coin3/astromenace 直链平台 EGL 同款"
+  - "上游 pulseaudio 后端默认开启，但制品仓 pulseaudio/17.0.1 钉 glib/2.88.0（与 gtk/3.24.43 的 glib/2.84.0.1 冲突）、pulseaudio/17.0 钉 expat/2.8.2（与 gtk 栈的 expat/2.8.2.1 冲突）→ conan 报 Version conflict，按可用依赖裁剪后端（bluez --disable-obex 同款取舍）"
+  - "上游 retro-gtk/meson.build 的 pkgconfig.generate() 带了 GI 专用的 namespace/export_packages 关键字，现代 meson（1.12）直接报 unknown keyword 使 configure 失败 → 补丁 0002 删除（对 .pc 输出无影响）"
+  - "上游 reftest 用 gtk_test_init()（需要 X/Wayland display，上游 CI 也是 xvfb-run 包裹）；该 reftest 只比较软件渲染的 pixdata、不创建 widget → 补丁 0003 改 g_test_init()，断言一条未删，使上游测试可在无显示器沙箱内实跑"
+  - "retro-runner 以 argv[1]=应用名（g_get_application_name()）、argv[2]=核心路径启动，内部断言 argc>=3 → 纯 GLib 消费者必须先 g_set_application_name()，否则 runner 直接断言失败（上游由 GTK/GApplication 或 g_test_init 顺带设置，隐藏了该前提）"
+  - "meson install 会改写 ELF 的 rpath，使链接期写入的 .codesign 哈希失效（OHOS loader 校验失败 → dlopen/execve Permission denied）→ packaging 后统一剥旧段重签，这是包内 .so / retro-runner 可加载的关键"
+  - "上游 2 项 meson 测试（RetroCore test、/retro-dummy reftest）在构建树内实跑需要 RETRO_RUNNER_PATH 覆盖（编译期常量指向安装前缀）→ 补丁 0001 让 runner 路径可由环境变量覆盖，同时解决非 root 部署的重定位问题"
+
+patch_generation:
+  method: manual-diff-unified
+  patches_count: 3

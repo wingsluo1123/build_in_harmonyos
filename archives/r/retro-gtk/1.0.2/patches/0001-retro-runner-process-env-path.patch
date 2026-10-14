@@ -1,0 +1,30 @@
+--- a/retro-gtk/retro-runner-process.c
++++ b/retro-gtk/retro-runner-process.c
+@@ -234,6 +234,7 @@
+   g_autoptr(GSubprocessLauncher) launcher = NULL;
+   g_autoptr(GSubprocess) process = NULL;
+   GError *tmp_error = NULL;
++  const gchar *runner_path;
+ 
+   g_return_if_fail (RETRO_IS_RUNNER_PROCESS (self));
+   g_return_if_fail (!G_IS_DBUS_CONNECTION (self->connection));
+@@ -243,8 +244,18 @@
+   if (!(connection = create_connection (launcher, 3, error)))
+     return;
+ 
++  /* Let the runner location be overridden at runtime: the compiled-in
++     RETRO_RUNNER_PATH is only correct when the library is deployed with the
++     prefix it was configured with.  Deployments that relocate the package
++     (or run the test suite from the build tree) can point this variable at
++     their retro-runner instead. */
++  runner_path = g_getenv ("RETRO_RUNNER_PATH");
++
++  if (runner_path == NULL)
++    runner_path = RETRO_RUNNER_PATH;
++
+   if (!(process = g_subprocess_launcher_spawn (launcher, &tmp_error,
+-                                               RETRO_RUNNER_PATH,
++                                               runner_path,
+                                                g_get_application_name (),
+                                                self->filename, NULL))) {
+     g_propagate_error (error, tmp_error);
