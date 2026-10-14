@@ -1,0 +1,86 @@
+--- a/install.sh	2020-07-18 21:49:46.000000000 +0800
++++ b/install.sh	2026-09-26 19:18:23.326686249 +0800
+@@ -34,6 +34,12 @@
+ [ -z "$SYSTEMD" ] && SYSTEMD="yes"
+ [ -z "$SYSTEMD_UNIT_D" ] && SYSTEMD_UNIT_D="$LIB_D/systemd/system"
+ [ -z "$TMPFILES_D" ] && TMPFILES_D="$ULIB_D/tmpfiles.d"
++# Optional integration components. Upstream default ("yes") keeps the
++# historical behaviour; set to "no" to skip udev / systemd-host / GUI
++# integration (e.g. when packaging for OHOS).
++[ -z "$INSTALL_GUI" ] && INSTALL_GUI="yes"
++[ -z "$INSTALL_UDEV" ] && INSTALL_UDEV="yes"
++[ -z "$INSTALL_PM_UTILS" ] && INSTALL_PM_UTILS="yes"
+ 
+ if [ -z "$ACPI" ] ; then
+ 	ACPI=auto
+@@ -118,6 +124,7 @@
+ $INSTALL -d -m 755 "$DESTDIR/usr/share/laptop-mode-tools/module-helpers"
+ $INSTALL -d -m 755 "$DESTDIR/etc/laptop-mode/conf.d"
+ $INSTALL -d -m 755 "$DESTDIR/etc/laptop-mode/modules"
++if [ "$INSTALL_GUI" != "no" ] ; then
+ $INSTALL -d -m 755 "$DESTDIR/usr/share/polkit-1/actions"
+ $INSTALL -d -m 755 "$DESTDIR/usr/share/applications"
+ $INSTALL -d -m 755 "$DESTDIR/usr/share/pixmaps"
+@@ -124,5 +131,8 @@
++fi
+ $INSTALL -d -m 755 "$DESTDIR/usr/sbin"
++if [ "$INSTALL_UDEV" != "no" ] ; then
+ $INSTALL -d -m 755 "$DESTDIR/$UDEV_D/rules.d"
++fi
+ $INSTALL -d -m 755 "$DESTDIR/$MAN_D/man8"
+ 
+ ALREADY_EXISTED=0
+@@ -161,6 +171,7 @@
+ 	exit 11
+ fi
+ 
++if [ "$INSTALL_GUI" != "no" ] ; then
+ if ( ! $INSTALL -m 644 usr/share/polkit-1/actions/org.linux.lmt.gui.policy "$DESTDIR/usr/share/polkit-1/actions/" ) ; then
+ 	echo "$0: Failed to install $DESTDIR/usr/share/polkit-1/actions/org.linux.lmt.gui.policy Installation failed."
+ 	exit 11
+@@ -167,4 +178,5 @@
+ fi
++fi
+ 
+ if ( ! $INSTALL -m 755 usr/sbin/lm-syslog-setup "$DESTDIR/usr/sbin" ) ; then
+ 	echo "$0: Failed to install $DESTDIR/usr/sbin/lm-syslog-setup. installation failed."
+@@ -198,6 +210,7 @@
+ 	exit 23
+ fi
+ 
++if [ "$INSTALL_GUI" != "no" ] ; then
+ if ( ! $INSTALL -m 644 gui/laptop-mode-tools.desktop "$DESTDIR/usr/share/applications" ) ; then
+ 	echo "$0: Failed to install $DESTDIR/usr/share/applications/laptop-mode-tools.desktop"
+ 	exit 11
+@@ -217,6 +230,7 @@
+ 	echo "$0: Failed to install $DESTDIR/usr/share/laptop-mode-tools/lmt.py";
+ 	exit 11
+ fi
++fi
+ 
+ # Install pm-utils hook only if pm-utils config dir is present, or force the
+ # install if we have a DESTDIR.
+@@ -223,3 +237,4 @@
++if [ "$INSTALL_PM_UTILS" != "no" ] ; then
+ if [ -n "$DESTDIR" -o -d "$DESTDIR/$ULIB_D/pm-utils/sleep.d" ] ; then
+ 	if ( ! $INSTALL -D -m 755 usr/lib/pm-utils/sleep.d/01laptop-mode "$DESTDIR/$ULIB_D/pm-utils/sleep.d/01laptop-mode" ) ; then
+ 		echo "$0: Failed to install 01-laptop-mode into $ULIB_D/pm-utils/sleep.d. Installation failed."
+@@ -230,8 +245,10 @@
+ if [ -f "$DESTDIR/$ULIB_D/pm-utils/sleep.d/99laptop-mode" ]; then
+ 	rm -f $DESTDIR/$ULIB_D/pm-utils/sleep.d/99laptop-mode;
+ fi
++fi
+ 
+ # udev rule
++if [ "$INSTALL_UDEV" != "no" ] ; then
+ if ( ! $INSTALL -D -m 644 etc/rules/99-laptop-mode.rules "$DESTDIR/$UDEV_D/rules.d/99-laptop-mode.rules" ) ; then
+ 	echo "$0: Failed to install udev rule into $UDEV_D/rules.d/ Installation failed."
+ 	exit 23
+@@ -241,6 +258,7 @@
+ if ( ! $INSTALL -D -m 755 etc/rules/lmt-udev "$DESTDIR/$UDEV_D/lmt-udev" ) ; then
+ 	echo "$0: Failed to install udev helper tool into $UDEV_D Installation failed."
+ fi
++fi
+ 
+ if [ "${SYSTEMD}" = "yes" ]; then
+ 	$INSTALL -d -m 755 "$DESTDIR/$SYSTEMD_UNIT_D"
