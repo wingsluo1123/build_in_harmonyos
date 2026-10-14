@@ -1,0 +1,63 @@
+--- a/scribus/CMakeLists.txt
++++ b/scribus/CMakeLists.txt
+@@ -35,20 +35,23 @@
+ include(api/CMakeLists.txt)
+ include(colormgmt/CMakeLists.txt)
+ include(desaxe/CMakeLists.txt)
+ include(fonts/CMakeLists.txt)
+ include(styles/CMakeLists.txt)
+ include(text/CMakeLists.txt)
+ 
+ add_subdirectory(dtd)
+ #add_subdirectory(ui/qml)
+ if(WITH_TESTS)
++	# 让 C++ 侧 #ifdef WITH_TESTS / #if WITH_TESTS 分支生效（主程序 --tests
++	# 入口由此编译进 scribus 可执行，才能运行 RunTests → TestStoryText）。
++	add_definitions(-DWITH_TESTS=1)
+ 	add_subdirectory(tests)
+ endif()
+ if (WANT_DESIGNER)
+ 	add_subdirectory(designer)
+ endif ()
+ add_subdirectory(third_party)
+ 
+ if(HAVE_OSG)
+ 	set(SCRIBUS_OSG_CLASS
+ 		ui/AdapterWidget.h
+@@ -790,23 +793,35 @@
+ 	${HARFBUZZ_SUBSET_LIBRARIES}
+ 	${ICU_LIBRARIES}
+ 	${TIFF_LIBRARIES}
+ 	${PNG_LIBRARIES}
+ 	${JPEG_LIBRARIES}
+ 	${WIN32_ONLY_LIBS}
+ 	${GMAGICK_LIBRARIES}
+ )
+ 
+ 
+-if (TARGET Fontconfig::Fontconfig)
++# OHOS/conan: prefer the injected absolute library path; the conan
++# fontconfig::fontconfig target carries no library list (its CMakeDeps
++# fontconfig_LIBS_RELEASE is empty), so linking that target leaves the
++# Fc* symbols unresolved.
++if(FONTCONFIG_LIBRARIES)
++	target_link_libraries(${EXE_NAME} PRIVATE
++		${FONTCONFIG_LIBRARIES}
++	)
++elseif (TARGET Fontconfig::Fontconfig)
+ 	target_link_libraries(${EXE_NAME} PRIVATE
+ 		Fontconfig::Fontconfig
++	)
++elseif(TARGET fontconfig::fontconfig)
++	target_link_libraries(${EXE_NAME} PRIVATE
++		fontconfig::fontconfig
+ 	)
+ endif()
+ 
+ 
+ 
+ if (NOT WIN32 AND NOT HAIKU)
+ 	target_link_libraries(${EXE_NAME} PRIVATE
+ 		${CUPS_LIBRARIES}
+ 	)
+ endif ()

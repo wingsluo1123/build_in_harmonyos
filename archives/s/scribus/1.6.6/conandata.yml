@@ -1,0 +1,34 @@
+sources:
+  url: https://sourceforge.net/projects/scribus/files/scribus/1.6.6/scribus-1.6.6.tar.xz/download
+  sha256: fdfe3e7cbe84b760b38d0561ed8736f9d25d4923adde6e15e03760d83be6166d
+  filename: scribus-1.6.6.tar.xz
+patches:
+- patch_file: patches/0001-CMakeLists.txt.patch
+  patch_type: portability
+  patch_description: 'OHOS: translations 条件化 + 全局 include_directories 启用 FONTCONFIG/Boost/ICU/HARFBUZZ/POPPLER
+    引用'
+- patch_file: patches/0002-CMakeLists_Dependencies.cmake.patch
+  patch_type: portability
+  patch_description: 'OHOS: Qt5LinguistTools 改 QUIET + CMAKE_PREFIX_PATH 追加 + 依赖查找兼容
+    CMakeDeps 大小写 + ICU pkg 名 icu-uc→icu + 显式加载 PkgConfig'
+- patch_file: patches/0003-scribus-CMakeLists.txt.patch
+  patch_type: portability
+  patch_description: 'OHOS: fontconfig 链接优先使用注入的 FONTCONFIG_LIBRARIES'
+- patch_file: patches/0004-scribus-main_nix.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS: 不强制 QT_QPA_PLATFORM=xcb（qtbase 制品无 xcb 插件，仅 offscreen）'
+- patch_file: patches/0005-scribus-scfonts.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS: 移除无用的 X11 include'
+- patch_file: patches/0006-scribus-scribusapp.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS/Qt5.15: QChar 比较歧义改 arg.startsWith；WITH_TESTS 开启后 --tests 入口的 argc()/argv()（Qt 制品无此成员接口）改置空，上游测试由独立 cellareatests 二进制在 build() 运行'
+- patch_file: patches/0007-scribus-tests-runtests.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS: runtests.cpp 的 QtTest include 改 <QtTest/QtTest>（qtbase 制品头文件位于 include/QtTest/ 子目录）'
+- patch_file: patches/0008-scribus-tests-testStoryText.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS/Qt5.15: testStoryText.cpp 的 insertChars(0, ...) 重载歧义改显式 QString 构造'
+- patch_file: patches-crlf/0009-scribus-text-textshaper.cpp.patch
+  patch_type: portability
+  patch_description: 'OHOS: harfbuzz 无 ICU 模块，textshaper 改用 uscript_getShortName（上游源文件 CRLF 行尾，补丁须保持 CRLF 以匹配，故置于 patches-crlf/ 独立目录，避开 refresh-patch 的 LF 规范化）'

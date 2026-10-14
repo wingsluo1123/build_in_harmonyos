@@ -1,0 +1,149 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.6.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.6.6"
+
+# 软件名
+software: "scribus"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-02"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://sourceforge.net/projects/scribus/files/scribus/1.6.6/scribus-1.6.6.tar.xz/download"
+
+  # 源码校验和
+  sha256: "fdfe3e7cbe84b760b38d0561ed8736f9d25d4923adde6e15e03760d83be6166d"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "WITH_TESTS=ON"
+    - "WITH_PODOFO=OFF"
+    - "QT_PREFIX=<qt5-qtbase package folder>"
+    - "CMAKE_IGNORE_PREFIX_PATH=$HOME/usr/local"
+    - "Python3_EXECUTABLE=<python package bin/python3.12>"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - qt5-qtbase/5.15.2.2
+    - poppler/25.12.0
+    - zlib/1.3.1.1
+    - libjpeg-turbo/3.2.0
+    - libpng/1.6.58
+    - libtiff/4.7.2
+    - freetype/2.14.3
+    - fontconfig/2.18.1.1
+    - expat/2.8.2.1
+    - openssl/1.1.1w
+    - cairo/1.18.4
+    - lcms2/2.19
+    - libxml2/2.15.3
+    - cups/2.4.19
+    - harfbuzz/14.2.0
+    - icu/76.1
+    - python/3.12.9
+    - hunspell/1.7.3
+    - boost/1.90.0.3
+    - librevenge/0.0.5
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-CMakeLists.txt.patch (translations 条件化 + 全局 include_directories 引用注入)"
+  - "0002-CMakeLists_Dependencies.cmake.patch (Qt5LinguistTools QUIET + CMAKE_PREFIX_PATH/CMakeDeps 兼容)"
+  - "0003-scribus-CMakeLists.txt.patch (fontconfig 链接优先注入库)"
+  - "0004-scribus-main_nix.cpp.patch (不强制 xcb 平台插件)"
+  - "0005-scribus-scfonts.cpp.patch (移除无用 X11 include)"
+  - "0006-scribus-scribusapp.cpp.patch (QChar 歧义 + WITH_TESTS argc/argv)"
+  - "0007-scribus-tests-runtests.cpp.patch (QtTest include 写法)"
+  - "0008-scribus-tests-testStoryText.cpp.patch (insertChars 重载歧义 + nrOfRuns/run 边界断言与上游实现对齐)"
+  - "patches-crlf/0009-scribus-text-textshaper.cpp.patch (harfbuzz 无 ICU 模块改用 uscript)"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "CRLF 行尾源文件补丁生成失败：refresh-patch 产 LF 补丁 dry-run 不匹配 CRLF 源文件，须手动 CRLF 补丁置独立目录（patches-crlf/）并声明 conandata.yml"
+  - "cmake/构建工具运行时需注入 SDK c++ 子目录 libc++_shared.so（W3 模拟环境）"
+  - "Qt5Test 库在 qt5-qtbase 包内但 CMakeDeps 未暴露 QT_QTTEST_LIBRARY/QT_LIBRARIES，需显式注入以启用 WITH_TESTS 测试链接"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/scribus-1.6.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/scribus-1.6.6.work
+  source_orig_hash: 355c829877f36d92
+  source_work_hash: 732d9217111c07e9
+  generated_at: '2026-10-08T20:12:01'
+  patches_count: 8
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-CMakeLists_Dependencies.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-scribus-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-scribus-main_nix.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-scribus-scfonts.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-scribus-scribusapp.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-scribus-tests-runtests.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-scribus-tests-testStoryText.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

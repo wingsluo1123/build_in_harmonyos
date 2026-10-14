@@ -1,0 +1,150 @@
+--- a/scribus/scribusapp.cpp
++++ b/scribus/scribusapp.cpp
+@@ -198,22 +198,28 @@
+ 		else if (arg == ARG_HELP || arg == ARG_HELP_SHORT)
+ 		{
+ 			header = true;
+ 			usage = true;
+ 		}
+ #ifdef WITH_TESTS
+ 		else if (arg == ARG_TESTS || arg == ARG_TESTS_SHORT)
+ 		{
+ 			header = true;
+ 			runtests = true;
+-			testargsc = argc() - argi;
+-			testargsv = argv() + argi;
++			// OHOS Qt5 制品不提供 QCoreApplication::argc()/argv() 成员接口，
++			// 上游 --tests 入口本意是把剩余命令行参数转发给 RunTests；这里置空
++			// 参数（QTest::qExec 接受空 argc/argv，使用默认 QCoreApplication）。
++			// 必须跳过剩余参数，否则下方 positional 循环会把 --tests 当文件
++			// 拦截（"File --tests does not exist"），RunTests 无法执行。
++			testargsc = 0;
++			testargsv = nullptr;
++			argi = argsc;   // 跳过剩余参数，防止 positional 循环拦截
+ 			break;
+ 		}
+ #endif
+ 		else if (arg == ARG_AVAILLANG || arg == ARG_AVAILLANG_SHORT)
+ 		{
+ 			header = true;
+ 			availlangs = true;
+ 		}
+ 		else if (arg == ARG_UPGRADECHECK || arg == ARG_UPGRADECHECK_SHORT)
+ 		{
+@@ -273,21 +279,21 @@
+ 		{
+ 			// Andreas Vox: Qt/Mac has -psn_blah flags that must be accepted.
+ 		}
+ 		else if (arg == CMD_OPTIONS_END)
+ 		{ //double dash, indicates end of command line options, see http://unix.stackexchange.com/questions/11376/what-does-double-dash-mean-also-known-as-bare-double-dash
+ 			argi++;
+ 			break;
+ 		}
+ 		else
+ 		{ //argument is not a known option, but either positional parameter or invalid.
+-			if (arg.at(0) == "-")
++			if (arg.startsWith("-"))
+ 			{
+ 				std::cout << tr("Invalid argument: %1").arg(arg).toLocal8Bit().data() << std::endl;
+ 				std::exit(EXIT_FAILURE);
+ 			}
+ 			m_fileName = QFile::decodeName(args[argi].toLocal8Bit());
+ 			if (!QFileInfo::exists(m_fileName))
+ 			{
+ 				std::cout << tr("File %1 does not exist, aborting.").arg(m_fileName).toLocal8Bit().data() << std::endl;
+ 				std::exit(EXIT_FAILURE);
+ 			}
+@@ -306,21 +312,21 @@
+ 			std::cout << tr("File %1 does not exist, aborting.").arg(m_fileName).toLocal8Bit().data() << std::endl;
+ 			std::exit(EXIT_FAILURE);
+ 		}
+ 		else
+ 		{
+ 			m_filesToLoad.append(m_fileName);
+ 		}
+ 	}
+ 	//Init translations
+ 	initLang();
+-	
++
+ 	//Show command line info
+ 	if (header)
+ 	{
+ 		useGUI = false;
+ 		showHeader();
+ 	}
+ 	if (version)
+ 		showVersion();
+ 	if (availlangs)
+ 		showAvailLangs();
+@@ -334,21 +340,21 @@
+ 	{
+ 		UpgradeChecker uc;
+ 		uc.fetch();
+ 	}
+ 	//Don't run the GUI init process called from main.cpp, and return
+ 	if (header)
+ 		std::exit(EXIT_SUCCESS);
+ 	//proceed
+ 	if (neversplash)
+ 		neverSplash(true);
+-	
++
+ }
+ 
+ int ScribusQApp::init()
+ {
+ 	m_ScCore = new ScribusCore();
+ 	Q_CHECK_PTR(m_ScCore);
+ 	if (!m_ScCore)
+ 		return EXIT_FAILURE;
+ 	ScCore = m_ScCore;
+ 	processEvents(QEventLoop::ExcludeUserInputEvents|QEventLoop::ExcludeSocketNotifiers, 1000);
+@@ -591,22 +597,22 @@
+ 	printArgLine(ts, ARG_AVAILLANG_SHORT, ARG_AVAILLANG, tr("List the currently installed interface languages") );
+ 	printArgLine(ts, ARG_NOSPLASH_SHORT, ARG_NOSPLASH, tr("Do not show the splashscreen on startup") );
+ 	printArgLine(ts, ARG_NEVERSPLASH_SHORT, ARG_NEVERSPLASH, tr("Stop showing the splashscreen on startup. Writes an empty file called .neversplash in ~/.config/scribus") );
+ 	printArgLine(ts, ARG_PREFS_SHORT, qPrintable(QString("%1 <%2>").arg(ARG_PREFS, tr("path"))), tr("Use path for user given preferences location") );
+ 	printArgLine(ts, ARG_PROFILEINFO_SHORT, ARG_PROFILEINFO, tr("Show location of ICC profile information on console while starting") );
+ 	printArgLine(ts, ARG_UPGRADECHECK_SHORT, ARG_UPGRADECHECK, tr("Download a file from the Scribus website and show the latest available version") );
+ 	printArgLine(ts, ARG_VERSION_SHORT, ARG_VERSION, tr("Output version information and exit") );
+ 	printArgLine(ts, ARG_PYTHONSCRIPT_SHORT, qPrintable(QString("%1 <%2> [%3] ").arg(ARG_PYTHONSCRIPT, tr("script"), tr("arguments ..."))), tr("Run script in Python [with optional arguments]. This option must be last option used") );
+ 	printArgLine(ts, ARG_NOGUI_SHORT, ARG_NOGUI, tr("Do not start GUI") );
+ 	ts << (QString("     %1").arg(CMD_OPTIONS_END,-39)) << tr("Explicit end of command line options"); Qt::endl(ts);
+- 	
+-	
++
++
+ #if defined(_WIN32) && !defined(_CONSOLE)
+ 	printArgLine(ts, ARG_CONSOLE_SHORT, ARG_CONSOLE, tr("Display a console window") );
+ #endif
+ 
+ #if WITH_TESTS
+ 	printArgLine(ts, ARG_TESTS_SHORT, ARG_TESTS, tr("Run unit tests and exit") );
+ #endif
+ 
+ /* Delete me?
+ 	std::cout << "-file|-- name Open file 'name'" ; endl(ts);
+@@ -684,21 +690,21 @@
+ }
+ 
+ void ScribusQApp::downloadComplete(const QString &t)
+ {
+ 	Q_UNUSED(t)
+ 	//qDebug()<<"ScribusQApp: download finished:"<<t;
+ }
+ 
+ bool ScribusQApp::event(QEvent *event)
+ {
+-	switch (event->type()) 
++	switch (event->type())
+ 	{
+ 	case QEvent::FileOpen:
+ 		{
+ 			QString filename = static_cast<QFileOpenEvent*>(event)->file();
+ 			if(m_ScCore && m_ScCore->initialized())
+ 			{
+ 				ScribusMainWindow* mw = m_ScCore->primaryMainWindow();
+ 				mw->loadDoc(filename);
+ 			}
+ 			else
