@@ -1,0 +1,29 @@
+# Upstream test inventory and consumer test declaration for xkill 1.0.7.
+
+package: xkill/1.0.7
+homepage: "https://gitlab.freedesktop.org/xorg/app/xkill"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Official X.Org xkill-1.0.7.tar.xz archive"
+    reason: "Archive file inventory contains no tests/ or test/ directory and no upstream test source files."
+  - source: "Makefile.am"
+    reason: "Declares bin_PROGRAMS=xkill and the man subdirectory; it has no TESTS, check_PROGRAMS, or check-local declaration. The generic Automake make check target therefore has zero registered tests."
+  - source: "meson.build"
+    reason: "Defines the xkill executable and man page only; it contains no test() or test_suite() call."
+  - source: "configure.ac"
+    reason: "Contains configure and dependency checks only; it declares no test suite."
+  - conclusion: "The upstream 1.0.7 release ships no automated tests. The build runs make check, which registers and executes zero upstream cases; test_package separately exercises the installed executable."
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check (0 registered tests)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xkill.py
+    description: "Executes the installed xkill binary through both version flags, both help flags, missing and invalid resource ids, unknown-option handling, and a no-server XOpenDisplay failure."
+    command: "python test_xkill.py <installed-bin/xkill> <runtime-LD_PRELOAD>"
+    assertions: 8
+
+assertion_count: 8
