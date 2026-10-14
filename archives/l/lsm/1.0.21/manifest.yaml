@@ -1,0 +1,30 @@
+# 版本级 manifest — lsm 1.0.21
+# 遵循 ARCHIVE-SPEC v2.0 / templates/manifest-version.yaml
+
+version: "1.0.21"
+software: "lsm"
+status: built
+build_date: "2026-09-26"
+build_system: "makefile"
+
+source:
+  url: "https://lsm.foobar.fi/download/foolsm-1.0.21.tar.gz"
+  sha256: "527d9c363aa62b9fc511b42c5a06f774a8767c4b5330db4d959c10b46b0dede7"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: ""
+
+patches_applied:
+  - "patches/0001-ohos-sockaddr-storage-guard.patch"
+  - "patches/0002-wait-any-portable.patch"
+
+knowledge_gained:
+  - "lsm 即 foolsm（Debian 因与 libstoragemgmt 路径冲突改名，打包二进制仍叫 foolsm），源码包名为 foolsm-1.0.21.tar.gz"
+  - "纯 Makefile 项目：无 configure、无 config.guess/sub 需要处理；VERSION 从 foolsm.spec 的 Version: 行读取"
+  - "Makefile 默认装到 $(PREFIX)/sbin，配方以 BINDIR=/bin 覆盖使产物落入 conan bin/foolsm"
+  - "上游无任何自动化测试（无 tests/ 目录、无 check/test 目标），按 no_tests 申报，test_package 以 foolsm -h/-v 版本输出做 3 点冒烟断言"
