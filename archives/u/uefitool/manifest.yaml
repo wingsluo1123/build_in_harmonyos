@@ -1,0 +1,48 @@
+# 软件级 manifest
+# 文件位置: archives/u/uefitool/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 软件名称（小写，与目录名一致）
+software: uefitool
+
+# 显示名
+display: "UEFITool"
+
+# 一句话描述
+description: "UEFITool — UEFI 固件镜像解析与提取工具集：UEFIExtract 批量解包并产出可读报告、UEFIFind 按 GUID/十六进制 pattern 检索，二者共用同一套固件卷/FFS/段解析器；Qt6 GUI 目标在 OHOS PC 上不构建"
+
+# 分类标签
+# foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data|library|utility
+category: utility
+
+# 官网 URL
+homepage: "https://github.com/LongSoft/UEFITool"
+
+# 开源许可证（SPDX 标识）
+license: BSD-2-Clause
+
+# 常用构建系统（可被版本级覆盖）
+# cmake | autotools | makefile | meson | custom
+build_system: cmake
+
+# OHOS 适配知识（跨版本通用）
+ohos_adaptation:
+  key_points:
+    - "根 CMakeLists.txt 无条件 ADD_SUBDIRECTORY(UEFITool)，而 UEFITool/CMakeLists.txt 第 9 行是 FIND_PACKAGE(Qt6 REQUIRED COMPONENTS Widgets) ⇒ 上游整树在 configure 阶段就需要 Qt6。OHOS PC 侧 Qt 是 qt5-qtbase（Qt 5.15），没有 Qt6 ⇒ 直接跑上游根工程必然 FATAL_ERROR，连零 Qt 依赖的 UEFIExtract/UEFIFind 也编不出来"
+    - "适配手法是**新增一个薄 CMakeLists**（archives/uefitool/0.28.0-a73/cmake/CMakeLists.txt），只 ADD_SUBDIRECTORY(UEFIExtract) 与 UEFIFind 两个子目录、不碰上游任何文件（R34），由 conanfile 的 cmake.configure(build_script_folder='cmake') 指向它。这也符合「包面裁剪」——GUI 目标既不可构建也不需要"
+    - "两个 CLI 子目录**零 Qt 依赖**（不 include 任何 Qt 头、不链 Qt 库），可独立构建；上游自己的 IF(UNIX) 分支才把产物名改成小写 uefiextract/uefifind，本包在适配侧 CMakeLists 里显式 SET_TARGET_PROPERTIES(... OUTPUT_NAME ...) 保证 OHOS 上拿到小写名"
+    - "guids.csv（12042 行 GUID → 可读名映射，格式 `<大写带连字符 GUID>,<名字>`、LF 行尾）**只**通过 UEFITool/uefitool.qrc 的 <file alias=\"guids.csv\"> 打进 GUI 的 Qt 资源，上游 INSTALL() 规则里没有任何一条装它；UEFIExtract/uefiextract_main.cpp 第 51 行在 main() 首行硬编码 initGuidDatabase(\"guids.csv\")（相对路径 ⇒ 按 CWD 解析）⇒ 剥掉 GUI 后该文件既不随包安装、也不在预期位置，而 common/guiddatabase.cpp 在文件读失败时**静默**返回空名表（零报错、退出码不变），固件里本该显示可读名的条目全退化成裸十六进制 GUID 串（common/ffs.cpp:233 的 guidToUString 查表失败即回退成裸格式，而其声明 ffs.h:25 的 convertToString 默认 true ⇒ 卷名/文件名都走查表路径）。本包在 package() 里把 common/guids.csv 装到 share/uefitool/"
+    - "U_ENABLE_GUID_DATABASE_SUPPORT 未定义时 initGuidDatabase()/guidDatabaseLookup() 是空实现（common/guiddatabase.cpp 的 #else 分支）——两个 CLI 子目录的 ADD_DEFINITIONS 都带了这个宏，所以真正决定名表有无效的是**运行时能否找到 guids.csv**，不是编译期开关"
+    - "CMake 侧 PROJECT_SOURCES 把第三方 C 库（brotli/LZMA/zlib/digest 共 38 个 .c）与 C++ 源混在同一列表，由 CMake 按扩展名分派语言，构建期无问题；但任何**手写**编译命令把 -std=c++11 套到整份源列表上会直接报 invalid argument '-std=c++11' not allowed with 'C'（本仓库本地校准时踩到，仅记录，不影响 CMake 路径）"
+    - "★ uefiextract 的 guids 子模式在 GUID 库为空时会打印用法文本并返回 1（U_INVALID_PARAMETER），与'参数写错'完全同形，且不生成 <img>.guids.csv。根因两处叠加：common/guiddatabase.cpp:124 的收集函数按 model->text 而非 model->name 筛选（普通文件 text 恒空 ⇒ 库恒空），且 uefiextract_main.cpp:102-107 的 guids 分支缺终结 return ⇒ 落穿到函数尾部 print_usage(); return 1;。消费者测试若要断言 guids 模式，镜像里必须有一个 Volume Top File（GUID 1BA0062E-C779-4582-8566-336AE8F78F09）"
+    - "真机 conan create 实测：整份构建日志中 warning 行数为 0 —— 上游源码在 OHOS 的 clang 15 + libc++ 上本身零告警，本包不需要任何 -Werror 豁免（P007），这也反向验证了零补丁策略没有靠 CFLAGS 级绕过"
+    - "上游**零测试**：全树 meson.build 无 test()、CMakeLists 无 enable_testing()/add_test()，唯一的测试性文件是 fuzzing/ffsparser_fuzzer.cpp（libFuzzer harness，无种子语料）⇒ 消费者测试必须自建（本包用纯标准库生成最小合法 FFS2 卷做真实解析）"
+    - "两个 CLI 的退出码契约**不对称**：UEFIExtract 无参数 argc<=1 返回 1（U_INVALID_PARAMETER），UEFIFind 无参数 argc==1 返回 0（打印用法）；-h/--help 与 -v/--version 两者都是 0；镜像打不开都返回 5（U_FILE_OPEN）。消费者测试不能套用同一模板，必须逐二进制实测"
+  common_dependencies: []
+
+# 版本索引
+versions:
+  "0.28.0-a73":
+    conan_ref: "uefitool/0.28.0-a73"
+    status: built
+    build_date: "2026-10-04"

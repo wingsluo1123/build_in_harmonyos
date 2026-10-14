@@ -1,0 +1,46 @@
+#====================================================================
+# DRAFT-uefitool-0.28.0-a73-cli-contract-self-inconsistent
+# 同一上游包内多个 CLI 的帮助文本与实现不一致 + 退出码语义相反
+# ——消费者测试套统一模板必然误判，且会出现"退出码 0 的假通过"
+#====================================================================
+
+id:                     DRAFT-uefitool-0.28.0-a73-cli-contract-self-inconsistent
+trigger_tool:           test|runtime
+phase:                  testing
+error_signature:        Usage: .*\{-h \| --help \| -v \| -version\}|U_INVALID_PARAMETER.*-version|照帮助文本传参后退出码非 0 且只打印 usage
+severity:               2
+category:               testing, detection, compat, runtime, portability
+match_keywords:         usage text, help text, --version, -version, unrecognized option, argc, exit code, return code, U_SUCCESS, U_INVALID_PARAMETER, U_ITEM_NOT_FOUND, multiple binaries, consumer test, template reuse, vacuous pass, false positive
+title:                  同一上游包内多个 CLI 的契约彼此不自洽（帮助文本承诺的选项实现不认 + 无参数退出码语义相反）—— 消费者测试套统一模板必然误判
+root_cause:             上游把多个可执行文件放在同一棵树里，各自由**独立**的 main() 处理参数，没有共享的选项解析层。于是同一份「Usage」格式在不同二进制里被手工抄写成不同内容，而实现分支各写各的：① 帮助文本与实现不一致 —— 某个二进制的 Usage 行承诺 {-h | --help | -v | -version}，实现只匹配 "-v" 与 "--version"，照文档敲单横线 -version 会落到兜底分支返回参数错误；同包另一个二进制的 Usage 行写的是 --version，与实现一致。② 退出码语义相反 —— 一个二进制把「无参数」当作用法错误（返回非 0），另一个当作「打印帮助即成功」（返回 0）。这类不自洽不会导致任何构建或运行失败，所以上游 CI（本例上游根本没有测试套件）不会暴露它。
+affected_scope:         同一上游发行版里打包多个 CLI 可执行文件、且各二进制自己解析 argv 的项目（本例 UEFITool：UEFIExtract 与 UEFIFind）；对消费者测试的影响最直接 —— 任何"写一份模板套到所有二进制"的做法都会同时踩到两处不自洽
+verification_cmd:       对每个二进制逐条按帮助文本敲一遍并记录退出码：BIN -h; BIN --help; BIN -v; BIN --version; BIN -version; BIN（无参数）; BIN /nonexistent。再把结果与各自 Usage 行逐字对照。例：`uefifind -version; echo $?` 与 `uefiextract -version; echo $?` 的差异即可复现。
+rec_priority:           P1
+rec_approach:           消费者测试**以源码为准而非以帮助文本为准**，并对每个二进制分别钉住它自己的契约。把「无参数退出码」当作被断言的契约之一（而不是假定它一定非 0）。对"帮助文本与实现不一致"这一项：记录事实但**不写成断言** —— 上游一旦修正，写死的断言会变成假失败。
+rec_command:            逐个二进制单独断言：# uefiextract 无参数 -> 1（视为用法错误）；# uefifind 无参数 -> 0（打印帮助即成功）；# uefifind <img> <非法模式> -> 1；# uefifind <img> 不命中 -> 8；# 两者 -v/--help -> 0；# 两者 <缺文件> -> 5
+problem:                为多二进制包写消费者测试时，最自然的做法是写一个函数套到每个二进制上。本例中这个做法**必然错**：若断言「无参数应返回非 0」，uefifind 会失败；若断言「无参数应返回 0」，uefiextract 会失败。更危险的是下一层：如果把「跑一下、rc == 0 即通过」当作"程序可用"的证明，那么当变量展开为空（例如 $BIN 未定义）时，uefifind 会**返回 0 并打印帮助** —— 测试报告全绿，而被测二进制根本没被正确调用。另一个可复现的事实：uefifind 的 Usage 行承诺 `-version`，实现只认 `--version`，照文档敲得到参数错误。
+diagnosis_steps:        1) 把包内所有可执行文件列出（install 规则 / bin 目录）；2) 对每一个，grep 出它的 Usage/帮助文本原文；3) grep 出它 main() 里所有 return 语句及其所在分支，逐条与帮助文本对照；4) 特别检查两处：帮助文本承诺的选项集合是否等于实现匹配的集合；「参数数量不足」这一分支返回的是成功还是失败；5) 用同一组输入（-h/--help/-v/--version/无参数/缺文件/非法模式）实际跑每个二进制并记录退出码，与第 3 步的静态结论对照。
+fix_pattern:            在 test.sh 里按二进制分节，每节只断言该二进制自己的契约（本包：A 层 17 条中"无参数"与"缺文件"都是两个二进制各断言一次、期望值不同）。凡是从帮助文本推断出的期望值，一律先与源码核对再写入断言。对于帮助文本与实现不一致之处，只在测试注释与文档里记录事实，不写成断言 —— 避免把上游的一次修正变成我们的假失败。适用边界：本条目描述的是"如何为契约不自洽的多二进制包写测试"，不主张去修上游（修不修是上游的事，且改帮助文本/退出码属于行为变更）。
+verification:           UEFITool A73：uefiextract 无参数 = 1（U_INVALID_PARAMETER，代码 `if (argc <= 1) { print_usage(); return 1; }`），uefifind 无参数 = 0（`if (argc == 1) { print_usage(); return U_SUCCESS; }`）；两者 -h/--help/-v/--version 均为 0；两者缺文件均为 5（U_FILE_OPEN）；uefifind 非法模式 = 1、不命中 = 8（U_ITEM_NOT_FOUND）。帮助文本不一致：uefifind 的 Usage 行写 `{-h | --help | -v | -version}` 而实现匹配 `arg == "-v" || arg == "--version"`；同包 uefiextract 的 Usage 行写 `{-h | --help | -v | --version}`，与实现一致。
+avoid_1_pattern:        写一个 run_cli() 函数套到所有二进制，并假定它们共享同一套退出码语义
+avoid_1_reason:         本例中两个二进制在「无参数」上语义**相反**，统一模板必然有一半断言是错的；而且错误方向不确定 —— 可能表现为测试失败（还容易发现），也可能表现为某个二进制在参数丢失时返回 0（假通过，更难发现）。
+avoid_1_consequence:     轻则测试反复失败、被当作"环境不稳"而放宽断言；重则测试全绿但实际上没验证到任何东西 —— 这属于最坏的一类：**证据不实**。
+avoid_2_pattern:        断言 rc == 0 就认为"二进制可用"，或把"能打印 usage"当作"被正确调用了"
+avoid_2_reason:         「无参数 + 返回 0」的组合意味着**参数丢失与正常执行无法从退出码区分**。变量为空、拼写错误、路径未设置等都会走进这条路径并返回成功。
+avoid_2_consequence:     变量展开为空时测试仍然全绿，被测产物根本没运行过；一旦被审核复核（例如把 bin/ 移走后重跑）就会暴露，代价远高于当初写严一点。
+principles:
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-uefitool-0.28.0-a73-cli-contract-self-inconsistent.md
+last_updated:           2026-10-04
+source_event:           uefitool 0.28.0-a73 消费者测试设计：核对两个 CLI 的 main() 字面返回值时发现「无参数」退出码相反（1 vs 0），并进一步查出帮助文本 -version 与实现 --version 不一致
+authors:                uefitool-adapter
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0

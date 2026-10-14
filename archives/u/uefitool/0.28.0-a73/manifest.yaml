@@ -1,0 +1,88 @@
+# 版本级 manifest
+# 文件位置: archives/u/uefitool/0.28.0-a73/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+#
+# `0.28.0-a73` 的读法：上游有两个并行分支。`0.28.0` 是 **old_engine** 的版本号，
+# 而本任务给的 `a73` 对应 **new_engine** 分支的快照 tag `A73`
+# （version.h 里是 `#define PROGRAM_VERSION "NE alpha 73"`）。
+# 因此源码必须取 tag `A73`，不能取 `0.28.0` 那个 release。
+# 目录名/包名沿用平台任务给的形式（与分支名 feat/uefitool-0.28.0-a73 一致）。
+version: "0.28.0-a73"
+
+# 软件名
+software: "uefitool"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-04"
+build_system: "cmake"
+conan_ref: "uefitool/0.28.0-a73"
+
+# 源码信息
+source:
+  # 源码下载 URL（官方源；完整三源列表见 conandata.yml）
+  url: "https://github.com/LongSoft/UEFITool/archive/refs/tags/A73.tar.gz"
+
+  # 源码校验和
+  sha256: "81d9944d75e27d4afbc8559d9ba913552006fd21ce9cadf357a4a0f58e59507e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（对应 conanfile.py generate() 写入 CMakeToolchain 的值）
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"                # OHOS：复用 Linux 平台模块，不新造 OHOS
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"         # 由 settings.arch 映射得到
+    - "-DCMAKE_SKIP_RPATH=ON"                    # 不产出第三方 .so（NEEDED 只剩平台自带 libc.so / libc++_shared.so，真机 readelf 实测）；同时绕开安装期 relink 写坏 ELF 签名（E077）
+    - "-DCMAKE_SKIP_INSTALL_RPATH=ON"
+    - "-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY"  # OHOS：编译期探测不调链接器
+    - "-DCMAKE_CXX_STANDARD=11"                  # 上游两个子工程均已 SET，此处仅记录
+
+  # 编译依赖列表（格式: name/version）
+  #
+  # ★ 本包**零外部依赖**：brotli / LZMA SDK / zlib / Tiano / bstrlib / SHA-1/256/512/SM3
+  #   全部以源码内嵌在 common/ 下，与 38 个 C++ 源一起编进可执行文件；
+  #   Kaitai 生成代码（common/generated/*.cpp）已入库，不需要 Kaitai 编译器。
+  #   「编译器 + CMake >= 3.22」即可构建。
+  dependencies: []
+
+  # 测试依赖（不进包、不传给消费者）—— 消费者测试只用 bash 与 python3（环境自带）
+  test_dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# 应用的补丁列表
+#
+# ★ 本包**零补丁**，上游源码一行不改。让两个 CLI 能被构建的唯一改动是适配侧
+#   自带的构建入口 archives/u/uefitool/0.28.0-a73/cmake/CMakeLists.txt
+#   （由 conanfile.py 的 export_sources() 随包带出）。它不在上游源码树里，
+#   因此不构成 patch —— 也就没有"补丁数同步"这一类问题。
+patches_applied: []
+
+# 编译中学到的知识
+knowledge_gained:
+  - "★ 上游根 CMakeLists.txt 只有五行，`ADD_SUBDIRECTORY(UEFITool)` 是无条件的，而 UEFITool/CMakeLists.txt 第 9 行是 FIND_PACKAGE(Qt6 REQUIRED COMPONENTS Widgets)。OHOS PC 侧 Qt 是 5.15 ⇒ 上游根工程在 configure 阶段就 FATAL_ERROR，连零 Qt 依赖的 UEFIExtract/UEFIFind 都到不了编译。修法是**新增**一个薄 cmake/CMakeLists.txt 只拉两个 CLI 子目录（cmake.configure(build_script_folder='cmake')），上游零改动。这条同时是「包面裁剪」：GUI 目标在 OHOS 上既不可构建也不需要"
+  - "★ guids.csv（GUID→可读名映射表）只通过 UEFITool/uefitool.qrc 的 Qt 资源进 GUI，上游 INSTALL() 从不安装它；而 UEFIExtract/uefiextract_main.cpp 第 51 行在 main() 首行就 initGuidDatabase(\"guids.csv\")（相对路径 ⇒ 按 CWD 解析）。剥掉 GUI 后该文件不在预期位置，而 common/guiddatabase.cpp 读失败时**静默**返回空名表 —— 退出码不变、报告照样生成，只是固件条目名全退化成裸十六进制 GUID 串。处置：package() 把 common/guids.csv 装到 share/uefitool/；消费者测试 cd 到该目录再跑，并断言报告里出现 GUID 名而不是只断言 rc=0"
+  - "U_ENABLE_GUID_DATABASE_SUPPORT 只决定 initGuidDatabase()/guidDatabaseLookup() 是空实现还是真实现（common/guiddatabase.cpp 的 #if/#else）。两个 CLI 子工程的 ADD_DEFINITIONS 都带了该宏 ⇒ 真正决定名表有无效的是**运行时能不能找到 guids.csv**，不是编译期开关"
+  - "★ 两个 CLI 的退出码契约不对称，消费者测试不能套同一模板：UEFIExtract 无参数（argc<=1）返回 1，UEFIFind 无参数（argc==1）打印用法并返回 0；-h/--help 与 -v/--version 两者都返回 0；镜像打不开都返回 5（U_FILE_OPEN）；UEFIFind 非法模式返回 1、pattern 不命中返回 8（U_ITEM_NOT_FOUND）"
+  - "★ UEFIExtract 的 initGuidDatabase() 在 main() 的**第一行**，早于 argc 检查 ⇒ 连 `uefiextract -v` 都会先去 CWD 找 guids.csv。这意味着任何在 CWD 放了错误 guids.csv 的环境都会污染所有子命令的行为，而与子命令本身无关"
+  - "上游零测试：全树无 enable_testing()/add_test()，meson.build 里无 test()，唯一沾测试的是 fuzzing/ffsparser_fuzzer.cpp（libFuzzer harness，无种子语料）。⇒ 消费者测试必须自建。本包用纯标准库手搓一个 4096 字节的最小合法 FFS2 固件卷做真实解析（不依赖任何外部固件样本，避免分发风险）"
+  - "CMake 的 PROJECT_SOURCES 把第三方 C 库（brotli/LZMA/zlib/digest 共 38 个 .c）与 C++ 源混在同一列表，CMake 按扩展名分派语言所以构建期无问题；但任何**手写**编译命令把 -std=c++11 套到整份列表上会直接报 `invalid argument '-std=c++11' not allowed with 'C'`（本仓库本地校准时踩到，仅记录）"
+  - "★ uefiextract 的 guids 子模式在 GUID 库为空时会**打印用法文本并返回 1**（U_INVALID_PARAMETER），与'参数写错'完全同形、且不生成 <img>.guids.csv。根因两处叠加：common/guiddatabase.cpp:124 的收集函数按 model->text 而非 model->name 筛选（普通文件的 text 恒空 ⇒ 库恒空），且 UEFIExtract/uefiextract_main.cpp:102-107 的 guids 分支缺终结 return ⇒ 落穿到函数尾部 :216-218 的 print_usage(); return 1;。对照：report 分支（:109-120）有显式 return 1，所以报告里看得到 GUID 名、导出文件里却看不到"
+  - "真机 conan create 实测：整份构建日志中 warning 行数为 **0** —— 上游源码在 OHOS 的 clang 15 + libc++ 上本身零告警，因此本包**不需要任何 -Werror 豁免**（这也反向验证了零补丁策略没有靠 CFLAGS 级绕过把构建擦干净，P007）"
+  - "CMAKE_SYSTEM_NAME 保持 Linux 而非新造 OHOS：CMake 内置系统表没有 OHOS 条目，新造会让上游按 cmake/os/${CMAKE_SYSTEM_NAME}.cmake 找模块而落空；OHOS 的能力差异改用 CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY（编译期探测不调链接器）+ conan toolchain 提供的 sysroot 表达"
+  - "OHOS 侧通用两条：① tools.build:jobs=1 必须固定（/storage/Users/** 走 HMDFS，GNU make 的 jobserver fifo 建不出来 ⇒ 并行子任务集体 Error 1 且日志零诊断，R9/E074）；② 构建步骤输出要绑定到普通文件再回显（conan 把 recipe 进程的输出流继承给构建子进程时，clang 会在第一个真正编译的翻译单元上静默非 0 退出，reliable/1.3.5 与 libfishcamp/1.2 同族）"
