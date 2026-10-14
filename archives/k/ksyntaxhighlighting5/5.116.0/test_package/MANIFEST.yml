@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ksyntaxhighlighting5/5.116.0
+homepage: "https://invent.kde.org/frameworks/syntax-highlighting"
+
+# 上游测试命令 (ctest, CMake 项目)
+upstream_check_command: "ctest --test-dir build --output-on-failure --no-tests=error"
+
+# conanfile.py build() 中是否已集成上游测试
+# 说明: 上游 6 个 autotests 已随 BUILD_TESTING=ON 编译，并在 conanfile.py
+# build() 中通过 ctest 真实执行（kconfig5/5.116.0 先例）：QT_QPA_PLATFORM=
+# offscreen + HOME/XDG 隔离 + 运行时库路径（_cmake_build_env + bin/ 兼容层）。
+upstream_test_in_build: true
+
+# 上游实际运行的测试程序（autotests/ 下 6 个 Qt 单元测试目标）
+upstream_tests:
+  - file: "autotests/foldingtest.cpp"
+    command: "folding_test"
+  - file: "autotests/htmlhighlighter_test.cpp"
+    command: "htmlhighlighter_test"
+  - file: "autotests/repository_test.cpp"
+    command: "repository_test"
+  - file: "autotests/testhighlighter.cpp"
+    command: "testhighlighter_test"
+  - file: "autotests/theme_test.cpp"
+    command: "theme_test"
+  - file: "autotests/wildcardmatcher_test.cpp"
+    command: "wildcardmatcher_test"
+
+# test_package 中自带的测试 (消费者视角验证, 调用 KF5SyntaxHighlighting API)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试: 构建 KSyntaxHighlighting::Repository 并查询 syntax definitions/themes，验证库可链接、头文件可包含、运行时符号可解析"
+    command: "./test_ksyntaxhighlighting5"
+
+# 测试断言总数 (test_package 内自检: definition 有效性 + theme 有效性)
+assertion_count: 2
