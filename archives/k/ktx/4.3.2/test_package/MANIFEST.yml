@@ -1,0 +1,101 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for ktx/4.3.2
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: 官方规范参考/03-测试质量规范-TEST_QUALITY_SPEC.md
+
+package: ktx/4.3.2
+homepage: "https://github.com/KhronosGroup/KTX-Software"
+
+# 上游测试命令（用于 ctest -N 分析）
+upstream_check_command: "ctest -N"
+
+# conanfile.py 的 build() 里是否调用了 cmake.test()
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试资产是完整的，全部随源码 tarball 发布，不需要任何 submodule 或网络：
+#   tests/gtest/       42 个文件（vendored googletest 1.11）
+#   tests/testimages/ 137 个文件（95 个 .ktx2 参考图）+ tests/srcimages/ 73 个源图
+#   other_projects/fmt 随包 vendored，且已因 KTX_FEATURE_TOOLS=ON 被 add_subdirectory
+# 唯一缺失的是 KTX_FEATURE_TOOLS_CTS 需要的空子模块 tests/cts/clitests ——
+# 该开关上游默认就是 OFF，本包沿用默认。
+#
+# 关于 wtests 套件的注册与该包的测试范围：
+#   * `KTX_FEATURE_TESTS` 默认 ON，控制的是 gtest 套件
+#     (unittests / texturetests / transcodetests / streamtests)。
+#     本包与**已合入的 archives/k/ktx-software/4.4.2（同上游）**一致设为 OFF，
+#     因此 build() 中不产生 gtest、也不调用 cmake.test()。
+#   * 四个 CLI 测试文件 (ktx2check / ktx2ktx2 / ktxsc / toktx) 只受
+#     `KTX_FEATURE_TOOLS` 控制，与 KTX_FEATURE_TESTS 无关。本包 TOOLS=ON，
+#     所以构建树里**确实注册了 133 个 ctest 用例**，已在真机上单独执行：
+#       133 registered / 126 passed / 7 failed (95%)，14.9 s，无动态库加载失败。
+#     没有放进 build() 的原因是可复现性：真机上 conan→cmake→make 整条链落在受限的
+#     `adhoc_bin` 安全域，该域拒绝启动用户存储构建树里的文件（本轮实测：make 无法
+#     启动构建树里的 mkversion，`/bin/sh: ./mkversion: Permission denied`，Error 126）；
+#     而 ctest 以及 gtest_discover_tests(DISCOVERY_MODE PRE_TEST) 要启动的正是那些
+#     文件。放进 build() 会得到与本机无关的失败，而不是真实的测试结论。
+
+upstream_tests:
+  - file: tests/ktx2check-tests.cmake
+    source: "KTX-Software-4.3.2/tests/"
+    description: "ktx2check CLI 套件：20 个用例（help/version/非法参数/退出码/逐图校验/--quiet/stdin/pipe 等），在 tests/testimages 上运行"
+    command: "ctest --test-dir <build_folder> -R '^ktx2check-test\\.'"
+    condition: "需要 KTX_FEATURE_TOOLS=ON（与 KTX_FEATURE_TESTS 无关）"
+  - file: tests/ktx2ktx2-tests.cmake
+    source: "KTX-Software-4.3.2/tests/"
+    description: "ktx2ktx2 CLI 套件：22 个用例（2d/数组/ASTC 转换、implied-out、含 10 个 unicode 文件名用例）"
+    command: "ctest --test-dir <build_folder> -R '^ktx2ktx2-test\\.'"
+    condition: "同上"
+  - file: tests/ktxsc-tests.cmake
+    source: "KTX-Software-4.3.2/tests/"
+    description: "ktxsc CLI 套件：21 个用例（zcmp 立方体贴图、就地压缩 curdir/diffdir 两种形态、unicode 文件名）"
+    command: "ctest --test-dir <build_folder> -R '^ktxsc-test\\.'"
+    condition: "同上"
+  - file: tests/toktx-tests.cmake
+    source: "KTX-Software-4.3.2/tests/"
+    description: "toktx CLI 套件：70 个用例（参考图对比、方向/元数据、PNG 块、ASTC 编码矩阵、立方体/数组/3D 纹理）"
+    command: "ctest --test-dir <build_folder> -R '^toktx-test\\.'"
+    condition: "同上"
+  - file: tests/tests.cmake
+    source: "KTX-Software-4.3.2/tests/"
+    description: "gtest 套件 unittests / texturetests / transcodetests / streamtests —— 本包未构建（KTX_FEATURE_TESTS=OFF，与已合入的 ktx-software/4.4.2 一致）"
+    command: ""
+    condition: "如需开启：把 KTX_FEATURE_TESTS 置 ON，并在 build() 末尾追加 cmake.test()；随后必须在**不受 adhoc_bin 域限制**的构建机上运行"
+
+# 真机上单独执行上游套件的结果（poller 域，非 conan create 内）
+upstream_suite_observed:
+  total_registered: 133
+  executed: 133
+  passed: 126
+  failed: 7
+  pass_rate: "94.7%"
+  wall_time: "14.9 s"
+  loader_failures: 0
+  reproducible: "连续两次全量运行得到相同的 126/7 与逐字相同的失败集合"
+  excluded: []
+  known_failures:
+    - name: ktx2check-test.all-quiet
+      cause: "环境：该用例的判据是 PASS_REGULAR_EXPRESSION '^$'（要求输出为空），而 ctest 通过 /data/service/hnp/bin/bash 拉起子进程时，bash 启动即向输出写入 'shell-init: error retrieving current directory: getcwd: cannot access parent directories: Not supported'。手动执行同一条命令输出 0 字节。"
+    - name: ktxsc-test.inplace-diffdir-zcmp_cubemap
+      cause: "环境：该族命令串是唯一使用 pushd ../.. 的；pushd 需要 getcwd，bash 在同一环境报 'pushd: error retrieving current directory: ... Not a tty' 后失败，&& 短路。手动执行同一条命令行 rc=0，且就地结果与参考文件逐字节相同。"
+    - name: ktxsc-test.inplace-diffdir-unicode-file-hu
+      cause: "同上（该族共 6 个用例）"
+    - name: ktxsc-test.inplace-diffdir-unicode-file-jp
+      cause: "同上"
+    - name: ktxsc-test.inplace-diffdir-unicode-file-ar
+      cause: "同上"
+    - name: ktxsc-test.inplace-diffdir-unicode-file-zh
+      cause: "同上"
+    - name: ktxsc-test.inplace-diffdir-unicode-file-ko
+      cause: "同上"
+  explanation: "133 个用例中有 78 个是经 hnp bash 拉起的子进程，这 78 个**全部**都会打出上述 getcwd 警告；其中 71 个照样通过，只有 7 个因为判据依赖‘子进程输出为空’或‘pushd 成功’而失败。警告出现在被测程序运行之前，且同一命令在 ctest 之外同一目录下手动执行可通过，故判定为真机 ctest 子进程工作目录解析问题，与本包产物无关。"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/test.c
+    description: "消费者冒烟：静态链接 libktx.a，调用 ktxTexture_CreateFromMemory(\"\", 0, ...) 并要求返回非 KTX_SUCCESS（证明真实库代码被执行，而非只链接了符号）"
+    command: "conan create（test_package 编译并运行 test_ktx）"
+    condition: "test() 内用 self.run() 直接执行测试二进制 —— 平台 L0d 要求 test() 中存在 self.run()"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 2

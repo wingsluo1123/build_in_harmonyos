@@ -1,0 +1,63 @@
+# 软件级 manifest — ktx
+# 文件位置: archives/k/ktx/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 软件名称（小写，与目录名一致；也是任务池里的软件名，task id 14729）
+software: ktx
+
+# 显示名
+display: "KTX"
+
+# 一句话描述
+description: "Khronos KTX 纹理容器库与命令行工具（libktx + ktx/toktx/ktxinfo/ktxsc/ktx2check/ktx2ktx2）"
+
+# 分类标签
+category: gfx
+
+# 官网 URL
+homepage: "https://github.com/KhronosGroup/KTX-Software"
+
+# 开源许可证（SPDX 标识）
+license: Apache-2.0
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "零外部依赖：basisu / astc-encoder / zstd / miniz / fmt / cxxopts 全部内置在源码树内，conanfile 的 requirements() 为空"
+    - "OHOS clang 定义 __linux__ 与 __aarch64__，Linux dlopen 代码路径与 ASTC 编码器 NEON 后端自动生效，无需补丁"
+    - "静态库优先：库类型开关随上游版本改名——4.3.2 是 KTX_FEATURE_STATIC_LIBRARY，4.4.2 起改为标准 BUILD_SHARED_LIBS；只设后者会在 4.3.2 上被静默忽略并产出 shared 库"
+    - "libktx.a 里含 C++ 目标文件（basisu/astc 是 C++），纯 C 消费者必须由 package_info 声明 system_libs=[c++, dl, pthread, m]，否则 operator new/delete 未定义"
+    - "从 tarball 构建没有 .git，上游的版本号生成链（git describe / mkversion）会退化为 0.0.0-noversion；4.4.2 用 KTX_GIT_VERSION_FULL 覆盖，4.3.2 无此机制，需补丁 backport"
+    - "KTX_FEATURE_GL_UPLOAD / KTX_FEATURE_VK_UPLOAD 走 dlopen 动态加载，OHOS 上默认关闭，不产生链接期依赖"
+    - "产物含 bin/ 工具，按 ARCHIVE-SPEC v3.0 §2.1 属于工具类型，必须在软件级目录提供 commands.json（L0k）"
+    - "静态构建不产生 libX.so -> libX.so.N 版本软链，因此在禁止创建符号链接的 adhoc_bin 受限域真机上也能直接完成 conan create"
+
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "4.3.2":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "ktx/4.3.2"
+    note: "任务池 task id 14729（activity: 开源鸿蒙PC专项积分赛-依赖）；上游 v4.3.2 tag 归档；1 个补丁 backport 4.4.2 的 KTX_GIT_VERSION_FULL 版本号覆盖机制"
+
+# 说明：同一上游在归档里还有另一个软件名 archives/k/ktx-software（4.4.2，零补丁，
+# 采用 BUILD_SHARED_LIBS 开关）。两者上游源码相同、软件名不同；本目录的软件名
+# `ktx` 与任务池记录逐字一致，不属于重复归档。

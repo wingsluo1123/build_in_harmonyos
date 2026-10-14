@@ -1,0 +1,93 @@
+# 版本级 manifest — ktx 4.3.2
+# 文件位置: archives/k/ktx/4.3.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "4.3.2"
+software: "ktx"
+status: built
+build_date: "2026-10-14"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/KhronosGroup/KTX-Software/archive/refs/tags/v4.3.2.tar.gz"
+  sha256: "74a114f465442832152e955a2094274b446c7b2427c77b1964c85c173a52ea1f"
+  tar_format: tar.gz
+  bytes: 252429885
+  archive_root: "KTX-Software-4.3.2"
+  members: 2638
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DKTX_FEATURE_STATIC_LIBRARY=ON"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DKTX_FEATURE_TESTS=OFF"
+    - "-DKTX_FEATURE_LOADTEST_APPS=OFF"
+    - "-DKTX_FEATURE_DOC=OFF"
+    - "-DKTX_FEATURE_JNI=OFF"
+    - "-DKTX_FEATURE_PY=OFF"
+    - "-DKTX_FEATURE_TOOLS=ON"
+    - "-DKTX_FEATURE_GL_UPLOAD=OFF"
+    - "-DKTX_FEATURE_VK_UPLOAD=OFF"
+    - "-DKTX_GIT_VERSION_FULL=v4.3.2"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-ohos-version-header.patch"
+
+# ============================================================
+# 验证
+# ============================================================
+
+test_results:
+  conan_create: "rc=0. Command: conan create archives/k/ktx/4.3.2 -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64, on a HarmonyOS PC workstation (conan 2.29.1 / cmake 4.1.2 / clang 15.0.4 / aarch64 / Release). 79 CXX and 43 C compile steps; the version.h custom command ran 7 times (8 CMake build units share one OUTPUT, lib/version.h); conan build log is 407 lines."
+  test_package: "passed. test_package compiles a C consumer against the static libktx.a and asserts that ktxTexture_CreateFromMemory(\"\", 0, ...) returns a non-success code. Runtime line: 'OK: ktx API call returned error code 11 (expected non-success)'."
+  upstream_suite: "133 ctest cases are registered in the build tree and were executed on the device from a plain shell: 126 passed, 7 failed (94.7%), 14.9 s, no shared-library load failures; two consecutive full runs produced the identical 126/7 split and the identical failed set. The 133 cases come from the four CLI test files (ktx2check 20, ktx2ktx2 22, ktxsc 21, toktx 70), which upstream registers under KTX_FEATURE_TOOLS alone and which are therefore independent of KTX_FEATURE_TESTS; the gtest suites (unittests / texturetests / transcodetests / streamtests) are not built here, matching the merged archives/k/ktx-software/4.4.2 entry for the same upstream. The suite is deliberately NOT invoked from build(): on this device the whole conan -> cmake -> make chain runs in the restricted adhoc_bin domain, which refuses to start files in the user-storage build tree -- that is the same restriction that made make fail to launch ./mkversion with 'Permission denied' (Error 126) -- and ctest, like gtest_discover_tests in DISCOVERY_MODE PRE_TEST, starts exactly those files. The 7 failures share one environmental root cause: 78 of the 133 cases are children of /data/service/hnp/bin/bash and ALL 78 emit 'shell-init: error retrieving current directory: getcwd: cannot access parent directories' before any test code runs; 71 of them still pass. Only the cases whose pass criterion depends on an empty output stream (ktx2check-test.all-quiet, PASS_REGULAR_EXPRESSION '^$') or on pushd succeeding (the six ktxsc-test.inplace-diffdir-* cases, the only family that calls 'pushd ../..') fail -- running the identical command lines outside ctest, in the identical directory, returns 0 and the in-place result is byte-identical to the reference. Per-case detail is in test_package/MANIFEST.yml (upstream_suite_observed) and notes.md."
+  package_id: "6ca9e5223930134dcba78240439f1e4aa207c14a"
+  recipe_revision: "b1b00239e0805ba36be202f7d8f97525"
+  package_revision: "8e6caabe56eeae1f8e7428f41ff69371"
+  version_string: "'ktx version: v4.3.2'; toktx/ktxinfo/ktx2check/ktx2ktx2/ktxsc all print v4.3.2 as well. The configure WARNING 'Falling back to 0.0.0-noversion' does not occur in the build log, and the string '0.0.0-noversion' has 0 occurrences in libktx.a. Generated lib/version.h reads '#define LIBKTX_VERSION v4.3.2'."
+  elf: "bin/ktx: ELF64, little endian, AArch64, Type DYN (PIE); DT_NEEDED = libc++_shared.so, libc.so only; program interpreter /lib/ld-musl-aarch64.so.1."
+  installed_files: 16
+  symlinks_in_package: 0
+  l0: "pass"
+  l1: "pass"
+  l2: "pass. bin/ktx runs outside the conan cache: rc=0, prints 'ktx version: v4.3.2', both from the package folder and from a copy placed in /data/storage/el2/base/haps/entry/files."
+  l4: "pass"
+  l5: "not applicable. This is a static-only package (libktx.a + libastcenc-neon-static.a); no shared object is produced, so there is no DT_SONAME to inspect. The six CLI binaries need only libc++_shared.so and libc.so."
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "4.3.2 and 4.4.2 use different switches for the library type: 4.3.2 has KTX_FEATURE_STATIC_LIBRARY (ON => static), while 4.4.2 uses the standard BUILD_SHARED_LIBS. Setting only BUILD_SHARED_LIBS on the 4.3.2 source tree is silently ignored and yields a shared libktx, so both variables are set explicitly."
+  - "ktx 4.3.2 has no KTX_GIT_VERSION_FULL override (4.4.2 added it): cmake/version.cmake calls git_describe_raw() unconditionally and the released tarball has no .git, so it degrades to 0.0.0-noversion and ./mkversion stamps version.h with the DEF_VER=v4.0 fallback. patches/0001 backports the 4.4.2 override path."
+  - "cmake/version.cmake is include()d at line 13 of the top-level CMakeLists, before project() at line 25, and cmake only reads conan_toolchain.cmake at project() time. A CMakeToolchain variable is therefore still empty at line 13 and the override would never be seen; KTX_GIT_VERSION_FULL must be passed as a real command-line -D cache variable."
+  - "On HarmonyOS PC the whole conan -> cmake -> make chain runs in the restricted adhoc_bin domain, which refuses to start files that live in the user-storage build tree. Upstream runs ./mkversion directly, so the build dies with '/bin/sh: ./mkversion: Permission denied' (make Error 126) even though the file is present with mode 0770 and runs fine from an interactive shell. Handing the script to ${BASH_EXECUTABLE} (guaranteed by find_package(Bash REQUIRED) at CMakeLists line 11) makes the interpreter read it instead. The same restriction is why the upstream ctest suite is run outside conan create here instead of from build()."
+  - "Upstream registers its CLI ctest suites under KTX_FEATURE_TOOLS, independently of KTX_FEATURE_TESTS: even with KTX_FEATURE_TESTS=OFF the build tree carries 133 ctest cases (ktx2check 20, ktx2ktx2 22, ktxsc 21, toktx 70) and ctest -N lists all of them. Only the gtest suites are gated on KTX_FEATURE_TESTS, whose upstream default is ON."
+  - "A ctest result on this platform has to be triaged, not taken at face value: every child that goes through /data/service/hnp/bin/bash prints 'shell-init: error retrieving current directory: getcwd: cannot access parent directories' before it does anything -- 78 of the 133 cases, of which 71 still pass. Only criteria that need an empty output stream or a successful pushd turn that warning into a failure."
+  - "patch_ng, which conan 2.x uses to apply patches, derives a file mode only from a 'new file mode <oct>' line or from a paired 'old mode <oct>' + 'new mode <oct>'; an 'index <sha>..<sha> <oct>' line is ignored. A patch generated on Windows (core.fileMode=false, every file 0666) therefore silently drops the +x bit of a patched script and the later make step fails with Error 126."
+  - "patch_ng applies hunks without searching for an offset: two patches that each rewrite a different region of the same file both apply cleanly in isolation, but the second one returns False when applied after the first, because the lines inserted by the first shift its anchor. All edits to one file must live in a single patch file. git apply hides this, since it does search for offsets."
+  - "All third-party code is vendored (basisu / astc-encoder / zstd / miniz); tools/imageio links the bundled lodepng, the basisu jpgd and the astc tinyexr, so the build downloads nothing. Only the upstream tarball itself is fetched, and there is no ExternalProject or FetchContent step."
+  - "KTX_FEATURE_VK_UPLOAD=OFF also removes include/ktxvulkan.h from the install set: only include/ktx.h and include/KHR/khr_df.h are installed."
+  - "Upstream mkversion always writes '#define <NAME>_DEFAULT_VERSION ${DEF_VER}.__default__', where '__default__' is a literal placeholder; no file in the source tree references any *_DEFAULT_VERSION macro, so this line is inert output and not a defect introduced by this adaptation."
