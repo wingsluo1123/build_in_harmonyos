@@ -1,0 +1,27 @@
+# 版本级 manifest — tuntox 0.0.10.1
+version: "0.0.10.1"
+software: "tuntox"
+status: building
+build_date: "2026-10-12"
+
+source:
+  url: "https://github.com/gjedeer/tuntox/archive/refs/tags/0.0.10.1.tar.gz"
+  sha256: "7f04ccf7789467ff5308ababbf24d44c300ca54f4035137f35f8e6cb2d779b12"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libsodium/1.0.22
+  # vendor 内联依赖：c-toxcore v0.2.19（源见 conandata.yml toxcore 字段）
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "tuntox 为纯 Makefile 应用，仅链接 c-toxcore；c-toxcore 未在本仓库单独适配，故在配方内 source() 内联下载、build() 先 CMakeToolchain 静态构建其核心（BUILD_TOXAV=OFF）再链接 tuntox"
+  - "c-toxcore 核心唯一硬依赖为 libsodium（pkg-config），由 PkgConfigDeps 生成 .pc 供 pkg_search_module 检索；toxav/bootstrapd 用 CMake 开关关闭"
+  - "tuntox Makefile 硬编码 gcc/-static/pkg-config，用 make 命令行覆盖 CC/CFLAGS/DSO_LDFLAGS（command-line 变量使 makefile 的 `+=` 失效，完全控制编译/链接）；构建 tuntox_nostatic（OHOS musl 无静态 libc）"
+  - "tox_bootstrap.h 随发布包附带，避免触发 generate_tox_bootstrap.py（需 requests+jinja2 并联网 nodes.tox.chat）"
+  - "上游无任何测试（Makefile 无 check 目标、无 tests/ 目录），test_package 以 `tuntox -h` 触发 print_version()->tox_version_* 做真实功能验证"
