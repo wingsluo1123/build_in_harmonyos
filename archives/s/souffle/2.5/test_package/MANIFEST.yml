@@ -1,0 +1,78 @@
+# test_package/MANIFEST.yml — souffle 2.5
+# 上游官方测试声明文件 (CI L0e 强制要求).
+# 详见 docs/TEST_QUALITY_SPEC.md 与 .gitcode 审查规则.
+
+package: souffle/2.5
+homepage: "https://souffle-lang.github.io/"
+
+# ---------------------------------------------------------------------------
+# 上游测试 (Layer 1, 在 conanfile.py build() 中通过 ctest 运行并输出
+# HMBS_UPSTREAM_TEST_RESULT 机器证据)
+# ---------------------------------------------------------------------------
+#
+# 审计结论: 上游存在完整测试套件 (CTest 驱动), upstream_tests_exist = true.
+#
+# 套件组成 (souffle-2.5 源码, 官方口径 = ctest_entries, add_test 项):
+#   - C++ 单元测试二进制 (src/tests, src/ast/tests, src/ram/tests,
+#     src/interpreter/tests, tests/libsouffle_interface): 每文件名 1 个
+#     add_test, 标签 unit_test, 自包含、可直接运行; 共 36 个二进制.
+#   - Datalog 功能套件 (tests/{semantic,syntactic,provenance,profile,
+#     scheduler,link,interface,libsouffle_interface}), 由 SOUFFLE_RUN_TEST*
+#     宏展开为 setup/run_souffle/compare_std_outputs/compare_csv 等多条
+#     add_test (interpreted + compiled 变体).
+#
+# 注册总数 (discovered) 由配方 build() 内真机 `ctest -N` 实测读取, 作为
+# 官方的 ctest_entries 总数 (upstream_test_total) 与口径向齐. 由于功能套件
+# compiled 变体要求运行时调用 C++ 编译器现场编译 souffle 生成的程序, 且
+# 部分脚本依赖 gzip/sqlite3 helper (本基础适配已关闭 zlib/sqlite), 配方只
+# 实际执行自包含的 unit_test 二进制集 (36 项), 其余功能 ctest 项以
+# ohos_feature 缺口如实计入 marker 的 gaps (count = discovered - executed),
+# 不伪造通过、不删除断言.
+#
+# 注意: 上表计数一律以真机 evidence 轮 `ctest -N` 与 unit_test 实际运行日志
+# 为准并回填; 此处 method 与存在性先行声明, 数值随 evidence 轮对齐.
+
+upstream_tests_exist: true
+upstream_test_audit: >-
+  Official souffle-2.5 source tree registers its upstream suite via CTest
+  (include(CTest) + SOUFFLE_ENABLE_TESTING). We audited every test
+  CMakeLists.txt: 36 souffle_add_binary_test targets (add_test each, label
+  unit_test) across src/tests, src/ast/tests, src/ram/tests,
+  src/interpreter/tests and tests/libsouffle_interface, plus the Datalog
+  functional suites under tests/{semantic,syntactic,provenance,profile,
+  scheduler,link,interface,libsouffle_interface} expanded by SOUFFLE_RUN_TEST*
+  into setup/run/compare ctest entries. The authoritative registered total is
+  the device `ctest -N` count (ctest_entries), read live by the recipe and
+  reported as `discovered` in HMBS_UPSTREAM_TEST_RESULT. The recipe executes
+  the 36 self-contained unit_test binaries and reports the remaining
+  functional ctest entries as an ohos_feature gap (count = discovered -
+  executed), because their compiled mode needs a runtime C++ compiler and the
+  helper scripts need gzip/sqlite3 (both disabled in this base adaptation).
+upstream_check_command: "ctest -N"
+upstream_test_in_build: true
+upstream_test_command: "ctest -L unit_test --output-on-failure"
+upstream_test_total: 2468
+upstream_test_count_method: ctest_entries
+
+upstream_tests:
+  - file: "src/tests/table_test.cpp"
+    source: "souffle-2.5.tar.gz/src/tests/table_test.cpp"
+    description: "C++ unit test binary (label unit_test) — Table datastructure"
+    command: "ctest -L unit_test"
+  - file: "src/ast/tests/ast_transformers_test.cpp"
+    source: "souffle-2.5.tar.gz/src/ast/tests/ast_transformers_test.cpp"
+    description: "AST transformer unit test binary (label unit_test)"
+    command: "ctest -L unit_test"
+
+# ---------------------------------------------------------------------------
+# 消费者测试 (Layer 2, test_package 内)
+# ---------------------------------------------------------------------------
+test_package_tests:
+  - file: "test.sh"
+    description: "case 1: souffle --version; case 2: evaluate transitive-closure .dl and assert path.csv has 6 rows"
+    command: "sh test.sh <package_folder>"
+  - file: "test.dl"
+    description: "End-to-end Datalog reachability program exercised by test.sh"
+    command: "souffle -D. -F. test.dl"
+
+assertion_count: 2
