@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(libunibreak_consumer C)
+find_package(libunibreak CONFIG REQUIRED)
+add_executable(test_unibreak test_unibreak.c)
+target_link_libraries(test_unibreak PRIVATE libunibreak::libunibreak)
