@@ -1,0 +1,69 @@
+修改说明（任务 12134 / PR #12134 / libchewing 0.13.1 —— Rust/Cargo 运行时库）
+生成: 2026-10-12  路径: archives/l/libchewing/0.13.1/
+修改文件: conanfile.py
+
+修改原因：
+  上一轮把源码下载通道改到 github.com 后，CI 已能成功下载三段源码与 corrosion
+  （日志实证 "Sources correctly downloaded from https://gh-proxy.com/..."），
+  失败点上移到 conan-build-test 的构建期。最新构建 #86448（worker CI-021）
+  最终错误：
+    ERROR: libchewing/0.13.1: Invalid configuration: Rust/Cargo toolchain
+           not executable: no verified cargo/rustc pair ...
+  其前置日志：
+    rust runtime cand: /usr/lib (libcrypto.so.3, libssl.so.3, ...) ssl-symbol=False
+    WARN: rust runtime bottle openssl3 staging failed (best-effort ...):
+          Not found: https://harmonybrew.atomgit.com/bottles/
+          openssl%403-3.6.4.arm64_ohos.bottle.tar.gz
+    WARN: rust runtime bottle zlib staging failed ...:
+          Not found: .../zlib-ng-compat-2.3.3_1.arm64_ohos.bottle.tar.gz
+    rust-staged FULL cargo err: rc=127: Error relocating
+          .../rust-toolchain/bin/cargo: SSL_get0_group_name: symbol
+
+  根因（两条，均为“路径/版本过期”而非逻辑缺陷）：
+  1) conanfile.py 顶部 RUST_RUNTIME_BOTTLES 里硬编码的两个 harmonybrew
+     bottle 下载地址已失效（实测 HTTP 404）：openssl%403-3.6.4...bottle.tar.gz
+     与 zlib-ng-compat-2.3.3_1...bottle.tar.gz。于是没有任何 staged 目录提供
+     OpenSSL 3.5+ 的 libssl，cargo（链接 libssl.so/libcrypto.so/libz.so 三个
+     无版本名 SONAME）落到系统 /usr/lib 的 OpenSSL 3.0.12，重定位时缺
+     SSL_get0_group_name（3.5+ 才导出）→ rc=127。
+  2) 即使 bottle 可用，_prepare_runtime_libs 把 bottle 解出的 lib 目录“追加”
+     在本地目录（含 /usr/lib）之后，而 ld 只取 LD_LIBRARY_PATH 上第一个匹配的
+     libssl.so.3，会先命中 /usr/lib 的 3.0 → 重新踩同一个缺符号问题。
+
+修改内容（仅 conanfile.py，两处）：
+  1) RUST_RUNTIME_BOTTLES：按 harmonybrew 官方公式索引
+     （https://harmonybrew.atomgit.com/api/formula.jws.json）更新为当前实际
+     发布的 bottle 地址与 sha256：
+       openssl3 -> .../openssl%403-3.6.5_1.arm64_ohos.bottle.1.tar.gz
+                   sha256 ae1d5bf9252d65d86053e68d7c91fc9d0066016bce50662ce4a32a0b0e954ef2
+       zlib     -> .../zlib-ng-compat-2.3.3_2.arm64_ohos.bottle.1.tar.gz
+                   sha256 7092bfe7af8908f4a7c72493881291fe2416f27fc6502c34e22346a4dbfc4c51
+     （URL 仍指向既有授权镜像 harmonybrew.atomgit.com，未手写任何代理前缀，符合 R39）
+  2) _prepare_runtime_libs：在 bottle 解压之后、compat 目录装配之前，新增一次
+     按符号兼容性重排 lib_dirs 的步骤——凡 libssl 导出 SSL_get0_group_name
+     (OpenSSL 3.5+) 的目录前置，其余（含系统 /usr/lib 3.0）后置，保证 loader
+     优先取到 3.6.5 的 libssl.so，而不是被 /usr/lib 的 3.0 抢先命中。
+
+验证（本机，2026-10-12）：
+  - 三份 bottle 实测可下载且 sha256 与公式索引完全一致：
+      openssl@3 3.6.5        11127884 B  ae1d5bf9...True
+      openssl@3.5 3.5.9       7365693 B  dd2f8efb...True（备选，未采用）
+      zlib-ng-compat 2.3.3_2    192282 B  7092bfe7...True
+  - 解包结构核对：openssl@3/3.6.5_1/lib 提供 libssl.so.3、libcrypto.so.3
+    且带无版本名软链 libssl.so -> libssl.so.3、libcrypto.so -> libcrypto.so.3；
+    zlib-ng-compat/2.3.3_2/lib 提供 libz.so -> libz.so.1 -> libz.so.1.3.1.zlib-ng。
+    三者恰好覆盖 cargo NEEDED 的 [libcrypto.so, libssl.so, libz.so]。
+  - 读 libssl.so.3 文件：e_machine=0xB7（aarch64），dynstr 内含
+    "SSL_get0_group_name" 字符串，并标注依赖 libcrypto.so.3 —— 即 3.6.5 的
+    libssl 正是 cargo 需要的 3.5+ 导出符号提供者。
+  - 因 bottle 目录同时含无版本名软链，_have_exact 三项齐全，compat 目录不再
+    需要生成，falls back 的宿主编译 openssl 兜底（_build_local_openssl_shared）
+    也因 _libssl_has_group_symbol 命中 True 而跳过，缩短构建时间。
+  - conanfile.py 通过 python -m py_compile。
+
+未完成/后续：
+  - 需 commit 并 push 到分支 feat/libchewing-0.13.1 以刷新 PR #12134，再观察
+    CI（预计 ssl-symbol=True、bottle staged 成功、cargo 可执行）。
+  - 若该 worker 上 nm/llvm-nm 不可用，_libssl_has_group_symbol 返回 None 会导致
+    重排不生效；但 #86448 日志显示 /usr/lib 返回的是 False（非 None），说明
+    符号检测工具在 worker 上可用，重排会生效。

@@ -1,0 +1,47 @@
+修改说明（任务 12134 / PR #12134 / libchewing 0.13.1）
+生成: 2026-10-08  路径: archives/l/libchewing/0.13.1/
+
+修改原因：
+  CI 在 conan-build-test 阶段下载源码失败（build #61873 等），任务卡在 waiting_gates。
+  根因：conandata.yml 的 sources 与 data 都指向 codeberg.org，而 CI 的镜像白名单
+  （ci/conan/build_and_test.sh 的 grep -qE 'url:.*https://(...github\.com...)/'）不含
+  codeberg.org，且该白名单/改写只对「单值双引号 url 行」生效。结果是：
+    - codeberg URL 得不到 gh-proxy 镜像回退；
+    - worker 缺少 curl，CI 预下载通道不可用；
+    - codeberg 对 CI 共享出口持续返回 HTTP 429 → source() 失败。
+  故把两段 codeberg 源迁到「可达且字节等价」的 github.com 归档。
+
+修改内容（本次共 4 个文件，均在 archives/l/libchewing/0.13.1/ 下）：
+  1) conandata.yml：三段源全部改为「单值双引号」的 github.com 直链
+     （E549：单值形态才会触发 CI 镜像注入；R39 禁止手写代理前缀，故不写 gh-proxy）：
+     - sources：https://github.com/chewing/libchewing/archive/e928d7b8...tar.gz
+       sha256 94cbd60a7e89f4680e46d1326b4943dbb79b6274e154cf83bc4de1b38978ea45
+     - data   ：https://github.com/fcitx-contrib/libchewing-data/archive/7bd07548...tar.gz
+       sha256 4c491740811586445c3cda5a244751968571fe126dba059dc3dd895265f379b0
+     - corrosion：https://github.com/corrosion-rs/corrosion/archive/refs/tags/v0.5.1.tar.gz
+       sha256 843334a9f0f5efbc225dccfa88031fe0f2ec6fd787ca1e7d55ed27b2c25d9c97（内容不变）
+  2) conanfile.py：
+     - 更新 _get_with_retry 上方注释块（旧注释「无合规可达镜像 / 不可用 GitHub」的结论已过时）；
+     - source() 在下载 data 之后调用 self._normalize_data()；
+     - 新增 _normalize_data()：把 data/CMakeLists.txt 的 cmake_minimum_required
+       由 3.31.6...3.31.6 还原为 codeberg bfba418 的 3.27.0...3.31.6（该镜像比 codeberg
+       落后一个「放宽版本下限」的提交）。行不存在时为空操作。
+  3) manifest.yaml：source.url / source.sha256 更新为 github 主源；upstream_test_audit
+     说明补充数据来源与迁移原因。
+  4) test_package/MANIFEST.yml：source_tarball / source_sha256 / data_sha256 同步更新，
+     并标注 data 经 fcitx-contrib 镜像获取。
+
+字节等价性验证（2026-10-08，本机下载后逐文件 sha256 比对）：
+  - 主源：github chewing/libchewing @ e928d7b8 解包 171 个文件，与 codeberg v0.13.1
+    完全一致（0 差异）；tarball 319278B，重复下载 sha256 稳定。
+  - data：github fcitx-contrib/libchewing-data @ 7bd07548 解包 20 个文件，与 codeberg
+    bfba418 完全一致；唯一差异是 data/CMakeLists.txt 的 cmake_minimum_required 一行
+    （3.31.6 vs 3.27.0），_normalize_data() 还原后与 codeberg 逐字节相等（已验证）。
+    其中 misc/swkb.dat、misc/symbols.dat 的 U+22EF（⋯）与上游一致，无须改写；
+    dict/moe 亦随镜像提供，主 CMakeLists 未引用 moe，缺失与否不影响构建。
+  - 三条 conandata url 均命中 CI 单行正则 `url:.*https://github.com/`，会触发镜像注入。
+  - conanfile.py 通过 python -m py_compile。
+
+未完成/后续：
+  - 本改动仅落盘存档工作树，尚未 commit / push（需按项目流程提交到分支
+    feat/libchewing-0.13.1 以刷新 PR），亦未在 CI worker 上实跑验证。
