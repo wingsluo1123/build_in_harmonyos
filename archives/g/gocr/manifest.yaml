@@ -1,0 +1,25 @@
+# manifest.yaml — gocr (软件级)
+# 文件位置: archives/g/gocr/manifest.yaml
+
+software: gocr
+display: "gocr (GOCR/JOCR, OSRA patched)"
+description: "OCR 引擎（OSRA 项目 patched 快照），提供 libPgm2asc 库与 gocr 命令行工具"
+category: utility
+homepage: "https://sourceforge.net/projects/osra/files/gocr-patched/"
+license: "GPL-2.0-or-later"
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "make 只编 CLI，OSRA 需要的库要显式 make libs（libPgm2asc.a）"
+    - "上游手写 Makefile.in 不支持 out-of-source，需 basic_layout(build_folder='.')"
+    - "configure 的 umask 077 临时目录在 HMDFS 不可写（E011）→ 补丁改 umask 022"
+    - "--without-netpbm：PNG/JPEG 输入依赖外部转换器，OSRA 走库 API 不需要"
+    - "头文件平铺进 include/，满足 OSRA 以 <pgm2asc.h>/<gocr.h> 的包含方式"
+  common_dependencies: []
+
+versions:
+  - version: "0.50pre-patched-2"
+    status: built
+    build_date: "2026-10-13"
