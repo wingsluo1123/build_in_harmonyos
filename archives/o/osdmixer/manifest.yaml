@@ -1,0 +1,24 @@
+# Software-level manifest - osdmixer
+# archives/o/osdmixer/manifest.yaml
+
+software: osdmixer
+display: "osdmixer"
+description: "OSS 音量监控小工具，音量变化时以 OSD 进度条显示 Master/PCM 音量（libxosd）"
+category: utility
+homepage: "https://www.freshports.org/audio/osdmixer"
+license: Unknown
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "手写 Makefile，无 configure：make 命令行直接覆盖 CC 与 XOSD（XOSD 由 Conan 依赖图拼出 -I/-L/-l，不查 xosd-config），R33 自洽"
+    - "跳过上游 make install（install -Dm 进 DESTDIR/usr/bin；OHOS 无带 -D 的 install），package() 用 Conan copy 装 bin/osdmixer"
+    - "上游无测试套件；test_package 用 help 参数路径做 5 条消费端冒烟校验，无需 /dev/mixer 与 X server"
+  common_dependencies:
+    - libxosd
+
+versions:
+  "0.9":
+    status: built
+    build_date: "2026-10-14"

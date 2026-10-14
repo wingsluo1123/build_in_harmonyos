@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for osdmixer 0.9 (osdmixer-0.9.tar.gz).
+
+package: osdmixer/0.9
+homepage: "https://www.freshports.org/audio/osdmixer"
+
+# ---- Upstream test audit (R51 step 1: count before running) ------------------
+# Conclusion: osdmixer 0.9 ships NO automated test suite. The tarball is 2269
+# bytes holding exactly two files (osdmixer-0.9/Makefile, osdmixer-0.9/main.c);
+# the binary is an OSS volume monitor with no test harness.
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "osdmixer-0.9.tar.gz (2269 bytes; files: osdmixer-0.9/Makefile, osdmixer-0.9/main.c)"
+    reason: "There is no tests/, test/, *_test.c or *_test.* file at any level; the tree holds only the tool source (main.c) plus its hand-written Makefile."
+  - source: "osdmixer-0.9/Makefile"
+    reason: "It defines only all/clean/install targets (BIN=osdmixer; single cc line `$(CC) $(XOSD) $(CFLAGS) main.c -o $(BIN)`); there is no check, test, TESTS or check_PROGRAMS target."
+  - source: "FreeBSD ports audio/osdmixer (PORTVERSION=0.9)"
+    reason: "The port's do-install only installs the prebuilt ${WRKSRC}/osdmixer binary (PLIST_FILES=bin/osdmixer); the port defines no test target either."
+  - conclusion: "Upstream 0.9 provides no automated tests; the adaptation's test_package validates the installed osdmixer binary as a runtime consumer check (help/usage path, no /dev/mixer or X server needed) and does not claim upstream coverage."
+
+# rule4 mandatory fields: explicit total (0, audited above) with an official
+# counting caliber. The tree uses a hand-written Makefile with no TESTS
+# registration; `make check` has no rule, equivalent to an empty automake
+# check target, hence autotools_tests (same rationale as mtu/1.5.1).
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -------------------------------------------
+test_package_tests:
+  - file: test_osdmixer.sh
+    description: "Execute the packaged osdmixer binary through 5 real assertions: (1) binary is executable, (2) bare `osdmixer` exits 0 on the help path, (3) help output is non-empty, (4) help output contains the version banner, (5) partial-args `osdmixer 48 48` exits 0 on the help path. Emits a machine-readable RESULT trailer parsed by test_package/conanfile.py. No /dev/mixer or X server is needed (help path returns before any OSS/X11 use)."
+    command: "sh test_osdmixer.sh <package>/bin/osdmixer"
+
+assertion_count: 5
