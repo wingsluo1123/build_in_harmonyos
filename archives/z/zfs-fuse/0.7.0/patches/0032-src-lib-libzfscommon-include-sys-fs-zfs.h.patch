@@ -1,0 +1,33 @@
+--- a/src/lib/libzfscommon/include/sys/fs/zfs.h
++++ b/src/lib/libzfscommon/include/sys/fs/zfs.h
+@@ -642,22 +642,28 @@
+ typedef struct ddt_histogram {
+ 	ddt_stat_t	ddh_stat[64];	/* power-of-two histogram buckets */
+ } ddt_histogram_t;
+ 
+ #define	ZVOL_DRIVER	"zvol"
+ #define	ZFS_DRIVER	"zfs"
+ /*
+  * ZFSFUSE: Renamed ZFS_DEV to ZFS_SOCK_NAME in order to
+  * catch all occurrences of this symbol.
+  */
+-#define ZFS_SOCK_DIR "/var/run/zfs"
+-#define ZFS_SOCK_NAME ZFS_SOCK_DIR "/zfs_socket"
++/* OHOS port: /var/run and /var/lib are not writable on HarmonyOS; allow the
++ * socket directory to be relocated via the ZFS_SOCK_DIR environment
++ * variable (implemented in libzfscommon/ohos_paths.c). */
++const char *zfs_get_sock_dir(void);
++const char *zfs_get_sock_path(void);
++const char *zfs_get_cache_dir(void);
++#define ZFS_SOCK_DIR zfs_get_sock_dir()
++#define ZFS_SOCK_NAME zfs_get_sock_path()
+ 
+ /* general zvol path */
+ #define	ZVOL_DIR		"/dev/zvol"
+ /* expansion */
+ #define	ZVOL_PSEUDO_DEV		"/devices/pseudo/zfs@0:"
+ /* for dump and swap */
+ #define	ZVOL_FULL_DEV_DIR	ZVOL_DIR "/dsk/"
+ #define	ZVOL_FULL_RDEV_DIR	ZVOL_DIR "/rdsk/"
+ 
+ #define	ZVOL_PROP_NAME		"name"

@@ -1,0 +1,32 @@
+--- /dev/null
++++ b/src/lib/libzfscommon/ohos_paths.c
+@@ -0,0 +1,29 @@
++/*
++ * OHOS (HarmonyOS) port support.
++ * /var/run and /var/lib are not writable on HarmonyOS, so the zfs-fuse
++ * control socket and the pool cache directory are resolved from the
++ * environment, falling back to the upstream defaults.
++ */
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/fs/zfs.h>
++
++const char *zfs_get_sock_dir(void)
++{
++	const char *dir = getenv("ZFS_SOCK_DIR");
++	return (dir != NULL && dir[0] != '\0') ? dir : "/var/run/zfs";
++}
++
++const char *zfs_get_sock_path(void)
++{
++	static char path[256];
++	(void) snprintf(path, sizeof (path), "%s/zfs_socket",
++	    zfs_get_sock_dir());
++	return path;
++}
++
++const char *zfs_get_cache_dir(void)
++{
++	const char *dir = getenv("ZPOOL_CACHE_DIR");
++	return (dir != NULL && dir[0] != '\0') ? dir : ZPOOL_CACHE_DIR;
++}

@@ -1,0 +1,47 @@
+--- a/src/lib/libzpool/include/sys/zfs_context.h
++++ b/src/lib/libzpool/include/sys/zfs_context.h
+@@ -62,20 +62,21 @@
+ // #include <libsysevent.h>
+ #include <sys/note.h>
+ #include <sys/types.h>
+ #include <sys/cred.h>
+ #include <sys/sysmacros.h>
+ #include <sys/bitmap.h>
+ #include <sys/resource.h>
+ #include <sys/byteorder.h>
+ #include <sys/list.h>
+ #include <sys/uio.h>
++#include <sys/stat.h> /* OHOS: define struct stat for vnode_t.v_stat (stat64->stat) */
+ #include <sys/zfs_debug.h>
+ #include <sys/sdt.h>
+ #include <sys/kstat.h>
+ #include <sys/u8_textprep.h>
+ #include <sys/sysevent/eventdefs.h>
+ // #include <sys/sysevent/dev.h>
+ #include <sys/sunddi.h>
+ 
+ /*
+  * Debugging
+@@ -461,21 +462,21 @@
+ 	do {\
+ 		(t)->tv_sec = gethrestime_sec();\
+ 		(t)->tv_nsec = 0;\
+ 	} while (0);
+ 
+ #define	max_ncpus	64
+ 
+ #define	minclsyspri	60
+ #define	maxclsyspri	99
+ 
+-#define	CPU_SEQID	(thr_self() & (max_ncpus - 1))
++#define	CPU_SEQID	(((int)(uintptr_t)thr_self()) & (max_ncpus - 1))
+ 
+ #define	kcred		NULL
+ #define	CRED()		NULL
+ 
+ #define	ptob(x)		((x) * PAGESIZE)
+ 
+ extern uint64_t physmem;
+ 
+ extern int highbit(ulong_t i);
+ extern int random_get_bytes(uint8_t *ptr, size_t len);

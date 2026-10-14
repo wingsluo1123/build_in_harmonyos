@@ -1,0 +1,70 @@
+--- a/src/lib/libsolkerncompat/include/sys/isa_defs.h
++++ b/src/lib/libsolkerncompat/include/sys/isa_defs.h
+@@ -531,20 +531,67 @@
+  */
+ 
+ #define _ILP32
+ #if !defined(_I32LPx) && defined(_KERNEL)
+ #define _I32LPx
+ #endif
+ 
+ #endif
+ 
+ /*
++ * Define the appropriate "processor characteristics" for AArch64
++ * (aarch64 OHOS/Linux). Modeled after the AMD64 block.
++ */
++#elif defined(__aarch64__)
++
++#if !defined(__aarch64)
++#define	__aarch64		/* preferred guard */
++#endif
++
++#define	_LITTLE_ENDIAN
++#define	_STACK_GROWS_DOWNWARD
++#define	_LONG_LONG_LTOH
++#define	_BIT_FIELDS_LTOH
++#define	_IEEE_754
++#define	_CHAR_IS_UNSIGNED
++#define	_BOOL_ALIGNMENT			1
++#define	_CHAR_ALIGNMENT			1
++#define	_SHORT_ALIGNMENT		2
++#define	_INT_ALIGNMENT			4
++#define	_FLOAT_ALIGNMENT		4
++#define	_FLOAT_COMPLEX_ALIGNMENT	4
++#define	_LONG_LONG_ALIGNMENT		8
++#define	_DOUBLE_ALIGNMENT		8
++#define	_LONG_DOUBLE_ALIGNMENT		16
++#define	_DOUBLE_COMPLEX_ALIGNMENT	8
++#define	_LONG_DOUBLE_COMPLEX_ALIGNMENT	16
++#define	_POINTER_ALIGNMENT		8
++#define	_MAX_ALIGNMENT			16
++#define	_ALIGNMENT_REQUIRED		0
++#define	_LONG_LONG_ALIGNMENT_32		8
++
++/*
++ * Define the appropriate "implementation choices" for AArch64
++ */
++#if !defined(_LP64)
++#define	_LP64
++#endif
++#if !defined(_I32LPx) && defined(_KERNEL)
++#define	_I32LPx
++#endif
++#define	_MULTI_DATAMODEL
++#define	_SUNOS_VTOC_16
++#define	_DMA_USES_PHYSADDR
++#define	_FIRMWARE_NEEDS_FDISK
++#define	_HAVE_CPUID_INSN
++
++/*
+  * #error is strictly ansi-C, but works as well as anything for K&R systems.
+  *  */
+ #else
+ #error "ISA not supported"
+ #endif
+ 
+ #if defined(_ILP32) && defined(_LP64)
+ #error "Both _ILP32 and _LP64 are defined"
+ #endif
+ 

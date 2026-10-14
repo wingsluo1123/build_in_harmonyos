@@ -1,0 +1,59 @@
+--- a/src/lib/libsolcompat/include/sys/types.h
++++ b/src/lib/libsolcompat/include/sys/types.h
+@@ -24,34 +24,54 @@
+  * Use is subject to license terms.
+  */
+ 
+ #ifndef _SOL_SYS_TYPES_H
+ #define _SOL_SYS_TYPES_H
+ 
+ #include <sys/isa_defs.h>
+ #include <sys/feature_tests.h>
+ #include_next <sys/types.h>
+ #include <inttypes.h>
++typedef long long longlong_t;
++typedef unsigned long long u_longlong_t;
++#ifndef _SOL_DADDR_T
++typedef long daddr_t; /* musl sys/types.h lacks daddr_t */
++#define _SOL_DADDR_T
++#endif
++
++/* OHOS/musl: libintl.h is an empty stub; declare the glibc-compatible
++ * gettext() family used across the ZFS i18n code paths. */
++char *dgettext(const char *__domainname, const char *__msgid);
++char *gettext(const char *__msgid);
++char *textdomain(const char *__domainname);
++char *bindtextdomain(const char *__domainname, const char *__dirname);
++
++/* OHOS/musl: glibc-style non-portable recursive-mutex spellings */
++#ifndef PTHREAD_MUTEX_RECURSIVE_NP
++#define PTHREAD_MUTEX_RECURSIVE_NP PTHREAD_MUTEX_RECURSIVE
++#endif
++#ifndef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
++#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP {{{PTHREAD_MUTEX_RECURSIVE}}}
++#endif
+ #include <sys/param.h> /* for NBBY */
+ #include <sys/types32.h>
+ 
+ #ifndef __APPLE__
+ typedef enum boolean { B_FALSE, B_TRUE } boolean_t;
+ #endif
+ 
+ typedef unsigned char uchar_t;
+ typedef unsigned short ushort_t;
+ typedef unsigned int uint_t;
+ typedef unsigned long ulong_t;
+ 
+-typedef long long longlong_t;
+-typedef unsigned long long u_longlong_t;
++
+ 
+ typedef longlong_t offset_t;
+ typedef u_longlong_t u_offset_t;
+ typedef u_longlong_t len_t;
+ typedef longlong_t diskaddr_t;
+ 
+ typedef short pri_t;
+ 
+ typedef int zoneid_t;
+ typedef int projid_t;
