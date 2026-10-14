@@ -1,0 +1,46 @@
+package: cvm/0.97
+homepage: "https://untroubled.org/cvm"
+
+upstream_check_command: "bash tests.sh -v"
+upstream_test_in_build: true
+upstream_test_command: "bash tests.sh -v (with Conan-provided sqlite3/cdb tools and an AF_UNIX-capable temporary directory)"
+upstream_tests_exist: true
+upstream_total_tests: 52
+upstream_total_invocations: 76
+upstream_executed_tests: 52
+upstream_executed_invocations: 76
+
+upstream_tests:
+  - file: tests.sh
+    source: cvm-0.97.tar.gz/tests.sh
+    description: "All 52 unique names and all 76 compare invocations, including SQLite, Qmail/vmailmgr and complete AF_UNIX/UDP lifecycle cases"
+    command: "bash tests.sh -v"
+  - file: tests/pipe_failure_atomic.c
+    source: recipe regression test against upstream client_xfer_command.c
+    description: "Injects first-pipe, second-pipe and fork failures plus parent success; asserts exact pipe/fork/close counts, close order and returned descriptor ownership"
+    command: "test-pipe-failure-atomic"
+
+test_package_tests:
+  - file: test_consumer.c
+    description: "Consumes cvm::v2client and validates account splitting plus public error data"
+    command: "cvm_consumer"
+  - file: test_pipe_failure.c
+    description: "Runs the packaged shared library under RLIMIT_NOFILE=5 and rejects unintended module execution"
+    command: "cvm_pipe_failure cvm_marker_helper MARKER"
+  - file: test_commands.py
+    description: "Runs packaged cvm-testclient and cvm-pwfile by absolute path for accepted and rejected credentials"
+    command: "python3 test_commands.py PACKAGE_BIN WORK_DIR"
+  - file: test_elf.py
+    description: "Audits 9 shared libraries and 13 commands for path leakage, empty RPATH/RUNPATH, SONAME chains, NEEDED closure and exactly one command signature"
+    command: "python3 test_elf.py PACKAGE_ROOT"
+
+test_package_integration_assertions: 19
+test_package_ohos_elf_assertions: 131
+assertion_count: 150
+
+submission_counting:
+  unit_tests: 80
+  integration_tests: 19
+  ohos_specific_tests: 131
+  total_independently_failing_points: 230
+  note: "80 unit points are all 76 upstream comparisons plus 4 deterministic fault scenarios; 19 integration and 131 OHOS ELF/signature points form the 150 test_package assertions."
