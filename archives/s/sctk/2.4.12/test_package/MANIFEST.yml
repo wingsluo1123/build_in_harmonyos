@@ -1,0 +1,74 @@
+# test_package/MANIFEST.yml
+# sctk 2.4.12 上游官方测试声明
+# sctk 为多子模块工具集：asclite(rttm评分) / rfilter1(文本过滤) / csrfilt / chfilt /
+# hamzaNorm / tanweenFilt / acomp / def_art / hubscr(集成) / slatreport 等
+
+package: sctk/2.4.12
+homepage: "https://github.com/usnistgov/SCTK"
+
+# 上游测试命令 (make check 逐子模块执行)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（OHOS 实测通过项）
+upstream_tests:
+  - file: src/asclite/testfiles/ascliteTest.pl
+    source: sctk-2.4.12/src/asclite/testfiles/ascliteTest.pl
+    description: "asclite 对齐评分测试套件（大量用例，全部通过）"
+    command: "perl ascliteTest.pl"
+  - file: src/rfilter1/makefile
+    source: sctk-2.4.12/src/rfilter1/makefile
+    description: "rfilter1 GLM 过滤测试（2 例，diff 校验）"
+    command: "make check"
+  - file: src/csrfilt/RunTests.pl
+    source: sctk-2.4.12/src/csrfilt/RunTests.pl
+    description: "csrfilt 过滤测试（11 例，全部通过）"
+    command: "perl RunTests.pl"
+  - file: src/chfilt/makefile
+    source: sctk-2.4.12/src/chfilt/makefile
+    description: "chfilt 过滤测试（通过）"
+    command: "make check"
+  - file: src/hamzaNorm/makefile
+    source: sctk-2.4.12/src/hamzaNorm/makefile
+    description: "hamzaNorm 测试（通过）"
+    command: "make check"
+  - file: src/tanweenFilt/makefile
+    source: sctk-2.4.12/src/tanweenFilt/makefile
+    description: "tanweenFilt 测试（通过）"
+    command: "make check"
+  - file: src/acomp/makefile
+    source: sctk-2.4.12/src/acomp/makefile
+    description: "acomp 测试（通过）"
+    command: "make check"
+  - file: src/def_art/makefile
+    source: sctk-2.4.12/src/def_art/makefile
+    description: "def_art 测试（通过）"
+    command: "make check"
+  - file: src/slatreport/makefile
+    source: sctk-2.4.12/src/slatreport/makefile
+    description: "slatreport 测试（通过）"
+    command: "make check"
+  - file: src/hubscr/RunTests.pl
+    source: sctk-2.4.12/src/hubscr/RunTests.pl
+    description: "hubscr 集成测试（6 例：4 通过即 test1-notag/test1-notag-a/test1/testArb；test1-sastt/test2-sastt 仅 aligninfo 行序差异，排序后内容 0 差异、sgml/mdeval 0 差异、prf 仅日期行，属 libc++ 指针 map 迭代顺序差异）"
+    command: "perl RunTests.pl"
+  - file: src/utf_filt/makefile
+    source: sctk-2.4.12/src/utf_filt/makefile
+    description: "utf_filt 测试：上游脚本因 NSGMLS 未安装主动跳过（RC=0，非失败）"
+    command: "make check"
+  - file: src/rttmSort/makefile
+    source: sctk-2.4.12/src/rttmSort/makefile
+    description: "rttmSort 等 8 工具（rttmSort/rttm2ctm/rttmSmooth/spkr2sad/mergectm2rttm/align2html/md-eval/stm2rttm）上游无测试用例（No Tests，RC=0）"
+    command: "make check"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.sh
+    description: "消费者端到端验证：rfilter1 GLM 过滤 + sclite 版本 + perl 工具存在"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 30

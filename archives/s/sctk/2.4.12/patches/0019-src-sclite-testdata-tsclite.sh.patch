@@ -1,0 +1,29 @@
+--- a/src/sclite/testdata/tsclite.sh
++++ b/src/sclite/testdata/tsclite.sh
+@@ -16,23 +16,23 @@
+ for i in $*
+ do
+ 	case $i in
+         	-nc) clean="FALSE";;
+                 -en) exe_name=$2;;
+ 		-clean) echo "Cleaning out tsclite.sh's directory"
+ 			rm -rf $OUT Failed.log ; exit;;
+ 		-purify_status)
+ 			echo "Checking Purify Output"
+ 			echo "    " `ls *.pure|wc -l` "Purify files"
+-			grep '^[A-Z][A-Z][A-Z]:' *pure | egrep -v 'FIU.*(stdin|stdout|stderr|reserved for Purif)' > /tmp/tsc.log
+-			for t in `awk -F: '{print $2}' /tmp/tsc.log | sort -u` ; do
+-				echo "   Type: $t  Count:" `grep $t /tmp/tsc.log|wc -l` " Tests:" `grep $t /tmp/tsc.log|awk -F. '{print $1}' | sort -u`
++			grep '^[A-Z][A-Z][A-Z]:' *pure | egrep -v 'FIU.*(stdin|stdout|stderr|reserved for Purif)' > ${TMPDIR:-$HOME/tmp}/tsc.log
++			for t in `awk -F: '{print $2}' ${TMPDIR:-$HOME/tmp}/tsc.log | sort -u` ; do
++				echo "   Type: $t  Count:" `grep $t ${TMPDIR:-$HOME/tmp}/tsc.log|wc -l` " Tests:" `grep $t ${TMPDIR:-$HOME/tmp}/tsc.log|awk -F. '{print $1}' | sort -u`
+ 			done
+ 			exit;;
+                 *) break;;
+         esac
+ 	shift;
+ done
+ 
+ echo "tsclite.sh -- Version 1.2"
+ echo "Variables:"
+ echo "    reference directory  =" $base_dir
