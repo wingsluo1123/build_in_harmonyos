@@ -1,0 +1,31 @@
+# conandata.yml — waffle 1.8.3
+# 主源码 + 构建期辅助源码（vendored meson 工具 / vendored cmocka 测试框架）。
+# 每个 source 的 url 可为有序列表：可用镜像在前、官方原始 URL 兜底（sha256 不变）。
+
+sources:
+  # 主源码：官方开发站（freedesktop.org，非 GitHub，CI 不自动加镜像）
+  waffle:
+    url: "https://waffle.freedesktop.org/files/release/waffle-1.8.3/waffle-1.8.3.tar.xz"
+    sha256: "333751a6684370717d4d6327061834f2fbdfe687478d7d3c6b1ab27f57c90877"
+  # vendored meson 构建工具源码（libdvdnav/7.0.0 已验证方案）：真机 HMBS_PYTHON3
+  # site-packages 无 mesonbuild，解压到 meson-vendor/ 经 python3 -c 注入调用。
+  meson:
+    url:
+      - "https://gh-proxy.com/https://github.com/mesonbuild/meson/releases/download/1.11.2/meson-1.11.2.tar.gz"
+      - "https://github.com/mesonbuild/meson/releases/download/1.11.2/meson-1.11.2.tar.gz"
+    sha256: "698feae069cef3ecd4d7aaf281d7df359bdfcf555a9a1564383d3b913fa8a736"
+  # cmocka 1.1.2 单元测试框架源码（meson dependency('cmocka', fallback) 子项目）
+  cmocka:
+    url: "https://cmocka.org/files/1.1/cmocka-1.1.2.tar.xz"
+    sha256: "d11cd1e129827ff240a501c1c43557e808de89e8fcd8ab9e963c8db419332bdd"
+  # cmocka 的 meson wrap 补丁（提供 meson.build 与 dep_cmocka 变量）
+  cmocka_wrap:
+    url:
+      - "https://gh-proxy.com/https://github.com/mesonbuild/cmocka/releases/download/1.1.2-1/cmocka.zip"
+      - "https://github.com/mesonbuild/cmocka/releases/download/1.1.2-1/cmocka.zip"
+    sha256: "0f70de53e55298f0eea270d86d887ee78f98c8b20cc837c801f8ce7b89018d99"
+
+patches:
+  - patch_file: "patches/0001-cmocka-uintptr_t-guard.patch"
+    patch_description: "Skip vendored cmocka 1.1.2 fallback uintptr_t typedef on compilers that already provide it via <stdint.h> (clang/gcc define __UINTPTR_TYPE__), avoiding typedef redefinition against OHOS sysroot alltypes.h"
+    patch_type: "portability"

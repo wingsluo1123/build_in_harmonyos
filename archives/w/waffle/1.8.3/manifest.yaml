@@ -1,0 +1,36 @@
+# 版本级 manifest — waffle 1.8.3
+# 文件位置: archives/w/waffle/1.8.3/manifest.yaml
+
+software: waffle
+version: "1.8.3"
+build_system: meson
+status: built
+build_date: "2026-10-07"
+
+source:
+  url: "https://waffle.freedesktop.org/files/release/waffle-1.8.3/waffle-1.8.3.tar.xz"
+  sha256: "333751a6684370717d4d6327061834f2fbdfe687478d7d3c6b1ab27f57c90877"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  toolchain: "vendored meson 1.11.2 (libdvdnav/7.0.0 已验证方案) + MesonToolchain"
+  configure_options:
+    - "build-tests=true（启用上游 cmocka 单元测试）"
+    - "build-examples=false（禁用示例）"
+    - "wrap_mode=nodownload（依赖 vendoring，构建零网络）"
+    - "default_library=shared"
+  dependencies:
+    - "vendored cmocka 1.1.2（meson subproject, 含 wrap 补丁）"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "waffle 主推 meson 构建；CMake 构建已废弃（需 waffle_enable_deprecated_build=ON）且 Linux 上强制至少一个 GL 后端，OHOS 无 GL/EGL/GBM/X11/Wayland 后端故不可用"
+  - "meson 在 OHOS 以 auto 探测各 GL 后端全部 disabled，只构建核心库 + linux_platform；GL 功能测试 gl_basic 不注册"
+  - "上游 3 个 core unit test 可执行文件（cmocka）共 86 用例（attrib_list=18+config_attrs=57+error=11）, 与平台无关, OHOS 全通过；计数口径 gtest_macros"
+  - "真机与 CI PATH 均无 meson, 需 vendoring meson 1.11.2 源码, build() 用 python3 -c sys.path 注入调 mesonmain.main()"
+  - "cmocka 通过 meson wrap fallback 依赖网络下载, 按惯例 vendoring 源码+wrap 到 subprojects/cmocka/ 并设 wrap_mode=nodownload"
+  - "OHOS 真机 PATH 无 ar/llvm-ar, static/testwaffle 构建需补 meson native file 指定 llvm-ar（clang 同目录）"
+  - "meson install 用 --destdir CLI（DESTDIR 环境变量不可达）, 配合 setup --prefix=/ 产物落到 package 目录"
