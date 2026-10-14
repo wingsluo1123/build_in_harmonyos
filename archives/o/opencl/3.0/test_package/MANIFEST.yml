@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: opencl/3.0
+homepage: "https://github.com/KhronosGroup/OpenCL-Headers"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "cmake -S . -B build -DOPENCL_HEADERS_BUILD_TESTING=ON -DBUILD_TESTING=ON && cmake --build build && ctest --test-dir build"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（350 = lang_c 18 头 ×10 版本/选项 + lang_cpp 17 头 ×10）
+upstream_tests:
+  - file: tests/test_headers.c
+    source: opencl-3.0/tests/test_headers.c
+    description: "cl_platform.h 类型布局与各版本宏定义校验（lang_c 18 头 × 版本100-310×选项）"
+    command: "ctest --test-dir build (180 个 C 用例)"
+  - file: tests/lang_cpp/CMakeLists.txt
+    source: opencl-3.0/tests/lang_cpp/CMakeLists.txt
+    description: "C++17 头文件独立编译校验（lang_cpp 17 头 × 版本100-310×选项）"
+    command: "ctest --test-dir build (170 个 C++ 用例)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：include <CL/opencl.h> 校验 CL_SUCCESS/CL_VERSION_3_0/类型大小"
+    command: "./test_probe"
+
+# 鸿蒙专项测试（独立于上游用例，真实运行于 OHOS aarch64）
+ohos_special_tests:
+  - file: tests/ohos_special_test.c
+    description: "OHOS 专项：CL_TARGET_OPENCL_VERSION=300 下版本宏/枚举值/平台检测/类型大小 8 项断言"
+    command: "./ohos_special_test"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 358
