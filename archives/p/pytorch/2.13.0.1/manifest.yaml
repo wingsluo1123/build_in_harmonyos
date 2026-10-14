@@ -1,0 +1,221 @@
+# pytorch 2.13.0 — HarmonyOS PC (aarch64) 适配（修订 2.13.0.1）
+software: pytorch
+version: "2.13.0.1"
+status: built
+build_date: "2026-09-25"
+build_system: cmake
+source:
+  url: "https://github.com/pytorch/pytorch/archive/refs/tags/v2.13.0.tar.gz"
+  sha256: "b36fbbc96f89185666047c44167e7f8ebc9cadaf7a3e7ef75c85d25b1285c0b4"
+dependencies:
+  # 2.13.0.1: OpenBLAS gives real LAPACK + optimized GEMM; without it the build
+  # falls back to the bundled Eigen BLAS (no LAPACK at all).
+  required:
+    - "openblas/0.3.34"
+  optional:
+    - "clang/22.1.8 (tool_requires)"
+    - "python/3.12.9 + pyyaml/6.0.2 + typing-extensions/4.16.0 + packaging/26.3 (tool_requires, BUILD_PYTHON codegen)"
+patches_applied:
+  - "0001-pytorch-ohos-adapt.patch"
+  - "0002-cpuinfo-ohos.patch"
+  - "0003-sleef-ohos-aarch64.patch"
+  - "0004-c10-enumerate-ssize-musl.patch"
+  - "0005-googletest-captured-stream-tmpdir.patch"
+  - "0006-c10-test-targets-cxx20.patch"
+  - "0007-shm-manager-cxx20.patch"
+  # 2.13.0.1 新增：分布式（c10d + Gloo + TensorPipe）在 OHOS 上的门控与 musl 适配
+  - "0008-gloo-tcp-transport-ohos.patch"
+  - "0009-libuv-linux-gating-ohos.patch"
+  - "0010-gloo-linux-cc-musl.patch"
+  - "0011-gloo-tcp-sources-ohos.patch"
+  # 2.13.0.1 新增：NNPACK 家族（NNPACK/QNNPACK/XNNPACK）平台门控放行
+  - "0012-nnpack-family-ohos-platform-gating.patch"
+  # 2.13.0.1 新增：oneDNN 内置 xbyak_aarch64 的 musl 兼容（glibc 专有 _SC_LEVEL*_CACHE_SIZE）
+  - "0013-xbyak-aarch64-musl-cache-sysconf.patch"
+  # 2.13.0.1 新增：libkineto 的 C++20 ranges 算法在 libc++ 15 下的可移植改写
+  - "0014-kineto-ranges-libcxx15.patch"
+  # 2.13.0.1 新增：默认量化引擎在 aarch64 上改为 QNNPACK
+  # （上游用 fbgemmSupportedCPU() 做判据，FBGEMM 在 ARM 上也返回真 → 默认 kX86，
+  #  而 kX86 派发的内核是 avx2/avx512 专用，首个量化算子即抛 "unknown architecure"）
+  - "0016-context-default-qengine-aarch64.patch"
+  # 2.13.0.1 新增：oneDNN 的 aarch64 JIT 在「拿不到可执行内存」的进程里自动降级
+  # （新增 at::isMKLDNNJitUsable() 运行时探测，只门控派发；hasMKLDNN() 仍如实报真）
+  - "0017-context-mkldnn-jit-runtime-gate.patch"
+  # 2.13.0.1 新增：ITT 的架构门控放行（上游 cmake_dependent_option(..., ON "CPU_INTEL" OFF)）
+  - "0018-itt-enable-aarch64.patch"
+  # 2.13.0.1 新增：qnnpack/xnnpack 的 add 对 0 维标量张量的分派修正
+  - "0019-qnnpack-add-scalar-and-empty.patch"
+  # 2.13.0.1 新增：pow 向量体指数窄化修复（cast_scalar_t -> scalar_t 往返丢信息时走标量路径）
+  - "0020-pow-vector-exponent-narrowing.patch"
+  # 2.13.0.1 新增：量化 zero_point 与舍入次序在 ARM 上与 ATen/测试参考一致
+  #（USE_FBGEMM=ON 后 aarch64 走 fbgemm LEGACY 路径，halfway 值差 1）
+  - "0021-quantize-zero-point-rounding-order-arm.patch"
+  # 2.13.0.1 新增：Half 融合算子（fmadd/fnmadd/fmsub/fnmsub）回落分支改 fp32 累加
+  #（无 -march 时 __ARM_FEATURE_FP16_VECTOR_ARITHMETIC 未定义，原回落用 fp16 双舍入，
+  #  与 OpMathType<Half>=float 的约定不符 → vec_test BitwiseFloatsAdditional 3 例）
+  - "0022-half-fmadd-fp32-fallback.patch"
+  # 2.13.0.1 新增：vec_test 目标在 OHOS 上关循环向量化（clang22 -O2+ 对该测试自身
+  #  字节拷贝脚手架的误优化 → Memory/UnAlignedLoadStore 4 例；仅作用于测试目标）
+  - "0023-vec-test-clang-no-vectorize-ohos.patch"
+  # 2.13.0.1 新增：量化内核（quantize_tensor_per_tensor_affine_cpu）与参考实现同序——
+  #  aarch64 走 fbgemm 泛型 LEGACY=true（先加 zero_point 再 nearbyint），x86 的 AVX2
+  #  快路径本就先舍入，故仅 ARM 改 false（quantized_test RoundingMode / qint32 例）
+  - "0024-quantize-kernel-zero-point-order-arm.patch"
+  # 2.13.0.1 新增：oneDNN 的 aarch64 eltwise gelu 路径在本平台不终止（无限自旋），
+  #  gelu 前/反向在 OHOS 上跳过 oneDNN 派发、走 ATen 自带向量/标量内核；
+  #  其余 oneDNN 算子正常，ISA 上限与 OMP_NUM_THREADS 均不影响该现象
+  - "0025-ohos-gelu-skip-onednn-eltwise.patch"
+  # 2.13.0.1 新增：AnyValue::try_get() 只比 typeid hash，而本机 libc++ 的 "Unique"
+  #  实现把 hash 绑定在类型名指针上；库对部分头文件实例化类型只发 local RTTI
+  #  （.dynsym 无该符号），消费者另带一份弱副本无法合并 → 同名类型被判不等。
+  #  hash 不等时回退比较 mangled 名（libc++ 在不保证 RTTI 合并平台的语义）
+  - "0026-anyvalue-typeinfo-name-fallback.patch"
+  # 2.13.0.1 新增：JIT 属性类的 RTTI 跨 DSO 合并（Attributes::getAttr<T> 内联模板的
+  #  dynamic_cast 在 -fvisibility=hidden 的库上失败 → 7 例 test_jit 报 "wrong type"；
+  #  实测 TORCH_API 与 visibility pragma 对隐式实例化模板无效，故回退比较 mangled 名）
+  - "0027-jit-attribute-rtti-cross-dso.patch"
+# 2.13.0.1 相对 2.13.0 的功能开关（2.13.0 全部为 OFF）
+backends:
+  enabled:
+    - name: "OpenMP"
+      cmake: "USE_OPENMP=ON"
+      evidence: "at::hasOpenMP()==true; ATen parallel backend = OMP; 静态链接 SDK libomp.a（无运行时 .so 依赖）"
+    - name: "FBGEMM"
+      cmake: "USE_FBGEMM=ON"
+      evidence: "supportedQEngines() 含 kFBGEMM; 引擎可 setQEngine 往返（其内核为 x86 优化，见 disabled_by_platform 中 oneDNN 条目对 kX86 的说明）"
+    - name: "QNNPACK"
+      cmake: "USE_PYTORCH_QNNPACK=ON"
+      evidence: "supportedQEngines() 含 kQNNPACK; 引擎可 setQEngine 往返; dynamic quantized Linear 实跑通过（本平台唯一可计算的量化引擎，补丁 0016 使其成为默认）"
+    - name: "XNNPACK"
+      cmake: "USE_XNNPACK=ON"
+      evidence: "torch.backends.xnnpack.enabled==true; _is_xnnpack_enabled()==true"
+    - name: "NNPACK"
+      cmake: "USE_NNPACK=ON"
+      evidence: "at::_nnpack_available()==true; torch.backends.nnpack.is_available()==true; 空间卷积可用"
+    - name: "Kineto (torch.profiler)"
+      cmake: "USE_KINETO=ON"
+      evidence: "libkineto.a 产出并链入 libtorch_cpu.so; torch.autograd.profiler.kineto_available()==true; torch.profiler 采到事件"
+    - name: "oneDNN (MKLDNN)"
+      cmake: "USE_MKLDNN=ON（补丁 0017 加运行时门控）"
+      evidence: >-
+        编进来了：at::hasMKLDNN()==true、torch._C._has_mkldnn 为真。是否**派发**给
+        oneDNN 由 at::isMKLDNNJitUsable() 决定（mmap(RW) + mprotect(RWX) + mprotect(RX)
+        探测，每进程一次）：解释器域实测为假（mprotect 均 EINVAL），同机原生消费者域为真。
+        test_package 断言门控恒等式 userEnabledMkldnn() == isMKLDNNJitUsable()、
+        supportedQEngines() 与默认 qengine 随门控一致；受限域自动走 ATen 原生内核，
+        故不再有「打开 oneDNN 即让卷积抛 Xbyak::Error」的问题。
+    - name: "ITT (Intel VTune)"
+      cmake: "USE_ITT=ON（补丁 0018 放行架构门控）"
+      evidence: >-
+        ittapi（pinned 0c57540）在 OHOS 工具链实测构出 libittnotify.a（134KB）；
+        torch.profiler.itt.is_available() 为真，range_push/mark/range_pop 调用路径实跑通过
+        （无采集器时是安全 no-op）。
+  disabled_by_platform:
+    - name: "x86 quantized engine (kX86)"
+      cmake: "随 USE_FBGEMM 编入，但默认引擎在非 x86 上改为 QNNPACK（补丁 0016）"
+      reason: >-
+        上游用 fbgemmSupportedCPU() 决定默认量化引擎，而 FBGEMM 在 aarch64 上也返回真
+        （FBGEMM 含部分 ARM 支持），于是 at::kX86 成了 ARM 上的默认引擎；但 kX86 派发的
+        fbgemm::ExecuteKernelU8S8 只实现 avx2/avx512，真实量化算子会抛
+        "unknown architecure"。补丁 0016 把 kX86 限制在 x86（与上游注释
+        "Make it default qengine for X86 CPU platforms" 一致），非 x86 回落 QNNPACK。
+  unchanged_off:
+    - "USE_SLEEF (本包自写 sleef 头补丁维持可用，向量 pow 走 std::pow 路径)"
+    - "USE_NUMA / USE_GFLAGS / USE_GLOG（上游默认 OFF，OHOS 无对应子系统）"
+
+upstream_tests:
+  command: >-
+    cmake -S <source> -B <build> -DBUILD_TEST=ON -DINSTALL_TEST=OFF &&
+    cmake --build <build> --target <114 个测试目标> -- -jN &&
+    TEST_TMPDIR=<build>/upstream-test-tmp ctest --test-dir <build> -R "^(...)$" --timeout 600 --output-on-failure
+  test_count: 4429
+  targets: 114
+  notes: >-
+    全量集成到 build() 的上游测试阶段 (_run_upstream_tests): 三个来源合并去重后共 114 个目标
+    —— c10/test 51 个 (50 个 *_test + cpp17 头文件检查, 868 用例)、caffe2/ATen 58 个
+    (pow_test / tensor_iterator_test / inline_container_test 等, 由生成的 CTestTestfile.cmake
+    读回, 2116 用例)、test/cpp 5 个 (test_api 1020 / test_jit 585 / test_lazy 612 /
+    test_shim 2 / test_aoti_abi_check 94)。子集内共 4429 个 gtest 运行时用例,
+    与库同工具链编译后执行; ctest 选择 108 项 (inline_container_test 走切分路径)。
+    所需补丁: 0004 (musl 下 Enumerate.h 缺 <sys/types.h>)、0005 (googletest CapturedStream
+    硬编码 /tmp, HarmonyOS PC 上只读 → death test 需 TEST_TMPDIR)、0006 (c10 测试目标
+    C++20)、0020 (pow 向量体指数窄化, 见 notes.md)。
+    两个套件按「每组一个进程」切分以规避本平台的进程内累积问题 (test_lazy 单进程第 69 例
+    SIGSEGV → 切 11 组; inline_container_test 与 allocator 用例同进程即挂 → 切 5 组),
+    切分后用例全覆盖且全通过。
+    未执行: test/*.py (184 文件 / 9926 def test_*, 需 python -m torch 构建); 其在原型上的
+    实测分类 (通过 74504 / 失败 104 / 跳过 9040 / 错误 67) 与理由见 test_package/MANIFEST.yml
+    与 notes.md「上游测试」。test/cpp 另有 10 个目标 (c10d / dist_autograd / rpc / nativert /
+    aoti_inference / profiler / inductor 等) 在本包配置下不存在 (依赖本包关闭或未启用的特性)。
+
+test_results:
+  type: official
+  upstream_command: >-
+    TEST_TMPDIR=<build>/upstream-test-tmp ctest --test-dir <build> -R "^(...)$"
+    --timeout 600 --output-on-failure (+ 切分组与 test/cpp 套件的独立进程运行)
+  total: 4429
+  passed: 4424
+  skipped: 5
+  failed: 0
+  # 实测口径（上游测试阶段，本地全量）
+  verified_run:
+    suites: "128/128 套件通过"
+    ctest: "100% tests passed, 0 tests failed out of 108"
+    split_runs: "2321 用例通过 / 0 失败 / 5 跳过（切分组 + test/cpp 直跑）"
+    gtest_cases: 4429
+    cpp_consumer: "test_pytorch OK (1+2+3 + 4+5+6 = 21.000000)"
+    ohos_special_checks: "56/56 PASS (test_pytorch_ohos, exit 0; 单工作线程环境第 7 组多线程检查转 SKIP，仍 exit 0)"
+    python_api: "PYTORCH_PY_OK (import torch / 张量加法 / autograd / torch.linalg.solve / 复数 torch.dot)"
+    python_api_ci: >-
+      CI 使用的解释器位于 /data/service/hnp 之下（hnp_file 安全域），hmmac 只允许该域 dlopen
+      带 hnp_file 标签的 .so，而包产物在用户路径 → import 被拒 with EACCES（E212/E488）。
+      该项因此不是静默跳过而是结构化验证：断言 torch/lib/*.so 与 C++ 消费者本轮实际加载的
+      lib/*.so 逐字节一致、_C 扩展为合法 ELF、相关 .so 仍带 .codesign（E077）；任一不满足即失败。
+    local_ci_w3: >-
+      build_and_test.sh 本地 CI 预审（与 CI 同脚本/profile/超时预算）：
+      Pass rate 100.0% (1/1)，L0_RESULT=pass、L1_RESULT=pass、L5_RESULT=pass
+    python_module_files: 2449
+    built_targets: [torch_cpu, torch_shm_manager, torch_python, _C]
+  test_package_assertions: 80
+  harmony_specific_tests:
+    - file: test_package/test_pytorch_ohos.cpp
+      description: >-
+        HarmonyOS 专项测试 (R6): 运行时判定宿主平台 (uname(2)), 在 HarmonyOS 上校验 8 组
+        鸿蒙/musl aarch64 特有适配点（共 56 项运行时检查）, 非 HarmonyOS 宿主打印 SKIP 并以 0
+        退出 (R8: 不使用平台条件编译宏) —
+        平台身份 (uname sysname=HarmonyOS + machine=aarch64 + CPU 后端与默认 dtype)、
+        补丁 0004 的 musl ssize_t 可见性、补丁 0001 的 group_norm ranges→iterator 路径与空张量判定、
+        OHOS aarch64 上的 CPU 张量算术 / complex64 乘法 / int64 归约 / STL 互操作、
+        分布式 c10d (libuv 符号经 dlsym 解析 / gloo vtable / FileStore 实跑)、
+        BLAS/LAPACK (linalg_solve / linalg_svd 数值 + 复数 dot)、
+        ATen 线程池 (parallel_for 覆盖每下标恰好一次 + OpenMP)、
+        后端 (oneDNN 运行时门控恒等式 / ITT / FBGEMM / QNNPACK / XNNPACK / NNPACK / Kineto)。
+      command: "./test_pytorch_ohos"
+  note: >-
+    上游测试阶段实测: 114 个目标 / 4429 个 gtest 用例; ctest 选择 108 项全部通过,
+    切分组与 test/cpp 套件 2321 用例通过 + 5 跳过 (均为上游自身 SKIP, 非失败) + 0 失败。
+    两个套件按「每组一个进程」切分以规避本平台的进程内累积问题 (test_lazy / inline_container_test,
+    见 notes.md「test/cpp 接入的两个平台性约束与处置」), 切分后用例全覆盖。
+    CI 数字随构建回填。test_package 侧另有 56 项鸿蒙专项检查 + 23 项 Python 断言。
+knowledge_ref:
+  - E017
+  - E092
+  - E298
+  - E077
+  - E212
+  - E488
+knowledge_gained:
+  - "pytorch 源码 tarball 不含 37 个 third_party 子模块，需按 pinned commit 从 codeload 逐个子模块补齐；本环境 codeload 被阻断，改用 gh-proxy.com 镜像（ghfast.top 对 cutlass 等大 repo 限速）"
+  - "pybind11 绑定包按 cpp 适配（R47 D.4-2）；pytorch 产出 C++ libtorch（libtorch.so/libtorch_cpu.so/libc10.so），非 python 包"
+  - "CMAKE_SYSTEM_NAME 用 HarmonyOS 时 CMake 不生成 SONAME（NEEDED 记相对路径 ../lib/xxx 无法解析）；改 OHOS + 不设 SOVERSION → 纯名 SONAME，musl 可加载"
+  - "dlopen 报 'Permission denied' 在本机可判别的成因是 .codesign：删除该段即复现（EACCES），用 binary-sign-tool 去段重签后恢复；HMDFS 上 chmod 无法放宽 other 位（775 仍 770），故涉及可加载性的修复应重写文件或重签，而非改权限"
+  - "CI 上 Python 扩展被拒（Error loading shared library ...: Permission denied）的另一成因是 hmmac 安全域：解释器在 /data/service/hnp 下运行于 hnp_file 域，该域只允许 dlopen 同标签 .so，而 conan 包位于用户路径；同一次运行的 C++ 消费者可加载完全相同的字节，仓内 aggdraw/pillow 亦按此口径处置（E212/E488）"
+  - "交叉编译需 tool_requires clang/22.1.8（SDK 仅 clang 15 不满足 pytorch Clang>=16），保留 SDK libc++15（__n1 ABI）+ -D__MUSL__"
+  - "CI worker 沙箱不允许从 conan 缓存路径加载 .so（HMDFS 执行限制），且 musl 命中不可加载的候选后不再回退；libc++/zlib 等宿主库必须走 /system/lib64 等平台路径（环境变量 LD_PRELOAD 也无效），故工具链须显式固定 LD_LIBRARY_PATH 到平台目录"
+  - "CMake 的 LINK_WHAT_YOU_USE（pytorch 顶层默认开启 CMAKE_LINK_WHAT_YOU_USE TRUE）会在每次链接后调用 ldd；OHOS 无 ldd，需提供 readelf 实现的 ldd 兼容 shim 并设置 CMAKE_LINK_WHAT_YOU_USE_CHECK，否则所有链接目标失败（Error running 'ldd'）"
+  - "上游测试集成方式：主构建 BUILD_TEST=OFF，build() 末尾重新配置 -DBUILD_TEST=ON -DINSTALL_TEST=OFF，把本配置下上游注册的 114 个 gtest 目标（c10/test 51 + caffe2/ATen 58 + test/cpp 5）全部构建后执行（ctest 选择 108 项 + test/cpp 直跑 + 2 个套件按组切分）；既保持包内容不含测试二进制，又能让上游用例以与库完全相同的工具链运行"
+  - "HarmonyOS PC 的 /tmp 只读：googletest CapturedStream 在非 Android/iOS 分支硬编码 \"/tmp/\"，导致所有 death test（EXPECT_DEATH）在 OHOS 上 abort；上游仅 Android 分支用 testing::TempDir() 读 TEST_TMPDIR/TMPDIR。需补丁改为 TempDir() 并在 ctest 前设置可写 TEST_TMPDIR"
+  - "musl 不透传提供 ssize_t：c10/util/Enumerate.h 使用 ssize_t 但未 include <sys/types.h>（glibc 下经其它头传递可见），交叉编译到 OHOS/musl 时编译失败；同类 POSIX 类型头文件依赖在 musl 移植时需逐个补 include"
+  - "conan_toolchain.cmake 以普通变量 set(CMAKE_CXX_STANDARD <profile cppstd>)，会遮蔽下层的 CACHE 写法，故 pytorch 顶层 set(CMAKE_CXX_STANDARD 20 CACHE ...) 在 compiler.cppstd=17 的 profile 下不生效；上游测试按 C++20 基线编写（std::unordered_set/.contains），需对测试目标单独设 CXX_STANDARD 20（不影响库目标，避免全量重编）"
+  - "在既有构建目录里重新 configure 时改全局 CMAKE_CXX_STANDARD 会导致所有目标 flag 变化并触发全量重编（torch_cpu 数千文件）；给单个目标设 CXX_STANDARD 属性可只影响该目标，是增量接入上游测试的正确做法"
+  - "cmake_dependent_option(INSTALL_TEST ... ON \"BUILD_TEST\" OFF)：BUILD_TEST=ON 会使 INSTALL_TEST 自动变 ON，从而让 c10/test 与 c10/benchmark 的 install() 规则全部生效；只构建测试目标而未构建 benchmark 时，package() 的 cmake.install() 会因找不到 bin/c10_intrusive_ptr_benchmark 而失败，需显式 -DINSTALL_TEST=OFF"

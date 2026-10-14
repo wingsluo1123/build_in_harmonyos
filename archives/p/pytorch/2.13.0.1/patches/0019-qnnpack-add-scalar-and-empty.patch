@@ -1,0 +1,42 @@
+--- a/aten/src/ATen/native/quantized/cpu/BinaryOps.cpp
++++ b/aten/src/ATen/native/quantized/cpu/BinaryOps.cpp
+@@ -168,7 +168,11 @@
+       zero_point,
+       qa.suggest_memory_format());
+ 
+-  if (qa_contig.size(0) == 0) {
++  // Nothing to compute when the output has no elements: size(0)==0 is the
++  // zero-batch case, and numel()==0 also covers shapes whose leading dimension
++  // is non-zero but which still contain no elements -- those would otherwise
++  // pass a channel count of 0 to QNNPACK, which rejects it as invalid.
++  if (qa_contig.numel() == 0) {
+     return qy;
+   }
+ 
+@@ -455,14 +459,24 @@
+         "Both inputs to qadd must have same type");
+ 
+ #ifdef USE_XNNPACK
+-    if (qa.scalar_type() == kQInt8) {
++    // Same reasoning as the QNNPACK branch below: xnnp_add() requires a
++    // non-zero dimensionality, but 0-dim quantized tensors are legitimate
++    // inputs (element-wise access in the TensorIterator output-setup tests),
++    // so they take the generic path instead.
++    if (qa.scalar_type() == kQInt8 && qa.ndimension() > 0) {
+           return xnnp_add<c10::qint8, ReLUFused>(qa, qb, scale, zero_point);
+     }
+ #endif // USE_XNNPACK
+ 
+ #ifdef USE_PYTORCH_QNNPACK
++    // QNNPACK's add is a channel-wise batched kernel: it takes a batch size and
++    // a non-zero channel count, so a 0-dim (scalar) tensor -- which is a valid
++    // input here, e.g. `torch.ops.quantized.add(qx[n][c][h][w], qy[n][c][h][w],
++    // scale, zp)` from the TensorIterator output-setup tests -- must not be
++    // routed into it. Such inputs fall through to the generic implementation
++    // below, which handles any dimensionality.
+     if(qa.sizes() == qb.sizes() && /* qnnpack does not support broadcasting */
+-      qa.scalar_type() == kQUInt8) {
++      qa.scalar_type() == kQUInt8 && qa.ndimension() > 0) {
+     return qnnpack_add<ReLUFused>(qa, qb, scale, zero_point);
+     }
+ #endif // USE_PYTORCH_QNNPACK

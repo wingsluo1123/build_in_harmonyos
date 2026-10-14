@@ -1,0 +1,45 @@
+--- a/third_party/ideep/mkl-dnn/third_party/xbyak_aarch64/src/util_impl_linux.h
++++ b/third_party/ideep/mkl-dnn/third_party/xbyak_aarch64/src/util_impl_linux.h
+@@ -385,10 +385,41 @@
+        */
+       lastDataCacheLevel_ = 2; // It is assumed L1 and L2 cache exist.
+ 
++      // _SC_LEVEL*_CACHE_SIZE are glibc extensions: musl -- and therefore the
++      // OHOS sysroot -- does not define them, so an unguarded sysconf() here
++      // does not even compile. Keep the sysconf path where the names exist and
++      // fall back to conservative sizes otherwise.
++      //
++      // Both paths must also fill in the cache *type* and *sharingCores*
++      // fields: they start out as NoCache/0 from init(), and with type==NoCache
++      // both getDataCacheSize() and getCoresSharingDataCache() return 0, so
++      // cpu/platform.cpp::get_per_core_cache_size() would divide 0/0 and raise
++      // SIGFPE on the first convolution that consults the per-core cache size.
++#ifdef _SC_LEVEL1_ICACHE_SIZE
+       cacheInfo_.levelCache[0].size[0] = sysconf(_SC_LEVEL1_ICACHE_SIZE); // L1, ICache
++#else
++      cacheInfo_.levelCache[0].size[0] = 32 * 1024;
++#endif
++      cacheInfo_.levelCache[0].type = SeparateCache;
++      cacheInfo_.levelCache[0].sharingCores[0] = 1;
++      cacheInfo_.levelCache[0].sharingCores[1] = 1;
++#ifdef _SC_LEVEL1_DCACHE_SIZE
+       cacheInfo_.levelCache[0].size[1] = sysconf(_SC_LEVEL1_DCACHE_SIZE); // L1, DCache
++#else
++      cacheInfo_.levelCache[0].size[1] = 64 * 1024;
++#endif
++      cacheInfo_.levelCache[1].type = UnifiedCache;
++      cacheInfo_.levelCache[1].sharingCores[2] = 1;
++#ifdef _SC_LEVEL2_CACHE_SIZE
+       cacheInfo_.levelCache[1].size[2] = sysconf(_SC_LEVEL2_CACHE_SIZE);  // L2, UCache
+-      cacheInfo_.levelCache[2].size[2] = sysconf(_SC_LEVEL3_CACHE_SIZE);  // L3, UCache
++#else
++      cacheInfo_.levelCache[1].size[2] = 512 * 1024;
++#endif
++      // Level 3 is above lastDataCacheLevel_, so a size of 0 keeps the getters
++      // from advertising a cache the CPU may not have.
++      cacheInfo_.levelCache[2].type = UnifiedCache;
++      cacheInfo_.levelCache[2].sharingCores[2] = 1;
++      cacheInfo_.levelCache[2].size[2] = 0;
+     }
+   }
+ 

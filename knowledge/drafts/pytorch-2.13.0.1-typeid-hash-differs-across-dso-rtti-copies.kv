@@ -1,0 +1,36 @@
+#====================================================================
+# Draft: pytorch 2.13.0.1 — libc++ compares typeid by *pointer to the name*,
+#        so when the library ships a local (non-exported) copy of a type's
+#        RTTI and the consumer emits its own weak copy, two values whose
+#        mangled names are identical are judged to be of different types
+#        ("Expected argument #1 to be of type X, but received value of type X")
+#====================================================================
+
+id:                     DRAFT-PYTORCH-21301-TYPEID-HASH-DIFFERS-ACROSS-DSO-RTTI-COPIES
+trigger_tool:           conan|clang|c++
+phase:                  runtime
+error_signature:        Expected argument #[0-9]+ to be of type .*, but received value of type .*|typeid.*hash_code.*mismatch|type_info.*not equal.*same name|_ZTI.*local.*dynsym.*absent
+
+severity:               2
+category:               abi|rtti|shared-library|upstream-defect
+match_keywords:         OHOS, HarmonyOS, aarch64, typeid, type_info, type_info::hash_code, RTTI, optional, ArrayRef, AnyValue, try_get, std::__n1, __n1, dynamic_cast, DSO, visibility, fvisibility, hidden, weak symbol, local binding, _ZTI, mangled name, pytorch, libc++
+
+title:                  typeid 的 hash 在跨 DSO 时不可靠：libc++ 默认按"类型名指针"算 hash，一旦库对某类型的 RTTI 只发 local 副本、消费者另发一份弱副本且动态链接器无法合并，两个 mangled 名完全相同的类型会被判为不同——报错文本两侧打印的类型名一字不差就是最好的线索
+root_cause:             libc++ 的 type_info 有三种比较实现（<typeinfo> 里 _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION）：
+                        * 1 "Unique"（默认，非 COFF/非 Apple 平台）——假设全程序只有一份 RTTI，hash_code() 直接由类型名指针导出，operator== 也比地址；
+                        * 2 "NonUnique"——hash 退化为对类型名字符串算 hash，比较用深比较（即 libc++ 认为"链接器可能没合并 RTTI"时要用的语义）；
+                        * 3 Apple arm64 专用位标记法。
+                        当 A 组件（如打包好的 .so，编译时带 -fvisibility=hidden）对某个头文件实例化类型只发出 **local** 的 RTTI 符号（llvm-nm 静态表里是 `d`/`t`，.dynsym 中根本不存在），而 B 组件（可执行文件或另一个 .so）也实例化了同一类型、发出默认可见性的弱副本时，动态链接器**不能**用 local 符号做跨模块合并，于是运行时存在两份 RTTI。此时 "Unique" 实现下的 hash_code() 是"两份不同指针各自的 hash"，直接比较必然不等——即使 typeid(X).name() 两边逐字符相同。
+                        上游代码的典型写法（pytorch 的 torch::nn::AnyValue::try_get / c10 容器的类型擦除读取）正是这种"只比 hash"的写法：if (typeid(T).hash_code() == type_info().hash_code())，于是同类型值被拒收。
+affected_scope:         所有把"类型擦除 + typeid 比较"用于跨模块边界的库（std::any 式容器、插件/扩展系统、序列化注册表、torch::nn::AnyModule 这类 C++ 前端）。触发条件是"跨 DSO 且 RTTI 副本未被合并"，因此与平台无关（任何 ELF 上都可能出现），只是在"库以 hidden visibility 编译、消费者另有默认可见性副本"的打包方式下最容易发生；用 -fvisibility=hidden 打包公共库时尤其要留意。判定线索：异常文本里"期望类型"与"实际类型"**打印得一模一样**——此时不要怀疑类型拼写或模板参数，直接怀疑 RTTI 副本没合并。
+verification_cmd:       nm -D <lib.so> | grep '_ZTI.*<mangled-type>'   # 若动态符号表里没有、而静态表 nm <lib.so> 里是 d/t，即 local 未导出副本
+rec_priority:           1
+rec_approach:           compare-mangled-type-names-as-fallback-after-hash-mismatch
+rec_description:        最小复现（可脱离 pytorch 验证，实测数据）：两个 DSO，一个用 -fvisibility=hidden 编译、一个默认；两边各自 typeid(std::optional<long>).name() / .hash_code()。实测 hidden 侧 **name 相同（NSt4__n18optionalIlEE）而 hash 不同（exe=373858220048 / dso=390721439352）**，默认可见性侧 hash 相同（两侧均 370141349968）；改用 strcmp 比 mangled 名，两种情况都判定相等。注意 hidden 变体里导出的入口函数要显式标 __attribute__((visibility("default")))，否则连调用都链接不上（这本身就是"hidden 传染"的旁证）。
+                        处置：保留 hash 快路径，hash 不等时回退比较 typeid(T).name() 的字符串（即 libc++ "NonUnique" 的语义）。类型判定不放松——不同类型 mangled 名必不同。不要改成"只用名字比较"（牺牲快路径），也不要靠 -fvisibility=default 重编整个库来绕（会暴露全部内部符号、且有 ODR 风险）。另一条可选路：在编译期选 _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION=2，但那要求库与所有消费者同时对 libc++ 生效，包管理器难以保证，故优先改调用点（本项目即按此处置，补丁 0026）。
+rec_command:            bash -c 'd=$(mktemp -d); printf "#include <optional>\n#include <typeinfo>\nextern \"C\" __attribute__((visibility(\"default\"))) unsigned long f(){return typeid(std::optional<long>).hash_code();}\n" > $d/a.cpp; printf "#include <cstdio>\n#include <optional>\n#include <typeinfo>\nextern \"C\" unsigned long f();\nint main(){printf(\"exe=%%lu dso=%%lu\\n\",typeid(std::optional<long>).hash_code(),f());}\n" > $d/m.cpp; clang++ -std=c++17 -fPIC -shared -fvisibility=hidden -o $d/liba.so $d/a.cpp && clang++ -std=c++17 -o $d/m $d/m.cpp -L$d -la -Wl,-rpath,$d && $d/m'
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:              12795
+source_commit:          11215db650

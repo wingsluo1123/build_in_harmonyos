@@ -1,0 +1,27 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -338,9 +338,21 @@
+ # option USE_XNNPACK: try to enable xnnpack by default.
+ option(USE_XNNPACK "Use XNNPACK" OFF)
+ option(USE_ROCM_KERNEL_ASSERT "Use Kernel Assert for ROCm" OFF)
+-# Ensure that an ITT build is the default for x86 CPUs
+-cmake_dependent_option(USE_ITT "Use Intel(R) VTune Profiler ITT functionality"
+-                       ON "CPU_INTEL" OFF)
++# Ensure that an ITT build is the default for x86 CPUs, while still letting the
++# other architectures opt in: the ITT API is portable C (the bundled
++# third_party/ittapi builds for aarch64 -- verified with the OHOS toolchain) and
++# its annotations are no-ops unless a collector attaches, so an explicit
++# -DUSE_ITT=ON is honoured elsewhere. It stays OFF by default outside x86 so
++# that a plain build does not silently pick up an Intel-specific profiler, and
++# it is unavailable on the remaining architectures.
++if(CPU_INTEL)
++  cmake_dependent_option(USE_ITT "Use Intel(R) VTune Profiler ITT functionality"
++                         ON "CPU_INTEL" OFF)
++elseif(CPU_AARCH64 OR CPU_POWER OR CPU_RISCV)
++  option(USE_ITT "Use Intel(R) VTune Profiler ITT functionality" OFF)
++else()
++  set(USE_ITT OFF CACHE BOOL "Use Intel(R) VTune Profiler ITT functionality" FORCE)
++endif()
+ # Ensure that an MKLDNN build is the default for x86 CPUs but optional for
+ # AArch64 (dependent on -DUSE_MKLDNN).
+ cmake_dependent_option(

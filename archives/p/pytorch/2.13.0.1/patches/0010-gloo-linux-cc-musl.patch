@@ -1,0 +1,34 @@
+--- a/third_party/gloo/gloo/common/linux.cc
++++ b/third_party/gloo/gloo/common/linux.cc
+@@ -198,7 +198,9 @@
+   } ecmd;
+   int rv;
+ 
+-  ifr->ifr_data = (__caddr_t)&ecmd;
++  // OHOS/musl: ifreq::ifr_data is plain `char*` here (glibc spells the same
++  // type via its __caddr_t alias, which musl does not define at all).
++  ifr->ifr_data = reinterpret_cast<char*>(&ecmd);
+   memset(&ecmd, 0, sizeof(ecmd));
+   ecmd.req.cmd = ETHTOOL_GLINKSETTINGS;
+ 
+@@ -226,7 +228,7 @@
+   struct ethtool_cmd edata;
+   int rv;
+ 
+-  ifr->ifr_data = (__caddr_t)&edata;
++  ifr->ifr_data = reinterpret_cast<char*>(&edata);
+   memset(&edata, 0, sizeof(edata));
+   edata.cmd = ETHTOOL_GSET;
+ 
+@@ -235,7 +237,10 @@
+     return SPEED_UNKNOWN;
+   }
+ 
+-  return ethtool_cmd_speed(&edata);
++  // OHOS/musl: this sysroot's <linux/ethtool.h> declares struct ethtool_cmd but
++  // not the ethtool_cmd_speed() helper that glibc's header provides; it is
++  // verbatim (speed_hi << 16) | speed.
++  return (edata.speed_hi << 16) | edata.speed;
+ }
+ 
+ int getInterfaceSpeedByName(const std::string& ifname) {

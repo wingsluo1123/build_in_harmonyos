@@ -1,0 +1,125 @@
+--- a/aten/src/ATen/Context.h
++++ b/aten/src/ATen/Context.h
+@@ -677,6 +677,12 @@
+   return globalContext().hasMKLDNN();
+ }
+ 
++// True when this process can obtain the executable memory that oneDNN's
++// run-time generated (xbyak_aarch64) kernels require. Compilation of oneDNN is
++// reported by hasMKLDNN(); this answers whether its kernels can actually run
++// here, which some OHOS launch domains forbid (see Context.cpp).
++TORCH_API bool isMKLDNNJitUsable();
++
+ inline void manual_seed(uint64_t seed) {
+   {
+     auto gen = globalContext().defaultGenerator(c10::DeviceType::CPU);
+--- a/aten/src/ATen/Context.cpp
++++ b/aten/src/ATen/Context.cpp
+@@ -19,8 +19,65 @@
+ #if defined(__aarch64__) && !defined(C10_MOBILE)
+ #include <cpuinfo.h>
+ #endif
++
++#if AT_MKLDNN_ENABLED() && (defined(__linux__) || defined(__OHOS__))
++#include <sys/mman.h>
++#include <unistd.h>
++#endif
++
+ namespace at {
+ 
++/* oneDNN's aarch64 kernels are generated at run time by xbyak_aarch64, which
++ * maps a writable buffer and later mprotects it to PROT_READ|PROT_EXEC. Some
++ * OHOS launch domains -- notably the process that hosts the Python
++ * interpreter -- refuse every way of obtaining executable memory: anonymous
++ * mmap(PROT_EXEC) and mmap(PROT_WRITE|PROT_EXEC), memfd/file backed executable
++ * mappings, and the RW->RX mprotect all fail with EINVAL or EACCES, while the
++ * native binaries of the very same device are unrestricted. Dispatching to
++ * oneDNN in such a process makes the first convolution abort with
++ * "Xbyak::Error: can't protect (err=6)", so probe once per process and let the
++ * answer decide whether oneDNN kernels can run *here*. The build time flag --
++ * and therefore hasMKLDNN()/_has_mkldnn -- keeps reporting that oneDNN is
++ * compiled in.
++ */
++bool isMKLDNNJitUsable() {
++  static const bool usable = []() {
++#if !AT_MKLDNN_ENABLED()
++    return false;
++#elif defined(__linux__) || defined(__OHOS__)
++    const long page = sysconf(_SC_PAGESIZE);
++    if (page <= 0) {
++      return false;
++    }
++    void* p = mmap(
++        nullptr,
++        static_cast<size_t>(page),
++        PROT_READ | PROT_WRITE,
++        MAP_PRIVATE | MAP_ANONYMOUS,
++        -1,
++        0);
++    if (p == MAP_FAILED) {
++      return false;
++    }
++    // xbyak's CodeArray::protect() is the call that raises ERR_CANT_PROTECT,
++    // and it is reached twice: the constructor sets PROTECT_RWE (RWX) and
++    // CodeGenerator::ready() narrows it to PROTECT_RE (RX). Require both, so a
++    // domain that permits only one of them is not mistaken for a usable one.
++    const bool rwx =
++        mprotect(p, static_cast<size_t>(page), PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
++    const bool rx =
++        mprotect(p, static_cast<size_t>(page), PROT_READ | PROT_EXEC) == 0;
++    const bool ok = rwx && rx;
++    munmap(p, static_cast<size_t>(page));
++    return ok;
++#else
++    // Platforms not known to restrict executable memory: assume oneDNN is fine.
++    return true;
++#endif
++  }();
++  return usable;
++}
++
+ /*
+   These const variables defined the fp32 precisions for different backend
+   We have "generic", "cuda", "mkldnn" backend now and we can choose fp32
+@@ -136,7 +193,16 @@
+ }
+ 
+ bool Context::userEnabledMkldnn() const {
++#if AT_MKLDNN_ENABLED()
++  // A process that cannot obtain executable memory cannot run oneDNN's JIT-ed
++  // aarch64 kernels at all (see isMKLDNNJitUsable above), so report the
++  // effective state -- "requested *and* possible here" -- rather than the raw
++  // request. Otherwise every mkldnn dispatch site (convolution, activation,
++  // blas, ...) would route work to kernels that abort on first use.
++  return enabled_mkldnn && isMKLDNNJitUsable();
++#else
+   return enabled_mkldnn;
++#endif
+ }
+ 
+ void Context::setUserEnabledMkldnn(bool e) {
+@@ -744,7 +810,9 @@
+ #endif
+ 
+ #if AT_MKLDNN_ENABLED()
+-    qengine = at::kONEDNN;
++    if (isMKLDNNJitUsable()) {
++      qengine = at::kONEDNN;
++    }
+ #endif
+ 
+ #ifdef USE_FBGEMM
+@@ -802,7 +870,12 @@
+ #endif
+ 
+ #if AT_MKLDNN_ENABLED()
+-    engines.push_back(at::kONEDNN);
++    // Only advertise the engine where it can actually execute: a process that
++    // cannot map executable memory would abort inside xbyak on the first
++    // quantized operator instead of failing cleanly at setQEngine() time.
++    if (isMKLDNNJitUsable()) {
++      engines.push_back(at::kONEDNN);
++    }
+ #endif
+ 
+ #ifdef USE_FBGEMM

@@ -1,0 +1,37 @@
+--- a/aten/src/ATen/Context.cpp
++++ b/aten/src/ATen/Context.cpp
+@@ -748,7 +748,17 @@
+ #endif
+ 
+ #ifdef USE_FBGEMM
+-    if (fbgemm::fbgemmSupportedCPU()) {
++    /* fbgemmSupportedCPU() also answers true on aarch64 -- FBGEMM carries
++     * partial ARM support -- yet the kernels that kX86 dispatches to are
++     * x86-only (fbgemm::ExecuteKernelU8S8 selects on avx2/avx512 and otherwise
++     * throws "unknown architecure"), so leaving kX86 as the default on ARM made
++     * the first quantized op fail. The comment below says "Make it default
++     * qengine for X86 CPU platforms", so restrict it to exactly those. */
++    bool is_x86_cpu = false;
++#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
++    is_x86_cpu = true;
++#endif
++    if (is_x86_cpu && fbgemm::fbgemmSupportedCPU()) {
+       /* X86 is enabled if and only if fbgemm is available.
+        * It combines goodness of fbgemm and onednn by dispatching.
+        * If onednn not available, always dispatch to fbgemm.
+@@ -757,6 +767,15 @@
+       qengine = at::kX86;
+     }
+ #endif
++
++#if defined(USE_PYTORCH_QNNPACK) && !defined(__x86_64__) && !defined(_M_X64) && !defined(__i386__) && !defined(_M_IX86)
++    /* aarch64: none of the x86-family engines can compute here, so fall back to
++     * the project's own ARM quantized kernel family instead of leaving the
++     * engine unset (which made quantized operators unusable out of the box). */
++    if (qengine == at::kNoQEngine) {
++      qengine = at::kQNNPACK;
++    }
++#endif
+     return qengine;
+   }();
+   auto qt_engine = quantized_engine.load();

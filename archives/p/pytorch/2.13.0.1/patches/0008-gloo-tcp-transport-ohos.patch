@@ -1,0 +1,16 @@
+--- a/third_party/gloo/gloo/CMakeLists.txt
++++ b/third_party/gloo/gloo/CMakeLists.txt
+@@ -74,7 +74,12 @@
+ endif()
+ 
+ # Compile TCP transport only on Linux (it uses epoll(2))
+-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
++# OHOS is musl-based and its sysroot provides epoll(2) (sys/epoll.h), which is
++# all this transport needs. The target triple is aarch64-linux-ohos, so
++# __linux__ IS defined and torch's GlooDeviceFactory.cpp enforces the transport:
++# without this it fails to compile with
++# "Expected the tcp transport to be available on Linux."
++if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "^(OHOS|HarmonyOS)$")
+   set(GLOO_HAVE_TRANSPORT_TCP 1)
+   if(${USE_TCP_OPENSSL_LINK} OR ${USE_TCP_OPENSSL_LOAD})
+     find_package(OpenSSL 1.1 REQUIRED EXACT)

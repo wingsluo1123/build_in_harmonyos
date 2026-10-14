@@ -1,0 +1,66 @@
+--- a/aten/src/ATen/cpu/vec/vec128/vec128_half_neon.h
++++ b/aten/src/ATen/cpu/vec/vec128/vec128_half_neon.h
+@@ -577,7 +577,14 @@
+ #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+   return Vectorized<c10::Half>(vfmaq_f16(c, a, b));
+ #else
+-  return a * b + c;
++  // [ohos-fix] Fallback used fp16 arithmetic, so `a * b` was rounded to half
++  // before the add. ATen computes FP16 ops in fp32 (OpMathType<Half> = float) and
++  // this file's operator+ already routes through binary_operator_via_float; keep
++  // the fused family in fp32 too, so the vector result matches that convention.
++  const auto [a_lo, a_hi] = convert_half_float(a);
++  const auto [b_lo, b_hi] = convert_half_float(b);
++  const auto [c_lo, c_hi] = convert_half_float(c);
++  return convert_float_half(a_lo * b_lo + c_lo, a_hi * b_hi + c_hi);
+ #endif
+ }
+ 
+@@ -589,7 +596,14 @@
+ #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+   return Vectorized<c10::Half>(vfmsq_f16(c, a, b));
+ #else
+-  return -a * b + c;
++  // [ohos-fix] Fallback used fp16 arithmetic, so `a * b` was rounded to half
++  // before the add. ATen computes FP16 ops in fp32 (OpMathType<Half> = float) and
++  // this file's operator+ already routes through binary_operator_via_float; keep
++  // the fused family in fp32 too, so the vector result matches that convention.
++  const auto [a_lo, a_hi] = convert_half_float(a);
++  const auto [b_lo, b_hi] = convert_half_float(b);
++  const auto [c_lo, c_hi] = convert_half_float(c);
++  return convert_float_half(-a_lo * b_lo + c_lo, -a_hi * b_hi + c_hi);
+ #endif
+ }
+ 
+@@ -601,7 +615,14 @@
+ #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+   return Vectorized<c10::Half>(vnegq_f16(vfmsq_f16(c, a, b)));
+ #else
+-  return a * b - c;
++  // [ohos-fix] Fallback used fp16 arithmetic, so `a * b` was rounded to half
++  // before the add. ATen computes FP16 ops in fp32 (OpMathType<Half> = float) and
++  // this file's operator+ already routes through binary_operator_via_float; keep
++  // the fused family in fp32 too, so the vector result matches that convention.
++  const auto [a_lo, a_hi] = convert_half_float(a);
++  const auto [b_lo, b_hi] = convert_half_float(b);
++  const auto [c_lo, c_hi] = convert_half_float(c);
++  return convert_float_half(a_lo * b_lo - c_lo, a_hi * b_hi - c_hi);
+ #endif
+ }
+ 
+@@ -613,7 +634,14 @@
+ #ifdef __ARM_FEATURE_FP16_VECTOR_ARITHMETIC
+   return Vectorized<c10::Half>(vnegq_f16(vfmaq_f16(c, a, b)));
+ #else
+-  return -a * b - c;
++  // [ohos-fix] Fallback used fp16 arithmetic, so `a * b` was rounded to half
++  // before the add. ATen computes FP16 ops in fp32 (OpMathType<Half> = float) and
++  // this file's operator+ already routes through binary_operator_via_float; keep
++  // the fused family in fp32 too, so the vector result matches that convention.
++  const auto [a_lo, a_hi] = convert_half_float(a);
++  const auto [b_lo, b_hi] = convert_half_float(b);
++  const auto [c_lo, c_hi] = convert_half_float(c);
++  return convert_float_half(-a_lo * b_lo - c_lo, -a_hi * b_hi - c_hi);
+ #endif
+ }
+ #endif // !defined(C10_MOBILE) && defined(__aarch64__)

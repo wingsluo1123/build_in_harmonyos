@@ -1,0 +1,49 @@
+--- a/third_party/kineto/libkineto/src/ApproximateClock.cpp
++++ b/third_party/kineto/libkineto/src/ApproximateClock.cpp
+@@ -56,7 +56,9 @@
+     scale_factors[i] =
+         static_cast<double>(delta_ns) / static_cast<double>(delta_approx);
+   }
+-  std::ranges::sort(scale_factors);
++  // std::ranges algorithms are not available with the OHOS SDK's libc++ 15
++  // (_LIBCPP_HAS_NO_INCOMPLETE_RANGES), so use the iterator-pair form.
++  std::sort(scale_factors.begin(), scale_factors.end());
+   long double scale_factor = scale_factors[(replicates / 2) + 1];
+ 
+   // We shift all times by `t0` for better numerics. Double precision only has
+--- a/third_party/kineto/libkineto/src/GenericActivityProfiler.cpp
++++ b/third_party/kineto/libkineto/src/GenericActivityProfiler.cpp
+@@ -162,7 +162,9 @@
+   }
+   for (const auto& session : sessions_) {
+     if (auto props = session->getDeviceProperties(); !props.empty()) {
+-      if (std::ranges::find(device_properties, props) ==
++      // std::ranges is unavailable with libc++ 15 on this sysroot; use the
++      // iterator-pair form.
++      if (std::find(device_properties.begin(), device_properties.end(), props) ==
+           device_properties.end()) {
+         device_properties.push_back(props);
+       }
+--- a/third_party/kineto/libkineto/src/output_json.cpp
++++ b/third_party/kineto/libkineto/src/output_json.cpp
+@@ -60,7 +60,8 @@
+ void sanitizeStrForJSON(std::string& value) {
+   // Replace all backslashes with forward slash because Windows paths causing
+   // JSONDecodeError.
+-  std::ranges::replace(value, '\\', '/');
++  // std::ranges is unavailable with libc++ 15 on this sysroot; iterator forms.
++  std::replace(value.begin(), value.end(), '\\', '/');
+   // Remove all new line characters
+   std::erase(value, '\n');
+ }
+@@ -101,8 +102,8 @@
+ }
+ 
+ bool isWhitespace(std::string_view s) {
+-  return std::ranges::all_of(
+-      s, [](unsigned char c) { return std::isspace(c); });
++  return std::all_of(
++      s.begin(), s.end(), [](unsigned char c) { return std::isspace(c); });
+ }
+ 
+ } // namespace

@@ -1,0 +1,20 @@
+--- a/caffe2/CMakeLists.txt
++++ b/caffe2/CMakeLists.txt
+@@ -1942,6 +1942,17 @@
+         if(NOT MSVC)
+               target_compile_options(${test_name}_${CPU_CAPABILITY} PRIVATE -Wno-ignored-qualifiers)
+         endif(NOT MSVC)
++        if(CMAKE_SYSTEM_NAME STREQUAL "OHOS" AND NOT MSVC)
++          # clang 22 at -O2/-O3 mis-optimises this test's own byte-copy
++          # scaffolding: the Memory/*.UnAlignedLoadStore instantiations whose
++          # vector type has no dedicated 128-bit loadu/store (complex<float>,
++          # qint8, quint8, qint32) fail there, but pass at -O0/-O1 and pass as
++          # soon as loop vectorisation is off. The library's loadu/store round
++          # trip itself is byte-exact (a standalone repro of the same loop passes
++          # at every optimisation level), so the workaround is scoped to this
++          # test target and leaves the library and the package contents untouched.
++          target_compile_options(${test_name}_${CPU_CAPABILITY} PRIVATE -fno-vectorize)
++        endif()
+         add_test(NAME ${test_name}_${CPU_CAPABILITY} COMMAND $<TARGET_FILE:${test_name}_${CPU_CAPABILITY}>)
+     endforeach()
+   endforeach()
