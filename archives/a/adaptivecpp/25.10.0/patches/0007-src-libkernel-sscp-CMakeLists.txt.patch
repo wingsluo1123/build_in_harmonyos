@@ -1,0 +1,33 @@
+--- a/src/libkernel/sscp/CMakeLists.txt
++++ b/src/libkernel/sscp/CMakeLists.txt
+@@ -20,20 +20,30 @@
+     set(target_depends clang)
+   endif()
+   if(WIN32)
+     set(platform_specific -DWIN32_LEAN_AND_MEAN -DNOMINMAX -D_USE_MATH_DEFINES)
+   elseif(APPLE)
+     # make overriding easier
+     if(CMAKE_SYSROOT)
+       set(platform_specific -isysroot ${CMAKE_SYSROOT})
+     else()
+       set(platform_specific -isysroot ${CMAKE_OSX_SYSROOT})
++    endif()
++  elseif(ACPP_BITCODE_SYSROOT)
++    # The clang that emits the libkernel bitcode is invoked standalone, so it
++    # cannot rely on the build system's implicit target flags. On targets whose
++    # standard library is not found through the default search paths (e.g. OHOS,
++    # where libc++ headers live outside the sysroot), the sysroot and the libc++
++    # header directory have to be passed explicitly.
++    set(platform_specific --sysroot=${ACPP_BITCODE_SYSROOT})
++    if(ACPP_BITCODE_LIBCXX_INCLUDE)
++      list(APPEND platform_specific -isystem ${ACPP_BITCODE_LIBCXX_INCLUDE})
+     endif()
+   endif()
+ 
+   add_custom_command(
+       OUTPUT ${target_output_file}
+       COMMAND ${CLANG_EXECUTABLE_PATH} -target ${triple} -fno-exceptions -fno-rtti -O3 -emit-llvm -std=c++17 -DHIPSYCL_SSCP_LIBKERNEL_LIBRARY
+                     -I ${HIPSYCL_SOURCE_DIR}/include ${additional} ${platform_specific} -o ${target_output_file} -c ${CMAKE_CURRENT_SOURCE_DIR}/${source}
+       DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${target_depends}
+       VERBATIM)
+ 

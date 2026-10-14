@@ -1,0 +1,92 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -445,20 +445,43 @@
+         message(SEND_ERROR "This LLVM seems to be a development version; only LLVM releases are tested and supported. Use -DACPP_EXPERIMENTAL_LLVM=ON if you still wish to try your luck.")
+       endif()
+     endif()
+   endif()
+ 
+   message(STATUS "Using clang include directory: ${CLANG_INCLUDE_PATH}")
+ 
+   # Check if building on Windows and LLVM_LIBS is set, if not, use LLVM_AVAILABLE_LIBS 
+   if(WIN32 AND NOT LLVM_LIBS AND LLVM_AVAILABLE_LIBS)
+     llvm_map_components_to_libnames(LLVM_LIBS analysis core support passes)
++  elseif(NOT LLVM_LIBS)
++    # When LLVM is consumed as an installed package (find_package(LLVM CONFIG)) no
++    # llvm-config style LLVM_LIBS variable is exported. Leaving the plugin without a
++    # single LLVM dependency makes it rely on the host process to resolve its LLVM
++    # symbols. That only works on glibc: musl's dynamic linker refuses to bind an
++    # unversioned reference to the versioned definitions exported by libLLVM.so
++    # (e.g. _ZN4llvm2cl18getGeneralCategoryEv@@LLVM_22.1), so loading the plugin
++    # fails with "Error relocating ...: symbol not found". Linking the LLVM shared
++    # library makes the plugin self-contained.
++    if(TARGET LLVM)
++      set(LLVM_LIBS LLVM)
++    elseif(LLVM_AVAILABLE_LIBS)
++      llvm_map_components_to_libnames(LLVM_LIBS analysis core support passes)
++    endif()
++    # The plugin also references symbols of the clang frontend library (for
++    # example clang::FrontendAction::FrontendAction()), which the host process
++    # would otherwise have to provide - same limitation as for libLLVM described
++    # above. Resolve libclang-cpp explicitly so the plugin links it by itself.
++    find_library(ACPP_CLANG_CPP_LIBRARY NAMES clang-cpp
++                 HINTS ${LLVM_LIBRARY_DIRS} NO_DEFAULT_PATH)
++    if(ACPP_CLANG_CPP_LIBRARY)
++      list(APPEND LLVM_LIBS ${ACPP_CLANG_CPP_LIBRARY})
++    endif()
+   endif()
+ endif()
+ 
+ if(WITH_ROCM_BACKEND)
+   find_path(ROCM_DEVICE_LIBS_PATH ockl.bc HINTS
+       ${ROCM_PATH}/amdgcn/bitcode
+       DOC "Path to ROCm bitcode libraries. Typically, $ROCM_PATH/amdgcn/bitcode")
+ 
+   if(ROCM_DEVICE_LIBS_PATH)
+     message(STATUS "Found ROCm bitcode library path: ${ROCM_DEVICE_LIBS_PATH}")
+@@ -514,20 +537,45 @@
+ 
+ 
+ set(ROCM_LIBS "-L${ROCM_PATH}/lib -L${ROCM_PATH}/hip/lib -lamdhip64" CACHE STRING "Necessary libraries for ROCm")
+ set(ACPP_FILESYSTEM_SEARCH_OPTIONS "Final;Experimental;Boost" CACHE STRING "Which filesystem libraries should be searched for")
+ 
+ ##########################################################
+ ## Do not define any variables that might be used by build
+ ## targets below this line.
+ ##########################################################
+ add_subdirectory(src)
++
++# Give every shared library of this project an explicit SONAME.
++# The project does not set VERSION/SOVERSION on its libraries, so the linker
++# records the path it was handed (for example ../common/libacpp-common.so) in
++# DT_NEEDED. Such a relative path is meaningless after installation, and libcs
++# that require an exact name match for their dependencies (musl, as used by
++# OHOS) then cannot load the library at all.
++foreach(_acpp_soname_target acpp-common acpp-rt acpp-clang rt-backend-omp llvm-to-host llvm-to-backend)
++  if(TARGET ${_acpp_soname_target})
++    get_target_property(_acpp_output_name ${_acpp_soname_target} OUTPUT_NAME)
++    if(NOT _acpp_output_name)
++      set(_acpp_output_name ${_acpp_soname_target})
++    endif()
++    set_property(TARGET ${_acpp_soname_target} APPEND_STRING PROPERTY LINK_FLAGS
++                 " -Wl,-soname,lib${_acpp_output_name}.so")
++    # Make the installed libraries locate each other no matter where the package
++    # ends up. CMake's own RPATH handling never reached these targets in this
++    # project (the variable the project sets refers to an undefined 'base', and
++    # neither INSTALL_RPATH nor BUILD_WITH_INSTALL_RPATH took effect here), so the
++    # run path goes on the link line directly. The single quotes keep the shell
++    # from expanding $ORIGIN when the link command is executed.
++    set_property(TARGET ${_acpp_soname_target} APPEND_STRING PROPERTY LINK_FLAGS
++                 " -Wl,-rpath,'\$ORIGIN' -Wl,-rpath,'\$ORIGIN/..' -Wl,-rpath,'\$ORIGIN/llvm-to-backend' -Wl,-rpath,'\$ORIGIN/hipSYCL' -Wl,-rpath,'${LLVM_LIBRARY_DIRS}'")
++  endif()
++endforeach()
+ 
+ set(DEFAULT_WIN32_CUDA_LINK_LINE "-L$ACPP_CUDA_LIB_PATH -lcudart")
+ set(DEFAULT_CUDA_LINK_LINE "-Wl,-rpath=$ACPP_CUDA_LIB_PATH -L$ACPP_CUDA_LIB_PATH -lcudart")
+ 
+ set(DEFAULT_WIN32_HIP_LINK_LINE "-L$ACPP_ROCM_PATH/lib -lamdhip64")
+ 
+ if(MINGW)
+   set(DEFAULT_LINK_PREFIX "-l:")
+ else()
+   set(DEFAULT_LINK_PREFIX "-l")

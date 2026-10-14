@@ -1,0 +1,102 @@
+software: adaptivecpp
+version: "25.10.0"
+build_date: "2026-10-02"
+build_system: cmake
+status: built
+conan_ref: "adaptivecpp/25.10.0"
+
+source:
+  url: "https://github.com/AdaptiveCpp/AdaptiveCpp/archive/refs/tags/v25.10.0.tar.gz"
+  sha256: "334b16ebff373bd2841f83332c2ae9a45ec192f2cf964d5fdfe94e1140776059"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  mode: native_on_device   # 鸿蒙 PC 真机原生编译（不设 CMAKE_SYSTEM_NAME）
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DACPP_COMPILER_FEATURE_PROFILE=full"
+    - "-DACPP_EXPERIMENTAL_LLVM=ON"
+    - "-DWITH_CUDA_BACKEND=OFF"
+    - "-DWITH_ROCM_BACKEND=OFF"
+    - "-DWITH_LEVEL_ZERO_BACKEND=OFF"
+    - "-DACPP_SUBPROJECT_PARALLEL_JOBS=2"
+  dependencies:
+    - "clang/22.1.8"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+- patches/0001-CMakeLists.txt.patch
+- patches/0002-src-common-dylib_loader.cpp.patch
+- patches/0003-src-compiler-AdaptiveCppLlvmPasses.cpp.patch
+- patches/0004-src-compiler-cbs-IRUtils.cpp.patch
+- patches/0005-src-compiler-llvm-to-backend-GlobalSizesFitInI32OptPass.cpp.patch
+- patches/0006-src-compiler-stdpar-SyncElision.cpp.patch
+- patches/0007-src-libkernel-sscp-CMakeLists.txt.patch
+- patches/0008-src-libkernel-sscp-host-math.cpp.patch
+- patches/0009-src-runtime-CMakeLists.txt.patch
+- patches/0010-src-runtime-omp-omp_code_object.cpp.patch
+- patches/0011-include-hipSYCL-compiler-Frontend.hpp.patch
+
+knowledge_gained:
+  - "AdaptiveCpp 的编译能力集中在 Clang 插件 acpp-clang，必须链接 clang 前端库；制品仓 clang/22.1.8 同时导出 ClangConfig.cmake + libclang-cpp.so + libLLVM.so + clang 头，是可用依赖"
+  - "上游要求 LLVM 主版本 15..20，clang/22.1.8 超出范围，需 ACPP_EXPERIMENTAL_LLVM=ON（真机首要验证项）"
+  - "OHOS SDK 自带 libomp.a/libomp.so 与 omp.h，OpenMP 交叉编译实测通过，CPU 后端无平台障碍"
+  - "官方仓库 CMake 类配方（clang/llvm/onetbb）均为真机原生编译，非交叉编译"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/.conan2/p/adapt83feb5ef95bf9/s
+  source_work_dir: /storage/Users/currentUser/acpp-patch-132232
+  source_orig_hash: 8061f7c8bbc5928e
+  source_work_hash: 812362155f368200
+  generated_at: '2026-10-08T12:03:24'
+  patches_count: 11
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-common-dylib_loader.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-compiler-AdaptiveCppLlvmPasses.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-compiler-cbs-IRUtils.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-compiler-llvm-to-backend-GlobalSizesFitInI32OptPass.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-compiler-stdpar-SyncElision.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-libkernel-sscp-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-libkernel-sscp-host-math.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-src-runtime-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-src-runtime-omp-omp_code_object.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-include-hipSYCL-compiler-Frontend.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

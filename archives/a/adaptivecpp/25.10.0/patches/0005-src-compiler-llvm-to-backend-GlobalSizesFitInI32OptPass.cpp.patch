@@ -1,0 +1,54 @@
+--- a/src/compiler/llvm-to-backend/GlobalSizesFitInI32OptPass.cpp
++++ b/src/compiler/llvm-to-backend/GlobalSizesFitInI32OptPass.cpp
+@@ -4,20 +4,22 @@
+  *
+  * Copyright The AdaptiveCpp Contributors
+  *
+  * AdaptiveCpp is released under the BSD 2-Clause "Simplified" License.
+  * See file LICENSE in the project root for full license details.
+  */
+ // SPDX-License-Identifier: BSD-2-Clause
+ #include "hipSYCL/compiler/llvm-to-backend/GlobalSizesFitInI32OptPass.hpp"
+ 
+ #include "hipSYCL/compiler/utils/LLVMUtils.hpp"
++
++#include <iterator>
+ 
+ #include <llvm/IR/Instructions.h>
+ #include <llvm/IR/Intrinsics.h>
+ #include <llvm/IR/Constants.h>
+ #include <llvm/IR/Module.h>
+ 
+ namespace hipsycl {
+ namespace compiler {
+ 
+ 
+@@ -33,21 +35,28 @@
+     return false;
+ 
+   if(auto* F = M.getFunction(BuiltinName)) {
+ 
+     auto *ReturnedIntType = llvm::dyn_cast<llvm::IntegerType>(F->getReturnType());
+     if(!ReturnedIntType)
+       return false;
+ 
+     for(auto* U : F->users()) {
+       if(auto* C = llvm::dyn_cast<llvm::CallInst>(U)) {
++#if LLVM_VERSION_MAJOR >= 22
++        // LLVM 22 removed Instruction::getNextNonDebugInstruction(). Since LLVM 19
++        // debug records are no longer instructions, so simply advancing the
++        // instruction iterator already steps over them.
++        auto NextInst = std::next(C->getIterator());
++#else
+         auto NextInst = llvmutils::makeInsertionPoint(C->getNextNonDebugInstruction());
++#endif
+ 
+         auto *GreaterEqualMin = llvm::ICmpInst::Create(
+             llvm::Instruction::OtherOps::ICmp, llvm::ICmpInst::Predicate::ICMP_SGE, C,
+             llvm::ConstantInt::get(M.getContext(),
+                                    llvm::APInt(ReturnedIntType->getBitWidth(), RangeMin)),
+             "", NextInst);
+         
+         llvm::ICmpInst::Predicate MaxPredicate = llvm::ICmpInst::ICMP_SLT;
+         if(MaxIsLessThanEqual)
+           MaxPredicate = llvm::ICmpInst::ICMP_SLE;

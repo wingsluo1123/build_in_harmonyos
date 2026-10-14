@@ -1,0 +1,102 @@
+--- a/src/compiler/stdpar/SyncElision.cpp
++++ b/src/compiler/stdpar/SyncElision.cpp
+@@ -21,20 +21,30 @@
+ #include <llvm/ADT/SmallVector.h>
+ #include <llvm/IR/Constants.h>
+ #include <llvm/IR/InstrTypes.h>
+ #include <llvm/IR/PassManager.h>
+ 
+ 
+ namespace hipsycl {
+ namespace compiler {
+ 
+ namespace {
++
++// LLVM 22 removed Instruction::getNextNonDebugInstruction(). Since LLVM 19 debug
++// records are no longer instructions, the regular successor already skips them.
++inline llvm::Instruction *nextNonDebugInstruction(llvm::Instruction *I) {
++#if LLVM_VERSION_MAJOR >= 22
++  return I ? I->getNextNode() : nullptr;
++#else
++  return I ? I->getNextNonDebugInstruction() : nullptr;
++#endif
++}
+ 
+ template <class Handler>
+ bool descendInstructionUseTree(llvm::Instruction *I, Handler &&H,
+                                llvm::Instruction *Parent = nullptr) {
+   if(H(I, Parent)) {
+     for(auto* U : I->users()) {
+       if(auto* UI = llvm::dyn_cast<llvm::Instruction>(U)) {
+         if(!descendInstructionUseTree(UI, H, I))
+           return false;
+       } else {
+@@ -158,21 +168,21 @@
+   }
+   // We could improve this logic massively: E.g. a function which does not have ptr arguments,
+   // does not have gobal variable users, contains no inttoptr instructions, and only calls functions
+   // which satisfy these criteria could be assumed to not access memory.
+   return false;
+ }
+ 
+ // returns whether To is in the same BB as From, and succeeds it in the instruction list.
+ bool isSucceedingInBB(llvm::Instruction* From, llvm::Instruction* To) {
+   if(From->getParent() == To->getParent()) {
+-    for(auto* I = From; I != nullptr; I = I->getNextNonDebugInstruction()) {
++    for(auto* I = From; I != nullptr; I = nextNonDebugInstruction(I)) {
+       if(I == To)
+         return true;
+     }
+   } 
+   return false;
+ }
+ 
+ template <unsigned N>
+ bool allAreSucceedingInBB(llvm::Instruction* From,
+                           const llvm::SmallVector<llvm::Instruction *, N> &To) {
+@@ -281,21 +291,21 @@
+     } else if(Current->isTerminator()){
+       // If this terminator causes control flow to exit from this function, we need
+       // to insert synchronization.
+       // TODO: Look again at exception handling instructions in more detail
+       if (llvm::isa<llvm::ReturnInst>(Current) || llvm::isa<llvm::InvokeInst>(Current) ||
+           llvm::isa<llvm::CallBrInst>(Current) || llvm::isa<llvm::ResumeInst>(Current)) {
+         H(Current);
+         return;
+       }
+     }
+-    Current = Current->getNextNonDebugInstruction();
++    Current = nextNonDebugInstruction(Current);
+   }
+   // We have reached the end of this BB - so we need to look
+   // at all its successors in the CFG
+   llvm::BasicBlock* BB = Start->getParent();
+   for(int i = 0; i < BB->getTerminator()->getNumSuccessors(); ++i) {
+     llvm::BasicBlock* Successor = BB->getTerminator()->getSuccessor(i);
+     if(Successor->size() > 0) {
+       llvm::Instruction* FirstI = &(*Successor->getFirstInsertionPt());
+       forEachReachableInstructionRequiringSync(
+           FirstI, StdparFunctions, PotentialStoresForStdparArgs, CompletelyVisitedBlocks,
+@@ -396,21 +406,21 @@
+       //
+       // It is important to have this logic here, and not e.g. when collecting StdparCallPositions,
+       // because the appropriate start position might be altered by other barrier insertions
+       // in earlier iterations!
+       llvm::SmallVector<llvm::Instruction*, 8> StartPositions;
+       if(I->isTerminator()) {
+         for(int i = 0; i < I->getNumSuccessors(); ++i) {
+           StartPositions.push_back(&*(I->getSuccessor(i)->getFirstInsertionPt()));
+         }
+       } else {
+-        StartPositions.push_back(I->getNextNonDebugInstruction());
++        StartPositions.push_back(nextNonDebugInstruction(I));
+       }
+       for(auto* Start : StartPositions) {
+ 
+         llvm::SmallPtrSet<llvm::BasicBlock*, 16> VisitedBlocks;
+         forEachReachableInstructionRequiringSync(
+             Start, StdparFunctions, InstructionsPotentiallyForStdparArgHandling, VisitedBlocks,
+             NoStackPtrsInStdparAlgorithms,
+             [&](llvm::Instruction *InsertSyncBefore) {
+               HIPSYCL_DEBUG_INFO << "[stdpar] SyncElision: Inserting synchronization in function "
+                                 << InsertSyncBefore->getParent()->getParent()->getName() << "\n";

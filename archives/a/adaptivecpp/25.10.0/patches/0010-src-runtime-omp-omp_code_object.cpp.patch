@@ -1,0 +1,70 @@
+--- a/src/runtime/omp/omp_code_object.cpp
++++ b/src/runtime/omp/omp_code_object.cpp
+@@ -4,42 +4,67 @@
+  *
+  * Copyright The AdaptiveCpp Contributors
+  *
+  * AdaptiveCpp is released under the BSD 2-Clause "Simplified" License.
+  * See file LICENSE in the project root for full license details.
+  */
+ // SPDX-License-Identifier: BSD-2-Clause
+ #include <algorithm>
+ #include <cassert>
+ #include <cctype>
++#include <dlfcn.h>
+ #include <sstream>
+ #include <string>
+ 
+ #include "hipSYCL/runtime/backend.hpp"
+ #include "hipSYCL/runtime/omp/omp_code_object.hpp"
+ 
+ #include "hipSYCL/common/config.hpp"
+ #include "hipSYCL/common/debug.hpp"
+ #include "hipSYCL/common/dylib_loader.hpp"
+ #include "hipSYCL/common/filesystem.hpp"
+ #include "hipSYCL/common/hcf_container.hpp"
+ #include "hipSYCL/runtime/kernel_configuration.hpp"
+ #include "hipSYCL/runtime/device_id.hpp"
+ #include "hipSYCL/runtime/error.hpp"
+ 
+ namespace hipsycl {
+ namespace rt {
+ 
+ namespace {
+ 
++// The JIT-compiled kernel libraries reference the OpenMP target memory API
++// (omp_target_alloc/free/memcpy), which is provided by libomptarget. Some
++// platforms (e.g. OHOS) ship a libomp without it; the package contains a
++// host-semantic implementation (libomptarget_host.so, built by the recipe)
++// sitting next to this runtime. Preload it so that its symbols are in the
++// dynamic loader's global scope before any kernel library is dlopen()ed.
++void preload_omp_target_api() {
++  static bool done = false;
++  if (done)
++    return;
++  done = true;
++  Dl_info info;
++  if (dladdr((void *)&preload_omp_target_api, &info) && info.dli_fname) {
++    std::string self_path{info.dli_fname};
++    auto slash = self_path.find_last_of('/');
++    if (slash != std::string::npos) {
++      std::string shim = self_path.substr(0, slash) + "/libomptarget_host.so";
++      std::string msg;
++      common::load_library(shim, msg); // best effort; harmless if absent
++    }
++  }
++}
++
+ result make_shared_library_from_blob(void *&module, const std::string &blob,
+                                      const std::string &cache_file) {
++  preload_omp_target_api();
+   // Write binary image to temporary file
+   if (!common::filesystem::atomic_write(cache_file, blob)) {
+     HIPSYCL_DEBUG_ERROR << "Could not store JIT kernel library in temporary "
+                            "kernel cache in file "
+                         << cache_file << std::endl;
+     return make_error(
+         __acpp_here(),
+         error_info{"omp_sscp_executable_object: could not store JIT kernel "
+                    "library in temporary kernel cache"});
+   }

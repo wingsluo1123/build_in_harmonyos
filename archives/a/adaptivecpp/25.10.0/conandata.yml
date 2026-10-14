@@ -1,0 +1,48 @@
+# conandata.yml - adaptivecpp 25.10.0
+# 源码声明。CI 读取本文件下载源码并校验。
+#
+# URL 为上游官方 GitHub tag 源（R39），sha256 为 v25.10.0 归档实测哈希。
+# 依赖声明见 conanfile.py：clang/22.1.8（制品仓 ohpcd 提供可消费 binary，
+# 内含 ClangConfig.cmake + libclang-cpp.so + libLLVM.so + clang 头）。
+#
+# 补丁均不使用 __OHOS__ 平台宏（R8）：LLVM 版本差异走 LLVM_VERSION_MAJOR，
+# C 库能力差异走 __GLIBC__ 特征宏，工具链路径与链接方式走 CMake 变量/target。
+
+sources:
+  url: "https://github.com/AdaptiveCpp/AdaptiveCpp/archive/refs/tags/v25.10.0.tar.gz"
+  sha256: "334b16ebff373bd2841f83332c2ae9a45ec192f2cf964d5fdfe94e1140776059"
+
+patches:
+  - patch_file: "patches/0001-CMakeLists.txt.patch"
+    patch_description: "两处打包正确性修复：(1) LLVM 作为已安装包被 find_package(LLVM CONFIG) 消费时不导出 llvm-config 风格的 LLVM_LIBS，上游仅在 Windows 兜底填充，插件因此不链接任何 LLVM/clang 库而依赖宿主解析符号；musl 的 ld.so 不会把无版本引用绑定到 libLLVM.so 的版本化定义（...@@LLVM_22.1），插件加载失败。改为在 LLVM_LIBS 为空时链接 LLVM 与 libclang-cpp。(2) 项目未给共享库设置 SONAME，链接器把命令行中的相对路径（如 ../common/libacpp-common.so）写进 DT_NEEDED，安装后无法解析；为全部共享库显式补齐 SONAME"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-common-dylib_loader.cpp.patch"
+    patch_description: "get_symbol_from_library 在 dlsym 前未清空 dlerror 状态：其他代码对可选符号的探测失败（如 libomp 探测 llvm_omp_target_* 系列，其实现由 libomptarget 提供）会在 musl 上留下未消费的 dlerror，导致后续成功的 dlsym 被误判为失败，kernel 加载报错。dlsym 前先 dlerror() 清空"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-compiler-AdaptiveCppLlvmPasses.cpp.patch"
+    patch_description: "LLVM 22 将插件注册接口头从 llvm/Passes/PassPlugin.h 迁至 llvm/Plugins/PassPlugin.h，按 LLVM_VERSION_MAJOR 选择正确路径"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-compiler-cbs-IRUtils.cpp.patch"
+    patch_description: "LLVM 19 起 DbgValueInst 由 DbgVariableRecord 取代，findDbgValues 的参数顺序与容器元素类型随之变化，按 LLVM_VERSION_MAJOR >= 19 分支适配"
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-compiler-llvm-to-backend-GlobalSizesFitInI32OptPass.cpp.patch"
+    patch_description: "LLVM 22 移除 Instruction::getNextNonDebugInstruction（LLVM 19 起调试记录已不是指令），改用指令迭代器推进"
+    patch_type: "portability"
+  - patch_file: "patches/0006-src-compiler-stdpar-SyncElision.cpp.patch"
+    patch_description: "同上：LLVM 22 移除 getNextNonDebugInstruction，改为按版本分支的 nextNonDebugInstruction 辅助函数"
+    patch_type: "portability"
+  - patch_file: "patches/0007-src-libkernel-sscp-CMakeLists.txt.patch"
+    patch_description: "libkernel bitcode 由独立调用的 clang 生成，不继承构建的 sysroot/标准库搜索路径；新增 ACPP_BITCODE_SYSROOT/ACPP_BITCODE_LIBCXX_INCLUDE 两个可选变量（与既有 Apple 分支对称），供标准库不在默认搜索路径的平台显式传入"
+    patch_type: "portability"
+  - patch_file: "patches/0008-src-libkernel-sscp-host-math.cpp.patch"
+    patch_description: "exp10/exp10f 为 glibc 扩展、fmaxmag/fminmag 为 C23 新增，musl 系 libc 的 libc++ 未声明；改用 __GLIBC__ 特征宏判断并提供等价实现，保持 device 侧 builtin 集合完整"
+    patch_type: "portability"
+  - patch_file: "patches/0009-src-runtime-CMakeLists.txt.patch"
+    patch_description: "两处 CMAKE_INSTALL_RPATH 使用了从未定义的变量 base，展开为空，安装后的运行时库没有任何可用 RPATH，加载 librt-backend-omp.so 时找不到 libllvm-to-host.so；改为 $ORIGIN 相对路径，包被安装到任意位置均有效"
+    patch_type: "portability"
+  - patch_file: "patches/0010-src-runtime-omp-omp_code_object.cpp.patch"
+    patch_description: "omp 后端 JIT 出的 kernel 库引用 OpenMP target 内存 API（omp_target_alloc/free/memcpy，libomptarget 提供），OHOS 的 libomp 不含这些符号，dlopen kernel 库时重定位失败。配方在包内编译了 host 语义实现 libomptarget_host.so（纯 CPU 下 device 指针即 host 指针，语义精确），本补丁让 runtime 在加载任何 kernel 库前按自身安装位置预载该实现，使其进入动态链接器全局符号集合"
+    patch_type: "portability"
+  - patch_file: "patches/0011-include-hipSYCL-compiler-Frontend.hpp.patch"
+    patch_description: "LLVM 22 显式 delete 了 getTypeDeclType 的 TagDecl/TypedefDecl 等重载，改经保留的 TypeDecl 基类入口获取声明自身类型"
+    patch_type: "portability"

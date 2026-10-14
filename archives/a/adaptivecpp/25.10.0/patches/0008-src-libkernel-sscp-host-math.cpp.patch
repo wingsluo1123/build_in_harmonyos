@@ -1,0 +1,79 @@
+--- a/src/libkernel/sscp/host/math.cpp
++++ b/src/libkernel/sscp/host/math.cpp
+@@ -84,21 +84,33 @@
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(cbrt)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(ceil)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(copysign)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(cos)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(cosh)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(erf)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(erfc)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(exp)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(exp2)
+ #if !defined(_WIN32) && !defined(__APPLE__)
++#if defined(__GLIBC__)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(exp10)
++#else
++// exp10()/exp10f() are a glibc extension and are not declared by libcs that
++// follow the C standard only (musl based systems such as OHOS). The builtin is
++// still part of the device interface, so provide the equivalent 10^x = e^(x ln 10).
++HIPSYCL_SSCP_BUILTIN float __acpp_sscp_exp10_f32(float x) {
++  return ::expf(x * 2.3025850929940459010f);
++}
++HIPSYCL_SSCP_BUILTIN double __acpp_sscp_exp10_f64(double x) {
++  return ::exp(x * 2.3025850929940456840179914546844);
++}
++#endif
+ #endif
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(pow)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(expm1)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(fabs)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(fdim)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(floor)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN3(fma)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(fmax)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(fmin)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(fmod)
+@@ -189,22 +201,42 @@
+ #endif
+ 
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(log)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(log2)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(log10)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(log1p)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN(logb)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN3_NAME(mad,fmaf,fma)
+ 
+ #if !defined(_WIN32) && !defined(__APPLE__)
++#if defined(__GLIBC__)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2_NAME(maxmag,fmaxmagf,fmaxmag)
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2_NAME(minmag,fmaxmagf,fmaxmag)
++#else
++// fmaxmag()/fminmag() are C23 additions and are not declared by the libc++
++// shipped for musl based systems such as OHOS, so provide them directly:
++//   fmaxmag(x, y) = (|x| > |y|) ? x : y
++//   fminmag(x, y) = (|x| < |y|) ? x : y
++// Both follow the C23 rule for NaN operands: the non-NaN operand is returned.
++HIPSYCL_SSCP_BUILTIN float __acpp_sscp_maxmag_f32(float x, float y) {
++  return ::fabsf(x) > ::fabsf(y) ? x : y;
++}
++HIPSYCL_SSCP_BUILTIN double __acpp_sscp_maxmag_f64(double x, double y) {
++  return ::fabs(x) > ::fabs(y) ? x : y;
++}
++HIPSYCL_SSCP_BUILTIN float __acpp_sscp_minmag_f32(float x, float y) {
++  return ::fabsf(x) < ::fabsf(y) ? x : y;
++}
++HIPSYCL_SSCP_BUILTIN double __acpp_sscp_minmag_f64(double x, double y) {
++  return ::fabs(x) < ::fabs(y) ? x : y;
++}
++#endif
+ #endif
+ 
+ HIPSYCL_SSCP_BUILTIN float __acpp_sscp_modf_f32(float x, float* y ) {
+   return modff(x, y);
+ }
+ HIPSYCL_SSCP_BUILTIN double __acpp_sscp_modf_f64(double x, double* y) {
+   return modf(x, y);
+ }
+ 
+ HIPSYCL_SSCP_MAP_HOST_FLOAT_BUILTIN2(nextafter)

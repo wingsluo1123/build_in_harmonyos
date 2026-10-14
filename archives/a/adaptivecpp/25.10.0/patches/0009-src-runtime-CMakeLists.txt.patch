@@ -1,0 +1,52 @@
+--- a/src/runtime/CMakeLists.txt
++++ b/src/runtime/CMakeLists.txt
+@@ -13,21 +13,25 @@
+ set(CXX_FILESYSTEM_HEADER "${CXX_FILESYSTEM_HEADER}" PARENT_SCOPE)
+ set(CXX_FILESYSTEM_NAMESPACE "${CXX_FILESYSTEM_NAMESPACE}" PARENT_SCOPE)
+ list(REMOVE_AT CMAKE_MODULE_PATH 0)
+ 
+ set(HIPSYCL_RT_EXTRA_CXX_FLAGS ${ACPP_RT_SANITIZE_FLAGS})
+ set(HIPSYCL_RT_EXTRA_LINKER_FLAGS ${ACPP_RT_SANITIZE_FLAGS})
+ 
+ 
+ set(HIPSYCL_RT_EXTRA_LINKER_FLAGS ${HIPSYCL_RT_EXTRA_LINKER_FLAGS} ${HIPSYCL_STDPAR_RT_LINKER_FLAGS})
+ 
+-set(CMAKE_INSTALL_RPATH ${base} ${base}/hipSYCL)
++# The variable 'base' used here was never defined, so the libraries were
++# installed without any usable RPATH and could not locate their siblings after
++# installation. Use $ORIGIN relative entries instead, which stay valid wherever
++# the package is installed.
++set(CMAKE_INSTALL_RPATH "\$ORIGIN;\$ORIGIN/hipSYCL")
+ 
+ add_library(acpp-rt SHARED
+   allocator.cpp
+   allocation_tracker.cpp
+   application.cpp
+   runtime.cpp
+   error.cpp
+   backend.cpp
+   backend_loader.cpp
+   device_id.cpp
+@@ -105,21 +109,21 @@
+   set_property(TARGET acpp-rt PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
+ endif()
+ 
+ install(TARGETS acpp-rt
+         EXPORT install_exports
+         INCLUDES DESTINATION include/AdaptiveCpp
+         RUNTIME DESTINATION bin
+         LIBRARY DESTINATION lib
+         ARCHIVE DESTINATION lib)
+ 
+-set(CMAKE_INSTALL_RPATH ${base}/../ ${base}/llvm-to-backend)
++set(CMAKE_INSTALL_RPATH "\$ORIGIN;\$ORIGIN/..;\$ORIGIN/llvm-to-backend")
+ 
+ if(WITH_CUDA_BACKEND)
+   add_library(rt-backend-cuda SHARED
+     cuda/cuda_event.cpp
+     cuda/cuda_event_pool.cpp
+     cuda/cuda_queue.cpp
+     cuda/cuda_instrumentation.cpp
+     cuda/cuda_allocator.cpp
+     cuda/cuda_device_manager.cpp
+     cuda/cuda_hardware_manager.cpp
