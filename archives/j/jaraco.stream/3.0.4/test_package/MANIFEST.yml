@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jaraco.stream/3.0.4
+homepage: "https://github.com/jaraco/jaraco.stream"
+
+# 上游测试命令 —— 两批，均随 PyPI sdist 提供
+#   1) pytest 用例：jaraco/stream/test_gzip.py（2 项，本地起 HTTP server 供 gzip 数据）
+#   2) docstring 内嵌 doctest：jaraco/stream/buffer.py（3 项）
+upstream_check_command: "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python3 -m pytest jaraco/stream/test_gzip.py -q ; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python3 -m pytest --doctest-modules jaraco/stream/buffer.py -q"
+
+# conanfile.py build() 中是否集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest jaraco/stream/test_gzip.py -q --assert=plain -p no:cacheprovider ; PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest --doctest-modules jaraco/stream/buffer.py -q --assert=plain -p no:cacheprovider"
+
+# 上游实际运行的测试（2026-10-09 真机实测记录，设备 HAD-W32 / OHOS aarch64）：
+#   - jaraco/stream/test_gzip.py：2 passed（1.12s）
+#   - jaraco/stream/buffer.py（--doctest-modules）：3 passed（0.02s）
+#   - 合计 5/5 通过；上游无 xfail/skip
+#   注：上游仓库把测试直接放在包目录内（jaraco/stream/test_gzip.py），
+#       不是独立的 tests/ 目录 —— 故清点口径为「包内测试模块」。
+upstream_tests:
+  - file: jaraco/stream/test_gzip.py
+    source: jaraco_stream-3.0.4/jaraco/stream/test_gzip.py
+    description: "上游 pytest 用例 2 项：gzip 流逐行解析（test_lines_from_stream）与流耗尽后可正常结束（test_lines_completes）"
+    command: "python -m pytest jaraco/stream/test_gzip.py -q（真机 2 passed）"
+  - file: jaraco/stream/buffer.py
+    source: jaraco_stream-3.0.4/jaraco/stream/buffer.py
+    description: "上游 docstring 内嵌 doctest 3 项：LineBuffer 切行/未完成行保留/不解码、DecodingLineBuffer 的 UTF-8 与 errors='replace'、LenientDecodingLineBuffer 的 latin-1 回退"
+    command: "python -m pytest --doctest-modules jaraco/stream/buffer.py -q（真机 3 passed）"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_jaraco_stream.py
+    description: >-
+      消费者测试：真实 API（R34）——导入面（包 + buffer/gzip 子模块 + Tee）；
+      LineBuffer 的 \n、\r\n 切行、未完成行保留（7→[foo]→3→0 的缓冲长度变化）、
+      不解码语义、可迭代协议；DecodingLineBuffer 的 UTF-8 解码、
+      errors='replace' 容错、严格模式 UnicodeDecodeError；
+      LenientDecodingLineBuffer 的 UTF-8→latin-1 回退；gzip 流的
+      read_chunks（按块大小切分且不丢尾块、拼接无损）→ load_streams →
+      lines_from_stream 逐行还原并对 JSON 做语义校验；「多 gzip 成员首尾相接」
+      场景（2 段共 6 行，顺序正确）；more_itertools 依赖可见性（conan requires
+      生效）；Tee 同时写文件且 stdout 可还原。
+    command: "python3 test_jaraco_stream.py <site-packages-dir>（真机 29 passed）"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 29
