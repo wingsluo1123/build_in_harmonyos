@@ -1,0 +1,29 @@
+# Version-level manifest - osdmixer 0.9
+# archives/o/osdmixer/0.9/manifest.yaml
+
+version: "0.9"
+software: "osdmixer"
+
+status: built
+build_date: "2026-10-14"
+build_system: "makefile"
+
+source:
+  url: "https://distcache.FreeBSD.org/ports-distfiles/osdmixer-0.9.tar.gz"
+  sha256: "615f421850a3eaa0c31375c41da9f6db1d89fd729e775189676ca632a873a98e"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libxosd/2.2.14
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Upstream make is a single cc line driven by backtick xosd-config; override CC/XOSD on the make command line from the Conan graph instead of PATH lookup (R33 hermetic)"
+  - "Skip upstream `make install` (install -Dm to DESTDIR/usr/bin; OHOS lacks install(1) with -D); copy the built binary with Conan copy (playumidi precedent)"
+  - "Upstream ships no test suite (Makefile has only all/clean/install); test_package validates the packaged binary via its help/usage path (argc<5 exits 0, no /dev/mixer or X server needed)"
