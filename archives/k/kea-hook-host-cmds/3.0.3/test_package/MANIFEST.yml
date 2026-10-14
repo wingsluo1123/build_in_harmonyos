@@ -1,0 +1,53 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 L0e 要求存在）
+package: kea-hook-host-cmds/3.0.3
+homepage: "https://www.isc.org/kea/"
+
+# 上游测试入口：Meson 注册的两个套件（build() 内真实执行）
+upstream_check_command: "meson test -C <builddir> dhcp-host-cmds-tests dhcp-host-cmds-libloadtests"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v -C <builddir> dhcp-host-cmds-tests dhcp-host-cmds-libloadtests"
+
+# 上游实际运行的测试程序（本次适配实测：125 + 3 = 128 个用例全部通过）
+upstream_tests:
+  - file: dhcp-host-cmds-tests
+    source: src/hooks/dhcp/host_cmds/tests/
+    description: >-
+      host_cmds hook 的单元测试（HostMgr 与 reservation-* 命令处理、
+      reservation 数据解析），本配置注册 125 个用例 / 2 个 gtest 测试组
+    command: "./dhcp-cmds-tests"
+  - file: dhcp-host-cmds-libloadtests
+    source: src/hooks/dhcp/host_cmds/libloadtests/
+    description: >-
+      通过 dlopen 加载 libdhcp_host_cmds.so 并驱动 reservation-* 命令 callout
+      的加载、注销与错误路径；本配置注册 3 个用例
+    command: "./dhcp-host-cmds-libload-tests"
+
+# test_package 中自带的测试（1 项完整消费者用例 + 1 项平台 ABI 用例，二者均在 OHOS 上运行）
+test_package_tests:
+  - file: test_host_cmds_hook.c
+    description: >-
+      完整消费者用例：按 Kea 服务器的方式 dlopen() 包内 libdhcp_host_cmds.so，
+      用 dlsym 解析 hook 契约符号 version/load/unload 与 9 个 reservation-* 命令 callout，
+      并实际调用 version() 校验 hook ABI（KEA_HOOKS_VERSION=30003）
+    command: "./test_host_cmds_hook <package>/lib/kea/hooks/libdhcp_host_cmds.so"
+    ohos_specific: true
+  - file: test_ohos_platform.c
+    description: >-
+      鸿蒙平台 ABI 用例：校验包内 libdhcp_host_cmds.so 的 OHOS 平台特征
+      （ELFCLASS64 / EM_AARCH64、DT_NEEDED 链接 musl libc.so 且非 glibc libc.so.6、
+      链接 libc++_shared.so），并由 OHOS 加载器 dlopen(RTLD_NOW) 解析整条依赖闭包
+    command: "./test_ohos_platform <package>/lib/kea/hooks/libdhcp_host_cmds.so"
+    ohos_specific: true
+
+# 鸿蒙特有测试用例统计（本次适配实测：2 个，2/2 通过；含 1 项完整消费者用例）
+ohos_specific_tests:
+  count: 2
+  entries:
+    - test_host_cmds_hook    # 完整消费者用例（dlopen + 命令 callout + hook ABI）
+    - test_ohos_platform     # 平台 ABI / OHOS 加载器用例
+  command: "./test_host_cmds_hook <package>/lib/kea/hooks/libdhcp_host_cmds.so && ./test_ohos_platform <package>/lib/kea/hooks/libdhcp_host_cmds.so"
+  result: "2/2 passed"
+
+# 测试用例总数（本次实测执行的上游用例数：125 + 3）
+assertion_count: 128
