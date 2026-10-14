@@ -1,0 +1,45 @@
+--- a/src/compiler/cbs/IRUtils.cpp
++++ b/src/compiler/cbs/IRUtils.cpp
+@@ -486,28 +486,42 @@
+   } else {
+     Alloca = llvm::dyn_cast<llvm::AllocaInst>(LInst.getPointerOperand());
+   }
+   if (Alloca && Alloca->hasMetadata(hipsycl::compiler::MDKind::Arrayified))
+     return Alloca;
+   return nullptr;
+ }
+ 
+ // bring along the llvm.dbg.value intrinsics when cloning values
+ void copyDgbValues(llvm::Value *From, llvm::Value *To, llvm::Instruction *InsertBefore) {
++#if LLVM_VERSION_MAJOR >= 19
++  // Since LLVM 19 the debug intrinsics were replaced by DbgVariableRecord;
++  // findDbgValues() accordingly changed both its argument order and its
++  // container element type: (Value *, SmallVectorImpl<DbgVariableRecord *> &).
++  llvm::SmallVector<llvm::DbgVariableRecord *, 1> DbgValues;
++  llvm::findDbgValues(From, DbgValues);
++  if (!DbgValues.empty()) {
++    auto *DbgValue = DbgValues.back();
++    llvm::DIBuilder DbgBuilder{*InsertBefore->getParent()->getParent()->getParent()};
++    DbgBuilder.insertDbgValueIntrinsic(To, DbgValue->getVariable(), DbgValue->getExpression(),
++                                       DbgValue->getDebugLoc(), InsertBefore);
++  }
++#else
+   llvm::SmallVector<llvm::DbgValueInst *, 1> DbgValues;
+   llvm::findDbgValues(DbgValues, From);
+   if (!DbgValues.empty()) {
+     auto *DbgValue = DbgValues.back();
+     llvm::DIBuilder DbgBuilder{*InsertBefore->getParent()->getParent()->getParent()};
+     DbgBuilder.insertDbgValueIntrinsic(To, DbgValue->getVariable(), DbgValue->getExpression(),
+                                        DbgValue->getDebugLoc(), InsertBefore);
+   }
++#endif
+ }
+ 
+ void dropDebugLocation(llvm::Instruction &I) {
+   I.dropLocation();
+ }
+ 
+ void dropDebugLocation(llvm::BasicBlock *BB) {
+   for (auto &I : *BB) {
+     auto *CI = llvm::dyn_cast<llvm::CallInst>(&I);
+     if (!CI || !llvm::isDbgInfoIntrinsic(CI->getIntrinsicID())) {

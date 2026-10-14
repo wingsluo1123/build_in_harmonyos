@@ -1,0 +1,26 @@
+software: adaptivecpp
+display: "AdaptiveCpp"
+description: "面向 C++ 异构编程模型的独立编译器（SYCL / C++ 标准并行 / HIP-CUDA），此处仅适配 CPU（OpenMP）后端"
+category: toolchain
+homepage: "https://github.com/AdaptiveCpp/AdaptiveCpp"
+license: "BSD-2-Clause"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "鸿蒙 PC 真机原生编译（不设 CMAKE_SYSTEM_NAME，不触发交叉编译），与官方 clang/llvm/onetbb 配方一致"
+    - "依赖制品仓 clang/22.1.8 作为 ClangConfig + libclang-cpp + clang 头的提供方，满足 acpp-clang 插件链接需求"
+    - "仅启用 CPU（OpenMP）后端：鸿蒙 PC 无 CUDA / ROCm / Level Zero 运行时"
+    - "上游 LLVM 版本上限为 20，LLVM 22 需 ACPP_EXPERIMENTAL_LLVM=ON，已在真机验证清单中标为首要风险项"
+
+versions:
+  25.10.0:
+    status: built
+    date: 2026-10-02
+    notes: "真机 aarch64 原生构建通过（conan create rc=0、conan-verify PASS、本地 CI W3 全绿）；SYCL 端到端内核已实跑（OK: 256 elements verified）；尚未 upload 到制品仓"
+
+tags:
+  - compiler
+  - sycl
+  - heterogeneous
+  - toolchain

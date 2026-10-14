@@ -1,0 +1,58 @@
+package: adaptivecpp/25.10.0
+upstream_test_in_build: false
+upstream_check_command: "cmake -S <upstream>/tests -B build && cmake --build build && ./build/sycl_tests etc."
+upstream_tests:
+  - file: tests/sycl_tests
+    source: "AdaptiveCpp-25.10.0/tests/sycl/*.cpp (29 TUs)"
+    description: "SYCL 核心 API 套件（Boost.Test）：buffer/accessor/usm/reduction/sub_group/math/queue 等"
+    command: "OMP_NUM_THREADS=1 ./build/sycl_tests"
+    result: "335 test cases: 334 PASS / 1 FAIL — profiler_tests/queue_profiling 报
+      'Operation not profiled: No execution start timestamp available'（CPU/OpenMP host device
+      无 profiling 时间戳，属该设备能力限制，非本包适配引入）"
+  - file: tests/rt_tests
+    source: "AdaptiveCpp-25.10.0/tests/runtime/*.cpp"
+    description: "运行时 DAG 构建/数据流套件（Boost.Test）"
+    command: "OMP_NUM_THREADS=1 ./build/rt_tests"
+    result: "2 test cases: 2 PASS ('No errors detected')"
+  - file: tests/device_compilation_tests
+    source: "AdaptiveCpp-25.10.0/tests/device_compilation_tests.cpp"
+    description: "设备编译路径套件（Boost.Test）"
+    command: "OMP_NUM_THREADS=1 ./build/device_compilation_tests"
+    result: "8 test cases: 8 PASS ('No errors detected')"
+  - file: tests/platform_api
+    source: "AdaptiveCpp-25.10.0/tests/platform_api/*.cpp"
+    description: "平台 API 探测（非 Boost，独立 main）"
+    command: "./build/platform_api/platform_api"
+    result: "PASS (exit 0) — 'Found device AdaptiveCpp OpenMP host device'"
+  - file: tests/dump_test
+    source: "AdaptiveCpp-25.10.0/tests/dump_test/*.cpp"
+    description: "DAG dump 演示（非 Boost，独立 main）"
+    command: "./build/dump_test/dump_test"
+    result: "异常退出 SIGSEGV(139) —— 属**上游测试自身缺陷**：dump_test.cpp 把栈对象交给
+      std::unique_ptr<operation>(&kernel_op) 接管所有权，析构时对栈地址 free；
+      该用例已完整打印全部输出（'***End of dumping tests***'）后才在清理阶段崩溃，
+      与本包适配无关，任何平台都会触发"
+# ── 上游套件运行方式与覆盖说明 ─────────────────────────────────────
+# 上游框架为 Boost.Test（tests/CMakeLists.txt: find_package(Boost COMPONENTS
+# unit_test_framework REQUIRED)），Boost 依赖取自 ohpcd 二进制（boost/1.84.0，与
+# 本 profile 完全匹配）。harmess 置于仓库外的独立目录，以本包产物 + CMakeDeps/
+# CMakeToolchain 生成消费侧工程；未修改上游任何测试源。
+# OHOS musl 缺 pthread_setcancelstate，构建 Boost 消费者需
+# -DBOOST_SP_NO_PTHREAD_SETCANCELSTATE（上游自身为 Android 提供同一开关）。
+# 未运行：pstl_tests / pcuda_tests —— tests/CMakeLists.txt 中被 WITH_PSTL_TESTS /
+# CUDA/ROCm 开关包住，默认不构建；pcuda_tests 另需 CUDA/ROCm 与真实 GPU。
+test_package_tests:
+  - file: sycl_smoke.cpp
+    description: "用被测包的 acpp 驱动编译并运行 SYCL 内核，逐元素校验计算结果（R34 反空壳）"
+    command: "./sycl_smoke"
+  - file: check_ohos.py
+    description: "鸿蒙平台特性断言 A1-A7（包布局/wrapper shebang/驱动配置/SONAME/musl dlopen/AArch64/权限）
+      + 可移植性补丁回归守卫 B1-B7（DT_NEEDED 无路径、$ORIGIN RPATH、插件显式链接 LLVM、libkernel bitcode、
+      导出 CMake 目标 IMPORTED_NO_SONAME、bin 脚本无 /bin/bash、无残留构建期路径）"
+    command: "python3 check_ohos.py <package_folder> <clang_pkg>/bin/llvm-readelf"
+    executed_by: "test_package/conanfile.py test() 通过 self.run 执行"
+# 断言口径：上游 Boost.Test 套件实跑 345 用例（sycl 335 + rt 2 + device_compilation 8），
+# 344 通过 / 1 失败（CPU 设备无 profiling 时间戳）；另有 2 个独立 main 用例
+# （platform_api 通过、dump_test 因上游自身缺陷 SIGSEGV）。
+# test_package 真机自执行的消费者侧判定合计 = 256（SYCL 逐元素校验）+ 49（鸿蒙平台特性/补丁回归 A/B 系列，含 B8）。
+assertion_count: 305

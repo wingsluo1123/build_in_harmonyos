@@ -1,0 +1,29 @@
+--- a/src/compiler/AdaptiveCppLlvmPasses.cpp
++++ b/src/compiler/AdaptiveCppLlvmPasses.cpp
+@@ -32,21 +32,26 @@
+ #include "hipSYCL/compiler/sscp/pcuda/StaticLocalMemoryPass.hpp"
+ #endif
+ 
+ #ifdef HIPSYCL_WITH_REFLECTION_BUILTINS
+ #include "hipSYCL/compiler/reflection/IntrospectStructPass.hpp"
+ #include "hipSYCL/compiler/reflection/FunctionNameExtractionPass.hpp"
+ #endif
+ 
+ #include "llvm/Pass.h"
+ #include "llvm/Passes/PassBuilder.h"
++#if LLVM_VERSION_MAJOR >= 22
++// LLVM 22 relocated the plugin registration interface from llvm/Passes to llvm/Plugins.
++#include "llvm/Plugins/PassPlugin.h"
++#else
+ #include "llvm/Passes/PassPlugin.h"
++#endif
+ #include "llvm/Support/CommandLine.h"
+ 
+ #if LLVM_VERSION_MAJOR < 16
+ #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+ #include "llvm/IR/LegacyPassManager.h"
+ #endif
+ 
+ namespace hipsycl {
+ namespace compiler {
+ 

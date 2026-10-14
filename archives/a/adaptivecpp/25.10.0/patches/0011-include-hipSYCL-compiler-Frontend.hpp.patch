@@ -1,0 +1,36 @@
+--- a/include/hipSYCL/compiler/Frontend.hpp
++++ b/include/hipSYCL/compiler/Frontend.hpp
+@@ -142,22 +142,31 @@
+ #else
+   Mangler->mangleTypeName(RecordType, SS);
+ #endif
+ 
+   return KernelName;
+ }
+ 
+ inline std::string buildKernelName(clang::RecordDecl* D, clang::MangleContext *Mangler) {
+   assert(D);
+   assert(Mangler);
+-  auto DeclName = buildKernelNameFromRecordType(
+-      Mangler->getASTContext().getTypeDeclType(D), Mangler);
++  auto &Ctx = Mangler->getASTContext();
++#if LLVM_VERSION_MAJOR >= 22
++  // LLVM 22 deleted the TagDecl overload of getTypeDeclType() in favour of the
++  // dedicated constructors. Going through the base TypeDecl interface still
++  // yields the declaration's own type (a RecordType for a RecordDecl).
++  const clang::TypeDecl *KernelTypeDecl = D;
++  auto DeclType = Ctx.getTypeDeclType(KernelTypeDecl);
++#else
++  auto DeclType = Ctx.getTypeDeclType(D);
++#endif
++  auto DeclName = buildKernelNameFromRecordType(DeclType, Mangler);
+   return "__acpp_kernel_" + DeclName;
+ }
+ 
+ // Partially taken from CGCUDANV.cpp
+ inline std::string
+ getDeviceSideName(clang::NamedDecl *ND, clang::ASTContext &Ctx,
+                   clang::MangleContext *RegularMangleContext,
+                   clang::MangleContext *DeviceMangleContext) {
+   clang::GlobalDecl GD;
+   // D could be either a kernel or a variable.
