@@ -1,0 +1,125 @@
+{
+  "package": "umurmur/0.3.1",
+  "audit_date": "2026-10-12",
+  "auditor": "W4 rule-isolated audit against generated input and current repository rules",
+  "head_sha": "86c5ba6c3e1da719d8534795b1859a8a0be49c8e",
+  "base_sha": "e44a437b752d912829371f62967ab03766dbdbb3",
+  "upstream_main_at_audit": "e44a437b752d912829371f62967ab03766dbdbb3",
+  "audit_input_sha256": "a417ae940f9a0001ffe497dcad7ac573f92824de5ac8596b25c6bab1fa43ffc6",
+  "ruleset": [
+    "templates/audit-prompt.md",
+    ".gitcode/code-style.md",
+    ".gitcode/review-memory.md",
+    "knowledge/ARCHIVE-SPEC.md"
+  ],
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "PF9/ARCHIVE-SPEC conflict",
+      "file": "archives/u/umurmur",
+      "line": 1,
+      "description": "The local PF9 implementation can classify the required software-level README.md, manifest.yaml and commands.json as paths missing a version component. ARCHIVE-SPEC and R38 require those files at software level, and CI L0m accepts that layout.",
+      "fix_suggestion": "Retain the required software-level files. If the stale local classifier blocks submission after W3 and W4 pass, use only the documented OHC_PREFLIGHT=0 escape hatch and record the classifier defect as framework feedback."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R3 documented exception",
+      "file": "archives/u/umurmur/0.3.1/patches/0003-flush-first-frame-after-tls-handshake.patch",
+      "line": 1,
+      "description": "The state-transition fix deliberately uses a zero-context diff because patch-ng misapplies the adjacent-brace hunk. The recipe applies this registered patch with git apply --unidiff-zero; clean W3, target tests and the reproducible three-arm build prove deterministic application.",
+      "fix_suggestion": "Retain the documented narrow exception. Revisit only when the repository patch engine can apply this source hunk unambiguously with normal context."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "artifact provenance boundary",
+      "file": "archives/u/umurmur/0.3.1/reports/test-report.md",
+      "line": 20,
+      "description": "The packaged daemon is free of RPATH/RUNPATH, .conan2 and project-owned build/source/package paths. Strings inherited from already-published static dependency binaries are outside this recipe's source-path remapping boundary and are not represented as uMurmur portability proof.",
+      "fix_suggestion": "Keep the report scoped to project-owned path leakage. Dependency packages should independently enforce reproducible prefix mapping in their own recipes."
+    }
+  ],
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "p3_count": 3,
+  "checks": {
+    "input_binding": {
+      "status": "pass",
+      "detail": "The generated input is bound by SHA256 to implementation HEAD 86c5ba6c3e1da719d8534795b1859a8a0be49c8e. Its 23-file diff includes the previous audit report as a historical workflow artifact; this final report replaces it, while the 22 substantive archive and knowledge files are hash-bound below."
+    },
+    "atomicity_W2": {
+      "status": "pass",
+      "detail": "The diff contains one software archive, umurmur/0.3.1, plus its paired Path-B draft. It changes no framework, index, SUMMARY, other archive, binary or source tarball."
+    },
+    "archive_format": {
+      "status": "pass",
+      "detail": "Software-level README.md, manifest.yaml and tool commands.json are present. Version-level recipe, official source metadata, four registered patches, notes, reports and substantive test_package are complete. Reproduction material is text-only under the permitted reports directory."
+    },
+    "delivery_hygiene": {
+      "status": "pass",
+      "detail": "No raw log, runtime state file, generated Conan environment, backup, binary, archive, token or personal absolute path is tracked. All files are regular 100644 text files; Python, JSON and YAML parse; git diff --check and all 12 repository test suites pass."
+    },
+    "source_R39_sha256": {
+      "status": "pass",
+      "detail": "conandata.yml uses the official HTTPS GitHub v0.3.1 tag archive and a full SHA256. No mirror, file URL, local path or vendored archive is committed."
+    },
+    "dependencies_W0_R36": {
+      "status": "pass",
+      "detail": "libconfig/1.8, protobuf-c/1.5.1 and openssl/3.5.8.1 are declared precisely and resolved as published OHOS armv8 packages during the clean build."
+    },
+    "recipe_R26_R32_R33": {
+      "status": "pass",
+      "detail": "The CMake recipe declares all four settings, validates Linux/OHOS, uses Conan CMakeToolchain/CMakeDeps and contains no bare compiler dependency, shared prefix injection or upload action. Final installation clears RUNPATH before exactly one signature is applied."
+    },
+    "patches_R6_R8_R19": {
+      "status": "pass",
+      "detail": "All production patches are registered and source-only; none introduces __OHOS__, stubs a feature or commits a generated/prebuilt artifact. The TLS patch changes real state-machine scheduling and preserves WANT_READ/WANT_WRITE behavior."
+    },
+    "test_integrity_R34_R51": {
+      "status": "pass",
+      "detail": "notes.md and MANIFEST.yml both record the verified upstream inventory as 0/0 across test directories, CTest, make check and runners. The test package runs the installed daemon in 12 end-to-end scenarios with 31 external assertions; four categories are identified as HarmonyOS target-specific rather than inflated as separate test cases."
+    },
+    "W3_and_target_evidence": {
+      "status": "pass",
+      "detail": "Tool-generated W3 exited 0. HarmonyOS PC target closure passed 31/31. The repository-contained bad patch, build script and probe reproduce A handshake-plus-first-frame timeout, B timeout plus 105 busy-poll ticks, and C Version delivery plus zero idle ticks. Commands, tick formula, thresholds and artifact/output hashes are recorded."
+    },
+    "artifact_relocatability": {
+      "status": "pass",
+      "detail": "The final signed AArch64 OHOS executable has exactly one .codesign section, no RPATH/RUNPATH, no .conan2 or project-owned build/source/package path, and resolves its default config relative to /proc/self/exe from an unrelated working directory."
+    },
+    "knowledge_path_B": {
+      "status": "pass",
+      "detail": "The paired .md/.kv draft describes a reusable nonblocking-TLS ready-transition scheduling contract, stable signature, wrong-fix busy-poll counterexample, correct repair, executable three-arm reproduction, regression boundary and explicit differences from the closest formal and draft entries. On current upstream/main, draft-review recommends create with highest formal similarity 0.14; the top E310 match concerns CLI version-output expectations and does not share this TLS scheduling mechanism."
+    },
+    "status_authenticity": {
+      "status": "pass",
+      "detail": "Both manifests remain status=built and commands.json remains binary=false because release upload has not occurred. No CI success, publication or 11-point award is claimed in tracked project files."
+    }
+  },
+  "file_hashes": {
+    "archives/u/umurmur/0.3.1/conandata.yml": "31e42486e0499cecabeedbc823ddc8a4e7d7ee73bd1ff14d5ae272829d963eb2",
+    "archives/u/umurmur/0.3.1/conanfile.py": "5c8f30b122d646d32d993d232ff84687daba4299db152f6505253bd5724fe765",
+    "archives/u/umurmur/0.3.1/manifest.yaml": "a038a9ff0e07cfe6030e5a5ea078434063bc1cf5a6d7616931b294d1c112b364",
+    "archives/u/umurmur/0.3.1/notes.md": "08427c9b8f91b279b209d4091ae4d604f5eb2b566c472777a2a09e18a97e10f4",
+    "archives/u/umurmur/0.3.1/patches/0001-modern-cmake-dependency-targets.patch": "c0ed684435abb10cd5e528e00a371f2d2847bb8e9842cbc5f28edc02d8867ca3",
+    "archives/u/umurmur/0.3.1/patches/0002-report-release-version.patch": "7ce542b21fe13c8e9f49116bb3160abac8c0f9052127957f7b8ff52460e3963a",
+    "archives/u/umurmur/0.3.1/patches/0003-flush-first-frame-after-tls-handshake.patch": "8f1ee51c78df4c70db53846967d51e84fb33f87111c9a28655509baa8ce2935b",
+    "archives/u/umurmur/0.3.1/patches/0004-relocatable-config-and-rpath.patch": "7868a3df4cc218ec9d7a89f054447ca2b8c042cc9f0c08ffc506a28a5e784290",
+    "archives/u/umurmur/0.3.1/reports/conan-verify-report.md": "eef19c50aec6283d99542012f242b32426f10c685f88f60a5faf69330dd47a9c",
+    "archives/u/umurmur/0.3.1/reports/path-b-evidence.md": "72a7a7afeb0f1a5c08f4f1c520267ee35c08cb3ace613f57479ca07a1ae4250e",
+    "archives/u/umurmur/0.3.1/reports/repro/arm-b-always-pollout.patch": "eacb7e638dd2590c421a576944ac5c895213c4c4fd3f283e0d37988b8c16920f",
+    "archives/u/umurmur/0.3.1/reports/repro/build-three-arms.py": "c2623ed37074a211690621c843939a9caac5b6b73bd0800494599088b1538854",
+    "archives/u/umurmur/0.3.1/reports/repro/probe-three-arms.py": "4fa896e80775444b593ad8b1622139a11bb8daf627d01b77ea3fe038c9fac5eb",
+    "archives/u/umurmur/0.3.1/reports/test-report.md": "5b3767278dd7ea0ac2084a3e5bd175974d3b2c75469e3519c3409ee7eb106719",
+    "archives/u/umurmur/0.3.1/test_package/MANIFEST.yml": "1cd265a7873a5fcdb39319223078cd7bd4cb1381e7d3589e953fb95b8447dced",
+    "archives/u/umurmur/0.3.1/test_package/conanfile.py": "b02844d429bd8a9acd6ad10d6beaa90dc375cda287dc703eac2ba3bef0131862",
+    "archives/u/umurmur/0.3.1/test_package/test_umurmur.py": "616901b997327e4c624f226cf54e48bb942cea018a22bee23bbf74c691f3ed8a",
+    "archives/u/umurmur/README.md": "4e5d04b3a336eeb0e4089f7f20829e36689ac64ae6ef834525185aa89465059f",
+    "archives/u/umurmur/commands.json": "69293b24d0dbb4376ba64d4bcb32d6c2916a850b296c71f5ceb43b0f34c91eaa",
+    "archives/u/umurmur/manifest.yaml": "7a80c3d8d8289d7dba9ee08d14ded1924755c4c19d67f5fd17f9eae9e3b6501c",
+    "knowledge/drafts/E429-draft-4084.kv": "f6bf1542ac8e89b4a11ed3d241fba737d796cc4d4a7d10c4bbbbc17d274c7759",
+    "knowledge/drafts/E429-draft-4084.md": "e5dc5210fd4e3b230813cb7f1c48ee7a3f37658dc64a256d8ad534ace31e20e6"
+  },
+  "summary": "W4 audited the implementation and reproducibility update at 86c5ba6c3e against current code-style, review-memory, audit-prompt and archive-format rules. P0=0 and P1=0. The PR remains atomic and text-only; source, dependencies, recipe, registered patches, honest 0/0 upstream inventory, substantive target tests, artifact relocation and executable Path-B evidence are internally consistent. Three documented P3 observations are non-blocking. Verdict: pass."
+}

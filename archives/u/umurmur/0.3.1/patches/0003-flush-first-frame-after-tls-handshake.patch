@@ -1,0 +1,38 @@
+diff --git a/src/client.c b/src/client.c
+index 4e1f9c4..55e87b8 100644
+--- a/src/client.c
++++ b/src/client.c
+@@ -57,0 +58 @@ static int Client_send_udp(client_t *client, uint8_t *data, int len);
++static int Client_flush_queued(client_t *client);
+@@ -473,2 +473,6 @@ int Client_read(client_t *client)
+-			return -1;
+-		}
++			return -1;
++		} else if (!client->SSLready) {
++			return 0;
++		} else {
++			Client_flush_queued(client);
++		}
+@@ -598,7 +603 @@ int Client_write(client_t *client)
+-	if (client->txsize == 0 && !list_empty(&client->txMsgQueue)) {
+-		message_t *msg;
+-		msg = list_get_entry(list_get_first(&client->txMsgQueue), message_t, node);
+-		list_del(list_get_first(&client->txMsgQueue));
+-		client->txQueueCount--;
+-		Client_send_message(client, msg);
+-	}
++	Client_flush_queued(client);
+@@ -607,0 +607,13 @@ int Client_write(client_t *client)
++static int Client_flush_queued(client_t *client)
++{
++	message_t *msg;
++
++	if (!client->SSLready || client->txsize != 0 || list_empty(&client->txMsgQueue))
++		return 0;
++
++	msg = list_get_entry(list_get_first(&client->txMsgQueue), message_t, node);
++	list_del(list_get_first(&client->txMsgQueue));
++	client->txQueueCount--;
++	return Client_send_message(client, msg);
++}
++

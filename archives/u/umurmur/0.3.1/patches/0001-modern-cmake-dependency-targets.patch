@@ -1,0 +1,33 @@
+diff --git a/cmake/Modules/FindProtobufC.cmake b/cmake/Modules/FindProtobufC.cmake
+index bd095c8..59262c3 100644
+--- a/cmake/Modules/FindProtobufC.cmake
++++ b/cmake/Modules/FindProtobufC.cmake
+@@ -3 +3 @@ include(FindPackageHandleStandardArgs)
+-find_path(PROTOBUFC_INCLUDE_DIR NAMES "protobuf-c.h" PATH_SUFFIXES "protobuf-c")
++find_path(PROTOBUFC_INCLUDE_DIR NAMES "protobuf-c/protobuf-c.h")
+diff --git a/cmake/Modules/SelectTLSBackend.cmake b/cmake/Modules/SelectTLSBackend.cmake
+index 2a95d3c..1a78efd 100644
+--- a/cmake/Modules/SelectTLSBackend.cmake
++++ b/cmake/Modules/SelectTLSBackend.cmake
+@@ -15,3 +15,8 @@ function(SelectTLSBackend SSL)
+-    if(OPENSSL_FOUND)
+-      set(LIBRARIES ${OPENSSL_LIBRARIES})
+-      set(INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
++    if(OpenSSL_FOUND OR OPENSSL_FOUND OR TARGET openssl::openssl)
++      if(TARGET openssl::openssl)
++        set(LIBRARIES openssl::openssl)
++        set(INCLUDE_DIR "")
++      else()
++        set(LIBRARIES ${OPENSSL_LIBRARIES})
++        set(INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
++      endif()
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2f488c4..ce7d3b4 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -24,0 +25,5 @@ find_package(ProtobufC REQUIRED)
++if(TARGET libconfig::libconfig)
++  set(LIBCONFIG_INCLUDE_DIR "")
++  set(LIBCONFIG_LIBRARIES libconfig::libconfig)
++endif()
++
