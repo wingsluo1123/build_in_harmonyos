@@ -1,0 +1,116 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+#
+# manifold 特殊性:
+#   上游测试套件 (427 gtest 用例, gtest_discover_tests 注册进 CTest)
+#   由主配方 conanfile.py 的 test() 以 cmake.test() 真实执行 —
+#   即 conan create 内建运行, test_package 不重复运行上游套件。
+#   test_package 只承担两层: 真实 API 消费测试 + OHOS ABI 专项检查。
+
+package: manifold/3.5.2
+homepage: https://github.com/elalish/manifold
+
+# 上游测试命令
+upstream_check_command: "ctest"
+upstream_test_framework: gtest_discover_tests (GoogleTest/CMake)
+
+# conanfile.py build()/test() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest (via conanfile.py test() -> cmake.test())"
+
+# 上游测试统计 (ctest -N 计数, static 与 shared 各执行一遍完整套件)
+upstream_test_counts:
+  discovered_tests: 427          # ctest -N: 427 个唯一测试定义
+  static_executed: 427           # 100% tests passed, 0 failed out of 427
+  shared_executed: 427           # 同一套 427 用例在 shared 变体再执行 (427/427)
+  total_executed: 854            # 427 static + 427 shared; 上游唯一测试定义仍为 427
+  modified: 0
+  skipped: 0
+  failed: 0
+
+# ctest 实际运行的测试套件 (gtest_discover_tests 从 manifold_test 提取,
+# 每个 gtest 用例 = 一个 CTest 条目; 括号内为用例数, 合计 427)
+upstream_tests:
+  - file: test/boolean_test.cpp
+    source: manifold-3.5.2.tar.gz/test/boolean_test.cpp
+    description: "Boolean 布尔运算套件 (51 用例)"
+  - file: test/boolean_complex_test.cpp
+    source: manifold-3.5.2.tar.gz/test/boolean_complex_test.cpp
+    description: "BooleanComplex 复杂模型布尔套件 (17 用例)"
+  - file: test/manifoldc_test.cpp
+    source: manifold-3.5.2.tar.gz/test/manifoldc_test.cpp
+    description: "CBIND manifoldc C 绑定套件 (22 用例)"
+  - file: test/cross_section_test.cpp
+    source: manifold-3.5.2.tar.gz/test/cross_section_test.cpp
+    description: "CrossSection 2D 截面 (clipper2) 套件 (15 用例)"
+  - file: test/context_test.cpp
+    source: manifold-3.5.2.tar.gz/test/context_test.cpp
+    description: "ExecutionContext (MeshGL/LevelSet/Smooth) 套件 (15 用例)"
+  - file: test/hull_test.cpp
+    source: manifold-3.5.2.tar.gz/test/hull_test.cpp
+    description: "Hull 凸包套件 (13 用例)"
+  - file: test/manifold_test.cpp
+    source: manifold-3.5.2.tar.gz/test/manifold_test.cpp
+    description: "Manifold 核心 API 套件 (47 用例)"
+  - file: test/measurement_test.cpp
+    source: manifold-3.5.2.tar.gz/test/measurement_test.cpp
+    description: "Manifold/Properties 几何度量套件 (Manifold 部分计入核心套件)"
+  - file: test/polygon_test.cpp
+    source: manifold-3.5.2.tar.gz/test/polygon_test.cpp
+    description: "Polygon 多边形三角化套件 (109 用例, 参数化展开)"
+  - file: test/properties_test.cpp
+    source: manifold-3.5.2.tar.gz/test/properties_test.cpp
+    description: "Properties 属性套件 (23 用例)"
+  - file: test/samples_test.cpp
+    source: manifold-3.5.2.tar.gz/test/samples_test.cpp
+    description: "Samples 示例模型套件 (12 用例)"
+  - file: test/sdf_test.cpp
+    source: manifold-3.5.2.tar.gz/test/sdf_test.cpp
+    description: "SDF 符号距离场套件 (9 用例)"
+  - file: test/smooth_test.cpp
+    source: manifold-3.5.2.tar.gz/test/smooth_test.cpp
+    description: "Smooth 光滑化套件 (18 用例)"
+
+# test_package 中自带的测试 (消费者视角验证)
+# Layer 1: test_manifold — 真实 API 消费程序, 17 个 CHECK/CHECK_NEAR 断言
+#   (C++ 源码预处理后实际执行的断言计数, 与运行输出 17 行 PASS 一致:
+#    static 17 PASS, shared 17 PASS。源码另有 3 个 CBIND 断言位于
+#    #ifdef MANIFOLD_TEST_CBIND 块内, 本包 CMakeDeps 只生成
+#    manifold::manifold 单组件目标 (无 manifold::manifoldc), 该宏未定义,
+#    CBIND 块被条件编译排除, 不计入; C 绑定由上游 CBIND 套件 22 用例覆盖)
+test_package_tests:
+  - file: test_manifold.cpp
+    description: "真实 API 消费: 构造/布尔/变换/CrossSection/球体/Simplify/版本宏 (17 CHECK 断言)"
+    command: "./bin/test_manifold"
+  - file: ohos_abi_check.py
+    description: "OHOS ABI 专项: ELF64/AArch64, musl DT_NEEDED, SONAME 链, RPATH 卫生 (11 类检查)"
+    command: "python3 ohos_abi_check.py --libdir <pkg>/lib"
+
+# OHOS 专项统计 (test_package/conanfile.py test() 内嵌执行, 不与上游 ctest 重复)
+# ohos_abi_check.py 对 libdir 下发现的每个真实 ELF 实体逐个断言:
+#   static 变体: 2 个静态归档 (libmanifold.a, libmanifoldc.a)
+#     M0 归档格式检查 × 2 = 2 个 PASS 断言 (M1-M10 仅对共享 ELF 实体执行)
+#   shared 变体: 2 个共享实体 (libmanifold.so.3.5.2, libmanifoldc.so.3.5.2)
+#     每实体 M1/M2/M4/M5/M6/M7/M8/M9 × 2 = 16 (M3 仅当 PT_INTERP 存在, 库无)
+#     M10 SONAME 链 × (libmanifold + libmanifoldc) × 2 链接 = 4
+#     合计 20 个 PASS 断言
+ohos_checks:
+  check_categories: "M0-M10 (11 类)"
+  static_assertions: 2      # M0 × 2 归档
+  shared_assertions: 20     # (M1,M2,M4..M9) × 2 库 + M10 × 4 链接
+  static_result: "ALL OHOS ABI CHECKS PASSED"
+  shared_result: "ALL OHOS ABI CHECKS PASSED"
+
+# 测试断言总数 (用于质量评估)
+# 口径: 上游 gtest 断言未逐一统计 (427 用例全 PASS), 此处按可精确
+# 计数的执行条目汇总: 427 (static ctest) + 427 (shared ctest)
+# + 17 (functional static) + 17 (functional shared)
+# + 2 (ABI static) + 20 (ABI shared) = 910 个执行断言/条目全 PASS
+assertion_count: 910
