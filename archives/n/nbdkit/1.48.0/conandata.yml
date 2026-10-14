@@ -1,0 +1,19 @@
+# conandata.yml — nbdkit 1.48.0
+
+sources:
+  url: "https://download.libguestfs.org/nbdkit/1.48-stable/nbdkit-1.48.0.tar.gz"
+  sha256: "5b90ed8277c514889e54e2b703ccf85086015d7174bbf10dd16e16f5e35d9cef"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "config.guess 添加 HarmonyOS/__OHOS__ 识别，输出 aarch64-unknown-linux-ohos（E007）"
+    patch_type: "platform"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "config.sub 添加 ohos-linux 三元组与 linux-ohos 内核-OS 白名单（E072）"
+    patch_type: "platform"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "configure 临时目录 umask 077→022：HMDFS 不保留 POSIX 0700 权限位，0700 临时目录导致 config.status 写 subs1.awk Permission denied（E129）"
+    patch_type: "platform"
+  - patch_file: "patches/0004-tmpdir.patch"
+    patch_description: "make_temporary_directory 优先使用 $TMPDIR（可写时以其为前缀 mkdtemp），回退 /tmp：OHOS /tmp 为 erofs 只读挂载，硬编码 /tmp 导致服务端 -U - 与 sh/tmpdir 建临时目录 Read-only file system（60 项上游测试失败首错）"
+    patch_type: "platform"
