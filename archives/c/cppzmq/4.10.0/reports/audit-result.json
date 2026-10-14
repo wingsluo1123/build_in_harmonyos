@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-11T22:55:48+08:00",
+    "branch": "feat/cppzmq-4.10.0",
+    "base_branch": "main",
+    "package": "cppzmq",
+    "version": "4.10.0",
+    "auditor": "independent-w4-auditor",
+    "revised_at": "2026-10-13T14:18:24+08:00",
+    "revision_note": "按 PR 提交版 conan-create.log（170 行）校准 summary 中全部行号引用：初稿行号取自适配提交（2a735f2962）时点工作树中的完整日志，收尾提交（b521e0a9d7）入库的精简日志行号整体前移（Target declared L141-142→L10-11；11 行 OK: L178-190→L22-32；PASSED→L33；两条 RUN L175/178→L167/169）。同时同步收尾提交后的事实口径：PR 变更为 13 个文件（4 M + 9 A，含 8 个 reports 取证文件）；初稿 P2（reports 未入库不可核对）已在收尾提交以 git add -f 解决。响应 atomgit-bot 检视意见 comment 193383501 / 193217624。"
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R-evidence-traceability",
+      "file": "archives/c/cppzmq/4.10.0/test_package/MANIFEST.yml",
+      "line": 13,
+      "description": "MANIFEST.yml:13 与 notes.md:55 均以 `reports/upstream-ctest.log` 作为上游 102/102 的‘证据’，但该目录被仓库 .gitignore:96 的 `reports/` 规则忽略，`git ls-files archives/c/cppzmq/4.10.0/reports/` 为空、`git check-ignore -v` 命中 .gitignore:96。即证据日志存在于工作树但不会进入本次 PR（5 个变更文件中不含它），检视者/CI 无法在 PR 内核对这条 102/102 断言。注：同仓其它包（如 archives/a/abook/0.6.1/reports/conan-create.log）的 reports 文件是已入库的，说明‘入库 reports 作为证据’在本仓是可行惯例。",
+      "fix_suggestion": "若要以 reports/ 作为证据，需 `git add -f archives/c/cppzmq/4.10.0/reports/upstream-ctest.log`（强制入库）并在变更清单中体现；否则应在 MANIFEST/notes 中改为可由 CI 复现的取证方式（例如给出生成该日志的确切命令与耗时），避免引用不可入库的路径。",
+      "resolution": "resolved: 收尾提交 b521e0a9d7 已将 8 个 reports 文件（含 upstream-ctest.log）以 git add -f 强制入库，git ls-files archives/c/cppzmq/4.10.0/reports/ 现返回 8 个文件，102/102 断言在 PR 内可直接核对。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-clean-worktree",
+      "file": "archives/c/cppzmq/4.10.0/notes.md",
+      "line": 69,
+      "description": "工作树中 notes.md 尚有一处未提交改动：`## 对话 #1 [2026-10-11]` 被改为 `### 对话 #1 [2026-10-11]`（`git diff` 可见），与 HEAD 不一致（`git status` 显示 ` M`）。即审计输入的 file_contents 与分支最终提交内容存在细微差异，存在‘提交前漏 add’的风险。",
+      "fix_suggestion": "提交前 `git add` 该处改动，确保工作树与将要提交的 PR 内容一致。",
+      "resolution": "resolved: notes.md 的 `### 对话 #1 [2026-10-11]`（L69）改动已随收尾提交 b521e0a9d7 提交，工作树 clean。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R-note-paths",
+      "file": "archives/c/cppzmq/4.10.0/notes.md",
+      "line": 39,
+      "description": "notes.md:23/39/40 保留有机地绝对路径（`/storage/Users/currentUser/usr/local/ssl/cert.pem`、`/storage/Users/currentUser/usr/local/include/zmq.hpp` 等）。经 diff 核对这些行属未改动的既有内容（本次 diff 仅新增 note 段落与末尾日期/状态），且位于纯文档、不会被执行，故不构成 CI 隐患。仅作提示：后续若整理该文件，建议改用 $PREFIX 占位。",
+      "fix_suggestion": "可选：把文档示例中的本机绝对路径替换为 $DEFAULT_PREFIX/$TEST_PREFIX 等占位符。非阻塞。",
+      "resolution": "acknowledged: 三处绝对路径（L23/39/40）经 diff 核对属既有未改行（本次 diff 新增行 grep 0 命中），纯文档不执行，维持非阻塞提示。"
+    }
+  ],
+  "summary": "结论：未发现 P0（欺骗性行为）与 P1（配方正确性）问题，verdict = pass。以下均为‘实际打开文件核对’的实测结果。\n\n【修订记录 2026-10-13】本报告初稿生成于适配提交（2a735f2962）时点，当时 summary 引用的 conan-create.log 行号取自工作树中的完整日志；收尾提交（b521e0a9d7）入库的精简日志为 170 行，初稿行号整体偏移（约 +8 ~ +156）。本次修订已按 PR 提交版逐行重新核对全部行号引用：Target declared → L10-11；11 行 OK: → L22-32；OHOS consumer test PASSED → L33；两条 RUN → L167/169；并同步 13 文件口径与 issues 解决状态。\n\n【1. 非空壳/业务闭环 —— 实测通过】test_package/test_cppzmq_ohos.cpp（97 行）真实调用 cppzmq/libzmq：L29 构造 zmq::context_t；L32-35 创建 rep/req socket 并真实 bind/connect `inproc://ohos_consumer_test`；L41-49 真实 REQ send→REP recv 并比对 payload；L52-57 补全 REQ/REP 状态机回程；L62-83 PAIR socket 上经 zmq_addon 的 send_multipart/recv_multipart 做两帧 multipart 编解码并逐帧校验。失败判定为显式 check()（L18-25）累加 g_failures，L90-96 以非零退出码收尾（成功返回 0，有失败返回 1，捕获 zmq::error_t 返回 2）。reports/conan-create.log:22-33 记录其真实运行输出 11 行 `OK:`（L22-32）并以 `OHOS consumer test PASSED`（L33）结束；reports/w3-local-ci.log 亦有同样的 test_package 执行证据（test_cppzmq_ohos 构建 L270/L288/L290、执行 L298、PASSED L310）。不是只打印字符串的空壳。\n\n【2. 非断言要求 —— 实测通过】对 test_cppzmq_ohos.cpp 全文件 `grep -n 'assert('` 仅命中 1 处，且位于 L11 注释（`without relying on assert()/abort()`），实际 `assert(` 调用数 = 0，符合 rule12‘鸿蒙专用用例不得断言式’。\n\n【3. 上游 102 用例证据 —— 实测通过，非伪造】reports/upstream-ctest.log（209 行，含 102 个 Start 行与 102 个 Passed 结果行）；末段（L207）为 `100% tests passed, 0 tests failed out of 102`（L209 Total Test time 2.32 sec），与 MANIFEST.yml:13、notes.md:54 的 `102 passed / 0 failed / 0 skipped` 完全一致。进一步交叉验证：其 build-upstream/tests 目录真实存在，`unit_tests_tests-b12d07c.cmake` 中 `add_test` 计数实测 = 102；`file unit_tests` 实测为 `ELF 64-bit LSB arm64, dynamic (/lib/ld-musl-aarch64.so.1)`，坐实 MANIFEST 所述‘OHOS aarch64 / aarch64-musl ELF’；upstream-build-cache.txt 显示使用 ohos-sdk_26.0.0.18 的 llvm-ar、CMAKE_PROJECT cppzmq 4.10.0。故该测试声明有真实工件支撑。\n\n【4. assertion_count 一致性 —— 实测通过】test_cppzmq.cpp 中 `assert(` 实测 5 处（L10、L28、L35、L39、L40），与 MANIFEST.yml 的 per-file `assertion_count: 5` 及顶层 `assertion_count: 5` 一致；ohos 文件为 0，与其 `assertion_count: 0` 一致。\n\n【5. 配方接线 —— 实测通过】test_package/conanfile.py:24-27 的 test() 依次执行 `os.path.join(self.cpp.build.bindirs[0], \"test_cppzmq\")` 与 `.../test_cppzmq_ohos`，env=\"conanrun\"；conan-create.log:167/169 实测 `RUN: ./test_cppzmq`、`RUN: ./test_cppzmq_ohos` 均执行成功，路径/bindirs/env 正确。CMakeLists.txt:13-14 用 add_executable/target_link_libraries 注册并链接 test_cppzmq_ohos、L18-19 用 add_test 注册两个用例；链接目标 `cppzmq libzmq` 与 CMakeDeps 实际声明的 target（conan-create.log:10-11 `Target declared 'cppzmq'` / `'libzmq'`）一致。\n\n【6. 绝对路径/CI 定时炸弹/TODO —— 未发现】对 5 个代码/文档变更文件 grep `/data/storage`、`/home/`、`.conan2`、`$HOME`、`/storage/Users`：4 个代码/清单文件全文件无命中；notes.md 本次 diff 新增行无命中，仅 L23/39/40 三处既有行保留本机绝对路径（见 P3 R-note-paths，非本次引入、纯文档不执行）。grep TODO/FIXME/XXX 于 5 个变更文件均无命中。test_package/build/ 被 .gitignore:17 的 `build/` 规则忽略、CMakeUserPresets.json 被 .gitignore:200 的 `**/CMakeUserPresets.json` 规则忽略，均未入库（git status --ignored 显示 `!!`），无构建产物混入。\n\n【7. sha256 —— 实测为真，非伪造】conandata.yml / manifest.yaml / ci-metadata.json 的 sha256 = c81c81bba8a7644c84932225f018b5088743a22999c6d82a2b5f5cd1e6942b74，经外部多源核对（Ubuntu launchpad、FreeBSD FreshPorts、buildroot patch、Solus）确为 cppzmq 4.10.0 上游真实哈希，非全零/全 f。\n\n【8. 原子性 —— 实测通过】`git diff --name-status main...HEAD` 为 13 个文件（4 M + 9 A）且全部位于 archives/c/cppzmq/4.10.0/（notes.md、test_package/{CMakeLists.txt,MANIFEST.yml,conanfile.py,test_cppzmq_ohos.cpp}、reports/ 8 个取证文件），未混入其它库/版本/框架文件。配方本体 conanfile.py 与 conandata.yml 未被改动，符合 notes 所述 L0j（recipe unchanged），R37 无需递增版本。\n\n【保留意见（见 issues）】初稿的实质关注点是 reports/ 被 .gitignore 忽略、102/102 断言在 PR 内不可核对（P2 可追溯性）——该问题已在收尾提交 b521e0a9d7 以 git add -f 入库 8 个 reports 文件解决（issues[0] resolution），现 PR 内可直接核对。另有 1 处未提交的 notes.md 细微改动（P3，已随收尾提交入库，issues[1] resolution）与文档中的本机绝对路径（P3，属既有未改行，维持提示）。"
+}

@@ -8,13 +8,18 @@ upstream_test_command: "ctest --test-dir build --output-on-failure -j1"
 upstream_tests:
   - file: tests/*.cpp
     source: cppzmq-4.10.0/tests/
-    description: "Upstream Catch2 test suite: tests for cppzmq C++ wrapper API."
+    description: "Upstream Catch2 test suite (Catch2 v2.13.9 via FetchContent): tests for the cppzmq C++ wrapper API."
     command: "ctest --test-dir build --output-on-failure -j1"
-    result: "Catch2 tests require FetchContent download; verified via consumer test on OHOS."
+    result: "Built & run natively on OHOS aarch64 (native clang 15.0.4, aarch64/musl ELF) in a separate out-of-recipe build with -DCPPZMQ_BUILD_TESTS=ON: 102/102 passed, 0 failed, 0 skipped. Evidence: reports/upstream-ctest.log. The conan recipe build itself keeps CPPZMQ_BUILD_TESTS=OFF (header-only library), so these tests are not re-run inside conan create."
 
 test_package_tests:
   - file: test_cppzmq.cpp
-    description: "Consumer test: create context, socket, send/receive messages, test multipart (zmq_addon)."
+    description: "Consumer test (assertion-based): create context, socket, send/receive messages, test multipart (zmq_addon)."
     command: "./test_cppzmq"
+    assertion_count: 5
+  - file: test_cppzmq_ohos.cpp
+    description: "HarmonyOS (OHOS aarch64) consumer feasibility test — assertion-free: real inproc REQ/REP round trip + multipart over cppzmq + libzmq, validated via explicit checks and non-zero exit on failure."
+    command: "./test_cppzmq_ohos"
+    assertion_count: 0
 
-assertion_count: 6
+assertion_count: 5

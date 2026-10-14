@@ -22,4 +22,6 @@ class CppzmqTestConan(ConanFile):
         cmake.build()
 
     def test(self):
+        # Run upstream test + HarmonyOS-specific consumer feasibility test.
         self.run(os.path.join(self.cpp.build.bindirs[0], "test_cppzmq"), env="conanrun")
+        self.run(os.path.join(self.cpp.build.bindirs[0], "test_cppzmq_ohos"), env="conanrun")
