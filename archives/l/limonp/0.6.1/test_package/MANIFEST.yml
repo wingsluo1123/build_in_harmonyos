@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml — limonp 0.6.1
+# CI L0e 强制要求此文件存在，声明上游测试来源。详见 docs/TEST_QUALITY_SPEC.md。
+
+package: limonp/0.6.1
+homepage: "https://github.com/yanyiwu/limonp"
+
+# 上游测试命令（本包 build() 内 ctest -V 全量实跑）
+upstream_check_command: "ctest -V"
+
+# conanfile.py build() 中是否已集成上游测试（层1）
+upstream_test_in_build: true
+upstream_test_command: "build() 内 ctest -V 全量实跑上游套件（3 个 ctest 用例：./test/test.run / ./test/demo / ./test/thread_pool_demo，其中 test.run 内含 35 个 gtest 用例）"
+
+upstream_tests:
+  - file: "test/unittest/{TArgvContext,TBlockingQueue,TBoundedQueue,TClosure,TColorPrint,TConfig,TFileLock,TLocalVector,TLogging,TMd5,TMutexLock,TStdExtension,TStringUtil,TThread,TThreadPool}.cpp"
+    source: "limonp-0.6.1/test/unittest/*.cpp"
+    description: "上游 test.run 的全部 TU（外加提供 main 的 gtest_main.cpp）。逐文件 TEST 宏合计 36：TArgvContext 1 / TBlockingQueue 3 / TBoundedQueue 1 / TClosure 2 / TColorPrint 1 / TConfig 1 / TFileLock 1 / TLocalVector 2 / TLogging 1 / TMd5 1 / TMutexLock 1 / TStdExtension 5 / TStringUtil 12 / TThread 1 / TThreadPool 2 = 35；TCastFloat.cpp 另有 1 个但**引用不存在的 limonp/CastFloat.hpp 且未被 ADD_EXECUTABLE(test.run ...) 收录**，因此不注册也不执行。用 fixture 的 TU（TConfig / TMd5 / TStdExtension / TStringUtil）通过相对路径 \"../test/testdata/...\" 打开文件，patch 0001 给 ADD_TEST 补了 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test + $<TARGET_FILE:...>。"
+    command: "ctest -V"
+  - file: "test/demo.cpp"
+    source: "limonp-0.6.1/test/demo.cpp"
+    description: "上游注册的 ctest 用例（ADD_TEST(NAME ./test/demo ...)），示例程序，只验证链接与运行不崩。"
+    command: "ctest -V"
+  - file: "test/thread_pool_demo.cpp"
+    source: "limonp-0.6.1/test/thread_pool_demo.cpp"
+    description: "上游注册的 ctest 用例（ADD_TEST(NAME ./test/thread_pool_demo ...)），线程池示例，验证 pthread 链接与运行。"
+    command: "ctest -V"
+
+# 上游 test.run 里注册并实跑的 gtest TEST 宏数（本包 build() 内 ctest -V 实跑并解析 gtest 汇总行）
+# rule4 口径差：源码声明 36（含 TCastFloat.cpp 的 1 个，引用缺失头 + 未被收录，实跑 35）
+# 全量通过率：35/36 = 97.2%（未实例化 1 计入分母不计通过）
+upstream_test_count: 35
+upstream_test_count_source_declared: 36
+
+# 消费者测试断言组数
+assertion_count: 5

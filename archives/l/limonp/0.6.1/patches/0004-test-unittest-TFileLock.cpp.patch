@@ -1,0 +1,30 @@
+--- a/test/unittest/TFileLock.cpp
++++ b/test/unittest/TFileLock.cpp
+@@ -1,16 +1,26 @@
+ #include "limonp/FileLock.hpp"
+ #include "gtest/gtest.h"
++#include <stdlib.h>
+ 
+ using namespace limonp;
+ 
+-static const char* test_file = "/tmp/limonp_test_filelock";
++// /tmp 在 OHOS 上是只读 erofs，测试改用可写目录（$TMPDIR 优先，回退当前目录）
++static const char* test_file = []() -> const char* {
++  const char* tmp = getenv("TMPDIR");
++  if (tmp && *tmp) {
++    static char buf[512];
++    snprintf(buf, sizeof(buf), "%s/limonp_test_filelock", tmp);
++    return buf;
++  }
++  return "limonp_test_filelock";
++}();
+ 
+ TEST(FileLockTest, Test1) {
+   FileLock fileLock1;
+   fileLock1.Open(test_file);
+   ASSERT_TRUE(fileLock1.Ok());
+   fileLock1.Lock();
+   ASSERT_TRUE(fileLock1.Ok());
+   fileLock1.UnLock();
+   ASSERT_TRUE(fileLock1.Ok());
+ }

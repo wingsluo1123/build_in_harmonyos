@@ -1,0 +1,24 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,13 +2,18 @@
+ 
+ cmake_minimum_required(VERSION 2.6)
+ 
+ ADD_DEFINITIONS(-O3 -Wall -g)
+ IF(APPLE) # mac os
+     ADD_DEFINITIONS(-std=c++0x)
+ endif()
+ ADD_SUBDIRECTORY(test)
+ 
+ ENABLE_TESTING()
+-ADD_TEST(NAME ./test/test.run COMMAND ./test/test.run)
+-ADD_TEST(NAME ./test/demo COMMAND ./test/demo)
+-ADD_TEST(NAME ./test/thread_pool_demo COMMAND ./test/thread_pool_demo)
++# 上游 ADD_TEST 用相对路径 COMMAND + 默认 WORKING_DIRECTORY（= build 目录），
++# 而 TConfig/TMd5/TStdExtension/TStringUtil 用相对路径 "../test/testdata/..."
++# 打开 fixture —— 只有 build 目录恰好是源码根的直接子目录时才解析得到。
++# 这里给出显式 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test 并把 COMMAND 换成
++# $<TARGET_FILE:...>，让任何 out-of-tree 构建目录（含 Conan 缓存布局）都能跑。
++ADD_TEST(NAME ./test/test.run COMMAND $<TARGET_FILE:test.run> WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test)
++ADD_TEST(NAME ./test/demo COMMAND $<TARGET_FILE:demo> WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test)
++ADD_TEST(NAME ./test/thread_pool_demo COMMAND $<TARGET_FILE:thread_pool_demo> WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test)
