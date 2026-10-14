@@ -1,0 +1,99 @@
+# test_package/MANIFEST.yml — crosstool 1.28.0
+# 上游存在自动化测试套件 testing/upgrade/run.sh（8 用例），test_package
+# 用包内 bin/ct-ng 完整重放并上报真实计数；禁止 no_tests。
+
+package: crosstool/1.28.0
+homepage: "https://crosstool-ng.github.io/"
+
+upstream_check_command: "make check -j1"
+upstream_test_in_build: true
+upstream_test_command: "testing/upgrade/run.sh port (CTNG=<pkg>/bin/ct-ng upgradeconfig, 8 cases)"
+
+upstream_tests_exist: true
+upstream_tests:
+  - file: testing/upgrade/run.sh#options-set
+    source: crosstool-ng-1.28.0/testing/upgrade/run.sh (global case)
+    description: "全局用例：扫描 config/*.in 的 (menu)config 符号，与 kconfig-list/<CT_CONFIG_VERSION_CURRENT> 对照，退役符号未升版即失败"
+    command: "ct-ng upgradeconfig (via packaged bin/ct-ng; options-set needs no .config)"
+  - file: testing/upgrade/samples/v0-0000.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0000.config
+    description: "升级用例：36 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0001.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0001.config
+    description: "升级用例：27 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0002.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0002.config
+    description: "升级用例：13 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0003.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0003.config
+    description: "升级用例：7 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0004.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0004.config
+    description: "升级用例：3 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0005.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0005.config
+    description: "升级用例：3 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+  - file: testing/upgrade/samples/v0-0006.config
+    source: crosstool-ng-1.28.0/testing/upgrade/samples/v0-0006.config
+    description: "升级用例：5 个 ## 期望断言，ct-ng upgradeconfig 后逐项比对"
+    command: "ct-ng upgradeconfig"
+
+# 计数口径：上游 run.sh 的 verdict 行数（options-set + samples/*.config）。
+# 单一可解析 harness，用 auto（94 个 ## 断言是 7 个样本用例内部的断言数，
+# 不是官方统计单位，不用作总数）。
+upstream_test_total: 8
+upstream_test_count_method: "auto"
+upstream_test_passed: 2
+upstream_test_failed: 6
+
+upstream_test_audit:
+  - path: "testing/upgrade/run.sh（上游 tag crosstool-ng-1.28.0）"
+    finding: "真实存在的上游测试 harness：options-set 全局检查 + 循环 samples/*.config 做 upgradeconfig 回归（每样本 PASS/FAIL verdict，fails_total 决定 exit code）。上一轮 no_tests 审计漏掉了它，是本轮证据门禁 incomplete 的根因"
+  - path: "testing/upgrade/samples/（7 个 .config + README）"
+    finding: "v0-0000..v0-0006 共 7 个样本，合计 94 个有效 ## OPT=val 期望断言（另有 3 行 ## BARE_SYMBOL 与 run.sh 两个 case 分支都不匹配，原生即被忽略；0 个 ## is-not-set）；全部逐字节 vendor 到 test_package/upstream_upgrade/samples/"
+  - path: "testing/upgrade/kconfig-list/（0/1/2/3，无 4）"
+    finding: "1.28.0 的 CT_CONFIG_VERSION_CURRENT=4（ct-ng.in 实证），但上游只发布了 kconfig-list/0..3，kconfig-list/4 在 tag 下 HTTP 404。run.sh 在引用缺失时无条件 fail，因此 options-set 在原生 1.28.0 上任何平台都失败，非 OHOS 问题；kconfig-list/3 已 vendor，仅用于诊断 diff"
+  - path: "Makefile.am（顶层）与 kconfig/Makefile.am"
+    finding: "均无 TESTS 注册，make check 为空操作；build() 仍执行它作入口健全性确认，但不再输出上游标记，唯一证据源是 test_package 的 8 用例重放（避免双标记计数矛盾）"
+  - path: "testing/docker/ 与 contrib/gcc-test-suite/"
+    finding: "docker/ 是多发行版容器矩阵（CI 在 GitHub Actions 另跑工具链构建，不在包内执行）；contrib/gcc-test-suite 是已构建工具链的 dejagnu 验证，需要完整目标工具链+目标机，不属于本包上游测试口径"
+
+# 上游固件来源（逐字节 vendor，未做任何修改；字节数与 GitHub API 清单一致）：
+#   https://raw.githubusercontent.com/crosstool-ng/crosstool-ng/crosstool-ng-1.28.0/testing/upgrade/samples/v0-000{0..6}.config
+#   sizes: 16834/16895/16683/10024/9052/8697/11040
+#   https://raw.githubusercontent.com/crosstool-ng/crosstool-ng/crosstool-ng-1.28.0/testing/upgrade/kconfig-list/3 (size 58664)
+#   kconfig-list/4 在同 tag 下 404（2026-09-30 实测），options-set 失败的直接证据
+
+# 消费者视角验证：真实执行包内 bin/ct-ng（R34 合规），每项断言退出码与关键输出
+test_package_tests:
+  - file: test_crosstool.sh
+    scenario: "consumer-binary"
+    description: >-
+      消费者功能测试：真实执行包内 bin/ct-ng 完成 4 项验证——version 版本横幅
+      （精确匹配 1.28.0）、help 动作列表、list-steps 构建步骤表、隔离目录 clean；
+      每项双断言（退出码 0 + 非空关键输出），空实现无法伪造通过。
+    command: "<shell> test_crosstool.sh（CT_NG_BIN 指向包内 bin/ct-ng）"
+    assertions: 8
+
+assertion_count: 8
+
+# 2026-09-30 真机 3 轮聚焦结论（2/8：v0-0004/v0-0005 通过；options-set +
+# 5 个样本失败，rc=0，迁移 INFO 日志显示上游改名规则正常触发）：
+# 失败全部复现上游 tag 事实，与 OHOS 无关——
+# ① 上游 CI（.github/workflows 两个文件解码实证）从不运行
+#    testing/upgrade/run.sh，套件腐烂无人发现；
+# ② 全部不匹配符号在 tag 下已不存在：gdb-7.x（包最小 8.3.1）、strace-4.x
+#    （仅 6.13/6.16）、automake≤1.14（最小 1.15.1）、gmp≤5.0（最小 6.1.2）、
+#    mpc≤1.0（仅 1.3.1）、mpfr≤3.1（仅 4.2.2）、expat≤2.2（最小 2.5.0）、
+#    binutils-2.25（最小 2.26.1）、linaro 全系列（包目录无版本）、isl-0.11
+#   （0.11.2 标 obsolete）、cloog-0.18.1（标 obsolete）、orig-uClibc 选项
+#    （config/libc 下无 uClibc.in，仅 uClibc-ng.in）、ELF2FLT custom 框架
+#    （config 无 ELF2FLT_SRC_CUSTOM 定义）、kernel-4.10（4.10.17 标 obsolete）；
+# ③ `conf --olddefconfig` 按 Kconfig 语义丢弃未知符号（actual=[absent]），
+#    在 x86 上结果相同。分类均为 test_failure，证据见各用例 gaps。
