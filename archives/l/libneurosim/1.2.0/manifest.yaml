@@ -1,0 +1,35 @@
+software: libneurosim
+version: "1.2.0"
+build_system: autotools
+status: built
+build_date: "2026-09-15"
+
+source:
+  url: "https://github.com/INCF/libneurosim/archive/refs/tags/v1.2.0.tar.gz"
+  sha256: "372fa0d8fb31950370f1d27bff4865e1200456239f4ea382c267d9a310175f83"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--without-mpi --with-python=no"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "libneurosim 上游 tarball 无预生成 configure，需先跑 autogen.sh 生成（autotools 从源码生成）"
+  - "可选依赖 MPI/Python 默认不启用（--without-mpi --with-python=no），保持最小依赖链"
+  - "自带 libltdl 子目录（SUBDIRS = libltdl neurosim libpyneurosim）"
+
+package_contract:
+  libraries: ["neurosim"]
+  pkg_config: ["libneurosim.pc"]
+  headers: ["neurosim/connection_generator.h", "neurosim/version.h"]
+
+test_results:
+  type: consumer
+  total: 4
+  passed: 4
+  failed: 0
+  note: "上游无自动化测试套件，以 test_package 消费者 4 断言为准"
