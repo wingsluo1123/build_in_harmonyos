@@ -1,0 +1,51 @@
+sources:
+  url: "https://github.com/TigerVNC/tigervnc/archive/refs/tags/v1.15.0.tar.gz"
+  sha256: "7f231906801e89f09a212e86701f3df1722e36767d6055a4e619390570548537"
+  # 官方 v1.15.0 release 只挂了 Windows 版 vncserver zip，未提供该版本源码 tar.gz
+  # （tigervnc-1.15.0.tar.gz 在 releases/download/v1.15.0/ 下 404）。
+  # 故使用官方仓库 tag v1.15.0 的 GitHub 归档 tarball，sha256 见上。
+  # 同一 tarball 在设备侧二次下载校验一致。
+
+patches:
+  "1.15.0":
+    # 一个补丁文件只针对一个源文件：Conan 的 apply_conandata_patches 用
+    # python-patch，同一补丁文件里出现第二个 "--- a/<同一路径>" 条目时会把
+    # hunk 定位到错误位置（真机实测：hunk1/hunk3 正常，hunk2 报
+    # "doesn't match source file at line 341 / expected 'endif()' / actual '  endif()'"）。
+    # git apply 有模糊匹配能容忍，python-patch 不能，故拆成两个文件。
+    - patch_file: "patches/0001-ohos-make-x11-pam-optional.patch"
+      patch_description: >-
+        上游对 UNIX 平台硬性要求 X11 与 PAM：find_package(X11 REQUIRED) 在无
+        Xlib 的 OpenHarmony 上必然失败，缺少 security/pam_appl.h 时直接
+        FATAL_ERROR。补丁新增 ENABLE_X11_TOOLS（控制 X11 探测）与 ENABLE_PAM
+        （控制 PAM 探测）两个开关，默认均为 ON，从而让与 X11/PAM 无关的 RFB
+        协议核心层可以配置构建，同时保持非 OHOS 平台行为不变。
+        另含两处必要改动：(1) 用 check_function_exists 探测 pthread_cancel
+        （musl 不声明该函数）；(2) 上游从未为 os/rdr/network/rfb 提供 install()
+        规则——它们只是 vncviewer/Xvnc 的内部静态库——补丁补上库与头文件的安装
+        规则，否则 make install 产不出任何可供链接的产物。
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-gate-x11-unix-tools.patch"
+      patch_description: >-
+        unix/CMakeLists.txt 无条件进入 tx/vncconfig/x0vncserver/vncpasswd（均需
+        X11）与 vncserver/vncsession（需 PAM，vncsession.c 硬 include
+        security/pam_appl.h）。补丁把该子树置于 ENABLE_X11_TOOLS（默认 ON）之下，
+        unix/common 仍始终构建。
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-guard-pthread-cancel.patch"
+      patch_description: >-
+        common/os/Thread.cxx 析构函数直接调用 pthread_cancel()，但基于 musl 的
+        OpenHarmony 并不声明该函数（真机报 use of undeclared identifier
+        'pthread_cancel'）。补丁在顶层 CMakeLists 增加 check_function_exists 探测，
+        并在 Thread.cxx 用 HAVE_PTHREAD_CANCEL 守卫该调用：函数存在时行为不变，
+        缺失时跳过（调用方仍需 stop()+wait()，如 DecodeManager 所做）。
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-make-perf-tests-optional.patch"
+      patch_description: >-
+        tests/perf 是基准测试（未注册到 ctest），链接它们会拉入 rfb 的
+        SSecurityPlain，进而需要 rfb::PasswordValidator 的 vtable；该类为抽象类且
+        虚析构内联定义，没有 key function，vtable 从不被发出，真机链接 encperf 报
+        undefined symbol: vtable for rfb::PasswordValidator（上游潜在缺陷）。
+        补丁把 tests/perf 置于 ENABLE_PERF_TESTS（默认 ON）之下，使库本体与真正的
+        单元测试仍可构建。
+      patch_type: "portability"

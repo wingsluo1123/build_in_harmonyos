@@ -1,0 +1,71 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -125,7 +125,11 @@
+ endmacro()
+ 
+ # X11 stuff. It's in a if() so that we can say REQUIRED
+-if(UNIX AND NOT APPLE)
++# OpenHarmony has no X server and no Xlib, so the X11 tool-chain is probed
++# only when the X11 based targets are actually wanted. ENABLE_X11_TOOLS
++# also gates the X11-only unix/ tool subtree below.
++option(ENABLE_X11_TOOLS "Build the X11 based unix tools" ON)
++if(UNIX AND NOT APPLE AND ENABLE_X11_TOOLS)
+   find_package(X11 REQUIRED)
+   if(X11_Xdamage_LIB)
+     add_definitions(-DHAVE_XDAMAGE)
+@@ -341,7 +345,8 @@
+ endif()
+ 
+ # Check for PAM library
+-if(UNIX AND NOT APPLE)
++option(ENABLE_PAM "Enable PAM based password validation" ON)
++if(UNIX AND NOT APPLE AND ENABLE_PAM)
+   check_include_files(security/pam_appl.h HAVE_PAM_H)
+   set(CMAKE_REQUIRED_LIBRARIES -lpam)
+   check_function_exists(pam_start HAVE_PAM_START)
+@@ -350,6 +355,18 @@
+     set(PAM_LIBS pam)
+   else()
+     message(FATAL_ERROR "Could not find PAM development files")
++  endif()
++endif()
++
++# pthread_cancel is optional: musl based systems (e.g. OpenHarmony) do not
++# declare it at all. Probe instead of assuming, so the absence is recorded in
++# config.h and reported rather than turning into a compile error.
++if(UNIX)
++  set(CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
++  check_function_exists(pthread_cancel HAVE_PTHREAD_CANCEL)
++  set(CMAKE_REQUIRED_DEFINITIONS)
++  if(NOT HAVE_PTHREAD_CANCEL)
++    message(STATUS "pthread_cancel() not available - running threads cannot be cancelled on destruction")
+   endif()
+ endif()
+ 
+@@ -420,6 +437,26 @@
+ 
+ add_subdirectory(tests)
+ 
++# Install the RFB protocol core so tigervnc can be consumed as a library.
++# Upstream builds os/rdr/network/rfb as internal static helpers of vncviewer and
++# Xvnc and ships no install() rules for them, so `make install` yields nothing
++# to link against. GNUInstallDirs is already included at the top of this file.
++install(TARGETS os rdr network rfb
++        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
++install(DIRECTORY ${CMAKE_SOURCE_DIR}/common/os
++        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tigervnc
++        FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
++install(DIRECTORY ${CMAKE_SOURCE_DIR}/common/rdr
++        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tigervnc
++        FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
++install(DIRECTORY ${CMAKE_SOURCE_DIR}/common/network
++        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tigervnc
++        FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
++install(DIRECTORY ${CMAKE_SOURCE_DIR}/common/rfb
++        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tigervnc
++        FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
++
+ 
+ if(BUILD_VIEWER)
+   add_subdirectory(release)

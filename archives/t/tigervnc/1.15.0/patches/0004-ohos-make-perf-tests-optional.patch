@@ -1,0 +1,21 @@
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -2,8 +2,16 @@
+   message(FATAL_ERROR "cmake must be invoked with the top level directory")
+ endif()
+ 
+-# Benchmarking tools
+-add_subdirectory(perf)
++# Benchmarking tools. They are not registered with ctest and they link the
++# whole of rfb, including rfb::SSecurityPlain. rfb::PasswordValidator is
++# abstract with an inline virtual destructor, i.e. it has no key function, so
++# its vtable is never emitted anywhere; linking a full executable therefore
++# fails with "undefined symbol: vtable for rfb::PasswordValidator". Keep the
++# benchmarks optional so the library and the real unit tests can still build.
++option(ENABLE_PERF_TESTS "Build the benchmarking tools in tests/perf" ON)
++if(ENABLE_PERF_TESTS)
++  add_subdirectory(perf)
++endif()
+ 
+ # Unit tests
+ add_subdirectory(unit)
