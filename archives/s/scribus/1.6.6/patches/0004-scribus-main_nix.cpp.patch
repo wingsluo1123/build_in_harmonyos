@@ -1,0 +1,29 @@
+--- a/scribus/main_nix.cpp
++++ b/scribus/main_nix.cpp
+@@ -59,21 +59,25 @@
+ \brief Launches the Gui
+ \param argc Number of arguments passed to Scribus
+ \param argv *argv list of the arguments passed to Scribus
+ \retval int Error code from the execution of Scribus
+ */
+ int mainApp(int argc, char **argv)
+ {
+ 	emergencyActivated = false;
+ 
+ #if !defined(Q_OS_MACOS)
+-	qputenv("QT_QPA_PLATFORM", "xcb");
++	// OHOS: qtbase vue built with only minimal/offscreen/vnc platform
++	// plugins (no xcb); only force xcb when the user did not already choose
++	// a platform via QT_QPA_PLATFORM (e.g. HEADLESS test runs use offscreen).
++	if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
++		qputenv("QT_QPA_PLATFORM", "xcb");
+ #endif
+ 
+ 	ScribusQApp app(argc, argv);
+ 	initCrashHandler();
+ 	app.parseCommandLine();
+ 	
+ 	if (QApplication::platformName() == "wayland")
+ 	{
+ 		QString errHdr = QObject::tr("Fatal Error");
+ 		QString errMsg = QObject::tr("Scribus does not support the Wayland platform. Use XWayland to run Scribus on Wayland. Scribus will close now.");

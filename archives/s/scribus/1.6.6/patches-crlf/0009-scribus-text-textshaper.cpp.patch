@@ -1,0 +1,30 @@
+--- a/scribus/text/textshaper.cpp
++++ b/scribus/text/textshaper.cpp
+@@ -2,8 +2,8 @@
+ 
+ #include <harfbuzz/hb.h>
+ #include <harfbuzz/hb-ft.h>
+-#include <harfbuzz/hb-icu.h>
+ #include <unicode/brkiter.h>
++#include <unicode/uscript.h>
+ #include <unicode/ubidi.h>
+ 
+ #include "scrptrun.h"
+@@ -350,7 +350,16 @@
+ 		}
+ 
+ 		hb_direction_t hbDirection = (textRun.dir == UBIDI_LTR) ? HB_DIRECTION_LTR : HB_DIRECTION_RTL;
+-		hb_script_t hbScript = hb_icu_script_to_script(textRun.script);
++		// OHOS: the published harfbuzz package disables the ICU module
++		// (harfbuzz-icu / hb_icu_script_to_script), so convert the ICU
++		// UScriptCode via its ISO 15924 short name and harfbuzz's
++		// tag-based API instead.
++		const char* scriptName = uscript_getShortName(textRun.script);
++		hb_script_t hbScript = hb_script_from_iso15924_tag(
++			(static_cast<hb_tag_t>(static_cast<unsigned char>(scriptName[0])) << 24) |
++			(static_cast<hb_tag_t>(static_cast<unsigned char>(scriptName[1])) << 16) |
++			(static_cast<hb_tag_t>(static_cast<unsigned char>(scriptName[2])) << 8) |
++			(static_cast<hb_tag_t>(static_cast<unsigned char>(scriptName[3]))));
+ 		std::string language = style.language().toStdString();
+ 		hb_language_t hbLanguage = hb_language_from_string(language.c_str(), language.length());
+ 

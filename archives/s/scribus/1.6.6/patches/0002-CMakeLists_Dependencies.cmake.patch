@@ -1,0 +1,205 @@
+--- a/CMakeLists_Dependencies.cmake
++++ b/CMakeLists_Dependencies.cmake
+@@ -1,12 +1,19 @@
+ ##############################################################################################################
+ ########## Find Dependencies                                                                        ##########
++
++# pkg-config: upstream Findpoppler/Findcairo/Findhunspell etc. each call
++# find_package(PkgConfig), but when conan CMakeDeps configs satisfy those
++# find_package() calls the custom Find modules are never loaded and the
++# pkg_check_modules macro stays undefined (breaking the librevenge /
++# harfbuzz / icu probes below). Load it explicitly up front.
++find_package(PkgConfig REQUIRED)
+ 
+ #<<PoDoFo for AI PDF import
+ option(WITH_PODOFO "Enable support for PDF embedded in AI" ON)
+ if (WITH_PODOFO)
+ 	find_package(LIBPODOFO 0.9.0)
+ 	if (LIBPODOFO_FOUND)
+ 		message(STATUS "PoDoFo Found OK, Version: " ${LIBPODOFO_VERSION})
+ 		set(HAVE_PODOFO ON)
+ 		if(LIBPODOFO_VERSION VERSION_GREATER_EQUAL "0.10.0")
+ 			if (CMAKE_CXX_STANDARD LESS 17)
+@@ -43,21 +50,28 @@
+ 			set(CMAKE_CXX_STANDARD 17)
+ 		endif()
+ 	endif()
+ else()
+ 	message(FATAL_ERROR "Could not find poppler library")
+ endif()
+ #>>Poppler for PDF import
+ 
+ #<< Qt
+ #Qt less than 6
+-set(CMAKE_PREFIX_PATH "${QT_PREFIX}/lib/cmake")
++# OHOS/conan: append Qt prefix to CMAKE_PREFIX_PATH instead of overwriting,
++# so conan-generated package configs (zlib/libjpeg/etc.) remain discoverable.
++# Upstream overwrites with set() which drops the conan toolchain paths.
++# QT_PREFIX points at the qtbase package folder (its lib/cmake/Qt5Config.cmake
++# layout is found via <prefix>/lib/cmake/<Module>/<Module>Config.cmake).
++if(QT_PREFIX)
++	list(APPEND CMAKE_PREFIX_PATH "${QT_PREFIX}")
++endif()
+ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+ 
+ if (NOT WANT_QT6)
+ 	message(STATUS "Qt5 Requested")
+ 	set(QT_MIN_VERSION "5.14.0")
+ 	add_compile_definitions(QT_DISABLE_DEPRECATED_BEFORE=0x050E00)
+ 	find_package(Qt5Core ${QT_MIN_VERSION} REQUIRED)
+ 	if(NOT Qt5Core_FOUND)
+ 		message(FATAL_ERROR "ERROR: No QT 5 found")
+ 	endif()
+@@ -74,23 +88,28 @@
+ 		message(FATAL_ERROR "ERROR: No QT 5 XML found")
+ 	endif()
+ 	find_package(Qt5Network ${QT_MIN_VERSION} REQUIRED)
+ 	if(NOT Qt5Network_FOUND)
+ 		message(FATAL_ERROR "ERROR: No Qt5Network found")
+ 	endif()
+ 	find_package(Qt5OpenGL ${QT_MIN_VERSION} REQUIRED)
+ 	if(NOT Qt5OpenGL_FOUND)
+ 		message(FATAL_ERROR "ERROR: No Qt5OpenGL found")
+ 	endif()
+-	find_package(Qt5LinguistTools ${QT_MIN_VERSION} REQUIRED)
++	# OHOS: Qt5LinguistTools is not shipped by the published qt5-qtbase
++	# variants (it belongs to the qttools module); translations are loaded
++	# at runtime from .qm files, so building without LinguistTools only
++	# skips .qm generation and the GUI falls back to English strings.
++	find_package(Qt5LinguistTools ${QT_MIN_VERSION} QUIET)
+ 	if(NOT Qt5LinguistTools_FOUND)
+-		message(FATAL_ERROR "ERROR: No Qt5LinguistTools found")
++		message(STATUS "Qt5LinguistTools not found — skipping translation .qm generation")
++		set(WANT_TRANSLATIONS OFF)
+ 	endif()
+ 	#find_package(Qt5Quick ${QT_MIN_VERSION} REQUIRED)
+ 	#if(Qt5Quick_FOUND)
+ 	#    message(STATUS "----- USE Qt5Quick -----")
+ 	#else()
+ 	#    message(FATAL_ERROR "ERROR: No Qt5Quick found")
+ 	#endif()
+ 	find_package(Qt5PrintSupport ${QT_MIN_VERSION} REQUIRED)
+ 	if(NOT Qt5PrintSupport_FOUND)
+ 		message(FATAL_ERROR "ERROR: No Qt5PrintSupport found")
+@@ -225,73 +244,80 @@
+ 		message("Include directories: ${Python2_INCLUDE_DIRS}")
+ 		message("Library directories: ${Python2_LIBRARY_DIRS}")
+ 		message("Runtime library directories: ${Python2_RUNTIME_LIBRARY_DIRS}")
+ 		set(HAVE_PYTHON ON)
+ 	endif()
+ endif()
+ #>> PYTHON
+ 
+ #<< FreeType2
+ find_package(Freetype REQUIRED)
+-if (FREETYPE_FOUND)
++# OHOS/conan: CMakeDeps exports *_FOUND with package-name casing
++# (freetype_FOUND); upstream checks the all-caps variant
++# (FREETYPE_FOUND). Accept either.
++if(FREETYPE_FOUND OR freetype_FOUND)
+ 	message(STATUS "FreeType2 Library Found OK")
+ else()
+ 	message(FATAL_ERROR "No Freetype Found")
+ endif()
+ #>> FreeType2
+ 
+ set(cairo_DIR ${CMAKE_MODULE_PATH})
+ find_package(cairo REQUIRED)
+ if(cairo_FOUND)
+ 	set(HAVE_CAIRO ON)
+ 	message("cairo Library found OK")
+ else()
+ 	message(FATAL_ERROR "No cairo library found")
+ endif()
+ #>>Render Library
+ 
+ #<<CUPS
+ if(NOT WIN32 AND NOT HAIKU)
+ 	find_package(Cups REQUIRED)
+-	if(CUPS_FOUND)
++	# OHOS/conan: accept both casings (cups_FOUND from CMakeDeps)
++	if(CUPS_FOUND OR cups_FOUND)
+ 		set(HAVE_CUPS ON)
+ 		message("CUPS Library Found OK")
+ 	endif()
+ else()
+ 	# Windows doesn't use CUPS
+ 	set(CUPS_INCLUDE_DIR)
+ endif()
+ #>>CUPS
+ 
+ #<<LibXML2
+ find_package(LibXml2 2.6.0 REQUIRED)
+-if(LIBXML2_FOUND)
++# OHOS/conan: accept both casings (libxml2_FOUND from CMakeDeps)
++if(LIBXML2_FOUND OR libxml2_FOUND)
+ 	set(HAVE_XML ON)
+ 	message("LIBXML2 Library Found OK")
+ endif()
+ #>>LibXML2
+ 
+ #<<LittleCMS
+ set(LCMS_DIR ${CMAKE_MODULE_PATH})
+ find_package(LCMS2 REQUIRED)
+-if(LCMS2_FOUND)
++# OHOS/conan: accept both casings (lcms2_FOUND from CMakeDeps)
++if(LCMS2_FOUND OR lcms2_FOUND)
+ 	set(HAVE_LCMS2 ON)
+ 	message("LittleCMS-2 Library Found OK")
+ else()
+ 	message(FATAL_ERROR "Could not find the LittleCMS 2 Library")
+ endif()
+ #>>LittleCMS
+ 
+ #<<FontConfig
+ if(NOT WIN32)
+ 	find_package(Fontconfig REQUIRED)
+-	if(Fontconfig_FOUND)
++	# OHOS/conan: accept both casings (fontconfig_FOUND from CMakeDeps)
++	if(Fontconfig_FOUND OR fontconfig_FOUND)
+ 		message("FontConfig Found OK")
+ 		set(HAVE_FONTCONFIG ON)
+ 	endif()
+ endif()
+ #>>FontConfig
+ 
+ #<<HUNSPELL for Spelling support
+ option(WANT_HUNSPELL "Enable support for spell checking with hunspell" ON)
+ if (WANT_HUNSPELL)
+ 	find_package(hunspell)
+@@ -341,22 +367,33 @@
+ 	pkg_check_modules(LIBREVENGE_STREAM librevenge-stream-0.0)
+ 	if (LIBREVENGE_STREAM_FOUND)
+ 		pkg_check_modules(LIBREVENGE_GENERATORS librevenge-generators-0.0)
+ 		if (LIBREVENGE_GENERATORS_FOUND)
+ 			set(HAVE_REVENGE ON)
+ 		endif()
+ 	endif()
+ endif()
+ 
+ # CTL support
+-pkg_check_modules(HARFBUZZ REQUIRED harfbuzz>=1.0.5 harfbuzz-icu)
++pkg_check_modules(HARFBUZZ REQUIRED harfbuzz>=1.0.5)
+ if (HARFBUZZ_FOUND)
+ 	message("Harfbuzz library Found OK")
+ endif()
+-pkg_check_modules(ICU REQUIRED icu-uc)
++# OHOS: the published harfbuzz package disables the ICU module
++# (harfbuzz-icu), and textshaper.cpp converts UScriptCode via the ICU
++# short name + hb_script_from_iso15924_tag, so the ICU submodule is
++# optional here. Keep the probe for informational purposes.
++pkg_check_modules(HARFBUZZ_ICU QUIET harfbuzz-icu)
++if (HARFBUZZ_ICU_FOUND)
++	message("Harfbuzz-icu library Found OK")
++endif()
++# ICU: the conan icu package exports a single aggregated icu.pc
++# (libicuuc + libicui18n + libicudata); upstream probes the icu-uc
++# submodule name which is not generated by PkgConfigDeps. Use "icu".
++pkg_check_modules(ICU REQUIRED icu)
+ 
+ # OpenType subsetting support
+ pkg_check_modules(HARFBUZZ_SUBSET harfbuzz-subset>=2.4.0)
+ if (HARFBUZZ_SUBSET_FOUND)
+ 	message("Harfbuzz subset library Found OK")
+ 	set (HAVE_HARFBUZZ_SUBSET ON)
+ endif()
