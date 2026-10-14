@@ -1,0 +1,143 @@
+--- a/src/clReflectScan/CMakeLists.txt
++++ b/src/clReflectScan/CMakeLists.txt
+@@ -1,67 +1,95 @@
+-# Our repository already contains one copy of llvm, so we do not
+-# need to use find_package
+-# NOTE: we use absolute path here so as we can use them for library paths
+-set(LLVM_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../extern/llvm"
+-  CACHE PATH "Path to LLVM source.")
++# clReflectScan — clang-based reflection scanner.
++# OHOS adaptation: consumes SDK LLVM/Clang monolith shared libraries
++# (libclang-cpp.so + libLLVM-15.so) instead of a source-tree LLVM build.
++# Also drops ClangFrontend.cpp which is absent from the v0.5.11 release tag.
++#
++# ABI note: the OHOS SDK LLVM monoliths are built with the libc++ `__h` ABI
++# namespace (custom __config_site), while the default OHOS toolchain and the
++# shipped clReflectCore/clReflectCpp/clReflectUtil static libraries use the
++# `__n1` namespace.  clReflectScan must therefore compile against a custom
++# __config_site (CLREFLECT_CONFIG_SITE_DIR) and link scan-local copies of the
++# core sources built with that same ABI, so its clang/LLVM template
++# instantiations match the monolith exports.
+ 
+-set(LLVM_BUILD_DIR_PREDICTION "${CMAKE_CURRENT_SOURCE_DIR}/../../extern/llvm-build")
+-if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+-  set(LLVM_BUILD_DIR_PREDICTION "${CMAKE_CURRENT_SOURCE_DIR}/../../extern/llvm-build-gnu")
+-endif (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
++set(CL_REFLECT_SCAN_SOURCES
++  ASTConsumer.cpp
++  AttributeParser.cpp
++  Main.cpp
++  ReflectionSpecs.cpp
++  )
+ 
+-set(LLVM_BUILD_DIR ${LLVM_BUILD_DIR_PREDICTION}
+-  CACHE PATH "Path to LLVM build.")
++# LLVM/Clang root: prefer explicit cache var, then env, then the OHOS SDK standard path
++set(LLVM_INSTALL_DIR "/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm"
++  CACHE PATH "Path to OHOS SDK LLVM install root (has include/ and lib/).")
++if(DEFINED ENV{OHOS_SDK_LLVM_ROOT} AND NOT "$ENV{OHOS_SDK_LLVM_ROOT}" STREQUAL "")
++  set(LLVM_INSTALL_DIR "$ENV{OHOS_SDK_LLVM_ROOT}")
++endif()
+ 
+-Include_directories("${LLVM_INSTALL_DIR}/include/")
+-include_directories("${LLVM_INSTALL_DIR}/tools/clang/include")
+-include_directories("${LLVM_BUILD_DIR}/include/")
+-include_directories("${LLVM_BUILD_DIR}/tools/clang/include")
++# Directory containing a custom libc++ __config_site (forces _LIBCPP_ABI_NAMESPACE __h).
++# Passed by the Conan recipe (conanfile.py generate()); empty means no override.
++set(CLREFLECT_CONFIG_SITE_DIR "" CACHE PATH "Directory with custom libc++ __config_site for __h ABI")
++
++include_directories("${LLVM_INSTALL_DIR}/include/")
+ 
+ if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+   # GCC/Clang flags for stdint.h types
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -fno-rtti")
+ endif (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+ 
+-set(LLVM_BASE_LIB_DIR "${LLVM_BUILD_DIR}/lib")
+-if (MSVC)
+-  set(LLVM_BASE_LIB_DIR "${LLVM_BASE_LIB_DIR}/$(ConfigurationName)")
+-endif (MSVC)
+-
++set(LLVM_BASE_LIB_DIR "${LLVM_INSTALL_DIR}/lib")
+ link_directories("${LLVM_BASE_LIB_DIR}")
+ 
+-add_clreflect_executable(clReflectScan
+-  ASTConsumer.cpp
+-  AttributeParser.cpp
+-  ClangFrontend.cpp
+-  Main.cpp
+-  ReflectionSpecs.cpp
++# Scan-local copies of the core/cpp sources, compiled with the __h ABI so that
++# clang/LLVM std::string template instantiations match the SDK monolith exports.
++# (The shipped clReflectCore/clReflectCpp/clReflectUtil stay on the default ABI.)
++set(CLREFLECT_SCAN_CORE_SOURCES
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/Database.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/DatabaseBinarySerialiser.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/DatabaseMetadata.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/DatabaseTextSerialiser.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/FileUtils.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCore/Logging.cpp
++  )
++set(CLREFLECT_SCAN_CPP_SOURCES
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCpp/Containers.cpp
++  ${CMAKE_CURRENT_SOURCE_DIR}/../clReflectCpp/clcpp.cpp
+   )
+ 
++if(NOT CLREFLECT_CONFIG_SITE_DIR STREQUAL "")
++  set(CLREFLECT_SCAN_ABI_FLAGS "-I${CLREFLECT_CONFIG_SITE_DIR}")
++else()
++  set(CLREFLECT_SCAN_ABI_FLAGS "")
++endif()
++
++add_library(clReflectScanCore STATIC ${CLREFLECT_SCAN_CORE_SOURCES})
++set_target_properties(clReflectScanCore PROPERTIES COMPILE_FLAGS "${CLREFLECT_SCAN_ABI_FLAGS}")
++target_include_directories(clReflectScanCore PRIVATE
++  "${PROJECT_SOURCE_DIR}/inc" "${PROJECT_SOURCE_DIR}/src")
++
++add_library(clReflectScanCpp STATIC ${CLREFLECT_SCAN_CPP_SOURCES})
++set_target_properties(clReflectScanCpp PROPERTIES COMPILE_FLAGS "${CLREFLECT_SCAN_ABI_FLAGS}")
++target_include_directories(clReflectScanCpp PRIVATE
++  "${PROJECT_SOURCE_DIR}/inc" "${PROJECT_SOURCE_DIR}/src")
++
++add_clreflect_executable(clReflectScan ${CL_REFLECT_SCAN_SOURCES})
++if(NOT CLREFLECT_SCAN_ABI_FLAGS STREQUAL "")
++  set_target_properties(clReflectScan PROPERTIES COMPILE_FLAGS "${CLREFLECT_SCAN_ABI_FLAGS}")
++endif()
++
++# OHOS SDK ships LLVM as a monolith: libclang-cpp.so already contains clang+LLVM.
+ set(CL_REFLECT_SCAN_LIBS
+-  clangParse
+-  clangFrontend
+-  clangSema
+-  clangAnalysis
+-  clangLex
+-  clangBasic
+-  clangSerialization
+-  clangDriver
+-  clangAST
+-  clangEdit
+-  LLVMSupport
+-  LLVMCore
+-  LLVMMC
++  clang-cpp
+   )
+ 
+-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+-  # Linux version needs to be linked against pthread
++if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux" OR ${CMAKE_SYSTEM_NAME} STREQUAL "OHOS" OR ${CMAKE_SYSTEM_NAME} STREQUAL "HarmonyOS")
++  # Linux/OHOS needs pthread
+   set(CL_REFLECT_SCAN_LIBS
+     ${CL_REFLECT_SCAN_LIBS} pthread)
+-endif(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
++endif()
+ 
+ target_link_libraries(clReflectScan
+-  clReflectCore
+-  clReflectCpp
++  clReflectScanCore
++  clReflectScanCpp
+   ${CL_REFLECT_SCAN_LIBS}
+   ${CMAKE_DL_LIBS}
+-  )
++  )

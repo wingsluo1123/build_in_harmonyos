@@ -1,0 +1,90 @@
+--- a/src/clReflectExport/MapFileParser.cpp
++++ b/src/clReflectExport/MapFileParser.cpp
+@@ -855,6 +855,75 @@
+         }
+     }
+ 
++    void ParseLLDMapFile(FILE* fp, cldb::Database& db, clcpp::pointer_type& base_address)
++    {
++        // lld map files (produced by -Wl,-Map with the OHOS SDK / lld linker) use a
++        // fixed-width column layout headed by "VMA LMA Size Align Out In Symbol" and
++        // already contain demangled C++ signatures, e.g. "TestGetType(clcpp::Database&)".
++        while (const char* next_line = ReadLine(fp))
++        {
++            std::string line = next_line;
++            if (line.find("VMA") != std::string::npos && line.find("Symbol") != std::string::npos)
++                continue; // header line
++
++            // Tokenise by whitespace: [VMA LMA Size Align] + symbol (may contain spaces)
++            std::vector<std::string> tokens;
++            size_t pos = 0;
++            while (pos < line.size())
++            {
++                while (pos < line.size() && (line[pos] == ' ' || line[pos] == '\t' || line[pos] == '\r'))
++                    pos++;
++                if (pos >= line.size())
++                    break;
++                size_t start = pos;
++                while (pos < line.size() && line[pos] != ' ' && line[pos] != '\t' && line[pos] != '\r')
++                    pos++;
++                tokens.push_back(line.substr(start, pos - start));
++            }
++            if (tokens.size() < 5)
++                continue;
++
++            // First four columns must be VMA, LMA, Size (hex) and Align (decimal)
++            char* end = 0;
++            unsigned long long vma = strtoull(tokens[0].c_str(), &end, 16);
++            if (end == tokens[0].c_str() || *end != 0)
++                continue;
++            strtoull(tokens[1].c_str(), &end, 16);
++            if (end == tokens[1].c_str() || *end != 0)
++                continue;
++            strtoull(tokens[2].c_str(), &end, 16);
++            if (end == tokens[2].c_str() || *end != 0)
++                continue;
++            strtoull(tokens[3].c_str(), &end, 10);
++            if (end == tokens[3].c_str() || *end != 0)
++                continue;
++
++            // Rebuild the symbol/signature (may contain spaces) and filter noise
++            std::string symbol;
++            for (size_t i = 4; i < tokens.size(); i++)
++            {
++                if (i > 4)
++                    symbol += " ";
++                symbol += tokens[i];
++            }
++            if (symbol.empty())
++                continue;
++            if (symbol[0] == '$')                  // assembler local labels ($x.0 etc.)
++                continue;
++            if (symbol.find(":(.") != std::string::npos)  // object/section refs
++                continue;
++            if (symbol.find("(.text") != std::string::npos)
++                continue;
++
++            // Only function-like signatures contain parentheses
++            if (symbol.find('(') == std::string::npos)
++                continue;
++
++            // lld map already contains demangled signatures
++            ProcessFunctionItem(db, symbol, (clcpp::pointer_type)vma);
++        }
++    }
++
+     void ParseGCCMapFile(const char* filename, cldb::Database& db, clcpp::pointer_type& base_address)
+     {
+         FILE* fp = fopen(filename, "rb");
+@@ -872,6 +941,11 @@
+         {
+             ParseLinuxGCCMapFile(fp, db, base_address);
+         }
++        else if (first_line != 0 && strstr(first_line, "VMA") != 0 && strstr(first_line, "Symbol") != 0)
++        {
++            // lld map file (OHOS SDK lld / LLD linker output)
++            ParseLLDMapFile(fp, db, base_address);
++        }
+         else
+         {
+             LOG(main, ERROR, "Unknown format of gcc map file!");

@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: clreflect/0.5.11
+homepage: "https://github.com/Celtoys/clReflect"
+
+# 上游测试命令 (CMake 自定义命令生成测试数据库 + 运行测试可执行文件)
+upstream_check_command: "make clReflectTest clReflectGenCppbin && ./clReflectTest"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake.build() 触发 clReflectGenCppbin（scan→merge→export 生成 cppbin），随后运行 ./clReflectTest"
+
+# 上游实际运行的测试程序: clReflectTest（加载 clReflectTest.cppbin 反射数据库，
+# 执行 TestGetType/TestConstructorDestructor/TestArraysFunc/TestAttributesFunc/
+# TestSerialise/TestOffsets/TestSerialiseJSON/TestTypedefsFunc/TestFunctionSerialise）
+upstream_tests:
+  - file: src/clReflectTest/Main.cpp
+    source: clreflect-0.5.11/src/clReflectTest/Main.cpp
+    description: "clReflect 上游测试套件主入口，加载 cppbin 反射数据库并运行 9 组测试函数"
+    command: "./clReflectTest"
+
+  - file: src/clReflectTest/TestOffsets.cpp
+    source: clreflect-0.5.11/src/clReflectTest/TestOffsets.cpp
+    description: "字段偏移反射测试（21 个 TESTS 宏声明，编译期与运行时偏移比对）"
+    command: "./clReflectTest"
+
+  - file: src/clReflectTest/TestSerialiseJSON.cpp
+    source: clreflect-0.5.11/src/clReflectTest/TestSerialiseJSON.cpp
+    description: "JSON 序列化/反序列化测试（60 个 NAME 用例，PASS/FAIL 逐项打印）"
+    command: "./clReflectTest"
+
+# test_package 中自带的测试 (消费者视角验证：仅用公开头文件/API/链接目标)
+test_package_tests:
+  - file: test_consumer.cpp
+    description: "消费者测试：链接 clReflectCpp 静态库，调用 clcpp::internal::HashNameString 并核对已知哈希"
+    command: "./test_consumer"
+
+# 测试断言总数 (上游 clReflectTest 通过数 36 PASS + 消费者 3 项哈希断言)
+assertion_count: 39
