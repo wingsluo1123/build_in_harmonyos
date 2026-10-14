@@ -1,0 +1,71 @@
+# manifest.yaml — tinyprog 1.0.23 适配元数据
+# AI 元数据（CI 不读取）。CI 只读 conanfile.py / conandata.yml /
+# test_package/ / patches/ 与软件级 commands.json。
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.0.23"
+software: "tinyprog"
+status: built
+
+build_date: "2026-10-09"
+build_system: setuptools
+language: python
+package_type: application
+
+source:
+  # R39：上游把可发行的 Python 包放在仓库 programmer/ 子目录，
+  # 发行 tag 名为 tinyprog-1.0.23 → 取 GitHub 官方 tag 归档（非 PyPI sdist）。
+  url: "https://github.com/tinyfpga/TinyFPGA-Bootloader/archive/refs/tags/tinyprog-1.0.23.tar.gz"
+  sha256: "3eeac2fa7cefcf8a5734fabdbb0699b705a99d79e77c9fb905608430621c2064"
+  tar_format: ".tar.gz"
+
+build:
+  system: pip
+  configure_options: []
+  dependencies:
+    # 制品仓已有配方且 binary 可用（R35：conan download 实测，非 conan list）
+    # run=True 为强制项：python-require 依赖默认 run=False → Requirement.files
+    # 为 False → graph_binaries._skip_binaries() 标 BINARY_SKIP，节点无
+    # package_folder、无 runenv PYTHONPATH，消费者 import 失败（知识 E14723）。
+    - pyserial/3.5
+    - six/1.17.0
+  # 制品仓无可用配方、构建期 pip 装配进包内的运行时依赖
+  # （packaging/26.3 有配方但不可消费：conan install 报
+  #   Invalid: 'settings.os.version' value not defined —— 实测）
+  pip_dependencies:
+    - intelhex==2.3.0
+    - jsonmerge==1.9.2
+    - tqdm==4.70.1
+    - pyusb==1.3.1
+    - packaging==26.3
+    # jsonmerge 仅约束 jsonschema>2.4.0，不钉版则闭包随镜像索引浮动：
+    # jsonschema>=4.18 会拖入 referencing→rpds-py（原生扩展），而 CI 里
+    # python3 是 profile 前置的 HNP python，无法 dlopen 用户存储路径的 .so
+    # （E212）→ 构建期冒烟必红。2.6.0 是闭包纯 Python 的最新版（知识 E14725）。
+    - jsonschema==2.6.0
+  # 只有鸿蒙社区镜像可从本环境访问（公网 PyPI 与清华镜像均失败，实测）
+  pip_index: "https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple"
+  cc: ""
+  cxx: ""
+
+patches_applied: []
+
+knowledge_gained:
+  - "纯 Python 应用无交叉编译步骤，适配完全是打包问题，不应引入 C/C++ 工具链依赖。 (ref:E001)"
+  - "Conan 2 的 python-require 依赖默认 run=False → 节点被标 BINARY_SKIP、无 package_folder 与 runenv PYTHONPATH，消费者 import 失败；必须显式 run=True。 (ref:E14723)"
+  - "本仓库纯 Python 依赖 payload 布局三种并存（lib/pythonX.Y/site-packages / lib/python/site-packages / flat），package_info 拼 PYTHONPATH 必须逐个探测，且 runenv 与 buildenv 都要写。 (ref:E14724)"
+  - "制品仓有配方 ≠ 可消费：packaging/26.3 配方存在但 conan install 报 settings.os.version 未定义，声明为 requires 会让 CI 全红，须改用 pip 装配。 (ref:R35)"
+  - "pip 传递依赖闭包必须钉死并断言无原生扩展：jsonmerge 仅约束 jsonschema>2.4.0，镜像对 rpds-py 的可见性逐次不同，同一配方本地解析出纯 Python 闭包、CI 解析出原生 rpds，而 HNP python 不能 dlopen 用户路径 .so（E212）→ 构建期冒烟 Permission denied。 (ref:E14725)"
+  - "OHOS 解释器的 sys.platform 不稳定（HNP 报 linux、worker 自带解释器报 ohos），os.uname()/platform.system() 才稳定报 HarmonyOS；依赖 sys.platform 做平台分派的外部纯 Python 依赖（pyserial 3.5 的 list_ports_posix）会在部分构建上直接 ImportError。本仓无该依赖配方（W2 单包不能顺带改）时，随包下发 sitecustomize.py 在 OHOS 上注册正确后端（cruft 同款），只改具体模块名而不动全局 sys.platform。 (ref:E14726)"
+
+# 上游测试实测口径（census 记录于 notes.md §4 与 test_package/MANIFEST.yml）
+upstream_tests:
+  total: 0
+  passed: 0
+  skipped: 0
+  failed: 0
+  command: "(上游无 Python 测试套件，见 notes.md §4)"
+consumer_tests:
+  total: 12
+  passed: 12
+  command: "conan test test_package tinyprog/1.0.23（test_package/test_tinyprog.py 12 用例）"
