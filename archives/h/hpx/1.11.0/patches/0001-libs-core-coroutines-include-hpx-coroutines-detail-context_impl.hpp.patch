@@ -1,0 +1,39 @@
+--- a/libs/core/coroutines/include/hpx/coroutines/detail/context_impl.hpp
++++ b/libs/core/coroutines/include/hpx/coroutines/detail/context_impl.hpp
+@@ -113,20 +113,36 @@
+ 
+ #include <hpx/coroutines/detail/context_generic_context.hpp>
+ 
+ namespace hpx::threads::coroutines::detail {
+ 
+     template <typename CoroutineImpl>
+     using default_context_impl =
+         generic_context::fcontext_context_impl<CoroutineImpl>;
+ }    // namespace hpx::threads::coroutines::detail
+ 
++#elif defined(__OHOS__) && defined(__aarch64__)
++
++// OHOS musl does not provide a usable context switching implementation:
++// the generic Boost.Context backend is unavailable on this platform and the
++// x86 specific implementation below is not applicable either.  Use the POSIX
++// ucontext based implementation instead; the platform does not declare the
++// ucontext context-switching functions (see context_posix.hpp) and the
++// implementations are provided by libucontext, which is linked into HPX.
++#include <hpx/coroutines/detail/context_posix.hpp>
++
++namespace hpx::threads::coroutines::detail {
++
++    template <typename CoroutineImpl>
++    using default_context_impl = posix::ucontext_context_impl<CoroutineImpl>;
++}    // namespace hpx::threads::coroutines::detail
++
+ #elif (defined(__linux) || defined(linux) || defined(__linux__)) &&            \
+     !defined(__bgq__) && !defined(__powerpc__) && !defined(__s390x__)
+ 
+ #include <hpx/coroutines/detail/context_linux_x86.hpp>
+ 
+ namespace hpx::threads::coroutines::detail {
+ 
+     template <typename CoroutineImpl>
+     using default_context_impl = lx::x86_linux_context_impl<CoroutineImpl>;
+ }    // namespace hpx::threads::coroutines::detail

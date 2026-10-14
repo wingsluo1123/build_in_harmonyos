@@ -1,0 +1,36 @@
+--- a/libs/core/coroutines/include/hpx/coroutines/detail/context_posix.hpp
++++ b/libs/core/coroutines/include/hpx/coroutines/detail/context_posix.hpp
+@@ -109,20 +109,33 @@
+ // NOTE: this implementation is not optimal as the makecontext API saves and
+ // restore the signal mask. This requires a system call for every context switch
+ // that really kills performance. Still is very portable and guaranteed to work.
+ //
+ // NOTE2: makecontext and friends are declared obsolescent in SuSv3, but it is
+ // unlikely that they will be removed any time soon.
+ 
+ #include <cstddef>    // ptrdiff_t
+ #include <ucontext.h>
+ 
++#if defined(__OHOS__)
++// OHOS musl systems provide the ucontext_t type but neither declare nor
++// implement the ucontext context switching functions.  The implementations
++// are provided by libucontext (unprefixed weak symbols, linked into HPX);
++// declare them here so the makecontext based implementation below compiles.
++extern "C" {
++int getcontext(ucontext_t* ucp);
++int setcontext(const ucontext_t* ucp);
++void makecontext(ucontext_t* ucp, void (*func)(void), int argc, ...);
++int swapcontext(ucontext_t* oucp, const ucontext_t* ucp);
++}
++#endif
++
+ #if defined(HPX_HAVE_STACKOVERFLOW_DETECTION)
+ 
+ #include <cstdlib>
+ #include <cstring>
+ #include <signal.h>
+ #include <strings.h>
+ 
+ #if !defined(SEGV_STACK_SIZE)
+ #define SEGV_STACK_SIZE MINSIGSTKSZ + 4096
+ #endif

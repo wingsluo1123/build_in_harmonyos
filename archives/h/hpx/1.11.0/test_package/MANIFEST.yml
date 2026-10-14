@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# HPX 1.11.0 -- 上游测试声明 + 消费者测试（R34/R51/R53）
+#
+# 上游测试清点（R51 第一步，来源：HPX 1.11.0 源码树）
+#   - CTest 测试注册：libs/*/tests/{unit,regressions,performance}/CMakeLists.txt
+#   - 规模：数千个 CTest 用例（含分布式/多进程用例），完整跑一次远超 CI 预算
+#   - 适配后运行策略：在 HarmonyOS PC 上选取与本次适配直接相关的子集实测
+#     （coroutines / threading / runtime / async 模块用例），其余逐项归因，
+#     详见 reports/test-report.md（R51 第二步/第三步）
+
+package: hpx/1.11.0
+homepage: "https://hpx.stellar-group.org/"
+
+# 上游测试命令
+upstream_check_command: "ctest -N (libs/*/tests 注册的 CTest 用例)"
+
+# conanfile.py build() 中是否集成上游测试（完整套件超出 CI 预算，见上）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# test_package 中自带的测试（消费者视角验证 + 鸿蒙特有断言）
+test_package_tests:
+  - file: test_hpx.cpp
+    description: >-
+      真实 HPX 消费者：启动 HPX runtime，执行 64 个 hpx::async 任务、
+      future continuation、promise/hpx::thread 挂起/恢复（覆盖 ucontext
+      上下文切换后端）；R53 鸿蒙特有断言：自身可执行为 AArch64 ELF、
+      runtime 在 HarmonyOS PC 上以 >= 2 worker/OS 线程启动
+    command: "./test_hpx --hpx:threads=2"
+
+# 断言总数（近似，test_hpx.cpp 中 check() 调用数）
+assertion_count: 7

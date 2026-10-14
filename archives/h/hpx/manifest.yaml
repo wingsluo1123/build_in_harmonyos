@@ -1,0 +1,26 @@
+software: hpx
+display: "HPX"
+description: "HPX — C++ 并行与分布式运行时系统（The C++ Standards Library for Parallelism and Concurrency）"
+category: parallel
+homepage: "https://hpx.stellar-group.org/"
+license: BSL-1.0
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "协程上下文切换：aarch64 默认 Boost.Context 在 OHOS 不可得（registry boost 包排除 context/coroutine/fiber 且无 OHOS asm）→ HPX_WITH_GENERIC_CONTEXT_COROUTINES=OFF + POSIX ucontext 后端 + libucontext/1.5.2（4 个平台补丁仅影响 OHOS；PF5 例外已在 PR 说明）"
+    - "Asio：HPX 无条件依赖 standalone Asio（>=1.12），registry 无 asio 包 → conandata 注入官方 tag 归档（asio-1-21-0，对齐 HPX_WITH_ASIO_TAG_DEFAULT）+ FETCHCONTENT_SOURCE_DIR_ASIO 本地源（configure 零网络）"
+    - "Boost 选型 1.85.0：唯一提供完整 Boost 头文件树的 registry 包（HPX 需要 accumulators/spirit/phoenix/parameter；1.90/1.91 组件构建缺这些头）"
+    - "zlib 版本统一：hwloc 子树要求 zlib/1.3.1.1 与 boost/1.85.0 的 zlib/1.3.1 冲突 → override 到修复版 1.3.1.1（R37，ABI 一致）"
+    - "HPX_WITH_PKGCONFIG=OFF：HPX 1.11 的 pkgconfig 生成与 CMake >= 4 不兼容（file(GENERATE INPUT) 含目标上下文相关 genex）"
+    - "Conan 目标名适配：CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON 下用 cmake_target_aliases 提供 Boost::boost / Hwloc::hwloc 别名（不改上游构建文件）"
+  common_dependencies:
+    - boost
+    - hwloc
+    - libucontext
+    - zlib
+
+versions:
+  "1.11.0":
+    status: built
+    build_date: "2026-09-28"
