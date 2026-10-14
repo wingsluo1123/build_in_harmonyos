@@ -1,0 +1,28 @@
+# conandata.yml — unar 1.10.8
+# 官方 GitHub 标签归档 v1.10.8（MacPaw/XADMaster 仓库），SHA-256 已核验
+
+sources:
+  xadmaster:
+    url: "https://github.com/MacPaw/XADMaster/archive/refs/tags/v1.10.8.tar.gz"
+    sha256: "652953d7988b3c33f4f52b61c357afd1a7c2fc170e5e6e2219f4432b0c4cd39f"
+  # Upstream README: UniversalDetector is a sibling-directory dependency
+  # (clone both repos side by side); the XADMaster GitHub tarball does not
+  # contain it. Pinned to tag 1.1 (verified byte-identical to the working
+  # local build source).
+  universal_detector:
+    url: "https://github.com/MacPaw/universal-detector/archive/refs/tags/1.1.tar.gz"
+    sha256: "8e8532111d0163628eb828a60d67b53133afad3f710b1967e69d3b8eee28a811"
+
+patches:
+  - patch_file: "patches/0001-getpass-ohos-stub.patch"
+    patch_description: "GNUSTEP build: getpass() is absent from musl libc; provide an interactive-read stub (mirrors the existing non-GNUSTEP fallback branch)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-xadregex-musl-compat.patch"
+    patch_description: "XADRegex: define REG_STARTEND (absent from musl regex.h, no-op value 0); regexec() requires a NUL-terminated string, copy the NSData buffer first — passing raw bytes over-reads on musl heaps and silently broke sub-archive (tar.gz) detection"
+    patch_type: "portability"
+  - patch_file: "patches/0003-unar-default-tz-utc.patch"
+    patch_description: "unar main(): default TZ to UTC when no TZ variable and no system zone data exist (GNUstep's load-time time zone resolution otherwise captures a failure state; date/calendar APIs raise NSInvalidArgumentException)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-lsar-default-tz-utc.patch"
+    patch_description: "lsar main(): same default-time-zone guard as unar"
+    patch_type: "portability"

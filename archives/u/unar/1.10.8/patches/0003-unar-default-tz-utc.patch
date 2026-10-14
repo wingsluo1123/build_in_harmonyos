@@ -1,0 +1,29 @@
+--- a/XADMaster-1.10.8/unar.m
++++ b/XADMaster-1.10.8/unar.m
+@@ -24,6 +24,9 @@
+ #import "CommandLineCommon.h"
+ #import "CSFileHandle.h"
+ 
++#include <stdlib.h>
++#include <unistd.h>
++
+ #define VERSION_STRING @"v1.10.7"
+ 
+ @interface Unarchiver:NSObject {}
+@@ -37,6 +40,16 @@
+ {
+ 	#ifdef GNUSTEP
+ 	setlocale(LC_ALL,""); // GNUstep requires this.
++
++	// GNUstep's date and calendar APIs resolve the default time zone from
++	// the TZ environment variable or the system zone files. On systems
++	// that provide neither, they raise an exception instead of falling
++	// back to UTC (the missing zone data results in a NULL string).
++	// Default to UTC when no usable time zone source is present.
++	if(!getenv("TZ")
++	&&access("/etc/localtime",F_OK)!=0
++	&&access("/usr/lib/zoneinfo",F_OK)!=0)
++		setenv("TZ","UTC",0);
+ 	#endif
+ 
+ 	NSAutoreleasePool *pool=[NSAutoreleasePool new];

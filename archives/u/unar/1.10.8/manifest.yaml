@@ -1,0 +1,123 @@
+# 版本级 manifest
+# 文件位置: archives/u/unar/1.10.8/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.10.8"
+
+# 软件名
+software: "unar"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/MacPaw/XADMaster/archive/refs/tags/v1.10.8.tar.gz"
+
+  # 源码校验和
+  sha256: "652953d7988b3c33f4f52b61c357afd1a7c2fc170e5e6e2219f4432b0c4cd39f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+  # 兄弟目录依赖（XADMaster tarball 不含；上游 README 要求并列 clone；
+  # 配方 source() 第二源获取，布局为 XADMaster 源目录的兄弟目录）
+  extra_sources:
+    - name: universal-detector
+      url: "https://github.com/MacPaw/universal-detector/archive/refs/tags/1.1.tar.gz"
+      sha256: "8e8532111d0163628eb828a60d67b53133afad3f710b1967e69d3b8eee28a811"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options:
+    - "make -f Makefile.linux (GCC_OPTS/GNUSTEP_OPTS/CFLAGS/LDFLAGS/LIBS 由 conanfile.py 注入)"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - gnustep-base/1.31.1
+    - wavpack/5.9.0
+    - zlib/1.3.1.1
+    - libobjc2/2.2.1
+    - bzip2/1.0.8.2
+    - icu/76.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-getpass-ohos-stub.patch"
+  - "0002-xadregex-musl-compat.patch"
+  - "0003-unar-default-tz-utc.patch"
+  - "0004-lsar-default-tz-utc.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "musl libc 无 getpass()：GNUSTEP 分支的交互式密码读取需桩实现（补丁 0001，仿非 GNUSTEP 分支的 fgets 回退）（knowledge_ref: E093）"
+  - "musl regex.h 无 REG_STARTEND（GNU 扩展）；且 regexec() 要求 NUL 终止字符串——XADRegex 直接传 NSData bytes 在 musl 堆上越界读，导致 tar.gz 子档案识别静默失败（补丁 0002；llvm-nm/堆布局实证，glibc 下碰巧可用）（knowledge_ref: DRAFT-UNAR-1108-MUSL-REGEXEC-NUL-OVERREAD）"
+  - "gnustep-base 在库加载期（constructor 阶段，早于 main）读取 TZ 并固化时区状态：OHOS 无 TZ 环境变量、无 /etc/localtime、无 /usr/lib/zoneinfo → 固化失败状态 → 日期/日历 API 抛 NSInvalidArgumentException、嵌套档案行为异常。main() 内 setenv 太迟（补丁 0003/0004 仅为第二道防线）；解法 = libtzguard.so 以首个 DT_NEEDED 链接，constructor 先行设 TZ=UTC（knowledge_ref: DRAFT-UNAR-1108-GNUSTEP-TZ-CONSTRUCTOR）"
+  - "conan 生态 zlib/bzip2/icu 包在本平台为静态库（libz.a/libicuuc.a/libicudata.a）→ -lz/-licuuc 静态链接进二进制，运行时 NEEDED 无对应 .so；XADMaster 自带 bzip2 算法（BWT.c），仅 CSBzip2Handle.h 需要 bzlib.h 头文件；但预编译 libgnustep-base.so 动态 NEEDED libz.so → 链接期静态与运行期 .so 可发现是两个独立要求（knowledge_ref: DRAFT-UNAR-1108-CONAN-STATIC-LINK-FABRIC）"
+  - "最终二进制 NEEDED = libtzguard.so(首位) + libgnustep-base.so.1.31 + libwavpack.so.1 + libobjc.so + libc++_shared.so + libc.so（knowledge_ref: DRAFT-UNAR-1108-GNUSTEP-TZ-CONSTRUCTOR）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/unar-1.10.8.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/unar-1.10.8.work
+  source_orig_hash: c307c705a943d08f
+  source_work_hash: 775c4938cfb693d1
+  generated_at: '2026-10-08T23:11:15'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-tzguard.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-XADMaster-1.10.8-CommandLineCommon.m.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-XADMaster-1.10.8-XADRegex.m.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-XADMaster-1.10.8-lsar.m.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-XADMaster-1.10.8-unar.m.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
