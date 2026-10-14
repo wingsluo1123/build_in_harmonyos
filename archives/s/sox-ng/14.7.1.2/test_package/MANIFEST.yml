@@ -1,0 +1,36 @@
+package: sox-ng/14.7.1.2
+homepage: "https://codeberg.org/sox_ng/sox_ng"
+
+upstream_check_command: "make check (three-channel); tests.sh -1/-2; testall.sh"
+upstream_test_in_build: true
+upstream_test_command: "make check (71 regression cases, 99 three-channel conversions, 108 sample assertions, 1 synth-size assertion); tests.sh -1/-2 (168/106 conversions, 108 sample assertions and 1 synth-size assertion each); testall.sh (23 round trips / 46 Sox conversions)"
+upstream_test_case_count: 794
+test_package_assertion_count: 8
+
+upstream_tests:
+  - file: src/tests.sh
+    source: sox_ng/src/tests.sh
+    description: "Lossless round-trip conversion matrix for mono, stereo, and three-channel audio"
+    command: "make check (three-channel); sh tests.sh -1; sh tests.sh -2"
+  - file: src/testall.sh
+    source: sox_ng/src/testall.sh
+    description: "Upstream conversion round trips for 23 legacy audio formats"
+    command: "sh testall.sh"
+  - file: test/check.sh
+    source: sox_ng/test/check.sh
+    description: "All 71 shipped security and regression test scripts"
+    command: "sox=<built-sox_ng> sh check.sh -n"
+  - file: src/sox_sample_test.c
+    source: sox_ng/src/sox_sample_test.c
+    description: "Sample conversion boundary assertions"
+    command: "./sox_sample_test"
+
+test_package_tests:
+  - file: consumer.c
+    description: "Consumer links libsox_ng, initializes it, and resolves WAV and volume handlers"
+    command: "./sox_ng_consumer"
+  - file: conanfile.py
+    description: "Runs packaged sox_ng --version and a generated-WAV read/stat round trip"
+    command: "sox_ng --version; sox_ng -n ... consumer.wav; sox_ng consumer.wav -n stat"
+
+assertion_count: 802
