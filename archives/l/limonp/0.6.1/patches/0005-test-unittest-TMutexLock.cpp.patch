@@ -1,0 +1,31 @@
+--- a/test/unittest/TMutexLock.cpp
++++ b/test/unittest/TMutexLock.cpp
+@@ -35,24 +35,26 @@
+       res.push_back(i);
+       usleep(100 * i);
+     }
+     return NULL;
+   }
+  public:
+   void Start() {
+     for(size_t i = 0; i < pthreadInfos_.size(); i++) {
+       pthreadInfos_[i].id = i;
+       pthreadInfos_[i].ptMutexLock = &mutex_;
+-      assert(!pthread_create(&pthreadInfos_[i].pthread_id, NULL, workerLocked, &pthreadInfos_[i]));
++      int rc = pthread_create(&pthreadInfos_[i].pthread_id, NULL, workerLocked, &pthreadInfos_[i]);
++      assert(!rc);
+     }
+     for(size_t i = 0; i < pthreadInfos_.size(); i++) {
+-      assert(!pthread_join(pthreadInfos_[i].pthread_id, NULL));
++      int rc = pthread_join(pthreadInfos_[i].pthread_id, NULL);
++      assert(!rc);
+     }
+   }
+ };
+ 
+ TEST(MutexLock, Test1) {
+   string str;
+   //ThreadsNoLocked noLock(THREAD_SUM);
+   //res.clear();
+   //noLock.Start();
+   //ASSERT_EQ(str << res, "[\"0\", \"0\", \"0\", \"1\", \"1\", \"1\", \"2\", \"2\", \"2\"]");

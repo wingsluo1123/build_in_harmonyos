@@ -1,0 +1,25 @@
+# conandata.yml — limonp 0.6.1
+# 官方源: https://github.com/yanyiwu/limonp (tag v0.6.1)
+
+sources:
+  "0.6.1":
+    url: "https://github.com/yanyiwu/limonp/archive/refs/tags/v0.6.1.tar.gz"
+    sha256: "a34893750a942afd2c747a41740f94dbc74891f72cef2ef0849f9c387abc73ff"
+
+patches:
+  "0.6.1":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "上游 3 个 ADD_TEST 用相对路径 COMMAND + 默认 WORKING_DIRECTORY（build 目录），而 TConfig/TMd5/TStdExtension/TStringUtil 用相对路径 \"../test/testdata/...\" 打开 fixture —— 只有 build 目录恰好是源码根的直接子目录时才解析得到。换成 $<TARGET_FILE:...> + WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test，让任何 out-of-tree 构建目录（含 Conan 缓存布局）都能跑。"
+      patch_type: "portability"
+    - patch_file: "patches/0002-include-limonp-StdExtension.hpp.patch"
+      patch_description: "上游用 #elif(__cplusplus == 201103L) 精确匹配 C++11 才走 <unordered_map>/<unordered_set>；OHOS 用 C++17（libc++ 无 <tr1/unordered_map>），掉进 tr1 fallback 编译失败。放宽为 >= 201103L。"
+      patch_type: "portability"
+    - patch_file: "patches/0003-include-limonp-StringUtil.hpp.patch"
+      patch_description: "上游 LTrim/RTrim 用 std::ptr_fun（C++17 已移除）组合 IsSpace 谓词，libc++ 下编译失败。改用 lambda。"
+      patch_type: "portability"
+    - patch_file: "patches/0004-test-unittest-TFileLock.cpp.patch"
+      patch_description: "上游测试硬编码 /tmp/limonp_test_filelock；OHOS 上 /tmp 是只读 erofs。改用 $TMPDIR（回退当前目录）。"
+      patch_type: "portability"
+    - patch_file: "patches/0005-test-unittest-TMutexLock.cpp.patch"
+      patch_description: "上游 assert(!pthread_create(...)) 在 Release（NDEBUG）下整个表达式被裁剪，线程从未创建、结果恒空。拆成先调用再断言。"
+      patch_type: "portability"

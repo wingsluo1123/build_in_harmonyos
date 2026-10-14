@@ -1,0 +1,69 @@
+# ═══ Draft knowledge entry — 老代码 `#elif(__cplusplus == 201103L)` 精确匹配 ⇒ C++17 掉进 tr1 fallback 编译失败 ═══
+# Timestamp: 2026-10-04
+# Software: limonp 0.6.1
+# Gate: G2→本地编译 (conan create)
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     DRAFT-limonp-0.6.1-cpp11-exact-match-tr1-fallback
+trigger_tool:           clang|make|conan
+phase:                  compilation
+error_signature:        '(tr1/unordered_map).*file not found|no member named .ptr_fun.|no member named .bind2nd.'
+severity:               2
+category:               c++, legacy-code, stdlib-libcxx, cppstd-17
+match_keywords:         __cplusplus, 201103L, tr1, unordered_map, unordered_set,
+                         exact match, == 201103L, libc++, C++11, C++17,
+                         legacy C++ code, droppped tr1 fallback
+title:                  老代码用 `#elif(__cplusplus == 201103L)` 精确匹配 C++11 ⇒ C++14/17 编译时精确相等为假、掉进 `<tr1/...>` fallback，libc++ 无 tr1 报 file not found
+
+root_cause:             2000-2016 年代的 C++ 头文件常用
+                        `#ifdef __APPLE__ / #elif(__cplusplus == 201103L) /
+                        #elif defined _MSC_VER / #else #include <tr1/unordered_map>`
+                        这类阶梯。`== 201103L` 只在编译器恰好编译 C++11 时成立；
+                        OHOS 平台固定 cppstd=17（__cplusplus == 201703L），
+                        精确相等为假 ⇒ 走 `#else` 的 `<tr1/unordered_map>` 分支，
+                        而 libc++（LLVM 的 C++ 标准库实现）从没有 tr1 目录 ⇒
+                        fatal error: 'tr1/unordered_map' file not found。
+                        同类阶梯里 `std::not1(std::ptr_fun(...))` /
+                        `std::bind2nd` 也在 C++17 被移除，一起编译失败。
+affected_scope:         任何用 C++11 精确匹配（== 201103L）做标准库分支、且
+                        在 C++17/20 构建的 2000-2016 年代纯头文件或库代码。
+                        OHOS 所有库默认 cppstd=17，全部命中。
+verification_cmd:       grep -n '__cplusplus' 头文件检查精确相等分支；
+                        grep -n 'tr1/' 头文件；clang++ -std=c++17 -fsyntax-only 复现。
+
+rec_priority:           1
+rec_approach:           widen-exact-match-to-gte
+rec_description:        把 `#elif(__cplusplus == 201103L)` 放宽为
+                        `#elif(__cplusplus >= 201103L)`，让 C++11/14/17/20 全部
+                        走 `<unordered_map>/<unordered_set>` 现代分支；同文件里
+                        `std::ptr_fun/std::bind2nd/std::not1` 换成 lambda。
+                        纯头文件库直接打包头文件即可，无需改构建系统。
+rec_command:            sed 或最小 patch：s/(__cplusplus == 201103L)/(__cplusplus >= 201103L)/；
+                        LTrim/RTrim 的 std::not1(std::ptr_fun(IsSpace)) →
+                        [](unsigned c){ return !IsSpace(c); }，
+                        std::not1(std::bind2nd(std::equal_to<char>(), x)) →
+                        [x](char c){ return c != x; }
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+forbid_1_pattern:       (skip.*test|#ifdef __OHOS__.*return 0)
+forbid_1_reason:        不能通过改构建选项降 C++ 标准规避——tr1 分支在 C++11 以下
+                        才存在，降标准会引入更多旧代码问题且偏离 OHOS 平台构建面。
+forbid_1_consequence:   库头以 C++17 交付时消费者编译仍会炸，问题未真正解决。
+
+principles:             P002, P014
+similar_to:             E218, E224, E293, DRAFT-coinor-vol-1.5.4-std-bind2nd-removed-cpp17, DRAFT-kytea-0.4.7-stale-shipped-configh-breaks-vpath
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-limonp-0.6.1-cpp11-exact-match-tr1-fallback.md
+last_updated:           2026-10-04
+source_event:           archives/l/limonp/0.6.1（G2 conan create 复现）
+
+authors:                2301_76770579
+source_pr:              (关联 limonp 0.6.1 PR)
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-04
