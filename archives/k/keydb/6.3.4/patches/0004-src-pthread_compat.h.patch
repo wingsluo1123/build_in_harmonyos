@@ -1,0 +1,44 @@
+--- /dev/null
++++ b/src/pthread_compat.h
+@@ -0,0 +1,41 @@
++/*
++ * pthread capability shims for non-glibc Linux libcs.
++ *
++ * OHOS uses a musl libc. musl provides the POSIX Threads primitives KeyDB
++ * relies on but omits several GNU extensions: the thread affinity calls, the
++ * cancellation-state setters and pthread_cancel() itself. Declare the
++ * forwarded entry points here and implement them in pthread_compat.cpp.
++ */
++#ifndef KEYDB_PTHREAD_COMPAT_H
++#define KEYDB_PTHREAD_COMPAT_H
++
++#if defined(__linux__) && !defined(__GLIBC__)
++
++/* cpu_set_t and the affinity prototypes live behind _GNU_SOURCE, while the
++ * translation units including this header have not necessarily set it yet. */
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE 1
++#endif
++
++#include <pthread.h>
++#include <sched.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++int pthread_setaffinity_np(pthread_t thread, size_t cpusetsize,
++                           const cpu_set_t *cpuset);
++int pthread_getaffinity_np(pthread_t thread, size_t cpusetsize,
++                           cpu_set_t *cpuset);
++int pthread_cancel(pthread_t thread);
++int pthread_setcancelstate(int state, int *oldstate);
++int pthread_setcanceltype(int type, int *oldtype);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* defined(__linux__) && !defined(__GLIBC__) */
++
++#endif /* KEYDB_PTHREAD_COMPAT_H */

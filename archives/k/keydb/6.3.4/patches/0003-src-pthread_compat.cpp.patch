@@ -1,0 +1,76 @@
+--- /dev/null
++++ b/src/pthread_compat.cpp
+@@ -0,0 +1,73 @@
++/*
++ * pthread capability shims for non-glibc Linux libcs.
++ *
++ * OHOS uses a musl libc, which provides the POSIX Threads primitives KeyDB
++ * relies on but not the GNU extensions pthread_setaffinity_np() and
++ * pthread_getaffinity_np(); thread pinning goes through sched_setaffinity().
++ * These shims keep the upstream call sites unchanged by forwarding to the API
++ * the platform does provide.
++ */
++#if defined(__linux__) && !defined(__GLIBC__)
++
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE 1
++#endif
++
++#include "pthread_compat.h"
++
++#include <errno.h>
++#include <pthread.h>
++#include <sched.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++int pthread_setaffinity_np(pthread_t thread, size_t cpusetsize,
++                           const cpu_set_t *cpuset) {
++    /* Only the calling thread can be re-pinned through this entry point;
++     * fail rather than silently pinning an unrelated thread. */
++    if (!pthread_equal(thread, pthread_self())) {
++        return EINVAL;
++    }
++    return sched_setaffinity(0, cpusetsize, cpuset);
++}
++
++int pthread_getaffinity_np(pthread_t thread, size_t cpusetsize,
++                           cpu_set_t *cpuset) {
++    if (!pthread_equal(thread, pthread_self())) {
++        return EINVAL;
++    }
++    return sched_getaffinity(0, cpusetsize, cpuset);
++}
++
++/* Cancellation is not implemented by this libc. Report ENOSYS rather than
++ * success: callers only proceed to join a thread when the call reports
++ * success, so claiming success would deadlock them on a thread that keeps
++ * running. */
++int pthread_cancel(pthread_t thread) {
++    (void)thread;
++    return ENOSYS;
++}
++
++int pthread_setcancelstate(int state, int *oldstate) {
++    (void)state;
++    if (oldstate != NULL) {
++        *oldstate = PTHREAD_CANCEL_ENABLE;
++    }
++    return 0;
++}
++
++int pthread_setcanceltype(int type, int *oldtype) {
++    (void)type;
++    if (oldtype != NULL) {
++        *oldtype = PTHREAD_CANCEL_DEFERRED;
++    }
++    return 0;
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* defined(__linux__) && !defined(__GLIBC__) */

@@ -1,0 +1,37 @@
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -6531,21 +6531,33 @@
+     serverAssert(!ret);
+ 
+     /* Write to the page once to make it resident */
+     *(volatile char*)q = 0;
+ 
+     /* Tell the kernel that this page is free to be reclaimed. */
+ #ifndef MADV_FREE
+ #define MADV_FREE 8
+ #endif
+     ret = madvise(q, 4096, MADV_FREE);
+-    serverAssert(!ret);
++    if (ret != 0) {
++        /* MADV_FREE is optional: OHOS/musl kernels reject it with EINVAL.
++         * The fork bug this probe looks for only exists on kernels that do
++         * implement MADV_FREE, so an unsupported advice value means the probe
++         * cannot run and the kernel is not affected by it. Abort the probe
++         * instead of the process (the upstream serverAssert would kill every
++         * server at startup on such kernels). */
++        serverLog(LL_WARNING,
++                  "madvise(MADV_FREE) unsupported on this kernel (errno=%d); "
++                  "skipping the arm64 fork bug probe", errno);
++        munmap(p, map_size);
++        return 0;
++    }
+ 
+     /* Write to the page after being marked for freeing, this is supposed to take
+      * ownership of that page again. */
+     *(volatile char*)q = 0;
+ 
+     /* Create a pipe for the child to return the info to the parent. */
+     ret = pipe(pipefd);
+     serverAssert(!ret);
+ 
+     /* Fork the process. */

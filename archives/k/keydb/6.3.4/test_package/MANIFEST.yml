@@ -1,0 +1,50 @@
+package: keydb/6.3.4
+homepage: "https://github.com/Snapchat/KeyDB"
+
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+upstream_tests:
+  - file: tests/test_helper.tcl
+    source: KeyDB-6.3.4/tests/test_helper.tcl
+    description: "KeyDB Tcl integration suite (unit/type, unit/expire, integration/*, ...) driven by ./runtest"
+    command: "sh ./runtest"
+
+test_package_tests:
+  - file: test.sh
+    description: "Conan consumer test: start the packaged keydb-server on loopback and verify version, PING, SET, GET and DEL through the packaged keydb-cli"
+    command: "bash test.sh"
+
+# HarmonyOS-specific tests. These cover what the upstream Tcl suite does not.
+#
+# Reported as NAMED end-to-end consumer cases, not as an assertion list: each
+# case drives the *packaged* binaries through a real workflow and inspects a
+# real result. `run_ohos_tests.sh` is the single entry point and prints one
+# [CASE] verdict per case plus the tally.
+#
+#   OHOS-1  keydb-server + keydb-cli : RESP round trip over loopback
+#   OHOS-2  RDB persistence round trip (server + cli + check-rdb)
+#   OHOS-3  AOF persistence round trip (server + cli + check-aof)
+#   OHOS-4  keydb-benchmark live load (server + benchmark); the server must
+#           verifiably have received the writes
+#
+# Every one of the five packaged commands is exercised end to end by at least
+# one case: server (1-4), cli (1-3), check-rdb (2), check-aof (3),
+# benchmark (4).
+ohos_specific_tests:
+  - file: tests/run_ohos_tests.sh
+    description: "Case runner (single entry): OHOS-1 server<->cli RESP round trip; OHOS-4 keydb-benchmark live load; folds in OHOS-2/OHOS-3 from ohos_persistence_test.sh; plus supporting checks S1 (five aarch64 ELF commands + musl pthread shim actually linked into keydb-server) and S2 (platform capability probe)"
+    command: "sh tests/run_ohos_tests.sh <package_folder>"
+  - file: tests/ohos_persistence_test.sh
+    description: "OHOS-2 RDB persistence round trip (server + cli + check-rdb): real dump.rdb produced, validated by the packaged keydb-check-rdb, values recovered after a restart. OHOS-3 AOF persistence round trip (server + cli + check-aof): real appendonly.aof produced, validated, rebuilt on restart"
+    command: "sh tests/ohos_persistence_test.sh <package_folder>"
+  - file: tests/ohos_platform_probe.c
+    description: "Supporting check S2: platform capability probe — madvise(MADV_DONTNEED) must succeed and MADV_FREE may cleanly report EINVAL; sched_setaffinity/sched_getaffinity plus CPU_* macros must work (the musl pthread shim forwards to them); pthread_setname_np must work"
+    command: "clang tests/ohos_platform_probe.c -o probe -lpthread && ./probe"
+
+# Conan consumer test (test_package/test.sh): 1 case.
+assertion_count: 6
+
+# HarmonyOS-specific end-to-end consumer cases (the OHOS-n above).
+harmonyos_case_count: 4

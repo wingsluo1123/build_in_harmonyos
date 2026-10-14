@@ -1,0 +1,20 @@
+--- a/tests/support/tmpfile.tcl
++++ b/tests/support/tmpfile.tcl
+@@ -1,12 +1,16 @@
+ set ::tmpcounter 0
+-set ::tmproot "./tests/tmp"
++if {[info exists ::env(KEYDB_TEST_TMPDIR)]} {
++    set ::tmproot $::env(KEYDB_TEST_TMPDIR)
++} else {
++    set ::tmproot "./tests/tmp"
++}
+ file mkdir $::tmproot
+ 
+ # returns a dirname unique to this process to write to
+ proc tmpdir {basename} {
+     set dir [file join $::tmproot $basename.[pid].[incr ::tmpcounter]]
+     file mkdir $dir
+     set _ $dir
+ }
+ 
+ # return a filename unique to this process to write to
