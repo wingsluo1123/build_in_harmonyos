@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试清点（R51：N = tests/ 目录数 + 测试注册数）：
+#   N = 16 = ① tests/functions_test 的 6 个 test_* 函数（POSIX sh + shunit2；build() 内真跑）
+#            + ② debian/tests/control 里逐条 `Tests:` 注册的 10 个 autopkgtest 用例
+#              （copy-file, unmkinitramfs, qemu-klibc, qemu-busybox, qemu-ata-only,
+#               qemu-virtio-only, qemu-separate-usr, qemu-panic-shell, qemu-net, qemu-net-iscsi）
+#   ⚠ 此前把另外 10 个解释成"shunit2 框架自带 example"是错的：它们是上游自带的 Debian
+#     autopkgtest 用例，正是审核实测 N=16 的来源。
+#   ①真跑（可满足）；②需 Debian 测试床（linux-image-generic + qemu + root），OHOS 架构上不可满足。
+
+package: initramfs-tools/0.151
+homepage: "https://salsa.debian.org/kernel-team/initramfs-tools"
+
+upstream_check_command: "PATH=<shunit2 目录>:$PATH sh tests/functions_test"
+
+upstream_test_in_build: true
+upstream_test_command: "PATH=<shunit2>:$PATH sh tests/functions_test"
+
+upstream_total: 16
+
+upstream_tests:
+  - file: tests/functions_test
+    source: "initramfs-tools_0.151.tar.xz（Debian native 包源码内自带）"
+    description: "shunit2 驱动的单元测试（6 个 test_*）：覆盖 scripts/functions 里的纯函数（如 _generate_hosts_content 生成的 /etc/hosts 片段）"
+    command: "PATH=<shunit2>:$PATH sh tests/functions_test"
+    count: 6
+    executed: 6
+    # 计数口径（供 rule4「少报」核对，可复现）：
+    #   · 本文件承载 6 个 test_*（真跑 6/6 通过，`Ran 6 tests` → OK）
+    #   · 余下 10 个为 debian/tests/control 注册的 autopkgtest 用例（见 upstream_not_run）
+  - file: debian/tests/control
+    source: "initramfs-tools_0.151.tar.xz（Debian native 包源码内自带）"
+    description: "Debian autopkgtest 集成用例（10 个 `Tests:` 注册项）：copy-file / unmkinitramfs / qemu-klibc / qemu-busybox / qemu-ata-only / qemu-virtio-only / qemu-separate-usr / qemu-panic-shell / qemu-net / qemu-net-iscsi"
+    command: "autopkgtest（需 Debian 测试床：linux-image-generic + qemu-system-native + root）"
+    count: 10
+    executed: 0
+
+# 未跑的 10 个：平台级系统性阻塞（非"缺配方依赖"、非用例失败），逐项依据：
+upstream_not_run:
+  - "copy-file：Restrictions 含 needs-root/breaks-testbed，Depends 含 linux-image-generic + zstd"
+  - "unmkinitramfs：Depends=bzip2,lz4,lzop,xz-utils,zstd，脚本 `set -eu` 逐一遍历 8 种压缩器 → 缺一即中止（本机 zstd/lzop MISSING）"
+  - "8 个 qemu-*：Restrictions=needs-root,breaks-testbed，Depends 含 linux-image-generic（Linux 内核镜像）+ qemu-system-native + genext2fs/ipxe-qemu/klibc-utils；OHOS 非 Linux 内核且 `command -v qemu-system-x86_64` = MISSING，架构上不可满足"
+
+release_smoke_tests:
+  - file: "sbin/mkinitramfs"
+    source: "包产物（由源码模板经 @VERSION@ / @BUSYBOX_PACKAGES@ 替换生成）"
+    description: "`sh -n` 语法通过、无占位符残留、含版本号 0.151"
+    command: "sh -n sbin/mkinitramfs && ! grep -q '@VERSION@\\|@BUSYBOX_PACKAGES@' sbin/mkinitramfs"
+
+test_package_tests:
+  - file: check_initramfs_tools.py
+    description: "消费者校验 4 项：①关键产物齐备（unmkinitramfs/lsinitramfs/mkinitramfs/update-initramfs + hooks/scripts 框架 + 配置 + man）②bin/unmkinitramfs 为 64 位 AArch64 ELF（本包 make all 产物）③模板替换已生效（sbin/mkinitramfs 无 @VERSION@/@BUSYBOX_PACKAGES@ 残留且含 0.151）④shell 产物 sh -n 全过 + best-effort 真跑 unmkinitramfs（仅具名环境信号可 SKIP，其余非 0 判 FAIL）"
+    command: "python3 check_initramfs_tools.py <package-folder>"
+
+assertion_count: 4
