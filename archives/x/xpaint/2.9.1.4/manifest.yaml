@@ -1,0 +1,99 @@
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/2.9.1.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.9.1.4"
+software: "xpaint"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+build_date: "2026-10-05"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # Debian 官方 pool 的 orig tarball（xpaint 上游 sourceforge 已失效，
+  # Debian pool 是权威再分发源，R39 合规）
+  url: "https://deb.debian.org/debian/pool/main/x/xpaint/xpaint_2.9.1.4.orig.tar.bz2"
+  sha256: "a733736bd635bbf5b5a04b8061da132b317793ef9292ce6f07a85f9dcfdc114a"
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # Imake 体系（E546）：无 xmkmf，配方内手工 GNUmakefile 组织编译
+  system: makefile
+
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - xorgproto/2025.1
+  - libx11/1.8.13
+  - libxext/6.4.0.1
+  - libxt/1.3.1
+  - libxmu/1.3.1.1
+  - libxpm/3.5.17
+  - libpng/1.6.58
+  - zlib/1.3.1.1
+  - libjpeg/10
+  - libtiff/4.7.0
+  - libxft/2.3.8
+  - fontconfig/2.18.1
+  - freetype/2.14.3
+
+  tool_requires:
+  - bison/2.7
+  - flex/2.6.4
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "0003-misc-h-bool-param.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "E546: Imake/xmkmf 体系在 OHOS 不可用（无 imake 工具链/X11 config 规则树），老式 X11 软件需通读 Imakefile 手工提取编译单元（SRCS/OBJS/DEFINES/SYS_LIBRARIES）在配方内组织编译"
+- "xaw3dxft 内嵌 widget 库随主程序编译（制品仓无 libXaw3d/libxaw）；laygram/laylex 由 bison/flex 生成后需 sed 's/yy/LayYY/g' 前缀改写（Imakefile 原规则）"
+- "E524 家族实证扩展：HMDFS 对 libXft.so.2 单文件 mmap(EXEC) 拒载（dlopen Permission denied），同目录同布局 libXmu/libXt/libX11 可载；跨版本(2.3.9/2.3.8)/位置(4处)/拷贝方式复现——静态桩注入规避（stub 返回 NULL，二进制无 libXft DT_NEEDED）"
+- "misc.h 原型参数名 'bool' 与 X11 头链引入的 stdbool typedef 冲突（0003 补丁改名 boolval）"
+- "image.h 的 struct imageprocessinfo 被 #ifdef _XLIB_H_ 守卫，conan 包 Xlib.h 守卫宏为 _X11_XLIB_H_ 不匹配，主程序 CFLAGS 需 -D_XLIB_H_；rw/ 不带此宏（-include X11/Xlib.h 提供 XColor）"
+- "上游 EXTRA_DEFINES 含 -DFEATURE_FRACTAL（Local.config），漏掉会使 operation.c 菜单数组与回调 #ifdef 不一致编译失败"
+
+patch_generation:
+  method: manual
+  generated_at: '2026-10-05T22:50:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0003-misc-h-bool-param.patch
+    type: manual
+    platform_only: false
+    guard: 'stdbool.h typedef collision rename — no platform macro (R8 compliant)'
+
+# ============================================================
+# 平台限制（如实申报）
+# ============================================================
+
+platform_limitations:
+  - "libXft 动态加载被 HMDFS 拒绝（E524 家族）：已用静态桩规避，GUI 字体渲染路径返回 NULL；headless 消费者测试不受影响，画布场景字体回退行为受限"
+
+---
+
+**编译结束**: 2026-10-05 22:50
+**最终状态**: published
