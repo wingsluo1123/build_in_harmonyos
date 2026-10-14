@@ -1,0 +1,29 @@
+# Maintainer-review candidate; no automatic Path B grade or points claim.
+id:                     DRAFT-ohos-offline-source-switch-criteria
+draft:                  true
+trigger_tool:           conan|curl|wget|tar
+phase:                  build
+severity:               2
+category:               ohos-offline-source-substitution
+error_signature:        urlopen error \[Errno 110\]|Connection refused|Operation timed out|configure script is missing|http://download\.[a-z0-9.]+/.*301.*Location
+match_keywords:         换源, source substitution, pristine, dist tarball, 源码快照, GitHub release asset, GitHub 归档, sourceforge, Fedora lookaside, Debian pool, MacPorts distfiles, Void sources, Gentoo distfiles, dfsg, sha512, sha256, md5, configure 缺失, autoreconf 不可用
+title:                  受限网络下的换源判据：官方发行版缓存里的 pristine 快照 ≠ dist tarball（须同时校验“生成物”与官方记录的强哈希）
+root_cause:             上游发布位可能整体不可达（GitHub 超时、sourceforge 连接被拒、官方站 301 Location 畸形或 TLS 不兼容），
+                        官方发行版源码缓存是常用替代；但**同一版本的镜像存在两种形态**：dist tarball（含 configure 等生成物，可直接构建）
+                        与源码快照 / GitHub 归档（无生成物，需 autoreconf）。只校验“可达 + 哈希”时，问题会在构建期以
+                        `configure script is missing` 或（本机 autoreconf 不可用时的）perl 模块加载失败暴露。
+                        另两条边界：Debian 的 `+dfsg` 属**下游重打包**（内容被删改，按 R39/PF7 不宜作替代源）；
+                        SourceForge 官方镜像主机（master/netix.dl.sourceforge.net）只会 301 回 downloads.sourceforge.net，
+                        当该项目域名整体不可达时镜像链完全无效。
+affected_scope:         所有上游发布位在本环境不可达、需要换源才能构建/发布的适配包（本轮：libcddb、libcaca、libbs2b、live555、samba）
+verification_cmd:       curl -sSL -o cand.tar.<ext> <url> && sha256sum cand.tar.<ext> && tar -tf cand.tar.<ext> | head -3
+rec_priority:           1
+rec_approach:           upstream-release-then-distro-cache-with-content-and-hash-check
+rec_description:        ①优先上游**官方发布位**（download.samba.org / download.gnome.org / x.org / videolan 等本轮均可达）；
+                        ②不可达时用**官方发行版源码缓存**，优先 Fedora lookaside（`src.fedoraproject.org/repo/pkgs/<name>/`，
+                        其缓存的多为 dist tarball），其次 Debian pool、MacPorts distfiles、Void sources、openSUSE/Alpine/Arch/Gentoo；
+                        ③**落盘前必须校验内容**：展开后确认目标消费方式所需的东西存在（autotools 配方要 `configure`），
+                        不能只验哈希；④用该缓存**记录的强哈希**（Fedora 的 sha512/md5）逐字核验，并把 sha256 一并写入 conandata；
+                        ⑤排除 `+dfsg`/下游重打包；⑥`*.dl.sourceforge.net` 只重定向回官方域名，勿寄希望。
+rec_command:            'curl -sSL -o cand.tar.gz <url> && sha256sum cand.tar.gz && rm -rf /tmp/chk && mkdir /tmp/chk && tar -xf cand.tar.gz -C /tmp/chk && ls /tmp/chk/*/ | head && [ -f /tmp/chk/*/configure ] && echo "dist-tarball OK"'
+evidence_ref:           archives/l/libcaca/0.99.beta20/notes.md（换源记录：4 份候选逐一排除）; archives/l/libcddb/1.3.2/conandata.yml; archives/l/libbs2b/3.1.0/notes.md; archives/l/live555/2026.08.14/conandata.yml; archives/s/samba/4.21.0.1/notes.md
