@@ -1,0 +1,53 @@
+package: unscd/0.54
+homepage: "https://busybox.net/~vda/unscd/"
+
+# Upstream test suite existence (audited against upstream sources + Debian orig)
+upstream_tests_exist: false
+
+# Upstream test audit (sources: busybox.net author page + unscd_0.54.orig.tar.gz,
+# sha256 823430b97de9349c73f12a33e4c28a9425b3166a77f7e9e03aeccb4964aaee53)
+upstream_test_audit:
+  source_tarball: "unscd_0.54.orig.tar.gz"
+  source_sha256: "823430b97de9349c73f12a33e4c28a9425b3166a77f7e9e03aeccb4964aaee53"
+  upstream_author_page: "https://busybox.net/~vda/unscd/"
+  top_level_files:
+    - nscd-0.54.c       # single 73304-byte daemon source; no TEST()/TEST_F/gtest, no pytest
+    - Makefile          # 223 bytes, targets all/clean only; no check/test target
+    - getpwnam_test.c   # 188-byte manual NSS probe (printf Found/Not found), not an automated suite
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "check/test targets in Makefile"
+    - "tests/ / test/ / spec/ / t/ directories"
+    - "ctest / meson test registrations"
+    - "find . -name '*test*' across the tree"
+  scan_result: "0 automated cases — no tests/ directory; Makefile has no check/test target; sources contain no gtest/pytest cases; getpwnam_test.c is a manual probe, not a runnable suite"
+  make_check_output: "make -n check reports no rule to make target 'check' (Makefile defines only all/clean)"
+  reason: "unscd 0.54 is a single-file nscd replacement daemon; upstream author page and the Debian orig tarball ship no automated test suite, only a manual getpwnam probe"
+
+# Upstream test command (no suite, kept empty so scanners do not misread it)
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream tests actually run (upstream_tests_exist: false)
+upstream_tests: []
+
+# Declared upstream total (explicit 0 for the no_tests case; single-Makefile
+# layout, audited via `make -n check` having no rule)
+upstream_test_total: 0
+upstream_test_count_method: "auto"
+
+# Consumer-side tests shipped in test_package
+test_package_tests:
+  - file: "test.sh"
+    description: "4 checks: binary present+non-empty, unscd -V version output, --help usage output, NSS consumer binary (getpwuid/getgrgid/gethostbyname)"
+    command: "bash test.sh"
+  - file: "test_nss.c"
+    description: "Real caller of the NSS libc APIs unscd caches (getpwuid/getgrgid/gethostbyname); compiled and run by test.sh"
+    command: "clang test_nss.c -o test_nss && ./test_nss"
+  - file: "conanfile.py"
+    description: "Conan test() entry: runs test.sh and re-emits both HMBS machine-evidence markers every round (test_package discovered=4 + upstream no_tests/0)"
+    command: "conan test test_package"
+
+assertion_count: 4
