@@ -1,0 +1,114 @@
+# 版本级 manifest — hpx 1.11.0
+# 文件位置: archives/h/hpx/1.11.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.11.0"
+
+software: "hpx"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-09-28"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 tag 归档（原 STEllAR-GROUP/hpx 已迁移至 TheHPXProject/hpx）
+  url: "https://github.com/TheHPXProject/hpx/archive/refs/tags/v1.11.0.tar.gz"
+  sha256: "01ec47228a2253b41e318bb09c83325a75021eb6ef3262400fbda30ac7389279"
+  tar_format: tar.gz
+
+# 额外注入依赖（conandata deps，非 conan 依赖）
+injected_deps:
+  asio:
+    url: "https://github.com/chriskohlhoff/asio/archive/refs/tags/asio-1-21-0.tar.gz"
+    sha256: "5d2d2dcb7bfb39bff941cabbfc8c27ee322a495470bf0f3a7c5238648cf5e6a9"
+    method: "FETCHCONTENT_SOURCE_DIR_ASIO（HPX_WITH_FETCH_ASIO=ON）"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DHPX_USE_CMAKE_CXX_STANDARD=ON"
+    - "-DHPX_WITH_MALLOC=system"
+    - "-DHPX_WITH_GENERIC_CONTEXT_COROUTINES=OFF"
+    - "-DHPX_WITH_FETCH_ASIO=ON"
+    - "-DFETCHCONTENT_SOURCE_DIR_ASIO=<build>/deps/asio"
+    - "-DHPX_WITH_TESTS=OFF"
+    - "-DHPX_WITH_EXAMPLES=OFF"
+    - "-DHPX_WITH_PKGCONFIG=OFF"
+    - "-DCMAKE_CXX_STANDARD_LIBRARIES=-L<libucontext>/lib -lucontext -lucontext_posix -lm"
+
+  dependencies:
+    - boost/1.85.0
+    - hwloc/2.14.0
+    - libucontext/1.5.2
+    - zlib/1.3.1.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-libs-core-coroutines-include-hpx-coroutines-detail-context_impl.hpp.patch"
+  - "0002-libs-core-coroutines-include-hpx-coroutines-detail-context_posix.hpp.patch"
+  - "0003-libs-core-coroutines-src-swapcontext.cpp.patch"
+  - "0004-libs-core-coroutines-src-detail-context_posix.cpp.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS aarch64 无可用 Boost.Context（registry boost 包排除 context/coroutine/fiber；无 OHOS asm）→ HPX_WITH_GENERIC_CONTEXT_COROUTINES=OFF + POSIX ucontext + libucontext/1.5.2（提供 unprefixed 弱符号的 OHOS 预编译包）"
+  - "OHOS clang 定义 __linux__，HPX 上下文分支会误选 context_linux_x86.hpp（x86 asm）；需要 OHOS+aarch64 平台分支（本 PR 的 4 个补丁，仅影响 OHOS）"
+  - "HPX 1.11 pkgconfig 生成在 CMake >= 4 下硬错误（file(GENERATE INPUT) 含目标上下文相关 genex）→ HPX_WITH_PKGCONFIG=OFF"
+  - "Conan CMakeToolchain 强制 CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON，boost/hwloc registry 包目标名（Boost::headers / hwloc::hwloc）与 HPX 期待（Boost::boost / Hwloc::hwloc）不同 → CMakeDeps cmake_target_aliases 补别名"
+  - "Conan 2 traits：共享库的静态/头文件依赖默认对下游 skip；公共头包含依赖头时必须 transitive_headers=True（boost/hwloc），否则消费者 CMakeDeps 配置为空"
+  - "HarmonyOS 加载器拒绝未签名共享库（Error loading shared library <so>: 随后符号 symbol not found）；package() 必须用 llvm-objcopy + binary-sign-tool -selfSign 1 签名 lib/**/*.so*（boost 配方同款）"
+  - "CI 轨 CMAKE_SYSTEM_NAME=HarmonyOS 无 CMake 平台模块 → 链接规则缺 SONAME/RPATH，共享库 DT_NEEDED 落相对路径；需显式设置 CMAKE_SHARED_LIBRARY_SONAME/RPATH/RPATH_LINK 标志（boost 配方同款）"
+  - "DevEco ohos.toolchain.cmake 在 cache 预定义 CMAKE_CXX_FLAGS/CMAKE_*_LINKER_FLAGS，Conan 的 *_FLAGS_INIT 注入失效（Windows 交叉轨）；HPX 特性测试的 -Werror 与 --gcc-toolchain unused 警告冲突"
+  - "静态 libucontext 需位于链接行末尾（CMAKE_CXX_STANDARD_LIBRARIES），放在 linker flags 位置不会拉取归档符号"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: "<win-work-tree>/builds/hpx-1.11.0.orig"
+  source_work_dir: "<win-work-tree>/builds/hpx-1.11.0.work"
+  generated_at: '2026-09-28'
+  patches_count: 4
+  note: >-
+    refresh-patch 在 Windows 上因路径分隔符未归一化（文件名含反斜杠）失败；
+    按 R14 手动模式使用同一 difflib 算法生成，全部 LF 换行且 patch --dry-run 通过
+
+patch_classification:
+  - file: 0001-libs-core-coroutines-include-hpx-coroutines-detail-context_impl.hpp.patch
+    type: portability
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0002-libs-core-coroutines-include-hpx-coroutines-detail-context_posix.hpp.patch
+    type: portability
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0003-libs-core-coroutines-src-swapcontext.cpp.patch
+    type: portability
+    platform_only: true
+    guard: '__OHOS__'
+  - file: 0004-libs-core-coroutines-src-detail-context_posix.cpp.patch
+    type: portability
+    platform_only: true
+    guard: '__OHOS__'
