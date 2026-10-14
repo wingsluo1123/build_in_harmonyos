@@ -1,0 +1,163 @@
+--- a/blowfish.c
++++ b/blowfish.c
+@@ -3,6 +3,7 @@
+ /* $Id: blowfish.c,v 1.3 1998/12/01 15:46:16 vasim Exp $ */
+ 
+ #include <sys/types.h>
++#include <arpa/inet.h>
+ #include "blowfish.h"
+ 
+ #define F(x,s) (((s->S[0][(x >> 24) & 0xff] \
+@@ -12,14 +13,14 @@
+ 
+ #define R(a,b,s,n) a ^= s->P[n]; b ^= F(a,s)
+ 
+-#define GET32(x) (htonl(*((u_int32_t *) (x))))
+-#define PUT32(x,y) (*((u_int32_t *) (x)) = ntohl(y))
++#define GET32(x) (htonl(*((uint32_t *) (x))))
++#define PUT32(x,y) (*((uint32_t *) (x)) = ntohl(y))
+ 
+ int brokenfish = 0;
+ 
+ /* Initial values of boxes */
+ /* Taken from SSH's implementation (by Mika Kojo) */
+-u_int32_t bf_P[18] = {
++uint32_t bf_P[18] = {
+   0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344,
+   0xa4093822, 0x299f31d0, 0x082efa98, 0xec4e6c89,
+   0x452821e6, 0x38d01377, 0xbe5466cf, 0x34e90c6c,
+@@ -27,7 +28,7 @@
+   0x9216d5d9, 0x8979fb1b
+ };
+ 
+-u_int32_t bf_S[4][256] = {
++uint32_t bf_S[4][256] = {
+   {
+     0xd1310ba6, 0x98dfb5ac, 0x2ffd72db, 0xd01adfb7,
+     0xb8e1afed, 0x6a267e96, 0xba7c9045, 0xf12c7f99,
+@@ -296,8 +297,8 @@
+ 
+ 
+ /* Encrypt one block (8 bytes) */
+-u_int64_t bf_encrypt(u_int64_t data, bf_subkeys *skeys) {
+-  u_int32_t xL, xR;
++uint64_t bf_encrypt(uint64_t data, bf_subkeys *skeys) {
++  uint32_t xL, xR;
+ 
+   xL = (data >> 32) & 0xffffffff;
+   xR = data & 0xffffffff;
+@@ -311,8 +312,8 @@
+   R(xL, xR, skeys, 12); R(xR, xL, skeys, 13);
+   R(xL, xR, skeys, 14); R(xR, xL, skeys, 15);
+ 
+-  return (((u_int64_t) (xR ^ skeys->P[17]) << 32)
+-	  + ((u_int64_t) (xL ^ skeys->P[16])));
++  return (((uint64_t) (xR ^ skeys->P[17]) << 32)
++	  + ((uint64_t) (xL ^ skeys->P[16])));
+ }
+ 
+ #define Fi(x,s) (((s->S[0][(x >> 24) & 0xff] \
+@@ -321,8 +322,8 @@
+ 		+ s->S[3][(x & 0xff) % 232])
+ #define Ri(a,b,s,n) a ^= s->P[n]; b ^= Fi(a,s)
+ 
+-u_int64_t bf_encrypt_init(u_int64_t data, bf_subkeys *skeys) {
+-  u_int32_t xL, xR;
++uint64_t bf_encrypt_init(uint64_t data, bf_subkeys *skeys) {
++  uint32_t xL, xR;
+   int i;
+ 
+   xL = (data >> 32) & 0xffffffff;
+@@ -331,13 +332,13 @@
+     Ri(xL, xR, skeys, i); Ri(xR, xL, skeys, i + 1);
+   }
+ 
+-  return (((u_int64_t) (xR ^ skeys->P[17]) << 32)
+-	  + ((u_int64_t) (xL ^ skeys->P[16])));
++  return (((uint64_t) (xR ^ skeys->P[17]) << 32)
++	  + ((uint64_t) (xL ^ skeys->P[16])));
+ }
+ 
+ /* Decrypt one block (8 bytes) */
+-u_int64_t bf_decrypt(u_int64_t data, bf_subkeys *skeys) {
+-  u_int32_t xL, xR;
++uint64_t bf_decrypt(uint64_t data, bf_subkeys *skeys) {
++  uint32_t xL, xR;
+ 
+   xL = (data >> 32) & 0xffffffff;
+   xR = data & 0xffffffff;
+@@ -351,14 +352,14 @@
+   R(xL, xR, skeys, 5); R(xR, xL, skeys, 4);
+   R(xL, xR, skeys, 3); R(xR, xL, skeys, 2);
+ 
+-  return (((u_int64_t) (xR ^ skeys->P[0]) << 32)
+-	  + ((u_int64_t) (xL ^ skeys->P[1])));
++  return (((uint64_t) (xR ^ skeys->P[0]) << 32)
++	  + ((uint64_t) (xL ^ skeys->P[1])));
+ }
+ 
+ /* Calculate subkeys */
+ void bf_subkeys_init(bf_subkeys *skeys, unsigned char *key, int len) {
+   int i, j;
+-  u_int64_t temp;
++  uint64_t temp;
+ 
+   for(i = 0; i < 4; i++)
+     for (j = 0; j < 256; j++)
+@@ -368,10 +369,10 @@
+ 
+   j = 0;
+   for(i = 0; i < 18; i++) {
+-    skeys->P[i] ^= (((u_int32_t) key[j] << 24)
+-		    + ((u_int32_t) key[(j + 1) % len] << 16)
+-		    + ((u_int32_t) key[(j + 2) % len] << 8)
+-		    + ((u_int32_t) key[(j + 3) % len]));
++    skeys->P[i] ^= (((uint32_t) key[j] << 24)
++		    + ((uint32_t) key[(j + 1) % len] << 16)
++		    + ((uint32_t) key[(j + 2) % len] << 8)
++		    + ((uint32_t) key[(j + 3) % len]));
+     j = (j + 4) % len;
+   }
+ 
+@@ -401,15 +402,15 @@
+ }
+ 
+ /* Encrypt few block(s) */
+-u_int64_t bf_encrypt_data(unsigned char *data, int len,
+-		     u_int64_t init, bf_subkeys *skeys) {
++uint64_t bf_encrypt_data(unsigned char *data, int len,
++		     uint64_t init, bf_subkeys *skeys) {
+   int i;
+-  u_int64_t temp, temp2, prev;
++  uint64_t temp, temp2, prev;
+ 
+   prev = init;
+   for(i = 0; i < len; i += 8) {
+-    temp2 = ((u_int64_t) GET32(data + i) << 32)
+-      | (u_int64_t) GET32(data + 4 + i);
++    temp2 = ((uint64_t) GET32(data + i) << 32)
++      | (uint64_t) GET32(data + 4 + i);
+     temp = bf_encrypt(temp2 ^ prev, skeys);
+     prev = temp2;
+     PUT32(data + i, (temp >> 32) & 0xffffffff);
+@@ -419,15 +420,15 @@
+ }
+ 
+ /* Decrypt few blocks */
+-u_int64_t bf_decrypt_data(unsigned char *data, int len,
+-		     u_int64_t init, bf_subkeys *skeys) {
++uint64_t bf_decrypt_data(unsigned char *data, int len,
++		     uint64_t init, bf_subkeys *skeys) {
+   int i;
+-  u_int64_t temp, prev;
++  uint64_t temp, prev;
+ 
+   prev = init;
+   for(i = 0; i < len; i += 8) {
+-    temp = bf_decrypt(((u_int64_t) GET32(data + i) << 32)
+-		      | (u_int64_t) GET32(data + 4 + i), skeys);
++    temp = bf_decrypt(((uint64_t) GET32(data + i) << 32)
++		      | (uint64_t) GET32(data + 4 + i), skeys);
+     prev ^= temp;
+     PUT32(data + i, (prev >> 32) & 0xffffffff);
+     PUT32(data + i + 4, prev & 0xffffffff);

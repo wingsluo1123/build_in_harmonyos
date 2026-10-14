@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: rtnppd/1.7b
+homepage: "https://sourceforge.net/projects/rtnppd/"
+
+# 上游测试套件存在性 (经审计源码 tar 包确认)
+upstream_tests_exist: false
+
+# 上游测试审计 (源码: rtnppd-1.7b.tar.gz, sha256 06651a98c99048d9a211a92a68d8e5ed03ffdf2caf04904923a8ae7418a5eca4)
+upstream_test_audit:
+  source_tarball: "rtnppd-1.7b.tar.gz"
+  source_sha256: "06651a98c99048d9a211a92a68d8e5ed03ffdf2caf04904923a8ae7418a5eca4"
+  top_level_files:
+    - Makefile          # 仅 default/rtnppd/testq/tnpppage/clean/install/install.config/key 目标, 无 check/test/TESTS 目标
+    - README            # 项目说明文本 (1999, Brandon Bidewell)
+    - COPYRIGHT         # BSD-2-Clause 许可证文本
+    - rtnppd.c          # 守护进程主程序 (getopt + fork 守护化 + 主循环), 无 TEST()/TEST_F/def test_
+    - rtnppd.h          # 主程序结构与原型头
+    - readcfg.c         # 配置文件读取 (regex 解析), 纯实现源
+    - readcfg.h         # 配置解析定义头
+    - crc.c             # CRC-16 实现, 纯实现源
+    - crc.h             # CRC-16 原型头
+    - blowfish.c        # Blowfish 加解密实现, 纯实现源
+    - blowfish.h        # Blowfish 定义头
+    - testq.c           # 外部队列示例工具 (非测试: 收包回显的演示程序)
+    - tnpppage.c        # 寻呼客户端工具 (非测试: 发送 TNPP 寻呼的客户端)
+    - rtnppd.conf / tnpp_dev.conf / tnpp_trans.conf  # 运行期配置样例
+    - new_rtnppd.conf / new_tnpp_dev.conf / new_tnpp_trans.conf  # 新格式配置样例
+    - example.complex   # 复杂组网配置示例
+    - from_sendmail_to_tnpppage.pl  # sendmail 集成辅助脚本
+    - CVS/              # 上游 CVS 元数据目录 (无测试内容)
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile check / test / TESTS / check_PROGRAMS 目标"
+    - "tests/ / test/ / spec/ / t/ 目录"
+    - "configure.ac / CMakeLists.txt / meson.build 测试声明"
+    - "find 全树 '*test*' (仅命中 testq.c 工具源, 无测试框架引用)"
+  scan_result: "0 matches — 全树无 tests/ 目录; testq.c/tnpppage.c 是随包发布的工具程序而非测试; Makefile 无 check/test 目标"
+  make_check_output: "make check 无规则可执行 (No rule to make target 'check') — 上游未定义任何测试目标"
+  reason: "rtnppd 1.7b 为 TNPP 分组路由守护进程, 2007 年发布的源码包不含任何测试套件: 无 tests/ 目录、无测试源文件、无 check/test 目标。功能验证由 test_package 真实执行三个二进制 (usage/getopt 启动路径) 与 OHOS 产物属性校验完成"
+
+# 上游测试总数来自上述手工 tar 包 + Makefile 审计 (无可枚举的测试框架条目)
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+# 上游 1.7b 无测试套件, 故无 check 命令可发现或执行。必须保持为空:
+# HMBS 把非空值视为"上游有测试", 会拒绝 no_tests/0 声明。
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (upstream_tests_exist: false, 见上方审计)
+# 上游无测试, 真机预检输出 HMBS_UPSTREAM_TEST_RESULT status:"no_tests" discovered:0 executed:0
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+# R34: 必须实质执行被测包的二进制
+test_package_tests:
+  - file: test.sh
+    description: "功能测试: rtnppd -h 打印 usage 横幅并 exit(1); tnpppage 无参打印 usage 并 exit(1); testq 无参打印 usage 并 exit(1)"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "OHOS 特有: 三个产物均为 AArch64 ELF (e_machine=0xB7)"
+    command: "bash test.sh"
+  - file: test.sh
+    description: "OHOS 特有: 三个产物均链接 OHOS/musl loader (ld-musl-aarch64.so.1)"
+    command: "bash test.sh"
+  - file: conanfile.py
+    description: "Conan test() 入口, 执行 test.sh 并输出 HMBS 机器证据标记 (test_package discovered=5/passedCount=5 + 上游 no_tests/0)"
+    command: "conan test test_package"
+
+# 测试断言总数 (test.sh 的 5 个真实断言, 与 HMBS_TEST_PACKAGE_RESULT discovered=5 一致)
+assertion_count: 5
+
+# OHOS 特有测试用例数 (Test 4 + Test 5: OHOS aarch64 ELF 身份 + musl loader 链接)
+ohos_specific_test_count: 2

@@ -1,0 +1,61 @@
+software: rtnppd
+version: "1.7b"
+status: built
+build_date: "2026-10-13"
+build_system: makefile
+
+source:
+  url: "https://downloads.sourceforge.net/project/rtnppd/Original/1.7/rtnppd-1.7b.tar.gz"
+  sha256: "06651a98c99048d9a211a92a68d8e5ed03ffdf2caf04904923a8ae7418a5eca4"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-blowfish-h-stdint.patch"
+  - "0002-blowfish-c-portability.patch"
+  - "0003-rtnppd-c-portability.patch"
+  - "0004-testq-c-main.patch"
+  - "0005-tnpppage-c-return.patch"
+
+knowledge_gained:
+  - "上游为 2007 年发布的纯 Makefile 项目, 无 configure、无测试套件 (与 rbootd 同类); package() 不得调用上游 make install (写 /etc//var/spool + dd 取 urandom 生成 key), 改为直接拷贝产物"
+  - "BSD 类型 u_int32_t/u_int64_t 需整体替换为 C99 uint32_t/uint64_t + <stdint.h> (OHOS/musl 的 sys/types.h 不提供 BSD 名, 涉及 blowfish.h/blowfish.c/rtnppd.c 三处)"
+  - "rtnppd.c 的 <sys/fcntl.h> 是 glibc 专有重定向头, musl 无此文件, 改为 <fcntl.h>"
+  - "Alpine gcc14.patch 已实证同类修复 (arpa/inet.h、decrypt_packet 原型、testq main 类型、tnpppage return), 本适配在其基础上把 void main 改为标准 int main"
+  - "OHOS agent 以 socket 作为 stdin 时 clang 经 make 链静默失败, build() 沿用 rbootd 模式 (< /dev/null + 日志回放 + 命令内 cd 代替 cwd=)"
+  - "三个二进制均可用 -h/无参安全路径验证 (usage 打印后 exit(1), 不 daemonize、不碰网络), 适合 test_package 功能断言"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: rtnppd-orig
+  source_work_dir: rtnppd-work
+  generated_at: '2026-10-13'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-blowfish-h-stdint.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-blowfish-c-portability.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-rtnppd-c-portability.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0004-testq-c-main.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0005-tnpppage-c-return.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
