@@ -1,0 +1,17 @@
+package: patman/1.2.2
+homepage: "https://bioinf.eva.mpg.de/patman/"
+
+upstream_test_in_build: false
+upstream_test_inventory:
+  result: "上游源码包（12 个文件：Makefile、3 个 .cpp、3 个 .h、patman.1 等）没有 tests/ 目录，Makefile 无 check/test 目标，也没有 ctest/pytest 注册，上游自动化测试 0 个。"
+  evidence:
+    - Makefile
+    - "ls patman-1.2.2.orig（无 tests/）"
+
+test_package_tests:
+  - file: conanfile.py + check_hits.cpp
+    description: "消费者用例：用 OHOS profile 通过 Conan 消费 patman，编译 check_hits（解析 patman 输出的命中表并与期望表逐行比对），运行：-V 版本串（补丁修正 1.2→1.2.2）、双链精确匹配、-s 单链、-e 1 错配、-e 1 -g 1 缺口 共 5 个用例"
+    command: "conan create（test_package 自动运行）"
+
+test_package_test_count: 5
+assertion_count: 5

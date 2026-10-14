@@ -1,0 +1,40 @@
+version: "1.2.2"
+software: patman
+status: built
+build_date: "2026-10-08"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/p/patman/patman_1.2.2+dfsg.orig.tar.xz"
+  sha256: "b1a1981108b18909c1c6ff07cdbdba80ca4eb00a9d8d259770a5f8a3aa706587"
+  tar_format: tar.xz
+
+build:
+  system: makefile
+  dependencies:
+    - popt/1.16
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.patch"
+
+knowledge_gained:
+  - "上游 Makefile 硬编码 g++ 与 -march=k8：用 $(CXX) 取代并删除架构参数，编译器由 Conan Toolchain 经环境变量传入"
+  - "Makefile 中 CPPFLAGS += 会把环境变量的 CPPFLAGS 与自身追加合并，但 g++ 字面量不受环境变量影响，必须改规则"
+  - "上游 install 目标用 install -s，会调用构建机 strip 处理 aarch64 ELF，配方改为直接 copy 产物"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /root/tmp/builds/patman-1.2.2.orig
+  source_work_dir: /root/tmp/builds/patman-1.2.2.work
+  source_orig_hash: 5fe1bd97d9241987
+  source_work_hash: 397aeac9a670f8bc
+  generated_at: '2026-10-08T15:07:36'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: portability
+    platform_only: false
+    guard: none
