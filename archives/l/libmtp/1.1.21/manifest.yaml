@@ -1,114 +1,53 @@
-software: libmtp
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.1.21/manifest.yaml
+# 版本级 manifest.yaml
+# 文件位置: archives/l/libmtp/1.1.21/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "1.1.21"
+software: libmtp
 
-# 编译状态
-# published | built | failed | archived
-status: published
+# prepared: 配方与测试已就绪，等待 OHOS 真机构建验证
+# （ohc-run.py finish 会将其改写为 built）
+status: built
 
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-26"
-
-# ============================================================
-# 源码信息
-# ============================================================
+build_date: "2026-09-30"
+build_system: conan
 
 source:
-  # 源码下载 URL
-  url: "https://downloads.sourceforge.net/libmtp/libmtp-1.1.21.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: "https://github.com/libmtp/libmtp/releases/download/v1.1.21/libmtp-1.1.21.tar.gz"
+  sha256: "f4c1ceb3df020a6cb851110f620c14fe399518c494ed252039cbfb4e34335135"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  build_system: autotools
   system: autotools
-
-  # 配置选项列表
-  configure_options: ""
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
+  configure_options:
+    # MTPZ（Zune 设备）专用，避免引入 libgcrypt
+    - "--disable-mtpz"
+    # udev 规则/mtp-probe 默认装 /usr/lib/udev（只读），重定向进安装前缀
+    - "--with-udev=${prefix}/lib/udev"
+    # 库形态（shared=False 时静态库；libusb/1.0.27 同款参数组）
+    - "--disable-shared"
+    - "--enable-static"
+    # 真机首验 D4：libtool 无条件调 config.guess（2021 版不认
+    # uname=HarmonyOS）→ 显式三元组（termrec §12.1 同款）
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
   dependencies:
-    - "libusb-1.0/1.0.27"
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+    # configure.ac:116 PKG_CHECK_MODULES(LIBUSB, libusb-1.0 >= 1.0.0)
+    - "libusb/1.0.27"
   cc: clang
   cxx: clang++
 
-# ============================================================
-# 补丁信息
-# ============================================================
-
-# 应用的补丁列表
 patches_applied:
-  - "0001-config.guess.patch"
-  - "0002-config.sub.patch"
-  - "0003-examples-pathutils.c.patch"
-  - "0004-libmtp.pc.patch"
-  - "0005-src-gphoto2-endian.h.patch"
-  - "0006-configure-hmdfs-tmpdir.patch"
+  # examples/pathutils.c:138 rindex() → strrchr()（musl/OHOS 无 rindex）
+  - "0001-examples-pathutils-rindex.patch"
 
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/libmtp-1.1.21.orig
-  source_work_dir: /storage/Users/currentUser/builds/libmtp-1.1.21.work
-  source_orig_hash: 77d68ee5e31ab016
-  source_work_hash: 08701e3ab1ccdac3
-  generated_at: '2026-05-26T17:00:42'
-  patches_count: 5
-
-patch_classification:
-  - file: 0001-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-examples-pathutils.c.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0004-libmtp.pc.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-src-gphoto2-endian.h.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+knowledge_gained:
+  - "configure.ac 无 AC_CANONICAL_HOST，但 libtool（configure:4676）无条件调 config.guess，2021 版不认 uname=HarmonyOS → 显式 --build/--host=aarch64-unknown-linux-gnu（termrec §12.1）"
+  - "OHOS musl 忽略 DT_RUNPATH → configure 的 conftest 运行期找不到依赖 .so（errno 127 伪装成 cannot run C compiled programs），须把依赖包 libdirs 注入 LD_LIBRARY_PATH（termrec §12.38③）"
+  - "conandata.yml 的 patches 必须是 dict 条目（patch_file/patch_description/patch_type），字符串条目使 export_conandata_patches 崩溃（'str' object has no attribute 'get'）"
+  - "USE_LINUX 由编译期探测 __linux__ 判定（OHOS clang 定义 __linux__）→ udev 规则与 mtp-probe 会被构建，--with-udev=${prefix}/lib/udev 重定向"
+  - "configure 内嵌 umask 077 && mktemp -d（configure:18485）在 HMDFS 产生不可写临时目录（E011），sed 为 022"
+  - "SDK bash getcwd 在 HMDFS 构建目录失败（E386）→ SHELL=/bin/sh + unset CONFIG_SHELL"
+  - "musl 无 legacy 函数 rindex()，examples/pathutils.c:138 改用标准 strrchr()"
+  - "上游零测试（全部 Makefile.am 无 check_PROGRAMS/TESTS），依 TEST_QUALITY_SPEC 由 test_package 补充消费者测试"
+  - "历史：旧格式条目 2026-05-26 曾在真机整链构建成功（hints/ 保留其手工流程），其 0001/0002（config.guess/sub）、0004（.pc）、0005（gphoto2-endian）补丁在 Conan 流程下不再需要"

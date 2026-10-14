@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点证据（R51 三步法）:
+#   * libmtp 1.1.21 上游【没有任何测试套件】：全部 Makefile.am（顶层/src/
+#     examples/util/doc）均无 check_PROGRAMS / TESTS 声明、无 make check
+#     目标、configure.ac 无 AC_CONFIG_TESTDIR；examples/ 是 17 个 CLI
+#     工具（bin_PROGRAMS），不是测试。
+#   * 依据 TEST_QUALITY_SPEC：上游无测试 → 说明原因并补充测试（本
+#     test_package 即为补充测试：安装后库的消费者验证）。
+#   * 旧格式条目（2026-05-26 真机笔记）同样只做了 mtp-detect 冒烟，
+#     未有任何上游测试可运行。
+
+package: libmtp/1.1.21
+homepage: "https://libmtp.sourceforge.io"
+
+# 上游测试命令：不存在
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无（上游零测试，原因见上）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_libmtp.c
+    description: "消费者测试：真实编译并链接安装后的 libmtp（含传递 libusb-1.0 符号闭包）。断言 ① LIBMTP_VERSION_STRING == 1.1.21；② LIBMTP_Detect_Raw_Devices() 枚举路径完整运行（真机无 MTP 设备/无 usbfs 时 NONE/NO_DEVICE_ATTACHED/CONNECTING 均为可接受终态，其他错误类为失败；libusb 消费者测试同款形态）。"
+    command: "编译 + 运行 test_libmtp"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3
