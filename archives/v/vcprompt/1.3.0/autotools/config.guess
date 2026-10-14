@@ -1,0 +1,52 @@
+#!/bin/sh
+# Minimal OHOS-aware config.guess for the vcprompt recipe.
+#
+# Why this file is shipped by the recipe instead of the GNU original:
+#   * the vcprompt 1.3.0 tarball has no pre-generated `configure`, so the recipe
+#     runs `autoconf`, and the generated script requires config.guess/config.sub;
+#   * in a CI image that provides autoconf from PATH, the GNU originals under
+#     share/autoconf/build-aux/ are not guaranteed to exist, which would make the
+#     build depend on an undocumented image detail.
+#
+# The output matches the GNU original (timestamp 2023-08-22) on the same machine:
+# on a HarmonyOS device both print `aarch64-unknown-linux-ohos`, i.e. the kernel
+# field stays `linux` and OHOS is carried by the `-ohos` suffix.
+#
+# `configure` calls config.guess with an optional --time-stamp / --help flag,
+# which is accepted here for compatibility.
+
+case "${1:-}" in
+    --time-stamp|-t)
+        echo "timestamp='2023-08-22'"
+        exit 0
+        ;;
+    --help|-h)
+        echo "Usage: $0 [--time-stamp]" >&2
+        exit 0
+        ;;
+esac
+
+machine=`uname -m 2>/dev/null || echo unknown`
+case "$machine" in
+    arm64|armv8*|aarch64) machine=aarch64 ;;
+    amd64)                machine=x86_64 ;;
+    i?86)                 machine=i686 ;;
+    unknown)              machine=`uname -p 2>/dev/null || echo unknown` ;;
+esac
+
+system=`uname -s 2>/dev/null || echo unknown`
+case "$system" in
+    Linux)  kernel=linux ;;
+    # GNU spells some systems with a slash; keep the first component lowercased
+    GNU/*)  kernel=`echo "$system" | tr '[:upper:]' '[:lower:]' | cut -d/ -f1` ;;
+    *)      kernel=`echo "$system" | tr '[:upper:]' '[:lower:]' | tr -d '/ '` ;;
+esac
+
+# HarmonyOS reports `uname -s` = HarmonyOS while running a Linux kernel; the
+# kernel field therefore stays `linux`, exactly like the GNU original prints on
+# this device (verified: `aarch64-unknown-linux-ohos`).
+case "$kernel" in
+    harmonyos|ohos) echo "${machine}-unknown-linux-ohos" ;;
+    *)              echo "${machine}-unknown-${kernel}" ;;
+esac
+exit 0

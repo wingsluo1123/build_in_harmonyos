@@ -1,0 +1,93 @@
+#!/bin/sh
+# Minimal OHOS-aware config.sub for the vcprompt recipe.
+#
+# Companion of the config.guess shipped beside it: the tarball has no
+# pre-generated `configure`, and that `configure` insists on having
+# config.guess/config.sub next to it (it validates config.sub by running
+# `config.sub sun4`, so unknown arguments must still exit 0).  `configure.ac`
+# uses no AC_CANONICAL_* macro, so no triplet logic depends on the values, but
+# `configure` still canonicalises build/host through this script.
+#
+# Outputs were aligned against the GNU original (timestamp 2023-09-19) shipped by
+# the autoconf package, measured on the same machine:
+#
+#   x86_64-pc-linux-gnu         -> x86_64-pc-linux-gnu   (unchanged)
+#   x86_64-linux-gnu            -> x86_64-pc-linux-gnu   (vendor filled in)
+#   aarch64-unknown-linux-gnu   -> aarch64-unknown-linux-gnu
+#   aarch64-unknown-linux-ohos  -> aarch64-unknown-linux-ohos
+#   aarch64-unknown-ohos        -> aarch64-unknown-ohos
+#   arm64-apple-darwin20        -> aarch64-apple-darwin20
+#   i686-pc-linux-gnu           -> i686-pc-linux-gnu
+#   sun4                        -> sun4                  (configure's probe)
+#
+# Deliberate limits (both differ from GNU, neither is reachable from this
+# recipe's configure.guess output):
+#   * `aarch64-linux-ohos` keeps the explicit `linux` vendor (GNU writes
+#     `unknown` there);
+#   * no os-alias expansion such as `gnueabihf` -> `linux-gnueabihf`, so
+#     `armv8l-linux-gnueabihf` is not canonicalised the GNU way.
+# Unknown arguments are passed through with exit 0, which is what `configure`
+# expects when it validates this file by running `config.sub sun4`.
+
+cpu=
+vendor=
+os=
+triplet=
+
+for arg in "$@"; do
+    case "$arg" in
+        --version|-V) echo "config.sub (vcprompt recipe) 2023-09-19"; exit 0 ;;
+        --help|-h)    echo "Usage: $0 CPU-VENDOR-OS" >&2; exit 0 ;;
+        --*)          ;;
+        *)            triplet="$arg" ;;
+    esac
+done
+
+if [ -z "$triplet" ]; then
+    echo "config.sub: missing argument" >&2
+    exit 1
+fi
+
+cpu=`echo "$triplet" | cut -d- -f1`
+rest=`echo "$triplet" | cut -d- -f2-`
+
+if [ "$rest" = "$triplet" ]; then
+    # a bare machine name with no vendor/os part (e.g. `sun4`): keep it verbatim
+    echo "$triplet"
+    exit 0
+fi
+
+case "$rest" in
+    *-*)
+        vendor=`echo "$rest" | cut -d- -f1`
+        os=`echo "$rest" | cut -d- -f2-`
+        ;;
+    *)
+        # only two components: GNU fills the vendor field rather than leaving a
+        # `cpu-os` gap, using `pc` for GNU/Linux-style systems
+        vendor=unknown
+        os="$rest"
+        case "$os" in
+            linux-*|gnu-*) vendor=pc ;;
+        esac
+        ;;
+esac
+
+# machine aliases
+case "$cpu" in
+    arm64) cpu=aarch64 ;;
+    amd64) cpu=x86_64 ;;
+esac
+
+# os aliases; any libc suffix (`-gnu`, `-gnueabihf`, `-musl`) is preserved
+case "$os" in
+    gnu) os=linux-gnu ;;
+esac
+
+# vendor aliases for the GNU/Linux spellings
+case "$cpu-$vendor-$os" in
+    x86_64-*-linux-gnu*) vendor=pc ;;
+esac
+
+echo "${cpu}-${vendor}-${os}"
+exit 0
