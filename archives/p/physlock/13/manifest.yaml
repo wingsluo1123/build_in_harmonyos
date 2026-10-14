@@ -1,0 +1,66 @@
+# 版本级 manifest — physlock 13
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "13"
+software: "physlock"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/xyb3rt/physlock/archive/refs/tags/v13.tar.gz"
+  sha256: "9ae4716a1e916f141e47a01b439133ca382281ebdcbec1e53f85da6771774bd6"
+  tar_format: tar.gz
+  upstream_repo: "https://github.com/xyb3rt/physlock"
+  upstream_tag: "v13"
+  upstream_commit: "d4091fe3396f6c63e42ea165797062f6032779eb"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型（上游为手写 GNU Makefile，非 autotools/cmake）
+  system: makefile
+
+  # 无 configure 阶段；留空必须写 ""
+  configure_options: ""
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - linux-pam/1.7.2
+    - systemd/261
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 上游源码零改动（无平台补丁）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "physlock 是单一 C 可执行文件 + 手写 GNU Makefile；Linux/OHOS 下第三方依赖与上游默认构型一致：linux-pam(-lpam -lpam_misc) + systemd/libsystemd(-lsystemd) (knowledge_ref: archives/p/physlock/13/notes.md)"
+  - "OHOS 无 cc/gcc（cc: not found），而 Makefile 的 $(CC) 默认 cc → 必须显式传 CC=clang（从 tools.build:compiler_executables 获取） (knowledge_ref: knowledge/graph/E001.kv)"
+  - "Makefile 的 HAVE_SYSTEMD 是 make 变量、从不 -D 传入编译器，session.c 的 #if HAVE_SYSTEMD 代码路径不参与编译；-lsystemd 只出现在链接行（仍要求 libsystemd.so 存在） (knowledge_ref: archives/p/physlock/13/notes.md)"
+  - "上游 install 目标硬编码 install -m 4755 -o root -g root（README 注明 install 需 root），非 root/沙箱无法执行 → 配方只 make，打包期手工落 bin/ 与 man1 (knowledge_ref: knowledge/graph/E079.kv)"
+  - "OHOS clang 驱动默认给可执行文件加 .codesign 段（自签名），无需额外 binary-sign-tool 步骤 (knowledge_ref: knowledge/graph/E077.kv)"
