@@ -1,0 +1,31 @@
+software: pseudo
+version: "1.9.2-git20250711-d1db9c219abf"
+status: built
+build_system: custom
+build_date: "2026-09-27"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/p/pseudo/pseudo_1.9.2+git20250711+d1db9c219abf.orig.tar.xz"
+  sha256: "4bb3b20e2e487db4d0668f5be7269d6e48556f1c73e1ee37a08ce4e734f30053"
+  tar_format: tar.xz
+
+build:
+  system: custom
+  configure_options:
+    - "--with-sqlite=<sqlite3 package>"
+    - "--with-static-sqlite=<libsqlite3.a>"
+    - "--without-rpath"
+    - "--disable-xattr"
+    - "--disable-xattrdb"
+  dependencies:
+    - "sqlite3/3.53.4"
+  cc: clang
+  cxx: none
+
+patches_applied: []
+
+knowledge_gained:
+  - "pseudo's configure is a custom shell script and requires an explicit --prefix and SQLite header/library paths"
+  - "The upstream test runner assumes PSEUDO_PREFIX equals the in-source build root, so pseudo is built in-source"
+  - "OHOS exposes bash at /data/service/hnp/bin/bash rather than /bin/bash; test shebangs are adapted without changing test bodies"
+  - "OHOS compatibility edits are idempotent so repeated builds can safely reuse Conan's extracted source cache"

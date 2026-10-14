@@ -1,0 +1,23 @@
+package: pseudo/1.9.2-git20250711-d1db9c219abf
+homepage: "https://git.yoctoproject.org/pseudo"
+
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "./bin/pseudo test/test*.sh (25 upstream scripts)"
+
+upstream_tests:
+  - file: test/
+    source: pseudo-1.9.2-git20250711-d1db9c219abf/test/
+    description: "All 25 upstream test*.sh scripts are discovered; platform-dependent ACL/xattr/tclsh scripts are explicitly skipped when the required host tools are absent, all other scripts are executed"
+    command: "PSEUDO_PREFIX=<build-root> ./bin/pseudo test/test*.sh"
+
+test_package_tests:
+  - file: test_pseudo.sh
+    description: "Run packaged pseudo -V and execute wrapped /bin/sh write and rename operations under PSEUDO_PREFIX"
+    command: "/bin/sh test_pseudo.sh <packaged-bin/pseudo>"
+    assertions:
+      - "pseudo -V reports version 1.9.2"
+      - "a wrapped command writes the expected file content"
+      - "a wrapped rename moves the file and preserves its content"
+
+assertion_count: 3
