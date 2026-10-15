@@ -1,5 +1,15 @@
 # Package-specific Conan create timeout overrides, in seconds.
 # Format: name/version seconds. Entries must be unique and within 3600..57600.
+
+# perfetto 58.2 (PR #14496): GN (generate-ninja) + Ninja standalone build. Local aarch64
+# conan create measured ~1h53m wall under heavy load (loadavg ~48, -j16); the GN self-host
+# step alone is ~7 min. The product-only target set (libperfetto / trace_processor_shell /
+# traced / traced_probes / perfetto CLI / tracebox / traceconv) accounts for ~84% of the
+# 4876 build steps, so CI workers may need up to ~1-1.5h and could exceed the 3600s default.
+# 21600s (6h) gives slower workers headroom (matching the swiftshader/vtk-class packages).
+# (Upstream test binaries are built only with -o "&:with_tests=True".)
+perfetto/58.2 21600
+
 # kingfisher/1.109.0: CI #66552 ran 3563s and was SIGKILLed at the default
 #   3600s budget (exit -1) while `cargo build` had already succeeded in 33m27s
 #   and `cargo test --release` was still compiling the 44 integration-test

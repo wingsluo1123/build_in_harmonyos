@@ -1,0 +1,17 @@
+--- a/buildtools/zstd/lib/dictBuilder/cover.c
++++ b/buildtools/zstd/lib/dictBuilder/cover.c
+@@ -241,6 +241,14 @@
+   unsigned d;
+ } COVER_ctx_t;
+ 
++#if !defined(__GLIBC__)
++/* Non-glibc libcs (e.g. the musl libc used on OHOS) ship neither a qsort_r
++ * declaration nor a qsort_r symbol. zstd sets _GNU_SOURCE in the include block
++ * above assuming glibc's qsort_r, so drop it here so that the portable qsort()
++ * fallback selected by the #if/#elif chain below is used instead. */
++#  undef _GNU_SOURCE
++#endif
++
+ #if !defined(_GNU_SOURCE) && !defined(__APPLE__) && !defined(_MSC_VER)
+ /* C90 only offers qsort() that needs a global context. */
+ static COVER_ctx_t *g_coverCtx = NULL;

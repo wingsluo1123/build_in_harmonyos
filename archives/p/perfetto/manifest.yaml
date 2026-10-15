@@ -1,0 +1,24 @@
+software: perfetto
+display: "Perfetto"
+description: "System profiling, app tracing and trace analysis: trace processor (SQL), traced service, tracing SDK and CLI"
+category: system
+homepage: "https://perfetto.dev"
+license: Apache-2.0
+build_system: gn
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "构建系统是 GN（generate-ninja）+ Ninja，非 CMake/autotools；上游不 vendor gn 二进制，需源码自举"
+    - "OHOS 用系统 clang（is_system_compiler=true / is_hermetic_clang=false），并清空上游默认的 Debian arm64 sysroot 交叉配置（target_triplet= sysroot=）"
+    - "构建产物须保留 .codesign：strip=\"\"（OHOS 上 strip 会让 ELF 无法执行）"
+    - "上游 20 个 buildtools/ 第三方源码改为 GitHub 可达镜像供给（googlesource 不可达），逐条 sha256 pin"
+    - "musl 差异面：qsort_r / fts.h / program_invocation_short_name 缺失；linux/socket.h sockaddr_storage 重定义；NULL==0L"
+  common_dependencies: []
+
+# 版本索引
+versions:
+  "58.2":
+    status: built
+    build_date: "2026-10-02"
+    conan_ref: "perfetto/58.2"

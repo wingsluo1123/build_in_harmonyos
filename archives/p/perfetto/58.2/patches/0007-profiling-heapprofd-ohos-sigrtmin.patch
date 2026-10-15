@@ -1,0 +1,18 @@
+--- a/src/profiling/memory/heapprofd_producer.cc
++++ b/src/profiling/memory/heapprofd_producer.cc
+@@ -71,7 +71,15 @@
+ constexpr uint64_t kMaxShmemSize = 500 * 1048576;    // ~500 MB
+ 
+ // Constants specified by bionic, hardcoded here for simplicity.
++#if !defined(__SIGRTMIN)
++// Some libcs (e.g. the musl libc used on OHOS) expose the realtime signals only
++// through the SIGRTMIN()/SIGRTMAX() functions, not glibc's compile-time
++// __SIGRTMIN. Use the kernel's raw realtime-signal base (32), i.e. the value
++// __SIGRTMIN has on glibc/bionic.
++constexpr int kProfilingSignal = 32 + 4;
++#else
+ constexpr int kProfilingSignal = __SIGRTMIN + 4;
++#endif
+ constexpr int kHeapprofdSignalValue = 0;
+ 
+ std::vector<UnwindingWorker> MakeUnwindingWorkers(HeapprofdProducer* delegate,

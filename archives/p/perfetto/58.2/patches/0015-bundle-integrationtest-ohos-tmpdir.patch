@@ -1,0 +1,14 @@
+--- a/src/trace_processor/shell/bundle_integrationtest.cc
++++ b/src/trace_processor/shell/bundle_integrationtest.cc
+@@ -342,7 +342,10 @@
+     fflush(stderr);
+     saved_fd_ = dup(STDERR_FILENO);
+     PERFETTO_CHECK(saved_fd_ >= 0);
+-    char tmpl[] = "/tmp/perfetto_stderr_XXXXXX";
++    // OHOS mounts /tmp read-only; use perfetto's temp-dir helper (honours TMPDIR).
++    char tmpl[256];
++    snprintf(tmpl, sizeof(tmpl), "%s/perfetto_stderr_XXXXXX",
++             perfetto::base::GetSysTempDir().c_str());
+     capture_fd_ = mkstemp(tmpl);
+     PERFETTO_CHECK(capture_fd_ >= 0);
+     path_ = tmpl;
