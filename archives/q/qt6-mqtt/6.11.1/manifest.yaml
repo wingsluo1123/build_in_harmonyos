@@ -1,0 +1,35 @@
+name: qt6-mqtt
+version: "6.11.1"
+status: published
+build_system: cmake
+build_date: "2026-10-14"
+conan_ref: "qt6-mqtt/6.11.1"
+
+source:
+  url: "https://github.com/qt/qtmqtt/archive/refs/tags/v6.11.1.tar.gz"
+  sha256: "704c74568156f0fe16fa13dbae21bc3ea62629d37b97162bac70c4195a123df2"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DQT_QMAKE_TARGET_MKSPEC=harmonyos-clang"
+    - "-DQT_BUILD_TESTS=ON"
+    - "-DQT_BUILD_TESTS_BY_DEFAULT=ON"
+    - "-DQT_BUILD_EXAMPLES=OFF"
+    - "-DQT_BUILD_BENCHMARKS=OFF"
+    - "-DQT_BUILD_MANUAL_TESTS=OFF"
+  dependencies:
+    - qtbase/6.11.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-tests-enable-harmonyos.patch"
+
+knowledge_gained:
+  - "qtmqtt is an additional Qt library that is not shipped in download.qt.io official_releases submodules; the open-source 6.11.1 tarball only exists via the github.com/qt/qtmqtt v6.11.1 tag archive (reference: archives/q/qt6-mqtt/6.11.1/conandata.yml)."
+  - "qtmqtt 6.11.1 gates tests/auto behind WIN32 OR (LINUX AND NOT CMAKE_CROSSCOMPILING), which skips all tests for OHOS; the portability patch adds CMAKE_SYSTEM_NAME STREQUAL \"HarmonyOS\" to the condition, and registered ctest names carry a _Tcp_4 variant suffix (reference: patches/0001-tests-enable-harmonyos.patch)."
+  - "Upstream qtmqtt does not bundle an MQTT test broker; broker-dependent auto tests qFatal without MQTT_TEST_BROKER/MQTT_TEST_BROKER_LOCATION, so only module_includes, tst_qmqttcontrolpacket_Tcp_4, tst_qmqtttopicfilter_Tcp_4 and tst_qmqtttopicname_Tcp_4 run broker-free (reference: notes.md#遇到的问题与解决方案)."
+  - "The OHOS CMake platform module lacks the SONAME flag (E537 family); setting CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG plus an LD_LIBRARY_PATH entry for the build-tree lib dir yields SONAME libQt6Mqtt.so.6 with the full symlink chain (reference: notes.md#问题-5-产物缺-dt_sonamee537-同族)."
+  - "The HarmonyOS consumer feasibility test exercises QMqttClient lifecycle, MQTT 5.0 connection/will properties and topic name/filter validation without a broker (reference: test_package/test_package.cpp)."
