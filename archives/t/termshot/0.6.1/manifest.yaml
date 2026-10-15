@@ -1,0 +1,48 @@
+software: termshot
+version: "0.6.1"
+status: built
+build_date: "2026-10-12"
+build_system: go
+package_type: application
+source:
+  url: "https://github.com/homeport/termshot/archive/refs/tags/v0.6.1.tar.gz"
+  sha256: "40abea3c9ae604f3c2cdc7e2a623bf6063c6b1c504a70c5e3a1b8457dbdd2fbc"
+  tar_format: tar.gz
+build:
+  system: go
+  go_module: github.com/homeport/termshot
+  go_version_required: "1.24.0"
+  go_toolchain_bootstrap: "go1.26.0 linux-arm64 (sha256 bd03b743eb6eb4193ea3c3fd3956546bf0e3ca5b7076c8226334afe6b75704cd)"
+  build_command: "go build -trimpath -o <out>/termshot ./cmd/termshot"
+  env:
+    CGO_ENABLED: "0"      # 纯静态编译（gg/freetype 的字体与图像编解码走纯 Go 后端，无需 cgo）
+    GOOS: linux
+    GOARCH: arm64
+    GOTOOLCHAIN: local
+  dependencies: []
+notes: >
+  Go CLI。OHOS 适配沿用已发布的 termsvg/0.11.0 / addchain/0.4.0 Go 模式：
+  自举 go1.26.0 并用 binary-sign-tool 为 SDK 全部 ELF 签名（未签名 ELF 在
+  OHOS 上 exec 报 Permission denied）；链接输出放非 hmdfs 工作区规避 E051；
+  go test 的 *.test 二进制由 -exec wrapper 签名。
+  上游测试注意：internal/ptexec 的固定终端尺寸用例（exec.go:175 对 os.Stdout
+  取尺寸）在非 tty 构建环境下返回 ENOTTY；上游 exec.go:179-186 自带 isCI()
+  回退路径，故上游 go test 环境注入 CI=true 走官方路径（断言仍真实执行）。
+  真机实测：go test ./... 2 个包 ok / 0 fail；二进制可在 OHOS 执行；
+  consumer test 9 条断言全 PASS（归入 5 个验证项：二进制可用 / 真 pty 截图为真 PNG / 尺寸 / ANSI 红色像素 / aarch64 ELF）。
+
+commands: commands.json
+commands_note: "R38：产物含可执行文件 bin/termshot，已声明 hicmd 格式 commands.json"
+
+platform_notes:
+  - "R26 不适用：Go 纯静态二进制，不链接任何系统库，无同名库污染风险"
+  - "R32：settings.os 判 `in (Linux, OHOS)`"
+  - "R33：编译器走 Go 工具链而非 CC/CFLAGS shell 变量"
+  - "R34：test_package 驱动真实二进制经真伪终端产出真实截图并校验图像结构"
+  - "R38：commands.json 已声明"
+
+knowledge_refs:
+  - "Go 工具链自举 + ELF 签名（addchain/0.4.0 先例）"
+  - "HMDFS 链接规避（link-out 放非 hmdfs 工作区）"
+  - "签名会重置执行位：签名后必须显式 chmod 755（termshot 本轮实测踩坑）"
+  - "chmod 非本用户所有文件会 EPERM：须容错处理"

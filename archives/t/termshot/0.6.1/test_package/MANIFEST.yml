@@ -1,0 +1,43 @@
+package: termshot/0.6.1
+homepage: "https://github.com/homeport/termshot"
+
+upstream_check_command: "go test ./... 2>&1 | tail -20"
+upstream_test_in_build: true
+upstream_test_command: "go test -count=1 ./..."
+
+upstream_tests:
+  - file: internal/img/output_test.go
+    source: termshot-0.6.1/internal/img/output_test.go
+    description: "图像输出（PNG/JPEG 编码）测试"
+    command: "go test ./internal/img/ -v"
+  - file: internal/ptexec/exec_test.go
+    source: termshot-0.6.1/internal/ptexec/exec_test.go
+    description: "伪终端命令执行（pty 执行与输出捕获）测试"
+    command: "go test ./internal/ptexec/ -v"
+
+test_package_tests:
+  - file: test_package/test_termshot.py
+    description: "R34 实质验证：真实二进制 --help/--version、真实命令经真伪终端产出真实截图（PNG/JPEG 魔数+尺寸+ANSI 颜色内容断言）、aarch64 ELF 架构校验"
+    command: "python3 test_termshot.py（由 test_package/conanfile.py test() 经 self.run 实际执行）"
+
+assertion_count: 9
+
+upstream_test_note: >
+  internal/ptexec 的 "should run with fixed terminal size" 用例在非 tty 构建环境下
+  因 pty.GetsizeFull(os.Stdout) 返回 ENOTTY 而失败；上游 exec.go:179-186 自带
+  isCI() 回退路径（CI=true 时以 80x25 兜底再应用请求的 rows/cols）。配方在
+  上游 go test 环境注入 CI=true 走该官方路径，断言仍真实执行
+  （实测 3/3 Specs Passed，stty size == "12 40"），未跳过、未削弱任何断言。
+
+colour_assertion_note: >
+  ANSI 红色像素断言用 --no-decoration 渲染：termshot 默认绘制窗口按钮，其中
+  红色 #ED655A(237,101,90) 会满足同一红色判定式，使断言永不失改。关掉装饰后
+  已做负对照实证：无颜色命令 -> 0 红色像素，ESC[31m 命令 -> 1154 红色像素。
+
+notes: >
+  termshot 为 Go CLI（module github.com/homeport/termshot，go 1.24.0）。
+  虽依赖 fogleman/gg 与 golang/freetype，但其字体/图像编解码走纯 Go 的
+  golang.org/x/image 后端，CGO_ENABLED=0 即可完全静态编译（真机实测）。
+  OHOS 适配沿用已发布的 termsvg/0.11.0 / addchain/0.4.0 Go 模式：
+  自举 go1.26.0 并签名、链接输出放非 hmdfs 工作区规避 E051、
+  go test 的 *.test 二进制由 -exec wrapper 签名。
