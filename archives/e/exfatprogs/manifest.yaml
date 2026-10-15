@@ -1,0 +1,81 @@
+# 本地 manifest
+# 路径: archives/e/exfatprogs/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ==============================
+# 基本信息
+# ==============================
+
+# 版本
+version: "1.4.3"
+
+# 软件名
+software: "exfatprogs"
+
+# 构建系统
+build_system: autotools
+
+# 构建状态
+# published | built | failed | archived
+status: built
+
+# 构建日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+
+# ==============================
+# 源码部分
+# ==============================
+
+source:
+  # 上游官方 release 直链（实测 200 / 425988 B）
+  url: "https://github.com/exfatprogs/exfatprogs/releases/download/1.4.3/exfatprogs-1.4.3.tar.xz"
+  sha256: "57226a8ec1bfbce06d68a42cde8cd980414a9457882e691fbce4a4f86c8d5f08"
+  tar_format: tar.xz
+
+# ==============================
+# 构建配置
+# ==============================
+
+build:
+  system: autotools
+  # --build 给 E007（config.guess 不识 HarmonyOS）；--enable-tests 编上游内置单元测试；
+  # CC/CXX 走 R33（设备无 gcc/cc）；CPPFLAGS 补 <libblkid>/include/blkid（上游 include 风格）
+  configure_options:
+    - "--prefix=/"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--enable-tests"
+    - "CC=clang"
+    - "CXX=clang++"
+  # 编译依赖（conan 引用，W0 以 conan install --build=never 精确核验）
+  dependencies:
+    - "libblkid/2.42.2"
+  build_tools:
+    - "xxd/9.1.0"
+  cc: clang
+  cxx: clang++
+
+# ==============================
+# 补丁信息
+# ==============================
+
+# 唯一一处源码补丁：跳过不可评估的内核版本闸（见 1.4.3/patches/0001-*.patch）
+patches_applied:
+  - "0001-lib-exfat-skip-kernel-version-gate-for-non-numeric-release.patch"
+
+# ==============================
+# 知识沉淀
+# ==============================
+
+knowledge_gained:
+  - "exfatprogs 1.4.3 ref: knowledge/drafts/DRAFT-exfatprogs-1.4.3-non-numeric-uname-release-kernel-gate.md"
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.4.3":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "exfatprogs/1.4.3"
+    note: "上游官方 GitHub release 直链；sha256 与 Debian pristine 副本逐字节一致"

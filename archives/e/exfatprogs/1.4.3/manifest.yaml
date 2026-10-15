@@ -1,0 +1,86 @@
+# 版本级 manifest — exfatprogs 1.4.3
+# 文件位置: archives/e/exfatprogs/1.4.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.4.3"
+
+# 软件名
+software: "exfatprogs"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游官方 release 直链；2026-10-15 实测 HTTP 200 / 425988 B）
+  # 哈希用 Debian pristine 副本交叉核对（仅作核对，不作源）：同 425988 B、
+  # 同 sha256，且与 exfatprogs_1.4.3-1.dsc 的 Checksums-Sha256 行逐字一致
+  url: "https://github.com/exfatprogs/exfatprogs/releases/download/1.4.3/exfatprogs-1.4.3.tar.xz"
+
+  # 源码校验和
+  sha256: "57226a8ec1bfbce06d68a42cde8cd980414a9457882e691fbce4a4f86c8d5f08"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（与 conanfile.py 的 _toolchain() 同源；
+  # --prefix/--bindir/--sbindir 由 conan AutotoolsToolchain 自动给出）
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--enable-tests"
+    - "CC=clang"
+    - "CXX=clang++"
+    # 上游 #include <blkid.h> 依赖发行版 blkid.pc 的 -I${includedir}/blkid，
+    # conan 生成的 blkid.pc 只带 -I${includedir} ⇒ 补组件子目录
+    - "CPPFLAGS=-I<libblkid package folder>/include/blkid"
+
+  # 编译依赖列表（格式: name/version）；W0 以 conan install --build=never 精确核验
+  dependencies:
+    - "libblkid/2.42.2"
+  # 构建期工具（tool_requires，同样以 --build=never 核验二进制已发布）
+  build_tools:
+    - "xxd/9.1.0"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 唯一一处源码补丁（内核版本闸，见 patches/0001-*.patch）；
+# 其余 7 处适配全部落在配方与构建环境层
+patches_applied:
+  - "0001-lib-exfat-skip-kernel-version-gate-for-non-numeric-release.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "exfatprogs 1.4.3 ref: knowledge/drafts/DRAFT-exfatprogs-1.4.3-non-numeric-uname-release-kernel-gate.md"
