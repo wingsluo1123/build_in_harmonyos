@@ -1,0 +1,13 @@
+# conandata.yml — xiccd 0.4.1
+# 官方源：上游 GitHub tag archive。
+# R39：只登记官方正式源；HTTPS 镜像 fallback 由 ci/conan/build_and_test.sh 在预下载
+# 阶段统一注入，配方内不硬编码镜像域名（PF7 源 URL 闸）。
+sources:
+  url:
+    - "https://github.com/agalakhov/xiccd/archive/refs/tags/v0.4.1.tar.gz"
+  sha256: "bd4077fa45bdb74e3e5e029b4361648459bbb67ecb0d762bc9df9f9cf26ea567"
+
+patches:
+  - patch_file: "patches/0001-configure.ac.patch"
+    patch_description: "Two changes to configure.ac, both build-system only (no platform macro, no conditional is introduced): (1) AC_INIT: upstream takes the version from m4_esyscmd_s(git describe ...) but the release tarball has no .git, so PACKAGE_VERSION/VERSION expand to an empty string and the built binary prints no version for `xiccd -V`; pin it to 0.4.1 (same shape as powerman/2.4.4, cowdancer/0.90). (2) AM_INIT_AUTOMAKE: relax to the `foreign` strictness level, because the tarball ships no AUTHORS/NEWS and automake would otherwise refuse to run (deliberately not fabricating empty upstream files)."
+    patch_type: "portability"
