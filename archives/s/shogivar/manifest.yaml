@@ -1,0 +1,26 @@
+software: shogivar
+display: "ShogiVar"
+description: "将棋（Shogi）裁判与对弈程序：支持 17 种古/现代将棋变体，内置电脑对手，GTK+ 3 图形棋盘"
+category: game
+homepage: "https://hgm.nubati.net/"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "随包的 config.guess/config.sub 是 2014 年版，无 HarmonyOS/OHOS 分支：必须配套改两个脚本（E007 + E072），且 config.guess 分支要自带 echo/exit"
+    - "上游前端是 GTK+ 2（configure 里 gtk+-2.0 + gmodule-2.0），OHOS 制品仓只发布 GTK3，需按 GTK3 API 移植 gtk/xoptions.c 与 gtk/gui.c"
+    - "librsvg 是死依赖：configure 要求、draw.c include，但全树零 rsvg 符号调用；引入还会与 gtk 的 cairo-gobject/1.18.4.2 冲突，故直接去掉"
+    - "HMDFS 忽略 umask/chmod 语义，autoconf 生成的 config.status 用 umask 077 建临时目录后无法遍历，需在 configure 内改写该段"
+    - "OHOS 无 automake/aclocal/libtool，改动 configure.ac 后必须屏蔽 automake maintainer-mode 规则（Makefile.in 里四个工具置 true）"
+    - "GNU make jobserver 在 OHOS 上不可用，所有 make 调用一律 -j1（含 check/install）"
+    - "conan 默认 --prefix=/，编译期 DATADIR 会变成 /share/games/shogivar；图形程序的资源目录必须在运行时按可执行文件位置解析"
+    - "16-bit 时代遗留的 char[80] STRING 缓冲被复用来拼文件系统路径，需放宽到 512 字节"
+  common_dependencies:
+    - gtk
+    - cairo
+
+versions:
+  - version: "1.55b"
+    status: built
+    build_date: "2026-10-14"
