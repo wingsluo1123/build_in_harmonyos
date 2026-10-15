@@ -1,0 +1,25 @@
+--- a/src/lib/filehandler.c
++++ b/src/lib/filehandler.c
+@@ -104,7 +104,21 @@ int testdir(const char *desc, const char *dir_name, bool create, bool silent) {
+ 
+     if (create == true) {
+         errno = 0;
+-        if (mkdir(dir_name, 0770) != 0) {
++        #ifdef MYMPD_OHOS
++            /* HarmonyOS PC storage resolves every access below a directory
++             * through the directory's group bits and ignores chmod() calls
++             * made after creation.  With the restrictive umask set in main
++             * (0077) the mkdir below stores mode 2700 and the directory
++             * becomes unusable - even for its owner.  Clear the umask for
++             * the creation call only so the requested 0770 mode is kept.
++             */
++            mode_t old_umask = umask(0000);
++        #endif
++        int mkdir_rc = mkdir(dir_name, 0770);
++        #ifdef MYMPD_OHOS
++            umask(old_umask);
++        #endif
++        if (mkdir_rc != 0) {
+             MYMPD_LOG_ERROR(NULL, "%s: creating \"%s\" failed", desc, dir_name);
+             MYMPD_LOG_ERRNO(NULL, errno);
+             //directory does not exist and creating it failed

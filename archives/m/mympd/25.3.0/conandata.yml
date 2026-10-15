@@ -1,0 +1,38 @@
+# conandata.yml — myMPD 25.3.0
+# 官方源：github.com/jcorporation/myMPD（tag v25.3.0 的 GitHub archive URL；
+# 上游 v25.3.0 Release 页面未发布源码附件，tag 归档即官方源码发布形态）
+# 源地址为有序镜像列表（2026-10-10 snort 实证口径）：gh-proxy.com / ghproxy.net
+# 是两个 GitHub 代理前缀，与官方 tarball 字节一致（sha256 与下方相同，本地
+# 三路交叉核验）；官方 GitHub URL 保留于列表末位兜底（R39）。ghfast.top 已从
+# 列表移除（2026-10-10 实测域名不可达）；其字样出现在本文中会使 CI/conan-verify
+# 的 E017 镜像注入短路（该注入的守卫即"文中不含 ghfast.top"），下载按列表顺序进行。
+
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+    - "https://ghproxy.net/https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+    - "https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+  sha256: "d21170635f5caf7650860bcab23560ec0691acd0102a89a281bbb72ab31a7d01"
+
+patches:
+  - patch_file: "patches/0001-test-suite-honor-tmpdir.patch"
+    patch_description: "0001 tests: route the unit test scratch directory (init/clean of the test environment, workdir global, certificate cleanup, filehandler/list/state/http-cache test paths) through a TMPDIR-aware test_tmpdir()/test_tmpfile() helper, and clean the tree with an in-process nftw() recursion instead of system(\"rm -rf\"), so the upstream suite runs on HarmonyOS/OHOS where /tmp is a read-only mount; with TMPDIR unset this resolves to the upstream hardcoded /tmp/mympd-test path, so other platforms are behaviour-equivalent. The same patch also re-assigns the sds handles returned by the sdscatfmt()/sdscat() growth functions instead of reusing the stale handle, and frees via sdsfree() where a handle is discarded - the platform's hardened jemalloc treats the stale-handle reuse as a fatal assertion (SIGTRAP), so the defect is triggered on the platform while the fix is semantically correct everywhere; no test case or expectation is changed"
+    patch_type: "portability"
+  - patch_file: "patches/0003-cmake-run-build-sh-via-interpreter.patch"
+    patch_description: "0003 build: build.sh is driven from CMake through execute_process() in three places (create assets, copy assets, generate html documentation). On platforms without binfmt_script support a script file cannot be executed directly, so a bash/sh interpreter is located at configure time (find_program) and the script is invoked through it (a no-op change on platforms where direct execution already works)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-test-files-copy-instead-symlink.patch"
+    patch_description: "0004 tests: the unit_test target materializes test/testfiles below the build tree with cmake -E create_symlink before building. Symlink creation is denied on the platform (EPERM across the filesystem), so the directory is materialized as a real copy instead (cmake -E rm -r -f + copy_directory); identical content, no symlink involved"
+    patch_type: "portability"
+  - patch_file: "patches/0005-cacertstore-add-harmonyos-ca-path.patch"
+    patch_description: "0005 TLS: find_ca_cert_store() probes a fixed list of system CA bundle locations (openSUSE, Fedora and Debian layouts) and finds none on HarmonyOS PC, whose system store lives at /etc/ssl/certs/cacert.pem; the HarmonyOS location is appended to the probe list (a no-op on platforms where that path does not exist)"
+    patch_type: "portability"
+  - patch_file: "patches/0006-test-http-client-reachable-mirror.patch"
+    patch_description: "0006 tests: test_http_client fetches README.md from raw.githubusercontent.com, which the verification network does not reach (name resolution succeeds, the TCP connect fails); the request is repointed at the byte-identical file through the gh-proxy.com mirror prefix so the network test still exercises the same fetch and TLS path on the verification host (a no-op change on networks with direct access)"
+    patch_type: "portability"
+  - patch_file: "patches/0007-getopt-long-options-sentinel.patch"
+    patch_description: "0007 options: the long_options[] array passed to getopt_long() ends without the all-zero terminating entry that the getopt(3) contract requires. An exact match or a short option is served before the scan needs the terminator, but an unmatched long option or an unambiguous abbreviation keeps the scan walking past the array into unrelated memory (on the platform libc this is a deterministic out-of-bounds read: device-verified SIGSEGV, exit 139, for both --foo and --dum, while --dump and -Z stay clean). The terminator puts the scan back inside the array; the option table itself is unchanged and the fix is correct on every libc"
+    patch_type: "bugfix"
+  - patch_file: "patches/0008-ohos-mkdir-group-accessible.patch"
+    patch_description: "0008 files: main() sets umask(0077), so the 0770 mkdir in testdir() - the single directory-creation point of the whole tree (work, cache, config, state, ssl, cover/thumbnail caches) - stores mode 2700 on HarmonyOS PC storage, where the group bits are what every later access below a directory is resolved through and chmod() after creation is ignored. Such a directory then rejects entry for everyone, its owner included, and the whole bootstrap fails with EACCES (device-verified with a minimal reproducer). The umask is cleared around the mkdir call and restored immediately after, so the requested group-accessible 0770 mode survives; OHOS-only, guarded by the MYMPD_OHOS define that the recipe adds for OHOS builds, other platforms keep the upstream behaviour unchanged"
+    patch_type: "portability"

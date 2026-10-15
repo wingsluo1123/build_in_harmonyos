@@ -1,0 +1,30 @@
+software: mympd
+display: "myMPD"
+description: "myMPD — MPD 音乐播放器的独立 Web 前端：内嵌 Web UI 资源、HTTP/WebSocket JSON-RPC API、首启自签 TLS 证书"
+category: audio
+homepage: "https://github.com/jcorporation/myMPD"
+license: GPL-3.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游按精确大小写的变量契约消费依赖（PCRE2_LIBRARIES / OPENSSL_VERSION / LUA_FOUND 等）：CMakeDeps 以 module 模式生成与上游 find_package 同名（精确大小写）的 Find 模块，openssl/lua 另加全大写前缀；CMAKE_FIND_PACKAGE_PREFER_CONFIG 两种取值下变量契约完整一致"
+    - "libmpdclient 不入依赖（注册表无 ≥2.26.0，上游最低要求 2.26.0）：不设 MYMPD_EMBEDDED_LIBMPDCLIENT（保持上游默认 OFF）→ find_package 未命中走上游自带 not-found 回退（该分支同时 set 变量 + add_compile_definitions 定义 C 宏，确定性选用内嵌 dist/libmpdclient 2.26.0）；⚠ 上游直通 ON 分支漏定义宏，勿用"
+    - "build.sh createassets 在 configure 期执行（内嵌 Web UI 资源）：jq/perl/luac 由 tool_requires 提供；注册表无 gzip 包 → 用 gzip 官方 drop-in pigz 派生 gzip 命名副本并前置到构建环境 PATH（check_cmd gzip 满足）"
+    - "补丁集共 7 枚（0001/0003-0008；编号 0002 未使用）：0001 测试套件全部临时路径经 TMPDIR 感知助手（OHOS /tmp 只读；TMPDIR 未设置时回落上游 /tmp 行为，另含 sds 句柄重赋值内存安全修复）；0003 build.sh 经 bash/sh 解释器调用（无 binfmt_script 平台不能直接执行脚本文件）；0004 测试文件目录以真实复制替代 symlink（平台全局 EPERM）；0005 系统 CA 探测表追加 HarmonyOS 路径；0006 网络测试改经镜像前缀；0007 getopt_long 长选项哨兵（上游缺陷修复）；0008 目录组权限 umask 窗口（MYMPD_OHOS 门控）"
+    - "MYMPD_STARTUP_SCRIPT=OFF（上游会向 /usr/lib/systemd 等绝对系统路径安装初始化脚本）；CMAKE_INSTALL_PREFIX 钉到包目录（上游用绝对 CMAKE_INSTALL_FULL_* 目标并固化工作/缓存/文档根路径）；MYMPD_DOC_HTML 保持上游默认 OFF（html 文档链需 sphinx/venv/网络）"
+  common_dependencies:
+    - pcre2
+    - openssl
+    - utf8proc
+    - libid3tag
+    - flac
+    - lua
+  status: built
+
+versions:
+  "25.3.0":
+    status: built
+    build_system: cmake
+    compiler: clang
+    notes: "上游 ctest 套件（35 条目 / 201 用例）与 test_package E2E 在 conan create 内实跑；真机验证数据见版本级 notes.md"
