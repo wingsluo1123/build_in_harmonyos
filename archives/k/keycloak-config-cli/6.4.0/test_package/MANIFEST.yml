@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: keycloak-config-cli/6.4.0
+homepage: "https://github.com/adorsys/keycloak-config-cli"
+
+# 上游测试通过 Maven Surefire/Failsafe 运行（./mvnw clean verify）
+# 上游测试框架：JUnit 5 (junit-jupiter，Spring Boot 3.2.9 管理版本 5.10.3)
+# -Djava.version=17：上游 CI build-pom-version job 矩阵 [17,21] 支持的构建参数
+upstream_check_command: "./mvnw -B -ntp clean verify -Djava.version=17 -DskipITs"
+upstream_test_in_build: true
+upstream_test_command: "./mvnw -B -ntp clean verify -Djava.version=17 -DskipITs"
+
+# 上游测试清点（R51 第一步，grep -rE "^\s*@Test\b" src/test 实测）：
+# 72 个测试 java 文件，490 个 @Test 注解
+#  - surefire 单测：31 个非 IT 文件（build() 中实际运行）
+#  - failsafe *IT 集成测试：41 个文件（testcontainers 1.20.3 → docker-java 3.4.0，
+#    需 Docker daemon 拉起 Keycloak 容器；OHOS 真机无 Docker，不运行，
+#    具体技术原因见 notes.md R51 申报表）
+upstream_tests:
+  - file: src/test/java/de/adorsys/keycloak/config/
+    source: keycloak-config-cli-6.4.0.tar.gz/src/test/java/
+    description: "上游 JUnit 5 单测套件（surefire，build() 中实际运行；490 个 @Test 中 IT 部分因平台无 Docker 不运行，见 notes.md）"
+    command: "./mvnw -B -ntp clean verify -Djava.version=17 -DskipITs"
+
+# test_package 中自带的测试 (消费者视角验证，在鸿蒙真机运行)
+test_package_tests:
+  - file: test.sh
+    description: "真机消费者验证共 10 项断言：fat jar 结构 A1-A8（含 Main-Class=PropertiesLauncher/Start-Class）+ 真实执行 A9（无配置 → import.files.locations 绑定失败签名 rc=1）+ A10（README 规范调用 → Spring 启动至 Keycloak import 阶段 → 127.0.0.1:59999 Connection refused rc=1）(R34 实质性验证)"
+    command: "bash test.sh"
+
+# 测试断言总数（conan-verify 实测回填：surefire 90 + test.sh 10 = 100）
+assertion_count: 100

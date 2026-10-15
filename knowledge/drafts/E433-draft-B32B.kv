@@ -1,0 +1,46 @@
+# ═══ Draft knowledge entry — OHOS 无 Docker：failsafe IT 跳过 + Mockito 5 需 -javaagent ═══
+# Timestamp: 2026-10-14
+# Software: keycloak-config-cli 6.4.0（Maven 双测试阶段；同源根因见 keycloak-metrics 7.0.0）
+# Gate: build() 上游测试执行（surefire/failsafe）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: E433
+trigger_tool: mvnw (Maven surefire + failsafe 双阶段)
+phase: testing
+error_signature: Could not find a valid Docker environment|docker\.sock|Mockito.*inline.*(attach|ByteBuddyAgent)
+severity: 3
+category: platform, limitation, ohos
+match_keywords: skipITs, Testcontainers, Docker, OHOS, Mockito, inline, byte-buddy-agent, javaagent, argLine
+title: OHOS 真机无 Docker daemon → 依赖 Testcontainers 的 failsafe IT 必须 -DskipITs 跳过；同时 Mockito 5 inline mock maker 在 OHOS 上 JVM 动态 attach 机制不可用，surefire argLine 需预装载 -javaagent:<byte-buddy-agent.jar>
+root_cause: 两个独立根因叠在同一测试阶段：(1) 41 个 *IT 集成测试基于 testcontainers 1.20.3（docker-java 3.4.0），需经 Docker Engine API（/var/run/docker.sock）拉起 Keycloak 容器；OHOS 真机未安装 Docker（which docker rc=1），failsafe 阶段必然失败 → 用上游支持的 -DskipITs 参数跳过（上游 CI ubuntu-latest 有 Docker，可正常运行，属平台差异非代码问题）。(2) Mockito 5 默认 inline mock maker 通过 JVM Attach API 动态挂载 byte-buddy-agent；OHOS 环境的 attach 机制不可用（ByteBuddyAgent.install() 失败），surefire 阶段 mock 相关用例报错 → 修复为在 surefire argLine 中显式 -javaagent 预装载本地 m2 仓库中的 byte-buddy-agent jar（keycloak-metrics 7.0.0 已验证同源根因与同修法）。
+affected_scope: 所有在 OHOS 真机执行 Maven 构建且 (a) 含 Testcontainers 集成测试或 (b) 使用 Mockito 5+ inline mock 的 Java 包；-DskipITs 与 -javaagent 需同时处理
+verification_cmd: which docker（rc=1 即无 Docker）；grep -rn "ByteBuddyAgent\|mockito" pom.xml（确认 inline 依赖）；修复后 surefire 90/90 PASS 且 failsafe 被跳过（无 IT 执行行）
+rec_priority: 1
+rec_approach: skipITs-plus-javaagent
+rec_description: 构建命令 -DskipITs 跳过 failsafe；surefire <argLine>（或 -DargLine）注入 -javaagent:$HOME/.m2/repository/net/bytebuddy/byte-buddy-agent/<ver>/byte-buddy-agent-<ver>.jar（版本从 mvn dependency:tree 的 mockito 依赖解析）
+rec_command: ./mvnw -B -ntp clean verify -Djava.version=17 -DskipITs -DargLine="-javaagent:$HOME/.m2/repository/net/bytebuddy/byte-buddy-agent/1.14.x/byte-buddy-agent-1.14.x.jar"
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority: 2
+fallback_approach: mockito 降级到 subclass mock maker（mockito-inline 配置 mock-maker=subclass）
+fallback_description: 侵入上游测试行为，仅当 -javaagent 通路不可用时考虑
+fallback_command:
+fallback_auto_fix: false
+fallback_impl: manual
+doc_file: doc/E433.md
+last_updated: 2026-10-14
+source_event: keycloak-config-cli 6.4.0 Run A 构建（41 IT 无法运行申报 + Mockito 5 -javaagent 修复，90 单测全绿）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used: 2026-10-14
+
+draft: true
+contributor_id: B32B
