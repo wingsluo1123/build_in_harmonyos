@@ -1,0 +1,54 @@
+# Version manifest — archives/l/libklibc/2.0.14/manifest.yaml
+
+version: "2.0.14"
+software: libklibc
+status: built
+build_date: "2026-10-15"
+build_system: "makefile"
+conan_ref: "libklibc/2.0.14@ohpcd/stable"
+
+source:
+  url: "https://www.kernel.org/pub/linux/libs/klibc/2.0/klibc-2.0.14.tar.xz"
+  sha256: "281bfb683e196818412af70b8968b7726475a80ff1c4bd67119e6bf5059f9075"
+  tar_format: tar.xz
+
+build:
+  system: makefile
+  target: "aarch64-linux-ohos"
+  architecture: arm64
+  jobs: 2
+  compiler: "HarmonyOS SDK Clang 15.0.4"
+  dependencies:
+    - "HarmonyOS SDK 26.0.0.18"
+    - "Conan 2.29.1"
+    - "Perl (syscall and error-list generation)"
+
+patches_applied:
+  - "patches/0001-usr-include-ohos-asm-layout.patch"
+  - "patches/0002-signal-kernel-nsig-compat.patch"
+  - "patches/0003-kbuild-sharedlib-cp-not-ln.patch"
+  - "patches/0004-kbuild-libc-only.patch"
+
+test_results:
+  target: "HarmonyOS PC AArch64"
+  upstream_framework: "Kbuild make test; usr/klibc/tests"
+  upstream_total: 39
+  upstream_passed: 39
+  upstream_failed: 0
+  upstream_not_built: 0
+  upstream_skipped: 0
+  upstream_pass_rate: "39/39 = 100%"
+  upstream_expected_nonzero: "testrand48; deterministic output matched its expected vector"
+  test_package_passed: 2
+  test_package_failed: 0
+  conan_create_exit: 0
+  execution: "Final device Conan create used tools.build:jobs=2; both Kbuild invocations cleared MAKEFLAGS and used -j1; all 39 upstream programs and both package programs executed"
+
+test_passed: "Upstream 39/39 (100%); test_package 2/2"
+test_failed: "0 failed, 0 not-built, 0 skipped"
+
+knowledge_gained:
+  - "Clang malloc/calloc builtins can change allocator edge-case assertions in an upstream libc test; disabling those builtins only for make test preserves the unmodified malloctest3 source and exercises klibc."
+  - "A separate no-MAP_NORESERVE allocator control passed malloctest3, so the final package keeps the upstream allocator implementation."
+  - "Kbuild links upstream tests with ld.lld without HarmonyOS .codesign; relinking the unchanged upstream test objects with the OHOS Clang driver adds the required section before on-device execution."
+  - "The klibc tests include a deterministic vector printer, testrand48, that exits 1 by design; compare its complete expected output rather than counting it as failed or skipped."
