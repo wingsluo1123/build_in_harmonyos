@@ -1,0 +1,84 @@
+# 版本级 manifest
+# 文件位置: archives/s/samarium/1.0.0/manifest.yaml
+# samarium 1.0.0 — HarmonyOS PC (OHOS aarch64) 适配（核心物理/数学层）
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.0.0"
+software: "samarium"
+status: partial
+build_date: "2026-10-02"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/strangeQuark1041/samarium/archive/refs/tags/v1.0.0.tar.gz"
+  sha256: "943de75803f492f78c5d55fe43be298fbb66156cc22946a3c6cc6b0634efc2e2"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DCMAKE_BUILD_TYPE=Release"
+  dependencies:
+    - fmt/8.1.1
+    - range-v3/0.12.0
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 适配范围（partial：SFML 依赖模块不交付）
+# ============================================================
+
+modules_available:
+  - math
+  - physics
+  - geometry
+  - graphics # 非 SFML 部分：Color / Gradient / Grid / Image / Trail / gradients
+  - util
+
+modules_disabled:
+  - name: app
+    reason: "src/samarium/app/App.{hpp,cpp} 硬依赖 SFML/Graphics/RenderWindow.hpp 与 SFML/Window/Event.hpp；本制品仓的 sfml/2.6.1.1 是 status: partial，只交付 System/Network，Window/Graphics 头文件目录已被其配方裁掉（archives/s/sfml/2.6.1.1/manifest.yaml 的 modules_disabled：OHOS CI 无 X11/DRM/UDev 窗口后端）。"
+  - name: gui
+    reason: "src/samarium/gui/{Keyboard.cpp,Keyboard.hpp,Mouse.cpp,Mouse.hpp,sfml.hpp} 依赖 SFML/Window/Keyboard.hpp、SFML/Window/Mouse.hpp 与 SFML/Graphics/RenderWindow.hpp，随 Window/Graphics 一起不可用。"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-cmake-remove-host-only-march-flag.patch"
+  - "0002-cmake-consume-installed-cmake-packages.patch"
+  - "0003-disable-sfml-dependent-app-gui-modules.patch"
+  - "0004-test-run-registered-boost-ut-suites.patch"
+  - "0005-grid-fix-out-of-range-member-access.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 不在 CMake 已知平台表里 ⇒ CMake 不写 RPATH/RUNPATH：`build()` 里跑 ctest 的测试二进制既找不到同构建树的 lib<自身>.so，也找不到共享依赖（CI 实证文案 `Error loading shared library libsamarium.so: (needed by ...)` 与同文案的 `libfmt.so.8`，而本机 x86_64 因 CMake 会写 RUNPATH 而不暴露）。修法：ctest 命令前缀 `LD_LIBRARY_PATH=\"<build_folder>/src:<依赖 libdir>:$LD_LIBRARY_PATH\"`（先例 libtrng/4.28、castxml/0.7.0）。"
+  - "上游 cmake/compiler_options.cmake 把所有目标加上 -march=x86-64：交叉编译到 aarch64（OHOS）时 clang 会报 unknown target CPU，配方必须打补丁移除（宿主专属优化项不能出现在交叉编译的公共编译选项里）。"
+  - "上游用 conan 1 形态（cmake/conan_install.cmake 在 configure 阶段执行 `conan install -if`，src/CMakeLists.txt include(conanbuildinfo)/conan_basic_setup(TARGETS)）：OHOS 侧必须换成 conan 2 的 CMakeDeps + find_package(CONFIG)，否则配置阶段就去拉不存在于制品仓的 sfml/2.5.1。"
+  - "上游 src/CMakeLists.txt 给共享库设了 CXX_VISIBILITY_PRESET hidden + VISIBILITY_INLINES_HIDDEN YES，而源码中没有任何 visibility 标注 ⇒ 交付的 .so 几乎不导出符号、消费者必然链接失败；同时 hidden visibility 会放大 OHOS libc++ 跨 DSO typeinfo 只比指针的问题（既有硬坑 A），必须去掉。"
+  - "上游 test/tests/main.cpp 是 `int main() {}`：Boost.UT 的两个 suite（Vector2.cpp / concepts.cpp）只做了静态注册，从不调用 cfg<>.run() ⇒ 上游 ctest 是空跑假通过（同 knowledge DRAFT-box2d-2.4.1-ctest-empty-suite-false-pass）。补 1 行 runner 后实测 `All tests passed (49 asserts in 4 tests)`；空 main 时执行 0 条断言。"
+  - "上游 graphics/Grid.hpp 的 at(size_t) 访问了不存在的成员 this->m_size（应为 this->data.size()）：GCC 13+ 的 -Wtemplate-body 直接判错（clang 延迟到实例化所以上游 CI 没暴露）⇒ 交付的公共头必须修好，否则消费者用新编译器编译就红。"
+  - "Conan 2.29 CMakeDeps 只对消费端**直接** requires 的包生成完整 *-data.cmake：samarium 的公共头传递 include range/v3 与 fmt 头，消费端（test_package）必须显式声明这两个依赖，否则 -isystem 里没有它们的 include（仓库既有 DRAFT-conan2-cmakedeps-transitive-include-strip）。"
+  - "包级 cpp_info.requires（无组件形态）会被 CMakeDeps 静默丢弃（生成的数据文件里 DEPENDENCIES 为空、config 里没有 find_dependency）；写成 cpp_info.components[\"<name>\"].requires 才会展开（实测 fmt::fmt / range-v3::range-v3 进入 DEPENDENCIES_RELEASE）。"
+  - "OHOS 不在 CMake 已知平台表 ⇒ CMAKE_SHARED_LIBRARY_SONAME_*_FLAG 未定义，共享库会缺 DT_SONAME；配合 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON 同时避免 HMDFS 上的版本化符号链接（先例 archives/h/hidapi/0.15.0）。"
+  - "OHOS 加载器拒载未签名的 .so（E135/E517）：package() 里对交付的 .so 逐个 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1（必须写另一个输出文件再 os.replace + chmod 0755），判据用重新读 .codesign 段而不是 os.access(X_OK)。"
