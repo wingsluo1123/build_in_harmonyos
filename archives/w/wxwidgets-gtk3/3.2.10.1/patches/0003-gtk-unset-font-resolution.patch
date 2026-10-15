@@ -1,0 +1,16 @@
+diff --git a/src/generic/graphicc.cpp b/src/generic/graphicc.cpp
+--- a/src/generic/graphicc.cpp
++++ b/src/generic/graphicc.cpp
+@@ -2539,7 +2539,11 @@
+     // Factor" in Gnome Tweaks, "Force font DPI" in KDE System Settings or
+     // GDK_DPI_SCALE environment variable).
+     GdkScreen* screen = gdk_screen_get_default();
+-    m_fontScalingFactor = screen ? float(gdk_screen_get_resolution(screen) / 96.0) : 1.0f;
++    // GDK returns -1 when the screen resolution is unset. Use the same
++    // default scale as for a missing screen instead of scaling fonts
++    // to a negative point size.
++    const double resolution = screen ? gdk_screen_get_resolution(screen) : -1;
++    m_fontScalingFactor = resolution > 0 ? float(resolution / 96.0) : 1.0f;
+ #endif
+ 
+     m_context = context;

@@ -1,0 +1,24 @@
+# Draft generated with ohc.graph.cmd_add; completed with verified evidence.
+id: E429
+title: 已连接 GTK 后端返回空监视器和未设置 DPI 时的能力值校验
+trigger_tool: runtime
+phase: runtime,testing
+severity: 3
+category: platform, detection, runtime, compat, testing
+error_signature: PANGO_SIZE_NEGATIVE|pango_font_description_set_size.*size >= 0|Invalid display geometry
+match_keywords: gdk_screen_get_resolution, monitor geometry, wxCairoContext, Pango, unset DPI, Broadway, wxDisplay
+root_cause: GTK显示连接成功并不保证每项后端能力有效：sole monitor geometry可为0x0，screen resolution的-1表示未设置；上层若直接用于默认窗口或DPI比例，会形成零窗口尺寸和负Pango字号。
+affected_scope: GTK兼容层与GUI绑定在不完整显示后端上；monitor geometry到screen的回退仅用于单监视器且尺寸非正；无效workarea回退该monitor的GetGeometry；DPI默认比例仅用于resolution<=0，不改变有效几何或DPI数据。
+verification_cmd: 比较实际GDK screen/monitor尺寸与resolution；运行test_wxgtk3_gui并要求工作区、窗口、文字尺寸为正且Pango critical=0；保留RED/GREEN退出码。
+rec_approach: validate-backend-values-before-gui-scaling
+rec_description: 在几何查询、点到显示映射和Cairo缩放共同入口校验后端值；无效单monitor用真实GDK screen尺寸回退，未设置DPI用比例1；用真实窗口、文本测量及错误处理器验证。
+rec_impl: source-patch+consumer-regression
+similar_to: E463, E471, E527
+rec_priority: 1
+rec_auto_fix: false
+authors: 2301_79503900 <3308319887@qq.com>
+last_updated: 2026-10-12
+source_event: wxwidgets-gtk3/3.2.10.1 native shared-mode validation
+doc_file: knowledge/drafts/E429-draft-6C2A.md
+draft: true
+contributor_id: 6C2A
