@@ -1,0 +1,81 @@
+version: "2.0.0"
+software: tuxguitar
+status: built
+build_date: "2026-10-14"
+build_system: maven
+conan_ref: "tuxguitar/2.0.0"
+package_type: library
+
+source:
+  # 上游 release 页（https://github.com/helge17/tuxguitar/releases/tag/2.0.0）只提供
+  # 各平台二进制分发包（tar.gz/deb/rpm/exe/apk），不含源码包资产；源码取官方仓库 tag 归档。
+  url: "https://github.com/helge17/tuxguitar/archive/refs/tags/2.0.0.tar.gz"
+  sha256: "a582ef93155619ef000baac38ea201de59dcb796503cb7ea71ef93a87d96312e"
+  tar_format: tar.gz
+  commit: "1190aa2b063c8e441600d2c334c9798256528c7a"
+
+build:
+  system: maven
+  # 从上游聚合器 desktop/build-scripts/tuxguitar-linux-swt 仅构建可移植（非 GUI/非原生）模块；
+  # -am 自动补入 tuxguitar / tuxguitar-ui-toolkit。
+  command: "mvn -B -pl <11 common modules> -am clean package"
+  modules_built: 13
+  excluded_modules:
+    - "desktop/TuxGuitar-ui-toolkit-swt|jfx|qt（GUI toolkit，鸿蒙无 X11/GTK SWT 端口）"
+    - "desktop/TuxGuitar-{alsa,jack,fluidsynth,AudioUnit,winmm,synth-lv2}/jni（Linux/Windows/macOS 原生 MIDI 后端）"
+    - "android/（Android 应用，Gradle）"
+  toolchain:
+    java: "BiShengJDK 17.0.13 (~/bishengjdk17)"
+    maven: "apache-maven 3.9.11（配方自取，sha256 4b7195b6...beac 校验）"
+    mirror: "Maven Central → 阿里云 central 镜像（maven.aliyun.com），3 次重试 + 直连兜底"
+  configure_options: []
+  dependencies: []
+  cc: clang
+
+patches_applied:
+  - "0001-common-TuxGuitar-lib-src-main-java-app-tuxguitar-util-TGUserFileUtils.java.patch"
+  - "0002-desktop-pom.xml.patch"
+
+knowledge_gained:
+  - "鸿蒙 BiShengJDK 17 把系统属性 user.home 报成不可用的相对占位符（实测字面量 \"?\"），任何以 user.home 拼接应用目录的 Java 程序都会写到相对当前工作目录的 \"?\" 下；应以 isAbsolute() 判定 + HOME 环境变量兜底。"
+  - "Maven 的 <os><family> 匹配基于 os.name 关键字：HarmonyOS 既不匹配 unix 也不匹配 windows，导致按平台 profile 定义属性（如 org.eclipse.swt.groupId）的工程在鸿蒙上直接 ProjectBuildingException；需为 os.name=HarmonyOS 显式补 profile。"
+  - "多模块 Java 工程适配时可用聚合器 -pl <artifactId 列表> -am 精确圈定可移植子集，避免构建 SWT/JNI 等平台绑定模块。"
+
+test:
+  upstream:
+    framework: junit5
+    command: "mvn -B -pl <common modules> -am clean package"
+    total: 58
+    passed: 58
+    failed: 0
+    errors: 0
+    skipped: 0
+    classes: 13
+  test_package:
+    total: 12
+    passed: 12
+    failed: 0
+    cases:
+      - "core: version.parse / version.packageIs2_0_0 / version.ordering"
+      - "core: song.defaultStructure / song.defaultTrackStrings / song.addNote / musicKey.noteNameOctave"
+      - "ohos: ohos.osNameIsHarmonyOS / ohos.userDirUsesPortableBranch / ohos.userDirIsAbsolute / ohos.userDirUnderHome / ohos.userDirWritable"
+  harmonyos_specific_cases: 5
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tuxguitar-2.0.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tuxguitar-2.0.0.work
+  source_orig_hash: c78d269cca104a6e
+  source_work_hash: ce76ad7e3abab069
+  generated_at: '2026-10-14T14:49:07'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-common-TuxGuitar-lib-src-main-java-app-tuxguitar-util-TGUserFileUtils.java.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-desktop-pom.xml.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

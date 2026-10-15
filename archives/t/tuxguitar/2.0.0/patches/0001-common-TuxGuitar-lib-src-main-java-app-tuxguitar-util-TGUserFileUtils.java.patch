@@ -1,0 +1,54 @@
+--- a/common/TuxGuitar-lib/src/main/java/app/tuxguitar/util/TGUserFileUtils.java
++++ b/common/TuxGuitar-lib/src/main/java/app/tuxguitar/util/TGUserFileUtils.java
+@@ -62,30 +62,50 @@
+ 
+ 		// Check if the path exists
+ 		File file = new File(configPath);
+ 		if(!isExistentAndReadable( file )){
+ 			tryCreateDirectory( file );
+ 		}
+ 		return configPath;
+ 	}
+ 
+ 	private static String getDefaultUserAppDir(){
+-		String home = System.getProperty("user.home");
++		String home = getUsableUserHome();
+ 		String folderName = "tuxguitar";
+ 		String os = System.getProperty("os.name");
+ 		if (os.equals("Mac OS X")) {
+ 			return joinPath(home, "Library", "Application Support", folderName);
+ 		}
+ 		if (os.contains("Windows")) {
+ 			return joinPath(home, "AppData", "Roaming", folderName);
+ 		}
+ 		return joinPath(home, ".config", folderName);
++	}
++
++	private static String getUsableUserHome(){
++		String home = System.getProperty("user.home");
++		if( isUsableHomePath(home) ){
++			return home;
++		}
++		// Some platforms report an unusable "user.home" (not an absolute path, e.g. a
++		// non-latin locale placeholder), which would make the application directory
++		// relative to the current working directory. Fall back to the POSIX HOME
++		// environment variable, which is always absolute on unix-like systems.
++		String envHome = System.getenv("HOME");
++		if( isUsableHomePath(envHome) ){
++			return envHome;
++		}
++		return home;
++	}
++
++	private static boolean isUsableHomePath(String path){
++		return (path != null && !path.isEmpty() && new File(path).isAbsolute());
+ 	}
+ 
+ 	private static String getUserPluginsConfigDir(){
+ 		String configPluginsPath = (getUserConfigDir() + File.separator + "plugins");
+ 
+ 		//Check if the path exists
+ 		File file = new File(configPluginsPath);
+ 		if(!isExistentAndReadable( file )){
+ 			tryCreateDirectory( file );
+ 		}
