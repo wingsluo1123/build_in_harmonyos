@@ -1,0 +1,34 @@
+# 版本级 manifest — zenmap 7.99
+version: "7.99"
+software: "zenmap"
+status: built
+build_date: "2026-10-12"
+build_system: "setuptools"
+
+source:
+  url: "https://github.com/nmap/nmap/archive/deb076224e9f138ea29fa4823bcce0030301dc54.tar.gz"
+  sha256: "640ff059c149257035254039162dc1d32d9ecfce1cc2ee7c9db84fd067776e8c"
+  tar_format: tar.gz
+  # zenmap 随 Nmap 源码树发布，无独立 release 包。官方 release tarball(nmap.org)
+  # 在 CI worker 不可达（#88152/#90209/#90255 均超时），故取官方仓库归档，并 pin 到
+  # 产出 7.99 release 的上游 commit deb076224e9f（其后触及 nmap.h 的 commit
+  # 6dac43b5d892 为 "Bump version to 7.99SVN"）。该 commit 的 zenmap/ 子树与官方
+  # nmap-7.99.tar.bz2 的 zenmap/ 子树递归 diff 为 0（逐字节一致）。
+
+build:
+  system: setuptools
+  configure_options:
+    - "pip wheel . --no-deps (PEP 517; gettext step removed by patches/0001)"
+    - "pip install <wheel> --target <stage> --no-deps --no-compile"
+  dependencies:
+    - nmap/7.99
+  cc: ""
+  cxx: ""
+
+patches_applied:
+  - "0001-pyproject-drop-gettext-msgfmt.patch"
+
+knowledge_gained:
+  - "纯 Python 包应使用 pip/PEP 517 安装（pip wheel + pip install --target），并复用 nmap/7.99 作为 run 依赖"
+  - "zenmapGUI/radialnet 在 import 期即 import gi；ohpcd 的 pygobject/3.58.0 产物在 OHOS 不可消费（扩展名 _gi.cpython-312-aarch64-linux-ohos.so 不匹配 EXT_SUFFIX，且 gtk/gobject-introspection 不含 .typelib），故不声明为 Conan 依赖"
+  - "上游 zenmap/pyproject.toml 声明了 py-modules=[ndiff] 与 ndiff 入口，但 ndiff 是独立上游包（nmap-7.99/ndiff 自带 pyproject），wheel 内无 ndiff 模块，bin/ndiff 为悬空脚本，打包时移除"

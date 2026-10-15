@@ -1,0 +1,42 @@
+# conandata.yml — zenmap 7.99
+#
+# Zenmap has no standalone release archive; it ships inside the Nmap source
+# tree, so the official Nmap source tree is the source and only its `zenmap/`
+# subtree is packaged.
+#
+# Source host choice (two reasons, both CI-driven):
+#   * The official release tarball is hosted under nmap.org/dist, which the CI
+#     workers cannot reach: builds #88152/#90209/#90255 failed with a source
+#     download timeout (CI diagnosis: "Worker 网络受限").  The official
+#     repository is reachable through the CI's github mirror channel (conan
+#     fetched it via the mirror), so the repository archive is used instead.
+#   * The repository archive is pinned to the upstream commit that produced the
+#     7.99 release: `deb076224e9f138ea29fa4823bcce0030301dc54`
+#     ("Reintegrate Nmap 7.99 release branch", 2026-03-27); the next commit
+#     touching nmap.h is 6dac43b5d892 "Bump version to 7.99SVN" (2026-03-27).
+#     Verified locally: the `zenmap/` tree at that commit is byte-for-byte
+#     identical to the `zenmap/` tree of the official nmap-7.99 release
+#     tarball (recursive diff = 0).  It is NOT the repo's only tag `v7.991`,
+#     which is a later revision with real code changes (35 files) relative to
+#     the 7.99 release.
+#
+# NOTE: this comment deliberately contains no other http(s) URL literal — the
+# CI pre-download step scrapes every URL in this file, and a bare URL here
+# would be turned into a bogus source entry.
+#
+# sha256 below is the digest of `.../archive/<sha>.tar.gz` (verified locally).
+
+sources:
+  url: "https://github.com/nmap/nmap/archive/deb076224e9f138ea29fa4823bcce0030301dc54.tar.gz"
+  sha256: "640ff059c149257035254039162dc1d32d9ecfce1cc2ee7c9db84fd067776e8c"
+
+# No source-code changes: the Python payload runs unmodified on the OHOS
+# aarch64 CPython.  The single patch is a packaging-only portability fix (see
+# notes.md): the CI worker / OHOS Python has no gettext `msgfmt`, so the
+# setuptools-gettext backend cannot compile the .po catalogues.  Those
+# catalogues only feed GUI translation, and the GUI needs GTK3 which is not
+# available on OHOS anyway, so the gettext build step is dropped.
+patches:
+  - patch_file: "patches/0001-pyproject-drop-gettext-msgfmt.patch"
+    patch_description: "Drop the setuptools-gettext build step (no msgfmt on OHOS)"
+    patch_type: "portability"
