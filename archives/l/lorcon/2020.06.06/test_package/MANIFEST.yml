@@ -1,0 +1,59 @@
+package: lorcon/2020.06.06
+homepage: "https://github.com/kismetwireless/lorcon"
+
+upstream_check_command: "python3 -m unittest upstream_pylorcon2_tests -v"
+upstream_test_in_build: false
+upstream_test_command: "python3 -m unittest upstream_pylorcon2_tests -v"
+upstream_tests_exist: true
+upstream_test_audit: "Audited lorcon-2020.06.06 source tree and master branch: Makefile.in defines no check/test target (verified raw Makefile.in targets are only all/install/clean/distclean/dep/depend); no tests/ or test/ directory; no CTest/CMakeLists, no gtest macros, no pytest config. The only automated suite is pylorcon2/test.py with 10 python_def unittests (testGetVersion, testListDrivers, testFindDriver, testAutoDriver, testInjection, testTimeout, testVap, testGetDriverName, testChannel, testMAC; upstream setUp Context('wlan0'), 8/10 methods call open_injmon/open_monitor/send_bytes/set_channel/set_hwmac/auto_driver). testGetVersion never touches Context/iface (only type(get_version()) == int, verified against tag source) and executes for real via the packaged lorcon_test binary (CHECK-OK version line); the other 9 require monitor-mode 802.11 injection hardware absent on HarmonyOS PC, so test_package mirrors the identical 10 IDs in upstream_pylorcon2_tests.py with 1 executed + 9 explicit skips (ohos_feature). Remaining pylorcon2/test-multi.py, test-packet.py, test-packet-filter.py, test-packet-scapy.py and ruby-lorcon/test.rb are hardware/pcap demos with zero assertions, not counted. Upstream test count by python_def method is 10."
+upstream_test_total: 10
+upstream_test_count_method: "python_def"
+
+upstream_tests:
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testGetVersion
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "PyLorcon2.get_version() type check; hardware-independent upstream (no Context use), executes for real via packaged lorcon_test CHECK-OK version line"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (executed: LORCON_TEST_BIN lorcon_test)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testListDrivers
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "list_drivers() non-empty check; on OHOS lorcon_list_drivers returns NULL (no USE_DRV_* defined)"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testFindDriver
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "find_driver('mac80211') check; requires driver database plus wireless stack"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testAutoDriver
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "auto_driver('wlan0') check; requires wlan0 monitor-mode interface"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testInjection
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "open_injmon + send_bytes injection check; requires injection-capable hardware"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testTimeout
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "set_timeout/get_timeout check; suite setUp still requires wlan0 Context"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testVap
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "set_vap/get_vap check; suite setUp still requires wlan0 Context"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testGetDriverName
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "get_driver_name() type check; suite setUp still requires wlan0 Context"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testChannel
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "open_injmon + set_channel/get_channel check; requires monitor-mode hardware"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+  - file: pylorcon2/test.py::PyLorcon2TestCase::testMAC
+    source: lorcon-2020.06.06/pylorcon2/test.py
+    description: "open_monitor + set_hwmac/get_hwmac check; requires monitor-mode hardware"
+    command: "python3 -m unittest upstream_pylorcon2_tests -v (skipped: no wireless injection on OHOS)"
+
+test_package_tests:
+  - file: test.c
+    description: "Call packaged lorcon API without hardware: version, packasm roundtrip, beacon forge, HT channel parse"
+    command: "./lorcon_test"
+
+assertion_count: 4
