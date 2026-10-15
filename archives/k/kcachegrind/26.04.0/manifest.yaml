@@ -1,0 +1,76 @@
+# 版本级 manifest — kcachegrind 26.04.0（KDE Gear 26.04.0）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "26.04.0"
+software: "kcachegrind"
+status: built
+build_date: "2026-10-15"
+build_system: "cmake"
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kcachegrind-26.04.0.tar.xz"
+  sha256: "476919c3a9bec436b1a55a6c1a28ebfb07b43d6e22c05c6a476d0bfa537c8fa4"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+  dependencies:
+    - qtbase/6.11.1.1
+    - kdbusaddons/6.29.0
+    - kio/6.14.0
+    - kxmlgui/6.18.0
+    - kconfigwidgets/6.18.0
+    - karchive/6.19.0
+    - kconfig/6.18.0
+    - kcoreaddons/6.18.0
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kjobwidgets/6.18.0
+    - kservice/6.18.0
+    - kcolorscheme/6.18.0
+    - kguiaddons/6.18.0
+    - kiconthemes/6.18.0
+    - kitemviews/6.18.0
+    - kwindowsystem/6.18.0
+    - kauth/6.18.0
+    - solid/6.18.0
+    - kbookmarks/6.18.0
+    - kcompletion/6.18.0
+    - kcodecs/6.18.0
+    - kcrash/6.18.0
+    - knotifications/6.18.0
+    - openssl/3.5.6.1
+    - libxml2/2.15.3
+    - extra-cmake-modules/6.29.0 (tool_requires)
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - patches/0001-kcachegrind-main.cpp.patch
+
+knowledge_gained:
+  - "kio/6.26.0 在 ohpcd 上是 KIOCORE_ONLY 变体（无 KIOWidgets/KIOGui/KIOFileWidgets）；上游 kcachegrind/CMakeLists.txt 显式链接 KF6::KIOWidgets ⇒ 必须改用带 KIOWidgets 的 kio/6.14.0 并用 override 抬齐到 6.18 闭包（ktimer 26.04.0 先例）。"
+  - "kcachegrind 源码只使用 KIO::file_copy（KIOCore）与 KJobWidgets::setWindow（kjobwidgets），KIOWidgets 仅为上游链接期目标 ⇒ 无需裁剪 KIO 功能。"
+  - "上游 KF6DocTools 为非 REQUIRED 可选依赖，doc/ 与 kdoctools_install(po) 由 KF6DocTools_FOUND 守卫 ⇒ 不声明 kdoctools 即自动跳过文档子目录，无需补丁。"
+  - "KF6 依赖库存在坏 DT_NEEDED：相对形式 `../../bin/<lib>.so` 被加载器按 CWD 解析（含 '/' 的名字绕过 DT_RPATH/LD_LIBRARY_PATH），绝对形式指向构建方 conan home。CI worker 缓存里的 kconfigwidgets/kiconthemes 是上游配方在 worker 上本地重建出来的同 package_id 副本（Conan 不校验同 package_id 的字节一致性），故该缺陷只在 CI 暴露、本开发机不可复现。修法（kteatime/ktimer 26.04.0 先例）：test_package 把依赖 .so 复制到 <conan_cache>/bin 并以 <conan_cache>/recon/kcg 为 CWD 运行测试（_reconstruct_kf6_rpaths）。"
+  - "远端 CI 前 6 次尝试全为基础设施故障（worker spawn 资源耗尽 posix_spawn/Resource temporarily unavailable、make Error 127，或 worker 挂死 mkdir 超时 1200s），失败点均在依赖 kio/6.14.0 的源码重建上；按踩坑清单 #10 重触发换 worker，第 7 次才跑到本包的真实失败。"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/kcachegrind-26.04.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/kcachegrind-26.04.0.work
+  source_orig_hash: f4c322231c34bad3
+  source_work_hash: 52d47e95f51acaf4
+  generated_at: '2026-10-15T00:58:16'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-kcachegrind-main.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

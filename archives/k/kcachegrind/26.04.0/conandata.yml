@@ -1,0 +1,17 @@
+# conandata.yml — kcachegrind 26.04.0 (KDE Gear 26.04.0)
+# 官方源: KDE Release Service（R39：只保留官方 https 源，CI 自动加镜像 fallback）
+sources:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kcachegrind-26.04.0.tar.xz"
+  sha256: "476919c3a9bec436b1a55a6c1a28ebfb07b43d6e22c05c6a476d0bfa537c8fa4"
+
+patches:
+  "26.04.0":
+    - patch_file: "patches/0001-kcachegrind-main.cpp.patch"
+      patch_description: >-
+        main(): construct KDBusService only when a D-Bus session bus is
+        reachable. KDBusService's constructor calls qFatal()-equivalent
+        termination when no session bus exists, so kcachegrind exited with
+        status 1 before parsing the command line on systems without one
+        (OpenHarmony has no D-Bus session bus). The service object is otherwise
+        unused, so skipping it only disables D-Bus based activation.
+      patch_type: "portability"
