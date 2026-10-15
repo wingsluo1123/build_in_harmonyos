@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（CI L0e 强制要求）
+package: libxfce4util/4.20.1
+homepage: "https://gitlab.xfce.org/xfce/libxfce4util"
+
+# 上游测试情况审计（tarball 实测）：
+#   - 4.20.1 tarball 无 tests/ 目录（find 无 *test* 目录命中）
+#   - 根 meson.build 及 libxfce4util/、xfce4-kiosk-query/、docs/、po/ 子目录
+#     的 meson.build 均无 test() 声明（grep -rn "test(" 零命中）
+#   - 上游维护 meson CI 亦未注册任何 test 阶段
+# → N=0：上游无测试套件，测试覆盖由下方 test_package 消费者冒烟补全
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package 自带测试（消费者视角：编译链接 + API 冒烟）
+test_package_tests:
+  - file: test.c
+    description: "消费者 API 冒烟：①版本字符串/版本宏/CHECK_VERSION（3 断言）②xfce_str_replace/xfce_utf8_strndup/xfce_utf8_remove_controls 字符串与 UTF-8（3 断言）③xfce_resource_dirs 资源目录（1 断言）④xfce_get_license_text 内置许可证文本（1 断言）⑤xfce_expand_variables 变量展开（1 断言）⑥XfceKiosk GObject 类型 + kiosk 查询（1 断言）。链接行含 glib 闭包（-lgio-2.0 -lgobject-2.0 -lglib-2.0 -lintl，proxy-libintl 覆盖 g_libintl_* 符号）"
+    command: "./test_libxfce4util"
+
+# 断言总数：test.c 中 10 个 API 断言点（每个对应一个 errors++ 检查分支）
+# + 1 个整体 PASS 判定（errors==0 汇总）
+assertion_count: 10

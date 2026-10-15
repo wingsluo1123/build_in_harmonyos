@@ -1,0 +1,45 @@
+software: libxfce4util
+# 版本级 manifest
+# 文件位置: archives/l/libxfce4util/4.20.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.20.1"
+description: "XFCE core utility library — GObject helpers, i18n (gettext proxy), XDG resource lookup, kiosk, string/utf8/file utils (XFCE 链根件)"
+license: "LGPL-2.0-or-later"
+category: foundation
+build_system: meson
+status: built
+build_date: "2026-10-15"
+
+homepage: "https://gitlab.xfce.org/xfce/libxfce4util"
+source_url: "https://archive.xfce.org/src/xfce/libxfce4util/4.20/libxfce4util-4.20.1.tar.bz2"
+
+build:
+  system: meson
+  build_system: meson
+  configure_options:
+    - "-Dintrospection=false"
+    - "-Dvala=disabled"
+    - "-Dgtk-doc=false"
+  dependencies:
+    - glib/2.84.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "XFCE 4.20 起上游转 meson 主构建；glib 依赖经 pkg-config 组件解析（glib-2.0/gobject-2.0/gio-2.0），conan(PkgConfigDeps) 生成器目录置顶注入"
+  - "OHOS sysroot libintl.h 为空 stub：glib 制品的 proxy libintl.h（gettext→g_libintl_* 宏）经 meson dependency() cflags 优先命中，编译期补位；链接期由 -lintl（glib 包内 proxy-libintl，SONAME libintl.so.8）提供符号"
+  - "OHOS lld 默认 --no-allow-shlib-undefined：消费 glib 共享库的目标链接行必须显式见 -lintl，否则 g_libintl_* 未定义；conan PkgConfigDeps 生成的 glib-2.0.pc 不含 -lintl，须在 generate() 增强 .pc 的 Libs 行（accountsservice 26.27.3 同款）"
+  - "meson install 重写 ELF（剥离 RUNPATH）使链接器自签 .codesign 失效 → OHOS 加载器拒绝（errno 为空的 Error loading shared library）；package() 内 llvm-objcopy --remove-section .codesign + binary-sign-tool selfSign 重签（glib/accountsservice 同款）"
+  - "xdt-gen-visibility 为源码根目录 python3 脚本，meson find_program() 优先搜源码目录，无需额外处理"
+  - "上游 4.20.1 无测试套件（无 tests/ 目录、无 test() 声明）→ N=0 审计声明 + 消费者冒烟补全（test.c 10 断言）"
+  - "conan test_package 遍历 dependencies 时 libffi/pcre2/zlib 等 Skipped binaries 节点 package_folder=None，须跳过"
+
+patch_generation:
+  method: none
+  patches_count: 0
+  generated_at: "2026-10-15"
+
+patch_classification: []
