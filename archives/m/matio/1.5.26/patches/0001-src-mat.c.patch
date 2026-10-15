@@ -1,0 +1,62 @@
+--- a/src/mat.c
++++ b/src/mat.c
+@@ -59,47 +59,52 @@
+ /*
+  *===================================================================
+  *                 Private Functions
+  *===================================================================
+  */
+ 
+ #define MAT_MKTEMP_DIR "/tmp/"
+ #define MAT_MKTEMP_TPL "XXXXXX"
+ #define MAT_MKTEMP_FILE "/temp.mat"
+ 
++/* TMPDIR paths can be longer than the default /tmp/ prefix; keep the
++ * fixed buffer large enough for a user-specified temp directory. */
++#define MAT_MKTEMP_DIR_MAX 256
++
+ #define MAT_MKTEMP_BUF_SIZE \
+-    (sizeof(MAT_MKTEMP_DIR) + sizeof(MAT_MKTEMP_TPL) + sizeof(MAT_MKTEMP_FILE) - 2)
++    (MAT_MKTEMP_DIR_MAX + sizeof(MAT_MKTEMP_TPL) + sizeof(MAT_MKTEMP_FILE) - 2)
+ 
+ static char *
+ Mat_mktemp(char *path_buf, char *dir_buf)
+ {
+     char *ret = NULL;
+ 
+     *path_buf = '\0';
+     *dir_buf = '\0';
+ 
+ #if ( defined(_WIN64) || defined(_WIN32) ) && !defined(__CYGWIN__)
+     strncpy(path_buf, MAT_MKTEMP_TPL, MAT_MKTEMP_BUF_SIZE - 1);
+     path_buf[MAT_MKTEMP_BUF_SIZE - 1] = '\0';
+     if ( NULL != _mktemp(path_buf) )
+         ret = path_buf;
+ #else
+     /* On Linux, using mktemp() causes annoying linker errors that can't be
+        suppressed. So, create a temporary directory with mkdtemp() instead,
+        and then just always use the same hardcoded filename inside that temp dir.
+-     */
+-    strncpy(dir_buf, MAT_MKTEMP_DIR MAT_MKTEMP_TPL, MAT_MKTEMP_BUF_SIZE - 1);
+-    dir_buf[MAT_MKTEMP_BUF_SIZE - 1] = '\0';
++       Prefer the TMPDIR environment variable when set so that read-only
++       filesystems (e.g. erofs /tmp on HarmonyOS) do not break Mat_VarDelete. */
++    const char *tmpdir = getenv("TMPDIR");
++    if ( tmpdir == NULL || *tmpdir == '\0' )
++        tmpdir = MAT_MKTEMP_DIR;
++    snprintf(dir_buf, MAT_MKTEMP_BUF_SIZE, "%s%s", tmpdir, MAT_MKTEMP_TPL);
+     if ( NULL != mkdtemp(dir_buf) ) {
+-        strncpy(path_buf, dir_buf, MAT_MKTEMP_BUF_SIZE - 1);
+-        path_buf[MAT_MKTEMP_BUF_SIZE - 1] = '\0';
+-        strncat(path_buf, MAT_MKTEMP_FILE, MAT_MKTEMP_BUF_SIZE - strlen(path_buf) - 1);
++        snprintf(path_buf, MAT_MKTEMP_BUF_SIZE, "%s%s", dir_buf, MAT_MKTEMP_FILE);
+         ret = path_buf;
+     }
+ #endif
+ 
+     return ret;
+ }
+ 
+ static int
+ ReadData(mat_t *mat, matvar_t *matvar)
+ {
