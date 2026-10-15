@@ -1,0 +1,76 @@
+# test_package/MANIFEST.yml — megadepth 1.2.0
+# 上游官方测试声明（R51 三步法：清点 → 实跑 → 如实回填）
+# CI build_and_test.sh L0e 强制要求本文件存在，assertion_count 不得为 0。
+
+package: megadepth/1.2.0
+homepage: "https://github.com/ChristopherWilks/megadepth"
+
+# ── 上游测试入口 ──
+# 上游无 ctest/pytest/autotools check；测试套件是 shell 集成测试 tests/test.sh，
+# 以相对路径读取 tests/ 下 52 个 fixture，并把产物写到 CWD 后逐条 diff 比对。
+# 带 `static` 参数运行 → 全部输入为仓库内本地文件（上游为无网络/静态链接场景设计）。
+# 注意：上游 static 分支之外仍有一处未加守卫的远程 HTTP 取数（test.sh:95），
+# 本平台 htslib(--disable-libcurl)/libbigwig(NOCURL) 不支持远程读取，
+# 已由 patches/0001 以完全等价的本地 fixture 替换（详见 conandata.yml）。
+upstream_check_command: "bash tests/test.sh static"
+upstream_test_in_build: true
+upstream_test_command: "bash tests/test.sh static  (cwd = 构建目录副本，megadepth 二进制置于 ./megadepth)"
+
+# ── 上游测试清点（tests/test.sh，static 模式实际执行项）──
+upstream_tests:
+  source_tree: "megadepth-1.2.0/tests/ (52 个 fixture 文件)"
+  test_files: 1
+  test_programs: 1
+  harness: "tests/test.sh (bash shell 集成测试)"
+  sequence:
+    - "tests/test_noprefix.bam --prefix test.bam --threads 4 --bigwig --auc --min-unique-qual 10 --annotation tests/test_exons.bed --frag-dist --alts --include-softclip --only-polya --read-ends --test-polya --no-annotation-stdout --no-auc-stdout --filter-out 260 --add-chr-prefix human"
+    - "tests/test.cram --prefix test.cram --threads 4 --coverage --no-coverage-stdout --auc --min-unique-qual 10 --annotation 400 --frag-dist --alts --include-softclip --only-polya --read-ends --test-polya --no-annotation-stdout --no-auc-stdout --filter-out 260"
+    - "tests/test.bam --annotation tests/test_exons.bed --op mean --add-chr-prefix human"
+    - "tests/test.bam (AUC 全量输出) | fgrep ALL_READS_ALL_BASES"
+    - "tests/test2.bam --threads 4 --junctions --all-junctions --prefix test2.bam"
+    - "test.bam.all.bw (--bigwig 产物) | grep AUC"
+    - "test.bam.all.bw --annotation tests/testbw1.bed --auc --prefix test.bam.bw1"
+    - "test.bam.all.bw --annotation tests/testbw2.bed --auc --prefix test.bam.bw2"
+    - "test.bam.all.bw --op mean --annotation tests/testbw2.bed --prefix bw2.mean"
+    - "test.bam.all.bw --op min  --annotation tests/testbw2.bed --prefix bw2.min"
+    - "test.bam.all.bw --op max  --annotation tests/testbw2.bed --prefix bw2.max"
+    - "tests/test3.bam --auc --coverage --prefix t3 --no-auc-stdout"
+    - "tests/test3.bam --coverage --min-unique-qual 10 --bigwig --auc --prefix test3 --no-auc-stdout"
+    - "tests/long_reads.bam --junctions --prefix long_reads.bam --long-reads"
+    - "test.bam.all.bw --sums-only --annotation tests/testbw2.bed --prefix test.bam.bw2"
+    - "tests/test_noprefix.bam --prefix test.bam.names --threads 4 --alts --write-names --include-softclip --only-polya --test-polya --no-annotation-stdout --no-auc-stdout --filter-out 260 --add-chr-prefix human   [patch 0001: 上游此处为远程 HTTP test.bam，替换为等价本地 fixture]"
+    - "tests/bw.all_overlap_types.test_input.bw --annotation tests/gh_bug_9.bed --auc"
+    - "tests/TCGA_BLCA_A13J.vcf.gz_cg_cov5.bw.bg.gz.chr1.60379.62229.bw --annotation tests/chr1.61863.62160.bed --no-annotation-stdout --prefix TCGA_BLCA_A13J_vs_chr1.61863.62160"
+    - "tests/TCGA_BLCA_A13J.vcf.gz_cg_cov5.bw.bg.gz.chr1.60379.62229.bw --annotation tests/chr1.61863.62160.bad_chrm_order.bed  (断言 stderr 含 'falling back')"
+  invocations: 19
+  not_executed:
+    - item: "test.sh:7,9 远程 HTTP test.bam / test.cram（非 static 分支）"
+      reason: "test.sh 以 static 参数运行时该分支不执行；且本平台 htslib 以 --disable-libcurl 构建，libbigwig 以 NOCURL 构建，二者均无远程 HTTP 读取能力——这是依赖包的构建选项约束，非环境缺失"
+    - item: "test.sh:87-88 远程 HTTP bigWig（static 守卫内）"
+      reason: "同上：远程读取能力缺失；该用例被上游自身的 [[ -z $static ]] 守卫排除"
+  result: "19/19 用例执行，30/30 断言通过（0 条 diff 差异）；完整日志见 reports/conan-create.log（本机留档，reports/ 被 .gitignore 忽略）"
+  assertion_count: 30
+
+# ── test_package 自带测试（消费者视角）──
+test_package_tests:
+  file: test_megadepth.sh
+  description: "对已安装的 megadepth 二进制执行真实功能计算，并与上游期望输出逐行比对"
+  command: "bash test_megadepth.sh <packaged-megadepth-path> <workdir>"
+  fixture_source: "上游 tests/ ：test.sam / test_exons.bed / test.bam.mosdepth.{annotation,unique}.per-base.exon_sums.tsv / test.bam.orig.alts.tsv"
+  fixtures_packaged: 5
+  tests:
+    - "--version 输出 'megadepth 1.2.0'"
+    - "--help 退出码 0"
+    - "比对输入覆盖度+注释计算（与上游 static 分支首例同参数）退出码 0"
+    - "out.annotation.tsv 与上游 expected.annotation.per-base.exon_sums.tsv 逐行一致"
+    - "out.unique.tsv 与上游 expected.unique.per-base.exon_sums.tsv 逐行一致"
+    - "--bigwig 产出非空 out.all.bw"
+    - "--frag-dist 产出 frag 分布文件"
+    - "--op mean 输出非空"
+    - "未知扩展名输入返回非零退出码"
+  ohos_specific:
+    - "测试驱动器使用 hnp bash（/data/service/hnp/bin/bash），规避 /system/bin/sh 执行 ELF 的限制"
+    - "打包二进制经 bindirs 定位，conanrun 环境注入 LD_LIBRARY_PATH 以解析共享依赖"
+    - "测试数据与输出目录均位于 TMPDIR 语义的临时目录（$TMPDIR 优先），不写入只读 /tmp，也不落在归档目录内"
+    - "fixture 一律为纯文本：平台 PR diff 端点对二进制文件不携带 GIT binary patch 数据，checkout-pr 的 git apply 会因 missing binary patch data 失败；改用上游文本 test.sam（megadepth 把 .sam 归入 BAM 族并自动识别），输出与 .bam 完全等价"
+  assertion_count: 9
