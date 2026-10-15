@@ -1,0 +1,63 @@
+software: berkeley-db
+version: "18.1.40"
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+source:
+  url: "https://download.oracle.com/berkeley-db/db-18.1.40.tar.gz"
+  sha256: "0cecb2ef0c67b166de93732769abdeba0555086d51de1090df325e18ee8da9c8"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--enable-static"
+    - "--enable-shared"
+    - "--with-repmgr-ssl=no"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Berkeley DB 18.1.40 与 5.3.28 相同，须在 build_unix/ 子目录运行 ../dist/configure"
+  - "18.1.40 的 config.guess 无需升级补丁：OHOS 目标显式传 --build/--host=aarch64-unknown-linux-gnu（berkeley-db 4.8.30 已验证路线），免去 5.3.28 的 137KB config.guess/config.sub 替换补丁"
+  - "HMDFS: configure 探测 print -r -- 成功但 config.status 执行环境无 print（探测 shell 与执行环境不一致）；构建时改写 dist/configure（8 处 print -r --、2 处 print -rn --）强制 POSIX printf %s\\n 回显"
+  - "HMDFS: config.status 临时目录默认 umask 077 → 2700+setgid 目录写 awk 脚本被拒（subs1.awk Permission denied）；须反激活 configure 末尾的 config.status 自动执行行，改写临时目录到 $TMPDIR + umask 022 后手动执行"
+  - "OHOS 内核无 binfmt_script：execve() 一切 #! 脚本恒 EACCES/126（与权限位无关）；configure/config.status/生成的 Makefile 必须显式解释器前缀——SHELL=sh sh ../dist/configure、sh ./config.status、LIBTOOL=sh ./libtool"
+  - "生成的 Makefile 中 LIBTOOL=./libtool 会被 make 直接 execve（126）；须在 config.status 内替换 S[\"LIBTOOL\"] 并对 Makefile 正则兜底改写为 sh ./libtool"
+  - "HMDFS 全盘拒绝符号链接（symlink(2) EPERM）：Makefile 的 $(LN) -s 便利链接（23 处，如 libdb.a）改写为 cp -f；上游 tarball 内符号链接（docs 的 bdb-sql、gsg_db_server）解包即跳过，DOCLIST 须剪枝"
+  - "安装期 llvm-strip 会剥离 OHOS clang 链接时自动注入的 .codesign 段（27008B 签名→10104B 未签名），装出的 db_* 工具在设备上被拒执行（126）；须禁用 install_utilities 的 $(STRIP) 行（对照：未 strip 的 ELF 可直执且 db_archive -V 正常输出版本）"
+  - "上游无 make check：dist/Makefile.in 对 check/depend/dvi/info/obj/TAGS 统一回显 'make: $@ target not available'（非失败退出）"
+  - "上游可运行 C 套件：make cutest 构建 CuTest 聚合执行文件（test/c，13 套件；83 个 Test* 函数、注册用例 55 个），test/c/README 指明在 build_unix 下 ./cutest 运行；测试脚手架在 clang -O3 下存在上游代码 UB 触发 trap 的现象（TestQueue），-O0 复建后全套 13 套件全绿（库本体不受影响）"
+  - "18.1.40 相对 5.3.28 移除 db_sql、新增 db_convert；UTIL_PROGS 共 15 个工具"
+
+binaries:
+  - db_archive
+  - db_checkpoint
+  - db_convert
+  - db_deadlock
+  - db_dump
+  - db_hotbackup
+  - db_load
+  - db_log_verify
+  - db_printlog
+  - db_recover
+  - db_replicate
+  - db_stat
+  - db_tuner
+  - db_upgrade
+  - db_verify
+
+libraries:
+  - libdb-18.1.so
+  - libdb-18.1.a
+
+headers:
+  - db.h
+  - db_cxx.h
