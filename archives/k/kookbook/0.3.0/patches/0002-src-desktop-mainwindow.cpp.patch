@@ -1,0 +1,35 @@
+--- a/src/desktop/mainwindow.cpp
++++ b/src/desktop/mainwindow.cpp
+@@ -187,32 +187,27 @@
+     toolbar->addSeparator();
+     {
+         auto action = toolbar->addAction(QIcon::fromTheme("document-new"), "New recipe", this, &MainWindow::newRecipe);
+         action->setShortcut(QKeySequence(QKeySequence::New));
+     }
+     {
+         auto action = toolbar->addAction(QIcon::fromTheme("edit-entry"),"Edit current recipe", this, &MainWindow::editActiveRecipe);
+         action->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+     }
+     {
+-        auto action = toolbar->addAction(QIcon::fromTheme("document-print"),"Print current recipe", m_mainPane, &MainPane::print);
+-        action->setShortcut(QKeySequence(QKeySequence::Print));
+-    }
+-    {
+         auto action = new QAction("Quit", this);
+         action->setShortcut(QKeySequence::Quit);
+         addAction(action);
+         connect(action, &QAction::triggered, qApp, &QApplication::quit);
+     }
+ 
+     toolbar->addAction(QIcon::fromTheme("randomize"), "Display random recipe", this, &MainWindow::showRandomRecipe);
+-    toolbar->addAction(QIcon::fromTheme("document-print-preview"),"Print preview current recipe", m_mainPane, &MainPane::printPreview);
+     toolbar->toggleViewAction()->setEnabled(false);
+     addToolBar(Qt::TopToolBarArea, toolbar);
+     QSettings s;
+     s.beginGroup("General");
+     setCurrentFolder(s.value("location", QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/recipes/").toString());
+     restoreState(s.value("windowState", QByteArray()).toByteArray());
+     statusBar()->show();
+     toolbar->show();
+ }
+ 

@@ -1,0 +1,116 @@
+# 版本级 manifest
+# 文件位置: archives/k/kookbook/0.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.3.0"
+software: "kookbook"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/kookbook/kookbook-0.3.0.tar.xz"
+  sha256: "c32c11e4a5a690267dcdeeb2e919829b08f5fa439da1a19da5e40f4a0649694f"
+  tar_format: tar.xz
+  upstream_repo: "https://invent.kde.org/utilities/kookbook"
+  released: "2026-04-11"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+  # 由 Conan CMakeToolchain 生成 toolchain，无手动 configure 选项。
+  # 注入变量：BUILD_TESTING=ON、CMAKE_CXX_STANDARD=17、CMAKE_INSTALL_RPATH、
+  # ECM_MODULE_PATH、QUERY_EXECUTABLE=<qtbase>/bin/qtpaths6、
+  # QT_ADDITIONAL_PACKAGES_PREFIX_PATH。
+  dependencies:
+  - qtbase/6.11.1
+  - qtdeclarative/6.11.1
+  - extra-cmake-modules/6.29.0
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "0001-CMakeLists.txt.patch"
+- "0002-src-desktop-mainwindow.cpp.patch"
+- "0003-src-desktop-panes-CMakeLists.txt.patch"
+- "0004-src-desktop-panes-mainpane.cpp.patch"
+- "0005-src-desktop-panes-mainpane.h.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "制品仓 qtbase 线的依赖拓扑：qtbase/6.11.1 是全部已发布 Qt6 模块（含 qtdeclarative/6.11.1）的构建基线；带 Qt6::PrintSupport 的是 qtbase/6.11.1.3，但 qtdeclarative/6.11.1 与 /6.11.1.1 精确声明 qtbase/6.11.1（conan Version conflict），qtdeclarative/6.11.1.2 在 qtbase/6.11.1.3 下把 qtshadertools/6.11.1 解析到未发布的 package id（Missing prebuilt package）。因此 Qt6 应用同时需要 Qml 与 PrintSupport 时，二者当前不可兼得。"
+- "qtbase/6.11.1 的 binary 实际带 libQt6Test.so 与 Qt6TestConfig.cmake（组件表中未声明 test 组件），纯 QtTest 上游测试可直接 BUILD_TESTING=ON + ctest 在目标机运行。"
+- "KDE ECM 作为 tool_requires 时，ECM_MODULE_PATH 与 conan_cmakedeps_paths.cmake 需手工注入（qtbase 用 cmake_find_mode=none，CMakeDeps 不生成后者）；ECMQueryQt 需要显式 QUERY_EXECUTABLE=<qtbase>/bin/qtpaths6，否则 KDEInstallDirs 无法解析安装目录。"
+- "GUI 应用的消费者端到端验证：kookbook 无 CLI 输出、不会自行退出、Qt 未安装信号处理器（SIGINT/SIGTERM 不触发析构，QSettings 不写回），因此业务输出改用进程外 inotify 观测——监视应用默认集合目录，核对运行中的应用真实打开并读取每一个 *.recipe.md（即 Scanner 扫描/RecipeParser 解析所消费的字节）。注意本机 hmdfs/tmpfs 的 atime 不更新（对照实验：cat 读取后 atime 不变），不能作为读取证据。"
+- "QTextDocument 对 markdown 相对路径图片资源为惰性加载（仅在绘制到视口时 loadResource），offscreen QPA 下即使窗口已显示也不保证加载，不能作为渲染证据。"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/kookbook-0.3.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/kookbook-0.3.0.work
+  source_orig_hash: 17b68cb983341af5
+  source_work_hash: a6b25c65712f3953
+  generated_at: '2026-10-15T15:19:58'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-src-desktop-mainwindow.cpp.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-src-desktop-panes-CMakeLists.txt.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0004-src-desktop-panes-mainpane.cpp.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0005-src-desktop-panes-mainpane.h.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+
+# ============================================================
+# 测试
+# ============================================================
+
+test_results:
+  type: official
+  # 上游 autotests/parsertest：ecm_add_test 注册 2 个 QtTest 目标（ctest 2 项），
+  # 数据驱动用例共 25 行（ingredientsextractortest 16 + recipeparsertest 9）。
+  upstream:
+    total: 2
+    passed: 2
+    failed: 0
+    skipped: 0
+    cases: 25
+  # test_package 鸿蒙特有消费者端到端用例 E2E-KOOKBOOK-01（8 项判定全过）。
+  consumer:
+    total: 1
+    passed: 1
+    failed: 0
+    case_id: E2E-KOOKBOOK-01
