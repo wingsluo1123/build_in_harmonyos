@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — kookbook 0.3.0（上游产品 KookBook，KDE）
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: kookbook/0.3.0
+homepage: "https://invent.kde.org/utilities/kookbook"
+
+# 上游唯一测试入口：autotests/（顶层 CMakeLists add_subdirectory(autotests)，
+# autotests/CMakeLists.txt: find_package(Qt6 COMPONENTS Test) +
+# add_subdirectory(parsertest)；autotests/parsertest/CMakeLists.txt 通过
+# ECMAddTests 的 ecm_add_test() 注册 2 个 QtTest 目标）。
+# ECMAddTests 以 BUILD_TESTING 为开关，配方 tc.variables["BUILD_TESTING"]="ON"。
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error (QT_QPA_PLATFORM=offscreen)"
+
+# 上游实际运行的测试程序（W3 实测 2/2 Passed, 0 failed, 100%）
+# 两个目标都用 QTEST_APPLESS_MAIN，不创建 QApplication，不依赖显示服务。
+upstream_tests:
+  - file: autotests/parsertest/ingredientsextractortest.cpp
+    source: kookbook-0.3.0/autotests/parsertest/ingredientsextractortest.cpp
+    description: "IngredientsExtractor::parseLine 数据驱动用例，16 个 QTest::newRow（含 '-' 与 '*' 两种项目符号、注释截断、空输入边界），每行 3 个 QCOMPARE（amount/unit/ingredient）"
+    command: "./ingredientsextractortest"
+  - file: autotests/parsertest/recipeparsertest.cpp
+    source: kookbook-0.3.0/autotests/parsertest/recipeparsertest.cpp
+    description: "RecipeParser::parseRecipe 数据驱动用例，9 个 QTest::newRow（空输入、仅标题、tags、多 author、正文+配料、以及 data/couscous.recipe.md 与 data/twoingredients.recipe.md 两个真实食谱文件 fixture）"
+    command: "./recipeparsertest"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_kookbook_e2e.py
+    description: "E2E-KOOKBOOK-01 规则12 完整消费者端到端用例：把真实食谱集合放入应用默认集合目录（<HOME>/Documents/recipes），以 offscreen QPA 运行安装后的 bin/kookbook，用 inotify 观测运行中的应用真实打开并读取集合内每一个 *.recipe.md（Scanner::setRootPath -> parseThingsInDifferentThread -> QFile::open -> RecipeParser::parseRecipe），并核对 AArch64/Qt6 DT_NEEDED 闭包、无动态链接失败"
+    command: "python3 test_kookbook_e2e.py <pkg>/bin/kookbook fixtures/"
+  - file: test_app.sh
+    description: "同一用例的手工复现入口（文档化命令）"
+    command: "sh test_app.sh <pkg>/bin/kookbook"
+
+# 测试断言总数 — 注意：这是**近似值**，供质量评估用，不是权威计数口径。
+# 权威计数以本文件的 upstream_tests / test_package_tests 条目与
+# reports/test-report.md 为准：上游 ctest 2 项、数据驱动用例 25 行
+# （ingredientsextractortest 16 行、recipeparsertest 9 行）、
+# 鸿蒙消费者端到端用例 1 个（E2E-KOOKBOOK-01，8 项判定）。
+# 近似来源：16 行 × 3 断言 = 48（精确）+ recipeparsertest 每行断言数随数据变化
+# （标题/tags 数量/配料数量/元数据，约 4~6 个），估 ≈45 + E2E 8 项判定 = 101。
+assertion_count: 101

@@ -1,0 +1,26 @@
+# conandata.yml — kookbook 0.3.0
+# 官方源码包：KDE 官方发布目录 download.kde.org/stable/kookbook/
+# 上游仓库：https://invent.kde.org/utilities/kookbook （GitHub 镜像 KDE/kookbook）
+# SHA-256 实测核验：c32c11e4a5a690267dcdeeb2e919829b08f5fa439da1a19da5e40f4a0649694f
+# （本机 curl 下载 + sha256sum 计算，与 conan source() 下载结果一致）
+
+sources:
+  url: "https://download.kde.org/stable/kookbook/kookbook-0.3.0.tar.xz"
+  sha256: "c32c11e4a5a690267dcdeeb2e919829b08f5fa439da1a19da5e40f4a0649694f"
+
+patches:
+  - patch_file: "patches/0001-CMakeLists.txt.patch"
+    patch_description: "OHOS: 制品仓 qtbase/6.11.1 的 FEATURE_printsupport=OFF（包内无 libQt6PrintSupport.so / Qt6PrintSupportConfig.cmake），从顶层 find_package(Qt6) 组件列表移除 PrintSupport"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-desktop-mainwindow.cpp.patch"
+    patch_description: "OHOS: 主工具栏移除“打印当前食谱”与“打印预览当前食谱”两个动作（二者绑定 MainPane::print/printPreview）"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-desktop-panes-CMakeLists.txt.patch"
+    patch_description: "OHOS: panes 静态库的 PUBLIC 链接列表移除 Qt::PrintSupport（与 0001 配套）"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-desktop-panes-mainpane.cpp.patch"
+    patch_description: "OHOS: MainPane 移除 QPrintDialog/QPrintPreviewDialog/QPrinter 打印实现与对应头文件引用（与 0001 配套）"
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-desktop-panes-mainpane.h.patch"
+    patch_description: "OHOS: MainPane 移除 print()/printPreview() 槽声明（与 0004 配套）"
+    patch_type: "portability"

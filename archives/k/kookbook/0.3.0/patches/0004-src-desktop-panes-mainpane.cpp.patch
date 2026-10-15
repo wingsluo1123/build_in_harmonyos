@@ -1,0 +1,59 @@
+--- a/src/desktop/panes/mainpane.cpp
++++ b/src/desktop/panes/mainpane.cpp
+@@ -19,23 +19,20 @@
+  * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+  * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+  * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  * OTHER DEALINGS IN THE SOFTWARE.
+  */
+ #include "mainpane.h"
+ #include <QHBoxLayout>
+ #include <memory>
+ #include <QTextBrowser>
+-#include <QPrintDialog>
+-#include <QPrintPreviewDialog>
+-#include <QPrinter>
+ #include <QScrollBar>
+ #include "recipedocument.h"
+ 
+ MainPane::MainPane(QWidget* parent) : PaneBase(parent)
+ {
+     m_document = std::make_unique<QTextDocument>();
+     auto layout = std::make_unique<QHBoxLayout>();
+     auto textView = std::make_unique<QTextBrowser>();
+     textView->setReadOnly(true);
+     textView->setDocument(m_document.get());
+@@ -62,32 +59,14 @@
+ void MainPane::openPath(const QString& path)
+ {
+     m_document->setBaseUrl(QUrl::fromLocalFile(path));
+     m_document->setMarkdown(RecipeDocument::openPath(path));
+ 
+     QTextCursor cursor = m_textView->textCursor();
+     cursor.setPosition(0);
+     m_textView->setTextCursor(cursor);
+ }
+ 
+-void MainPane::print()
+-{
+-    QPrintDialog d;
+-    if (d.exec() == QDialog::Accepted)
+-    {
+-        m_document->print(d.printer());
+-    }
+-}
+-
+-void MainPane::printPreview()
+-{
+-    QPrintPreviewDialog d;
+-    connect(&d, &QPrintPreviewDialog::paintRequested, this, [this](QPrinter* printer) {
+-        m_document->print(printer);
+-    });
+-    d.exec();
+-}
+-
+ MainPane::~MainPane()
+ {
+     // for smart pointers
+ }
