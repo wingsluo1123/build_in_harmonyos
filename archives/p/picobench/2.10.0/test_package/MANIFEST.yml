@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# picobench 2.10.0 — iboB 单头 C++11 微基准库（零依赖，MIT）
+# 上游测试：test/ 目录（doctest-util 0.1.2 + doctest-lib 2.4.11，CMake/CTest 注册）
+
+package: picobench/2.10.0
+homepage: "https://github.com/iboB/picobench"
+
+# 上游测试命令 (ctest -N 实测：2 个测试目标)
+upstream_check_command: "ctest --test-dir build"
+
+# 上游测试已镜像进 test_package 原样真跑（doctest/2.4.11 等价还原 CPM 拉取链）
+upstream_test_in_build: false
+upstream_test_command: "conan create (test_package: test_picobench_basic + test_picobench_multi_cpp)"
+
+# 上游实际运行的测试程序（doctest TEST_CASE 合计 7 个）
+upstream_tests:
+  - file: test/basic.cpp
+    source: picobench-2.10.0/test/basic.cpp
+    description: "上游 doctest 单翻译单元测试（6 TEST_CASE / 235 断言：test utils、picostring、state、cmd line、test、compare）→ 镜像为 test_picobench_basic"
+    command: "./test_picobench_basic"
+  - file: test/multi_cpp/main.cpp
+    source: picobench-2.10.0/test/multi_cpp/main.cpp
+    description: "上游 doctest 多翻译单元测试（1 TEST_CASE / 86 断言：main+suite_a+suite_b+suite_b_cont 4 TU 跨套件注册）→ 镜像为 test_picobench_multi_cpp"
+    command: "./test_picobench_multi_cpp"
+
+# test_package 中自带的测试 (消费者视角验证 + 上游镜像)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试：以 PICOBENCH 宏注册基准，runner API 运行+generate_report()，验证报告生成且每基准迭代计数>0、真实计时发生"
+    command: "./test_picobench"
+  - file: basic.cpp
+    description: "上游 test/basic.cpp 原样镜像（与上游 sha 一致），PICOBENCH_TEST 假时钟确定性断言"
+    command: "./test_picobench_basic"
+  - file: multi_cpp/
+    description: "上游 test/multi_cpp/ 原样镜像（4 TU），跨翻译单元 PICOBENCH 宏注册验证"
+    command: "./test_picobench_multi_cpp"
+
+# 上游 doctest 用例计数（N=7）：
+#   basic.cpp:      6 TEST_CASE（test utils / picostring / state / cmd line / test / compare）
+#   multi_cpp:      1 TEST_CASE（multi cpp test）
+# 本机 OHOS aarch64 clang 15 实测：7/7 test cases 全 PASS（235+86=321 断言全 PASS）
+assertion_count: 321
