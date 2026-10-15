@@ -1,0 +1,56 @@
+# 版本级 manifest — propka 3.5.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "3.5.1"
+software: propka
+status: built
+build_date: "2026-10-14"
+build_system: python
+
+source:
+  url: "https://files.pythonhosted.org/packages/76/6e/b409bfd37fbbcbaf41e485d2c6117027394cee12b7d6128b4e01b29c4843/propka-3.5.1.tar.gz"
+  sha256: "d8083b58d8c4c553ff8704c706190fe37ff82253adcd6e53b31d8ad7d6d52257"
+  filename: "propka-3.5.1.tar.gz"
+  note: >-
+    PyPI 官方 sdist（顶层 layout：`propka/` 包在源码根，24 个模块）。**该 sdist 带 `tests/*.py`
+    但不带测试数据**（`pdb/`、`results/` 未发布）——见下 test_assets。
+
+test_assets:
+  url: "https://codeload.github.com/jensengroup/propka/tar.gz/refs/tags/v3.5.1"
+  sha256: "e7357db9dfbeeee5ea67791e09710557980555808371253c674ae4f13b9c22f0"
+  reason: >-
+    sdist 里的测试代码会找 `tests/pdb`（PDB 输入）与 `tests/results`（期望结果），缺了直接
+    `FileNotFoundError: Can't find pdbs test files …`。故钉死上游仓库 tag v3.5.1 归档补齐
+    （12 个 PDB + 7 个期望结果），**仅测试用、不进产物**。
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    # **零运行期依赖**：setup.py 的 install_requires 为空；实测包内模块**不 import numpy**
+    # （Debian 的 debian/control 亦把 python3-numpy 标为 <!nocheck>，佐证 numpy 只在测试期用）
+    - "（无）"
+    # 测试期依赖（仅 build() 内、**不进产物**）
+    - "pytest（PyPI 平台源，测试期）"
+    - "numpy（PyPI 平台源，测试期；上游 tests_require 声明）"
+  python: "3.12"
+
+patches_applied: []
+
+upstream_tests:
+  framework: pytest
+  test_path: "tests/（11 个 test_*.py；测试数据由 test_assets 的仓库归档提供 tests/pdb 与 tests/results）"
+  test_command: "python3 -m pytest tests -q（build() 内真跑；PYTHONPATH = pkg : assets : test-deps）"
+  test_count: 49
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: "**49 passed（rc=0）**（本地 conan create 实测）：上游官方跑法为 pytest（Debian 侧以 `autopkgtest-pkg-pybuild` 跑同一套测试、并把 `python3-pytest` 列为 `<!nocheck>` 构建依赖，与本配方一致）；未被标记的失败一律让 build 硬失败（不宽恕）。**并如实披露测试数据口径**：sdist **不含** `tests/pdb`、`tests/results`，故测试数据取自 `conandata.test_assets` 钉死的上游仓库 tag v3.5.1 归档（同版本同源码，12 个 PDB + 7 个期望结果）；**包产物本身仍由 sdist 源码树打包**。"
+adapted_test_pass_rate: "test_package/check_propka.py **7 项消费者校验（全部离线）**，本地实测 `checks=7 fails=0 / RESULT: PASS`：①产物齐备（`propka/` 模块）②关键文件齐备（`__init__.py`/`atom.py`/`molecular_container.py`/`run.py`/`hybrid36.py`/`group.py`/`calculations.py`/`_version.py`；**注意无 `protein.py`**）③真实 `import propka`（零运行期依赖）④`__version__ == '3.5.1'`⑤**真实离线功能**：`hybrid36.decode('A0000') == 100000`（PDB hybrid-36 标识符解码）⑥子模块面（`propka.molecular_container`/`.atom`/`.group`/`.run`/`.hybrid36` 全部可导入）⑦证据（模块总字节 + .py 个数 + python 版本）"
+
+knowledge_gained:
+  - category: L1
+    content: "**上游 sdist 可能只发布测试代码、不发布测试数据**：propka 3.5.1 的 sdist 里 `tests/*.py` 齐全，但 `tests/pdb`（输入）与 `tests/results`（期望值）**没打进去**，跑起来直接 `FileNotFoundError: Can't find pdbs test files`——报错看着像“测试坏了”，实为**打包缺数据**。判定：解包 sdist 后 `ls tests/` 看数据目录是否为空/缺失，并对照上游仓库。处置：把同 tag 的**上游仓库归档**钉进 `conandata.test_assets`（sha256 固定、仅测试用不进产物），包产物仍来自 sdist；并在清单/正文披露该口径。"
+    reason: "propka 适配实测——sdist 缺测试数据的判定与处置"
+  - category: L1
+    content: "**判断“某依赖是运行期还是测试期”要看实证，不要凭库类别猜**：propka 是科学计算类（pKa 预测），直觉上离不开 numpy，但其 `setup.py` 的 `install_requires` 为空、包内模块**不 import numpy**（numpy 只在 `tests_require` 里）——Debian 的 `debian/control` 用 `python3-numpy <!nocheck>` 正好佐证（`<!nocheck>` = 只在要跑测试时才需要）。据此本配方**不声明任何 Conan requires**，只把 numpy 归入测试期依赖。验证方法：`grep -rl 'import numpy' <pkg>/`。"
+    reason: "propka 适配实测——运行期/测试期依赖的实证判定"
