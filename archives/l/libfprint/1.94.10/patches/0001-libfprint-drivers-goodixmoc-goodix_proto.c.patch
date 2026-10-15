@@ -1,0 +1,32 @@
+--- a/libfprint/drivers/goodixmoc/goodix_proto.c
++++ b/libfprint/drivers/goodixmoc/goodix_proto.c
+@@ -339,27 +339,29 @@
+     case MOC_CMD0_PWR_BTN_SHIELD:
+       presp->power_button_shield_resp.resp_cmd1 = LOBYTE (cmd);
+       uint8_t support_pwr_shield;
+ 
+       if (fpi_byte_reader_get_uint8 (byte_reader, &support_pwr_shield) &&
+           support_pwr_shield == 0xFF)
+         g_debug ("Power button shield feature not supported!\n");
+       break;
+ 
+     case MOC_CMD0_GET_VERSION:
++    {
+       const uint8_t *version_info;
+ 
+       if (!fpi_byte_reader_get_data (byte_reader, sizeof (gxfp_version_info_t), &version_info))
+         g_return_val_if_reached (-1);
+ 
+       memcpy (&presp->version_info, version_info, sizeof (gxfp_version_info_t));
+       break;
++    }
+ 
+     case MOC_CMD0_CAPTURE_DATA:
+       if (LOBYTE (cmd) == MOC_CMD1_DEFAULT)
+         {
+           if (!fpi_byte_reader_get_uint8 (byte_reader,
+                                           &presp->capture_data_resp.img_quality))
+             g_return_val_if_reached (-1);
+ 
+           if (!fpi_byte_reader_get_uint8 (byte_reader,
+                                           &presp->capture_data_resp.img_coverage))

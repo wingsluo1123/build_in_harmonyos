@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 实测数据来自 .tmp_diag/libfprint/testlogs/meson-test-suite.log（meson test，33 项）
+
+package: libfprint/1.94.10
+homepage: "https://fprint.freedesktop.org/"
+
+# 上游测试命令（meson test 注册 33 项：5 单测 + udev-hwdb + 27 驱动测试）
+upstream_check_command: "meson test"
+
+# conanfile.py build() 中是否已集成上游测试（OHOS 交叉/无硬件，未集成）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（meson 注册的测试，日志证据：
+# .tmp_diag/libfprint/testlogs/meson-test-suite.log + 各 test-*.log）
+upstream_tests:
+  - file: tests/test-fp-context
+    source: libfprint-1.94.10/tests/test-fp-context.c
+    description: "上下文测试（/context/new 等 9 子项；/context/remove-device-closing 因沙箱禁 AF_UNIX bind 被杀 SIGTRAP）"
+    command: "./tests/test-fp-context"
+  - file: tests/test-fp-device
+    source: libfprint-1.94.10/tests/test-fp-device.c
+    description: "设备测试（17 子项；/device/async/open 因沙箱禁 AF_UNIX bind 被杀 SIGTRAP）"
+    command: "./tests/test-fp-device"
+  - file: tests/test-fpi-device
+    source: libfprint-1.94.10/tests/test-fpi-device.c
+    description: "内部设备测试（通过）"
+    command: "./tests/test-fpi-device"
+  - file: tests/test-fpi-ssm
+    source: libfprint-1.94.10/tests/test-fpi-ssm.c
+    description: "状态机测试（通过）"
+    command: "./tests/test-fpi-ssm"
+  - file: tests/test-fpi-assembling
+    source: libfprint-1.94.10/tests/test-fpi-assembling.c
+    description: "帧组装测试（通过）"
+    command: "./tests/test-fpi-assembling"
+  - file: tests/udev-hwdb
+    source: libfprint-1.94.10/tests/udev-hwdb.c
+    description: "udev hwdb 生成测试（通过）"
+    command: "./tests/udev-hwdb"
+  - file: tests/drivers/*-test
+    source: libfprint-1.94.10/tests/drivers/
+    description: "27 个驱动测试（virtual-image/aes2501/elan/... 需真实指纹硬件/USB 捕获数据，沙箱无硬件全部 Skipped）"
+    command: "./tests/drivers/<driver>-test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：fp_context_new/enumerate/get_devices + fp_device_get_driver/name，断言发现流程在无 USB 后端的沙箱下仍返回合法（可能为空）设备列表"
+    command: "./test_libfprint"
+
+# 测试断言总数（test_package 内：context 非空 1 + FpContext 类型 1 + devices 非空 1 + 每设备字段检查 + 输出断言）
+assertion_count: 5

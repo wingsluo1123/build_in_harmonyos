@@ -1,0 +1,86 @@
+#====================================================================
+# DRAFT-libfprint-1.94.10-json-glib-dep-codesign-symbol-not-found
+# 已发布依赖包 json-glib .so codesign 摘要失效 → 运行期 symbol not found（E999 依赖包实例）
+#====================================================================
+
+id:                     DRAFT-libfprint-1.94.10-json-glib-dep-codesign-symbol-not-found
+trigger_tool:           test|runtime|conan
+phase:                  testing|runtime
+error_signature:        Error loading shared library libjson-glib-1.0.so.0: \(needed by .*libgusb\.so\.2\)|
+  Error relocating .*libgusb\.so\.2: json_object_has_member: symbol not found|
+  Error loading shared library libjson-glib|json_object_has_member: symbol not found
+
+severity:               3
+category:               runtime|codesign|ohos-platform|dependency
+match_keywords:         json-glib, libgusb, libjson-glib-1.0.so.0, symbol not found, Error loading
+  shared library, codesign, meson install, dynstr, dependency package, 依赖包, ohpcd,
+  远端包, sha256 不一致, E999
+title:                  已发布依赖包 json-glib/1.10.6 的 .so 被 meson install 改写破坏 codesign 摘要 →
+  任何消费者（gusb→json-glib 链）test_package 运行期 symbol not found；本地修缓存 ≠ CI 下载远端包，
+  需重新上传修复版依赖包（或配方 override 到修复版）
+
+root_cause:             >
+  E999 同根因作用于已发布依赖包：OHOS loader 在 dlopen 时校验 .codesign 摘要与当前内容一致。
+  json-glib/1.10.6 发布时其 libjson-glib-1.0.so.0 被 meson install 改写（RUNPATH 绝对路径→'X'），
+  摘要失配。libfprint 1.94.10 通过 gusb 依赖 json-glib：test_package 运行期加载 libgusb.so.2 时
+  需 libjson-glib-1.0.so.0，loader 拒绝 → 报 "Error loading shared library libjson-glib-1.0.so.0"
+  并级联 "json_object_has_member: symbol not found"。本地因手工修复过 json-glib 缓存包 .so
+  （用构建树原始 .so 替换 p/ 与 d/conan_package.tgz）而绿；CI 每次从 ohpcd 下载远端包，
+  远端 .so 哈希（b6fcccb9…）≠ 本地修复版（facbae90…）→ 本地绿 ≠ CI 绿，确定性阻塞。
+
+affected_scope:         >
+  所有通过 gusb 或直接依赖 json-glib/1.10.6 且 test_package 运行期加载该 .so 的 OHOS 适配任务；
+  以及任何"已发布 conan 二进制依赖包 .so 被构建期改写破坏 codesign 摘要"的同类场景
+  （本地手工修缓存只能救本机，远端包不重新上传则 CI 必挂）。
+
+verification_cmd:       >
+  判远端包损坏：用全新 CONAN_HOME 从 ohpcd 下载 json-glib/1.10.6 对应 package_id
+  （conan download json-glib/1.10.6:<pid> -r=ohpcd），对比其 libjson-glib-1.0.so.0 的 sha256
+  与本地已修复缓存（本例 b6fcccb9… ≠ facbae90…）；或直接看 CI 日志中 test_package 运行期
+  "Error loading shared library libjson-glib-1.0.so.0 / json_object_has_member: symbol not found"。
+
+rec_priority:           1
+rec_approach:           re-publish-fixed-dependency
+rec_description:        对依赖包应用 E999 的恢复方案：package() 里 meson install 后从构建树恢复
+  pristine .so（walk self.build_folder 同 basename 覆盖 p/ 及 d/conan_package.tgz），
+  重新上传 json-glib/1.10.6 修复包到 ohpcd；或若已有修复版（如 1.10.6.1）则由上游配方/本配方
+  override 到修复版，让 CI 不再下载损坏包。
+rec_command:            # json-glib 配方: package() 中 Meson(self).install() 后用 build_tree 原始 .so 覆盖
+  # 上传后 conan upload json-glib/1.10.6 -r=ohpcd；libfprint 侧无需改（依赖链自动取到新包）
+rec_auto_fix:           false
+rec_impl:               dependency-republish|override-version
+
+fallback_priority:      2
+fallback_approach:      recipe-override
+fallback_description:   若依赖包暂时无法重传，本配方/上游 gusb 配方 override json-glib 到已修复版本
+  （json-glib/1.10.6.1 已 built 于 2026-08-06，需确认其 .so 未损坏且已发布），或强制
+  --build=json-glib/* 从源码重建。
+fallback_command:       self.requires("json-glib/1.10.6.1", override=True)  # 或 CI --build=json-glib/*
+fallback_auto_fix:      false
+
+forbid_1_pattern:       "仅本地修缓存/改本地 .so 而不重新上传远端包，就声称修复"
+forbid_1_reason:        CI 每次下载远端包，本地修复对 CI 无效，属伪造通过。
+forbid_1_consequence:   CI 依旧失败，评审 request changes。
+forbid_2_pattern:       "删除/绕过 test_package 的 json-glib 加载路径以掩盖 symbol not found"
+forbid_2_reason:        掩盖真实依赖损坏，违反 R9。
+forbid_2_consequence:   产物运行期不可用，后续复用失败。
+
+principles:             R9, E999
+
+causes:                 []
+caused_by:              [E999]
+similar_to:             [E999-draft-856F]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-libfprint-1.94.10-json-glib-dep-codesign-symbol-not-found.md
+last_updated:           2026-10-12
+source_event:           libfprint 1.94.10 HarmonyOS PC 适配 (PR #14631, CI #85262 test_package 运行期)
+authors:                gcw_eQ4VpLdf
+source_pr:              14631
+source_commit:          92ff636391d379330e2db35b5868de6c5c2c2b85
+
+metrics_success_count:  0
+metrics_fail_count:     1
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-12
