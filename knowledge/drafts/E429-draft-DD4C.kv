@@ -1,0 +1,34 @@
+id:                     E429
+trigger_tool: perl|make|conan
+phase: testing
+rec_priority: 2
+error_signature: No such file or directory: 'perl'|Cannot open blib/script|Failed 1/31|Unsupported module YAML
+
+severity: 1
+category: compat, portability, build-system
+match_keywords: perl, make test, blib, prove -l, ExtUtils::MakeMaker, PERL5LIB, 绝对路径, YAML::XS, JSON::PP, 可选后端, TAP
+title: Perl 模块适配：test() 环境无 perl 需绝对路径；上游测试必须走 make（blib 依赖），CLI 可选后端要如实披露
+
+root_cause: 三个 Perl 侧高频坑：①**消费者校验裸名调 `perl` 会挂**——conan `test()` 的 `env="conanrun"` 里 PATH 不含 perl，实测 `FileNotFoundError: [Errno 2] No such file or directory: 'perl'`（与 init-system-helpers 的裸名 `perl`/`sh` 同源）→ 必须显式解析 perl 绝对路径（`/data/service/hnp/bin/perl` 等候选，最后退回 `shutil.which`）。②**Perl 上游测试必须走 `make`**——官方流程是 `perl Makefile.PL && make && make test`；只 `prove -l t/`（跳过 make）时 `t/pkwalify.t` 会因 `blib/script/pkwalify` 不存在而挂 1 条（实测 `Failed 1/31`），那是“没按官方流程跑”，不是测试坏了。③**CLI 的可选后端要如实披露**——`pkwalify` 解析 YAML/JSON 文件依赖 `YAML::Syck`/`YAML`/`YAML::XS`/`JSON::XS`/`JSON` 之一（上游 `Makefile.PL` 不强制），本环境这 5 个全缺（核心模块 `JSON::PP` 虽有但**不在其候选列表**里）→ CLI 实测 rc=2 并自报 `Unsupported module …`；此时模块级 API（`Kwalify::validate` 合法返回 1 / 非法 die）与上游 `make test` 均正常，必须**原样记录为已知限制、不冒充通过**。
+affected_scope: 所有 Perl 模块适配（`Makefile.PL`/`Build.PL` 系）：消费者校验的进程调用、上游测试跑法、以及 CLI 对可选依赖的运行时要求
+verification_cmd: 在 test() 环境里 `which perl`（多半为空）；`ls t/` 看 TAP 文件并对照上游 README 的官方流程；`perl -I<lib> <cli> -f <schema> <data>` 看 rc 与是否自报 `Unsupported module`；模块级用 `perl -I<lib> -MKwalify -e '...'` 真跑 `Kwalify::validate`
+
+principles:
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E429.md
+last_updated: 2026-10-14
+
+authors:
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+draft: true
+contributor_id: DD4C

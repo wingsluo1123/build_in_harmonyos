@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pkwalify/1.24
+homepage: "https://github.com/eserte/p5-Kwalify"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "perl Makefile.PL INSTALLDIRS=site && make -j1 && make test（上游 README 的官方流程；必须走 make，blib/ 由 make 生成）"
+
+upstream_tests:
+  - name: "t/（TAP：Kwalify.t / compat.t / pkwalify.t / required-no.t + t/testdata）"
+    count: 133
+    description: >-
+      纯 Perl 模块（Kwalify + Schema::Kwalify）自带 TAP 套件，官方跑法见上游 README：
+      `perl Makefile.PL` → `make` → `make test`。实测 `Result: PASS`（本次 conan 构建
+      `Files=3, Tests=133`；在解包目录直跑为 `Files=4, Tests=134`——两处观测都 PASS，
+      **计数差异如实并列**）。⚠️ 只 `prove -l t/`（跳过 `make`）会挂 1 条：`t/pkwalify.t`
+      会检查 `blib/script/pkwalify`，而 `blib/` 是 `make` 生成的（实测 `Failed 1/31`）。
+      **零运行期依赖**（`Makefile.PL` 的 `PREREQ_PM` 基本为空），也**不需要任何测试期依赖**。
+    command: "make test"
+
+test_package_tests:
+  - file: check_pkwalify.py
+    description: >-
+      R34 消费者校验 8 项（全部离线）：①产物齐备（`Kwalify.pm`）②`Schema::Kwalify` 产物存在
+      ③上游 CLI `bin/pkwalify` 存在且可执行 ④`perl -MKwalify` 且版本 == 1.24 ⑤
+      `perl -MSchema::Kwalify` 可加载 ⑥**真实功能真跑**：`Kwalify::validate` 合法返回 1 /
+      非法 die ⑦**上游 CLI 真跑**并如实记录（本环境缺可选 YAML/JSON 后端 → rc=2 且自报
+      `Unsupported module …`，不计为通过）⑧证据。注：**不裸名调 perl**（test() 的 conanrun
+      环境 PATH 无 perl），脚本内显式解析绝对路径。
+    command: "python3 check_pkwalify.py <package-folder>"
+
+assertion_count: 8
