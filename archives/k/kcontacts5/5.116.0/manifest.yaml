@@ -1,0 +1,50 @@
+software: kcontacts5
+version: "5.116.0"
+status: built
+build_system: cmake
+created_at: 2026-10-06
+build_date: "2026-10-06"
+dependencies:
+  required:
+    - kcoreaddons5/5.116.0
+    - ki18n5/5.116.0
+    - kconfig5/5.116.0
+    - kcodecs5/5.116.0
+    - qt5-qtbase/5.15.2.2
+    - iso-codes/4.20.1
+  build:
+    - ecm/6.26.0
+  optional: []
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: executed
+  upstream: >-
+    executed 2026-10-06: BUILD_TESTING=ON registered the 32 upstream ctest
+    cases from autotests/ and all 32 were executed from build() through
+    ctest with the offscreen QPA platform: 100% tests passed, 0 tests
+    failed out of 32 (no exclusions, no waivers; vcardtool_benchmark is
+    compiled by upstream design but not registered with ctest, and the
+    tests/ subdirectory of manual programs marked "FIXME: Build fails" is
+    skipped through patches/0001). The KCountry-based functions
+    (addresstest countryToISO/ISOtoCountry, addressformat repository
+    validation) ran against the iso-codes runtime data deployed into the
+    per-test XDG_DATA_HOME from the direct iso-codes/4.20.1 requirement.
+  test_package: >-
+    executed 2026-10-06: test_package/test.cpp drove the real public API
+    (Addressee field round-trips, Email/PhoneNumber/Address insertion,
+    VCardConverter create/parse round-trip, ContactGroup::Data, Picture
+    image data, Geo validity, Addressee::mimeType) plus the R53 ELF checks
+    on the packaged libKF5Contacts.so: 26 passed, 0 failed, and the
+    consumer binary genuinely executed on the OHOS environment (not the
+    link-level fallback).
+  full_reference: "kcontacts5/5.116.0@ohpcd/stable"
+source_url: https://download.kde.org/stable/frameworks/5.116/kcontacts-5.116.0.tar.xz
+source_sha256: f107fdec8f52f7362499159c958e57e3b8b1981b0d797a90685c4a604156b4cb
+knowledge_gained:
+  - "kcontacts5's Qt Quick requirement is test-only: the library itself links only Qt5::Core/Qt5::Gui (PUBLIC) plus KF5::CoreAddons/ConfigCore/I18n/I18nLocaleData/Codecs (PRIVATE); the top-level find_package(Qt5 COMPONENTS Gui Quick) lists Quick as a plain component but nothing in src/ links it. Demoting it to OPTIONAL_COMPONENTS through patches/0001 lets the 5.15.2.2 line (no Quick supply) build the full library + the whole autotests suite."
+  - "The upstream tests/ subdirectory (testread/testwrite, upstream-marked 'FIXME: Build fails'; qmlintegrationtest, a manual QML demo) is excluded: none of its targets registers a ctest case, so the delivered test suite is the 32-case autotests/ suite (verified against the ECMAddTests registrations in autotests/CMakeLists.txt)."
+  - "autotests/*.cpp include headers with the install-layout prefix (\"kcontacts/addressee.h\") although the source tree has no src/kcontacts/ directory: ECMGenerateHeaders emits build-local convenience forwarding headers (${CMAKE_CURRENT_BINARY_DIR}/kcontacts/<lowercase>.h) for every PREFIX'd ecm_generate_headers name, and KDECMakeSettings' CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE puts ${CMAKE_CURRENT_BINARY_DIR}/src on the target's BUILD_INTERFACE include path - the prefixed includes resolve inside the build tree with no patch."
+  - "find_package(KF5 REQUIRED COMPONENTS CoreAddons I18n Config Codecs) resolves through ECM's FindKF5.cmake forwarding module (ECM_MODULE_PATH) to the per-framework KF5*Config.cmake files; with all four KF5 deps consumed through cmake_find_mode=none, every dependency's lib/cmake must be injected into CMAKE_PREFIX_PATH through the hand-written conan_cmakedeps_paths.cmake (E429 pattern, kjobwidgets5 precedent)."
+  - "The KCountry-based autotest functions (Address::countryToISO / Address::ISOtoCountry, AddressFormatRepository validation) need the iso-codes JSON tables + translated iso_3166-1 catalogs through QStandardPaths::GenericDataLocation; kcontacts tests do NOT enable QStandardPaths test mode, so XDG_DATA_HOME is the effective data root (unlike ki18n5's own tests which use .qttest/share)."
+  - "Every packaged ELF is re-signed with llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 after cmake.install() because CMake's install-time RPATH rewrite invalidates the OHOS build-time .codesign section (ki18n 6.26.0.1 / kitemmodels 6.18.0.1 precedent)."
