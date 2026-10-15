@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(libcdr_consumer LANGUAGES CXX)
+find_package(libcdr CONFIG REQUIRED)
+add_executable(test_cdr test_cdr.cpp)
+target_link_libraries(test_cdr PRIVATE libcdr::libcdr)

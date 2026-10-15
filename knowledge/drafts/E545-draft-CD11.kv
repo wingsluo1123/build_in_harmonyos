@@ -1,0 +1,116 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E545.kv，填写各字段
+# 对应的人类文档: doc/E545.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E545
+trigger_tool: python
+phase: configuration
+error_signature: Version conflict: Conflict between .* and .* in the graph|frozen dependency identity mismatch
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity: 3
+category: conan, build-system, detection
+match_keywords: Version conflict, Conflict originates, version substring, frozen dependency, recipe identity, exact reference
+title: Conan 配方复制中的版本子串碰撞与冻结依赖身份独立漂移
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: 复制配方时全局替换主包版本子串，误改含相同子串的独立依赖版本；随后只修配方仍可能保留冻结 identity 的旧依赖标签，因此 conan create RC0 不能证明冻结闭包一致。 A raw PR diff can omit a binary sample payload even when the Git source branch is mergeable. Carry the original fixture as bounded text, decode it only into the consumer build directory, and verify its original byte count/SHA256 separately from the text carrier hash. Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test. The producer shared=True/fPIC option cannot change an already published non-PIC static dependency. Pin the same-upstream static-PIC suffix artifact and force one consistent dependency version through both direct and transitive paths; keep system-name zlib static rather than adding a competing libz.so.
+affected_scope: 从相近包或版本复制 Conan 配方、目标机控制器及依赖身份材料的任务；不局限于文档转换库。
+verification_cmd: 分别解析配方 requirements/build_requirements 引用、Conan 已解析图与冻结 identity.dependencies；按名称、版本、RREV/PID/PREV 比对，保存当前输入哈希。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: structured-reference-and-frozen-identity-consistency
+rec_description: 按字段精确替换主包版本，不对整文件替换版本子串；明确核对独立依赖与中间包的版本图。冻结前从同一已解析图生成依赖身份，已消费旧事务保持原状，修正后在新事务验证而不是追改旧证据。 A raw PR diff can omit a binary sample payload even when the Git source branch is mergeable. Carry the original fixture as bounded text, decode it only into the consumer build directory, and verify its original byte count/SHA256 separately from the text carrier hash. Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test. The producer shared=True/fPIC option cannot change an already published non-PIC static dependency. Pin the same-upstream static-PIC suffix artifact and force one consistent dependency version through both direct and transitive paths; keep system-name zlib static rather than adding a competing libz.so.
+rec_command: 对每个 self.requires/self.tool_requires 字符串作完整包引用校验，再与同一候选解析图和 identity.dependencies 精确比对。
+rec_auto_fix: false
+rec_impl: manual
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority: 2
+fallback_approach: explicit-reference-table
+fallback_description: 动态 requirements 无法靠 AST 完全解析时，以当前 Conan resolved graph 为权威并人工核对完整引用表，不能只 grep 版本或推测依赖存在。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern: \.replace\(["\x27][0-9]+\.[0-9]+\.[0-9]+
+forbid_1_reason: 对整文件替换主包版本不具有包名边界，会改写独立依赖；本例 0.0.3 -> 0.1.9 同时把 boost/1.90.0.3 改成 boost/1.90.1.9。
+forbid_1_consequence: 依赖图冲突，或构建恢复后身份材料仍不真实，不能提交该轮证据。
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes:                 []
+caused_by:              []
+similar_to: E317
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file: knowledge/drafts/E545-draft-CD11.md
+last_updated: 2026-10-14
+source_event: libcdr native r1 graph failure; r2 stale dependency label; r3 independently frozen corrected label and tests PASS 2026-10-13 current CI repair; libcdr-ci-repair-w3-20261013-r1, official CI log SHA256 cd24f4b9b6ad2347b45bcaaa059142d44d1a8a8ab354827482473bca4d0db450; This is not a new base64 transport claim. The increment is preserving consumer test-data identity across a text-only CI diff application path, independently of package/recipe identity. The checksum-verified original parser sample and all assertions remain unchanged. 2026-10-13 current CI repair; libcdr-ci-repair-w3-20261013-r101, official CI log SHA256 cb8b5ed11c5705ae2e9de2a3ee1e8ecaa7fea182ffebfe8a89e59ea8705cef65; Current worker logs provide the independent second-failure boundary after the earlier checkout/fixture repair: successful source retrieval and dependency installation are not proof that configure generated usable config files. Use both-branch source reconciliation, timestamp-preserving production-helper tests and complete native recipe/tests; do not treat a missing-curl predownload warning as the cause when source() already succeeded. This extends the existing evidence/transport topic with a causal validation boundary, not a new generic umask claim. 2026-10-14 current CI repair; libcdr-ci-repair-w3-20261013-r301, official CI log SHA256 69f097174198e763fb36bc86ffe2c53e063b992ef59aa84b2c6dd7e2b36e39a2; Current worker first advanced beyond the repaired config.status boundary and then rejected zlib/1.3.1 zutil.o while linking the real shared producer. Registry version suffix order is not proof of PIC: downloaded zlib/1.3.1.2 remains non-PIC, while 1.3.1.1 explicitly compiles the same upstream source with -fPIC. Bind the published recipe and binary revision before changing the graph, preserve every parser assertion, and validate a real DSO link rather than executable-only zlib smoke tests.
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors: moonlight <1427909882@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count: 1
+metrics_fail_count: 2
+metrics_confidence: 0.333333
+metrics_last_used: 2026-10-11
+
+draft: true
+contributor_id: CD11
