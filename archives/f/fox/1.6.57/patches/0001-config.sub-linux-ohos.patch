@@ -1,0 +1,26 @@
+Teach the bundled config.sub about the linux-ohos kernel/OS combination so
+that `./configure --host=aarch64-linux-ohos` canonicalises instead of failing
+with "Invalid configuration `aarch64-linux-ohos': OS `ohos' not recognized".
+
+config.sub in this release predates HarmonyOS and only knows linux-gnu,
+linux-android, linux-musl, linux-uclibc and linux-newlib.
+
+--- a/config.sub
++++ b/config.sub
+@@ -114,7 +114,7 @@
+ # Here we must recognize all the valid KERNEL-OS combinations.
+ maybe_os=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\2/'`
+ case $maybe_os in
+-  nto-qnx* | linux-gnu* | linux-android* | linux-dietlibc | linux-newlib* | \
++  nto-qnx* | linux-gnu* | linux-android* | linux-ohos* | linux-dietlibc | linux-newlib* | \
+   linux-musl* | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | kfreebsd*-gnu* | \
+   knetbsd*-gnu* | netbsd*-gnu* | netbsd*-eabi* | \
+   kopensolaris*-gnu* | cloudabi*-eabi* | \
+@@ -1408,6 +1408,7 @@
+ 	      | -chorusos* | -chorusrdb* | -cegcc* | -glidix* \
+ 	      | -cygwin* | -msys* | -pe* | -psos* | -moss* | -proelf* | -rtems* \
+ 	      | -midipix* | -mingw32* | -mingw64* | -linux-gnu* | -linux-android* \
++	      | -linux-ohos* \
+ 	      | -linux-newlib* | -linux-musl* | -linux-uclibc* \
+ 	      | -uxpv* | -beos* | -mpeix* | -udk* | -moxiebox* \
+ 	      | -interix* | -uwin* | -mks* | -rhapsody* | -darwin* | -opened* \

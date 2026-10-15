@@ -1,0 +1,68 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.6.57/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 核心字段
+# ============================================================
+
+version: "1.6.57"
+
+software: "fox"
+
+# 状态标记
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（NetBSD pkgsrc distfiles 官方镜像，与 mirrorservice 镜像 sha256 一致）
+  url: "https://cdn.netbsd.org/pub/pkgsrc/distfiles/fox-1.6.57.tar.gz"
+
+  # 源码校验和
+  sha256: "65ef15de9e0f3a396dc36d9ea29c158b78fad47f7184780357b929c94d458923"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--build=aarch64-linux-ohos"
+    - "--host=aarch64-linux-ohos"
+    - "--x-includes=<build_folder>/deps-prefix/include"
+    - "--x-libraries=<build_folder>/deps-prefix/lib"
+    - "--without-xft"
+    - "--without-xcursor"
+    - "--without-xrender"
+    - "--without-xrandr"
+    - "--without-xfixes"
+    - "--without-xinput"
+    - "--without-opengl"
+
+  # 编译依赖
+  dependencies:
+    - libx11/6.4.0
+    - libxext/6.4.0.1
+    - xorgproto/2025.1
+    - libpng/1.6.58
+    - libjpeg-turbo/3.2.0
+    - libtiff/4.7.2
+    - zlib/1.3.1.1
+    - bzip2/1.0.8
+
+  # 编译器
+  cc: clang
+  cxx: clang++
