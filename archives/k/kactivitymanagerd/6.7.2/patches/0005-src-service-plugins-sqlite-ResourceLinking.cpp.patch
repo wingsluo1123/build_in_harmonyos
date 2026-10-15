@@ -1,0 +1,149 @@
+--- a/src/service/plugins/sqlite/ResourceLinking.cpp
++++ b/src/service/plugins/sqlite/ResourceLinking.cpp
+@@ -8,21 +8,53 @@
+ #include "ResourceLinking.h"
+ #include <kactivities-features.h>
+ 
+ // Qt
+ #include <QDBusConnection>
+ #include <QFileSystemWatcher>
+ #include <QSqlQuery>
+ 
+ // KDE
+ #include <kconfig.h>
+-#include <kdirnotify.h>
++// OHOS adaptation: kdirnotify.h is not shipped by the D-Bus-less kio
++// package; use the locally generated interface stub instead.
++#include "kdirnotifygenerated.h"
++
++// OHOS adaptation: the qdbusxml2cpp-generated stub has no static emit*()
++// helpers (those are hand-written in kio's kdirnotify.h, which the
++// D-Bus-less published kio package does not ship). Send the session-bus
++// KDirNotify signals directly.
++namespace
++{
++void kdirnotifyFilesAdded(const QUrl &directory)
++{
++    QDBusMessage msg = QDBusMessage::createSignal(QStringLiteral("/KDirNotify"),
++                                                  QStringLiteral("org.kde.KDirNotify"),
++                                                  QStringLiteral("FilesAdded"));
++    msg.setArguments({directory.toString()});
++    QDBusConnection::sessionBus().send(msg);
++}
++
++void kdirnotifyFilesRemoved(const QList<QUrl> &files)
++{
++    QDBusMessage msg = QDBusMessage::createSignal(QStringLiteral("/KDirNotify"),
++                                                  QStringLiteral("org.kde.KDirNotify"),
++                                                  QStringLiteral("FilesRemoved"));
++    QStringList list;
++    list.reserve(files.size());
++    for (const auto &file : files) {
++        list.append(file.toString());
++    }
++    msg.setArguments({list});
++    QDBusConnection::sessionBus().send(msg);
++}
++} // namespace
+ 
+ // Local
+ #include "Database.h"
+ #include "DebugResources.h"
+ #include "StatsPlugin.h"
+ #include "Utils.h"
+ #include "resourcelinkingadaptor.h"
+ 
+ ResourceLinking::ResourceLinking(QObject *parent)
+     : QObject(parent)
+@@ -74,25 +106,25 @@
+                 *linkResourceToActivityQuery,
+                 ":usedActivity",
+                 usedActivity,
+                 ":initiatingAgent",
+                 initiatingAgent,
+                 ":targettedResource",
+                 targettedResource);
+ 
+     if (!usedActivity.isEmpty()) {
+         // qCDebug(KAMD_LOG_RESOURCES) << "Sending link event added: activities:/" << usedActivity;
+-        org::kde::KDirNotify::emitFilesAdded(QUrl(QStringLiteral("activities:/") + usedActivity));
++        kdirnotifyFilesAdded(QUrl(QStringLiteral("activities:/") + usedActivity));
+ 
+         if (usedActivity == StatsPlugin::self()->currentActivity()) {
+             // qCDebug(KAMD_LOG_RESOURCES) << "Sending link event added: activities:/current";
+-            org::kde::KDirNotify::emitFilesAdded(QUrl(QStringLiteral("activities:/current")));
++            kdirnotifyFilesAdded(QUrl(QStringLiteral("activities:/current")));
+         }
+     }
+ 
+     Q_EMIT ResourceLinkedToActivity(initiatingAgent, targettedResource, usedActivity);
+ }
+ 
+ void ResourceLinking::UnlinkResourceFromActivity(QString initiatingAgent, QString targettedResource, QString usedActivity)
+ {
+     // qCDebug(KAMD_LOG_RESOURCES) << "Unlinking " << targettedResource << " from " << usedActivity << " from " << initiatingAgent;
+ 
+@@ -145,25 +177,25 @@
+                 ":initiatingAgent",
+                 initiatingAgent,
+                 ":targettedResource",
+                 targettedResource);
+ 
+     if (!usedActivity.isEmpty()) {
+         // auto mangled = QString::fromUtf8(QUrl::toPercentEncoding(targettedResource));
+         auto mangled = QString::fromLatin1(targettedResource.toUtf8().toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+ 
+         // qCDebug(KAMD_LOG_RESOURCES) << "Sending link event removed: activities:/" << usedActivity << '/' << mangled;
+-        org::kde::KDirNotify::emitFilesRemoved({QUrl(QStringLiteral("activities:/") + usedActivity + '/' + mangled)});
++        kdirnotifyFilesRemoved({QUrl(QStringLiteral("activities:/") + usedActivity + '/' + mangled)});
+ 
+         if (usedActivity == StatsPlugin::self()->currentActivity()) {
+             // qCDebug(KAMD_LOG_RESOURCES) << "Sending link event removed: activities:/current/" << mangled;
+-            org::kde::KDirNotify::emitFilesRemoved({QUrl(QStringLiteral("activities:/current/") + mangled)});
++            kdirnotifyFilesRemoved({QUrl(QStringLiteral("activities:/current/") + mangled)});
+         }
+     }
+ 
+     Q_EMIT ResourceUnlinkedFromActivity(initiatingAgent, targettedResource, usedActivity);
+ }
+ 
+ bool ResourceLinking::IsResourceLinkedToActivity(QString initiatingAgent, QString targettedResource, QString usedActivity)
+ {
+     if (!validateArguments(initiatingAgent, targettedResource, usedActivity)) {
+         return false;
+@@ -243,32 +275,32 @@
+ 
+     return true;
+ }
+ 
+ void ResourceLinking::onActivityAdded(const QString &activity)
+ {
+     Q_UNUSED(activity);
+ 
+     // Notify KIO
+     // qCDebug(KAMD_LOG_RESOURCES) << "Added: activities:/  (" << activity << ")";
+-    org::kde::KDirNotify::emitFilesAdded(QUrl(QStringLiteral("activities:/")));
++    kdirnotifyFilesAdded(QUrl(QStringLiteral("activities:/")));
+ }
+ 
+ void ResourceLinking::onActivityRemoved(const QString &activity)
+ {
+     // Notify KIO
+     // qCDebug(KAMD_LOG_RESOURCES) << "Removed: activities:/" << activity;
+-    org::kde::KDirNotify::emitFilesRemoved({QUrl(QStringLiteral("activities:/") + activity)});
++    kdirnotifyFilesRemoved({QUrl(QStringLiteral("activities:/") + activity)});
+ 
+     // Remove statistics for the activity
+ }
+ 
+ void ResourceLinking::onCurrentActivityChanged(const QString &activity)
+ {
+     Q_UNUSED(activity);
+ 
+     // Notify KIO
+     // qCDebug(KAMD_LOG_RESOURCES) << "Changed: activities:/current -> " << activity;
+-    org::kde::KDirNotify::emitFilesAdded({QUrl(QStringLiteral("activities:/current"))});
++    kdirnotifyFilesAdded({QUrl(QStringLiteral("activities:/current"))});
+ }
+ 
+ #include "moc_ResourceLinking.cpp"

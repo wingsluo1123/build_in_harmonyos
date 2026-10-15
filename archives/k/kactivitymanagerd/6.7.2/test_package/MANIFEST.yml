@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点证据 (R51):
+#   - 源码树无 autotests/ 目录 (find . -name autotests → 空)
+#   - 所有 CMakeLists.txt 均无 enable_testing() / add_test() /
+#     BUILD_TESTING 引用
+#   - 上游仓库 (invent.kde.org/plasma/kactivitymanagerd) 该版本无任何
+#     单元/集成测试目标，测试通过 D-Bus 由 kactivities 库消费端间接验证
+# 因此 upstream_tests 为空，属"上游确无测试"，非未运行。
+
+package: kactivitymanagerd/6.7.2
+homepage: "https://invent.kde.org/plasma/kactivitymanagerd"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "N/A (upstream ships no test suite)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (无 —— 清点证据见文件头注释)
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证: 运行打包出的守护进程二进制)
+test_package_tests:
+  - file: test_package/conanfile.py (test())
+    description: "守护进程 smoke 测试: 运行打包出的 kactivitymanagerd 二进制，验证 Qt/KF6 依赖与插件可加载 (exit 0=无 D-Bus 总线时正常退出, 124=守护进程存活)"
+    command: "timeout 60 kactivitymanagerd"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3

@@ -1,0 +1,32 @@
+--- a/src/service/plugins/sqlite/CMakeLists.txt
++++ b/src/service/plugins/sqlite/CMakeLists.txt
+@@ -4,20 +4,29 @@
+    Database.cpp
+    StatsPlugin.cpp
+    ResourceScoreCache.cpp
+    ResourceScoreMaintainer.cpp
+    ResourceLinking.cpp
+ 
+    ${KACTIVITIES_CURRENT_ROOT_SOURCE_DIR}/src/common/database/Database.cpp
+    ${KACTIVITIES_CURRENT_ROOT_SOURCE_DIR}/src/common/database/schema/ResourcesDatabaseSchema.cpp
+ 
+    ${KACTIVITIES_CURRENT_ROOT_SOURCE_DIR}/src/utils/qsqlquery_iterator.cpp
++   )
++
++# OHOS adaptation: the published kio package is built without the D-Bus
++# feature, so the KDirNotify D-Bus interface is not shipped. Generate it
++# locally from kio's own introspection XML (LGPL-2.1-or-later).
++qt_add_dbus_interface (
++   sqliteplugin_SRCS
++   ${CMAKE_CURRENT_SOURCE_DIR}/org.kde.KDirNotify.xml
++   kdirnotifygenerated
+    )
+ 
+ qt_add_dbus_adaptor (
+    sqliteplugin_SRCS
+    ${KACTIVITIES_CURRENT_ROOT_SOURCE_DIR}/src/common/dbus/org.kde.ActivityManager.ResourcesLinking.xml
+    ResourceLinking.h ResourceLinking
+    resourcelinkingadaptor
+    )
+ 
+ qt_add_dbus_adaptor (
