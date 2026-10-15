@@ -1,0 +1,57 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -58,50 +58,48 @@
+             EXPORT_FILE_NAME "mgclient-export.h")
+ 
+     set_target_properties(mgclient-static PROPERTIES
+             OUTPUT_NAME mgclient)
+     target_compile_definitions(mgclient-static PUBLIC MGCLIENT_STATIC_DEFINE)
+     target_include_directories(mgclient-static
+             PRIVATE
+             "${PROJECT_SOURCE_DIR}/src"
+             PUBLIC
+             "${PROJECT_SOURCE_DIR}/include"
+-            "${CMAKE_CURRENT_BINARY_DIR}"
+-            "${OPENSSL_INCLUDE_DIR}")
++            "${CMAKE_CURRENT_BINARY_DIR}")
+     target_link_libraries(mgclient-static
+             PRIVATE
+-            ${OPENSSL_LIBRARIES} project_options project_c_warnings)
++            openssl::openssl project_options project_c_warnings)
+ 
+     if(MGCLIENT_ON_WINDOWS)
+         target_link_libraries(mgclient-static PUBLIC ws2_32 crypt32 gdi32)
+     endif()
+ 
+     add_library(mgclient-shared SHARED ${mgclient_src_files})
+ 
+     generate_export_header(mgclient-shared
+             BASE_NAME "mgclient"
+             EXPORT_FILE_NAME "mgclient-export.h")
+ 
+     set_target_properties(mgclient-shared PROPERTIES
+             OUTPUT_NAME mgclient
+             SOVERSION ${mgclient_SOVERSION}
+             C_VISIBILITY_PRESET hidden)
+     target_include_directories(mgclient-shared
+             PRIVATE
+             "${PROJECT_SOURCE_DIR}/src"
+             PUBLIC
+             "${PROJECT_SOURCE_DIR}/include"
+-            "${CMAKE_CURRENT_BINARY_DIR}"
+-            "${OPENSSL_INCLUDE_DIR}")
++            "${CMAKE_CURRENT_BINARY_DIR}")
+     target_link_libraries(mgclient-shared
+             PRIVATE
+-            ${OPENSSL_LIBRARIES} project_options project_c_warnings)
++            openssl::openssl project_options project_c_warnings)
+ 
+     if(MGCLIENT_ON_WINDOWS)
+         target_link_libraries(mgclient-shared PUBLIC ws2_32 crypt32 gdi32)
+     endif()
+ 
+     generate_export_header(mgclient-shared
+             BASE_NAME "mgclient"
+             EXPORT_FILE_NAME "mgclient-export.h")
+ 
+     include(GNUInstallDirs)
