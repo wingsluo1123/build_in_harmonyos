@@ -1,0 +1,47 @@
+id: DRAFT-asterisk-odbc-menuselect-host-elf-signing
+draft: true
+contributor_id: ylinz
+title: Sign a generated Asterisk menuselect host ELF before its first OHOS execution
+
+trigger_tool: make|menuselect|llvm-objcopy|binary-sign-tool|conan
+phase: compilation|configuration|packaging
+error_signature: Permission denied.*menuselect|menuselect.*Permission denied|Error 126.*menuselect|Operation not permitted.*menuselect
+severity: 1
+category: build-generated-host-tools,elf-signing,ohos,autotools
+match_keywords: Asterisk, menuselect, generated host ELF, first execution, .codesign, binary-sign-tool, llvm-objcopy, Error 126
+
+root_cause: Asterisk builds the target-side menuselect ELF during the make graph and executes it immediately to generate menuselect.makeopts. On OHOS, chmod restores only the mode bit; the kernel still rejects an ELF without a valid .codesign section, so signing after a later build or packaging phase is too late.
+affected_scope: OHOS builds that generate an ELF helper on the device and execute that helper before the next make target; this draft is specifically evidenced for Asterisk 22.10.1 menuselect and does not cover shell scripts, target-only artifacts, or arbitrary post-install mutations.
+verification_cmd: git checkout a23d26ee75 && CI_PACKAGES="archives/a/asterisk-odbc/22.10.1" zsh ci/conan/build_and_test.sh
+
+rec_priority: 1
+rec_approach: sign-generated-helper-before-first-execution
+rec_description: After make creates the helper, classify it as ELF, copy it to a same-directory staging path, remove any stale .codesign section, self-sign to a second temporary path, restore execute bits, atomically replace the original, and only then invoke the make target that executes it.
+rec_command: build helper; llvm-objcopy --remove-section .codesign helper.signing; binary-sign-tool sign -inFile helper.signing -outFile helper.signed -selfSign 1; chmod a+x helper.signed; replace helper before first execution
+rec_auto_fix: false
+rec_impl: conanfile.py _sign_ohos_executable before make menuselect.makeopts
+
+fallback_priority: 2
+fallback_approach: explicit-stage-signing
+fallback_description: A stage-boundary signer is only applicable when the build system proves that no dependent rule executes the new helper inside the same stage; that proof was not established for Asterisk menuselect.
+fallback_command:
+fallback_auto_fix: false
+fallback_impl:
+
+forbid_1_pattern: chmod.*menuselect.*without.*binary-sign-tool|binary-sign-tool.*after.*package
+forbid_1_reason: chmod does not add the required .codesign section, and package-time signing happens after Asterisk has already attempted to execute menuselect.
+forbid_1_consequence: make menuselect.makeopts fails at the first helper invocation with Permission denied or error 126.
+
+principles: P017, P019
+causes: []
+caused_by: []
+similar_to: [E077, E087, E318]
+conflicts_with: []
+prerequisite_of: []
+
+doc_file: knowledge/drafts/DRAFT-asterisk-odbc-menuselect-host-elf-signing.md
+last_updated: 2026-09-10
+source_event: asterisk-odbc/22.10.1 PR #7632, evidence report archives/a/asterisk-odbc/22.10.1/reports/knowledge-evidence.md
+authors: Theresa
+source_pr: 7632
+source_commit: a6ceb013f0db62e01d9281005974ea0776941465

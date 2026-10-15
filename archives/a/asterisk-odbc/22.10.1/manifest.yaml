@@ -1,0 +1,95 @@
+software: asterisk-odbc
+version: "22.10.1"
+status: built
+build_date: "2026-09-09"
+build_system: autotools
+issue: "TBD"
+source:
+  url: "https://github.com/asterisk/asterisk/archive/refs/tags/22.10.1.tar.gz"
+  sha256: "373c98f4d4a1b923b42def0aee03f4e36aca9d1c244a8eeda646da8a97f89663"
+  tar_format: tar.gz
+build:
+  system: autotools
+  configure_options:
+    - "--with-unixodbc=<unixodbc package_folder>"
+    - "--without-iodbc"
+    - "--without-pjproject"
+    - "--without-x11"
+    - "--without-gtk2"
+    - "--build=aarch64-unknown-linux-gnu and --host=aarch64-unknown-linux-ohos on OHOS"
+  dependencies:
+    required:
+      - unixodbc/2.3.12
+      - libedit/20240808
+      - uuid/2.40.1
+      - jansson/2.15.1
+      - libxml2/2.15.3
+      - sqlite3/3.49.1
+  cc: clang
+  cxx: clang++
+products:
+  modules:
+    - "lib/asterisk/modules/res_odbc_transaction.so"
+    - "lib/asterisk/modules/res_odbc.so"
+    - "lib/asterisk/modules/res_config_odbc.so"
+    - "lib/asterisk/modules/func_odbc.so"
+    - "lib/asterisk/modules/cdr_odbc.so"
+    - "lib/asterisk/modules/cdr_adaptive_odbc.so"
+    - "lib/asterisk/modules/cel_odbc.so"
+  resources:
+    - "res/res_odbc.conf.sample"
+    - "res/res_config_odbc.conf.sample"
+    - "res/func_odbc.conf.sample"
+    - "res/cdr_odbc.conf.sample"
+    - "res/cdr_adaptive_odbc.conf.sample"
+    - "res/cel_odbc.conf.sample"
+patches_applied:
+  - "conanfile.py: OHOS cross configure triplets, shell override, ld.lld selection with scoped LLVM runtime paths, constructor-based recursive mutex initialization, recursive menuselect BUILD_CC/BUILD_LDFLAGS, Makefile chmod 755 before menuselect dependency checks, build-time menuselect ELF signing, atomic package ELF signing, -fblocks, ASTMM_LIBC ignore, SOLINK=-shared"
+  - "test_package/test_asterisk_odbc.py: use full llvm-nm symbol table instead of nm -D and support llvm-readobj when readelf is unavailable"
+test_results:
+  type: remote-ohos-frontload
+  total: 9
+  passed: 9
+  failed: 0
+  skipped: 0
+  details:
+    - "python -m py_compile conanfile.py test_package/conanfile.py test_package/test_asterisk_odbc.py: passed"
+    - "conan inspect . / conan export .: passed, updated recipe revision 1aeda3f767e49c419c03e35b09cecb7a"
+    - "conan list \"unixodbc/2.3.12:*\" -r=ohpcd: passed, unixodbc rrev 6878d8258773e5a57d6526e9b29cc5b1 available"
+    - "conan graph info . and conan install . --build=never with OHOS profile: passed"
+    - "remote HarmonyOS aarch64 conan create: passed after #37218 linker fix, package id 74010f9f2b36ca0ffa1c38a1eee5383f6885ed38"
+    - "remote HarmonyOS aarch64 conan test: passed, rechecked all 7 modules and 6 sample configs"
+    - "consumer probe against built package: passed"
+    - "test_package symbol check relaxed from nm -D to full llvm-nm so OHOS local symbols pass: passed"
+    - "official shadow CI #42701: passed on OpenHarmonyPCDeveloper-CI-011; Conan test_package, L0, and L1 all passed"
+    - "upstream Asterisk 22.10.1 test inventory: reviewer reports 724 internal tests; the module-only recipe consumer probe is not this suite"
+    - "2026-09-10 current-device package build: recipe rrev a744e096929b9b22842d211bdaa90fc1 produced package revision 16c0f27d84febbcce59e43a387cdf1a7 with recursive mutex initialization enabled"
+    - "2026-09-10 current-device conan test: passed after the consumer probe used sys.executable tool directory and llvm-readobj header fallback; verified 7 modules and 6 sample configs"
+  upstream_test_exploration:
+    status: partial-complete
+    inventory: 724
+    inventory_source: "reviewer-provided upstream test count"
+    registered: 599
+    protected_framework_tests: 5
+    category_roots_executed: 80
+    normal_tests_executed: 594
+    passed: 559
+    failed: 26
+    not_run: 9
+    source_inventory_unregistered: 125
+    note: "Root-category isolation avoids nested category duplicate execution. The 724-case inventory result is 559 PASS, 26 FAIL, 14 SKIP (9 NOT RUN plus 5 protected framework tests), and 125 unregistered/not executed."
+known_issues:
+  - "issue 编号未在项目文件或会话上下文中找到，待补。"
+  - "官方 CI #42701 已基于当前修复提交通过；#36868 的错误 126 根因是构建期生成的 menuselect ELF 未签名，chmod 不能替代签名。"
+knowledge_gained:
+  - "Asterisk 22.10.1 ODBC 支持优先 unixODBC；configure 通过 SQLConnect/sql.h 探测 UNIXODBC 后设置 GENERIC_ODBC。"
+  - "Asterisk 22.10.1 has 724 upstream internal tests under tests/. They exercise the complete PBX test runner and are not represented by this module-only package's consumer probe."
+  - "核心 ODBC 模块为 res_odbc_transaction、res_odbc、res_config_odbc、func_odbc、cdr_odbc、cdr_adaptive_odbc、cel_odbc。"
+  - "Asterisk 源码 downloads.asterisk.org 的 22.10.1 tarball 路径返回 404；GitHub tag tarball 可下载并已校验 sha256。"
+  - "unixodbc/2.3.12 已在 ohpcd 发布 OHOS armv8 Release shared 包，asterisk-odbc 可继续依赖它做后续构建验证。"
+  - "OHOS build 里 Asterisk module entrypoints 可能只落在普通符号表，不一定出现在动态符号表；test_package 应以包内容验证为主。"
+  - "OHOS device tool bundles may provide llvm-readobj and llvm-nm without llvm-readelf/readelf; consumer probes should locate tools relative to their executing Python and accept the equivalent SharedObject header output."
+  - "官方 conan test 已可直接复用同一包缓存，作为交接前的最终消费验证。"
+  - "官方 CI #37218 证明 /data/service/hnp/bin/ld 路径存在并不代表 GNU ld，可能仍会启动缺少 libxml2.so.16 的 SDK lld；配方改用 ld.lld 入口，并仅在构建环境前置设备 LLVM/用户工具库路径。"
+  - "官方 CI #36868 在 chmod 755 后仍执行失败，证明 HMDFS 上构建期 ELF 需要 .codesign 签名；menuselect 生成后必须先 llvm-objcopy 移除旧签名段、binary-sign-tool self-sign，再恢复执行位。"
+  - "签名工具输出到临时文件并以 os.replace 原子替换，可同时规避签名工具重置权限和原地改写留下半成品；最终模块沿用同一流程。"
