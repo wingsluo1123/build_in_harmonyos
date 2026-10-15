@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# scanbd 1.5.1 上游未提供可回归的自动化测试套件：
+#   - 无 tests/ 目录、无 TESTS / check_PROGRAMS 目标、无 ctest / pytest 注册
+#   - src/test/ 下的 test01.c 与 test02.c 是手工 SANE 调试程序（test01 为
+#     while(true) 无限轮询，test02 轮询 10 次设备列表，均无断言），且未出现在
+#     configure.ac 的 AC_OUTPUT 列表与 Makefile.am 的 SUBDIRS 中，仅被一个游离的
+#     src/test/Makefile 引用，不属于构建系统的一部分
+
+package: scanbd/1.5.1
+homepage: "https://sourceforge.net/projects/scanbd/"
+
+# 上游测试命令 (用于 make check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际的测试程序 (未纳入构建系统, 见上)
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 执行已安装 scanbd 二进制，校验启动/选项解析/配置加载失败路径的退出码，并确认 scanbm 兼容入口存在"
+    command: "bash test.sh"
+
+# 上游测试断言总数
+assertion_count: 0
