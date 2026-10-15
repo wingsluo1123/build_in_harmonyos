@@ -1,0 +1,49 @@
+software: terminado
+version: "0.18.1"
+status: built
+build_date: "2026-10-12"
+build_system: pep517
+package_type: python-require
+source:
+  url: "https://files.pythonhosted.org/packages/source/t/terminado/terminado-0.18.1.tar.gz"
+  sha256: "de09f2c4b85de4765f7714688fff57d3e75bad1f909b589fde880460c753fd2e"
+  tar_format: tar.gz
+build:
+  system: pep517
+  build_command: "python3 -m pip wheel --no-deps -w dist ."
+  backend: hatchling
+  notes: >
+    terminado 声明 build-backend=hatchling.build（requires hatchling>=1.5）。
+    构建**必须保留 pip build isolation**：若传 --no-build-isolation，
+    pip 会从构建解释器 site-packages 导入 hatchling，而本机 hnp python3
+    未装 hatchling，直接报 BackendUnavailable: No module named 'hatchling'。
+    保留默认隔离后由 pip 从社区索引 (pypi.cnb.cool) 自动拉取 hatchling。
+  dependencies:
+    required:
+      - ptyprocess/0.7.0    # 上游 pyproject 声明 ptyprocess (os_name != 'nt') — via ohpcd
+      - tornado/6.5.2       # 上游 pyproject 声明 tornado>=6.1.0 — via ohpcd
+patches_applied: []
+notes: >
+  纯 Python wheel 包（无 C 扩展）：pip wheel 构建后解包到
+  lib/python3.12/site-packages，经 runenv_info 注入 PYTHONPATH 供消费者 import
+  （同 archives/t/tornado/6.5.2、archives/p/ptyprocess/0.7.0 模式）。
+  运行期关键能力已在真机验证：OHOS PC 的 PTY 可用（/dev/ptmx 可打开，
+  pty.openpty() 成功，命令可经伪终端回显），故 terminado 的 pty 通路成立。
+
+package_layout:
+  - path: lib/python3.12/site-packages/terminado/
+    desc: Python 包本体（__init__.py / management.py / websocket.py / uimodule.py 等 5 个 .py + py.typed）
+  - path: lib/python3.12/site-packages/terminado-0.18.1.dist-info/
+    desc: wheel 元数据
+  - path: lib/python3.12/site-packages/_terminado*.js / uimod_embed.js / terminado.js
+    desc: 前端静态资源（xterm.js 集成）
+
+platform_notes:
+  - "R26 不适用：无可链接库产物，无系统同名库污染风险"
+  - "R32：settings.os 判 `in (Linux, OHOS)`"
+  - "R33：构建不裸用 CC/CFLAGS 等 shell 环境变量，仅调用 pip"
+  - "R34：test_package 走真实 pty（ocied -> openpty -> 命令回显）+ TermSocket 基类断言"
+  - "R38：无可执行产物，无需 commands.json"
+
+knowledge_refs:
+  - "本机 python 解释器选型（G2）：hnp python3 的 lib-dynload 为非本机架构 .so，import select/pty 失败；test_package 用 openpty+select 功能探针自选解释器"

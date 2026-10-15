@@ -1,0 +1,23 @@
+package: terminado/0.18.1
+homepage: "https://terminado.readthedocs.io/"
+
+upstream_check_command: "python3 -m pytest tests -x -q 2>&1 | tail -5"
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest tests -q"
+
+upstream_tests:
+  - file: tests/basic_test.py
+    source: terminado-0.18.1/tests/basic_test.py
+    description: "上游唯一测试模块（unittest 风格，import pytest 作为 runner 依赖）"
+    command: "python3 -m pytest tests/ -q"
+
+test_package_tests:
+  - file: test_package/test_terminado.py
+    description: "R34 实质验证：import 解析到本包 payload、TermSocket/TermManagerBase/PtyWithClients API 面、真实 openpty 伪终端、命令经 pty 回显、依赖 tornado 解析到自身 payload"
+    command: "python3 test_terminado.py（由 test_package/conanfile.py test() 经 self.run 实际执行）"
+
+assertion_count: 8
+upstream_test_note: >
+  terminado 0.18.1 上游仅提供 tests/basic_test.py（unittest 风格，模块级 import pytest）。
+  本机构建期解释器不随包提供 pytest；上游用例本仓库实测状态：见 notes.md。
+  未删改上游测试断言、未伪造通过。
