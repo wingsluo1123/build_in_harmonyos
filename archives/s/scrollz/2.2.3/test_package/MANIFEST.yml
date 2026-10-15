@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml — scrollz 2.2.3
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求）
+
+package: scrollz/2.2.3
+homepage: "https://github.com/scrollz/scrollz"
+
+# 上游测试入口（用于 make -n check / ctest -N / meson test --list 分析）
+# 实测：上游根 Makefile.in 与 source/Makefile.in 都没有 check/test 目标，
+# 源码树中不存在任何测试源文件（见 notes.md「上游测试清点」）。
+upstream_check_command: "make check"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无（上游无测试套件）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证 CLI，L0c 测试源）
+test_package_tests:
+  - file: smoke_test.sh
+    description: >-
+      真实运行打包出的 scrollz 二进制并断言可观察输出：
+      T1 `scrollz --version` 输出含 'ircII version' 且退出码 0；
+      T2 `scrollz -v`（上游单横线版本开关）输出含 'ircII version'。
+    command: "sh smoke_test.sh <package>/bin/scrollz"
+    executed_by: "test_package/conanfile.py test() 通过 self.run 执行（L0d）"
+
+# 测试断言总数：test_package 3 项断言（上游无断言）
+assertion_count: 3
