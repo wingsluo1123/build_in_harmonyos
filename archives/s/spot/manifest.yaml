@@ -1,0 +1,23 @@
+software: spot
+display: "Spot"
+description: "LTL/PSL 公式与 ω-自动机处理库及 16 个命令行工具（LRDE/EPITA）"
+category: utility
+homepage: "https://spot.lre.epita.fr/"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "OHOS 拒绝 execve 含 #! 的脚本（EACCES→126）：configure 经 shell 显式解释调用；上游 make check 全量复现须对 tests/ 各子目录按目录设置 LOG_COMPILER（全局覆盖会波及 buddy/src → 127 且 check-recursive 中止）"
+    - "libtool 的 bin 包装脚本不可直接 exec：两遍法（先触发构建，再把 .libs/<name> 覆回 <name>）得到真身 ELF；LD_LIBRARY_PATH 用 33 个 .libs 绝对路径"
+    - "运行期生成的 #! 脚本（ltlcross 系列测试的 fake 翻译器）→ LD_PRELOAD 垫片拦截 posix_spawn(p) 改写为 /bin/sh <script>，ELF 原样放行（垫片源码随 reports/ 交付）"
+    - "设备默认 grep 为 toybox（无视 LC_ALL=C）→ 上游 style.test 对多字节字形误报；编译 execv 包装器仅将私有目录前置 PATH（源为 hnp 的 GNU grep 3.12）"
+    - "hmdfs 禁符号链接且掩蔽权限位：补丁 0001 令 libtool -avoid-version（单文件 .so）、补丁 0002 令 configure 的 mktemp 走 mkdir 回退分支"
+    - "装包阶段 ELF 因改写失效签名（E077）：llvm-objcopy 去 .codesign → binary-sign-tool -selfSign → 恢复权限位"
+  common_dependencies: []
+
+versions:
+  "2.15.1":
+    status: built
+    build_date: "2026-10-04"
+    conan_ref: "spot/2.15.1"

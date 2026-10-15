@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: spot/2.15.1
+homepage: "https://spot.lre.epita.fr/"
+
+# 上游测试命令：随源码分发的 autotools 套件（tests/*.test，以 `make check` 驱动）。
+# 本配方构建期不执行（构建耗时控制），由 R51 复现脚本在真机全量执行。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: "bash reports/run-upstream-tests.sh <spot-build-dir> [jobs]（真机手动执行，固化 SHELL/TMPDIR 环境适配；实测 188/214（26 项上游环境守卫跳过、0 失败），见 reports/upstream-test-run.md）"
+
+# 上游实际测试程序（自 MACHINE 回填）
+upstream_tests:
+  - category: core
+    count: 196
+    description: "tests/core/*.test —— 库核心套件（公式解析/化简、自动机算法、bdd、hoa 读写等）"
+    status: run_on_device
+    note: "真机全量执行，记录见 reports/upstream-test-run.md"
+  - category: sanity
+    count: 9
+    description: "tests/sanity/*.test —— 构建产物 sanity 检查"
+    status: run_on_device
+    note: ""
+  - category: ltsmin
+    count: 8
+    description: "tests/ltsmin/*.test —— ltsmin 接口用例（无 ltsmin 环境时按上游检测跳过）"
+    status: run_on_device
+    note: ""
+  - category: python
+    count: 1
+    description: "tests/python/*.test —— SWIG 绑定用例（--disable-python 未构建）"
+    status: not_built
+    note: "配方以 --disable-python 关闭绑定"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: spot_probe.cpp
+    description: "消费者二进制真实链接 spot::spot 执行 6 项具名 API 用例：version_string（2.15.1）/ parse_print_roundtrip（a U b）/ translate_gf_a（G F a → TGBA 非空）/ hoa_serialization（含 acceptance:）/ equivalence_positive（a U b ≡ b | (a & X(a U b))）/ equivalence_negative（a ≢ b）；逐例 TEST PASS/FAIL + 末行 TEST SUMMARY，任一失败 exit(1)"
+    command: "./spot_probe"
+  - file: conanfile.py
+    description: "消费者测试执行器，6 项具名用例：cpp_api_probe（包装 spot_probe 并逐字核对其 TEST SUMMARY）/ cli_ltl2tgba_version（--version 含 2.15.1）/ cli_ltl2tgba_translate（HOA 输出含 acceptance:）/ cli_ltlfilt_equivalence（正例等价过滤）/ elf_aarch64_shared（libspot.so readelf 为 AArch64）/ codesign_present（.codesign 段在）；逐例 TEST PASS/FAIL + 末行 TEST SUMMARY，任一失败 ConanException"
+    command: "conan test（test() 手工驱动）"
+
+# 测试用例总数：test_package 12 项（探针 6 + 执行器 6）
+assertion_count: 12
