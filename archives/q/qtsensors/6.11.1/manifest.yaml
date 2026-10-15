@@ -1,0 +1,31 @@
+# manifest.yaml — qtsensors 6.11.1
+
+version: "6.11.1"
+software: qtsensors
+status: built
+build_date: "2026-10-01"
+build_system: cmake
+
+source:
+  url: "https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.11/6.11.1/submodules/qtsensors-everywhere-src-6.11.1.tar.xz"
+  sha256: "23617062da7be526d023dec7f9b76231001a1098a7e5f94c646f2e4f87cfcf8f"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "QT_QMAKE_TARGET_MKSPEC=harmonyos-clang"
+    - "CMAKE_PREFIX_PATH=<qtbase 包>"
+    - "QT_BUILD_TESTS=ON"
+    - "QT_BUILD_TESTS_BY_DEFAULT=OFF"
+    - "QT_BUILD_EXAMPLES=OFF"
+  dependencies:
+    - qtbase/6.11.1
+  cc: clang
+  cxx: clang++
+
+knowledge_gained:
+  - "Qt Sensors 是 Qt 6 附加模块：Core 为唯一必需组件，Xml/Gui/Widgets/Quick/Qml/Svg/DBus/QuickTest 均为 OPTIONAL_COMPONENTS，因此只依赖 qtbase/6.11.1 即可构建"
+  - "与 qtserialport 同构：qtbase 使用 cmake_find_mode=none 并自带可重定位 Qt6Config.cmake，需显式设 CMAKE_PREFIX_PATH 指向其包目录"
+  - "必须把 qtbase 的 CMake Platform/HarmonyOS.cmake 目录加入 CMAKE_MODULE_PATH；否则 CMake 视 HarmonyOS 为未知平台、跳过 SOVERSION/SONAME 规则，插件 DT_NEEDED 会退化成相对路径字面量"
+  - "OHOS 无物理传感器后端：上游 tst_qsensor 的设备类用例不可运行，消费者测试改为断言 API 契约（传感器类型注册表、管理器可用性、实例生命周期），与 qtmultimedia 无媒体后端同一处理方式"
