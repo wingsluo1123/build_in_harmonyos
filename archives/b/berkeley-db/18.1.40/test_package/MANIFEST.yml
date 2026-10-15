@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 清点方法（R51）: 上游 tarball 解包后对 test/ 全树递归计数；
+# 可运行性实测与逐项技术原因见 notes.md 的「上游测试清点」申报表。
+
+package: berkeley-db/18.1.40
+homepage: "https://www.oracle.com/database/technologies/related/berkeleydb.html"
+
+# 上游测试命令：上游无 make check 目标（dist/Makefile.in 明确打印
+# "make: check target not available"）。可独立运行的 C 套件由
+# `make cutest` 构建、在 build_unix 目录下 `./cutest` 执行
+# （CuTest 框架，test/c/suites 共 13 个套件 83 个用例）；
+# tcl/java 等套件依赖解释器与语言绑定（--enable-tcl/--enable-java），
+# 平台构建未启用，逐项技术原因见 notes.md。
+upstream_check_command: "make cutest && ./cutest"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（CuTest C 套件，单一可执行文件聚合 13 套件；
+# 真机实测口径与逐套件结果见 notes.md）
+upstream_tests:
+  - file: cutest
+    source: db-18.1.40/test/c/cutest + db-18.1.40/test/c/suites
+    description: "CuTest C 单元/功能套件：环境配置/加密/分区/热备份/队列/回调等 83 用例"
+    command: "./cutest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试 — 链接 libdb-18.1 真实调用 db_version/db_create/db->open(内存态 Btree)/put/get/del/close"
+    command: "./test_berkeley-db"
+
+# 测试断言总数
+assertion_count: 15
