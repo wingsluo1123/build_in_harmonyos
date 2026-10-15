@@ -1,0 +1,60 @@
+version: "1.7.8"
+software: pmacct
+status: built
+build_date: "2026-10-08"
+build_system: autotools
+
+source:
+  url: "https://github.com/pmacct/pmacct/archive/refs/tags/v1.7.8.tar.gz"
+  sha256: "5c536eca24849fc703a7676237aed6451d2e3859396686d39bc55772da65c935"
+  upstream_version: "1.7.8"
+  tar_format: tar.gz
+  # 随包 vendored 的上游 git submodule（制品仓未发布；commit 取自 pmacct v1.7.8
+  # 固定的 submodule 指针，见 .gitmodules 与 git ls-tree）
+  vendored:
+    - name: libcdada
+      version: "0.4.0"
+      url: "https://github.com/msune/libcdada/archive/4eb0b613efa080596f38a5e66caaf4accb97d06e.tar.gz"
+      sha256: "b71bf41e6606c5c62b868ddf34569646fc153b333494b3268dd154662cb9f1f8"
+      reason: "pmacct 的 git submodule（src/external_libs/libcdada），制品仓无 libcdada；由上游 --with-external-deps 机制就地编译为静态库"
+
+build:
+  system: autotools
+  # 这里只列 generate() 真正追加给 configure 的参数（上游默认已打开的
+  # --enable-l2/--enable-traffic-bins/--enable-bgp-bins/--enable-bmp-bins/
+  # --enable-st-bins 不重复列出，见 knowledge_gained）。
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--with-pcap-includes=<libpcap>/include"
+    - "--with-pcap-libs=<libpcap>/lib"
+  dependencies:
+    - "libpcap/1.10.6"
+  build_requirements:
+    - "autoconf/2.72"
+    - "automake/1.18"
+    - "libtool/2.5.4"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-mallopt-m-check-action-guard.patch"
+  - "0002-src-external_libs-Makefile.am-libcdada-no-autogen.patch"
+
+knowledge_gained:
+  - "GitHub archive tarball 不含 configure，autoreconf 自举时 -I m4 不能省：configure.ac 的 AC_LINEARIZE_PATH 宏只在源码树 m4/ 下，aclocal 默认搜索路径找不到 (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "conan 2.29.1 AutotoolsToolchain 仅在 cross_building() 为真时才自动填 --build/--host；同 profile 下两个三元组都不会传，configure 只好跑 config.guess，而设备 uname -s=HarmonyOS 不被 config.guess(2024-07-27) 识别(rc=1) ⇒ 必须显式传三元组 (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "conanbuild 的 PERL5LIB 指向 conan perl 5.42.2，而 ohpcd automake/1.18 的 .aclocal-real/.automake-real shebang 写死 hnp perl 5.42.0，profile [buildenv] PATH 又把 hnp/bin 顶到最前 ⇒ 裸调 autoreconf 报 Perl_my_cxt_init symbol not found；解法=shim aclocal/automake 到 conan perl + 命令行层内联 PATH 前缀 (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "OHOS clang 15.0.4 的 C 与 C++ driver 都把 -lstdc++ 归一化为 libc++(链接行出现 -lc++ -lc++abi -lunwind)，故上游硬编码的 LIBS=-lstdc++ 在 OHOS 上无需补丁 (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "OHOS/musl 的 malloc.h 提供 mallopt() 但不定义 M_CHECK_ACTION，configure 的 AC_CHECK_FUNCS(mallopt) 置上 HAVE_MALLOPT 后 8 个 daemon 源文件在 mallopt(M_CHECK_ACTION,0) 上报未声明标识符(-Werror 硬错)；修法=宏守卫加 && defined(M_CHECK_ACTION) (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "pmacct 的 libcdada 子模块构建系统在非 git 仓库 + 源码树内已有 libcdada/include/cdada.h 时跳过 clone、就地 autogen+configure+make install 到 <build>/src/external_libs/rootfs ⇒ vendored 源码即可满足，无需外部 provider (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "上游无自动化测试套件：全树无 tests/、Makefile.am 无 TESTS/check_PROGRAMS/check-local，make check 无目标；真实测试入口是 ci/script.sh(ls -l src/nfacctd + src/nfacctd -V) 与 ci/smoke-test/docker-compose.yml(需 docker) (ref: archives/p/pmacct/1.7.8/reports/test-report.md)"
+  - "上游 configure 默认打开 --enable-l2/--enable-traffic-bins/--enable-bgp-bins/--enable-bmp-bins/--enable-st-bins，其中 bgp/bmp/st 需要 libcdada ⇒ 本包交付 7 个二进制（含 pmbgpd/pmbmpd）；uacctd 由 WITH_NFLOG 条件控制（configure.ac:162-166 in src/Makefile.am）且需 libnetfilter_log，制品仓未发布 ⇒ 不构建 (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "libcdada 子 configure 必须显式给 --build=$(build_alias) --host=$(host_alias)：否则它回退到 config.guess，而 OHOS 上 uname -s=HarmonyOS 不被识别 ⇒ 'cannot guess build type'；build==host 即非交叉 configure（patch 0002）。build() 在 make 前先用 conan-perl shim 预跑 `autoreconf -f -i` 生成 libcdada 的 configure，故规则只需直接 ./configure（ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "conanbuild 的 AutotoolsToolchain 会 export CPPFLAGS=-DNDEBUG（conanautotoolstoolchain.sh:17），与 libcdada config_m4/debug.m4 自己 AC_DEFINE([NDEBUG]) 在命令行上撞成 -Wmacro-redefined，libcdada 自带 -Werror ⇒ 每个编译单元硬失败。修法=patch 0002 在嵌套 configure 与嵌套 make 前都加 `CPPFLAGS= ` 清空外层泄漏（仅保留 libcdada 自己的 NDEBUG 定义） (ref: archives/p/pmacct/1.7.8/notes.md)"
+  - "ohpcd automake/1.18 的 .aclocal-real/.automake-real 脚本 shebang 写死 HNP perl，而 PERL5LIB 指向 conan perl 5.42.2 的 XS；HNP perl 加载 conan Cwd.so 报 Perl_my_cxt_init: symbol not found / Permission denied。libcdada 上游 ./autogen.sh 正是跑 autoreconf 触发它 ⇒ patch 0002 删掉 ./autogen.sh 步骤，build() 改用 conan-perl shim（ACLOCAL/AUTOMAKE/PERL env）预生成 libcdada 的 configure（ref: archives/p/pmacct/1.7.8/notes.md)"
+
+knowledge_ref:
+  - "archives/p/pmacct/1.7.8/notes.md"
+  - "archives/p/pmacct/1.7.8/reports/test-report.md"
+  - "archives/p/pmacct/1.7.8/reports/conan-verify-report.md"

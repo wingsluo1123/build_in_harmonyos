@@ -1,0 +1,23 @@
+sources:
+  url: "https://github.com/pmacct/pmacct/archive/refs/tags/v1.7.8.tar.gz"
+  sha256: "5c536eca24849fc703a7676237aed6451d2e3859396686d39bc55772da65c935"
+
+# libcdada 是 pmacct 的 git submodule（src/external_libs/libcdada，见上游
+# .gitmodules），制品仓未发布（`conan list libcdada` 0 命中），故随包 vendored。
+# 上游地址为 pmacct .gitmodules 声明的 msune/libcdada 官方仓库，commit 取自
+# pmacct v1.7.8 固定的 submodule 指针 4eb0b613efa080596f38a5e66caaf4accb97d06e
+# （与 `git ls-tree HEAD src/external_libs/libcdada` 一致，可复现）。
+# 解包位置 = 源码树 src/external_libs/libcdada/，交由 pmacct 自带的 submodule
+# 构建系统（configure 默认 --with-external-deps=yes）自行 autogen + configure
+# + make install 到 <build>/src/external_libs/rootfs。
+libcdada:
+  url: "https://github.com/msune/libcdada/archive/4eb0b613efa080596f38a5e66caaf4accb97d06e.tar.gz"
+  sha256: "b71bf41e6606c5c62b868ddf34569646fc153b333494b3268dd154662cb9f1f8"
+
+patches:
+  - patch_file: "patches/0001-mallopt-m-check-action-guard.patch"
+    patch_description: "Guard mallopt(M_CHECK_ACTION) with defined(M_CHECK_ACTION). OHOS/musl's malloc.h exports mallopt() but does not define M_CHECK_ACTION, so configure's AC_CHECK_FUNCS(mallopt) sets HAVE_MALLOPT and the 8 daemon sources then fail on 'use of undeclared identifier M_CHECK_ACTION' (hard error under -Werror)."
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-external_libs-Makefile.am-libcdada-no-autogen.patch"
+    patch_description: "OHOS portability for the vendored libcdada sub-build driven by src/external_libs/Makefile.am: (1) drop the upstream `./autogen.sh &&` step (it runs `autoreconf -f -i` which invokes the conan automake aclocal/automake `.real` scripts whose shebang is the HNP perl; that perl cannot load the conan perl's XS modules -> 'Perl_my_cxt_init: symbol not found' / 'Permission denied'). Instead the recipe cds straight into $(abs_builddir)/libcdada/build and runs $(abs_srcdir)/libcdada/configure directly; the configure script is pre-generated once by build() via the conan-perl shims (ACLOCAL/AUTOMAKE/PERL env). (2) pass --build=$(build_alias) --host=$(host_alias) so libcdada's configure never falls back to config.guess (which cannot identify HarmonyOS: uname -s = HarmonyOS -> 'cannot guess build type'); build == host keeps it a native (non-cross) configure. (3) clear CPPFLAGS for BOTH the nested configure and the nested make (prefix `CPPFLAGS= `): conanbuild's AutotoolsToolchain exports CPPFLAGS=-DNDEBUG (conanautotoolstoolchain.sh line 17), which collides with libcdada's own NDEBUG AC_DEFINE (config_m4/debug.m4) under libcdada's -Werror -> '-Wmacro-redefined' hard failure in every translation unit. Clearing the outer -DNDEBUG leaves only libcdada's own definition."
+    patch_type: "portability"
