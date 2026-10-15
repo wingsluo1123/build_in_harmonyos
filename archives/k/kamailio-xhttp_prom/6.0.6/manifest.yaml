@@ -1,0 +1,69 @@
+# 版本级 manifest — kamailio-xhttp_prom 6.0.6
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "6.0.6"
+software: "kamailio-xhttp_prom"
+status: published
+build_date: "2026-09-27"
+build_system: makefile                # kamailio 经典 Makefile 体系（非 autotools/cmake）
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://www.kamailio.org/pub/kamailio/6.0.6/src/kamailio-6.0.6_src.tar.gz"
+  sha256: "32e4290c6813c9d0289abe9ec2de9138e12e0381179218a7fed374ad813ecc48"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options:
+    - "make cfg include_modules=xhttp_prom extra_defs='<platform defs>'"
+    - "make modules modules=modules/xhttp_prom -j1 extra_defs='<platform defs>'"
+  dependencies: []                    # 上游模块 0 外部依赖（Makefile LIBS 为空）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试（L1 test_package）
+# ============================================================
+
+test_passed: 33                      # consumer 17 项 + check_artifact 16 项（全绿）
+test_failed: 0
+test_skipped: 0
+upstream_test_in_build: false        # 上游 xhttp_prom 模块无任何测试（清点证据见 reports/test-report.md）
+upstream_tests: []
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 上游 6.0.6 源码包原生识别 aarch64-unknown-linux-ohos，未应用任何补丁；
+# 平台探测宏经 make 命令行 extra_defs 注入（见 notes.md），未改动任何源文件
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "kamailio 模块体系（6.x）的平台探测：Makefile.defs 只处理 linux/solaris/freebsd/darwin 等分支，OS=harmonyos 不注入任何 HAVE_* 宏，而模块普遍包含 core 头（sr_module.h → resolve.h/sched_yield.h 等），宏缺失时直接 #error。解法：make 命令行 extra_defs 注入 linux 分支等价宏集，不改源码"
+  - "extra_defs 平台宏集（-D_GNU_SOURCE -DHAVE_GETHOSTBYNAME2 -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN）在 HarmonyOS(musl) 上逐符号实证：gethostbyname2/sched_yield/sched_setscheduler/timegm/gettimeofday/getaddrinfo 全部由 /lib/ld-musl-aarch64.so.1 导出（dladdr 确认）；HAVE_UNION_SEMUN 不注入（musl sys/sem.h 无 union semun，core lock_ops.h 自带条件定义）"
+  - "kamailio 模块 .so 的可验证性分析：模块未定义符号仅两类——kamailio 核心符号（运行期由主程序导出）+ OHOS libc 符号（实测 53 个 = 35 核心 + 18 libc，无第三类）。据此可构造独立消费者进程：自带核心符号占位定义(shim) → dlopen 成功即证明符号闭包在本平台自洽"
+  - "模块以 -Wl,-z,now(BIND_NOW) 构建时，dlopen 在加载期即完成全部重定位，故消费者用例可把「能否加载」直接作为 ABI 完整性判据（对齐 E004/E078 的 musl BIND_NOW 结论）"
+  - "kamailio 模块 ABI 的消费方式：dlsym(\"exports\") 取 struct module_exports（本版本 80 字节：name/dlflags/cmds/params/rpc_methods/pv_items/response_f/init_mod_f/init_child_f/destroy_mod_f），并调用 dlsym(\"mod_register\") 完成加载器第二步；导出表可静态读出模块名、配置命令与模块参数，作为运行期功能证据"
+  - "xhttp_prom 模块自带 Prometheus 指标实现（prom.c/prom_metric.c 编入模块），NEEDED 仅 libc.so —— 无 libprom 等外部依赖，制品仓不需要额外依赖包"
+
+# 本配方 0 补丁：探索阶段未改动任何源文件（平台宏全部经 make 命令行注入）
+patch_generation:
+  method: per-file-difflib
+  patches_count: 0
