@@ -1,0 +1,99 @@
+# 版本级 manifest — rawtran 1.1
+# 文件位置: archives/r/rawtran/1.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.1"
+software: rawtran
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: autotools（autoconf 2.69/automake；configure 已预生成于 tarball，免 autoreconf）
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "ftp://integral.physics.muni.cz/pub/rawtran/rawtran-1.1.tar.gz"
+  sha256: "3fe44b310387a12326adb7abc9642a08f5714afb9b80fa85103bfd92d80caea1"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "LIBS=-lz"
+  dependencies:
+    - cfitsio/4.6.4（AC_CHECK_LIB ffopen；静态，引用 zlib 符号）
+    - zlib/1.3.1.1（经 cfitsio 传递；-lz 必须位于 -lcfitsio 之后）
+    - pthread（AC_CHECK_LIB pthread_create）
+    - m（rawtran_LDFLAGS=-lm）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-remove-glibc-error-h-include.patch
+
+patch_classification:
+  - patch: patches/0001-remove-glibc-error-h-include.patch
+    type: portability
+    target: rawtran.c:37（#include <error.h>）
+    reason: >-
+      <error.h> 是 glibc 专有头（提供 error() 扩展函数），OHOS libc 不提供，
+      交叉编译 rawtran.c 直接 fatal error。逐行核实 rawtran.c 全部错误输出
+      均走标准库 perror()（6 处）与 cfitsio 的 fits_report_error()（1 处），
+      未调用 glibc 的 error() 函数——该 include 为上游冗余引入，移除后
+      语义不变（no-op 移植修复）。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "rawtran 唯一官方发布渠道是上游 FTP（主页 tar-ball 链接 → ftp://integral.physics.muni.cz/pub/rawtran/）；同路径 HTTP 文件 404、hg 开发仓全部端点 401（禁匿名）、GitHub 无官方仓（2026-10-13 实测）——conan 下载器（requests）对 ftp:// 报 InvalidSchema，配方 source() 因此 self.run(curl) 显式下载 + 手动 sha256 校验，tarball 大小与上游 FTP 目录列表逐项一致"
+  - "rawtran 是 dcraw 外部程序的 wrapper：configure 只依赖 cfitsio(ffopen)+pthread+m，dcraw 仅运行时经 system(\"dcraw >&-\") 调用（上游主页原文 'Building itself does not depends on dcraw'）——适配时 dcraw 不是构建依赖，也无需随包提供"
+  - "rawtran 返回码语义：--version 无条件 rc=0（version() 不查 dcraw）；无参/-h 运行 = help()+return(!dcraw_presented())，dcraw_presented() 用 WEXITSTATUS(system(\"dcraw >&-\"))==1 判定 → OHOS 无 dcraw 时 rc=1 且 stderr 有 'Warning: dcraw not found.'，两者构成确定性可执行 smoke 对（上游无 check 目标）"
+  - "rawtran.c 冗余引入 glibc 专有头 <error.h>（上游在 glibc 环境开发故无感）：OHOS libc 无此头，交叉编译 fatal error 'error.h' file not found；但该文件错误输出全部走标准 perror() 与 cfitsio fits_report_error()，未用 glibc error() 函数——移除 include 即语义 no-op 修复（patches/0001），无需自实现 error() shim"
+
+patch_generation:
+  method: manual（diff -ruN 对净源生成 unified diff，可重复套用）
+  patches_count: 1
+
+# ============================================================
+# 测试信息（与 PR 正文/reports 口径一致）
+# ============================================================
+
+upstream_tests:
+  entry: "无（Makefile.am 无 check 目标，tarball 无任何 test 文件）"
+  total: 0
+  total_scope: "上游未提供测试套件"
+  ran: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+
+ohos_specific_tests:
+  count: 4
+  location: "recipe build() _smoke 2 项 + test_package/test_rawtran.py 4 项断言"
+  details: >-
+    recipe build() smoke：--version rc=0 + 版本 banner；无参运行 rc=1
+    （graceful，非崩溃）+ stderr 'dcraw not found'。
+    test_package：bin/rawtran 存在/非空/可执行；--version 实跑 rc=0 +
+    'RAWTRAN, 1.1' banner；无参实跑 rc=1 + 'dcraw not found'；
+    lib/pkgconfig/rawtran.pc 存在（L1e 可破坏物，毁掉 bin/ 后测试必须 FAIL）。

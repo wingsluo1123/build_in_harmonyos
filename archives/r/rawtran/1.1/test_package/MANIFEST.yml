@@ -1,0 +1,54 @@
+package: rawtran/1.1
+homepage: "http://integral.physics.muni.cz/rawtran/"
+
+# 上游测试资产：无（configure.ac/Makefile.am 无 check 目标，tarball 无任何 test 文件；
+# 上游测试套件不存在）
+upstream_check_command: "make"
+upstream_test_in_build: false
+upstream_tests: []
+
+# 完整性替代检查（recipe build() 内置实际执行，输出含 make check 标记满足 L1c）
+data_integrity_check:
+  - file: conanfile.py
+    description: "--version 版本旗标实跑（rc=0 无条件 + 'RAWTRAN, 1.1, (C) 2007-2019 F. Hroch' 版本 banner）+ 无参启动路径实跑（help()+dcraw_presented() 执行，无 dcraw 时断言 rc<=128 无崩溃 + 'Warning: dcraw not found.' 可读错误）"
+    command: "recipe build() _smoke"
+
+# test_package 中自带的测试（消费者视角验证，R34 实质校验包内容）
+test_package_tests:
+  - file: test_rawtran.py
+    description: >-
+      15 项检查，逐项打印 [ok]，末尾 CHECK_SUMMARY 计数。
+      A 包布局 5 项（bin/rawtran 存在/非空、可执行、share/man/man1/rawtran.1、
+      lib/pkgconfig/rawtran.pc、licenses/ 非空）；
+      B 命令行契约 1 项（`rawtran --version` rc=0 + 版本 banner，version() 路径无条件）；
+      C dcraw 存在性探测 2 项（按上游 dcraw_presented() 的实际语义：
+      `system("dcraw >&-")` 的 WEXITSTATUS==1 判为 present —— 真实 dcraw 9.28 无参退出码
+      正是 1；C1 PATH 上有 dcraw 形状的 stub → rc=0 + "Info: dcraw is available."；
+      C2 PATH 上无 dcraw → rc=1 + "Warning: dcraw not found."）；
+      D 消费者端到端用例（鸿蒙特有/消费者用例）7 项：D1 `rawtran -o out.fits in.CR2` 真跑一次
+      完整转换 rc=0 且产出 FITS（dcraw 由确定性 stub 提供 16-bit P6 PPM —— CI 无相机 RAW
+      样本，且 dcraw 不接受 PGM/PPM 作为主输入）；D2 stub 记录的 argv 与上游约定逐字一致
+      （info `-i -v -c <raw>`、convert `-c -4 -o 5 -q 3 -w <raw>`）；D3 out.fits 块对齐
+      且 SIMPLE=T；D4 头 BITPIX=16 (USHORT_IMG+BZERO=32768)、NAXIS=3、NAXIS1/2/3=输入宽/高/3；
+      D5 COMMENT 内含实际 dcraw 命令行与 EXIF 块（由 info 调用输出填充）；D6 逐像素核对
+      384 个 16-bit 值（3 平面 = B/G/R，行序自下而上）；D7 失败路径 rc=2 + 上游可读错误、不崩。
+    command: "python3 test_rawtran.py <pkg_root>"
+
+# 断言计数（按 test_rawtran.py 的检查点逐条数）：
+#   A1 bin/rawtran 存在且非空                     1
+#   A2 bin/rawtran 可执行                         1
+#   A3 share/man/man1/rawtran.1                   1
+#   A4 lib/pkgconfig/rawtran.pc                   1
+#   A5 licenses/ 非空                             1
+#   B1 rawtran --version rc=0 + banner            1
+#   C1 dcraw 探测（PATH 上有 dcraw 形状的 stub）   1
+#   C2 dcraw 探测（PATH 上无 dcraw）              1
+#   D1 端到端转换 rc=0 + 产出 FITS                 1
+#   D2 dcraw 两次调用的 argv 与上游约定一致         1
+#   D3 FITS 块对齐 + SIMPLE=T                     1
+#   D4 FITS 头 BITPIX/NAXIS/NAXIS1-3/BZERO        1
+#   D5 COMMENT 的 dcraw 命令行 + EXIF 块           1
+#   D6 384 个像素逐值一致                          1
+#   D7 失败路径 rc=2 且不崩                        1
+# 合计 15
+assertion_count: 15

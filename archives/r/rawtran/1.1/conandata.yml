@@ -1,0 +1,43 @@
+# conandata.yml — rawtran 1.1
+# 事实源：上游 rawtran（Filip Hroch / Masaryk University）唯一官方发布渠道
+# 是上游自己的 FTP：
+#   ftp://integral.physics.muni.cz/pub/rawtran/rawtran-1.1.tar.gz
+# 主页 http://integral.physics.muni.cz/rawtran/ 的 "tar-ball" 下载链接
+# 即指向 ftp://integral.physics.muni.cz/pub/rawtran/（HTML href 实测）。
+#
+# HTTP 渠道交叉核验（2026-10-13 实测，全部不可用）：
+#   - 同路径 HTTP 文件 http://integral.physics.muni.cz/pub/rawtran/
+#     rawtran-1.1.tar.gz → 404（web server 不暴露 /pub/，FTP 是独立服务）
+#   - hg 开发仓 http://integral.physics.muni.cz/hg/rawtran/ 及 raw-file /
+#     archive / shorten 全部端点 → 401（禁匿名访问）
+#   - GitHub 无官方仓（api.github.com 仓库搜索命中的均为无关项目）
+# 因此**不存在**上游官方 HTTP 发布通道；FTP 即官方渠道（非镜像站）。
+#
+# conan 2.29.1 下载器走 requests（ftp:// 实测报
+# requests.exceptions.InvalidSchema: No connection adapters were found
+# for 'ftp://...'），source() 因此用 self.run(curl) 显式下载本 URL，
+# 并手动 sha256 校验（校验逻辑在 conanfile.py source()）。
+#
+# tarball 于 2026-10-13 经 curl ftp:// 实机下载：
+#   大小 8272269 字节，与上游 FTP 目录列表（curl ftp:// 目录 GET 输出）
+#   逐项一致（-rw-r--r-- 1 1000 1000 8272269 Jan 22 2019 rawtran-1.1.tar.gz）；
+#   sha256 取本机实测值（FTP 服务器不发布第三方校验和）。
+#   内容核实：autotools 工程（configure 预生成，免 autoreconf），
+#   源码 dark.c fitspath.c main.c pixmap.c/h rawtran.c/h + rawtran.1 +
+#   doc/（参考图廊，不参与构建）。
+
+sources:
+  "1.1":
+    url: "ftp://integral.physics.muni.cz/pub/rawtran/rawtran-1.1.tar.gz"
+    sha256: "3fe44b310387a12326adb7abc9642a08f5714afb9b80fa85103bfd92d80caea1"
+
+patches:
+  # NOTE: this conan reads the entries from the "patches" key
+  # (apply_conandata_patches in conan/tools/files/patches.py) and forwards
+  # each entry as kwargs to patch(), whose strip parameter is literally
+  # named "strip"; a "patch_strip" key is swallowed by **kwargs and silently
+  # ignored (verified against conan 2.29.1; repo precedent: jellyfish1).
+  - patch_file: "patches/0001-remove-glibc-error-h-include.patch"
+    patch_description: "<error.h> 是 glibc 专有头，OHOS libc 不提供；rawtran.c 未使用其任何符号（错误输出全部走标准库 perror() 与 cfitsio 的 fits_report_error()），移除该 include 为语义 no-op 的移植修复"
+    patch_type: "portability"
+    strip: 1
