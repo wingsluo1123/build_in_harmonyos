@@ -1,0 +1,32 @@
+package: pqclean/0.0-git.0586a82
+homepage: "https://github.com/PQClean/PQClean"
+
+upstream_check_command: "./pqclean-kem-functest && ./pqclean-sign-functest"
+upstream_test_in_build: true
+upstream_test_command: "./pqclean-kem-functest && ./pqclean-sign-functest"
+
+upstream_tests:
+  - file: functest.c
+    source: PQClean-0586a824fc0d49df0b6b6e9179d8d15d06d0974f/test/crypto_kem/functest.c
+    description: "Upstream ml-kem-768 functional test: keypair/enc/dec round-trip with canary checks, invalid sk_a, invalid ciphertext (3 test functions, NTESTS=1)"
+    command: "./pqclean-kem-functest"
+    tests: 3
+    assertions: 3
+  - file: functest.c
+    source: PQClean-0586a824fc0d49df0b6b6e9179d8d15d06d0974f/test/crypto_sign/functest.c
+    description: "Upstream ml-dsa-65 functional test: sign, detached sign, wrong pk rejection, function pointers (4 test functions, NTESTS=1)"
+    command: "./pqclean-sign-functest"
+    tests: 4
+    assertions: 4
+
+test_package_tests:
+  - file: test_pqclean.c
+    description: "One consumer executable: ml-kem-768 keypair/enc/dec return codes + shared-secret match + tampered-ct rejection; ml-dsa-65 keypair/sign/verify return codes + signature bounds + tampered-message rejection"
+    command: "./test_pqclean"
+    assertions: 9
+
+upstream_test_count: 2
+upstream_assertion_count: 7
+consumer_test_count: 1
+consumer_assertion_count: 9
+assertion_count: 16

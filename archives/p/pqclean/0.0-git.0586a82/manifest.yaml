@@ -1,0 +1,39 @@
+version: "0.0-git.0586a82"
+software: "pqclean"
+status: built
+build_date: "2026-10-03"
+build_system: makefile
+
+source:
+  url: "https://github.com/PQClean/PQClean/archive/0586a82.tar.gz"
+  mirror_url: "https://ghfast.top/https://github.com/PQClean/PQClean/archive/0586a82.tar.gz"
+  commit: "0586a824fc0d49df0b6b6e9179d8d15d06d0974f"
+  sha256: "5269325009c2de0fa48750174ae5ed6bc47f9f1e8c16b1184c9d5d4a3e828e8e"
+  tar_format: tar.gz
+
+build:
+  system: direct
+  configure_options:
+    - "C standard: C99"
+    - "static library"
+    - "schemes packaged: ml-kem-768 clean, ml-dsa-65 clean"
+    - "common sources: aes sha2 fips202 nistseedexpander sp800-185 randombytes"
+  dependencies: []
+  cc: clang
+
+patches_applied: []
+
+test_results:
+  type: upstream_and_consumer
+  upstream_tests: 2
+  upstream_assertions: 7
+  consumer_tests: 1
+  consumer_assertions: 9
+  passed: 3
+  failed: 0
+
+knowledge_gained:
+  - "PQClean has no unified build system; each scheme directory ships its own Makefile, scheme sources are compiled directly with -I<common>"
+  - "Scheme APIs are namespace-macro guarded; functest.c requires -DPQCLEAN_NAMESPACE=PQCLEAN_<SCHEME>_CLEAN to compile"
+  - "common/randombytes.c compiles on OHOS via the __linux__ branch (getrandom syscall); /dev/urandom is readable as fallback"
+  - "Upstream functest counts: ml-kem-768 3 test functions (keys/invalid_sk_a/invalid_ciphertext), ml-dsa-65 4 (sign/sign_detached/wrong_pk/func_ptrs), NTESTS=1"

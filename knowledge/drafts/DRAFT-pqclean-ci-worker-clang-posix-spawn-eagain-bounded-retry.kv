@@ -1,0 +1,80 @@
+#====================================================================
+# DRAFT-pqclean-ci-worker-clang-posix-spawn-eagain-bounded-retry —
+#   CI Worker 瞬时进程/资源耗尽使 clang 无法 spawn 子进程
+#   （posix_spawn EAGAIN），配方内有界重试吸收瞬时故障
+# 触发事件: pqclean 0.0-git.0586a82 PR #14587 CI build 105508（#91805，
+#   worker CI-010），conan create build() L127 链接首个 functest 失败
+# 知识新增类：四范围查重均无该模式（E055/E253/E405 是 musl Python 的
+#   posix_spawn 语义差异；libuev DRAFT 是 signalfd EAGAIN 虚假可读——
+#   均非 worker 资源耗尽的编译期 spawn 失败）
+#====================================================================
+
+id:                     DRAFT-pqclean-ci-worker-clang-posix-spawn-eagain-bounded-retry
+draft:                  DRAFT-pqclean-ci-worker-clang-posix-spawn-eagain-bounded-retry
+status:                 pending-editor-review
+title:                  CI Worker 瞬时进程耗尽（clang posix_spawn EAGAIN）的配方内有界重试：仅匹配瞬时特征重试、真错误首试即抛，保住红绿语义
+category:               ci, conan, toolchain, transient-fault
+severity:               2
+phase:                  build
+trigger_tool:           conan|clang
+error_signature:        clang-1[0-9]?: error: unable to execute command: posix_spawn failed: Resource temporarily unavailable|
+                         posix_spawn failed: Resource temporarily unavailable|
+                         unable to execute command: posix_spawn failed
+match_keywords:         posix_spawn, EAGAIN, Resource temporarily unavailable,
+                         clang, spawn, worker exhaustion, transient, retry,
+                         conan create, build(), ConanException Error 1,
+                         linker spawn, fork failure, CI worker, backoff
+root_cause: >
+  CI Worker 节点瞬时进程/资源耗尽（EAGAIN）：clang 驱动进程在派生
+  编译器/链接器子进程（cc1 / ld）时 posix_spawn 返回 EAGAIN。特征是
+  此前所有库源对象编译与静态库归档全部成功，仅在某个子进程 spawn
+  环节单点失败——与源码/配方缺陷无关（同 profile 本机复现全绿可证）。
+  典型现场：conan create 的 build() 中 self.run(编译/归档/链接) 某一条
+  突然报 ConanException: Error 1 while executing，日志内层为
+  "clang-15: error: unable to execute command: posix_spawn failed:
+  Resource temporarily unavailable"。
+solution: |
+  配方内加有界重试 helper，把编译/归档/链接类命令路由过去：
+
+  ```python
+  _TRANSIENT_SPAWN_RE = re.compile(
+      r"posix_spawn failed|Resource temporarily unavailable",
+      re.IGNORECASE,
+  )
+  # 类属性：_SPAWN_ATTEMPTS = 4；_SPAWN_RETRY_BASE_DELAY = 5
+
+  def _run_resilient(self, command):
+      for attempt in range(1, self._SPAWN_ATTEMPTS + 1):
+          buf = io.StringIO()
+          try:
+              self.run(command, env="conanbuild", stdout=buf, stderr=buf)
+              return
+          except ConanException:
+              output = buf.getvalue()
+              if output:
+                  self.output.writeln(output)   # 回放原始诊断
+              if attempt >= self._SPAWN_ATTEMPTS or not self._TRANSIENT_SPAWN.search(output):
+                  raise                        # 真错误首试即抛
+              delay = self._SPAWN_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+              self.output.warning(f"transient process-spawn exhaustion "
+                                  f"(attempt {attempt}/{self._SPAWN_ATTEMPTS}), "
+                                  f"retrying in {delay}s")
+              time.sleep(delay)
+  ```
+
+  关键边界：只匹配 errno 串（posix_spawn failed / Resource
+  temporarily unavailable）——"unable to execute command" 前缀不能
+  单独匹配（clang 对永久性错误也用该前缀）；退避 5s→10s→20s 共 4 次
+  （最坏 35s），对 CI 时限无感。
+fallback: >
+  重试耗尽仍失败（>4 次持续 EAGAIN）说明 worker 病重：纯 /rebuild
+  换 worker 即绿（单机瞬时故障）；若多个不同 worker 同款失败则不是
+  本模式——按确定性代码/冲突问题排查（R43/R44 停损上报），不得继续
+  盲目重试。
+verify_builds:         "#91805(fail,CI-010), #91882(pass,CI-001)"
+reference_impl: >
+  PR #14587（bcab6ccab9）：pqclean 0.0-git.0586a82 配方
+  archives/p/pqclean/0.0-git.0586a82/conanfile.py——_compile/_run_resilient
+  接线，22 库对象+归档+2 functest 链接全走重试通道；本机同 profile
+  conan create 全绿两轮复现 + CI #91882 全绿。
+doc_file:               doc/E560.md
