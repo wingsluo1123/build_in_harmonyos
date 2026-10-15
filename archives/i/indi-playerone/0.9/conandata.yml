@@ -1,0 +1,28 @@
+# conandata.yml — indi-playerone 0.9
+# 源码 = indilib/indi-3rdparty 仓库 indi-playerone/ 子目录的官方快照。
+# 上游未为 indi-playerone 单独打 tag，Debian Astronomy Team 以 orig.tar.gz
+# 形式发布该子目录快照，版本号 0.9+20230105184731（时间戳 = git 提交时刻
+# 2023-01-05 18:47:31），是该版本的权威可下载源；conan 版本号取基版本 0.9
+#（'+' 后为厂商 SDK 快照时间戳，与 indi-gpsnmea/indi-fishcamp 归一化口径一致）。
+# The '+' is written literally rather than percent-encoded as %2B on purpose
+# (CI pre-download rewrites URLs by last segment; percent-encoding breaks the
+# on-disk lookup — same note as indi-gpsnmea / libfli).
+# 2026-10-15 已验证：HTTP 200，63735 字节，顶层目录 indi-playerone-0.9+20230105184731。
+
+sources:
+  url:
+    - "https://deb.debian.org/debian/pool/contrib/i/indi-playerone/indi-playerone_0.9+20230105184731.orig.tar.gz"
+  sha256: "3f592574077cb79b95e2ac52de9fb557cddc3a50d471b3c34c58f1fe78a220c0"
+  # strip_root 由 conanfile.py 的 get(..., strip_root=True) 统一传入，
+  # 此处不再声明（否则 get() 会收到重复关键字参数）。
+
+patches:
+  - patch_file: "patches/0001-FindINDI.cmake.patch"
+    patch_description: "FindINDI.cmake 版本号正则回移上游 master 修复：兼容 INDI 2.x indiversion.h 的 INDI_VERSION \"2.2.2\" 引号形式（否则 FATAL_ERROR failed to detect INDI version）；与 indi-gpsnmea/indi-fishcamp 的 0001 补丁 byte-identical"
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeLists-ohos-port.patch"
+    patch_description: "CMakeLists.txt：① include(CMakeCommon) 之后把 CMAKE_CXX_STANDARD 抬到 17（上游 CMakeCommon 钉死 C++14，而 INDI 2.x 基类头 defaultdevice.h 使用 std::any 等 C++17 特性）；② INDI_DATA_DIR 覆盖为 ${CMAKE_INSTALL_PREFIX}/share/indi（树内 FindINDI 会报出 libindi 包的数据目录，直接 install 会把设备 xml 装进错误的包）"
+    patch_type: "portability"
+  - patch_file: "patches/0003-indi2.2-api-port.patch"
+    patch_description: "驱动对接 INDI 2.2 框架：① 基类成员 TemperatureNP 在 INDI 2.x 已是 INDI::PropertyNumber 类，驱动的 C 结构体用法迁移为 setPermission/getState/setState/setValue/getValue/apply（与 indi-fishcamp 0002 同一移植惯用法）；② BayerT 已在 2.x 移除，改用基类 INDI::PropertyText BayerTP 的 setText/apply；③ addFITSKeywords 更新为 INDI 2.x 新签名 (CCDChip*, std::vector<FITSRecord>&)"
+    patch_type: "portability"

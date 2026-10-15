@@ -1,0 +1,118 @@
+# test_package — indi-playerone 0.9 消费者端到端用例集
+#
+# indi-playerone 是 INDI 驱动（application 包），制品三项：
+#   * bin/indi_playerone_ccd            驱动可执行文件（链接 libindidriver.so.2
+#                                       + libPlayerOneCamera.so.3）
+#   * bin/playerone_camera_test         厂商 SDK 测试工具
+#   * share/indi/indi_playerone.xml     INDI 设备描述文件
+#
+# 驱动需要物理 PlayerOne Astronomy 相机（USB），且厂商 POA SDK **没有仿真
+# 模式**（对照 libfishcamp 的 fcUsb_setSimulation），本构建沙箱的 OHOS 动态
+# 加载器对 conan 缓存内的外部 .so dlopen 一律 Permission denied（libplayerone
+# 3.1.0 归档实测结论），故对包内二进制做**静态**验证（ELF 有效性 / 目标
+# 三元组 / INDI 框架与厂商 SDK 链接 / 内嵌驱动逻辑字符串 / 设备描述文件），
+# 功能核心用**真实下游链接**证明：ipo_probe.c 包含厂商头文件、引用驱动实际
+# 调用的 POA API，并用 OHOS clang 对包内 libPlayerOneCamera.so.3 完成编译+
+# 链接（不运行——无相机且沙箱禁止 dlopen）。
+
+files:
+  - test_playerone.c
+  - ipo_probe.c
+  - conanfile.py
+  - MANIFEST.yml
+
+requirements:
+  - indi-playerone/0.9
+  - libplayerone/3.1.0
+
+upstream_tests_exist: false
+upstream_test_count: 0
+
+use_cases:
+  - id: HC-1
+    title: "包内驱动是合法的 AArch64 64-bit ELF 可执行文件 / packaged driver ELF validity"
+    kind: consumer_e2e
+    description: >
+      解析包内 bin/indi_playerone_ccd 的 ELF 头：\x7fELF 魔数、ELFCLASS64、
+      ELFDATA2LSB、e_machine==EM_AARCH64(183)、e_type 为 ET_EXEC/ET_DYN。
+      证明制品是本机目标架构的真实可执行文件而不是占位文件。
+    checks: 7
+    status: pass
+
+  - id: HC-2
+    title: "驱动链接 INDI 2.x 框架与厂商 POA SDK 且内嵌 PlayerOne 驱动逻辑"
+    kind: consumer_e2e
+    description: >
+      在包内二进制字节流中验证链接与逻辑落地：NEEDED libindidriver.so.2
+      （INDI 2.x 驱动框架）、NEEDED libindiAlignmentDriver.so.2（INDI 2.x
+      CCD 基类库）、NEEDED libPlayerOneCamera.so.3（厂商 POA SDK）、
+      NEEDED libusb-1.0.so.0（SDK 的 USB 传输层）、NEEDED libc++_shared.so
+      （C++17 运行时，证明 0002 补丁 C++17 标准生效）；未定义导入
+      POAGetCameraProperties / POAOpenCamera / POAGetImageData（证明驱动
+      真实调用 SDK 而非 stub）；驱动逻辑字符串 'PlayerOne CCD'（默认设备名）、
+      'CCD_EXPOSURE'（曝光属性组）、'CCD_CONTROLS'（相机控制属性组）。
+    checks: 11
+    status: pass
+
+  - id: HC-3
+    title: "厂商 POA SDK 真实下游链接 / functional core downstream link (R34)"
+    kind: consumer_e2e
+    description: >
+      ipo_probe.c 包含包内 PlayerOneCamera.h（经 libplayerone 依赖），
+      引用驱动实际调用的核心 API（POAGetAPIVersion / POAGetCameraCount /
+      POAOpenCamera / POAGetCameraProperties），用 OHOS clang
+      --target=aarch64-linux-ohos 编译并对包内 libPlayerOneCamera.so.3
+      完成链接，产物为携带 NEEDED libPlayerOneCamera.so.3 的真实 aarch64
+      共享对象。伪造/缺符号的 SDK 会在链接期报 undefined symbol 而使本用例
+      FAIL。不运行：无物理相机且沙箱禁止 dlopen 外部 .so。
+    checks: 3
+    status: pass
+
+  - id: HC-4
+    title: "包内设备描述文件 / packaged device descriptor"
+    kind: consumer_e2e
+    description: >
+      读包内 share/indi/indi_playerone.xml（configure_file 从
+      indi_playerone.xml.cmake 生成），断言 <driversList>、group="CCDs"、
+      <device label="PlayerOne CCD">、<driver name="PlayerOne CCD">
+      indi_playerone_ccd</driver>（描述文件指向驱动二进制名）、
+      <version>0.9</version>（config.h 版本宏展开）。证明 INDI 服务端能
+      据此描述文件发现并启动该驱动。
+    checks: 5
+    status: pass
+
+  - id: HC-5
+    title: "鸿蒙特有：包内驱动以 OHOS aarch64 为目标 / OHOS aarch64 target confirmation"
+    kind: harmony_specific
+    description: >
+      断言全部落在**包内真实制品**上：ELF 解释器串为 OHOS musl 加载器
+      /lib/ld-musl-aarch64.so.1（证明按 OHOS 目标链接，非宿主 x86 产物）、
+      e_machine==183（aarch64 交叉编译）、测试进程自身 64-bit LP64
+      （与制品同一目标架构）。
+    checks: 3
+    status: pass
+
+summary:
+  total_use_cases: 5
+  passed_use_cases: 5
+  total_checks: 26
+  passed_checks: 26
+  pass_rate: 1.0
+  observed: "== 4 cases, 0 failed == / == 26 checks, 0 failures == / RESULT: PASSED (HC-3 由 conanfile 断言完成)"
+
+# 防空壳的结构性保障（R34 / rule12）
+anti_hollow:
+  - "test_package/conanfile.py 的 test() 用 self.run 真实编译并执行 test_playerone 与 ipo_probe 链接"
+  - "缺任一包内制品（bin/indi_playerone_ccd 或 share/indi/indi_playerone.xml 或厂商
+    .so）时直接抛 AssertionError，不是被跳过"
+  - "解析 summary 行：result!=PASSED、checks==0、任一 FAIL 均抛 AssertionError"
+  - "HC-3 的链接断言是真实消费路径：伪造一份缺 POAGetCameraProperties 符号的
+    libPlayerOneCamera.so 会在链接期 undefined symbol 而 FAIL"
+
+notes: >
+  上游（indilib/indi-3rdparty indi-playerone 子目录）不提供任何自动化测试
+  套件（tarball 中无 tests/ 目录、无 CTest 注册、无 Makefile test 目标；
+  playerone_camera_test 是面向终端用户的厂商 SDK 探测工具，需物理相机，
+  不是自动化测试），上游 N=0。本次补全 5 个消费者用例：HC-3 在沙箱内对
+  功能核心（厂商 POA SDK）做真实下游编译+链接，HC-1/HC-2/HC-5 对包内驱动
+  二进制做静态验证，HC-4 验证包内设备描述文件。
