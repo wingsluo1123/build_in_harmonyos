@@ -1,0 +1,29 @@
+--- a/src/net.c
++++ b/src/net.c
+@@ -454,22 +454,24 @@
+      * try IPv6 only if no IPv4 address was found. */
+     if (c->flags & VALKEY_PREFER_IPV6 && c->flags & VALKEY_PREFER_IPV4)
+         hints.ai_family = AF_UNSPEC;
+     else if (c->flags & VALKEY_PREFER_IPV6)
+         hints.ai_family = AF_INET6;
+     else
+         hints.ai_family = AF_INET;
+ 
+     rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+     if (rv != 0 && hints.ai_family != AF_UNSPEC) {
+-        /* Try again with the other IP version. */
+-        hints.ai_family = (hints.ai_family == AF_INET) ? AF_INET6 : AF_INET;
++        /* Fall back to AF_UNSPEC so both A/AAAA are tried in one lookup.
++         * (Single-family fallback may pick up a broken resolver path on
++         * platforms where one address family's lookup fails at system level.) */
++        hints.ai_family = AF_UNSPEC;
+         rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+     }
+     if (rv != 0) {
+         valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
+         return VALKEY_ERR;
+     }
+     for (p = servinfo; p != NULL; p = p->ai_next) {
+     addrretry:
+         if ((s = socket(p->ai_family, p->ai_socktype, valkeyTcpGetProtocol(c->flags & VALKEY_MPTCP))) == VALKEY_INVALID_FD)
+             continue;
