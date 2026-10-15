@@ -1,0 +1,14 @@
+--- a/_gn/build/gen.py
++++ b/_gn/build/gen.py
+@@ -31,7 +31,10 @@
+     if self._platform is not None:
+       return
+     self._platform = sys.platform
+-    if self._platform.startswith('linux'):
++    # OHOS (HarmonyOS) Python reports sys.platform 'ohos'/'harmonyos' although the
++    # kernel and syscall semantics are Linux; treat it as linux so the standalone
++    # bootstrap can pick a build_*.ninja template.
++    if self._platform.startswith(('ohos', 'harmonyos', 'linux')):
+       self._platform = 'linux'
+     elif self._platform.startswith('darwin'):
+       self._platform = 'darwin'

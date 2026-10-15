@@ -1,0 +1,20 @@
+--- a/buildtools/googletest/googletest/src/gtest-port.cc
++++ b/buildtools/googletest/googletest/src/gtest-port.cc
+@@ -1111,6 +1111,17 @@
+     // '/sdcard' and other variants cannot be relied on, as they are not
+     // guaranteed to be mounted, or may have a delay in mounting.
+     char name_template[] = "/data/local/tmp/gtest_captured_stream.XXXXXX";
++#  elif !defined(__GLIBC__)
++    // Some systems mount /tmp read-only (e.g. OHOS); put the captured-stream
++    // file in TMPDIR (set by the test runner) and fall back to ".".
++    char name_template[256];
++    {
++      const char* gtest_tmpdir = getenv("TMPDIR");
++      if (gtest_tmpdir == nullptr || gtest_tmpdir[0] == '\0')
++        gtest_tmpdir = ".";
++      snprintf(name_template, sizeof(name_template),
++               "%s/gtest_captured_stream.XXXXXX", gtest_tmpdir);
++    }
+ #  else
+     char name_template[] = "/tmp/captured_stream.XXXXXX";
+ #  endif  // GTEST_OS_LINUX_ANDROID

@@ -1,0 +1,31 @@
+--- a/src/ipc/test/test_socket.h
++++ b/src/ipc/test/test_socket.h
+@@ -23,6 +23,7 @@
+ #include <cinttypes>
+ 
+ #include "perfetto/base/build_config.h"
++#include "perfetto/ext/base/temp_file.h"
+ #include "perfetto/ext/base/unix_socket.h"
+ 
+ namespace perfetto {
+@@ -33,7 +34,7 @@
+       : test_name_(test_name) {}
+ 
+   const char* test_name_;
+-  char buf_[64]{};
++  char buf_[256]{};
+ 
+   // Inline to avoid multiple definition linker warnings (and avoid a .cc file).
+   inline base::SockFamily family();
+@@ -79,7 +80,10 @@
+ #else
+ 
+ const char* TestSocket::name() {
+-  snprintf(buf_, sizeof(buf_), "/tmp/%s.sock", test_name_);
++  // OHOS mounts /tmp read-only, so honour TMPDIR via perfetto's own helper
++  // (GetSysTempDir() returns TMPDIR when set, /tmp otherwise).
++  snprintf(buf_, sizeof(buf_), "%s/%s.sock", base::GetSysTempDir().c_str(),
++           test_name_);
+   return buf_;
+ }
+ base::SockFamily TestSocket::family() {

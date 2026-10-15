@@ -1,0 +1,22 @@
+--- a/src/trace_processor/util/gzip_decompressor_unittest.cc
++++ b/src/trace_processor/util/gzip_decompressor_unittest.cc
+@@ -28,6 +28,7 @@
+ #include <sstream>
+ #include <string>
+ #include "perfetto/base/logging.h"
++#include "perfetto/ext/base/temp_file.h"
+ 
+ using std::string;
+ 
+@@ -147,8 +148,9 @@
+     }
+     return output;
+   }();
+-  constexpr auto gz_file = "/tmp/abc.gz";
+-  constexpr auto txt_file = "/tmp/abc.txt";
++  // OHOS mounts /tmp read-only; use perfetto's temp-dir helper (honours TMPDIR).
++  const std::string gz_file = perfetto::base::GetSysTempDir() + "/abc.gz";
++  const std::string txt_file = perfetto::base::GetSysTempDir() + "/abc.txt";
+   EXPECT_EQ(size_t(1000 * 14), big_string.size());
+   WriteFile(gz_file, TrivialGzipCompress(big_string));
+   DecompressGzipFileInFileOut(gz_file, txt_file);

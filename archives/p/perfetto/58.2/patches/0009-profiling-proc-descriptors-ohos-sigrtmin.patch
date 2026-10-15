@@ -1,0 +1,17 @@
+--- a/src/profiling/perf/proc_descriptors.cc
++++ b/src/profiling/perf/proc_descriptors.cc
+@@ -92,7 +92,14 @@
+ #else
+ void AndroidRemoteDescriptorGetter::GetDescriptorsForPid(pid_t pid) {
+   constexpr static int kPerfProfilerSignalValue = 1;
++#if !defined(__SIGRTMIN)
++  // Some libcs (e.g. the musl libc on OHOS) expose realtime signals only through
++  // SIGRTMIN()/SIGRTMAX(), not glibc's compile-time __SIGRTMIN; use the kernel's
++  // raw realtime-signal base (32), as on glibc/bionic.
++  constexpr static int kProfilerSignal = 32 + 4;
++#else
+   constexpr static int kProfilerSignal = __SIGRTMIN + 4;
++#endif
+ 
+   PERFETTO_DLOG("Sending signal to pid [%d]", pid);
+   union sigval signal_value;

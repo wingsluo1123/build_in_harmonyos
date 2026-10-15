@@ -1,0 +1,64 @@
+--- a/src/trace_processor/util/symbolizer/filesystem_posix.cc
++++ b/src/trace_processor/util/symbolizer/filesystem_posix.cc
+@@ -21,7 +21,13 @@
+ 
+ #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+ #if PERFETTO_BUILDFLAG(PERFETTO_LOCAL_SYMBOLIZER)
++// Some libcs (e.g. the musl libc used on OHOS) do not ship <fts.h> — a
++// glibc/BSD extension — so fall back to the nftw()-based directory walk below.
++#if !__has_include(<fts.h>)
++#include <ftw.h>
++#else
+ #include <fts.h>
++#endif
+ #include <sys/stat.h>
+ #endif
+ 
+@@ -32,6 +38,39 @@
+ namespace perfetto {
+ namespace profiling {
+ #if PERFETTO_BUILDFLAG(PERFETTO_LOCAL_SYMBOLIZER)
++#if !__has_include(<fts.h>)
++namespace {
++
++FileCallback* g_walk_callback = nullptr;
++
++int WalkTrampoline(const char* path,
++                   const struct stat* st,
++                   int type,
++                   struct FTW*) {
++  // nftw() with flags == 0 follows symlinks and reports FTW_F for regular
++  // files, which matches the FTS_LOGICAL view of the tree used below.
++  if (type == FTW_F && g_walk_callback)
++    (*g_walk_callback)(path, static_cast<size_t>(st->st_size));
++  return 0;
++}
++
++}  // namespace
++
++bool WalkDirectories(std::vector<std::string> dirs, FileCallback fn) {
++  for (const std::string& dir : dirs) {
++    // nftw() takes no user-data argument, hence the file-static pointer.
++    g_walk_callback = &fn;
++    int res = nftw(dir.c_str(), WalkTrampoline, 16, 0);
++    g_walk_callback = nullptr;
++    if (res != 0) {
++      PERFETTO_PLOG("nftw");
++      return false;
++    }
++  }
++  return true;
++}
++
++#else
+ bool WalkDirectories(std::vector<std::string> dirs, FileCallback fn) {
+   std::vector<char*> dir_cstrs;
+   dir_cstrs.reserve(dirs.size());
+@@ -57,6 +96,7 @@
+   }
+   return true;
+ }
++#endif  // !__has_include(<fts.h>)
+ 
+ #else
+ bool WalkDirectories(std::vector<std::string>, FileCallback) {

@@ -1,0 +1,65 @@
+version: "58.2"
+status: built
+build_date: "2026-10-02"
+conan_ref: "perfetto/58.2"
+
+source:
+  url: "https://codeload.github.com/google/perfetto/tar.gz/refs/tags/v58.2"
+  sha256: "ad566546d5c461135a41962e95b680f374e438cf2d9936867608b84132ec610a"
+  tar_format: tar.gz
+
+build:
+  system: gn
+  configure_options:
+    - "is_debug=false"
+    - "is_system_compiler=true"
+    - "is_hermetic_clang=false"
+    - "target_triplet=\"\""
+    - "sysroot=\"\""
+    - "use_custom_libcxx=false"
+    - "skip_buildtools_check=true"
+    - "perfetto_use_system_zlib=true"
+    - "strip=\"\""
+  # 上游 standalone 构建所需的第三方源码，由配方 source() 从 GitHub 镜像供给（20 个包，逐条 sha256 pin）
+  vendored_sources:
+    - googletest@609281088cfefc76f9d0ce82e1ff6c30cc3591e5
+    - abseil-cpp@76bb24329e8bf5f39704eb10d21b9a80befa7c81
+    - protobuf@74211c0dfc2777318ab53c2cd2c317a2ef9012de
+    - benchmark@e991355c02b93fe17713efe04cbc2e278e00fdbd
+    - re2@927f5d53caf8111721e734cf24724686bb745f55
+    - zstd@f8745da6ff1ad1e7bab384bd1f9d742439278e99
+    - expat@fa75b96546c069d17b8f80d91e0f4ef0cde3790d
+    - linenoise@c894b9e59f02203dbe4e2be657572cf88c4230c3
+    - sqlite-amalgamation-3500300
+    - sqlite@a4643b451a2941f5e6965ab095d3057bc7cb2222
+    - llvm-project@617a15a9eac96088ae5e9134248d8236e34b91b1
+    - libbacktrace@14818b7783eeb9a56c3f0fca78cefd3143f8c5f6
+    - lzma@7851dce6f4ca17f5caa1c93a4e0a45686b1d56c3
+    - open_csd@0ce01e934f95efb6a216a6efa35af1245151c779
+    - android-core@9e6cef7f07d8c11b3ea820938aeb7ff2e9dbaa52
+    - android-unwinding@4b59ea8471e89d01300481a92de3230b79b6d7c7
+    - android-logging@da4d6df49d1d6c971be508dcde18e8b00bb74581
+    - android-libbase@18c2bd4f3607cb300bb96e543df91dfdda6a9655
+    - android-libprocinfo@fd214c13ededecae97a3b15b5fccc8925a749a84
+    - bionic@a0d0355105cb9d4a4b5384897448676133d7b8e2
+  build_tools:
+    - "gn@0725d7827575b239594fbc8fd5192873a1d62f44（源码自举，OHOS clang）"
+    - "ninja/1.13.2（conan tool_requires）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-buildtools-use-system-zlib.patch"
+  - "0002-zstd-ohos-qsort-r-fallback.patch"
+  - "0003-libbase-ohos-getprogname.patch"
+  - "0004-liblog-ohos-getprogname.patch"
+  - "0005-symbolizer-filesystem-ohos-nftw.patch"
+  - "0006-vm-sockets-ohos-sockaddr-storage.patch"
+
+knowledge_gained:
+  - "GN（generate-ninja）私有工具链可在 OHOS 自举：上游预编译 gn 为 x86/glibc 且无 .codesign，需用 OHOS clang 从源码构建"
+  - "OHOS 用户存储执行 ELF 需 .codesign 段；本机 OHOS clang 链接期自动添加"
+  - "OHOS 上 strip 会破坏 .codesign，构建须 strip=\"\""
+  - "OHOS musl 无 qsort_r / fts.h / program_invocation_short_name（glibc 专有），需移植补丁"
+  - "OHOS sysroot 的 <linux/socket.h> 无条件重定义 sockaddr_storage，与 musl <sys/socket.h> 冲突"
+  - "OHOS 头把 NULL 定义为 0L；perfetto 的 -Weverything 针对 hermetic clang 19 校准，系统 clang 15 需 is_hermetic_clang=false"

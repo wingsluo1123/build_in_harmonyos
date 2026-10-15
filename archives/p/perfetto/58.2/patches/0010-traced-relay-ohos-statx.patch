@@ -1,0 +1,15 @@
+--- a/src/traced_relay/relay_service.cc
++++ b/src/traced_relay/relay_service.cc
+@@ -62,6 +62,12 @@
+ #include <sys/syscall.h>
+ #endif
+ 
++#if !defined(__GLIBC__)
++// Non-glibc libcs (e.g. the musl libc used on OHOS) do not expose struct
++// statx/STATX_BTIME; take them from the kernel UAPI header.
++#include <linux/stat.h>
++#endif
++
+ #if PERFETTO_BUILDFLAG(PERFETTO_OS_QNX)
+ #include <sys/neutrino.h>
+ #include <sys/syspage.h>

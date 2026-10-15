@@ -1,0 +1,18 @@
+--- a/src/profiling/memory/java_hprof_producer.cc
++++ b/src/profiling/memory/java_hprof_producer.cc
+@@ -29,7 +29,15 @@
+ namespace profiling {
+ namespace {
+ 
++#if !defined(__SIGRTMIN)
++// Some libcs (e.g. the musl libc used on OHOS) expose the realtime signals only
++// through the SIGRTMIN()/SIGRTMAX() functions, not glibc's compile-time
++// __SIGRTMIN. Use the kernel's raw realtime-signal base (32), i.e. the value
++// __SIGRTMIN has on glibc/bionic.
++constexpr int kJavaHeapprofdSignal = 32 + 6;
++#else
+ constexpr int kJavaHeapprofdSignal = __SIGRTMIN + 6;
++#endif
+ constexpr uint32_t kInitialConnectionBackoffMs = 100;
+ constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
+ constexpr const char* kJavaHprofDataSource = "android.java_hprof";

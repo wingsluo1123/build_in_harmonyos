@@ -1,0 +1,14 @@
+--- a/src/tracing/test/api_test_support.cc
++++ b/src/tracing/test/api_test_support.cc
+@@ -171,7 +171,10 @@
+   res.fd = mkstemp(temp_file);
+   res.path = temp_file;
+ #else
+-  char temp_file[] = "/tmp/perfetto-XXXXXXXX";
++  // OHOS mounts /tmp read-only; use perfetto's temp-dir helper (honours TMPDIR).
++  char temp_file[256];
++  snprintf(temp_file, sizeof(temp_file), "%s/perfetto-XXXXXXXX",
++           perfetto::base::GetSysTempDir().c_str());
+   res.fd = mkstemp(temp_file);
+   res.path = temp_file;
+ #endif

@@ -1,0 +1,35 @@
+--- a/buildtools/android-logging/liblog/logger_write.cpp
++++ b/buildtools/android-logging/liblog/logger_write.cpp
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/time.h>
++#include <unistd.h>
+ 
+ #ifdef __BIONIC__
+ #include <android/set_abort_message.h>
+@@ -111,7 +112,23 @@
+ // BSD-based systems like Android/macOS have getprogname(). Others need us to provide one.
+ #if !defined(__APPLE__) && !defined(__BIONIC__)
+ static const char* getprogname() {
+-#ifdef _WIN32
++#if !defined(__GLIBC__) && !defined(_WIN32)
++  // Non-glibc libcs (e.g. the musl libc used on OHOS) provide neither
++  // getprogname() nor glibc's program_invocation_short_name; use /proc/self/exe.
++  static bool first = true;
++  static char progname[4096] = {};
++
++  if (first) {
++    char path[4097] = {};
++    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
++    const char* path_basename = (len > 0) ? strrchr(path, '/') : nullptr;
++    snprintf(progname, sizeof(progname), "%s",
++             path_basename ? path_basename + 1 : "?");
++    first = false;
++  }
++
++  return progname;
++#elif defined(_WIN32)
+   static bool first = true;
+   static char progname[MAX_PATH] = {};
+ 
