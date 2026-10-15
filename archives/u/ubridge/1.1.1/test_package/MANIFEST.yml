@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# ubridge 1.1.1 上游测试是 Python 黑盒套件（tests/brctl 7 套 + tests/link 1 套），
+# 通过 TCP 控制端口驱动 ubridge；无 ctest / meson / pytest 注册，无 make check 目标。
+
+package: ubridge/1.1.1
+homepage: "https://github.com/GNS3/ubridge"
+
+# 上游测试命令（Makefile 只有 ubridge / all / clean / install 四个目标，
+# 没有 check/test 目标；套件由 tests/*/run_all.py 逐个执行 test_*.py）
+upstream_check_command: "python3 tests/brctl/run_all.py"
+
+# conanfile.py build() 中已集成上游可运行的那一套（见 build() 的 _run_upstream_tests）
+upstream_test_in_build: true
+upstream_test_command: "cd tests/brctl && python3 test_no_privs.py"
+
+upstream_tests:
+  - file: tests/brctl/test_basic.py
+    source: ubridge-1.1.1/tests/brctl/test_basic.py
+    description: "基础 bridge 增删改查（需 root + cap_net_admin + ip）"
+    command: "python3 tests/brctl/test_basic.py"
+  - file: tests/brctl/test_boundary.py
+    source: ubridge-1.1.1/tests/brctl/test_boundary.py
+    description: "边界与非法参数（需特权才能走到变更分支）"
+    command: "python3 tests/brctl/test_boundary.py"
+  - file: tests/brctl/test_concurrency.py
+    source: ubridge-1.1.1/tests/brctl/test_concurrency.py
+    description: "并发客户端 / 并发变更（需 root + cap_net_admin）"
+    command: "python3 tests/brctl/test_concurrency.py"
+  - file: tests/brctl/test_no_privs.py
+    source: ubridge-1.1.1/tests/brctl/test_no_privs.py
+    description: "无特权拒绝路径：变更必须被优雅拒绝且进程存活（无需特权，已在 build() 实跑）"
+    command: "python3 tests/brctl/test_no_privs.py"
+  - file: tests/brctl/test_robustness.py
+    source: ubridge-1.1.1/tests/brctl/test_robustness.py
+    description: "畸形输入健壮性（多数用例需特权才能产生可观察变更）"
+    command: "python3 tests/brctl/test_robustness.py"
+  - file: tests/brctl/test_state.py
+    source: ubridge-1.1.1/tests/brctl/test_state.py
+    description: "状态机 / 幂等性（需 root + cap_net_admin）"
+    command: "python3 tests/brctl/test_state.py"
+  - file: tests/brctl/test_stress.py
+    source: ubridge-1.1.1/tests/brctl/test_stress.py
+    description: "压力用例（需 root + cap_net_admin）"
+    command: "python3 tests/brctl/test_stress.py"
+  - file: tests/link/test_basic.py
+    source: ubridge-1.1.1/tests/link/test_basic.py
+    description: "link 模块基础用例（需 root + cap_net_admin + veth 支持）"
+    command: "python3 tests/link/test_basic.py"
+
+# test_package 中自带的测试（消费者视角验证：真实启动已安装二进制并驱动控制协议）
+test_package_tests:
+  - file: test_consumer.py
+    description: "消费者测试 — 校验 aarch64 ELF、CLI 契约、控制协议应答码与模块注册"
+    command: "python3 test_consumer.py"
+
+# test_package 断言总数（A..I 共 20 条，逐条带实际输出证据）
+assertion_count: 20

@@ -1,0 +1,54 @@
+--- a/src/netlink/nl.c
++++ b/src/netlink/nl.c
+@@ -21,22 +21,28 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+  */
+ 
+ #include <sys/socket.h>
+ #include <string.h>
+ #include <stdio.h>
+ #include <time.h>
+ #include <unistd.h>
+ #include <errno.h>
+ #include <stdlib.h>
++/* E091 (define-guard): 本 libc 的 <sys/socket.h> 与内核 UAPI <linux/socket.h>
++ * （经下面这些 linux/* 头间接引入）都定义 struct sockaddr_storage；本文件只用
++ * libc 的定义，故包含内核头期间把该 tag 改名、包含后恢复（详见
++ * src/nio_linux_raw.c 的说明，此处无平台条件编译）。 */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
++#undef sockaddr_storage
+ #include <sys/types.h>
+ #include "nl.h"
+ 
+ #define NLMSG_TAIL(nmsg) \
+         ((struct rtattr *) (((void *) (nmsg)) + NLMSG_ALIGN((nmsg)->nlmsg_len)))
+ 
+ extern size_t nlmsg_len(const struct nlmsg *nlmsg)
+ {
+ 	return nlmsg->nlmsghdr.nlmsg_len - NLMSG_HDRLEN;
+ }
+@@ -78,21 +84,21 @@
+ extern int nla_put_u8(struct nlmsg *nlmsg, int attr, unsigned char value)
+ {
+ 	return nla_put(nlmsg, attr, &value, 1);
+ }
+ 
+ extern int nla_put_u32(struct nlmsg *nlmsg, int attr, int value)
+ {
+ 	return nla_put(nlmsg, attr, &value, sizeof(value));
+ }
+ 
+-extern int nla_put_u16(struct nlmsg *nlmsg, int attr, ushort value)
++extern int nla_put_u16(struct nlmsg *nlmsg, int attr, unsigned short value)
+ {
+ 	return nla_put(nlmsg, attr, &value, 2);
+ }
+ 
+ extern int nla_put_attr(struct nlmsg *nlmsg, int attr)
+ {
+ 	return nla_put(nlmsg, attr, NULL, 0);
+ }
+ 
+ struct rtattr *nla_begin_nested(struct nlmsg *nlmsg, int attr)

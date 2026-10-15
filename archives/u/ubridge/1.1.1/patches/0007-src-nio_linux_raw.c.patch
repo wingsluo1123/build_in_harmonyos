@@ -1,0 +1,33 @@
+--- a/src/nio_linux_raw.c
++++ b/src/nio_linux_raw.c
+@@ -18,22 +18,30 @@
+  *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <sys/socket.h>
+ #include <netdb.h>
+ #include <sys/ioctl.h>
+ #include <netinet/if_ether.h>
++/* E091 (define-guard): OHOS sysroot 的 UAPI <linux/socket.h>（由 <linux/if.h>
++ * 间接引入）无守卫地定义了 struct sockaddr_storage，而本 libc 的 <sys/socket.h>
++ * 已经定义过同名结构，直接包含即报 redefinition。本文件只用 libc 的定义，
++ * 故仅在包含内核头期间把该 tag 改名、包含后恢复：这是头文件命名冲突的绕行，
++ * 不含平台条件编译；在 UAPI 以 __kernel_sockaddr_storage 命名的平台上该宏不
++ * 命中任何 token，行为与上游一致。 */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/if.h>
+ #include <linux/if_packet.h>
++#undef sockaddr_storage
+ 
+ #include "ubridge.h"
+ #include "nio_linux_raw.h"
+ 
+ /* Get interface index of specified device */
+ static int nio_linux_raw_dev_id(char *device)
+ {
+    struct ifreq if_req;
+    int fd;
+ 

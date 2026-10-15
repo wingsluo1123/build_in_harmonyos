@@ -1,0 +1,23 @@
+--- a/src/ubridge.h
++++ b/src/ubridge.h
+@@ -72,11 +72,20 @@
+ } bridge_t;
+ 
+ extern bridge_t *bridge_list;
+ extern pthread_mutex_t global_lock;
+ extern int debug_level;
+ 
+ void ubridge_reset();
+ void *source_nio_listener(void *data);
+ void *destination_nio_listener(void *data);
+ 
++/* OHOS: musl 不实现 POSIX 线程取消 API（知识库 E085/E513），由
++ * src/ohos_pthread_compat.c 提供等价实现与补充声明；其它平台为空操作。 */
++void ubridge_ohos_pthread_cancel_init(void);
++
++#ifdef __OHOS__
++int pthread_cancel(pthread_t thread);
++void pthread_testcancel(void);
++#endif
++
+ #endif /* !UBRIDGE_H_ */

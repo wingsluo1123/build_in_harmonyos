@@ -1,0 +1,110 @@
+# ubridge 1.1.1 — 版本级 manifest（ARCHIVE-SPEC v2.0）
+
+version: "1.1.1"
+software: "ubridge"
+status: published
+build_date: "2026-10-13"
+build_system: makefile
+
+source:
+  url: "https://github.com/GNS3/ubridge/archive/refs/tags/v1.1.1.tar.gz"
+  sha256: "9bf68e46fd68f262ccd3f4d5244d50f44fe3a4f09c57cddc4670fa167a0380d8"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libpcap/1.10.6
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-src-hypervisor_brctl.c.patch"
+  - "0003-src-hypervisor_docker.c.patch"
+  - "0004-src-hypervisor_link.c.patch"
+  - "0005-src-netlink-nl.c.patch"
+  - "0006-src-netlink-nl.h.patch"
+  - "0007-src-nio_linux_raw.c.patch"
+  - "0008-src-nio_tap.c.patch"
+  - "0009-src-ohos_pthread_compat.c.patch"
+  - "0010-src-ubridge.c.patch"
+  - "0011-src-ubridge.h.patch"
+
+tests:
+  # 上游 v1.1.1 无 make check / ctest / meson test 目标，测试是 tests/ 下的
+  # Python 黑盒套件（每套一个 main()，用 r.check(描述, 条件) 断言，通过 TCP
+  # 控制端口驱动 ubridge）。
+  upstream_suite: "tests/brctl 7 套 + tests/link 1 套 = 8 套（119 个 r.check 检查点）"
+  upstream_test_command: "cd tests/brctl && python3 test_no_privs.py"
+  upstream_test_in_build: true
+  upstream_tests_executed: 4      # test_no_privs.py 的 4 个检查点，已集成进 build()
+  upstream_tests_passed: 4
+  upstream_suites_executed: 1     # 8 套中唯一无需特权的
+  upstream_suites_total: 8
+  upstream_suites_blocked: 7      # 缺 ip 工具 + 无 root/cap_net_admin（逐套原因见 notes.md）
+  upstream_tests_modified: false
+  test_package_assertions: 20
+  test_package_passed: 20
+
+knowledge_gained:
+  - "E091: OHOS 的 UAPI linux/socket.h 与 musl sys/socket.h 重复定义 struct sockaddr_storage；在包含内核头的语句块内把该 struct tag 临时改名、包含后 undef 即可（无条件改写，非平台宏）"
+  - "E085/E513: OHOS musl 不声明也不导出 pthread_cancel/pthread_testcancel；ubridge 用法是 cancel+join，空实现会让 join 挂死，需用保留信号(SIGUSR1)+处理器内 pthread_exit 保留取消语义"
+  - "OHOS 的 uname 返回 HarmonyOS（uname -o 仍是 GNU/Linux），上游 ifeq ($(shell uname), Linux) 会整段跳过 Linux 源文件，须用 $(filter Linux HarmonyOS,...) 判定"
+  - "glibc 专有类型 ushort 在 musl 未定义（u_short 才有），须改 unsigned short"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/ubridge-1.1.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/ubridge-1.1.1.work
+  source_orig_hash: 06b72f6966643013
+  source_work_hash: 4edc51d8cec5921f
+  generated_at: '2026-10-14T00:02:26'
+  patches_count: 11
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-hypervisor_brctl.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-hypervisor_docker.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-hypervisor_link.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-netlink-nl.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-netlink-nl.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-nio_linux_raw.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-nio_tap.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-src-ohos_pthread_compat.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-src-ubridge.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-src-ubridge.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
