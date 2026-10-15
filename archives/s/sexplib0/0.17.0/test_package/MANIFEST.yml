@@ -1,0 +1,27 @@
+manifest_version: "1.0"
+package: sexplib0
+version: "0.17.0"
+test_type: smoke
+assertion_count: 20
+upstream_tests:
+  source: "upstream test/ (dune): test/sexplib0_test.ml - 478 lines, 7 expect-test cases with 40 [%expect] assertions (record_of_sexp / sexp_conv_record / sexp_conv_labeled_tuple coverage)"
+  mechanism: "ALL 7 upstream cases run for real inside build() via `dune runtest` (output 'ALL UPSTREAM TESTS PASSED (7 cases, 40 checks)' gates the build). The upstream test file is ported by patches/0001+0002: inputs and expected outputs are kept verbatim; only the public-ecosystem-unbuildable framework glue was replaced (Parsexp input parsing, Base.Or_error/Result rendering, Expect_test_helpers_base print helper, ppx_expect/deriving preprocessors, Sexplib.Conv_error -> Sexp_conv_error). Root cause: base v0.17 requires OCaml >= 5.1; expect_test_helpers_core (provider of Expect_test_helpers_base) depends on core/ppx_jane, not published for OHOS; registry toolchain is OCaml 4.14.1."
+  discovered: 7
+  passed: 7
+  modified_reason: "test-framework PORT (not a test-content change): all 7 upstream cases and all 40 expected outputs are byte-for-byte identical to upstream; the harness (runner, input parser, result printer, expect comparison) was rewritten because the upstream stack cannot be built in the public ecosystem/OHOS registry (see mechanism). No test case was added, removed, or altered."
+
+# 鸿蒙特有测试（rule12：至少一个完整消费者用例）
+harmony_specific_test_count: 1
+harmony_specific_tests:
+  - file: test_package/test_ohos_e2e.ml
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      End-to-end consumer case on the real OHOS filesystem: writes an
+      S-expression config file with the packaged sexplib0, reads it back
+      byte-for-byte, re-serializes it deterministically and asserts
+      substring field-presence checks on the readback (sexplib0 has no
+      parser; nothing is parsed, by design).
+    command: "bash test.sh <lib_dir> <ocaml_lib> <ocaml_bin>  # third section"
+    executed: true
+    result: "ALL OHOS E2E PASSED (5 assertions)"
