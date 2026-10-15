@@ -1,0 +1,59 @@
+#====================================================================
+# DRAFT-makefile-no-configure-cppinfo-flags
+# 无 configure 的纯 Makefile 型 C 项目: conan 配方直接 self.run(make),
+# CFLAGS/LDFLAGS 由依赖 cpp_info 的 includedirs/libdirs 组合注入;
+# 顺带 OHOS clang aarch64 无 libatomic(不要加 -latomic)
+#====================================================================
+
+id:                     DRAFT-makefile-no-configure-cppinfo-flags
+trigger_tool:           make|clang|conan
+phase:                  build
+error_signature:        ld\.lld: error: unable to find library -latomic|
+                         fatal error: 'curl/curl\.h' file not found|
+                         No rule to make target
+
+severity:               2
+category:               build-system, makefile, conan, toolchain, ohos
+match_keywords:         Makefile, no configure, self.run(make), cpp_info,
+                         includedirs, libdirs, -latomic, libatomic,
+                         compiler-rt builtins, aarch64, CFLAGS, LDFLAGS
+
+title:                  上游只有手写 Makefile(无 configure)的 C 项目: 配方用 self.run 直接调 make, 依赖路径从 cpp_info 组合, 且 OHOS clang15 aarch64 不存在 libatomic
+
+root_cause:             (1) 这类项目(如 snac 2.93)的 Makefile 只认 PREFIX 风格
+                         的 -I/-L 根路径, 没有 configure 可供 --with-xxx 注入,
+                         Conan 的 Autotools helper 也无从施展。必须自行从
+                         self.dependencies 的 cpp_info.includedirs/libdirs
+                         拼出 CFLAGS/LDFLAGS, 再以 self.run(make ...) 执行。
+                         (2) 代码里含 64 位原子操作时, 习惯性加 -latomic 会在
+                         OHOS 上链接失败: SDK 无 libatomic, 且 clang15 对
+                         aarch64 的原子操作由 compiler-rt 内建直译为 LLD/ARMXD
+                         指令, 根本不需要 libatomic。
+
+affected_scope:         所有源码树自带 Makefile、无 configure/CMakeLists 的
+                         C/C++ 包在 HarmonyOS PC 上的适配(snac/2.93 实测;
+                         同类: 大量 2010 年代的便携 C 工具)
+
+verification_cmd:       # 先确认 SDK 里确实没有 libatomic
+                         find /data/service/hnp -name "libatomic*" | head
+                         # 再确认去掉 -latomic 后链接通过
+                         conan create archives/s/snac/2.93 \
+                           -pr:h=ci/conan/profiles/ohos-aarch64 \
+                           -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+
+rec_priority:           2
+rec_approach:           direct-make-with-cppinfo-flags
+rec_description:        配方里按依赖遍历拼参数, 例如:
+                           incs = ['-I"%s"' % d.cpp_info.includedirs[0]
+                                   for d in self.dependencies.values()]
+                           libs = ['-L"%s"' % d.cpp_info.libdirs[0] ...]
+                           self.run('make <target> CC=%s CFLAGS=\'%s\' LDFLAGS=\'%s -pthread\''
+                                    % (clang, " ".join(incs), " ".join(libs)),
+                                    cwd=self.source_folder)
+                         不要加 -latomic; 需要线程时 -pthread 即可。
+                         注意 self.folders.build = "."(上游不支持 out-of-tree)。
+
+related:
+  - archives/s/snac/2.93/conanfile.py
+  - knowledge/drafts/DRAFT-pure-python-wheel-package-type-build-scripts.kv
+last_updated:           2026-09-26
