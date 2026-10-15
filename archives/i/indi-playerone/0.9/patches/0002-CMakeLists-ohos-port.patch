@@ -1,0 +1,20 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -26,6 +26,17 @@
+ 
+ include(CMakeCommon)
+ 
++# INDI >= 2.0 base-class headers (defaultdevice.h) use C++17 features such as
++# std::any; the vendored CMakeCommon.cmake pins CMAKE_CXX_STANDARD to 14, which
++# cannot compile them. Raise the standard for this driver.
++set(CMAKE_CXX_STANDARD 17)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++
++# Install the device descriptor into THIS package's share/indi. The vendored
++# FindINDI.cmake reports INDI_DATA_DIR as the libindi package's data dir,
++# which would install the xml into the wrong package.
++set(INDI_DATA_DIR "${CMAKE_INSTALL_PREFIX}/share/indi")
++
+ if (INDI_WEBSOCKET)
+     find_package(websocketpp REQUIRED)
+     find_package(Boost COMPONENTS system thread)

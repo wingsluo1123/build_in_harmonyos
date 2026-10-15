@@ -1,0 +1,96 @@
+--- a/playerone_ccd.h
++++ b/playerone_ccd.h
+@@ -73,7 +73,7 @@
+     virtual IPState GuideWest(uint32_t ms) override;
+ 
+     // PlayerOne specific keywords
+-    virtual void addFITSKeywords(INDI::CCDChip *targetChip) override;
++    virtual void addFITSKeywords(INDI::CCDChip *targetChip, std::vector<INDI::FITSRecord> &fitsKeywords) override;
+ 
+     // Save config
+     virtual bool saveConfigItems(FILE *fp) override;
+--- a/playerone_ccd.cpp
++++ b/playerone_ccd.cpp
+@@ -429,7 +429,8 @@
+     BlinkNP[BLINK_DURATION].fill("BLINK_DURATION", "Blink duration",         "%2.3f", 0,  60, 0.001, 0);
+     BlinkNP.fill(getDeviceName(), "BLINK", "Blink", CONTROL_TAB, IP_RW, 60, IPS_IDLE);
+ 
+-    IUSaveText(&BayerT[2], getBayerString());
++    BayerTP[2].setText(getBayerString());
++    BayerTP.apply();
+ 
+     ADCDepthNP[0].fill("BITS", "Bits", "%2.0f", 0, 32, 1, mCameraInfo.bitDepth);
+     ADCDepthNP.fill(getDeviceName(), "ADC_DEPTH", "ADC Depth", IMAGE_INFO_TAB, IP_RO, 60, IPS_IDLE);
+@@ -500,8 +501,8 @@
+         // Even if there is no cooler, we define temperature property as READ ONLY
+         else
+         {
+-            TemperatureNP.p = IP_RO;
+-            defineProperty(&TemperatureNP);
++            TemperatureNP.setPermission(IP_RO);
++            defineProperty(TemperatureNP);
+         }
+ 
+         if (!ControlNP.isEmpty())
+@@ -549,7 +550,7 @@
+             deleteProperty(CoolerSP.getName());
+         }
+         else
+-            deleteProperty(TemperatureNP.name);
++            deleteProperty(TemperatureNP.getName());
+ 
+         if (!ControlNP.isEmpty())
+             deleteProperty(ControlNP.getName());
+@@ -771,9 +772,9 @@
+     if (ret != POA_OK)
+         LOGF_DEBUG("Failed to get temperature (%s).", Helpers::toString(ret));
+ 
+-    TemperatureN[0].value = confVal.floatValue;
+-    IDSetNumber(&TemperatureNP, nullptr);
+-    LOGF_INFO("The CCD Temperature is %.3f.", TemperatureN[0].value);
++    TemperatureNP[0].setValue(confVal.floatValue);
++    TemperatureNP.apply();
++    LOGF_INFO("The CCD Temperature is %.3f.", TemperatureNP[0].getValue());
+ 
+     // stop video capture
+     ret = POAStopExposure(mCameraInfo.cameraID);
+@@ -1307,7 +1308,7 @@
+     POAConfigValue confVal;
+ 
+     double value;
+-    IPState newState = TemperatureNP.s;
++    IPState newState = TemperatureNP.getState();
+ 
+     ret = POAGetConfig(mCameraInfo.cameraID, POA_TEMPERATURE, &confVal, &isAuto);
+     value = confVal.floatValue;
+@@ -1331,13 +1332,13 @@
+ 
+     // Update if there is a change
+     if (
+-        std::abs(mCurrentTemperature - TemperatureN[0].value) > 0.05 ||
+-        TemperatureNP.s != newState
++        std::abs(mCurrentTemperature - TemperatureNP[0].getValue()) > 0.05 ||
++        TemperatureNP.getState() != newState
+     )
+     {
+-        TemperatureNP.s = newState;
+-        TemperatureN[0].value = mCurrentTemperature;
+-        IDSetNumber(&TemperatureNP, nullptr);
++        TemperatureNP.setState(newState);
++        TemperatureNP[0].setValue(mCurrentTemperature);
++        TemperatureNP.apply();
+     }
+ 
+     if (HasCooler())
+@@ -1580,9 +1581,9 @@
+     );
+ }
+ 
+-void POACCD::addFITSKeywords(INDI::CCDChip *targetChip)
++void POACCD::addFITSKeywords(INDI::CCDChip *targetChip, std::vector<INDI::FITSRecord> &fitsKeywords)
+ {
+-    INDI::CCD::addFITSKeywords(targetChip);
++    INDI::CCD::addFITSKeywords(targetChip, fitsKeywords);
+ 
+     // e-/ADU
+     auto np = ControlNP.findWidgetByName("Gain");
