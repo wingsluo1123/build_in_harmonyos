@@ -1,0 +1,47 @@
+# conandata.yml — libheif-rav1e 1.23.0
+#
+# 交付面 = 上游 libheif 1.23.0 树内的 CMake MODULE 目标 heif-rav1e：
+#   libheif/plugins/CMakeLists.txt:72-74
+#     set(RAV1E_sources encoder_rav1e.cc encoder_rav1e.h)
+#     set(RAV1E_extra_plugin_sources ../error.cc)
+#     plugin_compilation(rav1e RAV1E RAV1E_FOUND RAV1E RAV1E)
+#   → add_library(heif-rav1e MODULE ...)  → 产物 lib/libheif/libheif-rav1e.so
+#     （rav1e AV1 编码后端插件模块；libheif/plugins/encoder_rav1e.cc）
+# 版本号取父 tarball 版本（同族先例：libhwy_test 1.3.0 ← highway 1.3.0）。
+
+sources:
+  # 父 tarball：上游 libheif 1.23.0 官方 tag 归档（R39：官方源）。
+  # sha256 为设备实测下载值（本任务独立下载后 sha256sum 计算，与同批
+  # 6 个 libheif 子包（libheif-libde265/-openh264/-openjpeg/-svtenc/-aom/-dav1d）逐字节一致）。
+  url:
+    - "https://gh-proxy.com/https://github.com/strukturag/libheif/archive/refs/tags/v1.23.0.tar.gz"
+    - "https://github.com/strukturag/libheif/archive/refs/tags/v1.23.0.tar.gz"
+  sha256: "50ea4fbd1e19c7b8820271d6d0c73f2623fec5d659ce9fae57e48dbeb94fab9a"
+
+# 包内树构建的 rav1e 0.7.1 源码（**不是** Conan 依赖，见 conanfile.py requirements() 与
+# notes.md「W0 依赖判定」）。上游 libheif 只随包提供 cmake/modules/FindRAV1E.cmake 探测
+# 模块 + libheif/plugins/encoder_rav1e.cc 适配源，树内**没有任何 rav1e 源码副本**
+# （find . -iname '*rav1e*' 只命中上述三个文件 + third-party/rav1e.cmd 这个 Windows 辅助脚本），
+# 而 W0 实测 ohpcd 制品仓没有任何 rav1e/librav1e/rust-rav1e 包 → 只能内树构建。
+#
+# 为什么写进 conandata.yml 而不是硬编码进 conanfile.py：CI 的 mirror-fallback 与
+# pre-download 只扫描 conandata.yml 里的 URL（ci/conan/build_and_test.sh），
+# 写在这里才能被预下载与镜像回退覆盖。
+rav1e:
+  url:
+    # 官方主源：xiph/rav1e GitHub tag 归档（上游 Homepage）
+    - "https://github.com/xiph/rav1e/archive/refs/tags/v0.7.1.tar.gz"
+    # 同一官方源 codeload 端点（GitHub 官方 tar.gz 直下，非第三方镜像）
+    - "https://codeload.github.com/xiph/rav1e/tar.gz/refs/tags/v0.7.1"
+  # sha256 为设备实测下载值（本任务从官方源下载后 sha256sum 计算；
+  # 与仓库既有 upstream 分支 archives/r/rust-rav1e/0.7.1/conandata.yml 声明值一致）。
+  sha256: "da7ae0df2b608e539de5d443c096e109442cdfa6c5e9b4014361211cf61d030c"
+  filename: "rav1e-0.7.1.tar.gz"
+
+# 本包无源码补丁：上游 libheif 与 rav1e 源码均零修改。
+#   * OHOS SDK libc++ 隐藏 C++20 ranges 算法的问题由配方内的编译期宏
+#     _LIBCPP_ENABLE_EXPERIMENTAL 解决（见 conanfile.py generate() 注释）；
+#   * rav1e 的 aarch64 NEON 汇编由 build.rs 经 cc crate 用 OHOS clang 编译
+#     （RUSTFLAGS -C linker + CC 注入），无需补丁；
+#   * 不注入任何 __OHOS__ 平台宏（R8/PF5）。
+patches: {}
