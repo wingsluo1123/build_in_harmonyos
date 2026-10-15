@@ -1,0 +1,53 @@
+--- a/libfprint/meson.build
++++ b/libfprint/meson.build
+@@ -325,34 +325,36 @@
+     install: false)
+ 
+ udev_hwdb_generator = custom_target('udev-hwdb',
+     output: 'autosuspend.hwdb',
+     depend_files: drivers_sources,
+     capture: true,
+     command: [ udev_hwdb ],
+     install: false,
+ )
+ 
+-metainfo = executable('fprint-list-metainfo',
+-    'fprint-list-metainfo.c',
+-    dependencies: libfprint_private_dep,
+-    link_with: libfprint_drivers,
+-    install: false)
+-
+-metainfo_generator = custom_target('metainfo',
+-    output: 'org.freedesktop.libfprint.metainfo.xml',
+-    depend_files: drivers_sources,
+-    capture: true,
+-    command: [ metainfo ],
+-    install: true,
+-    install_dir: datadir / 'metainfo'
+-)
++if get_option('metainfo')
++    metainfo = executable('fprint-list-metainfo',
++        'fprint-list-metainfo.c',
++        dependencies: libfprint_private_dep,
++        link_with: libfprint_drivers,
++        install: false)
++
++    metainfo_generator = custom_target('metainfo',
++        output: 'org.freedesktop.libfprint.metainfo.xml',
++        depend_files: drivers_sources,
++        capture: true,
++        command: [ metainfo ],
++        install: true,
++        install_dir: datadir / 'metainfo'
++    )
++endif
+ 
+ if install_udev_rules
+     udev_rules = executable('fprint-list-udev-rules',
+         'fprint-list-udev-rules.c',
+         dependencies: libfprint_private_dep,
+         link_with: libfprint_drivers,
+         install: false)
+ 
+     custom_target('udev-rules',
+         output: '70-@0@.rules'.format(versioned_libname),

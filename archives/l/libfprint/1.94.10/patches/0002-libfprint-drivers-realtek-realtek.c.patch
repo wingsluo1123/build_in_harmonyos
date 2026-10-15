@@ -1,0 +1,46 @@
+--- a/libfprint/drivers/realtek/realtek.c
++++ b/libfprint/drivers/realtek/realtek.c
+@@ -1065,20 +1065,21 @@
+       cmd_buf = (guint8 *) &co_accept_sample;
+       rtk_sensor_bulk_cmd (self, cmd_buf, NULL, FP_RTK_MSG_NO_STATUS, 0, fp_accept_sample_cb);
+       break;
+ 
+     case FP_RTK_ENROLL_CHECK_DUPLICATE:
+       cmd_buf = (guint8 *) &co_check_duplicate;
+       rtk_sensor_bulk_cmd (self, cmd_buf, NULL, FP_RTK_MSG_NO_STATUS, 0, fp_check_duplicate_cb);
+       break;
+ 
+     case FP_RTK_ENROLL_COMMIT:
++    {
+       gchar *valid_uid = NULL;
+       gint payload_len;
+ 
+       payload_len = UID_PAYLOAD_LEN_DEFAULT;
+ 
+       fpi_device_get_enroll_data (device, &print);
+       user_id = fpi_print_generate_user_id (print);
+       user_id_len = MIN (DEFAULT_UID_LEN, strlen (user_id));
+ 
+       payload = g_malloc0 (payload_len);
+@@ -1102,20 +1103,21 @@
+       g_debug ("user_id: %s, finger: 0x%x", user_id, finger);
+ 
+       nor_enroll_commit.param[0] = SUB_FINGER_01;
+       nor_enroll_commit.data_len[0] = GET_LEN_L (payload_len);
+       nor_enroll_commit.data_len[1] = GET_LEN_H (payload_len);
+ 
+       cmd_buf = (guint8 *) &nor_enroll_commit;
+       rtk_sensor_bulk_cmd (self, cmd_buf, g_steal_pointer (&payload),
+                            FP_RTK_MSG_DEFAULT, 1, fp_enroll_commit_cb);
+       break;
++    }
+ 
+     case FP_RTK_ENROLL_CANCEL_CAPTURE:
+       co_cancel_capture.param[0] = self->fp_purpose;
+       cmd_buf = (guint8 *) &co_cancel_capture;
+       rtk_sensor_bulk_cmd (self, cmd_buf, NULL, FP_RTK_MSG_DEFAULT, 0, fp_task_ssm_generic_cb);
+     }
+ }
+ 
+ static void
+ fp_init_sm_run_state (FpiSsm *ssm, FpDevice *device)

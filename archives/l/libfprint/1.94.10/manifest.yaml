@@ -1,0 +1,136 @@
+# 版本级 manifest — libfprint 1.94.10
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "1.94.10"
+
+# 软件名
+software: libfprint
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-03"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39）
+  url: "https://gitlab.freedesktop.org/libfprint/libfprint/-/archive/v1.94.10/libfprint-v1.94.10.tar.bz2"
+
+  # 源码校验和（实测）
+  sha256: "3c781e7920c9af5313d1a51101aadbd18e6e8edb35df3532850477fd96a0e952"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "-Ddrivers=all"
+    - "-Dintrospection=false"
+    - "-Dudev_rules=disabled"
+    - "-Dudev_hwdb=disabled"
+    - "-Dgtk-examples=false"
+    - "-Ddoc=false"
+    - "-Dexamples=false"
+    - "-Dinstalled-tests=false"
+    - "-Dmetainfo=false"
+    - "--wrap-mode=nodownload"
+    - "--buildtype=release"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib/2.84.0.1
+    - gusb/0.4.9
+    - libusb/1.0.27
+    - libgudev/238
+    - nss/3.118.1
+    - pixman/0.46.4.3
+    - openssl/3.5.6.1.1
+
+  # 构建工具依赖（tool_requires）
+  tool_dependencies:
+    - meson/1.11.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-libfprint-drivers-goodixmoc-goodix_proto.c.patch"
+  - "0002-libfprint-drivers-realtek-realtek.c.patch"
+  - "0003-libfprint-meson.build.patch"
+  - "0004-meson.build.patch"
+  - "0005-meson_options.txt.patch"
+
+# ============================================================
+# 测试结果（上游 meson test 实测，33 项注册）
+# ============================================================
+
+test_results:
+  type: official
+  total: 33
+  passed: 4
+  failed: 2
+  skipped: 27
+  note: "4 过（fpi-device/fpi-ssm/fpi-assembling/udev-hwdb）；2 败为沙箱禁 AF_UNIX socket bind（EPERM）非适配缺陷；27 跳为无指纹硬件。日志: .tmp_diag/libfprint/testlogs/"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libfprint 为 meson 构建，配方须用 MesonToolchain+PkgConfigDeps（非 autotools 模板）"
+  - "glib 配方不导出 gio-unix-2.0.pc，meson 依赖 gio-unix-2.0 的包需从 glib 包目录合成 shim"
+  - "交叉编译 metainfo 生成器（fprint-list-metainfo）无法在构建主机运行，需补丁加 meson_options 开关并门控"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/libfprint-1.94.10.orig
+  source_work_dir: /storage/Users/currentUser/builds/libfprint-1.94.10.work
+  source_orig_hash: 8c0d7900fca57eb3
+  source_work_hash: 42de1d33c5556e80
+  generated_at: '2026-10-04T03:40:50'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-libfprint-drivers-goodixmoc-goodix_proto.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-libfprint-drivers-realtek-realtek.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-libfprint-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-meson_options.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
