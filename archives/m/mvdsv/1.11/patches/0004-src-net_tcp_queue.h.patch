@@ -1,0 +1,46 @@
+--- /dev/null
++++ b/src/net_tcp_queue.h
+@@ -0,0 +1,43 @@
++/*
++Copyright (C) 2026 MVDSV contributors
++
++This program is free software; you can redistribute it and/or
++modify it under the terms of the GNU General Public License as
++published by the Free Software Foundation; either version 2 of the
++License, or (at your option) any later version.
++*/
++
++#ifndef MVDSV_NET_TCP_QUEUE_H
++#define MVDSV_NET_TCP_QUEUE_H
++
++#ifdef _WIN32
++#include <winsock2.h>
++#else
++#include <sys/select.h>
++#endif
++
++typedef enum
++{
++	NET_TCP_FLUSH_FATAL = -1,
++	NET_TCP_FLUSH_PENDING = 0,
++	NET_TCP_FLUSH_DRAINED = 1
++} net_tcp_flush_result_t;
++
++typedef enum
++{
++	NET_TCP_INTEREST_INVALID = -1,
++	NET_TCP_INTEREST_EMPTY = 0,
++	NET_TCP_INTEREST_ADDED = 1
++} net_tcp_interest_result_t;
++
++typedef int (*net_tcp_send_fn_t)(int socketnum, const void *buffer,
++	int length, int flags, void *context);
++
++net_tcp_flush_result_t NET_TCP_FlushQueue(int socketnum, char *buffer, int *length);
++net_tcp_flush_result_t NET_TCP_FlushQueueWithSender(int socketnum, char *buffer,
++	int *length, net_tcp_send_fn_t send_fn, void *context);
++net_tcp_interest_result_t NET_TCP_AddWriteInterest(int socketnum, int length,
++	fd_set *writeset, int *maxfd);
++int NET_TCP_IsSelectableSocket(int socketnum);
++
++#endif

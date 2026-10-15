@@ -1,0 +1,69 @@
+--- /dev/null
++++ b/src/net_tcp_stream.c
+@@ -0,0 +1,66 @@
++/*
++Copyright (C) 2026 MVDSV contributors
++
++This program is free software; you can redistribute it and/or
++modify it under the terms of the GNU General Public License as
++published by the Free Software Foundation; either version 2 of the
++License, or (at your option) any later version.
++*/
++
++#include "qwsvdef.h"
++
++#include "net_tcp_queue.h"
++#include "net_tcp_stream.h"
++
++int NET_TCP_AddStreamWriteInterests(svtcpstream_t *streams,
++	fd_set *writeset, int *maxfd)
++{
++	int added = 0;
++	int invalid = 0;
++	svtcpstream_t *stream;
++
++	for (stream = streams; stream; stream = stream->next)
++	{
++		if (stream->socketnum != INVALID_SOCKET && !stream->drop)
++		{
++			net_tcp_interest_result_t result = NET_TCP_AddWriteInterest(
++				stream->socketnum, stream->outlen, writeset, maxfd);
++			if (result == NET_TCP_INTEREST_INVALID)
++			{
++				stream->drop = true;
++				invalid = 1;
++			}
++			else
++				added += result;
++		}
++	}
++
++	return invalid ? -1 : added;
++}
++
++int NET_TCP_FlushReadyStreams(svtcpstream_t *streams, fd_set *writeset)
++{
++	int dropped = 0;
++	svtcpstream_t *stream;
++
++	for (stream = streams; stream; stream = stream->next)
++	{
++		if (stream->socketnum != INVALID_SOCKET && !stream->drop &&
++			NET_TCP_IsSelectableSocket(stream->socketnum) &&
++			FD_ISSET(stream->socketnum, writeset) &&
++			NET_TCP_FlushQueue(stream->socketnum, stream->outbuffer,
++				&stream->outlen) == NET_TCP_FLUSH_FATAL)
++		{
++			stream->drop = true;
++			++dropped;
++		}
++		else if (stream->socketnum != INVALID_SOCKET && !stream->drop &&
++			!NET_TCP_IsSelectableSocket(stream->socketnum))
++		{
++			stream->drop = true;
++			++dropped;
++		}
++	}
++
++	return dropped;
++}

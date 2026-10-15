@@ -1,0 +1,146 @@
+--- a/src/net.c
++++ b/src/net.c
+@@ -19,20 +19,23 @@
+ 	
+ */
+ // net.c
+ 
+ #ifdef SERVERONLY
+ #include "qwsvdef.h"
+ #else
+ #include "quakedef.h"
+ #include "server.h"
+ #endif
++
++#include "net_tcp_queue.h"
++#include "net_tcp_stream.h"
+ 
+ #ifdef _WIN32
+ WSADATA		winsockdata;
+ #endif
+ 
+ #ifndef SERVERONLY
+ netadr_t	net_local_cl_ipadr;
+ #endif
+ 
+ #ifndef CLIENTONLY
+@@ -848,53 +851,36 @@
+ 	if (netsrc != NS_SERVER)
+ 		return false;
+ 
+ 	for (st = svs.tcpstreams; st; st = st->next)
+ 	{
+ 		if (st->socketnum == INVALID_SOCKET)
+ 			continue;
+ 
+ 		if (NET_CompareAdr(to, st->remoteaddr))
+ 		{
+-			int sent;
+ 			unsigned short slen = BigShort((unsigned short)length);
+ 
+ 			if (st->outlen + length + sizeof(slen) >= sizeof(st->outbuffer))
+ 			{
+ 				// not enough space, we overflowed
+ 				break; // well, quake should resist to some packet lost.. so we just drop that packet.
+ 			}
+ 
+ 			// put data in buffer
+ 			memmove(st->outbuffer + st->outlen, (char*)&slen, sizeof(slen));
+ 			st->outlen += sizeof(slen);
+ 			memmove(st->outbuffer + st->outlen, data, length);
+ 			st->outlen += length;
+ 
+-			sent = send(st->socketnum, st->outbuffer, st->outlen, 0);
+-
+-			if (sent == 0)
+-			{
+-				// think it's OK
+-			}
+-			else if (sent > 0) //we put some data through
+-			{ //move up the buffer
+-				st->outlen -= sent;
+-				memmove(st->outbuffer, st->outbuffer + sent, st->outlen);
+-			}
+-			else
+-			{ //error of some kind. would block or something
+-				if (qerrno != EWOULDBLOCK && qerrno != EAGAIN)
+-				{
+-					st->drop = true; // something cricial, drop than
+-				}
+-			}
++			if (NET_TCP_FlushQueue(st->socketnum, st->outbuffer, &st->outlen) == NET_TCP_FLUSH_FATAL)
++				st->drop = true;
+ 
+ 			break;
+ 		}
+ 	}
+ 
+ 	// 'st' will be not zero, if we found 'to' in 'svs.tcpstreams'.
+ 	// That does not mean we actualy send packet, since there case of overflow, but who cares,
+ 	// all is matter that we found such 'to' and tried to send packet.
+ 	return !!st;
+ }
+@@ -1184,48 +1170,57 @@
+ 		closesocket(newsocket);
+ 		return INVALID_SOCKET;
+ 	}
+ 
+ 	return newsocket;
+ }
+ 
+ qbool NET_Sleep(int msec, qbool stdinissocket)
+ {
+ 	struct timeval	timeout;
+-	fd_set			fdset;
++	fd_set			readset, writeset;
+ 	qbool			stdin_ready = false;
+ 	int				maxfd = 0;
+ 
+-	FD_ZERO (&fdset);
++	FD_ZERO (&readset);
++	FD_ZERO (&writeset);
+ 
+ 	if (stdinissocket)
+ 	{
+-		FD_SET (0, &fdset); // stdin is processed too (tends to be socket 0)
++		FD_SET (0, &readset); // stdin is processed too (tends to be socket 0)
+ 		maxfd = max(0, maxfd);
+ 	}
+ 
+ 	if (svs.socketip != INVALID_SOCKET)
+ 	{
+-		FD_SET(svs.socketip, &fdset); // network socket
++		FD_SET(svs.socketip, &readset); // network socket
+ 		maxfd = max(svs.socketip, maxfd);
+ 	}
++
++#ifndef CLIENTONLY
++	NET_TCP_AddStreamWriteInterests(svs.tcpstreams, &writeset, &maxfd);
++#endif
+ 
+ 	timeout.tv_sec = msec/1000;
+ 	timeout.tv_usec = (msec%1000)*1000;
+-	switch (select(maxfd + 1, &fdset, NULL, NULL, &timeout))
++	switch (select(maxfd + 1, &readset, &writeset, NULL, &timeout))
+ 	{
+ 		case -1: break;
+ 		case  0: break;
+ 		default:
+ 
+ 		if (stdinissocket)
+-			stdin_ready = FD_ISSET (0, &fdset);
++			stdin_ready = FD_ISSET (0, &readset);
++
++#ifndef CLIENTONLY
++		NET_TCP_FlushReadyStreams(svs.tcpstreams, &writeset);
++#endif
+ 
+ 		break;
+ 	}
+ 
+ 	return stdin_ready;
+ }
+ 
+ void NET_GetLocalAddress (int socket, netadr_t *out)
+ {
+ 	char buff[512];
