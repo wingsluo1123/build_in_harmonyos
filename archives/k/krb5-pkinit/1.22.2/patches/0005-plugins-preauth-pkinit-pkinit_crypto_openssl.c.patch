@@ -1,0 +1,44 @@
+diff -ruN a/plugins/preauth/pkinit/pkinit_crypto_openssl.c b/plugins/preauth/pkinit/pkinit_crypto_openssl.c
+--- a/plugins/preauth/pkinit/pkinit_crypto_openssl.c
++++ b/plugins/preauth/pkinit/pkinit_crypto_openssl.c
+@@ -309,7 +309,12 @@
+     pkey = EVP_PKEY_new();
+     if (pkey == NULL)
+         return NULL;
++#ifdef LIBRESSL_VERSION_NUMBER
++    /* LibreSSL provides only EVP_PKEY_DH (no X9.42 DHX type). */
++    if (!EVP_PKEY_assign(pkey, EVP_PKEY_DH, *dh)) {
++#else
+     if (!EVP_PKEY_assign(pkey, EVP_PKEY_DHX, *dh)) {
++#endif
+         EVP_PKEY_free(pkey);
+         return NULL;
+     }
+@@ -392,7 +397,13 @@
+     DH *dh;
+     EVP_PKEY *pkey;
+ 
++#ifdef LIBRESSL_VERSION_NUMBER
++    /* LibreSSL has no d2i_DHxparams; d2i_DHparams decodes the same leading
++     * X9.42 fields (p, g), discarding the optional q/seed/j tail. */
++    dh = d2i_DHparams(NULL, &p, params_der->length);
++#else
+     dh = d2i_DHxparams(NULL, &p, params_der->length);
++#endif
+     pkey = dh_to_pkey(&dh);
+     DH_free(dh);
+     return pkey;
+@@ -662,8 +673,13 @@
+ set_padded_derivation(EVP_PKEY_CTX *ctx)
+ {
+     /* We would use EVP_PKEY_CTX_set_dh_pad() but it doesn't work with DHX. */
++#ifdef LIBRESSL_VERSION_NUMBER
++    /* LibreSSL has no EVP_PKEY_DHX/EVP_PKEY_CTRL_DH_PAD; short-result
++     * detection in the caller adjusts unpadded results. */
++#else
+     EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_DHX, EVP_PKEY_OP_DERIVE,
+                       EVP_PKEY_CTRL_DH_PAD, 1, NULL);
++#endif
+ }
+ #else
+ static void
