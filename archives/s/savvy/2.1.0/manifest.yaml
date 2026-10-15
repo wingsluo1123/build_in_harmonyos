@@ -1,0 +1,79 @@
+package: savvy
+version: "2.1.0"
+software: savvy
+homepage: "https://github.com/statgen/savvy"
+license: MPL-2.0
+status: built
+build_system: cmake
+
+source:
+  url: "https://github.com/statgen/savvy/archive/refs/tags/v2.1.0.tar.gz"
+  sha256: "83ebd88c097799b3bbf771dc8ebf6892797ca7a1f49c2d1665d52cfc1bf9e1de"
+  tar_format: tar.gz
+  notes: >
+    官方 tag 为 v2.1.0（带 v 前缀），解出目录 savvy-2.1.0，配方用
+    strip_root=True 拉平。SHA256 由本机对官方 GitHub tag 归档实测复核。
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTS=ON"
+    - "-DBUILD_EVAL=OFF"
+    - "-DBUILD_SLR_EXAMPLES=OFF"
+    - "-DBUILD_SPARSE_REGRESSION=OFF"
+    - "-DCMAKE_BUILD_TYPE=Release"
+  dependencies:
+    - "libshrinkwrap/1.2.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "savvy 2.1.0（statgen/savvy）是 SAV 变体文件格式的官方 C++ 接口库：add_library(savvy INTERFACE) 为 header-only（include/savvy/*.hpp），并附带 src/sav/ 生成 `sav` 命令行工具（import/export/head/index/sort/stat 等子命令）。"
+  - "savvy 仅 find_package(shrinkwrap REQUIRED) 并链接 INTERFACE 目标 shrinkwrap（裸目标名）；Conan CMakeDeps 只生成 shrinkwrap::shrinkwrap，裸名会退化为 -lshrinkwrap 且无 include 目录。build() 用 replace_in_file 把 target_link_libraries(savvy INTERFACE shrinkwrap) 改为 shrinkwrap::shrinkwrap（zydis Zycore 同款前例）。"
+  - "savvy 的链接期压缩依赖（xz/zlib/zstd）全部经 shrinkwrap 传递，不需要直接 requires：libshrinkwrap 的 CMakeDeps 配置把 xz/zlib/zstd 的 include/lib 信息级联给 savvy 的 CMakeLists 消费端。"
+  - "上游测试（-DBUILD_TESTS=ON）构建 savvy-test（src/test/main.cpp），ctest 注册恰好 5 个用例：convert-file / subset / random-access / stride-reduce / missing-headers。全部断言用 C 的 assert()；CI profile 是 Release（NDEBUG）会把断言编译掉导致'静默通过'。build() 给 savvy-test 目标加 -UNDEBUG 使断言真实验证（c-algorithms R09 同款前例），生产 sav 不受影响。"
+  - "上游测试 fixture 为源码树根目录的 test_file.vcf 与 test_file_missing_headers.vcf，经 -DSAVVYT_VCF_FILE 编译期绝对路径注入；SAV 中间文件（test_file_hard.sav/test_file_dose.sav）由测试写进程 cwd（Conan build 目录，可写）。"
+  - "patches 禁用平台宏：五个改动（cmake_minimum_required 3.2→3.5、shrinkwrap 目标名、savvy-test -UNDEBUG、writer.hpp 临时索引路径、utility.hpp 自包含 include 补全）都是 portability，用 build() 里的 replace_in_file 落地（仓库先例 zydis/c-algorithms），不引入 __OHOS__。"
+  - "savvy 产物既是 header-only 库又是 CLI 工具：必须用 package_type=header-library（不能用 application——Conan 2 的 CMakeDeps 对 application 生成的 *-data.cmake 丢弃 cpp_info.includedirs/libs，消费者 `<savvy/xxx.hpp>` file not found；basisu/razercfg/pianobar 同款 E 级前例）。bin/sav 经 bindirs + 软件级 commands.json（R38）交付，二者不冲突。"
+  - "SAV2 writer 把 s1r 索引写到硬编码 /tmp/tmpfileXXXXXX（mkstemp），在 HMBS 真机 /tmp 只读下 mkstemp 失败 → 索引不追加回 SAV 文件 → reader 内嵌索引加载失败 → random_access_test 在 reset_bounds 后 assert(rdr.good())(main.cpp:614) 失败。修复：writer.hpp 改用 TMPDIR/TMP（配方 _ensure_writable_tmp 注入的可写目录）并把 if(!tmp_fd) 修正为 if(tmp_fd<0)（mkstemp 失败返回 -1 为真值，原判断永远走不到错误分支）。纯 portability，无 __OHOS__。"
+  - "test_package 若要手动实例化 CMakeToolchain（为注入真机编译器路径/导出可写 TMPDIR），就不能再把 CMakeToolchain 写进 generators 属性，否则 Conan 报 'CMakeToolchain is declared in the generators attribute, but was instantiated in the generate() method too'。应置 generators=() 全由 generate() 手动生成。"
+  - "savvy 上游 5 个 ctest 用例共用同一个 savvy-test 测试二进制，且 convert-file/subset/random-access 都在进程 cwd 读写同一对产物 test_file_hard.sav/test_file_dose.sav；ctest 并行时多个进程同时写这些 .sav，后启动的 reader 读到半写文件，read_header 的 magic 判定失败打印 'Unsupported file format'，rdr 置 badbit → assert(rdr.good())/checksum 断言失败。CI worker 未注入 tools.build:jobs，Conan CMake.ctest() 自动追加 --parallel <cpu_count>（20）；HMBS 真机注入 tools.build:jobs=1 串行故通过。修复：build() 起始 self.conf.define('tools.build:jobs', 1) 显式串行（librtpi/neko/objfw 同款 conf 前例），与上游 CI 默认一致，不跳过用例。"
+  - "savvy 按 package_type=header-library 打包（含 bin/sav），header-only 头经 includedirs（默认=include）对消费者可见。首版曾只加 self.cpp_info.includedirs=['include'] 但保留 package_type=application，结果无效——application 的 CMakeDeps 直接丢弃 include 信息，消费者仍报 <savvy/xxx.hpp> file not found；改 package_type=header-library 后默认即传播 include（includedirs 显式声明仅作强化）。"
+
+patch_generation:
+  method: replace_in_file_build
+  patches_count: 0
+
+upstream_tests:
+  command: "ctest --output-on-failure"
+  registrations: 5
+  test_count: 5
+  executed: 0
+  not_executed: 0
+  count_method: ctest_entries
+  notes: >
+    rule4 口径：ctest -N 注册 5 个用例（convert_file_test / subset_test /
+    random_access_test / stride_reduce_test / missing_headers_test，均为
+    savvy-test 单二进制不同子命令）。执行数与通过数以真机预检证据为准
+    （本文件 executed 字段由 evidence 轮回填）。build() 显式
+    conf.define("tools.build:jobs", 1) 串行执行：5 个用例共用 savvy-test
+    二进制且共享 cwd 下的 test_file_hard.sav/test_file_dose.sav fixture，
+    并行会读写竞态（CI build #88326 出现 subset/random_access 的
+    "Unsupported file format" 失败）。计数从 ctest 自身日志逐行解析
+    `Test #N:` 进度行，不依赖并行度假设。
+
+test_package:
+  assertion_count: 2
+  description: >
+    消费者测试 test_savvy.cpp（C++11，链接 savvy::savvy）：① varint
+    encode/decode 往返 + 字节宽校验（真实调用 header-only API）；② 构造
+    savvy::variant 并校验字段访问器。另由 conanfile 运行安装的
+    `sav --version` 冒烟（L2）。
+
+ci:
+  profile: ci/conan/profiles/ohos-aarch64
+  package_type: header-library
+  shared_default: N/A
+  shadow_ci: "pending（本机无 conan，待真机预检）"

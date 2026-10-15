@@ -1,0 +1,23 @@
+software: savvy
+display: "savvy"
+description: "Official C++ interface library for the SAV variant file format with seamless support for BCF and VCF files (header-only), plus the sav command-line utility"
+category: bioinformatics
+homepage: "https://github.com/statgen/savvy"
+license: MPL-2.0
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "header-only：savvy 为 INTERFACE 库，无编译产物，consumers 经 savvy::savvy 头文件接口使用"
+    - "上游 find_package(shrinkwrap) 的裸目标名适配为 shrinkwrap::shrinkwrap（Conan CMakeDeps）"
+    - "上游测试用 assert()，CI Release(NDEBUG) 下断言被编译掉 → 给 savvy-test 加 -UNDEBUG 使断言真实生效"
+    - "链接期压缩依赖 xz/zlib/zstd 经 libshrinkwrap 的 cpp_info.requires 级联传递"
+  common_dependencies:
+    - libshrinkwrap
+
+versions:
+  "2.1.0":
+    status: built            # 本机前置完成，待真机预检
+    build_date: "2026-10-13"
+    format: conan
+    note: "header-library（header-only INTERFACE 库 + sav CLI，经 bindirs/commands.json 交付）；配方含五个 portability 改动（cmake_minimum_required 3.5、shrinkwrap 目标名、savvy-test -UNDEBUG、writer.hpp 临时索引路径、utility.hpp 自包含 include 补全）；上游 5 个 ctest 用例待真机验证，消费者测试 29 断言"
