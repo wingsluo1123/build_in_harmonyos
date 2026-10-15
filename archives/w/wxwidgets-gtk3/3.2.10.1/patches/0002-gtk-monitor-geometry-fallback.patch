@@ -1,0 +1,55 @@
+diff --git a/src/gtk/display.cpp b/src/gtk/display.cpp
+--- a/src/gtk/display.cpp
++++ b/src/gtk/display.cpp
+@@ -235,6 +235,23 @@
+     return gdk_window_get_screen(wxGetTopLevelGDK());
+ }
+ 
++// Some GTK backends expose a screen before populating monitor geometry.
++// Use the real screen dimensions for its sole monitor in this case.
++static GdkRectangle GetMonitorGeometry(GdkScreen* screen, int monitor)
++{
++    GdkRectangle rect;
++    gdk_screen_get_monitor_geometry(screen, monitor, &rect);
++    if ((rect.width <= 0 || rect.height <= 0) && monitor == 0 &&
++        gdk_screen_get_n_monitors(screen) == 1)
++    {
++        rect.x = 0;
++        rect.y = 0;
++        rect.width = gdk_screen_get_width(screen);
++        rect.height = gdk_screen_get_height(screen);
++    }
++    return rect;
++}
++
+ class wxDisplayImplGTK : public wxDisplayImpl
+ {
+     typedef wxDisplayImpl base_type;
+@@ -284,7 +301,7 @@
+     GdkRectangle rect;
+     GdkScreen* screen = GetScreen();
+     int monitor = gdk_screen_get_monitor_at_point(screen, pt.x, pt.y);
+-    gdk_screen_get_monitor_geometry(screen, monitor, &rect);
++    rect = GetMonitorGeometry(screen, monitor);
+     if (!wxRect(rect.x, rect.y, rect.width, rect.height).Contains(pt))
+         monitor = wxNOT_FOUND;
+     return monitor;
+@@ -313,8 +330,7 @@
+ 
+ wxRect wxDisplayImplGTK::GetGeometry() const
+ {
+-    GdkRectangle rect;
+-    gdk_screen_get_monitor_geometry(m_screen, m_index, &rect);
++    const GdkRectangle rect = GetMonitorGeometry(m_screen, m_index);
+     return wxRect(rect.x, rect.y, rect.width, rect.height);
+ }
+ 
+@@ -322,6 +338,8 @@
+ {
+     GdkRectangle rect;
+     gdk_screen_get_monitor_workarea(m_screen, m_index, &rect);
++    if (rect.width <= 0 || rect.height <= 0)
++        return GetGeometry();
+     return wxRect(rect.x, rect.y, rect.width, rect.height);
+ }
+ 

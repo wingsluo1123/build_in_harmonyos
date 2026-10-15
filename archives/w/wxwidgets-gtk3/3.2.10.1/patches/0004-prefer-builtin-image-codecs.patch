@@ -1,0 +1,23 @@
+diff --git a/build/cmake/lib/core/CMakeLists.txt b/build/cmake/lib/core/CMakeLists.txt
+--- a/build/cmake/lib/core/CMakeLists.txt
++++ b/build/cmake/lib/core/CMakeLists.txt
+@@ -62,6 +62,19 @@
+ endif()
+ 
+ wx_add_library(wxcore ${CORE_SRC})
++
++# wx_add_library links toolkit dependencies first. Prefer the selected
++# bundled codec archives before toolkit dependencies exporting the same
++# APIs, so headers and implementation use the same codec ABI.
++if(wxBUILD_SHARED AND TARGET wxcore)
++    get_target_property(wxcore_link_libraries wxcore LINK_LIBRARIES)
++    foreach(codec JPEG PNG)
++        if(wxUSE_LIB${codec} STREQUAL "builtin")
++            list(PREPEND wxcore_link_libraries ${${codec}_LIBRARIES})
++        endif()
++    endforeach()
++    set_property(TARGET wxcore PROPERTY LINK_LIBRARIES ${wxcore_link_libraries})
++endif()
+ foreach(lib JPEG PNG TIFF NANOSVG)
+     if(${lib}_LIBRARIES)
+         wx_lib_link_libraries(wxcore PRIVATE ${${lib}_LIBRARIES})
