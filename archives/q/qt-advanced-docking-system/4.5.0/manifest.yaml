@@ -1,0 +1,92 @@
+# 版本级 manifest
+# 文件位置: archives/q/qt-advanced-docking-system/4.5.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.5.0"
+
+# 软件名
+software: "qt-advanced-docking-system"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # GitHub 官方 codeload 端点（github.com/.../archive 即 302 重定向到此）；
+  # 与 archive 形式产物 sha256 逐字节相同，且不被 CI 的 gh-proxy 镜像注入正则匹配
+  # （该镜像当前返回 403）。详见 conandata.yml 顶部说明。
+  url: "https://codeload.github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/tar.gz/refs/tags/4.5.0"
+  sha256: "a438810b9749684232fa29721857bb700167006f44407ab4dd51f5c90d171f09"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_STATIC=OFF"           # 上游用 BUILD_STATIC 而非 BUILD_SHARED_LIBS
+    - "-DBUILD_EXAMPLES=OFF"         # examples/ 与 demo/ 是 GUI 程序，不属库本体
+    - "-DADS_VERSION=4.5.0"          # tarball 无 .git，避免 git describe 取版本
+
+  dependencies:
+    - qtbase/6.11.1                  # Qt6 Core/Gui/Widgets + Qt6::GuiPrivate（qpa）
+    - libxcb/1.17.0.1                # 源码无条件 include <xcb/xcb.h>（Q_OS_UNIX）
+
+  compiler:
+    cc: clang
+    cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-src-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "CMake 对 CMAKE_SYSTEM_NAME=HarmonyOS 不置 UNIX（无 Platform/HarmonyOS.cmake，'System is unknown to cmake'），上游 5 处 `if(UNIX AND NOT APPLE)` 全部落空：GuiPrivate 组件/私有头、Qt6::GuiPrivate 链接、linux/FloatingWidgetTitleBar.cpp 源文件、xcb 链接 —— 缺第 3 项时 .so 会带 CFloatingWidgetTitleBar 未定义符号，直到消费者链接才以 --no-allow-shlib-undefined 暴露（ref: E532）"
+  - "修复按 E532（harmonyos-into-unix-branch）惯例：条件扩展为 (UNIX OR CMAKE_SYSTEM_NAME STREQUAL \"HarmonyOS\")（ref: E532）"
+  - "上游 src/CMakeLists.txt 在 UNIX 分支裸链 `xcb` 库名，OHOS 无系统 X11；Conan 侧需改为 CMakeDeps 组件目标 libxcb::xcb（libxcb/1.17.0.1；全局目标为 libxcb::libxcb）（ref: E803）"
+  - "QtADS 公共头 ads_globals.h 在 Q_OS_UNIX 下无条件 include <xcb/xcb.h>，故 libxcb 必须以 transitive_headers/transitive_libs 声明，否则消费者编译缺 xcb 头、链接缺 libxcb（ref: E802）"
+  - "ADS_VERSION 必须在 project() 之前可见：CMake 到第一个 project() 才加载 CMAKE_TOOLCHAIN_FILE，而上游在 project() 之前读 ADS_VERSION —— tc.variables 无效，必须用 cmake.configure(cli_args=['-DADS_VERSION=4.5.0'])（ref: E800）"
+  - "上游仅在 if(NOT ADS_VERSION) 分支里设 CMAKE_MODULE_PATH=<src>/cmake/modules，但 src/CMakeLists.txt 无条件 include(Versioning)；外部传 ADS_VERSION 时必须自行补 CMAKE_MODULE_PATH（ref: E800）"
+  - "qtbase 设 cmake_find_mode=none 且无 cmake_file_name/cmake_target_name，CMakeDeps 会生成 find_dependency(qtbase) 与不存在的 qtbase::qtbase；消费者需 set_property 映射为 cmake_file_name=Qt6 + cmake_target_name=Qt6::Widgets（libfm-qt/pcmanfm-qt 同款）（ref: E801）"
+  - "qtbase 的 cmake_find_mode=none 使 CMakeDeps 不生成 conan_cmakedeps_paths.cmake；配方自写该文件时必须同时把生成器目录（CMAKE_CURRENT_LIST_DIR）加入 CMAKE_PREFIX_PATH/MODULE_PATH，否则 find_package(libxcb) 找不到 CMakeDeps 配置（ref: E801）"
+  - "qtbase/6.11.1（OHOS）确实提供 Qt6::GuiPrivate：lib/cmake/Qt6GuiPrivate/Qt6GuiPrivateConfig.cmake + include/QtGui/6.11.1/QtGui/qpa/qplatformnativeinterface.h，无需源码改动（ref: E801）"
+  - "无 Platform/HarmonyOS.cmake 还导致 CMAKE_SHARED_LIBRARY_SONAME_<LANG>_FLAG 为空、.so 无 DT_SONAME（CI L5a 拒绝）；配方补 -Wl,-soname, 后 VERSION/SOVERSION 才生效（并生成 .so.4/.so.4.5.0 符号链接）（ref: E383）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/qt-advanced-docking-system-4.5.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/qt-advanced-docking-system-4.5.0.work
+  source_orig_hash: 76db3236ef3c6df3
+  source_work_hash: 569636639be10b21
+  generated_at: '2026-10-15T01:19:20'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-src-CMakeLists.txt.patch
+    type: portability
+    platform_only: true
+    guard: "无平台宏（不含 __OHOS__）；仅按 E532 惯例把 5 处 if(UNIX AND NOT APPLE) 扩展为 if((UNIX OR CMAKE_SYSTEM_NAME STREQUAL \"HarmonyOS\") AND NOT APPLE)，并把裸库名 xcb 改为 Conan CMakeDeps 目标 libxcb::xcb（补 find_package(libxcb)）"

@@ -1,0 +1,40 @@
+# conandata.yml — qt-advanced-docking-system 4.5.0
+# 源码：上游官方 GitHub tag 归档，走 GitHub 官方 codeload 端点（R39：官方源）
+#
+# 为什么用 codeload 而不是 github.com/archive：
+#   1. codeload.github.com 是 GitHub 官方的归档下载服务（github.com/.../archive 本身
+#      就是 302 重定向到它），属官方正式源，非第三方镜像；
+#   2. 实测 github.com/.../archive 在本环境返回 302 后连接挂起，而 codeload 直连 200
+#      且完整下载 22295385 字节；
+#   3. CI（ci/conan/build_and_test.sh get_mirrors）只对 `^https?://github\.com/` 注入
+#      gh-proxy.com 镜像；该镜像当前对本环境返回 403「Access to this resource is
+#      forbidden」，导致下载必然失败。codeload 形式不被该正则匹配，conan 直连即可成功。
+#   4. 二者内容完全一致：codeload 产物 sha256 = a438810b9749684232fa29721857bb700167006f44407ab4dd51f5c90d171f09
+#      （与 github.com/archive 的 tarball 逐字节相同，已实测校验）。
+#
+# 注意：W3 本地 CI 模拟（ci/conan/build_and_test.sh）会把单值 sources.url 原地改写成
+#       [gh-proxy.com 镜像, 官方源] 列表且不还原；提交前必须还原为仅官方源，
+#       否则触发 PF7 源 URL 闸（R39）。
+
+sources:
+  url: "https://codeload.github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/tar.gz/refs/tags/4.5.0"
+  sha256: "a438810b9749684232fa29721857bb700167006f44407ab4dd51f5c90d171f09"
+  # codeload URL 路径以 tag 结尾、无 .tar.gz 扩展名；conan get() 依赖扩展名推断解包方式，
+  # 不声明会按 zip 处理并报 BadZipFile。显式给出文件名以走 tar.gz 分支（typeshare 同款做法）。
+  filename: "qt-advanced-docking-system-4.5.0.tar.gz"
+
+patches:
+  - patch_file: "patches/0001-src-CMakeLists.txt.patch"
+    patch_description: >-
+      Portability patch for HarmonyOS (aarch64-linux-ohos), touching only
+      src/CMakeLists.txt: (1) extend the five `if(UNIX AND NOT APPLE ...)`
+      platform guards with `OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS"` — CMake
+      ships no Platform/HarmonyOS.cmake and therefore never sets UNIX, while the
+      OHOS Qt port does define Q_OS_UNIX, so these branches (GuiPrivate
+      component + private include dirs + Qt6::GuiPrivate link,
+      linux/FloatingWidgetTitleBar.cpp source, xcb link) must stay active;
+      (2) link libxcb through its CMakeDeps target `libxcb::xcb` via
+      `find_package(libxcb REQUIRED)` instead of the bare library name `xcb`,
+      which cannot be resolved to the Conan-provided package. No platform
+      macros (`__OHOS__`) are introduced.
+    patch_type: "portability"

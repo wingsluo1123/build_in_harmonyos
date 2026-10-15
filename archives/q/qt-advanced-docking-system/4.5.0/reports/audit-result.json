@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R3",
+      "file": "archives/q/qt-advanced-docking-system/4.5.0/manifest.yaml",
+      "line": 17,
+      "description": "manifest.yaml declares status: published (notes.md also states '最终状态: published'), but a registry probe of conan.cnb.cool/OpenHarmonyPCDeveloper/Conan for the package returns no refs at all (qt-advanced-docking-system/* is absent). The repo's finish workflow sets published only after conan-verify/CI; here there is no upload evidence, so the status is ahead of reality. Non-blocking per the audit's blocking-severity table (same class as fmi-ls-bus, graded P2/pass); the assertion is not a fabricated binary/artifact claim.",
+      "fix_suggestion": "Set status to 'built' (and notes.md to the matching state) until the CI/conan upload completes, or attach the upload receipt; do not mark 'published' before an actual upload."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/q/qt-advanced-docking-system/4.5.0/test_package/MANIFEST.yml",
+      "line": 37,
+      "description": "QtADS is a Qt Widgets/UI library, so R40 applies. The recipe's only platform adaptation is the CMake UNIX/HarmonyOS folding plus the libxcb target; the library's X11 window-hint code compiles but is runtime-inactive by design (all call sites are guarded by is_platform_x11()/QGuiApplication::platformName()=='xcb'), and no OHOS-specific window-system/input code is added. The consumer test runs under QT_QPA_PLATFORM=offscreen, so real display-server docking/drag interaction is not covered. The MANIFEST.yml (lines 37-39) and notes.md disclose exactly this limitation, and the test still exercises the real API/object graph/state round-trip (not a version() stub), so this is an informational 'manual confirmation' note rather than a deception finding.",
+      "fix_suggestion": "Keep the disclosure; per R40, mark the package for manual confirmation of real-graphics-session docking/drag behaviour on OHOS (e.g. record the manual check in notes.md). No code change required."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L4",
+      "file": "archives/q/qt-advanced-docking-system/4.5.0/patches/0001-src-CMakeLists.txt.patch",
+      "line": 0,
+      "description": "W3 local CI L4 reports 'dangerous functions in patches' (warn). This is a regex false positive: the L4 pattern (strcpy|sprintf|gets|strcat)\\b matches the substring 'gets' inside the word 'Widgets' on the patch context lines 'set(ads_DEP_LIBS Core Gui Widgets)'. The patch contains no unsafe C function. Non-blocking per the audit's blocking-severity table (declared risky function or regex false positive -> P2/P3).",
+      "fix_suggestion": "No code change needed. Optionally narrow the L4 regex in ci/conan/build_and_test.sh to '\\b(strcpy|sprintf|gets|strcat)\\s*\\(' so CMake identifiers like 'Widgets' do not trip the gate."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "knowledge/drafts/E800-draft-8E9E.md",
+      "line": 1,
+      "description": "The PR adds four knowledge drafts (E800/E801/E802/E803). Their .kv files are substantive and correct, but the four companion .md files (E800-draft-8E9E.md, E801-draft-DA34.md, E802-draft-679D.md, E803-draft-9124.md) are still the raw generator skeletons with placeholder tokens ('# E800 — [简短错误描述]', '[描述触发...]', '[E???]'). scripts/ohc/submission.py copies the .md verbatim into knowledge/doc/E<id>.md on promotion, so the human-facing doc would be a template. Draft naming/location is compliant (draft_review.py accepts E*-draft-*.kv; knowledge_check KC1 finds no leak into knowledge/graph/ and junk_check passes), the .kv is the machine-readable authority, and the same skeleton state exists in ~130 legacy drafts, so this is a minor completeness nit, not a gate finding.",
+      "fix_suggestion": "Fill each .md from its .kv content (error signature, root cause, recommended fix, verification command) before promotion, or omit the .md companion files until they can be authored."
+    }
+  ],
+  "summary": "Audited the 18-file branch diff (10 recipe files under archives/q/qt-advanced-docking-system/4.5.0/ plus 8 knowledge/drafts files); no framework files, no binaries, exactly one package, so W2/JC6 and the file-permission boundary hold. Deception checks are clean: (R34) the consumer test genuinely drives the real QtADS public API — CDockManager lifecycle and dockWidgetsMap registry, all four dock areas, addDockWidgetTab, toggleView, perspectives, saveState/restoreState round trip, addDockWidgetFloating float/re-dock — with 30 CHECK()s; the previously tautological 'tabbed->dockAreaWidget() == left->dockAreaWidget() || ... != nullptr' assertion was replaced by the real '!= left->dockAreaWidget()' and re-run (untracked .scratch/logs/create12.log and reports/test-report.md: '30 checks, 0 failures / RESULT: PASSED'); (R9) test() calls self.run() on the built binary under QT_QPA_PLATFORM=offscreen, and L1e sabotage confirmed real package dependence; (R8) patch 0001 contains no __OHOS__/-D__OHOS__ and folds exactly the five upstream 'if (UNIX AND NOT APPLE ...)' guards with the sanctioned E532 shape '(UNIX OR CMAKE_SYSTEM_NAME STREQUAL \"HarmonyOS\")', plus the necessary bare-xcb -> find_package(libxcb REQUIRED)/libxcb::xcb target change; it applies cleanly to pristine upstream 4.5.0 (verified with patch -p1 --dry-run) and is disclosed in conandata.yml, manifest.yaml, notes.md and the conanfile docstring, so the change is both necessary and disclosed; (R19) no precompiled artifacts. Recipe quality is clean: conandata.yml carries only the official upstream GitHub URL (no mirror host, no file://) and its sha256 was independently confirmed byte-for-byte against a fresh download of that exact URL; the patch entry is well-formed with a substantive patch_description and patch_type 'portability'; the conanfile contains no hardcoded compilers/paths and no settings.os check (so R32 is vacuously satisfied), no shell env reads (R33 clean), version 4.5.0 matches the upstream tag and this is a brand-new package not present on main (R37 first-adaptation rule correct), and it is a library so no commands.json is required (R38 N/A). dependencies qtbase/6.11.1 and libxcb/1.17.0.1 are published in the registry (R36). R51 is honest: the 371-file upstream 4.5.0 tree has no tests/ directory, zero QtTest/QTEST_/catch2/gtest/enable_testing/add_test hits, and only build-only GitHub workflows, and the MANIFEST.yml records this inventory with evidence and no placeholders. .g0-verified-cmake is a legitimate, JC5-whitelisted ('g0-verified(-cmake)?') convention with precedent archives/z/z3/4.15.4/.g0-verified-cmake, and its claim agrees with reports/conan-verify-report.md (G0-G4 PASS), so it is not a fabricated gate marker (R52 clean). PF1-PF8, junk_check JC1-JC6 and knowledge_check KC1-KC5 all pass; PF9 holds (every changed archives path is the 5-segment archives/q/qt-advanced-docking-system/4.5.0/... form and the branch feat/qt-advanced-docking-system-4.5.0 matches the version dir); the software-level manifest/README are absent by deliberate PF9-driven choice and are not raised. Only non-blocking items remain: premature status: published (P2), the L4 regex false positive on 'Widgets' (P3), unfilled .md draft companions (P3), and the informational R40 manual-confirmation note (P3). Verdict: pass (0 P0, 0 P1)."
+}

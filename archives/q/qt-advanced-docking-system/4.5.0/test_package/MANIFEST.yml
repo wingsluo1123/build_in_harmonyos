@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: qt-advanced-docking-system/4.5.0
+homepage: "https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System"
+
+# ── 上游测试清点（R51 步骤 1）─────────────────────────────────────────────
+# 结论：上游 4.5.0 **不带任何自动化测试套件**。清点证据（源码树逐项核查）：
+#   $ find . -iname "*test*"            -> 无 tests/ 目录、无测试源文件
+#   $ grep -rl "QtTest|QTEST_|catch2|gtest|enable_testing|add_test" .  -> 无命中
+#   $ cat CMakeLists.txt src/CMakeLists.txt  -> 无 BUILD_TESTING / add_test
+#   $ ls .github/workflows/  -> linux-builds.yml / windows-cmake.yml（仅构建）
+# 上游回归手段是人工运行的 GUI 程序 demo/ 与 examples/*（非自动化断言测试），
+# 因此不存在可迁移到 CI 的上游测试命令。
+upstream_check_command: "(不适用：上游无测试套件；见上方清点证据)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游确实没有，故为空）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证，本 PR 自建，R34)
+test_package_tests:
+  - file: test_qt_advanced_docking_system.cpp
+    description: >-
+      消费者测试：find_package(qtadvanceddocking-qt6) + 链接
+      ads::qtadvanceddocking-qt6，在 offscreen QPA 下真实驱动 QtADS 公共 API
+      —— 配置标志（OpaqueSplitterResize/FocusHighlighting/testConfigFlag）、
+      CDockManager 生命周期与 dockWidgetsMap 注册表、四个停靠区
+      (Left/Right/Top/Bottom) 建区、tab 化停靠、toggleView 关闭/重开、
+      视角(addPerspective/perspectiveNames)、saveState/restoreState 往返、
+      CFloatingDockContainer 浮动与回停。
+      <br>覆盖范围说明(R40)：本测试在 offscreen QPA 下验证 API/对象图/状态往返，
+      不覆盖真实显示服务器下的窗口拖拽/停靠动画等交互；后者需在真机图形会话中
+      人工确认（offscreen 插件自身会打印 "does not support propagateSizeHints"）。
+    command: "./test_qt_advanced_docking_system"
+
+# 测试断言总数 (CHECK 计数；实测输出 "30 checks, 0 failures")
+assertion_count: 30
