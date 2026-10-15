@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+package: pgtt/4.6
+homepage: "https://github.com/darold/pgtt"
+
+upstream_check_command: "make installcheck"
+upstream_test_in_build: false
+upstream_test_command: "make installcheck (pg_regress: 20 groups)"
+
+upstream_tests_exist: true
+upstream_test_framework: pg_regress
+upstream_test_count: 21
+upstream_test_count_breakdown: "20 pg_regress groups (test/sql/*.sql, Makefile TESTS/REGRESS) + 1 standalone privilege.sql script"
+upstream_test_groups:
+  - 00_init
+  - 01_oncommitdelete
+  - 02_oncommitpreserve
+  - 03_createontruncate
+  - 04_rename
+  - 05_useindex
+  - 06_createas
+  - 07_createlike
+  - 08_plplgsql
+  - 09_transaction
+  - 10_foreignkey
+  - 11_after_error
+  - 12_droptable
+  - 13_searchpath
+  - 14_concurrent_index
+  - 15_security_grants
+  - 16_sql_injection
+  - 17_drop_authorization
+  - 18_subquery
+  - 19_trigger
+added_test_groups:
+  - harmonyos_feasibility
+upstream_test_runner: "test_package/pgtt_test.py: initdb cluster (TCP loopback) -> pg_ctl start -> deploy pgtt.so + share/extension into the postgresql install -> pg_regress --inputdir=<vendored test> --bindir=<pg>/bin --dbname=contrib_regression 00_init .. 19_trigger harmonyos_feasibility"
+upstream_test_dependency: "running PostgreSQL 18.3 server from postgresql/18.3 (postgres + initdb + pg_ctl + psql + pg_regress)"
+
+upstream_test_audit: |
+  Audited the upstream v4.6 source tree (commit c8730243ca993de96122641452a138f284ef0437).
+
+  Upstream test inventory (21 entries):
+    * 20 pg_regress groups declared by Makefile TESTS/REGRESS: 00_init,
+      01_oncommitdelete .. 19_trigger.  Each has a non-empty test/sql/<name>.sql
+      and a non-empty test/expected/<name>.out.
+    * 1 standalone script test/privilege.sql (README: "This test is not part of
+      the regression tests run with make check install because it need manual
+      changes" — it must be driven manually with createdb/psql/diff).
+
+  Executed here: the 20 pg_regress groups, byte-exactly, against a live
+  PostgreSQL 18.3 server (make installcheck is the upstream entry point; the
+  runner invokes the same pg_regress binary shipped in the postgresql package
+  with the same group list).  Result: 20/20 pass — see notes.md.
+
+  Also executed: the standalone test/privilege.sql.  It does NOT reproduce the
+  shipped test/expected/privilege.out on any platform, because that expected
+  file was not regenerated after the 4.6 security hardening: sql/pgtt--4.6.0.sql
+  now revokes INSERT/UPDATE/DELETE on pgtt_schema.pg_global_temp_tables from
+  PUBLIC and documents that roles which create GTTs need an explicit table-level
+  GRANT, while test/privilege.sql only grants on the schema.  With that
+  documented GRANT added the script matches the expected flow (verified — see
+  reports/03-privilege.*).  This is an upstream test-asset staleness, not an
+  OHOS/platform issue.
+
+  Added: 1 HarmonyOS-specific group (harmonyos_feasibility) proving that on
+  OHOS PC aarch64 the extension intercepts CREATE GLOBAL TEMPORARY TABLE,
+  registers the GTT in pgtt_schema and materialises the session-private copy.
+
+test_package_tests:
+  - file: test_package/pgtt_test.py
+    description: "Artifact assertions (ELF64/AArch64, DT_NEEDED == libpq.so.5 + libc.so, RUNPATH == $ORIGIN/../lib) + consumer SQL assertions against a live server (CREATE EXTENSION pgtt, extversion 4.6.0, GLOBAL TEMPORARY TABLE interception + pgtt_schema registry) + the upstream pg_regress suite (20 groups + 1 HarmonyOS group), byte-exact"
+    command: "conan test test_package pgtt/4.6"
+    assertions: 5
+    executed: true
+    passed: true
+
+assertion_count: 5
+assertion_executed: 5
+assertion_skipped: 0
