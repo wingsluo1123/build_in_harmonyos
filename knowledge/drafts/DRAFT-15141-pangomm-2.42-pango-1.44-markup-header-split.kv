@@ -1,0 +1,87 @@
+#====================================================================
+# DRAFT-15141-pangomm-2.42-pango-1.44-markup-header-split
+#   GNOME mm 绑定老版本线（gmmproc 2.6x 生成代码，细粒度 pango 头）×
+#   pango >= 1.44 头文件拆分（pango_parse_markup 移入 pango-markup.h）
+#   的编译失败与最小补丁修复
+# 来源: pangomm 2.42.2 适配 HarmonyOS PC（任务卡 #15141，PR #15574）
+# 路径: Path B（知识库扩展）
+# 状态: 草稿（待审核 promote）
+#====================================================================
+
+draft:                  DRAFT-15141-pangomm-2.42-pango-1.44-markup-header-split
+status:                 pending-editor-review
+title:                  GNOME mm 老线绑定配新 pango（>=1.44）编译报 pango_parse_markup 未声明：gmmproc 生成的细粒度头链缺拆分后的 pango-markup.h，最小补丁显式 include 修复
+category:               headers, compat, gnome-mm, portability-patch
+match_keywords: >
+  pango_parse_markup, undeclared identifier, pango-markup.h,
+  pango-attributes.h, header split, gmmproc, pangomm 2.42,
+  mm 绑定老线, 细粒度头, 伞形头, pango/pango.h, attrlist.cc
+
+error_signature:        error: use of undeclared identifier 'pango_parse_markup'|
+                        attrlist\.cc.*pango_parse_markup.*undeclared
+
+trigger_tool:           cc|clang++|ninja|meson
+phase:                  compilation
+
+severity:               2
+
+root_cause:             pango 1.44（2019）把 markup 解析 API 从 pango-attributes.h 拆分进
+                        独立的 pango-markup.h（伞形 pango/pango.h 仍传递包含它）。GNOME mm
+  绑定家族的老版本线（pangomm 2.42/2.46 线等）由 gmmproc 2.6x 生成的
+  头文件用**细粒度** pango 头（attrlist.h 只 include
+  <pango/pango-attributes.h>），不含 pango-markup.h——attrlist.cc 的
+  两个 markup 构造函数（AttrList(ustring,gunichar) 两形态）调用
+  pango_parse_markup() 时声明不可达。2.42 线 gmmproc 2.64.3 生成代码
+  实测：本地 pango 1.50.14 下 attrlist.cc:38/:65 两处编译失败。
+  近线（2.46+）生成头改用伞形 <pango/pango.h> 天然免疫——这是
+  「老版本绑定 × 新版本依赖头重组」的兼容窗口问题，不是平台差异。
+
+solution: |
+  最小补丁（portability patch，不改库语义）：在生成的
+  untracked/pango/pangomm/attrlist.cc 的既有 include 块后显式补
+  #include <pango/pango-markup.h>（附注释说明 pango>=1.44 拆分背景）。
+  conandata.yml 声明：
+    patches:
+      - patch_file: "patches/0001-pango-1.44-markup-header-split.patch"
+  先例：archives/p/pangomm/2.42.2/patches/0001-pango-1.44-markup-header-split.patch。
+  排查法（同类问题全量收敛，避免逐轮编译试错）：
+    1) ninja -k 0 一次性收集全部编译错误（而非默认首错即停）；
+    2) 提取全部 pango_* 调用符号，逐个 grep pango 头目录确认声明文件；
+    3) 对照生成头的 include 链找缺口，一处补丁收敛全部错误
+  （实测 2.42.2 全库仅 attrlist.cc 一处缺口）。
+
+rec_priority:           1
+rec_approach:           explicit-include-split-header
+rec_description:        在生成的 attrlist.cc 既有 include 块后显式补
+                        #include <pango/pango-markup.h>（portability 补丁，
+                        不改库语义），conandata.yml 声明 patch_file。
+                        排查法：ninja -k 0 一次收集全部编译错误 → 提取
+                        pango_* 符号逐个 grep 头目录定位声明文件 → 对照
+                        生成头 include 链找缺口，一处补丁收敛全部错误。
+rec_command:            grep -rn "pango_parse_markup" <pango-includes>/pango/
+                        # → pango-markup.h（拆分后真身）
+                        ninja -C build -k 0   # 全量错误收敛
+rec_auto_fix:           false
+rec_impl:               portability-patch
+
+fallback: >
+  若补丁不想动生成代码：改用 meson 项目参数注入强制包含
+  （add_project_arguments('-include', 'pango/pango-markup.h')，经
+  MesonToolchain project_options 不支持时用 cpp_args），或降依赖到
+  pango < 1.44（不推荐——制品仓 pango 线已到 1.50/1.56）。
+  注意：不能 sed 改上游 meson.build 硬换头——生成代码在 untracked/
+  预置，meson.build 不控制其 include。
+
+verify_builds:          89253（PR #15574 CI passed）, 本机 conan create RC=0
+
+reference_impl: >
+  PR #15574（pangomm 2.42.2 适配）；
+  对照组：archives/p/pangomm/2.46.5（伞形头，无需补丁）
+
+affected_scope: >
+  跨库适用：任何 gmmproc 2.6x 时代生成、细粒度 pango 头链的 mm 绑定
+  老线（pangomm 2.42 线、gtkmm 2.4/3.0 线的 pango 消费面）配 pango
+  >= 1.44 编译。仓内现役：pangomm/2.42.2（本件已修）。
+
+id:                     DRAFT-15141
+doc_file:               doc/DRAFT-15141.md
