@@ -1,0 +1,70 @@
+# 版本级 manifest
+# 文件位置: archives/p/picobench/2.10.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.10.0"
+
+# 软件名
+software: "picobench"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-04"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（列表：ghfast.top 镜像在前，官方源兜底）
+  url: "https://ghfast.top/https://github.com/iboB/picobench/archive/refs/tags/v2.10.0.tar.gz"
+
+  # 源码校验和（本机双源实测一致）
+  sha256: "65bdee215110c95a48a3d2aead7e38a89a8260fb7ba1c5f982e2df1690822c81"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表（header-only 库无编译阶段）
+  configure_options: []
+
+  # 编译依赖列表（零依赖）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（无补丁：单头库在 OHOS clang15/libc++ 下无需修改）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "picobench 为零依赖 header-only 单头库（C++11+），OHOS clang 15 + libc++ 下无需任何源码补丁即可使用"
+  - "上游测试依赖 CPM 拉取 doctest-util/doctest-lib，直连 GitHub 会因空文件缓存失败；预置 CPM_SOURCE_CACHE（CPM.cmake+icm+doctest-lib+doctest-util 四件）即可本地复现上游测试"
+  - "本机直跑 OHOS 目标二进制需 export LD_LIBRARY_PATH=/data/service/hnp/ohos-sdk.org/ohos-sdk_26.0.0.18/ohos/native/llvm/lib（libc++.so 位置），否则报 Error relocating symbol not found（非代码问题）"
+  - "runner(false) 构造后接管全局注册表中的 PICOBENCH 宏注册基准；generate_report() 返回 report 对象，suites/benchmarks/data 三层结构可用于消费者断言（迭代计数=benchmark_problem_space::dimension）"
