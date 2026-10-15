@@ -1,0 +1,62 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ming/0.4.8.r68.g04aee523
+homepage: "https://github.com/libming/libming"
+
+# 上游测试命令：顶层 Makefile.am 的 SUBDIRS 含 test/，test/ 各子目录用
+# `TESTS = dotests` 做 automake 测试目标（R51 清点证据）。
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游测试规模清点（源码包内实测，R51 第 1 步）：
+#   - test/ 下 21 个测试组目录，37 个 TestList 清单文件，共 100 条用例行
+#   - 比对机制：用例 C/C++ 程序生成 <name>.swf → util/listswf 转储 →
+#     `diff - <name>.ref` 与 132 个参考文件逐行比对（test/dotests.pl）
+#   - 绑定维度：test/Makefile.inc 按 AM_CONDITIONAL 组装 BINDINGS；
+#     本配方显式 --disable-perl/php/python/tcl，故只跑 C 与 C++ 两种绑定
+#   - 选项维度：10 条用例以 GIF/PNG/FREETYPE 为门槛（freetype 6 / png 3 /
+#     gif 1），本配方经 Conan 依赖启用三者，故这 10 条一并执行
+upstream_tests:
+  - file: test/dotests.pl
+    source: libming/04aee52363688426eab74f5d6180c149654a6473/test/dotests.pl
+    description: "上游测试驱动：按 TestList 逐条构建 SWF 并用 listswf 与 .ref 比对（100 条用例行）"
+    command: "make check"
+  - file: test/*/TestList
+    source: libming/04aee52363688426eab74f5d6180c149654a6473/test/*/TestList
+    description: "37 个用例清单，声明每条用例的类型与可选库门槛（swf[,GIF|PNG|FREETYPE]|dir）"
+    command: "make check"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_ming.c
+    description: "真实调用 libming API：Ming_init → newSWFMovie → newSWFShape/绘制 → SWFMovie_add → SWFMovie_save，并回读 .swf 校验 FWS/CWS 文件头与尺寸"
+    command: "./test_ming"
+  - file: conanfile.py
+    description: "编译链接 test_ming.c 并执行；再用被测包安装的 bin/listswf 回读生成的 SWF（覆盖 bin/ 交付面）"
+    command: "conan test_package"
+
+# ── 鸿蒙特有测试（PC 特有端到端消费者用例） ──
+# 只用被测包【已安装】的产物，串起完整 SWF 工具链，逐环节断言：
+#   makeswf  ActionScript(.as) → SWF（走 clang -E 预处理：OHOS 无 cpp）
+#   listswf  SWF → 结构文本（含压缩 SWF 的解压路径：覆盖 /tmp 只读缺陷）
+#   swftocxx SWF → C++ 源码
+# 平台特异性：工作目录须落在 TMPDIR（本平台 /tmp 只读）、运行期依赖靠 ELF RUNPATH
+# 定位（本平台 LD_LIBRARY_PATH 无法穿透子进程链）。
+harmony_specific_tests:
+  - file: test_ohos_e2e.sh
+    description: "鸿蒙端到端消费者用例：用已安装的 makeswf 把 ActionScript 编译成 SWF（默认 zlib 压缩 → CWS，走 clang -E 预处理），再用 listswf 反解析并断言含 SWF 头/SWFACTION_TRACE/本用例写入的常量，最后用 listaction 走第二条独立解析链路；工作目录取 TMPDIR（本平台 /tmp 只读），并覆盖 cws2fws() 的 TMPDIR 临时文件补丁路径"
+    command: "sh test_ohos_e2e.sh <package_folder>"
+  - file: test_ohos_e2e.as
+    description: "端到端用例的 ActionScript 输入（trace(\"ming-ohos-e2e-ok\")，经 makeswf 的预处理路径编译进 SWF，其常量在反解析输出中被断言）"
+    command: "sh test_ohos_e2e.sh <package_folder>"
+
+# 测试断言总数（实测）：test_ming.c 内 13 条 check() 断言
+#   + test_package/conanfile.py 的 2 项校验（生成的 .swf 存在、bin/listswf 已安装并成功回读）
+#   + 鸿蒙端到端用例 test_ohos_e2e.sh 的 12 项断言 = 27
+assertion_count: 27

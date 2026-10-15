@@ -1,0 +1,31 @@
+--- a/util/main.c
++++ b/util/main.c
+@@ -64,21 +64,27 @@
+  */
+ int
+ cws2fws(FILE *f, uLong outsize)
+ {
+ 
+ 	struct stat statbuffer;
+ 	int insize, ret;
+ 	int err,tmp_fd;
+ 	Byte *inbuffer,*outbuffer;
+ 
+-	sprintf(tmp_name, "/tmp/swftoscriptXXXXXX");
++	{
++		/* 优先使用 TMPDIR，回退 /tmp：部分平台（如 HarmonyOS）的 /tmp 是
++		   只读文件系统，硬编码 /tmp 会让 cws2fws() 对压缩 SWF 直接失败。 */
++		const char *tmpdir = getenv("TMPDIR");
++		snprintf(tmp_name, sizeof(tmp_name), "%s/swftoscriptXXXXXX",
++		         (tmpdir && *tmpdir) ? tmpdir : "/tmp");
++	}
+ 
+ #ifdef HAVE_MKSTEMP
+ 	tmp_fd = mkstemp(tmp_name);
+ #endif
+ #ifndef HAVE_MKSTEMP
+ 	tmp_fd = open(tmp_name, O_RDWR | O_CREAT | O_TRUNC , 0600);
+ #endif
+ 
+ 	if ( tmp_fd == -1 )
+ 	{

@@ -1,0 +1,70 @@
+# 版本级 manifest — ming (libming) 0.4.8.r68.g04aee523
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.4.8.r68.g04aee523"
+software: "ming"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-14"
+build_system: "autotools"
+
+source:
+  url: "https://codeload.github.com/libming/libming/tar.gz/04aee52363688426eab74f5d6180c149654a6473"
+  sha256: "a5cae95316889f12b3f8c1bc61c284e6028f1b714d2a5c55c484f2ddb5d54f2c"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-perl"
+    - "--disable-php"
+    - "--disable-python"
+    - "--disable-tcl"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies:
+    - freetype/2.14.3.2.1
+    - zlib/1.3.2
+    - libpng/1.6.58.3
+    - giflib/5.2.2
+  tool_requires:
+    - automake/1.18
+    - libtool/2.5.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-util-main.c.patch"
+  - "0002-util-makeswf_utils.c.patch"
+
+knowledge_gained:
+  - "源码包不含生成的 configure（只有 configure.ac/Makefile.am），build() 须 autoreconf 自举；宿主与 CI 缺 automake/aclocal/libtool（E178），用 tool_requires 补齐"
+  - "config.guess 不认 HarmonyOS，且在本平台写探针临时文件被拒 → 显式传三元组跳过；automake 1.18 的 config.sub 只接受 aarch64-unknown-linux-gnu（*-ohos/*-musl 均被拒）"
+  - "config.status 的 (umask 077 && mktemp -d) 临时目录在 HMDFS 上不可写（E114）→ sed 放宽为 umask 000"
+  - "flex/bison 各产生一份暂定定义，clang 11+ 默认 -fno-common 使其变强符号 → -fcommon"
+  - "注入依赖 -I/-L 不能带引号（否则指向不存在目录致可选库静默禁用）；系统自带 zlib 会掩盖该问题"
+  - "本平台 LD_LIBRARY_PATH 无法穿透 make→sh→perl→libtool wrapper 子进程链 → 运行期改用 ELF RUNPATH"
+  - "OHOS 无 cpp 可执行文件 → ActionScript 用例的预处理器改 clang -E（util/makeswf_utils.c 的 CPP 宏）"
+  - "OHOS 的 /tmp 是只读文件系统（Errno 30）→ util/main.c 的 cws2fws() 硬编码 /tmp 会让 listswf/swftocxx 等处理压缩 SWF(CWS) 全部失败；改为优先取 TMPDIR"
+  - "Conan 2.29 的 copy() 无 delete 参数（ADAPTATION_GUIDE 模板过时）→ 改用 rm()"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/ming-0.4.8.r68.g04aee523.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/ming-0.4.8.r68.g04aee523.work
+  source_orig_hash: 08bafee8bd5a36cc
+  source_work_hash: 67e965bc6f4d626a
+  generated_at: '2026-10-15T15:44:58'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-util-main.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-util-makeswf_utils.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
