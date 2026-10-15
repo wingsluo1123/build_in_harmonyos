@@ -1,0 +1,47 @@
+--- a/test/sample_test.py
++++ b/test/sample_test.py
+@@ -1,11 +1,13 @@
+ # test sampling of insert lengths
++
++from operator import ne
+ 
+ PROGNAM = "../src/smalt"
+ REF_FASTA_NAME = "genome_1.fa.gz"
+ READ_PREFIX = "gen1l75i300e0"
+ 
+ KMER = 11
+ NSKIP = 5
+ 
+ TMPFIL_PREFIX = "TMP"
+ MAXNUM_NONPROPER_PAIRS = 20
+@@ -98,26 +100,26 @@
+     ctr2 = 0
+     while 1:
+         if cig1.next(infil1):
+             break
+         ctr1 = ctr1 + 1
+         
+         if cig2.next(infil2):
+             break
+         ctr2 = ctr2 + 1
+ 
+-        if cmp(cig1.qnam, cig2.qnam):
++        if ne(cig1.qnam, cig2.qnam):
+             exit("readnames don't match: '%s' vs '%s'" % \
+                  (cig1.qnam, cig2.qnam))
+-        if cmp(cig1,cig2) and cig1.mapq > 5 and cig2.mapq > 5:
+-            exit("mappings don't match for read '%s'" % \
+-                 cig1.qnam)
++        if ne(cig1,cig2) and cig1.mapq > 5 and cig2.mapq > 5:
++            exit("mappings don't match for read '{}'; cig1: {}, cig2: {}, sig1.mapq: {}, sig2.mapq: {}".format(
++                 cig1.qnam, cig1, cig2, cig1.mapq, cig2.mapq))
+     infil2.close()
+     infil1.close()
+ 
+     if ctr1 != ctr1:
+         exit("Expected the same number of mates, got %i (A) and %i (B)" % \
+              ctr1, ctr2)
+     if ctr1 != 20000:
+         exit("Expected 20,000 reads, got %i." % ctr1)
+     
+ if __name__ == '__main__':

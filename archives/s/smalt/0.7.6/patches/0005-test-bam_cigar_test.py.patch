@@ -1,0 +1,68 @@
+--- a/test/bam_cigar_test.py
++++ b/test/bam_cigar_test.py
+@@ -135,55 +135,55 @@
+ 
+     tup = [SAMTOOLS_EXEC, 'view', '-h', '-o', oufilnam, infilnam]
+     
+     rv = call(tup)
+     if rv:
+         exit("ERROR when converting bam to sam: exited with code %i" % (rv))  
+ 
+ def testSAMfilesAreIdentical(filnamA, filnamB):
+     from testdata import openFile
+ 
+-    infilA = openFile(filnamA)
+-    infilB = openFile(filnamB)
++    infilA = openFile(filnamA, 'rb')
++    infilB = openFile(filnamB, 'rb')
+ 
+     while 1:
+         linA = infilA.readline()
+-        if not linA or linA[0]!="@":
++        if not linA or linA[0]!= 64:  # same as b"@"
+             break
+ 
+     while 1:
+         linB = infilB.readline()
+-        if not linB or linB[0]!="@":
++        if not linB or linB[0]!= 64:  # same as b"@"
+             break
+         
+     okflg = False
+     
+     while linA and linB:
+-        fldA = linA.split('\t')
+-        fldB = linB.split('\t')
++        fldA = linA.split(b'\t')
++        fldB = linB.split(b'\t')
+ 
+         okflg = len(fldA) == len(fldB)
+ 
+         if not okflg:
+-            print "lines differ in the number of fields:\n%s\n%s\n" % \
+-                  (linA.strip(), linB.strip())
++            print("lines differ in the number of fields:\n%s\n%s\n" % \
++                  (linA.strip(), linB.strip()))
+             break
+         
+         for i in SAM_TEST_FIELDS.keys():
+             okflg = fldA[i] == fldB[i]
+             if not okflg and i == 0:
+                 # samtools-0.1.18 view -h produces non-printing char
+                 # directly after header
+                 okflg = fldA[i][1:] == fldB[i] or fldA[i] == fldB[i][1:]
+             if not okflg:
+-                print "lines differ in %s:\n%s\n%s\n" % \
+-                      (SAM_TEST_FIELDS[i], linA.strip(), linB.strip())
++                print("lines differ in %s:\n%s\n%s\n" % \
++                      (SAM_TEST_FIELDS[i], linA.strip(), linB.strip()))
+                 break       
+         if not okflg:
+             break
+         linA = infilA.readline()
+         linB = infilB.readline()
+ 
+     if okflg:
+         okflg = not linA and not linB
+     
+     return okflg

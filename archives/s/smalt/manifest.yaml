@@ -1,0 +1,33 @@
+# 软件级 manifest — smalt
+software: smalt
+display: "SMALT"
+description: "DNA 测序读段比对工具：对参考基因组建立 k 词哈希索引，用种子命中定位候选片段后以 Smith-Waterman 动态规划比对，支持单端/双端、FASTA/FASTQ（含 gzip）输入与 SAM/SMALT 输出，并附带读段模拟与统计工具"
+category: bioinformatics
+homepage: "https://sourceforge.net/projects/smalt/"
+upstream_repo: "https://sourceforge.net/projects/smalt/"
+license: "GPL-3.0-or-later"
+language: "c"
+build_system: "autotools"
+package_type: "application"
+
+ohos_adaptation:
+  key_points:
+    - "tarball 自带 2009-11-20 版 config.guess/config.sub：worker 上 uname -s 返回 HarmonyOS 时 config.guess 直接 'unable to guess system type'，config.sub 也拒绝 linux-ohos 三元组，两者都必须打补丁（E007/E072/E122/E205/E268），不能用 --build/--host 伪造绕过"
+    - "2009 版 config.sub 要改两处：KERNEL-OS 白名单缺 linux-ohos*（否则 aarch64-linux 被当成 machine），且末尾 -linux*) 兜底会把 -linux-ohos 用 sed 改写成 -linux-gnu-ohos（故基本系统类型列表也要加）"
+    - "2009 版 config.guess 用 echo+exit 而非新版 GUESS= 变量，scripts/patch-autotools-ohos.pl 的块不能照搬"
+    - "configure 的 config.status 临时目录用 umask 077，HMDFS 上创建失败，改 000（E002/E011）"
+    - "test/Makefile.am 硬编码 -I../src/ -I../test，不支持 out-of-source 构建，配方必须 self.folders.build = '.'"
+    - "src/Makefile.am 的 libsgm_a_LIBADD = libseq.a 造成嵌套归档：OHOS lld 只告警可正常链接，Apple ld64 直接失败"
+    - "AM_PATH_PYTHON([2.6]) 只找 python/python2*，只有 python3 时 TESTS 会变空导致 make check 假通过；配方显式传 PYTHON=<sys.executable> 并硬断言 PASS 行数"
+    - "上游 6 个测试驱动是 Python 2 代码，worker 无 python2，需机械移植到 py3（不改断言与期望值）"
+    - "zlib 取静态变体、musl 的 libm.a/libpthread.a 是空壳档案，产物 DT_NEEDED 实测只有 libc.so（R26）"
+    - "多线程用未命名 POSIX 信号量（sem_init/sem_wait/sem_post），musl 以 futex 实现、不需要 /dev/shm；命名信号量路径在 #ifdef macosx_semaphores 内未启用"
+    - "smalt 是子命令风格 CLI：--version/--help 返回 51，正确用法是 smalt version / smalt help"
+  common_dependencies:
+    - zlib
+
+versions:
+  "0.7.6":
+    status: built
+    build_date: "2026-10-01"
+    conan_ref: "smalt/0.7.6"

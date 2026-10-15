@@ -1,0 +1,50 @@
+--- a/test/mthread_test.py
++++ b/test/mthread_test.py
+@@ -50,26 +50,26 @@
+     ctr = 0
+     while 1:
+         (isOK, isEOF) = getNextCigarPair(filA, cigA1, cigA2)
+         if not isOK:
+             break
+         (isOK, isEOF) = getNextCigarPair(filB, cigB1, cigB2)
+         if not isOK:
+             break
+         if cigA1 != cigB1:
+             if is_verbose:
+-                print "Not matching:\n%s\n%s" % (cigA1.lin, cigB1.lin)
++                print("Not matching:\n%s\n%s" % (cigA1.lin, cigB1.lin))
+             if cigA1.mapq > MAPQ_THRESH and cigB1.mapq > MAPQ_THRESH:
+-                exit("Discrepancy:\n%s\n%s" % (cigA1.lin, cigB1.lin))
++                exit("Discrepancy:\n%s\n%s\ncigA1.mapq=%i > MAPQ_THRESH=%i and cigB1.mapq=%i > MAPQ_THRESH=%i" % (cigA1.lin, cigB1.lin, cigA1.mapq, MAPQ_THRESH, cigB1.mapq, MAPQ_THRESH))
+         if cigA2 != cigB2:
+             if is_verbose:
+-                print "Not matching:\n%s\n%s" % (cigA2.lin, cigB2.lin) 
++                print("Not matching:\n%s\n%s" % (cigA2.lin, cigB2.lin)) 
+             if cigA2.mapq > MAPQ_THRESH and cigB2.mapq > MAPQ_THRESH:
+                 exit("Discrepancy:\n%s\n%s" % (cigA2.lin, cigB2.lin))
+         ctr = ctr + 1
+     if not isOK and isEOF:
+         isOK = True
+     return isOK, ctr
+             
+         
+         
+ if __name__ == '__main__':
+@@ -86,16 +86,16 @@
+     oufilnam_thread = df.addTMP(TMPFIL_PREFIX + ".n%i.cig" % NTHREADS)
+     
+     smalt_index(df, indexnam, refnam, KMER, NSKIP);
+ 
+     smalt_map(df, oufilnam_ref, indexnam, readfilnamA, readfilnamB);
+     smalt_map(df, oufilnam_thread, indexnam, readfilnamA, readfilnamB,
+               ["-n", "%i" % NTHREADS, "-O"]);
+ 
+     isOK, pairctr = cmpCigarFiles(oufilnam_ref, oufilnam_thread, VERBOSE)
+     if VERBOSE:
+-        print "Test ok=%s, number of pairs = %i" % (isOK, pairctr)
++        print("Test ok=%s, number of pairs = %i" % (isOK, pairctr))
+     if not isOK or pairctr != n_pairs_expected:
+         exit("Using smalt in multi-threaded mode gave inconsistent results!")
+ 
+     df.cleanup()
+     exit()
